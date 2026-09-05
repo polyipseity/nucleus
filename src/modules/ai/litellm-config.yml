@@ -3,14 +3,13 @@
 #
 # AI gateway on 127.0.0.1:4000.  Routes all requests through a single
 # generic `default` model backed by multiple remote providers, using
-# usage-based routing v2 with order-based failover.  API keys from
-# SOPS secrets.
+# simple-shuffle routing with weighted failover across order tiers.
+# API keys from SOPS secrets.
 #
-# Routing: usage-based-routing-v2 selects the endpoint with the lowest
-# utilization ratio relative to its tpm/rpm ceiling within each order
-# tier.  On failure, the v2 cooldown mechanism excludes the failed
-# endpoint and re-picks from remaining healthy ones.  After exhausting
-# retries within a tier, the next order tier is tried (tier 1 → 2).
+# Routing: simple-shuffle randomly selects an endpoint within each order
+# tier.  When `enable_weighted_failover` is set, a retryable failure
+# excludes the failed endpoint and re-picks from remaining healthy ones
+# in the same tier before falling through to the next tier.
 #
 # Redis: required for utilization tracking, cooldown state, prompt-cache
 # affinity, and response caching.  REDIS_HOST/REDIS_PORT/REDIS_USERNAME
@@ -66,6 +65,11 @@ router_settings:
   # Pre-flight checks: cooldown status, context limits, prompt-cache
   # affinity.  Mandatory for `order` prioritization.
   enable_pre_call_checks: true
+  # Intra-tier failover: on a retryable failure, exclude the failed
+  # deployment and re-pick from the remaining deployments in the same
+  # order tier before falling through to the next tier.  Only works
+  # with `simple-shuffle` and async entrypoints.
+  enable_weighted_failover: true
   # Prompt-cache stickiness: routes requests with cached context
   # prefixes to the endpoint that holds the warm cache entry,
   # bypassing load balancing.
