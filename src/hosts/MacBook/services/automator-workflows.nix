@@ -66,6 +66,23 @@ let
 
   # Baked at eval time from NUCLEUS_REPO_ROOT (set by apply.sh).
 
+  # Path to the ObjC thumbnail generator source.
+  thumbnailGenSrc = ../scripts/generate-automator-thumbnails.m;
+
+  # Build a workflow bundle with QuickLook/Thumbnail.png generated at build time.
+  # Compiles the ObjC SF Symbol renderer with clang (stdenv), runs it headless,
+  # and produces a 256×256 PNG. The deploy script copies the entire bundle.
+  buildWorkflowWithThumbnail = wf: wf // {
+    source = pkgs.runCommand "automator-${builtins.replaceStrings [" "] ["-"] wf.dir}" { } ''
+      cp -r "${wf.source}" "$out"
+      chmod -R u+w "$out"
+      mkdir -p "$out/Contents/QuickLook"
+      ${pkgs.stdenv.cc}/bin/cc -fobjc-arc -fmodules -framework AppKit -framework Foundation \
+        -o render_symbol "${thumbnailGenSrc}"
+      ./render_symbol "${wf.thumbnailSymbol}" "$out/Contents/QuickLook/Thumbnail.png"
+    '';
+  };
+
   # Currently deployed Automator workflows. Add new workflows here.
   # Each entry has:
   #   - dir: workflow directory name in ~/Library/Services/
@@ -80,7 +97,7 @@ let
   # Each block is positioned by its primary name alphabetically. This is the
   # cross-platform convention (same on NixOS and Windows).
   # Deployment order always follows the declared order below. No automatic sorting.
-  currentNucleusWorkflows = [
+  currentNucleusWorkflows = map buildWorkflowWithThumbnail [
     # Alphabetical before "optimize" — open nucleus manual
     {
       dir = "open nucleus manual.workflow";
