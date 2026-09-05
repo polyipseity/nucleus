@@ -9,6 +9,8 @@
 		<dict>
 			<key>NSBackgroundColorName</key>
 			<string>background</string>
+			<key>NSBackgroundSystemColorName</key>
+			<string>systemGrayColor</string>
 			<key>NSIconName</key>
 			<string>text.book.closed</string>
 			<key>NSMenuItem</key>
