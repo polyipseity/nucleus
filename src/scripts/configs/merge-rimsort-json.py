@@ -27,6 +27,12 @@ if not isinstance(managed_default, dict):
     print("rimsort: managed settings must contain instances.Default object", file=sys.stderr)
     sys.exit(1)
 
+# Merge top-level managed keys (e.g. current_instance) into the
+# existing config. The "instances" key is handled separately below.
+for key, value in managed.items():
+    if key != "instances":
+        existing[key] = value
+
 # Deep-merge managed keys into the Default instance. Managed keys
 # overwrite any existing values; unmanaged keys (theme, sorting,
 # window state, SteamCMD paths) are preserved unchanged.

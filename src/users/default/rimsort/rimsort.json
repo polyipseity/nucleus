@@ -1,8 +1,10 @@
 {
+  "current_instance": "Default",
   "instances": {
     "Default": {
       "steam_client_integration": true,
-      "launch_via_steam_protocol": true
+      "launch_via_steam_protocol": true,
+      "steamcmd_install_path": "~/.local/share/RimSort/instances/Default"
     }
   }
 }

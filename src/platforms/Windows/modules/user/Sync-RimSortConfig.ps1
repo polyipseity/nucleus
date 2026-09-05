@@ -143,7 +143,7 @@ function Sync-RimSortConfig {
   }
 
   # Managed keys that converge on every activation.
-  $managedKeys = @('game_folder', 'config_folder', 'local_folder', 'workshop_folder', 'steam_client_integration', 'launch_via_steam_protocol')
+  $managedKeys = @('game_folder', 'config_folder', 'local_folder', 'workshop_folder', 'steam_client_integration', 'launch_via_steam_protocol', 'steamcmd_install_path')
 
   foreach ($userRecord in $Users) {
     $username = [string]$userRecord.name
@@ -188,6 +188,11 @@ function Sync-RimSortConfig {
         if ($managedDefault.ContainsKey($key)) {
           $defaultInstance[$key] = $managedDefault[$key]
         }
+      }
+
+      # Converge top-level current_instance if present in managed settings.
+      if ($managedSettings.ContainsKey('current_instance')) {
+        $existingConfig['current_instance'] = $managedSettings['current_instance']
       }
 
       Write-Utf8Json -Path $configPath -Value $existingConfig

@@ -205,6 +205,7 @@ test_empty_existing_file() {
   fi
 }
 
+# ── Test: steamcmd_install_path merged and preserved ───────────────
 # ── Test: idempotent merge ──────────────────────────────────────────
 test_idempotent_merge() {
   local settings="$TMPDIR_TEST/idempotent.json"
@@ -222,6 +223,56 @@ test_idempotent_merge() {
   fi
 }
 
+# ── Test: steamcmd_install_path merged and preserved ───────────────
+test_steamcmd_install_path() {
+  local settings="$TMPDIR_TEST/steamcmd.json"
+  local managed='{"instances":{"Default":{"steamcmd_install_path":"~/.local/share/RimSort/instances/Default","game_folder":"/game"}}}'
+
+  run_merge "$settings" "$managed"
+
+  local steamcmd
+  steamcmd=$(json_get "$settings" "d['instances']['Default']['steamcmd_install_path']")
+  if [ "$steamcmd" = '"~/.local/share/RimSort/instances/Default"' ]; then
+    assert_pass "steamcmd: steamcmd_install_path set"
+  else
+    assert_fail "steamcmd: steamcmd_install_path set" "expected default path, got $steamcmd"
+  fi
+
+  # Verify idempotent
+  run_merge "$settings" "$managed"
+  steamcmd=$(json_get "$settings" "d['instances']['Default']['steamcmd_install_path']")
+  if [ "$steamcmd" = '"~/.local/share/RimSort/instances/Default"' ]; then
+    assert_pass "steamcmd: stable after double merge"
+  else
+    assert_fail "steamcmd: stable after double merge" "expected default path, got $steamcmd"
+  fi
+}
+
+# ── Test: current_instance top-level merged ────────────────────────
+test_current_instance_top_level() {
+  local settings="$TMPDIR_TEST/current_instance.json"
+  local managed='{"current_instance":"Default","instances":{"Default":{"game_folder":"/game"}}}'
+
+  run_merge "$settings" "$managed"
+
+  local ci
+  ci=$(json_get "$settings" "d['current_instance']")
+  if [ "$ci" = '"Default"' ]; then
+    assert_pass "current_instance: top-level key set"
+  else
+    assert_fail "current_instance: top-level key set" "expected 'Default', got $ci"
+  fi
+
+  # Verify idempotent
+  run_merge "$settings" "$managed"
+  ci=$(json_get "$settings" "d['current_instance']")
+  if [ "$ci" = '"Default"' ]; then
+    assert_pass "current_instance: stable after double merge"
+  else
+    assert_fail "current_instance: stable after double merge" "expected 'Default', got $ci"
+  fi
+}
+
 # ── Run all tests ───────────────────────────────────────────────────
 test_create_new_file
 test_preserves_unmanaged_keys
@@ -229,6 +280,8 @@ test_creates_nesting
 test_steam_integration_flags
 test_empty_existing_file
 test_idempotent_merge
+test_steamcmd_install_path
+test_current_instance_top_level
 
 if [ "$TESTS_FAILED" -gt 0 ]; then
   printf '%d failed, %d passed\n' "$TESTS_FAILED" "$TESTS_PASSED"
