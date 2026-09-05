@@ -184,6 +184,15 @@ function Sync-RimSortConfig {
         }
       }
 
+      # Expand ~ to user profile in string values. RimSort does not
+      # call expanduser() on steamcmd_install_path, so tilde-prefixed
+      # paths cause a PermissionError crash at startup.
+      foreach ($key in @($managedDefault.Keys)) {
+        if ($managedDefault[$key] -is [string]) {
+          $managedDefault[$key] = $managedDefault[$key].Replace('~', $env:USERPROFILE)
+        }
+      }
+
       foreach ($key in $managedKeys) {
         if ($managedDefault.ContainsKey($key)) {
           $defaultInstance[$key] = $managedDefault[$key]
