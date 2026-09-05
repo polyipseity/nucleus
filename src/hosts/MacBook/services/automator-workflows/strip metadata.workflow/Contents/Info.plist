@@ -3,18 +3,18 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleIdentifier</key>
-	<string>com.nucleus.StripMetadata.word</string>
+	<string>com.nucleus.StripMetadata</string>
 	<key>NSServices</key>
 	<array>
 		<dict>
 			<key>NSBackgroundColorName</key>
 			<string>background</string>
 			<key>NSIconName</key>
-				<string>eraser.line.dashed</string>
+			<string>eraser.line.dashed</string>
 			<key>NSMenuItem</key>
 			<dict>
 				<key>default</key>
-				<string>strip metadata - word</string>
+				<string>strip metadata</string>
 			</dict>
 			<key>NSMessage</key>
 			<string>runWorkflowAsService</string>
@@ -25,7 +25,7 @@
 			</dict>
 			<key>NSSendFileTypes</key>
 			<array>
-				<string>org.openxmlformats.wordprocessingml.document</string>
+				<string>public.item</string>
 			</array>
 		</dict>
 	</array>
