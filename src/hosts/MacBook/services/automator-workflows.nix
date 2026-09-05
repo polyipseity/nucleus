@@ -46,6 +46,11 @@
 #     render), generated at Nix build time via an Objective-C program using
 #     AppKit. The `thumbnailSymbol` field below drives generation. Regenerate
 #     when changing the symbol name for a workflow.
+#   - Finder display: Thumbnail.png alone is not enough. The deploy script
+#     calls NSWorkspace.setIcon:forFile:options: (via set-workflow-icon.m)
+#     to register the icon with IconServices and set the FinderInfo xattr.
+#     This must run at deploy time (not build time) because IconServices
+#     caches icons by exact file path.
 #   - macOS version floor: check the symbol's introduction year in the
 #     framework's name_availability.plist against the host's minimum version.
 #   - Known issue: NSIconName can prevent a Quick Action from appearing
@@ -69,19 +74,29 @@ let
   # Path to the ObjC thumbnail generator source.
   thumbnailGenSrc = ../scripts/generate-automator-thumbnails.m;
 
+  # Compiled ObjC program that registers custom Finder icons via NSWorkspace.setIcon:.
+  setWorkflowIcon = pkgs.runCommand "set-workflow-icon" { } ''
+    ${pkgs.stdenv.cc}/bin/cc -fobjc-arc -fmodules -Wno-deprecated-declarations \
+      -framework AppKit -framework Foundation \
+      -o "$out" "${../scripts/set-workflow-icon.m}"
+  '';
+
   # Build a workflow bundle with QuickLook/Thumbnail.png generated at build time.
   # Compiles the ObjC SF Symbol renderer with clang (stdenv), runs it headless,
   # and produces a 256×256 PNG. The deploy script copies the entire bundle.
-  buildWorkflowWithThumbnail = wf: wf // {
-    source = pkgs.runCommand "automator-${builtins.replaceStrings [" "] ["-"] wf.dir}" { } ''
-      cp -r "${wf.source}" "$out"
-      chmod -R u+w "$out"
-      mkdir -p "$out/Contents/QuickLook"
-      ${pkgs.stdenv.cc}/bin/cc -fobjc-arc -fmodules -framework AppKit -framework Foundation \
-        -o render_symbol "${thumbnailGenSrc}"
-      ./render_symbol "${wf.thumbnailSymbol}" "$out/Contents/QuickLook/Thumbnail.png"
-    '';
-  };
+  buildWorkflowWithThumbnail =
+    wf:
+    wf
+    // {
+      source = pkgs.runCommand "automator-${builtins.replaceStrings [ " " ] [ "-" ] wf.dir}" { } ''
+        cp -r "${wf.source}" "$out"
+        chmod -R u+w "$out"
+        mkdir -p "$out/Contents/QuickLook"
+        ${pkgs.stdenv.cc}/bin/cc -fobjc-arc -fmodules -framework AppKit -framework Foundation \
+          -o render_symbol "${thumbnailGenSrc}"
+        ./render_symbol "${wf.thumbnailSymbol}" "$out/Contents/QuickLook/Thumbnail.png"
+      '';
+    };
 
   # Currently deployed Automator workflows. Add new workflows here.
   # Each entry has:
@@ -218,6 +233,7 @@ in
             presentationModesDict = mkPresentationModes wf.presentationModes;
           }) currentNucleusWorkflows
         )
-      }'
+      }' \
+      "${setWorkflowIcon}"
   '';
 }
