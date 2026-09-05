@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -37,6 +38,14 @@ for key, value in managed.items():
 # overwrite any existing values; unmanaged keys (theme, sorting,
 # window state, SteamCMD paths) are preserved unchanged.
 default_instance.update(managed_default)
+
+# Expand ~ to home directory in string values. RimSort does not
+# call expanduser() on steamcmd_install_path, so tilde-prefixed
+# paths cause a PermissionError crash at startup.
+for key in default_instance:
+    value = default_instance[key]
+    if isinstance(value, str):
+        default_instance[key] = os.path.expanduser(value)
 
 config_path.parent.mkdir(parents=True, exist_ok=True)
 config_path.write_text(
