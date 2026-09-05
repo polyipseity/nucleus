@@ -203,6 +203,10 @@ done
 		<array>
 			<string>/System/Library/CoreServices/Finder.app</string>
 		</array>
+		<key>backgroundColor</key>
+		<data>YnBsaXN0MDDUAQIDBAUGFxpZJGFyY2hpdmVyWCRvYmplY3RzVCR0b3BYJHZlcnNpb25fEA9OU0tleWVkQXJjaGl2ZXKjBwgRVSRudWxs1AkKCwwNDg8QViRjbGFzc1xOU0NvbG9yU3BhY2VfEBROU051bWJlck9mQ29tcG9uZW50c1VOU1JHQoACEAEQA0w/Do6PPw6Ojz8Tk5TSEhMUFVgkY2xhc3Nlc1okY2xhc3NuYW1lohUWV05TQ29sb3JYTlNPYmplY3TRGBlUcm9vdIABEgABhqAIERskKTJESE5XXmuCiIqMjpugqbS3v8jL0NIAAAAAAAABAQAAAAAAAAAbAAAAAAAAAAAAAAAAAAAA1w==</data>
+		<key>backgroundColorName</key>
+		<string>systemGrayColor</string>
 		<key>inputTypeIdentifier</key>
 		<string>com.apple.Automator.fileSystemObject</string>
 		<key>outputTypeIdentifier</key>
