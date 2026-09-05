@@ -1,9 +1,9 @@
 {
   "instances": {
     "Default": {
-      "game_folder": "~/Library/Application Support/Steam/steamapps/common/RimWorld OS X/RimWorldMac.app",
+      "game_folder": "~/Library/Application Support/Steam/steamapps/common/RimWorld/RimWorldMac.app",
       "config_folder": "~/Library/Application Support/Rimworld/Config",
-      "local_folder": "~/Library/Application Support/Steam/steamapps/common/RimWorld OS X/RimWorldMac.app/RimWorld OS X/Mods",
+      "local_folder": "~/Library/Application Support/Steam/steamapps/common/RimWorld/RimWorldMac.app/Mods",
       "workshop_folder": "~/Library/Application Support/Steam/steamapps/workshop/content/294100",
       "steamcmd_install_path": "~/Library/Application Support/RimSort/instances/Default"
     }
