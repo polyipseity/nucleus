@@ -10,7 +10,7 @@
 			<key>NSBackgroundColorName</key>
 			<string>background</string>
 			<key>NSIconName</key>
-				<string>doc.badge.gearshape</string>
+			<string>doc.badge.gearshape</string>
 			<key>NSMenuItem</key>
 			<dict>
 				<key>default</key>
