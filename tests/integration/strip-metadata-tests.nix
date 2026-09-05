@@ -7,6 +7,7 @@ let
   windowsDscText = builtins.readFile ../../src/hosts/Windows/user/context-strip-metadata.dsc.yml;
   nautilusScriptText = builtins.readFile ../../src/scripts/integrations/configure-file-manager-strip-metadata.sh;
   plasmaDesktopText = builtins.readFile ../../src/users/default/plasma/desktop/nucleus-strip-metadata.desktop;
+  utilsShText = builtins.readFile ../../scripts/utils.sh;
 
   inherit (import ../lib.nix) assert';
 
@@ -73,6 +74,10 @@ let
 
   test_windows_dsc_has_strip_metadata_command = assert' (hasStripMetadataCommand windowsDscText) "Windows DSC must invoke strip-metadata in all command entries";
 
+  # === Behavioral tests ===
+
+  test_exiftool_preserves_icc_profiles = assert' (lib.hasInfix "--icc_profile:all" utilsShText) "utils.sh exiftool command must include --icc_profile:all to preserve ICC color profiles";
+
   allTests = [
     test_single_strip_metadata_workflow_exists
     test_strip_metadata_uses_public_item
@@ -83,6 +88,7 @@ let
     test_plasma_desktop_has_strip_metadata_command
     test_nautilus_script_has_strip_metadata_command
     test_windows_dsc_has_strip_metadata_command
+    test_exiftool_preserves_icc_profiles
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {
