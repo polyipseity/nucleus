@@ -179,8 +179,16 @@
     },
     "launchctlEntry": {
       "properties": {
-        "domain": {
-          "description": "launchd domain (user agent or system daemon)",
+        "launchdDomain": {
+          "description": "Actual launchd domain for this service (gui/<uid> or user/<uid>). Determines the launchctl target. Required when scope=user.",
+          "enum": [
+            "gui",
+            "user"
+          ],
+          "type": "string"
+        },
+        "scope": {
+          "description": "Service scope (user agent or system daemon). Determines watchdog filtering and elevation requirements.",
           "enum": [
             "user",
             "system"
@@ -188,7 +196,7 @@
           "type": "string"
         },
         "justification": {
-          "description": "Why this service is user-scoped when the policy default is system-wide. Required when domain=user.",
+          "description": "Why this service is user-scoped when the policy default is system-wide. Required when scope=user.",
           "type": "string"
         },
         "logging": {

@@ -432,7 +432,7 @@ in
       Label = "local.service-watchdog-user";
       ProgramArguments = [
         "${nucleusApps.nucleus-service-watchdog}/bin/nucleus-service-watchdog"
-        "--domain"
+        "--scope"
         "user"
       ];
       RunAtLoad = true;

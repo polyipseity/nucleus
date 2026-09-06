@@ -52,14 +52,14 @@ usage() {
 
   Options:
   -h|--help     Show usage.
-  --domain <d>  Filter to only check services in this domain (user/system).
+  --scope <s>  Filter to only check services in this scope (user/system).
                 When omitted, checks all services for the current host.
   --oneshot     Run once and exit (no persistent loop).
 EOF
 }
 
 # Handle help request before any further processing.
-watchdog_domain=""
+watchdog_scope=""
 watchdog_oneshot=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -67,12 +67,12 @@ while [ "$#" -gt 0 ]; do
     usage
     exit 0
     ;;
-  --domain)
+  --scope)
     if [ -z "${2:-}" ]; then
-      error "--domain requires an argument"
+      error "--scope requires an argument"
       exit 1
     fi
-    watchdog_domain="$2"
+    watchdog_scope="$2"
     shift
     ;;
   --oneshot)
@@ -126,15 +126,15 @@ log_restart() {
 # macOS (launchctl)
 # ──────────────────────────────────────────────────────────────────────────────
 recover_launchctl() {
-  local svc="$1" domain="$2" svc_id="$3"
+  local svc="$1" scope="$2" launchd_domain="$3" svc_id="$4"
   local sudo_prefix=""
-  if [ "$domain" = "system" ] && [ "$(id -u)" -ne 0 ]; then
+  if [ "$scope" = "system" ] && [ "$(id -u)" -ne 0 ]; then
     sudo_prefix="sudo"
   fi
   local target
-  target=$(launchctl_target "$domain" "$svc_id")
+  target=$(launchctl_target "$launchd_domain" "$svc_id")
   local plist=""
-  if [ "$domain" = "system" ]; then
+  if [ "$scope" = "system" ]; then
     plist="/Library/LaunchDaemons/$svc_id.plist"
   else
     plist="${HOME:-}/Library/LaunchAgents/$svc_id.plist"
@@ -142,22 +142,23 @@ recover_launchctl() {
   # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
   $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
   # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
-  $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" 2>/dev/null || true
+  $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$launchd_domain")" "$plist" 2>/dev/null || true
 }
 
 check_service_macos() {
   local svc="$1" entry="$2"
-  local domain svc_id
-  domain=$(echo "$entry" | jq -r '.domain // "user"')
+  local scope launchd_domain svc_id
+  scope=$(echo "$entry" | jq -r '.scope // "user"')
+  launchd_domain=$(echo "$entry" | jq -r '.launchdDomain // "gui"')
   svc_id=$(echo "$entry" | jq -r '.service // ""')
   [ -z "$svc_id" ] && return 0
 
   local sudo_prefix=""
-  if [ "$domain" = "system" ] && [ "$(id -u)" -ne 0 ]; then
+  if [ "$scope" = "system" ] && [ "$(id -u)" -ne 0 ]; then
     sudo_prefix="sudo"
   fi
   local target
-  target=$(launchctl_target "$domain" "$svc_id")
+  target=$(launchctl_target "$launchd_domain" "$svc_id")
   local print_out
   # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
   print_out=$($sudo_prefix launchctl print "$target" 2>/dev/null || true)
@@ -168,30 +169,30 @@ check_service_macos() {
     return 0
     ;;
   *"state = spawn scheduled"*)
-    recover_launchctl "$svc" "$domain" "$svc_id"
+    recover_launchctl "$svc" "$scope" "$launchd_domain" "$svc_id"
     log_restart "$svc_id" "spawn scheduled"
     ;;
   *"state = waiting"*)
-    recover_launchctl "$svc" "$domain" "$svc_id"
+    recover_launchctl "$svc" "$scope" "$launchd_domain" "$svc_id"
     log_restart "$svc_id" "waiting"
     ;;
   # Exit 78 (EX_CONFIG): non-retryable, launchd sets penalty box — needs bootout+bootstrap.
   # Exit 126 (transient): shell cannot exec; does NOT trigger penalty box.
   *"last exit code = 78"*)
-    recover_launchctl "$svc" "$domain" "$svc_id"
+    recover_launchctl "$svc" "$scope" "$launchd_domain" "$svc_id"
     log_restart "$svc_id" "EX_CONFIG"
     ;;
   *"Service is not found"* | "")
     # Service not loaded — try bootstrapping.
     local plist=""
-    if [ "$domain" = "system" ]; then
+    if [ "$scope" = "system" ]; then
       plist="/Library/LaunchDaemons/$svc_id.plist"
     else
       plist="${HOME:-}/Library/LaunchAgents/$svc_id.plist"
     fi
     if [ -f "$plist" ]; then
       # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
-      $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" 2>/dev/null || true
+      $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$launchd_domain")" "$plist" 2>/dev/null || true
       log_restart "$svc_id" "not found — bootstrap"
     fi
     ;;
@@ -237,10 +238,10 @@ _run_watchdog_iteration() {
     [ -z "$entry" ] && continue
     key=$(echo "$entry" | jq -r '.key')
 
-    # If --domain was specified, skip services that don't match.
-    if [ -n "$watchdog_domain" ]; then
-      svc_domain=$(echo "$entry" | jq -r '.hostEntry.domain // "user"')
-      if [ "$svc_domain" != "$watchdog_domain" ]; then
+    # If --scope was specified, skip services that don't match.
+    if [ -n "$watchdog_scope" ]; then
+      svc_scope=$(echo "$entry" | jq -r '.hostEntry.scope // "user"')
+      if [ "$svc_scope" != "$watchdog_scope" ]; then
         continue
       fi
     fi

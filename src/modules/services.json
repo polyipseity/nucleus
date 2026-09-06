@@ -35,7 +35,7 @@
     },
     "hosts": {
       "MacBook": {
-        "domain": "system",
+        "scope": "system",
         "runAsUser": true,
         "service": "org.nixos.httpsProxy",
         "type": "launchctl",
@@ -76,7 +76,7 @@
     },
     "hosts": {
       "MacBook": {
-        "domain": "system",
+        "scope": "system",
         "justification": "System-wide audio processor independent of login session",
         "runAsUser": true,
         "service": "local.camilladsp",
@@ -111,7 +111,8 @@
     },
     "hosts": {
       "MacBook": {
-        "domain": "user",
+        "scope": "user",
+        "launchdDomain": "gui",
         "justification": "User agent (launchd.agents) so TCC permits reading $HOME/.config/camilladsp/configs/config.yml; a system daemon is blocked from user-home file reads (EPERM).",
         "runAsUser": true,
         "service": "local.camilladsp-heartbeat",
@@ -160,7 +161,7 @@
     },
     "hosts": {
       "MacBook": {
-        "domain": "system",
+        "scope": "system",
         "justification": "System-wide web GUI daemon independent of login session",
         "runAsUser": true,
         "service": "local.camillagui-backend",
@@ -189,7 +190,8 @@
     },
     "hosts": {
       "MacBook": {
-        "domain": "user",
+        "scope": "user",
+        "launchdDomain": "gui",
         "justification": "Per-user FUSE mount namespace bound to login session",
         "prefixMatch": true,
         "service": "local.cloud-mount.",
@@ -228,7 +230,8 @@
     },
     "hosts": {
       "MacBook": {
-        "domain": "user",
+        "scope": "user",
+        "launchdDomain": "gui",
         "justification": "Requires GUI session (tray app with NSMenu)",
         "service": "local.discord-music-rpc",
         "type": "launchctl",
@@ -278,7 +281,7 @@
     },
     "hosts": {
       "MacBook": {
-        "domain": "system",
+        "scope": "system",
         "runAsUser": true,
         "service": "org.nixos.jellyfin",
         "type": "launchctl",
@@ -318,7 +321,7 @@
     },
     "hosts": {
       "MacBook": {
-        "domain": "system",
+        "scope": "system",
         "service": "org.nixos.linux-builder",
         "type": "launchctl",
         "platform": "macOS"
@@ -357,7 +360,7 @@
     },
     "hosts": {
       "MacBook": {
-        "domain": "system",
+        "scope": "system",
         "runAsUser": true,
         "service": "local.litellm",
         "type": "launchctl",
@@ -401,7 +404,7 @@
     },
     "hosts": {
       "MacBook": {
-        "domain": "system",
+        "scope": "system",
         "runAsUser": true,
         "service": "local.ollama",
         "type": "launchctl",
@@ -441,7 +444,7 @@
     },
     "hosts": {
       "MacBook": {
-        "domain": "system",
+        "scope": "system",
         "service": "local.redis",
         "type": "launchctl",
         "platform": "macOS"
@@ -507,7 +510,7 @@
     },
     "hosts": {
       "MacBook": {
-        "domain": "system",
+        "scope": "system",
         "service": "local.service-watchdog",
         "type": "launchctl",
         "platform": "macOS"
@@ -539,7 +542,8 @@
     },
     "hosts": {
       "MacBook": {
-        "domain": "user",
+        "scope": "user",
+        "launchdDomain": "gui",
         "justification": "User-scope watchdog monitors user-scope launchd agents; must run in user context to access user-scope services.",
         "service": "local.service-watchdog-user",
         "type": "launchctl",
@@ -568,7 +572,8 @@
     },
     "hosts": {
       "MacBook": {
-        "domain": "user",
+        "scope": "user",
+        "launchdDomain": "gui",
         "justification": "User key material in per-user ssh-agent process",
         "service": "com.openssh.ssh-agent",
         "type": "launchctl",
@@ -607,7 +612,7 @@
     },
     "hosts": {
       "MacBook": {
-        "domain": "system",
+        "scope": "system",
         "service": "com.openssh.sshd",
         "socketActivated": true,
         "type": "launchctl",

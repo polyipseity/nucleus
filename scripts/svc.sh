@@ -161,12 +161,12 @@ expand_prefix() {
   case "$HOST" in
   MacBook)
     local sudo_prefix=""
-    local domain
-    domain=$(echo "$plat_json" | jq -r '.domain // "user"')
-    [ "$domain" = "system" ] && sudo_prefix="sudo"
+    local scope
+    scope=$(echo "$plat_json" | jq -r '.scope // "user"')
+    [ "$scope" = "system" ] && sudo_prefix="sudo"
     local matches
     # check-suppress:suppression_doc: no matching services found is an expected empty result, not an error.
-    if [ "$domain" = "user" ] && [ "$EUID" -eq 0 ]; then
+    if [ "$scope" = "user" ] && [ "$EUID" -eq 0 ]; then
       matches=$(launchctl asuser "$REAL_USER_UID" launchctl list 2>/dev/null | awk -v p="$prefix" '$3 ~ p { print $3 }' || true) # check-suppress:suppression_doc: no matching services found is an expected empty result, not an error.
     else
       matches=$($sudo_prefix launchctl list 2>/dev/null | awk -v p="$prefix" '$3 ~ p { print $3 }' || true) # check-suppress:suppression_doc: no matching services found is an expected empty result, not an error.
@@ -175,7 +175,7 @@ expand_prefix() {
       printf '%s\t%s\t%s\t%s\n' "$name" "$prefix" "$plat_json" "$name"
     else
       while IFS= read -r m; do
-        printf '%s\t%s\t%s\t%s\n' "$name" "$m" "{\"type\":\"launchctl\",\"service\":\"$m\",\"domain\":\"$(echo "$plat_json" | jq -r '.domain')\"}" "$m"
+        printf '%s\t%s\t%s\t%s\n' "$name" "$m" "{\"type\":\"launchctl\",\"service\":\"$m\",\"scope\":\"$(echo "$plat_json" | jq -r '.scope')\"}" "$m"
       done <<<"$matches"
     fi
     ;;
@@ -213,13 +213,14 @@ svc_status() {
   case "$svc_type" in
   launchctl)
     local domain_flag=""
-    local domain
-    domain=$(echo "$entry_json" | jq -r '.domain // "user"')
-    [ "$domain" = "system" ] && domain_flag="sudo"
+    local scope launchd_domain
+    scope=$(echo "$entry_json" | jq -r '.scope // "user"')
+    launchd_domain=$(echo "$entry_json" | jq -r '.launchdDomain // "gui"')
+    [ "$scope" = "system" ] && domain_flag="sudo"
 
     local list_line running=true enabled=true pid=""
     # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
-    if [ "$domain" = "user" ] && [ "$EUID" -eq 0 ]; then
+    if [ "$scope" = "user" ] && [ "$EUID" -eq 0 ]; then
       list_line=$(launchctl asuser "$REAL_USER_UID" launchctl list 2>/dev/null | awk -v label="$svc_id" 'NR>1 && $3==label { print $1, $2 }' || true) # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
     else
       list_line=$($domain_flag launchctl list 2>/dev/null | awk -v label="$svc_id" 'NR>1 && $3==label { print $1, $2 }' || true) # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
@@ -241,7 +242,7 @@ svc_status() {
     if [ "$running" != "true" ]; then
       local print_out
       # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
-      print_out=$($domain_flag launchctl print "$(launchctl_target "$domain" "$svc_id")" 2>/dev/null || true)
+      print_out=$($domain_flag launchctl print "$(launchctl_target "$launchd_domain" "$svc_id")" 2>/dev/null || true)
       case "$print_out" in
       *"state = running"*)
         running=true
@@ -413,10 +414,11 @@ service_diagnostic() {
   svc_id=$(echo "$entry_json" | jq -r '.service // ""')
   case "$svc_type" in
   launchctl)
-    local domain sudo_prefix="" target
-    domain=$(echo "$entry_json" | jq -r '.domain // "user"')
-    [ "$domain" = "system" ] && sudo_prefix="sudo"
-    target=$(launchctl_target "$domain" "$svc_id")
+    local scope sudo_prefix="" target launchd_domain
+    scope=$(echo "$entry_json" | jq -r '.scope // "user"')
+    launchd_domain=$(echo "$entry_json" | jq -r '.launchdDomain // "gui"')
+    [ "$scope" = "system" ] && sudo_prefix="sudo"
+    target=$(launchctl_target "$launchd_domain" "$svc_id")
     $sudo_prefix launchctl print "$target" 2>/dev/null |
       awk -F'= ' '/state =/{s=$2} /last exit code/{e=$NF} END{printf "state=%s", s; if(e) printf ", exit=%s", e; printf "\n"}'
     ;;
@@ -464,15 +466,17 @@ svc_action() {
 
   case "$svc_type" in
   launchctl)
-    local domain
-    domain=$(echo "$entry_json" | jq -r '.domain // "user"')
+    local scope
+    scope=$(echo "$entry_json" | jq -r '.scope // "user"')
+    local launchd_domain
+    launchd_domain=$(echo "$entry_json" | jq -r '.launchdDomain // "gui"')
     local sudo_prefix=""
-    [ "$domain" = "system" ] && sudo_prefix="sudo"
+    [ "$scope" = "system" ] && sudo_prefix="sudo"
     local target
-    target=$(launchctl_target "$domain" "$svc_id")
+    target=$(launchctl_target "$launchd_domain" "$svc_id")
 
     local plist=""
-    if [ "$domain" = "system" ]; then
+    if [ "$scope" = "system" ]; then
       plist="/Library/LaunchDaemons/$svc_id.plist"
     else
       plist="$HOME/Library/LaunchAgents/$svc_id.plist"
@@ -594,7 +598,7 @@ do_list() {
         continue
       fi
       local _d_entry_domain
-      _d_entry_domain=$(echo "$svc_json" | jq -r '.domain // .scope // "system"')
+      _d_entry_domain=$(echo "$svc_json" | jq -r '.scope // .domain // "system"')
       if [ "$domain_filter" = "user" ] && [ "$_d_entry_domain" != "user" ]; then continue; fi
       if [ "$domain_filter" = "system" ] && [ "$_d_entry_domain" != "system" ]; then continue; fi
       if [ "$domain_filter" = "all" ] && [ "$_d_entry_domain" = "system" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
@@ -624,7 +628,7 @@ $pair_json"
         continue
       fi
       local _d_entry_domain
-      _d_entry_domain=$(echo "$svc_json" | jq -r '.domain // .scope // "system"')
+      _d_entry_domain=$(echo "$svc_json" | jq -r '.scope // .domain // "system"')
       if [ "$domain_filter" = "user" ] && [ "$_d_entry_domain" != "user" ]; then continue; fi
       if [ "$domain_filter" = "system" ] && [ "$_d_entry_domain" != "system" ]; then continue; fi
       if [ "$domain_filter" = "all" ] && [ "$_d_entry_domain" = "system" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
@@ -676,7 +680,7 @@ do_status() {
       continue
     fi
     local _d_entry_domain
-    _d_entry_domain=$(echo "$svc_json" | jq -r '.domain // .scope // "system"')
+    _d_entry_domain=$(echo "$svc_json" | jq -r '.scope // .domain // "system"')
     if [ "$domain_filter" = "user" ] && [ "$_d_entry_domain" != "user" ]; then continue; fi
     if [ "$domain_filter" = "system" ] && [ "$_d_entry_domain" != "system" ]; then continue; fi
     if [ "$domain_filter" = "all" ] && [ "$_d_entry_domain" = "system" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
@@ -729,7 +733,7 @@ do_action() {
     fi
 
     local _d_domain
-    _d_domain=$(echo "$entry" | jq -r '.hostEntry.domain // "system"')
+    _d_domain=$(echo "$entry" | jq -r '.hostEntry.scope // "system"')
     if [ "$_d_domain" = "system" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
       error "$svc_name — system-domain operations require sudo; run as root or with sudo"
       overall_exit=1
@@ -769,7 +773,7 @@ do_verify() {
   while IFS=$'\t' read -r key display svc_json json_key; do
     if echo "$key" | grep -q '^ERROR:'; then continue; fi
     local _d_domain
-    _d_domain=$(echo "$svc_json" | jq -r '.domain // .scope // "system"')
+    _d_domain=$(echo "$svc_json" | jq -r '.scope // .domain // "system"')
     if [ "$_d_domain" = "system" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
       error "$json_key — system-domain operations require sudo; run as root or with sudo"
       any_inactive=true

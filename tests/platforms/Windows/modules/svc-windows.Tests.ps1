@@ -800,19 +800,19 @@ Describe 'Show-LogConfig' {
   }
 }
 
-Describe 'Test-ServiceIsSystemDomain' {
-  It 'returns true for a system-domain entry' {
-    $entry = @{ hostEntry = @{ domain = 'system' } }
-    Test-ServiceIsSystemDomain -ResolvedEntry $entry | Should -Be $true
+Describe 'Test-ServiceIsSystemScope' {
+  It 'returns true for a system-scope entry' {
+    $entry = @{ hostEntry = @{ scope = 'system' } }
+    Test-ServiceIsSystemScope -ResolvedEntry $entry | Should -Be $true
   }
 
-  It 'returns false for a user-domain entry' {
-    $entry = @{ hostEntry = @{ domain = 'user' } }
-    Test-ServiceIsSystemDomain -ResolvedEntry $entry | Should -Be $false
+  It 'returns false for a user-scope entry' {
+    $entry = @{ hostEntry = @{ scope = 'user' } }
+    Test-ServiceIsSystemScope -ResolvedEntry $entry | Should -Be $false
   }
 
-  It 'returns false when domain is absent' {
+  It 'returns false when scope is absent' {
     $entry = @{ hostEntry = @{} }
-    Test-ServiceIsSystemDomain -ResolvedEntry $entry | Should -Be $false
+    Test-ServiceIsSystemScope -ResolvedEntry $entry | Should -Be $false
   }
 }

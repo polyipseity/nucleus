@@ -51,7 +51,7 @@ in
       ProgramArguments = [
         "/bin/sh"
         "-c"
-        "exec ${nucleusSvcWatchdog} --domain system"
+        "exec ${nucleusSvcWatchdog} --scope system"
       ];
       RunAtLoad = true;
       KeepAlive = true;

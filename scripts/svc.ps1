@@ -83,14 +83,14 @@ $NucleusHost = 'Windows'
 
 # ── Self-elevation ──────────────────────────────────────────────────────────────
 # Set when elevation was requested but could not be obtained (UAC cancelled /
-# no admin). In that case system-domain entries are skipped with a warning
+# no admin). In that case system-scope entries are skipped with a warning
 # rather than failing the whole run (rule-2 "cannot escalate" branch).
-$SkipSystemDomain = $false
+$SkipSystemScope = $false
 
-# System-domain operations (native services, scheduled tasks) require admin.
+# System-scope operations (native services, scheduled tasks) require admin.
 # When the caller is not elevated, re-exec via RunAs so the operation can
 # actually run. If elevation is impossible (UAC cancelled / no admin), warn and
-# skip only the system-domain entries rather than failing the whole run.
+# skip only the system-scope entries rather than failing the whole run.
 $isAdmin = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $Elevated -and -not $isAdmin) {
   $params = @{
@@ -114,10 +114,10 @@ if (-not $Elevated -and -not $isAdmin) {
   }
   if ($null -eq $proc) {
     Remove-Item $paramsJsonPath -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: temp file cleanup; failure harmless (%TEMP% recycled)
-    Write-NucleusWarning "svc: elevation unavailable (UAC cancelled or no admin) — system-domain operations will be skipped"
-    # Continue un-elevated: user-domain operations still work; system-domain
-    # entries are skipped below via $SkipSystemDomain.
-    $SkipSystemDomain = $true
+    Write-NucleusWarning "svc: elevation unavailable (UAC cancelled or no admin) — system-scope operations will be skipped"
+    # Continue un-elevated: user-scope operations still work; system-scope
+    # entries are skipped below via $SkipSystemScope.
+    $SkipSystemScope = $true
   } else {
     $proc.WaitForExit()
     $exitCode = $proc.ExitCode
@@ -208,15 +208,15 @@ function Resolve-ServiceName {
   return $results
 }
 
-# Returns $true when the resolved registry entry is a system-domain service
+# Returns $true when the resolved registry entry is a system-scope service
 # (requires admin). Used to skip such entries when elevation is unavailable.
-function Test-ServiceIsSystemDomain {
+function Test-ServiceIsSystemScope {
   param(
     [hashtable]$ResolvedEntry
   )
   $plat = $ResolvedEntry.hostEntry
-  if ($null -eq $plat -or -not $plat.ContainsKey('domain')) { return $false }
-  return $plat.domain -eq 'system'
+  if ($null -eq $plat -or -not $plat.ContainsKey('scope')) { return $false }
+  return $plat.scope -eq 'system'
 }
 
 # ---------------------------------------------------------------------------
@@ -524,8 +524,8 @@ switch ($Action) {
         $hasError = $true
         continue
       }
-      if ($SkipSystemDomain -and (Test-ServiceIsSystemDomain -ResolvedEntry $resolved[$key])) {
-        Write-NucleusWarning "$key — system-domain operation skipped (elevation unavailable)"
+      if ($SkipSystemScope -and (Test-ServiceIsSystemScope -ResolvedEntry $resolved[$key])) {
+        Write-NucleusWarning "$key — system-scope operation skipped (elevation unavailable)"
         continue
       }
       $status = Get-ServiceStatus -HostEntry $resolved[$key].hostEntry
@@ -546,8 +546,8 @@ switch ($Action) {
         $hasError = $true
         continue
       }
-      if ($SkipSystemDomain -and (Test-ServiceIsSystemDomain -ResolvedEntry $resolved[$key])) {
-        Write-NucleusWarning "$key — system-domain operation skipped (elevation unavailable)"
+      if ($SkipSystemScope -and (Test-ServiceIsSystemScope -ResolvedEntry $resolved[$key])) {
+        Write-NucleusWarning "$key — system-scope operation skipped (elevation unavailable)"
         continue
       }
       $status = Get-ServiceStatus -HostEntry $resolved[$key].hostEntry
@@ -572,8 +572,8 @@ switch ($Action) {
         continue
       }
 
-      if ($SkipSystemDomain -and (Test-ServiceIsSystemDomain -ResolvedEntry $resolved[$key])) {
-        Write-NucleusWarning "$key — system-domain operation skipped (elevation unavailable)"
+      if ($SkipSystemScope -and (Test-ServiceIsSystemScope -ResolvedEntry $resolved[$key])) {
+        Write-NucleusWarning "$key — system-scope operation skipped (elevation unavailable)"
         continue
       }
 
@@ -609,8 +609,8 @@ switch ($Action) {
         $hasInactive = $true
         continue
       }
-      if ($SkipSystemDomain -and (Test-ServiceIsSystemDomain -ResolvedEntry $resolved[$key])) {
-        Write-NucleusWarning "$key — system-domain operation skipped (elevation unavailable)"
+      if ($SkipSystemScope -and (Test-ServiceIsSystemScope -ResolvedEntry $resolved[$key])) {
+        Write-NucleusWarning "$key — system-scope operation skipped (elevation unavailable)"
         continue
       }
       $status = Get-ServiceStatus -HostEntry $resolved[$key].hostEntry
