@@ -111,6 +111,16 @@ function Sync-LiteLLMService {
   New-Item -Path $handlerLink -ItemType SymbolicLink -Target $handlerSource -Force > $null
   Set-ManagedSymlinkDeleteProtection -Context "Sync-LiteLLMService" -Path $handlerLink
 
+  # Symlink the cooldown-400 callback alongside the config.
+  $cooldownLink = Join-Path -Path $programDataDir -ChildPath "litellm-cooldown-400.py"
+  $cooldownSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\ai\litellm-cooldown-400.py"
+  if (-not (Test-Path -Path $cooldownSource -PathType Leaf)) {
+    throw "Cooldown-400 callback source not found: $cooldownSource"
+  }
+  if (Test-Path -Path $cooldownLink) { Remove-Item -Path $cooldownLink -Force }
+  New-Item -Path $cooldownLink -ItemType SymbolicLink -Target $cooldownSource -Force > $null
+  Set-ManagedSymlinkDeleteProtection -Context "Sync-LiteLLMService" -Path $cooldownLink
+
   $logFile = Join-Path -Path $serviceLogDir -ChildPath "combined.log"
 
   # Data-driven: read the env catalog to discover API keys and their env var

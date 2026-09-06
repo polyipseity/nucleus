@@ -343,6 +343,8 @@ ln -sf "$REPO_ROOT/src/modules/ai/litellm-config.yml" "$NUCLEUS_USER_ROOT/litell
 # Symlink the Cline custom handler alongside the config.  litellm's
 # get_instance_fn resolves the handler relative to the config file directory.
 ln -sf "$REPO_ROOT/src/modules/ai/cline_handler.py" "$NUCLEUS_USER_ROOT/cline_handler.py"
+# Symlink the cooldown-400 callback alongside the config.
+ln -sf "$REPO_ROOT/src/modules/ai/litellm-cooldown-400.py" "$NUCLEUS_USER_ROOT/litellm-cooldown-400.py"
 
 run_nix() {
   NIX_CONFIG="$(merge_nix_config)" NIX_PATH="nixpkgs=flake:nixpkgs" nix --option warn-dirty false "$@"
