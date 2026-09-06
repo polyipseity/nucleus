@@ -12,9 +12,9 @@ litellm's OpenAI provider calls ``model_dump()`` on the parsed
 Streaming is unaffected — Cline returns standard SSE without the
 envelope, so streaming requests pass through unchanged.
 
-This handler makes HTTP requests directly via httpx, strips the
-Cline envelope for non-streaming responses, and passes through
-streaming SSE chunks without modification.
+This handler makes HTTP requests via litellm's shared HTTPHandler
+(connection pooling), strips the Cline envelope for non-streaming
+responses, and parses tool call deltas from streaming SSE chunks.
 """
 
 import json
@@ -23,9 +23,15 @@ from collections.abc import AsyncIterator, Callable, Iterator
 from typing import Any
 
 import httpx
+import litellm
 from litellm.llms.custom_httpx.http_handler import AsyncHTTPHandler, HTTPHandler
-from litellm.llms.custom_llm import CustomLLM
-from litellm.types.utils import GenericStreamingChunk
+from litellm.llms.custom_llm import CustomLLM, CustomLLMError
+from litellm.types.utils import (
+    ChatCompletionToolCallChunk,
+    ChatCompletionToolCallFunctionChunk,
+    ChatCompletionUsageBlock,
+    GenericStreamingChunk,
+)
 from litellm.utils import ModelResponse
 
 logger = logging.getLogger("litellm_logger")
@@ -51,33 +57,28 @@ def _build_request_body(
     messages: list,
     optional_params: dict,
     stream: bool,
+    reasoning_effort: str | None = None,
 ) -> dict[str, Any]:
-    """Build the JSON request body, forwarding supported params."""
+    """Build the JSON request body, forwarding all params from litellm.
+
+    litellm's ``get_optional_params()`` for custom providers only puts
+    provider-specific (non-standard) params into ``optional_params``.
+    Standard OpenAI params (temperature, tools, etc.) are stripped by
+    litellm before they reach the handler — that is a litellm limitation,
+    not fixable here.  We forward everything litellm gives us.
+
+    ``reasoning_effort`` is read separately from ``litellm_params``
+    because litellm keeps it there rather than in ``optional_params``
+    for custom providers.
+    """
     body: dict[str, Any] = {
         "model": model,
         "messages": messages,
         "stream": stream,
     }
-    # Forward standard OpenAI-compatible params that Cline supports.
-    for key in (
-        "temperature",
-        "top_p",
-        "max_tokens",
-        "max_completion_tokens",
-        "stop",
-        "n",
-        "presence_penalty",
-        "frequency_penalty",
-        "logit_bias",
-        "user",
-        "seed",
-        "response_format",
-        "tools",
-        "tool_choice",
-        "parallel_tool_calls",
-    ):
-        if key in optional_params:
-            body[key] = optional_params[key]
+    body.update(optional_params)
+    if reasoning_effort is not None:
+        body["reasoning_effort"] = reasoning_effort
     return body
 
 
@@ -97,15 +98,41 @@ def _strip_cline_envelope(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
-def _timeout_to_seconds(
-    timeout: float | httpx.Timeout | None,
-) -> float | None:
-    """Convert litellm timeout to a plain float (seconds)."""
-    if timeout is None:
+def _extract_reasoning_effort(litellm_params: dict | None) -> str | None:
+    """Extract reasoning_effort from litellm_params if present."""
+    if litellm_params is None:
         return None
-    if isinstance(timeout, httpx.Timeout):
-        return timeout.connect  # type: ignore[return-value]
-    return float(timeout)
+    effort = litellm_params.get("reasoning_effort")
+    return str(effort) if effort is not None else None
+
+
+def _build_tool_use_chunk(
+    tool_call: dict[str, Any],
+) -> ChatCompletionToolCallChunk:
+    """Build a ChatCompletionToolCallChunk from a streaming tool_call delta."""
+    func = tool_call.get("function", {})
+    return ChatCompletionToolCallChunk(
+        id=tool_call.get("id"),
+        type="function",
+        function=ChatCompletionToolCallFunctionChunk(
+            name=func.get("name"),
+            arguments=func.get("arguments", ""),
+        ),
+        index=tool_call.get("index", 0),
+    )
+
+
+def _get_http_client(
+    client: HTTPHandler | AsyncHTTPHandler | None,
+    *,
+    async_client: bool = False,
+) -> HTTPHandler | AsyncHTTPHandler:
+    """Return the provided client or fall back to litellm's shared singleton."""
+    if client is not None:
+        return client
+    if async_client:
+        return litellm.module_level_aclient
+    return litellm.module_level_client
 
 
 class ClineHandler(CustomLLM):
@@ -132,13 +159,23 @@ class ClineHandler(CustomLLM):
     ) -> ModelResponse:
         url = f"{api_base.rstrip('/')}/chat/completions"
         http_headers = _build_request_headers(api_key, headers)
-        body = _build_request_body(model, messages, optional_params, stream=False)
-        timeout_s = _timeout_to_seconds(timeout)
+        reasoning_effort = _extract_reasoning_effort(litellm_params)
+        body = _build_request_body(
+            model, messages, optional_params, stream=False,
+            reasoning_effort=reasoning_effort,
+        )
 
-        with httpx.Client(timeout=timeout_s) as http_client:
-            response = http_client.post(url, json=body, headers=http_headers)
-            response.raise_for_status()
+        http_client = _get_http_client(client)
+        try:
+            response = http_client.post(
+                url, json=body, headers=http_headers, timeout=timeout,
+            )
             response_data = response.json()
+        except httpx.HTTPStatusError as e:
+            raise CustomLLMError(
+                e.response.status_code,
+                f"HTTP {e.response.status_code}: {e.response.text}",
+            ) from e
 
         response_data = _strip_cline_envelope(response_data)
 
@@ -146,7 +183,14 @@ class ClineHandler(CustomLLM):
         # Constructing from the dict lets litellm/Pydantic coerce the nested
         # dicts into proper Choice / Message objects, which is required by
         # post_call_processing (it accesses choice.message as an attribute).
-        return ModelResponse(**response_data)
+        model_response = ModelResponse(**response_data)
+
+        logging_obj.post_call(
+            input=messages,
+            original_response=response_data,
+            api_key=api_key,
+        )
+        return model_response
 
     def streaming(
         self,
@@ -169,16 +213,20 @@ class ClineHandler(CustomLLM):
     ) -> Iterator[GenericStreamingChunk]:
         url = f"{api_base.rstrip('/')}/chat/completions"
         http_headers = _build_request_headers(api_key, headers)
-        body = _build_request_body(model, messages, optional_params, stream=True)
-        timeout_s = _timeout_to_seconds(timeout)
+        reasoning_effort = _extract_reasoning_effort(litellm_params)
+        body = _build_request_body(
+            model, messages, optional_params, stream=True,
+            reasoning_effort=reasoning_effort,
+        )
 
-        with (
-            httpx.Client(timeout=timeout_s) as http_client,
-            http_client.stream(
-                "POST", url, json=body, headers=http_headers
-            ) as response,
-        ):
+        http_client = _get_http_client(client)
+        try:
+            response = http_client.post(
+                url, json=body, headers=http_headers, stream=True,
+                timeout=timeout,
+            )
             response.raise_for_status()
+
             for line in response.iter_lines():
                 if not line.startswith("data: "):
                     continue
@@ -189,8 +237,7 @@ class ClineHandler(CustomLLM):
                     chunk_data = json.loads(payload)
                 except json.JSONDecodeError:
                     continue
-                # Standard SSE chunk — Cline does NOT wrap streaming
-                # in an envelope.
+
                 choices = chunk_data.get("choices", [])
                 if not choices:
                     continue
@@ -200,18 +247,27 @@ class ClineHandler(CustomLLM):
 
                 usage: Any = None
                 if usage_block:
-                    from litellm.types.utils import ChatCompletionUsageBlock
-
                     usage = ChatCompletionUsageBlock(**usage_block)
+
+                # Parse tool call deltas from streaming response.
+                tool_use: ChatCompletionToolCallChunk | None = None
+                tool_calls = delta.get("tool_calls")
+                if tool_calls:
+                    tool_use = _build_tool_use_chunk(tool_calls[0])
 
                 yield GenericStreamingChunk(
                     text=delta.get("content", "") or "",
-                    tool_use=None,
+                    tool_use=tool_use,
                     is_finished=finish_reason is not None,
                     finish_reason=finish_reason or "",
                     usage=usage,
                     index=choices[0].get("index", 0),
                 )
+        except httpx.HTTPStatusError as e:
+            raise CustomLLMError(
+                e.response.status_code,
+                f"HTTP {e.response.status_code}: {e.response.text}",
+            ) from e
 
     async def acompletion(
         self,
@@ -234,21 +290,34 @@ class ClineHandler(CustomLLM):
     ) -> ModelResponse:
         url = f"{api_base.rstrip('/')}/chat/completions"
         http_headers = _build_request_headers(api_key, headers)
-        body = _build_request_body(model, messages, optional_params, stream=False)
-        timeout_s = _timeout_to_seconds(timeout)
+        reasoning_effort = _extract_reasoning_effort(litellm_params)
+        body = _build_request_body(
+            model, messages, optional_params, stream=False,
+            reasoning_effort=reasoning_effort,
+        )
 
-        async with httpx.AsyncClient(timeout=timeout_s) as http_client:
-            response = await http_client.post(url, json=body, headers=http_headers)
-            response.raise_for_status()
+        http_client = _get_http_client(client, async_client=True)
+        try:
+            response = await http_client.post(
+                url, json=body, headers=http_headers, timeout=timeout,
+            )
             response_data = response.json()
+        except httpx.HTTPStatusError as e:
+            raise CustomLLMError(
+                e.response.status_code,
+                f"HTTP {e.response.status_code}: {e.response.text}",
+            ) from e
 
         response_data = _strip_cline_envelope(response_data)
 
-        # Build a fresh ModelResponse from the unwrapped Cline response.
-        # Constructing from the dict lets litellm/Pydantic coerce the nested
-        # dicts into proper Choice / Message objects, which is required by
-        # post_call_processing (it accesses choice.message as an attribute).
-        return ModelResponse(**response_data)
+        model_response = ModelResponse(**response_data)
+
+        logging_obj.post_call(
+            input=messages,
+            original_response=response_data,
+            api_key=api_key,
+        )
+        return model_response
 
     async def astreaming(
         self,
@@ -271,16 +340,20 @@ class ClineHandler(CustomLLM):
     ) -> AsyncIterator[GenericStreamingChunk]:
         url = f"{api_base.rstrip('/')}/chat/completions"
         http_headers = _build_request_headers(api_key, headers)
-        body = _build_request_body(model, messages, optional_params, stream=True)
-        timeout_s = _timeout_to_seconds(timeout)
+        reasoning_effort = _extract_reasoning_effort(litellm_params)
+        body = _build_request_body(
+            model, messages, optional_params, stream=True,
+            reasoning_effort=reasoning_effort,
+        )
 
-        async with (
-            httpx.AsyncClient(timeout=timeout_s) as http_client,
-            http_client.stream(
-                "POST", url, json=body, headers=http_headers
-            ) as response,
-        ):
+        http_client = _get_http_client(client, async_client=True)
+        try:
+            response = await http_client.post(
+                url, json=body, headers=http_headers, stream=True,
+                timeout=timeout,
+            )
             response.raise_for_status()
+
             async for line in response.aiter_lines():
                 if not line.startswith("data: "):
                     continue
@@ -291,8 +364,7 @@ class ClineHandler(CustomLLM):
                     chunk_data = json.loads(payload)
                 except json.JSONDecodeError:
                     continue
-                # Standard SSE chunk — Cline does NOT wrap streaming
-                # in an envelope.
+
                 choices = chunk_data.get("choices", [])
                 if not choices:
                     continue
@@ -302,18 +374,27 @@ class ClineHandler(CustomLLM):
 
                 usage: Any = None
                 if usage_block:
-                    from litellm.types.utils import ChatCompletionUsageBlock
-
                     usage = ChatCompletionUsageBlock(**usage_block)
+
+                # Parse tool call deltas from streaming response.
+                tool_use: ChatCompletionToolCallChunk | None = None
+                tool_calls = delta.get("tool_calls")
+                if tool_calls:
+                    tool_use = _build_tool_use_chunk(tool_calls[0])
 
                 yield GenericStreamingChunk(
                     text=delta.get("content", "") or "",
-                    tool_use=None,
+                    tool_use=tool_use,
                     is_finished=finish_reason is not None,
                     finish_reason=finish_reason or "",
                     usage=usage,
                     index=choices[0].get("index", 0),
                 )
+        except httpx.HTTPStatusError as e:
+            raise CustomLLMError(
+                e.response.status_code,
+                f"HTTP {e.response.status_code}: {e.response.text}",
+            ) from e
 
 
 # Module-level instance for litellm's get_instance_fn resolution.
