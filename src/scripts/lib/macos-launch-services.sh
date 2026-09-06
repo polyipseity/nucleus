@@ -34,29 +34,41 @@ register_handler() {
 }
 
 # launchctl_target — Build a macOS launchctl service target specifier.
+# Pure formatter: domain + uid + label → target string. No environment
+# dependencies, no defaults — every caller MUST provide all three.
+#
 # macOS 25+ requires gui/<uid>/<service> for user domain and
 # system/<service> for system domain. Older macOS accepted bare service IDs.
-# Respects REAL_USER_UID if set (used by nucleus-svc when running under sudo).
+#
+# Args: $1 — domain ("system", "gui", or "user")
+#       $2 — uid (numeric; ignored for system domain)
+#       $3 — service label
 launchctl_target() {
-  local uid="${REAL_USER_UID:-$(id -u)}"
-  if [ "$1" = "system" ]; then
-    printf 'system/%s' "$2"
-  else
-    printf 'gui/%s/%s' "$uid" "$2"
-  fi
+  local domain="$1" uid="$2" label="$3"
+  case "$domain" in
+  system) printf 'system/%s' "$label" ;;
+  gui) printf 'gui/%s/%s' "$uid" "$label" ;;
+  user) printf 'user/%s/%s' "$uid" "$label" ;;
+  *) printf '%s/%s/%s' "$domain" "$uid" "$label" ;;
+  esac
 }
 
 # launchctl_bootstrap_domain — Build a macOS launchctl bootstrap domain target.
+# Pure formatter: domain + uid → bootstrap domain string. No environment
+# dependencies, no defaults — every caller MUST provide both.
+#
 # bootstrap expects a domain target (system or gui/<uid>), not a service target.
-# macOS 26 dropped the "user" alias; gui/<uid> is the only valid form for user.
-# Respects REAL_USER_UID if set (used by nucleus-svc when running under sudo).
+#
+# Args: $1 — domain ("system", "gui", or "user")
+#       $2 — uid (numeric; ignored for system domain)
 launchctl_bootstrap_domain() {
-  local uid="${REAL_USER_UID:-$(id -u)}"
-  if [ "$1" = "system" ]; then
-    printf 'system'
-  else
-    printf 'gui/%s' "$uid"
-  fi
+  local domain="$1" uid="$2"
+  case "$domain" in
+  system) printf 'system' ;;
+  gui) printf 'gui/%s' "$uid" ;;
+  user) printf 'user/%s' "$uid" ;;
+  *) printf '%s/%s' "$domain" "$uid" ;;
+  esac
 }
 
 # refresh_cfprefsd — Kill cfprefsd (CFPreferences daemon) on macOS.
@@ -150,6 +162,7 @@ refresh_shared_filelistd() {
 
 # refresh_finder_launchd — Restart Finder via launchctl kickstart.
 # Preserves window state. Preferred over killall for desktop refreshes.
+# Finder is always in the GUI domain — not configurable.
 refresh_finder_launchd() {
   case "$(uname -s)" in
   Darwin)

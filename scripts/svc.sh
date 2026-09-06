@@ -175,7 +175,7 @@ expand_prefix() {
       printf '%s\t%s\t%s\t%s\n' "$name" "$prefix" "$plat_json" "$name"
     else
       while IFS= read -r m; do
-        printf '%s\t%s\t%s\t%s\n' "$name" "$m" "{\"type\":\"launchctl\",\"service\":\"$m\",\"scope\":\"$(echo "$plat_json" | jq -r '.scope')\"}" "$m"
+        printf '%s\t%s\t%s\t%s\n' "$name" "$m" "{\"type\":\"launchctl\",\"service\":\"$m\",\"scope\":\"$(echo "$plat_json" | jq -r '.scope')\",\"launchdDomain\":\"$(echo "$plat_json" | jq -r '.launchdDomain // "gui"')\"}" "$m"
       done <<<"$matches"
     fi
     ;;
@@ -213,9 +213,10 @@ svc_status() {
   case "$svc_type" in
   launchctl)
     local domain_flag=""
-    local scope launchd_domain
+    local scope launchd_domain uid
     scope=$(echo "$entry_json" | jq -r '.scope // "user"')
     launchd_domain=$(echo "$entry_json" | jq -r '.launchdDomain // "gui"')
+    uid="${REAL_USER_UID:-$(id -u)}"
     [ "$scope" = "system" ] && domain_flag="sudo"
 
     local list_line running=true enabled=true pid=""
@@ -242,7 +243,7 @@ svc_status() {
     if [ "$running" != "true" ]; then
       local print_out
       # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
-      print_out=$($domain_flag launchctl print "$(launchctl_target "$launchd_domain" "$svc_id")" 2>/dev/null || true)
+      print_out=$($domain_flag launchctl print "$(launchctl_target "$launchd_domain" "$uid" "$svc_id")" 2>/dev/null || true)
       case "$print_out" in
       *"state = running"*)
         running=true
@@ -322,9 +323,9 @@ svc_status() {
 # /bin/sh wrapper to pass SIP gate
 # (.agents/instructions/macos-service-hardening.instructions.md).
 recover_launchctl_service() {
-  local domain="$1" svc_id="$2" sudo_prefix="$3"
+  local domain="$1" svc_id="$2" sudo_prefix="$3" uid="$4"
   local target
-  target=$(launchctl_target "$domain" "$svc_id")
+  target=$(launchctl_target "$domain" "$uid" "$svc_id")
   local print_out
   # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
   print_out=$($sudo_prefix launchctl print "$target" 2>/dev/null || true)
@@ -338,7 +339,7 @@ recover_launchctl_service() {
     fi
     # check-suppress:suppression_doc: service may not be loaded; bootout on absent service exits 1.
     $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
-    if $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" 2>/dev/null; then
+    if $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain" "$uid")" "$plist" 2>/dev/null; then
       return 0
     fi
     return 1
@@ -414,11 +415,12 @@ service_diagnostic() {
   svc_id=$(echo "$entry_json" | jq -r '.service // ""')
   case "$svc_type" in
   launchctl)
-    local scope sudo_prefix="" target launchd_domain
+    local scope sudo_prefix="" target launchd_domain uid
     scope=$(echo "$entry_json" | jq -r '.scope // "user"')
     launchd_domain=$(echo "$entry_json" | jq -r '.launchdDomain // "gui"')
+    uid="${REAL_USER_UID:-$(id -u)}"
     [ "$scope" = "system" ] && sudo_prefix="sudo"
-    target=$(launchctl_target "$launchd_domain" "$svc_id")
+    target=$(launchctl_target "$launchd_domain" "$uid" "$svc_id")
     $sudo_prefix launchctl print "$target" 2>/dev/null |
       awk -F'= ' '/state =/{s=$2} /last exit code/{e=$NF} END{printf "state=%s", s; if(e) printf ", exit=%s", e; printf "\n"}'
     ;;
@@ -470,10 +472,12 @@ svc_action() {
     scope=$(echo "$entry_json" | jq -r '.scope // "user"')
     local launchd_domain
     launchd_domain=$(echo "$entry_json" | jq -r '.launchdDomain // "gui"')
+    local uid
+    uid="${REAL_USER_UID:-$(id -u)}"
     local sudo_prefix=""
     [ "$scope" = "system" ] && sudo_prefix="sudo"
     local target
-    target=$(launchctl_target "$launchd_domain" "$svc_id")
+    target=$(launchctl_target "$launchd_domain" "$uid" "$svc_id")
 
     local plist=""
     if [ "$scope" = "system" ]; then
@@ -486,10 +490,10 @@ svc_action() {
     status) svc_status "$name" "$entry_json" ;;
     start)
       cleanup_service_ports "$entry_json"
-      recover_launchctl_service "$domain" "$svc_id" "$sudo_prefix" || {
+      recover_launchctl_service "$launchd_domain" "$svc_id" "$sudo_prefix" "$uid" || {
         $sudo_prefix launchctl enable "$target" >/dev/null 2>&1
         $sudo_prefix launchctl start "$svc_id" >/dev/null 2>&1 ||
-          $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" >/dev/null 2>&1
+          $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$launchd_domain" "$uid")" "$plist" >/dev/null 2>&1
       }
       poll_service_ready "$name" "$entry_json" >/dev/null || {
         local _diag
@@ -501,7 +505,7 @@ svc_action() {
     stop) $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 ;;
     restart)
       cleanup_service_ports "$entry_json"
-      recover_launchctl_service "$domain" "$svc_id" "$sudo_prefix" || {
+      recover_launchctl_service "$launchd_domain" "$svc_id" "$sudo_prefix" "$uid" || {
         # check-suppress:suppression_doc: service may not be loaded; bootout/enable on absent service exits 1.
         $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 || true
         for _i in 1 2 3 4 5; do
@@ -513,7 +517,7 @@ svc_action() {
         $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
         sleep 0.5
         # check-suppress:suppression_doc: service may not be loaded; bootout/enable on absent service exits 1.
-        $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" 2>/dev/null || true
+        $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$launchd_domain" "$uid")" "$plist" 2>/dev/null || true
         for _j in 1 2 3 4; do
           $sudo_prefix launchctl print "$target" 2>/dev/null |
             grep -q "state = running" && break

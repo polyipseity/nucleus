@@ -126,13 +126,13 @@ log_restart() {
 # macOS (launchctl)
 # ──────────────────────────────────────────────────────────────────────────────
 recover_launchctl() {
-  local svc="$1" scope="$2" launchd_domain="$3" svc_id="$4"
+  local svc="$1" scope="$2" launchd_domain="$3" svc_id="$4" uid="$5"
   local sudo_prefix=""
   if [ "$scope" = "system" ] && [ "$(id -u)" -ne 0 ]; then
     sudo_prefix="sudo"
   fi
   local target
-  target=$(launchctl_target "$launchd_domain" "$svc_id")
+  target=$(launchctl_target "$launchd_domain" "$uid" "$svc_id")
   local plist=""
   if [ "$scope" = "system" ]; then
     plist="/Library/LaunchDaemons/$svc_id.plist"
@@ -142,15 +142,16 @@ recover_launchctl() {
   # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
   $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
   # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
-  $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$launchd_domain")" "$plist" 2>/dev/null || true
+  $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$launchd_domain" "$uid")" "$plist" 2>/dev/null || true
 }
 
 check_service_macos() {
   local svc="$1" entry="$2"
-  local scope launchd_domain svc_id
+  local scope launchd_domain svc_id uid
   scope=$(echo "$entry" | jq -r '.scope // "user"')
   launchd_domain=$(echo "$entry" | jq -r '.launchdDomain // "gui"')
   svc_id=$(echo "$entry" | jq -r '.service // ""')
+  uid="${REAL_USER_UID:-$(id -u)}"
   [ -z "$svc_id" ] && return 0
 
   local sudo_prefix=""
@@ -158,7 +159,7 @@ check_service_macos() {
     sudo_prefix="sudo"
   fi
   local target
-  target=$(launchctl_target "$launchd_domain" "$svc_id")
+  target=$(launchctl_target "$launchd_domain" "$uid" "$svc_id")
   local print_out
   # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
   print_out=$($sudo_prefix launchctl print "$target" 2>/dev/null || true)
@@ -169,17 +170,17 @@ check_service_macos() {
     return 0
     ;;
   *"state = spawn scheduled"*)
-    recover_launchctl "$svc" "$scope" "$launchd_domain" "$svc_id"
+    recover_launchctl "$svc" "$scope" "$launchd_domain" "$svc_id" "$uid"
     log_restart "$svc_id" "spawn scheduled"
     ;;
   *"state = waiting"*)
-    recover_launchctl "$svc" "$scope" "$launchd_domain" "$svc_id"
+    recover_launchctl "$svc" "$scope" "$launchd_domain" "$svc_id" "$uid"
     log_restart "$svc_id" "waiting"
     ;;
   # Exit 78 (EX_CONFIG): non-retryable, launchd sets penalty box — needs bootout+bootstrap.
   # Exit 126 (transient): shell cannot exec; does NOT trigger penalty box.
   *"last exit code = 78"*)
-    recover_launchctl "$svc" "$scope" "$launchd_domain" "$svc_id"
+    recover_launchctl "$svc" "$scope" "$launchd_domain" "$svc_id" "$uid"
     log_restart "$svc_id" "EX_CONFIG"
     ;;
   *"Service is not found"* | "")
@@ -192,7 +193,7 @@ check_service_macos() {
     fi
     if [ -f "$plist" ]; then
       # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
-      $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$launchd_domain")" "$plist" 2>/dev/null || true
+      $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$launchd_domain" "$uid")" "$plist" 2>/dev/null || true
       log_restart "$svc_id" "not found — bootstrap"
     fi
     ;;

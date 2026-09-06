@@ -28,6 +28,8 @@ fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 # shellcheck source=../src/scripts/lib/lib.sh
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
+# shellcheck source=../src/scripts/lib/macos-launch-services.sh
+. "$SCRIPT_DIR/../src/scripts/lib/macos-launch-services.sh"
 
 usage() {
   usage_std "$(basename "$0")" "setup|reset|sync [options]"
@@ -146,6 +148,22 @@ collect_configured_mount_service_ids() {
     <<<"$_ccmsi_registry"; } 2>/dev/null || true # check-suppress:suppression_doc: user registry may be empty or malformed; empty result is handled.
 }
 
+# Detect the launchd domain for a service label by probing gui then user domains.
+# Cloud-mount services are not in services.json — they are dynamically created
+# by cloud-drives.nix — so we query launchd at runtime for domain discovery.
+# Args: $1 — service label; $2 — uid.
+# Output: "gui" or "user".
+_detect_launchd_domain() {
+  local label="$1" uid="$2"
+  if launchctl print "gui/${uid}/${label}" >/dev/null 2>&1; then
+    printf 'gui'
+  elif launchctl print "user/${uid}/${label}" >/dev/null 2>&1; then
+    printf 'user'
+  else
+    printf 'gui' # fallback: most user agents should be in gui
+  fi
+}
+
 # Restart managed cloud mount services so refreshed remote descriptions and
 # credentials are reflected immediately in mounted volumes.
 restart_cloud_mount_services() {
@@ -174,7 +192,8 @@ restart_cloud_mount_services() {
       fi
 
       _rcms_label="local.cloud-mount.${mount_id}"
-      _rcms_target="user/${_rcms_uid}/${_rcms_label}"
+      _rcms_domain="$(_detect_launchd_domain "$_rcms_label" "$_rcms_uid")"
+      _rcms_target="$(launchctl_target "$_rcms_domain" "$_rcms_uid" "$_rcms_label")"
 
       # Both missing-service and launchctl parse failures are benign here;
       # if the service is absent we emit a targeted hint and continue.
