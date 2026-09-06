@@ -1,6 +1,6 @@
 # macOS-only LaunchAgents (extracted from default.nix for focused maintainability).
 #
-# All agents here are user-domain LaunchAgents (domain = "user") so each user
+# All agents here are user-scoped LaunchAgents (domain = "gui") so each user
 # can configure them individually and launchd loads them without the
 # root-domain mismatch warning that global launchd.agents trigger under
 # nix-darwin.
@@ -196,8 +196,8 @@ in
   # unbounded cache growth between weekly GC runs. Cross-host parity with
   # NixOS systemd timer and Windows scheduled task.
   #
-  # domain = "user" installs to ~/Library/LaunchAgents (the user's GUI/login
-  # session) instead of /Library/LaunchAgents, so each user can configure it
+  # domain = "gui" installs to ~/Library/LaunchAgents and bootstraps into
+  # gui/<uid> instead of /Library/LaunchAgents, so each user can configure it
   # individually and launchd loads it without the root-domain mismatch warning
   # that global launchd.agents trigger under nix-darwin.
   launchd.agents."sccache-gc" = {
@@ -205,7 +205,7 @@ in
     # false via mkEnableOption), so without this the agent is silently dropped
     # and no plist is generated in ~/Library/LaunchAgents.
     enable = true;
-    domain = "user";
+    domain = "gui";
     config = {
       Label = "local.sccache-gc";
       ProgramArguments = [ "${sccacheGc}/bin/nucleus-sccache-gc" ];
@@ -228,7 +228,7 @@ in
     # false via mkEnableOption), so without this the agent is silently dropped
     # and no plist is generated in ~/Library/LaunchAgents.
     enable = true;
-    domain = "user";
+    domain = "gui";
     config = {
       Label = "local.log-gc-user";
       ProgramArguments = [ "${logGcUser}/bin/nucleus-log-gc-user" ];
@@ -266,7 +266,7 @@ in
     # false via mkEnableOption), so without this the agent is silently dropped
     # and no plist is generated in ~/Library/LaunchAgents.
     enable = true;
-    domain = "user";
+    domain = "gui";
     config = {
       Label = "local.betterdisplay-heartbeat";
       ProgramArguments = [ "${betterdisplayHeartbeat}/bin/nucleus-betterdisplay-heartbeat" ];
@@ -292,7 +292,7 @@ in
     # false via mkEnableOption), so without this the agent is silently dropped
     # and no plist is generated in ~/Library/LaunchAgents.
     enable = true;
-    domain = "user";
+    domain = "gui";
     config = {
       Label = "local.ds-store-gc";
       ProgramArguments = [ "${devDsStoreGc}/bin/nucleus-ds-store-gc" ];
@@ -313,7 +313,7 @@ in
     # false via mkEnableOption), so without this the agent is silently dropped
     # and no plist is generated in ~/Library/LaunchAgents.
     enable = true;
-    domain = "user";
+    domain = "gui";
     config = {
       Label = "local.spotlight-exclusions";
       ProgramArguments = [
@@ -355,7 +355,7 @@ in
     # false via mkEnableOption), so without this the agent is silently dropped
     # and no plist is generated in ~/Library/LaunchAgents.
     enable = true;
-    domain = "user";
+    domain = "gui";
     config = {
       Label = "local.nix-index-update";
       ProgramArguments = [
@@ -395,7 +395,7 @@ in
     # false via mkEnableOption), so without this the agent is silently dropped
     # and no plist is generated in ~/Library/LaunchAgents.
     enable = true;
-    domain = "user";
+    domain = "gui";
     config = {
       Label = "local.icloud-exclusions";
       ProgramArguments = [
@@ -427,7 +427,7 @@ in
     # false via mkEnableOption), so without this the agent is silently dropped
     # and no plist is generated in ~/Library/LaunchAgents.
     enable = true;
-    domain = "user";
+    domain = "gui";
     config = {
       Label = "local.service-watchdog-user";
       ProgramArguments = [
@@ -447,7 +447,7 @@ in
 
   # --------------------------------------------------------------------------
   # GUI environment variable propagation LaunchAgent (macOS-only)
-  # macOS maintains separate shell (user/<uid>/) and GUI (gui/<uid>/) launchd
+  # macOS maintains separate shell and GUI (gui/<uid>/) launchd
   # domains.  Shell sessionVariables set via home.sessionVariables never cross
   # into the GUI domain.  This agent calls launchctl setenv for every variable
   # that GUI applications (Obsidian, VS Code, oterm, etc.) need, providing
@@ -467,7 +467,7 @@ in
     # false via mkEnableOption), so without this the agent is silently dropped
     # and no plist is generated in ~/Library/LaunchAgents.
     enable = true;
-    domain = "user";
+    domain = "gui";
     config = {
       Label = "local.gui-env";
       ProgramArguments = [

@@ -113,7 +113,7 @@ in
 
     # macOS: launchd agent keeps the tray app running persistently after login.
     # This module is imported into the Home Manager config (home-manager.users),
-    # so use HM-native launchd.agents with domain = "user" (installs to
+    # so use HM-native launchd.agents with domain = "gui" (installs to
     # ~/Library/LaunchAgents) rather than environment.userLaunchAgents, which is
     # a nix-darwin top-level option and does not exist in the HM context.
     (lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && userEnable) {
@@ -122,7 +122,7 @@ in
         # false via mkEnableOption), so without this the agent is silently dropped
         # and no plist is generated in ~/Library/LaunchAgents.
         enable = true;
-        domain = "user";
+        domain = "gui";
         config = {
           Label = "local.discord-music-rpc";
           ProgramArguments = [ "${discord-music-rpc}/bin/discord-music-rpc" ];

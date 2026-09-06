@@ -4,7 +4,7 @@
 # with --no_config and never reads user-home config, so TCC is not triggered.
 # Config is deployed by Home Manager in modules/home.nix.
 #
-# The heartbeat is a user launch agent (HM launchd.agents, domain = "user") in
+# The heartbeat is a user-scoped launch agent (HM launchd.agents, domain = "gui") in
 # src/modules/camilladsp.nix. It runs inside the primary user's GUI/login
 # session so TCC permits reading $HOME/.config/camilladsp/configs/config.yml
 # (a system daemon is blocked by TCC from reading user-home file contents —

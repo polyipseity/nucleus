@@ -7,8 +7,8 @@
 # macOS TCC from reading user-home file contents — EPERM — which previously
 # left the playback device null after every rebuild).
 #
-# Mechanism: HM-native launchd.agents with domain = "user" (installs to
-# ~/Library/LaunchAgents, runs in the user's gui/<uid> domain). This is the
+# Mechanism: HM-native launchd.agents with domain = "gui" (installs to
+# ~/Library/LaunchAgents, bootstraps into gui/<uid>). This is the
 # correct user-scoped mechanism — Home Manager's setupLaunchAgents restarts the
 # agent on any plist change (cmp -s), so a store-hash change after a rebuild
 # takes effect on the next apply without manual intervention.
@@ -61,7 +61,7 @@ let
 in
 lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
   launchd.agents."camilladsp-heartbeat" = {
-    domain = "user";
+    domain = "gui";
     # HM's launchd module filters agents by a per-agent `enable` flag (defaults
     # false via mkEnableOption), so without this the agent is silently dropped
     # and no plist is generated in ~/Library/LaunchAgents.

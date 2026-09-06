@@ -346,7 +346,7 @@ in
       # macOS: LaunchAgents for rclone-backed mounts
       # -----------------------------------------------------------------------
       # This module is imported into the Home Manager config (home-manager.users
-      # via sharedModules), so use HM-native launchd.agents with domain = "user"
+      # via sharedModules), so use HM-native launchd.agents with domain = "gui"
       # (installs to ~/Library/LaunchAgents) rather than
       # environment.userLaunchAgents, which is a nix-darwin top-level option and
       # does not exist in the HM context.
@@ -355,7 +355,7 @@ in
           map (mount: {
             name = "cloud-mount-${mount.id}";
             value = {
-              domain = "user";
+              domain = "gui";
               enable = true;
               config = {
                 Label = "local.cloud-mount.${mount.id}";
@@ -448,7 +448,7 @@ in
       # -----------------------------------------------------------------------
       # macOS: LaunchAgents for per-replica scheduled replica-sync timers
       # -----------------------------------------------------------------------
-      # HM-native launchd.agents with domain = "user" (see mount block note):
+      # HM-native launchd.agents with domain = "gui" (see mount block note):
       # this module is imported into the Home Manager config, not the darwin
       # config, so environment.userLaunchAgents is not available here.
       (lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && declaredScheduledSyncReplicas != [ ]) {
@@ -456,7 +456,7 @@ in
           map (replica: {
             name = "cloud-replica-scheduled-sync-${replica.id}";
             value = {
-              domain = "user";
+              domain = "gui";
               enable = true;
               config = {
                 Label = "local.cloud-replica-scheduled-sync.${replica.id}";
