@@ -17,8 +17,6 @@ Cline envelope for non-streaming responses, and passes through
 streaming SSE chunks without modification.
 """
 
-from __future__ import annotations
-
 import json
 import logging
 from collections.abc import AsyncIterator, Callable, Iterator
@@ -174,9 +172,12 @@ class ClineHandler(CustomLLM):
         body = _build_request_body(model, messages, optional_params, stream=True)
         timeout_s = _timeout_to_seconds(timeout)
 
-        with httpx.Client(timeout=timeout_s) as http_client, http_client.stream(
-            "POST", url, json=body, headers=http_headers
-        ) as response:
+        with (
+            httpx.Client(timeout=timeout_s) as http_client,
+            http_client.stream(
+                "POST", url, json=body, headers=http_headers
+            ) as response,
+        ):
             response.raise_for_status()
             for line in response.iter_lines():
                 if not line.startswith("data: "):
@@ -273,44 +274,46 @@ class ClineHandler(CustomLLM):
         body = _build_request_body(model, messages, optional_params, stream=True)
         timeout_s = _timeout_to_seconds(timeout)
 
-        async with httpx.AsyncClient(timeout=timeout_s) as http_client:
-            async with http_client.stream(
+        async with (
+            httpx.AsyncClient(timeout=timeout_s) as http_client,
+            http_client.stream(
                 "POST", url, json=body, headers=http_headers
-            ) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if not line.startswith("data: "):
-                        continue
-                    payload = line[len("data: "):]
-                    if payload.strip() == "[DONE]":
-                        break
-                    try:
-                        chunk_data = json.loads(payload)
-                    except json.JSONDecodeError:
-                        continue
-                    # Standard SSE chunk — Cline does NOT wrap streaming
-                    # in an envelope.
-                    choices = chunk_data.get("choices", [])
-                    if not choices:
-                        continue
-                    delta = choices[0].get("delta", {})
-                    finish_reason = choices[0].get("finish_reason")
-                    usage_block = chunk_data.get("usage")
+            ) as response,
+        ):
+            response.raise_for_status()
+            async for line in response.aiter_lines():
+                if not line.startswith("data: "):
+                    continue
+                payload = line[len("data: ") :]
+                if payload.strip() == "[DONE]":
+                    break
+                try:
+                    chunk_data = json.loads(payload)
+                except json.JSONDecodeError:
+                    continue
+                # Standard SSE chunk — Cline does NOT wrap streaming
+                # in an envelope.
+                choices = chunk_data.get("choices", [])
+                if not choices:
+                    continue
+                delta = choices[0].get("delta", {})
+                finish_reason = choices[0].get("finish_reason")
+                usage_block = chunk_data.get("usage")
 
-                    usage: Any = None
-                    if usage_block:
-                        from litellm.types.utils import ChatCompletionUsageBlock
+                usage: Any = None
+                if usage_block:
+                    from litellm.types.utils import ChatCompletionUsageBlock
 
-                        usage = ChatCompletionUsageBlock(**usage_block)
+                    usage = ChatCompletionUsageBlock(**usage_block)
 
-                    yield GenericStreamingChunk(
-                        text=delta.get("content", "") or "",
-                        tool_use=None,
-                        is_finished=finish_reason is not None,
-                        finish_reason=finish_reason or "",
-                        usage=usage,
-                        index=choices[0].get("index", 0),
-                    )
+                yield GenericStreamingChunk(
+                    text=delta.get("content", "") or "",
+                    tool_use=None,
+                    is_finished=finish_reason is not None,
+                    finish_reason=finish_reason or "",
+                    usage=usage,
+                    index=choices[0].get("index", 0),
+                )
 
 
 # Module-level instance for litellm's get_instance_fn resolution.

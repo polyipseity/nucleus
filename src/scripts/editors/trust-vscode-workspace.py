@@ -32,13 +32,17 @@ if sys.platform == "darwin":
     app_support = os.path.join(HOME, "Library", "Application Support")
     db_paths = [
         os.path.join(app_support, "Code", "User", "globalStorage", "state.vscdb"),
-        os.path.join(app_support, "Code - Insiders", "User", "globalStorage", "state.vscdb"),
+        os.path.join(
+            app_support, "Code - Insiders", "User", "globalStorage", "state.vscdb"
+        ),
     ]
 else:
     config_home = os.environ.get("XDG_CONFIG_HOME", os.path.join(HOME, ".config"))
     db_paths = [
         os.path.join(config_home, "Code", "User", "globalStorage", "state.vscdb"),
-        os.path.join(config_home, "Code - Insiders", "User", "globalStorage", "state.vscdb"),
+        os.path.join(
+            config_home, "Code - Insiders", "User", "globalStorage", "state.vscdb"
+        ),
     ]
 
 TRUST_KEY = "content.trust.model.key"

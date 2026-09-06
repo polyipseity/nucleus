@@ -25,7 +25,10 @@ managed_instances = managed.get("instances", {})
 managed_default = managed_instances.get("Default", {})
 
 if not isinstance(managed_default, dict):
-    print("rimsort: managed settings must contain instances.Default object", file=sys.stderr)
+    print(
+        "rimsort: managed settings must contain instances.Default object",
+        file=sys.stderr,
+    )
     sys.exit(1)
 
 # Merge top-level managed keys (e.g. current_instance) into the

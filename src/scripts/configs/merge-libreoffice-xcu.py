@@ -17,20 +17,22 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-NS = {"oor": "http://openoffice.org/2001/registry",
-      "xlink": "http://www.w3.org/1999/xlink"}
+NS = {
+    "oor": "http://openoffice.org/2001/registry",
+    "xlink": "http://www.w3.org/1999/xlink",
+}
 
 # Register namespace prefixes so ElementTree writes "oor:" and "xlink:"
 # instead of auto-generated "ns0:" and "ns1:" prefixes.
 ET.register_namespace("oor", NS["oor"])
 ET.register_namespace("xlink", NS["xlink"])
 
-XCU_HEADER = '''\
+XCU_HEADER = """\
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE oor:items PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "items.dtd">
 <oor:items xmlns:oor="http://openoffice.org/2001/registry"
            xmlns:xlink="http://www.w3.org/1999/xlink">
-</oor:items>'''
+</oor:items>"""
 
 
 def _find_prop_in_items(items_elem, item_path, prop_name):
@@ -40,9 +42,9 @@ def _find_prop_in_items(items_elem, item_path, prop_name):
     the same oor:path.  We must search across all of them.
     """
     for item in items_elem.findall("item"):
-        if item.get(f'{{{NS["oor"]}}}path') == item_path:
+        if item.get(f"{{{NS['oor']}}}path") == item_path:
             for prop in item.findall("prop"):
-                if prop.get(f'{{{NS["oor"]}}}name') == prop_name:
+                if prop.get(f"{{{NS['oor']}}}name") == prop_name:
                     return prop
     return None
 
@@ -60,10 +62,10 @@ def _set_value(prop_elem, value):
 def _ensure_item(items_elem, item_path):
     """Return an existing <item> for item_path, or create a new one."""
     for item in items_elem.findall("item"):
-        if item.get(f'{{{NS["oor"]}}}path') == item_path:
+        if item.get(f"{{{NS['oor']}}}path") == item_path:
             return item
     item = ET.SubElement(items_elem, "item")
-    item.set(f'{{{NS["oor"]}}}path', item_path)
+    item.set(f"{{{NS['oor']}}}path", item_path)
     return item
 
 
@@ -77,9 +79,11 @@ def merge_entries(xcu_path, entries):
     if xcu_file.exists():
         tree = ET.parse(xcu_file)
         root = tree.getroot()
-        items_elem = root if root.tag == f'{{{NS["oor"]}}}items' else root.find("oor:items", NS)
+        items_elem = (
+            root if root.tag == f"{{{NS['oor']}}}items" else root.find("oor:items", NS)
+        )
         if items_elem is None:
-            items_elem = ET.SubElement(root, f'{{{NS["oor"]}}}items')
+            items_elem = ET.SubElement(root, f"{{{NS['oor']}}}items")
     else:
         xcu_file.parent.mkdir(parents=True, exist_ok=True)
         root = ET.fromstring(XCU_HEADER)
@@ -93,7 +97,7 @@ def merge_entries(xcu_path, entries):
         else:
             item = _ensure_item(items_elem, item_path)
             prop = ET.SubElement(item, "prop")
-            prop.set(f'{{{NS["oor"]}}}name', prop_name)
+            prop.set(f"{{{NS['oor']}}}name", prop_name)
             _set_value(prop, value)
 
     tree.write(xcu_file, xml_declaration=True, encoding="UTF-8")
@@ -101,7 +105,10 @@ def merge_entries(xcu_path, entries):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: merge-libreoffice-xcu.py <xcu-file> [path|name|value ...]", file=sys.stderr)
+        print(
+            "Usage: merge-libreoffice-xcu.py <xcu-file> [path|name|value ...]",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     xcu_path = sys.argv[1]
@@ -109,7 +116,10 @@ def main():
     for arg in sys.argv[2:]:
         parts = arg.split("|", 2)
         if len(parts) != 3:
-            print(f"Invalid entry format: {arg} (expected path|name|value)", file=sys.stderr)
+            print(
+                f"Invalid entry format: {arg} (expected path|name|value)",
+                file=sys.stderr,
+            )
             sys.exit(1)
         entries.append(tuple(parts))
 
