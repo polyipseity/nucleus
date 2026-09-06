@@ -161,14 +161,20 @@ class ClineHandler(CustomLLM):
         http_headers = _build_request_headers(api_key, headers)
         reasoning_effort = _extract_reasoning_effort(litellm_params)
         body = _build_request_body(
-            model, messages, optional_params, stream=False,
+            model,
+            messages,
+            optional_params,
+            stream=False,
             reasoning_effort=reasoning_effort,
         )
 
         http_client = _get_http_client(client)
         try:
             response = http_client.post(
-                url, json=body, headers=http_headers, timeout=timeout,
+                url,
+                json=body,
+                headers=http_headers,
+                timeout=timeout,
             )
             response_data = response.json()
         except httpx.HTTPStatusError as e:
@@ -215,14 +221,20 @@ class ClineHandler(CustomLLM):
         http_headers = _build_request_headers(api_key, headers)
         reasoning_effort = _extract_reasoning_effort(litellm_params)
         body = _build_request_body(
-            model, messages, optional_params, stream=True,
+            model,
+            messages,
+            optional_params,
+            stream=True,
             reasoning_effort=reasoning_effort,
         )
 
         http_client = _get_http_client(client)
         try:
             response = http_client.post(
-                url, json=body, headers=http_headers, stream=True,
+                url,
+                json=body,
+                headers=http_headers,
+                stream=True,
                 timeout=timeout,
             )
             response.raise_for_status()
@@ -292,14 +304,20 @@ class ClineHandler(CustomLLM):
         http_headers = _build_request_headers(api_key, headers)
         reasoning_effort = _extract_reasoning_effort(litellm_params)
         body = _build_request_body(
-            model, messages, optional_params, stream=False,
+            model,
+            messages,
+            optional_params,
+            stream=False,
             reasoning_effort=reasoning_effort,
         )
 
         http_client = _get_http_client(client, async_client=True)
         try:
             response = await http_client.post(
-                url, json=body, headers=http_headers, timeout=timeout,
+                url,
+                json=body,
+                headers=http_headers,
+                timeout=timeout,
             )
             response_data = response.json()
         except httpx.HTTPStatusError as e:
@@ -342,14 +360,20 @@ class ClineHandler(CustomLLM):
         http_headers = _build_request_headers(api_key, headers)
         reasoning_effort = _extract_reasoning_effort(litellm_params)
         body = _build_request_body(
-            model, messages, optional_params, stream=True,
+            model,
+            messages,
+            optional_params,
+            stream=True,
             reasoning_effort=reasoning_effort,
         )
 
         http_client = _get_http_client(client, async_client=True)
         try:
             response = await http_client.post(
-                url, json=body, headers=http_headers, stream=True,
+                url,
+                json=body,
+                headers=http_headers,
+                stream=True,
                 timeout=timeout,
             )
             response.raise_for_status()
