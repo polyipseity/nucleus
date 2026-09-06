@@ -237,7 +237,6 @@ class ClineHandler(CustomLLM):
                 stream=True,
                 timeout=timeout,
             )
-            response.raise_for_status()
 
             for line in response.iter_lines():
                 if not line.startswith("data: "):
@@ -376,7 +375,6 @@ class ClineHandler(CustomLLM):
                 stream=True,
                 timeout=timeout,
             )
-            response.raise_for_status()
 
             async for line in response.aiter_lines():
                 if not line.startswith("data: "):
