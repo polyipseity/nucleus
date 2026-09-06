@@ -61,6 +61,10 @@ litellm_settings:
   custom_provider_map:
     - provider: cline
       custom_handler: cline_handler.cline_handler
+  # Load the cooldown-400 callback.  The module patches _is_cooldown_required
+  # at import time so credit-exhaustion 400 errors trigger cooldown.
+  callbacks:
+    - litellm-cooldown-400.instance
 
 # WARNING suppresses per-request INFO chatter while still capturing
 # errors, warnings, and startup diagnostics.
@@ -161,6 +165,10 @@ model_list:
       api_key: os.environ/KEY_AI_COMMAND_CODE
       order: 2
       reasoning_effort: high
+      # Upstream-ready: when litellm >= release containing #34416, the
+      # monkey-patch becomes unnecessary and this policy activates natively.
+      allowed_fails_policy:
+        BadRequestErrorAllowedFails: 0
       model_info:
         max_input_tokens: 128000
         max_output_tokens: 16000
