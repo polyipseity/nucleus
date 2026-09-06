@@ -34,12 +34,12 @@ from litellm.router_utils.cooldown_handlers import (
 
 _CREDIT_EXHAUSTION_RE = _re.compile(
     r"\b("
-    r"insufficient.?credit"
-    r"|credit.?exhaust"
-    r"|usage.?limit"
-    r"|quota.?exceed"
-    r"|budget.?exceed"
-    r"|payment.?require"
+    r"insufficient\s+credits?"
+    r"|credits?\s+exhaust(?:ed)?"
+    r"|usage\s+limits?"
+    r"|quotas?\s+exceeded?"
+    r"|budgets?\s+exceeded?"
+    r"|payments?\s+required?"
     r"|exceed(?:s|ed)?\s+(?:your|the)\s+(?:credit|quota|budget|usage)"
     r"|not\s+enough\s+(?:credit|balance|quota)"
     r")\b",
