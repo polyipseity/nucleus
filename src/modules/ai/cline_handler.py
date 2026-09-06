@@ -26,9 +26,11 @@ import httpx
 import litellm
 from litellm.llms.custom_httpx.http_handler import AsyncHTTPHandler, HTTPHandler
 from litellm.llms.custom_llm import CustomLLM, CustomLLMError
-from litellm.types.utils import (
+from litellm.types.llms.openai import (
     ChatCompletionToolCallChunk,
     ChatCompletionToolCallFunctionChunk,
+)
+from litellm.types.utils import (
     ChatCompletionUsageBlock,
     GenericStreamingChunk,
 )
