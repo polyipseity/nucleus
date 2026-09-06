@@ -318,14 +318,14 @@ let
   # === TEST: macOS dev-tree maintenance is scheduled, not activation-bound ===
   # NOTE: these jobs are user launch agents. In the Home Manager module
   # (default.nix) the mechanism is HM-native `launchd.agents.<name>` with
-  # `domain = "user"` (installs to ~/Library/LaunchAgents), so each user can
+  # `domain = "gui"` (installs to ~/Library/LaunchAgents), so each user can
   # configure them individually and they load without the root-domain
   # launchctl warning that global launchd.agents trigger. The assertion intent
   # is unchanged: scheduled via launchd, not activation-bound.
   test_macos_dev_maintenance_is_scheduled = assert' (
     (lib.hasInfix "launchd.agents.\"ds-store-gc\"" macosLaunchdText)
     && (lib.hasInfix "launchd.agents.\"spotlight-exclusions\"" macosLaunchdText)
-    && (lib.hasInfix "domain = \"user\"" macosLaunchdText)
+    && (lib.hasInfix "domain = \"gui\"" macosLaunchdText)
     && (lib.hasInfix "Label = \"local.ds-store-gc\";" macosLaunchdText)
     && (lib.hasInfix "Label = \"local.spotlight-exclusions\";" macosLaunchdText)
     && (lib.hasInfix "ProgramArguments = [ \"\${devDsStoreGc}/bin/nucleus-ds-store-gc\" ];" macosLaunchdText)

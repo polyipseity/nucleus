@@ -4,7 +4,7 @@
 # generating the cloud mount/replica launchd agents (e.g. a stale generation that
 # predates cloud-drives.nix, or a future edit that drops the launchd.agents wiring).
 #
-# The agents are HM-native `launchd.agents.<name>` with `domain = "user"` (installed
+# The agents are HM-native `launchd.agents.<name>` with `domain = "gui"` (installed
 # to ~/Library/LaunchAgents). See .agents/instructions/launchd.instructions.md and
 # .agents/instructions/cloud-drives-and-finder.instructions.md.
 
@@ -21,10 +21,10 @@ in
     (assert' (containsRegex "launchd.agents = builtins.listToAttrs" cloudDrivesNix) "cloud-drives: mounts use launchd.agents")
     (assert' (containsRegex "name = \"cloud-mount-\\$\\{mount.id\\}\"" cloudDrivesNix) "cloud-drives: mount agent name template")
     (assert' (containsRegex "Label = \"local.cloud-mount.\\$\\{mount.id\\}\"" cloudDrivesNix) "cloud-drives: mount agent Label template")
-    (assert' (containsRegex "domain = \"user\"" cloudDrivesNix) "cloud-drives: domain = user")
+    (assert' (containsRegex "domain = \"gui\"" cloudDrivesNix) "cloud-drives: domain = gui")
     # Both mount and replica value blocks must set enable = true so HM actually
     # writes the plists (HM defaults enable to false — see camilladsp.nix:68).
-    (assert' (containsRegex "domain = .user.;.*enable = true" cloudDrivesNix) "cloud-drives: launchd agent value blocks must set enable = true")
+    (assert' (containsRegex "domain = .gui.;.*enable = true" cloudDrivesNix) "cloud-drives: launchd agent value blocks must set enable = true")
 
     # --- Replica agents: one launchd.agents entry per scheduled-sync replica ---
     (assert' (containsRegex "name = \"cloud-replica-scheduled-sync-\\$\\{replica.id\\}\"" cloudDrivesNix) "cloud-drives: replica agent name template")

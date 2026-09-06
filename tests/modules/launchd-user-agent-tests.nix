@@ -8,7 +8,7 @@
 #
 # In a Home Manager module (src/platforms/macOS/modules/default.nix) the
 # user-agent mechanism is HM's native `launchd.agents.<name>` with
-# `domain = "user"` (installs to ~/Library/LaunchAgents).  In the darwin
+# `domain = "gui"` (installs to ~/Library/LaunchAgents).  In the darwin
 # config (camilladsp.nix, ext-discord-music-rpc.nix, cloud-drives.nix) the
 # mechanism is `environment.userLaunchAgents` (nix-darwin top-level option).
 
@@ -24,13 +24,13 @@ in
 {
   tests = builtins.filter (x: x != null) [
     # --- HM launchd agents (launchd-agents.nix): HM-native user agents ---
-    # Each agent MUST be a launchd.agents entry with domain = "user" (NOT
+    # Each agent MUST be a launchd.agents entry with domain = "gui" (NOT
     # environment.userLaunchAgents, which is invalid in an HM module context).
     (assert' (containsRegex "launchd.agents.\"sccache-gc\"" launchdAgentsNix) "sccache-gc: uses launchd.agents")
     (assert' (
       containsRegex "launchd.agents.\"sccache-gc\"" launchdAgentsNix
       && containsRegex "domain = \"user\"" launchdAgentsNix
-    ) "sccache-gc: domain = user")
+    ) "sccache-gc: domain = gui")
     (assert' (containsRegex "launchd.agents.\"log-gc-user\"" launchdAgentsNix) "log-gc-user: uses launchd.agents")
     (assert' (containsRegex "launchd.agents.\"betterdisplay-heartbeat\"" launchdAgentsNix) "betterdisplay-heartbeat: uses launchd.agents")
     (assert' (containsRegex "launchd.agents.\"ds-store-gc\"" launchdAgentsNix) "ds-store-gc: uses launchd.agents")
@@ -48,18 +48,18 @@ in
     ) "gui-env: not environment.userLaunchAgents")
 
     # --- darwin config: camilladsp-heartbeat BANNED from environment.userLaunchAgents ---
-    # The persistent heartbeat was migrated to HM launchd.agents (domain = "user")
+    # The persistent heartbeat was migrated to HM launchd.agents (domain = "gui")
     # in src/modules/camilladsp.nix because nix-darwin's environment.userLaunchAgents
     # never restarts a loaded agent on plist change (stale-process gap). The
     # darwin-only camilladsp.nix must NOT use environment.userLaunchAgents for it.
     (assert' (
       !containsRegex "environment.userLaunchAgents.\"camilladsp-heartbeat\"" camilladspNix
     ) "camilladsp-heartbeat: banned from environment.userLaunchAgents in darwin config")
-    # --- Home Manager module: camilladsp-heartbeat uses HM-native launchd.agents (domain = "user") ---
+    # --- Home Manager module: camilladsp-heartbeat uses HM-native launchd.agents (domain = "gui") ---
     # src/modules/camilladsp.nix is imported into the HM config (home.nix
-    # sharedModules), so it must use launchd.agents.<name> with domain = "user".
+    # sharedModules), so it must use launchd.agents.<name> with domain = "gui".
     (assert' (containsRegex "launchd.agents.\"camilladsp-heartbeat\"" camilladspModuleNix) "camilladsp-heartbeat: uses launchd.agents")
-    (assert' (containsRegex "domain = \"user\"" camilladspModuleNix) "camilladsp-heartbeat: domain = user")
+    (assert' (containsRegex "domain = \"gui\"" camilladspModuleNix) "camilladsp-heartbeat: domain = gui")
     (assert' (
       !containsRegex "environment.userLaunchAgents.\"camilladsp-heartbeat\"" camilladspModuleNix
     ) "camilladsp-heartbeat: not environment.userLaunchAgents")
@@ -68,12 +68,12 @@ in
     # dropped and no plist is generated. This assertion guards against a future
     # regression that removes the flag.
     (assert' (containsRegex "enable = true" camilladspModuleNix) "camilladsp-heartbeat: enable = true set")
-    # --- Home Manager modules: HM-native launchd.agents with domain = "user" ---
+    # --- Home Manager modules: HM-native launchd.agents with domain = "gui" ---
     # ext-discord-music-rpc.nix and cloud-drives.nix are imported into the HM
     # config (home-manager.users / sharedModules), so they must use
-    # launchd.agents.<name> with domain = "user", NOT environment.userLaunchAgents.
+    # launchd.agents.<name> with domain = "gui", NOT environment.userLaunchAgents.
     (assert' (containsRegex "launchd.agents.\"discord-music-rpc\"" discordRpcNix) "discord-music-rpc: uses launchd.agents")
-    (assert' (containsRegex "domain = \"user\"" discordRpcNix) "discord-music-rpc: domain = user")
+    (assert' (containsRegex "domain = \"gui\"" discordRpcNix) "discord-music-rpc: domain = gui")
     # HM's launchd module filters agents by a per-agent `enable` flag (defaults
     # false via mkEnableOption), so without `enable = true` the agent is silently
     # dropped and no plist is generated. This assertion guards against a future
