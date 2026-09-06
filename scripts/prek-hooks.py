@@ -59,7 +59,7 @@ def run_check(files: list[str], repo_root: Path, scoped: bool = False) -> int:
             cmd.append("--scoped")
         if files:
             cmd.extend(files)
-        result = subprocess.run(cmd, cwd=repo_root, shell=False)
+        result = subprocess.run(cmd, cwd=repo_root, shell=False, check=False)
         if result.returncode != 0:
             print(
                 f"scripts/prek-hooks.py: error: check failed (exit {result.returncode})",
@@ -81,7 +81,7 @@ def run_check(files: list[str], repo_root: Path, scoped: bool = False) -> int:
         cmd.append("--scoped")
     if files:
         cmd.extend(files)
-    result = subprocess.run(cmd, shell=False)
+    result = subprocess.run(cmd, shell=False, check=False)
     if result.returncode != 0:
         print(
             f"scripts/prek-hooks.py: error: check failed (exit {result.returncode})",
@@ -114,7 +114,7 @@ def run_test(files: list[str], repo_root: Path) -> int:
         # Intentionally NOT passing --no-fail-fast: test defaults to fail-fast.
         # CI explicitly passes --no-fail-fast to accumulate all failures.
         cmd = ["nix", "run", "./src#test"]
-        result = subprocess.run(cmd, env=env, cwd=repo_root, shell=False)
+        result = subprocess.run(cmd, env=env, cwd=repo_root, shell=False, check=False)
         if result.returncode != 0:
             print(
                 f"scripts/prek-hooks.py: error: test failed (exit {result.returncode})",
@@ -132,7 +132,7 @@ def run_test(files: list[str], repo_root: Path) -> int:
         "-File",
         str(repo_root / "scripts" / "test.ps1"),
     ]
-    result = subprocess.run(cmd, shell=False)
+    result = subprocess.run(cmd, shell=False, check=False)
     if result.returncode != 0:
         print(
             f"scripts/prek-hooks.py: error: test failed (exit {result.returncode})",
@@ -193,9 +193,9 @@ def __main__() -> None:
     exit code.  Catches ``KeyboardInterrupt`` and exits with code 2.
     """
     try:
-        exit(main())
+        sys.exit(main())
     except KeyboardInterrupt:
-        exit(2)
+        sys.exit(2)
 
 
 if __name__ == "__main__":
