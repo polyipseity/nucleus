@@ -10,7 +10,7 @@ applyTo: "src/lockfiles/lockfile.json, src/lockfiles/lockfile.schema.json, src/s
 
 ## Two-tier model
 
-- **Pinned root sections** — authoritative. The enforcement lib (`lockfile-enforcement-lib.*`, used by `bump-lockfile --verify-installed` / `-VerifyInstalled`) compares installed versions against pins and reports drift. Currently pinned: `bun`, `cargo-binstall`, `cursor` (editor plugins — filesystem-based enforcement), `pwsh`, `rustup`, `scoop`, `source-builds`, `uv`, `version`, `vm-setup`, `vscode` (editor plugins — filesystem-based enforcement), `winget`.
+- **Pinned root sections** — authoritative. The enforcement lib (`lockfile-enforcement-lib.*`, used by `bump-lockfile --verify-installed` / `-VerifyInstalled`) compares installed versions against pins and reports drift. Currently pinned: `bun`, `cargo-binstall`, `cursor` (editor plugins — filesystem-based enforcement, including `superpowers` via Nix-store symlink), `pwsh`, `rustup`, `scoop`, `source-builds`, `uv`, `version`, `vm-setup`, `winget`.
 - **`suggestions` block** — warn-only, never enforced. Always warns that sub-sections are non-authoritative. Never causes a check failure. Sub-sections: `cursor`, `homebrew` (masApps only), `ollama`, `opencode`, `vscode`, `vm-setup.windows`.
 
 ## Invariant
@@ -37,12 +37,16 @@ All other `flake.lock` duplicates (nixpkgs, homebrew brews/casks) are removed.
 
 ## Canonical classification
 
-- **Root (pinned, enforced):** tools with a deterministic installed-version query on the target platform (`bun` global packages, `uv` tools, `cargo-binstall` crates, `rustup` stable toolchain, `pwsh` modules, `scoop`, `winget`, `vm-setup` ISO/digest sources, `source-builds`/`version` manual pins, `cursor`/`vscode` editor plugins — filesystem-based enforcement).
+- **Root (pinned, enforced):** tools with a deterministic installed-version query on the target platform (`bun` global packages, `uv` tools, `cargo-binstall` crates, `rustup` stable toolchain, `pwsh` modules, `scoop`, `winget`, `vm-setup` ISO/digest sources, `source-builds`/`version` manual pins, `cursor` editor plugins — filesystem-based enforcement including `superpowers` via Nix-store symlink (`builtins.fetchGit` at eval time, symlink into `/nix/store/` at activation).
 - **`suggestions` (warn-only):** `cursor` (editor extensions, same as `vscode`), `homebrew.masApps` (App Store IDs, not in any lockfile), `ollama` (daemon-dependent), `opencode` (VCS-pinned plugins, no installed-version query), `vscode` (editor extensions — Windows lock bridge, see above), `vm-setup.windows` (manual digest).
 
 ## Shared probe library
 
 The enforcement probe logic lives in a shared lib used by `bump-lockfile --verify-installed` (and the Windows equivalent). It is NOT wired into any repo check/test step — enforcement validates the provisioned machine only. The check step `05-lockfile-validation.*` performs structural validation (placeholder/overlap checks) separately and does NOT source the enforcement lib.
+
+### Superpowers provisioning
+
+The superpowers plugin is provisioned declaratively via `builtins.fetchGit` in `src/modules/agents.nix`. At Nix eval time, `cursor.superpowers.source` and `cursor.superpowers.rev` from the lockfile are used to fetch the git repository into the Nix store. At activation time, a symlink is created at `~/.local/share/nucleus/plugins/superpowers` pointing into `/nix/store/`. The POSIX enforcement check (`_lfe_check_superpowers`) verifies this symlink exists and targets a Nix store path. The Windows enforcement check verifies whatever state exists (symlink or directory) since Windows provisioning is not yet declarative.
 
 - POSIX: `src/scripts/checks/lockfile-enforcement-lib.sh` (`_lfe_check_*`, `_lfe_check_vscode`, `_lfe_warn_suggestions`, `_lfe_run_core`, `verify_installed_versions`). `bump-lockfile --verify-installed` calls `verify_installed_versions` directly.
 - Windows: `src/scripts/checks/lockfile-enforcement-lib.ps1` (`Invoke-LockfileEnforcement` with message-function delegates). `bump-lockfile -VerifyInstalled` calls it.
