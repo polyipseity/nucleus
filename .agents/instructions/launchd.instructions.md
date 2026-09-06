@@ -75,7 +75,7 @@ Default to user launch agents. Use a global agent only when the job genuinely
 must run for every logged-in user with identical behavior (e.g. a system-wide
 accessibility helper). When in doubt, user launch agent.
 
-### Activation-restart gap — use HM `launchd.agents` (domain = "user") for persistent daemons
+### Activation-restart gap — use HM `launchd.agents` (domain = "gui") for persistent daemons
 
 `environment.userLaunchAgents` (nix-darwin top-level) only `launchctl load`s an
 agent if it is NOT already loaded. It does not restart a loaded agent when
@@ -85,17 +85,17 @@ logs out — the running process is never replaced. (camilladsp-heartbeat ran a
 pre-fix binary for days after deploy.)
 
 For any persistent user-scoped job (KeepAlive / Restart=always / long-lived
-loop), declare it as Home Manager `launchd.agents.<name>` with `domain = "user"`
+loop), declare it as Home Manager `launchd.agents.<name>` with `domain = "gui"`
 instead. HM's `setupLaunchAgents` does `cmp -s` and bootout+bootstrap on any
 plist change, so a rebuild takes effect on the next apply with no manual
-intervention. The install path (`~/Library/LaunchAgents`) and `gui/<uid>` domain
-are identical, so TCC scope and per-user configurability are unchanged.
+intervention. The install path (`~/Library/LaunchAgents`) and `gui/<uid>` bootstrap
+target are identical, so TCC scope and per-user configurability are unchanged.
 
 `environment.userLaunchAgents` remains valid only for the nix-darwin config
 context (`hosts/MacBook/*.nix` imported via `MacBook/default.nix` `imports`)
 where the job is genuinely short-lived or does not need restart-on-change. Do
 not introduce new persistent `environment.userLaunchAgents` entries; migrate
-existing ones to HM `launchd.agents` (domain = "user").
+existing ones to HM `launchd.agents` (domain = "gui").
 
 ## Plist generation for `environment.userLaunchAgents`
 
@@ -126,13 +126,13 @@ inside a Home Manager module (anything imported via `home.nix` or
 `home-manager.users.<user>.environment does not exist`.
 
 In HM module context, declare a user-scoped agent with HM's native
-`launchd.agents.<name>` and `domain = "user"`. This installs the plist into
-`~/Library/LaunchAgents` and registers it in the user domain (`gui/<uid>`),
+`launchd.agents.<name>` and `domain = "gui"`. This installs the plist into
+`~/Library/LaunchAgents` and bootstraps it into the `gui/<uid>` domain,
 same install path and no-warning load context as `environment.userLaunchAgents`:
 
 ```nix
 launchd.agents."<name>" = {
-  domain = "user";
+  domain = "gui";
   config = {
     Label = "local.<name>";
     ProgramArguments = [ "..." ];
