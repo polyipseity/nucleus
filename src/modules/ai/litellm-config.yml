@@ -54,6 +54,13 @@ litellm_settings:
     # Namespace prefix for all LiteLLM Redis keys.  Prevents collisions
     # with other services sharing the same Redis instance.
     namespace: "litellm"
+  # Register the Cline custom handler.  The handler module lives next
+  # to the config file (deployed via symlink by apply.sh / Windows service).
+  # get_instance_fn resolves "cline_handler.cline_handler" relative to
+  # the config file directory.
+  custom_provider_map:
+    - provider: cline
+      custom_handler: cline_handler.cline_handler
 
 # WARNING suppresses per-request INFO chatter while still capturing
 # errors, warnings, and startup diagnostics.
@@ -136,7 +143,7 @@ model_list:
 
   - model_name: default
     litellm_params:
-      model: openai/cline-pass/mimo-v2.5
+      model: cline/cline-pass/mimo-v2.5
       api_base: https://api.cline.bot/api/v1
       api_key: os.environ/KEY_AI_CLINE
       order: 2
