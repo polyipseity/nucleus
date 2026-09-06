@@ -39,7 +39,7 @@
 
   # Journald retention: cap total journal size so disk-bound systemd services
   # (all managed nucleus services on NixOS) don't grow unbounded.
-  services.journald.extraConfig = ''
-    SystemMaxUse=500M
-  '';
+  services.journald.settings.Journal = {
+    SystemMaxUse = "500M";
+  };
 }
