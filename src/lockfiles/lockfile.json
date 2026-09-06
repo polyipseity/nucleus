@@ -2,13 +2,19 @@
   "$schema": "./lockfile.schema.json",
   "bun": {
     "@mariozechner/pi-coding-agent": "0.73.1",
-    "clawhub": "0.20.0"
+    "clawhub": "0.23.3"
   },
   "cargo-binstall": {
     "cargo-cache": "0.8.3",
     "cargo-nextest": "0.9.143",
     "nickel-lang-lsp": "1.17.0",
     "pay-respects": "0.8.8"
+  },
+  "cursor": {
+    "superpowers": {
+      "rev": "b36e0829c6d0140e93cfef2ca599b1b07d4a7797",
+      "source": "https://github.com/obra/superpowers.git"
+    }
   },
   "pwsh": {
     "PSScriptAnalyzer": "1.25.0",
@@ -31,30 +37,7 @@
       "source": "https://code.blicky.net/yorhel/ncdu.git"
     }
   },
-  "cursor": {
-    "superpowers": {
-      "rev": "b36e0829c6d0140e93cfef2ca599b1b07d4a7797",
-      "source": "https://github.com/obra/superpowers.git"
-    }
-  },
-  "vscode": {
-    "superpowers": {
-      "rev": "b36e0829c6d0140e93cfef2ca599b1b07d4a7797",
-      "source": "https://github.com/obra/superpowers.git"
-    }
-  },
   "suggestions": {
-    "opencode": {
-      "superpowers": {
-        "rev": "b36e0829c6d0140e93cfef2ca599b1b07d4a7797",
-        "source": "https://github.com/obra/superpowers.git"
-      }
-    },
-    "homebrew": {
-      "masApps": {
-        "Amphetamine": "937984704"
-      }
-    },
     "cursor": {
       "arrterian.nix-env-selector": "1.3.2",
       "astral-sh.ty": "2025.71.13500942",
@@ -122,6 +105,11 @@
       "tweag.vscode-nickel": "0.5.0",
       "vadimcn.vscode-lldb": "1.12.2"
     },
+    "homebrew": {
+      "masApps": {
+        "Amphetamine": "937984704"
+      }
+    },
     "ollama": {
       "MacBook": [
         {
@@ -160,6 +148,12 @@
         }
       ]
     },
+    "opencode": {
+      "superpowers": {
+        "rev": "b36e0829c6d0140e93cfef2ca599b1b07d4a7797",
+        "source": "https://github.com/obra/superpowers.git"
+      }
+    },
     "vm-setup": {
       "windows": {}
     },
@@ -167,23 +161,23 @@
       "arrterian.nix-env-selector": "1.3.2",
       "astral-sh.ty": "2025.71.13500942",
       "asvetliakov.vscode-neovim": "1.19.0",
-      "charliermarsh.ruff": "2026.68.0",
+      "charliermarsh.ruff": "2026.70.0",
       "christian-kohler.npm-intellisense": "1.4.5",
       "christian-kohler.path-intellisense": "2.10.0",
       "cl.eide": "3.26.14",
       "cschlosser.doxdocgen": "1.4.0",
-      "davidanson.vscode-markdownlint": "0.62.0",
+      "davidanson.vscode-markdownlint": "0.62.1",
       "dbaeumer.vscode-eslint": "3.0.34",
       "docker.docker": "0.18.0",
       "editorconfig.editorconfig": "0.18.2",
       "esbenp.prettier-vscode": "12.4.0",
       "github.codespaces": "1.18.15",
-      "github.remotehub": "0.65.2026072301",
-      "github.vscode-github-actions": "0.31.5",
+      "github.remotehub": "0.65.2026080601",
+      "github.vscode-github-actions": "0.32.3",
       "heaths.vscode-guid": "1.9.0",
       "ibm.output-colorizer": "0.1.2",
       "icrawl.discord-vscode": "5.9.2",
-      "james-yu.latex-workshop": "10.16.1",
+      "james-yu.latex-workshop": "10.18.0",
       "jnoortheen.nix-ide": "0.5.13",
       "keroc.hex-fmt": "1.0.0",
       "mark-hansen.hledger-vscode": "0.0.12",
@@ -204,7 +198,7 @@
       "ms-vscode-remote.remote-ssh-edit": "0.87.0",
       "ms-vscode-remote.remote-wsl": "0.104.3",
       "ms-vscode.cmake-tools": "1.23.52",
-      "ms-vscode.cpp-devtools": "0.6.13",
+      "ms-vscode.cpp-devtools": "0.6.15",
       "ms-vscode.cpptools": "1.32.2",
       "ms-vscode.cpptools-extension-pack": "1.5.1",
       "ms-vscode.cpptools-themes": "2.0.0",
@@ -212,9 +206,9 @@
       "ms-vscode.makefile-tools": "0.12.17",
       "ms-vscode.powershell": "2025.4.0",
       "ms-vscode.remote-explorer": "0.5.0",
-      "ms-vscode.remote-repositories": "0.43.2026072301",
+      "ms-vscode.remote-repositories": "0.43.2026080601",
       "ms-vscode.remote-server": "1.6.2026072909",
-      "ms-vscode.vscode-chat-customizations-evaluations": "1.1.2026072818",
+      "ms-vscode.vscode-chat-customizations-evaluations": "1.1.2026080719",
       "ms-vscode.vscode-serial-monitor": "0.13.251128001",
       "ms-vsliveshare.vsliveshare": "1.1.122",
       "myriad-dreamin.tinymist": "0.15.2",
@@ -231,7 +225,7 @@
       "vadimcn.vscode-lldb": "1.12.2"
     }
   },
-  "updated": "2026-08-19T04:11:41Z",
+  "updated": "2026-09-06T12:11:53Z",
   "uv": {
     "discord-music-rpc": {
       "rev": "bba71027a684db53f3fcde5adbd3d42627241a83",
@@ -245,28 +239,33 @@
   "vm-setup": {
     "nixos-iso": {
       "aarch64-linux": {
-        "digest": "sha256:29e34f6204ddf49b25d957db4cc43ac1132235c3285f5865f4d1c07c68d3e7b1",
-        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1057639.0ae2bc1419c3/nixos-minimal-26.11pre1057639.0ae2bc1419c3-aarch64-linux.iso"
+        "digest": "sha256:8202bbcf5ab2308435a95dd8c9650ba15144b6a482e5e6de3b4cdf1bbf934333",
+        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1068089.c043004d1c69/nixos-minimal-26.11pre1068089.c043004d1c69-aarch64-linux.iso"
       },
       "x86_64-linux": {
-        "digest": "sha256:78b131d842f64972e9f50d3b1affb6892c7f8dbc8cd6fc92289dbef7f4cf253b",
-        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1057639.0ae2bc1419c3/nixos-minimal-26.11pre1057639.0ae2bc1419c3-x86_64-linux.iso"
+        "digest": "sha256:ab312aa186601480b73951f294826d9f9598c46c8e5078955b22fbdc697239b8",
+        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1068089.c043004d1c69/nixos-minimal-26.11pre1068089.c043004d1c69-x86_64-linux.iso"
       }
     },
     "tart-images": {
       "sequoia": {
-        "digest": "sha256:785c3acb40fa5af6dd5aab96cd60408372c26125e173c14ea417498d086f829c",
+        "digest": "sha256:4947ac5ab1b2fdc46ab856132d2ba958f8e45b5f85192c66370dafc028c514dd",
         "image": "ghcr.io/cirruslabs/macos-sequoia-base"
       },
       "tahoe": {
-        "digest": "sha256:e3c3f00c2247e302e83db7a79274997e54f4b39e887bd4da79e529048b6d40d9",
+        "digest": "sha256:1b093499716409d29e8b5336844528e1cae375db97d2ad8e5aeff78cf0da201e",
         "image": "ghcr.io/cirruslabs/macos-tahoe-base"
       }
     }
   },
+  "vscode": {
+    "superpowers": {
+      "rev": "b36e0829c6d0140e93cfef2ca599b1b07d4a7797",
+      "source": "https://github.com/obra/superpowers.git"
+    }
+  },
   "winget": {
     "7zip.7zip": "26.01",
-    "EclipseAdoptium.Temurin.25.JDK": "25.0.1",
     "Anysphere.Cursor": "3.14.7",
     "BlenderFoundation.Blender": "5.1.2",
     "BurntSushi.ripgrep": "15.1.0",
@@ -274,6 +273,7 @@
     "Clement.bottom": "0.12.3",
     "DEVCOM.JetBrainsMonoNerdFont": "3.3.0",
     "Discord.Discord.Canary": "1.0.982",
+    "EclipseAdoptium.Temurin.25.JDK": "25.0.1",
     "EqualizerAPO.EqualizerAPO": "1.4.2",
     "GIMP.GIMP": "3.2.4",
     "Git.Git": "2.54.0",
@@ -297,15 +297,15 @@
     "Microsoft.WindowsTerminal.Preview": "1.25.1322.0",
     "MusicBrainz.Picard": "2.13.3",
     "Neovim.Neovim": "0.12.2",
+    "OBSProject.OBSStudio": "31.1.2",
     "Obsidian.Obsidian": "1.12.7",
     "Ollama.Ollama": "0.30.6",
-    "OBSProject.OBSStudio": "31.1.2",
     "Oven-sh.Bun": "1.3.14",
     "Parsec.Parsec": "150.101.0.0",
     "PeterVerbeek.PeaceEqualizerAPO": "1.6.10",
     "Rclone.Rclone": "1.74.3",
-    "RimSort.RimSort": "1.12.0",
     "Redis.Redis": "3.0.504",
+    "RimSort.RimSort": "1.12.0",
     "Rustlang.Rustup": "1.29.0",
     "SST.opencode": "1.16.2",
     "SecretsOPerationS.SOPS": "3.12.2",
