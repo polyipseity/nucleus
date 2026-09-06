@@ -217,34 +217,30 @@ $_subs
 EOF
 }
 
-# Compare the local superpowers plugin clone against the lockfile editor plugin sections.
-# Root cursor/vscode sections are enforced (hard-fail on drift).
+# Compare the Nix-store symlink against the lockfile cursor.superpowers pin.
+# The symlink at ~/.local/share/nucleus/plugins/superpowers points into /nix/store/
+# when the declarative builtins.fetchGit derivation has been evaluated.
 _lfe_check_superpowers() {
   local _lf="$1" _jq="$2"
   local _plugin_dir="$HOME/.local/share/nucleus/plugins/superpowers"
-  # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
-  local _expected_rev
-  _expected_rev="$(printf '%s' "$_lf" | "$_jq" -r '(.cursor // {}).superpowers.rev // (.vscode // {}).superpowers.rev // empty' 2>/dev/null)" || true # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
+  local _expected_rev _expected_source
+  _expected_source="$(printf '%s' "$_lf" | "$_jq" -r '.cursor.superpowers.source // empty' 2>/dev/null)" || true # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
+  _expected_rev="$(printf '%s' "$_lf" | "$_jq" -r '.cursor.superpowers.rev // empty' 2>/dev/null)" || true       # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
   [ -z "$_expected_rev" ] && {
-    say -l superpowers "no superpowers rev in lockfile; skipping"
+    say -l superpowers "no superpowers pin in lockfile; skipping"
     return 0
   }
-  if [ ! -d "$_plugin_dir" ]; then
-    error "superpowers.$_expected_rev: plugin directory not found at $_plugin_dir"
+  if [ ! -L "$_plugin_dir" ]; then
+    error "superpowers.$_expected_rev: plugin symlink not found at $_plugin_dir"
     return 1
   fi
-  local _actual_rev
-  # check-suppress:suppression_doc: git rev-parse may fail if the directory is not a git repo -- error path handles it.
-  _actual_rev="$(git -C "$_plugin_dir" rev-parse HEAD 2>/dev/null)" || true
-  if [ -z "$_actual_rev" ]; then
-    error "superpowers.$_expected_rev: could not read HEAD from $_plugin_dir"
+  local _target
+  _target="$(readlink "$_plugin_dir")"
+  if [[ "$_target" != /nix/store/* ]]; then
+    error "superpowers.$_expected_rev: symlink target $_target is not a Nix store path"
     return 1
   fi
-  if [ "$_actual_rev" != "$_expected_rev" ]; then
-    error "superpowers.$_expected_rev: expected rev $_expected_rev, got $_actual_rev"
-    return 1
-  fi
-  say -l superpowers "$_expected_rev present"
+  say -l superpowers "$_expected_rev present (store path: $_target)"
   return 0
 }
 

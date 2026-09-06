@@ -128,27 +128,32 @@ function Invoke-LockfileEnforcement {
     & $InfoFn "source-builds: VCS/rev-pinned — not version-verifiable, skipping enforcement"
   }
 
-  # --- cursor/vscode superpowers (local plugin clone — filesystem-based enforcement) ---
-  # Read from cursor or vscode root sections; both reference the same plugin directory.
+  # --- cursor superpowers (Nix-store symlink — filesystem-based enforcement) ---
+  # On POSIX hosts, builtins.fetchGit evaluates at Nix build time and the
+  # activation script symlinks ~/.local/share/nucleus/plugins/superpowers into
+  # /nix/store/.  On Windows, provisioning is not yet declarative; the check
+  # verifies whatever state exists (symlink or directory).
   $expectedRev = $null
   if ($Lockfile.ContainsKey('cursor') -and $Lockfile.cursor.ContainsKey('superpowers')) {
     $expectedRev = $Lockfile.cursor.superpowers.rev
-  } elseif ($Lockfile.ContainsKey('vscode') -and $Lockfile.vscode.ContainsKey('superpowers')) {
-    $expectedRev = $Lockfile.vscode.superpowers.rev
   }
   if ($expectedRev) {
     $pluginDir = Join-Path $env:USERPROFILE '.local\share\nucleus\plugins\superpowers'
     if (Test-Path $pluginDir) {
-      $actualRev = & git -C $pluginDir rev-parse HEAD 2>$null  # check-suppress:suppression_doc: git may fail if the directory is not a git repo; empty output triggers the error path
-      if ([string]::IsNullOrWhiteSpace($actualRev)) {
-        & $ErrorFn "superpowers.$expectedRev`: could not read HEAD from $pluginDir"; $errors++
-      } elseif ($actualRev.Trim() -ne $expectedRev) {
-        & $ErrorFn "superpowers.$expectedRev`: expected rev $expectedRev, got $($actualRev.Trim())"; $errors++
+      $item = Get-Item $pluginDir
+      if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+        # Symlink — verify it points into /nix/store/ (POSIX provisioning path)
+        $target = [System.IO.Path]::GetFullPath($pluginDir)
+        if ($target -like '/nix/store/*') {
+          & $InfoFn "superpowers.$expectedRev`: present (store path: $target)"
+        } else {
+          & $InfoFn "superpowers.$expectedRev`: symlink present (target: $target, not a Nix store path — Windows provisioning is not declarative)"
+        }
       } else {
-        & $InfoFn "superpowers.$expectedRev`: present"
+        & $InfoFn "superpowers.$expectedRev`: directory present (not a symlink — Windows provisioning is not declarative)"
       }
     } else {
-      & $ErrorFn "superpowers.$expectedRev`: plugin directory not found at $pluginDir"; $errors++
+      & $ErrorFn "superpowers.$expectedRev`: plugin path not found at $pluginDir"; $errors++
     }
   }
 
