@@ -100,6 +100,17 @@ function Sync-LiteLLMService {
   New-Item -Path $configLink -ItemType SymbolicLink -Target $configSource -Force > $null
   Set-ManagedSymlinkDeleteProtection -Context "Sync-LiteLLMService" -Path $configLink
 
+  # Symlink the Cline custom handler alongside the config.  litellm's
+  # get_instance_fn resolves the handler relative to the config file directory.
+  $handlerLink = Join-Path -Path $programDataDir -ChildPath "cline_handler.py"
+  $handlerSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\ai\cline_handler.py"
+  if (-not (Test-Path -Path $handlerSource -PathType Leaf)) {
+    throw "Cline handler source not found: $handlerSource"
+  }
+  if (Test-Path -Path $handlerLink) { Remove-Item -Path $handlerLink -Force }
+  New-Item -Path $handlerLink -ItemType SymbolicLink -Target $handlerSource -Force > $null
+  Set-ManagedSymlinkDeleteProtection -Context "Sync-LiteLLMService" -Path $handlerLink
+
   $logFile = Join-Path -Path $serviceLogDir -ChildPath "combined.log"
 
   # Data-driven: read the env catalog to discover API keys and their env var

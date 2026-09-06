@@ -340,6 +340,9 @@ _ash_script_dir="$(cd "$(dirname -- "$0")" && pwd -P)"
 # re-running apply.  All host services (macOS launchd, NixOS systemd, Windows
 # scheduled task) reference this well-known path.
 ln -sf "$REPO_ROOT/src/modules/ai/litellm-config.yml" "$NUCLEUS_USER_ROOT/litellm-config.yml"
+# Symlink the Cline custom handler alongside the config.  litellm's
+# get_instance_fn resolves the handler relative to the config file directory.
+ln -sf "$REPO_ROOT/src/modules/ai/cline_handler.py" "$NUCLEUS_USER_ROOT/cline_handler.py"
 
 run_nix() {
   NIX_CONFIG="$(merge_nix_config)" NIX_PATH="nixpkgs=flake:nixpkgs" nix --option warn-dirty false "$@"
