@@ -21,34 +21,21 @@ from __future__ import annotations
 
 import json
 import logging
-import time
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    AsyncIterator,
-    Callable,
-    Iterator,
-    Optional,
-    Union,
-)
+from collections.abc import AsyncIterator, Callable, Iterator
+from typing import Any
 
 import httpx
-
 from litellm.llms.custom_httpx.http_handler import AsyncHTTPHandler, HTTPHandler
+from litellm.llms.custom_llm import CustomLLM
 from litellm.types.utils import GenericStreamingChunk
 from litellm.utils import ModelResponse
-
-from litellm.llms.custom_llm import CustomLLM
-
-if TYPE_CHECKING:
-    from litellm import CustomStreamWrapper
 
 logger = logging.getLogger("litellm_logger")
 
 
 def _build_request_headers(
-    api_key: Optional[str],
-    extra_headers: Optional[dict],
+    api_key: str | None,
+    extra_headers: dict | None,
 ) -> dict[str, str]:
     """Build HTTP headers for the Cline API request."""
     headers: dict[str, str] = {
@@ -113,8 +100,8 @@ def _strip_cline_envelope(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def _timeout_to_seconds(
-    timeout: Optional[Union[float, httpx.Timeout]],
-) -> Optional[float]:
+    timeout: float | httpx.Timeout | None,
+) -> float | None:
     """Convert litellm timeout to a plain float (seconds)."""
     if timeout is None:
         return None
@@ -135,15 +122,15 @@ class ClineHandler(CustomLLM):
         model_response: ModelResponse,
         print_verbose: Callable,
         encoding: Any,
-        api_key: Optional[str],
+        api_key: str | None,
         logging_obj: Any,
         optional_params: dict,
-        acompletion: Optional[bool] = None,
-        litellm_params: Optional[dict] = None,
-        logger_fn: Optional[Callable] = None,
-        headers: Optional[dict] = None,
-        timeout: Optional[Union[float, httpx.Timeout]] = None,
-        client: Optional[HTTPHandler] = None,
+        acompletion: bool | None = None,
+        litellm_params: dict | None = None,
+        logger_fn: Callable | None = None,
+        headers: dict | None = None,
+        timeout: float | httpx.Timeout | None = None,
+        client: HTTPHandler | None = None,
     ) -> ModelResponse:
         url = f"{api_base.rstrip('/')}/chat/completions"
         http_headers = _build_request_headers(api_key, headers)
@@ -172,59 +159,58 @@ class ClineHandler(CustomLLM):
         model_response: ModelResponse,
         print_verbose: Callable,
         encoding: Any,
-        api_key: Optional[str],
+        api_key: str | None,
         logging_obj: Any,
         optional_params: dict,
-        acompletion: Optional[bool] = None,
-        litellm_params: Optional[dict] = None,
-        logger_fn: Optional[Callable] = None,
-        headers: Optional[dict] = None,
-        timeout: Optional[Union[float, httpx.Timeout]] = None,
-        client: Optional[HTTPHandler] = None,
+        acompletion: bool | None = None,
+        litellm_params: dict | None = None,
+        logger_fn: Callable | None = None,
+        headers: dict | None = None,
+        timeout: float | httpx.Timeout | None = None,
+        client: HTTPHandler | None = None,
     ) -> Iterator[GenericStreamingChunk]:
         url = f"{api_base.rstrip('/')}/chat/completions"
         http_headers = _build_request_headers(api_key, headers)
         body = _build_request_body(model, messages, optional_params, stream=True)
         timeout_s = _timeout_to_seconds(timeout)
 
-        with httpx.Client(timeout=timeout_s) as http_client:
-            with http_client.stream(
-                "POST", url, json=body, headers=http_headers
-            ) as response:
-                response.raise_for_status()
-                for line in response.iter_lines():
-                    if not line.startswith("data: "):
-                        continue
-                    payload = line[len("data: ") :]
-                    if payload.strip() == "[DONE]":
-                        break
-                    try:
-                        chunk_data = json.loads(payload)
-                    except json.JSONDecodeError:
-                        continue
-                    # Standard SSE chunk — Cline does NOT wrap streaming
-                    # in an envelope.
-                    choices = chunk_data.get("choices", [])
-                    if not choices:
-                        continue
-                    delta = choices[0].get("delta", {})
-                    finish_reason = choices[0].get("finish_reason")
-                    usage_block = chunk_data.get("usage")
+        with httpx.Client(timeout=timeout_s) as http_client, http_client.stream(
+            "POST", url, json=body, headers=http_headers
+        ) as response:
+            response.raise_for_status()
+            for line in response.iter_lines():
+                if not line.startswith("data: "):
+                    continue
+                payload = line[len("data: ") :]
+                if payload.strip() == "[DONE]":
+                    break
+                try:
+                    chunk_data = json.loads(payload)
+                except json.JSONDecodeError:
+                    continue
+                # Standard SSE chunk — Cline does NOT wrap streaming
+                # in an envelope.
+                choices = chunk_data.get("choices", [])
+                if not choices:
+                    continue
+                delta = choices[0].get("delta", {})
+                finish_reason = choices[0].get("finish_reason")
+                usage_block = chunk_data.get("usage")
 
-                    usage: Any = None
-                    if usage_block:
-                        from litellm.types.utils import ChatCompletionUsageBlock
+                usage: Any = None
+                if usage_block:
+                    from litellm.types.utils import ChatCompletionUsageBlock
 
-                        usage = ChatCompletionUsageBlock(**usage_block)
+                    usage = ChatCompletionUsageBlock(**usage_block)
 
-                    yield GenericStreamingChunk(
-                        text=delta.get("content", "") or "",
-                        tool_use=None,
-                        is_finished=finish_reason is not None,
-                        finish_reason=finish_reason or "",
-                        usage=usage,
-                        index=choices[0].get("index", 0),
-                    )
+                yield GenericStreamingChunk(
+                    text=delta.get("content", "") or "",
+                    tool_use=None,
+                    is_finished=finish_reason is not None,
+                    finish_reason=finish_reason or "",
+                    usage=usage,
+                    index=choices[0].get("index", 0),
+                )
 
     async def acompletion(
         self,
@@ -235,15 +221,15 @@ class ClineHandler(CustomLLM):
         model_response: ModelResponse,
         print_verbose: Callable,
         encoding: Any,
-        api_key: Optional[str],
+        api_key: str | None,
         logging_obj: Any,
         optional_params: dict,
-        acompletion: Optional[bool] = None,
-        litellm_params: Optional[dict] = None,
-        logger_fn: Optional[Callable] = None,
-        headers: Optional[dict] = None,
-        timeout: Optional[Union[float, httpx.Timeout]] = None,
-        client: Optional[AsyncHTTPHandler] = None,
+        acompletion: bool | None = None,
+        litellm_params: dict | None = None,
+        logger_fn: Callable | None = None,
+        headers: dict | None = None,
+        timeout: float | httpx.Timeout | None = None,
+        client: AsyncHTTPHandler | None = None,
     ) -> ModelResponse:
         url = f"{api_base.rstrip('/')}/chat/completions"
         http_headers = _build_request_headers(api_key, headers)
@@ -272,15 +258,15 @@ class ClineHandler(CustomLLM):
         model_response: ModelResponse,
         print_verbose: Callable,
         encoding: Any,
-        api_key: Optional[str],
+        api_key: str | None,
         logging_obj: Any,
         optional_params: dict,
-        acompletion: Optional[bool] = None,
-        litellm_params: Optional[dict] = None,
-        logger_fn: Optional[Callable] = None,
-        headers: Optional[dict] = None,
-        timeout: Optional[Union[float, httpx.Timeout]] = None,
-        client: Optional[AsyncHTTPHandler] = None,
+        acompletion: bool | None = None,
+        litellm_params: dict | None = None,
+        logger_fn: Callable | None = None,
+        headers: dict | None = None,
+        timeout: float | httpx.Timeout | None = None,
+        client: AsyncHTTPHandler | None = None,
     ) -> AsyncIterator[GenericStreamingChunk]:
         url = f"{api_base.rstrip('/')}/chat/completions"
         http_headers = _build_request_headers(api_key, headers)
