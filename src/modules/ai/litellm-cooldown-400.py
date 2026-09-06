@@ -77,9 +77,12 @@ def _patched_is_cooldown_required(
     except (ValueError, TypeError):
         status_int = 0
 
-    if status_int == 400 and exception_str is not None:
-        if _CREDIT_EXHAUSTION_RE.search(exception_str):
-            return True
+    if (
+        status_int == 400
+        and exception_str is not None
+        and _CREDIT_EXHAUSTION_RE.search(exception_str)
+    ):
+        return True
 
     return _original_is_cooldown_required(
         litellm_router_instance=litellm_router_instance,
