@@ -28,29 +28,15 @@ if [ -z "$PYTHON3" ]; then
   exit 0
 fi
 
-TMPDIR_TEST="$(mktemp -d)"
-trap 'rm -rf "$TMPDIR_TEST"' EXIT
-
-# Helper: run provision-steamcmd.py with a settings JSON file and capture output.
+# Helper: run provision-steamcmd.py with a JSON settings string and capture output.
 run_provision() {
-  local settings_path="$1"
-  "$PYTHON3" "$PROVISION_PY" "$settings_path"
+  local settings_json="$1"
+  "$PYTHON3" "$PROVISION_PY" "$settings_json"
 }
 
 # ── Test: extracts steamcmd_install_path from valid JSON ──────────────
 test_extracts_steamcmd_path() {
-  local settings="$TMPDIR_TEST/valid.json"
-  cat >"$settings" <<'EOF'
-{
-  "current_instance": "Default",
-  "instances": {
-    "Default": {
-      "steamcmd_install_path": "~/.local/share/RimSort/instances/Default",
-      "game_folder": "/path/to/game"
-    }
-  }
-}
-EOF
+  local settings='{"current_instance":"Default","instances":{"Default":{"steamcmd_install_path":"~/.local/share/RimSort/instances/Default","game_folder":"/path/to/game"}}}'
   local result
   result=$(run_provision "$settings")
   # The Python script returns the raw value with literal tilde (not expanded).
@@ -65,18 +51,7 @@ EOF
 
 # ── Test: returns empty when steamcmd_install_path is missing ─────────
 test_missing_steamcmd_path() {
-  local settings="$TMPDIR_TEST/no_path.json"
-  cat >"$settings" <<'EOF'
-{
-  "current_instance": "Default",
-  "instances": {
-    "Default": {
-      "game_folder": "/path/to/game",
-      "steam_client_integration": true
-    }
-  }
-}
-EOF
+  local settings='{"current_instance":"Default","instances":{"Default":{"game_folder":"/path/to/game","steam_client_integration":true}}}'
   local result
   result=$(run_provision "$settings")
   if [ -z "$result" ]; then
@@ -88,13 +63,7 @@ EOF
 
 # ── Test: returns empty when instances.Default is missing ─────────────
 test_missing_default_instance() {
-  local settings="$TMPDIR_TEST/no_default.json"
-  cat >"$settings" <<'EOF'
-{
-  "current_instance": "Default",
-  "instances": {}
-}
-EOF
+  local settings='{"current_instance":"Default","instances":{}}'
   local result
   result=$(run_provision "$settings")
   if [ -z "$result" ]; then
@@ -106,12 +75,7 @@ EOF
 
 # ── Test: returns empty when instances key is missing ─────────────────
 test_missing_instances_key() {
-  local settings="$TMPDIR_TEST/no_instances.json"
-  cat >"$settings" <<'EOF'
-{
-  "current_instance": "Default"
-}
-EOF
+  local settings='{"current_instance":"Default"}'
   local result
   result=$(run_provision "$settings")
   if [ -z "$result" ]; then
@@ -123,17 +87,7 @@ EOF
 
 # ── Test: extracts Windows-style path ─────────────────────────────────
 test_windows_style_path() {
-  local settings="$TMPDIR_TEST/windows.json"
-  cat >"$settings" <<'EOF'
-{
-  "instances": {
-    "Default": {
-      "steamcmd_install_path": "~/AppData/Local/RimSort/instances/Default",
-      "game_folder": "C:/Program Files (x86)/Steam/steamapps/common/RimWorld"
-    }
-  }
-}
-EOF
+  local settings='{"instances":{"Default":{"steamcmd_install_path":"~/AppData/Local/RimSort/instances/Default","game_folder":"C:/Program Files (x86)/Steam/steamapps/common/RimWorld"}}}'
   local result
   result=$(run_provision "$settings")
   # The Python script returns the raw value with literal tilde (not expanded).
@@ -148,16 +102,7 @@ EOF
 
 # ── Test: absolute path preserved as-is ───────────────────────────────
 test_absolute_path() {
-  local settings="$TMPDIR_TEST/absolute.json"
-  cat >"$settings" <<'EOF'
-{
-  "instances": {
-    "Default": {
-      "steamcmd_install_path": "/opt/rimsort/steamcmd"
-    }
-  }
-}
-EOF
+  local settings='{"instances":{"Default":{"steamcmd_install_path":"/opt/rimsort/steamcmd"}}}'
   local result
   result=$(run_provision "$settings")
   if [ "$result" = "/opt/rimsort/steamcmd" ]; then
