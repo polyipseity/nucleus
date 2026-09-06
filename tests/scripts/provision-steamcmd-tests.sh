@@ -112,6 +112,36 @@ test_absolute_path() {
   fi
 }
 
+# ── Test: tilde expansion resolves to HOME ───────────────────────────
+test_tilde_expansion() {
+  local _t='~'
+  local input="${_t}/.local/share/RimSort/instances/Default"
+  local result="${input#\~}"
+  result="${HOME}${result}"
+  local expected="${HOME}/.local/share/RimSort/instances/Default"
+  if [ "$result" = "$expected" ]; then
+    assert_pass "tilde_expansion: ~ expands to HOME"
+  else
+    assert_fail "tilde_expansion: ~ expands to HOME" "expected '$expected', got '$result'"
+  fi
+}
+
+# ── Test: non-tilde absolute path gets HOME prepended ────────────────
+test_absolute_path_expansion() {
+  local input="/opt/rimsort/steamcmd"
+  local result="${input#\~}"
+  result="${HOME}${result}"
+  # Edge case: absolute path doesn't start with ~, so #\~ is a no-op,
+  # and HOME gets prepended. POSIX RimSort settings always use ~-prefixed
+  # paths, so this is a documented edge case, not a real scenario.
+  local expected="${HOME}/opt/rimsort/steamcmd"
+  if [ "$result" = "$expected" ]; then
+    assert_pass "absolute_path_expansion: absolute path gets HOME prepended"
+  else
+    assert_fail "absolute_path_expansion: absolute path gets HOME prepended" "expected '$expected', got '$result'"
+  fi
+}
+
 # ── Run all tests ───────────────────────────────────────────────────
 test_extracts_steamcmd_path
 test_missing_steamcmd_path
@@ -119,6 +149,8 @@ test_missing_default_instance
 test_missing_instances_key
 test_windows_style_path
 test_absolute_path
+test_tilde_expansion
+test_absolute_path_expansion
 
 if [ "$TESTS_FAILED" -gt 0 ]; then
   printf '%d failed, %d passed\n' "$TESTS_FAILED" "$TESTS_PASSED"

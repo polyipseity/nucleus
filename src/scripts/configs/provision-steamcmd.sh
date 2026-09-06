@@ -32,7 +32,7 @@ if [ -z "$_ps_steamcmd_prefix" ]; then
 fi
 
 # Expand ~ to $HOME.
-_ps_steamcmd_prefix="${_ps_steamcmd_prefix#\$HOME}"
+_ps_steamcmd_prefix="${_ps_steamcmd_prefix#\~}"
 _ps_steamcmd_prefix="${HOME}${_ps_steamcmd_prefix}"
 
 _ps_steamcmd_dir="$_ps_steamcmd_prefix/steamcmd"
