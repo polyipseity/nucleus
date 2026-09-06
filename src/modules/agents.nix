@@ -29,7 +29,15 @@ let
   # exact pins (closes the drift root cause).  Mirrors pwsh.nix.
   lockfile = builtins.fromJSON (builtins.readFile ../lockfiles/lockfile.json);
   cargoBinstallDesired = builtins.attrNames (lockfile."cargo-binstall" or { });
-  superpowersRev = lockfile.cursor.superpowers.rev;
+
+  # Declarative superpowers fetch: evaluated at Nix build time, checked out
+  # into the Nix store once.  Activation symlinks — no git, no network.
+  superpowersLockfile = lockfile.cursor.superpowers;
+  superpowersSrc = builtins.fetchGit {
+    url = superpowersLockfile.source;
+    rev = superpowersLockfile.rev;
+    submodules = false;
+  };
 
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
@@ -214,26 +222,29 @@ in
     '';
 
     # -----------------------------------------------------------------------
-    # clone-superpowers-plugin
-    # Clones or updates the superpowers plugin repo into a fixed local path
-    # for VS Code / Cursor local plugin install.  The repo is fetched at
-    # apply time so VS Code and Cursor can load it from a local directory
-    # instead of fetching from a marketplace at runtime.
+    # symlink-superpowers-plugin
+    # Declaratively provisions the superpowers plugin as a Nix store symlink.
     #
-    # Why after install-bun-packages: the managed PATH prepend/append guards
-    # must be available (installed by install-bun-packages).  Ordering ensures
-    # the PATH is correct for any runtime tool needs.
+    # builtins.fetchGit evaluates at Nix build time, checking out the pinned
+    # rev into /nix/store/.  Activation creates a stable symlink from
+    # ~/.local/share/nucleus/plugins/superpowers → the store path.
+    #
+    # Why after linkGeneration: ensures ~/.local/share/ parent exists.
+    # No dependency on bun/PATH guards — this is a pure store path.
     #
     # Why best-effort: the system configuration applied successfully.  A
     # missing plugin does not break any declared system state.
     # -----------------------------------------------------------------------
-    clone-superpowers-plugin = lib.hm.dag.entryAfter [ "install-bun-packages" ] ''
-      "${activationBundle}/src/scripts/agents/clone-superpowers-plugin.sh" \
-        "${pkgs.git}/bin/git" \
-        "${managedPaths.toShellPrependGuard}" \
-        "${managedPaths.toShellAppendGuard}" \
-        "$HOME/.local/share/nucleus/plugins/superpowers" \
-        "${superpowersRev}"
+    symlink-superpowers-plugin = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      _ssp_target="$HOME/.local/share/nucleus/plugins/superpowers"
+      _ssp_src="${superpowersSrc}"
+      if [ -L "$_ssp_target" ] && [ "$(readlink "$_ssp_target")" = "$_ssp_src" ]; then
+        say -l superpowers "superpowers symlink already converged; skipping"
+      else
+        mkdir -p "$(dirname "$_ssp_target")"
+        ln -sfn "$_ssp_src" "$_ssp_target"
+        say -l superpowers "superpowers symlinked to $_ssp_src"
+      fi
     '';
 
   };
