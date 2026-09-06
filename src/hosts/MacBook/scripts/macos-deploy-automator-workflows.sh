@@ -23,7 +23,7 @@ while IFS= read -r _vsd_entry; do
 
   # Register Thumbnail.png with IconServices so Finder shows the custom SF Symbol icon.
   "$_vsd_set_icon_bin" "$_vsd_wf_dir/Contents/QuickLook/Thumbnail.png" "$_vsd_wf_dir"
-  mdimport "$_vsd_wf_dir"
+  /usr/bin/mdimport "$_vsd_wf_dir"
 
   # Enable in presentation_modes format (macOS 14+).
   # CFBundleIdentifier is set in each workflow's Info.plist.
