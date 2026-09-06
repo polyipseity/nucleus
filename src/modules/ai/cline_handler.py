@@ -157,23 +157,11 @@ class ClineHandler(CustomLLM):
 
         response_data = _strip_cline_envelope(response_data)
 
-        # Populate the model_response from the unwrapped Cline response.
-        choices_raw = response_data.get("choices", [])
-        if choices_raw:
-            model_response.choices = response_data["choices"]
-        model_response.id = response_data.get("id", model_response.id)
-        model_response.model = response_data.get("model", model_response.model)
-        model_response.created = response_data.get("created", model_response.created)
-        model_response.system_fingerprint = response_data.get(
-            "system_fingerprint", model_response.system_fingerprint
-        )
-        usage = response_data.get("usage")
-        if usage:
-            from litellm.types.utils import Usage
-
-            model_response.usage = Usage(**usage)
-
-        return model_response
+        # Build a fresh ModelResponse from the unwrapped Cline response.
+        # Constructing from the dict lets litellm/Pydantic coerce the nested
+        # dicts into proper Choice / Message objects, which is required by
+        # post_call_processing (it accesses choice.message as an attribute).
+        return ModelResponse(**response_data)
 
     def streaming(
         self,
@@ -269,23 +257,11 @@ class ClineHandler(CustomLLM):
 
         response_data = _strip_cline_envelope(response_data)
 
-        # Populate the model_response from the unwrapped Cline response.
-        choices_raw = response_data.get("choices", [])
-        if choices_raw:
-            model_response.choices = response_data["choices"]
-        model_response.id = response_data.get("id", model_response.id)
-        model_response.model = response_data.get("model", model_response.model)
-        model_response.created = response_data.get("created", model_response.created)
-        model_response.system_fingerprint = response_data.get(
-            "system_fingerprint", model_response.system_fingerprint
-        )
-        usage = response_data.get("usage")
-        if usage:
-            from litellm.types.utils import Usage
-
-            model_response.usage = Usage(**usage)
-
-        return model_response
+        # Build a fresh ModelResponse from the unwrapped Cline response.
+        # Constructing from the dict lets litellm/Pydantic coerce the nested
+        # dicts into proper Choice / Message objects, which is required by
+        # post_call_processing (it accesses choice.message as an attribute).
+        return ModelResponse(**response_data)
 
     async def astreaming(
         self,
