@@ -81,7 +81,7 @@ for db_path in db_paths:
             print("vscode-trust: trusted", dev_path, "in", db_path, file=sys.stderr)
         finally:
             conn.close()
-    except Exception as e:
+    except (sqlite3.Error, OSError, ValueError) as e:
         # Non-fatal: DB may be locked by a running VS Code instance, or
         # absent on a fresh install before VS Code has been launched once.
         print("vscode-trust: warning:", db_path, "-", e, file=sys.stderr)
