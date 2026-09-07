@@ -477,13 +477,10 @@ in
         (mkManagedDedupSet config.home.homeDirectory)
         envVars.macBookAllVars
       ];
-      # One-shot at login; gui-env-path activation step covers subsequent applies.
+      # One-shot at login in the GUI (Aqua) session so launchctl setenv
+      # values are visible to Finder-launched apps. gui-env-path activation
+      # step covers subsequent applies.
       RunAtLoad = true;
-      # HM auto-injects a "Background" LimitLoadToSessionType for user-domain
-      # agents (mkDefault). Background-domain launchctl setenv does not affect
-      # the Aqua domain where Finder-launched apps inherit env vars. Override
-      # to Aqua so env vars set by this agent are visible to GUI apps.
-      LimitLoadToSessionType = "Aqua";
     };
   };
 }
