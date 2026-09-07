@@ -1,4 +1,23 @@
 {
   "$schema": "./pi-settings.schema.json",
-  "prompts": ["~/.agents/prompts"]
+  "defaultModel": "mimo-v2.5",
+  "defaultProjectTrust": "ask",
+  "defaultProvider": "opencode-go",
+  "defaultThinkingLevel": "high",
+  "httpIdleTimeoutMs": 300000,
+  "lastChangelogVersion": "0.84.4",
+  "markdown": {
+    "mermaid": "final"
+  },
+  "prompts": [
+    "~/.agents/prompts"
+  ],
+  "showCacheMissNotices": true,
+  "showHardwareCursor": true,
+  "terminal": {
+    "showTerminalProgress": true
+  },
+  "theme": "light/dark",
+  "treeFilterMode": "default",
+  "tuiMode": "regular"
 }
