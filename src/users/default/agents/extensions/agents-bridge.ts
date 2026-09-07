@@ -13,7 +13,7 @@
 //     injected into the system prompt via before_agent_start
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
 interface InstructionFile {
@@ -104,12 +104,6 @@ async function readInstructions(
 }
 
 export default function (pi: ExtensionAPI) {
-  // Debug: write marker file to verify extension loads.
-  writeFile(
-    join(process.env.HOME ?? "/tmp", ".agents-bridge-loaded"),
-    new Date().toISOString(),
-  ).catch(() => {});
-
   // Notify user about loaded instruction files at session start.
   pi.on("session_start", async (_event, ctx) => {
     const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? "";
@@ -123,13 +117,6 @@ export default function (pi: ExtensionAPI) {
       ? await collectInstructionFiles(join(ctx.cwd, ".agents", "instructions"), "project")
       : [];
     const total = userFiles.length + projectFiles.length;
-
-    // Debug: write count to marker file.
-    writeFile(
-      join(homeDir, ".agents-bridge-loaded"),
-      `${new Date().toISOString()} total=${total} user=${userFiles.length} project=${projectFiles.length}\n`,
-    ).catch(() => {});
-
     if (total > 0 && ctx.hasUI) {
       ctx.ui.notify(
         `Loaded ${total} instruction files from .agents/instructions/`,
