@@ -40,7 +40,7 @@ fi
 # --- Extension symlink (method 1: writable, live repo) ---
 "$SCRIPT_DIR/../configs/seed-writable-symlink.sh" \
   "$_spi_extensions_dir/agents-bridge.ts" \
-  "src/users/default/agents/extensions/agents-bridge.ts"
+  "src/users/default/agents/pi-extensions/agents-bridge.ts"
 
 # --- Settings symlink (method 1: writable, live repo) ---
 "$SCRIPT_DIR/../configs/seed-writable-symlink.sh" \
