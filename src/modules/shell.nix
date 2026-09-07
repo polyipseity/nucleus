@@ -296,9 +296,10 @@ in
   #     tool binary (mtime freshness check).
   #   * Fails gracefully if a completion subcommand exits non-zero (soft-fail).
   #
-  # Why after install-cargo-binstall-packages: all Nix and non-Nix package managers
-  # (bun, uv, cargo-binstall) have converged by that point, so every tool binary
-  # that could provide completions is present before we try to generate them.
+  # DEFERRED: Completion generation stays imperative because it probes tool
+  # binaries directly from the Nix store and generates completion files at
+  # runtime. A declarative approach would require embedding completion files
+  # in every package, which is not yet standard practice.
   # ---------------------------------------------------------------------------
 
   home.activation = {

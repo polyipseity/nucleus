@@ -71,8 +71,10 @@ function Sync-WindowsRDP {
     # immediately available after apply without manual intervention.
     Set-Service -Name 'TermService' -StartupType Automatic
     Start-Service -Name 'TermService'
-    # Open the built-in Windows firewall rules for RDP (TCP 3389 and UDP).
-    # The rules already exist in every Windows install; we only enable them.
+    # WHY: Firewall rules toggle per-user via Enabled flag — DSC
+    # Microsoft.Windows.Settings/Firewall only supports global on/off, not
+    # individual rule management. These built-in rules already exist on every
+    # Windows install; we only enable/disable them.
     Enable-NetFirewallRule -Name 'RemoteDesktop-UserMode-In-TCP'
     Enable-NetFirewallRule -Name 'RemoteDesktop-UserMode-In-UDP'
   }

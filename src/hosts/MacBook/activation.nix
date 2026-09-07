@@ -162,9 +162,10 @@ in
       fi
     fi
 
-    # ---- ensure-log-dirs -----------------------------------------------------------
-    # Create system log dirs (all hosts) and macOS-specific user log dirs (console
-    # user + chown). Shared with NixOS via ensure-log-dirs.sh.
+    # WHY: Log directory creation is imperative because it must run AFTER the
+    # root symlinks resolve (Home Manager activation ordering is alphabetical,
+    # not dependency-based). The shared log-dirs-init.sh handles macOS-specific
+    # user log dirs with chown for console user.
     "${activationBundle}/src/scripts/services/log-dirs-init.sh" \
       "${config.nucleus.logging.systemLogDir}" \
       "${builtins.toString systemLogDirs}" \

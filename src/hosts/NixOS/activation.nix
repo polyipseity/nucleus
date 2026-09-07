@@ -82,8 +82,10 @@ in
   # ---------------------------------------------------------------------------
   # nixos-ensure-log-dirs
   # Create system log directories for all nucleus systemd services before they
-  # start, so journald/stderr redirect targets exist on disk.  Runs AFTER the
-  # root symlinks so <root>/logs resolves into the physical target.
+  # WHY: Log directory creation is imperative because it must run AFTER the
+  # root symlinks resolve (Nix activation ordering is alphabetical, not
+  # dependency-based). systemd LogsDirectory/StateDirectory cannot handle this
+  # ordering requirement.
   # ---------------------------------------------------------------------------
   system.activationScripts.nixos-ensure-log-dirs = lib.mkAfter ''
     "${activationBundle}/src/scripts/services/log-dirs-init.sh" \
