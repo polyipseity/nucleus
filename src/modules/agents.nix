@@ -251,15 +251,9 @@ in
     # missing plugin does not break any declared system state.
     # -----------------------------------------------------------------------
     symlink-superpowers-plugin = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      _ssp_target="$HOME/.local/share/nucleus/plugins/superpowers"
-      _ssp_src="${superpowersSrc}"
-      if [ -L "$_ssp_target" ] && [ "$(readlink "$_ssp_target")" = "$_ssp_src" ]; then
-        say -l superpowers "superpowers symlink already converged; skipping"
-      else
-        mkdir -p "$(dirname "$_ssp_target")"
-        ln -sfn "$_ssp_src" "$_ssp_target"
-        say -l superpowers "superpowers symlinked to $_ssp_src"
-      fi
+      "${activationBundle}/src/scripts/agents/symlink-superpowers-plugin.sh" \
+        "$HOME/.local/share/nucleus/plugins/superpowers" \
+        "${superpowersSrc}"
     '';
 
   };
