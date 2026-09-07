@@ -245,7 +245,7 @@
                   else if prev.stdenv.hostPlatform.isWindows then
                     prev.fetchurl {
                       url = "https://github.com/HEnquist/camillagui-backend/releases/download/v${version}/bundle_windows_amd64.zip";
-                      hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # TODO: nix-prefetch-url --unpack https://github.com/HEnquist/camillagui-backend/releases/download/v4.1.0/bundle_windows_amd64.zip
+                      hash = "sha256-rIyV8gLRy2dPLx+bfNdP8UQyIZOnw7dOyAIZXqEjEuo=";
                     }
                   else
                     prev.fetchurl {
@@ -382,22 +382,22 @@
                     if prev.stdenv.hostPlatform.isAarch64 then
                       prev.fetchurl {
                         url = "https://github.com/HEnquist/camilladsp/releases/download/v${version}/camilladsp-macos-aarch64.tar.gz";
-                        hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # TODO: nix-prefetch-url --unpack https://github.com/HEnquist/camilladsp/releases/download/v4.1.3/camilladsp-macos-aarch64.tar.gz
+                        hash = "sha256-cGKKx7ZvZ9oEUi6QQNSEwsvWHpN50ifFlfRtxhNVvvg=";
                       }
                     else
                       prev.fetchurl {
-                        url = "https://github.com/HEnquist/camilladsp/releases/download/v${version}/camilladsp-macos-intel.tar.gz";
-                        hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # TODO: nix-prefetch-url
+                        url = "https://github.com/HEnquist/camilladsp/releases/download/v${version}/camilladsp-macos-amd64.tar.gz";
+                        hash = "sha256-tm/1/QNjRDQOEORgYOrweh+0W1wJL7pG8RZFdVAIVWQ=";
                       }
                   else if prev.stdenv.hostPlatform.isWindows then
                     prev.fetchurl {
                       url = "https://github.com/HEnquist/camilladsp/releases/download/v${version}/camilladsp-windows-amd64.zip";
-                      hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # TODO: nix-prefetch-url --unpack https://github.com/HEnquist/camilladsp/releases/download/v4.1.3/camilladsp-windows-amd64.zip
+                      hash = "sha256-2UneWsX8Eygt1HFV4KxnCHwJ3YS698fVaGFr/G5D0ZA=";
                     }
                   else
                     prev.fetchurl {
                       url = "https://github.com/HEnquist/camilladsp/releases/download/v${version}/camilladsp-linux-amd64.tar.gz";
-                      hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # TODO: nix-prefetch-url
+                      hash = "sha256-VfXsLtgPzHmlQ2cvn4ms5FV9KQ2AWE7zHuBEIRG9CxE=";
                     };
 
                 dontBuild = true;
@@ -442,7 +442,7 @@
 
                   src = prev.fetchurl {
                     url = "https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip";
-                    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # TODO: nix-prefetch-url --unpack https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip
+                    hash = "sha256-dmmxcN7kLbjuInN3XtffstFzvbobhJ9w0sezeSkLzhM=";
                   };
 
                   dontBuild = true;
