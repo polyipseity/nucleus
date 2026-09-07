@@ -100,6 +100,21 @@ in
     '';
 
     # -------------------------------------------------------------------------
+    # symlink-pi-agent-config
+    # Symlinks Pi coding agent config files from ~/.agents/ into ~/.pi/agent/.
+    #
+    # Skills are handled natively by Pi (auto-discovered from ~/.agents/skills/
+    # and .agents/skills/), so no symlink is needed for those.
+    #
+    # Why after install-agent-skills: the extensions/ and pi-settings.json
+    # entries are deployed by symlink-agent-config.sh (which runs before
+    # install-agent-skills), so they are available as symlink sources.
+    # -------------------------------------------------------------------------
+    symlink-pi-agent-config = lib.hm.dag.entryAfter [ "install-agent-skills" ] ''
+      "${activationBundle}/src/scripts/agents/symlink-pi-agent-config.sh" "${repoRoot}" "${effectiveUsername}"
+    '';
+
+    # -------------------------------------------------------------------------
     # install-bun-packages
     # Idempotently converges the declarative bun global package set.
     #
