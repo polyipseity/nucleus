@@ -104,7 +104,10 @@ async function readInstructions(
 }
 
 export default function (pi: ExtensionAPI) {
-  // Notify user about loaded instruction files at session start.
+  // Collect instruction counts at session start for the notification.
+  let userInstructionCount = 0;
+  let projectInstructionCount = 0;
+
   pi.on("session_start", async (_event, ctx) => {
     const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? "";
     if (!homeDir) return;
@@ -113,44 +116,45 @@ export default function (pi: ExtensionAPI) {
       join(homeDir, ".agents", "instructions"),
       "user",
     );
-    if (userFiles.length > 0 && ctx.hasUI) {
-      ctx.ui.notify(
-        `Loaded ${userFiles.length} user instructions from ~/.agents/instructions/`,
-        "info",
-      );
-    }
+    userInstructionCount = userFiles.length;
 
     const projectFiles = ctx.isProjectTrusted()
       ? await collectInstructionFiles(join(ctx.cwd, ".agents", "instructions"), "project")
       : [];
-    if (projectFiles.length > 0 && ctx.hasUI) {
-      ctx.ui.notify(
-        `Loaded ${projectFiles.length} project instructions from .agents/instructions/`,
-        "info",
-      );
-    }
+    projectInstructionCount = projectFiles.length;
   });
 
-  // Register project-scope prompts for discovery.
+  // Register project-scope prompts for discovery and show combined notification.
   // User-scope prompts are handled via settings.json.
   pi.on("resources_discover", async (event, ctx) => {
     const projectPromptsDir = join(event.cwd, ".agents", "prompts");
+    let promptCount = 0;
     try {
       const s = await stat(projectPromptsDir);
       if (s.isDirectory()) {
         const entries = await readdir(projectPromptsDir);
-        const promptCount = entries.filter((e) => e.endsWith(".md")).length;
-        if (promptCount > 0 && ctx.hasUI) {
-          ctx.ui.notify(
-            `Loaded ${promptCount} project prompts from .agents/prompts/`,
-            "info",
-          );
-        }
+        promptCount = entries.filter((e) => e.endsWith(".md")).length;
         return { promptPaths: [projectPromptsDir] };
       }
     } catch {
       // directory does not exist
     }
+
+    // Show single comprehensive notification with all loaded resources.
+    const parts: string[] = [];
+    if (promptCount > 0) {
+      parts.push(`${promptCount} project prompts`);
+    }
+    if (userInstructionCount > 0) {
+      parts.push(`${userInstructionCount} user instructions`);
+    }
+    if (projectInstructionCount > 0) {
+      parts.push(`${projectInstructionCount} project instructions`);
+    }
+    if (parts.length > 0 && ctx.hasUI) {
+      ctx.ui.notify(`Loaded ${parts.join(", ")}`, "info");
+    }
+
     return {};
   });
 
