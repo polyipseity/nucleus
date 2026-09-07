@@ -69,6 +69,13 @@ Register-Step -Id "service-registry" -Name "Service registry validation" -Action
           Write-ErrorMessage "services.json: '$svcName' host '$hostName' missing required fields for type '$type'"
           $svcErrors++
         }
+        if ($type -in @('launchctl', 'systemctl')) {
+          $scope = $hEntry.scope
+          if ($scope -notin @('user', 'system')) {
+            Write-ErrorMessage "services.json: '$svcName' host '$hostName' has invalid or missing scope '$scope'"
+            $svcErrors++
+          }
+        }
       }
     }
   }

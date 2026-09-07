@@ -119,6 +119,30 @@ run_service_registry() {
           end | tostring
         )
       ] | @tsv' "$_svc_json")
+
+    # Validate launchctl/systemctl entries have valid scope
+    while IFS=$'\t' read -r _name _host _type _scope; do
+      case "$_type" in
+      launchctl | systemctl)
+        case "$_scope" in
+        user | system) ;;
+        *)
+          error "services.json: '$_name' host '$_host' has invalid or missing scope '$_scope'"
+          _svc_errors=$((_svc_errors + 1))
+          ;;
+        esac
+        ;;
+      esac
+    done < <(jq -r '
+      to_entries[] | select(.value | type == "object") | select(.key | startswith("$") | not) |
+      .key as $name |
+      (.value.hosts // {}) | to_entries[] |
+      [
+        $name,
+        .key,
+        (.value.type // "missing"),
+        (.value.scope // "")
+      ] | @tsv' "$_svc_json")
   fi
 
   # Validate user-scoped host entries have justification.
