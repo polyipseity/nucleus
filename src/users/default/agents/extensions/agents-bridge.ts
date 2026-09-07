@@ -104,6 +104,28 @@ async function readInstructions(
 }
 
 export default function (pi: ExtensionAPI) {
+  // Notify user about loaded instruction files at session start.
+  pi.on("session_start", async (_event, ctx) => {
+    if (!ctx.hasUI) return;
+    const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? "";
+    if (!homeDir) return;
+
+    const userFiles = await collectInstructionFiles(
+      join(homeDir, ".agents", "instructions"),
+      "user",
+    );
+    const projectFiles = ctx.isProjectTrusted()
+      ? await collectInstructionFiles(join(ctx.cwd, ".agents", "instructions"), "project")
+      : [];
+    const total = userFiles.length + projectFiles.length;
+    if (total > 0) {
+      ctx.ui.notify(
+        `Loaded ${total} instruction files from .agents/instructions/`,
+        "info",
+      );
+    }
+  });
+
   // Register project-scope prompts for discovery.
   // User-scope prompts are handled via settings.json.
   pi.on("resources_discover", async (event, _ctx) => {
