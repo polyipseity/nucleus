@@ -20,6 +20,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
+import * as process from "node:process";
 
 /** A discovered instruction file with its scope and absolute path. */
 interface InstructionFile {
