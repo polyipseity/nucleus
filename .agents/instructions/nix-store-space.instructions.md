@@ -16,10 +16,10 @@ Managed in [`posix-base.nix`](../../src/modules/posix-base.nix) (NixOS `nix.sett
 | `keep-derivations` / `keep-outputs` | `true` | Intentional — supports `nix-shell` and rollback |
 | `lazy-trees` | `true` | Reduces eval-time copy of flake source trees |
 | `eval-cores` | `0` (`auto`) | Parallel Nix evaluation |
-| `min-free` | `16 GiB` | GC trigger when store volume free space drops below this during builds |
-| `max-free` | `64 GiB` | Target free space after automatic GC |
+| `min-free` | `16 GB` | GC trigger when store volume free space drops below this during builds |
+| `max-free` | `64 GB` | Target free space after automatic GC |
 
-**Different from** [`apply.sh`](../../scripts/apply.sh) `health-check` subcommand `--min-free-bytes` (default 16 GiB system-wide disk warning).
+**Different from** [`apply.sh`](../../scripts/apply.sh) `health-check` subcommand `--min-free-bytes` (default 16 GB system-wide disk warning).
 
 Age-based store GC is canonical: `nix-collect-garbage --delete-older-than` via [`posix-base.nix`](../../src/modules/posix-base.nix), [`nix-store-gc.sh`](../../src/scripts/services/nix-store-gc.sh), and [`gc.sh`](../../scripts/gc.sh). Never use `nix-collect-garbage -d`.
 

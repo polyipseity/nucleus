@@ -37,8 +37,8 @@ let
     # health-check free-space limit (scripts/health-check.{sh,ps1}
     # min_free_bytes) so the daemon starts reclaiming at the same point
     # pre-flight would block; max-free is 4x headroom in the same unit.
-    min-free = 17179869184; # 16 GiB
-    max-free = 68719476736; # 64 GiB
+    min-free = 17179869184; # 16 GB
+    max-free = 68719476736; # 64 GB
   };
 
   gitconfigActivation = ''
