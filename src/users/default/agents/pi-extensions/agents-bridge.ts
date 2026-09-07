@@ -113,13 +113,19 @@ export default function (pi: ExtensionAPI) {
       join(homeDir, ".agents", "instructions"),
       "user",
     );
+    if (userFiles.length > 0 && ctx.hasUI) {
+      ctx.ui.notify(
+        `Loaded ${userFiles.length} user instructions from ~/.agents/instructions/`,
+        "info",
+      );
+    }
+
     const projectFiles = ctx.isProjectTrusted()
       ? await collectInstructionFiles(join(ctx.cwd, ".agents", "instructions"), "project")
       : [];
-    const total = userFiles.length + projectFiles.length;
-    if (total > 0 && ctx.hasUI) {
+    if (projectFiles.length > 0 && ctx.hasUI) {
       ctx.ui.notify(
-        `Loaded ${total} instruction files from .agents/instructions/`,
+        `Loaded ${projectFiles.length} project instructions from .agents/instructions/`,
         "info",
       );
     }
@@ -127,11 +133,19 @@ export default function (pi: ExtensionAPI) {
 
   // Register project-scope prompts for discovery.
   // User-scope prompts are handled via settings.json.
-  pi.on("resources_discover", async (event, _ctx) => {
+  pi.on("resources_discover", async (event, ctx) => {
     const projectPromptsDir = join(event.cwd, ".agents", "prompts");
     try {
       const s = await stat(projectPromptsDir);
       if (s.isDirectory()) {
+        const entries = await readdir(projectPromptsDir);
+        const promptCount = entries.filter((e) => e.endsWith(".md")).length;
+        if (promptCount > 0 && ctx.hasUI) {
+          ctx.ui.notify(
+            `Loaded ${promptCount} project prompts from .agents/prompts/`,
+            "info",
+          );
+        }
         return { promptPaths: [projectPromptsDir] };
       }
     } catch {
