@@ -36,9 +36,9 @@ let
     # GC pressure thresholds (shared across hosts). min-free matches the
     # health-check free-space limit (scripts/health-check.{sh,ps1}
     # min_free_bytes) so the daemon starts reclaiming at the same point
-    # pre-flight would block; max-free is 2x headroom in the same unit.
-    min-free = 10000000000;
-    max-free = 20000000000;
+    # pre-flight would block; max-free is 4x headroom in the same unit.
+    min-free = 17179869184; # 16 GiB
+    max-free = 68719476736; # 64 GiB
   };
 
   gitconfigActivation = ''

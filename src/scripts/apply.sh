@@ -32,7 +32,7 @@ usage() {
 do_health_check() {
   REPO_ROOT="$(derive_repo_root)"
 
-  min_free_bytes=10000000000
+  min_free_bytes=17179869184 # 16 GiB — matches nix.custom.conf min-free
   secret_health=true
   log_health=false
   store_audit=false
