@@ -35,11 +35,11 @@ function Sync-CamillaGUIService {
 
   $ErrorActionPreference = "Stop"
   $taskName = "NucleusCamillaGUI"
-  $logDir = Get-NucleusLogDir
-  $serviceLogDir = Join-Path -Path $logDir -ChildPath "camillagui-backend"
-  $logFile = Join-Path -Path $serviceLogDir -ChildPath "combined.log"
 
   if (-not $Enabled) {
+    # DSC handles task removal via scheduler-user.dsc.yml. The PowerShell
+    # module only removes the task when the feature is explicitly disabled
+    # (cleanup path) — DSC does not provide a "disable and remove" toggle.
     # check-suppress:suppression_doc: probe -- task may not exist; $null check handles missing task.
     $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     if ($null -ne $existingTask) {
@@ -49,31 +49,13 @@ function Sync-CamillaGUIService {
     return
   }
 
-  # Compute deterministic install path (must match Invoke-CamillaGUISetup).
+  # Task registration is handled by DSC (system/scheduler-user.dsc.yml).
+  # This module verifies the binary exists and warns if not provisioned.
   $camillaguiBin = Join-Path $HOME ".local\bin\camillagui_backend\camillagui_backend.exe"
   if (-not (Test-Path $camillaguiBin)) {
     Write-NucleusInfo -CommandName 'camillagui-backend' "binary not found at $camillaguiBin; run Invoke-CamillaGUISetup first"
     return
   }
 
-  $userId = if ([string]::IsNullOrWhiteSpace($env:USERDOMAIN)) {
-    $env:USERNAME
-  } else {
-    "$($env:USERDOMAIN)\$($env:USERNAME)"
-  }
-
-  $configPath = Join-Path -Path $HOME -ChildPath ".config\camillagui-backend\config.yml"
-  $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -Command `"& '$camillaguiBin' -c '$configPath' *>> '$logFile'`""
-  $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
-  $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
-  $principal = New-ScheduledTaskPrincipal -UserId $userId -RunLevel Limited
-
-  # check-suppress:suppression_doc: probe -- task may not exist; $null check handles missing task.
-  $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-  if ($null -ne $existingTask) {
-    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
-  }
-
-  Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force
-  Write-NucleusInfo -CommandName 'camillagui-backend' "registered scheduled task '$taskName'"
+  Write-NucleusInfo -CommandName 'camillagui-backend' "task registration delegated to DSC (scheduler-user.dsc.yml)"
 }

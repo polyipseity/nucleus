@@ -39,12 +39,10 @@ function Sync-DiscordMusicRPC {
 
   $ErrorActionPreference = "Stop"
   $taskName = "NucleusDiscordMusicRPC"
-  $logDir = Get-NucleusLogDir
-  $serviceLogDir = Join-Path -Path $logDir -ChildPath "discord-music-rpc"
-  $null = New-Item -Path $serviceLogDir -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
-  $logFile = Join-Path -Path $serviceLogDir -ChildPath "combined.log"
 
   if (-not $Enabled) {
+    # DSC handles task removal via scheduler-user.dsc.yml. The PowerShell
+    # module only removes the task when the feature is explicitly disabled.
     # check-suppress:suppression_doc: probe -- task may not exist; $null check handles missing task.
     $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     if ($null -ne $existingTask) {
@@ -54,38 +52,14 @@ function Sync-DiscordMusicRPC {
     return
   }
 
-  # Config symlink is managed by apply.ps1 (same as LiteLLM).  Ensure log
-  # directory exists.
-  $null = New-Item -Path $logDir -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
-
-  # Find the discord-music-rpc binary (installed via uv tool install or pip).
+  # Task registration is handled by DSC (system/scheduler-user.dsc.yml).
+  # This module verifies the binary exists and warns if not provisioned.
   # check-suppress:suppression_doc: probe -- command may not be installed; $null check handles absence.
   $discordMusicRpcCmd = Get-Command -Name "discord-music-rpc" -ErrorAction SilentlyContinue
   if ($null -eq $discordMusicRpcCmd) {
     Write-NucleusInfo -CommandName 'discord-music-rpc' "binary not found in PATH; run nucleus-apply to converge the uv install (pinned via the uv section of src/lockfiles/lockfile.json — see Invoke-UvSetup)"
     return
   }
-  $discordMusicRpcBin = $discordMusicRpcCmd.Source
 
-  # Register a logon scheduled task that starts the tray app in a hidden
-  # PowerShell window so no console window appears at startup.
-  $userId = if ([string]::IsNullOrWhiteSpace($env:USERDOMAIN)) {
-    $env:USERNAME
-  } else {
-    "$($env:USERDOMAIN)\$($env:USERNAME)"
-  }
-
-  $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -Command `"& '$discordMusicRpcBin' *>> '$logFile'`""
-  $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
-  $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
-  $principal = New-ScheduledTaskPrincipal -UserId $userId -RunLevel Limited
-
-  # check-suppress:suppression_doc: probe -- task may not exist; $null check handles missing task.
-  $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-  if ($null -ne $existingTask) {
-    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
-  }
-
-  Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force
-  Write-NucleusInfo -CommandName 'discord-music-rpc' "registered scheduled task '$taskName'"
+  Write-NucleusInfo -CommandName 'discord-music-rpc' "task registration delegated to DSC (scheduler-user.dsc.yml)"
 }
