@@ -144,74 +144,89 @@ export default function agentsBridge(pi: ExtensionAPI): void {
   let userInstructionCount = 0;
   let projectInstructionCount = 0;
 
-  pi.on("session_start", async (_event: SessionStartEvent, ctx: ExtensionContext): Promise<void> => {
-    const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? "";
-    if (!homeDir) return;
+  pi.on(
+    "session_start",
+    async (_event: SessionStartEvent, ctx: ExtensionContext): Promise<void> => {
+      const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? "";
+      if (!homeDir) return;
 
-    const userFiles = await collectInstructionFiles(
-      join(homeDir, ".agents", "instructions"),
-      "user",
-    );
-    userInstructionCount = userFiles.length;
+      const userFiles = await collectInstructionFiles(
+        join(homeDir, ".agents", "instructions"),
+        "user",
+      );
+      userInstructionCount = userFiles.length;
 
-    const projectFiles = ctx.isProjectTrusted()
-      ? await collectInstructionFiles(
-          join(ctx.cwd, ".agents", "instructions"),
-          "project",
-        )
-      : [];
-    projectInstructionCount = projectFiles.length;
-  });
+      const projectFiles = ctx.isProjectTrusted()
+        ? await collectInstructionFiles(
+            join(ctx.cwd, ".agents", "instructions"),
+            "project",
+          )
+        : [];
+      projectInstructionCount = projectFiles.length;
+    },
+  );
 
   // Register project-scope prompts for discovery and show combined notification.
   // User-scope prompts are handled via settings.json.
-  pi.on("resources_discover", async (event: ResourcesDiscoverEvent, ctx: ExtensionContext): Promise<ResourcesDiscoverResult> => {
-    const projectPromptsDir = join(event.cwd, ".agents", "prompts");
-    let promptCount = 0;
-    let discoverResult: ResourcesDiscoverResult = {};
-    try {
-      const s = await stat(projectPromptsDir);
-      if (s.isDirectory()) {
-        const entries = await readdir(projectPromptsDir);
-        promptCount = entries.filter((e) => e.endsWith(".md")).length;
-        discoverResult = { promptPaths: [projectPromptsDir] };
+  pi.on(
+    "resources_discover",
+    async (
+      event: ResourcesDiscoverEvent,
+      ctx: ExtensionContext,
+    ): Promise<ResourcesDiscoverResult> => {
+      const projectPromptsDir = join(event.cwd, ".agents", "prompts");
+      let promptCount = 0;
+      let discoverResult: ResourcesDiscoverResult = {};
+      try {
+        const s = await stat(projectPromptsDir);
+        if (s.isDirectory()) {
+          const entries = await readdir(projectPromptsDir);
+          promptCount = entries.filter((e) => e.endsWith(".md")).length;
+          discoverResult = { promptPaths: [projectPromptsDir] };
+        }
+      } catch {
+        // directory does not exist
       }
-    } catch {
-      // directory does not exist
-    }
 
-    // Show single comprehensive notification with all loaded resources.
-    const parts: string[] = [];
-    if (promptCount > 0) {
-      parts.push(`${promptCount} project prompts`);
-    }
-    if (userInstructionCount > 0) {
-      parts.push(`${userInstructionCount} user instructions`);
-    }
-    if (projectInstructionCount > 0) {
-      parts.push(`${projectInstructionCount} project instructions`);
-    }
-    if (parts.length > 0 && ctx.hasUI) {
-      ctx.ui.notify(`Loaded ${parts.join(", ")}`, "info");
-    }
+      // Show single comprehensive notification with all loaded resources.
+      const parts: string[] = [];
+      if (promptCount > 0) {
+        parts.push(`${promptCount} project prompts`);
+      }
+      if (userInstructionCount > 0) {
+        parts.push(`${userInstructionCount} user instructions`);
+      }
+      if (projectInstructionCount > 0) {
+        parts.push(`${projectInstructionCount} project instructions`);
+      }
+      if (parts.length > 0 && ctx.hasUI) {
+        ctx.ui.notify(`Loaded ${parts.join(", ")}`, "info");
+      }
 
-    return discoverResult;
-  });
+      return discoverResult;
+    },
+  );
 
   // Inject instructions from both user and project scope into the system prompt.
-  pi.on("before_agent_start", async (event: BeforeAgentStartEvent, ctx: ExtensionContext): Promise<BeforeAgentStartEventResult> => {
-    const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? "";
-    if (!homeDir) return {};
+  pi.on(
+    "before_agent_start",
+    async (
+      event: BeforeAgentStartEvent,
+      ctx: ExtensionContext,
+    ): Promise<BeforeAgentStartEventResult> => {
+      const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? "";
+      if (!homeDir) return {};
 
-    const instructions = await readInstructions(
-      homeDir,
-      ctx.cwd,
-      ctx.isProjectTrusted(),
-    );
-    if (!instructions) return {};
+      const instructions = await readInstructions(
+        homeDir,
+        ctx.cwd,
+        ctx.isProjectTrusted(),
+      );
+      if (!instructions) return {};
 
-    return {
-      systemPrompt: `${event.systemPrompt}\n\n${instructions}`,
-    };
-  });
+      return {
+        systemPrompt: `${event.systemPrompt}\n\n${instructions}`,
+      };
+    },
+  );
 }
