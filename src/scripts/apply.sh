@@ -401,6 +401,34 @@ run_health_check() {
   run_nix run "$REPO_ROOT/src#apply" health-check "${_rhc_args[@]}"
 }
 
+run_pre_build() {
+  # Pre-build the full derivation closure so the main rebuild step is near-instant.
+  # Failure is a warning, not an error — the main rebuild still proceeds.
+  _rpb_host="$(resolve_nucleus_host)"
+  case "$_rpb_host" in
+  MacBook)
+    say -l pre-build "pre-building system derivation closure..."
+    if ! run_nix build --no-link "$REPO_ROOT/src#darwinConfigurations.MacBook.system"; then
+      warn -l pre-build "pre-build failed; proceeding with full rebuild (may be slower)"
+    fi
+    ;;
+  NixOS)
+    say -l pre-build "pre-building system derivation closure..."
+    if ! run_nix_as_root build --no-link "$REPO_ROOT/src#nixosConfigurations.NixOS.system"; then
+      warn -l pre-build "pre-build failed; proceeding with full rebuild (may be slower)"
+    fi
+    ;;
+  *)
+    # Standalone Home Manager — pre-build the user's activation package.
+    _rpb_user="${target_user:-${NUCLEUS_USERNAME:-$(id -un)}}"
+    say -l pre-build "pre-building home-manager derivation closure for $_rpb_user..."
+    if ! run_nix build --no-link "$REPO_ROOT/src#homeConfigurations.$_rpb_user.activationPackage"; then
+      warn -l pre-build "pre-build failed; proceeding with full rebuild (may be slower)"
+    fi
+    ;;
+  esac
+}
+
 run_ai_sync() {
   # Call nucleus-ai sync to converge locally installed Ollama models with
   # the declarative manifest after the system configuration has been applied.
@@ -596,6 +624,7 @@ Darwin)
   "$_ash_script_dir/secrets/generate-ssh-host-key.sh"
   "$_ash_script_dir/secrets/register-host-age-key.sh" --repo-root "$REPO_ROOT"
   run_health_check
+  run_pre_build
   # Activation scripts run under `env -i` and cannot read NUCLEUS_REPO_ROOT;
   # materialize it at the SYSTEM root so derive_repo_root resolves REPO_ROOT
   # during activation (menu-bar/autostart convergence depend on it).
@@ -631,6 +660,7 @@ Linux)
     "$_ash_script_dir/secrets/generate-ssh-host-key.sh"
     "$_ash_script_dir/secrets/register-host-age-key.sh" --repo-root "$REPO_ROOT"
     run_health_check
+    run_pre_build
     # Keep root invocations on root-owned HOME for consistent Nix behavior.
     run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#NixOS"
     # Re-derive and rewrite the system repo-root file after activation overwrote
@@ -655,6 +685,7 @@ Linux)
     # The profile name must match the homeConfigurations key in flake.nix.
     target_username="${target_user:-${NUCLEUS_USERNAME:-$(id -un)}}"
     run_health_check
+    run_pre_build
     run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
     run_pin_flake_inputs
     run_terminal_activations
