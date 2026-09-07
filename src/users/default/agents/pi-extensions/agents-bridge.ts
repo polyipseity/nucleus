@@ -132,12 +132,13 @@ export default function (pi: ExtensionAPI) {
   pi.on("resources_discover", async (event, ctx) => {
     const projectPromptsDir = join(event.cwd, ".agents", "prompts");
     let promptCount = 0;
+    let discoverResult: { promptPaths?: string[] } = {};
     try {
       const s = await stat(projectPromptsDir);
       if (s.isDirectory()) {
         const entries = await readdir(projectPromptsDir);
         promptCount = entries.filter((e) => e.endsWith(".md")).length;
-        return { promptPaths: [projectPromptsDir] };
+        discoverResult = { promptPaths: [projectPromptsDir] };
       }
     } catch {
       // directory does not exist
@@ -158,7 +159,7 @@ export default function (pi: ExtensionAPI) {
       ctx.ui.notify(`Loaded ${parts.join(", ")}`, "info");
     }
 
-    return {};
+    return discoverResult;
   });
 
   // Inject instructions from both user and project scope into the system prompt.
