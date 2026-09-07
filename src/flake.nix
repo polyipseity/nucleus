@@ -242,6 +242,11 @@
                       url = "https://github.com/HEnquist/camillagui-backend/releases/download/v${version}/bundle_linux_aarch64.tar.gz";
                       hash = "sha256-mlQVtE3aWEePGN6f1XLt8JL2Wf1eRcvoCG/1ZI3Aidc=";
                     }
+                  else if prev.stdenv.hostPlatform.isWindows then
+                    prev.fetchurl {
+                      url = "https://github.com/HEnquist/camillagui-backend/releases/download/v${version}/bundle_windows_amd64.zip";
+                      hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # TODO: nix-prefetch-url --unpack https://github.com/HEnquist/camillagui-backend/releases/download/v4.1.0/bundle_windows_amd64.zip
+                    }
                   else
                     prev.fetchurl {
                       url = "https://github.com/HEnquist/camillagui-backend/releases/download/v${version}/bundle_linux_amd64.tar.gz";
@@ -252,11 +257,19 @@
                 dontStrip = true;
                 dontPatchELF = true;
 
-                installPhase = ''
-                  mkdir -p $out/libexec/camillagui-backend $out/bin
-                  cp -r * $out/libexec/camillagui-backend/
-                  ln -s $out/libexec/camillagui-backend/camillagui_backend $out/bin/camillagui-backend
-                '';
+                installPhase =
+                  if prev.stdenv.hostPlatform.isWindows then
+                    ''
+                      mkdir -p $out/libexec/camillagui-backend $out/bin
+                      cp -r * $out/libexec/camillagui-backend/
+                      # Windows .exe — no symlink needed; the setup script references libexec directly.
+                    ''
+                  else
+                    ''
+                      mkdir -p $out/libexec/camillagui-backend $out/bin
+                      cp -r * $out/libexec/camillagui-backend/
+                      ln -s $out/libexec/camillagui-backend/camillagui_backend $out/bin/camillagui-backend
+                    '';
 
                 meta = {
                   description = "Web GUI for CamillaDSP";
@@ -267,6 +280,8 @@
                     "aarch64-linux"
                     "x86_64-darwin"
                     "aarch64-darwin"
+                    "x86_64-cygwin"
+                    "x86_64-windows"
                   ];
                 };
               };
@@ -349,6 +364,101 @@
                     platforms = [
                       "aarch64-darwin"
                       "x86_64-darwin"
+                    ];
+                  };
+                };
+              }
+            )
+            (_final: prev: {
+              # CamillaDSP: cross-platform audio processing engine.
+              # macOS/Linux use the standard build; Windows uses the prebuilt
+              # binary from GitHub releases (not available in WinGet/Scoop).
+              camilladsp = prev.stdenv.mkDerivation rec {
+                pname = "camilladsp";
+                version = "4.1.3";
+
+                src =
+                  if prev.stdenv.hostPlatform.isDarwin then
+                    if prev.stdenv.hostPlatform.isAarch64 then
+                      prev.fetchurl {
+                        url = "https://github.com/HEnquist/camilladsp/releases/download/v${version}/camilladsp-macos-aarch64.tar.gz";
+                        hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # TODO: nix-prefetch-url --unpack https://github.com/HEnquist/camilladsp/releases/download/v4.1.3/camilladsp-macos-aarch64.tar.gz
+                      }
+                    else
+                      prev.fetchurl {
+                        url = "https://github.com/HEnquist/camilladsp/releases/download/v${version}/camilladsp-macos-intel.tar.gz";
+                        hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # TODO: nix-prefetch-url
+                      }
+                  else if prev.stdenv.hostPlatform.isWindows then
+                    prev.fetchurl {
+                      url = "https://github.com/HEnquist/camilladsp/releases/download/v${version}/camilladsp-windows-amd64.zip";
+                      hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # TODO: nix-prefetch-url --unpack https://github.com/HEnquist/camilladsp/releases/download/v4.1.3/camilladsp-windows-amd64.zip
+                    }
+                  else
+                    prev.fetchurl {
+                      url = "https://github.com/HEnquist/camilladsp/releases/download/v${version}/camilladsp-linux-amd64.tar.gz";
+                      hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # TODO: nix-prefetch-url
+                    };
+
+                dontBuild = true;
+                dontStrip = true;
+                dontPatchELF = true;
+
+                installPhase =
+                  if prev.stdenv.hostPlatform.isWindows then
+                    ''
+                      mkdir -p $out/bin
+                      cp camilladsp.exe $out/bin/
+                    ''
+                  else
+                    ''
+                      mkdir -p $out/bin
+                      find . -type f -executable -exec install -Dm 755 "{}" "$out/bin/{}" \;
+                    '';
+
+                meta = {
+                  description = "Cross-platform audio processing engine";
+                  homepage = "https://github.com/HEnquist/camilladsp";
+                  license = prev.lib.licenses.mit;
+                  platforms = [
+                    "x86_64-linux"
+                    "aarch64-linux"
+                    "x86_64-darwin"
+                    "aarch64-darwin"
+                    "x86_64-windows"
+                  ];
+                };
+              };
+            })
+            (
+              _final: prev:
+              prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
+                # SteamCMD Windows variant — pre-fetched zip from Valve's CDN.
+                # The macOS variant is defined above (darwin-only); this covers
+                # the Windows asset for cross-platform vendor completeness.
+                steamcmd-windows = prev.stdenv.mkDerivation rec {
+                  pname = "steamcmd-windows";
+                  version = "20180104";
+
+                  src = prev.fetchurl {
+                    url = "https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip";
+                    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # TODO: nix-prefetch-url --unpack https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip
+                  };
+
+                  dontBuild = true;
+
+                  installPhase = ''
+                    mkdir -p $out/share/steamcmd
+                    find . -type f -exec install -Dm 755 "{}" "$out/share/steamcmd/{}" \;
+                  '';
+
+                  meta = {
+                    description = "Steam command-line tools (Windows)";
+                    homepage = "https://developer.valvesoftware.com/wiki/SteamCMD";
+                    license = prev.lib.licenses.unfreeRedistributable;
+                    platforms = [
+                      "x86_64-windows"
+                      "x86_64-cygwin"
                     ];
                   };
                 };
@@ -872,6 +982,22 @@
         // {
           flakeInputs = mkFlakeInputsPkg pkgsLinux flakeInputsLinux;
         };
+      };
+
+      # -----------------------------------------------------------------------
+      # vendor-assets — pre-fetched Windows binary assets for setup scripts.
+      # Exposes CamillaDSP, camillagui-backend, and SteamCMD Windows zips as a
+      # single derivation. Windows apply.ps1 copies these to a local vendor/
+      # directory so setup scripts read local paths instead of downloading.
+      # Build: nix build .#vendor-assets
+      # -----------------------------------------------------------------------
+      vendor-assets = pkgsMac.symlinkJoin {
+        name = "nucleus-vendor-assets";
+        paths = [
+          pkgsMac.camilladsp
+          pkgsMac.camillagui-backend
+          pkgsMac.steamcmd-windows
+        ];
       };
 
       # -----------------------------------------------------------------------

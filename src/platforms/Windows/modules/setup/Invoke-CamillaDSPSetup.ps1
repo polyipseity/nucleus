@@ -12,14 +12,25 @@ function Invoke-CamillaDSPSetup {
     CamillaDSP is not available in WinGet, Scoop, or cargo-binstall, so a
     direct GitHub release download is used instead.
 
+  .PARAMETER VendorDir
+    Optional path to a directory containing pre-fetched vendor assets.
+    When set and the CamillaDSP zip exists in this directory, the script
+    reads the local file instead of downloading from the internet.
+
   .EXAMPLE
     Invoke-CamillaDSPSetup
+
+  .EXAMPLE
+    Invoke-CamillaDSPSetup -VendorDir 'C:\Users\admin\.nucleus\vendor'
 
   .NOTES
     Exit codes: 0 on success; non-zero on failure.
   #>
   [CmdletBinding()]
-  param()
+  param(
+    [Parameter(Mandatory = $false)]
+    [string]$VendorDir
+  )
 
   $installDir = Join-Path $HOME ".local\bin"
   $binaryPath = Join-Path $installDir "camilladsp.exe"
@@ -72,7 +83,16 @@ function Invoke-CamillaDSPSetup {
 
     Write-NucleusInfo -CommandName 'camilladsp-setup' "downloading v${desiredVersion} from GitHub releases"
     # check-suppress:suppression_doc: probe -- download may fail; Test-Path check handles failure downstream.
-    Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -ErrorAction SilentlyContinue
+    # Prefer pre-fetched vendor asset when available (no internet required).
+    $vendorZip = if (-not [string]::IsNullOrWhiteSpace($VendorDir)) {
+      Join-Path -Path $VendorDir -ChildPath "camilladsp-windows-amd64.zip"
+    } else { $null }
+    if (($null -ne $vendorZip) -and (Test-Path -LiteralPath $vendorZip -PathType Leaf)) {
+      Write-NucleusInfo -CommandName 'camilladsp-setup' "using pre-fetched vendor asset: $vendorZip"
+      Copy-Item -LiteralPath $vendorZip -Destination $zipPath -Force
+    } else {
+      Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -ErrorAction SilentlyContinue
+    }
     if (-not (Test-Path $zipPath)) {
       Write-NucleusError -CommandName 'camilladsp-setup' "download failed from $zipUrl"
       return

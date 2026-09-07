@@ -859,11 +859,31 @@ if ($EnableBunParity) {
 Invoke-UvSetup
 # PowerShell modules: pinned versions for DSC validation and code hygiene.
 Invoke-PowerShellModuleSetup
+
+# Resolve pre-fetched vendor assets directory. When `nix build .#vendor-assets`
+# has been run on a Nix-capable machine and the output copied to the host,
+# setup scripts read local zips instead of downloading from the internet.
+$vendorDirCandidates = @(
+  Join-Path -Path $repoRoot -ChildPath 'vendor',
+  Join-Path -Path $env:LOCALAPPDATA -ChildPath 'nucleus\vendor',
+  Join-Path -Path $env:USERPROFILE -ChildPath '.nucleus\vendor'
+)
+$vendorDir = $null
+foreach ($candidate in $vendorDirCandidates) {
+  if (Test-Path -LiteralPath $candidate -PathType Container) {
+    $vendorDir = $candidate
+    break
+  }
+}
+if ($null -ne $vendorDir) {
+  Write-NucleusInfo -CommandName 'apply' "resolved vendor assets directory: $vendorDir"
+}
+
 # CamillaDSP prebuilt binary runs after PATH is fully configured (no WinGet
 # package available; downloads from GitHub releases).
-Invoke-CamillaDSPSetup
+Invoke-CamillaDSPSetup -VendorDir $vendorDir
 # camillagui-backend prebuilt bundle (same rationale as CamillaDSP).
-Invoke-CamillaGUISetup
+Invoke-CamillaGUISetup -VendorDir $vendorDir
 # Source-built packages: git clone + build system at pinned revisions.
 # Requires zig from Scoop (installed by Invoke-ScoopSetup above) and
 # git from WinGet (system/packages.dsc.yml).
@@ -926,7 +946,7 @@ Sync-ObsidianConfig -Enabled:$EnableObsidianParity -Users $selectedUserRecords -
 # and window state into it. A symlink would let app-owned writes reach the
 # repo file. Merge preserves both managed and app-owned keys.
 Sync-RimSortConfig -Enabled:$EnableRimSortParity -Users $selectedUserRecords -RepoRoot $repoRoot
-Invoke-SteamCMDSetup -Enabled:$EnableRimSortParity -Users $selectedUserRecords -RepoRoot $repoRoot
+Invoke-SteamCMDSetup -Enabled:$EnableRimSortParity -Users $selectedUserRecords -RepoRoot $repoRoot -VendorDir $vendorDir
 # check-suppress:config-method: method 3 (merge) -- Picard defaults INI merged via Sync-PicardConfig on Windows
 Sync-PicardConfig -Enabled:$EnablePicardParity -Users $selectedUserRecords -RepoRoot $repoRoot
 # WHY: QtPass stores settings in platform-native stores (registry on Windows), so Method 1 (symlink) does not apply.
