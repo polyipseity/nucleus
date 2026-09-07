@@ -347,7 +347,11 @@ ln -sf "$REPO_ROOT/src/modules/ai/cline_handler.py" "$NUCLEUS_USER_ROOT/cline_ha
 ln -sf "$REPO_ROOT/src/modules/ai/litellm-cooldown-400.py" "$NUCLEUS_USER_ROOT/litellm-cooldown-400.py"
 
 run_nix() {
-  NIX_CONFIG="$(merge_nix_config)" NIX_PATH="nixpkgs=flake:nixpkgs" nix --option warn-dirty false "$@"
+  # --option min-free 0 suppresses auto-GC during the apply pipeline. The
+  # config file (nix.custom.conf) sets min-free to avoid runaway store growth,
+  # but during apply the NIX_CONFIG override may not take effect before eval
+  # reads the config file. The CLI flag takes precedence unconditionally.
+  NIX_CONFIG="$(merge_nix_config)" NIX_PATH="nixpkgs=flake:nixpkgs" nix --option warn-dirty false --option min-free 0 "$@"
 }
 
 run_nix_as_root() {
@@ -368,7 +372,7 @@ run_nix_as_root() {
     "NO_COLOR=${NO_COLOR:-}" \
     "CLICOLOR_FORCE=${CLICOLOR_FORCE:-}" \
     "TERM=${TERM:-}" \
-    nix --option warn-dirty false "$@"
+    nix --option warn-dirty false --option min-free 0 "$@"
 }
 
 start_sudo_keepalive() {
