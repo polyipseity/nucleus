@@ -376,6 +376,9 @@
               camilladsp = prev.stdenv.mkDerivation rec {
                 pname = "camilladsp";
                 version = "4.1.3";
+                # Tarball is flat (single file, no subdirectory) — skip
+                # unpackPhase's directory-finding logic.
+                sourceRoot = ".";
 
                 src =
                   if prev.stdenv.hostPlatform.isDarwin then
