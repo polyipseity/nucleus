@@ -75,7 +75,10 @@ function Sync-PowerPolicy {
     Invoke-PowerCfgChecked -Arguments @('/change', 'disk-timeout-dc', '0') -FailureMessage 'Failed to disable battery disk timeout.'
     Invoke-PowerCfgChecked -Arguments @('/setactive', $activeSchemeGuid) -FailureMessage 'Failed to reactivate the current power scheme after lid-action changes.'
 
-    Set-ItemProperty -Path $tcpParamsPath -Name 'KeepAliveTime' -Value 60000 -Type DWord
+    # WHY: KeepAliveTime is set declaratively via power-policy.dsc.yml (DSC
+    # RegistryValue resource). Only the powercfg and WoL logic remain here
+    # because they require runtime system calls (active scheme GUID resolution,
+    # adapter enumeration) that DSC cannot express.
 
     # check-suppress:suppression_doc: probe -- no physical adapters on headless/system.
     $physicalAdapters = Get-NetAdapter -Physical -ErrorAction SilentlyContinue
@@ -109,6 +112,9 @@ function Sync-PowerPolicy {
     Invoke-PowerCfgChecked -Arguments @('/change', 'disk-timeout-dc', '10') -FailureMessage 'Failed to restore battery disk timeout.'
     Invoke-PowerCfgChecked -Arguments @('/setactive', $activeSchemeGuid) -FailureMessage 'Failed to reactivate the current power scheme after restoring defaults.'
 
+    # Clean up the DSC-managed KeepAliveTime registry value when power policy
+    # is disabled.  DSC sets this declaratively (power-policy.dsc.yml), but the
+    # disable path must remove it because DSC resources are always-applied.
     # check-suppress:suppression_doc: probe whether KeepAliveTime exists before removing; Get-ItemProperty throws when absent.
     if (Get-ItemProperty -Path $tcpParamsPath -Name 'KeepAliveTime' -ErrorAction SilentlyContinue) {
       Remove-ItemProperty -Path $tcpParamsPath -Name 'KeepAliveTime'

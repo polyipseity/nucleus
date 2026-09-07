@@ -1,0 +1,17 @@
+---
+# WinGet DSC v3 - TCP KeepAliveTime for cross-host power parity
+$schema: https://aka.ms/configuration-dsc-schema/0.2
+properties:
+  configurationVersion: 0.2.0
+  resources:
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      directives:
+        description: >-
+          Set TCP KeepAliveTime to 60 seconds (60000 ms) to match macOS and NixOS
+          power posture. Prevents idle TCP connections from being dropped by
+          network equipment with aggressive NAT/firewall timeout policies.
+      settings:
+        keyPath: HKLM\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters
+        valueName: KeepAliveTime
+        valueData: 60000
+        valueType: DWord

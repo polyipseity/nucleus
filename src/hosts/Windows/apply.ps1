@@ -32,7 +32,8 @@
   'system/firewall.dsc.yml', 'system/taskbar.dsc.yml',
   'system/computer-name.dsc.yml', 'system/long-paths.dsc.yml',
   'system/storage-sense.dsc.yml', 'system/font-substitutes.dsc.yml',
-  'system/remote-desktop.dsc.yml', 'system/packages.dsc.yml').
+  'system/remote-desktop.dsc.yml', 'system/power-policy.dsc.yml',
+  'system/packages.dsc.yml').
   Filenames are resolved relative to $ConfigDir.
 
   Per-user DSC files can be declared in src/users/<username>/windows.json under each
@@ -243,7 +244,7 @@
 [CmdletBinding()]
 param(
   [string]$ConfigDir = $PSScriptRoot,
-  [string[]]$ConfigFiles = @("system/env.dsc.yml", "system/scheduler.dsc.yml", "system/developer-mode.dsc.yml", "system/firewall.dsc.yml", "system/taskbar.dsc.yml", "system/computer-name.dsc.yml", "system/long-paths.dsc.yml", "system/storage-sense.dsc.yml", "system/font-substitutes.dsc.yml", "system/remote-desktop.dsc.yml", "system/packages.dsc.yml"),
+  [string[]]$ConfigFiles = @("system/env.dsc.yml", "system/scheduler.dsc.yml", "system/developer-mode.dsc.yml", "system/firewall.dsc.yml", "system/taskbar.dsc.yml", "system/computer-name.dsc.yml", "system/long-paths.dsc.yml", "system/storage-sense.dsc.yml", "system/font-substitutes.dsc.yml", "system/remote-desktop.dsc.yml", "system/power-policy.dsc.yml", "system/packages.dsc.yml"),
   [Alias("h")]
   [switch]$Help,
   [Parameter(Mandatory)]
