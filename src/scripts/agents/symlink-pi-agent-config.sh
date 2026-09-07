@@ -2,8 +2,8 @@
 # Creates method-1 (writable) symlinks from ~/.pi/agent/ into the live repo.
 #
 # Creates:
-#   ~/.pi/agent/extensions/agents-bridge.ts → <live-root>/src/users/default/agents/extensions/agents-bridge.ts
-#   ~/.pi/agent/settings.json                → <live-root>/src/users/default/agents/pi-settings.json
+#   ~/.pi/agent/extensions/  → <live-root>/src/users/default/agents/pi-extensions/
+#   ~/.pi/agent/settings.json → <live-root>/src/users/default/agents/pi-settings.json
 #
 # Skills are handled natively by Pi (auto-discovered from ~/.agents/skills/ and
 # .agents/skills/), so no symlink is needed for those.
@@ -30,17 +30,10 @@ if [ ! -d "$_spi_pi_dir" ]; then
   say -l pi-agent "created $_spi_pi_dir"
 fi
 
-# Ensure ~/.pi/agent/extensions/ exists for the extension symlink.
-_spi_extensions_dir="$_spi_pi_dir/extensions"
-if [ ! -d "$_spi_extensions_dir" ]; then
-  mkdir -p "$_spi_extensions_dir"
-  say -l pi-agent "created $_spi_extensions_dir"
-fi
-
-# --- Extension symlink (method 1: writable, live repo) ---
+# --- Extensions symlink (method 1: writable, live repo) ---
 "$SCRIPT_DIR/../configs/seed-writable-symlink.sh" \
-  "$_spi_extensions_dir/agents-bridge.ts" \
-  "src/users/default/agents/pi-extensions/agents-bridge.ts"
+  "$_spi_pi_dir/extensions" \
+  "src/users/default/agents/pi-extensions"
 
 # --- Settings symlink (method 1: writable, live repo) ---
 "$SCRIPT_DIR/../configs/seed-writable-symlink.sh" \
