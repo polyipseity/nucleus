@@ -162,7 +162,7 @@ expand_prefix() {
   MacBook)
     local sudo_prefix=""
     local scope
-    scope=$(echo "$plat_json" | jq -r '.scope // "user"')
+    scope=$(echo "$plat_json" | jq -r '.scope // "system"')
     [ "$scope" = "system" ] && sudo_prefix="sudo"
     local matches
     # check-suppress:suppression_doc: no matching services found is an expected empty result, not an error.
@@ -214,7 +214,7 @@ svc_status() {
   launchctl)
     local domain_flag=""
     local scope launchd_domain uid
-    scope=$(echo "$entry_json" | jq -r '.scope // "user"')
+    scope=$(echo "$entry_json" | jq -r '.scope // "system"')
     launchd_domain=$(echo "$entry_json" | jq -r '.launchdDomain // "gui"')
     uid="${REAL_USER_UID:-$(id -u)}"
     [ "$scope" = "system" ] && domain_flag="sudo"
@@ -416,7 +416,7 @@ service_diagnostic() {
   case "$svc_type" in
   launchctl)
     local scope sudo_prefix="" target launchd_domain uid
-    scope=$(echo "$entry_json" | jq -r '.scope // "user"')
+    scope=$(echo "$entry_json" | jq -r '.scope // "system"')
     launchd_domain=$(echo "$entry_json" | jq -r '.launchdDomain // "gui"')
     uid="${REAL_USER_UID:-$(id -u)}"
     [ "$scope" = "system" ] && sudo_prefix="sudo"
@@ -469,7 +469,7 @@ svc_action() {
   case "$svc_type" in
   launchctl)
     local scope
-    scope=$(echo "$entry_json" | jq -r '.scope // "user"')
+    scope=$(echo "$entry_json" | jq -r '.scope // "system"')
     local launchd_domain
     launchd_domain=$(echo "$entry_json" | jq -r '.launchdDomain // "gui"')
     local uid
@@ -602,7 +602,7 @@ do_list() {
         continue
       fi
       local _d_entry_domain
-      _d_entry_domain=$(echo "$svc_json" | jq -r '.scope // .domain // "system"')
+      _d_entry_domain=$(echo "$svc_json" | jq -r '.scope // "system"')
       if [ "$domain_filter" = "user" ] && [ "$_d_entry_domain" != "user" ]; then continue; fi
       if [ "$domain_filter" = "system" ] && [ "$_d_entry_domain" != "system" ]; then continue; fi
       if [ "$domain_filter" = "all" ] && [ "$_d_entry_domain" = "system" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
@@ -632,7 +632,7 @@ $pair_json"
         continue
       fi
       local _d_entry_domain
-      _d_entry_domain=$(echo "$svc_json" | jq -r '.scope // .domain // "system"')
+      _d_entry_domain=$(echo "$svc_json" | jq -r '.scope // "system"')
       if [ "$domain_filter" = "user" ] && [ "$_d_entry_domain" != "user" ]; then continue; fi
       if [ "$domain_filter" = "system" ] && [ "$_d_entry_domain" != "system" ]; then continue; fi
       if [ "$domain_filter" = "all" ] && [ "$_d_entry_domain" = "system" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
@@ -684,7 +684,7 @@ do_status() {
       continue
     fi
     local _d_entry_domain
-    _d_entry_domain=$(echo "$svc_json" | jq -r '.scope // .domain // "system"')
+    _d_entry_domain=$(echo "$svc_json" | jq -r '.scope // "system"')
     if [ "$domain_filter" = "user" ] && [ "$_d_entry_domain" != "user" ]; then continue; fi
     if [ "$domain_filter" = "system" ] && [ "$_d_entry_domain" != "system" ]; then continue; fi
     if [ "$domain_filter" = "all" ] && [ "$_d_entry_domain" = "system" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
@@ -777,7 +777,7 @@ do_verify() {
   while IFS=$'\t' read -r key display svc_json json_key; do
     if echo "$key" | grep -q '^ERROR:'; then continue; fi
     local _d_domain
-    _d_domain=$(echo "$svc_json" | jq -r '.scope // .domain // "system"')
+    _d_domain=$(echo "$svc_json" | jq -r '.scope // "system"')
     if [ "$_d_domain" = "system" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
       error "$json_key — system-domain operations require sudo; run as root or with sudo"
       any_inactive=true
