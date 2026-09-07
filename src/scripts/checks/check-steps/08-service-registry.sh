@@ -158,7 +158,7 @@ run_service_registry() {
     [
       $name,
       .key,
-      (.value.domain // .value.scope // ""),
+      (.value.scope // ""),
       (.value.justification | tostring)
     ] | @tsv' "$_svc_json")
 

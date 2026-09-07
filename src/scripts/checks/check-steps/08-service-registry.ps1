@@ -88,7 +88,7 @@ Register-Step -Id "service-registry" -Name "Service registry validation" -Action
     if ($entry.ContainsKey('hosts')) {
       foreach ($hostName in $entry.hosts.Keys) {
         $hEntry = $entry.hosts[$hostName]
-        $domainScope = if ($hEntry.ContainsKey('domain')) { $hEntry.domain } elseif ($hEntry.ContainsKey('scope')) { $hEntry.scope } else { $null }
+        $domainScope = if ($hEntry.ContainsKey('scope')) { $hEntry.scope } else { $null }
         $hasJustification = $hEntry.ContainsKey('justification') -and -not [string]::IsNullOrEmpty($hEntry.justification)
         if ($domainScope -eq 'user' -and -not $hasJustification) {
           Write-ErrorMessage "services.json: '$svcName' host '$hostName' is user-scoped but missing justification"
