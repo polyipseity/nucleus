@@ -192,13 +192,13 @@ export default function agentsBridge(pi: ExtensionAPI): void {
       // Show single comprehensive notification with all loaded resources.
       const parts: string[] = [];
       if (promptCount > 0) {
-        parts.push(`${promptCount} project prompts`);
+        parts.push(`${promptCount} project prompt(s)`);
       }
       if (userInstructionCount > 0) {
-        parts.push(`${userInstructionCount} user instructions`);
+        parts.push(`${userInstructionCount} user instruction(s)`);
       }
       if (projectInstructionCount > 0) {
-        parts.push(`${projectInstructionCount} project instructions`);
+        parts.push(`${projectInstructionCount} project instruction(s)`);
       }
       if (parts.length > 0 && ctx.hasUI) {
         ctx.ui.notify(`Loaded ${parts.join(", ")}`, "info");
