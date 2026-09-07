@@ -1,0 +1,4 @@
+{
+  "$schema": "./pi-settings.schema.json",
+  "prompts": ["~/.agents/prompts"]
+}
