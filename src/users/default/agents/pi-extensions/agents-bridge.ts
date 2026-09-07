@@ -119,7 +119,10 @@ export default function (pi: ExtensionAPI) {
     userInstructionCount = userFiles.length;
 
     const projectFiles = ctx.isProjectTrusted()
-      ? await collectInstructionFiles(join(ctx.cwd, ".agents", "instructions"), "project")
+      ? await collectInstructionFiles(
+          join(ctx.cwd, ".agents", "instructions"),
+          "project",
+        )
       : [];
     projectInstructionCount = projectFiles.length;
   });
