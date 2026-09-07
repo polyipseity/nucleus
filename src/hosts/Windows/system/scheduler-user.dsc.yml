@@ -1,0 +1,92 @@
+---
+# WinGet DSC v3 - user-level scheduled tasks (nucleus services)
+#
+# These tasks run in the logged-in user's context (AtLogOn). DSC registers
+# the task skeleton; PowerShell Sync-* modules handle dynamic config
+# resolution, wrapper-script generation, and live restarts.
+#
+# Tasks with complex dynamic arguments (CamillaDSP wrapper, Cloud Drive
+# per-mount tasks) remain in PowerShell — DSC cannot express the full
+# lifecycle for those.
+$schema: https://aka.ms/configuration-dsc-schema/0.2
+properties:
+  configurationVersion: 0.2.0
+  resources:
+    # ── CamillaGUI backend ────────────────────────────────────────────────────
+    - resource: Microsoft.Windows.Settings/TaskScheduler
+      directives:
+        description: >-
+          CamillaGUI web backend — starts camillagui_backend.exe at logon with
+          the user's config.yml. The config symlink is deployed by
+          Invoke-CamillaGUISetup.
+      settings:
+        TaskPath: \nucleus\
+        TaskName: NucleusCamillaGUI
+        TaskDescriptionLiteral: CamillaGUI web backend for CamillaDSP
+        Action: |
+          $RepoRoot = $env:NUCLEUS_REPO_ROOT
+          $CamillaGUIBin = Join-Path $HOME ".local\bin\camillagui_backend\camillagui_backend.exe"
+          $ConfigPath = Join-Path $HOME ".config\camillagui-backend\config.yml"
+          $LogDir = Join-Path $env:LOCALAPPDATA "nucleus\logs\camillagui-backend"
+          New-Item -Path $LogDir -ItemType Directory -Force -ErrorAction SilentlyContinue
+          $LogFile = Join-Path $LogDir "combined.log"
+          & pwsh.exe -WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -Command "& '$CamillaGUIBin' -c '$ConfigPath' *>> '$LogFile'"
+        Trigger: AtLogOn
+        Enabled: true
+        RunWithHighestPrivileges: false
+        RunOnlyWhenNetworkAvailable: false
+        RunOnlyIfLoggedOn: true
+
+    # ── Discord Music RPC ─────────────────────────────────────────────────────
+    - resource: Microsoft.Windows.Settings/TaskScheduler
+      directives:
+        description: >-
+          Discord Rich Presence tray app — starts discord-music-rpc at logon.
+          Config symlink is deployed by apply.ps1.
+      settings:
+        TaskPath: \nucleus\
+        TaskName: NucleusDiscordMusicRPC
+        TaskDescriptionLiteral: Discord Music Rich Presence tray app
+        Action: |
+          $LogDir = Join-Path $env:LOCALAPPDATA "nucleus\logs\discord-music-rpc"
+          New-Item -Path $LogDir -ItemType Directory -Force -ErrorAction SilentlyContinue
+          $LogFile = Join-Path $LogDir "combined.log"
+          $Cmd = Get-Command -Name "discord-music-rpc" -ErrorAction SilentlyContinue
+          if ($Cmd) {
+            & pwsh.exe -WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -Command "& '$($Cmd.Source)' *>> '$LogFile'"
+          }
+        Trigger: AtLogOn
+        Enabled: true
+        RunWithHighestPrivileges: false
+        RunOnlyWhenNetworkAvailable: false
+        RunOnlyIfLoggedOn: true
+
+    # ── Replica Sync (daily fallback) ─────────────────────────────────────────
+    - resource: Microsoft.Windows.Settings/TaskScheduler
+      directives:
+        description: >-
+          Daily replica sync fallback at 12:00 — runs scripts\cloud.ps1 sync
+          as a backstop for missed post-apply runs.
+      settings:
+        TaskPath: \nucleus\
+        TaskName: NucleusReplicaSyncDaily
+        TaskDescriptionLiteral: Daily nucleus replica fallback sync
+        Action: |
+          $RepoRoot = $env:NUCLEUS_REPO_ROOT
+          if (-not $RepoRoot) {
+            Write-Output "replica-sync: NUCLEUS_REPO_ROOT not set; run via apply.ps1"
+            exit 1
+          }
+          $ScriptPath = Join-Path $RepoRoot "scripts\cloud.ps1"
+          if (-not (Test-Path $ScriptPath)) {
+            Write-Output "replica-sync: cloud.ps1 not found at '$ScriptPath'"
+            exit 1
+          }
+          & pwsh.exe -NoLogo -ExecutionPolicy Bypass -Command "& '$ScriptPath' sync"
+        Trigger: Daily
+        AtTime: 12:00
+        DaysInterval: 1
+        Enabled: true
+        RunWithHighestPrivileges: false
+        RunOnlyWhenNetworkAvailable: false
+        RunOnlyIfLoggedOn: true

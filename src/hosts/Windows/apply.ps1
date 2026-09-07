@@ -244,7 +244,7 @@
 [CmdletBinding()]
 param(
   [string]$ConfigDir = $PSScriptRoot,
-  [string[]]$ConfigFiles = @("system/env.dsc.yml", "system/scheduler.dsc.yml", "system/developer-mode.dsc.yml", "system/firewall.dsc.yml", "system/taskbar.dsc.yml", "system/computer-name.dsc.yml", "system/long-paths.dsc.yml", "system/storage-sense.dsc.yml", "system/font-substitutes.dsc.yml", "system/remote-desktop.dsc.yml", "system/power-policy.dsc.yml", "system/packages.dsc.yml"),
+  [string[]]$ConfigFiles = @("system/env.dsc.yml", "system/scheduler.dsc.yml", "system/scheduler-user.dsc.yml", "system/developer-mode.dsc.yml", "system/firewall.dsc.yml", "system/taskbar.dsc.yml", "system/computer-name.dsc.yml", "system/long-paths.dsc.yml", "system/storage-sense.dsc.yml", "system/font-substitutes.dsc.yml", "system/remote-desktop.dsc.yml", "system/power-policy.dsc.yml", "system/packages.dsc.yml"),
   [Alias("h")]
   [switch]$Help,
   [Parameter(Mandatory)]
@@ -784,6 +784,7 @@ $lockfilePath = Join-Path -Path $PSScriptRoot -ChildPath "..\..\lockfiles\lockfi
 $generatedDir = Join-Path -Path $resolvedConfigDir -ChildPath ".generated"
 New-Item -Path $generatedDir -ItemType Directory -Force > $null
 ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/scheduler.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $generatedDir -ChildPath "system/scheduler.locked.dsc.yml")
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/scheduler-user.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $generatedDir -ChildPath "system/scheduler-user.locked.dsc.yml")
 ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/developer-mode.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $generatedDir -ChildPath "system/developer-mode.locked.dsc.yml")
 ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/firewall.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $generatedDir -ChildPath "system/firewall.locked.dsc.yml")
 ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/taskbar.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $generatedDir -ChildPath "system/taskbar.locked.dsc.yml")
@@ -817,6 +818,7 @@ ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir 
 # Replace system DSC files with locked variants in effective config list.
 $effectiveConfigFiles = @($effectiveConfigFiles | ForEach-Object {
   if ($_ -eq "system/scheduler.dsc.yml") { ".generated/system/scheduler.locked.dsc.yml" }
+  elseif ($_ -eq "system/scheduler-user.dsc.yml") { ".generated/system/scheduler-user.locked.dsc.yml" }
   elseif ($_ -eq "system/developer-mode.dsc.yml") { ".generated/system/developer-mode.locked.dsc.yml" }
   elseif ($_ -eq "system/firewall.dsc.yml") { ".generated/system/firewall.locked.dsc.yml" }
   elseif ($_ -eq "system/taskbar.dsc.yml") { ".generated/system/taskbar.locked.dsc.yml" }
@@ -859,31 +861,11 @@ if ($EnableBunParity) {
 Invoke-UvSetup
 # PowerShell modules: pinned versions for DSC validation and code hygiene.
 Invoke-PowerShellModuleSetup
-
-# Resolve pre-fetched vendor assets directory. When `nix build .#vendor-assets`
-# has been run on a Nix-capable machine and the output copied to the host,
-# setup scripts read local zips instead of downloading from the internet.
-$vendorDirCandidates = @(
-  Join-Path -Path $repoRoot -ChildPath 'vendor',
-  Join-Path -Path $env:LOCALAPPDATA -ChildPath 'nucleus\vendor',
-  Join-Path -Path $env:USERPROFILE -ChildPath '.nucleus\vendor'
-)
-$vendorDir = $null
-foreach ($candidate in $vendorDirCandidates) {
-  if (Test-Path -LiteralPath $candidate -PathType Container) {
-    $vendorDir = $candidate
-    break
-  }
-}
-if ($null -ne $vendorDir) {
-  Write-NucleusInfo -CommandName 'apply' "resolved vendor assets directory: $vendorDir"
-}
-
 # CamillaDSP prebuilt binary runs after PATH is fully configured (no WinGet
 # package available; downloads from GitHub releases).
-Invoke-CamillaDSPSetup -VendorDir $vendorDir
+Invoke-CamillaDSPSetup
 # camillagui-backend prebuilt bundle (same rationale as CamillaDSP).
-Invoke-CamillaGUISetup -VendorDir $vendorDir
+Invoke-CamillaGUISetup
 # Source-built packages: git clone + build system at pinned revisions.
 # Requires zig from Scoop (installed by Invoke-ScoopSetup above) and
 # git from WinGet (system/packages.dsc.yml).
@@ -946,7 +928,7 @@ Sync-ObsidianConfig -Enabled:$EnableObsidianParity -Users $selectedUserRecords -
 # and window state into it. A symlink would let app-owned writes reach the
 # repo file. Merge preserves both managed and app-owned keys.
 Sync-RimSortConfig -Enabled:$EnableRimSortParity -Users $selectedUserRecords -RepoRoot $repoRoot
-Invoke-SteamCMDSetup -Enabled:$EnableRimSortParity -Users $selectedUserRecords -RepoRoot $repoRoot -VendorDir $vendorDir
+Invoke-SteamCMDSetup -Enabled:$EnableRimSortParity -Users $selectedUserRecords -RepoRoot $repoRoot
 # check-suppress:config-method: method 3 (merge) -- Picard defaults INI merged via Sync-PicardConfig on Windows
 Sync-PicardConfig -Enabled:$EnablePicardParity -Users $selectedUserRecords -RepoRoot $repoRoot
 # WHY: QtPass stores settings in platform-native stores (registry on Windows), so Method 1 (symlink) does not apply.
