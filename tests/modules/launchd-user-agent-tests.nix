@@ -20,6 +20,7 @@ let
   discordRpcNix = builtins.readFile ../../src/modules/ext-discord-music-rpc.nix;
   cloudDrivesNix = builtins.readFile ../../src/modules/cloud-drives.nix;
   launchdAgentsNix = builtins.readFile ../../src/platforms/macOS/modules/launchd-agents.nix;
+  servicesSchemaNix = builtins.readFile ../../src/modules/services.schema.json;
 in
 {
   tests = builtins.filter (x: x != null) [
@@ -29,7 +30,7 @@ in
     (assert' (containsRegex "launchd.agents.\"sccache-gc\"" launchdAgentsNix) "sccache-gc: uses launchd.agents")
     (assert' (
       containsRegex "launchd.agents.\"sccache-gc\"" launchdAgentsNix
-      && containsRegex "domain = \"user\"" launchdAgentsNix
+      && containsRegex "domain = \"gui\"" launchdAgentsNix
     ) "sccache-gc: domain = gui")
     (assert' (containsRegex "launchd.agents.\"log-gc-user\"" launchdAgentsNix) "log-gc-user: uses launchd.agents")
     (assert' (containsRegex "launchd.agents.\"betterdisplay-heartbeat\"" launchdAgentsNix) "betterdisplay-heartbeat: uses launchd.agents")
@@ -83,7 +84,7 @@ in
     # generates the plist in ~/Library/LaunchAgents.
     (assert' (containsRegex "enable = true" launchdAgentsNix) "launchd-agents.nix: all agents have enable = true")
     (assert' (containsRegex "launchd.agents = builtins.listToAttrs" cloudDrivesNix) "cloud-drives: mounts use launchd.agents")
-    (assert' (containsRegex "domain = \"user\"" cloudDrivesNix) "cloud-drives: domain = user")
+    (assert' (containsRegex "domain = \"gui\"" cloudDrivesNix) "cloud-drives: domain = gui")
     # None of these agents may use environment.userLaunchAgents in HM modules.
     (assert' (
       !containsRegex "environment.userLaunchAgents.\"discord-music-rpc\"" discordRpcNix
@@ -93,6 +94,49 @@ in
     ) "cloud-drives: not environment.userLaunchAgents")
     # Daemons must remain in launchd.daemons (not migrated)
     (assert' (containsRegex "launchd.daemons.\"camilladsp\"" camilladspNix) "camilladsp run service: still a launchd.daemons")
+
+    # --- Invariant: ALL agents use domain = "gui" (not "user") ---
+    # After the macOS 26 fix, every HM launchd agent MUST use domain = "gui".
+    # The "user" domain causes macOS to inject LimitLoadToSessionType =
+    # Background, which launchd skips during GUI login on macOS 26+.
+    (assert' (
+      containsRegex "domain = \"gui\"" launchdAgentsNix
+      && !containsRegex "domain = \"user\"" launchdAgentsNix
+    ) "launchd-agents.nix: all agents use domain = gui, none use user")
+    (assert' (
+      containsRegex "domain = \"gui\"" camilladspModuleNix
+      && !containsRegex "domain = \"user\"" camilladspModuleNix
+    ) "camilladsp.nix: domain = gui, not user")
+    (assert' (
+      containsRegex "domain = \"gui\"" discordRpcNix && !containsRegex "domain = \"user\"" discordRpcNix
+    ) "discord-music-rpc.nix: domain = gui, not user")
+    (assert' (
+      containsRegex "domain = \"gui\"" cloudDrivesNix && !containsRegex "domain = \"user\"" cloudDrivesNix
+    ) "cloud-drives.nix: domain = gui, not user")
+
+    # --- Invariant: no LimitLoadToSessionType = Background in agent sources ---
+    # HM injects LimitLoadToSessionType = Background only for domain = "user".
+    # Since all agents now use domain = "gui", none should have this injected.
+    # This test guards against a regression that re-introduces the user domain.
+    (assert' (
+      !containsRegex "LimitLoadToSessionType = \"Background\"" launchdAgentsNix
+    ) "launchd-agents.nix: no LimitLoadToSessionType = Background")
+    (assert' (
+      !containsRegex "LimitLoadToSessionType = \"Background\"" camilladspModuleNix
+    ) "camilladsp.nix: no LimitLoadToSessionType = Background")
+    (assert' (
+      !containsRegex "LimitLoadToSessionType = \"Background\"" discordRpcNix
+    ) "discord-music-rpc.nix: no LimitLoadToSessionType = Background")
+    (assert' (
+      !containsRegex "LimitLoadToSessionType = \"Background\"" cloudDrivesNix
+    ) "cloud-drives.nix: no LimitLoadToSessionType = Background")
+
+    # --- Schema invariant: services.schema.json uses scope, not domain ---
+    # The services.json schema must use 'scope' (user/system) for service
+    # classification, not 'domain' which is reserved for launchd domain.
+    (assert' (
+      containsRegex "\"scope\"" servicesSchemaNix && !containsRegex "\"domain\":" servicesSchemaNix
+    ) "services.schema.json: uses scope, not domain in launchctlEntry")
   ];
   success = true;
   allPass = true;

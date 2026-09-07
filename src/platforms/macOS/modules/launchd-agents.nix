@@ -479,7 +479,7 @@ in
       ];
       # One-shot at login; gui-env-path activation step covers subsequent applies.
       RunAtLoad = true;
-      # HM auto-injects LimitLoadToSessionType = "Background" for user-domain
+      # HM auto-injects a "Background" LimitLoadToSessionType for user-domain
       # agents (mkDefault). Background-domain launchctl setenv does not affect
       # the Aqua domain where Finder-launched apps inherit env vars. Override
       # to Aqua so env vars set by this agent are visible to GUI apps.
