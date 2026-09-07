@@ -1,26 +1,39 @@
-// agents-bridge.ts — Pi coding agent bridge for the standardized .agents/ directory.
-//
-// This extension makes Pi recognize both user-scope (~/.agents/) and
-// project-scope (./.agents/) agent files.
-//
-// What is handled natively by Pi (no code needed):
-//   - ~/.agents/skills/  → auto-discovered (user scope)
-//   - .agents/skills/    → auto-discovered (project scope, cwd + ancestors)
-//
-// What this extension handles:
-//   - Project-scope prompts (.agents/prompts/) via resources_discover
-//   - Instructions from both scopes (~/.agents/instructions/ and .agents/instructions/)
-//     injected into the system prompt via before_agent_start
+/**
+ * Pi extension that bridges the standardized `.agents/` directory layout.
+ *
+ * - Discovers project-scope prompts via `resources_discover`.
+ * - Injects user-scope and project-scope instructions into the system prompt
+ *   via `before_agent_start`.
+ * - Shows a single notification summarizing all loaded resources on session start.
+ *
+ * Skills are auto-discovered by Pi natively (no code needed).
+ */
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type {
+  BeforeAgentStartEvent,
+  BeforeAgentStartEventResult,
+  ExtensionAPI,
+  ExtensionContext,
+  ResourcesDiscoverEvent,
+  ResourcesDiscoverResult,
+  SessionStartEvent,
+} from "@earendil-works/pi-coding-agent";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 
+/** A discovered instruction file with its scope and absolute path. */
 interface InstructionFile {
   scope: "user" | "project";
   path: string;
 }
 
+/**
+ * Collect `.md` instruction files from a directory.
+ *
+ * @param dir   Absolute path to the instructions directory.
+ * @param scope Whether the directory is user-scope or project-scope.
+ * @returns Sorted list of discovered instruction files. Empty array on any error.
+ */
 async function collectInstructionFiles(
   dir: string,
   scope: "user" | "project",
@@ -46,6 +59,36 @@ async function collectInstructionFiles(
   }
 }
 
+/**
+ * Read multiple files concurrently, returning only successfully read contents.
+ *
+ * @param paths Absolute file paths to read.
+ * @returns Array of file contents (unreadable files silently excluded).
+ */
+async function readFiles(paths: string[]): Promise<string[]> {
+  const results = await Promise.all(
+    paths.map(async (p) => {
+      try {
+        return await readFile(p, "utf-8");
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return results.filter((c): c is string => c !== null);
+}
+
+/**
+ * Read and concatenate instruction files from user and project scopes.
+ *
+ * User-scope files are always included. Project-scope files are only
+ * included when `isTrusted` is true.
+ *
+ * @param homeDir   The user's home directory (e.g. `$HOME`).
+ * @param cwd       The current working directory.
+ * @param isTrusted Whether project-local trust is active.
+ * @returns Concatenated instruction sections, or empty string if none found.
+ */
 async function readInstructions(
   homeDir: string,
   cwd: string,
@@ -65,16 +108,7 @@ async function readInstructions(
   const sections: string[] = [];
 
   if (userFiles.length > 0) {
-    const contents = await Promise.all(
-      userFiles.map(async (f) => {
-        try {
-          return await readFile(f.path, "utf-8");
-        } catch {
-          return null;
-        }
-      }),
-    );
-    const valid = contents.filter((c): c is string => c !== null);
+    const valid = await readFiles(userFiles.map((f) => f.path));
     if (valid.length > 0) {
       sections.push(
         `## User-scope instructions (from ~/.agents/instructions/)\n\n${valid.join("\n\n")}`,
@@ -83,16 +117,7 @@ async function readInstructions(
   }
 
   if (projectFiles.length > 0) {
-    const contents = await Promise.all(
-      projectFiles.map(async (f) => {
-        try {
-          return await readFile(f.path, "utf-8");
-        } catch {
-          return null;
-        }
-      }),
-    );
-    const valid = contents.filter((c): c is string => c !== null);
+    const valid = await readFiles(projectFiles.map((f) => f.path));
     if (valid.length > 0) {
       sections.push(
         `## Project-scope instructions (from .agents/instructions/)\n\n${valid.join("\n\n")}`,
@@ -103,12 +128,23 @@ async function readInstructions(
   return sections.join("\n\n");
 }
 
-export default function (pi: ExtensionAPI) {
-  // Collect instruction counts at session start for the notification.
+/**
+ * Pi extension that bridges the standardized `.agents/` directory layout.
+ *
+ * - Discovers project-scope prompts via `resources_discover`.
+ * - Injects user-scope and project-scope instructions into the system prompt
+ *   via `before_agent_start`.
+ * - Shows a single notification summarizing all loaded resources on session start.
+ *
+ * Skills are auto-discovered by Pi natively (no code needed).
+ */
+export default function agentsBridge(pi: ExtensionAPI): void {
+  // Instruction counts are collected at session_start and read by
+  // resources_discover to build a single combined notification.
   let userInstructionCount = 0;
   let projectInstructionCount = 0;
 
-  pi.on("session_start", async (_event, ctx) => {
+  pi.on("session_start", async (_event: SessionStartEvent, ctx: ExtensionContext): Promise<void> => {
     const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? "";
     if (!homeDir) return;
 
@@ -129,10 +165,10 @@ export default function (pi: ExtensionAPI) {
 
   // Register project-scope prompts for discovery and show combined notification.
   // User-scope prompts are handled via settings.json.
-  pi.on("resources_discover", async (event, ctx) => {
+  pi.on("resources_discover", async (event: ResourcesDiscoverEvent, ctx: ExtensionContext): Promise<ResourcesDiscoverResult> => {
     const projectPromptsDir = join(event.cwd, ".agents", "prompts");
     let promptCount = 0;
-    let discoverResult: { promptPaths?: string[] } = {};
+    let discoverResult: ResourcesDiscoverResult = {};
     try {
       const s = await stat(projectPromptsDir);
       if (s.isDirectory()) {
@@ -163,7 +199,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   // Inject instructions from both user and project scope into the system prompt.
-  pi.on("before_agent_start", async (event, ctx) => {
+  pi.on("before_agent_start", async (event: BeforeAgentStartEvent, ctx: ExtensionContext): Promise<BeforeAgentStartEventResult> => {
     const homeDir = process.env.HOME ?? process.env.USERPROFILE ?? "";
     if (!homeDir) return {};
 
