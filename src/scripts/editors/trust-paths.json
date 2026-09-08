@@ -1,0 +1,7 @@
+{
+  "$schema": "./trust-paths.schema.json",
+  "paths": [
+    "~/dev",
+    "~/Library/Mobile Documents/com~apple~CloudDocs/data/git"
+  ]
+}

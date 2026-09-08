@@ -412,5 +412,18 @@ in
     trust-vscode-workspace = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/editors/trust-vscode-workspace.sh" "${pkgs.python3}/bin/python3"
     '';
+
+    # -----------------------------------------------------------------------
+    # trust-pi-project
+    # Inserts project trust entries for shared trust paths into
+    # ~/.pi/agent/trust.json so pi coding agent loads project resources
+    # (extensions, skills, settings) without a trust prompt.
+    #
+    # Reads the same trust-paths.json used by trust-vscode-workspace,
+    # ensuring both editors trust identical directories.
+    # -----------------------------------------------------------------------
+    trust-pi-project = lib.hm.dag.entryAfter [ "trust-vscode-workspace" ] ''
+      "${activationBundle}/src/scripts/editors/trust-pi-project.sh" "${pkgs.python3}/bin/python3"
+    '';
   };
 }

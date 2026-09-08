@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["paths"],
+  "properties": {
+    "$schema": {
+      "description": "Reference to the JSON Schema file that validates this data file.",
+      "type": "string"
+    },
+    "paths": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^~/",
+        "description": "Tilde-relative directory path to trust. Expanded at runtime via os.path.expanduser (POSIX) or $HOME substitution (Windows)."
+      },
+      "description": "Directory paths trusted by both VS Code workspace trust and pi project trust."
+    }
+  },
+  "additionalProperties": false,
+  "description": "Shared list of directory paths trusted by both VS Code workspace trust and pi project trust. Adding a path here trusts it in both editors."
+}

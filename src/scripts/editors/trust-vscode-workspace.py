@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Trust ~/dev directory in VS Code's workspace trust database (state.vscdb).
+"""Trust directories in VS Code's workspace trust database (state.vscdb).
 
-Reads VS Code's per-channel globalStorage SQLite database and inserts a trust
-entry for ~/dev. Handles both stable and insiders channels. Non-fatal on
+Reads the shared trust path list from trust-paths.json and inserts trust
+entries for each path into VS Code's per-channel globalStorage SQLite
+database. Handles both stable and insiders channels. Non-fatal on
 locked/absent databases.
 """
 
@@ -12,22 +13,30 @@ import sqlite3
 import sys
 
 HOME = os.environ.get("HOME", "")
-dev_path = os.path.join(HOME, "dev")
 
-# Only trust the dev directory when it actually exists on this machine.
-# Exits immediately when ~/dev is absent (edge case: first-run race before
-# ensure-dev-directory completes; resolved on the next apply).
-if not os.path.isdir(dev_path):
+# Locate trust-paths.json relative to this script.
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+TRUST_PATHS_FILE = os.path.join(SCRIPT_DIR, "trust-paths.json")
+
+if not os.path.isfile(TRUST_PATHS_FILE):
+    print("vscode-trust: warning:", TRUST_PATHS_FILE, "not found", file=sys.stderr)
     sys.exit(0)
 
-trust_entry = {
-    "uri": {"$mid": 1, "path": dev_path, "scheme": "file"},
-    "trusted": True,
-}
+with open(TRUST_PATHS_FILE, encoding="utf-8") as f:
+    config = json.load(f)
+
+paths_to_trust = []
+for raw in config.get("paths", []):
+    expanded = os.path.expanduser(raw)
+    if os.path.isdir(expanded):
+        paths_to_trust.append(expanded)
+    else:
+        print("vscode-trust: skipping", expanded, "(not a directory)", file=sys.stderr)
+
+if not paths_to_trust:
+    sys.exit(0)
 
 # Locate the state.vscdb for both stable and insiders channels.
-# The per-channel globalStorage directory is the authoritative location
-# for VS Code APPLICATION-scope storage regardless of installation backend.
 if sys.platform == "darwin":
     app_support = os.path.join(HOME, "Library", "Application Support")
     db_paths = [
@@ -51,8 +60,6 @@ for db_path in db_paths:
     if not os.path.isfile(db_path):
         continue
     try:
-        # timeout=5 waits up to 5 s for a SQLite lock; if VS Code holds
-        # the lock longer the OperationalError is caught below (non-fatal).
         conn = sqlite3.connect(db_path, timeout=5)
         try:
             cur = conn.cursor()
@@ -61,27 +68,42 @@ for db_path in db_paths:
             if row:
                 data = json.loads(row[0])
                 entries = data.get("uriTrustInfo", [])
+            else:
+                data = {}
+                entries = []
+
+            added = False
+            for path in paths_to_trust:
                 already_trusted = any(
-                    e.get("uri", {}).get("path") == dev_path
+                    e.get("uri", {}).get("path") == path
                     and e.get("uri", {}).get("scheme") == "file"
                     for e in entries
                 )
-                if already_trusted:
-                    continue
-                entries.append(trust_entry)
+                if not already_trusted:
+                    entries.append(
+                        {
+                            "uri": {"$mid": 1, "path": path, "scheme": "file"},
+                            "trusted": True,
+                        }
+                    )
+                    added = True
+
+            if added:
                 data["uriTrustInfo"] = entries
-            else:
-                data = {"uriTrustInfo": [trust_entry]}
-            new_value = json.dumps(data, separators=(",", ":"))
-            cur.execute(
-                "INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?, ?)",
-                (TRUST_KEY, new_value),
-            )
-            conn.commit()
-            print("vscode-trust: trusted", dev_path, "in", db_path, file=sys.stderr)
+                new_value = json.dumps(data, separators=(",", ":"))
+                cur.execute(
+                    "INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?, ?)",
+                    (TRUST_KEY, new_value),
+                )
+                conn.commit()
+                print(
+                    "vscode-trust: trusted",
+                    len(paths_to_trust),
+                    "path(s) in",
+                    db_path,
+                    file=sys.stderr,
+                )
         finally:
             conn.close()
     except (sqlite3.Error, OSError, ValueError) as e:
-        # Non-fatal: DB may be locked by a running VS Code instance, or
-        # absent on a fresh install before VS Code has been launched once.
         print("vscode-trust: warning:", db_path, "-", e, file=sys.stderr)

@@ -35,5 +35,6 @@
   "symlink-vscode-extensions"
   "symlink-vscode-config"
   "trust-vscode-workspace"
+  "trust-pi-project"
   "provision-wallpapers"
 ]
