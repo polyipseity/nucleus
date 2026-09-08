@@ -58,7 +58,7 @@ Check/test preflight, tool-availability policy, and scoped-mode conventions: `.a
 - Tests are required for feature additions and breaking changes.
 - Detailed testing guidance lives in `.agents/instructions/testing.instructions.md`.
 - The step-runner framework contract for check/test pipelines lives in `.agents/instructions/step-runner.instructions.md`.
-- Shared state in check/test scripts must flow through the step-runner context object, never ambient scope; see `.agents/instructions/no-ambient-passing.instructions.md`.
+- Shared state in check/test scripts must flow through the step-runner context object, never ambient scope; see `.agents/instructions/step-runner.instructions.md` § No ambient passing of shared state.
 
 ## Core Conventions
 

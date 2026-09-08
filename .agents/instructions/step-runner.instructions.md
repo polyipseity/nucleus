@@ -257,8 +257,16 @@ Step 7 validation rules:
     - Same aggregation (collect all, then report)
 ```
 
-## Related instruction files
+## No ambient passing of shared state
 
-- `testing.instructions.md` — Test structure, CI integration, and validation patterns.
-- `tooling-and-validation.instructions.md` — Repository tooling, build commands, and validation hooks.
-- `allow-and-deny-lists.instructions.md` — Step 7 EXCEPTION_LIST registry and exclude-list policy.
+No function or step may read state from enclosing scope (`$script:` in PowerShell, globals in bash, module-level vars in Python/TS) that was not passed as a parameter. State must flow through the call signature. The step-runner context object is the only carrier of runner-populated state.
+
+Check/test steps receive a context object as their first parameter:
+- PowerShell: `$Context.<Field>` (a `[PSObject]` built by `step-runner.ps1`).
+- Bash: `${ctx[...]}` (an associative array referenced via `local -n ctx="$1"`, built by `step-runner.sh`).
+
+Steps read only from that context and their own `local` variables — never from ambient scope. Step-private accumulators (counters, exit codes) must be `local` / `$local:`. Never write them to shared scope for other steps to read.
+
+Documented required environment inputs (e.g. `REPO_ROOT`, `NUCLEUS_REPO_ROOT` in lib helpers) or external env vars (e.g. `PARALLEL_JOBS`) are not ambient passing of runner state. Mark the exception with a `# WHY:` comment if non-obvious.
+
+Ambient passing breaks under isolation (runspaces, subshells, strict scoping). PowerShell runspaces cannot inherit the caller's `$script:` scope, so steps reading `$script:`-scoped state either fail or corrupt the main session via concurrent access. Bash subshells copy globals, hiding the same defect.
