@@ -331,6 +331,79 @@ test_step14_logging_behavioral_allowlist() {
   [ "$_ret" -eq 0 ]
 }
 
+# --- nix file structure tests ---
+
+test_step14_nix_file_structure_present() {
+  grep -q 'run_nix_file_structure' "$TEST_FILE"
+}
+
+test_step14_nix_file_structure_pattern1_detection() {
+  local _tmp
+  _tmp=$(mktemp -d)
+  mkdir -p "$_tmp/src/testmod"
+  touch "$_tmp/src/testmod.nix"
+  mkdir -p "$_tmp/src/testmod"
+  local _out
+  _out=$(mktemp)
+  # Source the check-lib to get filter_gitignored, then source the step
+  (cd "$_tmp" && mkdir -p src && git init -q && touch src/.gitkeep && git add . && git commit -q -m 'init' && \
+    . "$REPO_ROOT/src/scripts/checks/check-lib.sh" && \
+    . "$TEST_FILE" && \
+    declare -A ctx=([HAS_ARGS]=false [REPO_ROOT]="$_tmp") && \
+    run_nix_file_structure false "$_tmp" 2>"$_out" || true)
+  local _ret=0
+  grep -q 'exists alongside directory' "$_out" || _ret=1
+  if [ "$_ret" -ne 0 ]; then
+    echo "FAIL: Pattern 1 not detected"
+    cat "$_out"
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  [ "$_ret" -eq 0 ]
+}
+
+test_step14_nix_file_structure_pattern2_detection() {
+  local _tmp
+  _tmp=$(mktemp -d)
+  mkdir -p "$_tmp/src/mymod"
+  touch "$_tmp/src/mymod/mymod.nix"
+  local _out
+  _out=$(mktemp)
+  (cd "$_tmp" && mkdir -p src && git init -q && touch src/.gitkeep && git add . && git commit -q -m 'init' && \
+    . "$REPO_ROOT/src/scripts/checks/check-lib.sh" && \
+    . "$TEST_FILE" && \
+    declare -A ctx=([HAS_ARGS]=false [REPO_ROOT]="$_tmp") && \
+    run_nix_file_structure false "$_tmp" 2>"$_out" || true)
+  local _ret=0
+  grep -q 'same name as parent directory' "$_out" || _ret=1
+  if [ "$_ret" -ne 0 ]; then
+    echo "FAIL: Pattern 2 not detected"
+    cat "$_out"
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  [ "$_ret" -eq 0 ]
+}
+
+test_step14_nix_file_structure_valid_passes() {
+  local _tmp
+  _tmp=$(mktemp -d)
+  mkdir -p "$_tmp/src/mymod"
+  touch "$_tmp/src/mymod/default.nix"
+  local _out
+  _out=$(mktemp)
+  (cd "$_tmp" && mkdir -p src && git init -q && touch src/.gitkeep && git add . && git commit -q -m 'init' && \
+    . "$REPO_ROOT/src/scripts/checks/check-lib.sh" && \
+    . "$TEST_FILE" && \
+    declare -A ctx=([HAS_ARGS]=false [REPO_ROOT]="$_tmp") && \
+    run_nix_file_structure false "$_tmp" 2>"$_out")
+  local _ret=$?
+  grep -q 'nix file structure passed' "$_out" || _ret=1
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  [ "$_ret" -eq 0 ]
+}
+
 failures=0
 for test in \
   test_step14_dummy_key_registry_read \
@@ -358,7 +431,11 @@ for test in \
   test_step14_logging_ps1_twin \
   test_step14_logging_behavioral_positive \
   test_step14_logging_behavioral_negative \
-  test_step14_logging_behavioral_allowlist; do
+  test_step14_logging_behavioral_allowlist \
+  test_step14_nix_file_structure_present \
+  test_step14_nix_file_structure_pattern1_detection \
+  test_step14_nix_file_structure_pattern2_detection \
+  test_step14_nix_file_structure_valid_passes; do
   if ! $test; then
     failures=$((failures + 1))
   fi

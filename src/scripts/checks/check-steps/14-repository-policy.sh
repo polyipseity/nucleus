@@ -47,6 +47,9 @@ run_repository_policy() {
   say "--- logging format policy ---"
   run_logging_format_policy "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
+  say "--- nix file structure ---"
+  run_nix_file_structure "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+
   if [ "$_failed" -ne 0 ]; then
     error "repository policy check failed"
     return 1
@@ -662,5 +665,56 @@ run_logging_format_policy() {
     return 1
   fi
   say "logging format policy passed."
+  return 0
+}
+
+# ref: nix-authoring.instructions.md (Nix file structure)
+run_nix_file_structure() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
+  local _files=("$@")
+  cd "$_repo_root" || return 1
+
+  local _nfs_errors=0
+  local _nix_files=()
+
+  if $_has_args; then
+    for _f in "${_files[@]}"; do
+      case "$_f" in
+      src/*.nix | tests/*.nix) _nix_files+=("$_f") ;;
+      esac
+    done
+  else
+    while IFS= read -r -d '' _f; do
+      _nix_files+=("$_f")
+    done < <(find src tests -name '*.nix' -not -path '*/vendor/*' -print0)
+    mapfile -t _nix_files < <(printf '%s\n' "${_nix_files[@]}" | filter_gitignored)
+  fi
+
+  if [ "${#_nix_files[@]}" -gt 0 ]; then
+    local _f _dir _base _dirbase
+    for _f in "${_nix_files[@]}"; do
+      # Pattern 1: <name>.nix alongside <name>/ directory
+      _dir="${_f%.nix}"
+      if [ -d "$_dir" ]; then
+        _nfs_errors=$((_nfs_errors + 1))
+        error "nix file structure: '$_f' exists alongside directory '$_dir/' — move to '$_dir/default.nix' (nix-authoring.instructions.md)"
+      fi
+
+      # Pattern 2: <name>/<name>.nix (should be <name>/default.nix)
+      _base="$(basename "$_f" .nix)"
+      _dirbase="$(basename "$(dirname "$_f")")"
+      if [ "$_base" = "$_dirbase" ]; then
+        _nfs_errors=$((_nfs_errors + 1))
+        error "nix file structure: '$_f' has same name as parent directory — rename to 'default.nix' (nix-authoring.instructions.md)"
+      fi
+    done
+  fi
+
+  if [ "$_nfs_errors" -gt 0 ]; then
+    error "nix file structure check failed with $_nfs_errors error(s)"
+    return 1
+  fi
+  say "nix file structure passed."
   return 0
 }

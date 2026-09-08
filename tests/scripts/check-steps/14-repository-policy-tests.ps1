@@ -147,4 +147,23 @@ if ($content -match 'Test-Path -LiteralPath') {
   Assert-Fail -Name 'step14_ps1_args_mode_skips_missing_paths' -Reason 'step 14 PS1 should filter args-mode file lists to existing paths before Select-String'
 }
 
+# --- nix file structure tests ---
+if ($content -match 'run_nix_file_structure' -or $content -match 'nix file structure') {
+  Assert-Pass -Name 'step14_ps1_nix_file_structure_present' -Reason 'step 14 PS1 has nix file structure check'
+} else {
+  Assert-Fail -Name 'step14_ps1_nix_file_structure_present' -Reason 'step 14 PS1 should have nix file structure check'
+}
+
+if ($content -match 'exists alongside directory' -or $content -match 'Pattern 1') {
+  Assert-Pass -Name 'step14_ps1_nix_pattern1_check' -Reason 'step 14 PS1 checks Pattern 1 (file alongside directory)'
+} else {
+  Assert-Fail -Name 'step14_ps1_nix_pattern1_check' -Reason 'step 14 PS1 should check Pattern 1 (file alongside directory)'
+}
+
+if ($content -match 'same name as parent directory' -or $content -match 'Pattern 2') {
+  Assert-Pass -Name 'step14_ps1_nix_pattern2_check' -Reason 'step 14 PS1 checks Pattern 2 (file same name as dir)'
+} else {
+  Assert-Fail -Name 'step14_ps1_nix_pattern2_check' -Reason 'step 14 PS1 should check Pattern 2 (file same name as dir)'
+}
+
 if ($script:failed) { exit 1 } else { exit 0 }

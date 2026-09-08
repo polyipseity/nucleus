@@ -592,6 +592,48 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
     Write-Message "logging format policy passed."
   }
 
+  # --- nix file structure ---
+  Write-Message "--- nix file structure ---"
+  $nfsErrors = 0
+
+  $nixSearchDirs = @(
+    (Join-Path -Path $r -ChildPath 'src'),
+    (Join-Path -Path $r -ChildPath 'tests')
+  )
+  $nixFiles = @()
+  foreach ($dir in $nixSearchDirs) {
+    if (Test-Path -LiteralPath $dir) {
+      $nixFiles += Get-ChildItem -Path $dir -Recurse -Include '*.nix' |
+        Where-Object { $_.FullName -notmatch '[\/](vendor)[\/]' } |
+        Select-GitIgnored
+    }
+  }
+
+  foreach ($f in $nixFiles) {
+    $fullPath = $f.FullName
+    # Pattern 1: <name>.nix alongside <name>/ directory
+    $dirPath = [System.IO.Path]::ChangeExtension($fullPath, $null)
+    if ($dirPath -and (Test-Path -LiteralPath $dirPath -PathType Container)) {
+      Write-ErrorMessage "nix file structure: '$($fullPath.Substring($r.Length + 1))' exists alongside directory '$($dirPath.Substring($r.Length + 1))/' -- move to '$($dirPath.Substring($r.Length + 1))/default.nix' (nix-authoring.instructions.md)"
+      $nfsErrors++
+    }
+
+    # Pattern 2: <name>/<name>.nix (should be default.nix)
+    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($fullPath)
+    $parentName = Split-Path -Leaf (Split-Path -Parent $fullPath)
+    if ($baseName -eq $parentName) {
+      Write-ErrorMessage "nix file structure: '$($fullPath.Substring($r.Length + 1))' has same name as parent directory -- rename to 'default.nix' (nix-authoring.instructions.md)"
+      $nfsErrors++
+    }
+  }
+
+  if ($nfsErrors -gt 0) {
+    Write-ErrorMessage "nix file structure check failed with $nfsErrors error(s)"
+    $failed = $true
+  } else {
+    Write-Message "nix file structure passed."
+  }
+
   if ($failed) {
     Write-ErrorMessage "repository policy check failed"
     return $false
