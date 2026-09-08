@@ -312,3 +312,16 @@ Library files (under `src/scripts/lib/`) are pure function/constant definitions.
 ### Exception
 
 A lib file may be embedded via `builtins.readFile` when it contains a clean function definition (no tokens, no env var dependencies) and is wrapped into a standalone script (e.g., a launchd daemon script) that executes independently. The embedded lib must remain pure — all external inputs arrive as function arguments from the wrapping code.
+
+## Shell history exclusion
+
+All managed shells exclude two history features:
+
+| Feature | zsh | PowerShell (POSIX) | PowerShell (Windows) | cmd.exe |
+| --------- | ----- | --------------------- | ----------------------- | --------- |
+| Ignore space-prefixed commands | `setopt HIST_IGNORE_SPACE` | `-AddToHistoryHandler { ... }` | Same | No equivalent |
+| Ignore consecutive duplicates | `setopt HIST_IGNORE_DUPS` | `-HistoryNoDuplicates` | Same | No equivalent |
+
+File locations: zsh in `src/scripts/shell/init.zsh` (embedded by `src/modules/shell.nix` `initContent`); PowerShell in `src/scripts/shell/profile.ps1` (PSReadLine block, embedded by `src/modules/pwsh.nix` on POSIX, read by `Sync-ShellProfile.ps1` on Windows); cmd.exe documented limitation in `src/hosts/Windows/user/shell.dsc.yml`.
+
+When adding a new shell, enable the equivalent: bash `HISTCONTROL=ignorespace:ignoredups`; fish `fish_history` or custom function; nushell `$env.config.shell_integration.history.exclude_patterns`; cmd.exe no equivalent.
