@@ -143,30 +143,30 @@ The `__nucleus_symlink_farm` env var is generated in `src/hosts/MacBook/activati
 
 ## By-design imperative patterns
 
-The following patterns are intentionally imperative and must not be converted to declarative state. Each has a documented technical constraint.
+These patterns stay imperative on purpose. Each has a concrete reason why declarative does not work.
 
-| Pattern | Constraint |
-|---------|------------|
-| Bootstrap curl (`bootstrap.sh`) | Must work before Nix is installed |
-| macOS `defaults write` | No declarative API for macOS preferences |
-| Service restarts on macOS | launchd has no declarative restart API |
-| Dev repos `git clone` | Live checkouts required for development workflow |
-| SOPS decryption at runtime | Secrets must be decrypted at service start |
-| Jellyfin/Plex API calls | Runtime service integration, not provisioning |
-| Package manager installs (Bun, CargoBinstall, UV, Rustup, Scoop) | These ARE the declarative mechanism on their respective platforms |
-| `update.sh` / `check.sh` API queries | Dev-time tools, not activation runtime |
-| Log dirs activation (`activation.nix`) | Activation ordering constraint (alphabetical, not dependency-based) prevents `systemd LogsDirectory` from replacing activation-time creation |
-| Pwsh module installs (`pwsh.nix`) | Test isolation requires runtime install/teardown; declarative approach cannot express cleanup |
-| Android image downloads (`VMAndroid.ps1`, `Invoke-AndroidConfig.ps1`) | Dynamic URLs from latest releases; pre-fetch requires URL pinning in lockfile |
-| Ollama model pulls (`Invoke-AISync.ps1`) | Inherently dynamic/user-choice |
-| Wi-Fi MAC randomization (`Sync-WifiMacRandomization.ps1`) | Registry path contains runtime-discovered adapter GUIDs; DSC requires static paths |
-| PATH management (`Sync-UserPath.ps1`) | Read-modify-write cycle with `WM_SETTINGCHANGE` broadcast via P/Invoke; DSC cannot handle broadcast or reconstruct |
-| Firewall per-rule control (`Sync-OpenSSHServer.ps1`, `Sync-WindowsRDP.ps1`) | `Microsoft.Windows.Settings/Firewall` only supports global on/off, not per-rule control |
-| CamillaDSP/Heartbeat scheduled tasks | Dynamic arguments (port from `services.json`, config path) cannot be expressed in static DSC |
-| Cloud Drive Catalog scheduled tasks | Per-mount dynamic args cannot be expressed in static DSC |
-| QtPass config (`Sync-QtPassConfig.ps1`) | Registry hive load/unload for non-current-user profiles. DSC `RegistryValue` only targets the running user's hive, cannot write to another user's registry without hive load/unload logic. |
-| Caddy config generation (`Sync-CaddyService.ps1`) | Generates Caddyfile from `services.json` at runtime. NixOS does this declaratively via `services.caddy.virtualHosts`, but merging the two implementations requires a shared Nix module that both hosts consume. Significant refactoring for no practical benefit. |
-| Source build git clone (`Invoke-SourceBuild.ps1`) | Source builds need full git history for submodules. Vendoring tarballs via `pkgs.fetchFromGitHub` does not include `.git/` or submodule content. |
+| Pattern | Why it stays imperative |
+|---------|------------------------|
+| Bootstrap curl (`bootstrap.sh`) | Runs before Nix is installed. There is nothing declarative to eval against yet. |
+| macOS `defaults write` | Apple exposes no declarative API for preferences. `defaults write` is the only way. |
+| Service restarts on macOS | launchd has no restart API. Killing and re-bootstrapping is the only option. |
+| Dev repos `git clone` | Developers need live checkouts, not Nix store copies. |
+| SOPS decryption at runtime | Secrets are encrypted at rest. They must be decrypted when a service starts. |
+| Jellyfin/Plex API calls | Runtime queries against running services, not provisioning. |
+| Package manager installs | Scoop, bun, cargo-binstall, uv, rustup: these are the declarative mechanism on their respective platforms. |
+| `update.sh` / `check.sh` API queries | Dev-time tools that query live registries. Not part of activation. |
+| Log dirs (`activation.nix`) | Activation runs alphabetically, not by dependency. Log dirs must be created after root symlinks resolve. `systemd LogsDirectory` creates under `/var/log/` (wrong path) and cannot express ordering. |
+| Pwsh module installs (`pwsh.nix`) | Tests clean up module state after each run. Nix store paths are read-only, so cleanup is impossible. |
+| Android image downloads | URLs come from latest GitHub releases and change often. Pinning requires lockfile updates every time. |
+| Ollama model pulls | Users choose which models to pull. Not a provisioning concern. |
+| Wi-Fi MAC randomization | Registry paths contain adapter GUIDs discovered at runtime. DSC needs static paths. |
+| PATH management (`Sync-UserPath.ps1`) | Read-modify-write cycle with `WM_SETTINGCHANGE` broadcast via P/Invoke. DSC cannot broadcast or reconstruct the existing PATH. |
+| Firewall per-rule control | DSC `Microsoft.Windows.Settings/Firewall` only supports global on/off, not per-rule control. |
+| CamillaDSP/Heartbeat scheduled tasks | Port comes from `services.json`, config path from host state. DSC needs static values. |
+| Cloud Drive Catalog scheduled tasks | Per-mount dynamic args. DSC cannot express variable arguments per mount. |
+| QtPass config (`Sync-QtPassConfig.ps1`) | Writes to `HKCU` registry hives. For non-current-user profiles, the script loads and unloads hives manually. DSC `RegistryValue` only targets the running user. |
+| Caddy config generation (`Sync-CaddyService.ps1`) | Builds Caddyfile from `services.json` at runtime. NixOS does this declaratively, but the two implementations are separate. Merging them needs a shared Nix module across hosts. Not worth the refactoring. |
+| Source builds (`Invoke-SourceBuild.ps1`) | Source builds need full git history for submodules. `fetchFromGitHub` tarballs do not include `.git/` or submodule content. |
 
 ## Cross-platform parity matrix
 
@@ -180,11 +180,11 @@ Current declarative status per host for key infrastructure features:
 | Static registry values | — | — | DSC-convertible (PowerPolicy) + justified imperative (Wi-Fi MAC, PATH) |
 | Log dirs | mkdir (imperative) | mkdir activation + systemd (imperative — activation ordering constraint) | mkdir (imperative) |
 | State dirs | mkdir (imperative) | `StateDirectory` (partial — redis only) | mkdir (imperative) |
-| Runtime downloads | — | — | Pre-fetchable via `vendor-assets` (SteamCMD, CamillaDSP/GUI) + justified imperative (Android, Ollama) |
-| Zsh completions | Runtime activation (imperative) | Runtime activation (imperative — deferred build-time) | — |
+| Runtime downloads | — | — | Justified imperative (Android, Ollama — dynamic URLs and user choice) |
+| Zsh completions | Runtime activation (imperative) | Runtime activation (imperative) | — |
 | Pwsh modules | — | — | Runtime install (imperative — test isolation) |
 | Jellyfin API | — | — | Justified imperative (runtime API) |
-| Vendor assets | Nix derivations (declarative) | Nix derivations (declarative) | `vendor-assets` flake output + `-VendorDir` param (partially wired) |
+| Vendor assets | Nix derivations (declarative) | Nix derivations (declarative) | Justified imperative (download at setup time; no Nix on Windows) |
 
 ## Host vs platform naming
 
