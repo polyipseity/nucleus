@@ -48,13 +48,11 @@ Imperative Windows parity requires in both config and deconfig paths:
 
 ## Service lifecycle cleanup
 
-- **macOS/NixOS**: automatic — Nix removes the unit file on re-apply.
-- **Windows SCM** (Caddy, LiteLLM): `Sync-*Service.ps1` implements `Stop-Service` + `sc.exe delete` when `-Enabled:$false`.
-- **Windows scheduled tasks**: each `Sync-*` module calls `Unregister-ScheduledTask` when disabled.
+- **macOS/NixOS**: automatic — Nix removes unit files on re-apply.
+- **Windows SCM** (Caddy, LiteLLM): `Sync-*Service.ps1` implements `Stop-Service` + `sc.exe delete` when disabled.
+- **Windows tasks**: `Sync-*` modules call `Unregister-ScheduledTask` when disabled.
 
-New Windows service modules must implement both enable and disable paths. Verify disable fully removes managed state.
-
-Failed service starts emit a warning but do not abort activation. Watchdog handles retries.
+New Windows modules must implement enable and disable paths. Failed starts warn but don't abort activation.
 
 ## Service firing policy
 
@@ -62,16 +60,11 @@ Default: persistent daemon (auto-start + crash recovery). Periodic oneshots are 
 
 ## Package parity rules
 
-- Cross-host CLI tools: add to `src/modules/core.nix` (POSIX) and `src/hosts/Windows/system-packages.dsc.yml` (Windows) in the same change.
-- Dual nixpkgs + Homebrew packages go to `managedPackages` in `core.nix`, not spread across host files. See `package-installation-scope.instructions.md`.
-- Remove duplicates from `src/hosts/NixOS/desktop.nix` when `core.nix` `sharedPackages` already covers the package.
-- Windows source builds: pin by commit hash. Document steps in `Build-<Tool>.ps1` under `src/platforms/Windows/modules/`.
+Cross-host tools: add to `core.nix` (POSIX) and `system-packages.dsc.yml` (Windows) in same change. Dual nixpkgs+Homebrew: use `managedPackages` in `core.nix`, not spread across hosts. Remove duplicates from `NixOS/desktop.nix`. Windows source builds: pin by commit hash, document in `Build-<Tool>.ps1`.
 
 ## Secrets and wallpaper parity
 
-- Secrets: POSIX `src/modules/secrets.nix` + `materialize-user-secrets.sh`; Windows `Sync-UserSecret.ps1` / `Sync-SecretFile.ps1` via `apply.ps1`.
-- Wallpapers: POSIX `src/modules/wallpapers.nix`; Windows `Sync-WallpaperInventory.ps1` + `user.dsc.yml`.
-- Preserve stale cleanup rules on every host.
+Secrets: POSIX `secrets.nix` + `materialize-user-secrets.sh`; Windows `Sync-UserSecret.ps1`/`Sync-SecretFile.ps1`. Wallpapers: POSIX `wallpapers.nix`; Windows `Sync-WallpaperInventory.ps1` + `user.dsc.yml`. Preserve stale cleanup rules.
 
 ## Cloud-drive parity
 
@@ -79,35 +72,17 @@ See `cloud-drives-and-finder.instructions.md`. Key: mounts/replicas parity-first
 
 ## Cross-platform script deduplication
 
-Host-specific scripts (`src/hosts/<Host>/scripts/`) must implement genuinely host-specific features. If applicable to any POSIX host, use a shared subdirectory (`services/`, `configs/`, `packages/`, etc.).
+Host-specific scripts must implement genuinely host-specific features. If applicable to any POSIX host, use a shared subdirectory. When both macOS and NixOS have the same feature, merge via `builtins.replaceStrings` or `case "$(uname)"`. Drop prefixes; delete originals.
 
-When both macOS and NixOS have host-specific implementations of the same feature, merge into one POSIX-compatible script via `builtins.replaceStrings` token substitution or `case "$(uname)"` dispatch. Drop the `macos-`/`nixos-` prefix. Delete originals after merge.
+## Allowed exceptions and pre-merge checklist
 
-## Allowed platform-specific exceptions
-
-Single-host only when the feature depends on platform-specific primitives (macOS defaults domains, NixOS kernel modules, Windows registry/DSC). WHY comment in code required. If the exception masks controls, the WHY must explain the tradeoff and name the alternate access path.
-
-## Pre-merge parity checklist
-
-- All three hosts evaluated; multi-host implementation where practical.
-- Exceptions have WHY comments.
-- Shared logic extracted into shared modules.
-- Related instructions updated when invariants changed.
+Single-host only for platform-specific primitives (macOS defaults, NixOS kernel modules, Windows registry/DSC). WHY comment required; if masking controls, explain tradeoff and alternate access path. Before merge: all three hosts evaluated, exceptions justified, shared logic extracted, instructions updated.
 
 ## GC and retention policy
 
-Timing values live at their point of use. Change them in the source file listed below, not a separate manifest.
+Timing values live at their point of use. Change them in the source file, not a separate manifest.
 
-| Category | Source files |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Nix store GC, HM expiry | `src/modules/posix-base.nix`, `src/scripts/services/nix-store-gc.sh`, `scripts/gc.sh`, `src/modules/lib/gc-options.nix` |
-| macOS timers & defaults | `src/platforms/macOS/modules/default.nix`, `src/hosts/MacBook/defaults.nix` |
-| Linux timers & timeouts | `src/platforms/NixOS/modules/default.nix`, `src/modules/posix-security.nix` |
-| Windows schedules & timeouts | `src/hosts/Windows/system.dsc.yml`, `src/hosts/Windows/system-packages.dsc.yml`, `src/hosts/Windows/user.dsc.yml`, `src/hosts/Windows/user-env.dsc.yml`, `src/hosts/Windows/user-context.dsc.yml`, `src/platforms/Windows/modules/system/*.ps1` |
-| Cloud drive caches | `src/modules/cloud-drives.nix` |
-| AI/LLM timeouts | `scripts/ai-sync.sh`, `scripts/gc.sh` |
-| Declarative-diff GC items | `scripts/gc.sh`, `scripts/gc.ps1` |
-| App-level timeouts | `src/modules/editors.nix`, `src/users/default/picard/Picard.ini` |
+Nix store GC: `posix-base.nix`, `nix-store-gc.sh`, `gc.sh`, `gc-options.nix`. macOS: `platforms/macOS/modules/default.nix`, `hosts/MacBook/defaults.nix`. Linux: `platforms/NixOS/modules/default.nix`, `posix-security.nix`. Windows DSC: `system.dsc.yml`, `system-packages.dsc.yml`, `user.dsc.yml`, `user-env.dsc.yml`, `user-context.dsc.yml`, `platforms/Windows/modules/system/*.ps1`. Cloud: `cloud-drives.nix`. AI: `ai-sync.sh`. App-level: `editors.nix`, `picard/Picard.ini`.
 
 Override precedence: CLI flag > per-tool env var > master flag/env > Nix config default > `7d` / `7`.
 
@@ -123,29 +98,26 @@ Read-only exception: symlink MUST be read-only when target is in the Nix store (
 
 ## By-design imperative patterns
 
-| Pattern | Why imperative |
-|---------|---------------|
+| Pattern | Why |
+|---------|-----|
 | Bootstrap curl | Before Nix installed |
-| `defaults write` / macOS restarts | No declarative API; no launchd restart API |
-| `git clone`, SOPS, Jellyfin/Plex API | Runtime requirements (live checkouts, decryption, service queries) |
-| Package managers (Scoop/bun/cargo-binstall/uv/rustup) | Declarative mechanism on each platform |
-| `update.sh`/`check.sh` queries | Dev-time, not activation |
-| Log dirs, Pwsh modules, Android images | Ordering/DRY-constraint, Nix store read-only, dynamic URLs |
-| Ollama model pulls | User choice, not provisioning |
-| Wi-Fi MAC, PATH, Firewall per-rule | Runtime GUIDs, broadcast/DSC gap, DSC global-only |
-| CamillaDSP/Heartbeat/Cloud Drive tasks | Dynamic port/config/args from runtime state |
-| QtPass config (`HKCU` hives) | DSC targets only running user |
-| Caddy config, Source builds | Runtime `services.json` build, git history needed for submodules |
+| `defaults write`, macOS restarts | No declarative API, no launchd restart API |
+| `git clone`, SOPS, API calls | Runtime (live checkouts, decryption, queries) |
+| Package managers | Declarative mechanism on each platform |
+| Log dirs, Pwsh modules, Android images | Ordering constraint, Nix store read-only, dynamic URLs |
+| Wi-Fi MAC, PATH, Firewall | Runtime GUIDs, broadcast, DSC global-only |
+| CamillaDSP/Heartbeat/Cloud Drive tasks | Dynamic port/config/args |
+| QtPass, Caddy config, Source builds | HKCU hives, runtime build, git history needed |
 
 ## Cross-platform parity matrix
 
 | Feature | macOS | NixOS | Windows |
-|---------|-------|-------|--------|
-| Caddy config | launchd plist | NixOS Caddyfile | PowerShell generation |
-| Scheduled tasks | launchd plist | systemd timer | DSC scheduler + PS verification |
-| Firewall rules | — | nftables | DSC global toggle + PS per-rule |
-| Registry values | — | — | DSC + justified imperative |
-| Log/state dirs | mkdir | mkdir + `StateDirectory` (partial) | mkdir |
-| Runtime downloads | — | — | Justified imperative |
-| Zsh completions | Activation | Activation | — |
-| Vendor assets | Nix derivations | Nix derivations | Download at setup (no Nix) |
+| --- | --- | --- | --- |
+| Caddy | launchd plist | NixOS Caddyfile | PS generation |
+| Tasks | launchd plist | systemd timer | DSC + PS verify |
+| Firewall | — | nftables | DSC global + PS per-rule |
+| Registry | — | — | DSC + imperative |
+| Log/state dirs | mkdir | mkdir + `StateDirectory` | mkdir |
+| Downloads | — | — | Imperative |
+| Completions | Activation | Activation | — |
+| Vendor assets | Nix derivations | Nix derivations | Download (no Nix) |

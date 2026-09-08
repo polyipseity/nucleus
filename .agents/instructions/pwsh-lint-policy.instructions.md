@@ -8,97 +8,49 @@ applyTo: "**/*.ps1, scripts/*-PSScriptAnalyzerSettings.psd1"
 
 ## Suppression rules
 
-1. **Prefer redirecting over suppressing.** Use `> $null` to discard output — it is the fastest and cleanest method and is NOT considered a suppression (no annotation required). Reach for redirect first before any suppression technique.
-2. **Prefer `$null =` or `[void]` over `[SuppressMessageAttribute]` attribute.** When redirect cannot work (e.g., the value is not pipeline output), use `$null = <expr>` or (for method calls) `[void]<expr>`. These ARE considered suppressions and require `# check-suppress:suppression_doc:` annotation.
-3. **`| Out-Null` is banned.** It is substantially slower than alternatives due to pipeline overhead. Replace all instances with `> $null` (preferred) or `$null =` with annotation.
-4. **Avoid file-scope `[SuppressMessageAttribute('RuleId', '')]` attribute.** Placed on a file-scope `param()` block it applies to the entire file (too coarse). Prefer `$null =` or `[void]` with `# check-suppress:suppression_doc:` annotation. Use the attribute only when there is literally no code path to annotate -- e.g. a function name that must keep its exact form (see `PSUseApprovedVerbs` command-name wrappers below). In that case place it INSIDE the function body immediately before `param()` -- this scopes it to that single function only. When unavoidable, must minimize rules covered (list specific rule IDs, no wildcards).
-5. **Every suppression needs an annotation.** `$null =` and `[void]` must have a `# check-suppress:suppression_doc: <reason>` comment on the same line or preceding line; a `[SuppressMessageAttribute]` attribute must have a `# check-suppress:SuppressMessageAttribute: <RuleName> -- <reason>` comment. File-level suppressions of any kind are prohibited.
-6. **No catch-all suppressions.** Suppress specific rule IDs. No wildcards or blanket suppressions.
+1. **Redirect first.** Use `> $null` to discard output — fastest, cleanest, no annotation needed.
+2. **`$null =` or `[void]` next.** When redirect cannot work (not pipeline output), use `$null = <expr>` or `[void]<expr>`. Both require `# check-suppress:suppression_doc:` annotation.
+3. **`| Out-Null` is banned.** Replace with `> $null` or `$null =` with annotation.
+4. **No file-scope `[SuppressMessageAttribute]`.** Too coarse. Use `$null =`/`[void]` with annotation. The attribute is allowed only when no code path can be annotated (e.g. function-name wrappers). Place it inside the function body before `param()`; specific rule IDs only.
+5. **Every suppression needs an annotation.** `$null =`/`[void]` → `# check-suppress:suppression_doc: <reason>`; `[SuppressMessageAttribute]` → `# check-suppress:SuppressMessageAttribute: <RuleName> -- <reason>`.
+6. **No catch-all suppressions.** Specific rule IDs only.
 
-## Redirect alternative (`> $null`)
+## Suppression methods
 
-`> $null` is the preferred way to discard output. It is NOT a suppression and needs no annotation.
-
-- **Performance:** `> $null` and `$null =` are fastest, `[void]` slightly slower, `| Out-Null` is much slower (pipeline overhead).
-- **Syntax:** `Get-ChildItem > $null` (redirects stdout to null). Use `2>$null` for stderr-only suppression (see B-class section below).
-- **Multi-stream:** `*> $null` redirects all streams to null.
-- **`2>$null`** stays documented under B-class error suppression with `# check-suppress:suppression_doc:` annotation.
-
-## `$null = <expr>` suppression
-
-- **Trigger:** Assigning command output to `$null` to suppress it, e.g. `$null = New-Item -Path $dir -ItemType Directory -Force`.
-- **When acceptable:** When the output must be discarded but `> $null` redirect cannot work (e.g., the value is not pipeline output, or the expression is a .NET method call with a return value).
-- **Annotation format:** `$null = New-Item ...  # check-suppress:suppression_doc: $null = intentional suppression`
-- **PSSA rules commonly triggered:** `PSUseDeclaredVarsMoreThanAssignments`, `PSPossibleIncorrectComparisonWithNull`
-
-## `[void]<expr>` suppression
-
-- **Trigger:** Casting an expression to `[void]` to suppress its return value, e.g. `[void]$object.SomeMethod()`.
-- **When acceptable:** When the expression is a method call returning a value that must be suppressed.
-- **Annotation format:** `[void]$object.SomeMethod()  # check-suppress:suppression_doc: reason`
-- **Note:** `[void]` is slightly slower than `$null =` and `> $null`. Prefer `$null =` when both work.
-
-## `| Out-Null` — banned
-
-`| Out-Null` is BANNED. Do not use it in new code. Replace all existing instances.
-
-- **Replacement patterns:**
-  - `Command-WithOutput | Out-Null` → `Command-WithOutput > $null`
-  - `$null = Command-WithOutput  # check-suppress:suppression_doc: reason` (when redirect cannot work)
-- **Exception:** None. Every `| Out-Null` must be replaced.
+| Method | When | Annotation | Speed |
+| --- | --- | --- | --- |
+| `> $null` | Pipeline output discard | None (not a suppression) | Fastest |
+| `$null = <expr>` | Non-pipeline output, .NET method returns | `# check-suppress:suppression_doc:` | Fast |
+| `[void]<expr>` | Method calls needing value suppression | `# check-suppress:suppression_doc:` | Slightly slower than `$null =` |
+| `2>$null` | stderr-only suppression | `# check-suppress:suppression_doc:` | — |
+| `*> $null` | All-stream suppression | `# check-suppress:suppression_doc:` | — |
+| `| Out-Null` | **Banned** | — | Slowest (pipeline overhead) |
 
 ## Rule-specific fix strategies
 
 ### `PSUseUsingScopeModifierInNewRunspaces` with `$using:VAR.Count`
 
-**Trigger:** Member access on a `$using:` variable in a `Start-Job` / `Start-ThreadJob` script block (e.g. `$using:PS1_FILES.Count`).
+**Trigger:** Member access on `$using:` in `Start-Job`/`Start-ThreadJob` (e.g. `$using:PS1_FILES.Count`).
 
-**Root cause:** The AST places `$using:PS1_FILES` under a `MemberExpressionAst`, not a `UsingExpressionAst`. The rule's predicate only checks the immediate parent, missing the `$using:` scope modifier in the ancestor chain.
+**Root cause:** AST places `$using:` under `MemberExpressionAst`, not `UsingExpressionAst`. Rule checks only immediate parent. **Upstream:** [#1504](https://github.com/PowerShell/PSScriptAnalyzer/issues/1504) (open since 2020), [#2005](https://github.com/PowerShell/PSScriptAnalyzer/pull/2005) (tests only).
 
-**Upstream status:**
-
-- [Issue #1504](https://github.com/PowerShell/PSScriptAnalyzer/issues/1504): General false-positive tracking (open since 2020)
-- [PR #2005](https://github.com/PowerShell/PSScriptAnalyzer/pull/2005): Draft PR adding tests for the issue but no fix (May 2024)
-- No dedicated bug report for member-access false positive exists; the scope-ancestor check has never been addressed upstream
-
-**Fix:** Assign the `$using:` variable to a local first, then use `.Count` (or other member access) on the local:
+**Fix:** Assign `$using:` to a local, use member access on the local:
 
 ```powershell
 # BAD — triggers false positive:
 if ($using:PS1_FILES.Count -gt 0) { ... $using:PS1_FILES ... }
-
-# GOOD — no warning:
+# GOOD:
 $_ps1Files = $using:PS1_FILES
 if ($_ps1Files.Count -gt 0) { ... $_ps1Files ... }
 ```
 
 ### `PSUseApprovedVerbs`
 
-**Trigger:** Function or cmdlet name using an unapproved verb (e.g. `Ensure-Tool`).
+**Trigger:** Unapproved verb in function name (e.g. `Ensure-Tool`).
 
-**Root cause:** The rule checks every `FunctionDefinitionAst` node and verifies the verb part (text before the first hyphen) is one of the [approved PowerShell verbs](https://learn.microsoft.com/en-us/powershell/scripting/developer/cmdlet/approved-verbs-for-windows-powershell-commands).
+**Fix:** Rename to an [approved verb](https://learn.microsoft.com/en-us/powershell/scripting/developer/cmdlet/approved-verbs-for-windows-powershell-commands). Lowercase helpers (`say`, `warn`, `error`) must also be renamed to Verb-Noun format.
 
-**Fix:** Rename to use an approved verb. Example:
-
-```powershell
-# BAD — 'Ensure' is not an approved verb:
-function Ensure-Tool { ... }
-
-# GOOD — use an approved verb:
-function Assert-ToolAvailable { ... }
-```
-
-**Lowercase helpers (`say`, `warn`, `error`)**: These do not follow the Verb-Noun pattern at all. Rename them to use an approved Verb-Noun format:
-
-```powershell
-# BAD — no Verb-Noun pattern:
-function say { Write-Output "$args" }
-
-# GOOD — approved verb + descriptive noun:
-function Write-Message { Write-Output "$args" }
-```
-
-**Command-name wrappers** (`python`, `bun`, `cargo`, etc.): Functions that shadow native commands keep their exact lowercase name. Non-hyphenated lowercase names don't trigger `PSUseApprovedVerbs` (it only fires on Verb-Noun hyphenated names), but `node` triggers `PSAvoidOverwritingBuiltInCmdlets`. Add the attribute INSIDE the function body immediately before `param()`:
+**Command-name wrappers** (`python`, `bun`, `cargo`): Keep lowercase name. Non-hyphenated names don't trigger this rule, but `node` triggers `PSAvoidOverwritingBuiltInCmdlets`. Add suppression inside the function body before `param()`:
 
 ```powershell
 function node {
@@ -109,110 +61,79 @@ function node {
 }
 ```
 
-Use inline suppression with a documented reason as per standard suppression rules. The comment syntax `# SuppressMessageAttribute('RuleId', '')` does NOT work — PSSA's `GetSuppressions` only reads `AttributeAst` from param blocks; comment-based suppressions are silently ignored. The attribute MUST be placed inside the function body before `param()` (placing it on the `function` keyword line causes `UnexpectedAttribute` ParseErrors), and the `# check-suppress:` annotation must sit on the same line as, or immediately above, the attribute (step-11 adjacency requirement).
+The comment syntax `# SuppressMessageAttribute(...)` does NOT work — PSSA reads only `AttributeAst` from param blocks. The attribute MUST go inside the function body before `param()`, with `# check-suppress:` on the same line or immediately above.
 
-**`Add-ShellAlias` helper**: Functions that create aliases via `New-Item -Path Function:` use the PSFunction provider path and produce no `FunctionDefinitionAst`. The helper itself (`Add-ShellAlias`) uses the approved verb `Add-`. This is the canonical way to create function aliases without triggering the rule.
+**`Add-ShellAlias`**: Creates aliases via `New-Item -Path Function:` — no `FunctionDefinitionAst` produced, so no verb check.
 
-**`nucleus-*` CLI wrappers** (`nucleus-apply`, `nucleus-check`, `nucleus-cloud`, etc. in `src/scripts/shell/profile.ps1`): These use the fixed `nucleus-<command>` contract as the function name. They trigger `PSUseApprovedVerbs` because `nucleus` is not an approved verb. Add the attribute INSIDE the function body immediately before `param()` with a documented reason. Prefer `Add-ShellAlias` for new shell aliases that do not need the exact `nucleus-*` name.
+**`nucleus-*` wrappers**: Trigger because `nucleus` is not approved. Add the attribute inside the function body before `param()`. Prefer `Add-ShellAlias` when the exact name is not required.
 
 ### `PSUseSingularNouns`
 
-**Trigger:** Function or cmdlet name using a plural noun (e.g. `Get-VmRunningNames`).
+**Trigger:** Plural noun in function name (e.g. `Get-VmRunningNames`).
 
-**Root cause:** PowerShell convention requires singular nouns. PSSA flags any function whose noun part appears grammatically plural.
-
-**Semantic audit required:** Passing PSSA is necessary but not sufficient — a function can pass PSSA while misrepresenting its contract. After fixing PSSA findings, apply the decision tree below. Never rename only to silence PSSA without checking whether the function operates on a collection.
+Renaming alone is not enough — verify whether the function operates on a collection before picking the right noun.
 
 ### Anti-pattern: naive de-pluralization
 
-PSSA flags plural nouns; the tempting fix is to drop the trailing `s`. That is **wrong** when the function operates on or returns multiple items.
+Dropping the trailing `s` is **wrong** when the function handles multiple items:
 
-| Wrong (naive de-pluralization) | Right (collection-indicating singular) | Why |
-| ------------------------------ | -------------------------------------- | --- |
+| Wrong (naive) | Right (collection-indicating singular) | Why |
+| --- | --- | --- |
 | `Sync-Symlinks` → `Sync-Symlink` | `Sync-Symlinks` → `Sync-SymlinkManifest` | Manifest-driven multi-symlink convergence |
 | `Get-ServiceLogDirs` → `Get-ServiceLogDir` | `Get-ServiceLogDirs` → `Get-ServiceLogDirList` | Returns an array of log directory paths |
 | `Get-WallpaperEncryptedBlobs` → `Get-WallpaperEncryptedBlob` | `Get-WallpaperEncryptedBlobs` → `Get-WallpaperEncryptedBlobList` | Returns `string[]` of blob names |
 
-**Rule:** Never satisfy `PSUseSingularNouns` by dropping the plural suffix alone when the function's contract is collection-oriented. Pick a collection-indicating singular noun from the table below.
-
 ### Naming decision tree
 
-1. Does PSSA flag a plural noun? If yes, go to step 2. If no, still check step 3 for semantic correctness.
-2. Does the function return or operate on **multiple homogeneous items** (array parameter, foreach over registry entries, manifest list)? If yes → use a **collection-indicating singular noun** (`List`, `Manifest`, `Catalog`, `Inventory`, etc.). If no → use a **bare singular noun**.
-3. Does the function converge **one logical config surface** (single app config file, single service, single domain object)? If yes → bare singular or `*Config` / `*Service` suffix is correct even if internal loops exist.
-4. When in doubt, prefer a collection suffix over a bare singular. Bare singular for multi-item operations is almost always wrong.
+1. Plural flagged? → step 2. Not flagged? → still check step 3.
+2. Multiple homogeneous items? → collection-indicating singular. Otherwise → bare singular.
+3. One logical config surface? → bare singular or `*Config`/`*Service`.
+4. When in doubt, prefer collection suffix.
 
 ### `Sync-*` suffix selection guide
 
 | Suffix | Use when | Examples |
-| ------ | -------- | -------- |
-| `*Manifest` | A manifest JSON file drives the item list | `Sync-SymlinkManifest`, `Sync-VSCodeExtensionManifest` |
-| `*Catalog` | Registry/domain arrays of entries (homogeneous or heterogeneous) | `Sync-DevRepoCatalog`, `Sync-CloudDriveCatalog` |
-| `*Inventory` | Materialized asset set across users or files | `Sync-WallpaperInventory` |
-| `*Config` | Single app/config tree convergence | `Sync-AgentsConfig`, `Sync-CursorConfig` |
-| `*Service` | Single Windows service entity | `Sync-CaddyService`, `Sync-LiteLLMService` |
+| --- | --- | --- |
+| `*Manifest` | Manifest JSON drives item list | `Sync-SymlinkManifest`, `Sync-VSCodeExtensionManifest` |
+| `*Catalog` | Registry/domain arrays | `Sync-DevRepoCatalog`, `Sync-CloudDriveCatalog` |
+| `Inventory` | Materialized asset set across users/files | `Sync-WallpaperInventory` |
+| `*Config` | Single app/config tree | `Sync-AgentsConfig`, `Sync-CursorConfig` |
+| `*Service` | Single Windows service | `Sync-CaddyService`, `Sync-LiteLLMService` |
 
-**Fix — two cases:**
+**Fix:** Single item → bare singular. Multiple items → collection-indicating singular.
 
-1. **Function returns a single item** → use bare singular noun (e.g., `Get-Process`, `Get-Service`).
-2. **Function returns multiple items** (collection/plurality) → use a **collection-indicating singular noun** — never a bare singular noun that misrepresents the return type.
+**Allowed collection nouns:** List, Set, Collection, Array, Group, Batch, Bundle, Cluster, Map, Dictionary, Hash, Hashtable, Index, Registry, Catalog, Table, Queue, Stack, Vector, Matrix, Range, Buffer, Pool, Cache, Heap, Ring, Tree, Graph, Stream, Sequence, Series, Enum, Inventory, Manifest, Record, Store, Archive, Suite, Toolkit, Library, Report, Aggregate, Compilation, Overview, Summary.
 
-**Allowed collection-indicating singular nouns:**
+**Never suppress. Rename the function.**
 
-| Category | Words |
-| -------------------- | ----------------------------------------------------------------------------------------------------------- |
-| General collections | List, Set, Collection, Array, Group, Batch, Bundle, Cluster |
-| Key-value structures | Map, Dictionary, Hash, Hashtable, Index, Registry, Catalog, Table |
-| Data structures | Queue, Stack, Vector, Matrix, Range, Buffer, Pool, Cache, Heap, Ring, Tree, Graph, Stream, Sequence, Series |
-| Record-keeping | Enum, Inventory, Manifest, Record, Store, Archive, Suite, Toolkit, Library, Report |
-| Organizational | Aggregate, Compilation, Overview, Summary |
-
-**Suppression:** Never. Do not suppress `PSUseSingularNouns`. Rename the function.
-
-**Edge cases:** Words ending in 's' that are inherently singular (Status, alias, process, bus, focus, virus, analysis, basis, crisis, thesis, etc.) are not violations. PSSA's built-in dictionary handles most of these.
+**Edge cases:** Words ending in 's' that are inherently singular (Status, alias, process, bus, focus, virus, analysis, basis, crisis, thesis) are not violations.
 
 ## Reference table
 
-| Rule ID | Trigger | Fix strategy |
-| ---------------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `PSUseUsingScopeModifierInNewRunspaces` | `$using:VAR.Count` member access | Assign `$using:` var to local, use `.Count` on local |
-| `PSUseApprovedVerbs` | Function name uses unapproved verb | Rename to approved verb; lowercase helpers get Verb-Noun name; command-name wrappers add inline suppression |
-| `PSUseSingularNouns` | Function name uses plural noun | Rename to singular noun: bare singular for single-return, collection-indicating singular for multi-return |
-| `PSUseDeclaredVarsMoreThanAssignments` | `$null = <cmd>` or `[void]<expr>` | `> $null` redirect preferred, else annotate with `# check-suppress:suppression_doc:` |
-| `PSPossibleIncorrectComparisonWithNull` | `$null = <cmd>` | `> $null` redirect preferred, else annotate with `# check-suppress:suppression_doc:` |
-| `PSReviewUnusedParameter` / `PSAvoidUsingUnusedParameters` | Parameter not used in function body | Reassess parameter necessity; annotate `$null =` with `# check-suppress:suppression_doc:` |
+| Rule ID | Trigger | Fix |
+| --- | --- | --- |
+| `PSUseUsingScopeModifierInNewRunspaces` | `$using:VAR.Count` member access | Assign to local, use `.Count` on local |
+| `PSUseApprovedVerbs` | Unapproved verb | Rename to approved verb; lowercase helpers → Verb-Noun; command wrappers → inline suppression |
+| `PSUseSingularNouns` | Plural noun | Bare singular (single-return) or collection-indicating singular (multi-return) |
+| `PSUseDeclaredVarsMoreThanAssignments` | `$null = <cmd>` or `[void]<expr>` | `> $null` redirect preferred, else annotate |
+| `PSPossibleIncorrectComparisonWithNull` | `$null = <cmd>` | `> $null` redirect preferred, else annotate |
+| `PSReviewUnusedParameter` / `PSAvoidUsingUnusedParameters` | Unused parameter | Reassess necessity; annotate `$null =` |
 
 ## Adding a new rule policy
 
-To document a new PSScriptAnalyzer rule policy:
-
-1. Create a section `## <RuleName>` with:
-   - **Trigger:** what code pattern causes the finding.
-   - **Root cause:** why the rule fires.
-   - **Fix:** the canonical fix strategy with a code example.
-   - **Suppression:** when (if ever) suppression is acceptable, with the required justification format.
-   - **Upstream:** link to any related PSSA issue/PR if relevant.
-2. Add a row to the reference table above.
-3. Verify the fix strategy works by testing against actual repo code.
+1. Create a `## <RuleName>` section with: trigger, root cause, fix (with code example), suppression policy, upstream link (if any).
+2. Add a row to the reference table.
+3. Verify the fix against actual repo code.
 
 ## Annotation reference
 
-Two formats coexist under the `# check-suppress:` prefix:
-
 | Format | Class | Used for |
-| ---------------------------------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------- |
-| `# check-suppress:SuppressMessageAttribute: <RuleName> -- <reason>` | A/C | `[SuppressMessageAttribute]` attribute, and comment-only suppression of PSSA rules |
-| `# check-suppress:suppression_doc: <reason>` | B | `$null =`, `[void]`, `2>$null`, `-ErrorAction SilentlyContinue`, empty `catch {}`, <code>\|\| true</code> |
+| --- | --- | --- |
+| `# check-suppress:SuppressMessageAttribute: <RuleName> -- <reason>` | A/C | `[SuppressMessageAttribute]`, comment-only PSSA suppression |
+| `# check-suppress:suppression_doc: <reason>` | B | `$null =`, `[void]`, `2>$null`, `-ErrorAction SilentlyContinue`, empty `catch {}`, `|| true` |
 
 Both are grep-able: `grep 'check-suppress:' **/*.ps1`
 
-## B-class error suppression (stable)
+## B-class error suppression
 
-The following patterns use `# check-suppress:suppression_doc:` format and are NOT changing:
-
-- `2>$null` — stderr-only suppression
-- `-ErrorAction SilentlyContinue` — suppressing non-terminating errors
-- Empty `catch {}` — suppressing terminating errors
-- `|| true` — shell-level error suppression
-
-These are enforced by `check.ps1` step 12 and require a `# check-suppress:suppression_doc: <reason>` annotation.
+Patterns using `# check-suppress:suppression_doc:` (stable, not changing): `2>$null`, `-ErrorAction SilentlyContinue`, empty `catch {}`, `|| true`. Enforced by `check.ps1` step 12.

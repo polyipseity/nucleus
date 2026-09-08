@@ -17,32 +17,22 @@ macOS guest: Tart only (Apple Virtualization.framework). No automated Tart→UTM
 
 ## Guest identity — field contract
 
-| Field | Manifest key | Use for | Never use for |
-| ----- | ------------ | ------- | ------------- |
-| Guest ID | `id` | CLI args (`nucleus-vm start NixOS`), `data/<id>.qcow2`, `<id>.vm.json`, `start-<id>.sh`, virsh/utm/tart domain name, UUID/MAC derivation, running-VM probes, GC keep sets | OS-family paths, build branching, display labels |
-| Display name | `name` | UTM window title, libvirt `<title>`, CLI table human column, log labels (`-VmDisplay`) | File paths, CLI args, hypervisor domain name |
-| OS type | `type` | `~/virtual machines/src/<type>/` runtime artifacts, `src/vms/<type>/` build templates, per-type GC, build branching, type-specific nested groups (`Android`, `Windows`, …) | Per-VM disk filenames, CLI selection, UUID derivation |
-| Guest hostname | `hostname` | In-guest `hostName` / `ComputerName` via env/token plumbing; must equal `name` | Artifact paths or hypervisor names |
+| Field | Use for | Never use for |
+| --- | --- | --- |
+| `id` | CLI, files, domain name, UUID/MAC, GC probes | Paths, build branching, display |
+| `name` | UTM title, libvirt title, CLI table, logs | Paths, CLI args, domain name |
+| `type` | `~/…/src/<type>/`, build templates, per-type GC | Disk filenames, CLI selection, UUID |
+| `hostname` | In-guest `hostName`/`ComputerName`; must equal `name` | Artifact paths, domain names |
 
-Provisioning host (`hosts[]`, `NUCLEUS_HOST`: `MacBook`, `NixOS`, `Windows`) is the physical machine, not guest `type`.
+Provisioning host (`hosts[]`, `NUCLEUS_HOST`) is the physical machine, not guest `type`.
 
 ### Template tokens
 
-| Token | Manifest field | Substituted into |
-| ----- | -------------- | ---------------- |
-| `__VM_ID__` | `id` | Hypervisor domain name, `.utm` bundle, `start-<id>.sh` paths, libvirt `<name>` |
-| `__VM_DISPLAY__` | `name` | UTM `utmctl start` label, libvirt `<title>` |
-| `__GUEST_HOSTNAME__` | `hostname` | Autounattend, Packer guest install |
+`__VM_ID__` → domain/bundle/paths. `__VM_DISPLAY__` → UTM label/libvirt title. `__GUEST_HOSTNAME__` → Autounattend/Packer install.
 
 ### Path layout
 
-| Tree | Pattern | Driven by |
-| ---- | ------- | --------- |
-| Runtime VM dir | `~/virtual machines/src/<type>/` | manifest `type` |
-| Repo build templates | `src/vms/<type>/` | manifest `type` (`NixOS`, `Windows`, `macOS`, …) |
-| Per-guest disks | `~/virtual machines/data/<id>.qcow2` | manifest `id` |
-
-`src/vms/templates/` is shared scaffolding — not a guest `type` directory.
+Runtime: `~/virtual machines/src/<type>/`. Build templates: `src/vms/<type>/`. Disks: `~/virtual machines/data/<id>.qcow2`. `src/vms/templates/` is shared scaffolding, not a type directory.
 
 ## VM manifest — required fields
 
@@ -65,35 +55,30 @@ Provisioning host (`hosts[]`, `NUCLEUS_HOST`: `MacBook`, `NixOS`, `Windows`) is 
 
 Type-specific fields (all required when `type` matches, forbidden otherwise):
 
-| `type` | Group | Fields |
-| ----------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `"Android"` | `Android` | `systemImage`, `userdataImage`, `gsiImage`, `gsiUrl`, `gappsUrl` (all required; `gsiUrl` may be `null` for Lineage-only — no GSI disk; `gappsUrl` is the MindTheGapps zip URL for recovery sideload) |
-| `"macOS"` | `macOS` | `version` (release name, e.g. `"tahoe"`) |
-| `"Windows"` | `Windows` | `edition` (e.g. `"pro"`), `isoUrl` (`null` = Mido/Fido auto-resolve; a URL auto-downloads the installer ISO when `--windows-iso` is omitted, cached at `~/virtual machines/src/Windows/installer.iso`) |
+| `type` | Fields |
+| --- | --- |
+| `"Android"` | `systemImage`, `userdataImage`, `gsiImage`, `gsiUrl` (nullable), `gappsUrl` (MindTheGapps zip) |
+| `"macOS"` | `version` (e.g. `"tahoe"`) |
+| `"Windows"` | `edition` (e.g. `"pro"`), `isoUrl` (nullable: `null` = auto-resolve) |
 
-All fields required — no optional properties. Deliberate nullable: `Windows.isoUrl`, `Android.gsiUrl`.
+All fields required. Nullable: `Windows.isoUrl`, `Android.gsiUrl`.
 
 ## Size suffix grammar
 
-All size fields (`ram`, `diskSize`, `minImageSize`) use suffixed strings. Grammar identical across parsers (`src/modules/lib/size.nix`, `src/scripts/lib/size.sh`, `src/platforms/Windows/modules/SizeStrings.ps1`); malformed strings abort.
+All size fields use suffixed strings. Identical grammar across parsers (`size.nix`, `size.sh`, `SizeStrings.ps1`); malformed strings abort.
 
 ```text
 ^[0-9]+ ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$
 ```
 
-- **Decimal prefixes** `kB`, `MB`, `GB`, `TB` multiply by powers of 10 (×10³, ×10⁶, ×10⁹, ×10¹²).
-- **Binary prefixes** `kiB`, `MiB`, `GiB`, `TiB` multiply by powers of 2 (×2¹⁰, ×2²⁰, ×2³⁰, ×2⁴⁰).
-- A single optional space between number and prefix: `"8GB"`, `"8 GB"`, `"8192MiB"`.
-- `KB`/`KiB` (capital K) invalid. IEC binary prefix is `Ki`; `k` always lowercase.
-- Canonical values use decimal prefixes (`"8GB"`, `"128GB"`). Binary accepted but not convention.
-- Property names carry no unit — the suffix carries it (`ram`, `diskSize`, `minImageSize`; never `ramBytes`).
-- Canonical internal unit: integer bytes. 1024-based math confined to parsers and documented adapters.
+- Decimal: `kB`, `MB`, `GB`, `TB` (powers of 10). Binary: `kiB`, `MiB`, `GiB`, `TiB` (powers of 2).
+- Optional space allowed: `"8GB"`, `"8 GB"`. `KB`/`KiB` invalid; `k` always lowercase.
+- Canonical: decimal (`"8GB"`, `"128GB"`). Binary accepted but not convention.
+- Suffix carries unit; property names carry none. Internal unit: integer bytes.
 
 ## Port forwarding
 
-Port forwards declared in `portForwards` array: `{guestPort, hostPort}` pairs. All host-side forwards and probes derive from this — never hard-code ports.
-
-**Reserved block:** `22000–22099`. Every `hostPort` unique across VMs.
+`portForwards`: `{guestPort, hostPort}` pairs. All forwards and probes derive from this — never hard-code. **Reserved:** `22000–22099`.
 
 | VM | Host port(s) | Guest port | Service |
 | ---- | ------------- | ------------ | --------- |
@@ -103,9 +88,9 @@ Port forwards declared in `portForwards` array: `{guestPort, hostPort}` pairs. A
 | Android | `22040` | `5555` | ADB |
 | Android | `22041` | `5554` | Emulator console |
 
-- Non-Android: one `guestPort: 22` SSH entry. Android: `guestPort: 5555` (ADB) + `guestPort: 5554` (console), no `guestPort: 22`.
-- UTM/QEMU/libvirt render every entry generically. QEMU/Packer: `hostfwd=tcp::<hostPort>-:<guestPort>`.
-- Probes resolve host port by `guestPort` (`22` SSH, `5555` ADB) — never by literal host port.
+- Non-Android: one `guestPort: 22`. Android: `5555` (ADB) + `5554` (console), no `22`.
+- UTM/QEMU/libvirt render generically. QEMU/Packer: `hostfwd=tcp::<hostPort>-:<guestPort>`.
+- Probes resolve by `guestPort` (`22` SSH, `5555` ADB), never literal host port.
 
 | Backend | Forward mechanism | Host-local access |
 | --------- | ------------------- | ------------------- |
@@ -133,22 +118,18 @@ System images: `~/virtual machines/src/<type>/system image.qcow2`. Phase 1 build
 
 ## macOS — Tart
 
-- Backend: Tart CLI (Apple Virtualization.framework); macOS host only.
-- Store: `~/virtual machines/tart/vms/<id>/` — `~/.tart` symlinked to `~/virtual machines/tart` by `nucleus-vm setup`.
-- Build: Packer + `tart-cli` plugin pulling `ghcr.io/cirruslabs/macos-<version>-base:latest`.
-- Start: `tart run --net-softnet --net-softnet-expose <hostPort>:<guestPort> <id>`. SSH via `tart ip <id>` + port 22 (not localhost).
-- No UTM bundle for macOS guests.
-- Running state: `tart list --format json` + `.Running == true` via `vm_get_running_ids`.
+- Backend: Tart CLI (Apple Virtualization.framework); macOS only. Store: `~/virtual machines/tart/vms/<id>/`.
+- Build: Packer + `tart-cli` plugin from GHCR. Start: `tart run --net-softnet --net-softnet-expose <hostPort>:<guestPort> <id>`. SSH: `tart ip <id>` + port 22.
+- Running: `tart list --format json` + `.Running == true` via `vm_get_running_ids`.
 
 ## macOS — UTM
 
 - Backend: UTM 4.x QEMU. Bundle: `~/virtual machines/<id>.utm/`.
-- Config: `config.plist` pre-generated at `~/.local/share/nucleus/vms/<id>-config.plist` by `src/hosts/MacBook/vms.nix`; `vm.sh setup` copies into bundle.
-- Disks: hard links only. `Data/system disk.qcow2` links `data/<id>.qcow2` (or `<id> (system).qcow2` for Android). Android adds `Data/user data.qcow2` + `Data/GSI disk.qcow2`. UTM sandbox requires backing chain inside bundle — writable overlays back onto `Data/system base.qcow2` (hard link to `src/<type>/system image.qcow2`). UTM-generated `Data/efi_vars.fd` adopted into `data/<id> (nvram).fd`.
-- Network: **Emulated** (QEMU user/slirp) — vmnet-shared drops forwards.
+- Config: `config.plist` pre-generated by `src/hosts/MacBook/vms.nix`; `vm.sh setup` copies into bundle.
+- Disks: hard links only. Writable overlays back onto `Data/system base.qcow2` (hard link to `src/<type>/system image.qcow2`) for UTM sandbox. Android adds extra disk links. `efi_vars.fd` adopted into `data/<id> (nvram).fd`.
+- Network: emulated (QEMU user/slirp) — vmnet-shared drops forwards.
 - Template drift: `vm.sh setup` compares template vs bundle (`cmp -s`), not vs Nix source. Run `nucleus-apply` after manifest changes.
-- `utmctl`: `/Applications/UTM.app/Contents/MacOS/utmctl`.
-- Running state: `utmctl list` returns all registered VMs; filter `Status != stopped` via `vm_get_running_ids`.
+- `utmctl`: `/Applications/UTM.app/Contents/MacOS/utmctl`. Running: filter `Status != stopped` via `vm_get_running_ids`.
 
 ## NixOS — libvirt/KVM
 

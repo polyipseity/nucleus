@@ -21,29 +21,11 @@ MacBook: `id: MacBook`, `type: macOS`, `name: MacBook`, `hostname: MacBook`.
 
 ## Hostname convention
 
-Guest OSes use the same hostname as the corresponding host. Canonical values from `hostname` field in `VMs.json`:
-
-| Guest OS | `hostname` in VMs.json |
-| -------- | ---------------------- |
-| Android | `Android` |
-| macOS | `MacBook` |
-| NixOS | `NixOS` |
-| Windows | `Windows` |
-
-Manifest `hostname` is canonical. Guest files consume it via env/token plumbing — never hard-code hostnames:
-
-- `src/vms/guests/<id>/guest.nix`: `networking.hostName = builtins.getEnv "NUCLEUS_VM_GUEST_HOSTNAME"`
-- `src/vms/NixOS/packer.pkr.hcl`: `guest_hostname` var
-- `src/vms/macOS/packer.pkr.hcl`: `vm_hostname` var via `scutil`
-- `src/vms/Windows/Autounattend.xml`: `__GUEST_HOSTNAME__` token
-
-Set `hostname` (matching `name`) in `VMs.json`; never edit hostname literals in guest files.
+Guest OSes match host hostnames. Values from `hostname` in `VMs.json`: Android→`Android`, macOS→`MacBook`, NixOS→`NixOS`, Windows→`Windows`. Set in `VMs.json` (matching `name`); never edit literals in guest files. Guest files consume via `NUCLEUS_VM_GUEST_HOSTNAME` env (NixOS), `guest_hostname` var (Packer), `vm_hostname` var (macOS), `__GUEST_HOSTNAME__` token (Windows Autounattend).
 
 ## Guest credentials
 
-From per-user SOPS secrets (`src/secrets/users-<username>.yml`), never host login. Keys: `vm_guest_username`, `vm_guest_password` via `vmGuest` object in user registry. Setup scripts decrypt and inject. Credential drift must invalidate stale artifacts.
-
-SSH public keys for NixOS `authorized_keys`: `src/modules/vm-guest-ssh-public-key-paths.json`. Update `tests/modules/vm-setup-tests.nix` when changing credential policy.
+From per-user SOPS secrets, never host login. Keys: `vm_guest_username`, `vm_guest_password` via `vmGuest` in user registry. Setup scripts decrypt and inject. Drift must invalidate stale artifacts. SSH keys: `src/modules/vm-guest-ssh-public-key-paths.json`. Update `tests/modules/vm-setup-tests.nix` when changing.
 
 
 
@@ -64,9 +46,7 @@ Paired native implementations (not bash on Windows):
 
 ## Android UTM freeze
 
-CocoaSpice audio-pipeline deadlock: GStreamer teardown races CoreAudio IO thread. Not display sleep, virgl, or guest-side.
-
-**Workaround:** disable guest audio (`"sound": "none"` in `VMs.json`). **Recovery:** quit UTM, relaunch, `nucleus-vm start Android`. **Diagnostics:** `sample <utm-pid> 5 -mayDie`; `adb devices` → `offline` confirms adbd wedge. UTM #2221, #2364, #4781; CocoaSpice#5.
+CocoaSpice deadlock: GStreamer teardown races CoreAudio. **Workaround:** `"sound": "none"` in `VMs.json`. **Recovery:** quit UTM, relaunch, `nucleus-vm start Android`. **Diag:** `sample <utm-pid> 5 -mayDie`; `adb devices`→`offline`. UTM #2221, #2364, #4781; CocoaSpice#5.
 
 
 
@@ -86,15 +66,15 @@ POSIX `apply.sh` runs `nucleus-vm sync` unless `--no-vm-sync`. Windows `apply.ps
 ## Command taxonomy
 
 | Command | Use when |
-| --------- | ------------- |
-| `sync` | Manifest/template changed; VMs already provisioned. Runs automatically after apply. |
-| `setup` | First VM, missing images, credential drift, new guest. Full provision. |
-| `android-config` | Android only: `--gapps`/`--adb-keys`/`--magisk`/`--root`/`--fake-wifi`/`--fake-wifi-revert`. No flags = manual. Recovery flow: **fastboot** → `--gapps` → **Enable ADB** → sideload → reboot → **Allow USB debugging** → `--magisk` → `--root` → `--fake-wifi`. |
-| `gc` | Remove stale artifacts. `--gc-data` includes orphaned data disks. `--gc-disabled` narrows to enabled guests. |
+| --- | --- |
+| `sync` | Manifest changed; VMs provisioned. Auto after apply. |
+| `setup` | First VM, missing images, drift, new guest. Full provision. |
+| `android-config` | Android: `--gapps`/`--adb-keys`/`--magisk`/`--root`/`--fake-wifi`/`--fake-wifi-revert`. Manual: fastboot→`--gapps`→Enable ADB→sideload→reboot→Allow debugging→`--magisk`→`--root`→`--fake-wifi`. |
+| `gc` | Stale artifacts. `--gc-data`: orphaned disks. `--gc-disabled`: enabled guests only. |
 | `pack`/`unpack` | Copy VM tree to another host. |
-| `start`/`stop` | Runtime control. Restart after sync when port forwards changed. |
+| `start`/`stop` | Runtime. Restart after sync when ports changed. |
 
-`sync` refreshes descriptors, start/stop scripts, UTM plists, `virsh define`. Skips image build, disk creation, GC.
+`sync` refreshes descriptors, scripts, UTM plists, `virsh define`. Skips build/GC.
 
 ## Adding a new VM
 
@@ -109,16 +89,7 @@ Two-phase: phase 1 builds QCOW2 OS images (if absent); phase 2 provisions bundle
 
 ### Files
 
-| File | Purpose |
-| --- | --- |
-| `src/vms/NixOS/base-guest.nix` | NixOS guest base for `nixos-generators` (macOS/NixOS) |
-| `src/vms/guests/<id>/guest.nix` | Per-VM NixOS delta (hostname, credentials) |
-| `src/vms/NixOS/packer.pkr.hcl` | NixOS Packer template (Windows hosts) |
-| `src/vms/Windows/packer.pkr.hcl` | Windows 11 Packer template (all hosts) |
-| `src/vms/Windows/Autounattend.xml` | Windows 11 answer file (TPM bypass, WinRM) |
-| `scripts/vm.sh` | Build+provision (macOS/NixOS) |
-| `scripts/vm.ps1` | Windows wrapper → `Invoke-VMSetup.ps1` |
-| `src/platforms/Windows/modules/system/Invoke-VMSetup.ps1` | Windows build+provision logic |
+`base-guest.nix` (NixOS base), `guests/<id>/guest.nix` (per-VM delta), `NixOS/packer.pkr.hcl` (NixOS on Windows), `Windows/packer.pkr.hcl` (Win11 all hosts), `Windows/Autounattend.xml` (TPM bypass/WinRM), `scripts/vm.sh` (POSIX build+provision), `scripts/vm.ps1` (Windows wrapper), `Invoke-VMSetup.ps1` (Windows logic).
 
 ### Build strategies
 
