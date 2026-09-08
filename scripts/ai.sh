@@ -32,7 +32,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
 REPO_ROOT="$(derive_repo_root)"
-MANIFEST="$REPO_ROOT/src/modules/ai/models.json"
+MANIFEST="$REPO_ROOT/src/modules/ollama/models.json"
 LOCKFILE="$REPO_ROOT/src/lockfiles/lockfile.json"
 SERVICES_JSON="$REPO_ROOT/src/modules/services.json"
 HOST="$(resolve_nucleus_host)"

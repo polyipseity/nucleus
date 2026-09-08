@@ -339,12 +339,12 @@ _ash_script_dir="$(cd "$(dirname -- "$0")" && pwd -P)"
 # Symlink the LiteLLM config so edits take effect on service restart without
 # re-running apply.  All host services (macOS launchd, NixOS systemd, Windows
 # scheduled task) reference this well-known path.
-ln -sf "$REPO_ROOT/src/modules/ai/litellm-config.yml" "$NUCLEUS_USER_ROOT/litellm-config.yml"
+ln -sf "$REPO_ROOT/src/modules/litellm/litellm-config.yml" "$NUCLEUS_USER_ROOT/litellm-config.yml"
 # Symlink the Cline custom handler alongside the config.  litellm's
 # get_instance_fn resolves the handler relative to the config file directory.
-ln -sf "$REPO_ROOT/src/modules/ai/cline_handler.py" "$NUCLEUS_USER_ROOT/cline_handler.py"
+ln -sf "$REPO_ROOT/src/modules/litellm/cline_handler.py" "$NUCLEUS_USER_ROOT/cline_handler.py"
 # Symlink the cooldown-400 callback alongside the config.
-ln -sf "$REPO_ROOT/src/modules/ai/litellm-cooldown-400.py" "$NUCLEUS_USER_ROOT/litellm-cooldown-400.py"
+ln -sf "$REPO_ROOT/src/modules/litellm/litellm-cooldown-400.py" "$NUCLEUS_USER_ROOT/litellm-cooldown-400.py"
 
 run_nix() {
   # --option min-free 0 suppresses auto-GC during the apply pipeline. The
