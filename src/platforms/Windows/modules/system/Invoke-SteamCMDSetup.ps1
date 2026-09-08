@@ -27,17 +27,8 @@ function Invoke-SteamCMDSetup {
   .PARAMETER RepoRoot
     Absolute path to the repository root.
 
-  .PARAMETER VendorDir
-    Optional path to a directory containing pre-fetched vendor assets.
-    When set and the steamcmd zip exists in this directory, the script
-    reads the local file instead of downloading from the internet.
-    Populated by apply.ps1 from `nix build .#vendor-assets` output.
-
   .EXAMPLE
     Invoke-SteamCMDSetup -Enabled:$true -Users $userRegistry.users -RepoRoot $env:NUCLEUS_REPO_ROOT
-
-  .EXAMPLE
-    Invoke-SteamCMDSetup -Enabled:$true -Users $userRegistry.users -RepoRoot $env:NUCLEUS_REPO_ROOT -VendorDir 'C:\Users\admin\.nucleus\vendor'
 
   .NOTES
     Environment variables: (none)
@@ -55,7 +46,7 @@ function Invoke-SteamCMDSetup {
     [string]$RepoRoot,
 
     [Parameter(Mandatory = $false)]
-    [string]$VendorDir
+
   )
 
   if (-not $Enabled) {
@@ -165,18 +156,9 @@ function Invoke-SteamCMDSetup {
     }
 
     # Download and extract SteamCMD.
-    # Prefer pre-fetched vendor asset when available (no internet required).
-    $vendorZip = if (-not [string]::IsNullOrWhiteSpace($VendorDir)) {
-      Join-Path -Path $VendorDir -ChildPath 'steamcmd.zip'
-    } else { $null }
-    $useLocalAsset = ($null -ne $vendorZip) -and (Test-Path -LiteralPath $vendorZip -PathType Leaf)
-
     $tempZip = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "steamcmd-$([System.IO.Path]::GetRandomFileName()).zip"
     try {
-      if ($useLocalAsset) {
-        Write-NucleusInfo -CommandName 'Invoke-SteamCMDSetup' "using pre-fetched vendor asset: $vendorZip"
-        Copy-Item -LiteralPath $vendorZip -Destination $tempZip -Force
-      } else {
+      {
         Invoke-WebRequest -Uri $steamcmdZipUrl -OutFile $tempZip -UseBasicParsing
       }
       Expand-Archive -Path $tempZip -DestinationPath $steamcmdDir -Force

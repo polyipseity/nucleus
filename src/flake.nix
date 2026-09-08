@@ -437,34 +437,6 @@
               _final: prev:
               prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
                 # SteamCMD Windows variant — pre-fetched zip from Valve's CDN.
-                # The macOS variant is defined above (darwin-only); this covers
-                # the Windows asset for cross-platform vendor completeness.
-                steamcmd-windows = prev.stdenv.mkDerivation rec {
-                  pname = "steamcmd-windows";
-                  version = "20180104";
-
-                  src = prev.fetchurl {
-                    url = "https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip";
-                    hash = "sha256-dmmxcN7kLbjuInN3XtffstFzvbobhJ9w0sezeSkLzhM=";
-                  };
-
-                  dontBuild = true;
-
-                  installPhase = ''
-                    mkdir -p $out/share/steamcmd
-                    find . -type f -exec install -Dm 755 "{}" "$out/share/steamcmd/{}" \;
-                  '';
-
-                  meta = {
-                    description = "Steam command-line tools (Windows)";
-                    homepage = "https://developer.valvesoftware.com/wiki/SteamCMD";
-                    license = prev.lib.licenses.unfreeRedistributable;
-                    platforms = [
-                      "x86_64-windows"
-                      "x86_64-cygwin"
-                    ];
-                  };
-                };
               }
             )
             (_final: prev: {
@@ -987,21 +959,7 @@
         };
       };
 
-      # -----------------------------------------------------------------------
-      # vendor-assets — pre-fetched Windows binary assets for setup scripts.
-      # Exposes CamillaDSP, camillagui-backend, and SteamCMD Windows zips as a
-      # single derivation. Windows apply.ps1 copies these to a local vendor/
-      # directory so setup scripts read local paths instead of downloading.
-      # Build: nix build .#vendor-assets
-      # -----------------------------------------------------------------------
-      vendor-assets = pkgsMac.symlinkJoin {
-        name = "nucleus-vendor-assets";
-        paths = [
-          pkgsMac.camilladsp
-          pkgsMac.camillagui-backend
-          pkgsMac.steamcmd-windows
-        ];
-      };
+
 
       # -----------------------------------------------------------------------
       # winget-packages — Nix-generated list of WinGet package IDs that are
