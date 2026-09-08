@@ -1,5 +1,5 @@
 ---
-description: "Use when authoring or editing any code comment annotation in this repo: suppressions, references, rationale markers, sentinels, or structural comments. Covers canonical grammar, the four-category taxonomy, the machine-parsing invariant, the check-id registry, and enforcement greps."
+description: "Use when authoring or editing code comment annotations in this repo. Covers canonical grammar, the four-category taxonomy, the machine-parsing invariant, check-id registry, and enforcement greps."
 name: "Comment Annotations"
 applyTo: "scripts/**, src/**, tests/**"
 ---
@@ -10,67 +10,66 @@ Canonical policy for comment-based annotations across all platforms and file typ
 
 ## Machine-parsing invariant
 
-**Category 1 and 2 annotation families MUST be machine-parsed; Category 3 and 4 may NOT be.** This is a correctness gate: each family's registry lists its live machine consumer. An annotation that is not machine-parsed must live in Category 4 or gain a parser.
+**Category 1 and 2 families MUST be machine-parsed; Category 3 and 4 may NOT be.** Each family's registry lists its live consumer (check step or tool). Non-machine-parsed annotations belong in Category 4 or must gain a parser.
 
-## Canonical grammar — one grammar, two forms
+## Canonical grammar
 
 `# <prefix>: <reason>` (plain) or `# <prefix>: <subject> -- <reason>` (subject).
 
-| Prefix | Category | Plain example | Subject example |
+| Prefix | Category | Plain | Subject |
 | --- | --- | --- | --- |
-| `check-suppress:<check id>` | 1 | `# check-suppress:suppression_doc: grep no-match exit 1 is expected here` | `# check-suppress:embedded-content: exception 3 (C# interop, <=25 lines) -- P/Invoke classes stay inline` |
-| `ref` | 4 | `# ref: allow-and-deny-lists.instructions.md#A1` | `# ref: allow-and-deny-lists.instructions.md#A1 -- orchestrator contains pip/npm patterns; would cause false positives` |
-| `WHY` | 4 | `# WHY: <reason>` — mandatory colon | — (no subject slot) |
-| `TODO` | 4 | `# TODO: <text>` — mandatory colon | — |
+| `check-suppress:<id>` | 1 | `# check-suppress:suppression_doc: grep no-match exit 1 is expected here` | `# check-suppress:embedded-content: exception 3 (C# interop, <=25 lines) -- P/Invoke classes stay inline` |
+| `ref` | 4 | `# ref: allow-and-deny-lists.instructions.md#A1` | `# ref: allow-and-deny-lists.instructions.md#A1 -- orchestrator contains pip/npm patterns` |
+| `WHY` | 4 | `# WHY: <reason>` — colon mandatory | — |
+| `TODO` | 4 | `# TODO: <text>` — colon mandatory | — |
 
-Hard rules:
+Rules:
 
-- `--` (two hyphens) is the ONLY separator; em dash `—` never appears in markers (allowed in prose).
-- `reason:` keyword eliminated except shellcheck's inner `# reason:` (Category 2).
+- `--` is the ONLY separator; em dash `—` never in markers (allowed in prose).
+- `reason:` keyword eliminated except shellcheck inner `# reason:` (Category 2).
 - `method N` lowercase; `Method` not a proper noun.
-- `# WHY:` and `# TODO:` always carry a colon.
-- A trailing annotation swallows everything after it on the line — never put code after `# check-suppress:` on the same line. Use the multi-line form with the annotation on the preceding line.
+- Trailing annotation swallows everything after it — never put code after `# check-suppress:` on the same line.
 
 ## Unified taxonomy
 
 ### Category 1 — Tool-enforced → `# check-suppress:<check id>: ...` (ALL machine-parsed)
 
-| Family | Sites | Check id | Canonical form | Consumer |
-| --- | --- | --- | --- | --- |
-| `# Inline by embedded-content policy exception N (name).` | 10+1 | `embedded-content` | `# check-suppress:embedded-content: exception N (name) -- <reason>` | step 14 `repository-policy` `.ps1` |
-| `# Method N (name) -- <why>` (legacy) | 68→71 | `config-method` | `# check-suppress:config-method: method N (name) -- <reason>` (lowercase) | step 14 `.ps1` + `.sh` twin |
-| `# check-suppress:SuppressMessageAttribute: <rule> -- <just>` | 33 | `SuppressMessageAttribute` | `# check-suppress:SuppressMessageAttribute: <RuleName> -- <reason>` | step 12 `Get-UndocSuppViolation -CheckId 'SuppressMessageAttribute'` |
-| `# check-suppress:suppression_doc: <just>` | 623 | `suppression_doc` | unchanged (plain form) | step 12 regex `# check-suppress:$CheckId[\s:]` |
-| `# check-suppress:packer_validate: ...` | 1 | `packer_validate` | unchanged | `scripts/check.ps1` + `scripts/check.sh` |
-| `\|\| true` (shell) / `$null =` / `[void]` (ps1) | 11 sh + 92 ps1 | `suppression_doc` | annotate with `# check-suppress:suppression_doc: <reason>` | step 12 twins flag bare forms (`tests/` exempt) |
+| Family | Sites | Check id | Consumer |
+| --- | --- | --- | --- |
+| `# Inline by embedded-content policy exception N (name).` | 10+1 | `embedded-content` | step 14 `repository-policy` `.ps1` |
+| `# Method N (name) -- <why>` (legacy) | 68→71 | `config-method` | step 14 `.ps1` + `.sh` twin |
+| `# check-suppress:SuppressMessageAttribute: <rule> -- <just>` | 33 | `SuppressMessageAttribute` | step 12 `Get-UndocSuppViolation` |
+| `# check-suppress:suppression_doc: <just>` | 623 | `suppression_doc` | step 12 regex `# check-suppress:$CheckId[\s:]` |
+| `# check-suppress:packer_validate: ...` | 1 | `packer_validate` | `scripts/check.ps1` + `.sh` |
+| `\|\| true` / `$null =` / `[void]` | 11 sh + 92 ps1 | `suppression_doc` | step 12 (`tests/` exempt) |
 
 **Suppression semantics:** `|| true`, `$null =`, `[void]` are suppression patterns, not rationale markers — justify with `# check-suppress:suppression_doc:`, never `# WHY:`.
 
-**Counting sites:** CODE-ONLY — exclude `.md` matches. `git grep -h 'check-suppress:<id>:' -- '*.ps1' '*.sh' '*.nix' '*.zsh' | wc -l`. Grep patterns with literal `$` must be single-quoted (e.g. `'\$null ='`).
+**Counting sites:** CODE-ONLY. `git grep -h 'check-suppress:<id>:' -- '*.ps1' '*.sh' '*.nix' '*.zsh' | wc -l`. Literal `$` patterns must be single-quoted.
 
-### Category 2 — Tool-fixed (format dictated by tool; ALL machine-parsed)
+### Category 2 — Tool-fixed (ALL machine-parsed)
 
 | Family | Consumer |
 | --- | --- |
-| `# shellcheck disable=SCxxxx` / `# shellcheck source=` (+ inner `# reason:`) | shellcheck (via `scripts/check.sh sh`) |
-| `[SuppressMessageAttribute('Rule','')]` attributes | PSScriptAnalyzer |
-| `# >>> begin nucleus-managed: <subject> >>>` / `# <<< end nucleus-managed: <subject> <<<` sentinels | the managing script (e.g. `Sync-ShellProfile.ps1`) |
-| `<!-- markdownlint-disable ... -->` | markdownlint (config-only; no runner wired) |
+| `# shellcheck disable=SCxxxx` / `# shellcheck source=` (+ inner `# reason:`) | shellcheck |
+| `[SuppressMessageAttribute('Rule','')]` | PSScriptAnalyzer |
+| `# >>> begin nucleus-managed: <subject> >>>` / `# <<< end nucleus-managed: <subject> <<<` | the managing script |
+| `<!-- markdownlint-disable ... -->` | markdownlint (config-only) |
 
-**Sentinel convention:** nucleus-managed blocks delimited by `# >>> begin nucleus-managed: <subject> >>>` and `# <<< end nucleus-managed: <subject> <<<`. `>>>`/`<<<` reserved for machine-managed regions.
+**Sentinel convention:** `>>>`/`<<<` delimit nucleus-managed blocks. Reserved for machine-managed regions.
 
 ### Category 3 — Structural markers (NOT machine-parsed)
 
-Dividers (`# --- section ---`), DSC headers (`# WinGet DSC v3 -`, `# Sorting policy:`, `# Elevation policy:`). Documented only; never parsed.
+Dividers (`# --- section ---`), DSC headers (`# WinGet DSC v3 -`, `# Sorting policy:`, `# Elevation policy:`). Documented only.
 
-### Category 4 — Human-readable annotations (NOT machine-parsed)
+### Category 4 — Human-readable (NOT machine-parsed)
 
 | Family | Sites | Form |
 | --- | --- | --- |
 | `# ref:` | 54 | `# ref: <target> -- <just>` (no `reason:`; em dash → `--`) |
 | DSC reference headers (ex-`# Source:` / `# Cross-reference:` / `# See:`) | 0 | migrated → `# ref:` |
-| `# WHY:` | 171 (0 no-colon) | `# WHY: <reason>` — mandatory colon |
-| `# TODO:` | 0 tracked | `# TODO: <text>` — mandatory colon |
+| `# WHY:` | 171 (0 no-colon) | `# WHY: <reason>` — colon mandatory |
+| `# TODO:` | 0 tracked | `# TODO: <text>` — colon mandatory |
 
 ## Check-id registry
 
@@ -86,16 +85,13 @@ New tool-enforced markers MUST register a check id AND machine consumer before u
 
 ## `# WHY:` usage
 
-- Format: `# WHY: <reason>` — colon mandatory, lowercase keyword.
-- Purpose: explain non-obvious decisions (WHY-not-WHAT per `documentation.instructions.md`).
-- Scope: sh, zsh, ps1, nix, dsc.yml comments; rationale only.
+- `# WHY: <reason>` — colon mandatory, lowercase. Explain non-obvious decisions (WHY-not-WHAT per `documentation.instructions.md`).
+- Scope: sh, zsh, ps1, nix, dsc.yml; rationale only.
 - NOT for: suppressions (`|| true` → `check-suppress:suppression_doc:`), tool-enforced (`check-suppress:`), references (`ref:`), pending work (`TODO:`).
 
 ## `# ref:` usage
 
-- Plain: `# ref: <target>` where `<target>` is a file, section, or policy id.
-- Subject: `# ref: <target> -- <just>` when the reason is non-obvious.
-- Use for: policy citations, dependency notes, source-of-truth pointers. No `reason:` keyword, no em dash.
+- `# ref: <target>` (plain) or `# ref: <target> -- <just>` (subject). Use for policy citations, dependency notes, source-of-truth pointers. No `reason:` keyword, no em dash.
 
 ## Enforcement greps (wired into check steps where noted)
 

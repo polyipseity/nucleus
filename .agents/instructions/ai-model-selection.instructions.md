@@ -8,7 +8,7 @@ applyTo: "src/modules/ai/**, src/users/*/vscode/chatLanguageModels.*.json, src/h
 
 ## Profile key convention
 
-`src/modules/ai/models.json` groups model lists by **host name**, not by platform nickname. Use the exact OS hostname as keys (PascalCase, matching `networking.hostName` / `ComputerName` on each host):
+`src/modules/ai/models.json` groups models by **host name** (PascalCase, matching `networking.hostName` / `ComputerName`):
 
 | Key | Host | Resolved by |
 | --------- | ------------- | -------------------------------------- |
@@ -16,67 +16,53 @@ applyTo: "src/modules/ai/**, src/users/*/vscode/chatLanguageModels.*.json, src/h
 | `NixOS` | NixOS (Linux) | `ai-sync.sh` wildcard branch |
 | `Windows` | Windows | `Invoke-AISync.ps1` (always `Windows`) |
 
-Do **not** use lowercase names like `"macbook"`, `"nixos"`, or `"windows"` — the keys must match the exact OS hostname (see `AGENTS.md` **Host name equals display name** policy). Do **not** use generic names like `"mac"` or `"pc"`. When adding a new host, add a new key matching its exact OS hostname and update the profile detection logic in both `ai-sync.sh` and `Invoke-AISync.ps1`.
+Keys must match the exact OS hostname — no lowercase (`"macbook"`), no generic names (`"mac"`, `"pc"`). New hosts: add a key + update profile detection in both `ai-sync.sh` and `Invoke-AISync.ps1`.
 
-## Hardware constraints per host
+## Hardware constraints
 
 | Host | Memory budget | Notes |
 | --------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `MacBook` | ≤ 16 GB GPU (slight excess ~17–18 GB is OK) | 24 GB unified RAM; Apple Silicon Metal; flash attention + q4_0 KV cache enabled |
-| `NixOS` | ≤ 6 GB discrete VRAM (model file ≤ ~5 GB target) | GPU acceleration enabled via `services.ollama.acceleration = "cuda"`; `MemoryMax = "16G"` systemd cap remains in effect |
-| `Windows` | ≤ 6 GB discrete VRAM (same assumption as `NixOS`) | Same hardware class as NixOS PC; update if specs differ |
+| `MacBook` | ≤ 16 GB GPU (slight excess ~17–18 GB OK) | 24 GB unified RAM; Apple Silicon Metal; flash attention + q4_0 KV cache |
+| `NixOS` | ≤ 6 GB discrete VRAM (model file ≤ ~5 GB) | `services.ollama.acceleration = "cuda"`; `MemoryMax = "16G"` systemd cap |
+| `Windows` | ≤ 6 GB discrete VRAM | Same hardware class as NixOS PC |
 
-## Required cross-file sync
+## Cross-file sync
 
-When changing model selections, update all of the following in the same change:
+All of these must update in the same change:
 
 1. `src/modules/ai/models.json` host model lists.
-2. `src/users/default/vscode/chatLanguageModels.MacBook.json`
-3. `src/users/default/vscode/chatLanguageModels.NixOS.json`
-4. `src/users/default/vscode/chatLanguageModels.Windows.json`
-5. Manifest comment block in `src/modules/ai/default.nix`.
+2. `src/users/default/vscode/chatLanguageModels.{MacBook,NixOS,Windows}.json`
+3. Manifest comment block in `src/modules/ai/default.nix`.
 
-Each host's `chatLanguageModels.<host>.json` IDs must match (or be a subset of) that host key in `models.json`. Never leave stale editor entries for models absent from the host manifest.
+Each host's `chatLanguageModels.<host>.json` IDs must be a subset of that host key in `models.json`. Never leave stale entries for absent models.
 
-## Quantization guidance
+## Quantization
 
-Ollama model tags follow `<base>-<quant>` naming. Key quantizations:
+Tags follow `<base>-<quant>` naming:
 
-| Tag suffix | Typical size vs Q4_K_M | Quality vs Q4_K_M | When to use |
-| --------------- | ---------------------------- | ----------------- | ------------------------------------------------------------------------------------ |
-| `q4_K_M` | baseline (default) | baseline | Default; best quality/size tradeoff for most models |
-| `q8_0` | ~1.7× larger | noticeably better | MacBook only when headroom allows; never for NixOS/Windows |
-| `fp16` / `bf16` | ~2× larger | near-lossless | MacBook only for small models (e.g. e4b) where size allows |
-| `it-qat` | same as Q4_K_M | approaches BF16 | Preferred over plain Q4_K_M for Gemma models that ship QAT variants (gemma3, gemma4) |
-| `nvfp4` | slightly smaller than Q4_K_M | similar | NVIDIA GPU only (NixOS/Windows with NVIDIA); not for MacBook Metal |
-| `mxfp8` | ~1.5× Q4_K_M | good | NVIDIA GPU or Apple MLX only |
-| `mlx-bf16` | ~2× Q4_K_M | near-lossless | Apple MLX only; MacBook with sufficient headroom |
+| Tag suffix | Size vs Q4_K_M | Quality vs Q4_K_M | When to use |
+| --------------- | ---------------------------- | ----------------- | ---- |
+| `q4_K_M` | baseline | baseline | Default; best quality/size tradeoff |
+| `q8_0` | ~1.7× | noticeably better | MacBook only when headroom allows |
+| `fp16`/`bf16` | ~2× | near-lossless | MacBook only for small models (e.g. e4b) |
+| `it-qat` | same as Q4_K_M | approaches BF16 | Preferred for Gemma models shipping QAT (gemma3, gemma4) |
+| `nvfp4` | slightly smaller | similar | NVIDIA GPU only (NixOS/Windows with NVIDIA) |
+| `mxfp8` | ~1.5× | good | NVIDIA GPU or Apple MLX |
+| `mlx-bf16` | ~2× | near-lossless | Apple MLX only; MacBook with headroom |
 
-## Model selection preference
+**Selection preference**: larger parameter count beats better quantization. 27B `q4_K_M` over 14B `q8_0` even at similar sizes. VRAM ceilings still apply.
 
-Prefer the larger parameter count over better quantization, per host:
+**Per-host rules**: No q3 or lower GGUF variants exist in Ollama for any model here.
+- **MacBook**: `q4_K_M` default; `it-qat` when available (e.g. `gemma3:27b-it-qat`). `e4b-it-bf16` (16 GB) for `gemma4:e4b` when max quality desired.
+- **NixOS/Windows**: `q4_K_M` only — VRAM is tight.
 
-- `qwen3.5:27b` (17 GB, 27B params, `q4_K_M`) over `qwen3:14b-q8_0` (16 GB, 14B params, `q8_0`) for the MacBook slot.
-- 27B `q4_K_M` over 14B `q8_0` even at similar sizes — more parameters outweigh the quantization quality gap.
-
-VRAM budget ceilings still apply: MacBook ≤ ~18 GB (slight excess OK); NixOS/Windows ≤ 6 GB (strict — no excess).
-
-## Quantization rules
-
-Available quantizations in the relevant size range: `q4_K_M` (default), `q8_0`, `fp16`/`bf16`, plus hardware-specific formats (`nvfp4`, `mxfp8`, `mlx-bf16`). No q3 or lower GGUF variants exist in Ollama for any model in this repository.
-
-- **MacBook**: `q4_K_M` default; `it-qat` when the model family ships one (e.g. `gemma3:27b-it-qat`). `e4b-it-bf16` (16 GB) for `gemma4:e4b` when maximum quality is desired for a single small model.
-- **NixOS / Windows**: `q4_K_M` only — VRAM is tight.
-
-## Model size canonical source
-
-Model tags, sizes, and capability metadata live in `src/modules/ai/models.json` and the manifest comment block in `src/modules/ai/default.nix`. Read those sources when evaluating fit — do not duplicate volatile size tables here.
+Model tags, sizes, and capability metadata live in `src/modules/ai/models.json` and `src/modules/ai/default.nix`. Do not duplicate volatile size tables.
 
 ## Tool-calling verification
 
-Before committing a model change that relies on tool calling:
+Before committing a model change relying on tool calling:
 
-1. Start the Ollama server with the new model.
-2. Run a function-call curl test (see `src/modules/ai/default.nix` comment block for an example invocation).
-3. Record the result in `default.nix`: `— tool-calling curl-tested on <host>: PASS` or `FAIL`.
-4. Do not deploy as the primary agent model until tool calling passes on that host.
+1. Start Ollama with the new model.
+2. Run a function-call curl test (example in `src/modules/ai/default.nix` comment block).
+3. Record in `default.nix`: `— tool-calling curl-tested on <host>: PASS` or `FAIL`.
+4. Do not deploy as primary agent model until tool calling passes on that host.
