@@ -4,7 +4,7 @@
 
 let
   lib = import <nixpkgs/lib>;
-  fixtures = import ../../../fixtures/fixtures.nix { };
+  fixtures = import ../../../fixtures { };
   inherit (fixtures) fixtureUsername loadFixtureRegistry;
 
   macosModuleText = builtins.readFile ../../../../src/platforms/macOS/modules/default.nix;

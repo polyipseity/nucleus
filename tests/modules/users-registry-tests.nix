@@ -1,7 +1,7 @@
 # tests/modules/users-registry-tests.nix — users-registry.nix loader and platform resolution.
 
 let
-  fixtures = import ../fixtures/fixtures.nix { };
+  fixtures = import ../fixtures { };
   inherit (fixtures) fixtureUsername loadFixtureRegistry;
 
   usersMacBook = loadFixtureRegistry "MacBook";

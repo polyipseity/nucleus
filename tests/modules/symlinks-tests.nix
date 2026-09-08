@@ -1,7 +1,7 @@
 # tests/modules/symlinks-tests.nix — Per-user symlink wiring.
 
 let
-  fixtures = import ../fixtures/fixtures.nix { };
+  fixtures = import ../fixtures { };
   inherit (fixtures) fixtureUsername loadFixtureRegistry;
 
   inherit (import ../lib.nix) assert' containsRegex;

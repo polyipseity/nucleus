@@ -54,7 +54,7 @@ let
   selectUserAppConfigFile = configName: relativePath: overlay.selectFile configName relativePath;
 
   # check-suppress:config-method: method 3 (merge) -- qtpass.nix returns declarative merged settings applied via platform-native stores (macOS defaults, Linux INI); imported module, not a deployed file
-  qtpassModule = import ./configs/qtpass/qtpass.nix {
+  qtpassModule = import ./configs/qtpass {
     inherit
       config
       lib
@@ -72,7 +72,7 @@ let
   # check-suppress:config-method: method 3 (merge) -- LibreOffice owns registrymodifications.xcu and
   # overwrites it on exit. A symlink would be replaced. Merge injects managed
   # entries while preserving user-configured settings outside managed keys.
-  libreOfficeModule = import ./configs/libreoffice/libreoffice.nix {
+  libreOfficeModule = import ./configs/libreoffice {
     inherit lib;
     libreOfficeDefaultSettings = builtins.fromJSON (
       builtins.readFile (selectUserAppConfigFile "libreoffice" "libreoffice.json")
