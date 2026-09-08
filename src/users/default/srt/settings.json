@@ -10,7 +10,8 @@
       "~/.cargo/registry",
       "~/.cursor",
       "~/.npm",
-      "~/.pi"
+      "~/.pi",
+      "~/dev"
     ],
     "denyRead": [
       "~/.aws",
@@ -30,7 +31,6 @@
       ".env.*",
       ".git/config",
       ".git/hooks",
-      ".git/modules",
       ".vscode/launch.json",
       ".vscode/tasks.json",
       "~/.bash_profile",

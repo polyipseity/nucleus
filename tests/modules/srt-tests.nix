@@ -73,7 +73,6 @@ let
       ".env.*"
       ".git/config"
       ".git/hooks"
-      ".git/modules"
       ".vscode/launch.json"
       ".vscode/tasks.json"
       "~/.bash_profile"
@@ -90,8 +89,8 @@ let
       settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
       allowWrite = settings.filesystem.allowWrite;
     in
-    allowWrite == ["." "/tmp" "~/.bun" "~/.cargo/registry" "~/.cursor" "~/.npm" "~/.pi"]
-  ) "srt allowWrite must be minimal: project dir, tmp, package caches, cursor, pi";
+    allowWrite == ["." "/tmp" "~/.bun" "~/.cargo/registry" "~/.cursor" "~/.npm" "~/.pi" "~/dev"]
+  ) "srt allowWrite must cover project dir, tmp, package caches, cursor, pi, and dev directory";
 
   test_srt_settings_network_no_local_binding = assert' (
     let
