@@ -38,6 +38,13 @@
       "description": "Bun-installed global package versions. Package name → version string or VCS hash pin.",
       "type": "object"
     },
+    "pi": {
+      "additionalProperties": {
+        "$ref": "#/definitions/versionOrHash"
+      },
+      "description": "Pi coding agent npm package versions. Package name → version string.",
+      "type": "object"
+    },
     "cargo-binstall": {
       "additionalProperties": {
         "$ref": "#/definitions/versionOrHash"

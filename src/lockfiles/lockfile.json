@@ -17,6 +17,18 @@
       "source": "https://github.com/obra/superpowers.git"
     }
   },
+  "pi": {
+    "@juicesharp/rpiv-ask-user-question": "2.9.0",
+    "@narumitw/pi-plan-mode": "0.56.0",
+    "pi-background-tasks": "2.5.0",
+    "pi-extmgr": "0.3.0",
+    "pi-goal-x": "0.31.1",
+    "pi-memory": "0.4.2",
+    "pi-powerline-footer": "0.17.0",
+    "pi-simplify": "0.2.3",
+    "pi-subagents": "0.66.0",
+    "pi-web-access": "0.28.0"
+  },
   "pwsh": {
     "PSScriptAnalyzer": "1.25.0",
     "Pester": "6.1.0",
