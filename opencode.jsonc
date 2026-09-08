@@ -2,7 +2,7 @@
   "$schema": "https://opencode.ai/config.json",
   // See opencode.ai/docs/zh-tw/ for config, rules, and skills docs.
   "autoupdate": false,
-  "instructions": [".agents/instructions/**/*.md"],
+  "instructions": [".agents/instructions/**/*.instructions.md"],
   "skills": {
     "paths": [".agents/skills"],
   },
