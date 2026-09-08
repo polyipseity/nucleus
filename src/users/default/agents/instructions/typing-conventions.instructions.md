@@ -87,8 +87,3 @@ Default typing policy for all code.
   - C#: postfix `!` (null-forgiving operator)
   - Rust: `.unwrap()` / `.expect()` on `Option` / `Result` (prefer `if let` / match / `?` operator instead)
 - **`assert` is test-only.** Use `assert` only in test code. In production code, use proper error handling. The sole exception is runtime invariants whose violation must halt execution immediately.
-
-## Related instruction files
-
-- `programming-principles.instructions.md` — General coding principles including immutability-by-default, error handling, and architectural patterns.
-- `core-behavior.instructions.md` — Immutable-by-default enforcement rules and agent-wide coding conventions.

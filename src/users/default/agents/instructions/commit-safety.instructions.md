@@ -47,10 +47,3 @@ After a commit failure: always retry with a fresh `git commit`. Never amend.
 **Auto-formatting hook (nixfmt, prettier):** The hook modified staged files. The commit was not created (hooks run before commit finalization). Re-stage: `git add <files>`, then retry with a fresh `git commit`.
 
 **Blind retries waste time.** Hook failures always indicate a problem in staged content or a tool that modified it. Diagnose before re-attempting.
-
-## Related instruction files
-
-- `commit.instructions.md` — Pre-commit commitlint validation policy.
-- `core-behavior.instructions.md` — Git commit enforcement policy and commit-keeper subagent delegation.
-- `maintain.instructions.md` — Atomic commit workflow, safety rules, and git operation restrictions.
-- `execution-details.instructions.md` — Tool recovery and multi-edit recovery after failed operations.

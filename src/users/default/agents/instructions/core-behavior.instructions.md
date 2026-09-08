@@ -180,13 +180,3 @@ When the user says "refer back to the plan", "verify the plan", "check the plan"
 1. Read the plan via `memory view /memories/session/plan-<datetime>.md` if you know the datetime. If not, find the latest by using `memory view /memories/session/` to list files, then pick the most recent `plan-*.md` by sorting the names (descending datetime).
 2. Check the frontmatter: `status: completed` means the plan was fully executed; `status: in-progress` means execution was interrupted. The `current-step` field shows which workflow step was last reached. The `committed` field tracks atomic commit progress: `no` (no commits made), `partial` (some commits made), `yes` (all commits done).
 3. Present the plan and its frontmatter status to the user or act as instructed.
-
-## Related instruction files
-
-- `authoring.instructions.md` — Markdown authoring conventions, document structure, and formatting rules.
-- `commit-safety.instructions.md` — Git commit verification, amend prohibition, and failure recovery.
-- `execution-details.instructions.md` — Tool recovery, multi-edit recovery, and investigation protocol.
-- `maintain.instructions.md` — Codebase maintainability workflow, safety rules, and atomic commit patterns.
-- `programming-principles.instructions.md` — General coding principles, patterns, and architectural standards.
-- `typing-conventions.instructions.md` — Language-specific type-level conventions and immutability rules.
-- `workspace-guidance.instructions.md` — Workspace setup, AGENTS.md conventions, and customization hierarchy.

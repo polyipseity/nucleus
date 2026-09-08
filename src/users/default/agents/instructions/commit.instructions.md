@@ -55,9 +55,3 @@ If commitlint is present and configured but fails unexpectedly (tool error, not 
 ## Enforcement scope
 
 This instruction applies to every `git commit` operation: manual, automated, and via the `commit-staged` prompt. See `commit-staged.prompt.md` for the standard workflow that includes this validation.
-
-## Related instruction files
-
-- `commit-safety.instructions.md` — Post-commit verification, amend prohibition, and hook failure recovery.
-- `commit-staged.prompt.md` — Full staged-commit workflow with commitlint pre-validation built in.
-- `core-behavior.instructions.md` — Git commit enforcement policy and commit-keeper subagent delegation.

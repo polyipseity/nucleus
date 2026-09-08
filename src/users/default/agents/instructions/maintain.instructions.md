@@ -59,9 +59,3 @@ Final check:
 2. Is this the simplest design that still meets the requirement?
 3. Did we remove at least as much complexity as we added?
 4. Can a human quickly locate the source of truth?
-
-## Related instruction files
-
-- `core-behavior.instructions.md` — Subagent delegation patterns, git boundary rules, and immutable-by-default enforcement.
-- `commit-safety.instructions.md` — Commit verification protocol, amend prohibition, and failure recovery.
-- `execution-details.instructions.md` — Tool recovery and multi-edit recovery strategies.
