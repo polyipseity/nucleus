@@ -6,56 +6,52 @@ applyTo: "src/modules/cloud-drives.nix, src/platforms/macOS/modules/default.nix,
 
 # Cloud Drives and Finder Favorites
 
-## Canonical terminology
+## Terminology
 
 - **Mounts**: live/on-demand access (`rclone mount`).
-- **Replicas**: materialized local copy (`rclone sync` pull-only, remote -> local).
-- Keep this vocabulary consistent across Nix options, Windows user registry, scripts, docs, and tests.
-- Replica automation must not write to remotes: no push paths and no bisync paths in scripts, wrappers, scheduled tasks, or tests.
+- **Replicas**: materialized local copy (`rclone sync` pull-only, remote → local).
+- Keep vocabulary consistent across Nix options, Windows registry, scripts, docs, tests.
+- Replica automation must not write to remotes: no push or bisync paths in scripts, wrappers, scheduled tasks, or tests.
 
-## Path ownership invariants
+## Path ownership
 
-- Keep mount/replica local paths under managed user home paths (for example `~/clouds/*` or `%USERPROFILE%\clouds\*`).
-- Managed mount/replica paths must be real directories by default on all hosts.
-- If a managed mount/replica path is a symlink or reparse point, apply/setup must fail with a clear error; fix the path manually and re-apply.
+- Mount/replica local paths live under managed user home paths (e.g. `~/clouds/*` or `%USERPROFILE%\clouds\*`).
+- Managed paths must be real directories by default on all hosts.
+- If a managed path is a symlink or reparse point, apply/setup must fail with a clear error.
 
 ### macOS-only iCloud exception
 
-- Exactly one exception is allowed:
-  - entry: provider `iCloud`, id `iCloud`, replica localPath `clouds/iCloudReplica`
-  - behavior: `~/clouds/iCloudReplica` must be a symlink to `~/Library/Mobile Documents`
-- WHY: this avoids duplicating native iCloud Drive storage with a second managed tree on macOS.
+- One exception allowed: provider `iCloud`, id `iCloud`, replica localPath `clouds/iCloudReplica`.
+- `~/clouds/iCloudReplica` must symlink to `~/Library/Mobile Documents`. WHY: avoids duplicating native iCloud Drive storage.
 - Do not replicate this exception on NixOS or Windows.
 
-## Finder favorites policy on modern macOS
+## Finder favorites (modern macOS)
 
 - Do not manage Finder favorites by writing `FavoriteItems.sfl*` archives directly via NSKeyedArchiver/JXA.
-- Do not rely on `sfltool` for favorites management.
-- Preferred strategy:
-  1. Ensure canonical directories exist (`~/dev`, `~/clouds`, and standard user folders referenced by favorites).
-  2. Use `mysides` in activation to enforce an exact ordered favorites list.
-     - `mysides add` expects properly URI-encoded URLs. Spaces must be `%20`.
-     - Encode all `file://` URLs using Nix's `builtins.replaceStrings` before passing to `mysides`. Do not rely on shell-level encoding.
-  3. Restart Finder/sharedfilelistd/cfprefsd in-session after updates; if sidebar cache remains stale, emit a one-line logout/login hint in logs.
+- Do not rely on `sfltool`.
+- Preferred approach:
+  1. Ensure canonical directories exist (`~/dev`, `~/clouds`, standard user folders).
+  2. Use `mysides` in activation to enforce an exact ordered favorites list. `mysides add` expects URI-encoded URLs (spaces = `%20`). Encode `file://` URLs via Nix's `builtins.replaceStrings`, not shell-level encoding.
+  3. Restart Finder/sharedfilelistd/cfprefsd after updates; if sidebar cache stays stale, emit a logout/login hint in logs.
 
-## Cloud setup/update behavior
+## Cloud setup/update
 
 - Treat remote IDs (`remoteName`, `id`) as stable identity keys.
-- Update mutable metadata (for example display labels) only when changed; avoid rewriting remote config no-op fields.
-- Keep `RCLONE_CONFIG_PASS` handling explicit and non-interactive once secrets are materialized.
+- Update mutable metadata (e.g. display labels) only when changed.
+- Keep `RCLONE_CONFIG_PASS` handling explicit and non-interactive after secrets materialize.
 - Validate remotes with root-only listings (`rclone lsd` on `/`) to avoid false positives from partially accessible subpaths.
 
-## Windows parity rules for cloud modules
+## Windows parity
 
-- Keep cloud path convergence in reusable user modules, not in ad-hoc orchestrator snippets.
-- Detect and handle reparse points explicitly when checking path state.
-- Keep configuration idempotent: repeated applies should converge without duplicate mounts/dirs or repeated destructive work.
+- Cloud path convergence in reusable user modules, not ad-hoc orchestrator snippets.
+- Handle reparse points explicitly when checking path state.
+- Configuration idempotent: repeated applies converge without duplicate mounts/dirs.
 
-## Replica sync performance constraints
+## Replica sync performance
 
-rclone's remote listing/comparison phase is slow — expect multi-minute runtimes even for incremental syncs (5–15 min for full-root). This is the trade-off for pull-only idempotent replication.
+rclone's listing/comparison phase is slow — expect 5–15 min for full-root incremental syncs. This is the trade-off for pull-only idempotent replication.
 
-- Do not force throttle flags (`--checkers 1`, `--transfers 1`, etc.) in runtime sync paths unless a temporary exception is required. Bounded root-access probes (e.g., OneDrive inaccessible-root filtering) may use defensive flags; the real sync path must use backend defaults.
+- Do not force throttle flags (`--checkers 1`, `--transfers 1`) in runtime sync paths. Bounded root-access probes may use defensive flags; the real sync path uses backend defaults.
 - Inter-run spacing must accommodate multi-minute runtime.
 
 ## Tests and docs coupling
