@@ -84,8 +84,10 @@ in
   # Create system log directories for all nucleus systemd services before they
   # WHY: Log directory creation is imperative because it must run AFTER the
   # root symlinks resolve (Nix activation ordering is alphabetical, not
-  # dependency-based). systemd LogsDirectory/StateDirectory cannot handle this
-  # ordering requirement.
+  # dependency-based). systemd LogsDirectory creates under /var/log/ (wrong
+  # path — nucleus logs live under /var/lib/nucleus/logs/). StateDirectory
+  # creates under /var/lib/ but cannot create nested paths like
+  # nucleus/logs/<subdir>. Neither handles the activation ordering constraint.
   # ---------------------------------------------------------------------------
   system.activationScripts.nixos-ensure-log-dirs = lib.mkAfter ''
     "${activationBundle}/src/scripts/services/log-dirs-init.sh" \

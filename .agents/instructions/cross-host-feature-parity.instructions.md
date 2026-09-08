@@ -141,6 +141,48 @@ When a symlink exists on both POSIX and Windows, writability semantics MUST matc
 
 The `__nucleus_symlink_farm` env var is generated in `src/hosts/MacBook/activation.nix` from `appleSdkTools.symlinkFarmTools` plus any extra entries.
 
+## By-design imperative patterns
+
+The following patterns are intentionally imperative and must not be converted to declarative state. Each has a documented technical constraint.
+
+| Pattern | Constraint |
+|---------|------------|
+| Bootstrap curl (`bootstrap.sh`) | Must work before Nix is installed |
+| macOS `defaults write` | No declarative API for macOS preferences |
+| Service restarts on macOS | launchd has no declarative restart API |
+| Dev repos `git clone` | Live checkouts required for development workflow |
+| SOPS decryption at runtime | Secrets must be decrypted at service start |
+| Jellyfin/Plex API calls | Runtime service integration, not provisioning |
+| Package manager installs (Bun, CargoBinstall, UV, Rustup, Scoop) | These ARE the declarative mechanism on their respective platforms |
+| `update.sh` / `check.sh` API queries | Dev-time tools, not activation runtime |
+| Log dirs activation (`activation.nix`) | Activation ordering constraint (alphabetical, not dependency-based) prevents `systemd LogsDirectory` from replacing activation-time creation |
+| Pwsh module installs (`pwsh.nix`) | Test isolation requires runtime install/teardown; declarative approach cannot express cleanup |
+| Android image downloads (`VMAndroid.ps1`, `Invoke-AndroidConfig.ps1`) | Dynamic URLs from latest releases; pre-fetch requires URL pinning in lockfile |
+| Ollama model pulls (`Invoke-AISync.ps1`) | Inherently dynamic/user-choice |
+| Wi-Fi MAC randomization (`Sync-WifiMacRandomization.ps1`) | Registry path contains runtime-discovered adapter GUIDs; DSC requires static paths |
+| PATH management (`Sync-UserPath.ps1`) | Read-modify-write cycle with `WM_SETTINGCHANGE` broadcast via P/Invoke; DSC cannot handle broadcast or reconstruct |
+| Firewall per-rule control (`Sync-OpenSSHServer.ps1`, `Sync-WindowsRDP.ps1`) | `Microsoft.Windows.Settings/Firewall` only supports global on/off, not per-rule control |
+| CamillaDSP/Heartbeat scheduled tasks | Dynamic arguments (port from `services.json`, config path) cannot be expressed in static DSC |
+| Cloud Drive Catalog scheduled tasks | Per-mount dynamic args cannot be expressed in static DSC |
+
+## Cross-platform parity matrix
+
+Current declarative status per host for key infrastructure features:
+
+| Feature | macOS | NixOS | Windows |
+|---------|-------|-------|--------|
+| Caddy config | launchd plist | NixOS Caddyfile (declarative) | PowerShell generation (imperative) |
+| Scheduled tasks | launchd plist (declarative) | systemd timer (declarative) | DSC `scheduler.dsc.yml` + `scheduler-user.dsc.yml` (declarative) + PowerShell verification |
+| Firewall rules | — (no firewall svc) | nftables (declarative) | DSC global toggle + PowerShell per-rule (imperative — DSC lacks per-rule control) |
+| Static registry values | — | — | DSC-convertible (PowerPolicy) + justified imperative (Wi-Fi MAC, PATH) |
+| Log dirs | mkdir (imperative) | mkdir activation + systemd (imperative — activation ordering constraint) | mkdir (imperative) |
+| State dirs | mkdir (imperative) | `StateDirectory` (partial — redis only) | mkdir (imperative) |
+| Runtime downloads | — | — | Pre-fetchable via `vendor-assets` (SteamCMD, CamillaDSP/GUI) + justified imperative (Android, Ollama) |
+| Zsh completions | Runtime activation (imperative) | Runtime activation (imperative — deferred build-time) | — |
+| Pwsh modules | — | — | Runtime install (imperative — test isolation) |
+| Jellyfin API | — | — | Justified imperative (runtime API) |
+| Vendor assets | Nix derivations (declarative) | Nix derivations (declarative) | `vendor-assets` flake output + `-VendorDir` param (partially wired) |
+
 ## Host vs platform naming
 
 Three-layer model (Host → Platform → Implementation), decision tree, canonical helpers, and SSOT files are in `host-platform-naming.reference.md`. Key rule: host keys for physical machine identity, platform keys for OS-family semantics, never mix.
