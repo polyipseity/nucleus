@@ -5,16 +5,15 @@
 #
 # ## Sandbox-runtime (srt) policy
 #
-# srt is a hard requirement: the sandboxed wrappers (`pi`, `cursor`)
-# fail loudly if srt is not installed. All coding agents run inside
-# srt by default for filesystem and network isolation.
+# srt is a hard requirement for coding agents that lack built-in protections.
+# Currently only `pi` runs inside srt for filesystem and network isolation.
+# The `pi` wrapper fails loudly if srt is not installed.
 #
-# Unrestricted variants: `pi-unrestricted`, `cursor-unrestricted`
-# bypass the sandbox and do not require srt. No short form aliases
-# are allowed for unrestricted variants — the full name makes the
+# Unrestricted variant: `pi-unrestricted` bypasses the sandbox and does not
+# require srt. No short form aliases are allowed — the full name makes the
 # security implications explicit.
 #
-# Excluded: vscode — not sandboxed per policy.
+# Excluded: vscode, cursor (have built-in protections; no srt needed).
 #
 # Settings: `~/.srt-settings.json` (method-1 writable symlink from
 # `src/users/default/srt/settings.json`, per-user overridable).
