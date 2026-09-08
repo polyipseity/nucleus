@@ -612,6 +612,37 @@ function uv {
   return 1
 }
 
+# ---------------------------------------------------------------
+# Sandbox-runtime (srt) agent wrapping
+# ---------------------------------------------------------------
+# By default, coding agents run inside srt for filesystem/network
+# isolation. Use -unrestricted variants to bypass the sandbox.
+#
+# Excluded: vscode (not sandboxed per policy).
+function pi {
+  if (Get-Command srt -ErrorAction SilentlyContinue) {
+    srt command pi @args
+  } else {
+    & pi @args
+  }
+}
+
+function pi-unrestricted {
+  & pi @args
+}
+
+function cursor {
+  if (Get-Command srt -ErrorAction SilentlyContinue) {
+    srt command cursor @args
+  } else {
+    & cursor @args
+  }
+}
+
+function cursor-unrestricted {
+  & cursor @args
+}
+
 # --- nucleus-* argument completers ---
 # Register argument completers for all nucleus commands to provide
 # tab-completion for subcommands, flags, and dynamic values.

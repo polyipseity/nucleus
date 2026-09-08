@@ -312,6 +312,37 @@ EOF
   return 1
 }
 
+# ---------------------------------------------------------------
+# Sandbox-runtime (srt) agent wrapping
+# ---------------------------------------------------------------
+# By default, coding agents run inside srt for filesystem/network
+# isolation. Use -unrestricted variants to bypass the sandbox.
+#
+# Excluded: vscode (not sandboxed per policy).
+pi() {
+  if command -v srt >/dev/null 2>&1; then
+    srt command pi "$@"
+  else
+    command pi "$@"
+  fi
+}
+
+pi-unrestricted() {
+  command pi "$@"
+}
+
+cursor() {
+  if command -v srt >/dev/null 2>&1; then
+    srt command cursor "$@"
+  else
+    command cursor "$@"
+  fi
+}
+
+cursor-unrestricted() {
+  command cursor "$@"
+}
+
 # Intercept npm/npx/node/corepack invocations.
 # These tools are NOT installed by this repository. The sole JS runtime
 # and package manager is bun.  Users who separately installed Node.js
