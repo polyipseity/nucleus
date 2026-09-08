@@ -54,6 +54,10 @@ function Invoke-BunSetup {
   # package name (including scope if applicable).  Only add packages absent
   # from WinGet, Scoop, and cargo-binstall.
   $desiredPackages = @(
+    # sandbox-runtime: OS-level process sandboxing for coding agents.
+    # Available via pkgs.sandbox-runtime on POSIX but absent from WinGet,
+    # Scoop, and cargo-binstall on Windows.
+    '@anthropic-ai/sandbox-runtime',
     # coding agent CLI; available via pkgs.pi-coding-agent on POSIX but absent
     # from WinGet, Scoop, and cargo-binstall on Windows
     '@earendil-works/pi-coding-agent',

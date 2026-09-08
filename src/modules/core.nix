@@ -743,6 +743,10 @@ let
       nixpkgs = "rustup";
       winget = "Rustlang.Rustup";
     };
+    "sandbox-runtime" = {
+      category = "cli";
+      nixpkgs = "sandbox-runtime";
+    };
     sccache = {
       category = "cli";
       homebrew = {

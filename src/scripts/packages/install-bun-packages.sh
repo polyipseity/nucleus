@@ -47,6 +47,7 @@ fi
 # Versions are pinned from the lockfile `bun` section (see _ibp_install_spec).
 _ibp_desired="$(mktemp)"
 printf '%s\n' \
+  '@anthropic-ai/sandbox-runtime' \
   'clawhub' \
   >"$_ibp_desired"
 

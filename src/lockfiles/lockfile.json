@@ -1,6 +1,7 @@
 {
   "$schema": "./lockfile.schema.json",
   "bun": {
+    "@anthropic-ai/sandbox-runtime": "0.0.75",
     "@earendil-works/pi-coding-agent": "0.73.1",
     "clawhub": "0.23.3"
   },
