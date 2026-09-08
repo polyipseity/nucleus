@@ -10,9 +10,9 @@
 #   PATH snippets and __NUCLEUS_LLVM_BIN_DIR__ with the LLVM bin directory, then
 #   writes the result into the user's PowerShell profile managed block.
 #
-# Includes sandbox-runtime (srt) agent wrapping: pi and cursor run inside
-# srt by default for filesystem/network isolation. Use pi-unrestricted /
-# cursor-unrestricted to bypass the sandbox.
+# Includes sandbox-runtime (srt) agent wrapping: pi runs inside
+# srt by default for filesystem/network isolation. Use pi-unrestricted
+# to bypass the sandbox.
 
 # Managed PATH: prepend/append dirs, substituted by the embedding host
 # (Sync-ShellProfile.ps1 on Windows; empty on POSIX).
@@ -619,10 +619,10 @@ function uv {
 # ---------------------------------------------------------------
 # Sandbox-runtime (srt) agent wrapping
 # ---------------------------------------------------------------
-# By default, coding agents run inside srt for filesystem/network
-# isolation. Use -unrestricted variants to bypass the sandbox.
+# By default, pi runs inside srt for filesystem/network isolation.
+# Use pi-unrestricted to bypass the sandbox.
 #
-# Excluded: vscode (not sandboxed per policy).
+# Excluded: vscode, cursor (have built-in protections; no srt needed).
 function pi {
   if (-not (Get-Command srt -ErrorAction SilentlyContinue)) {
     Write-Error "srt (sandbox-runtime) is required but not installed. Run 'nucleus-apply' to install it." -ErrorAction Stop
@@ -632,17 +632,6 @@ function pi {
 
 function pi-unrestricted {
   & pi @args
-}
-
-function cursor {
-  if (-not (Get-Command srt -ErrorAction SilentlyContinue)) {
-    Write-Error "srt (sandbox-runtime) is required but not installed. Run 'nucleus-apply' to install it." -ErrorAction Stop
-  }
-  srt command cursor @args
-}
-
-function cursor-unrestricted {
-  & cursor @args
 }
 
 # --- nucleus-* argument completers ---

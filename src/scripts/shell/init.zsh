@@ -7,7 +7,7 @@
 # - pay-respects shell hook
 # - Starship prompt
 # - Managed dev tool interception (bun, cargo, rustc, uv)
-# - Sandbox-runtime (srt) agent wrapping (pi, cursor run in srt by default)
+# - Sandbox-runtime (srt) agent wrapping (pi runs in srt by default)
 # - System tool bans (npm, npx, node, corepack, pip)
 #
 # Embedded by src/modules/shell.nix into initContent.
@@ -328,10 +328,10 @@ EOF
 # ---------------------------------------------------------------
 # Sandbox-runtime (srt) agent wrapping
 # ---------------------------------------------------------------
-# By default, coding agents run inside srt for filesystem/network
-# isolation. Use -unrestricted variants to bypass the sandbox.
+# By default, pi runs inside srt for filesystem/network isolation.
+# Use pi-unrestricted to bypass the sandbox.
 #
-# Excluded: vscode (not sandboxed per policy).
+# Excluded: vscode, cursor (have built-in protections; no srt needed).
 pi() {
   command -v srt >/dev/null 2>&1 || { echo "error: srt (sandbox-runtime) is required but not installed. Run 'nucleus-apply' to install it." >&2; return 1; }
   srt command pi "$@"
@@ -339,15 +339,6 @@ pi() {
 
 pi-unrestricted() {
   command pi "$@"
-}
-
-cursor() {
-  command -v srt >/dev/null 2>&1 || { echo "error: srt (sandbox-runtime) is required but not installed. Run 'nucleus-apply' to install it." >&2; return 1; }
-  srt command cursor "$@"
-}
-
-cursor-unrestricted() {
-  command cursor "$@"
 }
 
 # Intercept npm/npx/node/corepack invocations.
