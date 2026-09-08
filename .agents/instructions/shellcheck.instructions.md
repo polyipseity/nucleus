@@ -45,7 +45,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/relative/path"
 ```
 
-Cwd-independent, CDPATH-safe, symlink-resolving. See `nix-and-script-authoring.instructions.md`.
+Cwd-independent, CDPATH-safe, symlink-resolving. See `script-authoring.instructions.md`.
 
 **jq with file argument**: keep `jq 'program'` and `"$FILE"` on the same line — a quote on its own line is a command separator (jq hangs). Add `|| return`; tests redirect stdin from `/dev/null`.
 

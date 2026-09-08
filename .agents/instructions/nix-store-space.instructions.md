@@ -35,7 +35,7 @@ Age-based GC: `nix-collect-garbage --delete-older-than` ([`posix-base.nix`](../.
 
 ## `$out` layout and duplication
 
-`writeNucleusShellApplication` ([`flake.nix`](../../src/flake.nix)): `$out/scripts` + `$out/src`, entry at `$out/<scriptName>.sh`. No `bundleDefault`. Each app symlinks shared derivations (two symlinks, no per-app tree duplication). Shellcheck in CI only. Call-site: [`nix-and-script-authoring.instructions.md`](nix-and-script-authoring.instructions.md).
+`writeNucleusShellApplication` ([`flake.nix`](../../src/flake.nix)): `$out/scripts` + `$out/src`, entry at `$out/<scriptName>.sh`. No `bundleDefault`. Each app symlinks shared derivations (two symlinks, no per-app tree duplication). Shellcheck in CI only. Call-site: [`nix-authoring.instructions.md`](nix-authoring.instructions.md).
 
 ## Runtime copies (reflink)
 
