@@ -40,7 +40,7 @@ NixOS `/nix` lives on a dedicated Btrfs subvolume `@nix` ([`disks.nix`](../../sr
 
 `writeNucleusShellApplication` in [`flake.nix`](../../src/flake.nix) always mirrors the repo hierarchy into `$out`: `$out/scripts` (shared `nucleus-scripts-bundle`) and `$out/src` (shared `nucleus-script-tree`), with the entry script at `$out/<scriptName>.sh`. There is no `bundleDefault` toggle — every call site gets the same layout, so `SCRIPT_DIR`-relative resolution works identically from the store path.
 
-See [`nix-authoring.instructions.md`](nix-authoring.instructions.md) for call-site guidance.
+See [`nix-and-script-authoring.instructions.md`](nix-and-script-authoring.instructions.md) for call-site guidance.
 
 Shellcheck runs in CI (`nucleus-check sh` / `script-tree.nix`), not per-app derivation builds.
 

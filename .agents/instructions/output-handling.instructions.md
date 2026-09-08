@@ -14,12 +14,12 @@ This file covers both **when** to choose a severity level (error/warning/info) a
 Select severity by whether the operation must succeed for the host to be correct.
 
 - **ERROR (hard-error):** any required convergence or configuration operation whose failure means the system is misconfigured or unsafe. Surface it with a non-zero exit (POSIX `die`/`error` + `exit 1`; PowerShell `Write-NucleusError` + `throw`). Continuing past it is forbidden. Includes:
-  - Privilege gap on `src/` code (see `scripts-and-permissions.instructions.md`, rule 1).
-  - Inverse-family already-elevated refusal (see `scripts-and-permissions.instructions.md`, rule 3 — a hard refusal, not a warning).
+  - Privilege gap on `src/` code (see `nix-and-script-authoring.instructions.md`, Privilege-gating policy).
+  - Inverse-family already-elevated refusal (see `nix-and-script-authoring.instructions.md`, Privilege-gating policy rule 3 — a hard refusal, not a warning).
   - Activation-script convergence failure (see below).
   - Secrets/identity derivation failure (age-key, GPG ownertrust, SSH fingerprint manifest).
   - Symlink creation / ACL delete-protection hardening failure.
-  - Jellyfin admin-token absence (see `scripts-and-permissions.instructions.md`, Jellyfin note).
+  - Jellyfin admin-token absence (see `nix-and-script-authoring.instructions.md`, Privilege-gating policy, Jellyfin note).
   - Allow/deny-list staleness (see `allow-and-deny-lists.instructions.md`, Tier 2).
   - Missing required tool in check/test preflight (see `tooling-and-validation.instructions.md`).
   - Cloud-drive mount/replica path conflict (see `cloud-drives-and-finder.instructions.md`).

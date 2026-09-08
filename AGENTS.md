@@ -11,7 +11,7 @@
 - **Layout exceptions** (do not move under `hosts/` or `platforms/`): `src/modules/configs/` (machine-wide singleton configs with host-keyed variants) and `src/users/` (per-user overlays — registry domain JSON, homedir app trees). See `user-config-placement.instructions.md` and `app-config-policy.instructions.md`.
 - `src/users/` contains per-user overlays: registry domain JSON (`src/users/<username>/<domain>.json` with `src/users/default/` fallback; schemas co-located in `src/users/default/`), per-user homedir app trees (`vscode/`, `agents/`, `direnv/`, …), and runtime assembly (`users-registry.nix` / `load-user-registry.sh` / `Load-UserRegistry.ps1`). Domain deep-merge via `lib.recursiveUpdate`; arrays replaced wholesale by design.
 - `scripts/` contains user-facing automation helpers with paired `.sh`/`.ps1` entry points: bootstrap, check, cloud-setup, gc, health-check, replica-sync, replica-reset, update, vm-setup, ai-sync, and others.
-- `src/scripts/` contains Nix-internal scripts organized into domain subdirectories (`services/`, `lib/`, `configs/`, `agents/`, …). Placement rules: `.agents/instructions/scripts-and-permissions.instructions.md`. Activation blocks use the bundle subprocess pattern: `.agents/instructions/activation-scripts.instructions.md`.
+- `src/scripts/` contains Nix-internal scripts organized into domain subdirectories (`services/`, `lib/`, `configs/`, `agents/`, …). Placement rules: `.agents/instructions/nix-and-script-authoring.instructions.md`. Activation blocks use the bundle subprocess pattern: `.agents/instructions/activation-scripts.instructions.md`.
 - `tests/` mirrors `src/` layout: `tests/hosts/<Host>/`, `tests/platforms/<Platform>/`, `tests/modules/` (cross-host shared), plus `tests/integration/` and `tests/scripts/`. Rule: `src/<layer>/...` → `tests/<layer>/...`. All changes require corresponding tests; see `.agents/instructions/testing.instructions.md`. Tests must not couple to specific real users under `src/users/<username>/`; use `tests/fixtures/` and `testing.instructions.md`.
 - No `docs/` directory exists or may be created. Repository documentation lives in `.agents/instructions/*.instructions.md`, `src/hosts/<Host>/MANUAL.md`, or inline comments.
 - Keep this file short and durable. Put file-type and workflow-specific rules in `.agents/instructions/*.instructions.md`, reusable workflows in `.agents/prompts/*.prompt.md`, and skill assets in `.agents/skills/<skill>/`.
@@ -116,7 +116,7 @@ Check/test preflight, tool-availability policy, and scoped-mode conventions: `.a
 - Windows long-path support stays enabled in DSC (`LongPathsEnabled = 1`).
 - Wallpaper state comes from managed decrypted assets, not ad-hoc local files.
 - SOPS recipients stay real and shared across encrypted files; rewrap with `sops updatekeys` after recipient changes.
-- Privilege-gating (hard-error default for `src/`; escalate for user-facing `scripts/`): `.agents/instructions/scripts-and-permissions.instructions.md`. Jellyfin admin-token absence is a separate hard-error concern.
+- Privilege-gating (hard-error default for `src/`; escalate for user-facing `scripts/`): `.agents/instructions/nix-and-script-authoring.instructions.md`. Jellyfin admin-token absence is a separate hard-error concern.
 
 Package installation policies: `.agents/instructions/package-installation-scope.instructions.md`.
 
