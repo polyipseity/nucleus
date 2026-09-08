@@ -23,14 +23,17 @@ function Sync-RimSortConfig {
   .PARAMETER Users
     Mandatory: array of managed user records from Load-UserRegistry.ps1.
 
+  .PARAMETER HostName
+    Host name for resolving the per-host overlay (e.g. "Windows").
+
   .PARAMETER RepoRoot
     Absolute path to the repository root.
 
   .EXAMPLE
-    Sync-RimSortConfig -Enabled:$true -Users $userRegistry.users -RepoRoot $env:NUCLEUS_REPO_ROOT
+    Sync-RimSortConfig -Enabled:$true -Users $userRegistry.users -HostName 'Windows' -RepoRoot $env:NUCLEUS_REPO_ROOT
 
   .EXAMPLE
-    Sync-RimSortConfig -Enabled:$false -Users $userRegistry.users -RepoRoot $env:NUCLEUS_REPO_ROOT
+    Sync-RimSortConfig -Enabled:$false -Users $userRegistry.users -HostName 'Windows' -RepoRoot $env:NUCLEUS_REPO_ROOT
 
   .NOTES
     Environment variables: (none)
@@ -43,6 +46,9 @@ function Sync-RimSortConfig {
 
     [Parameter(Mandatory = $true)]
     [object[]]$Users,
+
+    [Parameter(Mandatory = $true)]
+    [string]$HostName,
 
     [Parameter(Mandatory = $true)]
     [string]$RepoRoot
@@ -124,10 +130,41 @@ function Sync-RimSortConfig {
     return $parsed
   }
 
+  function Merge-Hashtables {
+    param(
+      [Parameter(Mandatory = $false)]
+      [AllowNull()]
+      [hashtable]$Base,
+
+      [Parameter(Mandatory = $false)]
+      [AllowNull()]
+      [hashtable]$Override
+    )
+
+    if ($null -eq $Override) { return $Base }
+    if ($null -eq $Base) { return $Override }
+
+    $result = @{}
+    foreach ($key in $Base.Keys) {
+      $result[$key] = $Base[$key]
+    }
+    foreach ($key in $Override.Keys) {
+      if ($result.ContainsKey($key) -and $result[$key] -is [hashtable] -and $Override[$key] -is [hashtable]) {
+        $result[$key] = Merge-Hashtables -Base $result[$key] -Override $Override[$key]
+      } else {
+        $result[$key] = $Override[$key]
+      }
+    }
+    return $result
+  }
+
   function Get-RimSortDesiredState {
     param(
       [Parameter(Mandatory = $true)]
       [string]$Username,
+
+      [Parameter(Mandatory = $true)]
+      [string]$HostName,
 
       [Parameter(Mandatory = $true)]
       [string]$RepoRoot
@@ -137,6 +174,13 @@ function Sync-RimSortConfig {
     $defaultSettings = ConvertTo-Hashtable -InputObject (Get-Content -Path $settingsPath -Raw | ConvertFrom-Json)
     if ($defaultSettings -isnot [hashtable]) {
       throw "RimSort overlay config '$settingsPath' must be a JSON object at the top level."
+    }
+
+    # Merge host-specific overlay (e.g. rimsort.Windows.json) if it exists.
+    $hostOverlayEntry = Resolve-UserConfigFirstLevelEntry -User $Username -ConfigName 'rimsort' -EntryName "rimsort.$HostName.json" -RepoRoot $RepoRoot
+    if (Test-Path -LiteralPath $hostOverlayEntry -PathType Leaf) {
+      $hostSettings = ConvertTo-Hashtable -InputObject (Get-Content -LiteralPath $hostOverlayEntry -Raw | ConvertFrom-Json)
+      $defaultSettings = Merge-Hashtables -Base $defaultSettings -Override $hostSettings
     }
 
     return $defaultSettings
@@ -149,7 +193,7 @@ function Sync-RimSortConfig {
     $username = [string]$userRecord.name
     $userHome = [string]$userRecord.homeDirectory
     $configPath = Join-Path -Path $userHome -ChildPath 'AppData\Local\RimSort\settings.json'
-    $managedSettings = Get-RimSortDesiredState -Username $username -RepoRoot $RepoRoot
+    $managedSettings = Get-RimSortDesiredState -Username $username -HostName $HostName -RepoRoot $RepoRoot
 
     if ($Enabled) {
       $existingConfig = Read-RimSortConfig -Path $configPath

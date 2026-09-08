@@ -936,7 +936,7 @@ Sync-ObsidianConfig -Enabled:$EnableObsidianParity -Users $selectedUserRecords -
 # check-suppress:config-method: method 3 (merge) -- RimSort owns settings.json and writes theme, sorting,
 # and window state into it. A symlink would let app-owned writes reach the
 # repo file. Merge preserves both managed and app-owned keys.
-Sync-RimSortConfig -Enabled:$EnableRimSortParity -Users $selectedUserRecords -RepoRoot $repoRoot
+Sync-RimSortConfig -Enabled:$EnableRimSortParity -Users $selectedUserRecords -HostName $env:NUCLEUS_HOST -RepoRoot $repoRoot
 Invoke-SteamCMDSetup -Enabled:$EnableRimSortParity -Users $selectedUserRecords -RepoRoot $repoRoot
 # check-suppress:config-method: method 3 (merge) -- Picard defaults INI merged via Sync-PicardConfig on Windows
 Sync-PicardConfig -Enabled:$EnablePicardParity -Users $selectedUserRecords -RepoRoot $repoRoot
