@@ -96,9 +96,8 @@ in
 
   # Install Pester for Windows Pester test suites if pwsh is available.
   # This enables Invoke-Pester in src/scripts/tests/test-steps/06-windows-pester.ps1.
-  # DEFERRED: Runtime module install stays imperative because it enables teardown
-  # test isolation — tests clean up module state after each run, which a
-  # declarative declarative approach cannot express.
+  # Runtime module install stays imperative: tests clean up module state after
+  # each run for isolation, and a declarative Nix store path is read-only.
   home.activation.install-pwsh-pester = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     "${activationBundle}/src/scripts/packages/install-pwsh-module.sh" \
       "${pkgs.powershell}/bin/pwsh" \

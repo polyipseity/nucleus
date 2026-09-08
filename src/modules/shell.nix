@@ -296,10 +296,9 @@ in
   #     tool binary (mtime freshness check).
   #   * Fails gracefully if a completion subcommand exits non-zero (soft-fail).
   #
-  # DEFERRED: Completion generation stays imperative because it probes tool
-  # binaries directly from the Nix store and generates completion files at
-  # runtime. A declarative approach would require embedding completion files
-  # in every package, which is not yet standard practice.
+  # Completion generation stays imperative: it probes tool binaries from the
+  # Nix store at runtime. Embedding completions in every package is not yet
+  # standard practice.
   # ---------------------------------------------------------------------------
 
   home.activation = {

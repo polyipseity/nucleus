@@ -164,6 +164,9 @@ The following patterns are intentionally imperative and must not be converted to
 | Firewall per-rule control (`Sync-OpenSSHServer.ps1`, `Sync-WindowsRDP.ps1`) | `Microsoft.Windows.Settings/Firewall` only supports global on/off, not per-rule control |
 | CamillaDSP/Heartbeat scheduled tasks | Dynamic arguments (port from `services.json`, config path) cannot be expressed in static DSC |
 | Cloud Drive Catalog scheduled tasks | Per-mount dynamic args cannot be expressed in static DSC |
+| QtPass config (`Sync-QtPassConfig.ps1`) | Registry hive load/unload for non-current-user profiles. DSC `RegistryValue` only targets the running user's hive, cannot write to another user's registry without hive load/unload logic. |
+| Caddy config generation (`Sync-CaddyService.ps1`) | Generates Caddyfile from `services.json` at runtime. NixOS does this declaratively via `services.caddy.virtualHosts`, but merging the two implementations requires a shared Nix module that both hosts consume. Significant refactoring for no practical benefit. |
+| Source build git clone (`Invoke-SourceBuild.ps1`) | Source builds need full git history for submodules. Vendoring tarballs via `pkgs.fetchFromGitHub` does not include `.git/` or submodule content. |
 
 ## Cross-platform parity matrix
 
