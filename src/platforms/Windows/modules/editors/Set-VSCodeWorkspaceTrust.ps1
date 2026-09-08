@@ -1,34 +1,36 @@
 <#
 .SYNOPSIS
-  Pre-trust %USERPROFILE%\dev in VS Code workspace trust for both stable and insiders channels.
+  Pre-trust shared directories in VS Code workspace trust for both stable and insiders channels.
 
 .DESCRIPTION
-  Writes a trust entry for %USERPROFILE%\dev to the SQLite state.vscdb for
-  both stable and insiders channels using Bun's built-in bun:sqlite module.
+  Reads the shared trust path list from src/scripts/editors/trust-paths.json and
+  writes trust entries for each path to the SQLite state.vscdb for both stable
+  and insiders channels using Bun's built-in bun:sqlite module.
   Non-fatal when the DB is absent (VS Code not yet launched once) or locked
   (VS Code is currently running); warns to stderr so the operator is informed.
 
 .NOTES
-  Environment variables: APPDATA, PATH
+  Environment variables: APPDATA, HOME, PATH
   Exit codes: 0 on success; non-zero on failure (non-fatal warnings on stderr)
 #>
 
 function Set-VSCodeWorkspaceTrust {
 <#
 .SYNOPSIS
-  Pre-trust %USERPROFILE%\dev in VS Code workspace trust for both stable and insiders channels.
+  Pre-trust shared directories in VS Code workspace trust for both stable and insiders channels.
 
 .DESCRIPTION
   VS Code workspace trust state lives in a SQLite database (state.vscdb) inside
   each channel's globalStorage directory, not in settings.json.  This function
-  writes the trust entry for the managed dev directory directly to that DB using
-  Bun's built-in bun:sqlite module (Bun is already installed via WinGet).
+  reads the shared trust path list from src/scripts/editors/trust-paths.json and
+  writes trust entries for each path directly to that DB using Bun's built-in
+  bun:sqlite module (Bun is already installed via WinGet).
 
   The function is a no-op when:
     - Enabled is $false.
-    - %USERPROFILE%\dev does not exist (edge case: run before Provision-DevDirectory).
+    - trust-paths.json is absent or contains no valid paths.
     - A DB path does not exist (VS Code channel not yet installed or never launched).
-    - The trust entry is already present (idempotent re-apply).
+    - All trust entries are already present (idempotent re-apply).
     - bun is not found in PATH or ~/.bun/bin (warns and skips without error).
 
   Non-fatal when the DB is locked (VS Code running); the Bun script writes a
@@ -41,7 +43,7 @@ function Set-VSCodeWorkspaceTrust {
 
 .EXAMPLE
     Set-VSCodeWorkspaceTrust
-  # Pre-trusts %USERPROFILE%\dev in both Code and Code - Insiders channels.
+  # Pre-trusts shared directories in both Code and Code - Insiders channels.
 
 .EXAMPLE
     Set-VSCodeWorkspaceTrust -Enabled:$false
@@ -57,15 +59,16 @@ function Set-VSCodeWorkspaceTrust {
         return
     }
 
-    $devPath = Join-Path -Path $HOME -ChildPath "dev"
+    # Locate trust-paths.json via the repo root derived from $PSScriptRoot.
+    # Module path: src/platforms/Windows/modules/editors/Set-VSCodeWorkspaceTrust.ps1
+    # Repo root:   src/platforms/Windows/modules/editors/ → ../../../../
+    $repoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)))
+    $trustPathsFile = Join-Path -Path $repoRoot -ChildPath "src\scripts\editors\trust-paths.json"
 
-    # Convert the Windows absolute path to VS Code's internal file URI path format.
-    # VS Code encodes file URIs with a lowercase drive letter, a colon, and
-    # forward slashes, preceded by a leading slash:
-    #   C:\Users\user\dev  →  /c:/Users/user/dev
-    $driveLetter = $devPath.Substring(0, 1).ToLower()
-    $pathRest = $devPath.Substring(2).Replace('\', '/')
-    $uriPath = "/$driveLetter`:$pathRest"
+    if (-not (Test-Path -Path $trustPathsFile)) {
+        Write-NucleusWarning -CommandName 'vscode-workspace-trust' "Set-VSCodeWorkspaceTrust: trust-paths.json not found at $trustPathsFile; skipping"
+        return
+    }
 
     # VS Code APPLICATION-scope storage (state.vscdb) lives in the globalStorage
     # subdirectory under each channel's User data directory.
@@ -96,10 +99,9 @@ function Set-VSCodeWorkspaceTrust {
             return
         }
 
-        # Pass uriPath and each DB path as positional arguments so the script
-        # body contains no interpolated values and is safe to write as a literal.
+        # Pass trust-paths.json path and each DB path as positional arguments.
         if ($PSCmdlet.ShouldProcess("VS Code workspace trust database", "Set")) {
-            & $bunCmd.Source $tempScript $uriPath @dbPaths
+            & $bunCmd.Source $tempScript $trustPathsFile @dbPaths
             if ($LASTEXITCODE -ne 0) {
                 Write-NucleusWarning -CommandName 'vscode-workspace-trust' "Set-VSCodeWorkspaceTrust: bun script exited with code $LASTEXITCODE"
             }

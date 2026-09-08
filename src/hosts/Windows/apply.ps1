@@ -164,6 +164,11 @@
   the folder opens without a trust prompt.  False skips the write; no cleanup
   is needed because VS Code manages its own trust DB state.
 
+.PARAMETER EnablePiProjectTrustParity
+  Enable managed pi coding agent project trust for shared directories.
+  Writes trust entries to %USERPROFILE%\.pi\agent\trust.json so pi loads
+  project resources without a trust prompt.  False skips the write.
+
 .PARAMETER NoAISync
   When specified, suppresses the post-apply Ollama model sync step.  Useful in
   CI or on low-bandwidth connections where model pulls (2-20 GB each) are
@@ -376,6 +381,7 @@ $EnableDevReposParity = if ($noUserStateParity) { $false } else { $null }
 $EnableVsCodeExtensionsParity = -not $noUserStateParity
 $EnableVsCodeSettingsParity = -not $noUserStateParity
 $EnableVsCodeWorkspaceTrustParity = -not $noUserStateParity
+$EnablePiProjectTrustParity = -not $noUserStateParity
 
 $secretsModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "secrets"
 $systemModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "system"
@@ -514,6 +520,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-UserPath.ps1")
 # editors/: VS Code configuration and workspace management.
 . (Join-Path -Path $editorsModuleDir -ChildPath "Set-VSCodeWorkspaceTrust.ps1")
+. (Join-Path -Path $editorsModuleDir -ChildPath "Set-PiProjectTrust.ps1")
 . (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VSCodeExtensionManifest.ps1")
 . (Join-Path -Path $editorsModuleDir -ChildPath "Sync-CursorExtensions.ps1")
 . (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VSCodeSettingManifest.ps1")
@@ -919,6 +926,7 @@ Sync-VSCodeExtensionManifest -Enabled:$EnableVsCodeExtensionsParity
 Sync-CursorExtensions -Enabled:$EnableVsCodeExtensionsParity
 Initialize-DevDirectory -Enabled:$EnableDevDirectoryParity
 Set-VSCodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
+Set-PiProjectTrust -Enabled:$EnablePiProjectTrustParity
 Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
 # check-suppress:config-method: method 3 (merge) -- LibreOffice owns registrymodifications.xcu and
 # overwrites it on exit. A symlink would be replaced. Merge injects managed
