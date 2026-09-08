@@ -6,7 +6,7 @@
   home-manager.sharedModules = [
     ../../modules/iterm2.nix
     ./cloud-drives.nix
-    ./services.nix
+    ./services
     ./vms.nix
   ];
 
