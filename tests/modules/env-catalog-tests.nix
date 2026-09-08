@@ -29,7 +29,7 @@ let
 
   # Cross-check: every os.environ/VAR referenced in litellm-config.yml must
   # be in the catalog's envVar values.
-  litellmConfig = builtins.readFile ../../src/modules/litellm/litellm-config.yml;
+  litellmConfig = builtins.readFile ../../src/modules/configs/litellm/litellm-config.yml;
   lines = builtins.split "\n" litellmConfig;
   stringLines = builtins.filter builtins.isString lines;
   extractEnvVar =

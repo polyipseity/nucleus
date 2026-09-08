@@ -14,7 +14,7 @@
     config     Show effective AI configuration.
 
   Data sources:
-    - src/modules/ollama/models.json  — model manifest
+    - src/modules/configs/ollama/models.json  — model manifest
     - src/modules/services.json    — service definitions (ollama + litellm)
 
 .PARAMETER Action
