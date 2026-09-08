@@ -293,26 +293,6 @@ Files: zsh `src/scripts/shell/init.zsh`, PowerShell `src/scripts/shell/profile.p
 
 Do not add `[ -n "$old_fingerprint" ]` (POSIX) or `$oldSshFingerprint -ne ''` (Windows) guards — they would skip the flush on first provision, leaving stale keys.
 
-## Lockfile management
-
-The consolidated lockfile at `src/lockfiles/lockfile.json` pins tool and package versions. All sections are required but may be empty (`{}`).
-
-| Key | Format | Description |
-| ---------------- | --------------------------------- | ---------------------------------------- |
-| `scoop` | `string → string` | Scoop package → version |
-| `cargo-binstall` | `string → string` | Cargo crate → version |
-| `bun` | `string → string` | Bun package → version |
-| `uv` | `string → string`; VCS pins `{source, rev}` | Uv package → version |
-| `rustup` | `string → string` | Rust toolchain → date |
-| `winget` | `string → string` | WinGet ID → version |
-| `vscode` | `string → string` | VS Code extension → version |
-| `homebrew` | `object with brews/casks/masApps` | Homebrew formula/cask/MAS → version |
-| `ollama` | `string → string` | Ollama model → digest hash |
-
-Homebrew has no native lockfile — pins live under `homebrew`; activation runs `brew bundle --force` from nix-darwin's Brewfile.
-
-Update with `scripts/update.sh` / `scripts/update.ps1`. For Nix packages, run `nix flake lock` from `src/`. The `uv` updater skips `.uv[<pkg>]` entries whose value is an object (VCS-pinned packages).
-
 ## Validation
 
 Nix files: `nix-instantiate --parse <file>` or `nix flake check`. Nix is not available on Windows — prefer small, isolated changes and rely on CI. If `flake.lock` is absent or stale, run `nix flake lock` from `src/` before applying.
