@@ -5,11 +5,9 @@
 # deeper paths inherit the chosen first-level entry in whole. Registry JSON
 # domains use users-registry.nix instead.
 #
-# Platform differences (documented, not bugs):
-# - Deduplication: case-sensitive (Nix attribute names are case-sensitive)
-# - Symlink detection: builtins.pathExists follows symlinks; broken symlinks
-#   fall through to default. This differs from shell (-L check) but is
-#   inconsequential in practice (broken symlinks indicate deployment errors).
+# Cross-platform consistency: deduplication is case-insensitive (weakest
+# constraint — works on NTFS, POSIX, and Nix). Symlink detection follows
+# symlinks (builtins.pathExists), matching POSIX -e and Windows Test-Path.
 #
 # selectUserConfigSource: host-specific files at
 #   src/users/<username>/<config>/<Host>.<ext>
@@ -25,16 +23,20 @@
 #
 # mkUserOverlay: binds effectiveUsername/repoRoot/hostName to the selectors.
 let
+  # Deduplicate case-insensitively, keeping first occurrence.
+  # Per-user entries come before default entries in the input list,
+  # so first-occurrence-wins means per-user wins on name collision.
+  # O(n²) but the list is tiny (<20 first-level entries).
   uniqueStrings =
     strings:
-    builtins.attrNames (
-      builtins.listToAttrs (
-        map (name: {
-          inherit name;
-          value = true;
-        }) strings
-      )
-    );
+    let
+      go =
+        acc: name:
+        let lower = lib.toLower name; in
+        if builtins.any (x: lib.toLower x == lower) acc then acc else acc ++ [ name ];
+      deduped = builtins.foldl' go [ ] strings;
+    in
+    builtins.sort (a: b: a < b) deduped;
 
   dropStrings =
     n: strings:
