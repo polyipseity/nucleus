@@ -7,7 +7,7 @@
 # Why system daemons (launchd.daemons) instead of user agents (launchd.agents):
 # Inference servers and API gateways serve all users and should start at boot,
 # not after login.  The corresponding Home Manager module
-# (modules/ai/default.nix) provides the ollama CLI, OLLAMA_HOST session
+# (modules/ai.nix) provides the ollama CLI, OLLAMA_HOST session
 # variable, and oterm client.
 {
   config,

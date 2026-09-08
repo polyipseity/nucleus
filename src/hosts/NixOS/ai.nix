@@ -5,7 +5,7 @@
 #   • LiteLLM — AI gateway proxy on 127.0.0.1:4000 that routes client requests
 #     to multiple remote providers with order-based failover.
 #
-# The Home Manager module modules/ai/default.nix provides the ollama CLI binary,
+# The Home Manager module modules/ai.nix provides the ollama CLI binary,
 # OLLAMA_HOST session variable, and the oterm client on all POSIX hosts
 # including this one.
 {
