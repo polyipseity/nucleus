@@ -389,7 +389,7 @@ in
     home.activation.seed-srt-settings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "${config.home.homeDirectory}/.srt-settings.json" \
-        "${overlay.selectFile "srt" "settings.json"}"
+        "${overlay.toRepoRelPath (overlay.selectFile "srt" "settings.json")}"
     '';
 
     # Override the default logDir (which uses ~) with a proper absolute path.
