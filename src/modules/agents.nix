@@ -152,6 +152,24 @@ in
     '';
 
     # -------------------------------------------------------------------------
+    # install-pi-packages
+    # Idempotently converges the declarative pi coding agent npm package set.
+    #
+    # Reads desired packages from the lockfile `pi` section, compares against
+    # actually installed packages in ~/.pi/agent/npm/, installs missing or
+    # drifted packages, and removes undesired ones.
+    #
+    # Why after install-bun-packages: logical grouping; pi binary is already
+    # on PATH via nixpkgs, no hard dependency on bun.
+    # -------------------------------------------------------------------------
+    install-pi-packages = lib.hm.dag.entryAfter [ "install-bun-packages" ] ''
+      "${activationBundle}/src/scripts/packages/install-pi-packages.sh" \
+        "${pkgs.jq}/bin/jq" \
+        "${pkgs.pi-coding-agent}/bin/pi" \
+        "${pkgs.gawk}/bin/awk"
+    '';
+
+    # -------------------------------------------------------------------------
     # install-uv-tools
     # Idempotently converges the declarative uv tool set (install + prune).
     #
