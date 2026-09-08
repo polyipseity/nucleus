@@ -3,39 +3,65 @@
   "allowPty": true,
   "filesystem": {
     "allowRead": [],
-    "allowWrite": [
-      ".",
-      "/tmp",
-      "~/.cursor",
-      "~/.pi"
-    ],
+    "allowWrite": [".", "/tmp", "~/.bun", "~/.cargo/registry", "~/.cursor", "~/.npm", "~/.pi"],
     "denyRead": [
+      "~/.aws",
+      "~/.azure",
+      "~/.config/gcloud",
+      "~/.docker/config.json",
+      "~/.env*",
       "~/.gnupg",
+      "~/.kube",
+      "~/.npmrc",
       "~/.sops",
-      "~/.ssh"
+      "~/.ssh",
+      "~/Library/Keychains"
     ],
     "denyWrite": [
       ".env",
-      ".env.*"
+      ".env.*",
+      ".git/config",
+      ".git/hooks",
+      ".git/modules",
+      ".vscode/launch.json",
+      ".vscode/tasks.json",
+      "~/.bash_profile",
+      "~/.bashrc",
+      "~/.config/fish",
+      "~/.zshenv",
+      "~/.zprofile",
+      "~/.zshrc"
     ]
   },
   "ignoreViolations": {
     "*": [
-      "/System",
+      "/etc/hosts",
+      "/etc/ssl",
       "/nix/store",
-      "/usr/bin"
+      "/private/tmp",
+      "/private/var",
+      "/System",
+      "/usr/bin",
+      "/usr/lib",
+      "/usr/share"
     ]
   },
   "network": {
     "allowedDomains": [
-      "api.anthropic.com",
-      "api.github.com",
+      "*.anthropic.com",
+      "*.github.com",
+      "*.googleapis.com",
+      "*.huggingface.co",
+      "*.npmjs.org",
+      "*.pypi.org",
+      "crates.io",
       "duckduckgo.com",
-      "github.com",
+      "huggingface.co",
       "npmjs.org",
-      "opencode.ai"
+      "opencode.ai",
+      "pypi.org"
     ],
-    "allowLocalBinding": true,
+    "allowLocalBinding": false,
     "deniedDomains": []
   }
 }

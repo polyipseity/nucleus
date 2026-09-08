@@ -4,6 +4,10 @@
   "description": "Configuration for Anthropic Sandbox Runtime (srt)",
   "type": "object",
   "properties": {
+    "allowPty": {
+      "type": "boolean",
+      "description": "Allow PTY allocation for sandboxed processes"
+    },
     "network": {
       "type": "object",
       "properties": {
