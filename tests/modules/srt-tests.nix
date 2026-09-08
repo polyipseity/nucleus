@@ -130,7 +130,10 @@ let
       settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
       allowed = settings.network.allowedDomains;
     in
-    builtins.all (d: builtins.elem d allowed) ["*.github.com" "github.com"]
+    builtins.all (d: builtins.elem d allowed) [
+      "*.github.com"
+      "github.com"
+    ]
   ) "srt allowedDomains must include *.github.com and github.com";
 
   test_srt_settings_network_covers_nix_cache = assert' (
@@ -138,7 +141,10 @@ let
       settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
       allowed = settings.network.allowedDomains;
     in
-    builtins.all (d: builtins.elem d allowed) ["cache.nixos.org" "nix-community.cachix.org"]
+    builtins.all (d: builtins.elem d allowed) [
+      "cache.nixos.org"
+      "nix-community.cachix.org"
+    ]
   ) "srt allowedDomains must cover nix binary caches";
 
   test_srt_settings_network_covers_cargo = assert' (
@@ -146,7 +152,10 @@ let
       settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
       allowed = settings.network.allowedDomains;
     in
-    builtins.all (d: builtins.elem d allowed) ["static.crates.io" "index.crates.io"]
+    builtins.all (d: builtins.elem d allowed) [
+      "static.crates.io"
+      "index.crates.io"
+    ]
   ) "srt allowedDomains must cover cargo/crates.io endpoints";
 
   test_srt_settings_network_covers_python = assert' (
@@ -170,7 +179,11 @@ let
       settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
       allowed = settings.network.allowedDomains;
     in
-    builtins.all (d: builtins.elem d allowed) ["ghcr.io" "github-releases.githubusercontent.com" "formulae.brew.sh"]
+    builtins.all (d: builtins.elem d allowed) [
+      "ghcr.io"
+      "github-releases.githubusercontent.com"
+      "formulae.brew.sh"
+    ]
   ) "srt allowedDomains must cover ghcr.io, GitHub releases CDN, and Homebrew";
 
   test_srt_settings_network_covers_ollama = assert' (
@@ -213,7 +226,7 @@ let
   test_srt_settings_ignore_violations_prek = assert' (
     let
       settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
-      prekIgnores = settings.ignoreViolations.prek or [];
+      prekIgnores = settings.ignoreViolations.prek or [ ];
     in
     builtins.elem ".git/hooks" prekIgnores
   ) "srt ignoreViolations must allow prek to write .git/hooks";
@@ -221,7 +234,7 @@ let
   test_srt_settings_ignore_violations_nix = assert' (
     let
       settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
-      nixIgnores = settings.ignoreViolations.nix or [];
+      nixIgnores = settings.ignoreViolations.nix or [ ];
     in
     builtins.elem "/nix/var" nixIgnores
   ) "srt ignoreViolations must allow nix to access /nix/var";

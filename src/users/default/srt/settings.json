@@ -58,8 +58,12 @@
       "/usr/share",
       "~/Library"
     ],
-    "nix": ["/nix/var"],
-    "prek": [".git/hooks"]
+    "nix": [
+      "/nix/var"
+    ],
+    "prek": [
+      ".git/hooks"
+    ]
   },
   "network": {
     "allowedDomains": [
