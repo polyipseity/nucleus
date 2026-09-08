@@ -5,22 +5,17 @@ name: "Citation Quality Reference"
 
 # Citation quality reference
 
-Keep URLs and content correct to prevent drift when citing external sources.
+Keep URLs and content correct to prevent drift.
 
-## Source preference (priority order)
+## Source preference
 
 1. **Developer/API docs**: `developer.apple.com/documentation/*`, `learn.microsoft.com/en-us/*`, official references, IETF RFCs.
-2. **User help** (only when developer docs absent): `support.apple.com/en-us/guide/*`, KB articles, vendor blogs. Support page where dev doc exists → add `# WHY:`.
+2. **User help** (when developer docs absent): `support.apple.com/en-us/guide/*`, KB articles, vendor blogs. Support page where dev doc exists → add `# WHY:`.
 3. **Avoid**: mirrors, archived copies, third-party rewrites, forums, Reddit, SO, expired/redirect links.
 
 ## URL standardization
 
-Apple support URLs must include `en-us`:
-
-- ✅ `https://support.apple.com/en-us/guide/mac-help/...`
-- ❌ `https://support.apple.com/guide/mac-help/...` (redirects by locale)
-
-Canonical URLs without query params. Include article IDs for stability.
+Apple support URLs must include `en-us`. ✅ `https://support.apple.com/en-us/HT123456`. ❌ `https://support.apple.com/HT123456` (no locale). Canonical URLs without query params. Include article IDs for stability.
 
 ## Deprecation hygiene
 

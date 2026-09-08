@@ -8,65 +8,64 @@ applyTo: "src/flake.nix, scripts/**/*.sh, scripts/**/*.ps1, src/scripts/**/*.sh,
 
 ## Canonical command set
 
-The user-facing CLI is roughly 12 flake apps, each a `nucleus-<name>` package built by `mkNucleusApps` in `src/flake.nix`. The flake `apps` output strips the `nucleus-` prefix so they run as `nix run .#<name>`:
+12 flake apps built by `mkNucleusApps` in `src/flake.nix`. The `apps` output strips `nucleus-` prefix for `nix run .#<name>`:
 
 - `apply`, `ai`, `bootstrap`, `check`, `config`, `utils`, `gc`, `svc`, `test`, `update`, `vm`, `cloud`
 
-`service-watchdog` is a daemon-only package, NOT a nucleus app — it is not registered in `mkNucleusApps`, so it never appears on PATH, via `nix run`, or in `packages`. It runs only under systemd/launchd (`src/hosts/NixOS/activation.nix`, `src/hosts/MacBook/service-watchdog.nix`) via its store path, never as a user command. `nucleus-utils` groups user utilities; `optimize-pdf` is its first subcommand.
+`service-watchdog` is daemon-only, NOT a nucleus app — not in `mkNucleusApps`, never on PATH or `nix run`. Runs only under systemd/launchd via store path. `nucleus-utils` groups user utilities; `optimize-pdf` is its first subcommand.
 
 ## No new single-purpose commands
 
-When adding new functionality, decide in this fixed order — stop at the first tier that fits:
+When adding functionality, decide in order — stop at first fit:
 
-1. **Internal** — if the logic is not user-facing (a library, daemon helper, or activation step), keep it as a plain script invoked by other code. Do NOT register a `nucleus-*` PATH command for it. See "Internal-invocation policy" below for how internal code calls other logic.
-2. **Subcommand** — if it is a variant or aspect of an existing nucleus app, add it as a subcommand of that parent (`check`, `gc`, `apply`, `cloud`, `update`).
-3. **New nucleus app** — only if it is a top-level concern with no suitable parent. Register via `nucleusApp` in `mkNucleusApps` in `src/flake.nix` (with a matching `scripts/<name>.sh` / `scripts/<name>.ps1` entry and a `home.packages` registration unless it is daemon-only like `service-watchdog`).
+1. **Internal** — not user-facing (library, daemon helper, activation step)? Keep as plain script. No `nucleus-*` PATH command.
+2. **Subcommand** — variant of existing app? Add as subcommand (`check`, `gc`, `apply`, `cloud`, `update`).
+3. **New app** — top-level concern with no parent? Register via `nucleusApp` in `mkNucleusApps` (matching `scripts/<name>.sh` + `scripts/<name>.ps1`; daemon-only like `service-watchdog` skips `home.packages`).
 
-The command set is shared with the completion generators and check step `10-completions-fresh`. Adding a command without updating both breaks freshness enforcement.
+The command set is shared with completion generators and check step `10-completions-fresh`. Updating one without the other breaks freshness.
 
 ## Internal-invocation policy
 
-Internal code must NOT call `nucleus-*` PATH commands. This includes daemons, apply post-steps, scheduled tasks, and activation scripts. Invoke the underlying logic by one of:
+Internal code must NOT call `nucleus-*` PATH commands. Invoke the underlying logic by one of:
 
-- The **script entry**: `scripts/<name>.sh` (POSIX) or `scripts/<name>.ps1` (Windows).
-- The **flake attr**: `src#<name>` (e.g. `nix run .#check`).
-- A **store path**: `${nucleusApps.nucleus-<name>}/bin/nucleus-<name>` (used by `service-watchdog.nix` / `activation.nix`).
+- **Script entry**: `scripts/<name>.sh` (POSIX) or `scripts/<name>.ps1` (Windows).
+- **Flake attr**: `src#<name>` (e.g. `nix run .#check`).
+- **Store path**: `${nucleusApps.nucleus-<name>}/bin/nucleus-<name>` (used by `service-watchdog.nix` / `activation.nix`).
 
-PATH commands are for user convenience, not for internal use. Calling them from activation scripts couples activation to a user-installed profile.
+PATH commands are for users only. Internal calls couple activation to a user-installed profile.
 
 ## Single registration surface
 
-All nucleus commands are declared exactly once in `mkNucleusApps` (`src/flake.nix`). User-facing surfaces derive from it automatically:
+All nucleus commands declared once in `mkNucleusApps` (`src/flake.nix`). Surfaces derive automatically:
 
 - `home.packages` (`src/modules/shell.nix`) spreads `nucleusApps` onto PATH.
-- The flake `apps` output derives via `mkNucleusAppsAsFlakeApps` (strips the `nucleus-` prefix for `nix run .#<name>`).
+- The flake `apps` output derives via `mkNucleusAppsAsFlakeApps` (strips `nucleus-` prefix for `nix run .#<name>`).
 - The `packages` flake output spreads `nucleusApps`.
 
-Never hand-register a command in two places. Deleting an entry from `mkNucleusApps` removes it from PATH, `nix run`, and `packages` simultaneously. This is the structural guard against the duplicate-`apps` failure mode.
+Never hand-register in two places. Deleting from `mkNucleusApps` removes from PATH, `nix run`, and `packages` simultaneously.
 
 ## Bootstrap independence
 
-`nucleus-bootstrap` installs Nix and base dependencies only. It MUST NOT assume anything is already provisioned. It may optionally invoke apply via `--apply`/`-Apply` after dependencies exist, but apply must never be a bootstrap dependency — bootstrap must succeed on a bare machine with no prior nucleus state.
+`nucleus-bootstrap` installs Nix and base deps only. Must not assume prior state. May invoke apply via `--apply`/`-Apply` after deps exist, but apply must never be a bootstrap dependency — bootstrap succeeds on a bare machine.
 
 ## Windows provisioning runs elevated
 
-Windows provisioning (`apply.ps1`, agent-host-shell setup, scheduled-task registration) runs self-elevated via `RunAs`, like POSIX `sudo`. Writing to `%ProgramData%\nucleus\bin` (or other system-wide locations) is admin-normal and requires no non-admin fallback. The agent must not assume a non-admin case or add degraded non-privileged branches. This is the inverse-family exception documented for `apply.ps1`.
+Windows provisioning runs self-elevated via `RunAs`. Writing to `%ProgramData%\nucleus\bin` is admin-normal, no non-admin fallback. The agent must not assume non-admin or add degraded branches. Inverse-family exception per `apply.ps1`.
 
 ## Windows parity
 
-Every POSIX `scripts/<name>.sh` that exposes subcommands needs a `scripts/<name>.ps1` twin with matching `[ValidateSet(...)]` `$Action` dispatch. The two entry points must accept the same subcommand vocabulary so `nix run .#<name>` behaves identically on macOS/NixOS and Windows.
+Every POSIX `scripts/<name>.sh` with subcommands needs a `scripts/<name>.ps1` twin with matching `[ValidateSet(...)]` `$Action` dispatch. Same subcommand vocabulary on all platforms.
 
-`apply` has a `scripts/apply.ps1` twin (consumed by `src/hosts/Windows/apply.ps1` for the `health-check` / `audit-store` actions), consistent with `svc` / `gc` / `cloud` / `vm` / `test` / `check`.
+`apply` has a `scripts/apply.ps1` twin (consumed by `src/hosts/Windows/apply.ps1` for `health-check`/`audit-store`), consistent with `svc`/`gc`/`cloud`/`vm`/`test`/`check`.
 
 ## Completion generators
 
-`src/scripts/completions/gen-completions.sh` (zsh) and `gen-completions.ps1` (pwsh) derive completions from each command's `--help` output. After any change to the command surface (new command, renamed subcommand, changed `[ValidateSet]`), regenerate and commit the output. Check step `10-completions-fresh` re-runs the generators in check mode and fails on any diff. Do not edit generated completion files by hand.
+`src/scripts/completions/gen-completions.sh` (zsh) and `gen-completions.ps1` (pwsh) derive completions from `--help` output. After command-surface changes: regenerate and commit. Check step `10-completions-fresh` re-runs in check mode, fails on diff. Never edit generated files by hand.
 
 ## Agent-host-shell wrapper
 
-The VS Code agent-host wrapper lives outside the user HOME:
-
+VS Code agent-host wrapper, outside user HOME:
 - POSIX: SYSTEM root bin — macOS `/Library/Application Support/nucleus/bin/agent-host-shell`, NixOS `/var/lib/nucleus/bin/agent-host-shell` (`src/modules/agent-host-shell.nix`).
 - Windows: `%ProgramData%\nucleus\bin\agent-host-shell.ps1` (`src/platforms/Windows/modules/system/Invoke-AgentHostShellSetup.ps1`).
 
-This is a system-level provisioning artifact, not a per-user dotfile. Do not relocate it into HOME or symlink it from `src/users/`.
+System-level provisioning, not per-user. Do not relocate into HOME or symlink from `src/users/`.

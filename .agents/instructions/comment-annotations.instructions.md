@@ -46,17 +46,13 @@ Rules: `--` only separator (never em dash). `reason:` eliminated except shellche
 | `# >>> begin nucleus-managed: <subject> >>>` / `# <<< end ... <<<` | the managing script |
 | `<!-- markdownlint-disable ... -->` | markdownlint (config-only) |
 
-## Category 3 — Structural markers (NOT machine-parsed)
+## Category 3-4 — Structural + human-readable (NOT machine-parsed)
 
-Dividers, DSC headers. Documented only.
-
-## Category 4 — Human-readable (NOT machine-parsed)
-
-`# ref:` (54 sites): `# ref: <target> -- <just>`. `# WHY:` (171): `# WHY: <reason>` — colon mandatory. `# TODO:` (0): `# TODO: <text>` — colon mandatory. Ex-`# Source:` / `# See:` in DSC → migrated to `# ref:`.
+Cat 3: Dividers, DSC headers. Cat 4: `# ref:` (54 sites): `# ref: <target> -- <just>`. `# WHY:` (171): `# WHY: <reason>` — colon mandatory. `# TODO:` (0). Ex-`# Source:` / `# See:` in DSC → `# ref:`.
 
 ## Check-id registry
 
-New tool-enforced markers MUST register check id + machine consumer before use. IDs: `suppression_doc` (step 12 `.ps1`+`.sh`), `SuppressMessageAttribute` (step 12 `Get-UndocSuppViolation`), `packer_validate` (`scripts/check.ps1`+`.sh`), `embedded-content` (step 14 `.ps1`), `config-method` (step 14 `.ps1`+`.sh`).
+New tool-enforced markers MUST register check id + machine consumer before use. IDs: `suppression_doc` (step 12), `SuppressMessageAttribute` (step 12), `packer_validate` (`scripts/check.*`), `embedded-content` (step 14), `config-method` (step 14).
 
 ## `# WHY:` and `# ref:` usage
 

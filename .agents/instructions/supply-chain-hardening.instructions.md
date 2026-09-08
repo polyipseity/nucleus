@@ -6,7 +6,7 @@ applyTo: "src/modules/shell*.nix, src/modules/agents.nix, src/modules/pwsh.nix, 
 
 # Supply chain hardening
 
-All managed package managers must have a minimum release age delay configured to limit exposure to newly published compromised package versions.
+All managed package managers must have a minimum release age delay to limit exposure to compromised newly-published versions.
 
 ## Active delays and pinning defaults
 
@@ -17,53 +17,35 @@ All managed package managers must have a minimum release age delay configured to
 
 ## Package managers without delay features
 
-WinGet, Scoop, cargo-binstall, rustup, and Homebrew have no built-in delay mechanism. They rely on version pinning in `src/lockfiles/lockfile.json`. Homebrew also disables `autoUpdate` globally.
+WinGet, Scoop, cargo-binstall, rustup, and Homebrew lack built-in delay. Rely on version pinning in `src/lockfiles/lockfile.json`. Homebrew also disables `autoUpdate` globally.
 
 ## Lifecycle script hardening
 
-When installing packages via `bun install -g`, the `--ignore-scripts` flag MUST be used to prevent arbitrary code execution during installation.
-
-When installing packages via `uv tool install`, the `--no-build` flag MUST be used to require pre-built wheels. If a package lacks pre-built wheels it must be explicitly reviewed and added to the allowlist.
+- `bun install -g`: use `--ignore-scripts` to prevent arbitrary code execution.
+- `uv tool install`: use `--no-build` to require pre-built wheels. Packages without pre-built wheels must be reviewed and added to the allowlist.
 
 ### Lifecycle script allowlist
 
-`src/lockfiles/lifecycle-allowlist.json` lists packages explicitly permitted to run lifecycle scripts. Each entry maps a package name to a justification string.
-
-Adding a package to this allowlist requires:
-
-1. Review of what the lifecycle scripts do.
-2. A documented justification in the allowlist entry.
-3. Verification that the package's lifecycle scripts are necessary and cannot be replaced by a locked/deterministic alternative.
-
-The validation scripts (`check.sh`, `check.ps1`) verify:
-
-- The allowlist file exists and is valid JSON.
-- Each entry has a non-empty justification string.
-
-See `allow-and-deny-lists.instructions.md#D2` for the registry entry of this allowlist.
+`src/lockfiles/lifecycle-allowlist.json` maps package names to justification strings. To add: review lifecycle scripts, document justification, verify scripts are necessary and cannot be replaced by a locked alternative. Validation (`check.sh`, `check.ps1`): file exists, valid JSON, each entry has non-empty justification. See `allow-and-deny-lists.instructions.md#D2`.
 
 ## Lockfile validation
 
-`check.sh` and `check.ps1` run the following lockfile validations always (even in path-scoped mode):
+`check.sh` and `check.ps1` run these lockfile validations always (even in path-scoped mode):
 
 1. **Internal consistency** — lockfile.json exists, schema is valid.
-2. **Overlap detection** — no package name appears in multiple package-manager sections (except intentional multi-source packages, see `allow-and-deny-lists.instructions.md#D1`).
+2. **Overlap detection** — no package name in multiple sections (except intentional, see `allow-and-deny-lists.instructions.md#D1`).
 3. **Lifecycle allowlist validation** — see above.
 
-With the `--online` flag (requires network), additional checks run: 4. **Freshness** — `bump-lockfile.sh --verify` queries all registries and diffs the result against the current lockfile. 5. **Yanked/removed detection** — queries registries to confirm pinned versions still exist.
+With `--online` (requires network): 4. **Freshness** — `bump-lockfile.sh --verify` queries registries, diffs against current. 5. **Yanked/removed detection** — confirms pinned versions still exist.
 
-## Hardening requirement for new additions
+## Adding a new package manager
 
-When adding a NEW package manager to this repository, you MUST:
-
-1. Check whether it supports a minimum-release-age / exclude-newer / install-delay configuration option or environment variable.
-2. If yes: configure it with `"5 days"` (or equivalent) in every shell layer — POSIX (`src/modules/shell.nix`) and Windows (`src/platforms/Windows/modules/user/Sync-ShellProfile.ps1`).
-3. If no: add a note to this table explaining why, and rely on lockfile pinning.
-4. If an existing package manager gains a delay feature in an upstream update, add it and remove the "no delay feature" note.
-5. Check whether the package manager supports an `--ignore-scripts` equivalent or `--no-build` equivalent. If yes, configure it in `src/modules/agents.nix`.
-6. If the package manager uses lifecycle scripts, add its packages to `src/lockfiles/lifecycle-allowlist.json` with justifications.
-7. Ensure CI uses the locked/locked-mode equivalent for that package manager (e.g., `--frozen`, `--locked`).
+1. Check for delay support (`minimum-release-age`, `exclude-newer`, install-delay env var). If yes: configure `"5 days"` in `src/modules/shell.nix` and `src/platforms/Windows/modules/user/Sync-ShellProfile.ps1`. If no: add note to table, rely on lockfile pinning.
+2. Check for `--ignore-scripts` or `--no-build` equivalent. If yes: configure in `src/modules/agents.nix`.
+3. If lifecycle scripts needed: add to `src/lockfiles/lifecycle-allowlist.json` with justifications.
+4. Ensure CI uses locked mode (`--frozen`, `--locked`).
+5. If upstream adds delay feature to existing manager: add it, remove the "no delay feature" note.
 
 ## Cross-host parity
 
-Delay settings must be applied on every host that runs the package manager. POSIX hosts share config through Nix modules; Windows has separate DSC and PowerShell profile layers. All must stay in sync.
+Delay settings apply on every host. POSIX shares via Nix modules; Windows uses separate DSC and PowerShell layers. Keep in sync.
