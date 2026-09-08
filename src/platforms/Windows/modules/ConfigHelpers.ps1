@@ -14,12 +14,9 @@
   Each function returns an object with .Changed ($true/$false) and .Message so
   callers can log uniformly.
 
-  Platform differences (documented, not bugs):
-  - Deduplication: case-insensitive (NTFS filenames are case-insensitive).
-    This differs from Nix (case-sensitive) but is inconsequential in practice
-    because no config directory has case-different entries.
-  - Symlink detection: Test-Path follows symlinks. Broken symlinks resolve to
-    the entry, matching shell behavior.
+  Cross-platform consistency: deduplication is case-insensitive (weakest
+  constraint — works on NTFS, POSIX, and Nix). Symlink detection follows
+  symlinks (Test-Path), matching Nix pathExists and POSIX -e.
 #>
 
 function Deploy-WritableSymlink {
