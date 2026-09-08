@@ -1,7 +1,8 @@
 ---
-description: "Use when adding or editing infrastructure code: Nix files, PowerShell modules, WinGet DSC YAML, shell scripts, or MANUAL.md host docs. Mandates documentation standards per file type, citation quality, and WHY-not-WHAT commenting."
+description: "Use when adding or editing infrastructure code or data files: Nix, PowerShell, DSC YAML, shell scripts, JSON, YAML, MANUAL.md. Covers documentation standards, citation quality, WHY-not-WHAT commenting, and deterministic JSON generation."
 name: "Documentation Standards"
-applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/Windows/**/*.yml, src/hosts/**/MANUAL.md, scripts/**, src/scripts/**"
+applyTo: "src/**/*.nix, src/**/*.ps1, src/**/*.json, src/**/*.jsonc, src/**/*.yaml, src/**/*.yml, src/hosts/Windows/**/*.yml, src/hosts/**/MANUAL.md, scripts/**, src/scripts/**"
+alwaysApply: true
 ---
 
 # Documentation standards
@@ -148,3 +149,17 @@ For multi-line settings, put the source at the top of the comment block:
   CriticalUpdateInstall = true;
 };
 ```
+
+## Deterministic JSON generation
+
+Generated JSON artifacts (e.g. `winget-packages.json`, `lockfile.json`) are committed and consumed by tooling. They must be byte-stable across runs so diffs show only real changes.
+
+1. **Object keys sorted case-sensitively.** Emit keys in ascending order by char code (`A`–`Z` < `a`–`z`). `ConvertTo-Json` (PowerShell) does NOT sort — build the object with keys already in sorted order, or sort explicitly.
+2. **Array elements sorted case-sensitively** when the array is a set/allow-list. Sort by char code before serialization.
+3. **Single trailing newline.** End the file with exactly one `\n`.
+4. **Multi-line output.** Emit pretty-printed, 2-space-indented JSON. Use `toSortedJSON` (Nix) or `ConvertTo-SortedJson` (PowerShell). Empty objects/arrays stay compact (`{}` / `[]`).
+5. **Deterministic and diff-friendly.** No insertion-order drift, no unsorted maps, no missing trailing newline, no one-line compaction.
+
+In-memory JSON that is never persisted (e.g. `builtins.toJSON` in activation strings) is exempt from multi-line rules.
+
+Shared utilities: `src/modules/lib/json.nix` `toSortedJSON`; `src/platforms/Windows/modules/lib/` `Sort-JsonObject` / `ConvertTo-SortedJson`.
