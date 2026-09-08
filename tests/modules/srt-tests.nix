@@ -90,7 +90,7 @@ let
       allowWrite = settings.filesystem.allowWrite;
     in
     allowWrite == ["." "/tmp" "~/.bun" "~/.cargo/registry" "~/.cursor" "~/.npm" "~/.pi" "~/dev"]
-  ) "srt allowWrite must cover project dir, tmp, package caches, cursor, pi, and dev directory";
+  ) "srt allowWrite must cover project dir, tmp, package caches, pi, and dev directory";
 
   test_srt_settings_network_no_local_binding = assert' (
     let
@@ -137,19 +137,9 @@ let
     && lib.hasInfix "srt (sandbox-runtime) is required" initZshText
   ) "init.zsh must have pi() function with hard-error when srt missing";
 
-  test_srt_cursor_function_zsh = assert' (
-    lib.hasInfix "cursor()" initZshText
-    && lib.hasInfix "srt command cursor" initZshText
-    && lib.hasInfix "srt (sandbox-runtime) is required" initZshText
-  ) "init.zsh must have cursor() function with hard-error when srt missing";
-
   test_srt_pi_unrestricted_zsh = assert' (
     lib.hasInfix "pi-unrestricted()" initZshText && lib.hasInfix "command pi" initZshText
   ) "init.zsh must have pi-unrestricted() function";
-
-  test_srt_cursor_unrestricted_zsh = assert' (
-    lib.hasInfix "cursor-unrestricted()" initZshText && lib.hasInfix "command cursor" initZshText
-  ) "init.zsh must have cursor-unrestricted() function";
 
   test_srt_pi_function_ps1 = assert' (
     lib.hasInfix "function pi {" profilePs1Text
@@ -157,32 +147,21 @@ let
     && lib.hasInfix "srt (sandbox-runtime) is required" profilePs1Text
   ) "profile.ps1 must have pi function with hard-error when srt missing";
 
-  test_srt_cursor_function_ps1 = assert' (
-    lib.hasInfix "function cursor {" profilePs1Text
-    && lib.hasInfix "srt command cursor" profilePs1Text
-    && lib.hasInfix "srt (sandbox-runtime) is required" profilePs1Text
-  ) "profile.ps1 must have cursor function with hard-error when srt missing";
-
   test_srt_pi_unrestricted_ps1 = assert' (
     lib.hasInfix "function pi-unrestricted" profilePs1Text && lib.hasInfix "& pi @args" profilePs1Text
   ) "profile.ps1 must have pi-unrestricted function";
-
-  test_srt_cursor_unrestricted_ps1 = assert' (
-    lib.hasInfix "function cursor-unrestricted" profilePs1Text
-    && lib.hasInfix "& cursor @args" profilePs1Text
-  ) "profile.ps1 must have cursor-unrestricted function";
 
   # === DOCUMENTATION ===
 
   test_srt_policy_documented = assert' (
     lib.hasInfix "Sandbox-runtime (srt) policy" agentsModuleText
     && lib.hasInfix "pi-unrestricted" agentsModuleText
-    && lib.hasInfix "cursor-unrestricted" agentsModuleText
+    && lib.hasInfix "cursor" agentsModuleText
   ) "agents.nix must document the srt sandboxing policy";
 
-  test_srt_excludes_vscode = assert' (
-    lib.hasInfix "vscode" agentsModuleText && lib.hasInfix "not sandboxed" agentsModuleText
-  ) "agents.nix must document that vscode is excluded from sandboxing";
+  test_srt_excludes_cursor = assert' (
+    lib.hasInfix "cursor" agentsModuleText && lib.hasInfix "built-in protections" agentsModuleText
+  ) "agents.nix must document that cursor is excluded from srt sandboxing";
 in
 builtins.seq
   (builtins.deepSeq {
@@ -201,15 +180,11 @@ builtins.seq
       test_srt_settings_managed_symlink
       test_srt_settings_activation
       test_srt_pi_function_zsh
-      test_srt_cursor_function_zsh
       test_srt_pi_unrestricted_zsh
-      test_srt_cursor_unrestricted_zsh
       test_srt_pi_function_ps1
-      test_srt_cursor_function_ps1
       test_srt_pi_unrestricted_ps1
-      test_srt_cursor_unrestricted_ps1
       test_srt_policy_documented
-      test_srt_excludes_vscode
+      test_srt_excludes_cursor
       ;
   } null)
   {
