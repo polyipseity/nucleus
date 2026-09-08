@@ -29,6 +29,15 @@ Shared modules must guard NixOS-only options with `lib.mkIf` checks on `options 
 
 No implicit defaults, no auto-derived paths, no backwards compatibility code. When defining `lib.mkOption`, provide meaningful defaults only when obvious (e.g. `false` for feature flags, `[ ]` for lists). Use canonical usernames in examples: `admin` for primary/elevated users, `guest` for secondary/unprivileged users.
 
+## Nix file structure
+
+Every `.nix` file inside a directory must be named `default.nix`, not `<dirname>.nix`. A `.nix` file must not exist alongside a same-named directory (e.g. `shell.nix` next to `shell/`). Both patterns are enforced by step 14 (`run_nix_file_structure`).
+
+**Correct:** `src/modules/shell/default.nix`, `src/modules/configs/libreoffice/default.nix`
+**Incorrect:** `src/modules/shell.nix` (alongside `shell/`), `src/modules/configs/libreoffice/libreoffice.nix` (same name as parent dir)
+
+When a `.nix` module file needs a companion data directory, place the file inside the directory as `default.nix` and reference the data via relative paths (e.g. `workflowsDir = ..;` for a sibling data directory).
+
 ## Script builders: `writeNucleusShellApplication` over `writeShellApplication`
 
 Always use `pkgs.writeNucleusShellApplication` (the repo's custom wrapper) instead of `pkgs.writeShellApplication`. The exception is technical constraints preventing its use (e.g. dynamic names in function context as in `cloud-drives.nix`) — add a `# WHY:` comment.
