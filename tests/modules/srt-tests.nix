@@ -36,6 +36,88 @@ let
 
   test_srt_settings_exists = assert' (builtins.pathExists ../../src/users/default/srt/settings.json) "srt settings.json must exist in src/users/default/srt/";
 
+  test_srt_settings_allow_pty = assert' (
+    let
+      settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
+    in
+    settings.allowPty == true
+  ) "srt settings must have allowPty = true";
+
+  test_srt_settings_deny_read_covers_credentials = assert' (
+    let
+      settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
+      denyRead = settings.filesystem.denyRead;
+    in
+    builtins.all (p: builtins.elem p denyRead) [
+      "~/.aws"
+      "~/.azure"
+      "~/.config/gcloud"
+      "~/.docker/config.json"
+      "~/.env*"
+      "~/.gnupg"
+      "~/.kube"
+      "~/.npmrc"
+      "~/.sops"
+      "~/.ssh"
+      "~/Library/Keychains"
+    ]
+  ) "srt denyRead must cover all credential paths";
+
+  test_srt_settings_deny_write_covers_injection = assert' (
+    let
+      settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
+      denyWrite = settings.filesystem.denyWrite;
+    in
+    builtins.all (p: builtins.elem p denyWrite) [
+      ".env"
+      ".env.*"
+      ".git/config"
+      ".git/hooks"
+      ".git/modules"
+      ".vscode/launch.json"
+      ".vscode/tasks.json"
+      "~/.bash_profile"
+      "~/.bashrc"
+      "~/.config/fish"
+      "~/.zshenv"
+      "~/.zprofile"
+      "~/.zshrc"
+    ]
+  ) "srt denyWrite must cover git hooks, vscode, and shell profiles";
+
+  test_srt_settings_allow_write_minimal = assert' (
+    let
+      settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
+      allowWrite = settings.filesystem.allowWrite;
+    in
+    allowWrite == ["." "/tmp" "~/.bun" "~/.cargo/registry" "~/.cursor" "~/.npm" "~/.pi"]
+  ) "srt allowWrite must be minimal: project dir, tmp, package caches, cursor, pi";
+
+  test_srt_settings_network_no_local_binding = assert' (
+    let
+      settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
+    in
+    settings.network.allowLocalBinding == false
+  ) "srt network allowLocalBinding must be false";
+
+  test_srt_settings_ignore_violations_comprehensive = assert' (
+    let
+      settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
+      ignores = settings.ignoreViolations."*";
+    in
+    builtins.all (p: builtins.elem p ignores) [
+      "/etc/hosts"
+      "/etc/ssl"
+      "/nix/store"
+      "/private/tmp"
+      "/private/var"
+      "/System"
+      "/usr/bin"
+      "/usr/lib"
+      "/usr/share"
+    ]
+  ) "srt ignoreViolations must cover system paths";
+
   test_srt_settings_has_schema = assert' (builtins.pathExists ../../src/users/default/srt/settings.schema.json) "srt settings.schema.json must exist in src/users/default/srt/";
 
   test_srt_settings_managed_symlink = assert' (
@@ -110,6 +192,12 @@ builtins.seq
       test_srt_not_in_bun_desired
       test_srt_in_lockfile
       test_srt_settings_exists
+      test_srt_settings_allow_pty
+      test_srt_settings_deny_read_covers_credentials
+      test_srt_settings_deny_write_covers_injection
+      test_srt_settings_allow_write_minimal
+      test_srt_settings_network_no_local_binding
+      test_srt_settings_ignore_violations_comprehensive
       test_srt_settings_has_schema
       test_srt_settings_managed_symlink
       test_srt_settings_activation
