@@ -117,6 +117,30 @@ resolve_user_config_first_level_entry() {
   _resolve_user_config_first_level_entry "$@"
 }
 
+resolve_user_config_source() {
+  local username="$1"
+  local config_name="$2"
+  local extension="$3"
+  local host_name="$4"
+  local repo_root per_user default
+
+  repo_root="$(_resolve_user_config_repo_root)"
+  per_user="${repo_root}/src/users/${username}/${config_name}/${host_name}.${extension}"
+  default="${repo_root}/src/users/default/${config_name}/${host_name}.${extension}"
+
+  if [ -e "$per_user" ] || [ -L "$per_user" ]; then
+    printf '%s' "$per_user"
+    return 0
+  fi
+  if [ -e "$default" ] || [ -L "$default" ]; then
+    printf '%s' "$default"
+    return 0
+  fi
+
+  warn -l resolve_user_config_source "no source for user '$username' config '$config_name' host '$host_name' extension '$extension'"
+  return 1
+}
+
 _wallpaper_image_name() {
   case "${1,,}" in
   *.gif | *.jpeg | *.jpg | *.png | *.webp) return 0 ;;
