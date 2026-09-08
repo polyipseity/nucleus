@@ -33,7 +33,7 @@ setup_fake_repo() {
   "$schema": "./lockfile.schema.json",
   "bun": {
     "clawhub": "0.20.0",
-    "@mariozechner/pi-coding-agent": "0.73.1"
+    "@earendil-works/pi-coding-agent": "0.73.1"
   },
   "uv": {
     "yamllint": "1.35.1",

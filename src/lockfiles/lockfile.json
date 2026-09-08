@@ -1,7 +1,7 @@
 {
   "$schema": "./lockfile.schema.json",
   "bun": {
-    "@mariozechner/pi-coding-agent": "0.73.1",
+    "@earendil-works/pi-coding-agent": "0.73.1",
     "clawhub": "0.23.3"
   },
   "cargo-binstall": {

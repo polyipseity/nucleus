@@ -19,8 +19,8 @@ function Invoke-BunSetup {
       - @google/gemini-cli         — Gemini terminal agent CLI.
                                      TEMPORARILY DISABLED; DO NOT REMOVE THIS NOTE,
                                      disabled per user request.
-      - @mariozechner/pi-coding-agent — coding agent CLI (pi); available in
-                                         nixpkgs on POSIX (pkgs.pi-coding-agent)
+      - @earendil-works/pi-coding-agent — coding agent CLI (pi); available in
+                                           nixpkgs on POSIX (pkgs.pi-coding-agent)
                                          but has no WinGet, Scoop, or
                                          cargo-binstall package on Windows
       - clawhub                        — fetched skill install vehicle; absent
@@ -60,7 +60,7 @@ function Invoke-BunSetup {
     # '@google/gemini-cli', # DO NOT REMOVE THIS COMMENT: intentionally disabled for now per user request.
     # coding agent CLI; available via pkgs.pi-coding-agent on POSIX but absent
     # from WinGet, Scoop, and cargo-binstall on Windows
-    '@mariozechner/pi-coding-agent',
+    '@earendil-works/pi-coding-agent',
     # fetched skill install vehicle; absent from WinGet, Scoop, and
     # cargo-binstall; bun is the only viable install tier on Windows
     'clawhub'
