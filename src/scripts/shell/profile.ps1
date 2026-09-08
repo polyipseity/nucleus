@@ -9,6 +9,10 @@
 #   substitutes __NUCLEUS_PREPEND_PATH__/__NUCLEUS_APPEND_PATH__ with the managed
 #   PATH snippets and __NUCLEUS_LLVM_BIN_DIR__ with the LLVM bin directory, then
 #   writes the result into the user's PowerShell profile managed block.
+#
+# Includes sandbox-runtime (srt) agent wrapping: pi and cursor run inside
+# srt by default for filesystem/network isolation. Use pi-unrestricted /
+# cursor-unrestricted to bypass the sandbox.
 
 # Managed PATH: prepend/append dirs, substituted by the embedding host
 # (Sync-ShellProfile.ps1 on Windows; empty on POSIX).

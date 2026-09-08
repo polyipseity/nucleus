@@ -1,3 +1,16 @@
+# Zsh initialization for nucleus-managed hosts.
+#
+# This file configures the interactive zsh environment including:
+# - History exclusion (space-prefixed, consecutive duplicates)
+# - Writable completion directory
+# - AI agent session detection
+# - pay-respects shell hook
+# - Starship prompt
+# - Managed dev tool interception (bun, cargo, rustc, uv)
+# - Sandbox-runtime (srt) agent wrapping (pi, cursor run in srt by default)
+# - System tool bans (npm, npx, node, corepack, pip)
+#
+# Embedded by src/modules/shell.nix into initContent.
 # ---------------------------------------------------------------
 # History: exclude commands starting with a space and duplicates
 # ---------------------------------------------------------------

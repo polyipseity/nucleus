@@ -2,6 +2,20 @@
 # src/users/<username>/agents/ (skills/ managed by install-agent-skills).
 # The repo root is baked at build time from $NUCLEUS_REPO_ROOT for out-of-store
 # symlink sources and lib runtime-sourcing paths.
+#
+# ## Sandbox-runtime (srt) policy
+#
+# All coding agents (pi, cursor) run inside srt by default for
+# filesystem and network isolation. The `pi` and `cursor` shell
+# functions wrap the binary with `srt command <agent>`.
+#
+# Unrestricted variants: `pi-unrestricted`, `cursor-unrestricted`
+# (aliases: `-pi-u`, `-cursor-u`) bypass the sandbox.
+#
+# Excluded: vscode — not sandboxed per policy.
+#
+# Settings: `~/.srt-settings.json` (method-1 writable symlink from
+# `src/users/default/srt/settings.json`, per-user overridable).
 {
   config,
   lib,
