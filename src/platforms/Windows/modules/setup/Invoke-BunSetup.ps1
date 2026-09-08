@@ -66,6 +66,13 @@ function Invoke-BunSetup {
     'clawhub'
   )
 
+  # Package-to-binary name overrides for packages whose bun binary name
+  # differs from the unscoped package basename (e.g. @anthropic-ai/sandbox-runtime
+  # installs as 'srt', not 'sandbox-runtime').
+  $binaryNames = @{
+    '@anthropic-ai/sandbox-runtime' = 'srt'
+  }
+
   # bun install -g places binaries in ~\.bun\bin by default (BUN_INSTALL_BIN).
   # Canonical source: ManagedPaths.ps1 -> managed-paths.nix (pathComponents).
   $bunBinDir = Get-NucleusManagedBinDir "bun"
@@ -118,7 +125,7 @@ function Invoke-BunSetup {
   # name for the bin).
   $toInstall = @($desiredPackages | Where-Object {
     $pkg = $_
-    $binName = ($pkg -split '/')[-1]
+    $binName = if ($binaryNames.ContainsKey($pkg)) { $binaryNames[$pkg] } else { ($pkg -split '/')[-1] }
     $notInstalled = $installedPackages -notcontains $pkg
     $binMissing = -not (
       (Test-Path (Join-Path $bunBinDir $binName)) -or
@@ -172,7 +179,7 @@ function Invoke-BunSetup {
         return
       }
     }
-    $binName = ($pkg -split '/')[-1]
+    $binName = if ($binaryNames.ContainsKey($pkg)) { $binaryNames[$pkg] } else { ($pkg -split '/')[-1] }
     if (-not (
       (Test-Path (Join-Path $bunBinDir $binName)) -or
       (Test-Path (Join-Path $bunBinDir "$binName.exe")) -or
