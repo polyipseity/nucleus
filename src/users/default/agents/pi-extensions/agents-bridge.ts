@@ -22,10 +22,11 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import * as process from "node:process";
 
-/** A discovered instruction file with its scope and absolute path. */
+/** A discovered instruction file with its scope, absolute path, and byte size. */
 interface InstructionFile {
   scope: "user" | "project";
   path: string;
+  size: number;
 }
 
 /**
@@ -48,7 +49,7 @@ async function collectInstructionFiles(
       try {
         const s = await stat(fullPath);
         if (s.isFile()) {
-          files.push({ scope, path: fullPath });
+          files.push({ scope, path: fullPath, size: s.size });
         }
       } catch {
         // skip unreadable entries
@@ -129,6 +130,14 @@ async function readInstructions(
   return sections.join("\n\n");
 }
 
+/** Format a byte count using 1000-based SI prefixes (kB, MB, GB). */
+function formatBytes(bytes: number): string {
+  if (bytes < 1000) return `${bytes} B`;
+  if (bytes < 1_000_000) return `${(bytes / 1000).toFixed(1)} kB`;
+  if (bytes < 1_000_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
+  return `${(bytes / 1_000_000_000).toFixed(1)} GB`;
+}
+
 /**
  * Pi extension that bridges the standardized `.agents/` directory layout.
  *
@@ -140,10 +149,12 @@ async function readInstructions(
  * Skills are auto-discovered by Pi natively (no code needed).
  */
 export default function agentsBridge(pi: ExtensionAPI): void {
-  // Instruction counts are collected at session_start and read by
+  // Instruction counts and sizes are collected at session_start and read by
   // resources_discover to build a single combined notification.
   let userInstructionCount = 0;
+  let userInstructionSize = 0;
   let projectInstructionCount = 0;
+  let projectInstructionSize = 0;
 
   pi.on(
     "session_start",
@@ -156,6 +167,7 @@ export default function agentsBridge(pi: ExtensionAPI): void {
         "user",
       );
       userInstructionCount = userFiles.length;
+      userInstructionSize = userFiles.reduce((sum, f) => sum + f.size, 0);
 
       const projectFiles = ctx.isProjectTrusted()
         ? await collectInstructionFiles(
@@ -164,6 +176,7 @@ export default function agentsBridge(pi: ExtensionAPI): void {
           )
         : [];
       projectInstructionCount = projectFiles.length;
+      projectInstructionSize = projectFiles.reduce((sum, f) => sum + f.size, 0);
     },
   );
 
@@ -177,12 +190,22 @@ export default function agentsBridge(pi: ExtensionAPI): void {
     ): Promise<ResourcesDiscoverResult> => {
       const projectPromptsDir = join(event.cwd, ".agents", "prompts");
       let promptCount = 0;
+      let promptSize = 0;
       let discoverResult: ResourcesDiscoverResult = {};
       try {
         const s = await stat(projectPromptsDir);
         if (s.isDirectory()) {
           const entries = await readdir(projectPromptsDir);
-          promptCount = entries.filter((e) => e.endsWith(".md")).length;
+          const mdEntries = entries.filter((e) => e.endsWith(".md"));
+          promptCount = mdEntries.length;
+          for (const entry of mdEntries) {
+            try {
+              const fs = await stat(join(projectPromptsDir, entry));
+              if (fs.isFile()) promptSize += fs.size;
+            } catch {
+              // skip unreadable entries
+            }
+          }
           discoverResult = { promptPaths: [projectPromptsDir] };
         }
       } catch {
@@ -192,13 +215,19 @@ export default function agentsBridge(pi: ExtensionAPI): void {
       // Show single comprehensive notification with all loaded resources.
       const parts: string[] = [];
       if (promptCount > 0) {
-        parts.push(`${promptCount} project prompt(s)`);
+        parts.push(
+          `${promptCount} project prompt(s) (${formatBytes(promptSize)})`,
+        );
       }
       if (userInstructionCount > 0) {
-        parts.push(`${userInstructionCount} user instruction(s)`);
+        parts.push(
+          `${userInstructionCount} user instruction(s) (${formatBytes(userInstructionSize)})`,
+        );
       }
       if (projectInstructionCount > 0) {
-        parts.push(`${projectInstructionCount} project instruction(s)`);
+        parts.push(
+          `${projectInstructionCount} project instruction(s) (${formatBytes(projectInstructionSize)})`,
+        );
       }
       if (parts.length > 0 && ctx.hasUI) {
         ctx.ui.notify(`Loaded ${parts.join(", ")}`, "info");
