@@ -1,5 +1,30 @@
 {
   "$schema": "./settings.schema.json",
+  "filesystem": {
+    "allowRead": [],
+    "allowWrite": [
+      ".",
+      "/tmp",
+      "~/.cursor",
+      "~/.pi"
+    ],
+    "denyRead": [
+      "~/.gnupg",
+      "~/.sops",
+      "~/.ssh"
+    ],
+    "denyWrite": [
+      ".env",
+      ".env.*"
+    ]
+  },
+  "ignoreViolations": {
+    "*": [
+      "/System",
+      "/nix/store",
+      "/usr/bin"
+    ]
+  },
   "network": {
     "allowedDomains": [
       "api.anthropic.com",
@@ -9,16 +34,7 @@
       "npmjs.org",
       "opencode.ai"
     ],
-    "deniedDomains": [],
-    "allowLocalBinding": true
-  },
-  "filesystem": {
-    "denyRead": ["~/.gnupg", "~/.sops", "~/.ssh"],
-    "allowRead": [],
-    "allowWrite": [".", "/tmp", "~/.cursor", "~/.pi"],
-    "denyWrite": [".env", ".env.*"]
-  },
-  "ignoreViolations": {
-    "*": ["/System", "/nix/store", "/usr/bin"]
+    "allowLocalBinding": true,
+    "deniedDomains": []
   }
 }
