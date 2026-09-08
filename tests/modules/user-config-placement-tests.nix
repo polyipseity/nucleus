@@ -9,6 +9,7 @@ let
   gitUserText = builtins.readFile ../../src/modules/git.nix;
   resolveUserConfigText = builtins.readFile ../../src/scripts/lib/resolve-user-config.sh;
   configHelpersText = builtins.readFile ../../src/platforms/Windows/modules/ConfigHelpers.ps1;
+  homeText = builtins.readFile ../../src/modules/home.nix;
 in
 assert containsRegex "mkUserOverlay" usersOverlayText;
 assert containsRegex "mkUserOverlay" shellText;
@@ -26,6 +27,12 @@ assert containsRegex "selectSource \"git\"" gitUserText;
 assert !containsRegex "src/modules/configs/(direnv|cargo|bun|uv|nextest|agents|pwsh)" shellText;
 assert !containsRegex "src/modules/configs/(direnv|cargo|bun|uv|nextest|agents|pwsh)" agentsText;
 assert !containsRegex "src/modules/configs/(direnv|cargo|bun|uv|nextest|agents|pwsh)" pwshText;
+# Verify home.nix uses overlay.selectSource for rimsort host overlay (not hardcoded path).
+assert containsRegex "overlay.selectSource.*rimsort" homeText;
+assert !containsRegex "src/users/.*/rimsort/rimsort.*hostName.*\.json" homeText;
+# Verify shell resolver has resolve_user_config_source for parity with Nix/Windows.
+assert containsRegex "resolve_user_config_source" resolveUserConfigText;
+assert containsRegex "Resolve-UserConfigSource" configHelpersText;
 {
   success = true;
   message = "user-config-placement tests passed";
