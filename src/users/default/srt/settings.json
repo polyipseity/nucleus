@@ -30,6 +30,7 @@
       ".env",
       ".env.*",
       ".git/config",
+      ".git/hooks",
       ".vscode/launch.json",
       ".vscode/tasks.json",
       "~/.bash_profile",
