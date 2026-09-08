@@ -48,7 +48,7 @@ let
   loggingPaths = import ./lib/logging-paths.nix { inherit pkgs hostName; };
 
   overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
-    inherit effectiveUsername repoRoot;
+    inherit effectiveUsername repoRoot hostName;
   };
 
   selectUserAppConfigFile = configName: relativePath: overlay.selectFile configName relativePath;
@@ -119,13 +119,7 @@ let
     builtins.readFile (selectUserAppConfigFile "rimsort" "rimsort.json")
   );
   rimsortHostSettings = builtins.fromJSON (
-    builtins.readFile (
-      let
-        perUser = "${repoRoot}/src/users/${effectiveUsername}/rimsort/rimsort.${hostName}.json";
-        default = "${repoRoot}/src/users/default/rimsort/rimsort.${hostName}.json";
-      in
-      if builtins.pathExists perUser then perUser else default
-    )
+    builtins.readFile (overlay.selectSource "rimsort" "rimsort.${hostName}.json")
   );
   rimsortManagedSettingsJson = builtins.toJSON (
     lib.recursiveUpdate rimsortManagedSettings rimsortHostSettings
