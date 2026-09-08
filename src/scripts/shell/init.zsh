@@ -333,11 +333,8 @@ EOF
 #
 # Excluded: vscode (not sandboxed per policy).
 pi() {
-  if command -v srt >/dev/null 2>&1; then
-    srt command pi "$@"
-  else
-    command pi "$@"
-  fi
+  command -v srt >/dev/null 2>&1 || { echo "error: srt (sandbox-runtime) is required but not installed. Run 'nucleus-apply' to install it." >&2; return 1; }
+  srt command pi "$@"
 }
 
 pi-unrestricted() {
@@ -345,11 +342,8 @@ pi-unrestricted() {
 }
 
 cursor() {
-  if command -v srt >/dev/null 2>&1; then
-    srt command cursor "$@"
-  else
-    command cursor "$@"
-  fi
+  command -v srt >/dev/null 2>&1 || { echo "error: srt (sandbox-runtime) is required but not installed. Run 'nucleus-apply' to install it." >&2; return 1; }
+  srt command cursor "$@"
 }
 
 cursor-unrestricted() {

@@ -624,11 +624,10 @@ function uv {
 #
 # Excluded: vscode (not sandboxed per policy).
 function pi {
-  if (Get-Command srt -ErrorAction SilentlyContinue) {
-    srt command pi @args
-  } else {
-    & pi @args
+  if (-not (Get-Command srt -ErrorAction SilentlyContinue)) {
+    Write-Error "srt (sandbox-runtime) is required but not installed. Run 'nucleus-apply' to install it." -ErrorAction Stop
   }
+  srt command pi @args
 }
 
 function pi-unrestricted {
@@ -636,11 +635,10 @@ function pi-unrestricted {
 }
 
 function cursor {
-  if (Get-Command srt -ErrorAction SilentlyContinue) {
-    srt command cursor @args
-  } else {
-    & cursor @args
+  if (-not (Get-Command srt -ErrorAction SilentlyContinue)) {
+    Write-Error "srt (sandbox-runtime) is required but not installed. Run 'nucleus-apply' to install it." -ErrorAction Stop
   }
+  srt command cursor @args
 }
 
 function cursor-unrestricted {

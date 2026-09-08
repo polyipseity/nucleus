@@ -51,12 +51,16 @@ let
   # === AGENT WRAPPING ===
 
   test_srt_pi_function_zsh = assert' (
-    lib.hasInfix "pi()" initZshText && lib.hasInfix "srt command pi" initZshText
-  ) "init.zsh must have pi() function wrapping with srt";
+    lib.hasInfix "pi()" initZshText
+    && lib.hasInfix "srt command pi" initZshText
+    && lib.hasInfix "srt (sandbox-runtime) is required" initZshText
+  ) "init.zsh must have pi() function with hard-error when srt missing";
 
   test_srt_cursor_function_zsh = assert' (
-    lib.hasInfix "cursor()" initZshText && lib.hasInfix "srt command cursor" initZshText
-  ) "init.zsh must have cursor() function wrapping with srt";
+    lib.hasInfix "cursor()" initZshText
+    && lib.hasInfix "srt command cursor" initZshText
+    && lib.hasInfix "srt (sandbox-runtime) is required" initZshText
+  ) "init.zsh must have cursor() function with hard-error when srt missing";
 
   test_srt_pi_unrestricted_zsh = assert' (
     lib.hasInfix "pi-unrestricted()" initZshText && lib.hasInfix "command pi" initZshText
@@ -67,12 +71,16 @@ let
   ) "init.zsh must have cursor-unrestricted() function";
 
   test_srt_pi_function_ps1 = assert' (
-    lib.hasInfix "function pi {" profilePs1Text && lib.hasInfix "srt command pi" profilePs1Text
-  ) "profile.ps1 must have pi function wrapping with srt";
+    lib.hasInfix "function pi {" profilePs1Text
+    && lib.hasInfix "srt command pi" profilePs1Text
+    && lib.hasInfix "srt (sandbox-runtime) is required" profilePs1Text
+  ) "profile.ps1 must have pi function with hard-error when srt missing";
 
   test_srt_cursor_function_ps1 = assert' (
-    lib.hasInfix "function cursor {" profilePs1Text && lib.hasInfix "srt command cursor" profilePs1Text
-  ) "profile.ps1 must have cursor function wrapping with srt";
+    lib.hasInfix "function cursor {" profilePs1Text
+    && lib.hasInfix "srt command cursor" profilePs1Text
+    && lib.hasInfix "srt (sandbox-runtime) is required" profilePs1Text
+  ) "profile.ps1 must have cursor function with hard-error when srt missing";
 
   test_srt_pi_unrestricted_ps1 = assert' (
     lib.hasInfix "function pi-unrestricted" profilePs1Text && lib.hasInfix "& pi @args" profilePs1Text

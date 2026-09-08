@@ -5,14 +5,14 @@
 #
 # ## Sandbox-runtime (srt) policy
 #
-# All coding agents (pi, cursor) run inside srt by default for
-# filesystem and network isolation. The `pi` and `cursor` shell
-# functions wrap the binary with `srt command <agent>`.
+# srt is a hard requirement: the sandboxed wrappers (`pi`, `cursor`)
+# fail loudly if srt is not installed. All coding agents run inside
+# srt by default for filesystem and network isolation.
 #
 # Unrestricted variants: `pi-unrestricted`, `cursor-unrestricted`
-# bypass the sandbox. No short form aliases are allowed for
-# unrestricted variants — the full name makes the security
-# implications explicit.
+# bypass the sandbox and do not require srt. No short form aliases
+# are allowed for unrestricted variants — the full name makes the
+# security implications explicit.
 #
 # Excluded: vscode — not sandboxed per policy.
 #
