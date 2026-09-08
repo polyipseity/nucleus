@@ -340,6 +340,8 @@ __marimo__/
 # }
 
 # self {
+/.pi/
+
 !/src/modules/env/
 !/src/modules/lib/
 !/src/platforms/Windows/modules/lib/
