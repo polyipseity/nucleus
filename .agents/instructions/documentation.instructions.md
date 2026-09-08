@@ -163,3 +163,13 @@ Generated JSON artifacts (e.g. `winget-packages.json`, `lockfile.json`) are comm
 In-memory JSON that is never persisted (e.g. `builtins.toJSON` in activation strings) is exempt from multi-line rules.
 
 Shared utilities: `src/modules/lib/json.nix` `toSortedJSON`; `src/platforms/Windows/modules/lib/` `Sort-JsonObject` / `ConvertTo-SortedJson`.
+
+## Markdown and agent customization authoring
+
+For markdown docs, AGENTS.md, prompt files, and agent customization markdown under `AGENTS.md, .agents/**/*.md, .opencode/**/*.md, .github/**/*.md`:
+
+- Keep docs short, scannable, and repo-specific. Link to canonical files instead of copying long policy blocks.
+- Follow `.markdownlint.jsonc` (root) and `.agents/.markdownlint.jsonc` (under `.agents/**`). Do not hard-wrap paragraphs (`MD013` disabled). Inline HTML and bare anchors allowed (`MD033`, `MD051` disabled). Under `.agents/**`, emphasis-only pseudo-headings allowed (`MD036` disabled).
+- Keep valid YAML frontmatter in `.instructions.md` and `.prompt.md` files. Quote `description` and start it with "Use when ...". Keep `applyTo` narrow and specific.
+- `commit-staged.prompt.md` is intentionally duplicated in three locations; body content must match: `.agents/prompts/commit-staged.prompt.md` (repo / OpenCode), `.opencode/commands/commit-staged.prompt.md` (symlink), `src/users/default/agents/prompts/commit-staged.prompt.md` (user overlay / Cursor).
+- Do not add `.github/copilot-instructions.md`; root `AGENTS.md` is canonical.
