@@ -119,25 +119,9 @@ Rotation: `log-gc-user.sh`/`log-gc-system.sh` copy-truncate + gzip; `NUCLEUS_GC_
 
 ## External exceptions
 
-These output classes bypass the standard; new passthrough requires a spec entry with a one-line rationale — never silently added or removed.
+These output classes bypass the standard; new passthrough requires a spec entry with a one-line rationale.
 
-- Third-party passthrough: nix/darwin-rebuild/home-manager build output, brew/cargo/bun/uv/rustup/ollama, git hook prek/commitlint/treefmt, winget configure, adb/qemu VM output.
-- Probe suppression: vm.sh virsh/socat/ssh/adb/tart readiness, ai.sh ollama readiness, silent-daemon `/dev/null`.
-- pwsh host rendering: `WARNING:` prefix and `Write-Error` rendering are host-injected.
-- Vendored `vendor/` scripts untouched.
-- Static doc content: MANUAL.md activation tail, `--- MANUAL SETUP (one-time, required) ---` banner in apply.ps1, `# ---- name ----` activation separators in macOS activation.nix.
-- Pre-lib bootstrap lines: apply.sh root check (line 9).
-- VM guest templates (POSIX + PS1): `vm-setup:` / `nucleus-vm:` labels — rendered templates; lib.sh / module unavailable in the guest.
-- Android guest script: `virt_wifi:` — same rendered/guest context.
-- Nix-inlined activation scripts: `lib/symlink-hardening.sh`, `lib/symlink-convergence.sh`, `services/cloud-drives-setup.sh` — literal context labels; lib.sh unreachable via `builtins.readFile` / activationScripts.
-- Darwin activation scripts (MacBook host): plain by design — nix-darwin's generated `activate` runs under `#!/usr/bin/env -i`, wiping color env vars before any activation script runs; no policy-compliant propagation path.
-- Shell-init contexts: `src/scripts/shell/init.zsh`, `src/scripts/shell/profile.ps1`, `src/platforms/macOS/scripts/macos-install-icloud-hooks.zsh` — F1 literal grammar; no helpers.
-- Framework-local PS1: `src/scripts/lib/nix-test-eval.ps1` — `test: error:` literals already F1 grammar; no module import.
-- Daemon log-file writers: `service-watchdog.sh` / `service-watchdog.ps1` — `[<ts>] watchdog: ...` F1-shaped lines written to log files.
-- Test-harness summary markers: `FAIL:`, `PASS:`, `Testing:`, `ERROR:` in test result files.
-- `tests/fixtures/logging-format` scope exclusion — fixture files intentionally exempt.
-- Status/diff/event-log displays: `scripts/ai.ps1` Endpoints status table, `src/scripts/completions/gen-completions.ps1` diff output, `scripts/svc.ps1` event log, `step-runner.ps1:196` ERROR passthrough — verbatim status/diff lines, not F1 messages.
-- Third-party additions (documented, not silenced): `sops updatekeys`, `rclone sync` stats, `tart`/`virsh`/`utmctl` console, `packer`/`nixos-generators`, `duperemove`, `journalctl` svc logs, `nix flake update`.
+Categories: third-party passthrough (nix, brew, cargo, git hooks, winget, adb/qemu), probe suppression (vm.sh, ai.sh readiness), pwsh host rendering, vendored scripts, static doc content, bootstrap lines, VM guest templates, Nix-inlined activation scripts, Darwin activation scripts (env -i wipes color), shell-init contexts, framework-local PS1, daemon log writers, test-harness markers, fixture files, status/diff/event-log displays, and documented third-party additions (sops, rclone, tart, packer, duperemove, journalctl).
 
 ---
 

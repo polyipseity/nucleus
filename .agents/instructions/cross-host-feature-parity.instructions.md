@@ -8,24 +8,14 @@ applyTo: "src/modules/**/*.json, src/modules/**/*.nix, src/hosts/**/*.nix, src/h
 
 ## Goal
 
-Default to parity-first: apply new capabilities to as many hosts as possible in the same change. Avoid one-host features unless a platform constraint prevents it. Keep host orchestration thin and push reusable behavior into shared modules (`src/modules/*.nix` and `src/platforms/Windows/modules/*.ps1`) or declarative state files (`src/hosts/Windows/*.dsc.yml`).
+Default to parity-first: same capability on every host where possible. Push reusable behavior into shared modules; avoid special-casing. POSIX uses bash, Windows uses PowerShell — never mix. Differences require WHY comments.
 
-Avoid special-casing in module logic. When a feature requires per-host differences, refactor shared behavior into parameterized abstractions rather than adding `if-else` branches or duplicating files.
+## Implementation pattern
 
-## What parity means
-
-Parity means the same capability on every host where possible, with the same CLI surface (subcommands, flags, exit codes, error messages where feasible), the same declarative data (`*.json` + schema) as SSOT when applicable, the same host tooling per platform, and the same docs (`MANUAL.md` on all hosts) and tests (paired unit tests + Nix wiring).
-
-Parity does **not** mean delegating Windows work to bash, `sh`, or `.sh` scripts; byte-identical implementation files across platforms; or identical platform primitives (launchd vs systemd vs SCM) — those differences are documented exceptions with WHY.
-
-**Implementation pattern (default):**
-
-- POSIX (macOS + NixOS): bash in `scripts/*.sh` or `src/scripts/**/*.sh`
-- Windows: PowerShell in `scripts/*.ps1` or `src/platforms/Windows/modules/**/*.ps1`
-- Shared content in the same language: single file in `src/scripts/` per `embedded-content.instructions.md`
-- Windows prohibition: no `Invoke-NucleusRepoScript` with `.sh` paths; no `bash`/`sh` subprocess calls from Windows runtime code (`profile.ps1`, `vm.ps1`, `apply.ps1`, Windows modules)
-
-**Exception:** generated `.sh` wrappers in VM trees (`pack.sh`, `start-*.sh`) exist for cross-host folder copy — Windows runs `.ps1` twins locally; nucleus Windows code does not execute those `.sh` files.
+- POSIX (macOS + NixOS): `scripts/*.sh` or `src/scripts/**/*.sh`
+- Windows: `scripts/*.ps1` or `src/platforms/Windows/modules/**/*.ps1`
+- Shared content: single file in `src/scripts/` per `embedded-content.instructions.md`
+- Windows prohibition: no `.sh` paths from Windows runtime code
 
 ## Feature scope triage
 
