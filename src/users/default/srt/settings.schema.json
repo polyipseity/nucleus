@@ -81,6 +81,26 @@
       "type": "boolean",
       "description": "Allow access to com.apple.trustd.agent for Go TLS verification (security warning: potential data exfiltration vector)"
     },
+    "credentials": {
+      "type": "object",
+      "description": "Credential masking configuration for sensitive data",
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Files to mask (whole-file or structured regex patterns)"
+        },
+        "envVars": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Environment variable names to mask"
+        },
+        "allowClearTextInNonTls": {
+          "type": "boolean",
+          "description": "Allow injecting real credentials into non-TLS connections (dangerous)"
+        }
+      }
+    },
     "mandatoryDenySearchDepth": {
       "type": "integer",
       "description": "Linux: ripgrep search depth for mandatory deny paths (1-10, default 3)"
@@ -113,6 +133,10 @@
         "sublayerGuid": {
           "type": "string",
           "description": "WFP sublayer GUID under which filters were installed"
+        },
+        "sandboxUser": {
+          "type": "string",
+          "description": "Name of the dedicated Windows sandbox user account (default: srt-sandbox)"
         },
         "srtWin": {
           "type": "object",

@@ -8,11 +8,13 @@
       "/tmp",
       "~/.bun",
       "~/.cache",
-      "~/.cargo/registry",
+      "~/.cargo",
       "~/.cursor",
       "~/.gnupg",
+      "~/.local",
       "~/.npm",
       "~/.pi",
+      "~/.rustup",
       "~/dev"
     ],
     "denyRead": [
@@ -55,7 +57,9 @@
       "/usr/local",
       "/usr/share",
       "~/Library"
-    ]
+    ],
+    "nix": ["/nix/var"],
+    "prek": [".git/hooks"]
   },
   "network": {
     "allowedDomains": [
@@ -69,15 +73,26 @@
       "api.cline.bot",
       "api.commandcode.ai",
       "api.openai.com",
+      "cache.nixos.org",
       "crates.io",
       "duckduckgo.com",
+      "files.pythonhosted.org",
+      "formulae.brew.sh",
+      "ghcr.io",
+      "github.com",
+      "github-releases.githubusercontent.com",
       "huggingface.co",
+      "index.crates.io",
+      "nix-community.cachix.org",
       "npmjs.org",
       "openai.com",
       "opencode.ai",
-      "pypi.org"
+      "pypi.org",
+      "registry.ollama.ai",
+      "static.crates.io",
+      "static.rust-lang.org"
     ],
-    "allowLocalBinding": false,
+    "allowLocalBinding": true,
     "allowUnixSockets": [
       "~/.gnupg/S.gpg-agent",
       "~/.gnupg/S.gpg-agent.extra"

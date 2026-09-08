@@ -54,14 +54,13 @@ let
       "~/.config/gcloud"
       "~/.docker/config.json"
       "~/.env*"
-      "~/.gnupg"
       "~/.kube"
       "~/.npmrc"
       "~/.sops"
       "~/.ssh"
       "~/Library/Keychains"
     ]
-  ) "srt denyRead must cover all credential paths";
+  ) "srt denyRead must cover all credential paths (note: ~/.gnupg is in allowWrite for git signing)";
 
   test_srt_settings_deny_write_covers_injection = assert' (
     let
@@ -84,20 +83,33 @@ let
     ]
   ) "srt denyWrite must cover git hooks, vscode, and shell profiles";
 
-  test_srt_settings_allow_write_minimal = assert' (
+  test_srt_settings_allow_write = assert' (
     let
       settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
       allowWrite = settings.filesystem.allowWrite;
     in
-    allowWrite == ["." "/tmp" "~/.bun" "~/.cargo/registry" "~/.cursor" "~/.npm" "~/.pi" "~/dev"]
-  ) "srt allowWrite must cover project dir, tmp, package caches, pi, and dev directory";
+    builtins.all (p: builtins.elem p allowWrite) [
+      "."
+      "/tmp"
+      "~/.bun"
+      "~/.cache"
+      "~/.cargo"
+      "~/.cursor"
+      "~/.gnupg"
+      "~/.local"
+      "~/.npm"
+      "~/.pi"
+      "~/.rustup"
+      "~/dev"
+    ]
+  ) "srt allowWrite must cover project dir, tmp, package caches, XDG dirs, and dev directory";
 
-  test_srt_settings_network_no_local_binding = assert' (
+  test_srt_settings_network_local_binding = assert' (
     let
       settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
     in
-    settings.network.allowLocalBinding == false
-  ) "srt network allowLocalBinding must be false";
+    settings.network.allowLocalBinding == true
+  ) "srt network allowLocalBinding must be true for local dev servers";
 
   test_srt_settings_network_covers_api_providers = assert' (
     let
@@ -113,13 +125,61 @@ let
     ]
   ) "srt allowedDomains must cover LLM API providers";
 
-  test_srt_settings_network_covers_github_ssh = assert' (
+  test_srt_settings_network_covers_github = assert' (
     let
       settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
       allowed = settings.network.allowedDomains;
     in
-    builtins.elem "*.github.com" allowed
-  ) "srt allowedDomains must include *.github.com for SSH git operations";
+    builtins.all (d: builtins.elem d allowed) ["*.github.com" "github.com"]
+  ) "srt allowedDomains must include *.github.com and github.com";
+
+  test_srt_settings_network_covers_nix_cache = assert' (
+    let
+      settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
+      allowed = settings.network.allowedDomains;
+    in
+    builtins.all (d: builtins.elem d allowed) ["cache.nixos.org" "nix-community.cachix.org"]
+  ) "srt allowedDomains must cover nix binary caches";
+
+  test_srt_settings_network_covers_cargo = assert' (
+    let
+      settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
+      allowed = settings.network.allowedDomains;
+    in
+    builtins.all (d: builtins.elem d allowed) ["static.crates.io" "index.crates.io"]
+  ) "srt allowedDomains must cover cargo/crates.io endpoints";
+
+  test_srt_settings_network_covers_python = assert' (
+    let
+      settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
+      allowed = settings.network.allowedDomains;
+    in
+    builtins.elem "files.pythonhosted.org" allowed
+  ) "srt allowedDomains must cover PyPI file downloads";
+
+  test_srt_settings_network_covers_rust = assert' (
+    let
+      settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
+      allowed = settings.network.allowedDomains;
+    in
+    builtins.elem "static.rust-lang.org" allowed
+  ) "srt allowedDomains must cover rustup downloads";
+
+  test_srt_settings_network_covers_ghcr = assert' (
+    let
+      settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
+      allowed = settings.network.allowedDomains;
+    in
+    builtins.all (d: builtins.elem d allowed) ["ghcr.io" "github-releases.githubusercontent.com" "formulae.brew.sh"]
+  ) "srt allowedDomains must cover ghcr.io, GitHub releases CDN, and Homebrew";
+
+  test_srt_settings_network_covers_ollama = assert' (
+    let
+      settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
+      allowed = settings.network.allowedDomains;
+    in
+    builtins.elem "registry.ollama.ai" allowed
+  ) "srt allowedDomains must cover ollama model registry";
 
   test_srt_settings_ignore_violations_covers_homebrew = assert' (
     let
@@ -149,6 +209,22 @@ let
       "/usr/share"
     ]
   ) "srt ignoreViolations must cover system paths";
+
+  test_srt_settings_ignore_violations_prek = assert' (
+    let
+      settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
+      prekIgnores = settings.ignoreViolations.prek or [];
+    in
+    builtins.elem ".git/hooks" prekIgnores
+  ) "srt ignoreViolations must allow prek to write .git/hooks";
+
+  test_srt_settings_ignore_violations_nix = assert' (
+    let
+      settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
+      nixIgnores = settings.ignoreViolations.nix or [];
+    in
+    builtins.elem "/nix/var" nixIgnores
+  ) "srt ignoreViolations must allow nix to access /nix/var";
 
   test_srt_settings_has_schema = assert' (builtins.pathExists ../../src/users/default/srt/settings.schema.json) "srt settings.schema.json must exist in src/users/default/srt/";
 
@@ -206,12 +282,20 @@ builtins.seq
       test_srt_settings_allow_pty
       test_srt_settings_deny_read_covers_credentials
       test_srt_settings_deny_write_covers_injection
-      test_srt_settings_allow_write_minimal
-      test_srt_settings_network_no_local_binding
+      test_srt_settings_allow_write
+      test_srt_settings_network_local_binding
       test_srt_settings_network_covers_api_providers
-      test_srt_settings_network_covers_github_ssh
+      test_srt_settings_network_covers_github
+      test_srt_settings_network_covers_nix_cache
+      test_srt_settings_network_covers_cargo
+      test_srt_settings_network_covers_python
+      test_srt_settings_network_covers_rust
+      test_srt_settings_network_covers_ghcr
+      test_srt_settings_network_covers_ollama
       test_srt_settings_ignore_violations_covers_homebrew
       test_srt_settings_ignore_violations_comprehensive
+      test_srt_settings_ignore_violations_prek
+      test_srt_settings_ignore_violations_nix
       test_srt_settings_has_schema
       test_srt_settings_managed_symlink
       test_srt_settings_activation
