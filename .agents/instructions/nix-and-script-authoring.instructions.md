@@ -247,10 +247,6 @@ Keep script behavior consistent with CI, `AGENTS.md`, and prompt guidance. If a 
 
 The `health-check` subcommand must export `SOPS_AGE_KEY_FILE` pointing to `/etc/sops/age/machine.txt` before its `sops -d` probe loop — `sops` does not search that path by default. Without this, `sops` falls through to GPG, which may lack the key. See `check_secret_health()` in `scripts/apply.sh`.
 
-## Template placeholder convention
-
-Tokens in source files must use `__UPPERCASE_WITH_DOUBLE_UNDERSCORES__` format (e.g. `__USERNAME__`, `__NIX_INDEX_BIN__`). Bare uppercase tokens are not permitted. Exception: well-known mechanical transformations (`"~"` → home directory, URL percent-encoding, path separator conversion) are not template placeholders.
-
 ## Apple SDK enhancement pattern
 
 The Apple SDK is enhanced with Xcode toolchain shims not bundled by nixpkgs. Three files:

@@ -30,7 +30,9 @@ Registry: `src/scripts/shell/profile.ps1`, `src/scripts/vms/start-android-vm.ps1
 
 ## Token convention
 
-`__UPPER_SNAKE__` everywhere. `{{TOKEN}}` prohibited. Every token replaced by every consumer or documented default. Registry in file header comments. No `__UPPER_SNAKE__` in comments — check step 14 greps. Reference without delimiters (`start-<VM_NAME>.sh`).
+`__UPPER_SNAKE__` everywhere (e.g. `__USERNAME__`, `__NIX_INDEX_BIN__`). `{{TOKEN}}` prohibited. Bare uppercase tokens without double underscores are not permitted. Every token replaced by every consumer or documented default. Registry in file header comments. No `__UPPER_SNAKE__` in comments — check step 14 greps. Reference without delimiters (`start-<VM_NAME>.sh`).
+
+Exception: well-known mechanical transformations (`"~"` → home directory, URL percent-encoding, path separator conversion) are not template placeholders.
 
 ## Exceptions
 
