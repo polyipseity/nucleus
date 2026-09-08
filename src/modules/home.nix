@@ -153,6 +153,11 @@ let
     }
     { path = "${resolvedHomeDirectory}/.config/starship.toml"; }
     { path = "${resolvedHomeDirectory}/Library/Application Support/iTerm2/DynamicProfiles"; }
+    {
+      # check-suppress:config-method: method 1 (writable symlink) -- srt settings are user-overridable via the standard overlay pattern.
+      path = "${resolvedHomeDirectory}/.srt-settings.json";
+      writable = true;
+    }
   ];
   managedSymlinkPathsJson = builtins.toJSON managedSymlinkPaths;
 
@@ -375,6 +380,16 @@ in
         "${config.home.homeDirectory}/.config/camillagui-backend/config.yml" \
         "src/modules/configs/camillagui-backend/config-${hostName}.yml" \
         "${hostName}"
+    '';
+
+    # Method-1 (writable) symlink for srt (sandbox-runtime) settings. Uses the
+    # standard user overlay pattern: src/users/default/srt/settings.json as
+    # default, src/users/<username>/srt/settings.json for per-user overrides.
+    # check-suppress:config-method: method 1 (writable symlink) -- srt settings are user-overridable via the standard overlay pattern.
+    home.activation.seed-srt-settings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+        "${config.home.homeDirectory}/.srt-settings.json" \
+        "${overlay.selectFile "srt" "settings.json"}"
     '';
 
     # Override the default logDir (which uses ~) with a proper absolute path.

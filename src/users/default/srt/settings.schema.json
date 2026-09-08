@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SRT Settings",
+  "description": "Configuration for Anthropic Sandbox Runtime (srt)",
+  "type": "object",
+  "properties": {
+    "network": {
+      "type": "object",
+      "properties": {
+        "allowedDomains": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Domains allowed for network access (supports wildcards)"
+        },
+        "deniedDomains": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Domains denied for network access (takes precedence over allowedDomains)"
+        },
+        "allowLocalBinding": {
+          "type": "boolean",
+          "description": "Allow binding to local ports"
+        }
+      }
+    },
+    "filesystem": {
+      "type": "object",
+      "properties": {
+        "denyRead": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Paths to deny read access"
+        },
+        "allowRead": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Paths to re-allow read access within denied regions"
+        },
+        "allowWrite": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Paths to allow write access"
+        },
+        "denyWrite": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Paths to deny write access within allowed paths"
+        }
+      }
+    },
+    "ignoreViolations": {
+      "type": "object",
+      "description": "Map command patterns to arrays of paths where violations should be ignored"
+    }
+  }
+}

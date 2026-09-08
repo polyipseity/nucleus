@@ -510,6 +510,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-DirenvConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-LibreOfficeXcu.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-StarshipConfig.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-SrtSettings.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-UserPath.ps1")
 # editors/: VS Code configuration and workspace management.
 . (Join-Path -Path $editorsModuleDir -ChildPath "Set-VSCodeWorkspaceTrust.ps1")
@@ -950,6 +951,7 @@ Sync-NextestConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $rep
 # check-suppress:config-method: method 1 (writable symlink) -- direnvrc cross-platform base config.
 Sync-DirenvConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $repoRoot
 Sync-StarshipConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $repoRoot
+Sync-SrtSettings -Enabled:$true -User $sessionUser -RepoRoot $repoRoot
 if ($EnableCloudDrivesParity) {
   foreach ($userRecord in $selectedUserRecords) {
     Sync-CloudDriveCatalog -UserConfig $userRecord -HomeDirectory $userRecord.homeDirectory

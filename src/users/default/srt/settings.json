@@ -1,0 +1,24 @@
+{
+  "$schema": "./settings.schema.json",
+  "network": {
+    "allowedDomains": [
+      "api.anthropic.com",
+      "api.github.com",
+      "duckduckgo.com",
+      "github.com",
+      "npmjs.org",
+      "opencode.ai"
+    ],
+    "deniedDomains": [],
+    "allowLocalBinding": true
+  },
+  "filesystem": {
+    "denyRead": ["~/.gnupg", "~/.sops", "~/.ssh"],
+    "allowRead": [],
+    "allowWrite": [".", "/tmp", "~/.cursor", "~/.pi"],
+    "denyWrite": [".env", ".env.*"]
+  },
+  "ignoreViolations": {
+    "*": ["/System", "/nix/store", "/usr/bin"]
+  }
+}
