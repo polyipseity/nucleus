@@ -3,7 +3,15 @@
   "allowPty": true,
   "filesystem": {
     "allowRead": [],
-    "allowWrite": [".", "/tmp", "~/.bun", "~/.cargo/registry", "~/.cursor", "~/.npm", "~/.pi"],
+    "allowWrite": [
+      ".",
+      "/tmp",
+      "~/.bun",
+      "~/.cargo/registry",
+      "~/.cursor",
+      "~/.npm",
+      "~/.pi"
+    ],
     "denyRead": [
       "~/.aws",
       "~/.azure",
