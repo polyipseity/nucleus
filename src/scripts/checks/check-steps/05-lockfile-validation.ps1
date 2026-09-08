@@ -217,6 +217,18 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Action {
     Write-Message "warning: suggestions.opencode: empty section (not yet populated)"
   }
 
+  # pi: coding agent npm packages (pinned root section)
+  if (-not $lf.ContainsKey('pi') -or $lf.pi.Count -eq 0) {
+    Write-NucleusWarning "pi: empty or missing section"
+  } else {
+    foreach ($entry in $lf.pi.GetEnumerator()) {
+      if ([string]::IsNullOrEmpty($entry.Value) -or $entry.Value -eq 'CHANGEME' -or $entry.Value -eq '1.0.0') {
+        Write-ErrorMessage "pi.$($entry.Key): placeholder version ($($entry.Value))"
+        $lfErrors++
+      }
+    }
+  }
+
   # cursor and vscode: editor plugin sections (pinned root sections)
   foreach ($editorSection in @('cursor', 'vscode')) {
     if (-not $lf.ContainsKey($editorSection) -or $lf[$editorSection].Count -eq 0) {

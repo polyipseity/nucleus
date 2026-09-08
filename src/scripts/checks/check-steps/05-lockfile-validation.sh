@@ -192,6 +192,19 @@ run_lockfile_validation() {
       fi
     fi
 
+    # pi: coding agent npm packages (pinned root section)
+    if ! jq -e '.pi | type == "object" and length > 0' "$_lfpath" >/dev/null 2>&1; then
+      warn "pi: empty or missing section"
+    else
+      local _placeholders
+      _placeholders=$(jq -r '.pi | to_entries[] | select(.value == "" or .value == "CHANGEME" or .value == "1.0.0") | .key' "$_lfpath" 2>/dev/null)
+      if [ -n "$_placeholders" ]; then
+        error "pi has placeholder versions for:"
+        error "  ${_placeholders//$'\n'/$'\n  '}"
+        _lf_section_errors=$((_lf_section_errors + 1))
+      fi
+    fi
+
     # cursor and vscode: editor plugin sections (pinned root sections)
     for _section in cursor vscode; do
       if ! jq -e ".${_section} | type == \"object\" and length > 0" "$_lfpath" >/dev/null 2>&1; then
