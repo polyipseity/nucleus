@@ -114,10 +114,8 @@
   # --- ExifTool metadata stripping ---
   "-strip-metadata" = "exiftool -all=";
   # --- Non-git aliases ---
-  "-cursor-u" = "cursor-unrestricted";
   "-la" = "eza --long --all";
   "-ll" = "eza --long --all";
-  "-pi-u" = "pi-unrestricted";
   # bun shortcuts — mirror the Windows bun function aliases in profile.ps1 managed block.
   # -n is the bare bun command; each other alias maps one concise suffix to a bun subcommand.
   # -no (outdated) reads like a negation prefix but o = outdated; the -n* namespace keeps it unambiguous.

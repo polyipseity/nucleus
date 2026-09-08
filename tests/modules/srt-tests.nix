@@ -7,7 +7,6 @@ let
   coreModuleText = builtins.readFile ../../src/modules/core.nix;
   homeModuleText = builtins.readFile ../../src/modules/home.nix;
   agentsModuleText = builtins.readFile ../../src/modules/agents.nix;
-  aliasesText = builtins.readFile ../../src/modules/shell/aliases.nix;
   initZshText = builtins.readFile ../../src/scripts/shell/init.zsh;
   profilePs1Text = builtins.readFile ../../src/scripts/shell/profile.ps1;
   bunInstallText = builtins.readFile ../../src/scripts/packages/install-bun-packages.sh;
@@ -80,12 +79,6 @@ let
     && lib.hasInfix "& cursor @args" profilePs1Text
   ) "profile.ps1 must have cursor-unrestricted function";
 
-  # === ALIASES ===
-
-  test_srt_alias_pi_u = assert' (lib.hasInfix "\"-pi-u\" = \"pi-unrestricted\"" aliasesText) "aliases.nix must have -pi-u alias for pi-unrestricted";
-
-  test_srt_alias_cursor_u = assert' (lib.hasInfix "\"-cursor-u\" = \"cursor-unrestricted\"" aliasesText) "aliases.nix must have -cursor-u alias for cursor-unrestricted";
-
   # === DOCUMENTATION ===
 
   test_srt_policy_documented = assert' (
@@ -116,8 +109,6 @@ builtins.seq
       test_srt_cursor_function_ps1
       test_srt_pi_unrestricted_ps1
       test_srt_cursor_unrestricted_ps1
-      test_srt_alias_pi_u
-      test_srt_alias_cursor_u
       test_srt_policy_documented
       test_srt_excludes_vscode
       ;

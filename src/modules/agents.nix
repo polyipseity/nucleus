@@ -10,7 +10,9 @@
 # functions wrap the binary with `srt command <agent>`.
 #
 # Unrestricted variants: `pi-unrestricted`, `cursor-unrestricted`
-# (aliases: `-pi-u`, `-cursor-u`) bypass the sandbox.
+# bypass the sandbox. No short form aliases are allowed for
+# unrestricted variants — the full name makes the security
+# implications explicit.
 #
 # Excluded: vscode — not sandboxed per policy.
 #
