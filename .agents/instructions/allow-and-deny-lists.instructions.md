@@ -131,6 +131,15 @@ Get-ChildItem ... | Select-GitIgnored
 | D2 | `lifecycle-allowlist.json` | All entries | T2 | Supply-chain hardening: lifecycle hooks permitted for listed packages | Error if stale (via `check.sh`) |
 | D3 | `supply-chain-hardening.instructions.md` | Allowlist mechanism (cross-reference) | — | External allowlist maintained in supply-chain-hardening docs | See that file |
 
+### Dummy key management
+
+Dummy-key registry: `src/modules/dummy-keys.json`, validated against `src/modules/dummy-keys.schema.json`.
+
+- Any dummy/placeholder API-key literal of the form `sk-` followed by 4+ alphanumerics hardcoded in a tracked config must resolve to a registered `dummyKeys.<name>.value`.
+- New entries need three fields: `value` (the exact literal consumers use), `consumers` (repo-relative paths of configs using it), and `note` (why it exists).
+- Consumers must use the registry `value` verbatim.
+- Check step 14 (`run_dummy_key_uniformity` in `src/scripts/checks/check-steps/14-repository-policy.sh` / `.ps1`) enforces registration; keep the check in sync with registry shape changes.
+
 ## Review cadence
 
 - **Quarterly**: full audit of all T3 entries. Check each excluded file still exists, each excluded pattern is still justified, and no new hard-coded exclude lists have been introduced. Verify that gitignore-based filtering (via `filter_gitignored`/`Select-GitIgnored`) is applied to any new file-generation script.
