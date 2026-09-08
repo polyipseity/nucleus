@@ -49,6 +49,10 @@ Imperative Windows parity requires in both config and deconfig paths:
 
 New Windows modules must implement enable and disable paths. Failed starts warn but don't abort activation.
 
+## Centralized daemon/service refresh
+
+All killing, refresh, and restart operations must go through centralized library functions: macOS `src/scripts/lib/macos-launch-services.sh` (`refresh_*` functions), Windows `src/platforms/Windows/modules/Set-NucleusService.ps1`. Do not inline killall/Stop-Service commands. For macOS activation blocks, use wrapper scripts under `src/platforms/macOS/scripts/` that source the library and call `refresh_*` functions.
+
 ## Service firing policy
 
 Default: persistent daemon (auto-start + crash recovery). Periodic oneshots are explicit exceptions. No explicit rate-limiting — platform defaults suffice. Full details in `service-firing-policy.reference.md`.

@@ -231,10 +231,6 @@ Root resolution via `derive_repo_root()` in `src/scripts/lib/lib.sh` (priority: 
 
 Scripts must not assume cwd is inside the repository. Script-specific `--repo-root` flags are acceptable overrides but not the sole mechanism.
 
-## Centralized daemon/service refresh
-
-All killing, refresh, and restart operations must go through centralized library functions: macOS `src/scripts/lib/macos-launch-services.sh` (`refresh_*` functions), Windows `src/platforms/Windows/modules/Set-NucleusService.ps1`. Do not inline killall/Stop-Service commands. For macOS activation blocks, use wrapper scripts under `src/platforms/macOS/scripts/` that source the library and call `refresh_*` functions.
-
 ## Runtime configuration (`nucleus-config`)
 
 Runtime toggles live at `~/.local/state/nucleus/config.json` (outside `~/.config/` so changes survive rebuilds). All toggles default to `true` when absent, enforced by `scripts/config.sh` / `scripts/config.ps1`. Services read the config file directly for early-boot compatibility. When adding a toggle: add a default entry to both script implementations, update consuming code to read the key (defaulting to `true`).
