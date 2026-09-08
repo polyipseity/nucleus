@@ -52,7 +52,9 @@
       "/System",
       "/usr/bin",
       "/usr/lib",
-      "/usr/share"
+      "/usr/local",
+      "/usr/share",
+      "~/Library"
     ]
   },
   "network": {
@@ -63,10 +65,15 @@
       "*.huggingface.co",
       "*.npmjs.org",
       "*.pypi.org",
+      "api.anthropic.com",
+      "api.cline.bot",
+      "api.commandcode.ai",
+      "api.openai.com",
       "crates.io",
       "duckduckgo.com",
       "huggingface.co",
       "npmjs.org",
+      "openai.com",
       "opencode.ai",
       "pypi.org"
     ],
