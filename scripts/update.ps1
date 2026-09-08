@@ -133,6 +133,9 @@ function Invoke-UpdateAll {
 # deleted scripts/bump-lockfile.ps1 (folded into `nucleus-update lockfile`).
 # ---------------------------------------------------------------------------
 function Invoke-LockfileBump {
+  # Source the deterministic JSON serialization helpers for sorted key output.
+  . (Join-Path $repoRoot 'src/platforms/Windows/modules/lib/JsonSort.ps1')
+
   # --list-sections: print the canonical section names and exit 0 (no lockfile
   # read required, matching the bash twin's early-exit behavior).
   if ($ListSections) {
@@ -825,11 +828,11 @@ function Invoke-LockfileBump {
   # must not rewrite the file (avoids timestamp churn and spurious git diffs).
   $ht['updated'] = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ' -AsUTC)
 
-  # Convert hashtable back to JSON. Use a depth of 10 for nested objects.
-  # NOTE: ConvertTo-Json does NOT sort keys (it preserves insertion order), so the
-  # hashtable must already be keyed in the desired order. Append exactly one
-  # trailing newline to match the bash writer's `printf '%s\n'` contract.
-  $outputJson = ($ht | ConvertTo-Json -Depth 10) + [Environment]::NewLine
+  # Convert hashtable back to JSON with sorted keys. Use a depth of 10 for
+  # nested objects. ConvertTo-SortedJson (from JsonSort.ps1) recursively sorts
+  # all object keys case-sensitively, matching the bash writer's `jq -S` behavior.
+  # Append exactly one trailing newline to match `printf '%s\n'` contract.
+  $outputJson = ($ht | ConvertTo-SortedJson -Depth 10) + [Environment]::NewLine
 
   $tmpFile = [System.IO.Path]::GetTempFileName()
   try {
