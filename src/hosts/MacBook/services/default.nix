@@ -34,7 +34,7 @@ let
 in
 {
   imports = [
-    ./automator-workflows.nix
+    ./automator-workflows
     ./app-bundles.nix
   ];
 

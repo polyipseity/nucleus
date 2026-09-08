@@ -67,18 +67,18 @@ let
   # Base path to committed workflow source directories.
   # Each workflow source is referenced as "${workflowsDir}/<name>.workflow" to
   # avoid parsing issues with spaces in path names.
-  workflowsDir = ./automator-workflows;
+  workflowsDir = ..;
 
   # Baked at eval time from NUCLEUS_REPO_ROOT (set by apply.sh).
 
   # Path to the ObjC thumbnail generator source.
-  thumbnailGenSrc = ../scripts/generate-automator-thumbnails.m;
+  thumbnailGenSrc = ../../scripts/generate-automator-thumbnails.m;
 
   # Compiled ObjC program that registers custom Finder icons via NSWorkspace.setIcon:.
   setWorkflowIcon = pkgs.runCommand "set-workflow-icon" { } ''
     ${pkgs.stdenv.cc}/bin/cc -fobjc-arc -fmodules -Wno-deprecated-declarations \
       -framework AppKit -framework Foundation \
-      -o "$out" "${../scripts/set-workflow-icon.m}"
+      -o "$out" "${../../scripts/set-workflow-icon.m}"
   '';
 
   # Build a workflow bundle with QuickLook/Thumbnail.png generated at build time.
@@ -201,7 +201,7 @@ let
       };
     }
   ];
-  activationBundle = pkgs.callPackage ../../../modules/lib/script-tree.nix { };
+  activationBundle = pkgs.callPackage ../../../../modules/lib/script-tree.nix { };
 
   # Nix-built open-manual script with the manual path baked in.
   openManualScript = pkgs.writeNucleusShellApplication {
@@ -213,7 +213,7 @@ let
   };
 in
 {
-  home.file."Library/Application Support/nucleus/manual.md".source = ../MANUAL.md;
+  home.file."Library/Application Support/nucleus/manual.md".source = ../../MANUAL.md;
 
   # CLI entry: `nucleus-open-manual` in ~/.local/lib/nucleus/open-manual.
   # Uses the shared open-host-manual.sh with the manual path as positional arg.
