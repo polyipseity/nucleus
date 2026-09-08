@@ -10,6 +10,7 @@
       "~/.cache",
       "~/.cargo/registry",
       "~/.cursor",
+      "~/.gnupg",
       "~/.npm",
       "~/.pi",
       "~/dev"
