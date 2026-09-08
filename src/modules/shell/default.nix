@@ -23,15 +23,15 @@
 }:
 let
   effectiveUsername = if managedUsername != null then managedUsername else config.home.username;
-  overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
+  overlay = (import ../lib/users-overlay.nix).mkUserOverlay {
     inherit effectiveUsername repoRoot hostName;
   };
 
   # Dedicated alias/env fragments keep list-like attrsets isolated so sort order
   # can be audited without scanning unrelated shell options.
-  shellAliases = import ./shell/aliases.nix { };
-  managedPaths = import ./lib/managed-paths.nix { inherit pkgs; };
-  envVarsHelpers = import ./lib/env-catalog.nix {
+  shellAliases = import ./aliases.nix { };
+  managedPaths = import ../lib/managed-paths.nix { inherit pkgs; };
+  envVarsHelpers = import ../lib/env-catalog.nix {
     inherit
       config
       pkgs
@@ -43,7 +43,7 @@ let
 
   # Canonical AI agent session detection names.  Shared with
   # pwsh.nix and Sync-ShellProfile.ps1 (Windows).
-  agentEnv = import ./agent-env-vars.nix;
+  agentEnv = import ../agent-env-vars.nix;
 
   # All env vars are sourced from the centralized catalog.
   mergedSessionVariables = envVarsHelpers.allVars;
@@ -87,7 +87,7 @@ let
   iCloudExcludedDirNames = _iCloudCfg.excludedDirNames;
   iCloudManagedRoots = _iCloudCfg.managedRoots;
 
-  activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
+  activationBundle = pkgs.callPackage ../lib/script-tree.nix { };
 
 in
 {
@@ -150,10 +150,10 @@ in
                 (lib.concatStringsSep " " (map lib.escapeShellArg iCloudExcludedDirNames))
                 (lib.concatStringsSep " " (map lib.escapeShellArg iCloudManagedRoots))
               ]
-              (builtins.readFile ../platforms/macOS/scripts/macos-install-icloud-hooks.zsh)
+              (builtins.readFile ../../platforms/macOS/scripts/macos-install-icloud-hooks.zsh)
           ))
         ]
-        (builtins.readFile ../scripts/shell/init.zsh);
+        (builtins.readFile ../../scripts/shell/init.zsh);
   };
 
   # User-scope package manager bin directories from the centralized catalog.
@@ -313,7 +313,7 @@ in
         "${pkgs.rustup}/bin/rustup" \
         "${pkgs.typst}/bin/typst" \
         "${pkgs.uv}/bin/uv" \
-        "${./completions/zsh}"
+        "${../completions/zsh}"
     '';
   };
 }

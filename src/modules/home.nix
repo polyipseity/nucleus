@@ -199,7 +199,7 @@ in
     ./pwsh.nix
     ./secrets.nix
     ./starship.nix
-    ./shell.nix
+    ./shell
     ./terminal-activations.nix
     ./wallpapers.nix
   ];
