@@ -18,7 +18,11 @@ let
     && lib.hasInfix "nixpkgs = \"sandbox-runtime\";" coreModuleText
   ) "sandbox-runtime must be declared in managedPackages with nixpkgs attr";
 
-  test_srt_in_bun_desired = assert' (lib.hasInfix "'@anthropic-ai/sandbox-runtime'" bunInstallText) "sandbox-runtime must be in bun global packages desired list (POSIX)";
+  # srt is provided by nixpkgs on POSIX (managedPackages), NOT by bun.
+  # bun install is only used on Windows (Invoke-BunSetup.ps1).
+  test_srt_not_in_bun_desired = assert' (
+    !lib.hasInfix "'@anthropic-ai/sandbox-runtime'" bunInstallText
+  ) "sandbox-runtime must NOT be in POSIX bun desired list (nixpkgs provides it)";
 
   test_srt_in_lockfile = assert' (
     let
@@ -95,7 +99,7 @@ builtins.seq
   (builtins.deepSeq {
     inherit
       test_srt_in_managed_packages
-      test_srt_in_bun_desired
+      test_srt_not_in_bun_desired
       test_srt_in_lockfile
       test_srt_settings_exists
       test_srt_settings_has_schema
