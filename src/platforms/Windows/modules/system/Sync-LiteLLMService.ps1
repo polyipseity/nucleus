@@ -92,7 +92,7 @@ function Sync-LiteLLMService {
   # Symlink the config so source edits take effect on service restart without
   # re-running apply.
   $configLink = Join-Path -Path $programDataDir -ChildPath "litellm-config.yml"
-  $configSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\litellm\litellm-config.yml"
+  $configSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\litellm\config.yml"
   if (-not (Test-Path -Path $configSource -PathType Leaf)) {
     throw "litellm config source not found: $configSource"
   }
@@ -113,7 +113,7 @@ function Sync-LiteLLMService {
 
   # Symlink the cooldown-400 callback alongside the config.
   $cooldownLink = Join-Path -Path $programDataDir -ChildPath "litellm-cooldown-400.py"
-  $cooldownSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\litellm\litellm-cooldown-400.py"
+  $cooldownSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\litellm\cooldown_400.py"
   if (-not (Test-Path -Path $cooldownSource -PathType Leaf)) {
     throw "Cooldown-400 callback source not found: $cooldownSource"
   }

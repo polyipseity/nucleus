@@ -114,7 +114,7 @@ For every JSON/YAML file in scope (except exceptions):
   */users/*/iterm2/DynamicProfiles/*.json, */users/*/obsidian/*.json, */users/*/qtpass/*.json,
   */configs/camilladsp/*, */configs/camillagui-backend/*, */users/*/discord-music-rpc/*,
   */users/*/agents/hooks/*.json, */users/*/agents/skills/*/_meta.json,
-  */configs/litellm/litellm-config.yml, */.sops.yaml)
+  */configs/litellm/config.yml, */.sops.yaml)
   Registered in allow-and-deny-lists.instructions.md.
 
   Aggregation: collect all → step fails if any. "ERROR: <N> file(s) missing or invalid $schema"
