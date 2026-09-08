@@ -9,6 +9,18 @@
   "markdown": {
     "mermaid": "final"
   },
+  "packages": [
+    "npm:@juicesharp/rpiv-ask-user-question@2.9.0",
+    "npm:@narumitw/pi-plan-mode@0.56.0",
+    "npm:pi-background-tasks@2.5.0",
+    "npm:pi-extmgr@0.3.0",
+    "npm:pi-goal-x@0.31.1",
+    "npm:pi-memory@0.4.2",
+    "npm:pi-powerline-footer@0.17.0",
+    "npm:pi-simplify@0.2.3",
+    "npm:pi-subagents@0.66.0",
+    "npm:pi-web-access@0.28.0"
+  ],
   "prompts": [
     "~/.agents/prompts"
   ],
