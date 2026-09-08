@@ -63,3 +63,38 @@ Tooling mirrors the autostart CLI surface (`list`/`status`/`show`/`hide`/`apply`
 3. Pick the uniform `kind` per host from the allowed enum.
 4. Run `src/scripts/autostart.sh apply` (or `autostart.ps1 apply` on Windows) to converge; `verify` must pass.
 5. No backwards-compat shims: remove any ad-hoc per-app script in the same change that adds the registry entry.
+
+## Menu bar icon policy
+
+By default, hide all menu bar icons on the MacBook host. Configure both the app and macOS to hide the icon where possible. When asked to disable, disable as much as possible; when asked to enable, enable as much as possible. The default is disable.
+
+### Allow-list
+
+These apps keep a menu bar icon (enabled via the Control Center gate, class f):
+- Amphetamine — menu-bar-only by design (LSUIElement); provisioned as the focus/energy tool.
+- Stats — the user-visible monitoring surface; replaces the macOS battery percentage item.
+- Mounty — NTFS remount surface; menu-bar-only by design.
+- OrbStack — menu-bar-first VM/container manager.
+
+Never set a hide key for allow-listed apps.
+
+### Hide mechanisms
+
+| Class | Mechanism | Examples |
+| --- | --- | --- |
+| a | Declarative preference key, converged from `apps.json` `menuBarIcon` via `src/scripts/menu-bar.sh` | Raycast, BetterDisplay, AltTab, Rectangle, LinearMouse, LuLu |
+| b | ⌘-drag only (per-session; icon returns on relaunch) | MiddleClick |
+| c | Icon is the app's primary UI — not hideable | Equaliser |
+| d | No supported option | Parsec, Telegram, WhatsApp, Steam |
+| f | macOS 26 Control Center `NSStatusItem` gate, converged from `apps.json` | Amphetamine, Stats, Mounty, OrbStack |
+
+### System items
+
+Hide Siri (`com.apple.Siri` `StatusMenuVisible`), Spotlight (`com.apple.Spotlight` `MenuItemHidden`, ByHost), the Input Menu (`com.apple.TextInputMenu.visible`), and the Control Centre battery item (`Battery = 12`, ByHost; Stats replaces it).
+
+### Rules
+
+- Set `NSStatusItemSpacing`/`NSStatusItemSelectionPadding` as low as possible: 0, falling back to 4 when icons overlap.
+- The macOS 26 Control Center `NSStatusItem` gate is managed declaratively via `defaults write com.apple.controlcenter "NSStatusItem Visible <BundleID>"` from `apps.json` `menuBarIcon` via `src/scripts/menu-bar.sh`. Pre-Tahoe this key is a harmless no-op.
+- Apps with no programmatic hide mechanism are still declared in `apps.json` with `kind: "manual"` and `provisioned: false`.
+- ByHost plists (`defaults -currentHost`) cannot be written by `system.defaults.CustomUserPreferences`; use an activation script with the `macos-console-user.sh` pattern.
