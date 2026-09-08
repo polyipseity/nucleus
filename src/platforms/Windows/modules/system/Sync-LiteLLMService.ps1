@@ -92,7 +92,7 @@ function Sync-LiteLLMService {
   # Symlink the config so source edits take effect on service restart without
   # re-running apply.
   $configLink = Join-Path -Path $programDataDir -ChildPath "litellm-config.yml"
-  $configSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\ai\litellm-config.yml"
+  $configSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\litellm\litellm-config.yml"
   if (-not (Test-Path -Path $configSource -PathType Leaf)) {
     throw "litellm config source not found: $configSource"
   }
@@ -103,7 +103,7 @@ function Sync-LiteLLMService {
   # Symlink the Cline custom handler alongside the config.  litellm's
   # get_instance_fn resolves the handler relative to the config file directory.
   $handlerLink = Join-Path -Path $programDataDir -ChildPath "cline_handler.py"
-  $handlerSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\ai\cline_handler.py"
+  $handlerSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\litellm\cline_handler.py"
   if (-not (Test-Path -Path $handlerSource -PathType Leaf)) {
     throw "Cline handler source not found: $handlerSource"
   }
@@ -113,7 +113,7 @@ function Sync-LiteLLMService {
 
   # Symlink the cooldown-400 callback alongside the config.
   $cooldownLink = Join-Path -Path $programDataDir -ChildPath "litellm-cooldown-400.py"
-  $cooldownSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\ai\litellm-cooldown-400.py"
+  $cooldownSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\litellm\litellm-cooldown-400.py"
   if (-not (Test-Path -Path $cooldownSource -PathType Leaf)) {
     throw "Cooldown-400 callback source not found: $cooldownSource"
   }

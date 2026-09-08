@@ -21,7 +21,7 @@
        Guarded by a Scoop presence check so the step is a no-op when Scoop is
        not yet installed (e.g. before the first apply.ps1 run).
     5. Remove locally installed Ollama models absent from the declarative manifest
-       at src/modules/ai/models.json.  Uses Invoke-AISync -GcOnly so no new
+       at src/modules/ollama/models.json.  Uses Invoke-AISync -GcOnly so no new
        model pulls are triggered — GC only reclaims space.  Guarded by an ollama
        presence check so the step is a no-op when Ollama is not installed.
     6. Remove stale VM build artifacts (Packer directories, pre-built disk

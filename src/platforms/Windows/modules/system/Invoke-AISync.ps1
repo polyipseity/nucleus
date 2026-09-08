@@ -5,7 +5,7 @@
 
 .DESCRIPTION
   Windows counterpart to scripts/ai.sh sync subcommand.  Reads the model manifest at
-  src/modules/ai/models.json, selects the `Windows` profile (always used on
+  src/modules/ollama/models.json, selects the `Windows` profile (always used on
   Windows), and converges the locally installed Ollama model set:
 
     1. Pull any model in the manifest that is not already installed.
@@ -56,7 +56,7 @@ function Invoke-AISync {
     Converge locally installed Ollama models with the declarative manifest.
 
   .DESCRIPTION
-    Reads src/modules/ai/models.json, selects the `Windows` profile, then pulls
+    Reads src/modules/ollama/models.json, selects the `Windows` profile, then pulls
     additions and removes unlisted models.  No-ops gracefully when ollama is
     absent or the server is unreachable.
 
@@ -104,7 +104,7 @@ function Invoke-AISync {
   $ErrorActionPreference = "Stop"
 
   $resolvedRepoRoot = (Resolve-Path -Path $RepoRoot).Path
-  $manifestPath     = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\ai\models.json"
+  $manifestPath     = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\ollama\models.json"
   $lockfilePath     = Join-Path -Path $resolvedRepoRoot -ChildPath "src\lockfiles\lockfile.json"
 
   # Override OLLAMA_HOST to point directly at Ollama (not LiteLLM) so that
