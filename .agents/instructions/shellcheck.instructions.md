@@ -19,11 +19,11 @@ applyTo: "scripts/**/*.sh, src/scripts/**/*.sh, src/vms/**/*.sh, tests/**/*.sh"
 
 ### Priority guidance
 
-- **SC2086 (word splitting)** — suppress only for intentional word-split arguments (rclone flags, globs, find type lists). Quote everything else.
-- **SC2064 (double-quoted trap)** — restructure to single-quoted trap. `trap '..."$VAR"...'` preserves semantics when the variable is set before the trap. Suppress only if variable must expand at definition time.
-- **SC2016 (literal `$` in single quotes)** — for awk >10 lines, extract to `.awk` file. For small tool strings (awk one-liners, jq filters, sed scripts, `sh -c` expansions, `grep -F`), suppress with reason.
-- **SC2154/SC2034 (referenced-not-assigned / unused)** — fix root cause: add runtime `source` with `# shellcheck source=`. Typically build-time Nix prepend hides assignment. Suppress only for untraceable framework-injected vars (e.g. nix-direnv `_nix_direnv_nix`).
-- **SC2194 (constant in `case`)** — use `__PLACEHOLDER__` with intermediate variable: `HOST_KIND="__HOST_KIND__"; case "$HOST_KIND"`. Avoids false matches with Handlebars syntax. Suppress only for build-time-only templates.
+- **SC2086** — suppress only for intentional word-split args (rclone flags, globs, find type lists). Quote everything else.
+- **SC2064** — restructure to single-quoted trap. Suppress only if variable must expand at definition time.
+- **SC2016** — awk >10 lines: extract to `.awk` file. Small tool strings (awk one-liners, jq, sed, `sh -c`, `grep -F`): suppress with reason.
+- **SC2154/SC2034** — fix via runtime `source` with `# shellcheck source=`. Suppress only for untraceable framework vars (e.g. nix-direnv `_nix_direnv_nix`).
+- **SC2194** — use `__PLACEHOLDER__` intermediate variable. Suppress only for build-time-only templates.
 
 ### Reference table
 

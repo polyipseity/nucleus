@@ -104,17 +104,11 @@ Host tooling: `adb`/`fastboot` for `android-config`. POSIX: `pkgs.android-tools`
 
 ## Disk format
 
-QCOW2 throughout. Runtime disks in `data/`; system images in `src/<type>/`. Copy-based migration between hosts.
+QCOW2 throughout. Runtime disks in `data/`; system images in `src/<type>/`. macOS/NixOS: `~/virtual machines/data/<id>.qcow2`; Windows: `%USERPROFILE%\virtual machines\data\<id>.qcow2`. UTM hard-links into bundle.
 
-- macOS runtime: `~/virtual machines/data/<id>.qcow2` (UTM bundle exposes `~/virtual machines/<id>.utm/Data/system disk.qcow2` as a hard link)
-- NixOS runtime: `~/virtual machines/data/<id>.qcow2`
-- Windows runtime: `%USERPROFILE%\virtual machines\data\<id>.qcow2`
+UEFI vars: macOS/Windows `data/<id> (nvram).fd`; NixOS uses libvirt NVRAM. System images: `~/virtual machines/src/<type>/system image.qcow2` (phase 1 builds once; phase 2 creates overlay).
 
-UEFI vars: macOS `data/<id> (nvram).fd` (from UTM `efi_vars.fd`); Windows same (from `edk2-arm-vars.fd`); NixOS uses libvirt NVRAM.
-
-System images: `~/virtual machines/src/<type>/system image.qcow2`. Phase 1 builds once per type; phase 2 creates overlay.
-
-`src/vms/templates/README.md` is token-replaced; preserve `__VM_DIR_DISPLAY__`. Changes require `test_vm_readme_template_content` reconciliation.
+`src/vms/templates/README.md` token-replaced; preserve `__VM_DIR_DISPLAY__`. Changes require `test_vm_readme_template_content` reconciliation.
 
 ## macOS — Tart
 
@@ -133,17 +127,8 @@ System images: `~/virtual machines/src/<type>/system image.qcow2`. Phase 1 build
 
 ## NixOS — libvirt/KVM
 
-- Infrastructure: `src/hosts/NixOS/vms.nix` (system module).
-- Packages: `qemu_kvm`, `virt-manager`, `virt-viewer`, `virtiofsd`, `passt`.
-- Groups: `kvm`, `libvirtd` added to managed user.
-- Domain XML: pre-generated at `/etc/nucleus/vms/<name>-domain.xml`; `vm.sh setup` calls `virsh define`.
-- Networking: passt with `<portForward>` from manifest.
-- VirtioFS via `virtiofsd`. SPICE display + clipboard. OVMF (UEFI) + swtpm (TPM) for Windows 11.
-- Start with `start-<name>.sh`/`.ps1` or `virt-manager`.
+Infrastructure: `src/hosts/NixOS/vms.nix`. Packages: `qemu_kvm`, `virt-manager`, `virt-viewer`, `virtiofsd`, `passt`. Groups: `kvm`, `libvirtd`. Domain XML pre-generated at `/etc/nucleus/vms/<name>-domain.xml`; `vm.sh setup` → `virsh define`. Networking: passt. VirtioFS, SPICE, OVMF+swtpm. Start: `start-<name>.sh`/`.ps1` or `virt-manager`.
 
 ## Windows — QEMU via Scoop
 
-- QEMU via Scoop extras bucket (`Invoke-ScoopSetup.ps1`).
-- Disks and start scripts in `%USERPROFILE%\virtual machines\`.
-- Start script: `start-<name>.ps1` (self-contained).
-- VirtioFS requires `virtiofsd` as separate process. See `~/virtual machines/README.md`.
+QEMU via Scoop (`Invoke-ScoopSetup.ps1`). Disks/start scripts in `%USERPROFILE%\virtual machines\`. Start: `start-<name>.ps1`. VirtioFS requires `virtiofsd` as separate process (see `~/virtual machines/README.md`).

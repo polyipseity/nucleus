@@ -121,19 +121,13 @@ Dropping the trailing `s` is **wrong** when the function handles multiple items:
 
 ## Adding a new rule policy
 
-1. Create a `## <RuleName>` section with: trigger, root cause, fix (with code example), suppression policy, upstream link (if any).
-2. Add a row to the reference table.
-3. Verify the fix against actual repo code.
+Create a `## <RuleName>` section (trigger, root cause, fix with code, suppression policy, upstream link). Add a row to the reference table. Verify against actual repo code.
 
 ## Annotation reference
 
 | Format | Class | Used for |
 | --- | --- | --- |
 | `# check-suppress:SuppressMessageAttribute: <RuleName> -- <reason>` | A/C | `[SuppressMessageAttribute]`, comment-only PSSA suppression |
-| `# check-suppress:suppression_doc: <reason>` | B | `$null =`, `[void]`, `2>$null`, `-ErrorAction SilentlyContinue`, empty `catch {}`, `|| true` |
+| `# check-suppress:suppression_doc: <reason>` | B | `$null =`, `[void]`, `2>$null`, `-ErrorAction SilentlyContinue`, `catch {}`, `|| true` |
 
-Both are grep-able: `grep 'check-suppress:' **/*.ps1`
-
-## B-class error suppression
-
-Patterns using `# check-suppress:suppression_doc:` (stable, not changing): `2>$null`, `-ErrorAction SilentlyContinue`, empty `catch {}`, `|| true`. Enforced by `check.ps1` step 12.
+Grep-able: `grep 'check-suppress:' **/*.ps1`. Enforced by `check.ps1` step 12.

@@ -6,23 +6,14 @@ applyTo: "src/hosts/Windows/**/*.yml"
 
 # WinGet DSC Authoring
 
-## Architecture: universal vs per-user DSC files
+## Architecture and file layout
 
-DSC files in this repo split into two categories:
+**System** (`system/*.dsc.yml`): applied to every user. **User** (`user/*.dsc.yml`): applied per-user via `dscConfigFiles` in `src/users/<username>/windows.json`. One file per subsystem; do not mix resources from different concerns.
 
-- **System files** (`system/*.dsc.yml`): applied universally to every user on the machine. Currently: `scheduler`, `developer-mode`, `firewall`, `taskbar`, `computer-name`, `long-paths`, `storage-sense`, `font-substitutes`, `remote-desktop`, `packages`.
-- **User files** (`user/*.dsc.yml`): applied per-user based on each user's `dscConfigFiles` list in `src/users/<username>/windows.json`. Currently: `wallpaper`, `screen-saver`, `explorer`, `shell`, `env`, `context-manual`, `context-optimize-pdf`.
+**System**: `scheduler`, `developer-mode`, `firewall`, `taskbar`, `computer-name`, `long-paths`, `storage-sense`, `font-substitutes`, `remote-desktop`, `packages`.
+**User**: `wallpaper`, `screen-saver`, `explorer`, `shell`, `env`, `context-manual`, `context-optimize-pdf`.
 
-Mapping: system files are always applied; user files must be explicitly listed per user. See `src/users/polyipseity/windows.json` (and `src/users/default/windows.json` fallback) for the active user-to-file mapping.
-
-## File location and purpose
-
-One DSC file per subsystem or concern. Do not mix resources from different subsystems.
-
-**System** (`system/*.dsc.yml`): `scheduler`, `developer-mode`, `firewall`, `taskbar`, `computer-name`, `long-paths`, `storage-sense`, `font-substitutes`, `remote-desktop`, `packages`.
-**User** (`user/*.dsc.yml`): `wallpaper`, `screen-saver`, `explorer`, `shell`, `env`, `context-manual`, `context-optimize-pdf`.
-
-Applied in-order by `src/hosts/Windows/apply.ps1`. Helper logic in `src/platforms/Windows/modules/*.ps1`; DSC files stay as state declarations, not script logic.
+Applied in-order by `src/hosts/Windows/apply.ps1`. Helper logic in `src/platforms/Windows/modules/*.ps1`; DSC files stay as state declarations.
 
 ## DSC v3 document structure
 
@@ -36,18 +27,12 @@ Sort alphabetically within each group by `settings.id` (packages) or `settings.v
 
 ## Authoring rules
 
-- Always use `.yml` extension for WinGet DSC manifests; do not create long-extension YAML filenames in `src/hosts/Windows/`.
-- Always specify `source: winget` for `Microsoft.WinGet.Client/Package` entries, even if it is technically the default.
-- Use the canonical WinGet package identifier (verified via `winget search`) rather than a display name or URL.
-- When a WinGet package has a Preview or Canary variant (for example `Microsoft.WindowsTerminal.Preview` vs `Microsoft.WindowsTerminal`), prefer the preview channel per the repository-wide Channel Preference Policy in `AGENTS.md`. Use the stable ID only when the preview channel is unavailable or severely broken; document the exception with a `directives.description:` note.
-- Prefer human-readable named package IDs over opaque Microsoft Store-generated IDs when a named ID exists.
-- When a package only exposes a generated ID, use it and document the rationale in `directives.description:`.
-- For registry values, always include `valueType` (`DWord`, `String`, etc.) to prevent ambiguous interpretation.
-- Scope environment variables as `User` or `Machine`; prefer `User` unless the setting must be machine-wide.
-- Use `%USERPROFILE%` rather than a hard-coded path for the user's home directory in `value` strings.
-- For UI/discoverability settings, apply a minimal-chrome rule: allow reduced persistent chrome (hidden optional taskbar controls, compact surfaces) when equivalent keyboard/command access remains available.
-- Preserve high-signal visibility defaults (hidden files, file extensions, status bars, navigation-pane folder visibility) unless a concrete workflow reason justifies reducing visibility.
-- If a choice reduces visibility or masks controls, explain the tradeoff in `directives.description:` with a short WHY and the alternate access path (shortcut, command, or menu route).
+- `.yml` extension only; specify `source: winget` for all packages.
+- Use canonical WinGet package identifiers (verified via `winget search`). Prefer named IDs over opaque Store-generated IDs; document rationale when only generated IDs exist.
+- Prefer preview/canary channel per `AGENTS.md` Channel Preference Policy; document exceptions in `directives.description:`.
+- Registry values must include `valueType` (`DWord`, `String`, etc.). Environment variables: scope as `User` or `Machine` (prefer `User`).
+- Use `%USERPROFILE%` for user home in `value` strings.
+- UI settings: allow reduced chrome when keyboard/command access remains. Preserve visibility defaults (hidden files, extensions, status bars) unless justified. When reducing visibility, explain the tradeoff and alternate access path in `directives.description:`.
 
 ## PowerShell DSC resource modules
 
@@ -139,23 +124,7 @@ Do not use `PSDscResources/Script` for Scoop management — `scoop` is not on PA
 
 ### Idempotency in Scoop operations
 
-All Scoop install/bucket operations must be guarded:
-
-```powershell
-if (-not (scoop bucket list | Select-String -Quiet "^extras$")) {
-    scoop bucket add extras
-}
-$cbBin = Join-Path $scoopShims "cargo-binstall.cmd"
-if (-not (Test-Path $cbBin)) {
-    # cargo-binstall has no WinGet package ID; Scoop main bucket is the
-    # preferred source.  Use Test-Path on the shim rather than Get-Command so
-    # the check is reliable before ~\scoop\shims is on PATH in this session.
-    scoop install cargo-binstall
-    if (-not (Test-Path $cbBin)) {
-        Write-Error "scoop: cargo-binstall install failed — shim not found after install"
-    }
-}
-```
+Guard all installs with existence checks (Test-Path on the shim, not Get-Command -- PATH may not be set in the DSC session).
 
 ### cargo binstall for Rust tools
 
@@ -167,18 +136,7 @@ See [Imperative recovery safety (Windows)](cross-host-feature-parity.instruction
 
 ## Validation
 
-- Test the manifest dry-run on the target machine with:
-
-  ```powershell
-  winget configure --what-if .\src\hosts\windows\system.dsc.yml
-  winget configure --what-if .\src\hosts\windows\system-packages.dsc.yml
-  winget configure --what-if .\src\hosts\windows\user.dsc.yml
-  winget configure --what-if .\src\hosts\windows\user-env.dsc.yml
-  winget configure --what-if .\src\hosts\windows\user-context.dsc.yml
-  ```
-
-- Full application requires an elevated PowerShell session and `--accept-configuration-agreements`.
-- The `scripts/bootstrap.ps1` wrapper passes both flags automatically.
+Dry-run: `winget configure --what-if .\src\hosts\windows\*.dsc.yml` for each file. Full apply requires elevated session + `--accept-configuration-agreements` (the `scripts/bootstrap.ps1` wrapper passes both).
 
 ## What to avoid
 
@@ -188,4 +146,4 @@ See [Imperative recovery safety (Windows)](cross-host-feature-parity.instruction
 
 ## Naming
 
-- Avoid repository-brand prefixes (e.g. `nucleus*`) in new PowerShell function names and filenames unless needed for cross-module disambiguation or external integration points. Use descriptive verb-noun patterns (e.g. `Sync-WallpaperInventory` instead of `Sync-NucleusWallpapers`).
+No repository-brand prefixes (`nucleus*`) in new PowerShell function names unless needed for disambiguation. Use descriptive verb-noun patterns (`Sync-WallpaperInventory`, not `Sync-NucleusWallpapers`).

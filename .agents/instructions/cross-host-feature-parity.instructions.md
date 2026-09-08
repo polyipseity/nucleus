@@ -12,22 +12,17 @@ Parity-first: same capability on every host. Reusable behavior in shared modules
 
 ## Implementation pattern
 
-- POSIX (macOS + NixOS): `scripts/*.sh` or `src/scripts/**/*.sh`
-- Windows: `scripts/*.ps1` or `src/platforms/Windows/modules/**/*.ps1`
-- Shared content: single file in `src/scripts/` per `embedded-content.instructions.md`
-- Windows prohibition: no `.sh` paths from Windows runtime code
+POSIX: `scripts/*.sh` or `src/scripts/**/*.sh`. Windows: `scripts/*.ps1` or `src/platforms/Windows/modules/**/*.ps1`. Shared: single file in `src/scripts/`. No `.sh` paths from Windows runtime code.
 
 ## Feature scope triage
 
-Evaluate all three hosts before writing code: macOS (`src/hosts/MacBook/` + shared), NixOS (`src/hosts/NixOS/` + shared), Windows (`src/hosts/Windows/` + `src/platforms/Windows/modules/`). Implement all applicable hosts in the same change.
+Evaluate all three hosts before writing: macOS (`src/hosts/MacBook/`), NixOS (`src/hosts/NixOS/`), Windows (`src/hosts/Windows/` + `src/platforms/Windows/modules/`). Implement all applicable hosts in the same change. When reducing parity debt: implement now, already in parity, or not practical yet (WHY in code). Review areas: packages/tools, shell/dev, security, desktop/UI, remote-access, secrets, editor, git/signing, power/network, automation.
 
-When reducing parity debt, evaluate each feature per host: implement parity now, already in parity, or not practical yet (WHY in code). Review: packages/tools, shell/dev workflow, security posture, desktop/UI, remote-access, secrets, editor experience, git/signing, power/network, automation hooks.
-
-Desktop/UI: prefer reducing persistent chrome when keyboard/command workflows remain. Preserve high-signal visibility defaults (hidden files, file extensions, status/path bars) unless a host constraint prevents it.
+Desktop/UI: prefer reducing persistent chrome when keyboard workflows remain. Preserve high-signal visibility defaults unless a host constraint prevents it.
 
 ### Host-specific lib/ pattern
 
-When a config has a native extension-point that auto-loads overrides (e.g. direnv `lib/*.sh`), use the host-specific lib/ subdirectory convention from `app-config-policy.instructions.md`. Avoids `if-else` branches and dead platform-specific code.
+When a config has a native extension-point (e.g. direnv `lib/*.sh`), use the host-specific lib/ convention from `app-config-policy.instructions.md`.
 
 ## Where to implement
 

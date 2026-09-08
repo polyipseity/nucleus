@@ -9,14 +9,15 @@ name: "Service Firing Policy Reference"
 
 | | Persistent daemon (auto-start + crash recovery) | Periodic oneshot (timer-triggered, exit between runs) |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **macOS launchd** | `RunAtLoad = true; KeepAlive = true;` | `StartInterval` or `StartCalendarInterval`; `KeepAlive = false`; `RunAtLoad = false` (or `true` for immediate first tick) |
-| **NixOS systemd** | `wantedBy = ["multi-user.target"]` (system) or `["default.target"]` (user); `serviceConfig.Restart = "always"` | `systemd.timers` (calendar or `OnUnitActiveSec`) + `Type = "oneshot"` service |
-| **Windows** | SCM: `StartType = Automatic`; scheduled task: `AtLogOn`/`AtStartup` with `AllowStartIfOnBatteries`, `DontStopIfGoingOnBatteries`, `StartWhenAvailable`. Internal `while ($true)` loop. | Scheduled task with calendar trigger or `Once` + `Repetition` |
+| **macOS launchd** | `RunAtLoad = true; KeepAlive = true;` | `StartInterval` or `StartCalendarInterval`; `KeepAlive = false` |
+| **NixOS systemd** | `wantedBy = ["multi-user.target"]` (system) / `["default.target"]` (user); `Restart = "always"` | `systemd.timers` (calendar/`OnUnitActiveSec`) + `Type = "oneshot"` service |
+| **Windows** | SCM: `StartType = Automatic`; scheduled task: `AtLogOn`/`AtStartup`. Internal `while ($true)` loop for keepalive. | Scheduled task: calendar trigger or `Once` + `Repetition` |
 
 ## Persistent daemons (default)
 
 | Service | macOS | NixOS | Windows |
 | ------------------------- | ------------------------------------------- | ------------------------- | ---------------------- |
+| `betterdisplay-heartbeat` | launchd `agent`, user | — (N/A) | — (N/A) |
 | `caddy` | launchd `daemon`, system | SCM | SCM |
 | `camilladsp` | launchd `daemon`, system | systemd `service`, system | scheduled task, user |
 | `camilladsp-heartbeat` | launchd `agent`, user | systemd `service`, system | scheduled task, user |
@@ -32,23 +33,22 @@ name: "Service Firing Policy Reference"
 | `service-watchdog-user` | launchd `agent`, user | — (N/A) | — (N/A) |
 | `ssh-agent` | launchd `agent`, user (built-in) | systemd `service`, user | SCM |
 | `sshd` | launchd `daemon`, system (socket-activated) | systemd `service`, system | SCM |
-| `betterdisplay-heartbeat` | launchd `agent`, user | — (N/A) | — (N/A) |
 
 ## Periodic oneshots (exceptions)
 
 | Service | macOS | NixOS | Windows | Rationale |
 | -------------------------- | ---------------------------------------------------- | ------------------------------------------------------ | ---------------------------------- | -------- |
 | `gc-weekly` | launchd `daemon`, StartCalendarInterval (Sun 12:00) | systemd `timer`, system (Sun 12:00, `Persistent=true`) | scheduled task (Weekly, Sun 12:00) | Full `gc.sh` as root; user homedir via `sudo -u` |
-| `nix-index-update` | launchd `agent`, StartCalendarInterval (daily 12:00) | systemd `timer`, user (daily 12:00, `Persistent=true`) | — (N/A) | Daily rebuild; Nix ecosystem only |
-| `dev-ds-store-gc` | launchd `agent`, StartCalendarInterval (daily 12:00) | — (N/A) | — (N/A) | macOS-only; `.DS_Store` cleanup |
-| `dev-spotlight-exclusions` | launchd `agent`, StartCalendarInterval (daily 12:00) | — (N/A) | — (N/A) | macOS-only; Spotlight metadata |
-| `icloud-exclusions` | launchd `agent`, StartInterval=3600 | — (N/A) | — (N/A) | macOS-only; iCloud xattr drift |
+| `nix-index-update` | launchd `agent`, StartCalendarInterval (daily 12:00) | systemd `timer`, user (daily 12:00, `Persistent=true`) | — (N/A) | Nix ecosystem only |
+| `dev-ds-store-gc` | launchd `agent`, StartCalendarInterval (daily 12:00) | — (N/A) | — (N/A) | macOS `.DS_Store` cleanup |
+| `dev-spotlight-exclusions` | launchd `agent`, StartCalendarInterval (daily 12:00) | — (N/A) | — (N/A) | macOS Spotlight metadata |
+| `icloud-exclusions` | launchd `agent`, StartInterval=3600 | — (N/A) | — (N/A) | macOS iCloud xattr drift |
 
 `gc-weekly` log overlap with daily `log-gc-user`/`log-gc-system` is intentional and idempotent. `duperemove` (NixOS only): weekly btrfs dedup on `/nix/store`.
 
 ## Internal loop pattern
 
-Persistent daemons needing periodic work use internal sleep loops instead of platform timers:
+Persistent daemons needing periodic work use internal sleep loops instead of platform timers. Why: platform timers become crash recovery only; fixes Windows `Duration` cap (P1D stopped repeating after 24 h).
 
 ```bash
 # POSIX
@@ -65,8 +65,6 @@ while ($true) {
   Start-Seconds -Seconds $Interval
 }
 ```
-
-Why: platform timers (StartInterval, systemd timers, scheduled-task repetition) become crash recovery only. Fixes Windows `Duration` cap (P1D stopped repeating after 24 h).
 
 ## Interval configuration
 
@@ -88,11 +86,7 @@ Why: platform timers (StartInterval, systemd timers, scheduled-task repetition) 
 | `gui-env` | `launchctl setenv` + `launchctl config user path`; login-time coverage |
 | `linux-builder` | Nix Linux builder VM; NixOS runs Linux natively |
 
-## POSIX-only services
-
-| Service | Rationale |
-| ------------------ | --------- |
-| `nix-index-update` | Nix ecosystem only; Windows uses Scoop |
+POSIX-only: `nix-index-update` — Nix ecosystem only; Windows uses Scoop.
 
 ## ssh-agent and sshd
 
