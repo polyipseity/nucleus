@@ -268,21 +268,6 @@ The Apple SDK is enhanced with Xcode toolchain shims not bundled by nixpkgs. Thr
 
 macOS-specific defaults sync, nix-darwin activation hooks, launchd service management, pmset power policy, and sops-nix LaunchAgent async behaviour: see `macos-service-hardening.instructions.md`.
 
-## Shell module conventions
-
-**zsh alias-vs-function precedence**: aliases expand before function lookup in zsh. A `shellAliases` entry with the same name as a function silently shadows the function. Never add a `shellAliases` entry matching a function defined in `initContent` or `initExtra`. Canonical example: thefuck — `eval $(thefuck --alias)` defines a function; adding `fuck = "thefuck"` as an alias shadows it.
-
-## Shell history exclusion
-
-All managed shells exclude space-prefixed commands and consecutive duplicates:
-
-| Feature | zsh | PowerShell | cmd.exe |
-| --------- | ----- | ----------- | --------- |
-| Space-prefixed commands | `setopt HIST_IGNORE_SPACE` | `-AddToHistoryHandler { ... }` | No equivalent |
-| Consecutive duplicates | `setopt HIST_IGNORE_DUPS` | `-HistoryNoDuplicates` | No equivalent |
-
-Files: zsh `src/scripts/shell/init.zsh`, PowerShell `src/scripts/shell/profile.ps1`. When adding a new shell, enable the equivalent.
-
 ## Machine age key auto-registration
 
 `apply.sh` calls `generate_ssh_host_key_if_needed` then `register_host_age_key_if_needed` before `darwin-rebuild`/`nixos-rebuild`. First checks for `/etc/ssh/ssh_host_ed25519_key`; if absent, runs `sudo env "PATH=$PATH" ssh-keygen -A` (Darwin/NixOS only). Derives machine age key via `ssh-to-age -i`; if new, inserts before the `# -- machine keys end --` marker, rewraps SOPS files, and prints `git add`/`git commit` commands (operator commits manually). Requires GPG keyring. Tools from `mkApplyApp` `runtimeInputs`. Windows: `Register-HostAgeKey` in `src/platforms/Windows/modules/secrets/Register-HostAgeKey.ps1`.
