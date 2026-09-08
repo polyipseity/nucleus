@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 # Resolves per-user homedir overlay paths. Mirrors users-overlay.nix.
 #
-# Platform differences (documented, not bugs):
-# - Deduplication: case-sensitive (POSIX filenames are case-sensitive)
-# - Symlink detection: checks both -e and -L (broken symlinks resolve to the
-#   entry). This differs from Nix (pathExists follows symlinks) but is
-#   inconsequential in practice (broken symlinks indicate deployment errors).
+# Cross-platform consistency: deduplication is case-insensitive (weakest
+# constraint — works on NTFS, POSIX, and Nix). Symlink detection follows
+# symlinks (-e only), matching Nix pathExists and Windows Test-Path.
 set -euo pipefail
 
 # Source lib.sh from this library's own directory (callers set SCRIPT_DIR to
@@ -44,11 +42,11 @@ _resolve_user_config_first_level_entry() {
   per_user="${repo_root}/src/users/${username}/${config_name}/${entry_name}"
   default="${repo_root}/src/users/default/${config_name}/${entry_name}"
 
-  if [ -e "$per_user" ] || [ -L "$per_user" ]; then
+  if [ -e "$per_user" ]; then
     printf '%s' "$per_user"
     return 0
   fi
-  if [ -e "$default" ] || [ -L "$default" ]; then
+  if [ -e "$default" ]; then
     printf '%s' "$default"
     return 0
   fi
@@ -59,10 +57,11 @@ _resolve_user_config_first_level_entry() {
 
 _list_user_config_seen_entry() {
   local candidate="$1"
+  local candidate_lower="${candidate,,}"
   local seen_entry
 
   for seen_entry in ${_luc_seen_entries+"${_luc_seen_entries[@]}"}; do
-    if [ "$seen_entry" = "$candidate" ]; then
+    if [ "${seen_entry,,}" = "$candidate_lower" ]; then
       return 0
     fi
   done
