@@ -121,8 +121,8 @@ function Invoke-SteamCMDSetup {
     # Read the host overlay (rimsort.<HostName>.json) if it exists.
     # This mirrors the host-specific overlay resolution in home.nix
     # (rimsortManagedSettings + rimsortHostSettings via lib.recursiveUpdate).
-    $hostOverlayPath = Join-Path -Path $RepoRoot -ChildPath "src\users\default\rimsort\rimsort.$hostKeyName.json"
-    $hostSettings = Resolve-OverlayPath -Path $hostOverlayPath
+    $hostOverlayEntry = Resolve-UserConfigFirstLevelEntry -User $username -ConfigName 'rimsort' -EntryName "rimsort.$hostKeyName.json" -RepoRoot $RepoRoot
+    $hostSettings = Resolve-OverlayPath -Path $hostOverlayEntry
 
     # Merge: host overlay wins on overlapping keys (lib.recursiveUpdate semantics).
     $mergedSettings = $baseSettings
