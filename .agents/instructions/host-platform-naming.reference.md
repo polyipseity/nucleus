@@ -15,9 +15,9 @@ name: "Host/Platform Naming Reference"
 
 ## Rules
 
-- Host JSON entries reference platform by name only (`"platform": "macOS"`). **Never put flags on host objects.**
+- Host JSON entries reference platform by name only (`"platform": "macOS"`). Never put flags on host objects.
 - Flags live in `host-platform-registry.json` → `platforms.<PlatformKey>.flags` only.
-- Lookup host first. When flags are needed: `platformForHost(host)` → `flagsForPlatform(platform)`.
+- Lookup host first. When flags needed: `platformForHost(host)` → `flagsForPlatform(platform)`.
 - `services.json` uses `hosts.MacBook|NixOS|Windows`, not `platforms.macos|nixos|windows`.
 - Flake configuration attrs: `darwinConfigurations.MacBook`, `nixosConfigurations.NixOS`.
 - Env-catalog `values` keys and `resolveValue` use host names (`MacBook`, not `macOS`).
@@ -26,9 +26,9 @@ name: "Host/Platform Naming Reference"
 
 ## Decision tree
 
-1. Is the data keyed by physical machine identity? → **Host key** (`MacBook`, `NixOS`, `Windows`).
-2. Is the data about OS-family semantics or implementation flags? → **Platform key** (`macOS`, `NixOS`, `Windows`).
-3. Is the data from nixpkgs, kernel, or third-party API? → Keep upstream naming; map at the boundary via registry helpers.
+1. Data keyed by physical machine identity? → **Host key** (`MacBook`, `NixOS`, `Windows`).
+2. Data about OS-family semantics or flags? → **Platform key** (`macOS`, `NixOS`, `Windows`).
+3. Data from nixpkgs, kernel, or third-party API? → Keep upstream naming; map at boundary via registry helpers.
 
 ## Canonical helpers
 
@@ -46,11 +46,9 @@ name: "Host/Platform Naming Reference"
 
 ## Audit
 
-Host vs platform vs implementation naming is enforced by service-registry validation (check step 8).
+Host vs platform vs implementation naming enforced by service-registry validation (check step 8).
 
 ## Cross-surface identifier mapping
-
-The same activation or apply step is named across five identifier surfaces. Each surface keeps its platform-native format; this table is the canonical cross-boundary reference.
 
 | Surface | Convention | Example |
 | ------- | ---------- | ------- |
@@ -62,16 +60,15 @@ The same activation or apply step is named across five identifier surfaces. Each
 
 ### Worked cross-boundary pair
 
-`write-terminal-activations` (activation entry) ↔ `Sync-TerminalActivation` (PowerShell) ↔ `terminal-activations:` (stage label) ↔ `run_terminal_activations` (apply function) name the same step across all surfaces. The singular/plural asymmetry is deliberate: the PowerShell verb is singular `Sync-TerminalActivation` (renamed from `Sync-TerminalActivations` in commit "fix(pwsh): rename Sync-TerminalActivations to Sync-TerminalActivation"), while the activation entry and stage label use plural. Do NOT "fix" this — the mapping documents the asymmetry as-is.
+`write-terminal-activations` ↔ `Sync-TerminalActivation` ↔ `terminal-activations:` ↔ `run_terminal_activations` — same step, all surfaces. Singular/plural asymmetry is deliberate (PowerShell singular, activation/stage plural). Do not "fix" this.
 
 ### Kept-as-is decisions
 
-- `Disable-SteamAutoStartup` keeps the approved `Disable` verb.
-- `config-utils.nix` generated names (`unprotectSymlink_${name}` etc.) are exempt from the kebab-case rule; the Windows side mirrors this exemption with `ConfigHelpers.ps1` `Deploy-*` generated names.
+- `Disable-SteamAutoStartup` keeps approved `Disable` verb.
+- `config-utils.nix` generated names (`unprotectSymlink_${name}` etc.) exempt from kebab-case; Windows mirrors with `ConfigHelpers.ps1` `Deploy-*` names.
 
 ### Known stage-label gaps
 
-Documented but NOT fixed — intentional parity gaps for future work:
-
-- POSIX `apply.sh` lacks the `svc:`, `vm-setup:`, `vm-sync:` labels that Windows `apply.ps1` emits.
-- Windows `apply.ps1` lacks the `health-check:` and `caddy-local-ca-trust:` labels that POSIX emits.
+Documented parity gaps (not fixed):
+- POSIX `apply.sh` lacks `svc:`, `vm-setup:`, `vm-sync:` labels Windows emits.
+- Windows `apply.ps1` lacks `health-check:` and `caddy-local-ca-trust:` labels POSIX emits.

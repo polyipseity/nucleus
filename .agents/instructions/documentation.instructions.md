@@ -7,91 +7,55 @@ alwaysApply: true
 
 # Documentation standards
 
-Document the **WHY, not the WHAT** — rationale, security implications, design tradeoffs — not restatements of existing code. Use the formal documentation mechanism for each file type; fall back to `#` comments otherwise. Rationale comments use `# WHY: <reason>` (mandatory colon, lowercase keyword); see `comment-annotations.instructions.md`.
-
-No backwards compatibility (see [AGENTS.md#no-backwards-compatibility](../../../AGENTS.md#no-backwards-compatibility)): document the current path only.
-
-When a setting cannot be auto-validated by tests or schemas, include an inline source citation (see Citation quality below).
+Document **WHY, not WHAT** — rationale, security, tradeoffs — not code restatements. Rationale: `# WHY: <reason>`. No backwards compatibility: document the current path only. When a setting cannot be auto-validated, add an inline source citation (`citation-quality.reference.md`).
 
 ## Nix files (`src/**/*.nix`)
 
-Inline `#` comments are the documentation mechanism.
+Inline `#` comments.
 
-- **File header**: every `.nix` file opens with a `#` comment: file path relative to `src/`, a dash, and a plain-language purpose. Example: `# modules/shell.nix — Interactive shell configuration for all hosts.`
-- **Non-trivial `let` bindings**: every helper function, derived value, or multi-step computation in a `let` block needs a `#` comment explaining what it computes and why.
-- **`system.activationScripts` and `home.activation` entries**: each entry must have a banner comment (separator line + entry name + purpose + algorithm notes) explaining what the script does, what invariant it maintains, and any side effects. See `platforms/macOS/modules/default.nix` for the pattern.
-- **`lib.mkOption` calls**: the `description` field is mandatory on every `mkOption` call. It must explain what the option controls and what effect different values have, not restate the type.
-- **Non-obvious inline code**: `builtins.*` calls, `lib.*` expressions, and config block patterns not immediately clear to a reader unfamiliar with Nix must have a `#` comment explaining the purpose.
-- **Document the WHY**: explain the rationale, security implication, or design tradeoff behind a setting (why a PAM service name was chosen, why an option combination closes a specific attack surface) rather than describing what the option does.
+- **File header**: `# <relative-path> — <purpose>`.
+- **`let` bindings**: comment what each helper computes and why.
+- **Activation entries**: banner comment (separator + name + purpose + algorithm). See `platforms/macOS/modules/default.nix`.
+- **`mkOption`**: `description` mandatory — explain control and value effects, not the type.
+- **Non-obvious code** (`builtins.*`, `lib.*`, unfamiliar patterns): comment the purpose.
+- **WHY**: rationale, security, tradeoffs behind settings.
 
 ## PowerShell files (`src/**/*.ps1`)
 
-Comment-based help (`<# … #>`) is the formal mechanism, required on every function and entry-point script.
+Comment-based help on every function and entry-point.
 
-- **Script-level help**: every entry-point `.ps1` opens with a `<# .SYNOPSIS … .DESCRIPTION … .PARAMETER … .EXAMPLE … #>` block before `[CmdletBinding()]` or `param(…)`.
-- **Function-level help**: every `function Verb-Noun { … }` gets its own `<# .SYNOPSIS … .DESCRIPTION … .PARAMETER … .OUTPUTS … .EXAMPLE … #>` block. Required: `.SYNOPSIS`, `.DESCRIPTION`, `.PARAMETER` (one per parameter), `.EXAMPLE`. Add `.OUTPUTS` when the function returns a value.
-- **Inline logic comments**: non-trivial logic blocks, exit-code checks, and PowerShell idioms that are not immediately obvious need an inline `#` comment explaining what the block does and why this approach was chosen.
-- **Document the WHY**: record rationale behind security-sensitive patterns (e.g. "env var cleared in `finally` so it is never left in the environment on failure") and non-obvious error-handling or recovery behaviour.
+- **Script-level**: `<# .SYNOPSIS … .DESCRIPTION … .PARAMETER … .EXAMPLE … #>` before `param(…)`.
+- **Function-level**: same block. One `.PARAMETER` per param. Add `.OUTPUTS` when returning a value.
+- **Inline**: non-obvious logic, exit codes, idioms get `#` comments. Document WHY behind security/error-handling patterns.
 
 ## WinGet DSC YAML (`src/hosts/Windows/**/*.yml`)
 
-`directives.description:` on each resource entry is the formal documentation mechanism.
-
-- Mandatory: every resource entry must include a non-empty `directives.description:` value.
-- **WHY not WHAT**: state the reason the resource exists and its practical effect, not restate the resource type or key names. "Enable long path support so Nix store paths and deep Git trees do not hit the 260-character Windows limit" is better than "Enable long path support in the registry."
-- When a resource sets a non-obvious value, the description must explain what enabling or disabling it changes in practice.
-- If a resource uses `dependsOn:`, the description should note why the ordering constraint exists.
+`directives.description:` on every resource. State reason and practical effect, not the resource type. For non-obvious values: explain what enabling/disabling changes. `dependsOn:`: note the ordering reason.
 
 ## Shell scripts (`scripts/**`, `src/scripts/**`)
 
-`#` comments are the documentation mechanism.
-
-- **File header**: every shell script begins (after the shebang) with a `#` comment block stating: (1) what the script does, (2) accepted commands/arguments, (3) environment variables read, and (4) exit conditions or prerequisites.
-- **Function-level comments**: every named function gets a `#` comment block immediately before it: what it does, arguments (`# Args: $1 — …`), outputs or side-effects, and preconditions. See `scripts/bootstrap.sh` for the pattern.
-- **Non-trivial inline logic**: `case` branches, conditional chains, and environment variable reads that are not self-explanatory need an inline `#` comment.
-- **Document the WHY**: state why a tool or flag was chosen (e.g. "`set -a` exports all variables so child processes inherit version pins") and document any behaviour a future reader might change incorrectly.
+- **File header** (after shebang): what, args, env vars, exit conditions.
+- **Functions**: what, args, outputs, preconditions (see `scripts/bootstrap.sh`).
+- **Logic**: inline `#` for non-obvious `case` branches, conditionals, env reads. Document WHY for tool/flag choices.
 
 ## Host MANUAL.md (`src/hosts/**/MANUAL.md`)
 
-Concise post-apply checklists containing only steps that cannot be safely automated.
+Ongoing operations only — no one-off migrations. Minimal formatting: title + bullets + backtick names. `command shortcuts` section + `nucleus commands` section. Group permissions by category. Remove steps when automatable.
 
-- **Ongoing operations only — never one-off migrations.** Execute path moves and cleanup before the breaking commit lands; do not add deferred migration sections (see [AGENTS.md#no-backwards-compatibility](../../../AGENTS.md#no-backwards-compatibility)).
-- Keep formatting minimal: title plus short bullet lists. Use direct actions with concrete names in backticks.
-- Include a `command shortcuts` section (complete set, names starting with `-` like `-g`, `-ga`) and a separate `nucleus commands` section.
-- Group permission-grant steps by category (e.g. Accessibility, Screen Recording); each permission appears once with all apps that need it.
-- Do not duplicate behavior that `apply` already guarantees. Remove steps when they become automatable.
-- Point to setup commands (e.g. `nucleus-cloud setup`) instead of expanding internal details.
+## UI label naming
 
-## UI label naming convention
-
-All user-facing UI labels (right-click context menu entries, dock/folder/script labels, button text, and other visible text) use sentence case (capitalize only the first word and proper nouns). This applies across all hosts: macOS `.app` bundles (`NSMenuItem`), NixOS file manager entries (Nautilus scripts, Dolphin `Name=`), and Windows Registry context menu entries (`valueData`).
-
-Exception: system-internal identifiers (`CFBundleIdentifier`), filenames on disk that differ from display names, and AppleScript source code may use whatever case the platform requires.
+Sentence case for all user-facing labels across all hosts (macOS `NSMenuItem`, NixOS Nautilus/Dolphin `Name=`, Windows Registry `valueData`). Exception: system-internal identifiers, filenames differing from display names, AppleScript source.
 
 ## Citation quality
 
-When citing external sources, keep URLs and content correct to prevent drift. Prefer developer docs over user help; Apple URLs must include `en-us` locale; never cite deprecated APIs as current. Full source preference rules, URL standardization, deprecation hygiene, and citation style examples are in `citation-quality.reference.md`.
+Developer docs over user help. Apple URLs need `en-us`. Never cite deprecated APIs as current. Full rules: `citation-quality.reference.md`.
 
-## Deterministic JSON generation
+## Deterministic JSON
 
-Generated JSON artifacts (e.g. `winget-packages.json`, `lockfile.json`) are committed and consumed by tooling. They must be byte-stable across runs so diffs show only real changes.
+Byte-stable across runs. Keys sorted case-sensitively by char code (`ConvertTo-Json` does NOT sort). Arrays sorted when sets/allow-lists. Single trailing newline. 2-space indent, empty objects/arrays compact. Use `toSortedJSON` (Nix) or `ConvertTo-SortedJson` (PowerShell). No insertion-order drift or one-line compaction. In-memory JSON never persisted is exempt.
 
-1. **Object keys sorted case-sensitively.** Emit keys in ascending order by char code (`A`–`Z` < `a`–`z`). `ConvertTo-Json` (PowerShell) does NOT sort — build the object with keys already in sorted order, or sort explicitly.
-2. **Array elements sorted case-sensitively** when the array is a set/allow-list. Sort by char code before serialization.
-3. **Single trailing newline.** End the file with exactly one `\n`.
-4. **Multi-line output.** Emit pretty-printed, 2-space-indented JSON. Use `toSortedJSON` (Nix) or `ConvertTo-SortedJson` (PowerShell). Empty objects/arrays stay compact (`{}` / `[]`).
-5. **Deterministic and diff-friendly.** No insertion-order drift, no unsorted maps, no missing trailing newline, no one-line compaction.
+Utilities: `src/modules/lib/json.nix` `toSortedJSON`; `src/platforms/Windows/modules/lib/` `Sort-JsonObject` / `ConvertTo-SortedJson`.
 
-In-memory JSON that is never persisted (e.g. `builtins.toJSON` in activation strings) is exempt from multi-line rules.
+## Markdown and agent customization
 
-Shared utilities: `src/modules/lib/json.nix` `toSortedJSON`; `src/platforms/Windows/modules/lib/` `Sort-JsonObject` / `ConvertTo-SortedJson`.
-
-## Markdown and agent customization authoring
-
-For markdown docs, AGENTS.md, prompt files, and agent customization markdown under `AGENTS.md, .agents/**/*.md, .opencode/**/*.md, .github/**/*.md`:
-
-- Keep docs short, scannable, and repo-specific. Link to canonical files instead of copying long policy blocks.
-- Follow `.markdownlint.jsonc` (root) and `.agents/.markdownlint.jsonc` (under `.agents/**`). Do not hard-wrap paragraphs (`MD013` disabled). Inline HTML and bare anchors allowed (`MD033`, `MD051` disabled). Under `.agents/**`, emphasis-only pseudo-headings allowed (`MD036` disabled).
-- Keep valid YAML frontmatter in `.instructions.md` and `.prompt.md` files. Quote `description` and start it with "Use when ...". Keep `applyTo` narrow and specific.
-- `commit-staged.prompt.md` is intentionally duplicated in three locations; body content must match: `.agents/prompts/commit-staged.prompt.md` (repo / OpenCode), `.opencode/commands/commit-staged.prompt.md` (symlink), `src/users/default/agents/prompts/commit-staged.prompt.md` (user overlay / Cursor).
-- Do not add `.github/copilot-instructions.md`; root `AGENTS.md` is canonical.
+Short, scannable, repo-specific. Link to canonical files. Follow `.markdownlint.jsonc` (root) and `.agents/.markdownlint.jsonc` (`.agents/**`). `MD013`/`MD033`/`MD051` disabled; `MD036` disabled under `.agents/**`. Valid YAML frontmatter in `.instructions.md`/`.prompt.md`. `commit-staged.prompt.md` tripled (`.agents/prompts/`, `.opencode/commands/`, `src/users/default/agents/prompts/`); body must match. No `.github/copilot-instructions.md`.

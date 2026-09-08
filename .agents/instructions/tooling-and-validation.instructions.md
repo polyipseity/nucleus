@@ -22,11 +22,7 @@ Noninteractive only: `GH_PROMPT_DISABLED=1`, `GH_PAGER=cat`. Prefer `--json`/`--
 
 Change tooling instructions → update neighboring configs same pass. Test counts from current `tests/` tree, not stale prose. Prefer real repo file names in examples.
 
-## Skill vs instruction vs AGENTS.md
-
-- **AGENTS.md**: durable conventions, ~30 lines/section max.
-- **`.instructions.md`**: file-type-scoped, narrow `applyTo`, lean.
-- **`SKILL.md`**: on-demand, avoid duplicating AGENTS.md.
+**AGENTS.md** = durable conventions (~30 lines/section). **`.instructions.md`** = file-type-scoped, narrow `applyTo`. **`SKILL.md`** = on-demand reference, don't duplicate AGENTS.md.
 
 ## Validation guidance
 

@@ -6,95 +6,80 @@ applyTo: "src/modules/apps.json, src/modules/apps.schema.json, src/scripts/autos
 
 # App auto-start registry
 
-## Policy (hard constraint)
+## Policy
 
-One mechanism per app per host controls auto-start — ours, never the app's native setting.
+One mechanism per app per host — ours, never the app's.
 
-1. **Disable the app's native auto-start** wherever one exists: macOS "Open at Login" / Login Item checkbox, Windows in-app "Start at login" or a Run key the app writes, Linux an XDG `.desktop` the app ships. Disable declaratively when a managed preference exists (`defaults`/`plist`, Group Policy, `dconf`); otherwise disable imperatively per-run so the app cannot re-enable itself.
-2. **Enable/disable via our single uniform mechanism** — a registry-driven, platform-specific launcher:
-   - macOS: login items we add/remove via `osascript System Events`. Headless/system items use a LaunchAgent or system-extension entry we own. TCC caveat: the `osascript System Events` login-item path may require the script runner to be granted Accessibility under System Settings → Privacy & Security on first run (UI scripting). Activation surfaces a manual-approval reminder when the runner lacks the entitlement.
-   - NixOS: an XDG autostart `.desktop` we write/remove in `~/.config/autostart/`.
-   - Windows: a Run-key entry or Startup-folder `.lnk` we write/remove.
+1. **Disable native auto-start** wherever one exists: macOS "Open at Login", Windows Run key, Linux XDG `.desktop`. Disable declaratively (`defaults`/`plist`, Group Policy, `dconf`) or imperatively per-run.
+2. **Enable/disable via uniform mechanism** — registry-driven, platform-specific:
+   - macOS: login items via `osascript System Events`. Headless/system: LaunchAgent or system-extension. TCC: script runner may need Accessibility on first run; activation surfaces reminder.
+   - NixOS: XDG autostart `.desktop` in `~/.config/autostart/`.
+   - Windows: Run-key or Startup-folder `.lnk`.
 
-No app-native "enable" path is ever used as the control mechanism.
+## Omission rule
 
-## Omission rule (hard constraint)
-
-An app may be `omitted` on a host only when the software has no build or port for that platform. The omission must state platform inapplicability (e.g. "no Linux build exists"), not point at a substitute.
-
-- Valid: WhatsApp on NixOS — "No Linux client exists; WhatsApp is macOS/Windows only."
-- Invalid: "PowerToys provides the Windows equivalent" or "Linux uses the native service" — cite a substitute, not a platform constraint.
+`omitted` only when software has no build for that platform. State platform inapplicability, not a substitute. Valid: WhatsApp/NixOS "No Linux client". Invalid: "PowerToys provides the equivalent".
 
 ## Registry location and shape
 
-- `src/modules/apps.json` is the SSOT for GUI/user app auto-start. Every entry declares per host: `autostartEnabled` (bool — launch it), `autostartDisableNative` (bool — disable the app's native setting), and `kind` (`login-item` | `launchagent` | `xdg-desktop` | `run-key` | `startup-folder` | `system-extension`).
-- `autostartDisableNative` is first-class: the app's own setting is always disabled (imperatively if no declarative toggle exists).
-- Schema: `src/modules/apps.schema.json` reuses shared parity definitions from `src/modules/registry-common.schema.json`. Every app requires `MacBook`/`NixOS`/`Windows` keys, or an explicit `omitted` + `justification` entry.
-- Tooling: `src/scripts/autostart.sh` (POSIX) and `src/scripts/autostart.ps1` (Windows) mirror the `svc` CLI surface (`list`/`status`/`enable`/`disable`/`apply`/`verify`) but manage login bootstrap, not daemon lifecycle. They live under `src/scripts/` (convergence tooling invoked by activation scripts), NOT `scripts/` (reserved for `nucleus-*` apps). Windows convergence is invoked from `Sync-AppAutostart.ps1` during `apply.ps1`.
+- `src/modules/apps.json` — SSOT. Per-host: `autostartEnabled` (bool), `autostartDisableNative` (bool), `kind` (`login-item` | `launchagent` | `xdg-desktop` | `run-key` | `startup-folder` | `system-extension`).
+- `autostartDisableNative` always-on: native setting disabled even without declarative toggle.
+- Schema: `src/modules/apps.schema.json` reuses `src/modules/registry-common.schema.json`. Each app needs `MacBook`/`NixOS`/`Windows` keys, or `omitted` + `justification`.
+- Tooling: `src/scripts/autostart.sh`/`.ps1` — `list`/`status`/`enable`/`disable`/`apply`/`verify`. Under `src/scripts/` (convergence), not `scripts/` (`nucleus-*`). Windows invoked from `Sync-AppAutostart.ps1`.
 
 ## Menu-bar / tray-icon registry (same SSOT)
 
-Menu-bar / tray-icon visibility is converged from the same `apps.json` SSOT via a `menuBarIcon` block on each host entry. It is a distinct concern from auto-start:
+Converged from `apps.json` via `menuBarIcon` block per host. Distinct from auto-start: auto-start is OR → disables native; icon is AND → convergence sets desired state, never disables.
 
-- Auto-start is OR (app-native OR our login item ⇒ launches), so auto-start disables the native setting.
-- Icon visibility is AND (icon shows only if the app-native show setting AND the OS both allow it). There is no separate "our mechanism" — the app's native preference is the control. The convergence tool sets it to the desired state; it never disables it.
+`menuBarIcon` fields (see `apps.schema.json` `menuBarIconEntry`):
 
-`menuBarIcon` block fields (see `apps.schema.json` `menuBarIconEntry`):
+- `iconVisible` (bool, required), `kind` (required) — `defaults-key`, `plist`, or `activation-script`.
+- `defaults-key`: `domain` + `key` + `valueType`. `plist`: `plistPath` + `key` + `valueType`.
+- `iconVisibleValue`/`iconHiddenValue` — typed per `valueType`. Inverted keys (BetterDisplay `hideMenuIcon`, Rectangle `hideMenubarIcon`, LuLu `noIconMode`): `iconVisible: false`, `iconVisibleValue: false`, `iconHiddenValue: true`.
+- `justification` — required for allow-listed apps or when block intentionally omitted.
 
-- `iconVisible` (bool, required) — the desired end state (true = show, false = hide).
-- `kind` (required) — `defaults-key` (macOS `defaults`/`plist` domain+key), `plist` (arbitrary plist path, e.g. LuLu's `/Library/Objective-See/LuLu/preferences.plist`), or `activation-script` (delegates to a host activation script).
-- `domain` + `key` + `valueType` (`defaults-key`), or `plistPath` + `key` + `valueType` (`plist`).
-- `iconVisibleValue` / `iconHiddenValue` (typed per `valueType`: bool/string/int) — the native value that means "visible" / "hidden". Inverted keys (e.g. BetterDisplay `hideMenuIcon`, Rectangle `hideMenubarIcon`, LuLu `noIconMode`) express the inversion here rather than via a disable flag: `iconVisible: false`, `iconVisibleValue: false`, `iconHiddenValue: true`.
-- `justification` — required when the app is allow-listed (Amphetamine/Stats) or otherwise intentionally omits a `menuBarIcon` block.
-
-Tooling mirrors the autostart CLI surface (`list`/`status`/`show`/`hide`/`apply`/`verify`): `src/scripts/menu-bar.sh` (POSIX) and `src/scripts/menu-bar.ps1` (Windows), invoked from `macos-configure-menu-bar-icons.sh` / `nixos-configure-menu-bar.sh` / `Sync-MenuBar.ps1`. `plist` kind on macOS restarts the owning daemon (via `pgrep`/`pkill` bundleId) so the new value takes effect.
+Tooling: `src/scripts/menu-bar.sh`/`.ps1` — `list`/`status`/`show`/`hide`/`apply`/`verify`. `plist` kind restarts owning daemon via `pgrep`/`pkill` bundleId.
 
 ## Boundary with `services.json`
 
-- `services.json` = background daemons/agents (camilladsp, jellyfin, caddy, discord-music-rpc, etc.). Untouched by this registry.
-- `apps.json` = foreground GUI apps the user launches at login (Raycast, Amphetamine, BetterDisplay, MiddleClick, Mounty, Stats, LinearMouse, LuLu, OrbStack, Parsec, Steam [disabled], Telegram, WhatsApp, battery, etc.).
-- `battery` is a macOS menu-bar GUI app that auto-starts at login — it belongs in `apps.json` as a `login-item` entry, not `services.json`. The `battery` CLI is the same app's command interface, not a separate service.
-- System-extension apps (fuse-t, Chrome Remote Desktop Host) are tracked in `apps.json` as `system-extension` entries (no exceptions) even though they cannot be force-launched — documented as manual-approval.
+- `services.json` = background daemons/agents (camilladsp, jellyfin, caddy). Untouched.
+- `apps.json` = foreground GUI apps at login (Raycast, Amphetamine, BetterDisplay, etc.).
+- `battery` = menu-bar GUI → `apps.json` `login-item`, not `services.json`.
+- System-extension apps (fuse-t, Chrome Remote Desktop Host) = `system-extension` entries, manual-approval.
 
 ## Adding a new app
 
-1. Add the app block to `apps.json` with `MacBook`/`NixOS`/`Windows` entries (or `omitted` + `justification`).
-2. Set `autostartDisableNative: true` on every host where the app ships a native auto-start setting.
-3. Pick the uniform `kind` per host from the allowed enum.
-4. Run `src/scripts/autostart.sh apply` (or `autostart.ps1 apply` on Windows) to converge; `verify` must pass.
-5. No backwards-compat shims: remove any ad-hoc per-app script in the same change that adds the registry entry.
+1. Add block to `apps.json` with host entries (or `omitted` + `justification`).
+2. `autostartDisableNative: true` on every host with native auto-start.
+3. Pick `kind` per host from enum.
+4. `autostart.sh apply`/`autostart.ps1 apply`; `verify` must pass.
+5. Remove ad-hoc per-app script in same change — no compat shims.
 
 ## Menu bar icon policy
 
-By default, hide all menu bar icons on the MacBook host. Configure both the app and macOS to hide the icon where possible. When asked to disable, disable as much as possible; when asked to enable, enable as much as possible. The default is disable.
+Default: hide all MacBook menu bar icons. Configure both app and macOS to hide where possible.
 
-### Allow-list
+### Allow-list (class f — Control Center gate)
 
-These apps keep a menu bar icon (enabled via the Control Center gate, class f):
-- Amphetamine — menu-bar-only by design (LSUIElement); provisioned as the focus/energy tool.
-- Stats — the user-visible monitoring surface; replaces the macOS battery percentage item.
-- Mounty — NTFS remount surface; menu-bar-only by design.
-- OrbStack — menu-bar-first VM/container manager.
-
-Never set a hide key for allow-listed apps.
+Amphetamine (menu-bar-only, LSUIElement), Stats (monitoring, replaces battery), Mounty (NTFS remount, menu-bar-only), OrbStack (VM/container manager). Never set hide key for these.
 
 ### Hide mechanisms
 
 | Class | Mechanism | Examples |
 | --- | --- | --- |
-| a | Declarative preference key, converged from `apps.json` `menuBarIcon` via `src/scripts/menu-bar.sh` | Raycast, BetterDisplay, AltTab, Rectangle, LinearMouse, LuLu |
-| b | ⌘-drag only (per-session; icon returns on relaunch) | MiddleClick |
-| c | Icon is the app's primary UI — not hideable | Equaliser |
+| a | Declarative via `apps.json` `menuBarIcon` | Raycast, BetterDisplay, AltTab, Rectangle, LinearMouse, LuLu |
+| b | ⌘-drag (per-session) | MiddleClick |
+| c | Primary UI — not hideable | Equaliser |
 | d | No supported option | Parsec, Telegram, WhatsApp, Steam |
-| f | macOS 26 Control Center `NSStatusItem` gate, converged from `apps.json` | Amphetamine, Stats, Mounty, OrbStack |
+| f | macOS 26 Control Center `NSStatusItem` gate | Amphetamine, Stats, Mounty, OrbStack |
 
 ### System items
 
-Hide Siri (`com.apple.Siri` `StatusMenuVisible`), Spotlight (`com.apple.Spotlight` `MenuItemHidden`, ByHost), the Input Menu (`com.apple.TextInputMenu.visible`), and the Control Centre battery item (`Battery = 12`, ByHost; Stats replaces it).
+Hide Siri (`com.apple.Siri` `StatusMenuVisible`), Spotlight (`com.apple.Spotlight` `MenuItemHidden`, ByHost), Input Menu (`com.apple.TextInputMenu.visible`), battery (`Battery = 12`, ByHost).
 
 ### Rules
 
-- Set `NSStatusItemSpacing`/`NSStatusItemSelectionPadding` as low as possible: 0, falling back to 4 when icons overlap.
-- The macOS 26 Control Center `NSStatusItem` gate is managed declaratively via `defaults write com.apple.controlcenter "NSStatusItem Visible <BundleID>"` from `apps.json` `menuBarIcon` via `src/scripts/menu-bar.sh`. Pre-Tahoe this key is a harmless no-op.
-- Apps with no programmatic hide mechanism are still declared in `apps.json` with `kind: "manual"` and `provisioned: false`.
-- ByHost plists (`defaults -currentHost`) cannot be written by `system.defaults.CustomUserPreferences`; use an activation script with the `macos-console-user.sh` pattern.
+- `NSStatusItemSpacing`/`NSStatusItemSelectionPadding`: 0 min, fallback 4 on overlap.
+- macOS 26 gate: `defaults write com.apple.controlcenter "NSStatusItem Visible <BundleID>"` via `menu-bar.sh`. Pre-Tahoe: no-op.
+- No hide mechanism: declare `kind: "manual"`, `provisioned: false`.
+- ByHost plists: use activation script with `macos-console-user.sh` pattern, not `system.defaults.CustomUserPreferences`.

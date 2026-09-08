@@ -61,23 +61,15 @@ Two-space indent; ✓ green / ✗ red / SKIP yellow / ⊘ yellow; dim labels.
 
 Palette: bold/red/yellow/magenta/green/cyan/blue/dim, underline (`4m`), underline-cyan (`4;36m`). 16 named colors only. POSIX vars in lib.sh: `_nuc_c{1,2}_blue`, `_nuc_c{1,2}_underline`, `_nuc_c{1,2}_ulcyan`.
 
-### Semantic inline coloring
+Semantic coloring: URLs → underline-cyan; single-quoted → blue. Quote pass first. Regex-only, no markup delimiters. Applied by `_nuc_semantic_color` (lib.sh) and `ConvertTo-NucleusSemanticColor` (Format-NucleusOutput.psm1).
 
-URLs → underline-cyan; single-quoted → blue. Quote pass first. Regex-only, no markup delimiters. POSIX `_nuc_semantic_color` (lib.sh); PS1 `ConvertTo-NucleusSemanticColor` (Format-NucleusOutput.psm1).
-
-### Color detection
-
-`NO_COLOR` non-empty → off (strips all decoration). `FORCE_COLOR` non-0 / `CLICOLOR_FORCE` → on. Else per-stream tty AND `TERM != dumb`. PS1 additionally: `$Host.UI.SupportsVirtualTerminal` AND `-not [Console]::IsOutputRedirected`. Engine owns `NO_COLOR` → `$PSStyle.OutputRendering = PlainText`; module must NOT mutate it.
-
-Color in shared helpers only (lib.sh, Format-NucleusOutput.psm1, step-runner, test-lib) — no raw ANSI, `tput`, `echo -e` elsewhere (check step 14).
+Detection: `NO_COLOR` non-empty → off (strips all decoration). `FORCE_COLOR` non-0 / `CLICOLOR_FORCE` → on. Else per-stream tty AND `TERM != dumb`. PS1 additionally checks `$Host.UI.SupportsVirtualTerminal` AND `-not [Console]::IsOutputRedirected`. Engine owns `NO_COLOR` → `$PSStyle.OutputRendering = PlainText`; module must NOT mutate it. Color in shared helpers only — no raw ANSI, `tput`, `echo -e` elsewhere (check step 14).
 
 ---
 
 ## Log storage and rotation
 
-Roots from `services.json` `$logging`: MacBook `~/nucleus/logs` + `/Users/Shared/nucleus/logs`; NixOS `~/.local/state/nucleus/log` + `/var/log/nucleus`; Windows `%LOCALAPPDATA%\nucleus\logs` + `%ProgramData%\nucleus\logs`. Override: `NUCLEUS_LOG_DIR`/`NUCLEUS_SYSTEM_LOG_DIR`. Unit output paths hardcoded per-module; `logging.capture` handles display/rotation/health-check only.
-
-Rotation: copy-truncate + gzip; default 7d expiry; `services.schema.json` defaults (maxSize 10000000, maxFiles 4, compress true, sanitize true).
+Roots from `services.json` `$logging`: MacBook `~/nucleus/logs` + `/Users/Shared/nucleus/logs`; NixOS `~/.local/state/nucleus/log` + `/var/log/nucleus`; Windows `%LOCALAPPDATA%\nucleus\logs` + `%ProgramData%\nucleus\logs`. Override: `NUCLEUS_LOG_DIR`/`NUCLEUS_SYSTEM_LOG_DIR`. Unit output paths hardcoded per-module; `logging.capture` handles display/rotation/health-check only. Rotation: copy-truncate + gzip, 7d expiry, `services.schema.json` defaults (maxSize 10000000, maxFiles 4).
 
 ---
 

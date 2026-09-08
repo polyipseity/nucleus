@@ -43,16 +43,11 @@ PATH via `home.sessionPath` (→ `~/.zshenv`), not `initContent` — survives di
 
 ## devShell
 
-Project-specific work. Managed default for repos without direnv/Nix: `bun`, `cargo`/`rustc`, `prek`, `uv`. Auto via direnv with `use flake`; manual via `nix develop`; alternative via managed profile. Windows: WSL or managed PowerShell. POSIX toolchain from `rust-toolchain.toml` (distinct from system `pkgs.rustup`).
+Project-specific work. Managed default for repos without direnv/Nix: `bun`, `cargo`/`rustc`, `prek`, `uv`. Auto via direnv with `use flake`; manual via `nix develop`; alternative via managed profile. Windows: WSL or managed PowerShell. POSIX toolchain from `rust-toolchain.toml`.
 
 ## Adding/changing blocked tools
 
-1. Add to `src/modules/shell.nix` (`initContent`), follow existing pattern.
-2. Add equivalent to `src/scripts/shell/profile.ps1`.
-3. Update this file.
-4. If devShell tool, add to `devShells.default` in `src/flake.nix`.
-
-`DIRENV_DIR` pass-through required in every blocking function. Not blocked: `cargo-binstall`, `cargo-cache`, `rustup`, `ruff`, `ty`.
+1. Add to `src/modules/shell.nix` (`initContent`), follow existing pattern. 2. Add equivalent to `src/scripts/shell/profile.ps1`. 3. Update this file. 4. If devShell tool, add to `devShells.default` in `src/flake.nix`. `DIRENV_DIR` pass-through required in every blocking function. Not blocked: `cargo-binstall`, `cargo-cache`, `rustup`, `ruff`, `ty`.
 
 ## Tool installation
 
@@ -62,29 +57,9 @@ Project-specific work. Managed default for repos without direnv/Nix: `bun`, `car
 
 ## Managed package classification
 
-Declared once in `src/modules/core.nix` `managedPackages`. `category`: `"cli"` → nixpkgs; `"gui"` → Homebrew (cask preferred) on macOS, nixpkgs on NixOS. Ship GUI? Classify `"gui"`.
+Declared once in `src/modules/core.nix` `managedPackages`. `category`: `"cli"` → nixpkgs; `"gui"` → Homebrew (cask preferred) on macOS, nixpkgs on NixOS. Ship GUI component → classify `"gui"`.
 
-### Platform restrictions
-
-Platform-specific packages add `platforms`:
-
-```nix
-iterm2 = {
-  category = "gui";
-  platforms = ["darwin"];
-  homebrew = { kind = "cask"; name = "iterm2"; };
-  nixpkgs = "iterm2";
-};
-```
-
-Darwin-only: `iterm2`, `rectangle`, `stats`, `utm`. Homebrew-only: use `missingNixAttrs`.
-
-### Adding a managed package
-
-1. Add to `managedPackages` in `core.nix` (alphabetical).
-2. `platforms = ["darwin"]` if macOS-only.
-3. Choose category.
-4. Remove duplicates from `NixOS/desktop.nix` if needed.
+Platform-specific packages add `platforms` field (e.g. `platforms = ["darwin"]` for `iterm2`, `rectangle`, `stats`, `utm`). Homebrew-only: use `missingNixAttrs`. Add to `managedPackages` alphabetically; remove duplicates from `NixOS/desktop.nix`.
 
 ## Violations
 
