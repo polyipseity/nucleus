@@ -1,6 +1,10 @@
 {
   "$schema": "./settings.schema.json",
   "allowPty": true,
+  "allowUnixSockets": [
+    "~/.gnupg/S.gpg-agent",
+    "~/.gnupg/S.gpg-agent.extra"
+  ],
   "filesystem": {
     "allowRead": [],
     "allowWrite": [
