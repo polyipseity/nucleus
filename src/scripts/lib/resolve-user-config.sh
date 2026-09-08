@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # Resolves per-user homedir overlay paths. Mirrors users-overlay.nix.
+#
+# Platform differences (documented, not bugs):
+# - Deduplication: case-sensitive (POSIX filenames are case-sensitive)
+# - Symlink detection: checks both -e and -L (broken symlinks resolve to the
+#   entry). This differs from Nix (pathExists follows symlinks) but is
+#   inconsequential in practice (broken symlinks indicate deployment errors).
 set -euo pipefail
 
 # Source lib.sh from this library's own directory (callers set SCRIPT_DIR to

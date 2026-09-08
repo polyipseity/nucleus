@@ -5,6 +5,12 @@
 # deeper paths inherit the chosen first-level entry in whole. Registry JSON
 # domains use users-registry.nix instead.
 #
+# Platform differences (documented, not bugs):
+# - Deduplication: case-sensitive (Nix attribute names are case-sensitive)
+# - Symlink detection: builtins.pathExists follows symlinks; broken symlinks
+#   fall through to default. This differs from shell (-L check) but is
+#   inconsequential in practice (broken symlinks indicate deployment errors).
+#
 # selectUserConfigSource: host-specific files at
 #   src/users/<username>/<config>/<Host>.<ext>
 # with src/users/default/<config>/<Host>.<ext> fallback.
