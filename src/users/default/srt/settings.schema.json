@@ -24,6 +24,19 @@
         "allowLocalBinding": {
           "type": "boolean",
           "description": "Allow binding to local ports"
+        },
+        "allowUnixSockets": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Unix socket paths to allow (macOS: path allowlist; Linux: ignored, uses seccomp)"
+        },
+        "allowAllUnixSockets": {
+          "type": "boolean",
+          "description": "Allow all Unix sockets (macOS: bypass; Linux: disable seccomp blocking)"
+        },
+        "deniedDomainReasons": {
+          "type": "object",
+          "description": "Map from deniedDomains entries to model-facing reason strings"
         }
       }
     },
@@ -55,6 +68,63 @@
     "ignoreViolations": {
       "type": "object",
       "description": "Map command patterns to arrays of paths where violations should be ignored"
+    },
+    "allowAppleEvents": {
+      "type": "boolean",
+      "description": "Allow Apple Events and Launch Services from macOS sandbox (security warning: enables code execution outside sandbox)"
+    },
+    "enableWeakerNestedSandbox": {
+      "type": "boolean",
+      "description": "Enable weaker sandbox mode for Docker environments without privileged namespaces"
+    },
+    "enableWeakerNetworkIsolation": {
+      "type": "boolean",
+      "description": "Allow access to com.apple.trustd.agent for Go TLS verification (security warning: potential data exfiltration vector)"
+    },
+    "mandatoryDenySearchDepth": {
+      "type": "integer",
+      "description": "Linux: ripgrep search depth for mandatory deny paths (1-10, default 3)"
+    },
+    "tlsTerminate": {
+      "type": "object",
+      "description": "TLS termination config for MITM proxy (experimental)",
+      "properties": {
+        "excludeDomains": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Domain patterns to exclude from TLS termination"
+        },
+        "extraCaCertPaths": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Paths to PEM CA certificate files to append to trust bundle"
+        }
+      }
+    },
+    "windows": {
+      "type": "object",
+      "description": "Windows-specific sandbox settings",
+      "properties": {
+        "proxyPortRange": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "description": "Port range [low, high] for JS proxies (must match windows-install --proxy-port-range)"
+        },
+        "sublayerGuid": {
+          "type": "string",
+          "description": "WFP sublayer GUID under which filters were installed"
+        },
+        "srtWin": {
+          "type": "object",
+          "description": "srt-win binary configuration",
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Path to srt-win binary (omit to use bundled vendor copy)"
+            }
+          }
+        }
+      }
     }
   }
 }
