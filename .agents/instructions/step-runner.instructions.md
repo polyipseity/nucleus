@@ -153,7 +153,7 @@ Live console chrome follows the F2/F4 palette via the shared color helpers — P
 - Step chrome (F2): `[step NN]` marker is dim, content default.
 - Results table (F4): glyphs ✓ green / ✗ red / SKIP yellow / ⊘ yellow (test-lib), labels dim.
 - Captured step files and skip messages are plain: color is console-only, capture files hold no escape sequences.
-- Colors are gated by NO_COLOR / FORCE_COLOR / tty detection per the console color spec in `logging.instructions.md`.
+- Colors are gated by NO_COLOR / FORCE_COLOR / tty detection per the console color spec in `output-handling.instructions.md`.
 
 ## Spec F: Silent skip elimination
 

@@ -82,8 +82,7 @@ Check/test preflight, tool-availability policy, and scoped-mode conventions: `.a
 - MacBook menu bar icons default to hidden; only Amphetamine and Stats may show. Policy, per-app hide mechanisms, and system-item keys: `.agents/instructions/app-autostart.instructions.md` § Menu bar icon policy.
 - Use `.yml` for YAML files (except required `.sops.yaml`).
 - Do not hide meaningful errors (`2>/dev/null`, unconditional `|| true`, `-ErrorAction SilentlyContinue`) unless failure is expected, explicitly justified, and still checked.
-- All command output and log files follow the canonical logging standard in `.agents/instructions/logging.instructions.md` (F1-F5 formats, console colors, log storage/rotation).
-- Error vs warning vs info severity: `.agents/instructions/error-handling.instructions.md` (hard-error default; warning requires `# check-suppress` justification). Level taxonomy: `logging.instructions.md`.
+- All command output, log files, and severity decisions follow the canonical standard in `.agents/instructions/output-handling.instructions.md` (severity model, F1-F5 formats, console colors, log storage/rotation).
 - Comment annotations follow `.agents/instructions/comment-annotations.instructions.md` (suppressions, references, rationale, sentinels); Category 1+2 machine-parsed, Category 3+4 not.
 - Hostnames: `MacBook`, `NixOS`, `Windows`. Host vs platform naming: `.agents/instructions/cross-host-feature-parity.instructions.md` (Host vs platform naming section).
 - Prefer preview/beta/canary channels when viable; if stable is required, add a short `# WHY:` comment.
