@@ -1,10 +1,24 @@
 ---
-description: "Use when handling PSScriptAnalyzer lint results in PowerShell files. Covers suppression rules, per-rule fix strategies, and how to document new rule policies."
+description: "Use when authoring or editing PowerShell files: authoring conventions (file naming, here-strings, parameter passing), PSScriptAnalyzer lint results, suppression rules, per-rule fix strategies, and how to document new rule policies."
 name: "PowerShell Lint Policy"
 applyTo: "**/*.ps1, scripts/*-PSScriptAnalyzerSettings.psd1"
 ---
 
 # PowerShell lint rule fixing policy
+
+## PowerShell conventions
+
+### File naming
+
+Standalone entry points: PascalCase `Verb-Noun` (e.g. `Get-SystemInventory.ps1`). The `scripts/` directory keeps paired shell basenames (`.sh` + `.ps1` aligned). Modules under `src/platforms/Windows/modules/` should export a single `Verb-Noun` function per file; rename the module and update `src/hosts/Windows/apply.ps1` dot-sourcing paths in the same change. Collection-operating functions use collection-indicating singular nouns: see `## PSUseSingularNouns` below.
+
+### Here-string extraction
+
+Extract inline here-strings to `modules/scripts/<name>.ps1`. Read with `Get-Content -Raw (Join-Path -Path $PSScriptRoot -ChildPath "..\scripts\<name>.ps1")`. Token replacement for double-quote here-strings: `-replace '__TOKEN__', $value`. Single-quote here-strings need no replacement.
+
+### Explicit parameter passing
+
+Behavioral parameters (`Enabled`, `Users`) must be `[Parameter(Mandatory)]`. Never auto-derive paths from `$PSScriptRoot`. Functions touching user profiles need explicit `-Username` or `-Users`. No deprecated parameters — remove entirely. Show all mandatory parameters in `.SYNOPSIS` and `.EXAMPLE`.
 
 ## Suppression rules
 

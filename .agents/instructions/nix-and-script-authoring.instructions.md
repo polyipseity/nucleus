@@ -212,20 +212,6 @@ A privilege is "required" only when the operation cannot succeed without it.
 
 **Jellyfin admin token** (`.Policy.IsAdministrator`): not covered by this policy. Missing token = hard-error, not warn-and-skip. This is a configuration-prerequisite check, not an escalation case.
 
-## PowerShell conventions
-
-### File naming
-
-Standalone entry points: PascalCase `Verb-Noun` (e.g. `Get-SystemInventory.ps1`). The `scripts/` directory keeps paired shell basenames (`.sh` + `.ps1` aligned). Modules under `src/platforms/Windows/modules/` should export a single `Verb-Noun` function per file; rename the module and update `src/hosts/Windows/apply.ps1` dot-sourcing paths in the same change. Collection-operating functions use collection-indicating singular nouns: see `pwsh-lint-policy.instructions.md`.
-
-### Here-string extraction
-
-Extract inline here-strings to `modules/scripts/<name>.ps1`. Read with `Get-Content -Raw (Join-Path -Path $PSScriptRoot -ChildPath "..\scripts\<name>.ps1")`. Token replacement for double-quote here-strings: `-replace '__TOKEN__', $value`. Single-quote here-strings need no replacement.
-
-### Explicit parameter passing
-
-Behavioral parameters (`Enabled`, `Users`) must be `[Parameter(Mandatory)]`. Never auto-derive paths from `$PSScriptRoot`. Functions touching user profiles need explicit `-Username` or `-Users`. No deprecated parameters — remove entirely. Show all mandatory parameters in `.SYNOPSIS` and `.EXAMPLE`.
-
 ## Library purity
 
 Libraries (`src/scripts/lib/` and `src/platforms/Windows/modules/scripts/`) are pure function/constant definitions: no top-level side effects on import, no `__TOKEN__` placeholders, Nix does not `builtins.readFile` lib files, and data from Nix flows through the consumer script to lib via function args. A lib may be embedded via `builtins.readFile` when it has a clean function definition wrapped into a standalone script.
@@ -252,10 +238,6 @@ All killing, refresh, and restart operations must go through centralized library
 ## Runtime configuration (`nucleus-config`)
 
 Runtime toggles live at `~/.local/state/nucleus/config.json` (outside `~/.config/` so changes survive rebuilds). All toggles default to `true` when absent, enforced by `scripts/config.sh` / `scripts/config.ps1`. Services read the config file directly for early-boot compatibility. When adding a toggle: add a default entry to both script implementations, update consuming code to read the key (defaulting to `true`).
-
-## PowerShell linting
-
-`scripts/check-pwsh.ps1` splits work across pipelines: check (pre-commit) runs syntax-only; test (pre-push) runs PSScriptAnalyzer. Standalone `nucleus-check pwsh` runs both. Always exclude `PSUseBOMForUnicodeEncodedFile` in settings files — UTF-8 without BOM is the repo standard. Verb-Noun and collection-singular naming: `pwsh-lint-policy.instructions.md`.
 
 ## Terminology in examples
 
