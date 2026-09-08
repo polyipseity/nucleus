@@ -19,7 +19,7 @@ function Skip-SchemaFile([string]$FilePath) {
     $f -like '*users\*\discord-music-rpc\*' -or $f -like '*users/*/discord-music-rpc/*' -or
     $f -like '*users\*\agents\hooks\*.json' -or $f -like '*users/*/agents/hooks/*.json' -or
     $f -like '*users\*\agents\skills\*\_meta.json' -or $f -like '*users/*/agents/skills/*/_meta.json' -or
-    $f -like '*ai\litellm-config.yml' -or $f -like '*ai/litellm-config.yml' -or
+    $f -like '*litellm\litellm-config.yml' -or $f -like '*litellm/litellm-config.yml' -or
     $f -like '*\.sops.yaml' -or $f -like '*/.sops.yaml' -or
     $f -like '*.vscode\*' -or $f -like '*.vscode/*' -or
     $f -like '*.agents\skills\*' -or $f -like '*.agents/skills/*' -or

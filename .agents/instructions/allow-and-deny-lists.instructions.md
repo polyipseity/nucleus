@@ -47,7 +47,7 @@ Categories A–D, dummy key rules below. New exclusions: category ID, tier, `# r
 | A5 | `gc.sh`, `gc.ps1` | `index.lock` | T3 | Git invariant | Quarterly |
 | A6 | `test-lib.sh` | `lib.nix` | T2 | Test helper excluded from test namespace | File exists |
 | A7 | `step-runner.sh`, `.ps1` | `*.schema.json` | T3 | Narrow glob | Quarterly |
-| A8 | `07-schema-validation.sh`, `.ps1` | `*/users/*/vscode/*.json`, `*/users/*/cursor/*.json`, `*/users/*/iterm2/DynamicProfiles/*.json`, `*/users/*/obsidian/*.json`, `*/users/*/qtpass/*.json`, `*/users/*/rimsort/*.json`, `*/configs/camilladsp/*`, `*/configs/camillagui-backend/*`, `*/users/*/discord-music-rpc/*`, `*/users/*/agents/hooks/*.json`, `*/users/*/agents/skills/*/_meta.json`, `*/ai/litellm-config.yml`, `*/.sops.yaml` | T3 | No published schema; vscode:// not fetchable | Quarterly |
+| A8 | `07-schema-validation.sh`, `.ps1` | `*/users/*/vscode/*.json`, `*/users/*/cursor/*.json`, `*/users/*/iterm2/DynamicProfiles/*.json`, `*/users/*/obsidian/*.json`, `*/users/*/qtpass/*.json`, `*/users/*/rimsort/*.json`, `*/configs/camilladsp/*`, `*/configs/camillagui-backend/*`, `*/users/*/discord-music-rpc/*`, `*/users/*/agents/hooks/*.json`, `*/users/*/agents/skills/*/_meta.json`, `*/litellm/litellm-config.yml`, `*/.sops.yaml` | T3 | No published schema; vscode:// not fetchable | Quarterly |
 | A9 | `12-suppression-audit.ps1` | self-file (basename) | T3 | Self-ref contains literal patterns detected | Quarterly |
 
 ### Category B — Directory-based
