@@ -146,12 +146,3 @@ Use this form for every primaryUser-scoped agent defined in an HM module
 `src/modules/cloud-drives.nix`). Reserve `environment.userLaunchAgents` for the
 darwin config context (`src/hosts/MacBook/camilladsp.nix`, imported via
 `MacBook/default.nix` `imports`).
-
-## Related instruction files
-
-- `programming-principles.instructions.md` — General coding principles.
-- `macos-service-hardening.instructions.md` — SIP /bin/sh wrapper and TCC notes
-  for macOS services.
-- `cross-host-feature-parity.instructions.md` — NixOS `systemd.user.services` and
-  Windows equivalents must mirror the macOS agent scope (user-scoped, not
-  system-wide) for parity.

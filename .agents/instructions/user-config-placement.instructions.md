@@ -77,8 +77,3 @@ Default empty subdirs ship with `.gitkeep`. Root `.gitignore` ignores decrypted/
 - Duplicate file in both `configs/` and `users/`.
 - Mixing machine and user scope in one directory tree.
 - Second-level overlay overrides (e.g. overriding a single file inside `default/plasma/desktop/` without replacing the whole `desktop/` first-level entry).
-
-## Related instructions
-
-- `app-config-policy.instructions.md` — deployment methods (writable symlink, merge, runtime read) within each scope.
-- `git-scope-terminology.instructions.md` — dual-scope git reference implementation.

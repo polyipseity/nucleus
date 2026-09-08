@@ -113,13 +113,3 @@ Rule: any new tool-enforced marker MUST register a check id AND a machine consum
 | `iso_checksum = "none"` without `# check-suppress:packer_validate:` = 0 | packer_validate annotation required | step 1 (check-packer --validate-only) |
 | bare `\|\| true` in production scripts = 0 | undocumented suppression | step 12 (suppression audit; `tests/` exempt) |
 | bare `$null =` / `[void]` / `2>$null` / `-ErrorAction SilentlyContinue` in ps1 = 0 | undocumented suppression | step 12 (suppression audit; all ps1 scanned) |
-
-## Related instruction files
-
-- `shellcheck.instructions.md` — shellcheck directive format and `# reason:` rules (Category 2).
-- `pwsh-lint-policy.instructions.md` — PSScriptAnalyzer suppression rules (Category 2).
-- `embedded-content.instructions.md` — embedded-content exception citations (Category 1, check id `embedded-content`).
-- `app-config-policy.instructions.md` — config deployment method annotations (Category 1, check id `config-method`).
-- `documentation.instructions.md` — WHY-not-WHAT comment principle (Category 4).
-- `allow-and-deny-lists.instructions.md` — `# ref:` citation style (Category 4).
-- `maintain.instructions.md` (user-level) — suppression justification rule: `|| true` → `# check-suppress:suppression_doc:`, not `# WHY:`.
