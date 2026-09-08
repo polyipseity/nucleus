@@ -18,7 +18,9 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _spi_repo_root="$1"
 _spi_username="$2"
-if [ -n "$_spi_repo_root" ]; then
+# Skip exporting NUCLEUS_REPO_ROOT when the path is a Nix store snapshot —
+# derive_repo_root() will fall back to the system repo-root file silently.
+if [ -n "$_spi_repo_root" ] && case "$_spi_repo_root" in /nix/store/*) false;; *) true;; esac; then
   export NUCLEUS_REPO_ROOT="$_spi_repo_root"
 fi
 
