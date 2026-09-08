@@ -35,7 +35,7 @@ in
 {
   imports = [
     ./automator-workflows
-    ./app-bundles.nix
+    ./app-bundles
   ];
 
   # Inject shared helpers into sub-modules.
