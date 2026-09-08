@@ -99,6 +99,39 @@ let
     settings.network.allowLocalBinding == false
   ) "srt network allowLocalBinding must be false";
 
+  test_srt_settings_network_covers_api_providers = assert' (
+    let
+      settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
+      allowed = settings.network.allowedDomains;
+    in
+    builtins.all (d: builtins.elem d allowed) [
+      "api.anthropic.com"
+      "api.cline.bot"
+      "api.commandcode.ai"
+      "api.openai.com"
+      "openai.com"
+    ]
+  ) "srt allowedDomains must cover LLM API providers";
+
+  test_srt_settings_network_covers_github_ssh = assert' (
+    let
+      settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
+      allowed = settings.network.allowedDomains;
+    in
+    builtins.elem "*.github.com" allowed
+  ) "srt allowedDomains must include *.github.com for SSH git operations";
+
+  test_srt_settings_ignore_violations_covers_homebrew = assert' (
+    let
+      settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
+      ignores = settings.ignoreViolations."*";
+    in
+    builtins.all (p: builtins.elem p ignores) [
+      "/usr/local"
+      "~/Library"
+    ]
+  ) "srt ignoreViolations must cover Homebrew and macOS app paths";
+
   test_srt_settings_ignore_violations_comprehensive = assert' (
     let
       settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
@@ -175,6 +208,9 @@ builtins.seq
       test_srt_settings_deny_write_covers_injection
       test_srt_settings_allow_write_minimal
       test_srt_settings_network_no_local_binding
+      test_srt_settings_network_covers_api_providers
+      test_srt_settings_network_covers_github_ssh
+      test_srt_settings_ignore_violations_covers_homebrew
       test_srt_settings_ignore_violations_comprehensive
       test_srt_settings_has_schema
       test_srt_settings_managed_symlink
