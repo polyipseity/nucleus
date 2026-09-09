@@ -32,8 +32,9 @@ setup_fake_repo() {
 {
   "$schema": "./lockfile.schema.json",
   "bun": {
-    "clawhub": "0.20.0",
-    "@earendil-works/pi-coding-agent": "0.73.1"
+    "@earendil-works/pi-coding-agent": "0.73.1",
+    "@tobilu/qmd": "2.8.3",
+    "clawhub": "0.20.0"
   },
   "uv": {
     "yamllint": "1.35.1",
@@ -52,6 +53,12 @@ setup_fake_repo() {
   }
 }
 EOF
+  cat >"$dir/src/lockfiles/lifecycle-allowlist.json" <<'LFALEOF'
+{
+  "$schema": "./lifecycle-allowlist.schema.json",
+  "@tobilu/qmd": "Required: postinstall compiles native modules."
+}
+LFALEOF
   printf '%s\n' "$dir"
 }
 
@@ -84,7 +91,7 @@ test_bun_install_passes_version_pins() {
   # ~/.bun/install/global/package.json is not found by the script.
   # The stub bun exits 0 but doesn't create the binary, so we pre-create the
   # target binary to satisfy the post-install existence check.
-  mkdir -p "$tmp/.bun/bin" && touch "$tmp/.bun/bin/clawhub"
+  mkdir -p "$tmp/.bun/bin" && touch "$tmp/.bun/bin/clawhub" "$tmp/.bun/bin/qmd"
   if HOME="$tmp" run_pkg_script install-bun-packages.sh "$tmp" "$(command -v jq)" "$tmp/bin/bun" "$(command -v awk)" >"$tmp/out.txt" 2>&1; then
     assert_pass "install-bun-packages runs to completion"
   else
@@ -168,8 +175,40 @@ test_cargo_binstall_passes_version_pins() {
   rm -rf "$tmp"
 }
 
+test_bun_lifecycle_allowlist() {
+  local tmp
+  tmp="$(setup_fake_repo)"
+  stub_tool bun "$tmp"
+  # @tobilu/qmd is in the lifecycle-allowlist -> should NOT use --ignore-scripts.
+  # clawhub is NOT in the allowlist -> should use --ignore-scripts.
+  # We need to add @tobilu/qmd to the lockfile for version pinning.
+  python3 -c "import json; d=json.load(open(\"$tmp/src/lockfiles/lockfile.json\")); d[\"bun\"][\"@tobilu/qmd\"] = \"2.8.3\"; json.dump(d, open(\"$tmp/src/lockfiles/lockfile.json\", \"w\"), indent=2)"
+  # Pre-create binaries for the post-install existence check.
+  mkdir -p "$tmp/.bun/bin" && touch "$tmp/.bun/bin/clawhub" "$tmp/.bun/bin/qmd"
+  if HOME="$tmp" run_pkg_script install-bun-packages.sh "$tmp" "$(command -v jq)" "$tmp/bin/bun" "$(command -v awk)" >"$tmp/out.txt" 2>&1; then
+    assert_pass "install-bun-packages runs to completion with lifecycle-allowlist"
+  else
+    assert_fail "install-bun-packages runs to completion with lifecycle-allowlist" "exit code $?"
+  fi
+  # @tobilu/qmd: allowlisted -> no --ignore-scripts
+  if grep -qxF 'install -g @tobilu/qmd@2.8.3' "$tmp/calls-bun.txt"; then
+    assert_pass "install-bun-packages omits --ignore-scripts for lifecycle-allowlisted @tobilu/qmd"
+  else
+    assert_fail "install-bun-packages omits --ignore-scripts for lifecycle-allowlisted @tobilu/qmd" "calls: $(cat "$tmp/calls-bun.txt" 2>/dev/null)"
+  fi
+  # clawhub: not allowlisted -> uses --ignore-scripts
+  if grep -qxF 'install -g --ignore-scripts clawhub@0.20.0' "$tmp/calls-bun.txt"; then
+    assert_pass "install-bun-packages uses --ignore-scripts for non-allowlisted clawhub"
+  else
+    assert_fail "install-bun-packages uses --ignore-scripts for non-allowlisted clawhub" "calls: $(cat "$tmp/calls-bun.txt" 2>/dev/null)"
+  fi
+  rm -f "$tmp/calls-bun.txt"
+  rm -rf "$tmp"
+}
+
 section "install-packages" "lockfile pinning"
 test_bun_install_passes_version_pins
+test_bun_lifecycle_allowlist
 test_uv_install_passes_version_pins
 test_rustup_install_passes_channel_date
 test_cargo_binstall_passes_version_pins
