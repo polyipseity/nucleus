@@ -14,6 +14,39 @@
       "systemLogDir": "%ProgramData%\\nucleus\\log"
     }
   },
+  "betterdisplay-heartbeat": {
+    "description": "BetterDisplay virtual screen heartbeat with crash-loop protection",
+    "displayName": "BetterDisplay Heartbeat",
+    "logging": {
+      "capture": "all",
+      "dirs": {
+        "system": [],
+        "user": [
+          "betterdisplay-heartbeat"
+        ]
+      }
+    },
+    "hosts": {
+      "MacBook": {
+        "scope": "user",
+        "launchdDomain": "gui",
+        "justification": "User agent so TCC grants Accessibility/Screen Recording for BetterDisplay CLI; system daemon cannot access GUI apps.",
+        "service": "local.betterdisplay-heartbeat",
+        "type": "launchctl",
+        "platform": "macOS"
+      },
+      "NixOS": {
+        "justification": "BetterDisplay is macOS-only; no virtual screen management on Linux.",
+        "type": "omitted",
+        "platform": "NixOS"
+      },
+      "Windows": {
+        "justification": "BetterDisplay is macOS-only; no virtual screen management on Windows.",
+        "type": "omitted",
+        "platform": "Windows"
+      }
+    }
+  },
   "caddy": {
     "description": "Local TLS reverse proxy engine",
     "displayName": "Caddy",
