@@ -87,8 +87,14 @@ if [ "${_redis_ticks}" -gt 0 ]; then
   fi
 fi
 
+_log_config_args=""
+if [ -n "${LITELLM_LOG_CONFIG:-}" ] && [ -f "$LITELLM_LOG_CONFIG" ]; then
+  _log_config_args="--log_config $LITELLM_LOG_CONFIG"
+fi
+
 exec litellm \
   --config "$config" \
   --port 4000 \
   --host 127.0.0.1 \
-  --drop_params
+  --drop_params \
+  $_log_config_args

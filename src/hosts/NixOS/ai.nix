@@ -17,6 +17,7 @@
 }:
 let
   litellmConfig = "${config.users.users.${username}.home}/.local/share/nucleus/litellm-config.yml";
+  litellmLogConfig = "${config.users.users.${username}.home}/.local/share/nucleus/litellm-logging-config.py";
   litellmDaemon = pkgs.writeNucleusShellApplication {
     name = "litellm-daemon";
     runtimeInputs = [ pkgs.litellm ];
@@ -56,6 +57,9 @@ in
     ];
     wants = [ "nucleus-redis.service" ];
     path = [ pkgs.litellm ];
+    environment = {
+      LITELLM_LOG_CONFIG = litellmLogConfig;
+    };
     serviceConfig = {
       Type = "simple";
       ExecStart = "${litellmDaemon}/bin/nucleus-litellm-daemon '${litellmConfig}' '0' ${

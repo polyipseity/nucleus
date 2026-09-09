@@ -19,6 +19,7 @@
 let
   userHome = "/Users/${username}";
   litellmConfig = "${userHome}/Library/Application Support/nucleus/litellm-config.yml";
+  litellmLogConfig = "${userHome}/Library/Application Support/nucleus/litellm-logging-config.py";
   catalog = import ../../modules/env-catalog.nix;
   envLib = import ../../modules/lib/env-catalog.nix {
     inherit
@@ -108,6 +109,7 @@ in
         LITELLM_REDIS_POLL_TICKS = "60";
         LITELLM_REDIS_HOST = redisCfg.host;
         LITELLM_REDIS_PORT = toString redisCfg.port;
+        LITELLM_LOG_CONFIG = litellmLogConfig;
       };
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/litellm/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/litellm/stderr.log";
