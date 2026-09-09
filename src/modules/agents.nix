@@ -293,7 +293,6 @@ in
     # -----------------------------------------------------------------------
     symlink-superpowers-plugin = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/agents/symlink-superpowers-plugin.sh" \
-        "${nucleusUserRoot}/plugins/superpowers" \
         "${superpowersSrc}"
     '';
 
