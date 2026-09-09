@@ -289,5 +289,42 @@ in
         "${superpowersSrc}"
     '';
 
+    # -----------------------------------------------------------------------
+    # symlink-superpowers-skills
+    # Symlinks superpowers skills into ~/.agents/skills/ via install-agent-skills.
+    #
+    # Extends install-agent-skills.sh with the superpowers skills directory.
+    # Skills are auto-discovered by Pi, Cursor, and other agents.
+    #
+    # Why after install-agent-skills: install-agent-skills creates the base
+    # ~/.agents/skills/ directory and symlinks bundled skills. We add
+    # superpowers skills after that to avoid conflicts.
+    #
+    # Why after symlink-superpowers-plugin: needs the Nix store symlink
+    # to exist so the skills directory is accessible.
+    # -----------------------------------------------------------------------
+    symlink-superpowers-skills =
+      lib.hm.dag.entryAfter [ "install-agent-skills" "symlink-superpowers-plugin" ]
+        ''
+          "${activationBundle}/src/scripts/agents/install-agent-skills.sh" \
+            "${repoRoot}" "${effectiveUsername}" \
+            "${superpowersSrc}/skills"
+        '';
+
+    # -----------------------------------------------------------------------
+    # symlink-superpowers-for-opencode
+    # Wires OpenCode to use local superpowers plugin via method-1 symlink.
+    #
+    # Creates ~/.opencode/plugins/superpowers → Nix store superpowers plugin.
+    #
+    # Why after linkGeneration: ensures ~/.opencode/ parent exists.
+    # Why best-effort: OpenCode is not installed on all hosts.
+    # -----------------------------------------------------------------------
+    symlink-superpowers-for-opencode =
+      lib.hm.dag.entryAfter [ "linkGeneration" "symlink-superpowers-plugin" ]
+        ''
+          "${activationBundle}/src/scripts/agents/symlink-superpowers-for-opencode.sh"
+        '';
+
   };
 }
