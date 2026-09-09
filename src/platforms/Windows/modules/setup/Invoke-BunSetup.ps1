@@ -63,7 +63,12 @@ function Invoke-BunSetup {
     '@earendil-works/pi-coding-agent',
     # fetched skill install vehicle; absent from WinGet, Scoop, and
     # cargo-binstall; bun is the only viable install tier on Windows
-    'clawhub'
+    'clawhub',
+    # on-device markdown search engine for pi memory_search; absent from
+    # WinGet, Scoop, cargo-binstall, and nixpkgs; bun is the only viable
+    # install tier. Requires lifecycle scripts (postinstall) for native
+    # module compilation and GGUF model downloads.
+    '@tobilu/qmd'
   )
 
   # Package-to-binary name overrides for packages whose bun binary name
