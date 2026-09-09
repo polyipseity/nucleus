@@ -23,7 +23,7 @@ $script:NUCLEUS_DEFAULT_DEV_TOOLS = "__DEFAULT_DEV_TOOLS_PATH__"
 # ---------------------------------------------------------------
 # AI agent session detection
 # ---------------------------------------------------------------
-# Environment variable names sourced from src/modules/agent-env-vars.nix.
+# Environment variable names sourced from src/modules/shell/agent-env-vars.nix.
 function Test-NucleusAgentSession {
     foreach ($__v in "__AGENT_ENV_VAR_NAMES__" -split ' ') {
         if ($__v -and (Test-Path "env:$__v")) { return $true }

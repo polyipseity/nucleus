@@ -40,7 +40,7 @@ if ($IsWindows) {
   }
   # AI agent session detection: suppress pay-respects when VSCODE_AGENT,
   # CLAUDECODE, etc. are set.
-  # Source of truth for env var names: src/modules/agent-env-vars.nix.
+  # Source of truth for env var names: src/modules/shell/agent-env-vars.nix.
   # Windows variant; POSIX hosts get Test-NucleusAgentSession from init.ps1
   # (token-based, /opt/.devin marker only).
   function Test-NucleusAgentSession {

@@ -198,7 +198,7 @@ in
     ../platforms/macOS/modules
     ./pwsh.nix
     ./secrets.nix
-    ./starship.nix
+    ./shell
     ./shell
     ./terminal-activations.nix
     ./wallpapers.nix

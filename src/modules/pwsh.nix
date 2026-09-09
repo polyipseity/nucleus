@@ -26,7 +26,7 @@ let
       ;
   };
 
-  agentEnv = import ./agent-env-vars.nix;
+  agentEnv = import ./shell/agent-env-vars;
 
   lockfile = builtins.fromJSON (builtins.readFile ../lockfiles/lockfile.json);
   pwshAnalyzerVersion = lockfile.pwsh.PSScriptAnalyzer or null;
