@@ -145,9 +145,16 @@
     ],
     "allowLocalBinding": true,
     "allowUnixSockets": [
+      "/nix/var/nix/daemon-socket/socket",
+      "/nix/var/nix/daemon-socket/socket/",
+      "/var/run/nix-daemon.socket",
+      "/nix/var/determinate/determinate-nixd.socket",
+      "/nix/var/determinate/determinate-nixd.socket/",
+      "/var/run/determinate-nixd.socket",
       "~/.gnupg/S.gpg-agent",
       "~/.gnupg/S.gpg-agent.extra"
     ],
+    "allowAllUnixSockets": false,
     "deniedDomains": []
   }
 }
