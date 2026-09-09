@@ -49,7 +49,7 @@ let
   userSshDir = "/Users/${username}/.ssh";
   userBuilderKeyPath = "${userSshDir}/linux-builder_ed25519";
 
-  envVars = import ../../modules/lib/env-catalog.nix {
+  envVars = import ../../modules/lib/env-secrets.nix {
     inherit
       config
       pkgs

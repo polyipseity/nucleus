@@ -43,7 +43,7 @@ let
   # Cached imports for all env-var-related callsites below.
   # managed-paths.nix for PATH components; env/catalog.json for catalog/resolution.
   managedPaths = import ../../../modules/lib/managed-paths.nix { inherit pkgs; };
-  envVars = import ../../../modules/lib/env-catalog.nix {
+  envVars = import ../../../modules/lib/env-secrets.nix {
     inherit
       config
       pkgs
@@ -500,7 +500,7 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
   #
   # This step handles ALL GUI env var propagation at activation time:
   #   1. launchctl setenv PATH — managed PATH with dedup (launchd-direct/XPC)
-  #   2. launchctl setenv for all non-PATH vars from env-catalog (EDITOR,
+  #   2. launchctl setenv for all non-PATH vars from env-secrets (EDITOR,
   #      OLLAMA_HOST, etc.)
   #   3. sudo launchctl config user path — persistent per-user PATH for LaunchServices
   #      .app bundles (requires reboot on first set).

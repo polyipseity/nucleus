@@ -16,7 +16,7 @@ let
   };
 
   managedPaths = import ./lib/managed-paths.nix { inherit pkgs; };
-  envVars = import ./lib/env-catalog.nix {
+  envVars = import ./lib/env-secrets.nix {
     inherit
       config
       pkgs

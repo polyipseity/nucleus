@@ -26,5 +26,5 @@ in
   ];
 
   # OLLAMA_HOST is defined in the centralized env var catalog
-  # (src/modules/lib/env-catalog.nix) and injected via home.sessionVariables.
+  # (src/modules/lib/env-secrets.nix) and injected via home.sessionVariables.
 }

@@ -47,7 +47,7 @@ let
 
   systemLogDir = config.nucleus.logging.systemLogDir;
 
-  envVars = import ../../modules/lib/env-catalog.nix {
+  envVars = import ../../modules/lib/env-secrets.nix {
     inherit
       config
       pkgs

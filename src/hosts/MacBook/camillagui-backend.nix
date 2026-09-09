@@ -13,7 +13,7 @@
 
 let
   userHome = config.users.users.${username}.home;
-  envVars = import ../../modules/lib/env-catalog.nix {
+  envVars = import ../../modules/lib/env-secrets.nix {
     inherit
       config
       pkgs

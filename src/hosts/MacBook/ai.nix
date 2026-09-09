@@ -21,7 +21,7 @@ let
   litellmConfig = "${userHome}/Library/Application Support/nucleus/litellm-config.yml";
   litellmLogConfig = "${userHome}/Library/Application Support/nucleus/litellm-logging-config.py";
   catalog = builtins.fromJSON (builtins.readFile ../../modules/env/catalog.json);
-  envLib = import ../../modules/lib/env-catalog.nix {
+  envLib = import ../../modules/lib/env-secrets.nix {
     inherit
       config
       pkgs
@@ -32,7 +32,7 @@ let
   };
   keyArgs = envLib.mkKeyArgs { inherit config catalog; };
 
-  envVars = import ../../modules/lib/env-catalog.nix {
+  envVars = import ../../modules/lib/env-secrets.nix {
     inherit
       config
       pkgs
@@ -149,7 +149,7 @@ in
       KeepAlive = true;
       RunAtLoad = true;
       UserName = username;
-      # Source: src/modules/lib/env-catalog.nix (OLLAMA_* entries).
+      # Source: src/modules/lib/env-secrets.nix (OLLAMA_* entries).
       # The catalog is the canonical list for these values.  OLLAMA_HOST
       # is excluded so the daemon binds to the default port (11434).  OLLAMA_HOST
       # is set by the gui-env LaunchAgent for CLI clients.

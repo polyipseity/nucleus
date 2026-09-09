@@ -18,7 +18,7 @@ let
   # Cached imports for all env-var-related callsites below.
   # managed-paths.nix for PATH components; env/catalog.json for catalog/resolution.
   managedPaths = import ../../../modules/lib/managed-paths.nix { inherit pkgs; };
-  envVars = import ../../../modules/lib/env-catalog.nix {
+  envVars = import ../../../modules/lib/env-secrets.nix {
     inherit
       config
       pkgs
@@ -448,7 +448,7 @@ in
   # login-time coverage before the first activation.
   #
   # The var list for non-PATH vars is generated from the centralized catalog
-  # — see src/modules/lib/env-catalog.nix (macBookAllVars).  All vars with a MacBook
+  # — see src/modules/lib/env-secrets.nix (macBookAllVars).  All vars with a MacBook
   # value (both user and non-user) are included — safe because macOS launchd
   # GUI domains are per-user.
   #

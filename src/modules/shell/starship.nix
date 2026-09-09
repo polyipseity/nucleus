@@ -41,6 +41,6 @@ in
   '';
 
   # STARSHIP_CACHE and STARSHIP_CONFIG are defined in the centralized env var
-  # catalog (src/modules/lib/env-catalog.nix) and injected via shell.nix's
+  # catalog (src/modules/lib/env-secrets.nix) and injected via shell.nix's
   # home.sessionVariables.  No separate declaration needed.
 }

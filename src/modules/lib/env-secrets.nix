@@ -1,4 +1,4 @@
-# modules/lib/env-catalog.nix — Centralized environment variable catalog.
+# modules/lib/env-secrets.nix — Centralized environment variable secrets catalog.
 #
 # This file contains the catalog of all managed environment variables and
 # the resolution logic for rendering them per-host.  It internally imports
@@ -14,13 +14,13 @@
 #   { default?, MacBook?, NixOS?, Windows? }
 # - `default` applies to any host not explicitly keyed.
 # - If a host key is absent AND `default` is absent, the host is not applicable.
-# Use: import ./lib/env-catalog.nix { inherit config pkgs lib username hostName; }
+# Use: import ./lib/env-secrets.nix { inherit config pkgs lib username hostName; }
 # Returns: { catalog, allVars, systemVars, macBookAllVars, resolveValue, ... }
 {
   pkgs,
   lib,
   # WHY: default to the repo root relative to this file (src/modules/lib →
-  # ../../..).  env-catalog.nix is imported as a plain function (not a module),
+  # ../../..).  env-secrets.nix is imported as a plain function (not a module),
   # so it does not receive specialArgs.  Callers that have repoRoot available
   # (modules threaded via specialArgs) pass it explicitly; the default keeps
   # standalone/test callers hermetic without threading the arg everywhere.
@@ -454,13 +454,22 @@ let
   );
 
   getAllNixVarNames = builtins.attrNames catalog;
-  # mkKeyArgs: build KEYFILE:ENVVAR pairs from the secret catalog and sops config.
-  # Usage: mkKeyArgs { inherit config catalog; }
-  #   where config is the NixOS/darwin module config and catalog is from
-  #   import ../../modules/env/catalog.json (via builtins.fromJSON).
-  mkKeyArgs =
-    { config, catalog }:
-    map (entry: "${config.sops.secrets.${entry.name}.path}:${entry.envVar}") catalog.keys;
+  # mkSecretArgs: build KEYFILE:ENVVAR pairs from the secrets catalog and sops config.
+  # Usage: mkSecretArgs { inherit config secrets; }
+  #   where config is the NixOS/darwin module config and secrets is from
+  #   import ../../modules/env/env-secrets.json (via builtins.fromJSON).
+  mkSecretArgs =
+    { config, secrets }:
+    map (entry: "${config.sops.secrets.${entry.name}.path}:${entry.envVar}") secrets.secrets;
+
+  # mkSecretArgsForConsumer: build KEYFILE:ENVVAR pairs filtered by consumer name.
+  # Usage: mkSecretArgsForConsumer { inherit config secrets; consumer = "litellm"; }
+  mkSecretArgsForConsumer =
+    { config, secrets, consumer }:
+    let
+      filtered = builtins.filter (entry: builtins.elem consumer entry.consumers) secrets.secrets;
+    in
+    map (entry: "${config.sops.secrets.${entry.name}.path}:${entry.envVar}") filtered;
 
 in
 {
@@ -475,6 +484,7 @@ in
     resolveValue
     passwordStoreDir
     currentHost
-    mkKeyArgs
+    mkSecretArgs
+    mkSecretArgsForConsumer
     ;
 }

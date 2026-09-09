@@ -29,7 +29,7 @@ let
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
   ollamaCfg = servicesJSON.ollama.network.default;
   catalog = builtins.fromJSON (builtins.readFile ../../modules/env/catalog.json);
-  envLib = import ../../modules/lib/env-catalog.nix {
+  envLib = import ../../modules/lib/env-secrets.nix {
     inherit
       config
       pkgs
@@ -98,11 +98,11 @@ in
     # https://github.com/ollama/ollama/blob/main/docs/faq.md
     # https://github.com/ollama/ollama/blob/main/envconfig/config.go
     # Ollama runtime env vars sourced from the centralized catalog.
-    # See src/modules/lib/env-catalog.nix (OLLAMA_FLASH_ATTENTION,
+    # See src/modules/lib/env-secrets.nix (OLLAMA_FLASH_ATTENTION,
     # OLLAMA_CONTEXT_LENGTH, OLLAMA_KV_CACHE_TYPE entries).
     environmentVariables =
       let
-        envVars' = import ../../modules/lib/env-catalog.nix {
+        envVars' = import ../../modules/lib/env-secrets.nix {
           inherit
             config
             pkgs

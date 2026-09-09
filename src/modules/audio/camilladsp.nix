@@ -44,7 +44,7 @@ let
     ];
   };
 
-  envVars = import ../lib/env-catalog.nix {
+  envVars = import ../lib/env-secrets.nix {
     inherit
       config
       pkgs

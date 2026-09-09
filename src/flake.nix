@@ -1064,7 +1064,7 @@
               buildInputs = [ pkgsDevMac.libiconv ];
               # sccache-wrapped C/C++ compilers for non-CMake projects that
               # read CC/CXX directly. CMake projects use CMAKE_C_COMPILER_LAUNCHER
-              # (set globally via env-catalog) instead.
+              # (set globally via env-secrets) instead.
               CC = "${pkgsDevMac.sccache}/bin/sccache ${pkgsDevMac.llvmPackages.clang}/bin/clang";
               CXX = "${pkgsDevMac.sccache}/bin/sccache ${pkgsDevMac.llvmPackages.clang}/bin/clang++";
               # Ensure EDITOR/VISUAL are always set to nvim inside the devShell.
@@ -1112,7 +1112,7 @@
               ];
               # sccache-wrapped C/C++ compilers for non-CMake projects that
               # read CC/CXX directly. CMake projects use CMAKE_C_COMPILER_LAUNCHER
-              # (set globally via env-catalog) instead.
+              # (set globally via env-secrets) instead.
               CC = "${pkgsDevLinux.sccache}/bin/sccache ${pkgsDevLinux.llvmPackages.clang}/bin/clang";
               CXX = "${pkgsDevLinux.sccache}/bin/sccache ${pkgsDevLinux.llvmPackages.clang}/bin/clang++";
               # Same rationale as the macOS devShell: force a correct EDITOR/VISUAL

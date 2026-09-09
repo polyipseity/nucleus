@@ -31,7 +31,7 @@ let
   # can be audited without scanning unrelated shell options.
   shellAliases = import ./aliases.nix { };
   managedPaths = import ../lib/managed-paths.nix { inherit pkgs; };
-  envVarsHelpers = import ../lib/env-catalog.nix {
+  envVarsHelpers = import ../lib/env-secrets.nix {
     inherit
       config
       pkgs
@@ -169,7 +169,7 @@ in
   #                uv tool install  → ~/.local/bin  (XDG_BIN_HOME default)
   # Sole declaration site for home.sessionPath and home.sessionVariables.
   # No other file sets these — all env vars flow through the centralized
-  # catalog in src/modules/lib/env-catalog.nix.
+  # catalog in src/modules/lib/env-secrets.nix.
   home.sessionPath =
     (builtins.map (p: "${config.home.homeDirectory}/${p}") managedPaths.pathComponents.prepend)
     ++ (builtins.map (p: "${config.home.homeDirectory}/${p}") managedPaths.pathComponents.append);

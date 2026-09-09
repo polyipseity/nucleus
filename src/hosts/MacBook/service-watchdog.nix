@@ -19,7 +19,7 @@ let
   # the ~/dev/nucleus symlink (macOS sandbox restriction).
   servicesJson = import ../../modules/lib/services-json-path.nix { };
 
-  envVars = import ../../modules/lib/env-catalog.nix {
+  envVars = import ../../modules/lib/env-secrets.nix {
     inherit
       config
       pkgs
