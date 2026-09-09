@@ -1,16 +1,16 @@
 # MacBook/services.nix — General macOS service configurations.
 #
-# Coordinates Automator workflow bundles (services/automator-workflows.nix) and
-# App bundles (services/app-bundles.nix) deployment. This file handles shared
+# Coordinates Automator workflow bundles (services/automator-workflows/default.nix) and
+# App bundles (services/app-bundles/default.nix) deployment. This file handles shared
 # daemon cache flush that runs after both sub-modules have deployed, so changes
 # from both Automator workflows (NSServicesStatus) and App bundles
 # (LaunchServices registration) take effect in one activation.
 #
 # For Automator workflows (.workflow bundles appearing in right-click →
-# Quick Actions or menu bar → Services): see services/automator-workflows.nix
+# Quick Actions or menu bar → Services): see automator-workflows/default.nix
 #
 # For App bundles (.app bundles appearing in menu bar → Services):
-# see services/app-bundles.nix
+# see app-bundles/default.nix
 #
 # Sorting policy — all service entry lists across both sub-modules are
 # manually maintained in their declared order; no automatic re-sorting.
