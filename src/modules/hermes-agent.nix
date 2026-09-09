@@ -8,7 +8,9 @@
 # service management (launchd on macOS, systemd on Linux).
 #
 # Per-host overrides (gateway.enable, model defaults) are applied here.
-# API keys flow through SOPS secrets wired in Phase 5.
+# API keys: add `hermes.ANTHROPIC_API_KEY: "sk-ant-..."` to your
+# src/secrets/users/<username>.yml. The secret is materialized by sops-nix
+# and passed to the service via environmentFiles.
 {
   config,
   lib,
@@ -38,9 +40,26 @@ let
   upstreamModule = (import "${hermes-agent}/nix/homeManagerModules.nix") {
     inputs = upstreamInputs;
   };
+
+  # Check if the user has a SOPS secrets file. The hermes secret
+  # (hermes/env) is declared conditionally — absent when the user
+  # hasn't added API keys yet.
+  userSecretFile = ../../secrets/users + "/${config.home.username}.yml";
+  hasUserSecretFile = builtins.pathExists userSecretFile;
 in
 {
   imports = [ upstreamModule ];
+
+  # Declare the SOPS secret for hermes API keys.
+  # Users must add `hermes.ANTHROPIC_API_KEY: "sk-ant-..."` (or similar)
+  # to their src/secrets/users/<username>.yml file.
+  sops.secrets = lib.mkIf hasUserSecretFile {
+    "hermes/env" = {
+      sopsFile = userSecretFile;
+      owner = config.home.username;
+      mode = "0400";
+    };
+  };
 
   # ── Nucleus-level configuration ──────────────────────────────────────
 
@@ -55,5 +74,10 @@ in
         lib.mkDefault true
       else
         lib.mkDefault false;
+    # Wire SOPS-decrypted API key file into the service environment.
+    # Only present when the user has added hermes secrets to their SOPS file.
+    environmentFiles = lib.mkIf hasUserSecretFile [
+      config.sops.secrets."hermes/env".path
+    ];
   };
 }
