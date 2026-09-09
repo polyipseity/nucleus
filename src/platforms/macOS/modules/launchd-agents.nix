@@ -236,12 +236,8 @@ in
         NUCLEUS_GC_EXPIRY = config.modules.gc.expiry;
       };
       RunAtLoad = false;
-      StartCalendarInterval = [
-        {
-          Hour = 12;
-          Minute = 0;
-        }
-      ];
+      # WHY: StartCalendarInterval is broken on this system — see posix-base.nix.
+      StartInterval = 86400;
     };
   };
 
