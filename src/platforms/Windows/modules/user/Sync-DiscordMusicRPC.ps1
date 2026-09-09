@@ -1,27 +1,32 @@
 <#
 .SYNOPSIS
-  Ensure discord-music-rpc startup task is converged on Windows.
+  Ensure discord-music-rpc config and startup task are converged on Windows.
 
 .DESCRIPTION
   Manages the discord-music-rpc tray application lifecycle for each managed
   user:
-    1. Creates or removes a logon scheduled task that starts the Rich Presence
+    1. Deploys a writable config.yaml symlink into %LOCALAPPDATA%\discord-music-rpc\
+       pointing into the repo tree so edits take effect immediately.
+    2. Creates or removes a logon scheduled task that starts the Rich Presence
        tray application in the background.
 
-  The config.yaml symlink is managed by apply.ps1 (same pattern as LiteLLM),
-  pointing directly into the repo tree so edits take effect immediately.
   The package must be installed separately (e.g. via `uv tool install`).
 
 .PARAMETER Enabled
-  True applies the config and registers the startup task.  False removes the
-  startup task and warns that the config remains on disk.  The config symlink
-  is managed by apply.ps1 (same as LiteLLM).
+  True applies the config symlink and registers the startup task.  False removes
+  the startup task and warns that the config remains on disk.
+
+.PARAMETER RepoRoot
+  Absolute path to the nucleus repository root.
+
+.PARAMETER User
+  Windows username for config overlay resolution.
 
 .EXAMPLE
-  Sync-DiscordMusicRPC -Enabled:$true
+  Sync-DiscordMusicRPC -Enabled:$true -RepoRoot $repoRoot -User $sessionUser
 
 .EXAMPLE
-  Sync-DiscordMusicRPC -Enabled:$false
+  Sync-DiscordMusicRPC -Enabled:$false -RepoRoot $repoRoot -User $sessionUser
 
 .NOTES
   Environment variables:
@@ -34,7 +39,13 @@ function Sync-DiscordMusicRPC {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)]
-    [bool]$Enabled
+    [bool]$Enabled,
+
+    [Parameter(Mandatory)]
+    [string]$RepoRoot,
+
+    [Parameter(Mandatory)]
+    [string]$User
   )
 
   $ErrorActionPreference = "Stop"
@@ -51,6 +62,16 @@ function Sync-DiscordMusicRPC {
     }
     return
   }
+
+  # Method-1 (writable) config symlink so repo edits take effect immediately.
+  # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
+  $configDir = Join-Path -Path $env:LOCALAPPDATA -ChildPath "discord-music-rpc"
+  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+  $null = New-Item -Path $configDir -ItemType Directory -Force
+  $configPath = Join-Path -Path $configDir -ChildPath "config.yaml"
+  $configSource = Resolve-UserConfigFile -User $User -ConfigName 'discord-music-rpc' -RelativePath 'config.yaml' -RepoRoot $RepoRoot
+  if (Test-Path -Path $configPath) { Remove-Item -Path $configPath -Force }
+  New-Item -Path $configPath -ItemType SymbolicLink -Target $configSource -Force > $null
 
   # Task registration is handled by DSC (system/scheduler-user.dsc.yml).
   # This module verifies the binary exists and warns if not provisioned.

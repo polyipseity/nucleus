@@ -972,14 +972,7 @@ Sync-CaddyLocalCA -RepoRoot $repoRoot -Enabled:$true
 Sync-JellyfinAccountCatalog -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
 Sync-JellyfinLibraryCatalog -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
 Sync-SymlinkManifest -Enabled:$EnableSymlinkParity -UserRecords $selectedUserRecords
-# check-suppress:config-method: method 1 (writable symlink) -- symlink config so edits take effect immediately.
-  $discordMusicRPCConfigDir = Join-Path -Path $env:LOCALAPPDATA -ChildPath "discord-music-rpc"
-  $null = New-Item -Path $discordMusicRPCConfigDir -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
-  $discordMusicRPCConfig = Join-Path -Path $discordMusicRPCConfigDir -ChildPath "config.yaml"
-  $discordMusicRPCConfigSource = Resolve-UserConfigFile -User $sessionUser -ConfigName 'discord-music-rpc' -RelativePath 'config.yaml' -RepoRoot $repoRoot
-  if (Test-Path -Path $discordMusicRPCConfig) { Remove-Item -Path $discordMusicRPCConfig -Force }
-  New-Item -Path $discordMusicRPCConfig -ItemType SymbolicLink -Target $discordMusicRPCConfigSource -Force > $null
-Sync-DiscordMusicRPC -Enabled:$EnableDiscordMusicRPCParity
+Sync-DiscordMusicRPC -Enabled:$EnableDiscordMusicRPCParity -RepoRoot $repoRoot -User $sessionUser
 Sync-CamillaDSPService -Enabled:$EnableCamillaDSPServiceParity
 Sync-CamillaDSPHeartbeatService -Enabled:$EnableCamillaDSPHeartbeatServiceParity
 Sync-CamillaGUIService -Enabled:$EnableCamillaGUIServiceParity
