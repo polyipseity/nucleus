@@ -3,6 +3,7 @@
   "bun": {
     "@anthropic-ai/sandbox-runtime": "0.0.75",
     "@earendil-works/pi-coding-agent": "0.73.1",
+    "@tobilu/qmd": "2.8.3",
     "clawhub": "0.23.3"
   },
   "cargo-binstall": {
