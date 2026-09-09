@@ -3,5 +3,6 @@
 {
   imports = [
     ./gnupg.nix
+    ./logging.nix
   ];
 }
