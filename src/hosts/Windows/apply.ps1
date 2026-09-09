@@ -461,6 +461,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-AISync.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-ReplicaSync.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-VMSetup.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Invoke-PostApply.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-AgentHostShellSetup.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-SteamCMDSetup.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-EnsureLogDir.ps1")
@@ -969,97 +970,8 @@ Sync-TerminalActivation
 # for the full policy.
 Invoke-AgentHostShellSetup
 
-# Warn-only service verification: check all managed services are running.
-# Failing to start a service should not block activation, but the warning
-# surfaces issues for post-apply investigation.
-$svcScript = Join-Path -Path $repoRoot -ChildPath "scripts\svc.ps1"
-if (Test-Path -LiteralPath $svcScript) {
-  try {
-    & $svcScript verify
-  } catch {
-    Write-NucleusWarning -CommandName svc "some services are inactive (non-fatal; check Event Viewer for details)"
-  }
-}
-
-# Health check: verify archiving ecosystem (7-Zip CLI + app) is functional post-apply.
-Test-ArchivingStack > $null
-
-# Converge locally installed Ollama models with the declarative manifest as the
-# final step of every apply.  Model pulls are 2-20 GB, so this runs last to
-# avoid blocking earlier configuration steps.  The sync is best-effort: a
-# missing or unreachable ollama binary is informational, not a hard failure,
-# because the system configuration has already been applied successfully.
-if ($NoAISync) {
-  Write-NucleusInfo -CommandName ai "-NoAISync set; skipping post-apply model sync"
-} else {
-  # check-suppress:suppression_doc: probe whether ollama is installed (may not be on first-provision hosts).
-  $ollamaOnPath = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
-  if ($null -eq $ollamaOnPath) {
-    Write-NucleusInfo -CommandName ai "ollama not found in PATH; skipping post-apply model sync"
-  } else {
-    Write-NucleusInfo -CommandName ai "running post-apply AI model sync..."
-    Invoke-AISync -RepoRoot $repoRoot -ServerReadyTimeoutSeconds 60
-  }
-}
-
-# Converge enabled cloud replicas from src/users/ as the final post-apply step.
-# This is best-effort: replica sync can be long-running and should not
-# retroactively fail a completed configuration convergence.
-
-if (-not $ReplicaSync) {
-  Write-NucleusInfo -CommandName replica-sync "skipping post-apply replica sync (default; pass -ReplicaSync to run now)"
-} else {
-  # check-suppress:suppression_doc: probe -- rclone may be absent on first-provision hosts.
-  $rcloneOnPath = Get-Command -Name "rclone" -ErrorAction SilentlyContinue
-  if ($null -eq $rcloneOnPath) {
-    Write-NucleusInfo -CommandName replica-sync "rclone not found in PATH; skipping post-apply replica sync"
-  } else {
-    Write-NucleusInfo -CommandName replica-sync "running post-apply replica sync..."
-    try {
-      Invoke-ReplicaSync -RepoRoot $repoRoot
-    } catch {
-      Write-NucleusWarning -CommandName replica-sync "replica sync incomplete (system apply succeeded): $($_.Exception.Message)"
-    }
-  }
-}
-
-# Post-apply VM step: full setup (-VMSetup) or lightweight config sync (default).
-if ($VMSetup) {
-  Write-NucleusInfo -CommandName vm-setup "running post-apply VM provisioning (setup)..."
-  try {
-    Invoke-VMSetup -RepoRoot $repoRoot
-  } catch {
-    Write-NucleusWarning -CommandName vm-setup "VM setup incomplete (system apply succeeded): $($_.Exception.Message)"
-  }
-} elseif ($NoVMSync) {
-  Write-NucleusInfo -CommandName vm-sync "-NoVMSync set; skipping post-apply VM config refresh"
-} else {
-  Write-NucleusInfo -CommandName vm-sync "running post-apply VM config refresh..."
-  try {
-    Invoke-VMSync -RepoRoot $repoRoot
-  } catch {
-    Write-NucleusWarning -CommandName vm-sync "VM sync incomplete (system apply succeeded): $($_.Exception.Message)"
-  }
-}
-
-# Perform bounded garbage collection as the final step after all provisioning.
-# GC is best-effort: failures should not retroactively fail a completed apply.
-# After all provisioning, GC can reclaim build artifacts, caches, and stale files.
-$gcScript = Join-Path -Path $repoRoot -ChildPath "scripts\gc.ps1"
-if (-not (Test-Path -LiteralPath $gcScript)) {
-  Write-NucleusInfo -CommandName gc "scripts/gc.ps1 not found; skipping garbage collection"
-} else {
-  Write-NucleusInfo -CommandName gc "running post-apply garbage collection..."
-  try {
-    & $gcScript -ModuleDir $systemModuleDir -RepoRoot $repoRoot
-  } catch {
-    Write-NucleusWarning -CommandName gc "GC incomplete (system apply succeeded): $($_.Exception.Message)"
-  }
-}
-
-# Display host-scoped one-time manual setup instructions as the final post-apply
-# step so operators see the checklist with no intervening output.
-$manualPath = Join-Path -Path $PSScriptRoot -ChildPath "MANUAL.md"
-Write-Output "--- MANUAL SETUP (one-time, required) ---"
-Get-Content -Path $manualPath | Write-Output
-Write-Output "-------------------------------------------"
+# Post-apply provisioning: service verification, AI sync, replica sync,
+# VM setup/sync, garbage collection, and manual display.
+Invoke-PostApply -RepoRoot $repoRoot -ModuleDir $systemModuleDir `
+  -NoAISync:$NoAISync -ReplicaSync:$ReplicaSync `
+  -VMSetup:$VMSetup -NoVMSync:$NoVMSync
