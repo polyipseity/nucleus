@@ -444,6 +444,14 @@ let
       category = "cli";
       nixpkgs = "llvmPackages.lldb";
     };
+    mas = {
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "mas";
+      };
+      platforms = [ "darwin" ];
+    };
     mold = {
       category = "cli";
       nixpkgs = "mold";
