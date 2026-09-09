@@ -7,7 +7,7 @@
 }:
 let
   inherit (lib) mkOption types;
-  loggingPaths = import ./lib/logging-paths.nix { inherit lib pkgs hostName; };
+  loggingPaths = import ../lib/logging-paths.nix { inherit lib pkgs hostName; };
 in
 {
   options.nucleus.logging = {

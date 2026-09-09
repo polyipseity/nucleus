@@ -4,7 +4,7 @@
   # system entrypoint never needs to define a Home Manager-only option.
   # vms.nix generates UTM config.plist templates for each VM in VMs.json.
   home-manager.sharedModules = [
-    ../../modules/iterm2.nix
+    ../../modules/configs/iterm2
     ./cloud-drives.nix
     ./services
     ./vms.nix
@@ -12,21 +12,13 @@
 
   imports = [
     ../../modules/core.nix
-    ../../modules/gnupg.nix
+    ../../modules/posix
     ../../modules/https-proxy.nix
-    ../../modules/logging.nix
-    ../../modules/posix-base.nix
-    ../../modules/posix-security.nix
-    ../../modules/posix-sops.nix
-    ../../modules/posix-user-shell.nix
-    ../../modules/repo-root-file.nix
-    ../../modules/agent-host-shell.nix
     ./activation.nix
     ./ai.nix
     ./base.nix
     ./camilladsp.nix
     ./camillagui-backend.nix
-    ../../modules/audio
     ../../modules/audio
     ./defaults.nix
     ./filesystem-scope.nix

@@ -39,8 +39,8 @@ let
 
   # Test 5: Verify security settings are consistent across hosts
   test_security_parity = assert' (
-    containsRegex "\.\./\.\./modules/posix-security\.nix" macbookDefaultText
-    && containsRegex "\.\./\.\./modules/posix-security\.nix" nixosDefaultText
+    containsRegex "\.\./\.\./modules/posix" macbookDefaultText
+    && containsRegex "\.\./\.\./modules/posix" nixosDefaultText
   ) "Security invariants must be parity-aligned across hosts";
 
   # Test 6: Verify wallpaper module is imported by all hosts

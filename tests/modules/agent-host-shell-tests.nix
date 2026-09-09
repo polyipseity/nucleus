@@ -12,7 +12,7 @@ let
   inherit (lib) hasInfix hasSuffix;
 
   # Module imports cleanly as a system module (will throw if it doesn't).
-  module = import ../../src/modules/agent-host-shell.nix {
+  module = import ../../src/modules/posix/agent-host-shell.nix {
     inherit lib pkgs;
     config = {
       nucleus.agentHostShell.enable = true;
