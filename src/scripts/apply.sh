@@ -407,19 +407,21 @@ run_health_check() {
 
 run_pre_build() {
   # Pre-build the full derivation closure so the main rebuild step is near-instant.
-  # Failure is a warning, not an error — the main rebuild still proceeds.
+  # Hard-error on failure: the main rebuild builds the same derivation and would
+  # fail with the same error — continuing only wastes time and produces confusing
+  # double-failure output.
   _rpb_host="$(resolve_nucleus_host)"
   case "$_rpb_host" in
   MacBook)
     say -l pre-build "pre-building system derivation closure..."
     if ! run_nix build --no-link "$REPO_ROOT/src#darwinConfigurations.MacBook.system"; then
-      warn -l pre-build "pre-build failed; proceeding with full rebuild (may be slower)"
+      die -l pre-build "pre-build failed — the main rebuild will fail with the same error; aborting early"
     fi
     ;;
   NixOS)
     say -l pre-build "pre-building system derivation closure..."
     if ! run_nix_as_root build --no-link "$REPO_ROOT/src#nixosConfigurations.NixOS.system"; then
-      warn -l pre-build "pre-build failed; proceeding with full rebuild (may be slower)"
+      die -l pre-build "pre-build failed — the main rebuild will fail with the same error; aborting early"
     fi
     ;;
   *)
@@ -427,7 +429,7 @@ run_pre_build() {
     _rpb_user="${target_user:-${NUCLEUS_USERNAME:-$(id -un)}}"
     say -l pre-build "pre-building home-manager derivation closure for $_rpb_user..."
     if ! run_nix build --no-link "$REPO_ROOT/src#homeConfigurations.$_rpb_user.activationPackage"; then
-      warn -l pre-build "pre-build failed; proceeding with full rebuild (may be slower)"
+      die -l pre-build "pre-build failed — the main rebuild will fail with the same error; aborting early"
     fi
     ;;
   esac
