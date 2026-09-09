@@ -175,11 +175,9 @@ let
     scriptName = "src/scripts/services/sccache-gc";
   };
 
-  logGcUser = pkgs.writeNucleusShellApplication {
-    name = "log-gc-user";
-    runtimeInputs = [ pkgs.jq ];
-    scriptName = "src/scripts/services/log-gc-user";
-  };
+  # WHY: logGcUser is centralized in gc-activations.nix for cross-host reuse.
+  gcApps = import ../../../modules/gc-activations.nix { inherit pkgs; };
+  inherit (gcApps) logGcUser;
 
   # guiEnvAgent — launchd login agent that manages GUI-environment PATH and
   # env vars.  All Nix-computed values are passed as CLI args to the script.

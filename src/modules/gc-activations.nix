@@ -19,6 +19,12 @@
     scriptName = "src/scripts/services/nix-store-gc";
   };
 
+  logGcUser = pkgs.writeNucleusShellApplication {
+    name = "log-gc-user";
+    runtimeInputs = [ pkgs.jq ];
+    scriptName = "src/scripts/services/log-gc-user";
+  };
+
   gcWeekly = pkgs.writeNucleusShellApplication {
     name = "gc-weekly";
     runtimeInputs = [ ];

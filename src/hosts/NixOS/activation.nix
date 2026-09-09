@@ -42,7 +42,7 @@ let
 
   # Shared GC application derivations (plan item 6).
   gcApps = import ../../modules/gc-activations.nix { inherit pkgs; };
-  inherit (gcApps) logGcSystem nixStoreGc gcWeekly;
+  inherit (gcApps) logGcUser logGcSystem nixStoreGc gcWeekly;
 in
 {
   # ---------------------------------------------------------------------------
@@ -132,6 +132,31 @@ in
 
   systemd.timers."nucleus-log-gc-system" = {
     description = "Daily system log rotation timer";
+    timerConfig = {
+      OnCalendar = "12:00:00";
+      Persistent = true;
+    };
+    wantedBy = [ "timers.target" ];
+  };
+
+  # ---------------------------------------------------------------------------
+  # Daily user log rotation — rotates ~/.local/share/nucleus/logs as the
+  # user (not root). Cross-host parity with macOS launchd agent and
+  # Windows scheduled task.
+  # ---------------------------------------------------------------------------
+  systemd.user.services."nucleus-log-gc-user" = {
+    description = "Daily user log rotation for nucleus services";
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${logGcUser}/bin/nucleus-log-gc-user";
+      Environment = [
+        "NUCLEUS_GC_EXPIRY=${config.modules.gc.expiry}"
+      ];
+    };
+  };
+
+  systemd.user.timers."nucleus-log-gc-user" = {
+    description = "Daily user log rotation timer";
     timerConfig = {
       OnCalendar = "12:00:00";
       Persistent = true;
