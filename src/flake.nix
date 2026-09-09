@@ -851,7 +851,7 @@
         modules = [
           ./hosts/MacBook/default.nix
           sops-nix.darwinModules.sops
-          ./modules/env/catalog-sops.nix
+          ./modules/env/env-secrets-sops.nix
           nix-homebrew.darwinModules.nix-homebrew
           home-manager.darwinModules.home-manager
           {
@@ -900,7 +900,7 @@
         modules = [
           ./hosts/NixOS/default.nix
           sops-nix.nixosModules.sops
-          ./modules/env/catalog-sops.nix
+          ./modules/env/env-secrets-sops.nix
           home-manager.nixosModules.home-manager
           {
             # Mirror the Darwin behavior so first switch is non-destructive when
