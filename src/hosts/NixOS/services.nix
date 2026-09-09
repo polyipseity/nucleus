@@ -64,8 +64,8 @@ let
     }) optimizePdfPresets
   );
 
-  # Office document MIME types for metadata stripping.
-  # Used for Nautilus MIME guard only; the shell script handles all six types.
+  # MIME types for metadata stripping (excludes PDF and legacy OLE2).
+  # Used for Nautilus MIME guard only; the shell script handles all types.
 
   stripMetadataNautilusScript = pkgs.writeNucleusShellApplication {
     name = "strip-metadata-nautilus";
