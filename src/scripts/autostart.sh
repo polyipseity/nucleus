@@ -10,12 +10,12 @@
 # Policy (driving constraint): we never let an app manage its own startup.
 # If an app exposes a native auto-start setting, we disable it (autostartDisableNative),
 # then control enable/disable through exactly one uniform mechanism we own:
-#   macOS   — login items we add/remove via osascript System Events
+#   macOS   — LaunchAgent plists we write/remove in ~/Library/LaunchAgents/
 #             (system extensions use systemextensionsctl best-effort + manual)
 #   NixOS   — an XDG autostart .desktop we write/remove
 #   Windows — a Run-key entry or Startup-folder .lnk we write/remove
 #
-# Prerequisites: apps.json in the repo; jq; osascript (macOS) or the relevant
+# Prerequisites: apps.json in the repo; jq; osascript (macOS system extensions only) or the relevant
 # platform tooling.  Exit conditions: non-zero when an app name does not
 # resolve, an action fails, or verify finds a disabled app that is still
 # starting (or an enabled app that is not).
@@ -81,75 +81,78 @@ read_registry() {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# macOS login-item helpers (run as the console user)
+# macOS LaunchAgent plist helpers
 # ──────────────────────────────────────────────────────────────────────────────
 
-# macos_login_item_exists NAME — stdout "true"/"false".
-macos_login_item_exists() {
-  local name="$1"
-  _nucleus_resolve_console_user || {
-    printf 'false'
-    return 0
-  }
-  /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
-    /usr/bin/osascript \
-    -e 'tell application "System Events"' \
-    -e "exists login item \"$name\"" \
-    -e 'end tell' 2>/dev/null | grep -qx 'true' && printf 'true' || printf 'false'
+# LAUNCHAGENTS_DIR — user-scoped LaunchAgent plist directory.
+LAUNCHAGENTS_DIR="$HOME/Library/LaunchAgents"
+
+# macos_launchagent_label BUNDLE_ID — stdout the nucleus-owned plist label.
+macos_launchagent_label() {
+  local bundle_id="$1"
+  printf 'local.%s' "$bundle_id"
 }
 
-# macos_login_item_ensure NAME PATH HIDDEN — add (idempotent) our login item.
-macos_login_item_ensure() {
-  local name="$1" path="$2" hidden="$3"
-  _nucleus_resolve_console_user || return 0
-  /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
-    /usr/bin/osascript \
-    -e 'tell application "System Events"' \
-    -e "if not (exists login item \"$name\") then" \
-    -e "make login item at end with properties {name:\"$name\", path:\"$path\", hidden:$hidden}" \
-    -e 'end if' \
-    -e 'end tell' 2>/dev/null
+# macos_launchagent_path BUNDLE_ID — stdout the nucleus-owned plist path.
+macos_launchagent_path() {
+  local bundle_id="$1"
+  printf '%s/%s.plist' "$LAUNCHAGENTS_DIR" "$(macos_launchagent_label "$bundle_id")"
 }
 
-# macos_login_item_remove NAME — delete any login item with this name.
-macos_login_item_remove() {
-  local name="$1"
-  _nucleus_resolve_console_user || return 0
-  /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
-    /usr/bin/osascript \
-    -e 'tell application "System Events"' \
-    -e "if exists login item \"$name\" then" \
-    -e "delete login item \"$name\"" \
-    -e 'end if' \
-    -e 'end tell' 2>/dev/null
+# macos_launchagent_exists BUNDLE_ID — stdout "true"/"false".
+macos_launchagent_exists() {
+  local bundle_id="$1"
+  [ -f "$(macos_launchagent_path "$bundle_id")" ] && printf 'true' || printf 'false'
 }
 
-# macos_native_login_items_remove APP_PATH — delete any login item whose path
-# lives under the app's embedded helper location (Contents/Library/LoginItems).
-# Apps like Mounty register an SMLoginItemSetEnabled helper there; when the app
-# launches it re-enables that helper, creating a second startup path alongside
-# our own login item. Removing it enforces the single-owned-mechanism policy.
-# Best-effort: a missing console user or absent helper is not an error.
-macos_native_login_items_remove() {
-  local app_path="$1"
+# macos_launchagent_ensure BUNDLE_ID APP_PATH — write nucleus-owned plist (idempotent).
+macos_launchagent_ensure() {
+  local bundle_id="$1" app_path="$2"
+  local label plist_path
+  label="$(macos_launchagent_label "$bundle_id")"
+  plist_path="$(macos_launchagent_path "$bundle_id")"
+  mkdir -p "$LAUNCHAGENTS_DIR"
+  cat >"$plist_path" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${label}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>${app_path}</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>AssociatedBundleIdentifiers</key>
+    <string>${bundle_id}</string>
+</dict>
+</plist>
+PLIST
+}
+
+# macos_launchagent_remove BUNDLE_ID — delete nucleus-owned plist.
+macos_launchagent_remove() {
+  local bundle_id="$1"
+  rm -f "$(macos_launchagent_path "$bundle_id")"
+}
+
+# macos_remove_app_launchagent BUNDLE_ID APP_PATH — delete app-owned plist
+# (e.g. ~/Library/LaunchAgents/com.lwouis.alt-tab-macos.plist) if its Program
+# matches the given app path. Safety: never remove a plist that points elsewhere.
+macos_remove_app_launchagent() {
+  local bundle_id="$1" app_path="$2"
   [ -n "$app_path" ] || return 0
-  _nucleus_resolve_console_user || return 0
-  local prefix="$app_path/Contents/Library/LoginItems"
-  /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
-    /usr/bin/osascript \
-    -e 'tell application "System Events"' \
-    -e "set liPrefix to \"$prefix\"" \
-    -e 'repeat with li in login items' \
-    -e 'try' \
-    -e 'set liPath to path of li' \
-    -e 'on error' \
-    -e 'set liPath to ""' \
-    -e 'end try' \
-    -e 'if liPath starts with liPrefix then' \
-    -e 'delete li' \
-    -e 'end if' \
-    -e 'end repeat' \
-    -e 'end tell' 2>/dev/null
+  local plist_path="$LAUNCHAGENTS_DIR/${bundle_id}.plist"
+  [ -f "$plist_path" ] || return 0
+  # Extract the first <string> inside <array> under ProgramArguments — that's the binary path.
+  local plist_program
+  plist_program=$(sed -n '/<key>ProgramArguments</key>/,/<\/array>/p' "$plist_path" | sed -n 's/.*<string>\(.*\)<\/string>.*/\1/p' | head -1)
+  if [ "$plist_program" = "$app_path" ]; then
+    rm -f "$plist_path"
+  fi
 }
 
 # macos_system_extension_present ID — stdout "true"/"false" via systemextensionsctl.
@@ -277,12 +280,10 @@ nixos_dispatch_per_user() {
 # Per-app state resolution
 # ──────────────────────────────────────────────────────────────────────────────
 
-# app_login_item_name — Derive the login item name for an app entry.
-# Uses displayName (matches how macOS labels login items); falls back to key.
-app_login_item_name() {
-  local key="$1" entry_json="$2"
-  echo "$entry_json" | jq -r '.displayName // empty' | head -1
-  [ -z "$(echo "$entry_json" | jq -r '.displayName // empty')" ] && printf '%s' "$key"
+# app_bundle_id — Extract bundleId from entry JSON.
+app_bundle_id() {
+  local entry_json="$1"
+  echo "$entry_json" | jq -r '.hostEntry.bundleId // empty'
 }
 
 # app_actual_state KEY ENTRY_JSON — stdout "enabled"/"disabled"/"unknown".
@@ -293,10 +294,9 @@ app_actual_state() {
   kind=$(echo "$entry_json" | jq -r '.hostEntry.kind')
   case "$kind" in
   login-item)
-    local name path
-    name=$(app_login_item_name "$key" "$entry_json")
-    path=$(echo "$entry_json" | jq -r '.hostEntry.path // empty')
-    if [ "$(macos_login_item_exists "$name")" = "true" ]; then
+    local bundle_id
+    bundle_id=$(app_bundle_id "$entry_json")
+    if [ -n "$bundle_id" ] && [ "$(macos_launchagent_exists "$bundle_id")" = "true" ]; then
       printf 'enabled'
     else
       printf 'disabled'
@@ -331,29 +331,30 @@ app_actual_state() {
 # mechanism remains), then we add/remove our login item per `autostartEnabled`.
 app_converge() {
   local key="$1" entry_json="$2"
-  local kind enabled disable_native name path hidden
+  local kind enabled disable_native path hidden
   kind=$(echo "$entry_json" | jq -r '.hostEntry.kind')
   enabled=$(echo "$entry_json" | jq -r '.hostEntry.autostartEnabled')
   disable_native=$(echo "$entry_json" | jq -r '.hostEntry.autostartDisableNative')
-  name=$(app_login_item_name "$key" "$entry_json")
   path=$(echo "$entry_json" | jq -r '.hostEntry.path // empty')
   hidden=$(echo "$entry_json" | jq -r '.hostEntry.hidden // false')
 
   case "$kind" in
   login-item)
+    local bundle_id
+    bundle_id=$(app_bundle_id "$entry_json")
+    if [ -z "$bundle_id" ]; then
+      warn -l "$key" "missing bundleId — skipping"
+      return 1
+    fi
     if [ "$disable_native" = "true" ]; then
-      # Neutralize any app-owned login item (our mechanism and the app's
-      # native checkbox both manifest as a login item with this name).
-      macos_login_item_remove "$name" || true # check-suppress:suppression_doc: login item may already be absent; removal is best-effort before re-adding our own.
-      # Neutralize the app's embedded SMLoginItemSetEnabled helper (e.g.
-      # Mounty's com.cu4uc.MountyHelper), which the app re-enables on launch
-      # and would otherwise start a second copy alongside our login item.
-      macos_native_login_items_remove "$path" || true # check-suppress:suppression_doc: embedded helper login item may be absent; removal is best-effort.
+      # Remove any app-owned LaunchAgent plist (e.g. AltTab's startAtLogin plist)
+      # that would start the app independently of our mechanism.
+      macos_remove_app_launchagent "$bundle_id" "$path" || true # check-suppress:suppression_doc: app-owned plist may be absent; removal is best-effort.
     fi
     if [ "$enabled" = "true" ]; then
-      macos_login_item_ensure "$name" "$path" "$hidden" || die -l "$key" "failed to ensure login item"
+      macos_launchagent_ensure "$bundle_id" "$path" || die -l "$key" "failed to ensure LaunchAgent plist"
     else
-      macos_login_item_remove "$name" || true # check-suppress:suppression_doc: login item may already be absent; removal is best-effort.
+      macos_launchagent_remove "$bundle_id" || true # check-suppress:suppression_doc: plist may already be absent; removal is best-effort.
     fi
     ;;
   system-extension)
