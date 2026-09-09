@@ -74,8 +74,25 @@ test_apply_pins_flake_inputs() {
   fi
 }
 
+test_apply_prebuild_fails_hard() {
+  # Pre-build and main rebuild build the same derivation. If pre-build fails,
+  # the main rebuild would fail with the same error — continuing wastes time.
+  if grep -q 'die -l pre-build' "$APPLY_SH" && ! grep -q 'warn -l pre-build.*proceeding' "$APPLY_SH"; then
+    assert_pass "apply.sh pre-build uses die on failure"
+  else
+    assert_fail "apply.sh pre-build uses die on failure" "expected die, found warn-and-continue"
+  fi
+  # Verify the old 'proceeding with full rebuild' message is gone.
+  if grep -q 'proceeding with full rebuild' "$APPLY_SH"; then
+    assert_fail "apply.sh must not contain stale proceed-with-rebuild message" "found legacy warn text"
+  else
+    assert_pass "apply.sh has no stale proceed-with-rebuild message"
+  fi
+}
+
 test_apply_uses_pascal_case_flake_hosts
 test_apply_prefers_live_checkout
 test_scripts_apply_delegates_to_src
 test_nucleus_wrappers_prefer_live_checkout
 test_apply_pins_flake_inputs
+test_apply_prebuild_fails_hard
