@@ -356,7 +356,7 @@ ln -sf "$REPO_ROOT/src/modules/configs/litellm/cline_handler.py" "$NUCLEUS_USER_
 # Symlink the cooldown-400 callback alongside the config.
 ln -sf "$REPO_ROOT/src/modules/configs/litellm/cooldown_400.py" "$NUCLEUS_USER_ROOT/litellm-cooldown-400.py"
 # Symlink the litellm logging config for traceback suppression.
-ln -sf "$REPO_ROOT/src/modules/litellm/logging-config.py" "$NUCLEUS_USER_ROOT/litellm-logging-config.py"
+ln -sf "$REPO_ROOT/src/modules/configs/litellm/logging-config.py" "$NUCLEUS_USER_ROOT/litellm-logging-config.py"
 
 run_nix() {
   # --option min-free 0 suppresses auto-GC during the apply pipeline. The
