@@ -15,7 +15,8 @@
       "~/.npm",
       "~/.pi",
       "~/.rustup",
-      "~/dev"
+      "~/dev",
+      "~/Library/Caches"
     ],
     "denyRead": [
       "~/.aws",
