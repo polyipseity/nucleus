@@ -23,6 +23,10 @@ function Invoke-BunSetup {
       - clawhub                        — fetched skill install vehicle; absent
                                          from WinGet, Scoop, and cargo-binstall;
                                          bun is the only viable install tier
+      - @tobilu/qmd                    — on-device markdown search engine for
+                                         pi memory_search; absent from WinGet,
+                                         Scoop, cargo-binstall, and nixpkgs;
+                                         requires lifecycle scripts (postinstall)
 
     Requires bun to be on PATH (installed from WinGet by system/packages.dsc.yml).
     Prepends %USERPROFILE%\.bun\bin to PATH internally so bun-installed

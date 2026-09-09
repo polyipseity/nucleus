@@ -40,7 +40,6 @@ let
 
   managedPaths = import ./lib/managed-paths.nix { inherit pkgs; };
 
-
   # Read the consolidated lockfile so activation scripts can converge to
   # exact pins (closes the drift root cause).  Mirrors pwsh.nix.
   lockfile = builtins.fromJSON (builtins.readFile ../lockfiles/lockfile.json);
@@ -144,6 +143,9 @@ in
     # Currently managed:
     #   clawhub — fetched skill install vehicle; absent from nixpkgs and
     #             cargo-binstall; bun is the only viable install tier.
+    #   @tobilu/qmd — on-device markdown search engine for pi memory_search;
+    #                  absent from nixpkgs and cargo-binstall; requires
+    #                  lifecycle scripts (in lifecycle-allowlist).
     # -------------------------------------------------------------------------
     install-bun-packages = lib.hm.dag.entryAfter [ "install-agent-skills" ] ''
       "${activationBundle}/src/scripts/packages/install-bun-packages.sh" \
