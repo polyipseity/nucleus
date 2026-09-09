@@ -1,114 +1,92 @@
 #!/usr/bin/env bash
-# One-off migration: replace System Events login items with LaunchAgent plists.
+# One-off migration: remove app-owned LaunchAgent plists and System Events
+# login items, then create nucleus-owned plists via autostart.sh apply.
 #
-# This script removes app-owned LaunchAgent plists (e.g. AltTab's startAtLogin
-# plist) and best-effort removes System Events login items, then runs
-# autostart.sh apply to create nucleus-owned plists.
-#
-# Run once. Idempotent — safe to re-run if interrupted.
+# Run once. Safe to re-run (idempotent).
+# This script will be removed after migration.
 #
 # Usage: src/scripts/migrate-autostart-launchagent.sh [--dry-run]
 
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-. "$SCRIPT_DIR/lib/lib.sh"
-
-REPO_ROOT="$(derive_repo_root)"
-APPS_JSON="$REPO_ROOT/src/modules/apps.json"
-LAUNCHAGENTS_DIR="$HOME/Library/LaunchAgents"
 DRY_RUN=false
-
 case "${1:-}" in
 --dry-run) DRY_RUN=true ;;
 esac
 
-if [ ! -f "$APPS_JSON" ]; then
-  die "apps.json not found at $APPS_JSON"
-fi
+LAUNCHAGENTS_DIR="$HOME/Library/LaunchAgents"
 
-require_command jq
+# App-owned LaunchAgent plists to remove (bundleId → app path for safety check).
+# Only apps that have startAtLogin/LaunchAtLogin create these.
+declare -A APP_PLISTS=(
+  ["com.lwouis.alt-tab-macos"]="/Applications/AltTab.app"
+  ["com.raycast.macos"]="/Applications/Raycast.app"
+  ["pro.betterdisplay.BetterDisplay"]="/Applications/BetterDisplay.app"
+  ["com.lujjjh.LinearMouse"]="/Applications/LinearMouse.app"
+)
 
-# Collect login-item apps with bundleId from apps.json.
-mapfile -t apps < <(
-  jq -r '
-    to_entries[]
-    | select(.value | type == "object")
-    | select(.value.hosts.MacBook.kind == "login-item")
-    | select(.value.hosts.MacBook.bundleId != null and .value.hosts.MacBook.bundleId != "N/A")
-    | [.value.hosts.MacBook.bundleId, .value.hosts.MacBook.path, .key] | @tsv
-  ' "$APPS_JSON"
+# System Events login item names to remove.
+LOGIN_ITEMS=(
+  "Raycast"
+  "Amphetamine"
+  "Stats"
+  "BetterDisplay"
+  "MiddleClick"
+  "Mounty"
+  "LinearMouse"
+  "LuLu"
+  "OrbStack"
+  "Parsec"
+  "Telegram"
+  "WhatsApp"
+  "Steam"
+  "AltTab"
+  "battery"
+  "Rectangle"
+  "Discord"
+  "Discord Canary"
 )
 
 removed=0
-skipped=0
 
-for entry in "${apps[@]}"; do
-  IFS=$'\t' read -r bundle_id app_path app_name <<< "$entry"
-
-  # --- 1. Remove app-owned LaunchAgent plist ---
-  app_plist="$LAUNCHAGENTS_DIR/${bundle_id}.plist"
-  if [ -f "$app_plist" ]; then
-    # Safety: extract Program field and verify it matches the app path.
-    plist_program=$(sed -n '/<key>ProgramArguments</key>/,/<\/array>/p' "$app_plist" \
-      | sed -n 's/.*<string>\(.*\)<\/string>.*/\1/p' | head -1)
-    if [ "$plist_program" = "$app_path" ]; then
-      if $DRY_RUN; then
-        echo "[dry-run] would remove $app_plist"
-      else
-        rm -f "$app_plist"
-        echo "removed $app_plist (matched $app_path)"
-      fi
-      ((removed++))
+# --- 1. Remove app-owned LaunchAgent plists ---
+for bundle_id in "${!APP_PLISTS[@]}"; do
+  app_path="${APP_PLISTS[$bundle_id]}"
+  plist="$LAUNCHAGENTS_DIR/${bundle_id}.plist"
+  if [ -f "$plist" ]; then
+    if $DRY_RUN; then
+      echo "[dry-run] would remove $plist"
     else
-      echo "skip $app_plist — Program mismatch: '$plist_program' != '$app_path'"
-      ((skipped++))
+      rm -f "$plist"
+      echo "removed $plist"
     fi
+    removed=$((removed + 1))
   fi
+done
 
-  # --- 2. Best-effort remove System Events login item ---
+# --- 2. Best-effort remove System Events login items ---
+for name in "${LOGIN_ITEMS[@]}"; do
   if $DRY_RUN; then
-    echo "[dry-run] would remove System Events login item '$app_name'"
+    echo "[dry-run] would remove System Events login item '$name'"
   else
     osascript \
       -e 'tell application "System Events"' \
-      -e "if exists login item \"$app_name\" then" \
-      -e "delete login item \"$app_name\"" \
+      -e "if exists login item \"$name\" then" \
+      -e "delete login item \"$name\"" \
       -e 'end if' \
-      -e 'end tell' 2>/dev/null || true # check-suppress:suppression_doc: osascript fails on macOS 26 (error -10810); best-effort cleanup.
-  fi
-
-  # --- 3. Best-effort remove embedded helper login items ---
-  if [ -d "$app_path/Contents/Library/LoginItems" ]; then
-    if $DRY_RUN; then
-      echo "[dry-run] would remove embedded login items in $app_path/Contents/Library/LoginItems/"
-    else
-      osascript \
-        -e 'tell application "System Events"' \
-        -e "set liPrefix to \"$app_path/Contents/Library/LoginItems\"" \
-        -e 'repeat with li in login items' \
-        -e 'try' \
-        -e 'set liPath to path of li' \
-        -e 'on error' \
-        -e 'set liPath to ""' \
-        -e 'end try' \
-        -e 'if liPath starts with liPrefix then' \
-        -e 'delete li' \
-        -e 'end if' \
-        -e 'end repeat' \
-        -e 'end tell' 2>/dev/null || true # check-suppress:suppression_doc: osascript fails on macOS 26; best-effort cleanup.
-    fi
+      -e 'end tell' 2>/dev/null || true # check-suppress:suppression_doc: osascript fails on macOS 26; best-effort cleanup.
   fi
 done
 
 echo ""
-echo "Migration complete: $removed app-owned plists removed, $skipped skipped."
+echo "Removed $removed app-owned plists."
 
 if ! $DRY_RUN; then
   echo ""
-  echo "Running autostart.sh apply to create nucleus-owned plists..."
+  SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+  echo "Running autostart.sh apply..."
   "$SCRIPT_DIR/autostart.sh" apply
   echo ""
-  echo "Current state:"
+  echo "Final state:"
   "$SCRIPT_DIR/autostart.sh" list
 fi
