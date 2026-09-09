@@ -40,6 +40,14 @@ let
 
   managedPaths = import ./lib/managed-paths.nix { inherit pkgs; };
 
+  # Nucleus user root (platform-specific). Mirrors nucleusUserRootFor in
+  # src/modules/lib/nucleus-roots.nix. Used for superpowers plugin path.
+  nucleusUserRoot =
+    if pkgs.stdenv.hostPlatform.isDarwin then
+      "${config.home.homeDirectory}/Library/Application Support/nucleus"
+    else
+      "${config.home.homeDirectory}/.local/share/nucleus";
+
   # Read the consolidated lockfile so activation scripts can converge to
   # exact pins (closes the drift root cause).  Mirrors pwsh.nix.
   lockfile = builtins.fromJSON (builtins.readFile ../lockfiles/lockfile.json);
@@ -275,9 +283,9 @@ in
     #
     # builtins.fetchGit evaluates at Nix build time, checking out the pinned
     # rev into /nix/store/.  Activation creates a stable symlink from
-    # ~/.local/share/nucleus/plugins/superpowers → the store path.
+    # <nucleusUserRoot>/plugins/superpowers → the store path.
     #
-    # Why after linkGeneration: ensures ~/.local/share/ parent exists.
+    # Why after linkGeneration: ensures nucleus user root parent exists.
     # No dependency on bun/PATH guards — this is a pure store path.
     #
     # Why best-effort: the system configuration applied successfully.  A
@@ -285,7 +293,7 @@ in
     # -----------------------------------------------------------------------
     symlink-superpowers-plugin = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/agents/symlink-superpowers-plugin.sh" \
-        "$HOME/.local/share/nucleus/plugins/superpowers" \
+        "${nucleusUserRoot}/plugins/superpowers" \
         "${superpowersSrc}"
     '';
 
