@@ -2,13 +2,13 @@
   "$schema": "https://opencode.ai/config.json",
   // See opencode.ai/docs/zh-tw/ for config, rules, and skills docs.
   "autoupdate": false,
-  "instructions": [".agents/instructions/**/*.instructions.md"],
-  "skills": {
-    "paths": [".agents/skills"],
-  },
-  "plugin": [
-    // Source: superpowers agent skills methodology.
-    // https://github.com/obra/superpowers
-    "superpowers@git+https://github.com/obra/superpowers.git"
+  "instructions": [
+    ".agents/instructions/**/*.instructions.md"
   ],
+  "skills": {
+    "paths": [
+      ".agents/skills"
+    ],
+  },
+  "plugin": [],
 }
