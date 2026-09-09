@@ -2,9 +2,9 @@
 
 let
   lib = import <nixpkgs/lib>;
-  macServicesText = builtins.readFile ../../src/hosts/MacBook/services.nix;
-  macAutomatorWorkflowsText = builtins.readFile ../../src/hosts/MacBook/services/automator-workflows.nix;
-  macAppBundlesText = builtins.readFile ../../src/hosts/MacBook/services/app-bundles.nix;
+  macServicesText = builtins.readFile ../../src/hosts/MacBook/services/default.nix;
+  macAutomatorWorkflowsText = builtins.readFile ../../src/hosts/MacBook/services/automator-workflows/default.nix;
+  macAppBundlesText = builtins.readFile ../../src/hosts/MacBook/services/app-bundles/default.nix;
   nixosServicesText = builtins.readFile ../../src/hosts/NixOS/services.nix;
   windowsDscText = builtins.readFile ../../src/hosts/Windows/user/context-optimize-pdf.dsc.yml;
   nautilusScriptText = builtins.readFile ../../src/scripts/integrations/configure-file-manager-optimize-pdf.sh;

@@ -2,7 +2,7 @@
 
 let
   lib = import <nixpkgs/lib>;
-  macAutomatorWorkflowsText = builtins.readFile ../../src/hosts/MacBook/services/automator-workflows.nix;
+  macAutomatorWorkflowsText = builtins.readFile ../../src/hosts/MacBook/services/automator-workflows/default.nix;
   nixosServicesText = builtins.readFile ../../src/hosts/NixOS/services.nix;
   windowsDscText = builtins.readFile ../../src/hosts/Windows/user/context-strip-metadata.dsc.yml;
   nautilusScriptText = builtins.readFile ../../src/scripts/integrations/configure-file-manager-strip-metadata.sh;
@@ -83,8 +83,7 @@ let
   ) "Plasma strip-metadata desktop entry must not include application/pdf in MimeType";
 
   test_utils_sh_skips_pdf = assert' (
-    lib.hasInfix "*.pdf)" utilsShText
-    && lib.hasInfix "skipping PDF" utilsShText
+    lib.hasInfix "*.pdf)" utilsShText && lib.hasInfix "skipping PDF" utilsShText
   ) "utils.sh strip-metadata must have explicit PDF skip case";
 
   allTests = [

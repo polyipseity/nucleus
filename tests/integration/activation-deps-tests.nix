@@ -29,9 +29,9 @@ let
   nixosUserGitconfigText = builtins.readFile ../../src/users/default/git/NixOS.gitconfig;
   discordMusicRpcModuleText = builtins.readFile ../../src/modules/ext-discord-music-rpc.nix;
   homeModuleText = builtins.readFile ../../src/modules/home.nix;
-  macbookServicesText = builtins.readFile ../../src/hosts/MacBook/services.nix;
+  macbookServicesText = builtins.readFile ../../src/hosts/MacBook/services/default.nix;
   macbookAppBundlesText = builtins.readFile ../../src/hosts/MacBook/services/app-bundles.nix;
-  macbookAutomatorWorkflowsText = builtins.readFile ../../src/hosts/MacBook/services/automator-workflows.nix;
+  macbookAutomatorWorkflowsText = builtins.readFile ../../src/hosts/MacBook/services/automator-workflows/default.nix;
 
   inherit (import ../lib.nix) assert';
 
@@ -376,9 +376,9 @@ let
 
   # === TEST: macOS services.nix imports both sub-modules ===
   test_services_imports_both_submodules = assert' (
-    lib.hasInfix "./services/automator-workflows.nix" macbookServicesText
-    && lib.hasInfix "./services/app-bundles.nix" macbookServicesText
-  ) "services.nix must import both automator-workflows.nix and app-bundles.nix";
+    lib.hasInfix "./automator-workflows" macbookServicesText
+    && lib.hasInfix "./app-bundles" macbookServicesText
+  ) "services/default.nix must import both automator-workflows and app-bundles";
 
   # === TEST: macOS Automator workflows has open nucleus manual entry ===
   test_macos_workflows_has_open_nucleus_manual =
