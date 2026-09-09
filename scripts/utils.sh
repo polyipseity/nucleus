@@ -235,9 +235,11 @@ do_strip_metadata() {
       fi
       # WHY: backup first, then mat2 --inplace on the original — .bak holds the
       # untouched original, so an interrupt leaves either the original or the
-      # stripped file, never a half-written one.
+      # stripped file, never a half-written one. --unknown-members keep preserves
+      # unsupported embedded content (OLE objects, WMF images) as-is instead of
+      # aborting — mat2 has no parser for these formats so they cannot be scrubbed.
       cp -- "$f" "$bak"
-      if "$mat2_cmd" --inplace "$f" 2>/dev/null; then
+      if "$mat2_cmd" --inplace --unknown-members keep "$f" 2>/dev/null; then
         "$rm_bak" && rm -f "$bak"
         say "stripped metadata: $f"
       else
