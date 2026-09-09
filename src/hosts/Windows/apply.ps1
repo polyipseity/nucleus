@@ -727,43 +727,6 @@ else {
   Remove-ManagedSecret -Users $Users
 }
 
-# Materialise system-level secrets (AI API keys) from src/secrets/system.yml
-# into %ProgramData%\nucleus\secrets\ so the SYSTEM-native litellm SCM service
-# can read them at startup.
-$systemSecretsDir = Join-Path -Path $env:ProgramData -ChildPath "nucleus\secrets"
-$null = New-Item -Path $systemSecretsDir -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
-$systemYmlPath = Join-Path -Path $secretsDir -ChildPath "system.yml"
-if (Test-Path -Path $systemYmlPath -PathType Leaf) {
-  $getSystemSecretParams = @{
-    FilePath    = $systemYmlPath
-    GpgExe      = $gpgExe
-    HostKeyPath = $machineSshHostKeyPath
-    RepoRoot    = $repoRoot
-    SopsExe     = $sopsExe
-  }
-  if (-not [string]::IsNullOrWhiteSpace($primarySshKeyPath)) {
-    $getSystemSecretParams['PrimarySshKeyPath'] = $primarySshKeyPath
-  }
-  $systemSecrets = Get-Secret @getSystemSecretParams
-  $availableKeys = @()
-  foreach ($prop in $systemSecrets.PSObject.Properties) {
-    if ($prop.Name -match '^env_' -and -not [string]::IsNullOrWhiteSpace($prop.Value)) {
-      $availableKeys += $prop.Name
-      $keyFile = Join-Path -Path $systemSecretsDir -ChildPath $prop.Name
-      $existing = if (Test-Path -Path $keyFile -PathType Leaf) { Get-Content -Path $keyFile -Raw -Encoding UTF8 }
-      if ($existing -ne $prop.Value) {
-        [System.IO.File]::WriteAllText($keyFile, $prop.Value, [System.Text.UTF8Encoding]::new($false))
-      }
-    }
-  }
-  # Copy static env-catalog.json to %LOCALAPPDATA%\nucleus\ for Sync-LiteLLMService consumption.
-  $catalogSource = Join-Path -Path $repoRoot -ChildPath 'src\hosts\Windows\env-catalog.json'
-  $catalogPath = Join-Path -Path $env:LOCALAPPDATA -ChildPath 'nucleus\env-catalog.json'
-  New-Item -Path (Split-Path $catalogPath) -ItemType Directory -Force > $null
-  Copy-Item -Path $catalogSource -Destination $catalogPath -Force
-  Write-NucleusInfo -CommandName 'apply' "copied static env-catalog.json"
-}
-
 # Materialize decrypted wallpapers ahead of DSC so user/wallpaper.dsc.yml can resolve an
 # explicit active wallpaper path deterministically.
 
@@ -978,7 +941,7 @@ Sync-CamillaDSPHeartbeatService -Enabled:$EnableCamillaDSPHeartbeatServiceParity
 Sync-CamillaGUIService -Enabled:$EnableCamillaGUIServiceParity
 Sync-AppAutostart -Enabled:$EnableAppAutostartParity -RepoRoot $repoRoot
 Sync-MenuBar -Enabled:$EnableMenuBarParity -RepoRoot $repoRoot
-Sync-LiteLLMService -RepoRoot $repoRoot -Enabled:`$true
+Sync-LiteLLMService -RepoRoot $repoRoot -Enabled:`$true -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -SopsExe $sopsExe -PrimarySshKeyPath $primarySshKeyPath -SecretsDir $secretsDir
 Sync-RedisService -RepoRoot $repoRoot -Enabled:`$true
 Sync-ReplicaSyncScheduledTask -RepoRoot $repoRoot -Enabled:$EnableCloudDrivesParity
 Sync-OpenSSHServer -Enabled:$EnableRemoteAccessParity

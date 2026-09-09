@@ -8,7 +8,7 @@
 
   The wrapper script under %ProgramData%\nucleus\litellm\ reads API keys from
   %ProgramData%\nucleus\secrets\ and the litellm config from a symlink.
-  Secrets are materialised by apply.ps1 via SOPS decryption of system.yml.
+  Secrets are materialised from system.yml via SOPS decryption.
 
   On disable the function removes the SCM service.
 
@@ -27,17 +27,32 @@ function Sync-LiteLLMService {
 
   .PARAMETER RepoRoot
     Absolute path to the repository root.  Required so the function can locate
-    the litellm config source file under src\modules\ai\.
+    the litellm config source file under src\modules\configs\litellm\.
 
   .PARAMETER Enabled
     Whether the litellm service should exist.  When false, the managed service
     is removed if present.
 
-  .EXAMPLE
-    Sync-LiteLLMService -RepoRoot 'C:\Users\admin\nucleus' -Enabled:$true
+  .PARAMETER GpgExe
+    Path to the GPG executable for SOPS decryption.
+
+  .PARAMETER HostKeyPath
+    Path to the machine SSH host key for SOPS decryption.
+
+  .PARAMETER SopsExe
+    Path to the SOPS executable for secret decryption.
+
+  .PARAMETER PrimarySshKeyPath
+    Optional path to the primary SSH key for SOPS decryption.
+
+  .PARAMETER SecretsDir
+    Path to the src/secrets directory containing system.yml.
 
   .EXAMPLE
-    Sync-LiteLLMService -RepoRoot 'C:\Users\admin\nucleus' -Enabled:$false
+    Sync-LiteLLMService -RepoRoot 'C:\Users\admin\nucleus' -Enabled:$true -GpgExe 'C:\...\gpg.exe' -HostKeyPath 'C:\...\ssh_host_ed25519_key' -SopsExe 'C:\...\sops.exe' -SecretsDir 'C:\...\secrets'
+
+  .EXAMPLE
+    Sync-LiteLLMService -RepoRoot 'C:\Users\admin\nucleus' -Enabled:$false -GpgExe 'C:\...\gpg.exe' -HostKeyPath 'C:\...\ssh_host_ed25519_key' -SopsExe 'C:\...\sops.exe' -SecretsDir 'C:\...\secrets'
   #>
   [CmdletBinding()]
   param(
@@ -45,7 +60,21 @@ function Sync-LiteLLMService {
     [string]$RepoRoot,
 
     [Parameter(Mandatory)]
-    [bool]$Enabled
+    [bool]$Enabled,
+
+    [Parameter(Mandatory)]
+    [string]$GpgExe,
+
+    [Parameter(Mandatory)]
+    [string]$HostKeyPath,
+
+    [Parameter(Mandatory)]
+    [string]$SopsExe,
+
+    [string]$PrimarySshKeyPath,
+
+    [Parameter(Mandatory)]
+    [string]$SecretsDir
   )
 
   if (-not (Test-Path -LiteralPath $RepoRoot -PathType Container)) {
@@ -66,6 +95,43 @@ function Sync-LiteLLMService {
     }
     return
   }
+
+  # Materialise system-level secrets (AI API keys) from src/secrets/system.yml
+  # into %ProgramData%\nucleus\secrets\ so the SYSTEM-native litellm SCM service
+  # can read them at startup.
+  $systemSecretsDir = Join-Path -Path $env:ProgramData -ChildPath "nucleus\secrets"
+  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+  $null = New-Item -Path $systemSecretsDir -ItemType Directory -Force
+  $systemYmlPath = Join-Path -Path $SecretsDir -ChildPath "system.yml"
+  if (Test-Path -Path $systemYmlPath -PathType Leaf) {
+    $getSystemSecretParams = @{
+      FilePath    = $systemYmlPath
+      GpgExe      = $GpgExe
+      HostKeyPath = $HostKeyPath
+      RepoRoot    = $RepoRoot
+      SopsExe     = $SopsExe
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PrimarySshKeyPath)) {
+      $getSystemSecretParams['PrimarySshKeyPath'] = $PrimarySshKeyPath
+    }
+    $systemSecrets = Get-Secret @getSystemSecretParams
+    foreach ($prop in $systemSecrets.PSObject.Properties) {
+      if ($prop.Name -match '^env_' -and -not [string]::IsNullOrWhiteSpace($prop.Value)) {
+        $keyFile = Join-Path -Path $systemSecretsDir -ChildPath $prop.Name
+        $existing = if (Test-Path -Path $keyFile -PathType Leaf) { Get-Content -Path $keyFile -Raw -Encoding UTF8 } else { $null }
+        if ($existing -ne $prop.Value) {
+          [System.IO.File]::WriteAllText($keyFile, $prop.Value, [System.Text.UTF8Encoding]::new($false))
+        }
+      }
+    }
+  }
+
+  # Copy static env-catalog.json to %LOCALAPPDATA%\nucleus\ for wrapper script consumption.
+  $catalogSource = Join-Path -Path $RepoRoot -ChildPath 'src\hosts\Windows\env-catalog.json'
+  $catalogPath = Join-Path -Path $env:LOCALAPPDATA -ChildPath 'nucleus\env-catalog.json'
+  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+  $null = New-Item -Path (Split-Path $catalogPath) -ItemType Directory -Force
+  Copy-Item -Path $catalogSource -Destination $catalogPath -Force
 
   # Find the litellm binary installed by uv.
   # uv tool install places binaries in ~\.local\bin by default.
