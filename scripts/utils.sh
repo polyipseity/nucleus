@@ -5,7 +5,8 @@
 # Ghostscript, keeping a .bak backup that is restored automatically if
 # optimization fails. Also provides strip-metadata: remove personal
 # metadata from Office files using mat2 (OOXML) and exiftool (other
-# formats). ICC color profiles are preserved for correct color rendering.
+# formats). PDF and legacy OLE2 files are skipped with a warning.
+# ICC color profiles are preserved for correct color rendering.
 #
 # Usage: nucleus-utils <subcommand> [args...]
 #   Subcommand: optimize-pdf [--preset <name>] [--rm-bak] <file>...
@@ -48,7 +49,8 @@ Subcommands:
               Strip personal metadata from files. Uses mat2 for OOXML
               (.docx/.xlsx/.pptx) and exiftool for other formats.
               ICC color profiles are preserved for correct color rendering.
-              Legacy OLE2 files (.doc/.xls/.ppt) are skipped with a warning.
+              Legacy OLE2 files (.doc/.xls/.ppt) and PDF files are skipped
+              with a warning.
 
   optimize-pdf presets (default: default):
     default   - high quality
@@ -246,6 +248,9 @@ do_strip_metadata() {
       ;;
     *.doc | *.xls | *.ppt)
       warn "skipping legacy OLE2 (no CLI tool can write this format): $f"
+      ;;
+    *.pdf)
+      warn "skipping PDF (strip-metadata does not support PDF files): $f"
       ;;
     *)
       if [[ -z "$et_cmd" ]]; then
