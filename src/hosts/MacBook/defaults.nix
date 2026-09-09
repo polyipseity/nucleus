@@ -381,7 +381,7 @@ in
       # Sensitivity require manual configuration in Raycast UI → Settings → Advanced.
       "com.raycast.macos" = {
         # --- Startup & Window Behavior ---
-        LaunchAtLogin = true; # Launch Raycast at login
+        LaunchAtLogin = false; # Managed by nucleus autostart system
         Appearance = "system"; # Auto Dark/Light based on time of day
         WindowMode = "default"; # Use default window (not compact)
         ShowFavoritesInCompactMode = true; # Show favorites in compact mode
@@ -432,7 +432,7 @@ in
       #
       # Note: preferences domain is pro.betterdisplay.BetterDisplay (not com.betterdisplay).
       "pro.betterdisplay.BetterDisplay" = {
-        LaunchAtLogin = true;
+        LaunchAtLogin = false;
         ShowResolutionsAsList = true;
         UseMaximumResolution = true;
         sendCrashReports = true;
@@ -506,7 +506,7 @@ in
         trackpadHapticFeedbackEnabled = "true";
 
         # --- Requested general settings ---
-        startAtLogin = "true";
+        startAtLogin = "false";
         captureWindowsInBackground = "true";
         language = "0"; # system default
         updatePolicy = "0"; # do not check periodically
@@ -517,7 +517,7 @@ in
       # dock visibility, and launch-at-login behavior.
       "org.linearmouse.LinearMouse" = {
         showInDock = true;
-        launchAtLogin = true;
+        launchAtLogin = false;
         SUEnableAutomaticChecks = false;
         SUAutomaticallyUpdate = false;
       };
