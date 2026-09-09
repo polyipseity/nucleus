@@ -17,8 +17,8 @@
     ./base.nix
     ./camilladsp.nix
     ./camillagui-backend.nix
-    ../../modules/camillagui-backend.nix
-    ../../modules/redis.nix
+    ../../modules/audio
+    ../../modules/audio
     ./desktop.nix
     ./filesystems.nix
     ./hardware/cpu.nix

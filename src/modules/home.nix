@@ -183,7 +183,7 @@ in
     ./lib/gc-options.nix
     ./agents.nix
     ./ai
-    ./camilladsp.nix
+    ./audio
     ./cloud-drives.nix
     ./core.nix
     ./cursor.nix

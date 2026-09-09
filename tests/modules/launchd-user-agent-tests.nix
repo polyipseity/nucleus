@@ -16,7 +16,7 @@ let
   inherit (import ../lib.nix) assert' containsRegex;
 
   camilladspNix = builtins.readFile ../../src/hosts/MacBook/camilladsp.nix;
-  camilladspModuleNix = builtins.readFile ../../src/modules/camilladsp.nix;
+  camilladspModuleNix = builtins.readFile ../../src/modules/audio/camilladsp.nix;
   discordRpcNix = builtins.readFile ../../src/modules/ext-discord-music-rpc.nix;
   cloudDrivesNix = builtins.readFile ../../src/modules/cloud-drives.nix;
   launchdAgentsNix = builtins.readFile ../../src/platforms/macOS/modules/launchd-agents.nix;
@@ -50,14 +50,14 @@ in
 
     # --- darwin config: camilladsp-heartbeat BANNED from environment.userLaunchAgents ---
     # The persistent heartbeat was migrated to HM launchd.agents (domain = "gui")
-    # in src/modules/camilladsp.nix because nix-darwin's environment.userLaunchAgents
+    # in src/modules/audio/camilladsp.nix because nix-darwin's environment.userLaunchAgents
     # never restarts a loaded agent on plist change (stale-process gap). The
     # darwin-only camilladsp.nix must NOT use environment.userLaunchAgents for it.
     (assert' (
       !containsRegex "environment.userLaunchAgents.\"camilladsp-heartbeat\"" camilladspNix
     ) "camilladsp-heartbeat: banned from environment.userLaunchAgents in darwin config")
     # --- Home Manager module: camilladsp-heartbeat uses HM-native launchd.agents (domain = "gui") ---
-    # src/modules/camilladsp.nix is imported into the HM config (home.nix
+    # src/modules/audio/camilladsp.nix is imported into the HM config (home.nix
     # sharedModules), so it must use launchd.agents.<name> with domain = "gui".
     (assert' (containsRegex "launchd.agents.\"camilladsp-heartbeat\"" camilladspModuleNix) "camilladsp-heartbeat: uses launchd.agents")
     (assert' (containsRegex "domain = \"gui\"" camilladspModuleNix) "camilladsp-heartbeat: domain = gui")
