@@ -39,6 +39,9 @@ _ibp_repo_root="$(derive_repo_root 2>/dev/null || true)"
 if [ -n "$_ibp_repo_root" ] && [ -f "$_ibp_repo_root/src/lockfiles/lockfile.json" ]; then
   _ibp_lockfile="$_ibp_repo_root/src/lockfiles/lockfile.json"
 fi
+if [ -n "$_ibp_repo_root" ] && [ -f "$_ibp_repo_root/src/lockfiles/lifecycle-allowlist.json" ]; then
+  _ibp_lifecycle_allowlist="$_ibp_repo_root/src/lockfiles/lifecycle-allowlist.json"
+fi
 
 # Declarative desired-state list.  One package per line.
 # Add a package name here to install it; remove it to trigger uninstall
@@ -135,8 +138,25 @@ while IFS= read -r _ibp_pkg; do
     [ -n "$_ibp_pin" ] && _ibp_spec="$_ibp_pin"
   fi
   say -l bun "installing $_ibp_spec"
-  if ! "$_bun_bin" install -g --ignore-scripts "$_ibp_spec"; then
-    die -l bun "'$_bun_bin install -g $_ibp_spec' failed"
+  # Check if package is in lifecycle-allowlist; allowlisted packages run
+  # lifecycle scripts (postinstall etc.) which some packages require for
+  # native module compilation and model downloads.
+  _ibp_allow_lifecycle=0
+  if [ -n "$_ibp_lifecycle_allowlist" ]; then
+    # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
+    if "$_jq_bin" -e --arg p "$_ibp_pkg" '(.[$p] // null) != null' "$_ibp_lifecycle_allowlist" 2>/dev/null; then
+      _ibp_allow_lifecycle=1
+    fi
+  fi
+  if [ "$_ibp_allow_lifecycle" -eq 1 ]; then
+    say -l bun "$_ibp_pkg: lifecycle scripts allowed (in lifecycle-allowlist)"
+    if ! "$_bun_bin" install -g "$_ibp_spec"; then
+      die -l bun "'$_bun_bin install -g $_ibp_spec' failed"
+    fi
+  else
+    if ! "$_bun_bin" install -g --ignore-scripts "$_ibp_spec"; then
+      die -l bun "'$_bun_bin install -g --ignore-scripts $_ibp_spec' failed"
+    fi
   fi
   _ibp_bin="${_ibp_pkg##*/}"
   if [ ! -f "$HOME/.bun/bin/$_ibp_bin" ] &&
