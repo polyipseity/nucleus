@@ -56,9 +56,23 @@ let
     config.sops.secrets.${entry.name}.path;
 
   hermesSecretPaths = map mkSecretPath hermesSecrets;
+
+  # SOPS file for user-scoped hermes secrets.
+  userSopsFile = ../../../secrets/users + "/${config.home.username}.yml";
+  hasUserSopsFile = builtins.pathExists userSopsFile;
 in
 {
   imports = [ upstreamModule ];
+
+  # Assert: if hermes secrets are declared, the user's SOPS file must exist.
+  # Catches the common case (file doesn't exist) with a clear message.
+  # sops-nix itself catches missing keys within the file at activation time.
+  assertions = [{
+    assertion = builtins.length hermesSecrets == 0 || hasUserSopsFile;
+    message = "hermes-agent: env-secrets.json declares ${toString (builtins.length hermesSecrets)} secret(s) "
+      + "but SOPS file src/secrets/users/${config.home.username}.yml does not exist. "
+      + "Add matching keys to the SOPS file or remove entries from env-secrets.json.";
+  }];
 
   # Declare SOPS secrets for all hermes-consumed keys.
   sops.secrets = builtins.listToAttrs (map (entry: {
