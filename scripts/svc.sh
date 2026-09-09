@@ -28,6 +28,7 @@ if [ -h "$_self" ]; then
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
+. "$SCRIPT_DIR/../src/scripts/lib/crash-loop.sh"
 . "$SCRIPT_DIR/../src/scripts/lib/macos-launch-services.sh"
 
 # usage — Print the full command reference.
@@ -609,8 +610,10 @@ do_list() {
         error "system-domain operations require sudo; run as root or with sudo"
         exit 1
       fi
-      local status_json pair_json
+      local status_json pair_json crash_status
       status_json=$(svc_status "$key" "$svc_json")
+      crash_status=$(crash_loop_status "$json_key")
+      status_json=$(echo "$status_json" | jq --arg cs "$crash_status" '. + {crashLoop: $cs}')
       pair_json=$(jq -cn --arg k "$json_key" --argjson v "$status_json" '{key:$k, value:$v}')
       if [ -n "$entries_json" ]; then
         entries_json="$entries_json
@@ -621,8 +624,8 @@ $pair_json"
     done <<<"$entries"
     printf '%s\n' "$entries_json" | jq -c -s 'reduce .[] as $i ({}; .[$i.key] = $i.value) | {version: 1, services: .}'
   else
-    printf '%-20s %-24s %-10s %-8s %s\n' "ID" "Name" "Status" "Running" "PID"
-    printf '%.0s-' {1..80}
+    printf '%-20s %-24s %-10s %-8s %-10s %s\n' "ID" "Name" "Status" "Running" "PID" "CrashLoop"
+    printf '%.0s-' {1..91}
     printf '\n'
     while IFS=$'\t' read -r key display svc_json json_key; do
       if echo "$key" | grep -q '^ERROR:'; then
@@ -650,7 +653,9 @@ $pair_json"
         local exit_display="exit $exit_code"
         pid="$exit_display"
       fi
-      printf '%-20s %-24s %-10s %-8s %s\n' "$json_key" "$display" "$status" "$running" "$pid"
+      local crash_status
+      crash_status=$(crash_loop_status "$json_key")
+      printf '%-20s %-24s %-10s %-8s %-10s %s\n' "$json_key" "$display" "$status" "$running" "$pid" "$crash_status"
     done <<<"$entries"
     if [ -n "$domain_filter_warning" ]; then
       printf '\n'
@@ -702,7 +707,9 @@ do_status() {
       local exit_display="exit $exit_code"
       pid="$exit_display"
     fi
-    printf '%-20s %-24s %-10s %-8s %s\n' "$json_key" "$display" "$status" "$running" "$pid"
+    local crash_status
+    crash_status=$(crash_loop_status "$json_key")
+    printf '%-20s %-24s %-10s %-8s %-10s %s\n' "$json_key" "$display" "$status" "$running" "$pid" "$crash_status"
   done <<<"$entries"
   "$any_error" && return 1 || return 0
 }
