@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Creates ~/.agents/skills/ as a real directory then populates it with
 # per-skill symlinks for every skill subdirectory in the resolved agents overlay.
+# Optionally symlinks additional skills from extra source directories.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -13,6 +14,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _ask_repo_root="$1"
 _ask_username="$2"
+_ask_extra_skills_source="${3:-}"
 # Skip exporting NUCLEUS_REPO_ROOT when the path is a Nix store snapshot —
 # derive_repo_root() will fall back to the system repo-root file silently.
 if [ -n "$_ask_repo_root" ] && case "$_ask_repo_root" in /nix/store/*) false ;; *) true ;; esac then
@@ -40,3 +42,13 @@ _nucleus_converge_symlinks \
   "-type d" "-d" \
   "is a real directory — if it is a fetched ClawHub download for a skill that has been re-committed, remove it and re-run apply." \
   ""
+
+# Symlink additional skills from extra source directory if provided.
+# Used for superpowers skills and other externally-fetched skill bundles.
+if [ -n "$_ask_extra_skills_source" ] && [ -d "$_ask_extra_skills_source" ]; then
+  _nucleus_converge_symlinks \
+    "$_ask_extra_skills_source" "$_ask_skills_dir" "skills" \
+    "-type d" "-d" \
+    "is a real directory — if it is a fetched skill that has been re-committed, remove it and re-run apply." \
+    ""
+fi
