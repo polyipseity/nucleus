@@ -78,6 +78,15 @@ let
 
   test_exiftool_preserves_icc_profiles = assert' (lib.hasInfix "--icc_profile:all" utilsShText) "utils.sh exiftool command must include --icc_profile:all to preserve ICC color profiles";
 
+  test_plasma_desktop_excludes_pdf = assert' (
+    !(lib.hasInfix "application/pdf" plasmaDesktopText)
+  ) "Plasma strip-metadata desktop entry must not include application/pdf in MimeType";
+
+  test_utils_sh_skips_pdf = assert' (
+    lib.hasInfix "*.pdf)" utilsShText
+    && lib.hasInfix "skipping PDF" utilsShText
+  ) "utils.sh strip-metadata must have explicit PDF skip case";
+
   allTests = [
     test_single_strip_metadata_workflow_exists
     test_strip_metadata_uses_public_item
@@ -89,6 +98,8 @@ let
     test_nautilus_script_has_strip_metadata_command
     test_windows_dsc_has_strip_metadata_command
     test_exiftool_preserves_icc_profiles
+    test_plasma_desktop_excludes_pdf
+    test_utils_sh_skips_pdf
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {
