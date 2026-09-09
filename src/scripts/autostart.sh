@@ -150,7 +150,7 @@ macos_remove_app_launchagent() {
   # Extract the first <string> inside <array> under ProgramArguments — that's the binary path.
   local plist_program
   plist_program=$(sed -n '/<key>ProgramArguments</key>/,/<\/array>/p' "$plist_path" | sed -n 's/.*<string>\(.*\)<\/string>.*/\1/p' | head -1)
-  if [ "$plist_program" = "$app_path" ]; then
+  if [ "$plist_program" = "$app_path" ] || [[ "$plist_program" == "$app_path/"* ]]; then
     rm -f "$plist_path"
   fi
 }
