@@ -10,7 +10,7 @@ let
   pkgs = import <nixpkgs> { };
   config = { };
 
-  envVars = import ../../src/modules/lib/env-catalog.nix {
+  envVars = import ../../src/modules/lib/env-secrets.nix {
     inherit config pkgs lib;
     username = "test";
     hostName = "MacBook";
@@ -26,7 +26,7 @@ let
     {
       inherit name;
       hasNixOsEntry = entry.values ? NixOS || entry.values ? default;
-      # Resolved-value semantics (matches env-catalog.nix allVars applicability):
+      # Resolved-value semantics (matches env-secrets.nix allVars applicability):
       # an explicit Windows = null excludes the var from Windows parity checks.
       hasWindowsEntry = envVars.resolveValue name "Windows" != null;
       hasMacBookEntry = entry.values ? MacBook || entry.values ? default;

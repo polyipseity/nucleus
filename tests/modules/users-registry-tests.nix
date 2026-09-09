@@ -62,7 +62,7 @@ let
 
   test_password_store_path_available = assert' (
     usersNixOS.${fixtureUsername}.passwordStore.path == "~/fixture/passwords"
-  ) "users-registry.nix must merge password-store.json for env-catalog consumers";
+  ) "users-registry.nix must merge password-store.json for env-secrets consumers";
 
   # Wholesale-array replacement: a user override of an array field must REPLACE
   # the default list entirely (lib.recursiveUpdate semantics), not union with it.

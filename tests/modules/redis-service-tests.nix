@@ -14,7 +14,7 @@ let
   hosts = redis.hosts;
 
   # REDIS_HOST/REDIS_PORT come from the env catalog default (verified by
-  # env-catalog-tests.nix); here we assert the network endpoint is loopback.
+  # env-secrets-tests.nix); here we assert the network endpoint is loopback.
   host = redis.network.default.host;
   port = redis.network.default.port;
 
