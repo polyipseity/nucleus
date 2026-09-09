@@ -8,9 +8,8 @@
 # service management (launchd on macOS, systemd on Linux).
 #
 # Per-host overrides (gateway.enable, model defaults) are applied here.
-# API keys: add `hermes.ANTHROPIC_API_KEY: "sk-ant-..."` to your
-# src/secrets/users/<username>.yml. The secret is materialized by sops-nix
-# and passed to the service via environmentFiles.
+# API keys: declare secrets in your per-user env-secrets.json with
+# consumers: ["hermes-agent"] and matching entries in your SOPS file.
 {
   config,
   lib,
@@ -21,10 +20,6 @@
 }:
 let
   # Minimal `inputs` shim for the upstream module.
-  # The upstream module accesses `inputs.self.packages.${system}.default`
-  # as the default package value for `services.hermes-agent.package`.
-  # Our overlay (flake.nix) adds `pkgs.hermes-agent`, so we resolve
-  # through the hermes-agent flake's own packages attribute.
   upstreamInputs = {
     self = {
       packages = {
@@ -34,32 +29,47 @@ let
     };
   };
 
-  # Import the upstream module function with our shimmed inputs.
-  # The upstream `nix/homeManagerModules.nix` exports a function that
-  # receives `inputs` as a parameter and returns a NixOS/HM module.
   upstreamModule = (import "${hermes-agent}/nix/homeManagerModules.nix") {
     inputs = upstreamInputs;
   };
 
-  # Check if the user has a SOPS secrets file. The hermes secret
-  # (hermes/env) is declared conditionally — absent when the user
-  # hasn't added API keys yet.
-  userSecretFile = ../../secrets/users + "/${config.home.username}.yml";
-  hasUserSecretFile = builtins.pathExists userSecretFile;
+  # Resolve per-user env-secrets.json via user overlay.
+  userSecretsFile = ../../../users + "/${config.home.username}/env-secrets.json";
+  defaultSecretsFile = ../users/default/env-secrets.json;
+  secretsFile =
+    if builtins.pathExists userSecretsFile then userSecretsFile
+    else defaultSecretsFile;
+  userSecrets = builtins.fromJSON (builtins.readFile secretsFile);
+
+  # Filter secrets by consumer: only keys where consumers contains "hermes-agent".
+  hermesSecrets = builtins.filter
+    (s: builtins.elem "hermes-agent" s.consumers)
+    userSecrets.secrets;
+
+  # Resolve SOPS secret paths for hermes-consumed keys.
+  # Each secret's sopsSource determines which SOPS file to read from.
+  mkSecretPath = entry:
+    let
+      sopsPrefix = if entry.sopsSource == "system" then "../secrets/system.yml"
+                    else "../secrets/users/${config.home.username}.yml";
+    in
+    config.sops.secrets.${entry.name}.path;
+
+  hermesSecretPaths = map mkSecretPath hermesSecrets;
 in
 {
   imports = [ upstreamModule ];
 
-  # Declare the SOPS secret for hermes API keys.
-  # Users must add `hermes.ANTHROPIC_API_KEY: "sk-ant-..."` (or similar)
-  # to their src/secrets/users/<username>.yml file.
-  sops.secrets = lib.mkIf hasUserSecretFile {
-    "hermes/env" = {
-      sopsFile = userSecretFile;
+  # Declare SOPS secrets for all hermes-consumed keys.
+  sops.secrets = builtins.listToAttrs (map (entry: {
+    name = entry.name;
+    value = {
+      sopsFile = if entry.sopsSource == "system" then ../secrets/system.yml
+                  else ../secrets/users + "/${config.home.username}.yml";
       owner = config.home.username;
       mode = "0400";
     };
-  };
+  }) hermesSecrets);
 
   # ── Nucleus-level configuration ──────────────────────────────────────
 
@@ -67,17 +77,12 @@ in
 
   services.hermes-agent = {
     enable = lib.mkDefault true;
-    # Gateway is opt-in per host. Headless servers (NixOS) don't need it
-    # by default; MacBook enables it for messaging integration.
     gateway.enable =
       if hostName == "MacBook" then
         lib.mkDefault true
       else
         lib.mkDefault false;
-    # Wire SOPS-decrypted API key file into the service environment.
-    # Only present when the user has added hermes secrets to their SOPS file.
-    environmentFiles = lib.mkIf hasUserSecretFile [
-      config.sops.secrets."hermes/env".path
-    ];
+    # Wire SOPS-decrypted API key files into the service environment.
+    environmentFiles = lib.mkIf (hermesSecretPaths != []) hermesSecretPaths;
   };
 }
