@@ -207,7 +207,7 @@ in
   imports = [
     ./lib/gc-options.nix
     ./agents.nix
-    ./ai
+    ./ai.nix
     ./audio
     ./cloud-drives.nix
     ./core.nix
@@ -220,7 +220,7 @@ in
     ./git.nix
     ./hermes-agent.nix
     ../platforms/NixOS/modules
-    ./logging.nix
+    ./posix/logging.nix
     ../platforms/macOS/modules
     ./pwsh.nix
     ./secrets.nix
