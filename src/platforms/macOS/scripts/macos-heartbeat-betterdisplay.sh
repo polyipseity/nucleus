@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # BetterDisplay virtual screen heartbeat.  Polls the HeadlessDisplay every 30
 # seconds and reconnects it if BetterDisplay marks it as disconnected.
+# Includes crash-loop detection: stops relaunching after ≥10 restarts/hour
+# or ≥5 consecutive failures.
 #
 # Environment variables (with built-in defaults):
 #   BD_BIN  — path to BetterDisplay executable
@@ -8,6 +10,11 @@
 #   DISPLAY_NAME — virtual display name to monitor
 
 set +e # heartbeat is fully soft-fail; never abort on individual check failure
+
+# Source crash-loop detection library.
+_BD_SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../../scripts/lib/crash-loop.sh
+. "$_BD_SCRIPT_DIR/../../../scripts/lib/crash-loop.sh"
 
 : "${BD_BIN:=/Applications/BetterDisplay.app/Contents/MacOS/BetterDisplay}" \
   "${BD_APP:=/Applications/BetterDisplay.app}" \
@@ -29,8 +36,24 @@ while true; do
 
   # Ensure BetterDisplay is running before issuing CLI commands.
   if ! /usr/bin/pgrep -xq "BetterDisplay" 2>/dev/null; then
+    # Crash-loop detection: stop relaunching if service is crash-looping.
+    if crash_loop_is_looping "betterdisplay-heartbeat"; then
+      warn "betterdisplay-heartbeat: crash-loop detected — skipping launch"
+      sleep 60
+      continue
+    fi
+
+    # Pre-flight: verify App Store receipt exists (missing receipt = crash).
+    if [ ! -f "/Applications/BetterDisplay.app/Contents/_MASReceipt/receipt" ]; then
+      crash_loop_record "betterdisplay-heartbeat" "missing-receipt"
+      warn "betterdisplay-heartbeat: receipt missing — skipping launch"
+      sleep 60
+      continue
+    fi
+
     # check-suppress:suppression_doc: BetterDisplay may not be installed yet; best-effort launch.
     /usr/bin/open -g -a "$BD_APP" || true
+    crash_loop_record "betterdisplay-heartbeat" "relaunch"
     /bin/sleep 5
   fi
 
@@ -39,6 +62,7 @@ while true; do
 
   # No-op if already connected.
   if [ "$connected_state" = "on" ]; then
+    crash_loop_success "betterdisplay-heartbeat"
     sleep 30
     continue
   fi
