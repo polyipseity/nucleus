@@ -5,7 +5,8 @@
 .DESCRIPTION
   Currently provides two subcommands:
   - optimize-pdf: optimize PDF files using Ghostscript with backup/restore.
-  - strip-metadata: strip file metadata with mat2/exiftool.
+  - strip-metadata: strip file metadata with mat2/exiftool. PDF and legacy
+    OLE2 files are skipped with a warning.
 .PARAMETER Action
   The subcommand to run: optimize-pdf, strip-metadata.
 .PARAMETER Preset
@@ -143,6 +144,10 @@ switch ($Action) {
       }
 
       $ext = [System.IO.Path]::GetExtension($f).ToLower()
+      if ($ext -eq '.pdf') {
+        Write-NucleusWarning "skipping PDF (strip-metadata does not support PDF files): $f"
+        continue
+      }
       if ($ext -in @('.docx', '.xlsx', '.pptx')) {
         # OOXML: use mat2 for comprehensive metadata stripping.
         # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
