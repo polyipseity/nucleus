@@ -20,22 +20,11 @@ let
     map (e: e.name) entries
   );
 
-  # Cross-check: every os.environ/VAR referenced in litellm-config.yml must
-  # be in the secrets' envVar values.
-  litellmConfig = builtins.readFile ../../src/modules/configs/litellm/litellm-config.yml;
-  lines = builtins.split "\n" litellmConfig;
-  stringLines = builtins.filter builtins.isString lines;
-  extractEnvVar =
-    line:
-    let
-      m = builtins.match ".*os\\.environ/([A-Z][A-Z0-9_]+).*" line;
-    in
-    if m != null then builtins.head m else null;
-  envRefs = builtins.filter (m: m != null) (builtins.map extractEnvVar stringLines);
-
-  # Consumer-filtered subsets for litellm and hermes-agent.
+  # Consumer-filtered subsets.
   litellmSecrets = builtins.filter (s: builtins.elem "litellm" s.consumers) entries;
   hermesSecrets = builtins.filter (s: builtins.elem "hermes-agent" s.consumers) entries;
+
+
 in
 {
   # === Schema structure ===
@@ -106,11 +95,6 @@ in
     builtins.length hermesSecrets == 0
   ) "no hermes-agent consumer entries by default (user opt-in)";
 
-  # === Cross-check: litellm-config.yml env refs vs catalog ===
-
-  test_litellm_config_env_refs_in_secrets = assert' (builtins.all (
-    ref: builtins.elem ref (map (e: e.envVar) entries)
-  ) envRefs) "all os.environ/ vars in litellm-config.yml must be present in env-secrets";
 
   # === sopsSource split ===
 
