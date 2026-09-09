@@ -36,3 +36,18 @@ esac
 
 mkdir -p "$(dirname "$_rimsort_settings_path")"
 _rimsort_merge_json "$_mrs_python3_bin" "$_rimsort_settings_path" "$_mrs_settings_json"
+
+# Ensure the Steam Workshop directory exists so RimSort can validate the
+# configured workshop_folder path.  Steam only creates this directory after
+# the first Workshop mod download; without it, RimSort disables Steam client
+# integration on startup.
+_workshop_folder="$($_mrs_python3_bin -c "
+import json, os, sys
+with open(sys.argv[1]) as f:
+    data = json.load(f)
+path = data.get('instances', {}).get('Default', {}).get('workshop_folder', '')
+print(os.path.expanduser(path))
+" "$_rimsort_settings_path")"
+if [ -n "$_workshop_folder" ]; then
+  mkdir -p "$_workshop_folder"
+fi
