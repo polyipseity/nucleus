@@ -39,6 +39,14 @@ let
     else
       "/home/${effectiveUsername}";
 
+  # Nucleus user-level root for system-wide app configs (litellm, etc.).
+  # Matches the path derive_repo_root() computes at runtime.
+  nucleusUserRoot =
+    if hostName == "MacBook" then
+      "${resolvedHomeDirectory}/Library/Application Support/nucleus"
+    else
+      "${resolvedHomeDirectory}/.local/share/nucleus";
+
   passwordStoreDir =
     if effectiveUser ? passwordStore && effectiveUser.passwordStore ? path then
       builtins.replaceStrings [ "~" ] [ resolvedHomeDirectory ] effectiveUser.passwordStore.path
@@ -152,6 +160,11 @@ let
       path = "${resolvedHomeDirectory}/.srt-settings.json";
       writable = true;
     }
+    # LiteLLM config and handler symlinks — repo edits take effect on service restart.
+    { path = "${nucleusUserRoot}/litellm-config.yml"; writable = true; }
+    { path = "${nucleusUserRoot}/cline_handler.py"; writable = true; }
+    { path = "${nucleusUserRoot}/litellm-cooldown-400.py"; writable = true; }
+    { path = "${nucleusUserRoot}/litellm-logging-config.py"; writable = true; }
   ];
   managedSymlinkPathsJson = builtins.toJSON managedSymlinkPaths;
 
@@ -384,6 +397,25 @@ in
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "${config.home.homeDirectory}/.srt-settings.json" \
         "${overlay.toRepoRelPath (overlay.selectFile "srt" "settings.json")}"
+    '';
+
+    # Method-1 (writable) symlinks for LiteLLM config and handler files.
+    # All host services reference this well-known path; repo edits take effect
+    # on service restart without re-running apply.
+    # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
+    home.activation.seed-litellm-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+        "${nucleusUserRoot}/litellm-config.yml" \
+        "src/modules/configs/litellm/config.yml"
+      "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+        "${nucleusUserRoot}/cline_handler.py" \
+        "src/modules/configs/litellm/cline_handler.py"
+      "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+        "${nucleusUserRoot}/litellm-cooldown-400.py" \
+        "src/modules/configs/litellm/cooldown_400.py"
+      "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+        "${nucleusUserRoot}/litellm-logging-config.py" \
+        "src/modules/configs/litellm/logging-config.py"
     '';
 
     # Override the default logDir (which uses ~) with a proper absolute path.

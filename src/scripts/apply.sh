@@ -346,17 +346,6 @@ unset _nix_profile_bin
 # Resolve src/scripts/ for apply-internal script delegation.
 _ash_script_dir="$(cd "$(dirname -- "$0")" && pwd -P)"
 
-# Symlink the LiteLLM config so edits take effect on service restart without
-# re-running apply.  All host services (macOS launchd, NixOS systemd, Windows
-# scheduled task) reference this well-known path.
-ln -sf "$REPO_ROOT/src/modules/configs/litellm/config.yml" "$NUCLEUS_USER_ROOT/litellm-config.yml"
-# Symlink the Cline custom handler alongside the config.  litellm's
-# get_instance_fn resolves the handler relative to the config file directory.
-ln -sf "$REPO_ROOT/src/modules/configs/litellm/cline_handler.py" "$NUCLEUS_USER_ROOT/cline_handler.py"
-# Symlink the cooldown-400 callback alongside the config.
-ln -sf "$REPO_ROOT/src/modules/configs/litellm/cooldown_400.py" "$NUCLEUS_USER_ROOT/litellm-cooldown-400.py"
-# Symlink the litellm logging config for traceback suppression.
-ln -sf "$REPO_ROOT/src/modules/configs/litellm/logging-config.py" "$NUCLEUS_USER_ROOT/litellm-logging-config.py"
 
 run_nix() {
   # --option min-free 0 suppresses auto-GC during the apply pipeline. The
