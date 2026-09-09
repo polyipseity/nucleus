@@ -4,7 +4,7 @@
 {
   config =
     let
-      servicesJSON = builtins.fromJSON (builtins.readFile ./services.json);
+      servicesJSON = builtins.fromJSON (builtins.readFile ../services.json);
     in
     {
       nucleus.httpsProxy.virtualHosts.camillagui = {

@@ -31,7 +31,7 @@
   ...
 }:
 let
-  servicesJSON = builtins.fromJSON (builtins.readFile ./services.json);
+  servicesJSON = builtins.fromJSON (builtins.readFile ../services.json);
   wsPort = toString servicesJSON.camilladsp.network.websocket.port;
 
   camilladspHeartbeat = pkgs.writeNucleusShellApplication {

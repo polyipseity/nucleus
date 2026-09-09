@@ -27,7 +27,7 @@
 }:
 let
   # Centralized service registry — single source of truth for network config.
-  servicesJSON = builtins.fromJSON (builtins.readFile ./services.json);
+  servicesJSON = builtins.fromJSON (builtins.readFile ../services.json);
   redisCfg = servicesJSON.redis.network.default;
 
   # The `launchd` option only exists on nix-darwin; `services.redis` only on
