@@ -69,7 +69,7 @@ Detection: `NO_COLOR` non-empty → off (strips all decoration). `FORCE_COLOR` n
 
 ## Log storage and rotation
 
-Roots from `services.json` `$logging`: MacBook `~/nucleus/logs` + `/Users/Shared/nucleus/logs`; NixOS `~/.local/state/nucleus/log` + `/var/log/nucleus`; Windows `%LOCALAPPDATA%\nucleus\logs` + `%ProgramData%\nucleus\logs`. Override: `NUCLEUS_LOG_DIR`/`NUCLEUS_SYSTEM_LOG_DIR`. Unit output paths hardcoded per-module; `logging.capture` handles display/rotation/health-check only. Rotation: copy-truncate + gzip, 7d expiry, `services.schema.json` defaults (maxSize 10000000, maxFiles 4).
+Roots from `services.json` `$logging`: MacBook `~/nucleus/logs` + `/Users/Shared/nucleus/logs`; NixOS `~/.local/state/nucleus/log` + `/var/log/nucleus`; Windows `%LOCALAPPDATA%\nucleus\logs` + `%ProgramData%\nucleus\logs`. Override: `NUCLEUS_LOG_DIR`/`NUCLEUS_SYSTEM_LOG_DIR`. Unit output paths hardcoded per-module; `logging.capture` handles display/rotation/health-check only. Rotation: copy-truncate + gzip, 7d expiry, `services.schema.json` defaults (maxSize 1000000, maxFiles 4). Health-check triggers immediate rotation when a file exceeds maxSize.
 
 ---
 

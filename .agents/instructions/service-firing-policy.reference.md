@@ -38,7 +38,9 @@ name: "Service Firing Policy Reference"
 
 | Service | macOS | NixOS | Windows | Rationale |
 | -------------------------- | ---------------------------------------------------- | ------------------------------------------------------ | ---------------------------------- | -------- |
-| `gc-weekly` | launchd `daemon`, StartCalendarInterval (Sun 12:00) | systemd `timer`, system (Sun 12:00, `Persistent=true`) | scheduled task (Weekly, Sun 12:00) | Full `gc.sh` as root; user homedir via `sudo -u` |
+| `gc-weekly` | launchd `daemon`, StartInterval=86400 | systemd `timer`, system (Sun 12:00, `Persistent=true`) | scheduled task (Weekly, Sun 12:00) | Full `gc.sh` as root; user homedir via `sudo -u` |
+| `log-gc-system` | launchd `daemon`, StartInterval=86400 | systemd `timer`, system (daily 12:00, `Persistent=true`) | scheduled task (Daily, 12:00) | System log rotation (root-owned logs) |
+| `log-gc-user` | launchd `agent`, StartInterval=86400 | systemd `timer`, user (daily 12:00, `Persistent=true`) | scheduled task (Daily, 12:00) | User log rotation |
 | `nix-index-update` | launchd `agent`, StartCalendarInterval (daily 12:00) | systemd `timer`, user (daily 12:00, `Persistent=true`) | — (N/A) | Nix ecosystem only |
 | `dev-ds-store-gc` | launchd `agent`, StartCalendarInterval (daily 12:00) | — (N/A) | — (N/A) | macOS `.DS_Store` cleanup |
 | `dev-spotlight-exclusions` | launchd `agent`, StartCalendarInterval (daily 12:00) | — (N/A) | — (N/A) | macOS Spotlight metadata |
