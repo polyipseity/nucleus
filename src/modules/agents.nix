@@ -40,13 +40,6 @@ let
 
   managedPaths = import ./lib/managed-paths.nix { inherit pkgs; };
 
-  # Nucleus user root (platform-specific). Mirrors nucleusUserRootFor in
-  # src/modules/lib/nucleus-roots.nix. Used for superpowers plugin path.
-  nucleusUserRoot =
-    if pkgs.stdenv.hostPlatform.isDarwin then
-      "${config.home.homeDirectory}/Library/Application Support/nucleus"
-    else
-      "${config.home.homeDirectory}/.local/share/nucleus";
 
   # Read the consolidated lockfile so activation scripts can converge to
   # exact pins (closes the drift root cause).  Mirrors pwsh.nix.
