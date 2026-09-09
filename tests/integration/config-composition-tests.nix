@@ -10,7 +10,7 @@ let
   shellModuleText = builtins.readFile ../../src/modules/shell/default.nix;
   macbookDefaultText = builtins.readFile ../../src/hosts/MacBook/default.nix;
   nixosDefaultText = builtins.readFile ../../src/hosts/NixOS/default.nix;
-  macbookAutomatorText = builtins.readFile ../../src/hosts/MacBook/services/automator-workflows.nix;
+  macbookAutomatorText = builtins.readFile ../../src/hosts/MacBook/services/automator-workflows/default.nix;
   nixosServicesText = builtins.readFile ../../src/hosts/NixOS/services.nix;
 
   # Test 1: Verify all POSIX hosts import core.nix
