@@ -346,7 +346,6 @@ unset _nix_profile_bin
 # Resolve src/scripts/ for apply-internal script delegation.
 _ash_script_dir="$(cd "$(dirname -- "$0")" && pwd -P)"
 
-
 run_nix() {
   # --option min-free 0 suppresses auto-GC during the apply pipeline. The
   # config file (nix.custom.conf) sets min-free to avoid runaway store growth,
@@ -522,6 +521,22 @@ Darwin)
   "$_ash_script_dir/secrets/register-host-age-key.sh" --repo-root "$REPO_ROOT"
   run_health_check
   run_pre_build
+  # Start linux-builder if not running (only on MacBook).
+  # The builder is disabled by default to save ~500 MiB RAM.
+  # Auto-stop via trap ensures cleanup on any exit (success, failure, interrupt).
+  _lb_started=false
+  if command -v nucleus-svc >/dev/null 2>&1; then
+    if ! nucleus-svc status linux-builder >/dev/null 2>&1; then
+      notice -l linux-builder "starting linux-builder (takes ~30-60s)..."
+      if nucleus-svc start linux-builder; then
+        _lb_started=true
+        # check-suppress:suppression_doc: trap cleanup for linux-builder; stop only if we started it.
+        trap 'if [ "$_lb_started" = true ]; then nucleus-svc stop linux-builder >/dev/null 2>&1 || true; fi' EXIT
+      else
+        warn -l linux-builder "failed to start linux-builder; builds may fail"
+      fi
+    fi
+  fi
   # Activation scripts run under `env -i` and cannot read NUCLEUS_REPO_ROOT;
   # materialize it at the SYSTEM root so derive_repo_root resolves REPO_ROOT
   # during activation (menu-bar/autostart convergence depend on it).
@@ -541,6 +556,11 @@ Darwin)
   "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
   run_caddy_local_ca_trust sudo
   run_post_apply MacBook
+  # Stop linux-builder if we started it (cleanup handled by trap on normal exit).
+  if [ "$_lb_started" = true ]; then
+    # check-suppress:suppression_doc: builder may already be stopped by trap; ignore stop failure.
+    nucleus-svc stop linux-builder >/dev/null 2>&1 || true
+  fi
   ;;
 Linux)
   if [ -f /etc/NIXOS ]; then
