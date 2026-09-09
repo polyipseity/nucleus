@@ -162,6 +162,11 @@ do_health_check() {
           if [ "$size" -gt "$threshold" ]; then
             warn "'$log_file' ($size bytes) exceeds 80% of rotation max ($max_size bytes)"
           fi
+          # Trigger immediate rotation when file exceeds maxSize
+          if [ "$size" -gt "$max_size" ]; then
+            notice "'$log_file' ($size bytes) exceeds maxSize ($max_size bytes); rotating now"
+            rotate_log_file "$log_file" "$max_size" "4" "true"
+          fi
 
           if [ "$sanitize" = "true" ] && head -n 5 "$log_file" | tr -d '[:print:][:space:]' | grep -q .; then
             warn "'$log_file' contains control characters despite sanitize=true"
@@ -179,6 +184,11 @@ do_health_check() {
           threshold=$((max_size * 80 / 100))
           if [ "$size" -gt "$threshold" ]; then
             warn "'$log_file' ($size bytes) exceeds 80% of rotation max ($max_size bytes)"
+          fi
+          # Trigger immediate rotation when file exceeds maxSize
+          if [ "$size" -gt "$max_size" ]; then
+            notice "'$log_file' ($size bytes) exceeds maxSize ($max_size bytes); rotating now"
+            rotate_log_file "$log_file" "$max_size" "4" "true"
           fi
 
           if [ "$sanitize" = "true" ] && head -n 5 "$log_file" | tr -d '[:print:][:space:]' | grep -q .; then

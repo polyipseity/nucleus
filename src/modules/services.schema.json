@@ -167,7 +167,7 @@
           "description": "Maximum log file size in bytes before rotation.",
           "type": "integer",
           "minimum": 1024,
-          "default": 10000000
+          "default": 1000000
         },
         "sanitize": {
           "description": "Strip control characters (ANSI escapes, \\r) from log output.",
