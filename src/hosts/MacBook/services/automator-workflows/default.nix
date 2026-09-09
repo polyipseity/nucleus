@@ -67,7 +67,7 @@ let
   # Base path to committed workflow source directories.
   # Each workflow source is referenced as "${workflowsDir}/<name>.workflow" to
   # avoid parsing issues with spaces in path names.
-  workflowsDir = ..;
+  workflowsDir = ./.;
 
   # Baked at eval time from NUCLEUS_REPO_ROOT (set by apply.sh).
 
