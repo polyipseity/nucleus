@@ -251,6 +251,52 @@ test_steamcmd_install_path() {
   fi
 }
 
+# ── Test: workshop directory created from merged settings ─────────
+test_workshop_directory_created() {
+  local settings="$TMPDIR_TEST/workshop_dir.json"
+  local workshop_dir="$TMPDIR_TEST/workshop/content/294100"
+  local managed
+  managed="{\"instances\":{\"Default\":{\"workshop_folder\":\"$workshop_dir\",\"game_folder\":\"/game\"}}}"
+
+  run_merge "$settings" "$managed"
+
+  # Workshop directory should not exist yet (merge only writes JSON).
+  if [ -d "$workshop_dir" ]; then
+    assert_fail "workshop_dir: directory not created by merge" "directory should not exist yet"
+    return
+  fi
+
+  # Simulate what the shell script does: extract and mkdir.
+  local resolved
+  resolved=$("$PYTHON3" -c "
+import json, os, sys
+with open(sys.argv[1]) as f:
+    data = json.load(f)
+path = data.get('instances', {}).get('Default', {}).get('workshop_folder', '')
+print(os.path.expanduser(path))
+" "$settings")
+  if [ -n "$resolved" ]; then
+    mkdir -p "$resolved"
+  fi
+
+  if [ -d "$workshop_dir" ]; then
+    assert_pass "workshop_dir: directory created"
+  else
+    assert_fail "workshop_dir: directory created" "expected $workshop_dir to exist"
+    return
+  fi
+
+  # Idempotent: running again should not fail.
+  if [ -n "$resolved" ]; then
+    mkdir -p "$resolved"
+  fi
+  if [ -d "$workshop_dir" ]; then
+    assert_pass "workshop_dir: idempotent"
+  else
+    assert_fail "workshop_dir: idempotent" "directory should still exist"
+  fi
+}
+
 # ── Test: current_instance top-level merged ────────────────────────
 test_current_instance_top_level() {
   local settings="$TMPDIR_TEST/current_instance.json"
@@ -325,6 +371,7 @@ test_idempotent_merge
 test_steamcmd_install_path
 test_current_instance_top_level
 test_tilde_expansion
+test_workshop_directory_created
 
 if [ "$TESTS_FAILED" -gt 0 ]; then
   printf '%d failed, %d passed\n' "$TESTS_FAILED" "$TESTS_PASSED"
