@@ -23,6 +23,13 @@
 #
 # mkUserOverlay: binds effectiveUsername/repoRoot/hostName to the selectors.
 let
+  # ASCII-only toLower using builtins.replaceStrings — no `lib` dependency.
+  # Sufficient for file/directory name deduplication.
+  toLower =
+    builtins.replaceStrings
+      [ "A" "B" "C" "D" "E" "F" "G" "H" "I" "J" "K" "L" "M" "N" "O" "P" "Q" "R" "S" "T" "U" "V" "W" "X" "Y" "Z" ]
+      [ "a" "b" "c" "d" "e" "f" "g" "h" "i" "j" "k" "l" "m" "n" "o" "p" "q" "r" "s" "t" "u" "v" "w" "x" "y" "z" ];
+
   # Deduplicate case-insensitively, keeping first occurrence.
   # Per-user entries come before default entries in the input list,
   # so first-occurrence-wins means per-user wins on name collision.
@@ -33,9 +40,9 @@ let
       go =
         acc: name:
         let
-          lower = lib.toLower name;
+          lower = toLower name;
         in
-        if builtins.any (x: lib.toLower x == lower) acc then acc else acc ++ [ name ];
+        if builtins.any (x: toLower x == lower) acc then acc else acc ++ [ name ];
       deduped = builtins.foldl' go [ ] strings;
     in
     builtins.sort (a: b: a < b) deduped;
