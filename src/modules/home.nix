@@ -206,6 +206,7 @@ in
     ./ext-discord-music-rpc.nix
     ./fonts.nix
     ./git.nix
+    ./hermes-agent.nix
     ../platforms/NixOS/modules
     ./logging.nix
     ../platforms/macOS/modules
