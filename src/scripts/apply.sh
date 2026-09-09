@@ -434,89 +434,6 @@ run_pre_build() {
   esac
 }
 
-run_ai_sync() {
-  # Call nucleus-ai sync to converge locally installed Ollama models with
-  # the declarative manifest after the system configuration has been applied.
-  if [ "$ai_sync" = false ]; then
-    say -l ai "--no-ai-sync set; skipping post-apply model sync"
-    return
-  fi
-
-  _ras_script="$REPO_ROOT/scripts/ai.sh"
-  if [ ! -f "$_ras_script" ]; then
-    say -l ai "scripts/ai.sh not found at $_ras_script; skipping model sync"
-    return
-  fi
-
-  if ! command -v ollama >/dev/null 2>&1; then
-    say -l ai "ollama not found in PATH; skipping post-apply model sync"
-    return
-  fi
-
-  say -l ai "running post-apply AI model sync..."
-  apply_log_init
-  if ! sh "$_ras_script" sync 2>&1 | tee -a "$_apply_log"; then
-    warn -l ai "ai.sh sync exited with an error; model sync incomplete (system apply succeeded)"
-  fi
-}
-
-run_vm_post_apply() {
-  _rvp_script="$REPO_ROOT/scripts/vm.sh"
-  if [ ! -f "$_rvp_script" ]; then
-    say -l nucleus-vm "scripts/vm.sh not found at $_rvp_script; skipping post-apply VM step"
-    return
-  fi
-
-  if [ "$vm_setup" = true ]; then
-    say -l nucleus-vm "running post-apply VM provisioning (setup)..."
-    apply_log_init
-    if ! sh "$_rvp_script" setup --accept-gsi-license 2>&1 | tee -a "$_apply_log"; then
-      warn -l nucleus-vm "vm.sh setup exited with an error; VM setup incomplete (system apply succeeded)"
-    fi
-    return
-  fi
-
-  if [ "$vm_sync" = false ]; then
-    say -l nucleus-vm "--no-vm-sync set; skipping post-apply VM config refresh"
-    return
-  fi
-
-  say -l nucleus-vm "running post-apply VM config refresh (sync)..."
-  apply_log_init
-  if ! sh "$_rvp_script" sync 2>&1 | tee -a "$_apply_log"; then
-    warn -l nucleus-vm "vm.sh sync exited with an error; VM sync incomplete (system apply succeeded)"
-  fi
-}
-
-# Per-run apply log: post-apply subcommand output (AI sync, replica sync, VM
-# post-apply, GC) is teed here for audit while staying live on the console.
-# Files land in the host user log dir (services.json $logging.logDir, honoring
-# NUCLEUS_LOG_DIR) and are rotated by log-gc-user.sh.
-_apply_log=""
-apply_log_init() {
-  if [ -z "$_apply_log" ]; then
-    _ali_dir="$(nucleus_log_dir)"
-    mkdir -p "$_ali_dir"
-    _apply_log="$_ali_dir/apply-$(date -u +%Y%m%dT%H%M%SZ).log"
-  fi
-}
-
-run_gc() {
-  # Call scripts/gc.sh to perform bounded garbage collection after the system
-  # configuration and model/VM setup have completed.
-  _rgc_script="$REPO_ROOT/scripts/gc.sh"
-  if [ ! -f "$_rgc_script" ]; then
-    say -l gc "scripts/gc.sh not found at $_rgc_script; skipping garbage collection"
-    return
-  fi
-
-  say -l gc "running post-apply garbage collection..."
-  apply_log_init
-  if ! sh "$_rgc_script" 2>&1 | tee -a "$_apply_log"; then
-    warn -l gc "gc.sh exited with an error; GC incomplete (system apply succeeded)"
-  fi
-}
-
 run_caddy_local_ca_trust() {
   # Delegate to src/scripts/services/caddy-trust.sh for Caddy local CA trust
   # (retry loop with caddy --address 127.0.0.1:2019).
@@ -542,30 +459,17 @@ run_pin_flake_inputs() {
   fi
 }
 
-run_replica_sync() {
-  # Call scripts/cloud.sh sync so enabled replicas in users.json are
-  # synchronized after a successful apply.
-  if [ "$replica_sync" = false ]; then
-    say -l replica-sync "skipping post-apply replica sync (default; pass --replica-sync to run now)"
-    return
-  fi
-
-  _rrb_script="$REPO_ROOT/scripts/cloud.sh"
-  if [ ! -f "$_rrb_script" ]; then
-    say -l replica-sync "scripts/cloud.sh not found at $_rrb_script; skipping replica sync"
-    return
-  fi
-
-  if ! command -v rclone >/dev/null 2>&1; then
-    say -l replica-sync "rclone not found in PATH; skipping post-apply replica sync"
-    return
-  fi
-
-  say -l replica-sync "running post-apply replica sync..."
-  apply_log_init
-  if ! sh "$_rrb_script" sync 2>&1 | tee -a "$_apply_log"; then
-    warn -l replica-sync "cloud.sh sync exited with an error; replica sync incomplete (system apply succeeded)"
-  fi
+run_post_apply() {
+  # Delegate all post-apply provisioning to src/scripts/post-apply.sh.
+  # Each step is best-effort: failures warn but do not abort apply.
+  local _target="${1:-}"
+  local _flags=(--repo-root "$REPO_ROOT")
+  if [ "$ai_sync" = true ]; then _flags+=(--ai-sync); else _flags+=(--no-ai-sync); fi
+  if [ "$replica_sync" = true ]; then _flags+=(--replica-sync); fi
+  if [ "$vm_setup" = true ]; then _flags+=(--vm-setup); fi
+  if [ "$vm_sync" = false ]; then _flags+=(--no-vm-sync); fi
+  _flags+=(--target "$_target")
+  sh "$REPO_ROOT/src/scripts/post-apply.sh" "${_flags[@]}"
 }
 
 run_terminal_activations() {
@@ -606,18 +510,6 @@ run_terminal_activations() {
   rm -f "$_rta_manifest"
 }
 
-run_manual_display() {
-  # Display the MANUAL.md for the given host after a successful apply.
-  _rmd_host="$1"
-  _rmd_manual="$REPO_ROOT/src/hosts/$_rmd_host/MANUAL.md"
-  if [ ! -f "$_rmd_manual" ]; then
-    return
-  fi
-  printf '\n'
-  cat "$_rmd_manual"
-  printf '\n'
-}
-
 case "$(uname -s)" in
 Darwin)
   # nix-darwin manages both the system layer and the user Home Manager
@@ -648,11 +540,7 @@ Darwin)
   run_terminal_activations
   "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
   run_caddy_local_ca_trust sudo
-  NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/services/jellyfin-sync.sh"
-  run_ai_sync
-  run_replica_sync
-  run_vm_post_apply
-  run_manual_display MacBook
+  run_post_apply MacBook
   ;;
 Linux)
   if [ -f /etc/NIXOS ]; then
@@ -678,12 +566,7 @@ Linux)
     run_terminal_activations
     "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
     run_caddy_local_ca_trust sudo
-    NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/services/jellyfin-sync.sh"
-    run_ai_sync
-    run_replica_sync
-    run_vm_post_apply
-    run_gc
-    run_manual_display NixOS
+    run_post_apply NixOS
   else
     # Standalone Home Manager (plain Linux or WSL): no NixOS system layer,
     # no sudo required — keepalive is not started.
@@ -696,12 +579,7 @@ Linux)
     run_terminal_activations
     "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
     run_caddy_local_ca_trust user
-    NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/services/jellyfin-sync.sh"
-    run_ai_sync
-    run_replica_sync
-    run_vm_post_apply
-    run_gc
-    run_manual_display NixOS
+    run_post_apply NixOS
   fi
   ;;
 *)
