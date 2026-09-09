@@ -20,7 +20,7 @@ let
   userHome = "/Users/${username}";
   litellmConfig = "${userHome}/Library/Application Support/nucleus/litellm-config.yml";
   litellmLogConfig = "${userHome}/Library/Application Support/nucleus/litellm-logging-config.py";
-  catalog = builtins.fromJSON (builtins.readFile ../../modules/env/catalog.json);
+  secrets = builtins.fromJSON (builtins.readFile ../../modules/env/env-secrets.json);
   envLib = import ../../modules/lib/env-secrets.nix {
     inherit
       config
@@ -30,7 +30,7 @@ let
       ;
     hostName = "MacBook";
   };
-  keyArgs = envLib.mkKeyArgs { inherit config catalog; };
+  secretArgs = envLib.mkSecretArgsForConsumer { inherit config secrets; consumer = "litellm"; };
 
   envVars = import ../../modules/lib/env-secrets.nix {
     inherit
@@ -95,7 +95,7 @@ in
         "/bin/sh"
         "-c"
         "exec ${litellmDaemon}/bin/nucleus-litellm-daemon '${litellmConfig}' '60' ${
-          lib.concatStringsSep " " (map (arg: "'${arg}'") keyArgs)
+          lib.concatStringsSep " " (map (arg: "'${arg}'") secretArgs)
         }"
       ];
       KeepAlive = true;
@@ -116,20 +116,20 @@ in
     };
   };
 
-  # Guard: if the env catalog declares AI keys but the resolved keyArgs is
+  # Guard: if the env-secrets catalog declares AI keys but the resolved secretArgs is
   # empty, the LiteLLM daemon would start with no API-key pairs and every
   # `default` request fails with "Missing credentials". This happens when the
-  # catalog (src/modules/env/catalog.json) is out of sync with sops.secrets
+  # catalog (src/modules/env/env-secrets.json) is out of sync with sops.secrets
   # (e.g. a key was added to the catalog but not to system.yml). Fail fast
   # with a clear message naming the missing secret.
   assertions = [
     {
       assertion =
-        (builtins.length catalog.keys == 0) || (builtins.length keyArgs == builtins.length catalog.keys);
+        (builtins.length secrets.secrets == 0) || (builtins.length secretArgs == builtins.length (builtins.filter (s: builtins.elem "litellm" s.consumers) secrets.secrets));
       message =
-        "litellm: env catalog declares ${toString (builtins.length catalog.keys)} secret(s) but only ${toString (builtins.length keyArgs)} KEYFILE:ENVVAR pair(s) resolved.  Check src/modules/env/catalog.json and sops.secrets. Missing: "
+        "litellm: env-secrets catalog declares ${toString (builtins.length secrets.secrets)} secret(s) but only ${toString (builtins.length secretArgs)} KEYFILE:ENVVAR pair(s) resolved.  Check src/modules/env/env-secrets.json and sops.secrets. Missing: "
         + lib.concatStringsSep ", " (
-          map (e: e.name) (builtins.filter (e: !(config.sops.secrets ? ${e.name})) catalog.keys)
+          map (e: e.name) (builtins.filter (e: !(config.sops.secrets ? ${e.name})) secrets.secrets)
         );
     }
   ];
