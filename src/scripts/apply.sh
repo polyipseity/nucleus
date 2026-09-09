@@ -445,6 +445,7 @@ run_caddy_local_ca_trust() {
   fi
 
   if ! sh "$_rclct_script" "$1"; then
+    # WHY: caddy-trust is a convenience feature; apply succeeds without local CA trust.
     warn -l caddy-trust 'delegated trust script exited with an error (continuing without failing apply)'
   fi
 }
@@ -456,6 +457,7 @@ run_pin_flake_inputs() {
   _rpfi_profile="/nix/var/nix/profiles/flake-inputs"
   say -l flake-inputs "pinning flake inputs to $_rpfi_profile..."
   if ! run_nix_as_root build --profile "$_rpfi_profile" "$REPO_ROOT/src#flakeInputs"; then
+    # WHY: flake-inputs pinning is a GC optimization; inputs re-fetch next apply if unpinned.
     warn -l flake-inputs "flakeInputs build failed (inputs may re-fetch next apply)"
   fi
 }
@@ -505,6 +507,7 @@ run_terminal_activations() {
     esac
     say -l terminal-activations "$_rta_line"
     if ! eval "$_rta_line"; then
+      # WHY: terminal-activations are last-resort TCC workarounds; system already rebuilt successfully.
       warn -l terminal-activations "command exited with error (continuing)"
     fi
   done <"$_rta_manifest"
