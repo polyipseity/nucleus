@@ -17,8 +17,7 @@
     ]
   },
   "plugin": [
-    // Source: superpowers agent skills methodology.
-    // https://github.com/obra/superpowers
-    "superpowers@git+https://github.com/obra/superpowers.git"
+    // Superpowers is provisioned via method-1 symlink to Nix store.
+    // See symlink-superpowers-for-opencode.sh and agents.nix.
   ]
 }
