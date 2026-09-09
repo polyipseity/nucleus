@@ -139,10 +139,11 @@ in
   '';
 
   # Launchd daemon that keeps the builder VM running.
-  # create-builder uses TMPDIR to share TLS certificates with the VM; the
-  # default /tmp is auto-cleaned by macOS after 3 days of inactivity, silently
-  # breaking the builder after a long sleep.  Use a dedicated /run path that
-  # we own and clean ourselves instead.
+  # Builder is disabled by default (KeepAlive=false, RunAtLoad=false) to
+  # save ~500 MiB RAM when not building aarch64-linux packages.
+  # Start manually: nucleus-svc start linux-builder
+  # Stop manually:  nucleus-svc stop linux-builder
+  # nucleus-apply and nucleus-vm auto-start/stop the builder as needed.
   launchd.daemons.linux-builder = {
     serviceConfig = {
       # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons
@@ -156,8 +157,8 @@ in
         "-c"
         "exec ${linuxBuilderDaemon}/bin/nucleus-linux-builder-daemon '${workDir}'"
       ];
-      KeepAlive = true;
-      RunAtLoad = true;
+      KeepAlive = false;
+      RunAtLoad = false;
       WorkingDirectory = workDir;
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/linux-builder/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/linux-builder/stderr.log";
