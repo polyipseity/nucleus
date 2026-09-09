@@ -14,7 +14,7 @@ _as_repo_root="$1"
 _as_username="$2"
 # Skip exporting NUCLEUS_REPO_ROOT when the path is a Nix store snapshot —
 # derive_repo_root() will fall back to the system repo-root file silently.
-if [ -n "$_as_repo_root" ] && case "$_as_repo_root" in /nix/store/*) false;; *) true;; esac; then
+if [ -n "$_as_repo_root" ] && case "$_as_repo_root" in /nix/store/*) false ;; *) true ;; esac then
   export NUCLEUS_REPO_ROOT="$_as_repo_root"
 fi
 

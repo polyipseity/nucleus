@@ -346,10 +346,10 @@ test_step14_nix_file_structure_pattern1_detection() {
   local _out
   _out=$(mktemp)
   # Source the check-lib to get filter_gitignored, then source the step
-  (cd "$_tmp" && mkdir -p src && git init -q && touch src/.gitkeep && git add . && git commit -q -m 'init' && \
-    . "$REPO_ROOT/src/scripts/checks/check-lib.sh" && \
-    . "$TEST_FILE" && \
-    declare -A ctx=([HAS_ARGS]=false [REPO_ROOT]="$_tmp") && \
+  (cd "$_tmp" && mkdir -p src && git init -q && touch src/.gitkeep && git add . && git commit -q -m 'init' &&
+    . "$REPO_ROOT/src/scripts/checks/check-lib.sh" &&
+    . "$TEST_FILE" &&
+    declare -A ctx=([HAS_ARGS]=false [REPO_ROOT]="$_tmp") &&
     run_nix_file_structure false "$_tmp" 2>"$_out" || true)
   local _ret=0
   grep -q 'exists alongside directory' "$_out" || _ret=1
@@ -369,10 +369,10 @@ test_step14_nix_file_structure_pattern2_detection() {
   touch "$_tmp/src/mymod/mymod.nix"
   local _out
   _out=$(mktemp)
-  (cd "$_tmp" && mkdir -p src && git init -q && touch src/.gitkeep && git add . && git commit -q -m 'init' && \
-    . "$REPO_ROOT/src/scripts/checks/check-lib.sh" && \
-    . "$TEST_FILE" && \
-    declare -A ctx=([HAS_ARGS]=false [REPO_ROOT]="$_tmp") && \
+  (cd "$_tmp" && mkdir -p src && git init -q && touch src/.gitkeep && git add . && git commit -q -m 'init' &&
+    . "$REPO_ROOT/src/scripts/checks/check-lib.sh" &&
+    . "$TEST_FILE" &&
+    declare -A ctx=([HAS_ARGS]=false [REPO_ROOT]="$_tmp") &&
     run_nix_file_structure false "$_tmp" 2>"$_out" || true)
   local _ret=0
   grep -q 'same name as parent directory' "$_out" || _ret=1
@@ -392,10 +392,10 @@ test_step14_nix_file_structure_valid_passes() {
   touch "$_tmp/src/mymod/default.nix"
   local _out
   _out=$(mktemp)
-  (cd "$_tmp" && mkdir -p src && git init -q && touch src/.gitkeep && git add . && git commit -q -m 'init' && \
-    . "$REPO_ROOT/src/scripts/checks/check-lib.sh" && \
-    . "$TEST_FILE" && \
-    declare -A ctx=([HAS_ARGS]=false [REPO_ROOT]="$_tmp") && \
+  (cd "$_tmp" && mkdir -p src && git init -q && touch src/.gitkeep && git add . && git commit -q -m 'init' &&
+    . "$REPO_ROOT/src/scripts/checks/check-lib.sh" &&
+    . "$TEST_FILE" &&
+    declare -A ctx=([HAS_ARGS]=false [REPO_ROOT]="$_tmp") &&
     run_nix_file_structure false "$_tmp" 2>"$_out")
   local _ret=$?
   grep -q 'nix file structure passed' "$_out" || _ret=1

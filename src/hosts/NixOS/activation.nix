@@ -42,7 +42,12 @@ let
 
   # Shared GC application derivations (plan item 6).
   gcApps = import ../../modules/gc-activations.nix { inherit pkgs; };
-  inherit (gcApps) logGcUser logGcSystem nixStoreGc gcWeekly;
+  inherit (gcApps)
+    logGcUser
+    logGcSystem
+    nixStoreGc
+    gcWeekly
+    ;
 in
 {
   # ---------------------------------------------------------------------------

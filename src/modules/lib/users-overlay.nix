@@ -32,7 +32,9 @@ let
     let
       go =
         acc: name:
-        let lower = lib.toLower name; in
+        let
+          lower = lib.toLower name;
+        in
         if builtins.any (x: lib.toLower x == lower) acc then acc else acc ++ [ name ];
       deduped = builtins.foldl' go [ ] strings;
     in

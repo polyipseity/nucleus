@@ -959,8 +959,6 @@
         };
       };
 
-
-
       # -----------------------------------------------------------------------
       # winget-packages — Nix-generated list of WinGet package IDs that are
       # enabled for the Windows host, derived from the shared package registry

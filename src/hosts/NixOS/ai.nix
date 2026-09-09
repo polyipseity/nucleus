@@ -17,7 +17,9 @@
 }:
 let
   litellmConfig = "${config.users.users.${username}.home}/.local/share/nucleus/litellm-config.yml";
-  litellmLogConfig = "${config.users.users.${username}.home}/.local/share/nucleus/litellm-logging-config.py";
+  litellmLogConfig = "${
+    config.users.users.${username}.home
+  }/.local/share/nucleus/litellm-logging-config.py";
   litellmDaemon = pkgs.writeNucleusShellApplication {
     name = "litellm-daemon";
     runtimeInputs = [ pkgs.litellm ];
