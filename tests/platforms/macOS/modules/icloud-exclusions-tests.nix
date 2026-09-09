@@ -8,7 +8,7 @@ let
   inherit (fixtures) fixtureUsername loadFixtureRegistry;
 
   macosModuleText = builtins.readFile ../../../../src/platforms/macOS/modules/default.nix;
-  shellModuleText = builtins.readFile ../../../../src/modules/shell.nix;
+  shellModuleText = builtins.readFile ../../../../src/modules/shell/default.nix;
   icloudHooksText = builtins.readFile ../../../../src/platforms/macOS/scripts/macos-install-icloud-hooks.zsh;
   icloudExclusionsLibText = builtins.readFile ../../../../src/scripts/lib/macos-icloud-exclusions.sh;
   usersRegistry = loadFixtureRegistry "MacBook";

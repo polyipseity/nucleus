@@ -14,7 +14,7 @@ let
   # Read live module files so ordering/name regressions are caught by tests
   # instead of relying only on mocked activation maps.
   agentsModuleText = builtins.readFile ../../src/modules/agents.nix;
-  shellModuleText = builtins.readFile ../../src/modules/shell.nix;
+  shellModuleText = builtins.readFile ../../src/modules/shell/default.nix;
   macosModuleText = builtins.readFile ../../src/platforms/macOS/modules/default.nix;
   macosLaunchdText = builtins.readFile ../../src/platforms/macOS/modules/launchd-agents.nix;
   activationDagModuleText = builtins.readFile ../../src/modules/lib/activation-dag.nix;

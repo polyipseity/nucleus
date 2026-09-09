@@ -2,7 +2,7 @@ let
   inherit (import ../lib.nix) containsRegex;
 
   usersOverlayText = builtins.readFile ../../src/modules/lib/users-overlay.nix;
-  shellText = builtins.readFile ../../src/modules/shell.nix;
+  shellText = builtins.readFile ../../src/modules/shell/default.nix;
   agentsText = builtins.readFile ../../src/modules/agents.nix;
   pwshText = builtins.readFile ../../src/modules/pwsh.nix;
   gitSystemText = builtins.readFile ../../src/modules/configs/git/MacBook.gitconfig;

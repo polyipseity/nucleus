@@ -6,7 +6,7 @@ let
 
   homeModuleText = builtins.readFile ../../src/modules/home.nix;
   coreModuleText = builtins.readFile ../../src/modules/core.nix;
-  shellModuleText = builtins.readFile ../../src/modules/shell.nix;
+  shellModuleText = builtins.readFile ../../src/modules/shell/default.nix;
   secretsModuleText = builtins.readFile ../../src/modules/secrets.nix;
   flakeText = builtins.readFile ../../src/flake.nix;
   cloudDrivesModuleText = builtins.readFile ../../src/modules/cloud-drives.nix;

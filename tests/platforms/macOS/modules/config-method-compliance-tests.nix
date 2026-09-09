@@ -13,7 +13,7 @@ let
   macosText = builtins.readFile ../../../../src/platforms/macOS/modules/default.nix;
   posixBaseText = builtins.readFile ../../../../src/modules/posix/base.nix;
   pwshText = builtins.readFile ../../../../src/modules/pwsh.nix;
-  shellText = builtins.readFile ../../../../src/modules/shell.nix;
+  shellText = builtins.readFile ../../../../src/modules/shell/default.nix;
   starshipText = builtins.readFile ../../../../src/modules/shell/starship.nix;
   # Host-specific files
   macbookBaseText = builtins.readFile ../../../../src/hosts/MacBook/base.nix;

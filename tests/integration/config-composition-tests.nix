@@ -7,7 +7,7 @@ let
   homeModuleText = builtins.readFile ../../src/modules/home.nix;
   coreModuleText = builtins.readFile ../../src/modules/core.nix;
   secretsModuleText = builtins.readFile ../../src/modules/secrets.nix;
-  shellModuleText = builtins.readFile ../../src/modules/shell.nix;
+  shellModuleText = builtins.readFile ../../src/modules/shell/default.nix;
   macbookDefaultText = builtins.readFile ../../src/hosts/MacBook/default.nix;
   nixosDefaultText = builtins.readFile ../../src/hosts/NixOS/default.nix;
   macbookAutomatorText = builtins.readFile ../../src/hosts/MacBook/services/automator-workflows.nix;
@@ -19,10 +19,10 @@ let
     && containsRegex "\.\./\.\./modules/core\.nix" nixosDefaultText
   ) "All POSIX hosts must import core.nix for shared packages";
 
-  # Test 2: Verify all hosts import shell.nix (ZSH management)
+  # Test 2: Verify all hosts import shell/ (ZSH management)
   test_all_hosts_import_shell = assert' (
-    containsRegex "\./shell\.nix" homeModuleText && containsRegex "programs\.zsh" shellModuleText
-  ) "All hosts must import shell.nix for consistent shell config";
+    containsRegex "\./shell" homeModuleText && containsRegex "programs\.zsh" shellModuleText
+  ) "All hosts must import shell/ for consistent shell config";
 
   # Test 3: Verify per-user secrets materialize from config.home.username
   test_sops_per_user_materialization = assert' (
