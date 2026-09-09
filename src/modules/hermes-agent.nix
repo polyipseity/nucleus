@@ -1,11 +1,9 @@
 # src/modules/hermes-agent.nix — Nucleus wrapper for upstream hermes-agent Home Manager module.
 #
-# Imports the upstream `homeManagerModules.default` with a shimmed `inputs`
-# binding so `inputs.self.packages.${system}.default` resolves to the
-# hermes-agent package from the overlay (added in flake.nix). The upstream
-# module then manages `programs.hermes-agent` (CLI) and
-# `services.hermes-agent` (gateway + backend daemons) with platform-native
-# service management (launchd on macOS, systemd on Linux).
+# Imports the upstream `homeManagerModules.default` HM module directly from
+# the flake-parts output. The upstream module manages `programs.hermes-agent`
+# (CLI) and `services.hermes-agent` (gateway + backend daemons) with
+# platform-native service management (launchd on macOS, systemd on Linux).
 #
 # Per-host overrides (gateway.enable, model defaults) are applied here.
 # API keys: declare secrets in your per-user env-secrets.json with
@@ -19,19 +17,9 @@
   ...
 }:
 let
-  # Minimal `inputs` shim for the upstream module.
-  upstreamInputs = {
-    self = {
-      packages = {
-        ${pkgs.stdenv.hostPlatform.system}.default =
-          hermes-agent.packages.${pkgs.stdenv.hostPlatform.system}.default;
-      };
-    };
-  };
-
-  upstreamModule = (import "${hermes-agent}/nix/homeManagerModules.nix") {
-    inputs = upstreamInputs;
-  };
+  # The flake-parts output already binds `inputs` internally —
+  # homeManagerModules.default is a standard HM module {config, lib, ...}:
+  upstreamModule = hermes-agent.homeManagerModules.default;
 
   # Resolve per-user env-secrets.json via user overlay.
   userSecretsFile = ../../../users + "/${config.home.username}/env-secrets.json";
