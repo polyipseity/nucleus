@@ -197,6 +197,9 @@ in
         "${pkgs.jq}/bin/jq" \
         '${
           builtins.toJSON {
+            # hermes-agent: NousResearch AI agent framework.  uv for Windows
+            # provisioning (macOS/NixOS use the Nix-provisioned package).
+            hermes-agent = "0.21.0";
             # PaddleOCR: cross-platform OCR with GPU auto-detection.  uv for
             # cross-host version consistency (nixpkgs v3.5.0, PyPI v3.6.0).
             # Pinned to Python 3.11 because its dependency opencv-contrib-python
