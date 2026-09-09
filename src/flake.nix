@@ -6,6 +6,10 @@
       url = "github:lnl7/nix-darwin";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    hermes-agent = {
+      url = "github:NousResearch/hermes-agent";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     home-manager = {
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -63,6 +67,7 @@
       treefmt-nix,
       cirruslabs-cli,
       darwin,
+      hermes-agent,
       home-manager,
       homebrew-cask,
       homebrew-core,
@@ -484,6 +489,9 @@
                 gnupg24 = gnupg25_pinned;
               }
             )
+            # hermes-agent: adds pkgs.hermes-agent via overlay so the upstream
+            # Nix module's default package resolves correctly.
+            hermes-agent.overlays.default
             # Expose writeNucleusShellApplication via pkgs so all module and
             # host files can use it without importing from flake.nix.
             (final: _prev: { writeNucleusShellApplication = writeNucleusShellApplication final; })
@@ -744,6 +752,7 @@
         );
 
       flakeInputsMac = {
+        hermes-agent = hermes-agent;
         darwin = darwin;
         home-manager = home-manager;
         nix-vscode-extensions = nix-vscode-extensions;
@@ -858,6 +867,7 @@
               hostName = "MacBook";
               inherit nixpkgs username repoRoot;
               users = usersMacBook;
+              hermes-agent = hermes-agent;
               nucleusApps = nucleusAppsMac // {
                 nucleus-service-watchdog = serviceWatchdogPkgMac;
               };
@@ -903,6 +913,7 @@
               hostName = "NixOS";
               inherit nixpkgs username repoRoot;
               users = usersNixOS;
+              hermes-agent = hermes-agent;
               nucleusApps = nucleusAppsLinux // {
                 nucleus-service-watchdog = serviceWatchdogPkgLinux;
               };
