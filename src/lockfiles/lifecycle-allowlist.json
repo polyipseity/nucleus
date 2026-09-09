@@ -1,3 +1,4 @@
 {
-  "$schema": "./lifecycle-allowlist.schema.json"
+  "$schema": "./lifecycle-allowlist.schema.json",
+  "@tobilu/qmd": "Required: postinstall compiles native modules (better-sqlite3, node-llama-cpp) and downloads GGUF embedding models. Without lifecycle scripts, qmd cannot function."
 }
