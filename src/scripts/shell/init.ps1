@@ -6,7 +6,7 @@
 __MANAGED_PREPEND_PATH__
 
 # Managed PATH: append dirs (after system default).
-# Canonical source: env-catalog.nix -> managed-paths.nix (pathComponents).
+# Canonical source: env/catalog.json -> managed-paths.nix (pathComponents).
 __MANAGED_APPEND_PATH__
 
 

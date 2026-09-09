@@ -9,8 +9,8 @@
 # caught without building the full host configuration.
 
 let
-  catalogPath = ../../src/modules/env-catalog.nix;
-  catalog = import catalogPath;
+  catalogPath = ../../src/modules/env/catalog.json;
+  catalog = builtins.fromJSON (builtins.readFile catalogPath);
   inherit (import ../lib.nix) assert';
 
   keys = catalog.keys or [ ];

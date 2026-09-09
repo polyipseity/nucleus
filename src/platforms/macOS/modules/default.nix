@@ -41,7 +41,7 @@ let
   };
 
   # Cached imports for all env-var-related callsites below.
-  # managed-paths.nix for PATH components; env-catalog.nix for catalog/resolution.
+  # managed-paths.nix for PATH components; env/catalog.json for catalog/resolution.
   managedPaths = import ../../../modules/lib/managed-paths.nix { inherit pkgs; };
   envVars = import ../../../modules/lib/env-catalog.nix {
     inherit

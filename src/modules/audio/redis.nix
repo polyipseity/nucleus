@@ -16,7 +16,7 @@
 # The endpoint (host/port) comes from the centralized service registry
 # (src/modules/services.json). Passwords are exposed to consumers as
 # REDIS_PASSWORD and REDIS_USER_LITELLM_PASSWORD by the shared env catalog
-# (src/modules/env-catalog.nix).
+# (src/modules/env/catalog.json).
 {
   config,
   lib,

@@ -2,7 +2,7 @@
 # Imported by both MacBook and NixOS to avoid per-host duplication.
 { pkgs, username, ... }:
 let
-  catalog = import ./env-catalog.nix;
+  catalog = builtins.fromJSON (builtins.readFile ./catalog.json);
   owner = if pkgs.stdenv.hostPlatform.isDarwin then username else "litellm";
 in
 {

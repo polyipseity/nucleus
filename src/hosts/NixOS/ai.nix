@@ -26,7 +26,7 @@ let
   # Centralized service registry — single source of truth for network config.
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
   ollamaCfg = servicesJSON.ollama.network.default;
-  catalog = import ../../modules/env-catalog.nix;
+  catalog = builtins.fromJSON (builtins.readFile ../../modules/env/catalog.json);
   envLib = import ../../modules/lib/env-catalog.nix {
     inherit
       config
@@ -144,7 +144,7 @@ in
   # Guard: if the env catalog declares AI keys but the resolved keyArgs is
   # empty, the LiteLLM service would start with no API-key pairs and every
   # `default` request fails with "Missing credentials". This happens when the
-  # catalog (src/modules/env-catalog.nix) is out of sync with sops.secrets
+  # catalog (src/modules/env/catalog.json) is out of sync with sops.secrets
   # (e.g. a key was added to the catalog but not to system.yml). Fail fast
   # with a clear message naming the missing secret.
   assertions = [
@@ -152,7 +152,7 @@ in
       assertion =
         (builtins.length catalog.keys == 0) || (builtins.length keyArgs == builtins.length catalog.keys);
       message =
-        "litellm: env catalog declares ${toString (builtins.length catalog.keys)} secret(s) but only ${toString (builtins.length keyArgs)} KEYFILE:ENVVAR pair(s) resolved.  Check src/modules/env-catalog.nix and sops.secrets. Missing: "
+        "litellm: env catalog declares ${toString (builtins.length catalog.keys)} secret(s) but only ${toString (builtins.length keyArgs)} KEYFILE:ENVVAR pair(s) resolved.  Check src/modules/env/catalog.json and sops.secrets. Missing: "
         + lib.concatStringsSep ", " (
           map (e: e.name) (builtins.filter (e: !(config.sops.secrets ? ${e.name})) catalog.keys)
         );

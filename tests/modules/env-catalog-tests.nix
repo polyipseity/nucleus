@@ -1,4 +1,4 @@
-# tests/modules/env-catalog-tests.nix — env-catalog.nix invariants.
+# tests/modules/env-catalog-tests.nix — env/catalog.json invariants.
 #
 # Validates the catalog structure, key patterns, env var derivation,
 # uniqueness, and schema compliance.  The catalog is the static source of
@@ -10,8 +10,8 @@
 # catalog edits.
 
 let
-  catalogPath = ../../src/modules/env-catalog.nix;
-  catalog = import catalogPath;
+  catalogPath = ../../src/modules/env/catalog.json;
+  catalog = builtins.fromJSON (builtins.readFile catalogPath);
   inherit (import ../lib.nix) assert';
 
   keys = catalog.keys or [ ];
