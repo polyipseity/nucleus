@@ -40,6 +40,8 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../lib/lib.sh"
 # shellcheck source=../lib/macos-launch-services.sh
 . "$SCRIPT_DIR/../lib/macos-launch-services.sh"
+# shellcheck source=../lib/crash-loop.sh
+. "$SCRIPT_DIR/../lib/crash-loop.sh"
 
 usage() {
   usage_std "$(basename "$0")" "[options]"
@@ -166,25 +168,45 @@ check_service_macos() {
 
   case "$print_out" in
   *"state = running"*)
-    # Service is healthy — nothing to do.
+    # Service is healthy — record success for crash-loop detection.
+    crash_loop_success "$svc"
     return 0
     ;;
   *"state = spawn scheduled"*)
+    if crash_loop_is_looping "$svc"; then
+      warn "watchdog: %s is crash-looping — skipping restart" "$svc_id"
+      return 0
+    fi
+    crash_loop_record "$svc" "spawn-scheduled"
     recover_launchctl "$svc" "$scope" "$launchd_domain" "$svc_id" "$uid"
     log_restart "$svc_id" "spawn scheduled"
     ;;
   *"state = waiting"*)
+    if crash_loop_is_looping "$svc"; then
+      warn "watchdog: %s is crash-looping — skipping restart" "$svc_id"
+      return 0
+    fi
+    crash_loop_record "$svc" "waiting"
     recover_launchctl "$svc" "$scope" "$launchd_domain" "$svc_id" "$uid"
     log_restart "$svc_id" "waiting"
     ;;
   # Exit 78 (EX_CONFIG): non-retryable, launchd sets penalty box — needs bootout+bootstrap.
   # Exit 126 (transient): shell cannot exec; does NOT trigger penalty box.
   *"last exit code = 78"*)
+    if crash_loop_is_looping "$svc"; then
+      warn "watchdog: %s is crash-looping — skipping restart" "$svc_id"
+      return 0
+    fi
+    crash_loop_record "$svc" "EX_CONFIG"
     recover_launchctl "$svc" "$scope" "$launchd_domain" "$svc_id" "$uid"
     log_restart "$svc_id" "EX_CONFIG"
     ;;
   *"Service is not found"* | "")
     # Service not loaded — try bootstrapping.
+    if crash_loop_is_looping "$svc"; then
+      warn "watchdog: %s is crash-looping — skipping restart" "$svc_id"
+      return 0
+    fi
     local plist=""
     if [ "$scope" = "system" ]; then
       plist="/Library/LaunchDaemons/$svc_id.plist"
@@ -192,6 +214,7 @@ check_service_macos() {
       plist="${HOME:-}/Library/LaunchAgents/$svc_id.plist"
     fi
     if [ -f "$plist" ]; then
+      crash_loop_record "$svc" "not-found"
       # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
       $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$launchd_domain" "$uid")" "$plist" 2>/dev/null || true
       log_restart "$svc_id" "not found — bootstrap"
@@ -217,10 +240,17 @@ check_service_nixos() {
 
   case "$is_active" in
   active | activating | reloading)
-    # Service is healthy — nothing to do.
+    # Service is healthy — record success for crash-loop detection.
+    crash_loop_success "$svc"
     return 0
     ;;
   inactive | dead | failed | not-found | "")
+    # Check crash-loop before restarting.
+    if crash_loop_is_looping "$svc"; then
+      warn "watchdog: %s is crash-looping — skipping restart" "$svc_id"
+      return 0
+    fi
+    crash_loop_record "$svc" "state=$is_active"
     # Stuck or missing — reset limits and restart.
     # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
     systemctl $scope_flag reset-failed "$svc_id" 2>/dev/null || true
