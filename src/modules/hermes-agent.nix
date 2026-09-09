@@ -36,20 +36,15 @@ let
   # Resolve per-user env-secrets.json via user overlay.
   userSecretsFile = ../../../users + "/${config.home.username}/env-secrets.json";
   defaultSecretsFile = ../users/default/env-secrets.json;
-  secretsFile =
-    if builtins.pathExists userSecretsFile then userSecretsFile
-    else defaultSecretsFile;
+  secretsFile = if builtins.pathExists userSecretsFile then userSecretsFile else defaultSecretsFile;
   userSecrets = builtins.fromJSON (builtins.readFile secretsFile);
 
   # Filter secrets by consumer: only keys where consumers contains "hermes-agent".
-  hermesSecrets = builtins.filter
-    (s: builtins.elem "hermes-agent" s.consumers)
-    userSecrets.secrets;
+  hermesSecrets = builtins.filter (s: builtins.elem "hermes-agent" s.consumers) userSecrets.secrets;
 
   # Resolve SOPS secret paths for hermes-consumed keys.
   # Each secret's sopsSource determines which SOPS file to read from.
-  mkSecretPath = entry:
-    config.sops.secrets.${entry.name}.path;
+  mkSecretPath = entry: config.sops.secrets.${entry.name}.path;
 
   hermesSecretPaths = map mkSecretPath hermesSecrets;
 in
@@ -58,15 +53,20 @@ in
   imports = [ upstreamModule ];
 
   # Declare SOPS secrets for all hermes-consumed keys.
-  sops.secrets = builtins.listToAttrs (map (entry: {
-    name = entry.name;
-    value = {
-      sopsFile = if entry.sopsSource == "system" then ../secrets/system.yml
-                  else ../secrets/users + "/${config.home.username}.yml";
-      owner = config.home.username;
-      mode = "0400";
-    };
-  }) hermesSecrets);
+  sops.secrets = builtins.listToAttrs (
+    map (entry: {
+      name = entry.name;
+      value = {
+        sopsFile =
+          if entry.sopsSource == "system" then
+            ../secrets/system.yml
+          else
+            ../secrets/users + "/${config.home.username}.yml";
+        owner = config.home.username;
+        mode = "0400";
+      };
+    }) hermesSecrets
+  );
 
   # ── Nucleus-level configuration ──────────────────────────────────────
 
@@ -74,12 +74,8 @@ in
 
   services.hermes-agent = {
     enable = lib.mkDefault true;
-    gateway.enable =
-      if hostName == "MacBook" then
-        lib.mkDefault true
-      else
-        lib.mkDefault false;
+    gateway.enable = if hostName == "MacBook" then lib.mkDefault true else lib.mkDefault false;
     # Wire SOPS-decrypted API key files into the service environment.
-    environmentFiles = lib.mkIf (hermesSecretPaths != []) hermesSecretPaths;
+    environmentFiles = lib.mkIf (hermesSecretPaths != [ ]) hermesSecretPaths;
   };
 }

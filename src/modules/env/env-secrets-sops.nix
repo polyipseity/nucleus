@@ -44,13 +44,21 @@ let
           null;
       keys = builtins.filter (k: k != null) (map extractKey nonEmpty);
     in
-    builtins.attrNames (builtins.listToAttrs (map (k: { name = k; value = true; }) keys));
+    builtins.attrNames (
+      builtins.listToAttrs (
+        map (k: {
+          name = k;
+          value = true;
+        }) keys
+      )
+    );
 
-  systemSopsKeys = if builtins.pathExists systemSopsFile then parseSopsKeys systemSopsFile else [];
-  userSopsKeys = if builtins.pathExists userSopsFile then parseSopsKeys userSopsFile else [];
+  systemSopsKeys = if builtins.pathExists systemSopsFile then parseSopsKeys systemSopsFile else [ ];
+  userSopsKeys = if builtins.pathExists userSopsFile then parseSopsKeys userSopsFile else [ ];
 
   # Find declared names missing from a SOPS file.
-  missingKeys = sopsKeys: entries:
+  missingKeys =
+    sopsKeys: entries:
     let
       declaredNames = map (e: e.name) entries;
     in
@@ -60,7 +68,8 @@ let
   missingUserKeys = missingKeys userSopsKeys userSecrets;
 
   mkSopsEntry =
-    sopsFile: map (entry: {
+    sopsFile:
+    map (entry: {
       name = entry.name;
       value = {
         inherit sopsFile owner;
@@ -73,31 +82,46 @@ in
   assertions = [
     {
       assertion = builtins.length systemSecrets == 0 || builtins.pathExists systemSopsFile;
-      message = "env-secrets: ${toString (builtins.length systemSecrets)} secret(s) declared with sopsSource=system "
+      message =
+        "env-secrets: ${toString (builtins.length systemSecrets)} secret(s) declared with sopsSource=system "
         + "but SOPS file src/secrets/system.yml does not exist.";
     }
     {
       assertion = builtins.length userSecrets == 0 || builtins.pathExists userSopsFile;
-      message = "env-secrets: ${toString (builtins.length userSecrets)} secret(s) declared with sopsSource=user "
+      message =
+        "env-secrets: ${toString (builtins.length userSecrets)} secret(s) declared with sopsSource=user "
         + "but SOPS file src/secrets/users/${username}.yml does not exist.";
     }
-  ] ++ (
+  ]
+  ++ (
     # Assert declared key names exist in the SOPS files.
-    if missingSystemKeys != [] then [{
-      assertion = false;
-      message = "env-secrets: keys missing from src/secrets/system.yml: "
-        + builtins.concatStringsSep ", " missingSystemKeys;
-    }] else []
-  ) ++ (
-    if missingUserKeys != [] then [{
-      assertion = false;
-      message = "env-secrets: keys missing from src/secrets/users/${username}.yml: "
-        + builtins.concatStringsSep ", " missingUserKeys;
-    }] else []
+    if missingSystemKeys != [ ] then
+      [
+        {
+          assertion = false;
+          message =
+            "env-secrets: keys missing from src/secrets/system.yml: "
+            + builtins.concatStringsSep ", " missingSystemKeys;
+        }
+      ]
+    else
+      [ ]
+  )
+  ++ (
+    if missingUserKeys != [ ] then
+      [
+        {
+          assertion = false;
+          message =
+            "env-secrets: keys missing from src/secrets/users/${username}.yml: "
+            + builtins.concatStringsSep ", " missingUserKeys;
+        }
+      ]
+    else
+      [ ]
   );
 
   sops.secrets = builtins.listToAttrs (
-    (mkSopsEntry systemSopsFile systemSecrets)
-    ++ (mkSopsEntry userSopsFile userSecrets)
+    (mkSopsEntry systemSopsFile systemSecrets) ++ (mkSopsEntry userSopsFile userSecrets)
   );
 }

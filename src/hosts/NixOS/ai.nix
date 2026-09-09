@@ -38,7 +38,10 @@ let
       ;
     hostName = "NixOS";
   };
-  secretArgs = envLib.mkSecretArgsForConsumer { inherit config secrets; consumer = "litellm"; };
+  secretArgs = envLib.mkSecretArgsForConsumer {
+    inherit config secrets;
+    consumer = "litellm";
+  };
 in
 {
   # LiteLLM AI gateway — systemd service on 127.0.0.1:4000.
@@ -152,7 +155,11 @@ in
   assertions = [
     {
       assertion =
-        (builtins.length secrets.secrets == 0) || (builtins.length secretArgs == builtins.length (builtins.filter (s: builtins.elem "litellm" s.consumers) secrets.secrets));
+        (builtins.length secrets.secrets == 0)
+        || (
+          builtins.length secretArgs
+          == builtins.length (builtins.filter (s: builtins.elem "litellm" s.consumers) secrets.secrets)
+        );
       message =
         "litellm: env-secrets catalog declares ${toString (builtins.length secrets.secrets)} secret(s) but only ${toString (builtins.length secretArgs)} KEYFILE:ENVVAR pair(s) resolved.  Check src/modules/env/env-secrets.json and sops.secrets. Missing: "
         + lib.concatStringsSep ", " (

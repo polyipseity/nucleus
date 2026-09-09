@@ -20,20 +20,47 @@ _target=""
 # ── Parse arguments ────────────────────────────────────────────────
 while [ $# -gt 0 ]; do
   case "$1" in
-  --repo-root) _repo_root="$2"; shift 2 ;;
-  --no-ai-sync) _ai_sync=false; shift ;;
-  --ai-sync) _ai_sync=true; shift ;;
-  --replica-sync) _replica_sync=true; shift ;;
-  --no-replica-sync) _replica_sync=false; shift ;;
-  --vm-setup) _vm_setup=true; shift ;;
-  --no-vm-sync) _vm_sync=false; shift ;;
-  --target) _target="$2"; shift 2 ;;
+  --repo-root)
+    _repo_root="$2"
+    shift 2
+    ;;
+  --no-ai-sync)
+    _ai_sync=false
+    shift
+    ;;
+  --ai-sync)
+    _ai_sync=true
+    shift
+    ;;
+  --replica-sync)
+    _replica_sync=true
+    shift
+    ;;
+  --no-replica-sync)
+    _replica_sync=false
+    shift
+    ;;
+  --vm-setup)
+    _vm_setup=true
+    shift
+    ;;
+  --no-vm-sync)
+    _vm_sync=false
+    shift
+    ;;
+  --target)
+    _target="$2"
+    shift 2
+    ;;
   *) shift ;;
   esac
 done
 
 if [ -z "$_repo_root" ]; then
-  _repo_root="$(derive_repo_root)" || { error "post-apply: could not resolve repo root"; exit 1; }
+  _repo_root="$(derive_repo_root)" || {
+    error "post-apply: could not resolve repo root"
+    exit 1
+  }
 fi
 
 # ── Per-run apply log ──────────────────────────────────────────────

@@ -21,9 +21,7 @@ let
   );
 
   # Consumer-filtered subsets.
-  litellmSecrets = builtins.filter (s: builtins.elem "litellm" s.consumers) entries;
   hermesSecrets = builtins.filter (s: builtins.elem "hermes-agent" s.consumers) entries;
-
 
 in
 {
@@ -67,34 +65,62 @@ in
 
   # === Expected key count and providers ===
 
-  test_key_count = assert' (builtins.length entries == 9) "env-secrets must contain exactly 9 entries";
+  test_key_count = assert' (
+    builtins.length entries == 9
+  ) "env-secrets must contain exactly 9 entries";
 
   test_expected_providers_present = assert' (builtins.all
     (expected: builtins.any (e: e.name == expected.name && e.envVar == expected.envVar) entries)
     [
-      { name = "env_key_ai_cline"; envVar = "KEY_AI_CLINE"; }
-      { name = "env_key_ai_command_code"; envVar = "KEY_AI_COMMAND_CODE"; }
-      { name = "env_key_ai_opencode_go"; envVar = "KEY_AI_OPENCODE_GO"; }
-      { name = "env_key_ai_opencode_go_1"; envVar = "KEY_AI_OPENCODE_GO_1"; }
-      { name = "env_key_ai_opencode_zen"; envVar = "KEY_AI_OPENCODE_ZEN"; }
-      { name = "env_key_ai_opencode_zen_1"; envVar = "KEY_AI_OPENCODE_ZEN_1"; }
-      { name = "env_key_ai_openrouter"; envVar = "KEY_AI_OPENROUTER"; }
-      { name = "env_redis_password"; envVar = "REDIS_PASSWORD"; }
-      { name = "env_redis_user_litellm_password"; envVar = "REDIS_USER_LITELLM_PASSWORD"; }
+      {
+        name = "env_key_ai_cline";
+        envVar = "KEY_AI_CLINE";
+      }
+      {
+        name = "env_key_ai_command_code";
+        envVar = "KEY_AI_COMMAND_CODE";
+      }
+      {
+        name = "env_key_ai_opencode_go";
+        envVar = "KEY_AI_OPENCODE_GO";
+      }
+      {
+        name = "env_key_ai_opencode_go_1";
+        envVar = "KEY_AI_OPENCODE_GO_1";
+      }
+      {
+        name = "env_key_ai_opencode_zen";
+        envVar = "KEY_AI_OPENCODE_ZEN";
+      }
+      {
+        name = "env_key_ai_opencode_zen_1";
+        envVar = "KEY_AI_OPENCODE_ZEN_1";
+      }
+      {
+        name = "env_key_ai_openrouter";
+        envVar = "KEY_AI_OPENROUTER";
+      }
+      {
+        name = "env_redis_password";
+        envVar = "REDIS_PASSWORD";
+      }
+      {
+        name = "env_redis_user_litellm_password";
+        envVar = "REDIS_USER_LITELLM_PASSWORD";
+      }
     ]
   ) "all 9 expected entries with correct envVar mappings must be present";
 
   # === Consumer scoping ===
 
-  test_all_system_entries_consumed_by_litellm = assert' (
-    builtins.all (e: builtins.elem "litellm" e.consumers)
-      (builtins.filter (e: e.sopsSource == "system") entries)
+  test_all_system_entries_consumed_by_litellm = assert' (builtins.all
+    (e: builtins.elem "litellm" e.consumers)
+    (builtins.filter (e: e.sopsSource == "system") entries)
   ) "all system entries must be consumed by litellm";
 
   test_hermes_secrets_empty_by_default = assert' (
     builtins.length hermesSecrets == 0
   ) "no hermes-agent consumer entries by default (user opt-in)";
-
 
   # === sopsSource split ===
 

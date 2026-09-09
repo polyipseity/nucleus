@@ -161,10 +161,22 @@ let
       writable = true;
     }
     # LiteLLM config and handler symlinks — repo edits take effect on service restart.
-    { path = "${nucleusUserRoot}/litellm-config.yml"; writable = true; }
-    { path = "${nucleusUserRoot}/cline_handler.py"; writable = true; }
-    { path = "${nucleusUserRoot}/litellm-cooldown-400.py"; writable = true; }
-    { path = "${nucleusUserRoot}/litellm-logging-config.py"; writable = true; }
+    {
+      path = "${nucleusUserRoot}/litellm-config.yml";
+      writable = true;
+    }
+    {
+      path = "${nucleusUserRoot}/cline_handler.py";
+      writable = true;
+    }
+    {
+      path = "${nucleusUserRoot}/litellm-cooldown-400.py";
+      writable = true;
+    }
+    {
+      path = "${nucleusUserRoot}/litellm-logging-config.py";
+      writable = true;
+    }
   ];
   managedSymlinkPathsJson = builtins.toJSON managedSymlinkPaths;
 

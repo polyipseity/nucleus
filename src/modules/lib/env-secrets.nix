@@ -465,7 +465,11 @@ let
   # mkSecretArgsForConsumer: build KEYFILE:ENVVAR pairs filtered by consumer name.
   # Usage: mkSecretArgsForConsumer { inherit config secrets; consumer = "litellm"; }
   mkSecretArgsForConsumer =
-    { config, secrets, consumer }:
+    {
+      config,
+      secrets,
+      consumer,
+    }:
     let
       filtered = builtins.filter (entry: builtins.elem consumer entry.consumers) secrets.secrets;
     in
