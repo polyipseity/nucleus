@@ -69,6 +69,12 @@ _audit_store_run_privileged() {
 _audit_store_linux_builder_ready() {
   _as_lb_label="${LINUX_BUILDER_LAUNCHD_LABEL:-org.nixos.linux-builder}"
 
+  # Check if builder is already running via nucleus-svc.
+  if command -v nucleus-svc >/dev/null 2>&1 && nucleus-svc status linux-builder >/dev/null 2>&1; then
+    return 0
+  fi
+
+  # Fallback to launchctl check.
   if launchctl print "system/${_as_lb_label}" >/dev/null 2>&1; then
     return 0
   fi
@@ -397,6 +403,23 @@ audit_linux_builder_store() {
   if ! command -v jq >/dev/null 2>&1; then
     error "jq unavailable; cannot audit linux-builder store"
     return 1
+  fi
+
+  # Start linux-builder if not running (only on MacBook).
+  # The builder is disabled by default to save ~500 MiB RAM.
+  # Auto-stop via trap ensures cleanup on any exit (success, failure, interrupt).
+  _albs_lb_started=false
+  if command -v nucleus-svc >/dev/null 2>&1; then
+    if ! nucleus-svc status linux-builder >/dev/null 2>&1; then
+      notice -l linux-builder "starting linux-builder for store audit (takes ~30-60s)..."
+      if nucleus-svc start linux-builder; then
+        _albs_lb_started=true
+        # check-suppress:suppression_doc: trap cleanup for linux-builder; stop only if we started it.
+        trap 'if [ "$_albs_lb_started" = true ]; then nucleus-svc stop linux-builder >/dev/null 2>&1 || true; fi' EXIT
+      else
+        warn -l linux-builder "failed to start linux-builder; store audit may fail"
+      fi
+    fi
   fi
 
   if ! _audit_store_linux_builder_ready; then
