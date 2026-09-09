@@ -4,6 +4,7 @@
 # Creates:
 #   ~/.pi/agent/extensions/  → <live-root>/src/users/default/agents/pi-extensions/
 #   ~/.pi/agent/settings.json → <live-root>/src/users/default/agents/pi-settings.json
+#   ~/.pi/agent/extensions/superpowers.ts → Nix store superpowers plugin
 #
 # Skills are handled natively by Pi (auto-discovered from ~/.agents/skills/ and
 # .agents/skills/), so no symlink is needed for those.
@@ -41,3 +42,21 @@ fi
 "$SCRIPT_DIR/../configs/seed-writable-symlink.sh" \
   "$_spi_pi_dir/settings.json" \
   "src/users/default/agents/pi-settings.json"
+
+# --- Superpowers extension symlink (method 1: Nix store target) ---
+# The superpowers plugin is fetched via builtins.fetchGit and symlinked to
+# ~/.local/share/nucleus/plugins/superpowers. We create a method-1 symlink
+# from ~/.pi/agent/extensions/superpowers.ts to the Nix store target.
+_spi_superpowers_ext="$HOME/.local/share/nucleus/plugins/superpowers/.pi/extensions/superpowers.ts"
+_spi_superpowers_link="$_spi_pi_dir/extensions/superpowers.ts"
+if [ -L "$_spi_superpowers_link" ]; then
+  if [ "$(readlink "$_spi_superpowers_link")" != "$_spi_superpowers_ext" ]; then
+    rm "$_spi_superpowers_link"
+  fi
+elif [ -e "$_spi_superpowers_link" ]; then
+  warn -l pi-agent "$_spi_superpowers_link exists and is not a managed symlink — skipping"
+fi
+if [ ! -e "$_spi_superpowers_link" ] && [ -e "$_spi_superpowers_ext" ]; then
+  ln -s "$_spi_superpowers_ext" "$_spi_superpowers_link"
+  say -l pi-agent "linked $_spi_superpowers_link -> $_spi_superpowers_ext"
+fi
