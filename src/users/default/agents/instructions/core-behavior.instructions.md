@@ -125,6 +125,12 @@ See "Terminal hygiene" below for output lifecycle management.
 - **Default search sources.** When asked to search, consult GitHub, DuckDuckGo, then any other search engines the model is aware of, in that priority order.
 - **Strict research-only mode.** When the user says "only verify", "only plan", "only report", "do not edit", or similar scoping phrases, treat this as a hard boundary. Do zero edits, zero file modifications, zero git operations. Report findings only. Do not pre-implement, sketch diffs, or suggest code changes unless explicitly asked.
 
+## Filesystem search scope
+
+Run `find`, `rg`, `ls -R`, `tree`, `git ls-files`, or any other filesystem enumeration only within the current working directory (the project root or the directory the task targets). Do not search paths above the project boundary or in unrelated directories.
+
+If you need to locate a file and it is not under the project tree, ask the user where it lives. Do not guess by searching outward.
+
 ## Instruction compliance
 
 - **Re-read instructions when context changes.** When a task transitions into a new domain (e.g., switches from editing notes to running Python, or from writing content to debugging a tool), re-read any instruction files that apply to the new context. Do not rely on memory of rules from earlier in the conversation — instruction files are the ground truth.
