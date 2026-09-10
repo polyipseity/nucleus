@@ -8,10 +8,11 @@
     };
     hermes-agent = {
       url = "github:NousResearch/hermes-agent/v2026.8.31";
-      # WHY: v2026.8.31 is the first release with homeManagerModules.default
-      # (added by PR #84178, merged 2026-08-19). Previous v2026.7.7 did not
-      # expose this attribute. The torch/safetensors wheel overrides in mkPkgs
-      # handle the slower dependency builds.
+      inputs.nixpkgs.follows = "nixpkgs";
+      # WHY: v2026.8.31 is the first release exposing homeManagerModules.default
+      # (PR #84178, merged 2026-08-19); v2026.7.7 lacked the attribute. The
+      # `voice` dependency group (ML source builds) is excluded in
+      # src/modules/hermes-agent.nix.
     };
     home-manager = {
       url = "github:nix-community/home-manager";
