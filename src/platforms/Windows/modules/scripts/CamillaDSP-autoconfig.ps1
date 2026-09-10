@@ -1,9 +1,16 @@
 <#
 .SYNOPSIS
-    CamillaDSP autoconfig wrapper for Windows service.
+    CamillaDSP process supervisor for the Windows scheduled task.
 .DESCRIPTION
-    Starts camilladsp with WebSocket server, assigns it to a Job Object for
-    automatic cleanup, pushes config via WS, and heartbeats config every 5s.
+    Starts camilladsp with the WebSocket server and no config, assigns it to a
+    Job Object for automatic cleanup, and supervises that single process until it
+    exits.
+
+    This wrapper deliberately does not push a config. The heartbeat is the only
+    pusher, which keeps a single writer for the audio graph and lets the
+    camilladsp.enable toggle gate binding in exactly one place. Pushing here as
+    well meant two writers racing at boot, each tearing down and rebuilding the
+    audio graph. Mirrors camilladsp-run.sh on POSIX.
 #>
 param(
   [Parameter(Mandatory)] [string] $CamillaDSPBin,
@@ -13,9 +20,6 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-
-# ── Smart device detection ────────────────────────────────────────────────
-. (Join-Path $PSScriptRoot "deviceselect.ps1")
 
 $stateFile = Join-Path -Path $HOME -ChildPath ".local\state\camilladsp\statefile.yml"
 $null = New-Item -Path (Split-Path $stateFile -Parent) -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
@@ -59,122 +63,10 @@ if ($job -ne [IntPtr]::Zero) {
   [void][JobObject]::AssignProcessToJobObject($job, $process.SafeHandle.DangerousGetHandle())  # check-suppress:suppression_doc: AssignProcessToJobObject return value discarded, error handling is externally verified
 }
 
-# Binding is controlled by camilladsp.enable (default false), mirroring the POSIX
-# heartbeat: set it false and nothing opens an audio input, though camilladsp
-# still runs. Without this gate the wrapper's own timer would keep binding even
-# when the separate heartbeat task was told not to.
-$nucleusCfgFile = Join-Path $HOME ".local\state\nucleus\config.json"
-# Must match the DEFAULTS entry in scripts/config.ps1 (false); a $true default here would
-# enable automatic device binding even though the CLI reports it disabled.
-$bindEnabled = $false
-if (Test-Path $nucleusCfgFile) {
-  # check-suppress:suppression_doc: probe -- no config file may not exist; $null check below handles absence
-  $nc = Get-Content -Raw $nucleusCfgFile -ErrorAction SilentlyContinue | ConvertFrom-Json
-  if ($null -ne $nc.camilladsp.enable) { $bindEnabled = [bool]$nc.camilladsp.enable }
-}
-
-# Poll WS port and push config (up to ~15s).  Graceful if config file
-# doesn't exist yet (first boot before Home Manager deploy).
-for ($i = 0; $i -lt 30; $i++) {
-  Start-Sleep -Milliseconds 500
-  if (-not $bindEnabled) { break }
-  if (-not (Test-Path $ConfigFile)) { continue }
-  try {
-    # Resolve playback device: patches empty device in config with system default.
-    $configYaml = Resolve-CamillaDSPPlaybackDevice -ConfigPath $ConfigFile
-    $configEscaped = $configYaml | ConvertTo-Json -Compress
-    $message = "{`"SetConfig`": $configEscaped}"
-    $ws = [System.Net.WebSockets.ClientWebSocket]::new()
-    $ct = [System.Threading.CancellationToken]::Empty
-    $ws.ConnectAsync([System.Uri]"ws://127.0.0.1:$Port", $ct).Wait()
-    $bytes = [System.Text.Encoding]::UTF8.GetBytes($message)
-    $ws.SendAsync([ArraySegment[byte]]::new($bytes), [System.Net.WebSockets.WebSocketMessageType]::Text, $true, $ct).Wait()
-    $ws.CloseAsync([System.Net.WebSockets.WebSocketCloseStatus]::NormalClosure, "done", $ct).Wait()
-    break
-  } catch {
-    # Port not ready or connection failed — retry.
-    $null = $_  # check-suppress:suppression_doc: $_ discarded in ForEach-Object, side-effect-only iteration
-  }
-}
-
-# Heartbeat: re-push config every 5s so config re-applies when a
-# disconnected audio device reappears.
-# Checks config.json on each tick so dynamic changes apply instantly.
-$heartbeatTimer = [System.Threading.Timer]::new({
-  param($s)
-  $cf, $p, $ncf = $s
-  # Check runtime toggles on every tick.
-  $bindEnabled = $false
-  if (Test-Path $ncf) {
-    # check-suppress:suppression_doc: probe -- no-config file may not exist; $null check below handles absence
-    $nc = Get-Content -Raw $ncf -ErrorAction SilentlyContinue | ConvertFrom-Json
-    if ($null -ne $nc.camilladsp.heartbeat -and -not $nc.camilladsp.heartbeat) { return }
-    if ($null -ne $nc.camilladsp.enable) { $bindEnabled = [bool]$nc.camilladsp.enable }
-  }
-  if (-not $bindEnabled) { return }
-  $lastPushFile = Join-Path $HOME ".local\state\camilladsp\last-push.txt"
-  try {
-    # Check current state.  Skip only when Running AND the live playback
-    # device already matches the target device that detection would currently
-    # select — a null live device must always be corrected (idiot-proof skip:
-    # never leave a running instance with no device), and a live device that
-    # differs from a non-null target (e.g. the system default output device
-    # changed) must be re-pushed. A null target is never pushed.
-    $targetDevice = Get-CamillaDSPResolvedPlaybackDeviceName -ConfigPath $cf
-    $stateWs = [System.Net.WebSockets.ClientWebSocket]::new()
-    $ct = [System.Threading.CancellationToken]::Empty
-    $stateWs.ConnectAsync([System.Uri]"ws://127.0.0.1:$p", $ct).Wait()
-    $getState = '{ "GetState": null }'
-    $stateBytes = [Text.Encoding]::UTF8.GetBytes($getState)
-    $stateWs.SendAsync([ArraySegment[byte]]::new($stateBytes), [WebSocketMessageType]::Text, $true, $ct).Wait()
-    $recvBuf = New-Object byte[] 1024
-    $result = $stateWs.ReceiveAsync([ArraySegment[byte]]::new($recvBuf), $ct).Result
-    $stateResp = [Text.Encoding]::UTF8.GetString($recvBuf, 0, $result.Count)
-    $stateWs.CloseAsync([CloseStatus]::NormalClosure, "done", $ct).Wait()
-    $state = ($stateResp | ConvertFrom-Json).GetState.value
-    if ($state -eq "Running") {
-      # Query the live config to see if the playback device already matches target.
-      $cfgWs = [System.Net.WebSockets.ClientWebSocket]::new()
-      $cfgWs.ConnectAsync([System.Uri]"ws://127.0.0.1:$p", $ct).Wait()
-      $getCfg = '{ "GetConfig": null }'
-      $cfgBytes = [Text.Encoding]::UTF8.GetBytes($getCfg)
-      $cfgWs.SendAsync([ArraySegment[byte]]::new($cfgBytes), [WebSocketMessageType]::Text, $true, $ct).Wait()
-      $cfgBuf = New-Object byte[] 4096
-      $cfgResult = $cfgWs.ReceiveAsync([ArraySegment[byte]]::new($cfgBuf), $ct).Result
-      $cfgResp = [Text.Encoding]::UTF8.GetString($cfgBuf, 0, $cfgResult.Count)
-      $cfgWs.CloseAsync([CloseStatus]::NormalClosure, "done", $ct).Wait()
-      $liveDevice = ($cfgResp | ConvertFrom-Json).GetConfig.value.devices.playback.device
-      if (-not [string]::IsNullOrEmpty($targetDevice) -and
-          -not [string]::IsNullOrEmpty($liveDevice) -and
-          $liveDevice -eq $targetDevice) {
-        # Converged. Still push when the config file changed since the last push.
-        if (Test-Path $lastPushFile) {
-          $fingerprint = (Get-FileHash -Path $cf -Algorithm SHA256).Hash + "|" + $targetDevice
-          if ((Get-Content -Raw $lastPushFile).Trim() -eq $fingerprint) { return }
-        }
-      }
-    }
-  } catch {
-    # Can't connect — will retry on next heartbeat.
-    return
-  }
-  # Push config.
-  try {
-    # Resolve playback device: patches empty device in config with system default.
-    $yaml = Resolve-CamillaDSPPlaybackDevice -ConfigPath $cf
-    $msg = "{`"SetConfig`": $($yaml | ConvertTo-Json -Compress)}"
-    $ws = [System.Net.WebSockets.ClientWebSocket]::new()
-    $ws.ConnectAsync([System.Uri]"ws://127.0.0.1:$p", $ct).Wait()
-    $ws.SendAsync([ArraySegment[byte]]::new([Text.Encoding]::UTF8.GetBytes($msg)), [WebSocketMessageType]::Text, $true, $ct).Wait()
-    $ws.CloseAsync([CloseStatus]::NormalClosure, "done", $ct).Wait()
-    # Record what was pushed so an unchanged config is not pushed again.
-    $null = New-Item -Path (Split-Path $lastPushFile -Parent) -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
-    Set-Content -Path $lastPushFile -NoNewline -Value ((Get-FileHash -Path $cf -Algorithm SHA256).Hash + "|" + $targetDevice)
-  } catch {
-    # Device may be gone — retry on next heartbeat.
-    $null = $_  # check-suppress:suppression_doc: $_ discarded in ForEach-Object, side-effect-only iteration
-  }
-}, ($ConfigFile, $Port, $nucleusCfgFile), 5000, 5000)
+# Why the config path is accepted but unused: the scheduled-task action written by
+# Sync-CamillaDSPService.ps1 still passes -ConfigFile, and that action lives in a
+# file this change does not touch. Dropping the parameter here without dropping it
+# there would make the task fail to launch.
+$null = $ConfigFile  # check-suppress:suppression_doc: parameter retained for the scheduled-task action; see comment above
 
 $process.WaitForExit()
-$heartbeatTimer.Dispose()
