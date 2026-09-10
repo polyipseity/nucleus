@@ -50,7 +50,7 @@ let
   '';
 in
 {
-  imports = [ ./lib/gc-options.nix ];
+  imports = [ ../lib/gc-options.nix ];
 
   config = lib.mkMerge [
     {
