@@ -7,7 +7,7 @@ let
   manifest = builtins.fromJSON (builtins.readFile ../../src/modules/vms/VMs.json);
 
   # Deterministic identity derivation, shared with src/hosts/MacBook/vms.nix.
-  vmIdentity = import ../../src/modules/lib/vm-identity.nix;
+  vmIdentity = import ../../src/modules/vms/vm-identity.nix;
 
   # Required fields for every VM entry.
   requiredFields = [
@@ -651,7 +651,7 @@ let
     in
     assert' (builtins.length uuids == builtins.length uniqueUuids) "All VMs must have distinct UUIDs";
 
-  # Known SHA-256 identity vectors (see src/modules/lib/vm-identity.nix). The
+  # Known SHA-256 identity vectors (see src/modules/vms/vm-identity.nix). The
   # vectors pin the derivation so neither the Nix lib nor its shell twin can
   # drift silently; a guest id change is a breaking identity change.
   knownUuidVectors = [
@@ -718,11 +718,11 @@ let
   test_macbook_identity_from_shared_lib =
     assert'
       (
-        lib.hasInfix "vmIdentity = import ../../modules/lib/vm-identity.nix;" macbook_vms_nix_text
+        lib.hasInfix "vmIdentity = import ../../modules/vms/vm-identity.nix;" macbook_vms_nix_text
         && lib.hasInfix "vmIdentity.mkUuid vm.id" macbook_vms_nix_text
         && lib.hasInfix "vmIdentity.mkMacAddress vm.id vm.macAddressPrefix" macbook_vms_nix_text
       )
-      "src/hosts/MacBook/vms.nix must derive identities from src/modules/lib/vm-identity.nix with vm.id";
+      "src/hosts/MacBook/vms.nix must derive identities from src/modules/vms/vm-identity.nix with vm.id";
 
   # Domain XML template function (re-implemented without pkgs for test isolation;
   # uses hardcoded x86_64 arch and a placeholder emulator path).

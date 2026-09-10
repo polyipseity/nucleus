@@ -1,4 +1,4 @@
-# src/modules/lib/vm-identity.nix — deterministic VM identity derivation.
+# src/modules/vms/vm-identity.nix — deterministic VM identity derivation.
 #
 # The UUID and MAC address of a guest are pure SHA-256 functions of the guest
 # id, so re-provisioning the same VM always reproduces the same identity and a

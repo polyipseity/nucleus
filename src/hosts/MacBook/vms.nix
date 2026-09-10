@@ -7,7 +7,7 @@
 # without PlistBuddy invocations.
 #
 # The UUID for each VM is derived deterministically from the VM id via SHA-256
-# (src/modules/lib/vm-identity.nix) so re-provisioning from scratch always
+# (src/modules/vms/vm-identity.nix) so re-provisioning from scratch always
 # produces the same UTM identity.
 #
 # Source: https://github.com/utmapp/UTM/blob/main/Configuration/UTMQemuConfiguration.swift
@@ -15,7 +15,7 @@
 let
   vmsData = builtins.fromJSON (builtins.readFile ../../modules/vms/VMs.json);
   size = import ../../modules/lib/size.nix;
-  vmIdentity = import ../../modules/lib/vm-identity.nix;
+  vmIdentity = import ../../modules/vms/vm-identity.nix;
   nucleusHost = "MacBook";
   enabledVms = builtins.filter (vm: vm.enabled && builtins.elem nucleusHost vm.hosts) vmsData.VMs;
 
