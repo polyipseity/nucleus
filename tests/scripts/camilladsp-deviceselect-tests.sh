@@ -23,7 +23,8 @@ fi
 # Isolate CamillaDSP state. The library derives its state directory from
 # XDG_STATE_HOME, and the stale-device self-heal deletes the saved-device file:
 # without this the tests would modify the developer's real ~/.local/state/camilladsp.
-export XDG_STATE_HOME="$(mktemp -d)"
+XDG_STATE_HOME="$(mktemp -d)"
+export XDG_STATE_HOME
 trap 'rm -rf "$XDG_STATE_HOME"' EXIT
 # Disable the enumeration cache by default. Tests assert on mocked enumeration
 # results, and a list cached by an earlier test would mask the mock. The cache
@@ -736,7 +737,8 @@ test_device_cache_reuse_and_invalidation() {
     _lib_script="$1"
     _cfg="$2"
     _counter="$3"
-    export XDG_STATE_HOME="$(mktemp -d)"
+    XDG_STATE_HOME="$(mktemp -d)"
+    export XDG_STATE_HOME
     export CAMILLADSP_DEVICE_CACHE_TTL=300
     . "$_lib_script"
     camilladsp_list_available_devices() {
@@ -774,7 +776,8 @@ test_config_change_detection() {
   result=$(bash -c '
     _lib_script="$1"
     _cfg="$2"
-    export XDG_STATE_HOME="$(mktemp -d)"
+    XDG_STATE_HOME="$(mktemp -d)"
+    export XDG_STATE_HOME
     . "$_lib_script"
     # Nothing pushed yet → changed (the first tick after boot must push).
     camilladsp_config_changed "$_cfg" "Speaker A" && printf "first=changed " || printf "first=unchanged "
