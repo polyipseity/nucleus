@@ -9,7 +9,7 @@ let
   usersOverlayText = builtins.readFile ../../../../src/modules/lib/users-overlay.nix;
   homeText = builtins.readFile ../../../../src/modules/home.nix;
   discordMusicRpcText = builtins.readFile ../../../../src/modules/ext-discord-music-rpc.nix;
-  iterm2Text = builtins.readFile ../../../../src/modules/configs/iterm2/iterm2.nix;
+  iterm2Text = builtins.readFile ../../../../src/modules/iterm2.nix;
   macosText = builtins.readFile ../../../../src/platforms/macOS/modules/default.nix;
   posixBaseText = builtins.readFile ../../../../src/modules/posix/base.nix;
   pwshText = builtins.readFile ../../../../src/modules/pwsh.nix;

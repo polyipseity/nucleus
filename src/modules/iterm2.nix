@@ -38,7 +38,7 @@ let
   };
   # Root of the nucleus repository, set by apply.sh at activation time.
 
-  overlay = (import ../../lib/users-overlay.nix { inherit lib; }).mkUserOverlay {
+  overlay = (import ./lib/users-overlay.nix { inherit lib; }).mkUserOverlay {
     inherit effectiveUsername repoRoot;
   };
 
