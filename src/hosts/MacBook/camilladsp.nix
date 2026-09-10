@@ -4,14 +4,13 @@
 # with --no_config and never reads user-home config, so TCC is not triggered.
 # Config is deployed by Home Manager in modules/home.nix.
 #
-# The heartbeat is a user-scoped launch agent (HM launchd.agents, domain = "gui") in
-# src/modules/camilladsp.nix. It runs inside the primary user's GUI/login
-# session so TCC permits reading $HOME/.config/camilladsp/configs/config.yml
-# (a system daemon is blocked by TCC from reading user-home file contents —
-# EPERM — which previously left the playback device null after every rebuild).
-# HM's setupLaunchAgents restarts the agent on plist change, so a rebuild takes
-# effect on the next apply. Trade-off: the agent only runs while the user is
-# logged into a GUI session (not at the login window); acceptable for audio.
+# The heartbeat is a user-scoped launch agent (HM launchd.agents, domain = "gui").
+# It runs inside the primary user's GUI/login session so TCC permits reading
+# $HOME/.config/camilladsp/configs/config.yml (a system daemon is blocked by
+# macOS TCC from reading user-home file contents — EPERM — which previously
+# left the playback device null after every rebuild). HM's setupLaunchAgents
+# restarts the agent on plist change, so a rebuild takes effect on the next
+# apply.
 #
 # Heartbeat re-pushes the config when camilladsp is not in "Running" state, so
 # config re-applies when a disconnected audio device reappears.
@@ -32,6 +31,16 @@ let
     scriptName = "src/scripts/services/camilladsp-run";
     runtimeInputs = [
       pkgs.camilladsp
+    ];
+  };
+
+  camilladspHeartbeat = pkgs.writeNucleusShellApplication {
+    name = "camilladsp-heartbeat";
+    scriptName = "src/scripts/services/camilladsp-heartbeat";
+    runtimeInputs = [
+      pkgs.websocat
+      pkgs.jq
+      (pkgs.python3.withPackages (p: [ p.pyyaml ]))
     ];
   };
 
@@ -72,6 +81,27 @@ in
       WorkingDirectory = config.users.users.${username}.home;
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/camilladsp/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/camilladsp/stderr.log";
+    };
+  };
+
+  launchd.agents."camilladsp-heartbeat" = {
+    domain = "gui";
+    # HM's launchd module filters agents by a per-agent `enable` flag (defaults
+    # false via mkEnableOption), so without this the agent is silently dropped
+    # and no plist is generated in ~/Library/LaunchAgents.
+    enable = true;
+    config = {
+      Label = "local.camilladsp-heartbeat";
+      ProgramArguments = [
+        "/bin/sh"
+        "-c"
+        "exec ${camilladspHeartbeat}/bin/nucleus-camilladsp-heartbeat --port ${wsPort}"
+      ];
+      EnvironmentVariables = daemonEnv;
+      KeepAlive = true;
+      RunAtLoad = true;
+      StandardOutPath = "/dev/null";
+      StandardErrorPath = "${config.nucleus.logging.systemLogDir}/camilladsp/heartbeat-stderr.log";
     };
   };
 }
