@@ -180,7 +180,7 @@ let
         "<false/>"
       ]
       # check-suppress:config-method: method 4 (runtime direct read) -- builtins.readFile embeds at eval time
-      (builtins.readFile ../../modules/configs/vms/utm-config.plist.xml);
+      (builtins.readFile ../../modules/vms/utm-config.plist.xml);
 in
 {
   # Write a UTM config.plist template for each VM declared in VMs.json.

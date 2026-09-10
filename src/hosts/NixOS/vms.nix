@@ -177,7 +177,7 @@ let
         (networkInterface vm)
       ]
       # check-suppress:config-method: method 4 (runtime direct read) -- builtins.readFile embeds at eval time
-      (builtins.readFile ../../modules/configs/vms/nixos-domain.xml);
+      (builtins.readFile ../../modules/vms/nixos-domain.xml);
 
   # Pre-generate libvirt domain XML for each declared VM into the nix store so
   # the activation script can install it to the SYSTEM root.  Keyed by VM id.

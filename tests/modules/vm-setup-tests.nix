@@ -1205,8 +1205,8 @@ let
   stopHostPs1TemplateText = builtins.readFile ../../src/vms/templates/stop-host.ps1;
   macbook_vms_nix_text = builtins.readFile ../../src/hosts/MacBook/vms.nix;
   nixos_vms_nix_text = builtins.readFile ../../src/hosts/NixOS/vms.nix;
-  nixos_domain_xml_text = builtins.readFile ../../src/modules/configs/vms/nixos-domain.xml;
-  utmConfigPlistText = builtins.readFile ../../src/modules/configs/vms/utm-config.plist.xml;
+  nixos_domain_xml_text = builtins.readFile ../../src/modules/vms/nixos-domain.xml;
+  utmConfigPlistText = builtins.readFile ../../src/modules/vms/utm-config.plist.xml;
   vms_json_text = builtins.readFile ../../src/modules/VMs.json;
   vm_guest_json_text = builtins.readFile ../../src/users/default/vm-guest.json;
   user_secret_text = builtins.readFile ../fixtures/user-registry/src/secrets/users/test-user.yml;
@@ -2143,7 +2143,7 @@ let
         && (lib.hasInfix "__VM_MAIN_DRIVE_READONLY__" utmConfigPlistText)
         && !(lib.hasInfix "disk-main.qcow2" utmConfigPlistText)
       )
-      "src/modules/configs/vms/utm-config.plist.xml must include core UTM schema keys (Drive/ImageName/QEMU/Input) with guest-agnostic main-drive tokens (never a legacy disk-main.qcow2 literal)";
+      "src/modules/vms/utm-config.plist.xml must include core UTM schema keys (Drive/ImageName/QEMU/Input) with guest-agnostic main-drive tokens (never a legacy disk-main.qcow2 literal)";
   # The Backend value must be exactly "QEMU" (uppercase) — UTM's Swift enum
   # performs a case-sensitive match and throws invalidBackend on any other value.
   # Keep generated templates schema-complete so UTM can decode/import bundles
@@ -2174,10 +2174,10 @@ let
     && (lib.hasInfix "<key>MaximumUsbShare</key>" utmConfigPlistText)
     && (lib.hasInfix "<key>UsbBusSupport</key>" utmConfigPlistText)
     && (lib.hasInfix "<key>UsbSharing</key>" utmConfigPlistText)
-  ) "src/modules/configs/vms/utm-config.plist.xml must include a schema-complete UTM configuration";
+  ) "src/modules/vms/utm-config.plist.xml must include a schema-complete UTM configuration";
   # The Sound block must be tokenized (__VM_SOUND__) so per-VM guest audio
   # hardware is rendered from vms.nix (Android: empty array).
-  test_macbook_utm_sound_token = assert' (lib.hasInfix "__VM_SOUND__" utmConfigPlistText) "src/modules/configs/vms/utm-config.plist.xml must tokenize the Sound block (__VM_SOUND__) so Android can disable guest audio";
+  test_macbook_utm_sound_token = assert' (lib.hasInfix "__VM_SOUND__" utmConfigPlistText) "src/modules/vms/utm-config.plist.xml must tokenize the Sound block (__VM_SOUND__) so Android can disable guest audio";
   test_macbook_utm_vm_sound_mapping =
     assert'
       (
@@ -2204,7 +2204,7 @@ let
         && !(lib.hasInfix "__VM_BASE_PORT_FORWARD__" utmConfigPlistText)
         && !(lib.hasInfix "__VM_ADDITIONAL_PORT_FORWARDS__" utmConfigPlistText)
       )
-      "src/modules/configs/vms/utm-config.plist.xml must use Mode=Emulated (not Shared) so UTM forwards manifest portForwards via hostfwd; vmnet-shared silently drops PortForward";
+      "src/modules/vms/utm-config.plist.xml must use Mode=Emulated (not Shared) so UTM forwards manifest portForwards via hostfwd; vmnet-shared silently drops PortForward";
   # UTM port forwards must map every manifest portForwards entry without
   # guestPort-based branching (each VM binds only its own host ports from
   # VMs.json, so concurrent VMs cannot collide on the same host port).
@@ -2505,7 +2505,7 @@ let
         (lib.hasInfix "__VM_ANDROID_DRIVES__\n    </array>\n    <key>Display</key>" utmConfigPlistText)
         && !(lib.hasInfix "</array>\n    __VM_ANDROID_DRIVES__" utmConfigPlistText)
       )
-      "src/modules/configs/vms/utm-config.plist.xml must emit __VM_ANDROID_DRIVES__ inside the Drive array so Android dict entries are valid array elements";
+      "src/modules/vms/utm-config.plist.xml must emit __VM_ANDROID_DRIVES__ inside the Drive array so Android dict entries are valid array elements";
 
   # NixOS libvirt domain XML must render manifest portForwards via passt user
   # networking (<range start= host-to-guest mapping), not legacy libvirt NAT or
