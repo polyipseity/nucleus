@@ -259,7 +259,7 @@ camilladsp_list_available_devices_cached() {
   local required_device="${3:-}"
 
   if [ -s "$CAMILLADSP_DEVICE_CACHE_FILE" ] && [ -s "$CAMILLADSP_DEVICE_CACHE_META_FILE" ]; then
-    local cached_probe cached_capture cached_at now ttl reusable=true
+    local cached_probe cached_capture cached_at now ttl reusable=true age
     cached_probe=$(sed -n 1p "$CAMILLADSP_DEVICE_CACHE_META_FILE")
     cached_capture=$(sed -n 2p "$CAMILLADSP_DEVICE_CACHE_META_FILE")
     cached_at=$(sed -n 3p "$CAMILLADSP_DEVICE_CACHE_META_FILE")
@@ -269,9 +269,12 @@ camilladsp_list_available_devices_cached() {
     case "$cached_at" in '' | *[!0-9]*) cached_at=0 ;; esac
     case "$ttl" in '' | *[!0-9]*) ttl=300 ;; esac
 
+    age=$((now - cached_at))
     [ "$probe" = "$cached_probe" ] || reusable=false
     [ "$capture_device" = "$cached_capture" ] || reusable=false
-    [ $((now - cached_at)) -lt "$ttl" ] || reusable=false
+    # Requiring a non-negative age makes TTL=0 mean "never reuse" rather than
+    # letting a negative age match and pin a stale list indefinitely.
+    [ "$age" -ge 0 ] && [ "$age" -lt "$ttl" ] || reusable=false
     if [ -n "$required_device" ] && ! grep -qxF -- "$required_device" "$CAMILLADSP_DEVICE_CACHE_FILE"; then
       reusable=false
     fi
@@ -376,9 +379,11 @@ PYEOF
 
   # Detect system default output device. The raw probe value doubles as the
   # device-cache key, so keep it before the capture-device rejection below.
+  # `|| true` rather than `|| _probe=""`: a detector that prints a name but
+  # exits non-zero still yields that name, which has always been the contract.
   local _probe
   # check-suppress:suppression_doc: detection failure is non-fatal — falls through to fallback path
-  _probe=$(camilladsp_detect_default_output 2>/dev/null) || _probe=""
+  _probe=$(camilladsp_detect_default_output 2>/dev/null) || true
 
   local detected_device="$_probe"
 
