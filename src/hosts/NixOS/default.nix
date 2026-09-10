@@ -6,6 +6,8 @@
     ../../modules/core.nix
     ../../modules/posix
     ../../modules/https-proxy.nix
+    ../../modules/redis.nix
+    ../../modules/camillagui-backend.nix
     ./ai.nix
     ./base.nix
     ./camilladsp.nix
