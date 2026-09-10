@@ -43,7 +43,7 @@ let
 
   # Canonical AI agent session detection names.  Shared with
   # pwsh.nix and Sync-ShellProfile.ps1 (Windows).
-  agentEnv = import ./agent-env-vars;
+  agentEnv = import ./agent-env-vars.nix;
 
   # All env vars are sourced from the centralized catalog.
   mergedSessionVariables = envVarsHelpers.allVars;

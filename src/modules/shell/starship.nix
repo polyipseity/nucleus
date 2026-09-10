@@ -25,7 +25,7 @@ let
 
   # Activation helper bundle (seed-writable-symlink.sh) resolved at eval time;
   # the helper itself resolves the LIVE repo root at activation time.
-  activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
+  activationBundle = pkgs.callPackage ../lib/script-tree.nix { };
 in
 {
   # ~/.config/starship.toml as a method-1 (writable) symlink to the selected repo

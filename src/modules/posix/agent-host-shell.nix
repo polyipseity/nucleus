@@ -27,7 +27,7 @@ let
     else
       "/var/lib/nucleus/bin/agent-host-shell";
 
-  activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
+  activationBundle = pkgs.callPackage ../lib/script-tree.nix { };
 in
 {
   options.nucleus.agentHostShell = {

@@ -7,7 +7,7 @@
   ...
 }:
 let
-  activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
+  activationBundle = pkgs.callPackage ../lib/script-tree.nix { };
   managedUserNames = builtins.attrNames users;
   sopsGroup = "nucleus-sops";
   machineAgeOwnerSpec =
