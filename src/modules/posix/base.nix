@@ -21,12 +21,9 @@ let
       "flakes"
       "nix-command"
     ];
-    # nix-community cachix broadens binary cache coverage, especially for
-    # aarch64-darwin where cache.nixos.org often lags.
-    extra-substituters = [ "https://nix-community.cachix.org" ];
-    extra-trusted-public-keys = [
-      "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
-    ];
+    # Substituter settings are managed in nix.custom.conf (method 2 read-only)
+    # because nix.enable = false under Determinate Nix on macOS — nix-darwin's
+    # nix.settings has no effect on substituters in that configuration.
     # Preserve derivation/output metadata for active shells and rollback
     # workflows so GC does not prune still-useful build context.
     keep-derivations = true;
