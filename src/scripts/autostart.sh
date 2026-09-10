@@ -409,7 +409,7 @@ do_list() {
       local state
       state=$(app_actual_state "$key" "$entry_json")
       local declared
-      declared=$(echo "$entry_json" | jq -r '.hostEntry.autostartEutostartEutostartEutostartEnabled')
+      declared=$(echo "$entry_json" | jq -r '.hostEntry.autostartEnabled')
       local pair
       pair=$(jq -cn --arg k "$key" --argjson v "$(jq -cn --arg s "$state" --argjson d "$declared" '{state:$s, declaredEnabled:$d}')" '{key:$k, value:$v}')
       out="${out:+$out
