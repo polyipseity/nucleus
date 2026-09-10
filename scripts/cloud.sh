@@ -141,7 +141,9 @@ collect_configured_mount_service_ids() {
     --arg username "$_ccmsi_username" \
     '
       ((.[$username].cloudDrives.mounts // [])[]?)
-      | select((.enable // true) == true and .id != null and .remoteName != null)
+      # `//` cannot be used: it also skips `false`, which would collect a
+      # disabled mount as enabled.
+      | select((.enable == null or .enable == true) and .id != null and .remoteName != null)
       | [.id, .remoteName]
       | @tsv
     ' \
