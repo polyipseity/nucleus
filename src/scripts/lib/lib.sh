@@ -268,6 +268,12 @@ derive_repo_root() {
     IFS= read -r _drr_system_root <"$_drr_system_file" ||
       _drr_system_root="" # check-suppress:suppression_doc: unreadable system file treated as absent.
     case "$_drr_system_root" in
+    /nix/store/*)
+      # WHY: Nix evaluation can only ever yield a store snapshot; accepting it
+      # silently would deploy symlinks into a read-only tree.
+      warn "system repo-root file points to Nix store path ($_drr_system_root); ignoring — run nucleus-apply to re-materialize the live path"
+      _drr_system_root=""
+      ;;
     /*) ;;
     *) _drr_system_root="" ;; # reject empty/relative system file paths
     esac
@@ -286,21 +292,6 @@ derive_repo_root() {
       if [ -f "$_drr_candidate/src/flake.nix" ]; then
         printf '%s\n' "$_drr_candidate"
         return 0
-      fi
-      if [ -f "$_drr_candidate/.nucleus-repo-root" ]; then
-        # WHY: store-installed apps bundle scripts/ + src/scripts/ but not
-        # src/flake.nix; the marker (baked from NUCLEUS_REPO_ROOT at build time)
-        # points at the canonical checkout.
-        IFS= read -r _drr_marker_root <"$_drr_candidate/.nucleus-repo-root" ||
-          _drr_marker_root="" # check-suppress:suppression_doc: unreadable marker treated as absent.
-        case "$_drr_marker_root" in
-        /*) ;;
-        *) _drr_marker_root="" ;; # reject empty/relative marker paths
-        esac
-        if [ -n "$_drr_marker_root" ] && [ -f "$_drr_marker_root/src/flake.nix" ]; then
-          printf '%s\n' "$_drr_marker_root"
-          return 0
-        fi
       fi
     done
   fi

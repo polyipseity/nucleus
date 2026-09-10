@@ -71,7 +71,7 @@ A privilege is "required" only when the operation cannot succeed without it.
 
 ## CWD independence — all `nucleus-*` commands must work from any working directory
 
-Root resolution via `derive_repo_root()` in `src/scripts/lib/lib.sh` (priority: `NUCLEUS_REPO_ROOT` → `<SYSTEM root>/repo-root` (macOS `/Library/Application Support/nucleus/repo-root`, NixOS `/var/lib/nucleus/repo-root`) → `SCRIPT_DIR` walk → `.nucleus-repo-root` marker → `git rev-parse`). `writeNucleusShellApplication` bakes `.nucleus-repo-root` into each app at build time. `src/modules/repo-root-file.nix` materializes `/etc/nucleus/repo-root` during apply. `posix-security.nix` preserves `NUCLEUS_REPO_ROOT` through `sudo`.
+Root resolution via `derive_repo_root()` in `src/scripts/lib/lib.sh` (priority: `NUCLEUS_REPO_ROOT` → `<SYSTEM root>/repo-root` (macOS `/Library/Application Support/nucleus/repo-root`, NixOS `/var/lib/nucleus/repo-root`) → `SCRIPT_DIR` walk → `git rev-parse`). Values that point into `/nix/store/` are rejected at every source, so a store snapshot can never be used as the repo root. `scripts/apply.sh` writes the live checkout path to `<SYSTEM root>/repo-root` before and after each rebuild; `src/modules/posix/security.nix` preserves `NUCLEUS_REPO_ROOT` through `sudo`.
 
 Scripts must not assume cwd is inside the repository. Script-specific `--repo-root` flags are acceptable overrides but not the sole mechanism.
 
