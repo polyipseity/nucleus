@@ -43,7 +43,7 @@ in
   # bare `if/then/else`: a bare conditional evaluates its `pkgs` reference while
   # the `config` attribute is being constructed, which forces `pkgs` resolution
   # through `_module.args` (needing `config`) and recurses. `mkIf` defers the
-  # reference until after `config` is available, matching repo-root-file.nix.
+  # reference until after `config` is available.
   config = lib.mkMerge [
     (mkIf pkgs.stdenv.hostPlatform.isDarwin {
       # Fragment from src/modules/agent-host-shell.nix
