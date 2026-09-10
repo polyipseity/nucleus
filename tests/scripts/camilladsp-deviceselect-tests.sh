@@ -20,6 +20,16 @@ if ! python3 -c "import yaml" 2>/dev/null; then
   exit 0
 fi
 
+# Isolate CamillaDSP state. The library derives its state directory from
+# XDG_STATE_HOME, and the stale-device self-heal deletes the saved-device file:
+# without this the tests would modify the developer's real ~/.local/state/camilladsp.
+export XDG_STATE_HOME="$(mktemp -d)"
+trap 'rm -rf "$XDG_STATE_HOME"' EXIT
+# Disable the enumeration cache by default. Tests assert on mocked enumeration
+# results, and a list cached by an earlier test would mask the mock. The cache
+# tests opt back in with their own TTL and their own state directory.
+export CAMILLADSP_DEVICE_CACHE_TTL=0
+
 # --- Helpers ---
 
 # Create a minimal CamillaDSP config YAML with given playback and capture devices.
@@ -570,23 +580,28 @@ test_last_saved_missing_falls_through() {
 test_needs_push_decision() {
   # Format: state|live|target|expected  (expected = skip or push)
   local cases=(
-    "Running|MacBook Air喇叭|MacBook Air喇叭|skip" # Running + live==target → skip
-    "Running|MacBook Air喇叭||skip"              # Running + null target → skip (never push null)
-    "Running||MacBook Air喇叭|push"              # Running + null live + non-null target → push
-    "Running|Old Device|MacBook Air喇叭|push"    # Running + live != target → push (default changed)
-    "Stopped|MacBook Air喇叭|MacBook Air喇叭|push" # not Running → push
-    "|MacBook Air喇叭|MacBook Air喇叭|push"        # empty state → push
-    "Inactive|||push"                          # not Running + empty target → push (initial config set even when detection yields nothing)
-    "Running|U18||skip"                        # Running + null target → skip (never push null onto a running instance)
+    "Running|MacBook Air喇叭|MacBook Air喇叭|skip"       # Running + live==target → skip
+    "Running|MacBook Air喇叭||skip"                    # Running + null target → skip (never push null)
+    "Running||MacBook Air喇叭|false|push"              # Running + null live + non-null target → push
+    "Running|Old Device|MacBook Air喇叭|false|push"    # Running + live != target → push (default changed)
+    "Running|MacBook Air喇叭|MacBook Air喇叭|false|skip" # Running + live == target + config unchanged → skip
+    "Running|MacBook Air喇叭|MacBook Air喇叭|true|push"  # Running + live == target but config file edited → push
+    "Stopped|MacBook Air喇叭|MacBook Air喇叭|false|push" # not Running → push
+    "|MacBook Air喇叭|MacBook Air喇叭|false|push"        # empty state → push
+    "Inactive|||false|push"                          # not Running + empty target → push (initial config set even when detection yields nothing)
+    "Running|U18||false|skip"                        # Running + null target → skip (never push null onto a running instance)
+    "Running|U18||true|skip"                         # null target skips even when the config changed (would set device to null)
   )
   local all_ok=1
   for c in "${cases[@]}"; do
-    local state live target expected
+    local state live target changed expected
     state="${c%%|*}"
     c="${c#*|}"
     live="${c%%|*}"
     c="${c#*|}"
     target="${c%%|*}"
+    c="${c#*|}"
+    changed="${c%%|*}"
     expected="${c#*|}"
     # camilladsp_needs_push returns 1 (skip) or 0 (push). Capture the rc
     # inside a subshell so the non-zero skip return doesn't trip set -e.
@@ -597,9 +612,10 @@ test_needs_push_decision() {
       _state="$2"
       _live="$3"
       _target="$4"
+      _changed="$5"
       . "$_lib_script"
-      camilladsp_needs_push "$_state" "$_live" "$_target"
-    ' _ "$DEVICESELECT_SH" "$state" "$live" "$target"
+      camilladsp_needs_push "$_state" "$_live" "$_target" "$_changed"
+    ' _ "$DEVICESELECT_SH" "$state" "$live" "$target" "$changed"
       echo $?
     )
     local got
@@ -684,10 +700,108 @@ test_target_playback_device() {
   fi
 }
 
+# Test 18: a saved device that enumeration proves gone is purged from state, so
+# every later tick does not repeat the same doomed lookup.
+test_last_device_purged_when_gone() {
+  local cfg
+  cfg="$(_make_config "" "Loopback Audio")"
+  local result
+  result=$(bash -c '
+    _lib_script="$1"
+    _cfg="$2"
+    . "$_lib_script"
+    camilladsp_save_last_device "Stale Device"
+    camilladsp_detect_default_output() { return 1; }
+    camilladsp_list_available_devices() { printf "%s\n" "Fresh Speaker"; }
+    camilladsp_resolve_playback_device "$_cfg" >/dev/null
+    if [ -s "$CAMILLADSP_LAST_DEVICE_FILE" ]; then printf "still-present"; else printf "purged"; fi
+  ' _ "$DEVICESELECT_SH" "$cfg")
+  rm -f "$cfg"
+  if [ "$result" = "purged" ]; then
+    assert_pass "saved device purged once enumeration proves it gone"
+  else
+    assert_fail "stale saved device self-heal" "expected 'purged', got '$result'"
+  fi
+}
+
+# Test 19: the enumeration cache is reused while nothing changed, and dropped the
+# moment the probe moves or the caller needs a device the cache contradicts.
+# Counts real enumerations (one byte written per call by the mock).
+test_device_cache_reuse_and_invalidation() {
+  local cfg counter
+  cfg="$(_make_config "" "Loopback Audio")"
+  counter=$(mktemp)
+  local result
+  result=$(bash -c '
+    _lib_script="$1"
+    _cfg="$2"
+    _counter="$3"
+    export XDG_STATE_HOME="$(mktemp -d)"
+    export CAMILLADSP_DEVICE_CACHE_TTL=300
+    . "$_lib_script"
+    camilladsp_list_available_devices() {
+      printf "x" >>"$_counter"
+      printf "%s\n" "$1" "Other Sink"
+    }
+    # 1st call: no cache yet → enumerate.
+    camilladsp_list_available_devices_cached "Loopback Audio" "Speaker A" >/dev/null
+    # 2nd call, nothing changed → served from cache, no new enumeration.
+    camilladsp_list_available_devices_cached "Loopback Audio" "Speaker A" >/dev/null
+    after_reuse=$(wc -c <"$_counter" | tr -d " ")
+    # Probe moved → must re-enumerate.
+    camilladsp_list_available_devices_cached "Loopback Audio" "Speaker B" >/dev/null
+    after_probe=$(wc -c <"$_counter" | tr -d " ")
+    # Caller needs a device the cache does not list → must re-enumerate.
+    camilladsp_list_available_devices_cached "Loopback Audio" "Speaker B" "Ghost Device" >/dev/null
+    after_required=$(wc -c <"$_counter" | tr -d " ")
+    printf "%s,%s,%s" "$after_reuse" "$after_probe" "$after_required"
+    rm -rf "$XDG_STATE_HOME"
+  ' _ "$DEVICESELECT_SH" "$cfg" "$counter")
+  rm -f "$cfg" "$counter"
+  if [ "$result" = "1,2,3" ]; then
+    assert_pass "cache reuses the list, then invalidates on probe change and on a missing required device"
+  else
+    assert_fail "enumeration cache" "expected enumeration counts 1,2,3; got '$result'"
+  fi
+}
+
+# Test 20: config-change detection compares against what we last pushed, so a
+# config we never pushed (a camillagui edit) does not look like a change.
+test_config_change_detection() {
+  local cfg
+  cfg="$(_make_config "" "Loopback Audio")"
+  local result
+  result=$(bash -c '
+    _lib_script="$1"
+    _cfg="$2"
+    export XDG_STATE_HOME="$(mktemp -d)"
+    . "$_lib_script"
+    # Nothing pushed yet → changed (the first tick after boot must push).
+    camilladsp_config_changed "$_cfg" "Speaker A" && printf "first=changed " || printf "first=unchanged "
+    camilladsp_record_push "$(camilladsp_config_fingerprint "$_cfg" "Speaker A")"
+    camilladsp_config_changed "$_cfg" "Speaker A" && printf "same=changed " || printf "same=unchanged "
+    # Device differs → changed: the file stores a null device, so the resolved
+    # device must be part of the fingerprint.
+    camilladsp_config_changed "$_cfg" "Speaker B" && printf "device=changed " || printf "device=unchanged "
+    printf "# edited\n" >>"$_cfg"
+    camilladsp_config_changed "$_cfg" "Speaker A" && printf "edit=changed" || printf "edit=unchanged"
+    rm -rf "$XDG_STATE_HOME"
+  ' _ "$DEVICESELECT_SH" "$cfg")
+  rm -f "$cfg"
+  if [ "$result" = "first=changed same=unchanged device=changed edit=changed" ]; then
+    assert_pass "config-change detection: first push, no-op, device change, file edit"
+  else
+    assert_fail "config-change detection" "unexpected result: '$result'"
+  fi
+}
+
 # --- Run all tests ---
 
 test_needs_push_decision
 test_target_playback_device
+test_last_device_purged_when_gone
+test_device_cache_reuse_and_invalidation
+test_config_change_detection
 
 test_macos_json_default_output
 test_macos_json_first_available
