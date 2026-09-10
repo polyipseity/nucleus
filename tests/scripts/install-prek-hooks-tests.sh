@@ -163,20 +163,11 @@ test_fresh_repo_no_git() {
   fi
 }
 
-main() {
-  test_no_prek_toml
-  test_installs_with_cwd_repo_root
-  test_failure_exits_1
-  test_submodule_git_file
-  test_already_installed_silent
-  test_passes_quiet_flag
-  test_fresh_repo_no_git
-
-  echo "install-prek-hooks-tests.sh: $TESTS_PASSED passed, $TESTS_FAILED failed"
-  if [ "$TESTS_FAILED" -gt 0 ]; then
-    exit 1
-  fi
-  exit 0
-}
-
-main "$@"
+test_no_prek_toml
+test_installs_with_cwd_repo_root
+test_failure_exits_1
+test_submodule_git_file
+test_already_installed_silent
+test_passes_quiet_flag
+test_fresh_repo_no_git
+finish_tests

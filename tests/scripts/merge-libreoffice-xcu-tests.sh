@@ -140,11 +140,4 @@ test_create_new_item
 test_empty_string_value
 
 # ── Summary ──────────────────────────────────────────────────────────
-section "Summary" ""
-if [ "$TESTS_FAILED" -gt 0 ]; then
-  printf '%d failed, %d passed\n' "$TESTS_FAILED" "$TESTS_PASSED"
-  exit 1
-fi
-
-printf 'all %d tests passed.\n' "$TESTS_PASSED"
-exit 0
+finish_tests

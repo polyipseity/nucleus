@@ -128,16 +128,7 @@ JSON
   assert_pass "merge: user-added entry preserved and index-0 repo entry refreshed"
 }
 
-main() {
-  test_corrupt_replaced
-  test_absent_copied
-  test_merge_preserves_user_entries
-
-  echo ""
-  echo "Passed: $TESTS_PASSED  Failed: $TESTS_FAILED"
-  if [ "$TESTS_FAILED" -gt 0 ]; then
-    exit 1
-  fi
-}
-
-main "$@"
+test_corrupt_replaced
+test_absent_copied
+test_merge_preserves_user_entries
+finish_tests

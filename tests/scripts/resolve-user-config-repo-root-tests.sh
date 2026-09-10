@@ -85,9 +85,4 @@ test_store_path_env_falls_back_to_system_file
 test_live_env_var_is_still_used
 test_unset_env_var_uses_system_file_and_never_store_path
 
-# Summary
-if [ "$TESTS_FAILED" -gt 0 ]; then
-  printf '\n%s%d failed%s\n' "${RED:-}" "$TESTS_FAILED" "${NC:-}"
-  exit 1
-fi
-printf '\n%s%d passed%s\n' "${GREEN:-}" "$TESTS_PASSED" "${NC:-}"
+finish_tests

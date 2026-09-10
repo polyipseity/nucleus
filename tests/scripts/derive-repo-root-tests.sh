@@ -121,9 +121,4 @@ test_normal_env_var_accepted
 test_system_file_store_path_rejected
 test_registry_helper_rejects_store_path
 
-# Summary
-if [ "$TESTS_FAILED" -gt 0 ]; then
-  printf '\n%s%d failed%s\n' "${RED:-}" "$TESTS_FAILED" "${NC:-}"
-  exit 1
-fi
-printf '\n%s%d passed%s\n' "${GREEN:-}" "$TESTS_PASSED" "${NC:-}"
+finish_tests

@@ -10,15 +10,6 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
 
-TESTS_SKIPPED=0
-
-assert_skip() {
-  local test_name="$1"
-  local reason="$2"
-  printf '%s⊘%s %s: %s\n' "$YELLOW" "$NC" "$test_name" "$reason"
-  ((++TESTS_SKIPPED))
-}
-
 cd "$REPO_ROOT"
 
 _gen_script="src/scripts/completions/gen-completions.sh"
@@ -171,13 +162,4 @@ else
   assert_fail "gen-completions: _nucleus dispatcher" "missing #compdef nucleus- or command names"
 fi
 
-# Summary
-echo ""
-if [ "$TESTS_FAILED" -gt 0 ]; then
-  echo "gen-completions tests: $TESTS_FAILED failed, $TESTS_PASSED passed"
-  exit 1
-elif [ "$TESTS_SKIPPED" -gt 0 ]; then
-  echo "gen-completions tests: all $TESTS_PASSED passed, $TESTS_SKIPPED skipped"
-else
-  echo "gen-completions tests: all $TESTS_PASSED passed"
-fi
+finish_tests

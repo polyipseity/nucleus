@@ -137,10 +137,4 @@ for pkg in "${LAYOUT_PACKAGES[@]}"; do
 done
 
 # --- Summary -----------------------------------------------------------------
-echo ""
-if [ "$TESTS_FAILED" -gt 0 ]; then
-  printf '%s%d passed, %d failed%s\n' "$RED" "$TESTS_PASSED" "$TESTS_FAILED" "$NC"
-  exit 1
-else
-  printf '%s%d passed%s\n' "$GREEN" "$TESTS_PASSED" "$NC"
-fi
+finish_tests

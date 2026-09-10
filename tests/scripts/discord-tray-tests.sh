@@ -87,16 +87,7 @@ test_default_app_key_is_stable() {
     "$home/.config/discord/settings.json" "false"
 }
 
-main() {
-  test_stable_hides_tray
-  test_canary_routes_to_canary_config
-  test_default_app_key_is_stable
-
-  echo ""
-  echo "Passed: $TESTS_PASSED  Failed: $TESTS_FAILED"
-  if [ "$TESTS_FAILED" -gt 0 ]; then
-    exit 1
-  fi
-}
-
-main "$@"
+test_stable_hides_tray
+test_canary_routes_to_canary_config
+test_default_app_key_is_stable
+finish_tests

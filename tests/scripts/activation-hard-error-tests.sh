@@ -122,16 +122,7 @@ APPSJSON
   rm -rf "$tmp" "$ro"
 }
 
-main() {
-  test_menu_bar_activation_script_die
-  test_menu_bar_unknown_app_nonzero
-  test_autostart_xdg_desktop_die
-
-  echo ""
-  echo "Passed: $TESTS_PASSED  Failed: $TESTS_FAILED"
-  if [ "$TESTS_FAILED" -gt 0 ]; then
-    exit 1
-  fi
-}
-
-main "$@"
+test_menu_bar_activation_script_die
+test_menu_bar_unknown_app_nonzero
+test_autostart_xdg_desktop_die
+finish_tests

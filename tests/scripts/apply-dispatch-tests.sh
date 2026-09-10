@@ -96,3 +96,4 @@ test_scripts_apply_delegates_to_src
 test_nucleus_wrappers_prefer_live_checkout
 test_apply_pins_flake_inputs
 test_apply_prebuild_fails_hard
+finish_tests

@@ -18,15 +18,6 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 
 cd "$REPO_ROOT"
 
-TESTS_SKIPPED=0
-
-assert_skip() {
-  local test_name="$1"
-  local reason="$2"
-  printf '%s⊘%s %s: %s\n' "$YELLOW" "$NC" "$test_name" "$reason"
-  ((++TESTS_SKIPPED))
-}
-
 # --- Phase 1: Batch build all nucleus packages -------------------------------
 # Build every package in a single Nix evaluation. Outputs store paths in the
 # same order as the package list.
@@ -272,15 +263,4 @@ else
 fi
 unset _pwsh_comp_file
 
-# --- Summary ---------------------------------------------------------------
-echo ""
-if [ "$TESTS_FAILED" -eq 0 ]; then
-  if [ "$TESTS_SKIPPED" -eq 0 ]; then
-    printf '%sAll %s nucleus apps smoke tests passed.%s\n' "$GREEN" "$TESTS_PASSED" "$NC"
-  else
-    printf '%s%s passed, %s skipped.%s\n' "$GREEN" "$TESTS_PASSED" "$TESTS_SKIPPED" "$NC"
-  fi
-else
-  printf '%s%s/%s nucleus apps smoke tests FAILED.%s\n' "$RED" "$TESTS_FAILED" "$((TESTS_FAILED + TESTS_PASSED))" "$NC" >&2
-  exit 1
-fi
+finish_tests

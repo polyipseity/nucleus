@@ -35,11 +35,4 @@ else
   assert_pass "check-pwsh: unknown -SkipStep name correctly rejected"
 fi
 
-# Summary
-echo ""
-if [ "$TESTS_FAILED" -gt 0 ]; then
-  echo "check-pwsh smoke tests: $TESTS_FAILED failed, $TESTS_PASSED passed"
-  exit 1
-else
-  echo "check-pwsh smoke tests: all $TESTS_PASSED passed"
-fi
+finish_tests

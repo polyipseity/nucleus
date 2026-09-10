@@ -299,8 +299,4 @@ test_expand_log_path_plain
 test_rotate_log_file_hard_errors_on_unwritable
 test_log_sanitize_strips
 
-echo ""
-echo "--- logging tests: $TESTS_PASSED passed, $TESTS_FAILED failed ---"
-echo ""
-
-exit "$TESTS_FAILED"
+finish_tests

@@ -138,8 +138,4 @@ test_create_sites_agree
 test_hidpi_and_aspect_retained
 test_resolutions_skips_virtual_display
 
-echo ""
-echo "--- macos-headless-display tests: $TESTS_PASSED passed, $TESTS_FAILED failed ---"
-echo ""
-
-exit "$TESTS_FAILED"
+finish_tests

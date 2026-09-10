@@ -35,3 +35,4 @@ test_flake_inputs_output_covers_all_inputs() {
 }
 
 test_flake_inputs_output_covers_all_inputs
+finish_tests

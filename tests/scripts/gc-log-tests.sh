@@ -172,8 +172,4 @@ test_nix_env_direct_when_sudo_false
 test_gc_logs_escalates_when_system_dir_not_writable
 test_gc_logs_inline_when_system_dir_writable
 
-echo ""
-echo "--- gc log tests: $TESTS_PASSED passed, $TESTS_FAILED failed ---"
-echo ""
-
-exit "$TESTS_FAILED"
+finish_tests

@@ -63,8 +63,4 @@ test_parse_args_skip_system_build_removed
 test_parse_args_no_unrecognized_flags
 test_test_lib_usage_no_skip_system_build
 
-echo ""
-echo "--- Phase 2 test-lib unit tests: $TESTS_PASSED passed, $TESTS_FAILED failed ---"
-echo ""
-
-exit "$TESTS_FAILED"
+finish_tests

@@ -69,14 +69,5 @@ test_ide_settings_symlink_and_overlay_skip() {
   assert_pass "cursor overlay still converges"
 }
 
-main() {
-  test_ide_settings_symlink_and_overlay_skip
-
-  echo ""
-  echo "Passed: $TESTS_PASSED  Failed: $TESTS_FAILED"
-  if [ "$TESTS_FAILED" -gt 0 ]; then
-    exit 1
-  fi
-}
-
-main "$@"
+test_ide_settings_symlink_and_overlay_skip
+finish_tests

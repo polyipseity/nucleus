@@ -466,8 +466,4 @@ test_nix_lock_runs_command_and_returns_exit
 test_nix_lock_recovers_stale
 test_nix_lock_serializes
 
-echo ""
-echo "--- Phase 1 POSIX unit tests: $TESTS_PASSED passed, $TESTS_FAILED failed ---"
-echo ""
-
-exit "$TESTS_FAILED"
+finish_tests

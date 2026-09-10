@@ -213,10 +213,4 @@ test_uv_install_passes_version_pins
 test_rustup_install_passes_channel_date
 test_cargo_binstall_passes_version_pins
 
-if [ "$TESTS_FAILED" -eq 0 ]; then
-  echo "All install-packages tests passed."
-  exit 0
-else
-  echo "$TESTS_FAILED install-packages test(s) failed."
-  exit 1
-fi
+finish_tests

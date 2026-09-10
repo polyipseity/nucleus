@@ -373,10 +373,4 @@ test_current_instance_top_level
 test_tilde_expansion
 test_workshop_directory_created
 
-if [ "$TESTS_FAILED" -gt 0 ]; then
-  printf '%d failed, %d passed\n' "$TESTS_FAILED" "$TESTS_PASSED"
-  exit 1
-fi
-
-printf 'all %d tests passed.\n' "$TESTS_PASSED"
-exit 0
+finish_tests

@@ -90,3 +90,4 @@ echo ""
 test_env_var_wins
 test_system_file_fallback
 test_hard_failure
+finish_tests

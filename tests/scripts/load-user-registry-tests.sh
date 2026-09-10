@@ -93,25 +93,17 @@ test_exposes_windows_dsc_config_files() {
   fi
 }
 
-main() {
-  command -v jq >/dev/null 2>&1 || {
-    echo "jq is required for load-user-registry-tests.sh" >&2
-    exit 1
-  }
-
-  test_discovers_fixture_user
-  test_excludes_default_dir
-  test_merges_is_primary_and_primary_user
-  test_merges_vm_guest_secret_keys
-  test_resolves_google_drive_replica_enable_per_host
-  test_resolves_icloud_replica_readwrite_per_host
-  test_exposes_windows_dsc_config_files
-
-  echo ""
-  echo "Passed: $TESTS_PASSED  Failed: $TESTS_FAILED"
-  if [ "$TESTS_FAILED" -gt 0 ]; then
-    exit 1
-  fi
+command -v jq >/dev/null 2>&1 || {
+  echo "jq is required for load-user-registry-tests.sh" >&2
+  exit 1
 }
 
-main "$@"
+test_discovers_fixture_user
+test_excludes_default_dir
+test_merges_is_primary_and_primary_user
+test_merges_vm_guest_secret_keys
+test_resolves_google_drive_replica_enable_per_host
+test_resolves_icloud_replica_readwrite_per_host
+test_exposes_windows_dsc_config_files
+
+finish_tests

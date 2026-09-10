@@ -58,8 +58,4 @@ echo ""
 test_sources_without_error
 test_nucleus_user_root_resolves
 
-echo ""
-echo "--- lib.sh sourcing tests: $TESTS_PASSED passed, $TESTS_FAILED failed ---"
-echo ""
-
-exit "$TESTS_FAILED"
+finish_tests

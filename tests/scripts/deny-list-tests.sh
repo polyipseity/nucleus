@@ -117,6 +117,4 @@ test_filter_glob_ignored
 test_filter_subdir_ignored
 test_filter_no_ignore_under_errexit
 
-echo ""
-echo "$TESTS_PASSED passed, $TESTS_FAILED failed"
-[ "$TESTS_FAILED" -eq 0 ] || exit 1
+finish_tests

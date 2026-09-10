@@ -826,8 +826,4 @@ test_null_when_no_devices
 test_preserves_other_fields
 test_all_devices_are_capture
 
-echo ""
-echo "--- camilladsp-deviceselect tests: $TESTS_PASSED passed, $TESTS_FAILED failed ---"
-echo ""
-
-exit "$TESTS_FAILED"
+finish_tests
