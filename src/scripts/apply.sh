@@ -146,7 +146,9 @@ do_health_check() {
     while IFS= read -r svc; do
       capture=$(jq -r --arg svc "$svc" '.[$svc].logging.capture // "all"' "$services_json")
       max_size=$(jq -r --arg svc "$svc" --arg def "$_max_size_default" '(.[$svc].logging.maxSize // ($def | tonumber))' "$services_json") # bytes
-      sanitize=$(jq -r --arg svc "$svc" '.[$svc].logging.sanitize // true' "$services_json")
+      # `//` cannot be used here: it also skips `false`, which would make the
+      # control-character check warn for a service with sanitization disabled.
+      sanitize=$(jq -r --arg svc "$svc" 'if .[$svc].logging.sanitize == null then true else .[$svc].logging.sanitize end' "$services_json")
 
       if [ "$capture" = "none" ]; then
         continue
