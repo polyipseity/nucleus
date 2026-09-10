@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
-# Persistent-loop heartbeat for CamillaDSP: pushes the current config unless
-# camilladsp is Running AND the live playback device is already set (idiot-proof
-# skip: a null live device is always corrected).  Runs indefinitely with
+# Persistent-loop heartbeat for CamillaDSP: the ONLY component that pushes the
+# config. It pushes when camilladsp is not Running, when the live playback device
+# has drifted from the device detection would select, or when the config file has
+# changed since the last push (camilladsp_config_changed). Runs indefinitely with
 # exponential backoff.  Designed as a persistent daemon (KeepAlive /
 # Restart=always / scheduled task AtLogOn) — not a timer-driven oneshot.
+#
+# Automatic binding is opt-in via the camilladsp.enable toggle (default false):
+# binding holds an open capture device, and the OS privacy-indicator path for
+# that is broken on this hardware, so the loop stays idle unless asked.
 #
 # Dependencies: websocat, jq, python3 (yaml) — PATH managed via writeShellApplication runtimeInputs
 #
@@ -50,15 +55,28 @@ _current_sleep=$_base_sleep
 
 # --- Main loop (persistent daemon pattern) ---
 while true; do
-  # --- Runtime toggle from config.json ---
-  # Respects the camilladsp.heartbeat flag for dynamic disable.
+  # --- Runtime toggles from config.json ---
+  # camilladsp.heartbeat — master switch for this loop (default true).
+  # camilladsp.enable    — gates automatic device binding (default false).
+  #   With binding off the loop still runs, so the service stays loaded and the
+  #   websocket API stays up for camillagui, but nothing opens an audio input.
+  #   WHY: an open capture device lights the macOS microphone privacy indicator,
+  #   and the indicator path is broken on this board (J813), which burns ~40% of
+  #   a core in WindowServer.  Automatic binding is therefore opt-in; a manual
+  #   push from camillagui still applies normally.
   config_json="$(case "$(uname -s)" in Darwin) echo "$HOME/Library/Application Support/nucleus/config.json" ;; *) echo "$HOME/.local/share/nucleus/config.json" ;; esac)"
+  _hb_enabled=true
+  _bind_enabled=false
   if [ -f "$config_json" ]; then
     _hb_enabled=$(jq -r '.camilladsp.heartbeat // true' "$config_json")
-    if [ "$_hb_enabled" = "false" ]; then
-      sleep "$_base_sleep"
-      continue
-    fi
+    _bind_enabled=$(jq -r '.camilladsp.enable // false' "$config_json")
+  fi
+  # With binding disabled there is nothing to probe for — the probe exists only
+  # to feed the push decision — so the whole tick is skipped rather than doing
+  # cheap work that can never have an effect.
+  if [ "$_hb_enabled" = "false" ] || [ "$_bind_enabled" != "true" ]; then
+    sleep "$_base_sleep"
+    continue
   fi
 
   _success=false
@@ -68,9 +86,10 @@ while true; do
   # unreachable, leave both empty (treated as "push"). The skip decision
   # compares the live device against the target device that detection would
   # currently select: skip ONLY when Running AND the live device is already set
-  # AND it equals the target. When the system default output device changes, the
-  # target differs from the live device, so the config is re-pushed. A null
-  # target is never pushed (it would set the device to null).
+  # AND it equals the target AND the config file is unchanged. When the system
+  # default output device changes, or the config file is edited, the decision
+  # pushes instead of skipping forever. A null target is never pushed (it would
+  # set the device to null).
   _state=""
   _live=""
   if _state_resp=$(printf '{"GetState":null}' | websocat -1 "ws://127.0.0.1:$ws_port" 2>/dev/null); then
@@ -96,7 +115,14 @@ except Exception:
     _target=$(camilladsp_target_playback_device "$config_file" 2>/dev/null) || true
   fi
 
-  if camilladsp_needs_push "$_state" "$_live" "$_target"; then
+  # Did the config on disk change since the last push? Compared against what we
+  # last pushed, so edits made through camillagui are never reverted here.
+  _changed=false
+  if [ -f "$config_file" ] && camilladsp_config_changed "$config_file" "$_target"; then
+    _changed=true
+  fi
+
+  if camilladsp_needs_push "$_state" "$_live" "$_target" "$_changed"; then
     # --- Push config ---
     # Pass resolved device to avoid redundant detection on push.
     if camilladsp_push_config --port "$ws_port" --config "$config_file" --device "$_target"; then
