@@ -12,7 +12,7 @@ let
 
   test_hermes_agent_flake_input_declared = assert' (
     lib.hasInfix "hermes-agent = {" flakeText
-    && lib.hasInfix ''url = "github:NousResearch/hermes-agent"'' flakeText
+    && lib.hasInfix ''url = "github:NousResearch/hermes-agent'' flakeText
   ) "flake.nix must declare hermes-agent input with NousResearch/hermes-agent URL";
 
   test_hermes_agent_nixpkgs_follows = assert' (
@@ -30,18 +30,12 @@ let
 
   # === WRAPPER MODULE ===
 
-  test_wrapper_module_imports_upstream = assert' (
-    lib.hasInfix "import" wrapperText && lib.hasInfix "homeManagerModules.nix" wrapperText
-  ) "wrapper module must import upstream homeManagerModules.nix";
-
-  test_wrapper_module_shims_inputs = assert' (
-    lib.hasInfix "upstreamInputs" wrapperText && lib.hasInfix "inputs.self.packages" wrapperText
-  ) "wrapper module must create inputs shim with inputs.self.packages";
+  test_wrapper_module_imports_upstream = assert' (lib.hasInfix "hermes-agent.homeManagerModules.default" wrapperText) "wrapper module must import upstream homeManagerModules.default";
 
   test_wrapper_module_enables_programs = assert' (lib.hasInfix "programs.hermes-agent.enable" wrapperText) "wrapper module must enable programs.hermes-agent";
 
   test_wrapper_module_enables_services = assert' (
-    lib.hasInfix "services.hermes-agent.enable" wrapperText && lib.hasInfix "gateway.enable" wrapperText
+    lib.hasInfix "services.hermes-agent = {" wrapperText && lib.hasInfix "gateway.enable" wrapperText
   ) "wrapper module must enable services.hermes-agent with gateway option";
 
   test_wrapper_module_gateway_per_host = assert' (lib.hasInfix ''hostName == "MacBook"'' wrapperText) "wrapper module must branch gateway.enable by hostName";
@@ -67,7 +61,6 @@ let
     test_hermes_agent_in_extraspecialargs_macbook
     test_hermes_agent_in_flake_inputs
     test_wrapper_module_imports_upstream
-    test_wrapper_module_shims_inputs
     test_wrapper_module_enables_programs
     test_wrapper_module_enables_services
     test_wrapper_module_gateway_per_host
