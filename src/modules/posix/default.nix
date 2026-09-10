@@ -2,6 +2,7 @@
 { ... }:
 {
   imports = [
+    ./base.nix
     ./gnupg.nix
     ./logging.nix
     ./user-shell.nix
