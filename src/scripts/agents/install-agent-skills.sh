@@ -20,7 +20,9 @@ _ask_extra_skills_source="${3:-}"
 if [ -n "$_ask_repo_root" ] && case "$_ask_repo_root" in /nix/store/*) false ;; *) true ;; esac then
   export NUCLEUS_REPO_ROOT="$_ask_repo_root"
 fi
-_ask_skills_source="$(resolve_user_config_first_level_entry "$_ask_username" "agents" "skills")"
+if ! _ask_skills_source="$(resolve_user_config_first_level_entry "$_ask_username" "agents" "skills")"; then
+  die -l skills "cannot resolve the agents skills overlay source — repo root unavailable (checked NUCLEUS_REPO_ROOT and the system repo-root file)"
+fi
 if [ ! -d "$_ask_skills_source" ]; then
   die -l skills "skills source dir not found: $_ask_skills_source"
 fi
