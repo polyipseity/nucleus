@@ -233,7 +233,7 @@ in
   config = {
     home = {
       username = effectiveUsername;
-      homeDirectory = lib.mkDefault resolvedHomeDirectory;
+      homeDirectory = lib.mkForce resolvedHomeDirectory;
       # Pin the Home Manager state version; changing this after initial
       # activation requires a deliberate migration.
       stateVersion = "24.11";
