@@ -6,9 +6,10 @@
 # exponential backoff.  Designed as a persistent daemon (KeepAlive /
 # Restart=always / scheduled task AtLogOn) — not a timer-driven oneshot.
 #
-# Automatic binding is opt-in via the camilladsp.enable toggle (default false):
-# binding holds an open capture device, and the OS privacy-indicator path for
-# that is broken on this hardware, so the loop stays idle unless asked.
+# Automatic binding is controlled by the camilladsp.enable toggle (default
+# true).  Binding holds an open capture device, and the OS privacy-indicator
+# path for that is broken on this hardware, so the toggle exists to stop the
+# loop binding without stopping the loop itself.
 #
 # Dependencies: websocat, jq, python3 (yaml) — PATH managed via writeShellApplication runtimeInputs
 #
@@ -57,19 +58,21 @@ _current_sleep=$_base_sleep
 while true; do
   # --- Runtime toggles from config.json ---
   # camilladsp.heartbeat — master switch for this loop (default true).
-  # camilladsp.enable    — gates automatic device binding (default false).
+  # camilladsp.enable    — gates automatic device binding (default true).
   #   With binding off the loop still runs, so the service stays loaded and the
   #   websocket API stays up for camillagui, but nothing opens an audio input.
   #   WHY: an open capture device lights the macOS microphone privacy indicator,
   #   and the indicator path is broken on this board (J813), which burns ~40% of
-  #   a core in WindowServer.  Automatic binding is therefore opt-in; a manual
-  #   push from camillagui still applies normally.
+  #   a core in WindowServer — set this false to stop that.  A manual push from
+  #   camillagui still applies normally either way.
   config_json="$(case "$(uname -s)" in Darwin) echo "$HOME/Library/Application Support/nucleus/config.json" ;; *) echo "$HOME/.local/share/nucleus/config.json" ;; esac)"
   _hb_enabled=true
-  _bind_enabled=false
+  _bind_enabled=true
   if [ -f "$config_json" ]; then
-    _hb_enabled=$(jq -r '.camilladsp.heartbeat // true' "$config_json")
-    _bind_enabled=$(jq -r '.camilladsp.enable // false' "$config_json")
+    # `//` cannot be used for these: jq treats `false` as empty, so `.key // true`
+    # yields true for an explicit false and the toggle could never be disabled.
+    _hb_enabled=$(jq -r 'if .camilladsp.heartbeat == null then true else .camilladsp.heartbeat end' "$config_json")
+    _bind_enabled=$(jq -r 'if .camilladsp.enable == null then true else .camilladsp.enable end' "$config_json")
   fi
   # With binding disabled there is nothing to probe for — the probe exists only
   # to feed the push decision — so the whole tick is skipped rather than doing

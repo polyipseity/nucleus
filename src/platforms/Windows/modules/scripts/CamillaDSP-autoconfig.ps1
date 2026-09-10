@@ -59,16 +59,16 @@ if ($job -ne [IntPtr]::Zero) {
   [void][JobObject]::AssignProcessToJobObject($job, $process.SafeHandle.DangerousGetHandle())  # check-suppress:suppression_doc: AssignProcessToJobObject return value discarded, error handling is externally verified
 }
 
-# Binding is opt-in via camilladsp.enable (default false), mirroring the POSIX
-# heartbeat: with it off nothing opens an audio input, though camilladsp still
-# runs. Without this gate the wrapper's own timer would keep binding even when
-# the separate heartbeat task was told not to.
+# Binding is controlled by camilladsp.enable (default true), mirroring the POSIX
+# heartbeat: set it false and nothing opens an audio input, though camilladsp
+# still runs. Without this gate the wrapper's own timer would keep binding even
+# when the separate heartbeat task was told not to.
 $nucleusCfgFile = Join-Path $HOME ".local\state\nucleus\config.json"
-$bindEnabled = $false
+$bindEnabled = $true
 if (Test-Path $nucleusCfgFile) {
   # check-suppress:suppression_doc: probe -- no config file may not exist; $null check below handles absence
   $nc = Get-Content -Raw $nucleusCfgFile -ErrorAction SilentlyContinue | ConvertFrom-Json
-  $bindEnabled = ($null -ne $nc.camilladsp.enable) -and [bool]$nc.camilladsp.enable
+  if ($null -ne $nc.camilladsp.enable) { $bindEnabled = [bool]$nc.camilladsp.enable }
 }
 
 # Poll WS port and push config (up to ~15s).  Graceful if config file
@@ -102,12 +102,12 @@ $heartbeatTimer = [System.Threading.Timer]::new({
   param($s)
   $cf, $p, $ncf = $s
   # Check runtime toggles on every tick.
-  $bindEnabled = $false
+  $bindEnabled = $true
   if (Test-Path $ncf) {
     # check-suppress:suppression_doc: probe -- no-config file may not exist; $null check below handles absence
     $nc = Get-Content -Raw $ncf -ErrorAction SilentlyContinue | ConvertFrom-Json
     if ($null -ne $nc.camilladsp.heartbeat -and -not $nc.camilladsp.heartbeat) { return }
-    $bindEnabled = ($null -ne $nc.camilladsp.enable) -and [bool]$nc.camilladsp.enable
+    if ($null -ne $nc.camilladsp.enable) { $bindEnabled = [bool]$nc.camilladsp.enable }
   }
   if (-not $bindEnabled) { return }
   $lastPushFile = Join-Path $HOME ".local\state\camilladsp\last-push.txt"

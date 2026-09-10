@@ -34,12 +34,13 @@ $currentSleep = $baseSleep
 while ($true) {
   # ── Runtime toggles from config.json ───────────────────────────────────
   # camilladsp.heartbeat — master switch for this loop.
-  # camilladsp.enable    — gates automatic device binding (default false).
+  # camilladsp.enable    — gates automatic device binding (default true).
   #   With binding off the loop still runs, so the service stays loaded and the
   #   websocket API stays up for camillagui, but nothing opens an audio input.
   #   WHY: an open capture device lights the OS microphone privacy indicator,
-  #   and automatic binding is therefore opt-in. Mirrors the POSIX heartbeat.
-  $bindEnabled = $false
+  #   which is costly on this hardware — set this false to stop that. Mirrors
+  #   the POSIX heartbeat.
+  $bindEnabled = $true
   $nucleusCfgFile = Join-Path $HOME ".local\state\nucleus\config.json"
   if (Test-Path $nucleusCfgFile) {
     # check-suppress:suppression_doc: probe -- no config file may not exist; $null check below handles absence
@@ -48,7 +49,7 @@ while ($true) {
       Start-Sleep -Seconds $baseSleep
       continue
     }
-    $bindEnabled = ($null -ne $nc.camilladsp.enable) -and [bool]$nc.camilladsp.enable
+    if ($null -ne $nc.camilladsp.enable) { $bindEnabled = [bool]$nc.camilladsp.enable }
   }
   if (-not $bindEnabled) {
     Start-Sleep -Seconds $baseSleep

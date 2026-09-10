@@ -37,7 +37,7 @@ require_command jq
 # Used as fallback when file/key is absent, so users can discover available options.
 DEFAULTS='{
   "camilladsp": {
-    "enable": false,
+    "enable": true,
     "heartbeat": true
   }
 }'
