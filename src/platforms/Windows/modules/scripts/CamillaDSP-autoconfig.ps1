@@ -59,10 +59,23 @@ if ($job -ne [IntPtr]::Zero) {
   [void][JobObject]::AssignProcessToJobObject($job, $process.SafeHandle.DangerousGetHandle())  # check-suppress:suppression_doc: AssignProcessToJobObject return value discarded, error handling is externally verified
 }
 
+# Binding is opt-in via camilladsp.enable (default false), mirroring the POSIX
+# heartbeat: with it off nothing opens an audio input, though camilladsp still
+# runs. Without this gate the wrapper's own timer would keep binding even when
+# the separate heartbeat task was told not to.
+$nucleusCfgFile = Join-Path $HOME ".local\state\nucleus\config.json"
+$bindEnabled = $false
+if (Test-Path $nucleusCfgFile) {
+  # check-suppress:suppression_doc: probe -- no config file may not exist; $null check below handles absence
+  $nc = Get-Content -Raw $nucleusCfgFile -ErrorAction SilentlyContinue | ConvertFrom-Json
+  $bindEnabled = ($null -ne $nc.camilladsp.enable) -and [bool]$nc.camilladsp.enable
+}
+
 # Poll WS port and push config (up to ~15s).  Graceful if config file
 # doesn't exist yet (first boot before Home Manager deploy).
 for ($i = 0; $i -lt 30; $i++) {
   Start-Sleep -Milliseconds 500
+  if (-not $bindEnabled) { break }
   if (-not (Test-Path $ConfigFile)) { continue }
   try {
     # Resolve playback device: patches empty device in config with system default.
@@ -85,16 +98,19 @@ for ($i = 0; $i -lt 30; $i++) {
 # Heartbeat: re-push config every 5s so config re-applies when a
 # disconnected audio device reappears.
 # Checks config.json on each tick so dynamic changes apply instantly.
-$nucleusCfgFile = Join-Path $HOME ".local\state\nucleus\config.json"
 $heartbeatTimer = [System.Threading.Timer]::new({
   param($s)
   $cf, $p, $ncf = $s
-  # Check runtime toggle on every tick.
+  # Check runtime toggles on every tick.
+  $bindEnabled = $false
   if (Test-Path $ncf) {
     # check-suppress:suppression_doc: probe -- no-config file may not exist; $null check below handles absence
     $nc = Get-Content -Raw $ncf -ErrorAction SilentlyContinue | ConvertFrom-Json
     if ($null -ne $nc.camilladsp.heartbeat -and -not $nc.camilladsp.heartbeat) { return }
+    $bindEnabled = ($null -ne $nc.camilladsp.enable) -and [bool]$nc.camilladsp.enable
   }
+  if (-not $bindEnabled) { return }
+  $lastPushFile = Join-Path $HOME ".local\state\camilladsp\last-push.txt"
   try {
     # Check current state.  Skip only when Running AND the live playback
     # device already matches the target device that detection would currently
@@ -128,7 +144,13 @@ $heartbeatTimer = [System.Threading.Timer]::new({
       $liveDevice = ($cfgResp | ConvertFrom-Json).GetConfig.value.devices.playback.device
       if (-not [string]::IsNullOrEmpty($targetDevice) -and
           -not [string]::IsNullOrEmpty($liveDevice) -and
-          $liveDevice -eq $targetDevice) { return }
+          $liveDevice -eq $targetDevice) {
+        # Converged. Still push when the config file changed since the last push.
+        if (Test-Path $lastPushFile) {
+          $fingerprint = (Get-FileHash -Path $cf -Algorithm SHA256).Hash + "|" + $targetDevice
+          if ((Get-Content -Raw $lastPushFile).Trim() -eq $fingerprint) { return }
+        }
+      }
     }
   } catch {
     # Can't connect — will retry on next heartbeat.
@@ -143,6 +165,9 @@ $heartbeatTimer = [System.Threading.Timer]::new({
     $ws.ConnectAsync([System.Uri]"ws://127.0.0.1:$p", $ct).Wait()
     $ws.SendAsync([ArraySegment[byte]]::new([Text.Encoding]::UTF8.GetBytes($msg)), [WebSocketMessageType]::Text, $true, $ct).Wait()
     $ws.CloseAsync([CloseStatus]::NormalClosure, "done", $ct).Wait()
+    # Record what was pushed so an unchanged config is not pushed again.
+    $null = New-Item -Path (Split-Path $lastPushFile -Parent) -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+    Set-Content -Path $lastPushFile -NoNewline -Value ((Get-FileHash -Path $cf -Algorithm SHA256).Hash + "|" + $targetDevice)
   } catch {
     # Device may be gone — retry on next heartbeat.
     $null = $_  # check-suppress:suppression_doc: $_ discarded in ForEach-Object, side-effect-only iteration

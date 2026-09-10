@@ -32,7 +32,14 @@ $currentSleep = $baseSleep
 
 # ── Main loop (persistent daemon pattern) ──────────────────────────────────
 while ($true) {
-  # ── Runtime toggle from config.json ─────────────────────────────────────
+  # ── Runtime toggles from config.json ───────────────────────────────────
+  # camilladsp.heartbeat — master switch for this loop.
+  # camilladsp.enable    — gates automatic device binding (default false).
+  #   With binding off the loop still runs, so the service stays loaded and the
+  #   websocket API stays up for camillagui, but nothing opens an audio input.
+  #   WHY: an open capture device lights the OS microphone privacy indicator,
+  #   and automatic binding is therefore opt-in. Mirrors the POSIX heartbeat.
+  $bindEnabled = $false
   $nucleusCfgFile = Join-Path $HOME ".local\state\nucleus\config.json"
   if (Test-Path $nucleusCfgFile) {
     # check-suppress:suppression_doc: probe -- no config file may not exist; $null check below handles absence
@@ -41,6 +48,11 @@ while ($true) {
       Start-Sleep -Seconds $baseSleep
       continue
     }
+    $bindEnabled = ($null -ne $nc.camilladsp.enable) -and [bool]$nc.camilladsp.enable
+  }
+  if (-not $bindEnabled) {
+    Start-Sleep -Seconds $baseSleep
+    continue
   }
 
   $success = $false
@@ -54,6 +66,21 @@ while ($true) {
   if (Test-Path $ConfigFile) {
     $targetDevice = Get-CamillaDSPResolvedPlaybackDeviceName -ConfigPath $ConfigFile
   }
+
+  # ── Did the config change since the last push? ──────────────────────────
+  # Compared against what we last pushed, so edits made through camillagui are
+  # never reverted here. A missing state file means "changed", so the first tick
+  # after boot always pushes. Mirrors camilladsp_config_changed in the POSIX lib.
+  # The target device is part of the fingerprint because the config file stores a
+  # null playback device — resolution happens at push time.
+  $lastPushFile = Join-Path $HOME ".local\state\camilladsp\last-push.txt"
+  $configChanged = $true
+  if (Test-Path $lastPushFile) {
+    $fingerprint = (Get-FileHash -Path $ConfigFile -Algorithm SHA256).Hash + "|" + $targetDevice
+    $lastFingerprint = (Get-Content -Raw $lastPushFile).Trim()
+    if ($lastFingerprint -eq $fingerprint) { $configChanged = $false }
+  }
+
   try {
     $stateWs = [System.Net.WebSockets.ClientWebSocket]::new()
     $ct = [System.Threading.CancellationToken]::Empty
@@ -82,7 +109,8 @@ while ($true) {
       # pushed; a live device that differs from a non-null target must be corrected.
       if (-not [string]::IsNullOrEmpty($targetDevice) -and
           -not [string]::IsNullOrEmpty($liveDevice) -and
-          $liveDevice -eq $targetDevice) {
+          $liveDevice -eq $targetDevice -and
+          -not $configChanged) {
         $success = $true
       }
     }
@@ -102,6 +130,9 @@ while ($true) {
         $ws.ConnectAsync([System.Uri]"ws://127.0.0.1:$Port", $ct).Wait()
         $ws.SendAsync([ArraySegment[byte]]::new([Text.Encoding]::UTF8.GetBytes($msg)), [System.Net.WebSockets.WebSocketMessageType]::Text, $true, $ct).Wait()
         $ws.CloseAsync([System.Net.WebSockets.WebSocketCloseStatus]::NormalClosure, "done", $ct).Wait()
+        # Record what was pushed so an unchanged config is not pushed again.
+        $null = New-Item -Path (Split-Path $lastPushFile -Parent) -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+        Set-Content -Path $lastPushFile -NoNewline -Value ((Get-FileHash -Path $ConfigFile -Algorithm SHA256).Hash + "|" + $targetDevice)
         $success = $true
       } catch {
         # Device may be gone — retry with backoff.
