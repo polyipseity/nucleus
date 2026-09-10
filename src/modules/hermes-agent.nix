@@ -24,6 +24,33 @@ let
   # homeManagerModules.default is a standard HM module {config, lib, ...}:
   upstreamModule = hermes-agent.homeManagerModules.default;
 
+  # Upstream's default package (`full`) is `minimal.override` with a
+  # dependency-group list written inline in its `nix/packages.nix`, and nothing
+  # exports that list. Read it back by evaluating that file with a stubbed
+  # flake-parts context and capturing the argument upstream passes to `override`.
+  #
+  # The host's real `stdenv` is passed through deliberately: upstream's own
+  # `lib.optionals pkgs.stdenv.isLinux [ "matrix" ]` then resolves for the
+  # target platform, so the extracted list already carries or omits `matrix`.
+  # `isLinux` is shadowed to keep upstream's deprecated alias from emitting a
+  # nixpkgs deprecation warning.
+  upstreamFullDependencyGroups =
+    ((import "${hermes-agent}/nix/packages.nix" { inherit (hermes-agent) inputs; }).perSystem {
+      pkgs = {
+        callPackage = _file: _args: { override = newArgs: newArgs.extraDependencyGroups or [ ]; };
+        stdenv = pkgs.stdenv // {
+          isLinux = pkgs.stdenv.hostPlatform.isLinux;
+        };
+      };
+      inherit lib;
+      inputs = { };
+      inputs' = {
+        npm-lockfile-fix = {
+          packages.default = null;
+        };
+      };
+    }).packages.default;
+
   # Resolve per-user env-secrets.json via user overlay.
   userSecretsFile = ../../../users + "/${config.home.username}/env-secrets.json";
   defaultSecretsFile = ../users/default/env-secrets.json;
@@ -81,6 +108,10 @@ in
       message =
         "hermes-agent: keys missing from SOPS file: " + builtins.concatStringsSep ", " missingKeys;
     }
+    {
+      assertion = lib.elem "voice" upstreamFullDependencyGroups;
+      message = "hermes-agent: could not read upstream's `full` dependency-group list — nix/packages.nix layout changed";
+    }
   ];
 
   # Declare SOPS secrets for all hermes-consumed keys.
@@ -108,29 +139,12 @@ in
     # group (faster-whisper -> ctranslate2/onnxruntime/torch/transformers).
     # Those build from source for 30-80 min each on aarch64-darwin with no
     # binary cache, and upstream's overlay is a pure alias to its own package
-    # so nucleus cannot substitute wheels for them. Restating the group list
-    # without `voice` keeps every other integration while dropping the
-    # expensive ML closure. Mirrors upstream's own `full` definition, including
-    # `matrix` on Linux only (oqs/liboqs has no aarch64-darwin wheels).
-    extraDependencyGroups = [
-      "anthropic"
-      "azure-identity"
-      "bedrock"
-      "daytona"
-      "dingtalk"
-      "edge-tts"
-      "exa"
-      "fal"
-      "feishu"
-      "firecrawl"
-      "hindsight"
-      "honcho"
-      "messaging"
-      "modal"
-      "parallel-web"
-      "tts-premium"
-      "vercel"
-    ]
-    ++ lib.optionals pkgs.stdenv.isLinux [ "matrix" ];
+    # so nucleus cannot substitute wheels for them. Subtracting the group from
+    # upstream's own list keeps every other integration while dropping the
+    # expensive ML closure, and follows upstream adding or removing an
+    # integration instead of silently desynchronising this file.
+    # `matrix` needs no special-casing here: it is already present or absent
+    # depending on the platform upstream evaluated for.
+    extraDependencyGroups = lib.remove "voice" upstreamFullDependencyGroups;
   };
 }
