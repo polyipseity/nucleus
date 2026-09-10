@@ -8,11 +8,11 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
 
-_repo_root="${NUCLEUS_REPO_ROOT:-}"
-if [ -z "$_repo_root" ] || [ ! -f "$_repo_root/src/modules/services.schema.json" ]; then
-  if _derived="$(derive_repo_root 2>/dev/null)"; then
-    _repo_root="$_derived"
-  fi
+# derive_repo_root() resolves NUCLEUS_REPO_ROOT when it is a live path and
+# rejects Nix store snapshots; an unresolvable root falls through to the
+# hardcoded defaults below.
+if ! _repo_root="$(derive_repo_root 2>/dev/null)"; then
+  _repo_root=""
 fi
 
 _services_schema_json="${_repo_root}/src/modules/services.schema.json"

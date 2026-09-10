@@ -8,7 +8,9 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 . "$SCRIPT_DIR/../lib/lib.sh"
 
-REPO_ROOT="${NUCLEUS_REPO_ROOT:-}"
+# Empty by default: derive_repo_root() resolves NUCLEUS_REPO_ROOT when it is a
+# live path and rejects Nix store snapshots.
+REPO_ROOT=""
 
 export SOPS_AGE_KEY_FILE="${SOPS_AGE_KEY_FILE:-/etc/sops/age/machine.txt}"
 

@@ -10,7 +10,9 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/lib/lib.sh"
 
 # ── Flag defaults ──────────────────────────────────────────────────
-_repo_root="${NUCLEUS_REPO_ROOT:-}"
+# Empty by default: derive_repo_root() resolves NUCLEUS_REPO_ROOT when it is a
+# live path and rejects Nix store snapshots.
+_repo_root=""
 _ai_sync=true
 _replica_sync=false
 _vm_setup=false

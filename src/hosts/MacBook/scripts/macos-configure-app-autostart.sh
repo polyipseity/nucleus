@@ -17,8 +17,9 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../../../scripts/lib/macos-console-user.sh"
 
 # Resolve the repo checkout root so we can read apps.json regardless of how
-# this script is invoked (Nix activation bundle vs. direct run).
-REPO_ROOT="${NUCLEUS_REPO_ROOT:-$(derive_repo_root)}"
+# this script is invoked (Nix activation bundle vs. direct run). derive_repo_root()
+# resolves a live NUCLEUS_REPO_ROOT and rejects Nix store snapshots.
+REPO_ROOT="$(derive_repo_root)"
 export NUCLEUS_REPO_ROOT="$REPO_ROOT"
 
 AUTOSTART_CLI="$REPO_ROOT/src/scripts/autostart.sh"

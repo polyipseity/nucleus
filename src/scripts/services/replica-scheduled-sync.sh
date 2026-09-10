@@ -10,7 +10,9 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 #   NUCLEUS_USER_HOME   — user home directory path
 replica_id="${NUCLEUS_REPLICA_ID:?NUCLEUS_REPLICA_ID required}"
 
-REPO_ROOT="${NUCLEUS_REPO_ROOT:-$(derive_repo_root)}"
+# derive_repo_root() resolves NUCLEUS_REPO_ROOT when it is a live path and
+# rejects Nix store snapshots.
+REPO_ROOT="$(derive_repo_root)"
 export NUCLEUS_REPO_ROOT="$REPO_ROOT"
 
 _cloud_sync_script="$REPO_ROOT/scripts/cloud.sh"
