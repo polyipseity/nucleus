@@ -23,6 +23,13 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 DP_BIN="/opt/homebrew/bin/displayplacer"
 
+# The BetterDisplay virtual screen "HeadlessDisplay" reports itself to
+# displayplacer as an ordinary external display, so it must be excluded by
+# identity rather than by display type. Its size is owned by
+# macos-configure-headless-display.sh.
+VIRTUAL_DISPLAY_PERSISTENT_ID="4A560A93-4311-4F80-A757-F69D8BE2A082"
+VIRTUAL_DISPLAY_SERIAL_ID="s2865085837"
+
 if [ -x "$DP_BIN" ]; then
   FULL_LIST=$("$DP_BIN" list)
 
@@ -114,7 +121,18 @@ if [ -x "$DP_BIN" ]; then
       continue
     fi
 
-    MODES=$(echo "$FULL_LIST" | /usr/bin/sed -n "/^Persistent screen id: $ID/,/^Persistent screen id:/p" | /usr/bin/grep "^  mode " | /usr/bin/sed 's/^  mode [0-9]*: //')
+    DISPLAY_BLOCK=$(echo "$FULL_LIST" | /usr/bin/sed -n "/^Persistent screen id: $ID/,/^Persistent screen id:/p")
+
+    # WHY: the HeadlessDisplay virtual screen is not a physical monitor. Matching
+    # it here would re-inflate the framebuffer that macos-configure-headless-display.sh
+    # deliberately keeps at 2560x1600. Both identifiers are checked because a
+    # discard-and-recreate can change the macOS-assigned persistent id.
+    if [ "$ID" = "$VIRTUAL_DISPLAY_PERSISTENT_ID" ] ||
+      printf '%s\n' "$DISPLAY_BLOCK" | /usr/bin/grep -qF "$VIRTUAL_DISPLAY_SERIAL_ID"; then
+      continue
+    fi
+
+    MODES=$(printf '%s\n' "$DISPLAY_BLOCK" | /usr/bin/grep "^  mode " | /usr/bin/sed 's/^  mode [0-9]*: //')
     # When the primary uses HiDPI scaling, restrict candidates to HiDPI modes.
     if [ -n "$T_SCALING" ]; then
       MODES=$(echo "$MODES" | /usr/bin/grep "scaling:on")

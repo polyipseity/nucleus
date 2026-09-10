@@ -83,7 +83,7 @@ while true; do
       -virtualScreenName="$DISPLAY_NAME" \
       -aspectWidth=16 \
       -aspectHeight=10 \
-      -multiplierStep=160 \
+      -multiplierStep=80 \
       -virtualScreenHiDPI=on \
       -connected=on
   fi

@@ -36,12 +36,19 @@ create_headless_display() {
   # creation time so fallback remains available with the lid closed.
   # Source: BetterDisplay CLI virtual-screen flags.
   # https://github.com/waydabber/BetterDisplay/wiki
+  #
+  # multiplierStep x aspect is the logical size, and -virtualScreenHiDPI doubles
+  # it into the framebuffer: 80 x 16:10 = 1280x800 logical / 2560x1600
+  # framebuffer. That matches the built-in display's own logical size, so a
+  # remote session sees the same layout as the local screen. The heartbeat
+  # recreate path passes the same value; tests/scripts/macos-headless-display-tests.sh
+  # fails if the two sites drift.
   "$BD_BIN" create \
     -type=VirtualScreen \
     -virtualScreenName="$DISPLAY_NAME" \
     -aspectWidth=16 \
     -aspectHeight=10 \
-    -multiplierStep=160 \
+    -multiplierStep=80 \
     -virtualScreenHiDPI=on \
     -connected=on
 }
