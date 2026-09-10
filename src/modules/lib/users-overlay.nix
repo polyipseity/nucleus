@@ -24,8 +24,6 @@
 # mkUserOverlay: binds effectiveUsername/repoRoot/hostName to the selectors.
 { lib }:
 let
-  toLower = lib.toLower;
-
   # Deduplicate case-insensitively, keeping first occurrence.
   # Per-user entries come before default entries in the input list,
   # so first-occurrence-wins means per-user wins on name collision.
@@ -36,9 +34,9 @@ let
       go =
         acc: name:
         let
-          lower = toLower name;
+          lower = lib.toLower name;
         in
-        if builtins.any (x: toLower x == lower) acc then acc else acc ++ [ name ];
+        if builtins.any (x: lib.toLower x == lower) acc then acc else acc ++ [ name ];
       deduped = builtins.foldl' go [ ] strings;
     in
     builtins.sort (a: b: a < b) deduped;
