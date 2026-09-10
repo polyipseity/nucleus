@@ -522,6 +522,31 @@
                     };
                     meta = prev.ctranslate2.meta or { description = "Fast inference engine for Transformer models"; };
                   };
+                  # WHY: torch builds from source via CMake (OpenBLAS, OpenMP, C++17),
+                  # taking 30-60+ min on aarch64-darwin. Pre-built PyPI wheel (106 MB)
+                  # eliminates the build entirely.
+                  torch = prev.python3Packages.buildPythonPackage {
+                    pname = "torch";
+                    version = "2.13.0";
+                    format = "wheel";
+                    src = prev.fetchurl {
+                      url = "https://files.pythonhosted.org/packages/c4/3a/ed0f4d4d1dcde03bced7aac9a28e800abcdc0cbd06b6775044c9fbd877b7/torch-2.13.0-cp312-cp312-macosx_14_0_arm64.whl";
+                      hash = "sha256-L+Ioq6KQ0UufMbBJvlUNvUacP9MBPXoZcFswRU2pcCc=";
+                    };
+                    meta = prev.torch.meta or { description = "Tensors and Dynamic neural networks in Python"; };
+                  };
+                  # WHY: safetensors is a Rust-based library that builds from source
+                  # (~5 min). Pre-built macOS wheel (0.5 MB) eliminates the build.
+                  safetensors = prev.python3Packages.buildPythonPackage {
+                    pname = "safetensors";
+                    version = "0.8.0";
+                    format = "wheel";
+                    src = prev.fetchurl {
+                      url = "https://files.pythonhosted.org/packages/f5/b1/fa7c600e7dceae12e9606c7578cbc9ff1e1ed55844883ee5c92205e86226/safetensors-0.8.0-cp310-abi3-macosx_11_0_arm64.whl";
+                      hash = "sha256-yAIB0iy/QFuAZHpgrad7ugbI+6LaJ0O6HonNzDmoHyU=";
+                    };
+                    meta = prev.safetensors.meta or { description = "Safe tensor storage and serialization"; };
+                  };
                 };
             })
             # Expose writeNucleusShellApplication via pkgs so all module and
