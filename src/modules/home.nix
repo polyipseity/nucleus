@@ -208,7 +208,6 @@ in
     ./lib/gc-options.nix
     ./agents.nix
     ./ai.nix
-    ./audio
     ./cloud-drives.nix
     ./core.nix
     ./cursor.nix

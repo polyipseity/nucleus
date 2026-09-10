@@ -1,5 +1,0 @@
-# Audio service modules.
-{ ... }:
-{
-  imports = [ ];
-}

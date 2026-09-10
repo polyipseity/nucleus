@@ -21,7 +21,6 @@
     ./base.nix
     ./camilladsp.nix
     ./camillagui-backend.nix
-    ../../modules/audio
     ./defaults.nix
     ./filesystem-scope.nix
     ./homebrew.nix
