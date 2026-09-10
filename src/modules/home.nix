@@ -127,7 +127,7 @@ let
     builtins.readFile (selectUserAppConfigFile "rimsort" "rimsort.json")
   );
   rimsortHostSettings = builtins.fromJSON (
-    builtins.readFile (overlay.selectSource "rimsort" "rimsort.${hostName}.json")
+    builtins.readFile (overlay.selectSource "rimsort" "rimsort.json")
   );
   rimsortManagedSettingsJson = builtins.toJSON (
     lib.recursiveUpdate rimsortManagedSettings rimsortHostSettings
