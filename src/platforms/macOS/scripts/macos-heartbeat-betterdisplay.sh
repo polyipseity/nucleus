@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# BetterDisplay virtual screen heartbeat.  Polls the HeadlessDisplay every 30
+# BetterDisplay virtual screen heartbeat.  Polls the HeadlessDisplay every 60
 # seconds and reconnects it if BetterDisplay marks it as disconnected.
 # Includes crash-loop detection: stops relaunching after ≥10 restarts/hour
 # or ≥5 consecutive failures.
@@ -26,11 +26,11 @@ _bd_cli() {
   "$BD_BIN" "$@" || true
 }
 
-# Persistent daemon loop: check every 30 s.
+# Persistent daemon loop: check every 60 s.
 while true; do
   # No-op if BetterDisplay is not installed.
   if [ ! -f "$BD_BIN" ]; then
-    sleep 30
+    sleep 60
     continue
   fi
 
@@ -63,7 +63,7 @@ while true; do
   # No-op if already connected.
   if [ "$connected_state" = "on" ]; then
     crash_loop_success "betterdisplay-heartbeat"
-    sleep 30
+    sleep 60
     continue
   fi
 
@@ -88,5 +88,5 @@ while true; do
       -connected=on
   fi
 
-  sleep 30
+  sleep 60
 done
