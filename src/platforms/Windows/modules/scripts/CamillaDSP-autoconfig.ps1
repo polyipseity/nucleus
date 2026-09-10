@@ -59,12 +59,14 @@ if ($job -ne [IntPtr]::Zero) {
   [void][JobObject]::AssignProcessToJobObject($job, $process.SafeHandle.DangerousGetHandle())  # check-suppress:suppression_doc: AssignProcessToJobObject return value discarded, error handling is externally verified
 }
 
-# Binding is controlled by camilladsp.enable (default true), mirroring the POSIX
+# Binding is controlled by camilladsp.enable (default false), mirroring the POSIX
 # heartbeat: set it false and nothing opens an audio input, though camilladsp
 # still runs. Without this gate the wrapper's own timer would keep binding even
 # when the separate heartbeat task was told not to.
 $nucleusCfgFile = Join-Path $HOME ".local\state\nucleus\config.json"
-$bindEnabled = $true
+# Must match the DEFAULTS entry in scripts/config.ps1 (false); a $true default here would
+# enable automatic device binding even though the CLI reports it disabled.
+$bindEnabled = $false
 if (Test-Path $nucleusCfgFile) {
   # check-suppress:suppression_doc: probe -- no config file may not exist; $null check below handles absence
   $nc = Get-Content -Raw $nucleusCfgFile -ErrorAction SilentlyContinue | ConvertFrom-Json
@@ -102,7 +104,7 @@ $heartbeatTimer = [System.Threading.Timer]::new({
   param($s)
   $cf, $p, $ncf = $s
   # Check runtime toggles on every tick.
-  $bindEnabled = $true
+  $bindEnabled = $false
   if (Test-Path $ncf) {
     # check-suppress:suppression_doc: probe -- no-config file may not exist; $null check below handles absence
     $nc = Get-Content -Raw $ncf -ErrorAction SilentlyContinue | ConvertFrom-Json
