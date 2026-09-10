@@ -18,10 +18,12 @@ _vsym_keybindings_file="$5"
 _vsym_chat_language_models_file="$6"
 _vsym_jq_bin="$7"
 
-if [ -z "$_vsym_repo_root" ] || [ ! -d "$_vsym_repo_root" ]; then
-  _vsym_repo_root="${NUCLEUS_REPO_ROOT:?VS Code: NUCLEUS_REPO_ROOT not set; run via apply.sh}"
+# Skip exporting NUCLEUS_REPO_ROOT when the path is a Nix store snapshot —
+# derive_repo_root() falls back to the system repo-root file, so config symlinks
+# resolve to the live checkout instead of a read-only store snapshot.
+if [ -n "$_vsym_repo_root" ] && case "$_vsym_repo_root" in /nix/store/*) false ;; *) true ;; esac then
+  export NUCLEUS_REPO_ROOT="$_vsym_repo_root"
 fi
-export NUCLEUS_REPO_ROOT="$_vsym_repo_root"
 
 _vsym_settings="$(resolve_user_config_file "$_vsym_username" "vscode" "settings.json")"
 _vsym_mcp="$(resolve_user_config_file "$_vsym_username" "vscode" "mcp.json")"
