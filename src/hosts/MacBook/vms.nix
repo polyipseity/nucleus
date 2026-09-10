@@ -1,7 +1,7 @@
 # MacBook/vms.nix — UTM VM configuration templates for the macOS host.
 #
 # Generates UTM 4.x QEMU-backend config.plist templates for each VM declared in
-# src/modules/VMs.json.  Templates are written to
+# src/modules/vms/VMs.json.  Templates are written to
 # ~/Library/Application Support/nucleus/vms/<name>-config.plist at Home Manager activation time
 # and consumed by scripts/vm.sh (nucleus-vm setup) to create UTM bundles
 # without PlistBuddy invocations.
@@ -13,7 +13,7 @@
 # Source: https://github.com/utmapp/UTM/blob/main/Configuration/UTMQemuConfiguration.swift
 { pkgs, lib, ... }:
 let
-  vmsData = builtins.fromJSON (builtins.readFile ../../modules/VMs.json);
+  vmsData = builtins.fromJSON (builtins.readFile ../../modules/vms/VMs.json);
   size = import ../../modules/lib/size.nix;
   vmIdentity = import ../../modules/lib/vm-identity.nix;
   nucleusHost = "MacBook";

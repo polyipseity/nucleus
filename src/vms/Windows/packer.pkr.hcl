@@ -2,7 +2,7 @@
 #
 # Builds an unattended Windows 11 installation using QEMU.  The resulting
 # QCOW2 disk image is pre-configured with VirtIO drivers, OpenSSH, and qemu-ga,
-# ready for use as the Windows VM guest declared in src/modules/VMs.json.
+# ready for use as the Windows VM guest declared in src/modules/vms/VMs.json.
 #
 # Usage (from repo root):
 #   cd src/vms/Windows && packer init . && packer build \

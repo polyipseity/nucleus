@@ -542,7 +542,7 @@ gc_vm_artifacts_if_present() {
   # WHY: keep-set has one source of truth in src/scripts/lib/vm.sh — vm_gc_vms
   vm_dir="${HOME}/virtual machines"
   src_dir="$vm_dir/src"
-  manifest="$REPO_ROOT/src/modules/VMs.json"
+  manifest="$REPO_ROOT/src/modules/vms/VMs.json"
 
   if [ ! -d "$vm_dir" ]; then
     return 0

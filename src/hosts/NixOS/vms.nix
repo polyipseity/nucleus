@@ -1,7 +1,7 @@
 # NixOS/vms.nix — KVM/libvirt virtual machine infrastructure for the NixOS host.
 #
 # Enables the libvirtd hypervisor so QEMU/KVM guests can be managed via virsh
-# and virt-manager.  Guest VMs are declared in src/modules/VMs.json and
+# and virt-manager.  Guest VMs are declared in src/modules/vms/VMs.json and
 # provisioned by scripts/vm.sh (run via `nucleus-vm setup`).
 #
 # Disk images are stored under ~/virtual machines/data/ and ~/virtual machines/src/
@@ -22,7 +22,7 @@
   ...
 }:
 let
-  vmsData = builtins.fromJSON (builtins.readFile ../../modules/VMs.json);
+  vmsData = builtins.fromJSON (builtins.readFile ../../modules/vms/VMs.json);
   size = import ../../modules/lib/size.nix;
   nucleusHost = "NixOS";
   enabledVms = builtins.filter (vm: vm.enabled && builtins.elem nucleusHost vm.hosts) vmsData.VMs;

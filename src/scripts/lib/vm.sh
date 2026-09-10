@@ -227,7 +227,7 @@ vm_resolve_guest_ssh_public_key() {
     return 1
   fi
 
-  _vrgspk_manifest="$_vrgspk_repo_root/src/modules/vm-guest-ssh-public-key-paths.json"
+  _vrgspk_manifest="$_vrgspk_repo_root/src/modules/vms/vm-guest-ssh-public-key-paths.json"
   if [ ! -f "$_vrgspk_manifest" ]; then
     error "guest SSH public key manifest not found: $_vrgspk_manifest"
     return 1
@@ -1130,7 +1130,7 @@ vm_write_descriptor() {
     --arg arch "$_vwd_arch" \
     --arg machine "$_vwd_machine" \
     --arg uefi "$_vwd_uefi" \
-    --arg schema "$REPO_ROOT/src/modules/vm-descriptor.schema.json" \
+    --arg schema "$REPO_ROOT/src/modules/vms/vm-descriptor.schema.json" \
     --arg createdBy "nucleus-vm" \
     '
     .VMs[$i] as $vm |

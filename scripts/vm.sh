@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Unified CLI for managing VMs across all hosts (macOS, NixOS, Windows).
 # Consolidates build, provision, start, stop, and lifecycle operations.
-# VMs are defined in src/modules/VMs.json (the canonical manifest).
+# VMs are defined in src/modules/vms/VMs.json (the canonical manifest).
 #
 # Commands: setup|sync|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack [vm...] [options].
 # Guest credentials are resolved from the per-user SOPS secret file referenced
@@ -425,7 +425,7 @@ esac
 #   so --repo-root overrides and Nix store layouts keep working. Exits 1
 #   when the manifest is missing.
 resolve_manifest() {
-  MANIFEST="$REPO_ROOT/src/modules/VMs.json"
+  MANIFEST="$REPO_ROOT/src/modules/vms/VMs.json"
   VMS_DIR="$REPO_ROOT/src/vms"
   TEMPLATES_DIR="$VMS_DIR/templates"
 

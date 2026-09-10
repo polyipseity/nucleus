@@ -3,7 +3,7 @@
 # Apple's Virtualization.framework which is not available on other platforms.
 #
 # Pulls a base macOS image from the Cirrus CI OCI registry and provisions it
-# for use as the nucleus macOS guest declared in src/modules/VMs.json.
+# for use as the nucleus macOS guest declared in src/modules/vms/VMs.json.
 #
 # Usage (from repo root):
 #   cd src/vms/macOS && packer init . && packer build \

@@ -25,7 +25,7 @@
        model pulls are triggered — GC only reclaims space.  Guarded by an ollama
        presence check so the step is a no-op when Ollama is not installed.
     6. Remove stale VM build artifacts (Packer directories, pre-built disk
-       images) for VMs no longer declared in src/modules/VMs.json.
+       images) for VMs no longer declared in src/modules/vms/VMs.json.
        Guarded by the NoVMGc switch.
     7. Rotate managed log files via copy-truncate using rotation parameters
        from src/modules/services.json.
@@ -510,7 +510,7 @@ if (-not $NoSccacheGc) {
 if (-not $NoVMGc) {
   $vmDir = Join-Path $env:USERPROFILE "virtual machines"
   $srcDir = Join-Path $vmDir "src"
-  $manifest = Join-Path $resolvedRepoRoot "src\modules\VMs.json"
+  $manifest = Join-Path $resolvedRepoRoot "src\modules\vms\VMs.json"
 
   # If VM directories do not exist, there is nothing to clean.
   if (-not (Test-Path -LiteralPath $vmDir -PathType Container)) {

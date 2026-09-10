@@ -791,7 +791,7 @@ function Invoke-VMSetup {
         }
 
         $descriptor = [ordered]@{
-            '$schema'    = Join-Path $RepoRoot 'src\modules\vm-descriptor.schema.json'
+            '$schema'    = Join-Path $RepoRoot 'src\modules\vms\vm-descriptor.schema.json'
             id           = [string]$Vm.id
             name         = [string]$Vm.name
             type         = [string]$Vm.type

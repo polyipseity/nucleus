@@ -4,7 +4,7 @@ let
   lib = import <nixpkgs/lib>;
   inherit (import ../lib.nix) assert' containsRegex;
 
-  manifest = builtins.fromJSON (builtins.readFile ../../src/modules/VMs.json);
+  manifest = builtins.fromJSON (builtins.readFile ../../src/modules/vms/VMs.json);
 
   # Deterministic identity derivation, shared with src/hosts/MacBook/vms.nix.
   vmIdentity = import ../../src/modules/lib/vm-identity.nix;
@@ -148,7 +148,7 @@ let
   ];
   size_sh_text = builtins.readFile ../../src/scripts/lib/size.sh;
   size_ps_text = builtins.readFile ../../src/platforms/Windows/modules/SizeStrings.ps1;
-  vms_schema_text = builtins.readFile ../../src/modules/VMs.schema.json;
+  vms_schema_text = builtins.readFile ../../src/modules/vms/VMs.schema.json;
 
   test_size_parser_accepts = assert' (builtins.all (f: size.parse f.input == f.bytes)
     size_accept_fixtures
@@ -1207,7 +1207,7 @@ let
   nixos_vms_nix_text = builtins.readFile ../../src/hosts/NixOS/vms.nix;
   nixos_domain_xml_text = builtins.readFile ../../src/modules/vms/nixos-domain.xml;
   utmConfigPlistText = builtins.readFile ../../src/modules/vms/utm-config.plist.xml;
-  vms_json_text = builtins.readFile ../../src/modules/VMs.json;
+  vms_json_text = builtins.readFile ../../src/modules/vms/VMs.json;
   vm_guest_json_text = builtins.readFile ../../src/users/default/vm-guest.json;
   user_secret_text = builtins.readFile ../fixtures/user-registry/src/secrets/users/test-user.yml;
   vms_windows_packer_text = builtins.readFile ../../src/vms/Windows/packer.pkr.hcl;
@@ -1220,7 +1220,7 @@ let
   android_magisk_sh_text = builtins.readFile ../../src/scripts/vms/android-magisk.sh;
   flake_nix_text = builtins.readFile ../../src/flake.nix;
   windows_system_packages_dsc_text = builtins.readFile ../../src/hosts/Windows/system/packages.dsc.yml;
-  guest_ssh_public_key_manifest_text = builtins.readFile ../../src/modules/vm-guest-ssh-public-key-paths.json;
+  guest_ssh_public_key_manifest_text = builtins.readFile ../../src/modules/vms/vm-guest-ssh-public-key-paths.json;
 
   test_vm_guest_ssh_public_key_manifest = assert' (
     lib.hasInfix "ssh_personal_{username}.pub" guest_ssh_public_key_manifest_text
