@@ -4,5 +4,6 @@
   imports = [
     ./gnupg.nix
     ./logging.nix
+    ./user-shell.nix
   ];
 }
