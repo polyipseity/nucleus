@@ -335,6 +335,7 @@
     "jqlang.jq": "1.8.1",
     "junegunn.fzf": "0.73.1",
     "sharkdp.bat": "0.26.1",
-    "sharkdp.fd": "10.4.2"
+    "sharkdp.fd": "10.4.2",
+    "waterlan.dos2unix": "7.5.6"
   }
 }

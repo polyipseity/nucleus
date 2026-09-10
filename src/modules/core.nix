@@ -205,6 +205,15 @@ let
       nixpkgs = "direnv";
       winget = "direnv.direnv";
     };
+    dos2unix = {
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "dos2unix";
+      };
+      nixpkgs = "dos2unix";
+      winget = "waterlan.dos2unix";
+    };
     "dotnet-runtime-6" = {
       category = "cli";
       homebrew = {

@@ -623,6 +623,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure dos2unix is installed for cross-platform text file line-ending conversion (DOS/Unix/Mac) parity with macOS (pkgs.dos2unix) and NixOS (pkgs.dos2unix)
+      settings:
+        id: waterlan.dos2unix
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: >-
           Ensure PowerSession is installed as the asciinema-compatible terminal
           session recorder for Windows (ConPTY-based). Provides `PowerSession.exe`
