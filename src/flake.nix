@@ -492,6 +492,38 @@
             # hermes-agent: adds pkgs.hermes-agent via overlay so the upstream
             # Nix module's default package resolves correctly.
             hermes-agent.overlays.default
+            # WHY: onnxruntime and ctranslate2 build from source via CMake
+            # (CoreML + LTO + ~10 C++ deps), taking 40-80 min on aarch64-darwin
+            # with no binary cache hit. Pre-built PyPI wheels (~17 MB + ~1 MB)
+            # eliminate the build entirely. Wheels are platform-specific, so
+            # this overlay only applies on Darwin; other platforms use the
+            # source build from nixpkgs.
+            (_final: prev: {
+              python3Packages =
+                prev.python3Packages
+                // prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
+                  onnxruntime = prev.python3Packages.buildPythonPackage {
+                    pname = "onnxruntime";
+                    version = "1.27.0";
+                    format = "wheel";
+                    src = prev.fetchurl {
+                      url = "https://files.pythonhosted.org/packages/c3/b7/dd3a524ed93a820dff1af902d0412957ab12499953333e9daa01af5bc480/onnxruntime-1.27.0-cp312-cp312-macosx_14_0_arm64.whl";
+                      hash = "sha256-oUws5FMS3vhrd66mUfRlZeRZYM9fByG/3/RJFlCGq3Y=";
+                    };
+                    meta = prev.onnxruntime.meta or { description = "ONNX Runtime Python bindings"; };
+                  };
+                  ctranslate2 = prev.python3Packages.buildPythonPackage {
+                    pname = "ctranslate2";
+                    version = "4.7.1";
+                    format = "wheel";
+                    src = prev.fetchurl {
+                      url = "https://files.pythonhosted.org/packages/fc/0f/581de94b64c5f2327a736270bc7e7a5f8fe5cf1ed56a2203b52de4d8986a/ctranslate2-4.7.1-cp312-cp312-macosx_11_0_arm64.whl";
+                      hash = "sha256-TAy9RqI7jcN8zb2bRHy19/rcNhyQ6d8X2CyoSx8BmYY=";
+                    };
+                    meta = prev.ctranslate2.meta or { description = "Fast inference engine for Transformer models"; };
+                  };
+                };
+            })
             # Expose writeNucleusShellApplication via pkgs so all module and
             # host files can use it without importing from flake.nix.
             (final: _prev: { writeNucleusShellApplication = writeNucleusShellApplication final; })
@@ -1140,7 +1172,12 @@
       homeConfigurations.${username} = home-manager.lib.homeManagerConfiguration {
         extraSpecialArgs = {
           hostName = "NixOS";
-          inherit nixpkgs username repoRoot hermes-agent;
+          inherit
+            nixpkgs
+            username
+            repoRoot
+            hermes-agent
+            ;
           users = usersNixOS;
           vsCodeMarketplace = vsCodeMarketplaceLinux;
         };
