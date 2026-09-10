@@ -109,7 +109,9 @@ menu_bar_native_set() {
   local kind domain key plist_path value
   kind=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.kind')
   local provisioned
-  provisioned=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.provisioned // true')
+  # `//` cannot be used: it also skips `false`, which would make a manual
+  # (provisioned=false) entry look provisioned and get SET anyway.
+  provisioned=$(echo "$entry_json" | jq -r 'if .hostEntry.menuBarIcon.provisioned == null then true else .hostEntry.menuBarIcon.provisioned end')
   if [ "$kind" = "manual" ] || [ "$provisioned" = "false" ]; then
     warn -l "$(echo "$entry_json" | jq -r '.displayName // "app"')" "manual icon entry; not auto-provisioned (set in the app's UI)"
     return 0
@@ -182,7 +184,9 @@ menu_bar_actual_visible() {
   local kind domain key_name plist_path value_type current desired_visible
   kind=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.kind')
   local provisioned
-  provisioned=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.provisioned // true')
+  # `//` cannot be used: it also skips `false`, which would report a manual
+  # (provisioned=false) entry as provisioned.
+  provisioned=$(echo "$entry_json" | jq -r 'if .hostEntry.menuBarIcon.provisioned == null then true else .hostEntry.menuBarIcon.provisioned end')
   if [ "$kind" = "manual" ] || [ "$provisioned" = "false" ]; then
     printf 'manual'
     return 0
