@@ -15,7 +15,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # Resolve the repo checkout root so we can read apps.json regardless of how
 # this script is invoked (Nix activation bundle vs. direct run). derive_repo_root()
 # resolves a live NUCLEUS_REPO_ROOT and rejects Nix store snapshots.
-REPO_ROOT="$(derive_repo_root)"
+REPO_ROOT="$(derive_repo_root)" || die -l menu-bar "cannot resolve the nucleus repo root; run nucleus-apply before this activation step."
 export NUCLEUS_REPO_ROOT="$REPO_ROOT"
 
 MENU_BAR_CLI="$REPO_ROOT/src/scripts/menu-bar.sh"
