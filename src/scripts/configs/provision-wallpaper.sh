@@ -167,6 +167,13 @@ wallpaper_post_copy_teardown() {
   # shellcheck source=../lib/symlink-hardening.sh
   . "$_script_dir/../lib/symlink-hardening.sh"
 
+  # WHY: an unresolvable overlay is indistinguishable from a removed overlay
+  # entry in the loop below, which deletes decrypted wallpapers. Refuse to run
+  # the stale cleanup unless the wallpapers overlay resolves.
+  if ! resolve_user_config_first_level_entry "$_current_user" "wallpapers" "encrypted" >/dev/null 2>&1; then
+    fail_wallpaper_provision "cannot resolve the wallpapers overlay for $_current_user; refusing stale wallpaper cleanup."
+  fi
+
   for decryptedFile in "$_pictures_dir"/*; do
     [ -e "$decryptedFile" ] || continue
     case "$decryptedFile" in *.xml) continue ;; esac
