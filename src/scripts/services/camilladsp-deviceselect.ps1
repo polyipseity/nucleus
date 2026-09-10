@@ -91,7 +91,14 @@ function Get-CamillaDSPFirstAvailablePlaybackDevice {
 
 # --- Last saved default state file ---
 
-$script:CamillaDSPStateDir = Join-Path $env:LOCALAPPDATA 'nucleus\camilladsp'
+# WHY: $env:LOCALAPPDATA is null off Windows, so resolving the state dir unconditionally
+# made this library impossible to source on macOS/Linux and blocked its test suite there.
+# Mirror the POSIX library's XDG state location on those platforms; Windows is unchanged.
+$script:CamillaDSPStateDir = if ($IsWindows) {
+  Join-Path $env:LOCALAPPDATA 'nucleus\camilladsp'
+} else {
+  Join-Path $HOME '.local/state/camilladsp'
+}
 $script:CamillaDSPLastDeviceFile = Join-Path $script:CamillaDSPStateDir 'last-device.txt'
 
 function Save-CamillaDSPLastDevice {
