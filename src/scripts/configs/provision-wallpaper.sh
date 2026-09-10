@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Self-contained wallpaper provisioning script.
-# CLI args: is_darwin pictures_dir desktoppr_bin coreutils_bin repo_root current_user sops_symlink_path wallpaper_items_json jq_bin
+# CLI args: is_darwin pictures_dir desktoppr_bin coreutils_bin current_user sops_symlink_path wallpaper_items_json jq_bin
 set -eu
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -20,9 +20,8 @@ _is_darwin="$1"
 _pictures_dir="$2"
 _desktoppr_bin="$3"
 _coreutils_bin="$4"
-_repo_root="$5"
-_current_user="$6"
-_sops_symlink_path="$7"
+_current_user="$5"
+_sops_symlink_path="$6"
 
 lock_wallpaper_dir() {
   if [ "$_is_darwin" -ne 1 ]; then
@@ -144,7 +143,6 @@ wallpaper_provision_symlink_unencrypted() {
   . "$_script_dir/../lib/resolve-user-config.sh"
   # shellcheck source=../lib/symlink-hardening.sh
   . "$_script_dir/../lib/symlink-hardening.sh"
-  export NUCLEUS_REPO_ROOT="$_repo_root"
 
   while IFS= read -r _fileName; do
     [ -n "$_fileName" ] || continue
@@ -168,7 +166,6 @@ wallpaper_post_copy_teardown() {
   . "$_script_dir/../lib/resolve-user-config.sh"
   # shellcheck source=../lib/symlink-hardening.sh
   . "$_script_dir/../lib/symlink-hardening.sh"
-  export NUCLEUS_REPO_ROOT="$_repo_root"
 
   for decryptedFile in "$_pictures_dir"/*; do
     [ -e "$decryptedFile" ] || continue
@@ -287,6 +284,6 @@ wallpaper_post_copy_teardown() {
 
 # Entry point
 wallpaper_pre_copy_setup
-wallpaper_provision_copy_items "$8" "$9" "$_sops_symlink_path"
+wallpaper_provision_copy_items "$7" "$8" "$_sops_symlink_path"
 wallpaper_provision_symlink_unencrypted
 wallpaper_post_copy_teardown

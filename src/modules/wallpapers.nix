@@ -104,7 +104,6 @@ in
       "${currentUserHome}/Pictures/wallpapers" \
       "${desktopprBinPath}" \
       "${pkgs.coreutils}" \
-      "${repoRoot}" \
       "${currentUsername}" \
       "${config.sops.defaultSymlinkPath}" \
       '${
