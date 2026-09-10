@@ -345,6 +345,7 @@
         "autostartEnabled": false,
         "autostartDisableNative": true,
         "kind": "login-item",
+        "bundleId": "RimSort",
         "path": "/Applications/RimSort.app",
         "menuBarIcon": {
           "kind": "manual",
