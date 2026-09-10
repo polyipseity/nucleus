@@ -39,6 +39,9 @@ let
       pkgs.websocat
       pkgs.jq
       (pkgs.python3.withPackages (p: [ p.pyyaml ]))
+      # The heartbeat probes the current default output with SwitchAudioSource;
+      # without this it silently depends on the ambient PATH.
+      pkgs.switchaudio-osx
     ];
   };
 
@@ -76,13 +79,22 @@ in
       EnvironmentVariables = daemonEnv;
       KeepAlive = true;
       RunAtLoad = true;
+      # Bound how fast launchd may restart this daemon. Without a throttle a
+      # persistent crash loop restarts immediately and without limit.
+      ThrottleInterval = 10;
       WorkingDirectory = config.users.users.${username}.home;
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/camilladsp/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/camilladsp/stderr.log";
     };
   };
 
-  environment.userLaunchAgents."camilladsp-heartbeat" = {
+  # The attribute name IS the installed filename, so it must carry the .plist
+  # suffix: launchd only auto-loads plists. Naming it "camilladsp-heartbeat"
+  # wrote an extension-less file that was never loaded, leaving the previously
+  # loaded job running arbitrarily stale code. EnvironmentVariables must also be
+  # a dict — the previous concatMap form rendered it as an <array>, which
+  # launchd rejects outright.
+  environment.userLaunchAgents."local.camilladsp-heartbeat.plist" = {
     enable = true;
     text = lib.generators.toPlist { escape = true; } {
       Label = "local.camilladsp-heartbeat";
@@ -91,10 +103,7 @@ in
         "-c"
         "exec ${camilladspHeartbeat}/bin/nucleus-camilladsp-heartbeat --port ${wsPort}"
       ];
-      EnvironmentVariables = lib.concatMap (name: [
-        name
-        (toString daemonEnv.${name})
-      ]) (builtins.attrNames daemonEnv);
+      EnvironmentVariables = lib.mapAttrs (_: toString) daemonEnv;
       KeepAlive = true;
       RunAtLoad = true;
       StandardOutPath = "/dev/null";

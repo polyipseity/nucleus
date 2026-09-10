@@ -49,8 +49,15 @@ in
 
     # --- darwin config: camilladsp-heartbeat uses environment.userLaunchAgents ---
     # The heartbeat uses nix-darwin's environment.userLaunchAgents (raw plist text)
-    # since it lives in the darwin config context (not an HM module).
-    (assert' (containsRegex "environment.userLaunchAgents.\"camilladsp-heartbeat\"" camilladspNix) "camilladsp-heartbeat: uses environment.userLaunchAgents")
+    # since it lives in the darwin config context (not an HM module). The
+    # attribute name IS the installed filename, so it must end in .plist or
+    # launchd never loads it.
+    (assert' (containsRegex "environment.userLaunchAgents.\"local.camilladsp-heartbeat.plist\"" camilladspNix) "camilladsp-heartbeat: uses environment.userLaunchAgents with a .plist filename")
+    # launchd rejects a non-dict EnvironmentVariables, so it must not be built by
+    # flattening the attrset into a list.
+    (assert' (
+      !containsRegex "EnvironmentVariables = lib.concatMap" camilladspNix
+    ) "camilladsp-heartbeat: EnvironmentVariables rendered as a dict")
     # --- Home Manager modules: HM-native launchd.agents with domain = "gui" ---
     # ext-discord-music-rpc.nix and cloud-drives.nix are imported into the HM
     # config (home-manager.users / sharedModules), so they must use
