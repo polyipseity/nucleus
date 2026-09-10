@@ -55,6 +55,31 @@ test_test_lib_usage_no_skip_system_build() {
   fi
 }
 
+# Every suite that sources this library must be able to fail: assertions only bump
+# a counter, so a suite that never turns the tally into an exit status reports
+# success to the runner no matter what it asserted.
+test_all_consumers_end_with_finish_tests() {
+  # Derived here rather than reusing SCRIPT_DIR/REPO_ROOT: sourcing
+  # src/scripts/tests/test-lib.sh below reassigns both, so shellcheck reads them
+  # as subshell-modified (SC2031) at every use outside a subshell.
+  local _dir
+  _dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+  local _file _last _missing=""
+  # Two levels cover the suite directory and its subdirectories; an unmatched glob
+  # stays literal, so the -f guard skips it.
+  for _file in "$_dir"/*-tests.sh "$_dir"/*/*-tests.sh; do
+    [ -f "$_file" ] || continue
+    grep -qE '^[[:space:]]*\.[[:space:]].*test-lib\.sh' "$_file" || continue
+    _last="$(awk 'NF && $1 !~ /^#/ { last = $0 } END { sub(/^[[:space:]]+/, "", last); print last }' "$_file")"
+    [ "$_last" = "finish_tests" ] || _missing="$_missing $(basename "$_file")"
+  done
+  if [ -z "$_missing" ]; then
+    assert_pass "every test-lib.sh consumer ends with finish_tests"
+  else
+    assert_fail "every test-lib.sh consumer ends with finish_tests" "not ending with finish_tests:$_missing"
+  fi
+}
+
 # ---- Run tests ----
 section 1 "Phase 2: test-lib unit tests"
 echo ""
@@ -62,5 +87,6 @@ echo ""
 test_parse_args_skip_system_build_removed
 test_parse_args_no_unrecognized_flags
 test_test_lib_usage_no_skip_system_build
+test_all_consumers_end_with_finish_tests
 
 finish_tests
