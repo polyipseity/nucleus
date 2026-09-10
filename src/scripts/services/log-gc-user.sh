@@ -9,7 +9,8 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # derive_repo_root() resolves NUCLEUS_REPO_ROOT when it is a live path and
 # rejects Nix store snapshots; an unresolvable root falls through to the
 # hardcoded defaults below.
-if ! _repo_root="$(derive_repo_root 2>/dev/null)"; then
+if ! _repo_root="$(derive_repo_root)"; then
+  warn "repo root unresolvable; using hardcoded log rotation defaults."
   _repo_root=""
 fi
 
