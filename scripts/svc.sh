@@ -1119,12 +1119,16 @@ do_log_config() {
   for svc in "${targets[@]}"; do
     local entry
     entry=$(jq -c --arg svc "$svc" --arg host "$HOST" '
+      # First non-null candidate wins, else the fallback. `//` must not be used
+      # for the boolean options: it also skips `false`, so an explicit host-level
+      # false would silently fall through to the service value or the default.
+      def firstSet($fallback): first((.[] | select(. != null)), $fallback);
       {
         capture: (.[$svc].hosts[$host].logging.capture // .[$svc].logging.capture // "all"),
         maxSize: (.[$svc].hosts[$host].logging.maxSize // .[$svc].logging.maxSize // 10000000), # bytes
         maxFiles: (.[$svc].hosts[$host].logging.maxFiles // .[$svc].logging.maxFiles // 4),
-        compress: (.[$svc].hosts[$host].logging.compress // .[$svc].logging.compress // true),
-        sanitize: (.[$svc].hosts[$host].logging.sanitize // .[$svc].logging.sanitize // true),
+        compress: ([.[$svc].hosts[$host].logging.compress, .[$svc].logging.compress] | firstSet(true)),
+        sanitize: ([.[$svc].hosts[$host].logging.sanitize, .[$svc].logging.sanitize] | firstSet(true)),
         level: (.[$svc].hosts[$host].logging.level // .[$svc].logging.level // null),
         eventLog: (.[$svc].hosts[$host].logging.eventLog // .[$svc].logging.eventLog // null)
       }
