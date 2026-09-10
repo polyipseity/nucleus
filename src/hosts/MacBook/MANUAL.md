@@ -60,7 +60,7 @@
 - `nucleus-cloud sync` — pull cloud replicas
 - `nucleus-cloud reset` — reset local replica state
 - `nucleus-update` — update repository
-- `nucleus-vm setup` — build and provision VMs from `src/modules/VMs.json`
+- `nucleus-vm setup` — build and provision VMs from `src/modules/vms/VMs.json`
   - **macOS guest** (tart): automatic on Apple Silicon. Requires `brew install cirruslabs/cli/tart`. Start with `tart run MacBook [--no-graphics]`.
   - **NixOS guest**: automatic; `nixos-generators` builds QCOW2.
   - **Windows 11 guest**: ISO auto-downloaded (Mido on POSIX, Fido on Windows); pass `--windows-iso /path/to/Win11.iso` to skip.

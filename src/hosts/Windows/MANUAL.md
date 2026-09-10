@@ -33,7 +33,7 @@
 - `nucleus-cloud sync` — pull cloud replicas
 - `nucleus-cloud reset` — reset local replica state
 - `nucleus-update` — update repository
-- `nucleus-vm setup` — build and provision VMs from `src/modules/VMs.json`. Requires QEMU (managed by Scoop). Guest converge is automatic; run `.\src\hosts\Windows\apply.ps1` inside the guest for manual re-converge.
+- `nucleus-vm setup` — build and provision VMs from `src/modules/vms/VMs.json`. Requires QEMU (managed by Scoop). Guest converge is automatic; run `.\src\hosts\Windows\apply.ps1` inside the guest for manual re-converge.
   - **NixOS guest**: uses Packer (ISO auto-downloaded).
   - **Windows 11 guest**: ISO auto-resolved; fallback `-WindowsIso C:\path\to\Win11.iso` (download from <https://www.microsoft.com/software-download/windows11>). Use `-Accelerator whpx` if Windows HyperVisor Platform is enabled. Run `start-<name>.ps1` in `%USERPROFILE%\virtual machines\`.
   - **Android guest** (LineageOS): QEMU backend via `start-android-vm.ps1`; ADB at `localhost:22040`. See `.agents/instructions/vm-management.instructions.md` (android-config). Run `nucleus-vm android-config Android` without flags for step-by-step instructions.

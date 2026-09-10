@@ -29,7 +29,7 @@
 
 - Every JSON and YAML data file MUST include an inline `$schema` property pointing to its schema file.
 - This replaces editor-level schema mappings so validation works in any editor and CI.
-- Schema files live alongside their data files (e.g., `src/modules/VMs.schema.json` for `src/modules/VMs.json`).
+- Schema files live alongside their data files (e.g., `src/modules/vms/VMs.schema.json` for `src/modules/vms/VMs.json`).
 - JSONC files that already embed `$schema` do not need additional mappings.
 
 ### Pre-flight and check discovery
