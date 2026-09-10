@@ -6,7 +6,8 @@
   Manages the CamillaDSP heartbeat lifecycle:
     1. Creates or removes a logon scheduled task that runs
        src/scripts/services/camilladsp-heartbeat.ps1 (persistent-loop daemon with
-       exponential backoff).
+       exponential backoff) through a generated logging wrapper, so the
+       heartbeat's output lands in its declared log directory.
 
   The heartbeat re-applies the config when CamillaDSP restarts after the
   underlying audio device disappears and reappears (same function as
@@ -80,7 +81,26 @@ function Sync-CamillaDSPHeartbeatService {
   # Resolve path to the shared heartbeat script.
   $heartbeatScript = Join-Path $PSScriptRoot "..\..\..\..\..\src\scripts\services\camilladsp-heartbeat.ps1"
 
-  $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -File `"$heartbeatScript`" -Port $CamillaDSPPort -ConfigFile `"$ConfigFile`""
+  # The heartbeat is user-scope, so it logs into the user log root under its own
+  # directory name. That directory is provisioned from services.json
+  # logging.dirs.user by Invoke-EnsureLogDir.
+  $serviceLogDir = Join-Path -Path (Get-NucleusLogDir) -ChildPath "camilladsp-heartbeat"
+  $logFile = Join-Path -Path $serviceLogDir -ChildPath "stderr.log"
+
+  # A scheduled task action cannot redirect a process's streams, so point the task
+  # at a generated wrapper that does. Mirrors Sync-LiteLLMService's run wrapper.
+  $wrapperDir = Join-Path -Path $HOME -ChildPath ".config\camilladsp\bin"
+  $null = New-Item -Path $wrapperDir -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+  $wrapperScript = Join-Path -Path $wrapperDir -ChildPath "heartbeat-run.ps1"
+  $wrapperContent = Get-Content -Raw (Join-Path -Path $PSScriptRoot -ChildPath "..\scripts\CamillaDSP-heartbeat-run.ps1")
+  $wrapperContent = $wrapperContent `
+    -replace '__HEARTBEAT_SCRIPT__', $heartbeatScript `
+    -replace '__PORT__', $CamillaDSPPort `
+    -replace '__CONFIG_FILE__', $ConfigFile `
+    -replace '__LOGFILE__', $logFile
+  [System.IO.File]::WriteAllText($wrapperScript, $wrapperContent, [System.Text.UTF8Encoding]::new($false))
+
+  $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -File `"$wrapperScript`""
   $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
   $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
   $principal = New-ScheduledTaskPrincipal -UserId $userId -RunLevel Limited
