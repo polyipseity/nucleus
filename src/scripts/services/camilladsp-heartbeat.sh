@@ -58,21 +58,23 @@ _current_sleep=$_base_sleep
 while true; do
   # --- Runtime toggles from config.json ---
   # camilladsp.heartbeat — master switch for this loop (default true).
-  # camilladsp.enable    — gates automatic device binding (default true).
+  # camilladsp.enable    — gates automatic device binding (default false).
   #   With binding off the loop still runs, so the service stays loaded and the
   #   websocket API stays up for camillagui, but nothing opens an audio input.
   #   WHY: an open capture device lights the macOS microphone privacy indicator,
   #   and the indicator path is broken on this board (J813), which burns ~40% of
   #   a core in WindowServer — set this false to stop that.  A manual push from
   #   camillagui still applies normally either way.
-  config_json="$(case "$(uname -s)" in Darwin) echo "$HOME/Library/Application Support/nucleus/config.json" ;; *) echo "$HOME/.local/share/nucleus/config.json" ;; esac)"
+  config_json="$HOME/.local/state/nucleus/config.json"
   _hb_enabled=true
-  _bind_enabled=true
+  _bind_enabled=false
   if [ -f "$config_json" ]; then
     # `//` cannot be used for these: jq treats `false` as empty, so `.key // true`
     # yields true for an explicit false and the toggle could never be disabled.
     _hb_enabled=$(jq -r 'if .camilladsp.heartbeat == null then true else .camilladsp.heartbeat end' "$config_json")
-    _bind_enabled=$(jq -r 'if .camilladsp.enable == null then true else .camilladsp.enable end' "$config_json")
+    # Default must match the DEFAULTS entry in scripts/config.sh (false), otherwise the
+    # CLI reports one value while this direct reader acts on the opposite one.
+    _bind_enabled=$(jq -r 'if .camilladsp.enable == null then false else .camilladsp.enable end' "$config_json")
   fi
   # With binding disabled there is nothing to probe for — the probe exists only
   # to feed the push decision — so the whole tick is skipped rather than doing

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Manages runtime configuration for nucleus services.
-# Config is stored in the nucleus USER root (~/Library/Application Support/nucleus/config.json on macOS, ~/.local/share/nucleus/config.json on NixOS).
+# Config is stored at ~/.local/state/nucleus/config.json on every host (see
+# script-authoring.instructions.md).
 # Subcommands: get, set, list.
 
 set -euo pipefail
@@ -17,10 +18,10 @@ fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
-case "$(uname -s)" in
-Darwin) CONFIG_FILE="$HOME/Library/Application Support/nucleus/config.json" ;;
-*) CONFIG_FILE="$HOME/.local/share/nucleus/config.json" ;;
-esac
+# WHY: one canonical location on every host. Resolving this per-OS made the CLI disagree
+# with scripts/config.ps1 and with the documented path, so automation reading the documented
+# path would silently see no config at all.
+CONFIG_FILE="$HOME/.local/state/nucleus/config.json"
 
 usage() {
   usage_std "$(basename "$0")" "get [<section.key>]|set <section.key> <value>|list" "Manage runtime configuration for nucleus services."
