@@ -1140,7 +1140,7 @@
       homeConfigurations.${username} = home-manager.lib.homeManagerConfiguration {
         extraSpecialArgs = {
           hostName = "NixOS";
-          inherit nixpkgs username repoRoot;
+          inherit nixpkgs username repoRoot hermes-agent;
           users = usersNixOS;
           vsCodeMarketplace = vsCodeMarketplaceLinux;
         };
