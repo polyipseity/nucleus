@@ -550,10 +550,8 @@ Darwin)
   # `-H` sets HOME to root's home so Nix does not inherit a user-owned HOME
   # while running as root (which otherwise produces ownership warnings).
   run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#MacBook"
-  # Re-derive and rewrite the system repo-root file after activation overwrote
-  # it with the Nix store path (repo-root-file.nix writes ${repoRoot} which
-  # resolves to /nix/store/...). The live checkout path is needed by scripts
-  # that call derive_repo_root() to access src/modules/*.json data files.
+  # Refresh the recorded live repo root after the rebuild in case the checkout
+  # moved during activation. This file is the value derive_repo_root() consumes.
   _post_rebuild_repo_root="$(derive_repo_root)"
   printf '%s\n' "$_post_rebuild_repo_root" | sudo -H tee "/Library/Application Support/nucleus/repo-root" >/dev/null
   run_pin_flake_inputs
@@ -579,12 +577,15 @@ Linux)
     "$_ash_script_dir/secrets/register-host-age-key.sh" --repo-root "$REPO_ROOT"
     run_health_check
     run_pre_build
+    # Activation scripts run under `env -i` and cannot read NUCLEUS_REPO_ROOT;
+    # record the live root at the SYSTEM root so derive_repo_root resolves
+    # REPO_ROOT during activation (menu-bar/autostart convergence depend on it).
+    sudo -H install -d -m 0755 "/var/lib/nucleus"
+    printf '%s\n' "$REPO_ROOT" | sudo -H tee "/var/lib/nucleus/repo-root" >/dev/null
     # Keep root invocations on root-owned HOME for consistent Nix behavior.
     run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#NixOS"
-    # Re-derive and rewrite the system repo-root file after activation overwrote
-    # it with the Nix store path (repo-root-file.nix writes ${repoRoot} which
-    # resolves to /nix/store/...). The live checkout path is needed by scripts
-    # that call derive_repo_root() to access src/modules/*.json data files.
+    # Refresh the recorded live repo root after the rebuild in case the checkout
+    # moved during activation. This file is the value derive_repo_root() consumes.
     _post_rebuild_repo_root="$(derive_repo_root)"
     printf '%s\n' "$_post_rebuild_repo_root" | sudo -H tee "/var/lib/nucleus/repo-root" >/dev/null
     run_pin_flake_inputs
