@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ClawHub fetched skill convergence (install + stale cleanup).
-# Consumes tool paths, PATH guards, repo root, and manifest path at
-# activation time.
+# Consumes tool paths, PATH guards, and the manifest path at activation time;
+# the repo root is resolved via derive_repo_root() so the manifest is read from
+# the live checkout, never a read-only Nix store snapshot.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -13,9 +14,11 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 _scs_jq_bin="$1"
 _scs_path_prepend="$2"
 _scs_path_append="$3"
-_scs_repo_root="$4"
-_scs_manifest_rel="$5"
-_scs_clawhub_bin="$6"
+_scs_manifest_rel="$4"
+_scs_clawhub_bin="$5"
+
+# Resolve the live repo root at activation time.
+_scs_repo_root="$(derive_repo_root)" || die -l clawhub "cannot resolve repo root for the fetched skill manifest"
 
 _scs_do_sync=true
 

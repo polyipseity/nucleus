@@ -270,7 +270,6 @@ in
         "${pkgs.jq}/bin/jq" \
         "${managedPaths.toShellPrependGuard}" \
         "${managedPaths.toShellAppendGuard}" \
-        "${repoRoot}" \
         "${clawhubManifestRelativePath}" \
         "$HOME/${builtins.elemAt managedPaths.pathComponents.append 0}/clawhub"
     '';
