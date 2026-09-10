@@ -181,7 +181,9 @@ PYEOF
   local _rc=$?
   rm -f "$_tmpfile"
   [ "${#names[@]}" -eq 0 ] && return $_rc
-  printf '%s\n' "${names[@]}" | sort
+  # WHY: pin collation so the documented deterministic ordering does not depend on the
+  # caller's locale (a UTF-8 locale sorts differently from C).
+  printf '%s\n' "${names[@]}" | LC_ALL=C sort
 }
 
 # Linux: enumerate sinks via wpctl/pactl/aplay, excluding the capture device.
@@ -222,7 +224,8 @@ _camilladsp_list_available_linux() {
   fi
 
   [ "${#candidates[@]}" -eq 0 ] && return 1
-  printf '%s\n' "${candidates[@]}" | sort
+  # WHY: same locale pin as camilladsp_list_available_devices above.
+  printf '%s\n' "${candidates[@]}" | LC_ALL=C sort
 }
 
 # List all available playback output devices (excluding capture_device).
