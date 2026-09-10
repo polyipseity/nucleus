@@ -31,7 +31,7 @@
 #   camilladsp_push_config [--port PORT] [--config FILE] [--retries N] [--retry-delay S]
 #     Resolves the config and pushes it via SetConfig over the websocket API.
 #
-# Dependencies: python3 (yaml module), websocat, jq, system_profiler (macOS),
+# Dependencies: python3 (yaml module), websocat, jq, SwitchAudioSource (macOS),
 #               wpctl/pactl/aplay (Linux)
 #
 # State file: ~/.local/state/camilladsp/last-device.txt persists the last device
@@ -51,28 +51,12 @@ _has_command() { command -v "$1" >/dev/null 2>&1; }
 
 # --- Platform-specific default output detection ---
 
-# macOS: parse system_profiler SPAudioDataType -json for the default output device.
-# Real system_profiler emits device flags as flat top-level keys and _properties
-# as a string naming the default property. The default output device is the one
-# whose coreaudio_default_audio_system_device == 'spaudio_yes'.
+# macOS: use SwitchAudioSource to query the default output device.
+# SwitchAudioSource -c returns the current default output device name in <1ms
+# with zero TCC cost (no system_profiler, no coreaudiod permission checks).
+# Requires: switchaudio-osx (managed via managedPackages).
 _camilladsp_detect_macos() {
-  local output
-  output=$(system_profiler SPAudioDataType -json 2>/dev/null) || return 1
-
-  local _tmpfile
-  _tmpfile=$(mktemp) || return 1
-  cat <<PYEOF >"$_tmpfile"
-import json, sys
-for dev in json.loads(sys.stdin.read()).get('SPAudioDataType', []):
-    for item in dev.get('_items', []):
-        if item.get('coreaudio_default_audio_system_device') == 'spaudio_yes':
-            print(item.get('_name', ''))
-            sys.exit(0)
-PYEOF
-  python3 "$_tmpfile" <<<"$output" 2>/dev/null
-  local _rc=$?
-  rm -f "$_tmpfile"
-  return $_rc
+  SwitchAudioSource -c 2>/dev/null || return 1
 }
 
 # Linux: try WirePlumber → PulseAudio → ALSA in order.
@@ -392,11 +376,13 @@ camilladsp_needs_push() {
 
 # Resolve the config and push it via SetConfig over the websocket API.
 # Retries with a fixed delay until success or retries exhausted.
-# Arguments: [--port PORT] [--config FILE] [--retries N] [--retry-delay S]
+# Arguments: [--port PORT] [--config FILE] [--device NAME] [--retries N] [--retry-delay S]
+# When --device is provided, skip resolution and patch the config directly.
 # Returns 0 on successful SetConfig, 1 otherwise.
 camilladsp_push_config() {
   local ws_port="${WS_PORT:-1234}"
   local config_file="$HOME/.config/camilladsp/configs/config.yml"
+  local device=""
   local retries=1
   local retry_delay=0.5
 
@@ -409,6 +395,10 @@ camilladsp_push_config() {
     --config)
       shift
       config_file="${1:-$config_file}"
+      ;;
+    --device)
+      shift
+      device="${1:-}"
       ;;
     --retries)
       shift
@@ -429,7 +419,25 @@ camilladsp_push_config() {
   [ -f "$config_file" ] || return 1
 
   local _resolved_config
-  _resolved_config=$(camilladsp_resolve_playback_device "$config_file") || return 1
+  if [ -n "$device" ]; then
+    # Skip resolution: patch config with the provided device name directly.
+    local _patchfile
+    _patchfile=$(mktemp) || return 1
+    cat <<PYEOF >"$_patchfile"
+import yaml, sys
+with open(sys.argv[1]) as f:
+    cfg = yaml.safe_load(f)
+cfg['devices']['playback']['device'] = sys.argv[2]
+yaml.dump(cfg, sys.stdout, default_flow_style=False, allow_unicode=True, sort_keys=False)
+PYEOF
+    _resolved_config=$(python3 "$_patchfile" "$config_file" "$device") || {
+      rm -f "$_patchfile"
+      return 1
+    }
+    rm -f "$_patchfile"
+  else
+    _resolved_config=$(camilladsp_resolve_playback_device "$config_file") || return 1
+  fi
 
   local _i
   for _i in $(seq 1 "$retries"); do

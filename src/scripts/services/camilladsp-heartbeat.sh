@@ -98,8 +98,8 @@ except Exception:
 
   if camilladsp_needs_push "$_state" "$_live" "$_target"; then
     # --- Push config ---
-    # Resolve playback device: patches empty device in config with system default.
-    if camilladsp_push_config --port "$ws_port" --config "$config_file"; then
+    # Pass resolved device to avoid redundant detection on push.
+    if camilladsp_push_config --port "$ws_port" --config "$config_file" --device "$_target"; then
       _success=true
     fi
   else
