@@ -8,7 +8,7 @@ applyTo: "scripts/vm.*, scripts/vm-setup.*, src/scripts/lib/vm.sh, src/scripts/v
 
 ## Guest identity
 
-Manifest: `src/modules/VMs.json`. Not using `guestId`, `guestName`, or `osType`.
+Manifest: `src/modules/vms/VMs.json`. Not using `guestId`, `guestName`, or `osType`.
 
 Key rules: `id` for file paths/CLI, `name` for display, `type` for build templates, `hostname` for in-guest identity (must equal `name`). Full field contract, tokens, path layout in `vm-reference.reference.md`.
 
@@ -78,7 +78,7 @@ POSIX `apply.sh` runs `nucleus-vm sync` unless `--no-vm-sync`. Windows `apply.ps
 
 ## Adding a new VM
 
-1. Add entry to `src/modules/VMs.json` with all required fields.
+1. Add entry to `src/modules/vms/VMs.json` with all required fields.
 2. Run `nucleus-vm setup` on all host platforms.
 3. Add test in `tests/modules/vm-setup-tests.nix` if platform-specific constraints exist.
 4. Update `src/hosts/<platform>/MANUAL.md` if manual steps required.
@@ -110,5 +110,5 @@ Two-phase: phase 1 builds QCOW2 OS images (if absent); phase 2 provisions bundle
 
 ## Removing a VM
 
-1. Remove entry from `src/modules/VMs.json`.
+1. Remove entry from `src/modules/vms/VMs.json`.
 2. Delete disk and registration: macOS delete `.utm` bundle; NixOS `virsh undefine` + delete `.qcow2`; Windows delete `.qcow2` + start script.

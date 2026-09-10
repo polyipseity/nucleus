@@ -215,7 +215,7 @@ validate_qcow2_image() {
 
 # vm_resolve_guest_ssh_public_key USERNAME REPO_ROOT
 #   Prints the first readable SSH public key under ~/.ssh per
-#   src/modules/vm-guest-ssh-public-key-paths.json. Static id_*.pub paths are
+#   src/modules/vms/vm-guest-ssh-public-key-paths.json. Static id_*.pub paths are
 #   tried before username templates (ssh_personal_{username}.pub, etc.).
 #   Returns 1 when no key exists.
 vm_resolve_guest_ssh_public_key() {

@@ -15,7 +15,7 @@ What nucleus manages at apply time, what stays on OS defaults, and bootstrap-onl
 | Root / block layout | — (APFS defaults) | [`fileSystems`](../../src/hosts/NixOS/hardware/disks.nix), [`filesystems.nix`](../../src/hosts/NixOS/filesystems.nix) | — (NTFS defaults) |
 | Removable NTFS RW | fuse-t + ntfs-3g + Mounty ([`homebrew.nix`](../../src/hosts/MacBook/homebrew.nix), [`ntfs-3g.nix`](../../src/hosts/MacBook/ntfs-3g.nix)) | ntfs-3g via udisks2/GVFS ([`filesystems.nix`](../../src/hosts/NixOS/filesystems.nix), [`desktop.nix`](../../src/hosts/NixOS/desktop.nix)) | native NTFS |
 | Cloud FUSE mounts | rclone + FUSE-T ([`cloud-drives.nix`](../../src/modules/cloud-drives.nix)) | rclone + fuse3 | rclone + WinFsp ([`packages.dsc.yml`](../../src/hosts/Windows/system/packages.dsc.yml)) |
-| VM disk container | QCOW2 ([`VMs.json`](../../src/modules/VMs.json), [`vm-management.instructions.md`](vm-management.instructions.md)) | QCOW2 + VirtioFS host share | QCOW2 |
+| VM disk container | QCOW2 ([`VMs.json`](../../src/modules/vms/VMs.json), [`vm-management.instructions.md`](vm-management.instructions.md)) | QCOW2 + VirtioFS host share | QCOW2 |
 | Storage hygiene | Finder Trash prune ([`defaults.nix`](../../src/hosts/MacBook/defaults.nix)) | — | Storage Sense ([`storage-sense.dsc.yml`](../../src/hosts/Windows/system/storage-sense.dsc.yml)) |
 | Long paths | — | — | [`long-paths.dsc.yml`](../../src/hosts/Windows/system/long-paths.dsc.yml) |
 
