@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Resolves per-user homedir overlay paths. Mirrors users-overlay.nix.
 #
+# Repo root resolution is delegated to derive_repo_root() (lib.sh) — never
+# re-implemented here, so store snapshots are rejected and the system
+# repo-root file is the single fallback for every caller.
+#
 # Cross-platform consistency: deduplication is case-insensitive (weakest
 # constraint — works on NTFS, POSIX, and Nix). Symlink detection follows
 # symlinks (-e only), matching Nix pathExists and Windows Test-Path.
@@ -13,32 +17,13 @@ _LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 . "$_LIB_DIR/lib.sh"
 unset _LIB_DIR
 
-_resolve_user_config_repo_root() {
-  if [ -n "${NUCLEUS_REPO_ROOT:-}" ]; then
-    printf '%s' "$NUCLEUS_REPO_ROOT"
-    return 0
-  fi
-
-  local script_dir
-  script_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-  local candidate
-  candidate="$(CDPATH='' cd -- "$script_dir/../../.." && pwd -P)"
-  if [ -f "$candidate/src/flake.nix" ]; then
-    printf '%s' "$candidate"
-    return 0
-  fi
-
-  warn -l resolve-user-config "NUCLEUS_REPO_ROOT is not set and repo root could not be derived"
-  return 1
-}
-
 _resolve_user_config_first_level_entry() {
   local username="$1"
   local config_name="$2"
   local entry_name="$3"
   local repo_root per_user default
 
-  repo_root="$(_resolve_user_config_repo_root)"
+  repo_root="$(derive_repo_root)"
   per_user="${repo_root}/src/users/${username}/${config_name}/${entry_name}"
   default="${repo_root}/src/users/default/${config_name}/${entry_name}"
 
@@ -74,7 +59,7 @@ list_user_config_first_level_entries() {
   local repo_root per_user_dir default_dir entry entry_name
   _luc_seen_entries=()
 
-  repo_root="$(_resolve_user_config_repo_root)"
+  repo_root="$(derive_repo_root)"
   per_user_dir="${repo_root}/src/users/${username}/${config_name}"
   default_dir="${repo_root}/src/users/default/${config_name}"
 
@@ -129,7 +114,7 @@ resolve_user_config_source() {
   local host_name="$4"
   local repo_root per_user default
 
-  repo_root="$(_resolve_user_config_repo_root)"
+  repo_root="$(derive_repo_root)"
   per_user="${repo_root}/src/users/${username}/${config_name}/${host_name}.${extension}"
   default="${repo_root}/src/users/default/${config_name}/${host_name}.${extension}"
 
