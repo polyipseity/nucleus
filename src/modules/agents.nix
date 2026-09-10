@@ -57,6 +57,11 @@ let
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
 {
+  # WHY: OpenCode discovers global agents under ~/.config/opencode/agents and
+  # global commands under ~/.config/opencode/commands. Both are bridged to the
+  # single shared agent-asset tree in ~/.agents/ (agents -> agents/, commands ->
+  # prompts/) so nothing is duplicated. linkGeneration rewrites these two paths
+  # on every apply, hence the unprotect/protect pairing around it.
   home.file = {
     ".config/opencode/agents".source =
       config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/agents";
