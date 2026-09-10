@@ -15,8 +15,8 @@ let
   userSecrets = builtins.filter (s: s.sopsSource == "user") secrets.secrets;
 
   # SOPS file paths.
-  systemSopsFile = ../secrets/system.yml;
-  userSopsFile = ../secrets/users + "/${username}.yml";
+  systemSopsFile = ../../secrets/system.yml;
+  userSopsFile = ../../secrets/users + "/${username}.yml";
 
   # Parse top-level key names from a SOPS YAML file.
   # Key names are plaintext (only values are encrypted).
