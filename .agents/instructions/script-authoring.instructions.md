@@ -77,7 +77,7 @@ Scripts must not assume cwd is inside the repository. Script-specific `--repo-ro
 
 ## Runtime configuration (`nucleus-config`)
 
-Runtime toggles live at `~/.local/state/nucleus/config.json` (outside `~/.config/` so changes survive rebuilds), resolved identically on every host. Toggles default to `true` when absent unless the entry documents a different default; the default is enforced by `scripts/config.sh` / `scripts/config.ps1`. Services read the config file directly for early-boot compatibility. When adding a toggle: add a default entry to both script implementations, and read the key in consuming code (including direct readers) with the same default as that entry.
+Runtime toggles live at `~/.local/state/nucleus/config.json` (outside `~/.config/` so changes survive rebuilds), resolved identically on every host. Toggles default to `true` when absent, enforced by `scripts/config.sh` / `scripts/config.ps1`. Services read the config file directly for early-boot compatibility. When adding a toggle: add a default entry to both script implementations, and read the key in consuming code (including direct readers) with the same default as that entry.
 
 ## Terminology in examples
 
