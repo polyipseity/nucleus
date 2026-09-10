@@ -30,10 +30,10 @@ elif [ -e "$_as_agents_dir" ] && [ ! -d "$_as_agents_dir" ]; then
 fi
 
 _nucleus_remove_stale_merged_symlinks \
-  "$_as_agents_dir" "$_as_username" "agents" "$_as_repo_root" "agents-config" "skills pi-extensions"
+  "$_as_agents_dir" "$_as_username" "agents" "agents-config" "skills pi-extensions"
 
 _nucleus_converge_merged_config_symlinks \
-  "$_as_username" "agents" "$_as_repo_root" "$_as_agents_dir" "agents-config" \
+  "$_as_username" "agents" "$_as_agents_dir" "agents-config" \
   "" "-e" \
   "is not a managed symlink — merge any wanted content into the source entry and remove it, then re-run apply." \
   "skills pi-extensions"

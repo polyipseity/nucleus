@@ -12,7 +12,9 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _scc_repo_root="$1"
 _scc_username="$2"
-if [ -n "$_scc_repo_root" ]; then
+# Skip exporting NUCLEUS_REPO_ROOT when the path is a Nix store snapshot —
+# derive_repo_root() will fall back to the system repo-root file silently.
+if [ -n "$_scc_repo_root" ] && case "$_scc_repo_root" in /nix/store/*) false ;; *) true ;; esac then
   export NUCLEUS_REPO_ROOT="$_scc_repo_root"
 fi
 _scc_label="cursor-config"
@@ -130,10 +132,10 @@ _scc_converge_mapped_file_symlinks \
 # ~/.cursor/.
 _scc_overlay_skip_names="rules agents commands skills settings.json"
 _nucleus_remove_stale_merged_symlinks \
-  "$_scc_cursor_dir" "$_scc_username" "cursor" "$_scc_repo_root" "$_scc_label" "$_scc_overlay_skip_names"
+  "$_scc_cursor_dir" "$_scc_username" "cursor" "$_scc_label" "$_scc_overlay_skip_names"
 
 _nucleus_converge_merged_config_symlinks \
-  "$_scc_username" "cursor" "$_scc_repo_root" "$_scc_cursor_dir" "$_scc_label" \
+  "$_scc_username" "cursor" "$_scc_cursor_dir" "$_scc_label" \
   "" "-e" \
   "is not a managed symlink — merge any wanted content into the source entry and remove it, then re-run apply." \
   "$_scc_overlay_skip_names"

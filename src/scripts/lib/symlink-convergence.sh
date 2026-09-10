@@ -111,7 +111,7 @@ _nucleus_converge_overlay_entry() {
   fi
 }
 
-# _nucleus_converge_merged_config_symlinks USERNAME CONFIG_NAME REPO_ROOT \
+# _nucleus_converge_merged_config_symlinks USERNAME CONFIG_NAME \
 #   TARGET_DIR LABEL FIND_TYPE CONFLICT_TEST CONFLICT_MSG_SUFFIX [SKIP_NAMES]
 #
 # Converges first-level merged overlay entries into TARGET_DIR. Skips SKIP_NAMES.
@@ -119,14 +119,12 @@ _nucleus_converge_overlay_entry() {
 _nucleus_converge_merged_config_symlinks() {
   _cmc_username="$1"
   _cmc_config_name="$2"
-  _cmc_repo_root="$3"
-  _cmc_target="$4"
-  _cmc_label="$5"
-  _cmc_find_type="$6"
-  _cmc_conflict_test="$7"
-  _cmc_conflict_msg_suffix="$8"
-  _cmc_skips="${9:-}"
-  export NUCLEUS_REPO_ROOT="$_cmc_repo_root"
+  _cmc_target="$3"
+  _cmc_label="$4"
+  _cmc_find_type="$5"
+  _cmc_conflict_test="$6"
+  _cmc_conflict_msg_suffix="$7"
+  _cmc_skips="${8:-}"
   while IFS= read -r _cmc_entry_name; do
     [ -n "$_cmc_entry_name" ] || continue
     for _cmc_skip in $_cmc_skips; do
@@ -151,10 +149,8 @@ _nucleus_remove_stale_merged_symlinks() {
   _rsm_target="$1"
   _rsm_username="$2"
   _rsm_config_name="$3"
-  _rsm_repo_root="$4"
-  _rsm_label="$5"
-  _rsm_skips="${6:-}"
-  export NUCLEUS_REPO_ROOT="$_rsm_repo_root"
+  _rsm_label="$4"
+  _rsm_skips="${5:-}"
   find "$_rsm_target" -mindepth 1 -maxdepth 1 -type l | while IFS= read -r _rsm_candidate; do
     _rsm_cname="$(basename "$_rsm_candidate")"
     for _rsm_skip in $_rsm_skips; do
