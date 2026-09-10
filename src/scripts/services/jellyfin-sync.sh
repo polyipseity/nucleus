@@ -630,16 +630,21 @@ _jfs_sync_libraries() {
     _jfsl_primary_limit="$(printf '%s' "$_jfsl_options" | jq -r '.imageOptions.Primary.limit // 1')"
     _jfsl_image_fetchers="$(printf '%s' "$_jfsl_options" | jq -c '.imageFetchers // ["Embedded Image Extractor","Screen Grabber"]')"
 
+    # Boolean options that default to true must be read with an explicit null
+    # check: `//` also skips an explicit `false`, which would push `true` back
+    # to the server and silently re-enable a library option the user turned off.
+    # The `// false` siblings below are unaffected — `false` is already the
+    # value they would produce.
     _jfsl_library_options="$(jq -cn \
-      --argjson enabled "$(printf '%s' "$_jfsl_options" | jq '.enabled // true')" \
-      --argjson enableRealtimeMonitor "$(printf '%s' "$_jfsl_options" | jq '.enableRealtimeMonitor // true')" \
-      --argjson enableEmbeddedTitles "$(printf '%s' "$_jfsl_options" | jq '.enableEmbeddedTitles // true')" \
+      --argjson enabled "$(printf '%s' "$_jfsl_options" | jq 'if .enabled == null then true else .enabled end')" \
+      --argjson enableRealtimeMonitor "$(printf '%s' "$_jfsl_options" | jq 'if .enableRealtimeMonitor == null then true else .enableRealtimeMonitor end')" \
+      --argjson enableEmbeddedTitles "$(printf '%s' "$_jfsl_options" | jq 'if .enableEmbeddedTitles == null then true else .enableEmbeddedTitles end')" \
       --argjson enableEmbeddedExtrasTitles "$(printf '%s' "$_jfsl_options" | jq '.enableEmbeddedExtrasTitles // false')" \
       --arg allowEmbeddedSubtitles "$(printf '%s' "$_jfsl_options" | jq -r '.allowEmbeddedSubtitles // "AllowAll"')" \
       --argjson saveLocalMetadata "$(printf '%s' "$_jfsl_options" | jq '.saveLocalMetadata // false')" \
-      --argjson enableChapterImageExtraction "$(printf '%s' "$_jfsl_options" | jq '.enableChapterImageExtraction // true')" \
+      --argjson enableChapterImageExtraction "$(printf '%s' "$_jfsl_options" | jq 'if .enableChapterImageExtraction == null then true else .enableChapterImageExtraction end')" \
       --argjson extractChapterImagesDuringLibraryScan "$(printf '%s' "$_jfsl_options" | jq '.extractChapterImagesDuringLibraryScan // false')" \
-      --argjson enableTrickplayImageExtraction "$(printf '%s' "$_jfsl_options" | jq '.enableTrickplayImageExtraction // true')" \
+      --argjson enableTrickplayImageExtraction "$(printf '%s' "$_jfsl_options" | jq 'if .enableTrickplayImageExtraction == null then true else .enableTrickplayImageExtraction end')" \
       --argjson extractTrickplayImagesDuringLibraryScan "$(printf '%s' "$_jfsl_options" | jq '.extractTrickplayImagesDuringLibraryScan // false')" \
       --argjson saveTrickplayWithMedia "$(printf '%s' "$_jfsl_options" | jq '.saveTrickplayWithMedia // false')" \
       --argjson imageFetchers "$_jfsl_image_fetchers" \
