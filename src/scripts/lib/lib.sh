@@ -399,10 +399,7 @@ sha256_of_file() {
 
 # Path to host-platform-registry.json in the nucleus repo.
 nucleus_host_platform_registry_path() {
-  _nhprp_repo="${NUCLEUS_REPO_ROOT:-}"
-  if [ -z "$_nhprp_repo" ]; then
-    _nhprp_repo="$(derive_repo_root)" || return 1
-  fi
+  _nhprp_repo="$(derive_repo_root)" || return 1
   printf '%s\n' "$_nhprp_repo/src/modules/host-platform-registry.json"
 }
 
@@ -438,10 +435,7 @@ nucleus_flag_for_host() {
 
 # Path to services.json in the nucleus repo.
 nucleus_services_json_path() {
-  _nsjp_repo="${NUCLEUS_REPO_ROOT:-}"
-  if [ -z "$_nsjp_repo" ]; then
-    _nsjp_repo="$(derive_repo_root)" || return 1
-  fi
+  _nsjp_repo="$(derive_repo_root)" || return 1
   printf '%s\n' "$_nsjp_repo/src/modules/services.json"
 }
 

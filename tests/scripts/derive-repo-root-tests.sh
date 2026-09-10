@@ -94,10 +94,32 @@ test_system_file_store_path_rejected() {
   fi
 }
 
+# Case E: registry/services path helpers must not accept NUCLEUS_REPO_ROOT
+# verbatim (a store path would otherwise be used as the repo root).
+test_registry_helper_rejects_store_path() {
+  local tmpdir out rc=0 expected
+  tmpdir="$(mktemp -d)"
+  local live="$tmpdir/live"
+  mkdir -p "$live/src/modules"
+  printf 'marker\n' >"$live/src/flake.nix"
+  printf '%s\n' "$live" >"$tmpdir/system-repo-root"
+  out="$(NUCLEUS_REPO_ROOT=/nix/store/nonexistent-source \
+    NUCLEUS_REPO_ROOT_SYSTEM_FILE="$tmpdir/system-repo-root" \
+    bash -c '. "'"$LIB_SH"'"; nucleus_host_platform_registry_path' 2>/dev/null)" || rc=$?
+  expected="$live/src/modules/host-platform-registry.json"
+  rm -rf "$tmpdir"
+  if [ "$rc" -eq 0 ] && [ "$out" = "$expected" ]; then
+    assert_pass "nucleus_host_platform_registry_path ignores a store-path NUCLEUS_REPO_ROOT"
+  else
+    assert_fail "registry-helper-store-path" "rc=$rc output: $out expected: $expected"
+  fi
+}
+
 test_store_path_falls_through
 test_store_path_falls_through_to_script_dir
 test_normal_env_var_accepted
 test_system_file_store_path_rejected
+test_registry_helper_rejects_store_path
 
 # Summary
 if [ "$TESTS_FAILED" -gt 0 ]; then
