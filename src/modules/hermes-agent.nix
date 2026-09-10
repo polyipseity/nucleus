@@ -16,6 +16,9 @@
   ...
 }:
 let
+  sopsUtils = import ./lib/sops-utils.nix;
+  inherit (sopsUtils) parseSopsKeys missingSopsKeys;
+
   # The flake-parts output already binds `inputs` internally —
   # homeManagerModules.default is a standard HM module {config, lib, ...}:
   upstreamModule = hermes-agent.homeManagerModules.default;
@@ -29,6 +32,37 @@ let
   # Filter secrets by consumer: only keys where consumers contains "hermes-agent".
   hermesSecrets = builtins.filter (s: builtins.elem "hermes-agent" s.consumers) userSecrets.secrets;
 
+  # Resolve SOPS file paths per sopsSource.
+  sopsFileForEntry =
+    entry:
+    if entry.sopsSource == "system" then
+      ../secrets/system.yml
+    else
+      ../secrets/users + "/${config.home.username}.yml";
+
+  # Parse SOPS file keys for eval-time assertion.
+  # Group hermes secrets by sopsSource and check each SOPS file independently.
+  hermesSystemSecrets = builtins.filter (s: s.sopsSource == "system") hermesSecrets;
+  hermesUserSecrets = builtins.filter (s: s.sopsSource == "user") hermesSecrets;
+
+  systemSopsFile = ../secrets/system.yml;
+  userSopsFile = ../secrets/users + "/${config.home.username}.yml";
+
+  hermesSystemSopsKeys =
+    if hermesSystemSecrets != [ ] && builtins.pathExists systemSopsFile then
+      parseSopsKeys systemSopsFile
+    else
+      [ ];
+  hermesUserSopsKeys =
+    if hermesUserSecrets != [ ] && builtins.pathExists userSopsFile then
+      parseSopsKeys userSopsFile
+    else
+      [ ];
+
+  missingSystemKeys = missingSopsKeys hermesSystemSopsKeys hermesSystemSecrets;
+  missingUserKeys = missingSopsKeys hermesUserSopsKeys hermesUserSecrets;
+  missingKeys = missingSystemKeys ++ missingUserKeys;
+
   # Resolve SOPS secret paths for hermes-consumed keys.
   # Each secret's sopsSource determines which SOPS file to read from.
   mkSecretPath = entry: config.sops.secrets.${entry.name}.path;
@@ -39,16 +73,21 @@ in
 
   imports = [ upstreamModule ];
 
+  # Assert declared hermes secret key names exist in the SOPS file.
+  assertions = [
+    {
+      assertion = missingKeys == [ ];
+      message =
+        "hermes-agent: keys missing from SOPS file: " + builtins.concatStringsSep ", " missingKeys;
+    }
+  ];
+
   # Declare SOPS secrets for all hermes-consumed keys.
   sops.secrets = builtins.listToAttrs (
     map (entry: {
       name = entry.name;
       value = {
-        sopsFile =
-          if entry.sopsSource == "system" then
-            ../secrets/system.yml
-          else
-            ../secrets/users + "/${config.home.username}.yml";
+        sopsFile = sopsFileForEntry entry;
         mode = "0400";
       };
     }) hermesSecrets
