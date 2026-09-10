@@ -492,63 +492,6 @@
             # hermes-agent: adds pkgs.hermes-agent via overlay so the upstream
             # Nix module's default package resolves correctly.
             hermes-agent.overlays.default
-            # WHY: onnxruntime and ctranslate2 build from source via CMake
-            # (CoreML + LTO + ~10 C++ deps), taking 40-80 min on aarch64-darwin
-            # with no binary cache hit. Pre-built PyPI wheels (~17 MB + ~1 MB)
-            # eliminate the build entirely. Wheels are platform-specific, so
-            # this overlay only applies on Darwin; other platforms use the
-            # source build from nixpkgs.
-            (_final: prev: {
-              python3Packages =
-                prev.python3Packages
-                // prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
-                  onnxruntime = prev.python3Packages.buildPythonPackage {
-                    pname = "onnxruntime";
-                    version = "1.27.0";
-                    format = "wheel";
-                    src = prev.fetchurl {
-                      url = "https://files.pythonhosted.org/packages/c3/b7/dd3a524ed93a820dff1af902d0412957ab12499953333e9daa01af5bc480/onnxruntime-1.27.0-cp312-cp312-macosx_14_0_arm64.whl";
-                      hash = "sha256-oUws5FMS3vhrd66mUfRlZeRZYM9fByG/3/RJFlCGq3Y=";
-                    };
-                    meta = prev.onnxruntime.meta or { description = "ONNX Runtime Python bindings"; };
-                  };
-                  ctranslate2 = prev.python3Packages.buildPythonPackage {
-                    pname = "ctranslate2";
-                    version = "4.7.1";
-                    format = "wheel";
-                    src = prev.fetchurl {
-                      url = "https://files.pythonhosted.org/packages/fc/0f/581de94b64c5f2327a736270bc7e7a5f8fe5cf1ed56a2203b52de4d8986a/ctranslate2-4.7.1-cp312-cp312-macosx_11_0_arm64.whl";
-                      hash = "sha256-TAy9RqI7jcN8zb2bRHy19/rcNhyQ6d8X2CyoSx8BmYY=";
-                    };
-                    meta = prev.ctranslate2.meta or { description = "Fast inference engine for Transformer models"; };
-                  };
-                  # WHY: torch builds from source via CMake (OpenBLAS, OpenMP, C++17),
-                  # taking 30-60+ min on aarch64-darwin. Pre-built PyPI wheel (106 MB)
-                  # eliminates the build entirely.
-                  torch = prev.python3Packages.buildPythonPackage {
-                    pname = "torch";
-                    version = "2.13.0";
-                    format = "wheel";
-                    src = prev.fetchurl {
-                      url = "https://files.pythonhosted.org/packages/c4/3a/ed0f4d4d1dcde03bced7aac9a28e800abcdc0cbd06b6775044c9fbd877b7/torch-2.13.0-cp312-cp312-macosx_14_0_arm64.whl";
-                      hash = "sha256-L+Ioq6KQ0UufMbBJvlUNvUacP9MBPXoZcFswRU2pcCc=";
-                    };
-                    meta = prev.torch.meta or { description = "Tensors and Dynamic neural networks in Python"; };
-                  };
-                  # WHY: safetensors is a Rust-based library that builds from source
-                  # (~5 min). Pre-built macOS wheel (0.5 MB) eliminates the build.
-                  safetensors = prev.python3Packages.buildPythonPackage {
-                    pname = "safetensors";
-                    version = "0.8.0";
-                    format = "wheel";
-                    src = prev.fetchurl {
-                      url = "https://files.pythonhosted.org/packages/f5/b1/fa7c600e7dceae12e9606c7578cbc9ff1e1ed55844883ee5c92205e86226/safetensors-0.8.0-cp310-abi3-macosx_11_0_arm64.whl";
-                      hash = "sha256-yAIB0iy/QFuAZHpgrad7ugbI+6LaJ0O6HonNzDmoHyU=";
-                    };
-                    meta = prev.safetensors.meta or { description = "Safe tensor storage and serialization"; };
-                  };
-                };
-            })
             # Expose writeNucleusShellApplication via pkgs so all module and
             # host files can use it without importing from flake.nix.
             (final: _prev: { writeNucleusShellApplication = writeNucleusShellApplication final; })
