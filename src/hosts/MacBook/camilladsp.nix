@@ -4,13 +4,11 @@
 # with --no_config and never reads user-home config, so TCC is not triggered.
 # Config is deployed by Home Manager in modules/home.nix.
 #
-# The heartbeat is a user-scoped launch agent (HM launchd.agents, domain = "gui").
+# The heartbeat is a user-scoped launch agent (environment.userLaunchAgents).
 # It runs inside the primary user's GUI/login session so TCC permits reading
 # $HOME/.config/camilladsp/configs/config.yml (a system daemon is blocked by
 # macOS TCC from reading user-home file contents — EPERM — which previously
-# left the playback device null after every rebuild). HM's setupLaunchAgents
-# restarts the agent on plist change, so a rebuild takes effect on the next
-# apply.
+# left the playback device null after every rebuild).
 #
 # Heartbeat re-pushes the config when camilladsp is not in "Running" state, so
 # config re-applies when a disconnected audio device reappears.
@@ -84,20 +82,19 @@ in
     };
   };
 
-  launchd.agents."camilladsp-heartbeat" = {
-    domain = "gui";
-    # HM's launchd module filters agents by a per-agent `enable` flag (defaults
-    # false via mkEnableOption), so without this the agent is silently dropped
-    # and no plist is generated in ~/Library/LaunchAgents.
+  environment.userLaunchAgents."camilladsp-heartbeat" = {
     enable = true;
-    config = {
+    text = lib.generators.toPlist { escape = true; } {
       Label = "local.camilladsp-heartbeat";
       ProgramArguments = [
         "/bin/sh"
         "-c"
         "exec ${camilladspHeartbeat}/bin/nucleus-camilladsp-heartbeat --port ${wsPort}"
       ];
-      EnvironmentVariables = daemonEnv;
+      EnvironmentVariables = lib.concatMap (name: [
+        name
+        (toString daemonEnv.${name})
+      ]) (builtins.attrNames daemonEnv);
       KeepAlive = true;
       RunAtLoad = true;
       StandardOutPath = "/dev/null";
