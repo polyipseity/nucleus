@@ -33,8 +33,10 @@ let
   test_wrapper_module_imports_upstream = assert' (lib.hasInfix "hermes-agent.homeManagerModules.default" wrapperText) "wrapper module must import upstream homeManagerModules.default";
 
   test_wrapper_module_excludes_voice_group = assert' (
-    lib.hasInfix "extraDependencyGroups" wrapperText && !(lib.hasInfix "\"voice\"" wrapperText)
-  ) "wrapper module must not enable the voice dependency group (ML source builds)";
+    lib.hasInfix "extraDependencyGroups" wrapperText && lib.hasInfix ''lib.remove "voice"'' wrapperText
+  ) "wrapper module must subtract the voice group from upstream's full list (ML source builds)";
+
+  test_wrapper_module_asserts_group_read = assert' (lib.hasInfix ''lib.elem "voice" upstreamFullDependencyGroups'' wrapperText) "wrapper module must fail closed when upstream's group list cannot be read";
 
   test_wrapper_module_enables_programs = assert' (lib.hasInfix "programs.hermes-agent.enable" wrapperText) "wrapper module must enable programs.hermes-agent";
 
@@ -66,6 +68,7 @@ let
     test_hermes_agent_in_flake_inputs
     test_wrapper_module_imports_upstream
     test_wrapper_module_excludes_voice_group
+    test_wrapper_module_asserts_group_read
     test_wrapper_module_enables_programs
     test_wrapper_module_enables_services
     test_wrapper_module_gateway_per_host
