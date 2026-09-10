@@ -11,6 +11,7 @@
 {
   config,
   lib,
+  pkgs,
   hostName,
   hermes-agent,
   ...
@@ -102,5 +103,34 @@ in
     gateway.enable = if hostName == "MacBook" then lib.mkDefault true else lib.mkDefault false;
     # Wire SOPS-decrypted API key files into the service environment.
     environmentFiles = lib.mkIf (hermesSecretPaths != [ ]) hermesSecretPaths;
+
+    # WHY: upstream's default package is `full`, which includes the `voice`
+    # group (faster-whisper -> ctranslate2/onnxruntime/torch/transformers).
+    # Those build from source for 30-80 min each on aarch64-darwin with no
+    # binary cache, and upstream's overlay is a pure alias to its own package
+    # so nucleus cannot substitute wheels for them. Restating the group list
+    # without `voice` keeps every other integration while dropping the
+    # expensive ML closure. Mirrors upstream's own `full` definition, including
+    # `matrix` on Linux only (oqs/liboqs has no aarch64-darwin wheels).
+    extraDependencyGroups = [
+      "anthropic"
+      "azure-identity"
+      "bedrock"
+      "daytona"
+      "dingtalk"
+      "edge-tts"
+      "exa"
+      "fal"
+      "feishu"
+      "firecrawl"
+      "hindsight"
+      "honcho"
+      "messaging"
+      "modal"
+      "parallel-web"
+      "tts-premium"
+      "vercel"
+    ]
+    ++ lib.optionals pkgs.stdenv.isLinux [ "matrix" ];
   };
 }
