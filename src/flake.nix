@@ -7,11 +7,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     hermes-agent = {
-      url = "github:NousResearch/hermes-agent/v2026.7.7";
-      # WHY: Pin to v2026.7.7 which uses nixpkgs 6201e203d095 (2026-04-01)
-      # with older, cached packages (onnxruntime-1.26.0, ctranslate2-4.6.1,
-      # torch-2.6.0). Removing follows lets the upstream flake use its own
-      # pin, avoiding 60+ min source builds.
+      url = "github:NousResearch/hermes-agent/v2026.8.31";
+      # WHY: v2026.8.31 is the first release with homeManagerModules.default
+      # (added by PR #84178, merged 2026-08-19). Previous v2026.7.7 did not
+      # expose this attribute. The torch/safetensors wheel overrides in mkPkgs
+      # handle the slower dependency builds.
     };
     home-manager = {
       url = "github:nix-community/home-manager";
