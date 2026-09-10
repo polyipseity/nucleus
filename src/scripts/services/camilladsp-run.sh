@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # Process runner for CamillaDSP. Starts camilladsp with --no_config and
-# supervises the single process until it exits. Config is pushed by the
-# separate camilladsp-heartbeat service — this script does NOT push config.
+# supervises the single process until it exits.
+#
+# This script never pushes a config. The heartbeat is the only pusher, which
+# keeps a single writer for the audio graph and lets the camilladsp.enable
+# toggle gate binding in exactly one place. Pushing here as well meant two
+# writers racing at boot, each tearing down and rebuilding the CoreAudio graph.
 #
 # Dependencies: camilladsp — PATH managed via writeShellApplication runtimeInputs
 #
@@ -52,13 +56,6 @@ require_command camilladsp
 # Start camilladsp in background and supervise the single process until it exits.
 camilladsp -p "$ws_port" --statefile "$state_file" -w --no_config -o "$log_file" &
 pid=$!
-
-# Push an initial config once camilladsp is up so the device is set even if the
-# heartbeat is briefly unavailable. Best-effort: the heartbeat owns steady-state
-# pushing, so a failure here must not kill the supervisor.
-# shellcheck source=./camilladsp-deviceselect.sh
-. "$SCRIPT_DIR/camilladsp-deviceselect.sh"
-camilladsp_push_config --port "$ws_port" --retries 5 --retry-delay 1 || true # check-suppress:suppression_doc: initial push is best-effort; the heartbeat owns steady-state config and will retry
 
 # Wait for camilladsp to exit
 wait "$pid"
