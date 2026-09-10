@@ -11,7 +11,7 @@ let
   lib = import <nixpkgs/lib>;
 
   aiNix = builtins.readFile ../../../src/hosts/MacBook/ai.nix;
-  redisNix = builtins.readFile ../../../src/modules/audio/redis.nix;
+  redisNix = builtins.readFile ../../../src/modules/redis.nix;
   daemonSh = builtins.readFile ../../../src/scripts/services/litellm-daemon.sh;
   servicesJson = builtins.fromJSON (builtins.readFile ../../../src/modules/services.json);
   redisHost = servicesJson.redis.network.default.host;
