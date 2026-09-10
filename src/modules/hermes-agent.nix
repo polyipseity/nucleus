@@ -11,7 +11,6 @@
 {
   config,
   lib,
-  pkgs,
   hostName,
   hermes-agent,
   ...
@@ -50,7 +49,6 @@ in
             ../secrets/system.yml
           else
             ../secrets/users + "/${config.home.username}.yml";
-        owner = config.home.username;
         mode = "0400";
       };
     }) hermesSecrets
