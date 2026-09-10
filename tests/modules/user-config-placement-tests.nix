@@ -32,6 +32,11 @@ assert containsRegex "overlay.selectSource.*rimsort" homeText;
 assert !containsRegex "src/users/.*/rimsort/rimsort.*hostName.*\.json" homeText;
 # Verify shell resolver has resolve_user_config_source for parity with Nix/Windows.
 assert containsRegex "resolve_user_config_source" resolveUserConfigText;
+# Verify the resolver delegates repo-root resolution to derive_repo_root() — a
+# duplicate implementation previously bypassed store-snapshot rejection.
+assert containsRegex "derive_repo_root" resolveUserConfigText;
+assert !containsRegex "_resolve_user_config_repo_root" resolveUserConfigText;
+assert !containsRegex "src/flake.nix" resolveUserConfigText;
 assert containsRegex "Resolve-UserConfigSource" configHelpersText;
 {
   success = true;

@@ -74,9 +74,30 @@ test_normal_env_var_accepted() {
   fi
 }
 
+# Case D: system repo-root file holding a Nix store path is rejected.
+test_system_file_store_path_rejected() {
+  local tmpdir out rc=0 expected
+  tmpdir="$(mktemp -d)"
+  expected="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
+  out="$(NUCLEUS_REPO_ROOT_SYSTEM_FILE="$tmpdir/system-repo-root" \
+    SCRIPT_DIR="$(cd "$SCRIPT_DIR/../../src/scripts/lib" && pwd -P)" \
+    bash -c '
+      printf "%s\n" "/nix/store/fake-source" > "'"$tmpdir"'/system-repo-root"
+      . "'"$LIB_SH"'"
+      derive_repo_root
+    ' 2>/dev/null)" || rc=$?
+  rm -rf "$tmpdir"
+  if [ "$rc" -eq 0 ] && [ "$out" = "$expected" ]; then
+    assert_pass "derive_repo_root ignores store paths recorded in the system repo-root file"
+  else
+    assert_fail "system-file-store-path" "rc=$rc output: $out expected: $expected"
+  fi
+}
+
 test_store_path_falls_through
 test_store_path_falls_through_to_script_dir
 test_normal_env_var_accepted
+test_system_file_store_path_rejected
 
 # Summary
 if [ "$TESTS_FAILED" -gt 0 ]; then

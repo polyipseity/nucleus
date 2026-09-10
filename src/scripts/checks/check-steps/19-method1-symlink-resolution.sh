@@ -45,9 +45,17 @@ run_method1_symlink_resolution() {
     return 2
   }
 
-  # Candidate method-1 targets (relative to $HOME). Mirrors managedSymlinkPaths +
-  # the per-user configs wired through seed-writable-symlink.sh.
+  # Candidate method-1 targets (relative to $HOME). Mirrors managedSymlinkPaths,
+  # the per-user configs wired through seed-writable-symlink.sh, and the agent /
+  # cursor overlay trees converged by symlink-agent-config.sh and
+  # symlink-cursor-config.sh.
   local _candidates=(
+    ".agents/agents"
+    ".agents/instructions"
+    ".agents/opencode.jsonc"
+    ".agents/prompts"
+    ".config/opencode/opencode.jsonc"
+    ".cursor/mcp.json"
     ".config/camilladsp/configs"
     ".config/camillagui-backend/config.yml"
     ".config/discord-music-rpc/config.yaml"
