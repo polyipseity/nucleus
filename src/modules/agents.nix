@@ -31,7 +31,7 @@ let
   # mkOutOfStoreSymlink — if repoRoot is unset, both symlink targets and lib
   # sourcing will fail identically.
   effectiveUsername = config.home.username;
-  overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
+  overlay = (import ./lib/users-overlay.nix { inherit lib; }).mkUserOverlay {
     inherit effectiveUsername repoRoot;
   };
   clawhubManifestRelativePath = overlay.toRepoRelPath (

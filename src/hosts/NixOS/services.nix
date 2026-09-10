@@ -20,7 +20,7 @@ let
       username
     else
       config.home.username;
-  overlay = (import ../../modules/lib/users-overlay.nix).mkUserOverlay {
+  overlay = (import ../../modules/lib/users-overlay.nix { inherit lib; }).mkUserOverlay {
     inherit effectiveUsername repoRoot;
   };
 

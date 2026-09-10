@@ -14,7 +14,7 @@ let
   # overlay directory, falling back to the shared defaults below.
   effectiveUsername = if managedUsername != null then managedUsername else username;
 
-  overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
+  overlay = (import ./lib/users-overlay.nix { inherit lib; }).mkUserOverlay {
     inherit effectiveUsername repoRoot hostName;
   };
 

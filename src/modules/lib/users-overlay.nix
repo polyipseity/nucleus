@@ -22,13 +22,9 @@
 # default config dirs (user wins on name collision at resolve time).
 #
 # mkUserOverlay: binds effectiveUsername/repoRoot/hostName to the selectors.
+{ lib }:
 let
-  # ASCII-only toLower using builtins.replaceStrings — no `lib` dependency.
-  # Sufficient for file/directory name deduplication.
-  toLower =
-    builtins.replaceStrings
-      [ "A" "B" "C" "D" "E" "F" "G" "H" "I" "J" "K" "L" "M" "N" "O" "P" "Q" "R" "S" "T" "U" "V" "W" "X" "Y" "Z" ]
-      [ "a" "b" "c" "d" "e" "f" "g" "h" "i" "j" "k" "l" "m" "n" "o" "p" "q" "r" "s" "t" "u" "v" "w" "x" "y" "z" ];
+  toLower = lib.toLower;
 
   # Deduplicate case-insensitively, keeping first occurrence.
   # Per-user entries come before default entries in the input list,

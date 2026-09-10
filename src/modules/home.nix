@@ -55,7 +55,7 @@ let
 
   loggingPaths = import ./lib/logging-paths.nix { inherit pkgs hostName; };
 
-  overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
+  overlay = (import ./lib/users-overlay.nix { inherit lib; }).mkUserOverlay {
     inherit effectiveUsername repoRoot hostName;
   };
 

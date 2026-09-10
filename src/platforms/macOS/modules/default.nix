@@ -11,7 +11,7 @@
   ...
 }:
 let
-  overlay = (import ../../../modules/lib/users-overlay.nix).mkUserOverlay {
+  overlay = (import ../../../modules/lib/users-overlay.nix { inherit lib; }).mkUserOverlay {
     effectiveUsername = config.home.username;
     inherit repoRoot;
   };

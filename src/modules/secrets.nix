@@ -116,7 +116,7 @@ in
   # --------------------------------------------------------------------------
   home.activation.verify-secret-decryption =
     let
-      overlayLib = import ./lib/users-overlay.nix;
+      overlayLib = import ./lib/users-overlay.nix { inherit lib; };
       wallpaperPaths = import ./lib/wallpaper-paths.nix {
         inherit lib;
         repoRoot = ../../.;
