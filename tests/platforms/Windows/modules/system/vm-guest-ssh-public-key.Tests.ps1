@@ -3,7 +3,7 @@
     Verifies Get-VMGuestSshPublicKey resolves keys from the shared manifest.
 .DESCRIPTION
     Runtime tests with a temporary USERPROFILE/.ssh fixture. Paths come from
-    src/modules/vm-guest-ssh-public-key-paths.json.
+    src/modules/vms/vm-guest-ssh-public-key-paths.json.
 .NOTES
     Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/system/vm-guest-ssh-public-key.Tests.ps1 -Passthru"
     Exit codes: 0 on success; 1 on failure

@@ -4,7 +4,7 @@ function Get-VMGuestSshPublicKey {
       Resolves the host SSH public key for NixOS guest authorized_keys injection.
 
     .DESCRIPTION
-      Reads src/modules/vm-guest-ssh-public-key-paths.json and returns the first
+      Reads src/modules/vms/vm-guest-ssh-public-key-paths.json and returns the first
       readable public key under ~/.ssh. Static id_*.pub paths are tried before
       username-scoped nucleus keys (ssh_personal_{username}.pub).
 
@@ -26,7 +26,7 @@ function Get-VMGuestSshPublicKey {
         [string]$Username = ''
     )
 
-    $manifestPath = Join-Path $RepoRoot 'src\modules\vm-guest-ssh-public-key-paths.json'
+    $manifestPath = Join-Path $RepoRoot 'src\modules\vms\vm-guest-ssh-public-key-paths.json'
     if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
         throw "vm-setup: guest SSH public key manifest not found: $manifestPath"
     }
