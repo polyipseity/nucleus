@@ -4,7 +4,7 @@
   # system entrypoint never needs to define a Home Manager-only option.
   # vms.nix generates UTM config.plist templates for each VM in VMs.json.
   home-manager.sharedModules = [
-    ../../modules/iterm2
+    ../../modules/iterm2.nix
     ./cloud-drives.nix
     ./services
     ./vms.nix
