@@ -107,7 +107,9 @@ in
       KeepAlive = true;
       RunAtLoad = true;
       StandardOutPath = "/dev/null";
-      StandardErrorPath = "${config.nucleus.logging.systemLogDir}/camilladsp/heartbeat-stderr.log";
+      # The heartbeat is a user-scope agent, so it logs into the user log root under its
+      # own declared dir (same shape as service-watchdog-user).
+      StandardErrorPath = "${config.nucleus.logging.logDir}/camilladsp-heartbeat/stderr.log";
     };
   };
 }

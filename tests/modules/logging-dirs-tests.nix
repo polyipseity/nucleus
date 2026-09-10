@@ -66,9 +66,12 @@ let
     redisDirs.system == [ "redis" ] && redisDirs.user == [ ]
   ) "redis: dirs.system=[redis] dirs.user=[]";
 
+  # The heartbeat's scope differs per host (user on MacBook/Windows, system on NixOS),
+  # so it declares both roots; each host writes into the root matching its own scope.
   test_camilladsp_heartbeat_dirs = assert' (
-    camillaHeartbeatDirs.system == [ "camilladsp" ] && camillaHeartbeatDirs.user == [ ]
-  ) "camilladsp-heartbeat: dirs.system=[camilladsp] dirs.user=[]";
+    camillaHeartbeatDirs.system == [ "camilladsp-heartbeat" ]
+    && camillaHeartbeatDirs.user == [ "camilladsp-heartbeat" ]
+  ) "camilladsp-heartbeat: dirs.system=[camilladsp-heartbeat] dirs.user=[camilladsp-heartbeat]";
 
   test_camilladsp_runAsUser = assert' camillaRunAsUser "camilladsp: runAsUser=true";
   test_camillagui_runAsUser = assert' camillaGuiRunAsUser "camillagui-backend: runAsUser=true";
