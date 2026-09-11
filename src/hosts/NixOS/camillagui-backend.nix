@@ -16,13 +16,6 @@
       "network-online.target"
       "camilladsp.service"
     ];
-    # WHY the backend creates this itself: its own application log (log_file in
-    # config-NixOS.yml) is written into camilladsp's log dir, and NixOS has no user-log-dir
-    # provisioner — log-dirs-init.sh only creates user dirs on Darwin. The unit prepares
-    # its own target rather than relying on another service's preStart.
-    preStart = ''
-      mkdir -p '%h/.local/share/nucleus/logs/camilladsp'
-    '';
     serviceConfig = {
       Type = "simple";
       User = username;
