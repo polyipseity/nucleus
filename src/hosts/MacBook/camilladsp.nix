@@ -106,7 +106,9 @@ in
       EnvironmentVariables = lib.mapAttrs (_: toString) daemonEnv;
       KeepAlive = true;
       RunAtLoad = true;
-      StandardOutPath = "/dev/null";
+      # WHY: the house default is the stdout.log/stderr.log pair for every service, so
+      # per-iteration heartbeat output is kept in a rotating file rather than discarded.
+      StandardOutPath = "${config.nucleus.logging.logDir}/camilladsp-heartbeat/stdout.log";
       # The heartbeat is a user-scope agent, so it logs into the user log root under its
       # own declared dir (same shape as service-watchdog-user).
       StandardErrorPath = "${config.nucleus.logging.logDir}/camilladsp-heartbeat/stderr.log";

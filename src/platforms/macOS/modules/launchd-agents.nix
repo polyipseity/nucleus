@@ -267,9 +267,11 @@ in
       # Start at login and stay alive; internal loop handles the 30 s interval.
       RunAtLoad = true;
       KeepAlive = true;
-      # Suppress per-iteration output to avoid filling system logs.
-      StandardOutPath = "/dev/null";
-      StandardErrorPath = "/dev/null";
+      # WHY: the house default is the stdout.log/stderr.log pair for every service.
+      # Rotation bounds the file, so the 30-second loop's no-op output stays diagnosable
+      # without filling the log tree.
+      StandardOutPath = "${config.nucleus.logging.logDir}/betterdisplay-heartbeat/stdout.log";
+      StandardErrorPath = "${config.nucleus.logging.logDir}/betterdisplay-heartbeat/stderr.log";
     };
   };
 
