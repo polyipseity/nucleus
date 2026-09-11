@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 # Idempotently converges the declarative bun global package set.
+#
+# Positional args: <jq-bin> <bun-bin> <awk-bin> <node-gyp-bin> <python3-bin> <make-bin>
+# The node-gyp toolchain args exist because allowlisted packages run lifecycle
+# scripts (see `src/lockfiles/lifecycle-allowlist.json`), and bun synthesises a
+# `node-gyp rebuild` for native dependencies whose prebuild metadata it ignores.
 set -euo pipefail
 
 # SC2094 avoidance: trap-based cleanup eliminates read/write-same-file
@@ -18,16 +23,44 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 _jq_bin="$1"
 _bun_bin="$2"
 _gawk_bin="$3"
+# node-gyp toolchain: bun runs lifecycle scripts for allowlisted packages, and a
+# native dependency without usable prebuild metadata is rebuilt through node-gyp,
+# which needs a Python interpreter and make.  The activation PATH provides
+# neither, so the toolchain is passed in explicitly.
+_ibp_node_gyp_bin="$4"
+_ibp_python3_bin="$5"
+_ibp_make_bin="$6"
 
-# Add bun's directory to PATH so bun is callable and child processes
-# can find it.
+# Add bun's and the node-gyp toolchain's directories to PATH so bun is callable
+# and the lifecycle-script children (node-gyp -> python3, make) resolve their
+# tools.
 _bun_bin_dir="$(dirname "$_bun_bin")"
-PATH="$_bun_bin_dir:$PATH"
+_ibp_node_gyp_dir="$(dirname "$_ibp_node_gyp_bin")"
+_ibp_python3_dir="$(dirname "$_ibp_python3_bin")"
+_ibp_make_dir="$(dirname "$_ibp_make_bin")"
+PATH="$_bun_bin_dir:$_ibp_node_gyp_dir:$_ibp_python3_dir:$_ibp_make_dir:$PATH"
 export PATH
 
 if [ ! -x "$_bun_bin" ]; then
   die -l bun "$_bun_bin not found in nix store; cannot install bun global packages"
 fi
+if [ ! -x "$_ibp_node_gyp_bin" ]; then
+  die -l bun "$_ibp_node_gyp_bin not found in nix store; cannot rebuild native dependencies of allowlisted bun packages"
+fi
+if [ ! -x "$_ibp_python3_bin" ]; then
+  die -l bun "$_ibp_python3_bin not found in nix store; node-gyp requires a Python interpreter"
+fi
+if [ ! -x "$_ibp_make_bin" ]; then
+  die -l bun "$_ibp_make_bin not found in nix store; node-gyp requires make"
+fi
+
+# WHY: node-gyp is pointed at the store wrapper instead of letting bun resolve
+# its own (which would fetch from the network), and at the store's Python rather
+# than searching PATH where an interpreter may be stdlib-less or absent.  The
+# nixpkgs wrapper already exports npm_config_nodedir, so no headers are
+# downloaded.
+export npm_config_node_gyp="$_ibp_node_gyp_bin"
+export npm_config_python="$_ibp_python3_bin"
 
 # Read version pins from the consolidated lockfile so installs are
 # reproducible (closes the drift root cause).  Falls back to unpinned

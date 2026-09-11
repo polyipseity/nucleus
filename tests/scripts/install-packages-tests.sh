@@ -27,7 +27,7 @@ PKG_DIR="$REPO_ROOT/src/scripts/packages"
 setup_fake_repo() {
   local dir
   dir="$(mktemp -d)"
-  mkdir -p "$dir/src/lockfiles" "$dir/bin"
+  mkdir -p "$dir/src/lockfiles" "$dir/bin" "$dir/toolchain"
   cat >"$dir/src/lockfiles/lockfile.json" <<'EOF'
 {
   "$schema": "./lockfile.schema.json",
@@ -62,6 +62,17 @@ LFALEOF
   printf '%s\n' "$dir"
 }
 
+# Create the node-gyp toolchain stubs in their own directory so the tests can
+# prove install-bun-packages.sh puts that directory on PATH for its children
+# (a stub next to bun would make the assertion vacuous).
+stub_node_gyp_toolchain() {
+  local dir="$1" name
+  for name in node-gyp python3 make; do
+    printf '#!/usr/bin/env bash\nexit 0\n' >"$dir/toolchain/$name"
+    chmod +x "$dir/toolchain/$name"
+  done
+}
+
 # Make a stub installer that appends its full argument list (one line per
 # invocation) to $CALLS_DIR/calls-$name.txt and exits 0.  $1 = tool name, $2 = repo root.
 stub_tool() {
@@ -72,6 +83,23 @@ printf '%s\n' "\$*" >> "\$CALLS_DIR/calls-$name.txt"
 exit 0
 EOF
   chmod +x "$dir/bin/$name"
+}
+
+# Stub bun that also records the node-gyp toolchain environment it was given,
+# so the tests can assert the activation wiring reaches the installer.
+stub_bun_tool() {
+  local dir="$1"
+  cat >"$dir/bin/bun" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$CALLS_DIR/calls-bun.txt"
+{
+  printf 'npm_config_node_gyp=%s\n' "${npm_config_node_gyp:-}"
+  printf 'npm_config_python=%s\n' "${npm_config_python:-}"
+  printf 'path=%s\n' "$PATH"
+} >"$CALLS_DIR/calls-bun-env.txt"
+exit 0
+EOF
+  chmod +x "$dir/bin/bun"
 }
 
 # Run a package script with the fake repo root + stub bin dir on PATH.
@@ -85,14 +113,16 @@ run_pkg_script() {
 test_bun_install_passes_version_pins() {
   local tmp
   tmp="$(setup_fake_repo)"
-  stub_tool bun "$tmp"
+  stub_bun_tool "$tmp"
+  stub_node_gyp_toolchain "$tmp"
   # No global package.json -> both desired packages are fresh installs.
   # WHY: HOME must point at a clean temp dir so the host's real
   # ~/.bun/install/global/package.json is not found by the script.
   # The stub bun exits 0 but doesn't create the binary, so we pre-create the
   # target binary to satisfy the post-install existence check.
   mkdir -p "$tmp/.bun/bin" && touch "$tmp/.bun/bin/clawhub" "$tmp/.bun/bin/qmd"
-  if HOME="$tmp" run_pkg_script install-bun-packages.sh "$tmp" "$(command -v jq)" "$tmp/bin/bun" "$(command -v awk)" >"$tmp/out.txt" 2>&1; then
+  if HOME="$tmp" run_pkg_script install-bun-packages.sh "$tmp" "$(command -v jq)" "$tmp/bin/bun" "$(command -v awk)" \
+    "$tmp/toolchain/node-gyp" "$tmp/toolchain/python3" "$tmp/toolchain/make" >"$tmp/out.txt" 2>&1; then
     assert_pass "install-bun-packages runs to completion"
   else
     assert_fail "install-bun-packages runs to completion" "exit code $?"
@@ -178,14 +208,16 @@ test_cargo_binstall_passes_version_pins() {
 test_bun_lifecycle_allowlist() {
   local tmp
   tmp="$(setup_fake_repo)"
-  stub_tool bun "$tmp"
+  stub_bun_tool "$tmp"
+  stub_node_gyp_toolchain "$tmp"
   # @tobilu/qmd is in the lifecycle-allowlist -> should NOT use --ignore-scripts.
   # clawhub is NOT in the allowlist -> should use --ignore-scripts.
   # We need to add @tobilu/qmd to the lockfile for version pinning.
   python3 -c "import json; d=json.load(open(\"$tmp/src/lockfiles/lockfile.json\")); d[\"bun\"][\"@tobilu/qmd\"] = \"2.8.3\"; json.dump(d, open(\"$tmp/src/lockfiles/lockfile.json\", \"w\"), indent=2)"
   # Pre-create binaries for the post-install existence check.
   mkdir -p "$tmp/.bun/bin" && touch "$tmp/.bun/bin/clawhub" "$tmp/.bun/bin/qmd"
-  if HOME="$tmp" run_pkg_script install-bun-packages.sh "$tmp" "$(command -v jq)" "$tmp/bin/bun" "$(command -v awk)" >"$tmp/out.txt" 2>&1; then
+  if HOME="$tmp" run_pkg_script install-bun-packages.sh "$tmp" "$(command -v jq)" "$tmp/bin/bun" "$(command -v awk)" \
+    "$tmp/toolchain/node-gyp" "$tmp/toolchain/python3" "$tmp/toolchain/make" >"$tmp/out.txt" 2>&1; then
     assert_pass "install-bun-packages runs to completion with lifecycle-allowlist"
   else
     assert_fail "install-bun-packages runs to completion with lifecycle-allowlist" "exit code $?"
@@ -206,8 +238,63 @@ test_bun_lifecycle_allowlist() {
   rm -rf "$tmp"
 }
 
+test_bun_install_exports_node_gyp_toolchain() {
+  local tmp
+  tmp="$(setup_fake_repo)"
+  stub_bun_tool "$tmp"
+  stub_node_gyp_toolchain "$tmp"
+  mkdir -p "$tmp/.bun/bin" && touch "$tmp/.bun/bin/clawhub" "$tmp/.bun/bin/qmd"
+  if HOME="$tmp" run_pkg_script install-bun-packages.sh "$tmp" "$(command -v jq)" "$tmp/bin/bun" "$(command -v awk)" \
+    "$tmp/toolchain/node-gyp" "$tmp/toolchain/python3" "$tmp/toolchain/make" >"$tmp/out.txt" 2>&1; then
+    assert_pass "install-bun-packages runs with the node-gyp toolchain"
+  else
+    assert_fail "install-bun-packages runs with the node-gyp toolchain" "exit code $?"
+  fi
+  if grep -qxF "npm_config_node_gyp=$tmp/toolchain/node-gyp" "$tmp/calls-bun-env.txt"; then
+    assert_pass "install-bun-packages exports npm_config_node_gyp to bun"
+  else
+    assert_fail "install-bun-packages exports npm_config_node_gyp to bun" "env: $(cat "$tmp/calls-bun-env.txt" 2>/dev/null)"
+  fi
+  if grep -qxF "npm_config_python=$tmp/toolchain/python3" "$tmp/calls-bun-env.txt"; then
+    assert_pass "install-bun-packages exports npm_config_python to bun"
+  else
+    assert_fail "install-bun-packages exports npm_config_python to bun" "env: $(cat "$tmp/calls-bun-env.txt" 2>/dev/null)"
+  fi
+  if grep -q ":$tmp/toolchain:" "$tmp/calls-bun-env.txt"; then
+    assert_pass "install-bun-packages puts the node-gyp toolchain directory on PATH"
+  else
+    assert_fail "install-bun-packages puts the node-gyp toolchain directory on PATH" "path: $(grep '^path=' "$tmp/calls-bun-env.txt" 2>/dev/null)"
+  fi
+  rm -rf "$tmp"
+}
+
+test_bun_install_hard_errors_without_toolchain() {
+  local tmp rc
+  tmp="$(setup_fake_repo)"
+  stub_bun_tool "$tmp"
+  stub_node_gyp_toolchain "$tmp"
+  rm -f "$tmp/toolchain/make"
+  mkdir -p "$tmp/.bun/bin" && touch "$tmp/.bun/bin/clawhub" "$tmp/.bun/bin/qmd"
+  rc=0
+  HOME="$tmp" run_pkg_script install-bun-packages.sh "$tmp" "$(command -v jq)" "$tmp/bin/bun" "$(command -v awk)" \
+    "$tmp/toolchain/node-gyp" "$tmp/toolchain/python3" "$tmp/toolchain/make" >"$tmp/out.txt" 2>&1 || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    assert_pass "install-bun-packages hard-errors when a node-gyp toolchain tool is missing"
+  else
+    assert_fail "install-bun-packages hard-errors when a node-gyp toolchain tool is missing" "exit 0 with make absent"
+  fi
+  if grep -q "make not found" "$tmp/out.txt"; then
+    assert_pass "install-bun-packages names the missing toolchain tool"
+  else
+    assert_fail "install-bun-packages names the missing toolchain tool" "out: $(cat "$tmp/out.txt" 2>/dev/null)"
+  fi
+  rm -rf "$tmp"
+}
+
 section "install-packages" "lockfile pinning"
 test_bun_install_passes_version_pins
+test_bun_install_exports_node_gyp_toolchain
+test_bun_install_hard_errors_without_toolchain
 test_bun_lifecycle_allowlist
 test_uv_install_passes_version_pins
 test_rustup_install_passes_channel_date

@@ -163,6 +163,25 @@ function Invoke-BunSetup {
     Write-NucleusInfo -CommandName 'bun-setup' "$pkg removed"
   }
 
+  # node-gyp toolchain: allowlisted packages run lifecycle scripts, and bun
+  # rebuilds a native dependency through node-gyp when it cannot use the shipped
+  # prebuild.  POSIX passes pkgs.python3 into install-bun-packages.sh; on Windows
+  # the interpreter comes from the DSC-provisioned Python 3.13 and node-gyp has to
+  # be told about it explicitly — the elevated apply session can carry a PATH
+  # snapshot taken before WinGet installed Python.  WHY: only probed when an
+  # install is actually pending, so an already-converged machine never depends on
+  # the interpreter being on PATH.
+  if ($toInstall.Count -gt 0 -and -not $env:npm_config_python) {
+    # check-suppress:suppression_doc: probe -- python may be absent; the if-guard reports that as an error below.
+    $pythonCmd = Get-Command python.exe -ErrorAction SilentlyContinue
+    if (-not $pythonCmd) {
+      Write-NucleusError -CommandName 'bun-setup' "python.exe not found on PATH; node-gyp cannot rebuild native dependencies of the managed bun packages (install Python.Python.3.13 via DSC, then re-apply)"
+      return
+    }
+    $env:npm_config_python = $pythonCmd.Source
+    Write-NucleusInfo -CommandName 'bun-setup' "node-gyp Python: $env:npm_config_python"
+  }
+
   # Install additions (fresh installs and version-mismatch reinstalls).
   foreach ($pkg in $toInstall) {
     $entry = $bunVersions.$pkg

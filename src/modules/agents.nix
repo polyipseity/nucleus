@@ -151,12 +151,21 @@ in
     #   @tobilu/qmd — on-device markdown search engine for pi memory_search;
     #                  absent from nixpkgs and cargo-binstall; requires
     #                  lifecycle scripts (in lifecycle-allowlist).
+    #
+    # Why the node-gyp toolchain args: allowlisted packages run lifecycle
+    # scripts, and bun rebuilds a native dependency through node-gyp when it
+    # cannot use the shipped prebuild.  The activation PATH carries neither a
+    # Python interpreter nor make, so gyp's find-python step would abort the
+    # whole activation.
     # -------------------------------------------------------------------------
     install-bun-packages = lib.hm.dag.entryAfter [ "install-agent-skills" ] ''
       "${activationBundle}/src/scripts/packages/install-bun-packages.sh" \
         "${pkgs.jq}/bin/jq" \
         "${pkgs.bun}/bin/bun" \
-        "${pkgs.gawk}/bin/awk"
+        "${pkgs.gawk}/bin/awk" \
+        "${pkgs.node-gyp}/bin/node-gyp" \
+        "${pkgs.python3}/bin/python3" \
+        "${pkgs.gnumake}/bin/make"
     '';
 
     # -------------------------------------------------------------------------
