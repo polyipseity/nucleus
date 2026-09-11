@@ -136,9 +136,7 @@
     "logging": {
       "capture": "all",
       "dirs": {
-        "system": [
-          "camilladsp-heartbeat"
-        ],
+        "system": [],
         "user": [
           "camilladsp-heartbeat"
         ]
@@ -155,8 +153,8 @@
         "platform": "macOS"
       },
       "NixOS": {
-        "justification": "Persistent systemd service with internal 5s loop; restarts config after device reconnection.",
-        "scope": "system",
+        "justification": "User-scoped systemd user service with an internal 5s loop; restarts config after device reconnection. User-scoped because it pushes a per-user config file into ~/.config/camilladsp for a per-user app, matching the macOS launchd agent and the Windows per-user task.",
+        "scope": "user",
         "service": "camilladsp-heartbeat.service",
         "type": "systemctl",
         "platform": "NixOS"
