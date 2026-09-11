@@ -93,10 +93,7 @@ test_exposes_windows_dsc_config_files() {
   fi
 }
 
-command -v jq >/dev/null 2>&1 || {
-  echo "jq is required for load-user-registry-tests.sh" >&2
-  exit 1
-}
+require_command jq "jq is required to read the user registry"
 
 test_discovers_fixture_user
 test_excludes_default_dir

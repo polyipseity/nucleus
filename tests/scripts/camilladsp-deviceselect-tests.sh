@@ -10,14 +10,13 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 DEVICESELECT_SH="$SCRIPT_DIR/../../src/scripts/services/camilladsp-deviceselect.sh"
 
-# Guard: python3 + yaml module required for all tests.
-if ! command -v python3 >/dev/null 2>&1; then
-  echo "python3 not found — skipping camilladsp-deviceselect tests"
-  exit 0
-fi
+# Prerequisites: the suite parses the device list with Python, so a missing
+# interpreter or PyYAML fails the suite rather than skipping it — skip-guards
+# are banned (tooling-and-validation.instructions.md).
+require_command python3 "camilladsp-deviceselect tests parse the device list with Python"
 if ! python3 -c "import yaml" 2>/dev/null; then
-  echo "python3 yaml module not found — skipping camilladsp-deviceselect tests"
-  exit 0
+  assert_fail "prerequisite: PyYAML" "PyYAML is required to parse the device list"
+  finish_tests
 fi
 
 # Isolate CamillaDSP state. The library derives its state directory from

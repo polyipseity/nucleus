@@ -15,18 +15,8 @@
 REPO_ROOT="$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PROVISION_PY="$REPO_ROOT/src/scripts/configs/provision-steamcmd.py"
 
-# Detect python3: prefer python3, fall back to python.
-PYTHON3=""
-for candidate in python3 python; do
-  if command -v "$candidate" >/dev/null 2>&1; then
-    PYTHON3="$candidate"
-    break
-  fi
-done
-if [ -z "$PYTHON3" ]; then
-  echo "SKIP: python3 not found" >&2
-  exit 0
-fi
+PYTHON3=python3
+require_command python3 "python3 is required to exercise the provisioner"
 
 # Helper: run provision-steamcmd.py with a JSON settings string and capture output.
 run_provision() {
