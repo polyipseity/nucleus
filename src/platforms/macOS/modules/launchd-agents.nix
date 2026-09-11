@@ -339,10 +339,10 @@ in
   #   A launchd agent runs the build asynchronously after login, with a
   #   freshness guard that makes agent reloads during apply a fast no-op.
   #
-  # Output is suppressed because nix-index emits verbose per-channel progress
-  # on stdout even for successful builds, which would fill the system log.
-  # This suppression is intentional: failure is benign (stale DB means
-  # pay-respects falls back to not suggesting packages), and the agent retries
+  # Output goes to the house stdout.log/stderr.log pair in the user log root.
+  # Rotation bounds the file, so nix-index's verbose per-channel progress is
+  # retained rather than discarded.  Failure is benign: a stale DB only means
+  # pay-respects falls back to not suggesting packages, and the agent retries
   # on the next daily run or load.  Check exit status with:
   #   launchctl list | grep nix-index-update
   # --------------------------------------------------------------------------
@@ -371,9 +371,9 @@ in
           Minute = 0;
         }
       ];
-      # Suppress per-build output to avoid filling system logs.  See above.
-      StandardOutPath = "/dev/null";
-      StandardErrorPath = "/dev/null";
+      # WHY: the house default is the stdout.log/stderr.log pair for every service.
+      StandardOutPath = "${config.nucleus.logging.logDir}/nix-index-update/stdout.log";
+      StandardErrorPath = "${config.nucleus.logging.logDir}/nix-index-update/stderr.log";
     };
   };
 

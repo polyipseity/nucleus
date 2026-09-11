@@ -413,6 +413,39 @@
       }
     }
   },
+  "nix-index-update": {
+    "description": "Daily nix-index rebuild so pay-respects can suggest nix profile install commands",
+    "displayName": "nix-index Update",
+    "logging": {
+      "capture": "all",
+      "dirs": {
+        "system": [],
+        "user": [
+          "nix-index-update"
+        ]
+      }
+    },
+    "hosts": {
+      "MacBook": {
+        "justification": "User agent: the index is per-user cache state and a full rebuild takes minutes, so it must not block the activation chain.",
+        "launchdDomain": "gui",
+        "scope": "user",
+        "service": "local.nix-index-update",
+        "type": "launchctl",
+        "platform": "macOS"
+      },
+      "NixOS": {
+        "justification": "The agent is a macOS launchd job in this repository; no equivalent is deployed on Linux.",
+        "type": "omitted",
+        "platform": "NixOS"
+      },
+      "Windows": {
+        "justification": "Nix is not available on Windows; command suggestions come from Scoop there.",
+        "type": "omitted",
+        "platform": "Windows"
+      }
+    }
+  },
   "ollama": {
     "description": "LLM inference server",
     "displayName": "Ollama",
