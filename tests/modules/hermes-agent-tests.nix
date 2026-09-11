@@ -7,6 +7,11 @@ let
   flakeText = builtins.readFile ../../src/flake.nix;
   homeText = builtins.readFile ../../src/modules/home.nix;
   wrapperText = builtins.readFile ../../src/modules/hermes-agent.nix;
+  # src/users/default/ is production-managed, so reading it here is allowed; only
+  # real src/users/<username>/ identities are off limits for tests.
+  defaultSecretsCatalog = builtins.fromJSON (
+    builtins.readFile ../../src/users/default/env-secrets.json
+  );
 
   # === FLAKE INPUT ===
 
@@ -57,6 +62,31 @@ let
       )
       "wrapper module must place a sops-secret barrier between sops-nix and hermesAgentSetup, gated on declared secrets";
 
+  test_wrapper_module_uses_registry_for_user_secrets =
+    assert'
+      (
+        lib.hasInfix "users-registry.nix" wrapperText
+        && lib.hasInfix ".envSecrets" wrapperText
+        # The hand-rolled path resolution and its pathExists fallback must be gone: the
+        # registry owns domain loading and merging.
+        && !(lib.hasInfix "userSecretsFile" wrapperText)
+        && !(lib.hasInfix "defaultSecretsFile" wrapperText)
+        && !(lib.hasInfix "secretsFile" wrapperText)
+      )
+      "wrapper module must read the per-user secret catalog through the user registry instead of a hardcoded path";
+
+  test_wrapper_module_asserts_secret_domain = assert' (lib.hasInfix "userSecrets ? secrets" wrapperText) "wrapper module must fail closed when the merged env-secrets domain declares no secrets";
+
+  test_default_catalog_declares_hermes_user_secrets =
+    let
+      hermesDefaults = builtins.filter (
+        s: builtins.elem "hermes-agent" s.consumers
+      ) defaultSecretsCatalog.secrets;
+    in
+    assert'
+      (builtins.length hermesDefaults > 0 && builtins.all (s: s.sopsSource == "user") hermesDefaults)
+      "src/users/default/env-secrets.json must declare the hermes secrets as user-sourced (system secrets live in src/modules/env/env-secrets.json)";
+
   # === HOME.NIX IMPORT ===
 
   test_home_imports_hermes_agent = assert' (lib.hasInfix "./hermes-agent.nix" homeText) "home.nix must import hermes-agent.nix";
@@ -84,6 +114,9 @@ let
     test_wrapper_module_enables_services
     test_wrapper_module_gateway_per_host
     test_wrapper_module_waits_for_secrets
+    test_wrapper_module_uses_registry_for_user_secrets
+    test_wrapper_module_asserts_secret_domain
+    test_default_catalog_declares_hermes_user_secrets
     test_home_imports_hermes_agent
     test_lockfile_has_hermes_agent
     test_hermes_agent_overlay_provides_package

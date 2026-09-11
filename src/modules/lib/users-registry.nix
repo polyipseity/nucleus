@@ -122,6 +122,11 @@ let
       symlinks = (loadMergedDomain username "symlinks.json").symlinks or [ ];
       devRepos = resolveDevRepos (loadMergedDomain username "dev-repos.json");
       envVars = loadMergedDomain username "env-vars.json";
+      # Per-user secret catalog. Separate from the system secret catalog
+      # (src/modules/env/env-secrets.json, materialized by env-secrets-sops.nix):
+      # users declare their own consumer-scoped secrets here and override the
+      # default list wholesale, like every other domain.
+      envSecrets = loadMergedDomain username "env-secrets.json";
       iCloudExclusions = loadMergedDomain username "icloud-exclusions.json";
       jellyfin = loadMergedDomain username "jellyfin.json";
       passwordStore = loadMergedDomain username "password-store.json";
@@ -145,6 +150,7 @@ let
           ;
       };
       envVars = envVars;
+      envSecrets = { inherit (envSecrets) secrets; };
       iCloudExclusions = {
         inherit (iCloudExclusions) excludedDirNames managedRoots;
       };

@@ -21,6 +21,22 @@ let
 
   test_discovers_fixture_user = assert' (builtins.elem fixtureUsername userNames) "users-registry.nix must discover test-user from fixture src/users/";
 
+  test_assembles_env_secrets_domain =
+    let
+      fixtureNames =
+        map (s: s.name)
+          (builtins.fromJSON (
+            builtins.readFile ../fixtures/user-registry/src/users/test-user/env-secrets.json
+          )).secrets;
+      defaultNames =
+        map (s: s.name)
+          (builtins.fromJSON (builtins.readFile ../../src/users/default/env-secrets.json)).secrets;
+      mergedNames = map (s: s.name) fixtureUser.envSecrets.secrets;
+    in
+    assert'
+      (mergedNames == fixtureNames && builtins.all (n: !(builtins.elem n defaultNames)) mergedNames)
+      "users-registry.nix must expose the per-user env-secrets domain with the user list replacing the default wholesale";
+
   test_excludes_default_dir = assert' (
     !(builtins.elem "default" userNames)
   ) "users-registry.nix must not treat default/ as a user";
@@ -89,6 +105,11 @@ let
     test_assembles_windows_dsc_config_files
     test_password_store_path_available
     test_user_array_override_replaces_wholesale
+    # The per-user secret catalog is a user registry domain like any other, so its
+    # array field follows the same wholesale-replacement contract. The fixture's
+    # src/users/default symlink points at the real default catalog, which is
+    # non-empty, so an element-wise union would leak default-only names in.
+    test_assembles_env_secrets_domain
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {

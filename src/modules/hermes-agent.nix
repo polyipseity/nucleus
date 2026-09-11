@@ -54,14 +54,25 @@ let
       };
     }).packages.default;
 
-  # Resolve per-user env-secrets.json via user overlay.
-  userSecretsFile = ../../../users + "/${config.home.username}/env-secrets.json";
-  defaultSecretsFile = ../users/default/env-secrets.json;
-  secretsFile = if builtins.pathExists userSecretsFile then userSecretsFile else defaultSecretsFile;
-  userSecrets = builtins.fromJSON (builtins.readFile secretsFile);
+  # Resolve the per-user secret catalog through the user registry, so a
+  # src/users/<username>/env-secrets.json override is merged over
+  # src/users/default/env-secrets.json by the same contract as every other domain
+  # (user wins; an array field is replaced wholesale, never unioned). System
+  # secrets are a separate catalog (src/modules/env/env-secrets.json).
+  allUsers = import ./lib/users-registry.nix {
+    lib = pkgs.lib;
+    repoRoot = ../..;
+    inherit hostName;
+  };
+  userRecord = allUsers.${config.home.username} or { };
+  userSecrets = userRecord.envSecrets or { };
 
   # Filter secrets by consumer: only keys where consumers contains "hermes-agent".
-  hermesSecrets = builtins.filter (s: builtins.elem "hermes-agent" s.consumers) userSecrets.secrets;
+  # `or [ ]` keeps this total so the assertion below reports a missing domain with
+  # its own message instead of a raw attribute error.
+  hermesSecrets = builtins.filter (s: builtins.elem "hermes-agent" s.consumers) (
+    userSecrets.secrets or [ ]
+  );
 
   # Resolve SOPS file paths per sopsSource.
   sopsFileForEntry =
@@ -115,6 +126,12 @@ in
       assertion = lib.elem "voice" upstreamFullDependencyGroups;
       message = "hermes-agent: could not read upstream's `full` dependency-group list — nix/packages.nix layout changed";
     }
+    {
+      # The registry tolerates an absent domain file (it yields { }); without this
+      # assertion a moved/renamed default catalog would silently wire no secrets.
+      assertion = userSecrets ? secrets;
+      message = "hermes-agent: no merged env-secrets domain for '${config.home.username}' — src/users/default/env-secrets.json is missing or has no 'secrets' key";
+    }
   ];
 
   # Declare SOPS secrets for all hermes-consumed keys.
@@ -148,7 +165,10 @@ in
   services.hermes-agent = {
     enable = lib.mkDefault true;
     gateway.enable = if hostName == "MacBook" then lib.mkDefault true else lib.mkDefault false;
-    # Wire SOPS-decrypted API key files into the service environment.
+    # Wire SOPS-decrypted API key files into the service environment. An empty
+    # secret value is legitimate (the key is simply not configured yet), so every
+    # declared path is wired as-is and the barrier below checks existence only —
+    # never non-emptiness.
     environmentFiles = lib.mkIf (hermesSecretPaths != [ ]) hermesSecretPaths;
 
     # WHY: upstream's default package is `full`, which includes the `voice`
