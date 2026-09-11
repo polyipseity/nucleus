@@ -136,10 +136,13 @@ function Invoke-LockfileBump {
   # Source the deterministic JSON serialization helpers for sorted key output.
   . (Join-Path $repoRoot 'src/platforms/Windows/modules/lib/JsonSort.ps1')
 
+  # Canonical section list, shared by --list-sections and by token validation so
+  # the two can never drift out of sync.
+  $validSectionsCsv = 'bun,cargo,cargo-binstall,cursor,pi,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows'
+
   # --list-sections: print the canonical section names and exit 0 (no lockfile
   # read required, matching the bash twin's early-exit behavior).
   if ($ListSections) {
-    $validSectionsCsv = 'bun,cargo,cargo-binstall,cursor,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows'
     foreach ($s in ($validSectionsCsv -split ',')) {
       Write-NucleusInfo $s
     }
@@ -158,7 +161,7 @@ function Invoke-LockfileBump {
   # the --sections token list exactly like the bash twin: trim whitespace per
   # token, map legacy bare sub-section names and the cargo alias to canonical
   # dotted form, and reject anything unknown.
-  $validSectionsCsv = 'bun,cargo,cargo-binstall,cursor,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows'
+  $validSectionsCsv = 'bun,cargo,cargo-binstall,cursor,pi,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows'
   $sectionTokens = @()
   if (-not [string]::IsNullOrEmpty($Sections)) {
     foreach ($tok in ($Sections -split ',')) {
@@ -377,6 +380,34 @@ function Invoke-LockfileBump {
       }
     } else {
       Write-NucleusWarning 'curl: command not found — skipping bun section'
+    }
+  }
+
+  # -------------------------------------------------------------------------
+  # pi — npm registry API (curl).  pi's extensions are published to npm and the
+  # lockfile stores package name -> version.  Object-shaped pins are VCS/rev
+  # pins, which the registry cannot update.
+  # -------------------------------------------------------------------------
+  if (Test-SectionEnabled 'pi') {
+    if (Get-Command -Name 'curl' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
+      if ($ht.ContainsKey('pi') -and $ht['pi'] -is [hashtable]) {
+        foreach ($key in @($ht['pi'].Keys)) {
+          $old = $ht['pi'][$key]
+          if ($old -isnot [string]) { continue }
+          # check-suppress:suppression_doc: probe -- package may not exist; stderr suppressed for clean output.
+          $result = & curl -fsSL "https://registry.npmjs.org/$key/latest" 2>$null
+          if ($result) {
+            $parsed = $result | ConvertFrom-Json
+            $new = $parsed.version.Trim()
+            if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
+              Write-Update -Section 'pi' -Key $key -OldValue $old -NewValue $new
+              $ht['pi'][$key] = $new
+            }
+          }
+        }
+      }
+    } else {
+      Write-NucleusWarning 'curl: command not found — skipping pi section'
     }
   }
 

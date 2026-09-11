@@ -206,7 +206,7 @@ EOF
 
   # Canonical section names (alphabetical). cargo aliases cargo-binstall; the
   # legacy bare tokens nixos-iso / tart-images normalize to vm-setup children.
-  _VALID_SECTIONS_CSV="bun,cargo,cargo-binstall,cursor,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows"
+  _VALID_SECTIONS_CSV="bun,cargo,cargo-binstall,cursor,pi,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows"
 
   # Parse flags (comma-separated, defaults to all)
   SECTIONS=""
@@ -413,6 +413,27 @@ EOF
       done < <(printf '%s\n' "$data" | jq -r '(.bun // {}) | keys[]')
     else
       warn "curl: command not found — skipping bun section"
+    fi
+  fi
+
+  # pi — npm registry API (curl).  Same endpoint as bun: pi's extensions are
+  # published to npm and the lockfile stores package name -> version.  Pins
+  # shaped as objects are VCS/rev pins and are not registry-updatable.
+  if section_enabled pi; then
+    if command -v curl >/dev/null 2>&1; then
+      while IFS= read -r key; do
+        [ -z "$key" ] && continue
+        old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.pi // {})[$k] // empty')
+        [ -z "$old" ] && continue
+        case "$old" in \{*) continue ;; esac
+        new=$(curl -fsSL "https://registry.npmjs.org/$key/latest" 2>/dev/null | jq -r '.version // empty' 2>/dev/null)
+        if [ -n "$new" ] && [ "$new" != "$old" ]; then
+          log_update "pi" "$key" "$old" "$new"
+          data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.pi[$k] = $v')
+        fi
+      done < <(printf '%s\n' "$data" | jq -r '(.pi // {}) | keys[]')
+    else
+      warn "curl: command not found — skipping pi section"
     fi
   fi
 
