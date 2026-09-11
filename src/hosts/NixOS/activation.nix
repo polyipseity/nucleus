@@ -29,6 +29,20 @@ let
       ) linuxServices
     )
   );
+  # User log dirs are provisioned too, and chowned to the service user, because this
+  # activation runs as root: without it every NixOS service that writes a log file would
+  # have to create the dir in its own unit (macOS and Windows provision from the registry).
+  linuxUserLogDirs = lib.unique (
+    lib.flatten (
+      lib.mapAttrsToList (
+        _: svc:
+        let
+          log = svc.logging;
+        in
+        (log.dirs or { }).user or [ ]
+      ) linuxServices
+    )
+  );
   # Bundle services.json into the nix store so the systemd watchdog can
   # read it without needing NUCLEUS_REPO_ROOT.  Same approach as the
   # macOS launchd watchdog (MacBook/service-watchdog.nix).
@@ -39,6 +53,7 @@ let
   # Shared nucleus root constants + activation helpers (Phase 1).
   nucleusRoots = import ../../modules/lib/nucleus-roots.nix { inherit lib pkgs; };
   userHome = config.users.users.${username}.home;
+  userGroup = config.users.users.${username}.group;
 
   # Shared GC application derivations (plan item 6).
   gcApps = import ../../modules/gc-activations.nix { inherit pkgs; };
@@ -86,7 +101,8 @@ in
 
   # ---------------------------------------------------------------------------
   # nixos-ensure-log-dirs
-  # Create system log directories for all nucleus systemd services before they
+  # Create system and user log directories for all nucleus systemd services before they
+  # start, chowning the user dirs to the service user.
   # WHY: Log directory creation is imperative because it must run AFTER the
   # root symlinks resolve (Nix activation ordering is alphabetical, not
   # dependency-based). systemd LogsDirectory creates under /var/log/ (wrong
@@ -98,8 +114,11 @@ in
     "${activationBundle}/src/scripts/services/log-dirs-init.sh" \
       "${config.nucleus.logging.systemLogDir}" \
       "${builtins.toString linuxSystemLogDirs}" \
+      "${builtins.toString linuxUserLogDirs}" \
       "" \
-      ""
+      "${config.nucleus.logging.logDir}" \
+      "${userHome}" \
+      "${username}:${userGroup}"
   '';
 
   # ---------------------------------------------------------------------------
