@@ -27,55 +27,58 @@ _rustup_bin_dir="$(dirname "$_rustup_bin")"
 PATH="$_rustup_bin_dir:$PATH"
 export PATH
 
+# A missing store binary is a convergence failure, not a warning: the
+# activation entry exists precisely to initialise rustup, and cargo-binstall
+# depends on the stable toolchain it installs.
 if [ ! -x "$_rustup_bin" ]; then
-  warn -l rustup "$_rustup_bin not found in nix store; skipping initialization"
-else
-  # WHY: none: forces every project to declare its toolchain via
-  # rust-toolchain.toml; prevents silent use of a global stable and
-  # matches Windows Invoke-RustupSetup.
-  "$_rustup_bin" default none
-  say -l rustup "default toolchain set to none"
+  die -l rustup "$_rustup_bin not found in nix store; cannot initialise the Rust toolchain"
+fi
 
-  # Install the stable toolchain so cargo +stable is available for
-  # cargo-binstall compilation (fallback) and cargo install --list operations.
-  # Mirrors Windows Invoke-RustupSetup desiredChannels=["stable"] behavior.
-  #
-  # Toolchain spec construction (rustup grammar): the -YYYY-MM-DD archive-date
-  # suffix is ONLY valid for nightly. stable/beta are rolling channels and
-  # reject a date suffix, so a lockfile pin like "2026-04-14" must NOT be
-  # appended to them. We therefore install the bare channel name for
-  # stable/beta and use the pin verbatim only for nightly (where the date is a
-  # real archive selector). The version pin for stable/beta is recorded in the
-  # lockfile for tracking only, not used in the install spec.
-  _rustup_channels="stable"
+# WHY: none: forces every project to declare its toolchain via
+# rust-toolchain.toml; prevents silent use of a global stable and
+# matches Windows Invoke-RustupSetup.
+"$_rustup_bin" default none
+say -l rustup "default toolchain set to none"
+
+# Install the stable toolchain so cargo +stable is available for
+# cargo-binstall compilation (fallback) and cargo install --list operations.
+# Mirrors Windows Invoke-RustupSetup desiredChannels=["stable"] behavior.
+#
+# Toolchain spec construction (rustup grammar): the -YYYY-MM-DD archive-date
+# suffix is ONLY valid for nightly. stable/beta are rolling channels and
+# reject a date suffix, so a lockfile pin like "2026-04-14" must NOT be
+# appended to them. We therefore install the bare channel name for
+# stable/beta and use the pin verbatim only for nightly (where the date is a
+# real archive selector). The version pin for stable/beta is recorded in the
+# lockfile for tracking only, not used in the install spec.
+_rustup_channels="stable"
+if [ -n "$_rustup_lockfile" ]; then
+  # check-suppress:suppression_doc: jq parse failure on a malformed lockfile falls back to bare stable -- safe, the toolchain still installs.
+  _rustup_channels="$("$_rustup_jq" -r '(.rustup // {}) | keys[]? // empty' "$_rustup_lockfile" 2>/dev/null)" || true
+  [ -z "$_rustup_channels" ] && _rustup_channels="stable"
+fi
+while IFS= read -r _rustup_channel; do
+  [ -z "$_rustup_channel" ] && continue
+  _rustup_pin=""
   if [ -n "$_rustup_lockfile" ]; then
-    # check-suppress:suppression_doc: jq parse failure on a malformed lockfile falls back to bare stable -- safe, the toolchain still installs.
-    _rustup_channels="$("$_rustup_jq" -r '(.rustup // {}) | keys[]? // empty' "$_rustup_lockfile" 2>/dev/null)" || true
-    [ -z "$_rustup_channels" ] && _rustup_channels="stable"
+    # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
+    # check-suppress:suppression_doc: jq parse failure on a malformed lockfile falls back to empty pin -- safe, the channel name is used as the spec.
+    _rustup_pin="$("$_rustup_jq" -r --arg c "$_rustup_channel" '(.rustup // {})[$c] // empty' "$_rustup_lockfile" 2>/dev/null)" || true
   fi
-  while IFS= read -r _rustup_channel; do
-    [ -z "$_rustup_channel" ] && continue
-    _rustup_pin=""
-    if [ -n "$_rustup_lockfile" ]; then
-      # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
-      # check-suppress:suppression_doc: jq parse failure on a malformed lockfile falls back to empty pin -- safe, the channel name is used as the spec.
-      _rustup_pin="$("$_rustup_jq" -r --arg c "$_rustup_channel" '(.rustup // {})[$c] // empty' "$_rustup_lockfile" 2>/dev/null)" || true
-    fi
-    # nightly pins carry a valid -YYYY-MM-DD archive suffix and are used
-    # verbatim; stable/beta are rolling channels installed by name alone
-    # (their version pin is tracked, not appended to the spec).
-    case "$_rustup_pin" in
-    nightly*-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) _rustup_spec="$_rustup_pin" ;;
-    nightly*) _rustup_spec="$_rustup_pin" ;;
-    *) _rustup_spec="$_rustup_channel" ;;
-    esac
-    if "$_rustup_bin" toolchain list 2>/dev/null | grep -q "^${_rustup_spec}"; then
-      say -l rustup "${_rustup_spec} toolchain already present"
-    else
-      say -l rustup "installing ${_rustup_spec} toolchain for cargo-binstall fallback"
-      "$_rustup_bin" toolchain install "${_rustup_spec}" --no-self-update
-    fi
-  done <<EOF
+  # nightly pins carry a valid -YYYY-MM-DD archive suffix and are used
+  # verbatim; stable/beta are rolling channels installed by name alone
+  # (their version pin is tracked, not appended to the spec).
+  case "$_rustup_pin" in
+  nightly*-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) _rustup_spec="$_rustup_pin" ;;
+  nightly*) _rustup_spec="$_rustup_pin" ;;
+  *) _rustup_spec="$_rustup_channel" ;;
+  esac
+  if "$_rustup_bin" toolchain list 2>/dev/null | grep -q "^${_rustup_spec}"; then
+    say -l rustup "${_rustup_spec} toolchain already present"
+  else
+    say -l rustup "installing ${_rustup_spec} toolchain for cargo-binstall fallback"
+    "$_rustup_bin" toolchain install "${_rustup_spec}" --no-self-update
+  fi
+done <<EOF
 $_rustup_channels
 EOF
-fi
