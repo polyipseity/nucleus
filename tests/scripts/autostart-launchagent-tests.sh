@@ -148,8 +148,17 @@ PLIST
 
 converge() {
   local app="$1" out_file="$2" rc=0
-  NUCLEUS_REPO_ROOT="$FIXTURE_ROOT" HOME="$FIXTURE_HOME" bash "$AUTOSTART_SH" disable "$app" \
+  local _mock_dir
+  _mock_dir="$(mktemp -d)"
+  # Mock stat/dscl to return empty (no console user override of LAUNCHAGENTS_DIR)
+  printf '#!/bin/sh\n' >"$_mock_dir/stat"
+  chmod +x "$_mock_dir/stat"
+  printf '#!/bin/sh\n' >"$_mock_dir/dscl"
+  chmod +x "$_mock_dir/dscl"
+  NUCLEUS_REPO_ROOT="$FIXTURE_ROOT" HOME="$FIXTURE_HOME" \
+    PATH="$_mock_dir:$PATH" bash "$AUTOSTART_SH" disable "$app" \
     >"$out_file" 2>&1 || rc=$?
+  rm -rf "$_mock_dir"
   printf '%s\n' "$rc"
 }
 
