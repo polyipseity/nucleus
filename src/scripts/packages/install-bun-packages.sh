@@ -178,7 +178,7 @@ while IFS= read -r _ibp_pkg; do
   _ibp_allow_lifecycle=0
   if [ -n "$_ibp_lifecycle_allowlist" ]; then
     # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
-    if "$_jq_bin" -e --arg p "$_ibp_pkg" '(.[$p] // null) != null' "$_ibp_lifecycle_allowlist" 2>/dev/null; then
+    if "$_jq_bin" -e --arg p "$_ibp_pkg" '(.[$p] // null) != null' "$_ibp_lifecycle_allowlist" >/dev/null 2>&1; then
       _ibp_allow_lifecycle=1
     fi
   fi
