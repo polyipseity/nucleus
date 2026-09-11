@@ -13,7 +13,8 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd)"
 MENU_BAR_SH="$REPO_ROOT/src/scripts/menu-bar.sh"
 AUTOSTART_SH="$REPO_ROOT/src/scripts/autostart.sh"
-readonly MENU_BAR_SH AUTOSTART_SH
+MANAGED_SYMLINKS_SH="$REPO_ROOT/src/scripts/configs/manage-out-of-store-symlinks.sh"
+readonly MENU_BAR_SH AUTOSTART_SH MANAGED_SYMLINKS_SH
 
 # Run a script and capture its exit code without tripping set -e.
 run_capture_rc() {
@@ -122,7 +123,63 @@ APPSJSON
   rm -rf "$tmp" "$ro"
 }
 
+# Run a command with its combined output captured to a file; the caller reads the
+# exit status from the list status. Needed because run_capture_rc discards output,
+# and the verify action is asserted on both its status and its F1 error line.
+run_capture_output() {
+  local out_file="$1"
+  shift
+  "$@" >"$out_file" 2>&1
+}
+
+test_managed_symlink_verify() {
+  local tmp jq_bin json rc out_file
+  tmp="$(mktemp -d)"
+  jq_bin="$(command -v jq)"
+  : >"$tmp/present.txt"
+  ln -s "$tmp/present.txt" "$tmp/present-link"
+
+  json="[{\"path\":\"$tmp/present.txt\"},{\"path\":\"$tmp/present-link\"}]"
+  rc=0
+  run_capture_output "$tmp/present.out" bash "$MANAGED_SYMLINKS_SH" verify home.nix "$json" "$jq_bin" || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    assert_pass "manage-out-of-store-symlinks verify accepts present paths and links"
+  else
+    assert_fail "manage-out-of-store-symlinks verify accepts present paths and links" "rc=$rc output=[$(cat "$tmp/present.out")]"
+  fi
+
+  json="[{\"path\":\"$tmp/absent\"}]"
+  rc=0
+  run_capture_output "$tmp/absent.out" bash "$MANAGED_SYMLINKS_SH" verify home.nix "$json" "$jq_bin" || rc=$?
+  if [ "$rc" -ne 0 ] && grep -q "error:" "$tmp/absent.out"; then
+    assert_pass "manage-out-of-store-symlinks verify hard-errors on an absent path"
+  else
+    assert_fail "manage-out-of-store-symlinks verify hard-errors on an absent path" "rc=$rc output=[$(cat "$tmp/absent.out")]"
+  fi
+
+  ln -s "$tmp/gone" "$tmp/dangling"
+  json="[{\"path\":\"$tmp/dangling\"}]"
+  rc=0
+  run_capture_output "$tmp/dangling.out" bash "$MANAGED_SYMLINKS_SH" verify home.nix "$json" "$jq_bin" || rc=$?
+  if [ "$rc" -ne 0 ] && grep -q "is dangling" "$tmp/dangling.out"; then
+    assert_pass "manage-out-of-store-symlinks verify hard-errors on a dangling symlink"
+  else
+    assert_fail "manage-out-of-store-symlinks verify hard-errors on a dangling symlink" "rc=$rc output=[$(cat "$tmp/dangling.out")]"
+  fi
+
+  rc=0
+  run_capture_output "$tmp/unknown.out" bash "$MANAGED_SYMLINKS_SH" bogus home.nix '[]' "$jq_bin" || rc=$?
+  if [ "$rc" -ne 0 ] && grep -q "unknown action" "$tmp/unknown.out"; then
+    assert_pass "manage-out-of-store-symlinks rejects an unknown action"
+  else
+    assert_fail "manage-out-of-store-symlinks rejects an unknown action" "rc=$rc output=[$(cat "$tmp/unknown.out")]"
+  fi
+
+  rm -rf "$tmp"
+}
+
 test_menu_bar_activation_script_die
 test_menu_bar_unknown_app_nonzero
 test_autostart_xdg_desktop_die
+test_managed_symlink_verify
 finish_tests

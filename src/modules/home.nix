@@ -430,6 +430,25 @@ in
         "src/modules/configs/litellm/logging-config.py"
     '';
 
+    # Managed symlink paths are seeded by the activation steps above, so they must
+    # exist once every seeder has run: a missing path means the owning seeder did
+    # not converge and the application would silently read a nonexistent config.
+    # Unprotect tolerates absence because it runs before these seeders; this check
+    # runs after them, which is the only point where absence is a defect.
+    home.activation.verify-managed-symlink-paths =
+      lib.hm.dag.entryAfter
+        [
+          "seed-camilladsp-configs"
+          "seed-camillagui-config"
+          "seed-discord-music-rpc-config"
+          "seed-iterm2-dynamic-profiles"
+          "seed-litellm-config"
+          "seed-srt-settings"
+        ]
+        ''
+          "${activationBundle}/src/scripts/configs/manage-out-of-store-symlinks.sh" "verify" "home.nix" '${managedSymlinkPathsJson}' "${pkgs.jq}/bin/jq"
+        '';
+
     # Override the default logDir (which uses ~) with a proper absolute path.
     # The launchd StandardErrorPath/StandardOutPath option types require an
     # absolute path and do not expand ~.
