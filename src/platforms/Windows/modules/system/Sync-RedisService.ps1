@@ -1,4 +1,4 @@
-#
+<#
 .SYNOPSIS
   Converge the nucleus-redis Windows native SCM service.
 
@@ -20,7 +20,7 @@
 
   Exit codes:
     0 on success; 1 on error.
-#
+#>
 
 function Sync-RedisService {
   <#

@@ -130,7 +130,7 @@ function Sync-RimSortConfig {
     return $parsed
   }
 
-  function Merge-Hashtables {
+  function Merge-Hashtable {
     param(
       [Parameter(Mandatory = $false)]
       [AllowNull()]
@@ -150,7 +150,7 @@ function Sync-RimSortConfig {
     }
     foreach ($key in $Override.Keys) {
       if ($result.ContainsKey($key) -and $result[$key] -is [hashtable] -and $Override[$key] -is [hashtable]) {
-        $result[$key] = Merge-Hashtables -Base $result[$key] -Override $Override[$key]
+        $result[$key] = Merge-Hashtable -Base $result[$key] -Override $Override[$key]
       } else {
         $result[$key] = $Override[$key]
       }
@@ -180,7 +180,7 @@ function Sync-RimSortConfig {
     $hostOverlayEntry = Resolve-UserConfigFirstLevelEntry -User $Username -ConfigName 'rimsort' -EntryName "rimsort.$HostName.json" -RepoRoot $RepoRoot
     if (Test-Path -LiteralPath $hostOverlayEntry -PathType Leaf) {
       $hostSettings = ConvertTo-Hashtable -InputObject (Get-Content -LiteralPath $hostOverlayEntry -Raw | ConvertFrom-Json)
-      $defaultSettings = Merge-Hashtables -Base $defaultSettings -Override $hostSettings
+      $defaultSettings = Merge-Hashtable -Base $defaultSettings -Override $hostSettings
     }
 
     return $defaultSettings

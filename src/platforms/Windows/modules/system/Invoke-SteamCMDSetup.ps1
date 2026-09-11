@@ -43,10 +43,7 @@ function Invoke-SteamCMDSetup {
     [object[]]$Users,
 
     [Parameter(Mandatory = $true)]
-    [string]$RepoRoot,
-
-    [Parameter(Mandatory = $false)]
-
+    [string]$RepoRoot
   )
 
   if (-not $Enabled) {
@@ -60,7 +57,7 @@ function Invoke-SteamCMDSetup {
   . (Join-Path -Path $RepoRoot -ChildPath 'src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1')
   $hostKeyName = Get-NucleusHostKey
 
-  function Merge-Hashtables {
+  function Merge-Hashtable {
     <#
     .SYNOPSIS
       Deep-merges two hashtables, mirroring lib.recursiveUpdate from Nix.
@@ -79,7 +76,7 @@ function Invoke-SteamCMDSetup {
       if ($result.ContainsKey($key) -and
           $result[$key] -is [hashtable] -and
           $Override[$key] -is [hashtable]) {
-        $result[$key] = Merge-Hashtables -Base $result[$key] -Override $Override[$key]
+        $result[$key] = Merge-Hashtable -Base $result[$key] -Override $Override[$key]
       } else {
         $result[$key] = $Override[$key]
       }
@@ -118,7 +115,7 @@ function Invoke-SteamCMDSetup {
     # Merge: host overlay wins on overlapping keys (lib.recursiveUpdate semantics).
     $mergedSettings = $baseSettings
     if ($null -ne $hostSettings) {
-      $mergedSettings = Merge-Hashtables -Base $baseSettings -Override $hostSettings
+      $mergedSettings = Merge-Hashtable -Base $baseSettings -Override $hostSettings
     }
 
     $steamcmdPath = $null
