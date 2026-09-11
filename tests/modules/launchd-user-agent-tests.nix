@@ -6,11 +6,13 @@
 #     individually and launchd loads them without the root-domain mismatch
 #     warning that global launchd.agents trigger under nix-darwin.
 #
-# In a Home Manager module (src/platforms/macOS/modules/default.nix) the
-# user-agent mechanism is HM's native `launchd.agents.<name>` with
-# `domain = "gui"` (installs to ~/Library/LaunchAgents).  In the darwin
-# config (camilladsp.nix, ext-discord-music-rpc.nix, cloud-drives.nix) the
-# mechanism is `environment.userLaunchAgents` (nix-darwin top-level option).
+# In a Home Manager module (src/platforms/macOS/modules/*.nix) the user-agent
+# mechanism is HM's native `launchd.agents.<name>` with `domain = "gui"`
+# (installs to ~/Library/LaunchAgents).  The darwin config uses the same form
+# where the derivation lives, through `home-manager.users.<user>.launchd.agents`
+# (camilladsp.nix).  nix-darwin's `environment.userLaunchAgents` is reserved for
+# short-lived jobs: it only loads a job that is not already registered, so it
+# cannot restart a loaded KeepAlive agent whose plist changed.
 
 let
   inherit (import ../lib.nix) assert' containsRegex;
@@ -20,6 +22,19 @@ let
   cloudDrivesNix = builtins.readFile ../../src/modules/cloud-drives.nix;
   launchdAgentsNix = builtins.readFile ../../src/platforms/macOS/modules/launchd-agents.nix;
   servicesSchemaNix = builtins.readFile ../../src/modules/services.schema.json;
+
+  # Every .nix file directly under src/hosts/MacBook/, concatenated, so the
+  # sweep below can assert that none of them assigns
+  # environment.userLaunchAgents.
+  macBookHostNixSources =
+    let
+      dir = ../../src/hosts/MacBook;
+      entries = builtins.readDir dir;
+      nixFiles = builtins.filter (
+        name: entries.${name} == "regular" && builtins.match ".*[.]nix" name != null
+      ) (builtins.attrNames entries);
+    in
+    builtins.concatStringsSep "\n" (map (name: builtins.readFile (dir + "/${name}")) nixFiles);
 in
 {
   tests = builtins.filter (x: x != null) [
@@ -47,17 +62,32 @@ in
       !containsRegex "environment.userLaunchAgents.\"gui-env\"" launchdAgentsNix
     ) "gui-env: not environment.userLaunchAgents")
 
-    # --- darwin config: camilladsp-heartbeat uses environment.userLaunchAgents ---
-    # The heartbeat uses nix-darwin's environment.userLaunchAgents (raw plist text)
-    # since it lives in the darwin config context (not an HM module). The
-    # attribute name IS the installed filename, so it must end in .plist or
-    # launchd never loads it.
-    (assert' (containsRegex "environment.userLaunchAgents.\"local.camilladsp-heartbeat.plist\"" camilladspNix) "camilladsp-heartbeat: uses environment.userLaunchAgents with a .plist filename")
+    # --- darwin config: camilladsp-heartbeat is an HM gui-domain agent ---
+    # The heartbeat is defined in the darwin config (its derivation lives there),
+    # so it is declared through home-manager.users.<user>.launchd.agents — the
+    # same HM launchd module the HM-context agents use.  A persistent KeepAlive
+    # job must not use nix-darwin's environment.userLaunchAgents: that mechanism
+    # only loads a job that is not already registered and therefore never
+    # restarts one whose plist changed (launchd.instructions.md --
+    # Activation-restart gap), which left the heartbeat running stale code.
+    (assert' (containsRegex "home-manager[.]users" camilladspNix) "camilladsp-heartbeat: declared in the HM user scope")
+    (assert' (containsRegex "launchd[.]agents[.]\"camilladsp-heartbeat\"" camilladspNix) "camilladsp-heartbeat: uses launchd.agents")
+    (assert' (containsRegex "enable = true" camilladspNix) "camilladsp-heartbeat: enable = true set")
+    (assert' (containsRegex "domain = \"gui\"" camilladspNix) "camilladsp-heartbeat: domain = gui")
+    (assert' (containsRegex "Label = \"local.camilladsp-heartbeat\"" camilladspNix) "camilladsp-heartbeat: keeps the local label")
+    (assert' (containsRegex "KeepAlive = true" camilladspNix) "camilladsp-heartbeat: KeepAlive = true")
+    (assert' (containsRegex "RunAtLoad = true" camilladspNix) "camilladsp-heartbeat: RunAtLoad = true")
     # launchd rejects a non-dict EnvironmentVariables, so it must not be built by
     # flattening the attrset into a list.
     (assert' (
       !containsRegex "EnvironmentVariables = lib.concatMap" camilladspNix
     ) "camilladsp-heartbeat: EnvironmentVariables rendered as a dict")
+    # No MacBook host module may assign environment.userLaunchAgents: persistent
+    # agents there are HM launchd.agents, and the nix-darwin-option form silently
+    # fails to restart a loaded job.
+    (assert' (
+      !containsRegex "environment[.]userLaunchAgents[.]\"" macBookHostNixSources
+    ) "src/hosts/MacBook/*.nix: no environment.userLaunchAgents assignment")
     # --- Home Manager modules: HM-native launchd.agents with domain = "gui" ---
     # ext-discord-music-rpc.nix and cloud-drives.nix are imported into the HM
     # config (home-manager.users / sharedModules), so they must use

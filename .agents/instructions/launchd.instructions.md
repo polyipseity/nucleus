@@ -83,4 +83,4 @@ launchd.agents."<name>" = {
 };
 ```
 
-Use for all primaryUser-scoped agents in HM modules (`src/platforms/macOS/modules/default.nix`, `src/modules/ext-discord-music-rpc.nix`, `src/modules/cloud-drives.nix`). Reserve `environment.userLaunchAgents` for darwin config context (`src/hosts/MacBook/camilladsp.nix`).
+Use for all primaryUser-scoped persistent agents — including those whose derivation lives in the darwin config, written as `home-manager.users.<user>.launchd.agents` (`src/hosts/MacBook/camilladsp.nix`) — and in HM modules (`src/platforms/macOS/modules/launchd-agents.nix`, `src/modules/ext-discord-music-rpc.nix`, `src/modules/cloud-drives.nix`). Reserve `environment.userLaunchAgents` for short-lived jobs in the nix-darwin config context; no persistent entry uses it.

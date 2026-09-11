@@ -4,7 +4,7 @@
 # with --no_config and never reads user-home config, so TCC is not triggered.
 # Config is deployed by Home Manager in modules/home.nix.
 #
-# The heartbeat is a user-scoped launch agent (environment.userLaunchAgents).
+# The heartbeat is a user-scoped launch agent (HM launchd.agents, domain = "gui").
 # It runs inside the primary user's GUI/login session so TCC permits reading
 # $HOME/.config/camilladsp/configs/config.yml (a system daemon is blocked by
 # macOS TCC from reading user-home file contents — EPERM — which previously
@@ -59,6 +59,14 @@ let
     NIX_SSL_CERT_FILE = resolveValue "NIX_SSL_CERT_FILE";
     NUCLEUS_HOST = resolveValue "NUCLEUS_HOST";
   };
+
+  # launchd.agents validates StandardOutPath/StandardErrorPath as absolute paths.
+  # The darwin-level logDir is the `~`-prefixed registry default, so read the
+  # HM-side absolute value instead — the same one the sibling HM launchd agents
+  # use (home.nix derives it from home.homeDirectory).
+  heartbeatLogDir = "${
+    config.home-manager.users.${username}.nucleus.logging.logDir
+  }/camilladsp-heartbeat";
 in
 {
   launchd.daemons."camilladsp" = {
@@ -88,30 +96,41 @@ in
     };
   };
 
-  # The attribute name IS the installed filename, so it must carry the .plist
-  # suffix: launchd only auto-loads plists. Naming it "camilladsp-heartbeat"
-  # wrote an extension-less file that was never loaded, leaving the previously
-  # loaded job running arbitrarily stale code. EnvironmentVariables must also be
-  # a dict — the previous concatMap form rendered it as an <array>, which
-  # launchd rejects outright.
-  environment.userLaunchAgents."local.camilladsp-heartbeat.plist" = {
+  # A persistent user-scoped job must be an HM launchd agent, not nix-darwin's
+  # environment.userLaunchAgents: that mechanism only loads a job when it is not
+  # already registered, so a plist change never restarts a loaded KeepAlive job
+  # and the heartbeat kept running stale code across every apply.  HM boots the
+  # job out by label, installs the plist and bootstraps it into gui/<uid>, which
+  # converges on the next apply.
+  # ref: launchd.instructions.md -- Activation-restart gap
+  #
+  # The attribute name is the agent key, not a filename: HM derives the plist
+  # path from the label.  No /bin/sh -c wrapper here — that shim exists only for
+  # system daemons, where macOS 26+ SIP blocks unsigned store binaries; HM wraps
+  # gui-domain agents in its own /bin/wait4path launcher instead.
+  home-manager.users.${username}.launchd.agents."camilladsp-heartbeat" = {
+    # HM's launchd module filters agents by a per-agent `enable` flag (defaults
+    # false via mkEnableOption), so without this the agent is silently dropped
+    # and no plist is generated in ~/Library/LaunchAgents.
     enable = true;
-    text = lib.generators.toPlist { escape = true; } {
+    domain = "gui";
+    config = {
       Label = "local.camilladsp-heartbeat";
+      # Heartbeat re-pushes the config when camilladsp is not in "Running" state.
       ProgramArguments = [
-        "/bin/sh"
-        "-c"
-        "exec ${camilladspHeartbeat}/bin/nucleus-camilladsp-heartbeat --port ${wsPort}"
+        "${camilladspHeartbeat}/bin/nucleus-camilladsp-heartbeat"
+        "--port"
+        wsPort
       ];
       EnvironmentVariables = lib.mapAttrs (_: toString) daemonEnv;
       KeepAlive = true;
       RunAtLoad = true;
       # WHY: the house default is the stdout.log/stderr.log pair for every service, so
       # per-iteration heartbeat output is kept in a rotating file rather than discarded.
-      StandardOutPath = "${config.nucleus.logging.logDir}/camilladsp-heartbeat/stdout.log";
+      StandardOutPath = "${heartbeatLogDir}/stdout.log";
       # The heartbeat is a user-scope agent, so it logs into the user log root under its
       # own declared dir (same shape as service-watchdog-user).
-      StandardErrorPath = "${config.nucleus.logging.logDir}/camilladsp-heartbeat/stderr.log";
+      StandardErrorPath = "${heartbeatLogDir}/stderr.log";
     };
   };
 }
