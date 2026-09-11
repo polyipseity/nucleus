@@ -12,6 +12,10 @@
 # hardcoded %LOCALAPPDATA%\nucleus string.
 $script:NucleusRepoRoot = (Resolve-Path (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..')).Path
 . (Join-Path -Path $script:NucleusRepoRoot -ChildPath 'src\platforms\Windows\modules\ManagedPaths.ps1')
+# Get-NucleusHostKey supplies the host key used to scope the probes, and
+# Resolve-NucleusFlakePin the revision expected by a "flake:<node>" pin.
+. (Join-Path -Path $script:NucleusRepoRoot -ChildPath 'src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1')
+. (Join-Path -Path $script:NucleusRepoRoot -ChildPath 'src\platforms\Windows\modules\lib\Resolve-NucleusFlakePin.ps1')
 
 function Invoke-LockfileEnforcement {
   [CmdletBinding()]
@@ -26,6 +30,31 @@ function Invoke-LockfileEnforcement {
 
   $errors = 0
 
+  # Probes are scoped to the packages this host declares in
+  # src/modules/packages/desired.json: an entry kept only for another host must
+  # not be reported as drift here.  $desiredNames holds the declared names per
+  # manager, and $desiredEntries the declared entries whose pins need extra
+  # handling.  Managers absent from the registry keep their historical
+  # lockfile-only behaviour.
+  $hostKey = Get-NucleusHostKey
+  $desiredNames = @{}
+  $desiredEntries = @{}
+  $desiredRegistryPath = Join-Path $script:NucleusRepoRoot 'src\modules\packages\desired.json'
+  if (Test-Path -LiteralPath $desiredRegistryPath) {
+    $registry = Get-Content -LiteralPath $desiredRegistryPath -Raw | ConvertFrom-Json -AsHashtable
+    foreach ($managerName in $registry.Keys) {
+      $managerEntry = $registry[$managerName]
+      # Non-manager keys (for example "$schema") are plain strings.
+      if ($managerEntry -isnot [hashtable]) { continue }
+      if (-not $managerEntry.ContainsKey($hostKey)) { continue }
+      $entries = @($managerEntry[$hostKey])
+      $names = [System.Collections.Generic.HashSet[string]]::new()
+      foreach ($entry in $entries) { $null = $names.Add([string]$entry.name) }  # check-suppress:suppression_doc: HashSet.Add returns a bool that carries no meaning here
+      $desiredNames[$managerName] = $names
+      $desiredEntries[$managerName] = $entries
+    }
+  }
+
   # --- bun (global packages) ---
   if (Get-Command bun -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
     $globalJson = Join-Path $env:USERPROFILE '.\bun\install\global\package.json'
@@ -35,6 +64,7 @@ function Invoke-LockfileEnforcement {
       $bunSec = if ($Lockfile.ContainsKey('bun')) { $Lockfile.bun } else { @{} }
       foreach ($entry in $bunSec.GetEnumerator()) {
         $pkg = $entry.Key; $pin = $entry.Value
+        if ($desiredNames.ContainsKey('bun') -and -not $desiredNames['bun'].Contains($pkg)) { continue }
         if ($pin -is [hashtable]) { & $InfoFn "bun.$pkg`: VCS-pinned (rev) — not version-verifiable, skipping"; continue }
         $inst = if ($installed -and $installed.ContainsKey('dependencies') -and $installed.dependencies.ContainsKey($pkg)) { $installed.dependencies[$pkg] } else { $null }
         if ($null -eq $inst) { & $ErrorFn "bun.$pkg`: expected $pin, not installed"; $errors++ }
@@ -49,6 +79,7 @@ function Invoke-LockfileEnforcement {
     $uvSec = if ($Lockfile.ContainsKey('uv')) { $Lockfile.uv } else { @{} }
     foreach ($entry in $uvSec.GetEnumerator()) {
       $tool = $entry.Key; $pin = $entry.Value
+      if ($desiredNames.ContainsKey('uv') -and -not $desiredNames['uv'].Contains($tool)) { continue }
       if ($pin -is [hashtable]) { & $InfoFn "uv.$tool`: VCS-pinned (rev) — not version-verifiable, skipping"; continue }
       $inst = $null
       foreach ($line in $uvList) {
@@ -59,12 +90,43 @@ function Invoke-LockfileEnforcement {
     }
   } else { & $InfoFn "uv: not installed; skipping enforcement" }
 
+  # --- uv tools pinned to a flake.lock revision ---
+  # Such a tool has no lockfile version (it is provisioned from a git revision so
+  # it matches the declarative POSIX build), so it is probed by revision through
+  # uv's PEP 610 record, which stores the installed commit.
+  if (Get-Command uv -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
+    foreach ($entry in @($desiredEntries['uv'])) {
+      if (-not $entry.pin) { continue }
+      if ($entry.pin -notmatch '^flake:(.+)$') {
+        & $ErrorFn "uv.$($entry.name)`: unsupported pin '$($entry.pin)'; expected 'flake:<node>'"; $errors++
+        continue
+      }
+      $nodeName = $Matches[1]
+      $resolvedPin = Resolve-NucleusFlakePin -Node $nodeName -FlakeLockPath (Join-Path $script:NucleusRepoRoot 'src\flake.lock')
+      if (-not $resolvedPin.Ok) {
+        & $ErrorFn "uv.$($entry.name)`: cannot resolve flake node '$nodeName' ($($resolvedPin.Reason))"; $errors++
+        continue
+      }
+      $toolRoot = if ($env:UV_TOOL_DIR) { Join-Path $env:UV_TOOL_DIR $entry.name } else { Join-Path $env:LOCALAPPDATA "uv\tools\$($entry.name)" }
+      $record = Get-ChildItem -Path $toolRoot -Filter 'direct_url.json' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+      if (-not $record) {
+        & $ErrorFn "uv.$($entry.name)`: expected revision $($resolvedPin.Rev), no install record under $toolRoot"; $errors++
+        continue
+      }
+      $direct = Get-Content -LiteralPath $record.FullName -Raw | ConvertFrom-Json -AsHashtable
+      $commit = if ($direct.ContainsKey('vcs_info')) { $direct.vcs_info.commit_id } else { $null }
+      if (-not $commit) { & $ErrorFn "uv.$($entry.name)`: expected revision $($resolvedPin.Rev), install record has no vcs_info"; $errors++ }
+      elseif ($commit -ne $resolvedPin.Rev) { & $ErrorFn "uv.$($entry.name)`: expected revision $($resolvedPin.Rev), installed $commit"; $errors++ }
+    }
+  } else { & $InfoFn "uv: not installed; skipping flake-pinned revision enforcement" }
+
   # --- cargo-binstall (crates) ---
   if (Get-Command cargo -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
     $cargoList = & cargo install --list 2>$null  # check-suppress:suppression_doc: list command may emit noise/errors when the tool store is uninitialised; empty output is treated as no-installs and drift is still reported below
     $cbSec = if ($Lockfile.ContainsKey('cargo-binstall')) { $Lockfile.'cargo-binstall' } else { @{} }
     foreach ($entry in $cbSec.GetEnumerator()) {
       $crate = $entry.Key; $pin = $entry.Value
+      if ($desiredNames.ContainsKey('cargo-binstall') -and -not $desiredNames['cargo-binstall'].Contains($crate)) { continue }
       if ($pin -is [hashtable]) { & $InfoFn "cargo-binstall.$crate`: VCS-pinned (rev) — not version-verifiable, skipping"; continue }
       $inst = $null
       foreach ($line in $cargoList) {
@@ -104,6 +166,7 @@ function Invoke-LockfileEnforcement {
     $scoopSec = if ($Lockfile.ContainsKey('scoop')) { $Lockfile.scoop } else { @{} }
     foreach ($entry in $scoopSec.GetEnumerator()) {
       $app = $entry.Key; $pin = $entry.Value
+      if ($desiredNames.ContainsKey('scoop') -and -not $desiredNames['scoop'].Contains($app)) { continue }
       if ($pin -is [hashtable]) { & $InfoFn "scoop.$app`: VCS-pinned (rev) — not version-verifiable, skipping"; continue }
       $inst = $null
       foreach ($line in $scoopList) {

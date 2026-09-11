@@ -116,7 +116,7 @@ _lfe_check_uv() {
     say -l uv "no tools installed; skipping"
     return 0
   }
-  local _pkgs _tool _pin _inst _rc=0
+  local _pkgs _tool _pin _inst _rev _commit _rc=0
   _pkgs="$(_lfe_scoped_keys "$_lf" "$_jq" "uv" "$_desired")" || return 0
   while IFS= read -r _tool; do
     [ -z "$_tool" ] && continue
@@ -124,8 +124,23 @@ _lfe_check_uv() {
     # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
     _pin="$(printf '%s' "$_lf" | "$_jq" -r --arg p "$_tool" '(.uv // {})[$p] // empty' 2>/dev/null)" || true # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
     [ -z "$_pin" ] && continue
+    # An object (VCS/rev) pin has no version to compare: uv records the
+    # resolved commit for the install (PEP 610), so verify that instead of
+    # silently skipping the tool.
     if [ "${_pin%"${_pin#?}"}" = '{' ]; then
-      say -l uv "$_tool: VCS-pinned (rev) — not version-verifiable, skipping"
+      # check-suppress:suppression_doc: jq parse failure on a malformed lockfile pin skips the revision -- drift is reported below when the revision cannot be read.
+      # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
+      _rev="$(printf '%s' "$_pin" | "$_jq" -r '.rev // empty' 2>/dev/null)" || true
+      if [ -z "$_rev" ]; then
+        error "uv.$_tool: pin has no rev; cannot verify the installed revision" || _rc=1
+        continue
+      fi
+      _commit="$(_lfe_uv_installed_commit "$_tool" "$_jq")" || true
+      if [ -z "$_commit" ]; then
+        error "uv.$_tool: expected revision $_rev, no install record" || _rc=1
+      elif [ "$_commit" != "$_rev" ]; then
+        error "uv.$_tool: expected revision $_rev, installed $_commit" || _rc=1
+      fi
       continue
     fi
     _inst="$(printf '%s\n' "$_installed" | awk -v t="$_tool" '$1 == t { v=$2; sub(/^v/,"",v); print v; exit }')"
@@ -138,6 +153,19 @@ _lfe_check_uv() {
 $_pkgs
 EOF
   return $_rc
+}
+
+# Print the commit uv recorded for an installed tool: PEP 610 keeps the
+# resolved revision in <tool>/lib/python*/site-packages/*.dist-info/direct_url.json.
+# Returns 1 when the tool has no such record.
+_lfe_uv_installed_commit() {
+  local _tool="$1" _jq="$2"
+  local _root="${UV_TOOL_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/uv/tools}/$_tool"
+  local _record=""
+  _record="$(find "$_root" -name direct_url.json -type f -print 2>/dev/null | head -1)" || true
+  [ -n "$_record" ] || return 1
+  # check-suppress:suppression_doc: malformed PEP 610 record yields no commit -- the caller reports the drift.
+  "$_jq" -r '.vcs_info.commit_id // empty' "$_record" 2>/dev/null || true
 }
 
 # Compare installed cargo-binstall crates against the host's declared crate set.

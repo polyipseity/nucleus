@@ -39,6 +39,10 @@ function Invoke-UvSetup {
   # desired-package registry.
   . (Join-Path -Path $repoRoot -ChildPath "src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1")
 
+  # Resolve-NucleusFlakePin turns a "flake:<node>" pin into a GitHub source and
+  # revision; the enforcement lib uses the same helper for its rev probe.
+  . (Join-Path -Path $repoRoot -ChildPath "src\platforms\Windows\modules\lib\Resolve-NucleusFlakePin.ps1")
+
   # Read version-pinning data from the consolidated lockfile.
   $lockfile = @{}
   if (Test-Path $lockfilePath) {
@@ -82,29 +86,29 @@ function Invoke-UvSetup {
       $toolPythonVersion[$entry.name] = $entry.python
     }
     if (-not $entry.pin) { continue }
-    if ($entry.pin -match '^flake:(.+)$') {
-      $nodeName = $Matches[1]
-    }
-    else {
+    if ($entry.pin -notmatch '^flake:(.+)$') {
       Write-NucleusError -CommandName 'Invoke-UvSetup' "unsupported pin '$($entry.pin)' for tool '$($entry.name)'; expected 'flake:<node>'"
       return
     }
-    if (-not (Test-Path -LiteralPath $flakeLockPath)) {
-      Write-NucleusError -CommandName 'Invoke-UvSetup' "tool '$($entry.name)' is pinned to flake node '$nodeName' but '$flakeLockPath' is missing"
-      return
-    }
-    $locked = (Get-Content -LiteralPath $flakeLockPath -Raw | ConvertFrom-Json).nodes.$nodeName.locked
-    if ($null -eq $locked -or -not $locked.rev) {
-      Write-NucleusError -CommandName 'Invoke-UvSetup' "flake.lock has no locked rev for node '$nodeName' (pinned by tool '$($entry.name)')"
-      return
-    }
-    if ($locked.type -ne 'github' -or -not $locked.owner -or -not $locked.repo) {
-      Write-NucleusError -CommandName 'Invoke-UvSetup' "flake node '$nodeName' is not a github input; cannot derive an install source for tool '$($entry.name)'"
+    $nodeName = $Matches[1]
+    $resolvedPin = Resolve-NucleusFlakePin -Node $nodeName -FlakeLockPath $flakeLockPath
+    if (-not $resolvedPin.Ok) {
+      switch ($resolvedPin.Reason) {
+        'missing-lockfile' {
+          Write-NucleusError -CommandName 'Invoke-UvSetup' "tool '$($entry.name)' is pinned to flake node '$nodeName' but '$flakeLockPath' is missing"
+        }
+        'missing-node' {
+          Write-NucleusError -CommandName 'Invoke-UvSetup' "flake.lock has no locked rev for node '$nodeName' (pinned by tool '$($entry.name)')"
+        }
+        default {
+          Write-NucleusError -CommandName 'Invoke-UvSetup' "flake node '$nodeName' is not a github input; cannot derive an install source for tool '$($entry.name)'"
+        }
+      }
       return
     }
     $uvPins[$entry.name] = [pscustomobject]@{
-      source = "https://github.com/$($locked.owner)/$($locked.repo)"
-      rev    = $locked.rev
+      source = $resolvedPin.Source
+      rev    = $resolvedPin.Rev
     }
   }
 
