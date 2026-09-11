@@ -402,18 +402,30 @@ function Invoke-LockfileBump {
   # lockfile stores package name -> version.  Object-shaped pins are VCS/rev
   # pins, which the registry cannot update.
   # -------------------------------------------------------------------------
+  # Versions published within the minimumReleaseAge window are skipped to
+  # avoid a pin that bun install would reject (supply-chain hardening).
   if (Test-SectionEnabled 'pi') {
     if (Get-Command -Name 'curl' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
       if ($ht.ContainsKey('pi') -and $ht['pi'] -is [hashtable]) {
+        $ageSeconds = if ($env:MINIMUM_RELEASE_AGE) { [int]$env:MINIMUM_RELEASE_AGE } else { 432000 }
         foreach ($key in @($ht['pi'].Keys)) {
           $old = $ht['pi'][$key]
           if ($old -isnot [string]) { continue }
           # check-suppress:suppression_doc: probe -- package may not exist; stderr suppressed for clean output.
-          $result = & curl -fsSL "https://registry.npmjs.org/$key/latest" 2>$null
+          $result = & curl -fsSL "https://registry.npmjs.org/$key" 2>$null
           if ($result) {
             $parsed = $result | ConvertFrom-Json
-            $new = $parsed.version.Trim()
-            if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
+            $versions = @($parsed.PSObject.Properties |
+              Where-Object { $_.Name -match '^[0-9]' -and $parsed.time.$($_.Name) } |
+              ForEach-Object {
+                $pubEpoch = [int][double]::Parse((Get-Date ([datetime]::Parse($parsed.time.$($_.Name)).ToUniversalTime()) -UFormat '%s'))
+                $age = [int][double]::Parse((Get-Date -UFormat '%s')) - $pubEpoch
+                if ($age -ge $ageSeconds) { [pscustomobject]@{ Version = $_.Name; Age = $age } }
+              })
+            $new = ($versions | Sort-Object { [version]$_.Version } -Descending | Select-Object -First 1).Version
+            if ([string]::IsNullOrEmpty($new)) {
+              Write-NucleusWarning "pi.$key`: no version older than the minimum release age -- keeping $old"
+            } elseif ($new -ne $old) {
               Write-Update -Section 'pi' -Key $key -OldValue $old -NewValue $new
               $ht['pi'][$key] = $new
             }
@@ -421,7 +433,7 @@ function Invoke-LockfileBump {
         }
       }
     } else {
-      Write-NucleusWarning 'curl: command not found — skipping pi section'
+      Write-NucleusWarning 'curl: command not found -- skipping pi section'
     }
   }
 

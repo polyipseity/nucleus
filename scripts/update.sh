@@ -419,15 +419,25 @@ EOF
   # pi — npm registry API (curl).  Same endpoint as bun: pi's extensions are
   # published to npm and the lockfile stores package name -> version.  Pins
   # shaped as objects are VCS/rev pins and are not registry-updatable.
+  # Versions published within the minimumReleaseAge window are skipped to
+  # avoid a pin that bun install would reject (supply-chain hardening).
   if section_enabled pi; then
     if command -v curl >/dev/null 2>&1; then
+      _pi_age_threshold=$(( $(date +%s) - ${MINIMUM_RELEASE_AGE:-432000} ))
       while IFS= read -r key; do
         [ -z "$key" ] && continue
         old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.pi // {})[$k] // empty')
         [ -z "$old" ] && continue
         case "$old" in \{*) continue ;; esac
-        new=$(curl -fsSL "https://registry.npmjs.org/$key/latest" 2>/dev/null | jq -r '.version // empty' 2>/dev/null)
-        if [ -n "$new" ] && [ "$new" != "$old" ]; then
+        new=$(curl -fsSL "https://registry.npmjs.org/$key" 2>/dev/null | jq -r --arg thresh "$_pi_age_threshold" '
+          [ .time | to_entries[] | select(.key | test("^[0-9]")) |
+            {version: .key, ts: (.value | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601)} ] |
+          map(select(.ts < ($thresh | tonumber))) |
+          sort_by(-.ts) | .[0] // empty | .version
+        ' 2>/dev/null)
+        if [ -z "$new" ]; then
+          warn "pi.$key: no version older than the minimum release age — keeping $old"
+        elif [ "$new" != "$old" ]; then
           log_update "pi" "$key" "$old" "$new"
           data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.pi[$k] = $v')
         fi
