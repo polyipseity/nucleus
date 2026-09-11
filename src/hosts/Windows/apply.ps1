@@ -358,6 +358,7 @@ $EnableWiFiParity = -not $noSystemParity
 $EnableAgentsConfigParity = -not $noUserStateParity
 $EnableAgentsSkillsParity = -not $noUserStateParity
 $EnableAgentsClawHubSkillsParity = -not $noUserStateParity
+$EnablePiExtensionsParity = -not $noUserStateParity
 $EnableBunParity = -not $noUserStateParity
 $EnableCloudDrivesParity = -not $noUserStateParity
 $EnableSymlinkParity = -not $noUserStateParity
@@ -486,6 +487,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-CamillaDSPSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-CamillaGUISetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-CargoBinstallSetup.ps1")
+. (Join-Path -Path $setupModuleDir -ChildPath "Invoke-PiSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-PowerShellModuleSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-RustupSetup.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-ScoopSetup.ps1")
@@ -497,6 +499,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsSkillManifest.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-CursorConfig.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-PiAgentConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-SymlinkManifest.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-DevRepoCatalog.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-DiscordMusicRPC.ps1")
@@ -828,6 +831,11 @@ Invoke-CargoBinstallSetup
 if ($EnableBunParity) {
   Invoke-BunSetup
 }
+# pi extensions converge from the shared registry; pi itself is a bun global
+# package, so this runs after bun-setup has made the pi CLI reachable.
+if ($EnablePiExtensionsParity) {
+  Invoke-PiSetup
+}
 # uv global tools run after WinGet DSC has installed astral-sh.uv.
 # uv-setup prepends ~/.local/bin to PATH internally for this session.
 Invoke-UvSetup
@@ -883,6 +891,7 @@ if ($userDevRepos -and $userDevRepos.repositories) {
 
 Sync-AgentsConfig -RepoRoot $repoRoot -User $sessionUser -Enabled:$EnableAgentsConfigParity
 Sync-AgentsSkillManifest -RepoRoot $repoRoot -Enabled:$EnableAgentsSkillsParity
+Sync-PiAgentConfig -RepoRoot $repoRoot -User $sessionUser -Enabled:$EnablePiExtensionsParity
 Sync-AgentsClawHubSkillManifest -RepoRoot $repoRoot -Enabled:$EnableAgentsClawHubSkillsParity
 Sync-CursorConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity -Username $sessionUser
 Sync-VSCodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity -Username $sessionUser
