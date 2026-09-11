@@ -350,7 +350,7 @@ test_step14_nix_file_structure_pattern1_detection() {
   # Source the check-lib to get filter_gitignored, then source the step
   # shellcheck source=/dev/null
   (cd "$_tmp" && mkdir -p src && git init -q && touch src/.gitkeep && git add . && git commit -q -m 'init' &&
-    . "$REPO_ROOT/src/scripts/checks/check-lib.sh" &&
+    unset _NUCLEUS_STEP_RUNNER_SOURCED _NUCLEUS_CHECK_LIB_SOURCED && _STEP_IDS=() && . "$REPO_ROOT/src/scripts/checks/check-lib.sh" &&
     . "$TEST_FILE" &&
     declare -A ctx=([HAS_ARGS]=false [REPO_ROOT]="$_tmp") &&
     run_nix_file_structure false "$_tmp" 2>"$_out" || true)
@@ -374,7 +374,7 @@ test_step14_nix_file_structure_pattern2_detection() {
   _out=$(mktemp)
   # shellcheck source=/dev/null
   (cd "$_tmp" && mkdir -p src && git init -q && touch src/.gitkeep && git add . && git commit -q -m 'init' &&
-    . "$REPO_ROOT/src/scripts/checks/check-lib.sh" &&
+    unset _NUCLEUS_STEP_RUNNER_SOURCED _NUCLEUS_CHECK_LIB_SOURCED && _STEP_IDS=() && . "$REPO_ROOT/src/scripts/checks/check-lib.sh" &&
     . "$TEST_FILE" &&
     declare -A ctx=([HAS_ARGS]=false [REPO_ROOT]="$_tmp") &&
     run_nix_file_structure false "$_tmp" 2>"$_out" || true)
@@ -398,7 +398,7 @@ test_step14_nix_file_structure_valid_passes() {
   _out=$(mktemp)
   # shellcheck source=/dev/null
   (cd "$_tmp" && mkdir -p src && git init -q && touch src/.gitkeep && git add . && git commit -q -m 'init' &&
-    . "$REPO_ROOT/src/scripts/checks/check-lib.sh" &&
+    unset _NUCLEUS_STEP_RUNNER_SOURCED _NUCLEUS_CHECK_LIB_SOURCED && _STEP_IDS=() && . "$REPO_ROOT/src/scripts/checks/check-lib.sh" &&
     . "$TEST_FILE" &&
     declare -A ctx=([HAS_ARGS]=false [REPO_ROOT]="$_tmp") &&
     run_nix_file_structure false "$_tmp" 2>"$_out")
