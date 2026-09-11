@@ -637,9 +637,11 @@ function Format-StepSummary {
 function Test-Prerequisite {
   Assert-ToolAvailable -Name 'actionlint' -Type 'Command'
   Assert-ToolAvailable -Name 'check-jsonschema' -Type 'Command'
+  Assert-ToolAvailable -Name 'git' -Type 'Command'
   Assert-ToolAvailable -Name 'jq' -Type 'Command'
   Assert-ToolAvailable -Name 'packer' -Type 'Command'
   Assert-ToolAvailable -Name 'pinact' -Type 'Command'
+  Assert-ToolAvailable -Name 'pwsh' -Type 'Command'
   Assert-ToolAvailable -Name 'shfmt' -Type 'Command'
   Assert-ToolAvailable -Name 'taplo' -Type 'Command'
   Assert-ToolAvailable -Name 'yamllint' -Type 'Command'

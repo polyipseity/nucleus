@@ -558,6 +558,7 @@ preflight_check() {
   require_command shfmt
   require_command taplo
   require_command treefmt
+  require_command yamllint
   require_command yq
   require_command zizmor
 }
