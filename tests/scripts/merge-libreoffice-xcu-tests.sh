@@ -113,7 +113,7 @@ test_empty_string_value() {
   "$PYTHON3" "$MERGE_SCRIPT" "$xcu" \
     "/org.openoffice.UserProfile/Data|mail|" 2>&1
 
-  if grep -q 'mail' "$xcu" && grep -qE '<oor:value\s*/>' "$xcu"; then
+  if grep -q 'mail' "$xcu" && grep -qE '<value\s*/>' "$xcu"; then
     assert_pass "empty_string_value: empty value element created"
   else
     assert_fail "empty_string_value: empty value element created" "empty value not found"
