@@ -16,6 +16,7 @@
 #   refresh_tiswitcher           — refresh TISwitcher input-source daemon
 #   refresh_system_ui            — restart SystemUIServer + WindowManager
 #   refresh_shared_filelistd     — restart sharedfilelistd
+#   refresh_wallpaper_agent     — restart WallpaperAgent (wallpaper folder)
 #   wait_for_daemons             — brief sleep for daemon flush settlement
 #   refresh_desktop_services     — composite: Finder+SystemUI (launchctl)
 #   refresh_services_menu        — composite: cfprefsd+pbs+sleep
@@ -167,6 +168,18 @@ refresh_finder_launchd() {
   case "$(uname -s)" in
   Darwin)
     /bin/launchctl kickstart -k "gui/$UID/com.apple.Finder" 2>/dev/null || true # check-suppress:suppression_doc: Finder may not be running or user may be in headless/SSH session
+    ;;
+  esac
+}
+
+# refresh_wallpaper_agent — Restart WallpaperAgent on macOS to force re-read
+# of wallpaper folder contents after provisioning new wallpapers.
+# WallpaperAgent holds folder contents in-memory; kill forces re-read.
+# No-op on non-macOS.
+refresh_wallpaper_agent() {
+  case "$(uname -s)" in
+  Darwin)
+    /usr/bin/killall WallpaperAgent 2>/dev/null || true # check-suppress:suppression_doc: WallpaperAgent may not be running; killall exits 1 for absent processes
     ;;
   esac
 }
