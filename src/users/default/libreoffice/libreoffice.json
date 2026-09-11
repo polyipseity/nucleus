@@ -1,5 +1,5 @@
 {
-  "$schema": "../../modules/configs/libreoffice/libreoffice.schema.json",
+  "$schema": "../../../modules/configs/libreoffice/libreoffice.schema.json",
   "clearUserProfileData": true,
   "extraSettings": [],
   "removePersonalInfoOnSave": true
