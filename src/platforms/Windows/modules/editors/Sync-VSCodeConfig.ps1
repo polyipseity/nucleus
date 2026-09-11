@@ -88,6 +88,11 @@ function Sync-VSCodeConfig {
   )
 
 
+  # The nested helpers below read this through the enclosing scope, which hides
+  # the read from PSReviewUnusedParameter; binding it locally keeps the data
+  # flow visible.
+  $effectiveUsername = $Username
+
   if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
     throw 'Sync-VSCodeConfig: RepoRoot must not be empty.'
   }
@@ -95,13 +100,13 @@ function Sync-VSCodeConfig {
   . (Join-Path -Path $PSScriptRoot -ChildPath '..\Set-ManagedSymlinkDeleteProtection.ps1')
 
   function Get-VSCodeRepoFileTarget {
-    param([Parameter(Mandatory)][string]$RelativePath)
-    return Resolve-UserConfigFile -User $Username -ConfigName 'vscode' -RelativePath $RelativePath -RepoRoot $RepoRoot
+    param([Parameter(Mandatory)][string]$RelativePath, [Parameter(Mandatory)][string]$User)
+    return Resolve-UserConfigFile -User $User -ConfigName 'vscode' -RelativePath $RelativePath -RepoRoot $RepoRoot
   }
 
   function Get-VSCodeRepoDirTarget {
-    param([Parameter(Mandatory)][string]$EntryName)
-    return Resolve-UserConfigFirstLevelEntry -User $Username -ConfigName 'vscode' -EntryName $EntryName -RepoRoot $RepoRoot
+    param([Parameter(Mandatory)][string]$EntryName, [Parameter(Mandatory)][string]$User)
+    return Resolve-UserConfigFirstLevelEntry -User $User -ConfigName 'vscode' -EntryName $EntryName -RepoRoot $RepoRoot
   }
 
   # Symlinks on Windows require Developer Mode or an elevated session.  Check
@@ -117,9 +122,8 @@ function Sync-VSCodeConfig {
     }
   }
 
-  # Build the target user's AppData\Roaming root from the explicit Username
-  # parameter so callers control which profile receives managed VS Code
-  # symlinks.
+  # AppData\Roaming is resolved from the running session's profile; -Username
+  # selects which user's config overlay supplies the managed files.
   $userProfile = [Environment]::GetFolderPath('UserProfile')
   $appDataRoaming = Join-Path -Path $userProfile -ChildPath "AppData\Roaming"
 
@@ -208,7 +212,7 @@ function Sync-VSCodeConfig {
     # --- Managed files ---
     foreach ($repoFileName in $managedFiles.Keys) {
       $linkFileName = $managedFiles[$repoFileName]
-      $repoTarget = Get-VSCodeRepoFileTarget -RelativePath $repoFileName
+      $repoTarget = Get-VSCodeRepoFileTarget -RelativePath $repoFileName -User $effectiveUsername
       $linkPath   = Join-Path -Path $channelDir  -ChildPath $linkFileName
 
       if (-not $Enabled) {
@@ -257,7 +261,7 @@ function Sync-VSCodeConfig {
 
     # --- Managed directories ---
     foreach ($alias in $managedDirs.Keys) {
-      $repoTarget = Get-VSCodeRepoDirTarget -EntryName $alias
+      $repoTarget = Get-VSCodeRepoDirTarget -EntryName $alias -User $effectiveUsername
       $linkPath   = Join-Path -Path $channelDir   -ChildPath $managedDirs[$alias]
 
       if (-not $Enabled) {
@@ -316,7 +320,7 @@ function Sync-VSCodeConfig {
         }
       }
       # check-suppress:config-method: method 3 (merge) -- name-keyed merge preserves VS Code-added model entries while refreshing repo entries.
-      $repoFile = Get-VSCodeRepoFileTarget -RelativePath "chatLanguageModels.$vscodeHostName.json"
+      $repoFile = Get-VSCodeRepoFileTarget -RelativePath "chatLanguageModels.$vscodeHostName.json" -User $effectiveUsername
       Merge-VSChatLanguageModel -RepoFile $repoFile -DestFile $chatLmPath
     }
   }

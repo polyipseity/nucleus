@@ -22,7 +22,7 @@
   Exit codes: 0 on success; non-zero on failure
 #>
 
-function Sync-CursorExtensions {
+function Sync-CursorExtensionManifest {
   <#
   .SYNOPSIS
     Converges managed Cursor extension parity.
@@ -40,10 +40,10 @@ function Sync-CursorExtensions {
     (remove managed extensions).
 
   .EXAMPLE
-    Sync-CursorExtensions -Enabled:`$true
+    Sync-CursorExtensionManifest -Enabled:`$true
 
   .EXAMPLE
-    Sync-CursorExtensions -Enabled:`$false
+    Sync-CursorExtensionManifest -Enabled:`$false
   #>
   param(
     [Parameter(Mandatory)]

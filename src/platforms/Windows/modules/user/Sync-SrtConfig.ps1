@@ -1,4 +1,4 @@
-function Sync-SrtSettings {
+function Sync-SrtConfig {
   <#
   .SYNOPSIS
     Deploys a repository-managed srt-settings.json writable symlink.
@@ -19,7 +19,7 @@ function Sync-SrtSettings {
     Absolute path to the nucleus repository checkout.
 
   .EXAMPLE
-    Sync-SrtSettings -Enabled:$true -User 'admin' -RepoRoot 'C:\Users\admin\repos\nucleus'
+    Sync-SrtConfig -Enabled:$true -User 'admin' -RepoRoot 'C:\Users\admin\repos\nucleus'
 
   .NOTES
     Exit codes: 0 on success; non-zero on failure
@@ -41,7 +41,7 @@ function Sync-SrtSettings {
   if (-not $Enabled) {
     if (Test-Path -Path $destPath -PathType Leaf) {
       Remove-Item -Path $destPath -Force
-      Write-NucleusInfo -CommandName 'Sync-SrtSettings' "removed $destPath"
+      Write-NucleusInfo -CommandName 'Sync-SrtConfig' "removed $destPath"
     }
     return
   }

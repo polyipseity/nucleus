@@ -524,13 +524,13 @@ if (-not $Elevated) {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-DirenvConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-LibreOfficeXcu.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-StarshipConfig.ps1")
-. (Join-Path -Path $userModuleDir -ChildPath "Sync-SrtSettings.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-SrtConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-UserPath.ps1")
 # editors/: VS Code configuration and workspace management.
 . (Join-Path -Path $editorsModuleDir -ChildPath "Set-VSCodeWorkspaceTrust.ps1")
 . (Join-Path -Path $editorsModuleDir -ChildPath "Set-PiProjectTrust.ps1")
 . (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VSCodeExtensionManifest.ps1")
-. (Join-Path -Path $editorsModuleDir -ChildPath "Sync-CursorExtensions.ps1")
+. (Join-Path -Path $editorsModuleDir -ChildPath "Sync-CursorExtensionManifest.ps1")
 . (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VSCodeSettingManifest.ps1")
 . (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VSCodeConfig.ps1")
 # wallpapers/: wallpaper materialization and stale-file cleanup.
@@ -910,7 +910,7 @@ Sync-AgentsClawHubSkillManifest -RepoRoot $repoRoot -User $sessionUser -Enabled:
 Sync-CursorConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity -Username $sessionUser
 Sync-VSCodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity -Username $sessionUser
 Sync-VSCodeExtensionManifest -Enabled:$EnableVsCodeExtensionsParity
-Sync-CursorExtensions -Enabled:$EnableVsCodeExtensionsParity
+Sync-CursorExtensionManifest -Enabled:$EnableVsCodeExtensionsParity
 Initialize-DevDirectory -Enabled:$EnableDevDirectoryParity
 Set-VSCodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
 Set-PiProjectTrust -Enabled:$EnablePiProjectTrustParity
@@ -946,7 +946,7 @@ Sync-NextestConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $rep
 # check-suppress:config-method: method 1 (writable symlink) -- direnvrc cross-platform base config.
 Sync-DirenvConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $repoRoot
 Sync-StarshipConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $repoRoot
-Sync-SrtSettings -Enabled:$true -User $sessionUser -RepoRoot $repoRoot
+Sync-SrtConfig -Enabled:$true -User $sessionUser -RepoRoot $repoRoot
 if ($EnableCloudDrivesParity) {
   foreach ($userRecord in $selectedUserRecords) {
     Sync-CloudDriveCatalog -UserConfig $userRecord -HomeDirectory $userRecord.homeDirectory
