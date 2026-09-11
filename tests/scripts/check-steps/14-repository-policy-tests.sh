@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
+# shellcheck disable=SC2031 # reason: test functions intentionally isolate REPO_ROOT in subshells
 # Test: step 14 repository-policy must enforce dummy-key registry uniformity
 # and the logging format policy
 
@@ -347,6 +348,7 @@ test_step14_nix_file_structure_pattern1_detection() {
   local _out
   _out=$(mktemp)
   # Source the check-lib to get filter_gitignored, then source the step
+  # shellcheck source=/dev/null
   (cd "$_tmp" && mkdir -p src && git init -q && touch src/.gitkeep && git add . && git commit -q -m 'init' &&
     . "$REPO_ROOT/src/scripts/checks/check-lib.sh" &&
     . "$TEST_FILE" &&
@@ -370,6 +372,7 @@ test_step14_nix_file_structure_pattern2_detection() {
   touch "$_tmp/src/mymod/mymod.nix"
   local _out
   _out=$(mktemp)
+  # shellcheck source=/dev/null
   (cd "$_tmp" && mkdir -p src && git init -q && touch src/.gitkeep && git add . && git commit -q -m 'init' &&
     . "$REPO_ROOT/src/scripts/checks/check-lib.sh" &&
     . "$TEST_FILE" &&
@@ -393,6 +396,7 @@ test_step14_nix_file_structure_valid_passes() {
   touch "$_tmp/src/mymod/default.nix"
   local _out
   _out=$(mktemp)
+  # shellcheck source=/dev/null
   (cd "$_tmp" && mkdir -p src && git init -q && touch src/.gitkeep && git add . && git commit -q -m 'init' &&
     . "$REPO_ROOT/src/scripts/checks/check-lib.sh" &&
     . "$TEST_FILE" &&
