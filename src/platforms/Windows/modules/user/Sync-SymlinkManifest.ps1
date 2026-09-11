@@ -44,7 +44,7 @@ function Sync-SymlinkManifest {
     [object[]]$UserRecords
   )
 
-  . (Join-Path -Path $PSScriptRoot -ChildPath "..\..\Set-ManagedSymlinkDeleteProtection.ps1")
+  . (Join-Path -Path $PSScriptRoot -ChildPath "..\Set-ManagedSymlinkDeleteProtection.ps1")
 
   function Resolve-ManagedUserPath {
     param(

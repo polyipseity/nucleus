@@ -4,8 +4,9 @@
 
 .DESCRIPTION
   Creates %USERPROFILE%\.agents\ as a real directory, then creates a per-entry
-  directory symbolic link inside it for every top-level entry in
-  src\modules\configs\agents\ except skills\.
+  directory symbolic link inside it for every top-level entry in the resolved
+  agents overlay (src\users\<username>\agents\ with src\users\default\ as
+  fallback) except skills\.
 
   skills\ is excluded here because it is managed by Sync-AgentsSkillManifest and may
   contain fetched (clawhub) skill downloads that must not be committed.  Using

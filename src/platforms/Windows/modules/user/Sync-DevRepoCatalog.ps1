@@ -62,7 +62,7 @@ function Sync-DevRepoCatalog {
     return
   }
 
-  . (Join-Path -Path $PSScriptRoot -ChildPath "..\..\Set-ManagedSymlinkDeleteProtection.ps1")
+  . (Join-Path -Path $PSScriptRoot -ChildPath "..\Set-ManagedSymlinkDeleteProtection.ps1")
 
   $userHome = [Environment]::GetFolderPath('UserProfile')
   $devDir = Join-Path -Path $userHome -ChildPath 'dev'
