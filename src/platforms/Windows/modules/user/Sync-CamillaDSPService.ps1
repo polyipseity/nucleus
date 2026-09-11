@@ -67,10 +67,8 @@ function Sync-CamillaDSPService {
     "$($env:USERDOMAIN)\$($env:USERNAME)"
   }
 
-  # Compute config path for wrapper script.
-  $configPath = Join-Path -Path $HOME -ChildPath ".config\camilladsp\configs\config.yml"
-
-  # Write the wrapper script that auto-applies config via WS API.
+  # Write the wrapper script that starts camilladsp with --no_config. Pushing the
+  # config is the heartbeat's job, so this wrapper never needs the config path.
   $wrapperDir = Join-Path -Path $HOME -ChildPath ".config\camilladsp\bin"
   $null = New-Item -Path $wrapperDir -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
   $wrapperScriptPath = Join-Path -Path $wrapperDir -ChildPath "autoconfig.ps1"
@@ -84,7 +82,7 @@ function Sync-CamillaDSPService {
   $deviceSelectContent = Get-Content -Raw $deviceSelectSource
   Set-Content -Path $deviceSelectDest -Value $deviceSelectContent -NoNewline
 
-  $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -File `"$wrapperScriptPath`" -CamillaDSPBin `"$camilladspBin`" -Port $wsPort -ConfigFile `"$configPath`" -LogFile `"$logFile`""
+  $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -File `"$wrapperScriptPath`" -CamillaDSPBin `"$camilladspBin`" -Port $wsPort -LogFile `"$logFile`""
   $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
   $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
   $principal = New-ScheduledTaskPrincipal -UserId $userId -RunLevel Limited

@@ -15,7 +15,6 @@
 param(
   [Parameter(Mandatory)] [string] $CamillaDSPBin,
   [Parameter(Mandatory)] [int] $Port,
-  [Parameter(Mandatory)] [string] $ConfigFile,
   [Parameter(Mandatory)] [string] $LogFile
 )
 
@@ -62,11 +61,5 @@ $job = [JobObject]::NewKillOnClose()
 if ($job -ne [IntPtr]::Zero) {
   [void][JobObject]::AssignProcessToJobObject($job, $process.SafeHandle.DangerousGetHandle())  # check-suppress:suppression_doc: AssignProcessToJobObject return value discarded, error handling is externally verified
 }
-
-# Why the config path is accepted but unused: the scheduled-task action written by
-# Sync-CamillaDSPService.ps1 still passes -ConfigFile, and that action lives in a
-# file this change does not touch. Dropping the parameter here without dropping it
-# there would make the task fail to launch.
-$null = $ConfigFile  # check-suppress:suppression_doc: parameter retained for the scheduled-task action; see comment above
 
 $process.WaitForExit()
