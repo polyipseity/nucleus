@@ -229,6 +229,10 @@ wallpaper_post_copy_teardown() {
       if ! "$_desktoppr_bin" all "$desktopprTarget"; then
         fail_wallpaper_provision "provision-wallpaper: desktoppr failed to set wallpaper directory $desktopprTarget."
       fi
+      # macOS: restart WallpaperAgent to force re-read of folder contents.
+      # WallpaperAgent caches folder contents in-memory; killing it forces
+      # an immediate re-read so newly provisioned wallpapers appear at once.
+      /usr/bin/killall WallpaperAgent 2>/dev/null || true # check-suppress:suppression_doc: WallpaperAgent may not be running; killall exits 1 for absent processes
     fi
   elif command -v gsettings >/dev/null 2>&1; then
     xmlFile="$_pictures_dir/wallpaper-gallery.xml"
