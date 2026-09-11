@@ -117,6 +117,13 @@ Test scripts only, not production code.
   - `& script.ps1` does not set `$LASTEXITCODE`.
   - `test.ps1` fail-fast kills process before summary. Use `--no-fail-fast` for debugging.
 - **Comments**: no `__TOKEN__`-delimited names in `.sh` test comments (step 14 greps). No both fragments of same-line regex in one comment (step 14 SAME-LINE).
+- **Fail-closed suites**: a suite that sources `tests/scripts/test-lib.sh` must end with
+  `finish_tests`. It is the only sanctioned exit and the only emitter of the `# nucleus-tally`
+  line that test step 5 requires, so a suite that exits early, or calls it from a branch that
+  never runs, is reported as `no tally` instead of passing. Prerequisites fail loudly through
+  the library's `require_command`, never a skip-guard. Note that `src/scripts/lib/lib.sh`
+  defines a `die`-based `require_command` for production scripts: a suite sourcing both
+  libraries gets that one, and the missing tally is what surfaces the mistake.
 - **Mechanics**: `.sh` with shebangs must be executable; `.ps1` stay 644. Libs derive `REPO_ROOT` themselves. `cache_file_lists()` stubs must init `CACHED_*_FILES=()` (SC2178).
 
 ## CI integration
