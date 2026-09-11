@@ -5,10 +5,10 @@
 # The daemon is a system service (User = username); the heartbeat is a systemd
 # USER service, because it only pushes a per-user config file and talks to a
 # loopback websocket — the same scope as the macOS launchd agent and the Windows
-# per-user scheduled task.
+# per-user scheduled task. Both units capture to journald, like every other NixOS
+# service (src/modules/posix/logging.nix); the stdout.log/stderr.log file pair is the
+# macOS and Windows rule, not this host's.
 {
-  config,
-  lib,
   pkgs,
   username,
   ...
@@ -17,17 +17,6 @@
 let
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
   wsPort = toString servicesJSON.camilladsp.network.websocket.port;
-
-  # config.nucleus.logging.logDir is a `~/...` template, and systemd does not
-  # expand `~`; resolve it against the service user's home instead.
-  # WHY the user log root and not the system one: nixos-ensure-log-dirs creates the
-  # system log root as root and log-dirs-init.sh only chowns on Darwin, so a non-root
-  # service cannot create a file under it, and systemd treats an unopenable redirect
-  # target as a start failure rather than a warning. The user root is also where the
-  # daemon's own preStart already writes.
-  heartbeatLogDir = "${
-    lib.replaceStrings [ "~" ] [ config.users.users.${username}.home ] config.nucleus.logging.logDir
-  }/camilladsp-heartbeat";
 
   camilladspRun = pkgs.writeNucleusShellApplication {
     name = "camilladsp-run";
@@ -79,19 +68,16 @@ in
   #     managers), so it tolerates the daemon being absent and simply skips its tick;
   #   - it is deliberately NOT made to linger, so it starts with the user's session
   #     rather than at boot. Do not "fix" that by enabling linger.
+  # WHY no StandardOutput/StandardError: NixOS services capture to journald
+  # (src/modules/posix/logging.nix). The stdout.log/stderr.log file pair is the macOS and
+  # Windows rule; adding file redirects here would make this the one NixOS service that
+  # logs differently from every other one.
   systemd.user.services.camilladsp-heartbeat = {
     description = "CamillaDSP config heartbeat";
-    # systemd creates no parent directories for an append: redirect target, so the
-    # directory must exist before the unit starts.
-    preStart = ''
-      mkdir -p '${heartbeatLogDir}'
-    '';
     serviceConfig = {
       Type = "simple";
       Restart = "always";
       ExecStart = "${camilladspHeartbeat}/bin/nucleus-camilladsp-heartbeat --port ${toString wsPort}";
-      StandardOutput = "append:${heartbeatLogDir}/stdout.log";
-      StandardError = "append:${heartbeatLogDir}/stderr.log";
     };
     wantedBy = [ "default.target" ];
   };
