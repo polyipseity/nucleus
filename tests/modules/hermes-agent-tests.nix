@@ -10,9 +10,7 @@ let
   # nixfmt reflows the module, so call-form assertions must be insensitive to line
   # breaks and indentation.
   wrapperTextFlat = lib.concatStringsSep " " (
-    builtins.filter (part: builtins.isString part && part != "") (
-      builtins.split "[ \t\n]+" wrapperText
-    )
+    builtins.filter (part: builtins.isString part && part != "") (builtins.split "[ \t\n]+" wrapperText)
   );
   # src/users/default/ is production-managed, so reading it here is allowed; only
   # real src/users/<username>/ identities are off limits for tests.
@@ -135,6 +133,7 @@ let
     test_wrapper_module_enables_services
     test_wrapper_module_gateway_per_host
     test_wrapper_module_waits_for_secrets
+    test_wrapper_module_renders_dotenv_template
     test_wrapper_module_uses_registry_for_user_secrets
     test_wrapper_module_asserts_secret_domain
     test_default_catalog_declares_hermes_user_secrets
