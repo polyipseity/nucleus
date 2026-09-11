@@ -15,16 +15,17 @@ param()
 
 BeforeAll {
   $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../../../..')).Path
-  $windowsTree = Join-Path $repoRoot 'src/platforms/Windows'
+  # $script: scope so the It blocks share it (Pester's cross-block convention).
+  $script:windowsTree = Join-Path $repoRoot 'src/platforms/Windows'
 }
 
 Describe 'Windows PowerShell module syntax' {
   It 'finds the Windows module tree' {
-    (Test-Path -LiteralPath $windowsTree -PathType Container) | Should -Be $true
+    (Test-Path -LiteralPath $script:windowsTree -PathType Container) | Should -Be $true
   }
 
   It 'parses every module without errors' {
-    $files = @(Get-ChildItem -Path $windowsTree -Recurse -Filter '*.ps1' -File)
+    $files = @(Get-ChildItem -Path $script:windowsTree -Recurse -Filter '*.ps1' -File)
     # A scan that silently finds nothing would make this guard vacuous.
     $files.Count | Should -BeGreaterThan 50
 

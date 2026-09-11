@@ -13,7 +13,7 @@
 # loops (output → capture → processed → output again).
 #
 # Detection helpers (Get-CamillaDSPDefaultPlaybackDevice,
-# Get-CamillaDSPAvailablePlaybackDevices, Get-CamillaDSPFirstAvailablePlaybackDevice,
+# Get-CamillaDSPAvailablePlaybackDeviceList, Get-CamillaDSPFirstAvailablePlaybackDevice,
 # Get-CamillaDSPLastDevice, Save-CamillaDSPLastDevice) are mockable for unit tests.
 #
 # State file: %LOCALAPPDATA%\nucleus\camilladsp\last-device.txt persists the
@@ -44,7 +44,7 @@ function Get-CamillaDSPDefaultPlaybackDevice {
   }
 }
 
-function Get-CamillaDSPAvailablePlaybackDevices {
+function Get-CamillaDSPAvailablePlaybackDeviceList {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory = $false)]
@@ -82,7 +82,7 @@ function Get-CamillaDSPFirstAvailablePlaybackDevice {
     [string]$CaptureDevice = $null
   )
 
-  $names = Get-CamillaDSPAvailablePlaybackDevices -CaptureDevice $CaptureDevice
+  $names = Get-CamillaDSPAvailablePlaybackDeviceList -CaptureDevice $CaptureDevice
   if ($null -eq $names -or $names.Count -eq 0) {
     return $null
   }
@@ -163,7 +163,7 @@ function Resolve-CamillaDSPPlaybackDevice {
   if (-not $detected) {
     $savedDevice = Get-CamillaDSPLastDevice
     if ($savedDevice -and $savedDevice -ne $captureDevice) {
-      $allDevices = Get-CamillaDSPAvailablePlaybackDevices -CaptureDevice $captureDevice
+      $allDevices = Get-CamillaDSPAvailablePlaybackDeviceList -CaptureDevice $captureDevice
       if ($null -ne $allDevices -and ($allDevices -contains $savedDevice)) {
         $detected = $savedDevice
       }
@@ -194,6 +194,7 @@ function Resolve-CamillaDSPPlaybackDevice {
 
 function Get-CamillaDSPResolvedPlaybackDeviceName {
   [CmdletBinding()]
+  [OutputType([string])]
   param(
     [Parameter(Mandatory)]
     [string]$ConfigPath

@@ -38,11 +38,15 @@ function Assert-Fail {
 # New-TempRepoWithFailingScript — Create a temp repo root whose
 # src/scripts/<name> exits 1, so the Sync-* module's child invocation fails.
 function New-TempRepoWithFailingScript {
+  [CmdletBinding(SupportsShouldProcess)]
+  [OutputType([string])]
   param([string]$ScriptName)
   $root = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-acthard-" + [guid]::NewGuid().ToString('N'))
-  $dir = Join-Path $root 'src' 'scripts'
-  $null = New-Item -ItemType Directory -Path $dir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
-  $null = Set-Content -Path (Join-Path $dir $ScriptName) -Value 'exit 1' -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
+  $dir = Join-Path -Path $root -ChildPath 'src' -AdditionalChildPath 'scripts'
+  if ($PSCmdlet.ShouldProcess($dir, 'create a failing activation script')) {
+    $null = New-Item -ItemType Directory -Path $dir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+    $null = Set-Content -Path (Join-Path $dir $ScriptName) -Value 'exit 1' -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
+  }
   return $root
 }
 

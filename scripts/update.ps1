@@ -84,6 +84,12 @@ $repoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Resol
 # Invoke-UpdateAll — flake input updates + SOPS recipient rewrap
 # ---------------------------------------------------------------------------
 function Invoke-UpdateAll {
+  [CmdletBinding()]
+  param(
+    [switch]$NoFlake,
+    [switch]$NoSops
+  )
+
   # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
   if (-not $NoFlake -and (Get-Command -Name 'nix.exe' -ErrorAction SilentlyContinue)) {
     $flakeOutput = & nix.exe --option warn-dirty false flake update --flake (Join-Path -Path $repoRoot -ChildPath 'src') 2>&1
@@ -133,6 +139,14 @@ function Invoke-UpdateAll {
 # deleted scripts/bump-lockfile.ps1 (folded into `nucleus-update lockfile`).
 # ---------------------------------------------------------------------------
 function Invoke-LockfileBump {
+  [CmdletBinding()]
+  param(
+    [string]$Sections = '',
+    [switch]$Verify,
+    [switch]$VerifyInstalled,
+    [switch]$ListSections
+  )
+
   # Source the deterministic JSON serialization helpers for sorted key output.
   . (Join-Path $repoRoot 'src/platforms/Windows/modules/lib/JsonSort.ps1')
 
@@ -883,10 +897,10 @@ function Invoke-LockfileBump {
 # Dispatch
 # ---------------------------------------------------------------------------
 if ($Action -eq 'lockfile') {
-  Invoke-LockfileBump
+  Invoke-LockfileBump -Sections $Sections -Verify:$Verify -VerifyInstalled:$VerifyInstalled -ListSections:$ListSections
 } else {
-  Invoke-UpdateAll
-  Invoke-LockfileBump
+  Invoke-UpdateAll -NoFlake:$NoFlake -NoSops:$NoSops
+  Invoke-LockfileBump -Sections $Sections -Verify:$Verify -VerifyInstalled:$VerifyInstalled -ListSections:$ListSections
 }
 
 Write-NucleusInfo "update workflow completed"

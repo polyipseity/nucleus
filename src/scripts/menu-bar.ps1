@@ -127,12 +127,19 @@ function Get-MenuBarNativeValue {
 # MenuBarNativeSet — Write the native preference to the desired state.
 # Never disables the native setting; SETs it.
 function Set-MenuBarNative {
+  [CmdletBinding(SupportsShouldProcess)]
+  [OutputType([int])]
   param([string]$Key, [hashtable]$Entry, [bool]$Visible)
   $icon = $Entry.hostEntry.menuBarIcon
   $kind = $icon.kind
   $provisioned = if ($icon.ContainsKey('provisioned')) { [bool]$icon.provisioned } else { $true }
   if ($kind -eq 'manual' -or -not $provisioned) {
     Write-NucleusInfo -CommandName 'menu-bar' "$Key — manual icon entry; not auto-provisioned (set in the app's UI)"
+    return 0
+  }
+  # SupportsShouldProcess gates every mutation below, so -WhatIf reports what
+  # would be written without touching the registry or running a script.
+  if (-not $PSCmdlet.ShouldProcess($Key, 'set menu bar icon state')) {
     return 0
   }
   $value = Get-MenuBarNativeValue -Visible $Visible -Entry $Entry
@@ -185,7 +192,7 @@ function Set-MenuBarNative {
 # MenuBarActualVisible — $true/$false whether the native preference matches the
 # desired visible value.
 function Get-MenuBarActualVisible {
-  param([string]$Key, [hashtable]$Entry)
+  param([hashtable]$Entry)
   $icon = $Entry.hostEntry.menuBarIcon
   $kind = $icon.kind
   $provisioned = if ($icon.ContainsKey('provisioned')) { [bool]$icon.provisioned } else { $true }
@@ -257,7 +264,7 @@ function Format-ListTable {
       if ($key -like 'ERROR:*') { continue }
       $jsonObj.apps[$key] = @{
         displayName     = $Results[$key].displayName
-        actualVisible   = (Get-MenuBarActualVisible -Key $key -Entry $Results[$key])
+        actualVisible   = (Get-MenuBarActualVisible -Entry $Results[$key])
         declaredVisible = $Results[$key].hostEntry.menuBarIcon.iconVisible
       }
     }
@@ -270,7 +277,7 @@ function Format-ListTable {
     if ($key -like 'ERROR:*') {
       $lines += "{0,-22} {1,-10} {2,-10} {3}" -f $key, 'n/a', '-', $Results[$key].displayName
     } else {
-      $actual = Get-MenuBarActualVisible -Key $key -Entry $Results[$key]
+      $actual = Get-MenuBarActualVisible -Entry $Results[$key]
       $declared = $Results[$key].hostEntry.menuBarIcon.iconVisible
       $lines += "{0,-22} {1,-10} {2,-10} {3}" -f $key, $actual, $declared, $Results[$key].displayName
     }
@@ -293,7 +300,7 @@ switch ($Action) {
         $hasError = $true
         continue
       }
-      $visible = Get-MenuBarActualVisible -Key $key -Entry $resolved[$key]
+      $visible = Get-MenuBarActualVisible -Entry $resolved[$key]
       Write-Output ("{0,-22} {1,-10} {2}" -f $key, $visible, $resolved[$key].displayName)
     }
     if ($hasError -and -not $Json) { exit 1 }
@@ -348,7 +355,7 @@ switch ($Action) {
     foreach ($key in $resolved.Keys) {
       if ($key -like 'ERROR:*') { continue }
       $declared = [bool]$Registry[$key].hostEntry.menuBarIcon.iconVisible
-      $actual = Get-MenuBarActualVisible -Key $key -Entry $Registry[$key]
+      $actual = Get-MenuBarActualVisible -Entry $Registry[$key]
       if ($actual -eq 'manual') {
         # Manual entries are declared but not auto-provisioned; no drift check.
         continue

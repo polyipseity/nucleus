@@ -631,6 +631,9 @@ function pi {
 }
 
 function pi-unrestricted {
+  # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- name is the user-facing command that bypasses the srt sandbox; renaming would break muscle memory
+  [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+  param()
   & pi @args
 }
 
