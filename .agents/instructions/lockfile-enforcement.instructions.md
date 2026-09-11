@@ -1,7 +1,7 @@
 ---
 description: "Use when editing src/lockfiles/lockfile.json, the lockfile enforcement lib (used by bump-lockfile verify), or bump-lockfile. Covers the two-tier (pinned vs suggestions) model, the warn-only→suggestions invariant, the no-cross-lockfile-duplication policy, and canonical section classification."
 name: "Lockfile Enforcement"
-applyTo: "src/lockfiles/lockfile.json, src/lockfiles/lockfile.schema.json, src/scripts/checks/check-steps/05-lockfile-validation.*, src/scripts/checks/lockfile-enforcement-lib.*, scripts/bump-lockfile.*"
+applyTo: "src/lockfiles/lockfile.json, src/lockfiles/lockfile.schema.json, src/scripts/checks/check-steps/05-lockfile-validation.*, src/scripts/checks/lockfile-enforcement-lib.*, src/platforms/Windows/modules/user/Sync-Superpowers.ps1, src/platforms/Windows/modules/user/Sync-OpenCodeConfig.ps1, scripts/bump-lockfile.*"
 ---
 
 # Lockfile enforcement
@@ -21,14 +21,15 @@ The consolidated lockfile at `src/lockfiles/lockfile.json` pins tool and package
 | `vscode` | `string → string` | VS Code extension → version |
 | `homebrew` | `object with brews/casks/masApps` | Homebrew formula/cask/MAS → version |
 | `ollama` | `string → string` | Ollama model → digest hash |
+| `pi` | `string → string` | Pi coding agent extension → version |
 
 Homebrew has no native lockfile — pins live under `homebrew`; activation runs `brew bundle --force` from nix-darwin's Brewfile.
 
-Update with `scripts/update.sh` / `scripts/update.ps1`. For Nix packages, run `nix flake lock` from `src/`. The `uv` updater skips `.uv[<pkg>]` entries whose value is an object (VCS-pinned packages).
+Update with `scripts/update.sh` / `scripts/update.ps1`. For Nix packages, run `nix flake lock` from `src/`. The `uv` updater skips `.uv[<pkg>]` entries whose value is an object (VCS-pinned packages); the `bun` and `pi` updaters query the npm registry and skip object-shaped (VCS/rev) pins.
 
 ## Two-tier model
 
-- **Pinned root** — authoritative. Enforcement lib (`lockfile-enforcement-lib.*`) compares installed versions against pins, reports drift. Pinned: `bun`, `cargo-binstall`, `cursor` (editor plugins, filesystem-based enforcement including `superpowers` via Nix-store symlink), `pwsh`, `rustup`, `scoop`, `source-builds`, `uv`, `version`, `vm-setup`, `winget`.
+- **Pinned root** — authoritative. Enforcement lib (`lockfile-enforcement-lib.*`) compares installed versions against pins, reports drift. Pinned: `bun`, `cargo-binstall`, `cursor` (editor plugins, filesystem-based enforcement including `superpowers` via a pinned checkout), `pi`, `pwsh`, `rustup`, `scoop`, `source-builds`, `uv`, `version`, `vm-setup`, `winget`. Probes are scoped to the current host's declared packages in `src/modules/packages/desired.json`, so a Windows-only package is never reported as drift on macOS.
 - **`suggestions`** — warn-only, never enforced, never causes check failure. Sub-sections: `cursor`, `homebrew` (masApps only), `ollama`, `opencode`, `vscode`, `vm-setup.windows`.
 
 ## Invariant
@@ -47,7 +48,7 @@ Removed: `suggestions.nixpkgs`, `suggestions.homebrew.brews`/`casks`. Retained: 
 
 ## Canonical classification
 
-- **Root (pinned):** `bun`, `uv`, `cargo-binstall`, `rustup`, `pwsh`, `scoop`, `winget`, `vm-setup`, `source-builds`/`version`, `cursor` (editor plugins — filesystem-based enforcement including `superpowers` via Nix-store symlink).
+- **Root (pinned):** `bun`, `uv`, `cargo-binstall`, `rustup`, `pwsh`, `scoop`, `winget`, `vm-setup`, `source-builds`/`version`, `pi`, `cursor` (editor plugins — filesystem-based enforcement including `superpowers` via a pinned checkout).
 - **`suggestions` (warn-only):** `cursor` (editor extensions), `homebrew.masApps`, `ollama`, `opencode`, `vscode`, `vm-setup.windows`.
 
 ## Shared probe library
@@ -56,7 +57,11 @@ Probe logic lives in a shared lib used by `bump-lockfile --verify-installed` (an
 
 ### Superpowers provisioning
 
-Provisioned via `builtins.fetchGit` in `src/modules/agents.nix` using `cursor.superpowers.source`/`.rev` from lockfile. Activation creates symlink at `~/.local/share/nucleus/plugins/superpowers` → `/nix/store/`. POSIX check (`_lfe_check_superpowers`) verifies symlink targets Nix store. Windows check verifies whatever state exists (not yet declarative).
+`cursor.superpowers` is the single pin (source + rev); `suggestions.opencode` no longer duplicates it.
+
+- **POSIX**: `builtins.fetchGit` in `src/modules/agents.nix` checks the rev out at Nix build time and activation symlinks `<nucleusUserRoot>/plugins/superpowers` → the store path. `_lfe_check_superpowers` verifies the symlink targets `/nix/store/`.
+- **Windows**: `Sync-Superpowers.ps1` clones the pin into `%LOCALAPPDATA%\nucleus\plugins\superpowers` and checks out the rev (detached HEAD); it then links the pi extension and the opencode plugin. `Invoke-LockfileEnforcement` verifies the checkout's HEAD matches the pinned rev.
+- Skill files are layered into `~/.agents/skills/` from `<plugin>/skills` (the agents-skills sync takes an extra source directory).
 
 - POSIX: `src/scripts/checks/lockfile-enforcement-lib.sh` (`_lfe_check_*`, `verify_installed_versions`). `bump-lockfile --verify-installed` calls `verify_installed_versions`.
 - Windows: `src/scripts/checks/lockfile-enforcement-lib.ps1` (`Invoke-LockfileEnforcement`). `bump-lockfile -VerifyInstalled` calls it.
