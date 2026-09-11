@@ -114,6 +114,7 @@ read_watchdog_services() {
     | select(.value.hosts[$host].type != "omitted")
     | select(.value.hosts[$host].socketActivated // false | not)
     | select(.value.hosts[$host].prefixMatch // false | not)
+    | select(.value.hosts[$host].onDemand // false | not)
     | select(.key != "service-watchdog")
     | {key: .key, displayName: .value.displayName, hostEntry: .value.hosts[$host]}
   ' "$SERVICES_JSON"
