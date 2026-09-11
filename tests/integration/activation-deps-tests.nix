@@ -90,7 +90,7 @@ let
         && lib.hasInfix "entryBetween" hermesAgentModuleText
         && lib.hasInfix ''[ "sops-nix" ]'' hermesAgentModuleText
         && lib.hasInfix ''[ "hermesAgentSetup" ]'' hermesAgentModuleText
-        && lib.hasInfix "hermesSecretPaths != [ ]" hermesAgentModuleText
+        && lib.hasInfix "hermesSecrets != [ ]" hermesAgentModuleText
       )
       "hermes environment files must wait for sops-nix to materialize, between sops-nix and hermesAgentSetup";
 

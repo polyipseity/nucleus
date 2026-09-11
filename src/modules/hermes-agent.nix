@@ -105,11 +105,15 @@ let
   missingUserKeys = missingSopsKeys hermesUserSopsKeys hermesUserSecrets;
   missingKeys = missingSystemKeys ++ missingUserKeys;
 
-  # Resolve SOPS secret paths for hermes-consumed keys.
-  # Each secret's sopsSource determines which SOPS file to read from.
-  mkSecretPath = entry: config.sops.secrets.${entry.name}.path;
-
-  hermesSecretPaths = map mkSecretPath hermesSecrets;
+  # Upstream builds ~/.hermes/.env by concatenating every `environmentFiles`
+  # entry verbatim, so each entry must be dotenv-formatted (`KEY=value`). The
+  # env-secrets catalog stores each secret as a bare value, so the raw sops paths
+  # cannot be passed through: python-dotenv reads a bare line as a key with an
+  # unknown value and drops it, leaving the gateway unauthenticated without any
+  # error. A sops template renders the catalog's `envVar` names onto the
+  # decrypted values, which is the shape upstream consumes.
+  hermesEnvTemplate = "hermes-env";
+  hermesEnvTemplatePath = config.sops.templates.${hermesEnvTemplate}.path;
 in
 {
 
@@ -149,14 +153,30 @@ in
   # sops-nix materializes those files from an asynchronous LaunchAgent — ordering
   # the consumer merely `entryAfter [ "sops-nix" ]` does not guarantee they exist
   # when the read happens, which produced one warning per unreadable path. The
-  # barrier polls for the declared paths to appear between the two steps. Gated on
-  # a non-empty secret list so hosts without hermes secrets declare no entry.
-  home.activation.wait-for-hermes-secrets = lib.mkIf (hermesSecretPaths != [ ]) (
+  # barrier polls for the rendered template, which sops-install-secrets writes
+  # after the secrets and exposes only once it swaps the generation symlink.
+  # Gated on a non-empty secret list so hosts without hermes secrets declare no
+  # entry.
+  home.activation.wait-for-hermes-secrets = lib.mkIf (hermesSecrets != [ ]) (
     lib.hm.dag.entryBetween [ "sops-nix" ] [ "hermesAgentSetup" ] ''
       "${activationBundle}/src/scripts/secrets/wait-for-sops-secrets.sh" \
-        ${lib.concatMapStringsSep " " (path: lib.escapeShellArg path) hermesSecretPaths}
+        ${lib.escapeShellArg hermesEnvTemplatePath}
     ''
   );
+
+  # `config.sops.placeholder.<name>` is defined by sops-nix only while
+  # `sops.templates` is non-empty, so the template is also what makes the
+  # placeholder map available. Skipped wholesale (not an empty template) when no
+  # hermes secret is declared — an empty template is a hard error in
+  # sops-install-secrets.
+  sops.templates = lib.optionalAttrs (hermesSecrets != [ ]) {
+    ${hermesEnvTemplate} = {
+      mode = "0400";
+      content = lib.concatMapStringsSep "\n" (
+        entry: "${entry.envVar}=${config.sops.placeholder.${entry.name}}"
+      ) hermesSecrets;
+    };
+  };
 
   # ── Nucleus-level configuration ──────────────────────────────────────
 
@@ -165,11 +185,11 @@ in
   services.hermes-agent = {
     enable = lib.mkDefault true;
     gateway.enable = if hostName == "MacBook" then lib.mkDefault true else lib.mkDefault false;
-    # Wire SOPS-decrypted API key files into the service environment. An empty
-    # secret value is legitimate (the key is simply not configured yet), so every
-    # declared path is wired as-is and the barrier below checks existence only —
-    # never non-emptiness.
-    environmentFiles = lib.mkIf (hermesSecretPaths != [ ]) hermesSecretPaths;
+    # Wire the rendered dotenv file into the service environment. An empty secret
+    # value is legitimate (the key is simply not configured yet) and renders as
+    # `KEY=`, which hermes reads as unconfigured; the barrier above waits for the
+    # file to appear and never for non-emptiness.
+    environmentFiles = lib.mkIf (hermesSecrets != [ ]) [ hermesEnvTemplatePath ];
 
     # WHY: upstream's default package is `full`, which includes the `voice`
     # group (faster-whisper -> ctranslate2/onnxruntime/torch/transformers).

@@ -7,6 +7,11 @@ let
   flakeText = builtins.readFile ../../src/flake.nix;
   homeText = builtins.readFile ../../src/modules/home.nix;
   wrapperText = builtins.readFile ../../src/modules/hermes-agent.nix;
+  # nixfmt reflows the module, so call-form assertions must be insensitive to line
+  # breaks and indentation.
+  wrapperTextFlat = lib.concatStringsSep " " (
+    builtins.filter (part: part != "") (builtins.split "[ \t\n]+" wrapperText)
+  );
   # src/users/default/ is production-managed, so reading it here is allowed; only
   # real src/users/<username>/ identities are off limits for tests.
   defaultSecretsCatalog = builtins.fromJSON (
@@ -56,11 +61,23 @@ let
       (
         lib.hasInfix "wait-for-sops-secrets.sh" wrapperText
         && lib.hasInfix "entryBetween" wrapperText
-        && lib.hasInfix ''[ "sops-nix" ]'' wrapperText
-        && lib.hasInfix ''[ "hermesAgentSetup" ]'' wrapperText
-        && lib.hasInfix "hermesSecretPaths != [ ]" wrapperText
+        && lib.hasInfix "hermesSecrets != [ ]" wrapperText
+        && lib.hasInfix "hermesEnvTemplatePath" wrapperText
       )
       "wrapper module must place a sops-secret barrier between sops-nix and hermesAgentSetup, gated on declared secrets";
+
+  test_wrapper_module_renders_dotenv_template =
+    assert'
+      (
+        lib.hasInfix "sops.templates" wrapperTextFlat
+        && lib.hasInfix "config.sops.placeholder." wrapperTextFlat
+        && lib.hasInfix "entry.envVar" wrapperTextFlat
+        && lib.hasInfix "environmentFiles = lib.mkIf (hermesSecrets != [ ]) [ hermesEnvTemplatePath ];" wrapperTextFlat
+        # Bare values are not dotenv, so handing the raw sops paths to upstream
+        # silently drops every credential: the binding must stay deleted.
+        && !(lib.hasInfix "hermesSecretPaths" wrapperText)
+      )
+      "wrapper module must render the hermes env vars into a dotenv sops template and pass that template to environmentFiles";
 
   test_wrapper_module_uses_registry_for_user_secrets =
     assert'

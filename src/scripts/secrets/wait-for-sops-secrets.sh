@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Wait for sops-nix to materialize the given secret files before their consumers
-# read them.
+# Wait for sops-nix to materialize the given paths (secret files or rendered
+# templates) before their consumers read them.
 #
 # WHY: on macOS sops-nix installs secrets through a LaunchAgent, so an activation
 # entry ordered merely `entryAfter [ "sops-nix" ]` does not gate on the files
@@ -12,7 +12,7 @@
 # filled the key in yet). A file that never appears means sops-nix did not run at
 # all, which is a hard error for a declared consumer.
 #
-# Usage: wait-for-sops-secrets <secret-path> [<secret-path> ...]
+# Usage: wait-for-sops-secrets <path> [<path> ...]
 # Env:   NUCLEUS_SOPS_WAIT_SECONDS — deadline in seconds (default 30)
 # Exit:  1 when any path is missing after the deadline (the message lists them)
 set -euo pipefail
