@@ -1,8 +1,11 @@
-# hosts/NixOS/camilladsp.nix — CamillaDSP systemd service.
+# hosts/NixOS/camilladsp.nix — CamillaDSP daemon and config heartbeat.
 #
-# Runs as the primary user so the daemon can access user-level config at
-# ~/.config/camilladsp/. Config is deployed by Home Manager in
-# modules/home.nix.
+# Both units run as the primary user so they can access user-level config at
+# ~/.config/camilladsp/. Config is deployed by Home Manager in modules/home.nix.
+# The daemon is a system service (User = username); the heartbeat is a systemd
+# USER service, because it only pushes a per-user config file and talks to a
+# loopback websocket — the same scope as the macOS launchd agent and the Windows
+# per-user scheduled task.
 {
   config,
   lib,
@@ -17,12 +20,11 @@ let
 
   # config.nucleus.logging.logDir is a `~/...` template, and systemd does not
   # expand `~`; resolve it against the service user's home instead.
-  # WHY the user log root and not the system one: both units below run as
-  # User = username, while nixos-ensure-log-dirs creates the system log root as
-  # root and log-dirs-init.sh only chowns on Darwin. A non-root service therefore
-  # cannot create a file under it, and systemd treats an unopenable redirect
-  # target as a start failure — not a warning. The user root is also what the
-  # camilladsp preStart below already uses.
+  # WHY the user log root and not the system one: nixos-ensure-log-dirs creates the
+  # system log root as root and log-dirs-init.sh only chowns on Darwin, so a non-root
+  # service cannot create a file under it, and systemd treats an unopenable redirect
+  # target as a start failure rather than a warning. The user root is also where the
+  # daemon's own preStart already writes.
   heartbeatLogDir = "${
     lib.replaceStrings [ "~" ] [ config.users.users.${username}.home ] config.nucleus.logging.logDir
   }/camilladsp-heartbeat";
@@ -69,10 +71,16 @@ in
     wantedBy = [ "default.target" ];
   };
 
-  systemd.services.camilladsp-heartbeat = {
+  # WHY a systemd USER service: the heartbeat only pushes a per-user config file and
+  # speaks to a loopback websocket, so it needs no system-level capability. Running it
+  # in the user's own manager gives it the same scope as the macOS launchd agent and the
+  # Windows per-user task. Two consequences, both intentional:
+  #   - it cannot order against camilladsp.service (system units are invisible to user
+  #     managers), so it tolerates the daemon being absent and simply skips its tick;
+  #   - it is deliberately NOT made to linger, so it starts with the user's session
+  #     rather than at boot. Do not "fix" that by enabling linger.
+  systemd.user.services.camilladsp-heartbeat = {
     description = "CamillaDSP config heartbeat";
-    after = [ "camilladsp.service" ];
-    wants = [ "camilladsp.service" ];
     # systemd creates no parent directories for an append: redirect target, so the
     # directory must exist before the unit starts.
     preStart = ''
@@ -80,7 +88,6 @@ in
     '';
     serviceConfig = {
       Type = "simple";
-      User = username;
       Restart = "always";
       ExecStart = "${camilladspHeartbeat}/bin/nucleus-camilladsp-heartbeat --port ${toString wsPort}";
       StandardOutput = "append:${heartbeatLogDir}/stdout.log";
