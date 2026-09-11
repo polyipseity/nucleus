@@ -123,7 +123,10 @@ Test scripts only, not production code.
   never runs, is reported as `no tally` instead of passing. Prerequisites fail loudly through
   the library's `require_command`, never a skip-guard. Note that `src/scripts/lib/lib.sh`
   defines a `die`-based `require_command` for production scripts: a suite sourcing both
-  libraries gets that one, and the missing tally is what surfaces the mistake.
+  libraries gets that one, and the missing tally is what surfaces the mistake. The
+  `nucleus-test` app provides `python3` with PyYAML, so run suites through it (or
+  `nix run ./src#test`) rather than from a bare shell, which must supply its own
+  interpreter.
 - **Mechanics**: `.sh` with shebangs must be executable; `.ps1` stay 644. Libs derive `REPO_ROOT` themselves. `cache_file_lists()` stubs must init `CACHED_*_FILES=()` (SC2178).
 
 ## CI integration
