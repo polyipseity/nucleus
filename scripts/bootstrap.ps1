@@ -322,6 +322,29 @@ if (Test-Path -Path $moduleSetupPath) {
   Invoke-PowerShellModuleSetup
 }
 
+# Provision check pipeline tools (actionlint, pinact, shfmt, taplo, zizmor).
+# Same WinGet IDs as src/hosts/Windows/system/packages.dsc.yml.
+# yamllint is installed separately via uv (no WinGet ID).
+$checkTools = @(
+    'rhysd.actionlint'
+    'suzuki-shunsuke.pinact'
+    'mvdan.shfmt'
+    'tamasfe.taplo'
+    'zizmor.zizmor'
+)
+foreach ($tool in $checkTools) {
+    Invoke-WingetPackageInstall -Id $tool
+}
+# yamllint: Python package, no WinGet ID. Requires uv on PATH.
+if (Get-Command -Name uv -ErrorAction SilentlyContinue) {
+    & uv tool install yamllint
+    if ($LASTEXITCODE -ne 0) {
+        Write-NucleusWarning "failed to install yamllint via uv tool install"
+    }
+} else {
+    Write-NucleusWarning "uv not found — yamllint will not be installed"
+}
+
 Invoke-RepositoryDirenvAllowIfAvailable
 
 if ($Apply) {
