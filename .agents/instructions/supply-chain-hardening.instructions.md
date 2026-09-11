@@ -21,7 +21,7 @@ WinGet, Scoop, cargo-binstall, rustup, and Homebrew lack built-in delay. Rely on
 
 ## Lifecycle script hardening
 
-- `bun install -g`: use `--ignore-scripts` to prevent arbitrary code execution. Packages in `lifecycle-allowlist.json` are exempted — the installer reads the allowlist and skips `--ignore-scripts` for allowlisted packages.
+- `bun install -g`: use `--ignore-scripts` to prevent arbitrary code execution. Packages in `lifecycle-allowlist.json` are exempted — the installer reads the allowlist and skips `--ignore-scripts` for allowlisted packages. Also pass `--linker hoisted`: the machine-wide `install.linker = "isolated"` leaves `$BUN_INSTALL/bin` unlinked for global installs (oven-sh/bun#30450), so the binary never reaches PATH.
 - `uv tool install`: use `--no-build` to require pre-built wheels. Packages without pre-built wheels must be reviewed and added to the allowlist.
 
 ### Lifecycle script allowlist

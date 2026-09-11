@@ -183,6 +183,11 @@ function Invoke-BunSetup {
   }
 
   # Install additions (fresh installs and version-mismatch reinstalls).
+  # WHY: the same ~/.bunfig.toml is deployed on Windows by Sync-BunConfig.ps1 and
+  # sets install.linker = "isolated", under which bun links a global package's
+  # binaries only into the global node_modules/.bin and leaves
+  # %USERPROFILE%\.bun\bin empty (oven-sh/bun#30450). Global installs are pinned
+  # back to the hoisted linker, which is where $bunBinDir is populated.
   foreach ($pkg in $toInstall) {
     $entry = $bunVersions.$pkg
     if ($entry -is [string]) {
@@ -190,9 +195,9 @@ function Invoke-BunSetup {
       $version = $entry
       $installSpec = if ($version) { "${pkg}@${version}" } else { $pkg }
       Write-NucleusInfo -CommandName 'bun-setup' "installing $installSpec"
-      bun install -g $installSpec
+      bun install -g --linker hoisted $installSpec
       if ($LASTEXITCODE -ne 0) {
-        Write-NucleusError -CommandName 'bun-setup' "'bun install -g $installSpec' failed (exit $LASTEXITCODE)"
+        Write-NucleusError -CommandName 'bun-setup' "'bun install -g --linker hoisted $installSpec' failed (exit $LASTEXITCODE)"
         return
       }
     } else {
@@ -201,9 +206,9 @@ function Invoke-BunSetup {
       $rev = $entry.rev
       $installSpec = "git+$source#$rev"
       Write-NucleusInfo -CommandName 'bun-setup' "installing $pkg from $installSpec"
-      bun install -g $installSpec
+      bun install -g --linker hoisted $installSpec
       if ($LASTEXITCODE -ne 0) {
-        Write-NucleusError -CommandName 'bun-setup' "'bun install -g $installSpec' failed (exit $LASTEXITCODE)"
+        Write-NucleusError -CommandName 'bun-setup' "'bun install -g --linker hoisted $installSpec' failed (exit $LASTEXITCODE)"
         return
       }
     }

@@ -182,14 +182,19 @@ while IFS= read -r _ibp_pkg; do
       _ibp_allow_lifecycle=1
     fi
   fi
+  # WHY: the machine-wide bunfig.toml sets `install.linker = "isolated"`, and bun
+  # then links a global package's binaries only into the global node_modules/.bin —
+  # $BUN_INSTALL/bin is left empty, so the installed CLI never reaches PATH
+  # (oven-sh/bun#30450). Global installs are pinned back to the hoisted linker,
+  # which is where the existence check below expects the binary.
   if [ "$_ibp_allow_lifecycle" -eq 1 ]; then
     say -l bun "$_ibp_pkg: lifecycle scripts allowed (in lifecycle-allowlist)"
-    if ! "$_bun_bin" install -g "$_ibp_spec"; then
-      die -l bun "'$_bun_bin install -g $_ibp_spec' failed"
+    if ! "$_bun_bin" install -g --linker hoisted "$_ibp_spec"; then
+      die -l bun "'$_bun_bin install -g --linker hoisted $_ibp_spec' failed"
     fi
   else
-    if ! "$_bun_bin" install -g --ignore-scripts "$_ibp_spec"; then
-      die -l bun "'$_bun_bin install -g --ignore-scripts $_ibp_spec' failed"
+    if ! "$_bun_bin" install -g --linker hoisted --ignore-scripts "$_ibp_spec"; then
+      die -l bun "'$_bun_bin install -g --linker hoisted --ignore-scripts $_ibp_spec' failed"
     fi
   fi
   _ibp_bin="${_ibp_pkg##*/}"

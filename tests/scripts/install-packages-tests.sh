@@ -127,7 +127,7 @@ test_bun_install_passes_version_pins() {
   else
     assert_fail "install-bun-packages runs to completion" "exit code $?"
   fi
-  if grep -qxF 'install -g --ignore-scripts clawhub@0.20.0' "$tmp/calls-bun.txt"; then
+  if grep -qxF 'install -g --linker hoisted --ignore-scripts clawhub@0.20.0' "$tmp/calls-bun.txt"; then
     assert_pass "install-bun-packages pins clawhub@0.20.0 from lockfile"
   else
     assert_fail "install-bun-packages pins clawhub@0.20.0 from lockfile" "calls: $(cat "$tmp/calls-bun.txt" 2>/dev/null)"
@@ -223,13 +223,13 @@ test_bun_lifecycle_allowlist() {
     assert_fail "install-bun-packages runs to completion with lifecycle-allowlist" "exit code $?"
   fi
   # @tobilu/qmd: allowlisted -> no --ignore-scripts
-  if grep -qxF 'install -g @tobilu/qmd@2.8.3' "$tmp/calls-bun.txt"; then
+  if grep -qxF 'install -g --linker hoisted @tobilu/qmd@2.8.3' "$tmp/calls-bun.txt"; then
     assert_pass "install-bun-packages omits --ignore-scripts for lifecycle-allowlisted @tobilu/qmd"
   else
     assert_fail "install-bun-packages omits --ignore-scripts for lifecycle-allowlisted @tobilu/qmd" "calls: $(cat "$tmp/calls-bun.txt" 2>/dev/null)"
   fi
   # clawhub: not allowlisted -> uses --ignore-scripts
-  if grep -qxF 'install -g --ignore-scripts clawhub@0.20.0' "$tmp/calls-bun.txt"; then
+  if grep -qxF 'install -g --linker hoisted --ignore-scripts clawhub@0.20.0' "$tmp/calls-bun.txt"; then
     assert_pass "install-bun-packages uses --ignore-scripts for non-allowlisted clawhub"
   else
     assert_fail "install-bun-packages uses --ignore-scripts for non-allowlisted clawhub" "calls: $(cat "$tmp/calls-bun.txt" 2>/dev/null)"
