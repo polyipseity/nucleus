@@ -81,7 +81,7 @@ function Sync-LibreOfficeXcu {
     'url'
   )
 
-  function Get-LibreOfficeDesiredEntries {
+  function Get-LibreOfficeDesiredEntryList {
     <#
     .SYNOPSIS
       Reads the per-user overlay JSON and returns the managed XCU entries.
@@ -181,7 +181,7 @@ function Sync-LibreOfficeXcu {
     }
   }
 
-  function Ensure-XcuItem {
+  function Initialize-XcuItem {
     <#
     .SYNOPSIS
       Returns the <item> element matching the given oor:path, creating it if absent.
@@ -220,6 +220,7 @@ function Sync-LibreOfficeXcu {
     .SYNOPSIS
       Sets or replaces the <value> inside a <prop> element.
     #>
+    [CmdletBinding(SupportsShouldProcess)]
     param(
       [Parameter(Mandatory = $true)]
       [System.Xml.XmlDocument]$Xml,
@@ -234,6 +235,12 @@ function Sync-LibreOfficeXcu {
     $nsMgr = New-Object System.Xml.XmlNamespaceManager($Xml.NameTable)
     $nsMgr.AddNamespace('oor', $OorNs)
 
+    # Gating the in-memory mutation is what makes -WhatIf effective for the
+    # persisted file: the caller writes the document unchanged.
+    if (-not $PSCmdlet.ShouldProcess($Prop.GetAttribute('oor:name', $OorNs), 'set the XCU property value')) {
+      return
+    }
+
     $valueElem = $Prop.SelectSingleNode('oor:value', $nsMgr)
     if ($null -ne $valueElem) {
       $valueElem.InnerText = $Value
@@ -245,7 +252,7 @@ function Sync-LibreOfficeXcu {
     }
   }
 
-  function Merge-XcuEntries {
+  function Merge-XcuEntryList {
     <#
     .SYNOPSIS
       Merges managed entries into the XCU document.
@@ -262,7 +269,7 @@ function Sync-LibreOfficeXcu {
     $nsMgr.AddNamespace('oor', $OorNs)
 
     foreach ($entry in $Entries) {
-      $item = Ensure-XcuItem -Xml $Xml -ItemPath $entry.Path
+      $item = Initialize-XcuItem -Xml $Xml -ItemPath $entry.Path
 
       $existingProp = $null
       foreach ($child in $item.ChildNodes) {
@@ -284,7 +291,7 @@ function Sync-LibreOfficeXcu {
     }
   }
 
-  function Remove-XcuManagedEntries {
+  function Remove-XcuManagedEntryList {
     <#
     .SYNOPSIS
       Removes managed entries from the XCU document.
@@ -292,6 +299,7 @@ function Sync-LibreOfficeXcu {
       For each managed entry, removes the matching <prop> from its <item>.
       If an <item> has no remaining children after cleanup, it is removed entirely.
     #>
+    [CmdletBinding(SupportsShouldProcess)]
     param(
       [Parameter(Mandatory = $true)]
       [System.Xml.XmlDocument]$Xml,
@@ -302,6 +310,10 @@ function Sync-LibreOfficeXcu {
 
     $nsMgr = New-Object System.Xml.XmlNamespaceManager($Xml.NameTable)
     $nsMgr.AddNamespace('oor', $OorNs)
+
+    if (-not $PSCmdlet.ShouldProcess(($Entries | ForEach-Object { $_.Name }) -join ', ', 'remove the managed XCU entries')) {
+      return
+    }
 
     foreach ($entry in $Entries) {
       $items = $Xml.SelectSingleNode('/oor:items', $nsMgr)
@@ -345,7 +357,7 @@ function Sync-LibreOfficeXcu {
     $username = [string]$userRecord.name
     $userHome = [string]$userRecord.homeDirectory
     $xcuPath = Join-Path -Path $userHome -ChildPath 'AppData\Roaming\LibreOffice\4\user\registrymodifications.xcu'
-    $managedEntries = Get-LibreOfficeDesiredEntries -Username $username -RepoRoot $RepoRoot
+    $managedEntries = Get-LibreOfficeDesiredEntryList -Username $username -RepoRoot $RepoRoot
 
     if ($managedEntries.Count -eq 0) {
       Write-NucleusInfo -CommandName 'Sync-LibreOfficeXcu' "No managed LibreOffice entries for $username, skipping."
@@ -354,7 +366,7 @@ function Sync-LibreOfficeXcu {
 
     if ($Enabled) {
       $xml = Read-XcuDocument -Path $xcuPath
-      Merge-XcuEntries -Xml $xml -Entries $managedEntries
+      Merge-XcuEntryList -Xml $xml -Entries $managedEntries
       Write-XcuDocument -Xml $xml -Path $xcuPath
       Write-NucleusInfo -CommandName 'Sync-LibreOfficeXcu' "LibreOffice XCU entries synced for $username."
       continue
@@ -367,7 +379,7 @@ function Sync-LibreOfficeXcu {
     }
 
     $xml = Read-XcuDocument -Path $xcuPath
-    Remove-XcuManagedEntries -Xml $xml -Entries $managedEntries
+    Remove-XcuManagedEntryList -Xml $xml -Entries $managedEntries
     Write-XcuDocument -Xml $xml -Path $xcuPath
     Write-NucleusInfo -CommandName 'Sync-LibreOfficeXcu' "LibreOffice XCU cleanup complete for $username."
   }

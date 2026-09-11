@@ -16,8 +16,11 @@ using namespace System.Text
 
 # Recursively sort object keys case-sensitively and array elements (when all
 # elements are strings) so the serialized output is deterministic.
-function Sort-JsonObject {
+function ConvertTo-SortedJsonObject {
   [CmdletBinding()]
+  # Polymorphic by design: the container shapes the input can produce are declared;
+  # raw scalar, or $null depending on the input shape.
+  [OutputType([System.Collections.Specialized.OrderedDictionary], [System.Collections.Generic.List[object]])]
   param(
     [Parameter(Mandatory, ValueFromPipeline)]
     [AllowNull()]
@@ -31,7 +34,7 @@ function Sort-JsonObject {
       $sorted = [Ordered]@{}
       $keys = @($InputObject.Keys) | Sort-Object -CaseSensitive
       foreach ($key in $keys) {
-        $sorted[$key] = Sort-JsonObject -InputObject $InputObject[$key]
+        $sorted[$key] = ConvertTo-SortedJsonObject -InputObject $InputObject[$key]
       }
       return $sorted
     }
@@ -42,7 +45,7 @@ function Sort-JsonObject {
         $list = $list | Sort-Object -CaseSensitive
       }
       $result = [List[object]]::new()
-      foreach ($item in $list) { $result.Add((Sort-JsonObject -InputObject $item)) }
+      foreach ($item in $list) { $result.Add((ConvertTo-SortedJsonObject -InputObject $item)) }
       return $result
     }
 
@@ -63,7 +66,7 @@ function ConvertTo-SortedJson {
   )
 
   process {
-    $sorted = Sort-JsonObject -InputObject $InputObject
+    $sorted = ConvertTo-SortedJsonObject -InputObject $InputObject
     # ConvertTo-Json without -Compress emits 2-space-indented multi-line JSON
     # and a single trailing newline, matching the Nix toSortedJSON helper.
     return ConvertTo-Json -InputObject $sorted -Depth $Depth

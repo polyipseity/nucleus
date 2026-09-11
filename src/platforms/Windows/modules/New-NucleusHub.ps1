@@ -20,7 +20,7 @@ function New-NucleusHub {
     Environment variables: (none)
     Exit codes: 0 on success; throws on failure
   #>
-  [CmdletBinding()]
+  [CmdletBinding(SupportsShouldProcess)]
   param(
     [Parameter(Mandatory)]
     [string]$UserHome
@@ -29,6 +29,12 @@ function New-NucleusHub {
   $ErrorActionPreference = 'Stop'
 
   $hubDir = Join-Path -Path $UserHome -ChildPath '.nucleus'
+
+  # One gate covers every mutation below (the hub directory and both
+  # junctions), so -WhatIf reports the whole operation.
+  if (-not $PSCmdlet.ShouldProcess($hubDir, 'create the .nucleus hub directory and its user/system junctions')) {
+    return
+  }
   $userRoot = Join-Path -Path $env:LOCALAPPDATA -ChildPath 'nucleus'
   $systemRoot = Join-Path -Path $env:ProgramData -ChildPath 'nucleus'
 
