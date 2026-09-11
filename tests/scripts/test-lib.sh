@@ -70,21 +70,32 @@ assert_skip() {
   ((++TESTS_SKIPPED))
 }
 
-# finish_tests — Print the tally and fail the script when any assertion failed.
-# Assertions only bump a counter, so a suite that never turns the tally into an
-# exit status reports success to the runner — which sees only the exit status —
-# no matter what it asserted. Must be the last statement of every suite that
-# sources this library.
+# finish_tests — Print the tally and exit with the suite's status. Assertions only
+# bump a counter, so a suite that never turns the tally into an exit status reports
+# success to the runner — which sees only the exit status — no matter what it
+# asserted. Must be the last statement of every suite that sources this library.
+#
+# The status is computed with `if` rather than `[ … ] && _status=1`: under `set -e`
+# a failing && list carries its own status, which would abort the function on the
+# very runs that should be tallied. `exit`, not `return`: `return` at a script's
+# top level is an error bash reports to stderr and then ignores, so an early-exit
+# caller would print the failure and keep running.
 finish_tests() {
+  local _status=0
   if [ "$TESTS_FAILED" -gt 0 ]; then
+    _status=1
     printf '\n%s%d passed, %d failed%s\n' "$RED" "$TESTS_PASSED" "$TESTS_FAILED" "$NC" >&2
-    exit 1
-  fi
-  if [ "$TESTS_SKIPPED" -gt 0 ]; then
+  elif [ "$TESTS_SKIPPED" -gt 0 ]; then
     printf '\n%s%d passed, %d skipped%s\n' "$GREEN" "$TESTS_PASSED" "$TESTS_SKIPPED" "$NC"
-    return 0
+  else
+    printf '\n%s%d passed%s\n' "$GREEN" "$TESTS_PASSED" "$NC"
   fi
-  printf '\n%s%d passed%s\n' "$GREEN" "$TESTS_PASSED" "$NC"
+  # Machine-readable tally, asserted by test step 05. A suite that exits without
+  # reaching this line cannot prove it ran its assertions — the one failure its
+  # exit status alone cannot express.
+  printf '# nucleus-tally passed=%d failed=%d skipped=%d\n' \
+    "$TESTS_PASSED" "$TESTS_FAILED" "$TESTS_SKIPPED"
+  exit "$_status"
 }
 
 # section — Print a section header to stdout (F3, mirrors lib.sh section()).
