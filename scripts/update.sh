@@ -423,7 +423,7 @@ EOF
   # avoid a pin that bun install would reject (supply-chain hardening).
   if section_enabled pi; then
     if command -v curl >/dev/null 2>&1; then
-      _pi_age_threshold=$(( $(date +%s) - ${MINIMUM_RELEASE_AGE:-432000} ))
+      _pi_age_threshold=$(($(date +%s) - ${MINIMUM_RELEASE_AGE:-432000}))
       while IFS= read -r key; do
         [ -z "$key" ] && continue
         old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.pi // {})[$k] // empty')

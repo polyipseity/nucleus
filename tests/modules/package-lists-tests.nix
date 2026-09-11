@@ -13,7 +13,7 @@
 # Run with: nix-instantiate --eval --strict tests/modules/package-lists-tests.nix
 
 let
-  inherit (import ../lib.nix) assert' flatten containsRegex;
+  inherit (import ../lib.nix) assert' containsRegex;
 
   repoRoot = ../..;
   readRepo = path: builtins.readFile (repoRoot + "/${path}");
