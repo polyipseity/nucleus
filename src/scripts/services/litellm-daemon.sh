@@ -87,14 +87,37 @@ if [ "${_redis_ticks}" -gt 0 ]; then
   fi
 fi
 
-_log_config_args=""
-if [ -n "${LITELLM_LOG_CONFIG:-}" ] && [ -f "$LITELLM_LOG_CONFIG" ]; then
-  _log_config_args="--log_config $LITELLM_LOG_CONFIG"
+# The logging config is created by the user-scope seeder
+# (home.activation.seed-litellm-config) and this daemon starts at boot, so wait for
+# it — like the Redis block above — before deciding it is missing.
+_log_config_deadline="${LITELLM_LOG_CONFIG_WAIT_SECONDS:-60}"
+if [ -n "${LITELLM_LOG_CONFIG:-}" ] && [ ! -f "$LITELLM_LOG_CONFIG" ]; then
+  warn "waiting for the litellm logging config at $LITELLM_LOG_CONFIG ..."
+  _log_config_ticks="$_log_config_deadline"
+  while [ "$_log_config_ticks" -gt 0 ] && [ ! -f "$LITELLM_LOG_CONFIG" ]; do
+    sleep 5
+    _log_config_ticks=$((_log_config_ticks - 5))
+  done
+fi
+
+# WHY: the flag is passed as a quoted argument in each branch instead of being
+# assembled into a string, because the macOS path contains a space
+# ("Library/Application Support/nucleus/...") and an unquoted expansion splits it
+# into a truncated value plus a stray positional argument.
+if [ -n "${LITELLM_LOG_CONFIG:-}" ]; then
+  if [ ! -f "$LITELLM_LOG_CONFIG" ]; then
+    die -l litellm-daemon "LITELLM_LOG_CONFIG=$LITELLM_LOG_CONFIG does not exist after ${_log_config_deadline}s; home.activation.seed-litellm-config did not converge"
+  fi
+  exec litellm \
+    --config "$config" \
+    --port 4000 \
+    --host 127.0.0.1 \
+    --drop_params \
+    --log_config "$LITELLM_LOG_CONFIG"
 fi
 
 exec litellm \
   --config "$config" \
   --port 4000 \
   --host 127.0.0.1 \
-  --drop_params \
-  $_log_config_args
+  --drop_params
