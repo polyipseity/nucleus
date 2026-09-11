@@ -11,6 +11,26 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 
+# assert_case <label> <expected> <actual> — compare a checker's "<rc>:<reason>".
+assert_case() {
+  if [ "$2" = "$3" ]; then
+    assert_pass "$1"
+  else
+    assert_fail "$1" "expected '$2', got '$3'"
+  fi
+}
+
+# _tally_check <suite> <capture> <status> — run the runner-side tally checker in a
+# subshell (it lives in the test-framework library, which reassigns globals) and
+# echo "<rc>:<reason>".
+_tally_check() {
+  bash -c '
+    . "'"$REPO_ROOT"'/src/scripts/tests/test-lib.sh"
+    _out="$(check_suite_tally "$1" "$2" "$3")" && _rc=0 || _rc=$?
+    printf "%s:%s" "$_rc" "$_out"
+  ' _ "$1" "$2" "$3" 2>/dev/null
+}
+
 # ---- Spec D: --skip-system-build removal ----
 
 # After removal, --skip-system-build must be rejected (unknown flag -> exit 1).
@@ -80,6 +100,51 @@ test_all_consumers_end_with_finish_tests() {
   fi
 }
 
+# A suite has to prove it reached its tally: the exit status alone cannot tell
+# "ran its assertions and passed" from "exited early" or "called finish_tests
+# from a branch it never reaches".
+test_check_suite_tally_contract() {
+  local _dir _suite _capture
+  _dir="$(mktemp -d)"
+  _suite="$_dir/consumer-tests.sh"
+  _capture="$_dir/capture.out"
+  cat >"$_suite" <<'EOF'
+#!/usr/bin/env bash
+. "$SCRIPT_DIR/test-lib.sh"
+finish_tests
+EOF
+
+  printf '# nucleus-tally passed=3 failed=0 skipped=0\n' >"$_capture"
+  assert_case "tally: clean pass accepted" "0:" "$(_tally_check "$_suite" "$_capture" 0)"
+
+  printf '# nucleus-tally passed=2 failed=1 skipped=0\n' >"$_capture"
+  assert_case "tally: reported failure accepted" "0:" "$(_tally_check "$_suite" "$_capture" 1)"
+
+  : >"$_capture"
+  assert_case "tally: missing tally rejected" "1:no tally (found 0)" "$(_tally_check "$_suite" "$_capture" 0)"
+
+  printf '# nucleus-tally passed=1 failed=0 skipped=0\n# nucleus-tally passed=1 failed=0 skipped=0\n' >"$_capture"
+  assert_case "tally: duplicate tally rejected" "1:no tally (found 2)" "$(_tally_check "$_suite" "$_capture" 0)"
+
+  printf '# nucleus-tally passed=1 failed=2 skipped=0\n' >"$_capture"
+  assert_case "tally: failed>0 with exit 0 rejected" "1:tally reports 2 failed but the suite exited 0" \
+    "$(_tally_check "$_suite" "$_capture" 0)"
+
+  printf '# nucleus-tally passed=1 failed=0 skipped=0\n' >"$_capture"
+  assert_case "tally: failed=0 with exit 1 rejected" "1:tally reports no failures but the suite exited 1" \
+    "$(_tally_check "$_suite" "$_capture" 1)"
+
+  # Suites that never source the consumer library have no tally to reach.
+  cat >"$_dir/plain-tests.sh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+  : >"$_capture"
+  assert_case "tally: non-consumer ignored" "0:" "$(_tally_check "$_dir/plain-tests.sh" "$_capture" 0)"
+
+  rm -rf "$_dir"
+}
+
 # ---- Run tests ----
 section 1 "Phase 2: test-lib unit tests"
 echo ""
@@ -88,5 +153,6 @@ test_parse_args_skip_system_build_removed
 test_parse_args_no_unrecognized_flags
 test_test_lib_usage_no_skip_system_build
 test_all_consumers_end_with_finish_tests
+test_check_suite_tally_contract
 
 finish_tests

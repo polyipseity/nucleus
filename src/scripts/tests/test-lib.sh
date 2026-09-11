@@ -102,6 +102,44 @@ cache_file_lists() {
   readarray -t TEST_NIX_FILES_ARR <<<"$TEST_NIX_FILES"
 }
 
+# check_suite_tally — Verify that a suite reached its tally, and that the tally
+# agrees with the exit status. The runner sees only the exit status, so a suite
+# that exits early — or calls finish_tests from a branch it never reaches — looks
+# exactly like one that passed. Suites that do not source the consumer library
+# have no tally and are not subject to the contract.
+#
+# Prints the reason and returns 1 when the tally is missing, duplicated, or
+# contradicts the status; returns 0 silently when the suite is not a consumer or
+# is consistent.
+#   $1 = suite path, $2 = capture file, $3 = exit status
+check_suite_tally() {
+  local _suite="$1" _capture="$2" _status="$3"
+  grep -qE '^[[:space:]]*\.[[:space:]].*test-lib\.sh' "$_suite" || return 0
+  if [ ! -f "$_capture" ]; then
+    printf 'no output captured\n'
+    return 1
+  fi
+  # Exactly one tally line: a suite must not be able to report twice, or not at all.
+  local _tally _count
+  _count=$(grep -c '^# nucleus-tally ' "$_capture" || true)
+  if [ "$_count" -ne 1 ]; then
+    printf 'no tally (found %s)\n' "$_count"
+    return 1
+  fi
+  _tally=$(grep '^# nucleus-tally ' "$_capture") || _tally=""
+  local _failed="${_tally##*failed=}"
+  _failed="${_failed%% *}"
+  if [ "$_failed" -gt 0 ] && [ "$_status" -eq 0 ]; then
+    printf 'tally reports %s failed but the suite exited 0\n' "$_failed"
+    return 1
+  fi
+  if [ "$_failed" -eq 0 ] && [ "$_status" -ne 0 ]; then
+    printf 'tally reports no failures but the suite exited %s\n' "$_status"
+    return 1
+  fi
+  return 0
+}
+
 # Override preflight_check for test-specific tools
 preflight_check() {
   require_command nix

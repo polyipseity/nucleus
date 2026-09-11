@@ -54,35 +54,38 @@ _is_priority_script_test() {
 
 _run_script_test() {
   local _script="$1"
+  local _capture _status=0 _reason=""
+  _capture=$(mktemp) || {
+    error "failed to create capture file"
+    return 1
+  }
 
+  # Captured rather than streamed, so the tally can be checked and so a failing
+  # suite is not run a second time just to show the output quiet mode suppressed.
   if [ "$(basename "$_script")" = "nucleus-apps-smoke-tests.sh" ]; then
-    if [ "$quiet_mode" = true ]; then
-      if ! nucleus_nix_locked bash "$_script" >/dev/null; then
-        nucleus_nix_locked bash "$_script"
-        return 1
-      fi
-      return 0
-    fi
-    nucleus_nix_locked bash "$_script"
-    return $?
+    nucleus_nix_locked bash "$_script" >"$_capture" 2>&1 || _status=$?
+  else
+    bash "$_script" >"$_capture" 2>&1 || _status=$?
   fi
 
-  if [ "$quiet_mode" = true ]; then
-    if ! bash "$_script" >/dev/null; then
-      bash "$_script"
-      return 1
-    fi
-    return 0
+  if [ "$quiet_mode" != true ] || [ "$_status" -ne 0 ]; then
+    cat "$_capture"
   fi
 
-  bash "$_script"
+  if ! _reason=$(check_suite_tally "$_script" "$_capture" "$_status"); then
+    error "FAILED script tests: $(basename "$_script") — $_reason"
+    _status=1
+  fi
+
+  rm -f "$_capture"
+  return "$_status"
 }
 
 _run_parallel_script_tests() {
   local _repo_root="$1"
   shift
   local -a _scripts=("$@")
-  local _capture_dir _failed_list _script _exit_code=0
+  local _capture_dir _failed_list _script _capture_file _status _reason _exit_code=0
 
   if [ "${#_scripts[@]}" -eq 0 ]; then
     return 0
@@ -102,13 +105,12 @@ _run_parallel_script_tests() {
     say "running $(basename "$_script")"
   done
 
-  # shellcheck disable=SC2016 # reason: $1/$2/$3 are sh -c positional params, not shell expansion
+  # shellcheck disable=SC2016 # reason: $1-$4 are sh -c positional params, not shell expansion
   printf '%s\0' "${_scripts[@]}" | xargs -0 -P "$PARALLEL_JOBS" -I{} sh -c '
     script="$1"
     capture_dir="$2"
-    failed_list="$3"
-    repo_root="$4"
-    quiet_mode="$5"
+    repo_root="$3"
+    quiet_mode="$4"
     base=$(basename "$script")
     capture_file="$capture_dir/$base.out"
     run_one() {
@@ -125,13 +127,26 @@ _run_parallel_script_tests() {
         bash "$script"
       fi
     }
-    if ! run_one >"$capture_file" 2>&1; then
-      printf "%s\n" "$script" >> "$failed_list"
-    fi
-  ' _ {} "$_capture_dir" "$_failed_list" "$_repo_root" "$quiet_mode"
+    _rc=0
+    run_one >"$capture_file" 2>&1 || _rc=$?
+    printf '%s' "$_rc" >"$capture_dir/$base.rc"
+  ' _ {} "$_capture_dir" "$_repo_root" "$quiet_mode"
 
   for _script in "${_scripts[@]}"; do
     _capture_file="$_capture_dir/$(basename "$_script").out"
+    _status=0
+    _reason=""
+    if [ -f "$_capture_dir/$(basename "$_script").rc" ]; then
+      _status=$(cat "$_capture_dir/$(basename "$_script").rc")
+    fi
+    # Judged here rather than inside the xargs job: this runs in the step's own
+    # shell, where the tally checker is defined, and it leaves the parallel job
+    # one job — run the suite and record its status.
+    if ! _reason=$(check_suite_tally "$_script" "$_capture_file" "$_status"); then
+      printf '%s (%s)\n' "$_script" "$_reason" >>"$_failed_list"
+    elif [ "$_status" -ne 0 ]; then
+      printf '%s\n' "$_script" >>"$_failed_list"
+    fi
     if [ -f "$_capture_file" ]; then
       cat "$_capture_file"
     fi
