@@ -141,16 +141,26 @@ macos_launchagent_remove() {
 
 # macos_remove_app_launchagent BUNDLE_ID APP_PATH — delete app-owned plist
 # (e.g. ~/Library/LaunchAgents/com.lwouis.alt-tab-macos.plist) if its Program
-# matches the given app path. Safety: never remove a plist that points elsewhere.
+# matches the given app path, in either plist form. Safety: never remove a plist
+# whose program points elsewhere or cannot be determined.
 macos_remove_app_launchagent() {
   local bundle_id="$1" app_path="$2"
   [ -n "$app_path" ] || return 0
   local plist_path="$LAUNCHAGENTS_DIR/${bundle_id}.plist"
   [ -f "$plist_path" ] || return 0
-  # Extract the first <string> inside <array> under ProgramArguments — that's the binary path.
+  # ProgramArguments form: the first <string> inside the array.
   local plist_program
-  plist_program=$(sed -n '/<key>ProgramArguments</key>/,/<\/array>/p' "$plist_path" | sed -n 's/.*<string>\(.*\)<\/string>.*/\1/p' | head -1)
-  if [ "$plist_program" = "$app_path" ] || [[ "$plist_program" == "$app_path/"* ]]; then
+  # The `|` address delimiter avoids escaping the `/` in `</key>`: with `/`
+  # delimiters BSD sed terminates the address early and fails with
+  # "invalid command code", which silently yielded an empty program path.
+  plist_program=$(sed -n '\|<key>ProgramArguments</key>|,\|</array>|p' "$plist_path" | sed -n 's|.*<string>\(.*\)</string>.*|\1|p' | head -1)
+  # Scalar form: some apps (AltTab) declare <key>Program</key> instead of an
+  # argument array; recognising only the array form leaves their agent registered,
+  # so the app starts twice.
+  if [ -z "$plist_program" ]; then
+    plist_program=$(sed -n '\|<key>Program</key>|{n;s|.*<string>\(.*\)</string>.*|\1|p;}' "$plist_path" | head -1)
+  fi
+  if [ -n "$plist_program" ] && { [ "$plist_program" = "$app_path" ] || [[ "$plist_program" == "$app_path/"* ]]; }; then
     rm -f "$plist_path"
   fi
 }

@@ -11,7 +11,8 @@ applyTo: "src/modules/apps.json, src/modules/apps.schema.json, src/scripts/autos
 One mechanism per app per host — ours, never the app's.
 
 1. **Disable native auto-start**: macOS "Open at Login", Windows Run key, Linux XDG `.desktop`. Declaratively or imperatively per-run.
-2. **Uniform mechanism**: macOS login items (`osascript System Events`); NixOS XDG `.desktop`; Windows Run-key/Startup-folder `.lnk`. TCC: script runner may need Accessibility on first run.
+2. **Uniform mechanism**: macOS nucleus-owned LaunchAgent plist (`~/Library/LaunchAgents/local.<bundle-id>.plist`, written by `autostart.sh`); NixOS XDG `.desktop`; Windows Run-key/Startup-folder `.lnk`. TCC: script runner may need Accessibility on first run.
+3. **Neutralise the app's own agent**: for macOS login-item apps, `autostartDisableNative` removes the app-owned plist in both plist forms (`ProgramArguments` array and scalar `Program`) — recognising only one form leaves the app starting twice. Embedded Service-Management helpers (`Contents/Library/LoginItems`) cannot be unregistered by a script on macOS 13+; disable those in the app's own settings and record the app as not fully convergent.
 
 `omitted` only when no build exists for platform. State inapplicability, not a substitute.
 

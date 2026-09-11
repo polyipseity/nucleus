@@ -31,7 +31,7 @@ let
   homeModuleText = builtins.readFile ../../src/modules/home.nix;
   hermesAgentModuleText = builtins.readFile ../../src/modules/hermes-agent.nix;
   macbookServicesText = builtins.readFile ../../src/hosts/MacBook/services/default.nix;
-  macbookAppBundlesText = builtins.readFile ../../src/hosts/MacBook/services/app-bundles.nix;
+  macbookAppBundlesText = builtins.readFile ../../src/hosts/MacBook/services/app-bundles/default.nix;
   macbookAutomatorWorkflowsText = builtins.readFile ../../src/hosts/MacBook/services/automator-workflows/default.nix;
 
   inherit (import ../lib.nix) assert';
@@ -299,21 +299,18 @@ let
     && !(lib.hasInfix "launchd.agents.\"art.ginzburg.MiddleClick\"" macbookActivationText)
   ) "MiddleClick startup on macOS must be registry-driven via our login item (no custom LaunchAgent)";
 
-  # === TEST: macOS Mounty startup is registry-driven via our login item ===
+  # === TEST: macOS Mounty startup is registry-driven via our launch agent ===
   # NOTE: Mounty previously used SMLoginItemSetEnabled on its helper bundle; the
-  # new policy owns exactly one uniform mechanism (our osascript login item), so
-  # the app-native helper path must no longer be referenced.
-  test_mounty_native_login_item =
-    assert'
-      (
-        (lib.hasInfix "\"Mounty\":" appsRegistryText)
-        && (lib.hasInfix "\"kind\": \"login-item\"" appsRegistryText)
-        && !(lib.hasInfix "SMLoginItemSetEnabled" macosAppAutostartScriptText)
-        && !(lib.hasInfix "com.cu4uc.MountyHelper" macosAppAutostartScriptText)
-        && (lib.hasInfix "macos_native_login_items_remove" autostartShText)
-        && (lib.hasInfix "Contents/Library/LoginItems" autostartShText)
-      )
-      "Mounty startup on macOS must be registry-driven via our login item (no app-native helper; embedded helper neutralized by path)";
+  # policy now owns exactly one uniform mechanism (our nucleus-owned LaunchAgent
+  # plist), so the app-native helper path must no longer be referenced.
+  test_mounty_native_login_item = assert' (
+    (lib.hasInfix "\"Mounty\":" appsRegistryText)
+    && (lib.hasInfix "\"kind\": \"login-item\"" appsRegistryText)
+    && !(lib.hasInfix "SMLoginItemSetEnabled" macosAppAutostartScriptText)
+    && !(lib.hasInfix "com.cu4uc.MountyHelper" macosAppAutostartScriptText)
+    && (lib.hasInfix "macos_launchagent_ensure" autostartShText)
+    && (lib.hasInfix "macos_remove_app_launchagent" autostartShText)
+  ) "Mounty startup on macOS must be registry-driven via our LaunchAgent (no app-native helper path)";
 
   # === TEST: Spotlight disables all known launcher hotkey slots ===
   # NOTE: hotkey loop lives in macos-disable-spotlight.sh, not in activation.nix
