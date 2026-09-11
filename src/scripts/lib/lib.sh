@@ -165,7 +165,7 @@ _nuc_semantic_color() {
   }
   # Quoted spans first, then URLs, so a URL inside quotes still reads as a URL.
   sed -e "s|'\([^']*\)'|${_nsc_blue}'\\1'${_nsc_reset}|g" \
-    -e "s|https\?://[^[:space:]'\"]*|${_nsc_ulcyan}&${_nsc_reset}|g"
+    -e "s|https\{0,1\}://[^[:space:]'\"]*|${_nsc_ulcyan}&${_nsc_reset}|g"
 }
 
 # say — Print an info message to stdout.
@@ -538,8 +538,8 @@ log_sanitize() {
   sed -e 's/\x1b\[[0-9;]*[a-zA-Z]//g' \
     -e 's/\x1b\][^\x07\x1b]*\x07//g' \
     -e 's/\x1b[PX^_].*\x1b\\//g' \
-    -e 's/\r//g' \
-    -e "s/[\x00-\x08\x0B\x0C\x0E-\x1F]//g"
+    -e 's/\r//g' |
+    tr -d '\000-\010\013\014\016-\037'
 }
 
 # rotate_log_file — Copy-truncate a single log file if it exceeds MAXSIZE.
