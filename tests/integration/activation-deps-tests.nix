@@ -30,6 +30,13 @@ let
   discordMusicRpcModuleText = builtins.readFile ../../src/modules/ext-discord-music-rpc.nix;
   homeModuleText = builtins.readFile ../../src/modules/home.nix;
   hermesAgentModuleText = builtins.readFile ../../src/modules/hermes-agent.nix;
+  # nixfmt reflows the module, so call-form assertions must be insensitive to line
+  # breaks and indentation.
+  hermesAgentModuleTextFlat = lib.concatStringsSep " " (
+    builtins.filter (part: builtins.isString part && part != "") (
+      builtins.split "[ \t\n]+" hermesAgentModuleText
+    )
+  );
   macbookServicesText = builtins.readFile ../../src/hosts/MacBook/services/default.nix;
   macbookAppBundlesText = builtins.readFile ../../src/hosts/MacBook/services/app-bundles/default.nix;
   macbookAutomatorWorkflowsText = builtins.readFile ../../src/hosts/MacBook/services/automator-workflows/default.nix;
@@ -81,18 +88,18 @@ let
 
   # === TEST: hermes env files wait for sops-nix materialization ===
   # On macOS sops-nix materializes secrets from an asynchronous LaunchAgent, so
-  # ordering the consumer merely after "sops-nix" does not gate on the files
+  # ordering the consumer merely after "sops-nix" does not gate on the file
   # existing; the barrier must sit between sops-nix and hermesAgentSetup.
+  # entryBetween takes the BEFORE list first — swapped lists put the barrier after
+  # the step that reads the secrets, which is how the original bug shipped.
   test_hermes_secrets_barrier_between_sops_and_setup =
     assert'
       (
         lib.hasInfix "wait-for-sops-secrets.sh" hermesAgentModuleText
-        && lib.hasInfix "entryBetween" hermesAgentModuleText
-        && lib.hasInfix ''[ "sops-nix" ]'' hermesAgentModuleText
-        && lib.hasInfix ''[ "hermesAgentSetup" ]'' hermesAgentModuleText
         && lib.hasInfix "hermesSecrets != [ ]" hermesAgentModuleText
+        && lib.hasInfix ''entryBetween [ "hermesAgentSetup" ] [ "setupLaunchAgents" "sops-nix" ]'' hermesAgentModuleTextFlat
       )
-      "hermes environment files must wait for sops-nix to materialize, between sops-nix and hermesAgentSetup";
+      "hermes environment files must wait for sops-nix to materialize, before hermesAgentSetup and after setupLaunchAgents + sops-nix";
 
   # === TEST: GPG keys imported before commits ===
   test_gpg_before_commits =

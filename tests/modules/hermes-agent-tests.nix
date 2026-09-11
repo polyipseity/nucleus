@@ -10,7 +10,9 @@ let
   # nixfmt reflows the module, so call-form assertions must be insensitive to line
   # breaks and indentation.
   wrapperTextFlat = lib.concatStringsSep " " (
-    builtins.filter (part: part != "") (builtins.split "[ \t\n]+" wrapperText)
+    builtins.filter (part: builtins.isString part && part != "") (
+      builtins.split "[ \t\n]+" wrapperText
+    )
   );
   # src/users/default/ is production-managed, so reading it here is allowed; only
   # real src/users/<username>/ identities are off limits for tests.
@@ -60,11 +62,13 @@ let
     assert'
       (
         lib.hasInfix "wait-for-sops-secrets.sh" wrapperText
-        && lib.hasInfix "entryBetween" wrapperText
         && lib.hasInfix "hermesSecrets != [ ]" wrapperText
         && lib.hasInfix "hermesEnvTemplatePath" wrapperText
+        # entryBetween takes the BEFORE list first; passing the two lists swapped
+        # silently placed the barrier after the step that reads the secrets.
+        && lib.hasInfix ''entryBetween [ "hermesAgentSetup" ] [ "setupLaunchAgents" "sops-nix" ]'' wrapperTextFlat
       )
-      "wrapper module must place a sops-secret barrier between sops-nix and hermesAgentSetup, gated on declared secrets";
+      "wrapper module must place the sops-secret barrier before hermesAgentSetup and after setupLaunchAgents + sops-nix";
 
   test_wrapper_module_renders_dotenv_template =
     assert'

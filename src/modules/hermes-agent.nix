@@ -155,10 +155,15 @@ in
   # when the read happens, which produced one warning per unreadable path. The
   # barrier polls for the rendered template, which sops-install-secrets writes
   # after the secrets and exposes only once it swaps the generation symlink.
+  # `entryBetween` takes the BEFORE list first: this entry runs before
+  # hermesAgentSetup and after setupLaunchAgents (which copies the sops-nix plist
+  # into ~/Library/LaunchAgents before it can be bootstrapped) and sops-nix, whose
+  # activation only bootstraps the LaunchAgent. `setupLaunchAgents` does not exist
+  # on Linux, where the DAG ignores unknown names and sops-nix runs synchronously.
   # Gated on a non-empty secret list so hosts without hermes secrets declare no
   # entry.
   home.activation.wait-for-hermes-secrets = lib.mkIf (hermesSecrets != [ ]) (
-    lib.hm.dag.entryBetween [ "sops-nix" ] [ "hermesAgentSetup" ] ''
+    lib.hm.dag.entryBetween [ "hermesAgentSetup" ] [ "setupLaunchAgents" "sops-nix" ] ''
       "${activationBundle}/src/scripts/secrets/wait-for-sops-secrets.sh" \
         ${lib.escapeShellArg hermesEnvTemplatePath}
     ''
