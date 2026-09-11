@@ -55,6 +55,10 @@ Removed: `suggestions.nixpkgs`, `suggestions.homebrew.brews`/`casks`. Retained: 
 
 Probe logic lives in a shared lib used by `bump-lockfile --verify-installed` (and Windows equivalent). Not wired into repo check/test steps — validates the provisioned machine only. Check step `05-lockfile-validation.*` does structural validation separately, does not source the enforcement lib.
 
+Probes are scoped: only packages the current host declares in `src/modules/packages/desired.json` are checked, so a pin kept for another host (or a lockfile entry no host declares) is never reported as drift. A tool declared with `pin: "flake:<node>"` has no lockfile version at all, so it is verified by revision instead: `Resolve-NucleusFlakePin` (shared with `Invoke-UvSetup`) resolves the node from `src/flake.lock`, and the probe compares that revision with the commit uv recorded for the install (PEP 610 `direct_url.json`). Object-shaped (`{source, rev}`) lockfile pins are verified the same way on both hosts.
+
+What this cannot prove: the probes observe an already-provisioned machine, so a first Windows install of a flake-pinned tool (hermes-agent from the flake revision) still needs one real Windows run; the derivation and the drift report are covered by fixtures.
+
 ### Superpowers provisioning
 
 `cursor.superpowers` is the single pin (source + rev); `suggestions.opencode` no longer duplicates it.
