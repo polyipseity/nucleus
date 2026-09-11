@@ -46,6 +46,17 @@ let
 
   test_wrapper_module_gateway_per_host = assert' (lib.hasInfix ''hostName == "MacBook"'' wrapperText) "wrapper module must branch gateway.enable by hostName";
 
+  test_wrapper_module_waits_for_secrets =
+    assert'
+      (
+        lib.hasInfix "wait-for-sops-secrets.sh" wrapperText
+        && lib.hasInfix "entryBetween" wrapperText
+        && lib.hasInfix ''[ "sops-nix" ]'' wrapperText
+        && lib.hasInfix ''[ "hermesAgentSetup" ]'' wrapperText
+        && lib.hasInfix "hermesSecretPaths != [ ]" wrapperText
+      )
+      "wrapper module must place a sops-secret barrier between sops-nix and hermesAgentSetup, gated on declared secrets";
+
   # === HOME.NIX IMPORT ===
 
   test_home_imports_hermes_agent = assert' (lib.hasInfix "./hermes-agent.nix" homeText) "home.nix must import hermes-agent.nix";
@@ -72,6 +83,7 @@ let
     test_wrapper_module_enables_programs
     test_wrapper_module_enables_services
     test_wrapper_module_gateway_per_host
+    test_wrapper_module_waits_for_secrets
     test_home_imports_hermes_agent
     test_lockfile_has_hermes_agent
     test_hermes_agent_overlay_provides_package

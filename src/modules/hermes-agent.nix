@@ -20,6 +20,9 @@ let
   sopsUtils = import ./lib/sops-utils.nix;
   inherit (sopsUtils) parseSopsKeys missingSopsKeys;
 
+  # Shared activation-script bundle (same derivation every activation block uses).
+  activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
+
   # The flake-parts output already binds `inputs` internally —
   # homeManagerModules.default is a standard HM module {config, lib, ...}:
   upstreamModule = hermes-agent.homeManagerModules.default;
@@ -123,6 +126,19 @@ in
         mode = "0400";
       };
     }) hermesSecrets
+  );
+
+  # WHY: upstream reads `environmentFiles` during `hermesAgentSetup`, and on macOS
+  # sops-nix materializes those files from an asynchronous LaunchAgent — ordering
+  # the consumer merely `entryAfter [ "sops-nix" ]` does not guarantee they exist
+  # when the read happens, which produced one warning per unreadable path. The
+  # barrier polls for the declared paths to appear between the two steps. Gated on
+  # a non-empty secret list so hosts without hermes secrets declare no entry.
+  home.activation.wait-for-hermes-secrets = lib.mkIf (hermesSecretPaths != [ ]) (
+    lib.hm.dag.entryBetween [ "sops-nix" ] [ "hermesAgentSetup" ] ''
+      "${activationBundle}/src/scripts/secrets/wait-for-sops-secrets.sh" \
+        ${lib.concatMapStringsSep " " (path: lib.escapeShellArg path) hermesSecretPaths}
+    ''
   );
 
   # ── Nucleus-level configuration ──────────────────────────────────────

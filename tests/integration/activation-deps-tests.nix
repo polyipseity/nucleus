@@ -29,6 +29,7 @@ let
   nixosUserGitconfigText = builtins.readFile ../../src/users/default/git/NixOS.gitconfig;
   discordMusicRpcModuleText = builtins.readFile ../../src/modules/ext-discord-music-rpc.nix;
   homeModuleText = builtins.readFile ../../src/modules/home.nix;
+  hermesAgentModuleText = builtins.readFile ../../src/modules/hermes-agent.nix;
   macbookServicesText = builtins.readFile ../../src/hosts/MacBook/services/default.nix;
   macbookAppBundlesText = builtins.readFile ../../src/hosts/MacBook/services/app-bundles.nix;
   macbookAutomatorWorkflowsText = builtins.readFile ../../src/hosts/MacBook/services/automator-workflows/default.nix;
@@ -77,6 +78,21 @@ let
       };
     in
     assert' (builtins.elem "ssh-key-adopt" activations.provision-dev-repos.before) "SSH keys must load before Git clones";
+
+  # === TEST: hermes env files wait for sops-nix materialization ===
+  # On macOS sops-nix materializes secrets from an asynchronous LaunchAgent, so
+  # ordering the consumer merely after "sops-nix" does not gate on the files
+  # existing; the barrier must sit between sops-nix and hermesAgentSetup.
+  test_hermes_secrets_barrier_between_sops_and_setup =
+    assert'
+      (
+        lib.hasInfix "wait-for-sops-secrets.sh" hermesAgentModuleText
+        && lib.hasInfix "entryBetween" hermesAgentModuleText
+        && lib.hasInfix ''[ "sops-nix" ]'' hermesAgentModuleText
+        && lib.hasInfix ''[ "hermesAgentSetup" ]'' hermesAgentModuleText
+        && lib.hasInfix "hermesSecretPaths != [ ]" hermesAgentModuleText
+      )
+      "hermes environment files must wait for sops-nix to materialize, between sops-nix and hermesAgentSetup";
 
   # === TEST: GPG keys imported before commits ===
   test_gpg_before_commits =
@@ -420,6 +436,7 @@ let
     test_app_bundles_deployment_uses_declared_order
     test_workflows_deployment_uses_declared_order
     test_macos_workflows_has_open_nucleus_manual
+    test_hermes_secrets_barrier_between_sops_and_setup
   ];
 in
 # NOTE: force allTests as deepSeq's SECOND argument.  `builtins.seq (builtins.deepSeq allTests) { ... }`
