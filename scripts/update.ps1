@@ -161,7 +161,7 @@ function Invoke-LockfileBump {
   # the --sections token list exactly like the bash twin: trim whitespace per
   # token, map legacy bare sub-section names and the cargo alias to canonical
   # dotted form, and reject anything unknown.
-  $validSectionsCsv = 'bun,cargo,cargo-binstall,cursor,pi,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows'
+  # Section list is declared once above; reuse it for token validation.
   $sectionTokens = @()
   if (-not [string]::IsNullOrEmpty($Sections)) {
     foreach ($tok in ($Sections -split ',')) {
