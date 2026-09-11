@@ -81,6 +81,8 @@ The comment syntax `# SuppressMessageAttribute(...)` does NOT work — PSSA read
 
 **`nucleus-*` wrappers**: Trigger because `nucleus` is not approved. Add the attribute inside the function body before `param()`. Prefer `Add-ShellAlias` when the exact name is not required.
 
+**`Sort` is not an approved verb** (`Sort-Object` is a legacy exception, and `Get-Verb Sort` returns nothing): rename such functions, e.g. `Sort-JsonObject` → `ConvertTo-SortedJsonObject`.
+
 ### `PSUseSingularNouns`
 
 **Trigger:** Plural noun in function name (e.g. `Get-VmRunningNames`).
@@ -122,6 +124,40 @@ Dropping the trailing `s` is **wrong** when the function handles multiple items:
 
 **Edge cases:** Words ending in 's' that are inherently singular (Status, alias, process, bus, focus, virus, analysis, basis, crisis, thesis) are not violations.
 
+### `PSUseShouldProcessForStateChangingFunctions`
+
+**Trigger:** A function whose verb is `New`, `Set`, or `Remove` — the only verbs this rule checks; `Initialize-`, `Add-`, and `Enable-` are not flagged (verified with a probe file).
+
+**Fix:** Add `[CmdletBinding(SupportsShouldProcess)]` and gate the mutation with `$PSCmdlet.ShouldProcess(<target>, <action>)`, following `Set-ManagedSymlinkDeleteProtection.ps1`, `Remove-ManagedSecret.ps1`, `Set-VSCodeWorkspaceTrust.ps1`, and `Set-PiProjectTrust.ps1`. Callers that pass no `-WhatIf` keep the current behaviour, and the paired `PSUseSupportsShouldProcess`/`PSShouldProcess` rules stay satisfied because the gate is actually called. Test fixtures that create files take the same treatment.
+
+**Not the same rule as `PSShouldProcess`.** `scripts/check-PSScriptAnalyzerSettings.psd1` excludes `PSShouldProcess`, which is a separate rule of the same family; excluding one does not silence the other.
+
+### `PSUseOutputTypeCorrectly`
+
+**Trigger:** A function returns a type that is not declared in an `OutputType` attribute.
+
+**Fix:** Declare what the function actually returns (`[OutputType([string])]`, `[OutputType([System.Collections.Specialized.OrderedDictionary])]`). A helper that returns several shapes — including `$null` and a passthrough scalar — declares the polymorphic contract once: `[OutputType([object])]`.
+
+### `PSReviewUnusedParameter`
+
+**Trigger:** A parameter that the rule cannot see being read.
+
+**Root cause:** The rule does not follow nested function definitions, so a parameter read only from a helper defined inside the same function (or, symmetrically, a script parameter read only inside a function) is reported as unused even though it is used.
+
+**Fix:** Make the read visible in the consuming scope. Bind the value where it is used (`$effectiveUsername = $Username`, then pass the local to the helpers), or give the callee an explicit parameter and pass it at the call site. Removing the parameter is valid only when nothing reads it. `$null = <param>` plus `# check-suppress:suppression_doc: <reason>` is the last resort.
+
+### `PSAvoidUsingPositionalParameters`
+
+**Trigger:** A command call with positional arguments (e.g. `Join-Path $PSScriptRoot 'x.ps1'`).
+
+**Fix:** Name the parameters (`Join-Path -Path ... -ChildPath ...`).
+
+### `PSUseDeclaredVarsMoreThanAssignments`
+
+**Trigger:** A variable that is assigned but never read.
+
+**Fix:** Read it in the assertion or computation that needs it, or delete it; use `> $null` when a command's output is deliberately discarded.
+
 ## Reference table
 
 | Rule ID | Trigger | Fix |
@@ -131,7 +167,10 @@ Dropping the trailing `s` is **wrong** when the function handles multiple items:
 | `PSUseSingularNouns` | Plural noun | Bare singular (single-return) or collection-indicating singular (multi-return) |
 | `PSUseDeclaredVarsMoreThanAssignments` | `$null = <cmd>` or `[void]<expr>` | `> $null` redirect preferred, else annotate |
 | `PSPossibleIncorrectComparisonWithNull` | `$null = <cmd>` | `> $null` redirect preferred, else annotate |
-| `PSReviewUnusedParameter` / `PSAvoidUsingUnusedParameters` | Unused parameter | Reassess necessity; annotate `$null =` |
+| `PSReviewUnusedParameter` / `PSAvoidUsingUnusedParameters` | Parameter read only from a nested function definition | Bind locally or pass explicitly; remove when nothing reads it; annotate `$null =` as a last resort |
+| `PSUseShouldProcessForStateChangingFunctions` | `New`/`Set`/`Remove` verb | `[CmdletBinding(SupportsShouldProcess)]` + `$PSCmdlet.ShouldProcess(...)`; distinct from the excluded `PSShouldProcess` |
+| `PSUseOutputTypeCorrectly` | Returned type not declared | `[OutputType([<type>])]`; `[OutputType([object])]` for a polymorphic helper |
+| `PSAvoidUsingPositionalParameters` | Positional command arguments | Name the parameters |
 
 ## Adding a new rule policy
 

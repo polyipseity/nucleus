@@ -51,7 +51,7 @@ Edit shared rules/agents/prompts/skills under `src/users/default/agents/`, not `
 | `~/.config/opencode/agents` | `~/.agents/agents` | Writable symlink (method 1) |
 | `~/.config/opencode/commands` | `~/.agents/prompts` | Writable symlink (method 1) |
 
-Windows resolves the same sources through the `Resolve-UserConfig*` overlay helpers; opencode uses `~/.config/opencode/` on every platform, including `%USERPROFILE%\.config\opencode\`. Pi's own extension set is converged by `install-pi-packages` / `Invoke-PiSetup` from the `pi` list in `src/modules/packages/desired.json`, pinned by the lockfile `pi` section — pi records installed extensions in `~/.pi/agent/settings.json`, which is the registry those steps read (never a directory listing of `~/.pi/agent/npm/`, which contains `node_modules`).
+Windows resolves the same sources through the `Resolve-UserConfig*` overlay helpers; opencode uses `~/.config/opencode/` on every platform, including `%USERPROFILE%\.config\opencode\`. Pi's own extension set is converged by `install-pi-packages` / `Invoke-PiSetup` from the `pi` list in `src/modules/packages/desired.json`, pinned by the lockfile `pi` section — pi records installed extensions in `~/.pi/agent/settings.json`, which is the registry those steps read (never a directory listing of `~/.pi/agent/npm/`, which contains `node_modules`). pi spawns the bare command `bun` for every `npm:` install (`npmCommand` in `pi-settings.json`), so the installer receives `${pkgs.bun}/bin` as an argument and prepends it to `PATH`, while `Invoke-PiSetup` resolves bun's own directory — the managed `~\.bun\bin` holds only bun-installed binaries — and fails loudly when bun is unresolvable.
 
 ## Bundled vs. fetched skills
 
@@ -71,7 +71,7 @@ ClawHub = JS CLI not in nixpkgs/cargo-binstall/WinGet/Scoop. Bun only.
 
 **POSIX**: `install-bun-packages` HM activation in `src/modules/agents.nix` — prepends `~/.bun/bin`, maintains desired list (`clawhub`), installs/removes as needed, persists to `~/.bun/install/global/package.json`.
 
-**Windows**: `Invoke-BunSetup` manages `$desiredPackages` (`@mariozechner/pi-coding-agent`, `clawhub`) → `~\.bun\install\global\package.json`. Order: WinGet DSC → `Invoke-BunSetup` → `Sync-AgentsSkillManifest` → `Sync-AgentsClawHubSkillManifest`.
+**Windows**: `Invoke-BunSetup` installs the `bun` desired list from `src/modules/packages/desired.json` → `~\.bun\install\global\package.json`. Order: WinGet DSC → `Invoke-BunSetup` → `Sync-AgentsSkillManifest` → `Sync-AgentsClawHubSkillManifest`.
 
 ## Authoring rules
 
