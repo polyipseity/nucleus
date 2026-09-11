@@ -151,7 +151,10 @@ function Sync-CloudDriveCatalog {
         # runs as the logged-in user) and invokes rclone mount.
         $taskName = "NucleusCloudMount-$($mount.id)"
         $taskPath = '\NucleusCloudMount\'
-        $logFile = Join-Path $mountLogDir "combined.log"
+        # WHY: stdout and stderr get separate files. logging.capture selects which streams
+        # are captured, never the destination shape (house default: the pair).
+        $stdoutLogFile = Join-Path $mountLogDir "stdout.log"
+        $stderrLogFile = Join-Path $mountLogDir "stderr.log"
         $wrapperPath = Join-Path $cloudDriveDir "mount-$($mount.id).ps1"
         $rclonePassFile = Join-Path $HomeDirectory 'AppData\Local\nucleus\secrets\rclone-config-pass'
 
@@ -164,7 +167,8 @@ function Sync-CloudDriveCatalog {
         $null = $wrapperLines.Add("`$env:RCLONE_CONFIG_PASS = (Get-Content '{0}' -Raw).Trim()" -f $escapedPassFile)  # check-suppress:suppression_doc: Add returns collection count, discarded
         }
         $escapedRclone = $rcloneExe.Replace("'", "''")
-        $escapedLogFile = $logFile.Replace("'", "''")
+        $escapedStdoutLogFile = $stdoutLogFile.Replace("'", "''")
+        $escapedStderrLogFile = $stderrLogFile.Replace("'", "''")
         # Quote each arg for single-quoted PowerShell strings.
         $quotedArgs = ($mountArgs | ForEach-Object {
             $str = $_.ToString()
@@ -175,7 +179,7 @@ function Sync-CloudDriveCatalog {
                 $str
             }
         }) -join ' '
-        $null = $wrapperLines.Add("& '{0}' {1} *>> '{2}'" -f $escapedRclone, $quotedArgs, $escapedLogFile)  # check-suppress:suppression_doc: Add returns collection count, discarded
+        $null = $wrapperLines.Add("& '{0}' {1} 1>> '{2}' 2>> '{3}'" -f $escapedRclone, $quotedArgs, $escapedStdoutLogFile, $escapedStderrLogFile)  # check-suppress:suppression_doc: Add returns collection count, discarded
         Set-Content -Path $wrapperPath -Value ($wrapperLines -join "`r`n") -Force -Encoding UTF8
 
         # Register a logon scheduled task that runs the wrapper in a hidden

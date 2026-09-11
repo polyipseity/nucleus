@@ -6,4 +6,6 @@
 # launches this wrapper instead of camilladsp-heartbeat.ps1 directly. Without it
 # the heartbeat's output went nowhere and its declared log directory was never
 # written, so heartbeat failures left no trace on Windows.
-& '__HEARTBEAT_SCRIPT__' -Port __PORT__ -ConfigFile '__CONFIG_FILE__' *>> '__LOGFILE__'
+# WHY: stdout and stderr go to separate files. logging.capture selects WHICH streams are
+# captured, never the destination shape; the house default is the stdout.log/stderr.log pair.
+& '__HEARTBEAT_SCRIPT__' -Port __PORT__ -ConfigFile '__CONFIG_FILE__' 1>> '__STDOUT_LOG__' 2>> '__STDERR_LOG__'

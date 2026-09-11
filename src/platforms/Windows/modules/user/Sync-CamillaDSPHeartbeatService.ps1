@@ -85,7 +85,10 @@ function Sync-CamillaDSPHeartbeatService {
   # directory name. That directory is provisioned from services.json
   # logging.dirs.user by Invoke-EnsureLogDir.
   $serviceLogDir = Join-Path -Path (Get-NucleusLogDir) -ChildPath "camilladsp-heartbeat"
-  $logFile = Join-Path -Path $serviceLogDir -ChildPath "stderr.log"
+  # WHY: the pair, not a single merged file. logging.capture selects which streams are
+  # captured, never the destination shape (house default: stdout.log + stderr.log).
+  $stdoutLogFile = Join-Path -Path $serviceLogDir -ChildPath "stdout.log"
+  $stderrLogFile = Join-Path -Path $serviceLogDir -ChildPath "stderr.log"
 
   # A scheduled task action cannot redirect a process's streams, so point the task
   # at a generated wrapper that does. Mirrors Sync-LiteLLMService's run wrapper.
@@ -96,8 +99,9 @@ function Sync-CamillaDSPHeartbeatService {
   $wrapperContent = $wrapperContent `
     -replace '__HEARTBEAT_SCRIPT__', $heartbeatScript `
     -replace '__PORT__', $CamillaDSPPort `
-    -replace '__CONFIG_FILE__', $ConfigFile `
-    -replace '__LOGFILE__', $logFile
+    -replace '__STDOUT_LOG__', $stdoutLogFile `
+    -replace '__STDERR_LOG__', $stderrLogFile `
+    -replace '__CONFIG_FILE__', $ConfigFile
   [System.IO.File]::WriteAllText($wrapperScript, $wrapperContent, [System.Text.UTF8Encoding]::new($false))
 
   $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -File `"$wrapperScript`""

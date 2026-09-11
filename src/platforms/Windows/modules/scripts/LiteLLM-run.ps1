@@ -16,4 +16,6 @@ foreach ($spec in $keySpecs) {
 # Redis env vars for LiteLLM coordination + response cache.
 [System.Environment]::SetEnvironmentVariable('REDIS_HOST', '__REDIS_HOST__', 'Process')
 [System.Environment]::SetEnvironmentVariable('REDIS_PORT', '__REDIS_PORT__', 'Process')
-& '__LITELLM_BIN__' --config '__CONFIG_LINK__' --port __PORT__ --host '__HOST__' --drop_params *>> '__LOGFILE__'
+# WHY: stdout and stderr go to separate files. logging.capture selects WHICH streams are
+# captured, never the destination shape; the house default is the stdout.log/stderr.log pair.
+& '__LITELLM_BIN__' --config '__CONFIG_LINK__' --port __PORT__ --host '__HOST__' --drop_params 1>> '__STDOUT_LOG__' 2>> '__STDERR_LOG__'
