@@ -29,8 +29,9 @@ properties:
           $ConfigPath = Join-Path $HOME ".config\camillagui-backend\config.yml"
           $LogDir = Join-Path $env:LOCALAPPDATA "nucleus\logs\camillagui-backend"
           New-Item -Path $LogDir -ItemType Directory -Force -ErrorAction SilentlyContinue
-          $LogFile = Join-Path $LogDir "combined.log"
-          & pwsh.exe -WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -Command "& '$CamillaGUIBin' -c '$ConfigPath' *>> '$LogFile'"
+          $StdoutLog = Join-Path $LogDir "stdout.log"
+          $StderrLog = Join-Path $LogDir "stderr.log"
+          & pwsh.exe -WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -Command "& '$CamillaGUIBin' -c '$ConfigPath' 1>> '$StdoutLog' 2>> '$StderrLog'"
         Trigger: AtLogOn
         Enabled: true
         RunWithHighestPrivileges: false
@@ -50,10 +51,11 @@ properties:
         Action: |
           $LogDir = Join-Path $env:LOCALAPPDATA "nucleus\logs\discord-music-rpc"
           New-Item -Path $LogDir -ItemType Directory -Force -ErrorAction SilentlyContinue
-          $LogFile = Join-Path $LogDir "combined.log"
+          $StdoutLog = Join-Path $LogDir "stdout.log"
+          $StderrLog = Join-Path $LogDir "stderr.log"
           $Cmd = Get-Command -Name "discord-music-rpc" -ErrorAction SilentlyContinue
           if ($Cmd) {
-            & pwsh.exe -WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -Command "& '$($Cmd.Source)' *>> '$LogFile'"
+            & pwsh.exe -WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -Command "& '$($Cmd.Source)' 1>> '$StdoutLog' 2>> '$StderrLog'"
           }
         Trigger: AtLogOn
         Enabled: true
