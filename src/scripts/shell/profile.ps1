@@ -229,7 +229,8 @@ if ((Get-Command fzf -ErrorAction SilentlyContinue) -and (Get-Module -ListAvaila
 
 # Git shell aliases — mirrors src/modules/shell/aliases.nix
 # Use Add-ShellAlias (not `function` or inline `New-Item -Path Function:`) for all shell aliases.
-# The helper wraps the PSFunction provider path, which bypasses PSUseApprovedVerbs by avoiding
+# Set-Item with the Function:global: prefix creates functions in the global scope even when
+# called from inside a wrapper function, and bypasses PSUseApprovedVerbs by avoiding
 # a FunctionDefinitionAst — the one and only AST node type that rule inspects.
 # Naming conventions:
 # - Prefix = base git command (all `git log` aliases start with `-gl`).
@@ -239,8 +240,8 @@ if ((Get-Command fzf -ErrorAction SilentlyContinue) -and (Get-Module -ListAvaila
 # - All options MUST use long form (--patch, --all, --message, etc.). See aliases.nix header.
 function Add-ShellAlias {
   param([string]$Name, [scriptblock]$Value)
-  # check-suppress:suppression_doc: New-Item returns FileInfo, discarded
-  $null = New-Item -Path Function: -Name $Name -Value $Value -Force
+  # check-suppress:suppression_doc: Set-Item returns Nothing, discarded
+  Set-Item -Path "Function:global:$Name" -Value $Value
 }
 Add-ShellAlias '-g' { & git @Args }
 Add-ShellAlias '-ga' { & git add @Args }
