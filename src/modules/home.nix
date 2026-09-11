@@ -137,7 +137,8 @@ let
   # Expanded from $HOME to resolvedHomeDirectory at eval time so the JSON
   # token carries absolute paths and no shell expansion is needed at runtime.
   # Each entry is { path, writable ? false }. `writable = false` (default) hardens
-  # the symlink immutable (uchg/chattr +i) so it cannot be deleted or written
+  # the symlink immutable (uchg on macOS — the only platform where a user-scope
+  # activation can set the flag) so it cannot be deleted or written
   # through; `writable = true` keeps it managed (still unprotect-before/re-protect-after)
   # but never immutable, so apps can write the active config back through it.
   # A `method 1 (writable symlink)` deployment MUST be `writable = true` — see

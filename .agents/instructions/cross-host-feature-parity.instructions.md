@@ -87,7 +87,7 @@ Override precedence: CLI flag > per-tool env var > master flag/env > Nix config 
 
 ## Provisioned symlink policy
 
-Every provisioned symlink must be writable AND delete-protected (`chflags uchg` macOS, `chattr +i` Linux, `icacls /deny` Windows). Best-effort with warning on failure.
+Every provisioned symlink must be writable AND delete-protected where the platform permits it: `chflags uchg` (macOS) and `icacls /deny` (Windows) prevent removal. Linux cannot, from a user-scope activation — `chattr` requires `CAP_LINUX_IMMUTABLE` (see `chattr(1)`) — so NixOS enforces the same contract by detection: check step 19 (`method-one-symlink-resolution`) plus `home.activation.verify-managed-symlink-paths`. Best-effort with warning on failure applies to the platforms that attempt prevention.
 
 Read-only exception: symlink MUST be read-only when target is in the Nix store (immutable content). On Windows, mirror POSIX writability semantics. Deviations require `# WHY:` comment.
 

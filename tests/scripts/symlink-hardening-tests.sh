@@ -105,8 +105,30 @@ test_flag_failure_reports_f1_error() {
   fi
 }
 
+# Linux cannot set the immutable flag from a user-scope activation (chattr needs
+# CAP_LINUX_IMMUTABLE), so the library must not invoke it: reinstating the call would
+# fail EPERM and — because a genuine flag failure is fatal — abort every NixOS apply.
+test_no_chattr_invocation() {
+  if grep -qE 'chattr[[:space:]]+-h' "$SH_LIB"; then
+    assert_fail "library does not invoke chattr" "found a chattr invocation in $SH_LIB"
+  else
+    assert_pass "library does not invoke chattr (NixOS protection is detection-based)"
+  fi
+}
+
+test_policy_records_capability_requirement() {
+  local policy="$REPO_ROOT/.agents/instructions/cross-host-feature-parity.instructions.md"
+  if grep -q "CAP_LINUX_IMMUTABLE" "$policy"; then
+    assert_pass "policy records why Linux cannot prevent symlink removal (CAP_LINUX_IMMUTABLE)"
+  else
+    assert_fail "policy records why Linux cannot prevent symlink removal (CAP_LINUX_IMMUTABLE)" "CAP_LINUX_IMMUTABLE not found in $policy"
+  fi
+}
+
 test_absent_path_is_silent_no_op
 test_dangling_symlink_is_accepted
 test_existing_symlink_is_accepted
 test_flag_failure_reports_f1_error
+test_no_chattr_invocation
+test_policy_records_capability_requirement
 finish_tests

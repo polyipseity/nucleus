@@ -3,11 +3,13 @@
 # make the following functions available in home-manager activation scripts.
 #
 # Provided functions:
-#   _nucleus_protect_symlink       — set uchg / chattr +i on a symlink
-#   _nucleus_unprotect_symlink     — clear uchg / chattr -i from a symlink
+#   _nucleus_protect_symlink       — set the immutable flag on a symlink (macOS uchg)
+#   _nucleus_unprotect_symlink     — clear the immutable flag from a symlink (macOS)
 #   _nucleus_symlink_error         — emit the F1 error line for a failed flag change
 # Set/clear immutable flags on symlinks so managed agent config symlinks are
-# not accidentally removed or replaced outside of an apply run.
+# not accidentally removed or replaced outside of an apply run. Only macOS can do
+# this from a user-scope activation; Linux enforces the contract by detection
+# instead — see the WHY in each Linux arm.
 
 # WHY: a flag change that genuinely fails is an error, not a warning, and an
 # absent path is not a failure at all — several managed symlinks are created by
@@ -42,12 +44,18 @@ _nucleus_protect_symlink() {
     fi
     ;;
   Linux)
-    if command -v chattr >/dev/null; then
-      if ! _nps_err="$(chattr -h +i "$_nps_path" 2>&1)"; then
-        _nucleus_symlink_error "$_nps_context" "could not protect symlink $_nps_path with chattr +i" "$_nps_err"
-        return 1
-      fi
-    fi
+    # WHY: this platform cannot set the immutable attribute from a user-scope
+    # activation. chattr requires CAP_LINUX_IMMUTABLE — "Only the superuser or a
+    # process possessing the CAP_LINUX_IMMUTABLE capability can set or clear this
+    # attribute" (chattr(1), https://man7.org/linux/man-pages/man1/chattr.1.html) —
+    # and Home Manager activation runs as the login user. nucleus deliberately does
+    # not ship e2fsprogs on that PATH: with the binary present the call would fail
+    # EPERM, and because a genuine flag failure is fatal here it would abort every
+    # NixOS apply. The contract is therefore enforced by detection rather than
+    # prevention: check step 19 (method-one-symlink-resolution) fails when a managed
+    # symlink does not resolve into the live repo, and
+    # home.activation.verify-managed-symlink-paths fails when a seeded path is
+    # missing. macOS keeps real prevention via uchg.
     ;;
   esac
 }
@@ -67,12 +75,9 @@ _nucleus_unprotect_symlink() {
     fi
     ;;
   Linux)
-    if command -v chattr >/dev/null; then
-      if ! _nus_err="$(chattr -h -i "$_nus_path" 2>&1)"; then
-        _nucleus_symlink_error "$_nus_context" "could not clear chattr +i from symlink $_nus_path before update" "$_nus_err"
-        return 1
-      fi
-    fi
+    # WHY: see the matching arm in _nucleus_protect_symlink — the capability is
+    # unavailable in a user-scope activation, so there is nothing to clear and
+    # NixOS relies on detection (check step 19 + verify-managed-symlink-paths).
     ;;
   esac
 }
