@@ -663,15 +663,21 @@
           nucleus-check = nucleusApp {
             name = "check";
             runtimeInputs = [
+              pkgs.actionlint
               pkgs.bash
               pkgs.git
               pkgs.jq
               pkgs.nixf
               pkgs.packer
+              pkgs.pinact
               pkgs.powershell
               pkgs.check-jsonschema
+              pkgs.shfmt
+              pkgs.taplo
               treefmtWrapper
+              pkgs.yamllint
               pkgs.yq-go
+              pkgs.zizmor
             ];
           };
           nucleus-cloud = nucleusApp {
