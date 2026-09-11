@@ -6,6 +6,13 @@
 # Message output is delegated via scriptblock parameters so the same probe
 # logic serves both the check step (Write-Message / Write-WarningMessage /
 # Write-ErrorMessage) and bump-lockfile.ps1 (Write-NucleusInfo / etc.).
+#
+# WHY: ManagedPaths.ps1 is dot-sourced for Get-NucleusUserRoot so the USER-root
+# paths below come from the canonical Windows declaration instead of a
+# hardcoded %LOCALAPPDATA%\nucleus string.
+$script:NucleusRepoRoot = (Resolve-Path (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..')).Path
+. (Join-Path -Path $script:NucleusRepoRoot -ChildPath 'src\platforms\Windows\modules\ManagedPaths.ps1')
+
 function Invoke-LockfileEnforcement {
   [CmdletBinding()]
   [OutputType([int])]
@@ -128,32 +135,43 @@ function Invoke-LockfileEnforcement {
     & $InfoFn "source-builds: VCS/rev-pinned — not version-verifiable, skipping enforcement"
   }
 
-  # --- cursor superpowers (Nix-store symlink — filesystem-based enforcement) ---
-  # On POSIX hosts, builtins.fetchGit evaluates at Nix build time and the
-  # activation script symlinks ~/.local/share/nucleus/plugins/superpowers into
-  # /nix/store/.  On Windows, provisioning is not yet declarative; the check
-  # verifies whatever state exists (symlink or directory).
+  # --- cursor superpowers (managed checkout + extension links) ---
+  # Windows fetches the plugin into <nucleus user root>\plugins\superpowers at
+  # the pinned revision (Sync-Superpowers.ps1) and links it for pi and opencode.
+  # The probe verifies the checkout revision, which is what the pin controls;
+  # the POSIX target (a symlink into /nix/store) is never observable from this
+  # Windows-side library.
   $expectedRev = $null
   if ($Lockfile.ContainsKey('cursor') -and $Lockfile.cursor.ContainsKey('superpowers')) {
     $expectedRev = $Lockfile.cursor.superpowers.rev
   }
   if ($expectedRev) {
-    $pluginDir = Join-Path $env:USERPROFILE '.local\share\nucleus\plugins\superpowers'
-    if (Test-Path $pluginDir) {
-      $item = Get-Item $pluginDir
-      if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
-        # Symlink — verify it points into /nix/store/ (POSIX provisioning path)
-        $target = [System.IO.Path]::GetFullPath($pluginDir)
-        if ($target -like '/nix/store/*') {
-          & $InfoFn "superpowers.$expectedRev`: present (store path: $target)"
-        } else {
-          & $InfoFn "superpowers.$expectedRev`: symlink present (target: $target, not a Nix store path — Windows provisioning is not declarative)"
-        }
-      } else {
-        & $InfoFn "superpowers.$expectedRev`: directory present (not a symlink — Windows provisioning is not declarative)"
+    $pluginDir = Join-Path (Get-NucleusUserRoot) 'plugins\superpowers'
+    if (-not (Test-Path -LiteralPath $pluginDir)) {
+      & $ErrorFn "superpowers.$expectedRev`: plugin checkout not found at $pluginDir"; $errors++
+    }
+    elseif (-not (Test-Path -LiteralPath (Join-Path -Path $pluginDir -ChildPath '.git'))) {
+      & $ErrorFn "superpowers.$expectedRev`: $pluginDir is not a managed git checkout"; $errors++
+    }
+    else {
+      # check-suppress:suppression_doc: probe -- git may be absent from PATH; the $null check below reports that as an error.
+      $git = Get-Command -Name git -ErrorAction SilentlyContinue
+      if ($null -eq $git) {
+        & $ErrorFn "superpowers.$expectedRev`: git not found; cannot verify the checkout revision"; $errors++
       }
-    } else {
-      & $ErrorFn "superpowers.$expectedRev`: plugin path not found at $pluginDir"; $errors++
+      else {
+        # check-suppress:suppression_doc: probe -- a failed rev-parse is reported as an error on the next lines.
+        $head = (& $git.Source -C $pluginDir rev-parse HEAD 2>$null | Select-Object -First 1)
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($head)) {
+          & $ErrorFn "superpowers.$expectedRev`: git rev-parse failed in $pluginDir"; $errors++
+        }
+        elseif ($head.Trim() -ne $expectedRev) {
+          & $ErrorFn "superpowers.$expectedRev`: checkout is at $($head.Trim())"; $errors++
+        }
+        else {
+          & $InfoFn "superpowers.$expectedRev`: checkout present at $pluginDir"
+        }
+      }
     }
   }
 

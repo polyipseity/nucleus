@@ -359,6 +359,8 @@ $EnableAgentsConfigParity = -not $noUserStateParity
 $EnableAgentsSkillsParity = -not $noUserStateParity
 $EnableAgentsClawHubSkillsParity = -not $noUserStateParity
 $EnablePiExtensionsParity = -not $noUserStateParity
+$EnableOpenCodeConfigParity = -not $noUserStateParity
+$EnableSuperpowersParity = -not $noUserStateParity
 $EnableBunParity = -not $noUserStateParity
 $EnableCloudDrivesParity = -not $noUserStateParity
 $EnableSymlinkParity = -not $noUserStateParity
@@ -500,6 +502,8 @@ if (-not $Elevated) {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsSkillManifest.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-CursorConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-PiAgentConfig.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-OpenCodeConfig.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-SuperpowersPlugin.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-SymlinkManifest.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-DevRepoCatalog.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-DiscordMusicRPC.ps1")
@@ -889,10 +893,20 @@ if ($userDevRepos -and $userDevRepos.repositories) {
   }
 }
 
+# Skill files shipped by the superpowers plugin are layered into
+# ~/.agents/skills/ alongside the committed skills.  The source exists only once
+# the plugin checkout has been provisioned, which is why the skills sync treats
+# a missing extra source as informational rather than fatal.
+$superpowersSkillsSource = Join-Path -Path (Get-NucleusUserRoot) -ChildPath 'plugins\superpowers\skills'
+
 Sync-AgentsConfig -RepoRoot $repoRoot -User $sessionUser -Enabled:$EnableAgentsConfigParity
-Sync-AgentsSkillManifest -RepoRoot $repoRoot -Enabled:$EnableAgentsSkillsParity
+# Superpowers is fetched before the pi/opencode links and the skills layer that
+# consume its checkout.
+Sync-SuperpowersPlugin -RepoRoot $repoRoot -Enabled:$EnableSuperpowersParity
+Sync-OpenCodeConfig -RepoRoot $repoRoot -User $sessionUser -Enabled:$EnableOpenCodeConfigParity
+Sync-AgentsSkillManifest -RepoRoot $repoRoot -User $sessionUser -Enabled:$EnableAgentsSkillsParity -ExtraSkillsSource $superpowersSkillsSource
 Sync-PiAgentConfig -RepoRoot $repoRoot -User $sessionUser -Enabled:$EnablePiExtensionsParity
-Sync-AgentsClawHubSkillManifest -RepoRoot $repoRoot -Enabled:$EnableAgentsClawHubSkillsParity
+Sync-AgentsClawHubSkillManifest -RepoRoot $repoRoot -User $sessionUser -Enabled:$EnableAgentsClawHubSkillsParity
 Sync-CursorConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity -Username $sessionUser
 Sync-VSCodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity -Username $sessionUser
 Sync-VSCodeExtensionManifest -Enabled:$EnableVsCodeExtensionsParity

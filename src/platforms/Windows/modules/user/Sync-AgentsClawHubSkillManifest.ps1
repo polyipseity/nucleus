@@ -3,9 +3,9 @@
   Download and update fetched (non-AGPL-compatible) skills via the ClawHub CLI.
 
 .DESCRIPTION
-  Reads the declarative fetched skill manifest at
-  src\modules\configs\agents\clawhub-skills.json and converges
-  %USERPROFILE%\.agents\skills\ with its contents.
+  Reads the declarative fetched skill manifest from the per-user agents overlay
+  (src\users\<username>\agents\clawhub-skills.json with src\users\default\ as
+  fallback) and converges %USERPROFILE%\.agents\skills\ with its contents.
 
   Fetched skills are those whose license is not AGPL-compatible and therefore
   cannot be committed to this repository.  Bundled (AGPL-compatible, committed)
@@ -33,6 +33,10 @@
   Absolute path to the root of the nucleus repository checkout.  apply.ps1
   resolves this from $PSScriptRoot and passes it explicitly.
 
+.PARAMETER User
+  Username from the user registry; the manifest resolves through the per-user
+  agents overlay.
+
 .PARAMETER Enabled
   Whether fetched skills should be synced. Mandatory: caller must explicitly
   choose true (converge with manifest) or false (skip sync). When $false,
@@ -42,11 +46,11 @@
   None.  Writes status messages to the host.
 
 .EXAMPLE
-  Sync-AgentsClawHubSkillManifest -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$true
+  Sync-AgentsClawHubSkillManifest -RepoRoot 'C:\Users\guest\repos\nucleus' -User 'guest' -Enabled:$true
 
 .EXAMPLE
   # Skip the fetched skill sync without removing any existing downloads:
-  Sync-AgentsClawHubSkillManifest -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$false
+  Sync-AgentsClawHubSkillManifest -RepoRoot 'C:\Users\guest\repos\nucleus' -User 'guest' -Enabled:$false
 
 .NOTES
   Environment variables: (none)
@@ -57,6 +61,8 @@ function Sync-AgentsClawHubSkillManifest {
   param(
     [Parameter(Mandatory)]
     [string]$RepoRoot,
+    [Parameter(Mandatory)]
+    [string]$User,
     [Parameter(Mandatory)]
     [bool]$Enabled
   )
@@ -70,12 +76,10 @@ function Sync-AgentsClawHubSkillManifest {
     return
   }
 
-  # Read the declarative fetched skill manifest.
-  $manifest = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\agents\clawhub-skills.json"
-  if (-not (Test-Path -LiteralPath $manifest)) {
-    Write-NucleusInfo -CommandName 'clawhub-skills' "Sync-AgentsClawHubSkillManifest: manifest not found at $manifest; skipping"
-    return
-  }
+  # Read the declarative fetched skill manifest from the agents overlay.  The
+  # resolver fails fast when neither the per-user nor the default manifest
+  # exists, so a missing manifest cannot pass as an empty sync.
+  $manifest = Resolve-UserConfigFile -User $User -ConfigName 'agents' -RelativePath 'clawhub-skills.json' -RepoRoot $RepoRoot
 
   $data = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
   # ConvertFrom-Json returns $null for a missing key; coerce to an empty array so
@@ -134,7 +138,7 @@ function Sync-AgentsClawHubSkillManifest {
         # A committed-skill (bundled) symlink occupies this slot.  Skip rather
         # than overwriting the managed symlink; the operator must remove the slug
         # from clawhub-skills.json or the committed skill from the repo first.
-        Write-NucleusWarning -CommandName 'clawhub-skills' "Sync-AgentsClawHubSkillManifest: skipping '$slug' — a committed-skill symlink exists at $skillPath; remove it from clawhub-skills.json or from src\modules\configs\agents\skills"
+        Write-NucleusWarning -CommandName 'clawhub-skills' "Sync-AgentsClawHubSkillManifest: skipping '$slug' — a committed-skill symlink exists at $skillPath; remove it from clawhub-skills.json or from the agents overlay skills tree"
         continue
       }
       # Unlock an existing fetched skill directory before updating so ClawHub can

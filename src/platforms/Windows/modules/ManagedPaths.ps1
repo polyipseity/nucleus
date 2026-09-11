@@ -91,6 +91,29 @@ function Get-NucleusLLVMBinDir {
 
 <#
 .SYNOPSIS
+  Returns the path to the nucleus USER root.
+.DESCRIPTION
+  Mirrors derive_nucleus_user_root in src/scripts/lib/lib.sh: the nucleus USER
+  root is %LOCALAPPDATA%\nucleus on Windows (~/Library/Application Support/nucleus
+  on macOS, ~/.local/share/nucleus on NixOS).  Scripts must call this instead of
+  hardcoding the path.
+.OUTPUTS
+  System.String.  Absolute path to the USER root.
+.EXAMPLE
+  Get-NucleusUserRoot -> C:\Users\admin\AppData\Local\nucleus
+#>
+function Get-NucleusUserRoot {
+  [CmdletBinding()]
+  [OutputType([string])]
+  param()
+  if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+    throw 'Get-NucleusUserRoot: %LOCALAPPDATA% is unset; the nucleus USER root is undefined on this host'
+  }
+  Join-Path -Path $env:LOCALAPPDATA -ChildPath 'nucleus'
+}
+
+<#
+.SYNOPSIS
   Prepends or appends a directory to the current session PATH, deduplicating.
 .DESCRIPTION
   Adds the specified directory to $env:PATH if it is not already present, at

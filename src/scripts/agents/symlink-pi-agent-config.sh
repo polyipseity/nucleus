@@ -45,9 +45,11 @@ fi
 
 # --- Superpowers extension symlink (method 1: Nix store target) ---
 # The superpowers plugin is fetched via builtins.fetchGit and symlinked to
-# ~/.local/share/nucleus/plugins/superpowers. We create a method-1 symlink
+# <nucleus user root>/plugins/superpowers. We create a method-1 symlink
 # from ~/.pi/agent/extensions/superpowers.ts to the Nix store target.
-_spi_superpowers_ext="$HOME/.local/share/nucleus/plugins/superpowers/.pi/extensions/superpowers.ts"
+# The USER root is host-specific, so it comes from derive_nucleus_user_root
+# (macOS ~/Library/Application Support/nucleus, NixOS ~/.local/share/nucleus).
+_spi_superpowers_ext="$(derive_nucleus_user_root)/plugins/superpowers/.pi/extensions/superpowers.ts"
 _spi_superpowers_link="$_spi_pi_dir/extensions/superpowers.ts"
 if [ -L "$_spi_superpowers_link" ]; then
   if [ "$(readlink "$_spi_superpowers_link")" != "$_spi_superpowers_ext" ]; then
