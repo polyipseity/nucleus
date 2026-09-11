@@ -634,6 +634,70 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
     Write-Message "nix file structure passed."
   }
 
+  # Service log-capture pair policy: a captured service stream always goes to its own
+  # file, <dir>/stdout.log and <dir>/stderr.log (output-handling.instructions.md).
+  # Merging the streams, capturing only one, and discarding one to /dev/null are all
+  # prohibited, on every host.
+  # WHY the narrow scope: this targets SERVICE capture points only -- launchd/systemd
+  # capture directives and the wrappers that redirect a service's output. Ad-hoc
+  # `2>$null`/`2>/dev/null` on a single command is the suppression-audit concern (step 12).
+  Write-Message "--- log capture pair policy ---"
+  $lcpErrors = 0
+  $lcpSearchDirs = @(
+    (Join-Path -Path $r -ChildPath 'src'),
+    (Join-Path -Path $r -ChildPath 'tests')
+  )
+  $lcpFiles = @()
+  foreach ($dir in $lcpSearchDirs) {
+    if (Test-Path -LiteralPath $dir) {
+      # Scope excludes test fixtures, which deliberately hold violation samples.
+      # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariants; vendored and secret files are separate concerns
+      $lcpFiles += Get-ChildItem -Path $dir -Recurse -Include '*.nix', '*.sh', '*.ps1', '*.psm1', '*.yml' |
+        Where-Object { $_.FullName -notmatch '[\/](vendor|secrets|fixtures)[\/]' } |
+        Select-GitIgnored
+    }
+  }
+
+  $lcpDiscardPattern = '(StandardOutPath|StandardErrorPath|StandardOutput|StandardError)\s*=\s*"/dev/null"'
+  foreach ($f in $lcpFiles) {
+    # Exclude this check's own twins: their source contains the literal pattern text.
+    if ($f.Name -in $selfLeaf, $selfShLeaf) { continue }
+    $lcpRel = $f.FullName.Substring($r.Length + 1) -replace '\\', '/'
+
+    # Rule 1: no capture directive may discard a stream.
+    Select-String -Path $f.FullName -Pattern $lcpDiscardPattern | ForEach-Object {
+      Write-ErrorMessage "log capture pair: '$lcpRel`:$($_.LineNumber)' discards a stream to /dev/null; capture stdout.log and stderr.log instead (output-handling.instructions.md)"
+      $lcpErrors++
+    }
+
+    # Rule 2: no merged-stream redirection.
+    Select-String -Path $f.FullName -Pattern '*>>' -SimpleMatch | ForEach-Object {
+      Write-ErrorMessage "log capture pair: '$lcpRel`:$($_.LineNumber)' merges stdout and stderr; use 1>> and 2>> into stdout.log and stderr.log"
+      $lcpErrors++
+    }
+
+    # Rule 3: capture is both-or-neither per file, per directive family.
+    # WHY boolean presence: a file may own several services, so only the lone-stream case
+    # is a violation -- with one stream captured and the other discarded, the discarded
+    # stream lands in whatever the platform default is.
+    $lcpRaw = Get-Content -LiteralPath $f.FullName -Raw
+    if (($lcpRaw -match 'StandardOutPath') -ne ($lcpRaw -match 'StandardErrorPath')) {
+      Write-ErrorMessage "log capture pair: '$lcpRel' declares only one of StandardOutPath/StandardErrorPath; declare both or neither"
+      $lcpErrors++
+    }
+    if (($lcpRaw -match 'StandardOutput\s*=') -ne ($lcpRaw -match 'StandardError\s*=')) {
+      Write-ErrorMessage "log capture pair: '$lcpRel' declares only one of StandardOutput/StandardError; declare both or neither"
+      $lcpErrors++
+    }
+  }
+
+  if ($lcpErrors -gt 0) {
+    Write-ErrorMessage "log capture pair policy check failed with $lcpErrors error(s)"
+    $failed = $true
+  } else {
+    Write-Message "log capture pair policy passed."
+  }
+
   if ($failed) {
     Write-ErrorMessage "repository policy check failed"
     return $false

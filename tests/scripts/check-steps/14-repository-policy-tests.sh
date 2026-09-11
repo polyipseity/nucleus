@@ -276,6 +276,7 @@ test_step14_logging_ps1_twin() {
 
 # Behavioral tests: run run_logging_format_policy against fixture trees.
 FIXTURE_DIR="$REPO_ROOT/tests/fixtures/logging-format"
+CAPTURE_FIXTURE_DIR="$REPO_ROOT/tests/fixtures/log-capture-pair"
 
 test_step14_logging_behavioral_positive() {
   local _tmp _out _ret
@@ -404,6 +405,80 @@ test_step14_nix_file_structure_valid_passes() {
   [ "$_ret" -eq 0 ]
 }
 
+# --- log capture pair policy tests ---
+
+test_step14_capture_pair_policy_present() {
+  if grep -q 'log capture pair policy' "$TEST_FILE"; then
+    return 0
+  fi
+  echo "FAIL: step 14 should enforce the log capture pair policy"
+  return 1
+}
+
+test_step14_capture_pair_devnull_pattern() {
+  if grep -Fq 'discards a stream to /dev/null' "$TEST_FILE"; then
+    return 0
+  fi
+  echo "FAIL: step 14 should reject a capture directive that discards a stream"
+  return 1
+}
+
+test_step14_capture_pair_merged_pattern() {
+  # Literal phrase only: embedding the merged-redirection token here would make this
+  # test file self-trip the policy it exercises.
+  if grep -Fq 'merges stdout and stderr' "$TEST_FILE"; then
+    return 0
+  fi
+  echo "FAIL: step 14 should reject a merged-stream redirection"
+  return 1
+}
+
+test_step14_capture_pair_lone_stream_pattern() {
+  if grep -Fq 'declares only one of StandardOutPath/StandardErrorPath' "$TEST_FILE"; then
+    return 0
+  fi
+  echo "FAIL: step 14 should reject a lone capture stream"
+  return 1
+}
+
+test_step14_capture_pair_behavioral_positive() {
+  local _tmp _out _ret
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  cp "$CAPTURE_FIXTURE_DIR/clean.nix" "$_tmp/clean.nix"
+  cp "$CAPTURE_FIXTURE_DIR/clean.ps1" "$_tmp/clean.ps1"
+  run_log_capture_pair_policy true "$_tmp" "$_tmp/clean.nix" "$_tmp/clean.ps1" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -ne 0 ]; then
+    echo "FAIL: a correct stdout.log/stderr.log pair should pass the log capture pair policy"
+    cat "$_out"
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  [ "$_ret" -eq 0 ]
+}
+
+test_step14_capture_pair_behavioral_negative() {
+  local _tmp _out _ret
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  cp "$CAPTURE_FIXTURE_DIR/violations.nix" "$_tmp/violations.nix"
+  cp "$CAPTURE_FIXTURE_DIR/violations.ps1" "$_tmp/violations.ps1"
+  cp "$CAPTURE_FIXTURE_DIR/lone.nix" "$_tmp/lone.nix"
+  run_log_capture_pair_policy true "$_tmp" "$_tmp/violations.nix" "$_tmp/violations.ps1" "$_tmp/lone.nix" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -eq 0 ] || ! grep -q 'discards a stream to /dev/null' "$_out" || ! grep -q 'merges stdout and stderr' "$_out" || ! grep -q 'declares only one of StandardOutPath/StandardErrorPath' "$_out"; then
+    echo "FAIL: prohibited log capture constructs should fail the log capture pair policy"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
 failures=0
 for test in \
   test_step14_dummy_key_registry_read \
@@ -435,7 +510,13 @@ for test in \
   test_step14_nix_file_structure_present \
   test_step14_nix_file_structure_pattern1_detection \
   test_step14_nix_file_structure_pattern2_detection \
-  test_step14_nix_file_structure_valid_passes; do
+  test_step14_nix_file_structure_valid_passes \
+  test_step14_capture_pair_policy_present \
+  test_step14_capture_pair_devnull_pattern \
+  test_step14_capture_pair_merged_pattern \
+  test_step14_capture_pair_lone_stream_pattern \
+  test_step14_capture_pair_behavioral_positive \
+  test_step14_capture_pair_behavioral_negative; do
   if ! $test; then
     failures=$((failures + 1))
   fi

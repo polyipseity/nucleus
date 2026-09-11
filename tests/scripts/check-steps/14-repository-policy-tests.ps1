@@ -166,4 +166,18 @@ if ($content -match 'same name as parent directory' -or $content -match 'Pattern
   Assert-Fail -Name 'step14_ps1_nix_pattern2_check' -Reason 'step 14 PS1 should check Pattern 2 (file same name as dir)'
 }
 
+# --- log capture pair policy tests ---
+foreach ($probe in @(
+    @{ Name = 'step14_ps1_capture_pair_policy_present'; Needle = 'log capture pair policy'; Reason = 'step 14 PS1 enforces the log capture pair policy' },
+    @{ Name = 'step14_ps1_capture_pair_devnull'; Needle = 'discards a stream to /dev/null'; Reason = 'step 14 PS1 rejects a capture directive that discards a stream' },
+    @{ Name = 'step14_ps1_capture_pair_merged'; Needle = 'merges stdout and stderr'; Reason = 'step 14 PS1 rejects a merged-stream redirection' },
+    @{ Name = 'step14_ps1_capture_pair_lone_stream'; Needle = 'declares only one of StandardOutPath/StandardErrorPath'; Reason = 'step 14 PS1 rejects a lone capture stream' }
+  )) {
+  if ($content.Contains($probe.Needle)) {
+    Assert-Pass -Name $probe.Name -Reason $probe.Reason
+  } else {
+    Assert-Fail -Name $probe.Name -Reason $probe.Reason
+  }
+}
+
 if ($script:failed) { exit 1 } else { exit 0 }

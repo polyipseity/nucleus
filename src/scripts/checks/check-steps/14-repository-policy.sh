@@ -8,7 +8,6 @@ _REPOSITORY_POLICY_STEP_SH="$(basename "${BASH_SOURCE[0]}")"
 _REPOSITORY_POLICY_STEP_PS1="${_REPOSITORY_POLICY_STEP_SH%.sh}.ps1"
 _REPOSITORY_POLICY_STEP_ID="${_REPOSITORY_POLICY_STEP_SH#[0-9][0-9]-}"
 _REPOSITORY_POLICY_STEP_ID="${_REPOSITORY_POLICY_STEP_ID%.sh}"
-readonly _REPOSITORY_POLICY_STEP_DIR _REPOSITORY_POLICY_STEP_SH _REPOSITORY_POLICY_STEP_PS1 _REPOSITORY_POLICY_STEP_ID
 
 register_step "repository-policy" "Repository policy" run_repository_policy
 
@@ -49,6 +48,9 @@ run_repository_policy() {
 
   say "--- nix file structure ---"
   run_nix_file_structure "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+
+  say "--- log capture pair policy ---"
+  run_log_capture_pair_policy "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
   if [ "$_failed" -ne 0 ]; then
     error "repository policy check failed"
@@ -716,5 +718,106 @@ run_nix_file_structure() {
     return 1
   fi
   say "nix file structure passed."
+  return 0
+}
+
+# Service log-capture pair policy: a captured service stream always goes to its own
+# file, <dir>/stdout.log and <dir>/stderr.log (output-handling.instructions.md).
+# Merging the streams, capturing only one, and discarding one to /dev/null are all
+# prohibited, on every host.
+# WHY the narrow scope: this targets SERVICE capture points only — launchd/systemd
+# capture directives and the wrappers that redirect a service's output. Ad-hoc
+# `2>/dev/null` on a single command is the suppression-audit concern (step 12).
+run_log_capture_pair_policy() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
+  local _files=("$@")
+  cd "$_repo_root" || return 1
+
+  local _lcp_errors=0
+  # Exclude this check's own files: their source contains the literal pattern text.
+  # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
+  local _lcp_self_sh="$_REPOSITORY_POLICY_STEP_SH" _lcp_self_ps1="$_REPOSITORY_POLICY_STEP_PS1"
+
+  # Scope excludes test fixtures, which deliberately hold violation samples.
+  # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariants; vendored and secret files are separate concerns
+  local _lcp_files=()
+  if $_has_args; then
+    for _f in "${_files[@]}"; do
+      case "$_f" in
+      vendor/* | src/secrets/* | tests/fixtures/*) continue ;;
+      esac
+      case "$_f" in
+      *.nix | *.sh | *.ps1 | *.psm1 | *.yml) ;;
+      *) continue ;;
+      esac
+      case "$(basename "$_f")" in
+      "$_lcp_self_sh" | "$_lcp_self_ps1") continue ;;
+      esac
+      _lcp_files+=("$_f")
+    done
+  else
+    while IFS= read -r _f; do
+      case "$_f" in
+      vendor/* | src/secrets/* | tests/fixtures/*) continue ;;
+      esac
+      case "$_f" in
+      *.nix | *.sh | *.ps1 | *.psm1 | *.yml) ;;
+      *) continue ;;
+      esac
+      case "$(basename "$_f")" in
+      "$_lcp_self_sh" | "$_lcp_self_ps1") continue ;;
+      esac
+      _lcp_files+=("$_f")
+    done < <(git ls-files | filter_gitignored)
+  fi
+
+  local _f _lcp_discard_re='(StandardOutPath|StandardErrorPath|StandardOutput|StandardError)[[:space:]]*=[[:space:]]*"/dev/null"'
+  for _f in "${_lcp_files[@]}"; do
+    [ -f "$_f" ] || continue
+
+    # Rule 1: no capture directive may discard a stream.
+    if grep -q -E "$_lcp_discard_re" "$_f"; then
+      local _lcp_hit
+      while IFS= read -r _lcp_hit; do
+        _lcp_errors=$((_lcp_errors + 1))
+        error "log capture pair: '$_f:$_lcp_hit' discards a stream to /dev/null; capture stdout.log and stderr.log instead (output-handling.instructions.md)"
+      done < <(grep -n -E "$_lcp_discard_re" "$_f")
+    fi
+
+    # Rule 2: no merged-stream redirection.
+    if grep -q -F '*>>' "$_f"; then
+      local _lcp_merged
+      while IFS= read -r _lcp_merged; do
+        _lcp_errors=$((_lcp_errors + 1))
+        error "log capture pair: '$_f:$_lcp_merged' merges stdout and stderr; use 1>> and 2>> into stdout.log and stderr.log"
+      done < <(grep -n -F '*>>' "$_f")
+    fi
+
+    # Rule 3: capture is both-or-neither per file, per directive family.
+    # WHY boolean presence: a file may own several services, so only the lone-stream
+    # case is a violation — with one stream captured and the other discarded, the
+    # discarded stream lands in whatever the platform default is.
+    local _lcp_launchd_out=false _lcp_launchd_err=false
+    if grep -q 'StandardOutPath' "$_f"; then _lcp_launchd_out=true; fi
+    if grep -q 'StandardErrorPath' "$_f"; then _lcp_launchd_err=true; fi
+    if [ "$_lcp_launchd_out" != "$_lcp_launchd_err" ]; then
+      _lcp_errors=$((_lcp_errors + 1))
+      error "log capture pair: '$_f' declares only one of StandardOutPath/StandardErrorPath; declare both or neither"
+    fi
+    local _lcp_systemd_out=false _lcp_systemd_err=false
+    if grep -q -E 'StandardOutput[[:space:]]*=' "$_f"; then _lcp_systemd_out=true; fi
+    if grep -q -E 'StandardError[[:space:]]*=' "$_f"; then _lcp_systemd_err=true; fi
+    if [ "$_lcp_systemd_out" != "$_lcp_systemd_err" ]; then
+      _lcp_errors=$((_lcp_errors + 1))
+      error "log capture pair: '$_f' declares only one of StandardOutput/StandardError; declare both or neither"
+    fi
+  done
+
+  if [ "$_lcp_errors" -gt 0 ]; then
+    error "log capture pair policy check failed with $_lcp_errors error(s)"
+    return 1
+  fi
+  say "log capture pair policy passed."
   return 0
 }
