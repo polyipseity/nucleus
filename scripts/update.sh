@@ -327,9 +327,9 @@ EOF
 
   # --verify-installed: verify installed tool versions against the pinned
   # lockfile sections and exit (never writes). Delegates to the shared probe
-  # library used by the check step so behavior stays identical.
+  # library; the host key scopes the probes to the packages this host manages.
   if $VERIFY_INSTALLED; then
-    verify_installed_versions "$REPO_ROOT"
+    verify_installed_versions "$REPO_ROOT" "$(resolve_nucleus_host)"
     exit $?
   fi
 

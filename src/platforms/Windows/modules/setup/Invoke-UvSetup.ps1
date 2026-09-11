@@ -11,6 +11,11 @@ function Invoke-UvSetup {
 
     Mirrors the install-uv-tools POSIX activation in agents.nix.
 
+    The desired set and the per-tool rationale live in the shared registry
+    src/modules/packages/desired.json (uv -> <host>).  An entry may pin its
+    version to a flake.lock node ("pin": "flake:<node>") when the declarative
+    POSIX provisioning, not a PyPI release, is the authoritative version.
+
     Requires uv to be on PATH (installed from WinGet by system/packages.dsc.yml).
     Prepends %USERPROFILE%\.local\bin to PATH internally so uv-installed
     binaries are accessible in subsequent steps of the same apply session.
@@ -27,7 +32,12 @@ function Invoke-UvSetup {
 
   # Derive repo root from script location (src/platforms/Windows/modules/setup/ -> repo root is 5 levels up).
   $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
-  $lockfilePath = Join-Path $repoRoot "lockfiles\lockfile.json"
+  $lockfilePath = Join-Path $repoRoot "src\lockfiles\lockfile.json"
+  $flakeLockPath = Join-Path $repoRoot "src\flake.lock"
+
+  # Get-NucleusHostKey resolves the canonical host key used to slice the shared
+  # desired-package registry.
+  . (Join-Path -Path $repoRoot -ChildPath "src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1")
 
   # Read version-pinning data from the consolidated lockfile.
   $lockfile = @{}
@@ -36,39 +46,71 @@ function Invoke-UvSetup {
   }
   $uvVersions = if ($lockfile -and $lockfile.uv) { $lockfile.uv } else { @{} }
 
-  # Declarative desired-state list.  Add a package name here to install it;
-  # remove it to trigger uninstall on the next apply.  Use the exact PyPI
-  # package name (without extras).  Only add packages absent from WinGet,
-  # Scoop, and cargo-binstall.
-  $desiredPackages = @(
-    # Discord Music RPC: tray Rich Presence app for Discord.  Pinned to a VCS
-    # rev via the uv section of lockfile.json (see Invoke-UvSetup).
-    'discord-music-rpc'
-    # LiteLLM AI gateway proxy.  Installed with the [proxy] extra for
-    # OpenAI-compatible server functionality.  The tool name in `uv tool list`
-    # is `litellm` (extras are stripped from the tool registry).
-    'litellm'
-    # PaddleOCR: cross-platform OCR with GPU auto-detection.
-    # Managed via uv for version consistency across all hosts.
-    'paddleocr'
-    # yamllint: no WinGet package; uv is the Windows install path (nixpkgs on POSIX).
-    'yamllint'
-  )
+  # Declarative desired-state list from the shared registry (single source of
+  # truth: src/modules/packages/desired.json).  Entries are objects with named
+  # fields; python/extras are read into per-tool lookup tables so one tool's
+  # version can never land in another tool's slot.
+  $desiredPath = Join-Path $repoRoot "src\modules\packages\desired.json"
+  if (-not (Test-Path -LiteralPath $desiredPath)) {
+    Write-NucleusError -CommandName 'Invoke-UvSetup' "desired package registry not found at '$desiredPath'"
+    return
+  }
+  $hostKey = Get-NucleusHostKey
+  $hostDesired = (Get-Content -LiteralPath $desiredPath -Raw | ConvertFrom-Json).uv.$hostKey
+  if ($null -eq $hostDesired) {
+    Write-NucleusError -CommandName 'Invoke-UvSetup' "desired package registry has no uv list for host '$hostKey'"
+    return
+  }
+  $desiredPackages = @($hostDesired | ForEach-Object { $_.name })
 
   # Packages that need extras syntax during install (e.g. 'litellm[proxy]').
   # Keyed by tool name (as it appears in uv tool list).
-  $packageExtras = @{
-    'litellm' = '[proxy]'
+  $packageExtras = @{}
+
+  # Per-tool Python version requirements.  Absent = use the uv default.
+  $toolPythonVersion = @{}
+
+  # Tools pinned to a flake.lock rev ("flake:<node>"), keyed by tool name.  Such
+  # a tool must match the rev the declarative POSIX provisioning uses, which no
+  # PyPI release tracks.
+  $uvPins = @{}
+  foreach ($entry in $hostDesired) {
+    if ($entry.extras) {
+      $packageExtras[$entry.name] = "[$($entry.extras)]"
+    }
+    if ($entry.python) {
+      $toolPythonVersion[$entry.name] = $entry.python
+    }
+    if (-not $entry.pin) { continue }
+    if ($entry.pin -match '^flake:(.+)$') {
+      $nodeName = $Matches[1]
+    }
+    else {
+      Write-NucleusError -CommandName 'Invoke-UvSetup' "unsupported pin '$($entry.pin)' for tool '$($entry.name)'; expected 'flake:<node>'"
+      return
+    }
+    if (-not (Test-Path -LiteralPath $flakeLockPath)) {
+      Write-NucleusError -CommandName 'Invoke-UvSetup' "tool '$($entry.name)' is pinned to flake node '$nodeName' but '$flakeLockPath' is missing"
+      return
+    }
+    $locked = (Get-Content -LiteralPath $flakeLockPath -Raw | ConvertFrom-Json).nodes.$nodeName.locked
+    if ($null -eq $locked -or -not $locked.rev) {
+      Write-NucleusError -CommandName 'Invoke-UvSetup' "flake.lock has no locked rev for node '$nodeName' (pinned by tool '$($entry.name)')"
+      return
+    }
+    if ($locked.type -ne 'github' -or -not $locked.owner -or -not $locked.repo) {
+      Write-NucleusError -CommandName 'Invoke-UvSetup' "flake node '$nodeName' is not a github input; cannot derive an install source for tool '$($entry.name)'"
+      return
+    }
+    $uvPins[$entry.name] = [pscustomobject]@{
+      source = "https://github.com/$($locked.owner)/$($locked.repo)"
+      rev    = $locked.rev
+    }
   }
 
   # uv tool install places binaries in ~\.local\bin by default (UV_TOOL_BIN_DIR).
   # Canonical source: ManagedPaths.ps1 -> managed-paths.nix (pathComponents).
   $uvBinDir = Get-NucleusManagedBinDir "local"
-
-  # Per-tool Python version requirements.  Empty/null = use default.
-  $toolPythonVersion = @{
-    'paddleocr' = '3.11'
-  }
 
   # Guard: uv must be accessible after WinGet DSC has installed astral-sh.uv.
   # check-suppress:suppression_doc: probe -- uv may not be installed; if-guard checks absence below.
@@ -113,7 +155,7 @@ function Invoke-UvSetup {
     $pkg = $_
     $isInstalled = $installedTools -contains $pkg
     if (-not $isInstalled) { return $true }
-    $entry = $uvVersions.$pkg
+    $entry = if ($uvPins.ContainsKey($pkg)) { $uvPins[$pkg] } else { $uvVersions.$pkg }
     if ($entry -is [string]) {
       # Version-pinned entry: reinstall if version mismatch.
       if (-not $entry) { return $false }
@@ -141,7 +183,7 @@ function Invoke-UvSetup {
 
   # Install additions (fresh installs and version-mismatch reinstalls).
   foreach ($pkg in $toInstall) {
-    $entry = $uvVersions.$pkg
+    $entry = if ($uvPins.ContainsKey($pkg)) { $uvPins[$pkg] } else { $uvVersions.$pkg }
     if ($entry -is [string]) {
       # Version-pinned entry: install from PyPI.
       $version = $entry

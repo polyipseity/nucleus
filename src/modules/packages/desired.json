@@ -1,0 +1,266 @@
+{
+  "$schema": "./desired.schema.json",
+  "bun": {
+    "MacBook": [
+      {
+        "name": "@tobilu/qmd",
+        "why": "On-device markdown search engine for pi memory_search; absent from nixpkgs and cargo-binstall; requires lifecycle scripts (postinstall), hence its lifecycle-allowlist entry."
+      },
+      {
+        "name": "clawhub",
+        "why": "Fetched-skill install vehicle; absent from nixpkgs and cargo-binstall; bun is the only viable install tier."
+      }
+    ],
+    "NixOS": [
+      {
+        "name": "@tobilu/qmd",
+        "why": "On-device markdown search engine for pi memory_search; absent from nixpkgs and cargo-binstall; requires lifecycle scripts (postinstall), hence its lifecycle-allowlist entry."
+      },
+      {
+        "name": "clawhub",
+        "why": "Fetched-skill install vehicle; absent from nixpkgs and cargo-binstall; bun is the only viable install tier."
+      }
+    ],
+    "Windows": [
+      {
+        "binary": "srt",
+        "name": "@anthropic-ai/sandbox-runtime",
+        "why": "OS-level process sandboxing for coding agents; available as pkgs.sandbox-runtime on POSIX but absent from WinGet, Scoop, and cargo-binstall on Windows."
+      },
+      {
+        "name": "@earendil-works/pi-coding-agent",
+        "why": "pi coding agent CLI; available as pkgs.pi-coding-agent on POSIX but absent from WinGet, Scoop, and cargo-binstall on Windows."
+      },
+      {
+        "name": "@tobilu/qmd",
+        "why": "On-device markdown search engine for pi memory_search; absent from WinGet, Scoop, cargo-binstall, and nixpkgs; requires lifecycle scripts (postinstall)."
+      },
+      {
+        "name": "clawhub",
+        "why": "Fetched-skill install vehicle; absent from WinGet, Scoop, and cargo-binstall; bun is the only viable install tier."
+      }
+    ]
+  },
+  "cargo-binstall": {
+    "MacBook": [
+      {
+        "name": "cargo-cache",
+        "why": "Cargo cache inspection and pruning; absent from nixpkgs."
+      },
+      {
+        "name": "cargo-nextest",
+        "why": "Managed Rust test runner; absent from nixpkgs."
+      },
+      {
+        "name": "nickel-lang-lsp",
+        "why": "Provides the nls (Nickel Language Server) binary required by the tweag.vscode-nickel VS Code extension."
+      },
+      {
+        "name": "pay-respects",
+        "why": "Command-line typo correction for the interactive shells."
+      }
+    ],
+    "NixOS": [
+      {
+        "name": "cargo-cache",
+        "why": "Cargo cache inspection and pruning; absent from nixpkgs."
+      },
+      {
+        "name": "cargo-nextest",
+        "why": "Managed Rust test runner; absent from nixpkgs."
+      },
+      {
+        "name": "nickel-lang-lsp",
+        "why": "Provides the nls (Nickel Language Server) binary required by the tweag.vscode-nickel VS Code extension."
+      },
+      {
+        "name": "pay-respects",
+        "why": "Command-line typo correction for the interactive shells."
+      }
+    ],
+    "Windows": [
+      {
+        "name": "cargo-cache",
+        "why": "Cargo cache inspection and pruning; absent from WinGet and Scoop."
+      },
+      {
+        "name": "cargo-nextest",
+        "why": "Managed Rust test runner (cross-platform); absent from WinGet and Scoop."
+      },
+      {
+        "binary": "nls",
+        "name": "nickel-lang-lsp",
+        "why": "Provides the nls (Nickel Language Server) binary required by the tweag.vscode-nickel VS Code extension; nls is absent from WinGet and Scoop, so cargo-binstall downloads it from the nickel-lang release assets."
+      },
+      {
+        "name": "pay-respects",
+        "why": "Command-line typo correction; the nix-locate lookup path is never reached on Windows because nix is never in PATH."
+      }
+    ]
+  },
+  "pi": {
+    "MacBook": [
+      {
+        "name": "@juicesharp/rpiv-ask-user-question"
+      },
+      {
+        "name": "@narumitw/pi-plan-mode"
+      },
+      {
+        "name": "pi-background-tasks"
+      },
+      {
+        "name": "pi-extmgr"
+      },
+      {
+        "name": "pi-goal-x"
+      },
+      {
+        "name": "pi-memory"
+      },
+      {
+        "name": "pi-powerline-footer"
+      },
+      {
+        "name": "pi-simplify"
+      },
+      {
+        "name": "pi-subagents"
+      },
+      {
+        "name": "pi-web-access"
+      }
+    ],
+    "NixOS": [
+      {
+        "name": "@juicesharp/rpiv-ask-user-question"
+      },
+      {
+        "name": "@narumitw/pi-plan-mode"
+      },
+      {
+        "name": "pi-background-tasks"
+      },
+      {
+        "name": "pi-extmgr"
+      },
+      {
+        "name": "pi-goal-x"
+      },
+      {
+        "name": "pi-memory"
+      },
+      {
+        "name": "pi-powerline-footer"
+      },
+      {
+        "name": "pi-simplify"
+      },
+      {
+        "name": "pi-subagents"
+      },
+      {
+        "name": "pi-web-access"
+      }
+    ],
+    "Windows": [
+      {
+        "name": "@juicesharp/rpiv-ask-user-question"
+      },
+      {
+        "name": "@narumitw/pi-plan-mode"
+      },
+      {
+        "name": "pi-background-tasks"
+      },
+      {
+        "name": "pi-extmgr"
+      },
+      {
+        "name": "pi-goal-x"
+      },
+      {
+        "name": "pi-memory"
+      },
+      {
+        "name": "pi-powerline-footer"
+      },
+      {
+        "name": "pi-simplify"
+      },
+      {
+        "name": "pi-subagents"
+      },
+      {
+        "name": "pi-web-access"
+      }
+    ]
+  },
+  "scoop": {
+    "MacBook": [],
+    "NixOS": [],
+    "Windows": [
+      {
+        "name": "cargo-binstall",
+        "why": "Rust CLI install vehicle; absent from WinGet; Scoop main bucket is the correct tier."
+      },
+      {
+        "name": "gopass",
+        "why": "Cross-platform pass reimplementation; Windows parity for pkgs.pass on POSIX."
+      },
+      {
+        "name": "iwck",
+        "why": "Temporary keyboard locker for cleaning; blocks all input until Ctrl+Break."
+      },
+      {
+        "name": "qemu",
+        "why": "QCOW2 tooling and guest VM runner for Invoke-VMSetup; Scoop extras bucket."
+      },
+      {
+        "name": "zig",
+        "why": "Zig compiler toolchain; build-time dependency for source-built packages (Invoke-SourceBuild)."
+      }
+    ]
+  },
+  "uv": {
+    "MacBook": [
+      {
+        "name": "paddleocr",
+        "python": "3.11",
+        "why": "Cross-platform OCR with GPU auto-detection; pinned to Python 3.11 because its dependency opencv-contrib-python cannot build on Python >=3.12 (distutils removed)."
+      }
+    ],
+    "NixOS": [
+      {
+        "name": "paddleocr",
+        "python": "3.11",
+        "why": "Cross-platform OCR with GPU auto-detection; pinned to Python 3.11 because its dependency opencv-contrib-python cannot build on Python >=3.12 (distutils removed)."
+      }
+    ],
+    "Windows": [
+      {
+        "name": "discord-music-rpc",
+        "why": "Tray Rich Presence app for Discord; pinned to a VCS rev via the uv section of lockfile.json."
+      },
+      {
+        "name": "hermes-agent",
+        "pin": "flake:hermes-agent",
+        "why": "NousResearch AI agent framework.  Provisioned from the flake.lock rev so the installed framework matches the Nix-provisioned version on POSIX hosts; the PyPI project has no release matching that rev."
+      },
+      {
+        "extras": "proxy",
+        "name": "litellm",
+        "why": "AI gateway proxy; the proxy extra is required for the OpenAI-compatible server.  The tool name in `uv tool list` is litellm, with extras stripped."
+      },
+      {
+        "name": "paddleocr",
+        "python": "3.11",
+        "why": "Cross-platform OCR with GPU auto-detection; pinned to Python 3.11 because its dependency opencv-contrib-python cannot build on Python >=3.12 (distutils removed)."
+      },
+      {
+        "name": "yamllint",
+        "why": "No WinGet package; uv is the Windows install path (nixpkgs on POSIX)."
+      }
+    ]
+  }
+}

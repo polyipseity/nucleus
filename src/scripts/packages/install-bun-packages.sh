@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Idempotently converges the declarative bun global package set.
 #
-# Positional args: <jq-bin> <bun-bin> <awk-bin> <node-gyp-bin> <python3-bin> <make-bin>
+# The desired set comes from src/modules/packages/desired.json (host-keyed
+# single source of truth); versions are pinned by the lockfile `bun` section.
+#
+# Positional args: <jq-bin> <bun-bin> <awk-bin> <node-gyp-bin> <python3-bin> <make-bin> <desired-json>
 # The node-gyp toolchain args exist because allowlisted packages run lifecycle
 # scripts (see `src/lockfiles/lifecycle-allowlist.json`), and bun synthesises a
 # `node-gyp rebuild` for native dependencies whose prebuild metadata it ignores.
@@ -10,10 +13,12 @@ set -euo pipefail
 # SC2094 avoidance: trap-based cleanup eliminates read/write-same-file
 # pipeline warnings — temp files are cleaned on EXIT instead of inline.
 _ibp_desired=""
+_ibp_desired_names=""
 _ibp_installed=""
+_ibp_installed_versions=""
 _ibp_to_remove=""
 _ibp_to_install=""
-_cleanup_ibp() { rm -f "$_ibp_desired" "$_ibp_installed" "$_ibp_installed_versions" "$_ibp_to_remove" "$_ibp_to_install"; }
+_cleanup_ibp() { rm -f "$_ibp_desired" "$_ibp_desired_names" "$_ibp_installed" "$_ibp_installed_versions" "$_ibp_to_remove" "$_ibp_to_install"; }
 trap _cleanup_ibp EXIT
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -30,6 +35,7 @@ _gawk_bin="$3"
 _ibp_node_gyp_bin="$4"
 _ibp_python3_bin="$5"
 _ibp_make_bin="$6"
+_ibp_desired_json="$7"
 
 # Add bun's and the node-gyp toolchain's directories to PATH so bun is callable
 # and the lifecycle-script children (node-gyp -> python3, make) resolve their
@@ -76,16 +82,21 @@ if [ -n "$_ibp_repo_root" ] && [ -f "$_ibp_repo_root/src/lockfiles/lifecycle-all
   _ibp_lifecycle_allowlist="$_ibp_repo_root/src/lockfiles/lifecycle-allowlist.json"
 fi
 
-# Declarative desired-state list.  One package per line.
-# Add a package name here to install it; remove it to trigger uninstall
-# on the next apply.  Only add packages absent from nixpkgs and
-# cargo-binstall (install preference: nixpkgs > cargo binstall > cargo > bun > uv).
+# Desired-state list from src/modules/packages/desired.json: an array of
+# {"name": <npm package>, "binary"?: <installed binary name>} objects.  Only
+# packages absent from nixpkgs and cargo-binstall belong here (install
+# preference: nixpkgs > cargo binstall > cargo > bun > uv).
+# Written as "<name>\t<binary>" so the binary-existence check can honour an
+# explicit override; the default binary is the unscoped package basename.
 # Versions are pinned from the lockfile `bun` section (see _ibp_install_spec).
 _ibp_desired="$(mktemp)"
-printf '%s\n' \
-  '@tobilu/qmd' \
-  'clawhub' \
-  >"$_ibp_desired"
+# shellcheck disable=SC2016 # reason: jq program body must not be expanded by shell
+printf '%s\n' "$_ibp_desired_json" |
+  "$_jq_bin" -r '.[] | "\(.name)\t\(if (.binary // "") == "" then (.name | split("/") | last) else .binary end)"' >"$_ibp_desired" ||
+  die -l bun "could not parse the desired bun package list"
+_ibp_desired_names="$(mktemp)"
+# shellcheck disable=SC2016 # reason: awk script body must not be expanded by shell
+"$_gawk_bin" -F'\t' '{print $1}' "$_ibp_desired" >"$_ibp_desired_names"
 
 # Get actually installed global packages from bun's authoritative package
 # registry (zap-style: remove any installed package absent from the desired
@@ -108,7 +119,7 @@ fi
 _ibp_to_remove="$(mktemp)"
 while IFS= read -r _ibp_pkg; do
   [ -z "$_ibp_pkg" ] && continue
-  if ! grep -qxF "$_ibp_pkg" "$_ibp_desired"; then
+  if ! grep -qxF "$_ibp_pkg" "$_ibp_desired_names"; then
     printf '%s\n' "$_ibp_pkg" >>"$_ibp_to_remove"
   fi
 done <"$_ibp_installed"
@@ -121,7 +132,8 @@ done <"$_ibp_installed"
 _ibp_to_install="$(mktemp)"
 while IFS= read -r _ibp_pkg; do
   [ -z "$_ibp_pkg" ] && continue
-  _ibp_bin="${_ibp_pkg##*/}"
+  # shellcheck disable=SC2016 # reason: awk script body must not be expanded by shell
+  _ibp_bin="$("$_gawk_bin" -F'\t' -v p="$_ibp_pkg" '$1 == p { print $2; exit }' "$_ibp_desired")"
   _ibp_lock_pin=""
   if [ -n "$_ibp_lockfile" ]; then
     # check-suppress:suppression_doc: jq parse failure on a malformed lockfile treats the pin as absent -- safe because the package is then installed unpinned.
@@ -144,7 +156,7 @@ while IFS= read -r _ibp_pkg; do
     _ibp_needs_install=1
   fi
   [ "$_ibp_needs_install" -eq 1 ] && printf '%s\n' "$_ibp_pkg" >>"$_ibp_to_install"
-done <"$_ibp_desired"
+done <"$_ibp_desired_names"
 
 # Remove packages no longer in the desired list.
 while IFS= read -r _ibp_pkg; do
@@ -197,7 +209,8 @@ while IFS= read -r _ibp_pkg; do
       die -l bun "'$_bun_bin install -g --linker hoisted --ignore-scripts $_ibp_spec' failed"
     fi
   fi
-  _ibp_bin="${_ibp_pkg##*/}"
+  # shellcheck disable=SC2016 # reason: awk script body must not be expanded by shell
+  _ibp_bin="$("$_gawk_bin" -F'\t' -v p="$_ibp_pkg" '$1 == p { print $2; exit }' "$_ibp_desired")"
   if [ ! -f "$HOME/.bun/bin/$_ibp_bin" ] &&
     [ ! -f "$HOME/.bun/bin/$_ibp_bin.cmd" ]; then
     die -l bun "$_ibp_pkg installed but binary '$_ibp_bin' not found in '$HOME/.bun/bin'"

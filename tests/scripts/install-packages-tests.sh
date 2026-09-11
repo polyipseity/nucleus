@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 # Behavioral tests for the POSIX package install scripts that converge to
 # lockfile pins: install-bun-packages.sh, install-uv-tools.sh,
-# init-rustup.sh, install-cargo-binstall-packages.sh.
+# init-rustup.sh, install-cargo-binstall-packages.sh, install-pi-packages.sh.
 #
 # Each test builds a fake repo root (src/lockfiles/lockfile.json) plus a
 # $tmp/bin of stub tools that record the install spec they were handed, then
 # runs the real script with NUCLEUS_REPO_ROOT pointing at the fake root so
 # derive_repo_root resolves the lockfile.  We assert the version-pinned spec
 # (pkg@version / pkg==version / channel-date / VCS) is passed to the installer.
+#
+# The desired-package list is the installers' trailing JSON argument, mirroring
+# the entry shape of src/modules/packages/desired.json.
 #
 # Run with: bash tests/scripts/install-packages-tests.sh
 
@@ -21,9 +24,16 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 
 PKG_DIR="$REPO_ROOT/src/scripts/packages"
 
+# Desired-package lists handed to the installers, in the shape of
+# src/modules/packages/desired.json entries (object with a named "name").
+DESIRED_BUN='[{"name":"clawhub"},{"name":"@tobilu/qmd"}]'
+DESIRED_UV='[{"name":"paddleocr","python":"3.11"}]'
+DESIRED_CARGO_BINSTALL='[{"name":"nickel-lang-lsp"},{"name":"pay-respects"}]'
+DESIRED_PI='[{"name":"pi-memory"},{"name":"pi-subagents"}]'
+
 # Build a fake repo root with a lockfile and stub tool bin dir.  Prints the
 # repo root path.  The lockfile mirrors the real shape for the sections the
-# tests exercise (bun / uv / rustup / cargo-binstall), including one VCS pin.
+# tests exercise (bun / uv / pi / rustup / cargo-binstall), including one VCS pin.
 setup_fake_repo() {
   local dir
   dir="$(mktemp -d)"
@@ -43,6 +53,10 @@ setup_fake_repo() {
       "rev": "bba71027a684db53f3fcde5adbd3d42627241a83",
       "source": "https://github.com/example/ext.discord-music-rpc"
     }
+  },
+  "pi": {
+    "pi-memory": "0.4.2",
+    "pi-subagents": "0.66.0"
   },
   "rustup": {
     "stable": "1.95.0"
@@ -122,7 +136,8 @@ test_bun_install_passes_version_pins() {
   # target binary to satisfy the post-install existence check.
   mkdir -p "$tmp/.bun/bin" && touch "$tmp/.bun/bin/clawhub" "$tmp/.bun/bin/qmd"
   if HOME="$tmp" run_pkg_script install-bun-packages.sh "$tmp" "$(command -v jq)" "$tmp/bin/bun" "$(command -v awk)" \
-    "$tmp/toolchain/node-gyp" "$tmp/toolchain/python3" "$tmp/toolchain/make" >"$tmp/out.txt" 2>&1; then
+    "$tmp/toolchain/node-gyp" "$tmp/toolchain/python3" "$tmp/toolchain/make" \
+    "$DESIRED_BUN" >"$tmp/out.txt" 2>&1; then
     assert_pass "install-bun-packages runs to completion"
   else
     assert_fail "install-bun-packages runs to completion" "exit code $?"
@@ -136,6 +151,55 @@ test_bun_install_passes_version_pins() {
   rm -rf "$tmp"
 }
 
+test_bun_install_honours_binary_override() {
+  local tmp
+  tmp="$(setup_fake_repo)"
+  stub_bun_tool "$tmp"
+  stub_node_gyp_toolchain "$tmp"
+  # @anthropic-ai/sandbox-runtime installs the 'srt' binary, not the unscoped
+  # package basename.  Pre-creating only srt proves the post-install check
+  # honours the declared override: without it the script would look for
+  # 'sandbox-runtime' and abort.
+  mkdir -p "$tmp/.bun/bin" && touch "$tmp/.bun/bin/srt"
+  if HOME="$tmp" run_pkg_script install-bun-packages.sh "$tmp" "$(command -v jq)" "$tmp/bin/bun" "$(command -v awk)" \
+    "$tmp/toolchain/node-gyp" "$tmp/toolchain/python3" "$tmp/toolchain/make" \
+    '[{"binary":"srt","name":"@anthropic-ai/sandbox-runtime"}]' >"$tmp/out.txt" 2>&1; then
+    assert_pass "install-bun-packages accepts a declared binary override"
+  else
+    assert_fail "install-bun-packages accepts a declared binary override" "exit code $? out: $(cat "$tmp/out.txt" 2>/dev/null)"
+  fi
+  if grep -qxF 'install -g --linker hoisted --ignore-scripts @anthropic-ai/sandbox-runtime' "$tmp/calls-bun.txt"; then
+    assert_pass "install-bun-packages installs the package named by the desired list"
+  else
+    assert_fail "install-bun-packages installs the package named by the desired list" "calls: $(cat "$tmp/calls-bun.txt" 2>/dev/null)"
+  fi
+  rm -f "$tmp/calls-bun.txt"
+  rm -rf "$tmp"
+}
+
+test_bun_install_rejects_malformed_desired_list() {
+  local tmp rc
+  tmp="$(setup_fake_repo)"
+  stub_bun_tool "$tmp"
+  stub_node_gyp_toolchain "$tmp"
+  mkdir -p "$tmp/.bun/bin" && touch "$tmp/.bun/bin/clawhub" "$tmp/.bun/bin/qmd"
+  rc=0
+  HOME="$tmp" run_pkg_script install-bun-packages.sh "$tmp" "$(command -v jq)" "$tmp/bin/bun" "$(command -v awk)" \
+    "$tmp/toolchain/node-gyp" "$tmp/toolchain/python3" "$tmp/toolchain/make" \
+    '{"clawhub":"0.20.0"}' >"$tmp/out.txt" 2>&1 || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    assert_pass "install-bun-packages hard-errors on an unparseable desired list"
+  else
+    assert_fail "install-bun-packages hard-errors on an unparseable desired list" "exit 0 with an object instead of an array"
+  fi
+  if grep -q "could not parse the desired bun package list" "$tmp/out.txt"; then
+    assert_pass "install-bun-packages names the unparseable desired list"
+  else
+    assert_fail "install-bun-packages names the unparseable desired list" "out: $(cat "$tmp/out.txt" 2>/dev/null)"
+  fi
+  rm -rf "$tmp"
+}
+
 test_uv_install_passes_version_pins() {
   local tmp
   tmp="$(setup_fake_repo)"
@@ -143,7 +207,7 @@ test_uv_install_passes_version_pins() {
   # uv tool list emits nothing -> both desired tools are fresh installs.
   if run_pkg_script install-uv-tools.sh "$tmp" \
     "$tmp/bin/uv" "$(command -v awk)" "$(command -v grep)" "$(command -v jq)" \
-    '{"paddleocr":"3.11"}' \
+    "$DESIRED_UV" \
     >"$tmp/out.txt" 2>&1; then
     assert_pass "install-uv-tools runs to completion"
   else
@@ -153,6 +217,28 @@ test_uv_install_passes_version_pins() {
     assert_pass "install-uv-tools pins paddleocr==3.6.0 from lockfile"
   else
     assert_fail "install-uv-tools pins paddleocr==3.6.0 from lockfile" "calls: $(cat "$tmp/calls-uv.txt" 2>/dev/null)"
+  fi
+  rm -f "$tmp/calls-uv.txt"
+  rm -rf "$tmp"
+}
+
+test_uv_install_applies_extras_suffix() {
+  local tmp
+  tmp="$(setup_fake_repo)"
+  stub_tool uv "$tmp"
+  # extras are applied as a pip-style suffix on the pinned distribution name.
+  if run_pkg_script install-uv-tools.sh "$tmp" \
+    "$tmp/bin/uv" "$(command -v awk)" "$(command -v grep)" "$(command -v jq)" \
+    '[{"extras":"proxy","name":"yamllint"}]' \
+    >"$tmp/out.txt" 2>&1; then
+    assert_pass "install-uv-tools runs to completion with an extras entry"
+  else
+    assert_fail "install-uv-tools runs to completion with an extras entry" "exit code $?"
+  fi
+  if grep -qxF 'tool install --no-build yamllint==1.35.1[proxy]' "$tmp/calls-uv.txt"; then
+    assert_pass "install-uv-tools appends the declared extras to the pinned spec"
+  else
+    assert_fail "install-uv-tools appends the declared extras to the pinned spec" "calls: $(cat "$tmp/calls-uv.txt" 2>/dev/null)"
   fi
   rm -f "$tmp/calls-uv.txt"
   rm -rf "$tmp"
@@ -184,7 +270,7 @@ test_cargo_binstall_passes_version_pins() {
   # cargo install --list emits nothing -> both desired crates are fresh installs.
   if run_pkg_script install-cargo-binstall-packages.sh "$tmp" \
     "$(command -v jq)" "$(command -v awk)" \
-    '["nickel-lang-lsp","pay-respects"]' \
+    "$DESIRED_CARGO_BINSTALL" \
     "$tmp/bin/cargo" \
     "$tmp/bin/cargo-binstall" >"$tmp/out.txt" 2>&1; then
     assert_pass "install-cargo-binstall-packages runs to completion"
@@ -205,6 +291,63 @@ test_cargo_binstall_passes_version_pins() {
   rm -rf "$tmp"
 }
 
+test_pi_install_keeps_npm_scheme_and_reads_settings() {
+  local tmp
+  tmp="$(setup_fake_repo)"
+  stub_tool pi "$tmp"
+  # pi's authoritative registry: settings.json lists pi-memory already at the
+  # pinned version, so only pi-subagents should be installed.  The install
+  # record mirrors settings.json so both sources agree.
+  mkdir -p "$tmp/.pi/agent/npm"
+  printf '%s' '{"packages":["npm:pi-memory@0.4.2"]}' >"$tmp/.pi/agent/settings.json"
+  printf '%s' '{"dependencies":{"pi-memory":"0.4.2"}}' >"$tmp/.pi/agent/npm/package.json"
+  if HOME="$tmp" run_pkg_script install-pi-packages.sh "$tmp" \
+    "$(command -v jq)" "$tmp/bin/pi" "$(command -v awk)" \
+    "$DESIRED_PI" >"$tmp/out.txt" 2>&1; then
+    assert_pass "install-pi-packages runs to completion"
+  else
+    assert_fail "install-pi-packages runs to completion" "exit code $? out: $(cat "$tmp/out.txt" 2>/dev/null)"
+  fi
+  if grep -qxF 'install npm:pi-subagents@0.66.0 --no-approve' "$tmp/calls-pi.txt"; then
+    assert_pass "install-pi-packages keeps the npm scheme on a pinned spec"
+  else
+    assert_fail "install-pi-packages keeps the npm scheme on a pinned spec" "calls: $(cat "$tmp/calls-pi.txt" 2>/dev/null)"
+  fi
+  if grep -q 'install npm:pi-memory' "$tmp/calls-pi.txt"; then
+    assert_fail "install-pi-packages skips a package already at the pinned version" "calls: $(cat "$tmp/calls-pi.txt" 2>/dev/null)"
+  else
+    assert_pass "install-pi-packages skips a package already at the pinned version"
+  fi
+  rm -f "$tmp/calls-pi.txt"
+  rm -rf "$tmp"
+}
+
+test_pi_install_hard_errors_on_failed_install() {
+  local tmp rc
+  tmp="$(setup_fake_repo)"
+  # A pi stub that always fails: convergence failure must abort the activation
+  # instead of silently retrying on the next apply.
+  printf '#!/usr/bin/env bash\nexit 1\n' >"$tmp/bin/pi"
+  chmod +x "$tmp/bin/pi"
+  mkdir -p "$tmp/.pi/agent/npm"
+  printf '%s' '{"packages":[]}' >"$tmp/.pi/agent/settings.json"
+  rc=0
+  HOME="$tmp" run_pkg_script install-pi-packages.sh "$tmp" \
+    "$(command -v jq)" "$tmp/bin/pi" "$(command -v awk)" \
+    '[{"name":"pi-subagents"}]' >"$tmp/out.txt" 2>&1 || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    assert_pass "install-pi-packages hard-errors when pi install fails"
+  else
+    assert_fail "install-pi-packages hard-errors when pi install fails" "exit 0 despite a failing pi install"
+  fi
+  if grep -q "install npm:pi-subagents@0.66.0' failed" "$tmp/out.txt"; then
+    assert_pass "install-pi-packages names the failed install spec"
+  else
+    assert_fail "install-pi-packages names the failed install spec" "out: $(cat "$tmp/out.txt" 2>/dev/null)"
+  fi
+  rm -rf "$tmp"
+}
+
 test_bun_lifecycle_allowlist() {
   local tmp
   tmp="$(setup_fake_repo)"
@@ -217,7 +360,8 @@ test_bun_lifecycle_allowlist() {
   # Pre-create binaries for the post-install existence check.
   mkdir -p "$tmp/.bun/bin" && touch "$tmp/.bun/bin/clawhub" "$tmp/.bun/bin/qmd"
   if HOME="$tmp" run_pkg_script install-bun-packages.sh "$tmp" "$(command -v jq)" "$tmp/bin/bun" "$(command -v awk)" \
-    "$tmp/toolchain/node-gyp" "$tmp/toolchain/python3" "$tmp/toolchain/make" >"$tmp/out.txt" 2>&1; then
+    "$tmp/toolchain/node-gyp" "$tmp/toolchain/python3" "$tmp/toolchain/make" \
+    "$DESIRED_BUN" >"$tmp/out.txt" 2>&1; then
     assert_pass "install-bun-packages runs to completion with lifecycle-allowlist"
   else
     assert_fail "install-bun-packages runs to completion with lifecycle-allowlist" "exit code $?"
@@ -245,7 +389,8 @@ test_bun_install_exports_node_gyp_toolchain() {
   stub_node_gyp_toolchain "$tmp"
   mkdir -p "$tmp/.bun/bin" && touch "$tmp/.bun/bin/clawhub" "$tmp/.bun/bin/qmd"
   if HOME="$tmp" run_pkg_script install-bun-packages.sh "$tmp" "$(command -v jq)" "$tmp/bin/bun" "$(command -v awk)" \
-    "$tmp/toolchain/node-gyp" "$tmp/toolchain/python3" "$tmp/toolchain/make" >"$tmp/out.txt" 2>&1; then
+    "$tmp/toolchain/node-gyp" "$tmp/toolchain/python3" "$tmp/toolchain/make" \
+    "$DESIRED_BUN" >"$tmp/out.txt" 2>&1; then
     assert_pass "install-bun-packages runs with the node-gyp toolchain"
   else
     assert_fail "install-bun-packages runs with the node-gyp toolchain" "exit code $?"
@@ -277,7 +422,8 @@ test_bun_install_hard_errors_without_toolchain() {
   mkdir -p "$tmp/.bun/bin" && touch "$tmp/.bun/bin/clawhub" "$tmp/.bun/bin/qmd"
   rc=0
   HOME="$tmp" run_pkg_script install-bun-packages.sh "$tmp" "$(command -v jq)" "$tmp/bin/bun" "$(command -v awk)" \
-    "$tmp/toolchain/node-gyp" "$tmp/toolchain/python3" "$tmp/toolchain/make" >"$tmp/out.txt" 2>&1 || rc=$?
+    "$tmp/toolchain/node-gyp" "$tmp/toolchain/python3" "$tmp/toolchain/make" \
+    "$DESIRED_BUN" >"$tmp/out.txt" 2>&1 || rc=$?
   if [ "$rc" -ne 0 ]; then
     assert_pass "install-bun-packages hard-errors when a node-gyp toolchain tool is missing"
   else
@@ -293,11 +439,16 @@ test_bun_install_hard_errors_without_toolchain() {
 
 section "install-packages" "lockfile pinning"
 test_bun_install_passes_version_pins
+test_bun_install_honours_binary_override
+test_bun_install_rejects_malformed_desired_list
 test_bun_install_exports_node_gyp_toolchain
 test_bun_install_hard_errors_without_toolchain
 test_bun_lifecycle_allowlist
 test_uv_install_passes_version_pins
+test_uv_install_applies_extras_suffix
 test_rustup_install_passes_channel_date
 test_cargo_binstall_passes_version_pins
+test_pi_install_keeps_npm_scheme_and_reads_settings
+test_pi_install_hard_errors_on_failed_install
 
 finish_tests

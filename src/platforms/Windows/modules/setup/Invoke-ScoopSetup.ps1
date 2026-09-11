@@ -27,6 +27,9 @@ function Invoke-ScoopSetup {
       - zig            — Zig compiler toolchain; build-time dependency for
                          source-built packages (Invoke-SourceBuild).
 
+    The desired set and the per-app rationale live in the shared registry
+    src/modules/packages/desired.json (scoop -> <host>).
+
   .EXAMPLE
     Invoke-ScoopSetup
 
@@ -39,7 +42,11 @@ function Invoke-ScoopSetup {
 
   # Derive repo root from script location (src/platforms/Windows/modules/setup/ -> repo root is 5 levels up).
   $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
-  $lockfilePath = Join-Path $repoRoot "lockfiles\lockfile.json"
+  $lockfilePath = Join-Path $repoRoot "src\lockfiles\lockfile.json"
+
+  # Get-NucleusHostKey resolves the canonical host key used to slice the shared
+  # desired-package registry.
+  . (Join-Path -Path $repoRoot -ChildPath "src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1")
 
   # Read version-pinning data from the consolidated lockfile.
   $lockfile = @{}
@@ -48,27 +55,21 @@ function Invoke-ScoopSetup {
   }
   $scoopVersions = if ($lockfile -and $lockfile.scoop) { $lockfile.scoop } else { @{} }
 
-  # Declarative desired-state list.  Add a package name here to install it;
-  # remove it to trigger uninstall on the next apply.  Use the exact Scoop
-  # app name.  Only add packages absent from WinGet.
-  $desiredPackages = @(
-    # Rust CLI install vehicle; absent from WinGet; Scoop main bucket is the
-    # correct install tier (winget > scoop > cargo binstall > cargo > bun > uv).
-    'cargo-binstall',
-    # Cross-platform pass reimplementation; Windows parity for pkgs.pass;
-    # absent from WinGet; Scoop main bucket.
-    'gopass',
-    # QCOW2 tooling and guest VM runner for Invoke-VMSetup; absent from
-    # WinGet; Scoop extras bucket.
-    'qemu',
-    # Temporary keyboard locker for cleaning; blocks all input while you
-    # wipe down the keyboard.  Press Ctrl+Break to unlock.
-    # Usage: run 'iwck' from any terminal.
-    'iwck',
-    # Zig compiler toolchain — build-time dependency for source-built
-    # packages (Invoke-SourceBuild).  Requires Scoop main bucket.
-    'zig'
-  )
+  # Declarative desired-state list from the shared registry (single source of
+  # truth: src/modules/packages/desired.json).  Only packages absent from
+  # WinGet are managed here.
+  $desiredPath = Join-Path $repoRoot "src\modules\packages\desired.json"
+  if (-not (Test-Path -LiteralPath $desiredPath)) {
+    Write-NucleusError -CommandName 'Invoke-ScoopSetup' "desired package registry not found at '$desiredPath'"
+    return
+  }
+  $hostKey = Get-NucleusHostKey
+  $hostDesired = (Get-Content -LiteralPath $desiredPath -Raw | ConvertFrom-Json).scoop.$hostKey
+  if ($null -eq $hostDesired) {
+    Write-NucleusError -CommandName 'Invoke-ScoopSetup' "desired package registry has no scoop list for host '$hostKey'"
+    return
+  }
+  $desiredPackages = @($hostDesired | ForEach-Object { $_.name })
 
   # Prepend the Scoop shims directory so 'scoop' is resolvable in this session.
   # DSC runs in a child process; PATH additions from that process do not

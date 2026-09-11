@@ -1,0 +1,318 @@
+{
+  "$id": "https://nucleus.local/packages/desired.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "bunEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "binary": {
+          "$ref": "#/definitions/binaryName",
+          "description": "Binary name installed by this package when it differs from the unscoped package basename (e.g. @anthropic-ai/sandbox-runtime installs 'srt')."
+        },
+        "name": {
+          "$ref": "#/definitions/packageName"
+        },
+        "why": {
+          "$ref": "#/definitions/why"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "bunHostMap": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/hostMap"
+        }
+      ],
+      "description": "Bun global packages per host.",
+      "properties": {
+        "MacBook": {
+          "items": {
+            "$ref": "#/definitions/bunEntry"
+          },
+          "type": "array"
+        },
+        "NixOS": {
+          "items": {
+            "$ref": "#/definitions/bunEntry"
+          },
+          "type": "array"
+        },
+        "Windows": {
+          "items": {
+            "$ref": "#/definitions/bunEntry"
+          },
+          "type": "array"
+        }
+      }
+    },
+    "cargoBinstallEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "binary": {
+          "$ref": "#/definitions/binaryName",
+          "description": "Executable placed in the cargo bin directory when it differs from the crate name (e.g. nickel-lang-lsp installs 'nls')."
+        },
+        "name": {
+          "$ref": "#/definitions/packageName",
+          "description": "Crate name as published on crates.io."
+        },
+        "why": {
+          "$ref": "#/definitions/why"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "cargoBinstallHostMap": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/hostMap"
+        }
+      ],
+      "description": "cargo-binstall crates per host.",
+      "properties": {
+        "MacBook": {
+          "items": {
+            "$ref": "#/definitions/cargoBinstallEntry"
+          },
+          "type": "array"
+        },
+        "NixOS": {
+          "items": {
+            "$ref": "#/definitions/cargoBinstallEntry"
+          },
+          "type": "array"
+        },
+        "Windows": {
+          "items": {
+            "$ref": "#/definitions/cargoBinstallEntry"
+          },
+          "type": "array"
+        }
+      }
+    },
+    "entryList": {
+      "type": "array"
+    },
+    "binaryName": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "hostMap": {
+      "additionalProperties": false,
+      "description": "Per-host desired lists. Every canonical host key is required so a host can never silently inherit another host's package set.",
+      "properties": {
+        "MacBook": {
+          "$ref": "#/definitions/entryList"
+        },
+        "NixOS": {
+          "$ref": "#/definitions/entryList"
+        },
+        "Windows": {
+          "$ref": "#/definitions/entryList"
+        }
+      },
+      "required": [
+        "MacBook",
+        "NixOS",
+        "Windows"
+      ],
+      "type": "object"
+    },
+    "packageName": {
+      "description": "Manager-native package identifier (npm specifier, crate name, PyPI project, or Scoop app name).",
+      "minLength": 1,
+      "type": "string"
+    },
+    "piEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/packageName",
+          "description": "npm package name installed into pi via `pi install npm:<name>@<pin>`."
+        },
+        "why": {
+          "$ref": "#/definitions/why"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "piHostMap": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/hostMap"
+        }
+      ],
+      "description": "pi coding-agent npm packages per host.",
+      "properties": {
+        "MacBook": {
+          "items": {
+            "$ref": "#/definitions/piEntry"
+          },
+          "type": "array"
+        },
+        "NixOS": {
+          "items": {
+            "$ref": "#/definitions/piEntry"
+          },
+          "type": "array"
+        },
+        "Windows": {
+          "items": {
+            "$ref": "#/definitions/piEntry"
+          },
+          "type": "array"
+        }
+      }
+    },
+    "scoopEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/packageName",
+          "description": "Scoop app name."
+        },
+        "why": {
+          "$ref": "#/definitions/why"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "scoopHostMap": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/hostMap"
+        }
+      ],
+      "description": "Scoop apps per host (Windows only; POSIX hosts declare empty lists).",
+      "properties": {
+        "MacBook": {
+          "items": {
+            "$ref": "#/definitions/scoopEntry"
+          },
+          "type": "array"
+        },
+        "NixOS": {
+          "items": {
+            "$ref": "#/definitions/scoopEntry"
+          },
+          "type": "array"
+        },
+        "Windows": {
+          "items": {
+            "$ref": "#/definitions/scoopEntry"
+          },
+          "type": "array"
+        }
+      }
+    },
+    "uvEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "extras": {
+          "description": "Extras applied as a pip-style suffix at install time (e.g. 'proxy' installs litellm[proxy]).",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        "name": {
+          "$ref": "#/definitions/packageName",
+          "description": "PyPI project name, without extras."
+        },
+        "pin": {
+          "description": "Version-pin source for this tool. Omit to pin from the lockfile uv section; 'flake:<node>' derives the version from that flake.lock node instead (used when flake.lock is the only authoritative record).",
+          "pattern": "^flake:[a-z][a-z0-9-]*$",
+          "type": "string"
+        },
+        "python": {
+          "description": "Interpreter request passed to `uv tool install --python` and `uv python install`. Named field so a version can never land in a positional slot of a different tool.",
+          "pattern": "^[0-9]+\\.[0-9]+$",
+          "type": "string"
+        },
+        "why": {
+          "$ref": "#/definitions/why"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "uvHostMap": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/hostMap"
+        }
+      ],
+      "description": "uv tools per host.",
+      "properties": {
+        "MacBook": {
+          "items": {
+            "$ref": "#/definitions/uvEntry"
+          },
+          "type": "array"
+        },
+        "NixOS": {
+          "items": {
+            "$ref": "#/definitions/uvEntry"
+          },
+          "type": "array"
+        },
+        "Windows": {
+          "items": {
+            "$ref": "#/definitions/uvEntry"
+          },
+          "type": "array"
+        }
+      }
+    },
+    "why": {
+      "description": "Rationale for managing this package here rather than through another install tier. Ignored by installers; kept so the reason travels with the data instead of the consumer.",
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "description": "Single source of truth for which packages each host installs through the non-nixpkgs package managers (bun, cargo-binstall, pi, scoop, uv). Version pins stay in lockfile.json (or flake.lock where a flake node is authoritative); installers must not carry their own lists.",
+  "properties": {
+    "$schema": {
+      "description": "Reference to the JSON Schema file that validates this data file.",
+      "type": "string"
+    },
+    "bun": {
+      "$ref": "#/definitions/bunHostMap"
+    },
+    "cargo-binstall": {
+      "$ref": "#/definitions/cargoBinstallHostMap"
+    },
+    "pi": {
+      "$ref": "#/definitions/piHostMap"
+    },
+    "scoop": {
+      "$ref": "#/definitions/scoopHostMap"
+    },
+    "uv": {
+      "$ref": "#/definitions/uvHostMap"
+    }
+  },
+  "required": [
+    "$schema",
+    "bun",
+    "cargo-binstall",
+    "pi",
+    "scoop",
+    "uv"
+  ],
+  "type": "object"
+}

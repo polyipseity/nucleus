@@ -38,7 +38,11 @@ function Invoke-CargoBinstallSetup {
 
   # Derive repo root from script location (src/platforms/Windows/modules/setup/ -> repo root is 5 levels up).
   $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
-  $lockfilePath = Join-Path $repoRoot "lockfiles\lockfile.json"
+  $lockfilePath = Join-Path $repoRoot "src\lockfiles\lockfile.json"
+
+  # Get-NucleusHostKey resolves the canonical host key used to slice the shared
+  # desired-package registry.
+  . (Join-Path -Path $repoRoot -ChildPath "src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1")
 
   # Read version-pinning data from the consolidated lockfile.
   $lockfile = @{}
@@ -47,30 +51,30 @@ function Invoke-CargoBinstallSetup {
   }
   $cargoBinstallVersions = if ($lockfile -and $lockfile.'cargo-binstall') { $lockfile.'cargo-binstall' } else { @{} }
 
-  # Structured desired-state list.  Each entry has a CrateName (published on
-  # crates.io) and a BinaryName (the executable placed in ~/.cargo/bin).
-  # The two may differ when a crate installs a binary under a different name
-  # (for example nickel-lang-lsp installs nls.exe, not nickel-lang-lsp.exe).
-  # Add an entry here to install it; remove it to trigger uninstall on the
-  # next apply.  Only add packages absent from both WinGet and Scoop.
-  $desiredPackages = @(
-    [pscustomobject]@{ CrateName = 'cargo-cache'; BinaryName = 'cargo-cache' }
-    # nickel-lang-lsp provides the nls (Nickel Language Server) binary required
-    # by the tweag.vscode-nickel VS Code extension for Nickel file editing.
-    # nls is not available in WinGet or Scoop; cargo-binstall downloads nls.exe
-    # from the nickel-lang GitHub release assets.
-    # Cross-platform parity: pkgs.nls in managedPackages on POSIX.
-    [pscustomobject]@{ CrateName = 'nickel-lang-lsp'; BinaryName = 'nls' }
-    # nix-index is managed on POSIX hosts (pkgs.nix-index in core.nix plus
-    # a LaunchAgent/systemd timer for periodic DB builds) but has no Windows
-    # equivalent and is not needed here.  pay-respects on Windows never
-    # attempts nix package lookup because `nix` is never in PATH; the
-    # nix-locate code path is simply never reached.
-    [pscustomobject]@{ CrateName = 'pay-respects'; BinaryName = 'pay-respects' }
-    # cargo-nextest — next-generation Rust test runner (cross-platform).
-    # Installed via cargo-binstall because no WinGet/Scoop package exists.
-    [pscustomobject]@{ CrateName = 'cargo-nextest'; BinaryName = 'cargo-nextest' }
-  )
+  # Structured desired-state list from the shared registry (single source of
+  # truth: src/modules/packages/desired.json).  Each entry yields a CrateName
+  # (published on crates.io) and a BinaryName (the executable placed in
+  # ~/.cargo/bin); the two differ when a crate installs a binary under a
+  # different name (for example nickel-lang-lsp installs nls.exe).  An entry
+  # without a "binary" field installs a binary named after the crate.
+  $desiredPath = Join-Path $repoRoot "src\modules\packages\desired.json"
+  if (-not (Test-Path -LiteralPath $desiredPath)) {
+    Write-NucleusError -CommandName 'Invoke-CargoBinstallSetup' "desired package registry not found at '$desiredPath'"
+    return
+  }
+  $hostKey = Get-NucleusHostKey
+  $hostDesired = (Get-Content -LiteralPath $desiredPath -Raw | ConvertFrom-Json).'cargo-binstall'.$hostKey
+  if ($null -eq $hostDesired) {
+    Write-NucleusError -CommandName 'Invoke-CargoBinstallSetup' "desired package registry has no cargo-binstall list for host '$hostKey'"
+    return
+  }
+  $desiredPackages = @($hostDesired | ForEach-Object {
+      $binaryName = if ($_.binary) { $_.binary } else { $_.name }
+      [pscustomobject]@{
+        CrateName  = $_.name
+        BinaryName = $binaryName
+      }
+    })
 
   # cargo-binstall and `cargo uninstall` both operate on this directory.
   # Canonical source: ManagedPaths.ps1 -> managed-paths.nix (pathComponents).

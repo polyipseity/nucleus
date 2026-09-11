@@ -15,18 +15,10 @@ function Invoke-BunSetup {
     here, following the repository preference hierarchy
     (nixpkgs/winget > scoop > cargo binstall > cargo > bun > uv).
 
-    Currently managed:
-      - @earendil-works/pi-coding-agent — coding agent CLI (pi); available in
-                                           nixpkgs on POSIX (pkgs.pi-coding-agent)
-                                         but has no WinGet, Scoop, or
-                                         cargo-binstall package on Windows
-      - clawhub                        — fetched skill install vehicle; absent
-                                         from WinGet, Scoop, and cargo-binstall;
-                                         bun is the only viable install tier
-      - @tobilu/qmd                    — on-device markdown search engine for
-                                         pi memory_search; absent from WinGet,
-                                         Scoop, cargo-binstall, and nixpkgs;
-                                         requires lifecycle scripts (postinstall)
+    The desired set and the per-package rationale live in the shared registry
+    src/modules/packages/desired.json (bun -> <host>); each entry may carry a
+    "binary" override naming the installed executable when it differs from the
+    unscoped package basename.
 
     Requires bun to be on PATH (installed from WinGet by system/packages.dsc.yml).
     Prepends %USERPROFILE%\.bun\bin to PATH internally so bun-installed
@@ -44,7 +36,11 @@ function Invoke-BunSetup {
 
   # Derive repo root from script location (src/platforms/Windows/modules/setup/ -> repo root is 5 levels up).
   $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
-  $lockfilePath = Join-Path $repoRoot "lockfiles\lockfile.json"
+  $lockfilePath = Join-Path $repoRoot "src\lockfiles\lockfile.json"
+
+  # Get-NucleusHostKey resolves the canonical host key used to slice the shared
+  # desired-package registry.
+  . (Join-Path -Path $repoRoot -ChildPath "src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1")
 
   # Read version-pinning data from the consolidated lockfile.
   $lockfile = @{}
@@ -53,33 +49,27 @@ function Invoke-BunSetup {
   }
   $bunVersions = if ($lockfile -and $lockfile.bun) { $lockfile.bun } else { @{} }
 
-  # Declarative desired-state list.  Add a package name here to install it;
-  # remove it to trigger uninstall on the next apply.  Use the exact npm
-  # package name (including scope if applicable).  Only add packages absent
-  # from WinGet, Scoop, and cargo-binstall.
-  $desiredPackages = @(
-    # sandbox-runtime: OS-level process sandboxing for coding agents.
-    # Available via pkgs.sandbox-runtime on POSIX but absent from WinGet,
-    # Scoop, and cargo-binstall on Windows.
-    '@anthropic-ai/sandbox-runtime',
-    # coding agent CLI; available via pkgs.pi-coding-agent on POSIX but absent
-    # from WinGet, Scoop, and cargo-binstall on Windows
-    '@earendil-works/pi-coding-agent',
-    # fetched skill install vehicle; absent from WinGet, Scoop, and
-    # cargo-binstall; bun is the only viable install tier on Windows
-    'clawhub',
-    # on-device markdown search engine for pi memory_search; absent from
-    # WinGet, Scoop, cargo-binstall, and nixpkgs; bun is the only viable
-    # install tier. Requires lifecycle scripts (postinstall) for native
-    # module compilation and GGUF model downloads.
-    '@tobilu/qmd'
-  )
-
-  # Package-to-binary name overrides for packages whose bun binary name
-  # differs from the unscoped package basename (e.g. @anthropic-ai/sandbox-runtime
-  # installs as 'srt', not 'sandbox-runtime').
-  $binaryNames = @{
-    '@anthropic-ai/sandbox-runtime' = 'srt'
+  # Declarative desired-state list from the shared registry (single source of
+  # truth: src/modules/packages/desired.json).  Entries are objects; an entry's
+  # "binary" names the installed executable when it differs from the unscoped
+  # package basename (e.g. @anthropic-ai/sandbox-runtime installs 'srt').
+  $desiredPath = Join-Path $repoRoot "src\modules\packages\desired.json"
+  if (-not (Test-Path -LiteralPath $desiredPath)) {
+    Write-NucleusError -CommandName 'Invoke-BunSetup' "desired package registry not found at '$desiredPath'"
+    return
+  }
+  $hostKey = Get-NucleusHostKey
+  $hostDesired = (Get-Content -LiteralPath $desiredPath -Raw | ConvertFrom-Json).bun.$hostKey
+  if ($null -eq $hostDesired) {
+    Write-NucleusError -CommandName 'Invoke-BunSetup' "desired package registry has no bun list for host '$hostKey'"
+    return
+  }
+  $desiredPackages = @($hostDesired | ForEach-Object { $_.name })
+  $binaryNames = @{}
+  foreach ($entry in $hostDesired) {
+    if ($entry.binary) {
+      $binaryNames[$entry.name] = $entry.binary
+    }
   }
 
   # bun install -g places binaries in ~\.bun\bin by default (BUN_INSTALL_BIN).

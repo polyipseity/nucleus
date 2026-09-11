@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Managed cargo-binstall package convergence (install + zap).
-# Consumes crate-description tokens at activation time.
+# Consumes the desired crate list from src/modules/packages/desired.json at
+# activation time; versions are pinned by the lockfile `cargo-binstall` section.
 #
 # Cargo resolution: uses nixpkgs cargo directly (store-path arg).
 # cargo-binstall is also supplied as a store-path arg (arg 5), not probed
@@ -50,10 +51,14 @@ fi
 PATH="$PATH:${_icp_cargo_bin%/*}"
 export PATH
 
-# Desired crates as JSON array of crate names, e.g. ["crate1","crate2"].
-# Empty array = no cargo-binstall-managed crates on this host.
+# Desired crates from src/modules/packages/desired.json: an array of
+# {"name": <crate>, "binary"?: <installed binary name>} objects.  An empty
+# array = no cargo-binstall-managed crates on this host.  The optional binary
+# name is consumed on Windows (Invoke-CargoBinstallSetup); POSIX converges on
+# the crate name alone.
 _icp_desired="$(mktemp)"
-printf '%s\n' "$_icp_desired_crates_json" | "$_icp_jq_bin" -r '.[]' >"$_icp_desired"
+# shellcheck disable=SC2016 # reason: jq program body must not be expanded by shell
+printf '%s\n' "$_icp_desired_crates_json" | "$_icp_jq_bin" -r '.[].name' >"$_icp_desired"
 
 # Get actually installed crates from `cargo install --list` (zap-style).
 # Output format: "crate-name vX.Y.Z:" on header lines; extract the

@@ -1,25 +1,64 @@
 # shellcheck shell=bash
 # Shared probe library for lockfile version enforcement.
 #
-# Provides the per-tool version probes (_lfe_check_*) and two entry points:
-#   - run_lockfile_enforcement  : used by the check step (16-lockfile-enforcement.sh);
-#                                 handles file presence / scope skipping and
-#                                 depends on check-lib.sh (skip_step, step_number).
-#   - verify_installed_versions : used by bump-lockfile --verify-installed;
+# Provides the per-tool version probes (_lfe_check_*) and one entry point:
+#   - verify_installed_versions : used by `update lockfile --verify-installed`;
 #                                 standalone (no check-lib dependency) — reads
 #                                 the lockfile, runs the pinned probes, always
 #                                 warns for suggestions, returns 1 on drift.
 #
-# Both entry points share the same probe logic so the check and the
-# verify-drift command never diverge.
+# Probes are scoped to the packages the current host actually manages, read
+# from the shared registry at src/modules/packages/desired.json.  A
+# Windows-only package must never be reported as drift on macOS (and vice
+# versa), so the desired set — not the lockfile section — decides what is
+# probed.
 #
 # Requires: say, warn, error (from lib.sh / check-lib.sh) and jq on PATH.
 
-# Compare installed bun global packages against the lockfile `bun` section.
+# Emit the package names this host manages, keyed by manager, from the shared
+# desired-package registry.  Fails loudly when the registry is unreadable: a
+# silent fallback would re-introduce cross-host false drift.
+_lfe_desired_names() {
+  local _host="$1" _jq="$2"
+  local _desired="src/modules/packages/desired.json"
+  if [ ! -f "$_desired" ]; then
+    error "desired package registry not found at $_desired"
+    return 1
+  fi
+  local _desired_data
+  if ! _desired_data="$(cat "$_desired")"; then
+    error "desired package registry could not be read: $_desired"
+    return 1
+  fi
+  # check-suppress:suppression_doc: jq parse failure on a malformed registry is reported as an error immediately below.
+  local _names
+  # shellcheck disable=SC2016 # reason: jq program body must not be expanded by shell
+  if ! _names="$(printf '%s' "$_desired_data" | "$_jq" -c --arg h "$_host" '
+      del(."$schema")
+      | with_entries(.value = ((.value[$h] // []) | map(.name)))
+    ')"; then
+    error "desired package registry is malformed: $_desired"
+    return 1
+  fi
+  printf '%s\n' "$_names"
+}
+
+# Emit the keys of one lockfile section that this host manages.  Empty output
+# means the host manages nothing in that section, so the probe has nothing to
+# check.
+_lfe_scoped_keys() {
+  local _lf="$1" _jq="$2" _section="$3" _desired="$4"
+  # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the section -- safe.
+  # shellcheck disable=SC2016 # reason: jq program body must not be expanded by shell
+  printf '%s' "$_lf" | "$_jq" -r --arg s "$_section" --argjson d "$_desired" \
+    '(.[$s] // {}) | keys[] as $k | select(($d[$s] // []) | index($k)) | $k' 2>/dev/null || return 0
+}
+
+# Compare installed bun global packages against the host's declared bun set.
 # String pins are version-checked; object (VCS/rev) pins are not
 # version-verifiable here and are skipped.  Returns 1 if any drift found.
 _lfe_check_bun() {
-  local _lf="$1" _jq="$2"
+  local _lf="$1" _jq="$2" _desired="$3"
   local _bun
   _bun="$(command -v bun || true)" # check-suppress:suppression_doc: command -v exits non-zero when the tool is absent; || true avoids set -e abort and the empty-string check below handles it
   [ -z "$_bun" ] && {
@@ -35,8 +74,7 @@ _lfe_check_bun() {
   # check-suppress:suppression_doc: malformed global package.json treats installed set as empty -- safe, drift is still reported below.
   _installed="$(cat "$_global_json" 2>/dev/null)" || true
   local _pkgs _pkg _pin _inst _rc=0
-  # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the section -- safe.
-  _pkgs="$(printf '%s' "$_lf" | "$_jq" -r '(.bun // {}) | keys[]' 2>/dev/null)" || return 0
+  _pkgs="$(_lfe_scoped_keys "$_lf" "$_jq" "bun" "$_desired")" || return 0
   while IFS= read -r _pkg; do
     [ -z "$_pkg" ] && continue
     # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
@@ -62,9 +100,9 @@ EOF
   return $_rc
 }
 
-# Compare installed uv tools against the lockfile `uv` section.
+# Compare installed uv tools against the host's declared uv set.
 _lfe_check_uv() {
-  local _lf="$1" _jq="$2"
+  local _lf="$1" _jq="$2" _desired="$3"
   local _uv
   _uv="$(command -v uv || true)" # check-suppress:suppression_doc: command -v exits non-zero when the tool is absent; || true avoids set -e abort and the empty-string check below handles it
   [ -z "$_uv" ] && {
@@ -79,8 +117,7 @@ _lfe_check_uv() {
     return 0
   }
   local _pkgs _tool _pin _inst _rc=0
-  # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the section -- safe.
-  _pkgs="$(printf '%s' "$_lf" | "$_jq" -r '(.uv // {}) | keys[]' 2>/dev/null)" || return 0
+  _pkgs="$(_lfe_scoped_keys "$_lf" "$_jq" "uv" "$_desired")" || return 0
   while IFS= read -r _tool; do
     [ -z "$_tool" ] && continue
     # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
@@ -103,9 +140,9 @@ EOF
   return $_rc
 }
 
-# Compare installed cargo-binstall crates against the lockfile `cargo-binstall` section.
+# Compare installed cargo-binstall crates against the host's declared crate set.
 _lfe_check_cargo_binstall() {
-  local _lf="$1" _jq="$2"
+  local _lf="$1" _jq="$2" _desired="$3"
   local _cargo
   _cargo="$(command -v cargo || true)" # check-suppress:suppression_doc: command -v exits non-zero when the tool is absent; || true avoids set -e abort and the empty-string check below handles it
   [ -z "$_cargo" ] && {
@@ -120,8 +157,7 @@ _lfe_check_cargo_binstall() {
     return 0
   }
   local _pkgs _crate _pin _inst _rc=0
-  # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the section -- safe.
-  _pkgs="$(printf '%s' "$_lf" | "$_jq" -r '(.["cargo-binstall"] // {}) | keys[]' 2>/dev/null)" || return 0
+  _pkgs="$(_lfe_scoped_keys "$_lf" "$_jq" "cargo-binstall" "$_desired")" || return 0
   while IFS= read -r _crate; do
     [ -z "$_crate" ] && continue
     # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
@@ -218,11 +254,19 @@ EOF
 }
 
 # Compare the Nix-store symlink against the lockfile cursor.superpowers pin.
-# The symlink at ~/.local/share/nucleus/plugins/superpowers points into /nix/store/
+# The symlink at <nucleusUserRoot>/plugins/superpowers points into /nix/store/
 # when the declarative builtins.fetchGit derivation has been evaluated.
+# WHY: the user root is host-specific — macOS uses
+# ~/Library/Application Support/nucleus, NixOS ~/.local/share/nucleus — so it is
+# read from NUCLEUS_USER_ROOT, exported by src/scripts/lib/lib.sh, which every
+# caller sources before loading this library.
 _lfe_check_superpowers() {
   local _lf="$1" _jq="$2"
-  local _plugin_dir="$HOME/.local/share/nucleus/plugins/superpowers"
+  if [ -z "${NUCLEUS_USER_ROOT:-}" ]; then
+    error "NUCLEUS_USER_ROOT is unset; cannot locate the superpowers plugin (source src/scripts/lib/lib.sh first)"
+    return 1
+  fi
+  local _plugin_dir="$NUCLEUS_USER_ROOT/plugins/superpowers"
   local _expected_rev _expected_source
   _expected_source="$(printf '%s' "$_lf" | "$_jq" -r '.cursor.superpowers.source // empty' 2>/dev/null)" || true # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
   _expected_rev="$(printf '%s' "$_lf" | "$_jq" -r '.cursor.superpowers.rev // empty' 2>/dev/null)" || true       # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
@@ -346,17 +390,21 @@ EOF
   return 0
 }
 
-# Shared core: given the lockfile data and a jq path, run the pinned probes
-# and always warn for suggestions.  Returns 1 if any pinned section has
-# version drift.  Does NOT depend on check-lib.sh (no skip_step / step_number),
-# so it is safe to call from both the check step and bump-lockfile.
+# Shared core: given the lockfile data, the host key and a jq path, run the
+# pinned probes scoped to the host's declared package set, and always warn for
+# suggestions.  Returns 1 if any pinned section has version drift.
 _lfe_run_core() {
-  local _lf_data="$1" _jq="$2"
+  local _lf_data="$1" _jq="$2" _host="$3"
   local _failures=0
 
-  _lfe_check_bun "$_lf_data" "$_jq" || _failures=$((_failures + 1))
-  _lfe_check_uv "$_lf_data" "$_jq" || _failures=$((_failures + 1))
-  _lfe_check_cargo_binstall "$_lf_data" "$_jq" || _failures=$((_failures + 1))
+  local _desired
+  if ! _desired="$(_lfe_desired_names "$_host" "$_jq")"; then
+    return 1
+  fi
+
+  _lfe_check_bun "$_lf_data" "$_jq" "$_desired" || _failures=$((_failures + 1))
+  _lfe_check_uv "$_lf_data" "$_jq" "$_desired" || _failures=$((_failures + 1))
+  _lfe_check_cargo_binstall "$_lf_data" "$_jq" "$_desired" || _failures=$((_failures + 1))
   _lfe_check_rustup "$_lf_data" "$_jq" || _failures=$((_failures + 1))
   _lfe_check_pwsh "$_lf_data" "$_jq" || _failures=$((_failures + 1))
   _lfe_check_superpowers "$_lf_data" "$_jq" || _failures=$((_failures + 1))
@@ -369,13 +417,18 @@ _lfe_run_core() {
   return "$_failures"
 }
 
-# Standalone entry point for bump-lockfile --verify-installed.  Reads the
-# lockfile, runs the pinned probes, always warns for suggestions, and returns
-# 1 if any pinned section has version drift.  Does NOT depend on check-lib.sh
-# (no skip_step / step_number), so it is safe to call from bump-lockfile.
+# Standalone entry point for `update lockfile --verify-installed`.  Reads the
+# lockfile, runs the pinned probes scoped to the host's declared package set,
+# always warns for suggestions, and returns 1 if any pinned section has version
+# drift.
 verify_installed_versions() {
-  local _repo_root="${1:-$PWD}"
+  local _repo_root="${1:-$PWD}" _host="${2:-}"
   cd "$_repo_root" || return 1
+
+  if [ -z "$_host" ]; then
+    error "verify_installed_versions: host key required — pass \$(resolve_nucleus_host)"
+    return 1
+  fi
 
   local _lockfile="src/lockfiles/lockfile.json"
   if [ ! -f "$_lockfile" ]; then
@@ -398,8 +451,8 @@ verify_installed_versions() {
     return 1
   fi
 
-  # Guard against set -e (bump-lockfile.sh) aborting on the non-zero count.
-  _lfe_run_core "$_lf_data" "$_jq" || _failures=$?
+  # Guard against set -e (update.sh) aborting on the non-zero count.
+  _lfe_run_core "$_lf_data" "$_jq" "$_host" || _failures=$?
   if [ "$_failures" -gt 0 ]; then
     error "lockfile verification found $_failures pinned section(s) with version drift"
     return 1

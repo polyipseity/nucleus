@@ -19,6 +19,7 @@
 # `src/users/default/srt/settings.json`, per-user overridable).
 {
   config,
+  hostName,
   lib,
   pkgs,
   repoRoot,
@@ -43,7 +44,17 @@ let
   # Read the consolidated lockfile so activation scripts can converge to
   # exact pins (closes the drift root cause).  Mirrors pwsh.nix.
   lockfile = builtins.fromJSON (builtins.readFile ../lockfiles/lockfile.json);
-  cargoBinstallDesired = builtins.attrNames (lockfile."cargo-binstall" or { });
+
+  # Declarative desired package sets, keyed by manager and host.  Every
+  # installer reads this file instead of carrying its own list, so a package
+  # cannot be installed on one host and silently forgotten on another.  A
+  # missing manager or host key is a hard error rather than an empty set -- an
+  # empty set would make the zap-style convergence prune installed packages.
+  packagesDesired = builtins.fromJSON (builtins.readFile ./packages/desired.json);
+  desiredFor =
+    manager:
+    packagesDesired.${manager}.${hostName}
+      or (throw "src/modules/packages/desired.json has no '${manager}' entry for host '${hostName}'");
 
   # Declarative superpowers fetch: evaluated at Nix build time, checked out
   # into the Nix store once.  Activation symlinks — no git, no network.
@@ -144,13 +155,8 @@ in
     #
     # Only packages absent from nixpkgs and cargo-binstall are managed here
     # (install preference: nixpkgs > cargo binstall > cargo > bun > uv).
-    #
-    # Currently managed:
-    #   clawhub — fetched skill install vehicle; absent from nixpkgs and
-    #             cargo-binstall; bun is the only viable install tier.
-    #   @tobilu/qmd — on-device markdown search engine for pi memory_search;
-    #                  absent from nixpkgs and cargo-binstall; requires
-    #                  lifecycle scripts (in lifecycle-allowlist).
+    # The desired set and the per-package binary-name overrides live in
+    # src/modules/packages/desired.json (bun, host-keyed).
     #
     # Why the node-gyp toolchain args: allowlisted packages run lifecycle
     # scripts, and bun rebuilds a native dependency through node-gyp when it
@@ -165,16 +171,18 @@ in
         "${pkgs.gawk}/bin/awk" \
         "${pkgs.node-gyp}/bin/node-gyp" \
         "${pkgs.python3}/bin/python3" \
-        "${pkgs.gnumake}/bin/make"
+        "${pkgs.gnumake}/bin/make" \
+        '${builtins.toJSON (desiredFor "bun")}'
     '';
 
     # -------------------------------------------------------------------------
     # install-pi-packages
     # Idempotently converges the declarative pi coding agent npm package set.
     #
-    # Reads desired packages from the lockfile `pi` section, compares against
-    # actually installed packages in ~/.pi/agent/npm/, installs missing or
-    # drifted packages, and removes undesired ones.
+    # Reads the desired packages from src/modules/packages/desired.json and
+    # the versions from the lockfile `pi` section, compares against actually
+    # installed packages in ~/.pi/agent/npm/, installs missing or drifted
+    # packages, and removes undesired ones.
     #
     # Why after install-bun-packages: logical grouping; pi binary is already
     # on PATH via nixpkgs, no hard dependency on bun.
@@ -183,7 +191,8 @@ in
       "${activationBundle}/src/scripts/packages/install-pi-packages.sh" \
         "${pkgs.jq}/bin/jq" \
         "${pkgs.pi-coding-agent}/bin/pi" \
-        "${pkgs.gawk}/bin/awk"
+        "${pkgs.gawk}/bin/awk" \
+        '${builtins.toJSON (desiredFor "pi")}'
     '';
 
     # -------------------------------------------------------------------------
@@ -193,7 +202,8 @@ in
     # Maintains a managed set of Python CLI tools installed via `uv tool install`.
     # On each apply it queries `uv tool list` for the actually installed set,
     # removes anything installed but absent from the desired list (zap-style),
-    # and installs any desired tools that are missing.
+    # and installs any desired tools that are missing.  The desired set lives in
+    # src/modules/packages/desired.json (uv, host-keyed).
     #
     # Only tools absent from nixpkgs, cargo-binstall, and bun are managed here
     # (install preference: nixpkgs > cargo binstall > cargo > bun > uv).
@@ -204,18 +214,7 @@ in
         "${pkgs.gawk}/bin/awk" \
         "${pkgs.gnugrep}/bin/grep" \
         "${pkgs.jq}/bin/jq" \
-        '${
-          builtins.toJSON {
-            # hermes-agent: NousResearch AI agent framework.  uv for Windows
-            # provisioning (macOS/NixOS use the Nix-provisioned package).
-            hermes-agent = "0.21.0";
-            # PaddleOCR: cross-platform OCR with GPU auto-detection.  uv for
-            # cross-host version consistency (nixpkgs v3.5.0, PyPI v3.6.0).
-            # Pinned to Python 3.11 because its dependency opencv-contrib-python
-            # cannot build on Python >=3.12 (distutils removed).
-            paddleocr = "3.11";
-          }
-        }'
+        '${builtins.toJSON (desiredFor "uv")}'
     '';
 
     # -------------------------------------------------------------------------
@@ -239,11 +238,11 @@ in
     # install-cargo-binstall-packages
     # Converges the declarative cargo-binstall package set (install + zap).
     #
-    # On POSIX hosts all packages that would otherwise require cargo-binstall
-    # are available in nixpkgs (e.g. pay-respects, cargo-cache), so the
-    # desired list is intentionally empty.  Any crate installed via
-    # `cargo install` or `cargo binstall` that is NOT in the desired list will
-    # be uninstalled (zap).
+    # The desired set lives in src/modules/packages/desired.json
+    # (cargo-binstall, host-keyed); versions come from the lockfile
+    # `cargo-binstall` section.  Any crate installed via `cargo install` or
+    # `cargo binstall` that is NOT in the desired list will be uninstalled
+    # (zap).
     #
     # Cargo resolution: uses nixpkgs cargo directly (store-path arg) for
     # list/uninstall operations.  Runtime path probing (~/.cargo/bin) is
@@ -260,7 +259,7 @@ in
       "${activationBundle}/src/scripts/packages/install-cargo-binstall-packages.sh" \
         "${pkgs.jq}/bin/jq" \
         "${pkgs.gawk}/bin/awk" \
-        '${builtins.toJSON cargoBinstallDesired}' \
+        '${builtins.toJSON (desiredFor "cargo-binstall")}' \
         "${pkgs.cargo}/bin/cargo" \
         "${pkgs.cargo-binstall}/bin/cargo-binstall"
     '';
