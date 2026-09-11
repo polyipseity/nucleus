@@ -98,5 +98,15 @@ finish_tests() {
   exit "$_status"
 }
 
+# require_command — Fail the suite when a provisioned prerequisite is missing.
+# Skip-guards are banned (tooling-and-validation.instructions.md): a missing tool
+# is a suite failure the tally has to record, not a silent pass. finish_tests
+# exits, so the call is terminal even from inside a function.
+require_command() { # <name> <reason>
+  command -v "$1" >/dev/null 2>&1 && return 0
+  assert_fail "prerequisite: $1" "$2"
+  finish_tests
+}
+
 # section — Print a section header to stdout (F3, mirrors lib.sh section()).
 section() { printf '\n%s=== [%s] %s ===%s\n' "$CYAN" "$1" "$2" "$NC"; }
