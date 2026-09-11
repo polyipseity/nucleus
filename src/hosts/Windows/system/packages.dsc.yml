@@ -690,3 +690,18 @@ properties:
       settings:
         id: EclipseAdoptium.Temurin.25.JDK
         source: winget
+
+    - resource: PSDscResources/Script
+      id: YamlLintInstall
+      directives:
+        description: >-
+          Install yamllint for cross-host YAML formatting parity with macOS and
+          NixOS. No WinGet ID exists; installed via uv tool install (user-scope
+          Python tool).
+      settings:
+        GetScript: |
+          return @{ Result = if (Get-Command yamllint -ErrorAction SilentlyContinue) { "Present" } else { "Absent" } }
+        TestScript: |
+          return [bool](Get-Command yamllint -ErrorAction SilentlyContinue)
+        SetScript: |
+          uv tool install yamllint
