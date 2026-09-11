@@ -716,6 +716,9 @@
               pkgs.findutils
               pkgs.git
               pkgs.powershell
+              # WHY: camilladsp-deviceselect parses YAML fixtures with python3, and the
+              # wrapper exports PATH so every spawned step and suite inherits it.
+              (pkgs.python3.withPackages (p: [ p.pyyaml ]))
               treefmtWrapper
             ];
           };
