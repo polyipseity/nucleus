@@ -192,7 +192,6 @@ let
     map (entry: entry.path) managedSymlinkPaths
     ++ [
       "${resolvedHomeDirectory}/.agents"
-      "${resolvedHomeDirectory}/.agents/skills"
       "${resolvedHomeDirectory}/.config/opencode"
       "${resolvedHomeDirectory}/.cursor"
       "${resolvedHomeDirectory}/.pi/agent/extensions"
