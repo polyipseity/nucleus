@@ -34,15 +34,17 @@ let
 
   lines = path: builtins.filter builtins.isString (builtins.split "\n" (builtins.readFile path));
 
-  # A lockfile path built with Join-Path is only valid when it names the src/
-  # segment or walks up with '..' first; anything else points at a path that
-  # does not exist.  Comments never call Join-Path, so help text is not matched.
+  # A lockfile path is only valid when it names the src/ segment or walks up
+  # with '..' first; anything else points at a path that does not exist.  Both
+  # Join-Path forms and bare string literals are covered: a module can also
+  # build the path by concatenation.  Comments never contain these forms with a
+  # path separator immediately before them, so help text stays out of scope.
   isOffender =
     path:
     builtins.any (
       line:
-      builtins.match ".*Join-Path.*lockfiles[\\\\/]lockfile[.]json.*" line != null
-      && builtins.match ".*(src[\\\\/]lockfiles|[.][.][\\\\/]).*" line == null
+      builtins.match ".*lockfiles[\\\\/]lockfile[.]json.*" line != null
+      && builtins.match ".*(src[\\\\/]lockfiles|[.][.][\\\\/]lockfiles).*" line == null
     ) (lines path);
 
   offenders = builtins.filter isOffender ps1Files;
@@ -52,10 +54,12 @@ let
   allTestsPass = offenders == [ ] && docsScanned > 20;
 in
 {
-  test_lockfile_paths_include_src = assert' (offenders == [ ])
-    "every Join-Path lockfile reference must include the src/ segment (offenders: ${builtins.concatStringsSep ", " (map toString offenders)})";
-  test_modules_scanned = assert' (docsScanned > 20)
-    "the scan must reach the Windows module tree (found ${toString docsScanned} .ps1 files)";
+  test_lockfile_paths_include_src =
+    assert' (offenders == [ ])
+      "every lockfile path reference must include the src/ segment or walk up with '..' (offenders: ${builtins.concatStringsSep ", " (map toString offenders)})";
+  test_modules_scanned = assert' (
+    docsScanned > 20
+  ) "the scan must reach the Windows module tree (found ${toString docsScanned} .ps1 files)";
 
   all_tests_pass = assert' allTestsPass "all Windows lockfile path invariants must hold";
   success = allTestsPass;
