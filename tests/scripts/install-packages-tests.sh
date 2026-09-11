@@ -350,6 +350,45 @@ test_pi_install_hard_errors_on_failed_install() {
   rm -rf "$tmp"
 }
 
+test_pi_install_emits_a_git_spec_for_a_revision_pin() {
+  local tmp rev
+  tmp="$(setup_fake_repo)"
+  stub_tool pi "$tmp"
+  stub_tool bun "$tmp"
+  rev="bba71027a684db53f3fcde5adbd3d42627241a83"
+  # A VCS-shaped pi pin.  pi's parser understands "git:<url>#<rev>" and treats
+  # "git+<url>#<rev>" as a local path, so the lockfile's git+ source prefix has
+  # to be stripped when the spec is emitted.
+  python3 -c "import json; p='$tmp/src/lockfiles/lockfile.json'; d=json.load(open(p)); d['pi']['pi-subagents']={'source':'git+https://github.com/example/pi-subagents','rev':'$rev'}; json.dump(d, open(p,'w'), indent=2)"
+  mkdir -p "$tmp/.pi/agent/npm"
+  printf '%s' '{"packages":[]}' >"$tmp/.pi/agent/settings.json"
+  if HOME="$tmp" run_pkg_script install-pi-packages.sh "$tmp" \
+    "$(command -v jq)" "$tmp/bin/pi" "$(command -v awk)" \
+    '[{"name":"pi-subagents"}]' "$tmp/bin" >"$tmp/out.txt" 2>&1; then
+    assert_pass "install-pi-packages runs with a revision pin"
+  else
+    assert_fail "install-pi-packages runs with a revision pin" "out: $(cat "$tmp/out.txt" 2>/dev/null)"
+  fi
+  if grep -qxF "install git:https://github.com/example/pi-subagents#$rev --no-approve" "$tmp/calls-pi.txt"; then
+    assert_pass "install-pi-packages emits pi's git: source form for a revision pin"
+  else
+    assert_fail "install-pi-packages emits pi's git: source form for a revision pin" "calls: $(cat "$tmp/calls-pi.txt" 2>/dev/null)"
+  fi
+  # Already installed at the pinned revision: the rev appears in the recorded
+  # dependency value, so a second apply must not reinstall.
+  rm -f "$tmp/calls-pi.txt"
+  printf '%s' "{\"dependencies\":{\"pi-subagents\":\"git+https://github.com/example/pi-subagents#$rev\"}}" >"$tmp/.pi/agent/npm/package.json"
+  HOME="$tmp" run_pkg_script install-pi-packages.sh "$tmp" \
+    "$(command -v jq)" "$tmp/bin/pi" "$(command -v awk)" \
+    '[{"name":"pi-subagents"}]' "$tmp/bin" >"$tmp/out2.txt" 2>&1 || true
+  if [ -f "$tmp/calls-pi.txt" ] && grep -q '^install ' "$tmp/calls-pi.txt"; then
+    assert_fail "install-pi-packages skips a revision pin already at the pinned rev" "calls: $(cat "$tmp/calls-pi.txt" 2>/dev/null)"
+  else
+    assert_pass "install-pi-packages skips a revision pin already at the pinned rev"
+  fi
+  rm -rf "$tmp"
+}
+
 test_pi_install_puts_bun_on_the_child_path() {
   local tmp bun_dir
   tmp="$(setup_fake_repo)"
@@ -499,5 +538,6 @@ test_cargo_binstall_passes_version_pins
 test_pi_install_keeps_npm_scheme_and_reads_settings
 test_pi_install_hard_errors_on_failed_install
 test_pi_install_puts_bun_on_the_child_path
+test_pi_install_emits_a_git_spec_for_a_revision_pin
 
 finish_tests

@@ -120,12 +120,14 @@ while IFS= read -r _ipp_pkg; do
   [ -z "$_ipp_pkg" ] && continue
   _ipp_lock_pin=""
   if [ -n "$_ipp_lockfile" ]; then
+    # The pin is tagged by kind: a string pin is a released version, an object
+    # pin is a repository revision (a git install has no comparable version).
     # check-suppress:suppression_doc: jq parse failure on a malformed lockfile treats the pin as absent -- safe because the package is then installed unpinned.
     # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
     _ipp_lock_pin="$("$_jq_bin" -r --arg p "$_ipp_pkg" '
       (.pi // {})[$p] as $e
-      | if ($e | type) == "string" then $e
-        elif ($e | type) == "object" and (($e.source // "") != "") and (($e.rev // "") != "") then $e.rev
+      | if ($e | type) == "string" then "version:\($e)"
+        elif ($e | type) == "object" and (($e.source // "") != "") and (($e.rev // "") != "") then "rev:\($e.rev)"
         else "" end
     ' "$_ipp_lockfile" 2>/dev/null)" || true
   fi
@@ -134,8 +136,22 @@ while IFS= read -r _ipp_pkg; do
   _ipp_needs_install=0
   if ! grep -qxF "$_ipp_pkg" "$_ipp_installed"; then
     _ipp_needs_install=1
-  elif [ -n "$_ipp_lock_pin" ] && [ "$_ipp_installed_version" != "$_ipp_lock_pin" ]; then
-    _ipp_needs_install=1
+  elif [ -n "$_ipp_lock_pin" ]; then
+    case "$_ipp_lock_pin" in
+    version:*)
+      if [ "${_ipp_lock_pin#version:}" != "$_ipp_installed_version" ]; then
+        _ipp_needs_install=1
+      fi
+      ;;
+    # A revision pin has no version to compare: pi records a git dependency,
+    # so the pinned revision must appear in the recorded value.
+    rev:*)
+      case "$_ipp_installed_version" in
+      *"${_ipp_lock_pin#rev:}"*) ;;
+      *) _ipp_needs_install=1 ;;
+      esac
+      ;;
+    esac
   fi
   [ "$_ipp_needs_install" -eq 1 ] && printf '%s\n' "$_ipp_pkg" >>"$_ipp_to_install"
 done <"$_ipp_desired"
@@ -154,12 +170,15 @@ while IFS= read -r _ipp_pkg; do
   [ -z "$_ipp_pkg" ] && continue
   _ipp_spec="npm:$_ipp_pkg"
   if [ -n "$_ipp_lockfile" ]; then
+    # A revision pin becomes pi's git source form: "git:<url>#<rev>".  pi's
+    # parser rejects "git+<url>" (it only understands "git:"), and a leading
+    # git+ in the lockfile source is stripped so the emitted spec stays valid.
     # check-suppress:suppression_doc: jq parse failure on a malformed lockfile falls back to unpinned install -- safe, the package still installs.
     # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
     _ipp_pin="$("$_jq_bin" -r --arg p "$_ipp_pkg" '
       (.pi // {})[$p] as $e
       | if ($e | type) == "string" then "npm:\($p)@\($e)"
-        elif ($e | type) == "object" and (($e.source // "") != "") and (($e.rev // "") != "") then "git+\($e.source)#\($e.rev)"
+        elif ($e | type) == "object" and (($e.source // "") != "") and (($e.rev // "") != "") then "git:\($e.source | sub("^git\\+"; ""))#\($e.rev)"
         else "" end
     ' "$_ipp_lockfile" 2>/dev/null)" || true
     [ -n "$_ipp_pin" ] && _ipp_spec="$_ipp_pin"
