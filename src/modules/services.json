@@ -354,6 +354,7 @@
     },
     "hosts": {
       "MacBook": {
+        "onDemand": true,
         "scope": "system",
         "service": "org.nixos.linux-builder",
         "type": "launchctl",
