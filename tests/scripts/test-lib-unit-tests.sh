@@ -100,6 +100,31 @@ test_all_consumers_end_with_finish_tests() {
   fi
 }
 
+# _stray_exits <file> — line numbers of `exit` statements that are not inside a
+# heredoc body. A mock stub's exit belongs to another process, so only an exit
+# outside a heredoc is the suite's own.
+_stray_exits() {
+  awk '
+    {
+      if (hd != "") {
+        line = $0
+        sub(/[[:space:]]+$/, "", line)
+        if (dash) sub(/^\t+/, "", line)
+        if (line == hd) { hd = "" }
+        next
+      }
+      if (match($0, /<<-?[[:space:]]*[\047"]?[A-Za-z_][A-Za-z0-9_]*[\047"]?/)) {
+        tok = substr($0, RSTART, RLENGTH)
+        dash = (tok ~ /^<<-/)
+        sub(/^<<-?[[:space:]]*[\047"]?/, "", tok)
+        sub(/[\047"]?$/, "", tok)
+        hd = tok
+      }
+      if ($0 ~ /^[[:space:]]*exit([[:space:]]|$)/) { print FNR }
+    }
+  ' "$1"
+}
+
 # A suite has to prove it reached its tally: the exit status alone cannot tell
 # "ran its assertions and passed" from "exited early" or "called finish_tests
 # from a branch it never reaches".
@@ -145,6 +170,38 @@ EOF
   rm -rf "$_dir"
 }
 
+# finish_tests is the only sanctioned exit: an exit that bypasses it fails the
+# suite without a tally, which the runner reports — but catching it here keeps a
+# suite that can never reach its tally from getting that far.
+test_no_consumer_exits_outside_a_heredoc() {
+  local _dir _file _hits _stray=""
+  _dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+  for _file in "$_dir"/*-tests.sh "$_dir"/*/*-tests.sh; do
+    [ -f "$_file" ] || continue
+    grep -qE '^[[:space:]]*\.[[:space:]].*test-lib\.sh' "$_file" || continue
+    _hits="$(_stray_exits "$_file" | tr '\n' ',')"
+    [ -z "$_hits" ] || _stray="$_stray $(basename "$_file"):$_hits"
+  done
+
+  # The checker has to flag a stray exit and ignore one inside a mock stub, or
+  # this assertion would pass by being blind.
+  local _fixture _selftest="ok"
+  _fixture="$(mktemp -d)"
+  printf 'exit 0\n' >"$_fixture/stray-tests.sh"
+  printf 'cat >f <<%s\n' STUBEOF >"$_fixture/stubbed-tests.sh"
+  printf 'exit 0\n' >>"$_fixture/stubbed-tests.sh"
+  printf '%s\n' STUBEOF >>"$_fixture/stubbed-tests.sh"
+  [ -n "$(_stray_exits "$_fixture/stray-tests.sh")" ] || _selftest="blind"
+  [ -z "$(_stray_exits "$_fixture/stubbed-tests.sh")" ] || _selftest="noisy"
+  rm -rf "$_fixture"
+
+  if [ "$_selftest" = ok ] && [ -z "$_stray" ]; then
+    assert_pass "no test-lib.sh consumer exits outside a heredoc"
+  else
+    assert_fail "no test-lib.sh consumer exits outside a heredoc" "checker=$_selftest stray:$_stray"
+  fi
+}
+
 # ---- Run tests ----
 section 1 "Phase 2: test-lib unit tests"
 echo ""
@@ -154,5 +211,6 @@ test_parse_args_no_unrecognized_flags
 test_test_lib_usage_no_skip_system_build
 test_all_consumers_end_with_finish_tests
 test_check_suite_tally_contract
+test_no_consumer_exits_outside_a_heredoc
 
 finish_tests
