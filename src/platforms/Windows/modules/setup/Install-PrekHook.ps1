@@ -9,6 +9,10 @@ function Install-PrekHook {
     nucleus checkout protected during the same provision run that installs or
     updates the prek binary.
 
+    A repository that opts into prek must not silently lose its hooks: when prek
+    cannot be resolved the function reports an error and throws rather than
+    skipping the installation.
+
     Install Git hooks for repositories that opt into prek via prek.toml
     during the Windows apply flow.
 
@@ -63,8 +67,8 @@ function Install-PrekHook {
     $resolvedPrekPath = Get-Command -Name "prek" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
   }
   if ([string]::IsNullOrWhiteSpace($resolvedPrekPath)) {
-    Write-NucleusWarning -CommandName prek "prek executable not found; skipping hook installation for $resolvedRepositoryRoot"
-    return
+    Write-NucleusError -CommandName prek "prek executable not found; cannot install the Git hooks declared by $prekConfigPath"
+    throw "Install-PrekHook: prek executable not found (looked for prek.exe and prek on PATH, and no -PrekExecutablePath was supplied)"
   }
 
   Push-Location -Path $resolvedRepositoryRoot

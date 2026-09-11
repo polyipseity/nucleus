@@ -16,10 +16,12 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $formatModule = Join-Path $repoRoot 'src/platforms/Windows/modules/Format-NucleusOutput.psm1'
 $syncMenuBar = Join-Path $repoRoot 'src/platforms/Windows/modules/user/Sync-MenuBar.ps1'
 $syncAutostart = Join-Path $repoRoot 'src/platforms/Windows/modules/user/Sync-AppAutostart.ps1'
+$installPrekHook = Join-Path $repoRoot 'src/platforms/Windows/modules/setup/Install-PrekHook.ps1'
 
 Import-Module $formatModule -Force
 . $syncMenuBar
 . $syncAutostart
+. $installPrekHook
 
 function Assert-Pass {
   param([string]$Name)
@@ -70,8 +72,32 @@ try {
   } else {
     Assert-Fail 'Sync-AppAutostart throws when' 'returned without throwing'
   }
+
+  # Install-PrekHook must hard-error when prek cannot be resolved: a repository
+  # that opts into prek must not silently lose its Git hooks.  PATH is narrowed
+  # to an empty directory so prek is unresolvable regardless of the host.
+  $prekRepo = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-acthard-prek-" + [guid]::NewGuid().ToString('N'))
+  $emptyPathDir = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-acthard-path-" + [guid]::NewGuid().ToString('N'))
+  $null = New-Item -ItemType Directory -Path $prekRepo -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+  $null = New-Item -ItemType Directory -Path $emptyPathDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+  $null = Set-Content -Path (Join-Path $prekRepo 'prek.toml') -Value 'fail_fast = true' -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
+  $savedPath = $env:PATH
+  $threw = $false
+  try {
+    $env:PATH = $emptyPathDir
+    Install-PrekHook -RepositoryRoot $prekRepo
+  } catch {
+    $threw = $true
+  } finally {
+    $env:PATH = $savedPath
+  }
+  if ($threw) {
+    Assert-Pass 'Install-PrekHook throws when prek cannot be resolved'
+  } else {
+    Assert-Fail 'Install-PrekHook throws when prek cannot be resolved' 'returned without throwing'
+  }
 } finally {
-  foreach ($r in @($menuBarRepo, $autostartRepo)) {
+  foreach ($r in @($menuBarRepo, $autostartRepo, $prekRepo, $emptyPathDir)) {
     if ($r -and (Test-Path -LiteralPath $r)) {
       # check-suppress:suppression_doc: cleanup in test teardown -- failure is acceptable
       Remove-Item -LiteralPath $r -Recurse -Force -ErrorAction SilentlyContinue
