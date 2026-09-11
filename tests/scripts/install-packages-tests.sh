@@ -295,6 +295,7 @@ test_pi_install_keeps_npm_scheme_and_reads_settings() {
   local tmp
   tmp="$(setup_fake_repo)"
   stub_tool pi "$tmp"
+  stub_tool bun "$tmp"
   # pi's authoritative registry: settings.json lists pi-memory already at the
   # pinned version, so only pi-subagents should be installed.  The install
   # record mirrors settings.json so both sources agree.
@@ -303,7 +304,7 @@ test_pi_install_keeps_npm_scheme_and_reads_settings() {
   printf '%s' '{"dependencies":{"pi-memory":"0.4.2"}}' >"$tmp/.pi/agent/npm/package.json"
   if HOME="$tmp" run_pkg_script install-pi-packages.sh "$tmp" \
     "$(command -v jq)" "$tmp/bin/pi" "$(command -v awk)" \
-    "$DESIRED_PI" >"$tmp/out.txt" 2>&1; then
+    "$DESIRED_PI" "$tmp/bin" >"$tmp/out.txt" 2>&1; then
     assert_pass "install-pi-packages runs to completion"
   else
     assert_fail "install-pi-packages runs to completion" "exit code $? out: $(cat "$tmp/out.txt" 2>/dev/null)"
@@ -325,6 +326,7 @@ test_pi_install_keeps_npm_scheme_and_reads_settings() {
 test_pi_install_hard_errors_on_failed_install() {
   local tmp rc
   tmp="$(setup_fake_repo)"
+  stub_tool bun "$tmp"
   # A pi stub that always fails: convergence failure must abort the activation
   # instead of silently retrying on the next apply.
   printf '#!/usr/bin/env bash\nexit 1\n' >"$tmp/bin/pi"
@@ -334,7 +336,7 @@ test_pi_install_hard_errors_on_failed_install() {
   rc=0
   HOME="$tmp" run_pkg_script install-pi-packages.sh "$tmp" \
     "$(command -v jq)" "$tmp/bin/pi" "$(command -v awk)" \
-    '[{"name":"pi-subagents"}]' >"$tmp/out.txt" 2>&1 || rc=$?
+    '[{"name":"pi-subagents"}]' "$tmp/bin" >"$tmp/out.txt" 2>&1 || rc=$?
   if [ "$rc" -ne 0 ]; then
     assert_pass "install-pi-packages hard-errors when pi install fails"
   else
@@ -344,6 +346,52 @@ test_pi_install_hard_errors_on_failed_install() {
     assert_pass "install-pi-packages names the failed install spec"
   else
     assert_fail "install-pi-packages names the failed install spec" "out: $(cat "$tmp/out.txt" 2>/dev/null)"
+  fi
+  rm -rf "$tmp"
+}
+
+test_pi_install_puts_bun_on_the_child_path() {
+  local tmp bun_dir
+  tmp="$(setup_fake_repo)"
+  # bun lives in a directory that is not a PATH entry of the harness, so the
+  # only way the pi child can resolve the bare command "bun" it spawns for
+  # npm: installs is the installer prepending its explicit bun argument.
+  bun_dir="$tmp/bun-only"
+  mkdir -p "$bun_dir/bin"
+  printf '#!/usr/bin/env bash\nexit 0\n' >"$bun_dir/bin/bun"
+  chmod +x "$bun_dir/bin/bun"
+  # pi records the bun it can resolve; an empty record is the spawn ENOENT
+  # failure this test guards against.
+  mkdir -p "$tmp/bin"
+  cat >"$tmp/bin/pi" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$CALLS_DIR/calls-pi.txt"
+printf 'resolved=%s\n' "$(command -v bun || true)" >> "$CALLS_DIR/calls-pi-bun.txt"
+exit 0
+EOF
+  chmod +x "$tmp/bin/pi"
+  mkdir -p "$tmp/.pi/agent/npm"
+  printf '%s' '{"packages":[]}' >"$tmp/.pi/agent/settings.json"
+  if HOME="$tmp" run_pkg_script install-pi-packages.sh "$tmp" \
+    "$(command -v jq)" "$tmp/bin/pi" "$(command -v awk)" \
+    '[{"name":"pi-subagents"}]' "$bun_dir/bin" >"$tmp/out.txt" 2>&1; then
+    assert_pass "install-pi-packages runs with bun only in the passed bin dir"
+  else
+    assert_fail "install-pi-packages runs with bun only in the passed bin dir" "out: $(cat "$tmp/out.txt" 2>/dev/null)"
+  fi
+  if grep -qxF "resolved=$bun_dir/bin/bun" "$tmp/calls-pi-bun.txt"; then
+    assert_pass "install-pi-packages puts the passed bun first on the child PATH"
+  else
+    assert_fail "install-pi-packages puts the passed bun first on the child PATH" "record: $(cat "$tmp/calls-pi-bun.txt" 2>/dev/null)"
+  fi
+  # Negative proof: an unusable bun must abort here instead of reaching pi,
+  # where it surfaces as an opaque spawn ENOENT.
+  if HOME="$tmp" run_pkg_script install-pi-packages.sh "$tmp" \
+    "$(command -v jq)" "$tmp/bin/pi" "$(command -v awk)" \
+    '[{"name":"pi-subagents"}]' "$tmp/absent" >"$tmp/out2.txt" 2>&1; then
+    assert_fail "install-pi-packages hard-errors on an unusable bun" "exit 0 without a runnable bun"
+  else
+    assert_pass "install-pi-packages hard-errors on an unusable bun"
   fi
   rm -rf "$tmp"
 }
@@ -450,5 +498,6 @@ test_rustup_install_passes_channel_date
 test_cargo_binstall_passes_version_pins
 test_pi_install_keeps_npm_scheme_and_reads_settings
 test_pi_install_hard_errors_on_failed_install
+test_pi_install_puts_bun_on_the_child_path
 
 finish_tests

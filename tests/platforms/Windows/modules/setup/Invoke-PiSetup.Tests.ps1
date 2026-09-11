@@ -46,8 +46,21 @@ Describe 'Invoke-PiSetup pi extension convergence' {
 
         $script:originalHome = $HOME
         $script:originalPath = $env:PATH
+
+        # bun shim: Invoke-PiSetup requires the interpreter to be resolvable,
+        # because pi spawns the bare command "bun" for npm: installs.
+        $script:bunDir = Join-Path $script:tempRoot 'bunbin'
+        $null = New-Item -ItemType Directory -Path $script:bunDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+        if ($IsWindows) {
+            $null = Set-Content -Path (Join-Path $script:bunDir 'bun.cmd') -Value "@echo off`r`nexit /b 0`r`n" -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
+        } else {
+            $bunShimPath = Join-Path $script:bunDir 'bun'
+            $null = Set-Content -Path $bunShimPath -Value "#!/bin/sh`nexit 0`n" -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
+            [System.IO.File]::SetUnixFileMode($bunShimPath, [System.IO.UnixFileMode]::UserRead -bor [System.IO.UnixFileMode]::UserWrite -bor [System.IO.UnixFileMode]::UserExecute)
+        }
+
         Set-Variable -Name HOME -Value $script:homeRoot -Force
-        $env:PATH = "$script:shimDir$([System.IO.Path]::PathSeparator)$env:PATH"
+        $env:PATH = "$script:bunDir$([System.IO.Path]::PathSeparator)$script:shimDir$([System.IO.Path]::PathSeparator)$env:PATH"
 
         function Initialize-PiSettingsRegistry {
             param([string[]]$Specs)
@@ -161,5 +174,38 @@ Describe 'Invoke-PiSetup pi extension convergence' {
         { Invoke-PiSetup } | Should -Throw -ExpectedMessage '*desired package registry not found*'
         # A hard error must not fall through to installing anything.
         @(Get-PiCallList | Where-Object { $_ -match '^(install|remove) ' }) | Should -BeNullOrEmpty
+    }
+
+    It 'puts the managed bun directory on PATH for the pi child' {
+        Clear-PiState
+        # The managed bin dir is not on PATH initially; the module must add it so
+        # the bare "bun" spawn pi performs stays resolvable in the child.
+        $managedBunDir = Get-NucleusManagedBinDir 'bun'
+        $managedPattern = [regex]::Escape($managedBunDir)
+        # Earlier cases already ran the converger, which appends the managed dir;
+        # scrub it so the assertion is about this run.
+        $separator = [System.IO.Path]::PathSeparator
+        $env:PATH = (@($env:PATH -split [regex]::Escape($separator) | Where-Object { -not $_.Contains($managedBunDir) }) -join $separator)
+        $env:PATH | Should -Not -Match $managedPattern
+        Invoke-PiSetup
+        $env:PATH | Should -Match $managedPattern
+        # bun must still be resolvable after the module ran; a missing one would
+        # make pi's installs fail with spawn ENOENT.
+        Get-Command bun -ErrorAction Stop | Should -Not -BeNullOrEmpty
+        @(Get-PiCallList | Where-Object { $_ -match '^install ' }).Count | Should -BeGreaterThan 0
+    }
+
+    It 'hard-errors when bun is not resolvable' {
+        Clear-PiState
+        $savedPath = $env:PATH
+        try {
+            # A PATH without any bun directory: pi's installs would fail with an
+            # opaque spawn ENOENT, so the module must fail loudly first.
+            $env:PATH = $script:shimDir
+            { Invoke-PiSetup } | Should -Throw -ExpectedMessage '*bun not found*'
+            @(Get-PiCallList | Where-Object { $_ -match '^(install|remove) ' }) | Should -BeNullOrEmpty
+        } finally {
+            $env:PATH = $savedPath
+        }
     }
 }

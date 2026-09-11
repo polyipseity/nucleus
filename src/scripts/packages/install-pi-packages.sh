@@ -7,7 +7,8 @@
 # unioned with the npm install record), installs missing or drifted packages,
 # and removes undesired ones.
 #
-# Args: $1 = jq bin, $2 = pi bin, $3 = awk bin, $4 = desired packages JSON
+# Args: $1 = jq bin, $2 = pi bin, $3 = awk bin, $4 = desired packages JSON,
+#       $5 = bun bin dir
 set -euo pipefail
 
 # SC2094 avoidance: trap-based cleanup eliminates read/write-same-file
@@ -31,15 +32,21 @@ _jq_bin="$1"
 _pi_bin="$2"
 _gawk_bin="$3"
 _ipp_desired_json="$4"
+_ipp_bun_bin="$5"
 
-# Add pi's directory to PATH so pi is callable and child processes
-# can find it.
+# Add pi's directory and bun's directory to PATH.  pi is the runner; bun is
+# required because pi spawns the bare command "bun" for every npm: install
+# (npmCommand in src/users/default/agents/pi-settings.json), so it must be
+# resolvable in the child environment, not merely callable by absolute path.
 _pi_bin_dir="$(dirname "$_pi_bin")"
-PATH="$_pi_bin_dir:$PATH"
+PATH="$_pi_bin_dir:$_ipp_bun_bin:$PATH"
 export PATH
 
 if [ ! -x "$_pi_bin" ]; then
   die -l pi "$_pi_bin not found in nix store; cannot install pi packages"
+fi
+if ! "$_ipp_bun_bin/bun" --version >/dev/null; then
+  die -l pi "$_ipp_bun_bin/bun is not runnable; pi spawns 'bun' for npm installs"
 fi
 
 # Read version pins from the consolidated lockfile so installs are

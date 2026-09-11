@@ -131,10 +131,20 @@ function Invoke-PiSetup {
   # installed nor removed twice.
   $installedPackages = @($installedPackages | Sort-Object -Unique)
 
-  # Canonical source: ManagedPaths.ps1 -> managed-paths.nix (pathComponents).
-  $bunBinDir = Get-NucleusManagedBinDir "bun"
-  if ($env:PATH -notlike "*$bunBinDir*") {
-    $env:PATH = "$env:PATH;$bunBinDir"
+  # pi spawns the bare command "bun" for every npm: install (npmCommand in
+  # src/users/default/agents/pi-settings.json), so bun's own directory must be
+  # on the child PATH — the managed bin dir only holds bun-installed binaries.
+  # check-suppress:suppression_doc: probe -- bun is provisioned by the WinGet DSC baseline; absence is reported below.
+  $bunCommand = Get-Command bun -ErrorAction SilentlyContinue | Select-Object -First 1
+  if (-not $bunCommand) {
+    $errMessage = "bun not found on PATH; ensure Oven-sh.Bun was installed before this step"
+    Write-NucleusError -CommandName 'pi-setup' $errMessage
+    throw "Invoke-PiSetup: $errMessage"
+  }
+  foreach ($bunDir in @((Split-Path -Parent $bunCommand.Source), (Get-NucleusManagedBinDir "bun"))) {
+    if ($env:PATH -notlike "*$bunDir*") {
+      $env:PATH = "$env:PATH;$bunDir"
+    }
   }
 
   # check-suppress:suppression_doc: probe -- pi may not be installed; the if-guard reports the error below.

@@ -184,15 +184,18 @@ in
     # installed packages in ~/.pi/agent/npm/, installs missing or drifted
     # packages, and removes undesired ones.
     #
-    # Why after install-bun-packages: logical grouping; pi binary is already
-    # on PATH via nixpkgs, no hard dependency on bun.
+    # Why after install-bun-packages: logical grouping.  bun is passed
+    # explicitly because pi spawns the bare command "bun" for every npm:
+    # install (npmCommand in src/users/default/agents/pi-settings.json), so
+    # bun's directory must be on the child PATH, not only callable by path.
     # -------------------------------------------------------------------------
     install-pi-packages = lib.hm.dag.entryAfter [ "install-bun-packages" ] ''
       "${activationBundle}/src/scripts/packages/install-pi-packages.sh" \
         "${pkgs.jq}/bin/jq" \
         "${pkgs.pi-coding-agent}/bin/pi" \
         "${pkgs.gawk}/bin/awk" \
-        '${builtins.toJSON (desiredFor "pi")}'
+        '${builtins.toJSON (desiredFor "pi")}' \
+        "${pkgs.bun}/bin"
     '';
 
     # -------------------------------------------------------------------------
