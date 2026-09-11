@@ -162,12 +162,7 @@
         }
       ]
     },
-    "opencode": {
-      "superpowers": {
-        "rev": "b36e0829c6d0140e93cfef2ca599b1b07d4a7797",
-        "source": "https://github.com/obra/superpowers.git"
-      }
-    },
+    "opencode": {},
     "vm-setup": {
       "windows": {}
     },
