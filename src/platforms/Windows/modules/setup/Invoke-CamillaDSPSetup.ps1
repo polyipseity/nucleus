@@ -19,17 +19,14 @@ function Invoke-CamillaDSPSetup {
     Exit codes: 0 on success; non-zero on failure.
   #>
   [CmdletBinding()]
-  param(
-    [Parameter(Mandatory = $false)]
-
-  )
+  param()
 
   $installDir = Join-Path $HOME ".local\bin"
   $binaryPath = Join-Path $installDir "camilladsp.exe"
 
   # Derive repo root from script location (src/platforms/Windows/modules/setup/ -> repo root is 5 levels up).
   $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
-  $lockfilePath = Join-Path $repoRoot "lockfiles\lockfile.json"
+  $lockfilePath = Join-Path $repoRoot "src\lockfiles\lockfile.json"
 
   # Read version-pinning data from the consolidated lockfile.
   $lockfile = @{}

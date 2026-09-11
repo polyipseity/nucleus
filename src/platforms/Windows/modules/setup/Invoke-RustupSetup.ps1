@@ -39,7 +39,7 @@ function Invoke-RustupSetup {
     $User = $env:USERNAME
   }
 
-  $lockfilePath = Join-Path $RepoRoot "lockfiles\lockfile.json"
+  $lockfilePath = Join-Path $RepoRoot "src\lockfiles\lockfile.json"
 
   # Read version-pinning data from the consolidated lockfile.
   $lockfile = @{}

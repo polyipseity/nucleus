@@ -35,7 +35,7 @@ function Invoke-SourceBuild {
 
   # Derive repo root from script location (src/platforms/Windows/modules/setup/ -> repo root is 5 levels up).
   $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
-  $lockfilePath = Join-Path $repoRoot "lockfiles\lockfile.json"
+  $lockfilePath = Join-Path $repoRoot "src\lockfiles\lockfile.json"
   $registryPath = Resolve-Path "$PSScriptRoot\..\source-builds.json"
 
   # Install root for source-built packages.

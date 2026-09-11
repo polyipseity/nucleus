@@ -52,7 +52,7 @@ function Sync-CursorExtensions {
 
   # Derive repo root from script location (src/platforms/Windows/modules/editors/ -> repo root is 5 levels up).
   $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
-  $lockfilePath = Join-Path $repoRoot "lockfiles\lockfile.json"
+  $lockfilePath = Join-Path $repoRoot "src\lockfiles\lockfile.json"
 
   # Read version-pinning data from the consolidated lockfile.
   $lockfile = @{}
