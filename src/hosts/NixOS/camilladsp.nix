@@ -47,8 +47,10 @@ in
       "network-online.target"
       "sound.target"
     ];
+    # Only the state dir is prepared: the daemon's output goes to journald, so there is
+    # no file capture target to create.
     preStart = ''
-      mkdir -p '%h/.local/share/nucleus/logs/camilladsp' '%h/.local/state/camilladsp'
+      mkdir -p '%h/.local/state/camilladsp'
     '';
     serviceConfig = {
       Type = "simple";
