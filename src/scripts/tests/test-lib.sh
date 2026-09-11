@@ -150,6 +150,11 @@ preflight_check() {
   require_command xargs
   require_command jq
   require_command check-jsonschema
+  # WHY: camilladsp-deviceselect parses YAML fixtures, so declaring it here fails the
+  # pipeline once, up front, instead of as one suite among many in step 05. The module
+  # probe is a second line because require_command tests command presence only.
+  require_command python3
+  python3 -c 'import yaml' >/dev/null 2>&1 || die "python3 cannot import yaml"
 }
 
 usage() {
