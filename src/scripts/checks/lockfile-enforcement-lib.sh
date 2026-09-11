@@ -128,13 +128,14 @@ _lfe_check_uv() {
     # resolved commit for the install (PEP 610), so verify that instead of
     # silently skipping the tool.
     if [ "${_pin%"${_pin#?}"}" = '{' ]; then
-      # check-suppress:suppression_doc: jq parse failure on a malformed lockfile pin skips the revision -- drift is reported below when the revision cannot be read.
       # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
+      # check-suppress:suppression_doc: jq parse failure on a malformed lockfile pin skips the revision -- drift is reported below when the revision cannot be read.
       _rev="$(printf '%s' "$_pin" | "$_jq" -r '.rev // empty' 2>/dev/null)" || true
       if [ -z "$_rev" ]; then
         error "uv.$_tool: pin has no rev; cannot verify the installed revision" || _rc=1
         continue
       fi
+      # check-suppress:suppression_doc: _lfe_uv_installed_commit returns 1 when no PEP 610 record exists; caller reports missing install record as drift
       _commit="$(_lfe_uv_installed_commit "$_tool" "$_jq")" || true
       if [ -z "$_commit" ]; then
         error "uv.$_tool: expected revision $_rev, no install record" || _rc=1
@@ -162,6 +163,7 @@ _lfe_uv_installed_commit() {
   local _tool="$1" _jq="$2"
   local _root="${UV_TOOL_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/uv/tools}/$_tool"
   local _record=""
+  # check-suppress:suppression_doc: find returns non-zero when tool directory absent or no direct_url.json; empty-string check below handles not-found
   _record="$(find "$_root" -name direct_url.json -type f -print 2>/dev/null | head -1)" || true
   [ -n "$_record" ] || return 1
   # check-suppress:suppression_doc: malformed PEP 610 record yields no commit -- the caller reports the drift.

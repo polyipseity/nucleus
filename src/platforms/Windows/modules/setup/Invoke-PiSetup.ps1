@@ -86,7 +86,7 @@ function Invoke-PiSetup {
   }
 
   # Installed set: pi's settings.json registry (authoritative record of what pi
-  # manages) unioned with the physical npm install record.  A directory listing
+  # manages) unioned with the npm-install record.  A directory listing
   # is not a valid source — the npm tree also contains node_modules.
   $settingsPath = Join-Path $HOME ".pi\agent\settings.json"
   $installRecordPath = Join-Path $HOME ".pi\agent\npm\package.json"
