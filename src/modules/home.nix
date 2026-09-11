@@ -180,6 +180,38 @@ let
   ];
   managedSymlinkPathsJson = builtins.toJSON managedSymlinkPaths;
 
+  # Deployed candidate list for check step 19 (method-1 links must resolve into the
+  # LIVE repo root). Generated here instead of restated inside the check step, whose
+  # hand-maintained array had already drifted from the deployed set and covered none
+  # of the trees that held the 17 stale links. Directory entries are walked one level
+  # by the step; file entries are inspected directly. The VS Code channel directories
+  # mirror editors.nix's stableBaseDir / insidersBaseDir split, which is spelled with
+  # a literal `$HOME` there and so cannot be reused verbatim as an absolute entry.
+  method1ManifestPaths =
+    map (entry: entry.path) managedSymlinkPaths
+    ++ [
+      "${resolvedHomeDirectory}/.agents"
+      "${resolvedHomeDirectory}/.agents/skills"
+      "${resolvedHomeDirectory}/.config/opencode"
+      "${resolvedHomeDirectory}/.cursor"
+      "${resolvedHomeDirectory}/.pi/agent/extensions"
+      "${resolvedHomeDirectory}/.pi/agent/settings.json"
+      "${resolvedHomeDirectory}/data"
+      nucleusUserRoot
+    ]
+    ++ (
+      if pkgs.stdenv.hostPlatform.isDarwin then
+        [
+          "${resolvedHomeDirectory}/Library/Application Support/Code/User"
+          "${resolvedHomeDirectory}/Library/Application Support/Code - Insiders/User"
+        ]
+      else
+        [
+          "${resolvedHomeDirectory}/.config/Code/User"
+          "${resolvedHomeDirectory}/.config/Code - Insiders/User"
+        ]
+    );
+
   # Picard baseline defaults are sourced from the canonical native INI file.
   # We apply these defaults with merge-overwrite semantics.
   # check-suppress:config-method: method 3 (merge) -- Picard INI defaults are merged with user overrides.
@@ -448,6 +480,16 @@ in
         ''
           "${activationBundle}/src/scripts/configs/manage-out-of-store-symlinks.sh" "verify" "home.nix" '${managedSymlinkPathsJson}' "${pkgs.jq}/bin/jq"
         '';
+
+    # Publish the step-19 candidate manifest. An activation artifact rather than a
+    # home.file entry: the audited nucleus root then holds a plain file instead of a
+    # store symlink, and the path has exactly one Nix-side literal.
+    home.activation.write-method1-symlink-manifest = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      "${activationBundle}/src/scripts/configs/write-method1-symlink-manifest.sh" \
+        "${nucleusUserRoot}/method1-symlink-manifest.txt" \
+        '${builtins.toJSON method1ManifestPaths}' \
+        "${pkgs.jq}/bin/jq"
+    '';
 
     # Override the default logDir (which uses ~) with a proper absolute path.
     # The launchd StandardErrorPath/StandardOutPath option types require an

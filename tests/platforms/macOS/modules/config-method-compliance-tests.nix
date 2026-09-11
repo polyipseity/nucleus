@@ -21,7 +21,7 @@ let
   macbookSecurityText = builtins.readFile ../../../../src/hosts/MacBook/security.nix;
   nixosServicesText = builtins.readFile ../../../../src/hosts/NixOS/services.nix;
   # Config definition files
-  qtpassText = builtins.readFile ../../../../src/modules/configs/qtpass/qtpass.nix;
+  qtpassText = builtins.readFile ../../../../src/modules/configs/qtpass/default.nix;
 in
 # Verify method comments exist on all consumer files.
 # method 1 (writable symlink) consumers:
@@ -124,6 +124,16 @@ assert
 assert !(containsRegex "mkOutOfStoreSymlink" shellText);
 assert !(containsRegex "mkOutOfStoreSymlink" pwshText);
 assert !(containsRegex "mkOutOfStoreSymlink" nixosServicesText);
+# Check step 19 audits the deployed manifest instead of a list restated inside the
+# step. The manifest must stay driven by managedSymlinkPaths plus the overlay
+# roots, so the check cannot drift from the deployment again.
+assert containsRegex "method1ManifestPaths = " homeText;
+assert containsRegex "write-method1-symlink-manifest" homeText;
+assert containsRegex "method1-symlink-manifest\.txt" homeText;
+assert
+  !(containsRegex "_candidates=\\(" (
+    builtins.readFile ../../../../src/scripts/checks/check-steps/19-method1-symlink-resolution.sh
+  ));
 {
   success = true;
   message = "Config method compliance tests passed";
