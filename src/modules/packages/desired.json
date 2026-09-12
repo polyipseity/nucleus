@@ -107,6 +107,12 @@
         "name": "@narumitw/pi-plan-mode"
       },
       {
+        "name": "@narumitw/pi-usage"
+      },
+      {
+        "name": "better-custom"
+      },
+      {
         "name": "pi-background-tasks"
       },
       {
@@ -117,6 +123,9 @@
       },
       {
         "name": "pi-memory"
+      },
+      {
+        "name": "pi-provider-litellm"
       },
       {
         "name": "pi-powerline-footer"
@@ -139,6 +148,12 @@
         "name": "@narumitw/pi-plan-mode"
       },
       {
+        "name": "@narumitw/pi-usage"
+      },
+      {
+        "name": "better-custom"
+      },
+      {
         "name": "pi-background-tasks"
       },
       {
@@ -149,6 +164,9 @@
       },
       {
         "name": "pi-memory"
+      },
+      {
+        "name": "pi-provider-litellm"
       },
       {
         "name": "pi-powerline-footer"
@@ -171,6 +189,12 @@
         "name": "@narumitw/pi-plan-mode"
       },
       {
+        "name": "@narumitw/pi-usage"
+      },
+      {
+        "name": "better-custom"
+      },
+      {
         "name": "pi-background-tasks"
       },
       {
@@ -181,6 +205,9 @@
       },
       {
         "name": "pi-memory"
+      },
+      {
+        "name": "pi-provider-litellm"
       },
       {
         "name": "pi-powerline-footer"
