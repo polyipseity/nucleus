@@ -361,26 +361,12 @@ run_embedded_content_enforcement() {
   return 0
 }
 
-_strip_prompt_frontmatter() {
-  awk 'BEGIN{fm=0} /^---$/ {fm++; if (fm == 1) next; if (fm == 2) {fm = 3; next}} fm == 1 || fm == 2 {next} {print}' "$1"
-}
-
 run_agents_policy() {
   local _repo_root="$2"
   cd "$_repo_root" || return 1
   local _agents_errors=0
 
-  local _repo_commit_staged=".agents/prompts/commit-staged.prompt.md"
-  local _user_commit_staged="src/users/default/agents/prompts/commit-staged.prompt.md"
-  local _repo_body _user_body
-  _repo_body=$(_strip_prompt_frontmatter "$_repo_commit_staged")
-  _user_body=$(_strip_prompt_frontmatter "$_user_commit_staged")
-  if [ "$_repo_body" != "$_user_body" ]; then
-    _agents_errors=$((_agents_errors + 1))
-    error "commit-staged.prompt.md body mismatch between repo and user overlay"
-  else
-    say "commit-staged prompt bodies match."
-  fi
+  # Commit-staged body match moved to test suite (14-agents-policy-tests.sh)
 
   local _instr
   while IFS= read -r -d '' _instr; do

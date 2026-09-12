@@ -321,34 +321,7 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
 
   Write-Message "--- agents policy ---"
 
-  $repoCommitStaged = Join-Path $r '.agents\prompts\commit-staged.prompt.md'
-  $userCommitStaged = Join-Path $r 'src\users\default\agents\prompts\commit-staged.prompt.md'
-  function Get-PromptBodyWithoutFrontmatter {
-    param([string]$Path)
-    $lines = Get-Content -LiteralPath $Path
-    $inFrontmatter = $false
-    $frontmatterCount = 0
-    $body = [System.Collections.Generic.List[string]]::new()
-    foreach ($line in $lines) {
-      if ($line -eq '---') {
-        $frontmatterCount++
-        if ($frontmatterCount -eq 1) { $inFrontmatter = $true; continue }
-        if ($frontmatterCount -eq 2) { $inFrontmatter = $false; continue }
-      }
-      if (-not $inFrontmatter -and $frontmatterCount -ge 2) {
-        $body.Add($line)
-      }
-    }
-    return ($body -join "`n")
-  }
-  $repoBody = Get-PromptBodyWithoutFrontmatter -Path $repoCommitStaged
-  $userBody = Get-PromptBodyWithoutFrontmatter -Path $userCommitStaged
-  if ($repoBody -ne $userBody) {
-    Write-ErrorMessage 'commit-staged.prompt.md body mismatch between repo and user overlay'
-    $failed = $true
-  } else {
-    Write-Message 'commit-staged prompt bodies match.'
-  }
+  # Commit-staged body match moved to test suite (14-agents-policy-tests.sh)
 
   $instructionFiles = Get-ChildItem -Path (Join-Path $r '.agents\instructions') -Filter '*.instructions.md' -File
   foreach ($instr in $instructionFiles) {
