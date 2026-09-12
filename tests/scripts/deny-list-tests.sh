@@ -14,11 +14,6 @@ NUCLEUS_REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 # shellcheck source=../../src/scripts/lib/deny-list.sh
 . "$NUCLEUS_REPO_ROOT/src/scripts/lib/deny-list.sh"
 
-# Helper: run filter_gitignored with input lines and capture output.
-_filter_test() {
-  printf '%s\n' "$@" | filter_gitignored
-}
-
 # Test 1: filter_gitignored with a known ignored path (result/ is in .gitignore)
 test_filter_ignored_path() {
   local result

@@ -22,6 +22,7 @@ readonly JQ_BIN
 
 # The script sets immutable flags (uchg on macOS, chattr +i on Linux) on the
 # symlinks it creates, so plain rm -rf fails on macOS. Clear the flags first.
+# shellcheck disable=SC2329 # reason: invoked via trap RETURN, not directly
 cleanup_tree() {
   local dir="$1"
   [ -d "$dir" ] || return 0

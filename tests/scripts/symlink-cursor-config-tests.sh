@@ -17,6 +17,7 @@ readonly SYMLINK_CURSOR_CONFIG
 test_ide_settings_symlink_and_overlay_skip() {
   local ide_user_dir expected_ide_settings
   _scc_test_home="$(mktemp -d)"
+  # shellcheck disable=SC2329 # reason: invoked via trap RETURN, not directly
   cleanup() {
     [ -d "$_scc_test_home" ] || return 0
     if [ "$(uname -s)" = "Darwin" ]; then
