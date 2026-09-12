@@ -1,4 +1,10 @@
 # Static assertions for the passwords-defaults policy implementation on MacBook.
+#
+# WHY: This test pins a multi-phase migration (PassKit.policy lifecycle).
+# grep assertions verify that each migration step was completed correctly:
+# Phase 1 registered the policy in preference-gc.nix, Phase 2 removed it from
+# defaults.nix, etc. The file-existence checks (builtins.pathExists) provide
+# structural validation; the text checks confirm the correct values were written.
 
 let
   lib = import <nixpkgs/lib>;
