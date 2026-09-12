@@ -45,9 +45,10 @@ Edit shared rules/agents/prompts/skills under `src/users/default/agents/`, not `
 
 | Target | Source | Mechanism |
 | --- | --- | --- |
-| `~/.pi/agent/extensions` | `src/users/<user>/agents/pi-extensions` | Writable symlink (method 1) |
-| `~/.pi/agent/settings.json` | `src/users/<user>/agents/pi-settings.json` | Writable symlink (method 1) |
-| `~/.config/opencode/opencode.jsonc` | `src/users/<user>/agents/opencode.jsonc` | Writable symlink (method 1) |
+| `~/.pi/agent/extensions` | `src/users/<user>/pi/extensions` | Writable symlink (method 1) |
+| `~/.pi/agent/settings.json` | `src/users/<user>/pi/settings.json` | Writable symlink (method 1) |
+| `~/.pi/web-search.json` | `src/users/<user>/pi/web-search.json` | Writable symlink (method 1) |
+| `~/.config/opencode/opencode.jsonc` | `src/users/<user>/opencode/opencode.jsonc` | Writable symlink (method 1) |
 | `~/.config/opencode/agents` | `~/.agents/agents` | Writable symlink (method 1) |
 | `~/.config/opencode/commands` | `~/.agents/prompts` | Writable symlink (method 1) |
 
