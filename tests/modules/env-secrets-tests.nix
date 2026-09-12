@@ -2,6 +2,8 @@
 #
 # Validates the secrets structure, consumer scoping, sopsSource split,
 # name patterns, env var derivation, uniqueness, and schema compliance.
+# Also validates LiteLLM secretArgs derivation shape from the same catalog.
+#
 # The env-secrets catalog is the static source of truth for all hosts,
 # consumed by env-secrets-sops.nix (NixOS/darwin) and ai.nix (secretArgs).
 
@@ -22,6 +24,18 @@ let
 
   # Consumer-filtered subsets.
   hermesSecrets = builtins.filter (s: builtins.elem "hermes-agent" s.consumers) entries;
+  litellmEntries = builtins.filter (s: builtins.elem "litellm" s.consumers) entries;
+
+  # LiteLLM secretArgs derivation (mirrors ai.nix).
+  dummySecretPath = name: "/run/secrets.d/15/${name}";
+  secretArgs = map (entry: "${dummySecretPath entry.name}:${entry.envVar}") litellmEntries;
+  extractEnvVar =
+    pair:
+    let
+      parts = builtins.split ":" pair;
+    in
+    builtins.elemAt parts (builtins.length parts - 1);
+  pairPattern = pair: builtins.match "^/run/secrets\\.d/15/[a-z0-9_]+:[A-Z][A-Z0-9_]*$" pair;
 
 in
 {
@@ -131,4 +145,18 @@ in
   test_user_secrets_empty_by_default = assert' (
     builtins.length (builtins.filter (e: e.sopsSource == "user") entries) == 0
   ) "no user sopsSource entries by default (user opt-in)";
+
+  # === LiteLLM secretArgs derivation ===
+
+  test_secretargs_count_matches_litellm =
+    assert' (builtins.length secretArgs == builtins.length litellmEntries)
+      "secretArgs count (${toString (builtins.length secretArgs)}) must equal litellm consumer count (${toString (builtins.length litellmEntries)})";
+
+  test_all_secretargs_are_pairs = assert' (builtins.all (
+    pair: pairPattern pair != null
+  ) secretArgs) "every secretArg must be a /run/secrets.d/15/<name>:<ENVVAR> pair";
+
+  test_secretargs_envvars_match_catalog = assert' (builtins.all (
+    pair: builtins.elem (extractEnvVar pair) (map (e: e.envVar) entries)
+  ) secretArgs) "every secretArg env var must match a catalog envVar";
 }

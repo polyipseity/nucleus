@@ -8,4 +8,22 @@ rec {
   flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
   # Regex-like match via builtins.match with .* prefix/suffix.
   containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
+
+  # Tail-recursive list helpers.
+  all =
+    pred: list:
+    if list == [ ] then
+      true
+    else if pred (builtins.head list) then
+      all pred (builtins.tail list)
+    else
+      false;
+  any =
+    pred: list:
+    if list == [ ] then
+      false
+    else if pred (builtins.head list) then
+      true
+    else
+      any pred (builtins.tail list);
 }

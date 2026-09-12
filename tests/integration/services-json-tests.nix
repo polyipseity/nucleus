@@ -1,37 +1,18 @@
-# tests/integration/svc-tests.nix — Structural invariant tests for service management.
+# tests/integration/services-json-tests.nix — Structural invariant tests for service management.
 #
 # Validates services.json data integrity: schema reference, required services,
-# host validity, scope correctness, and per-user justification requirements.
-# Implementation-coupled grep assertions against script source text have been
-# removed — those are now covered by check step 08 (service-registry) and the
-# script-level tests in tests/scripts/.
+# host validity, scope correctness, per-user justification, and watchdog wiring.
+#
+# Run with: nix-instantiate --eval tests/integration/services-json-tests.nix
 
 let
-  inherit (import ../lib.nix) assert' containsRegex;
+  inherit (import ../lib.nix) assert' containsRegex all any;
 
   servicesJsonText = builtins.readFile ../../src/modules/services.json;
+  flakeText = builtins.readFile ../../src/flake.nix;
 
-  # Parsed services.json for structural assertions
   parsedServices = builtins.fromJSON servicesJsonText;
   serviceNames = builtins.filter (n: parsedServices.${n} ? hosts) (builtins.attrNames parsedServices);
-
-  # Tail-recursive list helpers
-  all =
-    pred: list:
-    if list == [ ] then
-      true
-    else if pred (builtins.head list) then
-      all pred (builtins.tail list)
-    else
-      false;
-  any =
-    pred: list:
-    if list == [ ] then
-      false
-    else if pred (builtins.head list) then
-      true
-    else
-      any pred (builtins.tail list);
 
   knownHosts = [
     "MacBook"
@@ -39,7 +20,6 @@ let
     "Windows"
   ];
 
-  # Required services that must be present in services.json
   requiredServices = [
     "ollama"
     "litellm"
@@ -53,14 +33,12 @@ let
     "service-watchdog"
   ];
 
-  # Services with user scope that must carry a justification string
   userScopedServices = [
     "discord-music-rpc"
     "ssh-agent"
     "cloud-drive"
   ];
 
-  # Services expected to be system-scoped on MacBook
   macbookSystemServices = [
     "ollama"
     "litellm"
@@ -121,7 +99,16 @@ in
         all (h: entry.hosts.${h} ? justification) hosts
       ) userScopedServices
     ) "User-scoped services must have justification on every host")
+
+    # --- service-watchdog structural ---
+    (assert' (parsedServices ? service-watchdog) "service-watchdog present in services.json")
+    (assert' (parsedServices.service-watchdog ? hosts) "service-watchdog has hosts")
+    (assert' (parsedServices.service-watchdog ? displayName) "service-watchdog has displayName")
+
+    # --- flake.nix wiring ---
+    (assert' (containsRegex "service-watchdog" flakeText) "service-watchdog in flake.nix")
   ];
+
   success = true;
   message = "Service management structural tests passed";
 }
