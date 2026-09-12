@@ -9,6 +9,7 @@
       "~/.bun",
       "~/.cache",
       "~/.cargo",
+      "~/.config/qmd",
       "~/.cursor",
       "~/.gnupg",
       "~/.local",
