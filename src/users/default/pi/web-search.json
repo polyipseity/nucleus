@@ -1,7 +1,7 @@
 {
   "$schema": "./web-search.schema.json",
-  "workflow": "none",
   "ssrf": {
     "trustEnvProxy": true
-  }
+  },
+  "workflow": "none"
 }
