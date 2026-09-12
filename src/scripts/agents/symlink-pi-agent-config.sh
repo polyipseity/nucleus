@@ -2,8 +2,9 @@
 # Creates method-1 (writable) symlinks from ~/.pi/agent/ into the live repo.
 #
 # Creates:
-#   ~/.pi/agent/extensions/  → <live-root>/src/users/default/agents/pi-extensions/
-#   ~/.pi/agent/settings.json → <live-root>/src/users/default/agents/pi-settings.json
+#   ~/.pi/agent/extensions/    → <live-root>/src/users/default/pi/extensions/
+#   ~/.pi/agent/settings.json  → <live-root>/src/users/default/pi/settings.json
+#   ~/.pi/agent/web-search.json → <live-root>/src/users/default/pi/web-search.json
 #   ~/.pi/agent/extensions/superpowers.ts → Nix store superpowers plugin
 #
 # Skills are handled natively by Pi (auto-discovered from ~/.agents/skills/ and
@@ -36,12 +37,17 @@ fi
 # --- Extensions symlink (method 1: writable, live repo) ---
 "$SCRIPT_DIR/../configs/seed-writable-symlink.sh" \
   "$_spi_pi_dir/extensions" \
-  "src/users/default/agents/pi-extensions"
+  "src/users/default/pi/extensions"
 
 # --- Settings symlink (method 1: writable, live repo) ---
 "$SCRIPT_DIR/../configs/seed-writable-symlink.sh" \
   "$_spi_pi_dir/settings.json" \
-  "src/users/default/agents/pi-settings.json"
+  "src/users/default/pi/settings.json"
+
+# --- web-search.json symlink (method 1: writable, live repo) ---
+"$SCRIPT_DIR/../configs/seed-writable-symlink.sh" \
+  "$_spi_pi_dir/web-search.json" \
+  "src/users/default/pi/web-search.json"
 
 # --- Superpowers extension symlink (method 1: Nix store target) ---
 # The superpowers plugin is fetched via builtins.fetchGit and symlinked to
