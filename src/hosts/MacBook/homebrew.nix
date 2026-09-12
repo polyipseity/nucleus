@@ -24,6 +24,7 @@ let
   # These are tools unavailable in nixpkgs or where the Homebrew build is
   # preferred (e.g. tightly coupled to macOS internals).
   staticManagedBrews = [
+    "cirruslabs/cli/softnet" # Runtime dependency of tart; must be declared to survive brew bundle --zap cleanup
     "cirruslabs/cli/tart" # macOS VM hypervisor using Apple Virtualization.framework (requires code-signed binary)
     "displayplacer" # CLI display arrangement tool
     "smudge/smudge/nightlight" # Night Shift schedule & temperature control
