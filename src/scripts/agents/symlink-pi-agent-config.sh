@@ -4,6 +4,7 @@
 # Creates:
 #   ~/.pi/agent/extensions/    → <live-root>/src/users/default/pi/extensions/
 #   ~/.pi/agent/settings.json  → <live-root>/src/users/default/pi/settings.json
+#   ~/.pi/agent/npm/bunfig.toml → <live-root>/src/users/default/pi/bunfig.toml
 #   ~/.pi/web-search.json       → <live-root>/src/users/default/pi/web-search.json
 #   ~/.pi/agent/extensions/superpowers.ts → Nix store superpowers plugin
 #
@@ -43,6 +44,14 @@ fi
 "$SCRIPT_DIR/../configs/seed-writable-symlink.sh" \
   "$_spi_pi_dir/settings.json" \
   "src/users/default/pi/settings.json"
+
+# --- bunfig.toml symlink (method 1: writable, live repo) ---
+# WHY: Pi extensions require hoisted linker for Node.js module resolution.
+# The global bunfig.toml uses isolated linker (appropriate for global CLI tools),
+# but pi's npm directory needs hoisted so dependencies are in top-level node_modules/.
+"$SCRIPT_DIR/../configs/seed-writable-symlink.sh" \
+  "$_spi_pi_dir/npm/bunfig.toml" \
+  "src/users/default/pi/bunfig.toml"
 
 # --- web-search.json symlink (method 1: writable, live repo) ---
 # WHY: pi-web-access reads from ~/.pi/web-search.json (legacy dir),
