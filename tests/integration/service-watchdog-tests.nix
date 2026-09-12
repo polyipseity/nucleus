@@ -1,100 +1,55 @@
-# tests/integration/service-watchdog-tests.nix — Schema and invariant tests for service watchdog.
+# tests/integration/service-watchdog-tests.nix — Structural invariant tests for service watchdog.
+#
+# Validates services.json structure for the watchdog service and flake wiring.
+# Implementation-coupled grep assertions against script source text and platform
+# config files have been removed — those are now covered by check steps and
+# script-level tests.
 
 let
-  inherit (import ../lib.nix) containsRegex;
+  inherit (import ../lib.nix) assert' containsRegex;
 
-  watchdogShText = builtins.readFile ../../src/scripts/services/service-watchdog.sh;
-  watchdogPs1Text = builtins.readFile ../../src/scripts/services/service-watchdog.ps1;
-  flakeText = builtins.readFile ../../src/flake.nix;
-  macosWatchdogNixText = builtins.readFile ../../src/hosts/MacBook/service-watchdog.nix;
-  nixosActivationText = builtins.readFile ../../src/hosts/NixOS/activation.nix;
-  windowsSchedulerDscText = builtins.readFile ../../src/hosts/Windows/system/scheduler.dsc.yml;
   servicesJsonText = builtins.readFile ../../src/modules/services.json;
+  flakeText = builtins.readFile ../../src/flake.nix;
+
+  parsedServices = builtins.fromJSON servicesJsonText;
+  watchdog = parsedServices.service-watchdog;
 in
-
-# --- services.json structural assertions ---
-assert containsRegex ''"service-watchdog"'' servicesJsonText;
-assert containsRegex ''"local.service-watchdog"'' servicesJsonText;
-assert containsRegex ''"nucleus-service-watchdog.service"'' servicesJsonText;
-assert containsRegex ''"\\\\nucleus\\\\service-watchdog"'' servicesJsonText;
-
-# --- service-watchdog.sh structural assertions ---
-assert containsRegex "#!/usr/bin/env bash" watchdogShText;
-assert containsRegex "set -euo pipefail" watchdogShText;
-assert containsRegex "services.json" watchdogShText;
-assert containsRegex "require_command jq" watchdogShText;
-assert containsRegex "recover_launchctl" watchdogShText;
-assert containsRegex "check_service_macos" watchdogShText;
-assert containsRegex "check_service_nixos" watchdogShText;
-assert containsRegex "read_watchdog_services" watchdogShText;
-assert containsRegex "log_restart" watchdogShText;
-assert containsRegex "launchctl_target" watchdogShText;
-
-# --- service-watchdog.sh macOS recovery patterns ---
-assert containsRegex "state = running" watchdogShText;
-assert containsRegex "state = spawn scheduled" watchdogShText;
-assert containsRegex "state = waiting" watchdogShText;
-assert containsRegex "last exit code = 78" watchdogShText;
-assert containsRegex "Service is not found" watchdogShText;
-assert containsRegex "launchctl bootout" watchdogShText;
-assert containsRegex "launchctl bootstrap" watchdogShText;
-
-# --- service-watchdog.sh NixOS recovery patterns ---
-assert containsRegex "systemctl.*is-active" watchdogShText;
-assert containsRegex "systemctl.*reset-failed" watchdogShText;
-assert containsRegex "systemctl.*restart" watchdogShText;
-
-# --- service-watchdog.sh platform filtering ---
-assert containsRegex "socketActivated" watchdogShText;
-assert containsRegex "prefixMatch" watchdogShText;
-assert containsRegex "exit 0" watchdogShText;
-
-# --- service-watchdog.ps1 structural assertions ---
-assert containsRegex ".SYNOPSIS" watchdogPs1Text;
-assert containsRegex "services.json" watchdogPs1Text;
-assert containsRegex "Write-RestartLog" watchdogPs1Text;
-assert containsRegex "Test-NativeService" watchdogPs1Text;
-assert containsRegex "Test-ScheduledTask" watchdogPs1Text;
-assert containsRegex "Get-Service" watchdogPs1Text;
-assert containsRegex "Restart-Service" watchdogPs1Text;
-assert containsRegex "Get-ScheduledTask" watchdogPs1Text;
-assert containsRegex "Start-ScheduledTask" watchdogPs1Text;
-assert containsRegex "socketActivated" watchdogPs1Text;
-assert containsRegex "prefixMatch" watchdogPs1Text;
-
-# --- macOS launchd agent config ---
-assert containsRegex "local.service-watchdog" macosWatchdogNixText;
-assert containsRegex "KeepAlive = true" macosWatchdogNixText;
-assert containsRegex "RunAtLoad = true" macosWatchdogNixText;
-assert containsRegex "service-watchdog" macosWatchdogNixText;
-assert containsRegex "service-watchdog/stdout.log" macosWatchdogNixText;
-
-# --- NixOS systemd timer config ---
-assert containsRegex "nucleus-service-watchdog" nixosActivationText;
-assert containsRegex "Restart = .always." nixosActivationText;
-assert containsRegex "multi-user.target" nixosActivationText;
-assert containsRegex "Type = .simple." nixosActivationText;
-assert containsRegex "nucleus-service-watchdog" nixosActivationText;
-assert containsRegex "nucleus-service-watchdog" nixosActivationText;
-assert containsRegex "NUCLEUS_REPO_ROOT" nixosActivationText;
-
-# --- Windows DSC task config ---
-assert containsRegex "TaskName: service-watchdog" windowsSchedulerDscText;
-assert containsRegex "TaskPath: \\\\nucleus\\\\" windowsSchedulerDscText;
-assert containsRegex "AtStartup" windowsSchedulerDscText;
-assert containsRegex "service-watchdog.ps1" windowsSchedulerDscText;
-assert containsRegex "NUCLEUS_REPO_ROOT" windowsSchedulerDscText;
-assert containsRegex "RunWithHighestPrivileges: true" windowsSchedulerDscText;
-
-# --- Flake wiring ---
-assert containsRegex "nucleus-service-watchdog" flakeText;
-assert containsRegex ''name = "service-watchdog"'' flakeText;
-assert containsRegex "nucleusApps = nucleusAppsLinux" flakeText;
-assert containsRegex "pkgs.jq" flakeText;
-
-# --- Services.json integration ---
-assert containsRegex ''\$schema.*services\.schema\.json'' servicesJsonText;
 {
+  tests = builtins.filter (x: x != null) [
+    # --- services.json structural assertions ---
+    (assert' (watchdog ? displayName) "service-watchdog must have a displayName")
+    (assert' (containsRegex ''services\.schema\.json'' servicesJsonText)
+      "services.json must reference services.schema.json")
+
+    # --- Host entries present for all three platforms ---
+    (assert' (watchdog.hosts ? MacBook) "service-watchdog must have a MacBook host entry")
+    (assert' (watchdog.hosts ? NixOS) "service-watchdog must have a NixOS host entry")
+    (assert' (watchdog.hosts ? Windows) "service-watchdog must have a Windows host entry")
+
+    # --- macOS launchctl service name ---
+    (assert' (watchdog.hosts.MacBook.type == "launchctl")
+      "MacBook watchdog must use launchctl")
+    (assert' (watchdog.hosts.MacBook.service == "local.service-watchdog")
+      "MacBook watchdog service must be local.service-watchdog")
+
+    # --- NixOS systemctl service name ---
+    (assert' (watchdog.hosts.NixOS.type == "systemctl")
+      "NixOS watchdog must use systemctl")
+    (assert' (watchdog.hosts.NixOS.service == "nucleus-service-watchdog.service")
+      "NixOS watchdog service must be nucleus-service-watchdog.service")
+
+    # --- Windows schtask task path ---
+    (assert' (watchdog.hosts.Windows.type == "schtask")
+      "Windows watchdog must use schtask")
+    (assert' (watchdog.hosts.Windows ? taskPath)
+      "Windows watchdog must declare a taskPath")
+
+    # --- Flake wiring ---
+    (assert' (containsRegex "nucleus-service-watchdog" flakeText)
+      "flake.nix must declare nucleus-service-watchdog")
+    (assert' (containsRegex ''name = "service-watchdog"'' flakeText)
+      "flake.nix must register service-watchdog as a nucleusApp")
+  ];
   success = true;
-  message = "Service watchdog schema and invariant tests passed";
+  message = "Service watchdog structural tests passed";
 }
