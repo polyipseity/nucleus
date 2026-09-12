@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# WHY: grep-based — these assertions validate shell script invariants (PascalCase
+# flake host references, live checkout re-exec, delegation wiring) that cannot be
+# tested without parsing the script source. Each test checks a specific pattern
+# that would break runtime behavior if missing or altered.
 # shellcheck source=./test-lib.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/test-lib.sh"
 
