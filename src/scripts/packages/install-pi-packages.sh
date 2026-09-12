@@ -36,7 +36,7 @@ _ipp_bun_bin="$5"
 
 # Add pi's directory and bun's directory to PATH.  pi is the runner; bun is
 # required because pi spawns the bare command "bun" for every npm: install
-# (npmCommand in src/users/default/agents/pi-settings.json), so it must be
+# (npmCommand in src/users/default/pi/settings.json), so it must be
 # resolvable in the child environment, not merely callable by absolute path.
 _pi_bin_dir="$(dirname "$_pi_bin")"
 PATH="$_pi_bin_dir:$_ipp_bun_bin:$PATH"

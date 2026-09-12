@@ -132,7 +132,7 @@ function Invoke-PiSetup {
   $installedPackages = @($installedPackages | Sort-Object -Unique)
 
   # pi spawns the bare command "bun" for every npm: install (npmCommand in
-  # src/users/default/agents/pi-settings.json), so bun's own directory must be
+  # src/users/default/pi/settings.json), so bun's own directory must be
   # on the child PATH — the managed bin dir only holds bun-installed binaries.
   # check-suppress:suppression_doc: probe -- bun is provisioned by the WinGet DSC baseline; absence is reported below.
   $bunCommand = Get-Command bun -ErrorAction SilentlyContinue | Select-Object -First 1
