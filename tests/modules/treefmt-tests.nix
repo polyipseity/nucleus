@@ -1,4 +1,10 @@
 # tests/modules/treefmt-tests.nix — treefmt.nix formatter enablement and pinact offline policy.
+#
+# WHY: grep-only — treefmt.nix is a NixOS/darwin module requiring config args
+# (pkgs, lib, treefmtPackage) that cannot be provided in a standalone eval.
+# These assertions verify the module's text content to ensure formatters are
+# enabled/disabled correctly. Convert to behavioral if treefmt.nix is ever
+# refactored into an importable function.
 
 let
   lib = import <nixpkgs/lib>;
