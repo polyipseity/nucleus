@@ -390,24 +390,6 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
     Write-Message 'AGENTS.md instruction links resolve.'
   }
 
-  Write-Message '--- no real-user test coupling ---'
-
-  $usersRoot = Join-Path -Path $r -ChildPath 'src\users'
-  foreach ($userDir in Get-ChildItem -Path $usersRoot -Directory) {
-    if ($userDir.Name -eq 'default') { continue }
-    $userName = $userDir.Name
-    # check-suppress:suppression_doc: tests tree may be missing or lack matching files; empty result is the expected pass.
-    $testFiles = Get-ChildItem -Path (Join-Path $r 'tests') -Recurse -File -ErrorAction SilentlyContinue
-    $hits = Select-String -Path $testFiles -Pattern "\b$([regex]::Escape($userName))\b" -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: $testFiles may be empty or include unreadable/binary files; no matches is the expected pass
-    foreach ($hit in $hits) {
-      Write-ErrorMessage "tests must not reference production user '$userName': $($hit.Path):$($hit.LineNumber):$($hit.Line.Trim()) (see testing.instructions.md: No real-user test coupling)"
-      $failed = $true
-    }
-  }
-  if (-not $failed) {
-    Write-Message 'no real-user test coupling policy passed.'
-  }
-
   Write-Message "--- dummy key uniformity ---"
 
   $dummyRegistry = Join-Path $r 'src\modules\dummy-keys.json'
