@@ -1,15 +1,15 @@
-# tests/integration/svc-tests.nix — Schema and invariant tests for service management.
+# tests/integration/svc-tests.nix — Structural invariant tests for service management.
+#
+# Validates services.json data integrity: schema reference, required services,
+# host validity, scope correctness, and per-user justification requirements.
+# Implementation-coupled grep assertions against script source text have been
+# removed — those are now covered by check step 08 (service-registry) and the
+# script-level tests in tests/scripts/.
 
 let
-  inherit (import ../lib.nix) containsRegex;
+  inherit (import ../lib.nix) assert' containsRegex;
 
   servicesJsonText = builtins.readFile ../../src/modules/services.json;
-  svcShText = builtins.readFile ../../scripts/svc.sh;
-  svcPs1Text = builtins.readFile ../../scripts/svc.ps1;
-  flakeText = builtins.readFile ../../src/flake.nix;
-  svcRegistryShText = builtins.readFile ../../src/scripts/checks/check-steps/08-service-registry.sh;
-  svcRegistryPs1Text = builtins.readFile ../../src/scripts/checks/check-steps/08-service-registry.ps1;
-  windowsShellProfileText = builtins.readFile ../../src/scripts/shell/profile.ps1;
 
   # Parsed services.json for structural assertions
   parsedServices = builtins.fromJSON servicesJsonText;
@@ -32,230 +32,96 @@ let
       true
     else
       any pred (builtins.tail list);
+
+  knownHosts = [
+    "MacBook"
+    "NixOS"
+    "Windows"
+  ];
+
+  # Required services that must be present in services.json
+  requiredServices = [
+    "ollama"
+    "litellm"
+    "jellyfin"
+    "discord-music-rpc"
+    "sshd"
+    "ssh-agent"
+    "cloud-drive"
+    "rdp"
+    "linux-builder"
+    "service-watchdog"
+  ];
+
+  # Services with user scope that must carry a justification string
+  userScopedServices = [
+    "discord-music-rpc"
+    "ssh-agent"
+    "cloud-drive"
+  ];
+
+  # Services expected to be system-scoped on MacBook
+  macbookSystemServices = [
+    "ollama"
+    "litellm"
+  ];
 in
-
-# --- services.json structural assertions ---
-assert containsRegex ''\$schema.*services\.schema\.json'' servicesJsonText;
-assert containsRegex ''"ollama"'' servicesJsonText;
-assert containsRegex ''"litellm"'' servicesJsonText;
-assert containsRegex ''"jellyfin"'' servicesJsonText;
-assert containsRegex ''"discord-music-rpc"'' servicesJsonText;
-assert containsRegex ''"sshd"'' servicesJsonText;
-assert containsRegex ''"ssh-agent"'' servicesJsonText;
-assert containsRegex ''"cloud-drive"'' servicesJsonText;
-assert containsRegex ''"rdp"'' servicesJsonText;
-assert containsRegex ''"linux-builder"'' servicesJsonText;
-assert containsRegex ''"service-watchdog"'' servicesJsonText;
-assert containsRegex ''"displayName"'' servicesJsonText;
-assert containsRegex "prefixMatch" servicesJsonText;
-
-# --- svc.sh structural assertions ---
-assert containsRegex "read_registry" svcShText;
-assert containsRegex "resolve_service_names" svcShText;
-assert containsRegex "svc_status" svcShText;
-assert containsRegex "svc_action" svcShText;
-assert containsRegex "do_list" svcShText;
-assert containsRegex "do_status" svcShText;
-assert containsRegex "do_action" svcShText;
-assert containsRegex "do_logs" svcShText;
-assert containsRegex "do_log_paths" svcShText;
-assert containsRegex "do_log_config" svcShText;
-assert containsRegex "get_host_services" svcShText;
-assert containsRegex "get_capture" svcShText;
-assert containsRegex "get_unit" svcShText;
-assert containsRegex "service_log_files" svcShText;
-assert containsRegex "service_has_logs" svcShText;
-assert containsRegex "show_file_logs" svcShText;
-assert containsRegex "show_journald_logs" svcShText;
-assert containsRegex ''services\.json'' svcShText;
-assert containsRegex "launchctl" svcShText;
-assert containsRegex "systemctl" svcShText;
-assert containsRegex "cleanup_service_ports" svcShText;
-assert containsRegex "poll_service_ready" svcShText;
-assert containsRegex "extract_ports" svcShText;
-assert containsRegex "kill_processes_on_port" svcShText;
-assert containsRegex "wait_for_port" svcShText;
-
-# --- svc.ps1 structural assertions ---
-assert containsRegex "Resolve-ServiceName" svcPs1Text;
-assert containsRegex "Get-ServiceStatus" svcPs1Text;
-assert containsRegex "Invoke-ServiceAction" svcPs1Text;
-assert containsRegex "Format-StatusTable" svcPs1Text;
-assert containsRegex "Get-CaptureMode" svcPs1Text;
-assert containsRegex "Get-ServiceLogFile" svcPs1Text;
-assert containsRegex "Test-ServiceHasLog" svcPs1Text;
-assert containsRegex "Show-ServiceLog" svcPs1Text;
-assert containsRegex "Show-ServiceList" svcPs1Text;
-assert containsRegex "Show-LogConfig" svcPs1Text;
-assert containsRegex ''services\.json'' svcPs1Text;
-assert containsRegex "Get-Service" svcPs1Text;
-assert containsRegex "ScheduledTask" svcPs1Text;
-
-# --- svc.sh column format assertions ---
-assert containsRegex "ID" svcShText;
-assert containsRegex "%-20s" svcShText;
-assert containsRegex "%-24s" svcShText;
-
-# --- svc.ps1 column format assertions ---
-assert containsRegex "ID" svcPs1Text;
-assert containsRegex "[{]0,-20}" svcPs1Text;
-assert containsRegex "[{]1,-24}" svcPs1Text;
-
-# --- svc.sh bug-fix assertions ---
-assert containsRegex ''type == "object"'' svcShText;
-assert containsRegex "value: .displayName" svcShText;
-assert containsRegex "awk -v label=" svcShText;
-assert containsRegex "jq -c '.hostEntry'" svcShText;
-assert containsRegex "filtered_service_names" svcShText;
-
-# --- svc.ps1 bug-fix assertions ---
-assert containsRegex "entry -is " svcPs1Text;
-
-# --- flake.nix wiring assertions ---
-assert containsRegex "nucleus-svc" flakeText;
-assert containsRegex ''name = "svc"'' flakeText;
-
-# --- flake.nix nucleusApps wiring assertions ---
-assert containsRegex "nucleus-svc" flakeText;
-assert containsRegex ''name = "svc"'' flakeText;
-
-# --- services.json scope assertions ---
-# ollama and litellm are system-wide on MacBook.
-assert containsRegex ''"ollama".*"MacBook".*"system"'' servicesJsonText;
-assert containsRegex ''"litellm".*"MacBook".*"system"'' servicesJsonText;
-
-# User-scoped entries must have justification.
-assert containsRegex ''"discord-music-rpc".*justification'' servicesJsonText;
-assert containsRegex ''"ssh-agent".*justification'' servicesJsonText;
-assert containsRegex ''"cloud-drive".*justification'' servicesJsonText;
-
-# --- service registry step validation assertions ---
-assert containsRegex "Service registry validation" svcRegistryShText;
-assert containsRegex ''services\.json'' svcRegistryShText;
-assert containsRegex "justification" svcRegistryShText;
-assert (
-  containsRegex "load-user-registry" svcRegistryShText || containsRegex "src/users" svcRegistryShText
-);
-
-# Verdict ordering: "validation passed" must follow "justification" (not precede it)
-assert containsRegex "justification.*validation passed" svcRegistryShText;
-
-# --- service registry step validation assertions (PowerShell) ---
-assert containsRegex "Service registry validation" svcRegistryPs1Text;
-assert containsRegex ''services\.json'' svcRegistryPs1Text;
-assert containsRegex "justification" svcRegistryPs1Text;
-assert (
-  containsRegex "Load-UserRegistry" svcRegistryPs1Text
-  || containsRegex ''src\\users'' svcRegistryPs1Text
-);
-
-# Verdict ordering: "validation passed" must follow "justification" (not precede it)
-assert containsRegex "justification.*validation passed" svcRegistryPs1Text;
-
-# --- Windows profile wiring assertions ---
-assert containsRegex "nucleus-svc" windowsShellProfileText;
-assert containsRegex "scripts\\\\svc\\.ps1" windowsShellProfileText;
-
-# --- endpoint subcommand presence in both backends ---
-assert containsRegex "do_endpoint" svcShText;
-assert containsRegex "'endpoint'" svcPs1Text;
-assert containsRegex "endpoint_name" svcShText;
-
-# --- --json flag handling in both backends ---
-assert containsRegex "json_output" svcShText;
-assert containsRegex ''\$Json'' svcPs1Text;
-
-# --- Structural: each service has at least one non-omitted host ---
-assert all (
-  name:
-  let
-    entry = parsedServices.${name};
-    hosts = builtins.attrNames entry.hosts;
-  in
-  any (h: entry.hosts.${h}.type != "omitted") hosts
-) serviceNames;
-
-# --- Structural: all host keys are valid (MacBook, NixOS, Windows) ---
-assert all (
-  name:
-  let
-    entry = parsedServices.${name};
-    knownHosts = [
-      "MacBook"
-      "NixOS"
-      "Windows"
-    ];
-  in
-  all (h: any (kh: kh == h) knownHosts) (builtins.attrNames entry.hosts)
-) serviceNames;
-
-# --- Schema reference integrity ---
-assert containsRegex ''services\.schema\.json'' servicesJsonText;
-
-# --- Phase C: Structural/parse assertions ---
-# read_registry jq filter syntax
-assert containsRegex "to_entries.*map" svcShText;
-assert containsRegex "select.*type == .object." svcShText;
-# --json handled before action (the filtered_service_names loop)
-assert containsRegex "filtered_service_names" svcShText;
-assert containsRegex "json_output=true" svcShText;
-# $Json switch parameter in svc.ps1 param block
-assert containsRegex "switch.*\\\$Json" svcPs1Text;
-# Error: service not found in both backends
-assert containsRegex "service not found" svcShText;
-assert containsRegex "service not found in registry" svcPs1Text;
-# Error: unsupported host in svc.sh
-assert containsRegex "unsupported host" svcShText;
-# Unknown action error in both backends
-assert containsRegex "unsupported argument" svcShText;
-assert containsRegex "missing action" svcShText;
-assert containsRegex "missing action" svcPs1Text;
-
-# --- Phase E: Cross-host parity assertions ---
-# All 11 subcommands present in both backends
-assert builtins.all (x: containsRegex x svcShText) [
-  "endpoint"
-  "logs"
-  "log-paths"
-  "log-config"
-  "list"
-  "status"
-  "start"
-  "stop"
-  "restart"
-  "enable"
-  "disable"
-];
-assert builtins.all (x: containsRegex ("'" + x + "'") svcPs1Text) [
-  "endpoint"
-  "logs"
-  "log-paths"
-  "log-config"
-  "list"
-  "status"
-  "start"
-  "stop"
-  "restart"
-  "enable"
-  "disable"
-];
-# Both backends have consistent error message prefix
-# svc.sh: prefix auto-derived via shared error/warn helpers from lib.sh
-assert containsRegex "error \"" svcShText;
-assert containsRegex "svc:" svcPs1Text;
-
-# --- Dispatch wiring (explicit function mapping) ---
-# svc.sh action dispatch: special-case actions use explicit function names
-# (catches regression where "do_$action" produced invalid function names)
-assert containsRegex "log-paths[)] do_log_paths" svcShText;
-assert containsRegex "log-config[)] do_log_config" svcShText;
-assert containsRegex "verify *[|] *endpoint[)] \"do_\\$action\"" svcShText;
-assert containsRegex "list *[|] *status *[|] *logs[)] \"do_\\$action\"" svcShText;
-assert containsRegex "start *[|] *stop *[|] *restart *[|] *enable *[|] *disable[)] do_action"
-  svcShText;
-# do_log_config parses --json via global json_output (not a local variable)
-assert containsRegex "--json[)].*json_output=true" svcShText;
 {
+  tests = builtins.filter (x: x != null) [
+    # --- Schema reference integrity ---
+    (assert' (containsRegex ''services\.schema\.json'' servicesJsonText)
+      "services.json must reference services.schema.json")
+
+    # --- displayName field present in every service ---
+    (assert' (
+      all (name: parsedServices.${name} ? displayName) serviceNames
+    ) "Every service must have a displayName field")
+
+    # --- Required services present ---
+    (assert' (
+      all (name: builtins.hasAttr name parsedServices) requiredServices
+    ) "All required services must be present in services.json")
+
+    # --- Each service has at least one non-omitted host ---
+    (assert' (
+      all (
+        name:
+        let
+          entry = parsedServices.${name};
+          hosts = builtins.attrNames entry.hosts;
+        in
+        any (h: entry.hosts.${h}.type != "omitted") hosts
+      ) serviceNames
+    ) "Every service must have at least one non-omitted host")
+
+    # --- All host keys are valid ---
+    (assert' (
+      all (
+        name:
+        let
+          entry = parsedServices.${name};
+        in
+        all (h: any (kh: kh == h) knownHosts) (builtins.attrNames entry.hosts)
+      ) serviceNames
+    ) "All host keys must be MacBook, NixOS, or Windows")
+
+    # --- Scope assertions: system-scoped services on MacBook ---
+    (assert' (
+      all (name: parsedServices.${name}.hosts.MacBook.scope == "system") macbookSystemServices
+    ) "ollama and litellm must be system-scoped on MacBook")
+
+    # --- User-scoped entries must have justification ---
+    (assert' (
+      all (
+        name:
+        let
+          entry = parsedServices.${name};
+          hosts = builtins.attrNames entry.hosts;
+        in
+        all (h: entry.hosts.${h} ? justification) hosts
+      ) userScopedServices
+    ) "User-scoped services must have justification on every host")
+  ];
   success = true;
-  message = "Service management schema and invariant tests passed";
+  message = "Service management structural tests passed";
 }
