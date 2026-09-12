@@ -4,7 +4,6 @@ let
   # Read consumer source files
   agentsText = builtins.readFile ../../../../src/modules/agents.nix;
   defaultsText = builtins.readFile ../../../../src/hosts/MacBook/defaults.nix;
-  editorsText = builtins.readFile ../../../../src/modules/editors.nix;
   gitText = builtins.readFile ../../../../src/modules/git.nix;
   usersOverlayText = builtins.readFile ../../../../src/modules/lib/users-overlay.nix;
   homeText = builtins.readFile ../../../../src/modules/home.nix;
@@ -20,30 +19,10 @@ let
   macbookLinuxBuilderText = builtins.readFile ../../../../src/hosts/MacBook/linux-builder.nix;
   macbookSecurityText = builtins.readFile ../../../../src/hosts/MacBook/security.nix;
   nixosServicesText = builtins.readFile ../../../../src/hosts/NixOS/services.nix;
-  # Config definition files
-  qtpassText = builtins.readFile ../../../../src/modules/configs/qtpass/default.nix;
+
 in
-# Verify method comments exist on all consumer files.
-# method 1 (writable symlink) consumers:
-assert containsRegex "# check-suppress:config-method: method 1" editorsText;
-assert containsRegex "# check-suppress:config-method: method 1" macosText;
-assert containsRegex "# check-suppress:config-method: method 1" homeText;
-assert containsRegex "# check-suppress:config-method: method 1 \\(writable symlink\\)" gitText;
-assert containsRegex "# check-suppress:config-method: method 1" shellText;
-# method 2 (read-only) consumers:
-assert containsRegex "# check-suppress:config-method: method 2" macbookBaseText;
-assert containsRegex "# check-suppress:config-method: method 2" macbookSecurityText;
-assert containsRegex "# check-suppress:config-method: method 2" macbookLinuxBuilderText;
-assert containsRegex "# check-suppress:config-method: method 1" posixBaseText;
-# method 3 (merge) consumers:
-assert containsRegex "# check-suppress:config-method: method 3" homeText;
-assert containsRegex "# check-suppress:config-method: method 3" qtpassText;
-# method 4 (runtime embedded) consumers:
-assert containsRegex "# check-suppress:config-method: method 4" pwshText;
-assert containsRegex "# check-suppress:config-method: method 4" defaultsText;
-assert containsRegex "# check-suppress:config-method: method 4" agentsText;
-# Verify each host/service file that had method docs added
-assert containsRegex "# check-suppress:config-method: method 1" nixosServicesText;
+# Annotation checks (check-suppress:config-method) are covered by check step 14.
+# The assertions below verify structural wiring that step 14 does not cover.
 # Verify key config files are referenced in their consumer files
 # Phase 3: git.nix wires the user-scope ~/.gitconfig and ~/.config/git/ignore to
 # src/users/<username>/git/ with a src/users/default/git/ defaults fallback via
