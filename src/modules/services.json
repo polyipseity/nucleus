@@ -280,7 +280,8 @@
       "Windows": {
         "taskPath": "\\NucleusDiscordMusicRPC",
         "type": "schtask",
-        "platform": "Windows"
+        "platform": "Windows",
+        "justification": "Per-user scheduled task running Discord RPC in user session"
       }
     }
   },
