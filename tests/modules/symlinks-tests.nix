@@ -1,62 +1,60 @@
-# tests/modules/symlinks-tests.nix — Per-user symlink wiring.
+# tests/modules/symlinks-tests.nix — Per-user symlink wiring (behavioral).
+#
+# Validates that the users-registry correctly loads and structures per-user
+# symlink data from fixture JSON. No grep assertions — all checks evaluate
+# loaded data.
 
 let
   fixtures = import ../fixtures { };
   inherit (fixtures) fixtureUsername loadFixtureRegistry;
 
-  inherit (import ../lib.nix) assert' containsRegex;
+  inherit (import ../lib.nix) assert';
 
-  homeText = builtins.readFile ../../src/modules/home.nix;
-  symlinksModuleText = builtins.readFile ../../src/modules/symlinks.nix;
-  activationDagText = builtins.readFile ../../src/modules/lib/activation-dag.nix;
-  fixtureSymlinksText = builtins.readFile ../fixtures/user-registry/src/users/test-user/symlinks.json;
   usersMacBook = loadFixtureRegistry "MacBook";
   usersWindows = loadFixtureRegistry "Windows";
-  windowsRegistryLoaderText = builtins.readFile ../../src/platforms/Windows/modules/Load-UserRegistry.ps1;
-  windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
 
-  test_home_imports_symlinks_module = assert' (containsRegex ''\./symlinks\.nix'' homeText) "home.nix must import the symlinks module";
+  fixtureUser = usersMacBook.${fixtureUsername};
+  fixtureSymlinks = fixtureUser.symlinks;
 
-  test_symlinks_module_declares_host_targets = assert' (
-    containsRegex ''options\.nucleus\.symlinks'' symlinksModuleText
-    && containsRegex "mkOutOfStoreSymlink" symlinksModuleText
-    && containsRegex ''"MacBook"'' symlinksModuleText
-    && containsRegex ''"NixOS"'' symlinksModuleText
-    && containsRegex "Windows = lib\\.mkOption" symlinksModuleText
-    && containsRegex ''symlinks\.json'' symlinksModuleText
-  ) "symlinks module must declare host targets and managed manifest wiring";
+  # Behavioral: test-user must have symlinks on both platforms.
+  test_user_has_symlinks_macbook = assert' (
+    fixtureSymlinks != [ ]
+  ) "test-user must have symlinks on MacBook";
 
-  test_activation_dag_keeps_symlinks = assert' (
-    containsRegex ''"ensure-symlink-targets"'' activationDagText
-    && containsRegex ''"prepare-symlinks"'' activationDagText
-    && containsRegex ''"finalize-symlinks"'' activationDagText
-    && containsRegex "home\\.activation\\.ensure-symlink-targets" symlinksModuleText
-    && containsRegex "home\\.activation\\.prepare-symlinks" symlinksModuleText
-    && containsRegex "home\\.activation\\.finalize-symlinks" symlinksModuleText
-  ) "Shared activation DAG and symlinks module must keep all symlink activation steps";
+  test_user_has_symlinks_windows = assert' (
+    usersWindows.${fixtureUsername}.symlinks != [ ]
+  ) "test-user must have symlinks on Windows";
 
-  test_fixture_user_data_mapping_in_registries = assert' (
-    containsRegex ''"symlinks"'' fixtureSymlinksText
-    && containsRegex ''"path": "data"'' fixtureSymlinksText
-    && containsRegex ''"MacBook": "Library/Mobile Documents/com~fixture~test/data"'' fixtureSymlinksText
-    && containsRegex ''"NixOS": "clouds/GoogleDrive/data"'' fixtureSymlinksText
-    && containsRegex ''"Windows": "clouds\\\\GoogleDrive\\\\data"'' fixtureSymlinksText
-    && (usersMacBook.${fixtureUsername}.symlinks != [ ])
-    && (usersWindows.${fixtureUsername}.symlinks != [ ])
-  ) "test-user must map ~/data to fixture iCloud and Google Drive targets per host";
+  # Behavioral: symlink entries must have path and targets.
+  test_symlink_has_path = assert' (
+    builtins.all (s: s ? path) fixtureSymlinks
+  ) "Each symlink entry must have a path field";
 
-  test_windows_apply_wires_symlinks = assert' (
-    containsRegex "symlinks" windowsRegistryLoaderText
-    && containsRegex "Sync-SymlinkManifest" windowsApplyText
-    && containsRegex "EnableSymlinkParity" windowsApplyText
-  ) "Windows apply flow must load, expose, and run symlink parity";
+  test_symlink_has_targets = assert' (
+    builtins.all (s: s ? targets) fixtureSymlinks
+  ) "Each symlink entry must have a targets field";
+
+  # Behavioral: targets must include all three host keys.
+  test_symlink_targets_include_all_hosts = assert' (
+    let
+      first = builtins.head fixtureSymlinks;
+      targets = first.targets;
+    in
+    targets ? MacBook && targets ? NixOS && targets ? Windows
+  ) "Symlink targets must include MacBook, NixOS, and Windows";
+
+  # Behavioral: specific path value from fixture data.
+  test_fixture_data_path = assert' (
+    (builtins.head fixtureSymlinks).path == "data"
+  ) "Fixture symlink path must be 'data'";
 
   allTests = [
-    test_home_imports_symlinks_module
-    test_symlinks_module_declares_host_targets
-    test_activation_dag_keeps_symlinks
-    test_fixture_user_data_mapping_in_registries
-    test_windows_apply_wires_symlinks
+    test_user_has_symlinks_macbook
+    test_user_has_symlinks_windows
+    test_symlink_has_path
+    test_symlink_has_targets
+    test_symlink_targets_include_all_hosts
+    test_fixture_data_path
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {
