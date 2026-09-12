@@ -20,10 +20,10 @@ Describe 'Sync-PiAgentConfig pi agent links' {
         . (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\..\src\platforms\Windows\modules\user\Sync-PiAgentConfig.ps1')
 
         $script:repoRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-picfg-" + [guid]::NewGuid().ToString('N'))
-        $extensionsSourceDir = Join-Path $script:repoRoot 'src\users\default\agents\pi-extensions'
+        $extensionsSourceDir = Join-Path $script:repoRoot 'src\users\default\pi\extensions'
         $null = New-Item -ItemType Directory -Path $extensionsSourceDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         $null = Set-Content -Path (Join-Path $extensionsSourceDir 'agents-bridge.ts') -Value 'export {};' -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
-        $null = Set-Content -Path (Join-Path $script:repoRoot 'src\users\default\agents\pi-settings.json') -Value '{}' -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
+        $null = Set-Content -Path (Join-Path $script:repoRoot 'src\users\default\pi\settings.json') -Value '{}' -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
 
         $script:homeRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-pihome-" + [guid]::NewGuid().ToString('N'))
         $null = New-Item -ItemType Directory -Path $script:homeRoot -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
@@ -57,11 +57,11 @@ Describe 'Sync-PiAgentConfig pi agent links' {
 
         $extensionsItem = Get-Item -LiteralPath $extensionsLink -Force
         $extensionsItem.LinkType | Should -Be 'SymbolicLink'
-        $extensionsItem.Target | Should -Be (Join-Path $script:repoRoot 'src\users\default\agents\pi-extensions')
+        $extensionsItem.Target | Should -Be (Join-Path $script:repoRoot 'src\users\default\pi\extensions')
 
         $settingsItem = Get-Item -LiteralPath $settingsLink -Force
         $settingsItem.LinkType | Should -Be 'SymbolicLink'
-        $settingsItem.Target | Should -Be (Join-Path $script:repoRoot 'src\users\default\agents\pi-settings.json')
+        $settingsItem.Target | Should -Be (Join-Path $script:repoRoot 'src\users\default\pi\settings.json')
     }
 
     It 'is idempotent — re-running leaves the links intact' {
@@ -72,20 +72,20 @@ Describe 'Sync-PiAgentConfig pi agent links' {
 
         $item = Get-Item -LiteralPath $settingsLink -Force
         $item.LinkType | Should -Be 'SymbolicLink'
-        $item.Target | Should -Be (Join-Path $script:repoRoot 'src\users\default\agents\pi-settings.json')
+        $item.Target | Should -Be (Join-Path $script:repoRoot 'src\users\default\pi\settings.json')
     }
 
     It 'relinks a wrong-target symlink instead of leaving it drifted' {
         $piDir = Join-Path $script:homeRoot '.pi\agent'
         $settingsLink = Join-Path $piDir 'settings.json'
-        $staleSource = Join-Path $script:repoRoot 'src\users\default\agents\pi-settings.json'
+        $staleSource = Join-Path $script:repoRoot 'src\users\default\pi\settings.json'
         Remove-Item -LiteralPath $settingsLink -Force
         $null = New-Item -ItemType SymbolicLink -Path $settingsLink -Target $staleSource > $null  # check-suppress:suppression_doc: New-Item returns a FileInfo, discarded in test setup
 
         Sync-PiAgentConfig -RepoRoot $script:repoRoot -User 'testuser' -Enabled:$true > $null
 
         $item = Get-Item -LiteralPath $settingsLink -Force
-        $item.Target | Should -Be (Join-Path $script:repoRoot 'src\users\default\agents\pi-settings.json')
+        $item.Target | Should -Be (Join-Path $script:repoRoot 'src\users\default\pi\settings.json')
     }
 
     It 'removes the managed links and keeps unmanaged content on a disabled run' {

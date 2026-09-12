@@ -27,7 +27,7 @@ Describe 'Sync-OpenCodeConfig opencode config and bridges' {
         $script:tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-opencode-" + [guid]::NewGuid().ToString('N'))
         $script:repoRoot = Join-Path $script:tempRoot 'repo'
         $script:homeRoot = Join-Path $script:tempRoot 'home'
-        $script:agentsConfigDir = Join-Path $script:repoRoot 'src\users\default\agents'
+        $script:agentsConfigDir = Join-Path $script:repoRoot 'src\users\default\opencode'
         $null = New-Item -ItemType Directory -Path $script:agentsConfigDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         $null = New-Item -ItemType Directory -Path (Join-Path $script:homeRoot '.agents\agents') -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         $null = New-Item -ItemType Directory -Path (Join-Path $script:homeRoot '.agents\prompts') -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup

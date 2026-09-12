@@ -83,7 +83,7 @@ Describe 'Sync-AgentsSkillManifest overlay skills resolution' {
         (Get-Item -LiteralPath (Join-Path $script:homeRoot '.agents\skills\alpha') -Force).Target |
             Should -Be (Join-Path $script:overlaySkillsDir 'alpha')
 
-        $extraSource = Join-Path $script:repoRoot 'src\users\default\agents\pi-extensions'
+        $extraSource = Join-Path $script:repoRoot 'src\users\default\pi\extensions'
         $null = New-Item -ItemType Directory -Path $extraSource -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         $null = New-Item -ItemType Directory -Path (Join-Path $extraSource 'beta') -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         Sync-AgentsSkillManifest -RepoRoot $script:repoRoot -User 'test-user' -Enabled:$true -ExtraSkillsSource $extraSource
