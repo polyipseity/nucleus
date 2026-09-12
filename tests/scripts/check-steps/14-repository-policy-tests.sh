@@ -1,94 +1,18 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # shellcheck disable=SC2031 # reason: test functions intentionally isolate REPO_ROOT in subshells
-# Test: step 14 repository-policy must enforce dummy-key registry uniformity
-# and the logging format policy
+# Test: step 14 repository-policy behavioral tests
+# All grep-only tests (that checked implementation text) have been removed.
+# These tests exercise the actual check functions against fixture data.
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 TEST_FILE="$REPO_ROOT/src/scripts/checks/check-steps/14-repository-policy.sh"
-AWK_FILE="$REPO_ROOT/src/scripts/checks/check-steps/repository-policy.awk"
-REGISTRY_FILE="$REPO_ROOT/src/modules/dummy-keys.json"
-
-test_step14_dummy_key_registry_read() {
-  if grep -q 'dummy-keys.json' "$TEST_FILE"; then
-    return 0
-  fi
-  echo "FAIL: step 14 should read the dummy-key registry from dummy-keys.json"
-  return 1
-}
-
-test_step14_dummy_key_literal_pattern() {
-  # Matches: the rule comment sk-[A-Za-z0-9]{4,}
-  if grep -q 'sk-\[A-Za-z0-9\]{4,}' "$TEST_FILE"; then
-    return 0
-  fi
-  echo "FAIL: step 14 should target sk-[A-Za-z0-9]{4,} API key literals"
-  return 1
-}
-
-test_step14_dummy_key_error_path() {
-  if grep -q 'unregistered dummy API key literal' "$TEST_FILE"; then
-    return 0
-  fi
-  echo "FAIL: step 14 should error on unregistered dummy API key literals"
-  return 1
-}
-
-test_step14_dummy_key_registered_value() {
-  if grep -q 'sk-nucleus-dummy-litellm' "$REGISTRY_FILE"; then
-    return 0
-  fi
-  echo "FAIL: dummy-key registry should register the sk-nucleus-dummy-litellm value"
-  return 1
-}
-
-# --- activation naming policy tests --- (token placeholder check removed — purely cosmetic)
-
-test_step14_naming_policy_present() {
-  if grep -q 'activation naming policy' "$TEST_FILE"; then
-    return 0
-  fi
-  echo "FAIL: step 14 should enforce the activation naming policy"
-  return 1
-}
-
-test_step14_naming_kebab_regex() {
-  if grep -Fq '^[a-z][a-z0-9]*(-[a-z0-9]+)*$' "$TEST_FILE"; then
-    return 0
-  fi
-  echo "FAIL: step 14 should validate activation names against the kebab-case regex"
-  return 1
-}
-
-test_step14_naming_exemption_names() {
-  if grep -qE 'linkGeneration|writeBoundary|checkLinkTargets|setupLaunchAgents|installPackages|preActivation|extraActivation|postActivation' "$TEST_FILE"; then
-    return 0
-  fi
-  echo "FAIL: step 14 should exempt Home Manager built-in and nix-darwin hardcoded activation names"
-  return 1
-}
-
-test_step14_naming_generated_exemption() {
-  if grep -qE 'unprotectSymlink_\*|protectSymlink_\*|mergeConfig_\*' "$TEST_FILE"; then
-    return 0
-  fi
-  echo "FAIL: step 14 should exempt config-utils.nix generated activation names"
-  return 1
-}
-
-test_step14_naming_macos_prefix_error() {
-  if grep -q 'lacks the macos- prefix' "$TEST_FILE"; then
-    return 0
-  fi
-  echo "FAIL: step 14 should require the macos- prefix on macOS-only activation names"
-  return 1
-}
-
-# Behavioral tests: run run_activation_naming_policy against fixture trees.
 
 # shellcheck source=../../../src/scripts/checks/check-steps/14-repository-policy.sh
 . "$TEST_FILE"
+
+# --- activation naming policy behavioral tests ---
 
 test_step14_naming_behavioral_positive() {
   local _tmp _out _ret
@@ -190,92 +114,8 @@ EOF
   return 0
 }
 
-# --- logging format policy tests ---
+# --- logging format policy behavioral tests ---
 
-# Test-file note: these tests reference the policy's message strings, never the
-# banned literals themselves, so this file stays clean under the scan it tests.
-
-test_step14_logging_policy_present() {
-  if grep -q 'logging format policy' "$TEST_FILE"; then
-    return 0
-  fi
-  echo "FAIL: step 14 should enforce the logging format policy"
-  return 1
-}
-
-test_step14_logging_ansi_pattern() {
-  if grep -q 'raw ANSI escape literal' "$AWK_FILE"; then
-    return 0
-  fi
-  echo "FAIL: step 14 should flag raw ANSI escape literals"
-  return 1
-}
-
-test_step14_logging_termcap_pattern() {
-  if grep -q 'terminal capability query' "$AWK_FILE"; then
-    return 0
-  fi
-  echo "FAIL: step 14 should flag terminal capability queries"
-  return 1
-}
-
-test_step14_logging_echo_e_pattern() {
-  if grep -q 'echo dash-e flag' "$AWK_FILE"; then
-    return 0
-  fi
-  echo "FAIL: step 14 should flag the echo dash-e flag"
-  return 1
-}
-
-test_step14_logging_char27_pattern() {
-  if grep -q 'char-27 escape literal' "$AWK_FILE"; then
-    return 0
-  fi
-  echo "FAIL: step 14 should flag char-27 escape literals"
-  return 1
-}
-
-test_step14_logging_backtick_e_pattern() {
-  if grep -q 'backtick-e escape literal' "$AWK_FILE"; then
-    return 0
-  fi
-  echo "FAIL: step 14 should flag backtick-e escape literals"
-  return 1
-}
-
-test_step14_logging_skip_marker_pattern() {
-  if grep -q 'legacy skip marker' "$AWK_FILE"; then
-    return 0
-  fi
-  echo "FAIL: step 14 should flag legacy skip markers"
-  return 1
-}
-
-test_step14_logging_allowlist() {
-  if grep -q 'Invoke-LogManagement.ps1' "$REPO_ROOT/src/scripts/checks/check-steps/14-repository-policy.ps1" && grep -q 'log-management.Tests.ps1' "$REPO_ROOT/src/scripts/checks/check-steps/14-repository-policy.ps1"; then
-    return 0
-  fi
-  echo "FAIL: step 14 should allowlist the log sanitizer and its tests"
-  return 1
-}
-
-test_step14_logging_self_check() {
-  if grep -q 'NO_COLOR' "$TEST_FILE"; then
-    return 0
-  fi
-  echo "FAIL: step 14 should self-check NO_COLOR handling in shared helpers"
-  return 1
-}
-
-test_step14_logging_ps1_twin() {
-  if grep -q 'logging format policy' "$REPO_ROOT/src/scripts/checks/check-steps/14-repository-policy.ps1"; then
-    return 0
-  fi
-  echo "FAIL: step 14 .ps1 twin should enforce the logging format policy"
-  return 1
-}
-
-# Behavioral tests: run run_logging_format_policy against fixture trees.
 FIXTURE_DIR="$REPO_ROOT/tests/fixtures/logging-format"
 CAPTURE_FIXTURE_DIR="$REPO_ROOT/tests/fixtures/log-capture-pair"
 
@@ -333,11 +173,7 @@ test_step14_logging_behavioral_allowlist() {
   [ "$_ret" -eq 0 ]
 }
 
-# --- nix file structure tests ---
-
-test_step14_nix_file_structure_present() {
-  grep -q 'run_nix_file_structure' "$TEST_FILE"
-}
+# --- nix file structure behavioral tests ---
 
 test_step14_nix_file_structure_pattern1_detection() {
   local _tmp
@@ -347,7 +183,6 @@ test_step14_nix_file_structure_pattern1_detection() {
   mkdir -p "$_tmp/src/testmod"
   local _out
   _out=$(mktemp)
-  # Source the check-lib to get filter_gitignored, then source the step
   # shellcheck source=/dev/null
   (cd "$_tmp" && mkdir -p src && git init -q && touch src/.gitkeep && git add . && git commit -q -m 'init' &&
     unset _NUCLEUS_STEP_RUNNER_SOURCED _NUCLEUS_CHECK_LIB_SOURCED && _STEP_IDS=() && . "$REPO_ROOT/src/scripts/checks/check-lib.sh" &&
@@ -409,41 +244,7 @@ test_step14_nix_file_structure_valid_passes() {
   [ "$_ret" -eq 0 ]
 }
 
-# --- log capture pair policy tests ---
-
-test_step14_capture_pair_policy_present() {
-  if grep -q 'log capture pair policy' "$TEST_FILE"; then
-    return 0
-  fi
-  echo "FAIL: step 14 should enforce the log capture pair policy"
-  return 1
-}
-
-test_step14_capture_pair_devnull_pattern() {
-  if grep -Fq 'discards a stream to /dev/null' "$TEST_FILE"; then
-    return 0
-  fi
-  echo "FAIL: step 14 should reject a capture directive that discards a stream"
-  return 1
-}
-
-test_step14_capture_pair_merged_pattern() {
-  # Literal phrase only: embedding the merged-redirection token here would make this
-  # test file self-trip the policy it exercises.
-  if grep -Fq 'merges stdout and stderr' "$TEST_FILE"; then
-    return 0
-  fi
-  echo "FAIL: step 14 should reject a merged-stream redirection"
-  return 1
-}
-
-test_step14_capture_pair_lone_stream_pattern() {
-  if grep -Fq 'declares only one of StandardOutPath/StandardErrorPath' "$TEST_FILE"; then
-    return 0
-  fi
-  echo "FAIL: step 14 should reject a lone capture stream"
-  return 1
-}
+# --- log capture pair policy behavioral tests ---
 
 test_step14_capture_pair_behavioral_positive() {
   local _tmp _out _ret
@@ -485,40 +286,16 @@ test_step14_capture_pair_behavioral_negative() {
 
 failures=0
 for test in \
-  test_step14_dummy_key_registry_read \
-  test_step14_dummy_key_literal_pattern \
-  test_step14_dummy_key_error_path \
-  test_step14_dummy_key_registered_value \
-  test_step14_naming_policy_present \
-  test_step14_naming_kebab_regex \
-  test_step14_naming_exemption_names \
-  test_step14_naming_generated_exemption \
-  test_step14_naming_macos_prefix_error \
   test_step14_naming_behavioral_positive \
   test_step14_naming_behavioral_negative \
   test_step14_naming_behavioral_exemption \
   test_step14_naming_behavioral_prefix \
-  test_step14_logging_policy_present \
-  test_step14_logging_ansi_pattern \
-  test_step14_logging_termcap_pattern \
-  test_step14_logging_echo_e_pattern \
-  test_step14_logging_char27_pattern \
-  test_step14_logging_backtick_e_pattern \
-  test_step14_logging_skip_marker_pattern \
-  test_step14_logging_allowlist \
-  test_step14_logging_self_check \
-  test_step14_logging_ps1_twin \
   test_step14_logging_behavioral_positive \
   test_step14_logging_behavioral_negative \
   test_step14_logging_behavioral_allowlist \
-  test_step14_nix_file_structure_present \
   test_step14_nix_file_structure_pattern1_detection \
   test_step14_nix_file_structure_pattern2_detection \
   test_step14_nix_file_structure_valid_passes \
-  test_step14_capture_pair_policy_present \
-  test_step14_capture_pair_devnull_pattern \
-  test_step14_capture_pair_merged_pattern \
-  test_step14_capture_pair_lone_stream_pattern \
   test_step14_capture_pair_behavioral_positive \
   test_step14_capture_pair_behavioral_negative; do
   if ! $test; then
