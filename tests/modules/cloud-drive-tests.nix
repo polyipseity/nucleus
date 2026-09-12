@@ -1,4 +1,4 @@
-# tests/modules/cloud-launchd-agents-tests.nix — Cloud launchd agent generation invariant.
+# tests/modules/cloud-drive-tests.nix — Cloud drive launchd agent generation invariant.
 #
 # Guards against a regression where the macOS Home Manager config silently stops
 # generating the cloud mount/replica launchd agents (e.g. a stale generation that
