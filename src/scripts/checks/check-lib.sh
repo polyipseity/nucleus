@@ -31,7 +31,7 @@ discover_files() {
   local -n _df_out="$1"
   local _df_root="$2" _df_dir="$3" _df_exts="$4"
   local IFS=','
-  read -ra _df_ext_list <<< "$_df_exts"
+  read -ra _df_ext_list <<<"$_df_exts"
   local _df_find_args=()
   local _df_ext
   for _df_ext in "${_df_ext_list[@]}"; do
@@ -52,7 +52,7 @@ filter_scoped_files() {
   local _fsf_dir="$1" _fsf_exts="$2"
   shift 2
   local IFS=','
-  read -ra _fsf_ext_list <<< "$_fsf_exts"
+  read -ra _fsf_ext_list <<<"$_fsf_exts"
   local _fsf_f _fsf_base _fsf_ext
   for _fsf_f in "$@"; do
     case "$_fsf_f" in
@@ -62,7 +62,10 @@ filter_scoped_files() {
         # Strip leading * from glob for case match
         local _fsf_pat="${_fsf_ext#\*}"
         case "$_fsf_base" in
-        *"$_fsf_pat") _fsf_out+=("$_fsf_f"); break ;;
+        *"$_fsf_pat")
+          _fsf_out+=("$_fsf_f")
+          break
+          ;;
         esac
       done
       ;;
