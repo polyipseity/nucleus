@@ -499,7 +499,7 @@ in
     home.activation.provision-data-directory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/configs/provision-data-directory.sh" \
         "${config.home.homeDirectory}" \
-        '${builtins.toJSON config.nucleus.dataDirectory.manifest}' \
+        ${lib.escapeShellArg (builtins.toJSON config.nucleus.dataDirectory.manifest)} \
         "${pkgs.jq}/bin/jq"
     '';
 
