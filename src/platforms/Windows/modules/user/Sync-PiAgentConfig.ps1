@@ -6,14 +6,16 @@
   Creates %USERPROFILE%\.pi\agent\ as a real directory, then deploys method-1
   (writable) symlinks into the live repo checkout:
 
-    %USERPROFILE%\.pi\agent\extensions     -> the resolved agents overlay
-                                              "pi-extensions" entry
-    %USERPROFILE%\.pi\agent\settings.json  -> the resolved agents overlay
-                                              "pi-settings.json" file
+    %USERPROFILE%\.pi\agent\extensions      -> the resolved pi overlay
+                                              "extensions" entry
+    %USERPROFILE%\.pi\agent\settings.json   -> the resolved pi overlay
+                                              "settings.json" file
+    %USERPROFILE%\.pi\agent\web-search.json -> the resolved pi overlay
+                                              "web-search.json" file
 
   Both sources are resolved through the per-user overlay
   (Resolve-UserConfigFirstLevelEntry / Resolve-UserConfigFile), so a per-user
-  override wins over src\users\default\agents\ — no src\users\default path is
+  override wins over src\users\default\pi\ — no src\users\default path is
   hardcoded here.
 
   Mirrors src/scripts/agents/symlink-pi-agent-config.sh on POSIX hosts.  Skills
@@ -83,6 +85,7 @@ function Sync-PiAgentConfig {
   $piDir = Join-Path -Path $HOME -ChildPath '.pi\agent'
   $extensionsLink = Join-Path -Path $piDir -ChildPath 'extensions'
   $settingsLink = Join-Path -Path $piDir -ChildPath 'settings.json'
+  $webSearchLink = Join-Path -Path $piDir -ChildPath 'web-search.json'
 
   # Converge one link onto $TargetPath; returns $false after reporting the
   # conflict that prevents convergence.
@@ -114,7 +117,7 @@ function Sync-PiAgentConfig {
   }
 
   if (-not $Enabled) {
-    foreach ($linkPath in @($extensionsLink, $settingsLink)) {
+    foreach ($linkPath in @($extensionsLink, $settingsLink, $webSearchLink)) {
       if (-not (Test-Path -LiteralPath $linkPath)) { continue }
       $item = Get-Item -LiteralPath $linkPath -Force
       $isSymlink = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
@@ -132,8 +135,9 @@ function Sync-PiAgentConfig {
     return
   }
 
-  $extensionsSource = Resolve-UserConfigFirstLevelEntry -User $User -ConfigName 'agents' -EntryName 'pi-extensions' -RepoRoot $RepoRoot
-  $settingsSource = Resolve-UserConfigFile -User $User -ConfigName 'agents' -RelativePath 'pi-settings.json' -RepoRoot $RepoRoot
+  $extensionsSource = Resolve-UserConfigFirstLevelEntry -User $User -ConfigName 'pi' -EntryName 'extensions' -RepoRoot $RepoRoot
+  $settingsSource = Resolve-UserConfigFile -User $User -ConfigName 'pi' -RelativePath 'settings.json' -RepoRoot $RepoRoot
+  $webSearchSource = Resolve-UserConfigFile -User $User -ConfigName 'pi' -RelativePath 'web-search.json' -RepoRoot $RepoRoot
 
   if (-not (Test-Path -LiteralPath $extensionsSource -PathType Container)) {
     Write-NucleusError -CommandName $label "resolved pi extensions source is not a directory: $extensionsSource"
@@ -141,6 +145,10 @@ function Sync-PiAgentConfig {
   }
   if (-not (Test-Path -LiteralPath $settingsSource -PathType Leaf)) {
     Write-NucleusError -CommandName $label "resolved pi settings source is not a file: $settingsSource"
+    return
+  }
+  if (-not (Test-Path -LiteralPath $webSearchSource -PathType Leaf)) {
+    Write-NucleusError -CommandName $label "resolved pi web-search source is not a file: $webSearchSource"
     return
   }
 
@@ -151,4 +159,5 @@ function Sync-PiAgentConfig {
 
   if (-not (Sync-PiAgentLink -LinkPath $extensionsLink -TargetPath $extensionsSource)) { return }
   if (-not (Sync-PiAgentLink -LinkPath $settingsLink -TargetPath $settingsSource)) { return }
+  if (-not (Sync-PiAgentLink -LinkPath $webSearchLink -TargetPath $webSearchSource)) { return }
 }
