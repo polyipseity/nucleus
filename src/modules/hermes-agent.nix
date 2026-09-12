@@ -208,4 +208,11 @@ in
     # depending on the platform upstream evaluated for.
     extraDependencyGroups = lib.remove "voice" upstreamFullDependencyGroups;
   };
+
+  # Install Playwright Chromium for browser tools. Runs after hermesAgentSetup
+  # so the hermes venv is ready. Idempotent: skips if already installed.
+  home.activation.install-playwright-chromium = lib.hm.dag.entryAfter [ "hermesAgentSetup" ] ''
+    "${activationBundle}/src/scripts/agents/install-playwright-chromium.sh" \
+      "${pkgs.hermes-agent}"
+  '';
 }
