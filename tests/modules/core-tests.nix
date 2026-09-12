@@ -192,22 +192,6 @@ let
       && (resolveBackend "git" == "nixpkgs")
     ) "Multiple overrides should apply independently";
 
-  # === BASIC LOGIC VALIDATION ===
-
-  test_filter_nulls = assert' (
-    (builtins.filter (x: x != null) [
-      1
-      null
-      2
-      null
-      3
-    ]) == [
-      1
-      2
-      3
-    ]
-  ) "Filtering null values from list failed";
-
   # === PLATFORM COMPATIBILITY FILTERING ===
   # Tests for the platformCompatible helper added in core.nix.
 
@@ -304,46 +288,6 @@ let
       !platformCompatible true false "linux-only-pkg" && platformCompatible false true "linux-only-pkg"
     ) "Package with platforms = [\"linux\"] should be compatible on linux but not darwin";
 
-  # Test 11: Attribute merging with lib.mkMerge.
-  test_mkmerge_basic = assert' (
-    builtins.length (
-      lib.flatten [
-        [
-          1
-          2
-        ]
-        [
-          3
-          4
-        ]
-      ]
-    ) == 4
-  ) "List flattening failed for config merging";
-
-  # Test 12: OS-conditional path resolution.
-  test_conditional_home_path =
-    let
-      isDarwin = false;
-    in
-    assert' (
-      (if isDarwin then "/Users/admin" else "/home/admin") == "/home/admin"
-    ) "Home directory path resolution failed for Linux";
-
-  # Test 13: Package category validation.
-  test_package_category_enum =
-    let
-      isValidCategory =
-        category:
-        builtins.elem category [
-          "cli"
-          "gui"
-          "hardware"
-        ];
-    in
-    assert' (
-      (isValidCategory "cli") && (isValidCategory "gui") && !(isValidCategory "invalid")
-    ) "Package category validation failed";
-
   # Collect all test results.
   allTests = [
     test_linux_nix_index_is_daily
@@ -356,13 +300,9 @@ let
     test_policy_with_no_overrides
     test_selective_override_in_policy_mode
     test_multiple_overrides
-    test_filter_nulls
     test_platform_default_compatible
     test_platform_darwin_only
     test_platform_linux_only
-    test_mkmerge_basic
-    test_conditional_home_path
-    test_package_category_enum
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {
@@ -380,9 +320,8 @@ builtins.seq (builtins.deepSeq allTests null) {
     "8: Policy with no overrides cascades to defaults"
     "9: Selective override in policy mode"
     "10: Multiple overrides apply independently"
-    "11: List filtering preserves order"
-    "12: Config merging with lib.mkMerge"
-    "13: OS-conditional path resolution"
-    "14: Package category validation"
+    "11: Package without platforms compatible on both"
+    "12: Package with platforms=[darwin] excluded on linux"
+    "13: Package with platforms=[linux] excluded on darwin"
   ];
 }

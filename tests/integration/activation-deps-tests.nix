@@ -135,112 +135,6 @@ let
       builtins.length names == builtins.length uniqueNames
     ) "Activation step names must be unique";
 
-  # === TEST: No circular dependencies ===
-  test_no_circular_deps =
-    assert' true # Validated by NixOS/Home Manager eval
-      "Activation graph should be acyclic";
-
-  # === TEST: Windows DSC ordering invariant ===
-  test_windows_dsc_ordering =
-    let
-      # Windows orchestration order (from apply.ps1 and module sequencing):
-      # 1. Git + SSH config (for key setup)
-      # 2. Secret materialization (decrypt SOPS keys)
-      # 3. Dev repo sync (uses Git over SSH)
-      steps = [
-        "Sync-GitAndSshConfig" # Must be first
-        "Invoke-JITSecretMaterialization" # After Git config
-        "Sync-DevRepoCatalog" # After secrets materialized
-      ];
-      # Verify step count and order
-      correctOrder =
-        (builtins.elemAt steps 0 == "Sync-GitAndSshConfig")
-        && (builtins.elemAt steps 1 == "Invoke-JITSecretMaterialization")
-        && (builtins.elemAt steps 2 == "Sync-DevRepoCatalog");
-    in
-    assert' (
-      correctOrder && (builtins.length steps == 3)
-    ) "Windows DSC steps must execute in correct order: Git → Secrets → DevRepos";
-
-  # === TEST: Agent skill provisioning after core setup ===
-  test_agent_skills_after_core =
-    let
-      activations = {
-        gitConfig = {
-          after = [ ];
-        };
-        agentSkillsProvision = {
-          after = [ "gitConfig" ];
-        };
-      };
-    in
-    assert' (builtins.elem "gitConfig" activations.agentSkillsProvision.after) "Agent skills must provision after core setup";
-
-  # === TEST: Wallpaper gallery after user shell setup ===
-  test_wallpaper_after_shell =
-    let
-      activations = {
-        posixUserShell = {
-          after = [ ];
-        };
-        wallpaperGallery = {
-          after = [ "posixUserShell" ];
-        };
-      };
-    in
-    assert' (builtins.elem "posixUserShell" activations.wallpaperGallery.after) "Wallpaper must setup after user shell configured";
-
-  # === TEST: Package installation before Home Manager activation ===
-  test_packages_before_hm =
-    let
-      # On macOS: packages installed via Homebrew before Home Manager runs
-      # On NixOS: system packages available before Home Manager
-      order = [
-        "system-packages"
-        "home-manager-activation"
-      ];
-    in
-    assert' (
-      (builtins.elemAt order 0 == "system-packages")
-      && (builtins.elemAt order 1 == "home-manager-activation")
-    ) "System packages must be available before Home Manager activation";
-
-  # === TEST: All activation steps have valid dependency references ===
-  test_valid_dependency_references =
-    let
-      activationNames = [
-        "wait-for-sops-secrets"
-        "git-identity"
-        "gpg-import"
-        "ssh-key-adopt"
-        "provision-dev-repos"
-      ];
-      # Each dependency reference should exist in the names list
-      testDep = name: builtins.elem name activationNames;
-      validRefs = builtins.all testDep activationNames;
-    in
-    assert' validRefs "All activation dependency references must exist";
-
-  # === TEST: Before/after consistency ===
-  test_before_after_consistency =
-    let
-      # If A is in B's "before" list, B should be in A's "after" list (conceptually)
-      # This tests bidirectional consistency
-      activations = {
-        step1 = {
-          before = [ "step2" ];
-          after = [ ];
-        };
-        step2 = {
-          before = [ ];
-          after = [ "step1" ];
-        };
-      };
-    in
-    assert' (
-      (builtins.elem "step2" activations.step1.before) && (builtins.elem "step1" activations.step2.after)
-    ) "Before/after lists should be bidirectionally consistent";
-
   # === TEST: sync-clawhub-skills dependency name stays aligned across modules ===
   test_sync_clawhub_dependency_name_alignment =
     assert'
@@ -415,13 +309,6 @@ let
     test_ssh_before_git
     test_gpg_before_commits
     test_activation_names_unique
-    test_no_circular_deps
-    test_windows_dsc_ordering
-    test_agent_skills_after_core
-    test_wallpaper_after_shell
-    test_packages_before_hm
-    test_valid_dependency_references
-    test_before_after_consistency
     test_sync_clawhub_dependency_name_alignment
     test_sync_clawhub_does_not_exit_activation
     test_gimp_sensitivity_version_tracking
