@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Pi web-search config",
+  "description": "Configuration for pi-web-access plugin (fetch_content, web_search tools)",
+  "type": "object",
+  "properties": {
+    "workflow": {
+      "type": "string",
+      "description": "Search workflow mode"
+    },
+    "ssrf": {
+      "type": "object",
+      "description": "SSRF protection settings",
+      "properties": {
+        "trustEnvProxy": {
+          "type": "boolean",
+          "description": "When true and an HTTP proxy is configured via env vars, skip the DNS preflight SSRF check and let the proxy handle resolution. Required inside SRT sandbox where direct DNS is blocked."
+        },
+        "allowRanges": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "CIDR ranges exempted from the SSRF guard (e.g. fake-IP proxy ranges)"
+        }
+      }
+    }
+  }
+}

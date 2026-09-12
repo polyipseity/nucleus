@@ -1,5 +1,5 @@
 {
-  "$schema": "./pi-settings.schema.json",
+  "$schema": "./settings.schema.json",
   "defaultModel": "mimo-v2.5",
   "defaultProjectTrust": "ask",
   "defaultProvider": "opencode-go",
