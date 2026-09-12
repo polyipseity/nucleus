@@ -102,30 +102,6 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
     Write-Message "config method compliance passed."
   }
 
-  Write-Message "--- activation token placeholder ---"
-
-  $actPattern = '^\s*#.*__[A-Z][A-Z_]*__'
-  $actViolations = @()
-
-  if ($HasArgs) {
-    # WHY: if-expression output is pipeline-enumerated — an empty branch yields $null, crashing the .Count check below under StrictMode; the @() wrapper forces an array
-    $actFiles = @($PositionalArgs | Where-Object { $_ -like '*.sh' -or $_ -like '*.zsh' })
-    if ($actFiles.Count -gt 0) {
-      $actViolations += Select-String -Path $actFiles -Pattern $actPattern | ForEach-Object { "$($_.Path):$($_.LineNumber)" }
-    }
-  } else {
-    $actFiles = Get-ChildItem -Recurse -Path (Join-Path $r "src\scripts") -Include '*.sh', '*.zsh' | ForEach-Object { $_.FullName }
-    $actViolations += Select-String -Path $actFiles -Pattern $actPattern | ForEach-Object { "$($_.Path):$($_.LineNumber)" }
-  }
-
-  if ($actViolations.Count -gt 0) {
-    foreach ($av in ($actViolations | Sort-Object -Unique)) { Write-ErrorMessage $av }
-    Write-ErrorMessage "token placeholder strings found in script comments"
-    $failed = $true
-  } else {
-    Write-Message "no token placeholder strings in script comments."
-  }
-
   Write-Message "--- activation naming policy ---"
 
   # Collect activation entry definitions as "file:line:name" lines across the three

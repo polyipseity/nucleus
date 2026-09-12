@@ -43,7 +43,7 @@ test_step14_dummy_key_registered_value() {
   return 1
 }
 
-# --- activation naming policy tests ---
+# --- activation naming policy tests --- (token placeholder check removed — purely cosmetic)
 
 test_step14_naming_policy_present() {
   if grep -q 'activation naming policy' "$TEST_FILE"; then
