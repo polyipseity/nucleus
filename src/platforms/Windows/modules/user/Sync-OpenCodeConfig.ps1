@@ -8,7 +8,7 @@
   POSIX wires these through Home Manager plus symlink-agent-config.sh; this
   function provides the Windows equivalent:
 
-    %USERPROFILE%\.config\opencode\opencode.jsonc -> the agents overlay's
+    %USERPROFILE%\.config\opencode\opencode.jsonc -> the opencode overlay's
                                                      opencode.jsonc
     %USERPROFILE%\.config\opencode\agents         -> %USERPROFILE%\.agents\agents
     %USERPROFILE%\.config\opencode\commands       -> %USERPROFILE%\.agents\prompts
@@ -25,7 +25,7 @@
 
 .PARAMETER User
   Username from the user registry; opencode.jsonc resolves through the per-user
-  agents overlay (src/users/<username>/agents/ with src/users/default/ as
+  opencode overlay (src/users/<username>/opencode/ with src/users/default/ as
   fallback).
 
 .PARAMETER Enabled
@@ -93,9 +93,9 @@ function Sync-OpenCodeConfig {
     }
   }
 
-  $configTarget = Resolve-UserConfigFile -User $User -ConfigName 'agents' -RelativePath 'opencode.jsonc' -RepoRoot $RepoRoot
+  $configTarget = Resolve-UserConfigFile -User $User -ConfigName 'opencode' -RelativePath 'opencode.jsonc' -RepoRoot $RepoRoot
   if (-not (Test-Path -LiteralPath $configTarget -PathType Leaf)) {
-    Write-NucleusError -CommandName 'opencode' "Sync-OpenCodeConfig: opencode.jsonc not found in the agents overlay: $configTarget"
+    Write-NucleusError -CommandName 'opencode' "Sync-OpenCodeConfig: opencode.jsonc not found in the opencode overlay: $configTarget"
     throw
   }
   foreach ($bridge in @(@{ Path = $agentsTarget; Name = 'agents' }, @{ Path = $commandsTarget; Name = 'prompts' })) {
