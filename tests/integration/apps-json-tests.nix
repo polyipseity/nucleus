@@ -250,16 +250,16 @@ in
       all (
         name:
         let macbookHost = parsedApps.${name}.hosts.MacBook;
-        in macbookHost.kind == "manual" && macbookHost.provisioned == false
+        in macbookHost.menuBarIcon.kind == "manual" && macbookHost.menuBarIcon.provisioned == false
       ) manualApps
-    ) "Manual apps must have kind=manual and provisioned=false")
+    ) "Manual apps must have menuBarIcon.kind=manual and menuBarIcon.provisioned=false")
 
     # === Menu-bar: Discord apps use activation-script ===
     (assert' (
       all (
         name:
         let macbookHost = parsedApps.${name}.hosts.MacBook;
-        in macbookHost ? activation-script
+        in macbookHost.menuBarIcon.kind == "activation-script"
       ) discordApps
     ) "Discord apps must use activation-script for tray convergence")
   ];
