@@ -106,6 +106,23 @@ DSC dry-run: `winget configure --what-if .\src\hosts\Windows\{system,system-pack
 - Contract-breaking: add Nix logic or Pester tests. Bug fix: reproducing case if non-obvious.
 Commit atomically with implementation. Naming: `tests/<area>/<topic>-tests.nix` / `tests/platforms/Windows/modules/<area>/<feature>.Tests.ps1`
 
+## Anti-pattern: grep-only Nix tests
+
+Tests that use `builtins.readFile` + `containsRegex` / `lib.hasInfix` to check that specific text exists in source files are **implementation-coupled**. They break on code reflow, renaming, or comment changes while providing zero behavioral assurance.
+
+**Acceptable grep usage:**
+- Checking that a banned pattern does NOT appear (e.g., `!containsRegex "pip install"`)
+- Validating annotation presence (e.g., `containsRegex "# check-suppress:"`)
+- Checking for specific error message text in expected-failure tests
+- Shell script invariants where parsing is the only viable approach (add `# WHY:` comment)
+
+**Unacceptable grep usage:**
+- Checking that a function name exists in a file
+- Checking that an import path is present
+- Checking that a specific string literal appears in source code
+
+Convert unacceptable patterns to behavioral tests that evaluate the module with fixture data and verify output attributes. When grep is the only viable approach (shell scripts, modules requiring config args), add a `# WHY:` comment explaining the necessity.
+
 ## Test script gotchas
 
 Test scripts only, not production code.
