@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-  Provision hermes-agent SOUL.md and install Playwright Chromium on Windows.
+  Provision hermes-agent SOUL.md and set Playwright browsers path on Windows.
 
 .DESCRIPTION
   Ensures %USERPROFILE%\data\hermes-agent\ exists, creates a default SOUL.md
-  if not present, symlinks %USERPROFILE%\.hermes\SOUL.md to it, and installs
-  Playwright Chromium for browser tools.
+  if not present, symlinks %USERPROFILE%\.hermes\SOUL.md to it, and ensures
+  PLAYWRIGHT_BROWSERS_PATH is set for browser tools.
 
   This is the Windows equivalent of the POSIX activation entries in hermes-agent.nix.
 
@@ -75,19 +75,18 @@ You are Hermes Agent, built by Nous Research. Be direct: match the length of you
     Write-NucleusNotice "[$label] created symlink: $soulMdTarget -> $soulMdSource"
   }
 
-  # Install Playwright Chromium if not already installed
-  $playwrightCacheDir = Join-Path -Path $HOME -ChildPath '.cache\ms-playwright\chromium-*'
-  $chromiumInstalled = Get-ChildItem -Path $playwrightCacheDir -Directory -ErrorAction SilentlyContinue
+  # Playwright browsers path management
+  # On Windows, we check if browsers are installed in the standard location
+  # and set PLAYWRIGHT_BROWSERS_PATH if needed.
+  $playwrightCacheDir = Join-Path -Path $HOME -ChildPath '.cache\ms-playwright'
+  $chromiumInstalled = Get-ChildItem -Path (Join-Path -Path $playwrightCacheDir -ChildPath 'chromium-*') -Directory -ErrorAction SilentlyContinue
+
   if ($null -eq $chromiumInstalled) {
-    # Find npx in hermes-agent store path or PATH
-    $hermesStorePath = $null
+    # Chromium not installed - attempt to install via npx
+    $npxBin = $null
     $hermesBin = Get-Command -Name 'hermes' -ErrorAction SilentlyContinue
     if ($null -ne $hermesBin) {
       $hermesStorePath = Split-Path -Path (Split-Path -Path $hermesBin.Source -Parent) -Parent
-    }
-
-    $npxBin = $null
-    if ($null -ne $hermesStorePath) {
       $npxCandidate = Join-Path -Path $hermesStorePath -ChildPath 'bin\npx'
       if (Test-Path -Path $npxCandidate) {
         $npxBin = $npxCandidate
@@ -106,5 +105,12 @@ You are Hermes Agent, built by Nous Research. Be direct: match the length of you
     }
   } else {
     Write-NucleusNotice "[$label] Playwright Chromium already installed — skipping"
+  }
+
+  # Set PLAYWRIGHT_BROWSERS_PATH if not already set
+  $currentValue = [System.Environment]::GetEnvironmentVariable('PLAYWRIGHT_BROWSERS_PATH', 'User')
+  if ($currentValue -ne $playwrightCacheDir) {
+    [System.Environment]::SetEnvironmentVariable('PLAYWRIGHT_BROWSERS_PATH', $playwrightCacheDir, 'User')
+    Write-NucleusNotice "[$label] set PLAYWRIGHT_BROWSERS_PATH to $playwrightCacheDir"
   }
 }

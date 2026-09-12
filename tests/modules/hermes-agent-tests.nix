@@ -119,13 +119,14 @@ let
 
   test_hermes_agent_overlay_provides_package = assert' (lib.hasInfix "hermes-agent.overlays.default" flakeText) "hermes-agent overlay must provide pkgs.hermes-agent for POSIX hosts";
 
-  # === PLAYWRIGHT CHROMIUM ===
+  # === PLAYWRIGHT CHROMIUM (declarative) ===
 
-  test_wrapper_module_installs_playwright = assert' (
-    lib.hasInfix "install-playwright-chromium" wrapperText
-    && lib.hasInfix "entryAfter" wrapperText
-    && lib.hasInfix "hermesAgentSetup" wrapperTextFlat
-  ) "wrapper module must have activation entry for Playwright Chromium installation after hermesAgentSetup";
+  envCatalogText = builtins.readFile ../../src/modules/lib/env-secrets.nix;
+
+  test_playwright_browsers_path_in_env_catalog = assert' (
+    lib.hasInfix "PLAYWRIGHT_BROWSERS_PATH" envCatalogText
+    && lib.hasInfix "playwright-driver.browsers" envCatalogText
+  ) "env-secrets.nix must define PLAYWRIGHT_BROWSERS_PATH pointing to playwright-driver.browsers";
 
   # === DATA DIRECTORY ===
 
@@ -162,7 +163,7 @@ let
     test_home_imports_hermes_agent
     test_lockfile_has_hermes_agent
     test_hermes_agent_overlay_provides_package
-    test_wrapper_module_installs_playwright
+    test_playwright_browsers_path_in_env_catalog
     test_data_directory_imported
     test_data_directory_activation_entry
     test_data_directory_hermes_ops

@@ -345,6 +345,14 @@ let
       };
       why = "Cross-OS parity: nixpkgs flake lookup via <nixpkgs> in Nix expressions.";
     };
+
+    # ── Playwright browsers (system-wide) ──────────────────────────
+    PLAYWRIGHT_BROWSERS_PATH = {
+      values = {
+        default = "${pkgs.playwright-driver.browsers}";
+      };
+      why = "Playwright browser binaries location. Points to the Nix store path with pre-built Chromium/Firefox/WebKit. System-wide so all tools (hermes-agent, agent-browser, opencode) can find browsers. On Windows, set by Sync-HermesConfig.ps1.";
+    };
   };
 
   # ── Resolve value for an entry on a given host ───────────────────
