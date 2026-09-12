@@ -1,5 +1,9 @@
 # Regression tests for the ntfs-3g source build on MacBook.
 #
+# WHY: grep-only — ntfs-3g build requires macOS SDK/Xcode and cannot be evaluated
+# in isolation. These assertions pin specific build flags (DEVELOPER_DIR, CFLAGS,
+# LDFLAGS) that are impossible to test without a full darwin build environment.
+#
 # WHY: the Aug 20 build failed because the nix clang-wrapper's
 #   darwin-sdk-setup.bash overrides SDKROOT from DEVELOPER_DIR_arm64_apple_darwin
 #   (already set via xcode-select --switch) and emits
