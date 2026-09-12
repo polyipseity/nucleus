@@ -35,9 +35,7 @@ test_commit_staged_body_match() {
 }
 
 failures=0
-for test_func in test_commit_staged_body_match; do
-  if ! "$test_func"; then
-    failures=$((failures + 1))
-  fi
-done
+if ! test_commit_staged_body_match; then
+  failures=$((failures + 1))
+fi
 [ "$failures" -eq 0 ] || exit 1

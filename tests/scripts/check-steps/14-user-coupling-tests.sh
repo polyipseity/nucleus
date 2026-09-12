@@ -27,9 +27,7 @@ test_no_real_user_test_coupling() {
 }
 
 failures=0
-for test_func in test_no_real_user_test_coupling; do
-  if ! "$test_func"; then
-    failures=$((failures + 1))
-  fi
-done
+if ! test_no_real_user_test_coupling; then
+  failures=$((failures + 1))
+fi
 [ "$failures" -eq 0 ] || exit 1
