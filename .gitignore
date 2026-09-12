@@ -341,6 +341,7 @@ __marimo__/
 
 # self {
 /.pi/
+/src/users/*/pi/extensions/superpowers.ts
 
 !/src/modules/env/
 !/src/modules/lib/
@@ -349,24 +350,24 @@ __marimo__/
 !/src/users/*/direnv/lib/
 
 # Wallpaper encrypted overlay: ignore decrypted/runtime artifacts; track .sops only.
-src/users/*/wallpapers/encrypted/**
-!src/users/*/wallpapers/encrypted/**/
-!src/users/*/wallpapers/encrypted/**/*.sops
-!src/users/default/wallpapers/encrypted/.gitkeep
+/src/users/*/wallpapers/encrypted/**
+!/src/users/*/wallpapers/encrypted/**/
+!/src/users/*/wallpapers/encrypted/**/*.sops
+!/src/users/default/wallpapers/encrypted/.gitkeep
 
 # VS Code profiles: ignore runtime state; allow managed profile files only.
-src/users/*/vscode/profiles/*
-!src/users/*/vscode/profiles/*/
-!src/users/*/vscode/profiles/*/chatLanguageModels.json
-!src/users/*/vscode/profiles/*/keybindings.json
-!src/users/*/vscode/profiles/*/mcp.json
-!src/users/*/vscode/profiles/*/prompts/
-!src/users/*/vscode/profiles/*/prompts/**
-!src/users/*/vscode/profiles/*/settings.json
-!src/users/*/vscode/profiles/*/snippets/
-!src/users/*/vscode/profiles/*/snippets/**
-!src/users/*/vscode/profiles/*/tasks.json
+/src/users/*/vscode/profiles/*
+!/src/users/*/vscode/profiles/*/
+!/src/users/*/vscode/profiles/*/chatLanguageModels.json
+!/src/users/*/vscode/profiles/*/keybindings.json
+!/src/users/*/vscode/profiles/*/mcp.json
+!/src/users/*/vscode/profiles/*/prompts/
+!/src/users/*/vscode/profiles/*/prompts/**
+!/src/users/*/vscode/profiles/*/settings.json
+!/src/users/*/vscode/profiles/*/snippets/
+!/src/users/*/vscode/profiles/*/snippets/**
+!/src/users/*/vscode/profiles/*/tasks.json
 
 # Generated Windows DSC lockfiles (produced by apply.ps1 from lockfile.json).
-src/hosts/Windows/.generated/
+/src/hosts/Windows/.generated/
 # }
