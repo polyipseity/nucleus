@@ -525,6 +525,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-LibreOfficeXcu.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-StarshipConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-SrtConfig.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-HermesConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-UserPath.ps1")
 # editors/: VS Code configuration and workspace management.
 . (Join-Path -Path $editorsModuleDir -ChildPath "Set-VSCodeWorkspaceTrust.ps1")
@@ -947,6 +948,7 @@ Sync-NextestConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $rep
 Sync-DirenvConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $repoRoot
 Sync-StarshipConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $repoRoot
 Sync-SrtConfig -Enabled:$true -User $sessionUser -RepoRoot $repoRoot
+Sync-HermesConfig -Enabled:$true -User $sessionUser -RepoRoot $repoRoot
 if ($EnableCloudDrivesParity) {
   foreach ($userRecord in $selectedUserRecords) {
     Sync-CloudDriveCatalog -UserConfig $userRecord -HomeDirectory $userRecord.homeDirectory
