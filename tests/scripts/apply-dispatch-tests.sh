@@ -79,8 +79,8 @@ test_apply_pins_flake_inputs() {
 }
 
 test_apply_prebuild_fails_hard() {
-  # Pre-build and main rebuild build the same derivation. If pre-build fails,
-  # the main rebuild would fail with the same error — continuing wastes time.
+  # Pre-build and system activation build the same derivation. If pre-build fails,
+  # the activation would fail with the same error — continuing wastes time.
   if grep -q 'die -l pre-build' "$APPLY_SH" && ! grep -q 'warn -l pre-build.*proceeding' "$APPLY_SH"; then
     assert_pass "apply.sh pre-build uses die on failure"
   else
