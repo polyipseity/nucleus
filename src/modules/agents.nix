@@ -186,7 +186,7 @@ in
     #
     # Why after install-bun-packages: logical grouping.  bun is passed
     # explicitly because pi spawns the bare command "bun" for every npm:
-    # install (npmCommand in src/users/default/agents/pi-settings.json), so
+    # install (npmCommand in src/users/default/pi/settings.json), so
     # bun's directory must be on the child PATH, not only callable by path.
     # -------------------------------------------------------------------------
     install-pi-packages = lib.hm.dag.entryAfter [ "install-bun-packages" ] ''
