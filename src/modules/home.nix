@@ -238,6 +238,7 @@ in
 
   imports = [
     ./lib/gc-options.nix
+    ./lib/data-directory.nix
     ./agents.nix
     ./ai.nix
     ./cloud-drives.nix
@@ -488,6 +489,17 @@ in
       "${activationBundle}/src/scripts/configs/write-method1-symlink-manifest.sh" \
         "${nucleusUserRoot}/method1-symlink-manifest.txt" \
         '${builtins.toJSON method1ManifestPaths}' \
+        "${pkgs.jq}/bin/jq"
+    '';
+
+    # Centralized ~/data provisioning. Ensures ~/data exists and creates
+    # directories, files, and symlinks as specified in the manifest. Runs
+    # after linkGeneration so user-specific symlinks.json entries are not
+    # clobbered. The script never deletes anything.
+    home.activation.provision-data-directory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      "${activationBundle}/src/scripts/configs/provision-data-directory.sh" \
+        "${config.home.homeDirectory}" \
+        '${builtins.toJSON config.nucleus.dataDirectory.manifest}' \
         "${pkgs.jq}/bin/jq"
     '';
 
