@@ -65,6 +65,6 @@ print(Path(os.path.expanduser(path)).parent.parent / 'appworkshop_294100.acf')
 " "$_rimsort_settings_path")"
   if [ -n "$_acf_file" ] && [ ! -f "$_acf_file" ]; then
     mkdir -p "$(dirname "$_acf_file")"
-    printf '"AppWorkshop"\n{\n\t"appid"\t\t\t"294100"\n\t"SizeOnDisk"\t\t"0"\n\t"needsUpdate"\t\t"0"\n\t"TimeLastUpdated"\t"0"\n\t"WorkshopItemsInstalled"\n\t{\n\t}\n}\n' > "$_acf_file"
+    printf '"AppWorkshop"\n{\n\t"appid"\t\t\t"294100"\n\t"SizeOnDisk"\t\t"0"\n\t"needsUpdate"\t\t"0"\n\t"TimeLastUpdated"\t"0"\n\t"WorkshopItemsInstalled"\n\t{\n\t}\n}\n' >"$_acf_file"
   fi
 fi
