@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Deploy the pi coding agent config links (extensions directory + settings.json).
+  Deploy the pi coding agent config links (extensions directory + settings.json + web-search.json).
 
 .DESCRIPTION
   Creates %USERPROFILE%\.pi\agent\ as a real directory, then deploys method-1
@@ -10,7 +10,7 @@
                                               "extensions" entry
     %USERPROFILE%\.pi\agent\settings.json   -> the resolved pi overlay
                                               "settings.json" file
-    %USERPROFILE%\.pi\agent\web-search.json -> the resolved pi overlay
+    %USERPROFILE%\.pi\web-search.json        -> the resolved pi overlay
                                               "web-search.json" file
 
   Both sources are resolved through the per-user overlay
@@ -85,7 +85,7 @@ function Sync-PiAgentConfig {
   $piDir = Join-Path -Path $HOME -ChildPath '.pi\agent'
   $extensionsLink = Join-Path -Path $piDir -ChildPath 'extensions'
   $settingsLink = Join-Path -Path $piDir -ChildPath 'settings.json'
-  $webSearchLink = Join-Path -Path $piDir -ChildPath 'web-search.json'
+  $webSearchLink = Join-Path -Path $HOME -ChildPath '.pi\web-search.json'
 
   # Converge one link onto $TargetPath; returns $false after reporting the
   # conflict that prevents convergence.
