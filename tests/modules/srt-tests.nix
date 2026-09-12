@@ -43,6 +43,13 @@ let
     settings.allowPty == true
   ) "srt settings must have allowPty = true";
 
+  test_srt_settings_enable_weaker_network_isolation = assert' (
+    let
+      settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
+    in
+    settings.enableWeakerNetworkIsolation == true
+  ) "srt settings must have enableWeakerNetworkIsolation = true for Go TLS verification";
+
   test_srt_settings_deny_read_covers_credentials = assert' (
     let
       settings = builtins.fromJSON (builtins.readFile ../../src/users/default/srt/settings.json);
@@ -293,6 +300,7 @@ builtins.seq
       test_srt_in_lockfile
       test_srt_settings_exists
       test_srt_settings_allow_pty
+      test_srt_settings_enable_weaker_network_isolation
       test_srt_settings_deny_read_covers_credentials
       test_srt_settings_deny_write_covers_injection
       test_srt_settings_allow_write
