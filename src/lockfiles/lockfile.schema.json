@@ -5,7 +5,8 @@
       "description": "A version string or a VCS hash pin with source URL.",
       "oneOf": [
         {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         {
           "additionalProperties": false,
@@ -54,21 +55,24 @@
     },
     "pwsh": {
       "additionalProperties": {
-        "type": "string"
+        "type": "string",
+        "minLength": 1
       },
       "description": "PowerShell module versions. Module name → version string.",
       "type": "object"
     },
     "rustup": {
       "additionalProperties": {
-        "type": "string"
+        "type": "string",
+        "minLength": 1
       },
       "description": "Rustup toolchain pins. Channel name → version (stable/beta) or nightly-YYYY-MM-DD (nightly).",
       "type": "object"
     },
     "scoop": {
       "additionalProperties": {
-        "type": "string"
+        "type": "string",
+        "minLength": 1
       },
       "description": "Scoop package versions. Package name → version string.",
       "type": "object"
@@ -117,7 +121,8 @@
         },
         "cursor": {
           "additionalProperties": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "description": "Cursor extension versions. Same VS Code-compatible extensions as suggestions.vscode. Warn-only.",
           "type": "object"
@@ -156,7 +161,8 @@
         },
         "vscode": {
           "additionalProperties": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "description": "VS Code extension versions. Windows installs --pre-release --force (latest); POSIX uses flake.lock. Warn-only.",
           "type": "object"
@@ -296,7 +302,8 @@
     },
     "winget": {
       "additionalProperties": {
-        "type": "string"
+        "type": "string",
+        "minLength": 1
       },
       "description": "WinGet package identifiers and versions. Package ID → version string. Lockfile is the sole version authority — only bump-lockfile may change WinGet versions.",
       "type": "object"
