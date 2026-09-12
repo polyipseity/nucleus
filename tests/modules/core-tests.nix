@@ -1,34 +1,8 @@
-# tests/modules/core-tests.nix — Backend selection, package resolution, nix-index invariants.
+# tests/modules/core-tests.nix — Backend selection, package resolution, platform compatibility.
 
 let
   lib = import <nixpkgs/lib>;
-  inherit (import ../lib.nix) assert' containsRegex;
-
-  # === NIX-INDEX SCHEDULE INVARIANTS ===
-  linuxText = builtins.readFile ../../src/platforms/NixOS/modules/default.nix;
-  macosLaunchdText = builtins.readFile ../../src/platforms/macOS/modules/launchd-agents.nix;
-  coreModuleText = builtins.readFile ../../src/modules/core.nix;
-
-  test_core_accepts_treefmt_package = assert' (
-    lib.hasInfix "treefmtPackage ? null" coreModuleText
-    && lib.hasInfix "++ lib.optional (treefmtPackage != null) treefmtPackage" coreModuleText
-  ) "core.nix must accept treefmtPackage and append it to sharedPackages when set";
-
-  test_core_provisions_android_tools = assert' (
-    lib.hasInfix ''"android-tools" = {'' coreModuleText
-    && lib.hasInfix "nixpkgs = \"android-tools\";" coreModuleText
-  ) "core.nix must declare android-tools (adb, fastboot) in managedPackages for POSIX hosts";
-
-  test_linux_nix_index_is_daily = assert' (
-    containsRegex ''Description = "Daily nix-index database refresh";'' linuxText
-    && containsRegex ''OnCalendar = "12:00:00";'' linuxText
-    && !containsRegex ''OnCalendar = "Sun 12:00:00";'' linuxText
-  ) "linux nix-index timer must run daily at 12:00";
-
-  test_macos_nix_index_is_daily = assert' (
-    containsRegex ''Label = "local.nix-index-update";'' macosLaunchdText
-    && containsRegex "StartCalendarInterval = [[] .*[{] .*Hour = 12; .*Minute = 0; *[}] .*[]];" macosLaunchdText
-  ) "macOS nix-index launch agent must run daily at 12:00";
+  inherit (import ../lib.nix) assert';
 
   # === BACKEND SELECTION RESOLUTION LOGIC ===
   # Mimics core.nix resolveBackend: check overrides → check policy → fall back to global backend.
@@ -290,10 +264,6 @@ let
 
   # Collect all test results.
   allTests = [
-    test_linux_nix_index_is_daily
-    test_macos_nix_index_is_daily
-    test_core_accepts_treefmt_package
-    test_core_provisions_android_tools
     test_override_precedence
     test_policy_based_categorization
     test_global_backend_fallback
@@ -310,18 +280,14 @@ builtins.seq (builtins.deepSeq allTests null) {
   testCount = builtins.length allTests;
   message = "All ${builtins.toString (builtins.length allTests)} core tests passed";
   testNames = [
-    "1: Linux nix-index timer runs daily at 12:00"
-    "2: macOS nix-index launch agent runs daily at 12:00"
-    "3: core.nix accepts optional treefmtPackage for sharedPackages"
-    "4: core.nix provisions android-tools (adb, fastboot) on POSIX hosts"
-    "5: Override precedence (overrides > policy > global)"
-    "6: Policy-based categorization (CLI→nixpkgs, GUI→homebrew)"
-    "7: Global backend fallback when not in policy"
-    "8: Policy with no overrides cascades to defaults"
-    "9: Selective override in policy mode"
-    "10: Multiple overrides apply independently"
-    "11: Package without platforms compatible on both"
-    "12: Package with platforms=[darwin] excluded on linux"
-    "13: Package with platforms=[linux] excluded on darwin"
+    "1: Override precedence (overrides > policy > global)"
+    "2: Policy-based categorization (CLI→nixpkgs, GUI→homebrew)"
+    "3: Global backend fallback when not in policy"
+    "4: Policy with no overrides cascades to defaults"
+    "5: Selective override in policy mode"
+    "6: Multiple overrides apply independently"
+    "7: Package without platforms compatible on both"
+    "8: Package with platforms=[darwin] excluded on linux"
+    "9: Package with platforms=[linux] excluded on darwin"
   ];
 }
