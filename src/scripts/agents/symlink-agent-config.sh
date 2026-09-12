@@ -43,8 +43,8 @@ _nucleus_converge_merged_config_symlinks \
 # mkOutOfStoreSymlink) so the link still works after the repo root path
 # changes between rebuilds.
 mkdir -p "$HOME/.config/opencode"
-if ! _as_opencode_source="$(resolve_user_config_file "$_as_username" "agents" "opencode.jsonc")"; then
-  die -l agents-config "cannot resolve the agents opencode.jsonc overlay source — repo root unavailable (checked NUCLEUS_REPO_ROOT and the system repo-root file)"
+if ! _as_opencode_source="$(resolve_user_config_file "$_as_username" "opencode" "opencode.jsonc")"; then
+  die -l agents-config "cannot resolve the opencode.jsonc overlay source for user '$_as_username' — checked src/users/{$_as_username, default}/opencode/opencode.jsonc"
 fi
 _as_opencode_link="$HOME/.config/opencode/opencode.jsonc"
 if [ -L "$_as_opencode_link" ]; then
