@@ -162,18 +162,9 @@ run_activation_naming_policy() {
 
   local _nix_files=()
   if $_has_args; then
-    for _f in "${_files[@]}"; do
-      case "$_f" in
-      src/*.nix) _nix_files+=("$_f") ;;
-      esac
-    done
+    filter_scoped_files _nix_files "${_files[@]}" src '*.nix'
   else
-    while IFS= read -r -d '' _f; do
-      _nix_files+=("$_f")
-    done < <(find src -name '*.nix' -not -path '*/vendor/*' -print0)
-    # Apply gitignore filter as a second pass (find -print0 uses null separators,
-    # which filter_gitignored doesn't support directly)
-    mapfile -t _nix_files < <(printf '%s\n' "${_nix_files[@]}" | filter_gitignored)
+    discover_files _nix_files "$_repo_root" src '*.nix'
   fi
 
   if [ "${#_nix_files[@]}" -gt 0 ]; then
@@ -329,17 +320,18 @@ run_embedded_content_enforcement() {
   # Embedded-content policy scope for POSIX: src/scripts/** (see .agents/instructions/embedded-content.instructions.md).
   local _sh_files=()
   if $_has_args; then
-    for _f in "${_files[@]}"; do
-      case "$_f" in
-      src/scripts/*.sh) [ "$(basename "$_f")" = "$_self_sh" ] || _sh_files+=("$_f") ;;
-      esac
-    done
+    filter_scoped_files _sh_files "${_files[@]}" src/scripts '*.sh'
   else
-    while IFS= read -r -d '' _f; do
-      _sh_files+=("$_f")
-    done < <(find src/scripts -type f -name '*.sh' -not -name "$_self_sh" -print0)
-    mapfile -t _sh_files < <(printf '%s\n' "${_sh_files[@]}" | filter_gitignored)
+    discover_files _sh_files "$_repo_root" src/scripts '*.sh'
   fi
+  # Exclude this check's own file: its source contains the literal heredoc-detection patterns.
+  # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
+  local _filtered=()
+  local _f
+  for _f in "${_sh_files[@]}"; do
+    [ "$(basename "$_f")" = "$_self_sh" ] || _filtered+=("$_f")
+  done
+  _sh_files=("${_filtered[@]}")
 
   if [ "${#_sh_files[@]}" -gt 0 ]; then
     # Heredoc detector lives in a sibling .awk file (shellcheck policy: extract awk programs >10 lines).
