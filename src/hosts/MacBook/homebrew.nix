@@ -27,6 +27,7 @@ let
     "cirruslabs/cli/softnet" # Runtime dependency of tart; must be declared to survive brew bundle --zap cleanup
     "cirruslabs/cli/tart" # macOS VM hypervisor using Apple Virtualization.framework (requires code-signed binary)
     "displayplacer" # CLI display arrangement tool
+    "sqlite" # SQLite library; needed by qmd setCustomSQLite for sqlite-vec extension support
     "smudge/smudge/nightlight" # Night Shift schedule & temperature control
     "zackelia/formulae/bclm" # Battery charge limit management
   ];

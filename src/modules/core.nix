@@ -832,6 +832,11 @@ let
       };
       nixpkgs = "stats";
     };
+    sqlite = {
+      category = "cli";
+      nixpkgs = "sqlite";
+      winget = "SQLite.SQLite";
+    };
     steam = {
       category = "gui";
       homebrew = {
