@@ -119,6 +119,28 @@ let
 
   test_hermes_agent_overlay_provides_package = assert' (lib.hasInfix "hermes-agent.overlays.default" flakeText) "hermes-agent overlay must provide pkgs.hermes-agent for POSIX hosts";
 
+  # === PLAYWRIGHT CHROMIUM ===
+
+  test_wrapper_module_installs_playwright = assert' (
+    lib.hasInfix "install-playwright-chromium" wrapperText
+    && lib.hasInfix "entryAfter" wrapperText
+    && lib.hasInfix "hermesAgentSetup" wrapperTextFlat
+  ) "wrapper module must have activation entry for Playwright Chromium installation after hermesAgentSetup";
+
+  # === DATA DIRECTORY ===
+
+  dataDirectoryText = builtins.readFile ../../src/modules/lib/data-directory.nix;
+
+  test_data_directory_imported = assert' (lib.hasInfix "./lib/data-directory.nix" homeText) "home.nix must import data-directory.nix";
+
+  test_data_directory_activation_entry = assert' (lib.hasInfix "provision-data-directory" homeText) "home.nix must have activation entry for data-directory provisioning";
+
+  test_data_directory_hermes_ops = assert' (
+    lib.hasInfix "hermes-agent" dataDirectoryText
+    && lib.hasInfix "SOUL.md" dataDirectoryText
+    && lib.hasInfix "op = \"symlink\"" dataDirectoryText
+  ) "data-directory.nix must define hermes-agent directory, SOUL.md file, and symlink operations";
+
   allTests = [
     test_hermes_agent_flake_input_declared
     test_hermes_agent_nixpkgs_follows
@@ -140,6 +162,10 @@ let
     test_home_imports_hermes_agent
     test_lockfile_has_hermes_agent
     test_hermes_agent_overlay_provides_package
+    test_wrapper_module_installs_playwright
+    test_data_directory_imported
+    test_data_directory_activation_entry
+    test_data_directory_hermes_ops
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {
