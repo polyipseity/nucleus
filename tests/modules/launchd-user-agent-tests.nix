@@ -13,13 +13,15 @@
 # (camilladsp.nix).  nix-darwin's `environment.userLaunchAgents` is reserved for
 # short-lived jobs: it only loads a job that is not already registered, so it
 # cannot restart a loaded KeepAlive agent whose plist changed.
+#
+# Cloud drives testing is in cloud-drive-tests.nix (renamed from
+# cloud-launchd-agents-tests.nix).
 
 let
   inherit (import ../lib.nix) assert' containsRegex;
 
   camilladspNix = builtins.readFile ../../src/hosts/MacBook/camilladsp.nix;
   discordRpcNix = builtins.readFile ../../src/modules/ext-discord-music-rpc.nix;
-  cloudDrivesNix = builtins.readFile ../../src/modules/cloud-drives.nix;
   launchdAgentsNix = builtins.readFile ../../src/platforms/macOS/modules/launchd-agents.nix;
   servicesSchemaNix = builtins.readFile ../../src/modules/services.schema.json;
 
@@ -89,8 +91,8 @@ in
       !containsRegex "environment[.]userLaunchAgents[.]\"" macBookHostNixSources
     ) "src/hosts/MacBook/*.nix: no environment.userLaunchAgents assignment")
     # --- Home Manager modules: HM-native launchd.agents with domain = "gui" ---
-    # ext-discord-music-rpc.nix and cloud-drives.nix are imported into the HM
-    # config (home-manager.users / sharedModules), so they must use
+    # ext-discord-music-rpc.nix is imported into the HM config
+    # (home-manager.users / sharedModules), so it must use
     # launchd.agents.<name> with domain = "gui", NOT environment.userLaunchAgents.
     (assert' (containsRegex "launchd.agents.\"discord-music-rpc\"" discordRpcNix) "discord-music-rpc: uses launchd.agents")
     (assert' (containsRegex "domain = \"gui\"" discordRpcNix) "discord-music-rpc: domain = gui")
@@ -102,15 +104,10 @@ in
     # All launchd agents in launchd-agents.nix must have enable = true so HM
     # generates the plist in ~/Library/LaunchAgents.
     (assert' (containsRegex "enable = true" launchdAgentsNix) "launchd-agents.nix: all agents have enable = true")
-    (assert' (containsRegex "launchd.agents = builtins.listToAttrs" cloudDrivesNix) "cloud-drives: mounts use launchd.agents")
-    (assert' (containsRegex "domain = \"gui\"" cloudDrivesNix) "cloud-drives: domain = gui")
     # None of these agents may use environment.userLaunchAgents in HM modules.
     (assert' (
       !containsRegex "environment.userLaunchAgents.\"discord-music-rpc\"" discordRpcNix
     ) "discord-music-rpc: not environment.userLaunchAgents")
-    (assert' (
-      !containsRegex "environment.userLaunchAgents = builtins.listToAttrs" cloudDrivesNix
-    ) "cloud-drives: not environment.userLaunchAgents")
     # Daemons must remain in launchd.daemons (not migrated)
     (assert' (containsRegex "launchd.daemons.\"camilladsp\"" camilladspNix) "camilladsp run service: still a launchd.daemons")
 
@@ -125,9 +122,6 @@ in
     (assert' (
       containsRegex "domain = \"gui\"" discordRpcNix && !containsRegex "domain = \"user\"" discordRpcNix
     ) "discord-music-rpc.nix: domain = gui, not user")
-    (assert' (
-      containsRegex "domain = \"gui\"" cloudDrivesNix && !containsRegex "domain = \"user\"" cloudDrivesNix
-    ) "cloud-drives.nix: domain = gui, not user")
 
     # --- Invariant: no LimitLoadToSessionType = Background in agent sources ---
     # HM injects LimitLoadToSessionType = Background only for domain = "user".
@@ -139,9 +133,6 @@ in
     (assert' (
       !containsRegex "LimitLoadToSessionType = \"Background\"" discordRpcNix
     ) "discord-music-rpc.nix: no LimitLoadToSessionType = Background")
-    (assert' (
-      !containsRegex "LimitLoadToSessionType = \"Background\"" cloudDrivesNix
-    ) "cloud-drives.nix: no LimitLoadToSessionType = Background")
 
     # --- Schema invariant: services.schema.json uses scope, not domain ---
     # The services.json schema must use 'scope' (user/system) for service
