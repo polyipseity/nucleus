@@ -719,6 +719,7 @@
             name = "test";
             runtimeInputs = [
               pkgs.bash
+              pkgs.check-jsonschema
               pkgs.findutils
               pkgs.git
               pkgs.powershell
