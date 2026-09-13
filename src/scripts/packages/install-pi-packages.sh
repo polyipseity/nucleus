@@ -187,3 +187,74 @@ while IFS= read -r _ipp_pkg; do
   fi
   say -l pi "$_ipp_pkg installed successfully"
 done <"$_ipp_to_install"
+
+# ---------------------------------------------------------------------------
+# Patch pi-subagents for Nix-store compatibility
+# ---------------------------------------------------------------------------
+# When pi-coding-agent is installed as a Nix package, its package root lives
+# inside /nix/store — a read-only path where bun's hoisted peer dependencies
+# (@earendil-works/chord, @earendil-works/pi-server) are invisible to the
+# extension's findHostPeerPackageDir upward walk.  Two patches fix this:
+#
+# 1. runner-aliases.ts — the supplement fallback was gated on Pi 0.85.0 exactly
+#    and only covered pi-server.  We widen it to cover ANY missing specifier
+#    by checking the extension's own node_modules (where bun hoists them).
+#
+# 2. runner-server-preload.mjs — the ESM hook only intercepted pi-server.
+#    We generalise it to intercept any specifier present in the JITI_ALIAS map.
+#
+# Both patches are idempotent: the grep guard detects whether the old pattern
+# is still present before replacing.
+# ---------------------------------------------------------------------------
+_apply_pi_subagents_patches() {
+  local _ext_root="$HOME/.pi/agent/npm/node_modules/pi-subagents"
+  local _aliases="$_ext_root/src/runs/background/runner-aliases.ts"
+  local _preload="$_ext_root/runner-server-preload.mjs"
+
+  # --- Patch 1: runner-aliases.ts — widen supplement fallback ---
+  if [ -f "$_aliases" ] && grep -q 'readManifest(piPackageRoot)?.version === "0.85.0"' "$_aliases" 2>/dev/null; then
+    # Replace the version-gated, pi-server-only supplement with a generic
+    # fallback that works for any missing specifier at any pi version.
+    # Uses sed line-range delete + file insert (portable across macOS/Linux).
+    local _tmp _block
+    _tmp="$(mktemp)"
+    _block="$(mktemp)"
+    cp "$_aliases" "$_tmp"
+    # Write the new supplement block (3-tab indent to match surrounding code)
+    cat >"$_block" <<'BLOCK'
+		// Supplement missing host peers from the extension own node_modules.
+		// Covers packages hoisted by bun that are invisible from the Nix store path.
+		if (!target || !fs.existsSync(target)) {
+			const localDir = findHostPeerPackageDir(extensionRoot, pkg);
+			if (localDir) {
+				const localTarget = resolvePackageSubpath(localDir, subpath);
+				if (localTarget && fs.existsSync(localTarget)) {
+					target = localTarget;
+					supplemental.push(specifier);
+				}
+			}
+		}
+BLOCK
+    # Delete the old block (comment + if + inner if + closing braces = lines 133-147)
+    sed -i '' '133,147d' "$_tmp"
+    # Insert the new block before the "if (target" line (now at line 133)
+    sed -i '' '132r '"$_block" "$_tmp"
+    # Update the header comment to reflect the new behaviour
+    sed -i '' 's|Only Pi 0.85.0.s missing server exports may come from this extension.|Supplement any missing host peer from the extension own node_modules (bun-hoisted packages invisible from the Nix store path).|' "$_tmp"
+    mv "$_tmp" "$_aliases"
+    rm -f "$_block"
+    say -l pi "patched runner-aliases.ts — widened supplement fallback"
+  fi
+
+  # --- Patch 2: runner-server-preload.mjs — generalise interceptor ---
+  if [ -f "$_preload" ] && grep -q 'specifier === "@earendil-works/pi-server"' "$_preload" 2>/dev/null; then
+    # Replace the hardcoded pi-server check with a generic JITI_ALIAS lookup.
+    # Use single-quoted sed expression to avoid shell quote conflicts.
+    sed -i '' 's/if (specifier === "@earendil-works\/pi-server" || specifier === "@earendil-works\/pi-server\/unix") {/if (aliases[specifier]) {/' "$_preload"
+    # Update the header comment
+    sed -i '' 's|Only loaded when the parent supplies Pi 0.85.0.s missing server exports.|Intercept all supplemented host peer specifiers via the JITI_ALIAS map.|' "$_preload"
+    say -l pi "patched runner-server-preload.mjs — generalised interceptor"
+  fi
+}
+
+_apply_pi_subagents_patches
