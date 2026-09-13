@@ -11,6 +11,10 @@
 .PARAMETER Apply
   Install dependencies, then run src/hosts/Windows/apply.ps1 (default: $false).
 
+.PARAMETER ForceAdmin
+  Allow running as Administrator. Use in CI environments where elevation cannot
+  be avoided (default: $false).
+
 .PARAMETER ApplyArgs
   Optional arguments passed through to src/hosts/Windows/apply.ps1 (default: empty).
   Use -- before positional passthrough args (e.g., .\bootstrap.ps1 -Apply -- -DryRun).
@@ -64,6 +68,9 @@ param(
   [switch]$NoAISync = $(if ($env:NUCLEUS_AI_SYNC -eq 'false') { $true } else { $false }),
 
   [Parameter()]
+  [switch]$ForceAdmin,
+
+  [Parameter()]
   [switch]$ReplicaSync = $(if ($env:NUCLEUS_REPLICA_SYNC -eq 'true') { $true } else { $false }),
 
   [Parameter()]
@@ -82,7 +89,7 @@ Import-Module $modulePath -Force -DisableNameChecking
 # Refuse to run as Administrator — privilege escalation is managed internally
 # when needed rather than relying on an already-elevated caller.
 $isAdmin = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-if ($isAdmin) {
+if ($isAdmin -and -not $ForceAdmin) {
   Write-NucleusError "this script must not be run as Administrator. Run as a regular user (elevation is managed internally when needed)."
   exit 1
 }

@@ -7,7 +7,7 @@ set -euo pipefail
 
 # Refuse to run as root — privilege escalation (sudo) is managed internally
 # by the script when needed rather than relying on an already-elevated caller.
-if [ "$(id -u)" -eq 0 ]; then
+if [ "$(id -u)" -eq 0 ] && [ "${force_admin:-false}" = false ]; then
   error "this script must not be run as root. Run as a regular user (sudo is used internally when needed)."
 fi
 
@@ -25,6 +25,7 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 REPO_ROOT="$(derive_repo_root)"
 VERSIONS_FILE="$SCRIPT_DIR/bootstrap-versions.env"
 apply="${NUCLEUS_APPLY:-false}"
+force_admin=false
 
 # Flag parsing
 ai_sync="${NUCLEUS_AI_SYNC:-true}"
@@ -33,7 +34,7 @@ target_user="${NUCLEUS_TARGET_USER:-}"
 _apply_args=""
 
 usage() {
-  usage_std "bootstrap.sh" "[--apply|--no-apply] [--ai-sync|--no-ai-sync] [--replica-sync|--no-replica-sync] [--target-user=<name>] [-- <apply-args>...]" "Installs Nix (if absent) and the Nix-managed bootstrap dependencies. By default installs dependencies only. Pass --apply to also run the apply flow."
+  usage_std "bootstrap.sh" "[--apply|--no-apply] [--ai-sync|--no-ai-sync] [--replica-sync|--no-replica-sync] [--force-admin] [--target-user=<name>] [-- <apply-args>...]" "Installs Nix (if absent) and the Nix-managed bootstrap dependencies. By default installs dependencies only. Pass --apply to also run the apply flow."
 }
 
 while [ "$#" -gt 0 ]; do
@@ -59,6 +60,9 @@ while [ "$#" -gt 0 ]; do
     ;;
   --no-replica-sync)
     replica_sync=false
+    ;;
+  --force-admin)
+    force_admin=true
     ;;
   --target-user)
     if [ "$#" -lt 2 ] || [ -z "$2" ]; then

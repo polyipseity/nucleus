@@ -6,6 +6,7 @@ _arguments \
   '(-h --help)'{--help,-h}'[Show usage]' \
   '--ai-sync[ai sync]' \
   '--apply[apply]' \
+  '--force-admin[force admin]' \
   '--no-ai-sync[no ai sync]' \
   '--no-apply[no apply]' \
   '--no-replica-sync[no replica sync]' \
