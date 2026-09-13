@@ -24,7 +24,7 @@ fi
 # without this the tests would modify the developer's real ~/.local/state/camilladsp.
 XDG_STATE_HOME="$(mktemp -d)"
 export XDG_STATE_HOME
-trap 'rm -rf "$XDG_STATE_HOME"' EXIT
+trap 'rm -rf "$XDG_STATE_HOME"; echo "# nucleus-tally passed=0 failed=1 skipped=0"' EXIT
 # Disable the enumeration cache by default. Tests assert on mocked enumeration
 # results, and a list cached by an earlier test would mask the mock. The cache
 # tests opt back in with their own TTL and their own state directory.
