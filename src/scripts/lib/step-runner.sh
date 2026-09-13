@@ -183,6 +183,7 @@ nucleus_nix_locked() {
 HAS_ARGS=${HAS_ARGS:-false}
 FAIL_FAST=${FAIL_FAST:-false}
 ONLINE=${ONLINE:-false}
+VERBOSE_IDS=()
 
 _step_now_ms() {
   if [ -n "${EPOCHREALTIME-}" ]; then
@@ -205,14 +206,25 @@ _format_duration_s() {
 
 # --- _run_step wrapper ---
 _run_step() {
-  local _n="$1" _name="$2" _func="$3"
-  shift 3
+  local _n="$1" _name="$2" _func="$3" _id="$4"
+  shift 4
   local _step_start_ms _elapsed_ms _exit_code _fifo
 
   _step_start_ms=$(_step_now_ms)
 
   printf '\n=== [%s] %s ===\n' "$_n" "$_name" >"$_wave_tmpdir/step-$_n.out"
   printf '%s' "$_name" >"$_wave_tmpdir/step-$_n.name"
+
+  # Check if this step should be verbose
+  local _is_verbose=false
+  if [ "${#VERBOSE_IDS[@]}" -gt 0 ]; then
+    for _vid in "${VERBOSE_IDS[@]}"; do
+      if [ "$_vid" = "*" ] || [ "$_vid" = "$_id" ]; then
+        _is_verbose=true
+        break
+      fi
+    done
+  fi
 
   _fifo=$(mktemp -u "${TMPDIR:-/tmp}/nucleus-step-${_n}-XXXXXX")
   mkfifo "$_fifo"
@@ -225,10 +237,13 @@ _run_step() {
   ) >"$_fifo" 2>&1 &
   local _func_pid=$!
 
-  tee -a "$_wave_tmpdir/step-$_n.out" <"$_fifo" | while IFS= read -r _line || [ -n "$_line" ]; do
-    # _n is the zero-padded NN- prefix string; 10# forces decimal so %d doesn't parse it as octal.
-    printf '%s[step %2d]%s %s\n' "${_nuc_c2_dim}" "$((10#${_n}))" "${_nuc_c2_reset}" "$_line" >&2
-  done
+  if $_is_verbose; then
+    tee -a "$_wave_tmpdir/step-$_n.out" <"$_fifo" | while IFS= read -r _line || [ -n "$_line" ]; do
+      printf '%s[step %2d]%s %s\n' "${_nuc_c2_dim}" "$((10#${_n}))" "${_nuc_c2_reset}" "$_line" >&2
+    done
+  else
+    cat <"$_fifo" >>"$_wave_tmpdir/step-$_n.out" &
+  fi
 
   _exit_code=0
   wait "$_func_pid" || _exit_code=$?
@@ -298,6 +313,31 @@ parse_args() {
     --online)
       # shellcheck disable=SC2034 # reason: consumed by check step 13 (online-determinism) via transitive sourcing
       ONLINE=true
+      shift
+      ;;
+    --verbose)
+      VERBOSE_IDS=("*")
+      shift
+      ;;
+    --verbose=*)
+      VERBOSE_IDS=()
+      local _vval="${1#--verbose=}"
+      if [ -n "$_vval" ]; then
+        local _old_ifs="$IFS"
+        IFS=','
+        for _part in $_vval; do
+          _part="${_part## }"
+          _part="${_part%% }"
+          if [ -n "$_part" ]; then
+            VERBOSE_IDS+=("$_part")
+          fi
+        done
+        IFS="$_old_ifs"
+      fi
+      shift
+      ;;
+    --no-verbose)
+      VERBOSE_IDS=()
       shift
       ;;
     --skip-steps=*)
@@ -408,6 +448,7 @@ run_all_steps() {
   STEP_CTX[_wave_tmpdir]="$_wave_tmpdir"
   STEP_CTX[FAIL_FAST]="$FAIL_FAST"
   STEP_CTX[SKIP_STEPS]="SKIP_STEPS"
+  STEP_CTX[VERBOSE_IDS]="VERBOSE_IDS"
   STEP_CTX[ONLINE]="$ONLINE"
   STEP_CTX[SH_FILES]="SH_FILES"
   STEP_CTX[PS1_FILES]="PS1_FILES"
@@ -463,7 +504,7 @@ run_all_steps() {
       _n="${_STEP_NUMBERS[$_i]}"
       _name="${_STEP_NAMES[$_i]}"
       _started=$((_started + 1))
-      _run_step "$_n" "$_name" "${_STEP_FUNCS[$_i]}" "${POSITIONAL_ARGS[@]+${POSITIONAL_ARGS[@]}}" &
+      _run_step "$_n" "$_name" "${_STEP_FUNCS[$_i]}" "$_id" "${POSITIONAL_ARGS[@]+${POSITIONAL_ARGS[@]}}" &
       _batch_pids+=($!)
       _spawned_steps+=("$_n")
       printf '%s[%d/%d] step %s %s started%s\n' "${_nuc_c1_dim}" "$_started" "$_total" "$_n" "$_name" "${_nuc_c1_reset}"

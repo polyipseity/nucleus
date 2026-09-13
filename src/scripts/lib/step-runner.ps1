@@ -255,6 +255,7 @@ function Read-Argument {
   $script:SCOPED = $false
   $script:FULL = $false
   $script:SkipSteps = @()
+  $script:VerboseIds = @()
   $script:positionalArgs = @()
 
   $i = 0
@@ -283,6 +284,28 @@ function Read-Argument {
       }
       '^--online$' {
         $script:ONLINE = $true
+        break
+      }
+      '^--verbose$' {
+        $script:VerboseIds = @('*')
+        break
+      }
+      '^--verbose=(.*)$' {
+        $script:VerboseIds = @()
+        $value = $Matches[1]
+        if ($value) {
+          $ids = $value -split ','
+          foreach ($id in $ids) {
+            $id = $id.Trim()
+            if ($id -and $script:VerboseIds -notcontains $id) {
+              $script:VerboseIds += $id
+            }
+          }
+        }
+        break
+      }
+      '^--no-verbose$' {
+        $script:VerboseIds = @()
         break
       }
       '^--skip-steps=(.*)$' {
@@ -370,6 +393,7 @@ function Invoke-StepPipeline {
     CachedYamlFiles   = $script:CachedYamlFiles
     CachedJsonFiles   = $script:CachedJsonFiles
     CachedNixFiles    = $script:CachedNixFiles
+    VerboseIds         = $script:VerboseIds
     PositionalArgs    = $script:positionalArgs
     StepNumber        = 0
   }
@@ -479,6 +503,7 @@ function Invoke-StepPipeline {
       # is empty inside a runspace so the filename-derived fallback is unavailable.
       $stepContext = $contextObject.PSObject.Copy()
       $stepContext.StepNumber = $n
+      $stepContext.StepId = $id
 
       $null = $ps.AddScript({  # check-suppress:suppression_doc: AddScript returns the pipeline for chaining; discarded
         param($Number, $Name, $ActionText, $Context, $WaveTmpDir, $FAIL_FAST, $Dim, $Reset)
@@ -503,10 +528,13 @@ function Invoke-StepPipeline {
           # absent main-session function table.
           $stepBlock = [scriptblock]::Create($ActionText)
           $stepOutput = & $stepBlock $Context 2>&1
+          $isVerbose = $Context.VerboseIds -contains '*' -or $Context.VerboseIds -contains $Context.StepId
           foreach ($line in $stepOutput) {
             $text = if ($line -is [System.Management.Automation.ErrorRecord]) { $line.ToString() } else { "$line" }
             Add-Content -Path $outFile -Value $text
-            Write-Error ("{0}[step {1,2}]{2} {3}" -f $Dim, $Number, $Reset, $text)
+            if ($isVerbose) {
+              Write-Error ("{0}[step {1,2}]{2} {3}" -f $Dim, $Number, $Reset, $text)
+            }
           }
           $status = @($stepOutput)[-1]
           if ($status -is [int] -and $status -eq 2) { $exitCode = 2 }
