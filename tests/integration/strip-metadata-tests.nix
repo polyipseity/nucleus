@@ -5,6 +5,8 @@ let
   macAutomatorWorkflowsText = builtins.readFile ../../src/hosts/MacBook/services/automator-workflows/default.nix;
   nixosServicesText = builtins.readFile ../../src/hosts/NixOS/services.nix;
   windowsDscText = builtins.readFile ../../src/hosts/Windows/user/context-strip-metadata.dsc.yml;
+  utilsShText = builtins.readFile ../../scripts/utils.sh;
+  utilsPs1Text = builtins.readFile ../../scripts/utils.ps1;
 
   inherit (import ../lib.nix) assert';
 
@@ -40,11 +42,23 @@ let
 
   test_windows_has_strip_metadata_label = assert' (lib.hasInfix "strip metadata" windowsDscText) "Windows DSC must use the 'strip metadata' label";
 
+  # === Notification parity tests ===
+
+  test_posix_has_notify_helper = assert' (
+    lib.hasInfix "_notify" utilsShText
+    && lib.hasInfix "osascript" utilsShText
+    && lib.hasInfix "notify-send" utilsShText
+  ) "POSIX utils.sh must define _notify helper with osascript + notify-send";
+
+  test_windows_has_notification = assert' (lib.hasInfix "Show-NucleusNotification" utilsPs1Text) "Windows utils.ps1 must call Show-NucleusNotification in strip-metadata path";
+
   allTests = [
     test_single_strip_metadata_workflow_exists
     test_strip_metadata_uses_public_item
     test_nixos_has_strip_metadata
     test_windows_has_strip_metadata_label
+    test_posix_has_notify_helper
+    test_windows_has_notification
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {

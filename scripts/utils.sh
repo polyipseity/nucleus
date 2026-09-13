@@ -67,6 +67,20 @@ Subcommands:
 EOF
 }
 
+# _notify — Send a desktop notification if a notification tool is available.
+# macOS: osascript display notification; Linux: notify-send.
+# Args: $1 — title, $2 — message body.
+# check-suppress:suppression_doc: notification tools are optional — best-effort display.
+_notify() {
+  local title="$1" body="$2"
+  if command -v osascript >/dev/null 2>&1; then
+    osascript -e "display notification \"${body}\" with title \"${title}\"" 2>/dev/null || true # check-suppress:suppression_doc: notification is best-effort; failure is non-critical
+  fi
+  if command -v notify-send >/dev/null 2>&1; then
+    notify-send "${title}" "${body}" 2>/dev/null || true # check-suppress:suppression_doc: notification is best-effort; failure is non-critical
+  fi
+}
+
 # do_optimize_pdf — Optimize each input PDF in place via Ghostscript.
 # Args: $@ — option/flag pairs followed by input file paths.
 # Side effects: renames each input to <file>.bak and writes the optimized
@@ -242,6 +256,7 @@ do_strip_metadata() {
       if "$mat2_cmd" --inplace --unknown-members keep "$f" 2>/dev/null; then
         "$rm_bak" && rm -f "$bak"
         say "stripped metadata: $f"
+        _notify "strip metadata" "Stripped metadata: $f"
       else
         mv -f -- "$bak" "$f"
         error "metadata stripping failed, restored original: $f"
@@ -250,9 +265,11 @@ do_strip_metadata() {
       ;;
     *.doc | *.xls | *.ppt)
       warn "skipping legacy OLE2 (no CLI tool can write this format): $f"
+      _notify "strip metadata" "Skipped legacy OLE2 (unsupported format): $f"
       ;;
     *.pdf)
       warn "skipping PDF (strip-metadata does not support PDF files): $f"
+      _notify "strip metadata" "Skipped PDF (not supported): $f"
       ;;
     *)
       if [[ -z "$et_cmd" ]]; then
@@ -266,6 +283,7 @@ do_strip_metadata() {
       if "$et_cmd" -all= --icc_profile:all -overwrite_original "$f"; then
         "$rm_bak" && rm -f "$bak"
         say "stripped metadata: $f"
+        _notify "strip metadata" "Stripped metadata: $f"
       else
         mv -f -- "$bak" "$f"
         error "metadata stripping failed, restored original: $f"

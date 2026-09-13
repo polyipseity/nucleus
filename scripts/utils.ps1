@@ -44,6 +44,22 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Show-NucleusNotification — Display a Windows toast notification if BurntToast
+# is available; fall back to System.Windows.Forms.MessageBox.
+# Args: title, message.
+function Show-NucleusNotification {
+  param([string]$Title, [string]$Message)
+  # check-suppress:suppression_doc: BurntToast module is optional — fall back to MessageBox.
+  if (Get-Module -ListAvailable -Name BurntToast -ErrorAction SilentlyContinue) {
+    try { New-BurntToastNotification -Text $Title, $Message -ErrorAction Stop } catch { }
+  } else {
+    try {
+      [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null
+      [System.Windows.Forms.MessageBox]::Show($Message, $Title, 'OK', 'Information') | Out-Null
+    } catch { }
+  }
+}
+
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
@@ -146,6 +162,7 @@ switch ($Action) {
       $ext = [System.IO.Path]::GetExtension($f).ToLower()
       if ($ext -eq '.pdf') {
         Write-NucleusWarning "skipping PDF (strip-metadata does not support PDF files): $f"
+        Show-NucleusNotification -Title 'strip metadata' -Message "Skipped PDF (not supported): $f"
         continue
       }
       if ($ext -in @('.docx', '.xlsx', '.pptx')) {
@@ -165,6 +182,7 @@ switch ($Action) {
           }
           if ($RemoveBackup) { Remove-Item -LiteralPath $bak -Force }
           Write-NucleusInfo "stripped metadata: $f"
+          Show-NucleusNotification -Title 'strip metadata' -Message "Stripped metadata: $f"
         } catch {
           Move-Item -LiteralPath $bak -Destination $f -Force
           Write-NucleusError "metadata stripping failed, restored: $f"
@@ -173,6 +191,7 @@ switch ($Action) {
       } elseif ($ext -in @('.doc', '.xls', '.ppt')) {
         # Legacy OLE2: neither mat2 nor exiftool can write these formats.
         Write-NucleusWarning "skipping legacy OLE2 (no CLI tool can write this format): $f"
+        Show-NucleusNotification -Title 'strip metadata' -Message "Skipped legacy OLE2 (unsupported format): $f"
       } else {
         # Other formats: use exiftool.
         # WHY: backup first, then in-place strip on the original — .bak holds
@@ -187,6 +206,7 @@ switch ($Action) {
           )
           if ($RemoveBackup) { Remove-Item -LiteralPath $bak -Force }
           Write-NucleusInfo "stripped metadata: $f"
+          Show-NucleusNotification -Title 'strip metadata' -Message "Stripped metadata: $f"
         } catch {
           Move-Item -LiteralPath $bak -Destination $f -Force
           Write-NucleusError "metadata stripping failed, restored: $f"
