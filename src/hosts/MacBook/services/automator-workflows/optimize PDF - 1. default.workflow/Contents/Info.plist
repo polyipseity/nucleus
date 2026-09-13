@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleIdentifier</key>
-	<string>com.nucleus.OptimizePDF.printer</string>
+	<string>com.nucleus.OptimizePDF.default</string>
 	<key>NSServices</key>
 	<array>
 		<dict>
@@ -16,7 +16,7 @@
 			<key>NSMenuItem</key>
 			<dict>
 				<key>default</key>
-				<string>optimize PDF - printer</string>
+				<string>optimize PDF - (1) default</string>
 			</dict>
 			<key>NSMessage</key>
 			<string>runWorkflowAsService</string>

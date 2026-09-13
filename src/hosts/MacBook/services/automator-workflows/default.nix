@@ -108,7 +108,9 @@ let
   #
   # Sorting policy: primary sort is alphabetical by entry name. Exceptions:
   # - the 5 Optimize PDF presets are grouped as a single block and internally
-  #   sorted quality-descending (default → prepress → printer → ebook → screen).
+  #   sorted quality-descending ((1) default → (2) prepress → (3) printer → (4) ebook → (5) screen).
+  #   Numbering in parentheses after the "optimize PDF - " prefix ensures correct
+  #   sort order on every platform (macOS Automator menu, NixOS Nautilus, Windows Explorer).
   # Each block is positioned by its primary name alphabetically. This is the
   # cross-platform convention (same on NixOS and Windows).
   # Deployment order always follows the declared order below. No automatic sorting.
@@ -139,11 +141,11 @@ let
         TouchBar = true;
       };
     }
-    # Optimize PDF presets block — quality-descending, internally sorted
+    # Optimize PDF presets block — quality-descending, numbered for sort order
     {
-      dir = "optimize PDF - default.workflow";
-      enablementKey = "com.nucleus.OptimizePDF.default - optimize PDF - default - runWorkflowAsService";
-      source = "${workflowsDir}/optimize PDF - default.workflow";
+      dir = "optimize PDF - 1. default.workflow";
+      enablementKey = "com.nucleus.OptimizePDF.default - optimize PDF - (1) default - runWorkflowAsService";
+      source = "${workflowsDir}/optimize PDF - 1. default.workflow";
       thumbnailSymbol = "doc.badge.gearshape";
       presentationModes = {
         ContextMenu = true;
@@ -153,9 +155,9 @@ let
       };
     }
     {
-      dir = "optimize PDF - prepress.workflow";
-      enablementKey = "com.nucleus.OptimizePDF.prepress - optimize PDF - prepress - runWorkflowAsService";
-      source = "${workflowsDir}/optimize PDF - prepress.workflow";
+      dir = "optimize PDF - 2. prepress.workflow";
+      enablementKey = "com.nucleus.OptimizePDF.prepress - optimize PDF - (2) prepress - runWorkflowAsService";
+      source = "${workflowsDir}/optimize PDF - 2. prepress.workflow";
       thumbnailSymbol = "doc.badge.gearshape";
       presentationModes = {
         ContextMenu = true;
@@ -165,9 +167,9 @@ let
       };
     }
     {
-      dir = "optimize PDF - printer.workflow";
-      enablementKey = "com.nucleus.OptimizePDF.printer - optimize PDF - printer - runWorkflowAsService";
-      source = "${workflowsDir}/optimize PDF - printer.workflow";
+      dir = "optimize PDF - 3. printer.workflow";
+      enablementKey = "com.nucleus.OptimizePDF.printer - optimize PDF - (3) printer - runWorkflowAsService";
+      source = "${workflowsDir}/optimize PDF - 3. printer.workflow";
       thumbnailSymbol = "doc.badge.gearshape";
       presentationModes = {
         ContextMenu = true;
@@ -177,9 +179,9 @@ let
       };
     }
     {
-      dir = "optimize PDF - ebook.workflow";
-      enablementKey = "com.nucleus.OptimizePDF.ebook - optimize PDF - ebook - runWorkflowAsService";
-      source = "${workflowsDir}/optimize PDF - ebook.workflow";
+      dir = "optimize PDF - 4. ebook.workflow";
+      enablementKey = "com.nucleus.OptimizePDF.ebook - optimize PDF - (4) ebook - runWorkflowAsService";
+      source = "${workflowsDir}/optimize PDF - 4. ebook.workflow";
       thumbnailSymbol = "doc.badge.gearshape";
       presentationModes = {
         ContextMenu = true;
@@ -189,9 +191,9 @@ let
       };
     }
     {
-      dir = "optimize PDF - screen.workflow";
-      enablementKey = "com.nucleus.OptimizePDF.screen - optimize PDF - screen - runWorkflowAsService";
-      source = "${workflowsDir}/optimize PDF - screen.workflow";
+      dir = "optimize PDF - 5. screen.workflow";
+      enablementKey = "com.nucleus.OptimizePDF.screen - optimize PDF - (5) screen - runWorkflowAsService";
+      source = "${workflowsDir}/optimize PDF - 5. screen.workflow";
       thumbnailSymbol = "doc.badge.gearshape";
       presentationModes = {
         ContextMenu = true;

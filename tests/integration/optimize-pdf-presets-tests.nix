@@ -19,20 +19,41 @@ let
     "screen"
   ];
 
+  # Numbered names in quality-descending order.
+  numberedNames = [
+    "optimize PDF - (1) default"
+    "optimize PDF - (2) prepress"
+    "optimize PDF - (3) printer"
+    "optimize PDF - (4) ebook"
+    "optimize PDF - (5) screen"
+  ];
+
   # Check that all 5 presets appear in a file.
   allPresetsPresent = fileText: builtins.all (preset: lib.hasInfix preset fileText) presets;
 
-  test_all_5_presets_in_macos = assert' (
-    allPresetsPresent macAutomatorWorkflowsText
-  ) "macOS automator-workflows.nix must define all 5 presets";
+  test_all_5_presets_in_macos = assert' (allPresetsPresent macAutomatorWorkflowsText) "macOS automator-workflows.nix must define all 5 presets";
 
-  test_all_5_presets_in_nixos = assert' (
-    allPresetsPresent nixosServicesText
-  ) "NixOS services.nix must define all 5 presets";
+  test_all_5_presets_in_nixos = assert' (allPresetsPresent nixosServicesText) "NixOS services.nix must define all 5 presets";
 
-  test_all_5_presets_in_windows = assert' (
-    allPresetsPresent windowsDscText
-  ) "Windows DSC must define all 5 presets";
+  test_all_5_presets_in_windows = assert' (allPresetsPresent windowsDscText) "Windows DSC must define all 5 presets";
+
+  # Verify numbered naming convention (N. quality) for sort order.
+  test_macos_has_numbered_names = assert' (builtins.all
+    (name: lib.hasInfix name macAutomatorWorkflowsText)
+    numberedNames
+  ) "macOS automator-workflows.nix must use numbered names (optimize PDF - (N) quality)";
+
+  test_nixos_has_numbered_names = assert' (builtins.all (
+    name: lib.hasInfix name nixosServicesText
+  ) numberedNames) "NixOS services.nix must use numbered names (optimize PDF - (N) quality)";
+
+  test_windows_has_numbered_names = assert' (builtins.all (
+    name: lib.hasInfix name windowsDscText
+  ) numberedNames) "Windows DSC must use numbered names (optimize PDF - (N) quality)";
+
+  test_plasma_has_numbered_names = assert' (builtins.all (
+    name: lib.hasInfix name plasmaDesktopText
+  ) numberedNames) "Plasma desktop file must use numbered names (optimize PDF - (N) quality)";
 
   test_nixos_nautilus_has_mime_guard = assert' (
     lib.hasInfix "file --mime-type" nautilusScriptText
@@ -47,6 +68,10 @@ let
     test_all_5_presets_in_macos
     test_all_5_presets_in_nixos
     test_all_5_presets_in_windows
+    test_macos_has_numbered_names
+    test_nixos_has_numbered_names
+    test_windows_has_numbered_names
+    test_plasma_has_numbered_names
     test_nixos_nautilus_has_mime_guard
     test_nixos_dolphin_scoped_to_pdf
     test_windows_scoped_to_pdf

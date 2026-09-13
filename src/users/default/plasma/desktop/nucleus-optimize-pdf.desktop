@@ -5,26 +5,26 @@ MimeType=application/pdf;
 Actions=optimizePdfDefault;optimizePdfPrepress;optimizePdfPrinter;optimizePdfEbook;optimizePdfScreen
 
 [Desktop Action optimizePdfDefault]
-Name=optimize PDF - default
+Name=optimize PDF - (1) default
 Exec=nucleus-utils optimize-pdf --preset default %f
 Icon=application-pdf
 
 [Desktop Action optimizePdfPrepress]
-Name=optimize PDF - prepress
+Name=optimize PDF - (2) prepress
 Exec=nucleus-utils optimize-pdf --preset prepress %f
 Icon=application-pdf
 
 [Desktop Action optimizePdfPrinter]
-Name=optimize PDF - printer
+Name=optimize PDF - (3) printer
 Exec=nucleus-utils optimize-pdf --preset printer %f
 Icon=application-pdf
 
 [Desktop Action optimizePdfEbook]
-Name=optimize PDF - ebook
+Name=optimize PDF - (4) ebook
 Exec=nucleus-utils optimize-pdf --preset ebook %f
 Icon=application-pdf
 
 [Desktop Action optimizePdfScreen]
-Name=optimize PDF - screen
+Name=optimize PDF - (5) screen
 Exec=nucleus-utils optimize-pdf --preset screen %f
 Icon=application-pdf

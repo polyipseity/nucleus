@@ -37,8 +37,9 @@ let
   };
 
   # Ghostscript PDF optimization presets (quality descending).
-  # Sorting policy: manually maintained in quality-descending order.
-  # Must match macOS and Windows ordering (default → prepress → printer → ebook → screen).
+  # Sorting policy: manually maintained in quality-descending order with numbering.
+  # Must match macOS and Windows ordering ((1) default → (2) prepress → (3) printer → (4) ebook → (5) screen).
+  # Numbering in parentheses after the "optimize PDF - " prefix ensures correct sort order on all platforms.
   optimizePdfPresets = [
     "default"
     "prepress"
@@ -83,25 +84,25 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
       executable = true;
     };
 
-    # Nautilus: right-click → Scripts → optimize PDF - <preset> (5 presets)
+    # Nautilus: right-click → Scripts → optimize PDF - (N) <preset> (5 presets)
     # Nautilus scripts have no MIME filtering; each script guards with file --mime-type.
-    ".local/share/nautilus/scripts/optimize PDF - default" = {
+    ".local/share/nautilus/scripts/optimize PDF - (1) default" = {
       source = optimizePdfNautilusScripts.default;
       executable = true;
     };
-    ".local/share/nautilus/scripts/optimize PDF - prepress" = {
+    ".local/share/nautilus/scripts/optimize PDF - (2) prepress" = {
       source = optimizePdfNautilusScripts.prepress;
       executable = true;
     };
-    ".local/share/nautilus/scripts/optimize PDF - printer" = {
+    ".local/share/nautilus/scripts/optimize PDF - (3) printer" = {
       source = optimizePdfNautilusScripts.printer;
       executable = true;
     };
-    ".local/share/nautilus/scripts/optimize PDF - ebook" = {
+    ".local/share/nautilus/scripts/optimize PDF - (4) ebook" = {
       source = optimizePdfNautilusScripts.ebook;
       executable = true;
     };
-    ".local/share/nautilus/scripts/optimize PDF - screen" = {
+    ".local/share/nautilus/scripts/optimize PDF - (5) screen" = {
       source = optimizePdfNautilusScripts.screen;
       executable = true;
     };

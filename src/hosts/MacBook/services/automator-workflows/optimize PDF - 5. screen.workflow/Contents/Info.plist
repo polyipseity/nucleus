@@ -16,7 +16,7 @@
 			<key>NSMenuItem</key>
 			<dict>
 				<key>default</key>
-				<string>optimize PDF - screen</string>
+				<string>optimize PDF - (5) screen</string>
 			</dict>
 			<key>NSMessage</key>
 			<string>runWorkflowAsService</string>

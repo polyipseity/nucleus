@@ -1,6 +1,6 @@
 ---
 # WinGet DSC v3 - user-level "optimize PDF" context menu presets
-# Sorting policy: quality-descending order (default → prepress → printer → ebook → screen).
+# Sorting policy: quality-descending order with numbering ((1) default → (2) prepress → (3) printer → (4) ebook → (5) screen).
 # Must match macOS and NixOS ordering. No automatic sorting.
 $schema: https://aka.ms/configuration-dsc-schema/0.2
 properties:
@@ -10,17 +10,17 @@ properties:
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: optimizePdfVerbDefault
       directives:
-        description: Add "optimize PDF - default" to the right-click context menu for PDF files
+        description: Add "optimize PDF - (1) default" to the right-click context menu for PDF files
       settings:
-        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - default
-        valueData: "optimize PDF - default"
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - (1) default
+        valueData: "optimize PDF - (1) default"
         valueType: String
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: optimizePdfCmdDefault
       directives:
-        description: Command for the optimize PDF - default context menu entry
+        description: Command for the optimize PDF - (1) default context menu entry
       settings:
-        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - default\command
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - (1) default\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
           "nucleus-utils optimize-pdf --preset default '%1'"
@@ -29,17 +29,17 @@ properties:
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: optimizePdfVerbPrepress
       directives:
-        description: Add "optimize PDF - prepress" to the right-click context menu for PDF files
+        description: Add "optimize PDF - (2) prepress" to the right-click context menu for PDF files
       settings:
-        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - prepress
-        valueData: "optimize PDF - prepress"
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - (2) prepress
+        valueData: "optimize PDF - (2) prepress"
         valueType: String
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: optimizePdfCmdPrepress
       directives:
-        description: Command for the optimize PDF - prepress context menu entry
+        description: Command for the optimize PDF - (2) prepress context menu entry
       settings:
-        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - prepress\command
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - (2) prepress\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
           "nucleus-utils optimize-pdf --preset prepress '%1'"
@@ -48,17 +48,17 @@ properties:
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: optimizePdfVerbPrinter
       directives:
-        description: Add "optimize PDF - printer" to the right-click context menu for PDF files
+        description: Add "optimize PDF - (3) printer" to the right-click context menu for PDF files
       settings:
-        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - printer
-        valueData: "optimize PDF - printer"
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - (3) printer
+        valueData: "optimize PDF - (3) printer"
         valueType: String
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: optimizePdfCmdPrinter
       directives:
-        description: Command for the optimize PDF - printer context menu entry
+        description: Command for the optimize PDF - (3) printer context menu entry
       settings:
-        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - printer\command
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - (3) printer\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
           "nucleus-utils optimize-pdf --preset printer '%1'"
@@ -67,17 +67,17 @@ properties:
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: optimizePdfVerbEbook
       directives:
-        description: Add "optimize PDF - ebook" to the right-click context menu for PDF files
+        description: Add "optimize PDF - (4) ebook" to the right-click context menu for PDF files
       settings:
-        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - ebook
-        valueData: "optimize PDF - ebook"
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - (4) ebook
+        valueData: "optimize PDF - (4) ebook"
         valueType: String
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: optimizePdfCmdEbook
       directives:
-        description: Command for the optimize PDF - ebook context menu entry
+        description: Command for the optimize PDF - (4) ebook context menu entry
       settings:
-        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - ebook\command
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - (4) ebook\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
           "nucleus-utils optimize-pdf --preset ebook '%1'"
@@ -86,17 +86,17 @@ properties:
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: optimizePdfVerbScreen
       directives:
-        description: Add "optimize PDF - screen" to the right-click context menu for PDF files
+        description: Add "optimize PDF - (5) screen" to the right-click context menu for PDF files
       settings:
-        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - screen
-        valueData: "optimize PDF - screen"
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - (5) screen
+        valueData: "optimize PDF - (5) screen"
         valueType: String
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: optimizePdfCmdScreen
       directives:
-        description: Command for the optimize PDF - screen context menu entry
+        description: Command for the optimize PDF - (5) screen context menu entry
       settings:
-        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - screen\command
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - (5) screen\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
           "nucleus-utils optimize-pdf --preset screen '%1'"

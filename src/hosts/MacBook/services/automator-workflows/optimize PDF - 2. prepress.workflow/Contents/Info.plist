@@ -16,7 +16,7 @@
 			<key>NSMenuItem</key>
 			<dict>
 				<key>default</key>
-				<string>optimize PDF - prepress</string>
+				<string>optimize PDF - (2) prepress</string>
 			</dict>
 			<key>NSMessage</key>
 			<string>runWorkflowAsService</string>
