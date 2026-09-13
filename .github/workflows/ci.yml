@@ -84,16 +84,16 @@ jobs:
         if: runner.os != 'Windows'
         run: bash scripts/bootstrap.sh --no-apply --no-ai-sync --force-admin
 
+      - name: Provision bootstrap dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: pwsh -NoLogo -NoProfile -NonInteractive -File scripts/bootstrap.ps1 -ForceAdmin
+
       - name: Run repository checks (POSIX)
         if: runner.os != 'Windows'
         env:
           PACKER_GITHUB_API_TOKEN: ${{ github.token }}
         # --no-fail-fast: CI should accumulate all failures for visibility.
         run: nix run ./src#check -- --no-fail-fast
-
-      - name: Provision bootstrap dependencies (Windows)
-        if: runner.os == 'Windows'
-        run: pwsh -NoLogo -NoProfile -NonInteractive -File scripts/bootstrap.ps1 -ForceAdmin
 
       - name: Run repository checks (Windows)
         if: runner.os == 'Windows'
