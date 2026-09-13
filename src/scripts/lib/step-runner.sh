@@ -562,10 +562,28 @@ aggregate_results() {
     fi
 
     if [ -f "$_wave_tmpdir/step-$_n.out" ]; then
-      if [ -n "$_nuc_c1_cyan" ]; then
-        sed "s/^=== .*$/${_nuc_c1_bold}${_nuc_c1_cyan}&${_nuc_c1_reset}/" "$_wave_tmpdir/step-$_n.out"
-      else
-        cat "$_wave_tmpdir/step-$_n.out"
+      # In quiet mode, only replay output for failed steps (so errors are visible).
+      # In verbose mode, replay all output.
+      local _step_id="${_STEP_IDS[$_i]}"
+      local _should_replay=false
+      if [ "${#VERBOSE_IDS[@]}" -gt 0 ]; then
+        for _vid in "${VERBOSE_IDS[@]}"; do
+          if [ "$_vid" = "*" ] || [ "$_vid" = "$_step_id" ]; then
+            _should_replay=true
+            break
+          fi
+        done
+      fi
+      # Always replay failed steps regardless of verbose mode
+      if [ "$_exit_code" -ne 0 ] && [ "$_exit_code" -ne 2 ]; then
+        _should_replay=true
+      fi
+      if $_should_replay; then
+        if [ -n "$_nuc_c1_cyan" ]; then
+          sed "s/^=== .*$/${_nuc_c1_bold}${_nuc_c1_cyan}&${_nuc_c1_reset}/" "$_wave_tmpdir/step-$_n.out"
+        else
+          cat "$_wave_tmpdir/step-$_n.out"
+        fi
       fi
     fi
   done

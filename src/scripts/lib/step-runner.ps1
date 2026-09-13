@@ -631,13 +631,18 @@ function Format-StepSummary {
       $failedSteps = "$failedSteps$n "
     }
 
-    # Replay step output
+    # Replay step output (verbose mode or failed steps only)
     $outFile = Join-Path $script:WaveTmpDir "step-$n.out"
     if (Test-Path $outFile) {
-      Get-Content -Path $outFile | ForEach-Object {
-        if ($_ -match '^=== .* ===') { "$($script:NucStyleBold)$($script:NucStyleCyan)$_$($script:NucStyleReset)" }
-        else { $_ }
-      } | Write-Output
+      $stepId = $script:StepIds[$i]
+      $isVerbose = $script:VerboseIds -contains '*' -or $script:VerboseIds -contains $stepId
+      $isFailed = $exitCode -ne '0' -and $exitCode -ne '2'
+      if ($isVerbose -or $isFailed) {
+        Get-Content -Path $outFile | ForEach-Object {
+          if ($_ -match '^=== .* ===') { "$($script:NucStyleBold)$($script:NucStyleCyan)$_$($script:NucStyleReset)" }
+          else { $_ }
+        } | Write-Output
+      }
     }
   }
 
