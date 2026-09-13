@@ -563,6 +563,8 @@ $sopsCandidates = @(
 
 $gpgCandidates = @(
   (Join-Path -Path $env:ProgramFiles -ChildPath "GnuPG\bin\gpg.exe"),
+  # WHY: standalone GnuPG (GnuPG.GnuPG) installs to Program Files (x86) on x64 systems.
+  (Join-Path -Path "${env:ProgramFiles(x86)}" -ChildPath "GnuPG\bin\gpg.exe"),
   # check-suppress:suppression_doc: probe whether gpg is on PATH; Get-Command throws when absent.
   (Get-Command -Name "gpg.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
 ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }

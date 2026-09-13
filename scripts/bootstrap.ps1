@@ -117,7 +117,7 @@ function Get-RequiredVersionSetting {
     Import-BootstrapVersionTable.
 
   .PARAMETER Key
-    The settings key to look up (e.g. 'NUCLEUS_GPG4WIN_VERSION').
+    The settings key to look up (e.g. 'NUCLEUS_GNUPG_VERSION').
 
   .OUTPUTS
     [string]  The non-empty value associated with $Key.
@@ -313,7 +313,7 @@ if (-not (Get-Command -Name winget -ErrorAction SilentlyContinue)) {
 $BootstrapVersions = Import-BootstrapVersionTable -FilePath $VersionsFilePath
 
 $BootstrapPackageVersions = [ordered]@{
-  "GnuPG.Gpg4win" = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_GPG4WIN_VERSION"
+  "GnuPG.GnuPG" = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_GNUPG_VERSION"
   "HashiCorp.Packer" = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_PACKER_VERSION"
   "SecretsOPerationS.SOPS" = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_SOPS_VERSION"
 }

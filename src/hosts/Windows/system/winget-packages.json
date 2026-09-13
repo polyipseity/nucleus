@@ -17,7 +17,7 @@
     "GIMP.GIMP",
     "Git.Git",
     "GitHub.cli",
-    "GnuPG.Gpg4win",
+    "GnuPG.GnuPG",
     "Google.Chrome",
     "Google.Chrome.Canary",
     "Google.ChromeRemoteDesktopHost",

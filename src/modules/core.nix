@@ -307,7 +307,7 @@ let
         name = "gnupg";
       };
       nixpkgs = "gnupg";
-      winget = "GnuPG.Gpg4win";
+      winget = "GnuPG.GnuPG";
     };
     "google-chrome" = {
       category = "gui";

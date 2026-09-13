@@ -284,7 +284,7 @@
     "GIMP.GIMP": "3.2.4",
     "Git.Git": "2.54.0",
     "GitHub.cli": "2.93.0",
-    "GnuPG.Gpg4win": "5.0.2",
+    "GnuPG.GnuPG": "2.5.21",
     "Google.Chrome": "149.0.7827.54",
     "Google.Chrome.Canary": "151.0.7878.0",
     "Google.ChromeRemoteDesktopHost": "149.0.7827.18",
