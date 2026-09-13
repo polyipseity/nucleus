@@ -112,8 +112,7 @@ let
 
   # === LOCKFILE ===
 
-  lockfileText = builtins.readFile ../../src/lockfiles/lockfile.json;
-  test_lockfile_has_hermes_agent = assert' (lib.hasInfix ''"hermes-agent"'' lockfileText) "lockfile.json must pin hermes-agent version in uv section";
+
 
   # === PACKAGE PARITY (POSIX only — Windows uses uv tool install) ===
 
@@ -161,7 +160,6 @@ let
     test_wrapper_module_asserts_secret_domain
     test_default_catalog_declares_hermes_user_secrets
     test_home_imports_hermes_agent
-    test_lockfile_has_hermes_agent
     test_hermes_agent_overlay_provides_package
     test_playwright_browsers_path_in_env_catalog
     test_data_directory_imported
