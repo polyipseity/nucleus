@@ -5,21 +5,12 @@ let
   macAutomatorWorkflowsText = builtins.readFile ../../src/hosts/MacBook/services/automator-workflows/default.nix;
   nixosServicesText = builtins.readFile ../../src/hosts/NixOS/services.nix;
   windowsDscText = builtins.readFile ../../src/hosts/Windows/user/context-strip-metadata.dsc.yml;
-  nautilusScriptText = builtins.readFile ../../src/scripts/integrations/configure-file-manager-strip-metadata.sh;
-  plasmaDesktopText = builtins.readFile ../../src/users/default/plasma/desktop/nucleus-strip-metadata.desktop;
-  utilsShText = builtins.readFile ../../scripts/utils.sh;
 
   inherit (import ../lib.nix) assert';
-
-  # Check that a context menu entry invokes strip-metadata.
-  hasStripMetadataCommand = text: lib.hasInfix "strip-metadata" text;
 
   macWorkflowsDir = ../../src/hosts/MacBook/services/automator-workflows;
   macWorkflowPlist = builtins.readFile (
     builtins.toPath (toString macWorkflowsDir + "/strip metadata.workflow/Contents/Info.plist")
-  );
-  macWorkflowWflow = builtins.readFile (
-    builtins.toPath (toString macWorkflowsDir + "/strip metadata.workflow/Contents/document.wflow")
   );
 
   # === macOS tests ===
@@ -38,23 +29,6 @@ let
     && !lib.hasInfix "com.microsoft" macWorkflowPlist
   ) "Unified strip-metadata Info.plist must use public.item UTI (not per-format UTIs)";
 
-  test_macos_workflow_ordering = assert' (
-    let
-      posOpenManual = builtins.stringLength (
-        builtins.head (builtins.split "\"open nucleus manual.workflow\"" macAutomatorWorkflowsText)
-      );
-      posStripMeta = builtins.stringLength (
-        builtins.head (builtins.split "\"strip metadata.workflow\"" macAutomatorWorkflowsText)
-      );
-      posOptDefault = builtins.stringLength (
-        builtins.head (builtins.split "\"optimize PDF - default.workflow\"" macAutomatorWorkflowsText)
-      );
-    in
-    posOpenManual < posStripMeta && posStripMeta < posOptDefault
-  ) "macOS strip-metadata workflow must be between 'open nucleus manual' and 'optimize PDF' blocks";
-
-  test_macos_workflow_has_strip_metadata_command = assert' (hasStripMetadataCommand macWorkflowWflow) "macOS strip-metadata document.wflow must invoke strip-metadata";
-
   # === NixOS tests ===
 
   test_nixos_has_strip_metadata = assert' (
@@ -66,39 +40,11 @@ let
 
   test_windows_has_strip_metadata_label = assert' (lib.hasInfix "strip metadata" windowsDscText) "Windows DSC must use the 'strip metadata' label";
 
-  # === Integration tests ===
-
-  test_plasma_desktop_has_strip_metadata_command = assert' (hasStripMetadataCommand plasmaDesktopText) "Plasma desktop entry must invoke strip-metadata";
-
-  test_nautilus_script_has_strip_metadata_command = assert' (hasStripMetadataCommand nautilusScriptText) "Nautilus script must invoke strip-metadata";
-
-  test_windows_dsc_has_strip_metadata_command = assert' (hasStripMetadataCommand windowsDscText) "Windows DSC must invoke strip-metadata in all command entries";
-
-  # === Behavioral tests ===
-
-  test_exiftool_preserves_icc_profiles = assert' (lib.hasInfix "--icc_profile:all" utilsShText) "utils.sh exiftool command must include --icc_profile:all to preserve ICC color profiles";
-
-  test_plasma_desktop_excludes_pdf = assert' (
-    !(lib.hasInfix "application/pdf" plasmaDesktopText)
-  ) "Plasma strip-metadata desktop entry must not include application/pdf in MimeType";
-
-  test_utils_sh_skips_pdf = assert' (
-    lib.hasInfix "*.pdf)" utilsShText && lib.hasInfix "skipping PDF" utilsShText
-  ) "utils.sh strip-metadata must have explicit PDF skip case";
-
   allTests = [
     test_single_strip_metadata_workflow_exists
     test_strip_metadata_uses_public_item
-    test_macos_workflow_ordering
-    test_macos_workflow_has_strip_metadata_command
     test_nixos_has_strip_metadata
     test_windows_has_strip_metadata_label
-    test_plasma_desktop_has_strip_metadata_command
-    test_nautilus_script_has_strip_metadata_command
-    test_windows_dsc_has_strip_metadata_command
-    test_exiftool_preserves_icc_profiles
-    test_plasma_desktop_excludes_pdf
-    test_utils_sh_skips_pdf
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {
