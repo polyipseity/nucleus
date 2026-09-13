@@ -168,7 +168,7 @@ macos_remove_app_launchagent() {
   # argument array; recognising only the array form leaves their agent registered,
   # so the app starts twice.
   if [ -z "$plist_program" ]; then
-    plist_program=$(awk '/<key>Program<\/key>/{getline; s=$0; gsub(/.*<string>|<\/string>.*/, ""); print s; exit}' "$plist_path")
+    plist_program=$(awk '/<key>Program<\/key>/{getline; s=$0; gsub(/.*<string>|<\/string>.*/, "", s); print s; exit}' "$plist_path")
   fi
   if [ -n "$plist_program" ] && { [ "$plist_program" = "$app_path" ] || [[ "$plist_program" == "$app_path/"* ]]; }; then
     rm -f "$plist_path"

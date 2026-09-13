@@ -44,16 +44,16 @@ test_system_file_fallback() {
   mkdir -p "$tmpdir/src"
   printf 'marker\n' >"$tmpdir/src/flake.nix"
   # Write the system file from the parent shell so the subshell only reads it.
-  printf '%s\n' "$tmpdir" > "$tmpdir/system-repo-root"
+  printf '%s\n' "$tmpdir" >"$tmpdir/system-repo-root"
   # Explicitly unset NUCLEUS_REPO_ROOT so derive_repo_root falls through to
   # the system file path — prevents inherited env from short-circuiting.
   out="$(_run_provision "NUCLEUS_REPO_ROOT= NUCLEUS_REPO_ROOT_SYSTEM_FILE=$tmpdir/system-repo-root" 'resolve_repo_root_target' 2>&1)" || rc=$?
-  rm -rf "$tmpdir"
   if [ "$rc" -eq 0 ] && [ -d "$out" ] && [ -f "$out/src/flake.nix" ]; then
     assert_pass "resolve_repo_root_target falls back to SYSTEM repo-root file"
   else
     assert_fail "system-file" "rc=$rc output: $out"
   fi
+  rm -rf "$tmpdir"
 }
 
 # Case C: with neither available, resolution fails hard (no fallback to store path).
