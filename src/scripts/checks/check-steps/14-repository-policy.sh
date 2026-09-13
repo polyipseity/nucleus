@@ -190,6 +190,15 @@ run_activation_naming_policy() {
 
   sort -u -o "$_names_file" "$_names_file"
 
+  # Normalize absolute paths to be relative to the repo root so the
+  # regex filters (which expect src/... paths) work correctly.
+  if [ -s "$_names_file" ]; then
+    local _normalized
+    _normalized=$(mktemp)
+    sed "s|^${_repo_root}/||" "$_names_file" >"$_normalized"
+    mv "$_normalized" "$_names_file"
+  fi
+
   # Names defined outside macOS-scoped paths are cross-platform and need no macos- prefix.
   grep -v -E '^(src/platforms/macOS|src/hosts/MacBook)/' "$_names_file" |
     cut -d: -f3 |
