@@ -3,9 +3,13 @@
   "allowPty": true,
   "enableWeakerNetworkIsolation": true,
   "filesystem": {
-    "allowRead": [],
+    "allowRead": [
+      "~/.gnupg",
+      "~/Library/Keychains"
+    ],
     "allowWrite": [
       ".",
+      "/private/tmp",
       "/tmp",
       "~/.bun",
       "~/.cache",
@@ -29,8 +33,7 @@
       "~/.kube",
       "~/.npmrc",
       "~/.sops",
-      "~/.ssh",
-      "~/Library/Keychains"
+      "~/.ssh"
     ],
     "denyWrite": [
       ".env",
@@ -55,6 +58,7 @@
       "/private/tmp",
       "/private/var",
       "/System",
+      "/tmp",
       "/usr/bin",
       "/usr/lib",
       "/usr/local",
