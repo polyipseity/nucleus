@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   Ensures %USERPROFILE%\data\hermes-agent\ exists, creates a default SOUL.md
-  if not present, symlinks %USERPROFILE%\.hermes\SOUL.md to it, and ensures
+  if not present, symlinks %USERPROFILE%\.hermes\ to it, and ensures
   PLAYWRIGHT_BROWSERS_PATH is set for browser tools.
 
   This is the Windows equivalent of the POSIX activation entries in hermes-agent.nix.
@@ -45,7 +45,7 @@ function Sync-HermesConfig {
   $dataDir = Join-Path -Path $HOME -ChildPath 'data'
   $hermesDataDir = Join-Path -Path $dataDir -ChildPath 'hermes-agent'
   $soulMdSource = Join-Path -Path $hermesDataDir -ChildPath 'SOUL.md'
-  $soulMdTarget = Join-Path -Path $HOME -ChildPath '.hermes\SOUL.md'
+  $hermesSymlinkTarget = Join-Path -Path $HOME -ChildPath '.hermes'
 
   # Default SOUL.md content (matches POSIX default in data-directory.nix)
   $defaultSoulContent = @'
@@ -64,15 +64,20 @@ You are Hermes Agent, built by Nous Research. Be direct: match the length of you
     Write-NucleusNotice "[$label] created file: data/hermes-agent/SOUL.md"
   }
 
-  # Create symlink ~/.hermes/SOUL.md -> ~/data/hermes-agent/SOUL.md
-  # Skip if symlink already exists or target already present
-  if (-not (Test-Path -Path $soulMdTarget) -and -not (Test-Path -Path $soulMdTarget -PathType SymbolicLink)) {
-    $hermesDir = Split-Path -Path $soulMdTarget -Parent
+  # Create directory symlink ~/.hermes -> ~/data/hermes-agent
+  # Skip if symlink already exists or target directory already present
+  if (-not (Test-Path -Path $hermesSymlinkTarget) -and -not (Test-Path -Path $hermesSymlinkTarget -PathType SymbolicLink)) {
+    # Remove existing real directory if present (migration from old layout)
+    if (Test-Path -Path $HOME\.hermes -PathType Container) {
+      Remove-Item -Path $HOME\.hermes -Recurse -Force
+      Write-NucleusNotice "[$label] removed real ~/.hermes directory (migrating to symlink)"
+    }
+    $hermesDir = Split-Path -Path $hermesSymlinkTarget -Parent
     if (-not (Test-Path -Path $hermesDir)) {
       New-Item -ItemType Directory -Path $hermesDir -Force | Out-Null
     }
-    New-Item -ItemType SymbolicLink -Path $soulMdTarget -Target $soulMdSource | Out-Null
-    Write-NucleusNotice "[$label] created symlink: $soulMdTarget -> $soulMdSource"
+    New-Item -ItemType SymbolicLink -Path $hermesSymlinkTarget -Target $hermesDataDir | Out-Null
+    Write-NucleusNotice "[$label] created symlink: $hermesSymlinkTarget -> $hermesDataDir"
   }
 
   # Playwright browsers path management

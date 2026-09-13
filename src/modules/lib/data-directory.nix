@@ -20,7 +20,7 @@ let
   baseOps = [ ];
 
   # Hermes-agent SOUL.md provisioning. The persona file lives outside the
-  # repo in ~/data/hermes-agent/ and is symlinked from ~/.hermes/SOUL.md.
+  # repo in ~/data/hermes-agent/ and symlinked to ~/.hermes/.
   hermesOps = [
     {
       op = "dir";
@@ -33,8 +33,8 @@ let
     }
     {
       op = "symlink";
-      path = "${homeDir}/.hermes/SOUL.md";
-      target = "${homeDir}/data/hermes-agent/SOUL.md";
+      path = "${homeDir}/.hermes";
+      target = "${homeDir}/data/hermes-agent";
     }
   ];
 in
