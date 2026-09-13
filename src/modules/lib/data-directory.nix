@@ -19,17 +19,12 @@ let
   # lib.mkMerge in the config section.
   baseOps = [ ];
 
-  # Hermes-agent SOUL.md provisioning. The persona file lives outside the
-  # repo in ~/data/hermes-agent/ and symlinked to ~/.hermes/.
+  # Hermes-agent directory provisioning. The entire ~/.hermes/ directory is
+  # symlinked to ~/data/hermes-agent/ so all hermes state lives under ~/data/.
   hermesOps = [
     {
       op = "dir";
       path = "hermes-agent";
-    }
-    {
-      op = "file";
-      path = "hermes-agent/SOUL.md";
-      content = builtins.readFile ../configs/hermes-agent/SOUL.md;
     }
     {
       op = "symlink";
