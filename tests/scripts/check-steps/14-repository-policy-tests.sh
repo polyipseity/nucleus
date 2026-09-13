@@ -184,7 +184,7 @@ test_step14_nix_file_structure_pattern1_detection() {
   local _out
   _out=$(mktemp)
   # shellcheck source=/dev/null
-  (cd "$_tmp" && mkdir -p src && git init -q && touch src/.gitkeep && git add . && git commit -q -m 'init' &&
+  (cd "$_tmp" && mkdir -p src && git init -q && git config user.email "test@example.com" && git config user.name "Test User" && touch src/.gitkeep && git add . && git commit -q -m 'init' &&
     unset _NUCLEUS_STEP_RUNNER_SOURCED _NUCLEUS_CHECK_LIB_SOURCED && _STEP_IDS=() && . "$REPO_ROOT/src/scripts/checks/check-lib.sh" &&
     . "$TEST_FILE" &&
     declare -A ctx=([HAS_ARGS]=false [REPO_ROOT]="$_tmp") &&
@@ -208,7 +208,7 @@ test_step14_nix_file_structure_pattern2_detection() {
   local _out
   _out=$(mktemp)
   # shellcheck source=/dev/null
-  (cd "$_tmp" && mkdir -p src && git init -q && touch src/.gitkeep && git add . && git commit -q -m 'init' &&
+  (cd "$_tmp" && mkdir -p src && git init -q && git config user.email "test@example.com" && git config user.name "Test User" && touch src/.gitkeep && git add . && git commit -q -m 'init' &&
     unset _NUCLEUS_STEP_RUNNER_SOURCED _NUCLEUS_CHECK_LIB_SOURCED && _STEP_IDS=() && . "$REPO_ROOT/src/scripts/checks/check-lib.sh" &&
     . "$TEST_FILE" &&
     declare -A ctx=([HAS_ARGS]=false [REPO_ROOT]="$_tmp") &&
@@ -232,7 +232,7 @@ test_step14_nix_file_structure_valid_passes() {
   local _out
   _out=$(mktemp)
   # shellcheck source=/dev/null
-  (cd "$_tmp" && mkdir -p src && git init -q && touch src/.gitkeep && git add . && git commit -q -m 'init' &&
+  (cd "$_tmp" && mkdir -p src && git init -q && git config user.email "test@example.com" && git config user.name "Test User" && touch src/.gitkeep && git add . && git commit -q -m 'init' &&
     unset _NUCLEUS_STEP_RUNNER_SOURCED _NUCLEUS_CHECK_LIB_SOURCED && _STEP_IDS=() && . "$REPO_ROOT/src/scripts/checks/check-lib.sh" &&
     . "$TEST_FILE" &&
     declare -A ctx=([HAS_ARGS]=false [REPO_ROOT]="$_tmp") &&
