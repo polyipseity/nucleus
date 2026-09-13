@@ -3,9 +3,8 @@
   Provision hermes-agent SOUL.md and set Playwright browsers path on Windows.
 
 .DESCRIPTION
-  Ensures %USERPROFILE%\data\hermes-agent\ exists, creates a default SOUL.md
-  if not present, symlinks %USERPROFILE%\.hermes\ to it, and ensures
-  PLAYWRIGHT_BROWSERS_PATH is set for browser tools.
+  Ensures %USERPROFILE%\data\hermes-agent\ exists, symlinks %USERPROFILE%\.hermes\
+  to it, and ensures PLAYWRIGHT_BROWSERS_PATH is set for browser tools.
 
   This is the Windows equivalent of the POSIX activation entries in hermes-agent.nix.
 
@@ -44,13 +43,7 @@ function Sync-HermesConfig {
 
   $dataDir = Join-Path -Path $HOME -ChildPath 'data'
   $hermesDataDir = Join-Path -Path $dataDir -ChildPath 'hermes-agent'
-  $soulMdSource = Join-Path -Path $hermesDataDir -ChildPath 'SOUL.md'
   $hermesSymlinkTarget = Join-Path -Path $HOME -ChildPath '.hermes'
-
-  # Default SOUL.md content (matches POSIX default in data-directory.nix)
-  $defaultSoulContent = @'
-You are Hermes Agent, built by Nous Research. Be direct: match the length of your reply to the weight of the ask — a one-line question gets a one-line answer, and finished work gets a short report of what changed, what's verified, and what's left, never a replay of the process. No filler ("Great question," "I'd be happy to"), no restating the request back, no re-summarizing what you already said, no narrating tool calls the user can see. Plain claims over adjectives; when unsure, say so plainly. Agree because it's right, not because the user said it. Depth is earned — give it when the user asks for detail, teaches, or the stakes demand it, not by default.
-'@
 
   # Ensure ~/data/hermes-agent/ exists
   if (-not (Test-Path -Path $hermesDataDir)) {
@@ -58,13 +51,7 @@ You are Hermes Agent, built by Nous Research. Be direct: match the length of you
     Write-NucleusNotice "[$label] created directory: data/hermes-agent"
   }
 
-  # Create default SOUL.md if not exists
-  if (-not (Test-Path -Path $soulMdSource)) {
-    Set-Content -Path $soulMdSource -Value $defaultSoulContent -NoNewline
-    Write-NucleusNotice "[$label] created file: data/hermes-agent/SOUL.md"
-  }
-
-  # Create directory symlink ~/.hermes -> ~/data/hermes-agent
+  # Create directory symlink ~/.hermes/ -> ~/data/hermes-agent/
   # Skip if symlink already exists or target directory already present
   if (-not (Test-Path -Path $hermesSymlinkTarget) -and -not (Test-Path -Path $hermesSymlinkTarget -PathType SymbolicLink)) {
     # Remove existing real directory if present (migration from old layout)
