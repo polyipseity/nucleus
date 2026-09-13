@@ -314,6 +314,7 @@ $BootstrapVersions = Import-BootstrapVersionTable -FilePath $VersionsFilePath
 
 $BootstrapPackageVersions = [ordered]@{
   "GnuPG.Gpg4win" = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_GPG4WIN_VERSION"
+  "HashiCorp.Packer" = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_PACKER_VERSION"
   "SecretsOPerationS.SOPS" = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_SOPS_VERSION"
 }
 
