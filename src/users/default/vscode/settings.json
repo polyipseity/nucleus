@@ -289,6 +289,7 @@
   "github.codespaces.supportProxies": true,
   "github.copilot.chat.agent.backgroundTodoAgent.enabled": true,
   "github.copilot.chat.agent.currentEditorContext.enabled": false,
+  "github.copilot.chat.agentDebugLog.fileLogging.enabled": true,
   "github.copilot.chat.alternateGeminiModelFPrompt.enabled": true,
   "github.copilot.chat.alternateGptPrompt.enabled": true,
   "github.copilot.chat.anthropic.tools.websearch.enabled": true,
