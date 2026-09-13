@@ -76,6 +76,7 @@
     "allowAllUnixSockets": false,
     "allowedDomains": [
       "*.anthropic.com",
+      "*.blob.core.windows.net",
       "*.github.com",
       "*.googleapis.com",
       "*.huggingface.co",
@@ -156,6 +157,7 @@
       "pypi.org",
       "r.jina.ai",
       "registry.ollama.ai",
+      "results-receiver.actions.githubusercontent.com",
       "run.xcrawl.com",
       "s.jina.ai",
       "search.parallel.ai",
