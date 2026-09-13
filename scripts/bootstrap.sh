@@ -255,6 +255,36 @@ else
   say "Bootstrap dependencies already present, skipping installation."
 fi
 
+# ── PowerShell module provisioning ──────────────────────────────────────────
+# Mirror of Invoke-PowerShellModuleSetup.ps1 (Windows bootstrap).
+# Reads lockfile.json pwsh section; installs each module at pinned version.
+# Uses the same install-pwsh-module.sh helper as Nix activation.
+provision_pwsh_modules() {
+  local _pwsh="$1"
+  [ -x "$_pwsh" ] || return 0
+
+  local _lockfile="$REPO_ROOT/src/lockfiles/lockfile.json"
+  [ -f "$_lockfile" ] || return 0
+
+  local _modules
+  _modules=$("$_pwsh" -NoProfile -Command "
+    \$lf = Get-Content -Raw '$(cygpath -w "$_lockfile" 2>/dev/null || echo "$_lockfile")' | ConvertFrom-Json
+    if (\$lf.pwsh) { \$lf.pwsh.PSObject.Properties | ForEach-Object { Write-Output \"\$(\$_.Name)|\$(\$_.Value)\" } }
+  ") || return 0
+
+  while IFS='|' read -r _name _version; do
+    [ -n "$_name" ] || continue
+    "$SCRIPT_DIR/../src/scripts/packages/install-pwsh-module.sh" \
+      "$_pwsh" "$_name" "$_version"
+  done <<<"$_modules"
+}
+
+# Try Nix-packaged pwsh first (from runtimeInputs), fall back to system pwsh.
+_nix_pwsh=$(command -v pwsh 2>/dev/null || true) # check-suppress:suppression_doc: fallback to empty when pwsh is absent
+if [ -n "$_nix_pwsh" ]; then
+  provision_pwsh_modules "$_nix_pwsh"
+fi
+
 allow_repo_direnv_if_available
 
 if [ "$apply" = true ]; then

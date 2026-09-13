@@ -146,13 +146,10 @@ if (-not $skipPSSA) {
     throw 'PSScriptAnalyzer module is required for lint phase. Install with: Install-Module PSScriptAnalyzer -Scope CurrentUser'
   }
 
-  $originalPSModulePath = $env:PSModulePath
-  try {
   # Scope PSModulePath to reduce module-discovery overhead during PSSA rule evaluation.
-    $env:PSModulePath = @(
-      "$PSHome/Modules"
-      [System.IO.Path]::Combine($HOME, '.local/share/powershell/Modules')
-    ) -join [System.IO.Path]::PathSeparator
+  # Preserve the current pwsh's module paths (already correct for the running binary).
+  # Intentionally not overwriting $env:PSModulePath — the default value from the
+  # running pwsh already includes all required module directories.
 
     Import-Module PSScriptAnalyzer
     # Pre-import commonly-used modules to reduce PSSA's implicit Get-Command overhead during rule evaluation.
@@ -187,10 +184,6 @@ if (-not $skipPSSA) {
     }
 
     Write-NucleusInfo -CommandName check-pwsh ("PowerShell lint check passed for {0} files." -f $Paths.Count)
-  }
-  finally {
-    $env:PSModulePath = $originalPSModulePath
-  }
 } else {
   Write-NucleusInfo -CommandName check-pwsh 'PowerShell lint skipped (-SkipStep PSSA).'
 }

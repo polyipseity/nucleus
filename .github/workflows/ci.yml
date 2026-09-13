@@ -80,10 +80,9 @@ jobs:
         with:
           fail-mode: false
 
-      - name: Install PowerShell modules (POSIX)
+      - name: Provision pwsh modules (POSIX)
         if: runner.os != 'Windows'
-        run: |
-          pwsh -NoLogo -NoProfile -Command "Install-Module -Name PSScriptAnalyzer -RequiredVersion 1.25.0 -Force -Scope CurrentUser -AllowClobber"
+        run: bash scripts/bootstrap.sh --no-apply --no-ai-sync
 
       - name: Run repository checks (POSIX)
         if: runner.os != 'Windows'
