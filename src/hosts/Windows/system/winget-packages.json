@@ -63,6 +63,7 @@
     "TheDocumentFoundation.LibreOffice",
     "Typst.Typst",
     "Valve.Steam",
+    "Valve.SteamCMD",
     "VideoLAN.VLC",
     "Watfaq.PowerSession",
     "WinFsp.WinFsp",
@@ -84,6 +85,7 @@
     "sharkdp.fd",
     "suzuki-shunsuke.pinact",
     "tamasfe.taplo",
+    "waterlan.dos2unix",
     "zizmor.zizmor"
   ]
 }

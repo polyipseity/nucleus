@@ -51,12 +51,12 @@ function Show-NucleusNotification {
   param([string]$Title, [string]$Message)
   # check-suppress:suppression_doc: BurntToast module is optional — fall back to MessageBox.
   if (Get-Module -ListAvailable -Name BurntToast -ErrorAction SilentlyContinue) {
-    try { New-BurntToastNotification -Text $Title, $Message -ErrorAction Stop } catch { }
+    try { New-BurntToastNotification -Text $Title, $Message -ErrorAction Stop } catch { # check-suppress:suppression_doc: notification is best-effort; swallow all errors. }
   } else {
     try {
       [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null
       [System.Windows.Forms.MessageBox]::Show($Message, $Title, 'OK', 'Information') | Out-Null
-    } catch { }
+    } catch { # check-suppress:suppression_doc: notification is best-effort; swallow all errors. }
   }
 }
 

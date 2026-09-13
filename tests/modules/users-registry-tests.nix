@@ -86,12 +86,16 @@ let
     let
       exclusions = fixtureUser.iCloudExclusions.excludedDirNames;
     in
-    builtins.elem "node_modules" exclusions
-    && builtins.elem "target" exclusions
+    # The fixture overrides with 8 entries (a realistic subset).
     # Default-only entries must be absent — proves no element-wise union occurred.
-    && !(builtins.elem ".venv" exclusions)
+    builtins.length exclusions == 8
+    && builtins.elem "node_modules" exclusions
+    && builtins.elem "target" exclusions
+    && builtins.elem ".venv" exclusions
+    && builtins.elem ".hypothesis" exclusions
+    && builtins.elem "__pycache__" exclusions
+    # dist is in the default but NOT in the fixture — proves wholesale replacement.
     && !(builtins.elem "dist" exclusions)
-    && builtins.length exclusions == 2
   ) "users-registry.nix must replace default array wholesale (not union) on user override";
 
   allTests = [

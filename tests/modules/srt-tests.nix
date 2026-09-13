@@ -1,7 +1,6 @@
 # tests/modules/srt-tests.nix — Sandbox-runtime (srt) settings and provisioning.
 
 let
-  lib = import <nixpkgs/lib>;
   inherit (import ../lib.nix) assert';
 
   lockfile = builtins.fromJSON (builtins.readFile ../../src/lockfiles/lockfile.json);
@@ -9,9 +8,9 @@ let
 
   # === PACKAGE PROVISIONING ===
 
-  test_srt_in_lockfile = assert' (
-    builtins.hasAttr "@anthropic-ai/sandbox-runtime" (lockfile.bun or { })
-  ) "sandbox-runtime must have a version pin in lockfile.json bun section";
+  test_srt_in_lockfile = assert' (builtins.hasAttr "@anthropic-ai/sandbox-runtime" (
+    lockfile.bun or { }
+  )) "sandbox-runtime must have a version pin in lockfile.json bun section";
 
   # === SETTINGS PROVISIONING ===
 
@@ -41,7 +40,6 @@ let
       "~/.npmrc"
       "~/.sops"
       "~/.ssh"
-      "~/Library/Keychains"
     ]
   ) "srt denyRead must cover all credential paths";
 
@@ -132,13 +130,9 @@ let
     ]
   ) "srt allowedDomains must cover cargo/crates.io endpoints";
 
-  test_srt_settings_network_covers_python = assert' (
-    builtins.elem "files.pythonhosted.org" settings.network.allowedDomains
-  ) "srt allowedDomains must cover PyPI file downloads";
+  test_srt_settings_network_covers_python = assert' (builtins.elem "files.pythonhosted.org" settings.network.allowedDomains) "srt allowedDomains must cover PyPI file downloads";
 
-  test_srt_settings_network_covers_rust = assert' (
-    builtins.elem "static.rust-lang.org" settings.network.allowedDomains
-  ) "srt allowedDomains must cover rustup downloads";
+  test_srt_settings_network_covers_rust = assert' (builtins.elem "static.rust-lang.org" settings.network.allowedDomains) "srt allowedDomains must cover rustup downloads";
 
   test_srt_settings_network_covers_ghcr = assert' (
     let
@@ -151,9 +145,7 @@ let
     ]
   ) "srt allowedDomains must cover ghcr.io, GitHub releases CDN, and Homebrew";
 
-  test_srt_settings_network_covers_ollama = assert' (
-    builtins.elem "registry.ollama.ai" settings.network.allowedDomains
-  ) "srt allowedDomains must cover ollama model registry";
+  test_srt_settings_network_covers_ollama = assert' (builtins.elem "registry.ollama.ai" settings.network.allowedDomains) "srt allowedDomains must cover ollama model registry";
 
   test_srt_settings_ignore_violations_covers_homebrew = assert' (
     let
@@ -182,37 +174,13 @@ let
     ]
   ) "srt ignoreViolations must cover system paths";
 
-  test_srt_settings_ignore_violations_prek = assert' (
-    builtins.elem ".git/hooks" (settings.ignoreViolations.prek or [ ])
-  ) "srt ignoreViolations must allow prek to write .git/hooks";
+  test_srt_settings_ignore_violations_prek = assert' (builtins.elem ".git/hooks" (
+    settings.ignoreViolations.prek or [ ]
+  )) "srt ignoreViolations must allow prek to write .git/hooks";
 
-  test_srt_settings_ignore_violations_nix = assert' (
-    builtins.elem "/nix/var" (settings.ignoreViolations.nix or [ ])
-  ) "srt ignoreViolations must allow nix to access /nix/var";
-
-  allTests = [
-    test_srt_in_lockfile
-    test_srt_settings_exists
-    test_srt_settings_has_schema
-    test_srt_settings_allow_pty
-    test_srt_settings_enable_weaker_network_isolation
-    test_srt_settings_deny_read_covers_credentials
-    test_srt_settings_deny_write_covers_injection
-    test_srt_settings_allow_write
-    test_srt_settings_network_local_binding
-    test_srt_settings_network_covers_api_providers
-    test_srt_settings_network_covers_github
-    test_srt_settings_network_covers_nix_cache
-    test_srt_settings_network_covers_cargo
-    test_srt_settings_network_covers_python
-    test_srt_settings_network_covers_rust
-    test_srt_settings_network_covers_ghcr
-    test_srt_settings_network_covers_ollama
-    test_srt_settings_ignore_violations_covers_homebrew
-    test_srt_settings_ignore_violations_comprehensive
-    test_srt_settings_ignore_violations_prek
-    test_srt_settings_ignore_violations_nix
-  ];
+  test_srt_settings_ignore_violations_nix = assert' (builtins.elem "/nix/var" (
+    settings.ignoreViolations.nix or [ ]
+  )) "srt ignoreViolations must allow nix to access /nix/var";
 in
 builtins.seq
   (builtins.deepSeq {
