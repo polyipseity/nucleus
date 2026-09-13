@@ -564,6 +564,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure SQLite is installed for command-line database access
+      settings:
+        id: SQLite.SQLite
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure pinact is installed for cross-host GitHub Actions pin auditing parity with macOS and NixOS
       settings:
         id: suzuki-shunsuke.pinact

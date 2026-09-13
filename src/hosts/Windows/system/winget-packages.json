@@ -55,6 +55,7 @@
     "RimSort.RimSort",
     "Rustlang.Rustup",
     "SST.opencode",
+    "SQLite.SQLite",
     "Scoop.Scoop",
     "SecretsOPerationS.SOPS",
     "ShellCheck.ShellCheck",
