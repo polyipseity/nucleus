@@ -7,8 +7,8 @@
 # unioned with the npm-install record), installs missing or drifted packages,
 # and removes undesired ones.
 #
-# Args: $1 = jq bin, $2 = pi bin, $3 = awk bin, $4 = desired packages JSON,
-#       $5 = bun bin dir
+# Args: $1 = jq bin, $2 = pi bin, $3 = awk bin, $4 = sed bin,
+#       $5 = desired packages JSON, $6 = bun bin dir
 set -euo pipefail
 
 # SC2094 avoidance: trap-based cleanup eliminates read/write-same-file
@@ -31,15 +31,17 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 _jq_bin="$1"
 _pi_bin="$2"
 _gawk_bin="$3"
-_ipp_desired_json="$4"
-_ipp_bun_bin="$5"
+_sed_bin="$4"
+_ipp_desired_json="$5"
+_ipp_bun_bin="$6"
 
 # Add pi's directory and bun's directory to PATH.  pi is the runner; bun is
 # required because pi spawns the bare command "bun" for every npm: install
 # (npmCommand in src/users/default/pi/settings.json), so it must be
 # resolvable in the child environment, not merely callable by absolute path.
 _pi_bin_dir="$(dirname "$_pi_bin")"
-PATH="$_pi_bin_dir:$_ipp_bun_bin:$PATH"
+_sed_bin_dir="$(dirname "$_sed_bin")"
+PATH="$_pi_bin_dir:$_ipp_bun_bin:$_sed_bin_dir:$PATH"
 export PATH
 
 if [ ! -x "$_pi_bin" ]; then
@@ -236,11 +238,11 @@ _apply_pi_subagents_patches() {
 		}
 BLOCK
     # Delete the old block (comment + if + inner if + closing braces = lines 133-147)
-    sed -i '' '133,147d' "$_tmp"
+    sed '133,147d' "$_tmp" >"$_tmp.sed" && mv "$_tmp.sed" "$_tmp"
     # Insert the new block before the "if (target" line (now at line 133)
-    sed -i '' '132r '"$_block" "$_tmp"
+    sed '132r '"$_block" "$_tmp" >"$_tmp.sed" && mv "$_tmp.sed" "$_tmp"
     # Update the header comment to reflect the new behaviour
-    sed -i '' 's|Only Pi 0.85.0.s missing server exports may come from this extension.|Supplement any missing host peer from the extension own node_modules (bun-hoisted packages invisible from the Nix store path).|' "$_tmp"
+    sed 's|Only Pi 0.85.0.s missing server exports may come from this extension.|Supplement any missing host peer from the extension own node_modules (bun-hoisted packages invisible from the Nix store path).|' "$_tmp" >"$_tmp.sed" && mv "$_tmp.sed" "$_tmp"
     mv "$_tmp" "$_aliases"
     rm -f "$_block"
     say -l pi "patched runner-aliases.ts — widened supplement fallback"
@@ -250,9 +252,9 @@ BLOCK
   if [ -f "$_preload" ] && grep -q 'specifier === "@earendil-works/pi-server"' "$_preload" 2>/dev/null; then
     # Replace the hardcoded pi-server check with a generic JITI_ALIAS lookup.
     # Use single-quoted sed expression to avoid shell quote conflicts.
-    sed -i '' 's/if (specifier === "@earendil-works\/pi-server" || specifier === "@earendil-works\/pi-server\/unix") {/if (aliases[specifier]) {/' "$_preload"
+    sed 's/if (specifier === "@earendil-works\/pi-server" || specifier === "@earendil-works\/pi-server\/unix") {/if (aliases[specifier]) {/' "$_preload" >"$_preload.sed" && mv "$_preload.sed" "$_preload"
     # Update the header comment
-    sed -i '' 's|Only loaded when the parent supplies Pi 0.85.0.s missing server exports.|Intercept all supplemented host peer specifiers via the JITI_ALIAS map.|' "$_preload"
+    sed 's|Only loaded when the parent supplies Pi 0.85.0.s missing server exports.|Intercept all supplemented host peer specifiers via the JITI_ALIAS map.|' "$_preload" >"$_preload.sed" && mv "$_preload.sed" "$_preload"
     say -l pi "patched runner-server-preload.mjs — generalised interceptor"
   fi
 }

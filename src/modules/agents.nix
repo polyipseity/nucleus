@@ -194,6 +194,7 @@ in
         "${pkgs.jq}/bin/jq" \
         "${pkgs.pi-coding-agent}/bin/pi" \
         "${pkgs.gawk}/bin/awk" \
+        "${pkgs.gnused}/bin/sed" \
         '${builtins.toJSON (desiredFor "pi")}' \
         "${pkgs.bun}/bin"
     '';
