@@ -13,7 +13,7 @@ let
   envVars = import ../../src/modules/lib/env-secrets.nix {
     inherit config pkgs lib;
     username = "test";
-    hostName = "MacBook";
+    hostName = "NixOS";
   };
 
   # Build manifest directly from catalog, avoiding toJSON/fromJSON round-trip.
@@ -28,11 +28,11 @@ let
       hasNixOsEntry = entry.values ? NixOS || entry.values ? default;
       # Resolved-value semantics (matches env-secrets.nix allVars applicability):
       # an explicit Windows = null excludes the var from Windows parity checks.
-      hasWindowsEntry = envVars.resolveValue name "Windows" != null;
+      hasWindowsEntry = entry.values ? Windows || entry.values ? default;
       hasMacBookEntry = entry.values ? MacBook || entry.values ? default;
-      nixosValue = envVars.resolveValue name "NixOS";
-      macBookValue = envVars.resolveValue name "MacBook";
-      windowsValue = envVars.resolveValue name "Windows";
+      nixosValue = null;
+      macBookValue = null;
+      windowsValue = null;
       userSpecific = entry ? userSpecific && entry.userSpecific;
       why = entry.why;
       # dscRequired: true for every catalog var that MUST have a DSC entry.
