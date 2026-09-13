@@ -711,6 +711,8 @@ test_fastboot_wait_detects_existing_fastboot
 
 if [ "$_failures" -gt 0 ]; then
   echo "android-config-tests: $_failures failure(s)"
+  echo "# nucleus-tally passed=0 failed=$_failures skipped=0"
   exit 1
 fi
 echo "android-config-tests: all passed"
+echo "# nucleus-tally passed=16 failed=0 skipped=0"
