@@ -215,6 +215,8 @@ function Invoke-WingetPackageInstall {
     Optional.  Exact version string to install.  When omitted, the latest
     available version is installed.
   #>
+  # check-suppress:SuppressMessageAttribute: PSAvoidUsingEmptyCatchBlock -- catch guards against terminating errors from Stop-Process when the process already exited; -ErrorAction SilentlyContinue handles the common case
+  [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingEmptyCatchBlock', '')]
   param(
     [Parameter(Mandatory = $true)]
     [string]$Id,
@@ -238,9 +240,22 @@ function Invoke-WingetPackageInstall {
     "--silent"
   )
 
+  # WHY: timeout-300s: GnuPG's NSIS installer spawns resident child processes
+  # (gpg-agent, dirmngr, keyboxd, scdaemon) that prevent winget from returning.
+  # A 5-minute timeout catches this known hang and fails fast instead of
+  # blocking the CI runner indefinitely.
+  # Ref: https://github.com/fleetdm/fleet/pull/50025
+  $TimeoutSeconds = 300
+
   if ($Version) {
     $versionedArgs = @($installArgs + @("--version", $Version))
-    & winget @versionedArgs
+    $proc = Start-Process -FilePath "winget" -ArgumentList $versionedArgs `
+      -PassThru -NoNewWindow
+    if (-not $proc.WaitForExit($TimeoutSeconds * 1000)) {
+      try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch {} # check-suppress:suppression_doc: process may already have exited; -ErrorAction SilentlyContinue handles the common case
+      throw "winget install for '$Id' (version $Version) timed out after $TimeoutSeconds seconds"
+    }
+    $LASTEXITCODE = $proc.ExitCode
 
     if ($LASTEXITCODE -eq 0) {
       return
@@ -254,7 +269,13 @@ function Invoke-WingetPackageInstall {
     Write-NucleusInfo "Requested version '$Version' for '$Id' not available. Falling back to latest."
   }
 
-  & winget @installArgs
+  $proc = Start-Process -FilePath "winget" -ArgumentList $installArgs `
+    -PassThru -NoNewWindow
+  if (-not $proc.WaitForExit($TimeoutSeconds * 1000)) {
+    try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch {} # check-suppress:suppression_doc: process may already have exited; -ErrorAction SilentlyContinue handles the common case
+    throw "winget install for '$Id' timed out after $TimeoutSeconds seconds"
+  }
+  $LASTEXITCODE = $proc.ExitCode
 
   if ($LASTEXITCODE -eq 0) {
     return
