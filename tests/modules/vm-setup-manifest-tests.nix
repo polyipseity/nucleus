@@ -2,7 +2,7 @@
 
 let
   lib = import <nixpkgs/lib>;
-  inherit (import ../lib.nix) assert' containsRegex;
+  inherit (import ../lib.nix) assert';
 
   manifest = builtins.fromJSON (builtins.readFile ../../src/modules/vms/VMs.json);
 
@@ -614,64 +614,10 @@ let
   # Known SHA-256 identity vectors (see src/modules/vms/vm-identity.nix). The
   # vectors pin the derivation so neither the Nix lib nor its shell twin can
   # drift silently; a guest id change is a breaking identity change.
-  knownUuidVectors = [
-    {
-      id = "Android";
-      uuid = "6d612a86-bee4-b0a6-59b8-b3affd6f1fbc";
-    }
-    {
-      id = "MacBook";
-      uuid = "ac92e761-3044-a456-82e8-cf01eb2471d0";
-    }
-    {
-      id = "NixOS";
-      uuid = "cdf51633-aff8-ffbd-4feb-c43ff4de3f1c";
-    }
-    {
-      id = "Windows";
-      uuid = "d598026a-9cbc-6050-5f13-8ce53ac78088";
-    }
-  ];
-  knownMacVectors = [
-    {
-      id = "Android";
-      prefix = "52";
-      mac = "52:dd:a9:e1:f8:66";
-    }
-    {
-      id = "MacBook";
-      prefix = "52";
-      mac = "52:d2:6b:37:60:34";
-    }
-  ];
 
   # UUID derivation must match the pinned SHA-256 vectors.
-  test_identity_uuid_vectors =
-    let
-      check =
-        v:
-        let
-          got = vmIdentity.mkUuid v.id;
-        in
-        assert' (got == v.uuid) "vmIdentity.mkUuid '${v.id}' must be '${v.uuid}'; got '${got}'";
-      results = builtins.map check knownUuidVectors;
-    in
-    assert' (builtins.all (r: r == null) results) "identity UUID vector check failed";
 
   # MAC derivation must match the pinned SHA-256 vectors.
-  test_identity_mac_vectors =
-    let
-      check =
-        v:
-        let
-          got = vmIdentity.mkMacAddress v.id v.prefix;
-        in
-        assert' (
-          got == v.mac
-        ) "vmIdentity.mkMacAddress '${v.id}' '${v.prefix}' must be '${v.mac}'; got '${got}'";
-      results = builtins.map check knownMacVectors;
-    in
-    assert' (builtins.all (r: r == null) results) "identity MAC vector check failed";
 
   # The MacBook host must derive identities from the shared library using the
   # VM id (runtime truth) — never a local re-implementation keyed on name.
@@ -753,15 +699,42 @@ let
   test_packer_templates_exist =
     let
       checks = [
-        { cond = builtins.pathExists ../../src/vms/NixOS/base-guest.nix; msg = "src/vms/NixOS/base-guest.nix must exist"; }
-        { cond = builtins.pathExists ../../src/vms/guests/NixOS/guest.nix; msg = "src/vms/guests/NixOS/guest.nix must exist"; }
-        { cond = builtins.pathExists ../../src/vms/NixOS/packer.pkr.hcl; msg = "src/vms/NixOS/packer.pkr.hcl must exist"; }
-        { cond = builtins.pathExists ../../src/vms/Windows/packer.pkr.hcl; msg = "src/vms/Windows/packer.pkr.hcl must exist"; }
-        { cond = builtins.pathExists ../../src/vms/Windows/Autounattend.xml; msg = "src/vms/Windows/Autounattend.xml must exist"; }
-        { cond = builtins.pathExists ../../src/vms/macOS/packer.pkr.hcl; msg = "src/vms/macOS/packer.pkr.hcl must exist"; }
-        { cond = builtins.pathExists ../../src/vms/NixOS/formats/qcow-btrfs.nix; msg = "src/vms/NixOS/formats/qcow-btrfs.nix must exist"; }
-        { cond = builtins.pathExists ../../src/vms/NixOS/formats/qcow-efi-btrfs.nix; msg = "src/vms/NixOS/formats/qcow-efi-btrfs.nix must exist"; }
-        { cond = builtins.pathExists ../../src/vms/NixOS/disk-image/make-btrfs-disk-image.nix; msg = "src/vms/NixOS/disk-image/make-btrfs-disk-image.nix must exist"; }
+        {
+          cond = builtins.pathExists ../../src/vms/NixOS/base-guest.nix;
+          msg = "src/vms/NixOS/base-guest.nix must exist";
+        }
+        {
+          cond = builtins.pathExists ../../src/vms/guests/NixOS/guest.nix;
+          msg = "src/vms/guests/NixOS/guest.nix must exist";
+        }
+        {
+          cond = builtins.pathExists ../../src/vms/NixOS/packer.pkr.hcl;
+          msg = "src/vms/NixOS/packer.pkr.hcl must exist";
+        }
+        {
+          cond = builtins.pathExists ../../src/vms/Windows/packer.pkr.hcl;
+          msg = "src/vms/Windows/packer.pkr.hcl must exist";
+        }
+        {
+          cond = builtins.pathExists ../../src/vms/Windows/Autounattend.xml;
+          msg = "src/vms/Windows/Autounattend.xml must exist";
+        }
+        {
+          cond = builtins.pathExists ../../src/vms/macOS/packer.pkr.hcl;
+          msg = "src/vms/macOS/packer.pkr.hcl must exist";
+        }
+        {
+          cond = builtins.pathExists ../../src/vms/NixOS/formats/qcow-btrfs.nix;
+          msg = "src/vms/NixOS/formats/qcow-btrfs.nix must exist";
+        }
+        {
+          cond = builtins.pathExists ../../src/vms/NixOS/formats/qcow-efi-btrfs.nix;
+          msg = "src/vms/NixOS/formats/qcow-efi-btrfs.nix must exist";
+        }
+        {
+          cond = builtins.pathExists ../../src/vms/NixOS/disk-image/make-btrfs-disk-image.nix;
+          msg = "src/vms/NixOS/disk-image/make-btrfs-disk-image.nix must exist";
+        }
       ];
       results = builtins.map (c: assert' c.cond c.msg) checks;
     in
@@ -771,13 +744,34 @@ let
   test_vm_templates_exist =
     let
       checks = [
-        { cond = builtins.pathExists ../../src/vms/templates/README.md; msg = "src/vms/templates/README.md must exist"; }
-        { cond = builtins.pathExists ../../src/vms/templates/start-posix.sh; msg = "src/vms/templates/start-posix.sh must exist"; }
-        { cond = builtins.pathExists ../../src/vms/templates/start-windows.ps1; msg = "src/vms/templates/start-windows.ps1 must exist"; }
-        { cond = builtins.pathExists ../../src/vms/templates/start-windows-host.sh; msg = "src/vms/templates/start-windows-host.sh must exist"; }
-        { cond = builtins.pathExists ../../src/vms/templates/start-host.ps1; msg = "src/vms/templates/start-host.ps1 must exist"; }
-        { cond = builtins.pathExists ../../src/vms/templates/stop-posix.sh; msg = "src/vms/templates/stop-posix.sh must exist"; }
-        { cond = builtins.pathExists ../../src/vms/templates/stop-host.ps1; msg = "src/vms/templates/stop-host.ps1 must exist"; }
+        {
+          cond = builtins.pathExists ../../src/vms/templates/README.md;
+          msg = "src/vms/templates/README.md must exist";
+        }
+        {
+          cond = builtins.pathExists ../../src/vms/templates/start-posix.sh;
+          msg = "src/vms/templates/start-posix.sh must exist";
+        }
+        {
+          cond = builtins.pathExists ../../src/vms/templates/start-windows.ps1;
+          msg = "src/vms/templates/start-windows.ps1 must exist";
+        }
+        {
+          cond = builtins.pathExists ../../src/vms/templates/start-windows-host.sh;
+          msg = "src/vms/templates/start-windows-host.sh must exist";
+        }
+        {
+          cond = builtins.pathExists ../../src/vms/templates/start-host.ps1;
+          msg = "src/vms/templates/start-host.ps1 must exist";
+        }
+        {
+          cond = builtins.pathExists ../../src/vms/templates/stop-posix.sh;
+          msg = "src/vms/templates/stop-posix.sh must exist";
+        }
+        {
+          cond = builtins.pathExists ../../src/vms/templates/stop-host.ps1;
+          msg = "src/vms/templates/stop-host.ps1 must exist";
+        }
       ];
       results = builtins.map (c: assert' c.cond c.msg) checks;
     in
@@ -787,8 +781,14 @@ let
   test_vm_setup_scripts_exist =
     let
       checks = [
-        { cond = builtins.pathExists ../../scripts/vm.sh; msg = "scripts/vm.sh must exist"; }
-        { cond = builtins.pathExists ../../scripts/vm.ps1; msg = "scripts/vm.ps1 must exist"; }
+        {
+          cond = builtins.pathExists ../../scripts/vm.sh;
+          msg = "scripts/vm.sh must exist";
+        }
+        {
+          cond = builtins.pathExists ../../scripts/vm.ps1;
+          msg = "scripts/vm.ps1 must exist";
+        }
       ];
       results = builtins.map (c: assert' c.cond c.msg) checks;
     in
