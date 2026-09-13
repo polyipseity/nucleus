@@ -722,6 +722,87 @@ let
     in
     assert' (builtins.all (r: r == null) results) "Domain XML disk path check failed";
 
+  # --- Behavioral: VM reachability and identity contract ---
+
+  # Every enabled VM must be reachable by at least one known host (MacBook,
+  # NixOS, Windows).  An orphaned VM (enabled but with a hosts list that
+  # excludes all known hosts) would never be provisioned by any machine.
+  test_enabled_vm_not_orphaned =
+    let
+      hostFilter = vm: builtins.any (host: builtins.elem host (vm.hosts or null)) validHosts;
+      orphaned = builtins.filter (
+        vm: vm.enabled && !(builtins.isNull (vm.hosts or null)) && !hostFilter vm
+      ) manifest.VMs;
+    in
+    assert' (orphaned == [ ])
+      "Every enabled VM must be reachable by at least one known host; orphaned: ${
+        builtins.toString (builtins.map (v: v.name) orphaned)
+      }";
+
+  # hostname must equal display name (guest OS identity contract).
+  test_hostname_equals_name =
+    let
+      badHostnameName = builtins.filter (vm: vm.hostname != vm.name) manifest.VMs;
+    in
+    assert' (badHostnameName == [ ])
+      "Every VM hostname must equal name; bad entries: ${
+        builtins.toString (builtins.map (v: v.name) badHostnameName)
+      }";
+
+  # Packer templates and guest configs must exist.
+  test_packer_templates_exist =
+    let
+      checks = [
+        { cond = builtins.pathExists ../../src/vms/NixOS/base-guest.nix; msg = "src/vms/NixOS/base-guest.nix must exist"; }
+        { cond = builtins.pathExists ../../src/vms/guests/NixOS/guest.nix; msg = "src/vms/guests/NixOS/guest.nix must exist"; }
+        { cond = builtins.pathExists ../../src/vms/NixOS/packer.pkr.hcl; msg = "src/vms/NixOS/packer.pkr.hcl must exist"; }
+        { cond = builtins.pathExists ../../src/vms/Windows/packer.pkr.hcl; msg = "src/vms/Windows/packer.pkr.hcl must exist"; }
+        { cond = builtins.pathExists ../../src/vms/Windows/Autounattend.xml; msg = "src/vms/Windows/Autounattend.xml must exist"; }
+        { cond = builtins.pathExists ../../src/vms/macOS/packer.pkr.hcl; msg = "src/vms/macOS/packer.pkr.hcl must exist"; }
+        { cond = builtins.pathExists ../../src/vms/NixOS/formats/qcow-btrfs.nix; msg = "src/vms/NixOS/formats/qcow-btrfs.nix must exist"; }
+        { cond = builtins.pathExists ../../src/vms/NixOS/formats/qcow-efi-btrfs.nix; msg = "src/vms/NixOS/formats/qcow-efi-btrfs.nix must exist"; }
+        { cond = builtins.pathExists ../../src/vms/NixOS/disk-image/make-btrfs-disk-image.nix; msg = "src/vms/NixOS/disk-image/make-btrfs-disk-image.nix must exist"; }
+      ];
+      results = builtins.map (c: assert' c.cond c.msg) checks;
+    in
+    assert' (builtins.all (r: r == null) results) "Packer template file existence check failed";
+
+  # VM setup templates must exist.
+  test_vm_templates_exist =
+    let
+      checks = [
+        { cond = builtins.pathExists ../../src/vms/templates/README.md; msg = "src/vms/templates/README.md must exist"; }
+        { cond = builtins.pathExists ../../src/vms/templates/start-posix.sh; msg = "src/vms/templates/start-posix.sh must exist"; }
+        { cond = builtins.pathExists ../../src/vms/templates/start-windows.ps1; msg = "src/vms/templates/start-windows.ps1 must exist"; }
+        { cond = builtins.pathExists ../../src/vms/templates/start-windows-host.sh; msg = "src/vms/templates/start-windows-host.sh must exist"; }
+        { cond = builtins.pathExists ../../src/vms/templates/start-host.ps1; msg = "src/vms/templates/start-host.ps1 must exist"; }
+        { cond = builtins.pathExists ../../src/vms/templates/stop-posix.sh; msg = "src/vms/templates/stop-posix.sh must exist"; }
+        { cond = builtins.pathExists ../../src/vms/templates/stop-host.ps1; msg = "src/vms/templates/stop-host.ps1 must exist"; }
+      ];
+      results = builtins.map (c: assert' c.cond c.msg) checks;
+    in
+    assert' (builtins.all (r: r == null) results) "VM template file existence check failed";
+
+  # vm-setup scripts must exist for both POSIX and Windows hosts.
+  test_vm_setup_scripts_exist =
+    let
+      checks = [
+        { cond = builtins.pathExists ../../scripts/vm.sh; msg = "scripts/vm.sh must exist"; }
+        { cond = builtins.pathExists ../../scripts/vm.ps1; msg = "scripts/vm.ps1 must exist"; }
+      ];
+      results = builtins.map (c: assert' c.cond c.msg) checks;
+    in
+    assert' (builtins.all (r: r == null) results) "VM setup script existence check failed";
+
+  # base-guest.nix and guests/<id>/guest.nix must be non-empty.
+  test_guest_nix_nonempty =
+    let
+      baseContent = builtins.readFile ../../src/vms/NixOS/base-guest.nix;
+      guestContent = builtins.readFile ../../src/vms/guests/NixOS/guest.nix;
+    in
+    assert' (
+      builtins.stringLength baseContent > 0 && builtins.stringLength guestContent > 0
+    ) "src/vms/NixOS/base-guest.nix and src/vms/guests/NixOS/guest.nix must not be empty";
 
   all_tests = [
     test_required_fields
@@ -763,6 +844,12 @@ let
     test_domain_xml_kvm_type
     test_domain_xml_memory_unit
     test_domain_xml_disk_path_lowercase
+    test_enabled_vm_not_orphaned
+    test_hostname_equals_name
+    test_packer_templates_exist
+    test_vm_templates_exist
+    test_vm_setup_scripts_exist
+    test_guest_nix_nonempty
   ];
 
 in
@@ -807,6 +894,12 @@ in
     test_domain_xml_kvm_type
     test_domain_xml_memory_unit
     test_domain_xml_disk_path_lowercase
+    test_enabled_vm_not_orphaned
+    test_hostname_equals_name
+    test_packer_templates_exist
+    test_vm_templates_exist
+    test_vm_setup_scripts_exist
+    test_guest_nix_nonempty
     ;
 
   summary = builtins.deepSeq all_tests "vm-setup-manifest-tests: all tests passed";
