@@ -54,6 +54,31 @@ parse_args() {
       export FAIL_FAST=false
       shift
       ;;
+    --verbose)
+      VERBOSE_IDS=("*")
+      shift
+      ;;
+    --verbose=*)
+      VERBOSE_IDS=()
+      local _vval="${1#--verbose=}"
+      if [ -n "$_vval" ]; then
+        local _old_ifs="$IFS"
+        IFS=','
+        for _part in $_vval; do
+          _part="${_part## }"
+          _part="${_part%% }"
+          if [ -n "$_part" ]; then
+            VERBOSE_IDS+=("$_part")
+          fi
+        done
+        IFS="$_old_ifs"
+      fi
+      shift
+      ;;
+    --no-verbose)
+      VERBOSE_IDS=()
+      shift
+      ;;
     --skip-steps=*)
       SKIP_STEPS=()
       _IFS_SAVE="$IFS"
@@ -158,5 +183,5 @@ preflight_check() {
 }
 
 usage() {
-  usage_std "test.sh" "[-q|--quiet] [--fail-fast|--no-fail-fast] [--skip-steps=<ids>]" "Run the repository test suite. With --quiet, suppress success/progress output across applicable steps (failures always shown). By default, all output is shown. --fail-fast exits immediately on first failure (default); --no-fail-fast accumulates all failures. --skip-steps=<ids> skips steps with the given comma-separated IDs."
+  usage_std "test.sh" "[-q|--quiet] [--fail-fast|--no-fail-fast] [--verbose[=<ids>]] [--no-verbose] [--skip-steps=<ids>]" "Run the repository test suite. With --quiet, suppress success/progress output across applicable steps (failures always shown). With --verbose, stream all step output (default: headers + summaries only). --verbose=<ids> streams only the specified comma-separated step IDs. --fail-fast exits immediately on first failure (default); --no-fail-fast accumulates all failures. --skip-steps=<ids> skips steps with the given comma-separated IDs."
 }

@@ -8,6 +8,8 @@ _arguments \
   '--fail-fast[fail fast]' \
   '--full[full]' \
   '--no-fail-fast[no fail fast]' \
+  '--no-verbose[no verbose]' \
   '--online[online]' \
   '--scoped[scoped]' \
-  '--skip-steps[skip steps]'
+  '--skip-steps[skip steps]' \
+  '--verbose[verbose]'

@@ -10,6 +10,9 @@
 #   -q|--quiet           Suppress success/progress output across applicable steps.
 #   --fail-fast          Exit immediately on first failure (default).
 #   --no-fail-fast       Accumulate all failures.
+#   --verbose            Stream all step output (default: headers + summaries only).
+#   --verbose=<ids>      Stream only the specified comma-separated step IDs.
+#   --no-verbose         Suppress step output streaming (default).
 #   --skip-steps=<ids>   Skip steps with the given comma-separated IDs.
 #
 # Environment variables:

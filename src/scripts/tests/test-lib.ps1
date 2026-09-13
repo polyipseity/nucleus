@@ -12,11 +12,14 @@ Set-StepLibPath -Path $MyInvocation.MyCommand.Path
 
 $script:FAIL_FAST = $true
 $script:usageAction = {
-  Write-Output "Usage: test.ps1 [--fail-fast|--no-fail-fast] [--quiet] [--skip-steps=<ids>]"
+  Write-Output "Usage: test.ps1 [--fail-fast|--no-fail-fast] [--quiet] [--verbose[=<ids>]] [--no-verbose] [--skip-steps=<ids>]"
   Write-Output "  Run all Windows-compatible repository test suites."
   Write-Output "  --fail-fast            Exit immediately on first failure (default)."
   Write-Output "  --no-fail-fast          Accumulate all failures."
   Write-Output "  --quiet                No-op (--quiet is POSIX-only; accepted for CLI parity)."
+  Write-Output "  --verbose              Stream all step output (default: headers + summaries only)."
+  Write-Output "  --verbose=<ids>        Stream only the specified comma-separated step IDs."
+  Write-Output "  --no-verbose           Suppress step output streaming (default)."
   Write-Output "  --skip-steps=<ids>     Skip steps with the given comma-separated IDs."
 }
 

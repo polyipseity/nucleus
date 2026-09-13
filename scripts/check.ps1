@@ -16,6 +16,9 @@
 #   --fail-fast      Exit immediately on first failure.
 #   --no-fail-fast   Accumulate all failures (default).
 #   --online         Run online determinism checks.
+#   --verbose        Stream all step output (default: headers + summaries only).
+#   --verbose=<ids>  Stream only the specified comma-separated step IDs.
+#   --no-verbose     Suppress step output streaming (default).
 #   --skip-steps=<ids>  Skip steps with the given comma-separated IDs.
 #   (paths)          Files to check; restricts --scoped to matching files.
 #                     For subcommands, passed through to the underlying script.
@@ -305,15 +308,19 @@ function Invoke-CheckSh {
 
 switch ($Action) {
   'packer' {
-    Invoke-CheckPacker @Paths -WindowsTemplateOverride $WindowsTemplateOverride -AnnotationCheckOnly:$AnnotationCheckOnly -ValidateOnly:$ValidateOnly
+    # WHY: filter --verbose/--no-verbose from Paths — these flags are only for the step pipeline (all action); subcommands don't understand them.
+    $PackerPaths = @($Paths | Where-Object { $_ -notmatch '^--verbose' -and $_ -ne '--no-verbose' })
+    Invoke-CheckPacker @PackerPaths -WindowsTemplateOverride $WindowsTemplateOverride -AnnotationCheckOnly:$AnnotationCheckOnly -ValidateOnly:$ValidateOnly
     exit $LASTEXITCODE
   }
   'sh' {
-    Invoke-CheckSh @Paths
+    $ShPaths = @($Paths | Where-Object { $_ -notmatch '^--verbose' -and $_ -ne '--no-verbose' })
+    Invoke-CheckSh @ShPaths
     exit $LASTEXITCODE
   }
   'pwsh' {
-    & (Join-Path $ScriptDir '..\src\scripts\checks\check-pwsh.ps1') @Paths
+    $PwshPaths = @($Paths | Where-Object { $_ -notmatch '^--verbose' -and $_ -ne '--no-verbose' })
+    & (Join-Path $ScriptDir '..\src\scripts\checks\check-pwsh.ps1') @PwshPaths
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   }
   'all' {
