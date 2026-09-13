@@ -99,7 +99,7 @@ jobs:
         env:
           PACKER_GITHUB_API_TOKEN: ${{ github.token }}
         # --no-fail-fast: CI should accumulate all failures for visibility.
-        run: pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check.ps1 --no-fail-fast ${{ env.VERBOSE == 'true' && '--verbose' || (env.VERBOSE != 'false' && '--verbose={0}' -f env.VERBOSE || '') }}
+        run: pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check.ps1 --no-fail-fast ${{ env.VERBOSE == 'true' && '--verbose' || (env.VERBOSE != 'false' && format('--verbose={0}', env.VERBOSE) || '') }}
 
       - name: Run repository tests (POSIX)
         if: runner.os != 'Windows'
@@ -109,4 +109,4 @@ jobs:
       - name: Run repository tests (Windows)
         if: runner.os == 'Windows'
         # --no-fail-fast: CI should accumulate all failures for visibility.
-        run: pwsh -NoLogo -NoProfile -NonInteractive -File scripts/test.ps1 --no-fail-fast ${{ env.VERBOSE == 'true' && '--verbose' || (env.VERBOSE != 'false' && '--verbose={0}' -f env.VERBOSE || '') }}
+        run: pwsh -NoLogo -NoProfile -NonInteractive -File scripts/test.ps1 --no-fail-fast ${{ env.VERBOSE == 'true' && '--verbose' || (env.VERBOSE != 'false' && format('--verbose={0}', env.VERBOSE) || '') }}
