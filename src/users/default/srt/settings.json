@@ -10,7 +10,9 @@
     "allowWrite": [
       ".",
       "/private/tmp",
+      "/private/var/folders",
       "/tmp",
+      "/var/folders",
       "~/.bun",
       "~/.cache",
       "~/.cargo",
