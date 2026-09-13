@@ -14,16 +14,22 @@ let
   servicesSchemaNix = builtins.readFile ../../src/modules/services.schema.json;
   cloudDrivesNix = builtins.readFile ../../src/modules/cloud-drives.nix;
 
-  # Every .nix file directly under src/hosts/MacBook/
-  macBookHostNixSources =
+  # Check that no MacBook host module uses environment.userLaunchAgents.
+  # Read files individually to avoid concatenating ~106KB into one string
+  # (causes stack overflow on CI when regex matching).
+  macBookHostFiles =
     let
       dir = ../../src/hosts/MacBook;
       entries = builtins.readDir dir;
-      nixFiles = builtins.filter (
-        name: entries.${name} == "regular" && builtins.match ".*[.]nix" name != null
-      ) (builtins.attrNames entries);
     in
-    builtins.concatStringsSep "\n" (map (name: builtins.readFile (dir + "/${name}")) nixFiles);
+    map (name: builtins.readFile (dir + "/${name}")) (
+      builtins.filter (
+        name: entries.${name} == "regular" && builtins.match ".*[.]nix" name != null
+      ) (builtins.attrNames entries)
+    );
+  macBookHasUserLaunchAgents = builtins.any (
+    content: containsRegex "environment[.]userLaunchAgents[.]\"" content
+  ) macBookHostFiles;
 in
 {
   tests = builtins.filter (x: x != null) [
@@ -60,7 +66,7 @@ in
       !containsRegex "EnvironmentVariables = lib.concatMap" camilladspNix
     ) "camilladsp-heartbeat: EnvironmentVariables as dict")
     (assert' (
-      !containsRegex "environment[.]userLaunchAgents[.]\"" macBookHostNixSources
+      !macBookHasUserLaunchAgents
     ) "MacBook host modules: no environment.userLaunchAgents")
 
     # --- discord-music-rpc: HM launchd.agents with domain = "gui" ---
