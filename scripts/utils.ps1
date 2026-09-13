@@ -42,21 +42,32 @@ param(
   [switch]$Help
 )
 
+# check-suppress:suppression_doc: parameters are consumed via $PSBoundParameters in subcommand dispatch below
+$null = $PSBoundParameters
+
 $ErrorActionPreference = 'Stop'
 
 # Show-NucleusNotification — Display a Windows toast notification if BurntToast
 # is available; fall back to System.Windows.Forms.MessageBox.
 # Args: title, message.
 function Show-NucleusNotification {
+  # check-suppress:SuppressMessageAttribute: PSAvoidUsingEmptyCatchBlock -- notification is best-effort; all errors intentionally swallowed
+  [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingEmptyCatchBlock', '')]
   param([string]$Title, [string]$Message)
   # check-suppress:suppression_doc: BurntToast module is optional — fall back to MessageBox.
   if (Get-Module -ListAvailable -Name BurntToast -ErrorAction SilentlyContinue) {
-    try { New-BurntToastNotification -Text $Title, $Message -ErrorAction Stop } catch { # check-suppress:suppression_doc: notification is best-effort; swallow all errors. }
+    try {
+      New-BurntToastNotification -Text $Title, $Message -ErrorAction Stop
+    } catch {
+      # check-suppress:suppression_doc: notification is best-effort; swallow all errors.
+    }
   } else {
     try {
       [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null
       [System.Windows.Forms.MessageBox]::Show($Message, $Title, 'OK', 'Information') | Out-Null
-    } catch { # check-suppress:suppression_doc: notification is best-effort; swallow all errors. }
+    } catch {
+      # check-suppress:suppression_doc: notification is best-effort; swallow all errors.
+    }
   }
 }
 
