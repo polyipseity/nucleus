@@ -544,6 +544,38 @@ let
       name = "rimsort";
       nixpkgs = "rimsort";
     }
+    {
+      name = "dos2unix";
+      nixpkgs = "dos2unix";
+    }
+    {
+      name = "exiftool";
+      nixpkgs = "perlPackages.ImageExifTool";
+    }
+    {
+      name = "mat2";
+      nixpkgs = "mat2";
+    }
+    {
+      name = "pass";
+      nixpkgs = "pass";
+    }
+    {
+      name = "redis";
+      nixpkgs = "redis";
+    }
+    {
+      name = "sandbox-runtime";
+      nixpkgs = "sandbox-runtime";
+    }
+    {
+      name = "sqlite";
+      nixpkgs = "sqlite";
+    }
+    {
+      name = "steamcmd";
+      nixpkgs = "steamcmd";
+    }
   ];
 
   # Darwin-only managedPackages entries (attrs exist on Linux nixpkgs but
@@ -585,6 +617,10 @@ let
       name = "equaliser";
       nixpkgs = "equaliser";
     }
+    {
+      name = "switchaudio-osx";
+      nixpkgs = "switchaudio-osx";
+    }
   ];
 
   # managedPackages entries that intentionally have NO nixpkgs attr (the
@@ -595,6 +631,7 @@ let
     "equaliser"
     "equalizer-apo"
     "krokiet"
+    "mas"
     "parsec"
     "peace-equalizer-apo"
     "powertoys"
