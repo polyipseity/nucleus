@@ -1,6 +1,12 @@
 {
   "$schema": "../default/icloud-exclusions.schema.json",
   "excludedDirNames": [
+    ".hypothesis",
+    ".pnpm-store",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
     "node_modules",
     "target"
   ],
