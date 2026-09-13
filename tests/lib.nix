@@ -9,9 +9,12 @@ rec {
   # Regex-like match via builtins.match with .* prefix/suffix.
   containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
   # Pure substring search — no regex, avoids special-char issues.
-  containsString = needle: haystack: let
-    stripped = builtins.replaceStrings [ needle ] [ "" ] haystack;
-  in stripped != haystack;
+  containsString =
+    needle: haystack:
+    let
+      stripped = builtins.replaceStrings [ needle ] [ "" ] haystack;
+    in
+    stripped != haystack;
 
   # Tail-recursive list helpers.
   all =

@@ -26,13 +26,13 @@ let
   ) "test-user must have symlinks on Windows";
 
   # Behavioral: symlink entries must have path and targets.
-  test_symlink_has_path = assert' (
-    builtins.all (s: s ? path) fixtureSymlinks
-  ) "Each symlink entry must have a path field";
+  test_symlink_has_path = assert' (builtins.all (
+    s: s ? path
+  ) fixtureSymlinks) "Each symlink entry must have a path field";
 
-  test_symlink_has_targets = assert' (
-    builtins.all (s: s ? targets) fixtureSymlinks
-  ) "Each symlink entry must have a targets field";
+  test_symlink_has_targets = assert' (builtins.all (
+    s: s ? targets
+  ) fixtureSymlinks) "Each symlink entry must have a targets field";
 
   # Behavioral: targets must include all three host keys.
   test_symlink_targets_include_all_hosts = assert' (

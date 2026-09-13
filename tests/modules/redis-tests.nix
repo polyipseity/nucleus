@@ -43,9 +43,7 @@ in
     (assert' (
       hostTypes.Windows == "native" && hostServices.Windows == "nucleus-redis"
     ) "Windows redis must be nucleus-redis native")
-    (assert' (
-      !any (t: t == "omitted") (builtins.attrValues hostTypes)
-    ) "no redis host may be omitted")
+    (assert' (!any (t: t == "omitted") (builtins.attrValues hostTypes)) "no redis host may be omitted")
 
     # --- MacBook: launchd.daemons."redis" present ---
     (assert' (containsString "launchd.daemons.\"redis\"" redisNix) "macbook: launchd.daemons.redis present")
@@ -71,8 +69,12 @@ in
     (assert' (containsString "_redis_port}" daemonSh) "daemon.sh: redis port var")
 
     # --- MacBook: services.json entry ---
-    (assert' (servicesJson.redis.hosts.MacBook.type == "launchctl") "services.json: MacBook type = launchctl")
-    (assert' (servicesJson.redis.hosts.MacBook.service == "local.redis") "services.json: MacBook service = local.redis")
+    (assert' (
+      servicesJson.redis.hosts.MacBook.type == "launchctl"
+    ) "services.json: MacBook type = launchctl")
+    (assert' (
+      servicesJson.redis.hosts.MacBook.service == "local.redis"
+    ) "services.json: MacBook service = local.redis")
 
     # --- Windows: Sync-RedisService ---
     (assert' (containsString "function Sync-RedisService" syncRedisPs1) "windows: Sync-RedisService function")
@@ -91,7 +93,9 @@ in
 
     # --- Windows: services.json entry ---
     (assert' (servicesJson.redis.hosts.Windows.type == "native") "services.json: Windows type = native")
-    (assert' (servicesJson.redis.hosts.Windows.service == "nucleus-redis") "services.json: Windows service = nucleus-redis")
+    (assert' (
+      servicesJson.redis.hosts.Windows.service == "nucleus-redis"
+    ) "services.json: Windows service = nucleus-redis")
   ];
 
   success = true;
