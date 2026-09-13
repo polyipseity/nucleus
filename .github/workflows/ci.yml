@@ -99,10 +99,7 @@ jobs:
       - name: Run repository tests (POSIX)
         if: runner.os != 'Windows'
         # --no-fail-fast: CI should accumulate all failures for visibility.
-        # Increase stack size to prevent Nix evaluator stack overflow on large test files.
-        run: |
-          ulimit -s unlimited 2>/dev/null || true
-          nix run ./src#test -- --no-fail-fast
+        run: nix run ./src#test -- --no-fail-fast
 
       - name: Run repository tests (Windows)
         if: runner.os == 'Windows'
