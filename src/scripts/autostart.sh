@@ -91,7 +91,7 @@ LAUNCHAGENTS_DIR="$HOME/Library/LaunchAgents"
 # when this script runs as root during darwin-rebuild switch.
 if [ "$HOST" = "MacBook" ]; then
   # check-suppress:suppression_doc: /dev/console may not exist in headless/SSH; dscl may fail if user record is missing; both are expected and handled by the empty-check below.
-  _console_user_home="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null | /usr/bin/xargs -I{} /usr/bin/dscl . -read "/Users/{}" NFSHomeDirectory 2>/dev/null | /usr/bin/awk '{print $2}' || true)"
+  _console_user_home="$(stat -f%Su /dev/console 2>/dev/null | xargs -I{} dscl . -read "/Users/{}" NFSHomeDirectory 2>/dev/null | awk '{print $2}' || true)"
   if [ -n "$_console_user_home" ]; then
     LAUNCHAGENTS_DIR="$_console_user_home/Library/LaunchAgents"
   fi
