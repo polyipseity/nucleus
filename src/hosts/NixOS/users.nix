@@ -10,5 +10,10 @@
       "wheel"
     ];
     isNormalUser = true;
+    # WHY: enables systemd user services to survive logout. Required for
+    # hermes-agent gateway (messaging integration that must run 24/7).
+    # Affects all user-scoped systemd services, which is correct behavior
+    # for services that should persist across sessions.
+    linger = true;
   };
 }
