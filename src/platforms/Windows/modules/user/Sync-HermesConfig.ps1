@@ -10,17 +10,11 @@
 
   This is the Windows equivalent of the POSIX activation entries in hermes-agent.nix.
 
-.PARAMETER RepoRoot
-  Absolute path to the nucleus repository checkout.
-
 .PARAMETER Enabled
   Whether hermes-agent config provisioning should be managed.
 
-.PARAMETER Username
-  Username for path resolution.
-
 .EXAMPLE
-  Sync-HermesConfig -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$true -Username 'polyipseity'
+  Sync-HermesConfig -Enabled:$true
 
 .NOTES
   Exit codes: 0 on success; non-zero on failure
@@ -30,11 +24,7 @@ function Sync-HermesConfig {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)]
-    [string]$RepoRoot,
-    [Parameter(Mandatory)]
-    [bool]$Enabled,
-    [Parameter(Mandatory)]
-    [string]$Username
+    [bool]$Enabled
   )
 
   $label = 'hermes-config'

@@ -950,7 +950,7 @@ Sync-NextestConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $rep
 Sync-DirenvConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $repoRoot
 Sync-StarshipConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $repoRoot
 Sync-SrtConfig -Enabled:$true -User $sessionUser -RepoRoot $repoRoot
-Sync-HermesConfig -Enabled:$true -User $sessionUser -RepoRoot $repoRoot
+Sync-HermesConfig -Enabled:$true
 if ($EnableCloudDrivesParity) {
   foreach ($userRecord in $selectedUserRecords) {
     Sync-CloudDriveCatalog -UserConfig $userRecord -HomeDirectory $userRecord.homeDirectory
