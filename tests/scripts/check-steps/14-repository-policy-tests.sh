@@ -236,7 +236,7 @@ test_step14_nix_file_structure_valid_passes() {
     unset _NUCLEUS_STEP_RUNNER_SOURCED _NUCLEUS_CHECK_LIB_SOURCED && _STEP_IDS=() && . "$REPO_ROOT/src/scripts/checks/check-lib.sh" &&
     . "$TEST_FILE" &&
     declare -A ctx=([HAS_ARGS]=false [REPO_ROOT]="$_tmp") &&
-    run_nix_file_structure false "$_tmp" 2>"$_out")
+    run_nix_file_structure false "$_tmp" >"$_out" 2>&1)
   local _ret=$?
   grep -q 'nix file structure passed' "$_out" || _ret=1
   rm -rf "$_tmp"
