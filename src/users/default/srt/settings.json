@@ -192,6 +192,7 @@
       "/nix/var/nix/daemon-socket/socket/",
       "/var/run/determinate-nixd.socket",
       "/var/run/nix-daemon.socket",
+      "/private/var/run/mDNSResponder",
       "~/.gnupg/S.gpg-agent",
       "~/.gnupg/S.gpg-agent.extra"
     ],
