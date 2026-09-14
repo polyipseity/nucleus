@@ -217,6 +217,7 @@ in
   home.activation.symlink-hermes-logs = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     _hermes_log_dir="${config.home.homeDirectory}/Library/Application Support/nucleus/logs/hermes-agent"
     mkdir -p "$_hermes_log_dir"
+    /usr/bin/chown "${config.home.username}" "$_hermes_log_dir"
     for _f in "${config.home.homeDirectory}/Library/Logs/hermes-agent.log" \
               "${config.home.homeDirectory}/Library/Logs/hermes-agent.err.log"; do
       if [ -f "$_f" ] && [ ! -L "$_hermes_log_dir/$(basename "$_f")" ]; then
