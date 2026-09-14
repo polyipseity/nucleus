@@ -273,6 +273,14 @@ let
       nixpkgs = "fzf";
       winget = "junegunn.fzf";
     };
+    "font-awesome" = {
+      category = "cli";
+      homebrew = {
+        kind = "cask";
+        name = "font-fontawesome";
+      };
+      nixpkgs = "font-awesome";
+    };
     gh = {
       category = "cli";
       homebrew = {
