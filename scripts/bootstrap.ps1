@@ -363,7 +363,7 @@ function Install-GnuPGDirect {
   # WHY: /S suppresses all UI dialogs including the GpgEX regsvr32 dialog
   # that blocks on headless CI. /D= must be the last argument per NSIS spec.
   Write-NucleusInfo "Installing GnuPG $Version to $installDir"
-  $proc = Start-Process -FilePath $installerPath -ArgumentList "/S", "/D=$installDir" `n    -PassThru -NoNewWindow
+  $proc = Start-Process -FilePath $installerPath -ArgumentList "/S", "/D=$installDir" -PassThru -NoNewWindow
   $TimeoutSeconds = 300
   if (-not $proc.WaitForExit($TimeoutSeconds * 1000)) {
     try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch {} # check-suppress:suppression_doc: process may already have exited; -ErrorAction SilentlyContinue handles the common case
