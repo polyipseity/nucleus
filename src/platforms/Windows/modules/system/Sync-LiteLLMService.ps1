@@ -177,11 +177,11 @@ function Sync-LiteLLMService {
   New-Item -Path $handlerLink -ItemType SymbolicLink -Target $handlerSource -Force > $null
   Set-ManagedSymlinkDeleteProtection -Context "Sync-LiteLLMService" -Path $handlerLink
 
-  # Symlink the cooldown-400 callback alongside the config.
-  $cooldownLink = Join-Path -Path $programDataDir -ChildPath "litellm-cooldown-400.py"
-  $cooldownSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\litellm\cooldown_400.py"
+  # Symlink the cooldown handler callback alongside the config.
+  $cooldownLink = Join-Path -Path $programDataDir -ChildPath "cooldown_handler.py"
+  $cooldownSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\litellm\cooldown_handler.py"
   if (-not (Test-Path -Path $cooldownSource -PathType Leaf)) {
-    throw "Cooldown-400 callback source not found: $cooldownSource"
+    throw "Cooldown handler source not found: $cooldownSource"
   }
   if (Test-Path -Path $cooldownLink) { Remove-Item -Path $cooldownLink -Force }
   New-Item -Path $cooldownLink -ItemType SymbolicLink -Target $cooldownSource -Force > $null

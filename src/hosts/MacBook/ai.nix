@@ -19,7 +19,7 @@
 let
   userHome = "/Users/${username}";
   litellmConfig = "${userHome}/Library/Application Support/nucleus/litellm-config.yml";
-  litellmLogConfig = "${userHome}/Library/Application Support/nucleus/litellm-logging-config.json";
+  litellmLogConfig = "${userHome}/Library/Application Support/nucleus/logging_config.json";
   secrets = builtins.fromJSON (builtins.readFile ../../modules/env/env-secrets.json);
   envLib = import ../../modules/lib/env-secrets.nix {
     inherit

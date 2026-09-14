@@ -7,7 +7,7 @@ from cooldown.  Providers that answer "insufficient credits" with HTTP 400
 to also return True for 400s whose exception message matches known
 credit-exhaustion patterns.
 
-Loaded as a litellm callback via `callbacks: ["litellm-cooldown-400.instance"]`
+Loaded as a litellm callback via `callbacks: ["cooldown_handler.instance"]`
 in litellm_settings.  The monkey-patch runs at module import time (before
 any routing).  The _NoopCooldownPatch class satisfies litellm's callback
 interface.

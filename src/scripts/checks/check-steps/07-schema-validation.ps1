@@ -20,7 +20,7 @@ function Skip-SchemaFile([string]$FilePath) {
     $f -like '*users\*\agents\hooks\*.json' -or $f -like '*users/*/agents/hooks/*.json' -or
     $f -like '*users\*\agents\skills\*\_meta.json' -or $f -like '*users/*/agents/skills/*/_meta.json' -or
     $f -like '*configs\litellm\config.yml' -or $f -like '*configs/litellm/config.yml' -or
-    $f -like '*configs\litellm\logging-config.json' -or $f -like '*configs/litellm/logging-config.json' -or
+    $f -like '*configs\litellm\logging_config.json' -or $f -like '*configs/litellm/logging_config.json' -or
     $f -like '*\.sops.yaml' -or $f -like '*/.sops.yaml' -or
     $f -like '*.vscode\*' -or $f -like '*.vscode/*' -or
     $f -like '*.agents\skills\*' -or $f -like '*.agents/skills/*' -or

@@ -3,7 +3,7 @@
   "disable_existing_loggers": false,
   "formatters": {
     "notraceback": {
-      "()": "litellm_logging.NoTracebackFormatter",
+      "()": "logging_formatter.NoTracebackFormatter",
       "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     }
   },
