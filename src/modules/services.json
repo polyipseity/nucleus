@@ -285,6 +285,42 @@
       }
     }
   },
+  "hermes-agent": {
+    "description": "AI agent gateway \u2014 messaging integrations (Telegram, Discord, Slack) and cron jobs",
+    "displayName": "Hermes Agent",
+    "logging": {
+      "capture": "all",
+      "dirs": {
+        "system": [],
+        "user": [
+          "hermes-agent"
+        ]
+      }
+    },
+    "hosts": {
+      "MacBook": {
+        "scope": "user",
+        "launchdDomain": "gui",
+        "service": "org.nix-community.home.hermes-agent",
+        "type": "launchctl",
+        "platform": "macOS",
+        "justification": "User-scoped agent with per-user state, TCC grants, and user-owned sessions/cron."
+      },
+      "NixOS": {
+        "scope": "user",
+        "service": "hermes-agent.service",
+        "type": "systemctl",
+        "platform": "NixOS",
+        "justification": "User-scoped agent; upstream HM module creates systemd user service."
+      },
+      "Windows": {
+        "service": "hermes-gateway",
+        "type": "native",
+        "platform": "Windows",
+        "justification": "SCM Windows Service via `hermes gateway install --service-type service`. nucleus runs elevated so SCM install is available. Service name `hermes-gateway` for default HERMES_HOME."
+      }
+    }
+  },
   "jellyfin": {
     "description": "Media server",
     "displayName": "Jellyfin",
