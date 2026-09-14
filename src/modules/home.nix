@@ -175,7 +175,11 @@ let
       writable = true;
     }
     {
-      path = "${nucleusUserRoot}/litellm-logging-config.py";
+      path = "${nucleusUserRoot}/litellm-logging-config.json";
+      writable = true;
+    }
+    {
+      path = "${nucleusUserRoot}/litellm_logging.py";
       writable = true;
     }
   ];
@@ -459,8 +463,11 @@ in
         "${nucleusUserRoot}/litellm-cooldown-400.py" \
         "src/modules/configs/litellm/cooldown_400.py"
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
-        "${nucleusUserRoot}/litellm-logging-config.py" \
-        "src/modules/configs/litellm/logging-config.py"
+        "${nucleusUserRoot}/litellm-logging-config.json" \
+        "src/modules/configs/litellm/logging-config.json"
+      "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+        "${nucleusUserRoot}/litellm_logging.py" \
+        "src/modules/configs/litellm/litellm_logging.py"
     '';
 
     # Managed symlink paths are seeded by the activation steps above, so they must

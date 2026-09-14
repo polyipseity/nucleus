@@ -19,7 +19,7 @@
 let
   userHome = "/Users/${username}";
   litellmConfig = "${userHome}/Library/Application Support/nucleus/litellm-config.yml";
-  litellmLogConfig = "${userHome}/Library/Application Support/nucleus/litellm-logging-config.py";
+  litellmLogConfig = "${userHome}/Library/Application Support/nucleus/litellm-logging-config.json";
   secrets = builtins.fromJSON (builtins.readFile ../../modules/env/env-secrets.json);
   envLib = import ../../modules/lib/env-secrets.nix {
     inherit
@@ -113,6 +113,7 @@ in
         LITELLM_REDIS_HOST = redisCfg.host;
         LITELLM_REDIS_PORT = toString redisCfg.port;
         LITELLM_LOG_CONFIG = litellmLogConfig;
+        PYTHONPATH = "${userHome}/Library/Application Support/nucleus";
       };
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/litellm/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/litellm/stderr.log";
