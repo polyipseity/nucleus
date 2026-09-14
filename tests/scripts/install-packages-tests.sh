@@ -303,7 +303,7 @@ test_pi_install_keeps_npm_scheme_and_reads_settings() {
   printf '%s' '{"packages":["npm:pi-memory@0.4.2"]}' >"$tmp/.pi/agent/settings.json"
   printf '%s' '{"dependencies":{"pi-memory":"0.4.2"}}' >"$tmp/.pi/agent/npm/package.json"
   if HOME="$tmp" run_pkg_script install-pi-packages.sh "$tmp" \
-    "$(command -v jq)" "$tmp/bin/pi" "$(command -v awk)" \
+    "$(command -v jq)" "$tmp/bin/pi" "$(command -v awk)" "$(command -v sed)" \
     "$DESIRED_PI" "$tmp/bin" >"$tmp/out.txt" 2>&1; then
     assert_pass "install-pi-packages runs to completion"
   else
@@ -335,7 +335,7 @@ test_pi_install_hard_errors_on_failed_install() {
   printf '%s' '{"packages":[]}' >"$tmp/.pi/agent/settings.json"
   rc=0
   HOME="$tmp" run_pkg_script install-pi-packages.sh "$tmp" \
-    "$(command -v jq)" "$tmp/bin/pi" "$(command -v awk)" \
+    "$(command -v jq)" "$tmp/bin/pi" "$(command -v awk)" "$(command -v sed)" \
     '[{"name":"pi-subagents"}]' "$tmp/bin" >"$tmp/out.txt" 2>&1 || rc=$?
   if [ "$rc" -ne 0 ]; then
     assert_pass "install-pi-packages hard-errors when pi install fails"
@@ -363,7 +363,7 @@ test_pi_install_emits_a_git_spec_for_a_revision_pin() {
   mkdir -p "$tmp/.pi/agent/npm"
   printf '%s' '{"packages":[]}' >"$tmp/.pi/agent/settings.json"
   if HOME="$tmp" run_pkg_script install-pi-packages.sh "$tmp" \
-    "$(command -v jq)" "$tmp/bin/pi" "$(command -v awk)" \
+    "$(command -v jq)" "$tmp/bin/pi" "$(command -v awk)" "$(command -v sed)" \
     '[{"name":"pi-subagents"}]' "$tmp/bin" >"$tmp/out.txt" 2>&1; then
     assert_pass "install-pi-packages runs with a revision pin"
   else
@@ -379,7 +379,7 @@ test_pi_install_emits_a_git_spec_for_a_revision_pin() {
   rm -f "$tmp/calls-pi.txt"
   printf '%s' "{\"dependencies\":{\"pi-subagents\":\"git+https://github.com/example/pi-subagents#$rev\"}}" >"$tmp/.pi/agent/npm/package.json"
   HOME="$tmp" run_pkg_script install-pi-packages.sh "$tmp" \
-    "$(command -v jq)" "$tmp/bin/pi" "$(command -v awk)" \
+    "$(command -v jq)" "$tmp/bin/pi" "$(command -v awk)" "$(command -v sed)" \
     '[{"name":"pi-subagents"}]' "$tmp/bin" >"$tmp/out2.txt" 2>&1 || true
   if [ -f "$tmp/calls-pi.txt" ] && grep -q '^install ' "$tmp/calls-pi.txt"; then
     assert_fail "install-pi-packages skips a revision pin already at the pinned rev" "calls: $(cat "$tmp/calls-pi.txt" 2>/dev/null)"
@@ -412,7 +412,7 @@ EOF
   mkdir -p "$tmp/.pi/agent/npm"
   printf '%s' '{"packages":[]}' >"$tmp/.pi/agent/settings.json"
   if HOME="$tmp" run_pkg_script install-pi-packages.sh "$tmp" \
-    "$(command -v jq)" "$tmp/bin/pi" "$(command -v awk)" \
+    "$(command -v jq)" "$tmp/bin/pi" "$(command -v awk)" "$(command -v sed)" \
     '[{"name":"pi-subagents"}]' "$bun_dir/bin" >"$tmp/out.txt" 2>&1; then
     assert_pass "install-pi-packages runs with bun only in the passed bin dir"
   else
@@ -426,7 +426,7 @@ EOF
   # Negative proof: an unusable bun must abort here instead of reaching pi,
   # where it surfaces as an opaque spawn ENOENT.
   if HOME="$tmp" run_pkg_script install-pi-packages.sh "$tmp" \
-    "$(command -v jq)" "$tmp/bin/pi" "$(command -v awk)" \
+    "$(command -v jq)" "$tmp/bin/pi" "$(command -v awk)" "$(command -v sed)" \
     '[{"name":"pi-subagents"}]' "$tmp/absent" >"$tmp/out2.txt" 2>&1; then
     assert_fail "install-pi-packages hard-errors on an unusable bun" "exit 0 without a runnable bun"
   else
