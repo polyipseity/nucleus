@@ -735,6 +735,7 @@ let
     redis = {
       category = "cli";
       nixpkgs = "redis";
+      winget = "Redis.Redis";
     };
     rimsort = {
       category = "gui";
