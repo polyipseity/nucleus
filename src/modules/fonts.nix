@@ -7,6 +7,7 @@
 }:
 let
   openSourceFontPackages = [
+    pkgs.font-awesome
     pkgs.inter
     pkgs.jetbrains-mono
     pkgs.nerd-fonts.jetbrains-mono
