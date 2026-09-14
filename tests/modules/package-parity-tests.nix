@@ -312,6 +312,10 @@ let
       nixpkgs = "fzf";
     }
     {
+      name = "font-awesome";
+      nixpkgs = "font-awesome";
+    }
+    {
       name = "dotnet-runtime-6";
       nixpkgs = "dotnetCorePackages.runtime_6_0";
     }
