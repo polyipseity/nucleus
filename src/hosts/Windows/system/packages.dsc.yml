@@ -259,6 +259,33 @@ properties:
         id: Gyan.FFmpeg
         source: winget
 
+    - resource: PSDscResources/Script
+      id: FontAwesomeInstall
+      directives:
+        description: >-
+          Install Font Awesome 7 Free OTF fonts (Regular, Solid, Brands) from
+          GitHub releases for Typst CV icon glyphs; no WinGet package exists
+          for Font Awesome, so we download and install directly; matches
+          pkgs.font-awesome on POSIX hosts
+      settings:
+        GetScript: |
+          return @{ Result = if (Test-Path "$env:WINDIR\Fonts\Font Awesome 7 Free-Solid-900.otf") { "Present" } else { "Absent" } }
+        TestScript: |
+          return Test-Path "$env:WINDIR\Fonts\Font Awesome 7 Free-Solid-900.otf"
+        SetScript: |
+          $zipUrl = "https://github.com/FortAwesome/Font-Awesome/releases/download/7.3.1/fontawesome-free-7.3.1-desktop.zip"
+          $zipPath = Join-Path $env:TEMP "fontawesome-free-desktop.zip"
+          $extractPath = Join-Path $env:TEMP "fontawesome-extract"
+          Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath
+          Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+          $otfDir = Join-Path $extractPath "fontawesome-free-7.3.1-desktop" "otfs"
+          Get-ChildItem -Path $otfDir -Filter "*.otf" | ForEach-Object {
+            Copy-Item $_.FullName "$env:WINDIR\Fonts" -Force
+            New-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts" -Name $_.Name -Value $_.Name -PropertyType String -Force
+          }
+          Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
+          Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
+
     - resource: Microsoft.WinGet.Client/Package
       directives:
         description: >-
