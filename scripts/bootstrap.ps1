@@ -3,8 +3,8 @@
   Install bootstrap dependencies for the nucleus environment on Windows.
 
 .DESCRIPTION
-  Installs GnuPG and SOPS via winget using pinned versions from
-  scripts/bootstrap-versions.env.
+  Installs GnuPG (directly from the NSIS installer) and SOPS via winget
+  using pinned versions from scripts/bootstrap-versions.env.
   Runs a pre-flight health check before invoking apply when -Apply is used.
   Use -Apply to run the Windows apply script after dependency installation.
 
@@ -240,10 +240,9 @@ function Invoke-WingetPackageInstall {
     "--silent"
   )
 
-  # WHY: timeout-300s: GnuPG's NSIS installer spawns resident child processes
-  # (gpg-agent, dirmngr, keyboxd, scdaemon) that prevent winget from returning.
-  # A 5-minute timeout catches this known hang and fails fast instead of
-  # blocking the CI runner indefinitely.
+  # WHY: timeout-300s: safety net for any winget install that might hang
+  # (e.g. NSIS installers that spawn resident child processes). GnuPG is
+  # installed directly via Install-GnuPGDirect to avoid this class of issue.
   # Ref: https://github.com/fleetdm/fleet/pull/50025
   $TimeoutSeconds = 300
 
@@ -287,6 +286,109 @@ function Invoke-WingetPackageInstall {
   }
 
   throw "Failed to install package '$Id' with winget. Exit code: $LASTEXITCODE"
+}
+
+function Install-GnuPGDirect {
+  <#
+  .SYNOPSIS
+    Installs GnuPG directly from the NSIS installer, bypassing winget.
+
+  .DESCRIPTION
+    Winget's --silent flag does not suppress the GpgEX regsvr32 dialog on
+    headless CI systems, causing the install to hang indefinitely. Running
+    the NSIS installer directly with /S (silent) and /D=path skips the
+    dialog. Resident daemon processes spawned by the installer are killed
+    after installation completes.
+
+    Ref: https://github.com/fleetdm/fleet/pull/50025
+
+  .PARAMETER Version
+    GnuPG version string (e.g. '2.5.21').
+
+  .PARAMETER InstallerDate
+    Build date portion of the installer filename (e.g. '20260702').
+
+  .PARAMETER InstallerSha256
+    Expected SHA-256 hash of the installer EXE.
+  #>
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Version,
+
+    [Parameter(Mandatory = $true)]
+    [string]$InstallerDate,
+
+    [Parameter(Mandatory = $true)]
+    [string]$InstallerSha256
+  )
+
+  $installDir = Join-Path ${env:ProgramFiles} 'GnuPG'
+  $gpgExe = Join-Path $installDir 'gpg.exe'
+
+  # Skip if already installed at the correct version.
+  if (Test-Path -Path $gpgExe -PathType Leaf) {
+    $installedVersion = & $gpgExe --version 2>&1 | Select-Object -First 1
+    if ($installedVersion -match [regex]::Escape($Version)) {
+      Write-NucleusInfo "GnuPG $Version is already installed at $installDir."
+      return
+    }
+  }
+
+  $installerName = "gnupg-w32-${Version}_${InstallerDate}.exe"
+  $installerUrl = "https://gnupg.org/ftp/gcrypt/binary/$installerName"
+  $tempDir = Join-Path $env:TEMP "gnupg-install-$Version"
+  $installerPath = Join-Path $tempDir $installerName
+
+  # Create temp directory and download installer.
+  if (-not (Test-Path -Path $tempDir)) {
+    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+  }
+
+  Write-NucleusInfo "Downloading GnuPG $Version from $installerUrl"
+  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+  try {
+    $webClient = [System.Net.WebClient]::new()
+    $webClient.DownloadFile($installerUrl, $installerPath)
+  } catch {
+    throw "Failed to download GnuPG installer from $installerUrl : $_"
+  }
+
+  # Verify installer hash.
+  $actualHash = (Get-FileHash -Path $installerPath -Algorithm SHA256).Hash
+  if ($actualHash -ne $InstallerSha256) {
+    throw "GnuPG installer hash mismatch: expected $InstallerSha256, got $actualHash"
+  }
+
+  # Run the NSIS installer with /S (silent) and /D=path (install directory).
+  # WHY: /S suppresses all UI dialogs including the GpgEX regsvr32 dialog
+  # that blocks on headless CI. /D= must be the last argument per NSIS spec.
+  Write-NucleusInfo "Installing GnuPG $Version to $installDir"
+  $proc = Start-Process -FilePath $installerPath -ArgumentList "/S", "/D=$installDir" `n    -PassThru -NoNewWindow
+  $TimeoutSeconds = 300
+  if (-not $proc.WaitForExit($TimeoutSeconds * 1000)) {
+    try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch {} # check-suppress:suppression_doc: process may already have exited; -ErrorAction SilentlyContinue handles the common case
+    throw "GnuPG installer timed out after $TimeoutSeconds seconds"
+  }
+
+  if ($proc.ExitCode -ne 0) {
+    throw "GnuPG installer exited with code $($proc.ExitCode)"
+  }
+
+  # Kill resident daemon processes spawned by the installer.
+  # These prevent WaitForExit from returning when winget manages the process.
+  # With direct invocation they exit after /S completes, but kill them anyway
+  # to avoid port/lock conflicts with later gpg operations.
+  $daemons = @('gpg-agent', 'dirmngr', 'keyboxd', 'scdaemon', 'gpg-connect-agent', 'gpgme-w32spawn')
+  foreach ($daemon in $daemons) {
+    Stop-Process -Name $daemon -Force -ErrorAction SilentlyContinue
+  }
+
+  # Verify installation.
+  if (-not (Test-Path -Path $gpgExe -PathType Leaf)) {
+    throw "GnuPG installer completed but gpg.exe not found at $gpgExe"
+  }
+
+  Write-NucleusInfo "GnuPG $Version installed successfully at $installDir"
 }
 
 function Invoke-RepositoryDirenvAllowIfAvailable {
@@ -333,8 +435,15 @@ if (-not (Get-Command -Name winget -ErrorAction SilentlyContinue)) {
 
 $BootstrapVersions = Import-BootstrapVersionTable -FilePath $VersionsFilePath
 
+# GnuPG requires direct NSIS installation — winget's --silent flag does not
+# suppress the GpgEX regsvr32 dialog on headless CI, causing a hang.
+# Ref: https://github.com/fleetdm/fleet/pull/50025
+$gnupgVersion = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_GNUPG_VERSION"
+$gnupgDate = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_GNUPG_INSTALLER_DATE"
+$gnupgHash = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_GNUPG_INSTALLER_SHA256"
+Install-GnuPGDirect -Version $gnupgVersion -InstallerDate $gnupgDate -InstallerSha256 $gnupgHash
+
 $BootstrapPackageVersions = [ordered]@{
-  "GnuPG.GnuPG" = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_GNUPG_VERSION"
   "HashiCorp.Packer" = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_PACKER_VERSION"
   "SecretsOPerationS.SOPS" = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_SOPS_VERSION"
 }
