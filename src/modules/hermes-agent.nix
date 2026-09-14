@@ -214,17 +214,19 @@ in
   # to ~/Library/Logs/hermes-agent.log and ~/Library/Logs/hermes-agent.err.log.
   # There is no upstream option to override these paths. Symlinks from the
   # nucleus log directory make `nucleus-svc logs hermes-agent` find the files.
-  home.activation.symlink-hermes-logs = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    _hermes_log_dir="${config.home.homeDirectory}/Library/Application Support/nucleus/logs/hermes-agent"
-    mkdir -p "$_hermes_log_dir"
-    /usr/bin/chown "${config.home.username}" "$_hermes_log_dir"
-    for _f in "${config.home.homeDirectory}/Library/Logs/hermes-agent.log" \
-              "${config.home.homeDirectory}/Library/Logs/hermes-agent.err.log"; do
-      if [ -f "$_f" ] && [ ! -L "$_hermes_log_dir/$(basename "$_f")" ]; then
-        ln -s "$_f" "$_hermes_log_dir/$(basename "$_f")"
-      fi
-    done
-  '';
+  home.activation.symlink-hermes-logs = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin (
+    lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      _hermes_log_dir="${config.home.homeDirectory}/Library/Application Support/nucleus/logs/hermes-agent"
+      mkdir -p "$_hermes_log_dir"
+      chown "${config.home.username}" "$_hermes_log_dir"
+      for _f in "${config.home.homeDirectory}/Library/Logs/hermes-agent.log" \
+                "${config.home.homeDirectory}/Library/Logs/hermes-agent.err.log"; do
+        if [ -f "$_f" ] && [ ! -L "$_hermes_log_dir/$(basename "$_f")" ]; then
+          ln -s "$_f" "$_hermes_log_dir/$(basename "$_f")"
+        fi
+      done
+    ''
+  );
 
   # Playwright browsers are provisioned system-wide via pkgs.playwright-driver.browsers
   # in core.nix, with PLAYWRIGHT_BROWSERS_PATH set in env-catalog.nix. The assertion
