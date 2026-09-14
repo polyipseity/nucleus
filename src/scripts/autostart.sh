@@ -115,9 +115,31 @@ macos_launchagent_exists() {
   [ -f "$(macos_launchagent_path "$bundle_id")" ] && printf 'true' || printf 'false'
 }
 
+# macos_app_binary_path APP_PATH — stdout the executable path inside a .app bundle.
+# Reads CFBundleExecutable from the bundle's Info.plist. Returns the .app path
+# as fallback when resolution fails (e.g. missing Info.plist, non-Mach-O bundle).
+macos_app_binary_path() {
+  local app_path="$1"
+  local info_plist="$app_path/Contents/Info.plist"
+  if [ -f "$info_plist" ]; then
+    local binary_name
+    # shellcheck disable=SC2086 # reason: PlistBuddy output is a single token (binary name)
+    binary_name=$(/usr/libexec/PlistBuddy -c "Print CFBundleExecutable" "$info_plist" 2>/dev/null || true) # check-suppress:suppression_doc: PlistBuddy fails when Info.plist lacks CFBundleExecutable; fallback to .app path is intentional
+    if [ -n "$binary_name" ] && [ -x "$app_path/Contents/MacOS/$binary_name" ]; then
+      printf '%s' "$app_path/Contents/MacOS/$binary_name"
+      return
+    fi
+  fi
+  printf '%s' "$app_path"
+}
+
 # macos_launchagent_ensure BUNDLE_ID APP_PATH — write nucleus-owned plist (idempotent).
 macos_launchagent_ensure() {
   local bundle_id="$1" app_path="$2"
+  # Resolve the actual binary inside the .app bundle — launchd cannot
+  # execute a .app directory directly; execvp() requires an executable file.
+  local binary_path
+  binary_path="$(macos_app_binary_path "$app_path")"
   local label plist_path
   label="$(macos_launchagent_label "$bundle_id")"
   plist_path="$(macos_launchagent_path "$bundle_id")"
@@ -132,7 +154,7 @@ macos_launchagent_ensure() {
     <string>${label}</string>
     <key>ProgramArguments</key>
     <array>
-        <string>${app_path}</string>
+        <string>${binary_path}</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
