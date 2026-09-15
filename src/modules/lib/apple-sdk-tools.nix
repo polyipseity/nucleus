@@ -172,5 +172,5 @@ let
 in
 {
   inherit allTools;
-  symlinkFarmTools = builtins.filterAttrs (_name: path: path != null) farmSet;
+  symlinkFarmTools = pkgs.lib.filterAttrs (_name: path: path != null) farmSet;
 }
