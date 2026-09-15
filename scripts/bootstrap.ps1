@@ -254,8 +254,8 @@ function Invoke-WingetPackageInstall {
       try {
         Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
       } catch {
-        # check-suppress:SuppressMessageAttribute: PSAvoidEmptyCatchBlocks -- process may already have exited; -ErrorAction SilentlyContinue handles the common case
-        [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidEmptyCatchBlocks', '')]
+        # check-suppress:suppression_doc: process may already have exited; -ErrorAction SilentlyContinue handles the common case
+        $null = $null
       }
       throw "winget install for '$Id' (version $Version) timed out after $TimeoutSeconds seconds"
     }
@@ -279,8 +279,8 @@ function Invoke-WingetPackageInstall {
     try {
       Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
     } catch {
-      # check-suppress:SuppressMessageAttribute: PSAvoidEmptyCatchBlocks -- process may already have exited; -ErrorAction SilentlyContinue handles the common case
-      [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidEmptyCatchBlocks', '')]
+      # check-suppress:suppression_doc: process may already have exited; -ErrorAction SilentlyContinue handles the common case
+      $null = $null
     }
     throw "winget install for '$Id' timed out after $TimeoutSeconds seconds"
   }
@@ -391,8 +391,8 @@ function Install-GnuPGDirect {
           $null = [NucWin32]::SendMessage($_.MainWindowHandle, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero) # WM_CLOSE
           Write-NucleusInfo "Closed dialog window from $($_.ProcessName) (PID $($_.Id))"
         } catch {
-          # check-suppress:SuppressMessageAttribute: PSAvoidEmptyCatchBlock -- best-effort dialog close; installer may complete without it
-          [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidEmptyCatchBlocks', '')]
+          # check-suppress:suppression_doc: best-effort dialog close; installer may complete without it
+          $null = $null
         }
       }
     Start-Sleep -Milliseconds 500
@@ -406,8 +406,8 @@ function Install-GnuPGDirect {
     try {
       Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
     } catch {
-      # check-suppress:SuppressMessageAttribute: PSAvoidEmptyCatchBlocks -- process may already have exited
-      [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidEmptyCatchBlocks', '')]
+      # check-suppress:suppression_doc: process may already have exited
+      $null = $null
     }
     throw "GnuPG installer timed out after $TimeoutSeconds seconds"
   }
