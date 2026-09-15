@@ -89,7 +89,7 @@ jobs:
         env:
           PACKER_GITHUB_API_TOKEN: ${{ github.token }}
         # --no-fail-fast: CI should accumulate all failures for visibility.
-        run: nix run ./src#check -- --no-fail-fast ${{ env.VERBOSE == 'true' && '--verbose' || (env.VERBOSE != 'false' && format('--verbose={0}', env.VERBOSE) || '') }}
+        run: nix run ${{ env.VERBOSE == 'false' && '--quiet' || '' }} ./src#check -- --no-fail-fast ${{ env.VERBOSE == 'true' && '--verbose' || (env.VERBOSE != 'false' && format('--verbose={0}', env.VERBOSE) || '') }}
 
       - name: Run repository checks (Windows)
         if: runner.os == 'Windows'
@@ -101,7 +101,7 @@ jobs:
       - name: Run repository tests (POSIX)
         if: runner.os != 'Windows'
         # --no-fail-fast: CI should accumulate all failures for visibility.
-        run: nix run ./src#test -- --no-fail-fast ${{ env.VERBOSE == 'true' && '--verbose' || (env.VERBOSE != 'false' && format('--verbose={0}', env.VERBOSE) || '') }}
+        run: nix run ${{ env.VERBOSE == 'false' && '--quiet' || '' }} ./src#test -- --no-fail-fast ${{ env.VERBOSE == 'true' && '--verbose' || (env.VERBOSE != 'false' && format('--verbose={0}', env.VERBOSE) || '') }}
 
       - name: Run repository tests (Windows)
         if: runner.os == 'Windows'
