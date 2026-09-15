@@ -10,6 +10,10 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 DEVICESELECT_SH="$SCRIPT_DIR/../../src/scripts/services/camilladsp-deviceselect.sh"
 
+# Ensure the tally is always emitted on any exit path (early or normal).
+# Moved before require_command so a missing python3 still produces a tally.
+trap 'finish_tests' EXIT
+
 # Prerequisites: the suite parses the device list with Python, so a missing
 # interpreter or PyYAML fails the suite rather than skipping it — skip-guards
 # are banned (tooling-and-validation.instructions.md).
@@ -24,7 +28,8 @@ fi
 # without this the tests would modify the developer's real ~/.local/state/camilladsp.
 XDG_STATE_HOME="$(mktemp -d)"
 export XDG_STATE_HOME
-trap 'rm -rf "$XDG_STATE_HOME"' EXIT
+# Override the tally-only trap with one that also cleans up the temp dir.
+trap 'rm -rf "$XDG_STATE_HOME"; finish_tests' EXIT
 # Disable the enumeration cache by default. Tests assert on mocked enumeration
 # results, and a list cached by an earlier test would mask the mock. The cache
 # tests opt back in with their own TTL and their own state directory.
