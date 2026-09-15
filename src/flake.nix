@@ -723,6 +723,9 @@
               pkgs.findutils
               pkgs.git
               pkgs.powershell
+              # WHY: android-config-tests creates a test APK with zip; not a system
+              # utility on Ubuntu (only macOS ships it via Xcode CLT).
+              pkgs.zip
               # WHY: camilladsp-deviceselect parses YAML fixtures with python3, and the
               # wrapper exports PATH so every spawned step and suite inherits it.
               (pkgs.python3.withPackages (p: [ p.pyyaml ]))
