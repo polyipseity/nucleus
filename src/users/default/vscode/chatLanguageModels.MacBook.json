@@ -4,7 +4,7 @@
     "models": [
       {
         "id": "ollama_chat/devstral-small-2:24b",
-        "maxInputTokens": 32768,
+        "maxInputTokens": 32000,
         "maxOutputTokens": 16000,
         "name": "Devstral Small 2 24B",
         "toolCalling": true,
@@ -13,7 +13,7 @@
       },
       {
         "id": "ollama_chat/qwen2.5:1.5b",
-        "maxInputTokens": 32768,
+        "maxInputTokens": 32000,
         "maxOutputTokens": 16000,
         "name": "Qwen 2.5 1.5B",
         "toolCalling": false,
@@ -22,7 +22,7 @@
       },
       {
         "id": "default",
-        "maxInputTokens": 128000,
+        "maxInputTokens": 192000,
         "maxOutputTokens": 16000,
         "name": "LiteLLM Default",
         "toolCalling": true,

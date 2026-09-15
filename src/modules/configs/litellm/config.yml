@@ -142,7 +142,7 @@ model_list:
       order: 1
       reasoning_effort: high
       model_info:
-        max_input_tokens: 128000
+        max_input_tokens: 192000
         max_output_tokens: 16000
 
   - model_name: default
@@ -153,7 +153,7 @@ model_list:
       order: 2
       reasoning_effort: high
       model_info:
-        max_input_tokens: 128000
+        max_input_tokens: 192000
         max_output_tokens: 16000
     model_info:
       health_check_max_tokens: 500
@@ -170,7 +170,7 @@ model_list:
       allowed_fails_policy:
         BadRequestErrorAllowedFails: 0
       model_info:
-        max_input_tokens: 128000
+        max_input_tokens: 192000
         max_output_tokens: 16000
 
   - model_name: default
@@ -181,7 +181,7 @@ model_list:
       order: 2
       reasoning_effort: high
       model_info:
-        max_input_tokens: 128000
+        max_input_tokens: 192000
         max_output_tokens: 16000
 
   - model_name: default
@@ -191,5 +191,5 @@ model_list:
       order: 3
       reasoning_effort: high
       model_info:
-        max_input_tokens: 128000
+        max_input_tokens: 192000
         max_output_tokens: 16000

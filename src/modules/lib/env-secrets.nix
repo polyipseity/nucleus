@@ -246,9 +246,9 @@ let
     };
     OLLAMA_CONTEXT_LENGTH = {
       values = {
-        default = "32768";
+        default = "32000";
       };
-      why = "Set 32k token default context window so models that default to 2k/4k do not silently truncate on any host.";
+      why = "Set 32k token context window for local Ollama models, matching the LiteLLM and VS Code token-limit policy.";
     };
     OLLAMA_KV_CACHE_TYPE = {
       values = {
