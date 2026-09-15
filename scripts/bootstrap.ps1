@@ -306,11 +306,15 @@ function Install-GnuPGDirect {
   .DESCRIPTION
     Winget's --silent flag does not suppress the GpgEX regsvr32 dialog on
     headless CI systems, causing the install to hang indefinitely. Running
-    the NSIS installer directly with /S (silent) and /D=path skips the
-    dialog. Resident daemon processes spawned by the installer are killed
-    after installation completes.
+    the NSIS installer directly with /S (silent) and /D=path still blocks
+    on a modal MessageBox (regsvr32 gpgex6.dll failure, no /SD default).
+    We poll the installer's own MainWindowHandle and close it after a grace
+    period. Success is verified via the Add/Remove Programs registry entry
+    (the ARP entry is written in the installer's last hidden section, so the
+    exit code alone is unreliable on the timeout path).
 
-    Ref: https://github.com/fleetdm/fleet/pull/50025
+    Ref: Fleet PR https://github.com/fleetdm/fleet/pull/50025
+    Ref: Fleet commit https://github.com/fleetdm/fleet/commit/5326bed
 
   .PARAMETER Version
     GnuPG version string (e.g. '2.5.21').
@@ -370,60 +374,67 @@ function Install-GnuPGDirect {
   }
 
   # Run the NSIS installer with /S (silent) and /D=path (install directory).
-  # WHY: The GnuPG NSIS installer spawns a modal dialog (regsvr32 /s gpgex.dll
-  # fails on headless machines, showing a MessageBox with no /SD default). The
-  # installer process hangs forever waiting for user input. We poll for and close
-  # any dialog windows from the installer tree so it can continue. Ref: Fleet PR
-  # https://github.com/fleetdm/fleet/pull/50026
+  # WHY: The GnuPG NSIS installer calls RegDLL on gpgex6.dll (the GpgEX shell
+  # extension). On headless CI, regsvr32 fails and spawns a modal MessageBox
+  # with no /SD default — the /S flag does NOT suppress these. The dialog
+  # window belongs to the installer process itself, not to regsvr32/gpgex
+  # children (Fleet confirmed via 5326bed). We poll the installer's own
+  # MainWindowHandle and close it after a grace period so the install can
+  # continue to the ARP registry entry (written in the last hidden section).
+  # Success is verified via the ARP entry, not the exit code, because a
+  # killed installer (timeout path) has a meaningless exit code.
   Write-NucleusInfo "Installing GnuPG $Version to $installDir"
   $proc = Start-Process -FilePath $installerPath -ArgumentList "/S", "/D=$installDir" -PassThru -NoNewWindow
-  $TimeoutSeconds = 300
+  $TimeoutSeconds = 420
+  $pollSeconds = 10
+  $graceSeconds = 30
   $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  $graceDeadline = (Get-Date).AddSeconds($graceSeconds)
   while (-not $proc.HasExited -and (Get-Date) -lt $deadline) {
-    # Close any dialog windows from regsvr32 or gpgex (GpgEX shell extension
-    # registration failure on headless machines). Without this the NSIS installer
-    # blocks on a MessageBox forever.
-    Get-Process -Name 'regsvr32', 'gpgex' -ErrorAction SilentlyContinue |
-      Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } |
-      ForEach-Object {
-        try {
-          Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices; public class NucWin32 { [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam); }' -ErrorAction SilentlyContinue
-          $null = [NucWin32]::SendMessage($_.MainWindowHandle, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero) # WM_CLOSE
-          Write-NucleusInfo "Closed dialog window from $($_.ProcessName) (PID $($_.Id))"
-        } catch {
-          # check-suppress:suppression_doc: best-effort dialog close; installer may complete without it
-          $null = $null
-        }
-      }
-    Start-Sleep -Milliseconds 500
-  }
-  if ($proc.HasExited) {
-    if ($proc.ExitCode -ne 0) {
-      throw "GnuPG installer exited with code $($proc.ExitCode)"
+    Start-Sleep -Seconds $pollSeconds
+    $proc.Refresh()
+    if ($proc.HasExited) { break }
+
+    # After grace period, close any window the installer owns.
+    # The dialog is on the installer process itself, not on child processes.
+    if ((Get-Date) -gt $graceDeadline -and $proc.MainWindowHandle -ne [IntPtr]::Zero) {
+      Write-NucleusInfo "Closing installer dialog window ('$($proc.MainWindowTitle)')"
+      $null = $proc.CloseMainWindow()
     }
-  } else {
+  }
+  if (-not $proc.HasExited) {
     # Timeout — kill the installer and any leftover children.
+    Write-NucleusInfo "Installer still running after ${TimeoutSeconds}s; stopping it."
     try {
       Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
     } catch {
       # check-suppress:suppression_doc: process may already have exited
       $null = $null
     }
-    throw "GnuPG installer timed out after $TimeoutSeconds seconds"
+  } else {
+    Write-NucleusInfo "Install exit code: $($proc.ExitCode)"
   }
 
   # Kill resident daemon processes spawned by the installer.
-  # These prevent WaitForExit from returning when winget manages the process.
-  # With direct invocation they exit after /S completes, but kill them anyway
-  # to avoid port/lock conflicts with later gpg operations.
-  $daemons = @('gpg-agent', 'dirmngr', 'keyboxd', 'scdaemon', 'gpg-connect-agent', 'gpgme-w32spawn')
+  # Leaving them running holds file locks that make later gpg operations fail.
+  $daemons = @('gpg-agent', 'dirmngr', 'keyboxd', 'scdaemon', 'gpg-connect-agent', 'gpgme-w32spawn', 'gpa', 'launch-gpa')
   foreach ($daemon in $daemons) {
     Stop-Process -Name $daemon -Force -ErrorAction SilentlyContinue
   }
 
-  # Verify installation.
-  if (-not (Test-Path -Path $gpgExe -PathType Leaf)) {
-    throw "GnuPG installer completed but gpg.exe not found at $gpgExe"
+  # Success = ARP entry exists. The exit code is unreliable on the timeout path
+  # (killed installer) and inst.nsi writes the ARP entry in its last hidden
+  # section — so the entry is the canonical signal that the install completed.
+  $arpKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*'
+  $arpKey32 = 'HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+  $arpKeyUser = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*'
+  $registered = $null -ne (Get-ChildItem -Path @($arpKey, $arpKey32, $arpKeyUser) -ErrorAction SilentlyContinue |
+    ForEach-Object { Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue } |
+    Where-Object { $_.DisplayName -like 'GNU Privacy Guard*' } |
+    Select-Object -First 1)
+
+  if (-not $registered) {
+    throw 'GnuPG did not register in Add/Remove Programs after installation'
   }
 
   Write-NucleusInfo "GnuPG $Version installed successfully at $installDir"
