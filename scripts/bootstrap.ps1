@@ -238,6 +238,10 @@ function Invoke-WingetPackageInstall {
     "--id"
     $Id
     "--silent"
+    # WHY: pin to community source — msstore lacks HashiCorp/SOPS packages and
+    # its agreement prompt blocks source resolution on fresh CI runners.
+    "--source"
+    "winget"
   )
 
   # WHY: timeout-300s: safety net for any winget install that might hang
