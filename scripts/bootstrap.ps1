@@ -251,7 +251,12 @@ function Invoke-WingetPackageInstall {
     $proc = Start-Process -FilePath "winget" -ArgumentList $versionedArgs `
       -PassThru -NoNewWindow
     if (-not $proc.WaitForExit($TimeoutSeconds * 1000)) {
-      try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch {} # check-suppress:suppression_doc: process may already have exited; -ErrorAction SilentlyContinue handles the common case
+      try {
+        Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+      } catch {
+        # check-suppress:SuppressMessageAttribute: PSAvoidEmptyCatchBlocks -- process may already have exited; -ErrorAction SilentlyContinue handles the common case
+        [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidEmptyCatchBlocks', '')]
+      }
       throw "winget install for '$Id' (version $Version) timed out after $TimeoutSeconds seconds"
     }
     $LASTEXITCODE = $proc.ExitCode
@@ -271,7 +276,12 @@ function Invoke-WingetPackageInstall {
   $proc = Start-Process -FilePath "winget" -ArgumentList $installArgs `
     -PassThru -NoNewWindow
   if (-not $proc.WaitForExit($TimeoutSeconds * 1000)) {
-    try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch {} # check-suppress:suppression_doc: process may already have exited; -ErrorAction SilentlyContinue handles the common case
+    try {
+      Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+    } catch {
+      # check-suppress:SuppressMessageAttribute: PSAvoidEmptyCatchBlocks -- process may already have exited; -ErrorAction SilentlyContinue handles the common case
+      [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidEmptyCatchBlocks', '')]
+    }
     throw "winget install for '$Id' timed out after $TimeoutSeconds seconds"
   }
   $LASTEXITCODE = $proc.ExitCode
@@ -366,7 +376,12 @@ function Install-GnuPGDirect {
   $proc = Start-Process -FilePath $installerPath -ArgumentList "/S", "/D=$installDir" -PassThru -NoNewWindow
   $TimeoutSeconds = 300
   if (-not $proc.WaitForExit($TimeoutSeconds * 1000)) {
-    try { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue } catch {} # check-suppress:suppression_doc: process may already have exited; -ErrorAction SilentlyContinue handles the common case
+    try {
+      Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+    } catch {
+      # check-suppress:SuppressMessageAttribute: PSAvoidEmptyCatchBlocks -- process may already have exited; -ErrorAction SilentlyContinue handles the common case
+      [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidEmptyCatchBlocks', '')]
+    }
     throw "GnuPG installer timed out after $TimeoutSeconds seconds"
   }
 
