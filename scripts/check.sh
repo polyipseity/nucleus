@@ -209,6 +209,15 @@ do_packer() {
     (cd "$dir" && packer init . && packer validate "${vars[@]}" . 2>&1 | _filter_known_packer_warnings)
   }
 
+  # Preflight: install plugins sequentially to avoid "text file busy" race.
+  # Both NixOS and Windows need the qemu plugin; downloading it twice in
+  # parallel causes a write conflict on the cached plugin binary.
+  (cd src/vms/NixOS && packer init .) || true   # check-suppress:suppression_doc: plugin download may already be cached; init failure is non-fatal
+  (cd src/vms/Windows && packer init .) || true # check-suppress:suppression_doc: plugin download may already be cached; init failure is non-fatal
+  if [ "$(uname)" = "Darwin" ]; then
+    (cd src/vms/macOS && packer init .) || true # check-suppress:suppression_doc: plugin download may already be cached; init failure is non-fatal
+  fi
+
   # Parallel validation: each VM directory validates independently.
   # Uses temp exit files for race-free aggregation (same pattern as check.sh).
   _pkr_tmpdir=$(mktemp -d) || {
