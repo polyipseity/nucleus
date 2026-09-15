@@ -370,23 +370,46 @@ function Install-GnuPGDirect {
   }
 
   # Run the NSIS installer with /S (silent) and /D=path (install directory).
-  # WHY: /S suppresses all UI dialogs including the GpgEX regsvr32 dialog
-  # that blocks on headless CI. /D= must be the last argument per NSIS spec.
+  # WHY: The GnuPG NSIS installer spawns a modal dialog (regsvr32 /s gpgex.dll
+  # fails on headless machines, showing a MessageBox with no /SD default). The
+  # installer process hangs forever waiting for user input. We poll for and close
+  # any dialog windows from the installer tree so it can continue. Ref: Fleet PR
+  # https://github.com/fleetdm/fleet/pull/50026
   Write-NucleusInfo "Installing GnuPG $Version to $installDir"
   $proc = Start-Process -FilePath $installerPath -ArgumentList "/S", "/D=$installDir" -PassThru -NoNewWindow
   $TimeoutSeconds = 300
-  if (-not $proc.WaitForExit($TimeoutSeconds * 1000)) {
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  while (-not $proc.HasExited -and (Get-Date) -lt $deadline) {
+    # Close any dialog windows from regsvr32 or gpgex (GpgEX shell extension
+    # registration failure on headless machines). Without this the NSIS installer
+    # blocks on a MessageBox forever.
+    Get-Process -Name 'regsvr32', 'gpgex' -ErrorAction SilentlyContinue |
+      Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } |
+      ForEach-Object {
+        try {
+          Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices; public class NucWin32 { [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam); }' -ErrorAction SilentlyContinue
+          $null = [NucWin32]::SendMessage($_.MainWindowHandle, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero) # WM_CLOSE
+          Write-NucleusInfo "Closed dialog window from $($_.ProcessName) (PID $($_.Id))"
+        } catch {
+          # check-suppress:SuppressMessageAttribute: PSAvoidEmptyCatchBlock -- best-effort dialog close; installer may complete without it
+          [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidEmptyCatchBlocks', '')]
+        }
+      }
+    Start-Sleep -Milliseconds 500
+  }
+  if ($proc.HasExited) {
+    if ($proc.ExitCode -ne 0) {
+      throw "GnuPG installer exited with code $($proc.ExitCode)"
+    }
+  } else {
+    # Timeout — kill the installer and any leftover children.
     try {
       Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
     } catch {
-      # check-suppress:SuppressMessageAttribute: PSAvoidEmptyCatchBlocks -- process may already have exited; -ErrorAction SilentlyContinue handles the common case
+      # check-suppress:SuppressMessageAttribute: PSAvoidEmptyCatchBlocks -- process may already have exited
       [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidEmptyCatchBlocks', '')]
     }
     throw "GnuPG installer timed out after $TimeoutSeconds seconds"
-  }
-
-  if ($proc.ExitCode -ne 0) {
-    throw "GnuPG installer exited with code $($proc.ExitCode)"
   }
 
   # Kill resident daemon processes spawned by the installer.
