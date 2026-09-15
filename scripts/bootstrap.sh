@@ -99,9 +99,9 @@ run_nix() {
   # actionable failures instead of identical VCS status noise.
   # NIX_PATH is set explicitly because darwin-rebuild's export NIX_PATH=${NIX_PATH:-}
   # would otherwise clear it, overriding the nix-path config option.
-  # --quiet suppresses store path listings and copying lines in CI (VERBOSE=false).
+  # --quiet suppresses store path listings and copying lines in CI (NUCLEUS_VERBOSE=false).
   _nix_quiet_flags=()
-  if [ "${VERBOSE:-false}" = "false" ]; then
+  if [ "${NUCLEUS_VERBOSE:-false}" = "false" ]; then
     _nix_quiet_flags=(--quiet)
   fi
   NIX_CONFIG="$(merge_nix_config)" NIX_PATH="nixpkgs=flake:nixpkgs" \
