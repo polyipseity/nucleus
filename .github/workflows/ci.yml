@@ -79,6 +79,7 @@ jobs:
         uses: DeterminateSystems/flake-checker-action@a0f068d37b542f3150564fbf1164fec2d958ee11 # v12.0.0
         with:
           fail-mode: false
+          flakehub: false
 
       - name: Provision bootstrap dependencies (POSIX)
         if: runner.os != 'Windows'
