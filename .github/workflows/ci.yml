@@ -65,6 +65,8 @@ jobs:
       - name: Install Nix (POSIX)
         if: runner.os != 'Windows'
         uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+        with:
+          determinate: false
 
       - name: Cache Nix store (POSIX)
         if: runner.os != 'Windows'
