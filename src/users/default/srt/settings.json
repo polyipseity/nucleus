@@ -188,6 +188,10 @@
       "www.youtube.com"
     ],
     "allowLocalBinding": true,
+    "allowMachLookup": [
+      "com.apple.hiservices-xpcservice",
+      "com.apple.pasteboard.1"
+    ],
     "allowUnixSockets": [
       "/nix/var/determinate/determinate-nixd.socket",
       "/nix/var/determinate/determinate-nixd.socket/",
