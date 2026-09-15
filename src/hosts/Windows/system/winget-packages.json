@@ -52,6 +52,7 @@
     "PeterVerbeek.PeaceEqualizerAPO",
     "Python.Python.3.13",
     "Rclone.Rclone",
+    "Redis.Redis",
     "RimSort.RimSort",
     "Rustlang.Rustup",
     "SQLite.SQLite",
