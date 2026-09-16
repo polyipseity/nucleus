@@ -998,6 +998,7 @@ let
     "yq-go" = {
       category = "cli";
       nixpkgs = "yq-go";
+      winget = "MikeFarah.yq";
     };
     zizmor = {
       category = "cli";
