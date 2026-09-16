@@ -528,14 +528,24 @@ foreach ($tool in $checkTools) {
 }
 # Refresh PATH from registry so newly installed tools are available in the
 # current process. In GitHub Actions, also propagate the WinGet Links directory
-# to $env:GITHUB_PATH so subsequent steps can find WinGet-installed binaries.
+# and the uv tool bin directory to $env:GITHUB_PATH so subsequent steps can
+# find WinGet-installed and uv-installed binaries.
 # WHY: WinGet modifies PATH in the registry but the change is invisible to the
 # current and child processes until the terminal restarts (winget-cli#549).
+# uv tool install places binaries in ~\.local\bin; GITHUB_PATH is the only
+# mechanism to propagate PATH additions across GitHub Actions steps.
 $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User')
+$uvToolBin = Join-Path $env:USERPROFILE '.local\bin'
+if ($env:PATH -notlike "*$uvToolBin*") {
+    $env:PATH = "$uvToolBin;$env:PATH"
+}
 if ($env:GITHUB_PATH) {
     $winGetLinks = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links'
     if (Test-Path $winGetLinks) {
         Add-Content -Path $env:GITHUB_PATH -Value $winGetLinks
+    }
+    if (Test-Path $uvToolBin) {
+        Add-Content -Path $env:GITHUB_PATH -Value $uvToolBin
     }
 }
 # yamllint: Python package, no WinGet ID. Requires uv on PATH.
