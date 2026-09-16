@@ -396,6 +396,7 @@ function Invoke-StepPipeline {
     VerboseIds         = $script:VerboseIds
     PositionalArgs    = $script:positionalArgs
     StepNumber        = 0
+    StepId            = $null
   }
 
   $maxJobs = if ($env:PARALLEL_JOBS) { [int]$env:PARALLEL_JOBS } else { [Environment]::ProcessorCount }
