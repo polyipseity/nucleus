@@ -511,11 +511,10 @@ function Install-Uv {
     throw "Failed to download uv installer: $_"
   }
 
-  # WHY: --quiet suppresses interactive prompts; the installer places uv.exe
-  # in $env:LOCALAPPDATA\uv and optionally modifies the user's PATH via
-  # shell profile. We skip shell modification (--no-modify-path) and
-  # refresh PATH ourselves to keep bootstrap deterministic.
-  & $installScript --quiet --no-modify-path
+  # WHY: -NoModifyPath prevents the installer from modifying shell profiles.
+  # The installer places uv.exe in $env:LOCALAPPDATA\uv; we refresh PATH
+  # ourselves to keep bootstrap deterministic.
+  & $installScript -NoModifyPath
   if ($LASTEXITCODE -ne 0) {
     throw "uv installer failed with exit code $LASTEXITCODE"
   }
