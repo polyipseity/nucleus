@@ -600,7 +600,7 @@ let
         name = "packer";
       };
       nixpkgs = "packer";
-      winget = "HashiCorp.Packer";
+      winget = "Hashicorp.Packer";
     };
     parsec = {
       # macOS cask is in MacBook/homebrew.nix; no nixpkgs attr, so it is not on nixpkgs.

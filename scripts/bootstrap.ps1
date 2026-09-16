@@ -497,7 +497,7 @@ $gnupgHash = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLE
 Install-GnuPGDirect -Version $gnupgVersion -InstallerDate $gnupgDate -InstallerSha256 $gnupgHash
 
 $BootstrapPackageVersions = [ordered]@{
-  "HashiCorp.Packer" = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_PACKER_VERSION"
+  "Hashicorp.Packer" = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_PACKER_VERSION"
   "SecretsOPerationS.SOPS" = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_SOPS_VERSION"
 }
 

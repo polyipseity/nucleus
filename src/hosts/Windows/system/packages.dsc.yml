@@ -57,7 +57,7 @@ properties:
           Ensure HashiCorp Packer is installed for automated VM image building
           (scripts\VM-build.ps1; cross-host parity with pkgs.packer on macOS/NixOS).
       settings:
-        id: HashiCorp.Packer
+        id: Hashicorp.Packer
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package

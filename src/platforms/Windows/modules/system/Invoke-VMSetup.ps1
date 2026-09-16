@@ -1663,7 +1663,7 @@ function Invoke-BuildNixosImage {
 
     # check-suppress:suppression_doc: probe whether packer is installed; Get-Command throws when absent.
     if (-not (Get-Command packer -ErrorAction SilentlyContinue)) {
-        Write-NucleusWarning -CommandName vm-setup 'packer not found; install via WinGet (HashiCorp.Packer)'
+        Write-NucleusWarning -CommandName vm-setup 'packer not found; install via WinGet (Hashicorp.Packer)'
         return
     }
 
@@ -1959,7 +1959,7 @@ function Invoke-BuildWindowsImage {
 
     # check-suppress:suppression_doc: probe whether packer is installed; Get-Command throws when absent.
     if (-not (Get-Command packer -ErrorAction SilentlyContinue)) {
-        Write-NucleusWarning -CommandName vm-setup 'packer not found; install via WinGet (HashiCorp.Packer)'
+        Write-NucleusWarning -CommandName vm-setup 'packer not found; install via WinGet (Hashicorp.Packer)'
         return
     }
 
