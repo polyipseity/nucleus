@@ -481,6 +481,57 @@ function Invoke-RepositoryDirenvAllowIfAvailable {
   }
 }
 
+function Install-Uv {
+  <#
+  .SYNOPSIS
+    Installs uv if not already available.
+
+  .DESCRIPTION
+    Downloads and runs the official uv installer from astral.sh. uv is
+    required for installing Python-based check tools (yamllint,
+    check-jsonschema) that have no WinGet or Scoop package. The installer
+    places uv.exe in $env:LOCALAPPDATA\uv; this function refreshes PATH
+    and propagates the directory to GITHUB_PATH for subsequent CI steps.
+  #>
+  [CmdletBinding()]
+  param()
+
+  if (Get-Command -Name uv -ErrorAction SilentlyContinue) {
+    Write-NucleusInfo "uv is already available at $(Get-Command uv | Select-Object -ExpandProperty Source)"
+    return
+  }
+
+  Write-NucleusInfo "Installing uv from astral.sh..."
+  $installScript = Join-Path $env:TEMP 'uv-install.ps1'
+  try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $webClient = [System.Net.WebClient]::new()
+    $webClient.DownloadFile('https://astral.sh/uv/install.ps1', $installScript)
+  } catch {
+    throw "Failed to download uv installer: $_"
+  }
+
+  # WHY: --quiet suppresses interactive prompts; the installer places uv.exe
+  # in $env:LOCALAPPDATA\uv and optionally modifies the user's PATH via
+  # shell profile. We skip shell modification (--no-modify-path) and
+  # refresh PATH ourselves to keep bootstrap deterministic.
+  & $installScript --quiet --no-modify-path
+  if ($LASTEXITCODE -ne 0) {
+    throw "uv installer failed with exit code $LASTEXITCODE"
+  }
+
+  # Refresh PATH to include the uv installation directory.
+  $uvDir = Join-Path $env:LOCALAPPDATA 'uv'
+  if ($env:PATH -notlike "*$uvDir*") {
+    $env:PATH = "$uvDir;$env:PATH"
+  }
+
+  if (-not (Get-Command -Name uv -ErrorAction SilentlyContinue)) {
+    throw "uv installed but not found on PATH after refresh (expected at $uvDir)"
+  }
+  Write-NucleusInfo "uv installed successfully at $uvDir"
+}
+
 # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
 if (-not (Get-Command -Name winget -ErrorAction SilentlyContinue)) {
   throw "winget is required but was not found in PATH."
@@ -539,11 +590,24 @@ $uvToolBin = Join-Path $env:USERPROFILE '.local\bin'
 if ($env:PATH -notlike "*$uvToolBin*") {
     $env:PATH = "$uvToolBin;$env:PATH"
 }
+# Install uv before attempting uv tool installs. uv is not pre-installed on
+# GitHub Actions Windows runners and is required for yamllint and
+# check-jsonschema (no WinGet or Scoop packages exist for these).
+Install-Uv
+
 if ($env:GITHUB_PATH) {
     $winGetLinks = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links'
     if (Test-Path $winGetLinks) {
         Add-Content -Path $env:GITHUB_PATH -Value $winGetLinks
     }
+    # Propagate uv's own binary directory so uv is available in subsequent
+    # CI steps (each step runs in a fresh process).
+    $uvDir = Join-Path $env:LOCALAPPDATA 'uv'
+    if (Test-Path $uvDir) {
+        Add-Content -Path $env:GITHUB_PATH -Value $uvDir
+    }
+    # Propagate uv tool binary directory so tool-installed binaries
+    # (yamllint, check-jsonschema) are available in subsequent CI steps.
     if (Test-Path $uvToolBin) {
         Add-Content -Path $env:GITHUB_PATH -Value $uvToolBin
     }
