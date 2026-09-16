@@ -419,6 +419,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure yq is installed for YAML/JSON processing in check and activation scripts (parity with nixpkgs yq-go)
+      settings:
+        id: MikeFarah.yq
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure Neovim is installed to mirror the default-editor baseline declared on macOS and NixOS
       settings:
         id: Neovim.Neovim

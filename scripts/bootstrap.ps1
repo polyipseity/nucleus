@@ -562,7 +562,7 @@ if (Test-Path -Path $moduleSetupPath) {
   Invoke-PowerShellModuleSetup
 }
 
-# Provision check pipeline tools (actionlint, pinact, shfmt, taplo, zizmor).
+# Provision check pipeline tools (actionlint, pinact, shfmt, taplo, yq, zizmor).
 # Same WinGet IDs as src/hosts/Windows/system/packages.dsc.yml.
 # yamllint is installed separately via uv (no WinGet ID).
 $checkTools = @(
@@ -570,6 +570,7 @@ $checkTools = @(
     'suzuki-shunsuke.pinact'
     'mvdan.shfmt'
     'tamasfe.taplo'
+    'MikeFarah.yq'
     'zizmor.zizmor'
 )
 foreach ($tool in $checkTools) {
