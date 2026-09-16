@@ -512,15 +512,14 @@ function Install-Uv {
   }
 
   # WHY: -NoModifyPath prevents the installer from modifying shell profiles.
-  # The installer places uv.exe in $env:LOCALAPPDATA\uv; we refresh PATH
-  # ourselves to keep bootstrap deterministic.
+  # The uv installer is a PowerShell script invoked via & in the same process.
+  # $LASTEXITCODE is only set by native/external commands (.exe, .bat), not by
+  # PowerShell scripts, so it remains $null here regardless of outcome. The
+  # Get-Command check below is the reliable post-condition guard.
   & $installScript -NoModifyPath
-  if ($LASTEXITCODE -ne 0) {
-    throw "uv installer failed with exit code $LASTEXITCODE"
-  }
 
-  # Refresh PATH to include the uv installation directory.
-  $uvDir = Join-Path $env:LOCALAPPDATA 'uv'
+  # WHY: The uv installer places binaries in ~/.local/bin, not %LOCALAPPDATA%\uv.
+  $uvDir = Join-Path $env:USERPROFILE '.local\bin'
   if ($env:PATH -notlike "*$uvDir*") {
     $env:PATH = "$uvDir;$env:PATH"
   }
