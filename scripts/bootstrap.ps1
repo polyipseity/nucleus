@@ -526,6 +526,18 @@ $checkTools = @(
 foreach ($tool in $checkTools) {
     Invoke-WingetPackageInstall -Id $tool
 }
+# Refresh PATH from registry so newly installed tools are available in the
+# current process. In GitHub Actions, also propagate the WinGet Links directory
+# to $env:GITHUB_PATH so subsequent steps can find WinGet-installed binaries.
+# WHY: WinGet modifies PATH in the registry but the change is invisible to the
+# current and child processes until the terminal restarts (winget-cli#549).
+$env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User')
+if ($env:GITHUB_PATH) {
+    $winGetLinks = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Links'
+    if (Test-Path $winGetLinks) {
+        Add-Content -Path $env:GITHUB_PATH -Value $winGetLinks
+    }
+}
 # yamllint: Python package, no WinGet ID. Requires uv on PATH.
 if (Get-Command -Name uv -ErrorAction SilentlyContinue) {
     & uv tool install yamllint
