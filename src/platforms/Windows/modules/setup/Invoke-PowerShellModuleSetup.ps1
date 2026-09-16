@@ -65,7 +65,19 @@ function Invoke-PowerShellModuleSetup {
     $existing = Get-Module -ListAvailable -Name $moduleName | Select-Object -First 1
     if ($existing) {
       Write-NucleusInfo -CommandName 'Invoke-PowerShellModuleSetup' "removing $moduleName version $($existing.Version)..."
-      Uninstall-Module -Name $moduleName -AllVersions -Force -ErrorAction Stop
+      try {
+        Uninstall-Module -Name $moduleName -AllVersions -Force -ErrorAction Stop
+      } catch {
+        # Pre-installed modules (e.g. runner images) lack PSGallery package
+        # records — Uninstall-Package cannot find them.  Remove the module
+        # directory directly instead.
+        $moduleBase = $existing.ModuleBase
+        if (-not (Test-Path $moduleBase)) {
+          throw "Module directory not found: $moduleBase"
+        }
+        Remove-Item -Path $moduleBase -Recurse -Force -ErrorAction Stop
+        Write-NucleusInfo -CommandName 'Invoke-PowerShellModuleSetup' "removed $moduleName directory at $moduleBase"
+      }
     }
 
     Write-NucleusInfo -CommandName 'Invoke-PowerShellModuleSetup' "installing $moduleName version $requiredVersion..."
