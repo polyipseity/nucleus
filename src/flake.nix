@@ -891,6 +891,7 @@
               inherit nixpkgs username repoRoot;
               users = usersMacBook;
               hermes-agent = hermes-agent;
+              mac-app-util = mac-app-util;
               nucleusApps = nucleusAppsMac // {
                 nucleus-service-watchdog = serviceWatchdogPkgMac;
               };

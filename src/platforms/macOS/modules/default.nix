@@ -8,6 +8,7 @@
   users ? null,
   hostName,
   nucleusApps,
+  mac-app-util,
   ...
 }:
 let
@@ -334,6 +335,31 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
     # -------------------------------------------------------------------------
     macos-install-raycast-aliases = lib.hm.dag.entryAfter [ "macos-configure-launch-services" ] ''
       "${activationBundle}/src/platforms/macOS/scripts/macos-install-raycast-aliases.sh"
+    '';
+
+    # -------------------------------------------------------------------------
+    # mac-app-util trampolines
+    # Create Spotlight/Raycast-indexable .app wrappers for standalone GUI
+    # binaries that lack .app bundles (e.g. Homebrew formula binaries like
+    # Krokiet and Czkawka). Trampolines are AppleScript-compiled .app bundles
+    # that launch the target binary, making them discoverable by Spotlight
+    # and Raycast.
+    #
+    # WHY: mac-app-util's HM module (sync-trampolines) only processes .app
+    # bundles in ~/Applications/Home Manager Apps/. Homebrew binaries are not
+    # .app bundles, so we call mktrampoline directly.
+    #
+    # Source: https://github.com/hraban/mac-app-util
+    # -------------------------------------------------------------------------
+    macos-create-app-trampolines = lib.hm.dag.entryAfter [ "macos-install-raycast-aliases" ] ''
+      _trampoline_dir="${config.home.homeDirectory}/Applications/Nucleus App Aliases"
+      _mac_app_util="${mac-app-util.packages.${pkgs.stdenv.system}.default}/bin/mac-app-util"
+
+      for _bin in "/opt/homebrew/bin/krokiet" "/opt/homebrew/bin/czkawka_gui"; do
+        [ -x "$_bin" ] || continue
+        _name="$(basename "$_bin")"
+        "$_mac_app_util" mktrampoline "$_bin" "$_trampoline_dir/$_name.app"
+      done
     '';
 
     # -------------------------------------------------------------------------
