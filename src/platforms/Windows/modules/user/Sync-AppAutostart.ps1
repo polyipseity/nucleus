@@ -51,7 +51,8 @@ function Sync-AppAutostart {
       throw "autostart.ps1 exited with code $LASTEXITCODE"
     }
   } catch {
-    Write-NucleusError -CommandName 'autostart' "app auto-start convergence failed: $($_.Exception.Message)"
+    # check-suppress:suppression_doc: -ErrorAction SilentlyContinue prevents Write-Error from becoming a terminating error under $ErrorActionPreference='Stop'; throw propagates the error to the caller.
+    Write-NucleusError -CommandName 'autostart' "app auto-start convergence failed: $($_.Exception.Message)" -ErrorAction SilentlyContinue
     throw
   }
 }
