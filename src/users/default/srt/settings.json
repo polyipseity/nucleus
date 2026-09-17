@@ -189,8 +189,15 @@
     ],
     "allowLocalBinding": true,
     "allowMachLookup": [
+      "com.apple.coreservices.uasharedpasteboardaux.xpc",
+      "com.apple.coreservices.uasharedpasteboardmanager.xpc",
+      "com.apple.coreservices.uasharedpasteboardprogressui.xpc",
+      "com.apple.coreservices.uauseractivitypasteboardclient.xpc",
       "com.apple.hiservices-xpcservice",
-      "com.apple.pasteboard.1"
+      "com.apple.lsd.mapdb",
+      "com.apple.lsd.modifydb",
+      "com.apple.pasteboard.1",
+      "com.apple.pbs.fetch_services"
     ],
     "allowUnixSockets": [
       "/nix/var/determinate/determinate-nixd.socket",
