@@ -60,8 +60,8 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Action {
     # Root cursor/vscode sections (editor plugins) also overlap with suggestions pairs.
     $vscodeBased = @('suggestions.cursor', 'suggestions.vscode', 'cursor', 'vscode')
     foreach ($entry in $pkgToSections.GetEnumerator()) {
-      if ($entry.Value.Count -gt 1 -and $entry.Key -notin $lfOverlapExceptions) {
-        $nonVscode = $entry.Value | Where-Object { $_ -notin $vscodeBased }
+      if ((@($entry.Value)).Count -gt 1 -and $entry.Key -notin $lfOverlapExceptions) {
+        $nonVscode = @($entry.Value | Where-Object { $_ -notin $vscodeBased })
         if ($nonVscode.Count -gt 0) {
           Write-ErrorMessage "package '$($entry.Key)' appears in both $($entry.Value -join ', ')"
           $lfOverlapErrors++
@@ -71,7 +71,7 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Action {
     # Self-pruning: check if lfOverlapExceptions are still needed (A4)
     foreach ($exception in $lfOverlapExceptions) {
       if ($pkgToSections.ContainsKey($exception)) {
-        if ($pkgToSections[$exception].Count -le 1) {
+        if ((@($pkgToSections[$exception])).Count -le 1) {
           Write-ErrorMessage "stale exception: '$exception' no longer overlaps sections — remove from lfOverlapExceptions"
           $lfOverlapErrors++
         }
