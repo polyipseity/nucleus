@@ -39,7 +39,7 @@ run_lockfile_validation() {
     error "lockfile.json not found at $_lfpath"
     _lf_overlap_issues=$((_lf_overlap_issues + 1))
   else
-    local _lf_overlap_exceptions='["astral-sh.ty"]'
+    local _lf_overlap_exceptions='["astral-sh.ty","Windows"]' # ref: allow-and-deny-lists.instructions.md#D1
     local _lf_overlaps
     # Note: cursor and vscode are both VS Code–based editors; identical
     # extension IDs across these two sections are expected and excluded.

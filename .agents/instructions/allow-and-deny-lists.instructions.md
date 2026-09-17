@@ -77,7 +77,7 @@ Categories A–D, dummy key rules below. New exclusions: category ID, tier, `# r
 
 | ID | Files | Entry | Tier | Reason | Verify |
 | --- | --- | --- | --- | --- | --- |
-| D1 | `05-lockfile-validation.ps1` | `lfOverlapExceptions`: `astral-sh.ty` | T2 | Legitimate overlap | Error if stale |
+| D1 | `05-lockfile-validation.ps1` | `lfOverlapExceptions`: `astral-sh.ty`, `Windows` | T2 | `astral-sh.ty`: legitimate overlap. `Windows`: host key in `suggestions.vm-setup`, not a package name; overlaps with `suggestions.ollama.Windows` | Error if stale |
 | D2 | `lifecycle-allowlist.json` | All entries | T2 | Supply-chain hardening | Error if stale (`check.sh`) |
 | D3 | `supply-chain-hardening.instructions.md` | Allowlist (cross-ref) | — | External | See that file |
 
