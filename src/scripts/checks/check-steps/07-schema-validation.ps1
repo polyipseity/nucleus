@@ -23,6 +23,7 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Act
       $f -like '*users\*\agents\skills\*\_meta.json' -or $f -like '*users/*/agents/skills/*/_meta.json' -or
       $f -like '*configs\litellm\*' -or $f -like '*configs/litellm/*' -or
       $f -like '*users\*\vscode\mcp.json' -or $f -like '*users/*/vscode/mcp.json' -or
+      $f -like '*users\*\vscode\chatLanguageModels*.json' -or $f -like '*users/*/vscode/chatLanguageModels*.json' -or
       $f -like '*\.sops.yaml' -or $f -like '*/.sops.yaml' -or
       $f -like '*.yamllint.yml' -or
       # Infrastructure
@@ -47,13 +48,15 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Act
       if (Skip-SchemaFile $absSf) { continue }
       if ($absSf -like '*.json') {
         $schema = try { (Get-Content $absSf -Raw | ConvertFrom-Json -AsHashtable)['$schema'] } catch { $null }
-        if ($schema) {
+        # Skip external schema URLs (HTTP/HTTPS) — not local schema files; check-jsonschema would try to download them.
+        if ($schema -and $schema -notmatch '^https?://') {
           $schemafile = if ($schema -match '^\.') { [System.IO.Path]::GetFullPath((Join-Path (Split-Path $absSf -Parent) $schema)) } else { $schema }
           $manifest.Add(@{SchemaFile = $schemafile; InstanceFile = $absSf })
         }
       } elseif ($absSf -like '*.yml' -or $absSf -like '*.yaml') {
         $schema = try { (ConvertFrom-Yaml -Yaml (Get-Content $absSf -Raw))['$schema'] } catch { $null }
-        if ($schema) {
+        # Skip external schema URLs (HTTP/HTTPS) — not local schema files; check-jsonschema would try to download them.
+        if ($schema -and $schema -notmatch '^https?://') {
           $schemafile = if ($schema -match '^\.') { [System.IO.Path]::GetFullPath((Join-Path (Split-Path $absSf -Parent) $schema)) } else { $schema }
           $manifest.Add(@{SchemaFile = $schemafile; InstanceFile = $absSf })
         }
@@ -65,7 +68,8 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Act
       $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.Name -notlike '*.schema.json'  # ref: allow-and-deny-lists.instructions.md#B3,#A7 -- structural invariants; schema files are meta
     } | ForEach-Object {
       $schema = try { (Get-Content $_.FullName -Raw | ConvertFrom-Json -AsHashtable)['$schema'] } catch { $null }
-      if ($schema) {
+      # Skip external schema URLs (HTTP/HTTPS) — not local schema files; check-jsonschema would try to download them.
+      if ($schema -and $schema -notmatch '^https?://') {
         if ($schema -match '^\.') {
           $schemafile = [System.IO.Path]::GetFullPath((Join-Path $_.DirectoryName $schema))
         } else {
@@ -79,7 +83,8 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Act
       $_.FullName -notmatch '[/\\]vendor[/\\]'  # ref: allow-and-deny-lists.instructions.md#B3 -- structural invariant; gitignore filter applied on top
     } | ForEach-Object { $_.FullName } | Select-GitIgnored | ForEach-Object {
       $schema = try { (ConvertFrom-Yaml -Yaml (Get-Content $_ -Raw))['$schema'] } catch { $null }
-      if ($schema) {
+      # Skip external schema URLs (HTTP/HTTPS) — not local schema files; check-jsonschema would try to download them.
+      if ($schema -and $schema -notmatch '^https?://') {
         if ($schema -match '^\.') {
           $schemafile = [System.IO.Path]::GetFullPath((Join-Path (Split-Path $_ -Parent) $schema))
         } else {
