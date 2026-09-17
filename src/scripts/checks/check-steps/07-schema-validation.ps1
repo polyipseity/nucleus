@@ -1,35 +1,35 @@
-# Single source of truth for A8 exception list: files that don't need $schema.
-# ref: allow-and-deny-lists.instructions.md#A8
-function Skip-SchemaFile([string]$FilePath) {
-  $f = $FilePath
-  return (
-    $f -like '*.schema.json' -or
-    $f -like '*\vendor\*' -or $f -like '*/vendor/*' -or
-    $f -like '*\secrets\*' -or $f -like '*/secrets/*' -or
-    $f -like '*.github\workflows\*' -or $f -like '*.github/workflows/*' -or
-    $f -like '*.github\dependabot.yml' -or $f -like '*.github/dependabot.yml' -or
-    $f -like '*users\*\vscode\*.json' -or $f -like '*users/*/vscode/*.json' -or
-    $f -like '*users\*\cursor\*.json' -or $f -like '*users/*/cursor/*.json' -or
-    $f -like '*users\*\iterm2\DynamicProfiles\*.json' -or $f -like '*users/*/iterm2/DynamicProfiles/*.json' -or
-    $f -like '*users\*\obsidian\*.json' -or $f -like '*users/*/obsidian/*.json' -or
-    $f -like '*users\*\qtpass\*.json' -or $f -like '*users/*/qtpass/*.json' -or
-    $f -like '*users\*\rimsort\*.json' -or $f -like '*users/*/rimsort/*.json' -or
-    $f -like '*configs\camilladsp\*' -or $f -like '*configs/camilladsp/*' -or
-    $f -like '*configs\camillagui-backend\*' -or $f -like '*configs/camillagui-backend/*' -or
-    $f -like '*users\*\discord-music-rpc\*' -or $f -like '*users/*/discord-music-rpc/*' -or
-    $f -like '*users\*\agents\hooks\*.json' -or $f -like '*users/*/agents/hooks/*.json' -or
-    $f -like '*users\*\agents\skills\*\_meta.json' -or $f -like '*users/*/agents/skills/*/_meta.json' -or
-    $f -like '*configs\litellm\config.yml' -or $f -like '*configs/litellm/config.yml' -or
-    $f -like '*configs\litellm\logging_config.json' -or $f -like '*configs/litellm/logging_config.json' -or
-    $f -like '*\.sops.yaml' -or $f -like '*/.sops.yaml' -or
-    $f -like '*.vscode\*' -or $f -like '*.vscode/*' -or
-    $f -like '*.agents\skills\*' -or $f -like '*.agents/skills/*' -or
-    (Split-Path $f -Leaf) -in @('package.json', 'opencode.jsonc')
-  )
-}
-
 Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Action {
   param([Parameter(Mandatory)][PSObject]$Context)
+
+  # Single source of truth for A8 exception list: files that don't need $schema.
+  # ref: allow-and-deny-lists.instructions.md#A8
+  function Skip-SchemaFile([string]$FilePath) {
+    $f = $FilePath
+    return (
+      $f -like '*.schema.json' -or
+      $f -like '*\vendor\*' -or $f -like '*/vendor/*' -or
+      $f -like '*\secrets\*' -or $f -like '*/secrets/*' -or
+      $f -like '*.github\workflows\*' -or $f -like '*.github/workflows/*' -or
+      $f -like '*.github\dependabot.yml' -or $f -like '*.github/dependabot.yml' -or
+      $f -like '*users\*\vscode\*.json' -or $f -like '*users/*/vscode/*.json' -or
+      $f -like '*users\*\cursor\*.json' -or $f -like '*users/*/cursor/*.json' -or
+      $f -like '*users\*\iterm2\DynamicProfiles\*.json' -or $f -like '*users/*/iterm2/DynamicProfiles/*.json' -or
+      $f -like '*users\*\obsidian\*.json' -or $f -like '*users/*/obsidian/*.json' -or
+      $f -like '*users\*\qtpass\*.json' -or $f -like '*users/*/qtpass/*.json' -or
+      $f -like '*users\*\rimsort\*.json' -or $f -like '*users/*/rimsort/*.json' -or
+      $f -like '*configs\camilladsp\*' -or $f -like '*configs/camilladsp/*' -or
+      $f -like '*configs\camillagui-backend\*' -or $f -like '*configs/camillagui-backend/*' -or
+      $f -like '*users\*\discord-music-rpc\*' -or $f -like '*users/*/discord-music-rpc/*' -or
+      $f -like '*users\*\agents\hooks\*.json' -or $f -like '*users/*/agents/hooks/*.json' -or
+      $f -like '*users\*\agents\skills\*\_meta.json' -or $f -like '*users/*/agents/skills/*/_meta.json' -or
+      $f -like '*configs\litellm\config.yml' -or $f -like '*configs/litellm/config.yml' -or
+      $f -like '*configs\litellm\logging_config.json' -or $f -like '*configs/litellm/logging_config.json' -or
+      $f -like '*\.sops.yaml' -or $f -like '*/.sops.yaml' -or
+      $f -like '*.vscode\*' -or $f -like '*.vscode/*' -or
+      $f -like '*.agents\skills\*' -or $f -like '*.agents/skills/*' -or
+      (Split-Path $f -Leaf) -in @('package.json', 'opencode.jsonc')
+    )
+  }
 
   $HasArgs = $Context.HasArgs
   $RepoRoot = $Context.RepoRoot
