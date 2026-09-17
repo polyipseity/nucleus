@@ -22,7 +22,7 @@
       },
       {
         "id": "default",
-        "maxInputTokens": 192000,
+        "maxInputTokens": 256000,
         "maxOutputTokens": 16000,
         "name": "LiteLLM Default",
         "toolCalling": true,
