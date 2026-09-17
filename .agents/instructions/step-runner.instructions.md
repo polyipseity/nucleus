@@ -108,14 +108,17 @@ For every JSON/YAML file in scope (except exceptions):
   3. Format: empty or non-string → ERROR "Invalid $schema in <filepath>: must be a non-empty string"
   Continue checking all files (non-fatal per-file).
 
-  EXCEPTION_LIST (*.schema.json, vendor/**, secrets/**, .github/workflows/*.yml,
-  .github/dependabot.yml, .gitignore, .gitkeep, package.json, opencode.jsonc,
-  App-owned with no published schema: */users/*/vscode/*.json, */users/*/cursor/*.json,
+  EXCEPTION_LIST:
+  Schema definitions/meta: *.schema.json
+  External formats (no published schema): */users/*/cursor/*.json,
   */users/*/iterm2/DynamicProfiles/*.json, */users/*/obsidian/*.json, */users/*/qtpass/*.json,
-  */configs/camilladsp/*, */configs/camillagui-backend/*, */users/*/discord-music-rpc/*,
-  */users/*/agents/hooks/*.json, */users/*/agents/skills/*/_meta.json,
-  */configs/litellm/config.yml, */.sops.yaml)
+  */users/*/rimsort/*.json, */configs/camilladsp/*, */configs/camillagui-backend/*,
+  */users/*/discord-music-rpc/*, */users/*/agents/hooks/*.json,
+  */users/*/agents/skills/*/_meta.json, */configs/litellm/*, */.sops.yaml
+  Infrastructure: */vendor/*, */secrets/*, */.github/*
   Registered in allow-and-deny-lists.instructions.md.
+  Policy: nucleus-owned data requires $schema (we write our own schemas).
+  External formats: use published $schema when available; never roll our own.
 
   Aggregation: collect all → step fails if any. "ERROR: <N> file(s) missing or invalid $schema"
   Cross-platform: identical.
