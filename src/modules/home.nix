@@ -462,9 +462,11 @@ in
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "${nucleusUserRoot}/cooldown_handler.py" \
         "src/modules/configs/litellm/cooldown_handler.py"
+      # check-suppress:config-method: method 1 (writable symlink) -- litellm logging config; part of seed-litellm-config activation block.
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "${nucleusUserRoot}/logging_config.json" \
         "src/modules/configs/litellm/logging_config.json"
+      # check-suppress:config-method: method 1 (writable symlink) -- litellm logging formatter; part of seed-litellm-config activation block.
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "${nucleusUserRoot}/logging_formatter.py" \
         "src/modules/configs/litellm/logging_formatter.py"
