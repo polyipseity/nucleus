@@ -32,7 +32,7 @@ run_schema_validation() {
     # Schema definitions / meta
     *.schema.json) return 0 ;;
     # External formats (no published schema available)
-    */users/*/cursor/*.json | */users/*/iterm2/DynamicProfiles/*.json | */users/*/obsidian/*.json | */users/*/qtpass/*.json | */users/*/rimsort/*.json | */configs/camilladsp/* | */configs/camillagui-backend/* | */users/*/discord-music-rpc/* | */users/*/agents/hooks/*.json | */users/*/agents/skills/*/_meta.json | */configs/litellm/* | */.sops.yaml | */.yamllint.yml)
+    */users/*/cursor/*.json | */users/*/iterm2/DynamicProfiles/*.json | */users/*/obsidian/*.json | */users/*/qtpass/*.json | */users/*/rimsort/*.json | */configs/camilladsp/* | */configs/camillagui-backend/* | */users/*/discord-music-rpc/* | */users/*/agents/hooks/*.json | */users/*/agents/skills/*/_meta.json | */configs/litellm/* | */users/*/vscode/mcp.json | */.sops.yaml | */.yamllint.yml)
       return 0
       ;;
     # Infrastructure
@@ -69,9 +69,14 @@ run_schema_validation() {
 
     case "$_f" in
     *.json)
-      _has_schema=$(jq -r 'if type == "object" then (has("$schema") | tostring) else "false" end' "$_f" 2>/dev/null)
+      # Skip non-object JSON (arrays, primitives) — they cannot have root-level $schema.
+      _is_object=$(jq -r 'if type == "object" then "true" else "false" end' "$_f" 2>/dev/null)
+      if [ "$_is_object" != "true" ]; then
+        continue
+      fi
+      _has_schema=$(jq -r 'has("$schema") | tostring' "$_f" 2>/dev/null)
       if [ "$_has_schema" = "true" ]; then
-        _schema_val=$(jq -r 'if type == "object" then (."$schema" // "") else "" end' "$_f" 2>/dev/null)
+        _schema_val=$(jq -r '."$schema" // ""' "$_f" 2>/dev/null)
         if [ -z "$_schema_val" ]; then
           error "Invalid \$schema in $_f: must be a non-empty string"
           _missing_schema=$((_missing_schema + 1))

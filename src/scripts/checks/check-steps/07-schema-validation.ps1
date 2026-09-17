@@ -22,6 +22,7 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Act
       $f -like '*users\*\agents\hooks\*.json' -or $f -like '*users/*/agents/hooks/*.json' -or
       $f -like '*users\*\agents\skills\*\_meta.json' -or $f -like '*users/*/agents/skills/*/_meta.json' -or
       $f -like '*configs\litellm\*' -or $f -like '*configs/litellm/*' -or
+      $f -like '*users\*\vscode\mcp.json' -or $f -like '*users/*/vscode/mcp.json' -or
       $f -like '*\.sops.yaml' -or $f -like '*/.sops.yaml' -or
       $f -like '*.yamllint.yml' -or
       # Infrastructure
@@ -117,8 +118,12 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Act
     if (Skip-SchemaFile $f) { continue }
 
     if ($f -like '*.json') {
+      # Skip non-object JSON (arrays, primitives) — they cannot have root-level $schema.
       $content = try { Get-Content $f -Raw | ConvertFrom-Json -AsHashtable } catch { $null }
-      $hasSchema = $content -and $content.ContainsKey('$schema')
+      if ($null -eq $content -or $content -isnot [System.Collections.Hashtable]) {
+        continue
+      }
+      $hasSchema = $content.ContainsKey('$schema')
       if ($hasSchema) {
         $schemaVal = $content['$schema']
         if ([string]::IsNullOrEmpty($schemaVal)) {
