@@ -541,7 +541,7 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
   }
 
   foreach ($f in $nixFiles) {
-    $fullPath = $f.FullName
+    $fullPath = $f  # WHY: $f is a string from Select-GitIgnored, not a FileInfo object
     # Pattern 1: <name>.nix alongside <name>/ directory
     $dirPath = [System.IO.Path]::ChangeExtension($fullPath, $null)
     if ($dirPath -and (Test-Path -LiteralPath $dirPath -PathType Container)) {
@@ -592,17 +592,17 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
   $lcpDiscardPattern = '(StandardOutPath|StandardErrorPath|StandardOutput|StandardError)\s*=\s*"/dev/null"'
   foreach ($f in $lcpFiles) {
     # Exclude this check's own twins: their source contains the literal pattern text.
-    if ($f.Name -in $selfLeaf, $selfShLeaf) { continue }
-    $lcpRel = $f.FullName.Substring($r.Length + 1) -replace '\\', '/'
+    if ((Split-Path -Leaf $f) -in $selfLeaf, $selfShLeaf) { continue }  # WHY: $f is a string from Select-GitIgnored, not a FileInfo object
+    $lcpRel = $f.Substring($r.Length + 1) -replace '\\', '/'
 
     # Rule 1: no capture directive may discard a stream.
-    Select-String -Path $f.FullName -Pattern $lcpDiscardPattern | ForEach-Object {
+    Select-String -Path $f -Pattern $lcpDiscardPattern | ForEach-Object {
       Write-ErrorMessage "log capture pair: '$lcpRel`:$($_.LineNumber)' discards a stream to /dev/null; capture stdout.log and stderr.log instead (output-handling.instructions.md)"
       $lcpErrors++
     }
 
     # Rule 2: no merged-stream redirection.
-    Select-String -Path $f.FullName -Pattern '*>>' -SimpleMatch | ForEach-Object {
+    Select-String -Path $f -Pattern '*>>' -SimpleMatch | ForEach-Object {
       Write-ErrorMessage "log capture pair: '$lcpRel`:$($_.LineNumber)' merges stdout and stderr; use 1>> and 2>> into stdout.log and stderr.log"
       $lcpErrors++
     }
@@ -611,7 +611,7 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
     # WHY boolean presence: a file may own several services, so only the lone-stream case
     # is a violation -- with one stream captured and the other discarded, the discarded
     # stream lands in whatever the platform default is.
-    $lcpRaw = Get-Content -LiteralPath $f.FullName -Raw
+    $lcpRaw = Get-Content -LiteralPath $f -Raw
     if (($lcpRaw -match 'StandardOutPath') -ne ($lcpRaw -match 'StandardErrorPath')) {
       Write-ErrorMessage "log capture pair: '$lcpRel' declares only one of StandardOutPath/StandardErrorPath; declare both or neither"
       $lcpErrors++
