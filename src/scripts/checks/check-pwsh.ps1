@@ -159,12 +159,21 @@ if (-not $skipPSSA) {
 
     $files = @($Paths | Sort-Object -Unique | Where-Object { Test-Path -Path $_ })
 
-    $settingsTable = Import-PowerShellDataFile $settingsFile
+    $settingsTable = try { Import-PowerShellDataFile $settingsFile } catch {
+      throw "Failed to load PSSA settings from ${settingsFile}: $($_.Exception.Message)"
+    }
     $enabledSeverities = [System.Collections.Generic.HashSet[string]]@($settingsTable.Severity)
     $excludedRules = [System.Collections.Generic.HashSet[string]]@($settingsTable.ExcludeRules)
-    $enabledRuleNames = @(Get-ScriptAnalyzerRule | Where-Object {
+    $allRules = @(Get-ScriptAnalyzerRule)
+    if ($allRules.Count -eq 0) {
+      throw 'Get-ScriptAnalyzerRule returned no rules — PSScriptAnalyzer may not be installed correctly.'
+    }
+    $enabledRuleNames = @($allRules | Where-Object {
         $_.RuleName -notin $excludedRules -and $_.Severity -in $enabledSeverities
     } | ForEach-Object RuleName)
+    if ($enabledRuleNames.Count -eq 0) {
+      throw "No PSSA rules enabled after filtering (severities: $($enabledSeverities -join ', '); excluded: $($excludedRules -join ', '))."
+    }
 
     $diags = $files | Invoke-ScriptAnalyzer -Settings @{
       IncludeRules = [string[]]$enabledRuleNames
