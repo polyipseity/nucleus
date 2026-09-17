@@ -25,7 +25,8 @@
     "npm:pi-web-access@0.28.0",
     "npm:@narumitw/pi-usage@0.60.3",
     "npm:better-custom@0.4.2",
-    "npm:pi-provider-litellm@2.3.0"
+    "npm:pi-provider-litellm@2.3.0",
+    "npm:@getpipher/vision@0.5.2"
   ],
   "prompts": [
     "~/.agents/prompts"
