@@ -42,6 +42,7 @@ function Read-Argument {
   $script:FULL = $false
   $script:ONLINE = $false
   $script:SkipSteps = @()
+  $script:VerboseIds = @()
 
   $i = 0
   while ($i -lt $Arguments.Count) {
