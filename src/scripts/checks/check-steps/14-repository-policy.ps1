@@ -45,6 +45,10 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
     $relPath = $_.FullName.Substring($using:cfgDir.Length + 1) -replace '\\', '/'
     if ($relPath -like 'agents/*') { return $null }
 
+    # Skip configs deployed via provision-data-directory or flake inputs (not direct src/ references)
+    # ref: allow-and-deny-lists.instructions.md#A2 -- non-standard deployment mechanisms
+    if ($relPath -in 'hermes-agent/SOUL.md', 'ollama/models.json') { return $null }
+
     # Check against cached Select-String output -- relative path first, then basename
     $refs = @($using:cfgSelectOutput | Where-Object { $_.Line -match [regex]::Escape($relPath) })
     if ($refs.Count -eq 0) {
@@ -71,14 +75,17 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
         $hasMethod = $true
         break
       }
-      # Check preceding line using cached check-suppress:config-method output
+      # Check up to 5 preceding lines for the annotation (comment blocks may span multiple lines)
       if ($ref.LineNumber -gt 1) {
-        $prevLineNum = $ref.LineNumber - 1
-        $prevMatch = $using:cfgMethodOutput | Where-Object { $_.Path -eq $ref.Path -and $_.LineNumber -eq $prevLineNum }
-        if ($prevMatch) {
-          $hasMethod = $true
-          break
+        $searchLimit = [Math]::Max(1, $ref.LineNumber - 10)
+        for ($pn = $ref.LineNumber - 1; $pn -ge $searchLimit; $pn--) {
+          $prevMatch = $using:cfgMethodOutput | Where-Object { $_.Path -eq $ref.Path -and $_.LineNumber -eq $pn }
+          if ($prevMatch) {
+            $hasMethod = $true
+            break
+          }
         }
+        if ($hasMethod) { break }
       }
     }
     if (-not $hasMethod) {
