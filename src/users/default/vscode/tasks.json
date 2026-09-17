@@ -1,4 +1,5 @@
 {
+  "$schema": "https://www.schemastore.org/vscode-tasks.json",
   "tasks": [],
   "version": "2.0.0"
 }

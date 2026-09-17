@@ -1,4 +1,5 @@
 {
+  "$schema": "https://www.schemastore.org/vscode-settings.json",
   "[c]": {
     "editor.defaultFormatter": "ms-vscode.cpptools"
   },
