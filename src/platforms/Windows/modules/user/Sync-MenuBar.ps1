@@ -53,7 +53,10 @@ function Sync-MenuBar {
       throw "menu-bar.ps1 exited with code $LASTEXITCODE"
     }
   } catch {
-    Write-NucleusError -CommandName 'menu-bar' "menu-bar icon convergence failed: $($_.Exception.Message)"
+    # check-suppress:suppression_doc: -ErrorAction SilentlyContinue prevents Write-Error from
+    # becoming a terminating error under $ErrorActionPreference='Stop' in test harnesses.
+    # The function's own throw (next line) propagates the error to the caller.
+    Write-NucleusError -CommandName 'menu-bar' "menu-bar icon convergence failed: $($_.Exception.Message)" -ErrorAction SilentlyContinue
     throw
   }
 }

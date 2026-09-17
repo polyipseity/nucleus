@@ -37,7 +37,9 @@ function Select-GitIgnored {
 
     $tmp = [System.IO.Path]::GetTempFileName()
     try {
-      $allPaths | Set-Content -Path $tmp -Encoding utf8NoBOM
+      # Join with LF only — Windows Set-Content writes CRLF which breaks
+      # git check-ignore --stdin (trailing \r causes pattern mismatch).
+      ($allPaths -join "`n") | Set-Content -Path $tmp -NoNewline -Encoding utf8NoBOM
 
       # Capture git check-ignore output and exit code.
       # Using cmd /c to avoid PowerShell's own error handling interfering.
