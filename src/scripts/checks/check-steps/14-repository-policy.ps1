@@ -591,7 +591,7 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
       # Scope excludes test fixtures, which deliberately hold violation samples.
       # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariants; vendored and secret files are separate concerns
       $lcpFiles += Get-ChildItem -Path $dir -Recurse -Include '*.nix', '*.sh', '*.ps1', '*.psm1', '*.yml' |
-        Where-Object { $_.FullName -notmatch '[\/](vendor|secrets|fixtures)[\/]' } |
+        Where-Object { $_.FullName -notmatch '(^|[\\\/])(vendor|secrets|tests[\\\/]fixtures)([\\\/]|$)' } |
         Select-GitIgnored
     }
   }
