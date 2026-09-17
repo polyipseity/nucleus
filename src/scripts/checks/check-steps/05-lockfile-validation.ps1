@@ -27,7 +27,7 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Action {
   } else {
     $lf = Get-Content $lfPath -Raw | ConvertFrom-Json -AsHashtable
     # Known cross-section overlaps that are legitimate
-    $lfOverlapExceptions = @('Windows')  # ref: allow-and-deny-lists.instructions.md#D1 -- 'Windows' is a host key in suggestions.vm-setup, not a package name; overlaps with suggestions.ollama.Windows
+    $lfOverlapExceptions = @('astral-sh.ty', 'Windows')  # ref: allow-and-deny-lists.instructions.md#D1 -- 'Windows' is a host key in suggestions.vm-setup, not a package name; overlaps with suggestions.ollama.Windows. 'astral-sh.ty' legitimately appears in suggestions.cursor, suggestions.vscode, and winget
     $pkgToSections = @{}
     foreach ($section in $lf.Keys) {
       if ($section -eq 'ollama') { continue }

@@ -40,6 +40,8 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
     # Skip infrastructure files and Nix modules inside configs/  # ref: allow-and-deny-lists.instructions.md#A2 -- infrastructure files are not configs
     if ($basename -in '.gitkeep', '.gitignore') { return $null }
     if ($basename -like '*.schema.json') { return $null }
+    # Skip Nix module files — imported as modules (e.g. `import ./configs/qtpass {}`), not deployed as config files. The import references the directory, not the file; basename `default.nix` matches hundreds of unrelated references.
+    if ($basename -like '*.nix') { return $null }
 
     # Skip agent customization files (consumed as a directory via Method 4)  # ref: allow-and-deny-lists.instructions.md#A2 -- agents/* consumed as directory
     $relPath = $_.FullName.Substring($using:cfgDir.Length + 1) -replace '\\', '/'
