@@ -32,7 +32,7 @@ run_schema_validation() {
     # Schema definitions / meta
     *.schema.json) return 0 ;;
     # External formats (no published schema available)
-    */users/*/cursor/*.json | */users/*/iterm2/DynamicProfiles/*.json | */users/*/obsidian/*.json | */users/*/qtpass/*.json | */users/*/rimsort/*.json | */configs/camilladsp/* | */configs/camillagui-backend/* | */users/*/discord-music-rpc/* | */users/*/agents/hooks/*.json | */users/*/agents/skills/*/_meta.json | */configs/litellm/* | */.sops.yaml)
+    */users/*/cursor/*.json | */users/*/iterm2/DynamicProfiles/*.json | */users/*/obsidian/*.json | */users/*/qtpass/*.json | */users/*/rimsort/*.json | */configs/camilladsp/* | */configs/camillagui-backend/* | */users/*/discord-music-rpc/* | */users/*/agents/hooks/*.json | */users/*/agents/skills/*/_meta.json | */configs/litellm/* | */.sops.yaml | */.yamllint.yml)
       return 0
       ;;
     # Infrastructure

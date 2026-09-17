@@ -23,6 +23,7 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Act
       $f -like '*users\*\agents\skills\*\_meta.json' -or $f -like '*users/*/agents/skills/*/_meta.json' -or
       $f -like '*configs\litellm\*' -or $f -like '*configs/litellm/*' -or
       $f -like '*\.sops.yaml' -or $f -like '*/.sops.yaml' -or
+      $f -like '*.yamllint.yml' -or
       # Infrastructure
       $f -like '*\vendor\*' -or $f -like '*/vendor/*' -or
       $f -like '*\secrets\*' -or $f -like '*/secrets/*' -or
