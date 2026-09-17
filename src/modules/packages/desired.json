@@ -101,6 +101,10 @@
   "pi": {
     "MacBook": [
       {
+        "name": "@getpipher/vision",
+        "why": "Capability-aware vision extension: delegates image analysis to a vision model only for text-only primary models; passes through natively for multimodal models. Replaces pi-vision-tool and pi-paster."
+      },
+      {
         "name": "@juicesharp/rpiv-ask-user-question"
       },
       {
@@ -142,6 +146,10 @@
     ],
     "NixOS": [
       {
+        "name": "@getpipher/vision",
+        "why": "Capability-aware vision extension: delegates image analysis to a vision model only for text-only primary models; passes through natively for multimodal models. Replaces pi-vision-tool and pi-paster."
+      },
+      {
         "name": "@juicesharp/rpiv-ask-user-question"
       },
       {
@@ -182,6 +190,10 @@
       }
     ],
     "Windows": [
+      {
+        "name": "@getpipher/vision",
+        "why": "Capability-aware vision extension: delegates image analysis to a vision model only for text-only primary models; passes through natively for multimodal models. Replaces pi-vision-tool and pi-paster."
+      },
       {
         "name": "@juicesharp/rpiv-ask-user-question"
       },

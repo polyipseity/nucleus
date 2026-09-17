@@ -19,6 +19,7 @@
     }
   },
   "pi": {
+    "@getpipher/vision": "0.5.2",
     "@juicesharp/rpiv-ask-user-question": "2.9.0",
     "@narumitw/pi-plan-mode": "0.56.0",
     "@narumitw/pi-usage": "0.60.3",
