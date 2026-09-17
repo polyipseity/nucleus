@@ -7,6 +7,7 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
   $exitCode = 0
+  $stepFailed = $false
   $skippedTools = 0
   $toolCount = 0
 
@@ -74,15 +75,20 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
       }
     }
   )
-  Invoke-ScopedTool -SkipMessage 'skipping yamllint (no YAML files to check).' -ScopedFiles $yamlFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
-    param($Files)
-    $ylExit = 0
-    foreach ($yf in $Files) {
-      yamllint $yf 2>&1 | ForEach-Object { Write-Message $_ }
-      if ($LASTEXITCODE -ne 0) { $ylExit = $LASTEXITCODE }
+  if (-not $stepFailed) {
+    Invoke-ScopedTool -SkipMessage 'skipping yamllint (no YAML files to check).' -ScopedFiles $yamlFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
+      param($Files)
+      $ylExit = 0
+      foreach ($yf in $Files) {
+        yamllint $yf 2>&1 | ForEach-Object { Write-Message $_ }
+        if ($LASTEXITCODE -ne 0) { $ylExit = $LASTEXITCODE }
+      }
+      if ($ylExit -ne 0) {
+        Write-ErrorMessage 'yamllint found issues in YAML files.'
+        $stepFailed = $true
+        if ($stepFailed) { } # check-suppress:suppression_doc: make outer-scope read visible to PSSA
+      }
     }
-    if ($ylExit -ne 0) { throw 'yamllint found issues in YAML files.' }
-    Write-Message 'yamllint passed.'
   }
 
   $tomlFiles = @(
@@ -94,11 +100,16 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
         Sort-Object FullName | ForEach-Object { $_.FullName }
     }
   )
-  Invoke-ScopedTool -SkipMessage 'skipping taplo (no TOML files to check).' -ScopedFiles $tomlFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
-    param($Files)
-    taplo fmt @Files
-    if ($LASTEXITCODE -ne 0) { throw 'taplo fmt failed.' }
-    Write-Message 'taplo passed.'
+  if (-not $stepFailed) {
+    Invoke-ScopedTool -SkipMessage 'skipping taplo (no TOML files to check).' -ScopedFiles $tomlFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
+      param($Files)
+      taplo fmt @Files
+      if ($LASTEXITCODE -ne 0) {
+        Write-ErrorMessage 'taplo fmt failed.'
+        $stepFailed = $true
+        if ($stepFailed) { } # check-suppress:suppression_doc: make outer-scope read visible to PSSA
+      }
+    }
   }
 
   $pkrFiles = @(
@@ -110,11 +121,16 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
         Sort-Object FullName | ForEach-Object { $_.FullName }
     }
   )
-  Invoke-ScopedTool -SkipMessage 'skipping packer fmt (no Packer templates to check).' -ScopedFiles $pkrFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
-    param($Files)
-    packer fmt @Files
-    if ($LASTEXITCODE -ne 0) { throw 'packer fmt failed.' }
-    Write-Message 'packer fmt passed.'
+  if (-not $stepFailed) {
+    Invoke-ScopedTool -SkipMessage 'skipping packer fmt (no Packer templates to check).' -ScopedFiles $pkrFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
+      param($Files)
+      packer fmt @Files
+      if ($LASTEXITCODE -ne 0) {
+        Write-ErrorMessage 'packer fmt failed.'
+        $stepFailed = $true
+        if ($stepFailed) { } # check-suppress:suppression_doc: make outer-scope read visible to PSSA
+      }
+    }
   }
 
   $workflowFiles = @(
@@ -132,53 +148,70 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
       }
     }
   )
-  Invoke-ScopedTool -SkipMessage 'skipping actionlint (no workflow files to check).' -ScopedFiles $workflowFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
-    param($Files)
-    actionlint @Files
-    if ($LASTEXITCODE -ne 0) { throw 'actionlint failed.' }
-    Write-Message 'actionlint passed.'
-  }
-
-  Invoke-ScopedTool -SkipMessage 'skipping pinact (no workflow files to check).' -ScopedFiles $workflowFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
-    param($Files)
-    if ($Files) {
-      pinact run --fix=false --no-api @Files
-    } else {
-      pinact run --fix=false --no-api (Join-Path -Path $r -ChildPath '.github' -AdditionalChildPath 'workflows')
+  if (-not $stepFailed) {
+    Invoke-ScopedTool -SkipMessage 'skipping actionlint (no workflow files to check).' -ScopedFiles $workflowFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
+      param($Files)
+      actionlint @Files
+      if ($LASTEXITCODE -ne 0) {
+        Write-ErrorMessage 'actionlint failed.'
+        $stepFailed = $true
+        if ($stepFailed) { } # check-suppress:suppression_doc: make outer-scope read visible to PSSA
+      }
     }
-    if ($LASTEXITCODE -ne 0) { throw 'pinact failed.' }
-    Write-Message 'pinact passed.'
   }
 
-  Invoke-ScopedTool -SkipMessage 'skipping zizmor (no workflow files to check).' -ScopedFiles $workflowFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
-    param($Files)
-    zizmor @Files
-    if ($LASTEXITCODE -ne 0) { throw 'zizmor failed.' }
-    Write-Message 'zizmor passed.'
-  }
-
-  $validatePkrFiles = @(
-    if ($HasArgs) {
-      if ($Context.PKR_FILES) { $Context.PKR_FILES } else { @() }
-    } else {
-      @()
+  if (-not $stepFailed) {
+    Invoke-ScopedTool -SkipMessage 'skipping pinact (no workflow files to check).' -ScopedFiles $workflowFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
+      param($Files)
+      if ($Files) {
+        pinact run --fix=false --no-api @Files
+      } else {
+        pinact run --fix=false --no-api (Join-Path -Path $r -ChildPath '.github' -AdditionalChildPath 'workflows')
+      }
+      if ($LASTEXITCODE -ne 0) {
+        Write-ErrorMessage 'pinact failed.'
+        $stepFailed = $true
+        if ($stepFailed) { } # check-suppress:suppression_doc: make outer-scope read visible to PSSA
+      }
     }
-  )
-  $toolCount++
-  if ($validatePkrFiles.Count -gt 0) {
-    & "$r\scripts\check.ps1" packer -ValidateOnly @validatePkrFiles
-    if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
-    else { Write-Message 'Packer template validation passed.' }
-  } elseif (-not $HasArgs) {
-    & "$r\scripts\check.ps1" packer -ValidateOnly
-    if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
-    else { Write-Message 'Packer template validation passed.' }
-  } else {
-    Write-Message 'skipping check-packer (no Packer templates to check).'
-    $skippedTools++
   }
 
-  if ($exitCode -ne 0) {
+  if (-not $stepFailed) {
+    Invoke-ScopedTool -SkipMessage 'skipping zizmor (no workflow files to check).' -ScopedFiles $workflowFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
+      param($Files)
+      zizmor @Files
+      if ($LASTEXITCODE -ne 0) {
+        Write-ErrorMessage 'zizmor failed.'
+        $stepFailed = $true
+        if ($stepFailed) { } # check-suppress:suppression_doc: make outer-scope read visible to PSSA
+      }
+    }
+  }
+
+  if (-not $stepFailed) {
+    $validatePkrFiles = @(
+      if ($HasArgs) {
+        if ($Context.PKR_FILES) { $Context.PKR_FILES } else { @() }
+      } else {
+        @()
+      }
+    )
+    $toolCount++
+    if ($validatePkrFiles.Count -gt 0) {
+      & "$r\scripts\check.ps1" packer -ValidateOnly @validatePkrFiles
+      if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
+      else { Write-Message 'Packer template validation passed.' }
+    } elseif (-not $HasArgs) {
+      & "$r\scripts\check.ps1" packer -ValidateOnly
+      if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
+      else { Write-Message 'Packer template validation passed.' }
+    } else {
+      Write-Message 'skipping check-packer (no Packer templates to check).'
+      $skippedTools++
+    }
+  }
+
+  if ($stepFailed -or $exitCode -ne 0) {
     Write-ErrorMessage 'Code formatting and linting failed.'
     return $false
   }
