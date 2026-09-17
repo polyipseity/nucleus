@@ -23,20 +23,20 @@ run_schema_validation() {
   local _js_schema_files=()
 
   # Single source of truth for A8 exception list: files that don't need $schema.
+  # Policy: nucleus-owned data requires $schema (we write our own schemas).
+  # External formats: use published $schema when available; never roll our own.
   # ref: allow-and-deny-lists.instructions.md#A8
   skip_schema_file() {
     local _f="$1"
     case "$_f" in
-    *.schema.json | */vendor/* | */secrets/* | */.github/workflows/* | */.github/dependabot.yml)
+    # Schema definitions / meta
+    *.schema.json) return 0 ;;
+    # External formats (no published schema available)
+    */users/*/cursor/*.json | */users/*/iterm2/DynamicProfiles/*.json | */users/*/obsidian/*.json | */users/*/qtpass/*.json | */users/*/rimsort/*.json | */configs/camilladsp/* | */configs/camillagui-backend/* | */users/*/discord-music-rpc/* | */users/*/agents/hooks/*.json | */users/*/agents/skills/*/_meta.json | */configs/litellm/* | */.sops.yaml)
       return 0
       ;;
-    */users/*/vscode/*.json | */users/*/cursor/*.json | */users/*/iterm2/DynamicProfiles/*.json | */users/*/obsidian/*.json | */users/*/qtpass/*.json | */users/*/rimsort/*.json | */configs/camilladsp/* | */configs/camillagui-backend/* | */users/*/discord-music-rpc/* | */users/*/agents/hooks/*.json | */users/*/agents/skills/*/_meta.json | */configs/litellm/config.yml | */configs/litellm/logging_config.json | */.sops.yaml | */.vscode/* | */.agents/skills/*)
-      return 0
-      ;;
-    esac
-    local _nobase="${_f##*/}"
-    case "$_nobase" in
-    package.json | opencode.jsonc) return 0 ;;
+    # Infrastructure
+    */vendor/* | */secrets/* | */.github/*) return 0 ;;
     esac
     return 1
   }

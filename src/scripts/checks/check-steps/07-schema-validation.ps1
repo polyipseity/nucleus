@@ -2,16 +2,15 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Act
   param([Parameter(Mandatory)][PSObject]$Context)
 
   # Single source of truth for A8 exception list: files that don't need $schema.
+  # Policy: nucleus-owned data requires $schema (we write our own schemas).
+  # External formats: use published $schema when available; never roll our own.
   # ref: allow-and-deny-lists.instructions.md#A8
   function Skip-SchemaFile([string]$FilePath) {
     $f = $FilePath
     return (
+      # Schema definitions / meta
       $f -like '*.schema.json' -or
-      $f -like '*\vendor\*' -or $f -like '*/vendor/*' -or
-      $f -like '*\secrets\*' -or $f -like '*/secrets/*' -or
-      $f -like '*.github\workflows\*' -or $f -like '*.github/workflows/*' -or
-      $f -like '*.github\dependabot.yml' -or $f -like '*.github/dependabot.yml' -or
-      $f -like '*users\*\vscode\*.json' -or $f -like '*users/*/vscode/*.json' -or
+      # External formats (no published schema available)
       $f -like '*users\*\cursor\*.json' -or $f -like '*users/*/cursor/*.json' -or
       $f -like '*users\*\iterm2\DynamicProfiles\*.json' -or $f -like '*users/*/iterm2/DynamicProfiles/*.json' -or
       $f -like '*users\*\obsidian\*.json' -or $f -like '*users/*/obsidian/*.json' -or
@@ -22,12 +21,12 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Act
       $f -like '*users\*\discord-music-rpc\*' -or $f -like '*users/*/discord-music-rpc/*' -or
       $f -like '*users\*\agents\hooks\*.json' -or $f -like '*users/*/agents/hooks/*.json' -or
       $f -like '*users\*\agents\skills\*\_meta.json' -or $f -like '*users/*/agents/skills/*/_meta.json' -or
-      $f -like '*configs\litellm\config.yml' -or $f -like '*configs/litellm/config.yml' -or
-      $f -like '*configs\litellm\logging_config.json' -or $f -like '*configs/litellm/logging_config.json' -or
+      $f -like '*configs\litellm\*' -or $f -like '*configs/litellm/*' -or
       $f -like '*\.sops.yaml' -or $f -like '*/.sops.yaml' -or
-      $f -like '*.vscode\*' -or $f -like '*.vscode/*' -or
-      $f -like '*.agents\skills\*' -or $f -like '*.agents/skills/*' -or
-      (Split-Path $f -Leaf) -in @('package.json', 'opencode.jsonc')
+      # Infrastructure
+      $f -like '*\vendor\*' -or $f -like '*/vendor/*' -or
+      $f -like '*\secrets\*' -or $f -like '*/secrets/*' -or
+      $f -like '*.github\*' -or $f -like '*.github/*'
     )
   }
 
