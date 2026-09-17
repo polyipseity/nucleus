@@ -439,6 +439,7 @@ function Install-GnuPGDirect {
   $arpKeyUser = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*'
   # check-suppress:suppression_doc: registry keys may not exist on all systems; probe is best-effort
   $registered = $null -ne (Get-ChildItem -Path @($arpKey, $arpKey32, $arpKeyUser) -ErrorAction SilentlyContinue |
+    # check-suppress:suppression_doc: subkey may not exist or be accessible; probe is best-effort
     ForEach-Object { Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue } |
     Where-Object { $_.DisplayName -like 'GNU Privacy Guard*' } |
     Select-Object -First 1)
