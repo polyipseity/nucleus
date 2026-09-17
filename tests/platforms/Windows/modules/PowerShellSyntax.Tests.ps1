@@ -31,6 +31,7 @@ Describe 'Windows PowerShell module syntax' {
 
     $failures = @(foreach ($file in $files) {
         $errors = $null
+        # check-suppress:suppression_doc: return value discarded; parse errors captured via ref parameter
         [void][System.Management.Automation.Language.Parser]::ParseFile($file.FullName, [ref]$null, [ref]$errors)
         if ($errors) {
           '{0}: {1}' -f $file.FullName, $errors[0].Message

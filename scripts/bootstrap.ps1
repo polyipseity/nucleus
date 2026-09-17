@@ -256,6 +256,7 @@ function Invoke-WingetPackageInstall {
       -PassThru -NoNewWindow
     if (-not $proc.WaitForExit($TimeoutSeconds * 1000)) {
       try {
+        # check-suppress:suppression_doc: process may already have exited; -ErrorAction SilentlyContinue handles the common case
         Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
       } catch {
         # check-suppress:suppression_doc: process may already have exited; -ErrorAction SilentlyContinue handles the common case
@@ -281,6 +282,7 @@ function Invoke-WingetPackageInstall {
     -PassThru -NoNewWindow
   if (-not $proc.WaitForExit($TimeoutSeconds * 1000)) {
     try {
+      # check-suppress:suppression_doc: process may already have exited; -ErrorAction SilentlyContinue handles the common case
       Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
     } catch {
       # check-suppress:suppression_doc: process may already have exited; -ErrorAction SilentlyContinue handles the common case
@@ -359,7 +361,7 @@ function Install-GnuPGDirect {
 
   # Create temp directory and download installer.
   if (-not (Test-Path -Path $tempDir)) {
-    New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $tempDir -Force > $null
   }
 
   Write-NucleusInfo "Downloading GnuPG $Version from $installerUrl"
@@ -403,6 +405,7 @@ function Install-GnuPGDirect {
     # The dialog is on the installer process itself, not on child processes.
     if ((Get-Date) -gt $graceDeadline -and $proc.MainWindowHandle -ne [IntPtr]::Zero) {
       Write-NucleusInfo "Closing installer dialog window ('$($proc.MainWindowTitle)')"
+      # check-suppress:suppression_doc: return value discarded; close is best-effort
       $null = $proc.CloseMainWindow()
     }
   }
@@ -410,6 +413,7 @@ function Install-GnuPGDirect {
     # Timeout — kill the installer and any leftover children.
     Write-NucleusInfo "Installer still running after ${TimeoutSeconds}s; stopping it."
     try {
+      # check-suppress:suppression_doc: process may already have exited; -ErrorAction SilentlyContinue handles the common case
       Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
     } catch {
       # check-suppress:suppression_doc: process may already have exited
@@ -423,6 +427,7 @@ function Install-GnuPGDirect {
   # Leaving them running holds file locks that make later gpg operations fail.
   $daemons = @('gpg-agent', 'dirmngr', 'keyboxd', 'scdaemon', 'gpg-connect-agent', 'gpgme-w32spawn', 'gpa', 'launch-gpa')
   foreach ($daemon in $daemons) {
+    # check-suppress:suppression_doc: daemon may not be running; best-effort stop
     Stop-Process -Name $daemon -Force -ErrorAction SilentlyContinue
   }
 
@@ -432,6 +437,7 @@ function Install-GnuPGDirect {
   $arpKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*'
   $arpKey32 = 'HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
   $arpKeyUser = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*'
+  # check-suppress:suppression_doc: registry keys may not exist on all systems; probe is best-effort
   $registered = $null -ne (Get-ChildItem -Path @($arpKey, $arpKey32, $arpKeyUser) -ErrorAction SilentlyContinue |
     ForEach-Object { Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue } |
     Where-Object { $_.DisplayName -like 'GNU Privacy Guard*' } |
@@ -496,6 +502,7 @@ function Install-Uv {
   [CmdletBinding()]
   param()
 
+  # check-suppress:suppression_doc: probe whether uv is installed; throws when absent
   if (Get-Command -Name uv -ErrorAction SilentlyContinue) {
     Write-NucleusInfo "uv is already available at $(Get-Command uv | Select-Object -ExpandProperty Source)"
     return
@@ -524,6 +531,7 @@ function Install-Uv {
     $env:PATH = "$uvDir;$env:PATH"
   }
 
+  # check-suppress:suppression_doc: probe whether uv is installed; throws when absent
   if (-not (Get-Command -Name uv -ErrorAction SilentlyContinue)) {
     throw "uv installed but not found on PATH after refresh (expected at $uvDir)"
   }
@@ -612,6 +620,7 @@ if ($env:GITHUB_PATH) {
     }
 }
 # yamllint: Python package, no WinGet ID. Requires uv on PATH.
+# check-suppress:suppression_doc: probe whether uv is installed; warns when absent
 if (Get-Command -Name uv -ErrorAction SilentlyContinue) {
     & uv tool install yamllint
     if ($LASTEXITCODE -ne 0) {
@@ -621,6 +630,7 @@ if (Get-Command -Name uv -ErrorAction SilentlyContinue) {
     Write-NucleusWarning "uv not found — yamllint will not be installed"
 }
 # check-jsonschema: Python package, no WinGet ID. Requires uv on PATH.
+# check-suppress:suppression_doc: probe whether uv is installed; warns when absent
 if (Get-Command -Name uv -ErrorAction SilentlyContinue) {
     & uv tool install check-jsonschema
     if ($LASTEXITCODE -ne 0) {

@@ -110,6 +110,7 @@ function Save-CamillaDSPLastDevice {
 
   if ([string]::IsNullOrEmpty($Device)) { return }
   if (-not (Test-Path $script:CamillaDSPStateDir)) {
+    # check-suppress:suppression_doc: return value discarded; directory creation is side-effect only
     $null = New-Item -ItemType Directory -Path $script:CamillaDSPStateDir -Force
   }
   Set-Content -Path $script:CamillaDSPLastDeviceFile -Value $Device -NoNewline

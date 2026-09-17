@@ -105,6 +105,7 @@ function Sync-RedisService {
     }
     & winget.exe install --exact --id tporadowski.redis --source winget --accept-package-agreements --accept-source-agreements > $null
     # Re-probe after install.
+    # check-suppress:suppression_doc: redis may not be installed; probe is best-effort
     $redisCmd = Get-Command -Name "redis-server" -ErrorAction SilentlyContinue
     if ($null -ne $redisCmd) {
       $redisServer = $redisCmd.Source

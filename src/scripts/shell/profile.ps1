@@ -625,6 +625,7 @@ function uv {
 #
 # Excluded: vscode, cursor (have built-in protections; no srt needed).
 function pi {
+  # check-suppress:suppression_doc: probe whether srt is installed; throws when absent
   if (-not (Get-Command srt -ErrorAction SilentlyContinue)) {
     Write-Error "srt (sandbox-runtime) is required but not installed. Run 'nucleus-apply' to install it." -ErrorAction Stop
   }

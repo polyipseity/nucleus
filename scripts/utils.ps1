@@ -63,8 +63,8 @@ function Show-NucleusNotification {
     }
   } else {
     try {
-      [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') | Out-Null
-      [System.Windows.Forms.MessageBox]::Show($Message, $Title, 'OK', 'Information') | Out-Null
+      [System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms') > $null
+      [System.Windows.Forms.MessageBox]::Show($Message, $Title, 'OK', 'Information') > $null
     } catch {
       # check-suppress:suppression_doc: notification is best-effort; swallow all errors.
     }

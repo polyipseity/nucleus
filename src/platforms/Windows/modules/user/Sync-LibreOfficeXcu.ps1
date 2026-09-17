@@ -200,6 +200,7 @@ function Sync-LibreOfficeXcu {
     $items = $Xml.SelectSingleNode('/oor:items', $nsMgr)
     if ($null -eq $items) {
       $items = $Xml.CreateElement('oor', 'items', $OorNs)
+      # check-suppress:suppression_doc: return value discarded; AppendChild is side-effect only
       [void]$Xml.AppendChild($items)
     }
 
@@ -211,6 +212,7 @@ function Sync-LibreOfficeXcu {
 
     $newItem = $Xml.CreateElement('oor', 'item', $OorNs)
     $newItem.SetAttribute('oor:path', $OorNs, $ItemPath)
+    # check-suppress:suppression_doc: return value discarded; AppendChild is side-effect only
     [void]$items.AppendChild($newItem)
     return $newItem
   }
@@ -248,6 +250,7 @@ function Sync-LibreOfficeXcu {
     else {
       $newValue = $Xml.CreateElement('oor', 'value', $OorNs)
       $newValue.InnerText = $Value
+      # check-suppress:suppression_doc: return value discarded; AppendChild is side-effect only
       [void]$Prop.AppendChild($newValue)
     }
   }
@@ -286,6 +289,7 @@ function Sync-LibreOfficeXcu {
         $prop = $Xml.CreateElement('oor', 'prop', $OorNs)
         $prop.SetAttribute('oor:name', $OorNs, $entry.Name)
         Set-XcuPropValue -Xml $Xml -Prop $prop -Value $entry.Value
+        # check-suppress:suppression_doc: return value discarded; AppendChild is side-effect only
         [void]$item.AppendChild($prop)
       }
     }
@@ -334,6 +338,7 @@ function Sync-LibreOfficeXcu {
         }
 
         foreach ($prop in $propsToRemove) {
+          # check-suppress:suppression_doc: return value discarded; RemoveChild is side-effect only
           [void]$item.RemoveChild($prop)
         }
       }
@@ -344,6 +349,7 @@ function Sync-LibreOfficeXcu {
     if ($null -ne $items) {
       foreach ($item in @($items.ChildNodes)) {
         if ($item.LocalName -eq 'item' -and $item.ChildNodes.Count -eq 0) {
+          # check-suppress:suppression_doc: return value discarded; RemoveChild is side-effect only
           [void]$items.RemoveChild($item)
         }
       }

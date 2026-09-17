@@ -39,7 +39,7 @@ function Sync-HermesConfig {
 
   # Ensure ~/data/hermes-agent/ exists
   if (-not (Test-Path -Path $hermesDataDir)) {
-    New-Item -ItemType Directory -Path $hermesDataDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $hermesDataDir -Force > $null
     Write-NucleusNotice "[$label] created directory: data/hermes-agent"
   }
 
@@ -53,9 +53,9 @@ function Sync-HermesConfig {
     }
     $hermesDir = Split-Path -Path $hermesSymlinkTarget -Parent
     if (-not (Test-Path -Path $hermesDir)) {
-      New-Item -ItemType Directory -Path $hermesDir -Force | Out-Null
+      New-Item -ItemType Directory -Path $hermesDir -Force > $null
     }
-    New-Item -ItemType SymbolicLink -Path $hermesSymlinkTarget -Target $hermesDataDir | Out-Null
+    New-Item -ItemType SymbolicLink -Path $hermesSymlinkTarget -Target $hermesDataDir > $null
     Write-NucleusNotice "[$label] created symlink: $hermesSymlinkTarget -> $hermesDataDir"
   }
 
@@ -75,6 +75,7 @@ function Sync-HermesConfig {
   # WHY: if the user previously ran `hermes gateway install` (creating a
   # Scheduled Task), remove it before installing the SCM service to avoid
   # conflicts. This is cleanup, not migration.
+  # check-suppress:suppression_doc: task may not exist; probe is best-effort
   $existingTask = Get-ScheduledTask -TaskName 'HermesGateway' -ErrorAction SilentlyContinue
   if ($null -ne $existingTask) {
     Write-NucleusNotice "[$label] removing outdated HermesGateway Scheduled Task..."
@@ -83,6 +84,7 @@ function Sync-HermesConfig {
 
   # Unprovision outdated Startup-folder droppers
   $startupDir = Join-Path -Path $env:APPDATA -ChildPath 'Microsoft\Windows\Start Menu\Programs\Startup'
+  # check-suppress:suppression_doc: no matching items is expected; probe is best-effort
   $startupHermes = Get-ChildItem -Path $startupDir -Filter '*hermes*' -ErrorAction SilentlyContinue
   foreach ($f in $startupHermes) {
     Remove-Item -Path $f.FullName -Force
@@ -93,8 +95,10 @@ function Sync-HermesConfig {
   # WHY: SCM provides quadratic-backoff auto-restart on crash (PR #50200),
   # matching macOS launchd KeepAlive and Linux systemd Restart=always.
   # Requires admin rights (nucleus-apply runs elevated).
+  # check-suppress:suppression_doc: hermes may not be installed; probe is best-effort
   $hermesBin = Get-Command -Name 'hermes' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
   if ($null -ne $hermesBin) {
+    # check-suppress:suppression_doc: service may not exist; probe is best-effort
     $existingSvc = Get-Service -Name 'hermes-gateway' -ErrorAction SilentlyContinue
     if ($null -eq $existingSvc) {
       Write-NucleusNotice "[$label] installing hermes-agent SCM Windows Service..."
@@ -106,6 +110,7 @@ function Sync-HermesConfig {
   }
 
   # Verify SCM service exists
+  # check-suppress:suppression_doc: service may not exist; probe is best-effort
   $svc = Get-Service -Name 'hermes-gateway' -ErrorAction SilentlyContinue
   if ($null -eq $svc) {
     Write-NucleusWarning "[$label] hermes-gateway SCM service not found after install"
@@ -115,6 +120,7 @@ function Sync-HermesConfig {
   # On Windows, we check if browsers are installed in the standard location
   # and set PLAYWRIGHT_BROWSERS_PATH if needed.
   $playwrightCacheDir = Join-Path -Path $HOME -ChildPath '.cache\ms-playwright'
+  # check-suppress:suppression_doc: directory may not exist; probe is best-effort
   $chromiumInstalled = Get-ChildItem -Path (Join-Path -Path $playwrightCacheDir -ChildPath 'chromium-*') -Directory -ErrorAction SilentlyContinue
 
   if ($null -eq $chromiumInstalled) {
@@ -128,6 +134,7 @@ function Sync-HermesConfig {
       }
     }
     if ($null -eq $npxBin) {
+      # check-suppress:suppression_doc: npx may not be installed; probe is best-effort
       $npxBin = Get-Command -Name 'npx' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
     }
 

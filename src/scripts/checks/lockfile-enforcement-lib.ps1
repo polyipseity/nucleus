@@ -108,6 +108,7 @@ function Invoke-LockfileEnforcement {
         continue
       }
       $toolRoot = if ($env:UV_TOOL_DIR) { Join-Path $env:UV_TOOL_DIR $entry.name } else { Join-Path $env:LOCALAPPDATA "uv\tools\$($entry.name)" }
+      # check-suppress:suppression_doc: tool may not be installed; probe is best-effort
       $record = Get-ChildItem -Path $toolRoot -Filter 'direct_url.json' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
       if (-not $record) {
         & $ErrorFn "uv.$($entry.name)`: expected revision $($resolvedPin.Rev), no install record under $toolRoot"; $errors++

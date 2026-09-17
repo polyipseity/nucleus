@@ -41,6 +41,7 @@ Describe 'Lockfile enforcement: superpowers checkout probe' {
             $script:errors = @()
             $script:infos = @()
             $lockfile = @{ cursor = @{ superpowers = @{ source = 'https://example.invalid/superpowers.git'; rev = $Rev } } }
+            # check-suppress:suppression_doc: return value discarded in test setup
             $null = Invoke-LockfileEnforcement -Lockfile $lockfile `
                 -InfoFn { param($m) $script:infos += $m } `
                 -WarnFn { param($m) $script:warnings = @($script:warnings) + $m } `

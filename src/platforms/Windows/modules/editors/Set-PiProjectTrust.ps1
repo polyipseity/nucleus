@@ -116,7 +116,7 @@ function Set-PiProjectTrust {
     if ($PSCmdlet.ShouldProcess("pi trust database", "Set")) {
         try {
             if (-not (Test-Path -Path $trustDir)) {
-                New-Item -Path $trustDir -ItemType Directory -Force | Out-Null
+                New-Item -Path $trustDir -ItemType Directory -Force > $null
             }
             # Build sorted PSCustomObject for deterministic output.
             $sorted = [PSCustomObject]@{}
