@@ -245,8 +245,8 @@ in
   # --------------------------------------------------------------------------
   # BetterDisplay heartbeat LaunchAgent (macOS-only)
   # Persistent daemon that polls the HeadlessDisplay virtual screen every
-  # 30 seconds and reconnects it if BetterDisplay marks it as disconnected.
-  # Uses internal sleep loop (while true; do ...; sleep 30; done) so launchd
+  # 60 seconds and reconnects it if BetterDisplay marks it as disconnected.
+  # Uses internal sleep loop (while true; do ...; sleep 60; done) so launchd
   # KeepAlive provides crash recovery.
   #
   # Why a LaunchAgent rather than relying on macos-headless-display alone:

@@ -23,10 +23,9 @@ _BD_SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # _bd_run_bounded <seconds> <command> [args...] — Run a command with a hard
 # timeout, returning its exit status (143 when the timeout fired).
 #
-# WHY: the BetterDisplay CLI blocks indefinitely when the app is unresponsive
-# (observed: a single invocation never returned). launchd restarts a crashed
-# agent, not a hung one, so without this bound one stuck call would silently end
-# every later heartbeat for the rest of the login session.
+# WHY: the BetterDisplay CLI drives the app over XPC and documents no timeout,
+# so one unresponsive call would stall the heartbeat loop for the rest of the
+# login session — launchd restarts an agent that crashed, not one that is wedged.
 _bd_run_bounded() {
   local _timeout="$1"
   shift

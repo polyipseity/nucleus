@@ -75,7 +75,7 @@ while ($true) {
 | `camilladsp-heartbeat` | 5 s base, exponential backoff to 300 s max (`min(current × 2, max)`, reset on success) |
 | `service-watchdog` | 300 s fixed (system scope) |
 | `service-watchdog-user` | 300 s fixed (user scope) |
-| `betterdisplay-heartbeat` | 30 s fixed |
+| `betterdisplay-heartbeat` | 60 s fixed |
 
 ## macOS-only services
 
