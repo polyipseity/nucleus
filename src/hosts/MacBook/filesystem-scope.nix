@@ -7,6 +7,6 @@
 # /nix is materialised via /etc/synthetic.conf during nucleus-bootstrap
 # (ensure_macos_nix_mount in scripts/bootstrap.sh), not during apply.
 #
-# Removable NTFS read-write is managed via fuse-t, ntfs-3g, and Mounty
-# (homebrew.nix, ntfs-3g.nix).
+# Removable NTFS read-write is managed via ntfs-3g on the macFUSE FSKit
+# backend, plus Mounty for auto-mounting (homebrew.nix, ntfs-3g.nix).
 { ... }: { }

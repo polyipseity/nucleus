@@ -163,7 +163,7 @@
   },
   "Mounty": {
     "displayName": "Mounty",
-    "description": "NTFS auto-mounter for fuse-t drives",
+    "description": "NTFS auto-mounter for ntfs-3g drives",
     "hosts": {
       "MacBook": {
         "platform": "macOS",
@@ -600,18 +600,18 @@
       }
     }
   },
-  "fuse-t": {
-    "displayName": "fuse-t",
-    "description": "FSKit-capable FUSE userspace driver for rclone mounts",
+  "macFUSE": {
+    "displayName": "macFUSE",
+    "description": "FSKit-capable FUSE userspace driver for rclone and ntfs-3g mounts",
     "hosts": {
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": true,
         "autostartDisableNative": false,
         "kind": "system-extension",
-        "bundleId": "org.fuset.fskit-srv.module",
-        "approvalInstructions": "System Settings → General → Login Items & Extensions → by category → File System Extensions → enable fuse-t (FSKit module).",
-        "justification": "FSKit file-system extension; approve in Login Items & Extensions → File System Extensions (not Privacy & Security)."
+        "bundleId": "io.macfuse.app.fsmodule.macfuse",
+        "approvalInstructions": "System Settings → General → Login Items & Extensions → by category → File System Extensions → enable macFUSE.",
+        "justification": "FSKit file-system extension; io.macfuse.app.fsmodule.macfuse serves distributed volumes (cloud mounts) and io.macfuse.app.fsmodule.macfuse-local serves local volumes (NTFS). Approve in Login Items & Extensions → File System Extensions (not Privacy & Security). The macFUSE kernel extension stays unapproved."
       },
       "NixOS": {
         "platform": "NixOS",

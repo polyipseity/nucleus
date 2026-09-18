@@ -155,9 +155,9 @@ in
     # === Per-app approval instructions ===
     (assert' (
       builtins.match ".*File System Extensions.*" (
-        parsedApps."fuse-t".hosts.MacBook.approvalInstructions or ""
+        parsedApps."macFUSE".hosts.MacBook.approvalInstructions or ""
       ) != null
-    ) "fuse-t: File System Extensions approval instructions")
+    ) "macFUSE: File System Extensions approval instructions")
     (assert' (
       builtins.match ".*Accessibility.*" (
         parsedApps."Chrome Remote Desktop Host".hosts.MacBook.approvalInstructions or ""

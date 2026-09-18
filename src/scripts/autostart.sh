@@ -214,7 +214,7 @@ macos_fskit_module_registered() {
 
 # macos_system_extension_present ID — stdout "true"/"false".
 # Network/cmio/endpoint-security extensions come from systemextensionsctl. FSKit
-# file-system extensions (e.g. fuse-t) are visible only to pluginkit. TCC-granted
+# file-system extensions (e.g. macFUSE) are visible only to pluginkit. TCC-granted
 # helper tools (e.g. Chrome Remote Desktop Host) appear in neither and stay
 # manual-approval-only via the entry's approvalInstructions.
 macos_system_extension_present() {

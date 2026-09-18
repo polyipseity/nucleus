@@ -113,7 +113,7 @@ make_fixture() {
         "autostartEnabled": true,
         "autostartDisableNative": false,
         "kind": "system-extension",
-        "bundleId": "org.fuset.fskit-srv.module",
+        "bundleId": "io.macfuse.app.fsmodule.macfuse",
         "approvalInstructions": "fixture approval instructions"
       },
       "NixOS": {
@@ -191,7 +191,7 @@ run_autostart() {
     cat >"$_mock_dir/pluginkit" <<'PLUGINKIT'
 #!/bin/sh
 case "$*" in
-*com.apple.fskit.fsmodule*) printf '%s\n' '     org.fuset.fskit-srv.module(0.1.3)' ;;
+*com.apple.fskit.fsmodule*) printf '%s\n' '     io.macfuse.app.fsmodule.macfuse(0.1.3)' ;;
 esac
 PLUGINKIT
   else

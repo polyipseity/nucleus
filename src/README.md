@@ -70,4 +70,4 @@ Windows
   %ProgramData%\nucleus\          (SYSTEM root — ProgramData is already conventional)
 ```
 
-Accepted exceptions (not nucleus roots, left unchanged): `/usr/local/*` (impure Homebrew/fuse-t/battery), `/nix` (OS `synthetic.conf`), `%USERPROFILE%\.agents` (standard agent-tool location), `/run/secrets` (sops-nix default), `C:\ProgramData\ssh` (OS-owned), scheduled-task registry/HKLM/HKCU env vars, and `/etc/nucleus/bin` (nvim two-mechanism path).
+Accepted exceptions (not nucleus roots, left unchanged): `/usr/local/*` (impure Homebrew/macFUSE/battery), `/nix` (OS `synthetic.conf`), `%USERPROFILE%\.agents` (standard agent-tool location), `/run/secrets` (sops-nix default), `C:\ProgramData\ssh` (OS-owned), scheduled-task registry/HKLM/HKCU env vars, and `/etc/nucleus/bin` (nvim two-mechanism path).
