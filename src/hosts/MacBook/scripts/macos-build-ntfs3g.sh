@@ -72,6 +72,7 @@ FINGERPRINT_FILE="/usr/local/share/ntfs-3g/.build-fingerprint"
 LOG_FILE="/Library/Application Support/nucleus/logs/ntfs-3g-build.log"
 PROVIDER_ROOT=/usr/local
 NTFS3G_BIN=/usr/local/bin/ntfs-3g
+PKGUTIL_BIN=/usr/sbin/pkgutil
 
 # Reason the installed ntfs-3g must be rebuilt; prints nothing while it is
 # current.  Arguments: binary record fingerprint provider_digest — the observed
@@ -107,7 +108,7 @@ fi
 REBUILD_REASON="$(ntfs3g_rebuild_reason "$NTFS3G_BIN" "$FINGERPRINT_FILE" "$CURRENT_FINGERPRINT" "$PROVIDER_DIGEST")"
 
 if [ -n "$REBUILD_REASON" ]; then
-  MACFUSE_VERSION="$(macfuse_pkg_version)" || exit 1
+  MACFUSE_VERSION="$(macfuse_pkg_version "$PKGUTIL_BIN")" || exit 1
   PROVIDER_IDENTITY="$(fuse_provider_identity "$PROVIDER_ROOT" "$MACFUSE_VERSION")" || exit 1
   say -l ntfs-3g "building from source: $REBUILD_REASON (log: $LOG_FILE)"
   # WHY: prepend (not append) so nix gnumake shadows BSD /usr/bin/make.  BSD

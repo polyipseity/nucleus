@@ -47,6 +47,27 @@ seed_provider_root() {
   printf '%s\n' "$parent_dir/provider"
 }
 
+# seed_pkgutil_stub <dir> <exit_status> <receipt_line>... — write a pkgutil
+# stand-in that prints the receipt lines and exits with <exit_status>.
+# macfuse_pkg_version takes the tool path as an argument, so any receipt shape
+# can be driven on any host, including one whose output contradicts its status.
+seed_pkgutil_stub() {
+  local dir="$1" status="$2" stub
+  shift 2
+  stub="$dir/pkgutil"
+  {
+    printf '#!/bin/sh\n'
+    # Quoted heredoc delimiter: $(dirname "$0") belongs to the stub, not here.
+    cat <<'STUB'
+cat "$(dirname "$0")/receipt.txt"
+STUB
+    printf 'exit %s\n' "$status"
+  } >"$stub"
+  printf '%s\n' "$@" >"$dir/receipt.txt"
+  chmod +x "$stub"
+  printf '%s\n' "$stub"
+}
+
 # assert_digest_rejects_missing <test_name> <relative_path> — remove one required
 # provider file in a fresh copy and require the digest to refuse a value: a
 # partial provider must fail loudly rather than fingerprint a truncated tree.
@@ -214,31 +235,69 @@ test_identity_names_version_and_library() {
   fi
 }
 
-test_macfuse_pkg_version_contract() {
-  local rc=0 version expected
-  require_command /usr/sbin/pkgutil "macfuse_pkg_version reads /usr/sbin/pkgutil --pkg-info"
-  # Gate the branch on the receipt itself, never on the helper's own status:
-  # choosing by the helper's behaviour would read a helper that fails on a host
-  # that does have macFUSE as "receipt absent", and pass.
-  if /usr/sbin/pkgutil --pkg-info io.macfuse.installer.components.core >/dev/null 2>&1; then
-    version="$(provider_call macfuse_pkg_version 2>/dev/null)" || rc=$?
-    expected="$(/usr/sbin/pkgutil --pkg-info io.macfuse.installer.components.core | awk '/^version:/ { print $2 }')"
-    if [ "$rc" -eq 0 ] && [ -n "$expected" ] && [ "$version" = "$expected" ]; then
-      assert_pass "macfuse_pkg_version reports the installed receipt version"
-    else
-      assert_fail "macfuse_pkg_version reports the installed receipt version" \
-        "rc=$rc reported=[$version] receipt=[$expected]"
-    fi
+# Positive control for the stub fixture: the two failure cases below pass when
+# the stub prints nothing, so a stub that cannot read its receipt would let them
+# pass for the wrong reason.
+test_pkgutil_stub_prints_the_receipt_it_is_given() {
+  local work stub out
+  work="$(mktemp -d)"
+  stub="$(seed_pkgutil_stub "$work" 0 \
+    "package-id: io.macfuse.installer.components.core" \
+    "version: 5.3.3")"
+  out="$("$stub" 2>/dev/null || true)"
+  rm -rf "$work"
+  if [ "$out" = "$(printf 'package-id: io.macfuse.installer.components.core\nversion: 5.3.3')" ]; then
+    assert_pass "pkgutil stub prints the receipt it is given"
   else
-    # Host without macFUSE: the helper must fail loudly instead of inventing a
-    # version, because a provider that cannot be identified is exactly the state
-    # the build record exists to expose.
-    version="$(provider_call macfuse_pkg_version 2>/dev/null)" || rc=$?
-    if [ "$rc" -ne 0 ] && [ -z "$version" ]; then
-      assert_pass "macfuse_pkg_version fails loudly when the receipt is absent"
-    else
-      assert_fail "macfuse_pkg_version fails loudly when the receipt is absent" "rc=$rc stdout=[$version]"
-    fi
+    assert_fail "pkgutil stub prints the receipt it is given" "output=[$out]"
+  fi
+}
+
+test_macfuse_pkg_version_reads_the_version_line() {
+  local work stub version rc=0
+  work="$(mktemp -d)"
+  stub="$(seed_pkgutil_stub "$work" 0 \
+    "package-id: io.macfuse.installer.components.core" \
+    "version: 5.3.3" \
+    "volume: /")"
+  version="$(provider_call macfuse_pkg_version "$stub" 2>/dev/null)" || rc=$?
+  rm -rf "$work"
+  if [ "$rc" -eq 0 ] && [ "$version" = "5.3.3" ]; then
+    assert_pass "macfuse_pkg_version reports the receipt version line"
+  else
+    assert_fail "macfuse_pkg_version reports the receipt version line" "rc=$rc stdout=[$version]"
+  fi
+}
+
+test_macfuse_pkg_version_fails_without_a_version_line() {
+  local work stub out rc=0
+  work="$(mktemp -d)"
+  stub="$(seed_pkgutil_stub "$work" 0 \
+    "package-id: io.macfuse.installer.components.core" \
+    "volume: /")"
+  out="$(provider_call macfuse_pkg_version "$stub" 2>/dev/null)" || rc=$?
+  rm -rf "$work"
+  if [ "$rc" -ne 0 ] && [ -z "$out" ]; then
+    assert_pass "macfuse_pkg_version fails when the receipt carries no version line"
+  else
+    assert_fail "macfuse_pkg_version fails when the receipt carries no version line" "rc=$rc stdout=[$out]"
+  fi
+}
+
+test_macfuse_pkg_version_fails_when_pkgutil_fails() {
+  local work stub out rc=0
+  work="$(mktemp -d)"
+  # The stub prints a parseable version line and then fails: a non-zero pkgutil
+  # status has to fail the lookup instead of being masked by its output.
+  stub="$(seed_pkgutil_stub "$work" 1 \
+    "package-id: io.macfuse.installer.components.core" \
+    "version: 5.3.3")"
+  out="$(provider_call macfuse_pkg_version "$stub" 2>/dev/null)" || rc=$?
+  rm -rf "$work"
+  if [ "$rc" -ne 0 ] && [ -z "$out" ]; then
+    assert_pass "macfuse_pkg_version fails when pkgutil exits non-zero"
+  else
+    assert_fail "macfuse_pkg_version fails when pkgutil exits non-zero" "rc=$rc stdout=[$out]"
   fi
 }
 
@@ -303,13 +362,19 @@ test_record_field_reports_an_absent_line_for_legacy_records() {
 
 # ---- Run all tests ----
 
-# The build record is read on every platform, so those cases always run.
+# The build record is read on every platform, so those cases always run, as does
+# the receipt lookup: macfuse_pkg_version takes the pkgutil path as an argument
+# and is driven against a stub here.
 test_record_field_reads_the_requested_line
 test_record_field_rejects_a_missing_record
 test_record_field_reports_an_absent_line_for_legacy_records
+test_pkgutil_stub_prints_the_receipt_it_is_given
+test_macfuse_pkg_version_reads_the_version_line
+test_macfuse_pkg_version_fails_without_a_version_line
+test_macfuse_pkg_version_fails_when_pkgutil_fails
 
 # The provider itself is macOS-only: the library resolves the provider library
-# with /bin/realpath and reads the package receipt with /usr/sbin/pkgutil.
+# with /bin/realpath.
 if [ "$(uname -s)" != "Darwin" ]; then
   assert_skip "provider digest is a sha256 and is stable across calls" "macOS-only /bin/realpath"
   assert_skip "provider digest ignores where the provider root lives" "macOS-only /bin/realpath"
@@ -323,7 +388,6 @@ if [ "$(uname -s)" != "Darwin" ]; then
   assert_skip "provider library name follows the macFUSE symlink" "macOS-only /bin/realpath"
   assert_skip "provider library name follows a repointed macFUSE symlink" "macOS-only /bin/realpath"
   assert_skip "provider identity names the macFUSE version and resolved library" "macOS-only /bin/realpath"
-  assert_skip "macfuse_pkg_version reports the receipt version or fails loudly without one" "macOS-only /usr/sbin/pkgutil"
 else
   test_digest_is_stable_and_root_independent
   test_digest_is_independent_of_a_symlinked_root_spelling
@@ -333,7 +397,6 @@ else
   test_digest_rejects_an_unreadable_provider_file
   test_lib_name_follows_the_provider_symlink
   test_identity_names_version_and_library
-  test_macfuse_pkg_version_contract
 fi
 
 finish_tests

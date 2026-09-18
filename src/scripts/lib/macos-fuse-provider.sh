@@ -19,7 +19,7 @@
 #   fuse_provider_digest <provider_root>      — sha256 over the consumed files
 #   fuse_provider_identity <root> <version>   — informational build-record line
 #   fuse_provider_record_field <line> <file>  — one line of the build record
-#   macfuse_pkg_version                       — installed macFUSE package version
+#   macfuse_pkg_version <pkgutil_bin>        — installed macFUSE package version
 #
 # Requires sha256_of_file() and error() from src/scripts/lib/lib.sh.
 #
@@ -153,12 +153,22 @@ fuse_provider_record_field() { # <line_number> <record_file>
 }
 
 # Installed macFUSE package version from the installer receipt, e.g. 5.3.3.
+# The pkgutil path is a parameter so the lookup can be driven against a stub
+# rather than the receipt of the machine running the tests.
 # Fails loudly when the receipt is absent: an unidentifiable provider is exactly
 # the state the build record exists to expose, so it must not be papered over.
-macfuse_pkg_version() {
-  _mpv_version="$(/usr/sbin/pkgutil --pkg-info io.macfuse.installer.components.core | awk '/^version:/ { print $2 }')"
-  if [ -z "$_mpv_version" ]; then
+macfuse_pkg_version() { # <pkgutil_bin>
+  _mpv_pkgutil="${1:?macfuse_pkg_version: missing pkgutil path}"
+  if ! _mpv_info="$("$_mpv_pkgutil" --pkg-info io.macfuse.installer.components.core)"; then
     _fp_error "macFUSE package receipt not found (io.macfuse.installer.components.core)"
+    return 1
+  fi
+  # WHY: check pkgutil's own status before parsing, and keep the two failures
+  #   distinct: a failing pkgutil must not be masked by output that happens to
+  #   carry a version line.
+  _mpv_version="$(printf '%s\n' "$_mpv_info" | awk '/^version:/ { print $2 }')"
+  if [ -z "$_mpv_version" ]; then
+    _fp_error "macFUSE package receipt carries no version line (io.macfuse.installer.components.core)"
     return 1
   fi
   printf '%s\n' "$_mpv_version"
