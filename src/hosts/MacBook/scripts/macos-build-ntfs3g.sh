@@ -118,9 +118,15 @@ if ! [ -x /usr/local/bin/ntfs-3g ] ||
     #   Makefile-defined LDFLAGS overrides the environment variable of the same
     #   name.  Without the command-line form the libntfs-3g link loses
     #   -framework CoreFoundation and fails on the nfconv CoreFoundation calls.
-    make -j"$(sysctl -n hw.ncpu)" LDFLAGS="$LINK_FLAGS"
-    printf '[%s] ntfs-3g: installing...\n' "$(date '+%Y-%m-%d %H:%M:%S')"
-    make install LDFLAGS="$LINK_FLAGS"
+    # WHY: chain the two with && so a failed build cannot be masked by a
+    #   successful install.  The enclosing group's exit status is its last
+    #   command's, so `make install` would otherwise run after a failed `make`
+    #   and, if it succeeded, report a broken build as complete.
+    make -j"$(sysctl -n hw.ncpu)" LDFLAGS="$LINK_FLAGS" &&
+      {
+        printf '[%s] ntfs-3g: installing...\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+        make install LDFLAGS="$LINK_FLAGS"
+      }
   } >>"$LOG_FILE" 2>&1 || exit_code=$?
 
   if [ "${exit_code:-0}" -ne 0 ]; then
