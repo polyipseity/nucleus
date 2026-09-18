@@ -15,15 +15,10 @@ trap 'rm -rf "$_tmp"' EXIT
 mkdir -p "$_tmp/home"
 export HOME="$_tmp/home"
 
-# crash-loop.sh sources lib.sh through SCRIPT_DIR, so source both from the lib
-# directory and restore the suite's own SCRIPT_DIR afterwards.
-_suite_dir="$SCRIPT_DIR"
-SCRIPT_DIR="$REPO_ROOT/src/scripts/lib"
-# shellcheck source=../../src/scripts/lib/lib.sh
-. "$SCRIPT_DIR/lib.sh"
+# crash-loop.sh resolves lib.sh from its own directory, so it is sourced exactly
+# the way a consumer does it — no SCRIPT_DIR juggling, no pre-sourcing of lib.sh.
 # shellcheck source=../../src/scripts/lib/crash-loop.sh
-. "$SCRIPT_DIR/crash-loop.sh"
-SCRIPT_DIR="$_suite_dir"
+. "$REPO_ROOT/src/scripts/lib/crash-loop.sh"
 readonly REPO_ROOT
 
 state_dir="$(crash_loop_state_dir)"
@@ -100,5 +95,34 @@ if crash_loop_is_looping svc; then
 else
   assert_pass "a successful start makes few restarts non-looping"
 fi
+
+section 4 "Caller-independent library resolution"
+# Regression: crash-loop.sh sourced lib.sh through the *caller's* SCRIPT_DIR, so
+# any consumer outside src/scripts/lib lost derive_nucleus_user_root and wrote
+# its state to /state instead. A cold shell reproduces such a consumer: no
+# SCRIPT_DIR, no lib.sh pre-sourced.
+_cold_start="$(
+  bash -c '
+    . "$1/src/scripts/lib/crash-loop.sh"
+    command -v derive_nucleus_user_root >/dev/null || { printf "UNDEFINED"; exit 0; }
+    printf "%s" "$(crash_loop_state_dir)"
+  ' _ "$REPO_ROOT"
+)"
+case "$_cold_start" in
+"$HOME"/*)
+  assert_pass "a consumer without SCRIPT_DIR still resolves the user root"
+  ;;
+*)
+  assert_fail "a consumer without SCRIPT_DIR still resolves the user root" "$_cold_start"
+  ;;
+esac
+case "$_cold_start" in
+/state/*)
+  assert_fail "the state dir is never rooted at /state" "$_cold_start"
+  ;;
+*)
+  assert_pass "the state dir is never rooted at /state"
+  ;;
+esac
 
 finish_tests
