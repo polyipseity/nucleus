@@ -40,7 +40,7 @@ BeforeAll {
     'cloud-drive' = @{
       displayName = 'Cloud Drive Mounts'
       description = 'rclone FUSE cloud drive mounts'
-      hostEntry   = @{ type = 'schtask'; taskPath = '\NucleusCloudMount'; prefixMatch = $true; service = 'cloud-mount-' }
+      hostEntry   = @{ type = 'schtask'; taskPath = '\NucleusCloudMount'; prefixMatch = $true; service = 'NucleusCloudMount-' }
     }
     'camilladsp' = @{
       displayName = 'CamillaDSP'
@@ -68,7 +68,7 @@ BeforeAll {
     'cloud-drive' = @{
       displayName = 'Cloud Drive Mounts'
       description = 'rclone FUSE cloud drive mounts'
-      hosts       = @{ Windows = @{ platform = 'Windows'; type = 'schtask'; taskPath = '\NucleusCloudMount'; prefixMatch = $true; service = 'cloud-mount-'; logging = @{ capture = 'stderr' } } }
+      hosts       = @{ Windows = @{ platform = 'Windows'; type = 'schtask'; taskPath = '\NucleusCloudMount'; prefixMatch = $true; service = 'NucleusCloudMount-'; logging = @{ capture = 'stderr' } } }
     }
     'camilladsp' = @{
       displayName = 'CamillaDSP'
@@ -146,6 +146,7 @@ BeforeAll {
   # here); stub them to mirror production so Write-Error interception works.
   function Write-NucleusError { param([string]$Message) Write-Error "svc: error: $Message" }
   function Write-NucleusWarning { param([string]$Message) Write-Warning "svc: warning: $Message" }
+  function Write-NucleusInfo { param([string]$CommandName, [string]$Message) Write-Information "svc: [$CommandName] $Message" }
   function Start-ScheduledTask {
     # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test stub throws; Mock supplies behavior
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
@@ -166,10 +167,17 @@ BeforeAll {
   Mock Get-NucleusSystemLogDir { return 'TestDrive:\nucleus\system-logs' }
   Mock Get-WinEvent { return @() }
   Mock ConvertTo-SanitizedText { process { $_ } }
+  # Resolution enumerates scheduled tasks; an empty default keeps unrelated
+  # tests order-independent (per-context Mocks replace it).
+  Mock Get-ScheduledTask { return @() }
 
   # Script-scoped host (constant for Windows).
   $Script:NucleusHost = 'Windows'
   $NucleusHost = $Script:NucleusHost
+
+  # Prefix-match instance resolution lives in its own module, mirroring
+  # src/scripts/lib/svc-instances.sh on POSIX.
+  . (Join-Path $PSScriptRoot '../../../../src/platforms/Windows/modules/Get-NucleusServiceInstance.ps1')
 
   # Dot-source the function definitions.
   . ([scriptblock]::Create($functionCode))
@@ -182,11 +190,11 @@ BeforeAll {
 Describe 'Format-StatusTable' {
   It 'outputs table with headers and separator when Json is false' {
     $Script:Json = $false
-    $results = @{
-      'ollama' = @{ status = 'active'; running = $true; pid = 12345 }
-      'sshd'   = @{ status = 'inactive'; running = $false; pid = $null }
-    }
-    $output = Format-StatusTable -Results $results
+    $rows = @(
+      @{ class = 'live'; id = 'ollama'; displayName = 'Ollama'; status = 'active'; running = $true; pid = 12345 }
+      @{ class = 'live'; id = 'sshd'; displayName = 'SSH Server'; status = 'inactive'; running = $false; pid = $null }
+    )
+    $output = Format-StatusTable -Rows $rows
     $output | Should -Not -BeNullOrEmpty
     $output | Should -Match 'ID\s+Name\s+Status\s+Running\s+PID'
     $output | Should -Match 'ollama'
@@ -196,42 +204,65 @@ Describe 'Format-StatusTable' {
 
   It 'outputs compressed JSON when Json is true' {
     $Script:Json = $true
-    $results = @{
-      'ollama' = @{ status = 'active'; running = $true; pid = 12345 }
-    }
-    $output = Format-StatusTable -Results $results
+    $rows = @(
+      @{ class = 'live'; id = 'ollama'; displayName = 'Ollama'; status = 'active'; running = $true; pid = 12345 }
+    )
+    $output = Format-StatusTable -Rows $rows
     $output | Should -Not -BeNullOrEmpty
     $output | Should -Match '"version":1'
     $output | Should -Match '"services"'
     $output | Should -Match '"ollama"'
   }
 
-  It 'skips ERROR: entries in JSON mode' {
+  It 'omits error rows in JSON mode' {
     $Script:Json = $true
-    $results = @{
-      'ollama'  = @{ status = 'active'; running = $true; pid = 12345 }
-      'ERROR:unknown' = @{ displayName = 'unknown'; hostEntry = @{ error = 'service not found' } }
-    }
-    $output = Format-StatusTable -Results $results
-    $output | Should -Not -Match 'ERROR'
+    $rows = @(
+      @{ class = 'live'; id = 'ollama'; displayName = 'Ollama'; status = 'active'; running = $true; pid = 12345 }
+      @{ class = 'error'; id = 'cloud-driv'; displayName = 'cloud-driv'; status = 'n/a'; running = '-'; pid = '-' }
+    )
+    $output = Format-StatusTable -Rows $rows
+    $output | Should -Match '"ollama"'
+    $output | Should -Not -Match 'cloud-driv'
   }
 
-  It 'replaces ERROR: prefix with n/a in table mode' {
+  It 'reports error rows as n/a under the requested name' {
     $Script:Json = $false
-    $results = @{
-      'ERROR:unknown' = @{ displayName = 'unknown'; hostEntry = @{ error = 'service not found' } }
-    }
-    $output = Format-StatusTable -Results $results
-    $output | Should -Match 'unknown'
+    $rows = @(
+      @{ class = 'error'; id = 'cloud-driv'; displayName = 'cloud-driv'; status = 'n/a'; running = '-'; pid = '-' }
+    )
+    $output = Format-StatusTable -Rows $rows
+    $output | Should -Match 'cloud-driv'
     $output | Should -Match 'n/a'
+    $output | Should -Not -Match 'unknown'
+  }
+
+  It 'reports pseudo rows as n/a instead of inactive' {
+    $Script:Json = $false
+    $rows = @(
+      @{ class = 'pseudo'; id = 'cloud-drive'; displayName = 'Cloud Drive Mounts'; status = 'n/a'; running = '-'; pid = '-' }
+    )
+    $output = Format-StatusTable -Rows $rows
+    $output | Should -Match 'cloud-drive'
+    $output | Should -Match 'n/a'
+    $output | Should -Not -Match 'inactive'
+  }
+
+  It 'prints the instance id with its display name for instance rows' {
+    $Script:Json = $false
+    $rows = @(
+      @{ class = 'live'; id = '\NucleusCloudMount\NucleusCloudMount-work'; displayName = 'Cloud Drive Mounts (work)'; status = 'active'; running = $true; pid = 4321 }
+    )
+    $output = Format-StatusTable -Rows $rows
+    $output | Should -Match 'Cloud Drive Mounts \(work\)'
+    $output | Should -Match '4321'
   }
 
   It 'formats PID as "-" when pid is null' {
     $Script:Json = $false
-    $results = @{
-      'sshd' = @{ status = 'inactive'; running = $false; pid = $null }
-    }
-    $output = Format-StatusTable -Results $results
+    $rows = @(
+      @{ class = 'live'; id = 'sshd'; displayName = 'SSH Server'; status = 'inactive'; running = $false; pid = $null }
+    )
+    $output = Format-StatusTable -Rows $rows
     $lines = $output -split "`n"
     $dataLines = $lines | Where-Object { $_ -match 'sshd' }
     $dataLines | ForEach-Object { $_ | Should -Match '\s-\s*$' }
@@ -239,10 +270,10 @@ Describe 'Format-StatusTable' {
 
   It 'formats PID as number when pid is present' {
     $Script:Json = $false
-    $results = @{
-      'ollama' = @{ status = 'active'; running = $true; pid = 9876 }
-    }
-    $output = Format-StatusTable -Results $results
+    $rows = @(
+      @{ class = 'live'; id = 'ollama'; displayName = 'Ollama'; status = 'active'; running = $true; pid = 9876 }
+    )
+    $output = Format-StatusTable -Rows $rows
     $lines = $output -split "`n"
     $dataLines = $lines | Where-Object { $_ -match 'ollama' }
     $dataLines | ForEach-Object { $_ | Should -Match '9876' }
@@ -254,55 +285,127 @@ Describe 'Format-StatusTable' {
 # ---------------------------------------------------------------------------
 
 Describe 'Resolve-ServiceName' {
-  It 'returns all non-prefix services when no names given' {
-    $resolved = Resolve-ServiceName -Names @()
-    $resolved.Keys | Should -Contain 'ollama'
-    $resolved.Keys | Should -Contain 'sshd'
-    $resolved.Keys | Should -Contain 'camilladsp'
+  It 'resolves every registry entry when no names are given' {
+    $resolved = @(Resolve-ServiceName -Names @())
+    $resolved.instanceId | Should -Contain 'ollama'
+    $resolved.instanceId | Should -Contain 'sshd'
+    $resolved.instanceId | Should -Contain 'camilladsp'
   }
 
-  It 'returns exact match for a known service' {
-    $resolved = Resolve-ServiceName -Names @('ollama')
-    $resolved.Keys | Should -Be @('ollama')
+  It 'includes a prefix-match entry with no live instance as a pseudo row' {
+    Mock Get-ScheduledTask { return @() }
+
+    $resolved = @(Resolve-ServiceName -Names @('cloud-drive'))
+    $resolved.instanceId | Should -Contain 'cloud-drive'
+    $resolved.Count | Should -Be 1
+    $resolved[0].class | Should -Be 'pseudo'
+    $resolved[0].registryKey | Should -Be 'cloud-drive'
   }
 
-  It 'returns ERROR: for unknown service' {
-    $resolved = Resolve-ServiceName -Names @('nonexistent')
-    $resolved.Keys | Should -Contain 'ERROR:nonexistent'
-    $resolved['ERROR:nonexistent'].hostEntry.error | Should -Be 'service not found in registry'
+  It 'returns a live row for a known service' {
+    $resolved = @(Resolve-ServiceName -Names @('ollama'))
+    $resolved.Count | Should -Be 1
+    $resolved[0].class | Should -Be 'live'
+    $resolved[0].instanceId | Should -Be 'ollama'
+    $resolved[0].hostEntry.service | Should -Be 'ollama'
+  }
+
+  It 'returns an error row that carries the requested name' {
+    $resolved = @(Resolve-ServiceName -Names @('nonexistent'))
+    $resolved.Count | Should -Be 1
+    $resolved[0].class | Should -Be 'error'
+    $resolved[0].instanceId | Should -Be 'nonexistent'
+    $resolved[0].displayName | Should -Be 'nonexistent'
+    $resolved[0].hostEntry.error | Should -Be 'service not found in registry'
   }
 
   It 'resolves multiple services' {
-    $resolved = Resolve-ServiceName -Names @('ollama', 'sshd')
-    $resolved.Keys | Should -Contain 'ollama'
-    $resolved.Keys | Should -Contain 'sshd'
-  }
-
-  It 'does not expand prefix-match services without names' {
-    $resolved = Resolve-ServiceName -Names @()
-    $resolved.Keys | Should -Not -Contain 'cloud-drive'
+    $resolved = @(Resolve-ServiceName -Names @('ollama', 'sshd'))
+    $resolved.instanceId | Should -Contain 'ollama'
+    $resolved.instanceId | Should -Contain 'sshd'
   }
 
   Context 'prefix expansion (schtask)' {
     It 'expands prefix-match with matching scheduled tasks' {
       Mock Get-ScheduledTask {
         return @(
-          [PSCustomObject]@{ TaskName = 'cloud-mount-work'; TaskPath = '\NucleusCloudMount\'; State = 'Ready' }
+          [PSCustomObject]@{ TaskName = 'NucleusCloudMount-work'; TaskPath = '\NucleusCloudMount\'; State = 'Ready' }
         )
       }
 
-      $resolved = Resolve-ServiceName -Names @('cloud-drive')
-      $resolved.Keys | Should -Contain 'cloud-drive/cloud-mount-work'
-      $resolved['cloud-drive/cloud-mount-work'].hostEntry.type | Should -Be 'schtask'
+      $resolved = @(Resolve-ServiceName -Names @('cloud-drive'))
+      $resolved.Count | Should -Be 1
+      $resolved[0].class | Should -Be 'live'
+      $resolved[0].registryKey | Should -Be 'cloud-drive'
+      $resolved[0].instanceId | Should -Be '\NucleusCloudMount\NucleusCloudMount-work'
+      $resolved[0].displayName | Should -Be 'Cloud Drive Mounts (work)'
+      $resolved[0].hostEntry.type | Should -Be 'schtask'
+      $resolved[0].hostEntry.taskPath | Should -Be '\NucleusCloudMount\NucleusCloudMount-work'
     }
 
-    It 'creates no-matches entry when no tasks match prefix' {
-      Mock Get-ScheduledTask { return @() }
+    It 'ignores tasks that do not match the prefix' {
+      Mock Get-ScheduledTask {
+        return @(
+          [PSCustomObject]@{ TaskName = 'NucleusCloudMount-work'; TaskPath = '\NucleusCloudMount\'; State = 'Ready' }
+          [PSCustomObject]@{ TaskName = 'OtherTask'; TaskPath = '\NucleusCloudMount\'; State = 'Ready' }
+          [PSCustomObject]@{ TaskName = 'NucleusCamillaDSP'; TaskPath = '\'; State = 'Ready' }
+        )
+      }
 
-      $resolved = Resolve-ServiceName -Names @('cloud-drive')
-      $resolved.Keys | Should -Contain 'cloud-drive/*'
-      $resolved['cloud-drive/*'].displayName | Should -Be 'cloud-drive (no matches)'
+      $resolved = @(Resolve-ServiceName -Names @('cloud-drive'))
+      $resolved.Count | Should -Be 1
+      $resolved[0].instanceId | Should -Be '\NucleusCloudMount\NucleusCloudMount-work'
     }
+
+    It 'accepts a printed instance id as a service name' {
+      Mock Get-ScheduledTask {
+        return @(
+          [PSCustomObject]@{ TaskName = 'NucleusCloudMount-work'; TaskPath = '\NucleusCloudMount\'; State = 'Ready' }
+        )
+      }
+
+      $resolved = @(Resolve-ServiceName -Names @('\NucleusCloudMount\NucleusCloudMount-work'))
+      $resolved.Count | Should -Be 1
+      $resolved[0].class | Should -Be 'live'
+      $resolved[0].registryKey | Should -Be 'cloud-drive'
+      $resolved[0].displayName | Should -Be 'Cloud Drive Mounts (work)'
+    }
+
+    It 'reports a mistyped instance id as an error naming the prefix' {
+      Mock Get-ScheduledTask {
+        return @(
+          [PSCustomObject]@{ TaskName = 'NucleusCloudMount-work'; TaskPath = '\NucleusCloudMount\'; State = 'Ready' }
+        )
+      }
+
+      $resolved = @(Resolve-ServiceName -Names @('\NucleusCloudMount\NucleusCloudMount-nope'))
+      $resolved.Count | Should -Be 1
+      $resolved[0].class | Should -Be 'error'
+      $resolved[0].instanceId | Should -Be '\NucleusCloudMount\NucleusCloudMount-nope'
+      $resolved[0].hostEntry.error | Should -Match 'no such instance'
+    }
+  }
+}
+
+Describe 'New-StatusRow' {
+  It 'reports non-live rows as n/a without probing' {
+    Mock Get-ServiceStatus { throw 'Get-ServiceStatus must not be called' }
+
+    $row = New-StatusRow -ResolvedRow @{ registryKey = 'cloud-drive'; displayName = 'Cloud Drive Mounts'; hostEntry = @{ prefixMatch = $true }; instanceId = 'cloud-drive'; class = 'pseudo' }
+    $row.status | Should -Be 'n/a'
+    $row.running | Should -Be '-'
+    $row.pid | Should -Be '-'
+    Should -Invoke Get-ServiceStatus -Exactly 0
+  }
+
+  It 'probes live rows and labels them with the instance id' {
+    Mock Get-ServiceStatus { return @{ status = 'active'; running = $true; pid = 42 } }
+
+    $row = New-StatusRow -ResolvedRow @{ registryKey = 'cloud-drive'; displayName = 'Cloud Drive Mounts (work)'; hostEntry = @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work' }; instanceId = '\NucleusCloudMount\NucleusCloudMount-work'; class = 'live' }
+    $row.id | Should -Be '\NucleusCloudMount\NucleusCloudMount-work'
+    $row.displayName | Should -Be 'Cloud Drive Mounts (work)'
+    $row.status | Should -Be 'active'
+    $row.class | Should -Be 'live'
   }
 }
 
@@ -408,6 +511,27 @@ Describe 'Dispatch' {
     $dispatchSwitchAst = $switchAsts | Where-Object { $_.Condition.Extent.Text -eq '$Action' -and $_.Extent.Text -match "'list'" } | Select-Object -First 1
     $dispatchSwitchText = $dispatchSwitchAst.Extent.Text -replace '\bexit\b', 'throw'
 
+    # Row builders for the Resolve-ServiceName Mocks (resolution returns rows).
+    function New-TestRow {
+      # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test helper builds an in-memory row
+      [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+      param(
+        [string]$RegistryKey,
+        [string]$DisplayName,
+        [string]$InstanceId,
+        [string]$Class,
+        [hashtable]$HostEntry
+      )
+      return @{ registryKey = $RegistryKey; displayName = $DisplayName; hostEntry = $HostEntry; instanceId = $InstanceId; class = $Class }
+    }
+
+    function New-LiveRow {
+      # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test helper builds an in-memory row
+      [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+      param([string]$Key = 'ollama')
+      return New-TestRow -RegistryKey $Key -DisplayName $Key -InstanceId $Key -Class 'live' -HostEntry $Script:Registry[$Key].hostEntry
+    }
+
     # Test helper that wraps the switch dispatch for testing.
     function Invoke-Dispatch {
       param(
@@ -430,7 +554,7 @@ Describe 'Dispatch' {
 
   Context 'action routing' {
     It 'routes list to Resolve-ServiceName and Format-StatusTable' {
-      Mock Resolve-ServiceName { return @{ 'ollama' = $Script:Registry['ollama'] } }
+      Mock Resolve-ServiceName { return @(New-LiveRow -Key 'ollama') }
       Mock Get-ServiceStatus { return @{ status = 'active'; running = $true; pid = 12345 } }
       Mock Format-StatusTable { return 'formatted' }
 
@@ -441,7 +565,7 @@ Describe 'Dispatch' {
     }
 
     It 'routes status to Resolve-ServiceName and Format-StatusTable' {
-      Mock Resolve-ServiceName { return @{ 'ollama' = $Script:Registry['ollama'] } }
+      Mock Resolve-ServiceName { return @(New-LiveRow -Key 'ollama') }
       Mock Get-ServiceStatus { return @{ status = 'active'; running = $true; pid = 12345 } }
       Mock Format-StatusTable { return 'formatted' }
 
@@ -452,7 +576,7 @@ Describe 'Dispatch' {
     }
 
     It 'routes start to Invoke-ServiceAction' {
-      Mock Resolve-ServiceName { return @{ 'ollama' = $Script:Registry['ollama'] } }
+      Mock Resolve-ServiceName { return @(New-LiveRow -Key 'ollama') }
       Mock Invoke-ServiceAction { return $true }
 
       Invoke-Dispatch -Action start -ServiceName @('ollama')
@@ -461,7 +585,7 @@ Describe 'Dispatch' {
     }
 
     It 'routes stop to Invoke-ServiceAction' {
-      Mock Resolve-ServiceName { return @{ 'ollama' = $Script:Registry['ollama'] } }
+      Mock Resolve-ServiceName { return @(New-LiveRow -Key 'ollama') }
       Mock Invoke-ServiceAction { return $true }
 
       Invoke-Dispatch -Action stop -ServiceName @('ollama')
@@ -470,7 +594,7 @@ Describe 'Dispatch' {
     }
 
     It 'routes restart to Invoke-ServiceAction' {
-      Mock Resolve-ServiceName { return @{ 'ollama' = $Script:Registry['ollama'] } }
+      Mock Resolve-ServiceName { return @(New-LiveRow -Key 'ollama') }
       Mock Invoke-ServiceAction { return $true }
 
       Invoke-Dispatch -Action restart -ServiceName @('ollama')
@@ -479,7 +603,7 @@ Describe 'Dispatch' {
     }
 
     It 'routes enable to Invoke-ServiceAction' {
-      Mock Resolve-ServiceName { return @{ 'ollama' = $Script:Registry['ollama'] } }
+      Mock Resolve-ServiceName { return @(New-LiveRow -Key 'ollama') }
       Mock Invoke-ServiceAction { return $true }
 
       Invoke-Dispatch -Action enable -ServiceName @('ollama')
@@ -488,7 +612,7 @@ Describe 'Dispatch' {
     }
 
     It 'routes disable to Invoke-ServiceAction' {
-      Mock Resolve-ServiceName { return @{ 'ollama' = $Script:Registry['ollama'] } }
+      Mock Resolve-ServiceName { return @(New-LiveRow -Key 'ollama') }
       Mock Invoke-ServiceAction { return $true }
 
       Invoke-Dispatch -Action disable -ServiceName @('ollama')
@@ -595,7 +719,7 @@ Describe 'Dispatch' {
   Context 'JSON routing' {
     It 'list with Json outputs JSON through Format-StatusTable' {
       $Script:Json = $true
-      Mock Resolve-ServiceName { return @{ 'ollama' = $Script:Registry['ollama'] } }
+      Mock Resolve-ServiceName { return @(New-LiveRow -Key 'ollama') }
       Mock Get-ServiceStatus { return @{ status = 'active'; running = $true; pid = 12345; displayName = 'Ollama' } }
 
       $output = Invoke-Dispatch -Action list
@@ -610,6 +734,86 @@ Describe 'Dispatch' {
       Invoke-Dispatch -Action log-config -ServiceName @('ollama')
 
       Should -Invoke Show-LogConfig -Exactly 1 -ParameterFilter { $ServiceKey -eq 'ollama' -and $JsonOut }
+    }
+  }
+
+  Context 'instance resolution' {
+    It 'acts on one instance when given its printed id' {
+      Mock Resolve-ServiceName {
+        return @(New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (work)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' -Class 'live' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work' })
+      }
+      Mock Invoke-ServiceAction { return $true }
+
+      Invoke-Dispatch -Action restart -ServiceName @('\NucleusCloudMount\NucleusCloudMount-work')
+
+      Should -Invoke Invoke-ServiceAction -Exactly 1 -ParameterFilter { $Action -eq 'restart' -and $HostEntry.taskPath -eq '\NucleusCloudMount\NucleusCloudMount-work' }
+    }
+
+    It 'acts once per live instance when given the registry key' {
+      Mock Resolve-ServiceName {
+        return @(
+          New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (a)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-a' -Class 'live' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-a' }
+          New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (b)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-b' -Class 'live' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-b' }
+        )
+      }
+      Mock Invoke-ServiceAction { return $true }
+
+      Invoke-Dispatch -Action stop -ServiceName @('cloud-drive')
+
+      Should -Invoke Invoke-ServiceAction -Exactly 2 -ParameterFilter { $Action -eq 'stop' }
+    }
+
+    It 'fails an action on a prefix-match key with no live instances' {
+      Mock Resolve-ServiceName {
+        return @(New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts' -InstanceId 'cloud-drive' -Class 'pseudo' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount'; prefixMatch = $true; service = 'NucleusCloudMount-' })
+      }
+      Mock Invoke-ServiceAction { return $true }
+      Mock Write-Error { throw "Write-Error: $Message" }
+
+      { Invoke-Dispatch -Action restart -ServiceName @('cloud-drive') } | Should -Throw 'Write-Error: svc: error: cloud-drive — no instances found*'
+      Should -Invoke Invoke-ServiceAction -Exactly 0
+    }
+
+    It 'warns and keeps going when the name is unknown' {
+      Mock Resolve-ServiceName {
+        return @(New-TestRow -RegistryKey 'ERROR:cloud-driv' -DisplayName 'cloud-driv' -InstanceId 'cloud-driv' -Class 'error' -HostEntry @{ error = 'service not found in registry' })
+      }
+      Mock Write-NucleusWarning { }
+      Mock Write-Error { throw "Write-Error: $Message" }
+
+      { Invoke-Dispatch -Action start -ServiceName @('cloud-driv') } | Should -Throw 'Write-Error: svc: error: cloud-driv*'
+      Should -Invoke Write-NucleusWarning -Exactly 0
+    }
+
+    It 'omits unknown targets from list JSON' {
+      $Script:Json = $true
+      Mock Resolve-ServiceName {
+        return @(New-TestRow -RegistryKey 'ERROR:cloud-driv' -DisplayName 'cloud-driv' -InstanceId 'cloud-driv' -Class 'error' -HostEntry @{ error = 'service not found in registry' })
+      }
+
+      $output = Invoke-Dispatch -Action list -ServiceName @('cloud-driv')
+
+      $output | Should -Not -Match 'cloud-driv'
+      $output | Should -Not -Match 'unknown'
+    }
+
+    It 'fails verify on an unknown service' {
+      Mock Resolve-ServiceName {
+        return @(New-TestRow -RegistryKey 'ERROR:cloud-driv' -DisplayName 'cloud-driv' -InstanceId 'cloud-driv' -Class 'error' -HostEntry @{ error = 'service not found in registry' })
+      }
+
+      { Invoke-Dispatch -Action verify -ServiceName @('cloud-driv') } | Should -Throw
+    }
+
+    It 'does not fail verify when a prefix-match key has no instances' {
+      Mock Resolve-ServiceName {
+        return @(New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts' -InstanceId 'cloud-drive' -Class 'pseudo' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount'; prefixMatch = $true; service = 'NucleusCloudMount-' })
+      }
+      Mock Write-NucleusWarning { }
+
+      Invoke-Dispatch -Action verify -ServiceName @('cloud-drive')
+
+      Should -Invoke Write-NucleusWarning -Exactly 1 -ParameterFilter { $Message -match 'no instances found' }
     }
   }
 }

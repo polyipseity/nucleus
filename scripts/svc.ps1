@@ -11,6 +11,12 @@
 
   Services are defined in src/modules/services.json (the canonical registry).
 
+  Services are addressed by registry key. Entries flagged prefixMatch stand in for one
+  runtime service per instance: list and status print each instance id, and every action
+  accepts either the registry key (which acts on all live instances) or an exact instance
+  id. A prefix-match key with no live instance is reported as n/a, and acting on it fails
+  with "no instances found".
+
 .PARAMETER Action
   The operation to perform: list, status, start, stop, restart, enable, disable,
   endpoint, logs, log-paths, log-config.
@@ -30,6 +36,7 @@
   .\svc.ps1 status ollama,sshd
   .\svc.ps1 start ollama
   .\svc.ps1 restart jellyfin
+  .\svc.ps1 status \NucleusCloudMount\NucleusCloudMount-iCloud
   .\svc.ps1 endpoint jellyfin http
   .\svc.ps1 list -Json
   .\svc.ps1 logs
@@ -148,64 +155,235 @@ foreach ($svc in $RegistryRaw.Keys) {
 
 # Load log management helpers
 . (Join-Path -Path $RepoRoot -ChildPath "src\platforms\Windows\modules\Invoke-LogManagement.ps1")
+. (Join-Path -Path $RepoRoot -ChildPath "src\platforms\Windows\modules\Get-NucleusServiceInstance.ps1")
 
 # ---------------------------------------------------------------------------
-# Resolve service names (expand prefix matches)
+# Service resolution
 # ---------------------------------------------------------------------------
+
+function New-ResolvedRow {
+  <#
+  .SYNOPSIS
+    Builds one resolution row.
+
+  .DESCRIPTION
+    A row carries the registry key it came from, the display name to print, the host entry
+    the status/action helpers consume, the concrete instance id it addresses, and its class
+    (live, pseudo or error).
+
+  .PARAMETER RegistryKey
+    Registry key from services.json, or ERROR:<name> for an unresolvable name.
+
+  .PARAMETER DisplayName
+    Name to print in the ID/Name columns.
+
+  .PARAMETER HostEntry
+    Host entry hashtable; carries only an error field for error rows.
+
+  .PARAMETER InstanceId
+    Concrete instance id (equals the registry key for whole-service rows).
+
+  .PARAMETER Class
+    live, pseudo or error.
+
+  .OUTPUTS
+    System.Collections.Hashtable
+  #>
+  # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- pure builder of an in-memory row; no system state changes
+  [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+  param(
+    [string]$RegistryKey,
+    [string]$DisplayName,
+    [hashtable]$HostEntry,
+    [string]$InstanceId,
+    [ValidateSet('live', 'pseudo', 'error')]
+    [string]$Class
+  )
+
+  return @{
+    registryKey = $RegistryKey
+    displayName = $DisplayName
+    hostEntry   = $HostEntry
+    instanceId  = $InstanceId
+    class       = $Class
+  }
+}
+
+function Resolve-RegistryEntry {
+  <#
+  .SYNOPSIS
+    Emits the resolution rows for one registry entry.
+
+  .DESCRIPTION
+    An ordinary entry yields one live row. A prefix-match entry yields one live row per
+    live instance, or a single pseudo row when it has none — the pseudo row keeps the
+    registry host entry unchanged so scope filtering still works, and nothing is probed.
+
+  .PARAMETER Key
+    Registry key.
+
+  .PARAMETER Entry
+    Filtered registry entry (@{ displayName; description; network; hostEntry }).
+
+  .OUTPUTS
+    System.Collections.Hashtable[]
+  #>
+  param(
+    [string]$Key,
+    [hashtable]$Entry
+  )
+
+  $hostEntry = $Entry.hostEntry
+  $rowParameters = @{
+    RegistryKey = $Key
+    DisplayName = $Entry.displayName
+    HostEntry   = $hostEntry
+    InstanceId  = $Key
+    Class       = 'live'
+  }
+
+  if (-not ($hostEntry.ContainsKey('prefixMatch') -and $hostEntry.prefixMatch)) {
+    return @(New-ResolvedRow @rowParameters)
+  }
+
+  $instances = @(Get-NucleusPrefixInstanceList -HostEntry $hostEntry)
+  if ($instances.Count -eq 0) {
+    $rowParameters.Class = 'pseudo'
+    return @(New-ResolvedRow @rowParameters)
+  }
+
+  return @($instances | ForEach-Object {
+      $rowParameters.InstanceId = $_
+      $rowParameters.DisplayName = "$($Entry.displayName) ($(Get-NucleusInstanceSuffix -HostEntry $hostEntry -InstanceId $_))"
+      $rowParameters.HostEntry = New-NucleusInstanceHostEntry -HostEntry $hostEntry -InstanceId $_
+      New-ResolvedRow @rowParameters
+    })
+}
+
+function Resolve-InstanceId {
+  <#
+  .SYNOPSIS
+    Resolves a concrete instance id that is not a registry key.
+
+  .DESCRIPTION
+    list and status print concrete instance ids, so those ids must be accepted as
+    arguments. Membership is checked against live enumeration: an id that matches a
+    prefix-match entry's prefix but is not live yields an error row naming the prefix,
+    and a name matching no prefix yields nothing so the caller reports it as unknown.
+
+  .PARAMETER Name
+    Requested name.
+
+  .OUTPUTS
+    System.Collections.Hashtable, or $null when no prefix-match entry claims the name.
+  #>
+  param(
+    [string]$Name
+  )
+
+  foreach ($key in $Registry.Keys) {
+    $hostEntry = $Registry[$key].hostEntry
+    if (-not ($hostEntry.ContainsKey('prefixMatch') -and $hostEntry.prefixMatch)) { continue }
+
+    $prefix = Get-NucleusInstanceIdPrefix -HostEntry $hostEntry
+    if (-not $Name.StartsWith($prefix, [System.StringComparison]::Ordinal)) { continue }
+
+    $instances = @(Get-NucleusPrefixInstanceList -HostEntry $hostEntry)
+    if ($instances -notcontains $Name) {
+      $errorEntry = @{ error = "no such instance (prefix '$prefix'); run 'nucleus-svc list'" }
+      return New-ResolvedRow -RegistryKey "ERROR:$Name" -DisplayName $Name -HostEntry $errorEntry -InstanceId $Name -Class 'error'
+    }
+
+    $displayName = "$($Registry[$key].displayName) ($(Get-NucleusInstanceSuffix -HostEntry $hostEntry -InstanceId $Name))"
+    $instanceEntry = New-NucleusInstanceHostEntry -HostEntry $hostEntry -InstanceId $Name
+    return New-ResolvedRow -RegistryKey $key -DisplayName $displayName -HostEntry $instanceEntry -InstanceId $Name -Class 'live'
+  }
+
+  return $null
+}
 
 function Resolve-ServiceName {
+  <#
+  .SYNOPSIS
+    Resolves the requested service names into service rows.
+
+  .DESCRIPTION
+    Rows carry the class list and status render from, so no caller re-derives instance ids.
+    With no names, every registry entry is resolved (prefix-match entries included).
+
+  .PARAMETER Names
+    Requested service names; empty resolves every registry entry.
+
+  .OUTPUTS
+    System.Collections.Hashtable[]
+  #>
   param(
     [string[]]$Names
   )
 
-  $results = @{}
+  $rows = @()
 
   if ($Names.Count -eq 0) {
-    # Return all non-prefix services
     foreach ($key in $Registry.Keys) {
-      $plat = $Registry[$key].hostEntry
-      if (-not $plat.prefixMatch) {
-        $results[$key] = $Registry[$key]
-      }
+      $rows += Resolve-RegistryEntry -Key $key -Entry $Registry[$key]
     }
-    return $results
+    return $rows
   }
 
   foreach ($name in $Names) {
     if ($Registry.ContainsKey($name)) {
-      $plat = $Registry[$name].hostEntry
-      if ($plat.prefixMatch) {
-        # Expand prefix match
-        $prefix = $plat.service
-        switch ($plat.type) {
-          'schtask' {
-            $matched = Get-ScheduledTask | Where-Object { $_.TaskPath -like "*$prefix*" -or $_.TaskName -like "$prefix*" }
-            foreach ($t in $matched) {
-              $taskName = if ($t.TaskPath -eq '\') { $t.TaskName } else { "$($t.TaskPath)$($t.TaskName)" }
-              $results["$name/$($t.TaskName)"] = @{
-                displayName = "$name ($($t.TaskName))"
-                hostEntry   = @{ type = 'schtask'; taskPath = $taskName }
-              }
-            }
-            if ($matched.Count -eq 0) {
-              $results["$name/*"] = @{
-                displayName = "$name (no matches)"
-                hostEntry   = @{ type = 'schtask'; taskPath = $prefix }
-              }
-            }
-          }
-        }
-      } else {
-        $results[$name] = $Registry[$name]
-      }
-    } else {
-      $results["ERROR:$name"] = @{
-        displayName = $name
-        hostEntry   = @{ error = "service not found in registry" }
-      }
+      $rows += Resolve-RegistryEntry -Key $name -Entry $Registry[$name]
+      continue
+    }
+    $instanceRow = Resolve-InstanceId -Name $name
+    if ($null -ne $instanceRow) {
+      $rows += $instanceRow
+      continue
+    }
+    $errorEntry = @{ error = 'service not found in registry' }
+    $rows += New-ResolvedRow -RegistryKey "ERROR:$name" -DisplayName $name -HostEntry $errorEntry -InstanceId $name -Class 'error'
+  }
+  return $rows
+}
+
+function New-StatusRow {
+  <#
+  .SYNOPSIS
+    Builds one status-table row from a resolution row.
+
+  .DESCRIPTION
+    Live rows are probed through Get-ServiceStatus. Pseudo and error rows have no runtime
+    identity, so they are reported as n/a and never probed — a probe would report a false
+    inactive status.
+
+  .PARAMETER ResolvedRow
+    Resolution row from Resolve-ServiceName.
+
+  .OUTPUTS
+    System.Collections.Hashtable
+  #>
+  # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- pure builder of an in-memory row; the probe itself is read-only
+  [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+  param(
+    [hashtable]$ResolvedRow
+  )
+
+  if ($ResolvedRow.class -ne 'live') {
+    return @{
+      class       = $ResolvedRow.class
+      id          = $ResolvedRow.instanceId
+      displayName = $ResolvedRow.displayName
+      status      = 'n/a'
+      running     = '-'
+      pid         = '-'
     }
   }
-  return $results
+
+  $status = Get-ServiceStatus -HostEntry $ResolvedRow.hostEntry
+  $status.class = 'live'
+  $status.id = $ResolvedRow.instanceId
+  $status.displayName = $ResolvedRow.displayName
+  return $status
 }
 
 # Returns $true when the resolved registry entry is a system-scope service
@@ -320,14 +498,19 @@ function Invoke-ServiceAction {
 
 function Format-StatusTable {
   param(
-    [hashtable]$Results
+    [object[]]$Rows
   )
 
   if ($Json) {
-    $jsonObj = @{ version = 1; services = @{} }
-    foreach ($key in $Results.Keys) {
-      if ($key -like 'ERROR:*') { continue }
-      $jsonObj.services[$key] = $Results[$key]
+    $jsonObj = @{ version = 1; services = [ordered]@{} }
+    foreach ($row in $Rows) {
+      if ($row.class -eq 'error') { continue }
+      # class is a resolution detail; the JSON contract keeps the status fields only.
+      $entry = @{}
+      foreach ($key in $row.Keys) {
+        if ($key -ne 'class') { $entry[$key] = $row[$key] }
+      }
+      $jsonObj.services[$row.id] = $entry
     }
     return ($jsonObj | ConvertTo-Json -Depth 3 -Compress)
   }
@@ -336,14 +519,9 @@ function Format-StatusTable {
   $lines += "{0,-20} {1,-24} {2,-10} {3,-8} {4}" -f 'ID', 'Name', 'Status', 'Running', 'PID'
   $lines += '-' * 80
 
-  foreach ($key in $Results.Keys) {
-    $info = $Results[$key]
-    if ($key -like 'ERROR:*') {
-      $realKey = $key -replace '^ERROR:'
-      $lines += "{0,-20} {1,-24} {2,-10} {3,-8} {4}" -f $realKey, '', 'n/a', '-', '-'
-    } else {
-      $lines += "{0,-20} {1,-24} {2,-10} {3,-8} {4}" -f $key, $info.displayName, $info.status, $info.running, ($info.pid ?? '-')
-    }
+  foreach ($row in $Rows) {
+    $pidText = if ($row.pid) { $row.pid } else { '-' }
+    $lines += "{0,-20} {1,-24} {2,-10} {3,-8} {4}" -f $row.id, $row.displayName, $row.status, $row.running, $pidText
   }
   return $lines -join "`n"
 }
@@ -517,44 +695,41 @@ function Show-LogConfig {
 switch ($Action) {
   'list' {
     $resolved = Resolve-ServiceName -Names $ServiceName
-    $results = @{}
+    $rows = @()
     $hasError = $false
-    foreach ($key in $resolved.Keys) {
-      if ($key -like 'ERROR:*') {
+    foreach ($entry in $resolved) {
+      if ($entry.class -eq 'error') {
+        $rows += New-StatusRow -ResolvedRow $entry
         $hasError = $true
         continue
       }
-      if ($SkipSystemScope -and (Test-ServiceIsSystemScope -ResolvedEntry $resolved[$key])) {
-        Write-NucleusWarning "$key — system-scope operation skipped (elevation unavailable)"
+      if ($SkipSystemScope -and (Test-ServiceIsSystemScope -ResolvedEntry $entry)) {
+        Write-NucleusWarning "$($entry.instanceId) — system-scope operation skipped (elevation unavailable)"
         continue
       }
-      $status = Get-ServiceStatus -HostEntry $resolved[$key].hostEntry
-      $status.displayName = $resolved[$key].displayName
-      $results[$key] = $status
+      $rows += New-StatusRow -ResolvedRow $entry
     }
-    Write-Output (Format-StatusTable -Results $results)
+    Write-Output (Format-StatusTable -Rows $rows)
     if ($hasError -and -not $Json) { exit 1 }
   }
 
   'status' {
     $resolved = Resolve-ServiceName -Names $ServiceName
-    $results = @{}
+    $rows = @()
     $hasError = $false
-    foreach ($key in $resolved.Keys) {
-      if ($key -like 'ERROR:*') {
-        Write-NucleusWarning "$($resolved[$key].displayName) — $($resolved[$key].hostEntry.error)"
+    foreach ($entry in $resolved) {
+      if ($entry.class -eq 'error') {
+        Write-NucleusWarning "$($entry.displayName) — $($entry.hostEntry.error)"
         $hasError = $true
         continue
       }
-      if ($SkipSystemScope -and (Test-ServiceIsSystemScope -ResolvedEntry $resolved[$key])) {
-        Write-NucleusWarning "$key — system-scope operation skipped (elevation unavailable)"
+      if ($SkipSystemScope -and (Test-ServiceIsSystemScope -ResolvedEntry $entry)) {
+        Write-NucleusWarning "$($entry.instanceId) — system-scope operation skipped (elevation unavailable)"
         continue
       }
-      $status = Get-ServiceStatus -HostEntry $resolved[$key].hostEntry
-      $status.displayName = $resolved[$key].displayName
-      $results[$key] = $status
+      $rows += New-StatusRow -ResolvedRow $entry
     }
-    Write-Output (Format-StatusTable -Results $results)
+    Write-Output (Format-StatusTable -Rows $rows)
     if ($hasError -and -not $Json) { exit 1 }
   }
 
@@ -565,35 +740,37 @@ switch ($Action) {
     $resolved = Resolve-ServiceName -Names $ServiceName
     $overallExit = 0
 
-    foreach ($key in $resolved.Keys) {
-      if ($key -like 'ERROR:*') {
-        Write-NucleusError "$($resolved[$key].displayName) — service not found in registry"
+    foreach ($entry in $resolved) {
+      if ($entry.class -eq 'error') {
+        Write-NucleusError "$($entry.displayName) — $($entry.hostEntry.error)"
         $overallExit = 1
         continue
       }
 
-      if ($SkipSystemScope -and (Test-ServiceIsSystemScope -ResolvedEntry $resolved[$key])) {
-        Write-NucleusWarning "$key — system-scope operation skipped (elevation unavailable)"
+      if ($entry.class -eq 'pseudo') {
+        $prefix = Get-NucleusInstanceIdPrefix -HostEntry $entry.hostEntry
+        Write-NucleusError "$($entry.registryKey) — no instances found (prefix '$prefix')"
+        $overallExit = 1
         continue
       }
 
-      $plat = $resolved[$key].hostEntry
-      if ($plat.prefixMatch) {
-        Write-NucleusError "$key — prefix-match services require exact name; use list/status first"
-        $overallExit = 1
+      if ($SkipSystemScope -and (Test-ServiceIsSystemScope -ResolvedEntry $entry)) {
+        Write-NucleusWarning "$($entry.instanceId) — system-scope operation skipped (elevation unavailable)"
         continue
       }
 
       try {
-        $result = Invoke-ServiceAction -Action $Action -HostEntry $plat
+        $result = Invoke-ServiceAction -Action $Action -HostEntry $entry.hostEntry
         if ($result -ne $true) {
-          Write-NucleusError "$key — action '$Action' failed"
+          Write-NucleusError "$($entry.instanceId) — action '$Action' failed"
           $overallExit = 1
         } elseif ($Json) {
-          Write-Output (@{ version = 1; $key = @{ success = $true } } | ConvertTo-Json -Compress -Depth 3)
+          $payload = [ordered]@{ version = 1 }
+          $payload[$entry.instanceId] = @{ success = $true }
+          Write-Output ($payload | ConvertTo-Json -Compress -Depth 3)
         }
       } catch {
-        Write-NucleusError "$key — $($_.Exception.Message)"
+        Write-NucleusError "$($entry.instanceId) — $($_.Exception.Message)"
         $overallExit = 1
       }
     }
@@ -603,23 +780,28 @@ switch ($Action) {
   'verify' {
     $resolved = Resolve-ServiceName -Names $ServiceName
     $hasInactive = $false
-    foreach ($key in $resolved.Keys) {
-      if ($key -like 'ERROR:*') {
-        Write-NucleusWarning "$($resolved[$key].displayName) — $($resolved[$key].hostEntry.error)"
+    foreach ($entry in $resolved) {
+      if ($entry.class -eq 'error') {
+        Write-NucleusWarning "$($entry.displayName) — $($entry.hostEntry.error)"
         $hasInactive = $true
         continue
       }
-      if ($SkipSystemScope -and (Test-ServiceIsSystemScope -ResolvedEntry $resolved[$key])) {
-        Write-NucleusWarning "$key — system-scope operation skipped (elevation unavailable)"
+      if ($entry.class -eq 'pseudo') {
+        $prefix = Get-NucleusInstanceIdPrefix -HostEntry $entry.hostEntry
+        Write-NucleusWarning "$($entry.registryKey) — no instances found (prefix '$prefix'); nothing to verify"
         continue
       }
-      $status = Get-ServiceStatus -HostEntry $resolved[$key].hostEntry
+      if ($SkipSystemScope -and (Test-ServiceIsSystemScope -ResolvedEntry $entry)) {
+        Write-NucleusWarning "$($entry.instanceId) — system-scope operation skipped (elevation unavailable)"
+        continue
+      }
+      $status = Get-ServiceStatus -HostEntry $entry.hostEntry
       if ($status.running) {
         $pidStr = if ($status.pid) { " (pid $($status.pid))" } else { '' }
-        Write-NucleusInfo -CommandName 'svc' "verify $key — active$pidStr"
+        Write-NucleusInfo -CommandName 'svc' "verify $($entry.instanceId) — active$pidStr"
       } else {
         $diag = if ($status.status) { " ($($status.status))" } else { '' }
-        Write-NucleusWarning "$key — inactive$diag"
+        Write-NucleusWarning "$($entry.instanceId) — inactive$diag"
         $hasInactive = $true
       }
     }
