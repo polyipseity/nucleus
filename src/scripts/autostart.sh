@@ -197,17 +197,33 @@ macos_remove_app_launchagent() {
   fi
 }
 
-# macos_system_extension_present ID — stdout "true"/"false" via systemextensionsctl.
-# Only network/cmio/endpoint-security extensions appear here. FSKit file-system
-# extensions and TCC-granted helper tools (e.g. fuse-t, Chrome Remote Desktop
-# Host) are NOT visible to systemextensionsctl, so they are reported as absent
-# and handled as manual-approval-only via the entry's approvalInstructions.
-macos_system_extension_present() {
+# macos_fskit_module_registered ID — stdout "true"/"false" via pluginkit.
+# FSKit file-system extensions live in Apple's File System Extension plugin point,
+# which systemextensionsctl does not report.
+# WHY: pluginkit reports registration only — macOS exposes no non-privileged
+# enablement query — so a registered module counts as present and its enablement is
+# reported to the user, never assumed.
+macos_fskit_module_registered() {
   local bundle_id="$1"
-  if command -v systemextensionsctl >/dev/null 2>&1; then
-    systemextensionsctl list 2>/dev/null | grep -q "$bundle_id" && printf 'true' || printf 'false'
+  if command -v pluginkit >/dev/null 2>&1; then
+    pluginkit -m -p com.apple.fskit.fsmodule 2>/dev/null | grep -qF "$bundle_id" && printf 'true' || printf 'false'
   else
     printf 'false'
+  fi
+}
+
+# macos_system_extension_present ID — stdout "true"/"false".
+# Network/cmio/endpoint-security extensions come from systemextensionsctl. FSKit
+# file-system extensions (e.g. fuse-t) are visible only to pluginkit. TCC-granted
+# helper tools (e.g. Chrome Remote Desktop Host) appear in neither and stay
+# manual-approval-only via the entry's approvalInstructions.
+macos_system_extension_present() {
+  local bundle_id="$1"
+  if command -v systemextensionsctl >/dev/null 2>&1 &&
+    systemextensionsctl list 2>/dev/null | grep -q "$bundle_id"; then
+    printf 'true'
+  else
+    macos_fskit_module_registered "$bundle_id"
   fi
 }
 
@@ -407,7 +423,12 @@ app_converge() {
     bundle_id=$(echo "$entry_json" | jq -r '.hostEntry.bundleId // empty')
     approval_instructions=$(echo "$entry_json" | jq -r '.hostEntry.approvalInstructions // empty')
     if [ "$enabled" = "true" ]; then
-      if [ -n "$bundle_id" ] && [ "$(macos_system_extension_present "$bundle_id")" = "true" ]; then
+      if [ -n "$bundle_id" ] && [ "$(macos_fskit_module_registered "$bundle_id")" = "true" ]; then
+        # Registration is all macOS exposes for FSKit modules; the enablement
+        # toggle is manual and unreadable from the shell, so say so instead of
+        # repeating approval instructions that may already be satisfied.
+        say -l "$key" "FSKit module registered — enablement is manual and cannot be verified from the shell."
+      elif [ -n "$bundle_id" ] && [ "$(macos_system_extension_present "$bundle_id")" = "true" ]; then
         say -l "$key" "system extension present (approved)."
       else
         if [ -n "$approval_instructions" ]; then

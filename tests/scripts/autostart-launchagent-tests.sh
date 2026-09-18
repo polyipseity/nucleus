@@ -6,6 +6,10 @@
 # app-owned plist that declares the scalar <key>Program</key> (AltTab) registered,
 # so the app started twice — once from its own agent and once from ours.
 #
+# Also guards FSKit file-system extensions: they are invisible to
+# systemextensionsctl, so they must be resolved through pluginkit and reported as
+# registered rather than as unapproved.
+#
 # Run with: bash tests/scripts/autostart-launchagent-tests.sh
 set -euo pipefail
 
@@ -99,6 +103,30 @@ make_fixture() {
         "justification": "test fixture"
       }
     }
+  },
+  "FSKitApp": {
+    "displayName": "FSKit App",
+    "description": "fixture app whose extension is an FSKit file-system module",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "autostartEnabled": true,
+        "autostartDisableNative": false,
+        "kind": "system-extension",
+        "bundleId": "org.fuset.fskit-srv.module",
+        "approvalInstructions": "fixture approval instructions"
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "type": "omitted",
+        "justification": "test fixture"
+      },
+      "Windows": {
+        "platform": "Windows",
+        "type": "omitted",
+        "justification": "test fixture"
+      }
+    }
   }
 }
 APPSJSON
@@ -146,17 +174,32 @@ PLIST
 PLIST
 }
 
-converge() {
-  local app="$1" out_file="$2" rc=0
+# run_autostart ACTION APP OUT_FILE [FSKIT_REGISTERED] — run one autostart action
+# against the fixture repo with the macOS-only externals stubbed so the run is
+# hermetic. Prints the exit status.
+run_autostart() {
+  local action="$1" app="$2" out_file="$3" fskit_registered="${4:-true}" rc=0
   local _mock_dir
   _mock_dir="$(mktemp -d)"
   # Mock stat/dscl to return empty (no console user override of LAUNCHAGENTS_DIR)
   printf '#!/bin/sh\n' >"$_mock_dir/stat"
-  chmod +x "$_mock_dir/stat"
   printf '#!/bin/sh\n' >"$_mock_dir/dscl"
-  chmod +x "$_mock_dir/dscl"
+  # Mock systemextensionsctl to report no extensions: FSKit modules never appear
+  # there, so the plugin-point fallback is what resolves them.
+  printf '#!/bin/sh\n' >"$_mock_dir/systemextensionsctl"
+  if [ "$fskit_registered" = "true" ]; then
+    cat >"$_mock_dir/pluginkit" <<'PLUGINKIT'
+#!/bin/sh
+case "$*" in
+*com.apple.fskit.fsmodule*) printf '%s\n' '     org.fuset.fskit-srv.module(0.1.3)' ;;
+esac
+PLUGINKIT
+  else
+    printf '#!/bin/sh\n' >"$_mock_dir/pluginkit"
+  fi
+  chmod +x "$_mock_dir/stat" "$_mock_dir/dscl" "$_mock_dir/systemextensionsctl" "$_mock_dir/pluginkit"
   NUCLEUS_REPO_ROOT="$FIXTURE_ROOT" HOME="$FIXTURE_HOME" \
-    PATH="$_mock_dir:$PATH" bash "$AUTOSTART_SH" disable "$app" \
+    PATH="$_mock_dir:$PATH" bash "$AUTOSTART_SH" "$action" "$app" \
     >"$out_file" 2>&1 || rc=$?
   rm -rf "$_mock_dir"
   printf '%s\n' "$rc"
@@ -165,7 +208,7 @@ converge() {
 test_scalar_program_plist_is_removed() {
   local rc=0
   make_fixture
-  rc="$(converge AppOwned "$FIXTURE_ROOT/out.txt")"
+  rc="$(run_autostart disable AppOwned "$FIXTURE_ROOT/out.txt")"
   if [ "$rc" -eq 0 ] && [ ! -f "$FIXTURE_AGENTS/com.example.appowned.plist" ]; then
     assert_pass "an app-owned plist declaring a scalar Program is removed"
   else
@@ -177,7 +220,7 @@ test_scalar_program_plist_is_removed() {
 test_program_arguments_plist_is_removed() {
   local rc=0
   make_fixture
-  rc="$(converge ArrayApp "$FIXTURE_ROOT/out.txt")"
+  rc="$(run_autostart disable ArrayApp "$FIXTURE_ROOT/out.txt")"
   if [ "$rc" -eq 0 ] && [ ! -f "$FIXTURE_AGENTS/com.example.arrayapp.plist" ]; then
     assert_pass "an app-owned plist declaring ProgramArguments is still removed"
   else
@@ -189,11 +232,50 @@ test_program_arguments_plist_is_removed() {
 test_foreign_plist_is_kept() {
   local rc=0
   make_fixture
-  rc="$(converge ForeignApp "$FIXTURE_ROOT/out.txt")"
+  rc="$(run_autostart disable ForeignApp "$FIXTURE_ROOT/out.txt")"
   if [ "$rc" -eq 0 ] && [ -f "$FIXTURE_AGENTS/com.example.foreignapp.plist" ]; then
     assert_pass "a plist whose program points elsewhere is never removed"
   else
     assert_fail "a plist whose program points elsewhere is never removed" "rc=$rc plist present: $([ -f "$FIXTURE_AGENTS/com.example.foreignapp.plist" ] && echo yes || echo no) output=[$(cat "$FIXTURE_ROOT/out.txt")]"
+  fi
+  rm -rf "$FIXTURE_ROOT"
+}
+
+test_fskit_module_is_reported_present() {
+  local rc=0
+  make_fixture
+  rc="$(run_autostart status FSKitApp "$FIXTURE_ROOT/out.txt")"
+  # Match the state column exactly: the literal 'enabled' also occurs in 'disabled'.
+  if [ "$rc" -eq 0 ] && grep -Eq '^FSKitApp[[:space:]]+enabled[[:space:]]' "$FIXTURE_ROOT/out.txt"; then
+    assert_pass "an FSKit module registered with pluginkit is reported enabled"
+  else
+    assert_fail "an FSKit module registered with pluginkit is reported enabled" "rc=$rc output=[$(cat "$FIXTURE_ROOT/out.txt")]"
+  fi
+  rm -rf "$FIXTURE_ROOT"
+}
+
+test_fskit_module_converge_skips_approval_instructions() {
+  local rc=0
+  make_fixture
+  rc="$(run_autostart enable FSKitApp "$FIXTURE_ROOT/out.txt")"
+  if [ "$rc" -eq 0 ] &&
+    grep -q 'FSKit module registered' "$FIXTURE_ROOT/out.txt" &&
+    ! grep -q 'fixture approval instructions' "$FIXTURE_ROOT/out.txt"; then
+    assert_pass "converging a registered FSKit module reports registration instead of approval instructions"
+  else
+    assert_fail "converging a registered FSKit module reports registration instead of approval instructions" "rc=$rc output=[$(cat "$FIXTURE_ROOT/out.txt")]"
+  fi
+  rm -rf "$FIXTURE_ROOT"
+}
+
+test_unregistered_fskit_module_keeps_approval_instructions() {
+  local rc=0
+  make_fixture
+  rc="$(run_autostart enable FSKitApp "$FIXTURE_ROOT/out.txt" false)"
+  if [ "$rc" -eq 0 ] && grep -q 'fixture approval instructions' "$FIXTURE_ROOT/out.txt"; then
+    assert_pass "an unregistered FSKit module still surfaces its approval instructions"
+  else
+    assert_fail "an unregistered FSKit module still surfaces its approval instructions" "rc=$rc output=[$(cat "$FIXTURE_ROOT/out.txt")]"
   fi
   rm -rf "$FIXTURE_ROOT"
 }
@@ -204,9 +286,15 @@ if [ "$(uname -s)" != "Darwin" ]; then
   assert_skip "app-owned LaunchAgent plist removal" "macOS-only convergence path"
   assert_skip "app-owned LaunchAgent ProgramArguments removal" "macOS-only convergence path"
   assert_skip "foreign LaunchAgent plist is preserved" "macOS-only convergence path"
+  assert_skip "FSKit module registration is reported enabled" "macOS-only convergence path"
+  assert_skip "registered FSKit module converge skips approval instructions" "macOS-only convergence path"
+  assert_skip "unregistered FSKit module keeps approval instructions" "macOS-only convergence path"
 else
   test_scalar_program_plist_is_removed
   test_program_arguments_plist_is_removed
   test_foreign_plist_is_kept
+  test_fskit_module_is_reported_present
+  test_fskit_module_converge_skips_approval_instructions
+  test_unregistered_fskit_module_keeps_approval_instructions
 fi
 finish_tests
