@@ -43,7 +43,8 @@ fuse_provider_lib_name() {
 # include/fuse/, the resolved library, and lib/pkgconfig/fuse.pc.  The digest is
 # content-addressed over a sorted "path hash" manifest, so it is independent of
 # directory order, of where the provider root lives, and of the temporary file
-# name used to build the manifest.
+# name used to build the manifest.  The root is canonicalized first, so it is
+# also independent of how the caller spells it (symlinked components included).
 #
 # WHY: record the library under its resolved relative path:
 #   a macFUSE ABI bump (libfuse.2 -> libfuse.3) changes the digest even when the
@@ -58,6 +59,16 @@ fuse_provider_digest() {
     error "macFUSE pkg-config file not found at $_fpd_root/lib/pkgconfig/fuse.pc"
     return 1
   fi
+  # WHY: canonicalize the root before deriving relative manifest names.  The
+  #   library path below comes from realpath, so a root reached through a
+  #   symlinked component (/var -> /private/var, which is how $TMPDIR is spelled
+  #   on macOS) would otherwise survive the prefix strip and leak an absolute
+  #   path into the manifest — making the digest depend on how the caller spelled
+  #   the root, and so rebuild on a spelling change alone.
+  _fpd_root="$(/bin/realpath "$_fpd_root")" || {
+    error "macFUSE provider root is not resolvable: $1"
+    return 1
+  }
   _fpd_lib="$(_fp_resolved_lib "$_fpd_root")" || {
     error "macFUSE library not found at $_fpd_root/lib/libfuse.dylib"
     return 1

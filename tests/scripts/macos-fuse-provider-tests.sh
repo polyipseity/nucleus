@@ -37,15 +37,14 @@ provider_call() {
 # seed_provider_root <parent_dir> — copy the fixture tree to <parent_dir>/provider
 # and print the copy's path, so no case can disturb the checked-in fixtures.
 #
-# The printed path is canonical because the library resolves the provider library
-# with /bin/realpath: an unresolved root spelling (/var vs /private/var on macOS)
-# would leak an absolute library path into the digest manifest, which the
-# root-independence case below would then read as a difference.
+# The printed path is NOT canonicalized: the library has to tolerate any spelling
+# of the provider root, and the symlinked-spelling case below asserts exactly
+# that.
 seed_provider_root() {
   local parent_dir="$1"
   mkdir -p "$parent_dir/provider"
   cp -R "$PROVIDER_FIXTURE/." "$parent_dir/provider/"
-  (CDPATH='' cd -- "$parent_dir/provider" && pwd -P)
+  printf '%s\n' "$parent_dir/provider"
 }
 
 # assert_digest_rejects_missing <test_name> <relative_path> — remove one required
@@ -91,6 +90,28 @@ test_digest_is_stable_and_root_independent() {
   else
     assert_fail "provider digest ignores where the provider root lives" \
       "rc=$rc_other other=[$other] expected=[$first]"
+  fi
+}
+
+# The digest has to be a function of the provider's *content*, not of the path
+# used to reach it: the guard compares it with a value recorded by an earlier
+# activation, so a spelling change alone would otherwise rebuild the binary — and
+# a symlinked /var (as $TMPDIR has on macOS) makes that the common case.
+test_digest_is_independent_of_a_symlinked_root_spelling() {
+  local work root canonical via_link first second rc_canonical=0 rc_link=0
+  work="$(mktemp -d)"
+  root="$(seed_provider_root "$work")"
+  canonical="$(CDPATH='' cd -- "$root" && pwd -P)"
+  ln -sfn "$canonical" "$work/provider-link"
+  via_link="$work/provider-link"
+  first="$(provider_call fuse_provider_digest "$canonical")" || rc_canonical=$?
+  second="$(provider_call fuse_provider_digest "$via_link")" || rc_link=$?
+  rm -rf "$work"
+  if [ "$rc_canonical" -eq 0 ] && [ "$rc_link" -eq 0 ] && [ "$first" = "$second" ]; then
+    assert_pass "provider digest ignores a symlinked provider root spelling"
+  else
+    assert_fail "provider digest ignores a symlinked provider root spelling" \
+      "rc=$rc_canonical/$rc_link canonical=[$first] via-link=[$second]"
   fi
 }
 
@@ -265,6 +286,7 @@ test_record_field_reports_an_absent_line_for_legacy_records
 if [ "$(uname -s)" != "Darwin" ]; then
   assert_skip "provider digest is a sha256 and is stable across calls" "macOS-only /bin/realpath"
   assert_skip "provider digest ignores where the provider root lives" "macOS-only /bin/realpath"
+  assert_skip "provider digest ignores a symlinked provider root spelling" "macOS-only /bin/realpath"
   assert_skip "provider digest changes when a header changes" "macOS-only /bin/realpath"
   assert_skip "provider digest changes when the library symlink is repointed" "macOS-only /bin/realpath"
   assert_skip "provider digest rejects missing fuse headers" "macOS-only /bin/realpath"
@@ -276,6 +298,7 @@ if [ "$(uname -s)" != "Darwin" ]; then
   assert_skip "macfuse_pkg_version receipt contract" "macOS-only /usr/sbin/pkgutil"
 else
   test_digest_is_stable_and_root_independent
+  test_digest_is_independent_of_a_symlinked_root_spelling
   test_digest_changes_when_a_header_changes
   test_digest_changes_when_the_library_symlink_is_repointed
   test_digest_rejects_incomplete_providers
