@@ -44,10 +44,14 @@ in
 
   # Shared cache flush that runs after both Automator workflows and App bundles
   # have been deployed. Each sub-module handles its own deploy and prune
-  # lifecycle; this entry ensures final cache coherency.
+  # lifecycle; this entry ensures final cache coherency, including the forced
+  # pbs rescan that makes renamed or pruned workflows visible without a logout.
   home.activation.macos-flush-services-cache =
     lib.hm.dag.entryAfter [ "macos-deploy-automator-workflows" "macos-deploy-app-bundles" ]
       ''
-        "${activationBundle}/src/scripts/services/refresh-services-menu.sh"
+        "${activationBundle}/src/scripts/services/refresh-services-menu.sh" \
+          "/System/Library/CoreServices/pbs" \
+          "/bin/launchctl" \
+          "/usr/bin/sudo"
       '';
 }

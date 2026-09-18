@@ -20,6 +20,7 @@
 #   wait_for_daemons             — brief sleep for daemon flush settlement
 #   refresh_desktop_services     — composite: Finder+SystemUI (launchctl)
 #   refresh_services_menu        — composite: cfprefsd+pbs+sleep
+#   rescan_pbs_services          — force a full pbs Services rescan (console user)
 
 # register_handler DUTI_BIN BUNDLE_ID UTI [UTI ...]
 # Sets BUNDLE_ID as the default handler for each UTI across all roles.
@@ -214,4 +215,29 @@ refresh_services_menu() {
     /usr/bin/killall Finder 2>/dev/null || true
     ;;
   esac
+}
+
+# rescan_pbs_services PBS_BIN LAUNCHCTL_BIN SUDO_BIN UID USER
+# Force a complete Services rescan and publish the result to running apps.
+#
+# WHY: killing pbs only re-reads its caches. pbs detects changed Services via
+# FSEvents, which never fires for a bundle replaced or renamed in place, so a
+# renamed workflow kept its stale registration and newly provisioned ones
+# stayed invisible until the next login. `pbs -update` rewrites the userdef
+# cache from a complete rescan, and a bare `pbs` run publishes it to every
+# running app (pbs(8): "If run without any options, pbs will scan for changed
+# Services, cache them ... and immediately update the Services menu in all
+# running apps").
+#
+# Runs in the console user's session: pbs keeps per-user caches, so running it
+# as root would refresh root's Services instead of the logged-in user's.
+rescan_pbs_services() {
+  local _rps_pbs_bin _rps_launchctl_bin _rps_sudo_bin _rps_uid _rps_user
+  _rps_pbs_bin="$1"
+  _rps_launchctl_bin="$2"
+  _rps_sudo_bin="$3"
+  _rps_uid="$4"
+  _rps_user="$5"
+  "$_rps_launchctl_bin" asuser "$_rps_uid" "$_rps_sudo_bin" -H -u "$_rps_user" "$_rps_pbs_bin" -update
+  "$_rps_launchctl_bin" asuser "$_rps_uid" "$_rps_sudo_bin" -H -u "$_rps_user" "$_rps_pbs_bin"
 }
