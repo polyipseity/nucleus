@@ -10,7 +10,6 @@
   homebrew-core,
   homebrew-cask,
   cirruslabs-cli,
-  macos-fuse-t-cask,
   smudge-smudge,
   zackelia-formulae,
   ...
@@ -48,15 +47,15 @@ let
     "betterdisplay" # Advanced display management and virtual screens
     "chrome-remote-desktop-host" # Headless remote-desktop receiver
     "coolterm" # Serial terminal
-    "fuse-t" # FSKit-capable FUSE userspace driver for rclone mounts
     "gimp" # Raster image editor; macOS-only cask (nixpkgs gimp is Linux-only)
     "google-chrome@canary" # Chrome dev channel for web testing
     "keka" # Graphical archiver with 7-Zip backend support
     "keyboardcleantool" # Blocks all keyboard and TouchBar input for cleaning
     "linearmouse" # Per-device mouse/trackpad scrolling behavior and sensitivity
     "lulu" # Outbound network firewall
+    "macfuse@dev" # FUSE userspace driver for rclone and ntfs-3g mounts; the 5.4.0 dev channel is the first release built against the macOS 27 FSKit volume-operation APIs
     "middleclick" # Three/four-finger middle-click gesture helper
-    "mounty" # NTFS auto-mounter for fuse-t drives
+    "mounty" # NTFS auto-mounter for ntfs-3g drives
     "orbstack" # Docker/Linux VM runtime (faster than Docker Desktop)
     "parsec" # Low-latency remote gaming / desktop streaming
     "raycast" # Spotlight replacement and launcher
@@ -92,7 +91,6 @@ in
       "homebrew/homebrew-core" = homebrew-core;
       "homebrew/homebrew-cask" = homebrew-cask;
       "cirruslabs/homebrew-cli" = cirruslabs-cli;
-      "macos-fuse-t/homebrew-cask" = macos-fuse-t-cask;
       "smudge/homebrew-smudge" = smudge-smudge;
       "zackelia/homebrew-formulae" = zackelia-formulae;
     };

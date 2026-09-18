@@ -275,22 +275,6 @@
         "type": "github"
       }
     },
-    "macos-fuse-t-cask": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1780488840,
-        "narHash": "sha256-OOnbHdOhWeuxAPI65FKT7x0lqNBseBAyVv3KSMrdroc=",
-        "owner": "macos-fuse-t",
-        "repo": "homebrew-cask",
-        "rev": "940387c1877e390d4cc4e3f5c6f23c82fa32c4b1",
-        "type": "github"
-      },
-      "original": {
-        "owner": "macos-fuse-t",
-        "repo": "homebrew-cask",
-        "type": "github"
-      }
-    },
     "nix-homebrew": {
       "inputs": {
         "brew-src": "brew-src"
@@ -524,7 +508,6 @@
         "homebrew-cask": "homebrew-cask",
         "homebrew-core": "homebrew-core",
         "mac-app-util": "mac-app-util",
-        "macos-fuse-t-cask": "macos-fuse-t-cask",
         "nix-homebrew": "nix-homebrew",
         "nix-vscode-extensions": "nix-vscode-extensions",
         "nixos-generators": "nixos-generators",

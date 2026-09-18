@@ -52,10 +52,6 @@
       url = "github:smudge/homebrew-smudge";
       flake = false;
     };
-    macos-fuse-t-cask = {
-      url = "github:macos-fuse-t/homebrew-cask";
-      flake = false;
-    };
     mac-app-util = {
       url = "github:hraban/mac-app-util";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -87,7 +83,6 @@
       smudge-smudge,
       sops-nix,
       mac-app-util,
-      macos-fuse-t-cask,
       zackelia-formulae,
       ...
     }:
@@ -787,7 +782,6 @@
         homebrew-cask = homebrew-cask;
         cirruslabs-cli = cirruslabs-cli;
         smudge-smudge = smudge-smudge;
-        macos-fuse-t-cask = macos-fuse-t-cask;
         mac-app-util = mac-app-util;
         zackelia-formulae = zackelia-formulae;
         nixos-generators = nixos-generators;
@@ -861,7 +855,6 @@
             homebrew-core
             homebrew-cask
             cirruslabs-cli
-            macos-fuse-t-cask
             smudge-smudge
             zackelia-formulae
             ;
