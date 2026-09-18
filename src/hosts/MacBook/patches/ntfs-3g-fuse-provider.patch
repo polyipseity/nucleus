@@ -1,0 +1,11 @@
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -6,7 +6,7 @@
+ if FUSE_INTERNAL
+ FUSE_CFLAGS = -I$(top_srcdir)/include/fuse-lite
+ FUSE_LIBS   = $(top_builddir)/libfuse-lite/libfuse-lite.la
+ else
+ FUSE_CFLAGS = -I/usr/local/include/fuse -D_FILE_OFFSET_BITS=64
+-FUSE_LIBS   = -lfuse-t
++FUSE_LIBS   = /usr/local/lib/libfuse.dylib
+ endif

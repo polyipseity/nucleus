@@ -59,22 +59,26 @@ let
   cryptoPatchPath = ./patches/ntfs-3g-crypto.patch;
   rootbindirPatchPath = ./patches/ntfs-3g-rootbindir.patch;
   installHookPatchPath = ./patches/ntfs-3g-install-hook.patch;
+  fuseProviderPatchPath = ./patches/ntfs-3g-fuse-provider.patch;
 
   # Build parameters (extracted for fingerprint-based rebuild detection).
-  # macFUSE's fuse.pc declares these exact flags (Cflags:
-  # -I/usr/local/include/fuse -D_FILE_OFFSET_BITS=64; Libs: -L/usr/local/lib
-  # -lfuse -pthread).  The pinned fork's configure.ac has no fuse pkg-config
-  # check, so the provider flags are passed explicitly instead.
+  # macFUSE's fuse.pc declares Cflags: -I/usr/local/include/fuse
+  # -D_FILE_OFFSET_BITS=64.  The pinned fork's configure.ac has no fuse
+  # pkg-config check, so the compile flags are passed explicitly instead.
   cppFlags = "-I/usr/local/include/fuse -D_FILE_OFFSET_BITS=64";
-  # macFUSE is linked only during make/install — not during ./configure, where
-  # -lfuse in LDFLAGS breaks autoconf link probes under nix clang wrappers.
+  # WHY: macFUSE is linked by absolute dylib path from the patched
+  #   src/Makefile.am (fuseProviderPatchPath), never as -lfuse.  macFUSE also
+  #   installs /usr/local/lib/libfuse.la, whose dependency_libs names
+  #   -liconv -licucore; libtool would inherit those into libntfs-3g.la and from
+  #   there onto every ntfsprogs link, and the nixpkgs apple-sdk ships no
+  #   libiconv/libicucore stubs, so those links fail with "library not found".
   # WHY: ENABLE_NFCONV is enabled by default on darwin (configure.ac), so
   #   libntfs-3g/unistr.c calls CoreFoundation APIs
   #   (_CFStringNormalize, _CFRelease, ...) but upstream's Makefile.am never
   #   links the framework.  Add it here so the libntfs-3g.la link resolves.
   #   linkFlags flows only into make LDFLAGS (configure uses empty LDFLAGS=),
   #   so this does not affect autoconf probes.
-  linkFlags = "-L/usr/local/lib -lfuse -pthread -Wl,-rpath,/usr/local/lib -framework CoreFoundation";
+  linkFlags = "-framework CoreFoundation";
   configureFlags = "--with-fuse=external --prefix=/usr/local --disable-crypto --disable-plugins";
   clangBin = "${pkgs.llvmPackages.clang}/bin/clang";
   clangxxBin = "${pkgs.llvmPackages.clang}/bin/clang++";
@@ -102,6 +106,7 @@ let
       cryptoPatchPath
       rootbindirPatchPath
       installHookPatchPath
+      fuseProviderPatchPath
     ]
   );
 in
@@ -120,6 +125,7 @@ in
       "${cryptoPatchPath}" \
       "${rootbindirPatchPath}" \
       "${installHookPatchPath}" \
+      "${fuseProviderPatchPath}" \
       "${sdkRoot}" \
       "${cFlags}" \
       "${cxxFlags}" \

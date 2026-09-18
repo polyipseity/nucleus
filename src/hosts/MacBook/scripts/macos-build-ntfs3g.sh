@@ -3,7 +3,8 @@
 # Build polyipseity/ext.ntfs-3g from source.
 # Arguments: fingerprint buildToolsPath aclocalPath ntfs3gSrc cc cxx cppFlags
 #            linkFlags configureFlags cryptoPatchPath rootbindirPatchPath
-#            installHookPatchPath sdkRoot cFlags cxxFlags sdkDevDir
+#            installHookPatchPath fuseProviderPatchPath sdkRoot cFlags cxxFlags
+#            sdkDevDir
 #
 # CC/CXX/CPPFLAGS/CFLAGS/CXXFLAGS/LDFLAGS are exported here so ./configure and
 # make resolve them from the environment.
@@ -42,10 +43,11 @@ CONFIGURE_FLAGS="${9:?ntfs-3g build: missing configureFlags arg}"
 CRYPTO_PATCH_PATH="${10:?ntfs-3g build: missing cryptoPatchPath arg}"
 ROOTBINDIR_PATCH_PATH="${11:?ntfs-3g build: missing rootbindirPatchPath arg}"
 INSTALL_HOOK_PATCH_PATH="${12:?ntfs-3g build: missing installHookPatchPath arg}"
-SDK_ROOT="${13:?ntfs-3g build: missing sdkRoot arg}"
-C_FLAGS="${14:?ntfs-3g build: missing cFlags arg}"
-CXX_FLAGS="${15:?ntfs-3g build: missing cxxFlags arg}"
-SDK_DEV_DIR="${16:?ntfs-3g build: missing sdkDevDir arg}"
+FUSE_PROVIDER_PATCH_PATH="${13:?ntfs-3g build: missing fuseProviderPatchPath arg}"
+SDK_ROOT="${14:?ntfs-3g build: missing sdkRoot arg}"
+C_FLAGS="${15:?ntfs-3g build: missing cFlags arg}"
+CXX_FLAGS="${16:?ntfs-3g build: missing cxxFlags arg}"
+SDK_DEV_DIR="${17:?ntfs-3g build: missing sdkDevDir arg}"
 
 export CC CXX CPPFLAGS CFLAGS="$C_FLAGS" CXXFLAGS="$CXX_FLAGS"
 export SDKROOT="$SDK_ROOT"
@@ -86,11 +88,15 @@ if ! [ -x /usr/local/bin/ntfs-3g ] ||
     # and PKG_CHECK_MODULES(GNUTLS macros undefined without library deps),
     # fix rootbindir/rootlibdir defaults from /bin:/lib to /usr/local/*
     # (SIP), and fix install-exec-hook to handle missing .so/.dylib files
-    # on Darwin.
+    # on Darwin.  Patch src/Makefile.am to name the macFUSE dylib instead of
+    # fuse-t, by absolute path so libtool never reads macFUSE's libfuse.la and
+    # never inherits its -liconv/-licucore dependency_libs (the nixpkgs
+    # apple-sdk has no stubs for either).
     printf '[%s] ntfs-3g: patching...\n' "$(date '+%Y-%m-%d %H:%M:%S')"
     patch -p1 <"$CRYPTO_PATCH_PATH"
     patch -p1 <"$ROOTBINDIR_PATCH_PATH"
     patch -p1 <"$INSTALL_HOOK_PATCH_PATH"
+    patch -p1 <"$FUSE_PROVIDER_PATCH_PATH"
 
     printf '[%s] ntfs-3g: running autotools...\n' "$(date '+%Y-%m-%d %H:%M:%S')"
     libtoolize --copy --force
@@ -110,8 +116,8 @@ if ! [ -x /usr/local/bin/ntfs-3g ] ||
     # WHY: pass LDFLAGS on the make command line, not only via export.
     #   ./configure writes "LDFLAGS =" (empty) into every Makefile, and a
     #   Makefile-defined LDFLAGS overrides the environment variable of the same
-    #   name.  Without the command-line form the link step loses -L/usr/local/lib
-    #   and fails with "library not found for -lfuse".
+    #   name.  Without the command-line form the libntfs-3g link loses
+    #   -framework CoreFoundation and fails on the nfconv CoreFoundation calls.
     make -j"$(sysctl -n hw.ncpu)" LDFLAGS="$LINK_FLAGS"
     printf '[%s] ntfs-3g: installing...\n' "$(date '+%Y-%m-%d %H:%M:%S')"
     make install LDFLAGS="$LINK_FLAGS"
