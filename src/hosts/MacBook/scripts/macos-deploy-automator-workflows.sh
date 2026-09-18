@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 # Deploy macOS Automator workflow bundles.
-# Consumes jq binary, workflow JSON array, and setIcon binary path at activation time.
+# Consumes jq binary, workflow JSON array, setIcon binary, defaults binary, and
+# mdimport binary paths at activation time. The macOS system binaries arrive as
+# arguments rather than hardcoded paths so the whole deploy script can be run
+# end-to-end against stub binaries in tests.
 set -eu
 
 _vsd_jq_bin="$1"
 _vsd_current_workflows_json="$2"
 _vsd_set_icon_bin="$3"
+_vsd_defaults_bin="$4"
+_vsd_mdimport_bin="$5"
 _vsd_services_dir="$HOME/Library/Services"
 
 # Phase 1: Copy workflows, register icons, and build the NSServicesStatus plist XML.
@@ -41,7 +46,7 @@ automator_prune_stale_workflows() {
 _vsd_desired_dirs_file="$(mktemp)"
 trap 'rm -f "$_vsd_desired_dirs_file"' EXIT
 printf '%s\n' "$_vsd_current_workflows_json" | "$_vsd_jq_bin" -r '.[].dir' >"$_vsd_desired_dirs_file"
-automator_prune_stale_workflows "$_vsd_services_dir" "$_vsd_desired_dirs_file" /usr/bin/defaults
+automator_prune_stale_workflows "$_vsd_services_dir" "$_vsd_desired_dirs_file" "$_vsd_defaults_bin"
 
 while IFS= read -r _vsd_entry; do
   [ -z "$_vsd_entry" ] && continue
@@ -58,7 +63,7 @@ while IFS= read -r _vsd_entry; do
 
   # Register Thumbnail.png with IconServices so Finder shows the custom SF Symbol icon.
   "$_vsd_set_icon_bin" "$_vsd_wf_dir/Contents/QuickLook/Thumbnail.png" "$_vsd_wf_dir"
-  /usr/bin/mdimport "$_vsd_wf_dir"
+  "$_vsd_mdimport_bin" "$_vsd_wf_dir"
 
   # Accumulate this workflow's enablement entry into the full NSServicesStatus dict.
   # The key is XML-escaped (spaces/parens are safe in XML text content, but < > & must
@@ -68,4 +73,4 @@ done < <(printf '%s\n' "$_vsd_current_workflows_json" | "$_vsd_jq_bin" -r -c '.[
 
 # Phase 2: Write the complete NSServicesStatus dictionary in one shot.
 # CFBundleIdentifier is set in each workflow's Info.plist.
-/usr/bin/defaults write pbs NSServicesStatus "<dict>${_vsd_nss_dict}</dict>"
+"$_vsd_defaults_bin" write pbs NSServicesStatus "<dict>${_vsd_nss_dict}</dict>"

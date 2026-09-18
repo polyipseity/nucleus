@@ -241,6 +241,8 @@ in
           }) currentNucleusWorkflows
         )
       }' \
-      "${setWorkflowIcon}"
+      "${setWorkflowIcon}" \
+      "/usr/bin/defaults" \
+      "/usr/bin/mdimport"
   '';
 }
