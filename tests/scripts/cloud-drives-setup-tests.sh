@@ -23,7 +23,14 @@ run_setup() { # <home> <mounts_json> <replicas_json>
   HOME="$1" bash "$CD_SETUP_SH" "$JQ_BIN" "$2" "$3"
 }
 
+# Same invocation with the progress output discarded, so the caller can capture
+# the error line with `2>&1`.
+run_setup_stderr() { # <home> <mounts_json> <replicas_json>
+  HOME="$1" bash "$CD_SETUP_SH" "$JQ_BIN" "$2" "$3" 1>/dev/null
+}
+
 _mounts_macos='[{"localPath":"clouds/GoogleDrive","mountPoint":"/Volumes/nucleus-cloud-GoogleDrive"}]'
+_mounts_macos_labeled='[{"localPath":"clouds/GoogleDrive","mountPoint":"/Volumes/nucleus-cloud-GoogleDrive","serviceLabel":"local.cloud-mount.GoogleDrive"}]'
 _replicas_none='[]'
 
 section "1" "macOS mount paths"
@@ -103,6 +110,44 @@ test_macos_mount_path_rejects_nonempty_directory() {
   rm -rf "$home"
 }
 
+test_macos_mount_path_error_names_the_mount_agent() {
+  local home rc=0 err="" remedy_ok=false
+  local expected_remedy="launchctl bootout \"gui/\$(id -u)/local.cloud-mount.GoogleDrive\""
+  home="$(mktemp -d)"
+  mkdir -p "$home/clouds/GoogleDrive"
+  printf 'user data\n' >"$home/clouds/GoogleDrive/keep.txt"
+  err="$(run_setup_stderr "$home" "$_mounts_macos_labeled" "$_replicas_none" 2>&1)" || rc=$?
+  case "$err" in
+  *"$expected_remedy"*) remedy_ok=true ;;
+  esac
+  if [ "$rc" -ne 0 ] && [ -f "$home/clouds/GoogleDrive/keep.txt" ] && [ "$remedy_ok" = true ]; then
+    assert_pass "a blocked mount path names the LaunchAgent that can release it"
+  else
+    assert_fail "cloud-drives-macos-mount-remedy" "rc=$rc remedy=$remedy_ok stderr=[$err]"
+  fi
+  rm -rf "$home"
+}
+
+test_macos_mount_path_error_without_a_label_stays_generic() {
+  local home rc=0 err="" generic_ok=false remedy_absent=false
+  home="$(mktemp -d)"
+  mkdir -p "$home/clouds/GoogleDrive"
+  printf 'user data\n' >"$home/clouds/GoogleDrive/keep.txt"
+  err="$(run_setup_stderr "$home" "$_mounts_macos" "$_replicas_none" 2>&1)" || rc=$?
+  case "$err" in *'fix manually and re-apply'*) generic_ok=true ;; esac
+  case "$err" in
+  *launchctl*) remedy_absent=false ;;
+  *) remedy_absent=true ;;
+  esac
+  if [ "$rc" -ne 0 ] && [ "$generic_ok" = true ] && [ "$remedy_absent" = true ]; then
+    assert_pass "a blocked mount path without an agent label keeps the generic message"
+  else
+    assert_fail "cloud-drives-macos-mount-no-label" \
+      "rc=$rc generic=$generic_ok remedy_absent=$remedy_absent stderr=[$err]"
+  fi
+  rm -rf "$home"
+}
+
 section "2" "non-macOS mount paths"
 
 test_local_mount_path_is_real_directory() {
@@ -171,6 +216,8 @@ test_macos_mount_path_is_idempotent
 test_macos_mount_path_repairs_foreign_symlink
 test_macos_mount_path_replaces_empty_directory
 test_macos_mount_path_rejects_nonempty_directory
+test_macos_mount_path_error_names_the_mount_agent
+test_macos_mount_path_error_without_a_label_stays_generic
 test_local_mount_path_is_real_directory
 test_local_mount_path_rejects_symlink
 test_replica_directory_is_a_real_directory

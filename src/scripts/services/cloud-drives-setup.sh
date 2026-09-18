@@ -23,11 +23,14 @@ _cd_ensure_real_directory() {
 # Ensure PATH is a symlink to TARGET, converging stale state at this config-owned
 # path: a symlink carries no data, so a wrong target is relinked, and the mount
 # path may legitimately be a leftover empty directory from an earlier layout.
-# Usage: _cd_ensure_symlink "$HOME/clouds/gdrive" "/Volumes/nucleus-cloud-gdrive" "gdrive"
+# Usage: _cd_ensure_symlink "$HOME/clouds/gdrive" "/Volumes/nucleus-cloud-gdrive" "gdrive" "local.cloud-mount.gdrive"
+# SERVICE_LABEL is the macOS LaunchAgent that owns the mount at this path; it is
+# named in the remedy when the path is occupied, and may be empty.
 _cd_ensure_symlink() {
   _cd_link="$1"
   _cd_target="$2"
   _cd_name="$3"
+  _cd_service_label="$4"
 
   if [ -L "$_cd_link" ]; then
     if [ "$(readlink "$_cd_link")" = "$_cd_target" ]; then
@@ -40,7 +43,14 @@ _cd_ensure_symlink() {
   fi
   if [ -e "$_cd_link" ]; then
     if [ ! -d "$_cd_link" ] || [ -n "$(ls -A "$_cd_link")" ]; then
-      printf '%s\n' "cloud-drives (${_cd_name}): error: $_cd_link exists and is neither empty nor a symlink to $_cd_target; fix manually and re-apply" >&2
+      _cd_remedy="fix manually and re-apply"
+      if [ -n "$_cd_service_label" ]; then
+        # WHY: this is what a mount left attached by the previous layout looks
+        #   like from here, and "fix manually" alone gave no clue what to do.
+        #   The literal $(id -u) is for the operator to paste, not to expand.
+        _cd_remedy="if a cloud drive mount is still attached there, unload its agent with launchctl bootout \"gui/\$(id -u)/$_cd_service_label\", or move the data aside; then re-apply"
+      fi
+      printf '%s\n' "cloud-drives (${_cd_name}): error: $_cd_link exists and is neither empty nor a symlink to $_cd_target; $_cd_remedy" >&2
       exit 1
     fi
     # WHY: rmdir rather than rm -rf — it refuses a mount point that is still
@@ -70,10 +80,11 @@ while IFS= read -r _vsd_entry; do
   [ -z "$_vsd_entry" ] && continue
   _vsd_local_path="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.localPath')"
   _vsd_mount_point="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.mountPoint')"
+  _vsd_service_label="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.serviceLabel // empty')"
   if [ "$_vsd_mount_point" = "$HOME/$_vsd_local_path" ]; then
     _cd_ensure_real_directory "$HOME/$_vsd_local_path" "$_vsd_local_path"
   else
-    _cd_ensure_symlink "$HOME/$_vsd_local_path" "$_vsd_mount_point" "$_vsd_local_path"
+    _cd_ensure_symlink "$HOME/$_vsd_local_path" "$_vsd_mount_point" "$_vsd_local_path" "$_vsd_service_label"
   fi
 done < <(printf '%s\n' "$_vsd_mounts_json" | "$_vsd_jq_bin" -r -c '.[]')
 

@@ -174,6 +174,10 @@ let
     else
       "${currentUserHome}/${mount.localPath}";
 
+  # LaunchAgent label for a mount.  Shared by the agent definition and by the
+  # convergence script, which names it in the remedy for a blocked mount path.
+  mountLabel = mount: "local.cloud-mount.${mount.id}";
+
   # Build a rclone mount wrapper script for macOS LaunchAgents.
   # Uses the full Nix store path to rclone so the agent is not PATH-dependent.
   mkRcloneMountScript =
@@ -361,6 +365,7 @@ in
                     map (m: {
                       inherit (m) localPath;
                       mountPoint = mkMountPoint m;
+                      serviceLabel = mountLabel m;
                     }) enabledMounts
                   )
                 }' \
@@ -396,7 +401,7 @@ in
               domain = "gui";
               enable = true;
               config = {
-                Label = "local.cloud-mount.${mount.id}";
+                Label = mountLabel mount;
                 ProgramArguments = [ "${mkRcloneMountScript mount}/bin/nucleus-cloud-mount-${mount.id}" ];
                 RunAtLoad = true;
                 # Keep the mount alive; if the remote is not yet configured the
