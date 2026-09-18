@@ -179,6 +179,10 @@ BeforeAll {
   # src/scripts/lib/svc-instances.sh on POSIX.
   . (Join-Path $PSScriptRoot '../../../../src/platforms/Windows/modules/Get-NucleusServiceInstance.ps1')
 
+  # The module must be loaded before it can be mocked. An empty default keeps
+  # unrelated tests order-independent (per-context Mocks replace it).
+  Mock Get-NucleusConfiguredInstanceList { return @() }
+
   # Dot-source the function definitions.
   . ([scriptblock]::Create($functionCode))
 }
@@ -395,6 +399,17 @@ Describe 'New-StatusRow' {
     $row.status | Should -Be 'n/a'
     $row.running | Should -Be '-'
     $row.pid | Should -Be '-'
+    Should -Invoke Get-ServiceStatus -Exactly 0
+  }
+
+  It 'reports configured rows as not-loaded without probing' {
+    Mock Get-ServiceStatus { throw 'Get-ServiceStatus must not be called' }
+
+    $row = New-StatusRow -ResolvedRow @{ registryKey = 'cloud-drive'; displayName = 'Cloud Drive Mounts (work)'; hostEntry = @{ prefixMatch = $true; taskPath = '\NucleusCloudMount\NucleusCloudMount-work'; configured = $true }; instanceId = '\NucleusCloudMount\NucleusCloudMount-work'; class = 'configured' }
+    $row.status | Should -Be 'not-loaded'
+    $row.running | Should -Be '-'
+    $row.pid | Should -Be '-'
+    $row.configured | Should -Be $true
     Should -Invoke Get-ServiceStatus -Exactly 0
   }
 
@@ -814,6 +829,57 @@ Describe 'Dispatch' {
       Invoke-Dispatch -Action verify -ServiceName @('cloud-drive')
 
       Should -Invoke Write-NucleusWarning -Exactly 1 -ParameterFilter { $Message -match 'no instances found' }
+    }
+  }
+
+  Context 'configured rows' {
+    It 'fails when the name is an id that is declared but not loaded' {
+      Mock Resolve-ServiceName {
+        return @(New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (work)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' -Class 'configured' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work'; configured = $true })
+      }
+      Mock Invoke-ServiceAction { return $true }
+      Mock Write-Error { throw "Write-Error: $Message" }
+
+      { Invoke-Dispatch -Action restart -ServiceName @('\NucleusCloudMount\NucleusCloudMount-work') } |
+        Should -Throw 'Write-Error: svc: error: \NucleusCloudMount\NucleusCloudMount-work — configured but not loaded*'
+      Should -Invoke Invoke-ServiceAction -Exactly 0
+    }
+
+    It 'warns instead of failing when the registry key covers a declared but unloaded instance' {
+      Mock Resolve-ServiceName {
+        return @(
+          New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (a)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-a' -Class 'live' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-a' }
+          New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (work)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' -Class 'configured' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work'; configured = $true }
+        )
+      }
+      Mock Invoke-ServiceAction { return $true }
+      Mock Write-NucleusWarning { }
+
+      Invoke-Dispatch -Action restart -ServiceName @('cloud-drive')
+
+      Should -Invoke Invoke-ServiceAction -Exactly 1 -ParameterFilter { $HostEntry.taskPath -eq '\NucleusCloudMount\NucleusCloudMount-a' }
+      Should -Invoke Write-NucleusWarning -Exactly 1 -ParameterFilter { $Message -match 'configured but not loaded' }
+    }
+
+    It 'fails verify while a declared instance is not loaded' {
+      Mock Resolve-ServiceName {
+        return @(New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (work)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' -Class 'configured' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work'; configured = $true })
+      }
+      Mock Write-NucleusWarning { }
+
+      { Invoke-Dispatch -Action verify -ServiceName @('cloud-drive') } | Should -Throw
+      Should -Invoke Write-NucleusWarning -Exactly 1 -ParameterFilter { $Message -match 'configured but not loaded' }
+    }
+
+    It 'hints that no logs exist because the instance is not loaded' {
+      Mock Resolve-ServiceName {
+        return @(New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (work)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' -Class 'configured' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work'; configured = $true })
+      }
+      Mock Show-ServiceLog { }
+
+      Invoke-Dispatch -Action logs -ServiceName @('\NucleusCloudMount\NucleusCloudMount-work')
+
+      Should -Invoke Show-ServiceLog -Exactly 1 -ParameterFilter { $Configured -eq $true }
     }
   }
 

@@ -184,3 +184,31 @@ Describe 'Get-NucleusConfiguredInstanceList' {
     { Get-NucleusConfiguredInstanceList -HostEntry $entry -RepoRoot $Script:FixtureRepoRoot } | Should -Throw '*unsupported type*'
   }
 }
+
+Describe 'Get-NucleusConfiguredInstanceList filtering' {
+  BeforeAll {
+    # A mount is expected to run only when it is enabled and names a remote; both facts
+    # come from the merged registry, so the fixture exercises each filter branch.
+    $Script:FilterRepoRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("configured-instances-{0}" -f [guid]::NewGuid().ToString('N'))
+    $usersRoot = Join-Path $Script:FilterRepoRoot 'src/users'
+    $defaultRoot = Join-Path $usersRoot 'default'
+    $userRoot = Join-Path $usersRoot 'test-user'
+    $null = New-Item -Path $defaultRoot -ItemType Directory -Force
+    $null = New-Item -Path $userRoot -ItemType Directory -Force
+    $profileJson = '{"homeDirectory":{"MacBook":"/Users/test-user","NixOS":"/home/test-user","Windows":"C:\\Users\\test-user"},"isPrimary":true}'
+    Set-Content -Path (Join-Path $defaultRoot 'profile.json') -Value $profileJson
+    Set-Content -Path (Join-Path $userRoot 'profile.json') -Value $profileJson
+    $mounts = '{"mounts":[{"id":"Enabled","enable":true,"remoteName":"Enabled"},{"id":"Disabled","enable":false,"remoteName":"Disabled"},{"id":"NoRemote","enable":true},{"id":"NullRemote","enable":true,"remoteName":null}]}'
+    Set-Content -Path (Join-Path $defaultRoot 'cloud-drives.json') -Value $mounts
+  }
+
+  AfterAll {
+    if (Test-Path -Path $Script:FilterRepoRoot) { Remove-Item -Path $Script:FilterRepoRoot -Recurse -Force }
+  }
+
+  It 'returns only the enabled mounts that name a remote' {
+    $configured = @(Get-NucleusConfiguredInstanceList -HostEntry $Script:MountEntry -RepoRoot $Script:FilterRepoRoot -Username 'test-user')
+
+    $configured | Should -Be @('\NucleusCloudMount\NucleusCloudMount-Enabled')
+  }
+}

@@ -17,6 +17,10 @@
   id. A prefix-match key with no live instance is reported as n/a, and acting on it fails
   with "no instances found".
 
+  An instance the user registry declares but Windows does not run is listed as not-loaded:
+  acting on that exact id fails with a remedy, while acting on the registry key warns and
+  keeps the exit status of the instances that did run. Nothing is loaded automatically.
+
 .PARAMETER Action
   The operation to perform: list, status, start, stop, restart, enable, disable,
   endpoint, logs, log-paths, log-config.
@@ -196,7 +200,7 @@ function New-ResolvedRow {
     [string]$DisplayName,
     [hashtable]$HostEntry,
     [string]$InstanceId,
-    [ValidateSet('live', 'pseudo', 'error')]
+    [ValidateSet('live', 'pseudo', 'configured', 'error')]
     [string]$Class
   )
 
@@ -216,8 +220,9 @@ function Resolve-RegistryEntry {
 
   .DESCRIPTION
     An ordinary entry yields one live row. A prefix-match entry yields one live row per
-    live instance, or a single pseudo row when it has none — the pseudo row keeps the
-    registry host entry unchanged so scope filtering still works, and nothing is probed.
+    live instance plus one configured row per instance the user registry declares but
+    Windows does not run; when it has neither, a single pseudo row keeps the registry host
+    entry unchanged so scope filtering still works, and nothing is probed.
 
   .PARAMETER Key
     Registry key.
@@ -247,17 +252,29 @@ function Resolve-RegistryEntry {
   }
 
   $instances = @(Get-NucleusPrefixInstanceList -HostEntry $hostEntry)
-  if ($instances.Count -eq 0) {
+  $configured = @(Get-NucleusConfiguredInstanceList -HostEntry $hostEntry -Username $env:USERNAME | Where-Object { $instances -notcontains $_ })
+  if ($instances.Count -eq 0 -and $configured.Count -eq 0) {
     $rowParameters.Class = 'pseudo'
     return @(New-ResolvedRow @rowParameters)
   }
 
-  return @($instances | ForEach-Object {
+  $liveRows = @($instances | ForEach-Object {
       $rowParameters.InstanceId = $_
       $rowParameters.DisplayName = "$($Entry.displayName) ($(Get-NucleusInstanceSuffix -HostEntry $hostEntry -InstanceId $_))"
       $rowParameters.HostEntry = New-NucleusInstanceHostEntry -HostEntry $hostEntry -InstanceId $_
       New-ResolvedRow @rowParameters
     })
+
+  $configuredRows = @($configured | ForEach-Object {
+      $rowParameters.InstanceId = $_
+      $rowParameters.DisplayName = "$($Entry.displayName) ($(Get-NucleusInstanceSuffix -HostEntry $hostEntry -InstanceId $_))"
+      $rowParameters.HostEntry = New-NucleusInstanceHostEntry -HostEntry $hostEntry -InstanceId $_
+      $rowParameters.HostEntry.configured = $true
+      $rowParameters.Class = 'configured'
+      New-ResolvedRow @rowParameters
+    })
+
+  return @($liveRows + $configuredRows)
 }
 
 function Resolve-InstanceId {
@@ -267,9 +284,10 @@ function Resolve-InstanceId {
 
   .DESCRIPTION
     list and status print concrete instance ids, so those ids must be accepted as
-    arguments. Membership is checked against live enumeration: an id that matches a
-    prefix-match entry's prefix but is not live yields an error row naming the prefix,
-    and a name matching no prefix yields nothing so the caller reports it as unknown.
+    arguments. Membership is checked against live enumeration first and the declared
+    (configured) instances second: an id that matches a prefix-match entry's prefix but is
+    neither live nor declared yields an error row naming the prefix, and a name matching no
+    prefix yields nothing so the caller reports it as unknown.
 
   .PARAMETER Name
     Requested name.
@@ -289,14 +307,22 @@ function Resolve-InstanceId {
     if (-not $Name.StartsWith($prefix, [System.StringComparison]::Ordinal)) { continue }
 
     $instances = @(Get-NucleusPrefixInstanceList -HostEntry $hostEntry)
-    if ($instances -notcontains $Name) {
-      $errorEntry = @{ error = "no such instance (prefix '$prefix'); run 'nucleus-svc list'" }
-      return New-ResolvedRow -RegistryKey "ERROR:$Name" -DisplayName $Name -HostEntry $errorEntry -InstanceId $Name -Class 'error'
+    $isLive = $instances -contains $Name
+    if (-not $isLive) {
+      $configured = @(Get-NucleusConfiguredInstanceList -HostEntry $hostEntry -Username $env:USERNAME)
+      if ($configured -notcontains $Name) {
+        $errorEntry = @{ error = "no such instance (prefix '$prefix'); run 'nucleus-svc list'" }
+        return New-ResolvedRow -RegistryKey "ERROR:$Name" -DisplayName $Name -HostEntry $errorEntry -InstanceId $Name -Class 'error'
+      }
     }
 
     $displayName = "$($Registry[$key].displayName) ($(Get-NucleusInstanceSuffix -HostEntry $hostEntry -InstanceId $Name))"
     $instanceEntry = New-NucleusInstanceHostEntry -HostEntry $hostEntry -InstanceId $Name
-    return New-ResolvedRow -RegistryKey $key -DisplayName $displayName -HostEntry $instanceEntry -InstanceId $Name -Class 'live'
+    if ($isLive) {
+      return New-ResolvedRow -RegistryKey $key -DisplayName $displayName -HostEntry $instanceEntry -InstanceId $Name -Class 'live'
+    }
+    $instanceEntry.configured = $true
+    return New-ResolvedRow -RegistryKey $key -DisplayName $displayName -HostEntry $instanceEntry -InstanceId $Name -Class 'configured'
   }
 
   return $null
@@ -375,9 +401,9 @@ function New-StatusRow {
     Builds one status-table row from a resolution row.
 
   .DESCRIPTION
-    Live rows are probed through Get-ServiceStatus. Pseudo and error rows have no runtime
-    identity, so they are reported as n/a and never probed — a probe would report a false
-    inactive status.
+    Live rows are probed through Get-ServiceStatus. Configured rows are declared but not
+    running, so they report not-loaded without a probe; pseudo and error rows have no
+    runtime identity and report n/a, since a probe would report a false inactive status.
 
   .PARAMETER ResolvedRow
     Resolution row from Resolve-ServiceName.
@@ -392,14 +418,16 @@ function New-StatusRow {
   )
 
   if ($ResolvedRow.class -ne 'live') {
-    return @{
+    $row = @{
       class       = $ResolvedRow.class
       id          = $ResolvedRow.instanceId
       displayName = $ResolvedRow.displayName
-      status      = 'n/a'
+      status      = if ($ResolvedRow.class -eq 'configured') { 'not-loaded' } else { 'n/a' }
       running     = '-'
       pid         = '-'
     }
+    if ($ResolvedRow.class -eq 'configured') { $row.configured = $true }
+    return $row
   }
 
   $status = Get-ServiceStatus -HostEntry $ResolvedRow.hostEntry
@@ -717,12 +745,14 @@ function Show-EventLog {
 }
 
 function Show-ServiceLog {
-  param([string]$ServiceKey, [int]$Lines = 10, [switch]$Raw, [string]$InstanceId)
+  param([string]$ServiceKey, [int]$Lines = 10, [switch]$Raw, [string]$InstanceId, [switch]$Configured)
   if (Show-EventLog -ServiceKey $ServiceKey -Lines $Lines -Raw:$Raw) { return }
   $capture = Get-CaptureMode -ServiceKey $ServiceKey
   if ($capture -ne 'none') {
     if (-not (Show-FileLog -ServiceKey $ServiceKey -Lines $Lines -Raw:$Raw -InstanceId $InstanceId)) {
-      Write-NucleusWarning "$ServiceKey — no log files found"
+      # WHY: a declared-but-unloaded instance explains why the usual log location is empty.
+      $hint = if ($Configured) { ' (configured but not loaded)' } else { '' }
+      Write-NucleusWarning "$ServiceKey — no log files found$hint"
     }
   } else {
     Write-NucleusWarning "$ServiceKey — capture disabled"
@@ -844,6 +874,18 @@ switch ($Action) {
         continue
       }
 
+      if ($entry.class -eq 'configured') {
+        # A named not-loaded id is a failed request; the registry key is an aggregate, so
+        # warning keeps the exit status of the instances that did run.
+        if ($ServiceName -contains $entry.instanceId) {
+          Write-NucleusError "$($entry.instanceId) — configured but not loaded (run 'nucleus-apply', or start it with the service manager)"
+          $overallExit = 1
+        } else {
+          Write-NucleusWarning "$($entry.instanceId) — configured but not loaded"
+        }
+        continue
+      }
+
       if ($SkipSystemScope -and (Test-ServiceIsSystemScope -ResolvedEntry $entry)) {
         Write-NucleusWarning "$($entry.instanceId) — system-scope operation skipped (elevation unavailable)"
         continue
@@ -879,6 +921,11 @@ switch ($Action) {
       if ($entry.class -eq 'pseudo') {
         $prefix = Get-NucleusInstanceIdPrefix -HostEntry $entry.hostEntry
         Write-NucleusWarning "$($entry.registryKey) — no instances found (prefix '$prefix'); nothing to verify"
+        continue
+      }
+      if ($entry.class -eq 'configured') {
+        Write-NucleusWarning "$($entry.instanceId) — configured but not loaded (run 'nucleus-apply', or start it with the service manager)"
+        $hasInactive = $true
         continue
       }
       if ($SkipSystemScope -and (Test-ServiceIsSystemScope -ResolvedEntry $entry)) {
@@ -986,7 +1033,7 @@ switch ($Action) {
         Write-NucleusWarning "$($row.registryKey) — no instances found (prefix '$prefix')"
         continue
       }
-      Show-ServiceLog -ServiceKey $row.registryKey -Lines $logLines -Raw:$logRaw -InstanceId (Get-InstanceArgument -Row $row)
+      Show-ServiceLog -ServiceKey $row.registryKey -Lines $logLines -Raw:$logRaw -InstanceId (Get-InstanceArgument -Row $row) -Configured:($row.class -eq 'configured')
     }
     if ($hasError) { exit 1 }
   }

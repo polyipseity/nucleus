@@ -294,8 +294,10 @@ function Get-NucleusConfiguredInstanceList {
       # the Nix-side submodule default that decides which mounts are instantiated.
       $enabled = if ($mount.ContainsKey('enable')) { [bool]$mount.enable } else { $true }
       if (-not $enabled) { continue }
+      # WHY: the predicate mirrors the POSIX/Nix declared-mount filter (enable is true and
+      # remoteName is not null), so both hosts report the same set of expected instances.
       if (-not $mount.ContainsKey('remoteName')) { continue }
-      if ([string]::IsNullOrWhiteSpace([string]$mount.remoteName)) { continue }
+      if ($null -eq $mount.remoteName) { continue }
       $ids += Get-NucleusInstanceId -TaskFolder ([string]$HostEntry.taskPath) -TaskName "$([string]$HostEntry.service)$([string]$mount.id)"
     }
   }
