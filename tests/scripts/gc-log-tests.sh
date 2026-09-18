@@ -11,12 +11,6 @@ LIB_SH="$SCRIPT_DIR/../../src/scripts/lib/lib.sh"
 EXPIRE_SH="$SCRIPT_DIR/../../src/scripts/lib/expire-profile-generations.sh"
 GC_SH="$SCRIPT_DIR/../../scripts/gc.sh"
 
-# Extract a top-level function definition (opening `name() {` through the
-# column-0 closing `}`) from a script without executing the script body.
-_extract_func() {
-  awk -v name="$1" '$0 == name "() {" { p = 1 } p { print } p && $0 == "}" { p = 0; exit }' "$2"
-}
-
 # ---- Test A: sudo -H is passed for profile expiry ----
 
 test_sudo_h_passed_when_sudo_true() {
@@ -100,7 +94,7 @@ EOF
   export MOCK_RECORD="$work/record.txt"
   : >"$MOCK_RECORD"
 
-  gc_func="$(_extract_func gc_logs "$GC_SH")"
+  gc_func="$(extract_func gc_logs "$GC_SH")"
 
   PATH="$mock_dir:$PATH" REPO_ROOT="$SCRIPT_DIR/../.." bash -c '
     . "$1"
@@ -140,7 +134,7 @@ EOF
   export MOCK_RECORD="$work/record.txt"
   : >"$MOCK_RECORD"
 
-  gc_func="$(_extract_func gc_logs "$GC_SH")"
+  gc_func="$(extract_func gc_logs "$GC_SH")"
 
   PATH="$mock_dir:$PATH" REPO_ROOT="$SCRIPT_DIR/../.." bash -c '
     . "$1"

@@ -98,6 +98,13 @@ finish_tests() {
   exit "$_status"
 }
 
+# extract_func NAME FILE — print a top-level function definition (opening
+# `NAME() {` through the column-0 closing `}`) from a script without executing the
+# script body. Lets a suite exercise a script-local function in isolation.
+extract_func() {
+  awk -v name="$1" '$0 == name "() {" { p = 1 } p { print } p && $0 == "}" { p = 0; exit }' "$2"
+}
+
 # require_command — Fail the suite when a provisioned prerequisite is missing.
 # Skip-guards are banned (tooling-and-validation.instructions.md): a missing tool
 # is a suite failure the tally has to record, not a silent pass. finish_tests
