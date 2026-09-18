@@ -114,6 +114,7 @@ in
           }) wallpaperItemsForCurrentUser
         )
       }' \
-      "${pkgs.jq}/bin/jq"
+      "${pkgs.jq}/bin/jq" \
+      "${pkgs.python3}/bin/python3"
   '';
 }

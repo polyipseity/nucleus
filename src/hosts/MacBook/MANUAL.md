@@ -22,6 +22,7 @@
 - LuLu's menu bar icon is hidden declaratively (`noIconMode`); alerts and firewall rules are unaffected. To manage LuLu, reopen the app to show its preferences window.
 - OrbStack's menu bar applet is enabled declaratively via macOS 26 Control Center `NSStatusItem Visible com.orbstack.orbstack`. To restore after manual toggle: System Settings → Menu Bar → OrbStack → **Allow in the Menu Bar**.
 - Parsec has no menu bar icon hide option. If its icon ever appears, hide it per-session with ⌘-drag.
+- Lock-screen wallpaper: `nucleus-apply` mirrors the desktop wallpaper onto the lock screen by rewriting the WallpaperKit store (`~/Library/Application Support/com.apple.wallpaper/Store/Index.plist`), where macOS records the screen saver surface that the lock screen shows. When macOS denies that write, the apply logs a warning instead of failing. Fix it once by choosing **Photos** in System Settings → Wallpaper → Screen Saver and pointing it at `~/Pictures/wallpapers`, then lock the screen to confirm.
 - Restart macOS to see managed Finder sidebar favorites.
 - Caddy local-CA trust runs automatically. If missing: `sudo caddy trust --address 127.0.0.1:2019`.
 - Nix commands may wait on a `nixpkgs-weekly/0.1` fetch from flakehub ("waiting for another Nix process" / "unpacking" lines). Machine-level config (global registry maps `nixpkgs` to flakehub; `/etc/nix/nix.conf` sets `extra-nix-path`), not `src/flake.lock`. One-time cold-cache cost; later runs are instant.

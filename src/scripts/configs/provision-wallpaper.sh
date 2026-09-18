@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Self-contained wallpaper provisioning script.
-# CLI args: is_darwin pictures_dir desktoppr_bin coreutils_bin current_user sops_symlink_path wallpaper_items_json jq_bin
+# CLI args: is_darwin pictures_dir desktoppr_bin coreutils_bin current_user sops_symlink_path wallpaper_items_json jq_bin converge_python_bin
 set -eu
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -22,6 +22,7 @@ _desktoppr_bin="$3"
 _coreutils_bin="$4"
 _current_user="$5"
 _sops_symlink_path="$6"
+_converge_python_bin="$9"
 
 lock_wallpaper_dir() {
   if [ "$_is_darwin" -ne 1 ]; then
@@ -228,6 +229,27 @@ wallpaper_post_copy_teardown() {
     else
       if ! "$_desktoppr_bin" all "$desktopprTarget"; then
         fail_wallpaper_provision "provision-wallpaper: desktoppr failed to set wallpaper directory $desktopprTarget."
+      fi
+      # macOS: desktoppr writes the desktop surface only, so the lock-screen
+      # surface and any Space or display left on an older picture keep it.
+      if [ ! -x "$_converge_python_bin" ]; then
+        fail_wallpaper_provision "provision-wallpaper: python3 is not executable at $_converge_python_bin; cannot sync the macOS lock-screen wallpaper."
+      else
+        _converge_rc=0
+        "$_converge_python_bin" "$SCRIPT_DIR/converge-macos-wallpaper-store.py" \
+          "$HOME/Library/Application Support/com.apple.wallpaper/Store/Index.plist" \
+          "$resolvedPicturesDir" || _converge_rc=$?
+        case "$_converge_rc" in
+        0) ;;
+        3)
+          # macOS locking the store is not a convergence this script can repair.
+          # check-suppress:suppression_doc: a store that refuses writes is a macOS lockdown the user lifts once; failing the whole apply over a wallpaper would be worse
+          warn "macOS refused write access to the wallpaper store; set a screen saver that uses $resolvedPicturesDir once in System Settings > Wallpaper > Screen Saver to sync the lock screen."
+          ;;
+        *)
+          fail_wallpaper_provision "provision-wallpaper: failed to sync the macOS lock-screen wallpaper with the desktop wallpaper (exit $_converge_rc)."
+          ;;
+        esac
       fi
       # macOS: restart WallpaperAgent to force re-read of folder contents.
       # WallpaperAgent caches folder contents in-memory; killing it forces
