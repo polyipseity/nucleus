@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # cloud-drives-setup.sh — mount-path convergence and replica directories.
 #
-# macOS FSKit volumes are mounted at a direct child of /Volumes, so clouds/<id>
-# is a symlink to that mount point; on every other host clouds/<id> *is* the
-# mount point. The regression this guards: treating the macOS path as a real
-# directory (rclone then refuses to mount, or mounts into a directory the user
-# cannot see), and any state conflict being papered over instead of failing,
-# except the two cases the migration converges: a stale symlink target and a
-# leftover empty directory.
+# Every host mounts rclone drives at clouds/<id>, a real directory — macOS
+# included, because rclone stats the mount point before mounting and macFUSE only
+# creates a /Volumes mount point while mounting a volume. The regressions this
+# guards: treating the mount path as a symlink again, and a re-apply that fails
+# or destroys state it must leave alone — a mounted drive makes its mount point
+# look occupied, and the leftover symlink of the retired /Volumes layout must
+# fail loudly with a paste-ready remedy instead of being followed or deleted.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -29,166 +29,103 @@ run_setup_stderr() { # <home> <mounts_json> <replicas_json>
   HOME="$1" bash "$CD_SETUP_SH" "$JQ_BIN" "$2" "$3" 1>/dev/null
 }
 
-_mounts_macos='[{"localPath":"clouds/GoogleDrive","mountPoint":"/Volumes/nucleus-cloud-GoogleDrive"}]'
-_mounts_macos_labeled='[{"localPath":"clouds/GoogleDrive","mountPoint":"/Volumes/nucleus-cloud-GoogleDrive","serviceLabel":"local.cloud-mount.GoogleDrive"}]'
+_mounts_plain='[{"localPath":"clouds/GoogleDrive"}]'
+_mounts_labeled='[{"localPath":"clouds/GoogleDrive","serviceLabel":"local.cloud-mount.GoogleDrive"}]'
 _replicas_none='[]'
 
-section "1" "macOS mount paths"
+section "1" "mount paths"
 
-test_macos_mount_path_becomes_symlink() {
+test_mount_path_is_a_real_directory() {
   local home rc=0
   home="$(mktemp -d)"
-  run_setup "$home" "$_mounts_macos" "$_replicas_none" || rc=$?
-  if [ "$rc" -eq 0 ] && [ -L "$home/clouds/GoogleDrive" ] &&
-    [ "$(readlink "$home/clouds/GoogleDrive")" = "/Volumes/nucleus-cloud-GoogleDrive" ]; then
-    assert_pass "a macOS mount path becomes a symlink to the /Volumes mount point"
+  run_setup "$home" "$_mounts_plain" "$_replicas_none" || rc=$?
+  if [ "$rc" -eq 0 ] && [ -d "$home/clouds/GoogleDrive" ] && [ ! -L "$home/clouds/GoogleDrive" ]; then
+    assert_pass "a mount path is created as a real directory"
   else
-    assert_fail "cloud-drives-macos-mount-link" \
-      "rc=$rc link=$(readlink "$home/clouds/GoogleDrive" 2>/dev/null)"
+    assert_fail "cloud-drives-mount-dir" \
+      "rc=$rc isdir=$([ -d "$home/clouds/GoogleDrive" ] && echo yes || echo no)"
   fi
   rm -rf "$home"
 }
 
-test_macos_mount_path_is_idempotent() {
+test_mount_path_is_idempotent() {
   local home rc=0
   home="$(mktemp -d)"
-  run_setup "$home" "$_mounts_macos" "$_replicas_none" || rc=$?
+  run_setup "$home" "$_mounts_plain" "$_replicas_none" || rc=$?
   if [ "$rc" -ne 0 ]; then
-    assert_fail "cloud-drives-macos-mount-idempotent" "first run rc=$rc"
-  elif run_setup "$home" "$_mounts_macos" "$_replicas_none" &&
-    [ "$(readlink "$home/clouds/GoogleDrive")" = "/Volumes/nucleus-cloud-GoogleDrive" ]; then
-    assert_pass "re-applying keeps the macOS mount symlink unchanged"
+    assert_fail "cloud-drives-mount-idempotent" "first run rc=$rc"
+  elif run_setup "$home" "$_mounts_plain" "$_replicas_none" &&
+    [ -d "$home/clouds/GoogleDrive" ] && [ ! -L "$home/clouds/GoogleDrive" ]; then
+    assert_pass "re-applying keeps the mount path a real directory"
   else
-    assert_fail "cloud-drives-macos-mount-idempotent" \
-      "second run rc=$? link=$(readlink "$home/clouds/GoogleDrive" 2>/dev/null)"
+    assert_fail "cloud-drives-mount-idempotent" "second run rc=$?"
   fi
   rm -rf "$home"
 }
 
-test_macos_mount_path_repairs_foreign_symlink() {
+test_mount_path_tolerates_an_occupied_directory() {
   local home rc=0
   home="$(mktemp -d)"
-  mkdir -p "$home/clouds"
-  ln -s "/Volumes/somewhere-else" "$home/clouds/GoogleDrive"
-  run_setup "$home" "$_mounts_macos" "$_replicas_none" || rc=$?
-  if [ "$rc" -eq 0 ] &&
-    [ "$(readlink "$home/clouds/GoogleDrive")" = "/Volumes/nucleus-cloud-GoogleDrive" ]; then
-    assert_pass "a stale symlink target is relinked to the configured macOS mount point"
-  else
-    assert_fail "cloud-drives-macos-mount-foreign-link" \
-      "rc=$rc link=$(readlink "$home/clouds/GoogleDrive" 2>/dev/null)"
-  fi
-  rm -rf "$home"
-}
-
-test_macos_mount_path_replaces_empty_directory() {
-  local home rc=0
-  home="$(mktemp -d)"
+  # A mounted drive makes its mount point look occupied, so occupancy must not
+  # fail the apply: rclone owns the non-empty check and it is the only failure
+  # that can clear itself once the mount is gone.
   mkdir -p "$home/clouds/GoogleDrive"
-  run_setup "$home" "$_mounts_macos" "$_replicas_none" || rc=$?
-  if [ "$rc" -eq 0 ] && [ -L "$home/clouds/GoogleDrive" ] &&
-    [ "$(readlink "$home/clouds/GoogleDrive")" = "/Volumes/nucleus-cloud-GoogleDrive" ]; then
-    assert_pass "a leftover empty mount directory is replaced by the symlink"
+  printf 'mounted contents\n' >"$home/clouds/GoogleDrive/remote-file"
+  run_setup "$home" "$_mounts_plain" "$_replicas_none" || rc=$?
+  if [ "$rc" -eq 0 ] && [ -f "$home/clouds/GoogleDrive/remote-file" ]; then
+    assert_pass "an occupied mount path is left to rclone's non-empty check"
   else
-    assert_fail "cloud-drives-macos-mount-empty-dir" "rc=$rc"
+    assert_fail "cloud-drives-mount-occupied" "rc=$rc"
   fi
   rm -rf "$home"
 }
 
-test_macos_mount_path_rejects_nonempty_directory() {
-  local home rc=0
+test_mount_path_symlink_error_names_how_to_release_it() {
+  local home rc=0 err="" agent_ok=false remove_ok=false target_ok=false expected_agent expected_remove
   home="$(mktemp -d)"
-  mkdir -p "$home/clouds/GoogleDrive"
-  printf 'user data\n' >"$home/clouds/GoogleDrive/keep.txt"
-  run_setup "$home" "$_mounts_macos" "$_replicas_none" || rc=$?
-  if [ "$rc" -ne 0 ] && [ -f "$home/clouds/GoogleDrive/keep.txt" ] &&
-    [ ! -L "$home/clouds/GoogleDrive" ]; then
-    assert_pass "a non-empty real directory is left intact and fails loudly"
-  else
-    assert_fail "cloud-drives-macos-mount-real-dir" "rc=$rc"
-  fi
-  rm -rf "$home"
-}
-
-test_macos_mount_path_error_names_how_to_release_it() {
-  local home rc=0 err="" agent_ok=false unmount_ok=false expected_agent expected_unmount
-  home="$(mktemp -d)"
-  # Both commands must be paste-ready and name this fixture's own occupied path,
-  # not a placeholder: bootout releases a volume the old agent still owns, while
-  # diskutil is the only escape for one that outlived an agent refresh.
+  # Both parts of the remedy must be paste-ready and name this fixture's own
+  # path, not a placeholder: bootout releases a volume the retired layout's
+  # agent still owns, and only the operator may delete the leftover link.
   expected_agent="launchctl bootout \"gui/\$(id -u)/local.cloud-mount.GoogleDrive\""
-  expected_unmount="diskutil unmount force \"$home/clouds/GoogleDrive\""
-  mkdir -p "$home/clouds/GoogleDrive"
-  printf 'user data\n' >"$home/clouds/GoogleDrive/keep.txt"
-  err="$(run_setup_stderr "$home" "$_mounts_macos_labeled" "$_replicas_none" 2>&1)" || rc=$?
-  case "$err" in
-  *"$expected_agent"*) agent_ok=true ;;
-  esac
-  case "$err" in
-  *"$expected_unmount"*) unmount_ok=true ;;
-  esac
-  if [ "$rc" -ne 0 ] && [ -f "$home/clouds/GoogleDrive/keep.txt" ] &&
-    [ "$agent_ok" = true ] && [ "$unmount_ok" = true ]; then
-    assert_pass "a blocked mount path names the LaunchAgent and the unmount command that release it"
+  expected_remove="rm \"$home/clouds/GoogleDrive\""
+  mkdir -p "$home/clouds"
+  ln -s "/Volumes/nucleus-cloud-GoogleDrive" "$home/clouds/GoogleDrive"
+  err="$(run_setup_stderr "$home" "$_mounts_labeled" "$_replicas_none" 2>&1)" || rc=$?
+  case "$err" in *"$expected_agent"*) agent_ok=true ;; esac
+  case "$err" in *"$expected_remove"*) remove_ok=true ;; esac
+  case "$err" in *"/Volumes/nucleus-cloud-GoogleDrive"*) target_ok=true ;; esac
+  if [ "$rc" -ne 0 ] && [ -L "$home/clouds/GoogleDrive" ] &&
+    [ "$agent_ok" = true ] && [ "$remove_ok" = true ] && [ "$target_ok" = true ]; then
+    assert_pass "a leftover mount symlink names its target, its agent, and the removal"
   else
-    assert_fail "cloud-drives-macos-mount-remedy" \
-      "rc=$rc agent=$agent_ok unmount=$unmount_ok stderr=[$err]"
+    assert_fail "cloud-drives-mount-symlink-remedy" \
+      "rc=$rc agent=$agent_ok remove=$remove_ok target=$target_ok stderr=[$err]"
   fi
   rm -rf "$home"
 }
 
-test_macos_mount_path_error_without_a_label_stays_generic() {
+test_mount_path_symlink_error_without_a_label_stays_generic() {
   local home rc=0 err="" generic_ok=false remedy_absent=false
   home="$(mktemp -d)"
-  mkdir -p "$home/clouds/GoogleDrive"
-  printf 'user data\n' >"$home/clouds/GoogleDrive/keep.txt"
-  err="$(run_setup_stderr "$home" "$_mounts_macos" "$_replicas_none" 2>&1)" || rc=$?
+  mkdir -p "$home/clouds"
+  ln -s "$home/elsewhere" "$home/clouds/GoogleDrive"
+  err="$(run_setup_stderr "$home" "$_mounts_plain" "$_replicas_none" 2>&1)" || rc=$?
   case "$err" in *'fix manually and re-apply'*) generic_ok=true ;; esac
   case "$err" in
-  *launchctl* | *diskutil*) remedy_absent=false ;;
+  *launchctl*) remedy_absent=false ;;
   *) remedy_absent=true ;;
   esac
-  if [ "$rc" -ne 0 ] && [ "$generic_ok" = true ] && [ "$remedy_absent" = true ]; then
-    assert_pass "a blocked mount path without an agent label keeps the generic message"
+  if [ "$rc" -ne 0 ] && [ -L "$home/clouds/GoogleDrive" ] &&
+    [ "$generic_ok" = true ] && [ "$remedy_absent" = true ]; then
+    assert_pass "a symlinked mount path without an agent label keeps the generic message"
   else
-    assert_fail "cloud-drives-macos-mount-no-label" \
+    assert_fail "cloud-drives-mount-symlink-no-label" \
       "rc=$rc generic=$generic_ok remedy_absent=$remedy_absent stderr=[$err]"
   fi
   rm -rf "$home"
 }
 
-section "2" "non-macOS mount paths"
-
-test_local_mount_path_is_real_directory() {
-  local home rc=0
-  home="$(mktemp -d)"
-  run_setup "$home" "[{\"localPath\":\"clouds/OneDrive\",\"mountPoint\":\"$home/clouds/OneDrive\"}]" \
-    "$_replicas_none" || rc=$?
-  if [ "$rc" -eq 0 ] && [ -d "$home/clouds/OneDrive" ] && [ ! -L "$home/clouds/OneDrive" ]; then
-    assert_pass "a mount whose path is the mount point stays a real directory"
-  else
-    assert_fail "cloud-drives-local-mount-dir" \
-      "rc=$rc isdir=$([ -d "$home/clouds/OneDrive" ] && echo yes || echo no)"
-  fi
-  rm -rf "$home"
-}
-
-test_local_mount_path_rejects_symlink() {
-  local home rc=0
-  home="$(mktemp -d)"
-  mkdir -p "$home/clouds"
-  ln -s "$home/elsewhere" "$home/clouds/OneDrive"
-  run_setup "$home" "[{\"localPath\":\"clouds/OneDrive\",\"mountPoint\":\"$home/clouds/OneDrive\"}]" \
-    "$_replicas_none" || rc=$?
-  if [ "$rc" -ne 0 ] && [ -L "$home/clouds/OneDrive" ]; then
-    assert_pass "a symlinked mount path is reported instead of being replaced"
-  else
-    assert_fail "cloud-drives-local-mount-symlink" "rc=$rc"
-  fi
-  rm -rf "$home"
-}
-
-section "3" "replica directories"
+section "2" "replica directories"
 
 test_replica_directory_is_a_real_directory() {
   local home rc=0
@@ -220,15 +157,11 @@ test_icloud_replica_links_to_native_storage() {
   rm -rf "$home"
 }
 
-test_macos_mount_path_becomes_symlink
-test_macos_mount_path_is_idempotent
-test_macos_mount_path_repairs_foreign_symlink
-test_macos_mount_path_replaces_empty_directory
-test_macos_mount_path_rejects_nonempty_directory
-test_macos_mount_path_error_names_how_to_release_it
-test_macos_mount_path_error_without_a_label_stays_generic
-test_local_mount_path_is_real_directory
-test_local_mount_path_rejects_symlink
+test_mount_path_is_a_real_directory
+test_mount_path_is_idempotent
+test_mount_path_tolerates_an_occupied_directory
+test_mount_path_symlink_error_names_how_to_release_it
+test_mount_path_symlink_error_without_a_label_stays_generic
 test_replica_directory_is_a_real_directory
 test_icloud_replica_links_to_native_storage
 finish_tests
