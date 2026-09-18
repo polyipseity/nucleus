@@ -28,6 +28,13 @@ let
     "optimize PDF - (5) screen"
   ];
 
+  # On-disk macOS workflow bundles. Finder labels Quick Actions from the bundle
+  # directory name, so the directories must carry the same "(N)" numbering as
+  # the menu label.
+  macWorkflowsDir = ../../src/hosts/MacBook/services/automator-workflows;
+  macWorkflowDirEntries = builtins.readDir macWorkflowsDir;
+  expectedWorkflowDirs = map (name: "${name}.workflow") numberedNames;
+
   # Check that all 5 presets appear in a file.
   allPresetsPresent = fileText: builtins.all (preset: lib.hasInfix preset fileText) presets;
 
@@ -42,6 +49,31 @@ let
     (name: lib.hasInfix name macAutomatorWorkflowsText)
     numberedNames
   ) "macOS automator-workflows.nix must use numbered names (optimize PDF - (N) quality)";
+
+  test_macos_workflow_dirs_numbered = assert' (builtins.all
+    (dirName: builtins.hasAttr dirName macWorkflowDirEntries)
+    expectedWorkflowDirs
+  ) "macOS optimize PDF workflow directories must be named 'optimize PDF - (N) <preset>.workflow'";
+
+  test_macos_no_dot_numbered_dirs = assert' (lib.all
+    (name: builtins.match "(.*) - [0-9]+\\..*" name == null)
+    (builtins.attrNames macWorkflowDirEntries)
+  ) "macOS workflow directories must not use the 'N.' dot numbering form";
+
+  test_macos_dir_source_match_workflow_dirs = assert' (builtins.all
+    (
+      dirName:
+      lib.hasInfix "dir = \"${dirName}\";" macAutomatorWorkflowsText
+      && lib.hasInfix "source = \"\${workflowsDir}/${dirName}\";" macAutomatorWorkflowsText
+    )
+    expectedWorkflowDirs
+  ) "macOS default.nix dir/source must reference the on-disk '(N)' workflow directory names";
+
+  test_macos_workflow_dir_names_valid_store_names = assert' (builtins.all (
+    dirName:
+    builtins.match "[A-Za-z0-9+._?=-]+" (builtins.replaceStrings [ " " "(" ")" ] [ "-" "" "" ] dirName)
+    != null
+  ) expectedWorkflowDirs) "macOS workflow directory names must reduce to a valid Nix store-path name";
 
   test_nixos_has_numbered_names = assert' (builtins.all (
     name: lib.hasInfix name nixosServicesText
@@ -69,6 +101,10 @@ let
     test_all_5_presets_in_nixos
     test_all_5_presets_in_windows
     test_macos_has_numbered_names
+    test_macos_workflow_dirs_numbered
+    test_macos_no_dot_numbered_dirs
+    test_macos_dir_source_match_workflow_dirs
+    test_macos_workflow_dir_names_valid_store_names
     test_nixos_has_numbered_names
     test_windows_has_numbered_names
     test_plasma_has_numbered_names
