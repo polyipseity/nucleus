@@ -218,16 +218,18 @@ refresh_services_menu() {
 }
 
 # rescan_pbs_services PBS_BIN LAUNCHCTL_BIN SUDO_BIN UID USER
-# Force a complete Services rescan and publish the result to running apps.
+# Force a complete Services rescan and refresh the services pasteboard.
 #
 # WHY: killing pbs only re-reads its caches. pbs detects changed Services via
 # FSEvents, which never fires for a bundle replaced or renamed in place, so a
 # renamed workflow kept its stale registration and newly provisioned ones
-# stayed invisible until the next login. `pbs -update` rewrites the userdef
-# cache from a complete rescan, and a bare `pbs` run publishes it to every
-# running app (pbs(8): "If run without any options, pbs will scan for changed
-# Services, cache them ... and immediately update the Services menu in all
-# running apps").
+# stayed invisible until the next login. `pbs -update` does a complete rescan
+# and rewrites the userdef cache and the services pasteboard that the menus are
+# built from (verified: 2 of 7 nucleus services registered before, 7 after).
+#
+# A bare `pbs` run is not an option: this build rejects it with
+# `Usage: pbs [-debug] [-dump] [-dump_cache] [-read_bundle file] [-update]
+# [-flush] language1 language2...` on stderr and exit status 1.
 #
 # Runs in the console user's session: pbs keeps per-user caches, so running it
 # as root would refresh root's Services instead of the logged-in user's.
@@ -239,5 +241,4 @@ rescan_pbs_services() {
   _rps_uid="$4"
   _rps_user="$5"
   "$_rps_launchctl_bin" asuser "$_rps_uid" "$_rps_sudo_bin" -H -u "$_rps_user" "$_rps_pbs_bin" -update
-  "$_rps_launchctl_bin" asuser "$_rps_uid" "$_rps_sudo_bin" -H -u "$_rps_user" "$_rps_pbs_bin"
 }
