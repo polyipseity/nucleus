@@ -162,18 +162,6 @@ let
   # issues with the options fixed-point)
   # ---------------------------------------------------------------------------
 
-  # Mount point for an entry.
-  # WHY: macOS FSKit volumes must be mounted at a direct child of /Volumes, and
-  #   macFUSE creates that directory during the mount and transfers it to the
-  #   requesting user — so a root-owned activation must not pre-create it.
-  #   Every other host mounts directly under the user's home directory.
-  mkMountPoint =
-    mount:
-    if pkgs.stdenv.hostPlatform.isDarwin then
-      "/Volumes/nucleus-cloud-${mount.id}"
-    else
-      "${currentUserHome}/${mount.localPath}";
-
   # LaunchAgent label for a mount.  Shared by the agent definition and by the
   # convergence script, which names it in the remedy for a blocked mount path.
   mountLabel = mount: "local.cloud-mount.${mount.id}";
@@ -183,7 +171,13 @@ let
   mkRcloneMountScript =
     mount:
     let
-      mountPoint = mkMountPoint mount;
+      # Mount point for an entry.
+      # WHY: rclone stats the mount point before mounting and refuses to mount
+      #   when it is missing, while macFUSE creates a /Volumes mount point only
+      #   as part of the mount itself — and /Volumes is root-owned, so a
+      #   user-scope activation could not create it either.  Mounts therefore
+      #   live directly under the user's home directory, as on every other host.
+      mountPoint = "${currentUserHome}/${mount.localPath}";
       rcloneRemote = "${mount.remoteName}:${mount.remotePath}";
       # Always pass the configured iCloud service explicitly so mount behavior
       # follows the per-entry setting even if the shared remote was created
@@ -364,7 +358,6 @@ in
                   builtins.toJSON (
                     map (m: {
                       inherit (m) localPath;
-                      mountPoint = mkMountPoint m;
                       serviceLabel = mountLabel m;
                     }) enabledMounts
                   )

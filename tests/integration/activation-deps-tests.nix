@@ -8,6 +8,7 @@
 # - GPG keys imported before signed commits
 # - LaunchAgent refresh before cloud drive mount-path convergence
 # - Cloud drive LaunchAgent label wired module → convergence script
+# - Cloud drive mount points under the user's home, never under /Volumes
 #
 let
   lib = import <nixpkgs/lib>;
@@ -158,6 +159,19 @@ let
       )
       "cloud drive mounts must derive the LaunchAgent label from one binding and pass it to the convergence script";
 
+  # === TEST: cloud drive mount points live under the user's home ===
+  # WHY: grep-only — /Volumes is a trap here.  rclone stats the mount point
+  # before mounting and aborts when it is missing, while macFUSE creates a
+  # /Volumes mount point only as part of the mount itself, so a mount point
+  # under /Volumes can never come into existence.  Pinning the inline expression
+  # (and the absence of a host-conditional helper) keeps the wrapper's mount
+  # point and the convergence script's real directory in agreement.
+  test_cloud_drives_mount_point_under_home = assert' (
+    lib.hasInfix ''mountPoint = "''${currentUserHome}/''${mount.localPath}";'' cloudDrivesModuleTextFlat
+    && !(lib.hasInfix "mkMountPoint" cloudDrivesModuleText)
+    && !(lib.hasInfix "/Volumes/nucleus-cloud-" cloudDrivesModuleText)
+  ) "cloud drive mounts must live under the user's home directory, never under /Volumes";
+
   # Collect all tests.
   allTests = [
     test_secrets_before_devrepo
@@ -167,6 +181,7 @@ let
     test_hermes_secrets_barrier_between_sops_and_setup
     test_cloud_drives_converge_after_launch_agents
     test_cloud_drives_label_wiring
+    test_cloud_drives_mount_point_under_home
   ];
 in
 # NOTE: force allTests as deepSeq's SECOND argument.  `builtins.seq (builtins.deepSeq allTests) { ... }`
