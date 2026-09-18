@@ -134,6 +134,26 @@
           },
           "type": "object"
         },
+        "instanceDirs": {
+          "description": "Log subdirectories that exist once per runtime instance of a prefixMatch entry, named from an <instance> token. The service itself creates these directories (apply-time dir provisioning cannot know the instance ids), while rotation and expiry walk the whole log root recursively. Declared per platform host entry, not top-level: instance ids differ per host, and a host without file capture (journald) declares none.",
+          "properties": {
+            "system": {
+              "description": "Per-instance subdirs needed under the system-wide log root.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "user": {
+              "description": "Per-instance subdirs needed under the per-user log root. The <instance> token expands to the instance id minus the host entry's 'service' prefix.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
         "eventLog": {
           "description": "Windows Event Log query config for native services (ignored on other platforms).",
           "properties": {
@@ -339,6 +359,10 @@
         "prefixMatch": {
           "description": "Match all tasks with this prefix",
           "type": "boolean"
+        },
+        "service": {
+          "description": "Scheduled-task name prefix for prefixMatch entries. Combined with taskPath it forms the full task id, so instance ids can be derived from the cloud-drive manifest rather than stored.",
+          "type": "string"
         },
         "taskPath": {
           "description": "Scheduled task path (e.g. \\\\NucleusLiteLLM)",

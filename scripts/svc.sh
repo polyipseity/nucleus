@@ -941,10 +941,14 @@ get_unit() {
   ' "$SERVICES_JSON"
 }
 
-# service_log_dirs — Print declared logging.dirs paths for a service.
-# Args: $1 — service key. Output: absolute directory paths, one per line.
+# service_log_dirs — Print declared log directories for a service.
+# Args: $1 — service key; $2 — instance id (empty for whole-service rows).
+# Output: absolute directory paths, one per line.
+# WHY: an instance id only exists at runtime, so a prefix-match row's
+# directories come from the host entry's <instance> templates, while
+# service-wide dirs stay keyed by the registry entry.
 service_log_dirs() {
-  local svc="$1"
+  local svc="$1" instance="${2:-}"
   local log_root system_root subdir
 
   log_root="$(nucleus_log_dir)"
@@ -957,35 +961,59 @@ service_log_dirs() {
   while IFS= read -r subdir; do
     [ -n "$subdir" ] && printf '%s\n' "$system_root/$subdir"
   done <<<"$(jq -r --arg svc "$svc" '.[$svc].logging.dirs.system[]? // empty' "$SERVICES_JSON")"
+
+  if [ -n "$instance" ]; then
+    local host_entry
+    host_entry=$(jq -c --arg svc "$svc" --arg host "$HOST" '.[$svc].hosts[$host] // empty' "$SERVICES_JSON")
+    [ -n "$host_entry" ] || return 0
+    svc_instance_log_dirs "$host_entry" "$log_root" "$system_root" "$instance"
+  fi
 }
 
 # service_log_files — Print all log file paths for a service (user + system dirs).
-# Args: $1 — service key. Output: absolute .log paths, one per line.
+# Args: $1 — service key; $2 — instance id (empty for whole-service rows).
+# Output: absolute .log paths, one per line.
 # WHY: logging.dirs declares every subdirectory a service writes to (e.g.
 # jellyfin-app for application logs separate from launchd capture).
 service_log_files() {
-  local svc="$1"
+  local svc="$1" instance="${2:-}"
   local d
 
   while IFS= read -r d; do
     if [ -d "$d" ]; then
       find "$d" -name '*.log' -type f 2>/dev/null
     fi
-  done < <(service_log_dirs "$svc")
+  done < <(service_log_dirs "$svc" "$instance")
+}
+
+# service_unit — Systemd unit for a service row.
+# Args: $1 — service key; $2 — instance id (empty for whole-service rows).
+# Output: unit name or empty string.
+# WHY: a prefix-match instance IS its unit (cloud-mount-iCloud.service); the
+# registry only declares the prefix, so looking the instance up would miss.
+service_unit() {
+  local svc="$1" instance="${2:-}"
+
+  if [ -n "$instance" ]; then
+    printf '%s\n' "$instance"
+  else
+    get_unit "$svc"
+  fi
 }
 
 # service_has_logs — Check if a service has any accessible log output.
-# Args: $1 — service key. Returns 0 when files exist (or journald has output).
+# Args: $1 — service key; $2 — instance id (empty for whole-service rows).
+# Returns 0 when files exist (or journald has output).
 # WHY: distinguishes "no logs yet" from "no logs configured" so the logs
 # listing can annotate services that simply have never written anything.
 service_has_logs() {
-  local svc="$1"
-  if [ -n "$(service_log_files "$svc")" ]; then
+  local svc="$1" instance="${2:-}"
+  if [ -n "$(service_log_files "$svc" "$instance")" ]; then
     return 0
   fi
   if [ "$HOST" = "NixOS" ]; then
     local unit
-    unit="$(get_unit "$svc")"
+    unit="$(service_unit "$svc" "$instance")"
     if [ -n "$unit" ] && command -v journalctl >/dev/null 2>&1; then
       journalctl -u "$unit" -n 1 --quiet --no-pager >/dev/null 2>&1 && return 0
     fi
@@ -994,14 +1022,15 @@ service_has_logs() {
 }
 
 # show_file_logs — Show file-based logs for a service.
-# Args: $1 — service key; $2 — line count; $3 — raw flag (skip sanitizing).
+# Args: $1 — service key; $2 — line count; $3 — raw flag (skip sanitizing);
+#       $4 — instance id (empty for whole-service rows).
 # Output: tail of the service's log files, sanitized unless --raw.
 # WHY: an array passes multiple files to tail without unquoted-word splitting,
 # and sanitizing strips secrets/timestamps unless raw output is requested.
 show_file_logs() {
-  local svc="$1" lines="$2" raw="$3"
+  local svc="$1" lines="$2" raw="$3" instance="${4:-}"
   local files
-  files="$(service_log_files "$svc")"
+  files="$(service_log_files "$svc" "$instance")"
   [ -z "$files" ] && return 1
   local sanitize_cmd="log_sanitize"
   "$raw" && sanitize_cmd="cat"
@@ -1013,14 +1042,15 @@ show_file_logs() {
 }
 
 # show_journald_logs — Show journald logs for a service (NixOS only).
-# Args: $1 — service key; $2 — line count; $3 — raw; $4 — since (e.g. "1h").
+# Args: $1 — service key; $2 — line count; $3 — raw; $4 — since (e.g. "1h");
+#       $5 — instance id (empty for whole-service rows).
 # Output: journalctl output, sanitized unless raw.
 # WHY: journald is the authoritative log store on NixOS; --since is carried
 # as a single array element so the timestamp stays atomic.
 show_journald_logs() {
-  local svc="$1" lines="$2" raw="$3" since="$4"
+  local svc="$1" lines="$2" raw="$3" since="$4" instance="${5:-}"
   local unit
-  unit="$(get_unit "$svc")"
+  unit="$(service_unit "$svc" "$instance")"
   [ -z "$unit" ] && return 1
   local since_arg=()
   [ -n "$since" ] && since_arg=(--since "$since")
@@ -1071,60 +1101,84 @@ do_logs() {
   done
   service_names=("${parsed_args[@]}")
 
+  local registry entries
+  registry=$(read_registry)
+  entries=$(resolve_service_names "$registry" "${service_names[@]}")
+
   if [ "${#service_names[@]}" -eq 0 ]; then
     if $json_output; then
-      printf '%s\n' "$(get_host_services)" | jq -n -R -c '[inputs | select(length > 0)]'
+      local ids=""
+      while IFS=$'\t' read -r key display svc_json json_key row_class; do
+        ids="$ids$json_key"$'\n'
+      done <<<"$entries"
+      printf '%s' "$ids" | jq -n -R -c '[inputs | select(length > 0)]'
     else
       printf 'Available services:\n\n'
-      while IFS= read -r svc; do
-        local capture
-        capture="$(get_capture "$svc")"
-        if service_has_logs "$svc"; then
-          printf '  %-25s capture=%-7s\n' "$svc" "$capture"
-        else
-          printf '  %-25s capture=%-7s (no logs yet)\n' "$svc" "$capture"
+      while IFS=$'\t' read -r key display svc_json json_key row_class; do
+        local capture instance="" marker=""
+        capture="$(get_capture "$key")"
+        if [ "$json_key" != "$key" ]; then instance="$json_key"; fi
+        if [ "$row_class" = "pseudo" ]; then
+          marker='  (no instances)'
+        elif ! service_has_logs "$key" "$instance"; then
+          marker='  (no logs yet)'
         fi
-      done <<<"$(get_host_services)"
+        printf '  %-30s capture=%-7s%s\n' "$json_key" "$capture" "$marker"
+      done <<<"$entries"
     fi
     return
   fi
 
-  for svc in "${service_names[@]}"; do
-    if ! get_host_services | grep -qx "$svc"; then
-      error "logs: unknown service '$svc'"
+  while IFS=$'\t' read -r key display svc_json json_key row_class; do
+    local instance=""
+    if [ "$json_key" != "$key" ]; then instance="$json_key"; fi
+
+    if [ "$row_class" = "error" ]; then
+      error "logs: $json_key — $(printf '%s' "$svc_json" | jq -r '.error')"
       exit 1
     fi
+    if [ "$row_class" = "pseudo" ]; then
+      warn "$json_key — no instances found (prefix '$(printf '%s' "$svc_json" | jq -r '.service // ""')')"
+      continue
+    fi
+
     case "$HOST" in
     MacBook)
-      show_file_logs "$svc" "$lines" "$raw" || warn "$svc — no log files found"
+      show_file_logs "$key" "$lines" "$raw" "$instance" || warn "$json_key — no log files found"
       ;;
     NixOS)
       local unit
-      unit="$(get_unit "$svc")"
+      unit="$(service_unit "$key" "$instance")"
       if [ -n "$unit" ] && command -v journalctl >/dev/null 2>&1; then
-        show_journald_logs "$svc" "$lines" "$raw" "$since" || warn "$svc — no journald logs"
+        show_journald_logs "$key" "$lines" "$raw" "$since" "$instance" || warn "$json_key — no journald logs"
       else
-        show_file_logs "$svc" "$lines" "$raw" || warn "$svc — no log files found"
+        show_file_logs "$key" "$lines" "$raw" "$instance" || warn "$json_key — no log files found"
       fi
       ;;
     esac
-  done
+  done <<<"$entries"
 }
 
 # do_log_paths — Print log file path(s) for the named services (or all).
 # Output: absolute paths, one per line — suitable for tail -f or editors.
 # WHY: printing paths (not content) lets users open logs in their preferred
-# tool and keeps this action side-effect free.
+# tool and keeps this action side-effect free. Instance rows resolve to their
+# own per-instance directories so the paths match what the service writes.
 do_log_paths() {
-  if [ "${#service_names[@]}" -gt 0 ]; then
-    for svc in "${service_names[@]}"; do
-      service_log_files "$svc"
-    done
-  else
-    while IFS= read -r svc; do
-      service_log_files "$svc"
-    done <<<"$(get_host_services)"
-  fi
+  local registry entries
+  registry=$(read_registry)
+  entries=$(resolve_service_names "$registry" "${service_names[@]}")
+
+  while IFS=$'\t' read -r key display svc_json json_key row_class; do
+    local instance=""
+    if [ "$json_key" != "$key" ]; then instance="$json_key"; fi
+    if [ "$row_class" = "error" ]; then
+      error "log-paths: $json_key — $(printf '%s' "$svc_json" | jq -r '.error')"
+      exit 1
+    fi
+    [ "$row_class" = "pseudo" ] && continue
+    service_log_files "$key" "$instance"
+  done <<<"$entries"
 }
 
 # do_log_config — Show the effective logging configuration for each service.
@@ -1156,14 +1210,25 @@ do_log_config() {
   done
   service_names=("${parsed_args[@]}")
 
-  local targets=()
-  if [ "${#service_names[@]}" -gt 0 ]; then
-    targets=("${service_names[@]}")
-  else
-    while IFS= read -r svc; do targets+=("$svc"); done <<<"$(get_host_services)"
-  fi
+  # Instance rows share their registry entry's logging configuration, so the
+  # key list is de-duplicated: one config block per registry entry.
+  local targets="" key
+  local registry entries
+  registry=$(read_registry)
+  entries=$(resolve_service_names "$registry" "${service_names[@]}")
+  while IFS=$'\t' read -r key display svc_json json_key row_class; do
+    if [ "$row_class" = "error" ]; then
+      error "log-config: $json_key — $(printf '%s' "$svc_json" | jq -r '.error')"
+      exit 1
+    fi
+    case "$targets" in
+    *"$key"$'\n') ;;
+    *) targets="$targets$key"$'\n' ;;
+    esac
+  done <<<"$entries"
 
-  for svc in "${targets[@]}"; do
+  while IFS= read -r svc; do
+    [ -n "$svc" ] || continue
     local entry
     entry=$(jq -c --arg svc "$svc" --arg host "$HOST" '
       # First non-null candidate wins, else the fallback. `//` must not be used
@@ -1190,7 +1255,7 @@ do_log_config() {
         | "  \(.key): \(.value)"
       '
     fi
-  done
+  done <<<"$targets"
 }
 
 # Main

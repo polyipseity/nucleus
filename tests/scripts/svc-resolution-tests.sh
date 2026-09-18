@@ -21,8 +21,14 @@ mkdir -p "$_tmp/repo/src/modules" "$_tmp/bin" "$_tmp/home" "$_tmp/log"
 # One prefix-match entry with two host shapes plus one ordinary entry, so the
 # assertions describe resolution behaviour without depending on the real
 # registry's contents.
-cat >"$_tmp/repo/src/modules/services.json" <<'JSON'
+cat >"$_tmp/repo/src/modules/services.json" <<JSON
 {
+  "\$logging": {
+    "MacBook": {
+      "logDir": "$_tmp/log",
+      "systemLogDir": "$_tmp/syslog"
+    }
+  },
   "cloud-drive": {
     "displayName": "Cloud Drive Mounts",
     "hosts": {
@@ -31,7 +37,14 @@ cat >"$_tmp/repo/src/modules/services.json" <<'JSON'
         "prefixMatch": true,
         "service": "local.cloud-mount.",
         "scope": "user",
-        "launchdDomain": "gui"
+        "launchdDomain": "gui",
+        "logging": { "instanceDirs": { "user": ["cloud-mount-<instance>"] } }
+      },
+      "NixOS": {
+        "type": "systemctl",
+        "prefixMatch": true,
+        "service": "cloud-mount-",
+        "scope": "user"
       }
     }
   },
@@ -77,15 +90,51 @@ esac
 FAKE
 chmod +x "$_tmp/bin/launchctl"
 
-# run_svc — Run the CLI against the stub registry with the fake manager on PATH.
+# --- Fake systemctl/journalctl (NixOS rows) -------------------------------
+# FAKE_UNITS lists the units the fake reports as loaded; journalctl records each
+# invocation so tests can assert which unit an instance log request targeted.
+cat >"$_tmp/bin/systemctl" <<'FAKE'
+#!/usr/bin/env bash
+for _arg in "$@"; do
+  case "$_arg" in
+  list-units)
+    for _unit in ${FAKE_UNITS:-}; do printf '%s loaded active running fake\n' "$_unit"; done
+    exit 0
+    ;;
+  is-active)
+    printf 'active\n'
+    exit 0
+    ;;
+  is-enabled)
+    printf 'enabled\n'
+    exit 0
+    ;;
+  show)
+    printf 'MainPID=4242\n'
+    exit 0
+    ;;
+  esac
+done
+exit 1
+FAKE
+cat >"$_tmp/bin/journalctl" <<'FAKE'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"${FAKE_JOURNALCTL_LOG:?}"
+printf 'journald line for %s\n' "$*"
+FAKE
+chmod +x "$_tmp/bin/systemctl" "$_tmp/bin/journalctl"
+
+# run_svc — Run the CLI against the stub registry with fake managers on PATH.
 run_svc() { # <svc.sh args...>
-  env NUCLEUS_HOST=MacBook \
+  env NUCLEUS_HOST="${SVC_TEST_HOST:-MacBook}" \
     NUCLEUS_REPO_ROOT="$_tmp/repo" \
     HOME="$_tmp/home" \
     NUCLEUS_LOG_DIR="$_tmp/log" \
     PATH="$_tmp/bin:$PATH" \
     FAKE_LIVE="${FAKE_LIVE:-}" \
+    FAKE_UNITS="${FAKE_UNITS:-}" \
     FAKE_LAUNCHCTL_LOG="$_tmp/launchctl.log" \
+    FAKE_JOURNALCTL_LOG="$_tmp/journalctl.log" \
     bash "$SVC_SH" "$@"
 }
 
@@ -186,5 +235,53 @@ section 5 "Ordinary entries"
 run_cli status plain-service
 assert_eq "an ordinary service still resolves" 0 "$captured_status"
 assert_contains "an ordinary service reports its state" "$captured_output" "plain-service"
+
+section 6 "Per-instance logs"
+FAKE_LIVE="local.cloud-mount.iCloud local.cloud-mount.OneDrive"
+mkdir -p "$_tmp/log/cloud-mount-iCloud" "$_tmp/log/cloud-mount-OneDrive"
+printf 'icloud line\n' >"$_tmp/log/cloud-mount-iCloud/stdout.log"
+printf 'onedrive line\n' >"$_tmp/log/cloud-mount-OneDrive/stdout.log"
+
+run_cli log-paths local.cloud-mount.iCloud
+assert_eq "log-paths on an instance id exits 0" 0 "$captured_status"
+assert_contains "log-paths resolves that instance's directory" "$captured_output" "$_tmp/log/cloud-mount-iCloud/stdout.log"
+assert_not_contains "log-paths does not leak another instance's directory" "$captured_output" "cloud-mount-OneDrive"
+
+run_cli logs local.cloud-mount.iCloud
+assert_eq "logs on an instance id exits 0" 0 "$captured_status"
+assert_contains "logs prints that instance's content" "$captured_output" "icloud line"
+assert_not_contains "logs does not print another instance's content" "$captured_output" "onedrive line"
+
+run_cli log-paths cloud-drive
+assert_eq "log-paths on the prefix key exits 0" 0 "$captured_status"
+assert_contains "the aggregate covers the first instance" "$captured_output" "cloud-mount-iCloud"
+assert_contains "the aggregate covers the second instance" "$captured_output" "cloud-mount-OneDrive"
+
+run_cli logs
+assert_eq "the log listing exits 0" 0 "$captured_status"
+assert_contains "the log listing shows instance ids" "$captured_output" "local.cloud-mount.iCloud"
+assert_not_contains "the log listing does not list a loaded instance as empty" "$captured_output" "local.cloud-mount.iCloud                    capture=all      (no logs yet)"
+
+FAKE_LIVE=""
+run_cli log-paths cloud-drive
+assert_eq "log-paths with no instances exits 0" 0 "$captured_status"
+assert_eq "log-paths with no instances prints no paths" "" "$captured_output"
+
+section 7 "Instance logs on NixOS (journald)"
+FAKE_UNITS="cloud-mount-iCloud.service"
+SVC_TEST_HOST=NixOS
+: >"$_tmp/journalctl.log"
+run_cli logs cloud-mount-iCloud.service
+assert_eq "logs on a unit id exits 0" 0 "$captured_status"
+assert_contains "instance logs come from journald" "$captured_output" "journald line"
+assert_contains "the request targets that instance's unit" "$(cat "$_tmp/journalctl.log")" "-u cloud-mount-iCloud.service"
+
+: >"$_tmp/journalctl.log"
+run_cli logs cloud-drive
+assert_eq "logs on the prefix key exits 0" 0 "$captured_status"
+assert_contains "the aggregate request targets the live unit" "$(cat "$_tmp/journalctl.log")" "-u cloud-mount-iCloud.service"
+
+SVC_TEST_HOST=
+FAKE_UNITS=""
 
 finish_tests

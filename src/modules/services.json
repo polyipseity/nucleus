@@ -229,7 +229,14 @@
         "prefixMatch": true,
         "service": "local.cloud-mount.",
         "type": "launchctl",
-        "platform": "macOS"
+        "platform": "macOS",
+        "logging": {
+          "instanceDirs": {
+            "user": [
+              "cloud-mount-<instance>"
+            ]
+          }
+        }
       },
       "NixOS": {
         "justification": "Per-user FUSE mount namespace bound to login session",
@@ -242,9 +249,17 @@
       "Windows": {
         "justification": "Per-user FUSE mount via scheduled task at logon; replaced Servy for user-context isolation.",
         "prefixMatch": true,
+        "service": "NucleusCloudMount-",
         "taskPath": "\\NucleusCloudMount",
         "type": "schtask",
-        "platform": "Windows"
+        "platform": "Windows",
+        "logging": {
+          "instanceDirs": {
+            "user": [
+              "cloud-drive-mount-<instance>"
+            ]
+          }
+        }
       }
     }
   },
