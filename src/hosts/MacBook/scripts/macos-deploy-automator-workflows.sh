@@ -14,6 +14,35 @@ _vsd_services_dir="$HOME/Library/Services"
 # internal parser treats spaces as key-path separators regardless of shell quoting.
 _vsd_nss_dict=""
 
+# Prune bundles the current workflow list no longer declares. Pruning is what makes a renamed
+# or removed preset disappear: macOS re-registers an NSServicesStatus entry for every bundle it
+# still finds in ~/Library/Services, so a leftover bundle keeps its old label in Finder Quick
+# Actions and the Services menu even after the dictionary rewrite below drops its enablement
+# key. Only bundles whose readable CFBundleIdentifier is com.nucleus.* are removed.
+automator_prune_stale_workflows() {
+  local services_dir="$1" desired_dirs_file="$2" defaults_bin="$3"
+  local installed installed_name installed_id
+  for installed in "$services_dir"/*.workflow; do
+    [ -e "$installed" ] || continue
+    installed_name="${installed##*/}"
+    if grep -qxF -- "$installed_name" "$desired_dirs_file"; then
+      continue
+    fi
+    # check-suppress:suppression_doc: a bundle with no readable CFBundleIdentifier is not provably ours; it stays.
+    installed_id="$("$defaults_bin" read "$installed/Contents/Info" CFBundleIdentifier 2>/dev/null || true)"
+    case "$installed_id" in
+    com.nucleus.*) rm -rf "$installed" ;;
+    esac
+  done
+}
+
+# The declared set is the workflow list resolved for this activation, so anything else
+# in ~/Library/Services is a leftover from an earlier preset set.
+_vsd_desired_dirs_file="$(mktemp)"
+trap 'rm -f "$_vsd_desired_dirs_file"' EXIT
+printf '%s\n' "$_vsd_current_workflows_json" | "$_vsd_jq_bin" -r '.[].dir' >"$_vsd_desired_dirs_file"
+automator_prune_stale_workflows "$_vsd_services_dir" "$_vsd_desired_dirs_file" /usr/bin/defaults
+
 while IFS= read -r _vsd_entry; do
   [ -z "$_vsd_entry" ] && continue
   _vsd_dir="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.dir')"
