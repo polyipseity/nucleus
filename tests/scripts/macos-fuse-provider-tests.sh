@@ -217,21 +217,28 @@ test_identity_names_version_and_library() {
 test_macfuse_pkg_version_contract() {
   local rc=0 version expected
   require_command /usr/sbin/pkgutil "macfuse_pkg_version reads /usr/sbin/pkgutil --pkg-info"
-  version="$(provider_call macfuse_pkg_version 2>/dev/null)" || rc=$?
-  if [ "$rc" -eq 0 ] && [ -n "$version" ]; then
+  # Gate the branch on the receipt itself, never on the helper's own status:
+  # choosing by the helper's behaviour would read a helper that fails on a host
+  # that does have macFUSE as "receipt absent", and pass.
+  if /usr/sbin/pkgutil --pkg-info io.macfuse.installer.components.core >/dev/null 2>&1; then
+    version="$(provider_call macfuse_pkg_version 2>/dev/null)" || rc=$?
     expected="$(/usr/sbin/pkgutil --pkg-info io.macfuse.installer.components.core | awk '/^version:/ { print $2 }')"
-    if [ "$version" = "$expected" ]; then
+    if [ "$rc" -eq 0 ] && [ -n "$expected" ] && [ "$version" = "$expected" ]; then
       assert_pass "macfuse_pkg_version reports the installed receipt version"
     else
-      assert_fail "macfuse_pkg_version reports the installed receipt version" "reported=[$version] receipt=[$expected]"
+      assert_fail "macfuse_pkg_version reports the installed receipt version" \
+        "rc=$rc reported=[$version] receipt=[$expected]"
     fi
-  elif [ "$rc" -ne 0 ] && [ -z "$version" ]; then
-    # Host without macFUSE: the wrapper must fail loudly instead of inventing a
+  else
+    # Host without macFUSE: the helper must fail loudly instead of inventing a
     # version, because a provider that cannot be identified is exactly the state
     # the build record exists to expose.
-    assert_pass "macfuse_pkg_version fails loudly when the receipt is absent"
-  else
-    assert_fail "macfuse_pkg_version receipt contract" "rc=$rc stdout=[$version]"
+    version="$(provider_call macfuse_pkg_version 2>/dev/null)" || rc=$?
+    if [ "$rc" -ne 0 ] && [ -z "$version" ]; then
+      assert_pass "macfuse_pkg_version fails loudly when the receipt is absent"
+    else
+      assert_fail "macfuse_pkg_version fails loudly when the receipt is absent" "rc=$rc stdout=[$version]"
+    fi
   fi
 }
 
@@ -316,7 +323,7 @@ if [ "$(uname -s)" != "Darwin" ]; then
   assert_skip "provider library name follows the macFUSE symlink" "macOS-only /bin/realpath"
   assert_skip "provider library name follows a repointed macFUSE symlink" "macOS-only /bin/realpath"
   assert_skip "provider identity names the macFUSE version and resolved library" "macOS-only /bin/realpath"
-  assert_skip "macfuse_pkg_version receipt contract" "macOS-only /usr/sbin/pkgutil"
+  assert_skip "macfuse_pkg_version reports the receipt version or fails loudly without one" "macOS-only /usr/sbin/pkgutil"
 else
   test_digest_is_stable_and_root_independent
   test_digest_is_independent_of_a_symlinked_root_spelling
