@@ -7,6 +7,7 @@
 # - SSH keys loaded before git clones over SSH
 # - GPG keys imported before signed commits
 # - LaunchAgent refresh before cloud drive mount-path convergence
+# - Cloud drive LaunchAgent label wired module → convergence script
 #
 let
   lib = import <nixpkgs/lib>;
@@ -141,6 +142,22 @@ let
       )
       "cloud drive mount paths must converge after the LaunchAgent refresh, and still after writeBoundary";
 
+  # === TEST: cloud drive mounts carry one LaunchAgent label ===
+  # WHY: grep-only — the label is the text contract between the module and the
+  # convergence script, which can only name the agent that holds the mount if the
+  # Nix side actually passes it.  Dropping the `serviceLabel` line would silently
+  # downgrade the diagnostic to "fix manually and re-apply" while every suite
+  # stayed green, so pin all three facts: the single binding, the agent that uses
+  # it, and the JSON field the script reads.
+  test_cloud_drives_label_wiring =
+    assert'
+      (
+        lib.hasInfix ''mountLabel = mount: "local.cloud-mount.''${mount.id}";'' cloudDrivesModuleTextFlat
+        && lib.hasInfix "serviceLabel = mountLabel m;" cloudDrivesModuleTextFlat
+        && lib.hasInfix "Label = mountLabel mount;" cloudDrivesModuleTextFlat
+      )
+      "cloud drive mounts must derive the LaunchAgent label from one binding and pass it to the convergence script";
+
   # Collect all tests.
   allTests = [
     test_secrets_before_devrepo
@@ -149,6 +166,7 @@ let
     test_activation_names_unique
     test_hermes_secrets_barrier_between_sops_and_setup
     test_cloud_drives_converge_after_launch_agents
+    test_cloud_drives_label_wiring
   ];
 in
 # NOTE: force allTests as deepSeq's SECOND argument.  `builtins.seq (builtins.deepSeq allTests) { ... }`
