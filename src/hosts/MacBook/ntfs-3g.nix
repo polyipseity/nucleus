@@ -89,6 +89,12 @@ let
   #   aborts with "Unable to find libdl".  gnu17 downgrades that to a warning.
   cFlags = "-std=gnu17";
   cxxFlags = "-std=gnu17";
+  # WHY: the build script drives the whole procedure (patch order, autotools,
+  #   configure/make invocation, install chaining), so its content belongs in
+  #   the fingerprint.  A path interpolated into the fingerprint is copied to
+  #   the store, making the recorded hash content-addressed; without it a
+  #   script-only edit would leave the previous /usr/local install in place.
+  buildScriptPath = ./scripts/macos-build-ntfs3g.sh;
   buildFingerprint = builtins.hashString "sha256" (
     builtins.concatStringsSep "\n" [
       ntfs3gSrc.outPath
@@ -107,6 +113,7 @@ let
       rootbindirPatchPath
       installHookPatchPath
       fuseProviderPatchPath
+      buildScriptPath
     ]
   );
 in
