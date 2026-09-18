@@ -30,6 +30,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 . "$SCRIPT_DIR/../src/scripts/lib/crash-loop.sh"
 . "$SCRIPT_DIR/../src/scripts/lib/macos-launch-services.sh"
+. "$SCRIPT_DIR/../src/scripts/lib/svc-instances.sh"
 
 # usage — Print the full command reference.
 # WHY: the help text is the executable contract — it must enumerate every
@@ -38,7 +39,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 usage() {
   usage_std "$(basename "$0")" "list|status|start|stop|restart|enable|disable|verify|endpoint|logs|log-paths|log-config [service...] [options]"
   cat <<'EOF'
-  list                              List all known services with status.
+  list [service...]                 List services with status (instance ids included).
   status [service...]               Show status of specified services (all if omitted).
   --user                            Show only user-domain services (no sudo needed).
   --system                          Show only system-domain services (requires sudo).
@@ -55,6 +56,13 @@ usage() {
   --json                            Machine-readable JSON output.
   --verbose                         Show action result summaries (start/restart).
   -h|--help                         Show usage.
+
+  Services are registry keys from src/modules/services.json. Entries flagged
+  prefixMatch stand in for one runtime service per instance: list and status
+  print each instance id, and any action accepts either the registry key (acts
+  on every live instance) or an exact instance id printed by list/status.
+  A prefix-match key with no live instance is reported as n/a, and an action on
+  it fails with "no instances found".
 EOF
 }
 
@@ -102,13 +110,42 @@ read_registry() {
   ' "$SERVICES_JSON"
 }
 
+# resolve_entry — Emit resolution rows for one registry entry.
+# Args: $1 — registry key; $2 — display name; $3 — host entry JSON.
+# Output: one `live` row per concrete instance of a prefix-match entry, a
+# `pseudo` row when a prefix-match entry has no live instance, one plain `live`
+# row otherwise. Row format: key\tdisplay\tplatformJson\tjsonKey\tclass.
+# WHY: a prefix-match entry stands in for one runtime service per configured
+# instance, so every consumer needs the same expansion — emitting rows here
+# keeps list, status, actions, verify, and logs operating on identical ids.
+resolve_entry() {
+  local key="$1" display="$2" plat_json="$3" instances instance suffix
+
+  if [ "$(printf '%s' "$plat_json" | jq -r '.prefixMatch // false')" != "true" ]; then
+    printf '%s\t%s\t%s\t%s\tlive\n' "$key" "$display" "$plat_json" "$key"
+    return 0
+  fi
+
+  instances=$(svc_prefix_instances "$plat_json")
+  if [ -z "$instances" ]; then
+    printf '%s\t%s\t%s\t%s\tpseudo\n' "$key" "$display" "$plat_json" "$key"
+    return 0
+  fi
+
+  while IFS= read -r instance; do
+    suffix=$(svc_instance_suffix "$plat_json" "$instance")
+    printf '%s\t%s (%s)\t%s\t%s\tlive\n' \
+      "$key" "$display" "$suffix" "$(svc_instance_entry "$plat_json" "$instance")" "$instance"
+  done <<<"$instances"
+}
+
 # resolve_service_names — Given user-specified names, resolve prefix matches to concrete names.
 # Args: $1 — platform registry JSON; remaining args — requested service names.
-# Outputs newline-separated entries of form: key\tdisplayName\tplatformJson\tjsonKey.
+# Outputs newline-separated rows of form: key\tdisplayName\tplatformJson\tjsonKey\tclass.
 # With no names, expands every registry entry (prefix-match services included).
 # WHY: prefix matching lets users run `svc status jelly` instead of needing
-# the full id; unresolved names become ERROR: rows so callers can surface
-# them without aborting mid-output.
+# the full id; unresolved names become ERROR:<name> rows — carrying the name —
+# so callers can surface them without aborting mid-output.
 resolve_service_names() {
   local registry="$1"
   shift
@@ -116,84 +153,64 @@ resolve_service_names() {
 
   if [ "${#names[@]}" -eq 0 ]; then
     while IFS=$'\t' read -r key display plat_json; do
-      local prefix_match
-      prefix_match=$(echo "$plat_json" | jq -r '.prefixMatch // false')
-      if [ "$prefix_match" = "true" ]; then
-        local prefix entries
-        prefix=$(echo "$plat_json" | jq -r '.service')
-        entries=$(expand_prefix "$key" "$prefix" "$plat_json")
-        printf '%s\n' "$entries"
-      else
-        printf '%s\t%s\t%s\t%s\n' "$key" "$display" "$plat_json" "$key"
-      fi
-    done < <(echo "$registry" | jq -r 'to_entries[] | [.key, .value.displayName, (.value.hostEntry | tojson)] | @tsv')
+      resolve_entry "$key" "$display" "$plat_json"
+    done < <(printf '%s' "$registry" | jq -r 'to_entries[] | [.key, .value.displayName, (.value.hostEntry | tojson)] | @tsv')
     return
   fi
 
   for name in "${names[@]}"; do
     local entry
-    entry=$(echo "$registry" | jq -c --arg name "$name" '.[$name] // empty')
+    entry=$(printf '%s' "$registry" | jq -c --arg name "$name" '.[$name] // empty')
     if [ -n "$entry" ]; then
-      local prefix_match
-      prefix_match=$(echo "$entry" | jq -r '.hostEntry.prefixMatch // false')
-      if [ "$prefix_match" = "true" ]; then
-        local prefix
-        prefix=$(echo "$entry" | jq -r '.hostEntry.service')
-        local entries
-        entries=$(expand_prefix "$name" "$prefix" "$(echo "$entry" | jq -c '.hostEntry')")
-        printf '%s\n' "$entries"
-      else
-        printf '%s\n' "$name	$(echo "$entry" | jq -r '.displayName')	$(echo "$entry" | jq -c '.hostEntry')	$name"
-      fi
-    else
-      printf '%s\n' "ERROR:unknown	$name	{\"error\":\"service not found in registry\"}	ERROR:unknown"
+      resolve_entry "$name" "$(printf '%s' "$entry" | jq -r '.displayName')" "$(printf '%s' "$entry" | jq -c '.hostEntry')"
+      continue
     fi
+    resolve_instance_name "$registry" "$name"
   done
 }
 
-# expand_prefix — List concrete services matching a prefix on the current platform.
-# Args: $1 — requested name; $2 — id prefix; $3 — platform JSON.
-# Outputs tab-separated lines: name\tserviceId\tplatformJson\tjsonKey.
-# WHY: concrete ids are discovered from the live service manager (launchctl
-# list / systemctl list-units) because the registry's prefix entry stands in
-# for services whose full ids are only knowable at runtime.
-expand_prefix() {
-  local name="$1" prefix="$2" plat_json="$3"
-  case "$HOST" in
-  MacBook)
-    local sudo_prefix=""
-    local scope
-    scope=$(echo "$plat_json" | jq -r '.scope // "system"')
-    [ "$scope" = "system" ] && sudo_prefix="sudo"
-    local matches
-    # check-suppress:suppression_doc: no matching services found is an expected empty result, not an error.
-    if [ "$scope" = "user" ] && [ "$EUID" -eq 0 ]; then
-      matches=$(launchctl asuser "$REAL_USER_UID" launchctl list 2>/dev/null | awk -v p="$prefix" '$3 ~ p { print $3 }' || true) # check-suppress:suppression_doc: no matching services found is an expected empty result, not an error.
-    else
-      matches=$($sudo_prefix launchctl list 2>/dev/null | awk -v p="$prefix" '$3 ~ p { print $3 }' || true) # check-suppress:suppression_doc: no matching services found is an expected empty result, not an error.
-    fi
-    if [ -z "$matches" ]; then
-      printf '%s\t%s\t%s\t%s\n' "$name" "$prefix" "$plat_json" "$name"
-    else
-      while IFS= read -r m; do
-        printf '%s\t%s\t%s\t%s\n' "$name" "$m" "{\"type\":\"launchctl\",\"service\":\"$m\",\"scope\":\"$(echo "$plat_json" | jq -r '.scope')\",\"launchdDomain\":\"$(echo "$plat_json" | jq -r '.launchdDomain // "gui"')\"}" "$m"
-      done <<<"$matches"
-    fi
-    ;;
-  NixOS)
-    local scope_flag=""
-    [ "$(echo "$plat_json" | jq -r '.scope // "system"')" = "user" ] && scope_flag="--user"
-    local matches
-    # check-suppress:suppression_doc: no matching units found is an expected empty result.
-    matches=$(systemctl $scope_flag list-units --all "$prefix*" --no-legend 2>/dev/null | awk '{ print $1 }' || true)
-    if [ -z "$matches" ]; then
-      printf '%s\t%s\t%s\t%s\n' "$name" "$prefix" "$plat_json" "$name"
-    else
-      while IFS= read -r m; do
-        printf '%s\t%s\t%s\t%s\n' "$name" "$m" "{\"type\":\"systemctl\",\"service\":\"$m\",\"scope\":\"$(echo "$plat_json" | jq -r '.scope')\"}" "$m"
-      done <<<"$matches"
-    fi
-    ;;
+# resolve_instance_name — Resolve a concrete instance id that is not a registry key.
+# Args: $1 — platform registry JSON; $2 — requested name.
+# Output: one `live` row when the name is a live instance of a prefix-match
+# entry; otherwise an `error` row explaining why.
+# WHY: list and status print concrete ids, so those ids must be valid arguments
+# everywhere. Membership is checked against live enumeration so a mistyped id is
+# reported as such instead of as an inactive service.
+resolve_instance_name() {
+  local registry="$1" name="$2" match key display plat_json instances prefix
+
+  match=$(printf '%s' "$registry" | jq -c --arg name "$name" '
+    to_entries
+    | map(select(.value.hostEntry.prefixMatch == true))
+    | map(select((.value.hostEntry.service // "") as $p | ($p | length) > 0 and ($name | startswith($p))))
+    | first // empty')
+  if [ -z "$match" ]; then
+    printf '%s\t%s\t%s\t%s\terror\n' "ERROR:$name" "$name" '{"error":"service not found in registry"}' "$name"
+    return 0
+  fi
+
+  key=$(printf '%s' "$match" | jq -r '.key')
+  display=$(printf '%s' "$match" | jq -r '.value.displayName')
+  plat_json=$(printf '%s' "$match" | jq -c '.value.hostEntry')
+  prefix=$(printf '%s' "$plat_json" | jq -r '.service')
+  instances=$(svc_prefix_instances "$plat_json")
+  if [ -z "$instances" ] || ! printf '%s\n' "$instances" | grep -qxF "$name"; then
+    printf '%s\t%s\t%s\t%s\terror\n' "ERROR:$name" "$name" \
+      "{\"error\":\"no such instance (prefix '$prefix'); run 'nucleus-svc list'\"}" "$name"
+    return 0
+  fi
+
+  printf '%s\t%s (%s)\t%s\t%s\tlive\n' \
+    "$key" "$display" "$(svc_instance_suffix "$plat_json" "$name")" \
+    "$(svc_instance_entry "$plat_json" "$name")" "$name"
+}
+
+# placeholder_status_json — Status object for a row that has no runtime identity.
+# Args: $1 — row class. Output: compact JSON status object.
+# WHY: reporting such a row as "inactive" would be a lie — nothing was probed.
+placeholder_status_json() {
+  case "$1" in
+  pseudo) printf '{"status":"n/a","running":false,"enabled":false,"pid":null,"crashLoop":"-"}\n' ;;
   esac
 }
 
@@ -597,7 +614,7 @@ do_list() {
   local has_error=false
   if [ "$json_output" = true ]; then
     local entries_json=""
-    while IFS=$'\t' read -r key display svc_json json_key; do
+    while IFS=$'\t' read -r key display svc_json json_key row_class; do
       if echo "$key" | grep -q '^ERROR:'; then
         has_error=true
         continue
@@ -610,10 +627,15 @@ do_list() {
         error "system-domain operations require sudo; run as root or with sudo"
         exit 1
       fi
-      local status_json pair_json crash_status
-      status_json=$(svc_status "$key" "$svc_json")
-      crash_status=$(crash_loop_status "$json_key")
-      status_json=$(echo "$status_json" | jq --arg cs "$crash_status" '. + {crashLoop: $cs}')
+      local status_json pair_json
+      if [ "$row_class" = "live" ]; then
+        local crash_status
+        status_json=$(svc_status "$json_key" "$svc_json")
+        crash_status=$(crash_loop_status "$json_key")
+        status_json=$(printf '%s' "$status_json" | jq --arg cs "$crash_status" '. + {crashLoop: $cs}')
+      else
+        status_json=$(placeholder_status_json "$row_class")
+      fi
       pair_json=$(jq -cn --arg k "$json_key" --argjson v "$status_json" '{key:$k, value:$v}')
       if [ -n "$entries_json" ]; then
         entries_json="$entries_json
@@ -627,7 +649,7 @@ $pair_json"
     printf '%-20s %-24s %-10s %-8s %-10s %s\n' "ID" "Name" "Status" "Running" "PID" "CrashLoop"
     printf '%.0s-' {1..91}
     printf '\n'
-    while IFS=$'\t' read -r key display svc_json json_key; do
+    while IFS=$'\t' read -r key display svc_json json_key row_class; do
       if echo "$key" | grep -q '^ERROR:'; then
         local err_name="${key#ERROR:}"
         printf '%-20s %-24s %-10s %-8s %s\n' "$err_name" "" "n/a" "-" "-"
@@ -642,8 +664,14 @@ $pair_json"
         error "system-domain operations require sudo; run as root or with sudo"
         exit 1
       fi
+      if [ "$row_class" != "live" ]; then
+        local ph_status
+        ph_status=$(placeholder_status_json "$row_class" | jq -r '.status')
+        printf '%-20s %-24s %-10s %-8s %-10s %s\n' "$json_key" "$display" "$ph_status" "-" "-" "-"
+        continue
+      fi
       local status_json
-      status_json=$(svc_status "$key" "$svc_json")
+      status_json=$(svc_status "$json_key" "$svc_json")
       local status running pid exit_code
       status=$(echo "$status_json" | jq -r '.status')
       running=$(echo "$status_json" | jq -r '.running')
@@ -681,7 +709,7 @@ do_status() {
   fi
 
   local any_error=false
-  while IFS=$'\t' read -r key display svc_json json_key; do
+  while IFS=$'\t' read -r key display svc_json json_key row_class; do
     if echo "$key" | grep -q '^ERROR:'; then
       local err_name="${key#ERROR:}"
       warn "$err_name — $(echo "$svc_json" | jq -r '.error')"
@@ -696,8 +724,14 @@ do_status() {
       error "system-domain operations require sudo; run as root or with sudo"
       exit 1
     fi
+    if [ "$row_class" != "live" ]; then
+      local ph_status
+      ph_status=$(placeholder_status_json "$row_class" | jq -r '.status')
+      printf '%-20s %-24s %-10s %-8s %-10s %s\n' "$json_key" "$display" "$ph_status" "-" "-" "-"
+      continue
+    fi
     local status_json
-    status_json=$(svc_status "$key" "$svc_json")
+    status_json=$(svc_status "$json_key" "$svc_json")
     local status running pid exit_code
     status=$(echo "$status_json" | jq -r '.status')
     running=$(echo "$status_json" | jq -r '.running')
@@ -718,54 +752,59 @@ do_status() {
 # Args: none; reads global action and service_names.
 # Side effects: runs the requested action per service, continuing after a
 # failure so one bad service does not hide the rest; returns a combined exit.
+# do_action — Apply start|stop|restart|enable|disable to each named service.
+# Args: none; reads global action and service_names.
+# Side effects: runs the requested action per service, continuing after a
+# failure so one bad service does not hide the rest; returns a combined exit.
+# WHY: actions resolve through the same expansion as list/status, so a
+# prefix-match key acts on every live instance and a printed id is always a
+# valid argument — an unresolvable name is the only "not found" outcome.
 do_action() {
   if [ "${#service_names[@]}" -eq 0 ]; then
     error "missing service name for $action"
   fi
   local registry
   registry=$(read_registry)
+  local entries
+  entries=$(resolve_service_names "$registry" "${service_names[@]}")
 
   local overall_exit=0
-  for svc_name in "${service_names[@]}"; do
-    local entry
-    entry=$(echo "$registry" | jq -c --arg name "$svc_name" '.[$name] // empty')
-    if [ -z "$entry" ]; then
-      warn "$svc_name — service not found in registry"
+  while IFS=$'\t' read -r key display svc_json json_key row_class; do
+    if [ "$row_class" = "error" ]; then
+      warn "$json_key — $(printf '%s' "$svc_json" | jq -r '.error')"
       overall_exit=1
       continue
     fi
 
-    local prefix_match
-    prefix_match=$(echo "$entry" | jq -r '.hostEntry.prefixMatch // false')
-    if [ "$prefix_match" = "true" ]; then
-      warn "$svc_name — prefix-match services (like $(echo "$entry" | jq -r '.hostEntry.service')*) require exact name; use list or status to discover"
+    if [ "$row_class" = "pseudo" ]; then
+      error "$key — no instances found (prefix '$(printf '%s' "$svc_json" | jq -r '.service // ""')')"
       overall_exit=1
       continue
     fi
 
     local _d_domain
-    _d_domain=$(echo "$entry" | jq -r '.hostEntry.scope // "system"')
+    _d_domain=$(printf '%s' "$svc_json" | jq -r '.scope // "system"')
     if [ "$_d_domain" = "system" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
-      error "$svc_name — system-domain operations require sudo; run as root or with sudo"
+      error "$json_key — system-domain operations require sudo; run as root or with sudo"
       overall_exit=1
       continue
     fi
 
-    if ! svc_action "$action" "$svc_name" "$(echo "$entry" | jq '.hostEntry')"; then
-      warn "$svc_name — action $action failed"
+    if ! svc_action "$action" "$json_key" "$svc_json"; then
+      warn "$json_key — action $action failed"
       overall_exit=1
     fi
     if "$verbose_mode" && [ "$action" = "start" ] || [ "$action" = "restart" ]; then
       local _v_status
-      _v_status=$(svc_status "$svc_name" "$(echo "$entry" | jq '.hostEntry')")
+      _v_status=$(svc_status "$json_key" "$svc_json")
       local _v_running _v_pid
-      _v_running=$(echo "$_v_status" | jq -r '.running')
-      _v_pid=$(echo "$_v_status" | jq -r '.pid // "-"')
+      _v_running=$(printf '%s' "$_v_status" | jq -r '.running')
+      _v_pid=$(printf '%s' "$_v_status" | jq -r '.pid // "-"')
       if [ "$_v_running" = "true" ]; then
-        say "$action $svc_name → active (pid $_v_pid)"
+        say "$action $json_key → active (pid $_v_pid)"
       fi
     fi
-  done
+  done <<<"$entries"
   return "$overall_exit"
 }
 
@@ -781,8 +820,16 @@ do_verify() {
   entries=$(resolve_service_names "$registry" "${service_names[@]}")
   local any_inactive=false
 
-  while IFS=$'\t' read -r key display svc_json json_key; do
-    if echo "$key" | grep -q '^ERROR:'; then continue; fi
+  while IFS=$'\t' read -r key display svc_json json_key row_class; do
+    if [ "$row_class" = "error" ]; then
+      warn "$json_key — $(echo "$svc_json" | jq -r '.error')"
+      any_inactive=true
+      continue
+    fi
+    if [ "$row_class" = "pseudo" ]; then
+      notice "$json_key — no instances found (prefix '$(echo "$svc_json" | jq -r '.service // ""')'); nothing to verify"
+      continue
+    fi
     local _d_domain
     _d_domain=$(echo "$svc_json" | jq -r '.scope // "system"')
     if [ "$_d_domain" = "system" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
@@ -791,7 +838,7 @@ do_verify() {
       continue
     fi
     local status_json
-    status_json=$(svc_status "$key" "$svc_json")
+    status_json=$(svc_status "$json_key" "$svc_json")
     local running
     running=$(echo "$status_json" | jq -r '.running')
     if [ "$running" != "true" ]; then
