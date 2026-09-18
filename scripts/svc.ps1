@@ -346,6 +346,29 @@ function Resolve-ServiceName {
   return $rows
 }
 
+function Get-InstanceArgument {
+  <#
+  .SYNOPSIS
+    Returns the instance id of a resolution row, or an empty string for whole-service rows.
+
+  .DESCRIPTION
+    Log lookups take an instance id only when the row addresses a concrete instance, so the
+    registry key and the instance id are compared rather than assumed to differ.
+
+  .PARAMETER Row
+    Resolution row from Resolve-ServiceName.
+
+  .OUTPUTS
+    System.String
+  #>
+  param(
+    [hashtable]$Row
+  )
+
+  if ($Row.instanceId -eq $Row.registryKey) { return '' }
+  return $Row.instanceId
+}
+
 function New-StatusRow {
   <#
   .SYNOPSIS
@@ -565,7 +588,28 @@ function Get-EventLogConfig {
 }
 
 function Get-ServiceLogDirList {
-  param([string]$ServiceKey)
+  <#
+  .SYNOPSIS
+    Lists the log directories of a service, or of one of its instances.
+
+  .DESCRIPTION
+    Top-level logging.dirs covers the whole service. A prefix-match host entry adds
+    logging.instanceDirs, whose <instance> placeholder expands to the instance suffix;
+    without -InstanceId every live instance is expanded so an aggregate query still
+    reports all of them.
+
+  .PARAMETER ServiceKey
+    Registry key.
+
+  .PARAMETER InstanceId
+    Concrete instance id (e.g. \NucleusCloudMount\NucleusCloudMount-iCloud); omit for a
+    whole-service query.
+
+  .OUTPUTS
+    System.String[]
+  #>
+  param([string]$ServiceKey, [string]$InstanceId)
+
   $entry = $RegistryRaw[$ServiceKey]
   $dirs = @()
   if ($entry.ContainsKey('logging') -and $entry.logging.ContainsKey('dirs')) {
@@ -580,13 +624,40 @@ function Get-ServiceLogDirList {
       }
     }
   }
-  return $dirs
+
+  $hostEntry = $entry.hosts[$NucleusHost]
+  if (-not ($hostEntry.ContainsKey('logging') -and $hostEntry.logging.ContainsKey('instanceDirs'))) {
+    return [string[]]$dirs
+  }
+
+  $instanceDirs = $hostEntry.logging.instanceDirs
+  $ids = @()
+  if (-not [string]::IsNullOrWhiteSpace($InstanceId)) {
+    $ids = @($InstanceId)
+  } elseif ($hostEntry.ContainsKey('prefixMatch') -and $hostEntry.prefixMatch) {
+    $ids = @(Get-NucleusPrefixInstanceList -HostEntry $hostEntry)
+  }
+
+  foreach ($id in $ids) {
+    $suffix = Get-NucleusInstanceSuffix -HostEntry $hostEntry -InstanceId $id
+    foreach ($pattern in @($instanceDirs.user)) {
+      if (-not [string]::IsNullOrWhiteSpace($pattern)) {
+        $dirs += Join-Path (Get-NucleusLogDir) ($pattern -replace '<instance>', $suffix)
+      }
+    }
+    foreach ($pattern in @($instanceDirs.system)) {
+      if (-not [string]::IsNullOrWhiteSpace($pattern)) {
+        $dirs += Join-Path (Get-NucleusSystemLogDir) ($pattern -replace '<instance>', $suffix)
+      }
+    }
+  }
+  return [string[]]$dirs
 }
 
 function Get-ServiceLogFile {
-  param([string]$ServiceKey)
+  param([string]$ServiceKey, [string]$InstanceId)
   $files = @()
-  foreach ($dir in (Get-ServiceLogDirList -ServiceKey $ServiceKey)) {
+  foreach ($dir in (Get-ServiceLogDirList -ServiceKey $ServiceKey -InstanceId $InstanceId)) {
     if (Test-Path -LiteralPath $dir -PathType Container) {
       # check-suppress:suppression_doc: probe -- log dir may be empty; empty result handled.
       $files += Get-ChildItem -LiteralPath $dir -Recurse -Filter '*.log' -File -ErrorAction SilentlyContinue |
@@ -597,10 +668,10 @@ function Get-ServiceLogFile {
 }
 
 function Test-ServiceHasLog {
-  param([string]$ServiceKey)
+  param([string]$ServiceKey, [string]$InstanceId)
   $capture = Get-CaptureMode -ServiceKey $ServiceKey
   if ($capture -ne 'none') {
-    $files = Get-ServiceLogFile -ServiceKey $ServiceKey
+    $files = Get-ServiceLogFile -ServiceKey $ServiceKey -InstanceId $InstanceId
     if ($files.Count -gt 0) { return $true }
   }
   $eventLog = Get-EventLogConfig -ServiceKey $ServiceKey
@@ -613,8 +684,8 @@ function Test-ServiceHasLog {
 }
 
 function Show-FileLog {
-  param([string]$ServiceKey, [int]$Lines = 10, [switch]$Raw)
-  $files = Get-ServiceLogFile -ServiceKey $ServiceKey
+  param([string]$ServiceKey, [int]$Lines = 10, [switch]$Raw, [string]$InstanceId)
+  $files = Get-ServiceLogFile -ServiceKey $ServiceKey -InstanceId $InstanceId
   if ($files.Count -eq 0) { return $false }
   foreach ($file in $files) {
     $content = Get-Content -LiteralPath $file -Tail $Lines
@@ -646,11 +717,11 @@ function Show-EventLog {
 }
 
 function Show-ServiceLog {
-  param([string]$ServiceKey, [int]$Lines = 10, [switch]$Raw)
+  param([string]$ServiceKey, [int]$Lines = 10, [switch]$Raw, [string]$InstanceId)
   if (Show-EventLog -ServiceKey $ServiceKey -Lines $Lines -Raw:$Raw) { return }
   $capture = Get-CaptureMode -ServiceKey $ServiceKey
   if ($capture -ne 'none') {
-    if (-not (Show-FileLog -ServiceKey $ServiceKey -Lines $Lines -Raw:$Raw)) {
+    if (-not (Show-FileLog -ServiceKey $ServiceKey -Lines $Lines -Raw:$Raw -InstanceId $InstanceId)) {
       Write-NucleusWarning "$ServiceKey — no log files found"
     }
   } else {
@@ -659,11 +730,30 @@ function Show-ServiceLog {
 }
 
 function Show-ServiceList {
-  foreach ($svc in (Get-HostService)) {
-    $capture = Get-CaptureMode -ServiceKey $svc
-    $hasLog = Test-ServiceHasLog -ServiceKey $svc
-    Write-Output ("  {0,-25} capture={1,-7}{2}" -f $svc, $capture, $(if (-not $hasLog) { ' (no logs yet)' } else { '' }))
+  <#
+  .SYNOPSIS
+    Lists every resolved service row with its log availability.
+
+  .DESCRIPTION
+    Instance rows are listed under their concrete instance id so a prefix-match entry is
+    visible per instance, matching the POSIX listing.
+
+  .OUTPUTS
+    System.String[]
+  #>
+  $lines = @()
+  foreach ($row in (Resolve-ServiceName -Names @())) {
+    $capture = Get-CaptureMode -ServiceKey $row.registryKey
+    $instanceId = Get-InstanceArgument -Row $row
+    $marker = ''
+    if ($row.class -eq 'pseudo') {
+      $marker = '  (no instances)'
+    } elseif (-not (Test-ServiceHasLog -ServiceKey $row.registryKey -InstanceId $instanceId)) {
+      $marker = '  (no logs yet)'
+    }
+    $lines += "  {0,-30} capture={1,-7}{2}" -f $row.instanceId, $capture, $marker
   }
+  return $lines
 }
 
 function Show-LogConfig {
@@ -872,8 +962,9 @@ switch ($Action) {
     if ($parsedServices.Count -eq 0) {
       if ($Json) {
         $list = [ordered]@{}
-        foreach ($svc in (Get-HostService)) {
-          $list[$svc] = @{ capture = Get-CaptureMode -ServiceKey $svc; hasLogs = Test-ServiceHasLog -ServiceKey $svc }
+        foreach ($row in (Resolve-ServiceName -Names @())) {
+          if ($row.class -eq 'error') { continue }
+          $list[$row.instanceId] = @{ capture = Get-CaptureMode -ServiceKey $row.registryKey; hasLogs = Test-ServiceHasLog -ServiceKey $row.registryKey -InstanceId (Get-InstanceArgument -Row $row) }
         }
         Write-Output ($list | ConvertTo-Json -Compress)
       } else {
@@ -884,42 +975,54 @@ switch ($Action) {
       return
     }
     $hasError = $false
-    foreach ($svc in $parsedServices) {
-      if (-not $Registry.ContainsKey($svc)) {
-        Write-NucleusError "unknown service '$svc'"
+    foreach ($row in (Resolve-ServiceName -Names $parsedServices)) {
+      if ($row.class -eq 'error') {
+        Write-NucleusError "logs: $($row.displayName) — $($row.hostEntry.error)"
         $hasError = $true
         continue
       }
-      Show-ServiceLog -ServiceKey $svc -Lines $logLines -Raw:$logRaw
+      if ($row.class -eq 'pseudo') {
+        $prefix = Get-NucleusInstanceIdPrefix -HostEntry $row.hostEntry
+        Write-NucleusWarning "$($row.registryKey) — no instances found (prefix '$prefix')"
+        continue
+      }
+      Show-ServiceLog -ServiceKey $row.registryKey -Lines $logLines -Raw:$logRaw -InstanceId (Get-InstanceArgument -Row $row)
     }
     if ($hasError) { exit 1 }
   }
 
   'log-paths' {
-    $targets = if ($ServiceName.Count -gt 0) { $ServiceName } else { Get-HostService }
+    $targets = if ($ServiceName.Count -gt 0) { $ServiceName } else { @() }
     $hasError = $false
-    foreach ($svc in $targets) {
-      if (-not $Registry.ContainsKey($svc)) {
-        Write-NucleusError "unknown service '$svc'"
+    foreach ($row in (Resolve-ServiceName -Names $targets)) {
+      if ($row.class -eq 'error') {
+        Write-NucleusError "log-paths: $($row.displayName) — $($row.hostEntry.error)"
         $hasError = $true
         continue
       }
-      $files = Get-ServiceLogFile -ServiceKey $svc
+      if ($row.class -eq 'pseudo') { continue }
+      $instanceId = Get-InstanceArgument -Row $row
+      $files = Get-ServiceLogFile -ServiceKey $row.registryKey -InstanceId $instanceId
       if ($files.Count -gt 0) { Write-Output ($files -join "`n") }
     }
     if ($hasError) { exit 1 }
   }
 
   'log-config' {
-    $targets = if ($ServiceName.Count -gt 0) { $ServiceName } else { Get-HostService }
+    $targets = if ($ServiceName.Count -gt 0) { $ServiceName } else { @() }
     $hasError = $false
-    foreach ($svc in $targets) {
-      if (-not $Registry.ContainsKey($svc)) {
-        Write-NucleusError "unknown service '$svc'"
+    # Instance rows share their registry entry's logging configuration, so the key
+    # list is de-duplicated: one config block per registry entry.
+    $seen = @()
+    foreach ($row in (Resolve-ServiceName -Names $targets)) {
+      if ($row.class -eq 'error') {
+        Write-NucleusError "log-config: $($row.displayName) — $($row.hostEntry.error)"
         $hasError = $true
         continue
       }
-      Show-LogConfig -ServiceKey $svc -JsonOut:$Json
+      if ($seen -contains $row.registryKey) { continue }
+      $seen += $row.registryKey
+      Show-LogConfig -ServiceKey $row.registryKey -JsonOut:$Json
     }
     if ($hasError) { exit 1 }
   }

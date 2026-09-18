@@ -68,7 +68,7 @@ BeforeAll {
     'cloud-drive' = @{
       displayName = 'Cloud Drive Mounts'
       description = 'rclone FUSE cloud drive mounts'
-      hosts       = @{ Windows = @{ platform = 'Windows'; type = 'schtask'; taskPath = '\NucleusCloudMount'; prefixMatch = $true; service = 'NucleusCloudMount-'; logging = @{ capture = 'stderr' } } }
+      hosts       = @{ Windows = @{ platform = 'Windows'; type = 'schtask'; taskPath = '\NucleusCloudMount'; prefixMatch = $true; service = 'NucleusCloudMount-'; logging = @{ capture = 'stderr'; instanceDirs = @{ user = @('cloud-drive-mount-<instance>') } } } }
     }
     'camilladsp' = @{
       displayName = 'CamillaDSP'
@@ -700,19 +700,19 @@ Describe 'Dispatch' {
     It 'logs with unknown service writes error' {
       Mock Write-Error { throw "Write-Error: $Message" }
 
-      { Invoke-Dispatch -Action logs -ServiceName @('nonexistent') } | Should -Throw 'Write-Error: svc: error: unknown service*'
+      { Invoke-Dispatch -Action logs -ServiceName @('nonexistent') } | Should -Throw 'Write-Error: svc: error: logs: nonexistent — service not found in registry*'
     }
 
     It 'log-paths with unknown service writes error' {
       Mock Write-Error { throw "Write-Error: $Message" }
 
-      { Invoke-Dispatch -Action log-paths -ServiceName @('nonexistent') } | Should -Throw 'Write-Error: svc: error: unknown service*'
+      { Invoke-Dispatch -Action log-paths -ServiceName @('nonexistent') } | Should -Throw 'Write-Error: svc: error: log-paths: nonexistent — service not found in registry*'
     }
 
     It 'log-config with unknown service writes error' {
       Mock Write-Error { throw "Write-Error: $Message" }
 
-      { Invoke-Dispatch -Action log-config -ServiceName @('nonexistent') } | Should -Throw 'Write-Error: svc: error: unknown service*'
+      { Invoke-Dispatch -Action log-config -ServiceName @('nonexistent') } | Should -Throw 'Write-Error: svc: error: log-config: nonexistent — service not found in registry*'
     }
   }
 
@@ -814,6 +814,47 @@ Describe 'Dispatch' {
       Invoke-Dispatch -Action verify -ServiceName @('cloud-drive')
 
       Should -Invoke Write-NucleusWarning -Exactly 1 -ParameterFilter { $Message -match 'no instances found' }
+    }
+  }
+
+  Context 'log dispatch with instance ids' {
+    It 'passes the instance id to the log reader' {
+      Mock Resolve-ServiceName {
+        return @(
+          New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (work)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' -Class 'live' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work' }
+        )
+      }
+      Mock Show-ServiceLog { }
+
+      Invoke-Dispatch -Action logs -ServiceName @('\NucleusCloudMount\NucleusCloudMount-work')
+
+      Should -Invoke Show-ServiceLog -Exactly 1 -ParameterFilter {
+        $ServiceKey -eq 'cloud-drive' -and $InstanceId -eq '\NucleusCloudMount\NucleusCloudMount-work'
+      }
+    }
+
+    It 'reads the per-instance directories for log-paths' {
+      Mock Get-ServiceLogFile { return @() }
+      Mock Resolve-ServiceName {
+        return @(
+          New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (work)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' -Class 'live' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work' }
+        )
+      }
+
+      $output = Invoke-Dispatch -Action log-paths -ServiceName @('\NucleusCloudMount\NucleusCloudMount-work')
+
+      ($output -join "`n") | Should -BeNullOrEmpty
+      Should -Invoke Get-ServiceLogFile -Exactly 1 -ParameterFilter {
+        $ServiceKey -eq 'cloud-drive' -and $InstanceId -eq '\NucleusCloudMount\NucleusCloudMount-work'
+      }
+    }
+
+    It 'lists each instance in the no-argument listing' {
+      Mock Get-NucleusPrefixInstanceList { return @('\NucleusCloudMount\NucleusCloudMount-work') }
+
+      $output = @(Invoke-Dispatch -Action logs)
+
+      ($output -join "`n") | Should -Match 'NucleusCloudMount-work'
     }
   }
 }
@@ -1018,5 +1059,37 @@ Describe 'Test-ServiceIsSystemScope' {
   It 'returns false when scope is absent' {
     $entry = @{ hostEntry = @{} }
     Test-ServiceIsSystemScope -ResolvedEntry $entry | Should -Be $false
+  }
+}
+
+Describe 'Get-ServiceLogDirList with instances' {
+  It 'expands the instance directory for a concrete instance' {
+    $dirs = @(Get-ServiceLogDirList -ServiceKey 'cloud-drive' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work')
+    $dirs | Should -Contain (Join-Path 'TestDrive:\nucleus\logs' 'cloud-drive-mount-work')
+  }
+
+  It 'expands every live instance when no instance id is given' {
+    Mock Get-NucleusPrefixInstanceList {
+      return @('\NucleusCloudMount\NucleusCloudMount-a', '\NucleusCloudMount\NucleusCloudMount-b')
+    }
+
+    $dirs = @(Get-ServiceLogDirList -ServiceKey 'cloud-drive')
+
+    $dirs | Should -Contain (Join-Path 'TestDrive:\nucleus\logs' 'cloud-drive-mount-a')
+    $dirs | Should -Contain (Join-Path 'TestDrive:\nucleus\logs' 'cloud-drive-mount-b')
+  }
+
+  It 'leaves a service without instanceDirs unchanged' {
+    $dirs = @(Get-ServiceLogDirList -ServiceKey 'ollama' -InstanceId 'ignored')
+    $dirs.Count | Should -Be 0
+  }
+
+  It 'reads an instance log file that the whole-service query would miss' {
+    $instanceDir = Join-Path 'TestDrive:\nucleus\logs' 'cloud-drive-mount-work'
+    $null = New-Item -Path $instanceDir -ItemType Directory -Force
+    $null = New-Item -Path (Join-Path $instanceDir 'stdout.log') -ItemType File -Force
+
+    @(Get-ServiceLogFile -ServiceKey 'cloud-drive' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work').Count | Should -Be 1
+    @(Get-ServiceLogFile -ServiceKey 'cloud-drive').Count | Should -Be 0
   }
 }
