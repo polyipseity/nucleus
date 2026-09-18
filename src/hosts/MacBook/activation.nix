@@ -135,11 +135,11 @@ in
   # extraActivation — runs before openssh / Homebrew bundle.
   # ---------------------------------------------------------------------------
   system.activationScripts.extraActivation.text = ''
-    # ---- ensure-fuse-t-headers-dir --------------------------------------------------
-    # fuse-t cask post-install symlinks headers into /usr/local/include.  If that
-    # directory doesn't exist, the cask install silently skips the link step,
-    # leaving ntfs-3g build with no fuse headers.  Create it pre-emptively.
-    /bin/mkdir -p /usr/local/include
+    # ---- ensure-macfuse-install-dirs -----------------------------------------------
+    # macFUSE installs its headers into /usr/local/include and its libraries into
+    # /usr/local/lib, and its Homebrew cask postflight sets ownership on both of
+    # those directories, so both must exist before the cask installs.
+    /bin/mkdir -p /usr/local/include /usr/local/lib
 
     # ---- ensure-nucleus-roots ------------------------------------------------------
     # Create the USER/SYSTEM nucleus roots, their root->conventional symlinks, and

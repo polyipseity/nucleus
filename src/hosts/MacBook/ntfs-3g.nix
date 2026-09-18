@@ -1,22 +1,22 @@
 # MacBook/ntfs-3g.nix — build polyipseity/ext.ntfs-3g from source.
 #
 # WHY: build from source, not nixpkgs:
-#   The polyipseity fork of ntfs-3g (commit f0e5cb0) links against fuse-t, a
-#   FSKit-based FUSE implementation distributed as a Homebrew cask at
-#   /usr/local/lib/libfuse-t.dylib.  Nix sandbox builds cannot resolve this
-#   impure dependency, so we build imperatively during activation.
+#   The polyipseity fork of ntfs-3g (commit f0e5cb0) links against the macFUSE
+#   installation at /usr/local/lib/libfuse.dylib, an impure dependency that Nix
+#   sandbox builds cannot resolve, so we build imperatively during activation.
 #
 # WHY: activation script vs Nix derivation:
-#   A pure Nix derivation would require fuse-t headers and dylib inside the
-#   sandbox — impractical when fuse-t is a Homebrew cask placed in a fixed
-#   system path.  The activation script runs after Homebrew, guaranteeing
-#   fuse-t is installed before we build ntfs-3g.
+#   A pure Nix derivation would require macFUSE headers and dylib inside the
+#   sandbox — impractical when macFUSE is installed into fixed system paths.
+#   The activation script runs after Homebrew, guaranteeing macFUSE is installed
+#   before we build ntfs-3g.
 #
 # WHY: not ntfs-3g from nixpkgs:
-#   nixpkgs ntfs-3g uses the native macOS FUSE kext (osxfuse / macFUSE), which
-#   requires a kernel extension.  fuse-t is a modern FSKit-based alternative
-#   that works without kext approval, so the polyipseity fork is the preferred
-#   build on modern macOS.
+#   The nixpkgs package builds against macFUSE stub headers rather than the
+#   installed macFUSE, so its build does not track the provider this host runs.
+#   This fork is built against the installed macFUSE and mounts with
+#   -o backend=fskit, the kext-free path on macOS 27; the macFUSE kernel
+#   extension is never approved here.
 { lib, pkgs, ... }:
 let
   activationBundle = pkgs.callPackage ../../modules/lib/script-tree.nix { };
@@ -61,16 +61,20 @@ let
   installHookPatchPath = ./patches/ntfs-3g-install-hook.patch;
 
   # Build parameters (extracted for fingerprint-based rebuild detection).
-  cppFlags = "-I/usr/local/include/fuse/fuse";
-  # fuse-t is linked only during make/install — not during ./configure, where
-  # -lfuse-t in LDFLAGS breaks autoconf link probes under nix clang wrappers.
+  # macFUSE's fuse.pc declares these exact flags (Cflags:
+  # -I/usr/local/include/fuse -D_FILE_OFFSET_BITS=64; Libs: -L/usr/local/lib
+  # -lfuse -pthread).  The pinned fork's configure.ac has no fuse pkg-config
+  # check, so the provider flags are passed explicitly instead.
+  cppFlags = "-I/usr/local/include/fuse -D_FILE_OFFSET_BITS=64";
+  # macFUSE is linked only during make/install — not during ./configure, where
+  # -lfuse in LDFLAGS breaks autoconf link probes under nix clang wrappers.
   # WHY: ENABLE_NFCONV is enabled by default on darwin (configure.ac), so
   #   libntfs-3g/unistr.c calls CoreFoundation APIs
   #   (_CFStringNormalize, _CFRelease, ...) but upstream's Makefile.am never
   #   links the framework.  Add it here so the libntfs-3g.la link resolves.
   #   linkFlags flows only into make LDFLAGS (configure uses empty LDFLAGS=),
   #   so this does not affect autoconf probes.
-  linkFlags = "-L/usr/local/lib -lfuse-t -Wl,-rpath,/usr/local/lib -framework CoreFoundation";
+  linkFlags = "-L/usr/local/lib -lfuse -pthread -Wl,-rpath,/usr/local/lib -framework CoreFoundation";
   configureFlags = "--with-fuse=external --prefix=/usr/local --disable-crypto --disable-plugins";
   clangBin = "${pkgs.llvmPackages.clang}/bin/clang";
   clangxxBin = "${pkgs.llvmPackages.clang}/bin/clang++";

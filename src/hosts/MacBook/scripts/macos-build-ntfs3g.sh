@@ -9,22 +9,22 @@
 # make resolve them from the environment.
 #
 # WHY: build from source, not nixpkgs:
-#   The polyipseity fork of ntfs-3g (commit f0e5cb0) links against fuse-t, a
-#   FSKit-based FUSE implementation distributed as a Homebrew cask at
-#   /usr/local/lib/libfuse-t.dylib.  Nix sandbox builds cannot resolve this
-#   impure dependency, so we build imperatively during activation.
+#   The polyipseity fork of ntfs-3g (commit f0e5cb0) links against the macFUSE
+#   installation at /usr/local/lib/libfuse.dylib, an impure dependency that Nix
+#   sandbox builds cannot resolve, so we build imperatively during activation.
 #
 # WHY: activation script vs Nix derivation:
-#   A pure Nix derivation would require fuse-t headers and dylib inside the
-#   sandbox — impractical when fuse-t is a Homebrew cask placed in a fixed
-#   system path.  The activation script runs after Homebrew, guaranteeing
-#   fuse-t is installed before we build ntfs-3g.
+#   A pure Nix derivation would require macFUSE headers and dylib inside the
+#   sandbox — impractical when macFUSE is installed into fixed system paths.
+#   The activation script runs after Homebrew, guaranteeing macFUSE is installed
+#   before we build ntfs-3g.
 #
 # WHY: not ntfs-3g from nixpkgs:
-#   nixpkgs ntfs-3g uses the native macOS FUSE kext (osxfuse / macFUSE), which
-#   requires a kernel extension.  fuse-t is a modern FSKit-based alternative
-#   that works without kext approval, so the polyipseity fork is the preferred
-#   build on modern macOS.
+#   The nixpkgs package builds against the macFUSE stub headers and nothing in
+#   its closure selects a FUSE backend, so its mounts land on macFUSE's
+#   kernel-extension backend — a kext this host must never approve.  This fork is
+#   built against the installed macFUSE, so mounts can select the FSKit backend
+#   (-o backend=fskit), the kext-free path on macOS 27.
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../../../scripts/lib/lib.sh
@@ -100,8 +100,8 @@ if ! [ -x /usr/local/bin/ntfs-3g ] ||
     autoconf --force
 
     printf '[%s] ntfs-3g: configuring...\n' "$(date '+%Y-%m-%d %H:%M:%S')"
-    # WHY: keep fuse-t out of LDFLAGS during configure — autoconf link probes
-    # fail when every test binary must link fuse-t under nix clang wrappers.
+    # WHY: keep macFUSE out of LDFLAGS during configure — autoconf link probes
+    # fail when every test binary must link macFUSE under nix clang wrappers.
     LDFLAGS=
     ./configure "$CONFIGURE_FLAGS"
 
@@ -111,7 +111,7 @@ if ! [ -x /usr/local/bin/ntfs-3g ] ||
     #   ./configure writes "LDFLAGS =" (empty) into every Makefile, and a
     #   Makefile-defined LDFLAGS overrides the environment variable of the same
     #   name.  Without the command-line form the link step loses -L/usr/local/lib
-    #   and fails with "library not found for -lfuse-t".
+    #   and fails with "library not found for -lfuse".
     make -j"$(sysctl -n hw.ncpu)" LDFLAGS="$LINK_FLAGS"
     printf '[%s] ntfs-3g: installing...\n' "$(date '+%Y-%m-%d %H:%M:%S')"
     make install LDFLAGS="$LINK_FLAGS"
