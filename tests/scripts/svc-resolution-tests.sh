@@ -6,6 +6,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+readonly SCRIPT_DIR REPO_ROOT
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
 
@@ -16,6 +18,11 @@ SVC_SH="$SCRIPT_DIR/../../scripts/svc.sh"
 _tmp="$(mktemp -d)"
 trap 'rm -rf "$_tmp"' EXIT
 mkdir -p "$_tmp/repo/src/modules" "$_tmp/bin" "$_tmp/home" "$_tmp/log"
+
+# The user registry is discovery's source of truth, so the stub repo needs a
+# users tree. The default resolving user has no entry there (no mounts); section
+# 8 switches to the fixture's test-user, which declares mounts.
+ln -s "$REPO_ROOT/tests/fixtures/user-registry/src/users" "$_tmp/repo/src/users"
 
 # --- Stub registry -----------------------------------------------------------
 # One prefix-match entry with two host shapes plus one ordinary entry, so the
@@ -130,6 +137,7 @@ run_svc() { # <svc.sh args...>
     NUCLEUS_REPO_ROOT="$_tmp/repo" \
     HOME="$_tmp/home" \
     NUCLEUS_LOG_DIR="$_tmp/log" \
+    SUDO_USER="${SUDO_USER_OVERRIDE:-svc-test-nomounts}" \
     PATH="$_tmp/bin:$PATH" \
     FAKE_LIVE="${FAKE_LIVE:-}" \
     FAKE_UNITS="${FAKE_UNITS:-}" \
@@ -283,5 +291,46 @@ assert_contains "the aggregate request targets the live unit" "$(cat "$_tmp/jour
 
 SVC_TEST_HOST=
 FAKE_UNITS=""
+
+section 8 "Configured but not loaded mounts"
+SUDO_USER_OVERRIDE=test-user
+FAKE_LIVE=""
+run_cli list --user
+assert_eq "list with declared mounts exits 0" 0 "$captured_status"
+assert_contains "a declared mount is reported by its instance id" "$captured_output" "local.cloud-mount.iCloud"
+assert_contains "a second declared mount is reported" "$captured_output" "local.cloud-mount.OneDrive"
+assert_contains "a third declared mount is reported" "$captured_output" "local.cloud-mount.GoogleDrive"
+assert_contains "a declared mount reports not-loaded" "$captured_output" "not-loaded"
+assert_not_contains "a declared mount is not reported as n/a" "$captured_output" "n/a"
+
+run_cli list --user --json
+assert_eq "json listing with declared mounts exits 0" 0 "$captured_status"
+assert_contains "json marks the row configured" "$captured_output" '"configured":true'
+assert_contains "json reports the not-loaded status" "$captured_output" '"status":"not-loaded"'
+
+run_cli status local.cloud-mount.iCloud
+assert_eq "status on a declared mount exits 0" 0 "$captured_status"
+assert_contains "status reports the declared mount as not-loaded" "$captured_output" "not-loaded"
+
+run_cli restart local.cloud-mount.iCloud
+assert_eq "acting on a named declared mount fails" 1 "$captured_status"
+assert_contains "the failure says it is configured but not loaded" "$captured_output" "configured but not loaded"
+assert_contains "the failure names a remedy" "$captured_output" "nucleus-apply"
+
+: >"$_tmp/launchctl.log"
+run_cli restart cloud-drive
+assert_eq "an aggregate action with only declared mounts exits 0" 0 "$captured_status"
+assert_contains "the aggregate action warns" "$captured_output" "configured but not loaded"
+assert_eq "a declared mount is never loaded by an action" 0 "$(wc -l <"$_tmp/launchctl.log" | tr -d ' ')"
+
+run_cli verify cloud-drive
+assert_eq "verify fails while a declared mount is not loaded" 1 "$captured_status"
+assert_contains "verify explains the unmet declaration" "$captured_output" "configured but not loaded"
+
+run_cli status local.cloud-mount.NotDeclared
+assert_eq "an undeclared instance id still fails" 1 "$captured_status"
+assert_contains "an undeclared instance id is reported as no such instance" "$captured_output" "no such instance"
+
+SUDO_USER_OVERRIDE=
 
 finish_tests

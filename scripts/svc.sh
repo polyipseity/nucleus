@@ -112,14 +112,15 @@ read_registry() {
 
 # resolve_entry — Emit resolution rows for one registry entry.
 # Args: $1 — registry key; $2 — display name; $3 — host entry JSON.
-# Output: one `live` row per concrete instance of a prefix-match entry, a
-# `pseudo` row when a prefix-match entry has no live instance, one plain `live`
-# row otherwise. Row format: key\tdisplay\tplatformJson\tjsonKey\tclass.
+# Output: one `live` row per concrete instance of a prefix-match entry, one
+# `configured` row per instance the user registry declares but this host does
+# not run, a `pseudo` row when a prefix-match entry has neither, and one plain
+# `live` row otherwise. Row format: key\tdisplay\tplatformJson\tjsonKey\tclass.
 # WHY: a prefix-match entry stands in for one runtime service per configured
 # instance, so every consumer needs the same expansion — emitting rows here
 # keeps list, status, actions, verify, and logs operating on identical ids.
 resolve_entry() {
-  local key="$1" display="$2" plat_json="$3" instances instance suffix
+  local key="$1" display="$2" plat_json="$3" instances configured instance suffix
 
   if [ "$(printf '%s' "$plat_json" | jq -r '.prefixMatch // false')" != "true" ]; then
     printf '%s\t%s\t%s\t%s\tlive\n' "$key" "$display" "$plat_json" "$key"
@@ -127,16 +128,26 @@ resolve_entry() {
   fi
 
   instances=$(svc_prefix_instances "$plat_json")
-  if [ -z "$instances" ]; then
-    printf '%s\t%s\t%s\t%s\tpseudo\n' "$key" "$display" "$plat_json" "$key"
-    return 0
-  fi
+  configured=$(svc_configured_instance_ids "$plat_json" "$(configured_mounts)")
 
   while IFS= read -r instance; do
+    [ -n "$instance" ] || continue
     suffix=$(svc_instance_suffix "$plat_json" "$instance")
     printf '%s\t%s (%s)\t%s\t%s\tlive\n' \
       "$key" "$display" "$suffix" "$(svc_instance_entry "$plat_json" "$instance")" "$instance"
   done <<<"$instances"
+
+  while IFS= read -r instance; do
+    [ -n "$instance" ] || continue
+    if svc_list_contains "$instances" "$instance"; then continue; fi
+    suffix=$(svc_instance_suffix "$plat_json" "$instance")
+    printf '%s\t%s (%s)\t%s\t%s\tconfigured\n' \
+      "$key" "$display" "$suffix" "$(svc_instance_entry "$plat_json" "$instance")" "$instance"
+  done <<<"$configured"
+
+  if [ -z "$instances" ] && [ -z "$configured" ]; then
+    printf '%s\t%s\t%s\t%s\tpseudo\n' "$key" "$display" "$plat_json" "$key"
+  fi
 }
 
 # resolve_service_names — Given user-specified names, resolve prefix matches to concrete names.
@@ -177,7 +188,7 @@ resolve_service_names() {
 # everywhere. Membership is checked against live enumeration so a mistyped id is
 # reported as such instead of as an inactive service.
 resolve_instance_name() {
-  local registry="$1" name="$2" match key display plat_json instances prefix
+  local registry="$1" name="$2" match key display plat_json instances prefix expected
 
   match=$(printf '%s' "$registry" | jq -c --arg name "$name" '
     to_entries
@@ -194,7 +205,14 @@ resolve_instance_name() {
   plat_json=$(printf '%s' "$match" | jq -c '.value.hostEntry')
   prefix=$(printf '%s' "$plat_json" | jq -r '.service')
   instances=$(svc_prefix_instances "$plat_json")
-  if [ -z "$instances" ] || ! printf '%s\n' "$instances" | grep -qxF "$name"; then
+  if ! svc_list_contains "$instances" "$name"; then
+    for expected in $(svc_configured_instance_ids "$plat_json" "$(configured_mounts)"); do
+      [ "$expected" = "$name" ] || continue
+      printf '%s\t%s (%s)\t%s\t%s\tconfigured\n' \
+        "$key" "$display" "$(svc_instance_suffix "$plat_json" "$name")" \
+        "$(svc_instance_entry "$plat_json" "$name")" "$name"
+      return 0
+    done
     printf '%s\t%s\t%s\t%s\terror\n' "ERROR:$name" "$name" \
       "{\"error\":\"no such instance (prefix '$prefix'); run 'nucleus-svc list'\"}" "$name"
     return 0
@@ -205,12 +223,54 @@ resolve_instance_name() {
     "$(svc_instance_entry "$plat_json" "$name")" "$name"
 }
 
+# configured_mounts — Memoized mounts the invoking user's registry declares.
+# Output: the cloud-drives mounts array as JSON.
+# WHY: discovery consults the registry once per prefix-match entry, and every
+# consultation runs the loader — memoizing keeps one loader invocation per run.
+configured_mounts() {
+  printf '%s\n' "$_configured_mounts"
+}
+
+# init_configured_mounts — Resolve the user registry once, before dispatch.
+# Args: $1 — the resolved host registry JSON.
+# WHY: the loader needs jq and a live repo root, and its failure must abort the
+# command instead of silently reporting "nothing configured"; resolving it here
+# (not inside resolve_entry's command substitutions) keeps that failure fatal.
+init_configured_mounts() {
+  local registry="$1"
+
+  if [ "$(printf '%s' "$registry" | jq -r '[.[] | select(.hostEntry.prefixMatch == true)] | length')" = "0" ]; then
+    _configured_mounts="[]"
+    _configured_mounts_set=true
+    return 0
+  fi
+
+  if ! _configured_mounts=$(svc_configured_mounts "$REPO_ROOT" "$HOST"); then
+    die "cannot read the user registry for $HOST"
+  fi
+  _configured_mounts_set=true
+}
+
+# row_is_named — Whether the user asked for this id explicitly.
+# Args: $1 — instance id. Returns 0 when it appears verbatim in service_names.
+# WHY: an explicitly named not-loaded instance is an error, while an aggregate
+# selection must keep acting on the instances that are live.
+row_is_named() {
+  local wanted="$1" name
+
+  for name in ${service_names[@]+"${service_names[@]}"}; do
+    [ "$name" = "$wanted" ] && return 0
+  done
+  return 1
+}
+
 # placeholder_status_json — Status object for a row that has no runtime identity.
-# Args: $1 — row class. Output: compact JSON status object.
+# Args: $1 — row class (pseudo|configured). Output: compact JSON status object.
 # WHY: reporting such a row as "inactive" would be a lie — nothing was probed.
 placeholder_status_json() {
   case "$1" in
   pseudo) printf '{"status":"n/a","running":false,"enabled":false,"pid":null,"crashLoop":"-"}\n' ;;
+  configured) printf '{"status":"not-loaded","running":false,"enabled":false,"pid":null,"configured":true,"crashLoop":"-"}\n' ;;
   esac
 }
 
@@ -782,6 +842,16 @@ do_action() {
       continue
     fi
 
+    if [ "$row_class" = "configured" ]; then
+      if row_is_named "$json_key"; then
+        error "$json_key — configured but not loaded (run 'nucleus-apply', or start it with the service manager)"
+        overall_exit=1
+      else
+        warn "$json_key — configured but not loaded"
+      fi
+      continue
+    fi
+
     local _d_domain
     _d_domain=$(printf '%s' "$svc_json" | jq -r '.scope // "system"')
     if [ "$_d_domain" = "system" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
@@ -828,6 +898,11 @@ do_verify() {
     fi
     if [ "$row_class" = "pseudo" ]; then
       notice "$json_key — no instances found (prefix '$(echo "$svc_json" | jq -r '.service // ""')'); nothing to verify"
+      continue
+    fi
+    if [ "$row_class" = "configured" ]; then
+      any_inactive=true
+      warn "$json_key — configured but not loaded (run 'nucleus-apply', or start it with the service manager)"
       continue
     fi
     local _d_domain
@@ -1144,15 +1219,29 @@ do_logs() {
 
     case "$HOST" in
     MacBook)
-      show_file_logs "$key" "$lines" "$raw" "$instance" || warn "$json_key — no log files found"
+      if ! show_file_logs "$key" "$lines" "$raw" "$instance"; then
+        if [ "$row_class" = "configured" ]; then
+          warn "$json_key — no log files found (configured but not loaded)"
+        else
+          warn "$json_key — no log files found"
+        fi
+      fi
       ;;
     NixOS)
       local unit
       unit="$(service_unit "$key" "$instance")"
       if [ -n "$unit" ] && command -v journalctl >/dev/null 2>&1; then
-        show_journald_logs "$key" "$lines" "$raw" "$since" "$instance" || warn "$json_key — no journald logs"
-      else
-        show_file_logs "$key" "$lines" "$raw" "$instance" || warn "$json_key — no log files found"
+        if ! show_journald_logs "$key" "$lines" "$raw" "$since" "$instance"; then
+          if [ "$row_class" = "configured" ]; then
+            warn "$json_key — no journald logs (configured but not loaded)"
+          else
+            warn "$json_key — no journald logs"
+          fi
+        fi
+      elif [ "$row_class" = "configured" ]; then
+        warn "$json_key — no journald logs (configured but not loaded)"
+      elif ! show_file_logs "$key" "$lines" "$raw" "$instance"; then
+        warn "$json_key — no log files found"
       fi
       ;;
     esac
@@ -1265,6 +1354,9 @@ verbose_mode=false
 domain_filter=""
 action=""
 service_names=()
+# Memoized user-registry mounts for prefix-match discovery (configured_mounts).
+_configured_mounts=""
+_configured_mounts_set=false
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -1356,6 +1448,8 @@ fi
 
 # WHY: list/status/logs dispatch via "do_$action" because their handler names
 # match the subcommand verb; the hyphenated subcommands need explicit mapping.
+init_configured_mounts "$(read_registry)"
+
 case "$action" in
 list | status | logs) "do_$action" ;;
 log-paths) do_log_paths ;;

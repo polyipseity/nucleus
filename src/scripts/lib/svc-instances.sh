@@ -158,6 +158,16 @@ svc_configured_mounts() {
     jq -c --arg user "$username" '.[$user].cloudDrives.mounts // []'
 }
 
+# svc_list_contains — Whether a value is one of the newline-separated items.
+# Args: $1 — newline-separated list; $2 — value.
+# Returns 0 when present, 1 when absent or the list is empty.
+svc_list_contains() {
+  local list="$1" value="$2"
+
+  [ -n "$list" ] || return 1
+  printf '%s\n' "$list" | grep -qxF "$value"
+}
+
 # svc_notloaded_transition — First-occurrence marker for a not-loaded instance.
 # Args: $1 — instance key; $2 — state directory.
 # Output: "first" the first time a key is reported, "repeat" afterwards.
