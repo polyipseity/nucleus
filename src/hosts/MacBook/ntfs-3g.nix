@@ -95,6 +95,12 @@ let
   #   the store, making the recorded hash content-addressed; without it a
   #   script-only edit would leave the previous /usr/local install in place.
   buildScriptPath = ./scripts/macos-build-ntfs3g.sh;
+  # WHY: the provider helper decides which macFUSE files the digest covers, and
+  #   an edit that is a no-op over the current tree (say, a find narrowed to the
+  #   top level) leaves the digest value unchanged — the recorded provider field
+  #   then cannot notice it.  Fingerprinting the helper makes every edit to what
+  #   the digest covers force a rebuild.
+  providerFingerprintScript = ../../scripts/lib/macos-fuse-provider.sh;
   buildFingerprint = builtins.hashString "sha256" (
     builtins.concatStringsSep "\n" [
       ntfs3gSrc.outPath
@@ -114,6 +120,7 @@ let
       installHookPatchPath
       fuseProviderPatchPath
       buildScriptPath
+      providerFingerprintScript
     ]
   );
 in

@@ -79,10 +79,9 @@ PROVIDER_ROOT=/usr/local
 #   provider files is therefore observed on every activation: without it a
 #   macFUSE upgrade leaves the installed ntfs-3g holding an absolute
 #   /usr/local/lib/libfuse.<abi>.dylib load path that no longer resolves.
-# WHY: the helper (src/scripts/lib/macos-fuse-provider.sh) is deliberately absent
-#   from buildFingerprint: a change to the way it derives the digest changes the
-#   digest itself, which the field-2 comparison below catches on the next
-#   activation, so listing it would only duplicate that.
+# The helper is part of buildFingerprint (providerFingerprintScript in
+# ntfs-3g.nix): an edit that changes what the digest covers without changing its
+# value would otherwise leave the field-2 comparison below unchanged.
 if ! PROVIDER_DIGEST="$(fuse_provider_digest "$PROVIDER_ROOT")"; then
   error -l ntfs-3g "macFUSE under $PROVIDER_ROOT is not fingerprinted — install or repair it (Homebrew cask macfuse@dev)"
   exit 1
