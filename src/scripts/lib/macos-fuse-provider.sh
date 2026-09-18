@@ -65,7 +65,11 @@ fuse_provider_lib_name() {
 # name used to build the manifest.  The root is canonicalized first, so it is
 # also independent of how the caller spells it (symlinked components included).
 # A provider file that cannot be read fails the digest instead of contributing an
-# empty hash.
+# empty hash.  Coverage is the build's own inputs: every regular file under
+# include/fuse/, the resolved library the link step consumes, and the pkg-config
+# file the configure step reads.  Nothing else under the provider root is hashed,
+# and a symlink inside include/fuse/ is not itself covered — lib/libfuse.dylib
+# is, under the relative path it resolves to.
 #
 # WHY: record the library under its resolved relative path:
 #   a macFUSE ABI bump (libfuse.2 -> libfuse.3) changes the digest even when the
