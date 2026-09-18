@@ -6,6 +6,10 @@
 #            installHookPatchPath fuseProviderPatchPath sdkRoot cFlags cxxFlags
 #            sdkDevDir
 #
+# Rebuilds when the installed binary or the build record is missing, when the
+# Nix fingerprint (argument 1) changed, or when the observed macFUSE provider
+# digest changed.
+#
 # CC/CXX/CPPFLAGS/CFLAGS/CXXFLAGS/LDFLAGS are exported here so ./configure and
 # make resolve them from the environment.
 #
@@ -30,6 +34,8 @@
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../../../scripts/lib/lib.sh
 . "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
+# shellcheck source=../../../scripts/lib/macos-fuse-provider.sh
+. "$SCRIPT_DIR/../../../scripts/lib/macos-fuse-provider.sh"
 
 CURRENT_FINGERPRINT="${1:?ntfs-3g build: missing fingerprint arg}"
 BUILD_TOOLS_PATH="${2:?ntfs-3g build: missing buildToolsPath arg}"
@@ -64,11 +70,39 @@ unset DEVELOPER_DIR
 
 FINGERPRINT_FILE="/usr/local/share/ntfs-3g/.build-fingerprint"
 LOG_FILE="/Library/Application Support/nucleus/logs/ntfs-3g-build.log"
+PROVIDER_ROOT=/usr/local
 
-if ! [ -x /usr/local/bin/ntfs-3g ] ||
-  ! [ -f "$FINGERPRINT_FILE" ] ||
-  [ "$(cat "$FINGERPRINT_FILE")" != "$CURRENT_FINGERPRINT" ]; then
-  say -l ntfs-3g "building from source... (log: $LOG_FILE)"
+# WHY: macFUSE is an impure build input.  Homebrew installs it (cask
+#   macfuse@dev, which declares auto_updates) into /usr/local, so the library
+#   and headers this build links against can be replaced with no repository
+#   change and no change to the Nix fingerprint.  The digest of the consumed
+#   provider files is therefore observed on every activation: without it a
+#   macFUSE upgrade leaves the installed ntfs-3g holding an absolute
+#   /usr/local/lib/libfuse.<abi>.dylib load path that no longer resolves.
+# WHY: the helper (src/scripts/lib/macos-fuse-provider.sh) is deliberately absent
+#   from buildFingerprint: a change to the way it derives the digest changes the
+#   digest itself, which the field-2 comparison below catches on the next
+#   activation, so listing it would only duplicate that.
+if ! PROVIDER_DIGEST="$(fuse_provider_digest "$PROVIDER_ROOT")"; then
+  error -l ntfs-3g "macFUSE under $PROVIDER_ROOT is not fingerprinted — install or repair it (Homebrew cask macfuse@dev)"
+  exit 1
+fi
+
+REBUILD_REASON=
+if ! [ -x /usr/local/bin/ntfs-3g ]; then
+  REBUILD_REASON="binary missing"
+elif ! [ -f "$FINGERPRINT_FILE" ]; then
+  REBUILD_REASON="build record missing"
+elif [ "$(fuse_provider_record_field 1 "$FINGERPRINT_FILE")" != "$CURRENT_FINGERPRINT" ]; then
+  REBUILD_REASON="build configuration changed"
+elif [ "$(fuse_provider_record_field 2 "$FINGERPRINT_FILE")" != "$PROVIDER_DIGEST" ]; then
+  REBUILD_REASON="macFUSE provider changed"
+fi
+
+if [ -n "$REBUILD_REASON" ]; then
+  MACFUSE_VERSION="$(macfuse_pkg_version)" || exit 1
+  PROVIDER_IDENTITY="$(fuse_provider_identity "$PROVIDER_ROOT" "$MACFUSE_VERSION")" || exit 1
+  say -l ntfs-3g "building from source: $REBUILD_REASON (log: $LOG_FILE)"
   # WHY: prepend (not append) so nix gnumake shadows BSD /usr/bin/make.  BSD
   #   make cannot parse the GNU Makefiles ./configure generates, aborting the
   #   build with "Something went wrong bootstrapping makefile fragments".
@@ -82,7 +116,8 @@ if ! [ -x /usr/local/bin/ntfs-3g ] ||
 
   /bin/mkdir -p "$(dirname "$LOG_FILE")"
   {
-    printf '[%s] ntfs-3g: build started\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+    printf '[%s] ntfs-3g: build started (provider %s, digest %s)\n' \
+      "$(date '+%Y-%m-%d %H:%M:%S')" "$PROVIDER_IDENTITY" "$PROVIDER_DIGEST"
 
     # Patch configure.ac: remove crypto autodetect block (AM_PATH_LIBGCRYPT
     # and PKG_CHECK_MODULES(GNUTLS macros undefined without library deps),
@@ -139,5 +174,8 @@ if ! [ -x /usr/local/bin/ntfs-3g ] ||
   say -l ntfs-3g "build complete — log at $(/bin/realpath "$LOG_FILE")"
 
   /bin/mkdir -p "$(dirname "$FINGERPRINT_FILE")"
-  echo "$CURRENT_FINGERPRINT" >"$FINGERPRINT_FILE"
+  # Line 1 is the Nix fingerprint (source, patches, toolchain, flags, this
+  # script), line 2 the observed provider digest; both gate the next rebuild.
+  # Line 3 names the provider for diagnostics and never gates anything.
+  printf '%s\n%s\n%s\n' "$CURRENT_FINGERPRINT" "$PROVIDER_DIGEST" "$PROVIDER_IDENTITY" >"$FINGERPRINT_FILE"
 fi
