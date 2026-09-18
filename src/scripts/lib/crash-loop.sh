@@ -16,8 +16,14 @@
 [ -n "${_NUCLEUS_CRASH_LOOP_SOURCED-}" ] && return
 _NUCLEUS_CRASH_LOOP_SOURCED=1
 
-# Source lib.sh for derive_nucleus_user_root if not already loaded.
-[ -n "${_NUCLEUS_LIB_SOURCED-}" ] || . "${SCRIPT_DIR}/lib.sh"
+# Source lib.sh for derive_nucleus_user_root if not already loaded. The directory
+# is derived from this library's own location, never from the caller's
+# SCRIPT_DIR: consumers that live outside src/scripts/lib (for example
+# src/platforms/macOS/scripts) would otherwise resolve a nonexistent lib.sh, get
+# no error, and silently lose derive_nucleus_user_root.
+_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+[ -n "${_NUCLEUS_LIB_SOURCED-}" ] || . "$_LIB_DIR/lib.sh"
 
 # crash_loop_state_dir — returns the state directory path.
 crash_loop_state_dir() {
