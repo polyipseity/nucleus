@@ -111,7 +111,10 @@ let
 
   betterdisplayHeartbeat = pkgs.writeNucleusShellApplication {
     name = "betterdisplay-heartbeat";
-    runtimeInputs = [ ];
+    # WHY: crash-loop.sh reads its state files with jq. launchd starts agents with
+    # the system PATH, which carries no jq, so state reads failed on every tick
+    # and crash-loop detection never worked for this agent.
+    runtimeInputs = [ pkgs.jq ];
     scriptName = "src/platforms/macOS/scripts/macos-heartbeat-betterdisplay";
   };
 
@@ -264,11 +267,11 @@ in
     config = {
       Label = "local.betterdisplay-heartbeat";
       ProgramArguments = [ "${betterdisplayHeartbeat}/bin/nucleus-betterdisplay-heartbeat" ];
-      # Start at login and stay alive; internal loop handles the 30 s interval.
+      # Start at login and stay alive; internal loop handles the 60 s interval.
       RunAtLoad = true;
       KeepAlive = true;
       # WHY: the house default is the stdout.log/stderr.log pair for every service.
-      # Rotation bounds the file, so the 30-second loop's no-op output stays diagnosable
+      # Rotation bounds the file, so the 60-second loop's no-op output stays diagnosable
       # without filling the log tree.
       StandardOutPath = "${config.nucleus.logging.logDir}/betterdisplay-heartbeat/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.logDir}/betterdisplay-heartbeat/stderr.log";
