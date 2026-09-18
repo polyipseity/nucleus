@@ -65,7 +65,9 @@ crash_loop_write_state() {
     # Filter timestamps > cutoff, build JSON array.
     printf '%s' "$restarts_csv" | awk -v cutoff="$cutoff" -F',' '
     {
-      n = split($1, a, ",")
+      # WHY: the input is a comma-joined string, so fields come from the whole
+      # record ($0); splitting $1 would count only the first timestamp.
+      n = split($0, a, ",")
       printf "["
       first = 1
       for (i = 1; i <= n; i++) {
@@ -163,7 +165,7 @@ crash_loop_restart_count() {
   fi
 
   count=$(printf '%s' "$restarts" | awk -v cutoff="$cutoff" -F',' '{
-    n = split($1, a, ",")
+    n = split($0, a, ",")
     c = 0
     for (i = 1; i <= n; i++) {
       if (a[i] + 0 > cutoff) c++
@@ -197,7 +199,7 @@ crash_loop_consecutive_failures() {
 
   # Count restarts that are more recent than lastSuccess (from newest to oldest).
   printf '%s' "$restarts" | awk -v ls="$last_success" -F',' '{
-    n = split($1, a, ",")
+    n = split($0, a, ",")
     c = 0
     for (i = n; i >= 1; i--) {
       if (a[i] + 0 > ls) c++
