@@ -669,8 +669,10 @@
         "platform": "macOS"
       },
       "NixOS": {
-        "justification": "User-scope watchdog not needed on NixOS — the system watchdog covers both scopes via systemctl --user",
-        "type": "omitted",
+        "scope": "user",
+        "justification": "Stuck user-scope services live in the user's own systemd manager; the root system watchdog has no user manager to query, so covering them requires a user-session unit.",
+        "service": "nucleus-service-watchdog-user.service",
+        "type": "systemctl",
         "platform": "NixOS"
       },
       "Windows": {

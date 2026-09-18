@@ -225,3 +225,80 @@ function Get-NucleusPrefixInstanceList {
   # holding the real array, which silently breaks every .Count check.
   return [string[]]@($instances | Sort-Object -Unique)
 }
+
+function Get-NucleusConfiguredInstanceList {
+  <#
+  .SYNOPSIS
+    Lists the instance ids the user registry declares for a prefix-match entry.
+
+  .DESCRIPTION
+    A mount declared in src/users/<user>/cloud-drives.json is expected to run even
+    while its scheduled task does not exist, so the expected ids are derived from the
+    registry entry (task folder + task-name prefix + mount id) instead of being stored
+    a second time. Discovery only reads: it never registers a task.
+
+  .PARAMETER HostEntry
+    Host entry hashtable of the prefix-match entry.
+
+  .PARAMETER Username
+    Single user record to read. When omitted, every user is read — the watchdog runs
+    as SYSTEM and reconciles all users.
+
+  .PARAMETER RepoRoot
+    Absolute repository root. Defaults to $env:NUCLEUS_REPO_ROOT.
+
+  .OUTPUTS
+    System.String[] — expected instance ids, sorted; empty when none are declared.
+    Callers must wrap the call in @() to keep a single id an array.
+
+  .EXAMPLE
+    Get-NucleusConfiguredInstanceList -HostEntry $entry -Username 'admin'
+  #>
+  [CmdletBinding()]
+  [OutputType([string[]])]
+  param(
+    [Parameter(Mandatory)]
+    [hashtable]$HostEntry,
+
+    [string]$Username,
+
+    [string]$RepoRoot
+  )
+
+  if ($HostEntry.type -ne 'schtask') {
+    throw "Get-NucleusConfiguredInstanceList: unsupported type '$($HostEntry.type)' for a prefix-match entry"
+  }
+
+  $effectiveRepoRoot = $RepoRoot
+  if ([string]::IsNullOrWhiteSpace($effectiveRepoRoot)) { $effectiveRepoRoot = $env:NUCLEUS_REPO_ROOT }
+  if ([string]::IsNullOrWhiteSpace($effectiveRepoRoot)) {
+    throw 'Get-NucleusConfiguredInstanceList: no repository root (pass -RepoRoot or set NUCLEUS_REPO_ROOT)'
+  }
+
+  $loader = Join-Path -Path $PSScriptRoot -ChildPath 'Load-UserRegistry.ps1'
+  if (-not (Test-Path -Path $loader -PathType Leaf)) {
+    throw "Get-NucleusConfiguredInstanceList: user registry loader not found at '$loader'"
+  }
+
+  $registry = & $loader -RepoRoot $effectiveRepoRoot
+  $records = @($registry.users)
+  if (-not [string]::IsNullOrWhiteSpace($Username)) {
+    $records = @($records | Where-Object { $_.name -eq $Username })
+  }
+
+  $ids = @()
+  foreach ($record in $records) {
+    foreach ($mount in @($record.cloudDrives.mounts)) {
+      if ($null -eq $mount) { continue }
+      # WHY: enable is optional in the mount schema and defaults to true, matching
+      # the Nix-side submodule default that decides which mounts are instantiated.
+      $enabled = if ($mount.ContainsKey('enable')) { [bool]$mount.enable } else { $true }
+      if (-not $enabled) { continue }
+      if (-not $mount.ContainsKey('remoteName')) { continue }
+      if ([string]::IsNullOrWhiteSpace([string]$mount.remoteName)) { continue }
+      $ids += Get-NucleusInstanceId -TaskFolder ([string]$HostEntry.taskPath) -TaskName "$([string]$HostEntry.service)$([string]$mount.id)"
+    }
+  }
+
+  return [string[]]@($ids | Sort-Object -Unique)
+}

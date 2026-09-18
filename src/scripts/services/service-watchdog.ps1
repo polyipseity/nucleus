@@ -5,7 +5,11 @@
 .DESCRIPTION
   Detects and restarts nucleus-managed services stuck in a non-running state.
   Reads src/modules/services.json, filters to Windows services, and restarts
-  any native SCM service or scheduled task that is not running.
+  any native SCM service or scheduled task that is not running.  A prefix-match
+  entry is expanded per instance: every live instance is checked on its own,
+  and an instance the user registry declares but Windows does not run is
+  reported once per transition instead of being started, because those tasks
+  exit 0 by design when their remote is unconfigured.
   Runs indefinitely with 300 s sleep between iterations (persistent daemon
   pattern — launched by scheduled task AtStartup).
   Use -Oneshot to run a single iteration (for manual or CI use).
@@ -28,6 +32,8 @@ $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) {
   Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 }
 
+. (Join-Path $RepoRoot 'src\platforms\Windows\modules\Get-NucleusServiceInstance.ps1')
+
 $ServicesJson = Join-Path $RepoRoot "src\modules\services.json"
 if (-not (Test-Path $ServicesJson)) {
   Write-NucleusInfo "services registry not found at $ServicesJson"
@@ -38,7 +44,8 @@ $RegistryRaw = Get-Content $ServicesJson -Raw | ConvertFrom-Json -AsHashtable
 $NucleusHost = 'Windows'
 
 # ── Filter to watchdog-managed services ────────────────────────────────────
-# Exclude: omitted, socket-activated, prefix-match (handled by svc.ps1).
+# Exclude: omitted, socket-activated.  Prefix-match entries are kept and
+# expanded per instance during the iteration.
 $Services = @()
 foreach ($key in $RegistryRaw.Keys) {
   $entry = $RegistryRaw[$key]
@@ -48,7 +55,6 @@ foreach ($key in $RegistryRaw.Keys) {
   $hostEntry = $entry.hosts[$NucleusHost]
   if ($hostEntry.type -eq "omitted") { continue }
   if ($hostEntry.socketActivated) { continue }
-  if ($hostEntry.prefixMatch) { continue }
 
   $Services += @{
     key         = $key
@@ -56,6 +62,8 @@ foreach ($key in $RegistryRaw.Keys) {
     type        = $hostEntry.type
     service     = $hostEntry.service
     taskPath    = $hostEntry.taskPath
+    prefixMatch = [bool]$hostEntry.prefixMatch
+    hostEntry   = $hostEntry
   }
 }
 
@@ -103,9 +111,52 @@ function Test-ScheduledTask {
   }
 }
 
+# ── Helper: not-loaded markers ─────────────────────────────────────────────
+# WHY: the loop ticks every 300 s, so a declared-but-absent mount is reported on
+# its transition only; the marker is cleared as soon as the instance is live.
+# The marker is keyed by the full instance id, matching the POSIX watchdog.
+function Get-NotLoadedMarkerPath {
+  param([string]$InstanceId)
+  $stateDir = Join-Path (Join-Path $env:ProgramData 'nucleus') 'state\service-stats'
+  # Task ids contain separators, which are invalid in a file name.
+  $safe = $InstanceId -replace '[\\/:*?"<>|]', '_'
+  return Join-Path $stateDir "$safe.notloaded"
+}
+
+function Write-NotLoadedLog {
+  param([string]$Key, [string]$InstanceId)
+  $marker = Get-NotLoadedMarkerPath -InstanceId $InstanceId
+  if (Test-Path -Path $marker -PathType Leaf) { return }
+  New-Item -Path (Split-Path -Parent $marker) -ItemType Directory -Force > $null
+  New-Item -Path $marker -ItemType File -Force > $null
+  $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+  $cmd = Get-NucleusCommandName
+  Write-Output "[$timestamp] ${cmd}: $Key $InstanceId configured but not loaded (run 'nucleus-svc status $Key' or 'nucleus-apply')"
+}
+
+function Clear-NotLoadedMarker {
+  param([string]$InstanceId)
+  $marker = Get-NotLoadedMarkerPath -InstanceId $InstanceId
+  if (Test-Path -Path $marker -PathType Leaf) { Remove-Item -Path $marker -Force }
+}
+
 # ── Main loop (persistent daemon pattern) ──────────────────────────────────
 function Invoke-WatchdogIteration {
   foreach ($svc in $Services) {
+    if ($svc.prefixMatch) {
+      $instances = @(Get-NucleusPrefixInstanceList -HostEntry $svc.hostEntry)
+      foreach ($instance in $instances) {
+        Test-ScheduledTask -Key $instance -DisplayName "$($svc.displayName) ($instance)" -TaskPath $instance
+        Clear-NotLoadedMarker -InstanceId $instance
+      }
+      $configured = @(Get-NucleusConfiguredInstanceList -HostEntry $svc.hostEntry -RepoRoot $RepoRoot)
+      foreach ($expected in $configured) {
+        if ($instances -contains $expected) { continue }
+        Write-NotLoadedLog -Key $svc.key -InstanceId $expected
+      }
+      continue
+    }
+
     switch ($svc.type) {
       "native" {
         Test-NativeService -Key $svc.key -DisplayName $svc.displayName -ServiceName $svc.service

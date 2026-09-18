@@ -27,6 +27,11 @@ BeforeAll {
     taskPath    = '\NucleusCloudMount'
     scope       = 'user'
   }
+
+  # The user-registry fixture declares no mounts of its own, so it inherits the
+  # three default mounts. Pester 6 does not share $Script: from a Describe-level
+  # BeforeAll, so the fixture root is resolved here.
+  $Script:FixtureRepoRoot = (Resolve-Path -Path (Join-Path $PSScriptRoot '../../../fixtures/user-registry') -ErrorAction Stop).Path
 }
 
 Describe 'Get-NucleusInstanceIdPrefix' {
@@ -141,5 +146,41 @@ Describe 'Get-NucleusPrefixInstanceList' {
 
   It 'throws when the entry declares no type' {
     { Get-NucleusPrefixInstanceList -HostEntry @{ prefixMatch = $true; service = 'NucleusCloudMount-' } } | Should -Throw '*has no type*'
+  }
+}
+
+Describe 'Get-NucleusConfiguredInstanceList' {
+  It 'derives the expected task id from the declared mount' {
+    $configured = @(Get-NucleusConfiguredInstanceList -HostEntry $Script:MountEntry -RepoRoot $Script:FixtureRepoRoot -Username 'test-user')
+    $configured | Should -Contain '\NucleusCloudMount\NucleusCloudMount-iCloud'
+  }
+
+  It 'returns the declared mounts sorted' {
+    $configured = @(Get-NucleusConfiguredInstanceList -HostEntry $Script:MountEntry -RepoRoot $Script:FixtureRepoRoot -Username 'test-user')
+    $sorted = @($configured | Sort-Object)
+    $configured.Count | Should -Be $sorted.Count
+    for ($i = 0; $i -lt $configured.Count; $i++) {
+      $configured[$i] | Should -Be $sorted[$i]
+    }
+  }
+
+  It 'returns no id for a user without cloud-drive declarations' {
+    $configured = @(Get-NucleusConfiguredInstanceList -HostEntry $Script:MountEntry -RepoRoot $Script:FixtureRepoRoot -Username 'no-such-user')
+    $configured.Count | Should -Be 0
+  }
+
+  It 'reads every user when no username is given' {
+    $configured = @(Get-NucleusConfiguredInstanceList -HostEntry $Script:MountEntry -RepoRoot $Script:FixtureRepoRoot)
+    $configured | Should -Contain '\NucleusCloudMount\NucleusCloudMount-iCloud'
+  }
+
+  It 'throws when no repository root can be resolved' {
+    $env:NUCLEUS_REPO_ROOT = $null
+    { Get-NucleusConfiguredInstanceList -HostEntry $Script:MountEntry } | Should -Throw '*no repository root*'
+  }
+
+  It 'rejects a prefix-match entry of an unsupported type' {
+    $entry = @{ type = 'native'; prefixMatch = $true; service = 'ollama' }
+    { Get-NucleusConfiguredInstanceList -HostEntry $entry -RepoRoot $Script:FixtureRepoRoot } | Should -Throw '*unsupported type*'
   }
 }

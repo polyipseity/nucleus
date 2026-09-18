@@ -12,9 +12,13 @@
 # /bin/sh wrapper; this watchdog recovers any that get stuck at boot.
 # See .agents/instructions/macos-service-hardening.instructions.md.
 #
-# Reads services.json, filters to the current host, skips socket-activated
-# and prefix-match services, and recovers each non-running service via
+# Reads services.json, filters to the current host, skips socket-activated and
+# on-demand services, and recovers each non-running service via
 # bootout+bootstrap (launchctl) or reset-failed+restart (systemctl).
+# Prefix-match entries are expanded per instance: each live instance is checked
+# independently, and each instance the user registry declares but this host does
+# not run is reported once per transition (never auto-loaded — see
+# src/modules/cloud-drives.nix on the clean-exit-0 contract).
 
 set -euo pipefail
 
@@ -42,6 +46,8 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../lib/macos-launch-services.sh"
 # shellcheck source=../lib/crash-loop.sh
 . "$SCRIPT_DIR/../lib/crash-loop.sh"
+# shellcheck source=../lib/svc-instances.sh
+. "$SCRIPT_DIR/../lib/svc-instances.sh"
 
 usage() {
   usage_std "$(basename "$0")" "[options]"
@@ -105,7 +111,7 @@ esac
 
 require_command jq
 
-# Read services for this host, excluding socket-activated and prefix-match.
+# Read services for this host, excluding socket-activated and on-demand services.
 read_watchdog_services() {
   jq -c --arg host "$HOST" '
     to_entries[]
@@ -113,9 +119,9 @@ read_watchdog_services() {
     | select(.value.hosts | has($host))
     | select(.value.hosts[$host].type != "omitted")
     | select(.value.hosts[$host].socketActivated // false | not)
-    | select(.value.hosts[$host].prefixMatch // false | not)
     | select(.value.hosts[$host].onDemand // false | not)
     | select(.key != "service-watchdog")
+    | select(.key != "service-watchdog-user")
     | {key: .key, displayName: .value.displayName, hostEntry: .value.hosts[$host]}
   ' "$SERVICES_JSON"
 }
@@ -123,6 +129,44 @@ read_watchdog_services() {
 log_restart() {
   local svc="$1" reason="$2"
   printf '[%s] watchdog: restarted %s (%s)\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$svc" "$reason"
+}
+
+# log_notloaded — Report an instance the registry declares but nothing runs.
+# Args: $1 — registry key; $2 — instance id.
+log_notloaded() {
+  printf '[%s] watchdog: %s %s configured but not loaded (run '\''nucleus-svc status %s'\'' or '\''nucleus-apply'\'')\n' \
+    "$(date '+%Y-%m-%d %H:%M:%S')" "$1" "$2" "$1"
+}
+
+# check_service_instances — Monitor every instance of a prefix-match entry.
+# Args: $1 — registry key; $2 — host entry JSON.
+# WHY: a prefix-match entry stands in for one runtime service per configured
+# instance, so each instance is checked and tracked separately; a declared but
+# absent instance is reported once per transition instead of being restarted,
+# because those units exit 0 by design when their remote is unconfigured.
+check_service_instances() {
+  local key="$1" entry="$2"
+  local instances configured instance instance_entry
+
+  instances=$(svc_prefix_instances "$entry")
+
+  while IFS= read -r instance; do
+    [ -n "$instance" ] || continue
+    instance_entry=$(svc_instance_entry "$entry" "$instance")
+    case "$HOST" in
+    MacBook) check_service_macos "$instance" "$instance_entry" ;;
+    NixOS) check_service_nixos "$instance" "$instance_entry" ;;
+    esac
+    svc_notloaded_clear "$instance" "$(crash_loop_state_dir)"
+  done <<<"$instances"
+
+  configured=$(svc_configured_instance_ids "$entry" "$(svc_configured_mounts "$(derive_repo_root)" "$HOST")")
+  while IFS= read -r instance; do
+    [ -n "$instance" ] || continue
+    if svc_list_contains "$instances" "$instance"; then continue; fi
+    if [ "$(svc_notloaded_transition "$instance" "$(crash_loop_state_dir)")" != first ]; then continue; fi
+    log_notloaded "$key" "$instance"
+  done <<<"$configured"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -269,18 +313,24 @@ _run_watchdog_iteration() {
   while IFS= read -r entry; do
     [ -z "$entry" ] && continue
     key=$(echo "$entry" | jq -r '.key')
+    entry_json=$(echo "$entry" | jq -c '.hostEntry')
 
     # If --scope was specified, skip services that don't match.
     if [ -n "$watchdog_scope" ]; then
-      svc_scope=$(echo "$entry" | jq -r '.hostEntry.scope // "user"')
+      svc_scope=$(echo "$entry_json" | jq -r '.scope // "user"')
       if [ "$svc_scope" != "$watchdog_scope" ]; then
         continue
       fi
     fi
 
+    if [ "$(printf '%s' "$entry_json" | jq -r '.prefixMatch // false')" = "true" ]; then
+      check_service_instances "$key" "$entry_json"
+      continue
+    fi
+
     case "$HOST" in
-    MacBook) check_service_macos "$key" "$(echo "$entry" | jq -c '.hostEntry')" ;;
-    NixOS) check_service_nixos "$key" "$(echo "$entry" | jq -c '.hostEntry')" ;;
+    MacBook) check_service_macos "$key" "$entry_json" ;;
+    NixOS) check_service_nixos "$key" "$entry_json" ;;
     esac
   done < <(read_watchdog_services)
 }

@@ -127,16 +127,37 @@ in
   #   macOS   — launchd daemon (KeepAlive=true, internal 300s loop)
   #   NixOS   — systemd service (Restart=always, internal 300s loop)
   #   Windows — scheduled task AtStartup (internal 300s loop)
+  # --scope system keeps this root service to system-domain units; a root
+  # process has no user manager, so user-domain coverage is a separate unit.
   # ---------------------------------------------------------------------------
   systemd.services."nucleus-service-watchdog" = {
     description = "Nucleus service watchdog — restart stuck services";
     environment.NUCLEUS_SERVICES_JSON = "${servicesJson}";
-    script = "exec ${nucleusApps.nucleus-service-watchdog}/bin/nucleus-service-watchdog";
+    script = "exec ${nucleusApps.nucleus-service-watchdog}/bin/nucleus-service-watchdog --scope system";
     serviceConfig = {
       Restart = "always";
       Type = "simple";
     };
     wantedBy = [ "multi-user.target" ];
+  };
+
+  # ---------------------------------------------------------------------------
+  # User-scope service watchdog — the user's own systemd manager.  Runs in the
+  # user session so `systemctl --user` resolves (a root process has no user
+  # manager and would log a false restart).  Cross-host parity:
+  #   macOS   — launchd agent (local.service-watchdog-user)
+  #   NixOS   — systemd user service (this unit)
+  #   Windows — the scheduled task runs with system scope and covers all users
+  # ---------------------------------------------------------------------------
+  systemd.user.services."nucleus-service-watchdog-user" = {
+    description = "Nucleus user service watchdog — restart stuck user services";
+    environment.NUCLEUS_SERVICES_JSON = "${servicesJson}";
+    serviceConfig = {
+      Type = "simple";
+      Restart = "always";
+      ExecStart = "${nucleusApps.nucleus-service-watchdog}/bin/nucleus-service-watchdog --scope user";
+    };
+    wantedBy = [ "default.target" ];
   };
 
   # ---------------------------------------------------------------------------

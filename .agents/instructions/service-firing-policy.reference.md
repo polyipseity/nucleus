@@ -30,7 +30,7 @@ name: "Service Firing Policy Reference"
 | `ollama` | launchd `daemon`, system | systemd `service`, system | SCM |
 | `rdp` | — (N/A) | — (N/A) | SCM |
 | `service-watchdog` | launchd `daemon`, system | systemd `service`, system | scheduled task, system |
-| `service-watchdog-user` | launchd `agent`, user | — (N/A) | — (N/A) |
+| `service-watchdog-user` | launchd `agent`, user | systemd `service`, user | — (N/A: the system task reconciles every user) |
 | `ssh-agent` | launchd `agent`, user (built-in) | systemd `service`, user | SCM |
 | `sshd` | launchd `daemon`, system (socket-activated) | systemd `service`, system | SCM |
 
