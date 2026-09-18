@@ -126,37 +126,36 @@ if [ -n "$REBUILD_REASON" ]; then
     # fuse-t, by absolute path so libtool never reads macFUSE's libfuse.la and
     # never inherits its -liconv/-licucore dependency_libs (the nixpkgs
     # apple-sdk has no stubs for either).
-    printf '[%s] ntfs-3g: patching...\n' "$(date '+%Y-%m-%d %H:%M:%S')"
-    patch -p1 <"$CRYPTO_PATCH_PATH"
-    patch -p1 <"$ROOTBINDIR_PATCH_PATH"
-    patch -p1 <"$INSTALL_HOOK_PATCH_PATH"
-    patch -p1 <"$FUSE_PROVIDER_PATCH_PATH"
-
-    printf '[%s] ntfs-3g: running autotools...\n' "$(date '+%Y-%m-%d %H:%M:%S')"
-    libtoolize --copy --force
-    aclocal --force -I m4
-    autoheader --force
-    automake --add-missing --copy --force-missing
-    autoconf --force
-
-    printf '[%s] ntfs-3g: configuring...\n' "$(date '+%Y-%m-%d %H:%M:%S')"
+    # WHY: chain every step with && so the group's exit status is the first
+    #   failure.  A rejected patch or a failed autotools/configure step leaves a
+    #   tree that can still build, so the build would otherwise install sources
+    #   that are not what the fingerprint describes and record them as the
+    #   current install.  Chaining rather than exiting: the group's output is
+    #   redirected to the log file, so exiting early would suppress the console
+    #   BUILD FAILED report below.
     # WHY: keep macFUSE out of LDFLAGS during configure — autoconf link probes
-    # fail when every test binary must link macFUSE under nix clang wrappers.
-    LDFLAGS=
-    ./configure "$CONFIGURE_FLAGS"
-
-    printf '[%s] ntfs-3g: building...\n' "$(date '+%Y-%m-%d %H:%M:%S')"
-    export LDFLAGS="$LINK_FLAGS"
+    #   fail when every test binary must link macFUSE under nix clang wrappers.
     # WHY: pass LDFLAGS on the make command line, not only via export.
     #   ./configure writes "LDFLAGS =" (empty) into every Makefile, and a
     #   Makefile-defined LDFLAGS overrides the environment variable of the same
     #   name.  Without the command-line form the libntfs-3g link loses
     #   -framework CoreFoundation and fails on the nfconv CoreFoundation calls.
-    # WHY: chain the two with && so a failed build cannot be masked by a
-    #   successful install.  The enclosing group's exit status is its last
-    #   command's, so `make install` would otherwise run after a failed `make`
-    #   and, if it succeeded, report a broken build as complete.
-    make -j"$(sysctl -n hw.ncpu)" LDFLAGS="$LINK_FLAGS" &&
+    printf '[%s] ntfs-3g: patching...\n' "$(date '+%Y-%m-%d %H:%M:%S')" &&
+      patch -p1 <"$CRYPTO_PATCH_PATH" &&
+      patch -p1 <"$ROOTBINDIR_PATCH_PATH" &&
+      patch -p1 <"$INSTALL_HOOK_PATCH_PATH" &&
+      patch -p1 <"$FUSE_PROVIDER_PATCH_PATH" &&
+      printf '[%s] ntfs-3g: running autotools...\n' "$(date '+%Y-%m-%d %H:%M:%S')" &&
+      libtoolize --copy --force &&
+      aclocal --force -I m4 &&
+      autoheader --force &&
+      automake --add-missing --copy --force-missing &&
+      autoconf --force &&
+      printf '[%s] ntfs-3g: configuring...\n' "$(date '+%Y-%m-%d %H:%M:%S')" &&
+      LDFLAGS="" ./configure "$CONFIGURE_FLAGS" &&
+      printf '[%s] ntfs-3g: building...\n' "$(date '+%Y-%m-%d %H:%M:%S')" &&
+      export LDFLAGS="$LINK_FLAGS" &&
+      make -j"$(sysctl -n hw.ncpu)" LDFLAGS="$LINK_FLAGS" &&
       {
         printf '[%s] ntfs-3g: installing...\n' "$(date '+%Y-%m-%d %H:%M:%S')"
         make install LDFLAGS="$LINK_FLAGS"
