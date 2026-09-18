@@ -117,7 +117,7 @@ crash_loop_record() {
 
   # Log if reason provided.
   if [ -n "$reason" ]; then
-    notice "crash-loop: recorded restart for %s (%s)" "$service" "$reason"
+    notice "crash-loop: recorded restart for $service ($reason)"
   fi
 }
 

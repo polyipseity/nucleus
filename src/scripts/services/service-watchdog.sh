@@ -219,7 +219,7 @@ check_service_macos() {
     ;;
   *"state = spawn scheduled"*)
     if crash_loop_is_looping "$svc"; then
-      warn "watchdog: %s is crash-looping — skipping restart" "$svc_id"
+      warn "watchdog: $svc_id is crash-looping — skipping restart"
       return 0
     fi
     crash_loop_record "$svc" "spawn-scheduled"
@@ -228,7 +228,7 @@ check_service_macos() {
     ;;
   *"state = waiting"*)
     if crash_loop_is_looping "$svc"; then
-      warn "watchdog: %s is crash-looping — skipping restart" "$svc_id"
+      warn "watchdog: $svc_id is crash-looping — skipping restart"
       return 0
     fi
     crash_loop_record "$svc" "waiting"
@@ -239,7 +239,7 @@ check_service_macos() {
   # Exit 126 (transient): shell cannot exec; does NOT trigger penalty box.
   *"last exit code = 78"*)
     if crash_loop_is_looping "$svc"; then
-      warn "watchdog: %s is crash-looping — skipping restart" "$svc_id"
+      warn "watchdog: $svc_id is crash-looping — skipping restart"
       return 0
     fi
     crash_loop_record "$svc" "EX_CONFIG"
@@ -249,7 +249,7 @@ check_service_macos() {
   *"Service is not found"* | "")
     # Service not loaded — try bootstrapping.
     if crash_loop_is_looping "$svc"; then
-      warn "watchdog: %s is crash-looping — skipping restart" "$svc_id"
+      warn "watchdog: $svc_id is crash-looping — skipping restart"
       return 0
     fi
     local plist=""
@@ -292,7 +292,7 @@ check_service_nixos() {
   inactive | dead | failed | not-found | "")
     # Check crash-loop before restarting.
     if crash_loop_is_looping "$svc"; then
-      warn "watchdog: %s is crash-looping — skipping restart" "$svc_id"
+      warn "watchdog: $svc_id is crash-looping — skipping restart"
       return 0
     fi
     crash_loop_record "$svc" "state=$is_active"
