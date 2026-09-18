@@ -5,7 +5,9 @@
 # is a symlink to that mount point; on every other host clouds/<id> *is* the
 # mount point. The regression this guards: treating the macOS path as a real
 # directory (rclone then refuses to mount, or mounts into a directory the user
-# cannot see), and any state conflict being papered over instead of failing.
+# cannot see), and any state conflict being papered over instead of failing,
+# except the two cases the migration converges: a stale symlink target and a
+# leftover empty directory.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -56,15 +58,15 @@ test_macos_mount_path_is_idempotent() {
   rm -rf "$home"
 }
 
-test_macos_mount_path_rejects_foreign_symlink() {
+test_macos_mount_path_repairs_foreign_symlink() {
   local home rc=0
   home="$(mktemp -d)"
   mkdir -p "$home/clouds"
   ln -s "/Volumes/somewhere-else" "$home/clouds/GoogleDrive"
   run_setup "$home" "$_mounts_macos" "$_replicas_none" || rc=$?
-  if [ "$rc" -ne 0 ] &&
-    [ "$(readlink "$home/clouds/GoogleDrive")" = "/Volumes/somewhere-else" ]; then
-    assert_pass "a macOS mount path pointing elsewhere fails instead of being rewritten"
+  if [ "$rc" -eq 0 ] &&
+    [ "$(readlink "$home/clouds/GoogleDrive")" = "/Volumes/nucleus-cloud-GoogleDrive" ]; then
+    assert_pass "a stale symlink target is relinked to the configured macOS mount point"
   else
     assert_fail "cloud-drives-macos-mount-foreign-link" \
       "rc=$rc link=$(readlink "$home/clouds/GoogleDrive" 2>/dev/null)"
@@ -72,7 +74,21 @@ test_macos_mount_path_rejects_foreign_symlink() {
   rm -rf "$home"
 }
 
-test_macos_mount_path_rejects_real_directory() {
+test_macos_mount_path_replaces_empty_directory() {
+  local home rc=0
+  home="$(mktemp -d)"
+  mkdir -p "$home/clouds/GoogleDrive"
+  run_setup "$home" "$_mounts_macos" "$_replicas_none" || rc=$?
+  if [ "$rc" -eq 0 ] && [ -L "$home/clouds/GoogleDrive" ] &&
+    [ "$(readlink "$home/clouds/GoogleDrive")" = "/Volumes/nucleus-cloud-GoogleDrive" ]; then
+    assert_pass "a leftover empty mount directory is replaced by the symlink"
+  else
+    assert_fail "cloud-drives-macos-mount-empty-dir" "rc=$rc"
+  fi
+  rm -rf "$home"
+}
+
+test_macos_mount_path_rejects_nonempty_directory() {
   local home rc=0
   home="$(mktemp -d)"
   mkdir -p "$home/clouds/GoogleDrive"
@@ -80,7 +96,7 @@ test_macos_mount_path_rejects_real_directory() {
   run_setup "$home" "$_mounts_macos" "$_replicas_none" || rc=$?
   if [ "$rc" -ne 0 ] && [ -f "$home/clouds/GoogleDrive/keep.txt" ] &&
     [ ! -L "$home/clouds/GoogleDrive" ]; then
-    assert_pass "an existing real directory is left intact and fails loudly"
+    assert_pass "a non-empty real directory is left intact and fails loudly"
   else
     assert_fail "cloud-drives-macos-mount-real-dir" "rc=$rc"
   fi
@@ -152,8 +168,9 @@ test_icloud_replica_links_to_native_storage() {
 
 test_macos_mount_path_becomes_symlink
 test_macos_mount_path_is_idempotent
-test_macos_mount_path_rejects_foreign_symlink
-test_macos_mount_path_rejects_real_directory
+test_macos_mount_path_repairs_foreign_symlink
+test_macos_mount_path_replaces_empty_directory
+test_macos_mount_path_rejects_nonempty_directory
 test_local_mount_path_is_real_directory
 test_local_mount_path_rejects_symlink
 test_replica_directory_is_a_real_directory

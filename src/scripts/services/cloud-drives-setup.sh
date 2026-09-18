@@ -20,7 +20,9 @@ _cd_ensure_real_directory() {
   mkdir -p "$_cd_path"
 }
 
-# Ensure PATH is a symlink to TARGET.
+# Ensure PATH is a symlink to TARGET, converging stale state at this config-owned
+# path: a symlink carries no data, so a wrong target is relinked, and the mount
+# path may legitimately be a leftover empty directory from an earlier layout.
 # Usage: _cd_ensure_symlink "$HOME/clouds/gdrive" "/Volumes/nucleus-cloud-gdrive" "gdrive"
 _cd_ensure_symlink() {
   _cd_link="$1"
@@ -28,15 +30,26 @@ _cd_ensure_symlink() {
   _cd_name="$3"
 
   if [ -L "$_cd_link" ]; then
-    if [ "$(readlink "$_cd_link")" != "$_cd_target" ]; then
-      printf '%s\n' "cloud-drives (${_cd_name}): error: $_cd_link must symlink to $_cd_target; fix manually and re-apply" >&2
-      exit 1
+    if [ "$(readlink "$_cd_link")" = "$_cd_target" ]; then
+      return 0
     fi
+    rm "$_cd_link"
+    ln -s "$_cd_target" "$_cd_link"
+    printf '%s\n' "cloud-drives (${_cd_name}): relinked $_cd_link -> $_cd_target"
     return 0
   fi
   if [ -e "$_cd_link" ]; then
-    printf '%s\n' "cloud-drives (${_cd_name}): error: $_cd_link exists and is not a symlink to $_cd_target; fix manually and re-apply" >&2
-    exit 1
+    if [ ! -d "$_cd_link" ] || [ -n "$(ls -A "$_cd_link")" ]; then
+      printf '%s\n' "cloud-drives (${_cd_name}): error: $_cd_link exists and is neither empty nor a symlink to $_cd_target; fix manually and re-apply" >&2
+      exit 1
+    fi
+    # WHY: rmdir rather than rm -rf — it refuses a mount point that is still
+    #   attached, so a live mount can never be deleted from under the user.
+    if ! rmdir "$_cd_link"; then
+      printf '%s\n' "cloud-drives (${_cd_name}): error: cannot remove $_cd_link (still mounted?); unmount it and re-apply" >&2
+      exit 1
+    fi
+    printf '%s\n' "cloud-drives (${_cd_name}): replaced empty directory with a symlink to $_cd_target"
   fi
   ln -s "$_cd_target" "$_cd_link"
   printf '%s\n' "cloud-drives (${_cd_name}): linked $_cd_link -> $_cd_target"
