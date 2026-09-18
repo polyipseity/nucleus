@@ -81,6 +81,11 @@ let
       -o "$out" "${../../scripts/set-workflow-icon.m}"
   '';
 
+  # Sanitize a workflow directory name into a valid Nix store-path name.
+  # WHY: store-path names allow only [A-Za-z0-9+._?=-]; the "(N)" preset numbering
+  # carries parentheses, which Nix rejects in a derivation name.
+  sanitizeStoreName = builtins.replaceStrings [ " " "(" ")" ] [ "-" "" "" ];
+
   # Build a workflow bundle with QuickLook/Thumbnail.png generated at build time.
   # Compiles the ObjC SF Symbol renderer with clang (stdenv), runs it headless,
   # and produces a 256×256 PNG. The deploy script copies the entire bundle.
@@ -88,7 +93,7 @@ let
     wf:
     wf
     // {
-      source = pkgs.runCommand "automator-${builtins.replaceStrings [ " " ] [ "-" ] wf.dir}" { } ''
+      source = pkgs.runCommand "automator-${sanitizeStoreName wf.dir}" { } ''
         cp -r "${wf.source}" "$out"
         chmod -R u+w "$out"
         mkdir -p "$out/Contents/QuickLook"
@@ -128,73 +133,73 @@ let
         TouchBar = true;
       };
     }
-    # Alphabetical between "open" and "optimize" — strip metadata (single unified workflow)
+    # Optimize PDF presets block — quality-descending, numbered for sort order
+    {
+      dir = "optimize PDF - (1) default.workflow";
+      enablementKey = "com.nucleus.OptimizePDF.default - optimize PDF - (1) default - runWorkflowAsService";
+      source = "${workflowsDir}/optimize PDF - (1) default.workflow";
+      thumbnailSymbol = "doc.badge.gearshape";
+      presentationModes = {
+        ContextMenu = true;
+        ServicesMenu = true;
+        FinderPreview = true;
+        TouchBar = true;
+      };
+    }
+    {
+      dir = "optimize PDF - (2) prepress.workflow";
+      enablementKey = "com.nucleus.OptimizePDF.prepress - optimize PDF - (2) prepress - runWorkflowAsService";
+      source = "${workflowsDir}/optimize PDF - (2) prepress.workflow";
+      thumbnailSymbol = "doc.badge.gearshape";
+      presentationModes = {
+        ContextMenu = true;
+        ServicesMenu = true;
+        FinderPreview = true;
+        TouchBar = true;
+      };
+    }
+    {
+      dir = "optimize PDF - (3) printer.workflow";
+      enablementKey = "com.nucleus.OptimizePDF.printer - optimize PDF - (3) printer - runWorkflowAsService";
+      source = "${workflowsDir}/optimize PDF - (3) printer.workflow";
+      thumbnailSymbol = "doc.badge.gearshape";
+      presentationModes = {
+        ContextMenu = true;
+        ServicesMenu = true;
+        FinderPreview = true;
+        TouchBar = true;
+      };
+    }
+    {
+      dir = "optimize PDF - (4) ebook.workflow";
+      enablementKey = "com.nucleus.OptimizePDF.ebook - optimize PDF - (4) ebook - runWorkflowAsService";
+      source = "${workflowsDir}/optimize PDF - (4) ebook.workflow";
+      thumbnailSymbol = "doc.badge.gearshape";
+      presentationModes = {
+        ContextMenu = true;
+        ServicesMenu = true;
+        FinderPreview = true;
+        TouchBar = true;
+      };
+    }
+    {
+      dir = "optimize PDF - (5) screen.workflow";
+      enablementKey = "com.nucleus.OptimizePDF.screen - optimize PDF - (5) screen - runWorkflowAsService";
+      source = "${workflowsDir}/optimize PDF - (5) screen.workflow";
+      thumbnailSymbol = "doc.badge.gearshape";
+      presentationModes = {
+        ContextMenu = true;
+        ServicesMenu = true;
+        FinderPreview = true;
+        TouchBar = true;
+      };
+    }
+    # Alphabetical after "optimize" — strip metadata (single unified workflow)
     {
       dir = "strip metadata.workflow";
       enablementKey = "com.nucleus.StripMetadata - strip metadata - runWorkflowAsService";
       source = "${workflowsDir}/strip metadata.workflow";
       thumbnailSymbol = "eraser.line.dashed";
-      presentationModes = {
-        ContextMenu = true;
-        ServicesMenu = true;
-        FinderPreview = true;
-        TouchBar = true;
-      };
-    }
-    # Optimize PDF presets block — quality-descending, numbered for sort order
-    {
-      dir = "optimize PDF - 1. default.workflow";
-      enablementKey = "com.nucleus.OptimizePDF.default - optimize PDF - (1) default - runWorkflowAsService";
-      source = "${workflowsDir}/optimize PDF - 1. default.workflow";
-      thumbnailSymbol = "doc.badge.gearshape";
-      presentationModes = {
-        ContextMenu = true;
-        ServicesMenu = true;
-        FinderPreview = true;
-        TouchBar = true;
-      };
-    }
-    {
-      dir = "optimize PDF - 2. prepress.workflow";
-      enablementKey = "com.nucleus.OptimizePDF.prepress - optimize PDF - (2) prepress - runWorkflowAsService";
-      source = "${workflowsDir}/optimize PDF - 2. prepress.workflow";
-      thumbnailSymbol = "doc.badge.gearshape";
-      presentationModes = {
-        ContextMenu = true;
-        ServicesMenu = true;
-        FinderPreview = true;
-        TouchBar = true;
-      };
-    }
-    {
-      dir = "optimize PDF - 3. printer.workflow";
-      enablementKey = "com.nucleus.OptimizePDF.printer - optimize PDF - (3) printer - runWorkflowAsService";
-      source = "${workflowsDir}/optimize PDF - 3. printer.workflow";
-      thumbnailSymbol = "doc.badge.gearshape";
-      presentationModes = {
-        ContextMenu = true;
-        ServicesMenu = true;
-        FinderPreview = true;
-        TouchBar = true;
-      };
-    }
-    {
-      dir = "optimize PDF - 4. ebook.workflow";
-      enablementKey = "com.nucleus.OptimizePDF.ebook - optimize PDF - (4) ebook - runWorkflowAsService";
-      source = "${workflowsDir}/optimize PDF - 4. ebook.workflow";
-      thumbnailSymbol = "doc.badge.gearshape";
-      presentationModes = {
-        ContextMenu = true;
-        ServicesMenu = true;
-        FinderPreview = true;
-        TouchBar = true;
-      };
-    }
-    {
-      dir = "optimize PDF - 5. screen.workflow";
-      enablementKey = "com.nucleus.OptimizePDF.screen - optimize PDF - (5) screen - runWorkflowAsService";
-      source = "${workflowsDir}/optimize PDF - 5. screen.workflow";
-      thumbnailSymbol = "doc.badge.gearshape";
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;

@@ -16,8 +16,9 @@
 # manually maintained in their declared order; no automatic re-sorting.
 #   currentNucleusAppBundles: alphabetical by appDir.
 #   currentNucleusWorkflows: alphabetical by entry name, with the 5 Optimize
-#     PDF presets grouped as a block sorted quality-descending (default →
-#     prepress → printer → ebook → screen). This is the cross-platform
+#     PDF presets grouped as a block sorted quality-descending and numbered
+#     ((1) default → (2) prepress → (3) printer → (4) ebook → (5) screen) so the
+#     bundle directory names sort correctly. This is the cross-platform
 #     convention (same on NixOS and Windows).
 { lib, pkgs, ... }:
 let
