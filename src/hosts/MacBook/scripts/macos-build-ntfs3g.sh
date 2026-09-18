@@ -71,6 +71,23 @@ unset DEVELOPER_DIR
 FINGERPRINT_FILE="/usr/local/share/ntfs-3g/.build-fingerprint"
 LOG_FILE="/Library/Application Support/nucleus/logs/ntfs-3g-build.log"
 PROVIDER_ROOT=/usr/local
+NTFS3G_BIN=/usr/local/bin/ntfs-3g
+
+# Reason the installed ntfs-3g must be rebuilt; prints nothing while it is
+# current.  Arguments: binary record fingerprint provider_digest — the observed
+# state is passed in rather than read from the constants above, so the gate can
+# be exercised against fixtures (tests/scripts/macos-build-ntfs3g-tests.sh).
+ntfs3g_rebuild_reason() {
+  if ! [ -x "$1" ]; then
+    printf '%s\n' "binary missing"
+  elif ! [ -f "$2" ]; then
+    printf '%s\n' "build record missing"
+  elif [ "$(fuse_provider_record_field 1 "$2")" != "$3" ]; then
+    printf '%s\n' "build configuration changed"
+  elif [ "$(fuse_provider_record_field 2 "$2")" != "$4" ]; then
+    printf '%s\n' "macFUSE provider changed"
+  fi
+}
 
 # WHY: macFUSE is an impure build input.  Homebrew installs it (cask
 #   macfuse@dev, which declares auto_updates) into /usr/local, so the library
@@ -87,16 +104,7 @@ if ! PROVIDER_DIGEST="$(fuse_provider_digest "$PROVIDER_ROOT")"; then
   exit 1
 fi
 
-REBUILD_REASON=
-if ! [ -x /usr/local/bin/ntfs-3g ]; then
-  REBUILD_REASON="binary missing"
-elif ! [ -f "$FINGERPRINT_FILE" ]; then
-  REBUILD_REASON="build record missing"
-elif [ "$(fuse_provider_record_field 1 "$FINGERPRINT_FILE")" != "$CURRENT_FINGERPRINT" ]; then
-  REBUILD_REASON="build configuration changed"
-elif [ "$(fuse_provider_record_field 2 "$FINGERPRINT_FILE")" != "$PROVIDER_DIGEST" ]; then
-  REBUILD_REASON="macFUSE provider changed"
-fi
+REBUILD_REASON="$(ntfs3g_rebuild_reason "$NTFS3G_BIN" "$FINGERPRINT_FILE" "$CURRENT_FINGERPRINT" "$PROVIDER_DIGEST")"
 
 if [ -n "$REBUILD_REASON" ]; then
   MACFUSE_VERSION="$(macfuse_pkg_version)" || exit 1
