@@ -1,15 +1,23 @@
 #!/usr/bin/env bash
-# Tests for the undeclared-bundle pruning in
-# src/hosts/MacBook/scripts/macos-deploy-automator-workflows.sh.
+# Tests for src/hosts/MacBook/scripts/macos-deploy-automator-workflows.sh.
 #
 # Pruning is what makes a renamed or removed preset disappear: macOS
 # re-registers an NSServicesStatus entry for every workflow bundle still present
 # in ~/Library/Services, so a bundle left behind keeps its old label in Finder
 # Quick Actions and the Services menu even after the deployer rewrites the
-# enablement dictionary.  The suite extracts the pruner from the activation
-# script and runs it against fixture services directories; the script body is
-# never executed, because a real run copies bundles, calls setIcon and mdimport,
-# and rewrites the system preferences domain.
+# enablement dictionary.
+#
+# Two layers:
+#   * pruner cases, which extract automator_prune_stale_workflows and drive it
+#     directly against fixture services directories;
+#   * one end-to-end case, which runs the whole activation script under a
+#     stubbed HOME with stub setIcon/defaults/mdimport binaries.
+#
+# The pruner-only layer cannot see the call site, so deleting the call (or the
+# dictionary write) leaves it green; the end-to-end case is what covers that
+# wiring.  The stubs are the reason the deployer takes the macOS system binaries
+# as arguments: a hardcoded /usr/bin/defaults would escape them and rewrite the
+# real preferences domain.
 
 set -euo pipefail
 
@@ -280,6 +288,160 @@ test_prune_tolerates_an_empty_services_directory() {
   rm -rf "$work"
 }
 
+# ---- End-to-end deployment ----
+
+require_command jq "the deployer consumes the workflow list through jq"
+JQ_BIN="$(command -v jq)"
+
+# make_store_bundle <store_root> <workflow_dir_name> <identifier> — build a source
+# bundle shaped like the derivation output the deployer copies from.
+make_store_bundle() {
+  local bundle="$1/$2"
+  mkdir -p "$bundle/Contents/QuickLook"
+  cat >"$bundle/Contents/Info.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+  <key>CFBundleIdentifier</key>
+  <string>$3</string>
+</dict>
+</plist>
+EOF
+  : >"$bundle/Contents/QuickLook/Thumbnail.png"
+}
+
+# workflow_json_entry <dir> <source> <enablement_key> — one element of the array
+# the Nix expression hands the deployer, built with the jq the deployer uses.
+workflow_json_entry() {
+  # shellcheck disable=SC2016 # reason: jq program text; $dir/$key/$source are jq variables, not shell expansions
+  local program='{dir: $dir, enablementKey: $key, source: $source, presentationModesDict: "<dict><key>ContextMenuShortcut</key><true/></dict>"}'
+  "$JQ_BIN" -cn \
+    --arg dir "$1" \
+    --arg source "$2" \
+    --arg key "$3" \
+    "$program"
+}
+
+# make_reading_defaults_stub <path> — a `defaults` that answers an identifier
+# query from the bundle's own Info.plist and records every write in
+# $DEFAULTS_STUB_RECORD, the way the real binary talks to the preferences domain.
+make_reading_defaults_stub() {
+  cat >"$1" <<'STUB'
+#!/bin/sh
+case "$1" in
+read)
+  awk '/<key>CFBundleIdentifier<\/key>/{getline; gsub(/.*<string>|<\/string>.*/, ""); print; exit}' "$2.plist"
+  ;;
+write)
+  printf '%s\n' "$*" >>"${DEFAULTS_STUB_RECORD:?DEFAULTS_STUB_RECORD must be set}"
+  ;;
+*)
+  exit 1
+  ;;
+esac
+STUB
+  chmod +x "$1"
+}
+
+# make_recorder_stub <path> <log> — an executable that appends its argv to <log>.
+make_recorder_stub() {
+  cat >"$1" <<STUB
+#!/bin/sh
+printf '%s\\n' "\$*" >>"$2"
+STUB
+  chmod +x "$1"
+}
+
+test_deploy_script_takes_the_system_binaries_as_arguments() {
+  # Without this the end-to-end case below would reach the real /usr/bin/defaults
+  # and rewrite this machine's pbs preferences domain.
+  local hardcoded
+  hardcoded="$(grep -nE '/usr/bin/(defaults|mdimport)' "$DEPLOY_SCRIPT" || true)"
+  if [ -z "$hardcoded" ]; then
+    assert_pass "deploy script takes the macOS system binaries as arguments"
+  else
+    assert_fail "deploy script takes the macOS system binaries as arguments" \
+      "hardcoded system binary would bypass the test stubs: $hardcoded"
+  fi
+}
+
+test_deploy_end_to_end_converges_bundles_and_preferences() {
+  local work home store services defaults mdimport seticon json record
+  local kept prepress stale_unnumbered stale_dotted foreign
+  work="$(mktemp -d)"
+  home="$work/home"
+  store="$work/store"
+  services="$home/Library/Services"
+  mkdir -p "$services" "$store"
+
+  kept="optimize PDF - (1) default.workflow"
+  prepress="optimize PDF - (2) prepress.workflow"
+  stale_unnumbered="optimize PDF - default.workflow"
+  stale_dotted="optimize PDF - 1. default.workflow"
+  foreign="Some App.workflow"
+
+  make_store_bundle "$store" "$kept" "com.nucleus.OptimizePDF.default"
+  make_store_bundle "$store" "$prepress" "com.nucleus.OptimizePDF.prepress"
+  # Leftovers from the two earlier naming schemes, plus a bundle owned by another
+  # application: only the first two may be removed.
+  make_bundle "$services" "$stale_unnumbered" "com.nucleus.OptimizePDF.legacy"
+  make_bundle "$services" "$stale_dotted" "com.nucleus.OptimizePDF.dotted"
+  make_bundle "$services" "$foreign" "com.apple.Foo"
+
+  defaults="$work/defaults"
+  make_reading_defaults_stub "$defaults"
+  mdimport="$work/mdimport"
+  seticon="$work/seticon"
+  make_recorder_stub "$mdimport" "$work/mdimport.log"
+  make_recorder_stub "$seticon" "$work/seticon.log"
+  record="$work/defaults.log"
+  export DEFAULTS_STUB_RECORD="$record"
+
+  json="$({
+    workflow_json_entry "$kept" "$store/$kept" "com.nucleus.OptimizePDF.default - optimize PDF - (1) default - runWorkflowAsService"
+    workflow_json_entry "$prepress" "$store/$prepress" "com.nucleus.OptimizePDF.prepress - optimize PDF - (2) prepress - runWorkflowAsService"
+  } | "$JQ_BIN" -sc '.')"
+
+  HOME="$home" bash "$DEPLOY_SCRIPT" "$JQ_BIN" "$json" "$seticon" "$defaults" "$mdimport"
+
+  # 1. The leftovers are gone; declared and foreign bundles survive.
+  assert_installed "deploy end-to-end prunes bundles the workflow list no longer declares" \
+    "$services" "$(printf '%s\n%s\n%s\n' "$kept" "$prepress" "$foreign" | sort)"
+
+  # 2. Each declared bundle was copied and registered with IconServices/mdimport.
+  #    Both logs are read tolerantly: a missing one means the copy loop never ran,
+  #    which the assertion below reports instead of aborting the suite.
+  local icons metadata
+  icons="$(cat "$work/seticon.log" 2>/dev/null || true)"
+  metadata="$(cat "$work/mdimport.log" 2>/dev/null || true)"
+  if [ "$(printf '%s\n' "$icons" | wc -l | tr -d ' ')" = "2" ] &&
+    printf '%s\n' "$icons" | grep -qF "$services/$kept/Contents/QuickLook/Thumbnail.png" &&
+    printf '%s\n' "$icons" | grep -qF "$services/$prepress/Contents/QuickLook/Thumbnail.png" &&
+    printf '%s\n' "$metadata" | grep -qxF "$services/$kept" &&
+    printf '%s\n' "$metadata" | grep -qxF "$services/$prepress"; then
+    assert_pass "deploy end-to-end copies every declared bundle and registers its icon and metadata"
+  else
+    assert_fail "deploy end-to-end copies every declared bundle and registers its icon and metadata" \
+      "setIcon [$icons] mdimport [$metadata]"
+  fi
+
+  # 3. One dictionary write, holding both declared keys and their presentation
+  #    modes — this is the half a deleted write or a broken key accumulation drops.
+  local writes
+  writes="$(cat "$record" 2>/dev/null || true)"
+  if [ "$(printf '%s\n' "$writes" | wc -l | tr -d ' ')" = "1" ] &&
+    printf '%s\n' "$writes" | grep -qF 'write pbs NSServicesStatus' &&
+    printf '%s\n' "$writes" | grep -qF '<key>com.nucleus.OptimizePDF.default - optimize PDF - (1) default - runWorkflowAsService</key><dict><key>presentation_modes</key><dict><key>ContextMenuShortcut</key><true/></dict></dict>' &&
+    printf '%s\n' "$writes" | grep -qF '<key>com.nucleus.OptimizePDF.prepress - optimize PDF - (2) prepress - runWorkflowAsService</key>'; then
+    assert_pass "deploy end-to-end writes one NSServicesStatus dict holding every declared enablement key"
+  else
+    assert_fail "deploy end-to-end writes one NSServicesStatus dict holding every declared enablement key" \
+      "expected a single write with both keys, got [$writes]"
+  fi
+
+  rm -rf "$work"
+}
+
 # ---- Undeclared-bundle pruning ----
 
 test_prune_removes_an_undeclared_nucleus_bundle
@@ -291,5 +453,10 @@ test_prune_removes_exactly_the_undeclared_nucleus_bundles
 test_prune_does_not_treat_a_partially_matching_declared_name_as_a_declaration
 test_prune_tolerates_a_missing_services_directory
 test_prune_tolerates_an_empty_services_directory
+
+# ---- End-to-end deployment ----
+
+test_deploy_script_takes_the_system_binaries_as_arguments
+test_deploy_end_to_end_converges_bundles_and_preferences
 
 finish_tests
