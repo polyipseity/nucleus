@@ -1,7 +1,7 @@
 ---
 description: "Use when editing MacBook launchd daemons, Spotlight disable, SIP workarounds, or macOS service recovery scripts."
 name: "macOS Service Hardening"
-applyTo: "src/hosts/MacBook/*.nix, src/hosts/MacBook/activation.nix, src/hosts/MacBook/MANUAL.md, src/hosts/MacBook/defaults.nix, src/platforms/macOS/modules/**/*.nix, src/hosts/MacBook/scripts/macos-set-utm-prefs.sh, tests/integration/activation-deps-tests.nix, scripts/svc.sh, src/scripts/services/service-watchdog.sh, src/scripts/services/caddy-trust.sh"
+applyTo: "src/hosts/MacBook/*.nix, src/hosts/MacBook/activation.nix, src/hosts/MacBook/MANUAL.md, src/hosts/MacBook/defaults.nix, src/hosts/MacBook/services/**, src/platforms/macOS/modules/**/*.nix, src/hosts/MacBook/scripts/macos-set-utm-prefs.sh, src/scripts/lib/macos-launch-services.sh, src/scripts/services/refresh-services-menu.sh, tests/integration/activation-deps-tests.nix, scripts/svc.sh, src/scripts/services/service-watchdog.sh, src/scripts/services/caddy-trust.sh"
 ---
 
 # macOS service hardening
@@ -91,6 +91,12 @@ Background-process safety: forked daemons must detach stdio (`</dev/null >/dev/n
 Use `launchd.agents.<name>.serviceConfig` (not `.enable`/`.config`). `types.path` rejects tilde paths — use absolute paths. HM launchd module unchanged (`enable` + `config`).
 
 Set `Label` explicitly for `launchd.daemons` (e.g. `local.camilladsp`). Root processes cannot read iCloud Drive — bundle files into the nix store via `builtins.path`. Root without `UserName` has `HOME` unset — use `${HOME:-}` with `set -u`.
+
+## Services menu discovery (NSServices)
+
+`~/Library/Services` is discovered by `pbs`, not by LaunchServices, and per-user: pbs keeps its own caches, so a refresh must run in the console user's session (`launchctl asuser <uid> sudo -H -u <user>`), never as root. Killing pbs only re-reads those caches — it does not rescan — and pbs's change detection (FSEvents) misses a bundle replaced or renamed in place, so a renamed workflow keeps its stale registration and a newly provisioned one stays invisible until the next login.
+
+`home.activation.macos-flush-services-cache` runs `src/scripts/services/refresh-services-menu.sh` after the Automator-workflow and app-bundle deploy steps: it flushes the daemon caches, then forces a rescan (`pbs -update` rewrites the userdef cache; a bare `pbs` publishes it to running apps). `pbs -flush` is the documented escalation when `-update` proves insufficient, and `pbs -read_bundle <bundle>` prints one bundle's declaration without touching the cache — use it to prove a bundle parses before blaming the cache.
 
 ## macOS pmset power policy
 
