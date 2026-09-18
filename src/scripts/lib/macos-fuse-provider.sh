@@ -26,6 +26,13 @@
 # The provider root is a parameter rather than a constant so callers and tests
 # can point at any macFUSE installation shape.
 
+# WHY: every message from this helper names the ntfs-3g activation build, its
+#   only consumer.  lib.sh derives the default label from $0, which would report
+#   one failure under two labels — the helper's and the step's.
+_fp_error() {
+  error -l ntfs-3g "$@"
+}
+
 # Resolved path of the provider library, following the macFUSE symlink
 # (libfuse.dylib -> libfuse.2.dylib).  Returns 1 when it is absent or dangling.
 _fp_resolved_lib() {
@@ -66,11 +73,11 @@ fuse_provider_lib_name() {
 fuse_provider_digest() {
   _fpd_root="$1"
   if ! [ -f "$_fpd_root/include/fuse/fuse.h" ]; then
-    error "macFUSE headers not found under $_fpd_root/include/fuse"
+    _fp_error "macFUSE headers not found under $_fpd_root/include/fuse"
     return 1
   fi
   if ! [ -f "$_fpd_root/lib/pkgconfig/fuse.pc" ]; then
-    error "macFUSE pkg-config file not found at $_fpd_root/lib/pkgconfig/fuse.pc"
+    _fp_error "macFUSE pkg-config file not found at $_fpd_root/lib/pkgconfig/fuse.pc"
     return 1
   fi
   # WHY: canonicalize the root before deriving relative manifest names.  The
@@ -80,16 +87,16 @@ fuse_provider_digest() {
   #   path into the manifest — making the digest depend on how the caller spelled
   #   the root, and so rebuild on a spelling change alone.
   _fpd_root="$(/bin/realpath "$_fpd_root")" || {
-    error "macFUSE provider root is not resolvable: $1"
+    _fp_error "macFUSE provider root is not resolvable: $1"
     return 1
   }
   _fpd_lib="$(_fp_resolved_lib "$_fpd_root")" || {
-    error "macFUSE library not found at $_fpd_root/lib/libfuse.dylib"
+    _fp_error "macFUSE library not found at $_fpd_root/lib/libfuse.dylib"
     return 1
   }
 
   _fpd_manifest="$(mktemp)" || {
-    error "could not create a temporary file for the macFUSE provider manifest"
+    _fp_error "could not create a temporary file for the macFUSE provider manifest"
     return 1
   }
   # WHY: run find from inside the provider root so every manifest entry is a
@@ -112,17 +119,17 @@ fuse_provider_digest() {
     _fp_manifest_entry "$_fpd_manifest" "$_fpd_lib_rel" || exit 1
   ); then
     rm -f "$_fpd_manifest"
-    error "could not fingerprint the macFUSE provider under $_fpd_root"
+    _fp_error "could not fingerprint the macFUSE provider under $_fpd_root"
     return 1
   fi
   if ! LC_ALL=C sort -o "$_fpd_manifest" "$_fpd_manifest"; then
     rm -f "$_fpd_manifest"
-    error "could not sort the macFUSE provider manifest"
+    _fp_error "could not sort the macFUSE provider manifest"
     return 1
   fi
   if ! _fpd_digest="$(sha256_of_file "$_fpd_manifest")" || [ -z "$_fpd_digest" ]; then
     rm -f "$_fpd_manifest"
-    error "could not hash the macFUSE provider manifest"
+    _fp_error "could not hash the macFUSE provider manifest"
     return 1
   fi
   rm -f "$_fpd_manifest"
@@ -151,7 +158,7 @@ fuse_provider_record_field() { # <line_number> <record_file>
 macfuse_pkg_version() {
   _mpv_version="$(/usr/sbin/pkgutil --pkg-info io.macfuse.installer.components.core | awk '/^version:/ { print $2 }')"
   if [ -z "$_mpv_version" ]; then
-    error "macFUSE package receipt not found (io.macfuse.installer.components.core)"
+    _fp_error "macFUSE package receipt not found (io.macfuse.installer.components.core)"
     return 1
   fi
   printf '%s\n' "$_mpv_version"
