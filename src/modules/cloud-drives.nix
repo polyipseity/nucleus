@@ -339,33 +339,45 @@ in
       # Shared: directory structure
       # cloud-drives-setup: creates ~/clouds/ and converges each entry's path — a
       # symlink to the FSKit mount point on macOS, a real directory elsewhere.
+      # WHY: anchor this after both writeBoundary and setupLaunchAgents.  HM
+      #   requires side-effecting entries to run after writeBoundary, and on
+      #   macOS setupLaunchAgents is the entry whose plist compare followed by
+      #   bootout/bootstrap drops a volume still attached under the previous
+      #   layout.  A mount-point change leaves clouds/<id> occupied by that live
+      #   mount until the refresh runs, and convergence correctly refuses a live
+      #   mount — so running it first deadlocks the apply, because the entry that
+      #   can clear the state is only reached afterwards.  NixOS defines no
+      #   setupLaunchAgents entry (its systemd unit creates the mount point), so
+      #   there the writeBoundary anchor is the one that applies.
       # -----------------------------------------------------------------------
       {
-        home.activation.cloud-drives-setup = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-          "${activationBundle}/src/scripts/services/cloud-drives-setup.sh" \
-            "${pkgs.jq}/bin/jq" \
-            '${
-              builtins.toJSON (
-                map (m: {
-                  inherit (m) localPath;
-                  mountPoint = mkMountPoint m;
-                }) enabledMounts
-              )
-            }' \
-            '${
-              builtins.toJSON (
-                map (r: {
-                  localPath = r.localPath;
-                  name = if r.name != null then r.name else r.id;
-                  isSpecialICloud =
-                    pkgs.stdenv.hostPlatform.isDarwin
-                    && r.provider == "iCloud"
-                    && r.id == "iCloud"
-                    && r.localPath == "clouds/iCloudReplica";
-                }) enabledReplicas
-              )
-            }'
-        '';
+        home.activation.cloud-drives-setup =
+          lib.hm.dag.entryAfter [ "writeBoundary" "setupLaunchAgents" ]
+            ''
+              "${activationBundle}/src/scripts/services/cloud-drives-setup.sh" \
+                "${pkgs.jq}/bin/jq" \
+                '${
+                  builtins.toJSON (
+                    map (m: {
+                      inherit (m) localPath;
+                      mountPoint = mkMountPoint m;
+                    }) enabledMounts
+                  )
+                }' \
+                '${
+                  builtins.toJSON (
+                    map (r: {
+                      localPath = r.localPath;
+                      name = if r.name != null then r.name else r.id;
+                      isSpecialICloud =
+                        pkgs.stdenv.hostPlatform.isDarwin
+                        && r.provider == "iCloud"
+                        && r.id == "iCloud"
+                        && r.localPath == "clouds/iCloudReplica";
+                    }) enabledReplicas
+                  )
+                }'
+            '';
       }
 
       # -----------------------------------------------------------------------

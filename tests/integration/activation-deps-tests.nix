@@ -6,6 +6,7 @@
 # - Secret materialization before dev repo provisioning
 # - SSH keys loaded before git clones over SSH
 # - GPG keys imported before signed commits
+# - LaunchAgent refresh before cloud drive mount-path convergence
 #
 let
   lib = import <nixpkgs/lib>;
@@ -19,6 +20,13 @@ let
   hermesAgentModuleTextFlat = lib.concatStringsSep " " (
     builtins.filter (part: builtins.isString part && part != "") (
       builtins.split "[ \t\n]+" hermesAgentModuleText
+    )
+  );
+
+  cloudDrivesModuleText = builtins.readFile ../../src/modules/cloud-drives.nix;
+  cloudDrivesModuleTextFlat = lib.concatStringsSep " " (
+    builtins.filter (part: builtins.isString part && part != "") (
+      builtins.split "[ \t\n]+" cloudDrivesModuleText
     )
   );
 
@@ -115,6 +123,24 @@ let
       builtins.length names == builtins.length uniqueNames
     ) "Activation step names must be unique";
 
+  # === TEST: cloud drive mount paths converge after the LaunchAgents refresh ===
+  # WHY: grep-only — the ordering is a module-evaluation fact that is not
+  # exposed without a full Home Manager evaluation.  macos-configure-icloud-exclusions
+  # already sits after cloud-drives-setup, so the two orderings compose into the
+  # activation DAG.  On macOS the mount agents are refreshed by setupLaunchAgents
+  # (plist compare, then bootout/bootstrap), and that refresh is what releases a
+  # volume still attached at the previous layout's clouds/<id> path.  Converging
+  # first therefore hits a live mount the convergence step must refuse, and the
+  # apply can never reach the refresh that would clear it.  The writeBoundary
+  # anchor stays because HM requires side-effecting entries to run after it.
+  test_cloud_drives_converge_after_launch_agents =
+    assert'
+      (
+        lib.hasInfix ''home.activation.cloud-drives-setup = lib.hm.dag.entryAfter [ "writeBoundary" "setupLaunchAgents" ]'' cloudDrivesModuleTextFlat
+        && !(lib.hasInfix ''home.activation.cloud-drives-setup = lib.hm.dag.entryAfter [ "writeBoundary" ]'' cloudDrivesModuleTextFlat)
+      )
+      "cloud drive mount paths must converge after the LaunchAgent refresh, and still after writeBoundary";
+
   # Collect all tests.
   allTests = [
     test_secrets_before_devrepo
@@ -122,6 +148,7 @@ let
     test_gpg_before_commits
     test_activation_names_unique
     test_hermes_secrets_barrier_between_sops_and_setup
+    test_cloud_drives_converge_after_launch_agents
   ];
 in
 # NOTE: force allTests as deepSeq's SECOND argument.  `builtins.seq (builtins.deepSeq allTests) { ... }`
