@@ -10,10 +10,6 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 DEVICESELECT_SH="$SCRIPT_DIR/../../src/scripts/services/camilladsp-deviceselect.sh"
 
-# Ensure the tally is always emitted on any exit path (early or normal).
-# Moved before require_command so a missing python3 still produces a tally.
-trap 'finish_tests' EXIT
-
 # Prerequisites: the suite parses the device list with Python, so a missing
 # interpreter or PyYAML fails the suite rather than skipping it — skip-guards
 # are banned (tooling-and-validation.instructions.md).
@@ -28,8 +24,11 @@ fi
 # without this the tests would modify the developer's real ~/.local/state/camilladsp.
 XDG_STATE_HOME="$(mktemp -d)"
 export XDG_STATE_HOME
-# Override the tally-only trap with one that also cleans up the temp dir.
-trap 'rm -rf "$XDG_STATE_HOME"; finish_tests' EXIT
+# Cleanup only. This trap must not call finish_tests: finish_tests ends in exit, so a
+# tally trap prints a second tally, and on an abort it would exit 0 and report the crash
+# as a pass. A suite that exits without a tally is already a failure to the runner, so a
+# crash still fails loudly.
+trap 'rm -rf "$XDG_STATE_HOME"' EXIT
 # Disable the enumeration cache by default. Tests assert on mocked enumeration
 # results, and a list cached by an earlier test would mask the mock. The cache
 # tests opt back in with their own TTL and their own state directory.
@@ -309,41 +308,35 @@ test_no_default_fallback_first_available() {
   fi
 }
 
-# Test 8: real macOS JSON parsing — default output detection via system_profiler -json.
-# Fixture mirrors the REAL system_profiler SPAudioDataType -json shape: _properties
-# is a STRING (naming the default property) and device flags are FLAT top-level
-# keys on each item. The buggy code assumed _properties was a dict and read flags
-# from it, which raised on the real shape.
-test_macos_json_default_output() {
-  local json
-  json=$(
-    cat <<'JSON'
-{
-  "SPAudioDataType": [
-    {
-      "_items": [
-        { "_name": "BlackHole 2ch", "_properties": "coreaudio_default_audio_system_device", "coreaudio_default_audio_system_device": "spaudio_yes", "coreaudio_device_output": 2 },
-        { "_name": "MacBook Air喇叭", "_properties": "coreaudio_device_output", "coreaudio_device_output": 2 },
-        { "_name": "MacBook Air咪高風", "_properties": "coreaudio_device_input", "coreaudio_device_input": 1 }
-      ],
-      "_name": "coreaudio_device"
-    }
-  ]
-}
-JSON
-  )
-  local result
+# Test 8: macOS default output detection reads SwitchAudioSource -c, which needs no TCC
+# grant. The detector replaced system_profiler JSON parsing (0d4e763d), so the mock
+# replaces SwitchAudioSource rather than system_profiler.
+test_macos_default_output_detection() {
+  local result rc=0
   result=$(bash -c '
     _lib_script="$1"
-    _json="$2"
     . "$_lib_script"
-    system_profiler() { printf "%s" "$_json"; }
+    SwitchAudioSource() { printf "BlackHole 2ch\n"; }
     _camilladsp_detect_macos
-  ' _ "$DEVICESELECT_SH" "$json")
-  if [ "$result" = "BlackHole 2ch" ]; then
-    assert_pass "macOS JSON default output detection"
+  ' _ "$DEVICESELECT_SH") || rc=$?
+  if [ "$rc" -eq 0 ] && [ "$result" = "BlackHole 2ch" ]; then
+    assert_pass "macOS default output detection reads the SwitchAudioSource name"
   else
-    assert_fail "macOS JSON default output" "expected 'BlackHole 2ch', got '$result'"
+    assert_fail "macOS default output detection" "expected 'BlackHole 2ch' (rc 0), got '$result' (rc $rc)"
+  fi
+
+  # A failed lookup must propagate as a failure, not as an empty device name.
+  local result_fail rc_fail=0
+  result_fail=$(bash -c '
+    _lib_script="$1"
+    . "$_lib_script"
+    SwitchAudioSource() { return 1; }
+    _camilladsp_detect_macos
+  ' _ "$DEVICESELECT_SH") || rc_fail=$?
+  if [ "$rc_fail" -ne 0 ] && [ -z "$result_fail" ]; then
+    assert_pass "macOS default output detection fails when SwitchAudioSource fails"
+  else
+    assert_fail "macOS default output detection failure" "expected non-zero rc and empty output, got '$result_fail' (rc $rc_fail)"
   fi
 }
 
@@ -391,12 +384,12 @@ JSON
   fi
 }
 
-# Test 10: real-shape regression — default output detection against a fixture
-# byte-identical in shape to actual `system_profiler SPAudioDataType -json` on a
-# MacBook: string _properties, flat keys, a default output device, a built-in
-# output device, and an input-only mic with no coreaudio_device_output. Guards
-# against the dict-_properties assumption that broke real detection.
-test_macos_real_shape_default_output() {
+# Test 10: real-shape enumeration regression — fixture byte-identical in shape to actual
+# `system_profiler SPAudioDataType -json` on a MacBook: string _properties, flat keys,
+# per-device srate/transport, one default output device, one built-in output device, and
+# an input-only mic. Guards the flat-key assumption and proves the coreaudio_default_*
+# flags do not influence filtering.
+test_macos_real_shape_list_available() {
   local json
   json=$(
     cat <<'JSON'
@@ -414,18 +407,20 @@ test_macos_real_shape_default_output() {
 }
 JSON
   )
-  local result
+  local result expected
+  expected=$'BlackHole 2ch\nMacBook Air喇叭'
   result=$(bash -c '
     _lib_script="$1"
     _json="$2"
+    _capture="$3"
     . "$_lib_script"
     system_profiler() { printf "%s" "$_json"; }
-    _camilladsp_detect_macos
-  ' _ "$DEVICESELECT_SH" "$json")
-  if [ "$result" = "BlackHole 2ch" ]; then
-    assert_pass "macOS real-shape default output detection"
+    _camilladsp_list_available_macos "$_capture"
+  ' _ "$DEVICESELECT_SH" "$json" "Loopback Audio")
+  if [ "$result" = "$expected" ]; then
+    assert_pass "macOS real-shape enumeration lists exactly the output devices, sorted"
   else
-    assert_fail "macOS real-shape default output" "expected 'BlackHole 2ch', got '$result'"
+    assert_fail "macOS real-shape enumeration" "expected '$expected', got '$result'"
   fi
 }
 
@@ -810,9 +805,9 @@ test_last_device_purged_when_gone
 test_device_cache_reuse_and_invalidation
 test_config_change_detection
 
-test_macos_json_default_output
+test_macos_default_output_detection
 test_macos_json_first_available
-test_macos_real_shape_default_output
+test_macos_real_shape_list_available
 
 test_no_default_fallback_first_available
 
