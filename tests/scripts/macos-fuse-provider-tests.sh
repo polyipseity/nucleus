@@ -160,6 +160,26 @@ test_digest_rejects_incomplete_providers() {
   assert_digest_rejects_missing "provider digest rejects a missing pkg-config file" "lib/pkgconfig/fuse.pc"
 }
 
+# A provider file that exists but cannot be read must fail the digest: an empty
+# hash would record a fingerprint over contents that were never read.
+test_digest_rejects_an_unreadable_provider_file() {
+  local work root out rc=0
+  if [ "$(id -u)" -eq 0 ]; then
+    assert_skip "provider digest rejects an unreadable provider file" "root reads a chmod 000 file"
+    return 0
+  fi
+  work="$(mktemp -d)"
+  root="$(seed_provider_root "$work")"
+  chmod 000 "$root/include/fuse/fuse_common.h"
+  out="$(provider_call fuse_provider_digest "$root" 2>/dev/null)" || rc=$?
+  rm -rf "$work"
+  if [ "$rc" -ne 0 ] && [ -z "$out" ]; then
+    assert_pass "provider digest rejects an unreadable provider file"
+  else
+    assert_fail "provider digest rejects an unreadable provider file" "rc=$rc stdout=[$out]"
+  fi
+}
+
 test_lib_name_follows_the_provider_symlink() {
   local work root name repointed rc_name=0 rc_repointed=0
   work="$(mktemp -d)"
@@ -292,6 +312,7 @@ if [ "$(uname -s)" != "Darwin" ]; then
   assert_skip "provider digest rejects missing fuse headers" "macOS-only /bin/realpath"
   assert_skip "provider digest rejects a missing provider library" "macOS-only /bin/realpath"
   assert_skip "provider digest rejects a missing pkg-config file" "macOS-only /bin/realpath"
+  assert_skip "provider digest rejects an unreadable provider file" "macOS-only /bin/realpath"
   assert_skip "provider library name follows the macFUSE symlink" "macOS-only /bin/realpath"
   assert_skip "provider library name follows a repointed macFUSE symlink" "macOS-only /bin/realpath"
   assert_skip "provider identity names the macFUSE version and resolved library" "macOS-only /bin/realpath"
@@ -302,6 +323,7 @@ else
   test_digest_changes_when_a_header_changes
   test_digest_changes_when_the_library_symlink_is_repointed
   test_digest_rejects_incomplete_providers
+  test_digest_rejects_an_unreadable_provider_file
   test_lib_name_follows_the_provider_symlink
   test_identity_names_version_and_library
   test_macfuse_pkg_version_contract

@@ -33,6 +33,18 @@ _fp_resolved_lib() {
   /bin/realpath "$1/lib/libfuse.dylib"
 }
 
+# Append one "relative_path hash" entry to a manifest, failing when the file
+# cannot be hashed.
+#
+# WHY: sha256_of_file prints nothing and still succeeds for a file it cannot
+#   read, so an unchecked call would record an empty hash — a digest over a
+#   provider whose contents were never read.
+_fp_manifest_entry() { # <manifest_file> <relative_path>
+  _fpme_hash="$(sha256_of_file "$2")" || return 1
+  [ -n "$_fpme_hash" ] || return 1
+  printf '%s %s\n' "$2" "$_fpme_hash" >>"$1"
+}
+
 # Basename of the resolved provider library, e.g. libfuse.2.dylib.
 fuse_provider_lib_name() {
   _fpln_lib="$(_fp_resolved_lib "$1")" || return 1
@@ -45,6 +57,8 @@ fuse_provider_lib_name() {
 # directory order, of where the provider root lives, and of the temporary file
 # name used to build the manifest.  The root is canonicalized first, so it is
 # also independent of how the caller spells it (symlinked components included).
+# A provider file that cannot be read fails the digest instead of contributing an
+# empty hash.
 #
 # WHY: record the library under its resolved relative path:
 #   a macFUSE ABI bump (libfuse.2 -> libfuse.3) changes the digest even when the
@@ -80,22 +94,37 @@ fuse_provider_digest() {
   }
   # WHY: run find from inside the provider root so every manifest entry is a
   #   path relative to it — the digest then depends only on relative names and
-  #   contents, never on the provider root's own location.
+  #   contents, never on the provider root's own location.  mktemp returns an
+  #   absolute path, so the entry helper works from inside that root too.
+  # WHY: every step fails the whole digest instead of recording a partial
+  #   provider.  A truncated entry list (find or sort failing, or an unreadable
+  #   file) would otherwise be recorded as a valid fingerprint, which is exactly
+  #   the drift the build record exists to detect.
+  _fpd_lib_rel="${_fpd_lib#"$_fpd_root"/}"
   if ! (
     cd "$_fpd_root" || exit 1
-    find include/fuse -type f -print | LC_ALL=C sort | while IFS= read -r _fpd_file; do
-      printf '%s %s\n' "$_fpd_file" "$(sha256_of_file "$_fpd_file")"
-    done
-  ) >"$_fpd_manifest"; then
+    _fpd_files="$(find include/fuse -type f -print)" || exit 1
+    [ -n "$_fpd_files" ] || exit 1
+    printf '%s\n' "$_fpd_files" | LC_ALL=C sort | while IFS= read -r _fpd_file; do
+      _fp_manifest_entry "$_fpd_manifest" "$_fpd_file" || exit 1
+    done || exit 1
+    _fp_manifest_entry "$_fpd_manifest" "lib/pkgconfig/fuse.pc" || exit 1
+    _fp_manifest_entry "$_fpd_manifest" "$_fpd_lib_rel" || exit 1
+  ); then
     rm -f "$_fpd_manifest"
-    error "could not list macFUSE provider files under $_fpd_root/include/fuse"
+    error "could not fingerprint the macFUSE provider under $_fpd_root"
     return 1
   fi
-  printf '%s %s\n' "${_fpd_lib#"$_fpd_root"/}" "$(sha256_of_file "$_fpd_lib")" >>"$_fpd_manifest"
-  printf '%s %s\n' "lib/pkgconfig/fuse.pc" "$(sha256_of_file "$_fpd_root/lib/pkgconfig/fuse.pc")" >>"$_fpd_manifest"
-  LC_ALL=C sort -o "$_fpd_manifest" "$_fpd_manifest"
-
-  _fpd_digest="$(sha256_of_file "$_fpd_manifest")"
+  if ! LC_ALL=C sort -o "$_fpd_manifest" "$_fpd_manifest"; then
+    rm -f "$_fpd_manifest"
+    error "could not sort the macFUSE provider manifest"
+    return 1
+  fi
+  if ! _fpd_digest="$(sha256_of_file "$_fpd_manifest")" || [ -z "$_fpd_digest" ]; then
+    rm -f "$_fpd_manifest"
+    error "could not hash the macFUSE provider manifest"
+    return 1
+  fi
   rm -f "$_fpd_manifest"
   printf '%s\n' "$_fpd_digest"
 }
