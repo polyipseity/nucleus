@@ -162,10 +162,20 @@ let
   # issues with the options fixed-point)
   # ---------------------------------------------------------------------------
 
+  # Mount point for an entry.
+  # WHY: macOS FSKit volumes must be mounted at a direct child of /Volumes, and
+  #   macFUSE creates that directory during the mount and transfers it to the
+  #   requesting user — so a root-owned activation must not pre-create it.
+  #   Every other host mounts directly under the user's home directory.
+  mkMountPoint =
+    mount:
+    if pkgs.stdenv.hostPlatform.isDarwin then
+      "/Volumes/nucleus-cloud-${mount.id}"
+    else
+      "${currentUserHome}/${mount.localPath}";
+
   # Build a rclone mount wrapper script for macOS LaunchAgents.
   # Uses the full Nix store path to rclone so the agent is not PATH-dependent.
-  mkMountPoint = mount: "${currentUserHome}/${mount.localPath}";
-
   mkRcloneMountScript =
     mount:
     let
@@ -178,11 +188,16 @@ let
         "--iclouddrive-service"
         mount.iCloudService
       ];
-      fsKitBackendArgs = lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
+      # WHY: macFUSE defaults to its kernel-extension backend, which needs a kext
+      #   approval this host must never grant; FSKit runs the file system in user
+      #   space, so every macOS mount selects it explicitly.
+      # ref: https://github.com/macfuse/macfuse -- FSKit backend via -o backend=fskit
+      macFuseFsKitArgs = lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
         "--option"
         "backend=fskit"
       ];
       mountVolumeLabel = if mount.name != null then mount.name else mount.id;
+      # FSKit volumes carry a display name; --volname needs macFUSE 5.1 or newer.
       volumeNameArgs = lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
         "--volname"
         mountVolumeLabel
@@ -197,7 +212,10 @@ let
         "cat ${lib.escapeShellArg config.nucleus.rclone.configPassSecretPath}"
       ];
       extraArgsList =
-        iCloudServiceArgs ++ fsKitBackendArgs ++ volumeNameArgs ++ rclonePasswordArgs ++ mount.extraArgs;
+        iCloudServiceArgs ++ macFuseFsKitArgs ++ volumeNameArgs ++ rclonePasswordArgs ++ mount.extraArgs;
+      # WHY: FSKit has no FUSE notification API, so remote changes reach the mount
+      #   only through rclone's own cache and poll timers, and --read-only is
+      #   enforced by rclone's VFS because FSKit always opens files read/write.
       fullArgsList = [
         "--vfs-cache-mode"
         "full"
@@ -319,13 +337,21 @@ in
     lib.mkMerge [
       # -----------------------------------------------------------------------
       # Shared: directory structure
-      # cloud-drives-setup: creates ~/clouds/ and per-entry subdirectories.
+      # cloud-drives-setup: creates ~/clouds/ and converges each entry's path — a
+      # symlink to the FSKit mount point on macOS, a real directory elsewhere.
       # -----------------------------------------------------------------------
       {
         home.activation.cloud-drives-setup = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
           "${activationBundle}/src/scripts/services/cloud-drives-setup.sh" \
             "${pkgs.jq}/bin/jq" \
-            '${builtins.toJSON (map (m: { inherit (m) localPath; }) enabledMounts)}' \
+            '${
+              builtins.toJSON (
+                map (m: {
+                  inherit (m) localPath;
+                  mountPoint = mkMountPoint m;
+                }) enabledMounts
+              )
+            }' \
             '${
               builtins.toJSON (
                 map (r: {

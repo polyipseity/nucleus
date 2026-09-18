@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Cloud drive directory structure setup.
-# Tokens (described below) are substituted at build time by Nix.
+# Cloud drive directory structure setup: mount paths (the FSKit mount point on
+# macOS, a real directory elsewhere) and replica directories.
 set -eu
 
 # Ensure a managed real directory exists at PATH.
@@ -20,6 +20,28 @@ _cd_ensure_real_directory() {
   mkdir -p "$_cd_path"
 }
 
+# Ensure PATH is a symlink to TARGET.
+# Usage: _cd_ensure_symlink "$HOME/clouds/gdrive" "/Volumes/nucleus-cloud-gdrive" "gdrive"
+_cd_ensure_symlink() {
+  _cd_link="$1"
+  _cd_target="$2"
+  _cd_name="$3"
+
+  if [ -L "$_cd_link" ]; then
+    if [ "$(readlink "$_cd_link")" != "$_cd_target" ]; then
+      printf '%s\n' "cloud-drives (${_cd_name}): error: $_cd_link must symlink to $_cd_target; fix manually and re-apply" >&2
+      exit 1
+    fi
+    return 0
+  fi
+  if [ -e "$_cd_link" ]; then
+    printf '%s\n' "cloud-drives (${_cd_name}): error: $_cd_link exists and is not a symlink to $_cd_target; fix manually and re-apply" >&2
+    exit 1
+  fi
+  ln -s "$_cd_target" "$_cd_link"
+  printf '%s\n' "cloud-drives (${_cd_name}): linked $_cd_link -> $_cd_target"
+}
+
 _vsd_jq_bin="$1"
 _vsd_mounts_json="$2"
 _vsd_replicas_json="$3"
@@ -27,11 +49,19 @@ _vsd_replicas_json="$3"
 # Create the top-level clouds/ directory tree.
 mkdir -p "$HOME/clouds"
 
-# Process mounts: ensure each mount point is a real directory.
+# Process mounts: converge the user-visible path.  macOS mounts under /Volumes,
+# so clouds/<id> is a symlink to the mount point there; the mount point itself is
+# created by macFUSE during the first mount, and creating it here would leave it
+# owned by root.  Everywhere else the user-visible path is the mount point.
 while IFS= read -r _vsd_entry; do
   [ -z "$_vsd_entry" ] && continue
   _vsd_local_path="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.localPath')"
-  _cd_ensure_real_directory "$HOME/$_vsd_local_path" "$_vsd_local_path"
+  _vsd_mount_point="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.mountPoint')"
+  if [ "$_vsd_mount_point" = "$HOME/$_vsd_local_path" ]; then
+    _cd_ensure_real_directory "$HOME/$_vsd_local_path" "$_vsd_local_path"
+  else
+    _cd_ensure_symlink "$HOME/$_vsd_local_path" "$_vsd_mount_point" "$_vsd_local_path"
+  fi
 done < <(printf '%s\n' "$_vsd_mounts_json" | "$_vsd_jq_bin" -r -c '.[]')
 
 # Process replicas: ensure each replica directory or symlink exists.
