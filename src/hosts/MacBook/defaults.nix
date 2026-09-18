@@ -431,6 +431,19 @@ in
       # crash reporting, disable professional features (licensing), and set delay
       # values for display transitions.
       #
+      # nativeAutoBrightnessManagement off: the app must not interact with macOS
+      # auto brightness for the built-in panel. While auto brightness is on the
+      # two brightness owners fight, and the display ratchets up to the ceiling
+      # without any user input (upstream waydabber/BetterDisplay #4421, #5234).
+      # Upstream's mitigation is this very option (#4589, "prevent the app to
+      # interact with auto brightness"). BetterDisplay is on this host for the
+      # HeadlessDisplay virtual screen only, so it has no business controlling
+      # brightness at all.
+      #
+      # The @Display:2 suffix is BetterDisplay's tagID for the built-in panel
+      # (builtIn@Display:2 = 1 and name@Display:2 = "Color LCD" in this domain);
+      # the app stores its per-display settings with that suffix.
+      #
       # Note: preferences domain is pro.betterdisplay.BetterDisplay (not com.betterdisplay).
       "pro.betterdisplay.BetterDisplay" = {
         LaunchAtLogin = false;
@@ -440,6 +453,7 @@ in
         enableProfessionalFeatures = false;
         setDelay = 0.2;
         wakeDelay = 1.5;
+        "nativeAutoBrightnessManagement@Display:2" = false;
         SUEnableAutomaticChecks = false;
         SUAutomaticallyUpdate = false;
         SUEnablePrerelease = false;
