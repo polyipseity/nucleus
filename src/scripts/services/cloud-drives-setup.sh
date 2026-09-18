@@ -47,8 +47,12 @@ _cd_ensure_symlink() {
       if [ -n "$_cd_service_label" ]; then
         # WHY: this is what a mount left attached by the previous layout looks
         #   like from here, and "fix manually" alone gave no clue what to do.
-        #   The literal $(id -u) is for the operator to paste, not to expand.
-        _cd_remedy="if a cloud drive mount is still attached there, unload its agent with launchctl bootout \"gui/\$(id -u)/$_cd_service_label\", or move the data aside; then re-apply"
+        #   Both escapes are needed: bootout releases a volume the old agent
+        #   still owns, while a volume that outlived an agent refresh can only
+        #   be released by unmounting it — the refreshed agent mounts the
+        #   /Volumes path, so booting it out frees nothing here.  The literal
+        #   $(id -u) is for the operator to paste, not to expand.
+        _cd_remedy="if a cloud drive mount is still attached there, unload its agent with launchctl bootout \"gui/\$(id -u)/$_cd_service_label\" or unmount it with diskutil unmount force \"$_cd_link\", or move the data aside; then re-apply"
       fi
       printf '%s\n' "cloud-drives (${_cd_name}): error: $_cd_link exists and is neither empty nor a symlink to $_cd_target; $_cd_remedy" >&2
       exit 1

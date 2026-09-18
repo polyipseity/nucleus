@@ -110,20 +110,29 @@ test_macos_mount_path_rejects_nonempty_directory() {
   rm -rf "$home"
 }
 
-test_macos_mount_path_error_names_the_mount_agent() {
-  local home rc=0 err="" remedy_ok=false
-  local expected_remedy="launchctl bootout \"gui/\$(id -u)/local.cloud-mount.GoogleDrive\""
+test_macos_mount_path_error_names_how_to_release_it() {
+  local home rc=0 err="" agent_ok=false unmount_ok=false expected_agent expected_unmount
   home="$(mktemp -d)"
+  # Both commands must be paste-ready and name this fixture's own occupied path,
+  # not a placeholder: bootout releases a volume the old agent still owns, while
+  # diskutil is the only escape for one that outlived an agent refresh.
+  expected_agent="launchctl bootout \"gui/\$(id -u)/local.cloud-mount.GoogleDrive\""
+  expected_unmount="diskutil unmount force \"$home/clouds/GoogleDrive\""
   mkdir -p "$home/clouds/GoogleDrive"
   printf 'user data\n' >"$home/clouds/GoogleDrive/keep.txt"
   err="$(run_setup_stderr "$home" "$_mounts_macos_labeled" "$_replicas_none" 2>&1)" || rc=$?
   case "$err" in
-  *"$expected_remedy"*) remedy_ok=true ;;
+  *"$expected_agent"*) agent_ok=true ;;
   esac
-  if [ "$rc" -ne 0 ] && [ -f "$home/clouds/GoogleDrive/keep.txt" ] && [ "$remedy_ok" = true ]; then
-    assert_pass "a blocked mount path names the LaunchAgent that can release it"
+  case "$err" in
+  *"$expected_unmount"*) unmount_ok=true ;;
+  esac
+  if [ "$rc" -ne 0 ] && [ -f "$home/clouds/GoogleDrive/keep.txt" ] &&
+    [ "$agent_ok" = true ] && [ "$unmount_ok" = true ]; then
+    assert_pass "a blocked mount path names the LaunchAgent and the unmount command that release it"
   else
-    assert_fail "cloud-drives-macos-mount-remedy" "rc=$rc remedy=$remedy_ok stderr=[$err]"
+    assert_fail "cloud-drives-macos-mount-remedy" \
+      "rc=$rc agent=$agent_ok unmount=$unmount_ok stderr=[$err]"
   fi
   rm -rf "$home"
 }
@@ -136,7 +145,7 @@ test_macos_mount_path_error_without_a_label_stays_generic() {
   err="$(run_setup_stderr "$home" "$_mounts_macos" "$_replicas_none" 2>&1)" || rc=$?
   case "$err" in *'fix manually and re-apply'*) generic_ok=true ;; esac
   case "$err" in
-  *launchctl*) remedy_absent=false ;;
+  *launchctl* | *diskutil*) remedy_absent=false ;;
   *) remedy_absent=true ;;
   esac
   if [ "$rc" -ne 0 ] && [ "$generic_ok" = true ] && [ "$remedy_absent" = true ]; then
@@ -216,7 +225,7 @@ test_macos_mount_path_is_idempotent
 test_macos_mount_path_repairs_foreign_symlink
 test_macos_mount_path_replaces_empty_directory
 test_macos_mount_path_rejects_nonempty_directory
-test_macos_mount_path_error_names_the_mount_agent
+test_macos_mount_path_error_names_how_to_release_it
 test_macos_mount_path_error_without_a_label_stays_generic
 test_local_mount_path_is_real_directory
 test_local_mount_path_rejects_symlink
