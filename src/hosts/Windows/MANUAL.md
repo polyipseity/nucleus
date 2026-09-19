@@ -8,6 +8,7 @@
 - Caddy local-CA trust runs automatically. If missing: run `caddy trust --address 127.0.0.1:2019` in an elevated PowerShell.
 - Starship prompt is active in all shells. Requires a Nerd Font (configured automatically via `CaskaydiaCove Nerd Font`).
 - OBS virtual camera: `obs-virtualcam` ships inside the OBS Studio install (`OBSProject.OBSStudio`, gated by `managedPackages."obs-studio".enable`). Start the virtual camera from OBS and it appears as a DirectShow device in other apps.
+- Chrome Remote Desktop Host is installed declaratively as `Google.ChromeRemoteDesktopHost` (WinGet). To accept connections, open <https://remotedesktop.google.com/access> in Chrome and finish "Set up remote access". The installer owns the service; activation does not start or stop it.
 
 ## command shortcuts
 

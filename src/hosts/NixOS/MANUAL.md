@@ -10,7 +10,7 @@
 
 ## recurring operations
 
-- Chrome Remote Desktop Host is not packaged in nixpkgs. To enable inbound CRD access, install the host component manually (Google-provided package) and approve the system extension once in System Settings → Privacy & Security. The `apps.json` entry tracks it as a `system-extension` (manual approval); it is not force-launched by activation.
+- Chrome Remote Desktop Host has no nixpkgs package (nixpkgs #34084 was closed as not planned), and Linux has no equivalent approval step. Install Google's Debian package, add your user to the `chrome-remote-desktop` group, write `~/.chrome-remote-desktop-session`, then open <https://remotedesktop.google.com/access> in Chrome and finish "Set up remote access". CRD runs its own virtual X session, so log in to an X11 session; a Wayland login connects the host to a black screen. The `apps.json` entry tracks it as `manual`: activation installs nothing and never force-launches it.
 - If `nucleus-svc litellm` is active but every `default` request fails with HTTP 429/500 (`Missing credentials` / `No deployments available`), the daemon was built with no API-key pairs, usually because `src/modules/env-catalog.nix` is out of sync with decrypted SOPS secrets. Confirm with `systemctl cat litellm.service | grep ExecStart`. If there are no `KEYFILE:ENVVAR` pairs, run `nucleus-apply` to rebuild, then `nucleus-svc restart litellm`. The build-time assertion in `ai.nix` fails eval fast if the catalog declares keys but none resolve.
 - WhatsApp has no Linux client. Use WhatsApp Web in the browser; the NixOS `apps.json` entry is intentionally `omitted`.
 
