@@ -110,6 +110,7 @@ fi
 #   lifetime reports it.
 _mount_started="$SECONDS"
 _mount_stopping=false
+_mount_interrupted=false
 rclone mount \
   "$remote" \
   "$mount_point" \
@@ -122,25 +123,22 @@ _mount_pid=$!
 #   macFUSE/FSKit volume for this path, and every later mount there is destroyed
 #   seconds after it attaches.
 # check-suppress:suppression_doc: rclone may already have exited; a failed signal to a dead process changes nothing about the report below.
-trap '_mount_stopping=true; kill -TERM "$_mount_pid" 2>/dev/null || true' TERM INT
+trap '_mount_stopping=true; _mount_interrupted=true; kill -TERM "$_mount_pid" 2>/dev/null || true' TERM INT
 
-# WHY: a stop request interrupts 'wait' with a status above 128 (128+signo)
-#   while rclone is still unmounting, and only a reaped child proves rclone has
-#   really finished: a mount left unmounting in the background wedges the
-#   macFUSE/FSKit volume for this path, and every later mount there is destroyed
-#   seconds after it attaches.  The LaunchAgent's ExitTimeOut (60 s) bounds a
-#   mount that never finishes.
+# Wait for rclone, and repeat the wait when a stop signal interrupted it: the
+# interrupted wait reports the signal (128+signo), not rclone's status.  The
+# repeat is driven by the flag, never by the status — bash replays the cached
+# status of an already-reaped child, so a status of 137 or 143 would otherwise
+# keep this loop spinning until launchd's ExitTimeOut killed it.
 _mount_status=0
 while :; do
+  _mount_interrupted=false
   if wait "$_mount_pid"; then
     _mount_status=0
   else
     _mount_status=$?
   fi
-  # 127: an earlier 'wait' already reaped rclone, so there is nothing left to
-  # wait for.  At or below 128: rclone's own exit status.  Anything above is the
-  # stop signal that interrupted the wait, so rclone is still exiting.
-  if [ "$_mount_status" -eq 127 ] || [ "$_mount_status" -le 128 ]; then
+  if [ "$_mount_interrupted" = false ]; then
     break
   fi
 done
