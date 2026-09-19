@@ -169,6 +169,12 @@
   Writes trust entries to %USERPROFILE%\.pi\agent\trust.json so pi loads
   project resources without a trust prompt.  False skips the write.
 
+.PARAMETER EnableHarnessBridgeParity
+  Enable deployment of the harness-bridge hook entry points and their PATH
+  shims (%USERPROFILE%\.local\bin\harness-notify.cmd and harness-approval.cmd
+  calling the copies in the nucleus USER root).  False removes the managed shims
+  and copies, so harness hooks answer locally.
+
 .PARAMETER NoAISync
   When specified, suppresses the post-apply Ollama model sync step.  Useful in
   CI or on low-bandwidth connections where model pulls (2-20 GB each) are
@@ -385,6 +391,7 @@ $EnableVsCodeExtensionsParity = -not $noUserStateParity
 $EnableVsCodeSettingsParity = -not $noUserStateParity
 $EnableVsCodeWorkspaceTrustParity = -not $noUserStateParity
 $EnablePiProjectTrustParity = -not $noUserStateParity
+$EnableHarnessBridgeParity = -not $noUserStateParity
 
 $secretsModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "secrets"
 $systemModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "system"
@@ -526,6 +533,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-StarshipConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-SrtConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-HermesConfig.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-HarnessBridge.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-UserPath.ps1")
 # editors/: VS Code configuration and workspace management.
 . (Join-Path -Path $editorsModuleDir -ChildPath "Set-VSCodeWorkspaceTrust.ps1")
@@ -951,6 +959,9 @@ Sync-DirenvConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $repo
 Sync-StarshipConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $repoRoot
 Sync-SrtConfig -Enabled:$true -User $sessionUser -RepoRoot $repoRoot
 Sync-HermesConfig -Enabled:$true
+# Hook entry points must resolve by bare name from harness-spawned processes,
+# so they are deployed to the USER root with .cmd shims on the managed PATH.
+Sync-HarnessBridge -Enabled:$EnableHarnessBridgeParity -RepoRoot $repoRoot -UserRoot (Get-NucleusUserRoot) -UserProfile $HOME
 if ($EnableCloudDrivesParity) {
   foreach ($userRecord in $selectedUserRecords) {
     Sync-CloudDriveCatalog -UserConfig $userRecord -HomeDirectory $userRecord.homeDirectory
