@@ -22,7 +22,7 @@ One mechanism per app per host — ours, never the app's.
 
 Tooling: `src/scripts/autostart.sh`/`.ps1` — `list`/`status`/`enable`/`disable`/`apply`/`verify`. Under `src/scripts/`, not `scripts/`. Windows: `Sync-AppAutostart.ps1`.
 
-`services.json` = background daemons. `apps.json` = foreground GUI. `battery` = menu-bar GUI → `apps.json`. A `macos-system-extension` kind means macOS owns the approval flow.
+`services.json` = background daemons. `apps.json` = foreground GUI. `battery` = menu-bar GUI → `apps.json`. `macos-system-extension` means only macOS can grant the approval, and `manual` means no script can converge the app at all; both report the entry's `approvalInstructions` and change nothing themselves.
 
 ## Menu-bar / tray-icon (same SSOT)
 

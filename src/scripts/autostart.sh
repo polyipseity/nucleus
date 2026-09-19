@@ -344,6 +344,17 @@ app_bundle_id() {
   echo "$entry_json" | jq -r '.hostEntry.bundleId // empty'
 }
 
+# app_declared_display ENTRY_JSON — stdout the declared auto-start state, or
+# "manual" when the host has no mechanism a script can converge.
+app_declared_display() {
+  local entry_json="$1"
+  if [ "$(echo "$entry_json" | jq -r '.hostEntry.kind')" = "manual" ]; then
+    printf 'manual'
+  else
+    echo "$entry_json" | jq -r '.hostEntry.autostartEnabled'
+  fi
+}
+
 # app_actual_state KEY ENTRY_JSON — stdout "enabled"/"disabled"/"unknown".
 # Reflects whether OUR uniform mechanism currently has the app starting.
 app_actual_state() {
@@ -361,6 +372,12 @@ app_actual_state() {
     fi
     ;;
   macos-system-extension)
+    # macOS-only kind. Off macOS there is no approval surface to probe, so report
+    # unknown rather than calling macOS tooling that cannot exist on this host.
+    if [ "$HOST" != "MacBook" ]; then
+      printf 'unknown'
+      return 0
+    fi
     local bundle_id
     bundle_id=$(echo "$entry_json" | jq -r '.hostEntry.bundleId // empty')
     if [ -n "$bundle_id" ] && [ "$(macos_system_extension_present "$bundle_id")" = "true" ]; then
@@ -368,6 +385,9 @@ app_actual_state() {
     else
       printf 'disabled'
     fi
+    ;;
+  manual)
+    printf 'manual'
     ;;
   nixos-xdg-desktop)
     local name
@@ -419,6 +439,10 @@ app_converge() {
     # System extensions cannot be enabled/disabled from the shell; approval is
     # manual. Surface a per-app reminder (approvalInstructions) and report
     # actual presence; never pretend we forced the state.
+    if [ "$HOST" != "MacBook" ]; then
+      error -l "$key" "kind 'macos-system-extension' is macOS-only, but host is '$HOST'"
+      return 1
+    fi
     local bundle_id approval_instructions
     bundle_id=$(echo "$entry_json" | jq -r '.hostEntry.bundleId // empty')
     approval_instructions=$(echo "$entry_json" | jq -r '.hostEntry.approvalInstructions // empty')
@@ -437,6 +461,18 @@ app_converge() {
           warn -l "$key" "system extension not yet approved — enable it in System Settings → Privacy & Security, then approve the extension."
         fi
       fi
+    fi
+    ;;
+  manual)
+    # No programmable mechanism exists for this app on this host: the state is
+    # declared in the registry but never converged, so report the manual steps
+    # and succeed instead of failing apply on an app we cannot automate.
+    local manual_instructions
+    manual_instructions=$(echo "$entry_json" | jq -r '.hostEntry.approvalInstructions // empty')
+    if [ -n "$manual_instructions" ]; then
+      warn -l "$key" "$manual_instructions"
+    else
+      warn -l "$key" "manual entry; not auto-provisioned"
     fi
     ;;
   nixos-xdg-desktop)
@@ -486,7 +522,7 @@ do_list() {
     while IFS=$'\t' read -r key display entry_json; do
       local state declared
       state=$(app_actual_state "$key" "$entry_json")
-      declared=$(echo "$entry_json" | jq -r '.hostEntry.autostartEnabled')
+      declared=$(app_declared_display "$entry_json")
       printf '%-22s %-10s %-8s %s\n' "$key" "$state" "$declared" "$display"
     done < <(echo "$registry" | jq -r 'to_entries[] | [.key, .value.displayName, (.value | tojson)] | @tsv')
   fi
@@ -564,8 +600,12 @@ do_verify() {
   while IFS=$'\t' read -r key display entry_json; do
     if echo "$key" | grep -q '^ERROR:'; then continue; fi
     local declared actual
-    declared=$(echo "$entry_json" | jq -r '.hostEntry.autostartEnabled')
+    declared=$(app_declared_display "$entry_json")
     actual=$(app_actual_state "$key" "$entry_json")
+    if [ "$actual" = "manual" ]; then
+      # Manual entries are declared but not auto-provisioned; no drift check.
+      continue
+    fi
     if { [ "$declared" = "true" ] && [ "$actual" != "enabled" ]; } ||
       { [ "$declared" = "false" ] && [ "$actual" != "disabled" ]; }; then
       drift=true

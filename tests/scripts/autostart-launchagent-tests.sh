@@ -127,6 +127,50 @@ make_fixture() {
         "justification": "test fixture"
       }
     }
+  },
+  "ManualApp": {
+    "displayName": "Manual App",
+    "description": "fixture app with no mechanism a script can converge",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "kind": "manual",
+        "path": "/Applications/ManualApp.app",
+        "approvalInstructions": "fixture manual instructions"
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "type": "omitted",
+        "justification": "test fixture"
+      },
+      "Windows": {
+        "platform": "Windows",
+        "type": "omitted",
+        "justification": "test fixture"
+      }
+    }
+  },
+  "MisplacedExtension": {
+    "displayName": "Misplaced Extension",
+    "description": "fixture app declaring a macOS-only kind on NixOS",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "type": "omitted",
+        "justification": "test fixture"
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "kind": "macos-system-extension",
+        "bundleId": "io.example.misplaced",
+        "approvalInstructions": "fixture misplacement instructions"
+      },
+      "Windows": {
+        "platform": "Windows",
+        "type": "omitted",
+        "justification": "test fixture"
+      }
+    }
   }
 }
 APPSJSON
@@ -178,7 +222,7 @@ PLIST
 # against the fixture repo with the macOS-only externals stubbed so the run is
 # hermetic. Prints the exit status.
 run_autostart() {
-  local action="$1" app="$2" out_file="$3" fskit_registered="${4:-true}" rc=0
+  local action="$1" app="$2" out_file="$3" fskit_registered="${4:-true}" host="${5:-}" rc=0
   local _mock_dir
   _mock_dir="$(mktemp -d)"
   # Mock stat/dscl to return empty (no console user override of LAUNCHAGENTS_DIR)
@@ -198,9 +242,16 @@ PLUGINKIT
     printf '#!/bin/sh\n' >"$_mock_dir/pluginkit"
   fi
   chmod +x "$_mock_dir/stat" "$_mock_dir/dscl" "$_mock_dir/systemextensionsctl" "$_mock_dir/pluginkit"
-  NUCLEUS_REPO_ROOT="$FIXTURE_ROOT" HOME="$FIXTURE_HOME" \
-    PATH="$_mock_dir:$PATH" bash "$AUTOSTART_SH" "$action" "$app" \
-    >"$out_file" 2>&1 || rc=$?
+  local -a _env_prefix=(
+    env
+    NUCLEUS_REPO_ROOT="$FIXTURE_ROOT"
+    HOME="$FIXTURE_HOME"
+    PATH="$_mock_dir:$PATH"
+  )
+  # NUCLEUS_HOST pins the host so a platform-owned kind can be exercised on any
+  # machine; without it the run resolves the host from uname.
+  [ -n "$host" ] && _env_prefix+=(NUCLEUS_HOST="$host")
+  "${_env_prefix[@]}" bash "$AUTOSTART_SH" "$action" "$app" >"$out_file" 2>&1 || rc=$?
   rm -rf "$_mock_dir"
   printf '%s\n' "$rc"
 }
@@ -280,6 +331,61 @@ test_unregistered_fskit_module_keeps_approval_instructions() {
   rm -rf "$FIXTURE_ROOT"
 }
 
+# The manual-kind and misplacement cases are host-agnostic: they assert on the
+# registry dispatch run with NUCLEUS_HOST pinned, so they also run off macOS.
+
+test_manual_app_reports_approval_instructions() {
+  local rc=0
+  make_fixture
+  rc="$(run_autostart enable ManualApp "$FIXTURE_ROOT/out.txt" true MacBook)"
+  if [ "$rc" -eq 0 ] && grep -q 'fixture manual instructions' "$FIXTURE_ROOT/out.txt"; then
+    assert_pass "a manual app reports its approval instructions and succeeds"
+  else
+    assert_fail "a manual app reports its approval instructions and succeeds" "rc=$rc output=[$(cat "$FIXTURE_ROOT/out.txt")]"
+  fi
+  rm -rf "$FIXTURE_ROOT"
+}
+
+test_manual_app_status_shows_manual() {
+  local rc=0
+  make_fixture
+  rc="$(run_autostart status ManualApp "$FIXTURE_ROOT/out.txt" true MacBook)"
+  if [ "$rc" -eq 0 ] && grep -Eq '^ManualApp[[:space:]]+manual[[:space:]]' "$FIXTURE_ROOT/out.txt"; then
+    assert_pass "a manual app reports state 'manual'"
+  else
+    assert_fail "a manual app reports state 'manual'" "rc=$rc output=[$(cat "$FIXTURE_ROOT/out.txt")]"
+  fi
+  rm -rf "$FIXTURE_ROOT"
+}
+
+test_manual_app_verify_reports_no_drift() {
+  local rc=0
+  make_fixture
+  rc="$(run_autostart verify ManualApp "$FIXTURE_ROOT/out.txt" true MacBook)"
+  if [ "$rc" -eq 0 ] && ! grep -q 'drift' "$FIXTURE_ROOT/out.txt"; then
+    assert_pass "a manual app is never reported as drift"
+  else
+    assert_fail "a manual app is never reported as drift" "rc=$rc output=[$(cat "$FIXTURE_ROOT/out.txt")]"
+  fi
+  rm -rf "$FIXTURE_ROOT"
+}
+
+test_macos_only_kind_is_rejected_off_macos() {
+  local rc=0
+  make_fixture
+  rc="$(run_autostart enable MisplacedExtension "$FIXTURE_ROOT/out.txt" true NixOS)"
+  # The regression: this entry used to fall through to a macOS-only branch and
+  # print "System Settings → Privacy & Security" on a host that has neither.
+  if [ "$rc" -ne 0 ] &&
+    grep -q 'macOS-only' "$FIXTURE_ROOT/out.txt" &&
+    ! grep -q 'Privacy & Security' "$FIXTURE_ROOT/out.txt"; then
+    assert_pass "a macOS-only kind on a non-macOS host is rejected without macOS advice"
+  else
+    assert_fail "a macOS-only kind on a non-macOS host is rejected without macOS advice" "rc=$rc output=[$(cat "$FIXTURE_ROOT/out.txt")]"
+  fi
+  rm -rf "$FIXTURE_ROOT"
+}
+
 if [ "$(uname -s)" != "Darwin" ]; then
   # The convergence path under test is the macOS login-item one; on other hosts the
   # XDG/registry branches run instead.
@@ -297,4 +403,10 @@ else
   test_fskit_module_converge_skips_approval_instructions
   test_unregistered_fskit_module_keeps_approval_instructions
 fi
+
+test_manual_app_reports_approval_instructions
+test_manual_app_status_shows_manual
+test_manual_app_verify_reports_no_drift
+test_macos_only_kind_is_rejected_off_macos
+
 finish_tests

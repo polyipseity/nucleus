@@ -36,6 +36,10 @@ BeforeAll {
       displayName = 'Telegram'
       hostEntry   = @{ platform = 'Windows'; autostartEnabled = $true; autostartDisableNative = $true; kind = 'windows-startup-folder'; path = 'C:\Users\test\AppData\Telegram.exe' }
     }
+    'ManualApp' = @{
+      displayName = 'Manual App'
+      hostEntry   = @{ platform = 'Windows'; kind = 'manual'; approvalInstructions = 'fixture manual instructions' }
+    }
   }
 
   # Pester v5 cannot Mock commands that do not exist in the session, so every
@@ -84,7 +88,7 @@ Describe 'AppRunKeyValueName' {
 Describe 'Resolve-AppNameList' {
   It 'returns all registry entries when no names given' {
     $results = Resolve-AppNameList -Names @()
-    $results.Count | Should -Be 3
+    $results.Count | Should -Be 4
     $results.ContainsKey('Parsec') | Should -BeTrue
     $results.ContainsKey('Steam') | Should -BeTrue
     $results.ContainsKey('Telegram') | Should -BeTrue
@@ -119,6 +123,25 @@ Describe 'Get-AppActualState' {
     Mock Test-RunKeyEntry { return $false }
     $state = Get-AppActualState -Key 'Parsec' -Entry $Script:Registry['Parsec']
     $state | Should -Be 'disabled'
+  }
+
+  It 'reports manual for a kind no script can converge' {
+    $state = Get-AppActualState -Key 'ManualApp' -Entry $Script:Registry['ManualApp']
+    $state | Should -Be 'manual'
+  }
+}
+
+# ---------------------------------------------------------------------------
+# Invoke-AppConverge
+# ---------------------------------------------------------------------------
+
+Describe 'Invoke-AppConverge manual kind' {
+  It 'surfaces the approval instructions and succeeds' {
+    $Script:warning = $null
+    Mock Write-NucleusWarning { param($Message, $CommandName) $Script:warning = $Message }
+    $result = Invoke-AppConverge -Key 'ManualApp' -Entry $Script:Registry['ManualApp']
+    $result | Should -Be 0
+    $Script:warning | Should -Be 'ManualApp — fixture manual instructions'
   }
 }
 

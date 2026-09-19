@@ -43,10 +43,11 @@
   },
   "definitions": {
     "autostartKind": {
-      "description": "Our uniform auto-start mechanism per platform. Never the app's native enable path.",
+      "description": "Our uniform auto-start mechanism per platform. Never the app's native enable path. 'manual' declares an app no script can start automatically; the gap is surfaced via list/verify.",
       "enum": [
         "macos-launchagent",
         "macos-system-extension",
+        "manual",
         "nixos-xdg-desktop",
         "windows-run-key",
         "windows-startup-folder"

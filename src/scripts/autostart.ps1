@@ -197,6 +197,9 @@ function Get-AppActualState {
       $link = Join-Path -Path $startupPath -ChildPath "nucleus-$Key.lnk"
       if (Test-Path -LiteralPath $link) { return 'enabled' } else { return 'disabled' }
     }
+    'manual' {
+      return 'manual'
+    }
     default {
       return 'unknown'
     }
@@ -244,6 +247,19 @@ function Invoke-AppConverge {
           Write-NucleusInfo -CommandName 'autostart' "disabled $Key (removed Startup shortcut)"
         }
       }
+    }
+    'manual' {
+      # No programmable mechanism exists for this app on this host: the state is
+      # declared in the registry but never converged, so report the manual steps
+      # and succeed instead of failing apply on an app we cannot automate.
+      $instructions = if ($Entry.hostEntry.ContainsKey('approvalInstructions')) { $Entry.hostEntry.approvalInstructions } else { '' }
+      if ([string]::IsNullOrEmpty($instructions)) {
+        Write-NucleusWarning "$Key — manual entry; not auto-provisioned"
+      }
+      else {
+        Write-NucleusWarning "$Key — $instructions"
+      }
+      return 0
     }
     default {
       Write-NucleusWarning "$Key — unsupported kind '$kind' on host '$NucleusHost'"
