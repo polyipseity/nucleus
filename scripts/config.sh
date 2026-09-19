@@ -46,7 +46,7 @@ DEFAULTS='{
   },
   "harness-notify": {
     "enable": true,
-    "channels": ["telegram"],
+    "channels": ["telegram", "ntfy", "discord"],
     "max-chars": 1200
   }
 }'

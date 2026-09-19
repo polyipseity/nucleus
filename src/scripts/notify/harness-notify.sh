@@ -23,7 +23,10 @@
 #
 # Config (~/.local/state/nucleus/config.json, `nucleus-config`):
 #   harness-notify.enable    boolean, default true
-#   harness-notify.channels  array of `hermes send` targets, default ["telegram"]
+#   harness-notify.channels  array of `hermes send` targets, default
+#                            ["telegram", "ntfy", "discord"]; a channel the
+#                            host has not set up simply fails its delivery and
+#                            is reported as a warning
 #   harness-notify.max-chars integer body cap, default 1200
 set -euo pipefail
 
@@ -51,7 +54,7 @@ esac
 # WHY: defaults are mirrored from scripts/config.sh DEFAULTS (the SSOT for
 # runtime toggles).  Reading the file directly keeps this path usable from
 # harness hooks, which run outside any nucleus activation context.
-_hn_defaults='{"enable":true,"channels":["telegram"],"max-chars":1200}'
+_hn_defaults='{"enable":true,"channels":["telegram","ntfy","discord"],"max-chars":1200}'
 _hn_user_config='{}'
 if [ -f "$HOME/.local/state/nucleus/config.json" ]; then
   _hn_user_config="$(cat "$HOME/.local/state/nucleus/config.json")"
