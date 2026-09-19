@@ -13,6 +13,10 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/test-lib.sh"
 # shellcheck source=../../src/scripts/lib/macos-launch-services.sh
 . "$SCRIPT_DIR/../../src/scripts/lib/macos-launch-services.sh"
+# shellcheck source=../../src/scripts/lib/svc-instances.sh
+. "$SCRIPT_DIR/../../src/scripts/lib/svc-instances.sh"
+# shellcheck source=../../src/scripts/lib/macos-fskit.sh
+. "$SCRIPT_DIR/../../src/scripts/lib/macos-fskit.sh"
 
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 
@@ -334,6 +338,16 @@ list)
   for _label in ${FAKE_LIVE:-}; do printf '4242\t0\t%s\n' "$_label"; done
   ;;
 print)
+  case "${*: -1}" in
+  system/com.apple.filesystems.fskitd)
+    # The FSKit subsystem is not one of the managed instances this fake models,
+    # but its restart is observed through a new PID, so it has its own source.
+    _fskit_pid="$(cat "${FAKE_FSKIT_PID:?}" 2>/dev/null)"
+    [ -n "$_fskit_pid" ] || _fskit_pid=100
+    printf 'state = running\n\tpid = %s\n' "$_fskit_pid"
+    exit 0
+    ;;
+  esac
   case "$_state" in
   running)
     printf 'state = running\n\tpid = 4242\n'
@@ -368,16 +382,21 @@ exit 0
 FAKE
 
 # The mount table: FAKE_MOUNT_RELEASE_AFTER makes it stop listing the path after
-# that many probes, which is the shape of a volume that finishes unmounting.
+# that many probes (the shape of a volume that finishes unmounting), and
+# FAKE_MOUNT_APPEAR_AFTER makes it list the path again from that probe on (the
+# shape of a volume that attaches after its agent was reloaded).
 cat >"$_cli/bin/mount" <<'FAKE'
 #!/usr/bin/env bash
 _outcome="${FAKE_MOUNT_TABLE:-}"
-if [ -n "${FAKE_MOUNT_RELEASE_AFTER:-}" ] && [ -n "$_outcome" ]; then
-  _calls=0
-  [ -f "${FAKE_MOUNT_CALLS:?}" ] && _calls="$(cat "$FAKE_MOUNT_CALLS")"
-  _calls=$((_calls + 1))
-  printf '%s' "$_calls" >"$FAKE_MOUNT_CALLS"
-  [ "$_calls" -gt "$FAKE_MOUNT_RELEASE_AFTER" ] && _outcome=""
+_calls=0
+[ -f "${FAKE_MOUNT_CALLS:?}" ] && _calls="$(cat "$FAKE_MOUNT_CALLS")"
+_calls=$((_calls + 1))
+printf '%s' "$_calls" >"$FAKE_MOUNT_CALLS"
+if [ -n "${FAKE_MOUNT_RELEASE_AFTER:-}" ] && [ "$_calls" -gt "$FAKE_MOUNT_RELEASE_AFTER" ]; then
+  _outcome=""
+fi
+if [ -n "${FAKE_MOUNT_APPEAR_AFTER:-}" ] && [ "$_calls" -gt "$FAKE_MOUNT_APPEAR_AFTER" ]; then
+  _outcome="${FAKE_MOUNT_TABLE_APPEARING:-$_outcome}"
 fi
 printf 'mount: %s\n' "${_outcome:-released}" >>"${FAKE_TIMELINE:?}"
 if [ -n "$_outcome" ]; then printf '%s\n' "$_outcome"; fi
@@ -390,7 +409,31 @@ cat >"$_cli/bin/sleep" <<'FAKE'
 #!/usr/bin/env bash
 exit 0
 FAKE
-chmod +x "$_cli/bin/launchctl" "$_cli/bin/mount" "$_cli/bin/sleep"
+
+# FSKit provider fakes: the repair path reads FSKit's enabled-module list
+# (plutil), restarts the subsystem (killall through sudo) and observes the new
+# daemon through launchctl, so all three are stubbed on the CLI's PATH.
+mkdir -p "$_cli/home/Library/Group Containers/group.com.apple.fskit.settings"
+printf '    "io.macfuse.app.fsmodule.macfuse" => {\n        enabled = 1;\n    };\n' \
+  >"$_cli/home/Library/Group Containers/group.com.apple.fskit.settings/enabledModules.plist"
+cat >"$_cli/bin/plutil" <<'FAKE'
+#!/usr/bin/env bash
+cat "${*: -1}"
+FAKE
+cat >"$_cli/bin/sudo" <<'FAKE'
+#!/usr/bin/env bash
+printf 'sudo %s\n' "$*" >>"${FAKE_TIMELINE:?}"
+exec "$@"
+FAKE
+cat >"$_cli/bin/killall" <<'FAKE'
+#!/usr/bin/env bash
+printf 'killall %s\n' "$*" >>"${FAKE_TIMELINE:?}"
+_fskit_pid="$(cat "${FAKE_FSKIT_PID:?}" 2>/dev/null)"
+[ -n "$_fskit_pid" ] || _fskit_pid=100
+printf '%s' "$((_fskit_pid + 1))" >"$FAKE_FSKIT_PID"
+FAKE
+chmod +x "$_cli/bin/launchctl" "$_cli/bin/mount" "$_cli/bin/sleep" \
+  "$_cli/bin/plutil" "$_cli/bin/sudo" "$_cli/bin/killall"
 
 # run_cli — Run the CLI against the stub registry with the fakes on PATH.
 run_cli() { # <svc.sh args...>
@@ -404,6 +447,9 @@ run_cli() { # <svc.sh args...>
     FAKE_LIVE="${FAKE_LIVE:-}" \
     FAKE_MOUNT_TABLE="${FAKE_MOUNT_TABLE:-}" \
     FAKE_MOUNT_RELEASE_AFTER="${FAKE_MOUNT_RELEASE_AFTER:-}" \
+    FAKE_MOUNT_APPEAR_AFTER="${FAKE_MOUNT_APPEAR_AFTER:-}" \
+    FAKE_MOUNT_TABLE_APPEARING="${FAKE_MOUNT_TABLE_APPEARING:-}" \
+    FAKE_FSKIT_PID="${FAKE_FSKIT_PID:-}" \
     FAKE_KILL_FAIL="${FAKE_KILL_FAIL:-}" \
     bash "$REPO_ROOT/scripts/svc.sh" "$@"
 }
@@ -423,11 +469,24 @@ timeline_index() { # <substring>
   awk -v pat="$1" 'index($0, pat) { print NR; exit } END { if (NR == 0) print 0 }' "$FAKE_TIMELINE"
 }
 
+# _fskit_killcount — how many times the FSKit subsystem was signalled.
+_fskit_killcount() {
+  grep -c '^killall fskitd' "$FAKE_TIMELINE"
+}
+
+FAKE_FSKIT_PID="$_cli/fskit.pid"
+export FAKE_FSKIT_PID
+
 _cli_mount="fake://vol on $_cli/home/clouds/iCloud (fake, nodev)"
 FAKE_LIVE="local.cloud-mount.iCloud"
+# The volume leaves the table while the agent is stopped, then comes back once
+# the agent has been reloaded: that is what a restart of a healthy mount does.
+FAKE_MOUNT_TABLE_APPEARING="$_cli_mount"
+FAKE_MOUNT_APPEAR_AFTER=6
 
 reset_cli stopped "$_cli_mount" 2 restart local.cloud-mount.iCloud
 assert_count "restarting a cloud mount exits 0" 0 "$captured_status"
+assert_mentions "the restarted mount's volume is verified" "$captured_output" "is mounted"
 assert_count "the reload bootstraps the instance once" 1 "$(grep -c '^bootstrap' "$FAKE_TIMELINE")"
 _released="$(timeline_index 'mount: released')"
 _bootstrap="$(timeline_index 'bootstrap')"
@@ -446,7 +505,6 @@ else
 fi
 
 section 6 "A mount that never releases blocks the reload"
-
 reset_cli running "$_cli_mount" "" restart local.cloud-mount.iCloud
 assert_count "a mount that never releases fails the restart" 1 "$captured_status"
 assert_mentions "the stale volume is reported" "$captured_output" "still mounted"
@@ -477,5 +535,43 @@ FAKE_KILL_FAIL=
 reset_cli running "$_cli_mount" "" stop plain-service
 assert_count "stopping an ordinary service exits 0" 0 "$captured_status"
 assert_count "an ordinary service never probes the mount table" 0 "$(grep -c '^mount:' "$FAKE_TIMELINE")"
+
+section 8 "A blocked cloud mount repairs the FSKit provider before the reload"
+
+# WHY: the blocked marker is what says the provider, not the mount, is the
+# problem, so the repair is gated on it: a stale marker is ignored, and an
+# unblocked restart must leave the FSKit daemon alone.
+_cli_state_dir="$_cli/home/Library/Application Support/nucleus/state/service-stats"
+block_mount() { # <key>
+  svc_blocked_set "$1" "$_cli_state_dir" fskit-provider "$(fskit_remedy)"
+}
+
+block_mount local.cloud-mount.iCloud
+reset_cli stopped "$_cli_mount" 2 restart local.cloud-mount.iCloud
+assert_count "restarting a blocked cloud mount exits 0" 0 "$captured_status"
+assert_mentions "the blocked provider is repaired, not retried" "$captured_output" "repairing the macFUSE/FSKit provider"
+assert_count "the blocked provider's daemon is restarted" 1 "$(_fskit_killcount)"
+if [ "$(_fskit_killcount)" -eq 1 ] && [ "$(timeline_index 'sudo killall fskitd')" -lt "$(timeline_index 'bootstrap')" ]; then
+  assert_pass "the provider is repaired before the agent is reloaded"
+else
+  assert_fail "svc-blocked-repair-first" "timeline=[$(tr '\n' ';' <"$FAKE_TIMELINE")]"
+fi
+assert_mentions "the repaired mount's volume is verified" "$captured_output" "is mounted"
+
+svc_blocked_clear local.cloud-mount.iCloud "$_cli_state_dir"
+reset_cli stopped "$_cli_mount" 2 restart local.cloud-mount.iCloud
+assert_count "restarting an unblocked cloud mount exits 0" 0 "$captured_status"
+assert_count "an unblocked restart never restarts the FSKit daemon" 0 "$(_fskit_killcount)"
+
+section 9 "A cloud mount whose volume never comes back fails the restart"
+
+# WHY: the agent exits 0 when the provider refuses the volume, so the volume —
+# not the job's state — is what decides whether the restart worked.
+FAKE_MOUNT_APPEAR_AFTER=""
+reset_cli stopped "$_cli_mount" 2 restart local.cloud-mount.iCloud
+assert_count "a volume that never attaches fails the restart" 1 "$captured_status"
+assert_mentions "the failed attach" "$captured_output" "did not attach"
+assert_mentions "the failed attach names the repair command" "$captured_output" "nucleus-cloud repair"
+FAKE_MOUNT_APPEAR_AFTER=6
 
 finish_tests

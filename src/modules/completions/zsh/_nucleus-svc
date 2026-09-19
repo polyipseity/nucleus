@@ -20,7 +20,7 @@ _nucleus_svc_services() {
 
 _arguments \
   '(-h --help)'{--help,-h}'[Show usage]' \
-  '1:subcommand:((list "List services with status (instance ids included)" status "Show status of specified services (all if omitted)" start "Start a service" stop "Stop a service" restart "Restart a service" enable "Enable auto-start" disable "Disable auto-start" verify "Check all (or specified) services, warn if inactive" endpoint "Show network endpoint(s) for a service" logs "Show service logs (list available if no service)" log-paths "Print log file path(s)" log-config "Show effective logging configuration"))' \
+  '1:subcommand:((list "List services with status (instance ids included)" status "Show status of specified services (all if omitted)" start "Start a service" stop "Stop a service" restart "Restart a service, repairing a blocked cloud mount first if needed" enable "Enable auto-start" disable "Disable auto-start" verify "Check all (or specified) services, warn if inactive" endpoint "Show network endpoint(s) for a service" logs "Show service logs (list available if no service)" log-paths "Print log file path(s)" log-config "Show effective logging configuration"))' \
   '--json[json]' \
   '--system[system]' \
   '--user[user]' \

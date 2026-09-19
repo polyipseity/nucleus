@@ -70,17 +70,23 @@ JSON
 #   FAKE_DAEMON_KILLED  — set once killall ran; the FSKit daemon answers a new pid.
 #   FAKE_UNAME_S        — the platform the repair sees.
 #   FAKE_NO_MOUNT_ON_KICKSTART — a restarted agent whose mount never appears.
+#   FAKE_ATTACH_AFTER_KICKS — the volume appears only from this launch on, which
+#                      is how FSKit looks when it refuses the first attempts and
+#                      serves a later one.
 FAKE_MOUNT_MAP="$_tmp/mount-map"
 FAKE_JOBS_LOADED="$_tmp/jobs-loaded"
 FAKE_MOUNTS="$_tmp/mounts"
 FAKE_ACTIONS="$_tmp/actions"
 FAKE_LAUNCHCTL_LOG="$_tmp/launchctl.log"
 FAKE_DAEMON_KILLED="$_tmp/daemon-killed"
+FAKE_KICK_COUNT="$_tmp/kick-count"
 FAKE_KILLALL_STATUS=0
 FAKE_NO_MOUNT_ON_KICKSTART=0
+FAKE_ATTACH_AFTER_KICKS=""
 FAKE_UNAME_S=Darwin
 export FAKE_MOUNT_MAP FAKE_JOBS_LOADED FAKE_MOUNTS FAKE_ACTIONS FAKE_LAUNCHCTL_LOG
-export FAKE_DAEMON_KILLED FAKE_KILLALL_STATUS FAKE_NO_MOUNT_ON_KICKSTART FAKE_UNAME_S
+export FAKE_DAEMON_KILLED FAKE_KICK_COUNT FAKE_KILLALL_STATUS FAKE_NO_MOUNT_ON_KICKSTART
+export FAKE_ATTACH_AFTER_KICKS FAKE_UNAME_S
 
 printf 'local.cloud-mount.GoogleDrive\t%s\n' "$FAKE_HOME/clouds/GoogleDrive" >"$FAKE_MOUNT_MAP"
 printf 'local.cloud-mount.OneDrive\t%s\n' "$FAKE_HOME/clouds/OneDrive" >>"$FAKE_MOUNT_MAP"
@@ -108,9 +114,20 @@ print)
     ;;
   esac
   _label="${2##*/}"
+  # An agent whose attempt the provider refused has already exited by the time it
+  # is probed again, so only an attempt that was served (or one with no refusal
+  # modelled) reports the job as running.
   if grep -qxF "$_label" "$FAKE_JOBS_LOADED" 2>/dev/null; then
-    printf 'state = running\n\tpid = 4242\n'
-    exit 0
+    _kicks="$(cat "$FAKE_KICK_COUNT" 2>/dev/null || printf '0')"
+    _refused=false
+    [ "$FAKE_NO_MOUNT_ON_KICKSTART" = "1" ] && _refused=true
+    if [ -n "${FAKE_ATTACH_AFTER_KICKS:-}" ] && [ "$_kicks" -lt "$FAKE_ATTACH_AFTER_KICKS" ]; then
+      _refused=true
+    fi
+    if [ "$_refused" = false ]; then
+      printf 'state = running\n\tpid = 4242\n'
+      exit 0
+    fi
   fi
   printf 'Could not find service\n' >&2
   exit 113
@@ -119,7 +136,15 @@ kickstart)
   _label="${3##*/}"
   printf 'kickstart %s\n' "$_label" >>"$FAKE_ACTIONS"
   printf '%s\n' "$_label" >>"$FAKE_JOBS_LOADED"
-  if [ "$FAKE_NO_MOUNT_ON_KICKSTART" != "1" ]; then _attach "$_label"; fi
+  _kicks="$(cat "$FAKE_KICK_COUNT" 2>/dev/null || printf '0')"
+  _kicks=$((_kicks + 1))
+  printf '%s' "$_kicks" >"$FAKE_KICK_COUNT"
+  _serves=true
+  [ "$FAKE_NO_MOUNT_ON_KICKSTART" = "1" ] && _serves=false
+  if [ -n "${FAKE_ATTACH_AFTER_KICKS:-}" ] && [ "$_kicks" -lt "$FAKE_ATTACH_AFTER_KICKS" ]; then
+    _serves=false
+  fi
+  if [ "$_serves" = true ]; then _attach "$_label"; fi
   exit 0
   ;;
 bootstrap)
@@ -238,13 +263,15 @@ reset_world() {
   : >"$FAKE_JOBS_LOADED"
   printf 'fake://root on / (fake)\n' >"$FAKE_MOUNTS"
   rm -f "$FAKE_DAEMON_KILLED"
+  : >"$FAKE_KICK_COUNT"
   rm -f "$STATE_DIR"/*.blocked
   rm -f "$FAKE_HOME/Library/LaunchAgents"/*.plist
   for _label in "$@"; do printf '%s\n' "$_label" >>"$FAKE_JOBS_LOADED"; done
   FAKE_KILLALL_STATUS=0
   FAKE_NO_MOUNT_ON_KICKSTART=0
+  FAKE_ATTACH_AFTER_KICKS=""
   FAKE_UNAME_S=Darwin
-  export FAKE_KILLALL_STATUS FAKE_NO_MOUNT_ON_KICKSTART FAKE_UNAME_S
+  export FAKE_KILLALL_STATUS FAKE_NO_MOUNT_ON_KICKSTART FAKE_ATTACH_AFTER_KICKS FAKE_UNAME_S
 }
 
 # mark_blocked <label> — a fresh blocked marker, as the mount wrapper leaves it.
@@ -323,5 +350,19 @@ assert_eq "the bounded wait is validated" "1" "$(run_repair OneDrive --timeout 0
 reset_world local.cloud-mount.OneDrive
 assert_eq "an undeclared mount id is rejected" "1" "$(run_repair Nonexistent)"
 assert_mentions "an undeclared mount id" "$(cat "$_out")" "not declared"
+
+section "5" "a provider that serves the volume on a later attempt"
+
+# WHY: FSKit refuses the first attempts right after its daemon restarts, and the
+#   agent stops on a refusal instead of retrying it, so the repair has to launch
+#   the agent again inside its bound rather than probe once.
+reset_world local.cloud-mount.OneDrive
+FAKE_ATTACH_AFTER_KICKS=2
+export FAKE_ATTACH_AFTER_KICKS
+assert_eq "a volume served on a later attempt still comes back" "0" "$(run_repair OneDrive --timeout 40)"
+assert_mentions "the relaunched mount" "$(cat "$_out")" "mounted: OneDrive"
+assert_eq "the repair launched the agent again" "2" "$(grep -c '^kickstart local.cloud-mount.OneDrive$' "$FAKE_ACTIONS")"
+FAKE_ATTACH_AFTER_KICKS=""
+export FAKE_ATTACH_AFTER_KICKS
 
 finish_tests

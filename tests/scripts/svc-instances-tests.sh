@@ -26,10 +26,34 @@ mkdir -p "$_tmp/bin"
 # whatever happens to be running on the test machine.
 cat >"$_tmp/bin/launchctl" <<'FAKE_LAUNCHCTL'
 #!/usr/bin/env bash
+_job_state="$(cat "${FAKE_JOB_STATE:-/dev/null}" 2>/dev/null || printf 'stopped\n')"
 case "${1:-}" in
-list)
-  printf 'PID\tStatus\tLabel\n'
+list)  printf 'PID\tStatus\tLabel\n'
   for _label in ${FAKE_LIVE:-}; do printf '4242\t0\t%s\n' "$_label"; done
+  ;;
+print)
+  # The relaunch loop asks whether an attempt is still in flight. A launched
+  # cloud-mount agent exits on a refusal, so an attempt is live for exactly one
+  # probe; FAKE_JOB_ALWAYS models one that never goes away.
+  if [ -n "${FAKE_JOB_ALWAYS:-}" ]; then
+    printf 'state = %s\n' "$FAKE_JOB_ALWAYS"
+    [ "$FAKE_JOB_ALWAYS" = running ] && printf '\tpid = 4242\n'
+    exit 0
+  fi
+  _live="$(cat "${FAKE_ATTEMPT_LIVE:?}" 2>/dev/null)"
+  [ -n "$_live" ] || _live=0
+  if [ "$_live" -ge 1 ]; then
+    printf '0' >"$FAKE_ATTEMPT_LIVE"
+    printf 'state = running\n\tpid = 4242\n'
+    exit 0
+  fi
+  printf 'state = not running\n'
+  ;;
+kickstart)
+  _kicks="$(cat "${FAKE_KICK_CALLS:?}" 2>/dev/null)"
+  [ -n "$_kicks" ] || _kicks=0
+  printf '%s' "$((_kicks + 1))" >"$FAKE_KICK_CALLS"
+  printf '1' >"${FAKE_ATTEMPT_LIVE:?}"
   ;;
 *)
   exit 1
@@ -55,6 +79,9 @@ FAKE_SYSTEMCTL
 #   FAKE_MOUNT_UNTIL — report the table for this many calls, then report
 #                      nothing: a volume that finishes unmounting while it is
 #                      being waited on.
+#   FAKE_MOUNT_AFTER_KICKS — report nothing until the fake launchctl has been
+#                      asked to kickstart this many times: a provider that
+#                      refuses the first attempts and serves a later one.
 cat >"$_tmp/bin/mount" <<'FAKE_MOUNT'
 #!/usr/bin/env bash
 if [ -n "${FAKE_MOUNT_UNTIL:-}" ]; then
@@ -63,6 +90,11 @@ if [ -n "${FAKE_MOUNT_UNTIL:-}" ]; then
   calls=$((calls + 1))
   printf '%s' "$calls" >"$FAKE_MOUNT_CALLS"
   [ "$calls" -gt "$FAKE_MOUNT_UNTIL" ] && exit 0
+fi
+if [ -n "${FAKE_MOUNT_AFTER_KICKS:-}" ]; then
+  kicks="$(cat "${FAKE_KICK_CALLS:?}" 2>/dev/null)"
+  [ -n "$kicks" ] || kicks=0
+  [ "$kicks" -lt "$FAKE_MOUNT_AFTER_KICKS" ] && exit 0
 fi
 [ -n "${FAKE_MOUNT_SLOW:-}" ] && sleep "$FAKE_MOUNT_SLOW"
 printf '%s\n' "${FAKE_MOUNT_TABLE:-}"
@@ -73,8 +105,14 @@ export PATH
 FAKE_MOUNT_TABLE=""
 FAKE_MOUNT_SLOW=""
 FAKE_MOUNT_UNTIL=""
+FAKE_MOUNT_AFTER_KICKS=""
 FAKE_MOUNT_CALLS="$_tmp/mount.calls"
-export FAKE_MOUNT_TABLE FAKE_MOUNT_SLOW FAKE_MOUNT_UNTIL FAKE_MOUNT_CALLS
+FAKE_JOB_STATE="$_tmp/job.state"
+FAKE_JOB_ALWAYS=""
+FAKE_ATTEMPT_LIVE="$_tmp/attempt.live"
+FAKE_KICK_CALLS="$_tmp/kick.calls"
+export FAKE_MOUNT_TABLE FAKE_MOUNT_SLOW FAKE_MOUNT_UNTIL FAKE_MOUNT_AFTER_KICKS FAKE_MOUNT_CALLS
+export FAKE_JOB_STATE FAKE_JOB_ALWAYS FAKE_ATTEMPT_LIVE FAKE_KICK_CALLS
 
 LAUNCHCTL_ENTRY='{"type": "macos-launchctl","service":"local.cloud-mount.","scope":"user","launchdDomain":"gui","prefixMatch":true}'
 SYSTEMCTL_ENTRY='{"type": "nixos-systemctl","service":"cloud-mount-","scope":"user","prefixMatch":true}'
@@ -302,5 +340,69 @@ if [ -n "$(svc_boot_id)" ]; then
 else
   assert_fail "svc-boot-id" "svc_boot_id printed nothing"
 fi
+
+section "svc-instances" "bounded relaunch until the volume attaches"
+
+# Instant sleep, scoped to this section: the relaunch loop sleeps between
+# launches, and the section before this one asserts a probe that outlives its
+# bound, which needs a mount stub that really blocks.
+mkdir -p "$_tmp/fastbin"
+cat >"$_tmp/fastbin/sleep" <<'FAKE_SLEEP'
+#!/usr/bin/env bash
+exit 0
+FAKE_SLEEP
+chmod +x "$_tmp/fastbin/sleep"
+_path_before="$PATH"
+PATH="$_tmp/fastbin:$PATH"
+export PATH
+
+# WHY: FSKit can refuse the first attempts right after its daemon restarts, so
+# the relaunch is bounded twice — by the launch cap and by the budget — and a
+# launch that is still in flight is never interrupted.
+relaunch_rc() { # <path> <budget> [interval] [max-launches]
+  local _rc=0
+  svc_remount_until "$1" "gui/501/local.cloud-mount.iCloud" "" "$2" "${3:-5}" "${4:-4}" || _rc=$?
+  printf '%s' "$_rc"
+}
+kick_count() {
+  local _kicks
+  _kicks="$(cat "$FAKE_KICK_CALLS" 2>/dev/null)"
+  [ -n "$_kicks" ] || _kicks=0
+  printf '%s' "$_kicks"
+}
+
+: >"$FAKE_KICK_CALLS"
+: >"$FAKE_ATTEMPT_LIVE"
+FAKE_MOUNT_TABLE='fake://vol on /mnt/relaunch (fake)'
+assert_eq "an attached volume is never relaunched" "0|0" "$(relaunch_rc /mnt/relaunch 20)|$(kick_count)"
+
+# The attempt ends by itself (the agent stops on a refusal), so the next launch
+# is a new one: the volume appears once the provider has served two of them.
+: >"$FAKE_KICK_CALLS"
+: >"$FAKE_ATTEMPT_LIVE"
+FAKE_MOUNT_TABLE='fake://vol on /mnt/relaunch (fake)'
+FAKE_MOUNT_AFTER_KICKS=2
+assert_eq "a volume that attaches after two launches is awaited, not failed" "0|2" "$(relaunch_rc /mnt/relaunch 40)|$(kick_count)"
+
+# An attempt that is still in flight is left to its own attach bound.
+FAKE_JOB_ALWAYS=running
+: >"$FAKE_KICK_CALLS"
+FAKE_MOUNT_AFTER_KICKS=99
+assert_eq "a launch in flight is never interrupted" "1|0" "$(relaunch_rc /mnt/relaunch 10)|$(kick_count)"
+FAKE_JOB_ALWAYS=""
+
+# The budget stops the relaunch even when the volume never appears.
+: >"$FAKE_KICK_CALLS"
+: >"$FAKE_ATTEMPT_LIVE"
+assert_eq "the budget bounds the relaunch" "1|2" "$(relaunch_rc /mnt/absent 20)|$(kick_count)"
+
+# The launch cap bounds it too, for a provider that never serves the volume.
+: >"$FAKE_KICK_CALLS"
+: >"$FAKE_ATTEMPT_LIVE"
+assert_eq "the launch cap bounds the relaunch" "1|3" "$(relaunch_rc /mnt/absent 100)|$(kick_count)"
+FAKE_MOUNT_AFTER_KICKS=""
+FAKE_MOUNT_TABLE=""
+PATH="$_path_before"
+export PATH
 
 finish_tests

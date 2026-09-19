@@ -28,6 +28,8 @@ if [ -h "$_self" ]; then
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
+# shellcheck source=../src/scripts/lib/macos-fskit.sh
+. "$SCRIPT_DIR/../src/scripts/lib/macos-fskit.sh"
 . "$SCRIPT_DIR/../src/scripts/lib/crash-loop.sh"
 . "$SCRIPT_DIR/../src/scripts/lib/macos-launch-services.sh"
 . "$SCRIPT_DIR/../src/scripts/lib/svc-instances.sh"
@@ -45,7 +47,7 @@ usage() {
   --system                          Show only system-domain services (requires sudo).
   start <service>                   Start a service.
   stop <service>                    Stop a service.
-  restart <service>                 Restart a service.
+  restart <service>                 Restart a service, repairing a blocked cloud mount first if needed.
   enable <service>                  Enable auto-start.
   disable <service>                 Disable auto-start.
   verify [service...]               Check all (or specified) services, warn if inactive.
@@ -548,6 +550,12 @@ EOF
 #   next reboot.
 CLOUD_MOUNT_RELEASE_TIMEOUT=30
 
+# Bounds for bringing a cloud mount back after a restart or a provider repair.
+# WHY: FSKit can refuse the first attempts right after its daemon restarts, so the
+#   launch is retried within a budget instead of failing on the first refusal.
+CLOUD_MOUNT_ATTACH_BUDGET=45
+CLOUD_MOUNT_REPAIR_TIMEOUT=30
+
 # cloud_mount_point — Mount point of a cloud-drive instance, if any.
 # Args: $1 — prefix-match host entry JSON ("" for an ordinary service);
 #       $2 — concrete instance id.
@@ -573,6 +581,45 @@ wait_cloud_mount_released() {
   fi
 
   error "$name — mount point $mount_point is still mounted after ${CLOUD_MOUNT_RELEASE_TIMEOUT}s; not reloading the agent over a stale volume"
+  return 1
+}
+
+# repair_cloud_mount_provider — Repair the FSKit provider when a cloud mount is
+# blocked, before anything reloads its agent.
+# Args: $1 — service display name; $2 — instance id.
+# Returns 1 (with a hard error) when the provider cannot be repaired.
+# WHY: an agent reloaded into a wedged provider refuses the volume again and writes
+#   another blocked marker, so the provider is repaired first, and only when a
+#   fresh marker says the provider was the reason — an unblocked mount keeps the
+#   previous behaviour exactly.
+repair_cloud_mount_provider() {
+  local name="$1" instance="$2" state
+
+  state="$(svc_blocked_state "$instance" "$(crash_loop_state_dir)")"
+  [ "$state" != "clear" ] || return 0
+  notice "$name — $state; repairing the macFUSE/FSKit provider before reloading the agent"
+  if ! fskit_repair_provider "$CLOUD_MOUNT_REPAIR_TIMEOUT"; then
+    error "$name — the macFUSE/FSKit provider could not be repaired; run 'nucleus-cloud repair'"
+    return 1
+  fi
+  return 0
+}
+
+# wait_cloud_mount_attached — Bring a cloud mount's volume up, or fail loudly.
+# Args: $1 — service display name; $2 — mount point ("" ⇒ no-op);
+#       $3 — launchctl service target; $4 — sudo prefix.
+# Returns 1 after reporting that the volume never attached.
+# WHY: an agent whose provider refused the volume exits 0 by design, so the job's
+#   state is not the mount's state; the volume is the success criterion.
+wait_cloud_mount_attached() {
+  local name="$1" mount_point="$2" target="$3" sudo_prefix="$4"
+
+  [ -n "$mount_point" ] || return 0
+  if svc_remount_until "$mount_point" "$target" "$sudo_prefix" "$CLOUD_MOUNT_ATTACH_BUDGET"; then
+    say "$name — $mount_point is mounted"
+    return 0
+  fi
+  error "$name — $mount_point did not attach within ${CLOUD_MOUNT_ATTACH_BUDGET}s; run 'nucleus-cloud repair' and check 'nucleus-svc logs $name'"
   return 1
 }
 
@@ -619,6 +666,9 @@ svc_action() {
     status) svc_status "$name" "$entry_json" ;;
     start)
       cleanup_service_ports "$entry_json"
+      if [ -n "$cloud_mount" ]; then
+        repair_cloud_mount_provider "$name" "$svc_id" || return 1
+      fi
       recover_launchctl_service "$launchd_domain" "$svc_id" "$sudo_prefix" "$uid" || {
         # WHY: a loaded job only needs starting, an unloaded one needs loading
         #   again, and either failure is reported with launchctl's own output
@@ -636,12 +686,16 @@ svc_action() {
           return 1
         fi
       }
-      poll_service_ready "$name" "$entry_json" >/dev/null || {
-        local _diag
-        _diag=$(service_diagnostic "$entry_json")
-        warn "$name — started but not running ($_diag); check 'nucleus-svc logs $name'"
-        return 1
-      }
+      if [ -n "$cloud_mount" ]; then
+        wait_cloud_mount_attached "$name" "$cloud_mount" "$target" "$sudo_prefix" || return 1
+      else
+        poll_service_ready "$name" "$entry_json" >/dev/null || {
+          local _diag
+          _diag=$(service_diagnostic "$entry_json")
+          warn "$name — started but not running ($_diag); check 'nucleus-svc logs $name'"
+          return 1
+        }
+      fi
       ;;
     stop)
       local stop_rc=0
@@ -653,6 +707,9 @@ svc_action() {
       ;;
     restart)
       cleanup_service_ports "$entry_json"
+      if [ -n "$cloud_mount" ]; then
+        repair_cloud_mount_provider "$name" "$svc_id" || return 1
+      fi
       # WHY: release the volume before anything reloads the agent — a reload
       #   over a mount that is still attached gets the new mount destroyed as a
       #   duplicate.
@@ -700,12 +757,16 @@ svc_action() {
             error "$name — restart: failed to start service after reload"
         fi
       }
-      poll_service_ready "$name" "$entry_json" >/dev/null || {
-        local _diag
-        _diag=$(service_diagnostic "$entry_json")
-        warn "$name — restarted but not running ($_diag); check 'nucleus-svc logs $name'"
-        return 1
-      }
+      if [ -n "$cloud_mount" ]; then
+        wait_cloud_mount_attached "$name" "$cloud_mount" "$target" "$sudo_prefix" || return 1
+      else
+        poll_service_ready "$name" "$entry_json" >/dev/null || {
+          local _diag
+          _diag=$(service_diagnostic "$entry_json")
+          warn "$name — restarted but not running ($_diag); check 'nucleus-svc logs $name'"
+          return 1
+        }
+      fi
       ;;
     enable) $sudo_prefix launchctl enable "$target" >/dev/null 2>&1 ;;
     disable) $sudo_prefix launchctl disable "$target" >/dev/null 2>&1 ;;

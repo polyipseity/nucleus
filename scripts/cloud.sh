@@ -65,7 +65,8 @@ usage() {
     --repo-root PATH    Repo checkout used to find src/users/.
 
   repair options:
-    --timeout SECS      Seconds to wait for each mount to appear (default: 60).
+    --timeout SECS      Seconds to keep relaunching each mount agent until its
+                        volume appears (default: 60).
     --repo-root PATH    Repo checkout used to find src/users/.
 
   Common options:
@@ -277,13 +278,22 @@ _repair_mount_rows() {
   ' <<<"$1"
 }
 
-# _repair_restart_mount <label> <uid> — Restart one cloud-mount agent.
-# Returns 0 when the agent was restarted or loaded, 1 when it could not be.
+# _repair_mount_target <label> <uid> — launchctl target of a cloud-mount agent.
+# WHY: both the restart and the bounded relaunch below act on the same target, and
+#   resolving it once keeps the two from disagreeing about the domain.
+_repair_mount_target() {
+  local label="$1" uid="$2"
+
+  launchctl_target "$(_detect_launchd_domain "$label" "$uid")" "$uid" "$label"
+}
+
+# _repair_restart_mount <label> <uid> <target> <plist> — Restart one cloud-mount
+# agent.  Returns 0 when the agent was restarted or loaded, 1 when it could not be.
 _repair_restart_mount() {
   _rrm_label="$1"
   _rrm_uid="$2"
-  _rrm_domain="$(_detect_launchd_domain "$_rrm_label" "$_rrm_uid")"
-  _rrm_target="$(launchctl_target "$_rrm_domain" "$_rrm_uid" "$_rrm_label")"
+  _rrm_target="$3"
+  _rrm_plist="$4"
 
   # check-suppress:suppression_doc: a job that is not loaded is the question being asked, not an error; the bootstrap path below reports its own outcome.
   if launchctl print "$_rrm_target" >/dev/null 2>&1; then
@@ -295,12 +305,11 @@ _repair_restart_mount() {
     return 1
   fi
 
-  _rrm_plist="$HOME/Library/LaunchAgents/$_rrm_label.plist"
   if [ ! -f "$_rrm_plist" ]; then
     warn "$_rrm_label is not loaded and $_rrm_plist does not exist; run nucleus apply to create it"
     return 1
   fi
-  if launchctl bootstrap "$(launchctl_bootstrap_domain "$_rrm_domain" "$_rrm_uid")" "$_rrm_plist"; then
+  if launchctl bootstrap "$(launchctl_bootstrap_domain "$(_detect_launchd_domain "$_rrm_label" "$_rrm_uid")" "$_rrm_uid")" "$_rrm_plist"; then
     say "loaded $_rrm_label"
     return 0
   fi
@@ -1344,6 +1353,12 @@ do_repair() {
     exit 1
   fi
 
+  # Cloud mounts are gui agents of the invoking user, so launchctl needs no
+  # privilege; a registry that moves them into the system domain still gets the
+  # escalation the other svc-side operations use.
+  sudo_prefix=""
+  [ "$(jq -r '.scope // "user"' <<<"$cloud_entry")" = "system" ] && sudo_prefix="sudo"
+
   username="$(id -un)"
   uid="$(id -u)"
   mounts_json="$(svc_configured_mounts "$REPO_ROOT" "$host" "$username")"
@@ -1408,29 +1423,16 @@ do_repair() {
     fi
 
     svc_blocked_clear "$label" "$(crash_loop_state_dir)"
-    if ! _repair_restart_mount "$label" "$uid"; then
-      failures=$((failures + 1))
+    target="$(_repair_mount_target "$label" "$uid")"
+    plist="$HOME/Library/LaunchAgents/$label.plist"
+    if _repair_restart_mount "$label" "$uid" "$target" "$plist"; then
+      # WHY the relaunch: the FSKit subsystem can refuse the first attempts after
+      #   the restart (macFUSE reports status 3/4 before it succeeds), and the
+      #   agent stops on such a refusal instead of retrying it, so the volume is
+      #   awaited over the caller's bound with a bounded relaunch in between.
+      # check-suppress:suppression_doc: the report pass below names every mount that did not come back, so a failed relaunch is not an error here.
+      svc_remount_until "$mount_point" "$target" "$sudo_prefix" "$timeout" || true
     fi
-  done
-
-  # WHY: the FSKit subsystem can reject the first attempts after the restart
-  #   (macFUSE reports status 3/4 before it succeeds), so the mounts are awaited
-  #   over a bounded window instead of being probed once.
-  ticks=0
-  max_ticks=$((timeout / 2))
-  while :; do
-    pending=0
-    for row in "${rows[@]}"; do
-      IFS="$tab" read -r _mount_id _label mount_point <<<"$row"
-      if ! svc_mount_table_contains "$mount_point"; then
-        pending=$((pending + 1))
-      fi
-    done
-    if [ "$pending" -eq 0 ] || [ "$ticks" -ge "$max_ticks" ]; then
-      break
-    fi
-    sleep 2
-    ticks=$((ticks + 1))
   done
 
   for row in "${rows[@]}"; do

@@ -211,6 +211,46 @@ svc_wait_mount_released() {
   return 0
 }
 
+# svc_remount_until — Relaunch a launchd mount agent until its volume attaches.
+# Args: $1 — absolute mount point; $2 — launchctl service target;
+#       $3 — sudo prefix ("" or "sudo"); $4 — budget in seconds;
+#       $5 — seconds between launches (default 5); $6 — most launches to make
+#       (default 4).
+# Returns 0 as soon as the mount table lists the path, 1 when the budget or the
+# launch cap is reached with the path still absent.
+# WHY: FSKit can refuse the first attempts right after its daemon restarts (macFUSE
+#   status 3/4) while a later one serves the volume, and the mount agent no longer
+#   retries a provider refusal on its own (it stops and records a blocked marker),
+#   so the bounded retry belongs to the command that wants the mount up.  A launch
+#   that is still in flight is never interrupted: an attach may legitimately take
+#   its own bound, and kicking it again would destroy an attempt that could still
+#   succeed.
+svc_remount_until() {
+  local mount_point="$1" target="$2" sudo_prefix="$3" budget="$4" interval="${5:-5}" max_launches="${6:-4}"
+  local waited=0 launches=1 running
+
+  while :; do
+    if svc_mount_table_contains "$mount_point"; then
+      return 0
+    fi
+    if [ "$waited" -ge "$budget" ] || [ "$launches" -ge "$max_launches" ]; then
+      return 1
+    fi
+    running=false
+    # check-suppress:suppression_doc: a job that is not loaded or not running is the question being asked, not an error.
+    if $sudo_prefix launchctl print "$target" 2>/dev/null | grep -q 'state = running'; then
+      running=true
+    fi
+    if [ "$running" = false ]; then
+      # check-suppress:suppression_doc: a launch that fails is retried within the bound; the attempt's output is the agent's log, not this command's.
+      $sudo_prefix launchctl kickstart -k "$target" >/dev/null 2>&1 || true
+      launches=$((launches + 1))
+    fi
+    sleep "$interval"
+    waited=$((waited + interval))
+  done
+}
+
 # svc_mount_table_contains — Whether the mount table lists a path.
 # Args: $1 — absolute mount point; $2 — probe bound in seconds (default 10).
 # Returns 0 when the path is mounted, 1 when it is not.
@@ -403,6 +443,29 @@ svc_blocked_clear() {
   local file
 
   file="$(svc_blocked_file "$1" "$2")"
+  rm -f "$2/$1.blocked-reported"
   [ -e "$file" ] || return 0
   rm -f "$file"
+}
+
+# svc_blocked_transition — First-occurrence marker for a blocked instance.
+# Args: $1 — instance key; $2 — state directory; $3 — blocked state
+#       ("blocked <class>", as reported by svc_blocked_state).
+# Output: "first" when this instance is newly blocked, "repeat" afterwards.
+# WHY: the watchdog ticks every 300s, so the same blocked instance is reported
+#   once per transition instead of every tick; a different class is a new
+#   transition, and svc_blocked_clear drops the record so the next block is
+#   reported again.
+svc_blocked_transition() {
+  local key="$1" state_dir="$2" state="$3" marker recorded=""
+
+  marker="$state_dir/$key.blocked-reported"
+  [ -r "$marker" ] && recorded="$(cat "$marker")"
+  if [ -n "$recorded" ] && [ "$recorded" = "$state" ]; then
+    printf 'repeat\n'
+    return 0
+  fi
+  mkdir -p "$state_dir"
+  printf '%s\n' "$state" >"$marker"
+  printf 'first\n'
 }
