@@ -245,6 +245,9 @@ let
         NUCLEUS_RCLONE_REMOTE = rcloneRemote;
         NUCLEUS_RCLONE_MOUNT_POINT = mountPoint;
         NUCLEUS_RCLONE_ARGS = lib.concatStringsSep "\n" fullArgsList;
+        # WHY: the wrapper records a provider failure against the LaunchAgent
+        #   label, which is the key every service command and the watchdog use.
+        NUCLEUS_CLOUD_MOUNT_INSTANCE = mountLabel mount;
       };
     };
 

@@ -18,7 +18,15 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 MOUNT_SH="$REPO_ROOT/src/scripts/services/rclone-mount.sh"
+# The LaunchAgent label the wrapper records a provider failure against. It is the
+# key every service command uses, which is what makes the record useful.
+MOUNT_INSTANCE="local.cloud-mount.OneDrive"
 # PID of the wrapper the last run_mount_bg call started.
+
+# blocked_marker <home> — path of the blocked marker the wrapper writes.
+blocked_marker() {
+  printf '%s/Library/Application Support/nucleus/state/service-stats/%s.blocked\n' "$1" "$MOUNT_INSTANCE"
+}
 
 # Stub bin dir whose rclone records its argv, answers `listremotes` with
 # FAKE_REMOTES, and exits with FAKE_MOUNT_STATUS from `mount`. Prints the dir.
@@ -105,6 +113,87 @@ STUB
   printf '%s\n' "$dir"
 }
 
+# Stub bin dir whose rclone parks: it starts, attaches nothing, and writes nothing
+# to the console, which is how macFUSE leaves a mount behind its modal "unexpected
+# error" dialog (observed parked for 3573 s). It ends on a stop signal, the way the
+# dialog ends when its process is signalled.
+setup_fake_rclone_parked() {
+  local dir
+  dir="$(mktemp -d)"
+  cat >"$dir/rclone" <<'STUB'
+#!/usr/bin/env bash
+set -eu
+printf '%s\n' "$*" >>"$FAKE_CALLS"
+case "${1-}" in
+listremotes)
+  printf '%s\n' "OneDrive:"
+  exit 0
+  ;;
+mount)
+  trap 'exit 143' TERM
+  while :; do sleep 1; done
+  ;;
+esac
+exit 0
+STUB
+  chmod +x "$dir/rclone"
+  printf '%s\n' "$dir"
+}
+
+# Stub bin dir whose rclone is refused by macFUSE's FSKit provider: it reports the
+# provider's own message and exits non-zero, which is how the same failure ends
+# when FSKit answers immediately instead of parking the attempt.
+setup_fake_rclone_refused() {
+  local dir
+  dir="$(mktemp -d)"
+  cat >"$dir/rclone" <<'STUB'
+#!/usr/bin/env bash
+set -eu
+printf '%s\n' "$*" >>"$FAKE_CALLS"
+case "${1-}" in
+listremotes)
+  printf '%s\n' "OneDrive:"
+  exit 0
+  ;;
+mount)
+  printf '%s\n' 'MFMount: MFMount(_:_:_:_:): File system extension not enabled' >&2
+  printf '%s\n' 'fuse: mount failed with error: 4' >&2
+  exit 3
+  ;;
+esac
+exit 0
+STUB
+  chmod +x "$dir/rclone"
+  printf '%s\n' "$dir"
+}
+
+# Stub bin dir whose rclone attaches a volume and keeps serving it until it exits.
+# Lets the attach be observed (and the blocked marker be cleared) before the mount
+# ends on its own.
+setup_fake_rclone_attached() {
+  local dir
+  dir="$(mktemp -d)"
+  cat >"$dir/rclone" <<'STUB'
+#!/usr/bin/env bash
+set -eu
+printf '%s\n' "$*" >>"$FAKE_CALLS"
+case "${1-}" in
+listremotes)
+  printf '%s\n' "OneDrive:"
+  exit 0
+  ;;
+mount)
+  trap 'exit 0' TERM
+  sleep 6
+  exit 0
+  ;;
+esac
+exit 0
+STUB
+  chmod +x "$dir/rclone"
+  printf '%s\n' "$dir"
+}
+
 # Add a fake mount table (`mount`) and volume release (`diskutil`) to a stub bin
 # dir. The table lists FAKE_MOUNT_PATH while FAKE_ATTACHED exists; diskutil clears
 # that file only while FAKE_DISKUTIL_OK exists, and fails otherwise.
@@ -146,6 +235,7 @@ run_mount() {
     NUCLEUS_RCLONE_REMOTE="OneDrive:Backups" \
     NUCLEUS_RCLONE_MOUNT_POINT="$home/clouds/OneDrive" \
     NUCLEUS_RCLONE_ARGS='' \
+    NUCLEUS_CLOUD_MOUNT_INSTANCE="$MOUNT_INSTANCE" \
     bash "$MOUNT_SH" 1>/dev/null
 }
 
@@ -164,6 +254,7 @@ run_mount_bg() {
     NUCLEUS_RCLONE_REMOTE="OneDrive:Backups" \
     NUCLEUS_RCLONE_MOUNT_POINT="$home/clouds/OneDrive" \
     NUCLEUS_RCLONE_ARGS='' \
+    NUCLEUS_CLOUD_MOUNT_INSTANCE="$MOUNT_INSTANCE" \
     bash "$MOUNT_SH" 1>/dev/null 2>"$errfile" &
   RUN_MOUNT_BG_PID=$!
 }
@@ -488,6 +579,120 @@ test_hung_mount_probe_is_bounded_and_counts_as_attached() {
   rm -rf "$home" "$bin"
 }
 
+section "6" "FSKit provider failure"
+
+# WHY: a mount that writes nothing and never attaches is parked behind macFUSE's
+# modal "unexpected error" dialog; the attempt bound is the only thing that ends
+# it, and the failure has to be recorded and stopped, because every retry
+# re-registers the extension and pushes the provider further out of FSKit's list.
+test_parked_mount_is_bounded_and_recorded_as_a_provider_failure() {
+  local home bin calls err="" rc=0 marker="" elapsed=0 recorded=false remedy=false mounted=false
+  local started_at="$SECONDS"
+  home="$(mktemp -d)"
+  bin="$(setup_fake_rclone_parked)"
+  calls="$home/calls"
+  marker="$(blocked_marker "$home")"
+  : >"$calls"
+  export NUCLEUS_CLOUD_MOUNT_ATTEMPT_TIMEOUT=2
+  err="$(run_mount "$home" "$bin" "$calls" "OneDrive:" 0 2>&1)" || rc=$?
+  unset NUCLEUS_CLOUD_MOUNT_ATTEMPT_TIMEOUT
+  elapsed=$((SECONDS - started_at))
+  if grep -Fq "mount OneDrive:Backups" "$calls"; then mounted=true; fi
+  case "$err" in *"provider refused the mount of"*) recorded=true ;; esac
+  case "$err" in *"killall fskitd"*) remedy=true ;; esac
+  if [ "$rc" -eq 0 ] && [ -e "$marker" ] && [ "$mounted" = true ] && [ "$elapsed" -lt 15 ] &&
+    [ "$recorded" = true ] && [ "$remedy" = true ]; then
+    assert_pass "a parked mount is bounded, recorded as a provider failure and stopped"
+  else
+    assert_fail "rclone-mount-parked-mount" \
+      "rc=$rc marker=$([ -e "$marker" ] && echo yes || echo no) mounted=$mounted elapsed=${elapsed}s recorded=$recorded remedy=$remedy stderr=[$err]"
+  fi
+  rm -rf "$home" "$bin"
+}
+
+# The same failure reported immediately: FSKit refuses the volume, rclone exits
+# non-zero, and the wrapper must still stop instead of propagating a status that
+# KeepAlive reloads into another refused attempt.
+test_provider_refusal_is_recorded_and_stopped() {
+  local home bin calls err="" rc=0 marker="" recorded=false
+  home="$(mktemp -d)"
+  bin="$(setup_fake_rclone_refused)"
+  calls="$home/calls"
+  marker="$(blocked_marker "$home")"
+  : >"$calls"
+  err="$(run_mount "$home" "$bin" "$calls" "OneDrive:" 3 2>&1)" || rc=$?
+  case "$err" in *"provider refused the mount of"*) recorded=true ;; esac
+  if [ "$rc" -eq 0 ] && [ -e "$marker" ] && [ "$recorded" = true ]; then
+    assert_pass "a provider refusal is recorded and stopped instead of retried"
+  else
+    assert_fail "rclone-mount-provider-refusal" \
+      "rc=$rc marker=$([ -e "$marker" ] && echo yes || echo no) recorded=$recorded stderr=[$err]"
+  fi
+  rm -rf "$home" "$bin"
+}
+
+# A volume that attaches proves the provider is serving again, so the record of an
+# earlier failure must not outlive it: otherwise the status commands and the
+# watchdog keep reporting a mount as blocked while it is up.
+test_an_attached_volume_clears_the_blocked_marker() {
+  local home bin calls err="" rc=0 marker="" cleared=false recorded=false
+  home="$(mktemp -d)"
+  bin="$(setup_fake_rclone_attached)"
+  add_fake_mount_table "$bin"
+  calls="$home/calls"
+  marker="$(blocked_marker "$home")"
+  : >"$calls"
+  mkdir -p "$(dirname "$marker")"
+  : >"$marker"
+  export FAKE_ATTACHED="$home/attached" FAKE_MOUNT_PATH="$home/clouds/OneDrive"
+  # The volume attaches while rclone is serving it, after the pre-flight probe has
+  # already seen the path free.
+  (
+    sleep 1
+    : >"$FAKE_ATTACHED"
+  ) &
+  err="$(run_mount "$home" "$bin" "$calls" "OneDrive:" 0 2>&1)" || rc=$?
+  if [ ! -e "$marker" ]; then cleared=true; fi
+  case "$err" in *"provider refused the mount of"*) recorded=true ;; esac
+  if [ "$cleared" = true ] && [ "$recorded" = false ]; then
+    assert_pass "a volume that attaches clears the blocked marker"
+  else
+    assert_fail "rclone-mount-attach-clears-marker" \
+      "rc=$rc cleared=$cleared recorded=$recorded stderr=[$err]"
+  fi
+  unset FAKE_ATTACHED FAKE_MOUNT_PATH
+  rm -rf "$home" "$bin"
+}
+
+# WHY: a volume destroyed seconds after it attaches leaves rclone exiting 0 — a
+# status KeepAlive never retries — so the watcher has to notice the vanished volume
+# and fail the mount, which is what reloads the path.
+test_a_volume_that_vanishes_after_attaching_is_reported_and_failed() {
+  local home bin calls err="" rc=0 vanished=false
+  home="$(mktemp -d)"
+  bin="$(setup_fake_rclone_attached)"
+  add_fake_mount_table "$bin"
+  calls="$home/calls"
+  : >"$calls"
+  export FAKE_ATTACHED="$home/attached" FAKE_MOUNT_PATH="$home/clouds/OneDrive"
+  export NUCLEUS_CLOUD_MOUNT_DECAY_INTERVAL=1
+  (
+    sleep 1
+    : >"$FAKE_ATTACHED"
+    sleep 3
+    rm -f "$FAKE_ATTACHED"
+  ) &
+  err="$(run_mount "$home" "$bin" "$calls" "OneDrive:" 0 2>&1)" || rc=$?
+  unset NUCLEUS_CLOUD_MOUNT_DECAY_INTERVAL FAKE_ATTACHED FAKE_MOUNT_PATH
+  case "$err" in *"disappeared"*) vanished=true ;; esac
+  if [ "$rc" -eq 1 ] && [ "$vanished" = true ]; then
+    assert_pass "a volume that vanishes after it attached fails the mount"
+  else
+    assert_fail "rclone-mount-decayed-volume" "rc=$rc vanished=$vanished stderr=[$err]"
+  fi
+  rm -rf "$home" "$bin"
+}
+
 test_failed_mount_exit_is_reported_and_propagated
 test_clean_mount_exit_is_still_reported
 test_remote_and_mount_point_reach_rclone
@@ -500,4 +705,8 @@ test_attached_volume_is_released_before_mounting
 test_unreleasable_volume_refuses_the_mount
 test_free_mount_point_skips_the_pre_flight
 test_hung_mount_probe_is_bounded_and_counts_as_attached
+test_parked_mount_is_bounded_and_recorded_as_a_provider_failure
+test_provider_refusal_is_recorded_and_stopped
+test_an_attached_volume_clears_the_blocked_marker
+test_a_volume_that_vanishes_after_attaching_is_reported_and_failed
 finish_tests

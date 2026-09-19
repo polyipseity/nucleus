@@ -4,15 +4,25 @@ set -eu
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
+# shellcheck source=../lib/crash-loop.sh
+. "$SCRIPT_DIR/../lib/crash-loop.sh"
+# shellcheck source=../lib/macos-fskit.sh
+. "$SCRIPT_DIR/../lib/macos-fskit.sh"
+# shellcheck source=../lib/svc-instances.sh
+. "$SCRIPT_DIR/../lib/svc-instances.sh"
 
 # Configuration via environment variables (set by writeNucleusShellApplication extraEnv):
-#   NUCLEUS_RCLONE_REMOTE_NAME  — rclone remote name (used for existence check)
-#   NUCLEUS_RCLONE_REMOTE       — full remote path (e.g. "gdrive:backups")
-#   NUCLEUS_RCLONE_MOUNT_POINT  — local mount point directory
-#   NUCLEUS_RCLONE_ARGS         — additional rclone flags (newline-separated)
+#   NUCLEUS_RCLONE_REMOTE_NAME          — rclone remote name (used for existence check)
+#   NUCLEUS_RCLONE_REMOTE               — full remote path (e.g. "gdrive:backups")
+#   NUCLEUS_RCLONE_MOUNT_POINT          — local mount point directory
+#   NUCLEUS_RCLONE_ARGS                 — additional rclone flags (newline-separated)
+#   NUCLEUS_CLOUD_MOUNT_INSTANCE        — LaunchAgent label, the key a blocked marker is written under
+#   NUCLEUS_CLOUD_MOUNT_ATTEMPT_TIMEOUT — seconds the volume may take to attach (default 120)
+#   NUCLEUS_CLOUD_MOUNT_DECAY_INTERVAL  — seconds between checks for a volume that vanished (default 60)
 remote_name="${NUCLEUS_RCLONE_REMOTE_NAME:?NUCLEUS_RCLONE_REMOTE_NAME required}"
 remote="${NUCLEUS_RCLONE_REMOTE:?NUCLEUS_RCLONE_REMOTE required}"
 mount_point="${NUCLEUS_RCLONE_MOUNT_POINT:?NUCLEUS_RCLONE_MOUNT_POINT required}"
+instance="${NUCLEUS_CLOUD_MOUNT_INSTANCE:?NUCLEUS_CLOUD_MOUNT_INSTANCE required}"
 
 extra_args=()
 while IFS= read -r _arg; do
@@ -33,6 +43,32 @@ case "$rclone_remotes" in
   exit 0
   ;;
 esac
+
+# _cd_attach_timeout — NUCLEUS_CLOUD_MOUNT_ATTEMPT_TIMEOUT as a positive integer.
+# WHY: the value bounds an arithmetic loop, so a malformed override falls back to
+#   the default instead of aborting or spinning without a bound.
+_cd_attach_timeout() {
+  case "${NUCLEUS_CLOUD_MOUNT_ATTEMPT_TIMEOUT:-}" in
+  '' | *[!0-9]* | 0) printf '120\n' ;;
+  *) printf '%s\n' "$NUCLEUS_CLOUD_MOUNT_ATTEMPT_TIMEOUT" ;;
+  esac
+}
+
+# The attempt bound, resolved once: the watcher, the stall report and the copy of
+# rclone's output into the log all read it, and an override must not be re-parsed
+# per use.
+_cd_attach_seconds="$(_cd_attach_timeout)"
+
+# _cd_decay_interval — seconds between checks for a volume that vanished.
+# WHY: an attached volume that is destroyed later is the same provider failure
+#   found later, and the interval is overridable so the watcher's contract can be
+#   exercised in seconds instead of minutes.
+_cd_decay_interval() {
+  case "${NUCLEUS_CLOUD_MOUNT_DECAY_INTERVAL:-}" in
+  '' | *[!0-9]* | 0) printf '60\n' ;;
+  *) printf '%s\n' "$NUCLEUS_CLOUD_MOUNT_DECAY_INTERVAL" ;;
+  esac
+}
 
 # _cd_run_bounded <seconds> <command...> — run a command under a wall-clock bound.
 # Exit: the command's own status, or 124 when the bound elapsed.
@@ -82,6 +118,129 @@ _cd_mount_table_has() {
   return 1
 }
 
+# Capture of rclone's stderr, classified when the mount fails.
+# WHY: the reason a mount is refused (FSKit's "file system extension not
+#   found"/"not enabled", or mount(8) returning 69) is written to stderr by
+#   macFUSE just before rclone exits, and the wrapper has to read it to tell a
+#   provider failure from a remote failure.  A copier mirrors the capture back
+#   into the wrapper's own stderr, which is the LaunchAgent's stderr.log, so that
+#   log keeps every line rclone wrote — a pipe would do the same until it breaks,
+#   while rclone writing to a file cannot fail at all.
+_cd_capture="$(mktemp "${TMPDIR:-/tmp}/nucleus-cloud-mount.XXXXXX")"
+_cd_stalled="$_cd_capture.stalled"
+_cd_decayed="$_cd_capture.decayed"
+_cd_watcher=""
+_cd_copier=""
+
+# _cd_start_copier — Mirror rclone's captured stderr into this wrapper's stderr.
+_cd_start_copier() {
+  tail -n +1 -F "$_cd_capture" >&2 &
+  _cd_copier=$!
+}
+
+# _cd_stop_watcher — End the attempt watcher and reap it.
+_cd_stop_watcher() {
+  [ -n "$_cd_watcher" ] || return 0
+  # check-suppress:suppression_doc: the watcher may have finished on its own; a failed signal to a dead process changes nothing.
+  kill -TERM "$_cd_watcher" 2>/dev/null || true
+  # check-suppress:suppression_doc: same as above — the reap only avoids a zombie.
+  wait "$_cd_watcher" 2>/dev/null || true
+  _cd_watcher=""
+}
+
+# shellcheck disable=SC2329 # reason: invoked via the EXIT trap, not directly
+_cd_cleanup_capture() {
+  _cd_stop_watcher
+  if [ -n "$_cd_copier" ]; then
+    # check-suppress:suppression_doc: the copier reads a file that is removed below; a failed signal to a finished copier changes nothing at exit.
+    kill -TERM "$_cd_copier" 2>/dev/null || true
+    # check-suppress:suppression_doc: same as above.
+    wait "$_cd_copier" 2>/dev/null || true
+    _cd_copier=""
+  fi
+  rm -f "$_cd_capture" "$_cd_stalled" "$_cd_decayed"
+}
+trap '_cd_cleanup_capture' EXIT
+
+# _cd_watch_mount <rclonePid> <attemptSeconds> [decaySeconds] — bound the attach
+# and notice a volume that vanishes, from a background process.
+# WHY a background watcher instead of a poll in the foreground: bash reaps a
+#   child only through 'wait', and 'kill -0' cannot tell an exited child from a
+#   running one before that, so the bound has to run beside the wait for the wait
+#   to still report rclone's own status.  A volume that never attaches within the
+#   bound is stuck — macFUSE parks the mount behind a modal "unexpected error"
+#   dialog that writes nothing to the console (observed parked for 3573s) — and a
+#   volume that vanishes after it attached is the same failure found later, so both
+#   end the attempt instead of leaving it mounted-but-dead.
+_cd_watch_mount() {
+  local pid="$1" attempt="$2" decay="${3:-60}" attached=false
+  local second=0
+
+  # WHY one-second ticks around every probe: a watcher that is stopped must not
+  #   leave a minute-long sleeper behind, and the wrapper stops it as soon as the
+  #   mount ends.
+  while [ "$second" -lt "$attempt" ]; do
+    sleep 1
+    second=$((second + 1))
+    if _cd_mount_table_has "$mount_point"; then
+      attached=true
+      # WHY: the provider served a volume, so it is healthy again: whatever
+      #   blocked an earlier attempt is over.
+      svc_blocked_clear "$instance" "$(crash_loop_state_dir)"
+      break
+    fi
+  done
+
+  if [ "$attached" = false ]; then
+    : >"$_cd_stalled"
+    # check-suppress:suppression_doc: rclone may have exited on its own; the signal is best effort because the wrapper reports that exit itself.
+    kill -TERM "$pid" 2>/dev/null || true
+    return 0
+  fi
+  while :; do
+    second=0
+    while [ "$second" -lt "$decay" ]; do
+      sleep 1
+      second=$((second + 1))
+    done
+    if ! _cd_mount_table_has "$mount_point"; then
+      : >"$_cd_decayed"
+      # check-suppress:suppression_doc: same as above — the wrapper reads the exit status, the signal only ends the attempt.
+      kill -TERM "$pid" 2>/dev/null || true
+      return 0
+    fi
+  done
+}
+
+# _cd_provider_failure — whether macFUSE's FSKit provider, not the remote,
+# refused the mount.
+# WHY: only 'disabled' counts from the probe.  FSKit's module list can still name
+#   the module while the client is told "not enabled" (and the reverse), so the
+#   probe alone cannot decide — but a probe that cannot read the list answers
+#   'unknown' and must never block a mount that could succeed.
+# ref: https://github.com/macfuse/macfuse/issues/1132
+_cd_provider_failure() {
+  if grep -qE 'File system extension not (found|enabled)|fuse: mount failed with error|mount\(8\) returned 69' "$_cd_capture"; then
+    return 0
+  fi
+  [ "$(fskit_macfuse_module_state)" = "disabled" ]
+}
+
+# _cd_block_on_provider_failure <reason> — stop this mount and report the remedy.
+# Never returns: exit 0 keeps KeepAlive{SuccessfulExit:false} from reloading a
+# mount the provider refuses again, and the blocked marker is what 'nucleus-svc
+# status' and the watchdog read instead of retrying it.
+_cd_block_on_provider_failure() {
+  local reason="$1" remedy
+  remedy="$(fskit_remedy)"
+  svc_blocked_set "$instance" "$(crash_loop_state_dir)" fskit-provider "$remedy"
+  # check-suppress:suppression_doc: error's status is consumed because this path exits 0 on purpose, to stop the retry loop.
+  error -l cloud-drives "the macFUSE/FSKit provider refused the mount of '$mount_point' ($reason); the mount is stopped instead of retried." || true
+  # check-suppress:suppression_doc: same as above.
+  error -l cloud-drives "$remedy" || true
+  exit 0
+}
+
 # WHY: a volume that is still attached here is the leftover of a mount that did
 #   not finish unmounting (or a foreign mount), and mounting on top of it gets
 #   the new volume destroyed seconds later.  It is released first, and refused
@@ -111,12 +270,16 @@ fi
 _mount_started="$SECONDS"
 _mount_stopping=false
 _mount_interrupted=false
+_cd_start_copier
 rclone mount \
   "$remote" \
   "$mount_point" \
   "${extra_args[@]}" \
-  "$@" &
+  "$@" 2>"$_cd_capture" &
 _mount_pid=$!
+
+_cd_watch_mount "$_mount_pid" "$_cd_attach_seconds" "$(_cd_decay_interval)" &
+_cd_watcher=$!
 
 # WHY: forward termination to rclone, and then wait for rclone to finish exiting.
 #   A stop request that leaves rclone unmounting in the background wedges the
@@ -144,7 +307,12 @@ while :; do
 done
 trap - TERM INT
 
+# End the watcher: the attempt is over, and a watcher left behind would signal
+# this path's next mount.
+_cd_stop_watcher
+
 _mount_seconds=$((SECONDS - _mount_started))
+
 if [ "$_mount_stopping" = true ]; then
   # WHY: a requested stop is the expected end of this mount, so it is not a
   #   failure, and exit 0 keeps KeepAlive{SuccessfulExit:false} from resurrecting
@@ -154,6 +322,28 @@ if [ "$_mount_stopping" = true ]; then
     warn -l cloud-drives "rclone mount for '$mount_point' exited with status $_mount_status after ${_mount_seconds}s (stop requested)."
   fi
   exit 0
+fi
+
+# WHY: macFUSE prints the reason a mount was refused just before rclone exits, and
+#   the copier mirrors the capture in its own process, so the capture is given a
+#   moment to be complete and mirrored before anything is decided on it.
+sleep 0.3
+
+if _cd_provider_failure; then
+  _cd_block_on_provider_failure "see the macFUSE message above"
+fi
+
+if [ -e "$_cd_stalled" ]; then
+  # WHY: a mount that is still running with no volume after the bound is how a
+  #   wedged macFUSE provider looks from the console — the attempt is parked
+  #   behind a modal dialog that writes nothing — so it is reported and stopped
+  #   instead of retried into the same park.
+  _cd_block_on_provider_failure "no volume attached within ${_cd_attach_seconds}s while rclone was still running (a macFUSE dialog parks a mount without console output)"
+fi
+
+if [ -e "$_cd_decayed" ]; then
+  error -l cloud-drives "the volume at '$mount_point' disappeared ${_mount_seconds}s after it attached; the mount is reloaded so the path serves data again."
+  exit 1
 fi
 
 if [ "$_mount_status" -eq 0 ]; then
