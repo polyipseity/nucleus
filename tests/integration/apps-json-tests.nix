@@ -122,13 +122,13 @@ in
         in
         if
           (hostEntry ? type && hostEntry.type == "omitted")
-          || hostEntry ? kind && hostEntry.kind == "macos-system-extension"
+          || hostEntry ? kind && (hostEntry.kind == "macos-system-extension" || hostEntry.kind == "manual")
         then
           true
         else
           hostEntry.autostartDisableNative == true
       ) hosts
-    ) appNames) "Runtime entries other than macos-system-extension must disable native")
+    ) appNames) "Runtime entries other than macos-system-extension and manual must disable native")
 
     # === macos-system-extension entries must declare bundleId + approvalInstructions ===
     (assert' (all (

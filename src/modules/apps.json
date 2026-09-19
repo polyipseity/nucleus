@@ -642,15 +642,17 @@
         "platform": "NixOS",
         "autostartEnabled": true,
         "autostartDisableNative": false,
-        "kind": "macos-system-extension",
-        "justification": "System extension; manual approval once (see MANUAL.md)."
+        "kind": "manual",
+        "approvalInstructions": "Not a system extension. Install Google's Debian package, add your user to the chrome-remote-desktop group, write ~/.chrome-remote-desktop-session, then authorize the host at remotedesktop.google.com/access (see MANUAL.md).",
+        "justification": "No nixpkgs package exists (nixpkgs#34084 closed as not planned); the host runs its own X11 virtual session, so a Wayland login connects to a black screen."
       },
       "Windows": {
         "platform": "Windows",
         "autostartEnabled": true,
         "autostartDisableNative": false,
-        "kind": "macos-system-extension",
-        "justification": "System extension; manual approval once (see MANUAL.md)."
+        "kind": "manual",
+        "approvalInstructions": "Not a system extension. Authorize the host at remotedesktop.google.com/access in Chrome (name the host, set a PIN); its installer owns the service (see MANUAL.md).",
+        "justification": "Installed by WinGet as Google.ChromeRemoteDesktopHost; its installer registers the service, so there is nothing for activation to converge."
       }
     }
   },

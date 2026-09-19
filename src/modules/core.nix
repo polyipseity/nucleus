@@ -127,8 +127,9 @@ let
       nixpkgs = "check-jsonschema";
     };
     "chrome-remote-desktop" = {
-      # macOS cask chrome-remote-desktop-host is in MacBook/homebrew.nix; the
-      # nixpkgs attr is linux-only, so it is not installed on darwin.
+      # macOS gets the Homebrew cask (MacBook/homebrew.nix) and Windows the WinGet
+      # package; no nixpkgs attribute exists (nixpkgs#34084 closed as not planned),
+      # so NixOS installs nothing.
       category = "gui";
       homebrew = {
         kind = "cask";

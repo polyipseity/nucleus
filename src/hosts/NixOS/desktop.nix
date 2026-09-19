@@ -79,8 +79,9 @@ in
 
       # Remote-desktop clients for outbound access from this host.
       # Parsec is used for low-latency GPU-accelerated remote gaming/work sessions.
-      # Chrome Remote Desktop is not available as a nixpkgs package; see MANUAL.md
-      # for the one-time browser-extension setup required for inbound CRD access.
+      # Chrome Remote Desktop has no nixpkgs package; see MANUAL.md for the Debian
+      # package install and the one-time browser authorization required for
+      # inbound CRD access (X11 logins only).
       parsec-bin
 
       # Productivity and creative applications.
