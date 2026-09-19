@@ -33,22 +33,33 @@ in
   # home.file for manual.md is now in automator-workflows.nix (where the
   # consuming workflow lives).
 
-  home.activation.macos-deploy-app-bundles = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    "${activationBundle}/src/hosts/MacBook/scripts/macos-deploy-app-bundles.sh" \
-      "${pkgs.jq}/bin/jq" \
-      '${
-        builtins.toJSON (
-          map (svc: {
-            inherit (svc)
-              appDir
-              bundleId
-              menuItem
-              message
-              ;
-            source = "${svc.source}";
-            presentationModesDict = mkPresentationModes svc.presentationModes;
-          }) currentNucleusAppBundles
-        )
-      }'
-  '';
+  # WHY: after macos-deploy-automator-workflows, not just linkGeneration.
+  #   That step rewrites the whole NSServicesStatus dictionary in one shot,
+  #   because `defaults -dict-add` rejects its workflow keys at parse time
+  #   (parentheses are old-style plist array syntax, so those keys cannot be
+  #   merged). A whole-dict write erases every other entry, and this step
+  #   re-adds app-bundle entries with the merge-capable `-dict-add`, so the
+  #   erase has to happen first. Siblings default to linkGeneration, where the
+  #   attribute-name tie-break runs this step first and the entries are erased
+  #   on every apply.
+  home.activation.macos-deploy-app-bundles =
+    lib.hm.dag.entryAfter [ "linkGeneration" "macos-deploy-automator-workflows" ]
+      ''
+        "${activationBundle}/src/hosts/MacBook/scripts/macos-deploy-app-bundles.sh" \
+          "${pkgs.jq}/bin/jq" \
+          '${
+            builtins.toJSON (
+              map (svc: {
+                inherit (svc)
+                  appDir
+                  bundleId
+                  menuItem
+                  message
+                  ;
+                source = "${svc.source}";
+                presentationModesDict = mkPresentationModes svc.presentationModes;
+              }) currentNucleusAppBundles
+            )
+          }'
+      '';
 }

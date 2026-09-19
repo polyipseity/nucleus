@@ -9,6 +9,7 @@
 # - LaunchAgent refresh before cloud drive mount-path convergence
 # - Cloud drive LaunchAgent label wired module → convergence script
 # - Cloud drive mount points under the user's home, never under /Volumes
+# - App-bundle NSServicesStatus entries merged after the workflow whole-dict write
 #
 let
   lib = import <nixpkgs/lib>;
@@ -29,6 +30,13 @@ let
   cloudDrivesModuleTextFlat = lib.concatStringsSep " " (
     builtins.filter (part: builtins.isString part && part != "") (
       builtins.split "[ \t\n]+" cloudDrivesModuleText
+    )
+  );
+
+  appBundlesModuleText = builtins.readFile ../../src/hosts/MacBook/services/app-bundles/default.nix;
+  appBundlesModuleTextFlat = lib.concatStringsSep " " (
+    builtins.filter (part: builtins.isString part && part != "") (
+      builtins.split "[ \t\n]+" appBundlesModuleText
     )
   );
 
@@ -172,6 +180,21 @@ let
     && !(lib.hasInfix "/Volumes/nucleus-cloud-" cloudDrivesModuleText)
   ) "cloud drive mounts must live under the user's home directory, never under /Volumes";
 
+  # === TEST: app-bundle services merge after the workflow whole-dict write ===
+  # WHY: grep-only — the ordering is a module-evaluation fact that is not
+  # exposed without a full Home Manager evaluation.  macos-deploy-automator-workflows
+  # rewrites the entire NSServicesStatus dictionary, because `defaults -dict-add`
+  # rejects its parenthesised workflow keys at parse time (parens are old-style
+  # plist array syntax) so it cannot merge; that rewrite erases app-bundle
+  # entries.  macos-deploy-app-bundles re-adds its own entries with the
+  # merge-capable `-dict-add`, so it has to run last.  Both entries otherwise
+  # default to linkGeneration, where the attribute-name tie-break runs the
+  # app-bundle step first and the workflow step erases its entries every apply.
+  test_app_bundles_after_automator_workflows = assert' (
+    lib.hasInfix ''home.activation.macos-deploy-app-bundles = lib.hm.dag.entryAfter [ "linkGeneration" "macos-deploy-automator-workflows" ]'' appBundlesModuleTextFlat
+    && !(lib.hasInfix ''home.activation.macos-deploy-app-bundles = lib.hm.dag.entryAfter [ "linkGeneration" ]'' appBundlesModuleTextFlat)
+  ) "app-bundle NSServicesStatus entries must merge after the workflow whole-dict write";
+
   # Collect all tests.
   allTests = [
     test_secrets_before_devrepo
@@ -182,6 +205,7 @@ let
     test_cloud_drives_converge_after_launch_agents
     test_cloud_drives_label_wiring
     test_cloud_drives_mount_point_under_home
+    test_app_bundles_after_automator_workflows
   ];
 in
 # NOTE: force allTests as deepSeq's SECOND argument.  `builtins.seq (builtins.deepSeq allTests) { ... }`
