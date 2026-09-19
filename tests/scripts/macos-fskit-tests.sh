@@ -172,4 +172,35 @@ FAKE_KILLALL_STATUS=0
 
 assert_mentions "the remedy" "$(fskit_remedy)" "killall fskitd"
 
+section "macos-fskit" "provider repair"
+
+# WHY: the repair has to distinguish "the subsystem needed a restart" from "the
+# module is gone" — the second needs the operator, and only an error says so.
+: >"$FAKE_KILLALL_LOG"
+: >"$FAKE_FSKIT_COUNTER"
+FAKE_FSKIT_PIDS='100 200'
+FAKE_FSKIT_LISTING='[
+  0 => "io.macfuse.app.fsmodule.macfuse"
+]'
+assert_eq "a repaired provider reports ok" "ok" "$(fskit_repair_provider 5)"
+
+: >"$FAKE_KILLALL_LOG"
+: >"$FAKE_FSKIT_COUNTER"
+FAKE_FSKIT_PIDS='100 200'
+FAKE_FSKIT_LISTING='[
+  0 => "com.apple.fskit.exfat"
+]'
+FAKE_FSKIT_REPAIR_OUT="$(fskit_repair_provider 5 2>"$_tmp/repair-disabled.err")" || :
+assert_eq "a restart without the module reports module-disabled" "module-disabled" "$FAKE_FSKIT_REPAIR_OUT"
+assert_mentions "the disabled-module report" "$(cat "$_tmp/repair-disabled.err")" "Login Items & Extensions"
+
+: >"$FAKE_KILLALL_LOG"
+: >"$FAKE_FSKIT_COUNTER"
+FAKE_FSKIT_PIDS='100 100'
+if fskit_repair_provider 1 2>"$_tmp/repair-fail.err"; then
+  assert_fail "fskit-repair-daemon" "a daemon that never respawned was reported as repaired"
+else
+  assert_pass "a daemon that never respawns fails the repair"
+fi
+
 finish_tests

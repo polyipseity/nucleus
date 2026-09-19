@@ -150,3 +150,36 @@ fskit_restart_daemon() {
   error "fskit: $FSKIT_DAEMON_LABEL did not restart within ${wait_seconds}s; retry, or reboot"
   return 1
 }
+
+# fskit_repair_provider [waitSeconds] — Repair the provider: restart the FSKit
+# subsystem, then report whether the macFUSE module is usable again.
+# Output: "ok" when the daemon respawned and a macFUSE module is listed,
+# "module-disabled" when it respawned but no module is listed (only the operator
+# can re-enable it), "unknown" when the module list cannot be read.
+# Returns non-zero for everything but "ok", and prints the remedy with the error.
+# WHY the module check after the restart: a restart fixes a wedged subsystem,
+#   never a module that FSKit no longer serves, and the two are indistinguishable
+#   from the client side (both report "not enabled").
+fskit_repair_provider() {
+  local state
+
+  if ! fskit_restart_daemon "${1:-30}"; then
+    return 1
+  fi
+  state="$(fskit_macfuse_module_state)"
+  case "$state" in
+  enabled)
+    printf 'ok\n'
+    ;;
+  disabled)
+    error "fskit: macFUSE is missing from FSKit's module list; enable it in System Settings > General > Login Items & Extensions > By category > File System Extensions, then retry"
+    printf 'module-disabled\n'
+    return 1
+    ;;
+  *)
+    error "fskit: could not read FSKit's module list; check that the macFUSE file-system extension is enabled"
+    printf 'unknown\n'
+    return 1
+    ;;
+  esac
+}
