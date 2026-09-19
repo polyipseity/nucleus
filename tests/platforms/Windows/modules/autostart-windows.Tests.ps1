@@ -138,7 +138,7 @@ Describe 'Get-AppActualState' {
 Describe 'Invoke-AppConverge manual kind' {
   It 'surfaces the approval instructions and succeeds' {
     $Script:warning = $null
-    Mock Write-NucleusWarning { param($Message, $CommandName) $Script:warning = $Message }
+    Mock Write-NucleusWarning { param($Message) $Script:warning = $Message }
     $result = Invoke-AppConverge -Key 'ManualApp' -Entry $Script:Registry['ManualApp']
     $result | Should -Be 0
     $Script:warning | Should -Be 'ManualApp — fixture manual instructions'
