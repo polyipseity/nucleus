@@ -25,9 +25,37 @@
 				<key>NSApplicationIdentifier</key>
 				<string>com.apple.finder</string>
 			</dict>
+			<!--
+				Input types offered by Finder. Mirrors macosSendFileTypes in
+				src/modules/lib/strip-metadata-types.nix (parity-tested).
+				com.adobe.pdf is absent by design: strip-metadata cannot rewrite
+				PDF metadata, so the action is not offered for PDFs.
+			-->
 			<key>NSSendFileTypes</key>
 			<array>
-				<string>public.item</string>
+				<string>com.compuserve.gif</string>
+				<string>com.microsoft.waveform-audio</string>
+				<string>org.idpf.epub-container</string>
+				<string>org.matroska.mkv</string>
+				<string>org.oasis-open.opendocument.presentation</string>
+				<string>org.oasis-open.opendocument.spreadsheet</string>
+				<string>org.oasis-open.opendocument.text</string>
+				<string>org.openxmlformats.presentationml.presentation</string>
+				<string>org.openxmlformats.spreadsheetml.sheet</string>
+				<string>org.openxmlformats.wordprocessingml.document</string>
+				<string>org.webmproject.webm</string>
+				<string>org.webmproject.webp</string>
+				<string>org.xiph.flac</string>
+				<string>org.xiph.ogg-audio</string>
+				<string>public.audio</string>
+				<string>public.image</string>
+				<string>public.jpeg</string>
+				<string>public.movie</string>
+				<string>public.mp3</string>
+				<string>public.mpeg-4</string>
+				<string>public.pbm</string>
+				<string>public.png</string>
+				<string>public.tiff</string>
 			</array>
 		</dict>
 	</array>

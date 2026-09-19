@@ -9,8 +9,20 @@
 #   for any file or folder selection — the action ignores input anyway).
 # - All "optimize PDF - *.workflow" use "com.adobe.pdf" so the context menu
 #   only appears for PDF files.
-# - "strip metadata - *.workflow" uses "public.item" (broad scope — the
-#   shell script skips unsupported files with warnings internally).
+# - "strip metadata.workflow" uses an allow-list of the formats
+#   `nucleus-utils strip-metadata` can rewrite, declared in
+#   src/modules/lib/strip-metadata-types.nix — the same set drives the Dolphin
+#   service menu MIME types and the Windows context-menu verbs.
+#
+# WHY: strip metadata is an allow-list, not "public.item":
+#   NSSendFileTypes is inclusion-only — Apple defines no exclusion key — so
+#   "everything except PDFs" cannot be expressed as a rule; narrowing the list
+#   is the only way to withhold the action. Under "public.item" the action was
+#   offered for PDFs, which strip-metadata must refuse (no CLI tool rewrites PDF
+#   metadata without invalidating signatures), and the action then appeared to
+#   do nothing. Input outside the list — PDFs included — stays reachable from
+#   the CLI, and a mixed selection is still reported: strip-metadata lists every
+#   input it did not process in a modal dialog (scripts/utils.sh, --dialog).
 #
 # WARNING about UTI choice: The UTI "public.pdf" has NEVER existed on macOS.
 # Apple's UTI hierarchy defines "public.png", "public.jpeg", "public.html" etc.,
