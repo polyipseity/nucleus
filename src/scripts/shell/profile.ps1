@@ -774,6 +774,13 @@ $nucleusUpdateFlags = @(
   '--verify-installed'
 )
 
+$nucleusUtilsFlags = @(
+  '--dialog',
+  '--help',
+  '--preset',
+  '--rm-bak'
+)
+
 $nucleusVmFlags = @(
   '--accelerator',
   '--accept-gsi-license',
@@ -907,6 +914,7 @@ if ($IsWindows) {
 $nucleusSvcCommands = @('list', 'status', 'start', 'stop', 'restart', 'enable', 'disable', 'verify', 'endpoint', 'logs', 'log-paths', 'log-config')
 $nucleusConfigCommands = @('get', 'set', 'list')
 $nucleusGcCommands = @('cleanup-nix', 'preferences')
+$nucleusUtilsCommands = @('optimize-pdf', 'strip-metadata')
 
 Register-ArgumentCompleter -CommandName nucleus-svc -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
@@ -1013,15 +1021,10 @@ Register-ArgumentCompleter -CommandName nucleus-apply -ScriptBlock {
     Where-Object { $_ -like "$wordToComplete*" }
 }
 
-Register-ArgumentCompleter -CommandName nucleus-service-watchdog -ScriptBlock {
-  param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
-  $nucleusServiceWatchdogFlags | Where-Object { $_ -like "$wordToComplete*" }
-}
-
 Register-ArgumentCompleter -CommandName nucleus-utils -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
   $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
+  $nucleusUtilsCommands | Where-Object { $_ -like "$wordToComplete*" }
   $nucleusUtilsFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
 

@@ -80,6 +80,7 @@ function Get-NucleusCommandList {
     'svc',
     'test',
     'update',
+    'utils',
     'vm'
   )
 }
@@ -96,7 +97,7 @@ function Get-NucleusFlagMap {
     'svc' = @('--help', '--json', '--system', '--user', '--verbose')
     'test' = @('-q', '--fail-fast', '--help', '--no-fail-fast', '--quiet', '--skip-steps')
     'update' = @('--flake', '--help', '--list-sections', '--no-flake', '--no-sops', '--sections', '--sops', '--verify', '--verify-installed')
-    'utils' = @('--help')
+    'utils' = @('--dialog', '--help', '--preset', '--rm-bak')
     'vm' = @('--accept-gsi-license', '--accelerator', '--adb-keys', '--allow-shrink', '--dry-run', '--fake-wifi', '--fake-wifi-revert', '--force', '--gc', '--gc-data', '--gc-disabled', '--gapps', '--headful', '--help', '--json', '--magisk', '--mido-patch-file', '--mido-script', '--no-accept-gsi-license', '--no-gc', '--no-gc-data', '--no-gc-disabled', '--no-headful', '--repo-root', '--root', '--vm-dir-override', '--windows-iso', '--windows-iso-retries', '--windows-iso-source')
   }
 }
@@ -174,7 +175,11 @@ function Get-GeneratedRegion {
     for ($i = 0; $i -lt $flags.Count; $i++) {
       # No trailing comma: @( 'a', 'b', ) is a parse error in PowerShell.
       $comma = if ($i -lt $flags.Count - 1) { ',' } else { '' }
-      $lines.Add("  '$($flags[$i])'$comma")
+      # WHY: each flag is emitted as a single-quoted literal, so an embedded
+      # quote in a hand-maintained map value would close it early and leave
+      # profile.ps1 unparseable in every shell that loads it.
+      $literal = ([string]$flags[$i]).Replace("'", "''")
+      $lines.Add("  '$literal'$comma")
     }
     $lines.Add(')')
     $blocks.Add(($lines -join $Eol) + $Eol + $Eol)

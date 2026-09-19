@@ -3,6 +3,12 @@
 # idempotent regeneration, 13-command coverage, generated headers + zsh syntax,
 # update lockfile --list-* dynamic wiring, flag-extraction correctness pins, and
 # spec-word escaping of shell metacharacters in subcommand descriptions.
+#
+# Also guards the PowerShell twin (src/scripts/completions/gen-completions.ps1):
+# its command list matches the canonical set, every Register-ArgumentCompleter
+# target in profile.ps1 is a canonical command, every flag inventory the profile
+# references is defined in it, and the generated utils inventory matches the zsh
+# flag set.
 
 set -euo pipefail
 
@@ -13,8 +19,13 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 
 cd "$REPO_ROOT"
 
+require_command pwsh "gen-completions: PowerShell generator (profile.ps1 completer inventory)"
+
 _gen_script="src/scripts/completions/gen-completions.sh"
 _COMPLETIONS_DIR="src/modules/completions/zsh"
+# The PowerShell-side generated artifacts these tests cross-check.
+_ps_gen_script="src/scripts/completions/gen-completions.ps1"
+_profile_ps1="src/scripts/shell/profile.ps1"
 
 # The canonical nucleus-* command set (alphabetical) — must match the generator.
 # Subcommands are covered by their parent completion files, not as standalone
@@ -237,6 +248,63 @@ else
   else
     assert_fail "gen-completions: metacharacter round-trip" "expected '$_fx_desc', got '${_fx_decoded-}'"
   fi
+fi
+
+# 11. The PowerShell twin's command list must be the canonical set. It is the
+#     list that decides which $nucleus<Cmd>Flags inventories exist, so a command
+#     missing here loses its flag completion silently.
+_ps_commands="$(pwsh -NoLogo -NoProfile -NonInteractive -File "$_ps_gen_script" -ListCommands | tr -d '\r' | LC_ALL=C sort)"
+_expected_commands="$(printf '%s\n' "${_NUCLEUS_COMMANDS[@]}" | LC_ALL=C sort)"
+if [ "$_ps_commands" = "$_expected_commands" ]; then
+  assert_pass "gen-completions.ps1: command list matches the canonical set"
+else
+  assert_fail "gen-completions.ps1: command list" "ps-only: $(comm -13 <(printf '%s\n' "$_expected_commands") <(printf '%s\n' "$_ps_commands") | tr '\n' ' ')|missing: $(comm -23 <(printf '%s\n' "$_expected_commands") <(printf '%s\n' "$_ps_commands") | tr '\n' ' ')"
+fi
+
+# 12. Every flag inventory profile.ps1 REFERENCES must be DEFINED in it. The
+#     generated region is the only definition site, so a completer naming a
+#     variable the generator no longer emits completes nothing at all. This is
+#     the exact shipped regression: the utils completer existed while the
+#     generator had dropped utils from its command list, and the old name-anywhere
+#     check matched the reference in the completer body.
+_refs="$(grep -oE '[$]nucleus[A-Za-z0-9]*Flags' "$_profile_ps1" | LC_ALL=C sort -u || true)"
+_undefined_vars=""
+while IFS= read -r _ref; do
+  [ -n "$_ref" ] || continue
+  if ! grep -qE "^[$]${_ref#\$}[[:space:]]*=" "$_profile_ps1"; then
+    _undefined_vars="${_undefined_vars}${_undefined_vars:+ }$_ref"
+  fi
+done <<<"$_refs"
+# WHY: the _refs non-empty clause keeps a broken extractor from passing this
+# vacuously (nothing referenced, nothing undefined).
+if [ -z "$_undefined_vars" ] && [ -n "$_refs" ]; then
+  assert_pass "profile.ps1: every referenced flag inventory is defined"
+else
+  assert_fail "profile.ps1: referenced flag inventories" "nothing defines: ${_undefined_vars:-<no $nucleus*Flags references found>}"
+fi
+
+# 13. Every completer entry targets a canonical command: a registration for a
+#     command that is not part of the nucleus surface is dead code that can also
+#     reference an inventory nothing defines.
+_targets="$(grep -oE '^Register-ArgumentCompleter -CommandName nucleus-[a-z0-9-]+' "$_profile_ps1" | awk '{print $3}' | sed 's/^nucleus-//' | LC_ALL=C sort -u || true)"
+if [ "$_targets" = "$_expected_commands" ]; then
+  assert_pass "profile.ps1: completer targets match the canonical command set"
+else
+  assert_fail "profile.ps1: completer targets" "extra: $(comm -23 <(printf '%s\n' "$_targets") <(printf '%s\n' "$_expected_commands") | tr '\n' ' ')|missing: $(comm -13 <(printf '%s\n' "$_targets") <(printf '%s\n' "$_expected_commands") | tr '\n' ' ')"
+fi
+
+# 14. PowerShell/zsh flag parity for nucleus-utils: the two generators must
+#     describe the same flag set, or a flag completes on one platform and not the
+#     other. Only utils is pinned -- the other commands' zsh files carry flags the
+#     pwsh inventory does not derive, so they are not parity-comparable here.
+# WHY: both extractors exit 1 on an empty result; the comparison below is what
+# turns that into a failure, so their pipeline status is not reported twice.
+_ps_utils_flags="$(sed -n '/^[$]nucleusUtilsFlags = @(/,/^)/p' "$_profile_ps1" | tr -d "'" | grep -oE -- '--[a-z][a-z0-9-]*' | LC_ALL=C sort -u || true)"
+_zsh_utils_flags="$(grep -oE -- '--[a-z][a-z0-9-]*' "$_COMPLETIONS_DIR/_nucleus-utils" | LC_ALL=C sort -u || true)"
+if [ -n "$_ps_utils_flags" ] && [ "$_ps_utils_flags" = "$_zsh_utils_flags" ]; then
+  assert_pass "gen-completions: nucleus-utils flag set agrees across pwsh and zsh"
+else
+  assert_fail "gen-completions: nucleus-utils pwsh/zsh flag parity" "pwsh-only: $(comm -23 <(printf '%s\n' "$_ps_utils_flags") <(printf '%s\n' "$_zsh_utils_flags") | tr '\n' ' ')|zsh-only: $(comm -13 <(printf '%s\n' "$_ps_utils_flags") <(printf '%s\n' "$_zsh_utils_flags") | tr '\n' ' ')"
 fi
 
 finish_tests
