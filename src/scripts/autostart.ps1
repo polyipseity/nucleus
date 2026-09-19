@@ -189,10 +189,10 @@ function Get-AppActualState {
   param([string]$Key, [hashtable]$Entry)
   $kind = $Entry.hostEntry.kind
   switch ($kind) {
-    'run-key' {
+    'windows-run-key' {
       if (Test-RunKeyEntry -Key $Key) { return 'enabled' } else { return 'disabled' }
     }
-    'startup-folder' {
+    'windows-startup-folder' {
       $startupPath = [Environment]::GetFolderPath('Startup')
       $link = Join-Path -Path $startupPath -ChildPath "nucleus-$Key.lnk"
       if (Test-Path -LiteralPath $link) { return 'enabled' } else { return 'disabled' }
@@ -212,7 +212,7 @@ function Invoke-AppConverge {
   $path = if ($Entry.hostEntry.ContainsKey('path')) { $Entry.hostEntry.path } else { '' }
 
   switch ($kind) {
-    'run-key' {
+    'windows-run-key' {
       if ($disableNative) {
         # Neutralize any app-shipped Run-key/Startup entry so only our
         # uniform mechanism remains.
@@ -225,7 +225,7 @@ function Invoke-AppConverge {
         Disable-RunKeyEntry -Key $Key
       }
     }
-    'startup-folder' {
+    'windows-startup-folder' {
       if ($disableNative) {
         Unregister-NativeStartupShortcut -Path $path
         Unregister-NativeRunKey -Path $path

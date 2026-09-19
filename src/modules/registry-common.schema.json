@@ -53,7 +53,7 @@
           }
         }
       ],
-      "description": "Common host-entry shape: requires a platform ref and forbids legacy flag keys. Runtime-specific fields (service/launchctl, kind/login-item, etc.) are added by each registry's own host-entry definition via allOf."
+      "description": "Common host-entry shape: requires a platform ref and forbids legacy flag keys. Runtime-specific fields (service/launchctl, kind/macos-launchagent, etc.) are added by each registry's own host-entry definition via allOf."
     },
     "hostsParity": {
       "minProperties": 1,

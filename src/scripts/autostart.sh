@@ -351,7 +351,7 @@ app_actual_state() {
   local kind
   kind=$(echo "$entry_json" | jq -r '.hostEntry.kind')
   case "$kind" in
-  login-item)
+  macos-launchagent)
     local bundle_id
     bundle_id=$(app_bundle_id "$entry_json")
     if [ -n "$bundle_id" ] && [ "$(macos_launchagent_exists "$bundle_id")" = "true" ]; then
@@ -360,7 +360,7 @@ app_actual_state() {
       printf 'disabled'
     fi
     ;;
-  system-extension)
+  macos-system-extension)
     local bundle_id
     bundle_id=$(echo "$entry_json" | jq -r '.hostEntry.bundleId // empty')
     if [ -n "$bundle_id" ] && [ "$(macos_system_extension_present "$bundle_id")" = "true" ]; then
@@ -369,7 +369,7 @@ app_actual_state() {
       printf 'disabled'
     fi
     ;;
-  xdg-desktop)
+  nixos-xdg-desktop)
     local name
     name=$(app_desktop_filename "$key")
     if [ "$(xdg_desktop_exists "$name")" = "true" ]; then
@@ -397,7 +397,7 @@ app_converge() {
   hidden=$(echo "$entry_json" | jq -r '.hostEntry.hidden // false')
 
   case "$kind" in
-  login-item)
+  macos-launchagent)
     local bundle_id
     bundle_id=$(app_bundle_id "$entry_json")
     if [ -z "$bundle_id" ]; then
@@ -415,7 +415,7 @@ app_converge() {
       macos_launchagent_remove "$bundle_id" || true # check-suppress:suppression_doc: plist may already be absent; removal is best-effort.
     fi
     ;;
-  system-extension)
+  macos-system-extension)
     # System extensions cannot be enabled/disabled from the shell; approval is
     # manual. Surface a per-app reminder (approvalInstructions) and report
     # actual presence; never pretend we forced the state.
@@ -439,7 +439,7 @@ app_converge() {
       fi
     fi
     ;;
-  xdg-desktop)
+  nixos-xdg-desktop)
     if [ "$disable_native" = "true" ]; then
       # Neutralize any app-shipped autostart .desktop (e.g. steam.desktop)
       # so only our uniform mechanism remains.

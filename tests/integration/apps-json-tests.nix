@@ -122,15 +122,15 @@ in
         in
         if
           (hostEntry ? type && hostEntry.type == "omitted")
-          || hostEntry ? kind && hostEntry.kind == "system-extension"
+          || hostEntry ? kind && hostEntry.kind == "macos-system-extension"
         then
           true
         else
           hostEntry.autostartDisableNative == true
       ) hosts
-    ) appNames) "Non-system-extension runtime entries must disable native")
+    ) appNames) "Runtime entries other than macos-system-extension must disable native")
 
-    # === macOS system-extension entries must declare bundleId + approvalInstructions ===
+    # === macos-system-extension entries must declare bundleId + approvalInstructions ===
     (assert' (all (
       name:
       let
@@ -142,7 +142,9 @@ in
         let
           hostEntry = entry.hosts.${h};
         in
-        if hostEntry ? kind && hostEntry.kind == "system-extension" && hostEntry.platform == "macOS" then
+        if
+          hostEntry ? kind && hostEntry.kind == "macos-system-extension" && hostEntry.platform == "macOS"
+        then
           hostEntry ? bundleId
           && hostEntry.bundleId != ""
           && hostEntry ? approvalInstructions
@@ -150,7 +152,7 @@ in
         else
           true
       ) hosts
-    ) appNames) "macOS system-extension entries must have bundleId + approvalInstructions")
+    ) appNames) "macos-system-extension entries must have bundleId + approvalInstructions")
 
     # === Per-app approval instructions ===
     (assert' (

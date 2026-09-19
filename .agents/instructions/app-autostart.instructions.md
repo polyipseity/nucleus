@@ -18,11 +18,11 @@ One mechanism per app per host — ours, never the app's.
 
 ## Registry
 
-`src/modules/apps.json` — SSOT. Per-host: `autostartEnabled`, `autostartDisableNative` (bool), `kind` (`login-item` | `launchagent` | `xdg-desktop` | `run-key` | `startup-folder` | `system-extension`). `autostartDisableNative` always-on. Schema: `src/modules/apps.schema.json` + `src/modules/registry-common.schema.json`. Each app: host keys or `omitted`+`justification`.
+`src/modules/apps.json` — SSOT. Per-host: `autostartEnabled`, `autostartDisableNative` (bool), `kind` (`macos-launchagent` | `macos-system-extension` | `nixos-xdg-desktop` | `windows-run-key` | `windows-startup-folder`). Platform-owned kinds carry a platform prefix, so a kind that does not belong to its host's platform is a validation error. `autostartDisableNative` always-on. Schema: `src/modules/apps.schema.json` + `src/modules/registry-common.schema.json`. Each app: host keys or `omitted`+`justification`.
 
 Tooling: `src/scripts/autostart.sh`/`.ps1` — `list`/`status`/`enable`/`disable`/`apply`/`verify`. Under `src/scripts/`, not `scripts/`. Windows: `Sync-AppAutostart.ps1`.
 
-`services.json` = background daemons. `apps.json` = foreground GUI. `battery` = menu-bar GUI → `apps.json`. System-extension = manual-approval.
+`services.json` = background daemons. `apps.json` = foreground GUI. `battery` = menu-bar GUI → `apps.json`. A `macos-system-extension` kind means macOS owns the approval flow.
 
 ## Menu-bar / tray-icon (same SSOT)
 

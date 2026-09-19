@@ -8,7 +8,7 @@
         "platform": "macOS",
         "autostartEnabled": true,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "path": "/Applications/Raycast.app",
         "bundleId": "com.raycast.macos",
         "menuBarIcon": {
@@ -41,7 +41,7 @@
         "platform": "macOS",
         "autostartEnabled": true,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "path": "/Applications/Amphetamine.app",
         "bundleId": "com.if.Amphetamine",
         "menuBarIcon": {
@@ -74,7 +74,7 @@
         "platform": "macOS",
         "autostartEnabled": true,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "path": "/Applications/Stats.app",
         "bundleId": "eu.exelban.Stats",
         "menuBarIcon": {
@@ -107,7 +107,7 @@
         "platform": "macOS",
         "autostartEnabled": true,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "path": "/Applications/BetterDisplay.app",
         "bundleId": "pro.betterdisplay.BetterDisplay",
         "menuBarIcon": {
@@ -140,7 +140,7 @@
         "platform": "macOS",
         "autostartEnabled": true,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "path": "/Applications/MiddleClick.app",
         "bundleId": "com.rouge41.middleclick",
         "menuBarIcon": {
@@ -169,7 +169,7 @@
         "platform": "macOS",
         "autostartEnabled": true,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "path": "/Applications/Mounty.app",
         "bundleId": "com.mounty.app",
         "menuBarIcon": {
@@ -202,7 +202,7 @@
         "platform": "macOS",
         "autostartEnabled": true,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "path": "/Applications/LinearMouse.app",
         "bundleId": "com.lujjjh.LinearMouse",
         "menuBarIcon": {
@@ -235,7 +235,7 @@
         "platform": "macOS",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "path": "/Applications/LuLu.app",
         "bundleId": "com.objective-see.LuLu",
         "menuBarIcon": {
@@ -268,7 +268,7 @@
         "platform": "macOS",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "path": "/Applications/OrbStack.app",
         "bundleId": "com.orbstack.orbstack",
         "menuBarIcon": {
@@ -301,7 +301,7 @@
         "platform": "macOS",
         "autostartEnabled": true,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "path": "/Applications/Parsec.app",
         "bundleId": "tv.parsec.www",
         "menuBarIcon": {
@@ -314,7 +314,7 @@
         "platform": "NixOS",
         "autostartEnabled": true,
         "autostartDisableNative": true,
-        "kind": "xdg-desktop",
+        "kind": "nixos-xdg-desktop",
         "path": "/run/current-system/sw/bin/parsec",
         "menuBarIcon": {
           "kind": "manual",
@@ -326,7 +326,7 @@
         "platform": "Windows",
         "autostartEnabled": true,
         "autostartDisableNative": true,
-        "kind": "run-key",
+        "kind": "windows-run-key",
         "path": "C:\\Program Files\\Parsec\\parsec.exe",
         "menuBarIcon": {
           "kind": "manual",
@@ -344,7 +344,7 @@
         "platform": "macOS",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "bundleId": "RimSort",
         "path": "/Applications/RimSort.app",
         "menuBarIcon": {
@@ -357,7 +357,7 @@
         "platform": "NixOS",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "xdg-desktop",
+        "kind": "nixos-xdg-desktop",
         "path": "/run/current-system/sw/bin/rimsort",
         "menuBarIcon": {
           "kind": "manual",
@@ -369,7 +369,7 @@
         "platform": "Windows",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "run-key",
+        "kind": "windows-run-key",
         "path": "C:\\Program Files\\RimSort\\RimSort.exe",
         "menuBarIcon": {
           "kind": "manual",
@@ -387,7 +387,7 @@
         "platform": "macOS",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "path": "/Applications/Telegram.app",
         "bundleId": "ru.keepcoder.Telegram",
         "menuBarIcon": {
@@ -400,7 +400,7 @@
         "platform": "NixOS",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "xdg-desktop",
+        "kind": "nixos-xdg-desktop",
         "path": "/run/current-system/sw/bin/telegram-desktop",
         "menuBarIcon": {
           "kind": "manual",
@@ -412,7 +412,7 @@
         "platform": "Windows",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "run-key",
+        "kind": "windows-run-key",
         "path": "%LOCALAPPDATA%\\Telegram Desktop\\Telegram.exe",
         "menuBarIcon": {
           "kind": "manual",
@@ -430,7 +430,7 @@
         "platform": "macOS",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "path": "/Applications/WhatsApp.app",
         "bundleId": "net.whatsapp.WhatsApp",
         "menuBarIcon": {
@@ -448,7 +448,7 @@
         "platform": "Windows",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "run-key",
+        "kind": "windows-run-key",
         "path": "%LOCALAPPDATA%\\WhatsApp\\WhatsApp.exe",
         "menuBarIcon": {
           "kind": "manual",
@@ -466,7 +466,7 @@
         "platform": "macOS",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "path": "/Applications/Steam.app",
         "bundleId": "com.valvesoftware.steam",
         "menuBarIcon": {
@@ -479,7 +479,7 @@
         "platform": "NixOS",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "xdg-desktop",
+        "kind": "nixos-xdg-desktop",
         "path": "/run/current-system/sw/bin/steam",
         "menuBarIcon": {
           "kind": "manual",
@@ -491,7 +491,7 @@
         "platform": "Windows",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "run-key",
+        "kind": "windows-run-key",
         "path": "C:\\Program Files (x86)\\Steam\\steam.exe",
         "menuBarIcon": {
           "kind": "manual",
@@ -509,7 +509,7 @@
         "platform": "macOS",
         "autostartEnabled": true,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "path": "/Applications/AltTab.app",
         "bundleId": "com.lwouis.alt-tab-macos",
         "menuBarIcon": {
@@ -542,7 +542,7 @@
         "platform": "macOS",
         "autostartEnabled": true,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "path": "/Applications/battery.app",
         "bundleId": "com.fiplab.battery",
         "menuBarIcon": {
@@ -575,7 +575,7 @@
         "platform": "macOS",
         "autostartEnabled": true,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "path": "/Applications/Rectangle.app",
         "bundleId": "com.knollsoft.Rectangle",
         "menuBarIcon": {
@@ -608,7 +608,7 @@
         "platform": "macOS",
         "autostartEnabled": true,
         "autostartDisableNative": false,
-        "kind": "system-extension",
+        "kind": "macos-system-extension",
         "bundleId": "io.macfuse.app.fsmodule.macfuse",
         "approvalInstructions": "System Settings → General → Login Items & Extensions → by category → File System Extensions → enable macFUSE.",
         "justification": "FSKit file-system extension; io.macfuse.app.fsmodule.macfuse serves distributed volumes (cloud mounts) and io.macfuse.app.fsmodule.macfuse-local serves local volumes (NTFS). Approve in Login Items & Extensions → File System Extensions (not Privacy & Security). The macFUSE kernel extension stays unapproved."
@@ -633,7 +633,7 @@
         "platform": "macOS",
         "autostartEnabled": true,
         "autostartDisableNative": false,
-        "kind": "system-extension",
+        "kind": "macos-system-extension",
         "bundleId": "com.google.chromeremotedesktop.me2me-host",
         "approvalInstructions": "Not a system extension. Grant Accessibility and Screen Recording in System Settings → Privacy & Security (see MANUAL.md).",
         "justification": "PrivilegedHelperTool; grant Accessibility + Screen Recording (not a system extension)."
@@ -642,14 +642,14 @@
         "platform": "NixOS",
         "autostartEnabled": true,
         "autostartDisableNative": false,
-        "kind": "system-extension",
+        "kind": "macos-system-extension",
         "justification": "System extension; manual approval once (see MANUAL.md)."
       },
       "Windows": {
         "platform": "Windows",
         "autostartEnabled": true,
         "autostartDisableNative": false,
-        "kind": "system-extension",
+        "kind": "macos-system-extension",
         "justification": "System extension; manual approval once (see MANUAL.md)."
       }
     }
@@ -662,7 +662,7 @@
         "platform": "macOS",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "path": "/Applications/Discord.app",
         "bundleId": "com.hnc.Discord",
         "menuBarIcon": {
@@ -675,7 +675,7 @@
         "platform": "NixOS",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "xdg-desktop",
+        "kind": "nixos-xdg-desktop",
         "path": "/run/current-system/sw/bin/discord",
         "menuBarIcon": {
           "kind": "activation-script",
@@ -688,7 +688,7 @@
         "platform": "Windows",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "run-key",
+        "kind": "windows-run-key",
         "path": "%LOCALAPPDATA%\\Discord\\Discord.exe",
         "menuBarIcon": {
           "kind": "activation-script",
@@ -706,7 +706,7 @@
         "platform": "macOS",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "path": "/Applications/Discord Canary.app",
         "bundleId": "com.hnc.DiscordCanary",
         "menuBarIcon": {
@@ -719,7 +719,7 @@
         "platform": "NixOS",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "xdg-desktop",
+        "kind": "nixos-xdg-desktop",
         "path": "/run/current-system/sw/bin/discord-canary",
         "menuBarIcon": {
           "kind": "activation-script",
@@ -731,7 +731,7 @@
         "platform": "Windows",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "run-key",
+        "kind": "windows-run-key",
         "path": "%LOCALAPPDATA%\\DiscordCanary\\DiscordCanary.exe",
         "menuBarIcon": {
           "kind": "activation-script",

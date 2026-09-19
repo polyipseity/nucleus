@@ -45,12 +45,11 @@
     "autostartKind": {
       "description": "Our uniform auto-start mechanism per platform. Never the app's native enable path.",
       "enum": [
-        "login-item",
-        "launchagent",
-        "xdg-desktop",
-        "run-key",
-        "startup-folder",
-        "system-extension"
+        "macos-launchagent",
+        "macos-system-extension",
+        "nixos-xdg-desktop",
+        "windows-run-key",
+        "windows-startup-folder"
       ],
       "type": "string"
     },
@@ -76,11 +75,11 @@
       "description": "Auto-start runtime configuration for one host",
       "properties": {
         "bundleId": {
-          "description": "macOS bundle identifier (e.g. com.if.Amphetamine). Used to locate the app for login-item manipulation.",
+          "description": "macOS bundle identifier (e.g. com.if.Amphetamine). Used to locate the app for macos-launchagent manipulation.",
           "type": "string"
         },
         "autostartDisableNative": {
-          "description": "Does the app ship a native auto-start setting we must turn off (true for almost everything; false only for system-extension apps with no app setting).",
+          "description": "Does the app ship a native auto-start setting we must turn off (true for almost everything; false only for macos-system-extension apps with no app setting).",
           "type": "boolean"
         },
         "autostartEnabled": {
@@ -88,7 +87,7 @@
           "type": "boolean"
         },
         "approvalInstructions": {
-          "description": "Manual approval steps shown when a system-extension is not yet approved. Overrides the generic Privacy & Security hint because extension types differ (FSKit file-system extension vs TCC grants). Required for kind 'system-extension'.",
+          "description": "Manual approval steps shown when a macos-system-extension is not yet approved. Overrides the generic Privacy & Security hint because extension types differ (FSKit file-system extension vs TCC grants). Required for kind 'macos-system-extension'.",
           "type": "string"
         },
         "hidden": {

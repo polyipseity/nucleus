@@ -102,7 +102,7 @@ test_autostart_xdg_desktop_die() {
         "platform": "NixOS",
         "autostartEnabled": true,
         "autostartDisableNative": true,
-        "kind": "xdg-desktop",
+        "kind": "nixos-xdg-desktop",
         "path": "/run/current-system/sw/bin/testapp",
         "menuBarIcon": { "kind": "manual", "iconVisible": false }
       }

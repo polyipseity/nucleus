@@ -14,7 +14,7 @@ Register-Step -Id "app-registry" -Name "App auto-start registry validation" -Act
   }
   else {
     $apps = Get-Content $appJson -Raw | ConvertFrom-Json -AsHashtable
-    $validKinds = @('login-item', 'launchagent', 'xdg-desktop', 'run-key', 'startup-folder', 'system-extension')
+    $validKinds = @('macos-launchagent', 'macos-system-extension', 'nixos-xdg-desktop', 'windows-run-key', 'windows-startup-folder')
 
     foreach ($appName in $apps.Keys) {
       if ($appName -like '$*') { continue }

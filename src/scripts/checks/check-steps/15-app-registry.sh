@@ -55,7 +55,7 @@ run_app_registry() {
         ;;
       esac
       case "$_kind" in
-      login-item | launchagent | xdg-desktop | run-key | startup-folder | system-extension) ;;
+      macos-launchagent | macos-system-extension | nixos-xdg-desktop | windows-run-key | windows-startup-folder) ;;
       "missing") ;;
       *)
         error "apps.json: '$_name' host '$_host' has invalid kind '$_kind'"

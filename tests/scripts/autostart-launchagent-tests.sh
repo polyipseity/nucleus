@@ -40,7 +40,7 @@ make_fixture() {
         "platform": "macOS",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "path": "/Applications/AppOwned.app",
         "bundleId": "com.example.appowned"
       },
@@ -64,7 +64,7 @@ make_fixture() {
         "platform": "macOS",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "path": "/Applications/ArrayApp.app",
         "bundleId": "com.example.arrayapp"
       },
@@ -88,7 +88,7 @@ make_fixture() {
         "platform": "macOS",
         "autostartEnabled": false,
         "autostartDisableNative": true,
-        "kind": "login-item",
+        "kind": "macos-launchagent",
         "path": "/Applications/ForeignApp.app",
         "bundleId": "com.example.foreignapp"
       },
@@ -112,7 +112,7 @@ make_fixture() {
         "platform": "macOS",
         "autostartEnabled": true,
         "autostartDisableNative": false,
-        "kind": "system-extension",
+        "kind": "macos-system-extension",
         "bundleId": "io.macfuse.app.fsmodule.macfuse",
         "approvalInstructions": "fixture approval instructions"
       },
