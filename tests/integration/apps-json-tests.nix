@@ -1,7 +1,7 @@
 # tests/integration/apps-json-tests.nix — Structural invariant tests for app auto-start and menu-bar.
 #
 # Validates apps.json data integrity: host validity, autostart wiring,
-# menuBarIcon structure, and scope invariants.
+# statusIcon structure, and scope invariants.
 #
 # Run with: nix-instantiate --eval tests/integration/apps-json-tests.nix
 
@@ -23,7 +23,7 @@ let
     "Windows"
   ];
 
-  # Menu-bar apps expected to declare menuBarIcon on MacBook
+  # Menu-bar apps expected to declare statusIcon on MacBook
   menuBarApps = [
     "Amphetamine"
     "Stats"
@@ -211,10 +211,10 @@ in
       ) != null
     ) "Chrome Remote Desktop Host: Accessibility approval instructions")
 
-    # === Menu-bar: apps with controllable tray icons must declare menuBarIcon ===
+    # === Menu-bar: apps with controllable tray icons must declare statusIcon ===
     (assert' (all (
-      name: parsedApps.${name}.hosts.MacBook ? menuBarIcon
-    ) menuBarApps) "Every app with a controllable tray icon must declare menuBarIcon on MacBook")
+      name: parsedApps.${name}.hosts.MacBook ? statusIcon
+    ) menuBarApps) "Every app with a controllable tray icon must declare statusIcon on MacBook")
 
     # === Menu-bar: manual entries ===
     (assert' (all (
@@ -222,8 +222,8 @@ in
       let
         macbookHost = parsedApps.${name}.hosts.MacBook;
       in
-      macbookHost.menuBarIcon.kind == "manual"
-    ) manualApps) "Manual apps must have menuBarIcon.kind=manual")
+      macbookHost.statusIcon.kind == "manual"
+    ) manualApps) "Manual apps must have statusIcon.kind=manual")
 
     # === Menu-bar: Discord apps use activation-script ===
     (assert' (all (
@@ -231,7 +231,7 @@ in
       let
         macbookHost = parsedApps.${name}.hosts.MacBook;
       in
-      macbookHost.menuBarIcon.kind == "activation-script"
+      macbookHost.statusIcon.kind == "activation-script"
     ) discordApps) "Discord apps must use activation-script for tray convergence")
   ];
 

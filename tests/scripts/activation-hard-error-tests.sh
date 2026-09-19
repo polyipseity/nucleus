@@ -36,7 +36,7 @@ test_menu_bar_activation_script_die() {
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "activation-script",
           "script": "src/scripts/lib/failing-tray.sh",
           "iconVisible": false
@@ -71,7 +71,7 @@ test_menu_bar_unknown_app_nonzero() {
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "menuBarIcon": { "kind": "manual", "iconVisible": false }
+        "statusIcon": { "kind": "manual", "iconVisible": false }
       }
     }
   }
@@ -103,7 +103,7 @@ test_autostart_xdg_desktop_die() {
         "autostartEnabled": true,
         "kind": "nixos-xdg-desktop",
         "path": "/run/current-system/sw/bin/testapp",
-        "menuBarIcon": { "kind": "manual", "iconVisible": false }
+        "statusIcon": { "kind": "manual", "iconVisible": false }
       }
     }
   }

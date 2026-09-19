@@ -26,11 +26,11 @@ Tooling: `src/scripts/autostart.sh`/`.ps1` — `list`/`status`/`enable`/`disable
 
 ## Menu-bar / tray-icon (same SSOT)
 
-Auto-start OR → disables native; icon AND → sets state, never disables. Converged from `apps.json` `menuBarIcon` block.
+Auto-start OR → disables native; icon AND → sets state, never disables. Converged from `apps.json` `statusIcon` block.
 
-Fields (`apps.schema.json` `menuBarIconEntry`): `iconVisible` (bool), `kind` (`defaults-key` | `plist` | `activation-script` | `manual`). `defaults-key`: `domain`+`key`+`valueType`. `plist`: `plistPath`+`key`+`valueType`. `iconVisibleValue`/`iconHiddenValue` per `valueType`. Inverted: `iconVisible: false`, `iconVisibleValue: false`, `iconHiddenValue: true` (BetterDisplay, Rectangle, LuLu `noIconMode`). `justification` for allow-listed apps or omitted blocks.
+Fields (`apps.schema.json` `statusIconEntry`): `iconVisible` (bool), `kind` (`macos-defaults-key` | `macos-plist` | `activation-script` | `manual`). `macos-defaults-key`: `domain`+`key`+`valueType`. `macos-plist`: `plistPath`+`key`+`valueType`. `iconVisibleValue`/`iconHiddenValue` per `valueType`. Inverted: `iconVisible: false`, `iconVisibleValue: false`, `iconHiddenValue: true` (BetterDisplay, Rectangle, LuLu `noIconMode`). `justification` for allow-listed apps or omitted blocks.
 
-Tooling: `src/scripts/menu-bar.sh`/`.ps1` — `list`/`status`/`show`/`hide`/`apply`/`verify`. `plist` restarts daemon via `pgrep`/`pkill` bundleId.
+Tooling: `src/scripts/menu-bar.sh`/`.ps1` — `list`/`status`/`show`/`hide`/`apply`/`verify`. `macos-plist` restarts daemon via `pgrep`/`pkill` bundleId.
 
 ## Adding a new app
 
@@ -46,7 +46,7 @@ Default: hide all MacBook icons.
 
 | Class | Mechanism | Examples |
 | --- | --- | --- |
-| a | Declarative `apps.json` `menuBarIcon` | Raycast, BetterDisplay, AltTab, Rectangle, LinearMouse, LuLu |
+| a | Declarative `apps.json` `statusIcon` | Raycast, BetterDisplay, AltTab, Rectangle, LinearMouse, LuLu |
 | b | ⌘-drag (per-session) | MiddleClick |
 | c | Primary UI | Equaliser |
 | d | No option | Parsec, Telegram, WhatsApp, Steam |

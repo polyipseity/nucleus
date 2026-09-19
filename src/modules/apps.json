@@ -10,8 +10,8 @@
         "kind": "macos-launchagent",
         "path": "/Applications/Raycast.app",
         "bundleId": "com.raycast.macos",
-        "menuBarIcon": {
-          "kind": "defaults-key",
+        "statusIcon": {
+          "kind": "macos-defaults-key",
           "domain": "com.raycast.macos",
           "key": "ShowMenuBarIcon",
           "valueType": "bool",
@@ -42,8 +42,8 @@
         "kind": "macos-launchagent",
         "path": "/Applications/Amphetamine.app",
         "bundleId": "com.if.Amphetamine",
-        "menuBarIcon": {
-          "kind": "defaults-key",
+        "statusIcon": {
+          "kind": "macos-defaults-key",
           "domain": "com.apple.controlcenter",
           "key": "NSStatusItem Visible com.if.Amphetamine",
           "valueType": "bool",
@@ -74,8 +74,8 @@
         "kind": "macos-launchagent",
         "path": "/Applications/Stats.app",
         "bundleId": "eu.exelban.Stats",
-        "menuBarIcon": {
-          "kind": "defaults-key",
+        "statusIcon": {
+          "kind": "macos-defaults-key",
           "domain": "com.apple.controlcenter",
           "key": "NSStatusItem Visible eu.exelban.Stats",
           "valueType": "bool",
@@ -106,8 +106,8 @@
         "kind": "macos-launchagent",
         "path": "/Applications/BetterDisplay.app",
         "bundleId": "pro.betterdisplay.BetterDisplay",
-        "menuBarIcon": {
-          "kind": "defaults-key",
+        "statusIcon": {
+          "kind": "macos-defaults-key",
           "domain": "pro.betterdisplay.BetterDisplay",
           "key": "hideMenuIcon",
           "valueType": "bool",
@@ -138,7 +138,7 @@
         "kind": "macos-launchagent",
         "path": "/Applications/MiddleClick.app",
         "bundleId": "com.rouge41.middleclick",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "manual",
           "iconVisible": false
         }
@@ -165,8 +165,8 @@
         "kind": "macos-launchagent",
         "path": "/Applications/Mounty.app",
         "bundleId": "com.mounty.app",
-        "menuBarIcon": {
-          "kind": "defaults-key",
+        "statusIcon": {
+          "kind": "macos-defaults-key",
           "domain": "com.apple.controlcenter",
           "key": "NSStatusItem Visible com.mounty.app",
           "valueType": "bool",
@@ -197,8 +197,8 @@
         "kind": "macos-launchagent",
         "path": "/Applications/LinearMouse.app",
         "bundleId": "com.lujjjh.LinearMouse",
-        "menuBarIcon": {
-          "kind": "defaults-key",
+        "statusIcon": {
+          "kind": "macos-defaults-key",
           "domain": "com.lujjjh.LinearMouse",
           "key": "menuBarVisibilityMode",
           "valueType": "string",
@@ -229,8 +229,8 @@
         "kind": "macos-launchagent",
         "path": "/Applications/LuLu.app",
         "bundleId": "com.objective-see.LuLu",
-        "menuBarIcon": {
-          "kind": "plist",
+        "statusIcon": {
+          "kind": "macos-plist",
           "plistPath": "/Library/Objective-See/LuLu/preferences.plist",
           "key": "noIconMode",
           "valueType": "bool",
@@ -261,8 +261,8 @@
         "kind": "macos-launchagent",
         "path": "/Applications/OrbStack.app",
         "bundleId": "com.orbstack.orbstack",
-        "menuBarIcon": {
-          "kind": "defaults-key",
+        "statusIcon": {
+          "kind": "macos-defaults-key",
           "domain": "com.apple.controlcenter",
           "key": "NSStatusItem Visible com.orbstack.orbstack",
           "valueType": "bool",
@@ -293,7 +293,7 @@
         "kind": "macos-launchagent",
         "path": "/Applications/Parsec.app",
         "bundleId": "tv.parsec.www",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "manual",
           "iconVisible": false
         }
@@ -303,7 +303,7 @@
         "autostartEnabled": true,
         "kind": "nixos-xdg-desktop",
         "path": "/run/current-system/sw/bin/parsec",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "manual",
           "iconVisible": false
         }
@@ -313,7 +313,7 @@
         "autostartEnabled": true,
         "kind": "windows-run-key",
         "path": "C:\\Program Files\\Parsec\\parsec.exe",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "manual",
           "iconVisible": false
         }
@@ -330,7 +330,7 @@
         "kind": "macos-launchagent",
         "bundleId": "RimSort",
         "path": "/Applications/RimSort.app",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "manual",
           "iconVisible": false
         }
@@ -340,7 +340,7 @@
         "autostartEnabled": false,
         "kind": "nixos-xdg-desktop",
         "path": "/run/current-system/sw/bin/rimsort",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "manual",
           "iconVisible": false
         }
@@ -350,7 +350,7 @@
         "autostartEnabled": false,
         "kind": "windows-run-key",
         "path": "C:\\Program Files\\RimSort\\RimSort.exe",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "manual",
           "iconVisible": false
         }
@@ -367,7 +367,7 @@
         "kind": "macos-launchagent",
         "path": "/Applications/Telegram.app",
         "bundleId": "ru.keepcoder.Telegram",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "manual",
           "iconVisible": false
         }
@@ -377,7 +377,7 @@
         "autostartEnabled": false,
         "kind": "nixos-xdg-desktop",
         "path": "/run/current-system/sw/bin/telegram-desktop",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "manual",
           "iconVisible": false
         }
@@ -387,7 +387,7 @@
         "autostartEnabled": false,
         "kind": "windows-run-key",
         "path": "%LOCALAPPDATA%\\Telegram Desktop\\Telegram.exe",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "manual",
           "iconVisible": false
         }
@@ -404,7 +404,7 @@
         "kind": "macos-launchagent",
         "path": "/Applications/WhatsApp.app",
         "bundleId": "net.whatsapp.WhatsApp",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "manual",
           "iconVisible": false
         }
@@ -419,7 +419,7 @@
         "autostartEnabled": false,
         "kind": "windows-run-key",
         "path": "%LOCALAPPDATA%\\WhatsApp\\WhatsApp.exe",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "manual",
           "iconVisible": false
         }
@@ -436,7 +436,7 @@
         "kind": "macos-launchagent",
         "path": "/Applications/Steam.app",
         "bundleId": "com.valvesoftware.steam",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "manual",
           "iconVisible": false
         }
@@ -446,7 +446,7 @@
         "autostartEnabled": false,
         "kind": "nixos-xdg-desktop",
         "path": "/run/current-system/sw/bin/steam",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "manual",
           "iconVisible": false
         }
@@ -456,7 +456,7 @@
         "autostartEnabled": false,
         "kind": "windows-run-key",
         "path": "C:\\Program Files (x86)\\Steam\\steam.exe",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "manual",
           "iconVisible": false
         }
@@ -473,8 +473,8 @@
         "kind": "macos-launchagent",
         "path": "/Applications/AltTab.app",
         "bundleId": "com.lwouis.alt-tab-macos",
-        "menuBarIcon": {
-          "kind": "defaults-key",
+        "statusIcon": {
+          "kind": "macos-defaults-key",
           "domain": "com.lwouis.alt-tab-macos",
           "key": "menubarIconShown",
           "valueType": "string",
@@ -505,8 +505,8 @@
         "kind": "macos-launchagent",
         "path": "/Applications/battery.app",
         "bundleId": "com.fiplab.battery",
-        "menuBarIcon": {
-          "kind": "defaults-key",
+        "statusIcon": {
+          "kind": "macos-defaults-key",
           "domain": "com.fiplab.battery",
           "key": "menuBarBatteryDisplayMode",
           "valueType": "string",
@@ -537,8 +537,8 @@
         "kind": "macos-launchagent",
         "path": "/Applications/Rectangle.app",
         "bundleId": "com.knollsoft.Rectangle",
-        "menuBarIcon": {
-          "kind": "defaults-key",
+        "statusIcon": {
+          "kind": "macos-defaults-key",
           "domain": "com.knollsoft.Rectangle",
           "key": "hideMenubarIcon",
           "valueType": "bool",
@@ -619,7 +619,7 @@
         "kind": "macos-launchagent",
         "path": "/Applications/Discord.app",
         "bundleId": "com.hnc.Discord",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "activation-script",
           "script": "src/scripts/lib/discord-tray.sh",
           "iconVisible": false
@@ -630,7 +630,7 @@
         "autostartEnabled": false,
         "kind": "nixos-xdg-desktop",
         "path": "/run/current-system/sw/bin/discord",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "activation-script",
           "script": "src/scripts/lib/discord-tray.sh",
           "iconVisible": false
@@ -642,7 +642,7 @@
         "autostartEnabled": false,
         "kind": "windows-run-key",
         "path": "%LOCALAPPDATA%\\Discord\\Discord.exe",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "activation-script",
           "script": "src/scripts/lib/discord-tray.ps1",
           "iconVisible": false
@@ -660,7 +660,7 @@
         "kind": "macos-launchagent",
         "path": "/Applications/Discord Canary.app",
         "bundleId": "com.hnc.DiscordCanary",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "activation-script",
           "script": "src/scripts/lib/discord-tray.sh",
           "iconVisible": false
@@ -671,7 +671,7 @@
         "autostartEnabled": false,
         "kind": "nixos-xdg-desktop",
         "path": "/run/current-system/sw/bin/discord-canary",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "activation-script",
           "script": "src/scripts/lib/discord-tray.sh",
           "iconVisible": false
@@ -682,7 +682,7 @@
         "autostartEnabled": false,
         "kind": "windows-run-key",
         "path": "%LOCALAPPDATA%\\DiscordCanary\\DiscordCanary.exe",
-        "menuBarIcon": {
+        "statusIcon": {
           "kind": "activation-script",
           "script": "src/scripts/lib/discord-tray.ps1",
           "iconVisible": false

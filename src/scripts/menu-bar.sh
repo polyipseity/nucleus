@@ -39,7 +39,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 usage() {
   usage_std "$(basename "$0")" "list|status|show|hide|apply|verify [app...] [options]"
   cat <<'EOF'
-  list                       List all apps with a menuBarIcon block and their icon state.
+  list                       List all apps with a statusIcon block and their icon state.
   status [app...]            Show icon visibility of specified apps (all if omitted).
   show <app>                 Set the app's menu-bar / tray icon to visible.
   hide <app>                 Set the app's menu-bar / tray icon to hidden.
@@ -60,7 +60,7 @@ MacBook | NixOS | Windows) ;;
 esac
 
 # read_registry — Parse apps.json and return JSON filtered to current host,
-# keeping only entries that declare a menuBarIcon block.
+# keeping only entries that declare a statusIcon block.
 read_registry() {
   if [ ! -f "$APPS_JSON" ]; then
     error "app registry not found at $APPS_JSON"
@@ -72,7 +72,7 @@ read_registry() {
       | select(.value | type == "object")
       | select(.value.hosts | has($host))
       | select(.value.hosts[$host].type != "omitted")
-      | select(.value.hosts[$host].menuBarIcon != null)
+      | select(.value.hosts[$host].statusIcon != null)
       | {key: .key, value: {
           displayName: .value.displayName,
           description: .value.description,
@@ -92,11 +92,11 @@ read_registry() {
 menu_bar_value_for() {
   local visible="$1" entry_json="$2"
   local value_type
-  value_type=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.valueType // "bool"')
+  value_type=$(echo "$entry_json" | jq -r '.hostEntry.statusIcon.valueType // "bool"')
   if [ "$visible" = "true" ]; then
-    echo "$entry_json" | jq -r --arg t "$value_type" '.hostEntry.menuBarIcon.iconVisibleValue | if $t == "int" then tostring else tostring end'
+    echo "$entry_json" | jq -r --arg t "$value_type" '.hostEntry.statusIcon.iconVisibleValue | if $t == "int" then tostring else tostring end'
   else
-    echo "$entry_json" | jq -r --arg t "$value_type" '.hostEntry.menuBarIcon.iconHiddenValue | if $t == "int" then tostring else tostring end'
+    echo "$entry_json" | jq -r --arg t "$value_type" '.hostEntry.statusIcon.iconHiddenValue | if $t == "int" then tostring else tostring end'
   fi
 }
 
@@ -107,18 +107,18 @@ menu_bar_value_for() {
 menu_bar_native_set() {
   local entry_json="$1" visible="$2"
   local kind domain key plist_path value
-  kind=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.kind')
+  kind=$(echo "$entry_json" | jq -r '.hostEntry.statusIcon.kind')
   if [ "$kind" = "manual" ]; then
     warn -l "$(echo "$entry_json" | jq -r '.displayName // "app"')" "manual icon entry; not auto-provisioned (set in the app's UI)"
     return 0
   fi
   value=$(menu_bar_value_for "$visible" "$entry_json")
   case "$kind" in
-  defaults-key)
-    domain=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.domain')
-    key=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.key')
+  macos-defaults-key)
+    domain=$(echo "$entry_json" | jq -r '.hostEntry.statusIcon.domain')
+    key=$(echo "$entry_json" | jq -r '.hostEntry.statusIcon.key')
     local value_type
-    value_type=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.valueType // "bool"')
+    value_type=$(echo "$entry_json" | jq -r '.hostEntry.statusIcon.valueType // "bool"')
     _nucleus_resolve_console_user || return 0
     local write_args=(-bool)
     case "$value_type" in
@@ -129,11 +129,11 @@ menu_bar_native_set() {
     /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
       /usr/bin/defaults write "$domain" "$key" "${write_args[@]}" "$value" 2>/dev/null
     ;;
-  plist)
-    plist_path=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.plistPath')
-    key=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.key')
+  macos-plist)
+    plist_path=$(echo "$entry_json" | jq -r '.hostEntry.statusIcon.plistPath')
+    key=$(echo "$entry_json" | jq -r '.hostEntry.statusIcon.key')
     local value_type
-    value_type=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.valueType // "bool"')
+    value_type=$(echo "$entry_json" | jq -r '.hostEntry.statusIcon.valueType // "bool"')
     local write_args=(-bool)
     case "$value_type" in
     string) write_args=(-string) ;;
@@ -152,7 +152,7 @@ menu_bar_native_set() {
     ;;
   activation-script)
     local script app_key
-    script=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.script')
+    script=$(echo "$entry_json" | jq -r '.hostEntry.statusIcon.script')
     app_key=$(echo "$entry_json" | jq -r '.key // empty')
     if [ -n "$script" ]; then
       case "$script" in
@@ -167,7 +167,7 @@ menu_bar_native_set() {
     fi
     ;;
   *)
-    warn -l "$(echo "$entry_json" | jq -r '.displayName // "app"')" "unsupported menuBarIcon kind '$kind'"
+    warn -l "$(echo "$entry_json" | jq -r '.displayName // "app"')" "unsupported statusIcon kind '$kind'"
     return 1
     ;;
   esac
@@ -178,17 +178,17 @@ menu_bar_native_set() {
 menu_bar_actual_visible() {
   local key="$1" entry_json="$2"
   local kind domain key_name plist_path value_type current desired_visible
-  kind=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.kind')
+  kind=$(echo "$entry_json" | jq -r '.hostEntry.statusIcon.kind')
   if [ "$kind" = "manual" ]; then
     printf 'manual'
     return 0
   fi
-  value_type=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.valueType // "bool"')
-  desired_visible=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.iconVisible')
+  value_type=$(echo "$entry_json" | jq -r '.hostEntry.statusIcon.valueType // "bool"')
+  desired_visible=$(echo "$entry_json" | jq -r '.hostEntry.statusIcon.iconVisible')
   case "$kind" in
-  defaults-key)
-    domain=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.domain')
-    key_name=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.key')
+  macos-defaults-key)
+    domain=$(echo "$entry_json" | jq -r '.hostEntry.statusIcon.domain')
+    key_name=$(echo "$entry_json" | jq -r '.hostEntry.statusIcon.key')
     _nucleus_resolve_console_user || {
       printf 'unknown'
       return 0
@@ -199,9 +199,9 @@ menu_bar_actual_visible() {
       return 0
     }
     ;;
-  plist)
-    plist_path=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.plistPath')
-    key_name=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.key')
+  macos-plist)
+    plist_path=$(echo "$entry_json" | jq -r '.hostEntry.statusIcon.plistPath')
+    key_name=$(echo "$entry_json" | jq -r '.hostEntry.statusIcon.key')
     current=$(/usr/bin/defaults read "$plist_path" "$key_name" 2>/dev/null) || {
       printf 'unknown'
       return 0
@@ -262,7 +262,7 @@ nixos_dispatch_per_user() {
 menu_bar_converge() {
   local key="$1" entry_json="$2"
   local visible
-  visible=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.iconVisible')
+  visible=$(echo "$entry_json" | jq -r '.hostEntry.statusIcon.iconVisible')
   menu_bar_native_set "$entry_json" "$visible" || {
     warn -l "$key" "failed to set icon state"
     return 1
@@ -282,7 +282,7 @@ do_list() {
       local visible
       visible=$(menu_bar_actual_visible "$key" "$entry_json")
       local declared
-      declared=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.iconVisible')
+      declared=$(echo "$entry_json" | jq -r '.hostEntry.statusIcon.iconVisible')
       local pair
       pair=$(jq -cn --arg k "$key" --argjson v "$(jq -cn --arg s "$visible" --argjson d "$declared" '{actualVisible:$s, declaredVisible:$d}')" '{key:$k, value:$v}')
       out="${out:+$out
@@ -296,7 +296,7 @@ do_list() {
     while IFS=$'\t' read -r key display entry_json; do
       local visible declared
       visible=$(menu_bar_actual_visible "$key" "$entry_json")
-      declared=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.iconVisible')
+      declared=$(echo "$entry_json" | jq -r '.hostEntry.statusIcon.iconVisible')
       printf '%-22s %-10s %-10s %s\n' "$key" "$visible" "$declared" "$display"
     done < <(echo "$registry" | jq -r 'to_entries[] | [.key, .value.displayName, (.value | tojson)] | @tsv')
   fi
@@ -338,12 +338,12 @@ do_set() {
     local entry
     entry=$(echo "$registry" | jq -c --arg name "$app" '.[$name] // empty')
     if [ -z "$entry" ]; then
-      warn "$app — app not found in registry (or has no menuBarIcon block)"
+      warn "$app — app not found in registry (or has no statusIcon block)"
       overall=1
       continue
     fi
     local overridden
-    overridden=$(echo "$entry" | jq --argjson v "$value" '.hostEntry.menuBarIcon.iconVisible = $v')
+    overridden=$(echo "$entry" | jq --argjson v "$value" '.hostEntry.statusIcon.iconVisible = $v')
     if ! menu_bar_converge "$app" "$overridden"; then
       warn "$app — $action failed"
       overall=1
@@ -373,7 +373,7 @@ do_verify() {
   while IFS=$'\t' read -r key display entry_json; do
     if echo "$key" | grep -q '^ERROR:'; then continue; fi
     local declared actual
-    declared=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.iconVisible')
+    declared=$(echo "$entry_json" | jq -r '.hostEntry.statusIcon.iconVisible')
     actual=$(menu_bar_actual_visible "$key" "$entry_json")
     if [ "$actual" = "manual" ]; then
       # Manual entries are declared but not auto-provisioned; no drift check.

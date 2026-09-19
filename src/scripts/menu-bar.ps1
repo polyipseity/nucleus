@@ -18,11 +18,11 @@
     expressed via iconVisibleValue / iconHiddenValue, not via a disable flag.
 
   Windows note: tray-icon visibility is app-specific and often has no universal
-  OS toggle.  Each non-omitted Windows entry with a menuBarIcon block sets the
+  OS toggle.  Each non-omitted Windows entry with a statusIcon block sets the
   app's native tray setting (registry value or documented mechanism) to match
   iconVisible.  Where an app exposes no controllable tray setting, the
-  menuBarIcon block is omitted (manual), exactly like autostart's
-  system-extension.
+  statusIcon block is omitted (manual), exactly like autostart's
+  macos-system-extension.
 
 .PARAMETER Action
   The operation to perform: list, status, show, hide, apply, verify.
@@ -90,14 +90,14 @@ if (-not (Test-Path $AppsJson)) {
 }
 $RegistryRaw = Get-Content $AppsJson -Raw | ConvertFrom-Json -AsHashtable
 
-# Filter to Windows-relevant apps that declare a menuBarIcon block
+# Filter to Windows-relevant apps that declare a statusIcon block
 $Registry = @{}
 foreach ($key in $RegistryRaw.Keys) {
   if ($key.StartsWith('$')) { continue }
   $entry = $RegistryRaw[$key]
   if ($entry -is [hashtable] -and $entry.ContainsKey('hosts') -and $entry.hosts.ContainsKey($NucleusHost) -and $entry.hosts[$NucleusHost].type -ne 'omitted') {
     $hostEntry = $entry.hosts[$NucleusHost]
-    if ($hostEntry.ContainsKey('menuBarIcon') -and $null -ne $hostEntry.menuBarIcon) {
+    if ($hostEntry.ContainsKey('statusIcon') -and $null -ne $hostEntry.statusIcon) {
       $Registry[$key] = @{
         displayName = $entry.displayName
         description = $entry.description
@@ -116,7 +116,7 @@ foreach ($key in $RegistryRaw.Keys) {
 # disable flag.
 function Get-MenuBarNativeValue {
   param([bool]$Visible, [hashtable]$Entry)
-  $icon = $Entry.hostEntry.menuBarIcon
+  $icon = $Entry.hostEntry.statusIcon
   if ($Visible) {
     return $icon.iconVisibleValue
   } else {
@@ -130,7 +130,7 @@ function Set-MenuBarNative {
   [CmdletBinding(SupportsShouldProcess)]
   [OutputType([int])]
   param([string]$Key, [hashtable]$Entry, [bool]$Visible)
-  $icon = $Entry.hostEntry.menuBarIcon
+  $icon = $Entry.hostEntry.statusIcon
   $kind = $icon.kind
   if ($kind -eq 'manual') {
     Write-NucleusInfo -CommandName 'menu-bar' "$Key — manual icon entry; not auto-provisioned (set in the app's UI)"
@@ -143,8 +143,8 @@ function Set-MenuBarNative {
   }
   $value = Get-MenuBarNativeValue -Visible $Visible -Entry $Entry
   switch ($kind) {
-    'defaults-key' {
-      # On Windows, "defaults-key" is reinterpreted as a registry value
+    'macos-defaults-key' {
+      # On Windows, "macos-defaults-key" is reinterpreted as a registry value
       # (domain = registry key path, key = value name).  This is the closest
       # native-preference analog for apps that store tray state in the registry.
       $regPath = $icon.domain
@@ -176,12 +176,12 @@ function Set-MenuBarNative {
         Write-NucleusInfo -CommandName 'menu-bar' "set $Key icon via activation-script"
       }
     }
-    'plist' {
+    'macos-plist' {
       Write-NucleusWarning "$Key — plist kind is unsupported on Windows; skipping"
       return 1
     }
     default {
-      Write-NucleusWarning "$Key — unsupported menuBarIcon kind '$kind' on host '$NucleusHost'"
+      Write-NucleusWarning "$Key — unsupported statusIcon kind '$kind' on host '$NucleusHost'"
       return 1
     }
   }
@@ -192,7 +192,7 @@ function Set-MenuBarNative {
 # desired visible value.
 function Get-MenuBarActualVisible {
   param([hashtable]$Entry)
-  $icon = $Entry.hostEntry.menuBarIcon
+  $icon = $Entry.hostEntry.statusIcon
   $kind = $icon.kind
   if ($kind -eq 'manual') {
     return 'manual'
@@ -200,7 +200,7 @@ function Get-MenuBarActualVisible {
   $desiredVisible = [bool]$icon.iconVisible
   $desiredValue = Get-MenuBarNativeValue -Visible $desiredVisible -Entry $Entry
   switch ($kind) {
-    'defaults-key' {
+    'macos-defaults-key' {
       $regPath = $icon.domain
       $valueName = $icon.key
       if (-not (Test-Path -LiteralPath $regPath)) { return $false }
@@ -224,7 +224,7 @@ function Get-MenuBarActualVisible {
 # SETs the native preference to the desired state; never disables it.
 function Invoke-MenuBarConverge {
   param([string]$Key, [hashtable]$Entry)
-  $visible = [bool]$Entry.hostEntry.menuBarIcon.iconVisible
+  $visible = [bool]$Entry.hostEntry.statusIcon.iconVisible
   try {
     return (Set-MenuBarNative -Key $Key -Entry $Entry -Visible $visible)
   } catch {
@@ -248,7 +248,7 @@ function Resolve-AppNameList {
     if ($Registry.ContainsKey($name)) {
       $results[$name] = $Registry[$name]
     } else {
-      $results["ERROR:$name"] = @{ displayName = $name; hostEntry = @{ error = 'app not found in registry (or has no menuBarIcon block)' } }
+      $results["ERROR:$name"] = @{ displayName = $name; hostEntry = @{ error = 'app not found in registry (or has no statusIcon block)' } }
     }
   }
   return $results
@@ -263,7 +263,7 @@ function Format-ListTable {
       $jsonObj.apps[$key] = @{
         displayName     = $Results[$key].displayName
         actualVisible   = (Get-MenuBarActualVisible -Entry $Results[$key])
-        declaredVisible = $Results[$key].hostEntry.menuBarIcon.iconVisible
+        declaredVisible = $Results[$key].hostEntry.statusIcon.iconVisible
       }
     }
     return ($jsonObj | ConvertTo-Json -Depth 3 -Compress)
@@ -276,7 +276,7 @@ function Format-ListTable {
       $lines += "{0,-22} {1,-10} {2,-10} {3}" -f $key, 'n/a', '-', $Results[$key].displayName
     } else {
       $actual = Get-MenuBarActualVisible -Entry $Results[$key]
-      $declared = $Results[$key].hostEntry.menuBarIcon.iconVisible
+      $declared = $Results[$key].hostEntry.statusIcon.iconVisible
       $lines += "{0,-22} {1,-10} {2,-10} {3}" -f $key, $actual, $declared, $Results[$key].displayName
     }
   }
@@ -318,7 +318,7 @@ switch ($Action) {
       }
       $entry = $Registry[$key]
       # Override the declared iconVisible flag with the requested action for this run.
-      $entry.hostEntry.menuBarIcon.iconVisible = ($Action -eq 'show')
+      $entry.hostEntry.statusIcon.iconVisible = ($Action -eq 'show')
       try {
         if ((Invoke-MenuBarConverge -Key $key -Entry $entry) -ne 0) {
           Write-NucleusError "$key — $Action failed"
@@ -352,7 +352,7 @@ switch ($Action) {
     $drift = $false
     foreach ($key in $resolved.Keys) {
       if ($key -like 'ERROR:*') { continue }
-      $declared = [bool]$Registry[$key].hostEntry.menuBarIcon.iconVisible
+      $declared = [bool]$Registry[$key].hostEntry.statusIcon.iconVisible
       $actual = Get-MenuBarActualVisible -Entry $Registry[$key]
       if ($actual -eq 'manual') {
         # Manual entries are declared but not auto-provisioned; no drift check.

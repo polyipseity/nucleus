@@ -9,7 +9,7 @@
   visibility is AND (icon shows only if the app-native show setting AND the OS
   both allow it), so the native setting is SET, never disabled.  Tray-icon
   visibility is app-specific on Windows (no universal OS toggle); apps that
-  expose no controllable tray setting simply omit the menuBarIcon block.
+  expose no controllable tray setting simply omit the statusIcon block.
 
   Cross-platform parity:
     macOS   — activation script in MacBook/activation.nix (defaults write)
