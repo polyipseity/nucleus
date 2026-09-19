@@ -98,6 +98,10 @@ in
       gimp
       pass
       qtpass
+
+      # WHY: zenity draws the modal dialog that the "strip metadata" Nautilus
+      # entry uses to report inputs it could not process.
+      zenity
     ])
     ++ lib.optionals (pkgs.gnome ? nautilus-open-terminal) [
       pkgs.gnome.nautilus-open-terminal # adds "Open in Terminal" to Files context menu when available

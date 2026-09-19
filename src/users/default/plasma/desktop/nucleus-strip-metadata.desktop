@@ -6,5 +6,5 @@ Actions=stripMetadata
 
 [Desktop Action stripMetadata]
 Name=strip metadata
-Exec=nucleus-utils strip-metadata %f
+Exec=nucleus-utils strip-metadata --dialog %f
 Icon=x-office-document

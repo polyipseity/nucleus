@@ -65,9 +65,10 @@ let
     }) optimizePdfPresets
   );
 
-  # MIME types for metadata stripping (excludes PDF and legacy OLE2).
-  # Used for Nautilus MIME guard only; the shell script handles all types.
-
+  # Nautilus Scripts cannot declare a MIME filter, so this entry is offered for
+  # every selection; strip-metadata reports whatever it could not process in a
+  # modal dialog (--dialog). Declared input formats:
+  # src/modules/lib/strip-metadata-types.nix.
   stripMetadataNautilusScript = pkgs.writeNucleusShellApplication {
     name = "strip-metadata-nautilus";
     runtimeInputs = [ pkgs.file ];
