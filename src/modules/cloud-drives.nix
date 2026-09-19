@@ -223,8 +223,15 @@ let
         "5m"
         "--poll-interval"
         "1m"
+        # WHY: NOTICE not ERROR.  A mount that decays (macFUSE destroys the volume
+        #   seconds after it attaches, e.g. because a stale volume is still
+        #   registered for the path) exits with status 0 and writes nothing at
+        #   ERROR level, so the failure is indistinguishable from an idle mount in
+        #   the agent log.  The mount and unmount lines rclone emits at NOTICE are
+        #   what make that visible; DEBUG adds the per-volume destroy detail when a
+        #   deeper trace is needed.
         "--log-level"
-        "ERROR"
+        "NOTICE"
       ]
       ++ readOnlyFlag
       ++ extraArgsList;
