@@ -27,13 +27,13 @@ in
     (assert' (host == "127.0.0.1") "redis must bind loopback, got ${host}")
     (assert' (port == 6379) "redis must use port 6379, got ${toString port}")
     (assert' (
-      hostTypes.MacBook == "launchctl" && hostServices.MacBook == "local.redis"
+      hostTypes.MacBook == "macos-launchctl" && hostServices.MacBook == "local.redis"
     ) "MacBook redis must be local.redis launchctl")
     (assert' (
-      hostTypes.NixOS == "systemctl" && hostServices.NixOS == "nucleus-redis.service"
+      hostTypes.NixOS == "nixos-systemctl" && hostServices.NixOS == "nucleus-redis.service"
     ) "NixOS redis must be nucleus-redis.service systemctl")
     (assert' (
-      hostTypes.Windows == "native" && hostServices.Windows == "nucleus-redis"
+      hostTypes.Windows == "windows-native" && hostServices.Windows == "nucleus-redis"
     ) "Windows redis must be nucleus-redis native")
     (assert' (!any (t: t == "omitted") (builtins.attrValues hostTypes)) "no redis host may be omitted")
 

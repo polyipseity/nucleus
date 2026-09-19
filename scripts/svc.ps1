@@ -1,13 +1,13 @@
 <#
 .SYNOPSIS
-  Unified service management and log inspection for Windows (native, scheduled tasks).
+  Unified service management and log inspection for Windows (windows-native, windows-schtask).
 
 .DESCRIPTION
   Provides a uniform CLI for listing, starting, stopping, restarting,
   enabling, disabling, and inspecting logs of services across Windows
   service types:
-    - native:  standard Windows services (Get-Service, sc.exe)
-    - schtask: Scheduled tasks (Get-ScheduledTask etc.)
+    - windows-native:  standard Windows services (Get-Service, sc.exe)
+    - windows-schtask: Scheduled tasks (Get-ScheduledTask etc.)
 
   Services are defined in src/modules/services.json (the canonical registry).
 
@@ -460,7 +460,7 @@ function Get-ServiceStatus {
   $type = $HostEntry.type
 
   switch ($type) {
-    'native' {
+    'windows-native' {
       $svcName = $HostEntry.service
       try {
         $svc = Get-Service -Name $svcName -ErrorAction Stop
@@ -482,7 +482,7 @@ function Get-ServiceStatus {
         return @{ status = 'not-found'; running = $false; enabled = $false; pid = $null }
       }
     }
-    'schtask' {
+    'windows-schtask' {
       $taskPath = $HostEntry.taskPath
       try {
         $task = Get-ScheduledTask -TaskPath (Split-Path $taskPath -Parent) -TaskName (Split-Path $taskPath -Leaf) -ErrorAction Stop
@@ -512,7 +512,7 @@ function Invoke-ServiceAction {
   $type = $HostEntry.type
 
   switch ($type) {
-    'native' {
+    'windows-native' {
       $svcName = $HostEntry.service
       switch ($Action) {
         'status'  { return Get-ServiceStatus -HostEntry $HostEntry }
@@ -523,7 +523,7 @@ function Invoke-ServiceAction {
         'disable' { Set-Service -Name $svcName -StartupType Disabled -ErrorAction Stop; return $true }
       }
     }
-    'schtask' {
+    'windows-schtask' {
       $taskPath = $HostEntry.taskPath
       $taskName = Split-Path $taskPath -Leaf
       $taskParent = Split-Path $taskPath -Parent

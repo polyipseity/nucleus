@@ -40,7 +40,7 @@ cat >"$_tmp/repo/src/modules/services.json" <<JSON
     "displayName": "Cloud Drive Mounts",
     "hosts": {
       "MacBook": {
-        "type": "launchctl",
+        "type": "macos-launchctl",
         "prefixMatch": true,
         "service": "local.cloud-mount.",
         "scope": "user",
@@ -48,7 +48,7 @@ cat >"$_tmp/repo/src/modules/services.json" <<JSON
         "logging": { "instanceDirs": { "user": ["cloud-mount-<instance>"] } }
       },
       "NixOS": {
-        "type": "systemctl",
+        "type": "nixos-systemctl",
         "prefixMatch": true,
         "service": "cloud-mount-",
         "scope": "user"
@@ -58,7 +58,7 @@ cat >"$_tmp/repo/src/modules/services.json" <<JSON
   "plain-service": {
     "displayName": "Plain Service",
     "hosts": {
-      "MacBook": { "type": "launchctl", "service": "local.plain", "scope": "user" }
+      "MacBook": { "type": "macos-launchctl", "service": "local.plain", "scope": "user" }
     }
   }
 }

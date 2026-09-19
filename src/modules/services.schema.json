@@ -197,7 +197,7 @@
       },
       "type": "object"
     },
-    "launchctlEntry": {
+    "macosLaunchctlEntry": {
       "properties": {
         "launchdDomain": {
           "description": "Actual launchd domain for this service (gui/<uid> or user/<uid>). Determines the launchctl target. Required when scope=user.",
@@ -245,7 +245,7 @@
           "type": "boolean"
         },
         "type": {
-          "const": "launchctl"
+          "const": "macos-launchctl"
         }
       },
       "required": [
@@ -254,7 +254,7 @@
       ],
       "type": "object"
     },
-    "nativeEntry": {
+    "windowsNativeEntry": {
       "properties": {
         "justification": {
           "description": "Explanation of platform-specific configuration choices.",
@@ -277,7 +277,7 @@
           "type": "string"
         },
         "type": {
-          "const": "native"
+          "const": "windows-native"
         }
       },
       "required": [
@@ -320,16 +320,16 @@
       "description": "Service runtime configuration for one host",
       "oneOf": [
         {
-          "$ref": "#/definitions/launchctlEntry"
+          "$ref": "#/definitions/macosLaunchctlEntry"
         },
         {
-          "$ref": "#/definitions/systemctlEntry"
+          "$ref": "#/definitions/nixosSystemctlEntry"
         },
         {
-          "$ref": "#/definitions/nativeEntry"
+          "$ref": "#/definitions/windowsNativeEntry"
         },
         {
-          "$ref": "#/definitions/schtaskEntry"
+          "$ref": "#/definitions/windowsSchtaskEntry"
         },
         {
           "$ref": "registry-common.schema.json#/definitions/omittedEntry"
@@ -347,7 +347,7 @@
       ],
       "description": "Host-specific service configuration with platform reference"
     },
-    "schtaskEntry": {
+    "windowsSchtaskEntry": {
       "properties": {
         "justification": {
           "description": "Explanation of platform-specific configuration choices.",
@@ -369,7 +369,7 @@
           "type": "string"
         },
         "type": {
-          "const": "schtask"
+          "const": "windows-schtask"
         }
       },
       "required": [
@@ -378,7 +378,7 @@
       ],
       "type": "object"
     },
-    "systemctlEntry": {
+    "nixosSystemctlEntry": {
       "properties": {
         "justification": {
           "description": "Why this service is user-scoped when the policy default is system-wide. Required when scope=user.",
@@ -404,7 +404,7 @@
           "type": "string"
         },
         "type": {
-          "const": "systemctl"
+          "const": "nixos-systemctl"
         }
       },
       "required": [

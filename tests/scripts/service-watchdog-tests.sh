@@ -28,14 +28,14 @@ cat >"$_tmp/repo/src/modules/services.json" <<JSON
     "displayName": "Cloud Drive Mounts",
     "hosts": {
       "MacBook": {
-        "type": "launchctl",
+        "type": "macos-launchctl",
         "prefixMatch": true,
         "service": "local.cloud-mount.",
         "scope": "user",
         "launchdDomain": "gui"
       },
       "NixOS": {
-        "type": "systemctl",
+        "type": "nixos-systemctl",
         "prefixMatch": true,
         "service": "cloud-mount-",
         "scope": "user"

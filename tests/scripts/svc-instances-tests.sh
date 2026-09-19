@@ -46,9 +46,9 @@ chmod +x "$_tmp/bin/launchctl" "$_tmp/bin/systemctl"
 PATH="$_tmp/bin:$PATH"
 export PATH
 
-LAUNCHCTL_ENTRY='{"type":"launchctl","service":"local.cloud-mount.","scope":"user","launchdDomain":"gui","prefixMatch":true}'
-SYSTEMCTL_ENTRY='{"type":"systemctl","service":"cloud-mount-","scope":"user","prefixMatch":true}'
-SCHTASK_ENTRY='{"type":"schtask","service":"NucleusCloudMount-","taskPath":"\\NucleusCloudMount","prefixMatch":true}'
+LAUNCHCTL_ENTRY='{"type": "macos-launchctl","service":"local.cloud-mount.","scope":"user","launchdDomain":"gui","prefixMatch":true}'
+SYSTEMCTL_ENTRY='{"type": "nixos-systemctl","service":"cloud-mount-","scope":"user","prefixMatch":true}'
+SCHTASK_ENTRY='{"type": "windows-schtask","service":"NucleusCloudMount-","taskPath":"\\NucleusCloudMount","prefixMatch":true}'
 
 # assert_eq — Compare an actual value with the expected one.
 assert_eq() { # <test name> <expected> <actual>
@@ -101,7 +101,7 @@ assert_eq "systemd units match the literal prefix only" "cloud-mount-b.service" 
 FAKE_UNITS=""
 export FAKE_UNITS
 assert_eq "an entry with no service prefix enumerates nothing" "" \
-  "$(svc_prefix_instances '{"type":"launchctl","scope":"user"}')"
+  "$(svc_prefix_instances '{"type": "macos-launchctl","scope":"user"}')"
 
 section 4 "Per-instance log directories"
 assert_eq "user instance dir expands the <instance> token" "$_tmp/log/cloud-mount-iCloud" \

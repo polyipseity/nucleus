@@ -83,7 +83,7 @@ run_service_registry() {
     # Validate each host entry has valid type, platform ref, and required fields
     while IFS=$'\t' read -r _name _host _type _platform _has_required; do
       case "$_type" in
-      launchctl | systemctl | native | schtask | omitted) ;;
+      macos-launchctl | nixos-systemctl | windows-native | windows-schtask | omitted) ;;
       *)
         error "services.json: '$_name' host '$_host' has invalid type '$_type'"
         _svc_errors=$((_svc_errors + 1))
@@ -110,20 +110,20 @@ run_service_registry() {
         (.value.type // "missing"),
         (.value.platform // "missing"),
         (
-          if .value.type == "launchctl" then (.value.service | type == "string" and length > 0)
-          elif .value.type == "systemctl" then (.value.service | type == "string" and length > 0)
-          elif .value.type == "native" then (.value.service | type == "string" and length > 0)
-          elif .value.type == "schtask" then (.value.taskPath | type == "string" and length > 0)
+          if .value.type == "macos-launchctl" then (.value.service | type == "string" and length > 0)
+          elif .value.type == "nixos-systemctl" then (.value.service | type == "string" and length > 0)
+          elif .value.type == "windows-native" then (.value.service | type == "string" and length > 0)
+          elif .value.type == "windows-schtask" then (.value.taskPath | type == "string" and length > 0)
           elif .value.type == "omitted" then (.value.justification | type == "string" and length > 0)
           else false
           end | tostring
         )
       ] | @tsv' "$_svc_json")
 
-    # Validate launchctl/systemctl entries have valid scope
+    # Validate macos-launchctl/nixos-systemctl entries have valid scope
     while IFS=$'\t' read -r _name _host _type _scope; do
       case "$_type" in
-      launchctl | systemctl)
+      macos-launchctl | nixos-systemctl)
         case "$_scope" in
         user | system) ;;
         *)

@@ -21,7 +21,7 @@ BeforeAll {
   # Real registry shape for the Windows cloud-drive entry: the folder lives in
   # taskPath and the task-name prefix in service.
   $Script:MountEntry = @{
-    type        = 'schtask'
+    type        = 'windows-schtask'
     prefixMatch = $true
     service     = 'NucleusCloudMount-'
     taskPath    = '\NucleusCloudMount'
@@ -40,17 +40,17 @@ Describe 'Get-NucleusInstanceIdPrefix' {
   }
 
   It 'uses the bare prefix when the entry declares no folder' {
-    $entry = @{ type = 'schtask'; prefixMatch = $true; service = 'NucleusCloudMount-' }
+    $entry = @{ type = 'windows-schtask'; prefixMatch = $true; service = 'NucleusCloudMount-' }
     Get-NucleusInstanceIdPrefix -HostEntry $entry | Should -Be 'NucleusCloudMount-'
   }
 
   It 'normalizes a folder that already ends with a separator' {
-    $entry = @{ type = 'schtask'; prefixMatch = $true; service = 'NucleusCloudMount-'; taskPath = '\NucleusCloudMount\' }
+    $entry = @{ type = 'windows-schtask'; prefixMatch = $true; service = 'NucleusCloudMount-'; taskPath = '\NucleusCloudMount\' }
     Get-NucleusInstanceIdPrefix -HostEntry $entry | Should -Be '\NucleusCloudMount\NucleusCloudMount-'
   }
 
   It 'throws when the entry declares no service prefix' {
-    { Get-NucleusInstanceIdPrefix -HostEntry @{ type = 'schtask'; prefixMatch = $true } } | Should -Throw '*no service prefix*'
+    { Get-NucleusInstanceIdPrefix -HostEntry @{ type = 'windows-schtask'; prefixMatch = $true } } | Should -Throw '*no service prefix*'
   }
 }
 
@@ -64,7 +64,7 @@ Describe 'Get-NucleusInstanceSuffix' {
   }
 
   It 'drops a systemd unit suffix' {
-    $entry = @{ type = 'systemctl'; prefixMatch = $true; service = 'cloud-mount-'; scope = 'user' }
+    $entry = @{ type = 'nixos-systemctl'; prefixMatch = $true; service = 'cloud-mount-'; scope = 'user' }
     Get-NucleusInstanceSuffix -HostEntry $entry -InstanceId 'cloud-mount-iCloud.service' | Should -Be 'iCloud'
   }
 
@@ -76,7 +76,7 @@ Describe 'Get-NucleusInstanceSuffix' {
 Describe 'New-NucleusInstanceHostEntry' {
   It 'points the instance entry at the concrete scheduled task' {
     $instance = New-NucleusInstanceHostEntry -HostEntry $Script:MountEntry -InstanceId '\NucleusCloudMount\NucleusCloudMount-work'
-    $instance.type | Should -Be 'schtask'
+    $instance.type | Should -Be 'windows-schtask'
     $instance.taskPath | Should -Be '\NucleusCloudMount\NucleusCloudMount-work'
     $instance.scope | Should -Be 'user'
   }
@@ -87,13 +87,13 @@ Describe 'New-NucleusInstanceHostEntry' {
   }
 
   It 'carries the concrete service name for non-schtask entries' {
-    $entry = @{ type = 'launchctl'; prefixMatch = $true; service = 'local.cloud-mount.'; scope = 'user' }
+    $entry = @{ type = 'macos-launchctl'; prefixMatch = $true; service = 'local.cloud-mount.'; scope = 'user' }
     $instance = New-NucleusInstanceHostEntry -HostEntry $entry -InstanceId 'local.cloud-mount.iCloud'
     $instance.service | Should -Be 'local.cloud-mount.iCloud'
   }
 
   It 'leaves the registry entry untouched' {
-    $entry = @{ type = 'schtask'; prefixMatch = $true; service = 'NucleusCloudMount-'; taskPath = '\NucleusCloudMount' }
+    $entry = @{ type = 'windows-schtask'; prefixMatch = $true; service = 'NucleusCloudMount-'; taskPath = '\NucleusCloudMount' }
     $null = New-NucleusInstanceHostEntry -HostEntry $entry -InstanceId '\NucleusCloudMount\NucleusCloudMount-work'
     $entry.taskPath | Should -Be '\NucleusCloudMount'
     $entry.prefixMatch | Should -Be $true
@@ -140,7 +140,7 @@ Describe 'Get-NucleusPrefixInstanceList' {
   }
 
   It 'rejects a prefix-match entry of an unsupported type' {
-    $entry = @{ type = 'native'; prefixMatch = $true; service = 'ollama' }
+    $entry = @{ type = 'windows-native'; prefixMatch = $true; service = 'ollama' }
     { Get-NucleusPrefixInstanceList -HostEntry $entry } | Should -Throw '*unsupported type*'
   }
 
@@ -180,7 +180,7 @@ Describe 'Get-NucleusConfiguredInstanceList' {
   }
 
   It 'rejects a prefix-match entry of an unsupported type' {
-    $entry = @{ type = 'native'; prefixMatch = $true; service = 'ollama' }
+    $entry = @{ type = 'windows-native'; prefixMatch = $true; service = 'ollama' }
     { Get-NucleusConfiguredInstanceList -HostEntry $entry -RepoRoot $Script:FixtureRepoRoot } | Should -Throw '*unsupported type*'
   }
 }

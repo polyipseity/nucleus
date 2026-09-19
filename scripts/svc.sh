@@ -289,7 +289,7 @@ svc_status() {
   svc_id=$(echo "$entry_json" | jq -r '.service // .taskPath // ""')
 
   case "$svc_type" in
-  launchctl)
+  macos-launchctl)
     local domain_flag=""
     local scope launchd_domain uid
     scope=$(echo "$entry_json" | jq -r '.scope // "system"')
@@ -347,7 +347,7 @@ svc_status() {
       "$(printf '%s' "${state_text:-null}" | jq -R . 2>/dev/null || echo null)" \
       "${exit_code:-null}"
     ;;
-  systemctl)
+  nixos-systemctl)
     local scope_flag=""
     [ "$(echo "$entry_json" | jq -r '.scope // "system"')" = "user" ] && scope_flag="--user"
 
@@ -503,7 +503,7 @@ service_diagnostic() {
   svc_type=$(echo "$entry_json" | jq -r '.type')
   svc_id=$(echo "$entry_json" | jq -r '.service // ""')
   case "$svc_type" in
-  launchctl)
+  macos-launchctl)
     local scope sudo_prefix="" target launchd_domain uid
     scope=$(echo "$entry_json" | jq -r '.scope // "system"')
     launchd_domain=$(echo "$entry_json" | jq -r '.launchdDomain // "gui"')
@@ -513,7 +513,7 @@ service_diagnostic() {
     $sudo_prefix launchctl print "$target" 2>/dev/null |
       awk -F'= ' '/state =/{s=$2} /last exit code/{e=$NF} END{printf "state=%s", s; if(e) printf ", exit=%s", e; printf "\n"}'
     ;;
-  systemctl)
+  nixos-systemctl)
     local scope_flag=""
     [ "$(echo "$entry_json" | jq -r '.scope // "system"')" = "user" ] && scope_flag="--user"
     systemctl $scope_flag --no-pager -l status "$svc_id" 2>&1 |
@@ -556,7 +556,7 @@ svc_action() {
   svc_id=$(echo "$entry_json" | jq -r '.service // .taskPath // ""')
 
   case "$svc_type" in
-  launchctl)
+  macos-launchctl)
     local scope
     scope=$(echo "$entry_json" | jq -r '.scope // "system"')
     local launchd_domain
@@ -654,7 +654,7 @@ svc_action() {
     disable) $sudo_prefix launchctl disable "$target" >/dev/null 2>&1 ;;
     esac
     ;;
-  systemctl)
+  nixos-systemctl)
     local scope_flag=""
     [ "$(echo "$entry_json" | jq -r '.scope // "system"')" = "user" ] && scope_flag="--user"
 

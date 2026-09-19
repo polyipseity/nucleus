@@ -48,7 +48,7 @@ BeforeAll {
   $Script:MarkerDir = Join-Path (Join-Path $Script:MarkerRoot 'nucleus') 'state\service-stats'
   $env:ProgramData = $Script:MarkerRoot
   $Script:RepoRoot = 'C:\nucleus'
-  $Script:MountEntry = @{ type = 'schtask'; prefixMatch = $true; service = 'NucleusCloudMount-'; taskPath = '\NucleusCloudMount'; scope = 'user' }
+  $Script:MountEntry = @{ type = 'windows-schtask'; prefixMatch = $true; service = 'NucleusCloudMount-'; taskPath = '\NucleusCloudMount'; scope = 'user' }
 }
 
 AfterAll {
@@ -69,7 +69,7 @@ Describe 'Invoke-WatchdogIteration with a prefix-match entry' {
     Mock Get-NucleusPrefixInstanceList { return @() }
     $Script:Services = @(
       @{
-        key = 'cloud-drive'; displayName = 'Cloud Drive Mounts'; type = 'schtask'
+        key = 'cloud-drive'; displayName = 'Cloud Drive Mounts'; type = 'windows-schtask'
         service = 'NucleusCloudMount-'; taskPath = '\NucleusCloudMount'
         prefixMatch = $true; hostEntry = $Script:MountEntry
       }
@@ -145,7 +145,7 @@ Describe 'Invoke-WatchdogIteration with plain entries' {
     Mock Get-NucleusConfiguredInstanceList { return @() }
     Mock Start-ScheduledTask { }
     $Script:Services = @(
-      @{ key = 'ollama'; displayName = 'Ollama'; type = 'native'; service = 'ollama'; prefixMatch = $false; hostEntry = @{ type = 'native'; service = 'ollama' } }
+      @{ key = 'ollama'; displayName = 'Ollama'; type = 'windows-native'; service = 'ollama'; prefixMatch = $false; hostEntry = @{ type = 'windows-native'; service = 'ollama' } }
     )
   }
 

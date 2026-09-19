@@ -49,7 +49,7 @@ Register-Step -Id "service-registry" -Name "Service registry validation" -Action
           $svcErrors++
         }
         $type = $hEntry.type
-        if ($type -notin @('launchctl', 'systemctl', 'native', 'schtask', 'omitted')) {
+        if ($type -notin @('macos-launchctl', 'nixos-systemctl', 'windows-native', 'windows-schtask', 'omitted')) {
           Write-ErrorMessage "services.json: '$svcName' host '$hostName' has invalid type '$type'"
           $svcErrors++
         }
@@ -58,10 +58,10 @@ Register-Step -Id "service-registry" -Name "Service registry validation" -Action
           $svcErrors++
         }
         $hasRequired = switch ($type) {
-          'launchctl' { -not [string]::IsNullOrEmpty($hEntry.service) }
-          'systemctl' { -not [string]::IsNullOrEmpty($hEntry.service) }
-          'native' { -not [string]::IsNullOrEmpty($hEntry.service) }
-          'schtask' { -not [string]::IsNullOrEmpty($hEntry.taskPath) }
+          'macos-launchctl' { -not [string]::IsNullOrEmpty($hEntry.service) }
+          'nixos-systemctl' { -not [string]::IsNullOrEmpty($hEntry.service) }
+          'windows-native' { -not [string]::IsNullOrEmpty($hEntry.service) }
+          'windows-schtask' { -not [string]::IsNullOrEmpty($hEntry.taskPath) }
           'omitted' { -not [string]::IsNullOrEmpty($hEntry.justification) }
           default { $false }
         }
@@ -69,7 +69,7 @@ Register-Step -Id "service-registry" -Name "Service registry validation" -Action
           Write-ErrorMessage "services.json: '$svcName' host '$hostName' missing required fields for type '$type'"
           $svcErrors++
         }
-        if ($type -in @('launchctl', 'systemctl')) {
+        if ($type -in @('macos-launchctl', 'nixos-systemctl')) {
           $scope = $hEntry.scope
           if ($scope -notin @('user', 'system')) {
             Write-ErrorMessage "services.json: '$svcName' host '$hostName' has invalid or missing scope '$scope'"

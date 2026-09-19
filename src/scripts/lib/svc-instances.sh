@@ -45,7 +45,7 @@ svc_instance_entry() {
   local entry="$1" instance="$2"
 
   printf '%s' "$entry" | jq -c --arg id "$instance" '
-    (if .type == "schtask" then . + {taskPath: $id} else . + {service: $id} end)
+    (if .type == "windows-schtask" then . + {taskPath: $id} else . + {service: $id} end)
     | del(.prefixMatch)
   '
 }
@@ -63,7 +63,7 @@ svc_prefix_instances() {
   [ -n "$prefix" ] || return 0
 
   case "$svc_type" in
-  launchctl)
+  macos-launchctl)
     local scope sudo_prefix="" uid
     scope="$(printf '%s' "$entry" | jq -r '.scope // "system"')"
     uid="${REAL_USER_UID:-$(id -u)}"
@@ -75,7 +75,7 @@ svc_prefix_instances() {
       matches="$($sudo_prefix launchctl list 2>/dev/null | awk -v p="$prefix" 'index($3, p) == 1 { print $3 }' || true)" # check-suppress:suppression_doc: no matching instances is an expected empty result, not an error.
     fi
     ;;
-  systemctl)
+  nixos-systemctl)
     local scope_flag=""
     [ "$(printf '%s' "$entry" | jq -r '.scope // "system"')" = "user" ] && scope_flag="--user"
     # check-suppress:suppression_doc: no matching units is an expected empty result, not an error.
@@ -130,13 +130,13 @@ svc_configured_instance_ids() {
   [ -n "$ids" ] || return 0
 
   case "$svc_type" in
-  launchctl)
+  macos-launchctl)
     while IFS= read -r id; do printf '%s%s\n' "$prefix" "$id"; done <<<"$ids"
     ;;
-  systemctl)
+  nixos-systemctl)
     while IFS= read -r id; do printf '%s%s.service\n' "$prefix" "$id"; done <<<"$ids"
     ;;
-  schtask)
+  windows-schtask)
     task_path="${task_path%\\}"
     while IFS= read -r id; do printf '%s\\%s%s\n' "$task_path" "$prefix" "$id"; done <<<"$ids"
     ;;

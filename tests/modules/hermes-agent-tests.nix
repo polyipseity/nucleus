@@ -25,7 +25,7 @@ in
 
     # --- MacBook: launchd user agent ---
     (assert' (
-      hostTypes.MacBook == "launchctl"
+      hostTypes.MacBook == "macos-launchctl"
     ) "MacBook hermes-agent must be launchctl, got ${hostTypes.MacBook or "null"}")
     (assert' (
       hostServices.MacBook == "org.nix-community.home.hermes-agent"
@@ -35,7 +35,7 @@ in
 
     # --- NixOS: systemd user service ---
     (assert' (
-      hostTypes.NixOS == "systemctl"
+      hostTypes.NixOS == "nixos-systemctl"
     ) "NixOS hermes-agent must be systemctl, got ${hostTypes.NixOS or "null"}")
     (assert' (
       hostServices.NixOS == "hermes-agent.service"
@@ -44,7 +44,7 @@ in
 
     # --- Windows: SCM native service ---
     (assert' (
-      hostTypes.Windows == "native"
+      hostTypes.Windows == "windows-native"
     ) "Windows hermes-agent must be native SCM, got ${hostTypes.Windows or "null"}")
     (assert' (
       hostServices.Windows == "hermes-gateway"

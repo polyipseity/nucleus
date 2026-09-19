@@ -158,10 +158,10 @@ function Invoke-WatchdogIteration {
     }
 
     switch ($svc.type) {
-      "native" {
+      "windows-native" {
         Test-NativeService -Key $svc.key -DisplayName $svc.displayName -ServiceName $svc.service
       }
-      "schtask" {
+      "windows-schtask" {
         Test-ScheduledTask -Key $svc.key -DisplayName $svc.displayName -TaskPath $svc.taskPath
       }
       default {

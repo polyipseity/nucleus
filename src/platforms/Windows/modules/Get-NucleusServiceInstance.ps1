@@ -171,7 +171,7 @@ function New-NucleusInstanceHostEntry {
     $entry[$key] = $HostEntry[$key]
   }
 
-  if ($HostEntry.ContainsKey('type') -and $HostEntry.type -eq 'schtask') {
+  if ($HostEntry.ContainsKey('type') -and $HostEntry.type -eq 'windows-schtask') {
     $entry.taskPath = $InstanceId
   } else {
     $entry.service = $InstanceId
@@ -209,7 +209,7 @@ function Get-NucleusPrefixInstanceList {
   if (-not $HostEntry.ContainsKey('type')) {
     throw 'Get-NucleusPrefixInstanceList: host entry has no type'
   }
-  if ($HostEntry.type -ne 'schtask') {
+  if ($HostEntry.type -ne 'windows-schtask') {
     throw "Get-NucleusPrefixInstanceList: unsupported type '$($HostEntry.type)' for a prefix-match entry"
   }
 
@@ -265,7 +265,7 @@ function Get-NucleusConfiguredInstanceList {
     [string]$RepoRoot
   )
 
-  if ($HostEntry.type -ne 'schtask') {
+  if ($HostEntry.type -ne 'windows-schtask') {
     throw "Get-NucleusConfiguredInstanceList: unsupported type '$($HostEntry.type)' for a prefix-match entry"
   }
 

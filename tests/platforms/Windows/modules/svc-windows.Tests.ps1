@@ -29,24 +29,24 @@ BeforeAll {
       displayName = 'Ollama'
       description = 'LLM inference server'
       network     = @{ default = @{ host = '127.0.0.1'; port = 11434; protocol = 'http' } }
-      hostEntry   = @{ type = 'native'; service = 'ollama' }
+      hostEntry   = @{ type = 'windows-native'; service = 'ollama' }
     }
     'sshd' = @{
       displayName = 'SSH Server'
       description = 'Remote shell access via SSH'
       network     = @{ default = @{ host = '0.0.0.0'; port = 22; protocol = 'tcp' } }
-      hostEntry   = @{ type = 'native'; service = 'sshd' }
+      hostEntry   = @{ type = 'windows-native'; service = 'sshd' }
     }
     'cloud-drive' = @{
       displayName = 'Cloud Drive Mounts'
       description = 'rclone FUSE cloud drive mounts'
-      hostEntry   = @{ type = 'schtask'; taskPath = '\NucleusCloudMount'; prefixMatch = $true; service = 'NucleusCloudMount-' }
+      hostEntry   = @{ type = 'windows-schtask'; taskPath = '\NucleusCloudMount'; prefixMatch = $true; service = 'NucleusCloudMount-' }
     }
     'camilladsp' = @{
       displayName = 'CamillaDSP'
       description = 'Audio processor'
       network     = @{ websocket = @{ host = '127.0.0.1'; port = 1234; protocol = 'tcp' } }
-      hostEntry   = @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
+      hostEntry   = @{ type = 'windows-schtask'; taskPath = '\NucleusCamillaDSP' }
     }
   }
 
@@ -56,25 +56,25 @@ BeforeAll {
       displayName = 'Ollama'
       description = 'LLM inference server'
       network     = @{ default = @{ host = '127.0.0.1'; port = 11434; protocol = 'http' } }
-      hosts       = @{ Windows = @{ platform = 'Windows'; type = 'native'; service = 'ollama'; logging = @{ capture = 'all' } } }
+      hosts       = @{ Windows = @{ platform = 'Windows'; type = 'windows-native'; service = 'ollama'; logging = @{ capture = 'all' } } }
       logging     = @{ maxSize = 10000000 }
     }
     'sshd' = @{
       displayName = 'SSH Server'
       description = 'Remote shell access via SSH'
       network     = @{ default = @{ host = '0.0.0.0'; port = 22; protocol = 'tcp' } }
-      hosts       = @{ Windows = @{ platform = 'Windows'; type = 'native'; service = 'sshd' } }
+      hosts       = @{ Windows = @{ platform = 'Windows'; type = 'windows-native'; service = 'sshd' } }
     }
     'cloud-drive' = @{
       displayName = 'Cloud Drive Mounts'
       description = 'rclone FUSE cloud drive mounts'
-      hosts       = @{ Windows = @{ platform = 'Windows'; type = 'schtask'; taskPath = '\NucleusCloudMount'; prefixMatch = $true; service = 'NucleusCloudMount-'; logging = @{ capture = 'stderr'; instanceDirs = @{ user = @('cloud-drive-mount-<instance>') } } } }
+      hosts       = @{ Windows = @{ platform = 'Windows'; type = 'windows-schtask'; taskPath = '\NucleusCloudMount'; prefixMatch = $true; service = 'NucleusCloudMount-'; logging = @{ capture = 'stderr'; instanceDirs = @{ user = @('cloud-drive-mount-<instance>') } } } }
     }
     'camilladsp' = @{
       displayName = 'CamillaDSP'
       description = 'Audio processor'
       network     = @{ websocket = @{ host = '127.0.0.1'; port = 1234; protocol = 'tcp' } }
-      hosts       = @{ Windows = @{ platform = 'Windows'; type = 'schtask'; taskPath = '\NucleusCamillaDSP' } }
+      hosts       = @{ Windows = @{ platform = 'Windows'; type = 'windows-schtask'; taskPath = '\NucleusCamillaDSP' } }
     }
   }
 
@@ -343,7 +343,7 @@ Describe 'Resolve-ServiceName' {
       $resolved[0].registryKey | Should -Be 'cloud-drive'
       $resolved[0].instanceId | Should -Be '\NucleusCloudMount\NucleusCloudMount-work'
       $resolved[0].displayName | Should -Be 'Cloud Drive Mounts (work)'
-      $resolved[0].hostEntry.type | Should -Be 'schtask'
+      $resolved[0].hostEntry.type | Should -Be 'windows-schtask'
       $resolved[0].hostEntry.taskPath | Should -Be '\NucleusCloudMount\NucleusCloudMount-work'
     }
 
@@ -416,7 +416,7 @@ Describe 'New-StatusRow' {
   It 'probes live rows and labels them with the instance id' {
     Mock Get-ServiceStatus { return @{ status = 'active'; running = $true; pid = 42 } }
 
-    $row = New-StatusRow -ResolvedRow @{ registryKey = 'cloud-drive'; displayName = 'Cloud Drive Mounts (work)'; hostEntry = @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work' }; instanceId = '\NucleusCloudMount\NucleusCloudMount-work'; class = 'live' }
+    $row = New-StatusRow -ResolvedRow @{ registryKey = 'cloud-drive'; displayName = 'Cloud Drive Mounts (work)'; hostEntry = @{ type = 'windows-schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work' }; instanceId = '\NucleusCloudMount\NucleusCloudMount-work'; class = 'live' }
     $row.id | Should -Be '\NucleusCloudMount\NucleusCloudMount-work'
     $row.displayName | Should -Be 'Cloud Drive Mounts (work)'
     $row.status | Should -Be 'active'
@@ -438,7 +438,7 @@ Describe 'Get-ServiceStatus' {
         return [PSCustomObject]@{ ProcessId = 12345 }
       }
 
-      $status = Get-ServiceStatus -HostEntry @{ type = 'native'; service = 'ollama' }
+      $status = Get-ServiceStatus -HostEntry @{ type = 'windows-native'; service = 'ollama' }
       $status.status | Should -Be 'active'
       $status.running | Should -Be $true
       $status.enabled | Should -Be $true
@@ -449,7 +449,7 @@ Describe 'Get-ServiceStatus' {
         return [PSCustomObject]@{ Status = 'Stopped'; StartType = 'Manual' }
       }
 
-      $status = Get-ServiceStatus -HostEntry @{ type = 'native'; service = 'sshd' }
+      $status = Get-ServiceStatus -HostEntry @{ type = 'windows-native'; service = 'sshd' }
       $status.status | Should -Be 'inactive'
       $status.running | Should -Be $false
       $status.enabled | Should -Be $false
@@ -458,7 +458,7 @@ Describe 'Get-ServiceStatus' {
     It 'returns not-found when Get-Service throws' {
       Mock Get-Service { throw 'not found' }
 
-      $status = Get-ServiceStatus -HostEntry @{ type = 'native'; service = 'nonexistent' }
+      $status = Get-ServiceStatus -HostEntry @{ type = 'windows-native'; service = 'nonexistent' }
       $status.status | Should -Be 'not-found'
       $status.running | Should -Be $false
     }
@@ -470,7 +470,7 @@ Describe 'Get-ServiceStatus' {
         return [PSCustomObject]@{ State = 'Running' }
       }
 
-      $status = Get-ServiceStatus -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
+      $status = Get-ServiceStatus -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCamillaDSP' }
       $status.status | Should -Be 'active'
       $status.running | Should -Be $true
     }
@@ -480,7 +480,7 @@ Describe 'Get-ServiceStatus' {
         return [PSCustomObject]@{ State = 'Ready' }
       }
 
-      $status = Get-ServiceStatus -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
+      $status = Get-ServiceStatus -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCamillaDSP' }
       $status.status | Should -Be 'inactive'
       $status.running | Should -Be $false
       $status.enabled | Should -Be $true
@@ -491,7 +491,7 @@ Describe 'Get-ServiceStatus' {
         return [PSCustomObject]@{ State = 'Disabled' }
       }
 
-      $status = Get-ServiceStatus -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
+      $status = Get-ServiceStatus -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCamillaDSP' }
       $status.status | Should -Be 'disabled'
       $status.enabled | Should -Be $false
     }
@@ -499,7 +499,7 @@ Describe 'Get-ServiceStatus' {
     It 'returns not-found when Get-ScheduledTask throws' {
       Mock Get-ScheduledTask { throw 'not found' }
 
-      $status = Get-ServiceStatus -HostEntry @{ type = 'schtask'; taskPath = '\Unknown' }
+      $status = Get-ServiceStatus -HostEntry @{ type = 'windows-schtask'; taskPath = '\Unknown' }
       $status.status | Should -Be 'not-found'
     }
   }
@@ -755,7 +755,7 @@ Describe 'Dispatch' {
   Context 'instance resolution' {
     It 'acts on one instance when given its printed id' {
       Mock Resolve-ServiceName {
-        return @(New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (work)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' -Class 'live' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work' })
+        return @(New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (work)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' -Class 'live' -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work' })
       }
       Mock Invoke-ServiceAction { return $true }
 
@@ -767,8 +767,8 @@ Describe 'Dispatch' {
     It 'acts once per live instance when given the registry key' {
       Mock Resolve-ServiceName {
         return @(
-          New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (a)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-a' -Class 'live' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-a' }
-          New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (b)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-b' -Class 'live' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-b' }
+          New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (a)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-a' -Class 'live' -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-a' }
+          New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (b)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-b' -Class 'live' -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-b' }
         )
       }
       Mock Invoke-ServiceAction { return $true }
@@ -780,7 +780,7 @@ Describe 'Dispatch' {
 
     It 'fails an action on a prefix-match key with no live instances' {
       Mock Resolve-ServiceName {
-        return @(New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts' -InstanceId 'cloud-drive' -Class 'pseudo' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount'; prefixMatch = $true; service = 'NucleusCloudMount-' })
+        return @(New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts' -InstanceId 'cloud-drive' -Class 'pseudo' -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCloudMount'; prefixMatch = $true; service = 'NucleusCloudMount-' })
       }
       Mock Invoke-ServiceAction { return $true }
       Mock Write-Error { throw "Write-Error: $Message" }
@@ -822,7 +822,7 @@ Describe 'Dispatch' {
 
     It 'does not fail verify when a prefix-match key has no instances' {
       Mock Resolve-ServiceName {
-        return @(New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts' -InstanceId 'cloud-drive' -Class 'pseudo' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount'; prefixMatch = $true; service = 'NucleusCloudMount-' })
+        return @(New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts' -InstanceId 'cloud-drive' -Class 'pseudo' -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCloudMount'; prefixMatch = $true; service = 'NucleusCloudMount-' })
       }
       Mock Write-NucleusWarning { }
 
@@ -835,7 +835,7 @@ Describe 'Dispatch' {
   Context 'configured rows' {
     It 'fails when the name is an id that is declared but not loaded' {
       Mock Resolve-ServiceName {
-        return @(New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (work)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' -Class 'configured' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work'; configured = $true })
+        return @(New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (work)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' -Class 'configured' -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work'; configured = $true })
       }
       Mock Invoke-ServiceAction { return $true }
       Mock Write-Error { throw "Write-Error: $Message" }
@@ -848,8 +848,8 @@ Describe 'Dispatch' {
     It 'warns instead of failing when the registry key covers a declared but unloaded instance' {
       Mock Resolve-ServiceName {
         return @(
-          New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (a)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-a' -Class 'live' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-a' }
-          New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (work)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' -Class 'configured' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work'; configured = $true }
+          New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (a)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-a' -Class 'live' -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-a' }
+          New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (work)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' -Class 'configured' -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work'; configured = $true }
         )
       }
       Mock Invoke-ServiceAction { return $true }
@@ -863,7 +863,7 @@ Describe 'Dispatch' {
 
     It 'fails verify while a declared instance is not loaded' {
       Mock Resolve-ServiceName {
-        return @(New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (work)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' -Class 'configured' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work'; configured = $true })
+        return @(New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (work)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' -Class 'configured' -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work'; configured = $true })
       }
       Mock Write-NucleusWarning { }
 
@@ -873,7 +873,7 @@ Describe 'Dispatch' {
 
     It 'hints that no logs exist because the instance is not loaded' {
       Mock Resolve-ServiceName {
-        return @(New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (work)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' -Class 'configured' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work'; configured = $true })
+        return @(New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (work)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' -Class 'configured' -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work'; configured = $true })
       }
       Mock Show-ServiceLog { }
 
@@ -887,7 +887,7 @@ Describe 'Dispatch' {
     It 'passes the instance id to the log reader' {
       Mock Resolve-ServiceName {
         return @(
-          New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (work)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' -Class 'live' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work' }
+          New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (work)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' -Class 'live' -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work' }
         )
       }
       Mock Show-ServiceLog { }
@@ -903,7 +903,7 @@ Describe 'Dispatch' {
       Mock Get-ServiceLogFile { return @() }
       Mock Resolve-ServiceName {
         return @(
-          New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (work)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' -Class 'live' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work' }
+          New-TestRow -RegistryKey 'cloud-drive' -DisplayName 'Cloud Drive Mounts (work)' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' -Class 'live' -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCloudMount\NucleusCloudMount-work' }
         )
       }
 
@@ -933,7 +933,7 @@ Describe 'Invoke-ServiceAction' {
     It 'starts a service and returns $true' {
       Mock Start-Service { }
 
-      $result = Invoke-ServiceAction -Action 'start' -HostEntry @{ type = 'native'; service = 'ollama' }
+      $result = Invoke-ServiceAction -Action 'start' -HostEntry @{ type = 'windows-native'; service = 'ollama' }
       $result | Should -Be $true
       Should -Invoke Start-Service -Exactly 1
     }
@@ -941,7 +941,7 @@ Describe 'Invoke-ServiceAction' {
     It 'stops a service and returns $true' {
       Mock Stop-Service { }
 
-      $result = Invoke-ServiceAction -Action 'stop' -HostEntry @{ type = 'native'; service = 'ollama' }
+      $result = Invoke-ServiceAction -Action 'stop' -HostEntry @{ type = 'windows-native'; service = 'ollama' }
       $result | Should -Be $true
       Should -Invoke Stop-Service -Exactly 1
     }
@@ -949,7 +949,7 @@ Describe 'Invoke-ServiceAction' {
     It 'restarts a service and returns $true' {
       Mock Restart-Service { }
 
-      $result = Invoke-ServiceAction -Action 'restart' -HostEntry @{ type = 'native'; service = 'ollama' }
+      $result = Invoke-ServiceAction -Action 'restart' -HostEntry @{ type = 'windows-native'; service = 'ollama' }
       $result | Should -Be $true
       Should -Invoke Restart-Service -Exactly 1
     }
@@ -957,7 +957,7 @@ Describe 'Invoke-ServiceAction' {
     It 'enables a service and returns $true' {
       Mock Set-Service { }
 
-      $result = Invoke-ServiceAction -Action 'enable' -HostEntry @{ type = 'native'; service = 'ollama' }
+      $result = Invoke-ServiceAction -Action 'enable' -HostEntry @{ type = 'windows-native'; service = 'ollama' }
       $result | Should -Be $true
       Should -Invoke Set-Service -Exactly 1 -ParameterFilter { $StartupType -eq 'Automatic' }
     }
@@ -965,7 +965,7 @@ Describe 'Invoke-ServiceAction' {
     It 'disables a service and returns $true' {
       Mock Set-Service { }
 
-      $result = Invoke-ServiceAction -Action 'disable' -HostEntry @{ type = 'native'; service = 'ollama' }
+      $result = Invoke-ServiceAction -Action 'disable' -HostEntry @{ type = 'windows-native'; service = 'ollama' }
       $result | Should -Be $true
       Should -Invoke Set-Service -Exactly 1 -ParameterFilter { $StartupType -eq 'Disabled' }
     }
@@ -978,7 +978,7 @@ Describe 'Invoke-ServiceAction' {
         return [PSCustomObject]@{ ProcessId = 12345 }
       }
 
-      $result = Invoke-ServiceAction -Action 'status' -HostEntry @{ type = 'native'; service = 'ollama' }
+      $result = Invoke-ServiceAction -Action 'status' -HostEntry @{ type = 'windows-native'; service = 'ollama' }
       $result.status | Should -Be 'active'
     }
   }
@@ -987,7 +987,7 @@ Describe 'Invoke-ServiceAction' {
     It 'starts a scheduled task and returns $true' {
       Mock Start-ScheduledTask { }
 
-      $result = Invoke-ServiceAction -Action 'start' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
+      $result = Invoke-ServiceAction -Action 'start' -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCamillaDSP' }
       $result | Should -Be $true
       Should -Invoke Start-ScheduledTask -Exactly 1
     }
@@ -995,7 +995,7 @@ Describe 'Invoke-ServiceAction' {
     It 'stops a scheduled task and returns $true' {
       Mock Stop-ScheduledTask { }
 
-      $result = Invoke-ServiceAction -Action 'stop' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
+      $result = Invoke-ServiceAction -Action 'stop' -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCamillaDSP' }
       $result | Should -Be $true
       Should -Invoke Stop-ScheduledTask -Exactly 1
     }
@@ -1004,7 +1004,7 @@ Describe 'Invoke-ServiceAction' {
       Mock Stop-ScheduledTask { }
       Mock Start-ScheduledTask { }
 
-      $result = Invoke-ServiceAction -Action 'restart' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
+      $result = Invoke-ServiceAction -Action 'restart' -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCamillaDSP' }
       $result | Should -Be $true
       Should -Invoke Stop-ScheduledTask -Exactly 1
       Should -Invoke Start-ScheduledTask -Exactly 1
@@ -1013,7 +1013,7 @@ Describe 'Invoke-ServiceAction' {
     It 'enables a scheduled task and returns $true' {
       Mock Enable-ScheduledTask { }
 
-      $result = Invoke-ServiceAction -Action 'enable' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
+      $result = Invoke-ServiceAction -Action 'enable' -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCamillaDSP' }
       $result | Should -Be $true
       Should -Invoke Enable-ScheduledTask -Exactly 1
     }
@@ -1021,7 +1021,7 @@ Describe 'Invoke-ServiceAction' {
     It 'disables a scheduled task and returns $true' {
       Mock Disable-ScheduledTask { }
 
-      $result = Invoke-ServiceAction -Action 'disable' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
+      $result = Invoke-ServiceAction -Action 'disable' -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCamillaDSP' }
       $result | Should -Be $true
       Should -Invoke Disable-ScheduledTask -Exactly 1
     }

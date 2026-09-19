@@ -32,7 +32,7 @@
         "launchdDomain": "gui",
         "justification": "User agent so TCC grants Accessibility/Screen Recording for BetterDisplay CLI; system daemon cannot access GUI apps.",
         "service": "local.betterdisplay-heartbeat",
-        "type": "launchctl",
+        "type": "macos-launchctl",
         "platform": "macOS"
       },
       "NixOS": {
@@ -71,7 +71,7 @@
         "scope": "system",
         "runAsUser": true,
         "service": "org.nixos.httpsProxy",
-        "type": "launchctl",
+        "type": "macos-launchctl",
         "platform": "macOS"
       },
       "NixOS": {
@@ -81,7 +81,7 @@
       },
       "Windows": {
         "service": "nucleus-caddy",
-        "type": "native",
+        "type": "windows-native",
         "platform": "Windows"
       }
     }
@@ -113,19 +113,19 @@
         "justification": "System-wide audio processor independent of login session",
         "runAsUser": true,
         "service": "local.camilladsp",
-        "type": "launchctl",
+        "type": "macos-launchctl",
         "platform": "macOS"
       },
       "NixOS": {
         "justification": "System-wide audio processor independent of login session",
         "scope": "system",
         "service": "camilladsp.service",
-        "type": "systemctl",
+        "type": "nixos-systemctl",
         "platform": "NixOS"
       },
       "Windows": {
         "taskPath": "\\NucleusCamillaDSP",
-        "type": "schtask",
+        "type": "windows-schtask",
         "platform": "Windows"
       }
     }
@@ -149,19 +149,19 @@
         "justification": "User agent (launchd.agents) so TCC permits reading $HOME/.config/camilladsp/configs/config.yml; a system daemon is blocked from user-home file reads (EPERM).",
         "runAsUser": true,
         "service": "local.camilladsp-heartbeat",
-        "type": "launchctl",
+        "type": "macos-launchctl",
         "platform": "macOS"
       },
       "NixOS": {
         "justification": "User-scoped systemd user service with an internal 5s loop; restarts config after device reconnection. User-scoped because it pushes a per-user config file into ~/.config/camilladsp for a per-user app, matching the macOS launchd agent and the Windows per-user task.",
         "scope": "user",
         "service": "camilladsp-heartbeat.service",
-        "type": "systemctl",
+        "type": "nixos-systemctl",
         "platform": "NixOS"
       },
       "Windows": {
         "taskPath": "\\NucleusCamillaDSPHeartbeat",
-        "type": "schtask",
+        "type": "windows-schtask",
         "platform": "Windows"
       }
     }
@@ -198,19 +198,19 @@
         "justification": "System-wide web GUI daemon independent of login session",
         "runAsUser": true,
         "service": "local.camillagui-backend",
-        "type": "launchctl",
+        "type": "macos-launchctl",
         "platform": "macOS"
       },
       "NixOS": {
         "justification": "System-wide web GUI daemon independent of login session",
         "scope": "system",
         "service": "camillagui-backend.service",
-        "type": "systemctl",
+        "type": "nixos-systemctl",
         "platform": "NixOS"
       },
       "Windows": {
         "taskPath": "\\NucleusCamillaGUI",
-        "type": "schtask",
+        "type": "windows-schtask",
         "platform": "Windows"
       }
     }
@@ -228,7 +228,7 @@
         "justification": "Per-user FUSE mount namespace bound to login session",
         "prefixMatch": true,
         "service": "local.cloud-mount.",
-        "type": "launchctl",
+        "type": "macos-launchctl",
         "platform": "macOS",
         "logging": {
           "instanceDirs": {
@@ -243,7 +243,7 @@
         "prefixMatch": true,
         "scope": "user",
         "service": "cloud-mount-",
-        "type": "systemctl",
+        "type": "nixos-systemctl",
         "platform": "NixOS"
       },
       "Windows": {
@@ -251,7 +251,7 @@
         "prefixMatch": true,
         "service": "NucleusCloudMount-",
         "taskPath": "\\NucleusCloudMount",
-        "type": "schtask",
+        "type": "windows-schtask",
         "platform": "Windows",
         "logging": {
           "instanceDirs": {
@@ -282,19 +282,19 @@
         "launchdDomain": "gui",
         "justification": "Requires GUI session (tray app with NSMenu)",
         "service": "local.discord-music-rpc",
-        "type": "launchctl",
+        "type": "macos-launchctl",
         "platform": "macOS"
       },
       "NixOS": {
         "justification": "Requires GUI session (tray app with NSMenu)",
         "scope": "user",
         "service": "discord-music-rpc.service",
-        "type": "systemctl",
+        "type": "nixos-systemctl",
         "platform": "NixOS"
       },
       "Windows": {
         "taskPath": "\\NucleusDiscordMusicRPC",
-        "type": "schtask",
+        "type": "windows-schtask",
         "platform": "Windows",
         "justification": "Per-user scheduled task running Discord RPC in user session"
       }
@@ -317,20 +317,20 @@
         "scope": "user",
         "launchdDomain": "gui",
         "service": "org.nix-community.home.hermes-agent",
-        "type": "launchctl",
+        "type": "macos-launchctl",
         "platform": "macOS",
         "justification": "User-scoped agent with per-user state, TCC grants, and user-owned sessions/cron."
       },
       "NixOS": {
         "scope": "user",
         "service": "hermes-agent.service",
-        "type": "systemctl",
+        "type": "nixos-systemctl",
         "platform": "NixOS",
         "justification": "User-scoped agent; upstream HM module creates systemd user service."
       },
       "Windows": {
         "service": "hermes-gateway",
-        "type": "native",
+        "type": "windows-native",
         "platform": "Windows",
         "justification": "SCM Windows Service via `hermes gateway install --service-type service`. nucleus runs elevated so SCM install is available. Service name `hermes-gateway` for default HERMES_HOME."
       }
@@ -369,18 +369,18 @@
         "scope": "system",
         "runAsUser": true,
         "service": "org.nixos.jellyfin",
-        "type": "launchctl",
+        "type": "macos-launchctl",
         "platform": "macOS"
       },
       "NixOS": {
         "scope": "system",
         "service": "jellyfin.service",
-        "type": "systemctl",
+        "type": "nixos-systemctl",
         "platform": "NixOS"
       },
       "Windows": {
         "service": "JellyfinServer",
-        "type": "native",
+        "type": "windows-native",
         "platform": "Windows"
       }
     }
@@ -409,7 +409,7 @@
         "onDemand": true,
         "scope": "system",
         "service": "org.nixos.linux-builder",
-        "type": "launchctl",
+        "type": "macos-launchctl",
         "platform": "macOS"
       },
       "NixOS": {
@@ -449,19 +449,19 @@
         "scope": "system",
         "runAsUser": true,
         "service": "local.litellm",
-        "type": "launchctl",
+        "type": "macos-launchctl",
         "platform": "macOS"
       },
       "NixOS": {
         "scope": "system",
         "service": "litellm.service",
-        "type": "systemctl",
+        "type": "nixos-systemctl",
         "platform": "NixOS"
       },
       "Windows": {
         "justification": "Native Windows SCM service runs as SYSTEM; SOPS-decrypted API keys stored in %ProgramData%\\nucleus\\secrets\\ for SYSTEM access.",
         "service": "nucleus-litellm",
-        "type": "native",
+        "type": "windows-native",
         "platform": "Windows"
       }
     }
@@ -484,7 +484,7 @@
         "launchdDomain": "gui",
         "scope": "user",
         "service": "local.nix-index-update",
-        "type": "launchctl",
+        "type": "macos-launchctl",
         "platform": "macOS"
       },
       "NixOS": {
@@ -526,18 +526,18 @@
         "scope": "system",
         "runAsUser": true,
         "service": "local.ollama",
-        "type": "launchctl",
+        "type": "macos-launchctl",
         "platform": "macOS"
       },
       "NixOS": {
         "scope": "system",
         "service": "ollama.service",
-        "type": "systemctl",
+        "type": "nixos-systemctl",
         "platform": "NixOS"
       },
       "Windows": {
         "service": "ollama",
-        "type": "native",
+        "type": "windows-native",
         "platform": "Windows"
       }
     }
@@ -565,18 +565,18 @@
       "MacBook": {
         "scope": "system",
         "service": "local.redis",
-        "type": "launchctl",
+        "type": "macos-launchctl",
         "platform": "macOS"
       },
       "NixOS": {
         "scope": "system",
         "service": "nucleus-redis.service",
-        "type": "systemctl",
+        "type": "nixos-systemctl",
         "platform": "NixOS"
       },
       "Windows": {
         "service": "nucleus-redis",
-        "type": "native",
+        "type": "windows-native",
         "platform": "Windows"
       }
     }
@@ -610,7 +610,7 @@
       },
       "Windows": {
         "service": "TermService",
-        "type": "native",
+        "type": "windows-native",
         "platform": "Windows"
       }
     }
@@ -631,18 +631,18 @@
       "MacBook": {
         "scope": "system",
         "service": "local.service-watchdog",
-        "type": "launchctl",
+        "type": "macos-launchctl",
         "platform": "macOS"
       },
       "NixOS": {
         "scope": "system",
         "service": "nucleus-service-watchdog.service",
-        "type": "systemctl",
+        "type": "nixos-systemctl",
         "platform": "NixOS"
       },
       "Windows": {
         "taskPath": "\\nucleus\\service-watchdog",
-        "type": "schtask",
+        "type": "windows-schtask",
         "platform": "Windows"
       }
     }
@@ -665,14 +665,14 @@
         "launchdDomain": "gui",
         "justification": "User-scope watchdog monitors user-scope launchd agents; must run in user context to access user-scope services.",
         "service": "local.service-watchdog-user",
-        "type": "launchctl",
+        "type": "macos-launchctl",
         "platform": "macOS"
       },
       "NixOS": {
         "scope": "user",
         "justification": "Stuck user-scope services live in the user's own systemd manager; the root system watchdog has no user manager to query, so covering them requires a user-session unit.",
         "service": "nucleus-service-watchdog-user.service",
-        "type": "systemctl",
+        "type": "nixos-systemctl",
         "platform": "NixOS"
       },
       "Windows": {
@@ -697,20 +697,20 @@
         "launchdDomain": "gui",
         "justification": "User key material in per-user ssh-agent process",
         "service": "com.openssh.ssh-agent",
-        "type": "launchctl",
+        "type": "macos-launchctl",
         "platform": "macOS"
       },
       "NixOS": {
         "justification": "Standalone OpenSSH ssh-agent via programs.ssh.startAgent; user-scoped to isolate key material per login session.",
         "scope": "user",
         "service": "ssh-agent.service",
-        "type": "systemctl",
+        "type": "nixos-systemctl",
         "platform": "NixOS"
       },
       "Windows": {
         "justification": "Runs as SYSTEM SCM service; per-user isolation handled by OpenSSH's per-user ssh-agent.exe spawned on demand.",
         "service": "ssh-agent",
-        "type": "native",
+        "type": "windows-native",
         "platform": "Windows"
       }
     }
@@ -736,18 +736,18 @@
         "scope": "system",
         "service": "com.openssh.sshd",
         "socketActivated": true,
-        "type": "launchctl",
+        "type": "macos-launchctl",
         "platform": "macOS"
       },
       "NixOS": {
         "scope": "system",
         "service": "sshd.service",
-        "type": "systemctl",
+        "type": "nixos-systemctl",
         "platform": "NixOS"
       },
       "Windows": {
         "service": "sshd",
-        "type": "native",
+        "type": "windows-native",
         "platform": "Windows"
       }
     }
