@@ -37,6 +37,11 @@ $script:Defaults = @{
     enable = $true
     heartbeat = $true
   }
+  'harness-notify' = @{
+    enable = $true
+    channels = @('telegram')
+    'max-chars' = 1200
+  }
 }
 
 function New-ConfigDir {
