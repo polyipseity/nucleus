@@ -14,7 +14,6 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/test-lib.sh"
 
 APPROVAL="$SCRIPT_DIR/../../src/scripts/notify/harness-approval.sh"
-CURSOR_GATE="$SCRIPT_DIR/../../src/users/default/cursor/hooks/approve-shell.sh"
 
 require_command mktemp "temporary directories for the recording stub"
 require_command find "locating the harness-bridge state directory"
@@ -75,6 +74,21 @@ wait_for_request() {
   return 1
 }
 
+wait_for_announcement() {
+  # The request file is written before the notification is sent, so a reader
+  # that looks at the stub log right after wait_for_request can beat the sender.
+  local _i=0
+  while [ "$_i" -lt 40 ]; do
+    if [ -s "$HARNESS_APPROVAL_LOG" ]; then
+      cat "$HARNESS_APPROVAL_LOG"
+      return 0
+    fi
+    sleep 0.25
+    _i=$((_i + 1))
+  done
+  return 1
+}
+
 answer_request() {
   # Args: <request-file> <decision>
   local _request="$1" _decision="$2"
@@ -92,53 +106,89 @@ wait_for_decision() {
   approval_out="$(cat "$TMPDIR_ROOT/out")"
 }
 
-run_cursor_gate() {
-  # Args: <stdin-payload>  — PATH holds only the stub harness-approval plus the
-  # real tools the script needs (jq, cat, printf).
-  printf '%s' "$1" | PATH="$TMPDIR_ROOT/gate-bin:$PATH" bash "$CURSOR_GATE"
+start_approval_hook() {
+  # Args: <timeout-seconds> <harness> <payload>
+  printf '%s' "$3" >"$TMPDIR_ROOT/hook-payload"
+  HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" \
+    bash "$APPROVAL" hook "$2" <"$TMPDIR_ROOT/hook-payload" \
+    >"$TMPDIR_ROOT/out" 2>"$TMPDIR_ROOT/err" &
+  approval_pid=$!
 }
 
-test_cursor_gate_forwards_allow() {
-  mkdir -p "$TMPDIR_ROOT/gate-bin"
-  cat >"$TMPDIR_ROOT/gate-bin/harness-approval" <<'STUB'
-#!/usr/bin/env bash
-printf 'allow\n'
-STUB
-  chmod +x "$TMPDIR_ROOT/gate-bin/harness-approval"
+test_hook_mode_renders_cursor_json() {
+  write_config '{"harness-notify":{"enable":false}}'
+  local _rc=0
   local _out=""
-  _out="$(run_cursor_gate '{"command":"git push --force","cwd":"/tmp"}')" || true
-  if [ "$_out" = '{"permission":"allow"}' ]; then
-    assert_pass "beforeShellExecution gate forwards an allow decision"
+  _out="$(printf '%s' '{"command":"git push --force"}' | HOME="$TMPDIR_ROOT/home" \
+    PATH="$TMPDIR_ROOT/bin:$PATH" bash "$APPROVAL" hook cursor)" || _rc=$?
+  if [ "$_rc" -eq 0 ] && [ "$_out" = '{"permission":"ask"}' ]; then
+    assert_pass "hook mode answers Cursor with Cursor's own document"
   else
-    assert_fail "cursor-allow" "out=$_out"
+    assert_fail "hook-cursor" "rc=$_rc out=$_out"
   fi
 }
 
-test_cursor_gate_fails_open_to_ask() {
-  mkdir -p "$TMPDIR_ROOT/gate-bin"
-  rm -f "$TMPDIR_ROOT/gate-bin/harness-approval"
+test_hook_mode_renders_copilot_json() {
+  write_config '{"harness-notify":{"enable":false}}'
+  local _rc=0
   local _out=""
-  _out="$(run_cursor_gate '{"command":"ls"}')" || true
-  if [ "$_out" = '{"permission":"ask"}' ]; then
-    assert_pass "a missing broker answers ask, never allow"
+  _out="$(printf '%s' '{"tool_name":"runInTerminal","tool_input":{"command":"rm -rf /"}}' |
+    HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" bash "$APPROVAL" hook copilot)" || _rc=$?
+  if [ "$_rc" -eq 0 ] &&
+    grep -qF '"hookEventName":"PreToolUse"' <<<"$_out" &&
+    grep -qF '"permissionDecision":"ask"' <<<"$_out"; then
+    assert_pass "hook mode answers Copilot with a PreToolUse decision document"
   else
-    assert_fail "cursor-missing-broker" "out=$_out"
+    assert_fail "hook-copilot" "rc=$_rc out=$_out"
   fi
 }
 
-test_cursor_gate_asks_when_payload_has_no_command() {
-  mkdir -p "$TMPDIR_ROOT/gate-bin"
-  cat >"$TMPDIR_ROOT/gate-bin/harness-approval" <<'STUB'
-#!/usr/bin/env bash
-printf 'deny\n'
-STUB
-  chmod +x "$TMPDIR_ROOT/gate-bin/harness-approval"
+test_hook_mode_asks_plainly_for_unknown_harness() {
+  write_config '{"harness-notify":{"enable":false}}'
+  local _rc=0
   local _out=""
-  _out="$(run_cursor_gate '{"unexpected":"shape"}')" || true
-  if [ "$_out" = '{"permission":"ask"}' ]; then
-    assert_pass "an unrecognised payload shape asks instead of denying"
+  _out="$(printf '%s' '{}' | HOME="$TMPDIR_ROOT/home" \
+    PATH="$TMPDIR_ROOT/bin:$PATH" bash "$APPROVAL" hook opencode)" || _rc=$?
+  if [ "$_rc" -eq 0 ] && [ "$_out" = 'ask' ]; then
+    assert_pass "hook mode falls back to the plain decision for other harnesses"
   else
-    assert_fail "cursor-unknown-payload" "out=$_out"
+    assert_fail "hook-plain" "rc=$_rc out=$_out"
+  fi
+}
+
+test_hook_mode_brokers_the_payload_command() {
+  write_config '{"harness-notify":{"channels":["telegram"]}}'
+  : >"$HARNESS_APPROVAL_LOG"
+  start_approval_hook 30 cursor '{"command":"git push --force","cwd":"/tmp"}'
+  local _request
+  if ! _request="$(wait_for_request)"; then
+    kill "$approval_pid" 2>/dev/null
+    approval_pid=""
+    assert_fail "hook-broker" "no request file appeared"
+    return
+  fi
+  local _announced
+  _announced="$(wait_for_announcement || true)"
+  answer_request "$_request" allow
+  wait_for_decision
+  if [ "$approval_rc" -eq 0 ] && [ "$approval_out" = '{"permission":"allow"}' ] &&
+    grep -qF 'git push --force' <<<"$_announced"; then
+    assert_pass "hook mode brokers the payload command and renders a remote allow"
+  else
+    assert_fail "hook-broker" "rc=$approval_rc out=$approval_out log=$_announced"
+  fi
+}
+
+test_audit_log_records_the_decision() {
+  write_config '{"harness-notify":{"enable":false}}'
+  printf '%s' '{"tool_name":"bash","tool_input":"rm -rf build"}' |
+    HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" bash "$APPROVAL" hook copilot >/dev/null
+  local _log
+  _log="$(find "$TMPDIR_ROOT/home" -name harness-bridge.log -print -quit 2>/dev/null)"
+  if [ -n "$_log" ] && grep -qF 'copilot' "$_log" && grep -qF 'ask' "$_log"; then
+    assert_pass "every hook decision is recorded in the audit log"
+  else
+    assert_fail "audit" "log=$_log"
   fi
 }
 
@@ -237,7 +287,7 @@ test_request_is_announced() {
   local _id
   _id="$(basename "$_request" .json)"
   local _log
-  _log="$(cat "$HARNESS_APPROVAL_LOG")"
+  _log="$(wait_for_announcement || true)"
   answer_request "$_request" deny
   wait_for_decision
   if grep -qF 'approval needed' <<<"$_log" &&
@@ -279,8 +329,10 @@ test_disabled_bridge_asks_without_request
 test_missing_arguments_asks
 test_request_is_announced
 test_request_file_carries_the_action
-test_cursor_gate_forwards_allow
-test_cursor_gate_fails_open_to_ask
-test_cursor_gate_asks_when_payload_has_no_command
+test_hook_mode_renders_cursor_json
+test_hook_mode_renders_copilot_json
+test_hook_mode_asks_plainly_for_unknown_harness
+test_hook_mode_brokers_the_payload_command
+test_audit_log_records_the_decision
 
 finish_tests
