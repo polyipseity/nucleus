@@ -68,10 +68,10 @@ let
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 
   # Harness notification entry point.  Every provisioned coding harness
-  # (pi, opencode, Cursor, Copilot Chat, Copilot CLI) calls this one command
-  # from its hook configuration, so formatting, channel selection and failure
-  # handling live in a single script.  Deployed to ~/.local/bin (already on the
-  # managed PATH, including the GUI-session launchctl path) because the hook
+  # (pi, opencode, Cursor, VS Code Copilot Chat) calls this one command from its
+  # hook configuration, so formatting, channel selection and failure handling
+  # live in a single script.  Deployed to ~/.local/bin (already on the managed
+  # PATH, including the GUI-session launchctl path) because the hook
   # configuration is a symlink into this repository: embedding the store path
   # there would dirty the repo on every rebuild.
   harnessNotify = pkgs.writeNucleusShellApplication {

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Normalizes a coding-harness lifecycle event into a Hermes notification.
 #
-# Every provisioned harness (pi, opencode, Cursor, VS Code Copilot Chat, Copilot
-# CLI) funnels its hook payload through this single entry point so message
-# formatting, channel selection and failure handling have one definition.
+# Every provisioned harness (pi, opencode, Cursor, VS Code Copilot Chat) funnels
+# its hook payload through this single entry point so message formatting, channel
+# selection and failure handling have one definition.
 #
 # Delivery goes through `hermes send`, which reuses the platform credentials and
 # channel configuration the Hermes gateway already owns (~/.hermes/.env and
@@ -12,7 +12,7 @@
 # platforms.
 #
 # Usage: harness-notify <harness> <event> [text]
-#   harness  pi | opencode | cursor | copilot | copilot-cli | vscode
+#   harness  pi | opencode | cursor | copilot
 #   event    done | needs-input | approval | error
 #   text     Optional body.  When omitted, stdin is read: raw text, or a hook
 #            JSON object from which a message field is extracted.
