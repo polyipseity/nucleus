@@ -18,7 +18,7 @@ _COMPLETIONS_DIR="src/modules/completions/zsh"
 # The canonical nucleus-* command set (alphabetical) — must match the generator.
 # Subcommands are covered by their parent completion files, not as standalone
 # commands: check packer/sh/pwsh, gc cleanup-nix/preferences, apply
-# health-check/audit-store, cloud setup/reset/sync, update lockfile.
+# health-check/audit-store, cloud setup/reset/sync/repair, update lockfile.
 _NUCLEUS_COMMANDS=(ai apply bootstrap check cloud config gc utils svc test update vm)
 
 # 1. --help exits 0 and prints a usage: line.
@@ -112,7 +112,7 @@ fi
 # 9. Merged subcommand coverage: parent completion files enumerate their
 #    subcommands after the command-surface merge (check packer/sh/pwsh,
 #    gc cleanup-nix/preferences, apply health-check/audit-store, cloud
-#    setup/reset/sync, update lockfile).
+#    setup/reset/sync/repair, update lockfile).
 _sub_ok=1
 for _s in packer sh pwsh; do
   grep -qw -- "$_s" "$_COMPLETIONS_DIR/_nucleus-check" || {
@@ -132,7 +132,7 @@ for _s in health-check audit-store; do
     _sub_ok=0
   }
 done
-for _s in setup reset sync; do
+for _s in setup reset sync repair; do
   grep -qw -- "$_s" "$_COMPLETIONS_DIR/_nucleus-cloud" || {
     assert_fail "gen-completions: subcommand" "cloud missing $_s"
     _sub_ok=0
