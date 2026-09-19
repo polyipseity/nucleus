@@ -60,9 +60,7 @@
 				<dict>
 					<key>COMMAND_STRING</key>
 					<string>export PATH="/etc/profiles/per-user/$USER/bin:$PATH"
-for f in "$@"; do
-    nucleus-utils strip-metadata "$f"
-done
+nucleus-utils strip-metadata --dialog "$@"
 </string>
 					<key>CheckedForUserDefaultShell</key>
 					<true/>
