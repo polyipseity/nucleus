@@ -115,6 +115,7 @@ For every JSON/YAML file in scope (except exceptions):
   */users/*/rimsort/*.json, */configs/camilladsp/*, */configs/camillagui-backend/*,
   */users/*/discord-music-rpc/*, */users/*/agents/hooks/*.json,
   */users/*/agents/skills/*/_meta.json, */configs/litellm/*,
+  */users/*/hermes/plugins/*/plugin.yaml,
   */users/*/vscode/mcp.json, */users/*/vscode/chatLanguageModels*.json, */.sops.yaml
   Infrastructure: */vendor/*, */secrets/*, */.github/*
   Registered in allow-and-deny-lists.instructions.md.

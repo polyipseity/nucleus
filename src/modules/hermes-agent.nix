@@ -14,11 +14,19 @@
   pkgs,
   hostName,
   hermes-agent,
+  repoRoot,
   ...
 }:
 let
   sopsUtils = import ./lib/sops-utils.nix;
   inherit (sopsUtils) parseSopsKeys missingSopsKeys;
+
+  # Per-user overlay resolver, so the bridge plugin is selected through the same
+  # user-overridable contract as every other per-user tree.
+  overlay = (import ./lib/users-overlay.nix { inherit lib; }).mkUserOverlay {
+    effectiveUsername = config.home.username;
+    inherit repoRoot hostName;
+  };
 
   # Shared activation-script bundle (same derivation every activation block uses).
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
@@ -196,6 +204,13 @@ in
     # file to appear and never for non-emptiness.
     environmentFiles = lib.mkIf (hermesSecrets != [ ]) [ hermesEnvTemplatePath ];
 
+    # Declarative plugin enablement. Hermes gates every user-installed plugin on
+    # `plugins.enabled`, and `settings` is written to config.yaml (deep-merged
+    # with runtime edits) while the command line is installed — independent of
+    # whether this host runs the gateway service. The bridge plugin itself is
+    # symlinked into ~/.hermes/plugins/ by the activation below.
+    settings.plugins.enabled = [ "harness-bridge" ];
+
     # WHY: upstream's default package is `full`, which includes the `voice`
     # group (faster-whisper -> ctranslate2/onnxruntime/torch/transformers).
     # Those build from source for 30-80 min each on aarch64-darwin with no
@@ -208,6 +223,19 @@ in
     # depending on the platform upstream evaluated for.
     extraDependencyGroups = lib.remove "voice" upstreamFullDependencyGroups;
   };
+
+  # ── Harness bridge plugin ───────────────────────────────────────────
+  # Method-1 writable symlink into the live repo tree, so the plugin can be
+  # edited without a rebuild. `settings.plugins.enabled` above is what makes
+  # Hermes load it.
+  home.activation.seed-hermes-harness-bridge-plugin = lib.mkIf config.programs.hermes-agent.enable (
+    lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+        "$HOME/.hermes/plugins/harness-bridge" \
+        "${overlay.toRepoRelPath (overlay.selectFile "hermes" "plugins/harness-bridge")}" \
+        "${hostName}"
+    ''
+  );
 
   # ── Logging: symlink launchd logs into nucleus log directory ───────────
   # WHY: the upstream launchd plist hardcodes StandardOutPath/StandardErrorPath

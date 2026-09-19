@@ -1,0 +1,4 @@
+name: harness-bridge
+version: 1.0.0
+description: "Remote control for provisioned coding harnesses (pi, opencode, Cursor, Copilot): approve or deny pending tool requests and queue prompts for a harness session from any configured messaging platform."
+author: nucleus

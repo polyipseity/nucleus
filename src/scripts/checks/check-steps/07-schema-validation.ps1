@@ -22,6 +22,7 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Act
       $f -like '*users\*\agents\hooks\*.json' -or $f -like '*users/*/agents/hooks/*.json' -or
       $f -like '*users\*\agents\skills\*\_meta.json' -or $f -like '*users/*/agents/skills/*/_meta.json' -or
       $f -like '*configs\litellm\*' -or $f -like '*configs/litellm/*' -or
+      $f -like '*users\*\hermes\plugins\*\plugin.yaml' -or $f -like '*users/*/hermes/plugins/*/plugin.yaml' -or
       $f -like '*users\*\vscode\mcp.json' -or $f -like '*users/*/vscode/mcp.json' -or
       $f -like '*users\*\vscode\chatLanguageModels*.json' -or $f -like '*users/*/vscode/chatLanguageModels*.json' -or
       $f -like '*\.sops.yaml' -or $f -like '*/.sops.yaml' -or
