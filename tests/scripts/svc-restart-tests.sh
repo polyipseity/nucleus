@@ -262,4 +262,220 @@ for _site in scripts/svc.sh src/scripts/services/service-watchdog.sh src/scripts
   fi
 done
 
+section 5 "A reload waits for the cloud mount to be released"
+
+# assert_count <slug> <expected> <actual>; assert_mentions <slug> <haystack> <needle>
+# WHY: this suite asserts through assert_rc/contains, so the CLI section uses the
+# same helpers rather than introducing a second assertion style.
+assert_count() { # <slug> <expected> <actual>
+  if [ "$2" = "$3" ]; then
+    assert_pass "$1"
+  else
+    assert_fail "$1" "expected $2, got $3"
+  fi
+}
+
+assert_mentions() { # <slug> <haystack> <needle>
+  if contains "$2" "$3"; then
+    assert_pass "$1"
+  else
+    assert_fail "$1" "expected output to mention '$3', got: $2"
+  fi
+}
+
+# WHY: the ordering under test lives inside scripts/svc.sh (stop the mount, wait
+# until the volume left the mount table, only then bootout+bootstrap), so the
+# contract is exercised through the CLI: a stub registry, the shared user-registry
+# fixture, and fakes that append every call to ONE timeline, which is what makes
+# the order of a mount probe and a bootstrap observable.
+_cli="$_tmp/cli"
+mkdir -p "$_cli/repo/src/modules" "$_cli/bin" "$_cli/home" "$_cli/log"
+ln -sfn "$REPO_ROOT/tests/fixtures/user-registry/src/users" "$_cli/repo/src/users"
+cat >"$_cli/repo/src/modules/services.json" <<JSON
+{
+  "\$logging": { "MacBook": { "logDir": "$_cli/log", "systemLogDir": "$_cli/syslog" } },
+  "cloud-drive": {
+    "displayName": "Cloud Drive Mounts",
+    "hosts": {
+      "MacBook": {
+        "type": "macos-launchctl",
+        "prefixMatch": true,
+        "service": "local.cloud-mount.",
+        "scope": "user",
+        "launchdDomain": "gui"
+      }
+    }
+  },
+  "plain-service": {
+    "displayName": "Plain Service",
+    "hosts": {
+      "MacBook": {
+        "type": "macos-launchctl",
+        "service": "local.plain",
+        "scope": "user",
+        "launchdDomain": "gui"
+      }
+    }
+  }
+}
+JSON
+
+FAKE_TIMELINE="$_cli/timeline.log"
+FAKE_CLI_STATE="$_cli/job.state"
+FAKE_MOUNT_CALLS="$_cli/mount.calls"
+export FAKE_TIMELINE FAKE_CLI_STATE FAKE_MOUNT_CALLS
+
+cat >"$_cli/bin/launchctl" <<'FAKE'
+#!/usr/bin/env bash
+_state="$(cat "${FAKE_CLI_STATE:?}" 2>/dev/null || printf 'stopped\n')"
+case "${1:-}" in
+list)
+  printf 'PID\tStatus\tLabel\n'
+  for _label in ${FAKE_LIVE:-}; do printf '4242\t0\t%s\n' "$_label"; done
+  ;;
+print)
+  case "$_state" in
+  running)
+    printf 'state = running\n\tpid = 4242\n'
+    ;;
+  absent)
+    printf 'Could not find service\n' >&2
+    exit 113
+    ;;
+  *)
+    printf 'state = not running\n\tlast exit code = 0\n'
+    ;;
+  esac
+  ;;
+kill)
+  printf 'kill %s\n' "${*: -1}" >>"${FAKE_TIMELINE:?}"
+  [ "${FAKE_KILL_FAIL:-}" = 1 ] && exit 1
+  printf 'stopped\n' >"$FAKE_CLI_STATE"
+  ;;
+bootout)
+  printf 'bootout %s\n' "${*: -1}" >>"${FAKE_TIMELINE:?}"
+  printf 'absent\n' >"$FAKE_CLI_STATE"
+  ;;
+bootstrap)
+  printf 'bootstrap %s\n' "${*: -1}" >>"${FAKE_TIMELINE:?}"
+  printf 'running\n' >"$FAKE_CLI_STATE"
+  ;;
+enable | disable | start | kickstart)
+  printf '%s %s\n' "$1" "${*: -1}" >>"${FAKE_TIMELINE:?}"
+  ;;
+esac
+exit 0
+FAKE
+
+# The mount table: FAKE_MOUNT_RELEASE_AFTER makes it stop listing the path after
+# that many probes, which is the shape of a volume that finishes unmounting.
+cat >"$_cli/bin/mount" <<'FAKE'
+#!/usr/bin/env bash
+_outcome="${FAKE_MOUNT_TABLE:-}"
+if [ -n "${FAKE_MOUNT_RELEASE_AFTER:-}" ] && [ -n "$_outcome" ]; then
+  _calls=0
+  [ -f "${FAKE_MOUNT_CALLS:?}" ] && _calls="$(cat "$FAKE_MOUNT_CALLS")"
+  _calls=$((_calls + 1))
+  printf '%s' "$_calls" >"$FAKE_MOUNT_CALLS"
+  [ "$_calls" -gt "$FAKE_MOUNT_RELEASE_AFTER" ] && _outcome=""
+fi
+printf 'mount: %s\n' "${_outcome:-released}" >>"${FAKE_TIMELINE:?}"
+if [ -n "$_outcome" ]; then printf '%s\n' "$_outcome"; fi
+exit 0
+FAKE
+
+# Instant: the release wait polls on sleep, so its 30 s bound must not become
+# 30 s of wall clock in this suite.
+cat >"$_cli/bin/sleep" <<'FAKE'
+#!/usr/bin/env bash
+exit 0
+FAKE
+chmod +x "$_cli/bin/launchctl" "$_cli/bin/mount" "$_cli/bin/sleep"
+
+# run_cli — Run the CLI against the stub registry with the fakes on PATH.
+run_cli() { # <svc.sh args...>
+  env NUCLEUS_HOST=MacBook \
+    NUCLEUS_REPO_ROOT="$_cli/repo" \
+    NUCLEUS_SERVICES_JSON="$_cli/repo/src/modules/services.json" \
+    HOME="$_cli/home" \
+    NUCLEUS_LOG_DIR="$_cli/log" \
+    SUDO_USER=test-user \
+    PATH="$_cli/bin:$_tmp/bin:$PATH" \
+    FAKE_LIVE="${FAKE_LIVE:-}" \
+    FAKE_MOUNT_TABLE="${FAKE_MOUNT_TABLE:-}" \
+    FAKE_MOUNT_RELEASE_AFTER="${FAKE_MOUNT_RELEASE_AFTER:-}" \
+    FAKE_KILL_FAIL="${FAKE_KILL_FAIL:-}" \
+    bash "$REPO_ROOT/scripts/svc.sh" "$@"
+}
+
+reset_cli() { # <job state> <mount table> <release after>
+  printf '%s\n' "$1" >"$FAKE_CLI_STATE"
+  FAKE_MOUNT_TABLE="$2"
+  FAKE_MOUNT_RELEASE_AFTER="$3"
+  : >"$FAKE_TIMELINE"
+  : >"$FAKE_MOUNT_CALLS"
+  captured_status=0
+  captured_output="$(run_cli "${@:4}" 2>&1)" || captured_status=$?
+}
+
+# timeline_index — First line number of a timeline entry (0 when absent).
+timeline_index() { # <substring>
+  awk -v pat="$1" 'index($0, pat) { print NR; exit } END { if (NR == 0) print 0 }' "$FAKE_TIMELINE"
+}
+
+_cli_mount="fake://vol on $_cli/home/clouds/iCloud (fake, nodev)"
+FAKE_LIVE="local.cloud-mount.iCloud"
+
+reset_cli stopped "$_cli_mount" 2 restart local.cloud-mount.iCloud
+assert_count "restarting a cloud mount exits 0" 0 "$captured_status"
+assert_count "the reload bootstraps the instance once" 1 "$(grep -c '^bootstrap' "$FAKE_TIMELINE")"
+_released="$(timeline_index 'mount: released')"
+_bootstrap="$(timeline_index 'bootstrap')"
+if [ "$_released" -gt 0 ] && [ "$_bootstrap" -gt "$_released" ]; then
+  assert_pass "the reload starts only after the volume left the mount table"
+else
+  assert_fail "svc-reload-waits-for-mount" \
+    "released=$_released bootstrap=$_bootstrap timeline=[$(tr '\n' ';' <"$FAKE_TIMELINE")]"
+fi
+_kill="$(timeline_index 'kill')"
+if [ "$_kill" -gt 0 ] && [ "$_released" -gt "$_kill" ]; then
+  assert_pass "the volume is released after the mount is stopped"
+else
+  assert_fail "svc-stop-before-release-wait" \
+    "kill=$_kill released=$_released timeline=[$(tr '\n' ';' <"$FAKE_TIMELINE")]"
+fi
+
+section 6 "A mount that never releases blocks the reload"
+
+reset_cli running "$_cli_mount" "" restart local.cloud-mount.iCloud
+assert_count "a mount that never releases fails the restart" 1 "$captured_status"
+assert_mentions "the stale volume is reported" "$captured_output" "still mounted"
+assert_count "a stale volume is never reloaded over" 0 "$(grep -c '^bootstrap' "$FAKE_TIMELINE")"
+
+section 7 "Stop waits for release; an ordinary service never probes the table"
+
+reset_cli running "$_cli_mount" 1 stop local.cloud-mount.iCloud
+assert_count "stopping a cloud mount exits 0" 0 "$captured_status"
+assert_count "stopping a cloud mount kills the job" 1 "$(grep -c '^kill' "$FAKE_TIMELINE")"
+assert_count "stopping a cloud mount never bootstraps" 0 "$(grep -c '^bootstrap' "$FAKE_TIMELINE")"
+if [ "$(timeline_index 'mount: released')" -gt 0 ]; then
+  assert_pass "stopping waits for the volume to be released"
+else
+  assert_fail "svc-stop-waits-for-mount" "timeline=[$(tr '\n' ';' <"$FAKE_TIMELINE")]"
+fi
+
+FAKE_KILL_FAIL=1
+reset_cli running "$_cli_mount" 1 stop local.cloud-mount.iCloud
+assert_count "a stop whose mount kill failed still reports the failure" 1 "$captured_status"
+if [ "$(timeline_index 'mount: released')" -gt 0 ]; then
+  assert_pass "the failed stop still waited for the volume to be released"
+else
+  assert_fail "svc-stop-failure-still-waits" "timeline=[$(tr '\n' ';' <"$FAKE_TIMELINE")]"
+fi
+FAKE_KILL_FAIL=
+
+reset_cli running "$_cli_mount" "" stop plain-service
+assert_count "stopping an ordinary service exits 0" 0 "$captured_status"
+assert_count "an ordinary service never probes the mount table" 0 "$(grep -c '^mount:' "$FAKE_TIMELINE")"
+
 finish_tests

@@ -5,10 +5,14 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+readonly SCRIPT_DIR REPO_ROOT
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
+# shellcheck source=../../src/scripts/lib/lib.sh
+. "$REPO_ROOT/src/scripts/lib/lib.sh"
 # shellcheck source=../../src/scripts/lib/svc-instances.sh
-. "$SCRIPT_DIR/../../src/scripts/lib/svc-instances.sh"
+. "$REPO_ROOT/src/scripts/lib/svc-instances.sh"
 
 require_command jq "svc-instances tests parse registry JSON with jq"
 
@@ -42,9 +46,35 @@ for _arg in "$@"; do
 done
 exit 1
 FAKE_SYSTEMCTL
-chmod +x "$_tmp/bin/launchctl" "$_tmp/bin/systemctl"
+# --- Fake mount table --------------------------------------------------------
+# The mount probes read the table through `mount`, so a fake one makes the
+# assertions describe the table contract instead of whatever this host mounts.
+#   FAKE_MOUNT_TABLE — the table the probe reports.
+#   FAKE_MOUNT_SLOW  — sleep this long first: a probe that outlives its bound,
+#                      which is how a hung volume blocks inside the kernel.
+#   FAKE_MOUNT_UNTIL — report the table for this many calls, then report
+#                      nothing: a volume that finishes unmounting while it is
+#                      being waited on.
+cat >"$_tmp/bin/mount" <<'FAKE_MOUNT'
+#!/usr/bin/env bash
+if [ -n "${FAKE_MOUNT_UNTIL:-}" ]; then
+  calls=0
+  [ -f "${FAKE_MOUNT_CALLS:?}" ] && calls="$(cat "$FAKE_MOUNT_CALLS")"
+  calls=$((calls + 1))
+  printf '%s' "$calls" >"$FAKE_MOUNT_CALLS"
+  [ "$calls" -gt "$FAKE_MOUNT_UNTIL" ] && exit 0
+fi
+[ -n "${FAKE_MOUNT_SLOW:-}" ] && sleep "$FAKE_MOUNT_SLOW"
+printf '%s\n' "${FAKE_MOUNT_TABLE:-}"
+FAKE_MOUNT
+chmod +x "$_tmp/bin/launchctl" "$_tmp/bin/systemctl" "$_tmp/bin/mount"
 PATH="$_tmp/bin:$PATH"
 export PATH
+FAKE_MOUNT_TABLE=""
+FAKE_MOUNT_SLOW=""
+FAKE_MOUNT_UNTIL=""
+FAKE_MOUNT_CALLS="$_tmp/mount.calls"
+export FAKE_MOUNT_TABLE FAKE_MOUNT_SLOW FAKE_MOUNT_UNTIL FAKE_MOUNT_CALLS
 
 LAUNCHCTL_ENTRY='{"type": "macos-launchctl","service":"local.cloud-mount.","scope":"user","launchdDomain":"gui","prefixMatch":true}'
 SYSTEMCTL_ENTRY='{"type": "nixos-systemctl","service":"cloud-mount-","scope":"user","prefixMatch":true}'
@@ -121,5 +151,128 @@ assert_eq "clearing the marker restores the transition" "first" \
   "$(svc_notloaded_transition cloud-drive "$_tmp/state")"
 svc_notloaded_transition other "$_tmp/state" >/dev/null
 assert_eq "markers are per key" "repeat" "$(svc_notloaded_transition other "$_tmp/state")"
+
+section 6 "Cloud mount points"
+
+# WHY: the loader hands this function resolved local paths (a host-keyed variant
+# is not a mount point yet), so the array mixes both shapes deliberately.
+MOUNTS_JSON='[
+  {"id":"iCloud","localPath":"clouds/iCloud","remoteName":"iCloud"},
+  {"id":"OneDrive","localPath":"clouds/OneDrive","remoteName":"OneDrive"},
+  {"id":"NoPath","remoteName":"NoPath"},
+  {"id":"HostKeyed","localPath":{"MacBook":"clouds/HostKeyed"},"remoteName":"HostKeyed"}
+]'
+assert_eq "a declared mount resolves to its home-relative path" "/home/u/clouds/iCloud" \
+  "$(svc_cloud_mount_point "$LAUNCHCTL_ENTRY" "$MOUNTS_JSON" 'local.cloud-mount.iCloud' '/home/u')"
+assert_eq "the mount id is the instance suffix, not the instance id" "/home/u/clouds/OneDrive" \
+  "$(svc_cloud_mount_point "$LAUNCHCTL_ENTRY" "$MOUNTS_JSON" 'local.cloud-mount.OneDrive' '/home/u')"
+assert_eq "a trailing slash in the home does not double up" "/home/u/clouds/iCloud" \
+  "$(svc_cloud_mount_point "$LAUNCHCTL_ENTRY" "$MOUNTS_JSON" 'local.cloud-mount.iCloud' '/home/u/')"
+# mount_point_with_home <home> — The mount point with the base taken from HOME
+# instead of the optional argument.
+mount_point_with_home() { # <home>
+  HOME="$1" svc_cloud_mount_point "$LAUNCHCTL_ENTRY" "$MOUNTS_JSON" 'local.cloud-mount.iCloud'
+}
+
+assert_eq "the home argument is optional" "/h/clouds/iCloud" "$(mount_point_with_home /h)"
+assert_eq "an undeclared mount has no mount point" "" \
+  "$(svc_cloud_mount_point "$LAUNCHCTL_ENTRY" "$MOUNTS_JSON" 'local.cloud-mount.Nope' '/home/u')"
+assert_eq "a service outside the declared prefix has no mount point" "" \
+  "$(svc_cloud_mount_point '{"type":"macos-launchctl","service":"local.plain","scope":"user"}' "$MOUNTS_JSON" 'local.plain' '/home/u')"
+assert_eq "a mount without a local path has no mount point" "" \
+  "$(svc_cloud_mount_point "$LAUNCHCTL_ENTRY" "$MOUNTS_JSON" 'local.cloud-mount.NoPath' '/home/u')"
+assert_eq "an unresolved host-keyed local path is not a mount point" "" \
+  "$(svc_cloud_mount_point "$LAUNCHCTL_ENTRY" "$MOUNTS_JSON" 'local.cloud-mount.HostKeyed' '/home/u')"
+assert_eq "an empty home yields no mount point" "" "$(mount_point_with_home '')"
+assert_eq "a systemd instance resolves through the same mounts array" "/home/u/clouds/OneDrive" \
+  "$(svc_cloud_mount_point "$SYSTEMCTL_ENTRY" "$MOUNTS_JSON" 'cloud-mount-OneDrive.service' '/home/u')"
+
+section 7 "Bounded command probes"
+
+# bounded_rc — Exit status of a command run under svc_run_bounded.
+bounded_rc() { # <seconds> <command...>
+  local _rc=0
+  svc_run_bounded "$@" || _rc=$?
+  printf '%s' "$_rc"
+}
+
+assert_eq "a successful command keeps its status" "0" "$(bounded_rc 5 true)"
+assert_eq "a failing command keeps its status" "1" "$(bounded_rc 5 false)"
+assert_eq "a command that outlives its bound reports 124" "124" "$(bounded_rc 1 sleep 5)"
+rm -f "$_tmp/bounded.marker"
+assert_eq "a command killed at its bound reports 124" "124" \
+  "$(bounded_rc 1 sh -c "sleep 5; : > '$_tmp/bounded.marker'")"
+if [ -e "$_tmp/bounded.marker" ]; then
+  assert_fail "bounded-command-is-stopped" "the command kept running after its bound elapsed"
+else
+  assert_pass "a command stopped at its bound never finishes its work"
+fi
+
+section 8 "Mount table probe"
+
+# mount_table_rc <path> [probe bound] — probe status with the fake table the
+# caller set.
+mount_table_rc() { # <path> [bound]
+  local _rc=0
+  svc_mount_table_contains "$1" "${2:-10}" || _rc=$?
+  printf '%s' "$_rc"
+}
+
+FAKE_MOUNT_TABLE='fake://vol on /mnt/yes (fake, nodev)'
+assert_eq "a listed path is reported as mounted" "0" "$(mount_table_rc /mnt/yes)"
+assert_eq "an absent path is reported as not mounted" "1" "$(mount_table_rc /mnt/no)"
+assert_eq "a path that is a prefix of a listed one is not mounted" "1" "$(mount_table_rc /mnt/y)"
+FAKE_MOUNT_TABLE='fake://vol on /mnt/yesmore (fake, nodev)'
+assert_eq "a listed path that extends the probe is not a match" "1" "$(mount_table_rc /mnt/yes)"
+FAKE_MOUNT_TABLE=''
+FAKE_MOUNT_SLOW=''
+_mount_out=""
+_mount_rc=0
+_mount_out="$(svc_mount_table_contains /mnt/any 2>&1)" || _mount_rc=$?
+# WHY: an unreadable table is reported, but the return value still says
+# "not mounted" — that is the fail-open path the function documents as unsafe.
+assert_eq "an unreadable mount table is reported as not mounted" "1" "$_mount_rc"
+assert_mentions() { # <slug> <haystack> <needle>
+  case "$2" in
+  *"$3"*) assert_pass "$1" ;;
+  *) assert_fail "$1" "expected output to mention '$3', got: $2" ;;
+  esac
+}
+assert_mentions "an unreadable mount table is reported" "$_mount_out" "could not read the mount table"
+
+# WHY: a probe that outlives its bound models a hung volume, which must never be
+# read as "free" or the next mount lands on top of it.
+FAKE_MOUNT_TABLE='fake://vol on /mnt/yes (fake)'
+FAKE_MOUNT_SLOW=5
+assert_eq "a probe that outlives its bound counts as mounted" "0" "$(mount_table_rc /mnt/yes 1)"
+FAKE_MOUNT_SLOW=''
+
+# WHY: the wait is what a reload uses to avoid starting on top of a volume that
+# is still attached, so both exits matter: released, and never released.
+FAKE_MOUNT_TABLE='fake://vol on /mnt/wait (fake)'
+FAKE_MOUNT_CALLS="$_tmp/mount.calls"
+: >"$FAKE_MOUNT_CALLS"
+FAKE_MOUNT_UNTIL=2
+if svc_wait_mount_released /mnt/wait 10; then
+  assert_pass "a mount that is released while it is waited on returns success"
+else
+  assert_fail "svc-wait-mount-released" "the wait failed although the table stopped listing the path"
+fi
+FAKE_MOUNT_UNTIL=''
+if svc_wait_mount_released /mnt/wait 1; then
+  assert_fail "svc-wait-mount-timeout" "a path that never leaves the table was reported as released"
+else
+  assert_pass "a mount that never releases reports the timeout"
+fi
+# wait_released_rc <path> <timeout> — status of the mount release wait.
+wait_released_rc() { # <path> <timeout>
+  local _rc=0
+  svc_wait_mount_released "$1" "$2" || _rc=$?
+  printf '%s' "$_rc"
+}
+
+FAKE_MOUNT_TABLE='fake://vol on /mnt/other (fake)'
+assert_eq "a path that is not mounted needs no wait" "0" "$(wait_released_rc /mnt/absent 1)"
+FAKE_MOUNT_TABLE=''
 
 finish_tests

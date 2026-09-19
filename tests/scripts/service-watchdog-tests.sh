@@ -69,6 +69,9 @@ print)
     case "${2:-}" in
     *"$_label")
       printf 'state = %s\n\tpid = 4242\n' "${FAKE_STATE:-running}"
+      if [ -n "${FAKE_EXIT_CODE:-}" ]; then
+        printf '\tlast exit code = %s\n' "$FAKE_EXIT_CODE"
+      fi
       exit 0
       ;;
     esac
@@ -121,6 +124,27 @@ FAKE
 
 chmod +x "$_tmp/bin/launchctl" "$_tmp/bin/systemctl"
 
+# --- Fake plist dump, mount table, and sleep -------------------------------
+#   plutil — prints FAKE_PLIST_KEYS, which is how a launchd plist's
+#            KeepAlive { SuccessfulExit = false } contract is declared here.
+#   mount  — reports FAKE_MOUNT_TABLE: the cloud mount that a reload must not
+#            start on top of.
+#   sleep  — instant, so the watcher's 30 s mount-release bound costs no wall
+#            clock (the watchdog polls it while waiting for the volume).
+cat >"$_tmp/bin/plutil" <<'FAKE'
+#!/usr/bin/env bash
+printf '%s\n' "${FAKE_PLIST_KEYS:-}"
+FAKE
+cat >"$_tmp/bin/mount" <<'FAKE'
+#!/usr/bin/env bash
+printf '%s\n' "${FAKE_MOUNT_TABLE:-}"
+FAKE
+cat >"$_tmp/bin/sleep" <<'FAKE'
+#!/usr/bin/env bash
+exit 0
+FAKE
+chmod +x "$_tmp/bin/plutil" "$_tmp/bin/mount" "$_tmp/bin/sleep"
+
 # run_watchdog — Run one watchdog iteration against the stub host.
 run_watchdog() {
   env NUCLEUS_HOST="${WATCHDOG_TEST_HOST:-MacBook}" \
@@ -132,6 +156,9 @@ run_watchdog() {
     FAKE_LIVE="${FAKE_LIVE:-}" \
     FAKE_UNITS="${FAKE_UNITS:-}" \
     FAKE_STATE="${FAKE_STATE:-running}" \
+    FAKE_EXIT_CODE="${FAKE_EXIT_CODE:-}" \
+    FAKE_PLIST_KEYS="${FAKE_PLIST_KEYS:-}" \
+    FAKE_MOUNT_TABLE="${FAKE_MOUNT_TABLE:-}" \
     FAKE_SYSTEMCTL_STATE="${FAKE_SYSTEMCTL_STATE:-active}" \
     FAKE_LAUNCHCTL_LOG="$_tmp/launchctl.log" \
     FAKE_SYSTEMCTL_LOG="$_tmp/systemctl.log" \
@@ -269,5 +296,83 @@ assert_contains "the failing instance is logged" "$captured_output" "restarted c
 WATCHDOG_TEST_HOST=
 FAKE_SYSTEMCTL_STATE=
 FAKE_UNITS=
+
+section 8 "A cleanly exited KeepAlive job is reloaded"
+
+# WHY: a launchd job whose process exits 0 is never retried by
+# KeepAlive{SuccessfulExit:false}, so nothing brings a cloud mount back after a
+# reload that left it stopped. The plist decides: only a job that declares that
+# contract may be reloaded, or the watchdog would fight periodic agents.
+_plist_dir="$_tmp/home/Library/LaunchAgents"
+mkdir -p "$_plist_dir"
+printf 'plist placeholder\n' >"$_plist_dir/local.cloud-mount.iCloud.plist"
+FAKE_LIVE="local.cloud-mount.iCloud"
+FAKE_STATE="not running"
+FAKE_EXIT_CODE=0
+FAKE_PLIST_KEYS="KeepAlive = { SuccessfulExit = false }"
+FAKE_MOUNT_TABLE="fake://vol on $_tmp/home/clouds/OneDrive (fake, nodev)"
+SUDO_USER_OVERRIDE=test-user
+: >"$_tmp/launchctl.log"
+: >"$_tmp/booted-out.txt"
+run_capture
+assert_eq "a cleanly exited job exits 0" 0 "$captured_status"
+assert_contains "the cleanly exited job is booted out" "$(cat "$_tmp/launchctl.log")" "bootout"
+assert_contains "the cleanly exited job is bootstrapped again" "$(cat "$_tmp/launchctl.log")" "bootstrap"
+assert_contains "the recovered target is that instance" "$(cat "$_tmp/launchctl.log")" "local.cloud-mount.iCloud"
+assert_contains "the reload reports the clean exit" "$captured_output" "restarted local.cloud-mount.iCloud (clean exit)"
+
+section 9 "A crash-looping clean exit is not reloaded"
+
+mkdir -p "$state_dir"
+jq -n --argjson now "$(date +%s)" '{restarts: [range($now - 11; $now + 1)], lastSuccess: 0}' \
+  >"$state_dir/local.cloud-mount.iCloud.json"
+: >"$_tmp/launchctl.log"
+run_capture
+assert_eq "a crash-looping clean exit exits 0" 0 "$captured_status"
+assert_eq "a crash-looping clean exit is not touched" 0 "$(calls_made "$_tmp/launchctl.log")"
+assert_contains "the crash loop is reported for the clean exit" "$captured_output" "crash-looping"
+rm -f "$state_dir/local.cloud-mount.iCloud.json"
+
+section 10 "Jobs without the clean-exit contract are left alone"
+
+for _keys in "RunAtLoad = 1" "KeepAlive = 1"; do
+  FAKE_PLIST_KEYS="$_keys"
+  : >"$_tmp/launchctl.log"
+  run_capture
+  assert_eq "$_keys exits 0" 0 "$captured_status"
+  assert_eq "$_keys is never reloaded by the watchdog" 0 "$(calls_made "$_tmp/launchctl.log")"
+  assert_not_contains "$_keys is not reported as restarted" "$captured_output" "restarted"
+done
+rm -f "$_plist_dir/local.cloud-mount.iCloud.plist"
+: >"$_tmp/launchctl.log"
+run_capture
+assert_eq "a missing plist exits 0" 0 "$captured_status"
+assert_eq "a missing plist is never reloaded" 0 "$(calls_made "$_tmp/launchctl.log")"
+
+section 11 "A mount that never releases is not reloaded over"
+
+# WHY: the release wait is what keeps a reload from starting a second mount on
+# top of a volume that is still attached, so the assertion is about the mount
+# the instance owns, not about the watchdog in general.
+printf 'plist placeholder\n' >"$_plist_dir/local.cloud-mount.iCloud.plist"
+FAKE_LIVE="local.cloud-mount.iCloud"
+FAKE_STATE="not running"
+FAKE_EXIT_CODE=0
+FAKE_PLIST_KEYS="KeepAlive = { SuccessfulExit = false }"
+SUDO_USER_OVERRIDE=test-user
+FAKE_MOUNT_TABLE="fake://vol on $_tmp/home/clouds/iCloud (fake, nodev)"
+: >"$_tmp/launchctl.log"
+: >"$_tmp/booted-out.txt"
+run_capture
+assert_eq "a never-released mount exits 0" 0 "$captured_status"
+assert_eq "a never-released mount is not reloaded over" 0 "$(calls_made "$_tmp/launchctl.log")"
+assert_contains "the never-released mount is reported" "$captured_output" "still mounted"
+
+# The released shape of the same fixture: the same instance does reload once the
+# volume is gone, so the assertion above is about the mount, not the watchdog.
+FAKE_MOUNT_TABLE="fake://vol on $_tmp/home/clouds/OneDrive (fake, nodev)"
+: >"$_tmp/launchctl.log"
+run_capture
+assert_contains "the released mount is reloaded" "$(cat "$_tmp/launchctl.log")" "bootstrap"
 
 finish_tests
