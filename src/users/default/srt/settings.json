@@ -19,11 +19,13 @@
       "~/.config/qmd",
       "~/.cursor",
       "~/.gnupg",
+      "~/.hermes",
       "~/.local",
       "~/.npm",
       "~/.pi",
       "~/.rustup",
       "~/dev",
+      "~/Library/Application Support/nucleus",
       "~/Library/Caches"
     ],
     "denyRead": [
