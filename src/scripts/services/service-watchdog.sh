@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Persistent-loop service watchdog — detects and restarts nucleus-managed
 # services that are stuck in non-running states (EX_CONFIG, waiting,
-# spawn-scheduled, inactive, failed, or not loaded at all).
+# spawn-scheduled, inactive, failed, or not loaded at all), and reloads a
+# KeepAlive job whose process exited cleanly (launchd never retries exit 0).
 #
 # Runs indefinitely with a 300 s sleep between iterations (persistent daemon
 # pattern — launched by KeepAlive / Restart=always / scheduled task AtStartup).
@@ -18,7 +19,8 @@
 # Prefix-match entries are expanded per instance: each live instance is checked
 # independently, and each instance the user registry declares but this host does
 # not run is reported once per transition (never auto-loaded — see
-# src/modules/cloud-drives.nix on the clean-exit-0 contract).
+# src/modules/cloud-drives.nix on the clean-exit-0 contract). A loaded instance
+# that exited cleanly is a different case and is reloaded.
 
 set -euo pipefail
 
@@ -54,7 +56,7 @@ usage() {
   cat <<'EOF'
   Persistent service watchdog — detects and restarts nucleus-managed
   services stuck in non-running states (EX_CONFIG, waiting,
-  spawn-scheduled, inactive, failed, or not loaded at all).
+  spawn-scheduled, clean exit, inactive, failed, or not loaded at all).
   Runs indefinitely with 300 s sleep between iterations.
   Use --oneshot for a single iteration (manual / CI use).
 
@@ -111,6 +113,12 @@ esac
 
 require_command jq
 
+# Cloud-drive mounts for this host, resolved lazily by watchdog_mounts.
+# WHY: the loader needs a live repo root and aborts the tick when it fails, so
+#   the resolution stays lazy (only prefix-match instances ask for it).
+_watchdog_mounts=""
+_watchdog_mounts_set=false
+
 # Read services for this host, excluding socket-activated and on-demand services.
 read_watchdog_services() {
   jq -c --arg host "$HOST" '
@@ -138,6 +146,18 @@ log_notloaded() {
     "$(date '+%Y-%m-%d %H:%M:%S')" "$1" "$2" "$1"
 }
 
+# watchdog_mounts — Memoized cloud-drive mounts the invoking user declares.
+# Output: the mounts array JSON.
+# WHY: every cloud-mount instance needs its mount point, and each lookup runs
+#   the user-registry loader; memoizing keeps one loader invocation per tick.
+watchdog_mounts() {
+  if [ "$_watchdog_mounts_set" != true ]; then
+    _watchdog_mounts="$(svc_configured_mounts "$(derive_repo_root)" "$HOST")"
+    _watchdog_mounts_set=true
+  fi
+  printf '%s\n' "$_watchdog_mounts"
+}
+
 # check_service_instances — Monitor every instance of a prefix-match entry.
 # Args: $1 — registry key; $2 — host entry JSON.
 # WHY: a prefix-match entry stands in for one runtime service per configured
@@ -154,7 +174,7 @@ check_service_instances() {
     [ -n "$instance" ] || continue
     instance_entry=$(svc_instance_entry "$entry" "$instance")
     case "$HOST" in
-    MacBook) check_service_macos "$instance" "$instance_entry" ;;
+    MacBook) check_service_macos "$instance" "$instance_entry" "$entry" ;;
     NixOS) check_service_nixos "$instance" "$instance_entry" ;;
     esac
     svc_notloaded_clear "$instance" "$(crash_loop_state_dir)"
@@ -202,14 +222,54 @@ recover_launchctl() {
   return 1
 }
 
+# service_declares_clean_exit_restart — Whether a plist opts into
+# KeepAlive{SuccessfulExit:false}.
+# Args: $1 — plist path.
+# Returns 0 when the plist declares both KeepAlive and SuccessfulExit, 1
+# otherwise (including when the plist is missing or unreadable).
+# WHY: that is the only contract under which launchd leaves a cleanly exited job
+#   stopped, so it is the only one this watchdog may reload. A periodic agent
+#   that finished its work, and a KeepAlive=true job (which launchd restarts by
+#   itself), must be left alone.
+service_declares_clean_exit_restart() {
+  local plist="$1" dumped=""
+
+  [ -f "$plist" ] || return 1
+  # check-suppress:suppression_doc: a plist that cannot be dumped is not a clean-exit KeepAlive job, which is the answer this probe reports.
+  dumped="$(svc_run_bounded 5 plutil -p "$plist" 2>/dev/null)" || true
+  case "$dumped" in
+  *KeepAlive*) ;;
+  *) return 1 ;;
+  esac
+  case "$dumped" in
+  *SuccessfulExit*) return 0 ;;
+  *) return 1 ;;
+  esac
+}
+
+# check_service_macos — Check one macOS service and recover it when stuck.
+# Args: $1 — service name (crash-loop key); $2 — service entry JSON;
+#       $3 — prefix-match host entry JSON ("" for an ordinary service).
 check_service_macos() {
-  local svc="$1" entry="$2"
+  local svc="$1" entry="$2" prefix_entry="${3:-}"
   local scope launchd_domain svc_id uid
   scope=$(echo "$entry" | jq -r '.scope // "user"')
   launchd_domain=$(echo "$entry" | jq -r '.launchdDomain // "gui"')
   svc_id=$(echo "$entry" | jq -r '.service // ""')
   uid="${REAL_USER_UID:-$(id -u)}"
   [ -z "$svc_id" ] && return 0
+
+  local plist=""
+  if [ "$scope" = "system" ]; then
+    plist="/Library/LaunchDaemons/$svc_id.plist"
+  else
+    plist="${HOME:-}/Library/LaunchAgents/$svc_id.plist"
+  fi
+
+  local mount_point=""
+  if [ -n "$prefix_entry" ]; then
+    mount_point="$(svc_cloud_mount_point "$prefix_entry" "$(watchdog_mounts)" "$svc_id")"
+  fi
 
   local sudo_prefix=""
   if [ "$scope" = "system" ] && [ "$(id -u)" -ne 0 ]; then
@@ -259,17 +319,32 @@ check_service_macos() {
     recover_launchctl "$svc" "$scope" "$launchd_domain" "$svc_id" "$uid" || true
     log_restart "$svc_id" "EX_CONFIG"
     ;;
+  # A loaded job that is not running and exited cleanly: launchd does not retry a
+  # status of 0 under KeepAlive{SuccessfulExit:false}, so nothing brings the
+  # service back on its own.
+  *"last exit code = 0"*)
+    if ! service_declares_clean_exit_restart "$plist"; then
+      return 0
+    fi
+    if crash_loop_is_looping "$svc"; then
+      warn "watchdog: $svc_id is crash-looping — skipping restart"
+      return 0
+    fi
+    if [ -n "$mount_point" ] && ! svc_wait_mount_released "$mount_point"; then
+      # check-suppress:suppression_doc: error's status is consumed because the watchdog must keep watching the remaining services.
+      error "watchdog: $svc_id — mount point $mount_point is still mounted; not reloading the agent over a stale volume" || true
+      return 0
+    fi
+    crash_loop_record "$svc" "clean exit"
+    # check-suppress:suppression_doc: recover_launchctl already reported the failure via error; the watchdog keeps watching the remaining services.
+    recover_launchctl "$svc" "$scope" "$launchd_domain" "$svc_id" "$uid" || true
+    log_restart "$svc_id" "clean exit"
+    ;;
   *"Service is not found"* | "")
     # Service not loaded — try bootstrapping.
     if crash_loop_is_looping "$svc"; then
       warn "watchdog: $svc_id is crash-looping — skipping restart"
       return 0
-    fi
-    local plist=""
-    if [ "$scope" = "system" ]; then
-      plist="/Library/LaunchDaemons/$svc_id.plist"
-    else
-      plist="${HOME:-}/Library/LaunchAgents/$svc_id.plist"
     fi
     if [ -f "$plist" ]; then
       crash_loop_record "$svc" "not-found"
@@ -347,7 +422,7 @@ _run_watchdog_iteration() {
     fi
 
     case "$HOST" in
-    MacBook) check_service_macos "$key" "$entry_json" ;;
+    MacBook) check_service_macos "$key" "$entry_json" "" ;;
     NixOS) check_service_nixos "$key" "$entry_json" ;;
     esac
   done < <(read_watchdog_services)
