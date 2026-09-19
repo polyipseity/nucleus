@@ -44,8 +44,9 @@ run_app_registry() {
         (if .value.type == "omitted" then (.value.justification | type == "string" and length > 0) else true end | tostring)
       ] | @tsv' "$_app_json")
 
-    # autostartEnabled / autostartDisableNative must be booleans; kind must be in the schema enum.
-    while IFS=$'\t' read -r _name _host _type _enabled _disable_native _kind; do
+    # autostartEnabled / autostartDisableNative must be booleans; kind must be in the schema enum;
+    # a platform-prefixed kind must match its host platform.
+    while IFS=$'\t' read -r _name _host _type _platform _enabled _disable_native _kind _has_approval; do
       # Omitted hosts carry no runtime fields; the first loop already validated
       # their justification. Skip boolean/kind checks for them.
       [ "$_type" = "omitted" ] && continue
@@ -77,6 +78,31 @@ run_app_registry() {
           _app_errors=$((_app_errors + 1))
         fi
       fi
+
+      # A platform-prefixed kind belongs to that platform alone. Deriving the
+      # platform from the prefix is what keeps the naming honest: a macOS-only
+      # mechanism can no longer be declared on Linux or Windows.
+      local _kind_platform=""
+      case "$_kind" in
+      macos-*) _kind_platform="macOS" ;;
+      nixos-*) _kind_platform="NixOS" ;;
+      windows-*) _kind_platform="Windows" ;;
+      esac
+      if [ -n "$_kind_platform" ] && [ "$_kind_platform" != "$_platform" ]; then
+        error "apps.json: '$_name' host '$_host' kind '$_kind' is $_kind_platform-only but the host platform is '$_platform'"
+        _app_errors=$((_app_errors + 1))
+      fi
+
+      # Kinds no script can converge still need approvalInstructions: that text
+      # is the only guidance the report prints.
+      case "$_kind" in
+      macos-system-extension | manual)
+        if [ "$_has_approval" != "true" ]; then
+          error "apps.json: '$_name' host '$_host' kind '$_kind' requires approvalInstructions"
+          _app_errors=$((_app_errors + 1))
+        fi
+        ;;
+      esac
     done < <(jq -r '
       to_entries[] | select(.value | type == "object") | select(.key | startswith("$") | not) |
       .key as $name |
@@ -85,9 +111,11 @@ run_app_registry() {
         $name,
         .key,
         (.value.type // "missing"),
+        (.value.platform // "missing"),
         (if (.value | has("autostartEnabled")) then (.value.autostartEnabled | tostring) else "missing" end),
         (if (.value | has("autostartDisableNative")) then (.value.autostartDisableNative | tostring) else "missing" end),
-        (.value.kind // "missing")
+        (.value.kind // "missing"),
+        (if (.value | has("approvalInstructions")) and (.value.approvalInstructions | type == "string") and (.value.approvalInstructions | length > 0) then "true" else "false" end)
       ] | @tsv' "$_app_json")
   fi
 

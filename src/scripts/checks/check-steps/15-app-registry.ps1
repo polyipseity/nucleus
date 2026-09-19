@@ -58,12 +58,35 @@ Register-Step -Id "app-registry" -Name "App auto-start registry validation" -Act
           }
         }
 
-        # kind must be in the valid enum (if present).
+        # kind must be in the valid enum (if present), and a platform-prefixed
+        # kind must match its host platform.
         if ($hEntry.ContainsKey('kind')) {
           $kind = $hEntry.kind
           if ($kind -notin $validKinds) {
             Write-ErrorMessage "apps.json: '$appName' host '$hostName' has invalid kind '$kind'"
             $appErrors++
+          }
+
+          $kindPlatform = switch -Wildcard ($kind) {
+            'macos-*' { 'macOS' }
+            'nixos-*' { 'NixOS' }
+            'windows-*' { 'Windows' }
+            default { '' }
+          }
+          $entryPlatform = if ($hEntry.ContainsKey('platform')) { $hEntry.platform } else { 'missing' }
+          if ($kindPlatform -and $kindPlatform -ne $entryPlatform) {
+            Write-ErrorMessage "apps.json: '$appName' host '$hostName' kind '$kind' is $kindPlatform-only but the host platform is '$entryPlatform'"
+            $appErrors++
+          }
+
+          # Kinds no script can converge still need approvalInstructions: that
+          # text is the only guidance the report prints.
+          if ($kind -in @('macos-system-extension', 'manual')) {
+            $hasApproval = $hEntry.ContainsKey('approvalInstructions') -and -not [string]::IsNullOrEmpty($hEntry.approvalInstructions)
+            if (-not $hasApproval) {
+              Write-ErrorMessage "apps.json: '$appName' host '$hostName' kind '$kind' requires approvalInstructions"
+              $appErrors++
+            }
           }
         }
       }
