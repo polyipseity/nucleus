@@ -71,7 +71,6 @@ let
   # src/modules/lib/strip-metadata-types.nix.
   stripMetadataNautilusScript = pkgs.writeNucleusShellApplication {
     name = "strip-metadata-nautilus";
-    runtimeInputs = [ pkgs.file ];
     text = ''
       exec '${../../scripts/integrations/configure-file-manager-strip-metadata.sh}' "$@"
     '';
