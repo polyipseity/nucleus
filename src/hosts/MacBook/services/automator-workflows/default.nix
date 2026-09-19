@@ -11,8 +11,9 @@
 #   only appears for PDF files.
 # - "strip metadata.workflow" uses an allow-list of the formats
 #   `nucleus-utils strip-metadata` can rewrite, declared in
-#   src/modules/lib/strip-metadata-types.nix — the same set drives the Dolphin
-#   service menu MIME types and the Windows context-menu verbs.
+#   src/modules/lib/strip-metadata-types.nix — the same set is the reference for
+#   the Dolphin service menu MIME types and for the Windows context-menu
+#   extensions (a subset of it).
 #
 # WHY: strip metadata is an allow-list, not "public.item":
 #   NSSendFileTypes is inclusion-only — Apple defines no exclusion key — so
@@ -20,9 +21,10 @@
 #   is the only way to withhold the action. Under "public.item" the action was
 #   offered for PDFs, which strip-metadata must refuse (no CLI tool rewrites PDF
 #   metadata without invalidating signatures), and the action then appeared to
-#   do nothing. Input outside the list — PDFs included — stays reachable from
-#   the CLI, and a mixed selection is still reported: strip-metadata lists every
-#   input it did not process in a modal dialog (scripts/utils.sh, --dialog).
+#   do nothing. Whatever the workflow does hand over is reported as a whole
+#   rather than per file: strip-metadata lists every input it did not process in
+#   one modal dialog (scripts/utils.sh, --dialog). Types outside the list, PDFs
+#   included, stay reachable from the CLI.
 #
 # WARNING about UTI choice: The UTI "public.pdf" has NEVER existed on macOS.
 # Apple's UTI hierarchy defines "public.png", "public.jpeg", "public.html" etc.,
