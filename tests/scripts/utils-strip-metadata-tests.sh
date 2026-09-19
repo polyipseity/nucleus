@@ -414,6 +414,36 @@ test_refused_input_is_reported_instead_of_silently_skipped() {
   rm -rf "$work"
 }
 
+section 4 "Usage line"
+
+# The usage line is the one place the command names itself, and the completion
+# generator parses it (`usage: <name> <spec>`), so the name must come from the
+# script path — `basename "$$0"` printed the process id there instead.
+test_usage_line_names_the_script() {
+  local work out status=0 first prog
+  work="$(mktemp -d)"
+  out="$work/help.out"
+
+  bash "$UTILS_SH" --help >"$out" 2>&1 || status=$?
+
+  if [ "$status" -eq 0 ]; then
+    assert_pass "--help exits 0"
+  else
+    assert_fail "--help exits 0" "exit status $status"
+  fi
+
+  first="$(head -n1 "$out")"
+  prog="${first#usage: }"
+  prog="${prog%% *}"
+  if [ "$prog" = "utils.sh" ]; then
+    assert_pass "the usage line names the script, not the process id"
+  else
+    assert_fail "the usage line names the script, not the process id" \
+      "expected the first token of [$first] to be utils.sh, got [$prog]"
+  fi
+  rm -rf "$work"
+}
+
 # ---- Aggregated dialog (--dialog) ----
 
 test_mixed_selection_reports_every_skip_in_one_dialog
@@ -429,5 +459,9 @@ test_without_dialog_the_skip_is_notified_per_input_and_no_dialog_appears
 
 test_failing_input_does_not_abandon_the_remaining_files
 test_refused_input_is_reported_instead_of_silently_skipped
+
+# ---- Usage line ----
+
+test_usage_line_names_the_script
 
 finish_tests

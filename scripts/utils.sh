@@ -41,7 +41,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 # subcommand, flag, and preset the parsers accept, so it stays in sync with
 # the dispatch and case branches below.
 usage() {
-  usage_std "$(basename "$$0")" "optimize-pdf [--preset <name>] [--rm-bak] <file>... | strip-metadata [--rm-bak] [--dialog] <file>..." \
+  usage_std "$(basename "$0")" "optimize-pdf [--preset <name>] [--rm-bak] <file>... | strip-metadata [--rm-bak] [--dialog] <file>..." \
     "Grouped nucleus user utilities. Currently: optimize-pdf (optimize PDFs with Ghostscript), strip-metadata (strip file metadata with mat2/exiftool)."
   cat <<'EOF'
 
