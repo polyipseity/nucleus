@@ -36,7 +36,7 @@ _hn_event="${2-}"
 _hn_text="${3-}"
 
 if [ -z "$_hn_harness" ] || [ -z "$_hn_event" ]; then
-  error "usage: harness-notify <harness> <event> [text]"
+  warn "usage: harness-notify <harness> <event> [text]"
   exit 0
 fi
 

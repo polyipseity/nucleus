@@ -105,6 +105,19 @@ test_missing_config_uses_defaults() {
   fi
 }
 
+test_missing_arguments_is_non_fatal() {
+  write_config '{"harness-notify":{"channels":["telegram"]}}'
+  reset_log
+  local rc=0
+  printf '' | HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" \
+    bash "$NOTIFY" pi 2>/dev/null || rc=$?
+  if [ "$rc" -eq 0 ] && [ ! -s "$HARNESS_NOTIFY_LOG" ]; then
+    assert_pass "missing arguments exit 0 (a hook must never fail the harness)"
+  else
+    assert_fail "usage" "rc=$rc log: $(cat "$HARNESS_NOTIFY_LOG")"
+  fi
+}
+
 test_unknown_event_is_ignored() {
   write_config '{"harness-notify":{"channels":["telegram"]}}'
   reset_log
@@ -173,6 +186,7 @@ test_single_channel_delivery
 test_channel_fan_out
 test_disabled_config_sends_nothing
 test_missing_config_uses_defaults
+test_missing_arguments_is_non_fatal
 test_unknown_event_is_ignored
 test_hook_json_stdin_extracts_message
 test_plain_text_stdin_is_body
