@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
 # Cloud drive directory structure setup: mount points (a real directory on every
-# host, macOS included) and replica directories.
+# host, macOS included) and replica directories.  A mount that the previous
+# attempt left blocked is reported with its recorded remedy, so a missing drive
+# is never silent.
 set -eu
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/crash-loop.sh
+. "$SCRIPT_DIR/../lib/crash-loop.sh"
+# shellcheck source=../lib/svc-instances.sh
+. "$SCRIPT_DIR/../lib/svc-instances.sh"
 
 # Ensure a managed real directory exists at PATH.
 # Usage: _cd_ensure_real_directory "$HOME/path/to/mountpoint" "mount display name" "local.cloud-mount.gdrive"
@@ -50,6 +58,17 @@ while IFS= read -r _vsd_entry; do
   _vsd_local_path="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.localPath')"
   _vsd_service_label="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.serviceLabel // empty')"
   _cd_ensure_real_directory "$HOME/$_vsd_local_path" "$_vsd_local_path" "$_vsd_service_label"
+
+  # WHY a warning, not an error: only a provider repair brings the volume back,
+  #   and the mount records that itself once it attaches — failing the apply here
+  #   would block the convergence of everything else for a state it cannot fix.
+  #   The marker is boot-scoped, so a reboot (the standing remedy) clears it.
+  if [ -n "$_vsd_service_label" ]; then
+    _vsd_blocked="$(svc_blocked_state "$_vsd_service_label" "$(crash_loop_state_dir)")"
+    if [ "$_vsd_blocked" != "clear" ]; then
+      printf '%s\n' "cloud-drives ($_vsd_local_path): warning: the last mount attempt was blocked ($_vsd_blocked); $(svc_blocked_remedy "$_vsd_service_label" "$(crash_loop_state_dir)")" >&2
+    fi
+  fi
 done < <(printf '%s\n' "$_vsd_mounts_json" | "$_vsd_jq_bin" -r -c '.[]')
 
 # Process replicas: ensure each replica directory or symlink exists.

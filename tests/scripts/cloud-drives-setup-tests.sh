@@ -13,6 +13,10 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
+# shellcheck source=../../src/scripts/lib/svc-instances.sh
+. "$SCRIPT_DIR/../../src/scripts/lib/svc-instances.sh"
+# shellcheck source=../../src/scripts/lib/macos-fskit.sh
+. "$SCRIPT_DIR/../../src/scripts/lib/macos-fskit.sh"
 
 CD_SETUP_SH="$SCRIPT_DIR/../../src/scripts/services/cloud-drives-setup.sh"
 
@@ -125,6 +129,61 @@ test_mount_path_symlink_error_without_a_label_stays_generic() {
   rm -rf "$home"
 }
 
+# mark_blocked <home> <service label> — a fresh blocked marker, as the mount
+# wrapper leaves it when the FSKit provider refuses the volume.
+mark_blocked() { # <home> <label>
+  local state_dir="$1/Library/Application Support/nucleus/state/service-stats"
+  svc_blocked_set "$2" "$state_dir" fskit-provider "$(fskit_remedy)"
+}
+
+test_blocked_mount_warns_with_its_remedy() {
+  local home rc=0 err="" reported=false remedy_ok=false
+  home="$(mktemp -d)"
+  mark_blocked "$home" local.cloud-mount.GoogleDrive
+  err="$(run_setup_stderr "$home" "$_mounts_labeled" "$_replicas_none" 2>&1)" || rc=$?
+  case "$err" in *'cloud-drives (clouds/GoogleDrive): warning'*) reported=true ;; esac
+  case "$err" in *'nucleus-cloud repair'*) remedy_ok=true ;; esac
+  if [ "$rc" -eq 0 ] && [ "$reported" = true ] && [ "$remedy_ok" = true ]; then
+    assert_pass "a blocked mount is reported with the remedy, and the apply still succeeds"
+  else
+    assert_fail "cloud-drives-blocked-mount-warning" \
+      "rc=$rc reported=$reported remedy=$remedy_ok stderr=[$err]"
+  fi
+  rm -rf "$home"
+}
+
+test_unblocked_mount_is_silent() {
+  local home rc=0 err="" quiet=true
+  home="$(mktemp -d)"
+  err="$(run_setup_stderr "$home" "$_mounts_labeled" "$_replicas_none" 2>&1)" || rc=$?
+  case "$err" in *warning*) quiet=false ;; esac
+  if [ "$rc" -eq 0 ] && [ "$quiet" = true ]; then
+    assert_pass "a mount without a blocked marker is not reported"
+  else
+    assert_fail "cloud-drives-unblocked-mount-quiet" "rc=$rc stderr=[$err]"
+  fi
+  rm -rf "$home"
+}
+
+# WHY: the marker is boot-scoped, so one written before a reboot (the standing
+# remedy) must not be reported as a current problem.
+test_stale_blocked_mount_is_silent() {
+  local home rc=0 err="" quiet=true state_dir file
+  home="$(mktemp -d)"
+  state_dir="$home/Library/Application Support/nucleus/state/service-stats"
+  mkdir -p "$state_dir"
+  file="$state_dir/local.cloud-mount.GoogleDrive.blocked"
+  printf 'class=fskit-provider\nboot=other-boot\nts=1\n' >"$file"
+  err="$(run_setup_stderr "$home" "$_mounts_labeled" "$_replicas_none" 2>&1)" || rc=$?
+  case "$err" in *warning*) quiet=false ;; esac
+  if [ "$rc" -eq 0 ] && [ "$quiet" = true ]; then
+    assert_pass "a blocked marker from an earlier boot is not reported"
+  else
+    assert_fail "cloud-drives-stale-blocked-mount-quiet" "rc=$rc stderr=[$err]"
+  fi
+  rm -rf "$home"
+}
+
 section "2" "replica directories"
 
 test_replica_directory_is_a_real_directory() {
@@ -162,6 +221,9 @@ test_mount_path_is_idempotent
 test_mount_path_tolerates_an_occupied_directory
 test_mount_path_symlink_error_names_how_to_release_it
 test_mount_path_symlink_error_without_a_label_stays_generic
+test_blocked_mount_warns_with_its_remedy
+test_unblocked_mount_is_silent
+test_stale_blocked_mount_is_silent
 test_replica_directory_is_a_real_directory
 test_icloud_replica_links_to_native_storage
 finish_tests
