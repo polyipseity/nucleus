@@ -9,8 +9,8 @@
   auto-start apps rather than background daemons.
 
   Policy (driving constraint): we never let an app manage its own startup.
-  If an app exposes a native auto-start setting, we disable it (disableNative),
-  then control enable/disable through exactly one uniform mechanism we own:
+  If an app exposes a native auto-start setting, convergence disables it, then
+  control enable/disable through exactly one uniform mechanism we own:
     Windows — a Run-key entry (HKCU\Software\Microsoft\Windows\CurrentVersion\Run)
               or a Startup-folder .lnk we write/remove.
 
@@ -211,17 +211,14 @@ function Invoke-AppConverge {
   param([string]$Key, [hashtable]$Entry)
   $kind = $Entry.hostEntry.kind
   $enabled = $Entry.hostEntry.autostartEnabled
-  $disableNative = $Entry.hostEntry.autostartDisableNative
   $path = if ($Entry.hostEntry.ContainsKey('path')) { $Entry.hostEntry.path } else { '' }
 
   switch ($kind) {
     'windows-run-key' {
-      if ($disableNative) {
-        # Neutralize any app-shipped Run-key/Startup entry so only our
-        # uniform mechanism remains.
-        Unregister-NativeRunKey -Path $path
-        Unregister-NativeStartupShortcut -Path $path
-      }
+      # Neutralize any app-shipped Run-key/Startup entry so only our
+      # uniform mechanism remains.
+      Unregister-NativeRunKey -Path $path
+      Unregister-NativeStartupShortcut -Path $path
       if ($enabled) {
         Enable-RunKeyEntry -Key $Key -Path $path
       } else {
@@ -229,10 +226,8 @@ function Invoke-AppConverge {
       }
     }
     'windows-startup-folder' {
-      if ($disableNative) {
-        Unregister-NativeStartupShortcut -Path $path
-        Unregister-NativeRunKey -Path $path
-      }
+      Unregister-NativeStartupShortcut -Path $path
+      Unregister-NativeRunKey -Path $path
       $startupPath = [Environment]::GetFolderPath('Startup')
       $link = Join-Path -Path $startupPath -ChildPath "nucleus-$Key.lnk"
       if ($enabled) {

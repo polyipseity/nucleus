@@ -79,21 +79,13 @@
           "description": "macOS bundle identifier (e.g. com.if.Amphetamine). Used to locate the app for macos-launchagent manipulation.",
           "type": "string"
         },
-        "autostartDisableNative": {
-          "description": "Does the app ship a native auto-start setting we must turn off (true for almost everything; false only for macos-system-extension apps with no app setting).",
-          "type": "boolean"
-        },
         "autostartEnabled": {
-          "description": "Do we launch this app via our uniform auto-start mechanism.",
+          "description": "Do we launch this app via our uniform auto-start mechanism. Required unless kind is 'manual', which nothing launches.",
           "type": "boolean"
         },
         "approvalInstructions": {
-          "description": "Manual approval steps shown when a macos-system-extension is not yet approved. Overrides the generic Privacy & Security hint because extension types differ (FSKit file-system extension vs TCC grants). Required for kind 'macos-system-extension'.",
+          "description": "Manual approval steps shown when a macos-system-extension is not yet approved. Overrides the generic Privacy & Security hint because extension types differ (FSKit file-system extension vs TCC grants). Required for kind 'macos-system-extension' and 'manual'.",
           "type": "string"
-        },
-        "hidden": {
-          "description": "Launch the app hidden (macOS login item / launchagent Hide flag).",
-          "type": "boolean"
         },
         "justification": {
           "description": "Explanation of platform-specific configuration choices.",
@@ -111,8 +103,6 @@
         }
       },
       "required": [
-        "autostartEnabled",
-        "autostartDisableNative",
         "kind"
       ],
       "type": "object"
@@ -176,10 +166,6 @@
         },
         "kind": {
           "$ref": "#/definitions/menuBarKind"
-        },
-        "provisioned": {
-          "description": "Whether the engine can automatically converge this icon state. false = declared in config but must be set manually by the user (no programmatic mechanism). Defaults to true. Only meaningful with kind 'manual'.",
-          "type": "boolean"
         },
         "plistPath": {
           "description": "Absolute plist path for kind 'plist' (e.g. /Library/Objective-See/LuLu/preferences.plist).",

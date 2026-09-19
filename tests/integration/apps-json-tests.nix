@@ -108,7 +108,7 @@ in
       ) hosts
     ) appNames) "Omitted entries must not cite equivalent apps")
 
-    # === Native-disable invariant ===
+    # === autostartEnabled is required for launched kinds, forbidden for manual ===
     (assert' (all (
       name:
       let
@@ -120,15 +120,14 @@ in
         let
           hostEntry = entry.hosts.${h};
         in
-        if
-          (hostEntry ? type && hostEntry.type == "omitted")
-          || hostEntry ? kind && (hostEntry.kind == "macos-system-extension" || hostEntry.kind == "manual")
-        then
+        if hostEntry ? type && hostEntry.type == "omitted" then
           true
+        else if hostEntry.kind == "manual" then
+          !(hostEntry ? autostartEnabled)
         else
-          hostEntry.autostartDisableNative == true
+          hostEntry ? autostartEnabled
       ) hosts
-    ) appNames) "Runtime entries other than macos-system-extension and manual must disable native")
+    ) appNames) "autostartEnabled is required except on manual entries")
 
     # === macos-system-extension entries must declare bundleId + approvalInstructions ===
     (assert' (all (
@@ -223,8 +222,8 @@ in
       let
         macbookHost = parsedApps.${name}.hosts.MacBook;
       in
-      macbookHost.menuBarIcon.kind == "manual" && macbookHost.menuBarIcon.provisioned == false
-    ) manualApps) "Manual apps must have menuBarIcon.kind=manual and menuBarIcon.provisioned=false")
+      macbookHost.menuBarIcon.kind == "manual"
+    ) manualApps) "Manual apps must have menuBarIcon.kind=manual")
 
     # === Menu-bar: Discord apps use activation-script ===
     (assert' (all (

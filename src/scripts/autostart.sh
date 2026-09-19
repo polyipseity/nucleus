@@ -8,8 +8,8 @@
 #   Actions: list, status, enable, disable, apply, verify.
 #
 # Policy (driving constraint): we never let an app manage its own startup.
-# If an app exposes a native auto-start setting, we disable it (autostartDisableNative),
-# then control enable/disable through exactly one uniform mechanism we own:
+# If an app exposes a native auto-start setting, convergence disables it, then
+# control enable/disable through exactly one uniform mechanism we own:
 #   macOS   — LaunchAgent plists we write/remove in ~/Library/LaunchAgents/
 #             (system extensions use systemextensionsctl best-effort + manual)
 #   NixOS   — an XDG autostart .desktop we write/remove
@@ -251,14 +251,12 @@ xdg_desktop_exists() {
   if [ -f "$(xdg_autostart_dir)/$name" ]; then printf 'true'; else printf 'false'; fi
 }
 
-# xdg_desktop_write NAME EXEC_PATH HIDDEN — create OUR autostart .desktop.
+# xdg_desktop_write NAME EXEC_PATH — create OUR autostart .desktop.
 xdg_desktop_write() {
-  local name="$1" exec_path="$2" hidden="$3"
+  local name="$1" exec_path="$2"
   local dir
   dir=$(xdg_autostart_dir)
   mkdir -p "$dir"
-  local no_display="false"
-  [ "$hidden" = "true" ] && no_display="true"
   cat >"$dir/$name" <<DESKTOP
 [Desktop Entry]
 Type=Application
@@ -266,8 +264,6 @@ Name=$name
 Exec=$exec_path
 X-GNOME-Autostart-enabled=true
 X-GNOME-Autostart-Delay=0
-NoDisplay=$no_display
-Hidden=$no_display
 DESKTOP
 }
 
@@ -405,16 +401,15 @@ app_actual_state() {
 }
 
 # app_converge KEY ENTRY_JSON — Apply declared state for one app.
-# autostartDisableNative first neutralizes the app's own native auto-start (so only our
-# mechanism remains), then we add/remove our login item per `autostartEnabled`.
+# Every kind we can converge first neutralizes the app's own native auto-start
+# (so only our mechanism remains), then we add or remove our entry per
+# `autostartEnabled`.
 app_converge() {
   local key="$1" entry_json="$2"
-  local kind enabled disable_native path hidden
+  local kind enabled path name
   kind=$(echo "$entry_json" | jq -r '.hostEntry.kind')
-  enabled=$(echo "$entry_json" | jq -r '.hostEntry.autostartEnabled')
-  disable_native=$(echo "$entry_json" | jq -r '.hostEntry.autostartDisableNative')
+  enabled=$(echo "$entry_json" | jq -r '.hostEntry.autostartEnabled // false')
   path=$(echo "$entry_json" | jq -r '.hostEntry.path // empty')
-  hidden=$(echo "$entry_json" | jq -r '.hostEntry.hidden // false')
 
   case "$kind" in
   macos-launchagent)
@@ -424,11 +419,9 @@ app_converge() {
       warn -l "$key" "missing bundleId — skipping"
       return 1
     fi
-    if [ "$disable_native" = "true" ]; then
-      # Remove any app-owned LaunchAgent plist (e.g. AltTab's startAtLogin plist)
-      # that would start the app independently of our mechanism.
-      macos_remove_app_launchagent "$bundle_id" "$path" || true # check-suppress:suppression_doc: app-owned plist may be absent; removal is best-effort.
-    fi
+    # Remove any app-owned LaunchAgent plist (e.g. AltTab's startAtLogin plist)
+    # that would start the app independently of our mechanism.
+    macos_remove_app_launchagent "$bundle_id" "$path" || true # check-suppress:suppression_doc: app-owned plist may be absent; removal is best-effort.
     if [ "$enabled" = "true" ]; then
       macos_launchagent_ensure "$bundle_id" "$path" || die -l "$key" "failed to ensure LaunchAgent plist"
     else
@@ -476,14 +469,12 @@ app_converge() {
     fi
     ;;
   nixos-xdg-desktop)
-    if [ "$disable_native" = "true" ]; then
-      # Neutralize any app-shipped autostart .desktop (e.g. steam.desktop)
-      # so only our uniform mechanism remains.
-      xdg_native_autostart_remove "$path"
-    fi
+    # Neutralize any app-shipped autostart .desktop (e.g. steam.desktop)
+    # so only our uniform mechanism remains.
+    xdg_native_autostart_remove "$path"
     name=$(app_desktop_filename "$key")
     if [ "$enabled" = "true" ]; then
-      xdg_desktop_write "$name" "$path" "$hidden" || die -l "$key" "failed to write autostart .desktop"
+      xdg_desktop_write "$name" "$path" || die -l "$key" "failed to write autostart .desktop"
     else
       xdg_desktop_remove "$name" || true # check-suppress:suppression_doc: our autostart .desktop may already be absent; removal is best-effort.
     fi

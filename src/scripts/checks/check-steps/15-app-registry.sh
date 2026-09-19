@@ -44,26 +44,28 @@ run_app_registry() {
         (if .value.type == "omitted" then (.value.justification | type == "string" and length > 0) else true end | tostring)
       ] | @tsv' "$_app_json")
 
-    # autostartEnabled / autostartDisableNative must be booleans; kind must be in the schema enum;
+    # autostartEnabled must be boolean, and kind must be in the schema enum;
     # a platform-prefixed kind must match its host platform.
-    while IFS=$'\t' read -r _name _host _type _platform _enabled _disable_native _kind _has_approval; do
+    while IFS=$'\t' read -r _name _host _type _platform _enabled _kind _has_approval; do
       # Omitted hosts carry no runtime fields; the first loop already validated
       # their justification. Skip boolean/kind checks for them.
       [ "$_type" = "omitted" ] && continue
-      case "$_enabled" in
-      true | false) ;;
-      *)
-        error "apps.json: '$_name' host '$_host' autostartEnabled must be boolean (got '$_enabled')"
-        _app_errors=$((_app_errors + 1))
-        ;;
-      esac
-      case "$_disable_native" in
-      true | false) ;;
-      *)
-        error "apps.json: '$_name' host '$_host' autostartDisableNative must be boolean (got '$_disable_native')"
-        _app_errors=$((_app_errors + 1))
-        ;;
-      esac
+      # autostartEnabled is required for every kind we launch and forbidden for
+      # 'manual' — nothing is launched, so a toggle there would be a lie.
+      if [ "$_kind" = "manual" ]; then
+        if [ "$_enabled" != "missing" ]; then
+          error "apps.json: '$_name' host '$_host' kind 'manual' must not set autostartEnabled"
+          _app_errors=$((_app_errors + 1))
+        fi
+      else
+        case "$_enabled" in
+        true | false) ;;
+        *)
+          error "apps.json: '$_name' host '$_host' autostartEnabled must be boolean (got '$_enabled')"
+          _app_errors=$((_app_errors + 1))
+          ;;
+        esac
+      fi
       if [ "$_kind" != "missing" ]; then
         local _kind_valid=false
         local _valid
@@ -113,7 +115,6 @@ run_app_registry() {
         (.value.type // "missing"),
         (.value.platform // "missing"),
         (if (.value | has("autostartEnabled")) then (.value.autostartEnabled | tostring) else "missing" end),
-        (if (.value | has("autostartDisableNative")) then (.value.autostartDisableNative | tostring) else "missing" end),
         (.value.kind // "missing"),
         (if (.value | has("approvalInstructions")) and (.value.approvalInstructions | type == "string") and (.value.approvalInstructions | length > 0) then "true" else "false" end)
       ] | @tsv' "$_app_json")

@@ -7,7 +7,6 @@
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": true,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "path": "/Applications/Raycast.app",
         "bundleId": "com.raycast.macos",
@@ -40,7 +39,6 @@
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": true,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "path": "/Applications/Amphetamine.app",
         "bundleId": "com.if.Amphetamine",
@@ -73,7 +71,6 @@
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": true,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "path": "/Applications/Stats.app",
         "bundleId": "eu.exelban.Stats",
@@ -106,7 +103,6 @@
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": true,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "path": "/Applications/BetterDisplay.app",
         "bundleId": "pro.betterdisplay.BetterDisplay",
@@ -139,13 +135,11 @@
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": true,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "path": "/Applications/MiddleClick.app",
         "bundleId": "com.rouge41.middleclick",
         "menuBarIcon": {
           "kind": "manual",
-          "provisioned": false,
           "iconVisible": false
         }
       },
@@ -168,7 +162,6 @@
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": true,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "path": "/Applications/Mounty.app",
         "bundleId": "com.mounty.app",
@@ -201,7 +194,6 @@
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": true,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "path": "/Applications/LinearMouse.app",
         "bundleId": "com.lujjjh.LinearMouse",
@@ -234,7 +226,6 @@
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "path": "/Applications/LuLu.app",
         "bundleId": "com.objective-see.LuLu",
@@ -267,7 +258,6 @@
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "path": "/Applications/OrbStack.app",
         "bundleId": "com.orbstack.orbstack",
@@ -300,37 +290,31 @@
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": true,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "path": "/Applications/Parsec.app",
         "bundleId": "tv.parsec.www",
         "menuBarIcon": {
           "kind": "manual",
-          "provisioned": false,
           "iconVisible": false
         }
       },
       "NixOS": {
         "platform": "NixOS",
         "autostartEnabled": true,
-        "autostartDisableNative": true,
         "kind": "nixos-xdg-desktop",
         "path": "/run/current-system/sw/bin/parsec",
         "menuBarIcon": {
           "kind": "manual",
-          "provisioned": false,
           "iconVisible": false
         }
       },
       "Windows": {
         "platform": "Windows",
         "autostartEnabled": true,
-        "autostartDisableNative": true,
         "kind": "windows-run-key",
         "path": "C:\\Program Files\\Parsec\\parsec.exe",
         "menuBarIcon": {
           "kind": "manual",
-          "provisioned": false,
           "iconVisible": false
         }
       }
@@ -343,37 +327,31 @@
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "bundleId": "RimSort",
         "path": "/Applications/RimSort.app",
         "menuBarIcon": {
           "kind": "manual",
-          "provisioned": false,
           "iconVisible": false
         }
       },
       "NixOS": {
         "platform": "NixOS",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "nixos-xdg-desktop",
         "path": "/run/current-system/sw/bin/rimsort",
         "menuBarIcon": {
           "kind": "manual",
-          "provisioned": false,
           "iconVisible": false
         }
       },
       "Windows": {
         "platform": "Windows",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "windows-run-key",
         "path": "C:\\Program Files\\RimSort\\RimSort.exe",
         "menuBarIcon": {
           "kind": "manual",
-          "provisioned": false,
           "iconVisible": false
         }
       }
@@ -386,37 +364,31 @@
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "path": "/Applications/Telegram.app",
         "bundleId": "ru.keepcoder.Telegram",
         "menuBarIcon": {
           "kind": "manual",
-          "provisioned": false,
           "iconVisible": false
         }
       },
       "NixOS": {
         "platform": "NixOS",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "nixos-xdg-desktop",
         "path": "/run/current-system/sw/bin/telegram-desktop",
         "menuBarIcon": {
           "kind": "manual",
-          "provisioned": false,
           "iconVisible": false
         }
       },
       "Windows": {
         "platform": "Windows",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "windows-run-key",
         "path": "%LOCALAPPDATA%\\Telegram Desktop\\Telegram.exe",
         "menuBarIcon": {
           "kind": "manual",
-          "provisioned": false,
           "iconVisible": false
         }
       }
@@ -429,13 +401,11 @@
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "path": "/Applications/WhatsApp.app",
         "bundleId": "net.whatsapp.WhatsApp",
         "menuBarIcon": {
           "kind": "manual",
-          "provisioned": false,
           "iconVisible": false
         }
       },
@@ -447,12 +417,10 @@
       "Windows": {
         "platform": "Windows",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "windows-run-key",
         "path": "%LOCALAPPDATA%\\WhatsApp\\WhatsApp.exe",
         "menuBarIcon": {
           "kind": "manual",
-          "provisioned": false,
           "iconVisible": false
         }
       }
@@ -465,37 +433,31 @@
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "path": "/Applications/Steam.app",
         "bundleId": "com.valvesoftware.steam",
         "menuBarIcon": {
           "kind": "manual",
-          "provisioned": false,
           "iconVisible": false
         }
       },
       "NixOS": {
         "platform": "NixOS",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "nixos-xdg-desktop",
         "path": "/run/current-system/sw/bin/steam",
         "menuBarIcon": {
           "kind": "manual",
-          "provisioned": false,
           "iconVisible": false
         }
       },
       "Windows": {
         "platform": "Windows",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "windows-run-key",
         "path": "C:\\Program Files (x86)\\Steam\\steam.exe",
         "menuBarIcon": {
           "kind": "manual",
-          "provisioned": false,
           "iconVisible": false
         }
       }
@@ -508,7 +470,6 @@
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": true,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "path": "/Applications/AltTab.app",
         "bundleId": "com.lwouis.alt-tab-macos",
@@ -541,7 +502,6 @@
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": true,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "path": "/Applications/battery.app",
         "bundleId": "com.fiplab.battery",
@@ -574,7 +534,6 @@
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": true,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "path": "/Applications/Rectangle.app",
         "bundleId": "com.knollsoft.Rectangle",
@@ -607,7 +566,6 @@
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": true,
-        "autostartDisableNative": false,
         "kind": "macos-system-extension",
         "bundleId": "io.macfuse.app.fsmodule.macfuse",
         "approvalInstructions": "System Settings → General → Login Items & Extensions → by category → File System Extensions → enable macFUSE.",
@@ -632,7 +590,6 @@
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": true,
-        "autostartDisableNative": false,
         "kind": "macos-system-extension",
         "bundleId": "com.google.chromeremotedesktop.me2me-host",
         "approvalInstructions": "Not a system extension. Grant Accessibility and Screen Recording in System Settings → Privacy & Security (see MANUAL.md).",
@@ -640,16 +597,12 @@
       },
       "NixOS": {
         "platform": "NixOS",
-        "autostartEnabled": true,
-        "autostartDisableNative": false,
         "kind": "manual",
         "approvalInstructions": "Not a system extension. Install Google's Debian package, add your user to the chrome-remote-desktop group, write ~/.chrome-remote-desktop-session, then authorize the host at remotedesktop.google.com/access (see MANUAL.md).",
         "justification": "No nixpkgs package exists (nixpkgs#34084 closed as not planned); the host runs its own X11 virtual session, so a Wayland login connects to a black screen."
       },
       "Windows": {
         "platform": "Windows",
-        "autostartEnabled": true,
-        "autostartDisableNative": false,
         "kind": "manual",
         "approvalInstructions": "Not a system extension. Authorize the host at remotedesktop.google.com/access in Chrome (name the host, set a PIN); its installer owns the service (see MANUAL.md).",
         "justification": "Installed by WinGet as Google.ChromeRemoteDesktopHost; its installer registers the service, so there is nothing for activation to converge."
@@ -663,7 +616,6 @@
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "path": "/Applications/Discord.app",
         "bundleId": "com.hnc.Discord",
@@ -676,7 +628,6 @@
       "NixOS": {
         "platform": "NixOS",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "nixos-xdg-desktop",
         "path": "/run/current-system/sw/bin/discord",
         "menuBarIcon": {
@@ -689,7 +640,6 @@
       "Windows": {
         "platform": "Windows",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "windows-run-key",
         "path": "%LOCALAPPDATA%\\Discord\\Discord.exe",
         "menuBarIcon": {
@@ -707,7 +657,6 @@
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "path": "/Applications/Discord Canary.app",
         "bundleId": "com.hnc.DiscordCanary",
@@ -720,7 +669,6 @@
       "NixOS": {
         "platform": "NixOS",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "nixos-xdg-desktop",
         "path": "/run/current-system/sw/bin/discord-canary",
         "menuBarIcon": {
@@ -732,7 +680,6 @@
       "Windows": {
         "platform": "Windows",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "windows-run-key",
         "path": "%LOCALAPPDATA%\\DiscordCanary\\DiscordCanary.exe",
         "menuBarIcon": {

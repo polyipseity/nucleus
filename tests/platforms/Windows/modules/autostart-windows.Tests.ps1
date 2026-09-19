@@ -26,15 +26,15 @@ BeforeAll {
   $Script:Registry = @{
     'Parsec' = @{
       displayName = 'Parsec'
-      hostEntry   = @{ platform = 'Windows'; autostartEnabled = $true; autostartDisableNative = $true; kind = 'windows-run-key'; path = 'C:\Program Files\Parsec\parsec.exe' }
+      hostEntry   = @{ platform = 'Windows'; autostartEnabled = $true; kind = 'windows-run-key'; path = 'C:\Program Files\Parsec\parsec.exe' }
     }
     'Steam' = @{
       displayName = 'Steam'
-      hostEntry   = @{ platform = 'Windows'; autostartEnabled = $false; autostartDisableNative = $true; kind = 'windows-run-key'; path = 'C:\Program Files (x86)\Steam\steam.exe' }
+      hostEntry   = @{ platform = 'Windows'; autostartEnabled = $false; kind = 'windows-run-key'; path = 'C:\Program Files (x86)\Steam\steam.exe' }
     }
     'Telegram' = @{
       displayName = 'Telegram'
-      hostEntry   = @{ platform = 'Windows'; autostartEnabled = $true; autostartDisableNative = $true; kind = 'windows-startup-folder'; path = 'C:\Users\test\AppData\Telegram.exe' }
+      hostEntry   = @{ platform = 'Windows'; autostartEnabled = $true; kind = 'windows-startup-folder'; path = 'C:\Users\test\AppData\Telegram.exe' }
     }
     'ManualApp' = @{
       displayName = 'Manual App'

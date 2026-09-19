@@ -39,7 +39,6 @@ make_fixture() {
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "path": "/Applications/AppOwned.app",
         "bundleId": "com.example.appowned"
@@ -63,7 +62,6 @@ make_fixture() {
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "path": "/Applications/ArrayApp.app",
         "bundleId": "com.example.arrayapp"
@@ -87,7 +85,6 @@ make_fixture() {
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": false,
-        "autostartDisableNative": true,
         "kind": "macos-launchagent",
         "path": "/Applications/ForeignApp.app",
         "bundleId": "com.example.foreignapp"
@@ -111,7 +108,6 @@ make_fixture() {
       "MacBook": {
         "platform": "macOS",
         "autostartEnabled": true,
-        "autostartDisableNative": false,
         "kind": "macos-system-extension",
         "bundleId": "io.macfuse.app.fsmodule.macfuse",
         "approvalInstructions": "fixture approval instructions"

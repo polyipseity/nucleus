@@ -132,8 +132,7 @@ function Set-MenuBarNative {
   param([string]$Key, [hashtable]$Entry, [bool]$Visible)
   $icon = $Entry.hostEntry.menuBarIcon
   $kind = $icon.kind
-  $provisioned = if ($icon.ContainsKey('provisioned')) { [bool]$icon.provisioned } else { $true }
-  if ($kind -eq 'manual' -or -not $provisioned) {
+  if ($kind -eq 'manual') {
     Write-NucleusInfo -CommandName 'menu-bar' "$Key — manual icon entry; not auto-provisioned (set in the app's UI)"
     return 0
   }
@@ -195,8 +194,7 @@ function Get-MenuBarActualVisible {
   param([hashtable]$Entry)
   $icon = $Entry.hostEntry.menuBarIcon
   $kind = $icon.kind
-  $provisioned = if ($icon.ContainsKey('provisioned')) { [bool]$icon.provisioned } else { $true }
-  if ($kind -eq 'manual' -or -not $provisioned) {
+  if ($kind -eq 'manual') {
     return 'manual'
   }
   $desiredVisible = [bool]$icon.iconVisible

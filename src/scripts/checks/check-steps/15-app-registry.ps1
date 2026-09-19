@@ -40,28 +40,25 @@ Register-Step -Id "app-registry" -Name "App auto-start registry validation" -Act
           continue
         }
 
-        # autostartEnabled must be boolean.
-        if ($entry.ContainsKey('autostartEnabled')) {
-          $enabled = $entry.autostartEnabled
-          if ($enabled -isnot [bool]) {
-            Write-ErrorMessage "apps.json: '$appName' host '$hostName' autostartEnabled must be boolean (got '$enabled')"
+        # autostartEnabled is required for every kind we launch and forbidden for
+        # 'manual' — nothing is launched, so a toggle there would be a lie.
+        $entryKind = if ($hEntry.ContainsKey('kind')) { $hEntry.kind } else { 'missing' }
+        $enabled = if ($hEntry.ContainsKey('autostartEnabled')) { $hEntry.autostartEnabled } else { $null }
+        if ($entryKind -eq 'manual') {
+          if ($null -ne $enabled) {
+            Write-ErrorMessage "apps.json: '$appName' host '$hostName' kind 'manual' must not set autostartEnabled"
             $appErrors++
           }
         }
-
-        # autostartDisableNative must be boolean.
-        if ($hEntry.ContainsKey('autostartDisableNative')) {
-          $disableNative = $hEntry.autostartDisableNative
-          if ($disableNative -isnot [bool]) {
-            Write-ErrorMessage "apps.json: '$appName' host '$hostName' autostartDisableNative must be boolean (got '$disableNative')"
-            $appErrors++
-          }
+        elseif ($enabled -isnot [bool]) {
+          Write-ErrorMessage "apps.json: '$appName' host '$hostName' autostartEnabled must be boolean (got '$enabled')"
+          $appErrors++
         }
 
         # kind must be in the valid enum (if present), and a platform-prefixed
         # kind must match its host platform.
-        if ($hEntry.ContainsKey('kind')) {
-          $kind = $hEntry.kind
+        if ($entryKind -ne 'missing') {
+          $kind = $entryKind
           if ($kind -notin $validKinds) {
             Write-ErrorMessage "apps.json: '$appName' host '$hostName' has invalid kind '$kind'"
             $appErrors++
