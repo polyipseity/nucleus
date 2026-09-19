@@ -160,7 +160,12 @@ fi
 
 if [ "$_mount_status" -eq 0 ]; then
   warn -l cloud-drives "rclone mount for '$mount_point' exited with status 0 after ${_mount_seconds}s without a live mount; check the remote and the mount point."
-else
-  warn -l cloud-drives "rclone mount for '$mount_point' exited with status $_mount_status after ${_mount_seconds}s."
+  # WHY: rclone exits 0 both when its volume is destroyed seconds after the mount
+  #   appeared and when the mount never attached, so a clean exit here is a
+  #   failure: exit non-zero to let KeepAlive{SuccessfulExit:false} reload the
+  #   mount (launchd throttles the retry) rather than leave the drive missing
+  #   until the next reboot.  The next start releases a leftover volume first.
+  exit 1
 fi
+warn -l cloud-drives "rclone mount for '$mount_point' exited with status $_mount_status after ${_mount_seconds}s."
 exit "$_mount_status"
