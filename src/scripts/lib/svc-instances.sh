@@ -14,6 +14,10 @@
 #   svc_instance_log_dirs     <entryJson> <logRoot> <systemLogRoot> <instanceId>
 #   svc_configured_instance_ids <entryJson> <mountsJson>
 #   svc_configured_mounts     <repoRoot> <host> [username]
+#   svc_cloud_mount_point     <entryJson> <mountsJson> <instanceId> [userHome]
+#   svc_wait_mount_released   <mountPoint> [timeoutSeconds]
+#   svc_mount_table_contains  <mountPoint> [probeSeconds]
+#   svc_run_bounded           <seconds> <command...>
 #   svc_notloaded_transition  <key> <stateDir>
 #   svc_notloaded_clear       <key> <stateDir>
 #
@@ -156,6 +160,115 @@ svc_configured_mounts() {
   lib_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
   "$lib_dir/load-user-registry.sh" --host "$host" --repo-root "$repo_root" |
     jq -c --arg user "$username" '.[$user].cloudDrives.mounts // []'
+}
+
+# svc_cloud_mount_point — Mount point of a cloud-drive instance, if any.
+# Args: $1 — prefix-match host entry JSON; $2 — mounts array JSON (user registry
+#       cloud-drives); $3 — concrete instance id; $4 — user home
+#       (default: $HOME).
+# Output: the absolute mount point; nothing when the instance is not one of the
+#       declared cloud drives, which callers read as "no mount to wait for".
+# WHY: the path is <home>/<localPath>, the derivation src/modules/cloud-drives.nix
+#   feeds the mount wrapper, so the runtime side never invents a second spelling
+#   of the registry's mount location. The loader already resolved host-keyed
+#   localPath variants, so only a string is a mount point.
+svc_cloud_mount_point() {
+  local entry="$1" mounts="$2" instance="$3" home="${4:-${HOME:-}}" suffix local_path
+
+  [ -n "$home" ] || return 0
+  suffix="$(svc_instance_suffix "$entry" "$instance")"
+  # check-suppress:suppression_doc: a mounts array that cannot be parsed yields no mount point, which every caller treats as a service without one; jq reports the parse failure itself.
+  local_path="$(printf '%s' "$mounts" | jq -r --arg id "$suffix" '
+    [.[]? | select(.id == $id) | .localPath | select(type == "string")] | first // ""
+  ')" || return 0
+  [ -n "$local_path" ] || return 0
+
+  printf '%s/%s\n' "${home%/}" "$local_path"
+}
+
+# svc_wait_mount_released — Wait for a mount point to leave the mount table.
+# Args: $1 — absolute mount point; $2 — timeout in seconds (default 30).
+# Returns 0 once the path is not mounted (including when it never was), 1 when
+# it is still mounted after the timeout.
+# WHY: a service manager reload must not start while the previous volume is
+#   still attached — the new mount is then destroyed as a duplicate and the
+#   drive stays missing until a reboot. Callers report the timeout instead of
+#   reloading.
+svc_wait_mount_released() {
+  local mount_point="$1" timeout="${2:-30}" ticks=0 max_ticks
+
+  [ -n "$mount_point" ] || return 0
+  max_ticks=$((timeout * 2))
+
+  while svc_mount_table_contains "$mount_point"; do
+    if [ "$ticks" -ge "$max_ticks" ]; then
+      return 1
+    fi
+    sleep 0.5
+    ticks=$((ticks + 1))
+  done
+
+  return 0
+}
+
+# svc_mount_table_contains — Whether the mount table lists a path.
+# Args: $1 — absolute mount point; $2 — probe bound in seconds (default 10).
+# Returns 0 when the path is mounted, 1 when it is not.
+# WHY: a probe that hits its bound reports "mounted" — a volume that cannot even
+#   be listed must never be treated as free, or the next mount would land on top
+#   of it.
+svc_mount_table_contains() {
+  local mount_point="$1" bound="${2:-10}" status=0 table=""
+
+  # check-suppress:suppression_doc: a probe that fails or outlives its bound is classified below; its own status is not the answer.
+  table="$(svc_run_bounded "$bound" mount 2>/dev/null)" || status=$?
+  if [ "$status" -eq 124 ]; then
+    return 0
+  fi
+  if [ -z "$table" ]; then
+    warn -l svc-instances "could not read the mount table; assuming '$mount_point' is not mounted."
+    return 1
+  fi
+
+  case "$table" in
+  *" on $mount_point ("*) return 0 ;;
+  *) return 1 ;;
+  esac
+}
+
+# svc_run_bounded — Run a command under a wall-clock bound.
+# Args: $1 — bound in seconds; remaining args — command and arguments.
+# Exit: the command's own status, 124 when the bound elapsed, or the command's
+#       failure status when it could not be run at all.
+# WHY: a hung macFUSE/FSKit volume blocks the mount table and any stat of the
+#   volume inside the kernel, and these scripts have no 'timeout' binary on
+#   PATH, so a probe that can touch a mount carries its own bound — one dead
+#   volume would otherwise hang the watchdog and the whole nucleus-svc CLI.
+svc_run_bounded() {
+  local bound="$1"
+  shift
+  local pid ticks=0 max_ticks
+  max_ticks=$((bound * 5))
+
+  "$@" &
+  pid=$!
+
+  while kill -0 "$pid" 2>/dev/null; do
+    if [ "$ticks" -ge "$max_ticks" ]; then
+      # check-suppress:suppression_doc: the command already outlived its bound; signalling and reaping a process that ignores the signal must not change the timeout answer.
+      kill -TERM "$pid" 2>/dev/null || true
+      sleep 0.2
+      # check-suppress:suppression_doc: same as above — the kill and the reap are best effort, the bound is the answer.
+      kill -KILL "$pid" 2>/dev/null || true
+      # check-suppress:suppression_doc: same as above.
+      wait "$pid" 2>/dev/null || true
+      return 124
+    fi
+    sleep 0.2
+    ticks=$((ticks + 1))
+  done
+
+  wait "$pid"
 }
 
 # svc_list_contains — Whether a value is one of the newline-separated items.

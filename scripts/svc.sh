@@ -541,15 +541,52 @@ $_csp_ports
 EOF
 }
 
+# CLOUD_MOUNT_RELEASE_TIMEOUT — Seconds a stop/restart waits for a cloud mount
+# to leave the mount table before refusing to reload its agent.
+# WHY: a reload that starts while the previous volume is still attached gets the
+#   new mount destroyed as a duplicate, which leaves the drive missing until the
+#   next reboot.
+CLOUD_MOUNT_RELEASE_TIMEOUT=30
+
+# cloud_mount_point — Mount point of a cloud-drive instance, if any.
+# Args: $1 — prefix-match host entry JSON ("" for an ordinary service);
+#       $2 — concrete instance id.
+# Output: the absolute mount point; nothing for a service without a mount.
+cloud_mount_point() {
+  local prefix_entry="$1" instance="$2"
+
+  [ -n "$prefix_entry" ] || return 0
+  svc_cloud_mount_point "$prefix_entry" "$(configured_mounts)" "$instance"
+}
+
+# wait_cloud_mount_released — Block until a cloud mount's volume is gone.
+# Args: $1 — service name (for the report); $2 — mount point ("" ⇒ no-op).
+# Returns 1 with a hard error when the mount is still attached after the bound.
+# WHY: a mount that never releases needs an operator (unmount it, or reboot),
+#   not another agent started on top of it.
+wait_cloud_mount_released() {
+  local name="$1" mount_point="$2"
+
+  [ -n "$mount_point" ] || return 0
+  if svc_wait_mount_released "$mount_point" "$CLOUD_MOUNT_RELEASE_TIMEOUT"; then
+    return 0
+  fi
+
+  error "$name — mount point $mount_point is still mounted after ${CLOUD_MOUNT_RELEASE_TIMEOUT}s; not reloading the agent over a stale volume"
+  return 1
+}
+
 # svc_action — Perform an action on a single service.
 # Args: $1 — action (status|start|stop|restart|enable|disable);
-#        $2 — service name; $3 — platform JSON.
+#        $2 — service name; $3 — platform JSON;
+#        $4 — prefix-match host entry JSON ("" for an ordinary service).
 # Side effects: service-manager operations; may kill port-holding processes.
 # Returns 1 (with a diagnostic warning) when a start/restart ends inactive.
 svc_action() {
   local action="$1"
   local name="$2"
   local entry_json="$3"
+  local prefix_entry="${4:-}"
 
   local svc_type svc_id
   svc_type=$(echo "$entry_json" | jq -r '.type')
@@ -567,6 +604,9 @@ svc_action() {
     [ "$scope" = "system" ] && sudo_prefix="sudo"
     local target
     target=$(launchctl_target "$launchd_domain" "$uid" "$svc_id")
+
+    local cloud_mount=""
+    cloud_mount="$(cloud_mount_point "$prefix_entry" "$svc_id")"
 
     local plist=""
     if [ "$scope" = "system" ]; then
@@ -603,9 +643,26 @@ svc_action() {
         return 1
       }
       ;;
-    stop) $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 ;;
+    stop)
+      local stop_rc=0
+      $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 || stop_rc=$?
+      if ! wait_cloud_mount_released "$name" "$cloud_mount"; then
+        return 1
+      fi
+      return "$stop_rc"
+      ;;
     restart)
       cleanup_service_ports "$entry_json"
+      # WHY: release the volume before anything reloads the agent — a reload
+      #   over a mount that is still attached gets the new mount destroyed as a
+      #   duplicate.
+      if [ -n "$cloud_mount" ]; then
+        # check-suppress:suppression_doc: the agent may already be stopped; kill on an absent job must not abort the reload.
+        $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 || true
+        if ! wait_cloud_mount_released "$name" "$cloud_mount"; then
+          return 1
+        fi
+      fi
       recover_launchctl_service "$launchd_domain" "$svc_id" "$sudo_prefix" "$uid" || {
         # check-suppress:suppression_doc: service may not be loaded; kill on an absent service exits 1.
         $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 || true
@@ -894,7 +951,14 @@ do_action() {
       continue
     fi
 
-    if ! svc_action "$action" "$json_key" "$svc_json"; then
+    # Prefix-match entries declare the instance-id prefix and therefore the
+    # cloud drive each instance mounts; an ordinary service has no prefix entry.
+    local _d_prefix_entry=""
+    if [ "$(printf '%s' "$registry" | jq -r --arg k "$key" '.[$k].hostEntry.prefixMatch // false')" = "true" ]; then
+      _d_prefix_entry="$(printf '%s' "$registry" | jq -c --arg k "$key" '.[$k].hostEntry')"
+    fi
+
+    if ! svc_action "$action" "$json_key" "$svc_json" "$_d_prefix_entry"; then
       warn "$json_key — action $action failed"
       overall_exit=1
     fi
