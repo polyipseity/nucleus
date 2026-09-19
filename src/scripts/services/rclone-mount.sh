@@ -34,6 +34,71 @@ case "$rclone_remotes" in
   ;;
 esac
 
+# _cd_run_bounded <seconds> <command...> — run a command under a wall-clock bound.
+# Exit: the command's own status, or 124 when the bound elapsed.
+# WHY: a hung macFUSE/FSKit volume blocks mount(8) and diskutil inside the
+#   kernel, and this script has no 'timeout' binary on PATH, so every probe that
+#   can touch a mount carries its own bound.
+_cd_run_bounded() {
+  _rb_bound="$1"
+  shift
+  _rb_ticks=0
+  _rb_max=$((_rb_bound * 5))
+  "$@" &
+  _rb_pid=$!
+  while kill -0 "$_rb_pid" 2>/dev/null; do
+    if [ "$_rb_ticks" -ge "$_rb_max" ]; then
+      # check-suppress:suppression_doc: the command already outlived its bound; the signals and the reap are best effort and the bound is the answer.
+      kill -TERM "$_rb_pid" 2>/dev/null || true
+      sleep 0.2
+      # check-suppress:suppression_doc: same as above — the bound is the answer, not the cleanup.
+      kill -KILL "$_rb_pid" 2>/dev/null || true
+      # check-suppress:suppression_doc: same as above.
+      wait "$_rb_pid" 2>/dev/null || true
+      return 124
+    fi
+    sleep 0.2
+    _rb_ticks=$((_rb_ticks + 1))
+  done
+  _rb_status=0
+  wait "$_rb_pid" || _rb_status=$?
+  return "$_rb_status"
+}
+
+# _cd_mount_table_has <path> — whether the mount table lists PATH.
+# Returns 0 when mounted, 1 when not.  A probe that outlives its bound counts as
+# mounted, so nothing is ever mounted on top of a volume that cannot be listed.
+_cd_mount_table_has() {
+  _mth_status=0
+  _mth_table=""
+  # check-suppress:suppression_doc: a probe that fails or outlives its bound is classified below; its own status is not the answer.
+  _mth_table="$(_cd_run_bounded 10 mount)" || _mth_status=$?
+  if [ "$_mth_status" -eq 124 ]; then
+    return 0
+  fi
+  case "$_mth_table" in
+  *" on $1 ("*) return 0 ;;
+  esac
+  return 1
+}
+
+# WHY: a volume that is still attached here is the leftover of a mount that did
+#   not finish unmounting (or a foreign mount), and mounting on top of it gets
+#   the new volume destroyed seconds later.  It is released first, and refused
+#   when it cannot be, because only an operator can clear a wedged volume.
+if _cd_mount_table_has "$mount_point"; then
+  warn -l cloud-drives "a volume is still attached at '$mount_point'; releasing it before mounting."
+  _cd_unmount_status=0
+  if command -v diskutil >/dev/null 2>&1; then
+    # check-suppress:suppression_doc: the outcome is read back from the mount table below, so this command's own status is only reported with the refusal.
+    _cd_run_bounded 30 diskutil unmount force "$mount_point" >/dev/null 2>&1 || _cd_unmount_status=$?
+  fi
+  if _cd_mount_table_has "$mount_point"; then
+    error -l cloud-drives "volume at '$mount_point' is still attached after 'diskutil unmount force' (status $_cd_unmount_status); refusing to mount over it. Release it with 'sudo umount -f \"$mount_point\"' and re-apply, or reboot."
+    exit 1
+  fi
+fi
+
 # Run rclone in the foreground instead of exec'ing it, so its exit is always
 # reported and a stop request is never left half-done.
 #
