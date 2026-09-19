@@ -85,6 +85,15 @@ let
     scriptName = "src/scripts/notify/harness-approval";
     runtimeInputs = [ pkgs.jq ];
   };
+
+  # Turn-end entry point: notify, then inject a prompt queued with
+  # `/harness send`.  Stop hooks call this instead of harness-notify so the
+  # notification half still has a single implementation.
+  harnessDrive = pkgs.writeNucleusShellApplication {
+    name = "harness-drive";
+    scriptName = "src/scripts/notify/harness-drive";
+    runtimeInputs = [ pkgs.jq ];
+  };
 in
 {
   # WHY: OpenCode discovers global agents under ~/.config/opencode/agents and
@@ -102,6 +111,8 @@ in
     # Same contract for blocking approval hooks: a hook calls this, and it waits
     # for a remote decision before answering the harness.
     ".local/bin/harness-approval".source = "${harnessApproval}/bin/nucleus-harness-approval";
+    # Same contract for turn-end hooks (see harnessDrive above).
+    ".local/bin/harness-drive".source = "${harnessDrive}/bin/nucleus-harness-drive";
   };
 
   home.activation.unprotect-opencode-symlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''

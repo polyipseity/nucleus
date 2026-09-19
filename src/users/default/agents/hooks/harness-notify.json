@@ -1,10 +1,17 @@
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "harness-approval hook copilot",
+        "timeout": 130
+      }
+    ],
     "Stop": [
       {
         "type": "command",
-        "command": "harness-notify copilot done",
-        "timeout": 15
+        "command": "harness-drive copilot",
+        "timeout": 130
       }
     ]
   }

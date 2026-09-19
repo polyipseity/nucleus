@@ -1,11 +1,13 @@
 /**
  * Pi extension that routes pi lifecycle events to the shared harness
- * notification entry point (`harness-notify`, deployed to ~/.local/bin).
+ * notification entry point (`harness-notify`, deployed to ~/.local/bin) and
+ * delivers prompts queued from a messaging channel (`/harness send pi <text>`).
  *
  * Two events matter for notification purposes:
  *   - `agent_settled`   — pi will not continue on its own, so the turn is done.
  *                         (`agent_end` is too early: auto-retry, auto-compact
- *                         and queued follow-ups still run afterwards.)
+ *                         and queued follow-ups still run afterwards.)  It is
+ *                         also the moment a queued remote prompt is injected.
  *   - `ui_prompt_start` — pi is blocked on the user (select/confirm/input/…).
  *
  * Only *when* to speak is decided here; channel selection and message
@@ -16,13 +18,81 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { basename } from "node:path";
+import { readdirSync, readFileSync, unlinkSync } from "node:fs";
+import { homedir } from "node:os";
+import { basename, join } from "node:path";
 
 const NOTIFY_COMMAND = "harness-notify";
 // Bounds the wait at agent settle; any longer and a wedged network call would
 // visibly delay the next prompt.
 const NOTIFY_TIMEOUT_MS = 15_000;
 const FAILED_NOTIFICATION_CAP = 3;
+
+/**
+ * Nucleus USER root, mirroring derive_nucleus_user_root in
+ * src/scripts/lib/lib.sh.  pi is provisioned on macOS, NixOS and Windows, so the
+ * path cannot be platform-specific.
+ */
+function nucleusUserRoot(): string {
+  if (process.platform === "darwin") {
+    return join(homedir(), "Library", "Application Support", "nucleus");
+  }
+  if (process.platform === "win32") {
+    const localAppData = process.env.LOCALAPPDATA;
+    return localAppData
+      ? join(localAppData, "nucleus")
+      : join(homedir(), "AppData", "Local", "nucleus");
+  }
+  return join(homedir(), ".local", "share", "nucleus");
+}
+
+/**
+ * Consume one prompt queued by `/harness send pi <text>`, or null when the queue
+ * is empty.  The file is deleted before its text is returned: the queue is the
+ * only loop guard this path has, so a prompt must never be delivered twice.
+ */
+function takeQueuedPrompt(): string | null {
+  const dir = join(
+    nucleusUserRoot(),
+    "state",
+    "harness-bridge",
+    "commands",
+    "pi",
+  );
+
+  let names: string[];
+  try {
+    names = readdirSync(dir).filter((name) => name.endsWith(".json"));
+  } catch {
+    // No queue directory yet: the ordinary state before the first /harness send.
+    return null;
+  }
+
+  // The bridge names each entry "<epoch>-<id>.json", so the lexicographic
+  // maximum is the most recently queued prompt.
+  let newest = "";
+  for (const name of names) {
+    if (name > newest) newest = name;
+  }
+  if (newest === "") return null;
+
+  const path = join(dir, newest);
+  let text = "";
+  try {
+    const queued = JSON.parse(readFileSync(path, "utf8")) as { text?: unknown };
+    if (typeof queued.text === "string") text = queued.text.trim();
+  } catch {
+    // An unreadable queue entry is discarded below rather than retried forever.
+    text = "";
+  }
+  try {
+    unlinkSync(path);
+  } catch {
+    // Still on disk, so injecting now would deliver it again on the next settle.
+    return null;
+  }
+  return text === "" ? null : text;
+}
 
 export default function (pi: ExtensionAPI) {
   let failures = 0;
@@ -44,8 +114,20 @@ export default function (pi: ExtensionAPI) {
     }
   };
 
+  // Consume-once is the loop guard: an injected prompt that settles again finds
+  // an empty queue.  (pi reports `source: "extension"` only on the `input`
+  // event, not on the lifecycle events used here.)
   pi.on("agent_settled", async (_event, ctx) => {
     await notify("done", `${basename(ctx.cwd)} — turn finished`);
+
+    const prompt = takeQueuedPrompt();
+    if (prompt === null) return;
+    try {
+      await pi.sendUserMessage(prompt, { deliverAs: "followUp" });
+    } catch {
+      // Discarded like every other failure here: the queued prompt is consumed
+      // and the session keeps working, which is all this path has to guarantee.
+    }
   });
 
   pi.on("ui_prompt_start", async (event, ctx) => {
