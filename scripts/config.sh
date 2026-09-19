@@ -41,6 +41,9 @@ DEFAULTS='{
     "enable": true,
     "heartbeat": true
   },
+  "harness-approval": {
+    "timeout-seconds": 120
+  },
   "harness-notify": {
     "enable": true,
     "channels": ["telegram"],

@@ -1,5 +1,10 @@
 {
   "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": "$HOME/.cursor/hooks/approve-shell.sh"
+      }
+    ],
     "stop": [
       {
         "command": "harness-notify cursor done"

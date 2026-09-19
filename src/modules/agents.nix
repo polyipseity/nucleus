@@ -79,6 +79,12 @@ let
     scriptName = "src/scripts/notify/harness-notify";
     runtimeInputs = [ pkgs.jq ];
   };
+
+  harnessApproval = pkgs.writeNucleusShellApplication {
+    name = "harness-approval";
+    scriptName = "src/scripts/notify/harness-approval";
+    runtimeInputs = [ pkgs.jq ];
+  };
 in
 {
   # WHY: OpenCode discovers global agents under ~/.config/opencode/agents and
@@ -93,6 +99,9 @@ in
       config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/prompts";
     # Stable path for every harness hook definition (see harnessNotify above).
     ".local/bin/harness-notify".source = "${harnessNotify}/bin/nucleus-harness-notify";
+    # Same contract for blocking approval hooks: a hook calls this, and it waits
+    # for a remote decision before answering the harness.
+    ".local/bin/harness-approval".source = "${harnessApproval}/bin/nucleus-harness-approval";
   };
 
   home.activation.unprotect-opencode-symlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
