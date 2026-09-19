@@ -7,8 +7,9 @@
 # so the app started twice — once from its own agent and once from ours.
 #
 # Also guards FSKit file-system extensions: they are invisible to
-# systemextensionsctl, so they must be resolved through pluginkit and reported as
-# registered rather than as unapproved.
+# systemextensionsctl, and PluginKit rejects a module that is not inside a
+# SIP-protected app, so they must be resolved through FSKit's own enabled-module
+# list and reported as registered rather than as unapproved.
 #
 # Run with: bash tests/scripts/autostart-launchagent-tests.sh
 set -euo pipefail
@@ -214,30 +215,56 @@ PLIST
 PLIST
 }
 
-# run_autostart ACTION APP OUT_FILE [FSKIT_REGISTERED] — run one autostart action
-# against the fixture repo with the macOS-only externals stubbed so the run is
-# hermetic. Prints the exit status.
+# run_autostart ACTION APP OUT_FILE [FSKIT_MODULE_LISTED] [HOST] — run one
+# autostart action against the fixture repo with the macOS-only externals stubbed
+# so the run is hermetic. FSKIT_MODULE_LISTED selects the FSKit enabled-module list
+# the probe reads: "true" names the macFUSE module, "other" names a different
+# module, and "false" leaves the list absent. Prints the exit status.
 run_autostart() {
-  local action="$1" app="$2" out_file="$3" fskit_registered="${4:-true}" host="${5:-}" rc=0
-  local _mock_dir
+  local action="$1" app="$2" out_file="$3" fskit_module_listed="${4:-true}" host="${5:-}" rc=0
+  local _mock_dir _fskit_dir
   _mock_dir="$(mktemp -d)"
+  _fskit_dir="$FIXTURE_HOME/Library/Group Containers/group.com.apple.fskit.settings"
   # Mock stat/dscl to return empty (no console user override of LAUNCHAGENTS_DIR)
   printf '#!/bin/sh\n' >"$_mock_dir/stat"
   printf '#!/bin/sh\n' >"$_mock_dir/dscl"
   # Mock systemextensionsctl to report no extensions: FSKit modules never appear
-  # there, so the plugin-point fallback is what resolves them.
+  # there, so FSKit's enabled-module list is what resolves them.
   printf '#!/bin/sh\n' >"$_mock_dir/systemextensionsctl"
-  if [ "$fskit_registered" = "true" ]; then
-    cat >"$_mock_dir/pluginkit" <<'PLUGINKIT'
+  case "$fskit_module_listed" in
+  true)
+    mkdir -p "$_fskit_dir"
+    cat >"$_fskit_dir/enabledModules.plist" <<'FSKITLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+    <key>5</key>
+    <string>io.macfuse.app.fsmodule.macfuse</string>
+</dict>
+</plist>
+FSKITLIST
+    ;;
+  other)
+    mkdir -p "$_fskit_dir"
+    cat >"$_fskit_dir/enabledModules.plist" <<'FSKITLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+    <key>4</key>
+    <string>io.example.other.fsmodule</string>
+</dict>
+</plist>
+FSKITLIST
+    ;;
+  esac
+  # Mock plutil to print the fixture list the way the probe reads it (a quoted
+  # value per entry), and to fail on a missing file the way the real plutil does.
+  cat >"$_mock_dir/plutil" <<'PLUTIL'
 #!/bin/sh
-case "$*" in
-*com.apple.fskit.fsmodule*) printf '%s\n' '     io.macfuse.app.fsmodule.macfuse(0.1.3)' ;;
-esac
-PLUGINKIT
-  else
-    printf '#!/bin/sh\n' >"$_mock_dir/pluginkit"
-  fi
-  chmod +x "$_mock_dir/stat" "$_mock_dir/dscl" "$_mock_dir/systemextensionsctl" "$_mock_dir/pluginkit"
+[ -r "$2" ] || exit 1
+sed -n 's|.*<string>\(.*\)</string>.*|  "value" => "\1"|p' "$2"
+PLUTIL
+  chmod +x "$_mock_dir/stat" "$_mock_dir/dscl" "$_mock_dir/systemextensionsctl" "$_mock_dir/plutil"
   local -a _env_prefix=(
     env
     NUCLEUS_REPO_ROOT="$FIXTURE_ROOT"
@@ -294,9 +321,9 @@ test_fskit_module_is_reported_present() {
   rc="$(run_autostart status FSKitApp "$FIXTURE_ROOT/out.txt")"
   # Match the state column exactly: the literal 'enabled' also occurs in 'disabled'.
   if [ "$rc" -eq 0 ] && grep -Eq '^FSKitApp[[:space:]]+enabled[[:space:]]' "$FIXTURE_ROOT/out.txt"; then
-    assert_pass "an FSKit module registered with pluginkit is reported enabled"
+    assert_pass "an FSKit module listed in FSKit's enabled modules is reported enabled"
   else
-    assert_fail "an FSKit module registered with pluginkit is reported enabled" "rc=$rc output=[$(cat "$FIXTURE_ROOT/out.txt")]"
+    assert_fail "an FSKit module listed in FSKit's enabled modules is reported enabled" "rc=$rc output=[$(cat "$FIXTURE_ROOT/out.txt")]"
   fi
   rm -rf "$FIXTURE_ROOT"
 }
@@ -308,9 +335,9 @@ test_fskit_module_converge_skips_approval_instructions() {
   if [ "$rc" -eq 0 ] &&
     grep -q 'FSKit module registered' "$FIXTURE_ROOT/out.txt" &&
     ! grep -q 'fixture approval instructions' "$FIXTURE_ROOT/out.txt"; then
-    assert_pass "converging a registered FSKit module reports registration instead of approval instructions"
+    assert_pass "converging an FSKit module listed in the enabled modules reports registration instead of approval instructions"
   else
-    assert_fail "converging a registered FSKit module reports registration instead of approval instructions" "rc=$rc output=[$(cat "$FIXTURE_ROOT/out.txt")]"
+    assert_fail "converging an FSKit module listed in the enabled modules reports registration instead of approval instructions" "rc=$rc output=[$(cat "$FIXTURE_ROOT/out.txt")]"
   fi
   rm -rf "$FIXTURE_ROOT"
 }
@@ -320,9 +347,28 @@ test_unregistered_fskit_module_keeps_approval_instructions() {
   make_fixture
   rc="$(run_autostart enable FSKitApp "$FIXTURE_ROOT/out.txt" false)"
   if [ "$rc" -eq 0 ] && grep -q 'fixture approval instructions' "$FIXTURE_ROOT/out.txt"; then
-    assert_pass "an unregistered FSKit module still surfaces its approval instructions"
+    assert_pass "an FSKit module without an enabled-module list keeps its approval instructions"
   else
-    assert_fail "an unregistered FSKit module still surfaces its approval instructions" "rc=$rc output=[$(cat "$FIXTURE_ROOT/out.txt")]"
+    assert_fail "an FSKit module without an enabled-module list keeps its approval instructions" "rc=$rc output=[$(cat "$FIXTURE_ROOT/out.txt")]"
+  fi
+  rm -rf "$FIXTURE_ROOT"
+}
+
+# The regression this guards: reading PluginKit for the module reported it absent
+# even while it was registered and its volumes mounted, so convergence kept
+# warning about an approval step that was already done. The list FSKit serves is
+# the one a module has to appear in; a readable list that names another module is
+# not evidence for this one.
+test_unlisted_fskit_module_keeps_approval_instructions() {
+  local rc=0
+  make_fixture
+  rc="$(run_autostart enable FSKitApp "$FIXTURE_ROOT/out.txt" other)"
+  if [ "$rc" -eq 0 ] &&
+    grep -q 'fixture approval instructions' "$FIXTURE_ROOT/out.txt" &&
+    ! grep -q 'FSKit module registered' "$FIXTURE_ROOT/out.txt"; then
+    assert_pass "an FSKit module missing from an existing enabled-module list keeps its approval instructions"
+  else
+    assert_fail "an FSKit module missing from an existing enabled-module list keeps its approval instructions" "rc=$rc output=[$(cat "$FIXTURE_ROOT/out.txt")]"
   fi
   rm -rf "$FIXTURE_ROOT"
 }
@@ -389,8 +435,9 @@ if [ "$(uname -s)" != "Darwin" ]; then
   assert_skip "app-owned LaunchAgent ProgramArguments removal" "macOS-only convergence path"
   assert_skip "foreign LaunchAgent plist is preserved" "macOS-only convergence path"
   assert_skip "FSKit module registration is reported enabled" "macOS-only convergence path"
-  assert_skip "registered FSKit module converge skips approval instructions" "macOS-only convergence path"
-  assert_skip "unregistered FSKit module keeps approval instructions" "macOS-only convergence path"
+  assert_skip "listed FSKit module converge skips approval instructions" "macOS-only convergence path"
+  assert_skip "FSKit module without an enabled-module list keeps approval instructions" "macOS-only convergence path"
+  assert_skip "FSKit module missing from the enabled-module list keeps approval instructions" "macOS-only convergence path"
 else
   test_scalar_program_plist_is_removed
   test_program_arguments_plist_is_removed
@@ -398,6 +445,7 @@ else
   test_fskit_module_is_reported_present
   test_fskit_module_converge_skips_approval_instructions
   test_unregistered_fskit_module_keeps_approval_instructions
+  test_unlisted_fskit_module_keeps_approval_instructions
 fi
 
 test_manual_app_reports_approval_instructions

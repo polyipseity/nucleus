@@ -34,6 +34,7 @@ fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/lib/lib.sh"
 . "$SCRIPT_DIR/lib/macos-console-user.sh"
+. "$SCRIPT_DIR/lib/macos-fskit.sh"
 
 usage() {
   usage_std "$(basename "$0")" "list|status|enable|disable|apply|verify [app...] [options]"
@@ -197,26 +198,29 @@ macos_remove_app_launchagent() {
   fi
 }
 
-# macos_fskit_module_registered ID — stdout "true"/"false" via pluginkit.
+# macos_fskit_module_registered ID — stdout "true"/"false" via FSKit's own
+# enabled-module list.
 # FSKit file-system extensions live in Apple's File System Extension plugin point,
-# which systemextensionsctl does not report.
-# WHY: pluginkit reports registration only — macOS exposes no non-privileged
-# enablement query — so a registered module counts as present and its enablement is
-# reported to the user, never assumed.
+# which systemextensionsctl does not report, and PluginKit rejects a module that is
+# not inside a SIP-protected app — so pluginkit reports the macFUSE module as
+# absent even while its volumes mount.
+# WHY: the enabled-module list is the signal macOS makes readable to a script, and
+# a module that is listed counts as present; a list that cannot be read answers
+# "false" rather than claiming a registration nothing confirmed.
 macos_fskit_module_registered() {
   local bundle_id="$1"
-  if command -v pluginkit >/dev/null 2>&1; then
-    pluginkit -m -p com.apple.fskit.fsmodule 2>/dev/null | grep -qF "$bundle_id" && printf 'true' || printf 'false'
-  else
-    printf 'false'
-  fi
+  case "$(fskit_module_state "$bundle_id")" in
+  enabled) printf 'true' ;;
+  *) printf 'false' ;;
+  esac
 }
 
 # macos_system_extension_present ID — stdout "true"/"false".
 # Network/cmio/endpoint-security extensions come from systemextensionsctl. FSKit
-# file-system extensions (e.g. macFUSE) are visible only to pluginkit. TCC-granted
-# helper tools (e.g. Chrome Remote Desktop Host) appear in neither and stay
-# manual-approval-only via the entry's approvalInstructions.
+# file-system extensions (e.g. macFUSE) never appear there and are read from
+# FSKit's own enabled-module list instead. TCC-granted helper tools (e.g. Chrome
+# Remote Desktop Host) appear in neither and stay manual-approval-only via the
+# entry's approvalInstructions.
 macos_system_extension_present() {
   local bundle_id="$1"
   if command -v systemextensionsctl >/dev/null 2>&1 &&
@@ -441,10 +445,10 @@ app_converge() {
     approval_instructions=$(echo "$entry_json" | jq -r '.hostEntry.approvalInstructions // empty')
     if [ "$enabled" = "true" ]; then
       if [ -n "$bundle_id" ] && [ "$(macos_fskit_module_registered "$bundle_id")" = "true" ]; then
-        # Registration is all macOS exposes for FSKit modules; the enablement
-        # toggle is manual and unreadable from the shell, so say so instead of
-        # repeating approval instructions that may already be satisfied.
-        say -l "$key" "FSKit module registered — enablement is manual and cannot be verified from the shell."
+        # FSKit's enabled-module list is what a script can read; the enablement
+        # toggle itself stays manual, so report the listing instead of repeating
+        # approval instructions that may already be satisfied.
+        say -l "$key" "FSKit module registered — it is listed in FSKit's enabled file-system extensions."
       elif [ -n "$bundle_id" ] && [ "$(macos_system_extension_present "$bundle_id")" = "true" ]; then
         say -l "$key" "system extension present (approved)."
       else
