@@ -35,14 +35,16 @@ case "$rclone_remotes" in
 esac
 
 # Run rclone in the foreground instead of exec'ing it, so its exit is always
-# reported.
+# reported and a stop request is never left half-done.
 #
-# WHY: rclone runs with --log-level ERROR, so a mount that starts and exits
-#   cleanly writes nothing to stdout or stderr, and the LaunchAgent's
-#   KeepAlive{SuccessfulExit:false} never retries a status of 0.  A silent exit
-#   is indistinguishable from a healthy idle mount, so the one place that sees
-#   both the status and the lifetime reports it.
+# WHY: rclone reports a mount that decays — the volume is destroyed seconds after
+#   it attaches, so the path never serves anything — as a NOTICE-level unmount
+#   followed by exit 0, and the LaunchAgent's KeepAlive{SuccessfulExit:false}
+#   never retries a status of 0.  A clean exit is indistinguishable from a
+#   healthy idle mount, so the one place that sees both the status and the
+#   lifetime reports it.
 _mount_started="$SECONDS"
+_mount_stopping=false
 rclone mount \
   "$remote" \
   "$mount_point" \
@@ -50,16 +52,47 @@ rclone mount \
   "$@" &
 _mount_pid=$!
 
-# WHY: forward termination to rclone so a stop request reaches the mount and
-#   this shell then observes rclone's own exit status instead of orphaning it.
+# WHY: forward termination to rclone, and then wait for rclone to finish exiting.
+#   A stop request that leaves rclone unmounting in the background wedges the
+#   macFUSE/FSKit volume for this path, and every later mount there is destroyed
+#   seconds after it attaches.
 # check-suppress:suppression_doc: rclone may already have exited; a failed signal to a dead process changes nothing about the report below.
-trap 'kill -TERM "$_mount_pid" 2>/dev/null || true' TERM INT
+trap '_mount_stopping=true; kill -TERM "$_mount_pid" 2>/dev/null || true' TERM INT
 
+# WHY: a stop request interrupts 'wait' with a status above 128 (128+signo)
+#   while rclone is still unmounting, and only a reaped child proves rclone has
+#   really finished: a mount left unmounting in the background wedges the
+#   macFUSE/FSKit volume for this path, and every later mount there is destroyed
+#   seconds after it attaches.  The LaunchAgent's ExitTimeOut (60 s) bounds a
+#   mount that never finishes.
 _mount_status=0
-wait "$_mount_pid" || _mount_status=$?
+while :; do
+  if wait "$_mount_pid"; then
+    _mount_status=0
+  else
+    _mount_status=$?
+  fi
+  # 127: an earlier 'wait' already reaped rclone, so there is nothing left to
+  # wait for.  At or below 128: rclone's own exit status.  Anything above is the
+  # stop signal that interrupted the wait, so rclone is still exiting.
+  if [ "$_mount_status" -eq 127 ] || [ "$_mount_status" -le 128 ]; then
+    break
+  fi
+done
 trap - TERM INT
 
 _mount_seconds=$((SECONDS - _mount_started))
+if [ "$_mount_stopping" = true ]; then
+  # WHY: a requested stop is the expected end of this mount, so it is not a
+  #   failure, and exit 0 keeps KeepAlive{SuccessfulExit:false} from resurrecting
+  #   a job the operator just stopped.  A stop that did not release the volume is
+  #   still reported.
+  if [ "$_mount_status" -ne 0 ]; then
+    warn -l cloud-drives "rclone mount for '$mount_point' exited with status $_mount_status after ${_mount_seconds}s (stop requested)."
+  fi
+  exit 0
+fi
+
 if [ "$_mount_status" -eq 0 ]; then
   warn -l cloud-drives "rclone mount for '$mount_point' exited with status 0 after ${_mount_seconds}s without a live mount; check the remote and the mount point."
 else
