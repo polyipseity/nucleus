@@ -307,3 +307,102 @@ svc_notloaded_clear() {
   [ -e "$marker" ] || return 0
   rm -f "$marker"
 }
+
+# ── Blocked markers ──────────────────────────────────────────────────────────
+# A blocked marker records that an instance deliberately stopped trying to
+# converge — a cloud mount whose FSKit provider is wedged, for example — with a
+# class, the operator remedy, and the boot it was written in.  Status output and
+# the watchdog read it instead of restarting the instance into the same failure.
+# WHY boot-scoped: the standing remedy for a wedged provider is a daemon restart
+#   or a reboot, so a marker written before a reboot must not keep the instance
+#   down afterwards.  Any service may write one; nothing is cloud-specific.
+
+# svc_boot_id — Identifier of the current boot session.
+svc_boot_id() {
+  local boot=""
+
+  case "$(uname -s)" in
+  Darwin)
+    if [ -x /usr/sbin/sysctl ]; then
+      # check-suppress:suppression_doc: a probe that cannot report the boot time falls back to "unknown", which the marker freshness check treats as a different boot.
+      boot="$(/usr/sbin/sysctl -n kern.boottime 2>/dev/null || true)"
+    fi
+    ;;
+  Linux)
+    if [ -r /proc/sys/kernel/random/boot_id ]; then
+      boot="$(cat /proc/sys/kernel/random/boot_id)"
+    fi
+    ;;
+  esac
+  [ -n "$boot" ] || boot="unknown"
+  printf '%s\n' "$boot"
+}
+
+# svc_blocked_file — Path of the blocked marker for one instance.
+# Args: $1 — instance key; $2 — state directory.
+svc_blocked_file() { printf '%s/%s.blocked\n' "$2" "$1"; }
+
+# svc_blocked_set — Record a blocked instance.
+# Args: $1 — instance key; $2 — state directory; $3 — class; $4 — remedy.
+svc_blocked_set() {
+  local key="$1" state_dir="$2" class="$3" remedy="$4"
+  local file tmp
+
+  file="$(svc_blocked_file "$key" "$state_dir")"
+  mkdir -p "$state_dir"
+  tmp="$file.tmp.$$"
+  {
+    printf 'class=%s\n' "$class"
+    printf 'remedy=%s\n' "$remedy"
+    printf 'boot=%s\n' "$(svc_boot_id)"
+    printf 'ts=%s\n' "$(date +%s)"
+  } >"$tmp"
+  mv "$tmp" "$file"
+}
+
+# svc_blocked_field — One field of the marker, empty when the field is absent.
+# Args: $1 — instance key; $2 — state directory; $3 — field name.
+svc_blocked_field() {
+  local file
+
+  file="$(svc_blocked_file "$1" "$2")"
+  [ -r "$file" ] || return 0
+  sed -n "s/^$3=//p" "$file" | head -n 1
+}
+
+# svc_blocked_state — "blocked <class>" while the marker is fresh, else "clear".
+# Args: $1 — instance key; $2 — state directory.
+svc_blocked_state() {
+  local key="$1" state_dir="$2" file boot
+
+  file="$(svc_blocked_file "$key" "$state_dir")"
+  if [ ! -r "$file" ]; then
+    printf 'clear\n'
+    return 0
+  fi
+  boot="$(svc_blocked_field "$key" "$state_dir" boot)"
+  if [ "$boot" != "$(svc_boot_id)" ]; then
+    printf 'clear\n'
+    return 0
+  fi
+  printf 'blocked %s\n' "$(svc_blocked_field "$key" "$state_dir" class)"
+}
+
+# svc_blocked_remedy — Remedy of a fresh marker, nothing when the marker is not
+# fresh.  Args: $1 — instance key; $2 — state directory.
+svc_blocked_remedy() {
+  local state
+
+  state="$(svc_blocked_state "$1" "$2")"
+  [ "$state" != "clear" ] || return 0
+  svc_blocked_field "$1" "$2" remedy
+}
+
+# svc_blocked_clear — Drop the marker.  Args: $1 — key; $2 — state directory.
+svc_blocked_clear() {
+  local file
+
+  file="$(svc_blocked_file "$1" "$2")"
+  [ -e "$file" ] || return 0
+  rm -f "$file"
+}
