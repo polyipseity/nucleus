@@ -958,7 +958,7 @@ Sync-NextestConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $rep
 Sync-DirenvConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $repoRoot
 Sync-StarshipConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $repoRoot
 Sync-SrtConfig -Enabled:$true -User $sessionUser -RepoRoot $repoRoot
-Sync-HermesConfig -Enabled:$true
+Sync-HermesConfig -Enabled:$true -User $sessionUser -RepoRoot $repoRoot
 # Hook entry points must resolve by bare name from harness-spawned processes,
 # so they are deployed to the USER root with .cmd shims on the managed PATH.
 Sync-HarnessBridge -Enabled:$EnableHarnessBridgeParity -RepoRoot $repoRoot -UserRoot (Get-NucleusUserRoot) -UserProfile $HOME

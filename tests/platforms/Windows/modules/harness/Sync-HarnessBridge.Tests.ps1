@@ -55,7 +55,7 @@ BeforeAll {
 
     $sourceDir = Join-Path -Path $sandbox.Repo -ChildPath 'src\scripts\notify'
     $null = New-Item -ItemType Directory -Path $sourceDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
-    foreach ($name in @('harness-approval', 'harness-notify')) {
+    foreach ($name in @('harness-approval', 'harness-drive', 'harness-notify')) {
       Copy-Item -LiteralPath (Join-Path -Path $script:NotifyDir -ChildPath "$name.ps1") -Destination (Join-Path -Path $sourceDir -ChildPath "$name.ps1")
     }
 
@@ -271,6 +271,47 @@ BeforeAll {
 
     return (Join-Path -Path $Sandbox.LocalApp -ChildPath 'nucleus\state\harness-bridge')
   }
+
+  function Set-SandboxQueuedPrompt {
+    <#
+    .SYNOPSIS
+      Writes one queued `/harness send` prompt into the sandbox state directory.
+    .DESCRIPTION
+      The bridge names each entry "<epoch>-<id>.json", so tests control both the
+      ordering and the file name that the entry point must pick.
+    .PARAMETER Sandbox
+      Sandbox created by New-HarnessBridgeSandbox.
+    .PARAMETER Harness
+      Harness queue to write into.
+    .PARAMETER Name
+      Queue entry file name, e.g. '2000-bbbb.json'.
+    .PARAMETER Text
+      Prompt text.
+    #>
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    [OutputType([string])]
+    param(
+      [Parameter(Mandatory)]
+      [hashtable]$Sandbox,
+
+      [Parameter(Mandatory)]
+      [string]$Harness,
+
+      [Parameter(Mandatory)]
+      [string]$Name,
+
+      [Parameter(Mandatory)]
+      [AllowEmptyString()]
+      [string]$Text
+    )
+
+    $dir = Join-Path -Path (Join-Path -Path (Get-BridgeStateDir -Sandbox $Sandbox) -ChildPath 'commands') -ChildPath $Harness
+    $null = New-Item -ItemType Directory -Path $dir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+    $path = Join-Path -Path $dir -ChildPath $Name
+    $json = ConvertTo-Json -InputObject @{ id = $Name; harness = $Harness; text = $Text; created_at = 0 } -Compress -Depth 5
+    [System.IO.File]::WriteAllText($path, $json, [System.Text.UTF8Encoding]::new($false))
+    return $path
+  }
 }
 
 Describe 'Sync-HarnessBridge shim convergence' {
@@ -295,7 +336,7 @@ Describe 'Sync-HarnessBridge shim convergence' {
   It 'deploys both entry points and both PATH shims on an enabled run' {
     Sync-HarnessBridge -Enabled:$true -RepoRoot $script:syncSandbox.Repo -UserRoot $script:syncUserRoot -UserProfile $script:syncSandbox.Home > $null
 
-    foreach ($name in @('harness-approval', 'harness-notify')) {
+    foreach ($name in @('harness-approval', 'harness-drive', 'harness-notify')) {
       $deployed = Join-Path -Path $script:syncBinDir -ChildPath "$name.ps1"
       $source = Join-Path -Path $script:syncSandbox.Repo -ChildPath "src\scripts\notify\$name.ps1"
       Test-Path -LiteralPath $deployed | Should -Be $true
@@ -314,8 +355,10 @@ Describe 'Sync-HarnessBridge shim convergence' {
     $artifacts = @(
       (Join-Path -Path $script:syncBinDir -ChildPath 'harness-notify.ps1')
       (Join-Path -Path $script:syncBinDir -ChildPath 'harness-approval.ps1')
+      (Join-Path -Path $script:syncBinDir -ChildPath 'harness-drive.ps1')
       (Join-Path -Path $script:syncShimDir -ChildPath 'harness-notify.cmd')
       (Join-Path -Path $script:syncShimDir -ChildPath 'harness-approval.cmd')
+      (Join-Path -Path $script:syncShimDir -ChildPath 'harness-drive.cmd')
     )
     $before = $artifacts | ForEach-Object { (Get-Item -LiteralPath $_).LastWriteTimeUtc.Ticks }
 
@@ -334,7 +377,7 @@ Describe 'Sync-HarnessBridge shim convergence' {
 
     Sync-HarnessBridge -Enabled:$false -RepoRoot $script:syncSandbox.Repo -UserRoot $script:syncUserRoot -UserProfile $script:syncSandbox.Home > $null
 
-    foreach ($name in @('harness-approval', 'harness-notify')) {
+    foreach ($name in @('harness-approval', 'harness-drive', 'harness-notify')) {
       Test-Path -LiteralPath (Join-Path -Path $script:syncBinDir -ChildPath "$name.ps1") | Should -Be $false
       Test-Path -LiteralPath (Join-Path -Path $script:syncShimDir -ChildPath "$name.cmd") | Should -Be $false
     }
@@ -503,5 +546,109 @@ Describe 'harness-approval.ps1 Windows twin' {
     $result.ExitCode | Should -Be 0
     $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
     $document['permission'] | Should -Be 'ask'
+  }
+}
+
+Describe 'harness-drive.ps1 Windows twin' {
+  BeforeAll {
+    $script:driveSandbox = New-HarnessBridgeSandbox
+    Write-HermesStub -StubDir $script:driveSandbox.StubDir
+    $script:driveScript = Join-Path -Path $script:NotifyDir -ChildPath 'harness-drive.ps1'
+  }
+
+  AfterAll {
+    Remove-HarnessBridgeSandbox -Root $script:driveSandbox.Root
+  }
+
+  It 'injects the newest queued prompt as a Cursor followup document' {
+    Set-SandboxConfig -Sandbox $script:driveSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') } }
+    $null = Set-SandboxQueuedPrompt -Sandbox $script:driveSandbox -Harness 'cursor' -Name '1000-aaaa.json' -Text 'older prompt'  # check-suppress:suppression_doc: the helper returns the queue path; this test does not need it
+    $newestPath = Set-SandboxQueuedPrompt -Sandbox $script:driveSandbox -Harness 'cursor' -Name '2000-bbbb.json' -Text 'continue with the tests'
+
+    $started = Start-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @('cursor')
+    $result = Wait-TwinProcess -Started $started
+
+    $result.ExitCode | Should -Be 0
+    $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
+    $document['followup_message'] | Should -Be 'continue with the tests'
+    Test-Path -LiteralPath $newestPath | Should -Be $false
+    @(Get-ChildItem -LiteralPath (Split-Path -Path $newestPath -Parent) -Filter '*.json' -File).Count | Should -Be 1
+
+    $log = Get-HermesStubLog -Sandbox $script:driveSandbox
+    @($log | Where-Object { $_.Contains('--subject [cursor] finished') }).Count | Should -Be 1
+  }
+
+  It 'renders the Copilot Stop decision document with the prompt encoded as JSON' {
+    Set-SandboxConfig -Sandbox $script:driveSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') } }
+    $prompt = "summarize `"quotes`" and`na newline"
+    $null = Set-SandboxQueuedPrompt -Sandbox $script:driveSandbox -Harness 'copilot' -Name '3000-cccc.json' -Text $prompt  # check-suppress:suppression_doc: the helper returns the queue path; this test does not need it
+
+    $started = Start-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @('copilot')
+    $result = Wait-TwinProcess -Started $started
+
+    $result.ExitCode | Should -Be 0
+    $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
+    $document['hookSpecificOutput']['hookEventName'] | Should -Be 'Stop'
+    $document['hookSpecificOutput']['decision'] | Should -Be 'block'
+    $document['hookSpecificOutput']['reason'] | Should -Be $prompt
+  }
+
+  It 'renders no document and still consumes the prompt for a harness without a continuation' {
+    Set-SandboxConfig -Sandbox $script:driveSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') } }
+    $queuedPath = Set-SandboxQueuedPrompt -Sandbox $script:driveSandbox -Harness 'opencode' -Name '4000-dddd.json' -Text 'switch to the other branch'
+
+    $started = Start-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @('opencode')
+    $result = Wait-TwinProcess -Started $started
+
+    $result.ExitCode | Should -Be 0
+    $result.Stdout | Should -Be ''
+    Test-Path -LiteralPath $queuedPath | Should -Be $false
+  }
+
+  It 'prints an empty document when nothing is queued' {
+    # Explicit: the first test leaves an older cursor entry behind on purpose
+    # (one prompt per turn), so this starts from an empty queue.
+    $cursorQueue = Join-Path -Path (Join-Path -Path (Get-BridgeStateDir -Sandbox $script:driveSandbox) -ChildPath 'commands') -ChildPath 'cursor'
+    if (Test-Path -LiteralPath $cursorQueue) { Remove-Item -LiteralPath $cursorQueue -Recurse -Force }
+
+    $started = Start-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @('cursor')
+    $result = Wait-TwinProcess -Started $started
+
+    $result.ExitCode | Should -Be 0
+    $result.Stdout | Should -Be '{}'
+  }
+
+  It 'discards a queued prompt that carries no text and still answers with a document' {
+    Set-SandboxConfig -Sandbox $script:driveSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') } }
+    $queuedPath = Set-SandboxQueuedPrompt -Sandbox $script:driveSandbox -Harness 'cursor' -Name '6000-ffff.json' -Text ''
+
+    $started = Start-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @('cursor')
+    $result = Wait-TwinProcess -Started $started
+
+    $result.ExitCode | Should -Be 0
+    $result.Stdout | Should -Be '{}'
+    $result.Stderr | Should -Match 'queued prompt is empty'
+    Test-Path -LiteralPath $queuedPath | Should -Be $false
+  }
+
+  It 'leaves the queue untouched when the bridge is disabled' {
+    Set-SandboxConfig -Sandbox $script:driveSandbox -Config @{ 'harness-notify' = @{ enable = $false; channels = @('telegram') } }
+    $queuedPath = Set-SandboxQueuedPrompt -Sandbox $script:driveSandbox -Harness 'cursor' -Name '5000-eeee.json' -Text 'not now'
+
+    $started = Start-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @('cursor')
+    $result = Wait-TwinProcess -Started $started
+
+    $result.ExitCode | Should -Be 0
+    $result.Stdout | Should -Be '{}'
+    Test-Path -LiteralPath $queuedPath | Should -Be $true
+  }
+
+  It 'exits 0 with a usage warning when the harness argument is missing' {
+    $started = Start-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @()
+    $result = Wait-TwinProcess -Started $started
+
+    $result.ExitCode | Should -Be 0
+    $result.Stdout | Should -Be ''
+    $result.Stderr | Should -Match 'harness-drive: warning: usage'
   }
 }

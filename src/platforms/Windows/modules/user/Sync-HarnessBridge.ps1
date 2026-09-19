@@ -4,17 +4,19 @@
 
 .DESCRIPTION
   The harness bridge answers harness hooks through bare command names
-  (`harness-notify`, `harness-approval`) so one shared hook definition works on
-  every platform.  Windows reaches them through .cmd shims, because
-  %USERPROFILE%\.local\bin is a managed PATH component and a bare name resolves
-  through PATHEXT.
+  (`harness-notify`, `harness-approval`, `harness-drive`) so one shared hook
+  definition works on every platform.  Windows reaches them through .cmd shims,
+  because %USERPROFILE%\.local\bin is a managed PATH component and a bare name
+  resolves through PATHEXT.
 
   Layout this function converges:
 
     <USER root>\bin\harness-notify.ps1    deployed copy of the entry point
     <USER root>\bin\harness-approval.ps1  deployed copy of the entry point
+    <USER root>\bin\harness-drive.ps1     deployed copy of the entry point
     %USERPROFILE%\.local\bin\harness-notify.cmd    shim -> <USER root>\bin copy
     %USERPROFILE%\.local\bin\harness-approval.cmd  shim -> <USER root>\bin copy
+    %USERPROFILE%\.local\bin\harness-drive.cmd     shim -> <USER root>\bin copy
 
   Copies (rather than links into the repository) keep a hook working when the
   checkout moves; they are refreshed whenever the repository copy changes, so the
@@ -70,7 +72,7 @@ function Sync-HarnessBridge {
   )
 
   $label = 'harness-bridge'
-  $scriptNames = @('harness-approval', 'harness-notify')
+  $scriptNames = @('harness-approval', 'harness-drive', 'harness-notify')
   $binDir = Join-Path -Path $UserRoot -ChildPath 'bin'
   $shimDir = Join-Path -Path $UserProfile -ChildPath '.local\bin'
 
