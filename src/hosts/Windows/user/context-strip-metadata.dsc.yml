@@ -1,6 +1,9 @@
 ---
 # WinGet DSC v3 - user-level "strip metadata" context menu entries
 # One entry per Office extension (docx/xlsx/pptx + doc/xls/ppt).
+# -Dialog: the verb runs with -WindowStyle Hidden, so stdout and stderr are
+# discarded; the modal popup is what tells the user that a selected file
+# (legacy OLE2, or a PDF passed on the command line) was not processed.
 # Sorting policy: alphabetical by extension. No automatic sorting.
 $schema: https://aka.ms/configuration-dsc-schema/0.2
 properties:
@@ -23,7 +26,7 @@ properties:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.docx\shell\strip metadata\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-utils strip-metadata '%1'"
+          "nucleus-utils strip-metadata -Dialog '%1'"
         valueType: String
 
     # .xls — Excel (legacy binary)
@@ -43,7 +46,7 @@ properties:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.xls\shell\strip metadata\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-utils strip-metadata '%1'"
+          "nucleus-utils strip-metadata -Dialog '%1'"
         valueType: String
 
     # .xlsx — Excel (OOXML)
@@ -63,7 +66,7 @@ properties:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.xlsx\shell\strip metadata\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-utils strip-metadata '%1'"
+          "nucleus-utils strip-metadata -Dialog '%1'"
         valueType: String
 
     # .ppt — PowerPoint (legacy binary)
@@ -83,7 +86,7 @@ properties:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.ppt\shell\strip metadata\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-utils strip-metadata '%1'"
+          "nucleus-utils strip-metadata -Dialog '%1'"
         valueType: String
 
     # .pptx — PowerPoint (OOXML)
@@ -103,7 +106,7 @@ properties:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.pptx\shell\strip metadata\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-utils strip-metadata '%1'"
+          "nucleus-utils strip-metadata -Dialog '%1'"
         valueType: String
 
     # .doc — Word (legacy binary)
@@ -123,5 +126,5 @@ properties:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.doc\shell\strip metadata\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-utils strip-metadata '%1'"
+          "nucleus-utils strip-metadata -Dialog '%1'"
         valueType: String
