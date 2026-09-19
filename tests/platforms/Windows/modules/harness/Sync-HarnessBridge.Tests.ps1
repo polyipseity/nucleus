@@ -151,7 +151,7 @@ BeforeAll {
     [System.IO.File]::WriteAllText((Join-Path -Path $configDir -ChildPath 'config.json'), $json, [System.Text.UTF8Encoding]::new($false))
   }
 
-  function Start-TwinProcess {
+  function Invoke-TwinProcess {
     <#
     .SYNOPSIS
       Starts one harness-bridge entry point as a child pwsh process.
@@ -164,7 +164,7 @@ BeforeAll {
     .PARAMETER Stdin
       Optional standard input (hook payload).
     #>
-    [CmdletBinding(SupportsShouldProcess = $true)]
+    [CmdletBinding()]
     [OutputType([hashtable])]
     param(
       [Parameter(Mandatory)]
@@ -212,7 +212,7 @@ BeforeAll {
     .SYNOPSIS
       Waits for a started entry point and returns its exit code and streams.
     .PARAMETER Started
-      Handle returned by Start-TwinProcess.
+      Handle returned by Invoke-TwinProcess.
     .PARAMETER TimeoutSeconds
       Maximum wait before the child is killed.
     #>
@@ -402,7 +402,7 @@ Describe 'harness-notify.ps1 Windows twin' {
 
   It 'fans one event out to every configured channel with the harness subject' {
     Set-SandboxConfig -Sandbox $script:notifySandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram', 'ntfy', 'discord') } }
-    $started = Start-TwinProcess -Sandbox $script:notifySandbox -ScriptPath $script:notifyScript -Arguments @('pi', 'done', 'refactor done')
+    $started = Invoke-TwinProcess -Sandbox $script:notifySandbox -ScriptPath $script:notifyScript -Arguments @('pi', 'done', 'refactor done')
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
@@ -417,7 +417,7 @@ Describe 'harness-notify.ps1 Windows twin' {
 
   It 'extracts the message from a hook JSON payload when no text is given' {
     Set-SandboxConfig -Sandbox $script:notifySandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') } }
-    $started = Start-TwinProcess -Sandbox $script:notifySandbox -ScriptPath $script:notifyScript -Arguments @('opencode', 'done') -Stdin '{"message":"session idle"}'
+    $started = Invoke-TwinProcess -Sandbox $script:notifySandbox -ScriptPath $script:notifyScript -Arguments @('opencode', 'done') -Stdin '{"message":"session idle"}'
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
@@ -426,7 +426,7 @@ Describe 'harness-notify.ps1 Windows twin' {
 
   It 'falls back to the event label when the body is empty' {
     Set-SandboxConfig -Sandbox $script:notifySandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') } }
-    $started = Start-TwinProcess -Sandbox $script:notifySandbox -ScriptPath $script:notifyScript -Arguments @('cursor', 'needs-input')
+    $started = Invoke-TwinProcess -Sandbox $script:notifySandbox -ScriptPath $script:notifyScript -Arguments @('cursor', 'needs-input')
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
@@ -438,7 +438,7 @@ Describe 'harness-notify.ps1 Windows twin' {
   It 'notifies nothing when the bridge is disabled' {
     Set-SandboxConfig -Sandbox $script:notifySandbox -Config @{ 'harness-notify' = @{ enable = $false; channels = @('telegram') } }
     $before = (Get-HermesStubLog -Sandbox $script:notifySandbox).Count
-    $started = Start-TwinProcess -Sandbox $script:notifySandbox -ScriptPath $script:notifyScript -Arguments @('pi', 'done', 'ignored')
+    $started = Invoke-TwinProcess -Sandbox $script:notifySandbox -ScriptPath $script:notifyScript -Arguments @('pi', 'done', 'ignored')
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
@@ -446,7 +446,7 @@ Describe 'harness-notify.ps1 Windows twin' {
   }
 
   It 'exits 0 with a warning when arguments are missing' {
-    $started = Start-TwinProcess -Sandbox $script:notifySandbox -ScriptPath $script:notifyScript -Arguments @()
+    $started = Invoke-TwinProcess -Sandbox $script:notifySandbox -ScriptPath $script:notifyScript -Arguments @()
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
@@ -468,7 +468,7 @@ Describe 'harness-approval.ps1 Windows twin' {
   It 'honours a remote allow decision, clears the request, and audits it' {
     Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') } }
     $stateDir = Get-BridgeStateDir -Sandbox $script:approvalSandbox
-    $started = Start-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('pi', 'bash', 'git push --force', '30')
+    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('pi', 'bash', 'git push --force', '30')
 
     $requestPath = $null
     $deadline = [DateTime]::UtcNow.AddSeconds(20)
@@ -505,7 +505,7 @@ Describe 'harness-approval.ps1 Windows twin' {
 
   It 'answers Cursor hook mode with a Cursor permission document when nobody answers' {
     Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ 'timeout-seconds' = 2 } }
-    $started = Start-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'cursor') -Stdin '{"command":"rm -rf build"}'
+    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'cursor') -Stdin '{"command":"rm -rf build"}'
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
@@ -519,7 +519,7 @@ Describe 'harness-approval.ps1 Windows twin' {
 
   It 'answers Copilot hook mode with a PreToolUse decision document' {
     Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ 'timeout-seconds' = 2 } }
-    $started = Start-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'copilot') -Stdin '{"tool_name":"runInTerminal","tool_input":{"command":"rm -rf /"}}'
+    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'copilot') -Stdin '{"tool_name":"runInTerminal","tool_input":{"command":"rm -rf /"}}'
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
@@ -531,7 +531,7 @@ Describe 'harness-approval.ps1 Windows twin' {
 
   It 'renders the plain decision for harnesses without a document shape' {
     Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ 'timeout-seconds' = 2 } }
-    $started = Start-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'opencode') -Stdin '{"title":"run bash"}'
+    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'opencode') -Stdin '{"title":"run bash"}'
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
@@ -540,7 +540,7 @@ Describe 'harness-approval.ps1 Windows twin' {
 
   It 'still exits 0 with a decision when the payload is malformed' {
     Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ 'timeout-seconds' = 2 } }
-    $started = Start-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'cursor') -Stdin 'not json at all'
+    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'cursor') -Stdin 'not json at all'
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
@@ -565,7 +565,7 @@ Describe 'harness-drive.ps1 Windows twin' {
     $null = Set-SandboxQueuedPrompt -Sandbox $script:driveSandbox -Harness 'cursor' -Name '1000-aaaa.json' -Text 'older prompt'  # check-suppress:suppression_doc: the helper returns the queue path; this test does not need it
     $newestPath = Set-SandboxQueuedPrompt -Sandbox $script:driveSandbox -Harness 'cursor' -Name '2000-bbbb.json' -Text 'continue with the tests'
 
-    $started = Start-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @('cursor')
+    $started = Invoke-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @('cursor')
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
@@ -583,7 +583,7 @@ Describe 'harness-drive.ps1 Windows twin' {
     $prompt = "summarize `"quotes`" and`na newline"
     $null = Set-SandboxQueuedPrompt -Sandbox $script:driveSandbox -Harness 'copilot' -Name '3000-cccc.json' -Text $prompt  # check-suppress:suppression_doc: the helper returns the queue path; this test does not need it
 
-    $started = Start-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @('copilot')
+    $started = Invoke-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @('copilot')
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
@@ -597,7 +597,7 @@ Describe 'harness-drive.ps1 Windows twin' {
     Set-SandboxConfig -Sandbox $script:driveSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') } }
     $queuedPath = Set-SandboxQueuedPrompt -Sandbox $script:driveSandbox -Harness 'opencode' -Name '4000-dddd.json' -Text 'switch to the other branch'
 
-    $started = Start-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @('opencode')
+    $started = Invoke-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @('opencode')
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
@@ -611,7 +611,7 @@ Describe 'harness-drive.ps1 Windows twin' {
     $cursorQueue = Join-Path -Path (Join-Path -Path (Get-BridgeStateDir -Sandbox $script:driveSandbox) -ChildPath 'commands') -ChildPath 'cursor'
     if (Test-Path -LiteralPath $cursorQueue) { Remove-Item -LiteralPath $cursorQueue -Recurse -Force }
 
-    $started = Start-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @('cursor')
+    $started = Invoke-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @('cursor')
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
@@ -622,7 +622,7 @@ Describe 'harness-drive.ps1 Windows twin' {
     Set-SandboxConfig -Sandbox $script:driveSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') } }
     $queuedPath = Set-SandboxQueuedPrompt -Sandbox $script:driveSandbox -Harness 'cursor' -Name '6000-ffff.json' -Text ''
 
-    $started = Start-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @('cursor')
+    $started = Invoke-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @('cursor')
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
@@ -635,7 +635,7 @@ Describe 'harness-drive.ps1 Windows twin' {
     Set-SandboxConfig -Sandbox $script:driveSandbox -Config @{ 'harness-notify' = @{ enable = $false; channels = @('telegram') } }
     $queuedPath = Set-SandboxQueuedPrompt -Sandbox $script:driveSandbox -Harness 'cursor' -Name '5000-eeee.json' -Text 'not now'
 
-    $started = Start-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @('cursor')
+    $started = Invoke-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @('cursor')
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
@@ -644,7 +644,7 @@ Describe 'harness-drive.ps1 Windows twin' {
   }
 
   It 'exits 0 with a usage warning when the harness argument is missing' {
-    $started = Start-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @()
+    $started = Invoke-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @()
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
