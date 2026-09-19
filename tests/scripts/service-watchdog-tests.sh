@@ -375,4 +375,136 @@ FAKE_MOUNT_TABLE="fake://vol on $_tmp/home/clouds/OneDrive (fake, nodev)"
 run_capture
 assert_contains "the released mount is reloaded" "$(cat "$_tmp/launchctl.log")" "bootstrap"
 
+section 12 "A deliberately blocked instance is left alone"
+
+# WHY: a cloud mount whose macFUSE/FSKit provider refuses it stops on purpose —
+# rclone-mount.sh records a blocked marker and exits 0, so
+# KeepAlive{SuccessfulExit:false} keeps it stopped — and the watchdog must
+# report it once instead of reloading it on every 300 s tick: each reload
+# attempt re-registers the file-system extension and deepens the wedge.
+
+# current_boot_id — The boot id the runtime records in a blocked marker.
+# Mirrors svc_boot_id, including its "unknown" fallback: a probe that the host
+# refuses (sysctl is not always permitted) must not make a fresh marker look
+# stale here while the runtime reads it as fresh.
+current_boot_id() {
+  local boot=""
+  case "$(uname -s)" in
+  Darwin) [ -x /usr/sbin/sysctl ] && boot="$(/usr/sbin/sysctl -n kern.boottime 2>/dev/null || true)" ;;
+  Linux) [ -r /proc/sys/kernel/random/boot_id ] && boot="$(cat /proc/sys/kernel/random/boot_id)" ;;
+  esac
+  [ -n "$boot" ] || boot="unknown"
+  printf '%s\n' "$boot"
+}
+
+# write_blocked_marker — Seed the marker a deliberately stopped instance left.
+# Args: $1 — instance id; $2 — class; $3 — boot id (default: the current boot).
+# The boot id is read from the same probe the runtime uses, so freshness is
+# decided by the real comparison rather than by a stubbed one.
+write_blocked_marker() {
+  mkdir -p "$state_dir"
+  {
+    printf 'class=%s\n' "$2"
+    printf 'remedy=%s\n' "run 'sudo killall fskitd' (nucleus-cloud repair)"
+    printf 'boot=%s\n' "${3:-$(current_boot_id)}"
+    printf 'ts=%s\n' "$(date +%s)"
+  } >"$state_dir/$1.blocked"
+}
+
+# drop_blocked_marker — What the runtime does once the instance converges: the
+# library drops the marker and the report record together, which is what makes a
+# later block a new transition.
+drop_blocked_marker() {
+  rm -f "$state_dir/$1.blocked" "$state_dir/$1.blocked-reported"
+}
+
+# block_reports — Number of block reports held in a captured output block.
+block_reports() {
+  printf '%s\n' "$1" | grep -c ' is blocked (' || true
+}
+
+printf 'plist placeholder\n' >"$_plist_dir/local.cloud-mount.iCloud.plist"
+FAKE_LIVE="local.cloud-mount.iCloud"
+FAKE_STATE="not running"
+FAKE_EXIT_CODE=0
+FAKE_PLIST_KEYS="KeepAlive = { SuccessfulExit = false }"
+FAKE_MOUNT_TABLE="fake://vol on $_tmp/home/clouds/GoogleDrive (fake, nodev)"
+SUDO_USER_OVERRIDE=test-user
+drop_blocked_marker local.cloud-mount.iCloud
+write_blocked_marker local.cloud-mount.iCloud fskit-provider
+: >"$_tmp/launchctl.log"
+: >"$_tmp/booted-out.txt"
+run_capture
+assert_eq "a blocked instance exits 0" 0 "$captured_status"
+assert_eq "a blocked instance is never reloaded" 0 "$(calls_made "$_tmp/launchctl.log")"
+assert_eq "the block is reported once" 1 "$(block_reports "$captured_output")"
+assert_contains "the report names the instance and its class" "$captured_output" \
+  "local.cloud-mount.iCloud is blocked (fskit-provider)"
+assert_contains "the report names the remedy" "$captured_output" "killall fskitd"
+
+run_capture
+assert_eq "a repeated tick is silent about the block" 0 "$(block_reports "$captured_output")"
+assert_eq "a repeated tick does not reload it" 0 "$(calls_made "$_tmp/launchctl.log")"
+
+drop_blocked_marker local.cloud-mount.iCloud
+: >"$_tmp/launchctl.log"
+: >"$_tmp/booted-out.txt"
+run_capture
+assert_eq "a cleared block exits 0" 0 "$captured_status"
+assert_contains "the instance is reloaded once the block is gone" "$(cat "$_tmp/launchctl.log")" "bootstrap"
+
+write_blocked_marker local.cloud-mount.iCloud fskit-provider
+: >"$_tmp/launchctl.log"
+: >"$_tmp/booted-out.txt"
+run_capture
+assert_eq "a later block is reported again" 1 "$(block_reports "$captured_output")"
+assert_eq "a later block is not reloaded" 0 "$(calls_made "$_tmp/launchctl.log")"
+
+# A marker written in an earlier boot is stale: the standing remedy for a wedged
+# provider is a daemon restart or a reboot, so a reboot must not keep the
+# instance down.
+write_blocked_marker local.cloud-mount.iCloud fskit-provider other-boot
+: >"$_tmp/launchctl.log"
+: >"$_tmp/booted-out.txt"
+run_capture
+assert_eq "a marker from an earlier boot exits 0" 0 "$captured_status"
+assert_eq "a marker from an earlier boot is not reported" 0 "$(block_reports "$captured_output")"
+assert_contains "a marker from an earlier boot does not suppress the reload" \
+  "$(cat "$_tmp/launchctl.log")" "bootstrap"
+
+# One blocked instance must not silence the others in the same tick.
+drop_blocked_marker local.cloud-mount.iCloud
+printf 'plist placeholder\n' >"$_plist_dir/local.cloud-mount.OneDrive.plist"
+write_blocked_marker local.cloud-mount.iCloud fskit-provider
+FAKE_LIVE="local.cloud-mount.iCloud local.cloud-mount.OneDrive"
+: >"$_tmp/launchctl.log"
+: >"$_tmp/booted-out.txt"
+run_capture
+assert_eq "a mixed tick exits 0" 0 "$captured_status"
+assert_contains "the blocked instance is reported beside another" "$captured_output" \
+  "local.cloud-mount.iCloud is blocked (fskit-provider)"
+assert_contains "the unblocked instance is still recovered" "$(cat "$_tmp/launchctl.log")" \
+  "local.cloud-mount.OneDrive"
+assert_not_contains "the blocked instance is skipped beside it" "$(cat "$_tmp/launchctl.log")" \
+  "local.cloud-mount.iCloud"
+
+drop_blocked_marker local.cloud-mount.iCloud
+: >"$_tmp/launchctl.log"
+: >"$_tmp/booted-out.txt"
+write_blocked_marker cloud-mount-iCloud.service fskit-provider
+WATCHDOG_TEST_HOST=NixOS
+FAKE_UNITS="cloud-mount-iCloud.service"
+FAKE_SYSTEMCTL_STATE="failed"
+FAKE_LIVE=""
+: >"$_tmp/systemctl.log"
+run_capture
+assert_eq "a blocked NixOS unit exits 0" 0 "$captured_status"
+assert_eq "a blocked NixOS unit is not restarted" 0 "$(calls_made "$_tmp/systemctl.log")"
+assert_contains "the blocked NixOS unit is reported" "$captured_output" \
+  "cloud-mount-iCloud.service is blocked (fskit-provider)"
+WATCHDOG_TEST_HOST=
+FAKE_UNITS=""
+FAKE_SYSTEMCTL_STATE=""
+rm -f "$state_dir/cloud-mount-iCloud.service.blocked" "$state_dir/cloud-mount-iCloud.service.blocked-reported"
+
 finish_tests

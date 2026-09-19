@@ -21,6 +21,9 @@
 # not run is reported once per transition (never auto-loaded — see
 # src/modules/cloud-drives.nix on the clean-exit-0 contract). A loaded instance
 # that exited cleanly is a different case and is reloaded.
+#
+# An instance that wrote a blocked marker stopped on purpose, and is reported
+# once per transition and never restarted (see service_blocked).
 
 set -euo pipefail
 
@@ -59,6 +62,7 @@ usage() {
   spawn-scheduled, clean exit, inactive, failed, or not loaded at all).
   Runs indefinitely with 300 s sleep between iterations.
   Use --oneshot for a single iteration (manual / CI use).
+  An instance that wrote a blocked marker is reported once and never restarted.
 
   Options:
   -h|--help     Show usage.
@@ -144,6 +148,33 @@ log_restart() {
 log_notloaded() {
   printf '[%s] watchdog: %s %s configured but not loaded (run '\''nucleus-svc status %s'\'' or '\''nucleus-apply'\'')\n' \
     "$(date '+%Y-%m-%d %H:%M:%S')" "$1" "$2" "$1"
+}
+
+# service_blocked — Report a deliberately blocked instance and leave it alone.
+# Args: $1 — concrete instance id (also the marker key and the launchd label/
+#       systemd unit the runtime records the block against).
+# Returns: 0 when the instance is blocked, 1 when it is not.
+# WHY: an instance that stopped on purpose is not broken — a cloud mount whose
+#   macFUSE/FSKit provider refuses it writes a blocked marker and exits 0, so
+#   KeepAlive{SuccessfulExit:false} does not resurrect it — and restarting it
+#   here would re-enter the same failure on every 300s tick; each attempt also
+#   re-registers the file-system extension, which deepens the wedge instead of
+#   clearing it.  The marker is generic (any service may write one) and
+#   boot-scoped, so it is reported once per transition and a block written before
+#   a reboot never keeps an instance down afterwards.
+# ref: https://github.com/macfuse/macfuse/issues/1132
+service_blocked() {
+  local svc_id="$1" state_dir blocked
+
+  state_dir="$(crash_loop_state_dir)"
+  blocked="$(svc_blocked_state "$svc_id" "$state_dir")"
+  [ "$blocked" != "clear" ] || return 1
+  if [ "$(svc_blocked_transition "$svc_id" "$state_dir" "$blocked")" = first ]; then
+    printf '[%s] watchdog: %s is blocked (%s); %s\n' \
+      "$(date '+%Y-%m-%d %H:%M:%S')" "$svc_id" "${blocked#blocked }" \
+      "$(svc_blocked_remedy "$svc_id" "$state_dir")"
+  fi
+  return 0
 }
 
 # watchdog_mounts — Memoized cloud-drive mounts the invoking user declares.
@@ -259,6 +290,12 @@ check_service_macos() {
   uid="${REAL_USER_UID:-$(id -u)}"
   [ -z "$svc_id" ] && return 0
 
+  # WHY: checked before every probe and before any recovery, so a blocked
+  #   instance is neither reloaded nor even inspected further.
+  if service_blocked "$svc_id"; then
+    return 0
+  fi
+
   local plist=""
   if [ "$scope" = "system" ]; then
     plist="/Library/LaunchDaemons/$svc_id.plist"
@@ -370,6 +407,12 @@ check_service_nixos() {
   scope=$(echo "$entry" | jq -r '.scope // "system"')
   svc_id=$(echo "$entry" | jq -r '.service // ""')
   [ -z "$svc_id" ] && return 0
+
+  # WHY: the marker facility is generic, so a NixOS unit that wrote one is left
+  #   alone here as well; nothing about the block is macOS-specific.
+  if service_blocked "$svc_id"; then
+    return 0
+  fi
   [ "$scope" = "user" ] && scope_flag="--user"
 
   local is_active
