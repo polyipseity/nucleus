@@ -9,6 +9,8 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 
 . "$SCRIPT_DIR/../lib/lib.sh"
+# shellcheck source=../lib/macos-launch-services.sh
+. "$SCRIPT_DIR/../lib/macos-launch-services.sh"
 
 usage() {
   usage_std "$(basename "$0")" "{sudo|user}" "Trust the Caddy CA certificate for the current user or system-wide."
@@ -63,10 +65,14 @@ done
 # .agents/instructions/macos-service-hardening.instructions.md.
 if [ "$_ct_mode" = "sudo" ]; then
   warn -l caddy-trust "attempting launchd service recovery via bootout/bootstrap..."
-  # check-suppress:suppression_doc: HTTPS proxy service may not be loaded; bootout on absent service exits 1.
-  sudo launchctl bootout system/org.nixos.httpsProxy 2>/dev/null || true
-  sleep 1
-  if sudo launchctl bootstrap system /Library/LaunchDaemons/org.nixos.httpsProxy.plist 2>/dev/null; then
+  _ct_proxy_target=system/org.nixos.httpsProxy
+  _ct_proxy_plist=/Library/LaunchDaemons/org.nixos.httpsProxy.plist
+  # WHY: see launchctl_bootout_wait — macOS 26+ unloads asynchronously, so a
+  #   bootstrap issued before the unload completes fails with "Bootstrap failed:
+  #   5:" and the HTTPS proxy stays unloaded.
+  _ct_reload_out=""
+  if launchctl_bootout_wait "$_ct_proxy_target" sudo &&
+    _ct_reload_out=$(launchctl_bootstrap_plist system "$_ct_proxy_plist" "$_ct_proxy_target" sudo); then
     warn -l caddy-trust 'launchd service re-bootstrapped; retrying trust...'
     sleep 2
     _ct_attempt=0
@@ -78,6 +84,10 @@ if [ "$_ct_mode" = "sudo" ]; then
       _ct_attempt=$((_ct_attempt + 1))
       sleep 1
     done
+  else
+    _ct_reload_reason="${_ct_reload_out:-launchctl bootout did not unload $_ct_proxy_target}"
+    # check-suppress:suppression_doc: the trust attempt is best-effort by design; the final warning below reports the failed apply step.
+    error -l caddy-trust "HTTPS proxy service could not be reloaded: $_ct_reload_reason" || true
   fi
 fi
 

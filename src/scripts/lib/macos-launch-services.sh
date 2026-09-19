@@ -7,6 +7,9 @@
 #   register_handler             — set default UTI handler via duti
 #   launchctl_target             — build a launchctl service target specifier
 #   launchctl_bootstrap_domain   — build a launchctl bootstrap domain target
+#   launchctl_job_loaded         — is a launchd job loaded?
+#   launchctl_bootout_wait       — unload a launchd job and wait for the unload
+#   launchctl_bootstrap_plist    — load a plist, tolerating an already-loaded job
 #   refresh_cfprefsd             — kill cfprefsd (CFPreferences daemon)
 #   refresh_pbs                  — kill pbs (Pasteboard Server)
 #   refresh_lsd                  — rebuild Launch Services database
@@ -71,6 +74,95 @@ launchctl_bootstrap_domain() {
   user) printf 'user/%s' "$uid" ;;
   *) printf '%s/%s' "$domain" "$uid" ;;
   esac
+}
+
+# launchctl_job_loaded — Is a launchd job currently loaded?
+# Args: $1 — launchctl service target (e.g. "gui/501/local.cloud-mount.iCloud")
+#       $2 — sudo prefix ("" or "sudo")
+# Returns: 0 when the job is loaded, launchctl's own non-zero status otherwise.
+# WHY: loaded is what `launchctl` answers directly, and it is a different
+#   question from "state = running": a job that is loaded but not running is not
+#   missing, and a job that is missing cannot be started by `launchctl start`.
+launchctl_job_loaded() {
+  local target="$1" sudo_prefix="$2"
+  # check-suppress:suppression_doc: an unloaded job is the question being asked, not an error.
+  $sudo_prefix launchctl print "$target" >/dev/null 2>&1
+}
+
+# launchctl_bootout_wait — Unload a launchd job and wait until it is really gone.
+# Args: $1 — launchctl service target (e.g. "gui/501/local.cloud-mount.iCloud")
+#       $2 — sudo prefix ("" or "sudo")
+# Returns: 0 when the job is no longer loaded (or was never loaded), 1 when it is
+#          still loaded after the bounded wait.
+# WHY: macOS 26+ unloads asynchronously, so a `bootstrap` issued right after
+#   `bootout` can fail with "Bootstrap failed: 5: Input/output error" because the
+#   job is still loaded — and the bootout that completes afterwards then leaves
+#   the service unloaded and silent.  Home Manager's activation uses
+#   `launchctl bootout --wait` for the same reason; polling covers older macOS,
+#   where --wait does not exist.
+launchctl_bootout_wait() {
+  local target="$1" sudo_prefix="$2"
+  local major
+  # check-suppress:suppression_doc: sw_vers is absent off macOS and an unknown version takes the plain bootout path.
+  major="$(sw_vers -productVersion 2>/dev/null | cut -d. -f1 || true)"
+  case "$major" in
+  '' | *[!0-9]*) major=0 ;;
+  esac
+  # check-suppress:suppression_doc: an already-absent job needs no unload; bootout exits 1 for it.
+  if [ "$major" -ge 26 ]; then
+    # check-suppress:suppression_doc: the poll below is the check; an absent job already satisfies it.
+    $sudo_prefix launchctl bootout --wait "$target" >/dev/null 2>&1 || true
+  else
+    # check-suppress:suppression_doc: the poll below is the check; an absent job already satisfies it.
+    $sudo_prefix launchctl bootout "$target" >/dev/null 2>&1 || true
+  fi
+  local _i=0
+  while [ "$_i" -lt 10 ]; do
+    launchctl_job_loaded "$target" "$sudo_prefix" || return 0
+    sleep 0.5
+    _i=$((_i + 1))
+  done
+  return 1
+}
+
+# launchctl_bootstrap_plist — Load a plist into a launchd domain, tolerating an
+# already-loaded job and the asynchronous-unload race.
+# Args: $1 — bootstrap domain target (e.g. "gui/501", "system")
+#       $2 — plist path (e.g. "$HOME/Library/LaunchAgents/local.foo.plist")
+#       $3 — launchctl service target of that same job (e.g. "gui/501/local.foo")
+#       $4 — sudo prefix ("" or "sudo")
+# Output: launchctl's own output when the job could not be loaded; nothing on
+#         success, so a caller can quote the reason in its own error.
+# Returns: 0 when the job is loaded afterwards, 1 otherwise.
+# WHY: bootstrapping an already-loaded job only fails with "Bootstrap failed: 5:
+#   Input/output error", so the loaded case is the healthy case and is never
+#   passed to launchctl.  Code 5 on an unloaded job means a preceding
+#   asynchronous bootout has not finished yet, so the unload is waited out and
+#   the bootstrap retried instead of the service being reported as broken.
+launchctl_bootstrap_plist() {
+  local domain="$1" plist="$2" target="$3" sudo_prefix="$4"
+  if launchctl_job_loaded "$target" "$sudo_prefix"; then
+    return 0
+  fi
+
+  local out="" _i=0
+  while [ "$_i" -lt 3 ]; do
+    if out=$($sudo_prefix launchctl bootstrap "$domain" "$plist" 2>&1); then
+      return 0
+    fi
+    case "$out" in
+    *"Bootstrap failed: 5:"*)
+      # check-suppress:suppression_doc: a job that is already gone satisfies the wait; the bootstrap retry reports the outcome.
+      launchctl_bootout_wait "$target" "$sudo_prefix" || true
+      ;;
+    *)
+      break
+      ;;
+    esac
+    _i=$((_i + 1))
+  done
+  printf '%s\n' "$out"
+  return 1
 }
 
 # refresh_cfprefsd — Kill cfprefsd (CFPreferences daemon) on macOS.

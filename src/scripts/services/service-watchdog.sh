@@ -186,10 +186,20 @@ recover_launchctl() {
   else
     plist="${HOME:-}/Library/LaunchAgents/$svc_id.plist"
   fi
-  # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
-  $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
-  # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
-  $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$launchd_domain" "$uid")" "$plist" 2>/dev/null || true
+  # WHY: see launchctl_bootout_wait — macOS 26+ unloads asynchronously, so a
+  #   bootstrap issued before the unload completes fails with "Bootstrap failed:
+  #   5:" and the service stays unloaded.
+  if ! launchctl_bootout_wait "$target" "$sudo_prefix"; then
+    error "watchdog: $svc_id — launchctl bootout did not unload $target"
+    return 1
+  fi
+  local out="" bootstrap_domain=""
+  bootstrap_domain="$(launchctl_bootstrap_domain "$launchd_domain" "$uid")"
+  if out=$(launchctl_bootstrap_plist "$bootstrap_domain" "$plist" "$target" "$sudo_prefix"); then
+    return 0
+  fi
+  error "watchdog: $svc_id — launchctl bootstrap failed: $out"
+  return 1
 }
 
 check_service_macos() {
@@ -223,7 +233,8 @@ check_service_macos() {
       return 0
     fi
     crash_loop_record "$svc" "spawn-scheduled"
-    recover_launchctl "$svc" "$scope" "$launchd_domain" "$svc_id" "$uid"
+    # check-suppress:suppression_doc: recover_launchctl already reported the failure via error; the watchdog keeps watching the remaining services.
+    recover_launchctl "$svc" "$scope" "$launchd_domain" "$svc_id" "$uid" || true
     log_restart "$svc_id" "spawn scheduled"
     ;;
   *"state = waiting"*)
@@ -232,7 +243,8 @@ check_service_macos() {
       return 0
     fi
     crash_loop_record "$svc" "waiting"
-    recover_launchctl "$svc" "$scope" "$launchd_domain" "$svc_id" "$uid"
+    # check-suppress:suppression_doc: recover_launchctl already reported the failure via error; the watchdog keeps watching the remaining services.
+    recover_launchctl "$svc" "$scope" "$launchd_domain" "$svc_id" "$uid" || true
     log_restart "$svc_id" "waiting"
     ;;
   # Exit 78 (EX_CONFIG): non-retryable, launchd sets penalty box — needs bootout+bootstrap.
@@ -243,7 +255,8 @@ check_service_macos() {
       return 0
     fi
     crash_loop_record "$svc" "EX_CONFIG"
-    recover_launchctl "$svc" "$scope" "$launchd_domain" "$svc_id" "$uid"
+    # check-suppress:suppression_doc: recover_launchctl already reported the failure via error; the watchdog keeps watching the remaining services.
+    recover_launchctl "$svc" "$scope" "$launchd_domain" "$svc_id" "$uid" || true
     log_restart "$svc_id" "EX_CONFIG"
     ;;
   *"Service is not found"* | "")
@@ -260,9 +273,14 @@ check_service_macos() {
     fi
     if [ -f "$plist" ]; then
       crash_loop_record "$svc" "not-found"
-      # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
-      $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$launchd_domain" "$uid")" "$plist" 2>/dev/null || true
-      log_restart "$svc_id" "not found — bootstrap"
+      local bootstrap_out="" bootstrap_domain=""
+      bootstrap_domain="$(launchctl_bootstrap_domain "$launchd_domain" "$uid")"
+      if bootstrap_out=$(launchctl_bootstrap_plist "$bootstrap_domain" "$plist" "$target" "$sudo_prefix"); then
+        log_restart "$svc_id" "not found — bootstrap"
+      else
+        # check-suppress:suppression_doc: error's status is consumed because the watchdog must keep watching the remaining services.
+        error "watchdog: $svc_id — launchctl bootstrap failed: $bootstrap_out" || true
+      fi
     fi
     ;;
   esac

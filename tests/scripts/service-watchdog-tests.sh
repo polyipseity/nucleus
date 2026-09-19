@@ -49,14 +49,22 @@ JSON
 # FAKE_LIVE lists loaded labels, FAKE_STATE simulates the `print` state. Every
 # mutating subcommand is appended to FAKE_LAUNCHCTL_LOG so assertions can prove
 # exactly which instance was recovered (or that none was touched).
+# A booted-out label is reported absent until it is bootstrapped again: the
+# recovery helper waits out the unload (macOS 26+ unloads asynchronously) before
+# it reloads the job, so the stub has to model that unload.
 cat >"$_tmp/bin/launchctl" <<'FAKE'
 #!/usr/bin/env bash
+_booted_out="${FAKE_BOOTED_OUT:?}"
 case "${1:-}" in
 list)
   printf 'PID\tStatus\tLabel\n'
   for _label in ${FAKE_LIVE:-}; do printf '4242\t0\t%s\n' "$_label"; done
   ;;
 print)
+  if [ -f "$_booted_out" ] && grep -qxF "${2:-}" "$_booted_out"; then
+    printf 'Service is not found\n'
+    exit 1
+  fi
   for _label in ${FAKE_LIVE:-}; do
     case "${2:-}" in
     *"$_label")
@@ -68,7 +76,15 @@ print)
   printf 'Service is not found\n'
   exit 1
   ;;
-bootout | bootstrap | kickstart | enable | disable | kill)
+bootout)
+  printf '%s\n' "$*" >>"${FAKE_LAUNCHCTL_LOG:?}"
+  printf '%s\n' "${*: -1}" >>"$_booted_out"
+  ;;
+bootstrap)
+  printf '%s\n' "$*" >>"${FAKE_LAUNCHCTL_LOG:?}"
+  : >"$_booted_out"
+  ;;
+kickstart | enable | disable | kill)
   printf '%s\n' "$*" >>"${FAKE_LAUNCHCTL_LOG:?}"
   ;;
 *)
@@ -119,6 +135,7 @@ run_watchdog() {
     FAKE_SYSTEMCTL_STATE="${FAKE_SYSTEMCTL_STATE:-active}" \
     FAKE_LAUNCHCTL_LOG="$_tmp/launchctl.log" \
     FAKE_SYSTEMCTL_LOG="$_tmp/systemctl.log" \
+    FAKE_BOOTED_OUT="$_tmp/booted-out.txt" \
     bash "$WATCHDOG" --oneshot
 }
 
@@ -176,6 +193,7 @@ section 2 "A stuck instance is recovered"
 FAKE_LIVE="local.cloud-mount.iCloud"
 FAKE_STATE="spawn scheduled"
 : >"$_tmp/launchctl.log"
+: >"$_tmp/booted-out.txt"
 run_capture
 assert_eq "a stuck instance exits 0" 0 "$captured_status"
 assert_contains "the instance is booted out" "$(cat "$_tmp/launchctl.log")" "bootout"

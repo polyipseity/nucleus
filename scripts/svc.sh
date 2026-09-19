@@ -388,6 +388,8 @@ svc_status() {
 # recover_launchctl_service — Recover a launchctl service stuck in
 # spawn-scheduled / waiting / EX_CONFIG state.
 # Does bootout+bootstrap to fully reload. Returns 0 if recovery was done.
+# The unload is waited out before the bootstrap (see launchctl_bootout_wait), and
+# a reload that leaves the service unloaded is reported as an error, not a warning.
 #
 # Handles three cases that `launchctl start` alone cannot fix:
 #   • state = spawn scheduled   — server shutdown left service in limbo
@@ -415,11 +417,20 @@ recover_launchctl_service() {
     else
       plist="$HOME/Library/LaunchAgents/$svc_id.plist"
     fi
-    # check-suppress:suppression_doc: service may not be loaded; bootout on absent service exits 1.
-    $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
-    if $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain" "$uid")" "$plist" 2>/dev/null; then
+    # WHY: the unload must have completed before the bootstrap: macOS 26+
+    #   unloads asynchronously, and a bootstrap in between fails with
+    #   "Bootstrap failed: 5:" while the finished bootout leaves the service
+    #   unloaded.
+    if ! launchctl_bootout_wait "$target" "$sudo_prefix"; then
+      error "$svc_id — launchctl bootout did not unload $target"
+      return 1
+    fi
+    local bootstrap_domain bootstrap_out=""
+    bootstrap_domain="$(launchctl_bootstrap_domain "$domain" "$uid")"
+    if bootstrap_out=$(launchctl_bootstrap_plist "$bootstrap_domain" "$plist" "$target" "$sudo_prefix"); then
       return 0
     fi
+    error "$svc_id — launchctl bootstrap failed: $bootstrap_out"
     return 1
     ;;
   esac
@@ -569,9 +580,21 @@ svc_action() {
     start)
       cleanup_service_ports "$entry_json"
       recover_launchctl_service "$launchd_domain" "$svc_id" "$sudo_prefix" "$uid" || {
-        $sudo_prefix launchctl enable "$target" >/dev/null 2>&1
-        $sudo_prefix launchctl start "$svc_id" >/dev/null 2>&1 ||
-          $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$launchd_domain" "$uid")" "$plist" >/dev/null 2>&1
+        # WHY: a loaded job only needs starting, an unloaded one needs loading
+        #   again, and either failure is reported with launchctl's own output
+        #   instead of being discarded.
+        local start_out="" start_domain=""
+        start_domain="$(launchctl_bootstrap_domain "$launchd_domain" "$uid")"
+        if launchctl_job_loaded "$target" "$sudo_prefix"; then
+          $sudo_prefix launchctl enable "$target" >/dev/null 2>&1
+          if ! start_out=$($sudo_prefix launchctl start "$svc_id" 2>&1); then
+            error "$name — launchctl start failed: $start_out"
+            return 1
+          fi
+        elif ! start_out=$(launchctl_bootstrap_plist "$start_domain" "$plist" "$target" "$sudo_prefix"); then
+          error "$name — launchctl bootstrap failed: $start_out"
+          return 1
+        fi
       }
       poll_service_ready "$name" "$entry_json" >/dev/null || {
         local _diag
@@ -584,18 +607,27 @@ svc_action() {
     restart)
       cleanup_service_ports "$entry_json"
       recover_launchctl_service "$launchd_domain" "$svc_id" "$sudo_prefix" "$uid" || {
-        # check-suppress:suppression_doc: service may not be loaded; bootout/enable on absent service exits 1.
+        # check-suppress:suppression_doc: service may not be loaded; kill on an absent service exits 1.
         $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 || true
         for _i in 1 2 3 4 5; do
           $sudo_prefix launchctl print "$target" 2>/dev/null |
             grep -q "state = running" || break
           sleep 1
         done
-        # check-suppress:suppression_doc: service may not be loaded; bootout/enable on absent service exits 1.
-        $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
-        sleep 0.5
-        # check-suppress:suppression_doc: service may not be loaded; bootout/enable on absent service exits 1.
-        $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$launchd_domain" "$uid")" "$plist" 2>/dev/null || true
+        # WHY: the reload is only safe once the unload has completed: macOS 26+
+        #   unloads asynchronously, and a bootstrap in between fails with
+        #   "Bootstrap failed: 5:" while the finished bootout leaves the service
+        #   unloaded.
+        if ! launchctl_bootout_wait "$target" "$sudo_prefix"; then
+          error "$name — launchctl bootout did not unload $target; service not reloaded"
+          return 1
+        fi
+        local reload_out="" reload_domain=""
+        reload_domain="$(launchctl_bootstrap_domain "$launchd_domain" "$uid")"
+        if ! reload_out=$(launchctl_bootstrap_plist "$reload_domain" "$plist" "$target" "$sudo_prefix"); then
+          error "$name — launchctl bootstrap failed: $reload_out"
+          return 1
+        fi
         for _j in 1 2 3 4; do
           $sudo_prefix launchctl print "$target" 2>/dev/null |
             grep -q "state = running" && break
@@ -603,10 +635,12 @@ svc_action() {
         done
         if ! $sudo_prefix launchctl print "$target" 2>/dev/null |
           grep -q "state = running"; then
-          # check-suppress:suppression_doc: service may not be loaded; bootout/enable on absent service exits 1.
+          # check-suppress:suppression_doc: the job is loaded but may be disabled; enable on an enabled job exits 1.
           $sudo_prefix launchctl enable "$target" >/dev/null 2>&1 || true
+          # WHY: a reload that left the service loaded but not running is not a
+          #   warning: the poll below reports the diagnostic and the status.
           $sudo_prefix launchctl start "$svc_id" >/dev/null 2>&1 ||
-            warn "$name — restart: failed to start service after reload"
+            error "$name — restart: failed to start service after reload"
         fi
       }
       poll_service_ready "$name" "$entry_json" >/dev/null || {
