@@ -38,7 +38,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 COMMAND_NAME = "harness"
-REQUEST_TTL_SECONDS = 900
+
+# Stale-request housekeeping deliberately lives in the writer/consumer rather
+# than here: harness-approval sweeps entries older than four times its approval
+# window and removes its own request once it is answered or times out, so the
+# plugin has nothing to expire and must not grow a second, drifting lifetime.
 
 _HELP_TEXT = """Harness bridge
 
