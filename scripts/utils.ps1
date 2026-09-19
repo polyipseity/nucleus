@@ -1,4 +1,3 @@
-#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
   Grouped nucleus user utilities.
@@ -131,9 +130,24 @@ function ConvertTo-NucleusStripMetadataReport {
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
-if ($Help -or -not $Action) {
-  if (-not $Action) { Write-NucleusError "missing subcommand (optimize-pdf or strip-metadata)" }
+if ($Help) {
   Get-Help $PSCommandPath -Detailed
+  exit 0
+}
+
+# A bare invocation prints the usage summary and succeeds, matching utils.sh
+# (usage on stdout, exit 0): asking which subcommand to run is not a failure,
+# and a caller reading stdout must see the same summary on either platform.
+if (-not $Action) {
+  $scriptName = Split-Path -Leaf $PSCommandPath
+  Write-NucleusInfo "usage: $scriptName optimize-pdf [[-Preset] <name>] [[-RemoveBackup]] [-File] <path>... | strip-metadata [[-RemoveBackup]] [[-Dialog]] [-File] <path>..."
+  Write-NucleusInfo "  Grouped nucleus user utilities. Currently: optimize-pdf (optimize PDFs with Ghostscript), strip-metadata (strip file metadata with mat2/exiftool)."
+  Write-NucleusInfo ""
+  Write-NucleusInfo "Subcommands:"
+  Write-NucleusInfo "  optimize-pdf     Optimize PDF files using Ghostscript. Keeps a .bak backup by default."
+  Write-NucleusInfo "  strip-metadata   Strip personal metadata from files (mat2 for OOXML, exiftool otherwise); PDF and legacy OLE2 inputs are skipped."
+  Write-NucleusInfo ""
+  Write-NucleusInfo "Run $scriptName -Help for the full help text."
   exit 0
 }
 

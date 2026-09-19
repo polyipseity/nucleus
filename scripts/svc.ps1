@@ -78,10 +78,19 @@ $ErrorActionPreference = 'Stop'
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
-if ($Help -or -not $Action) {
-  if (-not $Action) { Write-NucleusError "missing action (list, status, start, stop, restart, enable, disable, verify, endpoint, logs, log-paths, log-config)" }
+if ($Help) {
   Get-Help $PSCommandPath -Detailed
   exit 0
+}
+
+# A missing action is an error, matching svc.sh (message on stderr, exit 1):
+# callers act on the result of a service operation, so a run that performed
+# nothing must not read as success. Write-NucleusError prints through
+# Write-Error, which stays non-terminating inside the output module, so the
+# status is set explicitly instead of relying on the preference.
+if (-not $Action) {
+  Write-NucleusError "missing action (list, status, start, stop, restart, enable, disable, verify, endpoint, logs, log-paths, log-config)"
+  exit 1
 }
 
 # ---------------------------------------------------------------------------

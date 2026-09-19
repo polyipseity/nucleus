@@ -90,10 +90,20 @@ $ErrorActionPreference = 'Stop'
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
-if ($Help -or -not $Action) {
-  if (-not $Action) { Write-NucleusError "missing action (setup, sync, build-system, list, status, start, stop, upgrade, reset, android-config, inject, resize, gc, pack, unpack)" }
+if ($Help) {
   Get-Help $PSCommandPath -Detailed
   exit 0
+}
+
+# A missing action is an error, matching vm.sh (message on stderr, exit 1):
+# callers act on the result of a VM operation, so a run that performed nothing
+# must not read as success. The action list is the twin's, in the twin's order
+# rather than this file's ValidateSet order, so the two platforms report the
+# same set. Write-NucleusError prints through Write-Error, which stays
+# non-terminating inside the output module, so the status is set explicitly.
+if (-not $Action) {
+  Write-NucleusError "missing action (setup, sync, build-system, list, status, start, stop, upgrade, reset, android-config, inject, gc, resize, pack, unpack)"
+  exit 1
 }
 
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Get-Item $PSScriptRoot).Parent.FullName }

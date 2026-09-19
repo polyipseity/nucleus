@@ -72,9 +72,24 @@ $null = $DryRun, $GcOnly, $AiProfile, $Json  # check-suppress:suppression_doc: s
 $fmtModulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $fmtModulePath -Force -DisableNameChecking
 
-if ($Help -or -not $Action) {
-  if (-not $Action) { Write-NucleusError "missing action (sync, list, status, endpoint, config)" }
+if ($Help) {
   Get-Help $PSCommandPath -Detailed
+  exit 0
+}
+
+# A bare invocation prints the usage summary and succeeds, matching ai.sh
+# (usage on stdout, exit 0). Reporting it as a missing action failed the run
+# and put an error line next to the help text a first-time caller is reading.
+if (-not $Action) {
+  $scriptName = Split-Path -Leaf $PSCommandPath
+  Write-NucleusInfo "usage: $scriptName sync|list|status|endpoint|config [options]"
+  Write-NucleusInfo "  sync                              Pull models and remove orphans."
+  Write-NucleusInfo "  list                              List AI models by profile."
+  Write-NucleusInfo "  status                            Show AI service and model sync status."
+  Write-NucleusInfo "  endpoint                          Show AI service endpoints."
+  Write-NucleusInfo "  config                            Show effective AI configuration."
+  Write-NucleusInfo ""
+  Write-NucleusInfo "Run $scriptName -Help for the full help text."
   exit 0
 }
 
