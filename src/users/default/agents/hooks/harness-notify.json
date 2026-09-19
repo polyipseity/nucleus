@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "harness-notify copilot done",
+        "timeout": 15
+      }
+    ]
+  }
+}

@@ -1,4 +1,10 @@
 {
-  "hooks": {},
+  "hooks": {
+    "stop": [
+      {
+        "command": "harness-notify cursor done"
+      }
+    ]
+  },
   "version": 1
 }

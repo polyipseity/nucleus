@@ -66,6 +66,19 @@ let
   };
 
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
+
+  # Harness notification entry point.  Every provisioned coding harness
+  # (pi, opencode, Cursor, Copilot Chat, Copilot CLI) calls this one command
+  # from its hook configuration, so formatting, channel selection and failure
+  # handling live in a single script.  Deployed to ~/.local/bin (already on the
+  # managed PATH, including the GUI-session launchctl path) because the hook
+  # configuration is a symlink into this repository: embedding the store path
+  # there would dirty the repo on every rebuild.
+  harnessNotify = pkgs.writeNucleusShellApplication {
+    name = "harness-notify";
+    scriptName = "src/scripts/notify/harness-notify";
+    runtimeInputs = [ pkgs.jq ];
+  };
 in
 {
   # WHY: OpenCode discovers global agents under ~/.config/opencode/agents and
@@ -78,6 +91,8 @@ in
       config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/agents";
     ".config/opencode/commands".source =
       config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/prompts";
+    # Stable path for every harness hook definition (see harnessNotify above).
+    ".local/bin/harness-notify".source = "${harnessNotify}/bin/nucleus-harness-notify";
   };
 
   home.activation.unprotect-opencode-symlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
@@ -95,6 +110,19 @@ in
   # symlinks in ~/.agents/. No Nix-level deployment needed — the scripts read
   # directly from the repo tree at activation time.
   home.activation = {
+    # -------------------------------------------------------------------------
+    # seed-opencode-notify-plugin
+    # OpenCode loads global plugins from ~/.opencode/plugins/ (the directory the
+    # superpowers plugin is linked into).  This is a method-1 writable symlink
+    # into the live repo tree so the plugin can be edited without a rebuild.
+    # -------------------------------------------------------------------------
+    seed-opencode-notify-plugin = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+        "$HOME/.opencode/plugins/harness-notify.js" \
+        "${overlay.toRepoRelPath (overlay.selectFile "opencode" "plugins/harness-notify.js")}" \
+        "${hostName}"
+    '';
+
     # -------------------------------------------------------------------------
     # symlink-agent-config
     # Creates ~/.agents/ as a real directory and populates it with per-entry
