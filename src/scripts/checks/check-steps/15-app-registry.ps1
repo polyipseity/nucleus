@@ -14,7 +14,10 @@ Register-Step -Id "app-registry" -Name "App auto-start registry validation" -Act
   }
   else {
     $apps = Get-Content $appJson -Raw | ConvertFrom-Json -AsHashtable
-    $validKinds = @('macos-launchagent', 'macos-system-extension', 'nixos-xdg-desktop', 'windows-run-key', 'windows-startup-folder')
+    # The valid kinds come from the schema enum, so this check cannot drift from
+    # the schema the way a second hardcoded list would.
+    $appSchema = Join-Path $r "src\modules\apps.schema.json"
+    $validKinds = (Get-Content $appSchema -Raw | ConvertFrom-Json).definitions.autostartKind.enum
 
     foreach ($appName in $apps.Keys) {
       if ($appName -like '$*') { continue }

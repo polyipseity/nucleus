@@ -13,6 +13,15 @@ run_app_registry() {
   cd "$_repo_root" || return 1
   local _app_errors=0
   local _app_json="src/modules/apps.json"
+  local _app_schema="src/modules/apps.schema.json"
+
+  # The valid kinds are read from the schema enum. A second hardcoded list is
+  # what let step 15 reject a kind the schema already accepted.
+  local -a _valid_kinds=()
+  local _valid_kind
+  while IFS= read -r _valid_kind; do
+    _valid_kinds+=("$_valid_kind")
+  done < <(jq -r '.definitions.autostartKind.enum[]' "$_app_schema")
 
   if [ ! -f "$_app_json" ]; then
     error "apps.json not found at $_app_json"
@@ -35,7 +44,7 @@ run_app_registry() {
         (if .value.type == "omitted" then (.value.justification | type == "string" and length > 0) else true end | tostring)
       ] | @tsv' "$_app_json")
 
-    # autostartEnabled / autostartDisableNative must be booleans; kind must be in the enum.
+    # autostartEnabled / autostartDisableNative must be booleans; kind must be in the schema enum.
     while IFS=$'\t' read -r _name _host _type _enabled _disable_native _kind; do
       # Omitted hosts carry no runtime fields; the first loop already validated
       # their justification. Skip boolean/kind checks for them.
@@ -54,14 +63,20 @@ run_app_registry() {
         _app_errors=$((_app_errors + 1))
         ;;
       esac
-      case "$_kind" in
-      macos-launchagent | macos-system-extension | nixos-xdg-desktop | windows-run-key | windows-startup-folder) ;;
-      "missing") ;;
-      *)
-        error "apps.json: '$_name' host '$_host' has invalid kind '$_kind'"
-        _app_errors=$((_app_errors + 1))
-        ;;
-      esac
+      if [ "$_kind" != "missing" ]; then
+        local _kind_valid=false
+        local _valid
+        for _valid in "${_valid_kinds[@]}"; do
+          if [ "$_valid" = "$_kind" ]; then
+            _kind_valid=true
+            break
+          fi
+        done
+        if [ "$_kind_valid" != true ]; then
+          error "apps.json: '$_name' host '$_host' has invalid kind '$_kind'"
+          _app_errors=$((_app_errors + 1))
+        fi
+      fi
     done < <(jq -r '
       to_entries[] | select(.value | type == "object") | select(.key | startswith("$") | not) |
       .key as $name |
