@@ -10,9 +10,9 @@
 
 ## recurring operations
 
-- **Chrome Remote Desktop Host**: not packaged in nixpkgs. To enable inbound CRD access, install the host component manually (Google-provided package) and approve the system extension once in System Settings → Privacy & Security. The `apps.json` entry tracks it as a `system-extension` (manual approval); it is not force-launched by activation.
-- **LiteLLM recovery**: if `nucleus-svc litellm` is active but every `default` request fails with HTTP 429/500 (`Missing credentials` / `No deployments available`), the daemon was built with no API-key pairs — typically because `src/modules/env-catalog.nix` is out of sync with decrypted SOPS secrets. Confirm with `systemctl cat litellm.service | grep ExecStart` — if no `KEYFILE:ENVVAR` pairs, run `nucleus-apply` to rebuild, then `nucleus-svc restart litellm`. The build-time assertion in `ai.nix` fails eval fast if the catalog declares keys but none resolve.
-- **WhatsApp**: no Linux client exists. Use WhatsApp Web in the browser; the NixOS `apps.json` entry is intentionally `omitted`.
+- Chrome Remote Desktop Host is not packaged in nixpkgs. To enable inbound CRD access, install the host component manually (Google-provided package) and approve the system extension once in System Settings → Privacy & Security. The `apps.json` entry tracks it as a `system-extension` (manual approval); it is not force-launched by activation.
+- If `nucleus-svc litellm` is active but every `default` request fails with HTTP 429/500 (`Missing credentials` / `No deployments available`), the daemon was built with no API-key pairs, usually because `src/modules/env-catalog.nix` is out of sync with decrypted SOPS secrets. Confirm with `systemctl cat litellm.service | grep ExecStart`. If there are no `KEYFILE:ENVVAR` pairs, run `nucleus-apply` to rebuild, then `nucleus-svc restart litellm`. The build-time assertion in `ai.nix` fails eval fast if the catalog declares keys but none resolve.
+- WhatsApp has no Linux client. Use WhatsApp Web in the browser; the NixOS `apps.json` entry is intentionally `omitted`.
 
 ## command shortcuts
 
@@ -28,7 +28,7 @@
 - `nucleus-apply` — apply configuration
 - `nucleus-bootstrap` — bootstrap system
 - `nucleus-update lockfile` — update version pins in `src/lockfiles/lockfile.json`; pass `--sections winget,scoop,...` for specific sections
-- `suggestions.*` sections (homebrew.masApps, ollama, vscode, vm-setup.windows) are warn-only — never enforced. `nucleus-update lockfile --verify-installed` always warns for them.
+- `suggestions.*` sections (homebrew.masApps, ollama, vscode, vm-setup.windows) are warn-only and never enforced. `nucleus-update lockfile --verify-installed` always warns for them.
 - `nucleus-check pwsh` — check PowerShell syntax
 - `nucleus-check sh` — check POSIX shell syntax
 - `nucleus-cloud setup` — configure cloud remotes and re-apply
