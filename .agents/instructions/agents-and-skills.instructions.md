@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or editing agents configuration, skill management, or ClawHub provisioning."
 name: "Agents and Skills"
-applyTo: "src/modules/agents.nix, src/modules/cursor.nix, src/platforms/Windows/modules/user/Sync-AgentsSkillManifest.ps1, src/platforms/Windows/modules/user/Sync-AgentsClawHubSkillManifest.ps1, src/platforms/Windows/modules/user/Sync-CursorConfig.ps1, src/platforms/Windows/modules/user/Sync-OpenCodeConfig.ps1, src/platforms/Windows/modules/user/Sync-PiAgentConfig.ps1, src/platforms/Windows/modules/user/Sync-Superpowers.ps1, src/platforms/Windows/modules/setup/Invoke-BunSetup.ps1, src/platforms/Windows/modules/setup/Invoke-PiSetup.ps1, src/users/*/agents/**, src/users/*/cursor/**, src/scripts/agents/**/*.sh, src/scripts/configs/symlink-cursor-config.sh"
+applyTo: "src/modules/agents.nix, src/modules/cursor.nix, src/modules/hermes-agent.nix, src/platforms/Windows/modules/user/Sync-AgentsSkillManifest.ps1, src/platforms/Windows/modules/user/Sync-AgentsClawHubSkillManifest.ps1, src/platforms/Windows/modules/user/Sync-CursorConfig.ps1, src/platforms/Windows/modules/user/Sync-OpenCodeConfig.ps1, src/platforms/Windows/modules/user/Sync-PiAgentConfig.ps1, src/platforms/Windows/modules/user/Sync-Superpowers.ps1, src/platforms/Windows/modules/user/Sync-HarnessBridge.ps1, src/platforms/Windows/modules/setup/Invoke-BunSetup.ps1, src/platforms/Windows/modules/setup/Invoke-PiSetup.ps1, src/scripts/notify/**, src/users/*/agents/**, src/users/*/cursor/**, src/users/*/hermes/plugins/**, src/users/*/opencode/**, src/users/*/pi/**, src/scripts/agents/**/*.sh, src/scripts/configs/symlink-cursor-config.sh, tests/modules/harness-bridge-tests.nix"
 ---
 
 # Agents and Skills
@@ -73,6 +73,14 @@ ClawHub = JS CLI not in nixpkgs/cargo-binstall/WinGet/Scoop. Bun only.
 **POSIX**: `install-bun-packages` HM activation in `src/modules/agents.nix` — prepends `~/.bun/bin`, maintains desired list (`clawhub`), installs/removes as needed, persists to `~/.bun/install/global/package.json`.
 
 **Windows**: `Invoke-BunSetup` installs the `bun` desired list from `src/modules/packages/desired.json` → `~\.bun\install\global\package.json`. Order: WinGet DSC → `Invoke-BunSetup` → `Sync-AgentsSkillManifest` → `Sync-AgentsClawHubSkillManifest`.
+
+## Harness bridge
+
+The provisioned harnesses (Cursor, VS Code Copilot Chat, opencode, pi) report completion, ask for tool-call approval, and accept remote prompts through one PATH-resolved entry point per action — `harness-notify`, `harness-approval`, `harness-drive` under `src/scripts/notify/` — with a PowerShell twin each, because the shared hook definitions (`src/users/default/agents/hooks/harness-notify.json` for VS Code, `src/users/default/cursor/hooks.json` for Cursor) name bare commands and must resolve on all three hosts. POSIX deploys them from `src/modules/agents.nix`; Windows copies them into the USER root and reaches them through `.cmd` shims on the managed PATH (`Sync-HarnessBridge.ps1`).
+
+Harness-specific glue sits with the harness: pi extensions `pi/extensions/harness-{notify,approval}.ts`, opencode plugin `opencode/plugins/harness-notify.js` (wired by `seed-opencode-notify-plugin`). Transport is the Hermes plugin `src/users/default/hermes/plugins/harness-bridge/` (`/harness status|approve|deny|send|sessions`), enabled via `services.hermes-agent.settings.plugins.enabled` and, on Windows, by `Sync-HermesConfig`. Requests and queued prompts live under `<USER root>/state/harness-bridge/`, decisions in `<USER root>/logs/harness-bridge.log`.
+
+Rules: hooks always exit 0 and fail open — an unanswered approval becomes a local prompt, never a denial; every hook `timeout` must exceed `harness-approval.timeout-seconds`; a hook command stays a bare name with no home expansion or absolute path, since one JSON file drives every host; the queued-prompt file is consumed before it is printed, which is the only loop guard. Cursor ignores `followup_message` on Windows, so that harness is driveable from macOS and NixOS only.
 
 ## Authoring rules
 
