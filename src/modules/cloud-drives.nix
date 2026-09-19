@@ -405,6 +405,14 @@ in
                   # from the "remote not configured" early-return path above).
                   SuccessfulExit = false;
                 };
+                # WHY: the teardown budget must cover a real macFUSE/FSKit unmount.
+                #   launchd SIGKILLs the job after this budget (default 20 s covers
+                #   only a fast teardown), and a mount killed mid-unmount leaves the
+                #   rclone process wedged and the volume registration stale, so every
+                #   later mount at this path is destroyed seconds after it attaches.
+                #   The wrapper forwards the stop request to rclone and then waits
+                #   for it to finish within this budget.
+                ExitTimeOut = 60;
                 # Log errors to ~/Library/Logs for easier debugging.
                 # Capture both stdout and stderr so mount activity is fully
                 # inspectable (remote not configured, network unavailable, etc.).
