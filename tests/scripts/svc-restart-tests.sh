@@ -574,4 +574,38 @@ assert_mentions "the failed attach" "$captured_output" "did not attach"
 assert_mentions "the failed attach names the repair command" "$captured_output" "nucleus-cloud repair"
 FAKE_MOUNT_APPEAR_AFTER=6
 
+section 10 "A blocked instance is visible in status and list"
+
+# WHY: the marker is what the operator has to act on, so it must be reachable from
+# the service commands, not only from the watchdog's log.
+block_mount local.cloud-mount.iCloud
+FAKE_LIVE="local.cloud-mount.iCloud"
+
+reset_cli running "$_cli_mount" "" list --json
+assert_count "a blocked instance still lists" 0 "$captured_status"
+assert_count "the blocked class is in the JSON status" "fskit-provider" \
+  "$(printf '%s' "$captured_output" | tail -1 | jq -r '.services["local.cloud-mount.iCloud"].blocked')"
+assert_mentions "the JSON status carries the remedy" \
+  "$(printf '%s' "$captured_output" | tail -1 | jq -r '.services["local.cloud-mount.iCloud"].blockedRemedy')" \
+  "nucleus-cloud repair"
+
+reset_cli running "$_cli_mount" "" list
+assert_count "list exits 0 for a blocked instance" 0 "$captured_status"
+assert_mentions "list reports the blocked class" "$captured_output" "blocked (fskit-provider)"
+assert_mentions "list reports the blocked remedy" "$captured_output" "nucleus-cloud repair"
+
+reset_cli running "$_cli_mount" "" status local.cloud-mount.iCloud
+assert_mentions "status reports the blocked class" "$captured_output" "blocked (fskit-provider)"
+
+svc_blocked_clear local.cloud-mount.iCloud "$_cli_state_dir"
+reset_cli running "$_cli_mount" "" list
+if contains "$captured_output" "blocked ("; then
+  assert_fail "svc-unblocked-not-reported" "an unblocked instance was reported as blocked"
+else
+  assert_pass "an unblocked instance is not reported as blocked"
+fi
+reset_cli running "$_cli_mount" "" list --json
+assert_count "the JSON status has no blocked class" "null" \
+  "$(printf '%s' "$captured_output" | tail -1 | jq -r '.services["local.cloud-mount.iCloud"].blocked')"
+
 finish_tests

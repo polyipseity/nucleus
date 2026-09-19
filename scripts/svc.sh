@@ -285,6 +285,7 @@ placeholder_status_json() {
 svc_status() {
   local name="$1"
   local entry_json="$2"
+  local platform_json blocked remedy state_dir
 
   local svc_type svc_id scope_flag=""
   svc_type=$(echo "$entry_json" | jq -r '.type')
@@ -343,11 +344,11 @@ svc_status() {
       state_text=$(echo "$print_out" | sed -n 's/.*state = //p' | head -1)
       exit_code=$(echo "$print_out" | sed -n 's/.*last exit code = //p' | head -1 | sed 's/:.*//')
     fi
-    printf '{"status":"%s","running":%s,"enabled":%s,"pid":%s,"state":%s,"exitCode":%s}' \
+    platform_json=$(printf '{"status":"%s","running":%s,"enabled":%s,"pid":%s,"state":%s,"exitCode":%s}' \
       "$status_text" \
       "$running" "$enabled" "${pid:-null}" \
       "$(printf '%s' "${state_text:-null}" | jq -R . 2>/dev/null || echo null)" \
-      "${exit_code:-null}"
+      "${exit_code:-null}")
     ;;
   nixos-systemctl)
     local scope_flag=""
@@ -376,15 +377,26 @@ svc_status() {
       exit_code=$(systemctl $scope_flag show -p ExecMainStatus "$svc_id" 2>/dev/null | sed 's/ExecMainStatus=//' || true)
       [ -z "$exit_code" ] && exit_code=""
     fi
-    printf '{"status":"%s","running":%s,"enabled":%s,"pid":%s,"state":%s,"exitCode":%s}' \
+    platform_json=$(printf '{"status":"%s","running":%s,"enabled":%s,"pid":%s,"state":%s,"exitCode":%s}' \
       "$is_active" "$running" "$enabled_bool" "${pid:-null}" \
       "$(printf '%s' "$is_active" | jq -R . 2>/dev/null || echo null)" \
-      "${exit_code:-null}"
+      "${exit_code:-null}")
     ;;
   *)
-    printf '{"status":"unknown","running":false,"enabled":false,"pid":null}'
+    platform_json='{"status":"unknown","running":false,"enabled":false,"pid":null}'
     ;;
   esac
+
+  # A blocked instance is a nucleus-side state, not a service-manager one, so it
+  # is added here for every platform: the marker key is the concrete instance id,
+  # which is what every caller passes as the name.  The marker reports
+  # "blocked <class>"; the JSON carries the class alone.
+  state_dir="$(crash_loop_state_dir)"
+  blocked="$(svc_blocked_state "$name" "$state_dir")"
+  remedy=""
+  [ "$blocked" = "clear" ] || remedy="$(svc_blocked_remedy "$name" "$state_dir")"
+  printf '%s' "$platform_json" | jq -c --arg b "$blocked" --arg r "$remedy" \
+    '. + {blocked: (if $b == "clear" then null else ($b | sub("^blocked "; "")) end), blockedRemedy: (if $r == "" then null else $r end)}'
 }
 
 # recover_launchctl_service — Recover a launchctl service stuck in
@@ -817,6 +829,19 @@ svc_action() {
 # Output: aligned human table or versioned JSON; returns 1 if any name failed.
 # WHY: system-domain entries are skipped without passwordless sudo so the
 # table never shows misleading "inactive" rows for unqueryable services.
+# print_blocked_note <statusJson> — One indented line naming a blocked instance's
+# class and remedy; nothing when the instance is not blocked.
+# WHY: the row's columns are fixed-width service-manager state, and the remedy is
+#   too long for one, so a blocked instance is reported under its row instead of
+#   widening the table for every service.
+print_blocked_note() {
+  local _info _class _remedy
+  _info="$(printf '%s' "$1" | jq -r 'if .blocked then "\(.blocked)\t\(.blockedRemedy // "")" else "" end')"
+  [ -n "$_info" ] || return 0
+  IFS=$'\t' read -r _class _remedy <<<"$_info"
+  printf '%-20s %s\n' "" "blocked ($_class): $_remedy"
+}
+
 do_list() {
   local registry
   registry=$(read_registry)
@@ -896,6 +921,7 @@ $pair_json"
       local crash_status
       crash_status=$(crash_loop_status "$json_key")
       printf '%-20s %-24s %-10s %-8s %-10s %s\n' "$json_key" "$display" "$status" "$running" "$pid" "$crash_status"
+      print_blocked_note "$status_json"
     done <<<"$entries"
     if [ -n "$domain_filter_warning" ]; then
       printf '\n'
@@ -956,6 +982,7 @@ do_status() {
     local crash_status
     crash_status=$(crash_loop_status "$json_key")
     printf '%-20s %-24s %-10s %-8s %-10s %s\n' "$json_key" "$display" "$status" "$running" "$pid" "$crash_status"
+    print_blocked_note "$status_json"
   done <<<"$entries"
   "$any_error" && return 1 || return 0
 }
