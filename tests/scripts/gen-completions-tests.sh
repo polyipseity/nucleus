@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Tests for src/scripts/completions/gen-completions.sh: --help contract, --check determinism,
 # idempotent regeneration, 13-command coverage, generated headers + zsh syntax,
-# update lockfile --list-* dynamic wiring, and flag-extraction correctness pins.
+# update lockfile --list-* dynamic wiring, flag-extraction correctness pins, and
+# spec-word escaping of shell metacharacters in subcommand descriptions.
 
 set -euo pipefail
 
@@ -37,7 +38,8 @@ fi
 
 # 3. Idempotency: a second generate is byte-identical (git-free comparison).
 _tmp_snapshot="$(mktemp -d)"
-trap 'rm -rf "$_tmp_snapshot"' EXIT
+_tmp_stub_repo="$(mktemp -d)"
+trap 'rm -rf "$_tmp_snapshot" "$_tmp_stub_repo"' EXIT
 cp -R "$_COMPLETIONS_DIR/." "$_tmp_snapshot/"
 if bash "$_gen_script" >/dev/null 2>&1 && diff -rq "$_tmp_snapshot" "$_COMPLETIONS_DIR" >/dev/null 2>&1; then
   assert_pass "gen-completions: regeneration is idempotent"
@@ -160,6 +162,81 @@ if grep -q '^#compdef nucleus-$' "$_disp_file" &&
   assert_pass "gen-completions: _nucleus dispatcher lists commands"
 else
   assert_fail "gen-completions: _nucleus dispatcher" "missing #compdef nucleus- or command names"
+fi
+
+# 10. Description text with shell metacharacters must survive BOTH quoting
+#     layers of a generated file: the single-quoted spec word parsed by the
+#     shell, and the double-quoted description that _arguments evals out of the
+#     ((...)) action. Regression: an unescaped ' ended the spec word early, so
+#     the file stopped being valid zsh and the command lost its whole
+#     completion. Holding ' " $ in one fixture also pins the escape ORDER (the
+#     single-quote layer runs last, so it cannot reintroduce an expansion).
+#     The stub repo root keeps this independent of live usage() text.
+_fx_repo="$_tmp_stub_repo/repo"
+mkdir -p "$_fx_repo/scripts"
+for _cmd in "${_NUCLEUS_COMMANDS[@]}"; do
+  {
+    printf '#!/usr/bin/env bash\n'
+    # shellcheck disable=SC2016 # reason: the stub's own shell expands this literal text; the test must not.
+    printf 'case "${1:-}" in\n'
+    printf -- '--help)\n'
+    printf -- "  echo 'usage: nucleus-%s'\n" "$_cmd"
+    printf -- '  echo\n'
+    printf -- "  echo '  --flag  Some flag'\n"
+    printf -- '  ;;\n'
+    printf 'esac\n'
+  } >"$_fx_repo/scripts/$_cmd.sh"
+done
+_fx_desc="Strip a file's \"\$HOME\" metadata"
+{
+  printf '#!/usr/bin/env bash\n'
+  # shellcheck disable=SC2016 # reason: the stub's own shell expands this literal text; the test must not.
+  printf 'case "${1:-}" in\n'
+  printf -- '--help)\n'
+  printf -- "  echo 'usage: nucleus-utils'\n"
+  printf -- '  echo\n'
+  # A quoted heredoc keeps the fixture's own shell from expanding $ or quotes.
+  printf "  cat <<'DESC'\n"
+  printf '  optimize-pdf  %s\n' "$_fx_desc"
+  printf 'DESC\n'
+  printf -- '  ;;\n'
+  printf 'esac\n'
+} >"$_fx_repo/scripts/utils.sh"
+
+# _fx_decode <generated-file> — print the description the file's own two quoting
+# layers yield for the subcommand spec, mirroring how _arguments splits the spec
+# into its third field and evals the ((...)) action content.
+_fx_decode() {
+  local _spec
+  _spec="$(grep -oE "'1:subcommand:.*'" "$1" | head -n1)" || return 1
+  [ -n "$_spec" ] || return 1
+  printf '%s\n' "$_spec" | zsh -c '
+    eval "spec=$(cat)"
+    action="${spec#*:*:}"
+    eval "ws=( ${action[3,-3]} )"
+    printf "%s\n" "${ws[2]}"
+  '
+}
+
+_fx_gen_rc=0
+NUCLEUS_REPO_ROOT="$_fx_repo" bash "$_gen_script" >/dev/null 2>&1 || _fx_gen_rc=$?
+_fx_file="$_fx_repo/src/modules/completions/zsh/_nucleus-utils"
+if [ "$_fx_gen_rc" -ne 0 ]; then
+  assert_fail "gen-completions: metacharacters in a subcommand description" "generator exited $_fx_gen_rc against the stub repo root"
+elif ! command -v zsh >/dev/null 2>&1; then
+  assert_skip "gen-completions: metacharacters in a subcommand description" "zsh not available"
+else
+  # check-suppress:suppression_doc: zsh -n stderr is not needed; the exit code decides the assertion.
+  if zsh -n "$_fx_file" 2>/dev/null; then
+    assert_pass "gen-completions: metacharacters keep the generated file valid zsh"
+  else
+    assert_fail "gen-completions: metacharacter syntax" "generated $_fx_file fails zsh -n"
+  fi
+  if _fx_decoded="$(_fx_decode "$_fx_file")" && [ "$_fx_decoded" = "$_fx_desc" ]; then
+    assert_pass "gen-completions: metacharacters survive both quoting layers"
+  else
+    assert_fail "gen-completions: metacharacter round-trip" "expected '$_fx_desc', got '${_fx_decoded-}'"
+  fi
 fi
 
 finish_tests

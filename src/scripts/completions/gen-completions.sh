@@ -125,11 +125,18 @@ sub_description() {
     sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//; s/\.$//'
 }
 
-# escape_zsh_dquote <text> — escape characters that would expand inside zsh
-# double quotes so extracted descriptions stay literal.
-escape_zsh_dquote() {
+# escape_zsh_spec_text <text> — escape text that ends up inside a generated
+# `_arguments` spec word, which is quoted twice. The order is load-bearing:
+#   1. the description is double-quoted for the eval `_arguments` runs on the
+#      ((...)) action content, so \ " $ and ` must stay literal there;
+#   2. the whole spec word is single-quoted in the generated file, so a bare '
+#      is written as '\'' (close, escape, reopen). Doing this first would make
+#      step 1 escape the backslashes it introduces.
+escape_zsh_spec_text() {
+  local _text
   # shellcheck disable=SC2016 # reason: the sed program is a regex metacharacter string for the tool, not shell expansion.
-  printf '%s\n' "$1" | sed -E 's/([\\"$`])/\\\1/g'
+  _text="$(printf '%s\n' "$1" | sed -E 's/([\\"$`])/\\\1/g')"
+  printf '%s\n' "$_text" | sed -E "s/'/'\\\\''/g"
 }
 
 # flag_desc <flag> — human-readable flag description: leading dashes stripped,
@@ -208,7 +215,7 @@ generate_command_file() {
     for _s in "${_subs[@]}"; do
       _desc="$(sub_description "$_help_tmp" "$_s")"
       if [ -n "$_desc" ]; then
-        _desc="$(escape_zsh_dquote "$_desc")"
+        _desc="$(escape_zsh_spec_text "$_desc")"
       else
         _desc=""
       fi
