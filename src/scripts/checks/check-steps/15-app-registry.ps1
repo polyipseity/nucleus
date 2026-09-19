@@ -18,6 +18,7 @@ Register-Step -Id "app-registry" -Name "App auto-start registry validation" -Act
     # the schema the way a second hardcoded list would.
     $appSchema = Join-Path $r "src\modules\apps.schema.json"
     $validKinds = (Get-Content $appSchema -Raw | ConvertFrom-Json).definitions.autostartKind.enum
+    $validIconKinds = (Get-Content $appSchema -Raw | ConvertFrom-Json).definitions.statusIconKind.enum
 
     foreach ($appName in $apps.Keys) {
       if ($appName -like '$*') { continue }
@@ -84,6 +85,29 @@ Register-Step -Id "app-registry" -Name "App auto-start registry validation" -Act
               Write-ErrorMessage "apps.json: '$appName' host '$hostName' kind '$kind' requires approvalInstructions"
               $appErrors++
             }
+          }
+        }
+
+        # The status-icon kinds follow the same two rules as the auto-start
+        # kinds: they must come from the schema enum, and a platform prefix
+        # must match the host.
+        if ($hEntry.ContainsKey('statusIcon') -and $null -ne $hEntry.statusIcon) {
+          $iconKind = if ($hEntry.statusIcon.ContainsKey('kind')) { $hEntry.statusIcon.kind } else { 'missing' }
+          if ($iconKind -notin $validIconKinds) {
+            Write-ErrorMessage "apps.json: '$appName' host '$hostName' has invalid statusIcon kind '$iconKind'"
+            $appErrors++
+          }
+
+          $iconPlatform = switch -Wildcard ($iconKind) {
+            'macos-*' { 'macOS' }
+            'nixos-*' { 'NixOS' }
+            'windows-*' { 'Windows' }
+            default { '' }
+          }
+          $hostPlatform = if ($hEntry.ContainsKey('platform')) { $hEntry.platform } else { 'missing' }
+          if ($iconPlatform -and $iconPlatform -ne $hostPlatform) {
+            Write-ErrorMessage "apps.json: '$appName' host '$hostName' statusIcon kind '$iconKind' is $iconPlatform-only but the host platform is '$hostPlatform'"
+            $appErrors++
           }
         }
       }

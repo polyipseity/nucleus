@@ -18,11 +18,10 @@
     expressed via iconVisibleValue / iconHiddenValue, not via a disable flag.
 
   Windows note: tray-icon visibility is app-specific and often has no universal
-  OS toggle.  Each non-omitted Windows entry with a statusIcon block sets the
-  app's native tray setting (registry value or documented mechanism) to match
-  iconVisible.  Where an app exposes no controllable tray setting, the
-  statusIcon block is omitted (manual), exactly like autostart's
-  macos-system-extension.
+  OS toggle.  A Windows entry with a statusIcon block either declares a host
+  script (`activation-script`) that sets the app's native tray setting, or is
+  `manual`: no script can converge it and no readable preference exists to
+  verify against, exactly like autostart's macos-system-extension.
 
 .PARAMETER Action
   The operation to perform: list, status, show, hide, apply, verify.
@@ -111,19 +110,6 @@ foreach ($key in $RegistryRaw.Keys) {
 # Windows native preference helpers (SET, never disable)
 # ---------------------------------------------------------------------------
 
-# MenuBarNativeValue — The native value to write (iconVisibleValue when visible,
-# iconHiddenValue when hidden).  Inverted keys are handled here, not by a
-# disable flag.
-function Get-MenuBarNativeValue {
-  param([bool]$Visible, [hashtable]$Entry)
-  $icon = $Entry.hostEntry.statusIcon
-  if ($Visible) {
-    return $icon.iconVisibleValue
-  } else {
-    return $icon.iconHiddenValue
-  }
-}
-
 # MenuBarNativeSet — Write the native preference to the desired state.
 # Never disables the native setting; SETs it.
 function Set-MenuBarNative {
@@ -137,29 +123,11 @@ function Set-MenuBarNative {
     return 0
   }
   # SupportsShouldProcess gates every mutation below, so -WhatIf reports what
-  # would be written without touching the registry or running a script.
+  # would be written without running a script.
   if (-not $PSCmdlet.ShouldProcess($Key, 'set menu bar icon state')) {
     return 0
   }
-  $value = Get-MenuBarNativeValue -Visible $Visible -Entry $Entry
   switch ($kind) {
-    'macos-defaults-key' {
-      # On Windows, "macos-defaults-key" is reinterpreted as a registry value
-      # (domain = registry key path, key = value name).  This is the closest
-      # native-preference analog for apps that store tray state in the registry.
-      $regPath = $icon.domain
-      $valueName = $icon.key
-      $valueType = if ($icon.ContainsKey('valueType')) { $icon.valueType } else { 'string' }
-      if (-not (Test-Path -LiteralPath $regPath)) {
-        New-Item -Path $regPath -Force > $null
-      }
-      switch ($valueType) {
-        'int' { Set-ItemProperty -LiteralPath $regPath -Name $valueName -Value ([int]$value) }
-        'bool' { Set-ItemProperty -LiteralPath $regPath -Name $valueName -Value ([bool]$value) }
-        default { Set-ItemProperty -LiteralPath $regPath -Name $valueName -Value ([string]$value) }
-      }
-      Write-NucleusInfo -CommandName 'menu-bar' "set $Key icon to $(if ($Visible) { 'visible' } else { 'hidden' }) via registry"
-    }
     'activation-script' {
       $script = $icon.script
       if (-not [string]::IsNullOrEmpty($script)) {
@@ -175,10 +143,6 @@ function Set-MenuBarNative {
         & $resolvedScript $Visible $Key
         Write-NucleusInfo -CommandName 'menu-bar' "set $Key icon via activation-script"
       }
-    }
-    'macos-plist' {
-      Write-NucleusWarning "$Key — plist kind is unsupported on Windows; skipping"
-      return 1
     }
     default {
       Write-NucleusWarning "$Key — unsupported statusIcon kind '$kind' on host '$NucleusHost'"
@@ -197,23 +161,10 @@ function Get-MenuBarActualVisible {
   if ($kind -eq 'manual') {
     return 'manual'
   }
-  $desiredVisible = [bool]$icon.iconVisible
-  $desiredValue = Get-MenuBarNativeValue -Visible $desiredVisible -Entry $Entry
-  switch ($kind) {
-    'macos-defaults-key' {
-      $regPath = $icon.domain
-      $valueName = $icon.key
-      if (-not (Test-Path -LiteralPath $regPath)) { return $false }
-      # check-suppress:suppression_doc: probe -- registry value may be absent; treated as not matching.
-      $current = Get-ItemProperty -LiteralPath $regPath -Name $valueName -ErrorAction SilentlyContinue
-      if ($null -eq $current) { return $false }
-      $actual = $current.$valueName
-      return ($actual -eq $desiredValue)
-    }
-    default {
-      return $false
-    }
-  }
+  # No Windows-launchable status-icon kind exposes a readable native preference
+  # ('activation-script' runs a host script we cannot query), so the icon state
+  # cannot be probed — report no match and let verify surface the gap.
+  return $false
 }
 
 # ---------------------------------------------------------------------------

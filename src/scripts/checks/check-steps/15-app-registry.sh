@@ -5,6 +5,26 @@
 
 register_step "app-registry" "App auto-start registry validation" run_app_registry
 
+# _kind_in_enum <kind> <array-name> — true when the named array holds <kind>.
+_kind_in_enum() {
+  local -n _haystack="$2"
+  local _item
+  for _item in "${_haystack[@]}"; do
+    if [ "$_item" = "$1" ]; then return 0; fi
+  done
+  return 1
+}
+
+# _platform_for_kind <kind> — print the platform a platform-prefixed kind
+# belongs to, or nothing when the kind is platform-neutral.
+_platform_for_kind() {
+  case "$1" in
+  macos-*) echo "macOS" ;;
+  nixos-*) echo "NixOS" ;;
+  windows-*) echo "Windows" ;;
+  esac
+}
+
 run_app_registry() {
   local -n ctx="$1"
   local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
@@ -22,6 +42,12 @@ run_app_registry() {
   while IFS= read -r _valid_kind; do
     _valid_kinds+=("$_valid_kind")
   done < <(jq -r '.definitions.autostartKind.enum[]' "$_app_schema")
+
+  local -a _valid_icon_kinds=()
+  local _valid_icon_kind
+  while IFS= read -r _valid_icon_kind; do
+    _valid_icon_kinds+=("$_valid_icon_kind")
+  done < <(jq -r '.definitions.statusIconKind.enum[]' "$_app_schema")
 
   if [ ! -f "$_app_json" ]; then
     error "apps.json not found at $_app_json"
@@ -66,30 +92,16 @@ run_app_registry() {
           ;;
         esac
       fi
-      if [ "$_kind" != "missing" ]; then
-        local _kind_valid=false
-        local _valid
-        for _valid in "${_valid_kinds[@]}"; do
-          if [ "$_valid" = "$_kind" ]; then
-            _kind_valid=true
-            break
-          fi
-        done
-        if [ "$_kind_valid" != true ]; then
-          error "apps.json: '$_name' host '$_host' has invalid kind '$_kind'"
-          _app_errors=$((_app_errors + 1))
-        fi
+      if [ "$_kind" != "missing" ] && ! _kind_in_enum "$_kind" _valid_kinds; then
+        error "apps.json: '$_name' host '$_host' has invalid kind '$_kind'"
+        _app_errors=$((_app_errors + 1))
       fi
 
       # A platform-prefixed kind belongs to that platform alone. Deriving the
       # platform from the prefix is what keeps the naming honest: a macOS-only
       # mechanism can no longer be declared on Linux or Windows.
-      local _kind_platform=""
-      case "$_kind" in
-      macos-*) _kind_platform="macOS" ;;
-      nixos-*) _kind_platform="NixOS" ;;
-      windows-*) _kind_platform="Windows" ;;
-      esac
+      local _kind_platform
+      _kind_platform=$(_platform_for_kind "$_kind")
       if [ -n "$_kind_platform" ] && [ "$_kind_platform" != "$_platform" ]; then
         error "apps.json: '$_name' host '$_host' kind '$_kind' is $_kind_platform-only but the host platform is '$_platform'"
         _app_errors=$((_app_errors + 1))
@@ -117,6 +129,31 @@ run_app_registry() {
         (if (.value | has("autostartEnabled")) then (.value.autostartEnabled | tostring) else "missing" end),
         (.value.kind // "missing"),
         (if (.value | has("approvalInstructions")) and (.value.approvalInstructions | type == "string") and (.value.approvalInstructions | length > 0) then "true" else "false" end)
+      ] | @tsv' "$_app_json")
+
+    # The status-icon kinds follow the same two rules as the auto-start kinds:
+    # they must come from the schema enum, and a platform prefix must match.
+    while IFS=$'\t' read -r _name _host _platform _icon_kind; do
+      if ! _kind_in_enum "$_icon_kind" _valid_icon_kinds; then
+        error "apps.json: '$_name' host '$_host' has invalid statusIcon kind '$_icon_kind'"
+        _app_errors=$((_app_errors + 1))
+      fi
+      local _icon_platform
+      _icon_platform=$(_platform_for_kind "$_icon_kind")
+      if [ -n "$_icon_platform" ] && [ "$_icon_platform" != "$_platform" ]; then
+        error "apps.json: '$_name' host '$_host' statusIcon kind '$_icon_kind' is $_icon_platform-only but the host platform is '$_platform'"
+        _app_errors=$((_app_errors + 1))
+      fi
+    done < <(jq -r '
+      to_entries[] | select(.value | type == "object") | select(.key | startswith("$") | not) |
+      .key as $name |
+      (.value.hosts // {}) | to_entries[] |
+      select(.value.statusIcon != null) |
+      [
+        $name,
+        .key,
+        (.value.platform // "missing"),
+        (.value.statusIcon.kind // "missing")
       ] | @tsv' "$_app_json")
   fi
 

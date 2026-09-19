@@ -179,6 +179,37 @@ in
       ) hosts
     ) appNames) "A platform-prefixed autostart kind must match its host platform")
 
+    # === Platform coherence: a platform-prefixed statusIcon kind must match its host ===
+    (assert' (all (
+      name:
+      let
+        entry = parsedApps.${name};
+        hosts = builtins.attrNames entry.hosts;
+      in
+      all (
+        h:
+        let
+          hostEntry = entry.hosts.${h};
+        in
+        if !(hostEntry ? statusIcon) then
+          true
+        else
+          let
+            kind = hostEntry.statusIcon.kind or "";
+            expected =
+              if builtins.match "macos-.*" kind != null then
+                "macOS"
+              else if builtins.match "nixos-.*" kind != null then
+                "NixOS"
+              else if builtins.match "windows-.*" kind != null then
+                "Windows"
+              else
+                null;
+          in
+          if expected == null then true else hostEntry.platform == expected
+      ) hosts
+    ) appNames) "A platform-prefixed statusIcon kind must match its host platform")
+
     # === Kinds no script can converge must carry approvalInstructions ===
     (assert' (all (
       name:
