@@ -18,7 +18,7 @@ BeforeAll {
   $ProfilePath = Join-Path $RepoRoot "src\scripts\shell\profile.ps1"
   $InvokeAndroidConfigPath = Join-Path $RepoRoot "src\platforms\Windows\modules\system\Invoke-AndroidConfig.ps1"
   $script:VmAndroidPath = Join-Path $RepoRoot "src\platforms\Windows\modules\system\VMAndroid.ps1"
-  $script:CheckShPs1Path = Join-Path $RepoRoot "scripts\check-sh.ps1"
+  $script:CheckPs1Path = Join-Path $RepoRoot "scripts\check.ps1"
 
   function Get-VmPs1Content { return Get-Content -Raw -Path $VmPs1Path }
   function Get-VmShContent { return Get-Content -Raw -Path $VmShPath }
@@ -55,20 +55,24 @@ Describe "Windows android-config native implementation" {
   }
 }
 
-Describe "Windows profile shellcheck delegation" {
-  It "profile.ps1 uses native check-sh.ps1" {
+Describe "PowerShell shellcheck enforcement" {
+  It "profile.ps1 completes nucleus-check and never delegates shell linting" {
     $content = Get-ProfileContent
-    $content | Should -Match ([regex]::Escape("scripts\check-sh.ps1"))
-    $content | Should -Not -Match ([regex]::Escape("scripts\check-sh.sh"))
+    $content | Should -Match ([regex]::Escape("Register-ArgumentCompleter -CommandName nucleus-check"))
+    $content | Should -Not -Match ([regex]::Escape("scripts\check-sh"))
   }
 
-  It "check-sh.ps1 exists and invokes shellcheck directly" {
-    Test-Path -LiteralPath $script:CheckShPs1Path -PathType Leaf | Should -Be $true
-    $checkContent = Get-Content -Raw -Path $script:CheckShPs1Path
+  It "check.ps1 inlines the shellcheck lint and calls shellcheck directly" {
+    Test-Path -LiteralPath $script:CheckPs1Path -PathType Leaf | Should -Be $true
+    $checkContent = Get-Content -Raw -Path $script:CheckPs1Path
+    $checkContent | Should -Match "function Invoke-CheckSh"
+    $checkContent | Should -Match "Invoke-CheckSh @ShPaths"
     $checkContent | Should -Match "shellcheck"
-    # check-sh.ps1's own header mentions its POSIX counterpart in prose, so
-    # assert no bash invocation of it rather than any mention.
-    $checkContent | Should -Not -Match "(&|bash)[^\r\n]*check-sh\.sh"
+    $checkContent | Should -Match "-S style"
+    # The Windows lint lives in the entry point itself: there is no separate
+    # check-sh.ps1 to call, and the POSIX body (check-sh.sh) is inlined in check.sh.
+    $checkContent | Should -Not -Match "check-sh\.sh"
+    $checkContent | Should -Not -Match "&[^\r\n]*check-sh\.ps1"
   }
 }
 
