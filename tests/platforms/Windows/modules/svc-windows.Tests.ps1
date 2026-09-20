@@ -1152,8 +1152,8 @@ Describe 'Get-ServiceLogDirList with instances' {
 
   It 'reads an instance log file that the whole-service query would miss' {
     $instanceDir = Join-Path 'TestDrive:\nucleus\logs' 'cloud-drive-mount-work'
-    $null = New-Item -Path $instanceDir -ItemType Directory -Force
-    $null = New-Item -Path (Join-Path $instanceDir 'stdout.log') -ItemType File -Force
+    New-Item -Path $instanceDir -ItemType Directory -Force > $null
+    New-Item -Path (Join-Path $instanceDir 'stdout.log') -ItemType File -Force > $null
 
     @(Get-ServiceLogFile -ServiceKey 'cloud-drive' -InstanceId '\NucleusCloudMount\NucleusCloudMount-work').Count | Should -Be 1
     @(Get-ServiceLogFile -ServiceKey 'cloud-drive').Count | Should -Be 0

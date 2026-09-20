@@ -192,6 +192,7 @@ function Sync-HermesConfig {
   # nucleus runs pwsh 7 on Windows, so the link is recognised through LinkType
   # instead.  A link whose target is gone is replaced rather than left in place,
   # which is what the previous form could not express.
+  # check-suppress:suppression_doc: probing an optional path; absence is the expected signal and the null check below handles it.
   $hermesTargetItem = Get-Item -LiteralPath $hermesSymlinkTarget -Force -ErrorAction SilentlyContinue
   if ($null -ne $hermesTargetItem -and $hermesTargetItem.LinkType -eq 'SymbolicLink') {
     if (-not (Test-Path -LiteralPath $hermesSymlinkTarget)) {

@@ -94,7 +94,7 @@ Describe 'New-NucleusInstanceHostEntry' {
 
   It 'leaves the registry entry untouched' {
     $entry = @{ type = 'windows-schtask'; prefixMatch = $true; service = 'NucleusCloudMount-'; taskPath = '\NucleusCloudMount' }
-    $null = New-NucleusInstanceHostEntry -HostEntry $entry -InstanceId '\NucleusCloudMount\NucleusCloudMount-work'
+    New-NucleusInstanceHostEntry -HostEntry $entry -InstanceId '\NucleusCloudMount\NucleusCloudMount-work' > $null
     $entry.taskPath | Should -Be '\NucleusCloudMount'
     $entry.prefixMatch | Should -Be $true
     $entry.ContainsKey('taskPath') | Should -Be $true
@@ -193,8 +193,8 @@ Describe 'Get-NucleusConfiguredInstanceList filtering' {
     $usersRoot = Join-Path $Script:FilterRepoRoot 'src/users'
     $defaultRoot = Join-Path $usersRoot 'default'
     $userRoot = Join-Path $usersRoot 'test-user'
-    $null = New-Item -Path $defaultRoot -ItemType Directory -Force
-    $null = New-Item -Path $userRoot -ItemType Directory -Force
+    New-Item -Path $defaultRoot -ItemType Directory -Force > $null
+    New-Item -Path $userRoot -ItemType Directory -Force > $null
     $profileJson = '{"homeDirectory":{"MacBook":"/Users/test-user","NixOS":"/home/test-user","Windows":"C:\\Users\\test-user"},"isPrimary":true}'
     Set-Content -Path (Join-Path $defaultRoot 'profile.json') -Value $profileJson
     Set-Content -Path (Join-Path $userRoot 'profile.json') -Value $profileJson
