@@ -1,5 +1,5 @@
 ---
-description: "Use when implementing or modifying the step-runner framework used by the check and test pipelines. Covers step registration, --skip-steps semantics, removed flags, skip message format, PS1 parallelism, and step 7 $schema enforcement."
+description: "Use when implementing or modifying the step-runner framework used by the check and test pipelines. Covers step registration, declared applicability (platform, mode, requires), the --only-steps selector, run-state rendering, PS1 parallelism, and step 7 $schema enforcement."
 name: "Step-Runner Framework"
 applyTo: "src/scripts/lib/step-runner.sh, src/scripts/lib/step-runner.ps1, scripts/check.sh, scripts/check.ps1, scripts/test.sh, scripts/test.ps1, tests/scripts/**, src/scripts/checks/check-steps/**, src/scripts/tests/test-steps/**"
 ---
@@ -8,33 +8,39 @@ applyTo: "src/scripts/lib/step-runner.sh, src/scripts/lib/step-runner.ps1, scrip
 
 Both POSIX (`step-runner.sh`) and PowerShell (`step-runner.ps1`) implementations must conform.
 
-## Spec A: Step ID registration
+## Spec A: Step registration
 
 ```text
-register_step(id: str, name: str, func: Function)                # 3-arg: number from NN- prefix
-register_step(id: str, number: int, name: str, func: Function)   # 4-arg: unit tests only
+register_step(id, name, func)                                 # 3-arg: platform=any mode=any requires=none
+register_step(id, name, func, platform, mode, requires)       # 6-arg: declared applicability
+register_step(id, number, name, func)                         # 4-arg: unit tests only ($2 must be [0-9]+)
+  Arity is exactly 3, 4 or 6; the 4-arg form is unit-tests only.
   id: non-empty, no digits, unique, kebab-case. number: positive, unique.
-  3-arg: from NN- prefix (error if missing). 4-arg: explicit (unit tests only).
-  name: display name. func: (has_args, repo_root, ...files).
-  Validation (hard failure): id digit/empty/dup; number dup.
-  Effect: appends to step arrays (POSIX _STEP_IDS; PS1 $script:StepIds).
+  3-arg: number from NN- prefix (error if missing). 4-arg: explicit (unit tests only).
+  name: display name. func: (ctx, ...files).
+  platform: any | posix | windows. posix = macOS and NixOS only; windows = Windows only.
+  mode: any | full | scoped. scoped = run with positional file args; full = whole-repo run.
+  requires: none | nix | network | sops-machine-key | deployed-host.
+  Validation (hard failure): id digit/empty/dup; number dup; unknown token.
+    register_step: unknown platform token 'darwin' (expected posix|windows|any)
+  Effect: appends to step arrays (POSIX _STEP_IDS/_STEP_PLATFORMS/_STEP_MODES/_STEP_REQUIRES; PS1 $script:StepIds/…).
+PowerShell named form: Register-Step -Id -Name -Action [-Number] [-Platform] [-Mode] [-Requires]; defaults any/any/none.
 ```
 
-## Spec B: `--skip-steps` flag
+## Spec B: `--only-steps` flag
 
 ```text
-Flag: --skip-steps=id1,id2,id3 (= mandatory; no space-separated form).
-Comma-separated step IDs, whitespace stripped. Empty = no-op.
-Effect: Populates SKIP_STEPS (POSIX) / $script:SkipSteps (PS1).
-Execution: if id in SKIP_STEPS → "=== [<number>] <name> === SKIPPED" (exit 2).
-Errors: unknown ignored; duplicates deduped; multiple flags last wins.
-Interactions: --fail-fast skipped steps don't trigger; --scoped --skip-steps takes priority.
+Flag: --only-steps=id1,id2,id3 (= mandatory; no space-separated form). check-pwsh.ps1 uses -OnlyStep <PSSA|Syntax>.
+Comma-separated step IDs, whitespace trimmed, duplicates deduped. Empty = no-op.
+Execution: an id not selected → "=== [<number>] <name> === not-selected" (not run, no exit effect).
+Errors: unknown id is a hard error with the known-id list; no negation flag and no alias. Multiple flags last wins.
+Interactions: selection is applied before the platform/mode/requires checks; --fail-fast unaffected.
 ```
 
 ## Spec C: `--format` removal (post-removal behavior)
 
 ```text
-Step 01 (code-formatting): always runs `treefmt` in-place (no --fail-on-change). Skipped only if absent.
+Step 01 (code-formatting): always runs `treefmt` in-place (no --fail-on-change).
 Pipelines may silently reformat — run `git status --short` after and commit `style(...)` fixes.
   POSIX: treefmt + Darwin supplements + check-packer --validate-only
   PS1: native CLIs (shfmt, yamllint, taplo, packer fmt, actionlint, pinact, zizmor, check-packer)
@@ -45,8 +51,8 @@ Pipelines may silently reformat — run `git status --short` after and commit `s
 
 ```text
 Test step 04 (system-config-build):
-  POSIX: runs on macOS/Linux; skips "SKIPPED (unsupported host <host>)" otherwise.
-  PS1: always skips "SKIPPED (POSIX-only test suite)". Exit 2. No flag controls execution.
+  POSIX: declares `requires sops-machine-key`; the runner reports it not applicable when the key is absent.
+  Windows: no counterpart — the system build has no PowerShell twin. No flag controls execution.
 ```
 
 ## Spec E: PS1 parallelism
@@ -58,7 +64,7 @@ Invoke-StepPipeline:
   - Per-step stdout/exit/timing → step-N.* files in wave temp dir.
   - Live [step NN] on stderr; ordered replay step-number order.
   - Timing: `%.3f s` summary; internal integer ms. POSIX: $EPOCHREALTIME / Time::HiRes / date +%s%3N.
-  - Error: exit code = max. Fail-fast: stop after current wave. --skip-steps excluded.
+  - Exit code 0 (all selected applicable steps passed) or 1 (any failed). Fail-fast: stop after current wave.
 ```
 
 ### Output color
@@ -66,15 +72,20 @@ Invoke-StepPipeline:
 F2/F4 palette via `_nuc_color_init` (POSIX, `src/scripts/lib/lib.sh`) / `$PSStyle` (PS1, `Format-NucleusOutput.psm1`). No raw ANSI/tput/echo-e (check step 14).
 
 - F1: `notice` bold blue; semantic coloring (URLs underline-cyan, quotes blue).
-- F2: `[step NN]` dim. F4: ✓ green / ✗ red / SKIP yellow / ⊘ yellow; labels dim.
+- F2: `[step NN]` dim. F4: ✓ green / ✗ red / – (en dash) yellow for not applicable or not selected; labels dim.
 - Captured files plain. Gated by NO_COLOR / FORCE_COLOR / tty (`output-handling.instructions.md`).
 
-## Spec F: Silent skip elimination
+## Spec F: Declared applicability
 
 ```text
-Every step that does not run: output "=== [<number>] <name> === SKIPPED (<reason>)".
-All skips via skip_step helper (F3). Exit 2 (not failure; SKIP in results).
-Never output "passed" or "no issues found". Single canonical skip path.
+The runner decides whether a registered step runs, from its declaration:
+  - selection: an id excluded by --only-steps → "not-selected";
+  - platform: posix needs macOS or NixOS, windows needs Windows → "not applicable (platform: <token>)";
+  - mode: scoped needs positional args, full needs none → "not applicable (mode: <token>)";
+  - requires: nix | network | sops-machine-key | deployed-host → "not applicable (requires: <token>)".
+A step never probes its own prerequisites; the runner owns run-state.
+Not-applicable and not-selected steps never affect the exit code (0 pass / 1 fail).
+Never output "passed" or "no issues found" for a step that did not run.
 ```
 
 ## Check step groups

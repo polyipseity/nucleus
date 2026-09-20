@@ -44,7 +44,7 @@ Steps by group; numbers from `check-steps/<nn>-*` filenames. Group layout in `st
 
 ### Scoped-mode (`_has_args`)
 
-POSIX: `$1=_has_args`, `$2=_repo_root`, rest = files. Skip (steps 7, 12): no match → `skip_step` + `return 2`. PowerShell: `param($HasArgs, $RepoRoot, $PositionalArgs)`. `$null` trap: empty pipeline → `$null`, `.Count` throws — wrap in `@(...)` with `# WHY:`.
+POSIX steps read `ctx[HAS_ARGS]` / `ctx[REPO_ROOT]` and the trailing file args; PowerShell steps read `$Context.HasArgs` / `$Context.RepoRoot` / `$Context.PositionalArgs`. Path-scopable steps (7, 12) filter the files they are given and treat an empty match set as nothing to check. A whole-repo-only step (19) declares `mode full` at registration; the runner reports it `not applicable (mode: full)` in a scoped run. `$null` trap: empty pipeline → `$null`, `.Count` throws — wrap in `@(...)` with `# WHY:`.
 
 ### Stack-specific
 

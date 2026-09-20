@@ -43,13 +43,13 @@ POSIX helpers in `src/scripts/lib/lib.sh`: `say`, `notice`, `error`, `warn`, `dr
 
 `[step NN] <content>` — zero-padded `%2d`, `10#` guard; marker dim, content default; console-only.
 
-### F3: Header/skip markers
+### F3: Header markers
 
-`=== [N] <title> ===[ SKIPPED (<reason>)]` — bold cyan, no `cmd:` prefix.
+`=== [N] <title> ===` — bold cyan, no `cmd:` prefix. A step that does not run appends `not applicable (<reason>)` or `not-selected`.
 
 ### F4: Tables
 
-Two-space indent; ✓ green / ✗ red / SKIP yellow / ⊘ yellow; dim labels.
+Two-space indent; ✓ green / ✗ red / – (en dash) yellow for not applicable or not selected; dim labels.
 
 ### F5: Machine-readable stdout
 
