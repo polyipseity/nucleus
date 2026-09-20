@@ -19,7 +19,11 @@
 }:
 let
   sopsUtils = import ./lib/sops-utils.nix;
-  inherit (sopsUtils) parseSopsKeys missingSopsKeys;
+  inherit (sopsUtils) parseSopsKeys;
+
+  # Selection and coverage auditing of the catalog live in their own pure library,
+  # so both rules are fixture-testable without a NixOS evaluation.
+  hermesSecretUtils = import ./lib/hermes-secrets.nix;
 
   # Per-user overlay resolver, so the bridge plugin is selected through the same
   # user-overridable contract as every other per-user tree.
@@ -75,12 +79,11 @@ let
   userRecord = allUsers.${config.home.username} or { };
   userSecrets = userRecord.envSecrets or { };
 
-  # Filter secrets by consumer: only keys where consumers contains "hermes-agent".
-  # `or [ ]` keeps this total so the assertion below reports a missing domain with
-  # its own message instead of a raw attribute error.
-  hermesSecrets = builtins.filter (s: builtins.elem "hermes-agent" s.consumers) (
-    userSecrets.secrets or [ ]
-  );
+  # Filter secrets by consumer and group them by `sopsSource`; `or [ ]` keeps this
+  # total so the assertion below reports a missing domain with its own message
+  # instead of a raw attribute error.
+  hermesSecretGroups = hermesSecretUtils.selectHermesSecrets (userSecrets.secrets or [ ]);
+  hermesSecrets = hermesSecretGroups.all;
 
   # Resolve SOPS file paths per sopsSource.
   sopsFileForEntry =
@@ -91,9 +94,10 @@ let
       ../secrets/users + "/${config.home.username}.yml";
 
   # Parse SOPS file keys for eval-time assertion.
-  # Group hermes secrets by sopsSource and check each SOPS file independently.
-  hermesSystemSecrets = builtins.filter (s: s.sopsSource == "system") hermesSecrets;
-  hermesUserSecrets = builtins.filter (s: s.sopsSource == "user") hermesSecrets;
+  # A group is checked against its own file only — and only when it has entries —
+  # because an absent file would otherwise be indistinguishable from an empty one.
+  hermesSystemSecrets = hermesSecretGroups.system;
+  hermesUserSecrets = hermesSecretGroups.user;
 
   systemSopsFile = ../secrets/system.yml;
   userSopsFile = ../secrets/users + "/${config.home.username}.yml";
@@ -109,9 +113,12 @@ let
     else
       [ ];
 
-  missingSystemKeys = missingSopsKeys hermesSystemSopsKeys hermesSystemSecrets;
-  missingUserKeys = missingSopsKeys hermesUserSopsKeys hermesUserSecrets;
-  missingKeys = missingSystemKeys ++ missingUserKeys;
+  missingKeys =
+    (hermesSecretUtils.auditHermesSecrets {
+      groups = hermesSecretGroups;
+      systemKeys = hermesSystemSopsKeys;
+      userKeys = hermesUserSopsKeys;
+    }).all;
 
   # Upstream builds ~/.hermes/.env by concatenating every `environmentFiles`
   # entry verbatim, so each entry must be dotenv-formatted (`KEY=value`). The
