@@ -77,20 +77,26 @@ merge_config() {
   fi
 }
 
+# _key_path_json <section.key> — print the dot-separated key as a jq path array.
+# Built with jq so a key containing a quote or backslash cannot produce invalid JSON.
+_key_path_json() {
+  jq -n --arg key "$1" '$key | split(".")'
+}
+
 cmd_get() {
   if [ $# -eq 0 ]; then
     merge_config
   else
-    # Convert "section.key" to jq filter ".section.key // null"
-    IFS='.' read -r -a parts <<<"$1"
-    filter="."
-    for part in "${parts[@]}"; do
-      filter+=" | .\"$part\""
-    done
-    filter+=" // null"
+    # WHY a path walk instead of a `.section.key // null` filter: jq's alternative
+    # operator treats `false` as false-y, so `false // null` is null and an off
+    # boolean printed nothing and exited 1 — indistinguishable from a missing key.
+    # The walk fails only when a segment is absent, so `false` and `null` values
+    # are printed while an unknown key keeps the "no output, exit 1" contract.
+    path_json="$(_key_path_json "$1")"
     merged=$(merge_config)
-    val=$(echo "$merged" | jq -r "$filter" 2>/dev/null || echo "null")
-    if [ "$val" = "null" ]; then
+    if ! val=$(printf '%s' "$merged" | jq -r --argjson path "$path_json" '
+      reduce $path[] as $k (.; if type == "object" and has($k) then .[$k] else error("no such key") end)
+    ' 2>/dev/null); then
       return 1
     fi
     printf '%s\n' "$val"
@@ -110,29 +116,28 @@ cmd_set() {
   raw_value="$*"
 
   # Convert dot-separated key to jq path JSON array
-  IFS='.' read -r -a parts <<<"$key"
-  path_json='['
-  sep=''
-  for part in "${parts[@]}"; do
-    path_json+="${sep}\"${part}\""
-    sep=', '
-  done
-  path_json+=']'
+  path_json="$(_key_path_json "$key")"
 
+  # WHY `try/catch` and not `fromjson? // $raw`: jq's alternative operator treats a
+  # parsed `false` (and `null`) as false-y, so `set <key> false` stored the string
+  # "false" instead of the boolean. Only a parse failure should fall back to raw.
   if [ -f "$CONFIG_FILE" ]; then
     jq --argjson path "$path_json" --arg raw "$raw_value" '
-      setpath($path; ($raw | fromjson? // $raw))
+      setpath($path; (try ($raw | fromjson) catch $raw))
     ' "$CONFIG_FILE"
   else
     echo '{}' | jq --argjson path "$path_json" --arg raw "$raw_value" '
-      setpath($path; ($raw | fromjson? // $raw))
+      setpath($path; (try ($raw | fromjson) catch $raw))
     '
   fi >"${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
 }
 
 cmd_list() {
+  # WHY `type != …` and not `scalars`: `paths(f)` keeps a leaf only when f yields
+  # something truthy, so `paths(scalars)` dropped every `false` leaf and the
+  # default-off flags were missing from the listing entirely.
   merge_config | jq -r '
-    paths(scalars) as $p
+    paths(type != "object" and type != "array") as $p
     | { key: ($p | join(".")), val: getpath($p) | tojson }
     | "\(.key)=\(.val)"
   '
