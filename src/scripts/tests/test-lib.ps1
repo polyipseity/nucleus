@@ -12,7 +12,7 @@ Set-StepLibPath -Path $MyInvocation.MyCommand.Path
 
 $script:FAIL_FAST = $true
 $script:usageAction = {
-  Write-Output "Usage: test.ps1 [--fail-fast|--no-fail-fast] [--quiet] [--verbose[=<ids>]] [--no-verbose] [--skip-steps=<ids>]"
+  Write-Output "Usage: test.ps1 [--fail-fast|--no-fail-fast] [--quiet] [--verbose[=<ids>]] [--no-verbose] [--only-steps=<ids>]"
   Write-Output "  Run all Windows-compatible repository test suites."
   Write-Output "  --fail-fast            Exit immediately on first failure (default)."
   Write-Output "  --no-fail-fast          Accumulate all failures."
@@ -20,7 +20,7 @@ $script:usageAction = {
   Write-Output "  --verbose              Stream all step output (default: headers + summaries only)."
   Write-Output "  --verbose=<ids>        Stream only the specified comma-separated step IDs."
   Write-Output "  --no-verbose           Suppress step output streaming (default)."
-  Write-Output "  --skip-steps=<ids>     Skip steps with the given comma-separated IDs."
+  Write-Output "  --only-steps=<ids>     Run only steps with the given comma-separated IDs."
 }
 
 function Write-Message { Write-Output "test: $args" }
@@ -41,7 +41,7 @@ function Read-Argument {
   $script:SCOPED = $false
   $script:FULL = $false
   $script:ONLINE = $false
-  $script:SkipSteps = @()
+  $script:OnlySteps = @()
   $script:VerboseIds = @()
 
   $i = 0
@@ -64,18 +64,8 @@ function Read-Argument {
         # No-op: --quiet is POSIX-only.
         break
       }
-      '^--skip-steps=(.*)$' {
-        $script:SkipSteps = @()
-        $value = $Matches[1]
-        if ($value) {
-          $ids = $value -split ','
-          foreach ($id in $ids) {
-            $id = $id.Trim()
-            if ($id -and $script:SkipSteps -notcontains $id) {
-              $script:SkipSteps += $id
-            }
-          }
-        }
+      '^--only-steps=(.*)$' {
+        $script:OnlySteps = @(Get-StepSelection -Value $Matches[1])
         break
       }
       '^-.*' {

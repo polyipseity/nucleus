@@ -688,8 +688,8 @@ $nucleusCheckFlags = @(
   '--help',
   '--no-fail-fast',
   '--online',
-  '--scoped',
-  '--skip-steps'
+  '--only-steps',
+  '--scoped'
 )
 
 $nucleusCloudFlags = @(
@@ -757,8 +757,8 @@ $nucleusTestFlags = @(
   '--fail-fast',
   '--help',
   '--no-fail-fast',
+  '--only-steps',
   '--quiet',
-  '--skip-steps',
   '-q'
 )
 

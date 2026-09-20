@@ -12,7 +12,7 @@ run_powershell_lint() {
 
   say "--- PSScriptAnalyzer lint (syntax runs in check step 2) ---"
   pwsh -NoLogo -NoProfile -NonInteractive -File "$_repo_root/src/scripts/checks/check-pwsh.ps1" \
-    -SkipStep Syntax \
+    -OnlyStep PSSA \
     -Settings "$_repo_root/scripts/test-PSScriptAnalyzerSettings.psd1" || _exit_code=1
   say "--- end PSScriptAnalyzer lint ---"
 

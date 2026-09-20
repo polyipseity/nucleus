@@ -1,15 +1,9 @@
-Register-Step -Id "windows-pester" -Name "Windows Pester tests" -Action {
+Register-Step -Id "windows-pester" -Name "Windows Pester tests" -Platform windows -Action {
   param([Parameter(Mandatory)][PSObject]$Context)
 
   # These Pester suites exercise Windows-only behavior (Windows service dispatch,
-  # DSC wiring, etc.). They also rely on $PSScriptRoot-relative module loading
-  # that breaks when Pester is invoked inside a step-runner runspace on
-  # non-Windows hosts. Skip the step off-Windows.
-  if (-not $IsWindows) {
-    Skip-Step -Number (Get-StepNumber -Context $Context) -Name 'Windows Pester tests' -Reason 'non-Windows host'
-    return 2
-  }
-
+  # DSC wiring, etc.). -Platform windows keeps the step off other hosts, where
+  # $PSScriptRoot-relative module loading breaks inside a step-runner runspace.
   $RepoRoot = $Context.RepoRoot
 
   $windowsTestRoots = @(

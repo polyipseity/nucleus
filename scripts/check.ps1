@@ -19,7 +19,7 @@
 #   --verbose        Stream all step output (default: headers + summaries only).
 #   --verbose=<ids>  Stream only the specified comma-separated step IDs.
 #   --no-verbose     Suppress step output streaming (default).
-#   --skip-steps=<ids>  Skip steps with the given comma-separated IDs.
+#   --only-steps=<ids>  Run only steps with the given comma-separated IDs.
 #   (paths)          Files to check; restricts --scoped to matching files.
 #                     For subcommands, passed through to the underlying script.
 #
@@ -308,18 +308,18 @@ function Invoke-CheckSh {
 
 switch ($Action) {
   'packer' {
-    # WHY: filter --verbose/--no-verbose from Paths — these flags are only for the step pipeline (all action); subcommands don't understand them.
-    $PackerPaths = @($Paths | Where-Object { $_ -notmatch '^--verbose' -and $_ -ne '--no-verbose' })
+    # WHY: filter --verbose/--no-verbose/--only-steps from Paths — these flags are only for the step pipeline (all action); subcommands don't understand them.
+    $PackerPaths = @($Paths | Where-Object { $_ -notmatch '^--verbose' -and $_ -ne '--no-verbose' -and $_ -notmatch '^--only-steps' })
     Invoke-CheckPacker @PackerPaths -WindowsTemplateOverride $WindowsTemplateOverride -AnnotationCheckOnly:$AnnotationCheckOnly -ValidateOnly:$ValidateOnly
     exit $LASTEXITCODE
   }
   'sh' {
-    $ShPaths = @($Paths | Where-Object { $_ -notmatch '^--verbose' -and $_ -ne '--no-verbose' })
+    $ShPaths = @($Paths | Where-Object { $_ -notmatch '^--verbose' -and $_ -ne '--no-verbose' -and $_ -notmatch '^--only-steps' })
     Invoke-CheckSh @ShPaths
     exit $LASTEXITCODE
   }
   'pwsh' {
-    $PwshPaths = @($Paths | Where-Object { $_ -notmatch '^--verbose' -and $_ -ne '--no-verbose' })
+    $PwshPaths = @($Paths | Where-Object { $_ -notmatch '^--verbose' -and $_ -ne '--no-verbose' -and $_ -notmatch '^--only-steps' })
     & (Join-Path $ScriptDir '..\src\scripts\checks\check-pwsh.ps1') @PwshPaths
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   }

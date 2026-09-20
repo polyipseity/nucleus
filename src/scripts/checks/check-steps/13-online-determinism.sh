@@ -3,7 +3,9 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "online-determinism" "Online determinism checks (--online)" run_online_determinism
+# Declared applicability: the online determinism check needs network access, granted
+# by --online; the runner reports `not applicable (requires: network)` otherwise.
+register_step "online-determinism" "Online determinism checks (--online)" run_online_determinism any any network
 
 run_online_determinism() {
   local -n ctx="$1"
@@ -12,15 +14,10 @@ run_online_determinism() {
   local _files=("$@")
   cd "$_repo_root" || return 1
 
-  if [ "${ctx[ONLINE]}" = "true" ]; then
-    if bash "$_repo_root/scripts/update.sh" lockfile --verify; then
-      say "online determinism checks passed."
-      return 0
-    else
-      return 1
-    fi
+  if bash "$_repo_root/scripts/update.sh" lockfile --verify; then
+    say "online determinism checks passed."
+    return 0
   else
-    say "skipping (use --online to run online determinism checks)."
-    return 2
+    return 1
   fi
 }

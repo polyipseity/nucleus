@@ -19,11 +19,11 @@
   Pass test settings for full coverage:
   -Settings scripts/test-PSScriptAnalyzerSettings.psd1
 
-.PARAMETER SkipStep
-  Step names to skip. Recognized values:
-  - `PSSA` — skip PSScriptAnalyzer lint (syntax-only; used by check step 2 on pre-commit).
-  - `Syntax` — skip parser syntax validation (PSSA-only; used by test step 2 on pre-push).
-  Unknown step names cause an error.
+.PARAMETER OnlyStep
+  Run only the named check. Recognized values:
+  - `PSSA` — run only PSScriptAnalyzer lint (test step 2 leans on this for the full-rule pass).
+  - `Syntax` — run only parser syntax validation.
+  Unknown step names cause an error. Omit to run both.
 
 .PARAMETER Scoped
   If specified and no paths are given, skip Git discovery (no files to check).
@@ -37,10 +37,10 @@
   nix run ./src#check-pwsh
 
 .EXAMPLE
-  nix run ./src#check-pwsh -- -SkipStep PSSA
+  nix run ./src#check-pwsh -- -OnlyStep Syntax
 
 .EXAMPLE
-  nix run ./src#check-pwsh -- -SkipStep Syntax -Settings scripts/test-PSScriptAnalyzerSettings.psd1
+  nix run ./src#check-pwsh -- -OnlyStep PSSA -Settings scripts/test-PSScriptAnalyzerSettings.psd1
 
 .EXAMPLE
   nix run ./src#check-pwsh -- -Settings scripts/check-PSScriptAnalyzerSettings.psd1 src/hosts/Windows/apply.ps1
@@ -52,7 +52,7 @@
 [CmdletBinding()]
 param(
   [string]$Settings = '',
-  [string[]]$SkipStep = @(),
+  [string[]]$OnlyStep = @(),
   [switch]$Scoped,
   [Parameter(Position = 0)]
   [string[]]$Paths = @($env:NUCLEUS_CHECK_PATHS -split ';' | Where-Object { $_ })
@@ -81,28 +81,28 @@ if (-not $Paths -or $Paths.Count -eq 0) {
   exit 0
 }
 
-# Validate SkipStep entries against known step names.
+# Validate OnlyStep entries against known step names.
 $knownStepNames = [System.Collections.Generic.HashSet[string]]::new(
   [System.StringComparer]::OrdinalIgnoreCase
 )
 $null = $knownStepNames.Add('PSSA')  # check-suppress:suppression_doc: Add returns collection count, discarded
 $null = $knownStepNames.Add('Syntax')  # check-suppress:suppression_doc: Add returns collection count, discarded
-$unknownNames = @($SkipStep | Where-Object { $_ -notin $knownStepNames })
+$unknownNames = @($OnlyStep | Where-Object { $_ -notin $knownStepNames })
 if ($unknownNames.Count -gt 0) {
-  throw "Unknown -SkipStep value(s): $($unknownNames -join ', '). Valid values: $($knownStepNames -join ', ')"
+  throw "Unknown -OnlyStep value(s): $($unknownNames -join ', '). Valid values: $($knownStepNames -join ', ')"
 }
 
-$skipStepSet = [System.Collections.Generic.HashSet[string]]::new(
+$onlyStepSet = [System.Collections.Generic.HashSet[string]]::new(
   [System.StringComparer]::OrdinalIgnoreCase
 )
-foreach ($t in $SkipStep) {
-    $null = $skipStepSet.Add($t) }  # check-suppress:suppression_doc: Add returns bool, discarded
+foreach ($t in $OnlyStep) {
+    $null = $onlyStepSet.Add($t) }  # check-suppress:suppression_doc: Add returns bool, discarded
 
 # ---------------------------------------------------------------------------
 # Syntax validation.
 # ---------------------------------------------------------------------------
-$skipSyntax = $skipStepSet -contains 'Syntax'
-if (-not $skipSyntax) {
+$runSyntax = $onlyStepSet.Count -eq 0 -or $onlyStepSet.Contains('Syntax')
+if ($runSyntax) {
   $parseErrors = @($Paths | Sort-Object -Unique | ForEach-Object -Parallel {
     $path = $_
     if (-not (Test-Path -Path $path)) {
@@ -132,15 +132,13 @@ if (-not $skipSyntax) {
   }
 
   Write-NucleusInfo -CommandName check-pwsh ("PowerShell syntax check passed for {0} files." -f $Paths.Count)
-} else {
-  Write-NucleusInfo -CommandName check-pwsh 'PowerShell syntax check skipped (-SkipStep Syntax).'
 }
 
 # ---------------------------------------------------------------------------
 # PSScriptAnalyzer lint.
 # ---------------------------------------------------------------------------
-$skipPSSA = $skipStepSet -contains 'PSSA'
-if (-not $skipPSSA) {
+$runPssa = $onlyStepSet.Count -eq 0 -or $onlyStepSet.Contains('PSSA')
+if ($runPssa) {
   # Preflight: PSScriptAnalyzer is required.
   if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
     throw 'PSScriptAnalyzer module is required for lint phase. Install with: Install-Module PSScriptAnalyzer -Scope CurrentUser'
@@ -193,6 +191,4 @@ if (-not $skipPSSA) {
     }
 
     Write-NucleusInfo -CommandName check-pwsh ("PowerShell lint check passed for {0} files." -f $Paths.Count)
-} else {
-  Write-NucleusInfo -CommandName check-pwsh 'PowerShell lint skipped (-SkipStep PSSA).'
 }

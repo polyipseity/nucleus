@@ -1,7 +1,7 @@
 #Requires -Version 7.4
 # Shared lockfile enforcement probes for both the check step and
 # bump-lockfile.ps1 -VerifyInstalled.  Does NOT depend on check-lib.ps1
-# (no Skip-Step / Get-StepNumber), so it is safe to source from bump-lockfile.
+# (no skip mechanism / Get-StepNumber), so it is safe to source from bump-lockfile.
 #
 # Message output is delegated via scriptblock parameters so the same probe
 # logic serves both the check step (Write-Message / Write-WarningMessage /

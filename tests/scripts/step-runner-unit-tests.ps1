@@ -1,6 +1,7 @@
 #Requires -Version 7.4
 # Unit tests for step-runner.ps1 functions in isolation (PowerShell).
-# Covers Spec A (step IDs) and Spec B (--skip-steps).
+# Covers registration arity and token validation, the applicability matrix, and
+# --only-steps.
 
 [CmdletBinding()]
 param()
@@ -22,12 +23,10 @@ function Assert-Fail {
     $script:failCount++
 }
 
-# ---- Spec A: Step ID registration (new 4-arg form with -Id) ----
+# ---- Spec A: Step ID registration (-Id form) ----
 
 function Test-RegisterStep-WithId {
-    $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
-    $script:StepNames = [System.Collections.Generic.List[string]]::new()
-    $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
+    Initialize-StepState
     . $stepRunner
 
     Register-Step -Id "code-formatting" -Number 1 -Name "Code formatting" -Action { $true }
@@ -36,14 +35,12 @@ function Test-RegisterStep-WithId {
         Assert-Pass "Register-Step -Id stores id, number, name correctly"
     } else {
         $ids = if ($script:StepIds) { $script:StepIds[0] } else { "null" }
-        Assert-Fail "Register-Step 4-arg" "Expected id='code-formatting' number=1, got id=$ids number=$($script:StepNumbers[0])"
+        Assert-Fail "Register-Step -Id" "Expected id='code-formatting' number=1, got id=$ids number=$($script:StepNumbers[0])"
     }
 }
 
 function Test-RegisterStep-MultipleWithId {
-    $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
-    $script:StepNames = [System.Collections.Generic.List[string]]::new()
-    $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
+    Initialize-StepState
     . $stepRunner
 
     Register-Step -Id "one" -Number 1 -Name "One" -Action { $true }
@@ -57,10 +54,60 @@ function Test-RegisterStep-MultipleWithId {
     }
 }
 
+function Test-RegisterStep-DeclaredToken {
+    Initialize-StepState
+    . $stepRunner
+
+    Register-Step -Id "declared" -Number 1 -Name "Declared" -Platform posix -Mode full -Requires deployed-host -Action { $true }
+
+    if ($script:StepPlatforms[0] -eq "posix" -and $script:StepModes[0] -eq "full" -and $script:StepRequires[0] -eq "deployed-host") {
+        Assert-Pass "Register-Step stores the declared platform, mode and requires tokens"
+    } else {
+        Assert-Fail "Register-Step declared tokens" "got platform='$($script:StepPlatforms[0])' mode='$($script:StepModes[0])' requires='$($script:StepRequires[0])'"
+    }
+}
+
+function Test-RegisterStep-UndeclaredDefault {
+    Initialize-StepState
+    . $stepRunner
+
+    Register-Step -Id "plain" -Number 1 -Name "Plain" -Action { $true }
+
+    if ($script:StepPlatforms[0] -eq "any" -and $script:StepModes[0] -eq "any" -and $script:StepRequires[0] -eq "none") {
+        Assert-Pass "Register-Step defaults to any/any/none"
+    } else {
+        Assert-Fail "Register-Step defaults" "got platform='$($script:StepPlatforms[0])' mode='$($script:StepModes[0])' requires='$($script:StepRequires[0])'"
+    }
+}
+
+function Test-RegisterStep-UnknownToken {
+    $cases = @(
+        @{ Name = 'platform'; Arguments = @{ Platform = 'darwin' }; Message = "unknown platform token 'darwin' (expected posix|windows|any)" },
+        @{ Name = 'mode'; Arguments = @{ Mode = 'partial' }; Message = "unknown mode token 'partial' (expected any|full|scoped)" },
+        @{ Name = 'requires'; Arguments = @{ Requires = 'gpu' }; Message = "unknown requires token 'gpu' (expected none|nix|network|sops-machine-key|deployed-host)" }
+    )
+    foreach ($case in $cases) {
+        Initialize-StepState
+        $threw = $false
+        $message = ''
+        try {
+            . $stepRunner
+            $parameters = $case.Arguments + @{ Id = 'bad'; Number = 1; Name = 'Bad'; Action = { $true } }
+            Register-Step @parameters
+        } catch {
+            $threw = $true
+            $message = $_.Exception.Message
+        }
+        if ($threw -and $message.Contains($case.Message)) {
+            Assert-Pass "Register-Step rejects an unknown $($case.Name) token"
+        } else {
+            Assert-Fail "Register-Step unknown $($case.Name)" "threw=$threw message='$message'"
+        }
+    }
+}
+
 function Test-RegisterStep-IdWithDigitError {
-    $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
-    $script:StepNames = [System.Collections.Generic.List[string]]::new()
-    $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
+    Initialize-StepState
     $exitCode = 0
     try {
         . $stepRunner
@@ -76,9 +123,7 @@ function Test-RegisterStep-IdWithDigitError {
 }
 
 function Test-RegisterStep-EmptyIdError {
-    $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
-    $script:StepNames = [System.Collections.Generic.List[string]]::new()
-    $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
+    Initialize-StepState
     $exitCode = 0
     try {
         . $stepRunner
@@ -94,9 +139,7 @@ function Test-RegisterStep-EmptyIdError {
 }
 
 function Test-RegisterStep-DuplicateIdError {
-    $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
-    $script:StepNames = [System.Collections.Generic.List[string]]::new()
-    $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
+    Initialize-StepState
     $exitCode = 0
     try {
         . $stepRunner
@@ -113,9 +156,7 @@ function Test-RegisterStep-DuplicateIdError {
 }
 
 function Test-RegisterStep-DuplicateNumberError {
-    $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
-    $script:StepNames = [System.Collections.Generic.List[string]]::new()
-    $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
+    Initialize-StepState
     $exitCode = 0
     try {
         . $stepRunner
@@ -134,9 +175,7 @@ function Test-RegisterStep-DuplicateNumberError {
 # ---- Spec A: Step number derivation from NN- filename prefix ----
 
 function Test-RegisterStep-DeriveNumberFromFilename {
-    $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
-    $script:StepNames = [System.Collections.Generic.List[string]]::new()
-    $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
+    Initialize-StepState
     $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ("step-runner-test-" + [System.IO.Path]::GetRandomFileName())
     try {
         $null = New-Item -ItemType Directory -Path $tmpDir  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
@@ -169,9 +208,7 @@ function Test-RegisterStep-DeriveNumberFromFilename {
 }
 
 function Test-RegisterStep-DeriveNumberThrowsWithoutPrefix {
-    $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
-    $script:StepNames = [System.Collections.Generic.List[string]]::new()
-    $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
+    Initialize-StepState
     $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ("step-runner-test-" + [System.IO.Path]::GetRandomFileName())
     $exitCode = 0
     try {
@@ -197,112 +234,220 @@ function Test-RegisterStep-DeriveNumberThrowsWithoutPrefix {
     }
 }
 
-# ---- Spec B: --skip-steps flag (via Read-Argument) ----
+# ---- Spec B: Applicability matrix (Get-StepRunState) ----
 
-function Test-SkipSteps-EqualsForm {
-    $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
-    $script:StepNames = [System.Collections.Generic.List[string]]::new()
-    $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
-    $script:usageAction = { Write-Output "usage: test" }
+function Test-RunState-Platform {
+    Initialize-StepState
     . $stepRunner
 
-    Read-Argument -Arguments @('--skip-steps=a,b')
+    # Exactly one platform applies to this host; the other names its token and value.
+    $offHost = if ($IsWindows) { 'posix' } else { 'windows' }
+    $offHostState = Get-StepRunState -Id 'x' -Platform $offHost -Mode any -Requires none
+    $anyState = Get-StepRunState -Id 'x' -Platform any -Mode any -Requires none
 
-    if ($script:SkipSteps.Count -eq 2 -and $script:SkipSteps[0] -eq 'a' -and $script:SkipSteps[1] -eq 'b') {
-        Assert-Pass "--skip-steps=a,b populates SkipSteps with two entries"
+    if ($offHostState -eq "not applicable (platform: $offHost)" -and $null -eq $anyState) {
+        Assert-Pass "platform applicability: off-host declares not applicable, any runs"
     } else {
-        Assert-Fail "--skip-steps equals" "Expected 2 entries ['a','b'], got $($script:SkipSteps.Count): $($script:SkipSteps -join ',')"
+        Assert-Fail "platform applicability" "offHost='$offHostState' any='$anyState'"
     }
 }
 
-function Test-SkipSteps-EmptyValue {
-    $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
-    $script:StepNames = [System.Collections.Generic.List[string]]::new()
-    $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
-    $script:usageAction = { Write-Output "usage: test" }
+function Test-RunState-Mode {
+    Initialize-StepState
     . $stepRunner
 
-    Read-Argument -Arguments @('--skip-steps=')
+    $script:HAS_ARGS = $true
+    $scopedState = Get-StepRunState -Id 'x' -Platform any -Mode scoped -Requires none
+    $fullState = Get-StepRunState -Id 'x' -Platform any -Mode full -Requires none
 
-    if ($script:SkipSteps.Count -eq 0) {
-        Assert-Pass "--skip-steps= results in empty SkipSteps"
+    $script:HAS_ARGS = $false
+    $scopedOffState = Get-StepRunState -Id 'x' -Platform any -Mode scoped -Requires none
+    $fullOffState = Get-StepRunState -Id 'x' -Platform any -Mode full -Requires none
+
+    if ($null -eq $scopedState -and $fullState -eq 'not applicable (mode: full)' -and
+        $scopedOffState -eq 'not applicable (mode: scoped)' -and $null -eq $fullOffState) {
+        Assert-Pass "mode applicability tracks the scoped/full run"
     } else {
-        Assert-Fail "--skip-steps empty" "Expected 0 entries, got $($script:SkipSteps.Count)"
+        Assert-Fail "mode applicability" "scoped='$scopedState' full='$fullState' scopedOff='$scopedOffState' fullOff='$fullOffState'"
     }
 }
 
-function Test-SkipSteps-UnknownIdNoError {
-    $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
-    $script:StepNames = [System.Collections.Generic.List[string]]::new()
-    $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
-    $script:usageAction = { Write-Output "usage: test" }
+function Test-RunState-Prerequisite {
+    Initialize-StepState
     . $stepRunner
 
-    $exitCode = 0
+    $script:ONLINE = $false
+    $offlineState = Get-StepRunState -Id 'x' -Platform any -Mode any -Requires network
+    $noneState = Get-StepRunState -Id 'x' -Platform any -Mode any -Requires none
+
+    $script:ONLINE = $true
+    $onlineState = Get-StepRunState -Id 'x' -Platform any -Mode any -Requires network
+
+    if ($offlineState -eq 'not applicable (requires: network)' -and $null -eq $onlineState -and $null -eq $noneState) {
+        Assert-Pass "requires applicability: network needs --online, none always runs"
+    } else {
+        Assert-Fail "requires applicability" "offline='$offlineState' online='$onlineState' none='$noneState'"
+    }
+}
+
+function Test-RunState-NotSelected {
+    Initialize-StepState
+    . $stepRunner
+
+    $script:OnlySteps = @('chosen')
+    $chosenState = Get-StepRunState -Id 'chosen' -Platform any -Mode any -Requires none
+    $otherState = Get-StepRunState -Id 'other' -Platform any -Mode any -Requires none
+
+    if ($null -eq $chosenState -and $otherState -eq 'not-selected') {
+        Assert-Pass "--only-steps marks every unselected step not-selected"
+    } else {
+        Assert-Fail "not-selected state" "chosen='$chosenState' other='$otherState'"
+    }
+}
+
+function Test-RunState-SelectionPrecedence {
+    Initialize-StepState
+    . $stepRunner
+
+    # An unselected step reports not-selected, not a platform/mode/requires reason.
+    $script:OnlySteps = @('chosen')
+    $state = Get-StepRunState -Id 'other' -Platform windows -Mode full -Requires nix
+
+    if ($state -eq 'not-selected') {
+        Assert-Pass "selection is reported before applicability"
+    } else {
+        Assert-Fail "selection precedence" "Expected 'not-selected', got '$state'"
+    }
+}
+
+# ---- Spec C: --only-steps flag (via Read-Argument) ----
+
+function Test-OnlySteps-EqualsForm {
+    Initialize-StepState
+    . $stepRunner
+    Register-Step -Id "alpha" -Number 1 -Name "Alpha" -Action { $true }
+    Register-Step -Id "beta" -Number 2 -Name "Beta" -Action { $true }
+
+    Read-Argument -Arguments @('--only-steps=alpha,beta')
+
+    if ($script:OnlySteps.Count -eq 2 -and $script:OnlySteps[0] -eq 'alpha' -and $script:OnlySteps[1] -eq 'beta') {
+        Assert-Pass "--only-steps=alpha,beta populates OnlySteps with two entries"
+    } else {
+        Assert-Fail "--only-steps equals" "Expected 2 entries ['alpha','beta'], got $($script:OnlySteps.Count): $($script:OnlySteps -join ',')"
+    }
+}
+
+function Test-OnlySteps-EmptyValue {
+    Initialize-StepState
+    . $stepRunner
+    Register-Step -Id "alpha" -Number 1 -Name "Alpha" -Action { $true }
+
+    Read-Argument -Arguments @('--only-steps=')
+
+    if ($script:OnlySteps.Count -eq 0) {
+        Assert-Pass "--only-steps= results in an empty selection"
+    } else {
+        Assert-Fail "--only-steps empty" "Expected 0 entries, got $($script:OnlySteps.Count)"
+    }
+}
+
+function Test-OnlySteps-Dedup {
+    Initialize-StepState
+    . $stepRunner
+    Register-Step -Id "alpha" -Number 1 -Name "Alpha" -Action { $true }
+
+    Read-Argument -Arguments @('--only-steps=alpha,alpha')
+
+    if ($script:OnlySteps.Count -eq 1 -and $script:OnlySteps[0] -eq 'alpha') {
+        Assert-Pass "--only-steps=alpha,alpha deduplicates to one entry"
+    } else {
+        Assert-Fail "--only-steps dedup" "Expected 1 entry 'alpha', got $($script:OnlySteps.Count): $($script:OnlySteps -join ',')"
+    }
+}
+
+function Test-OnlySteps-LastValueWin {
+    Initialize-StepState
+    . $stepRunner
+    Register-Step -Id "alpha" -Number 1 -Name "Alpha" -Action { $true }
+    Register-Step -Id "beta" -Number 2 -Name "Beta" -Action { $true }
+
+    Read-Argument -Arguments @('--only-steps=alpha', '--only-steps=beta')
+
+    if ($script:OnlySteps.Count -eq 1 -and $script:OnlySteps[0] -eq 'beta') {
+        Assert-Pass "--only-steps last value wins (no accumulation)"
+    } else {
+        Assert-Fail "--only-steps last-win" "Expected ['beta'], got $($script:OnlySteps -join ',')"
+    }
+}
+
+function Test-OnlySteps-UnknownIdError {
+    Initialize-StepState
+    . $stepRunner
+    Register-Step -Id "alpha" -Number 1 -Name "Alpha" -Action { $true }
+
+    $threw = $false
+    $message = ''
     try {
-        Read-Argument -Arguments @('--skip-steps=nonexistent-id')
+        Read-Argument -Arguments @('--only-steps=nonexistent-id')
     } catch {
-        $exitCode = 1
+        $threw = $true
+        $message = $_.Exception.Message
     }
-    if ($exitCode -eq 0) {
-        Assert-Pass "--skip-steps with unknown ID does not error (Spec B)"
+
+    if ($threw -and $message.Contains("unknown step id 'nonexistent-id' in --only-steps (known: alpha)")) {
+        Assert-Pass "--only-steps with an unknown ID is a hard error"
     } else {
-        Assert-Fail "--skip-steps unknown" "Expected no error for unknown ID"
+        Assert-Fail "--only-steps unknown" "threw=$threw message='$message'"
     }
 }
 
-function Test-SkipSteps-Dedup {
+# ---- Shared test state ----
+
+function Initialize-StepState {
+    $script:StepIds = [System.Collections.Generic.List[string]]::new()
     $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
     $script:StepNames = [System.Collections.Generic.List[string]]::new()
     $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
+    $script:StepPlatforms = [System.Collections.Generic.List[string]]::new()
+    $script:StepModes = [System.Collections.Generic.List[string]]::new()
+    $script:StepRequires = [System.Collections.Generic.List[string]]::new()
+    $script:OnlySteps = @()
+    $script:NotRunStates = @{}
+    $script:ONLINE = $false
+    $script:HAS_ARGS = $false
     $script:usageAction = { Write-Output "usage: test" }
-    . $stepRunner
-
-    Read-Argument -Arguments @('--skip-steps=a,a')
-
-    if ($script:SkipSteps.Count -eq 1 -and $script:SkipSteps[0] -eq 'a') {
-        Assert-Pass "--skip-steps=a,a deduplicates to one entry"
-    } else {
-        Assert-Fail "--skip-steps dedup" "Expected 1 entry 'a', got $($script:SkipSteps.Count): $($script:SkipSteps -join ',')"
-    }
-}
-
-function Test-SkipStep-LastValueWin {
-    $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
-    $script:StepNames = [System.Collections.Generic.List[string]]::new()
-    $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
-    $script:usageAction = { Write-Output "usage: test" }
-    . $stepRunner
-
-    Read-Argument -Arguments @('--skip-steps=a', '--skip-steps=b')
-
-    if ($script:SkipSteps.Count -eq 1 -and $script:SkipSteps[0] -eq 'b') {
-        Assert-Pass "--skip-steps last value wins (no accumulation)"
-    } else {
-        Assert-Fail "--skip-steps last-win" "Expected ['b'], got $($script:SkipSteps -join ',')"
-    }
 }
 
 # ---- Run tests ----
-Write-Output "`n=== Phase 1: Framework core unit tests (PS1) ==="
-Write-Output "Tests for Spec A (step IDs) and Spec B (--skip-steps)."
+Write-Output "`n=== Step-runner framework unit tests (PS1) ==="
+Write-Output "Registration arity, token validation, applicability matrix, --only-steps."
 Write-Output ""
 
 Test-RegisterStep-WithId
 Test-RegisterStep-MultipleWithId
+Test-RegisterStep-DeclaredToken
+Test-RegisterStep-UndeclaredDefault
+Test-RegisterStep-UnknownToken
 Test-RegisterStep-IdWithDigitError
 Test-RegisterStep-EmptyIdError
 Test-RegisterStep-DuplicateIdError
 Test-RegisterStep-DuplicateNumberError
 Test-RegisterStep-DeriveNumberFromFilename
 Test-RegisterStep-DeriveNumberThrowsWithoutPrefix
-Test-SkipSteps-EqualsForm
-Test-SkipSteps-EmptyValue
-Test-SkipSteps-UnknownIdNoError
-Test-SkipSteps-Dedup
-Test-SkipStep-LastValueWin
 
-Write-Output "`n--- Phase 1 PS1 unit tests: $($script:passCount) passed, $($script:failCount) failed ---"
+Test-RunState-Platform
+Test-RunState-Mode
+Test-RunState-Prerequisite
+Test-RunState-NotSelected
+Test-RunState-SelectionPrecedence
+
+Test-OnlySteps-EqualsForm
+Test-OnlySteps-EmptyValue
+Test-OnlySteps-Dedup
+Test-OnlySteps-LastValueWin
+Test-OnlySteps-UnknownIdError
+
+Write-Output "`n--- Step-runner PS1 unit tests: $($script:passCount) passed, $($script:failCount) failed ---"
 Write-Output ""
 
 exit $script:failCount

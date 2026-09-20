@@ -33,6 +33,7 @@ parse_args() {
   FULL=false
   HAS_ARGS=false
   POSITIONAL_ARGS=()
+  ONLY_STEPS=()
   quiet_mode=false
 
   while [ "$#" -gt 0 ]; do
@@ -79,21 +80,22 @@ parse_args() {
       VERBOSE_IDS=()
       shift
       ;;
-    --skip-steps=*)
-      SKIP_STEPS=()
+    --only-steps=*)
+      ONLY_STEPS=()
       _IFS_SAVE="$IFS"
       IFS=','
-      for _id in ${1#--skip-steps=}; do
+      for _id in ${1#--only-steps=}; do
         _id="${_id## }"
         _id="${_id%% }"
         [ -n "$_id" ] || continue
-        _skip_dup=false
-        for _existing in "${SKIP_STEPS[@]}"; do
-          [ "$_existing" = "$_id" ] && _skip_dup=true && break
+        _duplicate=false
+        for _existing in "${ONLY_STEPS[@]}"; do
+          [ "$_existing" = "$_id" ] && _duplicate=true && break
         done
-        $_skip_dup || SKIP_STEPS+=("$_id")
+        $_duplicate || ONLY_STEPS+=("$_id")
       done
       IFS="$_IFS_SAVE"
+      validate_only_steps
       shift
       ;;
     -*)
@@ -183,5 +185,5 @@ preflight_check() {
 }
 
 usage() {
-  usage_std "test.sh" "[-q|--quiet] [--fail-fast|--no-fail-fast] [--verbose[=<ids>]] [--no-verbose] [--skip-steps=<ids>]" "Run the repository test suite. With --quiet, suppress success/progress output across applicable steps (failures always shown). With --verbose, stream all step output (default: headers + summaries only). --verbose=<ids> streams only the specified comma-separated step IDs. --fail-fast exits immediately on first failure (default); --no-fail-fast accumulates all failures. --skip-steps=<ids> skips steps with the given comma-separated IDs."
+  usage_std "test.sh" "[-q|--quiet] [--fail-fast|--no-fail-fast] [--verbose[=<ids>]] [--no-verbose] [--only-steps=<ids>]" "Run the repository test suite. With --quiet, suppress success/progress output across applicable steps (failures always shown). With --verbose, stream all step output (default: headers + summaries only). --verbose=<ids> streams only the specified comma-separated step IDs. --fail-fast exits immediately on first failure (default); --no-fail-fast accumulates all failures. --only-steps=<ids> runs only the steps with the given comma-separated IDs."
 }

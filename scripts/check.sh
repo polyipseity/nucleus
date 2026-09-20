@@ -15,7 +15,7 @@
 #   --verbose         Stream all step output (default: headers + summaries only).
 #   --verbose=<ids>   Stream only the specified comma-separated step IDs.
 #   --no-verbose      Suppress step output streaming (default).
-#   --skip-steps=<ids>  Skip steps with the given comma-separated IDs.
+#   --only-steps=<ids>  Run only the steps with the given comma-separated IDs.
 #   (paths)           Files to check; passes paths through to sub-checkers and
 #                     skips whole-repo checks (always-run checks that don't support path filtering).
 #
@@ -53,7 +53,7 @@ _NUCLEUS_CHECKS_DIR="$(CDPATH='' cd -- "$_ORCH_SCRIPT_DIR/../src/scripts/checks"
 # inputs stable across parallel steps.
 # Override usage to list subcommands alongside the full-run options.
 usage() {
-  usage_std "check.sh" "[packer|pwsh|sh] [--fail-fast|--no-fail-fast] [--scoped|--full] [--online] [--verbose[=<ids>]] [--no-verbose] [--skip-steps=<ids>] [path ...]" "Run repository validation checks. With a subcommand, run only that check; without one, run all checks with parallel step dispatch (capped at PARALLEL_JOBS). Subcommands: packer (Packer template validation), pwsh (PowerShell syntax + naming lint), sh (shell script lint). Default: scoped if paths given, full otherwise."
+  usage_std "check.sh" "[packer|pwsh|sh] [--fail-fast|--no-fail-fast] [--scoped|--full] [--online] [--verbose[=<ids>]] [--no-verbose] [--only-steps=<ids>] [path ...]" "Run repository validation checks. With a subcommand, run only that check; without one, run all checks with parallel step dispatch (capped at PARALLEL_JOBS). Subcommands: packer (Packer template validation), pwsh (PowerShell syntax + naming lint), sh (shell script lint). Default: scoped if paths given, full otherwise."
 }
 
 # ──────────────────────────────────────────────────────────────────────────────

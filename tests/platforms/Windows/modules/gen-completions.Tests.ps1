@@ -209,7 +209,7 @@ Describe 'gen-completions.ps1 generated inventory' {
     # test/vm: the generator re-sorts via Sort-Object (e.g. '-q' sorts last), so
     # assert the SET order-independently plus absence of the stale flags.
     $testFlags = @(Get-NucleusFlagsFromProfile -VariableName 'nucleusTestFlags' -ProfileText $profileText)
-    $testExpected = @('-q', '--fail-fast', '--help', '--no-fail-fast', '--quiet', '--skip-steps') | Sort-Object
+    $testExpected = @('-q', '--fail-fast', '--help', '--no-fail-fast', '--only-steps', '--quiet') | Sort-Object
     @($testFlags | Sort-Object) | Should -Be $testExpected
 
     $vmFlags = @(Get-NucleusFlagsFromProfile -VariableName 'nucleusVmFlags' -ProfileText $profileText)

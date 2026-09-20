@@ -113,7 +113,7 @@ if [ "$(grep -cE "^  '--" "$_COMPLETIONS_DIR/_nucleus-apply")" -eq 12 ] &&
   grep -q -- "'--quiet\[quiet\]'" "$_COMPLETIONS_DIR/_nucleus-test" &&
   grep -q -- "'--fail-fast\[fail fast\]'" "$_COMPLETIONS_DIR/_nucleus-test" &&
   grep -q -- "'--no-fail-fast\[no fail fast\]'" "$_COMPLETIONS_DIR/_nucleus-test" &&
-  grep -q -- "'--skip-steps\[skip steps\]'" "$_COMPLETIONS_DIR/_nucleus-test" &&
+  grep -q -- "'--only-steps\[only steps\]'" "$_COMPLETIONS_DIR/_nucleus-test" &&
   grep -q -- '--help' "$_COMPLETIONS_DIR/_nucleus-utils" &&
   ! grep -qE -- '--(arg|argjson)' "$_COMPLETIONS_DIR/_nucleus-config" &&
   ! grep -qE -- "'--(arg|argjson|max-time|contimeout|import|all)\[" "$_COMPLETIONS_DIR"/_nucleus*; then

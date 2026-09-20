@@ -2,7 +2,7 @@
 # shellcheck source=../test-lib.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../test-lib.sh"
 
-register_step "system-config-build" "System config build" run_system_config_build
+register_step "system-config-build" "System config build" run_system_config_build any any sops-machine-key
 
 # _sops_secrets_available <host> <repo-root>
 # Returns 0 when every sops secret referenced by src/hosts/<host>/sops.nix is
@@ -63,25 +63,15 @@ run_system_config_build() {
   _host="$(resolve_nucleus_host)"
   export NUCLEUS_REPO_ROOT="$_repo_root"
 
-  # The system build pulls in sops-nix secrets that require the host's age key
-  # at /etc/sops/age/machine.txt. That key only exists on a provisioned host;
-  # in a dev environment without secrets the build cannot succeed. Skip rather
-  # than fail, so the suite stays green off-host while staying honest on a real
-  # host (where a missing key is a genuine provisioning error).
-  if [ ! -f /etc/sops/age/machine.txt ]; then
-    skip_step "$(step_number)" "System config build" "sops machine key /etc/sops/age/machine.txt absent"
-    return 2
-  fi
-
-  # The host's sops.nix references secrets that must exist (encrypted) in their
-  # sopsFile. A referenced key that is missing from the sops material is a real
-  # repo inconsistency (e.g. a secret wired into sops.nix but never added to the
-  # encrypted file). Off-host the material may also be undecryptable. In either
-  # case the system build cannot succeed, so skip rather than fail — staying
-  # green off-host while remaining honest on a provisioned host.
+  # The runner gates this step on the sops machine age key (requires
+  # sops-machine-key), so reaching here means the key exists. The host's sops.nix
+  # references secrets that must exist (encrypted) in their sopsFile: a key wired
+  # into sops.nix but missing from the encrypted material is a real repo
+  # inconsistency the build cannot recover from, so fail hard with the specific
+  # diagnostic instead of letting a generic eval error surface.
   if ! _sops_secrets_available "$_host" "$_repo_root"; then
-    skip_step "$(step_number)" "System config build" "sops secret material unavailable for host $_host"
-    return 2
+    error "sops secret material unavailable for host $_host"
+    return 1
   fi
 
   case "$_host" in
@@ -96,8 +86,8 @@ run_system_config_build() {
     fi
     ;;
   *)
-    skip_step "$(step_number)" "System config build" "unsupported host $_host"
-    return 2
+    error "unsupported host '$_host' in system config build"
+    return 1
     ;;
   esac
 

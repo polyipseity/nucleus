@@ -7,7 +7,7 @@ _arguments \
   '--fail-fast[fail fast]' \
   '--no-fail-fast[no fail fast]' \
   '--no-verbose[no verbose]' \
+  '--only-steps[only steps]' \
   '--quiet[quiet]' \
-  '--skip-steps[skip steps]' \
   '--verbose[verbose]' \
   '-q[q]'

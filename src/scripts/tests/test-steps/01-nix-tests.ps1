@@ -1,4 +1,4 @@
-Register-Step -Id "nix-tests" -Name "Nix test suite" -Action {
+Register-Step -Id "nix-tests" -Name "Nix test suite" -Requires nix -Action {
   param([Parameter(Mandatory)][PSObject]$Context)
 
   $RepoRoot = $Context.RepoRoot
@@ -15,6 +15,5 @@ Register-Step -Id "nix-tests" -Name "Nix test suite" -Action {
   & $testScript
   if ($LASTEXITCODE -ne 0) { return 1 }
 
-  Write-Message "skipping (requires Nix toolchain — not available on Windows)."
-  return 2
+  return $true
 }

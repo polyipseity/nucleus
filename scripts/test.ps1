@@ -10,7 +10,7 @@
 #   --fail-fast         Exit immediately on first failure (default).
 #   --no-fail-fast      Accumulate all failures.
 #   --quiet             No-op (--quiet is POSIX-only; accepted for CLI parity).
-#   --skip-steps=<ids>  Skip steps with the given comma-separated IDs.
+#   --only-steps=<ids>  Run only steps with the given comma-separated IDs.
 #
 # Environment variables:
 #   NUCLEUS_REPO_ROOT  Override the detected repository root path.

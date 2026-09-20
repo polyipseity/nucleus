@@ -10,6 +10,6 @@ _arguments \
   '--no-fail-fast[no fail fast]' \
   '--no-verbose[no verbose]' \
   '--online[online]' \
+  '--only-steps[only steps]' \
   '--scoped[scoped]' \
-  '--skip-steps[skip steps]' \
   '--verbose[verbose]'

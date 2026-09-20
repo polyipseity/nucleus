@@ -1,6 +1,6 @@
-# Smoke tests for check-pwsh.ps1 CLI (-SkipStep, -Paths).
-# Uses -SkipStep PSSA for syntax-only probes; check step 2 runs syntax on pre-commit.
-# PSScriptAnalyzer runs in test step 2 (-SkipStep Syntax).
+# Smoke tests for check-pwsh.ps1 CLI (-OnlyStep, -Paths).
+# Uses -OnlyStep Syntax for syntax-only probes, so the smoke test does not wait
+# on the PSScriptAnalyzer pass; test step 2 runs PSSA with -OnlyStep PSSA.
 
 #Requires -Version 7.4
 
@@ -27,9 +27,15 @@ function Assert-Fail {
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $pwshScript = Join-Path $repoRoot 'src\scripts\checks\check-pwsh.ps1'
+$pwsh = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
+
+# WHY: each probe runs in a child pwsh process. An in-process `& $pwshScript` call
+# never sets $LASTEXITCODE (the script only exits on failure), so under StrictMode
+# the exit code is unobservable — and the exit code of the *process* is what this
+# smoke test is about.
 
 # 1. Syntax validation passes on a known-good file.
-& $pwshScript -SkipStep PSSA -Paths $pwshScript > $null
+& $pwsh -NoLogo -NoProfile -NonInteractive -File $pwshScript -OnlyStep Syntax -Paths $pwshScript *> $null
 if ($LASTEXITCODE -ne 0) {
   Assert-Fail 'check-pwsh: syntax validation on known-good file' "exit code $LASTEXITCODE"
 } else {
@@ -38,25 +44,25 @@ if ($LASTEXITCODE -ne 0) {
 
 # 2. Syntax validation handles nonexistent files gracefully (skips them).
 $missingPath = Join-Path $repoRoot 'nonexistent\missing-file.ps1'
-& $pwshScript -SkipStep PSSA -Paths $missingPath > $null
+& $pwsh -NoLogo -NoProfile -NonInteractive -File $pwshScript -OnlyStep Syntax -Paths $missingPath *> $null
 if ($LASTEXITCODE -ne 0) {
   Assert-Fail 'check-pwsh: nonexistent file' "exit code $LASTEXITCODE"
 } else {
   Assert-Pass 'check-pwsh: nonexistent file handled gracefully'
 }
 
-# 3. Unknown -SkipStep names produce an error.
-$unknownSkipRejected = $false
+# 3. Unknown -OnlyStep values produce an error.
+$unknownOnlyStepRejected = $false
 try {
-  & $pwshScript -SkipStep UnknownName -Paths $pwshScript > $null
-  if ($LASTEXITCODE -ne 0) { $unknownSkipRejected = $true }
+  & $pwsh -NoLogo -NoProfile -NonInteractive -File $pwshScript -OnlyStep UnknownName -Paths $pwshScript *> $null
+  if ($LASTEXITCODE -ne 0) { $unknownOnlyStepRejected = $true }
 } catch {
-  $unknownSkipRejected = $true
+  $unknownOnlyStepRejected = $true
 }
-if ($unknownSkipRejected) {
-  Assert-Pass 'check-pwsh: unknown -SkipStep name correctly rejected'
+if ($unknownOnlyStepRejected) {
+  Assert-Pass 'check-pwsh: unknown -OnlyStep value correctly rejected'
 } else {
-  Assert-Fail 'check-pwsh: unknown -SkipStep name should fail' 'expected non-zero exit or throw'
+  Assert-Fail 'check-pwsh: unknown -OnlyStep value should fail' 'expected non-zero exit or throw'
 }
 
 Write-Output ''

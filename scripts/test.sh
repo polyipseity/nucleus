@@ -13,7 +13,7 @@
 #   --verbose            Stream all step output (default: headers + summaries only).
 #   --verbose=<ids>      Stream only the specified comma-separated step IDs.
 #   --no-verbose         Suppress step output streaming (default).
-#   --skip-steps=<ids>   Skip steps with the given comma-separated IDs.
+#   --only-steps=<ids>   Run only the steps with the given comma-separated IDs.
 #
 # Environment variables:
 #   NUCLEUS_REPO_ROOT  Override the detected repository root path.

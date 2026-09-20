@@ -47,9 +47,20 @@ $script:StepNames = [System.Collections.Generic.List[string]]::new()
 # dot-sourcing the lib, so helpers resolve. Storing the [scriptblock] (not a
 # string) also lets unit tests invoke actions directly via & $script:StepActions[i].
 $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
+# Applicability declared at registration. The runner renders every step as ran,
+# `not applicable (<reason>)`, or `not-selected`; a step file never probes its own
+# prerequisites.
+$script:StepPlatforms = [System.Collections.Generic.List[string]]::new()
+$script:StepModes = [System.Collections.Generic.List[string]]::new()
+$script:StepRequires = [System.Collections.Generic.List[string]]::new()
 # Path to the framework lib (check-lib.ps1 / test-lib.ps1) the runspace dot-sources
-# so step actions can call Write-ErrorMessage / Write-Message / Skip-Step / etc.
+# so step actions can call Write-ErrorMessage / Write-Message / etc.
 $script:StepLibPath = $null
+
+# --only-steps narrowing (empty array = run every step) and the per-step states
+# the summary renders as '–'. Populated by Read-Argument and Invoke-StepPipeline.
+$script:OnlySteps = @()
+$script:NotRunStates = @{}
 
 function Format-StepDuration {
   param(
@@ -66,9 +77,25 @@ function Register-Step {
     [int]$Number = 0,
     [Parameter(Mandatory)]
     [string]$Name,
+    # posix = macOS and NixOS only; windows = Windows only; any = everywhere.
+    [string]$Platform = 'any',
+    # scoped = run with positional file args; full = whole-repo run; any = both.
+    [string]$Mode = 'any',
+    # none, nix, network, sops-machine-key, deployed-host.
+    [string]$Requires = 'none',
     [Parameter(Mandatory)]
     [scriptblock]$Action
   )
+
+  if ($Platform -notin @('any', 'posix', 'windows')) {
+    throw "Register-Step: unknown platform token '$Platform' (expected posix|windows|any)"
+  }
+  if ($Mode -notin @('any', 'full', 'scoped')) {
+    throw "Register-Step: unknown mode token '$Mode' (expected any|full|scoped)"
+  }
+  if ($Requires -notin @('none', 'nix', 'network', 'sops-machine-key', 'deployed-host')) {
+    throw "Register-Step: unknown requires token '$Requires' (expected none|nix|network|sops-machine-key|deployed-host)"
+  }
 
   # Validate id not empty (Spec A).
   if ([string]::IsNullOrEmpty($Id)) {
@@ -112,6 +139,118 @@ function Register-Step {
   # & $script:StepActions[i]; the pipeline converts it to text for the runspace
   # via [scriptblock]::Create($Action.ToString()) (see Invoke-StepPipeline).
   $script:StepActions.Add($Action)
+  $script:StepPlatforms.Add($Platform)
+  $script:StepModes.Add($Mode)
+  $script:StepRequires.Add($Requires)
+}
+
+# --- Step applicability ---
+# ref: step-runner.instructions.md -- declared applicability replaces step-level skipping
+
+function Test-StepPlatformApplicable {
+  param(
+    [Parameter(Mandatory)]
+    [string]$Platform
+  )
+  switch ($Platform) {
+    'any' { $true }
+    'posix' { -not $IsWindows }
+    'windows' { [bool]$IsWindows }
+  }
+}
+
+# WHY: $script:HAS_ARGS is the runner's scoped/full determination (positional args
+# or --scoped vs --full), not the raw positional count -- a --scoped run is a
+# scoped run even without paths.
+function Test-StepModeApplicable {
+  param(
+    [Parameter(Mandatory)]
+    [string]$Mode
+  )
+  switch ($Mode) {
+    'any' { $true }
+    'scoped' { [bool]$script:HAS_ARGS }
+    'full' { -not $script:HAS_ARGS }
+  }
+}
+
+function Test-StepPrerequisite {
+  param(
+    [Parameter(Mandatory)]
+    [string]$Requires
+  )
+  switch ($Requires) {
+    'none' { $true }
+    'nix' {
+      # check-suppress:suppression_doc: probe -- an absent nix means the prerequisite is unmet, not an error
+      $null -ne (Get-Command -Name 'nix' -ErrorAction SilentlyContinue)
+    }
+    'network' { [bool]$script:ONLINE }
+    'sops-machine-key' { Test-Path -LiteralPath '/etc/sops/age/machine.txt' }
+    'deployed-host' {
+      # The deployed-symlink manifest is written at activation under the nucleus
+      # USER root, mirroring POSIX derive_nucleus_user_root.
+      $userRoot = if ($IsWindows) {
+        if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) { $null } else { Join-Path -Path $env:LOCALAPPDATA -ChildPath 'nucleus' }
+      } elseif ($IsMacOS) {
+        Join-Path -Path $HOME -ChildPath 'Library/Application Support/nucleus'
+      } else {
+        Join-Path -Path $HOME -ChildPath '.local/share/nucleus'
+      }
+      $userRoot -and (Test-Path -LiteralPath (Join-Path -Path $userRoot -ChildPath 'method1-symlink-manifest.txt'))
+    }
+  }
+}
+
+# Get-StepRunState — the printed state of a step that does not run, or $null when
+# it runs. Selection wins over the declarations: an unselected step is not
+# reported as not-applicable.
+function Get-StepRunState {
+  param(
+    [Parameter(Mandatory)]
+    [string]$Id,
+    [Parameter(Mandatory)]
+    [string]$Platform,
+    [Parameter(Mandatory)]
+    [string]$Mode,
+    [Parameter(Mandatory)]
+    [string]$Requires
+  )
+  if ($script:OnlySteps.Count -gt 0 -and $script:OnlySteps -notcontains $Id) {
+    return 'not-selected'
+  }
+  if (-not (Test-StepPlatformApplicable -Platform $Platform)) {
+    return "not applicable (platform: $Platform)"
+  }
+  if (-not (Test-StepModeApplicable -Mode $Mode)) {
+    return "not applicable (mode: $Mode)"
+  }
+  if (-not (Test-StepPrerequisite -Requires $Requires)) {
+    return "not applicable (requires: $Requires)"
+  }
+  return $null
+}
+
+# Get-StepSelection — split, trim, dedupe, and validate a comma-separated --only-steps
+# value. WHY: an unknown id is a hard error; a typo would otherwise narrow the run
+# to nothing and report success.
+function Get-StepSelection {
+  param(
+    [string]$Value
+  )
+  $ids = [System.Collections.Generic.List[string]]::new()
+  if ($Value) {
+    foreach ($part in ($Value -split ',')) {
+      $id = $part.Trim()
+      if ($id -and -not $ids.Contains($id)) { $ids.Add($id) }
+    }
+  }
+  foreach ($id in $ids) {
+    if ($script:StepIds -notcontains $id) {
+      throw "unknown step id '$id' in --only-steps (known: $($script:StepIds -join ', '))"
+    }
+  }
+  return $ids.ToArray()
 }
 
 # WHY: the orchestrator lib (check-lib.ps1 / test-lib.ps1) sets this so the
@@ -125,7 +264,7 @@ function Set-StepLibPath {
 }
 
 # --- Step-number derivation helper ---
-# Returns the step number for use inside step actions (e.g. skip messages).
+# Returns the step number for use inside step actions (e.g. step-numbered diagnostics).
 # Prefers $Context.StepNumber (set by Invoke-StepPipeline per runspace step),
 # because $MyInvocation.PSCommandPath is EMPTY inside a runspace — the step
 # action is an in-memory scriptblock, not a file, so the filename-derived
@@ -169,37 +308,6 @@ function Remove-WaveTempDir {
   }
 }
 
-# --- Invoke-SkippedStep helper ---
-function Invoke-SkippedStep {
-  param(
-    [int]$Number,
-    [string]$Name,
-    [string]$Id
-  )
-  $stepStart = [System.Diagnostics.Stopwatch]::StartNew()
-  "`n=== [$Number] $Name === SKIPPED (--skip-steps: $Id)" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.out") -Encoding utf8
-  $Name | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.name") -Encoding utf8 -NoNewline
-  # Exit code 2 = skipped step (rendered as SKIP, not a failure).
-  "2" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.exit") -Encoding utf8 -NoNewline
-  $stepStart.Stop()
-  "$($stepStart.ElapsedMilliseconds)" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.time") -Encoding utf8 -NoNewline
-}
-
-# --- Skip-Step display helper ---
-# WHY: runtime self-skips (scoped mode with no matching files) print the F3 skip header to
-# stdout; display-only — the runner's own skip path writes the step files and exit-code marker.
-function Skip-Step {
-  param(
-    [Parameter(Mandatory)]
-    [int]$Number,
-    [Parameter(Mandatory)]
-    [string]$Name,
-    [Parameter(Mandatory)]
-    [string]$Reason
-  )
-  "`n$($script:NucStyleBold)$($script:NucStyleCyan)=== [$Number] $Name === SKIPPED ($Reason)$($script:NucStyleReset)" | Write-Output
-}
-
 # --- Invoke-Step wrapper ---
 # Owns ALL orchestration I/O: timing, section headers, exit file writing, fail-fast.
 # Step actions receive params and write messages to stdout only.
@@ -224,11 +332,10 @@ function Invoke-Step {
   try {
     $stepParams = @{ HasArgs = $script:HAS_ARGS; RepoRoot = $RepoRoot; WaveTmpDir = $script:WaveTmpDir; PositionalArgs = $script:positionalArgs }
     $result = & $Action @stepParams
-    # Steps signal: pass ($true), fail ($false), or skip (int 2). The return value
-    # is the LAST pipeline element. Type-check 2 because $true -eq 2 is True in PowerShell.
+    # Steps signal pass ($true) or fail ($false); the return value is the LAST
+    # pipeline element.
     $status = @($result)[-1]
-    if ($status -is [int] -and $status -eq 2) { $exitCode = 2 }
-    elseif ($status -eq $false) { $exitCode = 1 }
+    if ($status -eq $false) { $exitCode = 1 }
   } catch {
     $exitCode = 1
     Write-Output "ERROR: $_"
@@ -241,8 +348,7 @@ function Invoke-Step {
   "$elapsedMs" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.time") -Encoding utf8 -NoNewline
 
   # 4. Fail-fast check
-  # Exit code 2 = skipped step; never a failure, so never fail-fast on it.
-  if ($exitCode -ne 0 -and $exitCode -ne 2 -and $script:FAIL_FAST) {
+  if ($exitCode -ne 0 -and $script:FAIL_FAST) {
     exit $exitCode
   }
 }
@@ -254,7 +360,7 @@ function Read-Argument {
   $script:ONLINE = $false
   $script:SCOPED = $false
   $script:FULL = $false
-  $script:SkipSteps = @()
+  $script:OnlySteps = @()
   $script:VerboseIds = @()
   $script:positionalArgs = @()
 
@@ -308,18 +414,8 @@ function Read-Argument {
         $script:VerboseIds = @()
         break
       }
-      '^--skip-steps=(.*)$' {
-        $script:SkipSteps = @()
-        $value = $Matches[1]
-        if ($value) {
-          $ids = $value -split ','
-          foreach ($id in $ids) {
-            $id = $id.Trim()
-            if ($id -and $script:SkipSteps -notcontains $id) {
-              $script:SkipSteps += $id
-            }
-          }
-        }
+      '^--only-steps=(.*)$' {
+        $script:OnlySteps = @(Get-StepSelection -Value $Matches[1])
         break
       }
       '^-.*' {
@@ -383,7 +479,6 @@ function Invoke-StepPipeline {
     RepoRoot          = $RepoRoot
     WaveTmpDir        = $script:WaveTmpDir
     FailFast          = $script:FAIL_FAST
-    SkipSteps         = $script:SkipSteps
     Online            = $script:ONLINE
     ShFiles           = $script:SH_FILES
     Ps1Files          = $script:PS1_FILES
@@ -403,7 +498,6 @@ function Invoke-StepPipeline {
   if ($maxJobs -lt 1) { $maxJobs = 1 }
 
   $pipelineStart = [System.Diagnostics.Stopwatch]::StartNew()
-  $totalSteps = $script:StepActions.Count
   $startedSteps = 0
   $pendingIndices = [System.Collections.Generic.List[int]]::new()
   $spawnedNumbers = [System.Collections.Generic.List[int]]::new()
@@ -413,17 +507,18 @@ function Invoke-StepPipeline {
     $n = $script:StepNumbers[$i]
     $name = $script:StepNames[$i]
 
-    $skip = $false
-    if ($script:SkipSteps -and $script:SkipSteps.Count -gt 0) {
-      if ($script:SkipSteps -contains $id) { $skip = $true }
-    }
-
-    if ($skip) {
-      Invoke-SkippedStep -Number $n -Name $name -Id $id
+    $state = Get-StepRunState -Id $id -Platform $script:StepPlatforms[$i] -Mode $script:StepModes[$i] -Requires $script:StepRequires[$i]
+    if ($state) {
+      $script:NotRunStates[$n] = $state
+      # The F3 header with the state appended, and nothing else.
+      "$($script:NucStyleBold)$($script:NucStyleCyan)`n=== [$n] $name === $state$($script:NucStyleReset)" | Write-Output
     } else {
       $null = $pendingIndices.Add($i)  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
     }
   }
+
+  # Only applicable, selected steps count toward the run progress.
+  $totalSteps = $pendingIndices.Count
 
   $pos = 0
   while ($pos -lt $pendingIndices.Count) {
@@ -464,7 +559,7 @@ function Invoke-StepPipeline {
       # (no exception surfaces; the runspace dies during the dot-source). Running
       # the dot-source here, sequentially per runspace, avoids the race while the
       # step itself still runs in parallel via BeginInvoke. The lib helpers
-      # (Write-ErrorMessage, Skip-Step, Get-StepNumber, etc.) persist in the
+      # (Write-ErrorMessage, Get-StepNumber, etc.) persist in the
       # runspace session state and are available to the step body below.
       $setup = {
         param($LibPath)
@@ -510,7 +605,7 @@ function Invoke-StepPipeline {
         param($Number, $Name, $ActionText, $Context, $WaveTmpDir, $FAIL_FAST, $Dim, $Reset)
 
         # WHY: the framework lib was already dot-sourced synchronously (see
-        # $setup above), so its Write-* helpers and Skip-Step are in this
+        # $setup above), so its Write-* helpers are in this
         # runspace's session state. We only run the step action here.
         # WHY: publish the step context to script scope so Get-StepNumber (a
         # function that cannot see this scriptblock's $Context parameter) can
@@ -538,8 +633,7 @@ function Invoke-StepPipeline {
             }
           }
           $status = @($stepOutput)[-1]
-          if ($status -is [int] -and $status -eq 2) { $exitCode = 2 }
-          elseif ($status -eq $false) { $exitCode = 1 }
+          if ($status -eq $false) { $exitCode = 1 }
         } catch {
           $exitCode = 1
           "$_" | Out-File -FilePath $outFile -Encoding utf8 -Append
@@ -549,7 +643,7 @@ function Invoke-StepPipeline {
         $stepStart.Stop()
         "$($stepStart.ElapsedMilliseconds)" | Out-File -FilePath "$WaveTmpDir/step-$Number.time" -Encoding utf8 -NoNewline
 
-        if ($exitCode -ne 0 -and $exitCode -ne 2 -and $FAIL_FAST) {
+        if ($exitCode -ne 0 -and $FAIL_FAST) {
           exit $exitCode
         }
       }).AddParameters(@{
@@ -586,7 +680,7 @@ function Invoke-StepPipeline {
 
     foreach ($rs in $runspaces) {
       $exitFile = Join-Path $script:WaveTmpDir "step-$($rs.Number).exit"
-      if ((Test-Path -LiteralPath $exitFile) -and (Get-Content -LiteralPath $exitFile -Raw) -notin @('0', '2') -and $script:FAIL_FAST) {
+      if ((Test-Path -LiteralPath $exitFile) -and (Get-Content -LiteralPath $exitFile -Raw) -ne '0' -and $script:FAIL_FAST) {
         exit [int](Get-Content -LiteralPath $exitFile -Raw)
       }
     }
@@ -614,6 +708,11 @@ function Format-StepSummary {
     $n = $script:StepNumbers[$i]
     $name = $script:StepNames[$i]
 
+    if ($script:NotRunStates.ContainsKey($n)) {
+      "$($script:NucStyleDim)  step {0,2}  $($script:NucStyleYellow){1}$($script:NucStyleReset)$($script:NucStyleDim)  {2,8}  $($script:NucStyleReset){3}" -f $n, "–", "–", $name | Write-Output
+      continue
+    }
+
     # check-suppress:suppression_doc: probe -- exit file may not exist if step never ran; $null defaulted to '1' below
     $exitCode = Get-Content -Path (Join-Path $script:WaveTmpDir "step-$n.exit") -ErrorAction SilentlyContinue
     if (-not $exitCode) { $exitCode = "1" }
@@ -624,9 +723,6 @@ function Format-StepSummary {
 
     if ($exitCode -eq "0") {
       "$($script:NucStyleDim)  step {0,2}  $($script:NucStyleGreen){1}$($script:NucStyleReset)$($script:NucStyleDim)  {2,8}  $($script:NucStyleReset){3}" -f $n, "✓", (Format-StepDuration -Milliseconds ([int]$elapsed)), $name | Write-Output
-    } elseif ($exitCode -eq "2") {
-      # Exit code 2 = skipped step; rendered as SKIP, never a failure.
-      "$($script:NucStyleDim)  step {0,2}  $($script:NucStyleYellow){1}$($script:NucStyleReset)$($script:NucStyleDim)  {2,8}  $($script:NucStyleReset){3}" -f $n, "SKIP", (Format-StepDuration -Milliseconds ([int]$elapsed)), $name | Write-Output
     } else {
       "$($script:NucStyleDim)  step {0,2}  $($script:NucStyleRed){1}$($script:NucStyleReset)$($script:NucStyleDim)  {2,8}  $($script:NucStyleReset){3}" -f $n, "✗", (Format-StepDuration -Milliseconds ([int]$elapsed)), $name | Write-Output
       $failedSteps = "$failedSteps$n "
@@ -637,7 +733,7 @@ function Format-StepSummary {
     if (Test-Path $outFile) {
       $stepId = $script:StepIds[$i]
       $isVerbose = $script:VerboseIds -contains '*' -or $script:VerboseIds -contains $stepId
-      $isFailed = $exitCode -ne '0' -and $exitCode -ne '2'
+      $isFailed = $exitCode -ne '0'
       if ($isVerbose -or $isFailed) {
         Get-Content -Path $outFile | ForEach-Object {
           if ($_ -match '^=== .* ===') { "$($script:NucStyleBold)$($script:NucStyleCyan)$_$($script:NucStyleReset)" }

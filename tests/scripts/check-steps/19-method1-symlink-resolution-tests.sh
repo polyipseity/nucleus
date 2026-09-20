@@ -29,8 +29,8 @@ fixture_user_root() {
 
 # Run the registered step function against FIXTURE_HOME/FIXTURE_REPO, capturing
 # combined output to OUT_FILE and printing the exit status. The step is invoked
-# through the real check-lib (sourced from this repository) so registration,
-# step_number and skip_step behave as they do in a pipeline run; the fixture repo
+# through the real check-lib (sourced from this repository) so registration and the
+# applicability declarations behave as they do in a pipeline run; the fixture repo
 # is what the step treats as the live repo root.
 run_step() {
   local fixture_home="$1" fixture_repo="$2" out_file="$3" rc=0
@@ -127,15 +127,18 @@ test_non_symlink_is_ignored_and_store_target_warns() {
   rm -rf "$FIXTURE_HOME" "$FIXTURE_REPO"
 }
 
-test_missing_manifest_skips() {
+test_missing_manifest_reports_nothing_to_verify() {
   local out rc=0
   make_fixture
   rc="$(run_step "$FIXTURE_HOME" "$FIXTURE_REPO" "$FIXTURE_HOME/out.txt")"
   out="$(cat "$FIXTURE_HOME/out.txt")"
-  if [ "$rc" -eq 2 ] && [ "${out#*no deployed manifest}" != "$out" ]; then
-    assert_pass "step 19 skips when the deployed manifest is absent"
+  # The runner declares the step not applicable when the manifest is absent
+  # (requires deployed-host); invoked directly, the step must be a clean no-op,
+  # never a skip sentinel.
+  if [ "$rc" -eq 0 ] && [ "${out#*nothing to verify}" != "$out" ]; then
+    assert_pass "step 19 is a no-op when the deployed manifest is absent"
   else
-    assert_fail "step 19 skips when the deployed manifest is absent" "rc=$rc output=[$out]"
+    assert_fail "step 19 no-op without manifest" "rc=$rc output=[$out]"
   fi
   rm -rf "$FIXTURE_HOME" "$FIXTURE_REPO"
 }
@@ -186,7 +189,7 @@ test_live_repo_target_passes
 test_store_snapshot_target_fails
 test_walked_directory_is_audited
 test_non_symlink_is_ignored_and_store_target_warns
-test_missing_manifest_skips
+test_missing_manifest_reports_nothing_to_verify
 test_step_has_no_restated_candidate_array
 test_manifest_roots_cover_the_deployed_trees
 test_writer_exists

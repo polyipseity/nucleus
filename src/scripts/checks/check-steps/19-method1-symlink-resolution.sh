@@ -3,7 +3,10 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "method-one-symlink-resolution" "Method-1 symlinks resolve to live repo root" run_method1_symlink_resolution
+# Declared applicability: this inspects the deployed home, so it only makes sense in
+# a whole-repo run (mode full) and only on a host whose activation wrote the manifest
+# (requires deployed-host). The runner reports `not applicable (...)` otherwise.
+register_step "method-one-symlink-resolution" "Method-1 symlinks resolve to live repo root" run_method1_symlink_resolution any full deployed-host
 
 # run_method1_symlink_resolution — Read-only verification that every deployed
 # method-1 (writable) symlink points at the LIVE repo root, not a read-only
@@ -23,54 +26,39 @@ register_step "method-one-symlink-resolution" "Method-1 symlinks resolve to live
 # own hand-maintained array, which had already drifted from the deployed set and
 # covered none of the trees that held the 17 stale links — so the list is derived
 # from the deployment instead of restated here, and there is deliberately no
-# fallback list: a missing manifest means this host cannot be audited (skipped), not
-# that the audit passed.
+# fallback list: a missing manifest means this host cannot be audited, which the
+# runner reports as `not applicable (requires: deployed-host)`.
 #
 # Manifest entries are absolute paths: a symlink is inspected directly, a directory
-# is walked one level for symlinks. Absent entries are skipped (an absent optional
+# is walked one level for symlinks. Absent entries are ignored (an absent optional
 # app directory is not a defect); the post-seeding existence contract lives in
 # home.activation.verify-managed-symlink-paths.
 #
 # Read-only-safe: it only reads symlink targets and immutable flags; it never writes
-# into the repo or the home. It skips (exit 2) when run outside a deployed host
-# (no $HOME, no manifest, or nothing to inspect), so it is safe in CI.
+# into the repo or the home.
 run_method1_symlink_resolution() {
   local -n ctx="$1"
-  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
+  # The live repo root the runner resolved at startup — the same resolution the
+  # activation helper uses.
+  local _live_root="${ctx[REPO_ROOT]}"
   shift
-
-  # Path-scoped runs (check.sh given file args) don't apply — this inspects the
-  # deployed home, not repo files. Skip to avoid false negatives.
-  if $_has_args; then
-    skip_step "$(step_number)" "Method-1 symlinks resolve to live repo root" "path-scoped run; inspects deployed home"
-    return 2
-  fi
-
-  local _home="${HOME:-}"
-  if [ -z "$_home" ] || [ ! -d "$_home" ]; then
-    skip_step "$(step_number)" "Method-1 symlinks resolve to live repo root" "no \$HOME; not a deployed host"
-    return 2
-  fi
-
-  # Resolve the live repo root the same way the activation helper does.
-  local _live_root
-  _live_root="$(derive_repo_root)" || {
-    skip_step "$(step_number)" "Method-1 symlinks resolve to live repo root" "cannot resolve live repo root"
-    return 2
-  }
 
   local _manifest
   _manifest="$(derive_nucleus_user_root)/method1-symlink-manifest.txt"
-  if [ ! -f "$_manifest" ]; then
-    skip_step "$(step_number)" "Method-1 symlinks resolve to live repo root" "no deployed manifest at $_manifest; run nucleus-apply"
-    return 2
+
+  # The runner dispatches this step only when the manifest exists (requires
+  # deployed-host); guard the read so a direct invocation without a deployment
+  # reports nothing to verify instead of a redirection error.
+  local -a _entries=()
+  if [ -f "$_manifest" ]; then
+    mapfile -t _entries <"$_manifest"
   fi
 
   local _checked=0 _violations=0 _entry _origin _link _target
   local -a _links=()
-  while IFS= read -r _entry; do
-    # Manifest comments are the only skipped lines; every other line is a path and
-    # an unparsable one is a violation, never a silent skip.
+  for _entry in "${_entries[@]+${_entries[@]}}"; do
+    # Manifest comments are the only ignored lines; every other line is a path and
+    # an unparsable one is a violation, never a silent pass.
     case "$_entry" in
     '' | '#'*) continue ;;
     /*) ;;
@@ -123,7 +111,7 @@ run_method1_symlink_resolution() {
         ;;
       esac
     done
-  done <"$_manifest"
+  done
 
   if [ "$_checked" -eq 0 ]; then
     say "0 deployed method-1 symlinks among the manifest entries — nothing to verify."
