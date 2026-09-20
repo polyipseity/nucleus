@@ -120,4 +120,4 @@ Read-only exception: symlink MUST be read-only when target is in the Nix store (
 | Downloads | — | — | Imperative |
 | Completions | Activation | Activation | — |
 | Vendor assets | Nix derivations | Nix derivations | Download (no Nix) |
-| Charge limit | `battery` CLI + Shortcuts shortcut | sysfs `charge_control_end_threshold` | — (vendor-specific) |
+| Charge limit | `battery` CLI (firmware SMC gate; native setting is manual) | sysfs `charge_control_end_threshold` | — (vendor-specific) |
