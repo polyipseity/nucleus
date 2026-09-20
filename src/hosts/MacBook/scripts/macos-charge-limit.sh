@@ -44,6 +44,33 @@ native_charge_limit_shortcut="Set Charge Limit 80"
 native_charge_limit_major=26
 native_charge_limit_minor=4
 
+# mcl_version_at_least <major> <minor> <floor_major> <floor_minor> — 0 when the
+# running macOS is at or above the floor.  Kept separate from the constants above
+# so tests/scripts/macos-charge-limit-tests.sh can exercise the version decision
+# without running the rest of this script.
+mcl_version_at_least() {
+  if [ "$1" -gt "$3" ]; then
+    return 0
+  fi
+  if [ "$1" -eq "$3" ] && [ "$2" -ge "$4" ]; then
+    return 0
+  fi
+  return 1
+}
+
+# mcl_shortcut_listed <name> — 0 when <name> appears on its own line of the
+# `shortcuts list` output on stdin.  The match is exact on purpose: a substring
+# match would accept a renamed or truncated shortcut as present and then run a
+# workflow other than the intended one.
+mcl_shortcut_listed() {
+  while IFS= read -r _mcl_listed; do
+    if [ "$_mcl_listed" = "$1" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 macos_version="$(/usr/bin/sw_vers -productVersion)"
 macos_major="${macos_version%%.*}"
 case "$macos_version" in
@@ -106,8 +133,7 @@ fi
 # ---- native macOS Charge Limit (macOS 26.4+) --------------------------------
 # WHY: the native setting has no pmset key and no configuration-profile
 #   payload, so the Shortcuts action is its only automation surface.
-if [ "$macos_major" -lt "$native_charge_limit_major" ] ||
-  { [ "$macos_major" -eq "$native_charge_limit_major" ] && [ "$macos_minor" -lt "$native_charge_limit_minor" ]; }; then
+if ! mcl_version_at_least "$macos_major" "$macos_minor" "$native_charge_limit_major" "$native_charge_limit_minor"; then
   notice -l power "macOS $macos_version has no native charge limit; the battery CLI gate alone caps charge at ${charge_limit_percent}%."
 else
   # WHY: `shortcuts` talks to a helper inside the GUI session, so the command
@@ -117,13 +143,12 @@ else
     warn -l power "Shortcuts helper unreachable for user '$_nucleus_console_user'; native ${charge_limit_percent}% gate not converged: $shortcut_list"
   else
     shortcut_present=false
-    while IFS= read -r listed_shortcut; do
-      if [ "$listed_shortcut" = "$native_charge_limit_shortcut" ]; then
-        shortcut_present=true
-      fi
-    done <<EOF
+    if mcl_shortcut_listed "$native_charge_limit_shortcut" <<EOF
 $shortcut_list
 EOF
+    then
+      shortcut_present=true
+    fi
 
     if [ "$shortcut_present" = false ]; then
       # WHY: the shortcut cannot be authored from the command line, so its
