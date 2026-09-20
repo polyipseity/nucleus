@@ -53,7 +53,7 @@ let
   );
   approvalScriptDefault = builtins.fromJSON (
     builtins.head (
-      builtins.match ".*\"harness-approval\":\\{\"enable\":false,\"timeout-seconds\":([0-9]+)\\}.*" (
+      builtins.match ".*\"harness-approval\":[{]\"enable\":false,\"timeout-seconds\":([0-9]+)[}].*" (
         flatten approvalScript
       )
     )
@@ -128,17 +128,17 @@ in
     # shipped state is deliberately "notify, do not broker": a host opts into
     # remote approvals, and never the other way round.
     (assert'
-      (builtins.match ".*\"harness-approval\": \\{[^}]*\"enable\": false,.*" flatConfigSh != null)
+      (builtins.match ".*\"harness-approval\": [{][^}]*\"enable\": false,.*" flatConfigSh != null)
       "nucleus-config DEFAULTS must ship harness-approval.enable=false, so no host brokers a tool call until it opts in"
     )
-    (assert' (builtins.match ".*\"harness-drive\": \\{[^}]*\"enable\": true.*" flatConfigSh != null)
+    (assert' (builtins.match ".*\"harness-drive\": [{][^}]*\"enable\": true.*" flatConfigSh != null)
       "nucleus-config DEFAULTS must ship harness-drive.enable=true, so a finished turn is announced and remote driving keeps working"
     )
     (assert' (
-      builtins.match ".*'harness-approval' = @\\{[^}]*enable = \\$false.*" flatConfigPs1 != null
+      builtins.match ".*'harness-approval' = @[{][^}]*enable = \\$false.*" flatConfigPs1 != null
     ) "the PowerShell nucleus-config DEFAULTS must ship the same harness-approval.enable=false")
     (assert' (
-      builtins.match ".*'harness-drive' += @\\{[^}]*enable = \\$true.*" flatConfigPs1 != null
+      builtins.match ".*'harness-drive' += @[{][^}]*enable = \\$true.*" flatConfigPs1 != null
     ) "the PowerShell nucleus-config DEFAULTS must ship the same harness-drive.enable=true")
 
     (assert' (containsString "\"harness-approval\":{\"enable\":false,\"timeout-seconds\":120}" approvalScript) "harness-approval must fall back to its own gate being off, so a config that never names it cannot broker")
@@ -148,7 +148,7 @@ in
 
     (assert' (containsString "\"harness-drive\":{\"enable\":true}" driveScript) "harness-drive must fall back to driving being on, matching the shipped default")
     (assert' (
-      builtins.match ".*'harness-drive' += @\\{ enable = \\$true \\}.*" (flatten driveScriptPs1) != null
+      builtins.match ".*'harness-drive' += @[{] enable = \\$true [}].*" (flatten driveScriptPs1) != null
     ) "the PowerShell harness-drive must declare the same drive gate")
     (assert' (containsString "\"harness-drive\".enable" driveScript) "harness-drive must consult harness-drive.enable before injecting a queued prompt")
     (assert' (containsString "$config['harness-drive'].enable" driveScriptPs1) "the PowerShell harness-drive must read the same drive gate")
