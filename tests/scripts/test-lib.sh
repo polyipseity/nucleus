@@ -105,6 +105,19 @@ extract_func() {
   awk -v name="$1" '$0 == name "() {" { p = 1 } p { print } p && $0 == "}" { p = 0; exit }' "$2"
 }
 
+# user_root_for_home HOME — print the per-user nucleus root for a HOME on this
+# platform. Mirrors derive_nucleus_user_root (src/scripts/lib/lib.sh), which
+# switches on `uname -s`: macOS nests the root under Library/Application Support,
+# every other POSIX host under .local/share. Suites that seed state for a script
+# running against the real platform must resolve the path the same way, or the
+# markers they write land where the script never looks.
+user_root_for_home() { # <home>
+  case "$(uname -s)" in
+  Darwin) printf '%s/Library/Application Support/nucleus\n' "$1" ;;
+  *) printf '%s/.local/share/nucleus\n' "$1" ;;
+  esac
+}
+
 # require_command — Fail the suite when a provisioned prerequisite is missing.
 # Skip-guards are banned (tooling-and-validation.instructions.md): a missing tool
 # is a suite failure the tally has to record, not a silent pass. finish_tests

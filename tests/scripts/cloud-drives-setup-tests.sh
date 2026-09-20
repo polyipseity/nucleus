@@ -132,7 +132,8 @@ test_mount_path_symlink_error_without_a_label_stays_generic() {
 # mark_blocked <home> <service label> — a fresh blocked marker, as the mount
 # wrapper leaves it when the FSKit provider refuses the volume.
 mark_blocked() { # <home> <label>
-  local state_dir="$1/Library/Application Support/nucleus/state/service-stats"
+  local state_dir
+  state_dir="$(user_root_for_home "$1")/state/service-stats"
   svc_blocked_set "$2" "$state_dir" fskit-provider "$(fskit_remedy)"
 }
 
@@ -170,7 +171,7 @@ test_unblocked_mount_is_silent() {
 test_stale_blocked_mount_is_silent() {
   local home rc=0 err="" quiet=true state_dir file
   home="$(mktemp -d)"
-  state_dir="$home/Library/Application Support/nucleus/state/service-stats"
+  state_dir="$(user_root_for_home "$home")/state/service-stats"
   mkdir -p "$state_dir"
   file="$state_dir/local.cloud-mount.GoogleDrive.blocked"
   printf 'class=fskit-provider\nboot=other-boot\nts=1\n' >"$file"

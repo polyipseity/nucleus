@@ -541,7 +541,7 @@ section 8 "A blocked cloud mount repairs the FSKit provider before the reload"
 # WHY: the blocked marker is what says the provider, not the mount, is the
 # problem, so the repair is gated on it: a stale marker is ignored, and an
 # unblocked restart must leave the FSKit daemon alone.
-_cli_state_dir="$_cli/home/Library/Application Support/nucleus/state/service-stats"
+_cli_state_dir="$(user_root_for_home "$_cli/home")/state/service-stats"
 block_mount() { # <key>
   svc_blocked_set "$1" "$_cli_state_dir" fskit-provider "$(fskit_remedy)"
 }

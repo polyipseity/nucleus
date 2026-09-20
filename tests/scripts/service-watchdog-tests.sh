@@ -167,7 +167,7 @@ run_watchdog() {
 }
 
 # state_dir — Where the watchdog keeps crash-loop and transition markers.
-state_dir="$_tmp/home/Library/Application Support/nucleus/state/service-stats"
+state_dir="$(user_root_for_home "$_tmp/home")/state/service-stats"
 
 # captured_output / captured_status — Results of the last run_watchdog call.
 captured_output=""
