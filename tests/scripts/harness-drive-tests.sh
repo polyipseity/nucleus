@@ -90,6 +90,23 @@ test_copilot_stop_document() {
   fi
 }
 
+test_stop_hook_active_does_not_suppress_delivery() {
+  # The consume-once queue is the loop guard, not the harness's own
+  # `stop_hook_active` flag.  A continuation turn arrives with that flag set, so
+  # honouring it here would swallow exactly the prompt the relay was asked to
+  # inject.
+  write_config '{}'
+  rm -rf "$COMMANDS"
+  queue_prompt copilot 1000-ffff.json "keep going"
+  local _out=""
+  _out="$(run_drive copilot '{"stop_hook_active":true}')" || true
+  if [ "$_out" = '{"hookSpecificOutput":{"hookEventName":"Stop","decision":"block","reason":"keep going"}}' ]; then
+    assert_pass "a payload that sets stop_hook_active still delivers the queued prompt"
+  else
+    assert_fail "loop-guard" "out=$_out"
+  fi
+}
+
 test_turn_end_is_announced() {
   write_config '{}'
   rm -rf "$COMMANDS"
@@ -218,6 +235,7 @@ test_missing_arguments_exit_zero() {
 
 test_cursor_followup_document
 test_copilot_stop_document
+test_stop_hook_active_does_not_suppress_delivery
 test_turn_end_is_announced
 test_empty_queue_renders_empty_documents
 test_queued_prompt_is_consumed
