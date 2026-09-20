@@ -111,7 +111,7 @@ subcommands_for() {
 # prefix a message carries is not asserted: the output module derives it from
 # the calling file's path (a separate concern this suite does not own).
 stderr_carries_error() {
-  printf '%s' "$1" | grep -qE 'error:|missing action|missing subcommand'
+  grep -qE 'error:|missing action|missing subcommand' <<<"$1"
 }
 
 section 1 "-Help prints the help block, exits 0, and stays off stderr"
@@ -127,9 +127,9 @@ for _script in utils ai svc vm; do
   # syntax line, which is what a leading `#!` line or a missing-action error
   # produces -- carries neither. Measured by prepending a shebang to ai.ps1:
   # 108 bytes, no SYNOPSIS, no REMARKS.
-  if printf '%s\n' "$PS_STDOUT" | grep -q '^SYNOPSIS' &&
-    printf '%s\n' "$PS_STDOUT" | grep -q '^REMARKS' &&
-    printf '%s\n' "$PS_STDOUT" | grep -qF "$_script.ps1"; then
+  if grep -q '^SYNOPSIS' <<<"$PS_STDOUT" &&
+    grep -q '^REMARKS' <<<"$PS_STDOUT" &&
+    grep -qF "$_script.ps1" <<<"$PS_STDOUT"; then
     assert_pass "$_script.ps1 -Help: prints the help block on stdout"
   else
     assert_fail "$_script.ps1 -Help: stdout contract" \
@@ -145,7 +145,7 @@ done
 
 # The bundled alias has to reach the same branch, not a subcommand named "h".
 run_ps utils.ps1 -h
-if [ "$PS_EXIT" -eq 0 ] && printf '%s\n' "$PS_STDOUT" | grep -q '^SYNOPSIS' && ! stderr_carries_error "$PS_STDERR"; then
+if [ "$PS_EXIT" -eq 0 ] && grep -q '^SYNOPSIS' <<<"$PS_STDOUT" && ! stderr_carries_error "$PS_STDERR"; then
   assert_pass "utils.ps1 -h: alias behaves like -Help"
 else
   assert_fail "utils.ps1 -h: alias" "exit=$PS_EXIT stderr=$(printf '%s' "$PS_STDERR" | one_line | cut -c1-80)"
@@ -159,7 +159,7 @@ for _script in utils ai; do
   else
     assert_fail "$_script.ps1 (no action): exit status" "expected 0, got $PS_EXIT"
   fi
-  if printf '%s\n' "$PS_STDOUT" | grep -qF "usage: $_script.ps1 "; then
+  if grep -qF "usage: $_script.ps1 " <<<"$PS_STDOUT"; then
     assert_pass "$_script.ps1 (no action): prints the usage summary on stdout"
   else
     assert_fail "$_script.ps1 (no action): usage summary" "stdout did not name $_script.ps1: $(printf '%s' "$PS_STDOUT" | head -1 | cut -c1-100)"
@@ -217,7 +217,7 @@ for _script in utils ai; do
   SH_STATUS="$SH_EXIT"
   SH_MISSING=""
   for _sub in $(subcommands_for "$_script"); do
-    if ! printf '%s' "$SH_STDOUT" | grep -qF "$_sub"; then
+    if ! grep -qF "$_sub" <<<"$SH_STDOUT"; then
       SH_MISSING="$SH_MISSING $_sub"
     fi
   done
@@ -232,7 +232,7 @@ for _script in utils ai; do
   run_ps "$_script.ps1"
   PS_MISSING=""
   for _sub in $(subcommands_for "$_script"); do
-    if ! printf '%s' "$PS_STDOUT" | grep -qF "$_sub"; then
+    if ! grep -qF "$_sub" <<<"$PS_STDOUT"; then
       PS_MISSING="$PS_MISSING $_sub"
     fi
   done
