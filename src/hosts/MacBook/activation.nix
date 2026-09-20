@@ -184,7 +184,7 @@ in
   #
   # Scripts included:
   #   configureBatteryPolicy           — pmset AC/battery policy
-  #   configureChargeLimit             — 80 % charge cap via battery CLI / bclm
+  #   configureChargeLimit             — 80 % charge cap via battery CLI + native Charge Limit
   #   configureSshAccess               — allow all users SSH access by removing com.apple.access_ssh group
   #   configureGimpScrollSensitivity   — GIMP drag-zoom-speed (25% of default)
   #   configureLinearMousePreferences  — LinearMouse update-check suppression

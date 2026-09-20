@@ -71,22 +71,44 @@ mcl_shortcut_listed() {
   return 1
 }
 
+# mcl_parse_macos_version <version> — print "<major> <minor>" for a `sw_vers
+# -productVersion` string, or fail when it does not look like a version.
+# WHY: separate from the caller so the accept/reject table is exercised by
+#   tests/scripts/macos-charge-limit-tests.sh.  An empty probe result must fail
+#   here instead of normalizing to a minor of "0" and then reading as "no native
+#   charge limit", which would silently disable the gate.
+mcl_parse_macos_version() {
+  local version="${1-}" major rest minor
+  major="${version%%.*}"
+  case "$major" in
+  '' | *[!0-9]*)
+    return 1
+    ;;
+  esac
+  case "$version" in
+  *.*)
+    rest="${version#*.}"
+    minor="${rest%%.*}"
+    case "$minor" in
+    '' | *[!0-9]*)
+      return 1
+      ;;
+    esac
+    ;;
+  *)
+    minor=0
+    ;;
+  esac
+  printf '%s %s\n' "$major" "$minor"
+  return 0
+}
+
 macos_version="$(/usr/bin/sw_vers -productVersion)"
-macos_major="${macos_version%%.*}"
-case "$macos_version" in
-*.*)
-  macos_minor="${macos_version#*.}"
-  macos_minor="${macos_minor%%.*}"
-  ;;
-*)
-  macos_minor=0
-  ;;
-esac
-case "${macos_major}${macos_minor}" in
-'' | *[!0-9]*)
+if ! macos_version_parsed="$(mcl_parse_macos_version "$macos_version")"; then
   die -l power "unexpected macOS version '$macos_version'."
-  ;;
-esac
+fi
+macos_major="${macos_version_parsed%% *}"
+macos_minor="${macos_version_parsed##* }"
 
 battery_app="/Applications/battery.app"
 battery_cli=""
@@ -139,7 +161,7 @@ else
   # WHY: `shortcuts` talks to a helper inside the GUI session, so the command
   #   must enter that session — a plain `sudo -u` from the root activation
   #   context fails with "Couldn't communicate with a helper application".
-  if ! shortcut_list="$(/usr/bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" /usr/bin/shortcuts list </dev/null 2>&1)"; then
+  if ! shortcut_list="$(/bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" /usr/bin/shortcuts list </dev/null 2>&1)"; then
     warn -l power "Shortcuts helper unreachable for user '$_nucleus_console_user'; native ${charge_limit_percent}% gate not converged: $shortcut_list"
   else
     shortcut_present=false
@@ -156,7 +178,7 @@ EOF
       #   rather than a convergence failure — the `battery` CLI gate still caps
       #   charge at 80 % in the meantime.
       warn -l power "shortcut '$native_charge_limit_shortcut' is missing; create it once (see MANUAL.md) to converge the native ${charge_limit_percent}% gate."
-    elif ! shortcut_output="$(/usr/bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" /usr/bin/shortcuts run "$native_charge_limit_shortcut" </dev/null 2>&1)"; then
+    elif ! shortcut_output="$(/bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" /usr/bin/shortcuts run "$native_charge_limit_shortcut" </dev/null 2>&1)"; then
       die -l power "shortcut '$native_charge_limit_shortcut' failed; native ${charge_limit_percent}% charge limit is not converged: $shortcut_output"
     fi
   fi
