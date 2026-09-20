@@ -212,14 +212,30 @@ _cd_watch_mount() {
   done
 }
 
+# _cd_fskit_provider — whether this host mounts through macFUSE's FSKit provider.
+# WHY: FSKit, its park-without-output failure mode and the 'sudo killall fskitd'
+#   remedy exist only on macOS.  The same wrapper serves NixOS over fuse3, where a
+#   bound that elapsed or a libfuse refusal is an ordinary mount failure the
+#   supervisor has to retry: a block written there could never be cleared, because
+#   the remedy cannot run on that host.  uname is the OS boundary rather than the
+#   host registry — resolving a host key would put a jq and repo-checkout
+#   dependency on a service hot path for a fact the kernel already answers.
+_cd_fskit_provider() {
+  case "$(uname -s)" in
+  Darwin) return 0 ;;
+  esac
+  return 1
+}
+
 # _cd_provider_failure — whether macFUSE's FSKit provider, not the remote,
-# refused the mount.
+# refused the mount.  Always false off macOS (see _cd_fskit_provider).
 # WHY: only 'disabled' counts from the probe.  FSKit's module list can still name
 #   the module while the client is told "not enabled" (and the reverse), so the
 #   probe alone cannot decide — but a probe that cannot read the list answers
 #   'unknown' and must never block a mount that could succeed.
 # ref: https://github.com/macfuse/macfuse/issues/1132
 _cd_provider_failure() {
+  _cd_fskit_provider || return 1
   if grep -qE 'File system extension not (found|enabled)|fuse: mount failed with error|mount\(8\) returned 69' "$_cd_capture"; then
     return 0
   fi
@@ -336,9 +352,14 @@ fi
 if [ -e "$_cd_stalled" ]; then
   # WHY: a mount that is still running with no volume after the bound is how a
   #   wedged macFUSE provider looks from the console — the attempt is parked
-  #   behind a modal dialog that writes nothing — so it is reported and stopped
-  #   instead of retried into the same park.
-  _cd_block_on_provider_failure "no volume attached within ${_cd_attach_seconds}s while rclone was still running (a macFUSE dialog parks a mount without console output)"
+  #   behind a modal dialog that writes nothing — so on macOS it is reported and
+  #   stopped instead of retried into the same park.  Elsewhere only the bound
+  #   applies: the attempt is stopped and failed, which is what reloads the mount.
+  if _cd_fskit_provider; then
+    _cd_block_on_provider_failure "no volume attached within ${_cd_attach_seconds}s while rclone was still running (a macFUSE dialog parks a mount without console output)"
+  fi
+  error -l cloud-drives "no volume attached at '$mount_point' within ${_cd_attach_seconds}s while rclone was still running; the attempt was stopped and the mount is reloaded."
+  exit 1
 fi
 
 if [ -e "$_cd_decayed" ]; then

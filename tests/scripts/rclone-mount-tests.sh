@@ -10,6 +10,8 @@
 # point, the deliberate skip of an unconfigured remote turning into a crash loop,
 # a stop request leaving rclone unmounting in the background (which wedges the
 # volume for the path), and a new mount landing on a volume that is still there.
+# The macFUSE/FSKit classification is macOS-only: off macOS the same failures are
+# ordinary ones that keep rclone's status so the supervisor reloads the mount.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -23,9 +25,28 @@ MOUNT_SH="$REPO_ROOT/src/scripts/services/rclone-mount.sh"
 MOUNT_INSTANCE="local.cloud-mount.OneDrive"
 # PID of the wrapper the last run_mount_bg call started.
 
-# blocked_marker <home> — path of the blocked marker the wrapper writes.
+# The suite pins the host it tests. The wrapper scopes the macFUSE/FSKit
+# classification to macOS with uname(1), and the marker directory comes from that
+# same probe (lib.sh's derive_nucleus_user_root), so the stub and the paths below
+# both follow FAKE_UNAME_S: Darwin by default, because every FSKit assertion needs
+# it, and Linux for the assertions that pin the other branch. Without the pin the
+# suite's result would depend on the machine that runs it.
+_suite_bin="$(mktemp -d)"
+cat >"$_suite_bin/uname" <<'FAKE_UNAME'
+#!/usr/bin/env bash
+printf '%s\n' "${FAKE_UNAME_S:-Darwin}"
+FAKE_UNAME
+chmod +x "$_suite_bin/uname"
+export PATH="$_suite_bin:$PATH"
+trap 'rm -rf "$_suite_bin"' EXIT
+
+# blocked_marker <home> [kernel] — path of the blocked marker the wrapper writes
+# for the instance. The directory follows the kernel the stub reports.
 blocked_marker() {
-  printf '%s/Library/Application Support/nucleus/state/service-stats/%s.blocked\n' "$1" "$MOUNT_INSTANCE"
+  case "${2:-Darwin}" in
+  Darwin) printf '%s/Library/Application Support/nucleus/state/service-stats/%s.blocked\n' "$1" "$MOUNT_INSTANCE" ;;
+  *) printf '%s/.local/share/nucleus/state/service-stats/%s.blocked\n' "$1" "$MOUNT_INSTANCE" ;;
+  esac
 }
 
 # Stub bin dir whose rclone records its argv, answers `listremotes` with
@@ -693,6 +714,128 @@ test_a_volume_that_vanishes_after_attaching_is_reported_and_failed() {
   rm -rf "$home" "$bin"
 }
 
+# add_disabled_fskit_probe <bin> <home> — make the FSKit probe answer 'disabled':
+# a readable module list plus a plutil that reports no macFUSE module, so the probe
+# branch of the classification can be exercised without a real FSKit.
+add_disabled_fskit_probe() {
+  local bin="$1" home="$2" plist_dir
+  plist_dir="$home/Library/Group Containers/group.com.apple.fskit.settings"
+  mkdir -p "$plist_dir"
+  : >"$plist_dir/enabledModules.plist"
+  cat >"$bin/plutil" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' '"5" => "com.apple.other.fsmodule"'
+STUB
+  chmod +x "$bin/plutil"
+}
+
+# no_blocked_marker <home> — whether neither host's marker directory holds one.
+# Returns 0 when the wrapper recorded nothing under either root.
+no_blocked_marker() {
+  if [ -e "$(blocked_marker "$1")" ] || [ -e "$(blocked_marker "$1" Linux)" ]; then
+    return 1
+  fi
+  return 0
+}
+
+# WHY: FSKit does not exist off macOS, so the provider's own message is an
+# ordinary mount failure there: it has to keep rclone's status so the supervisor
+# reloads the mount, and it must write no marker whose remedy cannot run there.
+test_provider_refusal_off_macos_is_not_recorded() {
+  local home bin calls err="" rc=0 recorded=false markers=no
+  home="$(mktemp -d)"
+  bin="$(setup_fake_rclone_refused)"
+  calls="$home/calls"
+  : >"$calls"
+  export FAKE_UNAME_S=Linux
+  err="$(run_mount "$home" "$bin" "$calls" "OneDrive:" 3 2>&1)" || rc=$?
+  unset FAKE_UNAME_S
+  case "$err" in *"provider refused the mount of"*) recorded=true ;; esac
+  if ! no_blocked_marker "$home"; then markers=yes; fi
+  if [ "$rc" -eq 3 ] && [ "$markers" = no ] && [ "$recorded" = false ]; then
+    assert_pass "a provider refusal off macOS keeps rclone's status and writes no marker"
+  else
+    assert_fail "rclone-mount-refusal-off-macos" \
+      "rc=$rc markers=$markers recorded=$recorded stderr=[$err]"
+  fi
+  rm -rf "$home" "$bin"
+}
+
+# WHY: off macOS only the bound applies to a mount that never attaches — the
+# attempt is stopped and failed so the supervisor reloads it, because an operator
+# has no macOS provider remedy to run on that host.
+test_stalled_attempt_off_macos_is_reloaded_not_blocked() {
+  local home bin calls err="" rc=0 markers=no reported=false remedy=false bounded=false
+  local started_at="$SECONDS" elapsed=0
+  home="$(mktemp -d)"
+  bin="$(setup_fake_rclone_parked)"
+  calls="$home/calls"
+  : >"$calls"
+  export NUCLEUS_CLOUD_MOUNT_ATTEMPT_TIMEOUT=2
+  export FAKE_UNAME_S=Linux
+  err="$(run_mount "$home" "$bin" "$calls" "OneDrive:" 0 2>&1)" || rc=$?
+  unset NUCLEUS_CLOUD_MOUNT_ATTEMPT_TIMEOUT FAKE_UNAME_S
+  elapsed=$((SECONDS - started_at))
+  case "$err" in *"no volume attached at"*) reported=true ;; esac
+  case "$err" in *"killall fskitd"*) remedy=true ;; esac
+  if ! no_blocked_marker "$home"; then markers=yes; fi
+  if [ "$elapsed" -lt 15 ]; then bounded=true; fi
+  if [ "$rc" -eq 1 ] && [ "$markers" = no ] && [ "$reported" = true ] && [ "$remedy" = false ] &&
+    [ "$bounded" = true ]; then
+    assert_pass "a stalled attempt off macOS is reported and reloaded instead of blocked"
+  else
+    assert_fail "rclone-mount-stall-off-macos" \
+      "rc=$rc markers=$markers reported=$reported remedy=$remedy bounded=$bounded elapsed=${elapsed}s stderr=[$err]"
+  fi
+  rm -rf "$home" "$bin"
+}
+
+# WHY: the probe is the other half of the classification and the decisive one when
+# FSKit's module list is stale, so it must not fire off macOS even when a plutil on
+# PATH answers 'disabled' for a mount that failed for its own reason.
+test_a_disabled_probe_off_macos_does_not_block() {
+  local home bin calls err="" rc=0 recorded=false markers=no
+  home="$(mktemp -d)"
+  bin="$(setup_fake_rclone)"
+  add_disabled_fskit_probe "$bin" "$home"
+  calls="$home/calls"
+  : >"$calls"
+  export FAKE_UNAME_S=Linux
+  err="$(run_mount "$home" "$bin" "$calls" "OneDrive:" 7 2>&1)" || rc=$?
+  unset FAKE_UNAME_S
+  case "$err" in *"provider refused the mount of"*) recorded=true ;; esac
+  if ! no_blocked_marker "$home"; then markers=yes; fi
+  if [ "$rc" -eq 7 ] && [ "$markers" = no ] && [ "$recorded" = false ]; then
+    assert_pass "a disabled FSKit probe off macOS neither blocks nor records the mount"
+  else
+    assert_fail "rclone-mount-disabled-probe-off-macos" \
+      "rc=$rc markers=$markers recorded=$recorded stderr=[$err]"
+  fi
+  rm -rf "$home" "$bin"
+}
+
+# The macOS counterpart of the previous test, so the gate is what changed and not
+# the classification: the same disabled probe must still stop the mount there.
+test_a_disabled_probe_on_macos_blocks_the_mount() {
+  local home bin calls err="" rc=0 markers=no recorded=false remedy=false
+  home="$(mktemp -d)"
+  bin="$(setup_fake_rclone)"
+  add_disabled_fskit_probe "$bin" "$home"
+  calls="$home/calls"
+  : >"$calls"
+  err="$(run_mount "$home" "$bin" "$calls" "OneDrive:" 7 2>&1)" || rc=$?
+  case "$err" in *"provider refused the mount of"*) recorded=true ;; esac
+  case "$err" in *"killall fskitd"*) remedy=true ;; esac
+  if ! no_blocked_marker "$home"; then markers=yes; fi
+  if [ "$rc" -eq 0 ] && [ "$markers" = yes ] && [ "$recorded" = true ] && [ "$remedy" = true ]; then
+    assert_pass "a disabled FSKit probe on macOS blocks the mount and records the remedy"
+  else
+    assert_fail "rclone-mount-disabled-probe-on-macos" \
+      "rc=$rc markers=$markers recorded=$recorded remedy=$remedy stderr=[$err]"
+  fi
+  rm -rf "$home" "$bin"
+}
+
 test_failed_mount_exit_is_reported_and_propagated
 test_clean_mount_exit_is_still_reported
 test_remote_and_mount_point_reach_rclone
@@ -709,4 +852,8 @@ test_parked_mount_is_bounded_and_recorded_as_a_provider_failure
 test_provider_refusal_is_recorded_and_stopped
 test_an_attached_volume_clears_the_blocked_marker
 test_a_volume_that_vanishes_after_attaching_is_reported_and_failed
+test_provider_refusal_off_macos_is_not_recorded
+test_stalled_attempt_off_macos_is_reloaded_not_blocked
+test_a_disabled_probe_off_macos_does_not_block
+test_a_disabled_probe_on_macos_blocks_the_mount
 finish_tests
