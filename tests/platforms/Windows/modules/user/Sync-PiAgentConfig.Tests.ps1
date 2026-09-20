@@ -2,10 +2,10 @@
 .SYNOPSIS
     Pester coverage for the pi agent config symlinks in Sync-PiAgentConfig.ps1.
 .DESCRIPTION
-    Unit-tests the %USERPROFILE%\.pi\agent links on temp paths: an enabled run
-    links extensions\ and settings.json to the overlay-resolved sources, re-runs
-    are idempotent, and a disabled run removes the managed links without
-    disturbing unmanaged content.
+    Unit-tests the %USERPROFILE%\.pi links on temp paths: an enabled run links the
+    extensions directory, settings.json and web-search.json to the overlay-resolved
+    sources, re-runs are idempotent, and a disabled run removes the managed links
+    without disturbing unmanaged content.
 .NOTES
     Environment variables: (none — $HOME is overridden at script scope)
     Exit codes: 0 on success; 1 on failure
@@ -24,6 +24,7 @@ Describe 'Sync-PiAgentConfig pi agent links' {
         $null = New-Item -ItemType Directory -Path $extensionsSourceDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         $null = Set-Content -Path (Join-Path $extensionsSourceDir 'agents-bridge.ts') -Value 'export {};' -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
         $null = Set-Content -Path (Join-Path $script:repoRoot 'src\users\default\pi\settings.json') -Value '{}' -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
+        $null = Set-Content -Path (Join-Path $script:repoRoot 'src\users\default\pi\web-search.json') -Value '{}' -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
 
         $script:homeRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-pihome-" + [guid]::NewGuid().ToString('N'))
         $null = New-Item -ItemType Directory -Path $script:homeRoot -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
@@ -47,10 +48,11 @@ Describe 'Sync-PiAgentConfig pi agent links' {
         }
     }
 
-    It 'links extensions and settings.json to the overlay-resolved sources on an enabled run' {
+    It 'links extensions, settings.json and web-search.json to the overlay-resolved sources on an enabled run' {
         $piDir = Join-Path $script:homeRoot '.pi\agent'
         $extensionsLink = Join-Path $piDir 'extensions'
         $settingsLink = Join-Path $piDir 'settings.json'
+        $webSearchLink = Join-Path $script:homeRoot '.pi\web-search.json'
         Test-Path -LiteralPath $extensionsLink | Should -Be $false
 
         Sync-PiAgentConfig -RepoRoot $script:repoRoot -User 'testuser' -Enabled:$true > $null
@@ -62,6 +64,11 @@ Describe 'Sync-PiAgentConfig pi agent links' {
         $settingsItem = Get-Item -LiteralPath $settingsLink -Force
         $settingsItem.LinkType | Should -Be 'SymbolicLink'
         $settingsItem.Target | Should -Be (Join-Path $script:repoRoot 'src\users\default\pi\settings.json')
+
+        # web-search.json lands beside the agent directory, not inside it.
+        $webSearchItem = Get-Item -LiteralPath $webSearchLink -Force
+        $webSearchItem.LinkType | Should -Be 'SymbolicLink'
+        $webSearchItem.Target | Should -Be (Join-Path $script:repoRoot 'src\users\default\pi\web-search.json')
     }
 
     It 'is idempotent — re-running leaves the links intact' {
@@ -92,6 +99,7 @@ Describe 'Sync-PiAgentConfig pi agent links' {
         $piDir = Join-Path $script:homeRoot '.pi\agent'
         $extensionsLink = Join-Path $piDir 'extensions'
         $settingsLink = Join-Path $piDir 'settings.json'
+        $webSearchLink = Join-Path $script:homeRoot '.pi\web-search.json'
         $unmanagedPath = Join-Path $piDir 'trust.json'
         $null = Set-Content -Path $unmanagedPath -Value '{}' -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
 
@@ -99,6 +107,7 @@ Describe 'Sync-PiAgentConfig pi agent links' {
 
         Test-Path -LiteralPath $extensionsLink | Should -Be $false
         Test-Path -LiteralPath $settingsLink | Should -Be $false
+        Test-Path -LiteralPath $webSearchLink | Should -Be $false
         Test-Path -LiteralPath $unmanagedPath | Should -Be $true
     }
 }
