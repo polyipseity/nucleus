@@ -10,6 +10,7 @@
 # - Cloud drive LaunchAgent label wired module → convergence script
 # - Cloud drive mount points under the user's home, never under /Volumes
 # - App-bundle NSServicesStatus entries merged after the workflow whole-dict write
+# - NixOS charge-limit activation wired to the bundled convergence script
 #
 let
   lib = import <nixpkgs/lib>;
@@ -37,6 +38,13 @@ let
   appBundlesModuleTextFlat = lib.concatStringsSep " " (
     builtins.filter (part: builtins.isString part && part != "") (
       builtins.split "[ \t\n]+" appBundlesModuleText
+    )
+  );
+
+  nixosDesktopModuleText = builtins.readFile ../../src/hosts/NixOS/desktop.nix;
+  nixosDesktopModuleTextFlat = lib.concatStringsSep " " (
+    builtins.filter (part: builtins.isString part && part != "") (
+      builtins.split "[ \t\n]+" nixosDesktopModuleText
     )
   );
 
@@ -195,6 +203,22 @@ let
     && !(lib.hasInfix ''home.activation.macos-deploy-app-bundles = lib.hm.dag.entryAfter [ "linkGeneration" ]'' appBundlesModuleTextFlat)
   ) "app-bundle NSServicesStatus entries must merge after the workflow whole-dict write";
 
+  # === TEST: NixOS charge-limit activation stays wired ===
+  # WHY: grep-only — the activation entry is a system-domain attribute that this
+  # test cannot read without a full NixOS evaluation.  A dropped or misspelled
+  # entry, or a lost positional argument, would leave every other suite green
+  # while the charge limit silently stopped converging on NixOS.  The bundle path
+  # is asserted by its tail so the assertion does not depend on the
+  # ${activationBundle} interpolation spelling.
+  test_nixos_charge_limit_wiring =
+    assert'
+      (
+        lib.hasInfix "system.activationScripts.nixos-configure-charge-limit.text = lib.mkAfter" nixosDesktopModuleTextFlat
+        && lib.hasInfix "/src/platforms/NixOS/scripts/nixos-configure-charge-limit.sh" nixosDesktopModuleTextFlat
+        && lib.hasInfix ''"/sys/class/power_supply"'' nixosDesktopModuleTextFlat
+      )
+      "the NixOS charge-limit activation must stay wired to the bundle script and the power_supply class root";
+
   # Collect all tests.
   allTests = [
     test_secrets_before_devrepo
@@ -206,6 +230,7 @@ let
     test_cloud_drives_label_wiring
     test_cloud_drives_mount_point_under_home
     test_app_bundles_after_automator_workflows
+    test_nixos_charge_limit_wiring
   ];
 in
 # NOTE: force allTests as deepSeq's SECOND argument.  `builtins.seq (builtins.deepSeq allTests) { ... }`
