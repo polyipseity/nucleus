@@ -1,11 +1,111 @@
-# Test: step 14 repository-policy PS1 enforcement
-# All grep-only tests were removed (they tested implementation text, not behavior).
-# Behavioral tests for the PS1 twin should be added to match the .sh twin's approach.
+# Test: step 14 repository-policy PS1 enforcement — logging-format scan.
+#
+# The .sh twin's behavioral tests dot-source the step file and call its policy
+# function directly. The PS1 step body cannot be called that way: the runner
+# rebuilds it with [scriptblock]::Create($Action.ToString()) inside a runspace,
+# so the body is the only thing that exists there. These tests drive the real
+# check host instead, with every other step skipped, and assert on what it
+# reports.
+#
+# WHY: both fixture bodies are assembled from [char]96 — a literal backtick-e in
+# this file would itself trip the policy under test, since step 14 scans tracked
+# .ps1 files and only the shared color helpers are allowlisted.
 
+#Requires -Version 7.4
+
+[CmdletBinding()]
+param()
+
+Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-$PSStyle.OutputRendering = 'PlainText'
 
-# Placeholder — no behavioral tests implemented yet for the PS1 twin.
-# The .sh twin has 12 behavioral tests covering naming, logging, nix file
-# structure, and log capture pair policies.
-exit 0
+$script:passCount = 0
+$script:failCount = 0
+
+function Assert-Pass {
+  param([string]$Name)
+  Write-Output "PASS $Name"
+  $script:passCount++
+}
+
+function Assert-Fail {
+  param([string]$Name, [string]$Reason)
+  Write-Output "FAIL $Name : $Reason"
+  $script:failCount++
+}
+
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../../..')).Path
+$checkScript = Join-Path $repoRoot 'scripts/check.ps1'
+$pwsh = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
+
+# WHY: only repository-policy runs. The other steps need toolchains (Nix, packer)
+# or whole-repo state that a fixture file in a temp directory cannot provide, and
+# their findings would drown the scan under test.
+$skipSteps = @(
+  'code-formatting', 'powershell-lint', 'nix-flake-eval', 'nix-lint',
+  'lockfile-validation', 'locked-dsc-validation', 'schema-validation',
+  'service-registry', 'completions-fresh', 'package-manager-enforcement',
+  'suppression-audit', 'online-determinism', 'app-registry',
+  'store-path-arg-usage', 'activation-tool-resolution'
+) -join ','
+
+$fixtureDir = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "nucleus-repository-policy-$([guid]::NewGuid().ToString('N'))"
+New-Item -ItemType Directory -Path $fixtureDir -Force > $null
+
+# Invoke-LoggingFormatPolicy — run step 14 over the given files.
+# Returns a hashtable with the child's exit code and combined output.
+function Invoke-LoggingFormatPolicy {
+  param([string[]]$Paths)
+  $output = & $pwsh -NoLogo -NoProfile -NonInteractive -File $checkScript --scoped --verbose=repository-policy "--skip-steps=$skipSteps" @Paths 2>&1 | Out-String
+  return @{
+    Status = $LASTEXITCODE
+    Output = $output
+  }
+}
+
+try {
+  # WHY: -File keeps the host's own flag parsing intact; `& $checkScript` would
+  # bind --scoped positionally to the host's first parameter and fail validation.
+  $backtick = [char]96
+  $cleanPath = Join-Path $fixtureDir 'clean.ps1'
+  $violatingPath = Join-Path $fixtureDir 'violating.ps1'
+
+  # A comment that explains why a parameter is named EventName. It mentions the
+  # reserved automatic variable, which is not an escape sequence.
+  Set-Content -Path $cleanPath -Value @(
+    '# WHY: the parameter is EventName because PowerShell reserves ' + $backtick + 'Event as an automatic variable.',
+    '$x = 1'
+  )
+  Set-Content -Path $violatingPath -Value ('$e = "' + $backtick + 'e[31m"')
+
+  # 1. An escape-looking word in a comment is not an escape.
+  $clean = Invoke-LoggingFormatPolicy -Paths @($cleanPath)
+  if ($clean.Status -ne 0 -or $clean.Output -match 'backtick-e escape literal') {
+    Assert-Fail 'step 14: a comment naming the automatic Event variable' "exit $($clean.Status); $($clean.Output.Trim())"
+  } elseif ($clean.Output -notmatch 'logging format policy passed\.') {
+    # WHY: without this the case could pass on a skipped step instead of a clean scan.
+    Assert-Fail 'step 14: a comment naming the automatic Event variable' 'logging format policy did not run'
+  } else {
+    Assert-Pass 'step 14: a comment naming the automatic Event variable is not an escape'
+  }
+
+  # 2. The policy still catches a real escape sequence.
+  $violating = Invoke-LoggingFormatPolicy -Paths @($violatingPath)
+  if ($violating.Status -eq 0 -or $violating.Output -notmatch 'backtick-e escape literal') {
+    Assert-Fail 'step 14: a backtick-e escape sequence' "exit $($violating.Status); $($violating.Output.Trim())"
+  } else {
+    Assert-Pass 'step 14: a backtick-e escape sequence is reported'
+  }
+} finally {
+  if (Test-Path -LiteralPath $fixtureDir) {
+    Remove-Item -Path $fixtureDir -Recurse -Force
+  }
+}
+
+Write-Output ''
+if ($script:failCount -gt 0) {
+  Write-Output "step 14 repository-policy tests: $($script:failCount) failed, $($script:passCount) passed"
+  exit 1
+}
+
+Write-Output "step 14 repository-policy tests: all $($script:passCount) passed"
