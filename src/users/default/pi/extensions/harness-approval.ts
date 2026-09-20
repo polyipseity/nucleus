@@ -42,8 +42,10 @@ const RISKY_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
 ];
 
 /**
- * `harness-notify.enable` is the single kill switch for the whole bridge: with it
- * off, this gate must not add prompts pi would not otherwise show.
+ * `harness-notify.enable` is the master kill switch: with it off, this gate must
+ * not add prompts pi would not otherwise show. The remote gate itself
+ * (`harness-approval.enable`, off by default) is read by the `harness-approval`
+ * command this extension calls, so turning it off leaves pi's own confirm.
  */
 function approvalEnabled(): boolean {
   try {
