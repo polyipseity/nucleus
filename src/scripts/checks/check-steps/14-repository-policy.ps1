@@ -501,7 +501,11 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
         Write-ErrorMessage "$($m.Path):$($m.LineNumber): char-27 escape literal (use PSStyle helpers)"
         $lfErrors++
       }
-      foreach ($m in (Select-String -Path $lfPsFiles -Pattern '`e')) {
+      # WHY: -CaseSensitive matches the awk twin (repository-policy.awk), whose
+      # regex is case-sensitive by construction. Without it, Select-String's
+      # case-insensitive default flags any lowercase-e example, including a
+      # comment that names the automatic Event variable.
+      foreach ($m in (Select-String -Path $lfPsFiles -Pattern '`e' -CaseSensitive)) {
         Write-ErrorMessage "$($m.Path):$($m.LineNumber): backtick-e escape literal (use PSStyle helpers)"
         $lfErrors++
       }
