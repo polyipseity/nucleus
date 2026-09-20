@@ -510,10 +510,6 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
         $lfErrors++
       }
     }
-    foreach ($m in (Select-String -Path $lfScanned -Pattern '==== [0-9]')) {
-      Write-ErrorMessage "$($m.Path):$($m.LineNumber): legacy skip marker (use the shared skip_step helper)"
-      $lfErrors++
-    }
   }
 
   # Self-check: the color spec requires NO_COLOR handling in both shared helpers.
@@ -534,6 +530,44 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
     $failed = $true
   } else {
     Write-Message "logging format policy passed."
+  }
+
+  # --- removed skip mechanism ---
+  # ref: step-runner.instructions.md -- declared applicability replaces step-level skipping
+  Write-Message "--- removed skip mechanism ---"
+  $skipErrors = 0
+  # WHY: the runners document the declared-applicability contract, and
+  # repository-policy.awk plus both gate steps carry the pattern list itself.
+  $skipScopeExcluded = @('step-runner.sh', 'step-runner.ps1', 'repository-policy.awk', $selfLeaf, $selfShLeaf)
+  $skipConstructPattern = '\bskip_step\b|\bSkip-Step\b|\bInvoke-SkippedStep\b|--skip-steps|-SkipStep|\breturn[ \t]+2\b|\bSKIPPED\b|-SkipMessage'
+  # WHY: if-expression output is pipeline-enumerated — an empty branch yields $null, crashing the .Count check below under StrictMode; the @() wrapper forces an array
+  $skipFiles = @(if ($HasArgs) {
+    @($PositionalArgs | Where-Object {
+        $_ -match '^(src[\\/]scripts|scripts|tests)[\\/]' -and
+        (Split-Path -Leaf $_) -notin $skipScopeExcluded -and
+        (Test-Path -LiteralPath $_)
+      })
+  } else {
+    @(git ls-files 'src/scripts' 'scripts' 'tests' | Select-GitIgnored | Where-Object {
+        (Split-Path -Leaf $_) -notin $skipScopeExcluded -and
+        (Test-Path -LiteralPath $_)
+      })  # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariant; gitignore filter applied on top
+  })
+
+  if ($skipFiles.Count -gt 0) {
+    # WHY: -CaseSensitive mirrors the awk twin; without it Select-String's
+    # case-insensitive default would flag prose that merely says "skipped".
+    foreach ($m in (Select-String -Path $skipFiles -Pattern $skipConstructPattern -CaseSensitive)) {
+      Write-ErrorMessage "$($m.Path):$($m.LineNumber): removed skip mechanism '$($m.Matches[0].Value)'; declare applicability at registration (-Platform/-Mode/-Requires)"
+      $skipErrors++
+    }
+  }
+
+  if ($skipErrors -gt 0) {
+    Write-ErrorMessage "skip mechanism removal check failed with $skipErrors error(s)"
+    $failed = $true
+  } else {
+    Write-Message "no removed skip mechanism found."
   }
 
   # --- nix file structure ---

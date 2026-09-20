@@ -9,9 +9,16 @@
 #     color-helper allowlist, across tracked .sh/.zsh/.ps1/.psm1
 #   - echo(1) -e flag in tracked .sh
 #   - char-27 ([char]27) and backtick-e escapes in tracked .ps1/.psm1
-#   - legacy "==== NN:" skip markers (must use the shared skip_step helper)
-mode != "logging-format" && FNR == 1 { in_heredoc = 0 }
-mode != "logging-format" && !in_heredoc && match($0, /<<-?[ \t]*["\047\\]?[A-Za-z_][A-Za-z0-9_]*/) {
+#
+# Skip-constructs mode (-v mode=skip-constructs): fails on any removed skip
+# construct (skip_step, Skip-Step, Invoke-SkippedStep, --skip-steps, -SkipStep,
+# return 2, SKIPPED, -SkipMessage) under src/scripts/, scripts/ or tests/. The
+# two runners document the declared-applicability contract, and this file plus
+# the two gate steps carry the pattern list, so all of them are excluded here.
+# The word "skip" in prose stays legal; only the named constructs match.
+
+mode == "" && FNR == 1 { in_heredoc = 0 }
+mode == "" && !in_heredoc && match($0, /<<-?[ \t]*["\047\\]?[A-Za-z_][A-Za-z0-9_]*/) {
   op = substr($0, RSTART, RLENGTH)
   tag = op
   sub(/^<<-?[ \t]*["\047\\]?/, "", tag)
@@ -21,7 +28,7 @@ mode != "logging-format" && !in_heredoc && match($0, /<<-?[ \t]*["\047\\]?[A-Za-
   body = 0
   next
 }
-mode != "logging-format" && in_heredoc {
+mode == "" && in_heredoc {
   if (dash && $0 ~ "^[ \t]*" tag "[ \t]*$") { in_heredoc = 0 }
   else if (!dash && $0 ~ "^" tag "[ \t]*$") { in_heredoc = 0 }
   else { body++; next }
@@ -52,6 +59,24 @@ mode == "logging-format" && !allowlisted {
     if ($0 ~ /`e/)
       print FILENAME ":" FNR ": backtick-e escape literal (use PSStyle helpers)"
   }
-  if ($0 ~ /==== [0-9]/)
-    print FILENAME ":" FNR ": legacy skip marker (use the shared skip_step helper)"
+}
+
+function report_skip_construct(construct) {
+  print FILENAME ":" FNR ": removed skip mechanism '" construct "'; declare applicability at registration (-Platform/-Mode/-Requires)"
+}
+
+mode == "skip-constructs" && FNR == 1 {
+  excluded = (FILENAME ~ /(^|\/)step-runner\.(sh|ps1)$/ ||
+              FILENAME ~ /(^|\/)repository-policy\.awk$/ ||
+              FILENAME ~ /(^|\/)14-repository-policy\.(sh|ps1)$/)
+}
+mode == "skip-constructs" && !excluded {
+  if ($0 ~ /(^|[^A-Za-z0-9_])skip_step([^A-Za-z0-9_]|$)/) report_skip_construct("skip_step")
+  if ($0 ~ /Skip-Step/) report_skip_construct("Skip-Step")
+  if ($0 ~ /Invoke-SkippedStep/) report_skip_construct("Invoke-SkippedStep")
+  if ($0 ~ /--skip-steps/) report_skip_construct("--skip-steps")
+  if ($0 ~ /-SkipStep/) report_skip_construct("-SkipStep")
+  if ($0 ~ /(^|[^A-Za-z0-9_])return[ \t]+2([^0-9]|$)/) report_skip_construct("return 2")
+  if ($0 ~ /(^|[^A-Za-z0-9_])SKIPPED([^A-Za-z0-9_]|$)/) report_skip_construct("SKIPPED")
+  if ($0 ~ /-SkipMessage/) report_skip_construct("-SkipMessage")
 }

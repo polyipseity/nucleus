@@ -40,6 +40,9 @@ run_repository_policy() {
   say "--- logging format policy ---"
   run_logging_format_policy "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
+  say "--- removed skip mechanism ---"
+  run_removed_skip_mechanism "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+
   say "--- nix file structure ---"
   run_nix_file_structure "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
@@ -585,6 +588,52 @@ run_logging_format_policy() {
     return 1
   fi
   say "logging format policy passed."
+  return 0
+}
+
+# --- removed skip mechanism --------------------------------------------------------------------
+# ref: step-runner.instructions.md -- declared applicability replaces step-level skipping
+# Every step declares platform/mode/requires at registration and the runner decides; a step that
+# cannot run is reported as not applicable, never as skipped. This scan keeps both halves of that
+# contract honest: no step may reintroduce a skip path, and no shared helper may grow one back.
+run_removed_skip_mechanism() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
+  local _files=("$@")
+  cd "$_repo_root" || return 1
+
+  local _rsk_errors=0
+  local _rsk_files=()
+
+  if $_has_args; then
+    for _f in "${_files[@]}"; do
+      case "$_f" in
+      src/scripts/* | scripts/* | tests/*) _rsk_files+=("$_f") ;;
+      esac
+    done
+  else
+    while IFS= read -r _f; do
+      _rsk_files+=("$_f")
+    done < <(git ls-files 'src/scripts' 'scripts' 'tests' | filter_gitignored)
+  fi
+
+  if [ "${#_rsk_files[@]}" -gt 0 ]; then
+    # Pattern scan lives in the sibling .awk file, which excludes the two runners, its own rule
+    # list, and both gate steps by filename.
+    local _awk_path="$_REPOSITORY_POLICY_STEP_DIR/$_REPOSITORY_POLICY_STEP_ID.awk"
+
+    local _violation
+    while IFS= read -r _violation; do
+      _rsk_errors=$((_rsk_errors + 1))
+      error "$_violation"
+    done < <(awk -v mode=skip-constructs -f "$_awk_path" "${_rsk_files[@]}")
+  fi
+
+  if [ "$_rsk_errors" -gt 0 ]; then
+    error "skip mechanism removal check failed with $_rsk_errors error(s)"
+    return 1
+  fi
+  say "no removed skip mechanism found."
   return 0
 }
 

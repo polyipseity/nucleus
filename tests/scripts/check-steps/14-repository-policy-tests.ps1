@@ -41,13 +41,7 @@ $pwsh = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else
 # WHY: only repository-policy runs. The other steps need toolchains (Nix, packer)
 # or whole-repo state that a fixture file in a temp directory cannot provide, and
 # their findings would drown the scan under test.
-$skipSteps = @(
-  'code-formatting', 'powershell-lint', 'nix-flake-eval', 'nix-lint',
-  'lockfile-validation', 'locked-dsc-validation', 'schema-validation',
-  'service-registry', 'completions-fresh', 'package-manager-enforcement',
-  'suppression-audit', 'online-determinism', 'app-registry',
-  'store-path-arg-usage', 'activation-tool-resolution'
-) -join ','
+$onlySteps = 'repository-policy'
 
 $fixtureDir = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "nucleus-repository-policy-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $fixtureDir -Force > $null
@@ -56,7 +50,7 @@ New-Item -ItemType Directory -Path $fixtureDir -Force > $null
 # Returns a hashtable with the child's exit code and combined output.
 function Invoke-LoggingFormatPolicy {
   param([string[]]$Paths)
-  $output = & $pwsh -NoLogo -NoProfile -NonInteractive -File $checkScript --scoped --verbose=repository-policy "--skip-steps=$skipSteps" @Paths 2>&1 | Out-String
+  $output = & $pwsh -NoLogo -NoProfile -NonInteractive -File $checkScript --scoped --verbose=repository-policy "--only-steps=$onlySteps" @Paths 2>&1 | Out-String
   return @{
     Status = $LASTEXITCODE
     Output = $output
@@ -83,7 +77,7 @@ try {
   if ($clean.Status -ne 0 -or $clean.Output -match 'backtick-e escape literal') {
     Assert-Fail 'step 14: a comment naming the automatic Event variable' "exit $($clean.Status); $($clean.Output.Trim())"
   } elseif ($clean.Output -notmatch 'logging format policy passed\.') {
-    # WHY: without this the case could pass on a skipped step instead of a clean scan.
+    # WHY: without this the case could pass on a step that never ran instead of a clean scan.
     Assert-Fail 'step 14: a comment naming the automatic Event variable' 'logging format policy did not run'
   } else {
     Assert-Pass 'step 14: a comment naming the automatic Event variable is not an escape'
