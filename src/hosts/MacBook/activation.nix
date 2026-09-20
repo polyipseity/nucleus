@@ -184,7 +184,7 @@ in
   #
   # Scripts included:
   #   configureBatteryPolicy           — pmset AC/battery policy
-  #   configureChargeLimit             — 80 % charge cap via battery CLI + native Charge Limit
+  #   configureChargeLimit             — 80 % charge cap via the battery CLI
   #   configureSshAccess               — allow all users SSH access by removing com.apple.access_ssh group
   #   configureGimpScrollSensitivity   — GIMP drag-zoom-speed (25% of default)
   #   configureLinearMousePreferences  — LinearMouse update-check suppression
@@ -231,13 +231,13 @@ in
     "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-battery-policy.sh"
 
     # ---- configure-charge-limit --------------------------------------------------
-    # WHY: two independent gates are converged to the same 80 % ceiling.  The
-    #   `battery` CLI writes the SMC charging gate and installs a headless
-    #   LaunchAgent (com.battery.app) so the cap persists without the tray being
-    #   open; the native macOS 26.4+ Charge Limit is driven through a Shortcuts
-    #   shortcut.  Neither has a declarative option — the tray icon is not
-    #   declaratively hideable, and the native setting has no pmset key and no
-    #   configuration-profile payload.
+    # WHY: the `battery` CLI writes the firmware-level SMC charging gate and
+    #   installs a headless LaunchAgent (com.battery.app), so the 80 % cap holds
+    #   without the tray being open.  It is the only gate that can be converged:
+    #   the native macOS 26.4+ Charge Limit has no pmset key, no
+    #   configuration-profile payload, and no CLI, so it stays a one-time manual
+    #   setting (see MANUAL.md).  The tray icon is not declaratively hideable
+    #   either; the menu-bar convergence below handles it.
     "${activationBundle}/src/hosts/MacBook/scripts/macos-charge-limit.sh"
 
     # ---- macos-configure-menu-bar-icons --------------------------------------------
