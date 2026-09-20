@@ -24,15 +24,15 @@ trap 'rm -rf "$TMPDIR_ROOT"' EXIT
 # Recording stub, mirroring harness-notify-tests.sh: proves the request was
 # announced on the configured channel without talking to Hermes.
 mkdir -p "$TMPDIR_ROOT/bin"
+# One write per invocation: the suite polls this log while harness-approval runs in
+# the background, so a reader must never observe an announcement whose body has
+# not been appended yet.
 cat >"$TMPDIR_ROOT/bin/hermes" <<'STUB'
 #!/usr/bin/env bash
-{
-  printf 'ARGV'
-  for _arg in "$@"; do printf '\037%s' "$_arg"; done
-  printf '\n'
-  _body="$(cat)"
-  printf 'BODY\037%s\n' "$_body"
-} >>"$HARNESS_APPROVAL_LOG"
+_record='ARGV'
+for _arg in "$@"; do _record="$_record"$'\037'"$_arg"; done
+_record="$_record"$'\n'"BODY"$'\037'"$(cat)"
+printf '%s\n' "$_record" >>"$HARNESS_APPROVAL_LOG"
 STUB
 chmod +x "$TMPDIR_ROOT/bin/hermes"
 export HARNESS_APPROVAL_LOG="$TMPDIR_ROOT/hermes.log"
@@ -90,8 +90,10 @@ wait_for_request() {
 }
 
 wait_for_announcement() {
-  # The request file is written before the notification is sent, so a reader
-  # that looks at the stub log right after wait_for_request can beat the sender.
+  # The request file is written before the notification is sent, so a reader that
+  # looks at the stub log right after wait_for_request can beat the sender. The
+  # stub appends a whole record in one write, so a non-empty log is a complete
+  # announcement.
   local _i=0
   while [ "$_i" -lt 40 ]; do
     if [ -s "$HARNESS_APPROVAL_LOG" ]; then
