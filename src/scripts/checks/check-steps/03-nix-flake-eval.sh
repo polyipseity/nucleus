@@ -38,8 +38,7 @@ run_nix_flake_eval() {
       say "nix flake evaluation passed."
     fi
   else
-    say "skipping (no Nix files in scope)."
-    return 2
+    say "0 Nix files in scope — nothing to evaluate."
   fi
 
   return $_ne_exit

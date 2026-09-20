@@ -25,8 +25,8 @@ run_store_path_arg_usage() {
       esac
     done
     if [ "$_has_sh_files" -eq 0 ]; then
-      skip_step "$(step_number)" "Store-path arg variable usage enforcement" "no shell files to check"
-      return 2
+      say "0 shell files in scope — nothing to enforce."
+      return 0
     fi
   fi
 
@@ -72,8 +72,8 @@ run_store_path_arg_usage() {
   fi
 
   if [ "${#_candidate_files[@]}" -eq 0 ]; then
-    skip_step "$(step_number)" "Store-path arg variable usage enforcement" "no shell files to check"
-    return 2
+    say "0 shell files in scope — nothing to enforce."
+    return 0
   fi
 
   # Collect ALL .sh files for cross-file usage search (variables may be

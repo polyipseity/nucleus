@@ -28,8 +28,8 @@ run_lockfile_validation() {
       esac
     done
     if [ "$_has_lf_files" -eq 0 ]; then
-      skip_step "$(step_number)" "Lockfile validation" "no lockfile files to check"
-      return 2
+      say "0 lockfile files in scope — nothing to validate."
+      return 0
     fi
   fi
 

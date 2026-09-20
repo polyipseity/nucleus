@@ -27,8 +27,8 @@ Register-Step -Id "activation-tool-resolution" -Name "Activation script tool res
         ($activationDirs | Where-Object { $f -like "$_" }).Count -gt 0
       })
     if ($ps1Files.Count -eq 0) {
-      Skip-Step -Number (Get-StepNumber) -Name "Activation script tool resolution" -Reason "no PowerShell activation scripts to check"
-      return 2
+      Write-Message "0 PowerShell activation scripts in scope — nothing to resolve."
+      return $true
     }
   } else {
     $ps1Files = @(
@@ -37,8 +37,8 @@ Register-Step -Id "activation-tool-resolution" -Name "Activation script tool res
       }
     )
     if ($ps1Files.Count -eq 0) {
-      Skip-Step -Number (Get-StepNumber) -Name "Activation script tool resolution" -Reason "no PowerShell activation scripts to check"
-      return 2
+      Write-Message "0 PowerShell activation scripts in scope — nothing to resolve."
+      return $true
     }
   }
 

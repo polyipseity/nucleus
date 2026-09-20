@@ -8,16 +8,16 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
   $exitCode = 0
   $stepFailed = $false
-  $skippedTools = 0
+  $inapplicableTools = 0
   $toolCount = 0
 
   function Invoke-ScopedTool {
     param(
-      [string]$SkipMessage,
+      [string]$InapplicableMessage,
       [scriptblock]$Run,
       [object[]]$ScopedFiles,
       [ref]$ToolCount,
-      [ref]$SkippedTools,
+      [ref]$InapplicableTools,
       [ref]$ExitCode
     )
     $ToolCount.Value++
@@ -27,8 +27,8 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
       return
     }
     if ($HasArgs) {
-      Write-Message $SkipMessage
-      $SkippedTools.Value++
+      Write-Message $InapplicableMessage
+      $InapplicableTools.Value++
       return
     }
     & $Run
@@ -48,7 +48,7 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
       @($fromCache + $envrc) | Sort-Object -Unique
     }
   )
-  Invoke-ScopedTool -SkipMessage 'skipping shfmt (no shell files to check).' -ScopedFiles $shFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
+  Invoke-ScopedTool -InapplicableMessage '0 shell files in scope — shfmt not run.' -ScopedFiles $shFiles -ToolCount ([ref]$toolCount) -InapplicableTools ([ref]$inapplicableTools) -ExitCode ([ref]$exitCode) -Run {
     param($Files)
     if ($Files) {
       shfmt -w @Files
@@ -76,7 +76,7 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
     }
   )
   if (-not $stepFailed) {
-    Invoke-ScopedTool -SkipMessage 'skipping yamllint (no YAML files to check).' -ScopedFiles $yamlFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
+    Invoke-ScopedTool -InapplicableMessage '0 YAML files in scope — yamllint not run.' -ScopedFiles $yamlFiles -ToolCount ([ref]$toolCount) -InapplicableTools ([ref]$inapplicableTools) -ExitCode ([ref]$exitCode) -Run {
       param($Files)
       $ylExit = 0
       foreach ($yf in $Files) {
@@ -101,7 +101,7 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
     }
   )
   if (-not $stepFailed) {
-    Invoke-ScopedTool -SkipMessage 'skipping taplo (no TOML files to check).' -ScopedFiles $tomlFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
+    Invoke-ScopedTool -InapplicableMessage '0 TOML files in scope — taplo not run.' -ScopedFiles $tomlFiles -ToolCount ([ref]$toolCount) -InapplicableTools ([ref]$inapplicableTools) -ExitCode ([ref]$exitCode) -Run {
       param($Files)
       taplo fmt @Files
       if ($LASTEXITCODE -ne 0) {
@@ -122,7 +122,7 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
     }
   )
   if (-not $stepFailed) {
-    Invoke-ScopedTool -SkipMessage 'skipping packer fmt (no Packer templates to check).' -ScopedFiles $pkrFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
+    Invoke-ScopedTool -InapplicableMessage '0 Packer templates in scope — packer fmt not run.' -ScopedFiles $pkrFiles -ToolCount ([ref]$toolCount) -InapplicableTools ([ref]$inapplicableTools) -ExitCode ([ref]$exitCode) -Run {
       param($Files)
       packer fmt @Files
       if ($LASTEXITCODE -ne 0) {
@@ -140,8 +140,8 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
       $workflowDir = Join-Path -Path $r -ChildPath '.github' -AdditionalChildPath 'workflows'
       if (Test-Path -LiteralPath $workflowDir) {
         @(
-          Get-ChildItem -Path $workflowDir -Filter '*.yml' -File -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- one extension variant may have no matches; empty result handled by the Invoke-ScopedTool skip path
-          Get-ChildItem -Path $workflowDir -Filter '*.yaml' -File -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- one extension variant may have no matches; empty result handled by the Invoke-ScopedTool skip path
+          Get-ChildItem -Path $workflowDir -Filter '*.yml' -File -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- one extension variant may have no matches; empty result handled by the Invoke-ScopedTool inapplicable path
+          Get-ChildItem -Path $workflowDir -Filter '*.yaml' -File -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- one extension variant may have no matches; empty result handled by the Invoke-ScopedTool inapplicable path
         ) | Sort-Object FullName | ForEach-Object { $_.FullName }
       } else {
         @()
@@ -149,7 +149,7 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
     }
   )
   if (-not $stepFailed) {
-    Invoke-ScopedTool -SkipMessage 'skipping actionlint (no workflow files to check).' -ScopedFiles $workflowFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
+    Invoke-ScopedTool -InapplicableMessage '0 workflow files in scope — actionlint not run.' -ScopedFiles $workflowFiles -ToolCount ([ref]$toolCount) -InapplicableTools ([ref]$inapplicableTools) -ExitCode ([ref]$exitCode) -Run {
       param($Files)
       actionlint @Files
       if ($LASTEXITCODE -ne 0) {
@@ -161,7 +161,7 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
   }
 
   if (-not $stepFailed) {
-    Invoke-ScopedTool -SkipMessage 'skipping pinact (no workflow files to check).' -ScopedFiles $workflowFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
+    Invoke-ScopedTool -InapplicableMessage '0 workflow files in scope — pinact not run.' -ScopedFiles $workflowFiles -ToolCount ([ref]$toolCount) -InapplicableTools ([ref]$inapplicableTools) -ExitCode ([ref]$exitCode) -Run {
       param($Files)
       if ($Files) {
         pinact run --fix=false --no-api @Files
@@ -177,7 +177,7 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
   }
 
   if (-not $stepFailed) {
-    Invoke-ScopedTool -SkipMessage 'skipping zizmor (no workflow files to check).' -ScopedFiles $workflowFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
+    Invoke-ScopedTool -InapplicableMessage '0 workflow files in scope — zizmor not run.' -ScopedFiles $workflowFiles -ToolCount ([ref]$toolCount) -InapplicableTools ([ref]$inapplicableTools) -ExitCode ([ref]$exitCode) -Run {
       param($Files)
       zizmor @Files
       if ($LASTEXITCODE -ne 0) {
@@ -206,8 +206,8 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
       if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
       else { Write-Message 'Packer template validation passed.' }
     } else {
-      Write-Message 'skipping check-packer (no Packer templates to check).'
-      $skippedTools++
+      Write-Message '0 Packer templates in scope — check-packer not run.'
+      $inapplicableTools++
     }
   }
 
@@ -215,8 +215,9 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
     Write-ErrorMessage 'Code formatting and linting failed.'
     return $false
   }
-  if ($skippedTools -eq $toolCount) {
-    return 2
+  if ($inapplicableTools -eq $toolCount) {
+    Write-Message '0 files in scope for every formatter and linter — nothing to check.'
+    return $true
   }
   Write-Message 'Code formatting and linting passed.'
   return $true

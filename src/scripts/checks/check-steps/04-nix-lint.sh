@@ -63,8 +63,7 @@ run_nix_lint() {
     done
     [ -n "$_nixf_tmpdir" ] && rm -rf -- "$_nixf_tmpdir"
   else
-    skip_step "$(step_number)" "Nix lint (nixf-tidy)" "no Nix files to check"
-    return 2
+    say "0 Nix files in scope — nothing to lint."
   fi
 
   if [ "$_nixf_exit" -gt 0 ]; then

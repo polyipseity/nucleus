@@ -13,8 +13,8 @@ Register-Step -Id "package-manager-enforcement" -Name "Package manager usage enf
   if ($HasArgs) {
     $hasShellFiles = @($PositionalArgs | Where-Object { $_ -match '\.(sh|ps1|nix)$' }).Count -gt 0
     if (-not $hasShellFiles) {
-      Skip-Step -Number (Get-StepNumber) -Name "Package manager usage enforcement" -Reason "no shell files to check"
-      return 2
+      Write-Message "0 shell files in scope — nothing to enforce."
+      return $true
     }
   }
 

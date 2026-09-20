@@ -24,8 +24,8 @@ run_hermetic_eval() {
 
   local -n _nix_files="${ctx[NIX_FILES]}"
   if $_has_args && [ "${#_nix_files[@]}" -eq 0 ]; then
-    say "skipping (no Nix files in scope)."
-    return 2
+    say "0 Nix files in scope — nothing to evaluate hermetically."
+    return 0
   fi
 
   cd "$_repo_root" || return 1

@@ -25,8 +25,8 @@ run_activation_tool_resolution() {
       esac
     done
     if [ "$_has_sh_files" -eq 0 ]; then
-      skip_step "$(step_number)" "Activation script tool resolution" "no shell files to check"
-      return 2
+      say "0 activation scripts in scope — nothing to resolve."
+      return 0
     fi
   fi
 
@@ -81,8 +81,8 @@ run_activation_tool_resolution() {
   fi
 
   if [ "${#_candidate_files[@]}" -eq 0 ]; then
-    skip_step "$(step_number)" "Activation script tool resolution" "no activation scripts to check"
-    return 2
+    say "0 activation scripts in scope — nothing to resolve."
+    return 0
   fi
 
   # --- Build dynamic allowlist of repo-defined functions ---

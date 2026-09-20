@@ -36,7 +36,7 @@ run_code_formatting() {
         esac
       done
       if [ "${#_workflow_files[@]}" -eq 0 ]; then
-        say "skipping actionlint/zizmor (no workflow files in scope)."
+        say "0 workflow files in scope — actionlint and zizmor not run."
       else
         actionlint "${_workflow_files[@]}" || _exit=$?
         if [ $_exit -eq 0 ]; then
@@ -58,7 +58,7 @@ run_code_formatting() {
         done < <(find .github/workflows -type f \( -name '*.yml' -o -name '*.yaml' \) -print0)
       fi
       if [ "${#_workflow_files[@]}" -eq 0 ]; then
-        say "skipping actionlint/zizmor (no workflow files)."
+        say "0 workflow files — actionlint and zizmor not run."
       else
         actionlint "${_workflow_files[@]}" || _exit=$?
         if [ $_exit -eq 0 ]; then
@@ -86,7 +86,7 @@ run_code_formatting() {
   elif ! $_has_args; then
     bash scripts/check.sh packer --validate-only || _pkr_exit=$?
   else
-    say "skipping check-packer (no Packer templates to check)."
+    say "0 Packer templates in scope — check-packer not run."
   fi
 
   if [ $_pkr_exit -eq 0 ]; then

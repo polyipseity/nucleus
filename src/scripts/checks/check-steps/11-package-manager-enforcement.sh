@@ -24,8 +24,8 @@ run_package_manager_enforcement() {
       esac
     done
     if [ "$_has_shell_files" -eq 0 ]; then
-      skip_step "$(step_number)" "Package manager usage enforcement" "no shell files to check"
-      return 2
+      say "0 shell files in scope — nothing to enforce."
+      return 0
     fi
   fi
 

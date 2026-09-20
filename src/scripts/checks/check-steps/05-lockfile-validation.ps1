@@ -11,8 +11,8 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Action {
   if ($HasArgs) {
     $hasLfFiles = @($PositionalArgs | Where-Object { $_ -match '(lockfile|lifecycle-allowlist)\.json$' }).Count -gt 0
     if (-not $hasLfFiles) {
-      Skip-Step -Number (Get-StepNumber) -Name "Lockfile validation" -Reason "no lockfile files to check"
-      return 2
+      Write-Message "0 lockfile files in scope — nothing to validate."
+      return $true
     }
   }
 

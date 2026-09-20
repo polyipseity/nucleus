@@ -126,8 +126,8 @@ run_method1_symlink_resolution() {
   done <"$_manifest"
 
   if [ "$_checked" -eq 0 ]; then
-    skip_step "$(step_number)" "Method-1 symlinks resolve to live repo root" "no deployed method-1 symlinks found among the manifest entries"
-    return 2
+    say "0 deployed method-1 symlinks among the manifest entries — nothing to verify."
+    return 0
   fi
 
   if [ "$_violations" -gt 0 ]; then
