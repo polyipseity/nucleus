@@ -24,7 +24,9 @@ Register-Step -Id "activation-tool-resolution" -Name "Activation script tool res
     # Filter to activation directories only.
     $ps1Files = @($ps1Files | Where-Object {
         $f = $_
-        ($activationDirs | Where-Object { $f -like "$_" }).Count -gt 0
+        # WHY: an empty Where-Object result is $null, and $null.Count throws under
+        # StrictMode, which crashed the whole step in scoped mode.
+        @($activationDirs | Where-Object { $f -like "$_" }).Count -gt 0
       })
     if ($ps1Files.Count -eq 0) {
       Write-Message "0 PowerShell activation scripts in scope — nothing to resolve."
