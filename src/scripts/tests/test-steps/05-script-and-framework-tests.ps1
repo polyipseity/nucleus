@@ -51,8 +51,18 @@ Register-Step -Id "script-and-framework-tests" -Name "Script and framework tests
 
   foreach ($testScript in $priorityScripts) {
     Write-Message "running $([System.IO.Path]::GetFileName($testScript))"
-    & $testScript
-    if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
+    # A fresh runspace carries $null in $LASTEXITCODE, and a script that ends
+    # without an explicit exit leaves the previous value in place; reset it so
+    # only this script's own outcome is measured.
+    $LASTEXITCODE = 0
+    $scriptThrew = $false
+    try {
+      & $testScript
+    } catch {
+      $scriptThrew = $true
+      Write-ErrorMessage $_
+    }
+    if ($scriptThrew -or $LASTEXITCODE -ne 0) { $exitCode = 1 }
   }
 
   if ($parallelScripts.Count -gt 0) {
@@ -69,8 +79,18 @@ Register-Step -Id "script-and-framework-tests" -Name "Script and framework tests
       $captureDir = $using:captureDir
       $base = [System.IO.Path]::GetFileName($script)
       $captureFile = Join-Path -Path $captureDir -ChildPath "$base.out"
-      & $script *> $captureFile
-      if ($LASTEXITCODE -ne 0) {
+      # Same reset as the priority loop, plus a catch: a throw terminates the
+      # runspace iteration before the exit code is observable, which used to
+      # drop the suite silently instead of reporting it as failed.
+      $LASTEXITCODE = 0
+      $scriptThrew = $false
+      try {
+        & $script *> $captureFile
+      } catch {
+        $scriptThrew = $true
+        Add-Content -Path $captureFile -Value $_.Exception.Message
+      }
+      if ($scriptThrew -or $LASTEXITCODE -ne 0) {
         New-Item -ItemType File -Path (Join-Path -Path $captureDir -ChildPath "$base.failed") -Force > $null
       }
     } -ThrottleLimit $throttle

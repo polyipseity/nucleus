@@ -109,3 +109,4 @@ if ($script:failCount -gt 0) {
 }
 
 Write-Output "step 14 repository-policy tests: all $($script:passCount) passed"
+exit 0

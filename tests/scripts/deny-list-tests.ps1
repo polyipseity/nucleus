@@ -72,3 +72,4 @@ try {
 Write-Output ""
 Write-Output "$script:passCount passed, $script:failCount failed"
 if ($script:failCount -gt 0) { exit 1 }
+exit 0
