@@ -78,30 +78,48 @@ try {
   }
 
   # Install-PrekHook must hard-error when prek cannot be resolved: a repository
-  # that opts into prek must not silently lose its Git hooks.  PATH is narrowed
-  # to an empty directory so prek is unresolvable regardless of the host.
+  # that opts into prek must not silently lose its Git hooks.
+  # WHY: the PATH is narrowed in a child process. Assigning $env:PATH in this
+  # process would mutate the process environment, which sibling runspaces of the
+  # parallel script-test runner (and the child scripts they launch) observe.
   $prekRepo = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-acthard-prek-" + [guid]::NewGuid().ToString('N'))
   $emptyPathDir = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-acthard-path-" + [guid]::NewGuid().ToString('N'))
+  $driverScript = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-acthard-driver-" + [guid]::NewGuid().ToString('N') + '.ps1')
   $null = New-Item -ItemType Directory -Path $prekRepo -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
   $null = New-Item -ItemType Directory -Path $emptyPathDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
   $null = Set-Content -Path (Join-Path $prekRepo 'prek.toml') -Value 'fail_fast = true' -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
-  $savedPath = $env:PATH
-  $threw = $false
-  try {
-    $env:PATH = $emptyPathDir
-    Install-PrekHook -RepositoryRoot $prekRepo
-  } catch {
-    $threw = $true
-  } finally {
-    $env:PATH = $savedPath
+  # check-suppress:embedded-content: generated temp driver (data, not a template) that imports the module and exercises Install-PrekHook under a narrowed PATH
+  $driverBody = @'
+param([string]$ModulePath, [string]$HookPath, [string]$RepositoryRoot)
+$ErrorActionPreference = 'Stop'
+Import-Module $ModulePath -Force
+. $HookPath
+Install-PrekHook -RepositoryRoot $RepositoryRoot
+'@
+  $null = Set-Content -Path $driverScript -Value $driverBody -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
+
+  $pwshCommand = Get-Command -Name 'pwsh' -CommandType Application | Select-Object -First 1
+  $psi = [System.Diagnostics.ProcessStartInfo]::new()
+  $psi.FileName = $pwshCommand.Source
+  $psi.UseShellExecute = $false
+  $psi.RedirectStandardOutput = $true
+  $psi.RedirectStandardError = $true
+  foreach ($argument in @('-NoProfile', '-File', $driverScript, $formatModule, $installPrekHook, $prekRepo)) {
+    $psi.ArgumentList.Add($argument)
   }
-  if ($threw) {
+  $psi.Environment['PATH'] = $emptyPathDir
+
+  $child = [System.Diagnostics.Process]::Start($psi)
+  $childStdout = $child.StandardOutput.ReadToEndAsync()
+  $childStderr = $child.StandardError.ReadToEndAsync()
+  $child.WaitForExit()
+  if ($child.ExitCode -ne 0) {
     Assert-Pass 'Install-PrekHook throws when prek cannot be resolved'
   } else {
-    Assert-Fail 'Install-PrekHook throws when prek cannot be resolved' 'returned without throwing'
+    Assert-Fail 'Install-PrekHook throws when prek cannot be resolved' "child exited 0: $($childStdout.Result.Trim()) $($childStderr.Result.Trim())"
   }
 } finally {
-  foreach ($r in @($menuBarRepo, $autostartRepo, $prekRepo, $emptyPathDir)) {
+  foreach ($r in @($menuBarRepo, $autostartRepo, $prekRepo, $emptyPathDir, $driverScript)) {
     if ($r -and (Test-Path -LiteralPath $r)) {
       # check-suppress:suppression_doc: cleanup in test teardown -- failure is acceptable
       Remove-Item -LiteralPath $r -Recurse -Force -ErrorAction SilentlyContinue
@@ -112,3 +130,4 @@ try {
 Write-Output ""
 Write-Output "$script:passCount passed, $script:failCount failed"
 if ($script:failCount -gt 0) { exit 1 }
+exit 0
