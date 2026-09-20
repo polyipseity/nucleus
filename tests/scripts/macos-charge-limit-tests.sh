@@ -38,6 +38,12 @@ assert_invokes() {
 #   cannot be exercised without root plus the GUI Shortcuts helper.
 assert_absent() {
   local file="$1" pattern="$2" description="$3"
+  if [ ! -f "$file" ]; then
+    # WHY: grep exits 2 for a missing file, which would land in the "absent"
+    #   branch below and pass a guard whose file was renamed or moved.
+    assert_fail "$description" "file not found: $file"
+    return
+  fi
   if grep -qF "$pattern" "$file"; then
     assert_fail "$description" "[$pattern] found in $(basename "$file")"
   else
@@ -54,6 +60,10 @@ test_bclm_fallback_is_gone() {
   done
 }
 
+# WHY: `charge_limit_percent=80` is the value the gate converges, and the literal
+#   invocation is what actually writes the firmware gate; neither can be
+#   exercised here (they need root plus the helper), so a rename or a dropped
+#   call would otherwise be invisible.
 test_firmware_gate_is_wired() {
   assert_invokes 'charge_limit_percent=80'
   # shellcheck disable=SC2016 # reason: the literal invocation is under test, not a shell expansion
