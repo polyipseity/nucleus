@@ -39,8 +39,6 @@ FAKE_HOME="$_tmp/home"
 mkdir -p "$FAKE_HOME/Library/Group Containers/group.com.apple.fskit.settings" \
   "$FAKE_HOME/Library/LaunchAgents"
 : >"$FAKE_HOME/Library/Group Containers/group.com.apple.fskit.settings/enabledModules.plist"
-STATE_DIR="$(HOME="$FAKE_HOME" crash_loop_state_dir)"
-mkdir -p "$STATE_DIR"
 _out="$_tmp/out.txt"
 
 # --- Fixture repo ------------------------------------------------------------
@@ -215,6 +213,12 @@ chmod +x "$_tmp/bin/launchctl" "$_tmp/bin/killall" "$_tmp/bin/sudo" "$_tmp/bin/p
   "$_tmp/bin/mount" "$_tmp/bin/sleep" "$_tmp/bin/uname" "$_tmp/bin/id"
 PATH="$_tmp/bin:$PATH"
 export PATH
+
+# The repair resolves its state directory from the platform it sees, so the suite
+# has to derive the same path through the same stubbed uname: derive it here, with
+# the fake toolchain on PATH, rather than against the host's own uname.
+STATE_DIR="$(HOME="$FAKE_HOME" crash_loop_state_dir)"
+mkdir -p "$STATE_DIR"
 
 assert_eq() { # <test name> <expected> <actual>
   if [ "$2" = "$3" ]; then
