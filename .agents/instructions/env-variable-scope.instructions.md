@@ -20,7 +20,7 @@ Nix vars: `src/modules/lib/env-catalog.nix` — `catalog` attrset with `values` 
 | Windows | `src/hosts/Windows/{user,system}/env.dsc.yml` | WinGet DSC v3 |
 | Windows PATH | `src/platforms/Windows/modules/user/Sync-UserPath.ps1` | PowerShell |
 
-Consumers: `shell.nix`, macOS `default.nix`, `hosts/NixOS/{base,ai}.nix`, daemon files in `hosts/MacBook/`. `env/default.nix` exposes `config._nucleus.envVars`. Per-host override via `override` attr. User-specific vars excluded from `systemVars`. Windows DSC mirrors catalog; parity enforced by `tests/integration/env-parity-tests.nix` + `tests/hosts/Windows/EnvVarParity.Tests.ps1`.
+Consumers: `shell.nix`, macOS `default.nix`, `hosts/NixOS/{base,ai}.nix`, daemon files in `hosts/MacBook/`. `env/default.nix` exposes `config._nucleus.envVars`. Per-host override via `override` attr. User-specific vars excluded from `systemVars`. Windows DSC mirrors catalog; parity enforced by `tests/integration/env-parity-tests.nix` (catalog ↔ DSC scope split, Nix lane) + `tests/platforms/Windows/modules/EnvVarParity.Tests.ps1` (Windows-only wiring, Pester).
 
 ### Windows elevation
 

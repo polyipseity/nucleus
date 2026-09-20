@@ -1,10 +1,12 @@
-# tests/integration/env-parity-tests.nix — Catalog manifest for Windows parity.
+# tests/integration/env-parity-tests.nix — Windows env var parity between the Nix
+# catalog and the Windows DSC files.
 #
-# Evaluates the centralized env var catalog and builds a manifest for the
-# Windows Pester test to verify DSC and profile env var parity.
-#
-# Standalone expression: import directly, no function wrapper needed.
-# The Windows Pester test accesses via (import "...").manifest (no arg).
+# Asserted in the Nix lane because a Windows host has no Nix toolchain, so the
+# catalog cannot be evaluated there: this needs no Windows host and materializes
+# no artifact. The parity assertions that need no catalog data (shell profile,
+# apply.ps1 wiring) live in
+# tests/platforms/Windows/modules/EnvVarParity.Tests.ps1, which test step 6 runs
+# on Windows.
 let
   lib = import <nixpkgs/lib>;
   pkgs = import <nixpkgs> { };
@@ -16,71 +18,87 @@ let
     hostName = "NixOS";
   };
 
-  # Build manifest directly from catalog, avoiding toJSON/fromJSON round-trip.
-  # (builtins.fromJSON chokes on toJsonManifest output due to a Nix eval issue.)
-  manifest = builtins.map (
-    name:
+  repoRoot = ../..;
+
+  # Both DSC files contain nothing but Microsoft.Windows.Environment/Variable
+  # resources, each with exactly one settings.name. The resource count is
+  # compared against the extracted name count because a resource whose shape
+  # changes would otherwise read as absent, and every subset assertion below
+  # would then pass vacuously.
+  dscResourceMarker = "resource: Microsoft.Windows.Environment/Variable";
+  dscNamePattern = "[ \t]*name:[ \t]*([A-Za-z_][A-Za-z0-9_]*)[ \t]*";
+
+  readDscVarNames =
+    relativePath:
     let
-      entry = envVars.catalog.${name};
+      text = builtins.readFile (repoRoot + "/${relativePath}");
+      names = builtins.map builtins.head (
+        builtins.filter (match: match != null) (
+          builtins.map (line: builtins.match dscNamePattern line) (lib.splitString "\n" text)
+        )
+      );
     in
     {
-      inherit name;
-      hasNixOsEntry = entry.values ? NixOS || entry.values ? default;
-      # Resolved-value semantics (matches env-secrets.nix allVars applicability):
-      # an explicit Windows = null excludes the var from Windows parity checks.
-      hasWindowsEntry = entry.values ? Windows || entry.values ? default;
-      hasMacBookEntry = entry.values ? MacBook || entry.values ? default;
-      nixosValue = null;
-      macBookValue = null;
-      windowsValue = null;
-      userSpecific = entry ? userSpecific && entry.userSpecific;
-      why = entry.why;
-      # dscRequired: true for every catalog var that MUST have a DSC entry.
-      # Derived from dscVarNames (the exclusion-filtered list).  Any new
-      # host-specific var with a Windows value auto-includes here unless
-      # explicitly excluded — wiring by default.
-      dscRequired = builtins.elem name dscVarNames;
-    }
-  ) envVars.getAllNixVarNames;
+      inherit names;
+      shapeOk =
+        builtins.length (lib.tail (lib.splitString dscResourceMarker text)) == builtins.length names;
+    };
 
-  # Subset of vars that have a NixOS entry (should map to a DSC entry).
-  nixosVars = builtins.filter (v: v.hasNixOsEntry) manifest;
-
-  # Names of vars that must exist in Windows env.dsc.yml. Vars whose catalog entry
-  # carries no Windows value are excluded: the macOS GUI PATH, the Darwin build
-  # SDK vars and the Nix SSL bundle are POSIX-only concerns Windows must not
-  # declare in DSC.
-  windowsRequiredVarNames = builtins.filter (
-    name:
-    name != "NUCLEUS_REPO_ROOT"
-    && name != "DEVELOPER_DIR"
-    && name != "SDKROOT"
-    && name != "LIBRARY_PATH"
-    && name != "PATH"
-    && name != "NIX_SSL_CERT_FILE"
-  ) envVars.getAllNixVarNames;
-
-  # Vars that Windows sets via Sync-ShellProfile.ps1 instead of DSC.
-  profileOnlyVarNames = [ ];
-
-  # Vars that Windows sets from a config-sync module instead of DSC:
-  # Sync-HermesConfig.ps1 writes PLAYWRIGHT_BROWSERS_PATH. NUCLEUS_HOST is not
-  # listed anywhere: apply.ps1 only sets it process-locally, and the value
-  # persists through system/env.dsc.yml, so it is DSC-required.
+  # Catalog vars Windows must not declare: the macOS GUI PATH, the Darwin build
+  # SDK vars, the Nix SSL bundle, and the live-checkout root (apply.ps1 writes it
+  # to the registry directly). PLAYWRIGHT_BROWSERS_PATH is set from a config-sync
+  # module instead of DSC.
+  windowsInapplicableVarNames = [
+    "DEVELOPER_DIR"
+    "LIBRARY_PATH"
+    "NIX_SSL_CERT_FILE"
+    "NUCLEUS_REPO_ROOT"
+    "PATH"
+    "SDKROOT"
+  ];
   syncOnlyVarNames = [ "PLAYWRIGHT_BROWSERS_PATH" ];
 
-  # Vars that should be in DSC.
-  dscVarNames = builtins.filter (
-    name: !builtins.elem name (profileOnlyVarNames ++ syncOnlyVarNames)
-  ) windowsRequiredVarNames;
+  dscRequiredVarNames = builtins.filter (
+    name: !builtins.elem name (windowsInapplicableVarNames ++ syncOnlyVarNames)
+  ) envVars.getAllNixVarNames;
+
+  # An explicit Windows = null excludes a var from Windows parity checks.
+  isUserSpecific = name: envVars.catalog.${name}.userSpecific or false;
+
+  requiredUserVarNames = builtins.filter isUserSpecific dscRequiredVarNames;
+  requiredMachineVarNames = builtins.filter (name: !isUserSpecific name) dscRequiredVarNames;
+
+  userDsc = readDscVarNames "src/hosts/Windows/user/env.dsc.yml";
+  systemDsc = readDscVarNames "src/hosts/Windows/system/env.dsc.yml";
+
+  missingFrom = required: actual: builtins.filter (name: !builtins.elem name actual) required;
+  absentFromCatalog = actual: required: builtins.filter (name: !builtins.elem name required) actual;
+
+  userMissing = missingFrom requiredUserVarNames userDsc.names;
+  userExtra = absentFromCatalog userDsc.names requiredUserVarNames;
+  machineMissing = missingFrom requiredMachineVarNames systemDsc.names;
+  machineExtra = absentFromCatalog systemDsc.names requiredMachineVarNames;
+
+  joinNames = names: builtins.concatStringsSep ", " names;
 in
+assert lib.assertMsg userDsc.shapeOk
+  "src/hosts/Windows/user/env.dsc.yml: resource count does not match its settings.name count — the parity parser must be updated";
+assert lib.assertMsg systemDsc.shapeOk
+  "src/hosts/Windows/system/env.dsc.yml: resource count does not match its settings.name count — the parity parser must be updated";
+assert lib.assertMsg
+  (builtins.length requiredUserVarNames > 0 && builtins.length requiredMachineVarNames > 0)
+  "the catalog resolved no Windows-applicable env vars — the exclusion list or the catalog import is broken";
+assert lib.assertMsg (
+  userMissing == [ ]
+) "user/env.dsc.yml is missing user-scoped catalog vars: ${joinNames userMissing}";
+assert lib.assertMsg (userExtra == [ ])
+  "user/env.dsc.yml declares vars that are not user-specific in the catalog: ${joinNames userExtra}";
+assert lib.assertMsg (
+  machineMissing == [ ]
+) "system/env.dsc.yml is missing machine-scoped catalog vars: ${joinNames machineMissing}";
+assert lib.assertMsg (machineExtra == [ ])
+  "system/env.dsc.yml declares vars that are not machine-scoped in the catalog: ${joinNames machineExtra}";
 {
-  inherit
-    manifest
-    nixosVars
-    windowsRequiredVarNames
-    profileOnlyVarNames
-    syncOnlyVarNames
-    dscVarNames
-    ;
+  success = true;
+  message = "Windows env var parity: ${toString (builtins.length requiredUserVarNames)} user-scope and ${toString (builtins.length requiredMachineVarNames)} machine-scope catalog vars match the DSC files";
 }

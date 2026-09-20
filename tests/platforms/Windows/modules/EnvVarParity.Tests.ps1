@@ -1,17 +1,18 @@
 <#
 .SYNOPSIS
-    Pester parity tests verifying Windows env vars match the Nix catalog.
+    Pester parity tests for Windows env var wiring that needs no Nix toolchain.
 .DESCRIPTION
-    Evaluates the Nix centralized env var catalog (src/modules/lib/env-catalog.nix)
-    and compares every Windows-relevant variable against the Windows DSC
-    registry (user/env.dsc.yml) and Sync-ShellProfile.ps1.
+    Compares the Windows DSC files, Sync-ShellProfile.ps1 and apply.ps1 against
+    each other. The assertions that need the Nix catalog — which vars are
+    Windows-applicable and in which scope — live in
+    tests/integration/env-parity-tests.nix and run in the Nix test lane, because
+    a Windows host has no Nix toolchain to evaluate the catalog with.
 
     Designed to fail if:
-    - A catalog var expected on Windows has no DSC or profile entry.
-    - A DSC var has no counterpart in the Nix catalog (would drift silently).
+    - CC, CXX or LD move back out of the Machine-scope DSC file.
+    - apply.ps1 persists NUCLEUS_HOST instead of leaving it to the DSC file.
 .NOTES
-    Requires: result/env-parity-manifest.json materialized by test step
-    06-windows-pester.ps1 from tests/integration/env-parity-tests.nix.
+    Requires: nothing beyond the repository checkout.
     Exit codes: 0 on success; 1 on failure
 #>
 
@@ -24,8 +25,6 @@ BeforeAll {
   $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\")
   $script:UserDscFile = Join-Path $RepoRoot "src\hosts\Windows\user\env.dsc.yml"
   $script:SystemDscFile = Join-Path $RepoRoot "src\hosts\Windows\system\env.dsc.yml"
-  $script:ManifestFile = Join-Path $RepoRoot "result\env-parity-manifest.json"
-  # $CatalogNixFile intentionally omitted; unused
 
   # ---- Helpers ----
 
@@ -49,15 +48,6 @@ BeforeAll {
     return $names
   }
 
-  # Evaluate the Nix catalog JSON manifest (materialized by 06-windows-pester.ps1).
-  function Get-NixCatalogManifest {
-    param ([string]$ManifestPath)
-    if (-not (Test-Path $ManifestPath)) {
-      throw "env-parity manifest not found at $ManifestPath — run test step 06-windows-pester to materialize it"
-    }
-    return Get-Content -Raw -Path $ManifestPath | ConvertFrom-Json
-  }
-
   # Extract profile-only vars (CC, CXX, LD) from Sync-ShellProfile.ps1.
   function Get-ProfileEnvVarNameList {
     $profilePath = Join-Path $RepoRoot "src\platforms\Windows\modules\user\Sync-ShellProfile.ps1"
@@ -78,65 +68,14 @@ BeforeAll {
   }
 }
 
-Describe "Windows env var parity with Nix catalog" {
-  Context "DSC parity — user scope" {
+Describe "Windows env var wiring parity" {
+  Context "DSC files" {
     It "user/env.dsc.yml exists and is readable" {
       $script:UserDscFile | Should -Exist
     }
 
-    It "catalog manifest evaluates successfully" {
-      { $script:Manifest = Get-NixCatalogManifest -ManifestPath $script:ManifestFile } | Should -Not -Throw
-      $script:Manifest | Should -Not -BeNullOrEmpty
-    }
-
-    It "every user-specific DSC-required catalog var has a User-scope DSC entry" {
-      $dscVars = Get-DscEnvVarNameList -DscPath $script:UserDscFile
-      $requiredVars = @($script:Manifest | Where-Object { $_.dscRequired -and $_.userSpecific } | ForEach-Object { $_.name })
-
-      $missing = $requiredVars | Where-Object { $_ -notin $dscVars }
-      if ($missing.Count -gt 0) {
-        Write-Warning "Missing User-scope DSC env vars: $($missing -join ', ')"
-      }
-      $missing.Count | Should -Be 0 -Because "every user-specific DSC-required catalog var should have a User-scope DSC Environment resource"
-    }
-
-    It "every User-scope DSC Env resource is DSC-required in catalog" {
-      $dscVars = Get-DscEnvVarNameList -DscPath $script:UserDscFile
-      $catalogDscRequired = @($script:Manifest | Where-Object { $_.dscRequired -and $_.userSpecific } | ForEach-Object { $_.name })
-
-      $extra = $dscVars | Where-Object { $_ -notin $catalogDscRequired }
-      if ($extra.Count -gt 0) {
-        Write-Warning "User-scope DSC env vars without DSC-required catalog entry: $($extra -join ', ')"
-      }
-      $extra.Count | Should -Be 0 -Because "every User-scope DSC Environment resource should be DSC-required in the Nix catalog"
-    }
-  }
-
-  Context "DSC parity — machine scope" {
     It "system/env.dsc.yml exists and is readable" {
       $script:SystemDscFile | Should -Exist
-    }
-
-    It "every DSC-required catalog var has a Machine-scope DSC entry" {
-      $dscVars = Get-DscEnvVarNameList -DscPath $script:SystemDscFile
-      $requiredVars = @($script:Manifest | Where-Object { $_.dscRequired -and -not $_.userSpecific } | ForEach-Object { $_.name })
-
-      $missing = $requiredVars | Where-Object { $_ -notin $dscVars }
-      if ($missing.Count -gt 0) {
-        Write-Warning "Missing Machine-scope DSC env vars: $($missing -join ', ')"
-      }
-      $missing.Count | Should -Be 0 -Because "every DSC-required catalog var should have a Machine-scope DSC Environment resource"
-    }
-
-    It "every Machine-scope DSC Env resource is DSC-required in catalog" {
-      $dscVars = Get-DscEnvVarNameList -DscPath $script:SystemDscFile
-      $catalogDscRequired = @($script:Manifest | Where-Object { $_.dscRequired -and -not $_.userSpecific } | ForEach-Object { $_.name })
-
-      $extra = $dscVars | Where-Object { $_ -notin $catalogDscRequired }
-      if ($extra.Count -gt 0) {
-        Write-Warning "Machine-scope DSC env vars without DSC-required catalog entry: $($extra -join ', ')"
-      }
-      $extra.Count | Should -Be 0 -Because "every Machine-scope DSC Environment resource should be DSC-required in the Nix catalog"
     }
   }
 
