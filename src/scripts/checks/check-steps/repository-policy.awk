@@ -12,9 +12,10 @@
 #
 # Skip-constructs mode (-v mode=skip-constructs): fails on any removed skip
 # construct (skip_step, Skip-Step, Invoke-SkippedStep, --skip-steps, -SkipStep,
-# return 2, SKIPPED, -SkipMessage) under src/scripts/, scripts/ or tests/. The
-# two runners document the declared-applicability contract, and this file plus
-# the two gate steps carry the pattern list, so all of them are excluded here.
+# return 2, SKIPPED, -SkipMessage, assert_skip, TESTS_SKIPPED) under src/scripts/,
+# scripts/ or tests/. The two runners document the declared-applicability
+# contract, and this file plus the two gate steps carry the pattern list, so all
+# of them are excluded here.
 # The word "skip" in prose stays legal; only the named constructs match.
 
 mode == "" && FNR == 1 { in_heredoc = 0 }
@@ -79,4 +80,6 @@ mode == "skip-constructs" && !excluded {
   if ($0 ~ /(^|[^A-Za-z0-9_])return[ \t]+2([^0-9]|$)/) report_skip_construct("return 2")
   if ($0 ~ /(^|[^A-Za-z0-9_])SKIPPED([^A-Za-z0-9_]|$)/) report_skip_construct("SKIPPED")
   if ($0 ~ /-SkipMessage/) report_skip_construct("-SkipMessage")
+  if ($0 ~ /(^|[^A-Za-z0-9_])assert_skip([^A-Za-z0-9_]|$)/) report_skip_construct("assert_skip")
+  if ($0 ~ /(^|[^A-Za-z0-9_])TESTS_SKIPPED([^A-Za-z0-9_]|$)/) report_skip_construct("TESTS_SKIPPED")
 }

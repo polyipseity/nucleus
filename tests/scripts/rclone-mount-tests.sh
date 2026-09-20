@@ -465,10 +465,11 @@ test_slow_stop_is_waited_out_and_reported() {
 # A mount killed outright while it is stopping exits with a status above 128, and
 # bash hands that status back on every later wait for the same (already reaped)
 # child, so the stop wait never sees a status it can break on.
-# WHY reported rather than asserted: the wrapper spinning here is a defect in
-#   src/scripts/services/rclone-mount.sh, not a contract of the wrapper. This case
-#   turns into the assertion it wants to be as soon as that defect is fixed, and
-#   assert_skip keeps the defect visible in the tally until then.
+# WHY failure rather than a reported gap: the wrapper spinning here is a defect in
+#   src/scripts/services/rclone-mount.sh, not a contract of the wrapper. A defect
+#   has to fail the suite — reporting it as skipped leaves the lane green while the
+#   product is broken — and the case is already the assertion it needs to be, so it
+#   passes unchanged once the defect is fixed.
 test_mount_killed_while_stopping_does_not_spin_the_wrapper() {
   local home bin calls errfile pids pid="" rclone_pid="" sleeper_pid="" rc=0
   home="$(mktemp -d)"
@@ -490,11 +491,11 @@ test_mount_killed_while_stopping_does_not_spin_the_wrapper() {
   wait_bounded "$pid" 5 || rc=$?
   # check-suppress:suppression_doc: cleanup of the stub's sleeper; it may have exited with its mount.
   kill -KILL "$sleeper_pid" 2>/dev/null || true
-  if [ "$rc" -eq 137 ]; then
-    assert_skip "a mount killed while it is stopping lets the wrapper return" \
-      "wrapper still waiting 5s after rclone was killed (defect: 'wait' returns the cached 137 for an already-reaped child, so the stop wait never ends and only launchd's ExitTimeOut kills it)"
-  else
+  if [ "$rc" -ne 137 ]; then
     assert_pass "a mount killed while it is stopping lets the wrapper return"
+  else
+    assert_fail "a mount killed while it is stopping lets the wrapper return" \
+      "wrapper still waiting 5s after rclone was killed (defect in rclone-mount.sh: the stop wait never ends because 'wait' returns the cached 137 for an already-reaped child)"
   fi
   rm -rf "$home" "$bin"
 }

@@ -23,21 +23,20 @@ if [ "$TEST_COLOR" -eq 1 ]; then
   RED='\033[0;31m'
   GREEN='\033[0;32m'
   CYAN='\033[1;36m'
-  # shellcheck disable=SC2034 # reason: consumed by assert_skip below and by sibling test files (gen-completions-tests.sh, nucleus-apps-smoke-tests.sh) via sourcing
+  # shellcheck disable=SC2034 # reason: consumed by sibling test files (gen-completions-tests.sh, nucleus-apps-smoke-tests.sh) via sourcing
   YELLOW='\033[0;33m'
   NC='\033[0m'
 else
   RED=''
   GREEN=''
   CYAN=''
-  # shellcheck disable=SC2034 # reason: consumed by assert_skip below and by sibling test files (gen-completions-tests.sh, nucleus-apps-smoke-tests.sh) via sourcing
+  # shellcheck disable=SC2034 # reason: consumed by sibling test files (gen-completions-tests.sh, nucleus-apps-smoke-tests.sh) via sourcing
   YELLOW=''
   NC=''
 fi
 
 TESTS_PASSED=0
 TESTS_FAILED=0
-TESTS_SKIPPED=0
 
 assert_pass() {
   local test_name="$1"
@@ -60,20 +59,14 @@ assert_fail() {
   ((++TESTS_FAILED))
 }
 
-# assert_skip — Record a test that could not run (missing optional dependency,
-# unsupported host). Skips never fail the suite, but they are reported so a
-# suite that quietly stopped exercising anything stays visible in the output.
-assert_skip() {
-  local test_name="$1"
-  local reason="$2"
-  printf '%s⊘%s %s: %s\n' "$YELLOW" "$NC" "$test_name" "$reason"
-  ((++TESTS_SKIPPED))
-}
-
 # finish_tests — Print the tally and exit with the suite's status. Assertions only
 # bump a counter, so a suite that never turns the tally into an exit status reports
 # success to the runner — which sees only the exit status — no matter what it
 # asserted. Must be the last statement of every suite that sources this library.
+#
+# There is no skip counter: a case that cannot run on this host asserts the
+# host-correct expectation instead of stepping aside, so every case the suite
+# claims to cover is a case the suite actually exercised.
 #
 # The status is computed with `if` rather than `[ … ] && _status=1`: under `set -e`
 # a failing && list carries its own status, which would abort the function on the
@@ -85,16 +78,14 @@ finish_tests() {
   if [ "$TESTS_FAILED" -gt 0 ]; then
     _status=1
     printf '\n%s%d passed, %d failed%s\n' "$RED" "$TESTS_PASSED" "$TESTS_FAILED" "$NC" >&2
-  elif [ "$TESTS_SKIPPED" -gt 0 ]; then
-    printf '\n%s%d passed, %d skipped%s\n' "$GREEN" "$TESTS_PASSED" "$TESTS_SKIPPED" "$NC"
   else
     printf '\n%s%d passed%s\n' "$GREEN" "$TESTS_PASSED" "$NC"
   fi
   # Machine-readable tally, asserted by test step 05. A suite that exits without
   # reaching this line cannot prove it ran its assertions — the one failure its
   # exit status alone cannot express.
-  printf '# nucleus-tally passed=%d failed=%d skipped=%d\n' \
-    "$TESTS_PASSED" "$TESTS_FAILED" "$TESTS_SKIPPED"
+  printf '# nucleus-tally passed=%d failed=%d\n' \
+    "$TESTS_PASSED" "$TESTS_FAILED"
   exit "$_status"
 }
 

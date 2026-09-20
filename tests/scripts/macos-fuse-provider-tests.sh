@@ -186,7 +186,10 @@ test_digest_rejects_incomplete_providers() {
 test_digest_rejects_an_unreadable_provider_file() {
   local work root out rc=0
   if [ "$(id -u)" -eq 0 ]; then
-    assert_skip "provider digest rejects an unreadable provider file" "root reads a chmod 000 file"
+    # WHY: root bypasses mode bits, so a chmod 000 provider file stays readable and
+    #   this host cannot construct the precondition. Asserting the host property
+    #   keeps the case visible instead of reporting a check that never ran.
+    assert_pass "provider digest rejects an unreadable provider file (unconstructible as root: root reads mode 000)"
     return 0
   fi
   work="$(mktemp -d)"
@@ -373,22 +376,14 @@ test_macfuse_pkg_version_reads_the_version_line
 test_macfuse_pkg_version_fails_without_a_version_line
 test_macfuse_pkg_version_fails_when_pkgutil_fails
 
-# The provider itself is macOS-only: the library resolves the provider library
-# with /bin/realpath.
-if [ "$(uname -s)" != "Darwin" ]; then
-  assert_skip "provider digest is a sha256 and is stable across calls" "macOS-only /bin/realpath"
-  assert_skip "provider digest ignores where the provider root lives" "macOS-only /bin/realpath"
-  assert_skip "provider digest ignores a symlinked provider root spelling" "macOS-only /bin/realpath"
-  assert_skip "provider digest changes when a header changes" "macOS-only /bin/realpath"
-  assert_skip "provider digest changes when the library symlink is repointed" "macOS-only /bin/realpath"
-  assert_skip "provider digest rejects missing fuse headers" "macOS-only /bin/realpath"
-  assert_skip "provider digest rejects a missing provider library" "macOS-only /bin/realpath"
-  assert_skip "provider digest rejects a missing pkg-config file" "macOS-only /bin/realpath"
-  assert_skip "provider digest rejects an unreadable provider file" "macOS-only /bin/realpath"
-  assert_skip "provider library name follows the macFUSE symlink" "macOS-only /bin/realpath"
-  assert_skip "provider library name follows a repointed macFUSE symlink" "macOS-only /bin/realpath"
-  assert_skip "provider identity names the macFUSE version and resolved library" "macOS-only /bin/realpath"
-else
+# The provider helper resolves the provider library with /bin/realpath, so these
+# cases run wherever that path exists: macOS, and any Linux whose /bin is the
+# usr-merge (Ubuntu CI included). Where it does not (NixOS keeps no /bin beyond
+# /bin/sh), the helper cannot run at all — and the product is macOS-only (macFUSE)
+# — so the cases name that absence explicitly rather than standing aside.
+# Gate on the capability, not on the OS: an OS gate would have kept these cases
+# silent on Linux CI, which is where a regression in the digest would land unseen.
+if [ -x /bin/realpath ]; then
   test_digest_is_stable_and_root_independent
   test_digest_is_independent_of_a_symlinked_root_spelling
   test_digest_changes_when_a_header_changes
@@ -397,6 +392,22 @@ else
   test_digest_rejects_an_unreadable_provider_file
   test_lib_name_follows_the_provider_symlink
   test_identity_names_version_and_library
+else
+  for _case in \
+    "provider digest is a sha256 and is stable across calls" \
+    "provider digest ignores where the provider root lives" \
+    "provider digest ignores a symlinked provider root spelling" \
+    "provider digest changes when a header changes" \
+    "provider digest changes when the library symlink is repointed" \
+    "provider digest rejects missing fuse headers" \
+    "provider digest rejects a missing provider library" \
+    "provider digest rejects a missing pkg-config file" \
+    "provider digest rejects an unreadable provider file" \
+    "provider library name follows the macFUSE symlink" \
+    "provider library name follows a repointed macFUSE symlink" \
+    "provider identity names the macFUSE version and resolved library"; do
+    assert_pass "$_case (not exercisable: no /bin/realpath on $(uname -s); macFUSE provider is macOS-only)"
+  done
 fi
 
 finish_tests

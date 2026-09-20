@@ -92,18 +92,27 @@ test_invoked_system_binaries_exist() {
   #   confirmed to be referenced first, so this list cannot rot into asserting
   #   nothing; provisioning-owned paths (/usr/local, /Applications) are
   #   deliberately absent because the script handles their absence itself.
-  if [ "$(uname -s)" != "Darwin" ]; then
-    assert_skip "system binaries the script invokes exist" "not macOS"
-    return
-  fi
-  local path
+  local path hosts
   path=/usr/bin/sudo
   if ! grep -qF "$path" "$CHARGE_LIMIT_SCRIPT"; then
     assert_fail "script still references [$path]" "not found in the script"
-  elif [ -x "$path" ]; then
-    assert_pass "script invokes an existing binary [$path]"
+    return
+  fi
+  # The script is host-scoped to MacBook (src/hosts/MacBook), so only that host's
+  # deployment ever invokes it. Host scoping is assertable everywhere; the binary
+  # itself can only be probed on the host that runs the script, so everywhere else
+  # the assertion names that fact rather than stepping aside.
+  hosts="$(find "$SCRIPT_DIR/../../src/hosts" -name 'macos-charge-limit.sh' -print)"
+  if [ "$hosts" != "$SCRIPT_DIR/../../src/hosts/MacBook/scripts/macos-charge-limit.sh" ]; then
+    assert_fail "charge-limit script stays host-scoped to MacBook" "found: [$hosts]"
+  elif [ "$(uname -s)" = "Darwin" ]; then
+    if [ -x "$path" ]; then
+      assert_pass "script invokes an existing binary [$path]"
+    else
+      assert_fail "script invokes an existing binary [$path]" "not executable"
+    fi
   else
-    assert_fail "script invokes an existing binary [$path]" "not executable"
+    assert_pass "charge-limit script stays host-scoped to MacBook, so [$(uname -s)] never invokes [$path]"
   fi
 }
 

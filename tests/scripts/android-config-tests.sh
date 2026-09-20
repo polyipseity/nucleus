@@ -19,15 +19,6 @@ export NUCLEUS_VM_ANDROID_REBOOT_SETTLE_SECONDS=0
 export NUCLEUS_VM_ANDROID_POLL_INTERVAL=0.1
 export NUCLEUS_VM_ANDROID_SIDLELOAD_PROBE_TIMEOUT=1
 
-# Skip on CI — ADB probes require a running Android VM which is not available on
-# GitHub Actions runners. All test functions mock ADB, but the skip avoids any
-# real ADB probe side-effects from sourced library init.
-if [ "${CI:-}" = true ] || [ "${GITHUB_ACTIONS:-}" = true ]; then
-  echo "android-config-tests: skipped (no Android VM in CI)"
-  echo "# nucleus-tally passed=0 failed=0 skipped=16"
-  exit 0
-fi
-
 _failures=0
 _tmp="$(mktemp -d)"
 trap 'rm -rf "$_tmp"' EXIT
@@ -720,8 +711,8 @@ test_fastboot_wait_detects_existing_fastboot
 
 if [ "$_failures" -gt 0 ]; then
   echo "android-config-tests: $_failures failure(s)"
-  echo "# nucleus-tally passed=0 failed=$_failures skipped=0"
+  echo "# nucleus-tally passed=0 failed=$_failures"
   exit 1
 fi
 echo "android-config-tests: all passed"
-echo "# nucleus-tally passed=16 failed=0 skipped=0"
+echo "# nucleus-tally passed=16 failed=0"

@@ -90,6 +90,38 @@ try {
   } else {
     Assert-Pass 'step 14: a backtick-e escape sequence is reported'
   }
+  # 3. The removed skip mechanism list covers the test-harness counter.
+  #    The tokens are composed at runtime: step 14 scans tracked .ps1/.sh files,
+  #    this test file included, so a literal token here would be a finding
+  #    against the gate's own test. The fixture is a symlink under tests/ (the
+  #    scoped skip scan only accepts paths under src/scripts, scripts or tests)
+  #    pointing at a file outside the repo, so a killed run leaks a dangling
+  #    symlink rather than a gate-violating file in the tree.
+  $skipToken = 'assert' + '_skip'
+  $counterToken = 'TESTS_' + 'SKIP' + 'PED'
+  $skipFixture = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "nucleus-skip-construct-$([guid]::NewGuid().ToString('N')).sh"
+  $skipLink = Join-Path $repoRoot 'tests/scripts/removed-skip-construct-fixture.sh'
+  Set-Content -Path $skipFixture -Value @("$skipToken case-name case-reason", "echo $counterToken")
+  New-Item -ItemType SymbolicLink -Path $skipLink -Target $skipFixture -Force > $null
+  try {
+    # WHY: the scoped skip scan only accepts repo-relative paths under
+    # tests/ (an absolute path fails the prefix test), so run it from the root.
+    $skipScan = $null
+    Push-Location -LiteralPath $repoRoot
+    try {
+      $skipScan = Invoke-LoggingFormatPolicy -Paths @('tests/scripts/removed-skip-construct-fixture.sh')
+    } finally {
+      Pop-Location
+    }
+    if ($skipScan.Status -eq 0 -or $skipScan.Output -notmatch $skipToken -or $skipScan.Output -notmatch $counterToken) {
+      Assert-Fail 'step 14: a removed skip construct' "exit $($skipScan.Status); $($skipScan.Output.Trim())"
+    } else {
+      Assert-Pass 'step 14: the test-harness skip counter is reported as a removed skip construct'
+    }
+  } finally {
+    if (Test-Path -LiteralPath $skipLink) { Remove-Item -LiteralPath $skipLink -Force }
+    if (Test-Path -LiteralPath $skipFixture) { Remove-Item -LiteralPath $skipFixture -Force }
+  }
 } finally {
   if (Test-Path -LiteralPath $fixtureDir) {
     Remove-Item -Path $fixtureDir -Recurse -Force

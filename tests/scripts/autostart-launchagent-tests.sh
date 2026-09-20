@@ -282,7 +282,7 @@ PLUTIL
 test_scalar_program_plist_is_removed() {
   local rc=0
   make_fixture
-  rc="$(run_autostart disable AppOwned "$FIXTURE_ROOT/out.txt")"
+  rc="$(run_autostart disable AppOwned "$FIXTURE_ROOT/out.txt" true MacBook)"
   if [ "$rc" -eq 0 ] && [ ! -f "$FIXTURE_AGENTS/com.example.appowned.plist" ]; then
     assert_pass "an app-owned plist declaring a scalar Program is removed"
   else
@@ -294,7 +294,7 @@ test_scalar_program_plist_is_removed() {
 test_program_arguments_plist_is_removed() {
   local rc=0
   make_fixture
-  rc="$(run_autostart disable ArrayApp "$FIXTURE_ROOT/out.txt")"
+  rc="$(run_autostart disable ArrayApp "$FIXTURE_ROOT/out.txt" true MacBook)"
   if [ "$rc" -eq 0 ] && [ ! -f "$FIXTURE_AGENTS/com.example.arrayapp.plist" ]; then
     assert_pass "an app-owned plist declaring ProgramArguments is still removed"
   else
@@ -306,7 +306,7 @@ test_program_arguments_plist_is_removed() {
 test_foreign_plist_is_kept() {
   local rc=0
   make_fixture
-  rc="$(run_autostart disable ForeignApp "$FIXTURE_ROOT/out.txt")"
+  rc="$(run_autostart disable ForeignApp "$FIXTURE_ROOT/out.txt" true MacBook)"
   if [ "$rc" -eq 0 ] && [ -f "$FIXTURE_AGENTS/com.example.foreignapp.plist" ]; then
     assert_pass "a plist whose program points elsewhere is never removed"
   else
@@ -318,7 +318,7 @@ test_foreign_plist_is_kept() {
 test_fskit_module_is_reported_present() {
   local rc=0
   make_fixture
-  rc="$(run_autostart status FSKitApp "$FIXTURE_ROOT/out.txt")"
+  rc="$(run_autostart status FSKitApp "$FIXTURE_ROOT/out.txt" true MacBook)"
   # Match the state column exactly: the literal 'enabled' also occurs in 'disabled'.
   if [ "$rc" -eq 0 ] && grep -Eq '^FSKitApp[[:space:]]+enabled[[:space:]]' "$FIXTURE_ROOT/out.txt"; then
     assert_pass "an FSKit module listed in FSKit's enabled modules is reported enabled"
@@ -331,7 +331,7 @@ test_fskit_module_is_reported_present() {
 test_fskit_module_converge_skips_approval_instructions() {
   local rc=0
   make_fixture
-  rc="$(run_autostart enable FSKitApp "$FIXTURE_ROOT/out.txt")"
+  rc="$(run_autostart enable FSKitApp "$FIXTURE_ROOT/out.txt" true MacBook)"
   if [ "$rc" -eq 0 ] &&
     grep -q 'FSKit module registered' "$FIXTURE_ROOT/out.txt" &&
     ! grep -q 'fixture approval instructions' "$FIXTURE_ROOT/out.txt"; then
@@ -345,7 +345,7 @@ test_fskit_module_converge_skips_approval_instructions() {
 test_unregistered_fskit_module_keeps_approval_instructions() {
   local rc=0
   make_fixture
-  rc="$(run_autostart enable FSKitApp "$FIXTURE_ROOT/out.txt" false)"
+  rc="$(run_autostart enable FSKitApp "$FIXTURE_ROOT/out.txt" false MacBook)"
   if [ "$rc" -eq 0 ] && grep -q 'fixture approval instructions' "$FIXTURE_ROOT/out.txt"; then
     assert_pass "an FSKit module without an enabled-module list keeps its approval instructions"
   else
@@ -362,7 +362,7 @@ test_unregistered_fskit_module_keeps_approval_instructions() {
 test_unlisted_fskit_module_keeps_approval_instructions() {
   local rc=0
   make_fixture
-  rc="$(run_autostart enable FSKitApp "$FIXTURE_ROOT/out.txt" other)"
+  rc="$(run_autostart enable FSKitApp "$FIXTURE_ROOT/out.txt" other MacBook)"
   if [ "$rc" -eq 0 ] &&
     grep -q 'fixture approval instructions' "$FIXTURE_ROOT/out.txt" &&
     ! grep -q 'FSKit module registered' "$FIXTURE_ROOT/out.txt"; then
@@ -428,25 +428,19 @@ test_macos_only_kind_is_rejected_off_macos() {
   rm -rf "$FIXTURE_ROOT"
 }
 
-if [ "$(uname -s)" != "Darwin" ]; then
-  # The convergence path under test is the macOS login-item one; on other hosts the
-  # XDG/registry branches run instead.
-  assert_skip "app-owned LaunchAgent plist removal" "macOS-only convergence path"
-  assert_skip "app-owned LaunchAgent ProgramArguments removal" "macOS-only convergence path"
-  assert_skip "foreign LaunchAgent plist is preserved" "macOS-only convergence path"
-  assert_skip "FSKit module registration is reported enabled" "macOS-only convergence path"
-  assert_skip "listed FSKit module converge skips approval instructions" "macOS-only convergence path"
-  assert_skip "FSKit module without an enabled-module list keeps approval instructions" "macOS-only convergence path"
-  assert_skip "FSKit module missing from the enabled-module list keeps approval instructions" "macOS-only convergence path"
-else
-  test_scalar_program_plist_is_removed
-  test_program_arguments_plist_is_removed
-  test_foreign_plist_is_kept
-  test_fskit_module_is_reported_present
-  test_fskit_module_converge_skips_approval_instructions
-  test_unregistered_fskit_module_keeps_approval_instructions
-  test_unlisted_fskit_module_keeps_approval_instructions
-fi
+# The macOS login-item branch is exercised on every host: NUCLEUS_HOST pins the
+# host, and run_autostart mocks plutil, stat, dscl, and systemextensionsctl, so the
+# branch's own tool use is what the mocks answer. The product never calls
+# launchctl on this path, so nothing here needs macOS. Running the cases
+# everywhere is the point: a macOS-only suite that steps aside off macOS stops
+# guarding the branch precisely where nobody is watching it.
+test_scalar_program_plist_is_removed
+test_program_arguments_plist_is_removed
+test_foreign_plist_is_kept
+test_fskit_module_is_reported_present
+test_fskit_module_converge_skips_approval_instructions
+test_unregistered_fskit_module_keeps_approval_instructions
+test_unlisted_fskit_module_keeps_approval_instructions
 
 test_manual_app_reports_approval_instructions
 test_manual_app_status_shows_manual

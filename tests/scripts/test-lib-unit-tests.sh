@@ -139,23 +139,23 @@ test_check_suite_tally_contract() {
 finish_tests
 EOF
 
-  printf '# nucleus-tally passed=3 failed=0 skipped=0\n' >"$_capture"
+  printf '# nucleus-tally passed=3 failed=0\n' >"$_capture"
   assert_case "tally: clean pass accepted" "0:" "$(_tally_check "$_suite" "$_capture" 0)"
 
-  printf '# nucleus-tally passed=2 failed=1 skipped=0\n' >"$_capture"
+  printf '# nucleus-tally passed=2 failed=1\n' >"$_capture"
   assert_case "tally: reported failure accepted" "0:" "$(_tally_check "$_suite" "$_capture" 1)"
 
   : >"$_capture"
   assert_case "tally: missing tally rejected" "1:no tally (found 0)" "$(_tally_check "$_suite" "$_capture" 0)"
 
-  printf '# nucleus-tally passed=1 failed=0 skipped=0\n# nucleus-tally passed=1 failed=0 skipped=0\n' >"$_capture"
+  printf '# nucleus-tally passed=1 failed=0\n# nucleus-tally passed=1 failed=0\n' >"$_capture"
   assert_case "tally: duplicate tally rejected" "1:no tally (found 2)" "$(_tally_check "$_suite" "$_capture" 0)"
 
-  printf '# nucleus-tally passed=1 failed=2 skipped=0\n' >"$_capture"
+  printf '# nucleus-tally passed=1 failed=2\n' >"$_capture"
   assert_case "tally: failed>0 with exit 0 rejected" "1:tally reports 2 failed but the suite exited 0" \
     "$(_tally_check "$_suite" "$_capture" 0)"
 
-  printf '# nucleus-tally passed=1 failed=0 skipped=0\n' >"$_capture"
+  printf '# nucleus-tally passed=1 failed=0\n' >"$_capture"
   assert_case "tally: failed=0 with exit 1 rejected" "1:tally reports no failures but the suite exited 1" \
     "$(_tally_check "$_suite" "$_capture" 1)"
 

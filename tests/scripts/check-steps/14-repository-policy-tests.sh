@@ -284,8 +284,42 @@ test_step14_capture_pair_behavioral_negative() {
   return 0
 }
 
+# The removed-skip list must cover the test-harness skip counter. The tokens are
+# composed at runtime: step 14 scans tracked .sh files, this file included, so a
+# literal token here would be a finding against the gate's own test.
+test_step14_removed_skip_constructs_detection() {
+  local _tmp _out _assert_token _counter_token
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  _assert_token="assert""_skip"
+  _counter_token="TESTS_""SKIP""PED"
+  printf '%s case-name case-reason\n' "$_assert_token" >"$_tmp/violating.sh"
+  printf 'echo "$%s"\n' "$_counter_token" >>"$_tmp/violating.sh"
+  awk -v mode=skip-constructs -f "$REPO_ROOT/src/scripts/checks/check-steps/repository-policy.awk" "$_tmp/violating.sh" >"$_out" 2>&1
+  if ! grep -q "$_assert_token" "$_out" || ! grep -q "$_counter_token" "$_out"; then
+    echo "FAIL: the removed skip list must report $_assert_token and $_counter_token"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  printf 'plain_function() { :; }\n' >"$_tmp/clean.sh"
+  awk -v mode=skip-constructs -f "$REPO_ROOT/src/scripts/checks/check-steps/repository-policy.awk" "$_tmp/clean.sh" >"$_out" 2>&1
+  if [ -s "$_out" ]; then
+    echo "FAIL: a clean shell file must report no removed skip construct"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
 failures=0
 for test in \
+  test_step14_removed_skip_constructs_detection \
   test_step14_naming_behavioral_positive \
   test_step14_naming_behavioral_negative \
   test_step14_naming_behavioral_exemption \

@@ -53,23 +53,15 @@ test_absent_path_is_silent_no_op() {
   rm -rf "$tmp"
 }
 
-# The immutable-flag call is only executable on a host whose PATH provides the
-# tool. nucleus installs chattr nowhere, so the Linux branch is inert and cannot
-# be exercised here; the skip keeps that gap visible instead of passing silently.
-require_immutable_flag_support() {
-  local label="$1"
-  if command -v chflags >/dev/null 2>&1; then
-    return 0
-  fi
-  assert_skip "$label" "chflags unavailable on this host; the Linux chattr branch is inert in nucleus"
-  return 1
-}
+# _nucleus_protect_symlink and _nucleus_unprotect_symlink must succeed silently
+# whether or not the host provides chflags: macOS sets the immutable flag on the
+# symlink, while NixOS protection is detection-based, because chattr needs
+# CAP_LINUX_IMMUTABLE and a user-scope activation cannot grant it. The cases below
+# assert the same contract — exit 0, no output — on every host, so a non-zero exit
+# or any output is a regression on either.
 
 test_dangling_symlink_is_accepted() {
   local tmp fn
-  if ! require_immutable_flag_support "_nucleus_protect_symlink accepts a dangling symlink"; then
-    return 0
-  fi
   tmp="$(mktemp -d)"
   ln -s "$tmp/gone" "$tmp/dangling"
   for fn in _nucleus_protect_symlink _nucleus_unprotect_symlink; do
@@ -80,9 +72,6 @@ test_dangling_symlink_is_accepted() {
 
 test_existing_symlink_is_accepted() {
   local tmp fn
-  if ! require_immutable_flag_support "_nucleus_protect_symlink accepts an existing symlink"; then
-    return 0
-  fi
   tmp="$(mktemp -d)"
   : >"$tmp/target"
   ln -s "$tmp/target" "$tmp/live"

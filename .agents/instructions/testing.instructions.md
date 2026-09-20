@@ -137,7 +137,9 @@ Test scripts only, not production code.
 - **Fail-closed suites**: a suite that sources `tests/scripts/test-lib.sh` must end with
   `finish_tests`. It is the only sanctioned exit and the only emitter of the `# nucleus-tally`
   line that test step 5 requires, so a suite that exits early, or calls it from a branch that
-  never runs, is reported as `no tally` instead of passing. Prerequisites fail loudly through
+  never runs, is reported as `no tally` instead of passing. The tally carries only
+  `passed` and `failed`: there is no skip count, because a case that cannot run on this host
+  asserts the host-correct expectation instead of stepping aside. Prerequisites fail loudly through
   the library's `require_command`, never a skip-guard. Note that `src/scripts/lib/lib.sh`
   defines a `die`-based `require_command` for production scripts: a suite sourcing both
   libraries gets that one, and the missing tally is what surfaces the mistake. The
