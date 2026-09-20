@@ -174,6 +174,20 @@ test_fails_when_the_write_is_refused() {
   rm -rf "$work"
 }
 
+test_fails_when_the_value_cannot_be_read_back() {
+  local work
+  work="$(mktemp -d)"
+  mkdir -p "$work/BAT0"
+  # WHY: a symlink to /dev/null accepts the write and then reports EOF, which is
+  # the way to reach the read-back arm; a file that silently keeps a different
+  # value cannot be built as a fixture.
+  ln -s /dev/null "$work/BAT0/charge_control_end_threshold"
+
+  assert_status "a value that cannot be read back fails activation" 1 "$work"
+
+  rm -rf "$work"
+}
+
 test_fails_when_the_power_supply_root_is_missing() {
   local work
   work="$(mktemp -d)"
@@ -191,6 +205,7 @@ test_writes_the_ceiling_when_the_resume_attribute_is_absent
 test_converges_upwards_from_a_lower_value
 test_ignores_hardware_without_the_attribute
 test_fails_when_the_write_is_refused
+test_fails_when_the_value_cannot_be_read_back
 test_fails_when_the_power_supply_root_is_missing
 
 finish_tests
