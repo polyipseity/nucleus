@@ -85,9 +85,13 @@ function Invoke-UvSetup {
     if ($entry.python) {
       $toolPythonVersion[$entry.name] = $entry.python
     }
-    if (-not $entry.pin) { continue }
-    if ($entry.pin -notmatch '^flake:(.+)$') {
-      Write-NucleusError -CommandName 'Invoke-UvSetup' "unsupported pin '$($entry.pin)' for tool '$($entry.name)'; expected 'flake:<node>'"
+    # WHY: StrictMode throws on a missing property, and a uv entry with no pin means
+    # "nothing pinned to enforce" rather than an error to report.
+    $pinProperty = $entry.PSObject.Properties['pin']
+    $pin = if ($pinProperty) { $pinProperty.Value } else { $null }
+    if (-not $pin) { continue }
+    if ($pin -notmatch '^flake:(.+)$') {
+      Write-NucleusError -CommandName 'Invoke-UvSetup' "unsupported pin '$pin' for tool '$($entry.name)'; expected 'flake:<node>'"
       return
     }
     $nodeName = $Matches[1]

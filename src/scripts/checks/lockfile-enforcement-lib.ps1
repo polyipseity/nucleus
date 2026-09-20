@@ -96,9 +96,13 @@ function Invoke-LockfileEnforcement {
   # uv's PEP 610 record, which stores the installed commit.
   if (Get-Command uv -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
     foreach ($entry in @($desiredEntries['uv'])) {
-      if (-not $entry.pin) { continue }
-      if ($entry.pin -notmatch '^flake:(.+)$') {
-        & $ErrorFn "uv.$($entry.name)`: unsupported pin '$($entry.pin)'; expected 'flake:<node>'"; $errors++
+      # WHY: StrictMode throws on a missing property, and a uv entry with no pin means
+      # "nothing pinned to enforce" rather than an error to report.
+      $pinProperty = $entry.PSObject.Properties['pin']
+      $pin = if ($pinProperty) { $pinProperty.Value } else { $null }
+      if (-not $pin) { continue }
+      if ($pin -notmatch '^flake:(.+)$') {
+        & $ErrorFn "uv.$($entry.name)`: unsupported pin '$pin'; expected 'flake:<node>'"; $errors++
         continue
       }
       $nodeName = $Matches[1]
