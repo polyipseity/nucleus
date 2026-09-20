@@ -261,6 +261,33 @@ test_timeout_asks_locally() {
   fi
 }
 
+test_unwritable_state_answers_ask() {
+  # A USER root that cannot be written must not leave the harness without a
+  # document: Copilot reads an unanswered PreToolUse hook as a denial, so the
+  # failure has to come back as `ask` and let the harness prompt locally.
+  local _ro_home="$TMPDIR_ROOT/ro-home"
+  mkdir -p "$_ro_home/.local/state/nucleus"
+  printf '%s\n' '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"enable":true}}' \
+    >"$_ro_home/.local/state/nucleus/config.json"
+  chmod 500 "$_ro_home"
+  : >"$HARNESS_APPROVAL_LOG"
+  local _rc=0
+  local _out=""
+  local _start=$SECONDS
+  _out="$(HOME="$_ro_home" PATH="$TMPDIR_ROOT/bin:$PATH" \
+    bash "$APPROVAL" pi bash "rm -rf build" 30)" || _rc=$?
+  local _elapsed=$((SECONDS - _start))
+  local _residue
+  _residue="$(find "$TMPDIR_ROOT" -name '*.tmp' -print -quit 2>/dev/null)"
+  chmod 700 "$_ro_home"
+  if [ "$_rc" -eq 0 ] && [ "$_out" = "ask" ] && [ "$_elapsed" -lt 5 ] &&
+    [ -z "$_residue" ] && [ ! -s "$HARNESS_APPROVAL_LOG" ]; then
+    assert_pass "an unwritable state directory answers ask at once"
+  else
+    assert_fail "unwritable-state" "rc=$_rc out=$_out elapsed=${_elapsed}s residue=$_residue log=$(cat "$HARNESS_APPROVAL_LOG")"
+  fi
+}
+
 test_disabled_bridge_asks_without_request() {
   write_config '{"harness-notify":{"enable":false,"channels":["telegram"]}}'
   : >"$HARNESS_APPROVAL_LOG"
@@ -353,12 +380,17 @@ test_request_is_announced() {
   _log="$(wait_for_announcement || true)"
   answer_request "$_request" deny
   wait_for_decision
+  # The publish goes through a temporary name, so the announced request must be
+  # the only file the glob can see.
+  local _residue
+  _residue="$(find "$(dirname -- "$_request")" -name '*.tmp' -print -quit 2>/dev/null)"
   if grep -qF 'approval needed' <<<"$_log" &&
     grep -qF "/harness approve $_id" <<<"$_log" &&
-    grep -qF 'rm -rf build' <<<"$_log"; then
-    assert_pass "the notification names the action and the request id to answer"
+    grep -qF 'rm -rf build' <<<"$_log" &&
+    [ -z "$_residue" ]; then
+    assert_pass "the request is published whole and the notification names the action and its id"
   else
-    assert_fail "announce" "log: $_log"
+    assert_fail "announce" "log: $_log residue: $_residue"
   fi
 }
 
@@ -388,6 +420,7 @@ test_request_file_carries_the_action() {
 test_remote_allow
 test_remote_deny
 test_timeout_asks_locally
+test_unwritable_state_answers_ask
 test_disabled_bridge_asks_without_request
 test_approval_disabled_asks_without_request
 test_unset_approval_gate_defaults_to_off

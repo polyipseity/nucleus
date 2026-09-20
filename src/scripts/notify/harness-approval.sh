@@ -105,10 +105,15 @@ _ha_finish() {
   *) _ha_decision="ask" ;;
   esac
   _ha_log_dir="$_ha_root/logs"
-  mkdir -p "$_ha_log_dir"
-  printf '%s\t%s\t%s\t%s\t%s\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$_ha_harness" "$_ha_tool" "$_ha_decision" "$_ha_summary" \
-    >>"$_ha_log_dir/harness-bridge.log"
+  # Best-effort: the decision is already made, and a hook that prints nothing is
+  # read as a denial by Copilot, so an unwritable log directory must not swallow
+  # the answer.
+  if ! { mkdir -p "$_ha_log_dir" &&
+    printf '%s\t%s\t%s\t%s\t%s\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$_ha_harness" "$_ha_tool" "$_ha_decision" "$_ha_summary" \
+      >>"$_ha_log_dir/harness-bridge.log"; }; then
+    warn "could not write the harness-bridge audit log"
+  fi
   _ha_render "$_ha_decision"
   exit 0
 }
@@ -155,29 +160,49 @@ _ha_timeout="${_ha_timeout_arg:-$(jq -r '."harness-approval"."timeout-seconds"' 
 _ha_dir="$_ha_root/state/harness-bridge"
 _ha_requests="$_ha_dir/requests"
 _ha_responses="$_ha_dir/responses"
-mkdir -p "$_ha_requests" "$_ha_responses"
+# The state tree is the first thing this script has to create under the USER
+# root, so an unwritable root fails here: answering `ask` keeps the harness's own
+# prompt instead of letting `set -e` end the run without a document.
+if ! mkdir -p "$_ha_requests" "$_ha_responses"; then
+  warn "could not create the harness-bridge state directory"
+  _ha_finish ask
+fi
 
 # A harness killed mid-poll leaves its request behind; such an entry can never
-# be answered and would otherwise stay in `/harness status` forever.  The
-# generous factor keeps a slow-but-live approval untouched.
+# be answered and would otherwise stay in `/harness status` forever.  An
+# interrupted publish leaves a `.tmp` companion the same way.  The generous
+# factor keeps a slow-but-live approval untouched.
 _ha_stale_after=$((_ha_timeout * 4))
 # Best-effort: a failed sweep must not block the approval — the request file for
 # this call is still written, and /harness status stays correct for new entries.
-if ! find "$_ha_requests" "$_ha_responses" -name '*.json' \
+if ! find "$_ha_requests" "$_ha_responses" \( -name '*.json' -o -name '*.tmp' \) \
   -mmin "+$((_ha_stale_after / 60 + 1))" -delete 2>/dev/null; then
   warn "could not sweep stale harness-bridge state"
 fi
 
 _ha_id="$(od -An -N4 -tx1 /dev/urandom | tr -d ' \n')"
 _ha_request="$_ha_requests/$_ha_id.json"
-jq -n \
+# WHY a temporary name beside the destination: the bridge plugin lists requests
+# with a glob, so a request has to appear complete or not at all, and a failed
+# publish must still leave the caller a decision.
+_ha_request_tmp="$_ha_request.tmp"
+if ! jq -n \
   --arg id "$_ha_id" \
   --arg harness "$_ha_harness" \
   --arg tool "$_ha_tool" \
   --arg summary "$_ha_summary" \
   --argjson created_at "$(date +%s)" \
   '{id: $id, harness: $harness, tool: $tool, summary: $summary, created_at: $created_at}' \
-  >"$_ha_request"
+  >"$_ha_request_tmp"; then
+  rm -f "$_ha_request_tmp"
+  warn "could not write the approval request"
+  _ha_finish ask
+fi
+if ! mv -f "$_ha_request_tmp" "$_ha_request"; then
+  rm -f "$_ha_request_tmp"
+  warn "could not publish the approval request"
+  _ha_finish ask
+fi
 
 # Best-effort: the request file is the source of truth, so a failed notification
 # only means the user has to look at /harness status instead of being pinged.

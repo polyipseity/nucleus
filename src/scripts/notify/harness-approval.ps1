@@ -293,13 +293,14 @@ function Request-HarnessApproval {
   $null = New-Item -ItemType Directory -Path $requestsDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
   $null = New-Item -ItemType Directory -Path $responsesDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
 
-  # A harness killed mid-poll leaves its request behind; such an entry can never
-  # be answered and would otherwise stay in `/harness status` forever.
+  # A harness killed mid-poll leaves its request behind, and an interrupted
+  # publish leaves a `.tmp` companion; neither can ever be answered and both
+  # would otherwise stay in `/harness status` forever.
   $staleCutoff = [DateTime]::UtcNow.AddSeconds(-4 * $TimeoutSeconds)
   try {
     foreach ($dir in @($requestsDir, $responsesDir)) {
-      Get-ChildItem -LiteralPath $dir -Filter '*.json' -File |
-        Where-Object { $_.LastWriteTimeUtc -lt $staleCutoff } |
+      Get-ChildItem -LiteralPath $dir -File |
+        Where-Object { ($_.Name -like '*.json' -or $_.Name -like '*.tmp') -and $_.LastWriteTimeUtc -lt $staleCutoff } |
         Remove-Item -Force
     }
   }
@@ -318,7 +319,17 @@ function Request-HarnessApproval {
     summary    = $Summary
     created_at = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
   } -Compress -Depth 5
-  [System.IO.File]::WriteAllText($requestPath, $requestJson, [System.Text.UTF8Encoding]::new($false))
+  # WHY a temporary name beside the destination: the bridge plugin lists
+  # requests with a glob, so a request has to appear complete or not at all.
+  $requestTempPath = "$requestPath.tmp"
+  try {
+    [System.IO.File]::WriteAllText($requestTempPath, $requestJson, [System.Text.UTF8Encoding]::new($false))
+    [System.IO.File]::Move($requestTempPath, $requestPath, $true)
+  }
+  catch {
+    Remove-Item -LiteralPath $requestTempPath -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: the failure being reported is the publish itself; the temporary file may not exist
+    throw
+  }
 
   # Best-effort: the request file is the source of truth, so a failed
   # notification only means the user looks at /harness status instead of being

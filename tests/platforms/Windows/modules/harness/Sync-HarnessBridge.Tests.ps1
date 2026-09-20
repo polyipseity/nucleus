@@ -489,6 +489,10 @@ Describe 'harness-approval.ps1 Windows twin' {
     $request['tool'] | Should -Be 'bash'
     $request['summary'] | Should -Be 'git push --force'
 
+    # The publish goes through a temporary name, so the announced request must be
+    # the only file the glob can see.
+    @(Get-ChildItem -LiteralPath (Join-Path -Path $stateDir -ChildPath 'requests') -Filter '*.tmp' -File).Count | Should -Be 0
+
     $responsePath = Join-Path -Path (Join-Path -Path $stateDir -ChildPath 'responses') -ChildPath (Split-Path -Path $requestPath -Leaf)
     [System.IO.File]::WriteAllText($responsePath, '{"decision":"allow","decided_by":"test"}', [System.Text.UTF8Encoding]::new($false))
 
@@ -497,6 +501,7 @@ Describe 'harness-approval.ps1 Windows twin' {
     $result.Stdout | Should -Be 'allow'
 
     @(Get-ChildItem -LiteralPath $stateDir -Recurse -Filter '*.json' -File).Count | Should -Be 0
+    @(Get-ChildItem -LiteralPath $stateDir -Recurse -Filter '*.tmp' -File).Count | Should -Be 0
 
     $auditLog = Join-Path -Path (Join-Path -Path $script:approvalSandbox.LocalApp -ChildPath 'nucleus\log') -ChildPath 'harness-bridge.log'
     Test-Path -LiteralPath $auditLog | Should -Be $true
