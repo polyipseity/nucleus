@@ -267,11 +267,19 @@ test_unwritable_state_answers_ask() {
   # A USER root that cannot be written must not leave the harness without a
   # document: Copilot reads an unanswered PreToolUse hook as a denial, so the
   # failure has to come back as `ask` and let the harness prompt locally.
+  #
+  # The state directory lives under the platform's USER root, so the unwritable
+  # level has to be the root's own parent: on macOS `<home>/Library/Application
+  # Support`, elsewhere `<home>/.local/share`. Sealing only `<home>` leaves the
+  # script free to create the root on a host whose root is not nested under it,
+  # and the wait it then takes is the real remote-approval timeout.
   local _ro_home="$TMPDIR_ROOT/ro-home"
-  mkdir -p "$_ro_home/.local/state/nucleus"
+  local _ro_parent
+  _ro_parent="$(dirname "$(user_root_for_home "$_ro_home")")"
+  mkdir -p "$_ro_home/.local/state/nucleus" "$_ro_parent"
   printf '%s\n' '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"enable":true}}' \
     >"$_ro_home/.local/state/nucleus/config.json"
-  chmod 500 "$_ro_home"
+  chmod 500 "$_ro_home" "$_ro_parent"
   : >"$HARNESS_APPROVAL_LOG"
   local _rc=0
   local _out=""
@@ -281,7 +289,7 @@ test_unwritable_state_answers_ask() {
   local _elapsed=$((SECONDS - _start))
   local _residue
   _residue="$(find "$TMPDIR_ROOT" -name '*.tmp' -print -quit 2>/dev/null)"
-  chmod 700 "$_ro_home"
+  chmod 700 "$_ro_home" "$_ro_parent"
   if [ "$_rc" -eq 0 ] && [ "$_out" = "ask" ] && [ "$_elapsed" -lt 5 ] &&
     [ -z "$_residue" ] && [ ! -s "$HARNESS_APPROVAL_LOG" ]; then
     assert_pass "an unwritable state directory answers ask at once"
