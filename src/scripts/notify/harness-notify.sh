@@ -28,6 +28,11 @@
 #                            host has not set up simply fails its delivery and
 #                            is reported as a warning
 #   harness-notify.max-chars integer body cap, default 1200
+#
+# The other two gates belong to their own entry points and do not change what
+# this script sends: `harness-approval.enable` (default false) answers tool calls
+# locally, and `harness-drive.enable` (default true) decides whether a queued
+# prompt is injected after a finished turn.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"

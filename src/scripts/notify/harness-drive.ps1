@@ -48,6 +48,8 @@
   Config (~\.local\state\nucleus\config.json, `nucleus-config`):
     harness-notify.enable  boolean, default true; false disables the whole bridge,
                            so nothing is drained and nothing is injected.
+    harness-drive.enable   boolean, default true; false keeps the completion
+                           notification but never injects a queued prompt.
 #>
 
 [CmdletBinding()]
