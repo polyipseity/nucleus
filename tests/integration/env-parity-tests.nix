@@ -46,25 +46,32 @@ let
   # Subset of vars that have a NixOS entry (should map to a DSC entry).
   nixosVars = builtins.filter (v: v.hasNixOsEntry) manifest;
 
-  # Names of vars that must exist in Windows env.dsc.yml.
+  # Names of vars that must exist in Windows env.dsc.yml. Vars whose catalog entry
+  # carries no Windows value are excluded: the macOS GUI PATH, the Darwin build
+  # SDK vars and the Nix SSL bundle are POSIX-only concerns Windows must not
+  # declare in DSC.
   windowsRequiredVarNames = builtins.filter (
     name:
     name != "NUCLEUS_REPO_ROOT"
     && name != "DEVELOPER_DIR"
     && name != "SDKROOT"
     && name != "LIBRARY_PATH"
+    && name != "PATH"
     && name != "NIX_SSL_CERT_FILE"
   ) envVars.getAllNixVarNames;
 
   # Vars that Windows sets via Sync-ShellProfile.ps1 instead of DSC.
   profileOnlyVarNames = [ ];
 
-  # Vars that Windows sets via apply.ps1 instead of DSC (also in system/env.dsc.yml).
-  applyOnlyVarNames = [ "NUCLEUS_HOST" ];
+  # Vars that Windows sets from a config-sync module instead of DSC:
+  # Sync-HermesConfig.ps1 writes PLAYWRIGHT_BROWSERS_PATH. NUCLEUS_HOST is not
+  # listed anywhere: apply.ps1 only sets it process-locally, and the value
+  # persists through system/env.dsc.yml, so it is DSC-required.
+  syncOnlyVarNames = [ "PLAYWRIGHT_BROWSERS_PATH" ];
 
   # Vars that should be in DSC.
   dscVarNames = builtins.filter (
-    name: !builtins.elem name (profileOnlyVarNames ++ applyOnlyVarNames)
+    name: !builtins.elem name (profileOnlyVarNames ++ syncOnlyVarNames)
   ) windowsRequiredVarNames;
 in
 {
@@ -73,7 +80,7 @@ in
     nixosVars
     windowsRequiredVarNames
     profileOnlyVarNames
-    applyOnlyVarNames
+    syncOnlyVarNames
     dscVarNames
     ;
 }
