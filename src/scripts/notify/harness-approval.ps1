@@ -45,6 +45,8 @@
 
   Config (~\.local\state\nucleus\config.json):
     harness-notify.enable             boolean, default true; false answers `ask`
+    harness-approval.enable           boolean, default false; false answers `ask`
+                                      at once, so the harness prompts locally
     harness-approval.timeout-seconds  integer, default 120
 #>
 
@@ -120,7 +122,11 @@ function Get-HarnessBridgeConfigPath {
 function Get-HarnessBridgeApprovalConfig {
   <#
   .SYNOPSIS
-    Reads the bridge enable flag and approval timeout over the declared defaults.
+    Reads the master flag, the approval gate and the timeout over the defaults.
+  .DESCRIPTION
+    Keeps the config sections apart: both sections declare an enable flag, and
+    flattening them into one hashtable would let the approval flag shadow the
+    master flag.
   .PARAMETER ConfigPath
     Absolute path to the nucleus runtime config file.
   #>
@@ -131,7 +137,10 @@ function Get-HarnessBridgeApprovalConfig {
     [string]$ConfigPath
   )
 
-  $config = @{ enable = $true; 'timeout-seconds' = 120 }
+  $config = @{
+    'harness-approval' = @{ enable = $false; 'timeout-seconds' = 120 }
+    'harness-notify'   = @{ enable = $true }
+  }
   if (-not (Test-Path -LiteralPath $ConfigPath -PathType Leaf)) { return $config }
   $raw = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8
   if ([string]::IsNullOrWhiteSpace($raw)) { return $config }
@@ -139,11 +148,11 @@ function Get-HarnessBridgeApprovalConfig {
   # Malformed JSON throws: the caller answers `ask`, matching the POSIX twin.
   $parsed = ConvertFrom-Json -InputObject $raw -AsHashtable
   if ($parsed -isnot [hashtable]) { return $config }
-  foreach ($sectionName in @('harness-notify', 'harness-approval')) {
+  foreach ($sectionName in @('harness-approval', 'harness-notify')) {
     if (-not $parsed.ContainsKey($sectionName)) { continue }
     $section = $parsed[$sectionName]
     if ($section -isnot [hashtable]) { continue }
-    foreach ($key in $section.Keys) { $config[$key] = $section[$key] }
+    foreach ($key in $section.Keys) { $config[$sectionName][$key] = $section[$key] }
   }
   return $config
 }
@@ -483,11 +492,18 @@ try {
     Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -LogDir $logDir
   }
 
-  if (-not $config.enable) {
+  if (-not $config['harness-notify'].enable) {
     Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -LogDir $logDir
   }
 
-  $timeout = if ($timeoutOverride -gt 0) { $timeoutOverride } else { [int]$config['timeout-seconds'] }
+  # The remote gate is off by default, so the hooks stay wired (a flag flip is all
+  # it takes to re-enable) while every tool call is answered `ask` at once and the
+  # harness keeps its own prompt.
+  if (-not $config['harness-approval'].enable) {
+    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -LogDir $logDir
+  }
+
+  $timeout = if ($timeoutOverride -gt 0) { $timeoutOverride } else { [int]$config['harness-approval']['timeout-seconds'] }
   if ($timeout -lt 1) { $timeout = 1 }
 
   $decision = Request-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText `

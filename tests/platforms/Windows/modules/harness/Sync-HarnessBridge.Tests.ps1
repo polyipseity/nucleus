@@ -466,7 +466,7 @@ Describe 'harness-approval.ps1 Windows twin' {
   }
 
   It 'honours a remote allow decision, clears the request, and audits it' {
-    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') } }
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ enable = $true } }
     $stateDir = Get-BridgeStateDir -Sandbox $script:approvalSandbox
     $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('pi', 'bash', 'git push --force', '30')
 
@@ -504,7 +504,7 @@ Describe 'harness-approval.ps1 Windows twin' {
   }
 
   It 'answers Cursor hook mode with a Cursor permission document when nobody answers' {
-    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ 'timeout-seconds' = 2 } }
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ enable = $true; 'timeout-seconds' = 2 } }
     $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'cursor') -Stdin '{"command":"rm -rf build"}'
     $result = Wait-TwinProcess -Started $started
 
@@ -518,7 +518,7 @@ Describe 'harness-approval.ps1 Windows twin' {
   }
 
   It 'answers Copilot hook mode with a PreToolUse decision document' {
-    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ 'timeout-seconds' = 2 } }
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ enable = $true; 'timeout-seconds' = 2 } }
     $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'copilot') -Stdin '{"tool_name":"runInTerminal","tool_input":{"command":"rm -rf /"}}'
     $result = Wait-TwinProcess -Started $started
 
@@ -530,7 +530,7 @@ Describe 'harness-approval.ps1 Windows twin' {
   }
 
   It 'renders the plain decision for harnesses without a document shape' {
-    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ 'timeout-seconds' = 2 } }
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ enable = $true; 'timeout-seconds' = 2 } }
     $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'opencode') -Stdin '{"title":"run bash"}'
     $result = Wait-TwinProcess -Started $started
 
@@ -538,8 +538,35 @@ Describe 'harness-approval.ps1 Windows twin' {
     $result.Stdout | Should -Be 'ask'
   }
 
+  It 'answers ask at once when the remote gate is disabled' {
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ enable = $false } }
+    $stubLogBefore = @(Get-HermesStubLog -Sandbox $script:approvalSandbox).Count
+
+    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'copilot') -Stdin '{"tool_name":"runInTerminal","tool_input":{"command":"rm -rf /"}}'
+    $result = Wait-TwinProcess -Started $started
+
+    $result.ExitCode | Should -Be 0
+    $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
+    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'ask'
+    @(Get-HermesStubLog -Sandbox $script:approvalSandbox).Count | Should -Be $stubLogBefore
+
+    $stateDir = Get-BridgeStateDir -Sandbox $script:approvalSandbox
+    if (Test-Path -LiteralPath $stateDir) {
+      @(Get-ChildItem -LiteralPath $stateDir -Recurse -Filter '*.json' -File).Count | Should -Be 0
+    }
+  }
+
+  It 'leaves the gate off when the config names no approval section' {
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') } }
+    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('pi', 'bash', 'git push --force', '30')
+    $result = Wait-TwinProcess -Started $started
+
+    $result.ExitCode | Should -Be 0
+    $result.Stdout | Should -Be 'ask'
+  }
+
   It 'still exits 0 with a decision when the payload is malformed' {
-    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ 'timeout-seconds' = 2 } }
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ enable = $true; 'timeout-seconds' = 2 } }
     $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'cursor') -Stdin 'not json at all'
     $result = Wait-TwinProcess -Started $started
 
@@ -629,6 +656,25 @@ Describe 'harness-drive.ps1 Windows twin' {
     $result.Stdout | Should -Be '{}'
     $result.Stderr | Should -Match 'queued prompt is empty'
     Test-Path -LiteralPath $queuedPath | Should -Be $false
+  }
+
+  It 'notifies but drops the queue when driving is disabled' {
+    Set-SandboxConfig -Sandbox $script:driveSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-drive' = @{ enable = $false } }
+    $queueDir = Join-Path -Path (Join-Path -Path (Get-BridgeStateDir -Sandbox $script:driveSandbox) -ChildPath 'commands') -ChildPath 'copilot'
+    if (Test-Path -LiteralPath $queueDir) { Remove-Item -LiteralPath $queueDir -Recurse -Force }
+    $null = Set-SandboxQueuedPrompt -Sandbox $script:driveSandbox -Harness 'copilot' -Name '7000-aaaa.json' -Text 'first'  # check-suppress:suppression_doc: the helper returns the queue path; this test does not need it
+    $null = Set-SandboxQueuedPrompt -Sandbox $script:driveSandbox -Harness 'copilot' -Name '8000-bbbb.json' -Text 'second'  # check-suppress:suppression_doc: the helper returns the queue path; this test does not need it
+    $auditLog = Join-Path -Path (Join-Path -Path $script:driveSandbox.LocalApp -ChildPath 'nucleus\log') -ChildPath 'harness-bridge.log'
+    if (Test-Path -LiteralPath $auditLog) { Remove-Item -LiteralPath $auditLog -Force }
+
+    $started = Invoke-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @('copilot')
+    $result = Wait-TwinProcess -Started $started
+
+    $result.ExitCode | Should -Be 0
+    $result.Stdout | Should -Be '{}'
+    @(Get-ChildItem -LiteralPath $queueDir -Filter '*.json' -File).Count | Should -Be 0
+    @(Get-HermesStubLog -Sandbox $script:driveSandbox | Where-Object { $_.Contains('--subject [copilot] finished') }).Count | Should -BeGreaterThan 0
+    (Get-Content -LiteralPath $auditLog -Raw -Encoding UTF8) | Should -Match 'dropped 2 queued prompt\(s\)'
   }
 
   It 'leaves the queue untouched when the bridge is disabled' {

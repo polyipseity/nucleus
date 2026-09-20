@@ -30,7 +30,9 @@
 #
 # Config (~/.local/state/nucleus/config.json):
 #   harness-notify.enable  boolean, default true; false disables the whole bridge,
-#                          so nothing is drained and nothing is injected.
+#                          so nothing is notified and nothing is drained.
+#   harness-drive.enable   boolean, default true; false keeps the completion
+#                          notification but never injects a queued prompt.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -79,8 +81,8 @@ if [ -f "$HOME/.local/state/nucleus/config.json" ]; then
   _hd_user_config="$(cat "$HOME/.local/state/nucleus/config.json")"
 fi
 if ! _hd_config="$(
-  jq -c --argjson defaults '{"harness-notify":{"enable":true}}' --argjson user "$_hd_user_config" \
-    '$defaults * { "harness-notify": ($user["harness-notify"] // {}) }' <<<'{}'
+  jq -c --argjson defaults '{"harness-notify":{"enable":true},"harness-drive":{"enable":true}}' --argjson user "$_hd_user_config" \
+    '$defaults * { "harness-notify": ($user["harness-notify"] // {}), "harness-drive": ($user["harness-drive"] // {}) }' <<<'{}'
 )"; then
   warn "could not parse nucleus config — not driving"
   _hd_empty "$_hd_harness"
@@ -105,6 +107,36 @@ if ! printf '%s' "$_hd_payload" | "$SCRIPT_DIR/harness-notify.sh" "$_hd_harness"
 fi
 
 _hd_commands="$(derive_nucleus_user_root)/state/harness-bridge/commands/$_hd_harness"
+
+# Driving has its own gate, and it is checked after the notification: with
+# driving off the turn is still announced, it just never continues.
+if [ "$(jq -r '."harness-drive".enable' <<<"$_hd_config")" != "true" ]; then
+  # WHY: a prompt queued while driving is off can never be delivered, and
+  # delivering it hours later (after the flag is flipped back) would be worse
+  # than dropping it, so it is discarded here and recorded in the audit log.
+  _hd_dropped=0
+  if [ -d "$_hd_commands" ]; then
+    for _hd_file in "$_hd_commands"/*.json; do
+      [ -f "$_hd_file" ] || continue
+      if ! rm -f "$_hd_file"; then
+        warn "could not discard the queued prompt '$_hd_file'"
+        continue
+      fi
+      _hd_dropped=$((_hd_dropped + 1))
+    done
+  fi
+  if [ "$_hd_dropped" -gt 0 ]; then
+    _hd_log_dir="$(derive_nucleus_user_root)/logs"
+    mkdir -p "$_hd_log_dir"
+    printf '%s\t%s\t%s\t%s\t%s\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$_hd_harness" "drive" "disabled" \
+      "dropped $_hd_dropped queued prompt(s)" \
+      >>"$_hd_log_dir/harness-bridge.log"
+    warn "harness-drive is disabled — dropped $_hd_dropped queued prompt(s)"
+  fi
+  _hd_empty "$_hd_harness"
+  exit 0
+fi
 
 # Newest by file name: the plugin names each entry "<epoch>-<id>.json", so a
 # lexicographic maximum is the most recently queued prompt.

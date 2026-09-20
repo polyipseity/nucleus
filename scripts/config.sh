@@ -42,7 +42,11 @@ DEFAULTS='{
     "heartbeat": true
   },
   "harness-approval": {
+    "enable": false,
     "timeout-seconds": 120
+  },
+  "harness-drive": {
+    "enable": true
   },
   "harness-notify": {
     "enable": true,

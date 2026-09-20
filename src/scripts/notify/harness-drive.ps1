@@ -113,7 +113,11 @@ function Get-HarnessBridgeConfigPath {
 function Get-HarnessBridgeDriveConfig {
   <#
   .SYNOPSIS
-    Reads the harness-notify enable flag over the declared default.
+    Reads the master flag and the drive gate over the declared defaults.
+  .DESCRIPTION
+    Keeps the config sections apart: both sections declare an enable flag, and
+    flattening them into one hashtable would let the drive flag shadow the
+    master flag.
   .PARAMETER ConfigPath
     Absolute path to the nucleus runtime config file.
   #>
@@ -124,7 +128,10 @@ function Get-HarnessBridgeDriveConfig {
     [string]$ConfigPath
   )
 
-  $config = @{ enable = $true }
+  $config = @{
+    'harness-drive'  = @{ enable = $true }
+    'harness-notify' = @{ enable = $true }
+  }
   if (-not (Test-Path -LiteralPath $ConfigPath -PathType Leaf)) { return $config }
   $raw = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8
   if ([string]::IsNullOrWhiteSpace($raw)) { return $config }
@@ -132,11 +139,14 @@ function Get-HarnessBridgeDriveConfig {
   # Malformed JSON throws: the caller treats that as "not driving", matching the
   # POSIX twin.
   $parsed = ConvertFrom-Json -InputObject $raw -AsHashtable
-  if ($parsed -isnot [hashtable] -or -not $parsed.ContainsKey('harness-notify')) { return $config }
-  $section = $parsed['harness-notify']
-  if ($section -isnot [hashtable]) { return $config }
+  if ($parsed -isnot [hashtable]) { return $config }
 
-  foreach ($key in $section.Keys) { $config[$key] = $section[$key] }
+  foreach ($sectionName in @('harness-drive', 'harness-notify')) {
+    if (-not $parsed.ContainsKey($sectionName)) { continue }
+    $section = $parsed[$sectionName]
+    if ($section -isnot [hashtable]) { continue }
+    foreach ($key in $section.Keys) { $config[$sectionName][$key] = $section[$key] }
+  }
   return $config
 }
 
@@ -246,6 +256,80 @@ function Get-QueuedHarnessPrompt {
   return @{ Path = $newest.FullName; Text = $text }
 }
 
+function Clear-QueuedHarnessPrompt {
+  <#
+  .SYNOPSIS
+    Discards every queued prompt for one harness and audits the drop.
+  .DESCRIPTION
+    Used when remote driving is switched off.  A prompt queued while driving is
+    off can never be delivered, and delivering it hours later (after the flag is
+    toggled back) would be worse than dropping it.
+  .PARAMETER Harness
+    Harness whose queue is emptied.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [string]$Harness
+  )
+
+  $commandsDir = Join-Path -Path (Get-HarnessBridgeUserRoot) -ChildPath 'state\harness-bridge\commands'
+  $commandDir = Join-Path -Path $commandsDir -ChildPath $Harness
+  if (-not (Test-Path -LiteralPath $commandDir -PathType Container)) { return }
+
+  # check-suppress:suppression_doc: an unreadable queue directory means there is nothing to drop
+  $files = @(Get-ChildItem -LiteralPath $commandDir -Filter '*.json' -File -ErrorAction SilentlyContinue)
+  $dropped = 0
+  foreach ($file in $files) {
+    try {
+      Remove-Item -LiteralPath $file.FullName -Force
+      $dropped++
+    }
+    catch {
+      Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message "could not discard the queued prompt '$($file.Name)'"
+    }
+  }
+  if ($dropped -eq 0) { return }
+
+  Write-HarnessDriveAuditEntry -Harness $Harness -Detail "dropped $dropped queued prompt(s)"
+  Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message "harness-drive is disabled — dropped $dropped queued prompt(s)"
+}
+
+function Write-HarnessDriveAuditEntry {
+  <#
+  .SYNOPSIS
+    Appends one line to the harness-bridge audit log.
+  .PARAMETER Harness
+    Harness the entry is about.
+  .PARAMETER Detail
+    What happened to that harness's queue.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [string]$Harness,
+
+    [Parameter(Mandatory)]
+    [string]$Detail
+  )
+
+  try {
+    $logDir = Join-Path -Path (Get-HarnessBridgeUserRoot) -ChildPath 'log'
+    $null = New-Item -ItemType Directory -Path $logDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+    $line = @(
+      [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ', [System.Globalization.CultureInfo]::InvariantCulture)
+      $Harness
+      'drive'
+      'disabled'
+      $Detail
+    ) -join "`t"
+    Add-Content -LiteralPath (Join-Path -Path $logDir -ChildPath 'harness-bridge.log') -Value $line -Encoding utf8
+  }
+  catch {
+    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'could not write the harness-bridge audit log'
+  }
+}
+
 function Send-HarnessDriveNotification {
   <#
   .SYNOPSIS
@@ -310,7 +394,7 @@ try {
     exit 0
   }
 
-  if (-not $config.enable) {
+  if (-not $config['harness-notify'].enable) {
     $empty = Get-HarnessDriveEmptyDocument -Harness $Harness
     if (-not [string]::IsNullOrWhiteSpace($empty)) { Write-Output $empty }
     exit 0
@@ -322,6 +406,15 @@ try {
   # The notification half shares one implementation; an empty payload still means
   # "the turn finished", which is what harness-notify turns into its default body.
   Send-HarnessDriveNotification -Harness $Harness -Payload $payload
+
+  # Driving has its own gate, checked after the notification: with driving off the
+  # turn is still announced, it just never continues.
+  if (-not $config['harness-drive'].enable) {
+    Clear-QueuedHarnessPrompt -Harness $Harness
+    $empty = Get-HarnessDriveEmptyDocument -Harness $Harness
+    if (-not [string]::IsNullOrWhiteSpace($empty)) { Write-Output $empty }
+    exit 0
+  }
 
   $commandsDir = Join-Path -Path (Get-HarnessBridgeUserRoot) -ChildPath 'state\harness-bridge\commands'
   $queued = Get-QueuedHarnessPrompt -CommandDir (Join-Path -Path $commandsDir -ChildPath $Harness)

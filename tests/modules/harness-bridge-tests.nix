@@ -42,13 +42,19 @@ let
   # so the literals below are quoted exactly and in order: reordering the channels
   # or dropping one fails the test.
   configSh = read "/scripts/config.sh";
+  flatConfigSh = flatten configSh;
+  flatConfigPs1 = flatten (read "/scripts/config.ps1");
+  approvalScript = read "/src/scripts/notify/harness-approval.sh";
+  approvalScriptPs1 = read "/src/scripts/notify/harness-approval.ps1";
+  driveScript = read "/src/scripts/notify/harness-drive.sh";
+  driveScriptPs1 = read "/src/scripts/notify/harness-drive.ps1";
   approvalWindow = builtins.fromJSON (
     builtins.head (builtins.match ".*harness-approval[^0-9]*([0-9]+).*" (flatten configSh))
   );
   approvalScriptDefault = builtins.fromJSON (
     builtins.head (
-      builtins.match ".*\"harness-approval\":\\{\"timeout-seconds\":([0-9]+)\\}.*" (
-        flatten (read "/src/scripts/notify/harness-approval.sh")
+      builtins.match ".*\"harness-approval\":\\{\"enable\":false,\"timeout-seconds\":([0-9]+)\\}.*" (
+        flatten approvalScript
       )
     )
   );
@@ -114,6 +120,44 @@ in
     (assert' (containsString "channels = @('telegram', 'ntfy', 'discord')" (read "/scripts/config.ps1")) "the PowerShell nucleus-config DEFAULTS must match the shell one")
     (assert' (containsString "\"channels\":[\"telegram\",\"ntfy\",\"discord\"]" (read "/src/scripts/notify/harness-notify.sh")) "harness-notify must mirror the nucleus-config channel default it fallbacks to")
     (assert' (containsString "@('telegram', 'ntfy', 'discord')" (read "/src/scripts/notify/harness-notify.ps1")) "the PowerShell harness-notify must mirror the same channel default")
+
+    # --- Per-action gates: master on, approval off, drive on ---
+    # WHY: each flag lives in every layer that reads it — the two nucleus-config
+    # implementations plus a fallback literal inside each script — with nothing
+    # shared between them, so the declared text is the only available check.  The
+    # shipped state is deliberately "notify, do not broker": a host opts into
+    # remote approvals, and never the other way round.
+    (assert'
+      (builtins.match ".*\"harness-approval\": \\{[^}]*\"enable\": false,.*" flatConfigSh != null)
+      "nucleus-config DEFAULTS must ship harness-approval.enable=false, so no host brokers a tool call until it opts in"
+    )
+    (assert' (builtins.match ".*\"harness-drive\": \\{[^}]*\"enable\": true.*" flatConfigSh != null)
+      "nucleus-config DEFAULTS must ship harness-drive.enable=true, so a finished turn is announced and remote driving keeps working"
+    )
+    (assert' (
+      builtins.match ".*'harness-approval' = @\\{[^}]*enable = \\$false.*" flatConfigPs1 != null
+    ) "the PowerShell nucleus-config DEFAULTS must ship the same harness-approval.enable=false")
+    (assert' (
+      builtins.match ".*'harness-drive' += @\\{[^}]*enable = \\$true.*" flatConfigPs1 != null
+    ) "the PowerShell nucleus-config DEFAULTS must ship the same harness-drive.enable=true")
+
+    (assert' (containsString "\"harness-approval\":{\"enable\":false,\"timeout-seconds\":120}" approvalScript) "harness-approval must fall back to its own gate being off, so a config that never names it cannot broker")
+    (assert' (containsString "'harness-approval' = @{ enable = $false; 'timeout-seconds' = 120 }" approvalScriptPs1) "the PowerShell harness-approval must declare the same off-by-default gate")
+    (assert' (containsString "\"harness-approval\".enable" approvalScript) "harness-approval must consult harness-approval.enable, not only the master flag")
+    (assert' (containsString "$config['harness-approval'].enable" approvalScriptPs1) "the PowerShell harness-approval must read the same approval gate")
+
+    (assert' (containsString "\"harness-drive\":{\"enable\":true}" driveScript) "harness-drive must fall back to driving being on, matching the shipped default")
+    (assert' (
+      builtins.match ".*'harness-drive' += @\\{ enable = \\$true \\}.*" (flatten driveScriptPs1) != null
+    ) "the PowerShell harness-drive must declare the same drive gate")
+    (assert' (containsString "\"harness-drive\".enable" driveScript) "harness-drive must consult harness-drive.enable before injecting a queued prompt")
+    (assert' (containsString "$config['harness-drive'].enable" driveScriptPs1) "the PowerShell harness-drive must read the same drive gate")
+
+    # The master flag stays the single switch on both paths: it is what makes a
+    # whole-bridge rollback one flag flip, and it is why the two examples in the
+    # host manuals still turn everything off.
+    (assert' (containsString "\"harness-notify\".enable" driveScript) "harness-drive must keep the master flag as the single switch")
+    (assert' (containsString "$config['harness-notify'].enable" driveScriptPs1) "the PowerShell harness-drive must keep the same master flag")
 
     # --- Approval window parity ---
     (assert' (approvalWindow == approvalScriptDefault)

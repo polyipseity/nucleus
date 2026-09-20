@@ -43,6 +43,21 @@ write_config() {
   printf '%s\n' "$1" >"$TMPDIR_ROOT/home/.local/state/nucleus/config.json"
 }
 
+# Remote brokering is opt-in, so every test that expects a request to be
+# announced has to enable it explicitly.
+write_config_brokering() {
+  write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"enable":true}}'
+}
+
+# A request left behind by an earlier test would make a "nothing was brokered"
+# assertion pass for the wrong reason.
+pending_requests() {
+  local _state
+  _state="$(find_state)"
+  [ -n "$_state" ] || return 0
+  find "$_state/requests" -name '*.json' -print -quit 2>/dev/null
+}
+
 # The user root differs per OS, so the suite locates the state directory the
 # script actually created instead of assuming a platform path.
 find_state() {
@@ -157,7 +172,7 @@ test_hook_mode_asks_plainly_for_unknown_harness() {
 }
 
 test_hook_mode_brokers_the_payload_command() {
-  write_config '{"harness-notify":{"channels":["telegram"]}}'
+  write_config_brokering
   : >"$HARNESS_APPROVAL_LOG"
   start_approval_hook 30 cursor '{"command":"git push --force","cwd":"/tmp"}'
   local _request
@@ -193,7 +208,7 @@ test_audit_log_records_the_decision() {
 }
 
 test_remote_allow() {
-  write_config '{"harness-notify":{"channels":["telegram"]}}'
+  write_config_brokering
   start_approval 30
   local _request
   if ! _request="$(wait_for_request)"; then
@@ -212,7 +227,7 @@ test_remote_allow() {
 }
 
 test_remote_deny() {
-  write_config '{"harness-notify":{"channels":["telegram"]}}'
+  write_config_brokering
   start_approval 30
   local _request
   if ! _request="$(wait_for_request)"; then
@@ -231,7 +246,7 @@ test_remote_deny() {
 }
 
 test_timeout_asks_locally() {
-  write_config '{"harness-notify":{"channels":["telegram"]}}'
+  write_config_brokering
   start_approval 2
   wait_for_decision
   local _state
@@ -261,6 +276,54 @@ test_disabled_bridge_asks_without_request() {
   fi
 }
 
+test_approval_disabled_asks_without_request() {
+  write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"enable":false}}'
+  : >"$HARNESS_APPROVAL_LOG"
+  local _rc=0
+  local _out=""
+  local _start=$SECONDS
+  _out="$(HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" \
+    bash "$APPROVAL" pi bash "rm -rf build" 30)" || _rc=$?
+  local _elapsed=$((SECONDS - _start))
+  if [ "$_rc" -eq 0 ] && [ "$_out" = "ask" ] && [ "$_elapsed" -lt 5 ] &&
+    [ ! -s "$HARNESS_APPROVAL_LOG" ] && [ -z "$(pending_requests)" ]; then
+    assert_pass "harness-approval.enable=false answers ask at once without notifying"
+  else
+    assert_fail "approval-off" "rc=$_rc out=$_out elapsed=${_elapsed}s log=$(cat "$HARNESS_APPROVAL_LOG")"
+  fi
+}
+
+test_unset_approval_gate_defaults_to_off() {
+  write_config '{"harness-notify":{"channels":["telegram"]}}'
+  : >"$HARNESS_APPROVAL_LOG"
+  local _rc=0
+  local _out=""
+  _out="$(HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" \
+    bash "$APPROVAL" pi bash "rm -rf build" 30)" || _rc=$?
+  if [ "$_rc" -eq 0 ] && [ "$_out" = "ask" ] && [ ! -s "$HARNESS_APPROVAL_LOG" ] &&
+    [ -z "$(pending_requests)" ]; then
+    assert_pass "an unset harness-approval section leaves the gate off"
+  else
+    assert_fail "approval-default" "rc=$_rc out=$_out log=$(cat "$HARNESS_APPROVAL_LOG")"
+  fi
+}
+
+test_approval_disabled_hook_answers_neutrally() {
+  write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"enable":false}}'
+  : >"$HARNESS_APPROVAL_LOG"
+  local _rc=0
+  local _out=""
+  _out="$(printf '%s' '{"tool_name":"runInTerminal","tool_input":{"command":"rm -rf /"}}' |
+    HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" bash "$APPROVAL" hook copilot)" || _rc=$?
+  if [ "$_rc" -eq 0 ] &&
+    grep -qF '"permissionDecision":"ask"' <<<"$_out" &&
+    [ ! -s "$HARNESS_APPROVAL_LOG" ]; then
+    assert_pass "with approvals off the hook still answers the harness's own document"
+  else
+    assert_fail "approval-off-hook" "rc=$_rc out=$_out log=$(cat "$HARNESS_APPROVAL_LOG")"
+  fi
+}
+
 test_missing_arguments_asks() {
   local _rc=0
   local _out=""
@@ -274,7 +337,7 @@ test_missing_arguments_asks() {
 }
 
 test_request_is_announced() {
-  write_config '{"harness-notify":{"channels":["telegram"]}}'
+  write_config_brokering
   : >"$HARNESS_APPROVAL_LOG"
   start_approval 30
   local _request
@@ -300,7 +363,7 @@ test_request_is_announced() {
 }
 
 test_request_file_carries_the_action() {
-  write_config '{"harness-notify":{"channels":["telegram"]}}'
+  write_config_brokering
   start_approval 30 cursor Shell "git push --force"
   local _request
   if ! _request="$(wait_for_request)"; then
@@ -326,6 +389,9 @@ test_remote_allow
 test_remote_deny
 test_timeout_asks_locally
 test_disabled_bridge_asks_without_request
+test_approval_disabled_asks_without_request
+test_unset_approval_gate_defaults_to_off
+test_approval_disabled_hook_answers_neutrally
 test_missing_arguments_asks
 test_request_is_announced
 test_request_file_carries_the_action

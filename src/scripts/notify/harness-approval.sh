@@ -24,8 +24,11 @@
 # blocked session.
 #
 # Config (~/.local/state/nucleus/config.json):
-#   harness-notify.enable    boolean, default true; false disables remote
-#                            approvals entirely (every call answers `ask`)
+#   harness-notify.enable    boolean, default true; false disables the whole
+#                            bridge, so every call answers `ask`
+#   harness-approval.enable  boolean, default false; the remote gate itself.
+#                            false answers `ask` at once, so the harness prompts
+#                            locally: no request, no notification, no wait
 #   harness-approval.timeout-seconds  integer, default 120
 set -euo pipefail
 
@@ -123,7 +126,7 @@ if [ -z "$_ha_tool" ]; then
   _ha_finish ask
 fi
 
-_ha_defaults='{"harness-notify":{"enable":true},"harness-approval":{"timeout-seconds":120}}'
+_ha_defaults='{"harness-notify":{"enable":true},"harness-approval":{"enable":false,"timeout-seconds":120}}'
 _ha_user_config='{}'
 if [ -f "$HOME/.local/state/nucleus/config.json" ]; then
   _ha_user_config="$(cat "$HOME/.local/state/nucleus/config.json")"
@@ -137,6 +140,13 @@ if ! _ha_config="$(
 fi
 
 if [ "$(jq -r '."harness-notify".enable' <<<"$_ha_config")" != "true" ]; then
+  _ha_finish ask
+fi
+
+# The remote gate is off by default, so the hooks stay wired (a flag flip is all
+# it takes to re-enable) while every tool call is answered `ask` at once and the
+# harness keeps its own prompt.
+if [ "$(jq -r '."harness-approval".enable' <<<"$_ha_config")" != "true" ]; then
   _ha_finish ask
 fi
 

@@ -168,6 +168,43 @@ test_disabled_bridge_keeps_the_queue() {
   fi
 }
 
+test_drive_disabled_notifies_but_drops_the_queue() {
+  write_config '{"harness-drive":{"enable":false}}'
+  rm -rf "$COMMANDS"
+  queue_prompt cursor 1000-aaaa.json "first"
+  queue_prompt cursor 2000-bbbb.json "second"
+  : >"$HARNESS_DRIVE_LOG"
+  rm -f "$USER_ROOT/logs/harness-bridge.log"
+  local _out=""
+  _out="$(run_drive cursor '{"hook_event_name":"Stop"}')" || true
+  local _left=""
+  _left="$(find "$COMMANDS" -name '*.json' -print -quit 2>/dev/null)"
+  local _audit=""
+  _audit="$(cat "$USER_ROOT/logs/harness-bridge.log" 2>/dev/null)" || _audit=""
+  if [ "$_out" = '{}' ] && [ -z "$_left" ] &&
+    grep -qF 'finished' <<<"$(cat "$HARNESS_DRIVE_LOG")" &&
+    grep -qF 'dropped 2 queued prompt(s)' <<<"$_audit"; then
+    assert_pass "harness-drive.enable=false still notifies and drops the queued prompts"
+  else
+    assert_fail "drive-off" "out=$_out left=$_left audit=$_audit"
+  fi
+}
+
+test_drive_disabled_with_empty_queue_is_quiet() {
+  write_config '{"harness-drive":{"enable":false}}'
+  rm -rf "$COMMANDS"
+  rm -f "$USER_ROOT/logs/harness-bridge.log"
+  local _rc=0
+  local _out=""
+  _out="$(run_drive copilot '{}')" || _rc=$?
+  if [ "$_rc" -eq 0 ] && [ "$_out" = '{}' ] &&
+    [ ! -f "$USER_ROOT/logs/harness-bridge.log" ]; then
+    assert_pass "with nothing queued the disabled drive path writes no audit entry"
+  else
+    assert_fail "drive-off-empty" "rc=$_rc out=$_out"
+  fi
+}
+
 test_missing_arguments_exit_zero() {
   local _rc=0
   local _out=""
@@ -186,6 +223,8 @@ test_empty_queue_renders_empty_documents
 test_queued_prompt_is_consumed
 test_newest_prompt_wins_and_one_is_consumed
 test_disabled_bridge_keeps_the_queue
+test_drive_disabled_notifies_but_drops_the_queue
+test_drive_disabled_with_empty_queue_is_quiet
 test_missing_arguments_exit_zero
 
 finish_tests
