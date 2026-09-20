@@ -10,12 +10,13 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 _vsd_jq_bin="$1"
 _vsd_gnupg_bin="$2"
 _vsd_ssh_to_age_bin="$3"
-_vsd_gpg_home="$4"
-_vsd_all_sops_files_json="$5"
-_vsd_git_identity_path="$6"
-_vsd_ssh_private_key_path="$7"
-_vsd_ssh_public_key_path="$8"
-shift 8
+_vsd_ssh_keygen_bin="$4"
+_vsd_gpg_home="$5"
+_vsd_all_sops_files_json="$6"
+_vsd_git_identity_path="$7"
+_vsd_ssh_private_key_path="$8"
+_vsd_ssh_public_key_path="$9"
+shift 9
 _vsd_gpg_manifest_path="$1"
 _vsd_ssh_key_paths_manifest="$2"
 _vsd_ssh_adopt_manifest="$3"
@@ -37,6 +38,17 @@ while IFS= read -r _vsd_private_key_path; do
   [ -n "$_vsd_private_key_path" ] || continue
   if [ ! -s "$_vsd_private_key_path" ]; then
     die -l secrets "managed SSH private key missing or empty at '$_vsd_private_key_path'."
+  fi
+  # A file that exists is not a key that works: an unparsable private key makes
+  # ssh report "invalid format" and fall back to no authentication, and a running
+  # agent hides that by answering first.  Derive the public half to prove OpenSSH
+  # can read the file.  -P '' supplies an empty passphrase so an encrypted key
+  # fails here instead of prompting for one, which activation cannot answer.
+  _vsd_derived_public_key="$(
+    "$_vsd_ssh_keygen_bin" -y -P '' -f "$_vsd_private_key_path" </dev/null
+  )" || true # check-suppress:suppression_doc: ssh-keygen exits non-zero for a malformed or encrypted key; the empty output is handled below.
+  if [ -z "$_vsd_derived_public_key" ]; then
+    die -l secrets "managed SSH private key at '$_vsd_private_key_path' is not a usable OpenSSH private key (ssh-keygen -y failed); fix the SOPS value or re-run materialize-user-secrets."
   fi
 done <"$_vsd_ssh_key_paths_manifest"
 

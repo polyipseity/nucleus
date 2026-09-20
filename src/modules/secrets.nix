@@ -107,7 +107,8 @@ in
   #
   # Five checks (in order):
   #   1. Materialization sanity: managed SSH keys, Git identity, and manifest
-  #      files exist and are non-empty.
+  #      files exist and are non-empty, and every managed SSH private key is
+  #      parsable (an unreadable key authenticates as nothing).
   #   2. GPG key presence: every fingerprint in managed-gpg-keys is in the
   #      keyring.
   #   3. GPG SOPS recipient check for all SOPS files.
@@ -148,6 +149,7 @@ in
           "${pkgs.jq}/bin/jq" \
           "${pkgs.gnupg}/bin/gpg" \
           "${pkgs.ssh-to-age}/bin/ssh-to-age" \
+          "${pkgs.openssh}/bin/ssh-keygen" \
           "${config.home.homeDirectory}/.gnupg" \
           '${builtins.toJSON allSopsFiles}' \
           "${gitIdentityPath}" \
