@@ -2,7 +2,7 @@
 # Unit tests for android-config.sh flag parsing, ADB authorization, and GApps sideload.
 #
 # Run with: bash tests/scripts/android-config-tests.sh
-set -euo pipefail
+set -Eeuo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
@@ -20,8 +20,31 @@ export NUCLEUS_VM_ANDROID_POLL_INTERVAL=0.1
 export NUCLEUS_VM_ANDROID_SIDLELOAD_PROBE_TIMEOUT=1
 
 _failures=0
+_passed=0
+_reported=''
+_current_case=''
+_last_error=''
 _tmp="$(mktemp -d)"
-trap 'rm -rf "$_tmp"' EXIT
+
+# WHY the abort reporter: an unexpected failure under `set -e` used to abort this
+# suite with no output and no tally line, so a run reported the file name and
+# nothing else. The ERR trap records the failing command; the EXIT trap then names
+# it with the case that was running, which only the caller can know.
+trap '_last_error="line $LINENO: $BASH_COMMAND"' ERR
+_report_abort() {
+  _ra_status="$1"
+  if [ -n "$_reported" ]; then
+    return 0
+  fi
+  printf 'FAIL: %s aborted (exit %s) at %s\n' "${_current_case:-<setup>}" "$_ra_status" "${_last_error:-unknown}" >&2
+  printf '# nucleus-tally passed=%s failed=%s\n' "$_passed" "$((_failures + 1))"
+}
+_on_exit() {
+  _oe_status=$?
+  rm -rf "$_tmp"
+  _report_abort "$_oe_status"
+}
+trap '_on_exit' EXIT
 
 assert_eq() {
   if [ "$1" != "$2" ]; then
@@ -692,27 +715,39 @@ EOF
   fi
 }
 
-test_adb_port_resolution
-test_adb_list_state_unauthorized
-test_wait_authorized_fails_on_unauthorized
-test_wait_recovery_succeeds_on_recovery
-test_no_flags_prints_manual
-test_root_applies_persist_root_access
-test_gapps_rejects_booted_device_state
-test_gapps_unauthorized_flashes_recovery
-test_gapps_sideload_path
-test_adb_keys_in_recovery
-test_magisk_stage_patch_kit_layout
-test_magisk_download_stdout_is_path_only
-test_wait_boot_completed_waits_for_sys_boot_completed
-test_android_config_magisk_configures_existing_su
-test_fastboot_probe_uses_getvar
-test_fastboot_wait_detects_existing_fastboot
+run_case() {
+  _current_case="$1"
+  _rc_before="$_failures"
+  "$1"
+  if [ "$_failures" -gt "$_rc_before" ]; then
+    return 0
+  fi
+  _passed=$((_passed + 1))
+  echo "✓ $_current_case"
+}
 
+run_case test_adb_port_resolution
+run_case test_adb_list_state_unauthorized
+run_case test_wait_authorized_fails_on_unauthorized
+run_case test_wait_recovery_succeeds_on_recovery
+run_case test_no_flags_prints_manual
+run_case test_root_applies_persist_root_access
+run_case test_gapps_rejects_booted_device_state
+run_case test_gapps_unauthorized_flashes_recovery
+run_case test_gapps_sideload_path
+run_case test_adb_keys_in_recovery
+run_case test_magisk_stage_patch_kit_layout
+run_case test_magisk_download_stdout_is_path_only
+run_case test_wait_boot_completed_waits_for_sys_boot_completed
+run_case test_android_config_magisk_configures_existing_su
+run_case test_fastboot_probe_uses_getvar
+run_case test_fastboot_wait_detects_existing_fastboot
+
+_reported=1
 if [ "$_failures" -gt 0 ]; then
   echo "android-config-tests: $_failures failure(s)"
-  echo "# nucleus-tally passed=0 failed=$_failures"
+  echo "# nucleus-tally passed=$_passed failed=$_failures"
   exit 1
 fi
 echo "android-config-tests: all passed"
-echo "# nucleus-tally passed=16 failed=0"
+echo "# nucleus-tally passed=$_passed failed=0"
