@@ -331,6 +331,19 @@ let
       why = "Starship config path. POSIX uses out-of-store symlink. Windows uses literal %USERPROFILE%.";
     };
 
+    # ── SSH agent ───────────────────────────────────────────────────
+    # nix-darwin exports the gpg-agent SSH socket for POSIX shells only (its
+    # shell snippet in /etc/zshenv is sourced by zsh/bash/fish).  PowerShell
+    # sources no such file, so it reads this entry through the profile token,
+    # and the macOS GUI domain receives it via macBookAllVars -> gui-env.
+    SSH_AUTH_SOCK = {
+      values = {
+        MacBook = "${resolvedHomeDirectory}/.gnupg/S.gpg-agent.ssh";
+      };
+      userSpecific = true;
+      why = "gpg-agent SSH socket (macOS). Default gpgconf location, serving the SSH protocol because src/modules/posix/gnupg.nix sets enableSSHSupport.";
+    };
+
     # ── Cross-OS compatibility ──────────────────────────────────────
     HOME = {
       values = {

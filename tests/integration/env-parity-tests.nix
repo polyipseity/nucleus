@@ -45,9 +45,9 @@ let
     };
 
   # Catalog vars Windows must not declare: the macOS GUI PATH, the Darwin build
-  # SDK vars, the Nix SSL bundle, and the live-checkout root (apply.ps1 writes it
-  # to the registry directly). PLAYWRIGHT_BROWSERS_PATH is set from a config-sync
-  # module instead of DSC.
+  # SDK vars, the Nix SSL bundle, the macOS gpg-agent SSH socket, and the
+  # live-checkout root (apply.ps1 writes it to the registry directly).
+  # PLAYWRIGHT_BROWSERS_PATH is set from a config-sync module instead of DSC.
   windowsInapplicableVarNames = [
     "DEVELOPER_DIR"
     "LIBRARY_PATH"
@@ -55,6 +55,7 @@ let
     "NUCLEUS_REPO_ROOT"
     "PATH"
     "SDKROOT"
+    "SSH_AUTH_SOCK"
   ];
   syncOnlyVarNames = [ "PLAYWRIGHT_BROWSERS_PATH" ];
 

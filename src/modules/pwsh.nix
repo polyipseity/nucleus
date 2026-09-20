@@ -28,6 +28,11 @@ let
 
   agentEnv = import ./shell/agent-env-vars.nix;
 
+  # Catalog entries keyed to a single host resolve to null elsewhere; the
+  # PowerShell block that consumes such a token guards on the empty string and
+  # stays inert on hosts that get the value from their session environment.
+  optionalEnv = value: if value == null then "" else value;
+
   lockfile = builtins.fromJSON (builtins.readFile ../lockfiles/lockfile.json);
   pwshAnalyzerVersion = lockfile.pwsh.PSScriptAnalyzer or null;
   pwshPesterVersion = lockfile.pwsh.Pester or null;
@@ -43,7 +48,10 @@ let
         "__ENV_CC__"
         "__ENV_CXX__"
         "__ENV_LD__"
+        "__ENV_SSH_AUTH_SOCK__"
         "__DEFAULT_DEV_TOOLS_PATH__"
+        "__SSH_AGENT_TTY_BIN__"
+        "__GPG_CONNECT_AGENT_BIN__"
         "__AGENT_ENV_VAR_NAMES__"
         "__AGENT_DEVIN_POSIX_PATH__"
         "__NUCLEUS_PREPEND_PATH__"
@@ -56,7 +64,12 @@ let
         (envVars.resolveValue "CC" envVars.currentHost)
         (envVars.resolveValue "CXX" envVars.currentHost)
         (envVars.resolveValue "LD" envVars.currentHost)
+        (optionalEnv (envVars.resolveValue "SSH_AUTH_SOCK" envVars.currentHost))
         "${managedPaths.defaultDevTools}"
+        # macOS system tool: the SSH agent block runs only where the macOS
+        # gpg-agent socket exists, and /usr/bin is always on PATH there.
+        "/usr/bin/tty"
+        "${pkgs.gnupg}/bin/gpg-connect-agent"
         (lib.concatStringsSep " " agentEnv.agentEnvVarNames)
         agentEnv.devinPosixPath
         ""
