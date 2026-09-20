@@ -182,10 +182,30 @@ test_missing_hermes_is_non_fatal() {
   fi
 }
 
+test_unreadable_config_is_non_fatal() {
+  # An unreadable config must take the unparsable exit rather than dying under
+  # `set -e`: the hook's own failure would reach the harness as an error.
+  write_config '{"harness-notify":{"channels":["telegram"]}}'
+  reset_log
+  chmod 000 "$TMPDIR_ROOT/home/.local/state/nucleus/config.json"
+  local rc=0
+  local err=""
+  err="$(run_notify "" pi "done" "unreadable config" 2>&1 >/dev/null)" || rc=$?
+  chmod 600 "$TMPDIR_ROOT/home/.local/state/nucleus/config.json"
+  local warned=no
+  case "$err" in *"could not parse nucleus config"*) warned=yes ;; esac
+  if [ "$rc" -eq 0 ] && [ ! -s "$HARNESS_NOTIFY_LOG" ] && [ "$warned" = yes ]; then
+    assert_pass "an unreadable config warns and sends nothing instead of dying"
+  else
+    assert_fail "unreadable-config" "rc=$rc warned=$warned log: $(cat "$HARNESS_NOTIFY_LOG")"
+  fi
+}
+
 test_single_channel_delivery
 test_channel_fan_out
 test_disabled_config_sends_nothing
 test_missing_config_uses_defaults
+test_unreadable_config_is_non_fatal
 test_missing_arguments_is_non_fatal
 test_unknown_event_is_ignored
 test_hook_json_stdin_extracts_message

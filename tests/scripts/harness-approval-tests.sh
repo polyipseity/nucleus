@@ -288,6 +288,25 @@ test_unwritable_state_answers_ask() {
   fi
 }
 
+test_unreadable_config_answers_ask() {
+  # An unreadable config is not a licence to die: this script must always print a
+  # decision, and the .ps1 twin reaches its neutral answer through `catch`.
+  write_config_brokering
+  chmod 000 "$TMPDIR_ROOT/home/.local/state/nucleus/config.json"
+  : >"$HARNESS_APPROVAL_LOG"
+  local _rc=0
+  local _out=""
+  _out="$(HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" \
+    bash "$APPROVAL" pi bash "rm -rf build" 30 2>/dev/null)" || _rc=$?
+  chmod 600 "$TMPDIR_ROOT/home/.local/state/nucleus/config.json"
+  if [ "$_rc" -eq 0 ] && [ "$_out" = "ask" ] && [ -z "$(pending_requests)" ] &&
+    [ ! -s "$HARNESS_APPROVAL_LOG" ]; then
+    assert_pass "an unreadable config answers ask without brokering"
+  else
+    assert_fail "unreadable-config" "rc=$_rc out=$_out requests=$(pending_requests) log=$(cat "$HARNESS_APPROVAL_LOG")"
+  fi
+}
+
 test_disabled_bridge_asks_without_request() {
   write_config '{"harness-notify":{"enable":false,"channels":["telegram"]}}'
   : >"$HARNESS_APPROVAL_LOG"
@@ -421,6 +440,7 @@ test_remote_allow
 test_remote_deny
 test_timeout_asks_locally
 test_unwritable_state_answers_ask
+test_unreadable_config_answers_ask
 test_disabled_bridge_asks_without_request
 test_approval_disabled_asks_without_request
 test_unset_approval_gate_defaults_to_off

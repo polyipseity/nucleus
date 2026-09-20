@@ -57,7 +57,13 @@ esac
 _hn_defaults='{"enable":true,"channels":["telegram","ntfy","discord"],"max-chars":1200}'
 _hn_user_config='{}'
 if [ -f "$HOME/.local/state/nucleus/config.json" ]; then
-  _hn_user_config="$(cat "$HOME/.local/state/nucleus/config.json")"
+  # WHY: an unreadable config takes the unparsable exit, message included, so
+  # both platforms report one string per action and `set -e` cannot kill a hook
+  # before it writes anything.
+  if ! _hn_user_config="$(cat "$HOME/.local/state/nucleus/config.json")"; then
+    warn "could not parse nucleus config — not notifying"
+    exit 0
+  fi
 fi
 _hn_config="$(
   jq -c --argjson defaults "$_hn_defaults" --argjson user "$_hn_user_config" \

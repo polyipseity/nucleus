@@ -63,6 +63,27 @@ run_drive() {
     HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" bash "$DRIVE" "${1-}"
 }
 
+test_unreadable_config_ends_the_turn_without_driving() {
+  # Mirrors the unparsable-config exit: a hook that dies under `set -e` renders
+  # no document at all, so the harness reports the turn end itself as failed.
+  # The queue is left untouched because injection was never confirmed enabled.
+  write_config '{"harness-notify":{"channels":["telegram"]}}'
+  rm -rf "$COMMANDS"
+  queue_prompt cursor 1000-uuuu.json "run the tests"
+  : >"$HARNESS_DRIVE_LOG"
+  chmod 000 "$TMPDIR_ROOT/home/.local/state/nucleus/config.json"
+  local _rc=0
+  local _out=""
+  _out="$(run_drive cursor '{}' 2>/dev/null)" || _rc=$?
+  chmod 600 "$TMPDIR_ROOT/home/.local/state/nucleus/config.json"
+  if [ "$_rc" -eq 0 ] && [ "$_out" = '{}' ] && [ -f "$COMMANDS/cursor/1000-uuuu.json" ] &&
+    [ ! -s "$HARNESS_DRIVE_LOG" ]; then
+    assert_pass "an unreadable config ends the turn and keeps the queued prompt"
+  else
+    assert_fail "unreadable-config" "rc=$_rc out=$_out queue=$(find "$COMMANDS" -type f 2>/dev/null | wc -l) log=$(cat "$HARNESS_DRIVE_LOG")"
+  fi
+}
+
 test_cursor_followup_document() {
   write_config '{}'
   rm -rf "$COMMANDS"
@@ -234,6 +255,7 @@ test_missing_arguments_exit_zero() {
 }
 
 test_cursor_followup_document
+test_unreadable_config_ends_the_turn_without_driving
 test_copilot_stop_document
 test_stop_hook_active_does_not_suppress_delivery
 test_turn_end_is_announced

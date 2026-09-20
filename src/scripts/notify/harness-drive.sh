@@ -78,7 +78,14 @@ _hd_render() { # <harness> <text>
 
 _hd_user_config='{}'
 if [ -f "$HOME/.local/state/nucleus/config.json" ]; then
-  _hd_user_config="$(cat "$HOME/.local/state/nucleus/config.json")"
+  # WHY: an unreadable config takes the unparsable exit, message included: a hook
+  # that dies under `set -e` renders no document, so the harness reports the turn
+  # end itself as failed.
+  if ! _hd_user_config="$(cat "$HOME/.local/state/nucleus/config.json")"; then
+    warn "could not parse nucleus config — not driving"
+    _hd_empty "$_hd_harness"
+    exit 0
+  fi
 fi
 if ! _hd_config="$(
   jq -c --argjson defaults '{"harness-notify":{"enable":true},"harness-drive":{"enable":true}}' --argjson user "$_hd_user_config" \

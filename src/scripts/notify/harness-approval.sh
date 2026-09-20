@@ -134,7 +134,13 @@ fi
 _ha_defaults='{"harness-notify":{"enable":true},"harness-approval":{"enable":false,"timeout-seconds":120}}'
 _ha_user_config='{}'
 if [ -f "$HOME/.local/state/nucleus/config.json" ]; then
-  _ha_user_config="$(cat "$HOME/.local/state/nucleus/config.json")"
+  # WHY: an unreadable config takes the unparsable exit, message included: a hook
+  # that dies under `set -e` prints no decision, and Copilot reads a
+  # document-less PreToolUse hook as a denial.
+  if ! _ha_user_config="$(cat "$HOME/.local/state/nucleus/config.json")"; then
+    warn "could not parse nucleus config — asking locally"
+    _ha_finish ask
+  fi
 fi
 if ! _ha_config="$(
   jq -c --argjson defaults "$_ha_defaults" --argjson user "$_ha_user_config" \
