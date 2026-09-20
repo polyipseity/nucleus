@@ -265,7 +265,7 @@ do_packer() {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# sh subcommand — inline body of scripts/check-sh.sh
+# sh subcommand — ShellCheck lint (shellcheck -x -S style)
 # ──────────────────────────────────────────────────────────────────────────────
 
 do_sh() {
@@ -279,7 +279,7 @@ do_sh() {
   # --source-path=SCRIPTDIR lets shellcheck resolve `# shellcheck source=` directives
   # relative to each script's own directory (e.g. bootstrap-versions.env alongside bootstrap.sh).
   # -x enables following external sources.
-  # Flag order: long options first, -x second. Flags live in src/treefmt.nix (source-path = "SCRIPTDIR"); Windows twin scripts/check-sh.ps1 passes --source-path per file.
+  # Flag order: long options first, -x second. Flags live in src/treefmt.nix (source-path = "SCRIPTDIR"); the Windows twin (scripts/check.ps1, Invoke-CheckSh) passes --source-path per file.
   _SCOPED=false
   while [ "$#" -gt 0 ]; do
     case "$1" in

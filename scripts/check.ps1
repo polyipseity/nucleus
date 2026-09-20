@@ -9,7 +9,7 @@
 #   -Action <all|packer|sh|pwsh>  Which check to run (default: all).
 #                     all    Run every check via the step pipeline.
 #                     packer Run the Packer template validation (check-packer.ps1).
-#                     sh     Run the shell script lint (check-sh.ps1).
+#                     sh     Run the shell script lint (ShellCheck).
 #                     pwsh   Run check-pwsh.ps1.
 #   --full           Run all checks including whole-repo checks (default).
 #   --scoped         Run only path-scopable checks.
@@ -252,7 +252,7 @@ function Invoke-CheckPacker {
 function Invoke-CheckSh {
   <#
   .SYNOPSIS
-    Lint repository shell scripts with ShellCheck (inlined from check-sh.ps1).
+    Lint repository shell scripts with ShellCheck.
   .DESCRIPTION
     Discovers tracked *.sh files via git ls-files (excluding vendor/) or accepts
     explicit paths. Flags match src/modules/lib/script-tree.nix: -x -S style.
