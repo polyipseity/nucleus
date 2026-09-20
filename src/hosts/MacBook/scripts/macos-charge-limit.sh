@@ -2,20 +2,17 @@
 # Keep charge capped at 80 % to reduce long-term battery wear on a mostly
 # docked development machine.
 #
-# On macOS 15+, bclm no longer works due kernel entitlement enforcement.
-# Prefer the maintained `battery` CLI (installed by the `battery` cask) and
-# run it as the active console user so user-scoped launch-agent state stays
-# in that user's home directory.
-#
-# bclm is retained as a fallback only for older macOS versions.
+# The `battery` CLI (installed by the `battery` cask) is the enforcement path.
+# It runs as the active console user so user-scoped launch-agent state stays in
+# that user's home directory, and it writes the SMC charging gate plus a
+# headless LaunchAgent (com.battery.app) so the cap persists without the tray
+# being open.
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../../../scripts/lib/macos-console-user.sh
 . "$SCRIPT_DIR/../../../scripts/lib/macos-console-user.sh"
 # shellcheck source=../../../scripts/lib/lib.sh
 . "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
-
-macos_major="$(/usr/bin/sw_vers -productVersion 2>/dev/null | /usr/bin/awk -F. '{print $1}')"
 
 battery_app="/Applications/battery.app"
 battery_cli=""
@@ -44,19 +41,8 @@ if [ -n "$battery_cli" ] && _nucleus_resolve_console_user; then
   if ! /usr/bin/sudo -H -u "$_nucleus_console_user" "$battery_cli" maintain 80 </dev/null >/dev/null 2>&1; then
     die -l power "battery maintain 80 failed for user '$_nucleus_console_user'."
   fi
-elif [ -x /opt/homebrew/bin/bclm ]; then
-  if [ -n "$macos_major" ] && [ "$macos_major" -ge 15 ]; then
-    warn -l power "bclm is unsupported on macOS >= 15; install and initialize the battery app to enforce 80% charge limit."
-  else
-    if ! /opt/homebrew/bin/bclm write 80; then
-      die -l power "bclm write 80 failed."
-    fi
-    if ! /opt/homebrew/bin/bclm persist; then
-      die -l power "bclm persist failed."
-    fi
-  fi
 elif [ -d "$battery_app" ]; then
   warn -l power "battery.app is installed but the battery CLI is unavailable; open battery.app once and complete setup to install the helper command."
 else
-  warn -l power "no supported battery charge-limit tool found (expected /usr/local/bin/battery or /opt/homebrew/bin/bclm)."
+  warn -l power "no supported battery charge-limit tool found (expected /usr/local/bin/battery)."
 fi

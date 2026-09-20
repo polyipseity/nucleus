@@ -56,10 +56,6 @@
       url = "github:hraban/mac-app-util";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    zackelia-formulae = {
-      url = "github:zackelia/homebrew-formulae";
-      flake = false;
-    };
     nixos-generators = {
       url = "github:nix-community/nixos-generators";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -83,7 +79,6 @@
       smudge-smudge,
       sops-nix,
       mac-app-util,
-      zackelia-formulae,
       ...
     }:
     let
@@ -783,7 +778,6 @@
         cirruslabs-cli = cirruslabs-cli;
         smudge-smudge = smudge-smudge;
         mac-app-util = mac-app-util;
-        zackelia-formulae = zackelia-formulae;
         nixos-generators = nixos-generators;
         brew-src = nix-homebrew.inputs.brew-src;
         nixlib = nixos-generators.inputs.nixlib;
@@ -856,7 +850,6 @@
             homebrew-cask
             cirruslabs-cli
             smudge-smudge
-            zackelia-formulae
             ;
           nucleusApps = nucleusAppsMac // {
             nucleus-service-watchdog = serviceWatchdogPkgMac;

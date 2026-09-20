@@ -515,8 +515,7 @@
         "rust-overlay": "rust-overlay",
         "smudge-smudge": "smudge-smudge",
         "sops-nix": "sops-nix",
-        "treefmt-nix": "treefmt-nix_3",
-        "zackelia-formulae": "zackelia-formulae"
+        "treefmt-nix": "treefmt-nix_3"
       }
     },
     "rust-overlay": {
@@ -683,22 +682,6 @@
       "original": {
         "owner": "pyproject-nix",
         "repo": "uv2nix",
-        "type": "github"
-      }
-    },
-    "zackelia-formulae": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1700431196,
-        "narHash": "sha256-O/qwaci/TWSlJaze3GDgLMygH9Fju6t6dajVW1kse4o=",
-        "owner": "zackelia",
-        "repo": "homebrew-formulae",
-        "rev": "d20606bc22be379349616c26e8dd48cb98de30ed",
-        "type": "github"
-      },
-      "original": {
-        "owner": "zackelia",
-        "repo": "homebrew-formulae",
         "type": "github"
       }
     }

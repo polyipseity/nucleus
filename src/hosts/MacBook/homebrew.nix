@@ -11,7 +11,6 @@
   homebrew-cask,
   cirruslabs-cli,
   smudge-smudge,
-  zackelia-formulae,
   ...
 }:
 let
@@ -28,7 +27,6 @@ let
     "displayplacer" # CLI display arrangement tool
     "sqlite" # SQLite library; needed by qmd setCustomSQLite for sqlite-vec extension support
     "smudge/smudge/nightlight" # Night Shift schedule & temperature control
-    "zackelia/formulae/bclm" # Battery charge limit management
   ];
 
   managedBrews = builtins.sort (a: b: a < b) (lib.unique (staticManagedBrews ++ coreManagedBrews));
@@ -92,7 +90,6 @@ in
       "homebrew/homebrew-cask" = homebrew-cask;
       "cirruslabs/homebrew-cli" = cirruslabs-cli;
       "smudge/homebrew-smudge" = smudge-smudge;
-      "zackelia/homebrew-formulae" = zackelia-formulae;
     };
     trust = {
       # Trust cirruslabs/cli as a whole tap because softnet is a transitive
@@ -100,7 +97,6 @@ in
       taps = [ "cirruslabs/cli" ];
       formulae = [
         "smudge/smudge/nightlight"
-        "zackelia/formulae/bclm"
       ];
     };
   };
