@@ -9,12 +9,19 @@
 #
 # WHY: the macOS-native Charge Limit (macOS 26.4+) is deliberately not converged
 #   here.  It has no `pmset` key, no configuration-profile payload, and no
-#   supported CLI — Apple exposes it only to the Settings UI and to a Shortcuts
-#   action, and Shortcuts workflows cannot be authored from the command line.
-#   Automating it would therefore mean requiring a hand-built shortcut, so the
-#   native limit stays a one-time manual setting (see MANUAL.md).  It can only
-#   lower the ceiling (80–100 %), so with the gate below at 80 % the effective
-#   cap is 80 % whether or not it is set.
+#   supported setter — Apple exposes it to the Settings UI and to a Shortcuts
+#   action, and a Shortcuts workflow cannot be authored from the command line, so
+#   automating it would mean requiring a hand-built shortcut.  The value itself
+#   sits in a root-writable NSKeyedArchiver blob in
+#   /Library/Preferences/com.apple.powerd.charging.plist, but that is Apple's
+#   private archive and its policy is keyed to a live owning task, so a
+#   hand-written entry is neither supported nor adopted.  The native limit stays
+#   a one-time manual setting (see MANUAL.md).
+#
+#   That manual step is the backstop, not a redundant second gate: the firmware
+#   gate below is the only automatic cap, and the `battery` helper has had
+#   regressions on macOS 26.x, which would leave the machine charging to 100 %
+#   with nothing reporting it.
 #
 # Manual conflict proof (needs root; documented rather than executed during
 # activation because SMC reads require elevated I/O access and are diagnostic

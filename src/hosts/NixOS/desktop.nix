@@ -143,7 +143,7 @@ in
   # posture; hardware without the attributes is reported, not failed, so the
   # switch still succeeds on a machine that cannot cap charge.
   # Cross-platform parity: macOS converges the same 80 % ceiling through the
-  # `battery` CLI plus the native Charge Limit.
+  # `battery` CLI; its native Charge Limit is a manual setting (MANUAL.md).
   system.activationScripts.nixos-configure-charge-limit.text = lib.mkAfter ''
     "${activationBundle}/src/platforms/NixOS/scripts/nixos-configure-charge-limit.sh" \
       "/sys/class/power_supply"
