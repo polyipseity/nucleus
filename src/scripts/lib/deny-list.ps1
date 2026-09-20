@@ -6,8 +6,8 @@
 Set-StrictMode -Version Latest
 
 # Select-GitIgnored — reads paths from pipeline input, filters out gitignored paths.
-# Uses git check-ignore --stdin for batch-mode efficiency with proper
-# $LASTEXITCODE handling (pipefail-safe).
+# Uses git check-ignore --stdin for batch-mode efficiency, writing git's stdin
+# directly so the byte stream is LF-exact on every platform.
 function Select-GitIgnored {
   [CmdletBinding()]
   [OutputType([System.Collections.Generic.List[string]])]
@@ -35,35 +35,56 @@ function Select-GitIgnored {
       return
     }
 
-    $tmp = [System.IO.Path]::GetTempFileName()
-    try {
-      # Join with LF only — Windows Set-Content writes CRLF which breaks
-      # git check-ignore --stdin (trailing \r causes pattern mismatch).
-      ($allPaths -join "`n") | Set-Content -Path $tmp -NoNewline -Encoding utf8NoBOM
+    # WHY: git check-ignore --stdin does not strip a trailing CR, so a CRLF
+    # byte sequence matches no pattern and the filter silently no-ops. Piping
+    # through PowerShell always terminates input with Environment.NewLine, so
+    # the paths are written to git's stdin directly, LF-exact.
+    $gitCommand = Get-Command -Name 'git' -CommandType Application -ErrorAction Stop |
+      Select-Object -First 1
 
-      # Capture git check-ignore output and exit code.
-      # Using cmd /c to avoid PowerShell's own error handling interfering.
-      $ignored = Get-Content $tmp | & git check-ignore --stdin 2>$null  # check-suppress:suppression_doc: check-ignore exits 1 and may write stderr when nothing is ignored; $LASTEXITCODE checked on next line
-      $gitExit = $LASTEXITCODE
+    $psi = [System.Diagnostics.ProcessStartInfo]::new()
+    $psi.FileName = $gitCommand.Source
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardInput = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.ArgumentList.Add('check-ignore')
+    $psi.ArgumentList.Add('--stdin')
 
-      if ($gitExit -le 1) {
-        # Exit 0: some paths ignored; Exit 1: nothing ignored
-        if ($ignored) {
-          $ignoredSet = [System.Collections.Generic.HashSet[string]]::new(
-            [string[]]@($ignored), [StringComparer]::OrdinalIgnoreCase)
-          $allPaths | Where-Object { -not $ignoredSet.Contains($_) }
-        } else {
-          # Nothing ignored — pass through
-          $allPaths
-        }
-      } else {
-        # git error (exit 128) — pass through unchanged
-        $allPaths
-      }
-    } finally {
-      # check-suppress:suppression_doc: temp file cleanup in finally; file may already be removed (best-effort)
-      Remove-Item -Path $tmp -Force -ErrorAction SilentlyContinue
+    $process = [System.Diagnostics.Process]::Start($psi)
+    # Both streams are read concurrently before stdin is written: the pipes have
+    # bounded buffers, so a large path list would deadlock on a full stdout pipe.
+    $stdout = $process.StandardOutput.ReadToEndAsync()
+    $stderr = $process.StandardError.ReadToEndAsync()
+    $process.StandardInput.Write(($allPaths -join "`n") + "`n")
+    $process.StandardInput.Close()
+    $process.WaitForExit()
+    $gitExit = $process.ExitCode
+
+    if ($gitExit -gt 1) {
+      # Exit 128: git could not run the query (broken repo, missing index).
+      # The documented contract is pass-through, but never silently.
+      Write-Warning "Select-GitIgnored: git check-ignore failed (exit $gitExit): $($stderr.Result.Trim())"
+      $allPaths
+      return
     }
+
+    # Exit 0: at least one path ignored; exit 1: none ignored (empty set).
+    $ignoredSet = [System.Collections.Generic.HashSet[string]]::new(
+      [System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($line in ($stdout.Result -split "`n")) {
+      $ignoredPath = $line.TrimEnd("`r")
+      if ($ignoredPath) {
+        $null = $ignoredSet.Add($ignoredPath)  # check-suppress:suppression_doc: HashSet.Add returns bool; membership is the only effect needed
+      }
+    }
+
+    if ($ignoredSet.Count -eq 0) {
+      $allPaths
+      return
+    }
+
+    $allPaths | Where-Object { -not $ignoredSet.Contains($_) }
   }
 }
 
