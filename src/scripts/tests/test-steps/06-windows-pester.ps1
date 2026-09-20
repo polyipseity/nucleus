@@ -26,5 +26,25 @@ Register-Step -Id "windows-pester" -Name "Windows Pester tests" -Platform window
   }
 
   $result = Invoke-Pester -Path $testFiles -PassThru
-  return ($result.FailedCount -eq 0)
+  if ($result.FailedCount -gt 0) {
+    # WHY: -PassThru returns a result object, so a bare exit status discards which
+    # tests failed. Report them here or a Windows-only failure is undiagnosable
+    # from the CI log.
+    Write-ErrorMessage "Pester: $($result.FailedCount) of $($result.TotalCount) tests failed."
+    try {
+      foreach ($failed in $result.Failed) {
+        $name = @('ExpandedPath', 'ExpandedName', 'Name') |
+          ForEach-Object { $failed.PSObject.Properties[$_].Value } |
+          Where-Object { $_ } | Select-Object -First 1
+        $record = $failed.PSObject.Properties['ErrorRecord']
+        $message = if ($record -and $record.Value) { $record.Value.Exception.Message } else { 'no error record' }
+        Write-ErrorMessage "  $name : $message"
+      }
+    } catch {
+      Write-ErrorMessage "  (could not enumerate failing tests: $($_.Exception.Message))"
+    }
+    return $false
+  }
+  Write-Message "Pester: all $($result.TotalCount) tests passed."
+  return $true
 }
