@@ -725,8 +725,35 @@ test_only_steps_dedup
 test_only_steps_last_value_wins
 test_only_steps_unknown_id_errors
 
+# A fail-fast abort exits before aggregate_results, which is the only other place
+# captured step output is replayed; the failing step's output must still be shown.
+test_run_all_steps_fail_fast_reports_failed_step() {
+  local _out _exit=0
+  _out=$(
+    # shellcheck disable=SC2030,SC2031 # reason: FAIL_FAST must be set in the subshell that sources step-runner; the change is scoped to that subshell
+    export FAIL_FAST=true
+    . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+    # shellcheck disable=SC2329 # reason: invoked indirectly via register_step function name
+    step_bad() {
+      echo "why-it-failed"
+      return 1
+    }
+    register_step "bad" 1 "Bad step" step_bad
+    run_all_steps 2>&1
+  ) || _exit=$?
+  if [ "$_exit" -eq 1 ] &&
+    [[ "$_out" == *"why-it-failed"* ]] &&
+    [[ "$_out" == *"Bad step"* ]] &&
+    [[ "$_out" == *"some checks failed: steps 1 "* ]]; then
+    assert_pass "a fail-fast abort reports the failing step and its output"
+  else
+    assert_fail "run_all_steps fail-fast report" "exit=$_exit output=[$_out]"
+  fi
+}
+
 echo "--- Dispatch ---"
 test_run_all_steps_reports_not_applicable_and_passes
+test_run_all_steps_fail_fast_reports_failed_step
 
 echo "--- Argument parsing and shared helpers ---"
 test_parse_args_help

@@ -418,6 +418,40 @@ function Initialize-StepState {
     $script:usageAction = { Write-Output "usage: test" }
 }
 
+# ---- Fail-fast reporting ----
+
+# A fail-fast abort exits before Format-StepSummary, which is the only other place
+# captured step output is replayed; the failing step's output must still be shown.
+function Test-FailFastReport-ReplaysFailedStep {
+    Initialize-StepState
+    . $stepRunner
+
+    # The entry points import Format-NucleusOutput.psm1; stub the reporter it provides.
+    function Write-ErrorMessage { param([string]$Message) Write-Output "error: $Message" }
+
+    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-failfast-test-$([System.IO.Path]::GetRandomFileName())"
+    New-Item -ItemType Directory -Path $tempDir -Force > $null
+    try {
+        $script:WaveTmpDir = $tempDir
+        $script:NucStyleDim = ''
+        $script:NucStyleReset = ''
+        $script:NucStyleRed = ''
+        Register-Step -Id "bad" -Number 1 -Name "Bad step" -Action { $true }
+        "why-it-failed" | Out-File -FilePath (Join-Path $tempDir "step-1.out") -Encoding utf8
+        "5" | Out-File -FilePath (Join-Path $tempDir "step-1.time") -Encoding utf8 -NoNewline
+
+        $out = Format-FailFastReport -Number @(1) 2>&1 | Out-String
+
+        if ($out -match 'Bad step' -and $out -match 'why-it-failed' -and $out -match 'some checks failed: steps 1 ') {
+            Assert-Pass "a fail-fast abort reports the failing step and its output"
+        } else {
+            Assert-Fail "Format-FailFastReport" "expected step name, replayed output and failure message; got [$out]"
+        }
+    } finally {
+        Remove-Item -LiteralPath $tempDir -Recurse -Force
+    }
+}
+
 # ---- Run tests ----
 Write-Output "`n=== Step-runner framework unit tests (PS1) ==="
 Write-Output "Registration arity, token validation, applicability matrix, --only-steps."
@@ -446,6 +480,7 @@ Test-OnlySteps-EmptyValue
 Test-OnlySteps-Dedup
 Test-OnlySteps-LastValueWin
 Test-OnlySteps-UnknownIdError
+Test-FailFastReport-ReplaysFailedStep
 
 Write-Output "`n--- Step-runner PS1 unit tests: $($script:passCount) passed, $($script:failCount) failed ---"
 Write-Output ""

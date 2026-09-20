@@ -675,13 +675,23 @@ function Invoke-StepPipeline {
     }
 
     if ($batchFailed -and $script:FAIL_FAST) {
+      # A runspace that threw has no per-step exit file to replay; report the
+      # infrastructure failure rather than exiting silently.
+      Write-ErrorMessage "step runspace failed (fail-fast)"
       exit 1
     }
 
-    foreach ($rs in $runspaces) {
-      $exitFile = Join-Path $script:WaveTmpDir "step-$($rs.Number).exit"
-      if ((Test-Path -LiteralPath $exitFile) -and (Get-Content -LiteralPath $exitFile -Raw) -ne '0' -and $script:FAIL_FAST) {
-        exit [int](Get-Content -LiteralPath $exitFile -Raw)
+    if ($script:FAIL_FAST) {
+      $failFastNumbers = @()
+      foreach ($rs in $runspaces) {
+        $exitFile = Join-Path $script:WaveTmpDir "step-$($rs.Number).exit"
+        if ((Test-Path -LiteralPath $exitFile) -and (Get-Content -LiteralPath $exitFile -Raw) -ne '0') {
+          $failFastNumbers += $rs.Number
+        }
+      }
+      if ($failFastNumbers.Count -gt 0) {
+        Format-FailFastReport -Number $failFastNumbers
+        exit 1
       }
     }
   }
@@ -695,6 +705,58 @@ function Invoke-StepPipeline {
     if (Test-Path -LiteralPath $timeFile) { $elapsedMs = [int](Get-Content -LiteralPath $timeFile -Raw) }
     Write-Output ("$($script:NucStyleDim)step {0} finished ({1})$($script:NucStyleReset)" -f $n, (Format-StepDuration -Milliseconds $elapsedMs))
   }
+}
+
+# --- Format-StepLine ---
+# One step's summary line (state glyph, duration, name). Shared by the fail-fast
+# abort and Format-StepSummary so a failing step renders identically whether or
+# not the summary is reached.
+function Format-StepLine {
+  param(
+    [Parameter(Mandatory)][int]$Number,
+    # AllowEmptyString: colors are empty strings when output decoration is disabled (NO_COLOR).
+    [Parameter(Mandatory)][AllowEmptyString()][string]$Glyph,
+    [Parameter(Mandatory)][AllowEmptyString()][string]$Color
+  )
+  $i = $script:StepNumbers.IndexOf($Number)
+  $name = $script:StepNames[$i]
+  # check-suppress:suppression_doc: probe -- time file may not exist if step never ran; $null defaulted to '0' below
+  $elapsed = Get-Content -Path (Join-Path $script:WaveTmpDir "step-$Number.time") -ErrorAction SilentlyContinue
+  if (-not $elapsed) { $elapsed = "0" }
+  "$($script:NucStyleDim)  step {0,2}  $Color{1}$($script:NucStyleReset)$($script:NucStyleDim)  {2,8}  $($script:NucStyleReset){3}" -f $Number, $Glyph, (Format-StepDuration -Milliseconds ([int]$elapsed)), $name | Write-Output
+}
+
+# --- Write-StepReplay ---
+# Replays a step's captured stdout/stderr, highlighting header-only lines the way
+# the summary does.
+function Write-StepReplay {
+  param([Parameter(Mandatory)][int]$Number)
+  $outFile = Join-Path $script:WaveTmpDir "step-$Number.out"
+  if (Test-Path $outFile) {
+    Get-Content -Path $outFile | ForEach-Object {
+      if ($_ -match '^=== .* ===') { "$($script:NucStyleBold)$($script:NucStyleCyan)$_$($script:NucStyleReset)" }
+      else { $_ }
+    } | Write-Output
+  }
+}
+
+# --- Format-FailFastReport ---
+# Reports the steps that failed before a fail-fast abort. The abort exits before
+# Format-StepSummary, which is the only other place step output is replayed, so
+# without this the run reports that steps started and never why one failed — the
+# pre-push hook cannot pass --no-fail-fast to work around it.
+function Format-FailFastReport {
+  param([Parameter(Mandatory)][int[]]$Number)
+  $failed = ""
+  "" | Write-Output
+  foreach ($n in $Number) {
+    Format-StepLine -Number $n -Glyph "✗" -Color $script:NucStyleRed
+    Write-StepReplay -Number $n
+    $failed = "$failed$n "
+  }
+  "" | Write-Output
+  Write-ErrorMessage "$($script:NucStyleRed)some checks failed: steps $failed$($script:NucStyleReset)"
+  "  Failed steps: $failed" | Write-Output
 }
 
 # --- Format-StepSummary ---
@@ -722,24 +784,18 @@ function Format-StepSummary {
     $totalElapsed += [int]$elapsed
 
     if ($exitCode -eq "0") {
-      "$($script:NucStyleDim)  step {0,2}  $($script:NucStyleGreen){1}$($script:NucStyleReset)$($script:NucStyleDim)  {2,8}  $($script:NucStyleReset){3}" -f $n, "✓", (Format-StepDuration -Milliseconds ([int]$elapsed)), $name | Write-Output
+      Format-StepLine -Number $n -Glyph "✓" -Color $script:NucStyleGreen
     } else {
-      "$($script:NucStyleDim)  step {0,2}  $($script:NucStyleRed){1}$($script:NucStyleReset)$($script:NucStyleDim)  {2,8}  $($script:NucStyleReset){3}" -f $n, "✗", (Format-StepDuration -Milliseconds ([int]$elapsed)), $name | Write-Output
+      Format-StepLine -Number $n -Glyph "✗" -Color $script:NucStyleRed
       $failedSteps = "$failedSteps$n "
     }
 
     # Replay step output (verbose mode or failed steps only)
-    $outFile = Join-Path $script:WaveTmpDir "step-$n.out"
-    if (Test-Path $outFile) {
-      $stepId = $script:StepIds[$i]
-      $isVerbose = $script:VerboseIds -contains '*' -or $script:VerboseIds -contains $stepId
-      $isFailed = $exitCode -ne '0'
-      if ($isVerbose -or $isFailed) {
-        Get-Content -Path $outFile | ForEach-Object {
-          if ($_ -match '^=== .* ===') { "$($script:NucStyleBold)$($script:NucStyleCyan)$_$($script:NucStyleReset)" }
-          else { $_ }
-        } | Write-Output
-      }
+    $stepId = $script:StepIds[$i]
+    $isVerbose = $script:VerboseIds -contains '*' -or $script:VerboseIds -contains $stepId
+    $isFailed = $exitCode -ne '0'
+    if ($isVerbose -or $isFailed) {
+      Write-StepReplay -Number $n
     }
   }
 

@@ -581,14 +581,15 @@ run_all_steps() {
   # Only applicable, selected steps count toward the run progress.
   _total=${#_pending_indices[@]}
 
-  local _pos=0 _batch_end _batch_i _batch_pid _wait_ret _fail_fast_exit=""
-  local -a _batch_pids=()
+  local _pos=0 _batch_end _batch_i _wait_ret _fail_fast=false
+  local -a _batch_pids=() _batch_indices=() _fail_fast_indices=()
   while [ "$_pos" -lt "${#_pending_indices[@]}" ]; do
     _batch_end=$((_pos + _max_jobs))
     if [ "$_batch_end" -gt "${#_pending_indices[@]}" ]; then
       _batch_end=${#_pending_indices[@]}
     fi
     _batch_pids=()
+    _batch_indices=()
     while [ "$_pos" -lt "$_batch_end" ]; do
       _i="${_pending_indices[$_pos]}"
       _pos=$((_pos + 1))
@@ -598,19 +599,22 @@ run_all_steps() {
       _started=$((_started + 1))
       _run_step "$_n" "$_name" "${_STEP_FUNCS[$_i]}" "$_id" "${POSITIONAL_ARGS[@]+${POSITIONAL_ARGS[@]}}" &
       _batch_pids+=($!)
+      _batch_indices+=("$_i")
       _spawned_steps+=("$_n")
       printf '%s[%d/%d] step %s %s started%s\n' "${_nuc_c1_dim}" "$_started" "$_total" "$_n" "$_name" "${_nuc_c1_reset}"
     done
-    _fail_fast_exit=""
-    for _batch_pid in "${_batch_pids[@]}"; do
+    _fail_fast=false
+    for _batch_i in "${!_batch_pids[@]}"; do
       _wait_ret=0
-      wait "$_batch_pid" || _wait_ret=$?
+      wait "${_batch_pids[$_batch_i]}" || _wait_ret=$?
       if [ "$_wait_ret" -ne 0 ] && $FAIL_FAST; then
-        _fail_fast_exit="$_wait_ret"
+        _fail_fast=true
+        _fail_fast_indices+=("${_batch_indices[$_batch_i]}")
       fi
     done
-    if [ -n "$_fail_fast_exit" ]; then
-      exit "$_fail_fast_exit"
+    if $_fail_fast; then
+      _report_fail_fast "${_fail_fast_indices[@]}"
+      exit 1
     fi
   done
 
@@ -622,6 +626,51 @@ run_all_steps() {
     _duration_s=$(_format_duration_s "$_elapsed_ms")
     printf '%sstep %s finished (%s)%s\n' "${_nuc_c1_dim}" "$_n" "$_duration_s" "${_nuc_c1_reset}"
   done
+}
+
+# --- _print_step_line ---
+# One step's summary line (state glyph, duration, name). Shared by the fail-fast
+# abort and aggregate_results so a failing step renders identically whether or
+# not the summary is reached.
+_print_step_line() {
+  local _i="$1" _glyph="$2" _color="$3"
+  local _n="${_STEP_NUMBERS[$_i]}" _name="${_STEP_NAMES[$_i]}"
+  local _elapsed_ms _duration_s
+  _elapsed_ms=$(cat "$_wave_tmpdir/step-$_n.time" 2>/dev/null || echo 0)
+  _duration_s=$(_format_duration_s "$_elapsed_ms")
+  # _n is the zero-padded NN- prefix string; 10# forces decimal so %d doesn't parse it as octal.
+  printf '  %sstep %2d%s  %s%s%s  %s%8s%s  %s\n' "${_nuc_c1_dim}" "$((10#${_n}))" "${_nuc_c1_reset}" "$_color" "$_glyph" "${_nuc_c1_reset}" "${_nuc_c1_dim}" "$_duration_s" "${_nuc_c1_reset}" "$_name"
+}
+
+# --- _replay_step_output ---
+# Replays a step's captured stdout/stderr. Header-only lines the step printed are
+# highlighted like the summary does.
+_replay_step_output() {
+  local _n="${_STEP_NUMBERS[$1]}"
+  [ -f "$_wave_tmpdir/step-$_n.out" ] || return 0
+  if [ -n "$_nuc_c1_cyan" ]; then
+    sed "s/^=== .*$/${_nuc_c1_bold}${_nuc_c1_cyan}&${_nuc_c1_reset}/" "$_wave_tmpdir/step-$_n.out"
+  else
+    cat "$_wave_tmpdir/step-$_n.out"
+  fi
+}
+
+# --- _report_fail_fast ---
+# Reports the steps that failed before a fail-fast abort. A fail-fast abort exits
+# before aggregate_results, which is the only other place step output is replayed,
+# so without this the run reports that steps started and never why one failed —
+# the pre-push hook cannot pass --no-fail-fast to work around it.
+_report_fail_fast() {
+  local _i _failed=""
+  printf '\n'
+  for _i in "$@"; do
+    _print_step_line "$_i" "✗" "${_nuc_c1_red}"
+    _replay_step_output "$_i"
+    _failed="$_failed$((10#${_STEP_NUMBERS[$_i]})) "
+  done
+  printf '\n'
+  error "some checks failed: steps $_failed"
+  printf '  Failed steps: %s\n' "$_failed"
 }
 
 # --- aggregate_results ---
@@ -651,36 +700,30 @@ aggregate_results() {
 
     # _n is the zero-padded NN- prefix string; 10# forces decimal so %d doesn't parse it as octal.
     if [ "$_exit_code" -eq 0 ]; then
-      printf '  %sstep %2d%s  %s✓%s  %s%8s%s  %s\n' "${_nuc_c1_dim}" "$((10#${_n}))" "${_nuc_c1_reset}" "${_nuc_c1_green}" "${_nuc_c1_reset}" "${_nuc_c1_dim}" "$_duration_s" "${_nuc_c1_reset}" "$_name"
+      _print_step_line "$_i" "✓" "${_nuc_c1_green}"
     else
-      printf '  %sstep %2d%s  %s✗%s  %s%8s%s  %s\n' "${_nuc_c1_dim}" "$((10#${_n}))" "${_nuc_c1_reset}" "${_nuc_c1_red}" "${_nuc_c1_reset}" "${_nuc_c1_dim}" "$_duration_s" "${_nuc_c1_reset}" "$_name"
+      _print_step_line "$_i" "✗" "${_nuc_c1_red}"
       _failed_steps="$_failed_steps$((10#${_n})) "
     fi
 
-    if [ -f "$_wave_tmpdir/step-$_n.out" ]; then
-      # In quiet mode, only replay output for failed steps (so errors are visible).
-      # In verbose mode, replay all output.
-      local _step_id="${_STEP_IDS[$_i]}"
-      local _should_replay=false
-      if [ "${#VERBOSE_IDS[@]}" -gt 0 ]; then
-        for _vid in "${VERBOSE_IDS[@]}"; do
-          if [ "$_vid" = "*" ] || [ "$_vid" = "$_step_id" ]; then
-            _should_replay=true
-            break
-          fi
-        done
-      fi
-      # Always replay failed steps regardless of verbose mode
-      if [ "$_exit_code" -ne 0 ]; then
-        _should_replay=true
-      fi
-      if $_should_replay; then
-        if [ -n "$_nuc_c1_cyan" ]; then
-          sed "s/^=== .*$/${_nuc_c1_bold}${_nuc_c1_cyan}&${_nuc_c1_reset}/" "$_wave_tmpdir/step-$_n.out"
-        else
-          cat "$_wave_tmpdir/step-$_n.out"
+    # In quiet mode, only replay output for failed steps (so errors are visible).
+    # In verbose mode, replay all output.
+    local _step_id="${_STEP_IDS[$_i]}"
+    local _should_replay=false
+    if [ "${#VERBOSE_IDS[@]}" -gt 0 ]; then
+      for _vid in "${VERBOSE_IDS[@]}"; do
+        if [ "$_vid" = "*" ] || [ "$_vid" = "$_step_id" ]; then
+          _should_replay=true
+          break
         fi
-      fi
+      done
+    fi
+    # Always replay failed steps regardless of verbose mode
+    if [ "$_exit_code" -ne 0 ]; then
+      _should_replay=true
+    fi
+    if $_should_replay; then
+      _replay_step_output "$_i"
     fi
   done
 
