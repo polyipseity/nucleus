@@ -90,7 +90,11 @@ Describe 'Invoke-PiSetup pi extension convergence' {
 
         function Get-PiCallList {
             if (-not (Test-Path -LiteralPath $script:piLog)) { return @() }
-            return @(Get-Content -LiteralPath $script:piLog)
+            # WHY the trim: cmd treats everything before the redirect as the echoed text,
+            # so the Windows shim records a trailing space for every call and the argv
+            # assertions below could never match there. The POSIX shim quotes "$*" and is
+            # unaffected; trimming here recovers the argv the product actually passed.
+            return @(Get-Content -LiteralPath $script:piLog | ForEach-Object { $_.TrimEnd() })
         }
     }
     AfterAll {
