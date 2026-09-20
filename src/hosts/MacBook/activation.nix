@@ -231,10 +231,13 @@ in
     "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-battery-policy.sh"
 
     # ---- configure-charge-limit --------------------------------------------------
-    # WHY: the battery menu bar tray icon is not declaratively hideable — its tray
-    #   is created unconditionally.  `battery maintain 80` installs a headless
-    #   LaunchAgent (com.battery.app) so the charge limit persists without the tray
-    #   being open.
+    # WHY: two independent gates are converged to the same 80 % ceiling.  The
+    #   `battery` CLI writes the SMC charging gate and installs a headless
+    #   LaunchAgent (com.battery.app) so the cap persists without the tray being
+    #   open; the native macOS 26.4+ Charge Limit is driven through a Shortcuts
+    #   shortcut.  Neither has a declarative option — the tray icon is not
+    #   declaratively hideable, and the native setting has no pmset key and no
+    #   configuration-profile payload.
     "${activationBundle}/src/hosts/MacBook/scripts/macos-charge-limit.sh"
 
     # ---- macos-configure-menu-bar-icons --------------------------------------------
