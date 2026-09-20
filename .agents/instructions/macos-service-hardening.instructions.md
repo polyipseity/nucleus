@@ -102,6 +102,8 @@ Set `Label` explicitly for `launchd.daemons` (e.g. `local.camilladsp`). Root pro
 
 `src/hosts/MacBook/activation.nix` (`postActivation`) is the SSOT for managed `pmset` writes. Preserve: `womp` on both `-c` and `-b`; `disksleep` equal to `sleep`; per-source `lowpowermode` before timer values; global `lidwake` (`-a`). Do not write `Sleep On Power Button` or `SleepServices` via `pmset` on Apple Silicon/macOS 15+.
 
+The 80 % charge limit is separate from `pmset` and lives in `src/hosts/MacBook/scripts/macos-charge-limit.sh`, which converges two independent gates: `battery maintain 80` (the SMC charging gate plus its headless `com.battery.app` LaunchAgent) and the native macOS 26.4+ Charge Limit, driven through the `Set Charge Limit 80` shortcut (`launchctl asuser` + `shortcuts run`). Neither has a declarative option — `pmset` exposes no charge-limit key and no configuration profile carries one. Keep both gates: charging needs every gate open, so the ceiling is the lower of the two, and the native gate holds the limit when an OS update breaks the third-party helper. The shortcut cannot be authored from the command line, so its one-time creation stays documented in `src/hosts/MacBook/MANUAL.md`.
+
 ## sops-nix macOS LaunchAgent async behaviour
 
 sops-nix on macOS installs secrets via LaunchAgent — `entryAfter = [ "sops-nix" ]` does not gate on files landing on disk. Wire `git-identity`, `gpg-import`, `ssh-key-adopt`, and other sops readers to `waitForSopsSecrets` (polling barrier) instead.
