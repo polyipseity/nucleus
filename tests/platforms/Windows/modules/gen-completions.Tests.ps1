@@ -49,15 +49,29 @@ BeforeAll {
 
   function Invoke-GenCompletion {
     param([string[]]$Arguments)
-    $oldRepoRoot = $env:NUCLEUS_REPO_ROOT
-    try {
-      $env:NUCLEUS_REPO_ROOT = $Script:FixtureRoot
-      $output = & $Script:PwshExe -NoProfile -File $Script:ScriptPath @Arguments 2>&1
-      $code = $LASTEXITCODE
-    } finally {
-      $env:NUCLEUS_REPO_ROOT = $oldRepoRoot
+    # WHY: the fixture repo root is handed to the child through the child's own
+    # environment. Setting $env:NUCLEUS_REPO_ROOT here would leak into every
+    # suite running concurrently in this process — steps share one PowerShell
+    # process — so a child spawned by another suite would resolve the wrong repo
+    # root (scripts/check.ps1 reads NUCLEUS_REPO_ROOT when it is set).
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $Script:PwshExe
+    $startInfo.UseShellExecute = $false
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.Environment['NUCLEUS_REPO_ROOT'] = $Script:FixtureRoot
+    $childArguments = @('-NoProfile', '-File', $Script:ScriptPath)
+    if ($Arguments) { $childArguments += $Arguments }
+    foreach ($argument in $childArguments) {
+      $startInfo.ArgumentList.Add($argument)
     }
-    return [pscustomobject]@{ Output = ($output -join "`n"); ExitCode = $code }
+    $process = [System.Diagnostics.Process]::Start($startInfo)
+    # WHY: both streams are read asynchronously; reading one to the end while the
+    # child fills the other stream's buffer can deadlock.
+    $stdout = $process.StandardOutput.ReadToEndAsync()
+    $stderr = $process.StandardError.ReadToEndAsync()
+    $process.WaitForExit()
+    return [pscustomobject]@{ Output = ($stdout.Result + $stderr.Result); ExitCode = $process.ExitCode }
   }
 
   function Get-NucleusFlagsFromProfile {
