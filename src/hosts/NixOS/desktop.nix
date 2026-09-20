@@ -137,6 +137,18 @@ in
     };
   };
 
+  # Charge cap: hold the pack at 80 % and resume at 75 % on hardware whose
+  # battery exposes the standard power_supply charge-control attributes.  This
+  # belongs beside the CPU governor profiles above because it is the same power
+  # posture; hardware without the attributes is reported, not failed, so the
+  # switch still succeeds on a machine that cannot cap charge.
+  # Cross-platform parity: macOS converges the same 80 % ceiling through the
+  # `battery` CLI plus the native Charge Limit.
+  system.activationScripts.nixos-configure-charge-limit.text = lib.mkAfter ''
+    "${activationBundle}/src/platforms/NixOS/scripts/nixos-configure-charge-limit.sh" \
+      "/sys/class/power_supply"
+  '';
+
   # logind lid-close behaviour: keep the machine awake with the lid closed on
   # every power source so long-running AI agents and remote-desktop sessions do
   # not die just because the panel was shut.  linux.nix already disables idle
