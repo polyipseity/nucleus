@@ -5,6 +5,12 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# Sourced before the product libraries so `finish_tests` and the shared counters
+# come from here, while the product's own `require_command` stays lib.sh's: the
+# suite drives the product in-process and must exercise production behaviour.
+# shellcheck source=./test-lib.sh
+. "$SCRIPT_DIR/test-lib.sh"
+
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 NUCLEUS_ANDROID_CONFIG_DIR="$REPO_ROOT/src/scripts/vms"
 export NUCLEUS_ANDROID_CONFIG_DIR
@@ -19,8 +25,6 @@ export NUCLEUS_VM_ANDROID_REBOOT_SETTLE_SECONDS=0
 export NUCLEUS_VM_ANDROID_POLL_INTERVAL=0.1
 export NUCLEUS_VM_ANDROID_SIDLELOAD_PROBE_TIMEOUT=1
 
-_failures=0
-_passed=0
 _reported=''
 _current_case=''
 _last_error=''
@@ -31,14 +35,16 @@ _tmp="$(mktemp -d)"
 # nothing else. The ERR trap records the failing command; the EXIT trap then names
 # it with the case that was running, which only the caller can know.
 trap '_last_error="line $LINENO: $BASH_COMMAND"' ERR
+# shellcheck disable=SC2329 # reason: dispatched by name through run_case, which shellcheck reads as a bare reference
 _report_abort() {
   _ra_status="$1"
   if [ -n "$_reported" ]; then
     return 0
   fi
   printf 'FAIL: %s aborted (exit %s) at %s\n' "${_current_case:-<setup>}" "$_ra_status" "${_last_error:-unknown}" >&2
-  printf '# nucleus-tally passed=%s failed=%s\n' "$_passed" "$((_failures + 1))"
+  printf '# nucleus-tally passed=%s failed=%s\n' "$TESTS_PASSED" "$((TESTS_FAILED + 1))"
 }
+# shellcheck disable=SC2329 # reason: dispatched by name through run_case, which shellcheck reads as a bare reference
 _on_exit() {
   _oe_status=$?
   rm -rf "$_tmp"
@@ -46,13 +52,15 @@ _on_exit() {
 }
 trap '_on_exit' EXIT
 
+# shellcheck disable=SC2329 # reason: dispatched by name through run_case, which shellcheck reads as a bare reference
 assert_eq() {
   if [ "$1" != "$2" ]; then
     echo "FAIL: $3: expected '$1', got '$2'"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
 }
 
+# shellcheck disable=SC2329 # reason: dispatched by name through run_case, which shellcheck reads as a bare reference
 setup_fixture() {
   _af_manifest="$_tmp/manifest.json"
   cat >"$_af_manifest" <<'EOF'
@@ -89,6 +97,7 @@ EOF
     "$REPO_ROOT/src/vms" "$_af_manifest" "MacBook" "false" "false" "false"
 }
 
+# shellcheck disable=SC2329 # reason: dispatched by name through run_case, which shellcheck reads as a bare reference
 test_adb_port_resolution() {
   setup_fixture
   assert_eq "22040" "$(vm_android_adb_host_port 0)" "ADB host port from manifest"
@@ -97,6 +106,7 @@ test_adb_port_resolution() {
   assert_eq "tcp:localhost:22041" "$(vm_android_fastboot_serial 0)" "fastboot serial"
 }
 
+# shellcheck disable=SC2329 # reason: dispatched by name through run_case, which shellcheck reads as a bare reference
 test_adb_list_state_unauthorized() {
   setup_fixture
   _af_bin="$_tmp/bin"
@@ -117,6 +127,7 @@ EOF
   assert_eq "unauthorized" "$(vm_android_adb_list_state 0)" "adb devices unauthorized state"
 }
 
+# shellcheck disable=SC2329 # reason: dispatched by name through run_case, which shellcheck reads as a bare reference
 test_wait_authorized_fails_on_unauthorized() {
   setup_fixture
   _af_bin="$_tmp/bin"
@@ -141,14 +152,15 @@ EOF
   set -e
   if [ "$_af_status" -eq 0 ]; then
     echo "FAIL: vm_android_adb_wait_authorized should fail when unauthorized"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if ! grep -q 'ADB authorization' "$_tmp/err.txt"; then
     echo "FAIL: expected ADB authorization timeout error"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
 }
 
+# shellcheck disable=SC2329 # reason: dispatched by name through run_case, which shellcheck reads as a bare reference
 test_wait_recovery_succeeds_on_recovery() {
   setup_fixture
   _af_bin="$_tmp/bin"
@@ -169,10 +181,11 @@ EOF
 
   if ! vm_android_adb_wait_recovery 0 1; then
     echo "FAIL: vm_android_adb_wait_recovery should succeed in recovery state"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
 }
 
+# shellcheck disable=SC2329 # reason: dispatched by name through run_case, which shellcheck reads as a bare reference
 test_no_flags_prints_manual() {
   setup_fixture
   set +e
@@ -181,22 +194,23 @@ test_no_flags_prints_manual() {
   set -e
   if [ "$_af_status" -ne 0 ]; then
     echo "FAIL: vm_android_config without flags should succeed and print the manual"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if ! grep -q 'Enter fastboot' "$_tmp/out.txt"; then
     echo "FAIL: expected manual workflow with Enter fastboot step"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if ! grep -q 'Magisk' "$_tmp/out.txt"; then
     echo "FAIL: expected manual workflow to mention Magisk"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if ! grep -q -- '--root' "$_tmp/out.txt"; then
     echo "FAIL: expected manual workflow to mention --root"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
 }
 
+# shellcheck disable=SC2329 # reason: dispatched by name through run_case, which shellcheck reads as a bare reference
 test_root_applies_persist_root_access() {
   setup_fixture
   _af_shell_log="$_tmp/shell.log"
@@ -239,30 +253,31 @@ EOF
     if [ -s "$_tmp/err.txt" ]; then
       sed 's/^/  /' "$_tmp/err.txt"
     fi
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if ! grep -q 'development_settings_enabled' "$_af_shell_log"; then
     echo "FAIL: --root should enable Developer options via settings"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if ! grep -q 'resetprop persist.sys.root_access 3' "$_af_shell_log"; then
     echo "FAIL: --root should apply resetprop persist.sys.root_access 3"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if grep -q 'resetprop ro.debuggable 1' "$_af_shell_log"; then
     echo "FAIL: --root must not set ro.debuggable to 1"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if ! grep -q 'nucleus-root-props.sh' "$_af_shell_log"; then
     echo "FAIL: --root should persist nucleus-root-props.sh in service.d"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if ! grep -q 'next: --fake-wifi' "$_tmp/out.txt"; then
     echo "FAIL: --root should suggest --fake-wifi as next step"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
 }
 
+# shellcheck disable=SC2329 # reason: dispatched by name through run_case, which shellcheck reads as a bare reference
 test_gapps_rejects_booted_device_state() {
   setup_fixture
   _af_bin="$_tmp/bin"
@@ -295,14 +310,15 @@ EOF
   set -e
   if [ "$_af_status" -eq 0 ]; then
     echo "FAIL: --gapps should fail when guest is booted to system"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if ! grep -q 'booted to system' "$_tmp/err.txt"; then
     echo "FAIL: expected booted-system error message"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
 }
 
+# shellcheck disable=SC2329 # reason: dispatched by name through run_case, which shellcheck reads as a bare reference
 test_gapps_unauthorized_flashes_recovery() {
   setup_fixture
   mkdir -p "$_tmp/vm/src/Android"
@@ -370,18 +386,19 @@ EOF
 
   if ! vm_android_config Android 0 --gapps >"$_tmp/out.txt" 2>&1; then
     echo "FAIL: --gapps should proceed when recovery ADB is unauthorized"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if [ ! -f "$_af_flash_log" ]; then
     echo "FAIL: expected fastboot flash recovery when unauthorized"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if ! grep -q 'Enable ADB' "$_tmp/out.txt"; then
     echo "FAIL: expected Enable ADB guidance after fastboot flash"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
 }
 
+# shellcheck disable=SC2329 # reason: dispatched by name through run_case, which shellcheck reads as a bare reference
 test_gapps_sideload_path() {
   setup_fixture
   mkdir -p "$_tmp/vm/src/Android"
@@ -443,26 +460,27 @@ EOF
 
   if ! vm_android_config Android 0 --gapps >"$_tmp/out.txt" 2>&1; then
     echo "FAIL: --gapps sideload path should succeed in sideload state"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if ! grep -q 'already in sideload mode' "$_tmp/out.txt"; then
     echo "FAIL: expected already-in-sideload detection"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if ! grep -q 'ro.build.type=userdebug' "$_tmp/out.txt"; then
     echo "FAIL: expected guest userdebug recovery detection"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if [ ! -f "$_af_sideload_log" ]; then
     echo "FAIL: expected adb sideload to run"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if ! grep -q 'Install anyway' "$_tmp/out.txt"; then
     echo "FAIL: expected manual Install anyway instructions"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
 }
 
+# shellcheck disable=SC2329 # reason: dispatched by name through run_case, which shellcheck reads as a bare reference
 test_adb_keys_in_recovery() {
   setup_fixture
   _af_push_log="$_tmp/push.log"
@@ -493,14 +511,15 @@ EOF
   chmod +x "$_af_bin/fastboot"
   HOME="$_af_home" PATH="$_af_bin:$PATH" vm_android_config Android 0 --adb-keys || {
     echo "FAIL: --adb-keys should succeed in recovery"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   }
   if [ ! -f "$_af_push_log" ]; then
     echo "FAIL: expected adb push for adb-keys in recovery"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
 }
 
+# shellcheck disable=SC2329 # reason: dispatched by name through run_case, which shellcheck reads as a bare reference
 test_magisk_stage_patch_kit_layout() {
   setup_fixture
   _af_apk_root="$_tmp/magisk-apk-root"
@@ -520,17 +539,18 @@ test_magisk_stage_patch_kit_layout() {
   _af_stage="$_tmp/magisk-stage"
   if ! vm_android_magisk_stage_patch_kit "$_af_apk" 0 "$_af_stage"; then
     echo "FAIL: vm_android_magisk_stage_patch_kit should succeed for a minimal APK"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
     return
   fi
   for _af_bin in magisk magiskboot magiskinit init-ld boot_patch.sh stub.apk; do
     if [ ! -f "$_af_stage/$_af_bin" ]; then
       echo "FAIL: staged patch kit missing $_af_bin"
-      _failures=$((_failures + 1))
+      TESTS_FAILED=$((TESTS_FAILED + 1))
     fi
   done
 }
 
+# shellcheck disable=SC2329 # reason: dispatched by name through run_case, which shellcheck reads as a bare reference
 test_magisk_download_stdout_is_path_only() {
   setup_fixture
   mkdir -p "$SRC_DIR/Android"
@@ -556,24 +576,25 @@ EOF
   _af_apk_out="$(vm_android_download_magisk_apk 0)"
   if [ "$_af_apk_out" != "$_af_apk" ]; then
     echo "FAIL: download_magisk_apk stdout should be only the APK path"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if printf '%s' "$_af_apk_out" | grep -q 'vm:'; then
     echo "FAIL: download_magisk_apk stdout must not include say() log lines"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
 
   _af_boot_out="$(vm_android_download_boot_image 0)"
   if [ "$_af_boot_out" != "$_af_boot" ]; then
     echo "FAIL: download_boot_image stdout should be only the boot image path"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if printf '%s' "$_af_boot_out" | grep -q 'vm:'; then
     echo "FAIL: download_boot_image stdout must not include say() log lines"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
 }
 
+# shellcheck disable=SC2329 # reason: dispatched by name through run_case, which shellcheck reads as a bare reference
 test_android_config_magisk_configures_existing_su() {
   setup_fixture
   _af_shell_log="$_tmp/shell.log"
@@ -611,22 +632,23 @@ EOF
 
   if ! vm_android_config Android 0 --magisk >"$_tmp/out.txt" 2>&1; then
     echo "FAIL: --magisk should succeed when Magisk su is already available"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if grep -q 'settings put global adb_enabled' "$_af_shell_log"; then
     echo "FAIL: --magisk must not enable USB debugging (use --root instead)"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if ! grep -q 'Magisk installed' "$_tmp/out.txt"; then
     echo "FAIL: --magisk should report Magisk installed"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if grep -q 'nucleus-adb-root' "$_tmp/out.txt" || grep -q 'resetprop ro.debuggable 1' "$_af_shell_log"; then
     echo "FAIL: --magisk must not install ro.debuggable props"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
 }
 
+# shellcheck disable=SC2329 # reason: dispatched by name through run_case, which shellcheck reads as a bare reference
 test_wait_boot_completed_waits_for_sys_boot_completed() {
   setup_fixture
   _af_boot_file="$_tmp/boot_completed"
@@ -654,20 +676,21 @@ EOF
   set -e
   if [ "$_af_status" -eq 0 ]; then
     echo "FAIL: wait_boot_completed should block while sys.boot_completed is 0"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if ! grep -q 'still booting' "$_tmp/out.txt"; then
     echo "FAIL: expected still-booting hint while sys.boot_completed is 0"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
 
   printf '1' >"$_af_boot_file"
   if ! vm_android_adb_wait_boot_completed 0 5; then
     echo "FAIL: wait_boot_completed should succeed when sys.boot_completed is 1"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
 }
 
+# shellcheck disable=SC2329 # reason: dispatched by name through run_case, which shellcheck reads as a bare reference
 test_fastboot_probe_uses_getvar() {
   setup_fixture
   _af_bin="$_tmp/bin"
@@ -687,10 +710,11 @@ EOF
   assert_eq "fastboot" "$(vm_android_fastboot_list_state 0)" "fastboot probe via getvar"
   if ! grep -q 'getvar is-userspace' "$_af_probe_log"; then
     echo "FAIL: expected fastboot getvar is-userspace probe"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
 }
 
+# shellcheck disable=SC2329 # reason: dispatched by name through run_case, which shellcheck reads as a bare reference
 test_fastboot_wait_detects_existing_fastboot() {
   setup_fixture
   _af_bin="$_tmp/bin"
@@ -707,26 +731,31 @@ EOF
   export PATH
   if ! vm_android_fastboot_wait 0 5 >"$_tmp/out.txt" 2>&1; then
     echo "FAIL: fastboot_wait should succeed when guest is already in fastboot"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   if ! grep -q 'guest already in fastboot' "$_tmp/out.txt"; then
     echo "FAIL: expected immediate fastboot detection"
-    _failures=$((_failures + 1))
+    TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
 }
 
 run_case() {
   _current_case="$1"
-  _rc_before="$_failures"
+  _rc_before="$TESTS_FAILED"
   # WHY: a fatal signal that the suite does not trap cannot run the EXIT trap, so
   # the case that is running has to be on the log before it starts — otherwise a
-  # death like that reports the file name and nothing else.
+  # death like that reports the file name and nothing else. The tool line names
+  # the host fact the product's require_command calls depend on: a case that dies
+  # in there writes its error into a redirect only the case can see.
   printf 'android-config-tests: case %s\n' "$1"
+  printf 'android-config-tests: tools adb=%s curl=%s fastboot=%s unzip=%s\n' \
+    "$(command -v adb || echo absent)" "$(command -v curl || echo absent)" \
+    "$(command -v fastboot || echo absent)" "$(command -v unzip || echo absent)"
   "$1"
-  if [ "$_failures" -gt "$_rc_before" ]; then
+  if [ "$TESTS_FAILED" -gt "$_rc_before" ]; then
     return 0
   fi
-  _passed=$((_passed + 1))
+  TESTS_PASSED=$((TESTS_PASSED + 1))
   echo "✓ $_current_case"
 }
 
@@ -748,10 +777,7 @@ run_case test_fastboot_probe_uses_getvar
 run_case test_fastboot_wait_detects_existing_fastboot
 
 _reported=1
-if [ "$_failures" -gt 0 ]; then
-  echo "android-config-tests: $_failures failure(s)"
-  echo "# nucleus-tally passed=$_passed failed=$_failures"
-  exit 1
-fi
-echo "android-config-tests: all passed"
-echo "# nucleus-tally passed=$_passed failed=0"
+# finish_tests is the sanctioned exit: it emits the tally the runner asserts and
+# exits with the suite's status. `_reported` is set first so the EXIT trap does
+# not report a second, abort-shaped tally.
+finish_tests
