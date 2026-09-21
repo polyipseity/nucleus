@@ -208,6 +208,25 @@ test_no_flags_prints_manual() {
     echo "FAIL: expected manual workflow to mention --root"
     TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
+  # The manual must not need the tools it documents: a host without adb and
+  # fastboot on PATH still has to print it. Only the documented text matters, so
+  # the assertion is the same as above over a PATH that cannot satisfy the
+  # product's require_command calls.
+  _af_path="$PATH"
+  PATH='/usr/bin:/bin'
+  set +e
+  vm_android_config Android 0 >"$_tmp/out-narrow.txt" 2>&1
+  _af_narrow_status=$?
+  set -e
+  PATH="$_af_path"
+  if [ "$_af_narrow_status" -ne 0 ]; then
+    echo "FAIL: manual must print without adb/fastboot on PATH (status $_af_narrow_status)"
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+  fi
+  if ! grep -q 'Enter fastboot' "$_tmp/out-narrow.txt"; then
+    echo "FAIL: manual must print without adb/fastboot on PATH"
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+  fi
 }
 
 # shellcheck disable=SC2329 # reason: dispatched by name through run_case, which shellcheck reads as a bare reference

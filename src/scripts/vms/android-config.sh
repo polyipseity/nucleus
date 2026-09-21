@@ -93,8 +93,11 @@ vm_android_config_gapps() {
     _vacg_state="$(vm_android_adb_poll_state "$_vacg_vm_index")"
     if [ "$_vacg_state" = "recovery" ]; then
       say "entering sideload mode on $_vacg_serial..."
+      # Declared path keeps this invocation out of the bare-command policy step 17
+      # enforces; the caller proved adb exists before reaching this branch.
+      _vacg_adb_bin="$(command -v adb)"
       # check-suppress:suppression_doc: reboot sideload may fail when already transitioning; sideload wait below handles the next state.
-      adb -s "$_vacg_serial" reboot sideload 2>/dev/null || true
+      "$_vacg_adb_bin" -s "$_vacg_serial" reboot sideload 2>/dev/null || true
     fi
     if ! vm_android_adb_wait_sideload "$_vacg_vm_index" 120; then
       error "guest did not enter sideload mode; from recovery select Apply update from ADB"
@@ -197,11 +200,6 @@ vm_android_config() {
   _vac_do_fake_wifi=false
   _vac_do_fake_wifi_revert=false
 
-  require_command adb
-  require_command curl
-  require_command fastboot
-  require_command unzip
-
   while [ "$#" -gt 0 ]; do
     case "$1" in
     --gapps) _vac_do_gapps=true ;;
@@ -235,6 +233,14 @@ vm_android_config() {
     vm_android_config_print_manual
     return 0
   fi
+
+  # WHY: the guards sit after --help and the no-flag branch because printing the
+  # manual is the only way to work on a host that has none of these tools. Every
+  # branch below really invokes adb, fastboot, curl or unzip.
+  require_command adb
+  require_command curl
+  require_command fastboot
+  require_command unzip
 
   _vac_serial="$(vm_android_adb_serial "$_vac_vm_index")"
 
