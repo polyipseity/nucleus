@@ -27,7 +27,7 @@ properties:
           $RepoRoot = $env:NUCLEUS_REPO_ROOT
           $CamillaGUIBin = Join-Path $HOME ".local\bin\camillagui_backend\camillagui_backend.exe"
           $ConfigPath = Join-Path $HOME ".config\camillagui-backend\config.yml"
-          $LogDir = Join-Path $env:LOCALAPPDATA "nucleus\logs\camillagui-backend"
+          $LogDir = Join-Path $env:LOCALAPPDATA "nucleus\log\camillagui-backend"
           New-Item -Path $LogDir -ItemType Directory -Force -ErrorAction SilentlyContinue
           $StdoutLog = Join-Path $LogDir "stdout.log"
           $StderrLog = Join-Path $LogDir "stderr.log"
@@ -49,7 +49,7 @@ properties:
         TaskName: NucleusDiscordMusicRPC
         TaskDescriptionLiteral: Discord Music Rich Presence tray app
         Action: |
-          $LogDir = Join-Path $env:LOCALAPPDATA "nucleus\logs\discord-music-rpc"
+          $LogDir = Join-Path $env:LOCALAPPDATA "nucleus\log\discord-music-rpc"
           New-Item -Path $LogDir -ItemType Directory -Force -ErrorAction SilentlyContinue
           $StdoutLog = Join-Path $LogDir "stdout.log"
           $StderrLog = Join-Path $LogDir "stderr.log"
