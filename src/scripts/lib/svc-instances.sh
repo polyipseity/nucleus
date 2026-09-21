@@ -237,8 +237,12 @@ svc_remount_until() {
       return 1
     fi
     running=false
+    # WHY: `grep -q` stops at its first match, which SIGPIPEs the probe while it
+    #   is still writing; under `set -o pipefail` that reads as a failed probe
+    #   and a launch that is still in flight would be kicked again. Reading the
+    #   whole output costs nothing here and removes the window.
     # check-suppress:suppression_doc: a job that is not loaded or not running is the question being asked, not an error.
-    if $sudo_prefix launchctl print "$target" 2>/dev/null | grep -q 'state = running'; then
+    if $sudo_prefix launchctl print "$target" 2>/dev/null | grep 'state = running' >/dev/null; then
       running=true
     fi
     if [ "$running" = false ]; then
@@ -318,7 +322,9 @@ svc_list_contains() {
   local list="$1" value="$2"
 
   [ -n "$list" ] || return 1
-  printf '%s\n' "$list" | grep -qxF "$value"
+  # WHY: the list is written by this shell, so a reader that stops at its first
+  # match would SIGPIPE the write and report a present value as missing.
+  grep -qxF "$value" <<<"$list"
 }
 
 # svc_notloaded_transition — First-occurrence marker for a not-loaded instance.

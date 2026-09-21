@@ -38,6 +38,14 @@ print)
   if [ -n "${FAKE_JOB_ALWAYS:-}" ]; then
     printf 'state = %s\n' "$FAKE_JOB_ALWAYS"
     [ "$FAKE_JOB_ALWAYS" = running ] && printf '\tpid = 4242\n'
+    # FAKE_JOB_BULK — padding after the state lines, so a reader that stops at
+    # its first match leaves this writer mid-write; that is the real shape of
+    # `launchctl print`, whose output does not fit one pipe buffer. The padding
+    # is one blocking write from this shell, so the signal reaches the writer
+    # the pipeline reports on.
+    if [ -n "${FAKE_JOB_BULK:-}" ]; then
+      printf 'filler\n%.0s' $(seq 1 "$FAKE_JOB_BULK")
+    fi
     exit 0
   fi
   _live="$(cat "${FAKE_ATTEMPT_LIVE:?}" 2>/dev/null)"
@@ -109,10 +117,11 @@ FAKE_MOUNT_AFTER_KICKS=""
 FAKE_MOUNT_CALLS="$_tmp/mount.calls"
 FAKE_JOB_STATE="$_tmp/job.state"
 FAKE_JOB_ALWAYS=""
+FAKE_JOB_BULK=""
 FAKE_ATTEMPT_LIVE="$_tmp/attempt.live"
 FAKE_KICK_CALLS="$_tmp/kick.calls"
 export FAKE_MOUNT_TABLE FAKE_MOUNT_SLOW FAKE_MOUNT_UNTIL FAKE_MOUNT_AFTER_KICKS FAKE_MOUNT_CALLS
-export FAKE_JOB_STATE FAKE_JOB_ALWAYS FAKE_ATTEMPT_LIVE FAKE_KICK_CALLS
+export FAKE_JOB_STATE FAKE_JOB_ALWAYS FAKE_JOB_BULK FAKE_ATTEMPT_LIVE FAKE_KICK_CALLS
 
 LAUNCHCTL_ENTRY='{"type": "macos-launchctl","service":"local.cloud-mount.","scope":"user","launchdDomain":"gui","prefixMatch":true}'
 SYSTEMCTL_ENTRY='{"type": "nixos-systemctl","service":"cloud-mount-","scope":"user","prefixMatch":true}'
@@ -389,6 +398,15 @@ FAKE_JOB_ALWAYS=running
 : >"$FAKE_KICK_CALLS"
 FAKE_MOUNT_AFTER_KICKS=99
 assert_eq "a launch in flight is never interrupted" "1|0" "$(relaunch_rc /mnt/relaunch 10)|$(kick_count)"
+
+# WHY: the probe reads `launchctl print` through a pipe, and a reader that stops
+# at its first match SIGPIPEs that writer; under `set -o pipefail` the pipeline
+# then reports failure and the loop kicked a launch that was still in flight.
+# The padding makes the window deterministic instead of load-dependent.
+FAKE_JOB_BULK=20000
+: >"$FAKE_KICK_CALLS"
+assert_eq "an in-flight launch survives a probe whose output outruns its reader" "1|0" "$(relaunch_rc /mnt/relaunch 10)|$(kick_count)"
+FAKE_JOB_BULK=""
 FAKE_JOB_ALWAYS=""
 
 # The budget stops the relaunch even when the volume never appears.
