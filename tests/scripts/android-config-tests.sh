@@ -718,6 +718,10 @@ EOF
 run_case() {
   _current_case="$1"
   _rc_before="$_failures"
+  # WHY: a fatal signal that the suite does not trap cannot run the EXIT trap, so
+  # the case that is running has to be on the log before it starts — otherwise a
+  # death like that reports the file name and nothing else.
+  printf 'android-config-tests: case %s\n' "$1"
   "$1"
   if [ "$_failures" -gt "$_rc_before" ]; then
     return 0
