@@ -65,6 +65,7 @@ Describe 'Lockfile enforcement: superpowers checkout probe' {
             @($result.Errors | Where-Object { $_ -match 'plugin checkout not found' }).Count | Should -Be 1
         } finally {
             Rename-Item -LiteralPath (Join-Path (Split-Path -Path $script:checkout -Parent) 'superpowers-hidden') -NewName 'superpowers'
+            (Test-Path -LiteralPath $script:checkout) | Should -BeTrue -Because 'the later revision cases need the fixture put back'
         }
     }
 
@@ -76,17 +77,20 @@ Describe 'Lockfile enforcement: superpowers checkout probe' {
             @($result.Errors | Where-Object { $_ -match 'is not a managed git checkout' }).Count | Should -Be 1
         } finally {
             Rename-Item -LiteralPath (Join-Path $script:checkout '.git-hidden') -NewName '.git'
+            (Test-Path -LiteralPath (Join-Path -Path $script:checkout -ChildPath '.git')) | Should -BeTrue -Because 'the later revision cases need the git directory put back'
         }
     }
 
     It 'reports an error when the checkout is at the wrong revision' {
         $result = Invoke-SuperpowersProbe -Rev '0000000000000000000000000000000000000000'
-        @($result.Errors | Where-Object { $_ -match 'checkout is at' }).Count | Should -Be 1
+        @($result.Errors | Where-Object { $_ -match 'checkout is at' }).Count |
+            Should -Be 1 -Because "errors: $($result.Errors -join '; '); infos: $($result.Infos -join '; ')"
     }
 
     It 'reports the checkout as present when it matches the pin' {
         $result = Invoke-SuperpowersProbe -Rev $script:checkoutRev
-        @($result.Infos | Where-Object { $_ -match 'checkout present at' }).Count | Should -Be 1
+        @($result.Infos | Where-Object { $_ -match 'checkout present at' }).Count |
+            Should -Be 1 -Because "errors: $($result.Errors -join '; '); infos: $($result.Infos -join '; ')"
         @($result.Errors | Where-Object { $_ -match 'superpowers' }).Count | Should -Be 0
     }
 }
