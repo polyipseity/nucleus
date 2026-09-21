@@ -96,10 +96,11 @@ function Invoke-LockfileEnforcement {
   # uv's PEP 610 record, which stores the installed commit.
   if (Get-Command uv -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
     foreach ($entry in @($desiredEntries['uv'])) {
-      # WHY: StrictMode throws on a missing property, and a uv entry with no pin means
-      # "nothing pinned to enforce" rather than an error to report.
-      $pinProperty = $entry.PSObject.Properties['pin']
-      $pin = if ($pinProperty) { $pinProperty.Value } else { $null }
+      # WHY: the registry is parsed with -AsHashtable, so the pin is a key on a
+      # hashtable rather than a property: PSObject.Properties does not list it and
+      # every flake-pinned entry would be skipped without a word. A StrictMode read
+      # of a missing key is why the presence check comes first.
+      $pin = if ($entry.ContainsKey('pin')) { $entry['pin'] } else { $null }
       if (-not $pin) { continue }
       if ($pin -notmatch '^flake:(.+)$') {
         & $ErrorFn "uv.$($entry.name)`: unsupported pin '$pin'; expected 'flake:<node>'"; $errors++

@@ -129,6 +129,10 @@ Describe 'lockfile enforcement flake-pinned revisions' {
     It 'reports no drift when the recorded commit matches the flake revision' {
         Write-InstalledCommit -Commit $script:rev
         $null = Invoke-Probe  # check-suppress:suppression_doc: the exit count is asserted through the captured error list
+        # WHY: clean results are the one outcome a probe that skipped the
+        # flake-pinned check entirely also produces, so this case owns the
+        # contract that the check actually ran.
+        @($script:infos | Where-Object { $_ -match 'uv:.*skip' }) | Should -BeNullOrEmpty
         $script:errors | Should -BeNullOrEmpty
     }
 
