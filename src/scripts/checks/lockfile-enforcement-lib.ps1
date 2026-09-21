@@ -229,10 +229,25 @@ function Invoke-LockfileEnforcement {
         & $ErrorFn "superpowers.$expectedRev`: git not found; cannot verify the checkout revision"; $errors++
       }
       else {
-        # check-suppress:suppression_doc: probe -- a failed rev-parse is reported as an error on the next lines.
-        $head = (& $git.Source -C $pluginDir rev-parse HEAD 2>$null | Select-Object -First 1)
-        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($head)) {
-          & $ErrorFn "superpowers.$expectedRev`: git rev-parse failed in $pluginDir"; $errors++
+        # WHY: the whole output is captured before its first line is taken; piping the
+        # native command into `Select-Object -First 1` stops it after one line, which is
+        # how this probe came to report a valid checkout as broken on Windows. The early
+        # stop also leaves $LASTEXITCODE untouched, so the exit-code half of the test
+        # below read an unrelated command's status. stderr goes to its own file so the
+        # revision on stdout stays unambiguous, and the failure names the exit code and
+        # git's own words instead of only the directory.
+        $headStderrFile = [System.IO.Path]::GetTempFileName()
+        try {
+          $headLines = @(& $git.Source -C $pluginDir rev-parse HEAD 2>$headStderrFile)
+          $headExit = $LASTEXITCODE
+          $headStderr = [System.IO.File]::ReadAllText($headStderrFile).Trim()
+        }
+        finally {
+          Remove-Item -LiteralPath $headStderrFile -Force
+        }
+        $head = if ($headLines.Count -gt 0) { [string]$headLines[0] } else { '' }
+        if ($headExit -ne 0 -or [string]::IsNullOrWhiteSpace($head)) {
+          & $ErrorFn "superpowers.$expectedRev`: git rev-parse failed in $pluginDir (exit $headExit): $headStderr"; $errors++
         }
         elseif ($head.Trim() -ne $expectedRev) {
           & $ErrorFn "superpowers.$expectedRev`: checkout is at $($head.Trim())"; $errors++
