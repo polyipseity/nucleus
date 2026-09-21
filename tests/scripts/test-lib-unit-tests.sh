@@ -143,7 +143,9 @@ EOF
   assert_case "tally: clean pass accepted" "0:" "$(_tally_check "$_suite" "$_capture" 0)"
 
   printf '# nucleus-tally passed=2 failed=1\n' >"$_capture"
-  assert_case "tally: reported failure accepted" "0:" "$(_tally_check "$_suite" "$_capture" 1)"
+  # A failing suite must be named as failing: a bare path in the runner's list
+  # says nothing about how many assertions failed.
+  assert_case "tally: reported failure is named" "1:tally reports 1 failed" "$(_tally_check "$_suite" "$_capture" 1)"
 
   : >"$_capture"
   assert_case "tally: missing tally rejected" "1:no tally (found 0)" "$(_tally_check "$_suite" "$_capture" 0)"

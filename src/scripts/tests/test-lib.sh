@@ -135,9 +135,9 @@ cache_file_lists() {
 # exactly like one that passed. Suites that do not source the consumer library
 # have no tally and are not subject to the contract.
 #
-# Prints the reason and returns 1 when the tally is missing, duplicated, or
-# contradicts the status; returns 0 silently when the suite is not a consumer or
-# is consistent.
+# Prints the reason and returns 1 when the tally is missing, duplicated, reports
+# failures, or contradicts the status; returns 0 silently only when the suite is
+# not a consumer or recorded a clean pass.
 #   $1 = suite path, $2 = capture file, $3 = exit status
 check_suite_tally() {
   local _suite="$1" _capture="$2" _status="$3"
@@ -162,6 +162,12 @@ check_suite_tally() {
   fi
   if [ "$_failed" -eq 0 ] && [ "$_status" -ne 0 ]; then
     printf 'tally reports no failures but the suite exited %s\n' "$_status"
+    return 1
+  fi
+  # A suite that failed on purpose and said so must still be named as failing:
+  # the runner's failure list carries the reason, so the count belongs in it.
+  if [ "$_failed" -gt 0 ]; then
+    printf 'tally reports %s failed\n' "$_failed"
     return 1
   fi
   return 0

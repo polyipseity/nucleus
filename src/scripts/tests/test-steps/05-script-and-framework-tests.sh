@@ -145,7 +145,7 @@ _run_parallel_script_tests() {
     if ! _reason=$(check_suite_tally "$_script" "$_capture_file" "$_status"); then
       printf '%s (%s)\n' "$_script" "$_reason" >>"$_failed_list"
     elif [ "$_status" -ne 0 ]; then
-      printf '%s\n' "$_script" >>"$_failed_list"
+      printf '%s (exit %s)\n' "$_script" "$_status" >>"$_failed_list"
     fi
     if [ -f "$_capture_file" ]; then
       cat "$_capture_file"
