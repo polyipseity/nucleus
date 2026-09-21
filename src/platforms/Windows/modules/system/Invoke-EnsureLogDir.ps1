@@ -34,7 +34,7 @@ function Invoke-EnsureLogDir {
     $dirs = $entry.Value.logging.dirs
     if (-not $dirs) { continue }
 
-    # System subdirs (e.g. %ProgramData%\nucleus\logs\camilladsp)
+    # System subdirs (e.g. %ProgramData%\nucleus\log\camilladsp)
     if ($dirs.system -and $dirs.system.Count -gt 0) {
       foreach ($subdir in $dirs.system) {
         $path = Join-Path -Path $systemLogDir -ChildPath $subdir
@@ -42,7 +42,7 @@ function Invoke-EnsureLogDir {
       }
     }
 
-    # User subdirs (e.g. %LOCALAPPDATA%\nucleus\logs\camilladsp)
+    # User subdirs (e.g. %LOCALAPPDATA%\nucleus\log\camilladsp)
     if ($dirs.user -and $dirs.user.Count -gt 0) {
       foreach ($subdir in $dirs.user) {
         $path = Join-Path -Path $userLogDir -ChildPath $subdir

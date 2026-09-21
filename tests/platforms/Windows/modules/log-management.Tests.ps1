@@ -30,9 +30,9 @@ Describe 'Get-NucleusLogDir' {
     $result | Should -Not -BeNullOrEmpty
   }
 
-  It 'returns path ending with nucleus\logs' {
+  It 'returns path ending with nucleus\log' {
     $result = Get-NucleusLogDir
-    $result | Should -Match 'nucleus[\\/]logs$'
+    $result | Should -Match 'nucleus[\\/]log$'
   }
 }
 
@@ -42,9 +42,9 @@ Describe 'Get-NucleusSystemLogDir' {
     $result | Should -Not -BeNullOrEmpty
   }
 
-  It 'returns path ending with nucleus\logs' {
+  It 'returns path ending with nucleus\log' {
     $result = Get-NucleusSystemLogDir
-    $result | Should -Match 'nucleus[\\/]logs$'
+    $result | Should -Match 'nucleus[\\/]log$'
   }
 }
 
