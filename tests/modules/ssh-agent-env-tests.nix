@@ -9,7 +9,12 @@
 # asserted by tests/scripts/pwsh-ssh-agent-profile-tests.sh.
 let
   lib = import <nixpkgs/lib>;
-  pkgs = import <nixpkgs> { };
+  # WHY: this file asserts the MacBook half of the catalog from any host, and its
+  #   macOS entries name darwin-only packages (the enhanced Apple SDK), which
+  #   nixpkgs refuses to evaluate elsewhere. allowUnsupportedSystem is the
+  #   documented opt-out for evaluating another system's declaration; nothing
+  #   here builds, so the flag only affects evaluation.
+  pkgs = import <nixpkgs> { config.allowUnsupportedSystem = true; };
   config = { };
 
   mkEnvVars =
