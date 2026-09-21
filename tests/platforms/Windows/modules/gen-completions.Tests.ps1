@@ -140,7 +140,10 @@ Describe 'gen-completions.ps1 generated inventory' {
   It 'emits a $nucleus<Cmd>Flags array for every nucleus-* command' {
     $null = Invoke-GenCompletion  # check-suppress:suppression_doc: Invoke-GenCompletion returns the generated profile text; output discarded because the test reads the fixture file instead
     $listResult = Invoke-GenCompletion -Arguments @('-ListCommands')
-    $commands = $listResult.Output -split "`n" | Where-Object { $_.Trim() }
+    # WHY: the child writes the command list with the platform newline, so a CRLF
+    # host leaves a trailing CR on every line; splitting on LF alone would keep
+    # it inside the derived PascalCase name and the pattern would never match.
+    $commands = $listResult.Output -split "`r?`n" | Where-Object { $_.Trim() }
     $profileText = Get-FixtureProfile
     foreach ($command in $commands) {
       $pascal = (($command.Split('-') | ForEach-Object { $_.Substring(0, 1).ToUpperInvariant() + $_.Substring(1) }) -join '')
