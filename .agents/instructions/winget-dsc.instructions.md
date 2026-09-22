@@ -89,7 +89,7 @@ Skip for: unreliable PATH, complex state, or declarative alternatives — secret
 ## Package manager preference hierarchy
 
 1. **WinGet** — preferred for any package with a WinGet ID.
-2. **Scoop** — portable CLI tools not in WinGet. No admin required; installs to `%USERPROFILE%\scoop\`.
+2. **Scoop** — portable CLI tools not in WinGet. No admin required; installs to `%USERPROFILE%\scoop\`. Public buckets (`main`, `extras`) for community packages; custom `nucleus` bucket for repo-owned manifests (e.g. NSIS installers for tools absent from public buckets).
 3. **cargo binstall** — Rust CLI tools not in WinGet or Scoop. Downloads prebuilt binaries.
 4. **bun** — last resort for JS/npm-only tools. Binaries go to `%USERPROFILE%\.bun\bin`.
 
@@ -121,6 +121,12 @@ Install Scoop itself via WinGet (package ID `Scoop.Scoop`). Scoop requires `Git.
 ### Scoop bucket and app provisioning
 
 Do not use `PSDscResources/Script` for Scoop management — `scoop` is not on PATH immediately after WinGet installs it. Use `src/platforms/Windows/modules/Invoke-ScoopSetup.ps1` instead, called by `apply.ps1` after DSC completes.
+
+### Custom buckets for non-public packages
+
+When a tool is absent from WinGet and Scoop's public buckets (`main`, `extras`), create a manifest in `src/modules/scoop-manifests/<name>.json` and add a `bucket: "nucleus"` field to its `desired.json` entry. `Invoke-ScoopSetup` copies manifests into `~\scoop\buckets\nucleus\` at apply time, then installs via `scoop install nucleus/<name>`.
+
+Manifest format follows [Scoop's app manifest spec](https://github.com/ScoopInstaller/Scoop/wiki/App-Manifests). For NSIS installers, use the `installer.script` block with `/S` silent flag. Include `$schema` pointing to Scoop's published schema for step 7 validation.
 
 ### Idempotency in Scoop operations
 
