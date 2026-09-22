@@ -20,6 +20,7 @@
 #   svc_run_bounded           <seconds> <command...>
 #   svc_notloaded_transition  <key> <stateDir>
 #   svc_notloaded_clear       <key> <stateDir>
+#   svc_clear_stale_fskit_blocks <servicesJson> <host>
 #
 # Requirements: jq; launchctl (macOS) or systemctl (NixOS) for live enumeration.
 # Pure function definitions only — no top-level side effects on import.
@@ -352,6 +353,51 @@ svc_notloaded_clear() {
 
   [ -e "$marker" ] || return 0
   rm -f "$marker"
+}
+
+# svc_clear_stale_fskit_blocks — Clear stale fskit-provider blocked markers.
+# Args: $1 — services.json path; $2 — host key (MacBook|NixOS|Windows).
+# Requires: Darwin (caller guards with uname check).
+# Reads services.json, finds prefix-match entries for the host, expands to
+# configured instances, and clears any with "blocked fskit-provider" state.
+# WHY: nucleus-apply provisions the system.  A blocked marker from a previous
+#   failed attempt is stale after apply re-registers the extension and restarts
+#   agents.  Clearing it is normal provisioning, not a special recovery.
+svc_clear_stale_fskit_blocks() {
+  local services_json="$1" host="$2"
+  local state_dir mount_json instance_ids instance entry_json
+
+  state_dir="$(crash_loop_state_dir)"
+
+  # Read prefix-match entries for this host.
+  while IFS= read -r entry_json; do
+    [ -z "$entry_json" ] && continue
+    # Only process prefix-match entries (cloud-drive etc.)
+    printf '%s' "$entry_json" | jq -r '.hostEntry.prefixMatch // false' | grep -qF true || continue
+
+    # Get configured mounts from user registry.
+    mount_json="$(svc_configured_mounts "$(derive_repo_root)" "$host")" || continue
+    instance_ids="$(svc_configured_instance_ids "$entry_json" "$mount_json")" || continue
+
+    while IFS= read -r instance; do
+      [ -z "$instance" ] && continue
+      case "$(svc_blocked_state "$instance" "$state_dir")" in
+      "blocked fskit-provider")
+        svc_blocked_clear "$instance" "$state_dir"
+        notice "clear-stale-blocks: cleared stale fskit-provider block for $instance"
+        # Kickstart the agent to restart immediately.
+        # check-suppress:suppression_doc: agent may not be loaded; kickstart is best-effort.
+        launchctl kickstart "gui/$(id -u)/$instance" 2>/dev/null || true
+        ;;
+      esac
+    done <<<"$instance_ids"
+  done < <(printf '%s' "$(jq -c --arg host "$host" '
+    to_entries[]
+    | select(.value | type == "object")
+    | select(.value.hosts | has($host))
+    | select(.value.hosts[$host].type != "omitted")
+    | {key: .key, hostEntry: .value.hosts[$host]}
+  ' "$services_json")")
 }
 
 # ── Blocked markers ──────────────────────────────────────────────────────────

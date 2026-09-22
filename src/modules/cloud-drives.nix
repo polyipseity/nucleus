@@ -344,6 +344,24 @@ in
     in
     lib.mkMerge [
       # -----------------------------------------------------------------------
+      # macOS: pre-stop cloud mount agents before setupLaunchAgents
+      # WHY: during setupLaunchAgents bootout+bootstrap, the old mount's FSKit
+      #   volume may still be attached when the new mount starts.  The new mount
+      #   script detects the stale volume and runs diskutil unmount force, which
+      #   can trigger lsd to re-register the FSKit extension with a new UUID
+      #   (Apple bug on macOS 26).  The subsequent mount then fails with a stale
+      #   UUID reference.  Pre-stopping agents and waiting for volumes to release
+      #   eliminates the stale volume, the force-unmount, and the UUID mismatch.
+      # -----------------------------------------------------------------------
+      (lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && declaredMountAgents != [ ]) {
+        home.activation.cloud-drives-pre-stop = lib.hm.dag.entryBefore [ "setupLaunchAgents" ] ''
+          "${activationBundle}/src/scripts/services/cloud-drives-pre-stop.sh" \
+            "${pkgs.jq}/bin/jq" \
+            '${builtins.toJSON (map (m: { inherit (m) id localPath; }) declaredMountAgents)}'
+        '';
+      })
+
+      # -----------------------------------------------------------------------
       # Shared: directory structure
       # cloud-drives-setup: creates ~/clouds/ and converges each entry's path — a
       # symlink to the FSKit mount point on macOS, a real directory elsewhere.
@@ -386,6 +404,20 @@ in
                   )
                 }'
             '';
+      }
+
+      # -----------------------------------------------------------------------
+      # Shared: clear stale fskit-provider blocked markers (core provisioning)
+      # WHY: nucleus-apply provisions the system.  A blocked marker from a
+      #   previous failed mount attempt is stale after apply re-registers the
+      #   extension and restarts agents.  Clearing it is normal provisioning
+      #   behavior — applies to ALL services, not just cloud mounts.
+      # -----------------------------------------------------------------------
+      {
+        home.activation.clear-stale-blocks = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
+          "${activationBundle}/src/scripts/services/clear-stale-blocks.sh" \
+            "${pkgs.jq}/bin/jq"
+        '';
       }
 
       # -----------------------------------------------------------------------

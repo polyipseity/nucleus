@@ -262,15 +262,47 @@ _cd_block_on_provider_failure() {
 #   the new volume destroyed seconds later.  It is released first, and refused
 #   when it cannot be, because only an operator can clear a wedged volume.
 if _cd_mount_table_has "$mount_point"; then
-  warn -l cloud-drives "a volume is still attached at '$mount_point'; releasing it before mounting."
-  _cd_unmount_status=0
-  if command -v diskutil >/dev/null 2>&1; then
-    # check-suppress:suppression_doc: the outcome is read back from the mount table below, so this command's own status is only reported with the refusal.
-    _cd_run_bounded 30 diskutil unmount force "$mount_point" >/dev/null 2>&1 || _cd_unmount_status=$?
+  warn -l cloud-drives "a volume is still attached at '$mount_point'; waiting for release."
+  # WHY: diskutil unmount force can trigger lsd to re-register the FSKit
+  #   extension with a new UUID, causing the subsequent mount to fail with
+  #   a stale UUID reference (Apple bug on macOS 26, Apple Developer Forums
+  #   #804432).  Waiting for natural release avoids this trigger.  The pre-stop
+  #   activation entry should have already released the volume, so this wait
+  #   is a safety fallback for edge cases.
+  _cd_wait_status=0
+  svc_wait_mount_released "$mount_point" 15 || _cd_wait_status=$?
+  if [ "$_cd_wait_status" -ne 0 ]; then
+    warn -l cloud-drives "volume at '$mount_point' did not release within 15s; force unmounting."
+    _cd_unmount_status=0
+    if command -v diskutil >/dev/null 2>&1; then
+      # check-suppress:suppression_doc: the outcome is read back from the mount table below, so this command's own status is only reported with the refusal.
+      _cd_run_bounded 30 diskutil unmount force "$mount_point" >/dev/null 2>&1 || _cd_unmount_status=$?
+    fi
+    if _cd_mount_table_has "$mount_point"; then
+      error -l cloud-drives "volume at '$mount_point' is still attached after 'diskutil unmount force' (status $_cd_unmount_status); refusing to mount over it. Release it with 'sudo umount -f \"$mount_point\"' and re-apply, or reboot."
+      exit 1
+    fi
   fi
-  if _cd_mount_table_has "$mount_point"; then
-    error -l cloud-drives "volume at '$mount_point' is still attached after 'diskutil unmount force' (status $_cd_unmount_status); refusing to mount over it. Release it with 'sudo umount -f \"$mount_point\"' and re-apply, or reboot."
-    exit 1
+fi
+
+# WHY: re-register the macFUSE FSKit extension to clear any stale UUID references.
+#   lsd periodically re-registers extensions with new UUIDs (Apple bug on macOS 26).
+#   If lsd re-registered after macFUSE's built-in auto-registration but before the
+#   mount syscall, extensionkitservice references a stale UUID and the mount fails
+#   with "File system extension not found".  Explicit re-registration here — after
+#   the stale-volume check but before rclone starts — clears any stale references.
+#   macFUSE 5.2.0+ has auto-registration, but it runs inside the rclone process
+#   and may lose the race with lsd.  This explicit step runs in the wrapper,
+#   outside rclone, and its effect persists into the rclone mount subprocess.
+if _cd_fskit_provider; then
+  _cd_macfuse_bin=""
+  _cd_macfuse_search="/Library/Filesystems/macfuse.fs/Contents/Resources/macfuse.app/Contents/MacOS/macfuse"
+  if [ -x "$_cd_macfuse_search" ]; then
+    _cd_macfuse_bin="$_cd_macfuse_search"
+  fi
+  if [ -n "$_cd_macfuse_bin" ]; then
+    # check-suppress:suppression_doc: re-registration is best-effort; if it fails, macFUSE's built-in auto-registration inside rclone provides a second chance.
+    "$_cd_macfuse_bin" install --force --components file-system-extensions 2>/dev/null || true
   fi
 fi
 
