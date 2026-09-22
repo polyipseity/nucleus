@@ -1405,38 +1405,41 @@ do_repair() {
   fi
 
   say "restarting the macOS FSKit provider (macFUSE file-system extension)..."
-  if ! fskit_repair_provider 30; then
+  if ! fskit_repair_provider "$timeout"; then
     error "the FSKit provider could not be repaired; no mount was restarted"
     exit 1
   fi
+
+  # WHY: FSKit needs a few seconds to re-register the macFUSE module after
+  #   fskitd respawns; agents that start before it is ready get "File system
+  #   extension not found" and must be kicked again.
+  sleep 5
 
   failures=0
   for row in "${rows[@]}"; do
     IFS="$tab" read -r mount_id label mount_point <<<"$row"
 
-    # WHY: a mounted volume is left alone — restarting it unmounts and remounts
-    #   for nothing, and that remount is what wedges FSKit in the first place.
-    blocked="$(svc_blocked_state "$label" "$(crash_loop_state_dir)")"
-    if [ "$blocked" = "clear" ] && svc_mount_table_contains "$mount_point"; then
+    if svc_mount_table_contains "$mount_point"; then
       say "mount '$mount_id' is already mounted"
       continue
     fi
 
-    svc_blocked_clear "$label" "$(crash_loop_state_dir)"
+    say "starting mount '$mount_id'..."
     target="$(_repair_mount_target "$label" "$uid")"
-    plist="$HOME/Library/LaunchAgents/$label.plist"
-    if _repair_restart_mount "$label" "$uid" "$target" "$plist"; then
-      # WHY the relaunch: the FSKit subsystem can refuse the first attempts after
-      #   the restart (macFUSE reports status 3/4 before it succeeds), and the
-      #   agent stops on such a refusal instead of retrying it, so the volume is
-      #   awaited over the caller's bound with a bounded relaunch in between.
-      # check-suppress:suppression_doc: the report pass below names every mount that did not come back, so a failed relaunch is not an error here.
-      svc_remount_until "$mount_point" "$target" "$sudo_prefix" "$timeout" || true
-    fi
-  done
+    # check-suppress:suppression_doc: kickstart may fail if agent is in a transitional state; the poll loop below detects the outcome.
+    launchctl kickstart -k "$target" 2>/dev/null || true
 
-  for row in "${rows[@]}"; do
-    IFS="$tab" read -r mount_id _label mount_point <<<"$row"
+    # Wait up to $timeout for the mount to appear.  The agent retries
+    # internally (exit 1 on provider failure -> launchd restarts it).
+    _waited=0
+    while [ "$_waited" -lt "$timeout" ]; do
+      sleep 5
+      _waited=$((_waited + 5))
+      if svc_mount_table_contains "$mount_point"; then
+        break
+      fi
+    done
+
     if svc_mount_table_contains "$mount_point"; then
       say "mounted: $mount_id ($mount_point)"
     else
