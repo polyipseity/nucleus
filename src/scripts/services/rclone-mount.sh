@@ -243,18 +243,19 @@ _cd_provider_failure() {
 }
 
 # _cd_block_on_provider_failure <reason> — stop this mount and report the remedy.
-# Never returns: exit 0 keeps KeepAlive{SuccessfulExit:false} from reloading a
-# mount the provider refuses again, and the blocked marker is what 'nucleus-svc
-# status' and the watchdog read instead of retrying it.
+# WHY: exit 1 (not 0) lets KeepAlive restart the agent so it retries the mount.
+#   exit 0 permanently killed the mount — one FSKit race after fskitd restart
+#   meant the drive was dead until reboot or manual kickstart.  The blocked
+#   marker is still written so the watchdog can report the provider failure.
 _cd_block_on_provider_failure() {
   local reason="$1" remedy
   remedy="$(fskit_remedy)"
   svc_blocked_set "$instance" "$(crash_loop_state_dir)" fskit-provider "$remedy"
-  # check-suppress:suppression_doc: error's status is consumed because this path exits 0 on purpose, to stop the retry loop.
-  error -l cloud-drives "the macFUSE/FSKit provider refused the mount of '$mount_point' ($reason); the mount is stopped instead of retried." || true
+  # check-suppress:suppression_doc: the error is informational; the exit code is what matters for KeepAlive.
+  error -l cloud-drives "the macFUSE/FSKit provider refused the mount of '$mount_point' ($reason); retrying via launchd." || true
   # check-suppress:suppression_doc: same as above.
   error -l cloud-drives "$remedy" || true
-  exit 0
+  exit 1
 }
 
 # WHY: a volume that is still attached here is the leftover of a mount that did
