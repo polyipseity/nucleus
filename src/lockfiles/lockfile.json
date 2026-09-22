@@ -47,6 +47,7 @@
     "gopass": "1.15.0",
     "iwck": "3.10",
     "qemu": "9.0.0",
+    "sigrok-cli": "0.7.2",
     "zig": "0.16.0"
   },
   "source-builds": {

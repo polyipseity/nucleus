@@ -256,6 +256,10 @@
         "why": "QCOW2 tooling and guest VM runner for Invoke-VMSetup; Scoop extras bucket."
       },
       {
+        "name": "sigrok-cli",
+        "why": "Logic analyzer CLI; absent from WinGet; provisioned via nucleus custom Scoop bucket."
+      },
+      {
         "name": "zig",
         "why": "Zig compiler toolchain; build-time dependency for source-built packages (Invoke-SourceBuild)."
       }
