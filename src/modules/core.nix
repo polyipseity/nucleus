@@ -649,9 +649,10 @@ let
       winget = "GnuPG.pass";
     };
     pulseview = {
-      # WHY: not in homebrew-core; nixpkgs builds cleanly on macOS/Linux. No WinGet package exists for sigrok tools.
+      # WHY: not in homebrew-core; nixpkgs builds cleanly on macOS/Linux. Windows provisioned via WinGet Sigrok.PulseView.
       category = "gui";
       nixpkgs = "pulseview";
+      winget = "Sigrok.PulseView";
     };
     powershell = {
       category = "cli";
@@ -808,6 +809,7 @@ let
       winget = "mvdan.shfmt";
     };
     sigrok-cli = {
+      # WHY: absent from WinGet; provisioned via Scoop custom bucket on Windows.
       category = "cli";
       homebrew = {
         kind = "formula";
