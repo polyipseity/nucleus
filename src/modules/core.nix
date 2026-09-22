@@ -648,6 +648,11 @@ let
       nixpkgs = "pass";
       winget = "GnuPG.pass";
     };
+    pulseview = {
+      # WHY: not in homebrew-core; nixpkgs builds cleanly on macOS/Linux. No WinGet package exists for sigrok tools.
+      category = "gui";
+      nixpkgs = "pulseview";
+    };
     powershell = {
       category = "cli";
       homebrew = {
@@ -801,6 +806,14 @@ let
       nixpkgs = "shfmt";
       # WHY: shfmt is a single static binary; no separate macOS cask exists.
       winget = "mvdan.shfmt";
+    };
+    sigrok-cli = {
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "sigrok-cli";
+      };
+      nixpkgs = "sigrok-cli";
     };
     sops = {
       category = "cli";
@@ -1256,6 +1269,7 @@ in
       # nixpkgs (pkgs.qtpass) there instead. Windows still uses WinGet; NixOS is
       # nixpkgs anyway, so this only changes macOS.
       default = {
+        pulseview = "nixpkgs";
         qtpass = "nixpkgs";
       };
       example = {
