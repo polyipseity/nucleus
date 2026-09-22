@@ -163,7 +163,7 @@ fskit_restart_daemon() {
 fskit_repair_provider() {
   local state
 
-  if ! fskit_restart_daemon "${1:-30}"; then
+  if ! fskit_restart_daemon "${1:-60}"; then
     return 1
   fi
   state="$(fskit_macfuse_module_state)"
