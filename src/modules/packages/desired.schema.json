@@ -178,6 +178,11 @@
     "scoopEntry": {
       "additionalProperties": false,
       "properties": {
+        "bucket": {
+          "description": "Scoop bucket name for packages not in the default buckets (e.g. 'nucleus' for repo-owned manifests). Omit when the package is in 'main' or 'extras'.",
+          "minLength": 1,
+          "type": "string"
+        },
         "name": {
           "$ref": "#/definitions/packageName",
           "description": "Scoop app name."

@@ -256,6 +256,7 @@
         "why": "QCOW2 tooling and guest VM runner for Invoke-VMSetup; Scoop extras bucket."
       },
       {
+        "bucket": "nucleus",
         "name": "sigrok-cli",
         "why": "Logic analyzer CLI; absent from WinGet; provisioned via nucleus custom Scoop bucket."
       },

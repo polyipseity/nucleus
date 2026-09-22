@@ -22,13 +22,20 @@ function Invoke-ScoopSetup {
                          (winget > scoop > cargo binstall > cargo > bun > uv).
       - gopass         — cross-platform pass reimplementation; Windows parity
                          for pkgs.pass on POSIX hosts.
+      - iwck           — temporary keyboard locker for cleaning; blocks all
+                         input until Ctrl+Break.
       - qemu           — QCOW2 tooling and guest VM runner for Invoke-VMSetup;
                          absent from WinGet; Scoop extras bucket.
+      - sigrok-cli     — logic analyzer CLI; absent from WinGet; provisioned
+                         via nucleus custom Scoop bucket (NSIS installer).
       - zig            — Zig compiler toolchain; build-time dependency for
                          source-built packages (Invoke-SourceBuild).
 
     The desired set and the per-app rationale live in the shared registry
     src/modules/packages/desired.json (scoop -> <host>).
+
+    Custom bucket manifests live in src/modules/scoop-manifests/ and are
+    copied into ~/.scoop/buckets/nucleus/ at apply time.
 
   .EXAMPLE
     Invoke-ScoopSetup
@@ -69,7 +76,10 @@ function Invoke-ScoopSetup {
     Write-NucleusError -CommandName 'Invoke-ScoopSetup' "desired package registry has no scoop list for host '$hostKey'"
     return
   }
-  $desiredPackages = @($hostDesired | ForEach-Object { $_.name })
+  $desiredPackages = @($hostDesired | ForEach-Object {
+    @{ name = $_.name; bucket = $_.bucket }
+  })
+  $desiredNames = @($desiredPackages | ForEach-Object { $_.name })
 
   # Prepend the Scoop shims directory so 'scoop' is resolvable in this session.
   # DSC runs in a child process; PATH additions from that process do not
@@ -85,6 +95,8 @@ function Invoke-ScoopSetup {
   # Ensure required buckets are registered.  'main' is the default bucket but
   # may be absent on a fresh Scoop install depending on the version.  'extras'
   # hosts qemu and is registered as a standard supplement bucket.
+  # 'nucleus' is a local custom bucket for repo-owned manifests (e.g. NSIS
+  # installers for tools absent from public buckets like sigrok-cli).
   foreach ($bucket in @('extras', 'main')) {
     # -ErrorAction SilentlyContinue is intentional: 'scoop bucket list' may
     # exit non-zero when no buckets are registered yet (fresh install).
@@ -97,6 +109,24 @@ function Invoke-ScoopSetup {
         Write-NucleusError -CommandName 'scoop' "failed to add bucket '$bucket' (exit $LASTEXITCODE)"
         return
       }
+    }
+  }
+
+  # Provision the nucleus custom bucket: copy repo-owned manifests into
+  # ~/.scoop/buckets/nucleus/ so Scoop can resolve nucleus/<package> installs.
+  $manifestsSource = Join-Path $repoRoot "src\modules\scoop-manifests"
+  if (Test-Path -LiteralPath $manifestsSource) {
+    $manifestFiles = @(Get-ChildItem -Path $manifestsSource -Filter '*.json' -File)
+    if ($manifestFiles.Count -gt 0) {
+      $nucleusBucketDir = Join-Path $env:USERPROFILE "scoop\buckets\nucleus"
+      if (-not (Test-Path -LiteralPath $nucleusBucketDir)) {
+        New-Item -Path $nucleusBucketDir -ItemType Directory -Force | Out-Null
+      }
+      foreach ($mf in $manifestFiles) {
+        $dest = Join-Path $nucleusBucketDir $mf.Name
+        Copy-Item -Path $mf.FullName -Destination $dest -Force
+      }
+      Write-NucleusInfo -CommandName 'scoop' "provisioned nucleus custom bucket with $($manifestFiles.Count) manifest(s)"
     }
   }
 
@@ -123,19 +153,19 @@ function Invoke-ScoopSetup {
   # Apps installed but not desired: zap-style removal.
   # Mirrors homebrew cleanup = "zap": removes anything installed but absent
   # from the declared desired set, regardless of how it was installed.
-  $toRemove = @($installedApps | Where-Object { $desiredPackages -notcontains $_ })
+  $toRemove = @($installedApps | Where-Object { $desiredNames -notcontains $_ })
 
   # Desired apps not yet installed OR installed at a version different from
   # the lockfile pin (version-aware reconciliation).  Scoop writes a
   # <name>.cmd shim for most apps; fall back to <name>.exe for apps (like
   # gopass) that ship a native binary shim.
   $toInstall = @($desiredPackages | Where-Object {
-    $pkg = $_
-    $isInstalled = $installedApps -contains $pkg
+    $pkgName = $_.name
+    $isInstalled = $installedApps -contains $pkgName
     if (-not $isInstalled) { return $true }
-    $expectedVersion = $scoopVersions.$pkg
+    $expectedVersion = $scoopVersions.$pkgName
     if (-not $expectedVersion) { return $false }
-    $installedVersion = $installedVersions[$pkg]
+    $installedVersion = $installedVersions[$pkgName]
     $installedVersion -ne $expectedVersion
   })
 
@@ -151,26 +181,32 @@ function Invoke-ScoopSetup {
   }
 
   # Install additions with version pinning from lockfile.
-  foreach ($pkg in $toInstall) {
-    $version = $scoopVersions.$pkg
-    $installSpec = if ($version) { "$pkg@$version" } else { $pkg }
+  foreach ($entry in $toInstall) {
+    $pkgName = $entry.name
+    $pkgBucket = $entry.bucket
+    $version = $scoopVersions.$pkgName
+    $installSpec = if ($pkgBucket) {
+      if ($version) { "$pkgBucket/$pkgName@$version" } else { "$pkgBucket/$pkgName" }
+    } else {
+      if ($version) { "$pkgName@$version" } else { $pkgName }
+    }
     Write-NucleusInfo -CommandName 'scoop' "installing '$installSpec'"
     scoop install $installSpec
     if ($LASTEXITCODE -ne 0) {
       Write-NucleusError -CommandName 'scoop' "'scoop install $installSpec' failed (exit $LASTEXITCODE)"
       return
     }
-    if (-not (Test-Path (Join-Path (Get-NucleusScoopShimsDir) "$pkg.cmd")) -and
-        -not (Test-Path (Join-Path (Get-NucleusScoopShimsDir) "$pkg.exe"))) {
-      Write-NucleusError -CommandName 'scoop' "'$pkg' installed but no shim found under '$(Get-NucleusScoopShimsDir)'"
+    if (-not (Test-Path (Join-Path (Get-NucleusScoopShimsDir) "$pkgName.cmd")) -and
+        -not (Test-Path (Join-Path (Get-NucleusScoopShimsDir) "$pkgName.exe"))) {
+      Write-NucleusError -CommandName 'scoop' "'$pkgName' installed but no shim found under '$(Get-NucleusScoopShimsDir)'"
       return
     }
-    Write-NucleusInfo -CommandName 'scoop' "'$pkg' installed successfully"
+    Write-NucleusInfo -CommandName 'scoop' "'$pkgName' installed successfully"
   }
 
   # Hold all managed packages at their locked versions (prevents accidental upgrades).
-  foreach ($pkg in $desiredPackages) {
-    scoop hold $pkg 2>&1 > $null
+  foreach ($pkgName in $desiredNames) {
+    scoop hold $pkgName 2>&1 > $null
   }
 
   if ($toInstall.Count -eq 0 -and $toRemove.Count -eq 0) {
