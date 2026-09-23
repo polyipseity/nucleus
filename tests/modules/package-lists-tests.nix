@@ -128,6 +128,55 @@ let
   spRevIsHex = (sp ? rev) && builtins.match "[0-9a-f]{40}" sp.rev != null;
   spIsValid = hasCursor && hasSuperpowers && spSourceIsUri && spRevIsHex;
 
+  # --- Windows DSC overlap parity (from winget-overlap-parity-tests.nix) ---
+  # Evaluate core.nix for Windows to get the resolved package set.
+  lib = import <nixpkgs/lib>;
+  evaluated = lib.evalModules {
+    prefix = [ ];
+    modules = [
+      ../../src/modules/core.nix
+      { nucleus.packages.selection.backend = "policy"; }
+      {
+        options.assertions = lib.mkOption {
+          type = lib.types.listOf lib.types.attrs;
+          default = [ ];
+          internal = true;
+        };
+      }
+    ];
+    specialArgs = {
+      lib = lib;
+      pkgs = import <nixpkgs> { system = "x86_64-linux"; };
+      options = { };
+      hostName = "Windows";
+    };
+  };
+  resolvedWindowsPackages = evaluated.config.nucleus.windows.wingetPackages.packages;
+  committedDoc = builtins.fromJSON (readRepo "src/hosts/Windows/system/winget-packages.json");
+  committedPackages = committedDoc.packages or [ ];
+
+  wpResolvedMatchesCommitted = resolvedWindowsPackages == committedPackages;
+  wpCursorDisabled = !builtins.elem "Anysphere.Cursor" resolvedWindowsPackages;
+  wpObsEnabled = builtins.elem "OBSProject.OBSStudio" resolvedWindowsPackages;
+  wpJdkEnabled = builtins.elem "EclipseAdoptium.Temurin.25.JDK" resolvedWindowsPackages;
+
+  # Every DSC WinGet id must be in the generated allow-list.
+  dscText = readRepo "src/hosts/Windows/system/packages.dsc.yml";
+  dscLines = lib.splitString "\n" dscText;
+  dscIdsRaw = builtins.filter (l: builtins.match "^        id: .*" l != null) dscLines;
+  dscIds = builtins.map (l: builtins.substring 12 (builtins.stringLength l - 12) l) dscIdsRaw;
+  wpDscCovered = builtins.all (
+    id: builtins.elem id resolvedWindowsPackages || id == "Anysphere.Cursor"
+  ) dscIds;
+
+  # Committed JSON must be multi-line with sorted keys and single trailing newline.
+  committedRaw = readRepo "src/hosts/Windows/system/winget-packages.json";
+  committedBody = lib.removeSuffix "\n" committedRaw;
+  wpJsonTerminated =
+    builtins.match ".*\n" committedRaw != null && builtins.match ".*\n\n" committedRaw == null;
+  wpJsonMultiline = builtins.match ".*\n.*" committedBody != null;
+  wpJsonHasKeys = builtins.hasAttr "$schema" committedDoc && builtins.hasAttr "packages" committedDoc;
+
   # --- Aggregate ---
   allTestsPass =
     allManagersDeclared
@@ -154,6 +203,16 @@ in
   test_lockfile_pins_resolve = assert' allLockfilePinsResolve "every desired package must have a lockfile version pin (or declare a flake pin)";
   test_no_hardcoded_posix_lists = assert' posixInstallersFreeOfLists "POSIX installers must not hardcode desired-package literals";
   test_cursor_superpowers_lockfile = assert' spIsValid "cursor.superpowers must have https source and 40-char hex rev";
+
+  # Windows DSC overlap parity tests.
+  test_wp_resolved_matches_committed = assert' wpResolvedMatchesCommitted "winget-packages.json must equal the Nix-resolved Windows enable set";
+  test_wp_cursor_disabled = assert' wpCursorDisabled "Cursor must be disabled on Windows";
+  test_wp_obs_enabled = assert' wpObsEnabled "OBS Studio must be enabled on Windows";
+  test_wp_jdk_enabled = assert' wpJdkEnabled "Temurin JDK 25 must be enabled on Windows";
+  test_wp_dsc_covered = assert' wpDscCovered "Every DSC WinGet id must be in the generated allow-list";
+  test_wp_json_sorted = assert' (
+    wpJsonTerminated && wpJsonMultiline && wpJsonHasKeys
+  ) "winget-packages.json must be multi-line with sorted keys and exactly one trailing newline";
 
   all_tests_pass = assert' allTestsPass "all package-lists invariants must hold";
   success = allTestsPass;
