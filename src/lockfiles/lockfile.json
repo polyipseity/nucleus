@@ -1,15 +1,15 @@
 {
   "$schema": "./lockfile.schema.json",
   "bun": {
-    "@anthropic-ai/sandbox-runtime": "0.0.75",
-    "@earendil-works/pi-coding-agent": "0.73.1",
+    "@anthropic-ai/sandbox-runtime": "0.0.77",
+    "@earendil-works/pi-coding-agent": "0.87.1",
     "@tobilu/qmd": "2.8.3",
     "clawhub": "0.23.3"
   },
   "cargo-binstall": {
     "cargo-cache": "0.8.3",
-    "cargo-nextest": "0.9.143",
-    "nickel-lang-lsp": "1.17.0",
+    "cargo-nextest": "0.9.146",
+    "nickel-lang-lsp": "1.18.0",
     "pay-respects": "0.8.8"
   },
   "cursor": {
@@ -19,24 +19,24 @@
     }
   },
   "pi": {
-    "@getpipher/vision": "0.5.2",
-    "@juicesharp/rpiv-ask-user-question": "2.9.0",
-    "@narumitw/pi-plan-mode": "0.56.0",
-    "@narumitw/pi-usage": "0.60.3",
+    "@getpipher/vision": "0.5.3",
+    "@juicesharp/rpiv-ask-user-question": "2.10.1",
+    "@narumitw/pi-plan-mode": "0.58.0",
+    "@narumitw/pi-usage": "0.60.8",
     "better-custom": "0.4.2",
     "pi-background-tasks": "2.5.0",
     "pi-extmgr": "0.3.0",
-    "pi-goal-x": "0.30.5",
+    "pi-goal-x": "0.31.6",
     "pi-memory": "0.4.2",
-    "pi-powerline-footer": "0.17.0",
-    "pi-provider-litellm": "2.3.0",
+    "pi-powerline-footer": "0.17.1",
+    "pi-provider-litellm": "3.1.0",
     "pi-simplify": "0.2.3",
-    "pi-subagents": "0.65.1",
-    "pi-web-access": "0.28.0"
+    "pi-subagents": "0.68.0",
+    "pi-web-access": "0.29.0"
   },
   "pwsh": {
     "PSScriptAnalyzer": "1.25.0",
-    "Pester": "6.1.0",
+    "Pester": "6.2.0",
     "powershell-yaml": "0.4.12"
   },
   "rustup": {
@@ -173,9 +173,9 @@
     },
     "vscode": {
       "arrterian.nix-env-selector": "1.3.2",
-      "astral-sh.ty": "2025.71.13500942",
+      "astral-sh.ty": "2026.69.12452253",
       "asvetliakov.vscode-neovim": "1.19.0",
-      "charliermarsh.ruff": "2026.70.0",
+      "charliermarsh.ruff": "2026.74.0",
       "christian-kohler.npm-intellisense": "1.4.5",
       "christian-kohler.path-intellisense": "2.10.0",
       "cl.eide": "3.26.14",
@@ -196,11 +196,11 @@
       "keroc.hex-fmt": "1.0.0",
       "mark-hansen.hledger-vscode": "0.0.12",
       "mkhl.direnv": "0.17.0",
-      "ms-azuretools.vscode-containers": "2.4.5",
+      "ms-azuretools.vscode-containers": "2.5.0",
       "ms-ceintl.vscode-language-pack-zh-hant": "1.129.2026071717",
       "ms-python.debugpy": "2026.6.0",
       "ms-python.python": "2026.4.0",
-      "ms-python.vscode-python-envs": "1.37.2026073101",
+      "ms-python.vscode-python-envs": "1.37.2026090401",
       "ms-toolsai.datawrangler": "1.24.2",
       "ms-toolsai.jupyter": "2025.9.1",
       "ms-toolsai.jupyter-keymap": "1.1.2",
@@ -212,7 +212,7 @@
       "ms-vscode-remote.remote-ssh-edit": "0.87.0",
       "ms-vscode-remote.remote-wsl": "0.104.3",
       "ms-vscode.cmake-tools": "1.23.52",
-      "ms-vscode.cpp-devtools": "0.6.15",
+      "ms-vscode.cpp-devtools": "0.7.0",
       "ms-vscode.cpptools": "1.32.2",
       "ms-vscode.cpptools-extension-pack": "1.5.1",
       "ms-vscode.cpptools-themes": "2.0.0",
@@ -222,7 +222,7 @@
       "ms-vscode.remote-explorer": "0.5.0",
       "ms-vscode.remote-repositories": "0.43.2026080601",
       "ms-vscode.remote-server": "1.6.2026072909",
-      "ms-vscode.vscode-chat-customizations-evaluations": "1.1.2026080719",
+      "ms-vscode.vscode-chat-customizations-evaluations": "1.1.2026090319",
       "ms-vscode.vscode-serial-monitor": "0.13.251128001",
       "ms-vsliveshare.vsliveshare": "1.1.122",
       "myriad-dreamin.tinymist": "0.15.2",
@@ -231,15 +231,15 @@
       "s-nlf-fh.glassit": "0.2.6",
       "sjhuangx.vscode-scheme": "0.4.0",
       "sst-dev.opencode-v2": "0.1.1",
-      "streetsidesoftware.code-spell-checker": "4.5.6",
-      "svelte.svelte-vscode": "110.3.0",
+      "streetsidesoftware.code-spell-checker": "4.7.3",
+      "svelte.svelte-vscode": "110.3.1",
       "takumii.markdowntable": "0.10.3",
       "tamasfe.even-better-toml": "0.21.2",
       "tweag.vscode-nickel": "0.5.0",
       "vadimcn.vscode-lldb": "1.12.2"
     }
   },
-  "updated": "2026-09-12T07:10:07Z",
+  "updated": "2026-09-23T08:08:15Z",
   "uv": {
     "discord-music-rpc": {
       "rev": "bba71027a684db53f3fcde5adbd3d42627241a83",
@@ -253,12 +253,12 @@
   "vm-setup": {
     "nixos-iso": {
       "aarch64-linux": {
-        "digest": "sha256:8202bbcf5ab2308435a95dd8c9650ba15144b6a482e5e6de3b4cdf1bbf934333",
-        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1068089.c043004d1c69/nixos-minimal-26.11pre1068089.c043004d1c69-aarch64-linux.iso"
+        "digest": "sha256:347769d17cf475238860ff3651481e3a6781552c3eff6405487fe2c126d21ef1",
+        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1077996.6774f7bc2537/nixos-minimal-26.11pre1077996.6774f7bc2537-aarch64-linux.iso"
       },
       "x86_64-linux": {
-        "digest": "sha256:ab312aa186601480b73951f294826d9f9598c46c8e5078955b22fbdc697239b8",
-        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1068089.c043004d1c69/nixos-minimal-26.11pre1068089.c043004d1c69-x86_64-linux.iso"
+        "digest": "sha256:ff526276f3258bb80b70df4794b724937ba3713fb734406162207c1a76132700",
+        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1077996.6774f7bc2537/nixos-minimal-26.11pre1077996.6774f7bc2537-x86_64-linux.iso"
       }
     },
     "tart-images": {
