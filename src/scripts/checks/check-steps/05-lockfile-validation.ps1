@@ -130,3 +130,23 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Action {
   Write-Message "lockfile.json validation passed"
   return $true
 }
+
+# run_online_determinism — Verify lockfile freshness against registries (requires network).
+function Invoke-OnlineDeterminism {
+  param(
+    [Parameter(Mandatory)]
+    [PSObject]$Context
+  )
+  $repoRoot = $Context.RepoRoot
+  Set-Location $repoRoot
+
+  $updateScript = Join-Path $repoRoot "scripts/update.ps1"
+  if (Test-Path $updateScript) {
+    & pwsh -File $updateScript lockfile -Verify
+    if ($LASTEXITCODE -eq 0) {
+      Write-Message "online determinism checks passed."
+      return $true
+    }
+  }
+  return $false
+}

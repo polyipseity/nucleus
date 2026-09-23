@@ -105,3 +105,18 @@ run_lockfile_validation() {
   say "lockfile.json validation passed"
   [ "$_lf_errors" -eq 0 ]
 }
+
+# run_online_determinism — Verify lockfile freshness against registries (requires network).
+run_online_determinism() {
+  local -n ctx="$1"
+  local _repo_root="${ctx[REPO_ROOT]}"
+  shift
+  cd "$_repo_root" || return 1
+
+  if bash "$_repo_root/scripts/update.sh" lockfile --verify; then
+    say "online determinism checks passed."
+    return 0
+  else
+    return 1
+  fi
+}
