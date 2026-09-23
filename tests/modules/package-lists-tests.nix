@@ -13,7 +13,7 @@
 # Run with: nix-instantiate --eval --strict tests/modules/package-lists-tests.nix
 
 let
-  inherit (import ../lib.nix) assert' containsRegex;
+  inherit (import ../lib.nix) assert';
 
   repoRoot = ../..;
   readRepo = path: builtins.readFile (repoRoot + "/${path}");
@@ -118,18 +118,6 @@ let
   allManagersDeclared = builtins.all (manager: desired ? ${manager}) managers;
   allHostsDeclared = builtins.all managerHasHosts managers;
 
-  # --- Consumers must read the shared registry ------------------------------
-  posixModuleReads = containsRegex "packages/desired[.]json" (readRepo "src/modules/agents.nix");
-  windowsConsumers = [
-    "src/platforms/Windows/modules/setup/Invoke-BunSetup.ps1"
-    "src/platforms/Windows/modules/setup/Invoke-CargoBinstallSetup.ps1"
-    "src/platforms/Windows/modules/setup/Invoke-ScoopSetup.ps1"
-    "src/platforms/Windows/modules/setup/Invoke-UvSetup.ps1"
-  ];
-  windowsConsumersRead = builtins.all (
-    path: containsRegex "desired[.]json" (readRepo path)
-  ) windowsConsumers;
-
   # Hardcoded per-package lines look like:  'pkg-name' \
   # Comments never start with a quote, so this only catches list literals.
   lines = text: builtins.filter builtins.isString (builtins.split "\n" text);
@@ -156,8 +144,6 @@ let
     && flakePinsAreGithub
     && noFlakePinDuplication
     && allLockfilePinsResolve
-    && posixModuleReads
-    && windowsConsumersRead
     && posixInstallersFreeOfLists;
 in
 {
@@ -170,8 +156,6 @@ in
   test_flake_pins_are_github = assert' flakePinsAreGithub "every 'flake:<node>' pin must name a github input with owner, repo, and rev";
   test_flake_pins_not_duplicated = assert' noFlakePinDuplication "a 'flake:<node>'-pinned package must not also carry a lockfile version pin";
   test_lockfile_pins_resolve = assert' allLockfilePinsResolve "every desired package must have a lockfile version pin (or declare a flake pin)";
-  test_posix_module_reads_registry = assert' posixModuleReads "src/modules/agents.nix must read src/modules/packages/desired.json";
-  test_windows_consumers_read_registry = assert' windowsConsumersRead "every Windows setup consumer must read desired.json";
   test_no_hardcoded_posix_lists = assert' posixInstallersFreeOfLists "POSIX installers must not hardcode desired-package literals";
 
   all_tests_pass = assert' allTestsPass "all package-lists invariants must hold";

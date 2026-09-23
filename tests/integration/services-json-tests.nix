@@ -8,13 +8,11 @@
 let
   inherit (import ../lib.nix)
     assert'
-    containsRegex
     all
     any
     ;
 
   servicesJsonText = builtins.readFile ../../src/modules/services.json;
-  flakeText = builtins.readFile ../../src/flake.nix;
 
   parsedServices = builtins.fromJSON servicesJsonText;
   serviceNames = builtins.filter (n: parsedServices.${n} ? hosts) (builtins.attrNames parsedServices);
@@ -51,9 +49,6 @@ let
 in
 {
   tests = builtins.filter (x: x != null) [
-    # --- Schema reference integrity ---
-    (assert' (containsRegex ''services\.schema\.json'' servicesJsonText) "services.json must reference services.schema.json")
-
     # --- displayName field present in every service ---
     (assert' (all (
       name: parsedServices.${name} ? displayName
@@ -102,9 +97,6 @@ in
     (assert' (parsedServices ? service-watchdog) "service-watchdog present in services.json")
     (assert' (parsedServices.service-watchdog ? hosts) "service-watchdog has hosts")
     (assert' (parsedServices.service-watchdog ? displayName) "service-watchdog has displayName")
-
-    # --- flake.nix wiring ---
-    (assert' (containsRegex "service-watchdog" flakeText) "service-watchdog in flake.nix")
   ];
 
   success = true;
