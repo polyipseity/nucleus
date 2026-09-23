@@ -61,6 +61,9 @@ run_repository_policy() {
   say "--- activation tool resolution ---"
   run_activation_tool_resolution "$_ctx_name" "${_files[@]}" || _failed=1
 
+  say "--- method-1 symlink resolution ---"
+  run_method1_symlink_resolution "$_ctx_name" "${_files[@]}" || _failed=1
+
   if [ "$_failed" -ne 0 ]; then
     error "repository policy check failed"
     return 1
@@ -1396,5 +1399,89 @@ AWKEOF
     return 1
   fi
   say "all activation scripts use resolved tool paths."
+  return 0
+}
+
+# run_method1_symlink_resolution — Verify deployed method-1 symlinks point at
+# the live repo root, not a read-only /nix/store/*-source snapshot.
+# Only runs when the manifest exists (deployed-host requirement).
+run_method1_symlink_resolution() {
+  local -n ctx="$1"
+  local _repo_root="${ctx[REPO_ROOT]}"
+  shift
+  cd "$_repo_root" || return 1
+
+  local _manifest
+  _manifest="$(derive_nucleus_user_root)/method1-symlink-manifest.txt"
+
+  # Skip if manifest doesn't exist (not a deployed host).
+  if [ ! -f "$_manifest" ]; then
+    say "no method-1 symlink manifest found — skipping."
+    return 0
+  fi
+
+  local -a _entries=()
+  mapfile -t _entries <"$_manifest"
+
+  local _checked=0 _violations=0 _entry _origin _link _target
+  local -a _links=()
+  for _entry in "${_entries[@]+${_entries[@]}}"; do
+    case "$_entry" in
+    '' | '#'*) continue ;;
+    /*) ;;
+    *)
+      error "method-1 manifest entry '$_entry' is not an absolute path"
+      _violations=$((_violations + 1))
+      continue
+      ;;
+    esac
+
+    _links=()
+    if [ -L "$_entry" ]; then
+      _links=("$_entry")
+      _origin="explicit"
+    elif [ -d "$_entry" ]; then
+      _origin="walked"
+      while IFS= read -r _link; do
+        [ "$_link" = "$_entry/extensions" ] && continue
+        _links+=("$_link")
+      done < <(find "$_entry" -mindepth 1 -maxdepth 1 -type l -print 2>/dev/null)
+    else
+      continue
+    fi
+
+    for _link in "${_links[@]}"; do
+      _target="$(readlink "$_link")"
+      _checked=$((_checked + 1))
+      case "$_target" in
+      "$_repo_root"/*)
+        ;;
+      /nix/store/*-source/*)
+        error "method-1 symlink '$_link' resolves to read-only store snapshot: $_target"
+        _violations=$((_violations + 1))
+        ;;
+      /nix/store/*)
+        warn "method-1 symlink '$_link' resolves into the Nix store: $_target"
+        ;;
+      *)
+        if [ "$_origin" = "explicit" ]; then
+          warn "method-1 symlink '$_link' resolves outside live repo root: $_target"
+        fi
+        ;;
+      esac
+    done
+  done
+
+  if [ "$_checked" -eq 0 ]; then
+    say "0 deployed method-1 symlinks among the manifest entries — nothing to verify."
+    return 0
+  fi
+
+  if [ "$_violations" -gt 0 ]; then
+    error "$_violations method-1 symlink(s) resolve to a read-only store snapshot instead of the live repo root"
+    return 1
+  fi
+
+  say "verified $_checked method-1 symlink(s) resolve to live repo root ($_repo_root)"
   return 0
 }
