@@ -5,8 +5,8 @@
       "description": "A version string or a VCS hash pin with source URL.",
       "oneOf": [
         {
-          "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "type": "string"
         },
         {
           "additionalProperties": false,
@@ -39,13 +39,6 @@
       "description": "Bun-installed global package versions. Package name → version string or VCS hash pin.",
       "type": "object"
     },
-    "pi": {
-      "additionalProperties": {
-        "$ref": "#/definitions/versionOrHash"
-      },
-      "description": "Pi coding agent npm package versions. Package name → version string.",
-      "type": "object"
-    },
     "cargo-binstall": {
       "additionalProperties": {
         "$ref": "#/definitions/versionOrHash"
@@ -53,26 +46,40 @@
       "description": "cargo-binstall crate versions. Crate name → version string or VCS hash pin.",
       "type": "object"
     },
+    "cursor": {
+      "additionalProperties": {
+        "$ref": "#/definitions/versionOrHash"
+      },
+      "description": "Deterministic pinned versions for Cursor editor plugins. Plugin name → VCS hash pin.",
+      "type": "object"
+    },
+    "pi": {
+      "additionalProperties": {
+        "$ref": "#/definitions/versionOrHash"
+      },
+      "description": "Pi coding agent npm package versions. Package name → version string.",
+      "type": "object"
+    },
     "pwsh": {
       "additionalProperties": {
-        "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "type": "string"
       },
       "description": "PowerShell module versions. Module name → version string.",
       "type": "object"
     },
     "rustup": {
       "additionalProperties": {
-        "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "type": "string"
       },
       "description": "Rustup toolchain pins. Channel name → version (stable/beta) or nightly-YYYY-MM-DD (nightly).",
       "type": "object"
     },
     "scoop": {
       "additionalProperties": {
-        "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "type": "string"
       },
       "description": "Scoop package versions. Package name → version string.",
       "type": "object"
@@ -84,24 +91,18 @@
       "description": "Windows source-built package VCS pins. Package name → VCS hash pin with source URL.",
       "type": "object"
     },
-    "cursor": {
-      "additionalProperties": {
-        "$ref": "#/definitions/versionOrHash"
-      },
-      "description": "Deterministic pinned versions for Cursor editor plugins. Plugin name → VCS hash pin.",
-      "type": "object"
-    },
-    "vscode": {
-      "additionalProperties": {
-        "$ref": "#/definitions/versionOrHash"
-      },
-      "description": "Deterministic pinned versions for VS Code editor plugins. Plugin name → VCS hash pin.",
-      "type": "object"
-    },
     "suggestions": {
       "additionalProperties": false,
       "description": "Sections that cannot be hard-pinned/enforced. Consumers must warn when present and never treat as authoritative. A section enforceable at most warn-only MUST live here, never as a pinned root child.",
       "properties": {
+        "cursor": {
+          "additionalProperties": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "description": "Cursor extension versions. Same VS Code-compatible extensions as suggestions.vscode. Warn-only.",
+          "type": "object"
+        },
         "homebrew": {
           "additionalProperties": false,
           "description": "Mac App Store pins for macOS. Formula/cask names are managed in nix-homebrew (tap commits in flake.lock); only masApps (App Store IDs, not in any lockfile) remain here as warn-only audit data.",
@@ -117,14 +118,6 @@
           "required": [
             "masApps"
           ],
-          "type": "object"
-        },
-        "cursor": {
-          "additionalProperties": {
-            "type": "string",
-            "minLength": 1
-          },
-          "description": "Cursor extension versions. Same VS Code-compatible extensions as suggestions.vscode. Warn-only.",
           "type": "object"
         },
         "ollama": {
@@ -159,14 +152,6 @@
           "description": "OpenCode plugin versions (warn-only). Plugin name → version string or VCS hash pin.",
           "type": "object"
         },
-        "vscode": {
-          "additionalProperties": {
-            "type": "string",
-            "minLength": 1
-          },
-          "description": "VS Code extension versions. Windows installs --pre-release --force (latest); POSIX uses flake.lock. Warn-only.",
-          "type": "object"
-        },
         "vm-setup": {
           "additionalProperties": false,
           "description": "VM image artifact pins that cannot be enforced.",
@@ -193,6 +178,14 @@
               "type": "object"
             }
           },
+          "type": "object"
+        },
+        "vscode": {
+          "additionalProperties": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "description": "VS Code extension versions. Windows installs --pre-release --force (latest); POSIX uses flake.lock. Warn-only.",
           "type": "object"
         }
       },
@@ -300,10 +293,17 @@
       },
       "type": "object"
     },
+    "vscode": {
+      "additionalProperties": {
+        "$ref": "#/definitions/versionOrHash"
+      },
+      "description": "Deterministic pinned versions for VS Code editor plugins. Plugin name → VCS hash pin.",
+      "type": "object"
+    },
     "winget": {
       "additionalProperties": {
-        "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "type": "string"
       },
       "description": "WinGet package identifiers and versions. Package ID → version string. Lockfile is the sole version authority — only bump-lockfile may change WinGet versions.",
       "type": "object"
