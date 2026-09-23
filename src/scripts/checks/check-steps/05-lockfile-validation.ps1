@@ -150,3 +150,60 @@ function Invoke-OnlineDeterminism {
   }
   return $false
 }
+
+# Invoke-LockedDscValidation — Verify DSC package versions match lockfile pins.
+function Invoke-LockedDscValidation {
+  param(
+    [Parameter(Mandatory)]
+    [PSObject]$Context
+  )
+  $repoRoot = $Context.RepoRoot
+  Set-Location $repoRoot
+  $lockfile = Join-Path $repoRoot "src/lockfiles/lockfile.json"
+  $dscDir = Join-Path $repoRoot "src/hosts/Windows/system"
+  $lfData = Get-Content -Raw $lockfile | ConvertFrom-Json
+  $locked = @{}
+  if ($lfData.winget) { $lfData.winget.PSObject.Properties | ForEach-Object { $locked[$_.Name] = $_.Value } }
+
+  $dscFiles = Get-ChildItem -Path $dscDir -Filter "*.dsc.yml" -ErrorAction SilentlyContinue
+  $violations = 0
+
+  foreach ($f in $dscFiles) {
+    $json = & yq eval -o=j "." $f.FullName 2>$null
+    if (-not $json) { continue }
+    $parsed = $json | ConvertFrom-Json
+    foreach ($r in $parsed.properties.resources) {
+      if ($r.resource -ne "Microsoft.WinGet.Client/Package") { continue }
+      if ($r.settings.source -ne "winget") { continue }
+      $id = $r.settings.id
+      $pinnedVer = $r.settings.version
+      if ($locked.ContainsKey($id)) {
+        $lfVer = $locked[$id]
+        if ($pinnedVer -and $pinnedVer -ne $lfVer) {
+          Write-ErrorMessage "system DSC: $id pinned $pinnedVer but lockfile has $lfVer"
+          $violations++
+        }
+      }
+    }
+  }
+
+  foreach ($entry in $locked.GetEnumerator()) {
+    $found = $false
+    foreach ($f in $dscFiles) {
+      $json = & yq eval -o=j "." $f.FullName 2>$null
+      if (-not $json) { continue }
+      if ($json -match ('"id": "' + [regex]::Escape($entry.Key) + '"')) { $found = $true; break }
+    }
+    if (-not $found) {
+      Write-ErrorMessage "$($entry.Key) ($($entry.Value)) is in lockfile but missing version pin in DSC"
+      $violations++
+    }
+  }
+
+  if ($violations -gt 0) {
+    Write-ErrorMessage "locked DSC validation failed with $violations error(s)"
+    return $false
+  }
+  Write-Message "locked DSC validation passed"
+  return $true
+}
