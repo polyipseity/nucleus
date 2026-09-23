@@ -30,10 +30,10 @@ Rules: `--` only separator (never em dash). `reason:` eliminated except shellche
 | --- | --- | --- | --- |
 | `# Inline by embedded-content policy exception N (name).` | 10+1 | `embedded-content` | step 14 `.ps1` |
 | `# Method N (name) -- <why>` (legacy) | 68→71 | `config-method` | step 14 `.ps1` + `.sh` |
-| `# check-suppress:SuppressMessageAttribute: <rule> -- <just>` | 33 | `SuppressMessageAttribute` | step 12 `Get-UndocSuppViolation` |
-| `# check-suppress:suppression_doc: <just>` | 623 | `suppression_doc` | step 12 regex |
+| `# check-suppress:SuppressMessageAttribute: <rule> -- <just>` | 33 | `SuppressMessageAttribute` | step 14 `Get-UndocSuppViolation` |
+| `# check-suppress:suppression_doc: <just>` | 623 | `suppression_doc` | step 14 regex |
 | `# check-suppress:packer_validate: ...` | 1 | `packer_validate` | `scripts/check.ps1` + `.sh` |
-| `\|\| true` / `$null =` / `[void]` | 11+92 | `suppression_doc` | step 12 (`tests/` exempt) |
+| `\|\| true` / `$null =` / `[void]` | 11+92 | `suppression_doc` | step 14 (`tests/` exempt) |
 
 **Suppression semantics:** `|| true`, `$null =`, `[void]` are suppression patterns, not rationale. Justify with `# check-suppress:suppression_doc:`, never `# WHY:`. **Counting:** CODE-ONLY. `git grep -h 'check-suppress:<id>:' -- '*.ps1' '*.sh' '*.nix' '*.zsh' | wc -l`.
 
@@ -52,7 +52,7 @@ Cat 3: Dividers, DSC headers. Cat 4: `# ref:` (54 sites): `# ref: <target> -- <j
 
 ## Check-id registry
 
-New tool-enforced markers MUST register check id + machine consumer before use. IDs: `suppression_doc` (step 12), `SuppressMessageAttribute` (step 12), `packer_validate` (`scripts/check.*`), `embedded-content` (step 14), `config-method` (step 14).
+New tool-enforced markers MUST register check id + machine consumer before use. IDs: `suppression_doc` (step 14), `SuppressMessageAttribute` (step 14), `packer_validate` (`scripts/check.*`), `embedded-content` (step 14), `config-method` (step 14).
 
 ## `# WHY:` and `# ref:` usage
 
@@ -71,4 +71,4 @@ New tool-enforced markers MUST register check id + machine consumer before use. 
 | `# ref:.*reason:` = 0 | no |
 | `# (Source\|Cross-reference\|See):` = 0 in dsc.yml | no |
 | `iso_checksum = "none"` without `packer_validate:` | step 1 |
-| bare `\|\| true` / `$null =` / `[void]` / `2>$null` / `-ErrorAction SilentlyContinue` in production = 0 | step 12 (`tests/` exempt) |
+| bare `\|\| true` / `$null =` / `[void]` / `2>$null` / `-ErrorAction SilentlyContinue` in production = 0 | step 14 (`tests/` exempt) |

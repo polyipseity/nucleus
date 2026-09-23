@@ -49,6 +49,12 @@ run_repository_policy() {
   say "--- log capture pair policy ---"
   run_log_capture_pair_policy "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
+  say "--- package manager enforcement ---"
+  run_package_manager_enforcement "$_ctx_name" "${_files[@]}" || _failed=1
+
+  say "--- suppression audit ---"
+  run_suppression_audit "$_ctx_name" "${_files[@]}" || _failed=1
+
   if [ "$_failed" -ne 0 ]; then
     error "repository policy check failed"
     return 1
@@ -694,7 +700,7 @@ run_nix_file_structure() {
 # prohibited, on every host.
 # WHY the narrow scope: this targets SERVICE capture points only — launchd/systemd
 # capture directives and the wrappers that redirect a service's output. Ad-hoc
-# `2>/dev/null` on a single command is the suppression-audit concern (step 12).
+# `2>/dev/null` on a single command is the suppression-audit concern (step 14).
 run_log_capture_pair_policy() {
   local _has_args="$1" _repo_root="$2"
   shift 2
@@ -786,5 +792,181 @@ run_log_capture_pair_policy() {
     return 1
   fi
   say "log capture pair policy passed."
+  return 0
+}
+
+# Package manager usage enforcement: ban bare `pip install` and `npm install`.
+# ref: allow-and-deny-lists.instructions.md#A1
+run_package_manager_enforcement() {
+  local -n ctx="$1"
+  shift
+  local _files=("$@")
+  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
+  cd "$_repo_root" || return 1
+  local _violations=0
+
+  # Skip when scoped to files outside this step's scope (no .sh/.ps1/.nix files).
+  if $_has_args; then
+    local _f _has_shell_files=0
+    for _f in "${_files[@]}"; do
+      case "$_f" in *.sh | *.ps1 | *.nix)
+        _has_shell_files=1
+        break
+        ;;
+      esac
+    done
+    if [ "$_has_shell_files" -eq 0 ]; then
+      say "0 shell files in scope — nothing to enforce."
+      return 0
+    fi
+  fi
+
+  # Ban bare `pip install` and `npm install`.
+  local _grep_files=()
+  # shellcheck disable=SC2178 # reason: nameref to context array — shellcheck sees string assignment but the ref resolves to an array
+  local -n _sh_files="${ctx[SH_FILES]}"
+  # shellcheck disable=SC2178 # reason: nameref to context array
+  local -n _ps1_files="${ctx[PS1_FILES]}"
+  # shellcheck disable=SC2178 # reason: nameref to context array
+  local -n _nix_files="${ctx[NIX_FILES]}"
+  if $_has_args; then
+    [ ${#_sh_files[@]} -gt 0 ] && _grep_files+=("${_sh_files[@]}")
+    [ ${#_ps1_files[@]} -gt 0 ] && _grep_files+=("${_ps1_files[@]}")
+    [ ${#_nix_files[@]} -gt 0 ] && _grep_files+=("${_nix_files[@]}")
+    local _filtered=()
+    local _f
+    for _f in "${_grep_files[@]}"; do
+      case "$(basename "$_f")" in
+      check.sh | check.ps1 | shell.nix | "$_REPOSITORY_POLICY_STEP_SH" | "$_REPOSITORY_POLICY_STEP_PS1") continue ;;
+      esac
+      _filtered+=("$_f")
+    done
+    _grep_files=("${_filtered[@]}")
+  else
+    mapfile -t _grep_files < <(
+      find scripts/ src/ tests/ \( -name '*.sh' -o -name '*.ps1' -o -name '*.nix' \) -print |
+        filter_gitignored |
+        grep -v -E '(check\.sh|check\.ps1|shell\.nix|'"$_REPOSITORY_POLICY_STEP_SH"'|'"$_REPOSITORY_POLICY_STEP_PS1"')$'
+    )
+  fi
+
+  if [ "${#_grep_files[@]}" -gt 0 ]; then
+    if printf '%s\0' "${_grep_files[@]}" |
+      xargs -0 grep -n -E '(^|[^a-z])pip install([^-]|$)' 2>/dev/null |
+      grep -v 'uv pip install' |
+      grep . >/dev/null 2>&1; then
+      error "bare pip install detected (use uv pip install instead)"
+      _violations=$((_violations + 1))
+    fi
+
+    if printf '%s\0' "${_grep_files[@]}" |
+      xargs -0 grep -n -E '(^|[^a-z])npm install([^-]|$)' 2>/dev/null |
+      grep . >/dev/null 2>&1; then
+      error "bare npm install detected (use bun or nix instead)"
+      _violations=$((_violations + 1))
+    fi
+  fi
+
+  # Self-pruning: verify excluded files still justify their exclusion (A1)
+  for _excluded in check.sh check.ps1 shell.nix; do
+    if [ -f "$_excluded" ] && ! grep -q -E '(pip install|npm install)' "$_excluded" 2>/dev/null; then
+      error "stale exclusion: '$_excluded' no longer contains pip/npm install patterns — remove from --exclude list"
+      _violations=$((_violations + 1))
+    fi
+  done
+
+  if [ "$_violations" -gt 0 ]; then
+    return 1
+  fi
+  say "no package manager violations found."
+  return 0
+}
+
+# Suppression audit: detect undocumented error suppressions.
+# ref: allow-and-deny-lists.instructions.md#A9
+run_suppression_audit() {
+  local -n ctx="$1"
+  shift
+  cd "${ctx[REPO_ROOT]}" || return 1
+  local _errors=0
+  local _tmpdir
+  _tmpdir=$(mktemp -d) || {
+    error "failed to create temp dir"
+    _errors=$((_errors + 1))
+  }
+
+  # Collect script files
+  local _files=()
+  # shellcheck disable=SC2178 # reason: nameref to context array
+  local -n _sh_files="${ctx[SH_FILES]}"
+  # shellcheck disable=SC2178 # reason: nameref to context array
+  local -n _nix_files="${ctx[NIX_FILES]}"
+  # shellcheck disable=SC2178 # reason: nameref to context array
+  local -n _cached_nix_files="${ctx[CACHED_NIX_FILES]}"
+  # shellcheck disable=SC2178 # reason: nameref to context array
+  local -n _cached_shell_files="${ctx[CACHED_SHELL_FILES]}"
+  if "${ctx[HAS_ARGS]}"; then
+    [ ${#_sh_files[@]} -gt 0 ] && _files+=("${_sh_files[@]}")
+    [ ${#_nix_files[@]} -gt 0 ] && _files+=("${_nix_files[@]}")
+  else
+    _files=("${_cached_nix_files[@]}" "${_cached_shell_files[@]}")
+  fi
+
+  # Drop this step's own file: its scan definitions contain the literal suppression patterns.
+  local _filtered=() _f_iter
+  for _f_iter in "${_files[@]}"; do
+    [ "$(basename "$_f_iter")" = "$_REPOSITORY_POLICY_STEP_SH" ] || _filtered+=("$_f_iter")
+  done
+  _files=("${_filtered[@]}")
+
+  if [ "${#_files[@]}" -gt 0 ]; then
+    # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
+    printf '%s\0' "${_files[@]}" |
+      xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
+        _safe="$(echo "$2" | tr "/" "_")"
+        _out="$1/${_safe}.out"
+        _grep_pattern="shellcheck disable=|check-suppress:"  # reason: self-reference — grep pattern literal, not a suppression
+        grep -Hn -E "$_grep_pattern" "$2" \
+          | grep -v -E "reason:|suppression_doc:|config-method|embedded-content|packer_validate|SuppressMessageAttribute" \
+          | sed "s/^/undoc_supp:/" >> "$_out" 2>/dev/null || true  # check-suppress:suppression_doc: grep exits 1 on no matches; an empty .out file is the clean signal
+        # Bare "|| true" suppressions: documented by "# check-suppress:suppression_doc:" on
+        # the same or preceding line; test fixtures (tests/) are exempt.
+        case "$2" in
+          *"/tests/"* | "tests/"*) ;;
+          *)
+            awk "
+              /^[[:space:]]*#/ { prev = \$0; next }
+              /\|\| true/ {
+                if (\$0 !~ /check-suppress:suppression_doc:/ && prev !~ /# check-suppress:suppression_doc:/) {
+                  print FILENAME \":\" FNR \":|| true: \" \$0
+                }
+              }
+              { prev = \$0 }
+            " "$2" | sed "s/^/undoc_supp:/" >> "$_out" 2>/dev/null || true  # check-suppress:suppression_doc: awk exits 1 on no || true matches; an empty .out file is the clean signal
+            ;;
+        esac
+      ' _ "$_tmpdir"
+
+    local _f _err
+    for _f in "$_tmpdir"/*.out "$_tmpdir"/.*.out; do
+      [ -f "$_f" ] || continue
+      while IFS= read -r _err; do
+        _errors=$((_errors + 1))
+        error "$_err"
+      done <"$_f"
+    done
+
+    if [ "$_errors" -gt 0 ]; then
+      say "  add '# check-suppress:suppression_doc: reason' comment to explain intentional suppressions."
+      rm -rf -- "$_tmpdir"
+      return 1
+    else
+      say "no undocumented error suppressions found."
+    fi
+  else
+    say "0 script files in scope — nothing to audit."
+  fi
+
+  rm -rf -- "$_tmpdir"
   return 0
 }

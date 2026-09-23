@@ -95,7 +95,7 @@ Never output "passed" or "no issues found" for a step that did not run.
 | Format/lint | 01–02 | `code-formatting`, `powershell-lint` |
 | Nix | 03–04 | `nix-flake-eval`, `nix-lint` |
 | Data/schema | 05–08, 10 | `lockfile-validation`, `locked-dsc-validation`, `schema-validation`, `service-registry`, `completions-fresh` |
-| Repo policy | 11–14 | `package-manager-enforcement`, `suppression-audit`, `online-determinism`, `repository-policy` |
+| Repo policy | 13–14 | `online-determinism`, `repository-policy` |
 
 ## Adding or renumbering check steps
 

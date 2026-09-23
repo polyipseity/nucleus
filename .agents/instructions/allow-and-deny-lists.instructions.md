@@ -41,14 +41,14 @@ Categories A–D, dummy key rules below. New exclusions: category ID, tier, `# r
 
 | ID | Files | Excluded | Tier | Reason | Verify |
 | --- | --- | --- | --- | --- | --- |
-| A1 | `11-package-manager-enforcement.sh`, `.ps1` | `check.sh`, `check.ps1`, `shell.nix` (+ self-refs) | T2 | Contains `pip`/`npm` in comments/errors; self-refs dynamic | grep pip/npm present |
+| A1 | `14-repository-policy.sh`, `.ps1` | `check.sh`, `check.ps1`, `shell.nix` (+ self-refs) | T2 | Contains `pip`/`npm` in comments/errors; self-refs dynamic | grep pip/npm present |
 | A2 | `14-repository-policy.sh`, `.ps1` | `.gitkeep`, `.gitignore`, `*.schema.json`, `agents/*` | T3 | Infrastructure, not configs | Quarterly |
 | A3 | `06-locked-dsc-validation.ps1` | `packages.dsc.yml` | T2 | Generated from lockfile | File exists |
 | A5 | `gc.sh`, `gc.ps1` | `index.lock` | T3 | Git invariant | Quarterly |
 | A6 | `test-lib.sh` | `lib.nix` | T2 | Test helper excluded from test namespace | File exists |
 | A7 | `step-runner.sh`, `.ps1` | `*.schema.json` | T3 | Narrow glob | Quarterly |
 | A8 | `07-schema-validation.sh`, `.ps1` | **Schema definitions:** `*.schema.json`. **External formats (no published schema):** `*/users/*/cursor/*.json`, `*/users/*/iterm2/DynamicProfiles/*.json`, `*/users/*/obsidian/*.json`, `*/users/*/qtpass/*.json`, `*/users/*/rimsort/*.json`, `*/configs/camilladsp/*`, `*/configs/camillagui-backend/*`, `*/users/*/discord-music-rpc/*`, `*/users/*/agents/hooks/*.json`, `*/users/*/agents/skills/*/_meta.json`, `*/configs/litellm/*`, `*/users/*/hermes/plugins/*/plugin.yaml`, `*/users/*/vscode/mcp.json`, `*/users/*/vscode/chatLanguageModels*.json`, `*/.sops.yaml`. **Tool config:** `.yamllint.yml` (yamllint's own schema rejects `$schema`). **Infrastructure:** `*/vendor/*`, `*/secrets/*`, `*/.github/*` | T3 | Nucleus-owned data: `$schema` required (we write our own). External formats: use published `$schema` when available; never roll our own. Exempt when no published schema exists. | Quarterly |
-| A9 | `12-suppression-audit.ps1` | self-file (basename) | T3 | Self-ref contains literal patterns detected | Quarterly |
+| A9 | `14-repository-policy.ps1` | self-file (basename) | T3 | Self-ref contains literal patterns detected | Quarterly |
 
 ### Category B — Directory-based
 

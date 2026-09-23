@@ -183,4 +183,4 @@ Create a `## <RuleName>` section (trigger, root cause, fix with code, suppressio
 | `# check-suppress:SuppressMessageAttribute: <RuleName> -- <reason>` | A/C | `[SuppressMessageAttribute]`, comment-only PSSA suppression |
 | `# check-suppress:suppression_doc: <reason>` | B | `$null =`, `[void]`, `2>$null`, `-ErrorAction SilentlyContinue`, `catch {}`, `|| true` |
 
-Grep-able: `grep 'check-suppress:' **/*.ps1`. Enforced by `check.ps1` step 12.
+Grep-able: `grep 'check-suppress:' **/*.ps1`. Enforced by `check.ps1` step 14.
