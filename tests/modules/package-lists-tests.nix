@@ -7,8 +7,7 @@
 #   • every "flake:<node>" node is a github input with a revision
 #   • a "flake:<node>"-pinned package has no duplicate lockfile version pin
 #   • every desired package resolves to a lockfile version pin (or a flake pin)
-#   • the POSIX and Windows consumers read the shared registry instead of
-#     carrying their own hardcoded lists
+#   • cursor.superpowers lockfile entry is valid
 #
 # Run with: nix-instantiate --eval --strict tests/modules/package-lists-tests.nix
 
@@ -35,16 +34,12 @@ let
     "Windows"
   ];
 
-  # Lockfile section that pins each manager's packages.
   lockfileSectionFor = manager: manager;
 
   entriesFor = manager: host: (desired.${manager} or { }).${host} or [ ];
 
-  # Explicit key-presence check: entriesFor defaults to [ ] so a missing host
-  # key cannot masquerade as an intentionally empty list.
   hasHostKey = manager: host: (desired.${manager} or { }) ? ${host};
 
-  # concatMap flattens one level per nesting, so the entry sets come out flat.
   allEntries = builtins.concatMap (
     manager: builtins.concatMap (host: entriesFor manager host) hosts
   ) managers;
@@ -76,11 +71,6 @@ let
   ) flakePins;
   flakePinsResolve = builtins.all (node: flakeLock.nodes ? ${node}) flakePinNodes;
 
-  # A flake-pinned tool is installed from a git revision, so the node must be a
-  # github input carrying a revision: Windows derives
-  # 'https://github.com/<owner>/<repo>' + rev from it (Invoke-UvSetup) and the
-  # enforcement probe compares that rev against the installed commit.  The tool
-  # must not also carry a lockfile pin: the flake revision is the single source.
   flakePinLocked = builtins.map (node: flakeLock.nodes.${node}.locked or { }) flakePinNodes;
   flakePinsAreGithub = builtins.all (
     locked:
@@ -111,15 +101,12 @@ let
 
   allLockfilePinsResolve = builtins.all lockfilePinsResolve managers;
 
-  # Section with a single host keyed list, for the consumers below.
   managerHasHosts =
     manager:
     builtins.all (host: hasHostKey manager host && builtins.isList (entriesFor manager host)) hosts;
   allManagersDeclared = builtins.all (manager: desired ? ${manager}) managers;
   allHostsDeclared = builtins.all managerHasHosts managers;
 
-  # Hardcoded per-package lines look like:  'pkg-name' \
-  # Comments never start with a quote, so this only catches list literals.
   lines = text: builtins.filter builtins.isString (builtins.split "\n" text);
   hasQuotedPackageLine =
     pattern: text: builtins.any (line: builtins.match pattern line != null) (lines text);
@@ -133,7 +120,15 @@ let
     path: !(hasQuotedPackageLine " *'[^']*' \\\\?" (readRepo path))
   ) posixInstallers;
 
-  # --- Aggregate ------------------------------------------------------------
+  # --- Cursor superpowers lockfile (from agents-superpowers-tests.nix) ---
+  hasCursor = lockfile ? cursor;
+  hasSuperpowers = hasCursor && lockfile.cursor ? superpowers;
+  sp = lockfile.cursor.superpowers or { };
+  spSourceIsUri = (sp ? source) && builtins.match "https://.*" sp.source != null;
+  spRevIsHex = (sp ? rev) && builtins.match "[0-9a-f]{40}" sp.rev != null;
+  spIsValid = hasCursor && hasSuperpowers && spSourceIsUri && spRevIsHex;
+
+  # --- Aggregate ---
   allTestsPass =
     allManagersDeclared
     && allHostsDeclared
@@ -144,7 +139,8 @@ let
     && flakePinsAreGithub
     && noFlakePinDuplication
     && allLockfilePinsResolve
-    && posixInstallersFreeOfLists;
+    && posixInstallersFreeOfLists
+    && spIsValid;
 in
 {
   test_managers_declared = assert' allManagersDeclared "desired.json must declare every manager (${builtins.concatStringsSep ", " managers})";
@@ -157,6 +153,7 @@ in
   test_flake_pins_not_duplicated = assert' noFlakePinDuplication "a 'flake:<node>'-pinned package must not also carry a lockfile version pin";
   test_lockfile_pins_resolve = assert' allLockfilePinsResolve "every desired package must have a lockfile version pin (or declare a flake pin)";
   test_no_hardcoded_posix_lists = assert' posixInstallersFreeOfLists "POSIX installers must not hardcode desired-package literals";
+  test_cursor_superpowers_lockfile = assert' spIsValid "cursor.superpowers must have https source and 40-char hex rev";
 
   all_tests_pass = assert' allTestsPass "all package-lists invariants must hold";
   success = allTestsPass;
