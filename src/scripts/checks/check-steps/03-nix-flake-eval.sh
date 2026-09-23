@@ -40,6 +40,9 @@ run_nix_flake_eval() {
 
     # Hermetic eval: prove Nix layer evaluates without forwarded env vars.
     run_hermetic_eval "$1" || _ne_exit=1
+
+    # Nix lint (nixf-tidy)
+    run_nixf_tidy "$1" || _ne_exit=1
   else
     say "0 Nix files in scope — nothing to evaluate."
   fi
@@ -98,4 +101,74 @@ run_hermetic_eval() {
   rm -f "$_nixos_out"
 
   return $_exit
+}
+
+# run_nixf_tidy — Run nixf-tidy on Nix files for lint checks.
+run_nixf_tidy() {
+  local -n ctx="$1"
+  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
+  shift
+  local _files=("$@")
+  cd "$_repo_root" || return 1
+  local _nixf_files=()
+  local _nixf_exit=0
+
+  local -n _nix_files="${ctx[NIX_FILES]}"
+  local -n _cached_nix_files="${ctx[CACHED_NIX_FILES]}"
+  if [ "${#_nix_files[@]}" -gt 0 ]; then
+    _nixf_files=("${_nix_files[@]}")
+  elif ! $_has_args; then
+    _nixf_files=("${_cached_nix_files[@]}")
+  else
+    _nixf_files=()
+  fi
+
+  if [ "${#_nixf_files[@]}" -gt 0 ]; then
+    local _nixf_tmpdir
+    _nixf_tmpdir=$(mktemp -d) || {
+      error "failed to create temp directory"
+      return 1
+    }
+    # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
+    printf '%s\0' "${_nixf_files[@]}" |
+      xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
+        tmpdir="$1"
+        f="$2"
+        safe_name="$(echo "$f" | tr "/" "_")"
+        if ! out=$(nixf-tidy < "$f" 2>&1); then
+          printf "FAIL\n%s\n" "$f" > "$tmpdir/${safe_name}.nixf"
+        elif [ "$(echo "$out" | jq "length" 2>/dev/null)" -gt 0 ] 2>/dev/null; then
+          printf "ISSUES\n%s\n%s\n" "$f" "$out" > "$tmpdir/${safe_name}.nixf"
+        fi
+      ' _ "$_nixf_tmpdir"
+
+    local _nixf_result _nixf_status _nixf_file_path
+    for _nixf_result in "$_nixf_tmpdir"/*.nixf; do
+      [ -f "$_nixf_result" ] || continue
+      IFS= read -r _nixf_status <"$_nixf_result"
+      IFS= read -r _nixf_file_path <"$_nixf_result"
+      case "$_nixf_status" in
+      FAIL)
+        error "$_nixf_file_path: nixf-tidy failed"
+        _nixf_exit=$((_nixf_exit + 1))
+        ;;
+      ISSUES)
+        tail -n +3 "$_nixf_result" | jq -r '.[] | "\(.sname): \(.message)"' | while IFS= read -r _nixf_issue; do
+          error "$_nixf_file_path: $_nixf_issue"
+        done
+        _nixf_exit=$((_nixf_exit + 1))
+        ;;
+      esac
+    done
+    [ -n "$_nixf_tmpdir" ] && rm -rf -- "$_nixf_tmpdir"
+  else
+    say "0 Nix files in scope — nothing to lint."
+  fi
+
+  if [ "$_nixf_exit" -gt 0 ]; then
+    return 1
+  else
+    say "nixf-tidy lint passed."
+    return 0
+  fi
 }
