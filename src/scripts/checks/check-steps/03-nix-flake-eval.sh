@@ -37,9 +37,65 @@ run_nix_flake_eval() {
     else
       say "nix flake evaluation passed."
     fi
+
+    # Hermetic eval: prove Nix layer evaluates without forwarded env vars.
+    run_hermetic_eval "$1" || _ne_exit=1
   else
     say "0 Nix files in scope — nothing to evaluate."
   fi
 
   return $_ne_exit
+}
+
+# run_hermetic_eval — Prove the Nix layer evaluates without any forwarded environment
+# variable and without --impure. The env catalog is a static Nix attrset in the
+# repo tree, so the flake must now evaluate cleanly with NUCLEUS_REPO_ROOT unset.
+run_hermetic_eval() {
+  local -n ctx="$1"
+  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
+  shift
+  local _exit=0
+
+  local -n _nix_files="${ctx[NIX_FILES]}"
+  if $_has_args && [ "${#_nix_files[@]}" -eq 0 ]; then
+    say "0 Nix files in scope — nothing to evaluate hermetically."
+    return 0
+  fi
+
+  cd "$_repo_root" || return 1
+  local _nix_cfg
+  _nix_cfg="$(merge_nix_config)"
+
+  # --- Darwin: must build hermetically (exit 0) ---
+  if ! nucleus_nix_locked env -u NUCLEUS_REPO_ROOT \
+    NIX_CONFIG="$_nix_cfg" \
+    nix build "./src#darwinConfigurations.MacBook.config.system.build.toplevel" --dry-run >/dev/null; then
+    error "darwin hermetic eval failed (expected exit 0 with no env vars and no --impure)"
+    _exit=1
+  else
+    say "darwin hermetic eval passed (no env vars, no --impure)."
+  fi
+
+  # --- NixOS: hermetic eval must reach the assertion stage, not fail on impurity ---
+  local _nixos_out
+  _nixos_out="$(mktemp)"
+  if nucleus_nix_locked env -u NUCLEUS_REPO_ROOT \
+    NIX_CONFIG="$_nix_cfg" \
+    nix build "./src#nixosConfigurations.NixOS.config.system.build.toplevel" --dry-run \
+    >"$_nixos_out" 2>&1; then
+    say "nixos hermetic eval passed (no env vars, no --impure)."
+  else
+    if grep -Eq "required argument 'repoRoot'|getEnv" "$_nixos_out"; then
+      error "nixos hermetic eval regressed to env-var dependency:"
+      cat "$_nixos_out" >&2
+      _exit=1
+    else
+      error "nixos hermetic eval failed for an unexpected reason:"
+      cat "$_nixos_out" >&2
+      _exit=1
+    fi
+  fi
+  rm -f "$_nixos_out"
+
+  return $_exit
 }
