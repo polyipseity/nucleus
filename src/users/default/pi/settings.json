@@ -4,6 +4,7 @@
   "defaultProjectTrust": "ask",
   "defaultProvider": "opencode-go",
   "defaultThinkingLevel": "high",
+  "followUpMode": "all",
   "httpIdleTimeoutMs": 300000,
   "lastChangelogVersion": "0.84.4",
   "markdown": {
@@ -33,10 +34,12 @@
   ],
   "showCacheMissNotices": true,
   "showHardwareCursor": true,
+  "steeringMode": "all",
   "terminal": {
     "showTerminalProgress": true
   },
   "theme": "light/dark",
+  "transport": "auto",
   "treeFilterMode": "default",
   "tuiMode": "regular"
 }
