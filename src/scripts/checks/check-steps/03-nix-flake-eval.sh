@@ -7,6 +7,7 @@ register_step "nix-flake-eval" "Nix flake evaluation" run_nix_flake_eval
 
 run_nix_flake_eval() {
   local -n ctx="$1"
+  local _ctx_name="$1"
   local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
   shift
   local _files=("$@")
@@ -39,10 +40,10 @@ run_nix_flake_eval() {
     fi
 
     # Hermetic eval: prove Nix layer evaluates without forwarded env vars.
-    run_hermetic_eval "$1" || _ne_exit=1
+    run_hermetic_eval "$_ctx_name" || _ne_exit=1
 
     # Nix lint (nixf-tidy)
-    run_nixf_tidy "$1" || _ne_exit=1
+    run_nixf_tidy "$_ctx_name" || _ne_exit=1
   else
     say "0 Nix files in scope — nothing to evaluate."
   fi
