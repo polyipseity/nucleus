@@ -500,7 +500,7 @@ run_package_manager_enforcement() {
     local _f
     for _f in "${_grep_files[@]}"; do
       case "$(basename "$_f")" in
-      check.sh | check.ps1 | shell.nix | repo-policy-*.sh | repo-policy-*.ps1 | repository-policy*.sh | repository-policy*.ps1 | 11-repo-policy-grep.sh | 12-repo-policy-pattern.sh | 13-repo-policy-data.sh) continue ;;
+      check.sh | check.ps1 | shell.nix | repo-policy-*.sh | repo-policy-*.ps1 | repository-policy*.sh | repository-policy*.ps1 | 11-repo-policy-grep.sh | 12-repo-policy-pattern.sh | 13-repo-policy-data.sh | 11-repo-policy-grep.ps1 | 12-repo-policy-pattern.ps1 | 13-repo-policy-data.ps1) continue ;;
       esac
       _filtered+=("$_f")
     done

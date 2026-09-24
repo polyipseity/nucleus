@@ -264,7 +264,7 @@ run_logging_format_policy() {
       *) continue ;;
       esac
       case "$(basename "$_f")" in
-      "$_lf_self_sh" | "$_lf_self_ps1" | 14-repository-policy.ps1) continue ;;
+      "$_lf_self_sh" | "$_lf_self_ps1" | 11-repo-policy-grep.ps1 | 12-repo-policy-pattern.ps1 | 13-repo-policy-data.ps1) continue ;;
       esac
       _lf_files+=("$_f")
     done
@@ -278,7 +278,7 @@ run_logging_format_policy() {
       *) continue ;;
       esac
       case "$(basename "$_f")" in
-      "$_lf_self_sh" | "$_lf_self_ps1" | 14-repository-policy.ps1) continue ;;
+      "$_lf_self_sh" | "$_lf_self_ps1" | 11-repo-policy-grep.ps1 | 12-repo-policy-pattern.ps1 | 13-repo-policy-data.ps1) continue ;;
       esac
       _lf_files+=("$_f")
     done < <(git ls-files | filter_gitignored)
@@ -444,7 +444,7 @@ run_log_capture_pair_policy() {
       *) continue ;;
       esac
       case "$(basename "$_f")" in
-      "$_lcp_self_sh" | "$_lcp_self_ps1" | 14-repository-policy.ps1) continue ;;
+      "$_lcp_self_sh" | "$_lcp_self_ps1" | 11-repo-policy-grep.ps1 | 12-repo-policy-pattern.ps1 | 13-repo-policy-data.ps1) continue ;;
       esac
       _lcp_files+=("$_f")
     done
@@ -458,7 +458,7 @@ run_log_capture_pair_policy() {
       *) continue ;;
       esac
       case "$(basename "$_f")" in
-      "$_lcp_self_sh" | "$_lcp_self_ps1" | 14-repository-policy.ps1) continue ;;
+      "$_lcp_self_sh" | "$_lcp_self_ps1" | 11-repo-policy-grep.ps1 | 12-repo-policy-pattern.ps1 | 13-repo-policy-data.ps1) continue ;;
       esac
       _lcp_files+=("$_f")
     done < <(git ls-files | filter_gitignored)
