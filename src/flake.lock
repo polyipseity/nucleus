@@ -17,22 +17,6 @@
         "type": "github"
       }
     },
-    "cirruslabs-cli": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1780337541,
-        "narHash": "sha256-7KVWRKl+Wxn3sAqAKE8lnhOeElH+J01CITvjxHtDp5o=",
-        "owner": "cirruslabs",
-        "repo": "homebrew-cli",
-        "rev": "4fef6a32df31b4c51bf745ae2d86b53a037a1a6c",
-        "type": "github"
-      },
-      "original": {
-        "owner": "cirruslabs",
-        "repo": "homebrew-cli",
-        "type": "github"
-      }
-    },
     "cl-nix-lite": {
       "inputs": {
         "flake-parts": "flake-parts_2",
@@ -365,6 +349,21 @@
         "type": "github"
       }
     },
+    "nixpkgs-lib": {
+      "locked": {
+        "lastModified": 1765674936,
+        "narHash": "sha256-k00uTP4JNfmejrCLJOwdObYC9jHRrr/5M/a/8L2EIdo=",
+        "owner": "nix-community",
+        "repo": "nixpkgs.lib",
+        "rev": "2075416fcb47225d9b68ac469a5c4801a9c4dd85",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "nixpkgs.lib",
+        "type": "github"
+      }
+    },
     "nixpkgs_2": {
       "locked": {
         "lastModified": 1761236834,
@@ -413,21 +412,6 @@
         "type": "github"
       }
     },
-    "nixpkgs-lib": {
-      "locked": {
-        "lastModified": 1765674936,
-        "narHash": "sha256-k00uTP4JNfmejrCLJOwdObYC9jHRrr/5M/a/8L2EIdo=",
-        "owner": "nix-community",
-        "repo": "nixpkgs.lib",
-        "rev": "2075416fcb47225d9b68ac469a5c4801a9c4dd85",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nix-community",
-        "repo": "nixpkgs.lib",
-        "type": "github"
-      }
-    },
     "npm-lockfile-fix": {
       "inputs": {
         "nixpkgs": [
@@ -446,6 +430,22 @@
       "original": {
         "owner": "jeslie0",
         "repo": "npm-lockfile-fix",
+        "type": "github"
+      }
+    },
+    "openai-tools": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790190853,
+        "narHash": "sha256-6qZfXkybNKE0i2HMj36SO3P4t6NpkJk62i99IiHbM8E=",
+        "owner": "openai",
+        "repo": "homebrew-tools",
+        "rev": "448fb0c7fbc25d9a7f5a8282a54216ef4fd20b7c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "openai",
+        "repo": "homebrew-tools",
         "type": "github"
       }
     },
@@ -501,7 +501,6 @@
     },
     "root": {
       "inputs": {
-        "cirruslabs-cli": "cirruslabs-cli",
         "darwin": "darwin",
         "hermes-agent": "hermes-agent",
         "home-manager": "home-manager_2",
@@ -512,6 +511,7 @@
         "nix-vscode-extensions": "nix-vscode-extensions",
         "nixos-generators": "nixos-generators",
         "nixpkgs": "nixpkgs_4",
+        "openai-tools": "openai-tools",
         "rust-overlay": "rust-overlay",
         "smudge-smudge": "smudge-smudge",
         "sops-nix": "sops-nix",
