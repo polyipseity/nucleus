@@ -6,8 +6,8 @@
 set -eu
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-# shellcheck source=../lib/crash-loop.sh
-. "$SCRIPT_DIR/../lib/crash-loop.sh"
+# shellcheck source=../lib/service-health.sh
+. "$SCRIPT_DIR/../lib/service-health.sh"
 # shellcheck source=../lib/svc-instances.sh
 . "$SCRIPT_DIR/../lib/svc-instances.sh"
 
@@ -64,9 +64,10 @@ while IFS= read -r _vsd_entry; do
   #   would block the convergence of everything else for a state it cannot fix.
   #   The marker is boot-scoped, so a reboot (the standing remedy) clears it.
   if [ -n "$_vsd_service_label" ]; then
-    _vsd_blocked="$(svc_blocked_state "$_vsd_service_label" "$(crash_loop_state_dir)")"
-    if [ "$_vsd_blocked" != "clear" ]; then
-      printf '%s\n' "cloud-drives ($_vsd_local_path): warning: the last mount attempt was blocked ($_vsd_blocked); $(svc_blocked_remedy "$_vsd_service_label" "$(crash_loop_state_dir)")" >&2
+    if svc_health_is_blocked "$_vsd_service_label"; then
+      _vsd_class=$(svc_health_get "$_vsd_service_label" "class" 2>/dev/null || echo "unknown")
+      _vsd_remedy=$(svc_health_get "$_vsd_service_label" "remedy" 2>/dev/null || echo "")
+      printf '%s\n' "cloud-drives ($_vsd_local_path): warning: the last mount attempt was blocked ($_vsd_class); $_vsd_remedy" >&2
     fi
   fi
 done < <(printf '%s\n' "$_vsd_mounts_json" | "$_vsd_jq_bin" -r -c '.[]')

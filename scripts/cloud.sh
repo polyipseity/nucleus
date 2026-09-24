@@ -37,8 +37,8 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib/svc-instances.sh"
 # shellcheck source=../src/scripts/lib/macos-fskit.sh
 . "$SCRIPT_DIR/../src/scripts/lib/macos-fskit.sh"
-# shellcheck source=../src/scripts/lib/crash-loop.sh
-. "$SCRIPT_DIR/../src/scripts/lib/crash-loop.sh"
+# shellcheck source=../src/scripts/lib/service-health.sh
+. "$SCRIPT_DIR/../src/scripts/lib/service-health.sh"
 
 usage() {
   usage_std "$(basename "$0")" "setup|reset|sync|repair [options]"

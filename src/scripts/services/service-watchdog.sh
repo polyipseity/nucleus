@@ -236,18 +236,20 @@ _watchdog_check_instance() {
     prev_counter=$(svc_health_get "$instance" "runs" 2>/dev/null || echo "0")
     prev_counter="${prev_counter:-0}"
 
-    if [ "$counter" -gt "$prev_counter" ] && [ "$last_exit" -ne 0 ]; then
-      # Supervisor is restarting the job — loop detected.
+    # Update runs/lastExit every tick.
+    svc_health_set "$instance" "runs" "$counter"
+    svc_health_set_last_exit "$instance" "$last_exit"
+
+    if svc_health_is_looping "$instance"; then
+      # Health-record-driven loop detection: covers both counter-incrementing
+      # restart loops and self-looping daemons (e.g. betterdisplay-heartbeat).
       notice "watchdog: $instance is looping (runs=$counter, last_exit=$last_exit); stopping"
-      svc_health_record_restart "$instance" "launchd-loop"
       svc_health_set_blocked "$instance" "crash-loop" "supervisor is restarting the job in a loop"
       supervisor_stop "$target"
       return 0
     fi
 
-    # Stable — record success.
-    svc_health_set "$instance" "runs" "$counter"
-    svc_health_set_last_exit "$instance" "$last_exit"
+    # Stable.
     return 0
   fi
 

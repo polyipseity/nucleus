@@ -111,10 +111,6 @@ let
 
   betterdisplayHeartbeat = pkgs.writeNucleusShellApplication {
     name = "betterdisplay-heartbeat";
-    # WHY: crash-loop.sh reads its state files with jq. launchd starts agents with
-    # the system PATH, which carries no jq, so state reads failed on every tick
-    # and crash-loop detection never worked for this agent.
-    runtimeInputs = [ pkgs.jq ];
     scriptName = "src/platforms/macOS/scripts/macos-heartbeat-betterdisplay";
   };
 

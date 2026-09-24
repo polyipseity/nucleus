@@ -30,7 +30,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 # shellcheck source=../src/scripts/lib/macos-fskit.sh
 . "$SCRIPT_DIR/../src/scripts/lib/macos-fskit.sh"
-. "$SCRIPT_DIR/../src/scripts/lib/crash-loop.sh"
+. "$SCRIPT_DIR/../src/scripts/lib/service-health.sh"
 . "$SCRIPT_DIR/../src/scripts/lib/macos-launch-services.sh"
 . "$SCRIPT_DIR/../src/scripts/lib/svc-instances.sh"
 
@@ -391,10 +391,14 @@ svc_status() {
   # is added here for every platform: the marker key is the concrete instance id,
   # which is what every caller passes as the name.  The marker reports
   # "blocked <class>"; the JSON carries the class alone.
-  state_dir="$(crash_loop_state_dir)"
-  blocked="$(svc_blocked_state "$name" "$state_dir")"
-  remedy=""
-  [ "$blocked" = "clear" ] || remedy="$(svc_blocked_remedy "$name" "$state_dir")"
+  state_dir="$(svc_health_state_dir)"
+  if svc_health_is_blocked "$name"; then
+    blocked="blocked $(svc_health_get "$name" "class")"
+    remedy="$(svc_health_get "$name" "remedy")"
+  else
+    blocked="clear"
+    remedy=""
+  fi
   printf '%s' "$platform_json" | jq -c --arg b "$blocked" --arg r "$remedy" \
     '. + {blocked: (if $b == "clear" then null else ($b | sub("^blocked "; "")) end), blockedRemedy: (if $r == "" then null else $r end)}'
 }
@@ -605,11 +609,14 @@ wait_cloud_mount_released() {
 #   fresh marker says the provider was the reason — an unblocked mount keeps the
 #   previous behaviour exactly.
 repair_cloud_mount_provider() {
-  local name="$1" instance="$2" state
+  local name="$1" instance="$2"
 
-  state="$(svc_blocked_state "$instance" "$(crash_loop_state_dir)")"
-  [ "$state" != "clear" ] || return 0
-  notice "$name — $state; repairing the macFUSE/FSKit provider before reloading the agent"
+  if ! svc_health_is_blocked "$instance"; then
+    return 0
+  fi
+  local class
+  class=$(svc_health_get "$instance" "class" 2>/dev/null || echo "unknown")
+  notice "$name — blocked ($class); repairing the macFUSE/FSKit provider before reloading the agent"
   if ! fskit_repair_provider "$CLOUD_MOUNT_REPAIR_TIMEOUT"; then
     error "$name — the macFUSE/FSKit provider could not be repaired; run 'nucleus-cloud repair'"
     return 1
@@ -868,7 +875,7 @@ do_list() {
       if [ "$row_class" = "live" ]; then
         local crash_status
         status_json=$(svc_status "$json_key" "$svc_json")
-        crash_status=$(crash_loop_status "$json_key")
+        crash_status=$(svc_health_status "$json_key")
         status_json=$(printf '%s' "$status_json" | jq --arg cs "$crash_status" '. + {crashLoop: $cs}')
       else
         status_json=$(placeholder_status_json "$row_class")
@@ -919,7 +926,7 @@ $pair_json"
         pid="$exit_display"
       fi
       local crash_status
-      crash_status=$(crash_loop_status "$json_key")
+      crash_status=$(svc_health_status "$json_key")
       printf '%-20s %-24s %-10s %-8s %-10s %s\n' "$json_key" "$display" "$status" "$running" "$pid" "$crash_status"
       print_blocked_note "$status_json"
     done <<<"$entries"
@@ -980,7 +987,7 @@ do_status() {
       pid="$exit_display"
     fi
     local crash_status
-    crash_status=$(crash_loop_status "$json_key")
+    crash_status=$(svc_health_status "$json_key")
     printf '%-20s %-24s %-10s %-8s %-10s %s\n' "$json_key" "$display" "$status" "$running" "$pid" "$crash_status"
     print_blocked_note "$status_json"
   done <<<"$entries"

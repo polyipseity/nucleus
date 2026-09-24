@@ -397,9 +397,8 @@ in
       #   behavior — applies to ALL services, not just cloud mounts.
       # -----------------------------------------------------------------------
       {
-        home.activation.clear-stale-blocks = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
-          "${activationBundle}/src/scripts/services/clear-stale-blocks.sh" \
-            "${pkgs.jq}/bin/jq"
+        home.activation.reset-service-health = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+          "${activationBundle}/src/scripts/services/reset-service-health.sh"
         '';
       }
 
