@@ -17,6 +17,51 @@
       "displayName": {
         "type": "string"
       },
+      "lifecycle": {
+        "description": "Shared policy data for the service (attempts, backoff, timeout, classification rules). Consumed by runners and watchers on every host from a single definition.",
+        "properties": {
+          "attempts": {
+            "description": "Maximum mount/retry attempts per run before giving up.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "backoffSeconds": {
+            "description": "Exponential backoff schedule in seconds between retry attempts.",
+            "items": { "type": "integer", "minimum": 1 },
+            "type": "array"
+          },
+          "attachSeconds": {
+            "description": "Seconds to wait for a live mount after rclone starts.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "reviveSeconds": {
+            "description": "Seconds between watchdog ticks for revival.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "repairSeconds": {
+            "description": "Seconds for a repair operation to complete before timeout.",
+            "type": "integer",
+            "minimum": 1
+          },
+          "transientClasses": {
+            "description": "Failure class tokens that are retried within the attempt bound.",
+            "items": { "type": "string" },
+            "type": "array"
+          },
+          "terminalClasses": {
+            "description": "Failure class tokens that stop after one attempt (no retry).",
+            "items": { "type": "string" },
+            "type": "array"
+          },
+          "classes": {
+            "description": "Failure class token to remedy text mapping.",
+            "additionalProperties": { "type": "string" },
+            "type": "object"
+          }
+        }
+      },
       "logging": {
         "$ref": "#/definitions/loggingEntry"
       },

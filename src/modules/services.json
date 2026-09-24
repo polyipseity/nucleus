@@ -218,6 +218,25 @@
   "cloud-drive": {
     "description": "rclone FUSE cloud drive mounts",
     "displayName": "Cloud Drive Mounts",
+    "lifecycle": {
+      "attempts": 3,
+      "backoffSeconds": [20, 40],
+      "attachSeconds": 45,
+      "reviveSeconds": 300,
+      "repairSeconds": 30,
+      "transientClasses": ["provider-refusal", "io-transient"],
+      "terminalClasses": ["auth", "remote-not-found", "path-permission"],
+      "classes": {
+        "provider-refusal": "re-enable macFUSE in System Settings > General > Login Items & Extensions",
+        "provider-version": "re-enable macFUSE after confirming the correct version is installed",
+        "mount-failed": "check remote configuration and credentials",
+        "crash-loop": "run nucleus-svc status and nucleus-svc logs for this mount",
+        "io-transient": "retry in progress",
+        "auth": "verify remote credentials",
+        "remote-not-found": "check remote name and configuration",
+        "path-permission": "check mount point permissions"
+      }
+    },
     "logging": {
       "capture": "all"
     },
