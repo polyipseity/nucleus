@@ -104,6 +104,19 @@ backend_is_transient() {
   return 1
 }
 
+# _macfuse_version_gte — return 0 if $1 >= $2 (dot-separated semver).
+_macfuse_version_gte() {
+  local IFS='.'
+  read -ra v1 <<<"$1"
+  read -ra v2 <<<"$2"
+  for i in 0 1 2; do
+    local a="${v1[$i]:-0}" b="${v2[$i]:-0}"
+    if [ "$a" -gt "$b" ] 2>/dev/null; then return 0; fi
+    if [ "$a" -lt "$b" ] 2>/dev/null; then return 1; fi
+  done
+  return 0
+}
+
 # backend_prepare — ensure the FUSE layer is present and at the required version.
 # Writes a health record and returns 20 for user-action required.
 # This is the ONLY place that registers/re-registers the filesystem extension.
@@ -114,12 +127,28 @@ backend_prepare() {
   # Verify macFUSE binary exists.
   local macfuse_bin="/Library/Filesystems/macfuse.fs/Contents/Resources/macfuse.app/Contents/MacOS/macfuse"
   if [ ! -x "$macfuse_bin" ]; then
-    # Try homebrew location.
     macfuse_bin="/opt/homebrew/bin/macfuse"
     if [ ! -x "$macfuse_bin" ]; then
       svc_health_set_blocked "$instance" "provider-version" "macFUSE not installed; install via 'brew install --cask macfuse@dev'"
       return 20
     fi
+  fi
+
+  # WHY: FSKit volume operations require macFUSE 5.4.0+ on macOS 27.
+  # Earlier versions lack the FSKit daemon interface.  Pin the version in
+  # Homebrew config; this check prevents silent failures from stale installs.
+  local installed_version
+  installed_version=$("$macfuse_bin" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "0.0.0")
+  if ! _macfuse_version_gte "$installed_version" "5.4.0"; then
+    svc_health_set_blocked "$instance" "provider-version" "macFUSE $installed_version is too old for FSKit; upgrade to 5.4.0+"
+    return 20
+  fi
+
+  # One-time install to re-register the filesystem extension if needed.
+  # WHY: only called when the extension is not enabled; never --force per attempt.
+  if ! fskit_extension_is_enabled; then
+    # check-suppress:suppression_doc: best-effort re-registration; failure blocks the mount
+    /opt/homebrew/bin/brew install --cask --no-quarantine macfuse@dev 2>/dev/null || true
   fi
 
   # Check FSKit module state.
