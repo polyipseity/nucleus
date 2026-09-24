@@ -90,8 +90,17 @@ do_packer() {
     esac
   done
 
-  require_command packer
   require_command jq
+
+  # Skip packer validation inside SRT sandbox — packer plugins need Unix sockets
+  # for IPC, but the sandbox blocks socket creation (allowAllUnixSockets: false).
+  # Source: src/users/default/srt/settings.json
+  if [ "${SANDBOX_RUNTIME:-0}" = "1" ]; then
+    notice "Packer validation skipped (SRT sandbox blocks Unix sockets)"
+    return 0
+  fi
+
+  require_command packer
 
   # Share plugin cache across Packer invocations to avoid re-downloading plugins.
   # This is the recommended pattern per Packer docs:
