@@ -113,32 +113,27 @@ _watchdog_check_single() {
 _watchdog_check_prefix() {
   local svc_key="$1" svc_type="$2" host_entry="$3"
 
-  local service_prefix
   # check-suppress:suppression_doc: best-effort operation; failure is non-fatal
   prefix_match=$(printf '%s' "$host_entry" | jq -r '.prefixMatch // false' 2>/dev/null || true)
 
   case "$svc_type" in
   macos-launchctl)
-    local domain uid
+    local domain uid service_name
     # check-suppress:suppression_doc: best-effort operation; failure is non-fatal
-    service_prefix=$(printf '%s' "$host_entry" | jq -r '.service // empty' 2>/dev/null || true)
+    service_name=$(printf '%s' "$host_entry" | jq -r '.service // empty' 2>/dev/null || true)
     uid=$(id -u)
-    local service_name
     # check-suppress:suppression_doc: best-effort operation; failure is non-fatal
     domain=$(printf '%s' "$host_entry" | jq -r '.launchdDomain // "gui"' 2>/dev/null || true)
-    launchctl list 2>/dev/null | awk -v p="$domain/$uid/$service_prefix" '$0 ~ p {print $NF}' | while read -r label; do
-      local instance="${label##*"$service_prefix"}"
-      _watchdog_check_instance "$svc_key" "$svc_type" "$host_entry" "$instance"
+    launchctl list 2>/dev/null | awk -v p="$domain/$uid/$service_name" '$0 ~ p {print $NF}' | while read -r label; do
+      _watchdog_check_instance "$svc_key" "$svc_type" "$host_entry" "$label"
     done
     ;;
   nixos-systemctl)
     local service_name
     # check-suppress:suppression_doc: best-effort operation; failure is non-fatal
     service_name=$(printf '%s' "$host_entry" | jq -r '.service // empty' 2>/dev/null || true)
-    systemctl --user list-units --type=service --all 2>/dev/null | awk -v p="$service_prefix" '$0 ~ p {print $1}' | while read -r unit; do
-      local instance="${unit%.*}"
-      instance="${instance##*"$service_prefix"}"
-      _watchdog_check_instance "$svc_key" "$svc_type" "$host_entry" "$instance"
+    systemctl --user list-units --type=service --all 2>/dev/null | awk -v p="$service_name" '$0 ~ p {print $1}' | while read -r unit; do
+      _watchdog_check_instance "$svc_key" "$svc_type" "$host_entry" "$unit"
     done
     ;;
   windows-schtask)
@@ -157,25 +152,21 @@ _watchdog_check_instance() {
   case "$svc_type" in
   macos-launchctl)
     local domain uid
-    # check-suppress:suppression_doc: best-effort operation; failure is non-fatal
-    service_name=$(printf '%s' "$host_entry" | jq -r '.service // empty' 2>/dev/null || true)
     uid=$(id -u)
-    local service_name
     # check-suppress:suppression_doc: best-effort operation; failure is non-fatal
     domain=$(printf '%s' "$host_entry" | jq -r '.launchdDomain // "gui"' 2>/dev/null || true)
-    target="$domain/$uid/${service_name}${instance}"
+    # instance IS the full launchd label (e.g. local.cloud-mount.OneDrive)
+    target="$domain/$uid/$instance"
     ;;
   nixos-systemctl)
-    local service_name
-    # check-suppress:suppression_doc: best-effort operation; failure is non-fatal
-    service_name=$(printf '%s' "$host_entry" | jq -r '.service // empty' 2>/dev/null || true)
-    target="${service_name}${instance}"
+    # instance IS the full systemd unit name (e.g. cloud-mount-OneDrive.service)
+    target="$instance"
     ;;
   windows-schtask)
-    local task_name="NucleusCloudMount-$instance"
-    local task_path
-    # check-suppress:suppression_doc: best-effort operation; failure is non-fatal
-    service_name=$(printf '%s' "$host_entry" | jq -r '.service // empty' 2>/dev/null || true)
+    # instance IS the full task path + name
+    local task_path task_name
+    task_path=$(printf '%s' "$instance" | sed 's|\\[^\\]*$||')
+    task_name=$(printf '%s' "$instance" | sed 's|.*\\||')
     target="$task_path|$task_name"
     ;;
   esac
@@ -187,12 +178,24 @@ _watchdog_check_instance() {
 
   # Rule 2: blocked record?
   if svc_health_is_blocked "$instance"; then
-    if ! svc_health_is_reported "$instance"; then
-      local class remedy
-      class=$(svc_health_get "$instance" "class" 2>/dev/null || echo "unknown")
+    local class remedy _blocked_state
+    class=$(svc_health_get "$instance" "class" 2>/dev/null || echo "unknown")
+    _blocked_state="$(svc_health_get "$instance" "state")"
+    if ! svc_health_is_reported "$instance" "${_blocked_state}:${class}"; then
       remedy=$(svc_health_get "$instance" "remedy" 2>/dev/null || echo "")
       notice "watchdog: $instance is blocked ($class): $remedy"
-      svc_health_mark_reported "$instance"
+      svc_health_mark_reported "$instance" "${_blocked_state}:${class}"
+    fi
+    return 0
+  fi
+
+  # Rule 4b: not-loaded record?
+  local _state
+  _state="$(svc_health_get "$instance" "state")"
+  if [ "$_state" = "not-loaded" ]; then
+    if ! svc_health_is_reported "$instance" "not-loaded"; then
+      notice "watchdog: $instance is configured but not loaded (run 'nucleus-svc status $instance' or 'nucleus-apply')"
+      svc_health_mark_reported "$instance" "not-loaded"
     fi
     return 0
   fi
@@ -202,11 +205,11 @@ _watchdog_check_instance() {
   case "$svc_type" in
   macos-launchctl)
     # check-suppress:suppression_doc: best-effort operation; failure is non-fatal
-    task_path=$(printf '%s' "$host_entry" | jq -r '.taskPath // "\\"' 2>/dev/null || true)
+    print_out=$(launchctl print "$target" 2>/dev/null || true)
     ;;
   nixos-systemctl)
     # check-suppress:suppression_doc: best-effort operation; failure is non-fatal
-    print_out=$(launchctl print "$target" 2>/dev/null || true)
+    print_out=$(systemctl --user status "$target" 2>/dev/null || true)
     ;;
   windows-schtask)
     local task_path task_name

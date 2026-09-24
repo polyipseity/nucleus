@@ -104,7 +104,7 @@ svc_health_set() {
   if [ -f "$file" ]; then
     jq ".$field = $value" "$file" >"$tmp" 2>/dev/null
   else
-    printf '{"state":"stopped","class":null,"remedy":null,"attempts":0,"reported":false,"boot":"%s","lastSuccess":0,"restarts":[],"runs":0,"lastExit":0}\n' \
+    printf '{"state":"stopped","class":null,"remedy":null,"attempts":0,"reportedState":null,"boot":"%s","lastSuccess":0,"restarts":[],"runs":0,"lastExit":0}\n' \
       "$(svc_health_boot_id)" >"$tmp"
     jq ".$field = $value" "$tmp" >"${tmp}.mv" 2>/dev/null && mv "${tmp}.mv" "$tmp"
   fi
@@ -169,7 +169,7 @@ svc_health_clear() {
   file="$(svc_health_state_file "$instance")"
   [ -f "$file" ] || return 0
   tmp="${file}.tmp.$$"
-  jq -c '.class = null | .remedy = null | .reported = false' "$file" >"$tmp" 2>/dev/null
+  jq -c '.class = null | .remedy = null | .reportedState = null' "$file" >"$tmp" 2>/dev/null
   mv "$tmp" "$file"
 }
 
@@ -281,18 +281,6 @@ svc_health_increment_runs() {
 # svc_health_set_last_exit — update lastExit.
 svc_health_set_last_exit() {
   svc_health_set "$1" "lastExit" "$2"
-}
-
-# svc_health_json_key — convert a service label/instance to the record key.
-# Strips the common prefix patterns used on each host.
-svc_health_json_key() {
-  local label="$1"
-  # Remove host-specific prefixes to get a canonical key.
-  local key="${label#local.cloud-mount-}"
-  key="${key#cloud-mount-}"
-  key="${key#NucleusCloudMount-}"
-  key="${key#n-}"
-  printf '%s' "$key"
 }
 
 # svc_health_render_status — produce a JSON snippet suitable for svc.sh status.

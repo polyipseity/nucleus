@@ -54,16 +54,16 @@ function Health-Init {
     $dir = Split-Path -Parent $file
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
     @{
-        state      = 'stopped'
-        'class'    = $null
-        remedy     = $null
-        attempts   = 0
-        reported   = $false
-        boot       = (Health-BootId)
-        lastSuccess = 0
-        restarts   = @()
-        runs       = 0
-        lastExit   = 0
+        state        = 'stopped'
+        'class'      = $null
+        remedy       = $null
+        attempts     = 0
+        reportedState = $null
+        boot         = (Health-BootId)
+        lastSuccess  = 0
+        restarts     = @()
+        runs         = 0
+        lastExit     = 0
     } | ConvertTo-Json -Depth 4 | Set-Content -Path $file -NoNewline
 }
 
@@ -115,7 +115,7 @@ function Health-SetBlocked {
     $json.'class' = $Class
     $json.remedy = $Remedy
     $json.boot = (Health-BootId)
-    $json.reported = $false
+    $json.reportedState = $null
     $json | ConvertTo-Json -Depth 4 | Set-Content -Path $tmp -NoNewline
     Move-Item -Path $tmp -Destination $file -Force
 }
@@ -130,18 +130,26 @@ function Health-IsBlocked {
     $boot -eq (Health-BootId)
 }
 
-# Health-IsReported — return true if the blocked record has been reported.
+# Health-IsReported — return true if the current state has been reported.
+# Args: $Instance, $Expected reportedState string.
 function Health-IsReported {
     [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$Instance)
-    (Health-Get -Instance $Instance -Field 'reported') -eq $true
+    param(
+        [Parameter(Mandatory)][string]$Instance,
+        [Parameter(Mandatory)][string]$Expected
+    )
+    (Health-Get -Instance $Instance -Field 'reportedState') -eq $Expected
 }
 
-# Health-MarkReported — mark the current blocked record as reported.
+# Health-MarkReported — mark the current state as reported.
+# Args: $Instance, $State reportedState string.
 function Health-MarkReported {
     [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$Instance)
-    Health-Set -Instance $Instance -Field 'reported' -Value $true
+    param(
+        [Parameter(Mandatory)][string]$Instance,
+        [Parameter(Mandatory)][string]$State
+    )
+    Health-Set -Instance $Instance -Field 'reportedState' -Value $State
 }
 
 # Health-Clear — remove class, remedy, and reported (re-arm).
@@ -154,7 +162,7 @@ function Health-Clear {
     $json = Get-Content -Raw $file | ConvertFrom-Json
     $json.'class' = $null
     $json.remedy = $null
-    $json.reported = $false
+    $json.reportedState = $null
     $json | ConvertTo-Json -Depth 4 | Set-Content -Path $tmp -NoNewline
     Move-Item -Path $tmp -Destination $file -Force
 }
@@ -264,15 +272,4 @@ function Health-SetLastExit {
         [Parameter(Mandatory)][int]$ExitCode
     )
     Health-Set -Instance $Instance -Field 'lastExit' -Value $ExitCode
-}
-
-# Health-JsonKey — convert a service label to the record key.
-function Health-JsonKey {
-    [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$Label)
-    $key = $Label -replace '^local\.cloud-mount-', '' `
-                 -replace '^cloud-mount-', '' `
-                 -replace '^NucleusCloudMount-', '' `
-                 -replace '^n-', ''
-    $key
 }
