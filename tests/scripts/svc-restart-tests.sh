@@ -11,6 +11,8 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
+# shellcheck source=../../src/scripts/lib/service-health.sh
+. "$SCRIPT_DIR/../../src/scripts/lib/service-health.sh"
 # shellcheck source=../../src/scripts/lib/macos-launch-services.sh
 . "$SCRIPT_DIR/../../src/scripts/lib/macos-launch-services.sh"
 # shellcheck source=../../src/scripts/lib/svc-instances.sh
@@ -543,7 +545,7 @@ section 8 "A blocked cloud mount repairs the FSKit provider before the reload"
 # unblocked restart must leave the FSKit daemon alone.
 _cli_state_dir="$(user_root_for_home "$_cli/home")/state/service-stats"
 block_mount() { # <key>
-  svc_blocked_set "$1" "$_cli_state_dir" fskit-provider "$(fskit_remedy)"
+  svc_health_set_blocked "$1" "fskit-provider" "$(fskit_remedy)"
 }
 
 block_mount local.cloud-mount.iCloud
@@ -558,7 +560,7 @@ else
 fi
 assert_mentions "the repaired mount's volume is verified" "$captured_output" "is mounted"
 
-svc_blocked_clear local.cloud-mount.iCloud "$_cli_state_dir"
+svc_health_clear local.cloud-mount.iCloud
 reset_cli stopped "$_cli_mount" 2 restart local.cloud-mount.iCloud
 assert_count "restarting an unblocked cloud mount exits 0" 0 "$captured_status"
 assert_count "an unblocked restart never restarts the FSKit daemon" 0 "$(_fskit_killcount)"
@@ -597,7 +599,7 @@ assert_mentions "list reports the blocked remedy" "$captured_output" "nucleus-cl
 reset_cli running "$_cli_mount" "" status local.cloud-mount.iCloud
 assert_mentions "status reports the blocked class" "$captured_output" "blocked (fskit-provider)"
 
-svc_blocked_clear local.cloud-mount.iCloud "$_cli_state_dir"
+svc_health_clear local.cloud-mount.iCloud
 reset_cli running "$_cli_mount" "" list
 if contains "$captured_output" "blocked ("; then
   assert_fail "svc-unblocked-not-reported" "an unblocked instance was reported as blocked"

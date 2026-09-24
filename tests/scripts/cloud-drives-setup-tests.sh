@@ -13,6 +13,8 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
+# shellcheck source=../../src/scripts/lib/service-health.sh
+. "$SCRIPT_DIR/../../src/scripts/lib/service-health.sh"
 # shellcheck source=../../src/scripts/lib/svc-instances.sh
 . "$SCRIPT_DIR/../../src/scripts/lib/svc-instances.sh"
 # shellcheck source=../../src/scripts/lib/macos-fskit.sh
@@ -129,12 +131,10 @@ test_mount_path_symlink_error_without_a_label_stays_generic() {
   rm -rf "$home"
 }
 
-# mark_blocked <home> <service label> — a fresh blocked marker, as the mount
+# mark_blocked <home> <service label> — a fresh blocked record, as the mount
 # wrapper leaves it when the FSKit provider refuses the volume.
 mark_blocked() { # <home> <label>
-  local state_dir
-  state_dir="$(user_root_for_home "$1")/state/service-stats"
-  svc_blocked_set "$2" "$state_dir" fskit-provider "$(fskit_remedy)"
+  svc_health_set_blocked "$2" "fskit-provider" "$(fskit_remedy)"
 }
 
 test_blocked_mount_warns_with_its_remedy() {

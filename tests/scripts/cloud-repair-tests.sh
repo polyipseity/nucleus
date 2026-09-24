@@ -20,8 +20,8 @@ readonly SCRIPT_DIR REPO_ROOT
 . "$SCRIPT_DIR/test-lib.sh"
 # shellcheck source=../../src/scripts/lib/lib.sh
 . "$REPO_ROOT/src/scripts/lib/lib.sh"
-# shellcheck source=../../src/scripts/lib/crash-loop.sh
-. "$REPO_ROOT/src/scripts/lib/crash-loop.sh"
+# shellcheck source=../../src/scripts/lib/service-health.sh
+. "$REPO_ROOT/src/scripts/lib/service-health.sh"
 # shellcheck source=../../src/scripts/lib/svc-instances.sh
 . "$REPO_ROOT/src/scripts/lib/svc-instances.sh"
 
@@ -217,7 +217,7 @@ export PATH
 # The repair resolves its state directory from the platform it sees, so the suite
 # has to derive the same path through the same stubbed uname: derive it here, with
 # the fake toolchain on PATH, rather than against the host's own uname.
-STATE_DIR="$(HOME="$FAKE_HOME" crash_loop_state_dir)"
+STATE_DIR="$(HOME="$FAKE_HOME" svc_health_state_dir)"
 mkdir -p "$STATE_DIR"
 
 assert_eq() { # <test name> <expected> <actual>
@@ -268,8 +268,11 @@ reset_world() {
   printf 'fake://root on / (fake)\n' >"$FAKE_MOUNTS"
   rm -f "$FAKE_DAEMON_KILLED"
   : >"$FAKE_KICK_COUNT"
-  rm -f "$STATE_DIR"/*.blocked
+  rm -f "$STATE_DIR"/*.json
   rm -f "$FAKE_HOME/Library/LaunchAgents"/*.plist
+  # Point svc_health to the fake home so blocked records land in STATE_DIR.
+  NUCLEUS_USER_ROOT="${STATE_DIR%/state/service-stats}"
+  export NUCLEUS_USER_ROOT
   for _label in "$@"; do printf '%s\n' "$_label" >>"$FAKE_JOBS_LOADED"; done
   FAKE_KILLALL_STATUS=0
   FAKE_NO_MOUNT_ON_KICKSTART=0
@@ -278,9 +281,9 @@ reset_world() {
   export FAKE_KILLALL_STATUS FAKE_NO_MOUNT_ON_KICKSTART FAKE_ATTACH_AFTER_KICKS FAKE_UNAME_S
 }
 
-# mark_blocked <label> — a fresh blocked marker, as the mount wrapper leaves it.
+# mark_blocked <label> — a fresh blocked record, as the mount wrapper leaves it.
 mark_blocked() {
-  svc_blocked_set "$1" "$STATE_DIR" fskit-provider "run sudo killall fskitd"
+  svc_health_set_blocked "$1" "fskit-provider" "run sudo killall fskitd"
 }
 
 section "1" "host and provider gates"
@@ -304,19 +307,19 @@ section "2" "repair brings the mounts back"
 
 reset_world local.cloud-mount.GoogleDrive local.cloud-mount.OneDrive
 mark_blocked local.cloud-mount.OneDrive
-if [ -f "$STATE_DIR/local.cloud-mount.OneDrive.blocked" ]; then
-  assert_pass "the blocked marker is in place before the repair"
+if svc_health_is_blocked local.cloud-mount.OneDrive; then
+  assert_pass "the blocked record is in place before the repair"
 else
-  assert_fail "cloud-repair-precondition" "the blocked marker was not written"
+  assert_fail "cloud-repair-precondition" "the blocked record was not written"
 fi
 assert_eq "a repaired host exits 0" "0" "$(run_repair)"
 assert_actioned "the repair" local.cloud-mount.OneDrive
 assert_actioned "the repair" local.cloud-mount.GoogleDrive
 assert_mentions "the repair" "$(cat "$_out")" "mounted: OneDrive"
-if [ -e "$STATE_DIR/local.cloud-mount.OneDrive.blocked" ]; then
-  assert_fail "cloud-repair-clears-marker" "the blocked marker survived the repair"
+if svc_health_is_blocked local.cloud-mount.OneDrive; then
+  assert_fail "cloud-repair-clears-marker" "the blocked record survived the repair"
 else
-  assert_pass "the repair clears the blocked marker"
+  assert_pass "the repair clears the blocked record"
 fi
 assert_untouched "a disabled mount" local.cloud-mount.Disabled
 # WHY: the daemon restart is what unwedges FSKit, so it has to happen before any

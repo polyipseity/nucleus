@@ -322,28 +322,6 @@ FAKE_MOUNT_TABLE='fake://vol on /mnt/other (fake)'
 assert_eq "a path that is not mounted needs no wait" "0" "$(wait_released_rc /mnt/absent 1)"
 FAKE_MOUNT_TABLE=''
 
-section "svc-instances" "blocked markers"
-
-# WHY: a blocked marker is what stops an instance from being restarted into the
-# same failure, and it is boot-scoped so a reboot (the standing remedy) retries.
-_blocked_dir="$_tmp/state"
-mkdir -p "$_blocked_dir"
-assert_eq "an instance without a marker is clear" "clear" "$(svc_blocked_state fake-instance "$_blocked_dir")"
-assert_eq "an instance without a marker has no remedy" "" "$(svc_blocked_remedy fake-instance "$_blocked_dir")"
-
-svc_blocked_set fake-instance "$_blocked_dir" fskit-provider "run sudo killall fskitd"
-assert_eq "a blocked instance reports its class" "blocked fskit-provider" "$(svc_blocked_state fake-instance "$_blocked_dir")"
-assert_eq "a blocked instance reports its remedy" "run sudo killall fskitd" "$(svc_blocked_remedy fake-instance "$_blocked_dir")"
-
-# A marker from an earlier boot must not survive the reboot that fixes it.
-printf 'class=fskit-provider\nremedy=stale\nboot=an-older-boot\nts=1\n' >"$_blocked_dir/stale-instance.blocked"
-assert_eq "a marker from an earlier boot is clear" "clear" "$(svc_blocked_state stale-instance "$_blocked_dir")"
-assert_eq "a marker from an earlier boot has no remedy" "" "$(svc_blocked_remedy stale-instance "$_blocked_dir")"
-
-svc_blocked_clear fake-instance "$_blocked_dir"
-assert_eq "clearing a marker unblocks the instance" "clear" "$(svc_blocked_state fake-instance "$_blocked_dir")"
-assert_eq "a cleared marker leaves nothing behind" "false" "$([ -e "$_blocked_dir/fake-instance.blocked" ] && printf true || printf false)"
-
 if [ -n "$(svc_boot_id)" ]; then
   assert_pass "the boot id is reported"
 else

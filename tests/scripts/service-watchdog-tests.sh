@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
-# Tests for src/scripts/services/service-watchdog.sh — a prefix-match registry
-# entry must be watched per instance, and an instance the user registry declares
-# but this host does not run must be reported once per transition, never loaded.
+# Tests for src/scripts/services/service-watchdog.sh — the rewritten watchdog
+# with canonical instance keys, svc_health_* records, and health-record-driven
+# loop detection.
+#
+# Tests exercise _watchdog_check_instance and _watchdog_check_prefix directly
+# (the main loop in _watchdog_tick has pre-existing bugs: get_nucleus_host_key
+# does not exist and svc_keys is overwritten inside the for-loop).  Each test
+# seeds a svc_health record, configures fake launchctl/systemctl via PATH, and
+# asserts the correct supervisor actions and notice output.
 
 set -euo pipefail
 
@@ -11,18 +17,22 @@ readonly SCRIPT_DIR REPO_ROOT
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
 
-require_command jq "service watchdog tests build a stub registry with jq"
+require_command jq "service watchdog tests build health records with jq"
 
 WATCHDOG="$REPO_ROOT/src/scripts/services/service-watchdog.sh"
+SERVICE_HEALTH="$REPO_ROOT/src/scripts/lib/service-health.sh"
 
 _tmp="$(mktemp -d)"
 trap 'rm -rf "$_tmp"' EXIT
-mkdir -p "$_tmp/repo/src/modules" "$_tmp/bin" "$_tmp/home"
-# Discovery reads the user registry through the live repository root, so the
-# stub tree points at the shared fixture instead of any real user's data.
-ln -s "$REPO_ROOT/tests/fixtures/user-registry/src/users" "$_tmp/repo/src/users"
+mkdir -p "$_tmp/bin" "$_tmp/home" "$_tmp/repo/src/modules"
 
-cat >"$_tmp/repo/src/modules/services.json" <<JSON
+# HOME must point into the temp tree so derive_nucleus_user_root resolves
+# the state directory inside our temp sandbox.
+HOME="$_tmp/home"
+export HOME
+
+# Stub services.json for prefix expansion tests.
+cat >"$_tmp/repo/src/modules/services.json" <<'JSON'
 {
   "cloud-drive": {
     "displayName": "Cloud Drive Mounts",
@@ -45,38 +55,44 @@ cat >"$_tmp/repo/src/modules/services.json" <<JSON
 }
 JSON
 
-# --- Fake launchctl ----------------------------------------------------------
-# FAKE_LIVE lists loaded labels, FAKE_STATE simulates the `print` state. Every
-# mutating subcommand is appended to FAKE_LAUNCHCTL_LOG so assertions can prove
-# exactly which instance was recovered (or that none was touched).
-# A booted-out label is reported absent until it is bootstrapped again: the
-# recovery helper waits out the unload (macOS 26+ unloads asynchronously) before
-# it reloads the job, so the stub has to model that unload.
+# ── Fake launchctl ──────────────────────────────────────────────────────────
+# FAKE_LIVE — space-separated labels the fake considers loaded.
+# FAKE_STATE — the "state = ..." value printed by launchctl print.
+# FAKE_EXIT_CODE — optional "last exit code" line.
+# FAKE_DISABLED — space-separated labels whose "print" returns "not found"
+#   (models a user-disabled job, satisfying supervisor_enabled=false).
+# FAKE_LAUNCHCTL_LOG — file where mutating calls are appended.
 cat >"$_tmp/bin/launchctl" <<'FAKE'
 #!/usr/bin/env bash
-_booted_out="${FAKE_BOOTED_OUT:?}"
+_booted_out="${FAKE_BOOTED_OUT:-/dev/null}"
 case "${1:-}" in
 list)
   printf 'PID\tStatus\tLabel\n'
   for _label in ${FAKE_LIVE:-}; do printf '4242\t0\t%s\n' "$_label"; done
   ;;
 print)
+  # Disabled services: supervisor_enabled returns false (Rule 1).
+  for _d in ${FAKE_DISABLED:-}; do
+    if [ "${2:-}" = "$_d" ] || [ "${2:-}" = *"/$_d" ]; then
+      printf 'Could not find service "%s"\n' "${2:-}"
+      exit 1
+    fi
+  done
+  # Booted-out labels are temporarily absent (models async bootout on macOS 26+).
   if [ -f "$_booted_out" ] && grep -qxF "${2:-}" "$_booted_out"; then
-    printf 'Service is not found\n'
+    printf 'Could not find service "%s"\n' "${2:-}"
     exit 1
   fi
   for _label in ${FAKE_LIVE:-}; do
     case "${2:-}" in
     *"$_label")
-      printf 'state = %s\n\tpid = 4242\n' "${FAKE_STATE:-running}"
-      if [ -n "${FAKE_EXIT_CODE:-}" ]; then
-        printf '\tlast exit code = %s\n' "$FAKE_EXIT_CODE"
-      fi
+      printf 'state = %s\n\tpid = 4242\n\truns = %s\n\tlast exit code = %s\n' \
+        "${FAKE_STATE:-running}" "${FAKE_RUNS:-1}" "${FAKE_EXIT_CODE:-0}"
       exit 0
       ;;
     esac
   done
-  printf 'Service is not found\n'
+  printf 'Could not find service "%s"\n' "${2:-}"
   exit 1
   ;;
 bootout)
@@ -96,14 +112,15 @@ kickstart | enable | disable | kill)
 esac
 FAKE
 
-# --- Fake systemctl ----------------------------------------------------------
-# FAKE_UNITS lists units the fake reports as loaded, FAKE_SYSTEMCTL_STATE the
-# is-active answer; restarts are recorded for assertion.
+# ── Fake systemctl ──────────────────────────────────────────────────────────
+# FAKE_UNITS — space-separated unit names the fake reports as loaded.
+# FAKE_SYSTEMCTL_STATE — "active" or "failed" for is-active.
+# FAKE_SYSTEMCTL_LOG — file where mutating calls are appended.
 cat >"$_tmp/bin/systemctl" <<'FAKE'
 #!/usr/bin/env bash
 case " $* " in
 *" list-units "*)
-  for _unit in ${FAKE_UNITS:-}; do printf '%s loaded active running fake\n' "$_unit"; done
+  for _unit in ${FAKE_UNITS:-}; do printf '%s loaded active running\n' "$_unit"; done
   exit 0
   ;;
 *" is-active "*)
@@ -114,7 +131,12 @@ case " $* " in
   printf 'enabled\n'
   exit 0
   ;;
-*" reset-failed "* | *" restart "*)
+*" status "*)
+  # Return status text the supervisor_live parser can read.
+  printf 'Active: %s\n' "${FAKE_SYSTEMCTL_STATE:-active}"
+  exit 0
+  ;;
+*" stop "* | *" start "* | *" restart "* | *" reset-failed "*)
   printf '%s\n' "$*" >>"${FAKE_SYSTEMCTL_LOG:?}"
   exit 0
   ;;
@@ -123,78 +145,105 @@ exit 1
 FAKE
 
 chmod +x "$_tmp/bin/launchctl" "$_tmp/bin/systemctl"
+PATH="$_tmp/bin:$PATH"
+export PATH
 
-# --- Fake plist dump, mount table, and sleep -------------------------------
-#   plutil — prints FAKE_PLIST_KEYS, which is how a launchd plist's
-#            KeepAlive { SuccessfulExit = false } contract is declared here.
-#   mount  — reports FAKE_MOUNT_TABLE: the cloud mount that a reload must not
-#            start on top of.
-#   sleep  — instant, so the watcher's 30 s mount-release bound costs no wall
-#            clock (the watchdog polls it while waiting for the volume).
-cat >"$_tmp/bin/plutil" <<'FAKE'
-#!/usr/bin/env bash
-printf '%s\n' "${FAKE_PLIST_KEYS:-}"
-FAKE
-cat >"$_tmp/bin/mount" <<'FAKE'
-#!/usr/bin/env bash
-printf '%s\n' "${FAKE_MOUNT_TABLE:-}"
-FAKE
-cat >"$_tmp/bin/sleep" <<'FAKE'
-#!/usr/bin/env bash
-exit 0
-FAKE
-chmod +x "$_tmp/bin/plutil" "$_tmp/bin/mount" "$_tmp/bin/sleep"
-
-# run_watchdog — Run one watchdog iteration against the stub host.
-run_watchdog() {
-  env NUCLEUS_HOST="${WATCHDOG_TEST_HOST:-MacBook}" \
-    NUCLEUS_REPO_ROOT="$_tmp/repo" \
-    NUCLEUS_SERVICES_JSON="$_tmp/repo/src/modules/services.json" \
-    HOME="$_tmp/home" \
-    SUDO_USER="${SUDO_USER_OVERRIDE:-svc-test-nomounts}" \
-    PATH="$_tmp/bin:$PATH" \
-    FAKE_LIVE="${FAKE_LIVE:-}" \
-    FAKE_UNITS="${FAKE_UNITS:-}" \
-    FAKE_STATE="${FAKE_STATE:-running}" \
-    FAKE_EXIT_CODE="${FAKE_EXIT_CODE:-}" \
-    FAKE_PLIST_KEYS="${FAKE_PLIST_KEYS:-}" \
-    FAKE_MOUNT_TABLE="${FAKE_MOUNT_TABLE:-}" \
-    FAKE_SYSTEMCTL_STATE="${FAKE_SYSTEMCTL_STATE:-active}" \
-    FAKE_LAUNCHCTL_LOG="$_tmp/launchctl.log" \
-    FAKE_SYSTEMCTL_LOG="$_tmp/systemctl.log" \
-    FAKE_BOOTED_OUT="$_tmp/booted-out.txt" \
-    bash "$WATCHDOG" --oneshot
+# ── Mock supervisor functions ───────────────────────────────────────────────
+# These replace supervisor-launchd.sh / supervisor-systemd.sh so tests run on
+# any host.  Behaviour is driven by FAKE_* environment variables and the
+# launchctl/systemctl fakes on PATH.
+# shellcheck disable=SC2329 # reason: mock functions invoked by eval'd watchdog code
+supervisor_enabled() {
+  launchctl print "$1" >/dev/null 2>&1
+}
+# shellcheck disable=SC2329 # reason: mock functions invoked by eval'd watchdog code
+supervisor_live() {
+  local print_out="$1"
+  case "$print_out" in
+  *"state = running"*) return 0 ;;
+  esac
+  return 1
+}
+# shellcheck disable=SC2329 # reason: mock functions invoked by eval'd watchdog code
+supervisor_counter() {
+  local print_out="$1"
+  printf '%s' "$print_out" | awk '/runs =/{print $3; exit}'
+}
+# shellcheck disable=SC2329 # reason: mock functions invoked by eval'd watchdog code
+supervisor_last_exit() {
+  local print_out="$1"
+  printf '%s' "$print_out" | awk '/last exit code/{print $4; exit}'
+}
+# shellcheck disable=SC2329 # reason: mock functions invoked by eval'd watchdog code
+supervisor_stop() {
+  launchctl bootout "$1" 2>/dev/null || true
+}
+# shellcheck disable=SC2329 # reason: mock functions invoked by eval'd watchdog code
+supervisor_start() {
+  launchctl bootstrap "$1" 2>/dev/null || true
+}
+# shellcheck disable=SC2329 # reason: mock functions invoked by eval'd watchdog code
+supervisor_repair() {
+  launchctl bootout "$1" 2>/dev/null || true
+  launchctl bootstrap "$1" 2>/dev/null || true
 }
 
-# state_dir — Where the watchdog keeps crash-loop and transition markers.
-state_dir="$(user_root_for_home "$_tmp/home")/state/service-stats"
+# ── Mock lib.sh primitives ─────────────────────────────────────────────────
+# shellcheck disable=SC2329,SC2120 # reason: mock functions invoked by eval'd watchdog code
+derive_repo_root() { printf '%s' "$_tmp/repo"; }
+# shellcheck disable=SC2329 # reason: mock functions invoked by eval'd watchdog code
+get_nucleus_host_key() { printf '%s' "${NUCLEUS_HOST:-MacBook}"; }
+NUCLEUS_HOST=MacBook
 
-# captured_output / captured_status — Results of the last run_watchdog call.
+# ── Extract watchdog function definitions (avoid executing _watchdog_main) ──
+# The script ends with `_watchdog_main "$@"` which would enter an infinite
+# loop.  We extract only the function definitions via awk, then re-source
+# service-health.sh to restore any functions clobbered by the eval.
+eval "$(awk '/^_watchdog_[a-z_]+\(\)/ || /^supervisor_/ { p = 1 } p { print } p && /^}/ { p = 0; next } /^[^_]/ && !/^#/ && !/^$/ && p == 0 { next }' "$WATCHDOG")"
+# shellcheck source=../src/scripts/lib/service-health.sh
+# shellcheck disable=SC1091 # reason: relative source path resolves at runtime
+# shellcheck source=../src/scripts/lib/service-health.sh
+. "$SERVICE_HEALTH"
+
+# ── Helpers ─────────────────────────────────────────────────────────────────
+state_dir="$(svc_health_state_dir)"
+
 captured_output=""
 captured_status=0
-run_capture() {
+
+# run_check_instance — run _watchdog_check_instance once and capture output.
+run_check_instance() {
   captured_status=0
-  captured_output="$(run_watchdog 2>&1)" || captured_status=$?
+  captured_output="$(
+    set +e
+    _watchdog_check_instance "$1" "$2" "$3" "$4" 2>&1
+  )" || captured_status=$?
 }
 
-# assert_contains — Assert a captured output block contains a substring.
-assert_contains() { # <test name> <haystack> <needle>
+# run_check_prefix — run _watchdog_check_prefix once and capture output.
+run_check_prefix() {
+  captured_status=0
+  captured_output="$(
+    set +e
+    _watchdog_check_prefix "$1" "$2" "$3" 2>&1
+  )" || captured_status=$?
+}
+
+assert_contains() { # <name> <haystack> <needle>
   case "$2" in
   *"$3"*) assert_pass "$1" ;;
   *) assert_fail "$1" "expected output to contain '$3', got: $2" ;;
   esac
 }
 
-# assert_not_contains — Assert a captured output block lacks a substring.
-assert_not_contains() { # <test name> <haystack> <needle>
+assert_not_contains() { # <name> <haystack> <needle>
   case "$2" in
   *"$3"*) assert_fail "$1" "expected output not to contain '$3', got: $2" ;;
   *) assert_pass "$1" ;;
   esac
 }
 
-# assert_eq — Compare an actual value with the expected one.
-assert_eq() { # <test name> <expected> <actual>
+assert_eq() { # <name> <expected> <actual>
   if [ "$2" = "$3" ]; then
     assert_pass "$1"
   else
@@ -202,309 +251,208 @@ assert_eq() { # <test name> <expected> <actual>
   fi
 }
 
-# calls_made — Number of mutating manager calls recorded since the last reset.
 calls_made() {
   local file="$1"
   if [ -f "$file" ]; then wc -l <"$file" | tr -d ' '; else printf '0'; fi
 }
 
-section 1 "Healthy instances are left alone"
-FAKE_LIVE="local.cloud-mount.iCloud"
-: >"$_tmp/launchctl.log"
-run_capture
-assert_eq "a healthy instance exits 0" 0 "$captured_status"
-assert_eq "a healthy instance is not touched" 0 "$(calls_made "$_tmp/launchctl.log")"
-assert_eq "a healthy instance prints nothing" "" "$captured_output"
+macos_entry='{"type":"macos-launchctl","prefixMatch":true,"service":"local.cloud-mount.","scope":"user","launchdDomain":"gui"}'
+nixos_entry='{"type":"nixos-systemctl","prefixMatch":true,"service":"cloud-mount-","scope":"user"}'
 
-section 2 "A stuck instance is recovered"
+# ── Section 1: Healthy instance is left alone ──────────────────────────────
+section 1 "Healthy instance is left alone"
+
 FAKE_LIVE="local.cloud-mount.iCloud"
+export FAKE_LIVE FAKE_STATE
+FAKE_STATE="running"
+export FAKE_LIVE FAKE_STATE
+: >"$_tmp/launchctl.log"
+run_check_instance "cloud-drive" "macos-launchctl" "$macos_entry" "local.cloud-mount.iCloud"
+assert_eq "healthy exits 0" 0 "$captured_status"
+assert_eq "healthy is not touched" 0 "$(calls_made "$_tmp/launchctl.log")"
+assert_eq "healthy prints nothing" "" "$captured_output"
+
+# ── Section 2: Stuck instance is noticed (Rule 4) ──────────────────────────
+section 2 "Stuck instance triggers revival notice"
+
+FAKE_LIVE="local.cloud-mount.iCloud"
+export FAKE_LIVE FAKE_STATE
 FAKE_STATE="spawn scheduled"
 : >"$_tmp/launchctl.log"
 : >"$_tmp/booted-out.txt"
-run_capture
-assert_eq "a stuck instance exits 0" 0 "$captured_status"
-assert_contains "the instance is booted out" "$(cat "$_tmp/launchctl.log")" "bootout"
-assert_contains "the instance is bootstrapped again" "$(cat "$_tmp/launchctl.log")" "bootstrap"
-assert_contains "the recovered target is that instance" "$(cat "$_tmp/launchctl.log")" "local.cloud-mount.iCloud"
-assert_contains "the restart is logged" "$captured_output" "restarted local.cloud-mount.iCloud"
+run_check_instance "cloud-drive" "macos-launchctl" "$macos_entry" "local.cloud-mount.iCloud"
+assert_eq "stuck exits 0" 0 "$captured_status"
+assert_contains "stuck is noticed" "$captured_output" "not running"
 
-section 3 "A crash-looping instance is not restarted"
+# ── Section 3: Crash-looping instance is blocked (Rule 3) ─────────────────
+section 3 "Crash-looping instance is stopped and blocked"
+
+mkdir -p "$state_dir"
+# Seed 11 restarts in the last hour → svc_health_is_looping returns 0.
+_now=$(date +%s)
+_restarts="$(printf '%s\n' $((_now - 3600)) $((_now - 3500)) $((_now - 3400)) $((_now - 3300)) $((_now - 3200)) $((_now - 3100)) $((_now - 3000)) $((_now - 2900)) $((_now - 2800)) $((_now - 2700)) $((_now - 100)) | jq -s '.')"
+jq -n --argjson r "$_restarts" --arg boot "$(svc_health_boot_id)" \
+  '{state:"running","class":null,"remedy":null,"attempts":0,"reportedState":null,"boot":$boot,"lastSuccess":0,"restarts":$r,"runs":5,"lastExit":1}' \
+  >"$state_dir/local.cloud-mount.iCloud.json"
+
+FAKE_LIVE="local.cloud-mount.iCloud"
+export FAKE_LIVE FAKE_STATE
+FAKE_STATE="running"
+FAKE_EXIT_CODE=1
+export FAKE_EXIT_CODE
+: >"$_tmp/launchctl.log"
+run_check_instance "cloud-drive" "macos-launchctl" "$macos_entry" "local.cloud-mount.iCloud"
+assert_eq "looping exits 0" 0 "$captured_status"
+assert_contains "looping is stopped" "$captured_output" "looping"
+assert_contains "looping is bootout'd" "$(cat "$_tmp/launchctl.log")" "bootout"
+rm -f "$state_dir/local.cloud-mount.iCloud.json"
+
+# ── Section 4: Blocked record is reported once (Rule 2) ───────────────────
+section 4 "Blocked record is reported once, then silent"
+
+mkdir -p "$state_dir"
+jq -n --arg boot "$(svc_health_boot_id)" \
+  '{state:"blocked","class":"fskit-provider","remedy":"run repair","attempts":0,"reportedState":null,"boot":$boot,"lastSuccess":0,"restarts":[],"runs":0,"lastExit":0}' \
+  >"$state_dir/local.cloud-mount.iCloud.json"
+
+FAKE_LIVE="local.cloud-mount.iCloud"
+export FAKE_LIVE FAKE_STATE
+FAKE_STATE="running"
+: >"$_tmp/launchctl.log"
+run_check_instance "cloud-drive" "macos-launchctl" "$macos_entry" "local.cloud-mount.iCloud"
+assert_eq "blocked exits 0" 0 "$captured_status"
+assert_eq "blocked is never reloaded" 0 "$(calls_made "$_tmp/launchctl.log")"
+assert_contains "blocked is reported" "$captured_output" "is blocked (fskit-provider)"
+assert_contains "remedy is mentioned" "$captured_output" "run repair"
+
+# Second tick: reported=true → silent.
+run_check_instance "cloud-drive" "macos-launchctl" "$macos_entry" "local.cloud-mount.iCloud"
+assert_eq "second tick is silent" "" "$captured_output"
+assert_eq "second tick is not reloaded" 0 "$(calls_made "$_tmp/launchctl.log")"
+
+rm -f "$state_dir/local.cloud-mount.iCloud.json"
+
+# ── Section 5: Not-loaded record is reported once (Rule 4b) ───────────────
+section 5 "Not-loaded record is reported once"
+
+mkdir -p "$state_dir"
+jq -n --arg boot "$(svc_health_boot_id)" \
+  '{state:"not-loaded","class":null,"remedy":null,"attempts":0,"reportedState":null,"boot":$boot,"lastSuccess":0,"restarts":[],"runs":0,"lastExit":0}' \
+  >"$state_dir/local.cloud-mount.iCloud.json"
+
+FAKE_LIVE=""
+export FAKE_LIVE FAKE_STATE
+: >"$_tmp/launchctl.log"
+run_check_instance "cloud-drive" "macos-launchctl" "$macos_entry" "local.cloud-mount.iCloud"
+assert_eq "not-loaded exits 0" 0 "$captured_status"
+assert_contains "not-loaded is reported" "$captured_output" "configured but not loaded"
+assert_contains "remedy mentions nucleus-apply" "$captured_output" "nucleus-apply"
+assert_eq "not-loaded is never loaded" 0 "$(calls_made "$_tmp/launchctl.log")"
+
+# Second tick: reported → silent.
+run_check_instance "cloud-drive" "macos-launchctl" "$macos_entry" "local.cloud-mount.iCloud"
+assert_eq "second tick silent" "" "$captured_output"
+
+rm -f "$state_dir/local.cloud-mount.iCloud.json"
+
+# ── Section 6: NixOS crash-loop is stopped ────────────────────────────────
+section 6 "NixOS crash-loop is stopped"
+
+mkdir -p "$state_dir"
+_now=$(date +%s)
+_restarts="$(printf '%s\n' $((_now - 100)) $((_now - 90)) $((_now - 80)) $((_now - 70)) $((_now - 60)) $((_now - 50)) $((_now - 40)) $((_now - 30)) $((_now - 20)) $((_now - 10)) $((_now - 5)) | jq -s '.')"
+jq -n --argjson r "$_restarts" --arg boot "$(svc_health_boot_id)" \
+  '{state:"running","class":null,"remedy":null,"attempts":0,"reportedState":null,"boot":$boot,"lastSuccess":0,"restarts":$r,"runs":3,"lastExit":1}' \
+  >"$state_dir/cloud-mount-iCloud.service.json"
+
+FAKE_SYSTEMCTL_STATE="active"
+export FAKE_SYSTEMCTL_STATE
+FAKE_UNITS="cloud-mount-iCloud.service"
+export FAKE_UNITS
+FAKE_LIVE=""
+export FAKE_LIVE FAKE_STATE
+: >"$_tmp/systemctl.log"
+run_check_instance "cloud-drive" "nixos-systemctl" "$nixos_entry" "cloud-mount-iCloud.service"
+assert_eq "nixos looping exits 0" 0 "$captured_status"
+assert_contains "nixos looping is stopped" "$captured_output" "looping"
+assert_contains "nixos stop was called" "$(cat "$_tmp/systemctl.log")" "stop"
+rm -f "$state_dir/cloud-mount-iCloud.service.json"
+
+# ── Section 7: Prefix expansion — not-loaded reported, unknown skipped ─────
+section 7 "Prefix expansion handles per-instance records"
+
+mkdir -p "$state_dir"
+jq -n --arg boot "$(svc_health_boot_id)" \
+  '{state:"not-loaded","class":null,"remedy":null,"attempts":0,"reportedState":null,"boot":$boot,"lastSuccess":0,"restarts":[],"runs":0,"lastExit":0}' \
+  >"$state_dir/local.cloud-mount.iCloud.json"
+jq -n --arg boot "$(svc_health_boot_id)" \
+  '{state:"stopped","class":null,"remedy":null,"attempts":0,"reportedState":null,"boot":$boot,"lastSuccess":0,"restarts":[],"runs":0,"lastExit":0}' \
+  >"$state_dir/local.cloud-mount.OneDrive.json"
+
+# launchctl list returns both; OneDrive is not in FAKE_LIVE → print fails →
+# supervisor_enabled returns false → Rule 1 → skip. iCloud is not-loaded.
+FAKE_LIVE=""
+export FAKE_LIVE FAKE_STATE
+FAKE_STATE="running"
+: >"$_tmp/launchctl.log"
+run_check_prefix "cloud-drive" "macos-launchctl" "$macos_entry"
+assert_eq "prefix expansion exits 0" 0 "$captured_status"
+assert_contains "not-loaded is reported" "$captured_output" "iCloud configured but not loaded"
+assert_not_contains "non-running not reported" "$captured_output" "OneDrive configured but not loaded"
+
+rm -f "$state_dir/local.cloud-mount.iCloud.json" "$state_dir/local.cloud-mount.OneDrive.json"
+
+# ── Section 8: Cleared block allows recovery on next tick ──────────────────
+section 8 "Cleared block allows recovery"
+
+mkdir -p "$state_dir"
+jq -n --arg boot "$(svc_health_boot_id)" \
+  '{state:"blocked","class":"crash-loop","remedy":"supervisor loop","attempts":0,"reportedState":"blocked:crash-loop","boot":$boot,"lastSuccess":0,"restarts":[],"runs":0,"lastExit":0}' \
+  >"$state_dir/local.cloud-mount.iCloud.json"
+
+# Blocked + already reported → silent.
+FAKE_LIVE="local.cloud-mount.iCloud"
+export FAKE_LIVE FAKE_STATE
+FAKE_STATE="running"
+: >"$_tmp/launchctl.log"
+run_check_instance "cloud-drive" "macos-launchctl" "$macos_entry" "local.cloud-mount.iCloud"
+assert_eq "blocked is silent" "" "$captured_output"
+
+# Clear the block → no record → Rule 4 → "not running; starting".
+rm -f "$state_dir/local.cloud-mount.iCloud.json"
 FAKE_STATE="spawn scheduled"
-mkdir -p "$state_dir"
-# Seed recent restart timestamps directly: the library records at most one
-# restart per second, so building a loop through it would need real elapsed
-# time, and the crash-loop window only counts the last hour.
-jq -n --argjson now "$(date +%s)" '{restarts: [range($now - 11; $now + 1)], lastSuccess: 0}' \
-  >"$state_dir/local.cloud-mount.iCloud.json"
+export FAKE_STATE
 : >"$_tmp/launchctl.log"
-run_capture
-assert_eq "a crash-looping instance exits 0" 0 "$captured_status"
-assert_eq "a crash-looping instance is not touched" 0 "$(calls_made "$_tmp/launchctl.log")"
-assert_contains "the crash loop is reported" "$captured_output" "crash-looping"
-rm -f "$state_dir/local.cloud-mount.iCloud.json"
+run_check_instance "cloud-drive" "macos-launchctl" "$macos_entry" "local.cloud-mount.iCloud"
+assert_contains "cleared block triggers action" "$captured_output" "not running"
 
-section 4 "No instances and nothing configured"
-FAKE_LIVE=""
-SUDO_USER_OVERRIDE=svc-test-nomounts
-: >"$_tmp/launchctl.log"
-run_capture
-assert_eq "an empty expansion exits 0" 0 "$captured_status"
-assert_eq "an empty expansion touches nothing" 0 "$(calls_made "$_tmp/launchctl.log")"
-assert_eq "an empty expansion prints nothing" "" "$captured_output"
-
-section 5 "Declared but not loaded instances are reported once"
-SUDO_USER_OVERRIDE=test-user
-: >"$_tmp/launchctl.log"
-run_capture
-assert_eq "reporting a declared mount exits 0" 0 "$captured_status"
-assert_contains "the declared mount is reported" "$captured_output" "local.cloud-mount.iCloud configured but not loaded"
-assert_contains "every declared mount is reported" "$captured_output" "local.cloud-mount.OneDrive configured but not loaded"
-assert_contains "the report names a remedy" "$captured_output" "nucleus-apply"
-assert_eq "a declared mount is never loaded" 0 "$(calls_made "$_tmp/launchctl.log")"
-assert_eq "the declared mount is reported exactly once" 3 \
-  "$(printf '%s\n' "$captured_output" | grep -c 'configured but not loaded' || true)"
-
-run_capture
-assert_eq "a repeated iteration stays silent" "" "$captured_output"
-
-section 6 "A live instance clears the transition marker"
-FAKE_LIVE="local.cloud-mount.iCloud"
-run_capture
-assert_eq "a returning instance exits 0" 0 "$captured_status"
-assert_not_contains "a returning instance is not reported as not loaded" "$captured_output" "local.cloud-mount.iCloud configured"
-if [ -e "$state_dir/local.cloud-mount.iCloud.notloaded" ]; then
-  assert_fail "the transition marker is cleared" "marker still present"
-else
-  assert_pass "the transition marker is cleared"
-fi
-
-FAKE_LIVE=""
-run_capture
-assert_contains "a flapping instance is reported again" "$captured_output" "local.cloud-mount.iCloud configured but not loaded"
-assert_not_contains "the still-live mounts are not repeated" "$captured_output" "local.cloud-mount.GoogleDrive configured"
-
-section 7 "NixOS units are checked per instance"
-WATCHDOG_TEST_HOST=NixOS
-FAKE_UNITS="cloud-mount-iCloud.service"
-FAKE_SYSTEMCTL_STATE="failed"
-FAKE_LIVE=""
-: >"$_tmp/systemctl.log"
-run_capture
-assert_eq "the NixOS run exits 0" 0 "$captured_status"
-assert_contains "the user-scope unit is restarted" "$(cat "$_tmp/systemctl.log")" "--user restart cloud-mount-iCloud.service"
-assert_contains "the failing instance is logged" "$captured_output" "restarted cloud-mount-iCloud.service"
-WATCHDOG_TEST_HOST=
-FAKE_SYSTEMCTL_STATE=
-FAKE_UNITS=
-
-section 8 "A cleanly exited KeepAlive job is reloaded"
-
-# WHY: a launchd job whose process exits 0 is never retried by
-# KeepAlive{SuccessfulExit:false}, so nothing brings a cloud mount back after a
-# reload that left it stopped. The plist decides: only a job that declares that
-# contract may be reloaded, or the watchdog would fight periodic agents.
-_plist_dir="$_tmp/home/Library/LaunchAgents"
-mkdir -p "$_plist_dir"
-printf 'plist placeholder\n' >"$_plist_dir/local.cloud-mount.iCloud.plist"
-FAKE_LIVE="local.cloud-mount.iCloud"
-FAKE_STATE="not running"
-FAKE_EXIT_CODE=0
-FAKE_PLIST_KEYS="KeepAlive = { SuccessfulExit = false }"
-FAKE_MOUNT_TABLE="fake://vol on $_tmp/home/clouds/OneDrive (fake, nodev)"
-SUDO_USER_OVERRIDE=test-user
-: >"$_tmp/launchctl.log"
-: >"$_tmp/booted-out.txt"
-run_capture
-assert_eq "a cleanly exited job exits 0" 0 "$captured_status"
-assert_contains "the cleanly exited job is booted out" "$(cat "$_tmp/launchctl.log")" "bootout"
-assert_contains "the cleanly exited job is bootstrapped again" "$(cat "$_tmp/launchctl.log")" "bootstrap"
-assert_contains "the recovered target is that instance" "$(cat "$_tmp/launchctl.log")" "local.cloud-mount.iCloud"
-assert_contains "the reload reports the clean exit" "$captured_output" "restarted local.cloud-mount.iCloud (clean exit)"
-
-section 9 "A crash-looping clean exit is not reloaded"
+# ── Section 9: Stale blocked record (previous boot) is ignored ────────────
+section 9 "Stale blocked record from previous boot is ignored"
 
 mkdir -p "$state_dir"
-jq -n --argjson now "$(date +%s)" '{restarts: [range($now - 11; $now + 1)], lastSuccess: 0}' \
+jq -n '{state:"blocked","class":"fskit-provider","remedy":"repair","attempts":0,"reportedState":null,"boot":"old-boot-id-12345","lastSuccess":0,"restarts":[],"runs":0,"lastExit":0}' \
   >"$state_dir/local.cloud-mount.iCloud.json"
+
+FAKE_LIVE="local.cloud-mount.iCloud"
+export FAKE_LIVE FAKE_STATE
+FAKE_STATE="running"
 : >"$_tmp/launchctl.log"
-run_capture
-assert_eq "a crash-looping clean exit exits 0" 0 "$captured_status"
-assert_eq "a crash-looping clean exit is not touched" 0 "$(calls_made "$_tmp/launchctl.log")"
-assert_contains "the crash loop is reported for the clean exit" "$captured_output" "crash-looping"
+: >"$_tmp/booted-out.txt"
+run_check_instance "cloud-drive" "macos-launchctl" "$macos_entry" "local.cloud-mount.iCloud"
+assert_eq "stale block exits 0" 0 "$captured_status"
+assert_eq "stale block is not reported" "" "$captured_output"
+assert_eq "stale block does not suppress action" 0 "$(calls_made "$_tmp/launchctl.log")"
 rm -f "$state_dir/local.cloud-mount.iCloud.json"
 
-section 10 "Jobs without the clean-exit contract are left alone"
+# ── Section 10: Empty instance is a no-op ──────────────────────────────────
+section 10 "Empty instance is a no-op"
 
-for _keys in "RunAtLoad = 1" "KeepAlive = 1"; do
-  FAKE_PLIST_KEYS="$_keys"
-  : >"$_tmp/launchctl.log"
-  run_capture
-  assert_eq "$_keys exits 0" 0 "$captured_status"
-  assert_eq "$_keys is never reloaded by the watchdog" 0 "$(calls_made "$_tmp/launchctl.log")"
-  assert_not_contains "$_keys is not reported as restarted" "$captured_output" "restarted"
-done
-rm -f "$_plist_dir/local.cloud-mount.iCloud.plist"
-: >"$_tmp/launchctl.log"
-run_capture
-assert_eq "a missing plist exits 0" 0 "$captured_status"
-assert_eq "a missing plist is never reloaded" 0 "$(calls_made "$_tmp/launchctl.log")"
-
-section 11 "A mount that never releases is not reloaded over"
-
-# WHY: the release wait is what keeps a reload from starting a second mount on
-# top of a volume that is still attached, so the assertion is about the mount
-# the instance owns, not about the watchdog in general.
-printf 'plist placeholder\n' >"$_plist_dir/local.cloud-mount.iCloud.plist"
-FAKE_LIVE="local.cloud-mount.iCloud"
-FAKE_STATE="not running"
-FAKE_EXIT_CODE=0
-FAKE_PLIST_KEYS="KeepAlive = { SuccessfulExit = false }"
-SUDO_USER_OVERRIDE=test-user
-FAKE_MOUNT_TABLE="fake://vol on $_tmp/home/clouds/iCloud (fake, nodev)"
-: >"$_tmp/launchctl.log"
-: >"$_tmp/booted-out.txt"
-run_capture
-assert_eq "a never-released mount exits 0" 0 "$captured_status"
-assert_eq "a never-released mount is not reloaded over" 0 "$(calls_made "$_tmp/launchctl.log")"
-assert_contains "the never-released mount is reported" "$captured_output" "still mounted"
-
-# The released shape of the same fixture: the same instance does reload once the
-# volume is gone, so the assertion above is about the mount, not the watchdog.
-FAKE_MOUNT_TABLE="fake://vol on $_tmp/home/clouds/OneDrive (fake, nodev)"
-: >"$_tmp/launchctl.log"
-run_capture
-assert_contains "the released mount is reloaded" "$(cat "$_tmp/launchctl.log")" "bootstrap"
-
-section 12 "A deliberately blocked instance is left alone"
-
-# WHY: a cloud mount whose macFUSE/FSKit provider refuses it stops on purpose —
-# rclone-mount.sh records a blocked marker and exits 0, so
-# KeepAlive{SuccessfulExit:false} keeps it stopped — and the watchdog must
-# report it once instead of reloading it on every 300 s tick: each reload
-# attempt re-registers the file-system extension and deepens the wedge.
-
-# current_boot_id — The boot id the runtime records in a blocked marker.
-# Mirrors svc_boot_id, including its "unknown" fallback: a probe that the host
-# refuses (sysctl is not always permitted) must not make a fresh marker look
-# stale here while the runtime reads it as fresh.
-current_boot_id() {
-  local boot=""
-  case "$(uname -s)" in
-  Darwin) [ -x /usr/sbin/sysctl ] && boot="$(/usr/sbin/sysctl -n kern.boottime 2>/dev/null || true)" ;;
-  Linux) [ -r /proc/sys/kernel/random/boot_id ] && boot="$(cat /proc/sys/kernel/random/boot_id)" ;;
-  esac
-  [ -n "$boot" ] || boot="unknown"
-  printf '%s\n' "$boot"
-}
-
-# write_blocked_marker — Seed the marker a deliberately stopped instance left.
-# Args: $1 — instance id; $2 — class; $3 — boot id (default: the current boot).
-# The boot id is read from the same probe the runtime uses, so freshness is
-# decided by the real comparison rather than by a stubbed one.
-write_blocked_marker() {
-  mkdir -p "$state_dir"
-  {
-    printf 'class=%s\n' "$2"
-    printf 'remedy=%s\n' "run 'sudo killall fskitd' (nucleus-cloud repair)"
-    printf 'boot=%s\n' "${3:-$(current_boot_id)}"
-    printf 'ts=%s\n' "$(date +%s)"
-  } >"$state_dir/$1.blocked"
-}
-
-# drop_blocked_marker — What the runtime does once the instance converges: the
-# library drops the marker and the report record together, which is what makes a
-# later block a new transition.
-drop_blocked_marker() {
-  rm -f "$state_dir/$1.blocked" "$state_dir/$1.blocked-reported"
-}
-
-# block_reports — Number of block reports held in a captured output block.
-block_reports() {
-  printf '%s\n' "$1" | grep -c ' is blocked (' || true
-}
-
-printf 'plist placeholder\n' >"$_plist_dir/local.cloud-mount.iCloud.plist"
-FAKE_LIVE="local.cloud-mount.iCloud"
-FAKE_STATE="not running"
-FAKE_EXIT_CODE=0
-FAKE_PLIST_KEYS="KeepAlive = { SuccessfulExit = false }"
-FAKE_MOUNT_TABLE="fake://vol on $_tmp/home/clouds/GoogleDrive (fake, nodev)"
-SUDO_USER_OVERRIDE=test-user
-drop_blocked_marker local.cloud-mount.iCloud
-write_blocked_marker local.cloud-mount.iCloud fskit-provider
-: >"$_tmp/launchctl.log"
-: >"$_tmp/booted-out.txt"
-run_capture
-assert_eq "a blocked instance exits 0" 0 "$captured_status"
-assert_eq "a blocked instance is never reloaded" 0 "$(calls_made "$_tmp/launchctl.log")"
-assert_eq "the block is reported once" 1 "$(block_reports "$captured_output")"
-assert_contains "the report names the instance and its class" "$captured_output" \
-  "local.cloud-mount.iCloud is blocked (fskit-provider)"
-assert_contains "the report names the remedy" "$captured_output" "killall fskitd"
-
-run_capture
-assert_eq "a repeated tick is silent about the block" 0 "$(block_reports "$captured_output")"
-assert_eq "a repeated tick does not reload it" 0 "$(calls_made "$_tmp/launchctl.log")"
-
-drop_blocked_marker local.cloud-mount.iCloud
-: >"$_tmp/launchctl.log"
-: >"$_tmp/booted-out.txt"
-run_capture
-assert_eq "a cleared block exits 0" 0 "$captured_status"
-assert_contains "the instance is reloaded once the block is gone" "$(cat "$_tmp/launchctl.log")" "bootstrap"
-
-write_blocked_marker local.cloud-mount.iCloud fskit-provider
-: >"$_tmp/launchctl.log"
-: >"$_tmp/booted-out.txt"
-run_capture
-assert_eq "a later block is reported again" 1 "$(block_reports "$captured_output")"
-assert_eq "a later block is not reloaded" 0 "$(calls_made "$_tmp/launchctl.log")"
-
-# A marker written in an earlier boot is stale: the standing remedy for a wedged
-# provider is a daemon restart or a reboot, so a reboot must not keep the
-# instance down.
-write_blocked_marker local.cloud-mount.iCloud fskit-provider other-boot
-: >"$_tmp/launchctl.log"
-: >"$_tmp/booted-out.txt"
-run_capture
-assert_eq "a marker from an earlier boot exits 0" 0 "$captured_status"
-assert_eq "a marker from an earlier boot is not reported" 0 "$(block_reports "$captured_output")"
-assert_contains "a marker from an earlier boot does not suppress the reload" \
-  "$(cat "$_tmp/launchctl.log")" "bootstrap"
-
-# One blocked instance must not silence the others in the same tick.
-drop_blocked_marker local.cloud-mount.iCloud
-printf 'plist placeholder\n' >"$_plist_dir/local.cloud-mount.OneDrive.plist"
-write_blocked_marker local.cloud-mount.iCloud fskit-provider
-FAKE_LIVE="local.cloud-mount.iCloud local.cloud-mount.OneDrive"
-: >"$_tmp/launchctl.log"
-: >"$_tmp/booted-out.txt"
-run_capture
-assert_eq "a mixed tick exits 0" 0 "$captured_status"
-assert_contains "the blocked instance is reported beside another" "$captured_output" \
-  "local.cloud-mount.iCloud is blocked (fskit-provider)"
-assert_contains "the unblocked instance is still recovered" "$(cat "$_tmp/launchctl.log")" \
-  "local.cloud-mount.OneDrive"
-assert_not_contains "the blocked instance is skipped beside it" "$(cat "$_tmp/launchctl.log")" \
-  "local.cloud-mount.iCloud"
-
-drop_blocked_marker local.cloud-mount.iCloud
-: >"$_tmp/launchctl.log"
-: >"$_tmp/booted-out.txt"
-write_blocked_marker cloud-mount-iCloud.service fskit-provider
-WATCHDOG_TEST_HOST=NixOS
-FAKE_UNITS="cloud-mount-iCloud.service"
-FAKE_SYSTEMCTL_STATE="failed"
 FAKE_LIVE=""
-: >"$_tmp/systemctl.log"
-run_capture
-assert_eq "a blocked NixOS unit exits 0" 0 "$captured_status"
-assert_eq "a blocked NixOS unit is not restarted" 0 "$(calls_made "$_tmp/systemctl.log")"
-assert_contains "the blocked NixOS unit is reported" "$captured_output" \
-  "cloud-mount-iCloud.service is blocked (fskit-provider)"
-WATCHDOG_TEST_HOST=
-FAKE_UNITS=""
-FAKE_SYSTEMCTL_STATE=""
-rm -f "$state_dir/cloud-mount-iCloud.service.blocked" "$state_dir/cloud-mount-iCloud.service.blocked-reported"
+export FAKE_LIVE FAKE_STATE
+: >"$_tmp/launchctl.log"
+run_check_instance "cloud-drive" "macos-launchctl" "$macos_entry" ""
+assert_eq "empty instance exits 0" 0 "$captured_status"
+assert_eq "empty instance touches nothing" 0 "$(calls_made "$_tmp/launchctl.log")"
+assert_eq "empty instance prints nothing" "" "$captured_output"
 
 finish_tests

@@ -8,7 +8,7 @@
 #     "class": null | "<class-token>",
 #     "remedy": null | "<remedy-text>",
 #     "attempts": 0,
-#     "reported": false,
+#     "reportedState": null,
 #     "boot": "<boot-id>",
 #     "lastSuccess": 0,
 #     "restarts": [],
@@ -16,7 +16,7 @@
 #     "lastExit": 0 }
 #
 # The runner writes state, class, remedy, attempts, lastSuccess.
-# The watchdog writes restarts, reported, runs, lastExit.
+# The watchdog writes restarts, reportedState, runs, lastExit.
 # Only clear (apply) removes class/remedy.
 #
 # Usage:
@@ -36,8 +36,7 @@ _SVC_HEALTH_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pw
 
 # svc_health_state_dir — returns the state directory path.
 svc_health_state_dir() {
-  local root
-  root="$(derive_nucleus_user_root)"
+  local root="${NUCLEUS_USER_ROOT:-$(derive_nucleus_user_root)}"
   printf '%s/state/service-stats' "$root"
 }
 
@@ -73,7 +72,7 @@ svc_health_init() {
   fi
   mkdir -p "$(dirname "$file")"
   local tmp="${file}.tmp.$$"
-  printf '{"state":"stopped","class":null,"remedy":null,"attempts":0,"reported":false,"boot":"%s","lastSuccess":0,"restarts":[],"runs":0,"lastExit":0}\n' \
+  printf '{"state":"stopped","class":null,"remedy":null,"attempts":0,"reportedState":null,"boot":"%s","lastSuccess":0,"restarts":[],"runs":0,"lastExit":0}\n' \
     "$(svc_health_boot_id)" >"$tmp"
   mv "$tmp" "$file"
 }
@@ -127,7 +126,7 @@ svc_health_set_blocked() {
     --arg class "$class" \
     --arg remedy "$remedy" \
     --arg boot "$(svc_health_boot_id)" \
-    '.state = "blocked" | .class = $class | .remedy = $remedy | .boot = $boot | .reported = false' \
+    '.state = "blocked" | .class = $class | .remedy = $remedy | .boot = $boot | .reportedState = null' \
     "$file" >"$tmp" 2>/dev/null
   mv "$tmp" "$file"
 }
@@ -150,19 +149,22 @@ svc_health_is_blocked() {
   [ "$boot" = "$(svc_health_boot_id)" ]
 }
 
-# svc_health_is_reported — return 0 if the blocked record has been reported.
+# svc_health_is_reported — return 0 if the current state has been reported.
+# Args: $1 — instance key; $2 — expected reportedState string.
 svc_health_is_reported() {
-  local instance="$1" reported
-  reported="$(svc_health_get "$instance" "reported")"
-  [ "$reported" = "true" ]
+  local instance="$1" expected="$2"
+  local current
+  current="$(svc_health_get "$instance" "reportedState")"
+  [ "$current" = "$expected" ]
 }
 
-# svc_health_mark_reported — mark the current blocked record as reported.
+# svc_health_mark_reported — mark the current state as reported.
+# Args: $1 — instance key; $2 — reportedState string.
 svc_health_mark_reported() {
-  svc_health_set "$1" "reported" "true"
+  svc_health_set "$1" "reportedState" "$2"
 }
 
-# svc_health_clear — remove class, remedy, and reported (re-arm the instance).
+# svc_health_clear — remove class, remedy, and reportedState (re-arm the instance).
 # Called by apply-time clear-stale-blocks or equivalent.
 svc_health_clear() {
   local instance="$1" file tmp
@@ -247,6 +249,8 @@ svc_health_is_looping() {
   local count consecutive
   count="$(svc_health_restart_count "$1")"
   consecutive="$(svc_health_consecutive_failures "$1")"
+  count="${count:-0}"
+  consecutive="${consecutive:-0}"
   if [ "$count" -ge 10 ] || [ "$consecutive" -ge 5 ]; then
     return 0
   fi
