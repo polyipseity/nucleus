@@ -27,6 +27,9 @@ run_repo_policy_grep() {
   say "--- suppression audit ---"
   run_suppression_audit "$_ctx_name" "$@" || _failed=1
 
+  say "--- cloud-mount invariants ---"
+  run_cloud_mount_invariants "$_ctx_name" "$@" || _failed=1
+
   if [ "$_failed" -ne 0 ]; then
     error "repository policy (grep-heavy) check failed"
     return 1
@@ -631,5 +634,37 @@ run_suppression_audit() {
   fi
 
   rm -rf -- "$_tmpdir"
+  return 0
+}
+
+# run_cloud_mount_invariants — verify the two-interface invariants.
+# Core cloud-mount files must not contain OS-specific FUSE/supervisor names.
+run_cloud_mount_invariants() {
+  local _ctx_name="$1"
+  shift
+  local _failed=0
+  local _core_files
+  _core_files="src/scripts/services/rclone-mount.sh src/scripts/services/rclone-mount.ps1"
+  local _os_pattern='macfuse|fskit|WinFsp|fuse3|nucleus-cloud-repair'
+
+  for _f in $_core_files; do
+    [ -f "$_f" ] || continue
+    if grep -qEi "$_os_pattern" "$_f" 2>/dev/null; then
+      error "$_ctx_name: $_f contains OS-specific FUSE/backend names (invariant violation: $_os_pattern)"
+      _failed=1
+    fi
+  done
+
+  # One macfuse install call site (darwin backend only).
+  local _install_count
+  _install_count=$(grep -rl 'macfuse install\|brew install.*macfuse' src/scripts/lib/ src/scripts/services/ 2>/dev/null | wc -l || echo 0)
+  if [ "$_install_count" -gt 1 ]; then
+    error "$_ctx_name: multiple macfuse install call sites ($_install_count); must be exactly one (mount-backend-darwin.sh)"
+    _failed=1
+  fi
+
+  if [ "$_failed" -eq 0 ]; then
+    say "no cloud-mount invariant violations found."
+  fi
   return 0
 }
