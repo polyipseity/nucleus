@@ -12,6 +12,10 @@
 # PATH-resolved commands are forbidden and enforced by the
 # `activation-tool-resolution` check (step 17).
 #
+# RUSTC_WRAPPER: set to the absolute sccache store path (arg 6) so cargo
+# (invoked by cargo-binstall's compilation fallback) finds sccache even
+# though Home Manager activation resets PATH.
+#
 # Install priority: nixpkgs > cargo binstall > cargo > bun > uv.
 set -euo pipefail
 
@@ -33,6 +37,7 @@ _icp_gawk_bin="$2"
 _icp_desired_crates_json="$3"
 _icp_cargo_bin="$4"
 _icp_cargo_binstall_bin="$5"
+_icp_sccache_bin="$6"
 if [ -z "$_icp_cargo_binstall_bin" ]; then
   die -l cargo-binstall "cargo-binstall store-path bin argument (arg 5) is required"
 fi
@@ -50,6 +55,15 @@ fi
 # Prepend nixpkgs cargo's directory to PATH so `cargo` is available.
 PATH="$PATH:${_icp_cargo_bin%/*}"
 export PATH
+
+# Set RUSTC_WRAPPER to the absolute sccache store path so cargo
+# (invoked by cargo-binstall's compilation fallback) finds sccache
+# even though HM activation resets PATH to a minimal set.
+# Empty arg is tolerated — the wrapper is simply not set.
+if [ -n "$_icp_sccache_bin" ]; then
+  RUSTC_WRAPPER="$_icp_sccache_bin"
+  export RUSTC_WRAPPER
+fi
 
 # Desired crates from src/modules/packages/desired.json: an array of
 # {"name": <crate>, "binary"?: <installed binary name>} objects.  An empty

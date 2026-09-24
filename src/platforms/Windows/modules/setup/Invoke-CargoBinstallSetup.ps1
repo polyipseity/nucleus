@@ -93,6 +93,16 @@ function Invoke-CargoBinstallSetup {
     return
   }
 
+  # Resolve sccache absolute path for RUSTC_WRAPPER override.
+  # Ensures cargo install (cargo-binstall fallback) finds sccache
+  # even when the session PATH is restricted.
+  $savedRustcWrapper = $env:RUSTC_WRAPPER
+  # check-suppress:suppression_doc: probe -- sccache may not be installed; EnvVarOverride block handles absence.
+  $_sccacheCmd = Get-Command sccache -ErrorAction SilentlyContinue
+  if ($_sccacheCmd) {
+    $env:RUSTC_WRAPPER = $_sccacheCmd.Source
+  }
+
   # Get actually installed crates from `cargo install --list` (zap-style:
   # remove any installed crate absent from the desired list, regardless of
   # prior managed state).  `cargo install --list` emits lines of the form
@@ -176,4 +186,7 @@ function Invoke-CargoBinstallSetup {
   if ($toRemove.Count -eq 0 -and $toInstall.Count -eq 0) {
     Write-NucleusInfo -CommandName 'cargo-binstall-setup' "all managed packages already converged — skipping"
   }
+
+  # Restore RUSTC_WRAPPER to its original value.
+  $env:RUSTC_WRAPPER = $savedRustcWrapper
 }

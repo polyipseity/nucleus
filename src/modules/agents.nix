@@ -313,7 +313,8 @@ in
         "${pkgs.gawk}/bin/awk" \
         '${builtins.toJSON (desiredFor "cargo-binstall")}' \
         "${pkgs.cargo}/bin/cargo" \
-        "${pkgs.cargo-binstall}/bin/cargo-binstall"
+        "${pkgs.cargo-binstall}/bin/cargo-binstall" \
+        "${pkgs.sccache}/bin/sccache"
     '';
 
     # -------------------------------------------------------------------------
