@@ -3,6 +3,12 @@
 # Uses displayplacer to match all external monitors to the built-in screen's
 # current mode so remote-desktop clients see a consistent resolution.
 #
+# WHY: displayplacer requires WindowServer context (CoreGraphics).  When no
+# display is attached or the session is headless (SSH, lid-closed without
+# clamshell mode), applying modes fails even though the config is valid.
+# Downgraded to warnings so activation continues; resolutions are re-applied
+# on the next activation with a GUI session.
+#
 # Algorithm:
 #   1. Identify the built-in screen's persistent ID and its current mode.
 #   2. If the built-in is on mode 4 (high-DPI Retina mode), apply it first
@@ -84,11 +90,11 @@ if [ -x "$DP_BIN" ]; then
   if [ -n "$MODE4_STR" ] && [ "$MODE4_CURRENT" != "yes" ]; then
     if _nucleus_resolve_console_user; then
       if ! /bin/launchctl asuser "$_nucleus_console_uid" "$DP_BIN" "id:$PRIMARY_ID $MODE4_STR"; then
-        die "failed to apply primary display mode with displayplacer."
+        warn "failed to apply primary display mode with displayplacer."
       fi
     else
       if ! "$DP_BIN" "id:$PRIMARY_ID $MODE4_STR"; then
-        die "failed to apply primary display mode with displayplacer."
+        warn "failed to apply primary display mode with displayplacer."
       fi
     fi
     /bin/sleep 1
@@ -145,11 +151,11 @@ if [ -x "$DP_BIN" ]; then
     if [ -n "$BEST_MODE" ]; then
       if _nucleus_resolve_console_user; then
         if ! /bin/launchctl asuser "$_nucleus_console_uid" "$DP_BIN" "id:$ID $BEST_MODE"; then
-          die "failed to apply mode '$BEST_MODE' to display id $ID."
+          warn "failed to apply mode '$BEST_MODE' to display id $ID."
         fi
       else
         if ! "$DP_BIN" "id:$ID $BEST_MODE"; then
-          die "failed to apply mode '$BEST_MODE' to display id $ID."
+          warn "failed to apply mode '$BEST_MODE' to display id $ID."
         fi
       fi
     fi

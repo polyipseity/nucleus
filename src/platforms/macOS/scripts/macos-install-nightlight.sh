@@ -4,6 +4,12 @@
 #
 # Schedule: 18:00 -> 06:00, colour temperature 50 % (~4000 K).
 # Source: https://github.com/smudge/nightlight
+#
+# WHY: Night Shift operations (temperature, schedule, on/off) require a live
+# GUI session with CoreBrightness XPC available.  During headless activation
+# (no display attached, lid closed, or remote SSH) these commands fail even
+# though the configuration is correct.  Downgraded to warnings so activation
+# continues; the setting will take effect on next GUI login.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -15,7 +21,7 @@ if [ -x "/opt/homebrew/bin/nightlight" ]; then
   NL_BIN="/opt/homebrew/bin/nightlight"
 
   if ! "$NL_BIN" schedule start; then
-    die "failed to configure Nightlight schedule."
+    warn "failed to configure Nightlight schedule."
   fi
 
   # Read current temperature; skip setting if already at target value.
@@ -25,11 +31,11 @@ if [ -x "/opt/homebrew/bin/nightlight" ]; then
   if [ "$current_temp" != "50" ]; then
     if _nucleus_resolve_console_user; then
       if ! /bin/launchctl asuser "$_nucleus_console_uid" "$NL_BIN" temp 50; then
-        die "failed to set Nightlight temperature."
+        warn "failed to set Nightlight temperature."
       fi
     else
       if ! "$NL_BIN" temp 50; then
-        die "failed to set Nightlight temperature."
+        warn "failed to set Nightlight temperature."
       fi
     fi
   fi
@@ -38,21 +44,21 @@ if [ -x "/opt/homebrew/bin/nightlight" ]; then
   if [ "$current_hour" -ge 18 ] || [ "$current_hour" -lt 6 ]; then
     if _nucleus_resolve_console_user; then
       if ! /bin/launchctl asuser "$_nucleus_console_uid" "$NL_BIN" on; then
-        die "failed to enable Nightlight."
+        warn "failed to enable Nightlight."
       fi
     else
       if ! "$NL_BIN" on; then
-        die "failed to enable Nightlight."
+        warn "failed to enable Nightlight."
       fi
     fi
   else
     if _nucleus_resolve_console_user; then
       if ! /bin/launchctl asuser "$_nucleus_console_uid" "$NL_BIN" off; then
-        die "failed to disable Nightlight."
+        warn "failed to disable Nightlight."
       fi
     else
       if ! "$NL_BIN" off; then
-        die "failed to disable Nightlight."
+        warn "failed to disable Nightlight."
       fi
     fi
   fi
