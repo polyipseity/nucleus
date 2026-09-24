@@ -3946,7 +3946,7 @@ vm_build_macos() {
   fi
 
   if ! command -v tart >/dev/null 2>&1; then
-    error "tart not found; install with: brew install cirruslabs/cli/tart"
+    error "tart not found; install with: brew install openai/tools/tart"
     return 1
   fi
 

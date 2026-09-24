@@ -9,7 +9,7 @@
   username,
   homebrew-core,
   homebrew-cask,
-  cirruslabs-cli,
+  openai-tools,
   smudge-smudge,
   ...
 }:
@@ -22,8 +22,8 @@ let
   # These are tools unavailable in nixpkgs or where the Homebrew build is
   # preferred (e.g. tightly coupled to macOS internals).
   staticManagedBrews = [
-    "cirruslabs/cli/softnet" # Runtime dependency of tart; must be declared to survive brew bundle --zap cleanup
-    "cirruslabs/cli/tart" # macOS VM hypervisor using Apple Virtualization.framework (requires code-signed binary)
+    "openai/tools/softnet" # Runtime dependency of tart; must be declared to survive brew bundle --zap cleanup
+    "openai/tools/tart" # macOS VM hypervisor using Apple Virtualization.framework (requires code-signed binary)
     "displayplacer" # CLI display arrangement tool
     "sqlite" # SQLite library; needed by qmd setCustomSQLite for sqlite-vec extension support
     "smudge/smudge/nightlight" # Night Shift schedule & temperature control
@@ -88,13 +88,13 @@ in
     taps = {
       "homebrew/homebrew-core" = homebrew-core;
       "homebrew/homebrew-cask" = homebrew-cask;
-      "cirruslabs/homebrew-cli" = cirruslabs-cli;
+      "openai/homebrew-tools" = openai-tools;
       "smudge/homebrew-smudge" = smudge-smudge;
     };
     trust = {
-      # Trust cirruslabs/cli as a whole tap because softnet is a transitive
+      # Trust openai/tools as a whole tap because softnet is a transitive
       # dependency of tart that cannot be enumerated statically.
-      taps = [ "cirruslabs/cli" ];
+      taps = [ "openai/tools" ];
       formulae = [
         "smudge/smudge/nightlight"
       ];

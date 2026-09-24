@@ -44,8 +44,8 @@
       url = "github:homebrew/homebrew-cask";
       flake = false;
     };
-    cirruslabs-cli = {
-      url = "github:cirruslabs/homebrew-cli";
+    openai-tools = {
+      url = "github:openai/homebrew-tools";
       flake = false;
     };
     smudge-smudge = {
@@ -65,7 +65,7 @@
   outputs =
     {
       treefmt-nix,
-      cirruslabs-cli,
+      openai-tools,
       darwin,
       hermes-agent,
       home-manager,
@@ -775,7 +775,7 @@
         nix-homebrew = nix-homebrew;
         homebrew-core = homebrew-core;
         homebrew-cask = homebrew-cask;
-        cirruslabs-cli = cirruslabs-cli;
+        openai-tools = openai-tools;
         smudge-smudge = smudge-smudge;
         mac-app-util = mac-app-util;
         nixos-generators = nixos-generators;
@@ -848,7 +848,7 @@
           inherit
             homebrew-core
             homebrew-cask
-            cirruslabs-cli
+            openai-tools
             smudge-smudge
             ;
           nucleusApps = nucleusAppsMac // {
