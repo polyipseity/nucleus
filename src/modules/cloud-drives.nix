@@ -200,7 +200,6 @@ let
         "--volname"
         mountVolumeLabel
       ];
-      readOnlyFlag = lib.optional (!mount.readWrite) "--read-only";
       # Pass the managed config passphrase command when the feature is enabled
       # so the LaunchAgent can decrypt an encrypted rclone.conf on every start.
       # WHY: --password-command not env var: LaunchAgents run outside user shell
@@ -214,27 +213,6 @@ let
       # WHY: FSKit has no FUSE notification API, so remote changes reach the mount
       #   only through rclone's own cache and poll timers, and --read-only is
       #   enforced by rclone's VFS because FSKit always opens files read/write.
-      fullArgsList = [
-        "--vfs-cache-mode"
-        "full"
-        "--vfs-cache-max-age"
-        "1h"
-        "--dir-cache-time"
-        "5m"
-        "--poll-interval"
-        "1m"
-        # WHY: NOTICE not ERROR.  A mount that decays (macFUSE destroys the volume
-        #   seconds after it attaches, e.g. because a stale volume is still
-        #   registered for the path) exits with status 0 and writes nothing at
-        #   ERROR level, so the failure is indistinguishable from an idle mount in
-        #   the agent log.  The mount and unmount lines rclone emits at NOTICE are
-        #   what make that visible; DEBUG adds the per-volume destroy detail when a
-        #   deeper trace is needed.
-        "--log-level"
-        "NOTICE"
-      ]
-      ++ readOnlyFlag
-      ++ extraArgsList;
     in
     pkgs.writeNucleusShellApplication {
       name = "cloud-mount-${mount.id}";
@@ -244,10 +222,15 @@ let
         NUCLEUS_RCLONE_REMOTE_NAME = mount.remoteName;
         NUCLEUS_RCLONE_REMOTE = rcloneRemote;
         NUCLEUS_RCLONE_MOUNT_POINT = mountPoint;
-        NUCLEUS_RCLONE_ARGS = lib.concatStringsSep "\n" fullArgsList;
+        NUCLEUS_RCLONE_ARGS = lib.concatStringsSep "\n" extraArgsList;
+        NUCLEUS_RCLONE_READ_ONLY = if mount.readWrite then "false" else "true";
         # WHY: the wrapper records a provider failure against the LaunchAgent
         #   label, which is the key every service command and the watchdog use.
         NUCLEUS_CLOUD_MOUNT_INSTANCE = mountLabel mount;
+        # Lifecycle policy — single definition, matches services.json cloud-drive.lifecycle.
+        NUCLEUS_MOUNT_ATTEMPTS = "3";
+        NUCLEUS_MOUNT_BACKOFF = "20,40";
+        NUCLEUS_MOUNT_ATTACH_SECONDS = "45";
       };
     };
 
@@ -439,14 +422,12 @@ in
                 Label = mountLabel mount;
                 ProgramArguments = [ "${mkRcloneMountScript mount}/bin/nucleus-cloud-mount-${mount.id}" ];
                 RunAtLoad = true;
-                # Keep the mount alive; if the remote is not yet configured the
-                # wrapper script exits 0, which suppresses the SuccessfulExit
-                # restart condition and avoids an aggressive retry loop.
-                KeepAlive = {
-                  # Restart on crash (non-zero exit) but not on clean exit (exit 0
-                  # from the "remote not configured" early-return path above).
-                  SuccessfulExit = false;
-                };
+                # WHY: no KeepAlive — the watchdog owns revival on every host.
+                #   A non-zero exit means a transient failure; the runner retries
+                #   internally with bounded backoff.  A zero exit means the mount
+                #   was blocked or stopped intentionally.  KeepAlive created a
+                #   parallel retry mechanism that contradicted the blocked-marker
+                #   contract and caused infinite restart loops.
                 # WHY: the teardown budget must cover a real macFUSE/FSKit unmount.
                 #   launchd SIGKILLs the job after this budget (default 20 s covers
                 #   only a fast teardown), and a mount killed mid-unmount leaves the
@@ -476,19 +457,9 @@ in
             value =
               let
                 mountPoint = "${currentUserHome}/${mount.localPath}";
-                rcloneRemote = "${mount.remoteName}:${mount.remotePath}";
-                iCloudServiceArgs = lib.optionals (mount.provider == "iCloud") [
-                  "--iclouddrive-service"
-                  mount.iCloudService
-                ];
-                readOnlyFlag = lib.optional (!mount.readWrite) "--read-only";
                 # Same password-command logic as the macOS LaunchAgent script.
                 # WHY: --password-command not env var: systemd user services do not
                 # inherit session environment variables set in shell profiles.
-                rclonePasswordArgs = lib.optionals config.nucleus.rclone.configPassEnabled [
-                  "--password-command"
-                  "cat ${lib.escapeShellArg config.nucleus.rclone.configPassSecretPath}"
-                ];
               in
               {
                 Unit = {
@@ -499,29 +470,12 @@ in
                 Service = {
                   Type = "simple";
                   ExecStartPre = "/bin/sh -c 'mkdir -p ${lib.escapeShellArg mountPoint}'";
-                  ExecStart = lib.concatStringsSep " " (
-                    [
-                      "${pkgs.rclone}/bin/rclone"
-                      "mount"
-                      (lib.escapeShellArg rcloneRemote)
-                      (lib.escapeShellArg mountPoint)
-                      "--vfs-cache-mode"
-                      "full"
-                      "--vfs-cache-max-age"
-                      "1h"
-                      "--dir-cache-time"
-                      "5m"
-                      "--poll-interval"
-                      "1m"
-                      "--log-level"
-                      "ERROR"
-                    ]
-                    ++ map lib.escapeShellArg (
-                      readOnlyFlag ++ iCloudServiceArgs ++ rclonePasswordArgs ++ mount.extraArgs
-                    )
-                  );
+                  ExecStart = "${mkRcloneMountScript mount}/bin/nucleus-cloud-mount-${mount.id}";
                   ExecStop = mkFusermountUnmount mountPoint;
-                  Restart = "always";
+                  # WHY: no Restart policy — the watchdog owns revival on every host.
+                  # A non-zero exit means a transient failure; the runner retries
+                  # internally with bounded backoff.  A zero exit means the mount
+                  # was blocked or stopped intentionally.
                 };
                 Install = {
                   WantedBy = [ "default.target" ];
