@@ -40,7 +40,7 @@ supervisor_counter() {
 # Args: $1 — launchctl print output.
 supervisor_last_exit() {
   local print_out="$1"
-  printf '%s' "$print_out" | awk '/last exit code/{print $4; exit}'
+  printf '%s' "$print_out" | awk '/last exit code/{print $5; exit}'
 }
 
 # supervisor_start — bootstrap a launchd job.

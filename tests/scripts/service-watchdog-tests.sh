@@ -172,7 +172,7 @@ supervisor_counter() {
 # shellcheck disable=SC2329 # reason: mock functions invoked by eval'd watchdog code
 supervisor_last_exit() {
   local print_out="$1"
-  printf '%s' "$print_out" | awk '/last exit code/{print $4; exit}'
+  printf '%s' "$print_out" | awk '/last exit code/{print $5; exit}'
 }
 # shellcheck disable=SC2329 # reason: mock functions invoked by eval'd watchdog code
 supervisor_stop() {
@@ -215,7 +215,7 @@ captured_status=0
 run_check_instance() {
   captured_status=0
   captured_output="$(
-    set +e
+    set +euo pipefail
     _watchdog_check_instance "$1" "$2" "$3" "$4" 2>&1
   )" || captured_status=$?
 }
@@ -224,7 +224,7 @@ run_check_instance() {
 run_check_prefix() {
   captured_status=0
   captured_output="$(
-    set +e
+    set +euo pipefail
     _watchdog_check_prefix "$1" "$2" "$3" 2>&1
   )" || captured_status=$?
 }
@@ -258,6 +258,13 @@ calls_made() {
 
 macos_entry='{"type":"macos-launchctl","prefixMatch":true,"service":"local.cloud-mount.","scope":"user","launchdDomain":"gui"}'
 nixos_entry='{"type":"nixos-systemctl","prefixMatch":true,"service":"cloud-mount-","scope":"user"}'
+
+# Export env vars needed by mock launchctl/systemctl subprocesses.
+FAKE_LAUNCHCTL_LOG="$_tmp/launchctl.log"
+FAKE_BOOTED_OUT="$_tmp/booted-out.txt"
+export FAKE_LAUNCHCTL_LOG FAKE_BOOTED_OUT
+FAKE_SYSTEMCTL_LOG="$_tmp/systemctl.log"
+export FAKE_SYSTEMCTL_LOG
 
 # ── Section 1: Healthy instance is left alone ──────────────────────────────
 section 1 "Healthy instance is left alone"

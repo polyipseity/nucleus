@@ -101,11 +101,18 @@ svc_health_set() {
   mkdir -p "$(dirname "$file")"
   tmp="${file}.tmp.$$"
   if [ -f "$file" ]; then
-    jq ".$field = $value" "$file" >"$tmp" 2>/dev/null
+    if ! jq ".$field = $value" "$file" >"$tmp" 2>/dev/null; then
+      rm -f "$tmp"
+      return 1
+    fi
   else
     printf '{"state":"stopped","class":null,"remedy":null,"attempts":0,"reportedState":null,"boot":"%s","lastSuccess":0,"restarts":[],"runs":0,"lastExit":0}\n' \
       "$(svc_health_boot_id)" >"$tmp"
-    jq ".$field = $value" "$tmp" >"${tmp}.mv" 2>/dev/null && mv "${tmp}.mv" "$tmp"
+    if ! jq ".$field = $value" "$tmp" >"${tmp}.mv" 2>/dev/null; then
+      rm -f "$tmp" "${tmp}.mv"
+      return 1
+    fi
+    mv "${tmp}.mv" "$tmp"
   fi
   mv "$tmp" "$file"
 }
