@@ -52,6 +52,30 @@ run_nix_flake_eval() {
       say "nix flake evaluation passed."
     fi
 
+    # Committed generated artifacts must equal their flake derivation.
+    # WHY: src/hosts/Windows/system/winget-packages.json cannot be generated on
+    # Windows (no Nix there), so it is committed — and this is the only
+    # byte-exact (format-inclusive) check of it; the always-run nix-tests step
+    # compares the parsed entry set on every POSIX host instead.
+    # WHY: ./src#winget-packages is built with the macOS package set
+    # (src/flake.nix), so it is an aarch64-darwin derivation that no other host
+    # can build.  Check it only where the host system matches, and report
+    # explicitly that it was not checked elsewhere rather than implying a pass.
+    local _ne_ga_out
+    if [ "$sys" != "aarch64-darwin" ]; then
+      say "winget allow-list freshness not checked: ./src#winget-packages is an aarch64-darwin derivation (host system: $sys)."
+    elif _ne_ga_out="$(nucleus_nix_locked nix build --no-link --print-out-paths ./src#winget-packages)"; then
+      if ! cmp -s "$_ne_ga_out" src/hosts/Windows/system/winget-packages.json; then
+        error "src/hosts/Windows/system/winget-packages.json is stale — regenerate it from its derivation (see .agents/instructions/winget-dsc.instructions.md)"
+        _ne_exit=1
+      else
+        say "generated winget allow-list matches its derivation."
+      fi
+    else
+      error "failed to build ./src#winget-packages for the generated-artifact check"
+      _ne_exit=1
+    fi
+
     # Hermetic eval: prove Nix layer evaluates without forwarded env vars.
     run_hermetic_eval "$_ctx_name" || _ne_exit=1
 

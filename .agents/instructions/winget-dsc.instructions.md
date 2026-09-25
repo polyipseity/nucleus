@@ -29,6 +29,7 @@ Sort alphabetically within each group by `settings.id` (packages) or `settings.v
 
 - `.yml` extension only; specify `source: winget` for all packages.
 - Use canonical WinGet package identifiers (verified via `winget search`). Prefer named IDs over opaque Store-generated IDs; document rationale when only generated IDs exist.
+- The WinGet allow-list `src/hosts/Windows/system/winget-packages.json` is generated from the managed package registry in `src/modules/core.nix` — never hand-edit it; regenerate it with `install -m 644 "$(nix build --no-link --print-out-paths ./src#winget-packages)" src/hosts/Windows/system/winget-packages.json` (macOS only — the derivation is built with the macOS package set). Check step 3 compares the committed file against that derivation byte for byte, but only on aarch64-darwin hosts; elsewhere the always-run nix-tests step compares the parsed entry set instead.
 - Prefer preview/canary channel per `AGENTS.md` Channel Preference Policy; document exceptions in `directives.description:`.
 - Registry values must include `valueType` (`DWord`, `String`, etc.). Environment variables: scope as `User` or `Machine` (prefer `User`).
 - Use `%USERPROFILE%` for user home in `value` strings.

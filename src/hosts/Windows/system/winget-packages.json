@@ -61,6 +61,7 @@
     "Scoop.Scoop",
     "SecretsOPerationS.SOPS",
     "ShellCheck.ShellCheck",
+    "Sigrok.PulseView",
     "Starship.Starship",
     "Telegram.TelegramDesktop.Beta",
     "TheDocumentFoundation.LibreOffice",
