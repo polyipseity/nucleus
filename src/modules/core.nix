@@ -646,6 +646,12 @@ let
         name = "pass";
       };
       nixpkgs = "pass";
+      # WHY: pass-otp is a separate package, not a top-level nixpkgs attr, and
+      # pass only loads it from SYSTEM_EXTENSION_DIR. The wrapper must replace
+      # the plain attr: contributing both would collide on bin/pass (nix-darwin
+      # system-path keeps the first, Home Manager's home-manager-path refuses to
+      # build). `nixpkgs` stays required as the availability probe.
+      nixpkgsPackage = pkgs.pass.withExtensions (extensions: [ extensions.pass-otp ]);
       winget = "GnuPG.pass";
     };
     pulseview = {
@@ -1125,6 +1131,15 @@ let
     in
     if attr == null then [ ] else lib.strings.splitString "." attr;
 
+  # Derivation for a managedPackages entry routed to nixpkgs. An entry may carry
+  # `nixpkgsPackage` when the bare `nixpkgs` attribute is not the derivation we
+  # want on PATH (e.g. `pass` needs its OTP extension wrapped into the binary);
+  # `nixpkgs` stays required as the availability probe.
+  managedNixPackageDerivation =
+    packageName:
+    managedPackages.${packageName}.nixpkgsPackage
+      or (lib.attrByPath (nixPkgsAttrPath packageName) null pkgs);
+
   # Managed packages routed to nixpkgs but absent from pkgs (platform-specific).
   missingNixPackageAttrs = builtins.filter (
     packageName:
@@ -1157,7 +1172,7 @@ let
     "neovim"
   ];
 
-  managedNixPackages = map (packageName: lib.attrByPath (nixPkgsAttrPath packageName) null pkgs) (
+  managedNixPackages = map managedNixPackageDerivation (
     if pkgs.stdenv.hostPlatform.isDarwin then
       builtins.filter (
         name:

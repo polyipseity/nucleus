@@ -8,6 +8,7 @@
 #   • a "flake:<node>"-pinned package has no duplicate lockfile version pin
 #   • every desired package resolves to a lockfile version pin (or a flake pin)
 #   • cursor.superpowers lockfile entry is valid
+#   • the managed `pass` resolves to the OTP-wrapped derivation, never alongside it
 #
 # Run with: nix-instantiate --eval --strict tests/modules/package-lists-tests.nix
 
@@ -129,29 +130,75 @@ let
   spIsValid = hasCursor && hasSuperpowers && spSourceIsUri && spRevIsHex;
 
   # --- Windows DSC overlap parity (from winget-overlap-parity-tests.nix) ---
-  # Evaluate core.nix for Windows to get the resolved package set.
+  # Evaluate core.nix for one host to get the resolved package set.
+  # `environment.systemPackages` is stubbed so the shared set (sharedPackages in
+  # core.nix) is observable without a full host configuration.
+  # WHY no `options` entry in specialArgs: specialArgs win over the module
+  # system's own module arguments, so passing `options = { }` replaces core.nix's
+  # options tree and silently makes its `options ? environment` guard false —
+  # environment.systemPackages then stays at this stub's empty default and the
+  # shared package set is unobservable.
   lib = import <nixpkgs/lib>;
-  evaluated = lib.evalModules {
-    prefix = [ ];
-    modules = [
-      ../../src/modules/core.nix
-      { nucleus.packages.selection.backend = "policy"; }
-      {
-        options.assertions = lib.mkOption {
-          type = lib.types.listOf lib.types.attrs;
-          default = [ ];
-          internal = true;
-        };
-      }
-    ];
-    specialArgs = {
-      lib = lib;
-      pkgs = import <nixpkgs> { system = "x86_64-linux"; };
-      options = { };
-      hostName = "Windows";
+  pkgsLinux = import <nixpkgs> { system = "x86_64-linux"; };
+  evalCoreForHost =
+    hostName:
+    lib.evalModules {
+      prefix = [ ];
+      modules = [
+        ../../src/modules/core.nix
+        { nucleus.packages.selection.backend = "policy"; }
+        {
+          options.assertions = lib.mkOption {
+            type = lib.types.listOf lib.types.attrs;
+            default = [ ];
+            internal = true;
+          };
+          options.environment.systemPackages = lib.mkOption {
+            # WHY nullOr: production feeds this from mkPkgs, whose overlays
+            # provide pi-coding-agent and sandbox-runtime; a bare nixpkgs does
+            # not, and managedNixPackages then yields null for those two entries
+            # because nixPackageAttrAvailable treats a missing attribute as
+            # available. Tolerating them keeps the harness free of flake
+            # internals while still proving how the pass entry resolves.
+            type = lib.types.listOf (lib.types.nullOr lib.types.package);
+            default = [ ];
+            internal = true;
+          };
+        }
+      ];
+      specialArgs = {
+        lib = lib;
+        pkgs = pkgsLinux;
+        # core.nix declares `treefmtPackage ? null`, but the module system fills
+        # every `functionArgs` entry and only then applies the function's own
+        # default, so an omitted argument resolves through `config._module.args`
+        # and throws. The real value is injected by src/flake.nix; these evals do
+        # not exercise formatting, so pin it to the no-op value core.nix handles.
+        treefmtPackage = null;
+        inherit hostName;
+      };
     };
-  };
+  evaluated = evalCoreForHost "Windows";
+  posixEvaluated = evalCoreForHost "NixOS";
   resolvedWindowsPackages = evaluated.config.nucleus.windows.wingetPackages.packages;
+
+  # --- Managed pass resolution (regression guard) ---
+  # `pass` must land as the OTP-wrapped derivation and never alongside the plain
+  # attr: two derivations providing bin/pass collide in buildEnv's paths
+  # (nix-darwin's system-path keeps the first and drops the wrapper; Home
+  # Manager's home-manager-path refuses to build).
+  sharedPackages = posixEvaluated.config.environment.systemPackages;
+  passOtpWrapper = pkgsLinux.pass.withExtensions (extensions: [ extensions.pass-otp ]);
+  # WHY narrow the identity check to the pass entries: whole-set equality forces
+  # `outPath` on every element, and that evaluates the meta of unrelated
+  # packages, tripping check-meta's insecure refusal (dotnet-runtime-6.0.36)
+  # which only the real hosts permit via mkPkgs' permittedInsecurePackages.
+  passCandidates = builtins.filter (
+    p: lib.hasPrefix "pass-env" (p.name or "") || lib.hasPrefix "password-store" (p.name or "")
+  ) sharedPackages;
+  passOtpResolved =
+    lib.any (p: p.drvPath == passOtpWrapper.drvPath) passCandidates
+    && !(lib.any (p: p.drvPath == pkgsLinux.pass.drvPath) passCandidates);
   committedDoc = builtins.fromJSON (readRepo "src/hosts/Windows/system/winget-packages.json");
   committedPackages = committedDoc.packages or [ ];
 
@@ -189,6 +236,7 @@ let
     && noFlakePinDuplication
     && allLockfilePinsResolve
     && posixInstallersFreeOfLists
+    && passOtpResolved
     && spIsValid;
 in
 {
@@ -202,6 +250,7 @@ in
   test_flake_pins_not_duplicated = assert' noFlakePinDuplication "a 'flake:<node>'-pinned package must not also carry a lockfile version pin";
   test_lockfile_pins_resolve = assert' allLockfilePinsResolve "every desired package must have a lockfile version pin (or declare a flake pin)";
   test_no_hardcoded_posix_lists = assert' posixInstallersFreeOfLists "POSIX installers must not hardcode desired-package literals";
+  test_pass_otp_resolved = assert' passOtpResolved "sharedPackages must contribute the pass-otp wrapper and not the plain pass attr";
   test_cursor_superpowers_lockfile = assert' spIsValid "cursor.superpowers must have https source and 40-char hex rev";
 
   # Windows DSC overlap parity tests.

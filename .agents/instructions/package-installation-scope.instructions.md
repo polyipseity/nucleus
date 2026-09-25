@@ -61,6 +61,8 @@ Declared once in `src/modules/core.nix` `managedPackages`. `category`: `"cli"` â
 
 Platform-specific packages add `platforms` field (e.g. `platforms = ["darwin"]` for `iterm2`, `rectangle`, `stats`, `utm`). Homebrew-only: use `missingNixAttrs`. Add to `managedPackages` alphabetically; remove duplicates from `NixOS/desktop.nix`.
 
+An entry whose bare `nixpkgs` attr is not the derivation to deploy carries `nixpkgsPackage` (a derivation) to override it; `nixpkgs` stays required as the availability probe. Never contribute a second derivation for the same binary: `buildEnv` collides on it (nix-darwin `system-path` keeps the first, Home Manager's `home-manager-path` refuses to build), so replace the entry instead â€” e.g. `pass` deploys `pkgs.pass.withExtensions (extensions: [ extensions.pass-otp ])`.
+
 Removing a tap-qualified Homebrew formula (`zackelia/formulae/bclm`) requires its tap to outlive it: nix-homebrew untaps undeclared taps before `brew bundle --zap` runs its cleanup, and the cleanup can then neither resolve nor uninstall the still-installed orphan, aborting activation with `Error: No available formula with the name "<tap>/<formula>"` after the profile has already moved to the new generation. Uninstall the formula on every MacBook (`brew uninstall --force <formula>`) before the commit that drops the tap from `nix-homebrew.taps`/`trust`; no migration shim belongs in the repo.
 
 ## Violations
