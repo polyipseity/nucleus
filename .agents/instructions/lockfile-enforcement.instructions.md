@@ -22,14 +22,23 @@ The consolidated lockfile at `src/lockfiles/lockfile.json` pins tool and package
 | `homebrew` | `object with brews/casks/masApps` | Homebrew formula/cask/MAS → version |
 | `ollama` | `string → string` | Ollama model → digest hash |
 | `pi` | `string → string` | Pi coding agent extension → version |
+| `psgallery` | `string → string`; hash pins `{version, hash}` | PowerShell module → version (PSGallery) |
 
 Homebrew has no native lockfile — pins live under `homebrew`; activation runs `brew bundle --force` from nix-darwin's Brewfile.
 
-Update with `scripts/update.sh` / `scripts/update.ps1`. For Nix packages, run `nix flake lock` from `src/`. The `uv` updater skips `.uv[<pkg>]` entries whose value is an object (VCS-pinned packages); the `bun` and `pi` updaters query the npm registry and skip object-shaped (VCS/rev) pins.
+Update with `scripts/update.sh` / `scripts/update.ps1`. For Nix packages, run `nix flake lock` from `src/`. The `uv` updater skips `.uv[<pkg>]` entries whose value is an object (VCS-pinned packages); the `bun` and `pi` updaters query the npm registry and skip object-shaped (VCS/rev) pins; the `psgallery` updater recomputes the nupkg hash for object-form entries and leaves the entry unchanged (with a warning) when the hash cannot be fetched.
+
+### `psgallery` pins
+
+`psgallery` is a pinned root whose source is PSGallery itself: nixpkgs packages none of these modules (probed against nixpkgs: `psini`, `pester`, `powershell-yaml`, `PSScriptAnalyzer`, `psframework`, `importexcel`, and `PSResourceGet` are all absent; nixpkgs ships the `pwsh` runtime only), so the lockfile is the only pin.
+
+PSGallery has no release-age delay feature, so the mitigation is the version pin plus, for hash-pinned entries, the SHA256 of the module's nupkg. An entry is either a version string or a `{version, hash}` object; `hash` is the SRI form of the SHA256 of `https://www.powershellgallery.com/api/v2/package/<Name>/<Version>`, which is what `nix store prefetch-file --json --hash-type sha256` records.
+
+The `psgallery` probe (`_lfe_check_psgallery`) verifies the installed module version only. The installed artifact is the extracted module directory, not the nupkg, so `hash` is not verifiable against an installation; it pins the artifact the declarative module path fetches.
 
 ## Two-tier model
 
-- **Pinned root** — authoritative. Enforcement lib (`lockfile-enforcement-lib.*`) compares installed versions against pins, reports drift. Pinned: `bun`, `cargo-binstall`, `cursor` (editor plugins, filesystem-based enforcement including `superpowers` via a pinned checkout), `pi`, `pwsh`, `rustup`, `scoop`, `source-builds`, `uv`, `version`, `vm-setup`, `winget`. Probes are scoped to the current host's declared packages in `src/modules/packages/desired.json`, so a Windows-only package is never reported as drift on macOS.
+- **Pinned root** — authoritative. Enforcement lib (`lockfile-enforcement-lib.*`) compares installed versions against pins, reports drift. Pinned: `bun`, `cargo-binstall`, `cursor` (editor plugins, filesystem-based enforcement including `superpowers` via a pinned checkout), `pi`, `psgallery`, `rustup`, `scoop`, `source-builds`, `uv`, `version`, `vm-setup`, `winget`. Probes are scoped to the current host's declared packages in `src/modules/packages/desired.json`, so a Windows-only package is never reported as drift on macOS.
 - **`suggestions`** — warn-only, never enforced, never causes check failure. Sub-sections: `cursor`, `homebrew` (masApps only), `ollama`, `opencode`, `vscode`, `vm-setup.windows`.
 
 ## Invariant
@@ -48,7 +57,7 @@ Removed: `suggestions.nixpkgs`, `suggestions.homebrew.brews`/`casks`. Retained: 
 
 ## Canonical classification
 
-- **Root (pinned):** `bun`, `uv`, `cargo-binstall`, `rustup`, `pwsh`, `scoop`, `winget`, `vm-setup`, `source-builds`/`version`, `pi`, `cursor` (editor plugins — filesystem-based enforcement including `superpowers` via a pinned checkout).
+- **Root (pinned):** `bun`, `uv`, `cargo-binstall`, `rustup`, `psgallery`, `scoop`, `winget`, `vm-setup`, `source-builds`/`version`, `pi`, `cursor` (editor plugins — filesystem-based enforcement including `superpowers` via a pinned checkout).
 - **`suggestions` (warn-only):** `cursor` (editor extensions), `homebrew.masApps`, `ollama`, `opencode`, `vscode`, `vm-setup.windows`.
 
 ## Shared probe library

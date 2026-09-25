@@ -14,10 +14,13 @@ All managed package managers must have a minimum release age delay to limit expo
 | --------------- | ---------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | **bun** | `~/.bunfig.toml` | `[install] minimumReleaseAge = 432000` (5 days in seconds), `exact = true` | `src/modules/shell.nix`, `src/platforms/Windows/modules/user/Sync-ShellProfile.ps1` |
 | **uv** | `uv.toml` | `exclude-newer = "P5D"` (ISO 8601 duration) + `add-bounds = "exact"` | `src/modules/shell.nix`, `src/platforms/Windows/modules/user/Sync-ShellProfile.ps1` |
+| **PSGallery** (PowerShell modules) | none upstream | version pin, plus the nupkg SHA256 (`hash`) for hash-pinned entries | `src/lockfiles/lockfile.json` (`psgallery`) |
 
 ## Package managers without delay features
 
 WinGet, Scoop, cargo-binstall, rustup, and Homebrew lack built-in delay. Rely on version pinning in `src/lockfiles/lockfile.json`. Homebrew also disables `autoUpdate` globally.
+
+PSGallery has no release-age feature at all, and nixpkgs packages none of the modules pinned in the lockfile's `psgallery` section, so it cannot be proxied through a delayed source. Rely on version pinning plus the nupkg SHA256 recorded in the object form of a `psgallery` entry.
 
 ## Lifecycle script hardening
 

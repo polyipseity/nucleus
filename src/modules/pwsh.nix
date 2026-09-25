@@ -34,9 +34,21 @@ let
   optionalEnv = value: if value == null then "" else value;
 
   lockfile = builtins.fromJSON (builtins.readFile ../lockfiles/lockfile.json);
-  pwshAnalyzerVersion = lockfile.pwsh.PSScriptAnalyzer or null;
-  pwshPesterVersion = lockfile.pwsh.Pester or null;
-  pwshYamlVersion = lockfile.pwsh."powershell-yaml" or null;
+
+  # A psgallery pin is either a version string or a {version, hash} object — that
+  # union is the schema's contract, not a fallback. A missing pin throws rather
+  # than defaulting, so a renamed or removed module cannot silently install an
+  # empty version spec.
+  psgalleryVersion =
+    module:
+    let
+      pin = lockfile.psgallery.${module} or (throw "lockfile.psgallery: no pin for ${module}");
+    in
+    if builtins.isString pin then pin else pin.version;
+
+  pwshAnalyzerVersion = psgalleryVersion "PSScriptAnalyzer";
+  pwshPesterVersion = psgalleryVersion "Pester";
+  pwshYamlVersion = psgalleryVersion "powershell-yaml";
 
   profileContent =
     # check-suppress:config-method: method 4 (runtime embedded) -- init.ps1 and profile.ps1 are read at eval time and embedded into the activation block as a literal string. No deployment step needed.

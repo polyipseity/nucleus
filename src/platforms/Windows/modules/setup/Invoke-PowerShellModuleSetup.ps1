@@ -4,9 +4,11 @@ function Invoke-PowerShellModuleSetup {
     Idempotently installs PowerShell modules pinned in the repository lockfile.
 
   .DESCRIPTION
-    Reads the `pwsh` section of lockfile.json and installs each listed module at
-    the pinned version. Modules already at the correct version are
-    skipped. Missing or mismatched modules are installed or updated.
+    Reads the `psgallery` section of lockfile.json and installs each listed
+    module at the pinned version. A pin is either a version string or a
+    {version, hash} object; only the version is used here. Modules already at
+    the correct version are skipped. Missing or mismatched modules are
+    installed or updated.
 
     This is additive-only: modules present but not in the lockfile are left
     untouched (no zap/uninstall). PowerShell modules are shared state with
@@ -40,15 +42,22 @@ function Invoke-PowerShellModuleSetup {
   }
 
   $lockfile = Get-Content $lockfilePath -Raw | ConvertFrom-Json
-  $pwshModules = if ($lockfile.pwsh) { $lockfile.pwsh } else { @{} }
+  # WHY no nupkg hash check here: Install-Module installs from PSGallery by name
+  # and cannot install a verified local nupkg, so hashing a separate download
+  # would not cover the artifact that lands on disk. The {hash} pin is consumed
+  # by the hash-pinned declarative module path instead; this installer is
+  # version-pinned only.
+  $psGalleryModules = if ($lockfile.psgallery) { $lockfile.psgallery } else { @{} }
 
-  if ($pwshModules.Count -eq 0) {
+  if ($psGalleryModules.Count -eq 0) {
     return
   }
 
-  foreach ($entry in $pwshModules.PSObject.Properties) {
+  foreach ($entry in $psGalleryModules.PSObject.Properties) {
     $moduleName = $entry.Name
-    $requiredVersion = $entry.Value
+    $pin = $entry.Value
+    # A psgallery pin is either a version string or a {version, hash} object.
+    $requiredVersion = if ($pin -is [string]) { $pin } else { $pin.version }
 
     if ([string]::IsNullOrWhiteSpace($requiredVersion)) {
       Write-NucleusWarning -CommandName 'Invoke-PowerShellModuleSetup' "$moduleName has no pinned version — skipping"

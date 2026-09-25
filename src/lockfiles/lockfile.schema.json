@@ -60,12 +60,36 @@
       "description": "Pi coding agent npm package versions. Package name → version string.",
       "type": "object"
     },
-    "pwsh": {
+    "psgallery": {
       "additionalProperties": {
-        "minLength": 1,
-        "type": "string"
+        "oneOf": [
+          {
+            "minLength": 1,
+            "type": "string"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "hash": {
+                "description": "SHA256 of the PSGallery nupkg in SRI form (sha256-<base64>).",
+                "pattern": "^sha256-[A-Za-z0-9+/]{43}=$",
+                "type": "string"
+              },
+              "version": {
+                "description": "Module version string",
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "hash",
+              "version"
+            ],
+            "type": "object"
+          }
+        ]
       },
-      "description": "PowerShell module versions. Module name → version string.",
+      "description": "PowerShell module versions from PSGallery. Module name → version string or {version, hash} object.",
       "type": "object"
     },
     "rustup": {
@@ -313,7 +337,7 @@
     "bun",
     "cargo-binstall",
     "cursor",
-    "pwsh",
+    "psgallery",
     "rustup",
     "scoop",
     "source-builds",

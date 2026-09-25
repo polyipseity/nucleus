@@ -155,16 +155,20 @@ function Invoke-LockfileEnforcement {
     } else { & $InfoFn "rustup: no stable pin in lockfile; skipping" }
   } else { & $InfoFn "rustup: not installed; skipping enforcement" }
 
-  # --- pwsh (modules) ---
+  # --- psgallery (PowerShell modules) ---
+  # A pin is either a version string or a {version, hash} object; only the
+  # version is enforceable here, because the installed module is an extracted
+  # directory rather than the pinned nupkg.
   if (Get-Command pwsh -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
-    $pwshSec = if ($Lockfile.ContainsKey('pwsh')) { $Lockfile.pwsh } else { @{} }
-    foreach ($entry in $pwshSec.GetEnumerator()) {
+    $psGallerySec = if ($Lockfile.ContainsKey('psgallery')) { $Lockfile.psgallery } else { @{} }
+    foreach ($entry in $psGallerySec.GetEnumerator()) {
       $mod = $entry.Key; $pin = $entry.Value
+      $version = if ($pin -is [hashtable]) { $pin.version } else { $pin }
       $inst = & pwsh -NoProfile -NonInteractive -Command "(Get-Module -ListAvailable -Name '$mod' | Select-Object -First 1).Version.ToString()" 2>$null  # check-suppress:suppression_doc: list command may emit noise/errors when the tool store is uninitialised; empty output is treated as no-installs and drift is still reported below
-      if ([string]::IsNullOrWhiteSpace($inst)) { & $ErrorFn "pwsh.$mod`: expected $pin, not installed"; $errors++ }
-      elseif ($inst.Trim() -ne $pin) { & $ErrorFn "pwsh.$mod`: expected $pin, installed $($inst.Trim())"; $errors++ }
+      if ([string]::IsNullOrWhiteSpace($inst)) { & $ErrorFn "psgallery.$mod`: expected $version, not installed"; $errors++ }
+      elseif ($inst.Trim() -ne $version) { & $ErrorFn "psgallery.$mod`: expected $version, installed $($inst.Trim())"; $errors++ }
     }
-  } else { & $InfoFn "pwsh: not installed; skipping enforcement" }
+  } else { & $InfoFn "psgallery: not installed; skipping enforcement" }
 
   # --- scoop ---
   if (Get-Command scoop -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip

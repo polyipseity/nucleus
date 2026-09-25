@@ -206,7 +206,7 @@ EOF
 
   # Canonical section names (alphabetical). cargo aliases cargo-binstall; the
   # legacy bare tokens nixos-iso / tart-images normalize to vm-setup children.
-  _VALID_SECTIONS_CSV="bun,cargo,cargo-binstall,cursor,pi,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows"
+  _VALID_SECTIONS_CSV="bun,cargo,cargo-binstall,cursor,pi,psgallery,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows"
 
   # Parse flags (comma-separated, defaults to all)
   SECTIONS=""
@@ -320,6 +320,15 @@ EOF
   log_update() {
     say "updating $1.$2 from $3 to $4"
     changed=true
+  }
+
+  # SRI SHA256 (sha256-<base64>) of a PSGallery nupkg, the form the lockfile's
+  # psgallery object pins record. Prints nothing when the fetch fails; every
+  # caller must treat empty output as a failed recomputation and must not write
+  # the entry.
+  psgallery_nupkg_hash() {
+    nix store prefetch-file --json --hash-type sha256 \
+      "https://www.powershellgallery.com/api/v2/package/$1/$2" 2>/dev/null | jq -er '.hash' 2>/dev/null
   }
 
   # Read lockfile
@@ -501,18 +510,40 @@ EOF
     done < <(printf '%s\n' "$data" | jq -r '(.rustup // {}) | keys[]')
   fi
 
-  # pwsh — Find-Module via pwsh -NoProfile
-  if section_enabled pwsh; then
+  # psgallery — Find-Module via pwsh -NoProfile
+  if section_enabled psgallery; then
     while IFS= read -r key; do
       [ -z "$key" ] && continue
-      old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.pwsh // {})[$k] // empty')
-      [ -z "$old" ] && continue
+      old_entry=$(printf '%s\n' "$data" | jq -c --arg k "$key" '(.psgallery // {})[$k] // empty')
+      [ -z "$old_entry" ] && continue
+      old=$(printf '%s\n' "$old_entry" | jq -r 'if type == "object" then .version else . end')
       new=$(pwsh -NoProfile -Command "Find-Module -Name '$key' | Select-Object -ExpandProperty Version" 2>/dev/null | head -1 | tr -d '[:space:]')
+      # WHY: Find-Module renders its warnings on stdout, so an unreachable
+      # PSGallery yields escape-coded noise instead of a version. Never write that
+      # through as a pin — leave the entry unchanged and say so.
+      case "$new" in
+      *[!0-9A-Za-z.+-]*)
+        warn "psgallery.$key: could not resolve a version — leaving the entry unchanged"
+        continue
+        ;;
+      esac
       if [ -n "$new" ] && [ "$new" != "$old" ]; then
-        log_update "pwsh" "$key" "$old" "$new"
-        data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.pwsh[$k] = $v')
+        if [ "$(printf '%s\n' "$old_entry" | jq -r 'type')" = object ]; then
+          # Object-form pins carry the nupkg hash; recompute it for the new
+          # version so a bump never leaves a stale hash behind.
+          new_hash=$(psgallery_nupkg_hash "$key" "$new") || new_hash=""
+          if [ -z "$new_hash" ]; then
+            warn "psgallery.$key: could not fetch the nupkg hash for $new — leaving the entry unchanged"
+            continue
+          fi
+          log_update "psgallery" "$key" "$old" "$new"
+          data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" --arg h "$new_hash" '.psgallery[$k] = {hash: $h, version: $v}')
+        else
+          log_update "psgallery" "$key" "$old" "$new"
+          data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.psgallery[$k] = $v')
+        fi
       fi
-    done < <(printf '%s\n' "$data" | jq -r '(.pwsh // {}) | keys[]')
+    done < <(printf '%s\n' "$data" | jq -r '(.psgallery // {}) | keys[]')
   fi
 
   # cursor — cursor --list-extensions --show-versions

@@ -236,30 +236,34 @@ _lfe_check_rustup() {
   return 1
 }
 
-# Compare installed pwsh modules against the lockfile `pwsh` section.
-_lfe_check_pwsh() {
+# Compare installed PowerShell modules against the lockfile `psgallery` section.
+# A pin is either a version string or a {version, hash} object; the installed
+# module is an extracted directory rather than the pinned nupkg, so only the
+# version is verifiable here. The {hash} pin is consumed by the hash-pinned
+# declarative module path instead.
+_lfe_check_psgallery() {
   local _lf="$1" _jq="$2"
   local _pwsh
   _pwsh="$(command -v pwsh || true)" # check-suppress:suppression_doc: command -v exits non-zero when the tool is absent; || true avoids set -e abort and the empty-string check below handles it
   [ -z "$_pwsh" ] && {
-    say -l pwsh "not installed; skipping enforcement"
+    say -l psgallery "not installed; skipping enforcement"
     return 0
   }
   local _pkgs _mod _pin _inst _rc=0
   # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the section -- safe.
-  _pkgs="$(printf '%s' "$_lf" | "$_jq" -r '(.pwsh // {}) | keys[]' 2>/dev/null)" || return 0
+  _pkgs="$(printf '%s' "$_lf" | "$_jq" -r '(.psgallery // {}) | keys[]' 2>/dev/null)" || return 0
   while IFS= read -r _mod; do
     [ -z "$_mod" ] && continue
     # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
     # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
-    _pin="$(printf '%s' "$_lf" | "$_jq" -r --arg m "$_mod" '(.pwsh // {})[$m] // empty' 2>/dev/null)" || true # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
+    _pin="$(printf '%s' "$_lf" | "$_jq" -r --arg m "$_mod" '((.psgallery // {})[$m] | if type == "object" then .version else . end) // empty' 2>/dev/null)" || true # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
     [ -z "$_pin" ] && continue
     # check-suppress:suppression_doc: module query may fail if pwsh profile errors -- safe.
     _inst="$("$_pwsh" -NoProfile -NonInteractive -Command "Get-Module -ListAvailable -Name '$_mod' | Select-Object -First 1 | ForEach-Object { \$_.Version.ToString() }" 2>/dev/null)" || true
     if [ -z "$_inst" ]; then
-      error "pwsh.$_mod: expected $_pin, not installed" || _rc=1
+      error "psgallery.$_mod: expected $_pin, not installed" || _rc=1
     elif [ "$_inst" != "$_pin" ]; then
-      error "pwsh.$_mod: expected $_pin, installed $_inst" || _rc=1
+      error "psgallery.$_mod: expected $_pin, installed $_inst" || _rc=1
     fi
   done <<EOF
 $_pkgs
@@ -436,7 +440,7 @@ _lfe_run_core() {
   _lfe_check_uv "$_lf_data" "$_jq" "$_desired" || _failures=$((_failures + 1))
   _lfe_check_cargo_binstall "$_lf_data" "$_jq" "$_desired" || _failures=$((_failures + 1))
   _lfe_check_rustup "$_lf_data" "$_jq" || _failures=$((_failures + 1))
-  _lfe_check_pwsh "$_lf_data" "$_jq" || _failures=$((_failures + 1))
+  _lfe_check_psgallery "$_lf_data" "$_jq" || _failures=$((_failures + 1))
   _lfe_check_superpowers "$_lf_data" "$_jq" || _failures=$((_failures + 1))
 
   _lfe_check_opencode "$_lf_data" "$_jq"

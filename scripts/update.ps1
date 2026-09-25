@@ -150,9 +150,12 @@ function Invoke-LockfileBump {
   # Source the deterministic JSON serialization helpers for sorted key output.
   . (Join-Path $repoRoot 'src/platforms/Windows/modules/lib/JsonSort.ps1')
 
+  # Source the PSGallery pin helpers (SRI hash of a downloaded nupkg).
+  . (Join-Path $repoRoot 'src/platforms/Windows/modules/lib/PsGalleryPin.ps1')
+
   # Canonical section list, shared by --list-sections and by token validation so
   # the two can never drift out of sync.
-  $validSectionsCsv = 'bun,cargo,cargo-binstall,cursor,pi,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows'
+  $validSectionsCsv = 'bun,cargo,cargo-binstall,cursor,pi,psgallery,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows'
 
   # --list-sections: print the canonical section names and exit 0 (no lockfile
   # read required, matching the bash twin's early-exit behavior).
@@ -543,26 +546,48 @@ function Invoke-LockfileBump {
   }
 
   # -------------------------------------------------------------------------
-  # pwsh — Find-Module via pwsh -NoProfile
+  # psgallery — Find-Module via pwsh -NoProfile
   # -------------------------------------------------------------------------
-  if (Test-SectionEnabled 'pwsh') {
+  if (Test-SectionEnabled 'psgallery') {
     if (Get-Command -Name 'pwsh' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
-      if ($ht.ContainsKey('pwsh') -and $ht['pwsh'] -is [hashtable]) {
-        foreach ($key in @($ht['pwsh'].Keys)) {
-          $old = $ht['pwsh'][$key]
+      if ($ht.ContainsKey('psgallery') -and $ht['psgallery'] -is [hashtable]) {
+        foreach ($key in @($ht['psgallery'].Keys)) {
+          $pin = $ht['psgallery'][$key]
+          # A psgallery pin is either a version string or a {version, hash} object.
+          $isObjectPin = $pin -is [hashtable]
+          $old = if ($isObjectPin) { $pin['version'] } else { $pin }
           # check-suppress:suppression_doc: probe -- module may not exist in PSGallery; stderr suppressed for clean output.
           $result = & pwsh -NoProfile -Command "Find-Module -Name '$key' | Select-Object -ExpandProperty Version" 2>$null
           if ($result) {
             $new = $result.Trim()
+            # WHY: Find-Module renders its warnings on stdout, so an unreachable
+            # PSGallery yields escape-coded noise instead of a version. Never
+            # write that through as a pin — leave the entry unchanged.
+            if (-not [string]::IsNullOrEmpty($new) -and $new -notmatch '^[0-9A-Za-z.+-]+$') {
+              Write-NucleusWarning "psgallery.$key`: could not resolve a version — leaving the entry unchanged"
+              continue
+            }
             if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
-              Write-Update -Section 'pwsh' -Key $key -OldValue $old -NewValue $new
-              $ht['pwsh'][$key] = $new
+              if ($isObjectPin) {
+                # Object-form pins carry the nupkg hash; recompute it for the new
+                # version so a bump never leaves a stale hash behind.
+                $newHash = Get-PsgalleryNupkgHash -ModuleName $key -Version $new
+                if ([string]::IsNullOrEmpty($newHash)) {
+                  Write-NucleusWarning "psgallery.$key`: could not fetch the nupkg hash for $new — leaving the entry unchanged"
+                  continue
+                }
+                Write-Update -Section 'psgallery' -Key $key -OldValue $old -NewValue $new
+                $ht['psgallery'][$key] = @{ hash = $newHash; version = $new }
+              } else {
+                Write-Update -Section 'psgallery' -Key $key -OldValue $old -NewValue $new
+                $ht['psgallery'][$key] = $new
+              }
             }
           }
         }
       }
     } else {
-      Write-NucleusWarning 'pwsh not found — skipping pwsh section'
+      Write-NucleusWarning 'pwsh not found — skipping psgallery section'
     }
   }
 

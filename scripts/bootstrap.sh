@@ -267,7 +267,10 @@ fi
 
 # ── PowerShell module provisioning ──────────────────────────────────────────
 # Mirror of Invoke-PowerShellModuleSetup.ps1 (Windows bootstrap).
-# Reads lockfile.json pwsh section; installs each module at pinned version.
+# Reads lockfile.json psgallery section; installs each module at pinned version.
+# A pin is either a version string or a {version, hash} object; only the version
+# is passed on (the helper installs through Install-Module, which cannot verify
+# a nupkg hash).
 # Uses the same install-pwsh-module.sh helper as Nix activation.
 provision_pwsh_modules() {
   local _pwsh="$1"
@@ -279,7 +282,7 @@ provision_pwsh_modules() {
   local _modules
   _modules=$("$_pwsh" -NoProfile -Command "
     \$lf = Get-Content -Raw '$(cygpath -w "$_lockfile" 2>/dev/null || echo "$_lockfile")' | ConvertFrom-Json
-    if (\$lf.pwsh) { \$lf.pwsh.PSObject.Properties | ForEach-Object { Write-Output \"\$(\$_.Name)|\$(\$_.Value)\" } }
+    if (\$lf.psgallery) { \$lf.psgallery.PSObject.Properties | ForEach-Object { \$v = \$_.Value; if (\$v -isnot [string]) { \$v = \$v.version }; Write-Output \"\$(\$_.Name)|\$v\" } }
   ") || return 0
 
   while IFS='|' read -r _name _version; do
