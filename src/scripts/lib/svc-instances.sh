@@ -18,8 +18,6 @@
 #   svc_wait_mount_released   <mountPoint> [timeoutSeconds]
 #   svc_mount_table_contains  <mountPoint> [probeSeconds]
 #   svc_run_bounded           <seconds> <command...>
-#   svc_notloaded_transition  <key> <stateDir>
-#   svc_notloaded_clear       <key> <stateDir>
 #   svc_clear_stale_fskit_blocks <servicesJson> <host>
 #
 # Requirements: jq; launchctl (macOS) or systemctl (NixOS) for live enumeration.
@@ -122,6 +120,12 @@ svc_instance_log_dirs() {
 # truth (the mount manifest) drives both provisioning and discovery. `enable`
 # defaults to true (cloud-drives.nix mountSubmodule) and a mount without a
 # configured remote is declared but never instantiated.
+# WHY: the enabled test is `.enable != false`, NOT `.enable // true`.  jq's `//`
+# substitutes its right operand when the left is null OR FALSE, so `// true`
+# cannot express "absent means enabled, but an explicit false means disabled" and
+# enumerated deliberately disabled mounts as configured.  The Windows twin
+# (Test-NucleusMountEnabled) implements the same rule; mount declarations omit
+# `enable` freely, and `enable: false` is live in four registry entries.
 svc_configured_instance_ids() {
   local entry="$1" mounts="$2" svc_type prefix task_path ids
 
@@ -130,7 +134,7 @@ svc_configured_instance_ids() {
   task_path="$(printf '%s' "$entry" | jq -r '.taskPath // ""')"
 
   ids="$(printf '%s' "$mounts" | jq -r '
-    .[]? | select((.enable // true) and (.remoteName != null)) | .id
+    .[]? | select((.enable != false) and (.remoteName != null)) | .id
   ')"
   [ -n "$ids" ] || return 0
 
@@ -259,19 +263,31 @@ svc_remount_until() {
 # svc_mount_table_contains — Whether the mount table lists a path.
 # Args: $1 — absolute mount point; $2 — probe bound in seconds (default 10).
 # Returns 0 when the path is mounted, 1 when it is not.
-# WHY: a probe that hits its bound reports "mounted" — a volume that cannot even
-#   be listed must never be treated as free, or the next mount would land on top
-#   of it.
+# WHY: every path that cannot establish the path's absence reports "mounted".  A
+#   probe that outlives its bound (a volume hung in the kernel) and a table that
+#   could not be read at all both answer that way, because the callers act on
+#   "not mounted" by starting a mount on top of the volume:
+#   svc_wait_mount_released reports the volume released so a reload begins, and
+#   nucleus-cloud repair launches the mount agent.
+# WHY: a read that succeeded and printed nothing is a genuinely empty mount
+#   table, which does establish the absence, so it answers "not mounted".
 svc_mount_table_contains() {
   local mount_point="$1" bound="${2:-10}" status=0 table=""
 
-  # check-suppress:suppression_doc: a probe that fails or outlives its bound is classified below; its own status is not the answer.
+  # check-suppress:suppression_doc: the reader's own status is classified below rather than propagated; a failed read is answered conservatively.
   table="$(svc_run_bounded "$bound" mount 2>/dev/null)" || status=$?
   if [ "$status" -eq 124 ]; then
     return 0
   fi
+  # WHY: a mount that exited non-zero (missing binary, killed, error) read
+  #   nothing, and a failed read is not evidence of absence — the status is what
+  #   tells it apart from a table that was read and happened to be empty.
+  if [ "$status" -ne 0 ]; then
+    warn -l svc-instances "could not read the mount table (mount exited $status); assuming '$mount_point' is mounted."
+    return 0
+  fi
   if [ -z "$table" ]; then
-    warn -l svc-instances "could not read the mount table; assuming '$mount_point' is not mounted."
+    warn -l svc-instances "the mount table is empty; assuming '$mount_point' is not mounted."
     return 1
   fi
 
@@ -326,31 +342,4 @@ svc_list_contains() {
   # WHY: the list is written by this shell, so a reader that stops at its first
   # match would SIGPIPE the write and report a present value as missing.
   grep -qxF "$value" <<<"$list"
-}
-
-# svc_notloaded_transition — First-occurrence marker for a not-loaded instance.
-# Args: $1 — instance key; $2 — state directory.
-# Output: "first" the first time a key is reported, "repeat" afterwards.
-# WHY: the watchdog ticks every 300s; logging the same not-loaded instance on
-# every tick would flood the log, so only transitions are reported.
-svc_notloaded_transition() {
-  local key="$1" state_dir="$2" marker
-
-  marker="$state_dir/$key.notloaded"
-  if [ -e "$marker" ]; then
-    printf 'repeat\n'
-    return 0
-  fi
-  mkdir -p "$state_dir"
-  : >"$marker"
-  printf 'first\n'
-}
-
-# svc_notloaded_clear — Drop the not-loaded marker once an instance is live.
-# Args: $1 — instance key; $2 — state directory.
-svc_notloaded_clear() {
-  local marker="$2/$1.notloaded"
-
-  [ -e "$marker" ] || return 0
-  rm -f "$marker"
 }

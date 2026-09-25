@@ -9,10 +9,17 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 readonly SCRIPT_DIR REPO_ROOT
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
+# Pin HOME and NUCLEUS_USER_ROOT to a temp tree before any library resolves a
+# state path: the suite asserts on svc_health_boot_id, which materialises
+# <state dir>/.boot-id on first call and would otherwise write into the
+# developer's real nucleus root.
+init_test_state
 # shellcheck source=../../src/scripts/lib/lib.sh
 . "$REPO_ROOT/src/scripts/lib/lib.sh"
 # shellcheck source=../../src/scripts/lib/svc-instances.sh
 . "$REPO_ROOT/src/scripts/lib/svc-instances.sh"
+# shellcheck source=../../src/scripts/lib/service-health.sh
+. "$REPO_ROOT/src/scripts/lib/service-health.sh"
 
 require_command jq "svc-instances tests parse registry JSON with jq"
 
@@ -90,8 +97,14 @@ FAKE_SYSTEMCTL
 #   FAKE_MOUNT_AFTER_KICKS — report nothing until the fake launchctl has been
 #                      asked to kickstart this many times: a provider that
 #                      refuses the first attempts and serves a later one.
+#   FAKE_MOUNT_FAIL  — exit with this status printing nothing: a reader that
+#                      could not read the table at all, as opposed to one that
+#                      read an empty table.
 cat >"$_tmp/bin/mount" <<'FAKE_MOUNT'
 #!/usr/bin/env bash
+if [ -n "${FAKE_MOUNT_FAIL:-}" ]; then
+  exit "$FAKE_MOUNT_FAIL"
+fi
 if [ -n "${FAKE_MOUNT_UNTIL:-}" ]; then
   calls=0
   [ -f "${FAKE_MOUNT_CALLS:?}" ] && calls="$(cat "$FAKE_MOUNT_CALLS")"
@@ -114,13 +127,14 @@ FAKE_MOUNT_TABLE=""
 FAKE_MOUNT_SLOW=""
 FAKE_MOUNT_UNTIL=""
 FAKE_MOUNT_AFTER_KICKS=""
+FAKE_MOUNT_FAIL=""
 FAKE_MOUNT_CALLS="$_tmp/mount.calls"
 FAKE_JOB_STATE="$_tmp/job.state"
 FAKE_JOB_ALWAYS=""
 FAKE_JOB_BULK=""
 FAKE_ATTEMPT_LIVE="$_tmp/attempt.live"
 FAKE_KICK_CALLS="$_tmp/kick.calls"
-export FAKE_MOUNT_TABLE FAKE_MOUNT_SLOW FAKE_MOUNT_UNTIL FAKE_MOUNT_AFTER_KICKS FAKE_MOUNT_CALLS
+export FAKE_MOUNT_TABLE FAKE_MOUNT_SLOW FAKE_MOUNT_UNTIL FAKE_MOUNT_AFTER_KICKS FAKE_MOUNT_FAIL FAKE_MOUNT_CALLS
 export FAKE_JOB_STATE FAKE_JOB_ALWAYS FAKE_JOB_BULK FAKE_ATTEMPT_LIVE FAKE_KICK_CALLS
 
 LAUNCHCTL_ENTRY='{"type": "macos-launchctl","service":"local.cloud-mount.","scope":"user","launchdDomain":"gui","prefixMatch":true}'
@@ -188,18 +202,7 @@ assert_eq "system instance dir uses the system log root" "$_tmp/syslog/cloud-mou
 assert_eq "an entry without instanceDirs yields no directories" "" \
   "$(svc_instance_log_dirs "$LAUNCHCTL_ENTRY" "$_tmp/log" "$_tmp/syslog" 'local.cloud-mount.iCloud')"
 
-section 5 "Not-loaded transition markers"
-assert_eq "the first report of a not-loaded instance is a transition" "first" \
-  "$(svc_notloaded_transition cloud-drive "$_tmp/state")"
-assert_eq "a repeated report is not a transition" "repeat" \
-  "$(svc_notloaded_transition cloud-drive "$_tmp/state")"
-svc_notloaded_clear cloud-drive "$_tmp/state"
-assert_eq "clearing the marker restores the transition" "first" \
-  "$(svc_notloaded_transition cloud-drive "$_tmp/state")"
-svc_notloaded_transition other "$_tmp/state" >/dev/null
-assert_eq "markers are per key" "repeat" "$(svc_notloaded_transition other "$_tmp/state")"
-
-section 6 "Cloud mount points"
+section 5 "Cloud mount points"
 
 # WHY: the loader hands this function resolved local paths (a host-keyed variant
 # is not a mount point yet), so the array mixes both shapes deliberately.
@@ -234,7 +237,7 @@ assert_eq "an empty home yields no mount point" "" "$(mount_point_with_home '')"
 assert_eq "a systemd instance resolves through the same mounts array" "/home/u/clouds/OneDrive" \
   "$(svc_cloud_mount_point "$SYSTEMCTL_ENTRY" "$MOUNTS_JSON" 'cloud-mount-OneDrive.service' '/home/u')"
 
-section 7 "Bounded command probes"
+section 6 "Bounded command probes"
 
 # bounded_rc — Exit status of a command run under svc_run_bounded.
 bounded_rc() { # <seconds> <command...>
@@ -255,7 +258,7 @@ else
   assert_pass "a command stopped at its bound never finishes its work"
 fi
 
-section 8 "Mount table probe"
+section 7 "Mount table probe"
 
 # mount_table_rc <path> [probe bound] — probe status with the fake table the
 # caller set.
@@ -273,19 +276,31 @@ FAKE_MOUNT_TABLE='fake://vol on /mnt/yesmore (fake, nodev)'
 assert_eq "a listed path that extends the probe is not a match" "1" "$(mount_table_rc /mnt/yes)"
 FAKE_MOUNT_TABLE=''
 FAKE_MOUNT_SLOW=''
-_mount_out=""
-_mount_rc=0
-_mount_out="$(svc_mount_table_contains /mnt/any 2>&1)" || _mount_rc=$?
-# WHY: an unreadable table is reported, but the return value still says
-# "not mounted" — that is the fail-open path the function documents as unsafe.
-assert_eq "an unreadable mount table is reported as not mounted" "1" "$_mount_rc"
+FAKE_MOUNT_FAIL=''
 assert_mentions() { # <slug> <haystack> <needle>
   case "$2" in
   *"$3"*) assert_pass "$1" ;;
   *) assert_fail "$1" "expected output to mention '$3', got: $2" ;;
   esac
 }
+_mount_out=""
+_mount_rc=0
+_mount_out="$(svc_mount_table_contains /mnt/any 2>&1)" || _mount_rc=$?
+# WHY: a read that SUCCEEDED and printed nothing is a genuinely empty mount
+# table, and an empty table is evidence that the path is absent.
+assert_eq "an empty mount table that was read is reported as not mounted" "1" "$_mount_rc"
+assert_mentions "an empty mount table is reported" "$_mount_out" "the mount table is empty"
+
+# WHY: a table that could not be READ is not evidence that the path is absent.
+# Every caller acts on "not mounted" by starting a mount, so an unreadable table
+# answers exactly like a probe that outlives its bound.
+FAKE_MOUNT_FAIL=1
+_mount_out=""
+_mount_rc=0
+_mount_out="$(svc_mount_table_contains /mnt/any 2>&1)" || _mount_rc=$?
+assert_eq "a mount table that could not be read counts as mounted" "0" "$_mount_rc"
 assert_mentions "an unreadable mount table is reported" "$_mount_out" "could not read the mount table"
+FAKE_MOUNT_FAIL=''
 
 # WHY: a probe that outlives its bound models a hung volume, which must never be
 # read as "free" or the next mount lands on top of it.
@@ -293,6 +308,19 @@ FAKE_MOUNT_TABLE='fake://vol on /mnt/yes (fake)'
 FAKE_MOUNT_SLOW=5
 assert_eq "a probe that outlives its bound counts as mounted" "0" "$(mount_table_rc /mnt/yes 1)"
 FAKE_MOUNT_SLOW=''
+
+# WHY: svc_wait_mount_released is the call a reload makes, and the two unreadable
+# paths must agree — a reader that failed and a probe that outlived its bound
+# describe the same condition, and answering them differently is what let a
+# reload start on top of a volume that was still attached.
+FAKE_MOUNT_TABLE=''
+FAKE_MOUNT_FAIL=1
+if svc_wait_mount_released /mnt/any 1; then
+  assert_fail "svc-wait-mount-unreadable" "an unreadable mount table was reported as released"
+else
+  assert_pass "an unreadable mount table is never reported as released"
+fi
+FAKE_MOUNT_FAIL=''
 
 # WHY: the wait is what a reload uses to avoid starting on top of a volume that
 # is still attached, so both exits matter: released, and never released.
@@ -322,11 +350,59 @@ FAKE_MOUNT_TABLE='fake://vol on /mnt/other (fake)'
 assert_eq "a path that is not mounted needs no wait" "0" "$(wait_released_rc /mnt/absent 1)"
 FAKE_MOUNT_TABLE=''
 
-if [ -n "$(svc_boot_id)" ]; then
+if [ -n "$(svc_health_boot_id)" ]; then
   assert_pass "the boot id is reported"
 else
-  assert_fail "svc-boot-id" "svc_boot_id printed nothing"
+  assert_fail "svc-boot-id" "svc_health_boot_id printed nothing"
 fi
+
+section 8 "Declared mount filtering (enable / remoteName)"
+
+# The Windows side pins this contract with an Enabled/Disabled/NoRemote/NullRemote
+# fixture (Get-NucleusServiceInstance.Tests.ps1); this is the POSIX mirror, so the
+# enable and remoteName rules are pinned on BOTH hosts.  `enable` is optional and
+# defaults to true (cloud-drives.nix mountSubmodule), so an omitted key means
+# enabled while an explicit false disables the mount.
+MOUNT_FIXTURE='[
+  {"id":"Enabled","enable":true,"remoteName":"Enabled"},
+  {"id":"Disabled","enable":false,"remoteName":"Disabled"},
+  {"id":"NoRemote","enable":true},
+  {"id":"NullRemote","enable":true,"remoteName":null},
+  {"id":"NoEnableKey","remoteName":"NoEnableKey"}
+]'
+
+assert_eq "launchd declares only enabled mounts that name a remote" \
+  "local.cloud-mount.Enabled
+local.cloud-mount.NoEnableKey" \
+  "$(svc_configured_instance_ids "$LAUNCHCTL_ENTRY" "$MOUNT_FIXTURE")"
+assert_eq "systemd declares only enabled mounts that name a remote" \
+  "cloud-mount-Enabled.service
+cloud-mount-NoEnableKey.service" \
+  "$(svc_configured_instance_ids "$SYSTEMCTL_ENTRY" "$MOUNT_FIXTURE")"
+assert_eq "the scheduled-task mapping declares only enabled mounts that name a remote" \
+  '\NucleusCloudMount\NucleusCloudMount-Enabled
+\NucleusCloudMount\NucleusCloudMount-NoEnableKey' \
+  "$(svc_configured_instance_ids "$SCHTASK_ENTRY" "$MOUNT_FIXTURE")"
+
+# WHY: an explicit false must not be read as "absent".  jq's `//` substitutes on
+# false as well as on null, so `enable // true` cannot express the default.
+if svc_configured_instance_ids "$LAUNCHCTL_ENTRY" "$MOUNT_FIXTURE" | grep -q 'Disabled'; then
+  assert_fail "enable-false-excluded" "an explicitly disabled mount was declared as configured"
+else
+  assert_pass "an explicitly disabled mount is not declared as configured"
+fi
+
+if svc_configured_instance_ids "$LAUNCHCTL_ENTRY" "$MOUNT_FIXTURE" | grep -q 'NoEnableKey'; then
+  assert_pass "a mount that omits enable is declared (the default is true)"
+else
+  assert_fail "enable-absent-included" "a mount without an enable key was dropped"
+fi
+
+# A declared-but-remote-less mount is never instantiated, by either null or absence.
+assert_eq "a mount without a remote is not declared (absent key)" "" \
+  "$(svc_configured_instance_ids "$LAUNCHCTL_ENTRY" '[{"id":"NoRemote","enable":true}]')"
+assert_eq "a mount without a remote is not declared (null remoteName)" "" \
+  "$(svc_configured_instance_ids "$LAUNCHCTL_ENTRY" '[{"id":"NullRemote","enable":true,"remoteName":null}]')"
 
 section "svc-instances" "bounded relaunch until the volume attaches"
 

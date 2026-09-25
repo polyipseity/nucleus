@@ -18,49 +18,36 @@
         "type": "string"
       },
       "lifecycle": {
-        "description": "Shared policy data for the service (attempts, backoff, timeout, classification rules). Consumed by runners and watchers on every host from a single definition.",
+        "description": "Shared policy data for the service (mount attempt counts, timings, watchdog cadence). Consumed by runners and watchers on every host from a single definition. Contains no failure-classification tokens and no user-facing text: classification is per host (see each host's mount backend) and remedies live in the code that emits them.",
         "properties": {
-          "attempts": {
-            "description": "Maximum mount/retry attempts per run before giving up.",
+          "mountAttempts": {
+            "description": "Maximum mount attempts in ONE runner invocation before the runner gives up. Governs the mount runner only; it is not a retry count for the service watchdog.",
             "type": "integer",
             "minimum": 1
           },
-          "backoffSeconds": {
-            "description": "Exponential backoff schedule in seconds between retry attempts.",
+          "mountRetryBackoffSeconds": {
+            "description": "Seconds to sleep before the NEXT mount attempt, indexed by attempt number (1-based): attempt N sleeps element N-1. CLAMPED, never extrapolated - when `mountAttempts` exceeds the schedule length the LAST declared value is reused, so every delay a runner sleeps is a declared value and no runner may invent one beyond the list. Hosts must not diverge on this rule.",
             "items": { "type": "integer", "minimum": 1 },
+            "minItems": 1,
             "type": "array"
           },
-          "attachSeconds": {
-            "description": "Seconds to wait for a live mount after rclone starts.",
+          "mountAttachTimeoutSeconds": {
+            "description": "Seconds to wait for the mount to become live after rclone starts. A TIMEOUT, not an interval and not a retry count: when it elapses the attempt is recorded as a failure.",
             "type": "integer",
             "minimum": 1
           },
-          "reviveSeconds": {
-            "description": "Seconds between watchdog ticks for revival.",
+          "watchdogTickSeconds": {
+            "description": "Seconds the service watchdog sleeps between ticks, on every host. Bounds how long a service can stay down before revival is even attempted. Distinct from watchdogRepairTimeoutSeconds, which bounds ONE repair call rather than the gap between ticks.",
             "type": "integer",
             "minimum": 1
           },
-          "repairSeconds": {
-            "description": "Seconds for a repair operation to complete before timeout.",
+          "watchdogRepairTimeoutSeconds": {
+            "description": "Seconds allowed for ONE supervisor repair call before the watchdog abandons it as timed out. Bounds a single call, not the gap between ticks; distinct from watchdogTickSeconds.",
             "type": "integer",
             "minimum": 1
-          },
-          "transientClasses": {
-            "description": "Failure class tokens that are retried within the attempt bound.",
-            "items": { "type": "string" },
-            "type": "array"
-          },
-          "terminalClasses": {
-            "description": "Failure class tokens that stop after one attempt (no retry).",
-            "items": { "type": "string" },
-            "type": "array"
-          },
-          "classes": {
-            "description": "Failure class token to remedy text mapping.",
-            "additionalProperties": { "type": "string" },
-            "type": "object"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "logging": {
         "$ref": "#/definitions/loggingEntry"
@@ -289,13 +276,18 @@
           "description": "Service is socket-activated by launchd (e.g. sshd). Shows as \"listening\" in status instead of \"inactive\".",
           "type": "boolean"
         },
+        "unitPath": {
+          "description": "Canonical install path for the supervisor unit file. Backend resolves __INSTANCE__ token and leading ~ expansion. Required for file-backed supervisors (macos-launchctl, nixos-systemctl).",
+          "type": "string"
+        },
         "type": {
           "const": "macos-launchctl"
         }
       },
       "required": [
         "type",
-        "service"
+        "service",
+        "unitPath"
       ],
       "type": "object"
     },
@@ -448,13 +440,18 @@
           "description": "systemd unit name",
           "type": "string"
         },
+        "unitPath": {
+          "description": "Canonical install path for the systemd unit file. Backend resolves __INSTANCE__ token and leading ~ expansion. Required for file-backed supervisors (nixos-systemctl).",
+          "type": "string"
+        },
         "type": {
           "const": "nixos-systemctl"
         }
       },
       "required": [
         "type",
-        "service"
+        "service",
+        "unitPath"
       ],
       "type": "object"
     }
