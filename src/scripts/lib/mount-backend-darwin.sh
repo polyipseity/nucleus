@@ -31,13 +31,27 @@ backend_class() {
   }
 
   # FSKit/provider refusal patterns.
+  # The module state decides retry policy: provider-refusal is transient and is retried,
+  # provider-version is terminal and blocks at once.  Retrying a provider failure is what
+  # produced the original restart storm.
+  # fskit_macfuse_module_state answers exactly three values (enabled|disabled|unknown), so
+  # this branch reads:
+  #   disabled — the extension is PRESENT but switched off.  The user must re-enable it,
+  #     and a re-enable can succeed, so this is the one provider state worth retrying.
+  #   everything else — `enabled`, `unknown`, or an unexpected/empty value.  Either the
+  #     module IS listed and the mount failed anyway, or its state could not be read at
+  #     all; neither is a condition a retry can clear, so both are terminal.
+  # WHY this function does NOT check a macFUSE version: the version judgement is made in
+  # backend_prepare below, which blocks provider-version up front when the installed
+  # macFUSE predates 5.4.0 (the first release built against the macOS 27 FSKit
+  # volume-operation APIs).  Reaching this branch with `enabled` therefore means a listed
+  # module whose mount still failed — terminal is the safe reading, since a retry that
+  # cannot help is exactly the storm this classification exists to prevent.
   if grep -qE 'File system extension not (found|enabled)|fuse: mount failed with error|mount\(8\) returned 69|MFMount.*not enabled' "$capture"; then
-    local module_state
-    module_state="$(fskit_macfuse_module_state)"
-    if [ "$module_state" = "disabled" ]; then
+    if [ "$(fskit_macfuse_module_state)" = "disabled" ]; then
       printf 'provider-refusal\n'
     else
-      printf 'provider-refusal\n'
+      printf 'provider-version\n'
     fi
     return
   fi
@@ -166,9 +180,22 @@ backend_prepare() {
     ;;
   unknown)
     # Cannot read the list — try to proceed; rclone will report if it fails.
+    # WHY this fails OPEN while backend_class fails CLOSED for the same `unknown` state:
+    # the two answer different questions.  prepare asks "may I proceed?" — refusing here
+    # would block a mount that may work, under a class that misdescribes the condition.
+    # class asks "what kind of failure is this?" — and a provider failure the module state
+    # cannot explain is not something a retry can clear, so it is terminal.  Composed,
+    # they yield "attempt once, then block": no path retries an unexplained provider
+    # failure indefinitely.  Do not "fix" either one to match the other.
     return 0
     ;;
   esac
+
+  # Not reachable through the three declared states above, but stated explicitly rather
+  # than left to fall out of the `case`: an unexpected value fails OPEN, exactly like
+  # `unknown`.  The mount is attempted, and rclone plus backend_class report the real
+  # failure; failing closed here would block the mount under a class that misdescribes it.
+  return 0
 }
 
 # backend_args — emit macOS-specific rclone mount flags.
