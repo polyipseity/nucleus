@@ -73,6 +73,43 @@ filter_scoped_files() {
   done
 }
 
+# Run a step's sub-checks in declared order, announcing each label and failing the
+# whole step when any sub-check fails.
+# Usage: run_policy_checks <ctx-name> <step-label> <spec-array-name> [files ...]
+#   A spec is "<label>|<function>|<style>": "ctx" passes the context name to the
+#   sub-check, "files" passes the context's HAS_ARGS and REPO_ROOT. Sub-checks keep
+#   their signatures, so each stays callable on its own against a fixture tree.
+run_policy_checks() {
+  local _rpc_ctx="$1" _rpc_label="$2" _rpc_specs="$3"
+  # shellcheck disable=SC2178 # reason: namerefs to the caller's context and spec array
+  local -n _rpc_context="$_rpc_ctx"
+  # shellcheck disable=SC2178 # reason: nameref to the caller's spec array
+  local -n _rpc_spec_list="$_rpc_specs"
+  shift 3
+  local _failed=0 _spec _label _func _style
+  for _spec in "${_rpc_spec_list[@]}"; do
+    _label="${_spec%%|*}"
+    _spec="${_spec#*|}"
+    _func="${_spec%%|*}"
+    _style="${_spec##*|}"
+    say "--- $_label ---"
+    case "$_style" in
+    ctx) "$_func" "$_rpc_ctx" "$@" || _failed=1 ;;
+    files) "$_func" "${_rpc_context[HAS_ARGS]}" "${_rpc_context[REPO_ROOT]}" "$@" || _failed=1 ;;
+    *)
+      error "run_policy_checks: unknown style '$_style' in spec '$_label|$_func|$_style'"
+      return 1
+      ;;
+    esac
+  done
+  if [ "$_failed" -ne 0 ]; then
+    error "$_rpc_label check failed"
+    return 1
+  fi
+  say "$_rpc_label passed."
+  return 0
+}
+
 usage() {
   usage_std "check.sh" "[--fail-fast|--no-fail-fast] [--scoped|--full] [--online] [--verbose[=<ids>]] [--no-verbose] [--only-steps=<ids>] [path ...]" "Run all repository validation checks with parallel step dispatch (capped at PARALLEL_JOBS). Use --scoped to skip whole-repo checks (path-scoped mode), --full to force whole-repo checks even with paths. Default: scoped if paths given, full otherwise. With arguments, passes paths through to supporting checkers. Use --fail-fast to exit immediately on first failure (default: accumulate all). Use --no-fail-fast to accumulate all failures (default). Use --online to additionally run online determinism checks (requires network). Use --verbose to stream all step output (default: headers + summaries only). Use --verbose=<ids> to stream only specified step IDs. Use --no-verbose to suppress streaming (default). Use --only-steps=<ids> to run only the steps with the given comma-separated IDs."
 }

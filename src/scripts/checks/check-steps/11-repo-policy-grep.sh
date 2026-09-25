@@ -4,41 +4,22 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-_REPO_POLICY_STEP_DIR="$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-_AWK_PATH="$_REPO_POLICY_STEP_DIR/repository-policy.awk"
-
 register_step "repo-policy-grep" "Repository policy (grep-heavy)" run_repo_policy_grep
 
+# Sub-checks in output order, as "<label>|<function>|<style>".
+_POLICY_GREP_CHECKS=(
+  "store-path arg usage|run_store_path_arg_usage|ctx"
+  "activation tool resolution|run_activation_tool_resolution|ctx"
+  "package manager enforcement|run_package_manager_enforcement|ctx"
+  "suppression audit|run_suppression_audit|ctx"
+  "cloud-mount invariants|run_cloud_mount_invariants|ctx"
+  "service supervision invariants|run_service_supervision_invariants|ctx"
+)
+
 run_repo_policy_grep() {
-  local -n ctx="$1"
   local _ctx_name="$1"
   shift
-  local _failed=0
-
-  say "--- store-path arg usage ---"
-  run_store_path_arg_usage "$_ctx_name" "$@" || _failed=1
-
-  say "--- activation tool resolution ---"
-  run_activation_tool_resolution "$_ctx_name" "$@" || _failed=1
-
-  say "--- package manager enforcement ---"
-  run_package_manager_enforcement "$_ctx_name" "$@" || _failed=1
-
-  say "--- suppression audit ---"
-  run_suppression_audit "$_ctx_name" "$@" || _failed=1
-
-  say "--- cloud-mount invariants ---"
-  run_cloud_mount_invariants "$_ctx_name" "$@" || _failed=1
-
-  say "--- service supervision invariants ---"
-  run_service_supervision_invariants "$_ctx_name" "$@" || _failed=1
-
-  if [ "$_failed" -ne 0 ]; then
-    error "repository policy (grep-heavy) check failed"
-    return 1
-  fi
-  say "repository policy (grep-heavy) passed."
-  return 0
+  run_policy_checks "$_ctx_name" "repository policy (grep-heavy)" _POLICY_GREP_CHECKS "$@"
 }
 
 run_store_path_arg_usage() {

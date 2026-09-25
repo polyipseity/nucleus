@@ -6,42 +6,28 @@
 
 _REPO_POLICY_STEP_DIR="$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _AWK_PATH="$_REPO_POLICY_STEP_DIR/repository-policy.awk"
+# Every repo-policy step file carries the literal pattern text the scans below search
+# for, so each scan skips the whole set, itself included.
+# ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
+_POLICY_STEP_SELF_SH="$(basename "${BASH_SOURCE[0]}")"
+_POLICY_STEP_SELF_PS1="${_POLICY_STEP_SELF_SH%.sh}.ps1"
 
 register_step "repo-policy-pattern" "Repository policy (pattern-based)" run_repo_policy_pattern
 
+# Sub-checks in output order, as "<label>|<function>|<style>".
+_POLICY_PATTERN_CHECKS=(
+  "activation naming policy|run_activation_naming_policy|files"
+  "config method compliance|run_config_method_compliance|files"
+  "logging format policy|run_logging_format_policy|files"
+  "removed skip mechanism|run_removed_skip_mechanism|files"
+  "nix file structure|run_nix_file_structure|files"
+  "log capture pair policy|run_log_capture_pair_policy|files"
+)
+
 run_repo_policy_pattern() {
-  # shellcheck disable=SC2034 # reason: ctx is a nameref passed to sub-checks via _ctx_name
-  local -n ctx="$1"
   local _ctx_name="$1"
   shift
-  local _failed=0
-
-  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
-
-  say "--- activation naming policy ---"
-  run_activation_naming_policy "$_has_args" "$_repo_root" "$@" || _failed=1
-
-  say "--- config method compliance ---"
-  run_config_method_compliance "$_has_args" "$_repo_root" "$@" || _failed=1
-
-  say "--- logging format policy ---"
-  run_logging_format_policy "$_has_args" "$_repo_root" "$@" || _failed=1
-
-  say "--- removed skip mechanism ---"
-  run_removed_skip_mechanism "$_has_args" "$_repo_root" "$@" || _failed=1
-
-  say "--- nix file structure ---"
-  run_nix_file_structure "$_has_args" "$_repo_root" "$@" || _failed=1
-
-  say "--- log capture pair policy ---"
-  run_log_capture_pair_policy "$_has_args" "$_repo_root" "$@" || _failed=1
-
-  if [ "$_failed" -ne 0 ]; then
-    error "repository policy (pattern-based) check failed"
-    return 1
-  fi
-  say "repository policy (pattern-based) passed."
-  return 0
+  run_policy_checks "$_ctx_name" "repository policy (pattern-based)" _POLICY_PATTERN_CHECKS "$@"
 }
 
 run_config_method_compliance() {
@@ -237,6 +223,21 @@ run_activation_naming_policy() {
   return 0
 }
 
+# True when a pattern scan may read "$1": it matches the caller's extension regex,
+# and is neither vendored code, a secret, nor a test fixture (fixtures hold violation
+# samples on purpose).
+# ref: allow-and-deny-lists.instructions.md#B6 -- structural invariants; vendored and secret files are separate concerns
+_policy_scan_target() {
+  local _pst_file="$1" _pst_ext_re="$2"
+  case "$_pst_file" in
+  vendor/* | src/secrets/* | tests/fixtures/*) return 1 ;;
+  esac
+  case "$(basename "$_pst_file")" in
+  "$_POLICY_STEP_SELF_SH" | "$_POLICY_STEP_SELF_PS1" | 11-repo-policy-grep.ps1 | 13-repo-policy-data.ps1) return 1 ;;
+  esac
+  [[ "$_pst_file" =~ $_pst_ext_re ]]
+}
+
 run_logging_format_policy() {
   local _has_args="$1" _repo_root="$2"
   shift 2
@@ -244,43 +245,20 @@ run_logging_format_policy() {
   cd "$_repo_root" || return 1
 
   local _lf_errors=0
-  # Exclude this check's own files: their source contains the literal pattern text.
-  # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
-  local _lf_self_sh
-  _lf_self_sh="$(basename "${BASH_SOURCE[0]}")"
-  local _lf_self_ps1="${_lf_self_sh%.sh}.ps1"
 
   # Logging-format policy scope: tracked script files outside vendored code,
   # secrets, and test fixtures (fixtures deliberately hold violation samples).
   # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariants; vendored and secret files are separate concerns
+  local _lf_ext_re='\.(sh|zsh|ps1|psm1)$'
   local _lf_files=()
+  local _f
   if $_has_args; then
     for _f in "${_files[@]}"; do
-      case "$_f" in
-      vendor/* | src/secrets/* | tests/fixtures/*) continue ;;
-      esac
-      case "$_f" in
-      *.sh | *.zsh | *.ps1 | *.psm1) ;;
-      *) continue ;;
-      esac
-      case "$(basename "$_f")" in
-      "$_lf_self_sh" | "$_lf_self_ps1" | 11-repo-policy-grep.ps1 | 12-repo-policy-pattern.ps1 | 13-repo-policy-data.ps1) continue ;;
-      esac
-      _lf_files+=("$_f")
+      if _policy_scan_target "$_f" "$_lf_ext_re"; then _lf_files+=("$_f"); fi
     done
   else
     while IFS= read -r _f; do
-      case "$_f" in
-      vendor/* | src/secrets/* | tests/fixtures/*) continue ;;
-      esac
-      case "$_f" in
-      *.sh | *.zsh | *.ps1 | *.psm1) ;;
-      *) continue ;;
-      esac
-      case "$(basename "$_f")" in
-      "$_lf_self_sh" | "$_lf_self_ps1" | 11-repo-policy-grep.ps1 | 12-repo-policy-pattern.ps1 | 13-repo-policy-data.ps1) continue ;;
-      esac
-      _lf_files+=("$_f")
+      if _policy_scan_target "$_f" "$_lf_ext_re"; then _lf_files+=("$_f"); fi
     done < <(git ls-files | filter_gitignored)
   fi
 
@@ -425,46 +403,23 @@ run_log_capture_pair_policy() {
   cd "$_repo_root" || return 1
 
   local _lcp_errors=0
-  # Exclude this check's own files: their source contains the literal pattern text.
-  # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
-  local _lcp_self_sh
-  _lcp_self_sh="$(basename "${BASH_SOURCE[0]}")"
-  local _lcp_self_ps1="${_lcp_self_sh%.sh}.ps1"
 
   # Scope excludes test fixtures, which deliberately hold violation samples.
   # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariants; vendored and secret files are separate concerns
+  local _lcp_ext_re='\.(nix|sh|ps1|psm1|yml)$'
   local _lcp_files=()
+  local _f
   if $_has_args; then
     for _f in "${_files[@]}"; do
-      case "$_f" in
-      vendor/* | src/secrets/* | tests/fixtures/*) continue ;;
-      esac
-      case "$_f" in
-      *.nix | *.sh | *.ps1 | *.psm1 | *.yml) ;;
-      *) continue ;;
-      esac
-      case "$(basename "$_f")" in
-      "$_lcp_self_sh" | "$_lcp_self_ps1" | 11-repo-policy-grep.ps1 | 12-repo-policy-pattern.ps1 | 13-repo-policy-data.ps1) continue ;;
-      esac
-      _lcp_files+=("$_f")
+      if _policy_scan_target "$_f" "$_lcp_ext_re"; then _lcp_files+=("$_f"); fi
     done
   else
     while IFS= read -r _f; do
-      case "$_f" in
-      vendor/* | src/secrets/* | tests/fixtures/*) continue ;;
-      esac
-      case "$_f" in
-      *.nix | *.sh | *.ps1 | *.psm1 | *.yml) ;;
-      *) continue ;;
-      esac
-      case "$(basename "$_f")" in
-      "$_lcp_self_sh" | "$_lcp_self_ps1" | 11-repo-policy-grep.ps1 | 12-repo-policy-pattern.ps1 | 13-repo-policy-data.ps1) continue ;;
-      esac
-      _lcp_files+=("$_f")
+      if _policy_scan_target "$_f" "$_lcp_ext_re"; then _lcp_files+=("$_f"); fi
     done < <(git ls-files | filter_gitignored)
   fi
 
-  local _f _lcp_discard_re='(StandardOutPath|StandardErrorPath|StandardOutput|StandardError)[[:space:]]*=[[:space:]]*"/dev/null"'
+  local _lcp_discard_re='(StandardOutPath|StandardErrorPath|StandardOutput|StandardError)[[:space:]]*=[[:space:]]*"/dev/null"'
   for _f in "${_lcp_files[@]}"; do
     [ -f "$_f" ] || continue
 

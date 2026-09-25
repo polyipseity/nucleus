@@ -6,36 +6,19 @@
 
 register_step "repo-policy-data" "Repository policy (data-driven)" run_repo_policy_data
 
+# Sub-checks in output order, as "<label>|<function>|<style>".
+_POLICY_DATA_CHECKS=(
+  "dummy key uniformity|run_dummy_key_uniformity|files"
+  "preflight install command policy|run_preflight_install_command_policy|ctx"
+  "agents policy|run_agents_policy|files"
+  "embedded content enforcement|run_embedded_content_enforcement|files"
+  "method-1 symlink resolution|run_method1_symlink_resolution|ctx"
+)
+
 run_repo_policy_data() {
-  # shellcheck disable=SC2034 # reason: ctx is a nameref passed to sub-checks via _ctx_name
-  local -n ctx="$1"
   local _ctx_name="$1"
   shift
-  local _failed=0
-
-  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
-
-  say "--- dummy key uniformity ---"
-  run_dummy_key_uniformity "$_has_args" "$_repo_root" "$@" || _failed=1
-
-  say "--- preflight install command policy ---"
-  run_preflight_install_command_policy "$_ctx_name" "$@" || _failed=1
-
-  say "--- agents policy ---"
-  run_agents_policy "$_has_args" "$_repo_root" "$@" || _failed=1
-
-  say "--- embedded content enforcement ---"
-  run_embedded_content_enforcement "$_has_args" "$_repo_root" "$@" || _failed=1
-
-  say "--- method-1 symlink resolution ---"
-  run_method1_symlink_resolution "$_ctx_name" "$@" || _failed=1
-
-  if [ "$_failed" -ne 0 ]; then
-    error "repository policy (data-driven) check failed"
-    return 1
-  fi
-  say "repository policy (data-driven) passed."
-  return 0
+  run_policy_checks "$_ctx_name" "repository policy (data-driven)" _POLICY_DATA_CHECKS "$@"
 }
 
 run_dummy_key_uniformity() {
