@@ -15,6 +15,8 @@ _MOUNT_BACKEND_LINUX_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" 
 [ -n "${_NUCLEUS_LIB_SOURCED-}" ] || . "$_MOUNT_BACKEND_LINUX_DIR/lib.sh"
 # shellcheck source=service-health.sh
 [ -n "${_NUCLEUS_SERVICE_HEALTH_SOURCED-}" ] || . "$_MOUNT_BACKEND_LINUX_DIR/service-health.sh"
+# shellcheck source=svc-instances.sh
+[ -n "${_NUCLEUS_SVC_INSTANCES_SOURCED-}" ] || . "$_MOUNT_BACKEND_LINUX_DIR/svc-instances.sh"
 
 # backend_class — classify a failure from stderr capture.
 backend_class() {
@@ -135,10 +137,23 @@ backend_mount() {
 _backend_capture=""
 _backend_rclone_pid=""
 
-# backend_probe — check if the volume is live.
+# backend_probe — report whether the mount point is a LIVE MOUNT.
+# Args: $1 — mount_point.
+# Exit: 0 when mounted, 1 when not mounted.
+#
+# WHY: this asks about MOUNT STATE, never about directory contents. An empty
+#   remote root is a legitimate state (a freshly created cloud folder), so a
+#   content test reports a healthy mount as dead: the runner never sets live,
+#   retries `mountAttempts` times, and leaves the service permanently blocked at
+#   `mount-failed` on a mount that actually succeeded.
+# This is the same PREDICATE the macOS backend asks via diskutil — "is this path
+#   a live mount?" — answered here with this host's mount state, through the
+#   repository's single mount-table predicate: svc_mount_table_contains
+#   (src/scripts/lib/svc-instances.sh). Delegating rather than re-parsing keeps
+#   one implementation of the question, so `nucleus-cloud repair` and this probe
+#   can never disagree about whether a mount point is mounted.
 backend_probe() {
-  local mount_point="$1"
-  [ -d "$mount_point" ] && [ "$(ls -A "$mount_point" 2>/dev/null)" ]
+  svc_mount_table_contains "$1"
 }
 
 # backend_unmount — release the volume.
