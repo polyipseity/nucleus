@@ -51,7 +51,9 @@ usage_std() {
 
 # Auto-derived command prefix for output helpers.
 # Strips "nucleus-" prefix if present; falls back to basename.
-_nuc_prefix="$(basename "$0")"
+# WHY: only set if unset — tests export a correct prefix before subshells
+# source this file, and unconditionally overwriting it breaks notice output.
+: "${_nuc_prefix:=$(basename "$0")}"
 # Strip .sh extension for cleaner prefix (e.g., "svc:" instead of "svc.sh:")
 _nuc_prefix="${_nuc_prefix%.sh}"
 case "$_nuc_prefix" in
@@ -317,6 +319,41 @@ resolve_nucleus_host() {
   Linux) printf '%s\n' "NixOS" ;;
   *) printf '%s\n' "Unknown" ;;
   esac
+}
+
+# supervisor_resolve_unit_path — expand a declared supervisor unit path.
+# Args: $1 — declared path (may hold a __INSTANCE__ placeholder); $2 — instance id.
+# A leading ~/ expands to $HOME. The placeholder resolves to the instance's
+# distinguishing part: prefix-match services declare a path whose literal text
+# around the token also appears in the instance id (e.g.
+# "local.cloud-mount.__INSTANCE__.plist" for instance "local.cloud-mount.iCloud"),
+# so the value is the instance with the template basename's literal prefix and
+# suffix removed. A declared path without the placeholder is returned verbatim.
+supervisor_resolve_unit_path() {
+  _srup_declared="$1" _srup_instance="$2"
+  case "$_srup_declared" in
+  *__INSTANCE__*)
+    _srup_base="${_srup_declared##*/}"
+    _srup_litpre="${_srup_base%%__INSTANCE__*}"
+    _srup_litpost="${_srup_base#*__INSTANCE__}"
+    _srup_value="$_srup_instance"
+    if [ -n "$_srup_litpost" ]; then
+      case "$_srup_value" in *"$_srup_litpost") _srup_value="${_srup_value%"$_srup_litpost"}" ;; esac
+    fi
+    if [ -n "$_srup_litpre" ]; then
+      case "$_srup_value" in "$_srup_litpre"*) _srup_value="${_srup_value#"$_srup_litpre"}" ;; esac
+    fi
+    # POSIX sh has no ${var/pat/rep}; split on the first placeholder occurrence
+    # and rejoin, matching bash's first-match substitution semantics.
+    _srup_head="${_srup_declared%%__INSTANCE__*}"
+    _srup_tail="${_srup_declared#*__INSTANCE__}"
+    _srup_declared="${_srup_head}${_srup_value}${_srup_tail}"
+    ;;
+  esac
+  case "$_srup_declared" in
+  \~/*) _srup_declared="$HOME${_srup_declared#\~}" ;;
+  esac
+  printf '%s' "$_srup_declared"
 }
 
 merge_nix_config() {

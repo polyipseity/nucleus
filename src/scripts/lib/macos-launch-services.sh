@@ -6,6 +6,8 @@
 # Provided functions:
 #   register_handler             — set default UTI handler via duti
 #   launchctl_target             — build a launchctl service target specifier
+#   launchctl_session_uid        — uid owning the per-user launchd domain
+#   supervisor_resolve_target    — launchctl target for a service entry
 #   launchctl_bootstrap_domain   — build a launchctl bootstrap domain target
 #   launchctl_job_loaded         — is a launchd job loaded?
 #   launchctl_bootout_wait       — unload a launchd job and wait for the unload
@@ -55,6 +57,41 @@ launchctl_target() {
   gui) printf 'gui/%s/%s' "$uid" "$label" ;;
   user) printf 'user/%s/%s' "$uid" "$label" ;;
   *) printf '%s/%s/%s' "$domain" "$uid" "$label" ;;
+  esac
+}
+
+# launchctl_session_uid — the uid that owns the per-user launchd domain.
+# The effective uid is the right answer whenever a user runs the probe, but a
+# root process (a system daemon) still addresses the logged-in user's gui
+# session, so there the console user's uid is the session owner.  /dev/console
+# is unreadable when nobody is logged in, and root is then the only uid left.
+launchctl_session_uid() {
+  local uid
+  uid="$(id -u)"
+  if [ "$uid" = "0" ]; then
+    # check-suppress:suppression_doc: /dev/console is unreadable headless; the effective uid is the only remaining answer
+    uid="$(/usr/bin/stat -f%u /dev/console 2>/dev/null || true)"
+    [ -n "$uid" ] || uid=0
+  fi
+  printf '%s' "$uid"
+}
+
+# supervisor_resolve_target — the launchctl target for a service entry.
+# The domain follows from the declared scope: a system-scope job is
+# "system/<label>" and carries no uid; a user-scope job is
+# "<launchdDomain>/<uid>/<label>".
+# WHY: launchdDomain names only the per-user domain (gui vs user) and is absent
+#   from system-scope entries.  Defaulting it to "gui" for every entry addresses
+#   a system daemon inside the GUI session, where launchd has never loaded it,
+#   so every status probe reports "not loaded" and every start targets a domain
+#   the job does not belong to.
+# Args: $1 — scope ("user" | "system"); $2 — launchdDomain (user scope only);
+#       $3 — unit label.
+supervisor_resolve_target() {
+  local scope="$1" domain="$2" label="$3"
+  case "$scope" in
+  system) launchctl_target system "" "$label" ;;
+  *) launchctl_target "${domain:-gui}" "$(launchctl_session_uid)" "$label" ;;
   esac
 }
 
