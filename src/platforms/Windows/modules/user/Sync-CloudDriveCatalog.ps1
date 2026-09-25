@@ -33,6 +33,12 @@
   Environment variables: (none)
   Exit codes: 0 on success; non-zero on failure
 #>
+
+# WHY: the mount instance id is the health-record key, and the watchdog resolves it
+#   through the shared scheduled-task mapping.  Reusing that mapping here keeps the
+#   writer and the reader on one construction site instead of two.
+. (Join-Path -Path $PSScriptRoot -ChildPath '..\Get-NucleusServiceInstance.ps1')
+
 function Sync-CloudDriveCatalog {
     [CmdletBinding()]
     param(
@@ -55,7 +61,25 @@ function Sync-CloudDriveCatalog {
     # ------------------------------------------------------------------
     # Mounts
     # ------------------------------------------------------------------
-    $enabledMounts = $mounts | Where-Object { $_.enable -eq $true }
+    # WHY: mounts default to enabled when `enable` is omitted, so the test is shared
+    #   with the declared-instance filter (Test-NucleusMountEnabled) rather than being
+    #   a second `-eq $true` copy that would drop mounts the watchdog still expects.
+    #   Replicas below are deliberately different: their submodule defaults to false.
+    $enabledMounts = $mounts | Where-Object { Test-NucleusMountEnabled -Mount $_ }
+
+    # WHY: cloud-drive.lifecycle in services.json is the single definition of the
+    #   mount retry policy.  Deriving these here keeps Windows from carrying a second
+    #   copy of the same numbers; the POSIX twin derives them in cloud-drives.nix.
+    $servicesJsonPath = Join-Path $env:NUCLEUS_REPO_ROOT 'src\modules\services.json'
+    $servicesRegistry = Get-Content -Path $servicesJsonPath -Raw | ConvertFrom-Json -AsHashtable
+    $mountLifecycle = $servicesRegistry['cloud-drive'].lifecycle
+    $mountAttempts = [string]$mountLifecycle.mountAttempts
+    $mountBackoff = (@($mountLifecycle.mountRetryBackoffSeconds) | ForEach-Object { [string]$_ }) -join ','
+    $mountAttachSeconds = [string]$mountLifecycle.mountAttachTimeoutSeconds
+    if (-not $mountAttempts -or -not $mountBackoff -or -not $mountAttachSeconds) {
+        throw "cloud-drives: cloud-drive.lifecycle is incomplete (mountAttempts/mountRetryBackoffSeconds/mountAttachTimeoutSeconds) in $servicesJsonPath"
+    }
+
     foreach ($mount in $enabledMounts) {
         $localPath = Join-Path $HomeDirectory $mount.localPath
         if (Test-Path -LiteralPath $localPath) {
@@ -123,27 +147,27 @@ function Sync-CloudDriveCatalog {
         }
         $readWrite = if ($null -ne $mount.readWrite) { [bool]$mount.readWrite } else { $true }
 
-        $mountArgs = @(
-            'mount'
-            $remoteSpec
-            $localPath
-            '--vfs-cache-mode', 'full'
-            '--vfs-cache-max-age', '1h'
-            '--dir-cache-time', '5m'
-            '--poll-interval', '1m'
-            '--log-level', 'ERROR'
-        )
-
+        # WHY: this list carries only the per-mount EXTRAS, never `mount`, the remote
+        #   spec, the mount point, the VFS flags, --log-level or --read-only: the mount
+        #   backend owns those and composes them itself (Mount-Backend-Args).  Sending
+        #   the whole argument list instead made the backend append it verbatim, so
+        #   rclone received a stray `mount` plus a duplicated remote spec, mount point
+        #   and VFS flags.  POSIX draws the same line (cloud-drives.nix extraArgsList ->
+        #   NUCLEUS_RCLONE_ARGS), so both hosts keep ONE owner for the canonical flags.
+        $mountExtraArgs = @()
         if ($mount.provider -eq 'iCloud') {
-            $mountArgs += '--iclouddrive-service', $iCloudService
+            $mountExtraArgs += '--iclouddrive-service', $iCloudService
         }
 
-        if (-not $readWrite) {
-            $mountArgs += '--read-only'
-        }
+        # WHY: the wrapper must carry a literal resolved NOW.  The generated script runs
+        #   in a fresh scope where $mount has no value, so a deferred `if ($mount.readOnly)`
+        #   evaluated to writable for every mount.  $readWrite is this file's one way of
+        #   reading the setting (registry field readWrite), and the mapping mirrors POSIX
+        #   (cloud-drives.nix: readWrite -> READ_ONLY false/true).
+        $readOnlyLiteral = if ($readWrite) { 'false' } else { 'true' }
 
         if ($mount.extraArgs) {
-            $mountArgs += @($mount.extraArgs | Where-Object { $_ })
+            $mountExtraArgs += @($mount.extraArgs | Where-Object { $_ })
         }
 
         # Write a PowerShell wrapper script that passes the rclone config
@@ -151,6 +175,10 @@ function Sync-CloudDriveCatalog {
         # runs as the logged-in user) and invokes rclone mount.
         $taskName = "NucleusCloudMount-$($mount.id)"
         $taskPath = '\NucleusCloudMount\'
+        # WHY: the health-record key must be the id the watchdog resolves for this
+        #   scheduled task (folder-qualified), not the bare registry id - otherwise the
+        #   runner writes a record the watchdog never reads and loop detection never runs.
+        $instanceId = Get-NucleusInstanceId -TaskFolder $taskPath -TaskName $taskName
         # WHY: stdout and stderr get separate files. logging.capture selects which streams
         # are captured, never the destination shape (house default: the pair).
         $stdoutLogFile = Join-Path $mountLogDir "stdout.log"
@@ -165,7 +193,37 @@ function Sync-CloudDriveCatalog {
             $escapedPassFile = $rclonePassFile.Replace("'", "''")
             $passLine = "`$env:RCLONE_CONFIG_PASS = (Get-Content '$escapedPassFile' -Raw).Trim()`r`n"
         }
-        $wrapperContent = "# Auto-generated by Sync-CloudDriveCatalog.ps1`r`n`$env:NUCLEUS_RCLONE_REMOTE = '$($mount.remoteName)'`r`n`$env:NUCLEUS_RCLONE_MOUNT_POINT = '$mountPoint'`r`n`$env:NUCLEUS_CLOUD_MOUNT_INSTANCE = '$($mount.id)'`r`n`$env:NUCLEUS_RCLONE_READ_ONLY = `$(if ($mount.readOnly) { 'true' } else { 'false' })`r`n`$env:NUCLEUS_RCLONE_ARGS = '$($mountArgs -join "`r`n")'`r`n`$env:NUCLEUS_MOUNT_ATTEMPTS = '3'`r`n`$env:NUCLEUS_MOUNT_BACKOFF = '20,40'`r`n`$env:NUCLEUS_MOUNT_ATTACH_SECONDS = '45'`r`n`$passLine`& '$runnerPath'`r`n"
+
+        # WHY: every interpolated value below lands inside a single-quoted PowerShell
+        #   literal in the generated wrapper, so an apostrophe in any of them (a profile
+        #   such as C:\Users\O'Brien, a remote name, an extra arg) would terminate the
+        #   literal early and leave the wrapper unparseable - the scheduled task then
+        #   fails silently inside a hidden window.  Escaping follows the
+        #   $escapedPassFile idiom above.  Code-derived values (readOnlyLiteral, the
+        #   lifecycle numerics) cannot contain an apostrophe and are emitted as-is.
+        # WHY: the remote value is the REMOTE SPEC, not the bare remote name: POSIX
+        #   sets NUCLEUS_RCLONE_REMOTE to "${remoteName}:${remotePath}"
+        #   (cloud-drives.nix).  Every current registry entry uses remotePath "/",
+        #   where the two forms are equivalent, so this is inert today - but a
+        #   non-root remotePath would otherwise be silently dropped and the root
+        #   would be mounted instead.
+        $escapedRemoteName = ([string]$remoteSpec).Replace("'", "''")
+        $escapedMountPoint = ([string]$localPath).Replace("'", "''")
+        $escapedInstanceId = ([string]$instanceId).Replace("'", "''")
+        $escapedArgs = ([string]($mountExtraArgs -join "`r`n")).Replace("'", "''")
+        $escapedRcloneExe = ([string]$rcloneExe).Replace("'", "''")
+        $escapedRunnerPath = ([string]$runnerPath).Replace("'", "''")
+        $escapedStdoutLogFile = ([string]$stdoutLogFile).Replace("'", "''")
+        $escapedStderrLogFile = ([string]$stderrLogFile).Replace("'", "''")
+
+        # WHY: the resolved absolute rclone path is conveyed because the task runs
+        #   `pwsh.exe -NoProfile`, so a bare `rclone` resolves only when it happens to be
+        #   on the user's registry PATH.  POSIX reads the same variable but is safe via the
+        #   wrapper's runtimeInputs PATH; Windows has no equivalent guarantee.
+        # WHY: the wrapper redirects the runner's output to per-instance stdout/stderr
+        #   files under <root>/logs - a captured service writes each stream to its own
+        #   file, and without this the mount's output is discarded entirely.
+        $wrapperContent = "# Auto-generated by Sync-CloudDriveCatalog.ps1`r`n`$env:NUCLEUS_RCLONE_REMOTE = '$escapedRemoteName'`r`n`$env:NUCLEUS_RCLONE_MOUNT_POINT = '$escapedMountPoint'`r`n`$env:NUCLEUS_CLOUD_MOUNT_INSTANCE = '$escapedInstanceId'`r`n`$env:NUCLEUS_RCLONE_READ_ONLY = '$readOnlyLiteral'`r`n`$env:NUCLEUS_RCLONE_ARGS = '$escapedArgs'`r`n`$env:NUCLEUS_RCLONE_BIN = '$escapedRcloneExe'`r`n`$env:NUCLEUS_MOUNT_ATTEMPTS = '$mountAttempts'`r`n`$env:NUCLEUS_MOUNT_BACKOFF = '$mountBackoff'`r`n`$env:NUCLEUS_MOUNT_ATTACH_SECONDS = '$mountAttachSeconds'`r`n`$passLine`& '$escapedRunnerPath' 1>> '$escapedStdoutLogFile' 2>> '$escapedStderrLogFile'`r`n"
         Set-Content -Path $wrapperPath -Value $wrapperContent -Force -Encoding UTF8
 
         # Register a logon scheduled task that runs the wrapper in a hidden
