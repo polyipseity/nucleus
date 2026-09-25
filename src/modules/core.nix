@@ -1338,6 +1338,17 @@ in
   };
 
   config = lib.mkMerge [
+    {
+      # WHY: the `treefmtPackage ? null` default in the function signature above
+      # is not honoured — the module system resolves every `functionArgs` entry
+      # through `config._module.args` after passing the external args, so an
+      # evaluator that does not supply the argument (the nixos-generators guest
+      # build) throws "attribute 'treefmtPackage' missing" instead of taking the
+      # signature default. Declared with mkDefault so the concrete wrapper
+      # src/flake.nix passes via specialArgs still wins.
+      _module.args.treefmtPackage = lib.mkDefault null;
+    }
+
     (lib.optionalAttrs (options ? environment && options.environment ? systemPackages) {
       environment.systemPackages = sharedPackages;
     })

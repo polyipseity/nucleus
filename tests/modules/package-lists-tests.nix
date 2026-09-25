@@ -169,12 +169,6 @@ let
       specialArgs = {
         lib = lib;
         pkgs = pkgsLinux;
-        # core.nix declares `treefmtPackage ? null`, but the module system fills
-        # every `functionArgs` entry and only then applies the function's own
-        # default, so an omitted argument resolves through `config._module.args`
-        # and throws. The real value is injected by src/flake.nix; these evals do
-        # not exercise formatting, so pin it to the no-op value core.nix handles.
-        treefmtPackage = null;
         inherit hostName;
       };
     };
