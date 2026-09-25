@@ -495,6 +495,22 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
     macos-configure-headless-display = lib.hm.dag.entryAfter [ "macos-install-nightlight" ] ''
       "${activationBundle}/src/platforms/macOS/scripts/macos-configure-headless-display.sh"
     '';
+
+    # -------------------------------------------------------------------------
+    # macos-generate-sf-symbols
+    # Regenerates the SF Symbols name list from the macOS SFSymbols framework
+    # into the USER root's state dir. The list used to be a committed 10,943-line
+    # data file; generating it instead keeps it in step with the installed macOS
+    # and keeps generated data out of the repository. The sf-symbols skill greps
+    # the generated file.
+    #
+    # WHY: /usr/bin/plutil is a macOS system binary with no nixpkgs attribute
+    #   (nixpkgs.aarch64-darwin lacks `plutil`), so it is passed as its stable
+    #   absolute path; grep, sort, and cmp are store paths.
+    # -------------------------------------------------------------------------
+    macos-generate-sf-symbols = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      "${activationBundle}/src/platforms/macOS/scripts/macos-generate-sf-symbols.sh" "/usr/bin/plutil" "${pkgs.gnugrep}/bin/grep" "${pkgs.coreutils}/bin/sort" "${pkgs.diffutils}/bin/cmp"
+    '';
   };
 
   # WHY: terminal-activations (last resort): Safari and accessibility defaults

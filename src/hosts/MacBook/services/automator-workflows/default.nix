@@ -49,8 +49,9 @@
 #   - Hard rule: always verify SF Symbol names against the macOS private
 #     framework — never rely on third-party lists alone. Community lists
 #     are often incomplete (e.g. missing entries that the framework includes).
-#     Use `.agents/skills/sf-symbols/symbols.txt` for quick grep-based lookup
-#     — it is extracted from the framework, not downloaded.
+#     Use `~/Library/Application Support/nucleus/state/sf-symbols.txt` for quick
+#     grep-based lookup — it is generated from the framework at activation, not
+#     downloaded, and not committed.
 #   - Uniform naming: use the same name for NSIconName (Info.plist) and
 #     systemImageName (document.wflow) for cross-surface consistency.
 #   - No custom TIFF icons: SF Symbols are resolution-independent and
