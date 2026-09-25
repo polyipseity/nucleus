@@ -1,4 +1,7 @@
-# Test: step 14 repository-policy PS1 enforcement — logging-format scan.
+# Test: repo-policy-pattern (check step 12) PS1 enforcement for the logging-format scan.
+#
+# Step 14 repository-policy was split into steps 11/12/13 (commit 4fe5ac95); this
+# twin drives the live step 12 instead.
 #
 # The .sh twin's behavioral tests dot-source the step file and call its policy
 # function directly. The PS1 step body cannot be called that way: the runner
@@ -7,8 +10,8 @@
 # check host instead, with every other step skipped, and assert on what it
 # reports.
 #
-# WHY: both fixture bodies are assembled from [char]96 — a literal backtick-e in
-# this file would itself trip the policy under test, since step 14 scans tracked
+# WHY: both fixture bodies are assembled from [char]96; a literal backtick-e in
+# this file would itself trip the policy under test, since the step scans tracked
 # .ps1 files and only the shared color helpers are allowlisted.
 
 #Requires -Version 7.4
@@ -38,10 +41,10 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../../..')).Path
 $checkScript = Join-Path $repoRoot 'scripts/check.ps1'
 $pwsh = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
 
-# WHY: only repository-policy runs. The other steps need toolchains (Nix, packer)
+# WHY: only repo-policy-pattern runs. The other steps need toolchains (Nix, packer)
 # or whole-repo state that a fixture file in a temp directory cannot provide, and
 # their findings would drown the scan under test.
-$onlySteps = 'repository-policy'
+$onlySteps = 'repo-policy-pattern'
 
 $fixtureDir = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "nucleus-repository-policy-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $fixtureDir -Force > $null
@@ -50,7 +53,7 @@ New-Item -ItemType Directory -Path $fixtureDir -Force > $null
 # Returns a hashtable with the child's exit code and combined output.
 function Invoke-LoggingFormatPolicy {
   param([string[]]$Paths)
-  $output = & $pwsh -NoLogo -NoProfile -NonInteractive -File $checkScript --scoped --verbose=repository-policy "--only-steps=$onlySteps" @Paths 2>&1 | Out-String
+  $output = & $pwsh -NoLogo -NoProfile -NonInteractive -File $checkScript --scoped --verbose=repo-policy-pattern "--only-steps=$onlySteps" @Paths 2>&1 | Out-String
   return @{
     Status = $LASTEXITCODE
     Output = $output

@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # shellcheck disable=SC2031 # reason: test functions intentionally isolate REPO_ROOT in subshells
-# Test: step 14 repository-policy behavioral tests
-# All grep-only tests (that checked implementation text) have been removed.
-# These tests exercise the actual check functions against fixture data.
+# Test: repo-policy-pattern (check step 12) behavioral tests.
+# Step 14 repository-policy was split into steps 11/12/13 (commit 4fe5ac95); the
+# naming, logging-format, nix-file-structure and log-capture-pair policies now
+# live in step 12. All grep-only tests (that checked implementation text) have
+# been removed; these tests exercise the actual check functions against fixture data.
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-TEST_FILE="$REPO_ROOT/src/scripts/checks/check-steps/14-repository-policy.sh"
+TEST_FILE="$REPO_ROOT/src/scripts/checks/check-steps/12-repo-policy-pattern.sh"
 
-# shellcheck source=../../../src/scripts/checks/check-steps/14-repository-policy.sh
+# shellcheck source=../../../src/scripts/checks/check-steps/12-repo-policy-pattern.sh
 . "$TEST_FILE"
 
 # --- activation naming policy behavioral tests ---
@@ -187,7 +189,6 @@ test_step14_nix_file_structure_pattern1_detection() {
   (cd "$_tmp" && mkdir -p src && git init -q && git config user.email "test@example.com" && git config user.name "Test User" && touch src/.gitkeep && git add . && git commit -q -m 'init' &&
     unset _NUCLEUS_STEP_RUNNER_SOURCED _NUCLEUS_CHECK_LIB_SOURCED && _STEP_IDS=() && . "$REPO_ROOT/src/scripts/checks/check-lib.sh" &&
     . "$TEST_FILE" &&
-    declare -A ctx=([HAS_ARGS]=false [REPO_ROOT]="$_tmp") &&
     run_nix_file_structure false "$_tmp" 2>"$_out" || true)
   local _ret=0
   grep -q 'exists alongside directory' "$_out" || _ret=1
@@ -211,7 +212,6 @@ test_step14_nix_file_structure_pattern2_detection() {
   (cd "$_tmp" && mkdir -p src && git init -q && git config user.email "test@example.com" && git config user.name "Test User" && touch src/.gitkeep && git add . && git commit -q -m 'init' &&
     unset _NUCLEUS_STEP_RUNNER_SOURCED _NUCLEUS_CHECK_LIB_SOURCED && _STEP_IDS=() && . "$REPO_ROOT/src/scripts/checks/check-lib.sh" &&
     . "$TEST_FILE" &&
-    declare -A ctx=([HAS_ARGS]=false [REPO_ROOT]="$_tmp") &&
     run_nix_file_structure false "$_tmp" 2>"$_out" || true)
   local _ret=0
   grep -q 'same name as parent directory' "$_out" || _ret=1
@@ -235,7 +235,6 @@ test_step14_nix_file_structure_valid_passes() {
   (cd "$_tmp" && mkdir -p src && git init -q && git config user.email "test@example.com" && git config user.name "Test User" && touch src/.gitkeep && git add . && git commit -q -m 'init' &&
     unset _NUCLEUS_STEP_RUNNER_SOURCED _NUCLEUS_CHECK_LIB_SOURCED && _STEP_IDS=() && . "$REPO_ROOT/src/scripts/checks/check-lib.sh" &&
     . "$TEST_FILE" &&
-    declare -A ctx=([HAS_ARGS]=false [REPO_ROOT]="$_tmp") &&
     run_nix_file_structure false "$_tmp" >"$_out" 2>&1)
   local _ret=$?
   grep -q 'nix file structure passed' "$_out" || _ret=1

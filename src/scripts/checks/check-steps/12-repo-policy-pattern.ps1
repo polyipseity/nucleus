@@ -7,6 +7,8 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
   $selfLeaf = if ($PSCommandPath) { Split-Path -Leaf $PSCommandPath } else { '12-repo-policy-pattern.ps1' }
+  # WHY: the .sh twin carries the same literal pattern text and must be excluded from scans too
+  $selfShLeaf = $selfLeaf -replace '\.ps1$', '.sh'
   # WHY: all repo-policy step files must be excluded from pattern scans to avoid self-referencing literal pattern text
   $allStepLeaves = @('11-repo-policy-grep.ps1', '12-repo-policy-pattern.ps1', '13-repo-policy-data.ps1', '14-repository-policy.ps1')
   $allStepShLeaves = @('11-repo-policy-grep.sh', '12-repo-policy-pattern.sh', '13-repo-policy-data.sh', '14-repository-policy.sh')

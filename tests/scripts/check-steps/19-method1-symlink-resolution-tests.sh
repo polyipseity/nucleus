@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
-# Tests for check step 19 (method-one-symlink-resolution).
+# Tests for the method-1 symlink resolution sub-check.
 #
-# The step's candidate list is derived from the deployed manifest rather than from
-# an array inside the step, so these tests drive the step against fixture homes and
-# assert its classification, plus structural guards that keep the drift from
-# returning.
+# Step 19 was merged into step 14 (commit 50113ae8) and step 14 was split into
+# steps 11/12/13 (commit 4fe5ac95); the sub-check now lives in step 13 as
+# run_method1_symlink_resolution.
+#
+# The sub-check's candidate list is derived from the deployed manifest rather than
+# from an array inside it, so these tests drive it against fixture homes and assert
+# its classification, plus structural guards that keep the drift from returning.
 #
 # Run with: bash tests/scripts/check-steps/19-method1-symlink-resolution-tests.sh
 set -euo pipefail
@@ -14,7 +17,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../test-lib.sh"
 
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../../.." && pwd)"
-STEP_FILE="$REPO_ROOT/src/scripts/checks/check-steps/19-method1-symlink-resolution.sh"
+STEP_FILE="$REPO_ROOT/src/scripts/checks/check-steps/13-repo-policy-data.sh"
 WRITER="$REPO_ROOT/src/scripts/configs/write-method1-symlink-manifest.sh"
 HOME_NIX="$REPO_ROOT/src/modules/home.nix"
 readonly STEP_FILE WRITER HOME_NIX
@@ -39,7 +42,7 @@ run_step() {
       HOME="$fixture_home" NUCLEUS_REPO_ROOT="$fixture_repo" bash -c '
         set -euo pipefail
         . "$1/src/scripts/checks/check-lib.sh"
-        . "$1/src/scripts/checks/check-steps/19-method1-symlink-resolution.sh"
+        . "$1/src/scripts/checks/check-steps/13-repo-policy-data.sh"
         declare -A _ctx=([HAS_ARGS]=false [REPO_ROOT]="$2")
         run_method1_symlink_resolution _ctx
       ' _ "$REPO_ROOT" "$fixture_repo"
@@ -135,10 +138,20 @@ test_missing_manifest_reports_nothing_to_verify() {
   # The runner declares the step not applicable when the manifest is absent
   # (requires deployed-host); invoked directly, the step must be a clean no-op,
   # never a skip sentinel.
-  if [ "$rc" -eq 0 ] && [ "${out#*nothing to verify}" != "$out" ]; then
-    assert_pass "step 19 is a no-op when the deployed manifest is absent"
+  if [ "$rc" -eq 0 ] && [ "${out#*no method-1 symlink manifest found}" != "$out" ]; then
+    assert_pass "method-1 sub-check is a no-op when the deployed manifest is absent"
   else
-    assert_fail "step 19 no-op without manifest" "rc=$rc output=[$out]"
+    assert_fail "method-1 sub-check no-op without manifest" "rc=$rc output=[$out]"
+  fi
+  # A present comment-only manifest is the live "nothing to verify" path.
+  local rc2=0 out2
+  write_manifest "# fixture"
+  rc2="$(run_step "$FIXTURE_HOME" "$FIXTURE_REPO" "$FIXTURE_HOME/out2.txt")"
+  out2="$(cat "$FIXTURE_HOME/out2.txt")"
+  if [ "$rc2" -eq 0 ] && [ "${out2#*nothing to verify}" != "$out2" ]; then
+    assert_pass "method-1 sub-check reports nothing to verify for a comment-only manifest"
+  else
+    assert_fail "method-1 sub-check empty manifest" "rc=$rc2 output=[$out2]"
   fi
   rm -rf "$FIXTURE_HOME" "$FIXTURE_REPO"
 }
