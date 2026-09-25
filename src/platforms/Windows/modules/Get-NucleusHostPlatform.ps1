@@ -67,7 +67,10 @@ function Test-NucleusPlatformFlag {
     throw "Test-NucleusPlatformFlag: unknown platform '$platform'"
   }
   $flags = $registry.platforms[$platform].flags
-  if (-not $flags.ContainsKey($Flag)) {
+  # A platform entry without a flags map must answer $false, not throw: a method
+  # call on $null raises instead of returning, which turns a missing key into an
+  # unhandled error at every caller.
+  if ($null -eq $flags -or -not $flags.ContainsKey($Flag)) {
     return $false
   }
   return [bool]$flags[$Flag]
