@@ -67,13 +67,6 @@ let
   # is broken/notarized), so it is contributed by core.nix's managedNixPackages
   # rather than listed here. Windows uses WinGet IJHack.QtPass.
   managedCasks = builtins.sort (a: b: a < b) (lib.unique (staticManagedCasks ++ coreManagedCasks));
-
-  # Nix-managed packages that must be in the system environment (not just the
-  # user profile) because they need to be reachable from non-login shells or
-  # other accounts. CLI tools default to nixpkgs per AGENTS.md policy.
-  # pass.withExtensions wraps pkgs.pass (pass-otp is an output of pass, not a
-  # top-level attr), so it is contributed via core.nix's extraSystemPackages
-  # rather than a managedPackages entry.
 in
 {
 
