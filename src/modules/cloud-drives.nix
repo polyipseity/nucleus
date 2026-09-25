@@ -12,6 +12,11 @@ let
   currentUsername = config.home.username;
   currentUserHome = config.home.homeDirectory;
 
+  # cloud-drive.lifecycle in services.json is the single definition of the mount
+  # retry policy. Deriving the mount env vars from it keeps this module from
+  # carrying a second copy of the same numbers.
+  cloudDriveLifecycle = (builtins.fromJSON (builtins.readFile ./services.json)).cloud-drive.lifecycle;
+
   userConfig =
     users.${currentUsername}.cloudDrives or {
       mounts = [ ];
@@ -162,9 +167,13 @@ let
   # issues with the options fixed-point)
   # ---------------------------------------------------------------------------
 
-  # LaunchAgent label for a mount.  Shared by the agent definition and by the
-  # convergence script, which names it in the remedy for a blocked mount path.
-  mountLabel = mount: "local.cloud-mount.${mount.id}";
+  # Supervisor unit identity for a mount.  The unit definition, the convergence
+  # script's remedy, and the runner's recorded health key all derive from these,
+  # so they cannot diverge — see lib/mount-identity.nix for why that matters.
+  isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
+  mountIdentity = import ./lib/mount-identity.nix;
+  mountUnitName = mount: mountIdentity.unitName isDarwin mount.id;
+  mountServiceId = mount: mountIdentity.serviceId isDarwin mount.id;
 
   # Build a rclone mount wrapper script for macOS LaunchAgents.
   # Uses the full Nix store path to rclone so the agent is not PATH-dependent.
@@ -219,25 +228,47 @@ let
       scriptName = "src/scripts/services/rclone-mount";
       runtimeInputs = [ pkgs.rclone ];
       extraEnv = {
-        NUCLEUS_RCLONE_REMOTE_NAME = mount.remoteName;
         NUCLEUS_RCLONE_REMOTE = rcloneRemote;
         NUCLEUS_RCLONE_MOUNT_POINT = mountPoint;
         NUCLEUS_RCLONE_ARGS = lib.concatStringsSep "\n" extraArgsList;
         NUCLEUS_RCLONE_READ_ONLY = if mount.readWrite then "false" else "true";
-        # WHY: the wrapper records a provider failure against the LaunchAgent
-        #   label, which is the key every service command and the watchdog use.
-        NUCLEUS_CLOUD_MOUNT_INSTANCE = mountLabel mount;
-        # Lifecycle policy — single definition, matches services.json cloud-drive.lifecycle.
-        NUCLEUS_MOUNT_ATTEMPTS = "3";
-        NUCLEUS_MOUNT_BACKOFF = "20,40";
-        NUCLEUS_MOUNT_ATTACH_SECONDS = "45";
+        # WHY: the wrapper records a provider failure against the supervisor unit
+        #   identity, which is the key every service command and the watchdog use.
+        NUCLEUS_CLOUD_MOUNT_INSTANCE = mountServiceId mount;
+        # Lifecycle policy — derived from services.json cloud-drive.lifecycle.
+        NUCLEUS_MOUNT_ATTEMPTS = toString cloudDriveLifecycle.mountAttempts;
+        NUCLEUS_MOUNT_BACKOFF = lib.concatStringsSep "," (
+          map toString cloudDriveLifecycle.mountRetryBackoffSeconds
+        );
+        NUCLEUS_MOUNT_ATTACH_SECONDS = toString cloudDriveLifecycle.mountAttachTimeoutSeconds;
       };
     };
 
-  # Build a systemd ExecStop unmount command (NixOS only).
+  # Build a systemd ExecStop unmount script (NixOS only).
+  #
+  # WHY a generated script rather than a `/bin/sh -c '…'` unit line: lib.escapeShellArg
+  #   emits its own single quotes, which collide with the surrounding ones.  For a mount
+  #   point containing a space the quoted argument closed early, so `sh -c` ran
+  #   `fusermount3 -u "/Users/a"` — the path split at the first space and the remainder
+  #   became separate words, leaving the volume mounted and the stale mount blocking the
+  #   next start.  Escaped exactly once, inside the script where bash parses it, the path
+  #   always arrives as ONE argument; the unit line is then a bare store path with no
+  #   quoting left to get wrong.
   mkFusermountUnmount =
-    # check-suppress:suppression_doc: unmounting a mount that may not exist; cleanup-only operation that must not fail (e.g. on retry after partial mount failure).
-    mountPoint: "/bin/sh -c 'fusermount3 -u ${lib.escapeShellArg mountPoint} || true'";
+    mountPoint:
+    pkgs.writeShellScript "cloud-mount-unmount" ''
+      # check-suppress:suppression_doc: unmounting a mount that may not exist; cleanup-only operation that must not fail (e.g. on retry after partial mount failure).
+      fusermount3 -u ${lib.escapeShellArg mountPoint} || true
+    '';
+
+  # Build a systemd ExecStartPre script that ensures the mount point directory exists.
+  # Same quoting rationale as mkFusermountUnmount above: the path is escaped once, inside
+  # the script, instead of nested inside a `sh -c '…'` argument.
+  mkEnsureMountPoint =
+    mountPoint:
+    pkgs.writeShellScript "cloud-mount-mkdir" ''
+      mkdir -p ${lib.escapeShellArg mountPoint}
+    '';
 
   # Build a scheduled replica-sync runner that invokes
   # scripts/cloud.sh sync for one replica id. replica_id and user_home are
@@ -369,7 +400,7 @@ in
                   builtins.toJSON (
                     map (m: {
                       inherit (m) localPath;
-                      serviceLabel = mountLabel m;
+                      serviceLabel = mountUnitName m;
                     }) enabledMounts
                   )
                 }' \
@@ -413,12 +444,12 @@ in
       (lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && declaredMountAgents != [ ]) {
         launchd.agents = builtins.listToAttrs (
           map (mount: {
-            name = "cloud-mount-${mount.id}";
+            name = mountUnitName mount;
             value = {
               domain = "gui";
               enable = true;
               config = {
-                Label = mountLabel mount;
+                Label = mountUnitName mount;
                 ProgramArguments = [ "${mkRcloneMountScript mount}/bin/nucleus-cloud-mount-${mount.id}" ];
                 RunAtLoad = true;
                 # WHY: no KeepAlive — the watchdog owns revival on every host.
@@ -432,8 +463,10 @@ in
                 #   only a fast teardown), and a mount killed mid-unmount leaves the
                 #   rclone process wedged and the volume registration stale, so every
                 #   later mount at this path is destroyed seconds after it attaches.
-                #   The wrapper forwards the stop request to rclone and then waits
-                #   for it to finish within this budget.
+                # NOTE: the runner installs no signal handler, so it does not itself
+                #   forward the stop to rclone; teardown of the backgrounded rclone
+                #   relies on launchd's own signal delivery to the job.  This budget is
+                #   what gives that delivery room to complete before SIGKILL.
                 ExitTimeOut = 60;
                 # Log errors to ~/Library/Logs for easier debugging.
                 # Capture both stdout and stderr so mount activity is fully
@@ -452,7 +485,7 @@ in
       (lib.mkIf (pkgs.stdenv.hostPlatform.isLinux && rcloneMounts != [ ]) {
         systemd.user.services = builtins.listToAttrs (
           map (mount: {
-            name = "cloud-mount-${mount.id}";
+            name = mountUnitName mount;
             value =
               let
                 mountPoint = "${currentUserHome}/${mount.localPath}";
@@ -468,7 +501,7 @@ in
                 };
                 Service = {
                   Type = "simple";
-                  ExecStartPre = "/bin/sh -c 'mkdir -p ${lib.escapeShellArg mountPoint}'";
+                  ExecStartPre = "${mkEnsureMountPoint mountPoint}";
                   ExecStart = "${mkRcloneMountScript mount}/bin/nucleus-cloud-mount-${mount.id}";
                   ExecStop = mkFusermountUnmount mountPoint;
                   # WHY: no Restart policy — the watchdog owns revival on every host.

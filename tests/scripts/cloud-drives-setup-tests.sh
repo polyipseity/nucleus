@@ -13,6 +13,7 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
+init_test_state
 # shellcheck source=../../src/scripts/lib/service-health.sh
 . "$SCRIPT_DIR/../../src/scripts/lib/service-health.sh"
 # shellcheck source=../../src/scripts/lib/svc-instances.sh
@@ -26,13 +27,19 @@ require_command jq "cloud-drives-setup.sh parses its mount and replica arguments
 JQ_BIN="$(command -v jq)"
 
 run_setup() { # <home> <mounts_json> <replicas_json>
-  HOME="$1" bash "$CD_SETUP_SH" "$JQ_BIN" "$2" "$3"
+  # NUCLEUS_USER_ROOT is pinned per test: init_test_state exports one shared
+  # root for the whole suite, and the script would otherwise read another
+  # test's records. HOME alone does not move it (lib.sh only derives the root
+  # when the variable is unset).
+  HOME="$1" NUCLEUS_USER_ROOT="$(user_root_for_home "$1")" \
+    bash "$CD_SETUP_SH" "$JQ_BIN" "$2" "$3"
 }
 
 # Same invocation with the progress output discarded, so the caller can capture
 # the error line with `2>&1`.
 run_setup_stderr() { # <home> <mounts_json> <replicas_json>
-  HOME="$1" bash "$CD_SETUP_SH" "$JQ_BIN" "$2" "$3" 1>/dev/null
+  HOME="$1" NUCLEUS_USER_ROOT="$(user_root_for_home "$1")" \
+    bash "$CD_SETUP_SH" "$JQ_BIN" "$2" "$3" 1>/dev/null
 }
 
 _mounts_plain='[{"localPath":"clouds/GoogleDrive"}]'
@@ -132,9 +139,13 @@ test_mount_path_symlink_error_without_a_label_stays_generic() {
 }
 
 # mark_blocked <home> <service label> — a fresh blocked record, as the mount
-# wrapper leaves it when the FSKit provider refuses the volume.
+# wrapper leaves it when the FSKit provider refuses the volume. Written into the
+# test's own root so it cannot leak into a later test.
 mark_blocked() { # <home> <label>
-  svc_health_set_blocked "$2" "fskit-provider" "$(fskit_remedy)"
+  (
+    NUCLEUS_USER_ROOT="$(user_root_for_home "$1")"
+    svc_health_set_blocked "$2" "fskit-provider" "$(fskit_remedy)"
+  )
 }
 
 test_blocked_mount_warns_with_its_remedy() {
@@ -166,19 +177,19 @@ test_unblocked_mount_is_silent() {
   rm -rf "$home"
 }
 
-# WHY: the marker is boot-scoped, so one written before a reboot (the standing
+# WHY: the record is boot-scoped, so one written before a reboot (the standing
 # remedy) must not be reported as a current problem.
 test_stale_blocked_mount_is_silent() {
   local home rc=0 err="" quiet=true state_dir file
   home="$(mktemp -d)"
   state_dir="$(user_root_for_home "$home")/state/service-stats"
   mkdir -p "$state_dir"
-  file="$state_dir/local.cloud-mount.GoogleDrive.blocked"
-  printf 'class=fskit-provider\nboot=other-boot\nts=1\n' >"$file"
+  file="$state_dir/local.cloud-mount.GoogleDrive.json"
+  printf '{"state":"blocked","class":"fskit-provider","remedy":"re-enable macFUSE","boot":"other-boot","attempts":0,"lastSuccess":0,"restarts":[],"generation":null,"lastExit":0,"reportedState":null}\n' >"$file"
   err="$(run_setup_stderr "$home" "$_mounts_labeled" "$_replicas_none" 2>&1)" || rc=$?
   case "$err" in *warning*) quiet=false ;; esac
   if [ "$rc" -eq 0 ] && [ "$quiet" = true ]; then
-    assert_pass "a blocked marker from an earlier boot is not reported"
+    assert_pass "a blocked record from an earlier boot is not reported"
   else
     assert_fail "cloud-drives-stale-blocked-mount-quiet" "rc=$rc stderr=[$err]"
   fi

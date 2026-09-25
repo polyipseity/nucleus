@@ -13,8 +13,9 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 # Ensure a managed real directory exists at PATH.
 # Usage: _cd_ensure_real_directory "$HOME/path/to/mountpoint" "mount display name" "local.cloud-mount.gdrive"
-# SERVICE_LABEL names the macOS LaunchAgent that owns a mount at this path; it is
-# quoted in the remedy when the path is a symlink, and may be empty.
+# SERVICE_LABEL names the supervisor unit that owns a mount at this path (the
+# macOS LaunchAgent label, or the systemd unit base name); it is quoted in the
+# remedy when the path is a symlink, and may be empty.
 _cd_ensure_real_directory() {
   _cd_path="$1"
   _cd_name="$2"
