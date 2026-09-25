@@ -117,7 +117,7 @@ read_registry() {
 # Output: one `live` row per concrete instance of a prefix-match entry, one
 # `configured` row per instance the user registry declares but this host does
 # not run, a `pseudo` row when a prefix-match entry has neither, and one plain
-# `live` row otherwise. Row format: key\tdisplay\tplatformJson\tjsonKey\tclass.
+# `live` row otherwise. Row format: key\tdisplay\tplatformJson\tinstance\tclass.
 # WHY: a prefix-match entry stands in for one runtime service per configured
 # instance, so every consumer needs the same expansion — emitting rows here
 # keeps list, status, actions, verify, and logs operating on identical ids.
@@ -154,7 +154,7 @@ resolve_entry() {
 
 # resolve_service_names — Given user-specified names, resolve prefix matches to concrete names.
 # Args: $1 — platform registry JSON; remaining args — requested service names.
-# Outputs newline-separated rows of form: key\tdisplayName\tplatformJson\tjsonKey\tclass.
+# Outputs newline-separated rows of form: key\tdisplayName\tplatformJson\tinstance\tclass.
 # With no names, expands every registry entry (prefix-match services included).
 # WHY: prefix matching lets users run `svc status jelly` instead of needing
 # the full id; unresolved names become ERROR:<name> rows — carrying the name —
@@ -285,7 +285,7 @@ placeholder_status_json() {
 svc_status() {
   local name="$1"
   local entry_json="$2"
-  local platform_json blocked remedy state_dir
+  local platform_json blocked remedy
 
   local svc_type svc_id scope_flag=""
   svc_type=$(echo "$entry_json" | jq -r '.type')
@@ -294,10 +294,9 @@ svc_status() {
   case "$svc_type" in
   macos-launchctl)
     local domain_flag=""
-    local scope launchd_domain uid
+    local scope launchd_domain
     scope=$(echo "$entry_json" | jq -r '.scope // "system"')
     launchd_domain=$(echo "$entry_json" | jq -r '.launchdDomain // "gui"')
-    uid="${REAL_USER_UID:-$(id -u)}"
     [ "$scope" = "system" ] && domain_flag="sudo"
 
     local list_line running=true enabled=true pid=""
@@ -324,7 +323,7 @@ svc_status() {
     if [ "$running" != "true" ]; then
       local print_out
       # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
-      print_out=$($domain_flag launchctl print "$(launchctl_target "$launchd_domain" "$uid" "$svc_id")" 2>/dev/null || true)
+      print_out=$($domain_flag launchctl print "$(supervisor_resolve_target "$scope" "$launchd_domain" "$svc_id")" 2>/dev/null || true)
       case "$print_out" in
       *"state = running"*)
         running=true
@@ -391,7 +390,6 @@ svc_status() {
   # is added here for every platform: the marker key is the concrete instance id,
   # which is what every caller passes as the name.  The marker reports
   # "blocked <class>"; the JSON carries the class alone.
-  state_dir="$(svc_health_state_dir)"
   if svc_health_is_blocked "$name"; then
     blocked="blocked $(svc_health_get "$name" "class")"
     remedy="$(svc_health_get "$name" "remedy")"
@@ -522,12 +520,11 @@ service_diagnostic() {
   svc_id=$(echo "$entry_json" | jq -r '.service // ""')
   case "$svc_type" in
   macos-launchctl)
-    local scope sudo_prefix="" target launchd_domain uid
+    local scope sudo_prefix="" target launchd_domain
     scope=$(echo "$entry_json" | jq -r '.scope // "system"')
     launchd_domain=$(echo "$entry_json" | jq -r '.launchdDomain // "gui"')
-    uid="${REAL_USER_UID:-$(id -u)}"
     [ "$scope" = "system" ] && sudo_prefix="sudo"
-    target=$(launchctl_target "$launchd_domain" "$uid" "$svc_id")
+    target=$(supervisor_resolve_target "$scope" "$launchd_domain" "$svc_id")
     $sudo_prefix launchctl print "$target" 2>/dev/null |
       awk -F'= ' '/state =/{s=$2} /last exit code/{e=$NF} END{printf "state=%s", s; if(e) printf ", exit=%s", e; printf "\n"}'
     ;;
@@ -569,7 +566,10 @@ CLOUD_MOUNT_RELEASE_TIMEOUT=30
 # Bounds for bringing a cloud mount back after a restart or a provider repair.
 # WHY: FSKit can refuse the first attempts right after its daemon restarts, so the
 #   launch is retried within a budget instead of failing on the first refusal.
-CLOUD_MOUNT_ATTACH_BUDGET=45
+# The attach budget is deliberately NOT declared here: wait_cloud_mount_attached
+#   reads services.json cloud-drive.lifecycle.mountAttachTimeoutSeconds — the same
+#   field the mount runner receives as NUCLEUS_MOUNT_ATTACH_SECONDS — so this CLI
+#   can never quote a budget its host's policy no longer declares.
 CLOUD_MOUNT_REPAIR_TIMEOUT=30
 
 # cloud_mount_point — Mount point of a cloud-drive instance, if any.
@@ -634,11 +634,19 @@ wait_cloud_mount_attached() {
   local name="$1" mount_point="$2" target="$3" sudo_prefix="$4"
 
   [ -n "$mount_point" ] || return 0
-  if svc_remount_until "$mount_point" "$target" "$sudo_prefix" "$CLOUD_MOUNT_ATTACH_BUDGET"; then
+  # WHY single-sourced: the runner's NUCLEUS_MOUNT_ATTACH_SECONDS is this same
+  #   registry field, so raising it must reach this message too — a second
+  #   definition here would let the CLI contradict the runner on the same host.
+  local attach_budget
+  if ! attach_budget=$(jq -er '."cloud-drive".lifecycle.mountAttachTimeoutSeconds' "$SERVICES_JSON"); then
+    error "$name — services.json cloud-drive.lifecycle.mountAttachTimeoutSeconds is missing or invalid"
+    return 1
+  fi
+  if svc_remount_until "$mount_point" "$target" "$sudo_prefix" "$attach_budget"; then
     say "$name — $mount_point is mounted"
     return 0
   fi
-  error "$name — $mount_point did not attach within ${CLOUD_MOUNT_ATTACH_BUDGET}s; run 'nucleus-cloud repair' and check 'nucleus-svc logs $name'"
+  error "$name — $mount_point did not attach within ${attach_budget}s; run 'nucleus-cloud repair' and check 'nucleus-svc logs $name'"
   return 1
 }
 
@@ -664,12 +672,16 @@ svc_action() {
     scope=$(echo "$entry_json" | jq -r '.scope // "system"')
     local launchd_domain
     launchd_domain=$(echo "$entry_json" | jq -r '.launchdDomain // "gui"')
+    # The system domain is implied by scope and carries no uid; launchdDomain
+    # names only the per-user domain.  Normalizing here keeps every consumer in
+    # this function — target, recover, bootstrap domain — on the same domain.
+    [ "$scope" = "system" ] && launchd_domain="system"
     local uid
     uid="${REAL_USER_UID:-$(id -u)}"
     local sudo_prefix=""
     [ "$scope" = "system" ] && sudo_prefix="sudo"
     local target
-    target=$(launchctl_target "$launchd_domain" "$uid" "$svc_id")
+    target=$(supervisor_resolve_target "$scope" "$launchd_domain" "$svc_id")
 
     local cloud_mount=""
     cloud_mount="$(cloud_mount_point "$prefix_entry" "$svc_id")"
@@ -858,7 +870,7 @@ do_list() {
   local has_error=false
   if [ "$json_output" = true ]; then
     local entries_json=""
-    while IFS=$'\t' read -r key display svc_json json_key row_class; do
+    while IFS=$'\t' read -r key display svc_json instance row_class; do
       if echo "$key" | grep -q '^ERROR:'; then
         has_error=true
         continue
@@ -874,13 +886,13 @@ do_list() {
       local status_json pair_json
       if [ "$row_class" = "live" ]; then
         local crash_status
-        status_json=$(svc_status "$json_key" "$svc_json")
-        crash_status=$(svc_health_status "$json_key")
+        status_json=$(svc_status "$instance" "$svc_json")
+        crash_status=$(svc_health_status "$instance")
         status_json=$(printf '%s' "$status_json" | jq --arg cs "$crash_status" '. + {crashLoop: $cs}')
       else
         status_json=$(placeholder_status_json "$row_class")
       fi
-      pair_json=$(jq -cn --arg k "$json_key" --argjson v "$status_json" '{key:$k, value:$v}')
+      pair_json=$(jq -cn --arg k "$instance" --argjson v "$status_json" '{key:$k, value:$v}')
       if [ -n "$entries_json" ]; then
         entries_json="$entries_json
 $pair_json"
@@ -893,7 +905,7 @@ $pair_json"
     printf '%-20s %-24s %-10s %-8s %-10s %s\n' "ID" "Name" "Status" "Running" "PID" "CrashLoop"
     printf '%.0s-' {1..91}
     printf '\n'
-    while IFS=$'\t' read -r key display svc_json json_key row_class; do
+    while IFS=$'\t' read -r key display svc_json instance row_class; do
       if echo "$key" | grep -q '^ERROR:'; then
         local err_name="${key#ERROR:}"
         printf '%-20s %-24s %-10s %-8s %s\n' "$err_name" "" "n/a" "-" "-"
@@ -911,11 +923,11 @@ $pair_json"
       if [ "$row_class" != "live" ]; then
         local ph_status
         ph_status=$(placeholder_status_json "$row_class" | jq -r '.status')
-        printf '%-20s %-24s %-10s %-8s %-10s %s\n' "$json_key" "$display" "$ph_status" "-" "-" "-"
+        printf '%-20s %-24s %-10s %-8s %-10s %s\n' "$instance" "$display" "$ph_status" "-" "-" "-"
         continue
       fi
       local status_json
-      status_json=$(svc_status "$json_key" "$svc_json")
+      status_json=$(svc_status "$instance" "$svc_json")
       local status running pid exit_code
       status=$(echo "$status_json" | jq -r '.status')
       running=$(echo "$status_json" | jq -r '.running')
@@ -926,8 +938,8 @@ $pair_json"
         pid="$exit_display"
       fi
       local crash_status
-      crash_status=$(svc_health_status "$json_key")
-      printf '%-20s %-24s %-10s %-8s %-10s %s\n' "$json_key" "$display" "$status" "$running" "$pid" "$crash_status"
+      crash_status=$(svc_health_status "$instance")
+      printf '%-20s %-24s %-10s %-8s %-10s %s\n' "$instance" "$display" "$status" "$running" "$pid" "$crash_status"
       print_blocked_note "$status_json"
     done <<<"$entries"
     if [ -n "$domain_filter_warning" ]; then
@@ -954,7 +966,7 @@ do_status() {
   fi
 
   local any_error=false
-  while IFS=$'\t' read -r key display svc_json json_key row_class; do
+  while IFS=$'\t' read -r key display svc_json instance row_class; do
     if echo "$key" | grep -q '^ERROR:'; then
       local err_name="${key#ERROR:}"
       warn "$err_name — $(echo "$svc_json" | jq -r '.error')"
@@ -972,11 +984,11 @@ do_status() {
     if [ "$row_class" != "live" ]; then
       local ph_status
       ph_status=$(placeholder_status_json "$row_class" | jq -r '.status')
-      printf '%-20s %-24s %-10s %-8s %-10s %s\n' "$json_key" "$display" "$ph_status" "-" "-" "-"
+      printf '%-20s %-24s %-10s %-8s %-10s %s\n' "$instance" "$display" "$ph_status" "-" "-" "-"
       continue
     fi
     local status_json
-    status_json=$(svc_status "$json_key" "$svc_json")
+    status_json=$(svc_status "$instance" "$svc_json")
     local status running pid exit_code
     status=$(echo "$status_json" | jq -r '.status')
     running=$(echo "$status_json" | jq -r '.running')
@@ -987,8 +999,8 @@ do_status() {
       pid="$exit_display"
     fi
     local crash_status
-    crash_status=$(svc_health_status "$json_key")
-    printf '%-20s %-24s %-10s %-8s %-10s %s\n' "$json_key" "$display" "$status" "$running" "$pid" "$crash_status"
+    crash_status=$(svc_health_status "$instance")
+    printf '%-20s %-24s %-10s %-8s %-10s %s\n' "$instance" "$display" "$status" "$running" "$pid" "$crash_status"
     print_blocked_note "$status_json"
   done <<<"$entries"
   "$any_error" && return 1 || return 0
@@ -1015,9 +1027,9 @@ do_action() {
   entries=$(resolve_service_names "$registry" "${service_names[@]}")
 
   local overall_exit=0
-  while IFS=$'\t' read -r key display svc_json json_key row_class; do
+  while IFS=$'\t' read -r key display svc_json instance row_class; do
     if [ "$row_class" = "error" ]; then
-      warn "$json_key — $(printf '%s' "$svc_json" | jq -r '.error')"
+      warn "$instance — $(printf '%s' "$svc_json" | jq -r '.error')"
       overall_exit=1
       continue
     fi
@@ -1029,11 +1041,11 @@ do_action() {
     fi
 
     if [ "$row_class" = "configured" ]; then
-      if row_is_named "$json_key"; then
-        error "$json_key — configured but not loaded (run 'nucleus-apply', or start it with the service manager)"
+      if row_is_named "$instance"; then
+        error "$instance — configured but not loaded (run 'nucleus-apply', or start it with the service manager)"
         overall_exit=1
       else
-        warn "$json_key — configured but not loaded"
+        warn "$instance — configured but not loaded"
       fi
       continue
     fi
@@ -1041,7 +1053,7 @@ do_action() {
     local _d_domain
     _d_domain=$(printf '%s' "$svc_json" | jq -r '.scope // "system"')
     if [ "$_d_domain" = "system" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
-      error "$json_key — system-domain operations require sudo; run as root or with sudo"
+      error "$instance — system-domain operations require sudo; run as root or with sudo"
       overall_exit=1
       continue
     fi
@@ -1053,18 +1065,18 @@ do_action() {
       _d_prefix_entry="$(printf '%s' "$registry" | jq -c --arg k "$key" '.[$k].hostEntry')"
     fi
 
-    if ! svc_action "$action" "$json_key" "$svc_json" "$_d_prefix_entry"; then
-      warn "$json_key — action $action failed"
+    if ! svc_action "$action" "$instance" "$svc_json" "$_d_prefix_entry"; then
+      warn "$instance — action $action failed"
       overall_exit=1
     fi
     if "$verbose_mode" && [ "$action" = "start" ] || [ "$action" = "restart" ]; then
       local _v_status
-      _v_status=$(svc_status "$json_key" "$svc_json")
+      _v_status=$(svc_status "$instance" "$svc_json")
       local _v_running _v_pid
       _v_running=$(printf '%s' "$_v_status" | jq -r '.running')
       _v_pid=$(printf '%s' "$_v_status" | jq -r '.pid // "-"')
       if [ "$_v_running" = "true" ]; then
-        say "$action $json_key → active (pid $_v_pid)"
+        say "$action $instance → active (pid $_v_pid)"
       fi
     fi
   done <<<"$entries"
@@ -1083,37 +1095,37 @@ do_verify() {
   entries=$(resolve_service_names "$registry" "${service_names[@]}")
   local any_inactive=false
 
-  while IFS=$'\t' read -r key display svc_json json_key row_class; do
+  while IFS=$'\t' read -r key display svc_json instance row_class; do
     if [ "$row_class" = "error" ]; then
-      warn "$json_key — $(echo "$svc_json" | jq -r '.error')"
+      warn "$instance — $(echo "$svc_json" | jq -r '.error')"
       any_inactive=true
       continue
     fi
     if [ "$row_class" = "pseudo" ]; then
-      notice "$json_key — no instances found (prefix '$(echo "$svc_json" | jq -r '.service // ""')'); nothing to verify"
+      notice "$instance — no instances found (prefix '$(echo "$svc_json" | jq -r '.service // ""')'); nothing to verify"
       continue
     fi
     if [ "$row_class" = "configured" ]; then
       any_inactive=true
-      warn "$json_key — configured but not loaded (run 'nucleus-apply', or start it with the service manager)"
+      warn "$instance — configured but not loaded (run 'nucleus-apply', or start it with the service manager)"
       continue
     fi
     local _d_domain
     _d_domain=$(echo "$svc_json" | jq -r '.scope // "system"')
     if [ "$_d_domain" = "system" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
-      error "$json_key — system-domain operations require sudo; run as root or with sudo"
+      error "$instance — system-domain operations require sudo; run as root or with sudo"
       any_inactive=true
       continue
     fi
     local status_json
-    status_json=$(svc_status "$json_key" "$svc_json")
+    status_json=$(svc_status "$instance" "$svc_json")
     local running
     running=$(echo "$status_json" | jq -r '.running')
     if [ "$running" != "true" ]; then
       any_inactive=true
       local diag
       diag=$(service_diagnostic "$svc_json")
-      warn "$json_key — inactive ($diag); check 'nucleus-svc logs $json_key'"
+      warn "$instance — inactive ($diag); check 'nucleus-svc logs $instance'"
     fi
   done <<<"$entries"
 
@@ -1376,65 +1388,67 @@ do_logs() {
   if [ "${#service_names[@]}" -eq 0 ]; then
     if $json_output; then
       local ids=""
-      while IFS=$'\t' read -r key display svc_json json_key row_class; do
-        ids="$ids$json_key"$'\n'
+      while IFS=$'\t' read -r key display svc_json instance row_class; do
+        ids="$ids$instance"$'\n'
       done <<<"$entries"
       printf '%s' "$ids" | jq -n -R -c '[inputs | select(length > 0)]'
     else
       printf 'Available services:\n\n'
-      while IFS=$'\t' read -r key display svc_json json_key row_class; do
-        local capture instance="" marker=""
+      while IFS=$'\t' read -r key display svc_json instance row_class; do
+        # WHY: log helpers want an instance id or empty for a whole-service row.
+        local capture instance_qualifier="" marker=""
         capture="$(get_capture "$key")"
-        if [ "$json_key" != "$key" ]; then instance="$json_key"; fi
+        if [ "$instance" != "$key" ]; then instance_qualifier="$instance"; fi
         if [ "$row_class" = "pseudo" ]; then
           marker='  (no instances)'
-        elif ! service_has_logs "$key" "$instance"; then
+        elif ! service_has_logs "$key" "$instance_qualifier"; then
           marker='  (no logs yet)'
         fi
-        printf '  %-30s capture=%-7s%s\n' "$json_key" "$capture" "$marker"
+        printf '  %-30s capture=%-7s%s\n' "$instance" "$capture" "$marker"
       done <<<"$entries"
     fi
     return
   fi
 
-  while IFS=$'\t' read -r key display svc_json json_key row_class; do
-    local instance=""
-    if [ "$json_key" != "$key" ]; then instance="$json_key"; fi
+  while IFS=$'\t' read -r key display svc_json instance row_class; do
+    # WHY: log helpers want an instance id or empty for a whole-service row.
+    local instance_qualifier=""
+    if [ "$instance" != "$key" ]; then instance_qualifier="$instance"; fi
 
     if [ "$row_class" = "error" ]; then
-      error "logs: $json_key — $(printf '%s' "$svc_json" | jq -r '.error')"
+      error "logs: $instance — $(printf '%s' "$svc_json" | jq -r '.error')"
       exit 1
     fi
     if [ "$row_class" = "pseudo" ]; then
-      warn "$json_key — no instances found (prefix '$(printf '%s' "$svc_json" | jq -r '.service // ""')')"
+      warn "$instance — no instances found (prefix '$(printf '%s' "$svc_json" | jq -r '.service // ""')')"
       continue
     fi
 
     case "$HOST" in
     MacBook)
-      if ! show_file_logs "$key" "$lines" "$raw" "$instance"; then
+      if ! show_file_logs "$key" "$lines" "$raw" "$instance_qualifier"; then
         if [ "$row_class" = "configured" ]; then
-          warn "$json_key — no log files found (configured but not loaded)"
+          warn "$instance — no log files found (configured but not loaded)"
         else
-          warn "$json_key — no log files found"
+          warn "$instance — no log files found"
         fi
       fi
       ;;
     NixOS)
       local unit
-      unit="$(service_unit "$key" "$instance")"
+      unit="$(service_unit "$key" "$instance_qualifier")"
       if [ -n "$unit" ] && command -v journalctl >/dev/null 2>&1; then
-        if ! show_journald_logs "$key" "$lines" "$raw" "$since" "$instance"; then
+        if ! show_journald_logs "$key" "$lines" "$raw" "$since" "$instance_qualifier"; then
           if [ "$row_class" = "configured" ]; then
-            warn "$json_key — no journald logs (configured but not loaded)"
+            warn "$instance — no journald logs (configured but not loaded)"
           else
-            warn "$json_key — no journald logs"
+            warn "$instance — no journald logs"
           fi
         fi
       elif [ "$row_class" = "configured" ]; then
-        warn "$json_key — no journald logs (configured but not loaded)"
-      elif ! show_file_logs "$key" "$lines" "$raw" "$instance"; then
-        warn "$json_key — no log files found"
+        warn "$instance — no journald logs (configured but not loaded)"
+      elif ! show_file_logs "$key" "$lines" "$raw" "$instance_qualifier"; then
+        warn "$instance — no log files found"
       fi
       ;;
     esac
@@ -1451,15 +1465,16 @@ do_log_paths() {
   registry=$(read_registry)
   entries=$(resolve_service_names "$registry" "${service_names[@]}")
 
-  while IFS=$'\t' read -r key display svc_json json_key row_class; do
-    local instance=""
-    if [ "$json_key" != "$key" ]; then instance="$json_key"; fi
+  while IFS=$'\t' read -r key display svc_json instance row_class; do
+    # WHY: log helpers want an instance id or empty for a whole-service row.
+    local instance_qualifier=""
+    if [ "$instance" != "$key" ]; then instance_qualifier="$instance"; fi
     if [ "$row_class" = "error" ]; then
-      error "log-paths: $json_key — $(printf '%s' "$svc_json" | jq -r '.error')"
+      error "log-paths: $instance — $(printf '%s' "$svc_json" | jq -r '.error')"
       exit 1
     fi
     [ "$row_class" = "pseudo" ] && continue
-    service_log_files "$key" "$instance"
+    service_log_files "$key" "$instance_qualifier"
   done <<<"$entries"
 }
 
@@ -1498,9 +1513,9 @@ do_log_config() {
   local registry entries
   registry=$(read_registry)
   entries=$(resolve_service_names "$registry" "${service_names[@]}")
-  while IFS=$'\t' read -r key display svc_json json_key row_class; do
+  while IFS=$'\t' read -r key display svc_json instance row_class; do
     if [ "$row_class" = "error" ]; then
-      error "log-config: $json_key — $(printf '%s' "$svc_json" | jq -r '.error')"
+      error "log-config: $instance — $(printf '%s' "$svc_json" | jq -r '.error')"
       exit 1
     fi
     case "$targets" in

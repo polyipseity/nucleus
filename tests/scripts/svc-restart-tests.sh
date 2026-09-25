@@ -11,6 +11,7 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
+init_test_state
 # shellcheck source=../../src/scripts/lib/service-health.sh
 . "$SCRIPT_DIR/../../src/scripts/lib/service-health.sh"
 # shellcheck source=../../src/scripts/lib/macos-launch-services.sh
@@ -256,8 +257,10 @@ section 4 "Reload goes through the helper"
 # result, so the contract under test is "every call site reloads through the
 # helper". The pattern matches an invocation (an argument follows launchctl)
 # and not a message that merely names the command.
+# The watchdog delegates reload to the launchd supervisor backend, so the site
+# that owns the reload there is src/scripts/lib/supervisor-launchd.sh.
 _reload_invocation="launchctl (bootstrap|bootout)( --wait)? [\"'$]"
-for _site in scripts/svc.sh src/scripts/services/service-watchdog.sh src/scripts/services/caddy-trust.sh; do
+for _site in scripts/svc.sh src/scripts/lib/supervisor-launchd.sh src/scripts/services/caddy-trust.sh; do
   _body="$(cat "$REPO_ROOT/$_site")"
   if ! contains "$_body" "launchctl_bootout_wait" || ! contains "$_body" "launchctl_bootstrap_plist"; then
     assert_fail "svc-reload-through-helper" "$(basename "$_site") does not reload through both shared helpers"
@@ -310,6 +313,11 @@ cat >"$_cli/repo/src/modules/services.json" <<JSON
         "scope": "user",
         "launchdDomain": "gui"
       }
+    },
+    "lifecycle": {
+      "mountAttempts": 3,
+      "mountRetryBackoffSeconds": [20, 40],
+      "mountAttachTimeoutSeconds": 77
     }
   },
   "plain-service": {
@@ -574,6 +582,12 @@ reset_cli stopped "$_cli_mount" 2 restart local.cloud-mount.iCloud
 assert_count "a volume that never attaches fails the restart" 1 "$captured_status"
 assert_mentions "the failed attach" "$captured_output" "did not attach"
 assert_mentions "the failed attach names the repair command" "$captured_output" "nucleus-cloud repair"
+# WHY control first: the CLI must quote the budget declared by THIS fixture, so
+# the assertion below cannot pass by coincidence with a hardcoded 45.
+assert_count "control: the stub registry declares the attach budget" "77" \
+  "$(jq -r '."cloud-drive".lifecycle.mountAttachTimeoutSeconds' "$_cli/repo/src/modules/services.json")"
+assert_mentions "the failed attach quotes the registry's attach budget, not a hardcode" \
+  "$captured_output" "did not attach within 77s"
 FAKE_MOUNT_APPEAR_AFTER=6
 
 section 10 "A blocked instance is visible in status and list"

@@ -18,6 +18,7 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 readonly SCRIPT_DIR REPO_ROOT
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
+init_test_state
 # shellcheck source=../../src/scripts/lib/lib.sh
 . "$REPO_ROOT/src/scripts/lib/lib.sh"
 # shellcheck source=../../src/scripts/lib/service-health.sh
@@ -214,10 +215,20 @@ chmod +x "$_tmp/bin/launchctl" "$_tmp/bin/killall" "$_tmp/bin/sudo" "$_tmp/bin/p
 PATH="$_tmp/bin:$PATH"
 export PATH
 
-# The repair resolves its state directory from the platform it sees, so the suite
-# has to derive the same path through the same stubbed uname: derive it here, with
-# the fake toolchain on PATH, rather than against the host's own uname.
-STATE_DIR="$(HOME="$FAKE_HOME" svc_health_state_dir)"
+# The repair resolves its state directory from the platform it sees and from the
+# fake home, so the suite has to derive the same path the same way: with the fake
+# toolchain on PATH, with NUCLEUS_USER_ROOT cleared (run_repair unsets it for the
+# subprocess), and with the platform the repair will see. Deriving it against an
+# already-set NUCLEUS_USER_ROOT silently resolved — and reset_world deleted — the
+# real user's service-health records, while the subprocess wrote to the fake home
+# instead, so no health assertion could observe the repair's own writes.
+FAKE_UNAME_S=Darwin
+export FAKE_UNAME_S
+STATE_DIR="$(
+  unset NUCLEUS_USER_ROOT
+  export HOME="$FAKE_HOME"
+  svc_health_state_dir
+)"
 mkdir -p "$STATE_DIR"
 
 assert_eq() { # <test name> <expected> <actual>

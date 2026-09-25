@@ -287,36 +287,6 @@ _repair_mount_target() {
   launchctl_target "$(_detect_launchd_domain "$label" "$uid")" "$uid" "$label"
 }
 
-# _repair_restart_mount <label> <uid> <target> <plist> — Restart one cloud-mount
-# agent.  Returns 0 when the agent was restarted or loaded, 1 when it could not be.
-_repair_restart_mount() {
-  _rrm_label="$1"
-  _rrm_uid="$2"
-  _rrm_target="$3"
-  _rrm_plist="$4"
-
-  # check-suppress:suppression_doc: a job that is not loaded is the question being asked, not an error; the bootstrap path below reports its own outcome.
-  if launchctl print "$_rrm_target" >/dev/null 2>&1; then
-    if launchctl kickstart -k "$_rrm_target"; then
-      say "restarted $_rrm_label"
-      return 0
-    fi
-    warn "failed to restart $_rrm_label"
-    return 1
-  fi
-
-  if [ ! -f "$_rrm_plist" ]; then
-    warn "$_rrm_label is not loaded and $_rrm_plist does not exist; run nucleus apply to create it"
-    return 1
-  fi
-  if launchctl bootstrap "$(launchctl_bootstrap_domain "$(_detect_launchd_domain "$_rrm_label" "$_rrm_uid")" "$_rrm_uid")" "$_rrm_plist"; then
-    say "loaded $_rrm_label"
-    return 0
-  fi
-  warn "failed to load $_rrm_label from $_rrm_plist"
-  return 1
-}
-
 # Maps a known remote name to its rclone provider type string.
 remote_provider_type() {
   case "$1" in
@@ -1426,22 +1396,34 @@ do_repair() {
 
     say "starting mount '$mount_id'..."
     target="$(_repair_mount_target "$label" "$uid")"
-    # check-suppress:suppression_doc: kickstart may fail if agent is in a transitional state; the poll loop below detects the outcome.
-    launchctl kickstart -k "$target" 2>/dev/null || true
+    plist="$HOME/Library/LaunchAgents/$label.plist"
 
-    # Wait up to $timeout for the mount to appear.  The agent retries
-    # internally (exit 1 on provider failure -> launchd restarts it).
-    _waited=0
-    while [ "$_waited" -lt "$timeout" ]; do
-      sleep 5
-      _waited=$((_waited + 5))
-      if svc_mount_table_contains "$mount_point"; then
-        break
-      fi
-    done
+    # WHY: an unloaded agent cannot be kickstarted, so a repair that finds one
+    #   with an installed plist loads it first.  A loaded-but-wedged agent still
+    #   reports a running state while its volume never attached, so it is
+    #   restarted instead of waited on.
+    if [ -f "$plist" ] && ! launchctl_job_loaded "$target" "$sudo_prefix"; then
+      domain="$(launchctl_bootstrap_domain "$(_detect_launchd_domain "$label" "$uid")" "$uid")"
+      # check-suppress:suppression_doc: the bounded relaunch below is the check; a bootstrap that fails leaves the job unloaded and the relaunch reports the outcome.
+      launchctl_bootstrap_plist "$domain" "$plist" "$target" "$sudo_prefix" >/dev/null || true
+    else
+      # check-suppress:suppression_doc: a kickstart that fails is retried by the bounded relaunch below, which is the check.
+      $sudo_prefix launchctl kickstart -k "$target" >/dev/null 2>&1 || true
+    fi
+
+    # WHY the bounded relaunch: FSKit can refuse the first attempts right after
+    #   its daemon restarts while a later one serves the volume, and the mount
+    #   runner stops on a provider refusal instead of retrying it, so the
+    #   bounded retry belongs to the command that wants the mount up.
+    # check-suppress:suppression_doc: the report pass below names every mount that did not come back, so a failed relaunch is not an error here.
+    svc_remount_until "$mount_point" "$target" "$sudo_prefix" "$timeout" || true
 
     if svc_mount_table_contains "$mount_point"; then
       say "mounted: $mount_id ($mount_point)"
+      # WHY: a mount that came back is no longer blocked, so the record that
+      #   gated it is re-armed here — otherwise every later apply re-reports a
+      #   problem the repair already fixed.
+      svc_health_clear "$label"
     else
       # check-suppress:suppression_doc: every unrecovered mount is reported before the command fails, so one missing drive cannot hide the others.
       error "not mounted: $mount_id ($mount_point)" || true
