@@ -11,6 +11,14 @@ run_nix_tests() {
   local _exit_code=0
   local _tmp_failed
 
+  # WHY: <nixpkgs> must be the flake-locked input, not this machine's channel —
+  # three tests/ files import <nixpkgs>, and validating them against a drifting
+  # channel is both non-reproducible and broken where the channel is
+  # unreachable. The eval phases below inherit the exported NIX_PATH.
+  if ! nucleus_pin_nixpkgs "$_repo_root"; then
+    return 1
+  fi
+
   _tmp_failed=$(mktemp) || {
     error "failed to create temp file"
     return 1
@@ -34,8 +42,9 @@ run_nix_tests() {
   # WHY: nix-instantiate evals contend on the shared SQLite eval cache and
   # ~/.cache/nix/flake-registry.json when test steps 1/4/5 run concurrently;
   # hold the nix lock for the whole eval phase so cross-step nix invocations
-  # serialize. Evals run serially (xargs -P 1) because parallel imports of
-  # <nixpkgs> race on flake-registry updates.
+  # serialize. Evals run serially (xargs -P 1) because the shared eval cache
+  # wants a single writer — <nixpkgs> is pinned by nucleus_pin_nixpkgs above,
+  # so these evals no longer race on flake-registry updates for it.
   nucleus_nix_locked _run_eval_phase "$_tmp_failed"
 
   if [ -s "$_tmp_failed" ]; then

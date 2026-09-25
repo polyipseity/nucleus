@@ -203,6 +203,32 @@ nucleus_nix_locked() {
   return "$_lock_ret"
 }
 
+# --- Nix pin ---
+# ref: tooling-and-validation.instructions.md
+# Point <nixpkgs> at the flake-locked input so a step never resolves it through
+# this machine's channel or registry. Idempotent per process: the first call
+# resolves and exports the path, later calls reuse it.
+nucleus_pin_nixpkgs() {
+  local _repo_root="$1"
+  local _pin_out
+
+  if [ -n "${NUCLEUS_PINNED_NIXPKGS:-}" ]; then
+    return 0
+  fi
+  # WHY: a failed or empty build must fail the caller's step, never pin "$empty/nixpkgs".
+  if ! _pin_out="$(nix build --no-link --print-out-paths "$_repo_root/src#flakeInputs")"; then
+    error "failed to build the flakeInputs derivation from $_repo_root/src — cannot pin <nixpkgs>"
+    return 1
+  fi
+  if [ ! -d "$_pin_out/nixpkgs" ]; then
+    error "flakeInputs output $_pin_out has no nixpkgs/ directory — cannot pin <nixpkgs>"
+    return 1
+  fi
+  NUCLEUS_PINNED_NIXPKGS="${_pin_out%/}/nixpkgs"
+  export NUCLEUS_PINNED_NIXPKGS
+  export NIX_PATH="nixpkgs=$NUCLEUS_PINNED_NIXPKGS"
+}
+
 # Defaults for when parse_args hasn't been called (e.g. unit tests that source
 # this library directly). run_all_steps reads all three eagerly while building
 # the step context, so they must always be bound under `set -u`.

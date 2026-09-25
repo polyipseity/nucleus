@@ -29,6 +29,12 @@ run_nix_flake_eval() {
   fi
 
   if $_ne_eval; then
+    # WHY: <nixpkgs> comes from the flake-locked input, never from this
+    # machine's channel — the evals below must not depend on the ambient one.
+    if ! nucleus_pin_nixpkgs "$_repo_root"; then
+      _ne_exit=1
+    fi
+
     # WHY: both evals write the shared SQLite eval cache; serialize them with
     # the test steps' nix invocations (pre-push check and test may overlap).
     local sys
