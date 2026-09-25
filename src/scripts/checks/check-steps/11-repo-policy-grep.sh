@@ -30,6 +30,9 @@ run_repo_policy_grep() {
   say "--- cloud-mount invariants ---"
   run_cloud_mount_invariants "$_ctx_name" "$@" || _failed=1
 
+  say "--- service supervision invariants ---"
+  run_service_supervision_invariants "$_ctx_name" "$@" || _failed=1
+
   if [ "$_failed" -ne 0 ]; then
     error "repository policy (grep-heavy) check failed"
     return 1
@@ -657,14 +660,131 @@ run_cloud_mount_invariants() {
 
   # One macfuse install call site (darwin backend only).
   local _install_count
-  _install_count=$(grep -rl 'macfuse install\|brew install.*macfuse' src/scripts/lib/ src/scripts/services/ 2>/dev/null | wc -l || echo 0)
-  if [ "$_install_count" -gt 1 ]; then
-    error "$_ctx_name: multiple macfuse install call sites ($_install_count); must be exactly one (mount-backend-darwin.sh)"
+  _install_count=$(grep -rl 'macfuse install\|brew install.*macfuse' src/scripts/lib/ src/scripts/services/ 2>/dev/null | wc -l || true) # check-suppress:suppression_doc: grep exits 1 when no install site matches; || echo 0 appended a second 0 under pipefail so the exactly-one assertion below never fired
+  if [ "$_install_count" -ne 1 ]; then
+    error "$_ctx_name: found $_install_count macfuse install call sites; must be exactly one (mount-backend-darwin.sh)"
     _failed=1
   fi
 
-  if [ "$_failed" -eq 0 ]; then
-    say "no cloud-mount invariant violations found."
+  if [ "$_failed" -ne 0 ]; then
+    return 1
   fi
+  say "no cloud-mount invariant violations found."
+  return 0
+}
+
+# run_service_supervision_invariants — verify the uniform supervision policy.
+# The rewrite locked in one loop policy, one threshold source, and one retry
+# owner.  Every assertion below fails if a later change reintroduces a second
+# copy of one of them; none of them inspects service identity, because loop
+# protection is deliberately not configurable per service.
+run_service_supervision_invariants() {
+  local _ctx_name="$1"
+  shift
+  local _failed=0
+  local _health_lib="src/scripts/lib/service-health.sh"
+  local _watchdog="src/scripts/services/service-watchdog.sh"
+  local _services_json="src/modules/services.json"
+
+  # Thresholds live once, in the POSIX health library, and are compared there
+  # only through their constants.  A second definition or a bare numeric
+  # comparison is a second policy that can drift from the watchdog's.
+  if [ -f "$_health_lib" ]; then
+    local _name _defs
+    for _name in _SVC_HEALTH_LOOP_RESTARTS _SVC_HEALTH_LOOP_CONSECUTIVE _SVC_HEALTH_WARN_RESTARTS; do
+      _defs=$(grep -cE "^[[:space:]]*readonly ${_name}=" "$_health_lib" || true) # check-suppress:suppression_doc: grep -c exits 1 when the count is zero, which is a violation this check reports rather than ignores
+      if [ "${_defs:-0}" -ne 1 ]; then
+        error "$_ctx_name: $_health_lib defines $_name ${_defs:-0} times; loop thresholds must have exactly one source"
+        _failed=1
+      fi
+    done
+
+    local _bare
+    _bare=$(grep -nE '\-(ge|gt|le|lt)[[:space:]]+"?[0-9]+' "$_health_lib" || true) # check-suppress:suppression_doc: grep exits 1 when no bare threshold remains, which is the clean result
+    if [ -n "$_bare" ]; then
+      error "$_ctx_name: $_health_lib compares a bare numeric threshold; use the _SVC_HEALTH_* constants: $(printf '%s' "$_bare" | tr '\n' ';')"
+      _failed=1
+    fi
+
+    # Drop this step's own file: it names the constants in the loop below.
+    local _self_name
+    _self_name="$(basename "${BASH_SOURCE[0]}")"
+    local _elsewhere
+    _elsewhere=$(grep -rnE '_SVC_HEALTH_(LOOP|WARN)_[A-Z_]+' --include='*.sh' src/ scripts/ |
+      grep -vE "^${_health_lib}:" |
+      grep -vE "(^|/)${_self_name}:" |
+      grep -vE ':[0-9]+:[[:space:]]*#' ||
+      true) # check-suppress:suppression_doc: grep exits 1 when a clean tree references the constants nowhere else, which is the expected result
+    if [ -n "$_elsewhere" ]; then
+      error "$_ctx_name: the loop thresholds are referenced outside $_health_lib; they have one definition and one library"
+      _failed=1
+    fi
+  fi
+
+  # Loop protection is a property of the health record, never a per-service
+  # setting.  Only the service entry's own keys are inspected, so the
+  # legitimate cloud-drive.lifecycle block stays out of scope by design.
+  if [ -f "$_services_json" ]; then
+    local _forbidden
+    if ! _forbidden=$(jq -r '
+        to_entries[]
+        | select(.key | startswith("$") | not)
+        | select(.value | type == "object")
+        | .key as $svc
+        | (.value | keys)[]
+        | select(test("loop|throttle|exempt"; "i"))
+        | "\($svc): \(.)"
+      ' "$_services_json"); then
+      error "$_ctx_name: $_services_json is not valid JSON; cannot verify the loop-policy invariants"
+      _failed=1
+    elif [ -n "$_forbidden" ]; then
+      error "$_ctx_name: $_services_json declares a per-service loop/throttle/exempt field: $(printf '%s' "$_forbidden" | tr '\n' ';')"
+      error "$_ctx_name: loop protection is uniform for every service; it must not become a per-service field"
+      _failed=1
+    fi
+  fi
+
+  # The POSIX watchdog supervises through the supervisor backend alone; the
+  # PowerShell it once carried made it unable to check anything on this host.
+  if [ -f "$_watchdog" ] && grep -qiE 'ScheduledTask|schtask|ConvertTo-Json' "$_watchdog"; then
+    error "$_ctx_name: $_watchdog contains PowerShell; the POSIX watchdog runs on POSIX hosts only"
+    _failed=1
+  fi
+
+  # Retry and backoff belong to the shared runner alone.  A mount backend or
+  # the setup step that sleeps is a second retry owner, which is how the
+  # original restart storm ran without backoff.
+  local _mount_path_file
+  for _mount_path_file in src/scripts/lib/mount-backend-darwin.sh src/scripts/lib/mount-backend-linux.sh src/scripts/services/cloud-drives-setup.sh; do
+    [ -f "$_mount_path_file" ] || continue
+    if grep -qE '(^|[^[:alnum:]_])sleep([^[:alnum:]_]|$)' "$_mount_path_file"; then
+      error "$_ctx_name: $_mount_path_file sleeps; retry/backoff is owned by the shared runner (src/scripts/services/rclone-mount.sh)"
+      _failed=1
+    fi
+  done
+
+  # Only the watchdog may act on the loop predicate.  A service script that
+  # calls it is enforcing a private throttle instead of reporting health.
+  local _consumers
+  _consumers=$(grep -rnE 'svc_health_is_looping[[:space:]]+[^[:space:]]' --include='*.sh' src/scripts/ scripts/ |
+    grep -vE ':[0-9]+:[[:space:]]*#' |
+    cut -d: -f1 |
+    sort -u ||
+    true) # check-suppress:suppression_doc: grep exits 1 when nothing consumes the predicate, which is a violation this check reports rather than ignores
+  local _consumer
+  for _consumer in $_consumers; do
+    case "$_consumer" in
+    src/scripts/lib/service-health.sh | src/scripts/services/service-watchdog.sh) ;;
+    *)
+      error "$_ctx_name: $_consumer calls svc_health_is_looping; the watchdog is the only loop-policy consumer"
+      _failed=1
+      ;;
+    esac
+  done
+
+  if [ "$_failed" -ne 0 ]; then
+    return 1
+  fi
+  say "no service supervision invariant violations found."
   return 0
 }

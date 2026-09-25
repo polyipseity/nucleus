@@ -554,6 +554,8 @@
               if text != null then
                 ''
                   # Write script directly from text parameter — no mirror tree or exec-discovery.
+                  # The body below is inlined, so it INHERITS the `set -euo pipefail` above
+                  # (no exec, no boundary).
                   cat > "$out/bin/nucleus-${name}" << 'WRAPPER'
                   #!${pkgs.runtimeShell}
                   set -euo pipefail
@@ -571,6 +573,12 @@
                 ''
                   # Create thin wrapper. Resolve symlinks so it works through
                   # home-manager profile symlinks, then exec the store-bundled script.
+                  # WHY `set -euo pipefail` above is NOT enough for the store script: shell
+                  # options are not inherited across `exec`, so the setting hardens the
+                  # wrapper itself (symlink resolution, cd) but NOT the script it execs.
+                  # A store script that needs strict mode must set it in its own body —
+                  # do not assume this line reaches it.  Some runners deliberately do not
+                  # (see the WHY in src/scripts/services/rclone-mount.sh).
                   cat > "$out/bin/nucleus-${name}" << 'WRAPPER'
                   #!${pkgs.runtimeShell}
                   set -euo pipefail
