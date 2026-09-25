@@ -226,6 +226,42 @@ function Get-NucleusPrefixInstanceList {
   return [string[]]@($instances | Sort-Object -Unique)
 }
 
+function Test-NucleusMountEnabled {
+  <#
+  .SYNOPSIS
+    Reports whether a cloud-drive mount declaration is enabled.
+
+  .DESCRIPTION
+    `enable` is optional in src/users/<user>/cloud-drives.json and defaults to true
+    (cloud-drives.nix mountSubmodule). An omitted key therefore means enabled, and only
+    an explicit false disables the mount. This is the single Windows definition of that
+    rule: the declared-instance filter and the catalog generator both call it, so they
+    cannot disagree about which mounts are instantiated.
+
+    The POSIX twin is the `.enable != false` predicate in src/scripts/lib/svc-instances.sh.
+    A jq `//` default cannot express this rule, because `//` substitutes on false as well
+    as on null.
+
+  .PARAMETER Mount
+    Single mount hashtable from the user registry.
+
+  .OUTPUTS
+    System.Boolean — true when the mount is enabled.
+
+  .EXAMPLE
+    if (-not (Test-NucleusMountEnabled -Mount $mount)) { continue }
+  #>
+  [CmdletBinding()]
+  [OutputType([bool])]
+  param(
+    [Parameter(Mandatory)]
+    [hashtable]$Mount
+  )
+
+  if ($Mount.ContainsKey('enable')) { return [bool]$Mount.enable }
+  return $true
+}
+
 function Get-NucleusConfiguredInstanceList {
   <#
   .SYNOPSIS
@@ -290,12 +326,10 @@ function Get-NucleusConfiguredInstanceList {
   foreach ($record in $records) {
     foreach ($mount in @($record.cloudDrives.mounts)) {
       if ($null -eq $mount) { continue }
-      # WHY: enable is optional in the mount schema and defaults to true, matching
-      # the Nix-side submodule default that decides which mounts are instantiated.
-      $enabled = if ($mount.ContainsKey('enable')) { [bool]$mount.enable } else { $true }
-      if (-not $enabled) { continue }
-      # WHY: the predicate mirrors the POSIX/Nix declared-mount filter (enable is true and
-      # remoteName is not null), so both hosts report the same set of expected instances.
+      # WHY: a mount without a configured remote is declared but never instantiated, and
+      #   the enabled test is shared with the catalog generator so both agree on which
+      #   mounts are expected to exist.
+      if (-not (Test-NucleusMountEnabled -Mount $mount)) { continue }
       if (-not $mount.ContainsKey('remoteName')) { continue }
       if ($null -eq $mount.remoteName) { continue }
       $ids += Get-NucleusInstanceId -TaskFolder ([string]$HostEntry.taskPath) -TaskName "$([string]$HostEntry.service)$([string]$mount.id)"

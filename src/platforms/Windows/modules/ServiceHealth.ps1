@@ -15,6 +15,18 @@ param()
 
 $ErrorActionPreference = 'Stop'
 
+# Loop-detection thresholds, defined once and read only by Health-IsLooping.
+# Health-Status reports through that same predicate, so the status a user sees
+# can never disagree with the policy the watchdog enforces.  Mirrors the
+# _SVC_HEALTH_LOOP_* constants in src/scripts/lib/service-health.sh.
+# WHY: -Force lets a re-dot-source refresh the values instead of throwing on an
+# already-read-only variable.
+Set-Variable -Name 'HealthLoopRestarts' -Value 10 -Option ReadOnly -Scope Script -Force
+Set-Variable -Name 'HealthLoopConsecutive' -Value 5 -Option ReadOnly -Scope Script -Force
+Set-Variable -Name 'HealthWarnRestarts' -Value 5 -Option ReadOnly -Scope Script -Force
+# Sentinel for "the OS could not report a boot time" — see Health-BootId.
+Set-Variable -Name 'HealthBootUnknown' -Value 'unknown' -Option ReadOnly -Scope Script -Force
+
 # HealthStateDir — returns the state directory path.
 function Health-StateDir {
     [CmdletBinding()]
@@ -23,26 +35,62 @@ function Health-StateDir {
     Join-Path (Join-Path $userData 'state') 'service-stats'
 }
 
+# Get-HealthSafeInstanceName — map a service instance id to a path-safe token.
+# WHY: scheduled-task ids are folder-qualified (\Folder\Name), so separators and
+# other reserved characters are replaced before an id becomes part of a file name.
+# A raw id would nest the record under the folder and put it out of reach of
+# Health-ClearAll's flat sweep, leaving a blocked instance un-re-armed at apply time.
+# This is the ONE place the substitution lives; every caller that builds a path from
+# an instance id reuses it rather than repeating the pattern.
+# WHY: named with an approved verb instead of the file's Health-<Noun> style so this
+# new function adds no PSUseApprovedVerbs finding to an already-red file.
+function Get-HealthSafeInstanceName {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param([Parameter(Mandatory)][string]$Instance)
+    $Instance -replace '[\\/:*?"<>|]', '_'
+}
+
 # Health-StateFile — returns the state file path for one instance.
 function Health-StateFile {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Instance)
-    Join-Path (Health-StateDir) "$Instance.json"
+    $safe = Get-HealthSafeInstanceName -Instance $Instance
+    Join-Path (Health-StateDir) "$safe.json"
 }
 
-# Health-BootId — returns a boot identifier for freshness tracking.
+# Health-BootId — the identity of the CURRENT boot, asked of the OS on every
+# call.  Mirrors svc_health_boot_id in service-health.sh.
+#
+# WHY this is recomputed and never cached (it previously read a sticky
+# `<state dir>\.boot-id` file back forever): a record's boot is compared against
+# this value to decide whether a block is still in force, so the value MUST
+# change when the OS reboots.  A cached copy cannot, which left the documented
+# "a reboot clears a block" contract unreachable.
+#
+# WHY an unavailable boot time yields a sentinel instead of a fabricated value:
+# clearing a block is driven by the stored boot DIFFERING from this value, so
+# inventing one when the OS cannot be asked would make every block read as stale
+# and silently void the loop protection.  The sentinel means "not evidence of a
+# reboot", and Health-IsBlocked keeps the block.  Failing closed costs a blocked
+# instance nothing the apply-time re-arm (Health-ClearAll via apply) cannot fix;
+# failing open re-admits the restart storm the block exists to prevent.
 function Health-BootId {
     [CmdletBinding()]
+    [OutputType([string])]
     param()
-    $dir = Health-StateDir
-    $file = Join-Path $dir '.boot-id'
-    if (Test-Path $file) {
-        return (Get-Content -Raw $file).Trim()
+    try {
+        # No -ErrorAction here: the module sets $ErrorActionPreference = 'Stop' at
+        # the top, so a CIM failure already terminates and is caught below.  The
+        # Pester stub for this command is a simple function with no common
+        # parameters, so passing -ErrorAction would throw on the stub itself.
+        $boot = (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime
+        if ($null -eq $boot) { return $script:HealthBootUnknown }
+        return $boot.ToString('o')
+    } catch {
+        # The OS could not report a boot time.  Fail closed, as documented above.
+        return $script:HealthBootUnknown
     }
-    $val = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime.ToString('o')
-    New-Item -ItemType Directory -Path $dir -Force | Out-Null
-    Set-Content -Path $file -Value $val -NoNewline
-    $val
 }
 
 # Health-Init — ensure the state file exists with defaults.
@@ -62,7 +110,10 @@ function Health-Init {
         boot         = (Health-BootId)
         lastSuccess  = 0
         restarts     = @()
-        runs         = 0
+        # WHY: null, not 0, is the "never observed" generation.  A counter may
+        # legitimately read 0 (systemd NRestarts), so zero cannot double as the
+        # unknown sentinel without swallowing each service's first restart.
+        generation   = $null
         lastExit     = 0
     } | ConvertTo-Json -Depth 4 | Set-Content -Path $file -NoNewline
 }
@@ -120,14 +171,39 @@ function Health-SetBlocked {
     Move-Item -Path $tmp -Destination $file -Force
 }
 
+# Health-SetRunning — clear the blocker fields and mark the instance running.
+function Health-SetRunning {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Instance)
+    Health-Init -Instance $Instance
+    $file = Health-StateFile -Instance $Instance
+    $tmp = "$file.tmp.$PID"
+    $json = Get-Content -Raw $file | ConvertFrom-Json
+    $json.state = 'running'
+    $json.'class' = $null
+    $json.remedy = $null
+    $json | ConvertTo-Json -Depth 4 | Set-Content -Path $tmp -NoNewline
+    Move-Item -Path $tmp -Destination $file -Force
+}
+
 # Health-IsBlocked — return true if the instance has a fresh blocked record.
+# Fresh means the record was written during the CURRENT boot, so a record from a
+# previous boot stops gating the service — that is how a reboot clears a block
+# (the other way being the apply-time re-arm).
+# WHY the unknown/absent guards: when the OS cannot report a boot time, or the
+# record carries no boot stamp at all, a mismatch is NOT evidence of a reboot,
+# so the block is KEPT (fail closed).  See Health-BootId.
 function Health-IsBlocked {
     [CmdletBinding()]
+    [OutputType([bool])]
     param([Parameter(Mandatory)][string]$Instance)
     $state = Health-Get -Instance $Instance -Field 'state'
     if ($state -ne 'blocked') { return $false }
     $boot = Health-Get -Instance $Instance -Field 'boot'
-    $boot -eq (Health-BootId)
+    $current = Health-BootId
+    if ([string]::IsNullOrEmpty($current) -or $current -eq $script:HealthBootUnknown) { return $true }
+    if ([string]::IsNullOrEmpty($boot) -or $boot -eq $script:HealthBootUnknown) { return $true }
+    return ($boot -eq $current)
 }
 
 # Health-IsReported — return true if the current state has been reported.
@@ -152,7 +228,16 @@ function Health-MarkReported {
     Health-Set -Instance $Instance -Field 'reportedState' -Value $State
 }
 
-# Health-Clear — remove class, remedy, and reported (re-arm).
+# Health-Clear — re-arm the instance: drop class, remedy, and reportedState,
+# return state to 'stopped', and drop the restart history, so that neither a
+# blocked state NOR a loop history survives the re-arm.  Rule 2 never
+# auto-revives, so a record left at state 'blocked' would stay blocked until reboot
+# even though apply had already re-armed it.
+# WHY: Health-IsLooping reads .restarts, so a clear that kept the history would be
+#   re-blocked by the watchdog's Rule 3 on the very next tick and would stay
+#   blocked until the old timestamps aged out.  Dropping .restarts is what makes
+#   this a re-arm rather than a status reset.  Mirrors svc_health_clear in
+#   src/scripts/lib/service-health.sh.
 function Health-Clear {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Instance)
@@ -160,9 +245,11 @@ function Health-Clear {
     if (-not (Test-Path $file)) { return }
     $tmp = "$file.tmp.$PID"
     $json = Get-Content -Raw $file | ConvertFrom-Json
+    $json.state = 'stopped'
     $json.'class' = $null
     $json.remedy = $null
     $json.reportedState = $null
+    $json.restarts = @()
     $json | ConvertTo-Json -Depth 4 | Set-Content -Path $tmp -NoNewline
     Move-Item -Path $tmp -Destination $file -Force
 }
@@ -234,34 +321,26 @@ function Health-ConsecutiveFailures {
 }
 
 # Health-IsLooping — return true if the service is in a crash loop.
+# WHY: the only place the loop thresholds are compared; Health-Status delegates
+# here rather than re-implementing the comparison.
 function Health-IsLooping {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Instance)
     $count = Health-RestartCount -Instance $Instance
     $consecutive = Health-ConsecutiveFailures -Instance $Instance
-    ($count -ge 10) -or ($consecutive -ge 5)
+    ($count -ge $script:HealthLoopRestarts) -or ($consecutive -ge $script:HealthLoopConsecutive)
 }
 
 # Health-Status — return status string.
 function Health-Status {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Instance)
-    $count = Health-RestartCount -Instance $Instance
-    $consecutive = Health-ConsecutiveFailures -Instance $Instance
-    if (($count -ge 10) -or ($consecutive -ge 5)) { 'LOOP' }
-    elseif ($count -ge 5) { "${count}/hr" }
-    else { 'OK' }
-}
-
-# Health-IncrementRuns — atomically increment the runs counter.
-function Health-IncrementRuns {
-    [CmdletBinding()]
-    param([Parameter(Mandatory)][string]$Instance)
-    $file = Health-StateFile -Instance $Instance
-    if (-not (Test-Path $file)) { return }
-    Health-Set -Instance $Instance -Field 'runs' -Value (
-        (Health-Get -Instance $Instance -Field 'runs') + 1
-    )
+    if (Health-IsLooping -Instance $Instance) {
+        'LOOP'
+    } else {
+        $count = Health-RestartCount -Instance $Instance
+        if ($count -ge $script:HealthWarnRestarts) { "${count}/hr" } else { 'OK' }
+    }
 }
 
 # Health-SetLastExit — update lastExit.

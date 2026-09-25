@@ -198,7 +198,7 @@ Describe 'Get-NucleusConfiguredInstanceList filtering' {
     $profileJson = '{"homeDirectory":{"MacBook":"/Users/test-user","NixOS":"/home/test-user","Windows":"C:\\Users\\test-user"},"isPrimary":true}'
     Set-Content -Path (Join-Path $defaultRoot 'profile.json') -Value $profileJson
     Set-Content -Path (Join-Path $userRoot 'profile.json') -Value $profileJson
-    $mounts = '{"mounts":[{"id":"Enabled","enable":true,"remoteName":"Enabled"},{"id":"Disabled","enable":false,"remoteName":"Disabled"},{"id":"NoRemote","enable":true},{"id":"NullRemote","enable":true,"remoteName":null}]}'
+    $mounts = '{"mounts":[{"id":"Enabled","enable":true,"remoteName":"Enabled"},{"id":"Disabled","enable":false,"remoteName":"Disabled"},{"id":"NoRemote","enable":true},{"id":"NullRemote","enable":true,"remoteName":null},{"id":"NoEnableKey","remoteName":"NoEnableKey"}]}'
     Set-Content -Path (Join-Path $defaultRoot 'cloud-drives.json') -Value $mounts
   }
 
@@ -209,6 +209,25 @@ Describe 'Get-NucleusConfiguredInstanceList filtering' {
   It 'returns only the enabled mounts that name a remote' {
     $configured = @(Get-NucleusConfiguredInstanceList -HostEntry $Script:MountEntry -RepoRoot $Script:FilterRepoRoot -Username 'test-user')
 
-    $configured | Should -Be @('\NucleusCloudMount\NucleusCloudMount-Enabled')
+    # NoEnableKey omits `enable`, which defaults to true.  The POSIX twin
+    # (svc-instances-tests.sh section 8) runs this same fixture.
+    $configured | Should -Be @(
+      '\NucleusCloudMount\NucleusCloudMount-Enabled',
+      '\NucleusCloudMount\NucleusCloudMount-NoEnableKey'
+    )
+  }
+}
+
+Describe 'Test-NucleusMountEnabled' {
+  It 'treats an omitted enable key as enabled' {
+    Test-NucleusMountEnabled -Mount @{ id = 'NoEnableKey'; remoteName = 'x' } | Should -BeTrue
+  }
+
+  It 'treats an explicit true as enabled' {
+    Test-NucleusMountEnabled -Mount @{ id = 'On'; enable = $true } | Should -BeTrue
+  }
+
+  It 'treats an explicit false as disabled' {
+    Test-NucleusMountEnabled -Mount @{ id = 'Off'; enable = $false } | Should -BeFalse
   }
 }
