@@ -2,6 +2,31 @@
 # Shared test library: counters, assertions, and color helpers.
 # Source this after setting SCRIPT_DIR and/or REPO_ROOT.
 
+# Test state isolation — must run before any lib.sh / service-health.sh sourcing.
+# Sets HOME and NUCLEUS_USER_ROOT to a temp dir so that derive_nucleus_user_root
+# never resolves to the developer's real state directory.  lib.sh:38 uses
+# ${VAR:=$(default)}, so any pre-set value is preserved and not overwritten.
+init_test_state() {
+  local _tmp_home _tmp_nucleus
+  _tmp_home="$(mktemp -d)"
+  _tmp_nucleus="$_tmp_home/.local/share/nucleus"
+  mkdir -p "$_tmp_nucleus/state/service-stats"
+  export HOME="$_tmp_home"
+  export NUCLEUS_USER_ROOT="$_tmp_nucleus"
+  # Prevent derive_repo_root from walking into the real repo tree.
+  export NUCLEUS_REPO_ROOT="$_tmp_home/.repo"
+  mkdir -p "$_tmp_home/.repo"
+}
+
+# Nothing initialises on source — every suite must call init_test_state
+# itself BEFORE the first lib.sh / service-health.sh source, or it gets no
+# isolation at all.  Two suites do more: cloud-repair additionally unsets
+# NUCLEUS_USER_ROOT around its own STATE_DIR derivation (deriving it against an
+# already-set root pointed the suite at the real user's service-health records)
+# and launches its repair subprocess with the variable removed, while
+# svc-restart has no NUCLEUS_USER_ROOT handling of its own and relies on this
+# initialiser alone.
+
 # Console color detection (mirrors lib.sh _nuc_color_init): NO_COLOR set
 # non-empty -> plain; FORCE_COLOR set and != "0" or CLICOLOR_FORCE set
 # non-empty -> color; else color only when stdout is a tty ([ -t 1 ]) and
