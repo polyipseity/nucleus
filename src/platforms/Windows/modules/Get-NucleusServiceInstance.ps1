@@ -232,7 +232,7 @@ function Test-NucleusMountEnabled {
     Reports whether a cloud-drive mount declaration is enabled.
 
   .DESCRIPTION
-    `enable` is optional in src/users/<user>/cloud-drives.json and defaults to true
+    'enable' is optional in src/users/<user>/cloud-drives.json and defaults to true
     (cloud-drives.nix mountSubmodule). An omitted key therefore means enabled, and only
     an explicit false disables the mount. This is the single Windows definition of that
     rule: the declared-instance filter and the catalog generator both call it, so they

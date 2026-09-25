@@ -61,7 +61,7 @@ function Sync-CloudDriveCatalog {
     # ------------------------------------------------------------------
     # Mounts
     # ------------------------------------------------------------------
-    # WHY: mounts default to enabled when `enable` is omitted, so the test is shared
+    # WHY: mounts default to enabled when 'enable' is omitted, so the test is shared
     #   with the declared-instance filter (Test-NucleusMountEnabled) rather than being
     #   a second `-eq $true` copy that would drop mounts the watchdog still expects.
     #   Replicas below are deliberately different: their submodule defaults to false.

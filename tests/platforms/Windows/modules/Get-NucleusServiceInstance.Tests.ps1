@@ -209,7 +209,7 @@ Describe 'Get-NucleusConfiguredInstanceList filtering' {
   It 'returns only the enabled mounts that name a remote' {
     $configured = @(Get-NucleusConfiguredInstanceList -HostEntry $Script:MountEntry -RepoRoot $Script:FilterRepoRoot -Username 'test-user')
 
-    # NoEnableKey omits `enable`, which defaults to true.  The POSIX twin
+    # NoEnableKey omits 'enable', which defaults to true.  The POSIX twin
     # (svc-instances-tests.sh section 8) runs this same fixture.
     $configured | Should -Be @(
       '\NucleusCloudMount\NucleusCloudMount-Enabled',

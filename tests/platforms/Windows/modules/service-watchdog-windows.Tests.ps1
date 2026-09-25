@@ -196,22 +196,15 @@ Describe 'Invoke-WatchdogIteration rule table' {
     # path, where the only signal is the supervisor's generation token
     # advancing.  A crash loop never survives a tick, so five changed ticks trip
     # the consecutive-failure rule and the instance is blocked, not restarted.
-    Mock Supervisor-Generation { return 1 }
+    # Only the change between ticks matters, so a counter advances the token on
+    # every observation instead of six literal per-tick return values.
+    $Script:GenerationToken = 0
+    Mock Supervisor-Generation { return ($Script:GenerationToken += 1) }
     Invoke-WatchdogIteration > $null
-
-    Mock Supervisor-Generation { return 2 }
     Invoke-WatchdogIteration > $null
-
-    Mock Supervisor-Generation { return 3 }
     Invoke-WatchdogIteration > $null
-
-    Mock Supervisor-Generation { return 4 }
     Invoke-WatchdogIteration > $null
-
-    Mock Supervisor-Generation { return 5 }
     Invoke-WatchdogIteration > $null
-
-    Mock Supervisor-Generation { return 6 }
     Invoke-WatchdogIteration > $null
 
     (Health-Get -Instance 'ollama' -Field 'state') | Should -Be 'blocked'

@@ -337,7 +337,7 @@ Describe 'Sync-CloudDriveCatalog generated wrapper' {
 }
 
 Describe 'Sync-CloudDriveCatalog mount filtering' {
-  # WHY: `enable` is optional and defaults to true (cloud-drives.nix mountSubmodule), so
+  # WHY: 'enable' is optional and defaults to true (cloud-drives.nix mountSubmodule), so
   #   a mount that omits the key must still be provisioned.  The generator shares
   #   Test-NucleusMountEnabled with the declared-instance filter; these two cases pin both
   #   directions of that shared predicate on the generation side, so the two consumers
