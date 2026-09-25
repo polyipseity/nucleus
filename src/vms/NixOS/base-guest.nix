@@ -30,7 +30,7 @@
 # - src/hosts/NixOS/vms.nix — no hypervisor/nested VM support needed
 # - src/hosts/NixOS/hardware/* — qemu-guest.nix handles virtualized hardware
 # - src/hosts/NixOS/jellyfin.nix — singleton media server not guest-appropriate
-# - posix-sops.nix / hosts/NixOS/sops.nix — sops.* options need the sops-nix
+# - src/modules/posix/sops.nix — sops.* options need the sops-nix
 #   module, which nixos-generators does not load; the guest takes credentials
 #   from NUCLEUS_VM_GUEST_* environment variables instead of SOPS.
 #
@@ -46,12 +46,12 @@
   imports = [
     "${modulesPath}/profiles/qemu-guest.nix"
     # WHY: relative to src/vms/NixOS/, repo files are three levels up (../../../src).
-    # Shared POSIX modules from src/modules/
+    # Shared POSIX modules from src/modules/posix/
     ../../../src/modules/core.nix
-    ../../../src/modules/gnupg.nix
-    ../../../src/modules/posix-base.nix
-    ../../../src/modules/posix-security.nix
-    ../../../src/modules/posix-user-shell.nix
+    ../../../src/modules/posix/gnupg.nix
+    ../../../src/modules/posix/base.nix
+    ../../../src/modules/posix/security.nix
+    ../../../src/modules/posix/user-shell.nix
     # NixOS host modules (excluding vms, hardware, ai, jellyfin infrastructure)
     ../../../src/hosts/NixOS/base.nix
     ../../../src/hosts/NixOS/desktop.nix
@@ -60,19 +60,19 @@
     ../../../src/hosts/NixOS/users.nix
   ];
 
-  # WHY: posix-base.nix selects its per-host gitconfig via hostName and the
+  # WHY: posix/base.nix selects its per-host gitconfig via hostName and the
   # shared user modules key off username; nixos-generators passes no
   # specialArgs, so thread generic placeholders here.  This is the TYPE build
   # (no per-VM identity): the per-VM delta src/vms/guests/<id>/guest.nix
   # overrides both with the real values from NUCLEUS_VM_GUEST_* environment
-  # variables via the same _module.args option.  SOPS modules (posix-sops.nix,
-  # hosts/NixOS/sops.nix) are deliberately NOT imported: they define the
+  # variables via the same _module.args option.  The SOPS module
+  # (src/modules/posix/sops.nix) is deliberately NOT imported: it defines the
   # sops.* options that only exist when sops-nix.nixosModules.sops is loaded,
   # which nixos-generators does not do for standalone guest builds.  The
   # guest injects its credentials and hostname via NUCLEUS_VM_GUEST_*
   # environment variables instead of SOPS decryption.
   _module.args = {
-    # WHY: posix-base.nix and other shared modules now take `repoRoot` as a
+    # WHY: posix/base.nix and other shared modules now take `repoRoot` as a
     # module arg (threaded via specialArgs on the real hosts). nixos-generators
     # passes no specialArgs, so inject the repo root here. The guest image is
     # built from the repo tree, so the repo root is the parent of src/.
