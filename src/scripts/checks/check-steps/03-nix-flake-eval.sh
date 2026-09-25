@@ -37,8 +37,15 @@ run_nix_flake_eval() {
 
     # WHY: both evals write the shared SQLite eval cache; serialize them with
     # the test steps' nix invocations (pre-push check and test may overlap).
+    # WHY: builtins.currentSystem is unavailable under pure eval (the default
+    # for `nix eval`), so the previous probe — suppressed stderr plus a
+    # hardcoded aarch64-darwin fallback — silently reported the darwin system
+    # on every host and made the eval below target the wrong packages set on
+    # Linux.  `nix config show system` is pure, cheap, and reports the system
+    # in effect (it follows a configured `system = …`, exactly as `nix build`
+    # would).
     local sys
-    sys=$(nucleus_nix_locked nix eval --expr 'builtins.currentSystem' --raw 2>/dev/null || echo 'aarch64-darwin')
+    sys="$(nucleus_nix_locked nix config show system)"
     if ! nucleus_nix_locked nix eval "path:./src#packages.$sys" >/dev/null; then
       _ne_exit=1
     else
