@@ -1131,14 +1131,25 @@ let
     in
     if attr == null then [ ] else lib.strings.splitString "." attr;
 
+  # Whether the managed entry's nixpkgs attribute path resolves in this pkgs
+  # instance. An entry with no `nixpkgs` attribute yields the empty path, which
+  # `lib.hasAttrByPath`/`lib.getAttrFromPath` would read as the whole `pkgs`
+  # attrset, so the empty path is rejected explicitly.
+  nixPackageAttrPresent =
+    packageName:
+    nixPkgsAttrPath packageName != [ ] && lib.hasAttrByPath (nixPkgsAttrPath packageName) pkgs;
+
   # Derivation for a managedPackages entry routed to nixpkgs. An entry may carry
   # `nixpkgsPackage` when the bare `nixpkgs` attribute is not the derivation we
   # want on PATH (e.g. `pass` needs its OTP extension wrapped into the binary);
   # `nixpkgs` stays required as the availability probe.
+  # WHY getAttrFromPath: unlike attrByPath with a null default it throws when the
+  # path is missing, so an entry that still cannot resolve fails loudly instead
+  # of contributing `null` to buildEnv's paths.
   managedNixPackageDerivation =
     packageName:
     managedPackages.${packageName}.nixpkgsPackage
-      or (lib.attrByPath (nixPkgsAttrPath packageName) null pkgs);
+      or (lib.getAttrFromPath (nixPkgsAttrPath packageName) pkgs);
 
   # Managed packages routed to nixpkgs but absent from pkgs (platform-specific).
   missingNixPackageAttrs = builtins.filter (
@@ -1179,6 +1190,7 @@ let
         (managedPackages.${name}.nixpkgs or null) != null
         && managedPackageBackends.${name} == "nixpkgs"
         && managedPackagePlatformCompatible name
+        && nixPackageAttrPresent name
         && !(builtins.elem name posixProgramsProvidedPackages)
       ) enabledManagedPackageNames
     else
@@ -1186,6 +1198,7 @@ let
         name:
         (managedPackages.${name}.nixpkgs or null) != null
         && managedPackagePlatformCompatible name
+        && nixPackageAttrPresent name
         && nixPackageAttrAvailable name
         && !(builtins.elem name posixProgramsProvidedPackages)
       ) enabledManagedPackageNames

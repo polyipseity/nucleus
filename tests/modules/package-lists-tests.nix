@@ -154,13 +154,7 @@ let
             internal = true;
           };
           options.environment.systemPackages = lib.mkOption {
-            # WHY nullOr: production feeds this from mkPkgs, whose overlays
-            # provide pi-coding-agent and sandbox-runtime; a bare nixpkgs does
-            # not, and managedNixPackages then yields null for those two entries
-            # because nixPackageAttrAvailable treats a missing attribute as
-            # available. Tolerating them keeps the harness free of flake
-            # internals while still proving how the pass entry resolves.
-            type = lib.types.listOf (lib.types.nullOr lib.types.package);
+            type = lib.types.listOf lib.types.package;
             default = [ ];
             internal = true;
           };
