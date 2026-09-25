@@ -171,10 +171,6 @@ let
       writable = true;
     }
     {
-      path = "${nucleusUserRoot}/cooldown_handler.py";
-      writable = true;
-    }
-    {
       path = "${nucleusUserRoot}/logging_config.json";
       writable = true;
     }
@@ -459,9 +455,6 @@ in
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "${nucleusUserRoot}/cline_handler.py" \
         "src/modules/configs/litellm/cline_handler.py"
-      "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
-        "${nucleusUserRoot}/cooldown_handler.py" \
-        "src/modules/configs/litellm/cooldown_handler.py"
       # check-suppress:config-method: method 1 (writable symlink) -- litellm logging config; part of seed-litellm-config activation block.
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "${nucleusUserRoot}/logging_config.json" \

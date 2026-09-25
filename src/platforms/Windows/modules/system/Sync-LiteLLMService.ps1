@@ -177,16 +177,6 @@ function Sync-LiteLLMService {
   New-Item -Path $handlerLink -ItemType SymbolicLink -Target $handlerSource -Force > $null
   Set-ManagedSymlinkDeleteProtection -Context "Sync-LiteLLMService" -Path $handlerLink
 
-  # Symlink the cooldown handler callback alongside the config.
-  $cooldownLink = Join-Path -Path $programDataDir -ChildPath "cooldown_handler.py"
-  $cooldownSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\litellm\cooldown_handler.py"
-  if (-not (Test-Path -Path $cooldownSource -PathType Leaf)) {
-    throw "Cooldown handler source not found: $cooldownSource"
-  }
-  if (Test-Path -Path $cooldownLink) { Remove-Item -Path $cooldownLink -Force }
-  New-Item -Path $cooldownLink -ItemType SymbolicLink -Target $cooldownSource -Force > $null
-  Set-ManagedSymlinkDeleteProtection -Context "Sync-LiteLLMService" -Path $cooldownLink
-
   # WHY: the pair, not a merged file. logging.capture selects which streams are captured,
   # never the destination shape (house default: stdout.log + stderr.log).
   $stdoutLogFile = Join-Path -Path $serviceLogDir -ChildPath "stdout.log"
