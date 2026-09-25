@@ -28,6 +28,30 @@ let
   listElements = builtins.filter isListElement parts;
   extractedNames = map builtins.head listElements;
 
+  # --- Entry blocks keyed by name (structural parse) ---
+  # WHY: the assertion needs each entry's real text, and forcing managedPackages
+  # through the module system would drag in every host's config args (pkgs,
+  # treefmtPackage, …), so this file checks the registry source.  A regex over
+  # the whole file is not portable: Nix's regex is POSIX ERE, which rejects `\]`
+  # outright (`error: invalid regular expression`, not a false result), and
+  # whether `.` crosses a newline is implementation-defined.  Splitting on the
+  # entry boundary instead hands each assertion the real block that follows
+  # `name = {` up to the next entry.
+  entryBlocks = builtins.listToAttrs (
+    builtins.filter (x: x != null) (
+      lib.lists.imap0 (
+        i: el:
+        if isListElement el && (i + 1) < builtins.length parts then
+          {
+            name = builtins.head el;
+            value = builtins.elemAt parts (i + 1);
+          }
+        else
+          null
+      ) parts
+    )
+  );
+
   # --- Extract nixpkgs attrs from core.nix text ---
   matches = builtins.split "nixpkgs = \"([^\"]+)\";" coreModuleText;
   isStr = x: builtins.isString x;
@@ -95,10 +119,14 @@ let
     let
       hasDarwinPlatform =
         name:
-        builtins.match (".*" + name + "\"? = \\{\n.*platforms = \\[ \"darwin\" \\];.*") coreModuleText
-        != null;
+        let
+          entryBlock = entryBlocks.${name} or null;
+        in
+        entryBlock != null && lib.hasInfix "platforms = [ \"darwin\" ]" entryBlock;
+      unmarked = builtins.filter (name: !hasDarwinPlatform name) darwinOnlyPackageNames;
     in
-    assert' (builtins.all hasDarwinPlatform darwinOnlyPackageNames) "Darwin-only packages should have platforms field set in core.nix";
+    assert' (unmarked == [ ])
+      "Darwin-only packages must set platforms = [ \"darwin\" ] in core.nix; unmarked: ${lib.strings.concatStringsSep ", " unmarked}";
 
   # Darwin-only packages must not be buildable on Linux.
   test_darwin_only_absent_on_linux =
