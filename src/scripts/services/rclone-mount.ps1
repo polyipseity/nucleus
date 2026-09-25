@@ -6,17 +6,30 @@
     Dispatches to MountBackend.ps1. No OS/FUSE/supervisor names.
 
     Environment (injected by the wrapper or caller):
-      NUCLEUS_RCLONE_REMOTE_NAME, NUCLEUS_RCLONE_REMOTE,
-      NUCLEUS_RCLONE_MOUNT_POINT, NUCLEUS_RCLONE_ARGS,
-      NUCLEUS_CLOUD_MOUNT_INSTANCE.
+      NUCLEUS_RCLONE_REMOTE, NUCLEUS_RCLONE_MOUNT_POINT, NUCLEUS_RCLONE_ARGS,
+      NUCLEUS_RCLONE_BIN, NUCLEUS_RCLONE_READ_ONLY,
+      NUCLEUS_CLOUD_MOUNT_INSTANCE, NUCLEUS_MOUNT_ATTEMPTS,
+      NUCLEUS_MOUNT_BACKOFF, NUCLEUS_MOUNT_ATTACH_SECONDS.
 #>
 [CmdletBinding()]
 param()
 
 $ErrorActionPreference = 'Stop'
 
-. "$PSScriptRoot\..\platforms\Windows\modules\ServiceHealth.ps1"
-. "$PSScriptRoot\..\platforms\Windows\modules\MountBackend.ps1"
+# ── Resolve repo root ──────────────────────────────────────────────────────
+# Same bootstrap as src/scripts/services/service-watchdog.ps1: NUCLEUS_REPO_ROOT
+# wins (the machine-wide value apply.ps1 writes), and the PSScriptRoot walk
+# covers a direct run from the live checkout.
+$RepoRoot = if ($env:NUCLEUS_REPO_ROOT) {
+    $env:NUCLEUS_REPO_ROOT
+} else {
+    Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
+}
+
+$ModulesDir = Join-Path $RepoRoot 'src\platforms\Windows\modules'
+
+. (Join-Path $ModulesDir 'ServiceHealth.ps1')
+. (Join-Path $ModulesDir 'MountBackend.ps1')
 
 $instance = $env:NUCLEUS_CLOUD_MOUNT_INSTANCE
 if (-not $instance) { throw 'NUCLEUS_CLOUD_MOUNT_INSTANCE not set' }
@@ -27,9 +40,19 @@ if (-not $mountPoint) { throw 'NUCLEUS_RCLONE_MOUNT_POINT not set' }
 $rcloneArgs = $env:NUCLEUS_RCLONE_ARGS
 $rcloneBin = if ($env:NUCLEUS_RCLONE_BIN) { $env:NUCLEUS_RCLONE_BIN } else { 'rclone' }
 $readOnly = $env:NUCLEUS_RCLONE_READ_ONLY -eq 'true'
-$attempts = if ($env:NUCLEUS_MOUNT_ATTEMPTS) { [int]$env:NUCLEUS_MOUNT_ATTEMPTS } else { 3 }
-$attachSeconds = if ($env:NUCLEUS_MOUNT_ATTACH_SECONDS) { [int]$env:NUCLEUS_MOUNT_ATTACH_SECONDS } else { 45 }
-$backoffCsv = if ($env:NUCLEUS_MOUNT_BACKOFF) { $env:NUCLEUS_MOUNT_BACKOFF } else { '20,40' }
+# The lifecycle policy is single-sourced from cloud-drive.lifecycle in
+# services.json and injected by the generator, so these three are REQUIRED.
+# WHY: a hardcoded default here is a second policy definition that can silently
+#   drift from the registry, and the POSIX runner consumes the same three with
+#   `:?` (required, no fallback). A missing value must fail loudly on both hosts.
+$attemptsRaw = $env:NUCLEUS_MOUNT_ATTEMPTS
+if (-not $attemptsRaw) { throw 'NUCLEUS_MOUNT_ATTEMPTS not set' }
+$attempts = [int]$attemptsRaw
+$attachSecondsRaw = $env:NUCLEUS_MOUNT_ATTACH_SECONDS
+if (-not $attachSecondsRaw) { throw 'NUCLEUS_MOUNT_ATTACH_SECONDS not set' }
+$attachSeconds = [int]$attachSecondsRaw
+$backoffCsv = $env:NUCLEUS_MOUNT_BACKOFF
+if (-not $backoffCsv) { throw 'NUCLEUS_MOUNT_BACKOFF not set' }
 $backoffSchedule = $backoffCsv -split ',' | ForEach-Object { [int]$_.Trim() }
 
 # Initialize health record.
@@ -52,14 +75,19 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
 
     Write-Host "$instance`: mount attempt $attempt/$attempts"
 
-    $captureFile = Join-Path $env:TEMP "rclone-capture-$instance-$PID.txt"
+    # WHY: the instance id is folder-qualified (\NucleusCloudMount\NucleusCloudMount-iCloud),
+    # so it cannot be used raw in a path — the embedded separators would nest this file
+    # under a directory that does not exist and -RedirectStandardError would then fail
+    # terminally.  Get-HealthSafeInstanceName owns the one instance -> path-safe mapping,
+    # so reuse it rather than repeating the substitution here.
+    $captureFile = Join-Path $env:TEMP "rclone-capture-$(Get-HealthSafeInstanceName -Instance $instance)-$PID.txt"
 
     # Build mount args.
     $mountArgs = Mount-Backend-Args -Remote $remote -MountPoint $mountPoint -ReadOnly $readOnly -ExtraArgs $rcloneArgs
 
-    # Start rclone mount.
-    $proc = Start-Process -FilePath $rcloneBin -ArgumentList ('mount', $mountArgs) `
-        -NoNewWindow -PassThru -RedirectStandardError $captureFile -Wait:$false
+    # Start rclone mount through the backend's single mount entry point (POSIX delegates
+    # the same way); it prepends the 'mount' subcommand itself.
+    $proc = Mount-Backend-Mount -RcloneBin $rcloneBin -Args $mountArgs -CaptureFile $captureFile
 
     # Wait for mount to appear.
     $live = $false
@@ -75,7 +103,6 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
     if ($live) {
         Health-SetRunning -Instance $instance
         Health-RecordSuccess -Instance $instance
-        Health-IncrementRuns -Instance $instance
 
         # Wait for rclone to exit.
         $proc.WaitForExit()
@@ -109,6 +136,10 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
     # Transient — backoff and retry.
     Remove-Item -Path $captureFile -ErrorAction SilentlyContinue
     if ($attempt -lt $attempts) {
+        # The declared schedule is CLAMPED, never extrapolated (services.schema.json,
+        # mountRetryBackoffSeconds): an attempt past the end of the list reuses the last declared value,
+        # so every delay is a value services.json declares.  The POSIX runner clamps
+        # identically in _cm_get_backoff; the two hosts must not diverge on this rule.
         $backoffIdx = [Math]::Min($attempt - 1, $backoffSchedule.Count - 1)
         $backoff = $backoffSchedule[$backoffIdx]
         Write-Host "$instance`: retrying in ${backoff}s"

@@ -129,22 +129,58 @@ function Mount-Backend-Mount {
     )
 
     $Script:_BackendCapture = $CaptureFile
-    $proc = Start-Process -FilePath $RcloneBin -ArgumentList ('mount', $Args) `
+    # WHY: the array must be FLAT.  `('mount', $Args)` uses the comma operator, which
+    #   nests $Args as a single element (System.Object[]), and Start-Process rejects it:
+    #   "Cannot convert 'System.Object[]' to the type 'System.String' required by
+    #   parameter 'ArgumentList'".  Concatenating keeps one flat string array.
+    $proc = Start-Process -FilePath $RcloneBin -ArgumentList (@('mount') + $Args) `
         -NoNewWindow -PassThru -RedirectStandardError $CaptureFile
     $Script:_BackendRclonePid = $proc.Id
     $proc
 }
 
-# Mount-Backend-Probe — check if the volume is live.
+# Mount-Backend-Probe — report whether the mount point is a LIVE MOUNT.
+# Returns $true when mounted, $false when not mounted.
+#
+# WHY: this asks about MOUNT STATE, never alone about directory contents.  An empty
+#   remote root is a legitimate state (a freshly created cloud folder), and reporting
+#   it as dead makes the runner retry `mountAttempts` times and leave the service
+#   permanently blocked at mount-failed on a mount that actually succeeded.  Linux
+#   answers the same question through the mount table (mount-backend-linux.sh ->
+#   svc_mount_table_contains) and macOS through diskutil; Windows has no mount table,
+#   so it asks this host's mount state and keeps the content check as a SECOND
+#   signal.
+#
+# WHY the union rather than a replacement: the reparse-point test is an assumption
+#   about WinFsp that cannot be confirmed from here, so it is added as an ADDITIONAL
+#   reason to call a path mounted.  If the assumption holds, empty-but-mounted starts
+#   working; if it does not, behaviour is exactly the previous status quo.  Treating
+#   everything as mounted is NOT an option - the transition back to not-mounted is
+#   what makes revival work.
+#
+# UNVERIFIED on Windows: that a WinFsp DIRECTORY mount is exposed as a reparse point
+#   (and therefore carries FileAttributes.ReparsePoint on the mount-point directory
+#   itself).  Confirm on a real Windows host by starting a mount and inspecting
+#   (Get-Item -Force <mount point>).Attributes.  Until then the content check remains
+#   the effective signal for a non-empty remote root.
 function Mount-Backend-Probe {
     [CmdletBinding()]
+    [OutputType([bool])]
     param([Parameter(Mandatory)][string]$MountPoint)
 
-    if (Test-Path $MountPoint) {
-        $items = Get-ChildItem -Path $MountPoint -ErrorAction SilentlyContinue
-        return ($null -ne $items -and $items.Count -gt 0)
+    if (-not (Test-Path -LiteralPath $MountPoint)) {
+        return $false
     }
-    return $false
+
+    # A WinFsp directory mount is expected to be a reparse point in its own right.
+    $item = Get-Item -LiteralPath $MountPoint -Force
+    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+        return $true
+    }
+
+    # check-suppress:suppression_doc: an unreadable or empty directory is the not-mounted answer, decided by the content test immediately below.
+    $items = @(Get-ChildItem -Path $MountPoint -ErrorAction SilentlyContinue)
+    return ($items.Count -gt 0)
 }
 
 # Mount-Backend-Unmount — release the volume.

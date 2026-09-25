@@ -10,16 +10,30 @@
 #   NixOS systemd unit (same derivation, different backend)
 #
 # Environment (injected by Nix extraEnv or shell wrapper):
-#   NUCLEUS_RCLONE_REMOTE_NAME  — display name
 #   NUCLEUS_RCLONE_REMOTE       — rclone remote
 #   NUCLEUS_RCLONE_MOUNT_POINT  — local mount path
 #   NUCLEUS_RCLONE_ARGS         — newline-separated rclone flags
 #   NUCLEUS_CLOUD_MOUNT_INSTANCE — instance key (e.g. "iCloud")
 #
-# Lifecycle policy (injected by Nix or parsed from services.json):
-#   NUCLEUS_MOUNT_ATTEMPTS      — max retry attempts (default 3)
-#   NUCLEUS_MOUNT_BACKOFF       — comma-separated backoff seconds (default "20,40")
-#   NUCLEUS_MOUNT_ATTACH_SECONDS — attach budget (default 45)
+# Lifecycle policy (injected by Nix from services.json cloud-drive.lifecycle):
+#   NUCLEUS_MOUNT_ATTEMPTS      — max retry attempts
+#   NUCLEUS_MOUNT_BACKOFF       — comma-separated backoff seconds
+#   NUCLEUS_MOUNT_ATTACH_SECONDS — attach budget
+#
+# WHY: this runner deliberately sets no shell strict mode.  It is launched through the
+#   generated nucleus app wrapper (writeNucleusShellApplication in src/flake.nix), which
+#   does set `set -euo pipefail` — but shell options do NOT survive `exec`, so that
+#   setting hardens the wrapper, not this script.  (The wrapper's inline-`text` branch is
+#   hardened; the thin-wrapper branch is not.)  Failure handling here is explicit instead:
+#   `cmd || rc=$?` where the status is inspected, `|| true` for best-effort cleanup, and
+#   explicit `exit` codes.  Adding `set -e` would CHANGE control flow in the retry loop,
+#   because several calls must be allowed to fail: the svc_health_* writes (deliberately
+#   non-fatal; see the F1/F5 fixes) and backend_mount, whose failure must still reach the
+#   attach wait, the failure classification, the blocked record and the retry.  Aborting
+#   instead of classifying exits the unit, which invites the supervisor to revive it —
+#   the restart storm this design exists to prevent.  The Windows runner hardens itself
+#   with $ErrorActionPreference = 'Stop'; that asymmetry is deliberate and documented, not
+#   an oversight.
 
 [ -n "${_NUCLEUS_RCLONE_MOUNT_SOURCED-}" ] && return
 _NUCLEUS_RCLONE_MOUNT_SOURCED=1
@@ -46,19 +60,25 @@ _cm_dispatch_backend() {
 
 # _cm_parse_backoff — parse the backoff schedule into an array.
 _cm_parse_backoff() {
-  local backoff_csv="${NUCLEUS_MOUNT_BACKOFF:-20,40}"
+  local backoff_csv="${NUCLEUS_MOUNT_BACKOFF:?}"
   IFS=',' read -ra _cm_backoff <<<"$backoff_csv"
 }
 
 # _cm_get_backoff — get the backoff seconds for a given attempt (1-indexed).
+#
+# WHY: the declared schedule is CLAMPED, never extrapolated (services.schema.json,
+#   mountRetryBackoffSeconds).  An attempt past the end of the list reuses the last declared value, so
+#   every delay this runner sleeps is a value services.json actually declares and no runner
+#   invents one of its own.  The Windows runner clamps identically (rclone-mount.ps1), and
+#   the two hosts must not diverge on this rule.
 _cm_get_backoff() {
   local attempt="$1"
-  if [ "$attempt" -le "${#_cm_backoff[@]}" ]; then
-    printf '%s' "${_cm_backoff[$((attempt - 1))]}"
-  else
-    # Extrapolate: last value + 20 for each additional attempt.
-    printf '%s' "$((${_cm_backoff[${#_cm_backoff[@]} - 1]} + 20 * (attempt - ${#_cm_backoff[@]})))"
+  local _cm_idx=$((attempt - 1))
+  local _cm_last=$((${#_cm_backoff[@]} - 1))
+  if [ "$_cm_idx" -gt "$_cm_last" ]; then
+    _cm_idx="$_cm_last"
   fi
+  printf '%s' "${_cm_backoff[$_cm_idx]}"
 }
 
 # main — the core mount loop.
@@ -70,8 +90,8 @@ _cm_main() {
   local read_only="${NUCLEUS_RCLONE_READ_ONLY:-false}"
   local rclone_bin="${NUCLEUS_RCLONE_BIN:-rclone}"
 
-  local attempts="${NUCLEUS_MOUNT_ATTEMPTS:-3}"
-  local attach_seconds="${NUCLEUS_MOUNT_ATTACH_SECONDS:-45}"
+  local attempts="${NUCLEUS_MOUNT_ATTEMPTS:?}"
+  local attach_seconds="${NUCLEUS_MOUNT_ATTACH_SECONDS:?}"
 
   # Dispatch to the correct backend.
   _cm_dispatch_backend
@@ -110,7 +130,22 @@ _cm_main() {
     local mount_args_file
     mount_args_file="$(mktemp)"
     backend_args "$remote" "$mount_point" "$read_only" "$rclone_args" >"$mount_args_file"
-    backend_mount "$rclone_bin" "$(<"$mount_args_file")"
+    # WHY: backend_args emits ONE TOKEN PER LINE.  Passing "$(<file)" collapses that to a
+    #   SINGLE argument, because double quotes suppress field splitting — rclone then
+    #   receives one blob where it expects remote, mount point and flags as separate argv
+    #   entries, and rejects it with its usage message.  Read the file line-by-line into an
+    #   array instead: "${mount_args[@]}" passes each token as a discrete argument while
+    #   preserving any token that itself contains a space, which matters because a mount
+    #   point can live under a path containing spaces.  Empty lines are skipped rather than
+    #   emitted as empty arguments.  (No mapfile: the interpreter is bash 3.2 on macOS.)
+    local -a mount_args=()
+    local _cm_arg_line
+    while IFS= read -r _cm_arg_line; do
+      if [ -n "$_cm_arg_line" ]; then
+        mount_args+=("$_cm_arg_line")
+      fi
+    done <"$mount_args_file"
+    backend_mount "$rclone_bin" "${mount_args[@]}"
 
     # Wait for the volume to appear.
     local attach_start=$SECONDS
@@ -125,9 +160,11 @@ _cm_main() {
 
     if [ "$live" = true ]; then
       # Mount succeeded — record and watch.
+      # No generation bump here: the run token belongs to the supervisor, and the
+      # watchdog records a restart from a change in it.  Advancing it on a
+      # successful start would register a phantom restart on every mount.
       svc_health_set_running "$instance"
       svc_health_record_success "$instance"
-      svc_health_increment_runs "$instance"
       rm -f "$capture_file" "$mount_args_file"
 
       # Watch for the mount to stay alive or exit.
