@@ -285,13 +285,27 @@ test_run_state_requires_network() {
 }
 
 test_run_state_requires_nix() {
-  local _off _on
+  local _stub_dir _off _on
+  # Both branches are constructed, not observed. The negative case hides every
+  # command; the positive case puts an executable stub nix on PATH. Probing only
+  # the host's own PATH leaves the positive branch an observation -- it holds
+  # because the runner happens to have nix installed, and a runner without it
+  # would fail this for the wrong reason. Same construction as the
+  # sops-machine-key case below, which overrides the resolver for the same reason.
+  _stub_dir="$(mktemp -d)"
+  : >"$_stub_dir/nix"
+  chmod +x "$_stub_dir/nix"
   _off="$(
     . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
     HAS_ARGS=false ONLINE=false ONLY_STEPS=()
     PATH=/nonexistent _step_run_state x any any nix
   )"
-  _on="$(step_state false false "" x any any nix)"
+  _on="$(
+    . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+    HAS_ARGS=false ONLINE=false ONLY_STEPS=()
+    PATH="$_stub_dir" _step_run_state x any any nix
+  )"
+  rm -rf "$_stub_dir"
   if [ "$_off" = "not applicable (requires: nix)" ] && [ -z "$_on" ]; then
     assert_pass "requires applicability: nix is probed on PATH"
   else
