@@ -5,6 +5,9 @@
   imports = [
     ../../modules/core.nix
     ../../modules/posix
+    # WHY: security.sudo is a NixOS-only option, so the macOS-shared posix/
+    # aggregator cannot carry it; the host imports the module directly.
+    ../../modules/posix/security.nix
     ../../modules/https-proxy.nix
     ../../modules/redis.nix
     ../../modules/camillagui-backend.nix
