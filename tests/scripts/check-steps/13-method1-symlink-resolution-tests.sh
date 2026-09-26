@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-# Tests for the method-1 symlink resolution sub-check.
-#
-# Step 19 was merged into step 14 (commit 50113ae8) and step 14 was split into
-# steps 11/12/13 (commit 4fe5ac95); the sub-check now lives in step 13 as
-# run_method1_symlink_resolution.
+# Tests for the method-1 symlink resolution sub-check (run_method1_symlink_resolution,
+# step 13).
 #
 # The sub-check's candidate list is derived from the deployed manifest rather than
 # from an array inside it, so these tests drive it against fixture homes and assert
@@ -72,9 +69,9 @@ test_live_repo_target_passes() {
   rc="$(run_step "$FIXTURE_HOME" "$FIXTURE_REPO" "$FIXTURE_HOME/out.txt")"
   out="$(cat "$FIXTURE_HOME/out.txt")"
   if [ "$rc" -eq 0 ] && [ "${out#*verified 1 method-1 symlink}" != "$out" ]; then
-    assert_pass "step 19 passes a link that resolves into the live repo root"
+    assert_pass "step 13 passes a link that resolves into the live repo root"
   else
-    assert_fail "step 19 passes a link that resolves into the live repo root" "rc=$rc output=[$out]"
+    assert_fail "step 13 passes a link that resolves into the live repo root" "rc=$rc output=[$out]"
   fi
   rm -rf "$FIXTURE_HOME" "$FIXTURE_REPO"
 }
@@ -87,9 +84,9 @@ test_store_snapshot_target_fails() {
   rc="$(run_step "$FIXTURE_HOME" "$FIXTURE_REPO" "$FIXTURE_HOME/out.txt")"
   out="$(cat "$FIXTURE_HOME/out.txt")"
   if [ "$rc" -eq 1 ] && [ "${out#*resolves to read-only store snapshot: /nix/store/aaaa-source/src}" != "$out" ]; then
-    assert_pass "step 19 fails a link that resolves into a /nix/store/*-source snapshot"
+    assert_pass "step 13 fails a link that resolves into a /nix/store/*-source snapshot"
   else
-    assert_fail "step 19 fails a link that resolves into a /nix/store/*-source snapshot" "rc=$rc output=[$out]"
+    assert_fail "step 13 fails a link that resolves into a /nix/store/*-source snapshot" "rc=$rc output=[$out]"
   fi
   rm -rf "$FIXTURE_HOME" "$FIXTURE_REPO"
 }
@@ -103,9 +100,9 @@ test_walked_directory_is_audited() {
   rc="$(run_step "$FIXTURE_HOME" "$FIXTURE_REPO" "$FIXTURE_HOME/out.txt")"
   out="$(cat "$FIXTURE_HOME/out.txt")"
   if [ "$rc" -eq 1 ] && [ "${out#*tree/inside-link}" != "$out" ]; then
-    assert_pass "step 19 walks a directory entry one level and flags a store-snapshot link inside it"
+    assert_pass "step 13 walks a directory entry one level and flags a store-snapshot link inside it"
   else
-    assert_fail "step 19 walks a directory entry one level and flags a store-snapshot link inside it" "rc=$rc output=[$out]"
+    assert_fail "step 13 walks a directory entry one level and flags a store-snapshot link inside it" "rc=$rc output=[$out]"
   fi
   rm -rf "$FIXTURE_HOME" "$FIXTURE_REPO"
 }
@@ -123,9 +120,9 @@ test_non_symlink_is_ignored_and_store_target_warns() {
   if [ "$rc" -eq 0 ] &&
     [ "${out#*resolves into the Nix store: /nix/store/cccc-home-manager-files/x}" != "$out" ] &&
     [ "${out#*verified 2 method-1 symlink}" != "$out" ]; then
-    assert_pass "step 19 ignores a non-symlink entry and warns about a non-snapshot store target"
+    assert_pass "step 13 ignores a non-symlink entry and warns about a non-snapshot store target"
   else
-    assert_fail "step 19 ignores a non-symlink entry and warns about a non-snapshot store target" "rc=$rc output=[$out]"
+    assert_fail "step 13 ignores a non-symlink entry and warns about a non-snapshot store target" "rc=$rc output=[$out]"
   fi
   rm -rf "$FIXTURE_HOME" "$FIXTURE_REPO"
 }
@@ -159,9 +156,9 @@ test_missing_manifest_reports_nothing_to_verify() {
 # Structural guards: the drift this rewrite removes must not return.
 test_step_has_no_restated_candidate_array() {
   if grep -q '_candidates=(' "$STEP_FILE"; then
-    assert_fail "step 19 does not restate its candidates" "found a _candidates=( array"
+    assert_fail "step 13 does not restate its candidates" "found a _candidates=( array"
   else
-    assert_pass "step 19 does not restate its candidates"
+    assert_pass "step 13 does not restate its candidates"
   fi
 }
 

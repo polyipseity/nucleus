@@ -1,7 +1,6 @@
 # Test: repo-policy-pattern (check step 12) PS1 enforcement for the logging-format scan.
 #
-# Step 14 repository-policy was split into steps 11/12/13 (commit 4fe5ac95); this
-# twin drives the live step 12 instead.
+# This twin drives the live step 12.
 #
 # The .sh twin's behavioral tests dot-source the step file and call its policy
 # function directly. The PS1 step body cannot be called that way: the runner
@@ -49,7 +48,7 @@ $onlySteps = 'repo-policy-pattern'
 $fixtureDir = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "nucleus-repository-policy-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $fixtureDir -Force > $null
 
-# Invoke-LoggingFormatPolicy — run step 14 over the given files.
+# Invoke-LoggingFormatPolicy — run step 12 over the given files.
 # Returns a hashtable with the child's exit code and combined output.
 function Invoke-LoggingFormatPolicy {
   param([string[]]$Paths)
@@ -78,23 +77,23 @@ try {
   # 1. An escape-looking word in a comment is not an escape.
   $clean = Invoke-LoggingFormatPolicy -Paths @($cleanPath)
   if ($clean.Status -ne 0 -or $clean.Output -match 'backtick-e escape literal') {
-    Assert-Fail 'step 14: a comment naming the automatic Event variable' "exit $($clean.Status); $($clean.Output.Trim())"
+    Assert-Fail 'step 12: a comment naming the automatic Event variable' "exit $($clean.Status); $($clean.Output.Trim())"
   } elseif ($clean.Output -notmatch 'logging format policy passed\.') {
     # WHY: without this the case could pass on a step that never ran instead of a clean scan.
-    Assert-Fail 'step 14: a comment naming the automatic Event variable' 'logging format policy did not run'
+    Assert-Fail 'step 12: a comment naming the automatic Event variable' 'logging format policy did not run'
   } else {
-    Assert-Pass 'step 14: a comment naming the automatic Event variable is not an escape'
+    Assert-Pass 'step 12: a comment naming the automatic Event variable is not an escape'
   }
 
   # 2. The policy still catches a real escape sequence.
   $violating = Invoke-LoggingFormatPolicy -Paths @($violatingPath)
   if ($violating.Status -eq 0 -or $violating.Output -notmatch 'backtick-e escape literal') {
-    Assert-Fail 'step 14: a backtick-e escape sequence' "exit $($violating.Status); $($violating.Output.Trim())"
+    Assert-Fail 'step 12: a backtick-e escape sequence' "exit $($violating.Status); $($violating.Output.Trim())"
   } else {
-    Assert-Pass 'step 14: a backtick-e escape sequence is reported'
+    Assert-Pass 'step 12: a backtick-e escape sequence is reported'
   }
   # 3. The removed skip mechanism list covers the test-harness counter.
-  #    The tokens are composed at runtime: step 14 scans tracked .ps1/.sh files,
+  #    The tokens are composed at runtime: step 12 scans tracked .ps1/.sh files,
   #    this test file included, so a literal token here would be a finding
   #    against the gate's own test. The fixture is a symlink under tests/ (the
   #    scoped skip scan only accepts paths under src/scripts, scripts or tests)
@@ -117,9 +116,9 @@ try {
       Pop-Location
     }
     if ($skipScan.Status -eq 0 -or $skipScan.Output -notmatch $skipToken -or $skipScan.Output -notmatch $counterToken) {
-      Assert-Fail 'step 14: a removed skip construct' "exit $($skipScan.Status); $($skipScan.Output.Trim())"
+      Assert-Fail 'step 12: a removed skip construct' "exit $($skipScan.Status); $($skipScan.Output.Trim())"
     } else {
-      Assert-Pass 'step 14: the test-harness skip counter is reported as a removed skip construct'
+      Assert-Pass 'step 12: the test-harness skip counter is reported as a removed skip construct'
     }
   } finally {
     if (Test-Path -LiteralPath $skipLink) { Remove-Item -LiteralPath $skipLink -Force }
@@ -133,9 +132,9 @@ try {
 
 Write-Output ''
 if ($script:failCount -gt 0) {
-  Write-Output "step 14 repository-policy tests: $($script:failCount) failed, $($script:passCount) passed"
+  Write-Output "step 12 repository-policy tests: $($script:failCount) failed, $($script:passCount) passed"
   exit 1
 }
 
-Write-Output "step 14 repository-policy tests: all $($script:passCount) passed"
+Write-Output "step 12 repository-policy tests: all $($script:passCount) passed"
 exit 0

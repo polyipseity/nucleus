@@ -2,10 +2,9 @@
 # shellcheck shell=bash
 # shellcheck disable=SC2031 # reason: test functions intentionally isolate REPO_ROOT in subshells
 # Test: repo-policy-pattern (check step 12) behavioral tests.
-# Step 14 repository-policy was split into steps 11/12/13 (commit 4fe5ac95); the
-# naming, logging-format, nix-file-structure and log-capture-pair policies now
-# live in step 12. All grep-only tests (that checked implementation text) have
-# been removed; these tests exercise the actual check functions against fixture data.
+# The naming, logging-format, nix-file-structure and log-capture-pair policies
+# live in step 12. These tests exercise the actual check functions against
+# fixture data rather than grepping their implementation text.
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
@@ -284,7 +283,7 @@ test_step14_capture_pair_behavioral_negative() {
 }
 
 # The removed-skip list must cover the test-harness skip counter. The tokens are
-# composed at runtime: step 14 scans tracked .sh files, this file included, so a
+# composed at runtime: step 12 scans tracked .sh files, this file included, so a
 # literal token here would be a finding against the gate's own test.
 test_step14_removed_skip_constructs_detection() {
   local _tmp _out _assert_token _counter_token

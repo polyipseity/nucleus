@@ -183,7 +183,7 @@ run_agents_policy() {
   cd "$_repo_root" || return 1
   local _agents_errors=0
 
-  # Commit-staged body match moved to test suite (14-agents-policy-tests.sh)
+  # Commit-staged body match moved to test suite (agents-prompt-parity-tests.sh)
 
   local _instr
   while IFS= read -r -d '' _instr; do
