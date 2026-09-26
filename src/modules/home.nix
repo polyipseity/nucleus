@@ -141,8 +141,9 @@ let
   # activation can set the flag) so it cannot be deleted or written
   # through; `writable = true` keeps it managed (still unprotect-before/re-protect-after)
   # but never immutable, so apps can write the active config back through it.
-  # A `method 1 (writable symlink)` deployment MUST be `writable = true` — see
-  # the config-method compliance check (step 14) which bans immutable Method 1 links.
+  # A `method 1 (writable symlink)` deployment MUST be `writable = true`; the
+  # requirement is stated in the config-method policy the paths above follow.
+  # No check step enforces it, so the invariant lives here and nowhere else.
   managedSymlinkPaths = [
     { path = "${resolvedHomeDirectory}/iCloud"; }
     {

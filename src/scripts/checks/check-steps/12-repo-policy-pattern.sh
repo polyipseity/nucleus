@@ -395,7 +395,7 @@ run_nix_file_structure() {
 # prohibited, on every host.
 # WHY the narrow scope: this targets SERVICE capture points only — launchd/systemd
 # capture directives and the wrappers that redirect a service's output. Ad-hoc
-# `2>/dev/null` on a single command is the suppression-audit concern (step 14).
+# `2>/dev/null` on a single command is the suppression-audit concern (step 11).
 run_log_capture_pair_policy() {
   local _has_args="$1" _repo_root="$2"
   shift 2

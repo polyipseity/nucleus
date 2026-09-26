@@ -10,8 +10,8 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   # WHY: the .sh twin carries the same literal pattern text and must be excluded from scans too
   $selfShLeaf = $selfLeaf -replace '\.ps1$', '.sh'
   # WHY: all repo-policy step files must be excluded from pattern scans to avoid self-referencing literal pattern text
-  $allStepLeaves = @('11-repo-policy-grep.ps1', '12-repo-policy-pattern.ps1', '13-repo-policy-data.ps1', '14-repository-policy.ps1')
-  $allStepShLeaves = @('11-repo-policy-grep.sh', '12-repo-policy-pattern.sh', '13-repo-policy-data.sh', '14-repository-policy.sh')
+  $allStepLeaves = @('11-repo-policy-grep.ps1', '12-repo-policy-pattern.ps1', '13-repo-policy-data.ps1')
+  $allStepShLeaves = @('11-repo-policy-grep.sh', '12-repo-policy-pattern.sh', '13-repo-policy-data.sh')
   $failed = $false
 
   Write-Message "--- config method compliance ---"
@@ -395,7 +395,7 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   # prohibited, on every host.
   # WHY the narrow scope: this targets SERVICE capture points only -- launchd/systemd
   # capture directives and the wrappers that redirect a service's output. Ad-hoc
-  # `2>$null`/`2>/dev/null` on a single command is the suppression-audit concern (step 14).
+  # `2>$null`/`2>/dev/null` on a single command is the suppression-audit concern (step 11).
   Write-Message "--- log capture pair policy ---"
   $lcpErrors = 0
   $lcpSearchDirs = @(

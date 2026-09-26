@@ -1,4 +1,4 @@
-# repository-policy.awk — check step 14 pattern scans.
+# repository-policy.awk — pattern scans shared by check steps 12 and 13.
 #
 # Default mode (no -v mode): heredoc size detector for the embedded-content
 # policy; flags heredocs with more than 30 content lines.

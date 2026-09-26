@@ -28,12 +28,12 @@ Rules: `--` only separator (never em dash). `reason:` eliminated except shellche
 
 | Family | Sites | Check id | Consumer |
 | --- | --- | --- | --- |
-| `# Inline by embedded-content policy exception N (name).` | 10+1 | `embedded-content` | step 14 `.ps1` |
-| `# Method N (name) -- <why>` (legacy) | 68→71 | `config-method` | step 14 `.ps1` + `.sh` |
-| `# check-suppress:SuppressMessageAttribute: <rule> -- <just>` | 33 | `SuppressMessageAttribute` | step 14 `Get-UndocSuppViolation` |
-| `# check-suppress:suppression_doc: <just>` | 623 | `suppression_doc` | step 14 regex |
-| `# check-suppress:packer_validate: ...` | 1 | `packer_validate` | `scripts/check.ps1` + `.sh` |
-| `\|\| true` / `$null =` / `[void]` | 11+92 | `suppression_doc` | step 14 (`tests/` exempt) |
+| `# check-suppress:embedded-content: <why>` | 12 | `embedded-content` | step 13 `.ps1` + `.sh` |
+| `# check-suppress:config-method: <why>` | 100 | `config-method` | step 12 `.ps1` + `.sh` |
+| `# check-suppress:SuppressMessageAttribute: <rule> -- <just>` | 68 | `SuppressMessageAttribute` | step 11 `Get-UndocSuppViolation` |
+| `# check-suppress:suppression_doc: <just>` | 623 | `suppression_doc` | step 11 regex |
+| `# check-suppress:packer_validate: ...` | 5 | `packer_validate` | `scripts/check.ps1` + `.sh` |
+| `\|\| true` / `$null =` / `[void]` | 11+92 | `suppression_doc` | step 11 (`tests/` exempt) |
 
 **Suppression semantics:** `|| true`, `$null =`, `[void]` are suppression patterns, not rationale. Justify with `# check-suppress:suppression_doc:`, never `# WHY:`. **Counting:** CODE-ONLY. `git grep -h 'check-suppress:<id>:' -- '*.ps1' '*.sh' '*.nix' '*.zsh' | wc -l`.
 
@@ -52,7 +52,7 @@ Cat 3: Dividers, DSC headers. Cat 4: `# ref:` (54 sites): `# ref: <target> -- <j
 
 ## Check-id registry
 
-New tool-enforced markers MUST register check id + machine consumer before use. IDs: `suppression_doc` (step 14), `SuppressMessageAttribute` (step 14), `packer_validate` (`scripts/check.*`), `embedded-content` (step 14), `config-method` (step 14).
+New tool-enforced markers MUST register check id + machine consumer before use. IDs: `suppression_doc` (step 11), `SuppressMessageAttribute` (step 11), `packer_validate` (`scripts/check.*`), `embedded-content` (step 13), `config-method` (step 12).
 
 ## `# WHY:` and `# ref:` usage
 
@@ -65,10 +65,10 @@ New tool-enforced markers MUST register check id + machine consumer before use. 
 | `# WHY [^:]` = 0 | no |
 | `# TODO[^:]` = 0 | no |
 | `# undoc-supp:` = 0 | no |
-| bare `Inline by embedded-content` = 0 | step 14 |
-| capital `# Method` = 0 | step 14 |
+| bare `Inline by embedded-content` = 0 | no |
+| capital `# Method` = 0 | no |
 | no `—` after `# check-suppress:` or `# ref:` | no |
 | `# ref:.*reason:` = 0 | no |
 | `# (Source\|Cross-reference\|See):` = 0 in dsc.yml | no |
 | `iso_checksum = "none"` without `packer_validate:` | step 1 |
-| bare `\|\| true` / `$null =` / `[void]` / `2>$null` / `-ErrorAction SilentlyContinue` in production = 0 | step 14 (`tests/` exempt) |
+| bare `\|\| true` / `$null =` / `[void]` / `2>$null` / `-ErrorAction SilentlyContinue` in production = 0 | step 11 (`tests/` exempt) |

@@ -31,7 +31,7 @@ No implicit defaults, no auto-derived paths, no backwards compatibility code. Wh
 
 ## Nix file structure
 
-Every `.nix` file inside a directory must be named `default.nix`, not `<dirname>.nix`. A `.nix` file must not exist alongside a same-named directory (e.g. `shell.nix` next to `shell/`). Both patterns are enforced by step 14 (`run_nix_file_structure`).
+Every `.nix` file inside a directory must be named `default.nix`, not `<dirname>.nix`. A `.nix` file must not exist alongside a same-named directory (e.g. `shell.nix` next to `shell/`). Both patterns are enforced by step 12 (`run_nix_file_structure`).
 
 **Correct:** `src/modules/shell/default.nix`, `src/modules/configs/libreoffice/default.nix`
 **Incorrect:** `src/modules/shell.nix` (alongside `shell/`), `src/modules/configs/libreoffice/libreoffice.nix` (same name as parent dir)
@@ -154,9 +154,9 @@ When adding a new split-pattern script, extract the pure-shell body first, then 
 
 All extracted inline scripts must accept inputs via positional arguments, not environment variables. Helper scripts in `src/scripts/` (e.g. `register-host-age-key.sh`, `install-prek-hooks.sh`) use `--repo-root <path>` flags instead.
 
-**Store-path args for external commands.** Activation scripts receiving external tools (e.g. `jq`, `sops`, `age`) must get them as Nix store-path arguments (e.g. `_jq_bin="$1"`) and invoke via the variable (`"$_jq_bin"`), never bare command names. Check step 14 (`run_store_path_arg_usage`) enforces that every `_X_bin` declaration has at least one command-like usage.
+**Store-path args for external commands.** Activation scripts receiving external tools (e.g. `jq`, `sops`, `age`) must get them as Nix store-path arguments (e.g. `_jq_bin="$1"`) and invoke via the variable (`"$_jq_bin"`), never bare command names. Check step 11 (`run_store_path_arg_usage`) enforces that every `_X_bin` declaration has at least one command-like usage.
 
-**Activation tool resolution (step 14, `run_activation_tool_resolution`).** Scans activation scripts for bare external commands not resolved via a store-path arg or `PATH=` prepend. The only sanctioned `PATH` use is a deliberate prepend for tools that must be visible to child processes (e.g. bun, rustup, cargo). This check has no suppression — it skips comments and reports all violations. Fix by passing the tool as a store-path arg (preferred) or adding a `PATH=` prepend with a `_bin`-suffixed variable.
+**Activation tool resolution (step 11, `run_activation_tool_resolution`).** Scans activation scripts for bare external commands not resolved via a store-path arg or `PATH=` prepend. The only sanctioned `PATH` use is a deliberate prepend for tools that must be visible to child processes (e.g. bun, rustup, cargo). This check has no suppression — it skips comments and reports all violations. Fix by passing the tool as a store-path arg (preferred) or adding a `PATH=` prepend with a `_bin`-suffixed variable.
 
 ## Library purity
 

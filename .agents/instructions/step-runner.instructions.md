@@ -69,7 +69,7 @@ Invoke-StepPipeline:
 
 ### Output color
 
-F2/F4 palette via `_nuc_color_init` (POSIX, `src/scripts/lib/lib.sh`) / `$PSStyle` (PS1, `Format-NucleusOutput.psm1`). No raw ANSI/tput/echo-e (check step 14).
+F2/F4 palette via `_nuc_color_init` (POSIX, `src/scripts/lib/lib.sh`) / `$PSStyle` (PS1, `Format-NucleusOutput.psm1`). No raw ANSI/tput/echo-e (check step 12).
 
 - F1: `notice` bold blue; semantic coloring (URLs underline-cyan, quotes blue).
 - F2: `[step NN]` dim. F4: ✓ green / ✗ red / – (en dash) yellow for not applicable or not selected; labels dim.

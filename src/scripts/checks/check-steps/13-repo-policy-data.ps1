@@ -8,7 +8,7 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Ac
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
   $selfLeaf = if ($PSCommandPath) { Split-Path -Leaf $PSCommandPath } else { '13-repo-policy-data.ps1' }
   # WHY: all repo-policy step files must be excluded from pattern scans to avoid self-referencing literal pattern text
-  $allStepLeaves = @('11-repo-policy-grep.ps1', '12-repo-policy-pattern.ps1', '13-repo-policy-data.ps1', '14-repository-policy.ps1')
+  $allStepLeaves = @('11-repo-policy-grep.ps1', '12-repo-policy-pattern.ps1', '13-repo-policy-data.ps1')
   $failed = $false
 
   Write-Message "--- dummy key uniformity ---"

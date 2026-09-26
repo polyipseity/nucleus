@@ -63,13 +63,13 @@ Palette: bold/red/yellow/magenta/green/cyan/blue/dim, underline (`4m`), underlin
 
 Semantic coloring: URLs → underline-cyan; single-quoted → blue. Quote pass first. Regex-only, no markup delimiters. Applied by `_nuc_semantic_color` (lib.sh) and `ConvertTo-NucleusSemanticColor` (Format-NucleusOutput.psm1).
 
-Detection: `NO_COLOR` non-empty → off (strips all decoration). `FORCE_COLOR` non-0 / `CLICOLOR_FORCE` → on. Else per-stream tty AND `TERM != dumb`. PS1 additionally checks `$Host.UI.SupportsVirtualTerminal` AND `-not [Console]::IsOutputRedirected`. Engine owns `NO_COLOR` → `$PSStyle.OutputRendering = PlainText`; module must NOT mutate it. Color in shared helpers only — no raw ANSI, `tput`, `echo -e` elsewhere (check step 14).
+Detection: `NO_COLOR` non-empty → off (strips all decoration). `FORCE_COLOR` non-0 / `CLICOLOR_FORCE` → on. Else per-stream tty AND `TERM != dumb`. PS1 additionally checks `$Host.UI.SupportsVirtualTerminal` AND `-not [Console]::IsOutputRedirected`. Engine owns `NO_COLOR` → `$PSStyle.OutputRendering = PlainText`; module must NOT mutate it. Color in shared helpers only — no raw ANSI, `tput`, `echo -e` elsewhere (check step 12).
 
 ---
 
 ## Log storage and rotation
 
-Roots from `services.json` `$logging`: MacBook `~/Library/Application Support/nucleus/logs` + `/Library/Application Support/nucleus/logs`; NixOS `~/.local/share/nucleus/logs` + `/var/lib/nucleus/logs`; Windows `%LOCALAPPDATA%\nucleus\log` + `%ProgramData%\nucleus\log`. Override: `NUCLEUS_LOG_DIR`/`NUCLEUS_SYSTEM_LOG_DIR`. **Capture mechanism is per host: NixOS services log to journald; macOS and Windows capture each stream to its own file — `<dir>/stdout.log` and `<dir>/stderr.log`.** Where a file is captured, merging the two streams, capturing only one of them, and discarding one to `/dev/null` are prohibited on every host, which is where the platform default would otherwise silently swallow it; unit paths are hardcoded per module and enforced by check step 14 (`repository-policy`). `logging.capture` selects *which* streams are captured (`stderr` means only `stderr.log` exists), never the destination shape, and drives display/rotation/health-check. Rotation: copy-truncate + gzip, 7d expiry, `services.schema.json` defaults (maxSize 1000000, maxFiles 4). Health-check triggers immediate rotation when a file exceeds maxSize.
+Roots from `services.json` `$logging`: MacBook `~/Library/Application Support/nucleus/logs` + `/Library/Application Support/nucleus/logs`; NixOS `~/.local/share/nucleus/logs` + `/var/lib/nucleus/logs`; Windows `%LOCALAPPDATA%\nucleus\log` + `%ProgramData%\nucleus\log`. Override: `NUCLEUS_LOG_DIR`/`NUCLEUS_SYSTEM_LOG_DIR`. **Capture mechanism is per host: NixOS services log to journald; macOS and Windows capture each stream to its own file — `<dir>/stdout.log` and `<dir>/stderr.log`.** Where a file is captured, merging the two streams, capturing only one of them, and discarding one to `/dev/null` are prohibited on every host, which is where the platform default would otherwise silently swallow it; unit paths are hardcoded per module and enforced by check step 12 (`repo-policy-pattern`). `logging.capture` selects *which* streams are captured (`stderr` means only `stderr.log` exists), never the destination shape, and drives display/rotation/health-check. Rotation: copy-truncate + gzip, 7d expiry, `services.schema.json` defaults (maxSize 1000000, maxFiles 4). Health-check triggers immediate rotation when a file exceeds maxSize.
 
 ---
 
@@ -81,4 +81,4 @@ New passthrough requires spec entry + rationale. Categories: third-party passthr
 
 ## Enforcement
 
-Check step 14 bans raw ANSI/`tput`/`echo -e`/`[char]27`/backtick-e/legacy `==== NN` outside 9-file allowlist: lib.sh, step-runner.sh, step-runner.ps1, test-lib.sh, test-lib.ps1, Format-NucleusOutput.psm1, Format-NucleusOutput.Tests.ps1, Invoke-LogManagement.ps1, log-management.Tests.ps1.
+Check step 12 bans raw ANSI/`tput`/`echo -e`/`[char]27`/backtick-e/legacy `==== NN` outside 9-file allowlist: lib.sh, step-runner.sh, step-runner.ps1, test-lib.sh, test-lib.ps1, Format-NucleusOutput.psm1, Format-NucleusOutput.Tests.ps1, Invoke-LogManagement.ps1, log-management.Tests.ps1.
