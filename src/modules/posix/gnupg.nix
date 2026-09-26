@@ -24,6 +24,7 @@ lib.mkIf
     # pinned revision (a1fa429) does not expose programs.gnupg.agent.settings.
     # Without this file, pinentry-program defaults to the first on PATH and
     # allow-loopback-pinentry is unset, breaking non-interactive signing.
+    # Fragment from src/modules/posix/gnupg.nix
     system.activationScripts.postActivation.text = lib.mkAfter ''
       "${pkgs.callPackage ../lib/script-tree.nix { }}/src/scripts/secrets/configure-gpg-agent.sh" \
         "${pkgs.pinentry_mac}/bin/pinentry-mac"

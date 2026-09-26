@@ -288,7 +288,7 @@ function Sync-GitAndSshConfig {
   # Machine-wide Git system scope: symlink <install>\etc\gitconfig to the repo's
   # <Host>.gitconfig (installer shipped defaults only — signing, newline and
   # symlink defaults are user-scoped), mirroring the POSIX /etc/gitconfig
-  # symlink (src/modules/posix-base.nix). Git for Windows
+  # symlink (src/modules/posix/base.nix). Git for Windows
   # >= 2.24 does not read %ProgramData%\Git\config; <install>\etc\gitconfig is
   # the only system config and is installer-owned, so <Host>.gitconfig folds in
   # the installer's shipped defaults (credential.helper, http.sslBackend,

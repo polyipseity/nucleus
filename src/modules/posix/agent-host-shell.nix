@@ -46,7 +46,7 @@ in
   # reference until after `config` is available.
   config = lib.mkMerge [
     (mkIf pkgs.stdenv.hostPlatform.isDarwin {
-      # Fragment from src/modules/agent-host-shell.nix
+      # Fragment from src/modules/posix/agent-host-shell.nix
       system.activationScripts.postActivation.text = mkAfter ''
         "${activationBundle}/src/scripts/agent-host-shell/write-wrapper.sh" \
           "${wrapperPath}" \
@@ -54,7 +54,7 @@ in
       '';
     })
     (mkIf (!pkgs.stdenv.hostPlatform.isDarwin) {
-      # Fragment from src/modules/agent-host-shell.nix
+      # Fragment from src/modules/posix/agent-host-shell.nix
       system.activationScripts.agent-host-shell.text = mkAfter ''
         "${activationBundle}/src/scripts/agent-host-shell/write-wrapper.sh" \
           "${wrapperPath}" \

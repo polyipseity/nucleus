@@ -43,7 +43,7 @@ nix-darwin only honors the hardcoded `preActivation` / `extraActivation` / `post
 Every fragment MUST carry a header comment naming its owning module so its origin is traceable, e.g.:
 
 ```nix
-# Fragment from src/modules/posix-sops.nix
+# Fragment from src/modules/posix/gnupg.nix
 system.activationScripts.postActivation.text = lib.mkAfter ''
   ...fragment body...
 '';

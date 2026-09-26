@@ -1,14 +1,14 @@
 ---
 description: "Use when changing Nix store policy, GC thresholds, script bundling, or store-space audits in nucleus. Documents rejected approaches, host filesystem limits, bundleDefault policy, and GC semantics."
 name: "Nix Store Space"
-applyTo: "src/modules/posix-base.nix, src/modules/configs/nix/**, src/flake.nix, src/modules/lib/script-tree.nix, scripts/gc.sh, src/scripts/cleanup-nix-build-artifacts.sh, src/scripts/services/duperemove-store.sh"
+applyTo: "src/modules/posix/base.nix, src/modules/configs/nix/**, src/flake.nix, src/modules/lib/script-tree.nix, src/modules/lib/gc-options.nix, scripts/gc.sh, src/scripts/cleanup-nix-build-artifacts.sh, src/scripts/services/duperemove-store.sh, src/scripts/services/nix-store-gc.sh"
 ---
 
 # Nix store space policy
 
 ## Canonical store policy
 
-Managed in [`posix-base.nix`](../../src/modules/posix-base.nix) (NixOS `nix.settings`) and mirrored in [`nix.custom.conf`](../../src/modules/configs/nix/nix.custom.conf) on MacBook (`nix.enable = false` under Determinate Nix).
+Managed in [`posix/base.nix`](../../src/modules/posix/base.nix) (NixOS `nix.settings`) and mirrored in [`nix.custom.conf`](../../src/modules/configs/nix/nix.custom.conf) on MacBook (`nix.enable = false` under Determinate Nix).
 
 | Setting | Value | Notes |
 | ------- | ----- | ----- |
@@ -21,7 +21,7 @@ Managed in [`posix-base.nix`](../../src/modules/posix-base.nix) (NixOS `nix.sett
 
 Different from [`apply.sh`](../../scripts/apply.sh) `health-check` `--min-free-bytes` (16 GB system-wide).
 
-Age-based GC: `nix-collect-garbage --delete-older-than` ([`posix-base.nix`](../../src/modules/posix-base.nix), [`nix-store-gc.sh`](../../src/scripts/services/nix-store-gc.sh), [`gc.sh`](../../src/scripts/gc.sh)). Never `-d`.
+Age-based GC: `nix-collect-garbage --delete-older-than` ([`posix/base.nix`](../../src/modules/posix/base.nix), [`nix-store-gc.sh`](../../src/scripts/services/nix-store-gc.sh), [`gc.sh`](../../scripts/gc.sh)). Never `-d`.
 
 **Generation retention:** newest `generationsKeep` (default 7) AND newer than `expiry` (default 7d). Config: [`gc-options.nix`](../../src/modules/lib/gc-options.nix); override: `NUCLEUS_GC_GENERATIONS_KEEP`/`NUCLEUS_GC_EXPIRY` + `nucleus-gc` flags.
 

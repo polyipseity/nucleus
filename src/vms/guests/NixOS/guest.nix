@@ -34,7 +34,7 @@ in
 
   # WHY: override the generic placeholders threaded by base-guest.nix through
   # _module.args (mkDefault) with this VM's real identity from guest-identity.nix
-  # so posix-base.nix's gitconfig and the shared user modules key off the actual
+  # so posix/base.nix's gitconfig and the shared user modules key off the actual
   # guest user.
   _module.args = {
     hostName = guestIdentity.hostname;

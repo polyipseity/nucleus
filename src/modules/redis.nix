@@ -33,7 +33,7 @@ let
   # The `launchd` option only exists on nix-darwin; `services.redis` only on
   # NixOS. Gate each subtree with optionalAttrs so the inactive option path is
   # never declared (a bare `mkIf false` would still register the option and
-  # fail on the other platform). Mirrors posix-base.nix hasLaunchdDaemonsOption.
+  # fail on the other platform). Mirrors posix/base.nix hasLaunchdDaemonsOption.
   hasLaunchdDaemonsOption = options ? launchd && options.launchd ? daemons;
   hasRedisServersOption =
     options ? services && options.services ? redis && options.services.redis ? servers;

@@ -65,7 +65,7 @@ Every POSIX `scripts/<name>.sh` with subcommands needs a `scripts/<name>.ps1` tw
 ## Agent-host-shell wrapper
 
 VS Code agent-host wrapper, outside user HOME:
-- POSIX: SYSTEM root bin — macOS `/Library/Application Support/nucleus/bin/agent-host-shell`, NixOS `/var/lib/nucleus/bin/agent-host-shell` (`src/modules/agent-host-shell.nix`).
+- POSIX: SYSTEM root bin — macOS `/Library/Application Support/nucleus/bin/agent-host-shell`, NixOS `/var/lib/nucleus/bin/agent-host-shell` (`src/modules/posix/agent-host-shell.nix`).
 - Windows: `%ProgramData%\nucleus\bin\agent-host-shell.ps1` (`src/platforms/Windows/modules/system/Invoke-AgentHostShellSetup.ps1`).
 
 System-level provisioning, not per-user. Do not relocate into HOME or symlink from `src/users/`.

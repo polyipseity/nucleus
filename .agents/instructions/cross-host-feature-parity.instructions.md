@@ -81,7 +81,7 @@ Single-host only for platform-specific primitives (macOS defaults, NixOS kernel 
 
 Timing values live at their point of use. Change them in the source file, not a separate manifest.
 
-Nix store GC: `posix-base.nix`, `nix-store-gc.sh`, `gc.sh`, `gc-options.nix`. macOS: `platforms/macOS/modules/default.nix`, `hosts/MacBook/defaults.nix`. Linux: `platforms/NixOS/modules/default.nix`, `posix-security.nix`. Windows DSC: `system.dsc.yml`, `system-packages.dsc.yml`, `user.dsc.yml`, `user-env.dsc.yml`, `user-context.dsc.yml`, `platforms/Windows/modules/system/*.ps1`. Cloud: `cloud-drives.nix`. AI: `ai-sync.sh`. App-level: `editors.nix`, `picard/Picard.ini`.
+Nix store GC: `posix/base.nix`, `nix-store-gc.sh`, `gc.sh`, `gc-options.nix`. macOS: `platforms/macOS/modules/default.nix`, `hosts/MacBook/defaults.nix`. Linux: `platforms/NixOS/modules/default.nix`, `posix/security.nix`. Windows DSC: `system.dsc.yml`, `system-packages.dsc.yml`, `user.dsc.yml`, `user-env.dsc.yml`, `user-context.dsc.yml`, `platforms/Windows/modules/system/*.ps1`. Cloud: `cloud-drives.nix`. AI: `ai-sync.sh`. App-level: `editors.nix`, `picard/Picard.ini`.
 
 Override precedence: CLI flag > per-tool env var > master flag/env > Nix config default > `7d` / `7`.
 
