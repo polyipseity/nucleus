@@ -47,6 +47,12 @@ printf '{"mounts":[]}\n' >"$_tmp/repo/src/users/default/cloud-drives.json"
 # the state directory inside our temp sandbox.
 HOME="$_tmp/home"
 export HOME
+# Pin NUCLEUS_USER_ROOT alongside HOME: lib.sh only derives the root when the
+# variable is unset, so an inherited NUCLEUS_USER_ROOT wins over HOME and this
+# suite would otherwise write service-stats records into the operator's real
+# state dir. user_root_for_home mirrors derive_nucleus_user_root's layout.
+NUCLEUS_USER_ROOT="$(user_root_for_home "$HOME")"
+export NUCLEUS_USER_ROOT
 
 # Source lib.sh in the parent shell so derive_nucleus_user_root is available.
 # Do NOT export _NUCLEUS_LIB_SOURCED — subshells need to source lib.sh fresh
