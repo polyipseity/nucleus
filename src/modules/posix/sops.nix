@@ -46,9 +46,10 @@ in
   users.groups.${sopsGroup} = lib.mkIf (!isDarwin) { };
 
   # WHY: the group grants read access to a key that decrypts every SOPS secret.
-  # Narrowing it to only the users that decrypt secrets is a real security
-  # improvement, but the user registry does not record which users decrypt, so
-  # the broad grant stands until that fact is available.
+  # The grant is broad and permanent: the user registry records no per-user
+  # decrypt capability, so a narrower grant is not expressible, and the group
+  # carries no privilege beyond reading the key. Narrowing it requires recording
+  # that fact in the registry first.
   users.users = lib.mkIf (!isDarwin) (
     lib.genAttrs (builtins.attrNames users) (_name: {
       extraGroups = lib.mkAfter [ sopsGroup ];
