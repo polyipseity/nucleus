@@ -156,7 +156,7 @@ Test scripts only, not production code.
 
 ## CI integration
 
-Push/PR/manual. POSIX: `nix run ./src#test`. Windows: `bootstrap.ps1` → `test.ps1` (step 6).
+Push/PR/manual. POSIX: `nix run ./src#test`. Windows: `bootstrap.ps1` → `test.ps1`.
 
 ## Validation checklist
 
