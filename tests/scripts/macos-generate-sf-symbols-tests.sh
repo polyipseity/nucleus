@@ -29,6 +29,24 @@ CMP_BIN="$(command -v cmp)"
 
 OUT="$NUCLEUS_USER_ROOT/state/sf-symbols.txt"
 
+# mtime_of <path> — epoch mtime of <path>, portable across GNU and BSD stat.
+# GNU `stat -f` is --file-system: it exits 0 and prints a filesystem block, so a
+# `stat -f %m ... || stat -c %Y` shim silently captures that block instead of an
+# mtime. The variant is therefore chosen by validating the output is a bare
+# integer, never by exit status.  BOTH candidates are validated, not just the
+# first: a fallback result taken on trust is the same defect one level down.
+mtime_of() {
+  local _m
+  for _m in "$(stat -c %Y "$1" 2>/dev/null)" "$(stat -f %m "$1" 2>/dev/null)"; do
+    case "$_m" in
+    '' | *[!0-9]*) continue ;;
+    esac
+    printf '%s' "$_m"
+    return 0
+  done
+  return 0
+}
+
 # --- fake plutil: fixture names for `plutil -extract symbols raw -o - <plist>` --
 _fake_bin_dir="$(mktemp -d)"
 cat >"$_fake_bin_dir/plutil" <<'FAKE_PLUTIL'
@@ -126,22 +144,25 @@ test_idempotent() {
   _run_generator
   local first second first_mtime second_mtime
   first="$(cat "$OUT")"
-  first_mtime="$(stat -f %m "$OUT" 2>/dev/null || stat -c %Y "$OUT")"
+  first_mtime="$(mtime_of "$OUT")"
 
   sleep 1
   _run_generator
   second="$(cat "$OUT")"
-  second_mtime="$(stat -f %m "$OUT" 2>/dev/null || stat -c %Y "$OUT")"
+  second_mtime="$(mtime_of "$OUT")"
 
   if [ "$first" = "$second" ]; then
     assert_pass "rerun produces identical content"
   else
     assert_fail "idempotency" "content changed between runs"
   fi
-  if [ "$first_mtime" = "$second_mtime" ]; then
+  # An unreadable mtime must fail, not compare equal as two empty strings.
+  if [ -z "$first_mtime" ] || [ -z "$second_mtime" ]; then
+    assert_fail "mtime probe" "no stat variant returned an mtime (first='$first_mtime' second='$second_mtime')"
+  elif [ "$first_mtime" = "$second_mtime" ]; then
     assert_pass "unchanged content leaves the file untouched"
   else
-    assert_fail "no-op write" "mtime changed on an identical rerun"
+    assert_fail "no-op write" "mtime changed on an identical rerun ($first_mtime -> $second_mtime)"
   fi
 }
 
