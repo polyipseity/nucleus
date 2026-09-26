@@ -18,7 +18,7 @@
     4. not live + not blocked            -> start (the only revival path)
 
   A block is never auto-cleared.  Only a reboot (the health record's boot id no
-  longer matches) or an explicit re-arm (nucleus-apply -> Health-ClearAll)
+  longer matches) or an explicit re-arm (nucleus-apply -> Clear-HealthRecordAll)
   clears one, which is why Rule 2 must precede Rule 4.
 
   Health state lives in one unified record per instance (ServiceHealth.ps1),
@@ -213,13 +213,13 @@ function Write-NotLoadedNotice {
   [CmdletBinding()]
   param([Parameter(Mandatory)][string]$Instance)
 
-  Health-Init -Instance $Instance
-  if ((Health-Get -Instance $Instance -Field 'state') -ne 'not-loaded') {
-    Health-Set -Instance $Instance -Field 'state' -Value 'not-loaded'
+  Initialize-HealthRecord -Instance $Instance
+  if ((Get-HealthField -Instance $Instance -Field 'state') -ne 'not-loaded') {
+    Set-HealthField -Instance $Instance -Field 'state' -Value 'not-loaded'
   }
-  if (-not (Health-IsReported -Instance $Instance -Expected 'not-loaded')) {
+  if (-not (Test-HealthReported -Instance $Instance -Expected 'not-loaded')) {
     Write-NucleusNotice -CommandName 'service-watchdog' -Message "$Instance is configured but not loaded"
-    Health-MarkReported -Instance $Instance -State 'not-loaded'
+    Set-HealthReported -Instance $Instance -State 'not-loaded'
   }
 }
 
@@ -250,14 +250,14 @@ function Test-ServiceInstance {
   }
 
   # Rule 2: a blocked record must be reported, never revived.
-  if (Health-IsBlocked -Instance $Instance) {
-    $state = Health-Get -Instance $Instance -Field 'state'
-    $class = Health-Get -Instance $Instance -Field 'class'
+  if (Test-HealthBlocked -Instance $Instance) {
+    $state = Get-HealthField -Instance $Instance -Field 'state'
+    $class = Get-HealthField -Instance $Instance -Field 'class'
     $reported = "${state}:${class}"
-    if (-not (Health-IsReported -Instance $Instance -Expected $reported)) {
-      $remedy = Health-Get -Instance $Instance -Field 'remedy'
+    if (-not (Test-HealthReported -Instance $Instance -Expected $reported)) {
+      $remedy = Get-HealthField -Instance $Instance -Field 'remedy'
       Write-NucleusNotice -CommandName 'service-watchdog' -Message "$Instance is blocked ($class): $remedy"
-      Health-MarkReported -Instance $Instance -State $reported
+      Set-HealthReported -Instance $Instance -State $reported
     }
     return
   }
@@ -269,7 +269,7 @@ function Test-ServiceInstance {
   # of the same unified record.  Without this branch Windows would start an
   # instance the POSIX watchdog deliberately leaves alone, and the "one shared
   # rule table" claim in the header would be false.
-  $recordState = Health-Get -Instance $Instance -Field 'state'
+  $recordState = Get-HealthField -Instance $Instance -Field 'state'
   if ($recordState -eq 'not-loaded') {
     Write-NotLoadedNotice -Instance $Instance
     return
@@ -284,7 +284,7 @@ function Test-ServiceInstance {
     # reads it, so the supervisor's generation token is folded in here.  A token
     # that changed between ticks means the supervisor started a new run; an
     # unchanged token means the instance survived the whole tick.
-    $stored = Health-Get -Instance $Instance -Field 'generation'
+    $stored = Get-HealthField -Instance $Instance -Field 'generation'
 
     # A missing baseline means this is the first observation: adopt the token and
     # record nothing, so a cold start is never mistaken for a restart.  Only a
@@ -296,19 +296,19 @@ function Test-ServiceInstance {
         # token is a run count on POSIX, but process identity or a run *time* on
         # Windows, where the difference is elapsed seconds and would fabricate
         # thousands of restarts out of a single one.
-        Health-RecordRestart -Instance $Instance -Reason 'supervisor'
+        Add-HealthRestart -Instance $Instance -Reason 'supervisor'
       } else {
-        Health-RecordSuccess -Instance $Instance
+        Set-HealthSuccess -Instance $Instance
       }
     }
 
-    Health-Set -Instance $Instance -Field 'generation' -Value $generation
-    Health-SetLastExit -Instance $Instance -ExitCode $lastExit
+    Set-HealthField -Instance $Instance -Field 'generation' -Value $generation
+    Set-HealthLastExitCode -Instance $Instance -ExitCode $lastExit
 
     # Rule 3: live but looping — break the loop, never restart it.
-    if (Health-IsLooping -Instance $Instance) {
+    if (Test-HealthLooping -Instance $Instance) {
       Write-NucleusNotice -CommandName 'service-watchdog' -Message "$Instance is looping; stopping it"
-      Health-SetBlocked -Instance $Instance -Class 'crash-loop' -Remedy 'restart-loop'
+      Set-HealthBlocked -Instance $Instance -Class 'crash-loop' -Remedy 'restart-loop'
       Supervisor-Stop -Target $Target
       return
     }

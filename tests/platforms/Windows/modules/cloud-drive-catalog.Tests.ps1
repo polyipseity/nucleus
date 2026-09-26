@@ -212,7 +212,7 @@ Describe 'Sync-CloudDriveCatalog generated wrapper' {
       $entry = $script:Registry['cloud-drive'].hosts.Windows
       $watchdogId = Get-NucleusInstanceId -TaskFolder ([string]$entry.taskPath) -TaskName "$($entry.service)iCloud"
       $emitted = [regex]::Match($script:Wrapper['iCloud'], "(?m)^\`$env:NUCLEUS_CLOUD_MOUNT_INSTANCE = '(.*)'$").Groups[1].Value
-      Health-StateFile -Instance $emitted | Should -Be (Health-StateFile -Instance $watchdogId)
+      Get-HealthStateFile -Instance $emitted | Should -Be (Get-HealthStateFile -Instance $watchdogId)
     }
   }
 

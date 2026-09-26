@@ -83,7 +83,7 @@ function Mount-Backend-Prepare {
         if (-not (Test-Path $regPath)) {
             # WinFsp not installed.
             . "$PSScriptRoot\ServiceHealth.ps1"
-            Health-SetBlocked -Instance $Instance -Class 'provider-refusal' -Remedy 'install WinFsp via winget install WinFsp.WinFsp'
+            Set-HealthBlocked -Instance $Instance -Class 'provider-refusal' -Remedy 'install WinFsp via winget install WinFsp.WinFsp'
             return 20
         }
     }

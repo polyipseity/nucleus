@@ -11,7 +11,7 @@
   with the AST parser, so the iteration body can be driven from a fixed service
   set.  The health record is exercised for real against a per-run temporary
   storage root, so the rules run against the same record shape production uses;
-  only Health-BootId (which reads WMI) and the supervisor interface are mocked.
+  only Get-HealthBootId (which reads WMI) and the supervisor interface are mocked.
   Adapter behaviour is covered by supervisor-scm.Tests.ps1 and
   supervisor-schtask.Tests.ps1.
 
@@ -76,7 +76,7 @@ Describe 'Invoke-WatchdogIteration rule table' {
     $Script:Repaired = @()
 
     Mock Import-SupervisorAdapter { }
-    Mock Health-BootId { return 'test-boot' }
+    Mock Get-HealthBootId { return 'test-boot' }
     Mock Supervisor-Enabled { return $true }
     Mock Supervisor-Live { return $true }
     Mock Supervisor-Generation { return 0 }
@@ -107,7 +107,7 @@ Describe 'Invoke-WatchdogIteration rule table' {
   }
 
   It 'rule 2: reports a blocked record once and never revives it' {
-    Health-SetBlocked -Instance 'ollama' -Class 'mount-failed' -Remedy 'check the remote'
+    Set-HealthBlocked -Instance 'ollama' -Class 'mount-failed' -Remedy 'check the remote'
 
     $first = @(Invoke-WatchdogIteration)
     $second = @(Invoke-WatchdogIteration)
@@ -119,13 +119,13 @@ Describe 'Invoke-WatchdogIteration rule table' {
 
   It 'rule 3: blocks and stops a looping service' {
     $now = [DateTimeOffset]::Now.ToUnixTimeSeconds()
-    Health-Init -Instance 'ollama'
-    Health-Set -Instance 'ollama' -Field 'restarts' -Value @($now, $now, $now, $now, $now, $now, $now, $now, $now, $now)
+    Initialize-HealthRecord -Instance 'ollama'
+    Set-HealthField -Instance 'ollama' -Field 'restarts' -Value @($now, $now, $now, $now, $now, $now, $now, $now, $now, $now)
 
     Invoke-WatchdogIteration > $null
 
-    (Health-Get -Instance 'ollama' -Field 'state') | Should -Be 'blocked'
-    (Health-Get -Instance 'ollama' -Field 'class') | Should -Be 'crash-loop'
+    (Get-HealthField -Instance 'ollama' -Field 'state') | Should -Be 'blocked'
+    (Get-HealthField -Instance 'ollama' -Field 'class') | Should -Be 'crash-loop'
     $Script:Stopped | Should -Be @('ollama')
     $Script:Started.Count | Should -Be 0
   }
@@ -157,38 +157,38 @@ Describe 'Invoke-WatchdogIteration rule table' {
 
     Invoke-WatchdogIteration > $null
 
-    (Health-Get -Instance 'ollama' -Field 'generation') | Should -Be 1234
-    (Health-Get -Instance 'ollama' -Field 'lastExit') | Should -Be 3
-    @(Health-Get -Instance 'ollama' -Field 'restarts').Count | Should -Be 0
-    (Health-Get -Instance 'ollama' -Field 'state') | Should -Not -Be 'blocked'
+    (Get-HealthField -Instance 'ollama' -Field 'generation') | Should -Be 1234
+    (Get-HealthField -Instance 'ollama' -Field 'lastExit') | Should -Be 3
+    @(Get-HealthField -Instance 'ollama' -Field 'restarts').Count | Should -Be 0
+    (Get-HealthField -Instance 'ollama' -Field 'state') | Should -Not -Be 'blocked'
   }
 
   It 'stamps a success when the generation token is unchanged across a tick' {
     Mock Supervisor-Generation { return 42 }
 
     Invoke-WatchdogIteration > $null
-    Health-Set -Instance 'ollama' -Field 'lastSuccess' -Value 0
+    Set-HealthField -Instance 'ollama' -Field 'lastSuccess' -Value 0
 
     Invoke-WatchdogIteration > $null
 
-    @(Health-Get -Instance 'ollama' -Field 'restarts').Count | Should -Be 0
-    (Health-Get -Instance 'ollama' -Field 'lastSuccess') | Should -BeGreaterThan 0
+    @(Get-HealthField -Instance 'ollama' -Field 'restarts').Count | Should -Be 0
+    (Get-HealthField -Instance 'ollama' -Field 'lastSuccess') | Should -BeGreaterThan 0
   }
 
   It 'counts a restart when the generation token moves backwards' {
     # A process-id token is not monotonic: it can fall to zero and later jump to
     # a new pid.  Comparing with '>' would miss the drop, so a loop that only
     # ever moved the token downwards would never be flagged.
-    Health-Init -Instance 'ollama'
-    Health-Set -Instance 'ollama' -Field 'generation' -Value 1234
+    Initialize-HealthRecord -Instance 'ollama'
+    Set-HealthField -Instance 'ollama' -Field 'generation' -Value 1234
 
     Mock Supervisor-Generation { return 0 }
     Invoke-WatchdogIteration > $null
-    @(Health-Get -Instance 'ollama' -Field 'restarts').Count | Should -Be 1
+    @(Get-HealthField -Instance 'ollama' -Field 'restarts').Count | Should -Be 1
 
     Mock Supervisor-Generation { return 5678 }
     Invoke-WatchdogIteration > $null
-    @(Health-Get -Instance 'ollama' -Field 'restarts').Count | Should -Be 2
+    @(Get-HealthField -Instance 'ollama' -Field 'restarts').Count | Should -Be 2
   }
 
   It 'blocks a service that keeps restarting, detected from the generation token alone' {
@@ -207,8 +207,8 @@ Describe 'Invoke-WatchdogIteration rule table' {
     Invoke-WatchdogIteration > $null
     Invoke-WatchdogIteration > $null
 
-    (Health-Get -Instance 'ollama' -Field 'state') | Should -Be 'blocked'
-    (Health-Get -Instance 'ollama' -Field 'class') | Should -Be 'crash-loop'
+    (Get-HealthField -Instance 'ollama' -Field 'state') | Should -Be 'blocked'
+    (Get-HealthField -Instance 'ollama' -Field 'class') | Should -Be 'crash-loop'
     $Script:Stopped | Should -Be @('ollama')
     $Script:Started.Count | Should -Be 0
   }
@@ -231,7 +231,7 @@ Describe 'Invoke-WatchdogIteration with a prefix-match entry' {
     $Script:Stopped = @()
 
     Mock Import-SupervisorAdapter { }
-    Mock Health-BootId { return 'test-boot' }
+    Mock Get-HealthBootId { return 'test-boot' }
     Mock Supervisor-Enabled { return $true }
     Mock Supervisor-Live { return $true }
     Mock Supervisor-Generation { return 0 }
@@ -281,7 +281,7 @@ Describe 'Invoke-WatchdogIteration with a prefix-match entry' {
 
     ($first -join "`n") | Should -BeLike '*configured but not loaded*'
     $second.Count | Should -Be 0
-    (Health-Get -Instance '\NucleusCloudMount\NucleusCloudMount-iCloud' -Field 'state') | Should -Be 'not-loaded'
+    (Get-HealthField -Instance '\NucleusCloudMount\NucleusCloudMount-iCloud' -Field 'state') | Should -Be 'not-loaded'
   }
 
   It 'refuses to revive an instance whose record still says not-loaded' {
@@ -297,7 +297,7 @@ Describe 'Invoke-WatchdogIteration with a prefix-match entry' {
     # Tick 1: the supervisor does not have the unit yet.
     Mock Supervisor-Enabled { return $false }
     Invoke-WatchdogIteration > $null
-    (Health-Get -Instance $live -Field 'state') | Should -Be 'not-loaded'
+    (Get-HealthField -Instance $live -Field 'state') | Should -Be 'not-loaded'
 
     # Tick 2: the unit appeared without nucleus-apply clearing the record.
     Mock Supervisor-Enabled { return $true }
@@ -306,20 +306,20 @@ Describe 'Invoke-WatchdogIteration with a prefix-match entry' {
 
     # Rule 4b reads the record, not the probe: only nucleus-apply re-arms it.
     $Script:Started.Count | Should -Be 0
-    (Health-Get -Instance $live -Field 'state') | Should -Be 'not-loaded'
+    (Get-HealthField -Instance $live -Field 'state') | Should -Be 'not-loaded'
   }
 
   It 'blocks and stops an instance that is looping' {
     $now = [DateTimeOffset]::Now.ToUnixTimeSeconds()
     $live = '\NucleusCloudMount\NucleusCloudMount-iCloud'
-    Health-Init -Instance $live
-    Health-Set -Instance $live -Field 'restarts' -Value @($now, $now, $now, $now, $now, $now, $now, $now, $now, $now)
+    Initialize-HealthRecord -Instance $live
+    Set-HealthField -Instance $live -Field 'restarts' -Value @($now, $now, $now, $now, $now, $now, $now, $now, $now, $now)
 
     Mock Get-NucleusPrefixInstanceList { return @($live) }
 
     Invoke-WatchdogIteration > $null
 
-    (Health-Get -Instance $live -Field 'state') | Should -Be 'blocked'
+    (Get-HealthField -Instance $live -Field 'state') | Should -Be 'blocked'
     $Script:Stopped | Should -Be @($live)
     $Script:Started.Count | Should -Be 0
   }

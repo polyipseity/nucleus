@@ -7,6 +7,12 @@
     system-scope instances).
 
     Record schema matches the POSIX version exactly.
+
+    ShouldProcess gating is deliberately partial: it covers the New/Set/Remove verbs
+    that PSScriptAnalyzer's PSUseShouldProcessForStateChangingFunctions inspects, so the
+    Initialize-, Add- and Clear- mutators that write the same file are ungated. A -WhatIf
+    pass therefore reports the Set- calls only. No caller passes -WhatIf today; revisit
+    this if dry-run support is ever wanted.
 .PARAMETER Instance
     Service instance key (e.g. "iCloud", "GoogleDrive").
 #>
@@ -15,8 +21,8 @@ param()
 
 $ErrorActionPreference = 'Stop'
 
-# Loop-detection thresholds, defined once and read only by Health-IsLooping.
-# Health-Status reports through that same predicate, so the status a user sees
+# Loop-detection thresholds, defined once and read only by Test-HealthLooping.
+# Get-HealthStatus reports through that same predicate, so the status a user sees
 # can never disagree with the policy the watchdog enforces.  Mirrors the
 # _SVC_HEALTH_LOOP_* constants in src/scripts/lib/service-health.sh.
 # WHY: -Force lets a re-dot-source refresh the values instead of throwing on an
@@ -24,11 +30,11 @@ $ErrorActionPreference = 'Stop'
 Set-Variable -Name 'HealthLoopRestarts' -Value 10 -Option ReadOnly -Scope Script -Force
 Set-Variable -Name 'HealthLoopConsecutive' -Value 5 -Option ReadOnly -Scope Script -Force
 Set-Variable -Name 'HealthWarnRestarts' -Value 5 -Option ReadOnly -Scope Script -Force
-# Sentinel for "the OS could not report a boot time" — see Health-BootId.
+# Sentinel for "the OS could not report a boot time" — see Get-HealthBootId.
 Set-Variable -Name 'HealthBootUnknown' -Value 'unknown' -Option ReadOnly -Scope Script -Force
 
 # HealthStateDir — returns the state directory path.
-function Health-StateDir {
+function Get-HealthStateDir {
     [CmdletBinding()]
     param()
     $userData = Join-Path $env:LOCALAPPDATA 'nucleus'
@@ -39,11 +45,9 @@ function Health-StateDir {
 # WHY: scheduled-task ids are folder-qualified (\Folder\Name), so separators and
 # other reserved characters are replaced before an id becomes part of a file name.
 # A raw id would nest the record under the folder and put it out of reach of
-# Health-ClearAll's flat sweep, leaving a blocked instance un-re-armed at apply time.
+# Clear-HealthRecordAll's flat sweep, leaving a blocked instance un-re-armed at apply time.
 # This is the ONE place the substitution lives; every caller that builds a path from
 # an instance id reuses it rather than repeating the pattern.
-# WHY: named with an approved verb instead of the file's Health-<Noun> style so this
-# new function adds no PSUseApprovedVerbs finding to an already-red file.
 function Get-HealthSafeInstanceName {
     [CmdletBinding()]
     [OutputType([string])]
@@ -51,15 +55,15 @@ function Get-HealthSafeInstanceName {
     $Instance -replace '[\\/:*?"<>|]', '_'
 }
 
-# Health-StateFile — returns the state file path for one instance.
-function Health-StateFile {
+# Get-HealthStateFile — returns the state file path for one instance.
+function Get-HealthStateFile {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Instance)
     $safe = Get-HealthSafeInstanceName -Instance $Instance
-    Join-Path (Health-StateDir) "$safe.json"
+    Join-Path (Get-HealthStateDir) "$safe.json"
 }
 
-# Health-BootId — the identity of the CURRENT boot, asked of the OS on every
+# Get-HealthBootId — the identity of the CURRENT boot, asked of the OS on every
 # call.  Mirrors svc_health_boot_id in service-health.sh.
 #
 # WHY this is recomputed and never cached (it previously read a sticky
@@ -72,10 +76,10 @@ function Health-StateFile {
 # clearing a block is driven by the stored boot DIFFERING from this value, so
 # inventing one when the OS cannot be asked would make every block read as stale
 # and silently void the loop protection.  The sentinel means "not evidence of a
-# reboot", and Health-IsBlocked keeps the block.  Failing closed costs a blocked
-# instance nothing the apply-time re-arm (Health-ClearAll via apply) cannot fix;
+# reboot", and Test-HealthBlocked keeps the block.  Failing closed costs a blocked
+# instance nothing the apply-time re-arm (Clear-HealthRecordAll via apply) cannot fix;
 # failing open re-admits the restart storm the block exists to prevent.
-function Health-BootId {
+function Get-HealthBootId {
     [CmdletBinding()]
     [OutputType([string])]
     param()
@@ -93,11 +97,11 @@ function Health-BootId {
     }
 }
 
-# Health-Init — ensure the state file exists with defaults.
-function Health-Init {
+# Initialize-HealthRecord — ensure the state file exists with defaults.
+function Initialize-HealthRecord {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Instance)
-    $file = Health-StateFile -Instance $Instance
+    $file = Get-HealthStateFile -Instance $Instance
     if (Test-Path $file) { return }
     $dir = Split-Path -Parent $file
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
@@ -107,7 +111,7 @@ function Health-Init {
         remedy       = $null
         attempts     = 0
         reportedState = $null
-        boot         = (Health-BootId)
+        boot         = (Get-HealthBootId)
         lastSuccess  = 0
         restarts     = @()
         # WHY: null, not 0, is the "never observed" generation.  A counter may
@@ -118,30 +122,35 @@ function Health-Init {
     } | ConvertTo-Json -Depth 4 | Set-Content -Path $file -NoNewline
 }
 
-# Health-Get — read a single field from the record.
-function Health-Get {
+# Get-HealthField — read a single field from the record.
+function Get-HealthField {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string]$Instance,
         [Parameter(Mandatory)][string]$Field
     )
-    $file = Health-StateFile -Instance $Instance
+    $file = Get-HealthStateFile -Instance $Instance
     if (-not (Test-Path $file)) { return $null }
     $json = Get-Content -Raw $file | ConvertFrom-Json
     $json.$Field
 }
 
-# Health-Set — write a field to the record. Atomic via tmp+mv.
-function Health-Set {
-    [CmdletBinding()]
+# Set-HealthField — write a field to the record. Atomic via tmp+mv.
+function Set-HealthField {
+    [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory)][string]$Instance,
         [Parameter(Mandatory)][string]$Field,
         [Parameter(Mandatory)]$Value
     )
-    $file = Health-StateFile -Instance $Instance
+    # One gate covers every mutation below, including creating the record when it
+    # is absent, so -WhatIf reports (and skips) the whole write.
+    if (-not $PSCmdlet.ShouldProcess("$Instance/$Field", 'write the service health field')) {
+        return
+    }
+    $file = Get-HealthStateFile -Instance $Instance
     if (-not (Test-Path $file)) {
-        Health-Init -Instance $Instance
+        Initialize-HealthRecord -Instance $Instance
     }
     $tmp = "$file.tmp.$PID"
     $json = Get-Content -Raw $file | ConvertFrom-Json
@@ -150,33 +159,43 @@ function Health-Set {
     Move-Item -Path $tmp -Destination $file -Force
 }
 
-# Health-SetBlocked — set state to blocked with class and remedy.
-function Health-SetBlocked {
-    [CmdletBinding()]
+# Set-HealthBlocked — set state to blocked with class and remedy.
+function Set-HealthBlocked {
+    [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory)][string]$Instance,
         [Parameter(Mandatory)][string]$Class,
         [Parameter(Mandatory)][string]$Remedy
     )
-    Health-Init -Instance $Instance
-    $file = Health-StateFile -Instance $Instance
+    # Gate before Initialize-HealthRecord, which creates the record: -WhatIf must
+    # not leave a new file behind.
+    if (-not $PSCmdlet.ShouldProcess($Instance, 'block the service health record')) {
+        return
+    }
+    Initialize-HealthRecord -Instance $Instance
+    $file = Get-HealthStateFile -Instance $Instance
     $tmp = "$file.tmp.$PID"
     $json = Get-Content -Raw $file | ConvertFrom-Json
     $json.state = 'blocked'
     $json.'class' = $Class
     $json.remedy = $Remedy
-    $json.boot = (Health-BootId)
+    $json.boot = (Get-HealthBootId)
     $json.reportedState = $null
     $json | ConvertTo-Json -Depth 4 | Set-Content -Path $tmp -NoNewline
     Move-Item -Path $tmp -Destination $file -Force
 }
 
-# Health-SetRunning — clear the blocker fields and mark the instance running.
-function Health-SetRunning {
-    [CmdletBinding()]
+# Set-HealthRunning — clear the blocker fields and mark the instance running.
+function Set-HealthRunning {
+    [CmdletBinding(SupportsShouldProcess)]
     param([Parameter(Mandatory)][string]$Instance)
-    Health-Init -Instance $Instance
-    $file = Health-StateFile -Instance $Instance
+    # Gate before Initialize-HealthRecord, which creates the record: -WhatIf must
+    # not leave a new file behind.
+    if (-not $PSCmdlet.ShouldProcess($Instance, 'mark the service health record running')) {
+        return
+    }
+    Initialize-HealthRecord -Instance $Instance
+    $file = Get-HealthStateFile -Instance $Instance
     $tmp = "$file.tmp.$PID"
     $json = Get-Content -Raw $file | ConvertFrom-Json
     $json.state = 'running'
@@ -186,62 +205,65 @@ function Health-SetRunning {
     Move-Item -Path $tmp -Destination $file -Force
 }
 
-# Health-IsBlocked — return true if the instance has a fresh blocked record.
+# Test-HealthBlocked — return true if the instance has a fresh blocked record.
 # Fresh means the record was written during the CURRENT boot, so a record from a
 # previous boot stops gating the service — that is how a reboot clears a block
 # (the other way being the apply-time re-arm).
 # WHY the unknown/absent guards: when the OS cannot report a boot time, or the
 # record carries no boot stamp at all, a mismatch is NOT evidence of a reboot,
-# so the block is KEPT (fail closed).  See Health-BootId.
-function Health-IsBlocked {
+# so the block is KEPT (fail closed).  See Get-HealthBootId.
+function Test-HealthBlocked {
     [CmdletBinding()]
     [OutputType([bool])]
     param([Parameter(Mandatory)][string]$Instance)
-    $state = Health-Get -Instance $Instance -Field 'state'
+    $state = Get-HealthField -Instance $Instance -Field 'state'
     if ($state -ne 'blocked') { return $false }
-    $boot = Health-Get -Instance $Instance -Field 'boot'
-    $current = Health-BootId
+    $boot = Get-HealthField -Instance $Instance -Field 'boot'
+    $current = Get-HealthBootId
     if ([string]::IsNullOrEmpty($current) -or $current -eq $script:HealthBootUnknown) { return $true }
     if ([string]::IsNullOrEmpty($boot) -or $boot -eq $script:HealthBootUnknown) { return $true }
     return ($boot -eq $current)
 }
 
-# Health-IsReported — return true if the current state has been reported.
+# Test-HealthReported — return true if the current state has been reported.
 # Args: $Instance, $Expected reportedState string.
-function Health-IsReported {
+function Test-HealthReported {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string]$Instance,
         [Parameter(Mandatory)][string]$Expected
     )
-    (Health-Get -Instance $Instance -Field 'reportedState') -eq $Expected
+    (Get-HealthField -Instance $Instance -Field 'reportedState') -eq $Expected
 }
 
-# Health-MarkReported — mark the current state as reported.
+# Set-HealthReported — mark the current state as reported.
 # Args: $Instance, $State reportedState string.
-function Health-MarkReported {
-    [CmdletBinding()]
+function Set-HealthReported {
+    [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory)][string]$Instance,
         [Parameter(Mandatory)][string]$State
     )
-    Health-Set -Instance $Instance -Field 'reportedState' -Value $State
+    if (-not $PSCmdlet.ShouldProcess($Instance, 'mark the reported state')) {
+        return
+    }
+    Set-HealthField -Instance $Instance -Field 'reportedState' -Value $State
 }
 
-# Health-Clear — re-arm the instance: drop class, remedy, and reportedState,
+# Clear-HealthRecord — re-arm the instance: drop class, remedy, and reportedState,
 # return state to 'stopped', and drop the restart history, so that neither a
 # blocked state NOR a loop history survives the re-arm.  Rule 2 never
 # auto-revives, so a record left at state 'blocked' would stay blocked until reboot
 # even though apply had already re-armed it.
-# WHY: Health-IsLooping reads .restarts, so a clear that kept the history would be
+# WHY: Test-HealthLooping reads .restarts, so a clear that kept the history would be
 #   re-blocked by the watchdog's Rule 3 on the very next tick and would stay
 #   blocked until the old timestamps aged out.  Dropping .restarts is what makes
 #   this a re-arm rather than a status reset.  Mirrors svc_health_clear in
 #   src/scripts/lib/service-health.sh.
-function Health-Clear {
+function Clear-HealthRecord {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Instance)
-    $file = Health-StateFile -Instance $Instance
+    $file = Get-HealthStateFile -Instance $Instance
     if (-not (Test-Path $file)) { return }
     $tmp = "$file.tmp.$PID"
     $json = Get-Content -Raw $file | ConvertFrom-Json
@@ -254,26 +276,26 @@ function Health-Clear {
     Move-Item -Path $tmp -Destination $file -Force
 }
 
-# Health-ClearAll — clear all instances (apply-time re-arm).
-function Health-ClearAll {
+# Clear-HealthRecordAll — clear all instances (apply-time re-arm).
+function Clear-HealthRecordAll {
     [CmdletBinding()]
     param()
-    $dir = Health-StateDir
+    $dir = Get-HealthStateDir
     if (-not (Test-Path $dir)) { return }
     Get-ChildItem -Path $dir -Filter '*.json' | ForEach-Object {
-        Health-Clear -Instance $_.BaseName
+        Clear-HealthRecord -Instance $_.BaseName
     }
 }
 
-# Health-RecordRestart — append a restart timestamp, prune >1 hour.
-function Health-RecordRestart {
+# Add-HealthRestart — append a restart timestamp, prune >1 hour.
+function Add-HealthRestart {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string]$Instance,
         [string]$Reason = ''
     )
-    Health-Init -Instance $Instance
-    $file = Health-StateFile -Instance $Instance
+    Initialize-HealthRecord -Instance $Instance
+    $file = Get-HealthStateFile -Instance $Instance
     $now = [DateTimeOffset]::Now.ToUnixTimeSeconds()
     $cutoff = $now - 3600
     $tmp = "$file.tmp.$PID"
@@ -292,22 +314,27 @@ function Health-RecordRestart {
     }
 }
 
-# Health-RecordSuccess — update lastSuccess to now.
-function Health-RecordSuccess {
-    [CmdletBinding()]
+# Set-HealthSuccess — update lastSuccess to now.
+function Set-HealthSuccess {
+    [CmdletBinding(SupportsShouldProcess)]
     param([Parameter(Mandatory)][string]$Instance)
-    Health-Init -Instance $Instance
-    Health-Set -Instance $Instance -Field 'lastSuccess' -Value (
+    # Gate before Initialize-HealthRecord, which creates the record: -WhatIf must
+    # not leave a new file behind.
+    if (-not $PSCmdlet.ShouldProcess($Instance, 'stamp the last-success time')) {
+        return
+    }
+    Initialize-HealthRecord -Instance $Instance
+    Set-HealthField -Instance $Instance -Field 'lastSuccess' -Value (
         [DateTimeOffset]::Now.ToUnixTimeSeconds()
     )
 }
 
-# Health-RestartCount — count restarts in the last hour.
-function Health-RestartCount {
+# Get-HealthRestartCount — count restarts in the last hour.
+function Get-HealthRestartCount {
     [CmdletBinding()]
     [OutputType([int])]
     param([Parameter(Mandatory)][string]$Instance)
-    $file = Health-StateFile -Instance $Instance
+    $file = Get-HealthStateFile -Instance $Instance
     if (-not (Test-Path $file)) { return 0 }
     $now = [DateTimeOffset]::Now.ToUnixTimeSeconds()
     $cutoff = $now - 3600
@@ -315,49 +342,52 @@ function Health-RestartCount {
     @($json.restarts | Where-Object { $_ -gt $cutoff }).Count
 }
 
-# Health-ConsecutiveFailures — count restarts newer than lastSuccess.
-function Health-ConsecutiveFailures {
+# Get-HealthConsecutiveFailureCount — count restarts newer than lastSuccess.
+function Get-HealthConsecutiveFailureCount {
     [CmdletBinding()]
     [OutputType([int])]
     param([Parameter(Mandatory)][string]$Instance)
-    $file = Health-StateFile -Instance $Instance
+    $file = Get-HealthStateFile -Instance $Instance
     if (-not (Test-Path $file)) { return 0 }
     $json = Get-Content -Raw $file | ConvertFrom-Json
     $ls = if ($json.lastSuccess) { $json.lastSuccess } else { 0 }
     @($json.restarts | Where-Object { $_ -gt $ls }).Count
 }
 
-# Health-IsLooping — return true if the service is in a crash loop.
-# WHY: the only place the loop thresholds are compared; Health-Status delegates
+# Test-HealthLooping — return true if the service is in a crash loop.
+# WHY: the only place the loop thresholds are compared; Get-HealthStatus delegates
 # here rather than re-implementing the comparison.
-function Health-IsLooping {
+function Test-HealthLooping {
     [CmdletBinding()]
     [OutputType([bool])]
     param([Parameter(Mandatory)][string]$Instance)
-    $count = Health-RestartCount -Instance $Instance
-    $consecutive = Health-ConsecutiveFailures -Instance $Instance
+    $count = Get-HealthRestartCount -Instance $Instance
+    $consecutive = Get-HealthConsecutiveFailureCount -Instance $Instance
     ($count -ge $script:HealthLoopRestarts) -or ($consecutive -ge $script:HealthLoopConsecutive)
 }
 
-# Health-Status — return status string.
-function Health-Status {
+# Get-HealthStatus — return status string.
+function Get-HealthStatus {
     [CmdletBinding()]
     [OutputType([string])]
     param([Parameter(Mandatory)][string]$Instance)
-    if (Health-IsLooping -Instance $Instance) {
+    if (Test-HealthLooping -Instance $Instance) {
         'LOOP'
     } else {
-        $count = Health-RestartCount -Instance $Instance
+        $count = Get-HealthRestartCount -Instance $Instance
         if ($count -ge $script:HealthWarnRestarts) { "${count}/hr" } else { 'OK' }
     }
 }
 
-# Health-SetLastExit — update lastExit.
-function Health-SetLastExit {
-    [CmdletBinding()]
+# Set-HealthLastExitCode — update lastExit.
+function Set-HealthLastExitCode {
+    [CmdletBinding(SupportsShouldProcess)]
     param(
         [Parameter(Mandatory)][string]$Instance,
         [Parameter(Mandatory)][int]$ExitCode
     )
-    Health-Set -Instance $Instance -Field 'lastExit' -Value $ExitCode
+    if (-not $PSCmdlet.ShouldProcess($Instance, 'record the last exit code')) {
+        return
+    }
+    Set-HealthField -Instance $Instance -Field 'lastExit' -Value $ExitCode
 }

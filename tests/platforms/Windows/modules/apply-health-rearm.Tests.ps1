@@ -3,7 +3,7 @@
   Wiring test: the Windows apply path must invoke the apply-time health re-arm.
 
 .DESCRIPTION
-  Health-ClearAll is defined and unit-tested, but a defined-and-tested function is
+  Clear-HealthRecordAll is defined and unit-tested, but a defined-and-tested function is
   not a wired one.  The defect this guards against was that the re-arm had NO
   production call site, so a blocked instance survived apply and cleared only on
   reboot — while two separate comments (service-watchdog.ps1:18 and
@@ -28,11 +28,11 @@ BeforeAll {
   $script:Ast = [System.Management.Automation.Language.Parser]::ParseFile($script:ApplyPath, [ref]$tokens, [ref]$errors)
   $script:ParseErrors = @($errors)
 
-  # Every actual command invocation of Health-ClearAll.  A comment or a string
+  # Every actual command invocation of Clear-HealthRecordAll.  A comment or a string
   # mentioning the name produces no CommandAst, so neither can satisfy this.
   $script:Invocations = @(
     $script:Ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.CommandAst] }, $true) |
-      Where-Object { $_.GetCommandName() -eq 'Health-ClearAll' }
+      Where-Object { $_.GetCommandName() -eq 'Clear-HealthRecordAll' }
   )
 
   # An invocation is conditional when a guard encloses it.
@@ -56,11 +56,11 @@ Describe 'apply.ps1 wires the apply-time health re-arm' {
     $script:ParseErrors.Count | Should -Be 0
   }
 
-  It 'invokes Health-ClearAll' {
+  It 'invokes Clear-HealthRecordAll' {
     $script:Invocations.Count | Should -BeGreaterThan 0 -Because 'a defined-and-tested function with no call site is exactly the defect this guards'
   }
 
-  It 'invokes Health-ClearAll unconditionally' {
+  It 'invokes Clear-HealthRecordAll unconditionally' {
     $unconditional = $script:Invocations.Count - $script:Conditional.Count
     $unconditional | Should -BeGreaterThan 0 -Because 'a re-arm inside a guard leaves the default apply path as broken as having no call at all'
   }

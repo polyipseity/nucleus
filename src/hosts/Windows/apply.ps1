@@ -455,7 +455,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Resolve-Executable.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Test-ArchivingStack.ps1")
 # ServiceHealth.ps1 must load before the apply-time health re-arm that calls
-# Health-ClearAll (see the re-arm step below the user-state syncs).
+# Clear-HealthRecordAll (see the re-arm step below the user-state syncs).
 . (Join-Path -Path $resolvedModuleDir -ChildPath "ServiceHealth.ps1")
 # secrets/: decryption, SOPS age key management, and secret materialization.
 # ConvertFrom-SshEd25519PublicKeyToAgePubKey must be loaded before any file that
@@ -976,7 +976,7 @@ if ($EnableCloudDrivesParity) {
 # without this step a blocked service stays blocked across applies even though
 # apply just re-provisioned and restarted it.  Mirrors the POSIX
 # home.activation.reset-service-health step in src/modules/cloud-drives.nix.
-Health-ClearAll
+Clear-HealthRecordAll
 # Ensure all nucleus log subdirectories exist before starting services.
 Invoke-EnsureLogDir -ServicesJson (Join-Path -Path $repoRoot -ChildPath "src\modules\services.json")
 Sync-CaddyService -RepoRoot $repoRoot -Enabled:`$true

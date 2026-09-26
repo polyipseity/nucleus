@@ -56,7 +56,7 @@ if (-not $backoffCsv) { throw 'NUCLEUS_MOUNT_BACKOFF not set' }
 $backoffSchedule = $backoffCsv -split ',' | ForEach-Object { [int]$_.Trim() }
 
 # Initialize health record.
-Health-Init -Instance $instance
+Initialize-HealthRecord -Instance $instance
 
 # Backend prepare.
 $prepareRc = Mount-Backend-Prepare -Instance $instance
@@ -71,8 +71,8 @@ if ($prepareRc -eq 20) {
 
 # Bounded retry loop.
 for ($attempt = 1; $attempt -le $attempts; $attempt++) {
-    if (Health-IsBlocked -Instance $instance) {
-        $class = Health-Get -Instance $instance -Field 'class'
+    if (Test-HealthBlocked -Instance $instance) {
+        $class = Get-HealthField -Instance $instance -Field 'class'
         Write-Output "$instance`: blocked (class=$class); not attempting"
         exit 0
     }
@@ -105,14 +105,14 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
     }
 
     if ($live) {
-        Health-SetRunning -Instance $instance
-        Health-RecordSuccess -Instance $instance
+        Set-HealthRunning -Instance $instance
+        Set-HealthSuccess -Instance $instance
 
         # Wait for rclone to exit.
         $proc.WaitForExit()
         $exitCode = $proc.ExitCode
 
-        Health-SetLastExit -Instance $instance $exitCode
+        Set-HealthLastExitCode -Instance $instance $exitCode
         Mount-Backend-Unmount -MountPoint $mountPoint
         Write-Output "$instance`: mount exited with status $exitCode"
         exit $exitCode
@@ -132,7 +132,7 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
 
     # Terminal class — stop immediately.
     if (-not (Mount-Backend-IsTransient -Class $class)) {
-        Health-SetBlocked -Instance $instance -Class $class -Remedy $remedy
+        Set-HealthBlocked -Instance $instance -Class $class -Remedy $remedy
         Remove-Item -Path $captureFile -ErrorAction SilentlyContinue
         exit 0
     }
@@ -152,6 +152,6 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
 }
 
 # All attempts exhausted — blocked.
-Health-SetBlocked -Instance $instance -Class 'mount-failed' -Remedy (Mount-Backend-Remedy -Class 'mount-failed')
+Set-HealthBlocked -Instance $instance -Class 'mount-failed' -Remedy (Mount-Backend-Remedy -Class 'mount-failed')
 Write-Output "$instance`: all $attempts attempts exhausted; blocked"
 exit 0
