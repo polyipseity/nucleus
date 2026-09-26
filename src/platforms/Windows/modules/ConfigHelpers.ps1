@@ -22,7 +22,7 @@
 function Deploy-WritableSymlink {
   <#
   .SYNOPSIS
-    Method 1 (default) — creates a bidirectional writable symlink.
+    Method 1 (default) -- creates a bidirectional writable symlink.
   .PARAMETER Name
     Unique identifier for logging.
   .PARAMETER RepoRoot
@@ -83,7 +83,7 @@ function Deploy-WritableSymlink {
 function Deploy-ReadOnly {
   <#
   .SYNOPSIS
-    Method 2 (fallback) — copies a file with ReadOnly attribute.
+    Method 2 (fallback) -- copies a file with ReadOnly attribute.
   .PARAMETER Name
     Unique identifier for logging.
   .PARAMETER RepoRoot
@@ -145,7 +145,7 @@ function Deploy-ReadOnly {
 function Deploy-Merge {
   <#
   .SYNOPSIS
-    Method 3 (fallback) — merges managed settings into an app-owned config file.
+    Method 3 (fallback) -- merges managed settings into an app-owned config file.
   .PARAMETER Name
     Unique identifier for logging.
   .PARAMETER TargetPath

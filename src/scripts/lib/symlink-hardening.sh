@@ -52,7 +52,7 @@ _nucleus_protect_symlink() {
     # not ship e2fsprogs on that PATH: with the binary present the call would fail
     # EPERM, and because a genuine flag failure is fatal here it would abort every
     # NixOS apply. The contract is therefore enforced by detection rather than
-    # prevention: check step 19 (method-one-symlink-resolution) fails when a managed
+    # prevention: check step 13 (method-one-symlink-resolution) fails when a managed
     # symlink does not resolve into the live repo, and
     # home.activation.verify-managed-symlink-paths fails when a seeded path is
     # missing. macOS keeps real prevention via uchg.
@@ -77,7 +77,7 @@ _nucleus_unprotect_symlink() {
   Linux)
     # WHY: see the matching arm in _nucleus_protect_symlink — the capability is
     # unavailable in a user-scope activation, so there is nothing to clear and
-    # NixOS relies on detection (check step 19 + verify-managed-symlink-paths).
+    # NixOS relies on detection (check step 13 + verify-managed-symlink-paths).
     ;;
   esac
 }

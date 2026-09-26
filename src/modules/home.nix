@@ -182,7 +182,7 @@ let
   ];
   managedSymlinkPathsJson = builtins.toJSON managedSymlinkPaths;
 
-  # Deployed candidate list for check step 19 (method-1 links must resolve into the
+  # Deployed candidate list for check step 13 (method-1 links must resolve into the
   # LIVE repo root). Generated here instead of restated inside the check step, whose
   # hand-maintained array had already drifted from the deployed set and covered none
   # of the trees that held the 17 stale links. Directory entries are walked one level

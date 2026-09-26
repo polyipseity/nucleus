@@ -7,19 +7,6 @@
 # the single implementation of that mapping, shared by scripts/svc.sh (list,
 # status, actions, verify, logs) and src/scripts/services/service-watchdog.sh.
 #
-# Functions:
-#   svc_instance_suffix       <entryJson> <instanceId>
-#   svc_instance_entry        <entryJson> <instanceId>
-#   svc_prefix_instances      <entryJson>
-#   svc_instance_log_dirs     <entryJson> <logRoot> <systemLogRoot> <instanceId>
-#   svc_configured_instance_ids <entryJson> <mountsJson>
-#   svc_configured_mounts     <repoRoot> <host> [username]
-#   svc_cloud_mount_point     <entryJson> <mountsJson> <instanceId> [userHome]
-#   svc_wait_mount_released   <mountPoint> [timeoutSeconds]
-#   svc_mount_table_contains  <mountPoint> [probeSeconds]
-#   svc_run_bounded           <seconds> <command...>
-#   svc_clear_stale_fskit_blocks <servicesJson> <host>
-#
 # Requirements: jq; launchctl (macOS) or systemctl (NixOS) for live enumeration.
 # Pure function definitions only — no top-level side effects on import.
 

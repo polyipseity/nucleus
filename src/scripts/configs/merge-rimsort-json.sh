@@ -3,7 +3,7 @@
 # integration flags) into settings.json while preserving app-owned
 # theme, sorting, and window-state settings.
 #
-# Method 3 (merge) — RimSort owns settings.json and overwrites it on
+# Method 3 (merge) -- RimSort owns settings.json and overwrites it on
 # every save. A symlink would let app-owned writes reach the repo file.
 # Merge injects managed keys into instances.Default while preserving
 # all other settings.
