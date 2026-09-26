@@ -290,6 +290,120 @@ function Test-RunState-Prerequisite {
     }
 }
 
+function Test-StepPrerequisite-TokenMatrix {
+    Initialize-StepState
+    . $stepRunner
+
+    $none = Test-StepPrerequisite -Requires 'none'
+
+    $script:ONLINE = $false
+    $networkOffline = Test-StepPrerequisite -Requires 'network'
+    $script:ONLINE = $true
+    $networkOnline = Test-StepPrerequisite -Requires 'network'
+    $script:ONLINE = $false
+
+    $unknown = Test-StepPrerequisite -Requires 'not-a-real-requires-token'
+
+    if ($none -ne $true) {
+        Assert-Fail "prerequisite none" "expected true, got '$none'"
+    } elseif ($networkOffline -ne $false -or $networkOnline -ne $true) {
+        Assert-Fail "prerequisite network" "offline='$networkOffline' online='$networkOnline'"
+    } elseif ($unknown) {
+        # The switch has no default, so an unregistered token falls through to
+        # nothing. Registration rejects unknown tokens, so reaching here means the
+        # token bypassed validation; a truthy result would report it as satisfied.
+        Assert-Fail "prerequisite unknown token" "expected unsatisfied, got '$unknown'"
+    } else {
+        Assert-Pass "prerequisite tokens: none always, network follows --online, unknown is unsatisfied"
+    }
+}
+
+function Test-StepPrerequisite-NixProbesPath {
+    Initialize-StepState
+    . $stepRunner
+
+    $stubDir = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "nucleus-prereq-nix-$([System.Guid]::NewGuid().ToString('N'))"
+    $null = New-Item -ItemType Directory -Path $stubDir -Force
+    Set-Content -LiteralPath (Join-Path $stubDir 'nix') -Value '' -NoNewline
+    if ($IsWindows) { Set-Content -LiteralPath (Join-Path $stubDir 'nix.cmd') -Value '@exit /b 0' -NoNewline }
+
+    $savedPath = $env:PATH
+    try {
+        $env:PATH = $stubDir
+        $present = Test-StepPrerequisite -Requires 'nix'
+        $env:PATH = Join-Path -Path $stubDir -ChildPath 'no-such-subdir'
+        $absent = Test-StepPrerequisite -Requires 'nix'
+    } finally {
+        $env:PATH = $savedPath
+        Remove-Item -LiteralPath $stubDir -Recurse -Force
+    }
+
+    if ($present -ne $true) {
+        Assert-Fail "prerequisite nix present" "a stub nix on PATH reported '$present'"
+    } elseif ($absent -ne $false) {
+        Assert-Fail "prerequisite nix absent" "an empty PATH reported '$absent'"
+    } else {
+        Assert-Pass "prerequisite nix: satisfied by a stub on PATH, unsatisfied without one"
+    }
+}
+
+function Test-StepPrerequisite-FileProbeMatrix {
+    Initialize-StepState
+    . $stepRunner
+
+    if ($IsWindows) {
+        $savedProgramData = $env:ProgramData
+        $savedLocalAppData = $env:LOCALAPPDATA
+        $root = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "nucleus-prereq-root-$([System.Guid]::NewGuid().ToString('N'))"
+        try {
+            $env:ProgramData = $root
+            $env:LOCALAPPDATA = $root
+            $keyAbsent = Test-StepPrerequisite -Requires 'sops-machine-key'
+            $manifestAbsent = Test-StepPrerequisite -Requires 'deployed-host'
+            $null = New-Item -ItemType Directory -Path (Join-Path $root 'nucleus\sops\age') -Force
+            Set-Content -LiteralPath (Join-Path $root 'nucleus\sops\age\machine.txt') -Value ''
+            Set-Content -LiteralPath (Join-Path $root 'nucleus\method1-symlink-manifest.txt') -Value ''
+            $keyPresent = Test-StepPrerequisite -Requires 'sops-machine-key'
+            $manifestPresent = Test-StepPrerequisite -Requires 'deployed-host'
+        } finally {
+            $env:ProgramData = $savedProgramData
+            $env:LOCALAPPDATA = $savedLocalAppData
+            Remove-Item -LiteralPath $root -Recurse -Force
+        }
+        if ($keyAbsent -ne $false -or $manifestAbsent -ne $false) {
+            Assert-Fail "prerequisite absent" "key='$keyAbsent' manifest='$manifestAbsent'"
+        } elseif ($keyPresent -ne $true -or $manifestPresent -ne $true) {
+            Assert-Fail "prerequisite present" "key='$keyPresent' manifest='$manifestPresent'"
+        } else {
+            Assert-Pass "prerequisite files: absent until written, then satisfied"
+        }
+        return
+    }
+
+    # WHY not redirected here: the POSIX roots are absolute constants and $HOME is
+    # read-only, so neither sops-machine-key nor deployed-host can be pointed at a
+    # temp tree on this host. Assert the documented root instead -- a regression to
+    # the sibling root, or to the other platform's spelling, turns this red.
+    if ($IsMacOS) {
+        $keyPath = '/Library/Application Support/nucleus/sops/age/machine.txt'
+        $manifestPath = Join-Path -Path $HOME -ChildPath 'Library/Application Support/nucleus/method1-symlink-manifest.txt'
+    } else {
+        $keyPath = '/var/lib/nucleus/sops/age/machine.txt'
+        $manifestPath = Join-Path -Path $HOME -ChildPath '.local/share/nucleus/method1-symlink-manifest.txt'
+    }
+
+    $key = Test-StepPrerequisite -Requires 'sops-machine-key'
+    $manifest = Test-StepPrerequisite -Requires 'deployed-host'
+    $keyExpected = Test-Path -LiteralPath $keyPath -PathType Leaf
+    $manifestExpected = Test-Path -LiteralPath $manifestPath -PathType Leaf
+
+    if ($key -ne $keyExpected -or $manifest -ne $manifestExpected) {
+        Assert-Fail "prerequisite posix root" "key='$key' expected '$keyExpected'; manifest='$manifest' expected '$manifestExpected'"
+    } else {
+        Assert-Pass "prerequisite files probe the documented posix roots (key=$keyExpected, manifest=$manifestExpected)"
+    }
+}
+
 function Test-RunState-NotSelected {
     Initialize-StepState
     . $stepRunner
@@ -472,6 +586,9 @@ Test-RegisterStep-DeriveNumberThrowsWithoutPrefix
 Test-RunState-Platform
 Test-RunState-Mode
 Test-RunState-Prerequisite
+Test-StepPrerequisite-TokenMatrix
+Test-StepPrerequisite-NixProbesPath
+Test-StepPrerequisite-FileProbeMatrix
 Test-RunState-NotSelected
 Test-RunState-SelectionPrecedence
 
