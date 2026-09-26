@@ -12,7 +12,8 @@
 # PATH-resolved commands are forbidden and enforced by the
 # `activation-tool-resolution` check (step 17).
 #
-# RUSTC_WRAPPER: set to the absolute sccache store path (arg 6) so cargo
+# RUSTC_WRAPPER: set to the absolute sccache store path (arg 6, optional — an
+# empty value leaves the wrapper unset) so cargo
 # (invoked by cargo-binstall's compilation fallback) finds sccache even
 # though Home Manager activation resets PATH.
 #
@@ -21,8 +22,12 @@ set -euo pipefail
 
 # SC2094 avoidance: trap-based cleanup eliminates read/write-same-file
 # pipeline warnings — temp files are cleaned on EXIT instead of inline.
+# Every name the cleanup trap touches is declared here, so the trap stays
+# safe under `set -u` when it fires on an early abort before the mktemp
+# assignments have run.
 _icp_desired=""
 _icp_installed=""
+_icp_installed_versions=""
 _icp_to_remove=""
 _icp_to_install=""
 _cleanup_icp() { rm -f "$_icp_desired" "$_icp_installed" "$_icp_installed_versions" "$_icp_to_remove" "$_icp_to_install"; }
@@ -37,7 +42,11 @@ _icp_gawk_bin="$2"
 _icp_desired_crates_json="$3"
 _icp_cargo_bin="$4"
 _icp_cargo_binstall_bin="$5"
-_icp_sccache_bin="$6"
+# WHY: ${6:-} not $6 — sccache is optional (the RUSTC_WRAPPER block below
+# only sets it when non-empty), so a caller that has no sccache store path
+# must be able to omit the argument entirely. Under `set -u` a bare `$6`
+# aborted before the optionality check could ever run.
+_icp_sccache_bin="${6:-}"
 if [ -z "$_icp_cargo_binstall_bin" ]; then
   die -l cargo-binstall "cargo-binstall store-path bin argument (arg 5) is required"
 fi
