@@ -580,6 +580,15 @@ $gpgCandidates = @(
   (Get-Command -Name "gpg.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
 ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
+$sshKeygenCandidates = @(
+  # The OpenSSH client ships in System32 on Windows 10 1809+ and Server 2019+.
+  (Join-Path -Path $env:SystemRoot -ChildPath 'System32\OpenSSH\ssh-keygen.exe'),
+  # Git for Windows carries its own ssh-keygen, used when the inbox client is absent.
+  (Join-Path -Path $env:ProgramFiles -ChildPath 'Git\usr\bin\ssh-keygen.exe'),
+  # check-suppress:suppression_doc: probe whether ssh-keygen is on PATH; Get-Command throws when absent.
+  (Get-Command -Name "ssh-keygen.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
+) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+
 # check-suppress:suppression_doc: probe -- prek WinGet package directory may not exist; $null check handles absence.
 $prekPackageDir = Get-ChildItem -Path (Join-Path -Path $env:LOCALAPPDATA -ChildPath "Microsoft\WinGet\Packages\j178.Prek_*") -Directory -ErrorAction SilentlyContinue |
   Sort-Object -Property Name -Descending |
@@ -603,6 +612,9 @@ $prekCandidates = @(
 
 $sopsExe = Resolve-Executable -Name "sops" -CandidatePaths $sopsCandidates
 $gpgExe = Resolve-Executable -Name "gpg" -CandidatePaths $gpgCandidates
+# Required by Invoke-SecretVerification to prove each managed SSH private key is
+# readable with an empty passphrase, the same probe the POSIX verifier performs.
+$sshKeygenExe = Resolve-Executable -Name "ssh-keygen" -CandidatePaths $sshKeygenCandidates
 $prekExe = if ($prekCandidates.Count -gt 0) {
   Resolve-Executable -Name "prek" -CandidatePaths $prekCandidates
 } else {
@@ -762,6 +774,7 @@ foreach ($user in $Users) {
   }
   Invoke-SecretVerification `
     -GpgExe $gpgExe `
+    -SshKeygenExe $sshKeygenExe `
     -HostKeyPath $machineSshHostKeyPath `
     -Username $user `
     -SecretsDir $secretsDir `
