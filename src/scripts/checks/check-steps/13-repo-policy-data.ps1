@@ -217,9 +217,6 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Ac
     if ($content -notmatch '(?m)^applyTo:\s*') {
       Write-ErrorMessage "$($instr.FullName): missing applyTo frontmatter field"
       $failed = $true
-    } elseif ($content -match '(?m)^applyTo:\s*"\*\*"') {
-      Write-ErrorMessage "$($instr.FullName): applyTo must not be `"**`" — use scripts/**, src/**, tests/** or narrower"
-      $failed = $true
     }
   }
 

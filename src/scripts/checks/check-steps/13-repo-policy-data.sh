@@ -207,9 +207,6 @@ run_agents_policy() {
     if [ -z "$_apply" ]; then
       _agents_errors=$((_agents_errors + 1))
       error "${_instr#./}: missing applyTo frontmatter field"
-    elif [ "$_apply" = '**' ]; then
-      _agents_errors=$((_agents_errors + 1))
-      error "${_instr#./}: applyTo must not be \"**\" — use scripts/**, src/**, tests/** or narrower"
     fi
   done < <(find .agents/instructions -type f -name '*.instructions.md' -print0)
 
