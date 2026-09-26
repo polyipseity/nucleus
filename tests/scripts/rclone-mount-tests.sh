@@ -489,6 +489,64 @@ test_transient_error_retries_and_succeeds() {
   export -f MOCK_BACKEND_PROBE MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT MOCK_BACKEND_MOUNT
 }
 
+section "3b" "a mount that dies during startup is classified without waiting out the budget"
+
+test_dead_mount_stops_attach_wait_early() {
+  local home bin
+  home="$(create_home)"
+  bin="$(setup_fake_rclone)"
+  # A 20s attach budget against a mount that dies instantly. Polling to the end
+  # of the budget is correct when the mount is merely slow to show up, so the
+  # budget itself cannot shrink to make this test fast -- the loop has to be
+  # shown leaving early. Unfixed lands near 20s; fixed lands under 5s.
+  setup_env "$home" "$bin" 20
+  NUCLEUS_MOUNT_ATTEMPTS="1"
+  NUCLEUS_MOUNT_BACKOFF="0,0"
+  export NUCLEUS_MOUNT_ATTEMPTS NUCLEUS_MOUNT_BACKOFF
+
+  # The volume never appears, so every probe misses for the whole loop.
+  MOCK_BACKEND_PROBE() { return 1; }
+  MOCK_BACKEND_CLASSIFY() { printf 'mount-failed'; }
+  # Terminal, so one attempt ends the run and the elapsed time is attributable
+  # to the attach wait alone rather than to retry backoff.
+  MOCK_BACKEND_IS_TRANSIENT() { return 1; }
+  MOCK_BACKEND_MOUNT() {
+    # A mount that exits during startup: the defect under test. A subshell, so
+    # the pid the runner holds is a real backgrounded child that dies at once.
+    (exit 1) 2>"$_backend_capture" &
+    _backend_rclone_pid=$!
+  }
+  export -f MOCK_BACKEND_PROBE MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT MOCK_BACKEND_MOUNT
+  install_mocks
+
+  local start elapsed
+  start=$SECONDS
+  # rc is not asserted: the runner exits 0 on a blocked mount as it does on a
+  # running one, so it cannot distinguish this outcome. Elapsed time can.
+  run_main >/dev/null 2>&1
+  elapsed=$((SECONDS - start))
+
+  if [ "$elapsed" -lt 5 ]; then
+    assert_pass "a dead mount is classified in ${elapsed}s, not after the 20s budget"
+  else
+    assert_fail "dead-mount-fast-classify" "elapsed=${elapsed}s budget=20s"
+  fi
+  rm -rf "$home" "$bin"
+
+  # Restore defaults so the following tests are unaffected.
+  MOCK_BACKEND_PROBE() { [ -f "${FAKE_MARKER:-}" ]; }
+  MOCK_BACKEND_CLASSIFY() { printf 'mount-failed'; }
+  MOCK_BACKEND_IS_TRANSIENT() { return 1; }
+  MOCK_BACKEND_MOUNT() {
+    local rclone_bin="$1"
+    shift
+    # check-suppress:suppression_doc: _backend_capture is set in the runner's scope before this mock is called
+    "$rclone_bin" mount "$@" 2>"$_backend_capture" &
+    _backend_rclone_pid=$!
+  }
+  export -f MOCK_BACKEND_PROBE MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT MOCK_BACKEND_MOUNT
+}
+
 section "4" "terminal failure → blocked record"
 
 test_terminal_failure_writes_blocked_record() {
@@ -1072,6 +1130,7 @@ test_prepare_blocks_returns_20
 test_mount_succeeds_and_records_success
 test_mount_passes_remote_and_point_to_rclone
 test_transient_error_retries_and_succeeds
+test_dead_mount_stops_attach_wait_early
 test_terminal_failure_writes_blocked_record
 test_unconfigured_remote_exits_0
 test_health_record_created_on_startup

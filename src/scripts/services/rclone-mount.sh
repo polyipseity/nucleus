@@ -155,6 +155,16 @@ _cm_main() {
         live=true
         break
       fi
+      # WHY: a mount that dies during startup would otherwise be polled for the
+      #   whole budget -- 45s x 3 attempts in production -- before anything
+      #   classified it, even though the capture file already held the reason.
+      #   An unreaped child is a zombie and kill -0 succeeds on a zombie, but
+      #   the probe and sleep below are themselves foreground children, so bash
+      #   reaps between polls and the worst case is one extra poll, not the
+      #   full budget.
+      if ! kill -0 "${_backend_rclone_pid:-}" 2>/dev/null; then
+        break
+      fi
       sleep 1
     done
 
