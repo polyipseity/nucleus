@@ -7,7 +7,16 @@ Register-Step -Id "powershell-lint" -Name "PowerShell syntax" -Action {
 
   $ps1Files = $Context.Ps1Files
   if (-not $ps1Files) { $ps1Files = @() }
-  & "$r\scripts\check.ps1" pwsh
+
+  # A scoped run with no .ps1 in scope checks nothing. Without this the analyzer
+  # falls back to `git ls-files` and lints every PowerShell file in the repo,
+  # which is the inverse of the scoped contract.
+  if ($Context.HasArgs -and $ps1Files.Count -eq 0) {
+    Write-Message '0 PowerShell files in scope — syntax check not run.'
+    return $true
+  }
+
+  & "$r\scripts\check.ps1" pwsh @ps1Files
   if ($LASTEXITCODE -ne 0) {
     Write-ErrorMessage "PowerShell check failed."
     return $false
