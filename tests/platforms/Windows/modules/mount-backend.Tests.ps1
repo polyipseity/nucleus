@@ -20,6 +20,24 @@
 BeforeAll {
   $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '../../../..')
   . (Join-Path (Join-Path $repoRoot 'src/platforms/Windows/modules') 'MountBackend.ps1')
+  . (Join-Path (Join-Path $repoRoot 'src/platforms/Windows/modules') 'ServiceHealth.ps1')
+
+  # Windows-only cmdlets, absent off Windows, stubbed so Pester has a command to Mock.
+  # Same shape as the stubs in svc-windows.Tests.ps1.
+  function Get-Service {
+    # check-suppress:SuppressMessageAttribute: PSAvoidOverwritingBuiltInCmdlets -- test stub shadows built-in cmdlet for Pester Mock
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidOverwritingBuiltInCmdlets', '')]
+    param()
+    throw 'stub: Get-Service'
+  }
+  function Start-Service {
+    # check-suppress:SuppressMessageAttribute: PSAvoidOverwritingBuiltInCmdlets -- test stub shadows built-in cmdlet for Pester Mock
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidOverwritingBuiltInCmdlets', '')]
+    # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test stub throws; Mock supplies behavior
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    param()
+    throw 'stub: Start-Service'
+  }
 
   $script:Root = Join-Path ([IO.Path]::GetTempPath()) ("mount-backend-$([guid]::NewGuid())")
   $script:MountedEmpty = Join-Path $script:Root 'mounted-empty'
@@ -34,9 +52,17 @@ BeforeAll {
   Set-Content -Path (Join-Path $script:MountedFull 'remote-entry.txt') -Value 'x'
   # An attached mount whose remote root happens to be empty.
   $null = New-Item -ItemType SymbolicLink -Path $script:MountedEmpty -Target $target
+
+  # Get-HealthStateDir resolves $env:LOCALAPPDATA, which is empty off Windows and would
+  # therefore land the record at a path relative to the CWD.  Point it at this suite's
+  # temp root, and restore it in AfterAll because the Pester step runs every suite in one
+  # process and a leaked value would redirect another suite's health writes.
+  $script:SavedLocalAppData = $env:LOCALAPPDATA
+  $env:LOCALAPPDATA = $script:Root
 }
 
 AfterAll {
+  $env:LOCALAPPDATA = $script:SavedLocalAppData
   Remove-Item -LiteralPath $script:Root -Recurse -Force -ErrorAction Ignore
 }
 
@@ -94,5 +120,42 @@ Describe 'Mount-Backend-Mount argument list' {
     $proc | Should -Not -BeNullOrEmpty
     $null = $proc.WaitForExit(15000)
     $proc.HasExited | Should -BeTrue
+  }
+}
+
+Describe 'Mount-Backend-Prepare failure contract' {
+
+  BeforeEach {
+    # WinFsp reported as installed, so the registry-probe branch is not taken and the
+    # service check is what decides the outcome.
+    Mock Get-Command -ParameterFilter { $Name -eq 'winfsp-x64.dll' } -MockWith { [pscustomobject]@{ Name = 'winfsp-x64.dll' } }
+  }
+
+  It 'reports a refused service start through the health record instead of throwing' {
+    Mock Get-Service -MockWith { [pscustomobject]@{ Name = 'WinFsp.Launcher'; Status = 'Stopped' } }
+    Mock Start-Service -MockWith { throw [System.UnauthorizedAccessException]::new('Access is denied.') }
+
+    $rc = Mount-Backend-Prepare -Instance 'prepare-refused'
+
+    # rclone-mount.ps1 has no try/catch and handles only rc 20.  An exception escaping here
+    # kills the mount loop before any health record exists, leaving the watchdog a record
+    # with no class or remedy to act on.
+    $rc | Should -Be 20
+    Should -Invoke Start-Service -Exactly 1
+
+    $record = Get-Content -Raw (Get-HealthStateFile -Instance 'prepare-refused') | ConvertFrom-Json
+    $record.state | Should -Be 'blocked'
+    $record.'class' | Should -Be 'provider-refusal'
+    $record.remedy | Should -Not -BeNullOrEmpty
+  }
+
+  It 'does not touch the service when the launcher is already running' {
+    Mock Get-Service -MockWith { [pscustomobject]@{ Name = 'WinFsp.Launcher'; Status = 'Running' } }
+    Mock Start-Service -MockWith { throw 'Start-Service must not be called' }
+
+    $rc = Mount-Backend-Prepare -Instance 'prepare-running'
+
+    $rc | Should -Be 0
+    Should -Invoke Start-Service -Exactly 0
   }
 }

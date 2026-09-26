@@ -22,6 +22,7 @@ function Mount-Backend-Class {
     param([Parameter(Mandatory)][string]$CaptureFile)
 
     if (-not (Test-Path $CaptureFile)) { return 'mount-failed' }
+    # check-suppress:suppression_doc: an unreadable capture file yields $null, which the empty-content branch below turns into the same 'mount-failed' verdict
     $content = Get-Content -Raw $CaptureFile -ErrorAction SilentlyContinue
     if (-not $content) { return 'mount-failed' }
 
@@ -74,6 +75,7 @@ function Mount-Backend-Prepare {
     param([Parameter(Mandatory)][string]$Instance)
 
     # Check WinFsp is installed.
+    # check-suppress:suppression_doc: a missing command throws; the -not test on the next line is the absence probe
     $winfsp = Get-Command 'winfsp-x64.dll' -ErrorAction SilentlyContinue
     if (-not $winfsp) {
         $regPath = 'HKLM:\SOFTWARE\WOW6432Node\WinFsp'
@@ -89,9 +91,19 @@ function Mount-Backend-Prepare {
     }
 
     # Ensure WinFsp Launcher service is running.
+    # check-suppress:suppression_doc: an absent service leaves $svc null, so the -and guard below skips the start and not-running is the answer
     $svc = Get-Service -Name 'WinFsp.Launcher' -ErrorAction SilentlyContinue
     if ($svc -and $svc.Status -ne 'Running') {
-        Start-Service -Name 'WinFsp.Launcher' -ErrorAction SilentlyContinue
+        # WHY: the refusal is reported through the module's own channel.  rclone-mount.ps1 has
+        #   no try/catch and handles only rc 20, so an escaping exception kills the mount loop
+        #   before any health record exists and leaves the watchdog a record it cannot act on.
+        try {
+            Start-Service -Name 'WinFsp.Launcher'
+        } catch {
+            . "$PSScriptRoot\ServiceHealth.ps1"
+            Set-HealthBlocked -Instance $Instance -Class 'provider-refusal' -Remedy 'start WinFsp.Launcher from an elevated session; the mount task runs unelevated'
+            return 20
+        }
     }
 
     return 0
@@ -197,8 +209,10 @@ function Mount-Backend-Unmount {
     param([Parameter(Mandatory)][string]$MountPoint)
 
     # Kill any rclone processes using this mount point.
+    # check-suppress:suppression_doc: no rclone process running is the normal case; Get-Process throws instead of returning an empty set
     Get-Process -Name 'rclone' -ErrorAction SilentlyContinue |
         Where-Object { $_.CommandLine -match [regex]::Escape($MountPoint) } |
+        # check-suppress:suppression_doc: the process can exit between enumeration and this call, making the stop a no-op
         Stop-Process -Force -ErrorAction SilentlyContinue
 }
 
@@ -207,6 +221,7 @@ function Mount-Backend-Repair {
     [CmdletBinding()]
     param()
 
+    # check-suppress:suppression_doc: repair is a no-op when WinFsp is absent, which the -not $svc test below selects
     $svc = Get-Service -Name 'WinFsp.Launcher' -ErrorAction SilentlyContinue
     if ($svc) {
         # WHY: Write-Output, not Write-Host — Write-Host goes to the information stream,
@@ -215,7 +230,15 @@ function Mount-Backend-Repair {
         #   so the restart notice would be lost.  This function is currently unreferenced;
         #   keep the output on the success stream if a caller is added.
         Write-Output "Restarting WinFsp.Launcher service..."
-        Restart-Service -Name 'WinFsp.Launcher' -Force -ErrorAction SilentlyContinue
+        # WHY: the success line follows the restart rather than preceding it, so it is only
+        #   emitted when the restart actually returned.  This function is unreferenced and
+        #   has no return-code contract, so the message is the only outcome signal it has.
+        try {
+            Restart-Service -Name 'WinFsp.Launcher' -Force
+        } catch {
+            Write-Output "WinFsp.Launcher service restart failed: $_"
+            return
+        }
         Write-Output "WinFsp.Launcher service restarted."
     } else {
         Write-Warning "WinFsp.Launcher service not found."
@@ -229,6 +252,7 @@ function Mount-Backend-ProviderRefusal {
     param([Parameter(Mandatory)][string]$CaptureFile)
 
     if (-not (Test-Path $CaptureFile)) { return $false }
+    # check-suppress:suppression_doc: an unreadable capture file yields $null, and -match against $null is $false, the correct probe verdict
     $content = Get-Content -Raw $CaptureFile -ErrorAction SilentlyContinue
     $content -match 'WinFsp.*not found|winfsp.*failed|FUSE.*not available'
 }

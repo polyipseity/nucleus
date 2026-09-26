@@ -105,6 +105,21 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Act
     return $result
   }
 
+  # comment-annotations.instructions.md: the suppression family is not enforced
+  # under tests/. The exemption is declared for `|| true`, `$null =`, `[void]`,
+  # `2>$null` and `-ErrorAction SilentlyContinue`; `| Out-Null`, `empty catch {}`
+  # and `SuppressMessageAttribute(` stay enforced everywhere.
+  # WHY the repo-relative form: the whole-repo branch enumerates absolute paths, so
+  #   matching those would exempt EVERY file in a checkout that merely lives under a
+  #   directory named `tests` (~/code/tests/nucleus), disarming the policy silently.
+  $saNotTests = {
+      $saPath = [string]$_
+      if ($saPath.StartsWith($r, [StringComparison]::OrdinalIgnoreCase)) {
+          $saPath = $saPath.Substring($r.Length).TrimStart([char[]]"\/")
+      }
+      $saPath -notmatch '(^|[\\/])tests[\\/]'
+  }
+
   if ($HasArgs) {
     $saShFiles = @(if ($Context.ShFiles) { $Context.ShFiles } else { $PositionalArgs | Where-Object { $_ -like '*.sh' } })
     $saNixFiles = @(if ($Context.NixFiles) { $Context.NixFiles } else { $PositionalArgs | Where-Object { $_ -like '*.nix' } })
@@ -112,13 +127,13 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Act
       Where-Object { (Split-Path -Leaf $_) -notin $allStepLeaves })
     $saHasFiles = ($saShFiles.Count -gt 0) -or ($saNixFiles.Count -gt 0) -or ($saPs1Files.Count -gt 0)
 
-    $saUndocViolations += Get-UndocSuppViolation -Pattern '|| true' -Label '|| true' -Files @(($saShFiles + $saNixFiles) | Where-Object { $_ -notmatch '(^|[\\/])tests[\\/]' }) -Cache ([ref]$saFileCache)
-    $saUndocViolations += Get-UndocSuppViolation -Pattern '2>$null' -Label '2>$null' -Files $saPs1Files -Cache ([ref]$saFileCache)
-    $saUndocViolations += Get-UndocSuppViolation -Pattern '-ErrorAction SilentlyContinue' -Label '-ErrorAction SilentlyContinue' -Files $saPs1Files -Cache ([ref]$saFileCache)
+    $saUndocViolations += Get-UndocSuppViolation -Pattern '|| true' -Label '|| true' -Files @((@($saShFiles + $saNixFiles)) | Where-Object $saNotTests) -Cache ([ref]$saFileCache)
+    $saUndocViolations += Get-UndocSuppViolation -Pattern '2>$null' -Label '2>$null' -Files @($saPs1Files | Where-Object $saNotTests) -Cache ([ref]$saFileCache)
+    $saUndocViolations += Get-UndocSuppViolation -Pattern '-ErrorAction SilentlyContinue' -Label '-ErrorAction SilentlyContinue' -Files @($saPs1Files | Where-Object $saNotTests) -Cache ([ref]$saFileCache)
     $saUndocViolations += Get-UndocSuppViolation -Pattern 'catch\s*\{\s*\}' -Label 'empty catch {}' -IsRegex -Files $saPs1Files -Cache ([ref]$saFileCache)
     $saUndocViolations += Get-UndocSuppViolation -Pattern '\| Out-Null' -Label '| Out-Null' -IsRegex -Files $saPs1Files -NoSuppressionCheck -Cache ([ref]$saFileCache)
-    $saUndocViolations += Get-UndocSuppViolation -Pattern '\$null\s*=\s*\S' -Label '$null =' -IsRegex -Files $saPs1Files -Cache ([ref]$saFileCache)
-    $saUndocViolations += Get-UndocSuppViolation -Pattern '\[void\]' -Label '[void]' -IsRegex -Files $saPs1Files -Cache ([ref]$saFileCache)
+    $saUndocViolations += Get-UndocSuppViolation -Pattern '\$null\s*=\s*\S' -Label '$null =' -IsRegex -Files @($saPs1Files | Where-Object $saNotTests) -Cache ([ref]$saFileCache)
+    $saUndocViolations += Get-UndocSuppViolation -Pattern '\[void\]' -Label '[void]' -IsRegex -Files @($saPs1Files | Where-Object $saNotTests) -Cache ([ref]$saFileCache)
     $saUndocViolations += Get-UndocSuppViolation -Pattern 'SuppressMessageAttribute\(' -Label 'SuppressMessageAttribute' -IsRegex -Files $saPs1Files -CheckId 'SuppressMessageAttribute' -Cache ([ref]$saFileCache)
   } else {
     $saAllShNix = @(
@@ -133,13 +148,13 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Act
     )
     $saHasFiles = ($saAllShNix.Count -gt 0) -or ($saAllPs1.Count -gt 0)
 
-    $saUndocViolations += Get-UndocSuppViolation -Pattern '|| true' -Label '|| true' -Files @($saAllShNix | Where-Object { $_ -notmatch '(^|[\\/])tests[\\/]' }) -Cache ([ref]$saFileCache)
-    $saUndocViolations += Get-UndocSuppViolation -Pattern '2>$null' -Label '2>$null' -Files $saAllPs1 -Cache ([ref]$saFileCache)
-    $saUndocViolations += Get-UndocSuppViolation -Pattern '-ErrorAction SilentlyContinue' -Label '-ErrorAction SilentlyContinue' -Files $saAllPs1 -Cache ([ref]$saFileCache)
+    $saUndocViolations += Get-UndocSuppViolation -Pattern '|| true' -Label '|| true' -Files @($saAllShNix | Where-Object $saNotTests) -Cache ([ref]$saFileCache)
+    $saUndocViolations += Get-UndocSuppViolation -Pattern '2>$null' -Label '2>$null' -Files @($saAllPs1 | Where-Object $saNotTests) -Cache ([ref]$saFileCache)
+    $saUndocViolations += Get-UndocSuppViolation -Pattern '-ErrorAction SilentlyContinue' -Label '-ErrorAction SilentlyContinue' -Files @($saAllPs1 | Where-Object $saNotTests) -Cache ([ref]$saFileCache)
     $saUndocViolations += Get-UndocSuppViolation -Pattern 'catch\s*\{\s*\}' -Label 'empty catch {}' -IsRegex -Files $saAllPs1 -Cache ([ref]$saFileCache)
     $saUndocViolations += Get-UndocSuppViolation -Pattern '\| Out-Null' -Label '| Out-Null' -IsRegex -Files $saAllPs1 -NoSuppressionCheck -Cache ([ref]$saFileCache)
-    $saUndocViolations += Get-UndocSuppViolation -Pattern '\$null\s*=\s*\S' -Label '$null =' -IsRegex -Files $saAllPs1 -Cache ([ref]$saFileCache)
-    $saUndocViolations += Get-UndocSuppViolation -Pattern '\[void\]' -Label '[void]' -IsRegex -Files $saAllPs1 -Cache ([ref]$saFileCache)
+    $saUndocViolations += Get-UndocSuppViolation -Pattern '\$null\s*=\s*\S' -Label '$null =' -IsRegex -Files @($saAllPs1 | Where-Object $saNotTests) -Cache ([ref]$saFileCache)
+    $saUndocViolations += Get-UndocSuppViolation -Pattern '\[void\]' -Label '[void]' -IsRegex -Files @($saAllPs1 | Where-Object $saNotTests) -Cache ([ref]$saFileCache)
     $saUndocViolations += Get-UndocSuppViolation -Pattern 'SuppressMessageAttribute\(' -Label 'SuppressMessageAttribute' -IsRegex -Files $saAllPs1 -CheckId 'SuppressMessageAttribute' -Cache ([ref]$saFileCache)
   }
 

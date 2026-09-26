@@ -133,11 +133,13 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
     # Terminal class — stop immediately.
     if (-not (Mount-Backend-IsTransient -Class $class)) {
         Set-HealthBlocked -Instance $instance -Class $class -Remedy $remedy
+        # check-suppress:suppression_doc: best-effort capture cleanup; the file is already gone on the retry path that reuses it
         Remove-Item -Path $captureFile -ErrorAction SilentlyContinue
         exit 0
     }
 
     # Transient — backoff and retry.
+    # check-suppress:suppression_doc: best-effort capture cleanup; the file is already gone on the retry path that reuses it
     Remove-Item -Path $captureFile -ErrorAction SilentlyContinue
     if ($attempt -lt $attempts) {
         # The declared schedule is CLAMPED, never extrapolated (services.schema.json,

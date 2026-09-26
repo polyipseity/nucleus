@@ -165,10 +165,12 @@ function Invoke-LockedDscValidation {
   $locked = @{}
   if ($lfData.winget) { $lfData.winget.PSObject.Properties | ForEach-Object { $locked[$_.Name] = $_.Value } }
 
+  # check-suppress:suppression_doc: an absent DSC directory yields no files, and the loop below then reports every locked id as unverified rather than passing
   $dscFiles = Get-ChildItem -Path $dscDir -Filter "*.dsc.yml" -ErrorAction SilentlyContinue
   $violations = 0
 
   foreach ($f in $dscFiles) {
+    # check-suppress:suppression_doc: yq writes a parse diagnostic to stderr for a document it cannot convert; the empty-result guard skips that file
     $json = & yq eval -o=j "." $f.FullName 2>$null
     if (-not $json) { continue }
     $parsed = $json | ConvertFrom-Json
@@ -190,6 +192,7 @@ function Invoke-LockedDscValidation {
   foreach ($entry in $locked.GetEnumerator()) {
     $found = $false
     foreach ($f in $dscFiles) {
+      # check-suppress:suppression_doc: same yq parse diagnostic as above; an empty result leaves this entry marked unverified
       $json = & yq eval -o=j "." $f.FullName 2>$null
       if (-not $json) { continue }
       if ($json -match ('"id": "' + [regex]::Escape($entry.Key) + '"')) { $found = $true; break }

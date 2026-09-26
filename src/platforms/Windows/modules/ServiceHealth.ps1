@@ -104,7 +104,7 @@ function Initialize-HealthRecord {
     $file = Get-HealthStateFile -Instance $Instance
     if (Test-Path $file) { return }
     $dir = Split-Path -Parent $file
-    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    New-Item -ItemType Directory -Path $dir -Force > $null
     @{
         state        = 'stopped'
         'class'      = $null

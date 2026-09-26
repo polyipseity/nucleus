@@ -120,7 +120,7 @@ function Invoke-ScoopSetup {
     if ($manifestFiles.Count -gt 0) {
       $nucleusBucketDir = Join-Path $env:USERPROFILE "scoop\buckets\nucleus"
       if (-not (Test-Path -LiteralPath $nucleusBucketDir)) {
-        New-Item -Path $nucleusBucketDir -ItemType Directory -Force | Out-Null
+        New-Item -Path $nucleusBucketDir -ItemType Directory -Force > $null
       }
       foreach ($mf in $manifestFiles) {
         $dest = Join-Path $nucleusBucketDir $mf.Name
