@@ -42,14 +42,17 @@ while IFS= read -r _vsd_private_key_path; do
   # A file that exists is not a key that works: an unparsable private key makes
   # ssh report "invalid format" and fall back to no authentication, and a running
   # agent hides that by answering first.  Derive the public half to prove OpenSSH
-  # can read the file.  -e extracts the public key from the unencrypted header of
-  # the openssh-key-v1 format, so it works on both encrypted and unencrypted keys
-  # without needing the passphrase — activation cannot answer a prompt.
+  # can read the file.  -y derives from the private key, and -P '' supplies an
+  # empty passphrase, so a passphrase-protected key is REJECTED (the supplied
+  # passphrase is simply wrong) while activation still cannot answer a prompt.
+  # -e was wrong here: it reads the unencrypted header of the openssh-key-v1
+  # format, which a protected key still has, so it accepted every protected key.
+  # WHY: a managed key must work unattended, so requiring a passphrase is a failure.
   _vsd_derived_public_key="$(
-    "$_vsd_ssh_keygen_bin" -e -f "$_vsd_private_key_path" </dev/null
-  )" || true # check-suppress:suppression_doc: ssh-keygen -e exits non-zero for a malformed or unreadable key; the empty output is handled below.
+    "$_vsd_ssh_keygen_bin" -y -P '' -f "$_vsd_private_key_path" </dev/null
+  )" || true # check-suppress:suppression_doc: ssh-keygen -y exits non-zero for a malformed, unreadable, or passphrase-protected key; the empty output is handled below.
   if [ -z "$_vsd_derived_public_key" ]; then
-    die -l secrets "managed SSH private key at '$_vsd_private_key_path' is not a usable OpenSSH private key (ssh-keygen -e failed); fix the SOPS value or re-run materialize-user-secrets."
+    die -l secrets "managed SSH private key at '$_vsd_private_key_path' is not a usable OpenSSH private key (ssh-keygen -y failed, so it is unreadable or passphrase-protected); fix the SOPS value or re-run materialize-user-secrets."
   fi
 done <"$_vsd_ssh_key_paths_manifest"
 
