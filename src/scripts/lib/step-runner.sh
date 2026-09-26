@@ -344,7 +344,7 @@ _step_prerequisite_met() {
   none) return 0 ;;
   nix) command -v nix >/dev/null 2>&1 ;;
   network) [ "$ONLINE" = true ] ;;
-  sops-machine-key) [ -f /etc/sops/age/machine.txt ] ;;
+  sops-machine-key) [ -f "$(nucleus_machine_age_key_path)" ] ;;
   deployed-host) [ -f "$(derive_nucleus_user_root)/method1-symlink-manifest.txt" ] ;;
   esac
 }

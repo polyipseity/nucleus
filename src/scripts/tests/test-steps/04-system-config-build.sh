@@ -37,7 +37,7 @@ _sops_secrets_available() {
         _abs="$(CDPATH='' cd -- "$(dirname -- "$_rel")" && pwd)/$(basename -- "$_rel")"
         if [ ! -f "$_abs" ]; then
           _missing+=("$_name (sopsFile $_file missing)")
-        elif ! SOPS_AGE_KEY_FILE=/etc/sops/age/machine.txt sops --decrypt "$_abs" 2>/dev/null |
+        elif ! SOPS_AGE_KEY_FILE="$(nucleus_machine_age_key_path)" sops --decrypt "$_abs" 2>/dev/null |
           grep -qE "^$_name:"; then
           _missing+=("$_name (not present in $_file)")
         fi

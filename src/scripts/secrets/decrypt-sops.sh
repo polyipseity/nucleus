@@ -14,7 +14,7 @@ _ds_sops_file=""
 _ds_sops_bin="sops"
 _ds_gpg_bin="gpg"
 _ds_host_key_path="/etc/ssh/ssh_host_ed25519_key"
-_ds_machine_age_key_path="/etc/sops/age/machine.txt"
+_ds_machine_age_key_path="$(nucleus_machine_age_key_path)"
 _ds_gnupg_home="${GNUPGHOME:-$HOME/.gnupg}"
 
 usage() {
@@ -27,7 +27,7 @@ Options:
   --sops-bin <path>            sops executable (default: sops)
   --gpg-bin <path>             gpg executable (default: gpg)
   --host-key-path <path>       Machine SSH host private key
-  --machine-age-key-path <path> Derived machine age key file
+  --machine-age-key-path <path> Derived machine age key file (default: nucleus_machine_age_key_path)
   --gnupg-home <path>          GnuPG homedir for GPG fallback
   --gawk-bin <path>            gawk executable (default: awk)
   --output-type <fmt>          sops output type (default: json)

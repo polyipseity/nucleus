@@ -12,7 +12,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 # live path and rejects Nix store snapshots.
 REPO_ROOT=""
 
-export SOPS_AGE_KEY_FILE="${SOPS_AGE_KEY_FILE:-/etc/sops/age/machine.txt}"
+export SOPS_AGE_KEY_FILE="${SOPS_AGE_KEY_FILE:-$(nucleus_machine_age_key_path)}"
 
 usage() {
   usage_std "$(basename "$0")" "[options]"

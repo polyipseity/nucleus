@@ -106,6 +106,7 @@ if [ -n "$_vsd_ssh_failures" ]; then
 fi
 
 # --- 5. Machine age key existence check (warning-only) ---
-if [ ! -f "/etc/sops/age/machine.txt" ]; then
-  warn -l secrets "/etc/sops/age/machine.txt missing; this machine cannot be a SOPS age device recipient until the host key is registered in .sops.yaml and derive-host-age-key.sh has run successfully."
+_vsd_machine_age_key="$(nucleus_machine_age_key_path)"
+if [ ! -f "$_vsd_machine_age_key" ]; then
+  warn -l secrets "$_vsd_machine_age_key missing; this machine cannot be a SOPS age device recipient until the host key is registered in .sops.yaml and derive-host-age-key.sh has run successfully."
 fi

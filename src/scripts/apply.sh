@@ -106,7 +106,7 @@ do_health_check() {
 
   # check_secret_health — Decrypt-checks every SOPS-managed secret file.
   check_secret_health() {
-    _sch_machine_key="/etc/sops/age/machine.txt"
+    _sch_machine_key="$(nucleus_machine_age_key_path)"
     if [ -f "$_sch_machine_key" ]; then
       SOPS_AGE_KEY_FILE="$_sch_machine_key"
       export SOPS_AGE_KEY_FILE

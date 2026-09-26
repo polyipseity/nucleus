@@ -186,7 +186,20 @@ function Test-StepPrerequisite {
       $null -ne (Get-Command -Name 'nix' -ErrorAction SilentlyContinue)
     }
     'network' { [bool]$script:ONLINE }
-    'sops-machine-key' { Test-Path -LiteralPath '/etc/sops/age/machine.txt' }
+    'sops-machine-key' {
+      # System-root machine age key, mirroring sops.age.keyFile in
+      # src/modules/secrets.nix. Get-Secret.ps1 already declares the Windows
+      # form of this same path, so the three forms below are the declared
+      # nucleus system roots, not a second convention.
+      $machineAgeKeyPath = if ($IsWindows) {
+        if ([string]::IsNullOrWhiteSpace($env:ProgramData)) { $null } else { Join-Path -Path $env:ProgramData -ChildPath 'nucleus\sops\age\machine.txt' }
+      } elseif ($IsMacOS) {
+        '/Library/Application Support/nucleus/sops/age/machine.txt'
+      } else {
+        '/var/lib/nucleus/sops/age/machine.txt'
+      }
+      $machineAgeKeyPath -and (Test-Path -LiteralPath $machineAgeKeyPath -PathType Leaf)
+    }
     'deployed-host' {
       # The deployed-symlink manifest is written at activation under the nucleus
       # USER root, mirroring POSIX derive_nucleus_user_root.

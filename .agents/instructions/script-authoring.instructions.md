@@ -89,7 +89,7 @@ Keep script behavior consistent with CI, `AGENTS.md`, and prompt guidance. If a 
 
 ## apply.sh health-check SOPS identity
 
-The `health-check` subcommand must export `SOPS_AGE_KEY_FILE` pointing to `/etc/sops/age/machine.txt` before its `sops -d` probe loop — `sops` does not search that path by default. Without this, `sops` falls through to GPG, which may lack the key. See `check_secret_health()` in `scripts/apply.sh`.
+The `health-check` subcommand must export `SOPS_AGE_KEY_FILE` pointing at the machine age key — resolve it with `nucleus_machine_age_key_path` from `src/scripts/lib/lib.sh`, never a literal path — before its `sops -d` probe loop. `sops` does not search that path by default, so without it `sops` falls through to GPG, which may lack the key. The path is the one `sops.age.keyFile` declares in `src/modules/secrets.nix`; see `check_secret_health()` in `src/scripts/apply.sh`.
 
 ## Machine age key auto-registration
 

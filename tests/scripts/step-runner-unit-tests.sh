@@ -300,17 +300,38 @@ test_run_state_requires_nix() {
 }
 
 test_run_state_requires_sops_machine_key() {
-  local _expected _state
-  _state="$(step_state false false "" x any any sops-machine-key)"
-  if [ -f /etc/sops/age/machine.txt ]; then
-    _expected=""
-  else
-    _expected="not applicable (requires: sops-machine-key)"
-  fi
-  if [ "$_state" = "$_expected" ]; then
+  local _dir _key _missing _off _on
+  _dir="$(mktemp -d)"
+  _key="$_dir/machine.txt"
+  _missing="$_dir/absent-machine.txt"
+  : >"$_key"
+  # The gate is [ -f "$(nucleus_machine_age_key_path)" ] and that path is absolute
+  # and host-derived, so HOME cannot move it. Override the resolver after sourcing
+  # instead; step_state cannot inject a redefinition, so these probes hand-roll the
+  # subshell the way the deployed-host sibling does.
+  #
+  # Both branches are forced. Testing only the host's own state compares two empty
+  # strings on a host that has the key, which would still pass if the gate were
+  # reverted to the legacy hardcoded path -- the one thing this guards against.
+  _off="$(HAS_ARGS=false ONLINE=false ONLY_STEPS_CSV="" bash -c '
+    . "$1"
+    _probe="$2"
+    HAS_ARGS="$HAS_ARGS"; ONLINE="$ONLINE"; ONLY_STEPS=()
+    nucleus_machine_age_key_path() { printf "%s\n" "$_probe"; }
+    _step_run_state x any any sops-machine-key
+  ' _ "$STEP_RUNNER" "$_missing")"
+  _on="$(HAS_ARGS=false ONLINE=false ONLY_STEPS_CSV="" bash -c '
+    . "$1"
+    _probe="$2"
+    HAS_ARGS="$HAS_ARGS"; ONLINE="$ONLINE"; ONLY_STEPS=()
+    nucleus_machine_age_key_path() { printf "%s\n" "$_probe"; }
+    _step_run_state x any any sops-machine-key
+  ' _ "$STEP_RUNNER" "$_key")"
+  rm -rf "$_dir"
+  if [ "$_off" = "not applicable (requires: sops-machine-key)" ] && [ -z "$_on" ]; then
     assert_pass "requires applicability: sops-machine-key tracks the machine age key"
   else
-    assert_fail "requires sops-machine-key" "got '$_state', expected '$_expected'"
+    assert_fail "requires sops-machine-key" "off='$_off' on='$_on'"
   fi
 }
 
