@@ -2,6 +2,7 @@
 { ... }:
 {
   imports = [
+    ./agent-host-shell.nix
     ./base.nix
     ./gnupg.nix
     ./logging.nix
