@@ -54,7 +54,11 @@ param(
   [string]$Settings = '',
   [string[]]$OnlyStep = @(),
   [switch]$Scoped,
-  [Parameter(Position = 0)]
+  # ValueFromRemainingArguments is required, not decorative: without it a
+  # [string[]] at Position 0 binds the first path and rejects the second, so
+  # `check.ps1 pwsh a.ps1 b.ps1` fails on b.ps1. Callers pass whole sets of
+  # paths, not single files.
+  [Parameter(Position = 0, ValueFromRemainingArguments = $true)]
   [string[]]$Paths = @($env:NUCLEUS_CHECK_PATHS -split ';' | Where-Object { $_ })
 )
 
@@ -192,3 +196,11 @@ if ($runPssa) {
 
     Write-NucleusInfo -CommandName check-pwsh ("PowerShell lint check passed for {0} files." -f $Paths.Count)
 }
+
+# The success path must exit explicitly. Callers that invoke this in-process --
+# check.ps1 reads $LASTEXITCODE straight after -- get no value when the script
+# simply falls off the end, and under Set-StrictMode reading an unset variable
+# is a terminating error, so a passing run reports as a failure. The early
+# success exits above already do this; this is the same contract for the path
+# that actually does the work.
+exit 0
