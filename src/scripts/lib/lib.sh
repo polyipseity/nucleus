@@ -40,16 +40,11 @@ export NUCLEUS_USER_ROOT
 
 # Nucleus SYSTEM-root machine age key, derived from the host SSH key by
 # src/scripts/secrets/derive-host-age-key.sh during system activation.
-# ref: src/modules/secrets.nix -- mirrors sops.age.keyFile, which is the
-# declarative source of truth for this path. Imperative readers resolve
-# through this function so the shell side cannot drift from the declared
-# value again, which is how a second, legacy spelling under /etc/sops
-# survived alongside it.
+# The system root is resolved from the same services.json manifest the log dir
+# comes from, so a root change in the manifest moves both without a second edit.
 nucleus_machine_age_key_path() {
-  case "$(uname -s)" in
-  Darwin) printf '%s\n' "/Library/Application Support/nucleus/sops/age/machine.txt" ;;
-  *) printf '%s\n' "/var/lib/nucleus/sops/age/machine.txt" ;;
-  esac
+  _nmakp_root="$(dirname -- "$(nucleus_system_log_dir)")" || return 1
+  printf '%s\n' "$_nmakp_root/sops/age/machine.txt"
 }
 
 usage_std() {

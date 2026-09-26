@@ -1,8 +1,8 @@
 # src/modules/posix/sops.nix — Machine age-key derivation for POSIX hosts.
 #
 # Derives the age secret identity from /etc/ssh/ssh_host_ed25519_key and writes
-# it to /Library/Application Support/nucleus/sops/age/machine.txt (macOS) or
-# /var/lib/nucleus/sops/age/machine.txt (NixOS) so the Home Manager sops-nix
+# it under the nucleus SYSTEM root (path resolved by
+# src/scripts/secrets/derive-host-age-key.sh) so the Home Manager sops-nix
 # instance can decrypt SOPS secrets without root.
 #
 # Why a dedicated derived file rather than sshKeyPaths in Home Manager:
@@ -11,10 +11,10 @@
 #   regular user; ssh-to-age must read the private key to derive the age
 #   identity and fails with "permission denied" in that context. System
 #   activation runs as root and CAN read the host key, so we derive the age
-#   identity there and write it to a path the user can read:
-#   /var/lib/nucleus/sops/age/machine.txt is owned root:nucleus-sops (mode
-#   0640) on NixOS, or by the primary user (mode 0600) on nix-darwin. Home
-#   Manager references it through sops.age.keyFile in secrets.nix.
+#   identity there and write it to a path the user can read: on NixOS the file
+#   under /var/lib/nucleus is owned root:nucleus-sops (mode 0640), on nix-darwin
+#   the primary user owns it (mode 0600). Home Manager references it through
+#   sops.age.keyFile in secrets.nix.
 #
 # Idempotency:
 #   ssh-to-age is deterministic for a given SSH key; repeated runs always

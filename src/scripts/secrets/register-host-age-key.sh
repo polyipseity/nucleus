@@ -31,9 +31,8 @@ if [ -z "$_rak_repo_root" ]; then
 fi
 
 # Why before darwin-rebuild / nixos-rebuild:
-#   derive-host-age-key.sh writes the machine age key (macOS
-#   /Library/Application Support/nucleus/sops/age/machine.txt, NixOS
-#   /var/lib/nucleus/sops/age/machine.txt) only after the system activation
+#   derive-host-age-key.sh writes the machine age key under the nucleus SYSTEM
+#   root only after the system activation
 #   completes.  On the first apply the machine key must already be a
 #   .sops.yaml recipient before sops-nix
 #   attempts to decrypt secrets.  The SSH host public key is created by

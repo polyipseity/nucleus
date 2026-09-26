@@ -24,6 +24,15 @@ let
   userSecretFilePath = ../secrets/users + "/${currentUsername}.yml";
   hasUserSecretFile = builtins.pathExists userSecretFilePath;
 
+  # Spelled once for both consumers: sops.age.keyFile below, and the
+  # derive-host-age-key.sh invocation further down. The shell readers resolve
+  # this same value through nucleus_machine_age_key_path.
+  machineAgeKeyPath =
+    if pkgs.stdenv.hostPlatform.isDarwin then
+      "/Library/Application Support/nucleus/sops/age/machine.txt"
+    else
+      "/var/lib/nucleus/sops/age/machine.txt";
+
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
 {
@@ -36,11 +45,7 @@ in
   # sshKeyPaths must be empty: the host private key is root-only; HM reads
   # the derived identity from keyFile instead (same root-only-key constraint).
   sops.age = {
-    keyFile =
-      if pkgs.stdenv.hostPlatform.isDarwin then
-        "/Library/Application Support/nucleus/sops/age/machine.txt"
-      else
-        "/var/lib/nucleus/sops/age/machine.txt";
+    keyFile = machineAgeKeyPath;
     sshKeyPaths = [ ];
   };
 
@@ -87,12 +92,7 @@ in
         "${pkgs.openssh}/bin/ssh-add" \
         "${pkgs.sops}/bin/sops" \
         "/etc/ssh/ssh_host_ed25519_key" \
-        "${
-          if pkgs.stdenv.hostPlatform.isDarwin then
-            "/Library/Application Support/nucleus/sops/age/machine.txt"
-          else
-            "/var/lib/nucleus/sops/age/machine.txt"
-        }" \
+        "${machineAgeKeyPath}" \
         "${pkgs.gawk}/bin/awk"
     ''
   );

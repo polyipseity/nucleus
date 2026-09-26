@@ -162,6 +162,15 @@ let
     in
     map builtins.head (lib.filter isListElement parts);
 
+  singleQuoted =
+    line:
+    let
+      parts = builtins.split "'([^']+)'" line;
+    in
+    map builtins.head (lib.filter isListElement parts);
+
+  isMachinePath = p: builtins.match ".*/sops/age/machine\\.txt" p != null;
+
   # Body of a shell function, located by line index rather than by guessing a
   # closing-brace delimiter. Delimiter splitting was tried first and did NOT
   # match, which silently pulled the entire remainder of lib.sh into the
@@ -176,31 +185,73 @@ let
     in
     lib.take closing after;
 
-  # lib.sh: the two printf branches of nucleus_machine_age_key_path.
+  # Path drift. The path is no longer spelled in three places: lib.sh and
+  # derive-host-age-key.sh derive it, taking the system root from the
+  # services.json manifest. The one remaining literal is the Nix side, which
+  # is now checked against the manifest instead of against a restated copy of
+  # itself -- so a root change in the manifest is caught here rather than
+  # needing a second edit in a second language.
   libShText = builtins.readFile ./../../src/scripts/lib/lib.sh;
   libShFunctionLines = shellFunctionBody libShText "nucleus_machine_age_key_path() {";
-  libShBranchLines = lib.filter (l: lib.hasInfix "printf" l) libShFunctionLines;
-  libShPaths = lib.sort (a: b: a < b) (lib.unique (lib.concatMap doubleQuoted libShBranchLines));
 
-  # secrets.nix: the two literals inside the sops.age block.
+  deriveScriptText = builtins.readFile ./../../src/scripts/secrets/derive-host-age-key.sh;
+  deriveScriptLines = lib.strings.splitString "\n" deriveScriptText;
+
+  # secrets.nix: the two literals in the machineAgeKeyPath binding.
   secretsNixText = builtins.readFile ./../../src/modules/secrets.nix;
   secretsNixLines = lib.strings.splitString "\n" secretsNixText;
-  sopsAgeStart = indexWhere (l: lib.hasInfix "sops.age = {" l) secretsNixLines;
-  sopsAgeAfter = lib.lists.drop (sopsAgeStart + 1) secretsNixLines;
-  sopsAgeClosing = indexWhere (l: lib.trim l == "};") sopsAgeAfter;
-  sopsAgeLines = lib.take sopsAgeClosing sopsAgeAfter;
-  secretsNixPaths = lib.sort (a: b: a < b) (lib.unique (lib.concatMap doubleQuoted sopsAgeLines));
+  machineKeyStart = indexWhere (l: lib.hasInfix "machineAgeKeyPath =" l) secretsNixLines;
+  machineKeyAfter = lib.lists.drop (machineKeyStart + 1) secretsNixLines;
+  machineKeyClosing = indexWhere (l: lib.hasInfix ";" l) machineKeyAfter;
+  machineKeyLines = lib.take (machineKeyClosing + 1) machineKeyAfter;
+  secretsNixPaths = lib.sort (a: b: a < b) (lib.unique (lib.concatMap doubleQuoted machineKeyLines));
 
-  # derive-host-age-key.sh: the two age_dir branches, plus the filename the
-  # script appends when it builds the key path. The match includes the opening
-  # quote so `age_key_file="$age_dir/machine.txt"` is NOT selected -- it merely
-  # mentions age_dir and holds a template, not a literal.
-  deriveScriptText = builtins.readFile ./../../src/scripts/secrets/derive-host-age-key.sh;
-  deriveAgeDirLines = lib.filter (l: lib.hasInfix "age_dir=\"" l) (
-    lib.strings.splitString "\n" deriveScriptText
+  # The expected paths, computed from the manifest rather than restated here.
+  # Only the two POSIX hosts: secrets.nix is evaluated through Home Manager,
+  # which Windows does not use, and the Windows root is a %ProgramData%
+  # template that is not a POSIX path at all.
+  loggingConfig =
+    (builtins.fromJSON (builtins.readFile ./../../src/modules/services.json))."$logging";
+
+  # step-runner.ps1 is cross-platform and cannot call the shell resolver, so it
+  # carries the POSIX roots as literals. Those are the one remaining unguarded
+  # duplication, pinned here. The PowerShell source quotes them singly, which
+  # is why this needs singleQuoted and not doubleQuoted.
+  stepRunnerText = builtins.readFile ./../../src/scripts/lib/step-runner.ps1;
+  stepRunnerPosixPaths = lib.sort (a: b: a < b) (
+    lib.unique (
+      lib.filter isMachinePath (lib.concatMap singleQuoted (lib.strings.splitString "\n" stepRunnerText))
+    )
   );
-  deriveScriptPaths = lib.sort (a: b: a < b) (
-    lib.unique (lib.map (p: "${p}/machine.txt") (lib.concatMap doubleQuoted deriveAgeDirLines))
+  manifestPaths = lib.sort (a: b: a < b) (
+    lib.map (host: "${builtins.dirOf loggingConfig.${host}.systemLogDir}/sops/age/machine.txt") [
+      "MacBook"
+      "NixOS"
+    ]
+  );
+
+  # The Windows suffix is the one duplication left standing, in two PowerShell
+  # consumers. It is not shared by a constant because Get-Secret.ps1 is
+  # dot-sourced with a param() block, and PowerShell requires param() to come
+  # first, so a dot-sourced constant cannot reach a parameter default. Removing
+  # the duplication instead means restructuring the secret-decryption path on
+  # the one platform with no local test coverage, which costs more than the
+  # 24 characters it saves. So the suffix is pinned, not eliminated. A single
+  # quoted string containing a backslash: the POSIX literals in the same file
+  # are forward-slashed, so the backslash is what discriminates them.
+  isWindowsSuffix = p: builtins.match ".*\\\\machine\\.txt" p != null;
+  getSecretText = builtins.readFile ./../../src/platforms/Windows/modules/secrets/Get-Secret.ps1;
+  windowsSuffixInGetSecret = lib.sort (a: b: a < b) (
+    lib.unique (
+      lib.filter isWindowsSuffix (lib.concatMap singleQuoted (lib.strings.splitString "\n" getSecretText))
+    )
+  );
+  windowsSuffixInStepRunner = lib.sort (a: b: a < b) (
+    lib.unique (
+      lib.filter isWindowsSuffix (
+        lib.concatMap singleQuoted (lib.strings.splitString "\n" stepRunnerText)
+      )
+    )
   );
 
   # ===========================================================================
@@ -274,35 +325,56 @@ let
       )
       "the evaluated darwin postActivation must run derive-host-age-key.sh with the user:<primary> owner spec";
 
-  # Path drift. Compared as sets so an ordering change is not a failure, but a
-  # value change in ANY ONE of the three sources is.
-  test_lib_sh_resolver_matches_secrets_nix =
-    assert' (libShPaths == secretsNixPaths)
-      "nucleus_machine_age_key_path in src/scripts/lib/lib.sh must spell the same two paths as sops.age.keyFile in src/modules/secrets.nix; resolver=${lib.strings.concatStringsSep " | " libShPaths}, secrets.nix=${lib.strings.concatStringsSep " | " secretsNixPaths}";
+  # Path drift. The single remaining literal is compared against the manifest.
+  test_secrets_nix_matches_the_manifest_root =
+    assert' (secretsNixPaths == manifestPaths)
+      "the machineAgeKeyPath literals in secrets.nix must be <system root>/sops/age/machine.txt for the roots services.json declares; secrets.nix=${lib.strings.concatStringsSep " | " secretsNixPaths}, manifest=${lib.strings.concatStringsSep " | " manifestPaths}";
 
-  test_derivation_script_matches_secrets_nix =
-    assert' (deriveScriptPaths == secretsNixPaths)
-      "derive-host-age-key.sh must write the same two paths sops.age.keyFile declares; script=${lib.strings.concatStringsSep " | " deriveScriptPaths}, secrets.nix=${lib.strings.concatStringsSep " | " secretsNixPaths}";
+  test_step_runner_posix_paths_match_the_manifest_root =
+    assert' (stepRunnerPosixPaths == manifestPaths)
+      "the POSIX roots spelled in src/scripts/lib/step-runner.ps1 must match the manifest roots; step-runner=${lib.strings.concatStringsSep " | " stepRunnerPosixPaths}, manifest=${lib.strings.concatStringsSep " | " manifestPaths}";
 
   # Guard against the extractor itself silently finding nothing, which would
-  # make the two comparisons above compare [ ] with [ ] and pass.
-  test_lib_sh_paths_are_the_documented_pair =
-    assert'
-      (
-        libShPaths == [
-          "/Library/Application Support/nucleus/sops/age/machine.txt"
-          "/var/lib/nucleus/sops/age/machine.txt"
-        ]
-      )
-      "the path extractor found nothing to compare; a drift guard over two empty lists is a false green, so the extracted pair is asserted explicitly";
-
-  # The non-emptiness guard for the secrets.nix side, stated on its own: this
-  # asserts the extractor found the two branch literals. Asserting equality with
-  # libShPaths here would merely repeat
-  # test_lib_sh_resolver_matches_secrets_nix while looking like a second check.
+  # make the comparison above compare [ ] with [ ] and pass.
   test_secrets_nix_path_extraction_is_not_empty =
     assert' (builtins.length secretsNixPaths == 2)
       "the secrets.nix extractor found ${toString (builtins.length secretsNixPaths)} path(s), not 2; a drift guard over two empty lists is a false green";
+
+  # The shell side must keep deriving. Re-introducing a hardcoded platform branch
+  # is the regression these two prevent, and it is silent: such a branch agrees
+  # with secrets.nix until a root changes, then the two disagree invisibly.
+  test_lib_sh_derives_the_root_rather_than_spelling_it =
+    assert'
+      (
+        lib.hasInfix "nucleus_system_log_dir" (lib.concatStringsSep "\n" libShFunctionLines)
+        && !lib.any (
+          l: lib.hasInfix "/Library/Application Support/nucleus" l || lib.hasInfix "/var/lib/nucleus" l
+        ) libShFunctionLines
+      )
+      "nucleus_machine_age_key_path must take the system root from nucleus_system_log_dir; a hardcoded root in its body is the duplication this replaced";
+
+  # age_dir is still assigned, but from dirname of the shared path -- the
+  # discriminator is the quote-then-slash of a literal, not the name itself.
+  test_derivation_script_uses_the_shared_resolver =
+    assert'
+      (
+        lib.hasInfix "nucleus_machine_age_key_path" deriveScriptText
+        && !lib.any (l: lib.hasInfix "age_dir=\"/" l) deriveScriptLines
+      )
+      "derive-host-age-key.sh must build the key path from nucleus_machine_age_key_path; a literal age_dir branch is the duplication this replaced";
+
+  # The two Windows consumers must agree on the suffix. Each must also yield
+  # exactly one: an extractor that finds nothing makes the comparison below
+  # compare [ ] with [ ] and pass, which is the false green this file exists
+  # to prevent.
+  test_windows_suffix_extraction_is_not_empty =
+    assert'
+      (builtins.length windowsSuffixInGetSecret == 1 && builtins.length windowsSuffixInStepRunner == 1)
+      "the Windows suffix extractor found get-secret=${toString (builtins.length windowsSuffixInGetSecret)} step-runner=${toString (builtins.length windowsSuffixInStepRunner)}, not 1 each; a drift guard over two empty lists is a false green";
+
+  test_windows_suffix_agrees_across_consumers =
+    assert' (windowsSuffixInGetSecret == windowsSuffixInStepRunner)
+      "the machine age key suffix must match across both PowerShell consumers; get-secret=${lib.strings.concatStringsSep " | " windowsSuffixInGetSecret}, step-runner=${lib.strings.concatStringsSep " | " windowsSuffixInStepRunner}";
 
   allTests = [
     test_no_posix_module_lost_its_importer
@@ -314,10 +386,13 @@ let
     test_nixos_group_is_absent_on_darwin
     test_nixos_activation_derives_the_machine_age_key
     test_darwin_activation_derives_the_machine_age_key
-    test_lib_sh_resolver_matches_secrets_nix
-    test_derivation_script_matches_secrets_nix
-    test_lib_sh_paths_are_the_documented_pair
+    test_secrets_nix_matches_the_manifest_root
     test_secrets_nix_path_extraction_is_not_empty
+    test_step_runner_posix_paths_match_the_manifest_root
+    test_lib_sh_derives_the_root_rather_than_spelling_it
+    test_derivation_script_uses_the_shared_resolver
+    test_windows_suffix_extraction_is_not_empty
+    test_windows_suffix_agrees_across_consumers
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {

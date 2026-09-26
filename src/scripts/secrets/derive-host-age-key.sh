@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 # Derive age secret identity from SSH host key and write to the nucleus sops age dir
-# (macOS: /Library/Application Support/nucleus/sops/age/machine.txt,
-#  NixOS:  /var/lib/nucleus/sops/age/machine.txt).
 # Invoked from system activation (runs as root).
 #
 # Owner spec (arg 2):
@@ -20,11 +18,8 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 _dha_ssh_to_age_bin="$1"
 _dha_owner_spec="$2"
 
-case "$(uname -s)" in
-Darwin) age_dir="/Library/Application Support/nucleus/sops/age" ;;
-*) age_dir="/var/lib/nucleus/sops/age" ;;
-esac
-age_key_file="$age_dir/machine.txt"
+age_key_file="$(nucleus_machine_age_key_path)"
+age_dir="$(dirname -- "$age_key_file")"
 host_ssh_key="/etc/ssh/ssh_host_ed25519_key"
 
 if [ ! -f "$host_ssh_key" ]; then
