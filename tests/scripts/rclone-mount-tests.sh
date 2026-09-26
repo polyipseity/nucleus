@@ -50,6 +50,15 @@ case "${1-}" in
 mount)
   # Simulate pre-attach delay.
   sleep "${FAKE_MOUNT_SLEEP:-0}"
+  # The first attempt is the failing one: it attaches nothing and exits at once,
+  # so the runner classifies it instead of waiting out the attach budget. The
+  # volume only ever appears on the attempt that succeeds. A missing counter file
+  # means this is not the retry scenario, so it takes the normal path -- defaulting
+  # to the failing path here would silently disarm every later test in the suite.
+  if [ -n "${FAKE_ATTEMPTS_FILE:-}" ] && [ -f "$FAKE_ATTEMPTS_FILE" ] &&
+    [ "$(head -1 "$FAKE_ATTEMPTS_FILE")" -le 1 ]; then
+    exit "${FAKE_FAIL_EXIT:-0}"
+  fi
   # Signal volume attachment.
   if [ -n "${FAKE_MARKER:-}" ]; then
     touch "$FAKE_MARKER"
@@ -58,8 +67,30 @@ mount)
   if [ -n "${FAKE_ERRFILE:-}" ] && [ -f "$FAKE_ERRFILE" ]; then
     cat "$FAKE_ERRFILE" >&2
   fi
-  # Live for a while so the runner can "wait" on us.
-  sleep "${FAKE_SLEEP:-4}"
+  # Stay alive until the runner records this mount as running, rather than for a
+  # fixed number of seconds.
+  #
+  # WHY: the runner only probes for NUCLEUS_MOUNT_ATTACH_SECONDS. A mount that
+  # outlives that budget can die having never been observed, so the runner
+  # classifies a live mount as failed -- the failure behind the mount-success
+  # state=blocked flake. Gating the exit on the observation the runner actually
+  # makes ties the two together by the runner's own progress rather than by luck:
+  # however slowly the loop polls, the mount is still there when it looks. The
+  # bound is only a hang guard; if the record never reaches running the test is
+  # failing regardless, and must fail rather than block forever.
+  if [ -n "${FAKE_EXIT_WHEN_RUNNING:-}" ]; then
+    _deadline=$((SECONDS + FAKE_EXIT_WHEN_RUNNING))
+    while [ "$SECONDS" -lt "$_deadline" ]; do
+      if [ -f "${FAKE_HEALTH_FILE:-}" ] &&
+        grep -q '"state"[[:space:]]*:[[:space:]]*"running"' "$FAKE_HEALTH_FILE" 2>/dev/null; then
+        break
+      fi
+      sleep 0.2
+    done
+  else
+    # Live for a while so the runner can "wait" on us.
+    sleep "${FAKE_SLEEP:-4}"
+  fi
   exit "${FAKE_EXIT:-0}"
   ;;
 listremotes)
@@ -91,23 +122,32 @@ create_home() {
 setup_env() {
   HOME="$1"
   PATH="$2:$PATH"
+  # Clear the lifetime controls before each test. They are exported, so a test
+  # that sets one would otherwise hand it to every test that follows and quietly
+  # change what their mock rclone does.
+  unset FAKE_ATTEMPTS_FILE FAKE_EXIT_WHEN_RUNNING
   NUCLEUS_RCLONE_REMOTE="OneDrive:Backups"
   NUCLEUS_RCLONE_MOUNT_POINT="$1/clouds/OneDrive"
   NUCLEUS_RCLONE_ARGS=""
   NUCLEUS_CLOUD_MOUNT_INSTANCE="test-mount.OneDrive"
   NUCLEUS_MOUNT_ATTEMPTS="3"
   NUCLEUS_MOUNT_BACKOFF="0,0"
-  NUCLEUS_MOUNT_ATTACH_SECONDS="2"
+  NUCLEUS_MOUNT_ATTACH_SECONDS="${3:-2}"
   NUCLEUS_USER_ROOT="$1/.local/share/nucleus"
+  # The fake rclone inherits this and gates its own exit on the record, so the
+  # mount's lifetime is decided by the runner's observation of it rather than by
+  # a clock the two processes happen to share.
+  FAKE_HEALTH_FILE="$(printf '%s/state/service-stats/%s.json' "$NUCLEUS_USER_ROOT" "$NUCLEUS_CLOUD_MOUNT_INSTANCE")"
   export HOME PATH NUCLEUS_RCLONE_REMOTE \
     NUCLEUS_RCLONE_MOUNT_POINT NUCLEUS_RCLONE_ARGS NUCLEUS_CLOUD_MOUNT_INSTANCE \
     NUCLEUS_MOUNT_ATTEMPTS NUCLEUS_MOUNT_BACKOFF NUCLEUS_MOUNT_ATTACH_SECONDS \
-    NUCLEUS_USER_ROOT
+    NUCLEUS_USER_ROOT FAKE_HEALTH_FILE
 }
 
 # health_file — path to the health record for the current test instance.
+# One spelling, also handed to the fake rclone by setup_env.
 health_file() {
-  printf '%s/state/service-stats/%s.json' "$NUCLEUS_USER_ROOT" "$NUCLEUS_CLOUD_MOUNT_INSTANCE"
+  printf '%s' "$FAKE_HEALTH_FILE"
 }
 
 # health_field — read a single field from the health record via jq.
@@ -305,13 +345,13 @@ test_mount_succeeds_and_records_success() {
   local home bin marker
   home="$(create_home)"
   bin="$(setup_fake_rclone)"
-  setup_env "$home" "$bin"
+  setup_env "$home" "$bin" 10
   marker="$home/clouds/OneDrive/.marker"
   FAKE_MARKER="$marker"
   FAKE_CALLS="$home/calls"
   FAKE_REMOTES="OneDrive:"
-  FAKE_SLEEP=3
-  export FAKE_MARKER FAKE_CALLS FAKE_REMOTES FAKE_SLEEP
+  FAKE_EXIT_WHEN_RUNNING=8
+  export FAKE_MARKER FAKE_CALLS FAKE_REMOTES FAKE_EXIT_WHEN_RUNNING
   install_mocks
   # Re-export after overriding so the subshell sees the updated function.
   export -f MOCK_BACKEND_PREPARE MOCK_BACKEND_ARGS MOCK_BACKEND_MOUNT \
@@ -335,14 +375,14 @@ test_mount_passes_remote_and_point_to_rclone() {
   local home bin marker calls
   home="$(create_home)"
   bin="$(setup_fake_rclone)"
-  setup_env "$home" "$bin"
+  setup_env "$home" "$bin" 10
   marker="$home/clouds/OneDrive/.marker"
   calls="$home/calls"
   FAKE_MARKER="$marker"
   FAKE_CALLS="$calls"
   FAKE_REMOTES="OneDrive:"
-  FAKE_SLEEP=2
-  export FAKE_MARKER FAKE_CALLS FAKE_REMOTES FAKE_SLEEP
+  FAKE_EXIT_WHEN_RUNNING=8
+  export FAKE_MARKER FAKE_CALLS FAKE_REMOTES FAKE_EXIT_WHEN_RUNNING
   install_mocks
 
   local rc=0
@@ -362,31 +402,31 @@ test_transient_error_retries_and_succeeds() {
   local home bin marker
   home="$(create_home)"
   bin="$(setup_fake_rclone)"
-  setup_env "$home" "$bin"
+  setup_env "$home" "$bin" 5
   marker="$home/clouds/OneDrive/.marker"
   FAKE_MARKER="$marker"
   FAKE_CALLS="$home/calls"
   FAKE_REMOTES="OneDrive:"
-  FAKE_SLEEP=1
-  export FAKE_MARKER FAKE_CALLS FAKE_REMOTES FAKE_SLEEP
+  FAKE_EXIT_WHEN_RUNNING=8
+  FAKE_ATTEMPTS_FILE="$home/attempts"
+  export FAKE_MARKER FAKE_CALLS FAKE_REMOTES FAKE_EXIT_WHEN_RUNNING FAKE_ATTEMPTS_FILE
   install_mocks
 
-  # First call: no marker (probe fails), transient class.
-  # Second call: marker appears (probe succeeds), mount succeeds.
-  # Use a file-based counter since call_count is a local that won't survive the subshell.
-  local probe_calls
-  probe_calls="$home/probe-calls"
-  printf '0\n' >"$probe_calls"
+  # One counter per ATTEMPT, not per probe. The previous version counted probes,
+  # so the first probe failed and the second succeeded inside a single attempt:
+  # the retry path was never taken at all, and the test passed without ever
+  # exercising the classification it names. Counting attempts makes attempt 1
+  # fail for its whole budget, which is what actually forces the retry.
+  #
+  # A file-based counter, because a shell local does not survive into the
+  # subshell the mocks are exported to.
+  local attempts_file="$home/attempts"
+  printf '0\n' >"$attempts_file"
   MOCK_BACKEND_PROBE() {
-    local n
-    n="$(head -1 "$probe_calls")"
-    n="$((n + 1))"
-    printf '%s\n' "$n" >"$probe_calls"
-    # First attempt: no marker yet (simulate transient failure).
-    if [ "$n" -le 1 ]; then
+    # The failing attempt: no volume will ever appear, so every probe misses.
+    if [ "$(head -1 "$attempts_file")" -le 1 ]; then
       return 1
     fi
-    # Second attempt onward: marker present.
     [ -f "${FAKE_MARKER:-}" ]
   }
   MOCK_BACKEND_CLASSIFY() {
@@ -395,23 +435,22 @@ test_transient_error_retries_and_succeeds() {
   MOCK_BACKEND_IS_TRANSIENT() {
     [ "$1" = "io-transient" ]
   }
-  # Kill rclone after first (failed) attempt so the loop can retry.
+  # The failing attempt exits at once, so the runner classifies it instead of
+  # waiting out the attach budget. The wall-clock killer this replaces raced the
+  # runner's own wait by half a second: when it fired first the mount died by
+  # SIGTERM and the runner faithfully reported 143, which is the retry-transient
+  # flake. Nothing needs killing here -- the runner terminates a mount it has
+  # given up on by itself.
   MOCK_BACKEND_MOUNT() {
     local rclone_bin="$1"
     shift
     # check-suppress:suppression_doc: _backend_capture is set in the runner's scope before this mock is called
+    local n
+    n="$(head -1 "$attempts_file")"
+    n="$((n + 1))"
+    printf '%s\n' "$n" >"$attempts_file"
     "$rclone_bin" mount "$@" 2>"$_backend_capture" &
     _backend_rclone_pid=$!
-    # On first attempt: let rclone create the marker, then kill it.
-    # On subsequent attempts: rclone lives until the runner kills it.
-    local n
-    n="$(head -1 "$probe_calls")"
-    if [ "$n" -le 1 ]; then
-      (
-        sleep 1.5 # marker created at 1s; kill after
-        kill -TERM "$_backend_rclone_pid" 2>/dev/null
-      ) &
-    fi
   }
   # Re-export all mocks so the subshell sees the updated functions.
   export -f MOCK_BACKEND_PREPARE MOCK_BACKEND_ARGS MOCK_BACKEND_MOUNT \
@@ -423,10 +462,16 @@ test_transient_error_retries_and_succeeds() {
   local rc=0
   run_main 2>/dev/null || rc=$?
 
-  if [ "$rc" -eq 0 ]; then
+  # rc alone cannot tell success from failure here. The runner exits 0 on a
+  # blocked mount exactly as it does on a running one, so an rc-only assertion
+  # passes even with the retry path removed -- it did, until this was made to
+  # require what the name claims: a second attempt, and a running record.
+  local attempts_made
+  attempts_made="$(head -1 "$attempts_file")"
+  if [ "$attempts_made" -ge 2 ] && [ "$(health_field state)" = "running" ]; then
     assert_pass "a transient failure retries and eventually succeeds"
   else
-    assert_fail "retry-transient" "rc=$rc"
+    assert_fail "retry-transient" "attempts=$attempts_made state=$(health_field state)"
   fi
   rm -rf "$home" "$bin"
 
@@ -520,10 +565,13 @@ test_unconfigured_remote_exits_0() {
   run_main 2>/dev/null || rc=$?
 
   # Runner does not check remote config — mount proceeds regardless.
-  if [ "$rc" -eq 0 ]; then
+  # The claim is that the runner does not gate on the remote being configured,
+  # so what must be observed is the mount proceeding -- not rc, which is 0
+  # whether or not it did.
+  if [ "$rc" -eq 0 ] && [ "$(health_field state)" = "running" ]; then
     assert_pass "an unconfigured remote exits 0 (runner does not gate on listremotes)"
   else
-    assert_fail "unconfigured-remote" "rc=$rc"
+    assert_fail "unconfigured-remote" "rc=$rc state=$(health_field state)"
   fi
   rm -rf "$home" "$bin"
 }
@@ -534,13 +582,13 @@ test_health_record_created_on_startup() {
   local home bin marker
   home="$(create_home)"
   bin="$(setup_fake_rclone)"
-  setup_env "$home" "$bin"
+  setup_env "$home" "$bin" 10
   marker="$home/clouds/OneDrive/.marker"
   FAKE_MARKER="$marker"
   FAKE_CALLS="$home/calls"
   FAKE_REMOTES="OneDrive:"
-  FAKE_SLEEP=2
-  export FAKE_MARKER FAKE_CALLS FAKE_REMOTES FAKE_SLEEP
+  FAKE_EXIT_WHEN_RUNNING=8
+  export FAKE_MARKER FAKE_CALLS FAKE_REMOTES FAKE_EXIT_WHEN_RUNNING
   install_mocks
   # Re-export so the subshell sees the correct mock functions.
   export -f MOCK_BACKEND_PREPARE MOCK_BACKEND_ARGS MOCK_BACKEND_MOUNT \
@@ -610,22 +658,22 @@ test_exit_0_on_success() {
   local home bin marker
   home="$(create_home)"
   bin="$(setup_fake_rclone)"
-  setup_env "$home" "$bin"
+  setup_env "$home" "$bin" 10
   marker="$home/clouds/OneDrive/.marker"
   FAKE_MARKER="$marker"
   FAKE_CALLS="$home/calls"
   FAKE_REMOTES="OneDrive:"
-  FAKE_SLEEP=2
-  export FAKE_MARKER FAKE_CALLS FAKE_REMOTES FAKE_SLEEP
+  FAKE_EXIT_WHEN_RUNNING=8
+  export FAKE_MARKER FAKE_CALLS FAKE_REMOTES FAKE_EXIT_WHEN_RUNNING
   install_mocks
 
   local rc=0
   run_main 2>/dev/null || rc=$?
 
-  if [ "$rc" -eq 0 ]; then
+  if [ "$rc" -eq 0 ] && [ "$(health_field state)" = "running" ]; then
     assert_pass "exit 0 on successful mount"
   else
-    assert_fail "exit-success" "rc=$rc"
+    assert_fail "exit-success" "rc=$rc state=$(health_field state)"
   fi
   rm -rf "$home" "$bin"
 }
@@ -680,10 +728,15 @@ test_prepare_failure_exits_20() {
   local rc=0
   run_main 2>/dev/null || rc=$?
 
-  if [ "$rc" -eq 0 ]; then
+  # A prepare that returns 20 makes the runner exit 0 without attempting the
+  # mount, so the record is never running. rc is 0 here and on every other path,
+  # so it cannot distinguish them; what the name claims is that the mount did not
+  # proceed. Asserting "not running" rather than a specific state keeps the test
+  # honest about which runner wrote the record.
+  if [ "$rc" -eq 0 ] && [ "$(health_field state)" != "running" ]; then
     assert_pass "backend_prepare returning 20 exits 0 (user-action required)"
   else
-    assert_fail "prepare-exit-20" "rc=$rc"
+    assert_fail "prepare-exit-20" "rc=$rc state=$(health_field state)"
   fi
   # The default MOCK_BACKEND_PREPARE is a load-time statement (line 180), not
   # part of install_mocks, so this override would otherwise survive into every
