@@ -106,6 +106,12 @@ DSC dry-run: `winget configure --what-if .\src\hosts\Windows\{system,system-pack
 - Contract-breaking: add Nix logic or Pester tests. Bug fix: reproducing case if non-obvious.
 Commit atomically with implementation. Naming: `tests/<area>/<topic>-tests.nix` / `tests/platforms/Windows/modules/<area>/<feature>.Tests.ps1`
 
+## Anti-pattern: assertions that cannot discriminate
+
+An assertion on a value which cannot distinguish the outcomes it claims to test proves nothing. The rclone mount runner exits 0 on a running mount, on a blocked one, on a terminal failure and on an exhausted retry alike, so every `rc -eq 0` assertion over it passed regardless — one test named for retry had never exercised retry. The same shape hides in expectations derived from the host under test, and in gates that compare two lists which are both empty.
+
+Before writing an assertion, ask what result would make it fail. If every reachable outcome produces the same value, it is not a test. Assert the discriminating fact — the attempt count, the recorded state, the resolved path — not the summary that all paths share, and prove it by breaking the behaviour and confirming the assertion fires.
+
 ## Anti-pattern: grep-only Nix tests
 
 Tests that use `builtins.readFile` + `containsRegex` / `lib.hasInfix` to check that specific text exists in source files are **implementation-coupled**. They break on code reflow, renaming, or comment changes while providing zero behavioral assurance.
@@ -133,7 +139,7 @@ Test scripts only, not production code.
   - `Write-ErrorMessage`/`Write-Message` from `test-lib.ps1` — tests asserting UNDEFINED pass standalone but fail in-suite.
   - `& script.ps1` does not set `$LASTEXITCODE`.
   - `test.ps1` fail-fast kills process before summary. Use `--no-fail-fast` for debugging.
-- **Comments**: no `__TOKEN__`-delimited names in `.sh` test comments (step 14 greps). No both fragments of same-line regex in one comment (step 14 SAME-LINE).
+- **Comments**: no `__TOKEN__`-delimited names in `.sh` test comments. No both fragments of same-line regex in one comment. Neither rule is machine-enforced; they are review requirements.
 - **Fail-closed suites**: a suite that sources `tests/scripts/test-lib.sh` must end with
   `finish_tests`. It is the only sanctioned exit and the only emitter of the `# nucleus-tally`
   line that test step 5 requires, so a suite that exits early, or calls it from a branch that
