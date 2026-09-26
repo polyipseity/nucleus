@@ -19,33 +19,55 @@ let
   inherit (import ../lib.nix) assert';
 
   lib = import <nixpkgs/lib>;
-  pkgs = import <nixpkgs> { };
 
   inherit (lib) hasInfix;
 
-  isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
+  # Both package sets are pinned to an explicit system. An unpinned
+  # `import <nixpkgs> { }` resolves to the HOST, so the darwin evaluation below
+  # would silently become x86_64-linux on the ubuntu-latest leg of the CI matrix
+  # and take the NixOS branch in agent-host-shell.nix — leaving the darwin branch
+  # of the module verified on one host only, with nothing reporting the gap. Same
+  # trap as tests/modules/posix-module-imports-tests.nix, where it was the one P0
+  # this effort caught late. Evaluation only, nothing is built, so either host
+  # can evaluate either set.
+  darwinPkgs = import <nixpkgs> { system = "aarch64-darwin"; };
+  linuxPkgs = import <nixpkgs> { system = "x86_64-linux"; };
 
   # The module under test, evaluated for real. This forces the option
-  # declaration and produces the activation fragment this host would run, which
+  # declaration and produces the activation fragment the host would run, which
   # is the artifact the wrapper actually comes from. The stub supplies the
   # platform option surface: `system.activationScripts` belongs to nix-darwin and
   # NixOS, not to the generic module system, so without it the module has nothing
   # to attach its fragment to.
-  evaluated = lib.evalModules {
-    modules = [
-      (import ../../src/modules/posix/agent-host-shell.nix { inherit lib pkgs; })
-      {
-        options.system.activationScripts = lib.mkOption {
-          type = lib.types.attrsOf (lib.types.attrsOf lib.types.lines);
-          default = { };
-        };
-      }
-    ];
-  };
+  #
+  # Parameterised by package set so both platform branches are evaluated on every
+  # host. The module picks its wrapper root at :25-28 and guards its two
+  # activation fragments with mkIf on hostPlatform at :48 and :56, so a
+  # single-platform evaluation leaves one of them permanently unexercised.
+  evaluatedFor =
+    pkgs:
+    lib.evalModules {
+      modules = [
+        (import ../../src/modules/posix/agent-host-shell.nix { inherit lib pkgs; })
+        {
+          options.system.activationScripts = lib.mkOption {
+            type = lib.types.attrsOf (lib.types.attrsOf lib.types.lines);
+            default = { };
+          };
+        }
+      ];
+    };
 
-  activationText = builtins.concatStringsSep "\n" (
-    lib.mapAttrsToList (_name: fragment: fragment.text or "") evaluated.config.system.activationScripts
-  );
+  activationFor =
+    evaluated:
+    builtins.concatStringsSep "\n" (
+      lib.mapAttrsToList (_name: fragment: fragment.text or "") evaluated.config.system.activationScripts
+    );
+
+  darwinEval = evaluatedFor darwinPkgs;
+  linuxEval = evaluatedFor linuxPkgs;
+  darwinActivation = activationFor darwinEval;
+  linuxActivation = activationFor linuxEval;
 
   # Settings keys are flat and dotted, not nested.
   vscode = builtins.fromJSON (builtins.readFile ../../src/users/default/vscode/settings.json);
@@ -64,33 +86,38 @@ let
     linux = "/var/lib/nucleus";
   };
 
-  expectedWrapperPath = "${
-    documentedSystemRoots.${if isDarwin then "osx" else "linux"}
-  }/bin/agent-host-shell";
-  vscodeProfile = if isDarwin then agentProfiles.osx else agentProfiles.linux;
+  wrapperPathFor = platform: "${documentedSystemRoots.${platform}}/bin/agent-host-shell";
 
   test_option_is_declared = assert' (
-    evaluated.options ? nucleus.agentHostShell.enable
+    darwinEval.options ? nucleus.agentHostShell.enable
   ) "the module must declare options.nucleus.agentHostShell.enable";
 
   test_option_defaults_to_enabled = assert' (
-    evaluated.options.nucleus.agentHostShell.enable.default == true
+    darwinEval.options.nucleus.agentHostShell.enable.default == true
   ) "agentHostShell.enable must default to true, or no host ever gets a wrapper";
 
-  # Behavioral: the path is read out of the activation the host would really run,
-  # so a module that stops emitting it fails here rather than at apply time.
-  test_wrapper_path_is_in_the_activation = assert' (hasInfix expectedWrapperPath activationText) "the evaluated activation must reference the documented wrapper path ${expectedWrapperPath}";
+  # Behavioral: each path is read out of the activation that platform would
+  # really run, so a module that stops emitting it fails here rather than at
+  # apply time. Both branches are asserted on every host, so neither depends on
+  # the runner it happens to run on.
+  test_darwin_wrapper_path_is_in_the_activation = assert' (hasInfix (wrapperPathFor "osx") darwinActivation) "the darwin activation must reference the documented wrapper path ${wrapperPathFor "osx"}";
 
-  test_activation_invokes_the_writer = assert' (hasInfix "write-wrapper.sh" activationText) "the evaluated activation must invoke write-wrapper.sh";
+  test_linux_wrapper_path_is_in_the_activation = assert' (hasInfix (wrapperPathFor "linux") linuxActivation) "the linux activation must reference the documented wrapper path ${wrapperPathFor "linux"}";
+
+  test_activation_invokes_the_writer = assert' (
+    hasInfix "write-wrapper.sh" darwinActivation && hasInfix "write-wrapper.sh" linuxActivation
+  ) "both activations must invoke write-wrapper.sh";
 
   # A renamed or deleted script would otherwise only surface as a failed apply.
   test_writer_script_exists = assert' (builtins.pathExists ../../src/scripts/agent-host-shell/write-wrapper.sh) "src/scripts/agent-host-shell/write-wrapper.sh must exist for the activation to succeed";
 
-  test_wrapper_matches_vscode_profile =
-    assert' (vscodeProfile.path == expectedWrapperPath)
-      "VS Code's ${
-        if isDarwin then "osx" else "linux"
-      } agentHostProfile (${vscodeProfile.path}) must be the path the module installs (${expectedWrapperPath})";
+  test_darwin_wrapper_matches_vscode_profile =
+    assert' (agentProfiles.osx.path == wrapperPathFor "osx")
+      "VS Code's osx agentHostProfile (${agentProfiles.osx.path}) must be the path the darwin module installs (${wrapperPathFor "osx"})";
+
+  test_linux_wrapper_matches_vscode_profile =
+    assert' (agentProfiles.linux.path == wrapperPathFor "linux")
+      "VS Code's linux agentHostProfile (${agentProfiles.linux.path}) must be the path the linux module installs (${wrapperPathFor "linux"})";
 
   test_both_posix_profiles_match_system_roots = assert' (
     agentProfiles.osx.path == "${documentedSystemRoots.osx}/bin/agent-host-shell"
@@ -106,10 +133,12 @@ let
   allTests = [
     test_option_is_declared
     test_option_defaults_to_enabled
-    test_wrapper_path_is_in_the_activation
+    test_darwin_wrapper_path_is_in_the_activation
+    test_linux_wrapper_path_is_in_the_activation
     test_activation_invokes_the_writer
     test_writer_script_exists
-    test_wrapper_matches_vscode_profile
+    test_darwin_wrapper_matches_vscode_profile
+    test_linux_wrapper_matches_vscode_profile
     test_both_posix_profiles_match_system_roots
     test_windows_profile_is_present
   ];
