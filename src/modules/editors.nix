@@ -38,9 +38,8 @@ let
       builtins.trace "VS Code: ${pub}.${name} not in marketplace index — skipping" [ ];
 
   # Canonical extension set shared by both platforms, sorted alphabetically by
-  # publisher.name.  45 extensions come from nixpkgs; 22 come from the VS Code
-  # Marketplace via nix-vscode-extensions (via mkMktx).  A missing marketplace
-  # entry degrades gracefully to an empty contribution rather than failing eval.
+  # publisher.name.  A missing marketplace entry degrades gracefully to an empty
+  # contribution rather than failing eval.
   # On all platforms, symlink-vscode-extensions symlinks each extension into the
   # writable ~/.vscode/extensions and ~/.vscode-insiders/extensions directories
   # so both stable and insiders channels share an identical extension payload.

@@ -26,9 +26,9 @@ let
   # Category rules: cli → nixpkgs; gui → Homebrew (cask preferred) on macOS.
   #   On NixOS: all packages go to nixpkgs unconditionally.
   # If a package ships any GUI component (binary, UI, daemon), classify as "gui".
-  # REMOVED: pkgs.cargo conflicts with pkgs.rustup (both provide bin/cargo).
-  # Activation script install-cargo-binstall-packages gets pkgs.cargo as
-  # a store-path argument directly — no PATH dependency needed.
+  # pkgs.cargo must not be added to the shared set: it conflicts with
+  # pkgs.rustup, which provides the same bin/cargo. Activation script
+  # install-cargo-binstall-packages takes cargo as a store-path argument.
   managedPackages = {
     "7zip" = {
       category = "cli";
