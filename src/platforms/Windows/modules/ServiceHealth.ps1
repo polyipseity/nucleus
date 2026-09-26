@@ -283,7 +283,12 @@ function Health-RecordRestart {
     $json | ConvertTo-Json -Depth 4 | Set-Content -Path $tmp -NoNewline
     Move-Item -Path $tmp -Destination $file -Force
     if ($Reason) {
-        Write-Host "service-health: recorded restart for $Instance ($Reason)"
+        # WHY: Write-Output, not Write-Host — the only caller is the service-watchdog,
+        #   which runs as a captured daemon (services.json logging.capture: all), so its
+        #   stdout lands in a log file.  Write-Host goes to the information stream, which
+        #   the capture does not collect, and the verbose/information streams are hidden
+        #   under the default preference variables, so the restart record would be lost.
+        Write-Output "service-health: recorded restart for $Instance ($Reason)"
     }
 }
 
@@ -300,6 +305,7 @@ function Health-RecordSuccess {
 # Health-RestartCount — count restarts in the last hour.
 function Health-RestartCount {
     [CmdletBinding()]
+    [OutputType([int])]
     param([Parameter(Mandatory)][string]$Instance)
     $file = Health-StateFile -Instance $Instance
     if (-not (Test-Path $file)) { return 0 }
@@ -312,6 +318,7 @@ function Health-RestartCount {
 # Health-ConsecutiveFailures — count restarts newer than lastSuccess.
 function Health-ConsecutiveFailures {
     [CmdletBinding()]
+    [OutputType([int])]
     param([Parameter(Mandatory)][string]$Instance)
     $file = Health-StateFile -Instance $Instance
     if (-not (Test-Path $file)) { return 0 }
@@ -325,6 +332,7 @@ function Health-ConsecutiveFailures {
 # here rather than re-implementing the comparison.
 function Health-IsLooping {
     [CmdletBinding()]
+    [OutputType([bool])]
     param([Parameter(Mandatory)][string]$Instance)
     $count = Health-RestartCount -Instance $Instance
     $consecutive = Health-ConsecutiveFailures -Instance $Instance
@@ -334,6 +342,7 @@ function Health-IsLooping {
 # Health-Status — return status string.
 function Health-Status {
     [CmdletBinding()]
+    [OutputType([string])]
     param([Parameter(Mandatory)][string]$Instance)
     if (Health-IsLooping -Instance $Instance) {
         'LOOP'

@@ -316,7 +316,7 @@ function Test-ServiceInstance {
     # Rule 5: live but broken — repair in place so it is not counted as a restart.
     if ($lastExit -eq 78) {
       Write-NucleusNotice -CommandName 'service-watchdog' -Message "$Instance exited 78 (EX_CONFIG); repairing it"
-      $repairTimeout = Get-WatchdogLifecycleSeconds -Name 'watchdogRepairTimeoutSeconds' -Default 30
+      $repairTimeout = Get-WatchdogLifecycleDuration -Name 'watchdogRepairTimeoutSeconds' -Default 30
       $repairStatus = Invoke-BoundedRepair -Target $Target -TimeoutSeconds $repairTimeout
       if ($repairStatus -eq 124) {
         Write-NucleusWarning -CommandName 'service-watchdog' -Message "repair of $Instance timed out after ${repairTimeout}s"
@@ -335,7 +335,7 @@ function Test-ServiceInstance {
 }
 
 # ── Declared lifecycle timings ─────────────────────────────────────────────
-function Get-WatchdogLifecycleSeconds {
+function Get-WatchdogLifecycleDuration {
   <#
   .SYNOPSIS
     Reads one cloud-drive lifecycle timing from the service registry.
@@ -408,15 +408,22 @@ function Invoke-BoundedRepair {
   }
 
   # WHY -ArgumentList instead of $using:: the child re-dot-sources the adapter, so it
-  #   needs no value from this runspace and there is nothing for
-  #   PSUseUsingScopeModifierInNewRunspaces to flag.
+  #   needs no value from this runspace.
+  # WHY the block is hoisted into a variable: PSSA's PSUseUsingScopeModifierInNewRunspaces
+  #   reads an INLINE Start-Job ScriptBlock as if its own param() block declared nothing,
+  #   then demands the 'using:' modifier for the very parameters that block names.
+  #   -ArgumentList still binds them positionally exactly as before, so hoisting the
+  #   block changes nothing about the call and stops the rule misfiring on a correct
+  #   construct.  Verified against a minimal repro: inline form reports 4 findings, the
+  #   hoisted form reports none.
+  $repairBody = {
+    param($AdapterPath, $RepairTarget)
+    . $AdapterPath
+    Supervisor-Repair -Target $RepairTarget
+  }
   $job = $null
   try {
-    $job = Start-Job -ScriptBlock {
-      param($AdapterPath, $RepairTarget)
-      . $AdapterPath
-      Supervisor-Repair -Target $RepairTarget
-    } -ArgumentList (Join-Path $ModulesDir $adapter), $Target
+    $job = Start-Job -ScriptBlock $repairBody -ArgumentList (Join-Path $ModulesDir $adapter), $Target
   } catch {
     Write-NucleusWarning -CommandName 'service-watchdog' -Message "could not start a bounded repair for ${Target}: $($_.Exception.Message)"
     return 1
@@ -462,6 +469,6 @@ if ($Oneshot) {
 } else {
   while ($true) {
     Invoke-WatchdogIteration
-    Start-Sleep -Seconds (Get-WatchdogLifecycleSeconds -Name 'watchdogTickSeconds' -Default 300)
+    Start-Sleep -Seconds (Get-WatchdogLifecycleDuration -Name 'watchdogTickSeconds' -Default 300)
   }
 }

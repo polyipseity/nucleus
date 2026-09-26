@@ -61,7 +61,11 @@ Health-Init -Instance $instance
 # Backend prepare.
 $prepareRc = Mount-Backend-Prepare -Instance $instance
 if ($prepareRc -eq 20) {
-    Write-Host "$instance`: backend requires user action; see health record"
+    # WHY: Write-Output, not Write-Host — this script is the body of a scheduled task
+    #   whose stdout is captured to stdout.log, while the verbose and information streams
+    #   are hidden under the default preference variables, so those would silently drop
+    #   the operator's mount diagnostics.  Every Write-Host below follows this same rule.
+    Write-Output "$instance`: backend requires user action; see health record"
     exit 0
 }
 
@@ -69,11 +73,11 @@ if ($prepareRc -eq 20) {
 for ($attempt = 1; $attempt -le $attempts; $attempt++) {
     if (Health-IsBlocked -Instance $instance) {
         $class = Health-Get -Instance $instance -Field 'class'
-        Write-Host "$instance`: blocked (class=$class); not attempting"
+        Write-Output "$instance`: blocked (class=$class); not attempting"
         exit 0
     }
 
-    Write-Host "$instance`: mount attempt $attempt/$attempts"
+    Write-Output "$instance`: mount attempt $attempt/$attempts"
 
     # WHY: the instance id is folder-qualified (\NucleusCloudMount\NucleusCloudMount-iCloud),
     # so it cannot be used raw in a path — the embedded separators would nest this file
@@ -83,11 +87,11 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
     $captureFile = Join-Path $env:TEMP "rclone-capture-$(Get-HealthSafeInstanceName -Instance $instance)-$PID.txt"
 
     # Build mount args.
-    $mountArgs = Mount-Backend-Args -Remote $remote -MountPoint $mountPoint -ReadOnly $readOnly -ExtraArgs $rcloneArgs
+    $mountArgs = Mount-Backend-ArgumentList -Remote $remote -MountPoint $mountPoint -ReadOnly $readOnly -ExtraArgs $rcloneArgs
 
     # Start rclone mount through the backend's single mount entry point (POSIX delegates
     # the same way); it prepends the 'mount' subcommand itself.
-    $proc = Mount-Backend-Mount -RcloneBin $rcloneBin -Args $mountArgs -CaptureFile $captureFile
+    $proc = Mount-Backend-Mount -RcloneBin $rcloneBin -MountArgs $mountArgs -CaptureFile $captureFile
 
     # Wait for mount to appear.
     $live = $false
@@ -110,7 +114,7 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
 
         Health-SetLastExit -Instance $instance $exitCode
         Mount-Backend-Unmount -MountPoint $mountPoint
-        Write-Host "$instance`: mount exited with status $exitCode"
+        Write-Output "$instance`: mount exited with status $exitCode"
         exit $exitCode
     }
 
@@ -124,7 +128,7 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
         $proc.WaitForExit()
     }
 
-    Write-Host "$instance`: attempt $attempt failed (class=$class, $remedy)"
+    Write-Output "$instance`: attempt $attempt failed (class=$class, $remedy)"
 
     # Terminal class — stop immediately.
     if (-not (Mount-Backend-IsTransient -Class $class)) {
@@ -142,12 +146,12 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
         # identically in _cm_get_backoff; the two hosts must not diverge on this rule.
         $backoffIdx = [Math]::Min($attempt - 1, $backoffSchedule.Count - 1)
         $backoff = $backoffSchedule[$backoffIdx]
-        Write-Host "$instance`: retrying in ${backoff}s"
+        Write-Output "$instance`: retrying in ${backoff}s"
         Start-Sleep -Seconds $backoff
     }
 }
 
 # All attempts exhausted — blocked.
 Health-SetBlocked -Instance $instance -Class 'mount-failed' -Remedy (Mount-Backend-Remedy -Class 'mount-failed')
-Write-Host "$instance`: all $attempts attempts exhausted; blocked"
+Write-Output "$instance`: all $attempts attempts exhausted; blocked"
 exit 0

@@ -63,13 +63,70 @@ BeforeAll {
 
   # ScheduledTasks is a Windows-only module; the generator calls these before and after
   # writing the wrapper.  Stubs keep the wrapper write on the real code path.
-  function New-ScheduledTaskAction { [CmdletBinding()] param([string]$Execute, [string]$Argument) [pscustomobject]@{ Execute = $Execute } }
-  function New-ScheduledTaskTrigger { [CmdletBinding()] param([switch]$AtLogOn, [string]$User) [pscustomobject]@{ User = $User } }
-  function New-ScheduledTaskSettingsSet { [CmdletBinding()] param([switch]$AllowStartIfOnBatteries, [switch]$DontStopIfGoingOnBatteries, [switch]$StartWhenAvailable) [pscustomobject]@{} }
-  function New-ScheduledTaskPrincipal { [CmdletBinding()] param([string]$UserId, [string]$RunLevel) [pscustomobject]@{ UserId = $UserId } }
-  function Register-ScheduledTask { [CmdletBinding()] param([string]$TaskName, [string]$TaskPath, $Action, $Trigger, $Settings, $Principal, [switch]$Force) [pscustomobject]@{ TaskName = $TaskName } }
-  function Get-ScheduledTask { [CmdletBinding()] param([string]$TaskName, [string]$TaskPath) $null }
-  function Unregister-ScheduledTask { [CmdletBinding()] param([string]$TaskName, [switch]$Confirm) }
+  # WHY the suppressions below: these are test doubles, not cmdlets.  Each shadows a real
+  # ScheduledTasks cmdlet under its exact name — that name IS the shadowing mechanism, so it
+  # cannot be renamed away — and each returns a [pscustomobject] without touching system
+  # state.  Their parameters exist only so the stub signature matches how
+  # Sync-CloudDriveCatalog calls the real cmdlet, which PSScriptAnalyzer cannot see across
+  # the file boundary (the documented PSReviewUnusedParameter limitation).
+  function New-ScheduledTaskAction {
+    # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test double shadowing a real cmdlet; the New- name is required to shadow it and it changes no system state
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    # check-suppress:SuppressMessageAttribute: PSReviewUnusedParameter -- parameter mirrors the real cmdlet's signature; the cross-file call site is invisible to the rule
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '')]
+    [CmdletBinding()]
+    param([string]$Execute, [string]$Argument)
+    [pscustomobject]@{ Execute = $Execute }
+  }
+  function New-ScheduledTaskTrigger {
+    # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test double shadowing a real cmdlet; the New- name is required to shadow it and it changes no system state
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    # check-suppress:SuppressMessageAttribute: PSReviewUnusedParameter -- parameter mirrors the real cmdlet's signature; the cross-file call site is invisible to the rule
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '')]
+    [CmdletBinding()]
+    param([switch]$AtLogOn, [string]$User)
+    [pscustomobject]@{ User = $User }
+  }
+  function New-ScheduledTaskSettingsSet {
+    # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test double shadowing a real cmdlet; the New- name is required to shadow it and it changes no system state
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    # check-suppress:SuppressMessageAttribute: PSReviewUnusedParameter -- parameters mirror the real cmdlet's signature; the cross-file call site is invisible to the rule
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '')]
+    [CmdletBinding()]
+    param([switch]$AllowStartIfOnBatteries, [switch]$DontStopIfGoingOnBatteries, [switch]$StartWhenAvailable)
+    [pscustomobject]@{}
+  }
+  function New-ScheduledTaskPrincipal {
+    # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test double shadowing a real cmdlet; the New- name is required to shadow it and it changes no system state
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    # check-suppress:SuppressMessageAttribute: PSReviewUnusedParameter -- parameter mirrors the real cmdlet's signature; the cross-file call site is invisible to the rule
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '')]
+    [CmdletBinding()]
+    param([string]$UserId, [string]$RunLevel)
+    [pscustomobject]@{ UserId = $UserId }
+  }
+  function Register-ScheduledTask {
+    # check-suppress:SuppressMessageAttribute: PSReviewUnusedParameter -- parameters mirror the real cmdlet's signature; the cross-file call site is invisible to the rule
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '')]
+    [CmdletBinding()]
+    param([string]$TaskName, [string]$TaskPath, $Action, $Trigger, $Settings, $Principal, [switch]$Force)
+    [pscustomobject]@{ TaskName = $TaskName }
+  }
+  function Get-ScheduledTask {
+    # check-suppress:SuppressMessageAttribute: PSReviewUnusedParameter -- parameters mirror the real cmdlet's signature; the cross-file call site is invisible to the rule
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '')]
+    [CmdletBinding()]
+    param([string]$TaskName, [string]$TaskPath)
+    $null
+  }
+  function Unregister-ScheduledTask {
+    # check-suppress:SuppressMessageAttribute: PSUseSupportsShouldProcess -- the stub mirrors the real cmdlet's -Confirm surface so production call sites bind unchanged; SupportsShouldProcess would add ShouldProcess machinery a test double has no use for
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseSupportsShouldProcess', '')]
+    # check-suppress:SuppressMessageAttribute: PSReviewUnusedParameter -- parameters mirror the real cmdlet's signature; the cross-file call site is invisible to the rule
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '')]
+    [CmdletBinding()]
+    param([string]$TaskName, [switch]$Confirm)
+  }
 
   # One read-only and one read-write mount: the read-only branch is only observable
   # by comparison, so both directions are generated in the same run.

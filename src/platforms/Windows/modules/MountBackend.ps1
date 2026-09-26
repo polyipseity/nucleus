@@ -18,6 +18,7 @@ $Script:_BackendRclonePid = $null
 # Mount-Backend-Class — classify a failure from stderr capture.
 function Mount-Backend-Class {
     [CmdletBinding()]
+    [OutputType([string])]
     param([Parameter(Mandatory)][string]$CaptureFile)
 
     if (-not (Test-Path $CaptureFile)) { return 'mount-failed' }
@@ -45,6 +46,7 @@ function Mount-Backend-Class {
 # Mount-Backend-Remedy — return the remedy text for a class.
 function Mount-Backend-Remedy {
     [CmdletBinding()]
+    [OutputType([string])]
     param([Parameter(Mandatory)][string]$Class)
 
     switch ($Class) {
@@ -60,6 +62,7 @@ function Mount-Backend-Remedy {
 # Mount-Backend-IsTransient — return true if the class is transient (retryable).
 function Mount-Backend-IsTransient {
     [CmdletBinding()]
+    [OutputType([bool])]
     param([Parameter(Mandatory)][string]$Class)
     $Class -in @('provider-refusal', 'io-transient')
 }
@@ -67,6 +70,7 @@ function Mount-Backend-IsTransient {
 # Mount-Backend-Prepare — ensure WinFsp is installed and its launcher is running.
 function Mount-Backend-Prepare {
     [CmdletBinding()]
+    [OutputType([int])]
     param([Parameter(Mandatory)][string]$Instance)
 
     # Check WinFsp is installed.
@@ -93,9 +97,10 @@ function Mount-Backend-Prepare {
     return 0
 }
 
-# Mount-Backend-Args — emit Windows-specific rclone mount flags.
-function Mount-Backend-Args {
+# Mount-Backend-ArgumentList — emit Windows-specific rclone mount flags.
+function Mount-Backend-ArgumentList {
     [CmdletBinding()]
+    [OutputType([string[]])]
     param(
         [Parameter(Mandatory)][string]$Remote,
         [Parameter(Mandatory)][string]$MountPoint,
@@ -103,20 +108,22 @@ function Mount-Backend-Args {
         [string]$ExtraArgs = ''
     )
 
-    $args = @($Remote, $MountPoint,
+    # WHY: $rcloneFlags, not $args — $args is the automatic variable, and
+    #   reassigning it has undesired side effects.
+    $rcloneFlags = @($Remote, $MountPoint,
         '--vfs-cache-mode', 'full',
         '--vfs-cache-max-age', '1h',
         '--dir-cache-time', '5m',
         '--poll-interval', '1m',
         '--log-level', 'NOTICE')
 
-    if ($ReadOnly) { $args += '--read-only' }
+    if ($ReadOnly) { $rcloneFlags += '--read-only' }
 
     if ($ExtraArgs) {
-        $args += ($ExtraArgs -split '\s+' | Where-Object { $_ })
+        $rcloneFlags += ($ExtraArgs -split '\s+' | Where-Object { $_ })
     }
 
-    $args
+    $rcloneFlags
 }
 
 # Mount-Backend-Mount — invoke rclone with the resolved flags.
@@ -124,16 +131,17 @@ function Mount-Backend-Mount {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string]$RcloneBin,
-        [Parameter(Mandatory)][string[]]$Args,
+        # WHY: $MountArgs, not $Args — $args is the automatic variable.
+        [Parameter(Mandatory)][string[]]$MountArgs,
         [Parameter(Mandatory)][string]$CaptureFile
     )
 
     $Script:_BackendCapture = $CaptureFile
-    # WHY: the array must be FLAT.  `('mount', $Args)` uses the comma operator, which
-    #   nests $Args as a single element (System.Object[]), and Start-Process rejects it:
+    # WHY: the array must be FLAT.  `('mount', $MountArgs)` uses the comma operator, which
+    #   nests $MountArgs as a single element (System.Object[]), and Start-Process rejects it:
     #   "Cannot convert 'System.Object[]' to the type 'System.String' required by
     #   parameter 'ArgumentList'".  Concatenating keeps one flat string array.
-    $proc = Start-Process -FilePath $RcloneBin -ArgumentList (@('mount') + $Args) `
+    $proc = Start-Process -FilePath $RcloneBin -ArgumentList (@('mount') + $MountArgs) `
         -NoNewWindow -PassThru -RedirectStandardError $CaptureFile
     $Script:_BackendRclonePid = $proc.Id
     $proc
@@ -197,13 +205,18 @@ function Mount-Backend-Unmount {
 # Mount-Backend-Repair — restart WinFsp Launcher service.
 function Mount-Backend-Repair {
     [CmdletBinding()]
-    param([string]$MountPoint = '')
+    param()
 
     $svc = Get-Service -Name 'WinFsp.Launcher' -ErrorAction SilentlyContinue
     if ($svc) {
-        Write-Host "Restarting WinFsp.Launcher service..."
+        # WHY: Write-Output, not Write-Host — Write-Host goes to the information stream,
+        #   which a scheduled task's stdout/stderr redirection does not collect, and the
+        #   verbose/information streams are hidden under the default preference variables,
+        #   so the restart notice would be lost.  This function is currently unreferenced;
+        #   keep the output on the success stream if a caller is added.
+        Write-Output "Restarting WinFsp.Launcher service..."
         Restart-Service -Name 'WinFsp.Launcher' -Force -ErrorAction SilentlyContinue
-        Write-Host "WinFsp.Launcher service restarted."
+        Write-Output "WinFsp.Launcher service restarted."
     } else {
         Write-Warning "WinFsp.Launcher service not found."
     }
@@ -212,6 +225,7 @@ function Mount-Backend-Repair {
 # Mount-Backend-ProviderRefusal — whether the failure was a provider refusal.
 function Mount-Backend-ProviderRefusal {
     [CmdletBinding()]
+    [OutputType([bool])]
     param([Parameter(Mandatory)][string]$CaptureFile)
 
     if (-not (Test-Path $CaptureFile)) { return $false }

@@ -84,13 +84,13 @@ Describe 'Mount-Backend-Probe mount-state contract' {
 Describe 'Mount-Backend-Mount argument list' {
 
   It 'starts the process with a FLAT argument list instead of a nested one' {
-    # `('mount', $Args)` uses the comma operator and nests $Args as one element, which
+    # `('mount', $MountArgs)` uses the comma operator and nests the flags as one element, which
     # Start-Process rejects: "Cannot convert 'System.Object[]' to the type
     # 'System.String' required by parameter 'ArgumentList'".  Every mount attempt then
     # dies before rclone is ever started.
     $capture = Join-Path $script:Root 'capture.txt'
     $proc = Mount-Backend-Mount -RcloneBin (Get-Process -Id $PID).Path `
-      -Args @('-NoProfile', '-Command', 'exit 0') -CaptureFile $capture
+      -MountArgs @('-NoProfile', '-Command', 'exit 0') -CaptureFile $capture
     $proc | Should -Not -BeNullOrEmpty
     $null = $proc.WaitForExit(15000)
     $proc.HasExited | Should -BeTrue

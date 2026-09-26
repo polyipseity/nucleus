@@ -63,6 +63,8 @@ BeforeAll {
   }
 
   function New-CaseEnv {
+    # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- Pester helper that merges two hashtables; it mutates no system state and the New- verb reads as "make a case env"
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     param([hashtable]$Extra = @{})
     $env = @{}
     foreach ($k in $script:BaseEnv.Keys) { $env[$k] = $script:BaseEnv[$k] }
