@@ -104,5 +104,5 @@ fi
 
 # --- 5. Machine age key existence check (warning-only) ---
 if [ ! -f "/etc/sops/age/machine.txt" ]; then
-  warn -l secrets "/etc/sops/age/machine.txt missing; this machine cannot be a SOPS age device recipient until the host key is registered in .sops.yaml and deriveHostAgeKey has run successfully."
+  warn -l secrets "/etc/sops/age/machine.txt missing; this machine cannot be a SOPS age device recipient until the host key is registered in .sops.yaml and derive-host-age-key.sh has run successfully."
 fi

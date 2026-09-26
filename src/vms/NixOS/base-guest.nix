@@ -30,9 +30,9 @@
 # - src/hosts/NixOS/vms.nix — no hypervisor/nested VM support needed
 # - src/hosts/NixOS/hardware/* — qemu-guest.nix handles virtualized hardware
 # - src/hosts/NixOS/jellyfin.nix — singleton media server not guest-appropriate
-# - src/modules/posix/sops.nix — sops.* options need the sops-nix
-#   module, which nixos-generators does not load; the guest takes credentials
-#   from NUCLEUS_VM_GUEST_* environment variables instead of SOPS.
+# - src/modules/env/env-secrets-sops.nix — its sops.secrets declarations need
+#   the sops-nix module, which nixos-generators does not load; the guest takes
+#   credentials from NUCLEUS_VM_GUEST_* environment variables instead of SOPS.
 #
 # Source: https://github.com/nix-community/nixos-generators
 {
@@ -65,9 +65,9 @@
   # specialArgs, so thread generic placeholders here.  This is the TYPE build
   # (no per-VM identity): the per-VM delta src/vms/guests/<id>/guest.nix
   # overrides both with the real values from NUCLEUS_VM_GUEST_* environment
-  # variables via the same _module.args option.  The SOPS module
-  # (src/modules/posix/sops.nix) is deliberately NOT imported: it defines the
-  # sops.* options that only exist when sops-nix.nixosModules.sops is loaded,
+  # variables via the same _module.args option.  The SOPS declaration module
+  # (src/modules/env/env-secrets-sops.nix) is deliberately NOT imported: its
+  # sops.secrets options only exist when sops-nix.nixosModules.sops is loaded,
   # which nixos-generators does not do for standalone guest builds.  The
   # guest injects its credentials and hostname via NUCLEUS_VM_GUEST_*
   # environment variables instead of SOPS decryption.

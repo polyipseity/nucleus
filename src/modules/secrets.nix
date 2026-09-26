@@ -28,11 +28,13 @@ let
 in
 {
   # Machine age key derived from /etc/ssh/ssh_host_ed25519_key by
-  # deriveHostAgeKey in posix-sops.nix (root:nucleus-sops, mode 0640).
-  # with sshKeyPaths (0600 root:wheel). gnupgHome is intentionally absent:
+  # src/scripts/secrets/derive-host-age-key.sh, which writes it under the
+  # nucleus SYSTEM root and chowns it per its owner-spec argument
+  # (root:nucleus-sops 0640 on NixOS, the primary user 0600 on macOS).
+  # gnupgHome is intentionally absent:
   # sops-nix rejects setting both keyFile and gnupgHome simultaneously.
   # sshKeyPaths must be empty: the host private key is root-only; HM reads
-  # the derived identity from keyFile instead (same contract as posix-sops.nix).
+  # the derived identity from keyFile instead (same root-only-key constraint).
   sops.age = {
     keyFile =
       if pkgs.stdenv.hostPlatform.isDarwin then

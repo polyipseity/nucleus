@@ -3,7 +3,7 @@
 # registers it in .sops.yaml as a new recipient, then rewraps every
 # SOPS-encrypted file so the machine can decrypt them on first apply.
 # Must run before Nix activation (darwin-rebuild / nixos-rebuild) because
-# deriveHostAgeKey writes /etc/sops/age/machine.txt only during activation.
+# derive-host-age-key.sh writes the machine age key only during activation.
 
 set -euo pipefail
 
@@ -31,9 +31,11 @@ if [ -z "$_rak_repo_root" ]; then
 fi
 
 # Why before darwin-rebuild / nixos-rebuild:
-#   deriveHostAgeKey (posix-sops.nix) writes /etc/sops/age/machine.txt
-#   only after the system activation completes.  On the first apply the
-#   machine key must already be a .sops.yaml recipient before sops-nix
+#   derive-host-age-key.sh writes the machine age key (macOS
+#   /Library/Application Support/nucleus/sops/age/machine.txt, NixOS
+#   /var/lib/nucleus/sops/age/machine.txt) only after the system activation
+#   completes.  On the first apply the machine key must already be a
+#   .sops.yaml recipient before sops-nix
 #   attempts to decrypt secrets.  The SSH host public key is created by
 #   the OS at install time and is available before any Nix activation.
 #
