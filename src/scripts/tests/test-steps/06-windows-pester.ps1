@@ -41,7 +41,7 @@ param([Parameter(Mandatory)][string]$SuitePath)
 Import-Module Pester -MinimumVersion 5.0
 $result = Invoke-Pester -Path $SuitePath -PassThru -Output None
 
-Write-Output "nucleus-pester result total=$($result.TotalCount) failed=$($result.FailedCount)"
+Write-Output "nucleus-pester result total=$($result.TotalCount) failed=$($result.FailedCount) skipped=$($result.SkippedCount)"
 foreach ($failed in $result.Failed) {
   $name = @('ExpandedPath', 'ExpandedName', 'Name') |
     ForEach-Object { $failed.PSObject.Properties[$_].Value } |
@@ -84,8 +84,8 @@ exit 0
     $failures = [System.Collections.Generic.List[string]]::new()
     $noise = [System.Collections.Generic.List[string]]::new()
     foreach ($line in ($stdout.Result -split "`r?`n")) {
-      if ($line -match '^nucleus-pester result total=(\d+) failed=(\d+)$') {
-        $result = [pscustomobject]@{ Total = [int]$Matches[1]; Failed = [int]$Matches[2] }
+      if ($line -match '^nucleus-pester result total=(\d+) failed=(\d+) skipped=(\d+)$') {
+        $result = [pscustomobject]@{ Total = [int]$Matches[1]; Failed = [int]$Matches[2]; Skipped = [int]$Matches[3] }
       } elseif ($line -match '^nucleus-pester failed: (.*)$') {
         $failures.Add($Matches[1])
       } elseif ($line.Trim()) {
@@ -102,12 +102,24 @@ exit 0
     }
   }
 
+  # Declared expected skips, per suite. A skip that is not listed here fails the
+  # step. Per-suite rather than one repo-wide total, so a skip cannot be moved
+  # between suites to keep the count stable.
+  #
+  # WHY each entry is legitimate: Sync-AgentsSkillManifest resolves the managed
+  # skill symlink by its Windows target, which is not meaningful on a POSIX
+  # filesystem, so the case is platform-conditional rather than missing.
+  $expectedSkips = @{
+    'Sync-AgentsSkillManifest.Tests.ps1' = if ($IsWindows) { 0 } else { 1 }
+  }
+
   try {
     $childPwsh = Join-Path -Path $PSHOME -ChildPath 'pwsh'
     if ($IsWindows) { $childPwsh = Join-Path -Path $PSHOME -ChildPath 'pwsh.exe' }
 
     $totalTests = 0
     $totalFailed = 0
+    $totalSkipped = 0
     $failedSuites = [System.Collections.Generic.List[string]]::new()
     foreach ($testFile in $testFiles) {
       $suiteName = [System.IO.Path]::GetFileName($testFile)
@@ -124,6 +136,14 @@ exit 0
       }
 
       $totalTests += $outcome.Result.Total
+      $expected = if ($expectedSkips.ContainsKey($suiteName)) { $expectedSkips[$suiteName] } else { 0 }
+      $totalSkipped += $outcome.Result.Skipped
+      if ($outcome.Result.Skipped -ne $expected) {
+        $failedSuites.Add($suiteName)
+        Write-ErrorMessage "Pester: $suiteName skipped $($outcome.Result.Skipped) tests, expected $expected. Declare a legitimate skip in '`$expectedSkips' with a reason, or remove the -Skip."
+      } elseif ($outcome.Result.Skipped -gt 0) {
+        Write-Message "Pester: $suiteName skipped $($outcome.Result.Skipped) declared test(s)."
+      }
       if ($outcome.Result.Failed -gt 0) {
         $totalFailed += $outcome.Result.Failed
         $failedSuites.Add($suiteName)
@@ -136,7 +156,7 @@ exit 0
       Write-ErrorMessage "Pester: $totalFailed of $totalTests tests failed in $($failedSuites.Count) of $($testFiles.Count) suites."
       return $false
     }
-    Write-Message "Pester: all $totalTests tests passed in $($testFiles.Count) suites."
+    Write-Message "Pester: all $totalTests tests passed in $($testFiles.Count) suites ($totalSkipped declared skip(s))."
     return $true
   } finally {
     Remove-Item -LiteralPath $runnerPath -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: the temp runner is removed on every path; a leftover file after a transient lock must not replace the step's real verdict.
