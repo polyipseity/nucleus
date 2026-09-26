@@ -80,6 +80,7 @@ Categories A–D, dummy key rules below. New exclusions: category ID, tier, `# r
 | D1 | `05-lockfile-validation.ps1` | `lfOverlapExceptions`: `astral-sh.ty`, `Windows` | T2 | `astral-sh.ty`: legitimate overlap. `Windows`: host key in `suggestions.vm-setup`, not a package name; overlaps with `suggestions.ollama.Windows` | Error if stale |
 | D2 | `lifecycle-allowlist.json` | All entries | T2 | Supply-chain hardening | Error if stale (`check.sh`) |
 | D3 | `supply-chain-hardening.instructions.md` | Allowlist (cross-ref) | — | External | See that file |
+| D4 | `tests/modules/posix-module-imports-tests.nix` | `hostScopedModules`: `security.nix` | T2 | `security.sudo` is a NixOS-only option, so the macOS-shared `posix/` aggregator cannot carry `security.nix`; the NixOS host imports it directly from its entrypoint | Error if stale (`nix-tests`) |
 
 ## Dummy key management
 
