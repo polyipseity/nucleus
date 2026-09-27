@@ -31,6 +31,7 @@ _arguments \
   '--no-nix-gc[no nix gc]' \
   '--no-ollama-gc[no ollama gc]' \
   '--no-sccache-gc[no sccache gc]' \
+  '--no-scoop-gc[no scoop gc]' \
   '--no-system-gc[no system gc]' \
   '--no-tool-cache-gc[no tool cache gc]' \
   '--no-vm-data-gc[no vm data gc]' \
@@ -38,6 +39,7 @@ _arguments \
   '--no-wallpaper-gc[no wallpaper gc]' \
   '--ollama-gc[ollama gc]' \
   '--sccache-gc[sccache gc]' \
+  '--scoop-gc[scoop gc]' \
   '--system-gc[system gc]' \
   '--system-generations-keep[system generations keep]' \
   '--tool-cache-gc[tool cache gc]' \
