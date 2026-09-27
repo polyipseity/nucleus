@@ -7,6 +7,11 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
   $selfLeaf = if ($PSCommandPath) { Split-Path -Leaf $PSCommandPath } else { '13-repo-policy-data.ps1' }
+  # WHY defined here and not borrowed from step 12: each step body runs in its
+  #   own runspace, so a variable another step assigns is not in scope. Step 12
+  #   sets the same derivation for itself; the POSIX twin derives it from
+  #   BASH_SOURCE the same way.
+  $selfShLeaf = $selfLeaf -replace '\.ps1$', '.sh'
   # WHY: all repo-policy step files must be excluded from pattern scans to avoid self-referencing literal pattern text
   $allStepLeaves = @('11-repo-policy-grep.ps1', '12-repo-policy-pattern.ps1', '13-repo-policy-data.ps1')
   $failed = $false

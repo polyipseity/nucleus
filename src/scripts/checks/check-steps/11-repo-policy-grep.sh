@@ -57,6 +57,8 @@ run_store_path_arg_usage() {
 
   # Files excluded from this check: their _X_bin variables are used as config
   # parameters (not commands), so the check would produce false positives.
+  # The self-file basenames are A9; check.sh and configure-gpg-agent.sh are A13.
+  # ref: allow-and-deny-lists.instructions.md#A13 -- _*_bin values are config parameters, not commands
   local _exclude_pattern='(check\.sh|'"$_self_sh"'|'"$_self_ps1"'|configure-gpg-agent\.sh)$'
 
   if $_has_args; then
@@ -525,7 +527,7 @@ AWKEOF
   return 0
 }
 
-# ref: allow-and-deny-lists.instructions.md#A1
+# ref: allow-and-deny-lists.instructions.md#A12
 run_package_manager_enforcement() {
   local -n ctx="$1"
   shift
@@ -565,7 +567,7 @@ run_package_manager_enforcement() {
     local _f
     for _f in "${_grep_files[@]}"; do
       case "$(basename "$_f")" in
-      check.sh | check.ps1 | shell.nix | repo-policy-*.sh | repo-policy-*.ps1 | repository-policy*.sh | repository-policy*.ps1 | 11-repo-policy-grep.sh | 12-repo-policy-pattern.sh | 13-repo-policy-data.sh | 11-repo-policy-grep.ps1 | 12-repo-policy-pattern.ps1 | 13-repo-policy-data.ps1) continue ;;
+      repo-policy-*.sh | repo-policy-*.ps1 | repository-policy*.sh | repository-policy*.ps1 | 11-repo-policy-grep.sh | 12-repo-policy-pattern.sh | 13-repo-policy-data.sh | 11-repo-policy-grep.ps1 | 12-repo-policy-pattern.ps1 | 13-repo-policy-data.ps1) continue ;;
       esac
       _filtered+=("$_f")
     done
@@ -574,7 +576,7 @@ run_package_manager_enforcement() {
     mapfile -t _grep_files < <(
       find scripts/ src/ tests/ \( -name '*.sh' -o -name '*.ps1' -o -name '*.nix' \) -print |
         filter_gitignored |
-        grep -v -E '(check\.sh|check\.ps1|shell\.nix|repo-policy-.*\.(sh|ps1)|repository-policy.*\.(sh|ps1)|1[123]-repo-policy-.*\.sh)$'
+        grep -v -E '(repo-policy-.*\.(sh|ps1)|repository-policy.*\.(sh|ps1)|1[123]-repo-policy-.*\.sh)$'
     )
   fi
 
@@ -594,14 +596,6 @@ run_package_manager_enforcement() {
       _violations=$((_violations + 1))
     fi
   fi
-
-  # Self-pruning: verify excluded files still justify their exclusion (A1)
-  for _excluded in check.sh check.ps1 shell.nix; do
-    if [ -f "$_excluded" ] && ! grep -q -E '(pip install|npm install)' "$_excluded" 2>/dev/null; then
-      error "stale exclusion: '$_excluded' no longer contains pip/npm install patterns — remove from --exclude list"
-      _violations=$((_violations + 1))
-    fi
-  done
 
   if [ "$_violations" -gt 0 ]; then
     return 1

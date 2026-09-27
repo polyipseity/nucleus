@@ -16,7 +16,7 @@ Registry of all hard-coded filter lists. Every filter: category, justification, 
 
 ## Inline comment
 
-`# ref: <target> -- <just>` — e.g. `# ref: allow-and-deny-lists.instructions.md#A1 -- pip/npm in comments`. `--` separator, never em dash. No `reason:` keyword.
+`# ref: <target> -- <just>` — e.g. `# ref: allow-and-deny-lists.instructions.md#A12 -- pip/npm in comments`. `--` separator, never em dash. No `reason:` keyword.
 
 ## Gitignore-based denylist
 
@@ -41,7 +41,6 @@ Categories A–D, dummy key rules below. New exclusions: category ID, tier, `# r
 
 | ID | Files | Excluded | Tier | Reason | Verify |
 | --- | --- | --- | --- | --- | --- |
-| A1 | `11-repo-policy-grep.sh`, `.ps1` | `check.sh`, `check.ps1`, `shell.nix` (+ self-refs) | T2 | Contains `pip`/`npm` in comments/errors; self-refs dynamic | grep pip/npm present |
 | A2 | `12-repo-policy-pattern.sh`, `.ps1` | `.gitkeep`, `.gitignore`, `*.schema.json`, `agents/*` | T3 | Infrastructure, not configs | Quarterly |
 | A5 | `gc.sh`, `gc.ps1` | `index.lock` | T3 | Git invariant | Quarterly |
 | A6 | `test-lib.sh` | `lib.nix` | T2 | Test helper excluded from test namespace | File exists |
@@ -50,6 +49,8 @@ Categories A–D, dummy key rules below. New exclusions: category ID, tier, `# r
 | A9 | `11-repo-policy-grep.sh` | self-file (basename) | T3 | Self-ref contains literal patterns detected | Quarterly |
 | A10 | `11-repo-policy-grep.sh` | `android-fake-wifi-guest-setup.sh`, `android-fake-wifi-guest-revert.sh` | T3 | Android guest scripts run inside the guest, which has no Nix store and cannot accept a store-path arg or a PATH prepend, so the `ip`/`modprobe`/`rmmod` there cannot be resolved by the mechanism this check enforces. The whole file is excluded rather than the token, because there is no store in the guest to resolve against. | Quarterly |
 | A11 | `scripts/gc.sh` | `command -v` tool lookups | T3 | `scripts/` is outside the check's scanned `_activation_dirs`, so a lookup here is not a stored exclusion but a relocation. Recorded because the rule is still satisfied: `duperemove-store.sh` takes the binary as `$_duperemove_bin="$1"` and invokes `"$_duperemove_bin"`, which is the `_X_bin="$1"` contract. The real constraint is narrower than "NixOS-only": the derivation carrying `runtimeInputs` is `gcWeekly` in `src/modules/gc-activations.nix`, shared by `posix/base.nix` and `hosts/NixOS/activation.nix`, so a NixOS-only package cannot be added without splitting the wrapper. `duperemove`, `cargo-cache`, `ollama`, `jq` and `journalctl` are all resolved this way. | Quarterly |
+| A12 | `11-repo-policy-grep.sh` | patterns `repo-policy-.*\.(sh\|ps1)`, `repository-policy.*\.(sh\|ps1)`, `1[123]-repo-policy-.*\.sh` (stored list, not filenames) | T3 | The package-manager scan bans bare `pip`/`npm` install, and the step files carry that literal in their own detection patterns and error strings. The patterns are a superset of the files that exist: the first matches nothing, the second matches `repository-policy-awk-tests.sh`, and the third matches the six step files plus their tests. Excluded by basename and glob from the whole-repo branch; `$pmeExcludeNames` in the twin | Quarterly |
+| A13 | `11-repo-policy-grep.sh` | `check.sh`, `configure-gpg-agent.sh` | T3 | Part of the store-path-arg resolution `_exclude_pattern` in `run_store_path_arg_usage`: their `_*_bin` variables are configuration parameters rather than commands, so the scan would report false positives. The self-file basenames in the same pattern are A9. The android guest scripts are excluded by a separate list in `run_activation_tool_resolution` and recorded as A10; `src/scripts/secrets/` is in `_activation_dirs`, so that function's filter does not exclude `configure-gpg-agent.sh` | Quarterly |
 
 ### Category B — Directory-based
 
@@ -92,4 +93,4 @@ Registry: `src/modules/dummy-keys.json` (validated against `src/modules/dummy-ke
 
 - **Quarterly**: audit T3 — files exist, patterns justified, no new hard-coded excludes.
 - **Shared-content**: per `embedded-content.instructions.md` § Shared cross-platform content.
-- **Trigger**: check step added/removed/renumbered. **Last reviewed**: 2026-08-13.
+- **Trigger**: check step added/removed/renumbered. **Last reviewed**: 2026-09-27.

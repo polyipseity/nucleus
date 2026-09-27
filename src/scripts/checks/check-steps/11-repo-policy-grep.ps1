@@ -14,7 +14,7 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   # --- Package manager enforcement ---
   Write-Message "--- package manager enforcement ---"
   $pmeViolations = 0
-  $pmeExcludeNames = @('check.sh', 'check.ps1', 'shell.nix') + $allStepLeaves + $allStepShLeaves
+  $pmeExcludeNames = @() + $allStepLeaves + $allStepShLeaves
 
   if ($HasArgs) {
     $pmeHasShell = @($PositionalArgs | Where-Object { $_ -match '\.(sh|ps1|nix)$' }).Count -gt 0
@@ -38,7 +38,6 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
     $pmeGrepFiles = @(
       Get-ChildItem -Recurse -Path (Join-Path $r 'scripts'), (Join-Path $r 'src'), (Join-Path $r 'tests') `
         -Include *.sh, *.ps1, *.nix `
-        -Exclude check.sh, check.ps1, shell.nix `
         | Where-Object { $pmeExcludeNames -notcontains $_.Name } `
         | ForEach-Object { $_.FullName }
     )
@@ -49,15 +48,6 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
 
       $npmV = Select-String -Path $pmeGrepFiles -Pattern '(^|[^a-z])npm install([^-]|$)'
       if ($npmV) { Write-ErrorMessage 'bare npm install detected (use bun or nix instead)'; $pmeViolations++ }
-    }
-  }
-
-  # Self-pruning: verify excluded files still justify their exclusion (A1)
-  foreach ($ef in @('check.sh', 'check.ps1', 'shell.nix')) {
-    $efPath = Join-Path $r $ef
-    if ((Test-Path $efPath) -and -not (Select-String -LiteralPath $efPath -Pattern '(pip install|npm install)' -Quiet)) {
-      Write-ErrorMessage "stale exclusion: '$ef' no longer contains pip/npm install patterns — remove from -Exclude list"
-      $pmeViolations++
     }
   }
 
@@ -330,7 +320,11 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   }
   $ssAllowedConsumers = @('src/scripts/lib/service-health.sh', 'src/scripts/services/service-watchdog.sh')
   foreach ($ssConsumerPath in @($ssConsumerPaths | Sort-Object -Unique)) {
-    $ssConsumerRelative = $ssConsumerPath.Substring($r.Length).TrimStart('/', '\')
+    # WHY forward-slash normalization: -notcontains is string equality, so a
+    #   backslash-separated path from Get-ChildItem can never equal a
+    #   forward-slash allowlist entry and every allowed file is reported. The
+    #   POSIX twin's `case` never had this because grep already emits `/`.
+    $ssConsumerRelative = ($ssConsumerPath.Substring($r.Length).TrimStart([char[]]"\/")) -replace '\\', '/'
     if ($ssAllowedConsumers -notcontains $ssConsumerRelative) {
       Write-ErrorMessage "$ssConsumerRelative calls svc_health_is_looping; the watchdog is the only loop-policy consumer"
       $ssViolations++
