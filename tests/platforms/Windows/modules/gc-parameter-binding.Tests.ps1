@@ -57,7 +57,9 @@ BeforeAll {
             [AllowEmptyString()]
             [string]$ParamText,
 
-            [hashtable]$Environment = @{}
+            [hashtable]$Environment = @{},
+
+            [string[]]$Arguments = @()
         )
         $parts = $Script:SwitchMap | ForEach-Object { '{0}=${1}' -f $_.Switch, $_.Switch }
         # WHY: the stub interpolates its own variables, so the reporting line is
@@ -76,6 +78,9 @@ BeforeAll {
         $startInfo.ArgumentList.Add('-NoProfile')
         $startInfo.ArgumentList.Add('-File')
         $startInfo.ArgumentList.Add($stubPath)
+        foreach ($argument in $Arguments) {
+            $startInfo.ArgumentList.Add($argument)
+        }
         foreach ($key in $Environment.Keys) {
             $startInfo.Environment[$key] = [string]$Environment[$key]
         }
@@ -106,36 +111,44 @@ BeforeAll {
 }
 
 Describe 'nucleus-gc parameter block' {
-    It 'binds every no-* switch to the true value of its environment variable' {
-        $env = @{}
-        foreach ($entry in $Script:SwitchMap) { $env[$entry.Variable] = 'true' }
-
-        $result = Invoke-ParamBlockStub -ParamText (Get-GcParamBlock) -Environment $env
-        $result.ExitCode | Should -Be 0 -Because "the block must bind; stderr was: $($result.Stderr)"
-
-        $state = ConvertTo-SwitchState -Stdout $result.Stdout
-        foreach ($entry in $Script:SwitchMap) {
-            $state[$entry.Switch] | Should -BeTrue -Because "$($entry.Variable) was set to true"
-        }
-    }
-
-    It 'binds every no-* switch false when its environment variable is unset' {
+    It 'binds every no-* switch false when it is not passed on the command line' {
         $result = Invoke-ParamBlockStub -ParamText (Get-GcParamBlock)
         $result.ExitCode | Should -Be 0 -Because "the block must bind; stderr was: $($result.Stderr)"
 
         $state = ConvertTo-SwitchState -Stdout $result.Stdout
         foreach ($entry in $Script:SwitchMap) {
             $state.ContainsKey($entry.Switch) | Should -BeTrue -Because "the stub must report $($entry.Switch)"
-            $state[$entry.Switch] | Should -BeFalse -Because "$($entry.Variable) was not set"
+            $state[$entry.Switch] | Should -BeFalse -Because "no argument was passed for it"
         }
     }
 
-    It 'binds a switch false when its environment variable is set to anything other than true' {
-        $result = Invoke-ParamBlockStub -ParamText (Get-GcParamBlock) -Environment @{ NUCLEUS_GC_NO_NIX = 'false' }
+    It 'binds only the named no-* switch when one is passed on the command line' {
+        $result = Invoke-ParamBlockStub -ParamText (Get-GcParamBlock) -Arguments @('-NoOllamaGc')
         $result.ExitCode | Should -Be 0 -Because "the block must bind; stderr was: $($result.Stderr)"
 
         $state = ConvertTo-SwitchState -Stdout $result.Stdout
-        $state['NoNixGc'] | Should -BeFalse -Because "only the exact string true enables the switch"
-        $state['NoHmGc'] | Should -BeFalse -Because "only the named variable was set"
+        $state['NoOllamaGc'] | Should -BeTrue -Because '-NoOllamaGc was passed'
+        foreach ($entry in $Script:SwitchMap) {
+            if ($entry.Switch -ne 'NoOllamaGc') {
+                $state[$entry.Switch] | Should -BeFalse -Because "only -NoOllamaGc was passed"
+            }
+        }
+    }
+
+    # WHY: the eleven NUCLEUS_GC_NO_* variables were removed because nothing on any
+    # host set them, so a switch could never be enabled except by hand. This pins
+    # that the environment no longer reaches them, so the defaults cannot creep back.
+    It 'ignores NUCLEUS_GC_NO_* entirely, so the switches are command-line only' {
+        $env = @{}
+        foreach ($entry in $Script:SwitchMap) { $env[$entry.Variable] = 'true' }
+        $env['NUCLEUS_GC_NO_NIX'] = 'true'
+
+        $result = Invoke-ParamBlockStub -ParamText (Get-GcParamBlock) -Environment $env
+        $result.ExitCode | Should -Be 0 -Because "the block must bind; stderr was: $($result.Stderr)"
+
+        $state = ConvertTo-SwitchState -Stdout $result.Stdout
+        foreach ($entry in $Script:SwitchMap) {
+            $state[$entry.Switch] | Should -BeFalse -Because "$($entry.Variable) must not reach the switch"
+        }
     }
 }
