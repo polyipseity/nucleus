@@ -128,7 +128,7 @@ function Test-AiManifestPathTracked {
   # @() on both operands: PowerShell unrolls a one-element array on return, and
   # string + array concatenates rather than joining, which would fuse every
   # path into one bogus path instead of reporting each one.
-  $candidates = Get-NormalizedSet -Paths (@(Get-AiShManifestList) + @(Get-AiPs1ManifestList))
+  $candidates = @(Get-NormalizedSet -Paths (@(Get-AiShManifestList) + @(Get-AiPs1ManifestList)))
   # An empty set would pass vacuously through a loop that never runs, so the
   # empty case is a failure of this assertion rather than of nothing.
   if ($candidates.Count -eq 0) {
@@ -145,12 +145,18 @@ function Test-AiManifestPathParity {
     Assert-Fail -Name 'ai twins declare the same manifest paths' -Reason 'extraction failed on at least one twin'
     return
   }
-  $shSet = (Get-NormalizedSet -Paths $shPaths) -join ' '
-  $ps1Set = (Get-NormalizedSet -Paths $ps1Paths) -join ' '
-  if ($shSet -eq $ps1Set) {
-    Assert-Pass -Name "ai twins declare the same manifest paths ($ps1Set)"
+  # Compare the newline-joined form, not the space-joined one: a two-path set
+  # and a single path containing a space would flatten to the same string, so a
+  # space-joined compare can pass for two different declarations. The
+  # space-joined form is for the message only, matching the sh twin.
+  $shNorm = @(Get-NormalizedSet -Paths $shPaths)
+  $ps1Norm = @(Get-NormalizedSet -Paths $ps1Paths)
+  $shFlat = $shNorm -join ' '
+  $ps1Flat = $ps1Norm -join ' '
+  if (($shNorm -join "`n") -eq ($ps1Norm -join "`n")) {
+    Assert-Pass -Name "ai twins declare the same manifest paths ($ps1Flat)"
   } else {
-    Assert-Fail -Name 'ai twins declare the same manifest paths' -Reason "ai.sh=[$shSet] ai.ps1=[$ps1Set]"
+    Assert-Fail -Name 'ai twins declare the same manifest paths' -Reason "ai.sh=[$shFlat] ai.ps1=[$ps1Flat]"
   }
 }
 
