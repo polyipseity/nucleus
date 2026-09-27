@@ -78,6 +78,15 @@
 .PARAMETER NoVMGc
   Skip stale VM artifact removal (default: $false).
 
+.PARAMETER NoSystemGc
+  Skip system GC (default: $false). Accepted but ignored on Windows (POSIX-only).
+
+.PARAMETER NoNixArtifactsGc
+  Skip stale nix build-artifact symlink removal (default: $false). Accepted but ignored on Windows (POSIX-only).
+
+.PARAMETER NoDuperemoveGc
+  Skip duperemove store deduplication (default: $false). Accepted but ignored on Windows (POSIX-only).
+
 .PARAMETER Expiry
   Master expiry override for both HM and Nix GC durations (e.g. "14d", "30d") (default: "7d"). Accepted but ignored on Windows (POSIX-only).
 
@@ -112,6 +121,9 @@ param(
   [switch]$NoVMGc,
   [switch]$NoLogGc,
   [switch]$NoJournaldGc,
+  [switch]$NoSystemGc,
+  [switch]$NoNixArtifactsGc,
+  [switch]$NoDuperemoveGc,
   [string]$LogMaxSize = $(if ($env:NUCLEUS_GC_LOG_MAX_SIZE) { $env:NUCLEUS_GC_LOG_MAX_SIZE } else { '' }),
   [string]$LogMaxFiles = $(if ($env:NUCLEUS_GC_LOG_MAX_FILES) { $env:NUCLEUS_GC_LOG_MAX_FILES } else { '' }),
   [string]$LogCompress = $(if ($env:NUCLEUS_GC_LOG_COMPRESS) { $env:NUCLEUS_GC_LOG_COMPRESS } else { '' }),
@@ -154,8 +166,10 @@ if ([string]::IsNullOrWhiteSpace($ModuleDir)) {
   $ModuleDir = Join-Path $RepoRoot 'src\platforms\Windows\modules'
 }
 
-# -NoNixGc, -NoHmGc, and -NoJournaldGc are accepted but ignored on Windows
-# (POSIX-only options from gc.sh). Accepted for cross-platform CLI parity.
+# -NoNixGc, -NoHmGc, -NoJournaldGc, -NoSystemGc, -NoNixArtifactsGc, and
+# -NoDuperemoveGc are accepted but ignored on Windows: nix, system GC, nix
+# artifacts and duperemove have no Windows form. Accepted for cross-platform CLI
+# parity with gc.sh, which carries the same flags.
 if ($NoNixGc) {
   Write-NucleusWarning "-NoNixGc accepted but ignored on Windows (POSIX-only)"
 }
@@ -164,6 +178,18 @@ if ($NoHmGc) {
 }
 if ($NoJournaldGc) {
   Write-NucleusWarning "-NoJournaldGc accepted but ignored on Windows (POSIX-only)"
+}
+
+if ($NoSystemGc) {
+  Write-NucleusWarning "-NoSystemGc accepted but ignored on Windows (POSIX-only)"
+}
+
+if ($NoNixArtifactsGc) {
+  Write-NucleusWarning "-NoNixArtifactsGc accepted but ignored on Windows (POSIX-only)"
+}
+
+if ($NoDuperemoveGc) {
+  Write-NucleusWarning "-NoDuperemoveGc accepted but ignored on Windows (POSIX-only)"
 }
 
 # -Expiry, -HmExpiry, -NixExpiry are accepted but ignored on Windows

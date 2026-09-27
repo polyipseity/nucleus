@@ -48,6 +48,7 @@ usage() {
   --vm-data-gc|--no-vm-data-gc        Also GC data/ writable disks during VM gc (default: --no-vm-data-gc).
   --log-gc|--no-log-gc                Control log rotation (default: --log-gc).
   --journald-gc|--no-journald-gc        Control journald log vacuum (default: --journald-gc).
+  --scoop-gc|--no-scoop-gc            Control Scoop cache clearing (default: --scoop-gc; ignored on POSIX, Scoop is Windows-only).
   --log-max-size <bytes>              Log rotation max file size before rotation (default: 10000000).
   --log-max-files <count>             Number of rotated archives to keep (default: 4).
   --log-compress <true|false>         Compress rotated logs (default: true).
@@ -75,6 +76,7 @@ sccache_gc=true
 wallpaper_gc=true
 vm_gc=true
 vm_data_gc=false
+scoop_gc=true
 log_gc=true
 journald_gc=true
 dry_run=false
@@ -171,6 +173,12 @@ while [ "$#" -gt 0 ]; do
     ;;
   --journald-gc)
     journald_gc=true
+    ;;
+  --scoop-gc)
+    scoop_gc=true
+    ;;
+  --no-scoop-gc)
+    scoop_gc=false
     ;;
   --no-journald-gc)
     journald_gc=false
@@ -793,6 +801,13 @@ if [ "$journald_gc" = true ]; then
   else
     gc_journald_if_available
   fi
+fi
+
+# WHY: Scoop exists only on Windows, so gc.ps1 owns the cache clearing and this
+# flag exists for command-line parity. It is reported rather than ignored silently,
+# because a user carrying a flag set across hosts should learn it did nothing here.
+if [ "$scoop_gc" = false ]; then
+  warn "--no-scoop-gc accepted but ignored on POSIX (Scoop is Windows-only)"
 fi
 
 nuc_done "$@"
