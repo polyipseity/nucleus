@@ -6,7 +6,7 @@
 # catalog on the consumer "litellm"; Get-LiteLLMKeySpec.ps1 is the Windows half
 # of that same filter. Every entry in the shipped catalog is a litellm
 # consumer, so a test that only reads the real catalog cannot tell a working
-# filter from a missing one -- both return all 9. The mixed-consumer fixture
+# filter from a missing one -- both return every entry. The mixed-consumer fixture
 # below is what makes the predicate observable.
 set -euo pipefail
 
