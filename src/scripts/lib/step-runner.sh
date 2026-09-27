@@ -268,7 +268,6 @@ _run_step() {
   printf '\n=== [%s] %s ===\n' "$_n" "$_name" >"$_wave_tmpdir/step-$_n.out"
   printf '%s' "$_name" >"$_wave_tmpdir/step-$_n.name"
 
-  # Check if this step should be verbose
   local _is_verbose=false
   if [ "${#VERBOSE_IDS[@]}" -gt 0 ]; then
     for _vid in "${VERBOSE_IDS[@]}"; do
@@ -314,10 +313,7 @@ _run_step() {
 # --- Step applicability ---
 # ref: step-runner.instructions.md -- declared applicability replaces step-level skipping.
 # The runner decides, from registration-time declarations, whether a step runs; a
-# step file never probes its own prerequisites or reports a skip sentinel. Sample
-# output: `=== [19] Method-1 symlinks resolve to live repo root === not applicable
-# (requires: deployed-host)`.
-
+# step file never probes its own prerequisites or reports a skip sentinel.
 # _step_platform_applicable <platform> -- true when the declared platform matches
 # this host. This runner only executes on POSIX hosts, so `posix` and `any` apply
 # and `windows` does not.

@@ -178,7 +178,6 @@ run_activation_tool_resolution() {
   cd "$_repo_root" || return 1
   local _violations=0
 
-  # Only shell scripts apply to this check.
   if $_has_args; then
     local _f _has_sh_files=0
     for _f in "${_files[@]}"; do
@@ -203,7 +202,6 @@ run_activation_tool_resolution() {
     src/scripts/completions
   )
 
-  # Collect candidate files: only activation-script directories.
   # ref: comment-annotations.instructions.md#C1 -- self-derived basename for self-exclusion
   # The android guest scripts are excluded as a class: they execute inside the
   # guest, which has no Nix store, so `ip` there cannot be given a store-path arg
@@ -527,7 +525,6 @@ AWKEOF
   return 0
 }
 
-# Package manager usage enforcement: ban bare `pip install` and `npm install`.
 # ref: allow-and-deny-lists.instructions.md#A1
 run_package_manager_enforcement() {
   local -n ctx="$1"
@@ -553,7 +550,6 @@ run_package_manager_enforcement() {
     fi
   fi
 
-  # Ban bare `pip install` and `npm install`.
   local _grep_files=()
   # shellcheck disable=SC2178 # reason: nameref to context array — shellcheck sees string assignment but the ref resolves to an array
   local -n _sh_files="${ctx[SH_FILES]}"
@@ -627,7 +623,6 @@ run_suppression_audit() {
     _errors=$((_errors + 1))
   }
 
-  # Collect script files
   local _files=()
   # shellcheck disable=SC2178 # reason: nameref to context array
   local -n _sh_files="${ctx[SH_FILES]}"
