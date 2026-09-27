@@ -408,7 +408,6 @@ case_depth > 0 { next }
       cmd == "fi" || cmd == "done" || cmd == "then" || cmd == "else" || cmd == "do") next
 
   if (cmd !~ /^[a-z_][a-z0-9_-]*$/) next
-  if (length(cmd) < 3) next
 
   if (cmd in allow) next
   if (cmd in path_provided) next
@@ -422,6 +421,17 @@ AWKEOF
 
   local _awk_violations
   _awk_violations=$(
+    # WHY: one awk invocation sees every candidate file, but the program's
+    # in_heredoc/case_depth state is initialised in BEGIN and never reset per
+    # file. Rule 319 also does `next`, so a one-line `case ... esac` increments
+    # case_depth without its esac ever being seen by rule 320. services/
+    # camilladsp-deviceselect.sh:272-273 and configs/provision-wallpaper.sh:180,
+    # 208,267 are balanced in shell but not to this parser, so case_depth stays
+    # positive from there on and rule 321 skips every later line. This
+    # sub-check therefore reports 0 violations end-to-end while the tree has
+    # real ones. Do not read a green result here as evidence. Fixing it needs a
+    # per-file reset AND routing embedded awk/jq programs out of the command
+    # scan, or merge-picard-ini.sh alone turns this step red.
     # shellcheck disable=SC2046 # reason: printf safely expands the array
     printf '%s\0' "${_candidate_files[@]}" |
       xargs -0 awk -v LIB_FUNCS_FILE="$_lib_funcs_file" "$_awk_program" 2>/dev/null
