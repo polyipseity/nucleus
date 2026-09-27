@@ -1,7 +1,7 @@
 ---
 description: "Use when adding, updating, or reviewing AI model selections in src/modules/configs/ollama/models.json, VS Code chatLanguageModels host files, scripts/ai.sh, or src/platforms/Windows/modules/system/Invoke-AISync.ps1."
 name: "AI Model Selection"
-applyTo: "src/modules/ai.nix, src/modules/configs/ollama/**, src/modules/configs/litellm/**, src/users/*/vscode/chatLanguageModels.*.json, src/hosts/*/ai.nix, src/platforms/Windows/modules/system/Invoke-AISync.ps1, src/platforms/Windows/modules/system/Sync-LiteLLMService.ps1"
+applyTo: "scripts/ai.sh, src/modules/ai.nix, src/modules/configs/ollama/**, src/modules/configs/litellm/**, src/users/*/vscode/chatLanguageModels.*.json, src/hosts/*/ai.nix, src/platforms/Windows/modules/system/Invoke-AISync.ps1, src/platforms/Windows/modules/system/Sync-LiteLLMService.ps1"
 ---
 
 # AI Model Selection

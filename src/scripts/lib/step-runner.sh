@@ -426,7 +426,7 @@ parse_args() {
       shift
       ;;
     --online)
-      # shellcheck disable=SC2034 # reason: consumed by check step 13 (online-determinism) via transitive sourcing
+      # shellcheck disable=SC2034 # reason: consumed by this file's own network prerequisite branch (_step_mode_applicable); no check step declares requires network today, so nothing else reads it via transitive sourcing
       ONLINE=true
       shift
       ;;
@@ -522,13 +522,13 @@ parse_args() {
 
 # --- File caching ---
 cache_file_lists() {
-  # shellcheck disable=SC2034 # reason: consumed by step files (04, 11) via transitive sourcing
+  # shellcheck disable=SC2034 # reason: consumed by step files 03 and 11 via transitive sourcing
   readarray -t CACHED_NIX_FILES < <(
     find . -path ./vendor -prune -false -o -name '*.nix' -print |
       filter_gitignored |
       sort
   ) # ref: allow-and-deny-lists.instructions.md#B7 -- structural invariant; gitignore filter applied on top
-  # shellcheck disable=SC2034 # reason: consumed by step files (07, 09) via transitive sourcing
+  # shellcheck disable=SC2034 # reason: consumed by step file 07 via transitive sourcing
   readarray -t CACHED_YAML_FILES < <(
     find . -not -path '*/vendor/*' \( -name '*.yml' -o -name '*.yaml' \) -print |
       filter_gitignored |
