@@ -1,7 +1,7 @@
 ---
 description: "Use when authoring or editing WinGet DSC configuration files under src/hosts/Windows/. Covers DSC v3 YAML structure, resource ordering, sorting, and safe authoring patterns for this repository."
 name: "WinGet DSC Authoring"
-applyTo: "src/hosts/Windows/**/*.yml"
+applyTo: "src/hosts/Windows/**/*.yml, src/hosts/Windows/**/*.json"
 ---
 
 # WinGet DSC Authoring
