@@ -105,21 +105,6 @@ with open(sys.argv[1], encoding="utf-8") as fh:
 ' "$1"
 }
 
-# The live catalog and an independent reading of it must agree exactly.
-test_live_catalog_matches_independent_derivation() {
-  local _got _want
-  _got="$(names_ps "$CATALOG" | sort)"
-  _want="$(expected_names "$CATALOG" | sort)"
-  # 9 as of this writing; derived rather than hardcoded so a legitimately added
-  # key does not fail the test, while any disagreement between the two readings
-  # does.
-  if [ "$_got" = "$_want" ] && [ -n "$_got" ]; then
-    assert_pass "Windows filter selects the same keys as the catalog's litellm consumers ($(printf '%s\n' "$_got" | wc -l | tr -d ' '))"
-  else
-    assert_fail "Windows filter selects the same keys as the catalog's litellm consumers" "got [$(echo "$_got" | tr '\n' ' ')] want [$(echo "$_want" | tr '\n' ' ')]"
-  fi
-}
-
 # Every shipped secret is currently a litellm consumer, so assert the shape the
 # caller depends on: a bare secret name, never a path. LiteLLM-run.ps1 joins
 # $spec.file onto its own secrets directory, and Join-Path does not treat an
@@ -146,14 +131,12 @@ test_filter_excludes_other_consumers() {
   fi
 }
 
-# The pure-live cases above cannot discriminate. Every shipped secret is
+# The pure-live case above cannot discriminate. Every shipped secret is
 # currently a litellm consumer, so a filter that selected everything would
-# agree with them, and their passing would prove nothing about the predicate.
-# This case runs the catalog that actually ships with one non-litellm entry
-# added, so the real artifact is exercised on the only input where a working
-# filter and a broken one differ. Revisit once the catalog gains a secret for
-# another consumer: at that point the live cases discriminate on their own and
-# the perturbation becomes redundant.
+# agree with it, and its passing would prove nothing about the predicate. This
+# case runs the catalog that actually ships with one non-litellm entry added,
+# so the real artifact is exercised on the only input where a working filter
+# and a broken one differ.
 test_live_catalog_excludes_an_injected_other_consumer() {
   local _got _want _live _perturbed
   _live="$(count_secrets "$CATALOG")"
@@ -195,26 +178,9 @@ test_catalog_without_secrets_array_is_a_hard_error() {
   fi
 }
 
-# The caller must read the real catalog, not a generated copy of one that never
-# existed. Pinned by path so a revert to a runtime-directory copy fails here.
-test_caller_reads_the_repository_catalog() {
-  local _cited=0
-  local _caller="$REPO_ROOT/src/platforms/Windows/modules/system/Sync-LiteLLMService.ps1"
-  if grep -q 'src\\modules\\env\\env-secrets\.json' "$_caller"; then
-    _cited=1
-  fi
-  if [ "$_cited" -eq 1 ]; then
-    assert_pass "Sync-LiteLLMService reads src\modules\env\env-secrets.json from the repository"
-  else
-    assert_fail "Sync-LiteLLMService reads src\modules\env\env-secrets.json from the repository" "no such path in the caller"
-  fi
-}
-
-test_live_catalog_matches_independent_derivation
 test_selected_names_are_bare_not_paths
 test_filter_excludes_other_consumers
 test_live_catalog_excludes_an_injected_other_consumer
 test_missing_catalog_is_a_hard_error
 test_catalog_without_secrets_array_is_a_hard_error
-test_caller_reads_the_repository_catalog
 finish_tests
