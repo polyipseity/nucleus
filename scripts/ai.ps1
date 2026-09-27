@@ -100,7 +100,7 @@ if (-not $Action) {
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Get-Item $PSScriptRoot).Parent.FullName }
 if (-not $env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT = $RepoRoot }
 . (Join-Path $RepoRoot 'src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1')
-$ModelsJson = Join-Path $RepoRoot "src\modules\ai\models.json"
+$ModelsJson = Join-Path $RepoRoot "src\modules\configs\ollama\models.json"
 $ServicesJson = Join-Path $RepoRoot "src\modules\services.json"
 
 # ---------------------------------------------------------------------------
