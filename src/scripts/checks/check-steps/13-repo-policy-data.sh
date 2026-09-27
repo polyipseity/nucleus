@@ -4,7 +4,7 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "repo-policy-data" "Repository policy (data-driven)" run_repo_policy_data
+register_step "repo-policy-data" "Repository policy (data-driven)" run_repo_policy_data posix any none
 
 # Sub-checks in output order, as "<label>|<function>|<style>".
 _POLICY_DATA_CHECKS=(

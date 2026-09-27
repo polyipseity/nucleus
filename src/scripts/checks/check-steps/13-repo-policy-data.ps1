@@ -1,4 +1,4 @@
-Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Action {
+Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Platform windows -Mode any -Requires none -Action {
   param([Parameter(Mandatory)][PSObject]$Context)
 
   $HasArgs = $Context.HasArgs

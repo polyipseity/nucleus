@@ -1,4 +1,4 @@
-Register-Step -Id "app-registry" -Name "App auto-start registry validation" -Action {
+Register-Step -Id "app-registry" -Name "App auto-start registry validation" -Platform windows -Mode full -Requires none -Action {
   param([Parameter(Mandatory)][PSObject]$Context)
 
   $RepoRoot = $Context.RepoRoot

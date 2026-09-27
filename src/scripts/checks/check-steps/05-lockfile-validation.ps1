@@ -1,4 +1,4 @@
-Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Action {
+Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Platform windows -Mode any -Requires none -Action {
   param([Parameter(Mandatory)][PSObject]$Context)
 
   $HasArgs = $Context.HasArgs

@@ -1,4 +1,4 @@
-Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action {
+Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Platform windows -Mode any -Requires none -Action {
   param([Parameter(Mandatory)][PSObject]$Context)
 
   $HasArgs = $Context.HasArgs

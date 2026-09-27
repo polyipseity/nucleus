@@ -1,4 +1,4 @@
-Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Action {
+Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Platform windows -Mode any -Requires none -Action {
   param([Parameter(Mandatory)][PSObject]$Context)
 
   # Single source of truth for A8 exception list: files that don't need $schema.

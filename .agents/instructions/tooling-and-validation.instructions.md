@@ -34,21 +34,15 @@ Scope: `scripts/`, `tests/`, `src/scripts/`, `src/platforms/Windows/modules/`.
 
 ### Check script structure
 
-Steps by group; numbers from `check-steps/<nn>-*` filenames. Group layout in `step-runner.instructions.md`. Windows: steps 3-4 stubs. New tools → add to both preflight and provisioning. **Source of truth:** step filenames and header docstrings. **Nix pinning:** a check or test step that resolves `<nixpkgs>` pins it with `nucleus_pin_nixpkgs <repo_root>` (`src/scripts/lib/step-runner.sh`) before its first nix invocation; the machine's `<nixpkgs>` is never used.
-
-### Check modes
-
-- **Always-run:** whole-repo invariants. Steps 6, 8, 14 sub-checks.
-- **Conditional:** file-type dependent or always (`--full`). Steps 3, 5, 11.
-- **Path-scopable:** per-file/type. Steps 1, 2, 4, 7, 9, 12, 14 sub-checks.
+Steps by group; numbers from `check-steps/<nn>-*` filenames. Group layout in `step-runner.instructions.md`. New tools → add to both preflight and provisioning. **Source of truth:** step filenames and header docstrings. A step's platform, mode and prerequisites are declared at its `register_step` call; never transcribe them into prose, because a copy drifts from the declaration and the declaration is what the runner reads. **Nix pinning:** a check or test step that resolves `<nixpkgs>` pins it with `nucleus_pin_nixpkgs <repo_root>` (`src/scripts/lib/step-runner.sh`) before its first nix invocation; the machine's `<nixpkgs>` is never used.
 
 ### Scoped-mode (`_has_args`)
 
-POSIX steps read `ctx[HAS_ARGS]` / `ctx[REPO_ROOT]` and the trailing file args; PowerShell steps read `$Context.HasArgs` / `$Context.RepoRoot` / `$Context.PositionalArgs`. Path-scopable steps (7, 12) filter the files they are given and treat an empty match set as nothing to check. A whole-repo-only step (19) declares `mode full` at registration; the runner reports it `not applicable (mode: full)` in a scoped run. `$null` trap: empty pipeline → `$null`, `.Count` throws — wrap in `@(...)` with `# WHY:`.
+POSIX steps read `ctx[HAS_ARGS]` / `ctx[REPO_ROOT]` and the trailing file args; PowerShell steps read `$Context.HasArgs` / `$Context.RepoRoot` / `$Context.PositionalArgs`. Path-scopable steps filter the files they are given and treat an empty match set as nothing to check. A whole-repo-only step declares `mode full` at registration; the runner reports it `not applicable (mode: full)` in a scoped run. `$null` trap: empty pipeline → `$null`, `.Count` throws — wrap in `@(...)` with `# WHY:`.
 
 ### Stack-specific
 
-- **Nix format:** `check.sh --format` via treefmt (flag from `prek.toml`). No separate `format-nix` hook.
+- **Nix format:** `treefmt` only — no separate `format-nix` hook.
 - **nixf-tidy:** `nixf-tidy < file` (stdin; positional hangs). Run before Nix test edits.
 - **deadnix in tests:** Real findings (lazy eval). Fix: remove or `builtins.seq (builtins.deepSeq { ... } null)`. `deepSeq` is two-arg; one-arg = partial lambda → dead assertions, false green.
 - **Commit validation:** commitlint via `prek.toml`. Types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`. Pre-validate: temp-dir `bun install` (bare `bun x` can't resolve deps). Remove artifacts after.

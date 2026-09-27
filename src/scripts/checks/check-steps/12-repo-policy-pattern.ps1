@@ -1,4 +1,4 @@
-Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)" -Action {
+Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)" -Platform windows -Mode any -Requires none -Action {
   param([Parameter(Mandatory)][PSObject]$Context)
 
   $HasArgs = $Context.HasArgs

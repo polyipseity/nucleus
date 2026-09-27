@@ -3,7 +3,7 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "code-formatting" "Code formatting and linting" run_code_formatting
+register_step "code-formatting" "Code formatting and linting" run_code_formatting posix any none
 
 run_code_formatting() {
   local -n ctx="$1"

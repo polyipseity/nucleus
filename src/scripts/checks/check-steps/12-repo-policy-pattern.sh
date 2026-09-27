@@ -12,7 +12,7 @@ _AWK_PATH="$_REPO_POLICY_STEP_DIR/repository-policy.awk"
 _POLICY_STEP_SELF_SH="$(basename "${BASH_SOURCE[0]}")"
 _POLICY_STEP_SELF_PS1="${_POLICY_STEP_SELF_SH%.sh}.ps1"
 
-register_step "repo-policy-pattern" "Repository policy (pattern-based)" run_repo_policy_pattern
+register_step "repo-policy-pattern" "Repository policy (pattern-based)" run_repo_policy_pattern posix any none
 
 # Sub-checks in output order, as "<label>|<function>|<style>".
 _POLICY_PATTERN_CHECKS=(

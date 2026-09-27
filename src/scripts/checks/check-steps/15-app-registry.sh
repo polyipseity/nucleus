@@ -3,7 +3,7 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "app-registry" "App auto-start registry validation" run_app_registry
+register_step "app-registry" "App auto-start registry validation" run_app_registry posix full none
 
 # _kind_in_enum <kind> <array-name> — true when the named array holds <kind>.
 _kind_in_enum() {

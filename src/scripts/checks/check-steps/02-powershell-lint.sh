@@ -3,7 +3,7 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "powershell-lint" "PowerShell syntax" run_powershell_lint
+register_step "powershell-lint" "PowerShell syntax" run_powershell_lint posix any none
 
 run_powershell_lint() {
   local -n ctx="$1"

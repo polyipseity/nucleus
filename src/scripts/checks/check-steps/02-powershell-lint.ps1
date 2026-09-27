@@ -1,4 +1,4 @@
-Register-Step -Id "powershell-lint" -Name "PowerShell syntax" -Action {
+Register-Step -Id "powershell-lint" -Name "PowerShell syntax" -Platform windows -Mode any -Requires none -Action {
   param([Parameter(Mandatory)][PSObject]$Context)
 
   $RepoRoot = $Context.RepoRoot

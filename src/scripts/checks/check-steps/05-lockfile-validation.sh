@@ -3,7 +3,7 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "lockfile-validation" "Lockfile validation" run_lockfile_validation
+register_step "lockfile-validation" "Lockfile validation" run_lockfile_validation posix any none
 
 run_lockfile_validation() {
   local -n ctx="$1"

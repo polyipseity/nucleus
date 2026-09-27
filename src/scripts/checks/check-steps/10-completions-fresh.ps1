@@ -8,7 +8,7 @@
 # in the bump-lockfile completer still has its --list-sections contract
 # (introspection).
 
-Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Action {
+Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform windows -Mode full -Requires none -Action {
   param([Parameter(Mandatory)][PSObject]$Context)
 
   $RepoRoot = $Context.RepoRoot

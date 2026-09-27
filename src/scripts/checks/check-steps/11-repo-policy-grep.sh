@@ -4,7 +4,7 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "repo-policy-grep" "Repository policy (grep-heavy)" run_repo_policy_grep
+register_step "repo-policy-grep" "Repository policy (grep-heavy)" run_repo_policy_grep posix any none
 
 # Sub-checks in output order, as "<label>|<function>|<style>".
 _POLICY_GREP_CHECKS=(

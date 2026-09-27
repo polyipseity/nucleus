@@ -1,4 +1,4 @@
-Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Action {
+Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Platform windows -Mode any -Requires none -Action {
   param([Parameter(Mandatory)][PSObject]$Context)
 
   $HasArgs = $Context.HasArgs
