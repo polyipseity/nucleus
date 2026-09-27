@@ -323,7 +323,16 @@ gc_duperemove_store_if_available() {
     error "duperemove-store.sh not found at $_dds_script"
     return 1
   fi
-  NUCLEUS_GC_DRY_RUN="$dry_run" "$_dds_script"
+  # WHY: resolve-only. duperemove is a NixOS system package and cannot be a
+  # runtimeInput of a cross-platform script, so the lookup happens here rather
+  # than in the flake. Applicability is owned by duperemove-store.sh, which
+  # exits 0 for non-Linux, missing /nix/store and non-btrfs before it looks at
+  # the binary, and hard-errors only on a btrfs host that is missing it. Gating
+  # here instead would print a false "unavailable" on every macOS run and turn
+  # a genuine btrfs misconfiguration into a skip.
+  # check-suppress:suppression_doc: an empty result is the inner script's case, not an error here
+  _duperemove_bin="$(command -v duperemove || true)"
+  NUCLEUS_GC_DRY_RUN="$dry_run" "$_dds_script" "$_duperemove_bin"
 }
 
 gc_nix_build_artifacts_if_present() {

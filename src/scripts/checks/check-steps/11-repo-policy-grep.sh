@@ -205,6 +205,10 @@ run_activation_tool_resolution() {
 
   # Collect candidate files: only activation-script directories.
   # ref: comment-annotations.instructions.md#C1 -- self-derived basename for self-exclusion
+  # The android guest scripts are excluded as a class: they execute inside the
+  # guest, which has no Nix store, so `ip` there cannot be given a store-path arg
+  # or a PATH prepend. Recorded as A10 rather than left as a bare glob.
+  # ref: allow-and-deny-lists.instructions.md#A10 -- guest scripts have no Nix store to resolve against
   # shellcheck disable=SC2155 # reason: basename's exit status is irrelevant; self-derived for exclusion
   local _self_sh="$(basename "${BASH_SOURCE[0]}")"
   local _candidate_files=()
@@ -240,7 +244,8 @@ run_activation_tool_resolution() {
         # shellcheck disable=SC2046 # reason: echo expands the find array safely — no globbing risk
         find "${_find_dirs[@]}" -name '*.sh' -print |
           filter_gitignored |
-          grep -v -E '(check\.sh|android-fake-wifi-guest-|'"$_self_sh"')$'
+          LC_ALL=C sort |
+          grep -v -E '(check\.sh|android-fake-wifi-guest-.*\.sh|'"$_self_sh"')$'
       )
     fi
   fi
@@ -263,6 +268,15 @@ run_activation_tool_resolution() {
       sed 's/[[:space:]]*().*//' | sort -u
     grep -rh -E '^function[[:space:]]+[a-zA-Z_][a-zA-Z_0-9]*' src/scripts/lib/ 2>/dev/null |
       sed 's/^function[[:space:]]*//' | sed 's/[[:space:]].*//' | sort -u
+    {
+      # Activation-script directories (subset of all scripts).
+      grep -h -E '^[[:space:]]*[a-zA-Z_][a-zA-Z_0-9]*[[:space:]]*\(\)' "${_candidate_files[@]}" 2>/dev/null |
+        sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*().*//' |
+        grep -E '^[a-zA-Z_][a-zA-Z_0-9]*$' | sort -u
+      grep -h -E '^[[:space:]]*function[[:space:]]+[a-zA-Z_][a-zA-Z_0-9]*' "${_candidate_files[@]}" 2>/dev/null |
+        sed 's/^[[:space:]]*function[[:space:]]*//' | sed 's/[[:space:]].*//' |
+        grep -E '^[a-zA-Z_][a-zA-Z_0-9]*$' | sort -u
+    }
   } >"$_lib_funcs_file"
 
   # --- Awk scan ---
@@ -283,6 +297,18 @@ BEGIN {
   for (i in a) allow[a[i]] = 1;  delete a
   split("nix nix-env nix-build nix-channel nix-shell nix-store nix-collect-garbage nix-instantiate nix-prefetch-url nix-store nix-hash nixos-rebuild darwin-rebuild systemctl launchctl sw_vers xcode-select brew nix-shell nix-build git ssh scp rsync tar unzip zip make cmake cargo rustup rustc bun node npm npx python3 pip3 jq yq xmlstarlet xsltproc gawk getopt", a)
   for (i in a) allow[a[i]] = 1;  delete a
+}
+
+# One awk invocation scans every candidate file, so per-file state must be
+# reset here. Without it a single unbalanced construct in one file silently
+# blinds every file scanned after it.
+FNR == 1 {
+  in_heredoc = 0
+  heredoc_delim = ""
+  case_depth = 0
+  in_embedded = 0
+  embedded_close = ""
+  pending = ""
 }
 
 LIB_FUNCS_FILE != "" {
@@ -316,7 +342,46 @@ in_heredoc {
 
 /^[[:space:]]*(#|$)/ { next }
 
-/^[[:space:]]*case[[:space:]]/ { case_depth++; next }
+# An awk or jq program is passed as a quoted argument, usually to a resolved
+# binary such as "$_x_awk_bin". Its body is program text, not shell. This has
+# to sit above both the case rules and the bare-quote rule below: the case
+# rules would otherwise read a program line that looks like a case opener as
+# real shell and raise case_depth, and the bare-quote rule would consume the
+# opening line and leave the rest of the body to be read as commands.
+in_embedded {
+  if (index($0, embedded_close) > 0) in_embedded = 0
+  next
+}
+{
+  # Walk the quotes that start a word, since a quote inside a token is part of
+  # that token. The first one that does not close on its own line opens a
+  # multi-line argument.
+  rest = $0
+  opener = ""
+  while (match(rest, /(^|[[:space:]])[`'\"]/)) {
+    _q = substr(rest, RSTART + RLENGTH - 1, 1)
+    _after = substr(rest, RSTART + RLENGTH)
+    if (index(_after, _q) > 0) {
+      rest = substr(_after, index(_after, _q) + 1)
+      continue
+    }
+    opener = _q
+    break
+  }
+  if (opener != "" && $0 ~ /(_bin|awk|jq)/) {
+    in_embedded = 1
+    embedded_close = opener
+    next
+  }
+}
+
+# A one-line `case ... esac` closes on its own line, so matching the opener and
+# doing `next` would leave the depth raised with nothing to lower it. Only
+# raise depth when the line does not already contain the terminator.
+/^[[:space:]]*case[[:space:]]/ {
+  if ($0 !~ /(^|[^-[:alnum:]_])esac([[:space:]]|$)/) case_depth++
+  next
+}
 /^[[:space:]]*esac\b/ { if (case_depth > 0) case_depth--; next }
 case_depth > 0 { next }
 
@@ -359,6 +424,18 @@ case_depth > 0 { next }
 
 {
   line = $0
+  # A trailing backslash continues the command onto the next line. Without
+  # this the continuation is read as a command of its own, and a leading path
+  # like 2>/dev/null is stripped to its basename and reported.
+  if (pending != "") {
+    line = pending " " line
+    pending = ""
+  }
+  if (line ~ /\\$/) {
+    sub(/\\$/, "", line)
+    pending = line
+    next
+  }
   gsub(/^[[:space:]]+/, "", line)
 
   if (line ~ /^[{});]/ || line ~ /^;;/ || line ~ /^esac\b/ || line ~ /^fi\b/ ||
@@ -421,17 +498,12 @@ AWKEOF
 
   local _awk_violations
   _awk_violations=$(
-    # WHY: one awk invocation sees every candidate file, but the program's
-    # in_heredoc/case_depth state is initialised in BEGIN and never reset per
-    # file. Rule 319 also does `next`, so a one-line `case ... esac` increments
-    # case_depth without its esac ever being seen by rule 320. services/
-    # camilladsp-deviceselect.sh:272-273 and configs/provision-wallpaper.sh:180,
-    # 208,267 are balanced in shell but not to this parser, so case_depth stays
-    # positive from there on and rule 321 skips every later line. This
-    # sub-check therefore reports 0 violations end-to-end while the tree has
-    # real ones. Do not read a green result here as evidence. Fixing it needs a
-    # per-file reset AND routing embedded awk/jq programs out of the command
-    # scan, or merge-picard-ini.sh alone turns this step red.
+    # One awk invocation sees every candidate file, so the program resets
+    # in_heredoc/case_depth/in_embedded on FNR == 1. Without that reset a
+    # single construct the parser cannot balance blinds every later file, and
+    # a green result here would be evidence of nothing. The reset and the
+    # embedded-program routing exist for that reason, not for the checks
+    # themselves.
     # shellcheck disable=SC2046 # reason: printf safely expands the array
     printf '%s\0' "${_candidate_files[@]}" |
       xargs -0 awk -v LIB_FUNCS_FILE="$_lib_funcs_file" "$_awk_program" 2>/dev/null

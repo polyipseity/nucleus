@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Btrfs block-level deduplication for /nix/store on NixOS hosts.
 # Invoked from scripts/gc.sh during weekly root GC (after nix-collect-garbage).
+# $1: resolved duperemove binary.
 set -eu
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -9,6 +10,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _dry_run="${NUCLEUS_GC_DRY_RUN:-false}"
 _hashfile="/var/lib/duperemove/hashfile"
+_duperemove_bin="$1"
 
 if [ "$(uname -s)" != "Linux" ]; then
   exit 0
@@ -23,8 +25,9 @@ if [ "$_store_fstype" != "btrfs" ]; then
   exit 0
 fi
 
-if ! command -v duperemove >/dev/null 2>&1; then
-  error "duperemove is required on btrfs NixOS hosts but is not in PATH"
+if [ ! -x "$_duperemove_bin" ]; then
+  error "duperemove is required on btrfs NixOS hosts but is not executable at $_duperemove_bin"
+  exit 1
 fi
 
 if [ "$_dry_run" = true ]; then
@@ -34,4 +37,4 @@ fi
 
 mkdir -p "$(dirname "$_hashfile")"
 say "running duperemove on /nix/store"
-duperemove -dr --hashfile="$_hashfile" /nix/store
+"$_duperemove_bin" -dr --hashfile="$_hashfile" /nix/store
