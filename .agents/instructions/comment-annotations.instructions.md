@@ -26,14 +26,14 @@ Rules: `--` only separator (never em dash). `reason:` eliminated except shellche
 
 ## Category 1 — Tool-enforced → `# check-suppress:<check id>: ...` (ALL machine-parsed)
 
-| Family | Sites | Check id | Consumer |
-| --- | --- | --- | --- |
-| `# check-suppress:embedded-content: <why>` | 12 | `embedded-content` | step 13 `.ps1` + `.sh` |
-| `# check-suppress:config-method: <why>` | 100 | `config-method` | step 12 `.ps1` + `.sh` |
-| `# check-suppress:SuppressMessageAttribute: <rule> -- <just>` | 68 | `SuppressMessageAttribute` | step 11 `Get-UndocSuppViolation` |
-| `# check-suppress:suppression_doc: <just>` | 623 | `suppression_doc` | step 11 regex |
-| `# check-suppress:packer_validate: ...` | 5 | `packer_validate` | `scripts/check.ps1` + `.sh` |
-| `\|\| true` / `$null =` / `[void]` | 11+92 | `suppression_doc` | step 11 (`tests/` exempt) |
+| Family | Check id | Consumer |
+| --- | --- | --- |
+| `# check-suppress:embedded-content: <why>` | `embedded-content` | step 13 `.ps1` + `.sh` |
+| `# check-suppress:config-method: <why>` | `config-method` | step 12 `.ps1` + `.sh` |
+| `# check-suppress:SuppressMessageAttribute: <rule> -- <just>` | `SuppressMessageAttribute` | step 11 `Get-UndocSuppViolation` |
+| `# check-suppress:suppression_doc: <just>` | `suppression_doc` | step 11 regex |
+| `# check-suppress:packer_validate: ...` | `packer_validate` | `scripts/check.ps1` + `.sh` |
+| `\|\| true` / `$null =` / `[void]` | `suppression_doc` | step 11 (`tests/` exempt) |
 
 **Suppression semantics:** `|| true`, `$null =`, `[void]` are suppression patterns, not rationale. Justify with `# check-suppress:suppression_doc:`, never `# WHY:`. **Counting:** CODE-ONLY. `git grep -h 'check-suppress:<id>:' -- '*.ps1' '*.sh' '*.nix' '*.zsh' | wc -l`.
 
@@ -48,7 +48,7 @@ Rules: `--` only separator (never em dash). `reason:` eliminated except shellche
 
 ## Category 3-4 — Structural + human-readable (NOT machine-parsed)
 
-Cat 3: Dividers, DSC headers. Cat 4: `# ref:` (54 sites): `# ref: <target> -- <just>`. `# WHY:` (171): `# WHY: <reason>` — colon mandatory. `# TODO:` (0). Ex-`# Source:` / `# See:` in DSC → `# ref:`.
+Cat 3: Dividers, DSC headers. Cat 4: `# ref: <target> -- <just>`. `# WHY: <reason>` — colon mandatory. `# TODO: <text>`. Ex-`# Source:` / `# See:` in DSC → `# ref:`.
 
 ## Check-id registry
 

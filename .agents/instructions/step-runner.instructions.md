@@ -88,23 +88,14 @@ Not-applicable and not-selected steps never affect the exit code (0 pass / 1 fai
 Never output "passed" or "no issues found" for a step that did not run.
 ```
 
-## Check step groups
-
-| Group | Steps | IDs |
-| ----- | ----- | --- |
-| Format/lint | 01–02 | `code-formatting`, `powershell-lint` |
-| Nix | 03 | `nix-flake-eval` |
-| Data/schema | 05, 07, 08, 10, 15 | `lockfile-validation`, `schema-validation`, `service-registry`, `completions-fresh`, `app-registry` |
-| Repo policy | 11–13 | `repo-policy-grep`, `repo-policy-pattern`, `repo-policy-data` |
-
 ## Adding or renumbering check steps
 
 Step numbers from `NN-` filename prefix of `src/scripts/checks/check-steps/<nn>-*.{sh,ps1}`. IDs digit-free kebab-case. Renumbering = filename change + reference sweep.
 
-References to move: `TEST_FILE`/`$testFile`, `# shellcheck source=`, prose "step N", `repository-policy.awk`, generator/installer comments, groups table, test pairs.
+References to move: `TEST_FILE`/`$testFile`, `# shellcheck source=`, prose "step N", `repository-policy.awk`, generator/installer comments, test pairs.
 
-- **No blind appending** — number must reflect function and group.
-- **Group first, number second** — new groups require justification + renumbering.
+- **No blind appending** — number must reflect what the step actually does.
+- **Group first, number second** — a step that opens a new group needs justification and renumbering.
 - **Rename first, then create** — `git mv` step+test pairs, update all references, create new pair, one atomic commit.
 - **Test-pipeline steps**: same principles.
 
@@ -119,17 +110,7 @@ For every JSON/YAML file in scope (except exceptions):
   3. Format: empty or non-string → ERROR "Invalid $schema in <filepath>: must be a non-empty string"
   Continue checking all files (non-fatal per-file).
 
-  EXCEPTION_LIST:
-  Schema definitions/meta: *.schema.json
-  External formats (no published schema): */users/*/cursor/*.json,
-  */users/*/iterm2/DynamicProfiles/*.json, */users/*/obsidian/*.json, */users/*/qtpass/*.json,
-  */users/*/rimsort/*.json, */configs/camilladsp/*, */configs/camillagui-backend/*,
-  */users/*/discord-music-rpc/*, */users/*/agents/hooks/*.json,
-  */users/*/agents/skills/*/_meta.json, */configs/litellm/*,
-  */users/*/hermes/plugins/*/plugin.yaml,
-  */users/*/vscode/mcp.json, */users/*/vscode/chatLanguageModels*.json, */.sops.yaml
-  Infrastructure: */vendor/*, */secrets/*, */.github/*
-  Registered in allow-and-deny-lists.instructions.md.
+  EXCEPTION_LIST: the A8 registry row in allow-and-deny-lists.instructions.md.
   Policy: nucleus-owned data requires $schema (we write our own schemas).
   External formats: use published $schema when available; never roll our own.
 

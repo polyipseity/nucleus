@@ -34,7 +34,7 @@ Scope: `scripts/`, `tests/`, `src/scripts/`, `src/platforms/Windows/modules/`.
 
 ### Check script structure
 
-Steps by group; numbers from `check-steps/<nn>-*` filenames. Group layout in `step-runner.instructions.md`. New tools → add to both preflight and provisioning. **Source of truth:** step filenames and header docstrings. A step's platform, mode and prerequisites are declared at its `register_step` call; never transcribe them into prose, because a copy drifts from the declaration and the declaration is what the runner reads. **Nix pinning:** a check or test step that resolves `<nixpkgs>` pins it with `nucleus_pin_nixpkgs <repo_root>` (`src/scripts/lib/step-runner.sh`) before its first nix invocation; the machine's `<nixpkgs>` is never used.
+Steps by group; numbers from `check-steps/<nn>-*` filenames. New tools → add to both preflight and provisioning. **Source of truth:** step filenames and header docstrings. A step's platform, mode and prerequisites are declared at its `register_step` call; never transcribe them into prose, because a copy drifts from the declaration and the declaration is what the runner reads. **Nix pinning:** a check or test step that resolves `<nixpkgs>` pins it with `nucleus_pin_nixpkgs <repo_root>` (`src/scripts/lib/step-runner.sh`) before its first nix invocation; the machine's `<nixpkgs>` is never used.
 
 ### Scoped-mode (`_has_args`)
 
