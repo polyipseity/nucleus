@@ -156,7 +156,7 @@ All extracted inline scripts must accept inputs via positional arguments, not en
 
 **Store-path args for external commands.** Activation scripts receiving external tools (e.g. `jq`, `sops`, `age`) must get them as Nix store-path arguments (e.g. `_jq_bin="$1"`) and invoke via the variable (`"$_jq_bin"`), never bare command names. Check step 11 (`run_store_path_arg_usage`) enforces that every `_X_bin` declaration has at least one command-like usage.
 
-**Activation tool resolution (step 11, `run_activation_tool_resolution`).** Scans activation scripts for bare external commands not resolved via a store-path arg or `PATH=` prepend. The only sanctioned `PATH` use is a deliberate prepend for tools that must be visible to child processes (e.g. bun, rustup, cargo). It skips comments, the body of an embedded `awk`/`jq` program passed as a quoted argument, and the Android guest scripts (`#A10`). Fix by passing the tool as a store-path arg (preferred) or adding a `PATH=` prepend with a `_bin`-suffixed variable. The PowerShell twin does not implement this check.
+**Activation tool resolution (step 11, `run_activation_tool_resolution`).** Scans activation scripts for bare external commands not resolved via a store-path arg or `PATH=` prepend. The only sanctioned `PATH` use is a deliberate prepend for tools that must be visible to child processes (e.g. bun, rustup, cargo). It skips comments, the body of an embedded `awk`/`jq` program whose opening line names the tool (`*_bin`, `awk` or `jq`), and the Android guest scripts (`#A10`). Fix by passing the tool as a store-path arg (preferred) or adding a `PATH=` prepend with a `_bin`-suffixed variable. The PowerShell twin does not implement this check.
 
 ## Library purity
 

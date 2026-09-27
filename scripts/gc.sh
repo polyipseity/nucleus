@@ -323,13 +323,16 @@ gc_duperemove_store_if_available() {
     error "duperemove-store.sh not found at $_dds_script"
     return 1
   fi
-  # WHY: resolve-only. duperemove is a NixOS system package and cannot be a
-  # runtimeInput of a cross-platform script, so the lookup happens here rather
-  # than in the flake. Applicability is owned by duperemove-store.sh, which
-  # exits 0 for non-Linux, missing /nix/store and non-btrfs before it looks at
-  # the binary, and hard-errors only on a btrfs host that is missing it. Gating
-  # here instead would print a false "unavailable" on every macOS run and turn
-  # a genuine btrfs misconfiguration into a skip.
+  # WHY: resolve-only. The derivation carrying runtimeInputs is gcWeekly in
+  # src/modules/gc-activations.nix, shared by posix/base.nix and
+  # hosts/NixOS/activation.nix, so a NixOS-only package cannot go in its
+  # runtimeInputs without splitting the wrapper. Applicability is owned by
+  # duperemove-store.sh, which exits 0 for non-Linux, missing /nix/store and
+  # non-btrfs before it looks at the binary, and hard-errors only on a btrfs
+  # host that is missing it. Gating here instead would print a false
+  # "unavailable" on every macOS run and turn a genuine btrfs misconfiguration
+  # into a skip.
+  # ref: allow-and-deny-lists.instructions.md#A11 -- cross-platform gc.sh cannot carry a NixOS-only runtimeInput, and scripts/ is outside the check's scanned _activation_dirs
   # check-suppress:suppression_doc: an empty result is the inner script's case, not an error here
   _duperemove_bin="$(command -v duperemove || true)"
   NUCLEUS_GC_DRY_RUN="$dry_run" "$_dds_script" "$_duperemove_bin"

@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# shellcheck disable=SC2031 # reason: test functions intentionally isolate REPO_ROOT in subshells
 # Test: activation tool resolution (check step 11, run_activation_tool_resolution).
 #
 # This sub-check reported zero violations on every file after
