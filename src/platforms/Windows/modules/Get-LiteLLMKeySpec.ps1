@@ -15,13 +15,6 @@
   from. Both hosts select the identical set because both read the identical
   data and apply the identical predicate.
 
-  The catalog is repository data, not a generated artifact, so it is read
-  straight from $RepoRoot. An earlier implementation copied a supposed
-  generated catalog into %LOCALAPPDATA% that nothing ever wrote, so the copy
-  could only fail and the guarded read below it silently yielded zero keys.
-# The dead filename is deliberately not named here: the dead-reference
-# guard is zero-tolerance for it across the whole tree, comments included.
-
 .NOTES
   Requirements: none.
   Environment variables: none.
