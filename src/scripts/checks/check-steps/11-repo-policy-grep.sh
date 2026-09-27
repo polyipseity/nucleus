@@ -57,9 +57,9 @@ run_store_path_arg_usage() {
 
   # Files excluded from this check: their _X_bin variables are used as config
   # parameters (not commands), so the check would produce false positives.
-  # The self-file basenames are A9; check.sh and configure-gpg-agent.sh are A13.
+  # The self-file basenames are A9; configure-gpg-agent.sh is A13.
   # ref: allow-and-deny-lists.instructions.md#A13 -- _*_bin values are config parameters, not commands
-  local _exclude_pattern='(check\.sh|'"$_self_sh"'|'"$_self_ps1"'|configure-gpg-agent\.sh)$'
+  local _exclude_pattern='('"$_self_sh"'|'"$_self_ps1"'|configure-gpg-agent\.sh)$'
 
   if $_has_args; then
     local _f
@@ -74,7 +74,7 @@ run_store_path_arg_usage() {
       _base="$(basename "$_f")"
       # Apply same exclusions as non-args branch (basename check + regex).
       case "$_base" in
-      check.sh | "$_self_sh" | "$_self_ps1") continue ;;
+      "$_self_sh" | "$_self_ps1") continue ;;
       esac
       if echo "$_base" | grep -qE "$_exclude_pattern"; then
         continue
@@ -226,7 +226,7 @@ run_activation_tool_resolution() {
         "$_dir"/*)
           # shellcheck disable=SC2155 # reason: basename's exit status is irrelevant; exclusion check
           case "$(basename "$_f")" in
-          "$_self_sh" | check.sh | android-fake-wifi-guest-*.sh) continue 2 ;;
+          "$_self_sh" | android-fake-wifi-guest-*.sh) continue 2 ;;
           esac
           _candidate_files+=("$_f")
           break
@@ -245,7 +245,7 @@ run_activation_tool_resolution() {
         find "${_find_dirs[@]}" -name '*.sh' -print |
           filter_gitignored |
           LC_ALL=C sort |
-          grep -v -E '(check\.sh|android-fake-wifi-guest-.*\.sh|'"$_self_sh"')$'
+          grep -v -E '(android-fake-wifi-guest-.*\.sh|'"$_self_sh"')$'
       )
     fi
   fi
