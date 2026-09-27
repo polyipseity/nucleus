@@ -45,7 +45,7 @@ POSIX steps read `ctx[HAS_ARGS]` / `ctx[REPO_ROOT]` and the trailing file args; 
 - **Nix format:** `treefmt` only — no separate `format-nix` hook.
 - **nixf-tidy:** `nixf-tidy < file` (stdin; positional hangs). Run before Nix test edits.
 - **deadnix in tests:** Real findings (lazy eval). Fix: remove or `builtins.seq (builtins.deepSeq { ... } null)`. `deepSeq` is two-arg; one-arg = partial lambda → dead assertions, false green.
-- **Commit validation:** commitlint via `prek.toml`. Types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`. Pre-validate: temp-dir `bun install` (bare `bun x` can't resolve deps). Remove artifacts after.
+- **Commit validation:** commitlint via `prek.toml`. The type list is the upstream preset's, not ours to copy. Pre-validate: temp-dir `bun install` (bare `bun x` can't resolve deps). Remove artifacts after.
 - **prek:** Always-install, idempotent. Refuses external `core.hooksPath` (exit 2). `require_serial = true` on `repo-check`/`repo-test` to avoid cache races. Subagents must not commit/push. Warm cache from git real path, not symlink (different cache dbs). Never `treefmt --no-cache`.
 - **CI:** No new checks/tests in `ci.yml` — route into repo checks or tests.
 

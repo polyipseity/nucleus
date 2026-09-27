@@ -42,12 +42,6 @@ declared_mode() {
     "$CHECK_STEPS_DIR/$1.sh" | head -1
 }
 
-# declared_platform <step-stem> -- the platform token, or empty.
-declared_platform() {
-  sed -n 's/^register_step "[^"]*" "[^"]*" [A-Za-z0-9_]* \([a-z]*\) [a-z]* [a-z-]*$/\1/p' \
-    "$CHECK_STEPS_DIR/$1.sh" | head -1
-}
-
 # consumes_file_args <step-stem> -- true when the step reads its file arguments
 # anywhere beyond the `local _files=...` declaration. A whole-repo step collects
 # them and never looks at them, which is what makes `full` the honest mode.
@@ -159,7 +153,7 @@ EOF
 }
 
 test_posix_and_powershell_twins_agree() {
-  local _bad="" _stem _ps1
+  local _bad="" _compared=0 _stem _ps1
   while read -r _stem; do
     [ -n "$_stem" ] || continue
     _ps1="$CHECK_STEPS_DIR/$_stem.ps1"
@@ -167,12 +161,20 @@ test_posix_and_powershell_twins_agree() {
     local _sh_mode _ps_mode
     _sh_mode=$(declared_mode "$_stem")
     _ps_mode=$(sed -n 's/.*-Mode \([a-z]*\).*/\1/p' "$_ps1" | head -1)
+    _compared=$((_compared + 1))
     [ "$_sh_mode" = "$_ps_mode" ] || _bad="${_bad} ${_stem}(${_sh_mode}/${_ps_mode})"
   done <<EOF
 $(step_stems)
 EOF
+  # WHY: a lookup that silently matched no twin would leave _compared at 0 and
+  # pass having compared nothing, which is the vacuity the POSIX lane guards.
+  if [ "$_compared" -eq 0 ]; then
+    assert_fail "every PowerShell twin declares the same mode as its POSIX step" \
+      "no PowerShell twin was found under $CHECK_STEPS_DIR; compared 0 steps"
+    return
+  fi
   if [ -z "$_bad" ]; then
-    assert_pass "every PowerShell twin declares the same mode as its POSIX step"
+    assert_pass "every PowerShell twin declares the same mode as its POSIX step (${_compared} compared)"
   else
     assert_fail "POSIX/PowerShell mode disagreement (posix/windows):${_bad}"
   fi
@@ -180,12 +182,13 @@ EOF
 
 test_full_steps_ignore_args_on_windows_too() {
   # The same honesty rule applies to the twin. A step is one answer, not two.
-  local _bad="" _stem _ps1
+  local _bad="" _checked=0 _stem _ps1
   while read -r _stem; do
     [ -n "$_stem" ] || continue
     _ps1="$CHECK_STEPS_DIR/$_stem.ps1"
     [ -f "$_ps1" ] || continue
     [ "$(declared_mode "$_stem")" = "full" ] || continue
+    _checked=$((_checked + 1))
     # A Windows twin that reaches for its arguments is filterable there too.
     if grep -qE 'Context\.(PositionalArgs|HasArgs)' "$_ps1"; then
       _bad="${_bad} ${_stem}"
@@ -193,8 +196,15 @@ test_full_steps_ignore_args_on_windows_too() {
   done <<EOF
 $(step_stems)
 EOF
+  # WHY: no `full` step with a twin would leave _checked at 0 and pass having
+  # examined nothing, which is the vacuity the POSIX lane guards.
+  if [ "$_checked" -eq 0 ]; then
+    assert_fail "steps declared full have PowerShell twins that ignore their arguments too" \
+      "no step declared full with a PowerShell twin; checked 0 steps"
+    return
+  fi
   if [ -z "$_bad" ]; then
-    assert_pass "steps declared full have PowerShell twins that ignore their arguments too"
+    assert_pass "steps declared full have PowerShell twins that ignore their arguments too (${_checked} checked)"
   else
     assert_fail "these full steps have twins that read their arguments:${_bad}"
   fi
