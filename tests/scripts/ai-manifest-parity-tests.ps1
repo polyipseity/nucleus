@@ -60,7 +60,15 @@ function Get-AiPs1ManifestList {
 # text does not mention one, which is not a failure on its own.
 function Get-AiPs1DocumentedManifest {
   $text = Get-Content -LiteralPath $aiPs1 -Raw
-  $m = [regex]::Match($text, '[A-Za-z0-9_./-]*models\.json')
+  # WHY scoped to the <# ... #> blocks: searching the whole file returns the
+  # *assignment* rather than the documented path, and a test that compares the
+  # code against itself passes whatever the code says.
+  # Every block, not just the first, so this twin and the sh twin agree on which
+  # lines are eligible. [regex]::Match would take only the first block and the two
+  # would diverge silently the day ai.ps1 gained a second one.
+  $help = (([regex]::Matches($text, '(?s)<#.*?#>')) | ForEach-Object { $_.Value }) -join "`n"
+  if (-not $help) { return '' }
+  $m = [regex]::Match($help, '[A-Za-z0-9_./-]*models\.json')
   if ($m.Success) { return $m.Value }
   return ''
 }

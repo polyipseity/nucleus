@@ -341,7 +341,7 @@ function Invoke-LockfileBump {
         $new = $null
         try {
           # check-suppress:suppression_doc: probe -- crate may not exist or network unavailable; cargo search is the fallback below
-          $resp = Invoke-RestMethod -Uri "https://crates.io/api/v1/crates/$key" -Headers @{ 'User-Agent' = 'nucleus-bump-lockfile' }
+          $resp = Invoke-RestMethod -Uri "https://crates.io/api/v1/crates/$key" -Headers @{ 'User-Agent' = 'nucleus-update-lockfile' }
           if ($resp.crate.max_stable_version) {
             $new = $resp.crate.max_stable_version
           } elseif ($resp.versions -and $resp.versions.Count -gt 0) {

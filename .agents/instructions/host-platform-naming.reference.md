@@ -42,7 +42,7 @@ name: "Host/Platform Naming Reference"
 
 - `src/modules/host-platform-registry.json` — host → platform refs; platform → flags
 - `src/modules/services.json` — per-service `hosts.*` with required `platform` field
-- `src/modules/lib/env-catalog.nix` — `values.MacBook|NixOS|Windows`
+- `src/modules/lib/env-secrets.nix` — `values.MacBook|NixOS|Windows`
 
 ## Audit
 

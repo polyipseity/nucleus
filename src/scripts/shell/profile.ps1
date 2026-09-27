@@ -33,7 +33,7 @@ if ($IsWindows) {
   # LLVM/Clang: add LLVM bin directory to PATH for the current session so
   # newly provisioned hosts can run clang/ld.lld immediately.
   # CC/CXX/LD are set at Machine scope via system/env.dsc.yml for
-  # all-process visibility.  Source: src/modules/lib/env-catalog.nix.
+  # all-process visibility.  Source: src/modules/lib/env-secrets.nix.
   $llvmBinDir = "__NUCLEUS_LLVM_BIN_DIR__"
   if ((Test-Path $llvmBinDir) -and ($env:PATH -notlike "*$llvmBinDir*")) {
     $env:PATH = "$env:PATH;$llvmBinDir"

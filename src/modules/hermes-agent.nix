@@ -264,7 +264,7 @@ in
   );
 
   # Playwright browsers are provisioned system-wide via pkgs.playwright-driver.browsers
-  # in core.nix, with PLAYWRIGHT_BROWSERS_PATH set in env-catalog.nix. The assertion
+  # in core.nix, with PLAYWRIGHT_BROWSERS_PATH set in env-secrets.nix. The assertion
   # below verifies version compatibility between the nixpkgs playwright-driver and
   # hermes-agent's Python playwright package at eval time.
 }

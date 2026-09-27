@@ -13,7 +13,7 @@
 #
 # Redis: required for utilization tracking, cooldown state, prompt-cache
 # affinity, and response caching.  REDIS_HOST/REDIS_PORT/REDIS_USERNAME
-# are non-secret env vars from the env-catalog.nix registry.
+# are non-secret env vars from the env-secrets.nix registry.
 # REDIS_PASSWORD and REDIS_USER_LITELLM_PASSWORD are SOPS secrets via
 # the KEYFILE:ENVVAR pipeline.
 #
@@ -36,7 +36,7 @@
 #     (env_key_ai_foo → KEY_AI_FOO).
 #
 # To add a new provider: add the SOPS key to system.yml (env_key_<name>),
-# add a model_list entry here, and add the mapping to src/modules/env-catalog.nix.
+# add a model_list entry here, and add the mapping to src/modules/lib/env-secrets.nix.
 # The env var name is derived automatically by uppercasing the full key name.
 
 litellm_settings:

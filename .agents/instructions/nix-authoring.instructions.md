@@ -177,7 +177,7 @@ The Apple SDK is enhanced with Xcode toolchain shims not bundled by nixpkgs. Thr
 
 - `src/modules/lib/apple-sdk-tools.nix` maps xcrun shim names to nixpkgs derivations. Returns `allTools` and `symlinkFarmTools`. Attribute names with `+` must be quoted: `"c++"`, `"clang++"`, `"flex++"`, `"c++filt"`.
 - `src/modules/lib/apple-sdk-enhanced.nix` merges via `pkgs.symlinkJoin`.
-- `env-catalog.nix` sets `DEVELOPER_DIR` and `SDKROOT` to the enhanced derivation.
+- `env-secrets.nix` sets `DEVELOPER_DIR` and `SDKROOT` to the enhanced derivation.
 - `src/hosts/MacBook/activation.nix` runs `macos-remove-command-line-tools.sh` then `xcode-select --switch` on the enhanced SDK.
 
 ## Validation

@@ -329,7 +329,7 @@
         "minLength": 1,
         "type": "string"
       },
-      "description": "WinGet package identifiers and versions. Package ID → version string. Lockfile is the sole version authority — only bump-lockfile may change WinGet versions.",
+      "description": "WinGet package identifiers and versions. Package ID → version string. Lockfile is the sole version authority — only `nucleus-update lockfile` may change WinGet versions.",
       "type": "object"
     }
   },

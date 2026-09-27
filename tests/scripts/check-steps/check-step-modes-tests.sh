@@ -43,12 +43,27 @@ declared_mode() {
 }
 
 # consumes_file_args <step-stem> -- true when the step reads its file arguments
-# anywhere beyond the `local _files=...` declaration. A whole-repo step collects
-# them and never looks at them, which is what makes `full` the honest mode.
+# anywhere beyond collecting them. A whole-repo step declares
+# `local _files=("$@")` and never looks at it, which is what makes `full` the
+# honest mode.
+#
+# The runner hands a step its arguments through three channels, so all three are
+# checked. Counting `_files` alone let a step that filters through
+# ctx[POSITIONAL_ARGS], or through a bare "$@" it never bound to `_files`, read
+# as whole-repo while it was in fact filtering.
 consumes_file_args() {
-  local _refs
-  _refs=$(grep -c '_files' "$CHECK_STEPS_DIR/$1.sh" 2>/dev/null || true)
-  [ "${_refs:-0}" -gt 1 ]
+  local _f="$CHECK_STEPS_DIR/$1.sh" _refs _decl _dollars
+  [ -f "$_f" ] || return 1
+  # `_files` referenced beyond its own declaration
+  _refs=$(grep -c '_files' "$_f" 2>/dev/null || true)
+  [ "${_refs:-0}" -gt 1 ] && return 0
+  # the runner's positional-argument channel, read directly
+  grep -qE 'POSITIONAL_ARGS' "$_f" 2>/dev/null && return 0
+  # the implicit channel: "$@"/$# read anywhere beyond the canonical declaration
+  _decl=$(grep -c 'local _files=("[$]@")' "$_f" 2>/dev/null || true)
+  _dollars=$(grep -cE '[$]@|[$]#' "$_f" 2>/dev/null || true)
+  [ "${_dollars:-0}" -gt "${_decl:-0}" ] && return 0
+  return 1
 }
 
 # registers_full_form <step-stem> -- true when the call carries all three

@@ -22,7 +22,7 @@
 # Source: https://developer.hashicorp.com/packer/plugins/builders/qemu
 #         https://nixos.org/manual/nixos/stable/index.html#sec-installation-manual
 #
-# ISO URL and checksum are pinned to a specific build.  Run bump-lockfile to
+# ISO URL and checksum are pinned to a specific build.  Run `nucleus-update lockfile` to
 # update them; the lockfile (src/lockfiles/lockfile.json) is the source of truth.
 
 variable "nixos_iso_url" {

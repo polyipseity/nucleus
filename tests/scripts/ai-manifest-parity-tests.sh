@@ -36,12 +36,21 @@ _ai_ps1_manifests() {
     sed 's|\\|/|g'
 }
 
-# The manifest path as ai.ps1's own help text declares it. Empty when the help
-# text does not mention one, which is not a failure on its own. awk rather than
-# `grep | head -1` because a no-match grep exits non-zero, which would abort
-# the suite outright under `set -e` and make the empty case unreachable.
+# WHY scoped to the <# ... #> block: searching the whole file returns the
+# *assignment* rather than the documented path, and a test that compares the code
+# against itself then passes whatever the code says.
+# Scoped to every comment block, not just the first, so this twin and the .ps1
+# twin agree on which lines are eligible; a second block added later must not make
+# them diverge silently.
+# Empty when the help text does not mention one, which is not a failure on its own.
+# awk rather than `grep | head -1` because a no-match grep exits non-zero, which
+# would abort the suite outright under `set -e` and make the empty case unreachable.
 _ai_ps1_documented_manifest() {
-  awk 'match($0, /[A-Za-z0-9_.\/-]*models\.json/) { print substr($0, RSTART, RLENGTH); exit }' "$AI_PS1"
+  awk '
+    /^<#/ { in_help = 1; next }
+    /^#>/ { in_help = 0 }
+    in_help && match($0, /[A-Za-z0-9_.\/-]*models\.json/) { print substr($0, RSTART, RLENGTH); exit }
+  ' "$AI_PS1"
 }
 
 # Deduplicated, sorted form of a path list, so two twins can be compared as

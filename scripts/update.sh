@@ -391,7 +391,7 @@ EOF
       # Query crates.io for the latest stable version (User-Agent required;
       # crates.io returns 403 without it), falling back to cargo search.
       # check-suppress:suppression_doc: crates.io API may be unreachable or return a non-JSON error page; the cargo search fallback handles failure.
-      new=$(curl -fsSL -A "nucleus-bump-lockfile" "https://crates.io/api/v1/crates/$key" 2>/dev/null | jq -r '.crate.max_stable_version // .versions[0].num // empty' 2>/dev/null) || new=""
+      new=$(curl -fsSL -A "nucleus-update-lockfile" "https://crates.io/api/v1/crates/$key" 2>/dev/null | jq -r '.crate.max_stable_version // .versions[0].num // empty' 2>/dev/null) || new=""
       if [ -z "$new" ]; then
         # check-suppress:suppression_doc: cargo may be unavailable or the crate unpublished; the warn path reports the failure.
         new=$(cargo search --limit 1 "$key" 2>/dev/null | awk -v k="$key" -F' = ' '$1 == k {gsub(/"/, "", $2); sub(/[[:space:]].*/, "", $2); print $2; exit}') || new=""

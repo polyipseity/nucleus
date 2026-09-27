@@ -24,7 +24,7 @@
 #         https://github.com/cirruslabs/tart
 #         https://github.com/cirruslabs/macos-image-templates
 #
-# Base image OCI reference is pinned by digest.  Run bump-lockfile to update;
+# Base image OCI reference is pinned by digest.  Run `nucleus-update lockfile` to update;
 # the lockfile (src/lockfiles/lockfile.json) is the source of truth.
 
 variable "macos_version" {

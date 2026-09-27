@@ -677,6 +677,23 @@ _replay_step_output() {
   fi
 }
 
+# --- _step_reports_no_scope ---
+# True when a step's captured output carries the no-scope convention. A
+# filtering step whose scope was empty exits 0, so without this its only news —
+# why it checked nothing — is discarded and a ✓ sits beside a step that did no
+# work. Matching the message couples the runner to prose, which
+# no-scope-message-tests.sh turns into an enforced invariant over every step.
+_step_reports_no_scope() {
+  local _out="$_wave_tmpdir/step-${_STEP_NUMBERS[$1]}.out"
+  [ -f "$_out" ] || return 1
+  # WHY the label branch: every step emits through say/Write-Message, which
+  # prefix `<label>: `, so a real line reads `05-lockfile-validation: 0 lockfile
+  # files in scope — nothing to validate.` and never starts with `0`. Anchoring
+  # at the label boundary, not the line start, is what makes this match in
+  # production; an earlier `^0 ` anchor matched only a bare echo in the test.
+  grep -qE '(^|: )0 .+ in scope' "$_out"
+}
+
 # --- _report_fail_fast ---
 # Reports the steps that failed before a fail-fast abort. A fail-fast abort exits
 # before aggregate_results, which is the only other place step output is replayed,
@@ -742,6 +759,13 @@ aggregate_results() {
     fi
     # Always replay failed steps regardless of verbose mode
     if [ "$_exit_code" -ne 0 ]; then
+      _should_replay=true
+    fi
+    # WHY: also replay a passing step that had nothing in scope. Its exit code is
+    # 0 and its output is otherwise dropped, so the run reports the same ✓ for
+    # "checked and found nothing" and "never ran" — the ambiguity this removes.
+    # Exit codes are untouched.
+    if _step_reports_no_scope "$_i"; then
       _should_replay=true
     fi
     if $_should_replay; then

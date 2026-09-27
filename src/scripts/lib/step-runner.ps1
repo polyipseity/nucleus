@@ -753,6 +753,26 @@ function Write-StepReplay {
   }
 }
 
+# --- Test-StepReportsNoScope ---
+# True when a step's captured output carries the no-scope convention. A
+# filtering step whose scope was empty exits 0, so without this its only news —
+# why it checked nothing — is discarded and a ✓ sits beside a step that did no
+# work. Matching the message couples the runner to prose, which
+# no-scope-message-tests.sh turns into an enforced invariant over every step.
+function Test-StepReportsNoScope {
+  param([Parameter(Mandatory)][int]$Number)
+  $outFile = Join-Path $script:WaveTmpDir "step-$Number.out"
+  if (-not (Test-Path $outFile)) { return $false }
+  # WHY the label branch: Write-Message renders "<label>: <message>", so a real
+  # line reads "05-lockfile-validation: 0 lockfile files in scope — nothing to
+  # validate." and never starts with "0". This mirrors the POSIX pattern in
+  # step-runner.sh so the twins detect the same thing.
+  foreach ($line in @(Get-Content -Path $outFile)) {
+    if ($line -match '(^|: )0 .+ in scope') { return $true }
+  }
+  return $false
+}
+
 # --- Format-FailFastReport ---
 # Reports the steps that failed before a fail-fast abort. The abort exits before
 # Format-StepSummary, which is the only other place step output is replayed, so
@@ -803,11 +823,16 @@ function Format-StepSummary {
       $failedSteps = "$failedSteps$n "
     }
 
-    # Replay step output (verbose mode or failed steps only)
+    # Replay step output (verbose mode, failed steps, or nothing in scope)
     $stepId = $script:StepIds[$i]
     $isVerbose = $script:VerboseIds -contains '*' -or $script:VerboseIds -contains $stepId
     $isFailed = $exitCode -ne '0'
-    if ($isVerbose -or $isFailed) {
+    # WHY: also replay a passing step that had nothing in scope. Its exit code is
+    # 0 and its output is otherwise dropped, so the run reports the same ✓ for
+    # "checked and found nothing" and "never ran" — the ambiguity this removes.
+    # Exit codes are untouched.
+    $isNoScope = Test-StepReportsNoScope -Number $n
+    if ($isVerbose -or $isFailed -or $isNoScope) {
       Write-StepReplay -Number $n
     }
   }
