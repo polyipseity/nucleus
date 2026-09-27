@@ -17,9 +17,9 @@ Wrong comments are **deleted, not corrected**. Correction preserves the assumpti
 
 These comments are usually agent-written, and the characteristic failure is a plausible, confident claim about code the author never verified. If a comment cannot be verified from the file in front of you, it does not get written.
 
-A truthful comment marking a genuine, still-open gap is neither wrong nor low-value and stays: it is what stops unexecuted work being read as completed work, and rewording it as the gap narrows is not the upkeep below.
-
 A comment that has to be reworded every time the code underneath it changes is the one exception to the deletion test: the upkeep has already cost more than the comment returns, so cut it.
+
+A truthful comment marking a genuine, still-open gap is neither wrong nor low-value and stays: it is what stops unexecuted work being read as completed work, and rewording it as the gap narrows is not upkeep.
 
 ## Nix files (`src/**/*.nix`)
 
