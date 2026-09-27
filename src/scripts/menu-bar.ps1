@@ -69,10 +69,18 @@ $ErrorActionPreference = 'Stop'
 $modulePath = Join-Path $PSScriptRoot '..\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
-if ($Help -or -not $Action) {
-  if (-not $Action) { Write-NucleusError "missing action (list, status, show, hide, apply, verify)" }
+if ($Help) {
   Get-Help $PSCommandPath -Detailed
   exit 0
+}
+
+# A missing action is an error, matching menu-bar.sh (message on stderr, exit 1).
+# Sync-MenuBar.ps1:49 throws on a non-zero exit, so this file's exit status is
+# load-bearing, though that caller always passes apply and never reaches here.
+# The exit is stated rather than left to how Write-NucleusError ends the script.
+if (-not $Action) {
+  Write-NucleusError "missing action (list, status, show, hide, apply, verify)"
+  exit 1
 }
 
 # ---------------------------------------------------------------------------

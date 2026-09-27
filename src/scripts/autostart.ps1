@@ -60,10 +60,18 @@ $ErrorActionPreference = 'Stop'
 $modulePath = Join-Path $PSScriptRoot '..\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
-if ($Help -or -not $Action) {
-  if (-not $Action) { Write-NucleusError "missing action (list, status, enable, disable, apply, verify)" }
+if ($Help) {
   Get-Help $PSCommandPath -Detailed
   exit 0
+}
+
+# A missing action is an error, matching autostart.sh (message on stderr, exit 1).
+# Sync-AppAutostart.ps1:47 throws on a non-zero exit, so this file's exit status
+# is load-bearing, though that caller always passes apply and never reaches here.
+# The exit is stated rather than left to how Write-NucleusError ends the script.
+if (-not $Action) {
+  Write-NucleusError "missing action (list, status, enable, disable, apply, verify)"
+  exit 1
 }
 
 # ---------------------------------------------------------------------------
