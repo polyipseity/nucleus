@@ -44,6 +44,34 @@ Describe 'Get-NucleusCommandName' {
   }
 }
 
+Describe 'entry point prefix derivation' {
+  # A Pester It block cannot show this: the outermost call frame there is
+  # Pester.psm1, so the derived name is Pester under any implementation. The
+  # probe runs in a child pwsh so the outermost frame is a real script file,
+  # which is the condition production runs under.
+  It "uses the calling script's name rather than the module's" {
+    $probeName = 'entrypoint-prefix-probe'
+    $probePath = Join-Path $TestDrive "$probeName.ps1"
+    $probeBody = @(
+      "Import-Module `$env:NUCLEUS_OUTPUT_MODULE -Force -DisableNameChecking"
+      "`$ErrorActionPreference = 'Continue'"
+      "Write-NucleusError 'probe' -ErrorAction Continue"
+    ) -join "`n"
+    Set-Content -Path $probePath -Value $probeBody
+
+    $previousModule = $env:NUCLEUS_OUTPUT_MODULE
+    $env:NUCLEUS_OUTPUT_MODULE = $modulePath
+    try {
+      $output = & (Get-Command pwsh).Source -NoProfile -File $probePath 2>&1 | Out-String
+    } finally {
+      $env:NUCLEUS_OUTPUT_MODULE = $previousModule
+    }
+
+    $output | Should -Match "$probeName`: error: probe"
+    $output | Should -Not -Match 'Format-NucleusOutput: error'
+  }
+}
+
 Describe 'Write-NucleusInfo' {
   It 'outputs formatted info message' {
     $result = Write-NucleusInfo 'hello world' 6>&1
@@ -52,7 +80,8 @@ Describe 'Write-NucleusInfo' {
 
   It 'outputs with command name prefix' {
     $result = Write-NucleusInfo 'test' 6>&1
-    # Should start with a word (the command name) followed by ": "
+    # Constrains the prefix to one token then ": ". That token is Pester under a
+    # runner, so the derivation itself is covered by the child probe above.
     $result | Should -Match '^[a-zA-Z][a-zA-Z0-9-]*: test$'
   }
 

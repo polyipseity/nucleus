@@ -38,6 +38,9 @@ if ($env:NO_COLOR) {
     $script:NucleusColorOn = $true
 }
 
+# Entry-point name for the F1 prefix, in module scope so a re-import starts fresh.
+$script:NucleusCommandNameCache = $null
+
 # Semantic inline tokenizer (F spec, "more console colors"): single-quoted
 # spans -> blue, URLs -> underline cyan, only when color is on; byte-identical
 # passthrough otherwise. Quote pass runs first so URLs inside quotes still read
@@ -101,11 +104,26 @@ function Get-NucleusCommandName {
     .SYNOPSIS
         Derive the short command name for the F1 output prefix.
     .PARAMETER Path
-        Script path to derive from (defaults to the current command's file).
+        Script path to derive from. Defaults to the calling entry point, which is
+        the outermost frame on the call stack.
     #>
     param(
-        [string]$Path = $PSCommandPath
+        [string]$Path
     )
+    if (-not $Path) {
+        # WHY: $PSCommandPath inside a module is this module rather than the entry
+        # point that called it, so every grouped script printed
+        # "Format-NucleusOutput:" as its prefix. For a file caller the outermost
+        # frame is the entry point, because a call can cross nested modules on the
+        # way in. Get-PSCallStack is not free, so the name is resolved once per
+        # process. -Path overrides it for a dot-sourced caller whose path is not the
+        # process entry point.
+        if (-not $script:NucleusCommandNameCache) {
+            $frames = @(Get-PSCallStack | Where-Object { $_.ScriptName })
+            $script:NucleusCommandNameCache = $frames[-1].ScriptName
+        }
+        $Path = $script:NucleusCommandNameCache
+    }
     $name = [System.IO.Path]::GetFileNameWithoutExtension($Path)
     if ($name -like 'nucleus-*') {
         $name = $name.Substring(8) # strip 'nucleus-'
