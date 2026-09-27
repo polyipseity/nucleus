@@ -85,7 +85,7 @@ Use `admin` for primary/elevated users and `guest` for secondary/unprivileged us
 
 ## Tooling alignment
 
-Keep script behavior consistent with CI, `AGENTS.md`, and prompt guidance. If a script wraps project tooling, keep underlying commands discoverable. When script location or behavior changes, re-check `.github/workflows/ci.yml`, `.vscode/settings.json`, and any prompt or instruction files that reference it.
+Keep script behavior consistent with CI, `AGENTS.md`, and prompt guidance. If a script wraps project tooling, keep underlying commands discoverable. When script location or behavior changes, re-check `.github/workflows/ci.yml`, and any prompt or instruction files that reference it.
 
 ## apply.sh health-check SOPS identity
 

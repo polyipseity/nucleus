@@ -1,7 +1,7 @@
 ---
 description: "Use when editing shell module configuration, zsh alias/function interaction, or shell history exclusion rules."
 name: "Shell Conventions"
-applyTo: "src/modules/shell*.nix, src/scripts/shell/**"
+applyTo: "src/modules/shell/**, src/scripts/shell/**"
 ---
 
 # Shell conventions

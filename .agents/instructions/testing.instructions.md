@@ -23,7 +23,7 @@ Both accept `--fail-fast` / `--no-fail-fast`. prek hooks use defaults; CI always
 # Nix tests
 nix-instantiate --eval tests/modules/core-tests.nix
 nix-instantiate --eval tests/modules/module-imports-tests.nix
-nix-instantiate --eval --strict -A summary tests/modules/vm-setup-tests.nix  # VM setup (attr `summary`)
+nix-instantiate --eval --strict -A summary tests/modules/vm-setup-manifest-tests.nix  # VM setup (attr `summary`)
 cd src && nix flake check
 ```
 

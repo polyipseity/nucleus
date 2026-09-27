@@ -1,7 +1,7 @@
 ---
 description: "Use when adding, renaming, or reviewing nucleus command-surface entries (flake apps, scripts/*.sh/.ps1, or subcommand dispatch). Covers the canonical command set, the no-new-single-purpose-command rule, internal-invocation policy, Windows parity, completion generation, and the agent-host-shell wrapper location."
 name: "Nucleus Command Surface"
-applyTo: "src/flake.nix, scripts/**/*.sh, scripts/**/*.ps1, src/scripts/**/*.sh, src/scripts/completions/**, src/modules/shell.nix"
+applyTo: "src/flake.nix, scripts/**/*.sh, scripts/**/*.ps1, src/scripts/**/*.sh, src/scripts/completions/**, src/modules/shell/default.nix"
 ---
 
 # Nucleus command surface
@@ -38,7 +38,7 @@ PATH commands are for users only. Internal calls couple activation to a user-ins
 
 All nucleus commands declared once in `mkNucleusApps` (`src/flake.nix`). Surfaces derive automatically:
 
-- `home.packages` (`src/modules/shell.nix`) spreads `nucleusApps` onto PATH.
+- `home.packages` (`src/modules/shell/default.nix`) spreads `nucleusApps` onto PATH.
 - The flake `apps` output derives via `mkNucleusAppsAsFlakeApps` (strips `nucleus-` prefix for `nix run .#<name>`).
 - The `packages` flake output spreads `nucleusApps`.
 

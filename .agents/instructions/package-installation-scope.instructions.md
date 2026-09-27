@@ -47,7 +47,7 @@ Project-specific work. Managed default for repos without direnv/Nix: `bun`, `car
 
 ## Adding/changing blocked tools
 
-1. Add to `src/modules/shell.nix` (`initContent`), follow existing pattern. 2. Add equivalent to `src/scripts/shell/profile.ps1`. 3. Update this file. 4. If devShell tool, add to `devShells.default` in `src/flake.nix`. `DIRENV_DIR` pass-through required in every blocking function. Not blocked: `cargo-binstall`, `cargo-cache`, `rustup`, `ruff`, `ty`.
+1. Add to `src/modules/shell/default.nix` (`initContent`), follow existing pattern. 2. Add equivalent to `src/scripts/shell/profile.ps1`. 3. Update this file. 4. If devShell tool, add to `devShells.default` in `src/flake.nix`. `DIRENV_DIR` pass-through required in every blocking function. Not blocked: `cargo-binstall`, `cargo-cache`, `rustup`, `ruff`, `ty`.
 
 ## Tool installation
 

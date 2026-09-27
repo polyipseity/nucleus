@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or editing virtual machine provisioning across hosts, VM manifests, or VM test files."
 name: "VM Management"
-applyTo: "scripts/vm.*, scripts/vm-setup.*, src/scripts/lib/vm.sh, src/scripts/vms/**, src/hosts/*/vms.nix, src/modules/vms/**, src/secrets/users-*.yml, tests/modules/vm-setup-tests.nix, src/vms/**, src/platforms/Windows/modules/system/Invoke-VMSetup.ps1, src/platforms/Windows/modules/system/Invoke-AndroidConfig.ps1"
+applyTo: "scripts/vm.*, src/scripts/lib/vm.sh, src/scripts/vms/**, src/hosts/*/vms.nix, src/modules/vms/**, src/secrets/users/*.yml, tests/modules/vm-setup-manifest-tests.nix, src/vms/**, src/platforms/Windows/modules/system/Invoke-VMSetup.ps1, src/platforms/Windows/modules/system/Invoke-AndroidConfig.ps1"
 ---
 
 # VM Management
@@ -25,7 +25,7 @@ Guest OSes match host hostnames. Values from `hostname` in `VMs.json`: Androidâ†
 
 ## Guest credentials
 
-From per-user SOPS secrets, never host login. Keys: `vm_guest_username`, `vm_guest_password` via `vmGuest` in user registry. Setup scripts decrypt and inject. Drift must invalidate stale artifacts. SSH keys: `src/modules/vm-guest-ssh-public-key-paths.json`. Update `tests/modules/vm-setup-tests.nix` when changing.
+From per-user SOPS secrets, never host login. Keys: `vm_guest_username`, `vm_guest_password` via `vmGuest` in user registry. Setup scripts decrypt and inject. Drift must invalidate stale artifacts. SSH keys: `src/modules/vm-guest-ssh-public-key-paths.json`. Update `tests/modules/vm-setup-manifest-tests.nix` when changing.
 
 
 
@@ -42,7 +42,7 @@ Paired native implementations (not bash on Windows):
 
 **Privileged access:** Magisk `su` only. **Never `adb root`.** `--root` sets `persist.sys.root_access=3`; `ro.debuggable` stays `0`.
 
-**Change checklist:** `VMs.json` + `VMs.schema.json`, `vm.sh`, `vm.ps1`, Windows modules, `tests/scripts/android-config-tests.{sh,ps1}`, `tests/integration/android-config-parity-tests.nix`, `tests/modules/vm-setup-tests.nix`, all `MANUAL.md`.
+**Change checklist:** `VMs.json` + `VMs.schema.json`, `vm.sh`, `vm.ps1`, Windows modules, `tests/scripts/android-config-tests.{sh,ps1}`, `tests/integration/android-config-parity-tests.nix`, `tests/modules/vm-setup-manifest-tests.nix`, all `MANUAL.md`.
 
 ## Android UTM freeze
 
@@ -80,7 +80,7 @@ POSIX `apply.sh` runs `nucleus-vm sync` unless `--no-vm-sync`. Windows `apply.ps
 
 1. Add entry to `src/modules/vms/VMs.json` with all required fields.
 2. Run `nucleus-vm setup` on all host platforms.
-3. Add test in `tests/modules/vm-setup-tests.nix` if platform-specific constraints exist.
+3. Add test in `tests/modules/vm-setup-manifest-tests.nix` if platform-specific constraints exist.
 4. Update `src/hosts/<platform>/MANUAL.md` if manual steps required.
 
 ## VM image building

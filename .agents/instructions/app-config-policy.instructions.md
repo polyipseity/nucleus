@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or editing configs in src/modules/configs/ or modifying application settings. Covers config methods, storage selection, per-user overrides, cross-platform parity, and testing."
 name: "Application Config Policy"
-applyTo: "src/modules/configs/**, src/modules/**/*.nix, src/hosts/**/*.nix, src/platforms/Windows/modules/**/*.ps1, src/flake.nix, src/users/**/*.json, tests/modules/*-tests.nix, tests/integration/*-tests.nix, tests/hosts/**/*-tests.nix"
+applyTo: "src/modules/configs/**, src/modules/**/*.nix, src/hosts/**/*.nix, src/platforms/Windows/modules/**/*.ps1, src/flake.nix, src/users/**/*.json, tests/modules/*-tests.nix, tests/integration/*-tests.nix"
 ---
 
 # Application config policy
@@ -47,7 +47,7 @@ Script reads config directly via `$NUCLEUS_REPO_ROOT`. For nucleus-owned scripts
 
 `src/modules/configs/<name>/lib/` holds host-specific overrides auto-loaded by the application (e.g. direnv `lib/*.sh`). Platform-specific; deploying to other hosts is dead code. Rules: base config valid on all hosts; overrides deploy only on needed hosts; document in lib file header and deployment module comment; N/A for hosts without the app.
 
-Example: `src/users/default/direnv/lib/apple-sdk-override.sh` — macOS `_nix()` override, deployed on POSIX via `shell.nix`; Windows deploys only base `direnvrc`.
+Example: `src/users/default/direnv/lib/apple-sdk-override.sh` — macOS `_nix()` override, deployed on POSIX via `shell/default.nix`; Windows deploys only base `direnvrc`.
 
 ### User-scoped configs
 

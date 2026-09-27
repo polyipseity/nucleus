@@ -1,22 +1,22 @@
 ---
-description: "Use when adding, updating, or reviewing AI model selections in src/modules/ai/models.json, VS Code chatLanguageModels host files, scripts/ai-sync.sh, src/platforms/Windows/modules/Invoke-AISync.ps1, or src/modules/ai/default.nix."
+description: "Use when adding, updating, or reviewing AI model selections in src/modules/configs/ollama/models.json, VS Code chatLanguageModels host files, scripts/ai.sh, src/platforms/Windows/modules/system/Invoke-AISync.ps1, or src/modules/ai.nix."
 name: "AI Model Selection"
-applyTo: "src/modules/ai.nix, src/modules/configs/ollama/**, src/modules/configs/litellm/**, src/users/*/vscode/chatLanguageModels.*.json, src/hosts/*/ai.nix, scripts/ai-sync.sh, scripts/ai-sync.ps1, src/platforms/Windows/modules/system/Invoke-AISync.ps1, src/platforms/Windows/modules/system/Sync-LiteLLMService.ps1"
+applyTo: "src/modules/ai.nix, src/modules/configs/ollama/**, src/modules/configs/litellm/**, src/users/*/vscode/chatLanguageModels.*.json, src/hosts/*/ai.nix, src/platforms/Windows/modules/system/Invoke-AISync.ps1, src/platforms/Windows/modules/system/Sync-LiteLLMService.ps1"
 ---
 
 # AI Model Selection
 
 ## Profile key convention
 
-`src/modules/ai/models.json` keys by **host name** (PascalCase, matching `networking.hostName` / `ComputerName`):
+`src/modules/configs/ollama/models.json` keys by **host name** (PascalCase, matching `networking.hostName` / `ComputerName`):
 
 | Key | Host | Resolved by |
 | --- | --- | --- |
-| `MacBook` | macOS | `ai-sync.sh` Darwin branch |
-| `NixOS` | NixOS | `ai-sync.sh` wildcard branch |
+| `MacBook` | macOS | `scripts/ai.sh` |
+| `NixOS` | NixOS | `scripts/ai.sh` |
 | `Windows` | Windows | `Invoke-AISync.ps1` |
 
-Exact hostname only — no lowercase, no generic names. New hosts: update detection in both `ai-sync.sh` and `Invoke-AISync.ps1`.
+Exact hostname only — no lowercase, no generic names. New hosts: update detection in `Invoke-AISync.ps1`.
 
 ## Hardware constraints
 
@@ -28,7 +28,7 @@ Exact hostname only — no lowercase, no generic names. New hosts: update detect
 
 ## Cross-file sync
 
-Update in the same change: `src/modules/ai/models.json`, `src/users/default/vscode/chatLanguageModels.{MacBook,NixOS,Windows}.json`, and the manifest comment in `src/modules/ai/default.nix`. Each host's `chatLanguageModels` IDs must be a subset of the host key in `models.json`. No stale entries.
+Update in the same change: `src/modules/configs/ollama/models.json`, `src/users/default/vscode/chatLanguageModels.{MacBook,NixOS,Windows}.json`. Each host's `chatLanguageModels` IDs must be a subset of the host key in `models.json`. No stale entries.
 
 ## Quantization
 
@@ -44,7 +44,7 @@ Tags: `<base>-<quant>`. No q3 or lower GGUF variants exist in Ollama.
 | `mxfp8` | ~1.5× | good | NVIDIA GPU or Apple MLX |
 | `mlx-bf16` | ~2× | near-lossless | Apple MLX; MacBook with headroom |
 
-**Preference**: larger param count > better quantization. 27B `q4_K_M` > 14B `q8_0`. **MacBook**: `q4_K_M` default; `it-qat` when available; `e4b-it-bf16` for `gemma4:e4b`. **NixOS/Windows**: `q4_K_M` only. Metadata in `src/modules/ai/models.json` + `src/modules/ai/default.nix` — do not duplicate.
+**Preference**: larger param count > better quantization. 27B `q4_K_M` > 14B `q8_0`. **MacBook**: `q4_K_M` default; `it-qat` when available; `e4b-it-bf16` for `gemma4:e4b`. **NixOS/Windows**: `q4_K_M` only. Metadata lives in `src/modules/configs/ollama/models.json`; do not duplicate it.
 
 ## Tool-calling verification
 

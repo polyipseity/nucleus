@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or modifying package manager installations, configuration, or setup scripts. Covers supply chain delay defaults enforced across all managed package managers."
 name: "Supply Chain Hardening"
-applyTo: "src/modules/shell*.nix, src/modules/agents.nix, src/modules/pwsh.nix, src/hosts/Windows/user/env.dsc.yml, src/platforms/Windows/modules/**/*.ps1, scripts/check.sh, scripts/check.ps1, scripts/update.sh, scripts/update.ps1, src/lockfiles/lifecycle-allowlist.json"
+applyTo: "src/modules/shell/**, src/modules/agents.nix, src/modules/pwsh.nix, src/hosts/Windows/user/env.dsc.yml, src/platforms/Windows/modules/**/*.ps1, scripts/check.sh, scripts/check.ps1, scripts/update.sh, scripts/update.ps1, src/lockfiles/lifecycle-allowlist.json"
 ---
 
 # Supply chain hardening
@@ -12,8 +12,8 @@ All managed package managers must have a minimum release age delay to limit expo
 
 | Package manager | Mechanism | Setting | File(s) |
 | --------------- | ---------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| **bun** | `~/.bunfig.toml` | `[install] minimumReleaseAge = 432000` (5 days in seconds), `exact = true` | `src/modules/shell.nix`, `src/platforms/Windows/modules/user/Sync-ShellProfile.ps1` |
-| **uv** | `uv.toml` | `exclude-newer = "P5D"` (ISO 8601 duration) + `add-bounds = "exact"` | `src/modules/shell.nix`, `src/platforms/Windows/modules/user/Sync-ShellProfile.ps1` |
+| **bun** | `~/.bunfig.toml` | `[install] minimumReleaseAge = 432000` (5 days in seconds), `exact = true` | `src/modules/shell/default.nix`, `src/platforms/Windows/modules/user/Sync-ShellProfile.ps1` |
+| **uv** | `uv.toml` | `exclude-newer = "P5D"` (ISO 8601 duration) + `add-bounds = "exact"` | `src/modules/shell/default.nix`, `src/platforms/Windows/modules/user/Sync-ShellProfile.ps1` |
 | **PSGallery** (PowerShell modules) | none upstream | version pin, plus the nupkg SHA256 (`hash`) for hash-pinned entries | `src/lockfiles/lockfile.json` (`psgallery`) |
 
 ## Package managers without delay features
@@ -39,11 +39,11 @@ PSGallery has no release-age feature at all, and nixpkgs packages none of the mo
 2. **Overlap detection** — no package name in multiple sections (except intentional, see `allow-and-deny-lists.instructions.md#D1`).
 3. **Lifecycle allowlist validation** — see above.
 
-With `--online` (requires network): 4. **Freshness** — `bump-lockfile.sh --verify` queries registries, diffs against current. 5. **Yanked/removed detection** — confirms pinned versions still exist.
+With `--online` (requires network): 4. **Freshness** — `update.sh lockfile --verify` queries registries, diffs against current. 5. **Yanked/removed detection** — confirms pinned versions still exist.
 
 ## Adding a new package manager
 
-1. Check for delay support (`minimum-release-age`, `exclude-newer`, install-delay env var). If yes: configure `"5 days"` in `src/modules/shell.nix` and `src/platforms/Windows/modules/user/Sync-ShellProfile.ps1`. If no: add note to table, rely on lockfile pinning.
+1. Check for delay support (`minimum-release-age`, `exclude-newer`, install-delay env var). If yes: configure `"5 days"` in `src/modules/shell/default.nix` and `src/platforms/Windows/modules/user/Sync-ShellProfile.ps1`. If no: add note to table, rely on lockfile pinning.
 2. Check for `--ignore-scripts` or `--no-build` equivalent. If yes: configure in `src/modules/agents.nix`.
 3. If lifecycle scripts needed: add to `src/lockfiles/lifecycle-allowlist.json` with justifications.
 4. Ensure CI uses locked mode (`--frozen`, `--locked`).

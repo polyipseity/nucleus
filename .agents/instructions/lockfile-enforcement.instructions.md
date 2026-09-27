@@ -1,7 +1,7 @@
 ---
-description: "Use when editing src/lockfiles/lockfile.json, the lockfile enforcement lib (used by bump-lockfile verify), or bump-lockfile. Covers the two-tier (pinned vs suggestions) model, the warn-only→suggestions invariant, the no-cross-lockfile-duplication policy, and canonical section classification."
+description: "Use when editing src/lockfiles/lockfile.json, the lockfile enforcement lib (used by the update lockfile action), or that action. Covers the two-tier (pinned vs suggestions) model, the warn-only→suggestions invariant, the no-cross-lockfile-duplication policy, and canonical section classification."
 name: "Lockfile Enforcement"
-applyTo: "src/lockfiles/lockfile.json, src/lockfiles/lockfile.schema.json, src/scripts/checks/check-steps/05-lockfile-validation.*, src/scripts/checks/lockfile-enforcement-lib.*, src/platforms/Windows/modules/user/Sync-Superpowers.ps1, src/platforms/Windows/modules/user/Sync-OpenCodeConfig.ps1, scripts/bump-lockfile.*"
+applyTo: "src/lockfiles/lockfile.json, src/lockfiles/lockfile.schema.json, src/scripts/checks/check-steps/05-lockfile-validation.*, src/scripts/checks/lockfile-enforcement-lib.*, src/platforms/Windows/modules/user/Sync-SuperpowersPlugin.ps1, src/platforms/Windows/modules/user/Sync-OpenCodeConfig.ps1"
 ---
 
 # Lockfile enforcement
@@ -62,7 +62,7 @@ Removed: `suggestions.nixpkgs`, `suggestions.homebrew.brews`/`casks`. Retained: 
 
 ## Shared probe library
 
-Probe logic lives in a shared lib used by `bump-lockfile --verify-installed` (and Windows equivalent). Not wired into repo check/test steps — validates the provisioned machine only. Check step `05-lockfile-validation.*` does structural validation separately, does not source the enforcement lib.
+Probe logic lives in a shared lib used by `update.sh lockfile --verify-installed` (and Windows equivalent). Not wired into repo check/test steps — validates the provisioned machine only. Check step `05-lockfile-validation.*` does structural validation separately, does not source the enforcement lib.
 
 Probes are scoped: only packages the current host declares in `src/modules/packages/desired.json` are checked, so a pin kept for another host (or a lockfile entry no host declares) is never reported as drift. A tool declared with `pin: "flake:<node>"` has no lockfile version at all, so it is verified by revision instead: `Resolve-NucleusFlakePin` (shared with `Invoke-UvSetup`) resolves the node from `src/flake.lock`, and the probe compares that revision with the commit uv recorded for the install (PEP 610 `direct_url.json`). Object-shaped (`{source, rev}`) lockfile pins are verified the same way on both hosts.
 
@@ -73,15 +73,15 @@ What this cannot prove: the probes observe an already-provisioned machine, so a 
 `cursor.superpowers` is the single pin (source + rev); `suggestions.opencode` no longer duplicates it.
 
 - **POSIX**: `builtins.fetchGit` in `src/modules/agents.nix` checks the rev out at Nix build time and activation symlinks `<nucleusUserRoot>/plugins/superpowers` → the store path. `_lfe_check_superpowers` verifies the symlink targets `/nix/store/`.
-- **Windows**: `Sync-Superpowers.ps1` clones the pin into `%LOCALAPPDATA%\nucleus\plugins\superpowers` and checks out the rev (detached HEAD); it then links the pi extension and the opencode plugin. `Invoke-LockfileEnforcement` verifies the checkout's HEAD matches the pinned rev.
+- **Windows**: `Sync-SuperpowersPlugin.ps1` clones the pin into `%LOCALAPPDATA%\nucleus\plugins\superpowers` and checks out the rev (detached HEAD); it then links the pi extension and the opencode plugin. `Invoke-LockfileEnforcement` verifies the checkout's HEAD matches the pinned rev.
 - Skill files are layered into `~/.agents/skills/` from `<plugin>/skills` (the agents-skills sync takes an extra source directory).
 
-- POSIX: `src/scripts/checks/lockfile-enforcement-lib.sh` (`_lfe_check_*`, `verify_installed_versions`). `bump-lockfile --verify-installed` calls `verify_installed_versions`.
-- Windows: `src/scripts/checks/lockfile-enforcement-lib.ps1` (`Invoke-LockfileEnforcement`). `bump-lockfile -VerifyInstalled` calls it.
+- POSIX: `src/scripts/checks/lockfile-enforcement-lib.sh` (`_lfe_check_*`, `verify_installed_versions`). `update.sh lockfile --verify-installed` calls `verify_installed_versions`.
+- Windows: `src/scripts/checks/lockfile-enforcement-lib.ps1` (`Invoke-LockfileEnforcement`). `update.ps1 -Action lockfile -VerifyInstalled` calls it.
 
-Changing probe logic: edit the shared lib, re-run PSScriptAnalyzer on ps1 files. Enforcement runs only via `bump-lockfile --verify-installed` / `-VerifyInstalled`.
+Changing probe logic: edit the shared lib, re-run PSScriptAnalyzer on ps1 files. Enforcement runs only via `update.sh lockfile --verify-installed` / `-VerifyInstalled`.
 
-## bump-lockfile behavior
+## update lockfile behavior
 
 - `--verify` / `-Verify`: diff-based; exit 1 if lockfile would change (updaters available).
 - `--verify-installed` / `-VerifyInstalled`: compares installed versions against pinned sections; exit 1 on drift; never writes. Always warns for `suggestions`.
