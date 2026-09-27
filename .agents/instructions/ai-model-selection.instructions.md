@@ -1,5 +1,5 @@
 ---
-description: "Use when adding, updating, or reviewing AI model selections in src/modules/configs/ollama/models.json, VS Code chatLanguageModels host files, scripts/ai.sh, src/platforms/Windows/modules/system/Invoke-AISync.ps1, or src/modules/ai.nix."
+description: "Use when adding, updating, or reviewing AI model selections in src/modules/configs/ollama/models.json, VS Code chatLanguageModels host files, scripts/ai.sh, or src/platforms/Windows/modules/system/Invoke-AISync.ps1."
 name: "AI Model Selection"
 applyTo: "src/modules/ai.nix, src/modules/configs/ollama/**, src/modules/configs/litellm/**, src/users/*/vscode/chatLanguageModels.*.json, src/hosts/*/ai.nix, src/platforms/Windows/modules/system/Invoke-AISync.ps1, src/platforms/Windows/modules/system/Sync-LiteLLMService.ps1"
 ---
@@ -51,6 +51,6 @@ Tags: `<base>-<quant>`. No q3 or lower GGUF variants exist in Ollama.
 Before committing a model change relying on tool calling:
 
 1. Start Ollama with the new model.
-2. Run function-call curl test (example in `default.nix` comment block).
-3. Record in `default.nix`: `— tool-calling curl-tested on <host>: PASS` or `FAIL`.
+2. Run a function-call curl test against the running model.
+3. Record the outcome — `tool-calling curl-tested on <host>: PASS` or `FAIL` — in the change's commit message. This rule has no file to record it in, so do not add a comment block to hold the result.
 4. Do not deploy until tool calling passes on that host.
