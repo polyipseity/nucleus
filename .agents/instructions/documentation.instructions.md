@@ -13,7 +13,7 @@ Document **WHY, not WHAT** — rationale, security, tradeoffs — not code resta
 
 A comment earns its place only when its absence could cause a reader to do the wrong thing — change a security constraint, undo a deliberate deviation, or be surprised by an apparent bug. If deleting it changes nothing a reader would do, it is low value and it goes. Not a restatement of the code, not a signpost, not a reassurance, not a narration of the diff.
 
-Wrong comments are **deleted, not corrected**. Correction preserves the assumption that the comment deserved to exist and leaves a re-verification obligation on every future reader; deletion is permanent and cannot rot. A comment whose subject a change deletes goes with the subject — that is the rule, not an exception to it. The same test covers a comment that has to be reworded every time the code underneath it changes, and a comment about another comment: neither survived long enough to be worth the upkeep, so cut them.
+Wrong comments are **deleted, not corrected**. Correction preserves the assumption that the comment deserved to exist and leaves a re-verification obligation on every future reader; deletion is permanent and cannot rot. A comment whose subject a change deletes goes with the subject — that is the rule, not an exception to it. The same test covers a comment that has to be reworded every time the code underneath it changes: the upkeep has already cost more than the comment returns, so cut it.
 
 These comments are usually agent-written, and the characteristic failure is a plausible, confident claim about code the author never verified. If a comment cannot be verified from the file in front of you, it does not get written.
 
