@@ -720,6 +720,30 @@ test_nix_lock_serializes() {
   fi
 }
 
+# ---- nixpkgs pinning: a pre-set pin must still reach NIX_PATH ----
+
+# WHY: the pin is a no-op without NIX_PATH, so this asserts on NIX_PATH and not
+# only on the pin variable. A pre-set NUCLEUS_PINNED_NIXPKGS skips the build,
+# and the old early return exported neither variable, leaving the caller's
+# "<nixpkgs>" resolving to the machine's channel instead of the flake's.
+test_nucleus_pin_nixpkgs_exports_nix_path_when_prepinned() {
+  local result
+  # WHY: assigned and exported here rather than inside the $( ) below, because a
+  # modification made in that subshell would never reach the call.
+  local NUCLEUS_PINNED_NIXPKGS=/tmp/nucleus-prepinned
+  export NUCLEUS_PINNED_NIXPKGS
+  result=$(
+    . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+    nucleus_pin_nixpkgs "$REPO_ROOT"
+    echo "NIX_PATH=${NIX_PATH:-}"
+  )
+  if echo "$result" | grep -q "NIX_PATH=nixpkgs=/tmp/nucleus-prepinned"; then
+    assert_pass "a pre-set pin still exports NIX_PATH to the caller's steps"
+  else
+    assert_fail "pin-prepinned-nix-path" "Expected 'NIX_PATH=nixpkgs=/tmp/nucleus-prepinned', got: $result"
+  fi
+}
+
 # ---- Run tests ----
 section 1 "Framework core unit tests (POSIX)"
 echo "Registration arity, token validation, applicability matrix, --only-steps."
@@ -803,5 +827,8 @@ echo "--- Nix lock tests (Phase 9) ---"
 test_nix_lock_runs_command_and_returns_exit
 test_nix_lock_recovers_stale
 test_nix_lock_serializes
+
+echo "--- nixpkgs pinning ---"
+test_nucleus_pin_nixpkgs_exports_nix_path_when_prepinned
 
 finish_tests
