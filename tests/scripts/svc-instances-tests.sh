@@ -302,17 +302,17 @@ assert_eq "a mount table that could not be read counts as mounted" "0" "$_mount_
 assert_mentions "an unreadable mount table is reported" "$_mount_out" "could not read the mount table"
 FAKE_MOUNT_FAIL=''
 
-# WHY: the two-valued predicate cannot tell a mount that is present from a
-#   table that could not be read, so a caller that must report cannot see the
-#   difference. These pin the third answer before anything consumes it.
-_state=""
-_state="$(svc_mount_table_state /mnt/any 10)"
-assert_eq "a readable table without the path is absent" "absent:empty" "$_state"
-
 FAKE_MOUNT_FAIL=1
 _state=""
 _state="$(svc_mount_table_state /mnt/any 10)"
 assert_eq "a table that could not be read is unknown" "unknown:mount-status-1" "$_state"
+# WHY: a reader that failed is what a volume hung in the kernel produces inside
+#   the polling loops, and it is silent for the same reason the not-listed
+#   answer is: a warn here would write one line per tick for the whole timeout.
+#   The token goes to stdout, so only the stream is asserted.
+_state_err=""
+_state_err="$(svc_mount_table_state /mnt/any 10 2>&1 >/dev/null)"
+assert_eq "the state function stays silent when the reader exits non-zero" "" "$_state_err"
 FAKE_MOUNT_FAIL=''
 
 # WHY: FAKE_MOUNT_SLOW makes the reader delay before it answers, so a bound of
@@ -321,6 +321,9 @@ FAKE_MOUNT_SLOW=30
 _state=""
 _state="$(svc_mount_table_state /mnt/any 1)"
 assert_eq "a probe that outlives its bound is unknown" "unknown:probe-bound" "$_state"
+_state_err=""
+_state_err="$(svc_mount_table_state /mnt/any 1 2>&1 >/dev/null)"
+assert_eq "the state function stays silent when the read outlives its bound" "" "$_state_err"
 FAKE_MOUNT_SLOW=''
 
 # WHY: a read that succeeded and printed nothing is genuinely empty, which does
@@ -347,6 +350,20 @@ _mount_err="$(svc_mount_table_contains /mnt/any 2>&1 >/dev/null)" || _mount_rc=$
 assert_eq "a readable table that lists other paths is not mounted" "1" "$_mount_rc"
 assert_eq "the predicate stays silent for a readable table that lists other paths" "" "$_mount_err"
 FAKE_MOUNT_TABLE=""
+
+# WHY: the predicate's case has no *) arm, so a token it does not recognise
+#   falls out of the case and returns the case's own status, which is 0. That
+#   0 is the safe answer, because every caller that acts on it starts nothing,
+#   and a *) arm returning 1 would reintroduce the double-mount hazard, so
+#   nothing else in this suite holds the fall-through in place.
+_fallthrough_rc=0
+(
+  # The token is injected rather than produced: no fixture reaches an
+  # unrecognised state, and a new *) arm is what a future edit would add.
+  svc_mount_table_state() { printf 'unrecognised:token\n'; }
+  svc_mount_table_contains /mnt/any 10
+) >/dev/null 2>&1 || _fallthrough_rc=$?
+assert_eq "a token the predicate does not recognise reads as mounted" "0" "$_fallthrough_rc"
 
 # WHY: present must still read as present through the new function, otherwise
 #   the wrapper in the next step has nothing to wrap. The harness spells the

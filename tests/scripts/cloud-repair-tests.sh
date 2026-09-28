@@ -508,6 +508,11 @@ export FAKE_NO_MOUNT_ON_KICKSTART FAKE_MOUNT_FAIL_ONCE
 assert_eq "a failure alongside an undeterminable mount fails the command" "1" "$(run_repair --timeout 2)"
 assert_mentions "the combined summary names the failure" "$(cat "$_out")" "1 failure(s)"
 assert_mentions "the combined summary names the undeterminable mount" "$(cat "$_out")" "could not determine the state of 1 mount(s)"
+# WHY: the count is the point of a combined run, and the count line names no
+#   mount and no reason, so only the per-row warning says why the drive was left
+#   alone. A reason expansion that lost its token would leave the count
+#   assertion satisfied and the operator with no reason to act on.
+assert_mentions "the combined run names the reason the mount was left alone" "$(cat "$_out")" "mount-status-1"
 # check-suppress:suppression_doc: grep exits 1 on a zero match count, which is the passing case here
 assert_eq "the combined run does not claim success" "0" \
   "$(grep -c 'cloud mounts repaired' "$_out" || true)"
@@ -526,6 +531,22 @@ mark_blocked local.cloud-mount.OneDrive
 FAKE_MOUNT_FAIL_AFTER=1
 export FAKE_MOUNT_FAIL_AFTER
 assert_eq "a mount the verify probe cannot confirm fails the command" "1" "$(run_repair OneDrive --timeout 2)"
+# WHY: every needle in this section is the per-row warning's, and the decision
+#   probe emits the same warning, so a run that stopped before the verify probe
+#   would satisfy all of them. The fake reader counts its reads, so the count is
+#   what says the run got past the decision probe. The comparison is against a
+#   literal rather than against the knob, because a knob that fails the decision
+#   read instead would then satisfy an assertion that reads the knob.
+_table_reads=0
+if [ -e "${FAKE_MOUNTS}.reads" ]; then
+  _table_reads="$(cat "${FAKE_MOUNTS}.reads")"
+fi
+if [ "$_table_reads" -gt 1 ]; then
+  assert_pass "the run reached the verify probe after the decision probe"
+else
+  assert_fail "the run reached the verify probe after the decision probe" \
+    "the table was read $_table_reads time(s), so the run stopped at the decision probe"
+fi
 # check-suppress:suppression_doc: grep exits 1 on a zero match count, which is the passing case here
 assert_eq "an unconfirmable mount is not reported as mounted" "0" \
   "$(grep -c 'mounted: OneDrive' "$_out" || true)"
