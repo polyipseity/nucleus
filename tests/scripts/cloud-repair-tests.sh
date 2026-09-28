@@ -190,6 +190,13 @@ FAKE_PLUTIL
 
 cat >"$_tmp/bin/mount" <<'FAKE_MOUNT'
 #!/usr/bin/env bash
+# WHY: the sibling suite's fake reader can fail, this one cannot, and the case
+#   under test is precisely a table that could not be read at all. Without this
+#   arm the fake can only be slow, which is the 124 path, not the broken-reader
+#   path, and the two are different states in the tri-state.
+if [ -n "${FAKE_MOUNT_FAIL:-}" ]; then
+  exit "$FAKE_MOUNT_FAIL"
+fi
 # WHY: the real sleep, not the fake one: the fake sleep is the thing under test
 #   in this suite, and charging a hung-volume delay to it would make the case
 #   that distinguishes the two meaningless.
@@ -434,5 +441,27 @@ else
   assert_fail "a mount table that outlived its bound" "the path was reported absent, so a repair would mount a volume that may already be attached"
 fi
 reset_world
+
+section "7" "repair does not claim success when the mount table is unreadable"
+
+reset_world local.cloud-mount.OneDrive
+export FAKE_MOUNT_FAIL=1
+# WHY: the bug. An unreadable table answers "present", so repair skipped the
+#   row, counted no failure, still printed "cloud mounts repaired", and still
+#   exited 0. Exit status and message are asserted together, because on the old
+#   code each of them alone would have been satisfiable by accident.
+assert_eq "repair fails when it could not read the mount table" "1" "$(run_repair OneDrive --timeout 2)"
+assert_mentions "an undeterminable mount is named" "$(cat "$_out")" "could not determine"
+# check-suppress:suppression_doc: grep exits 1 on a zero match count, which is the passing case here
+assert_eq "repair does not claim a success it did not have" "0" \
+  "$(grep -c 'cloud mounts repaired' "$_out" || true)"
+unset FAKE_MOUNT_FAIL
+
+reset_world local.cloud-mount.OneDrive
+# WHY: without this, a repair that failed for any other reason would satisfy the
+#   assertions above. The success path must still exit 0 and still say it
+#   repaired the mounts, or the fix has only made repair always fail.
+assert_eq "repair still succeeds when the table can be read" "0" "$(run_repair OneDrive --timeout 2)"
+assert_mentions "repair still reports success on the success path" "$(cat "$_out")" "cloud mounts repaired"
 
 finish_tests

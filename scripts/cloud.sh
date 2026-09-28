@@ -1386,13 +1386,27 @@ do_repair() {
   sleep 5
 
   failures=0
+  undetermined=0
   for row in "${rows[@]}"; do
     IFS="$tab" read -r mount_id label mount_point <<<"$row"
 
-    if svc_mount_table_contains "$mount_point"; then
+    _cm_state="$(svc_mount_table_state "$mount_point")"
+    case "$_cm_state" in
+    present)
       say "mount '$mount_id' is already mounted"
       continue
-    fi
+      ;;
+    unknown:*)
+      # WHY: the table could not be read, so nothing is known about this
+      #   mount. Starting one anyway is what the "unknown answers present"
+      #   rule exists to prevent, and skipping it silently is what made
+      #   repair report a success it did not perform. Count it and fail the
+      #   command so the operator sees the mount was left alone.
+      warn "could not determine whether mount '$mount_id' ($mount_point) is mounted (${_cm_state#unknown:}); leaving it alone"
+      undetermined=$((undetermined + 1))
+      continue
+      ;;
+    esac
 
     say "starting mount '$mount_id'..."
     target="$(_repair_mount_target "$label" "$uid")"
@@ -1433,6 +1447,15 @@ do_repair() {
 
   if [ "$failures" -gt 0 ]; then
     error "repair finished with $failures failure(s); $(fskit_remedy)"
+    exit 1
+  fi
+
+  if [ "$undetermined" -gt 0 ]; then
+    # WHY: a mount left alone because the table could not read it is not a
+    #   repaired mount. Reporting success here is the defect this fixes, so
+    #   the command fails instead, and the count says how many need a
+    #   second look. See fskit_remedy for the operator's next step.
+    error "repair could not determine the state of $undetermined mount(s); those were left alone. $(fskit_remedy)"
     exit 1
   fi
 
