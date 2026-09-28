@@ -13,9 +13,11 @@
     Three groups are declared here rather than inferred, because each one is a
     deliberate design decision:
 
-      * The six POSIX-only capabilities -- accepted and ignored, because
-        Windows has no nix store, no journald and no btrfs /nix/store.  The
-        set is cross-checked against gc.ps1's own help text, so a switch cannot
+      * The six POSIX-only capabilities -- accepted and ignored.  Five of them
+        because Windows has no nix store, no journald and no btrfs
+        /nix/store; nix-artifacts-gc because the all action never calls
+        Invoke-CleanupNix, so the switch has nothing to gate.  The set is
+        cross-checked against gc.ps1's own help text, so a switch cannot
         quietly stop documenting itself as POSIX-only.
 
       * --vm-data-gc -- gc.ps1 spells its counterpart GCVMData, positively.
@@ -67,6 +69,11 @@ BeforeAll {
 
     # The POSIX-only set, spelled as gc.sh flag names so the comparison against
     # gc.sh is direct.  Each is verified against gc.ps1's help text below.
+    # ref: allow-and-deny-lists.instructions.md#D6 -- these switches exist in
+    # gc.ps1 only for CLI parity with gc.sh, and gc.ps1's own help text is the
+    # cross-check, so the list must name exactly the switches that document
+    # themselves POSIX-only. T2 (self-prune): a stale entry breaks the equality
+    # against $Script:DocumentedIgnoredSwitches.
     $Script:PosixOnlyCapabilities = @(
         'duperemove-gc'
         'hm-gc'
@@ -87,6 +94,10 @@ BeforeAll {
     # Every command in gc.ps1 that removes or rewrites state.  git is absent on
     # purpose: gc.ps1 shells out to it for both reads and removals, and only the
     # removals live inside the dry-run-aware helpers.
+    # ref: allow-and-deny-lists.instructions.md#D5 -- a command missing from
+    # this list is silently skipped by the guard walk, so a renamed helper would
+    # disarm the dry-run coverage check instead of failing it. T2 (self-prune):
+    # stale entries error in the destructive-list staleness test.
     $Script:DestructiveCommands = @(
         'Clear-DirectoryContentsIfPresent'
         'Clear-GitCache'
@@ -138,25 +149,35 @@ BeforeAll {
             ForEach-Object { $_.Name }
     )
 
-    function Get-UnguardedDestructiveCallSite {
-        $dryRunAware = @{}
-        foreach ($name in $Script:DryRunAwareFunctions) { $dryRunAware[$name] = $true }
-
+    # The commands the destructive list matches, guarded or not.  Split out of
+    # the guard walk so the total is assertable: a walk that matches nothing is
+    # indistinguishable from a script in which nothing is unguarded.
+    function Get-DestructiveCallNodeList {
         $commandNodes = $Script:GcPs1Ast.FindAll(
             { param($node) $node -is [System.Management.Automation.Language.CommandAst] },
             $true)
 
-        $sites = foreach ($node in $commandNodes) {
-            $name = $node.GetCommandName()
-            # The cargo-cache invocation is a call operator on a member
-            # expression (& $cargoCacheCmd.Source), so it has no command name
-            # and is matched by the shape of its first element instead.
-            $isCargoCacheCall = $node.CommandElements.Count -gt 0 -and
-                $node.CommandElements[0].Extent.Text -match '\$\w+\.Source$'
-            if (($Script:DestructiveCommands -notcontains $name) -and -not $isCargoCacheCall) {
-                continue
+        return @(
+            foreach ($node in $commandNodes) {
+                $name = $node.GetCommandName()
+                # The cargo-cache invocation is a call operator on a member
+                # expression (& $cargoCacheCmd.Source), so it has no command
+                # name and is matched by the shape of its first element instead.
+                $isCargoCacheCall = $node.CommandElements.Count -gt 0 -and
+                    $node.CommandElements[0].Extent.Text -match '\$\w+\.Source$'
+                if (($Script:DestructiveCommands -contains $name) -or $isCargoCacheCall) {
+                    $node
+                }
             }
+        )
+    }
 
+    function Get-UnguardedDestructiveCallSite {
+        $dryRunAware = @{}
+        foreach ($name in $Script:DryRunAwareFunctions) { $dryRunAware[$name] = $true }
+
+        $sites = foreach ($node in (Get-DestructiveCallNodeList)) {
+            $name = $node.GetCommandName()
             $guarded = $false
             # A call into a helper that guards itself is guarded by
             # construction, so the call's own name counts as an ancestor.
@@ -260,7 +281,21 @@ Describe 'nucleus-gc dry-run coverage' {
         # WHY: without this, -DryRun could bind and bind true while the script
         # still collected for real, which is the exact failure that made gc.ps1
         # unusable as a preview.
+        $destructiveCalls = @(Get-DestructiveCallNodeList)
+        $destructiveCalls.Count | Should -BeGreaterThan 0 -Because (
+            'a walk that matched nothing would be indistinguishable from a script in which nothing is unguarded')
         Get-UnguardedDestructiveCallSite | Should -BeNullOrEmpty
+    }
+
+    It 'has no stale entry in the destructive-command list' {
+        # WHY: an entry the walk no longer matches means the command it named
+        # has been renamed or removed, and the coverage check has quietly
+        # stopped covering it. Nothing else in the suite would notice.
+        $matched = @(Get-DestructiveCallNodeList | ForEach-Object { $_.GetCommandName() })
+        foreach ($command in $Script:DestructiveCommands) {
+            $matched | Should -Contain $command -Because (
+                "$command is listed as destructive but the walk no longer matches it, so it is no longer covered (T2)")
+        }
     }
 
     It 'reports a dry run through the existing Write-NucleusDryRun helper' {

@@ -79,6 +79,8 @@ Categories A–D, dummy key rules below. New exclusions: category ID, tier, `# r
 | D2 | `lifecycle-allowlist.json` | All entries | T2 | Supply-chain hardening | Error if stale (`check.sh`) |
 | D3 | `supply-chain-hardening.instructions.md` | Allowlist (cross-ref) | — | External | See that file |
 | D4 | `tests/modules/posix-module-imports-tests.nix` | `hostScopedModules`: `security.nix` | T2 | `security.sudo` is a NixOS-only option, so the macOS-shared `posix/` aggregator cannot carry `security.nix`; the NixOS host imports it directly from its entrypoint | Error if stale (`nix-tests`) |
+| D5 | `tests/platforms/Windows/modules/gc-parity.Tests.ps1` | `$DestructiveCommands` | T2 | A command absent from the list is silently skipped by the dry-run guard walk, so renaming or removing a helper in `scripts/gc.ps1` would disarm the coverage check instead of failing it | Error if stale (`has no stale entry in the destructive-command list`) |
+| D6 | `tests/platforms/Windows/modules/gc-parity.Tests.ps1` | `$PosixOnlyCapabilities` | T2 | `gc.ps1` carries these switches only for CLI parity with `gc.sh`; the list must name exactly the switches that `gc.ps1`'s own help text documents as POSIX-only | Error if stale (`documents exactly the POSIX-only capabilities as accepted and ignored`) |
 
 ## Dummy key management
 
