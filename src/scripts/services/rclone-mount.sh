@@ -112,6 +112,10 @@ _cm_main() {
 
   # Bounded retry loop.
   local attempt=1
+  # Set when the last attach wait ended on a mount table that could not be read.
+  # Read by the per-attempt class below and by the exhaustion record, both of
+  # which need to say "the read failed" rather than "the mount failed".
+  local probe_unknown=false
   while [ "$attempt" -le "$attempts" ]; do
     # If a blocked record exists, do not attempt.
     if svc_health_is_blocked "$instance"; then
@@ -150,8 +154,17 @@ _cm_main() {
     # Wait for the volume to appear.
     local attach_start=$SECONDS
     local live=false
+    local probe_state=""
     while [ $((SECONDS - attach_start)) -lt "$attach_seconds" ]; do
-      if backend_probe "$mount_point"; then
+      # WHY: backend_probe_state, not backend_probe. The two-valued answer is 0
+      #   both for a live mount and for a table that could not be read, and this
+      #   loop acts on that 0 by recording the service running and deleting the
+      #   evidence, so only the three-valued answer is safe here: an unknown
+      #   state falls through to the same poll the absent state takes, spending
+      #   no attempt and issuing no restart of its own, and the budget below is
+      #   what ends the run.
+      probe_state="$(backend_probe_state "$mount_point")"
+      if [ "$probe_state" = present ]; then
         live=true
         break
       fi
@@ -192,6 +205,20 @@ _cm_main() {
     # Mount did not attach — classify the failure.
     local class
     class="$(backend_class "$capture_file")"
+    # WHY: an unreadable table says nothing about the mount. backend_class reads
+    #   rclone's output and answers mount-failed when it finds no cause there,
+    #   which would blame the mount for a read nobody could make and send the
+    #   operator to check the remote. io-transient is the class whose remedy is
+    #   to try again, and what ended this attempt was the budget, not the mount.
+    case "$probe_state" in
+    unknown:*)
+      probe_unknown=true
+      class="io-transient"
+      ;;
+    *)
+      probe_unknown=false
+      ;;
+    esac
     local remedy
     remedy="$(backend_remedy "$class")"
 
@@ -205,15 +232,26 @@ _cm_main() {
 
     notice -l cloud-drives "$instance: attempt $attempt failed (class=$class, $remedy)"
 
+    # WHY: the capture file is dropped on every other path because the class in
+    #   the health record is the whole diagnosis there. On the unreadable-table
+    #   path the class is one this runner chose rather than one rclone's output
+    #   supports, so the file is the only remaining record of what the mount was
+    #   doing while the read kept failing. Kept and named rather than dropped
+    #   silently; at most one file per attempt survives a run.
+    if [ "$probe_unknown" = true ]; then
+      notice -l cloud-drives "$instance: rclone output kept at $capture_file"
+    else
+      rm -f "$capture_file"
+    fi
+    rm -f "$mount_args_file"
+
     # Check if transient — terminal classes stop immediately.
     if ! backend_is_transient "$class"; then
       svc_health_set_blocked "$instance" "$class" "$remedy"
-      rm -f "$capture_file" "$mount_args_file"
       exit 0
     fi
 
     # Transient — backoff and retry.
-    rm -f "$capture_file" "$mount_args_file"
     if [ "$attempt" -lt "$attempts" ]; then
       local backoff
       backoff=$(_cm_get_backoff "$attempt")
@@ -225,7 +263,14 @@ _cm_main() {
   done
 
   # Exhausted all attempts — write blocked record.
+  # WHY: the same reasoning as the per-attempt class. A run that spent its whole
+  #   budget on a table that could not be read has not exhausted the mount, and
+  #   recording mount-failed would point the operator at the remote instead of
+  #   at the read.
   local final_class="mount-failed"
+  if [ "$probe_unknown" = true ]; then
+    final_class="io-transient"
+  fi
   local final_remedy
   final_remedy="$(backend_remedy "$final_class")"
   svc_health_set_blocked "$instance" "$final_class" "$final_remedy"

@@ -156,6 +156,19 @@ backend_probe() {
   svc_mount_table_contains "$1"
 }
 
+# backend_probe_state — the mount table's three-valued answer for a mount point.
+# Args: $1 — mount point.
+# Prints: present, absent:<reason> or unknown:<reason>. Always returns 0.
+# WHY: backend_probe cannot tell a path that IS mounted from a table that could
+#   not be read, because it answers 0 for both so that no caller starts a mount
+#   on a volume it could not disprove. The attach wait loop in rclone-mount.sh is
+#   a caller that reports rather than acts — it sets live on the answer, and then
+#   records the service running and deletes the capture file — so it reads this
+#   instead and keeps the third value.
+backend_probe_state() {
+  svc_mount_table_state "$1"
+}
+
 # backend_unmount — release the volume.
 backend_unmount() {
   local mount_point="$1"

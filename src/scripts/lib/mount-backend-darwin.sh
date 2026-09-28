@@ -257,6 +257,26 @@ backend_probe() {
   [ -d "$mount_point" ] && [ "$(ls -A "$mount_point" 2>/dev/null)" ]
 }
 
+# backend_probe_state — the three-valued answer for a mount point.
+# Args: $1 — mount point.
+# Prints: present or absent:not-listed. Never unknown:*, and never returns
+#   non-zero.
+# WHY: the Linux backend answers the same question with a value that can be
+#   unknown, and the attach wait loop in rclone-mount.sh reads this function, so
+#   the two must share a vocabulary and not only a boolean. The absent unknown
+#   case here is a property of the platform, not an omission: macOS has no mount
+#   table to read, so the question is a per-path query — diskutil info, or a
+#   non-empty directory — that either names a volume at the path or does not.
+#   There is no half-read table for the answer to be unsure about, and a query
+#   that could not run is already the not-live answer backend_probe gives.
+backend_probe_state() {
+  if backend_probe "$1"; then
+    printf 'present\n'
+  else
+    printf 'absent:not-listed\n'
+  fi
+}
+
 # backend_unmount — release the volume.
 # Args: $1 — mount_point.
 backend_unmount() {

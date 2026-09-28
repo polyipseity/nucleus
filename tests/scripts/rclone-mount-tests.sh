@@ -122,10 +122,10 @@ create_home() {
 setup_env() {
   HOME="$1"
   PATH="$2:$PATH"
-  # Clear the lifetime controls before each test. They are exported, so a test
-  # that sets one would otherwise hand it to every test that follows and quietly
-  # change what their mock rclone does.
-  unset FAKE_ATTEMPTS_FILE FAKE_EXIT_WHEN_RUNNING
+  # Clear the lifetime and probe controls before each test. They are exported, so
+  # a test that sets one would otherwise hand it to every test that follows and
+  # quietly change what their mock rclone or mock probe does.
+  unset FAKE_ATTEMPTS_FILE FAKE_EXIT_WHEN_RUNNING FAKE_PROBE_STATE FAKE_PROBE_STATE_FILE
   NUCLEUS_RCLONE_REMOTE="OneDrive:Backups"
   NUCLEUS_RCLONE_MOUNT_POINT="$1/clouds/OneDrive"
   NUCLEUS_RCLONE_ARGS=""
@@ -184,7 +184,8 @@ run_main() {
   local _cm_missing=''
   local _cm_fn
   for _cm_fn in backend_prepare backend_args backend_mount backend_probe \
-    backend_class backend_is_transient backend_unmount backend_remedy; do
+    backend_probe_state backend_class backend_is_transient backend_unmount \
+    backend_remedy; do
     if ! declare -f "$_cm_fn" >/dev/null 2>&1; then
       _cm_missing="$_cm_missing $_cm_fn"
     fi
@@ -197,10 +198,11 @@ run_main() {
   # the other seven: the runner invokes all eight, and an unexported one leaves
   # the child with a command-not-found that run_main's `|| rc=$?` hides.
   export -f MOCK_BACKEND_PREPARE MOCK_BACKEND_ARGS MOCK_BACKEND_MOUNT \
-    MOCK_BACKEND_PROBE MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT \
-    MOCK_BACKEND_UNMOUNT MOCK_BACKEND_REMEDY backend_prepare backend_args \
-    backend_mount backend_probe backend_class backend_is_transient \
-    backend_unmount backend_remedy
+    MOCK_BACKEND_PROBE MOCK_BACKEND_PROBE_STATE MOCK_BACKEND_CLASSIFY \
+    MOCK_BACKEND_IS_TRANSIENT MOCK_BACKEND_UNMOUNT MOCK_BACKEND_REMEDY \
+    backend_prepare backend_args backend_mount backend_probe \
+    backend_probe_state backend_class backend_is_transient backend_unmount \
+    backend_remedy
   # Export guard vars so the subshell doesn't re-source backend libs
   # and overwrite the mocks.
   export _NUCLEUS_MOUNT_BACKEND_DARWIN_SOURCED=1
@@ -231,8 +233,43 @@ MOCK_BACKEND_MOUNT() {
   "$rclone_bin" mount "$@" 2>"$_backend_capture" &
   _backend_rclone_pid=$!
 }
+# MOCK_BACKEND_PROBE_STATE — the mount table's three-valued answer: present, an
+# absent:<reason>, or an unknown:<reason>. The attach wait loop reads this, not
+# MOCK_BACKEND_PROBE, because a zero return cannot tell a mount that is present
+# from a table that could not be read.
+#
+# FAKE_PROBE_STATE pins the answer outright, which is how a table that cannot be
+# read is modelled. FAKE_PROBE_STATE_FILE mirrors the attempt counter the retry
+# test uses: one counter per ATTEMPT, not per probe, so the failing attempt
+# misses for its whole budget and the retry is what the test actually exercises.
+# With neither set, the answer is derived from the marker the way a readable
+# table reports one.
+MOCK_BACKEND_PROBE_STATE() {
+  if [ -n "${FAKE_PROBE_STATE:-}" ]; then
+    printf '%s\n' "$FAKE_PROBE_STATE"
+    return
+  fi
+  if [ -n "${FAKE_PROBE_STATE_FILE:-}" ] && [ -f "$FAKE_PROBE_STATE_FILE" ] &&
+    [ "$(head -1 "$FAKE_PROBE_STATE_FILE")" -le 1 ]; then
+    printf 'absent:not-listed\n'
+    return
+  fi
+  if [ -f "${FAKE_MARKER:-}" ]; then
+    printf 'present\n'
+  else
+    printf 'absent:not-listed\n'
+  fi
+}
+# MOCK_BACKEND_PROBE — the two-valued view, answering the way
+# svc_mount_table_contains answers, so the mock carries the same contract the
+# Linux backend's probe does: a table that could not be read returns 0. That
+# 0 is correct for a caller that acts on the answer, and it is why the attach
+# wait loop cannot use this function to decide a mount is live.
 MOCK_BACKEND_PROBE() {
-  [ -f "${FAKE_MARKER:-}" ]
+  case "$(MOCK_BACKEND_PROBE_STATE "$@")" in
+  present | unknown:*) return 0 ;;
+  *) return 1 ;;
+  esac
 }
 MOCK_BACKEND_CLASSIFY() {
   printf 'mount-failed'
@@ -258,12 +295,14 @@ install_mocks() {
   backend_args() { MOCK_BACKEND_ARGS "$@"; }
   backend_mount() { MOCK_BACKEND_MOUNT "$@"; }
   backend_probe() { MOCK_BACKEND_PROBE "$@"; }
+  backend_probe_state() { MOCK_BACKEND_PROBE_STATE "$@"; }
   backend_class() { MOCK_BACKEND_CLASSIFY "$@"; }
   backend_is_transient() { MOCK_BACKEND_IS_TRANSIENT "$@"; }
   backend_unmount() { MOCK_BACKEND_UNMOUNT "$@"; }
   backend_remedy() { MOCK_BACKEND_REMEDY "$@"; }
   export -f backend_prepare backend_args backend_mount backend_probe \
-    backend_class backend_is_transient backend_unmount backend_remedy
+    backend_probe_state backend_class backend_is_transient backend_unmount \
+    backend_remedy
 }
 
 # ── Tests ────────────────────────────────────────────────────────────────────
@@ -419,16 +458,12 @@ test_transient_error_retries_and_succeeds() {
   # fail for its whole budget, which is what actually forces the retry.
   #
   # A file-based counter, because a shell local does not survive into the
-  # subshell the mocks are exported to.
+  # subshell the mocks are exported to. The probe reads the SAME counter, so
+  # there is one place that decides which attempt is the failing one.
   local attempts_file="$home/attempts"
   printf '0\n' >"$attempts_file"
-  MOCK_BACKEND_PROBE() {
-    # The failing attempt: no volume will ever appear, so every probe misses.
-    if [ "$(head -1 "$attempts_file")" -le 1 ]; then
-      return 1
-    fi
-    [ -f "${FAKE_MARKER:-}" ]
-  }
+  FAKE_PROBE_STATE_FILE="$attempts_file"
+  export FAKE_PROBE_STATE_FILE
   MOCK_BACKEND_CLASSIFY() {
     printf 'io-transient'
   }
@@ -454,9 +489,10 @@ test_transient_error_retries_and_succeeds() {
   }
   # Re-export all mocks so the subshell sees the updated functions.
   export -f MOCK_BACKEND_PREPARE MOCK_BACKEND_ARGS MOCK_BACKEND_MOUNT \
-    MOCK_BACKEND_PROBE MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT \
-    MOCK_BACKEND_UNMOUNT backend_prepare backend_args backend_mount \
-    backend_probe backend_class backend_is_transient backend_unmount
+    MOCK_BACKEND_PROBE MOCK_BACKEND_PROBE_STATE MOCK_BACKEND_CLASSIFY \
+    MOCK_BACKEND_IS_TRANSIENT MOCK_BACKEND_UNMOUNT backend_prepare \
+    backend_args backend_mount backend_probe backend_probe_state \
+    backend_class backend_is_transient backend_unmount
   install_mocks
 
   local rc=0
@@ -475,8 +511,9 @@ test_transient_error_retries_and_succeeds() {
   fi
   rm -rf "$home" "$bin"
 
-  # Restore default mocks so subsequent tests are not affected.
-  MOCK_BACKEND_PROBE() { [ -f "${FAKE_MARKER:-}" ]; }
+  # Restore default mocks so subsequent tests are not affected. The probe control
+  # needs no matching restore: setup_env unsets it before every test, so the file
+  # pointer does not follow this one into the tests that come after.
   MOCK_BACKEND_CLASSIFY() { printf 'mount-failed'; }
   MOCK_BACKEND_IS_TRANSIENT() { return 1; }
   MOCK_BACKEND_MOUNT() {
@@ -486,7 +523,7 @@ test_transient_error_retries_and_succeeds() {
     "$rclone_bin" mount "$@" 2>"$_backend_capture" &
     _backend_rclone_pid=$!
   }
-  export -f MOCK_BACKEND_PROBE MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT MOCK_BACKEND_MOUNT
+  export -f MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT MOCK_BACKEND_MOUNT
 }
 
 section "3b" "a mount that dies during startup is classified without waiting out the budget"
@@ -505,7 +542,7 @@ test_dead_mount_stops_attach_wait_early() {
   export NUCLEUS_MOUNT_ATTEMPTS NUCLEUS_MOUNT_BACKOFF
 
   # The volume never appears, so every probe misses for the whole loop.
-  MOCK_BACKEND_PROBE() { return 1; }
+  FAKE_PROBE_STATE="absent:not-listed"
   MOCK_BACKEND_CLASSIFY() { printf 'mount-failed'; }
   # Terminal, so one attempt ends the run and the elapsed time is attributable
   # to the attach wait alone rather than to retry backoff.
@@ -516,7 +553,8 @@ test_dead_mount_stops_attach_wait_early() {
     (exit 1) 2>"$_backend_capture" &
     _backend_rclone_pid=$!
   }
-  export -f MOCK_BACKEND_PROBE MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT MOCK_BACKEND_MOUNT
+  export FAKE_PROBE_STATE
+  export -f MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT MOCK_BACKEND_MOUNT
   install_mocks
 
   local start elapsed
@@ -533,8 +571,8 @@ test_dead_mount_stops_attach_wait_early() {
   fi
   rm -rf "$home" "$bin"
 
-  # Restore defaults so the following tests are unaffected.
-  MOCK_BACKEND_PROBE() { [ -f "${FAKE_MARKER:-}" ]; }
+  # Restore defaults so the following tests are unaffected. The probe is not
+  # among them: setup_env clears FAKE_PROBE_STATE before every test.
   MOCK_BACKEND_CLASSIFY() { printf 'mount-failed'; }
   MOCK_BACKEND_IS_TRANSIENT() { return 1; }
   MOCK_BACKEND_MOUNT() {
@@ -544,7 +582,86 @@ test_dead_mount_stops_attach_wait_early() {
     "$rclone_bin" mount "$@" 2>"$_backend_capture" &
     _backend_rclone_pid=$!
   }
-  export -f MOCK_BACKEND_PROBE MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT MOCK_BACKEND_MOUNT
+  export -f MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT MOCK_BACKEND_MOUNT
+}
+
+section "3c" "a mount table that cannot be read is not a running mount"
+
+# The Linux backend answers backend_probe through svc_mount_table_contains,
+# which returns 0 for every unknown:* state because a caller that ACTS on the
+# answer must never start a mount on a volume it could not disprove. The attach
+# wait loop is such a caller by position and a reporter by use: it sets live on
+# the same zero return, so a table nobody could read exited the loop on its
+# first tick, recorded the service running and successful, and deleted the
+# capture file holding the only real evidence. The macOS backend reads the same
+# undeterminable input as not-live, so the two platforms answered one condition
+# in opposite ways.
+#
+# Three separate assertions, because the three are separately wrong on the buggy
+# path: the record, the evidence, and the lesson the remedy text teaches.
+test_unreadable_mount_table_does_not_record_running() {
+  local home bin state class kept
+  home="$(create_home)"
+  bin="$(setup_fake_rclone)"
+  # A 2s attach budget against a table that never reads. The budget is the
+  # smallest thing that still exercises the poll-to-the-end path, and attempts=1
+  # ends the run in the exhaustion record, which is the record a supervisor reads.
+  setup_env "$home" "$bin" 2
+  NUCLEUS_MOUNT_ATTEMPTS=1
+  NUCLEUS_MOUNT_BACKOFF="0,0"
+  export NUCLEUS_MOUNT_ATTEMPTS NUCLEUS_MOUNT_BACKOFF
+  FAKE_MARKER="$home/clouds/OneDrive/.marker"
+  FAKE_CALLS="$home/calls"
+  FAKE_REMOTES="OneDrive:"
+  # rclone outlives the attach budget. The mount is never in question here, only
+  # the read is, so a runner that broke out because the child died would not be
+  # exercising the budget at all.
+  FAKE_SLEEP=6
+  # A distinctive stderr line, so "the capture file survived" is answered by
+  # content rather than by "something is left in TMPDIR".
+  printf 'fuse: mount attempt left the table unreadable\n' >"$home/rclone.err"
+  FAKE_ERRFILE="$home/rclone.err"
+  FAKE_PROBE_STATE="unknown:mount-status-32"
+  export FAKE_MARKER FAKE_CALLS FAKE_REMOTES FAKE_SLEEP FAKE_ERRFILE FAKE_PROBE_STATE
+  install_mocks
+  # Transient, matching how the Linux backend classifies io-transient, so the
+  # run reaches the exhaustion record rather than stopping on the first attempt.
+  MOCK_BACKEND_IS_TRANSIENT() { [ "$1" = "io-transient" ]; }
+  export -f MOCK_BACKEND_IS_TRANSIENT
+
+  local rc=0
+  # stdout is captured because the runner NAMES the file it keeps, and that name
+  # is the only way to reach it: macOS mktemp ignores TMPDIR for the bare
+  # template it uses, so a redirected TMPDIR does not move the capture file.
+  run_main >"$home/out" 2>/dev/null || rc=$?
+
+  # rc cannot discriminate: the runner exits 0 on a blocked mount exactly as it
+  # does on a running one, which is this suite's standing exit contract.
+  state="$(health_field state)"
+  class="$(health_field class)"
+  kept="$(sed -n 's/.*rclone output kept at //p' "$home/out" | head -1)"
+
+  if [ "$state" != "running" ]; then
+    assert_pass "an unreadable mount table is not recorded as a running mount"
+  else
+    assert_fail "unknown-table-not-running" "state=$state (the attach loop took the success branch)"
+  fi
+  if [ -n "$kept" ] && [ -f "$kept" ] && grep -qF 'left the table unreadable' "$kept"; then
+    assert_pass "the capture file holding rclone's output survives the run and is named"
+  else
+    assert_fail "unknown-table-keeps-capture" "kept='${kept:-<none>}' (expected a file still holding rclone's output)"
+  fi
+  if [ "$class" = "io-transient" ]; then
+    assert_pass "an unreadable mount table is classified io-transient, not mount-failed"
+  else
+    assert_fail "unknown-table-class" "class=$class (expected io-transient)"
+  fi
+  # The kept file lives in the system temp dir, outside the test's own tree, so
+  # it is removed here or it outlives the suite.
+  if [ -n "$kept" ]; then
+    rm -f "$kept"
+  fi
+  rm -rf "$home" "$bin"
 }
 
 section "4" "terminal failure → blocked record"
@@ -560,12 +677,14 @@ test_terminal_failure_writes_blocked_record() {
   FAKE_SLEEP=1
   export FAKE_MARKER FAKE_CALLS FAKE_REMOTES FAKE_SLEEP
   install_mocks
-  # Probe never finds a volume.
-  MOCK_BACKEND_PROBE() { return 1; }
+  # Probe never finds a volume. The mount the mock really runs touches FAKE_MARKER,
+  # so the answer has to be pinned rather than left to follow the marker.
+  FAKE_PROBE_STATE="absent:not-listed"
   MOCK_BACKEND_CLASSIFY() { printf 'auth'; }
   MOCK_BACKEND_IS_TRANSIENT() { return 1; } # auth is terminal
   # Re-export so the subshell sees updated mock functions.
-  export -f MOCK_BACKEND_PROBE MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT
+  export FAKE_PROBE_STATE
+  export -f MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT
   backend_probe() { MOCK_BACKEND_PROBE "$@"; }
   backend_class() { MOCK_BACKEND_CLASSIFY "$@"; }
   backend_is_transient() { MOCK_BACKEND_IS_TRANSIENT "$@"; }
@@ -596,11 +715,11 @@ test_terminal_failure_writes_blocked_record() {
   fi
   rm -rf "$home" "$bin"
 
-  # Restore default mocks so subsequent tests are not affected.
-  MOCK_BACKEND_PROBE() { [ -f "${FAKE_MARKER:-}" ]; }
+  # Restore default mocks so subsequent tests are not affected. The probe is not
+  # among them: setup_env clears FAKE_PROBE_STATE before every test.
   MOCK_BACKEND_CLASSIFY() { printf 'mount-failed'; }
   MOCK_BACKEND_IS_TRANSIENT() { return 1; }
-  export -f MOCK_BACKEND_PROBE MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT
+  export -f MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT
   backend_probe() { MOCK_BACKEND_PROBE "$@"; }
   backend_class() { MOCK_BACKEND_CLASSIFY "$@"; }
   backend_is_transient() { MOCK_BACKEND_IS_TRANSIENT "$@"; }
@@ -676,9 +795,12 @@ test_health_record_class_and_remedy_on_blocked() {
   FAKE_SLEEP=1
   export FAKE_MARKER FAKE_CALLS FAKE_REMOTES FAKE_SLEEP
   install_mocks
-  MOCK_BACKEND_PROBE() { return 1; }
+  # The mount the mock really runs touches FAKE_MARKER, so the answer has to be
+  # pinned rather than left to follow the marker.
+  FAKE_PROBE_STATE="absent:not-listed"
   MOCK_BACKEND_CLASSIFY() { printf 'provider-refusal'; }
   MOCK_BACKEND_IS_TRANSIENT() { return 0; } # transient: retry first
+  export FAKE_PROBE_STATE
 
   local rc=0
   run_main 2>/dev/null || rc=$?
@@ -703,11 +825,11 @@ test_health_record_class_and_remedy_on_blocked() {
   fi
   rm -rf "$home" "$bin"
 
-  # Restore default mocks so subsequent tests are not affected.
-  MOCK_BACKEND_PROBE() { [ -f "${FAKE_MARKER:-}" ]; }
+  # Restore default mocks so subsequent tests are not affected. The probe is not
+  # among them: setup_env clears FAKE_PROBE_STATE before every test.
   MOCK_BACKEND_CLASSIFY() { printf 'mount-failed'; }
   MOCK_BACKEND_IS_TRANSIENT() { return 1; }
-  export -f MOCK_BACKEND_PROBE MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT
+  export -f MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT
 }
 
 section "6" "exit codes"
@@ -747,9 +869,10 @@ test_exit_0_on_blocked_record() {
   FAKE_SLEEP=1
   export FAKE_MARKER FAKE_CALLS FAKE_REMOTES FAKE_SLEEP
   install_mocks
-  MOCK_BACKEND_PROBE() { return 1; }
+  FAKE_PROBE_STATE="absent:not-listed"
   MOCK_BACKEND_CLASSIFY() { printf 'remote-not-found'; }
   MOCK_BACKEND_IS_TRANSIENT() { return 1; } # terminal
+  export FAKE_PROBE_STATE
 
   local rc=0
   run_main 2>/dev/null || rc=$?
@@ -762,11 +885,11 @@ test_exit_0_on_blocked_record() {
   fi
   rm -rf "$home" "$bin"
 
-  # Restore default mocks so subsequent tests are not affected.
-  MOCK_BACKEND_PROBE() { [ -f "${FAKE_MARKER:-}" ]; }
+  # Restore default mocks so subsequent tests are not affected. The probe is not
+  # among them: setup_env clears FAKE_PROBE_STATE before every test.
   MOCK_BACKEND_CLASSIFY() { printf 'mount-failed'; }
   MOCK_BACKEND_IS_TRANSIENT() { return 1; }
-  export -f MOCK_BACKEND_PROBE MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT
+  export -f MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT
 }
 
 section "7" "backend_prepare failure"
@@ -904,8 +1027,20 @@ run_main_real_backend() {
     # predicates: it probes the host's FUSE provider and returns 20 when the
     # installed version needs user action, which would exit before mounting and
     # leave the argument vector unexercised.
+    #
+    # backend_probe_state is overridden alongside backend_probe because the
+    # attach wait loop reads it, and the real Linux implementation would shell
+    # out to this host's mount table -- which answers nothing about the fake
+    # marker -- instead of the volume these tests mount.
     backend_prepare() { return 0; }
     backend_probe() { [ -f "${FAKE_MARKER:-}" ]; }
+    backend_probe_state() {
+      if [ -f "${FAKE_MARKER:-}" ]; then
+        printf 'present\n'
+      else
+        printf 'absent:not-listed\n'
+      fi
+    }
     backend_class() { printf 'mount-failed'; }
     backend_is_transient() { return 1; }
     backend_unmount() { return 0; }
@@ -1131,6 +1266,7 @@ test_mount_succeeds_and_records_success
 test_mount_passes_remote_and_point_to_rclone
 test_transient_error_retries_and_succeeds
 test_dead_mount_stops_attach_wait_early
+test_unreadable_mount_table_does_not_record_running
 test_terminal_failure_writes_blocked_record
 test_unconfigured_remote_exits_0
 test_health_record_created_on_startup
