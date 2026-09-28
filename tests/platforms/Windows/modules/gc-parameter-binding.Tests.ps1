@@ -30,18 +30,34 @@ BeforeAll {
     $Script:GcScript = Join-Path -Path $Script:RepoRoot -ChildPath 'scripts\gc.ps1'
 
     $Script:SwitchMap = @(
-        [pscustomobject]@{ Switch = 'NoNixGc'; Variable = 'NUCLEUS_GC_NO_NIX' }
-        [pscustomobject]@{ Switch = 'NoHmGc'; Variable = 'NUCLEUS_GC_NO_HM' }
-        [pscustomobject]@{ Switch = 'NoToolCacheGc'; Variable = 'NUCLEUS_GC_NO_TOOL_CACHE_GC' }
-        [pscustomobject]@{ Switch = 'NoGitCacheGc'; Variable = 'NUCLEUS_GC_NO_GIT_CACHE_GC' }
-        [pscustomobject]@{ Switch = 'NoOllamaGc'; Variable = 'NUCLEUS_GC_NO_OLLAMA_GC' }
-        [pscustomobject]@{ Switch = 'NoScoopGc'; Variable = 'NUCLEUS_GC_NO_SCOOP_GC' }
-        [pscustomobject]@{ Switch = 'NoSccacheGc'; Variable = 'NUCLEUS_GC_NO_SCCACHE_GC' }
-        [pscustomobject]@{ Switch = 'NoWallpaperGc'; Variable = 'NUCLEUS_GC_NO_WALLPAPER_GC' }
-        [pscustomobject]@{ Switch = 'NoVMGc'; Variable = 'NUCLEUS_GC_NO_VM_GC' }
-        [pscustomobject]@{ Switch = 'NoLogGc'; Variable = 'NUCLEUS_GC_NO_LOG_GC' }
-        [pscustomobject]@{ Switch = 'NoJournaldGc'; Variable = 'NUCLEUS_GC_NO_JOURNALD_GC' }
-        [pscustomobject]@{ Switch = 'GCVMData'; Variable = '' }
+        [pscustomobject]@{ Switch = 'NoNixGc' }
+        [pscustomobject]@{ Switch = 'NoHmGc' }
+        [pscustomobject]@{ Switch = 'NoToolCacheGc' }
+        [pscustomobject]@{ Switch = 'NoGitCacheGc' }
+        [pscustomobject]@{ Switch = 'NoOllamaGc' }
+        [pscustomobject]@{ Switch = 'NoScoopGc' }
+        [pscustomobject]@{ Switch = 'NoSccacheGc' }
+        [pscustomobject]@{ Switch = 'NoWallpaperGc' }
+        [pscustomobject]@{ Switch = 'NoVMGc' }
+        [pscustomobject]@{ Switch = 'NoLogGc' }
+        [pscustomobject]@{ Switch = 'NoJournaldGc' }
+        [pscustomobject]@{ Switch = 'GCVMData' }
+    )
+
+    # The eleven env vars the switches used to default from, named here rather
+    # than derived from the map because GCVMData is positive and names none.
+    $Script:RemovedEnvVars = @(
+        'NUCLEUS_GC_NO_NIX'
+        'NUCLEUS_GC_NO_HM'
+        'NUCLEUS_GC_NO_TOOL_CACHE_GC'
+        'NUCLEUS_GC_NO_GIT_CACHE_GC'
+        'NUCLEUS_GC_NO_OLLAMA_GC'
+        'NUCLEUS_GC_NO_SCOOP_GC'
+        'NUCLEUS_GC_NO_SCCACHE_GC'
+        'NUCLEUS_GC_NO_WALLPAPER_GC'
+        'NUCLEUS_GC_NO_VM_GC'
+        'NUCLEUS_GC_NO_LOG_GC'
+        'NUCLEUS_GC_NO_JOURNALD_GC'
     )
 
     function Get-GcParamBlock {
@@ -149,20 +165,15 @@ Describe 'nucleus-gc parameter block' {
     # that the environment no longer reaches them, so the defaults cannot creep back.
     It 'ignores NUCLEUS_GC_NO_* entirely, so the switches are command-line only' {
         $env = @{}
-        foreach ($entry in $Script:SwitchMap) {
-            # WHY: GCVMData is positive and names no variable. Writing an empty
-            # name would hand the child a degenerate "=true" entry, which macOS
-            # tolerates and Windows never had verified.
-            if ($entry.Variable) { $env[$entry.Variable] = 'true' }
-        }
-        $env['NUCLEUS_GC_NO_NIX'] = 'true'
+        foreach ($name in $Script:RemovedEnvVars) { $env[$name] = 'true' }
 
         $result = Invoke-ParamBlockStub -ParamText (Get-GcParamBlock) -Environment $env
         $result.ExitCode | Should -Be 0 -Because "the block must bind; stderr was: $($result.Stderr)"
 
         $state = ConvertTo-SwitchState -Stdout $result.Stdout
         foreach ($entry in $Script:SwitchMap) {
-            $state[$entry.Switch] | Should -BeFalse -Because "$($entry.Variable) must not reach the switch"
+            $state.ContainsKey($entry.Switch) | Should -BeTrue -Because "the stub must report $($entry.Switch)"
+            $state[$entry.Switch] | Should -BeFalse -Because "no NUCLEUS_GC_NO_* variable may reach it"
         }
     }
 }

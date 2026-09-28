@@ -105,7 +105,7 @@
   .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -RepoRoot "C:\Users\admin\nucleus" -NoToolCacheGc
 
 .NOTES
-  Environment variables: NUCLEUS_GC_MODULE_DIR, NUCLEUS_GC_NO_NIX, NUCLEUS_GC_NO_HM, NUCLEUS_GC_NO_TOOL_CACHE_GC, NUCLEUS_GC_NO_GIT_CACHE_GC, NUCLEUS_GC_NO_OLLAMA_GC, NUCLEUS_GC_NO_SCOOP_GC, NUCLEUS_GC_NO_SCCACHE_GC, NUCLEUS_GC_NO_WALLPAPER_GC, NUCLEUS_GC_NO_VM_GC, NUCLEUS_GC_EXPIRY, NUCLEUS_GC_HM_EXPIRY, NUCLEUS_GC_NIX_EXPIRY, NUCLEUS_REPO_ROOT.
+  Environment variables: NUCLEUS_GC_HM_EXPIRY, NUCLEUS_GC_LOG_COMPRESS, NUCLEUS_GC_LOG_MAX_FILES, NUCLEUS_GC_LOG_MAX_SIZE, NUCLEUS_GC_MODULE_DIR, NUCLEUS_GC_NIX_EXPIRY, NUCLEUS_LOG_EXPIRY, NUCLEUS_REPO_ROOT.
   Exit codes: 0 on success; non-zero on failure.
 #>
 [CmdletBinding()]
@@ -132,7 +132,7 @@ param(
   [string]$LogMaxSize = $(if ($env:NUCLEUS_GC_LOG_MAX_SIZE) { $env:NUCLEUS_GC_LOG_MAX_SIZE } else { '' }),
   [string]$LogMaxFiles = $(if ($env:NUCLEUS_GC_LOG_MAX_FILES) { $env:NUCLEUS_GC_LOG_MAX_FILES } else { '' }),
   [string]$LogCompress = $(if ($env:NUCLEUS_GC_LOG_COMPRESS) { $env:NUCLEUS_GC_LOG_COMPRESS } else { '' }),
-  [string]$Expiry = $(if ($env:NUCLEUS_GC_EXPIRY) { $env:NUCLEUS_GC_EXPIRY } else { '' }),
+  [string]$Expiry,
   [string]$HmExpiry = $(if ($env:NUCLEUS_GC_HM_EXPIRY) { $env:NUCLEUS_GC_HM_EXPIRY } else { '' }),
   [string]$NixExpiry = $(if ($env:NUCLEUS_GC_NIX_EXPIRY) { $env:NUCLEUS_GC_NIX_EXPIRY } else { '' }),
   [Alias("h")]
@@ -614,7 +614,7 @@ if (-not $NoLogGc) {
 
     $logDir = Get-NucleusLogDir
     $systemLogDir = Get-NucleusSystemLogDir
-    $logExpiry = if ($Expiry) { $Expiry } elseif ($env:NUCLEUS_GC_EXPIRY) { $env:NUCLEUS_GC_EXPIRY } else { '7d' }
+    $logExpiry = if ($env:NUCLEUS_LOG_EXPIRY) { $env:NUCLEUS_LOG_EXPIRY } else { '7d' }
 
     Invoke-LogRotation -Path $logDir -MaxSize $logMaxSize -MaxFiles $logMaxFiles -Compress $logCompress
     Invoke-LogExpiry -Path $logDir -Expiry $logExpiry

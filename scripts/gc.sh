@@ -16,6 +16,8 @@ if [ -h "$_self" ]; then
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
+# shellcheck source=../src/scripts/lib/log-expiry.sh
+. "$SCRIPT_DIR/../src/scripts/lib/log-expiry.sh"
 
 # Subcommand dispatch. gc.sh normally runs the full default GC below; a leading
 # subcommand word runs a single targeted operation instead and exits.
@@ -756,7 +758,7 @@ gc_logs() {
 
   _gl_log_dir="$(nucleus_log_dir)"
   _gl_system_log_dir="$(nucleus_system_log_dir)"
-  _gl_expiry="${expiry_arg:-${NUCLEUS_GC_EXPIRY:-7d}}"
+  _gl_expiry="$(resolve_log_expiry)"
 
   rotate_logs_in_directory "$_gl_log_dir" "$_gl_maxsize" "$_gl_maxfiles" "$_gl_compress"
   expire_logs_in_directory "$_gl_log_dir" "$_gl_expiry"
@@ -767,7 +769,7 @@ gc_logs() {
       expire_logs_in_directory "$_gl_system_log_dir" "$_gl_expiry"
     elif command -v sudo >/dev/null 2>&1 && [ "$(id -u)" -ne 0 ]; then
       say "system log dir '$_gl_system_log_dir' not writable by current user; escalating to root"
-      sudo env NUCLEUS_REPO_ROOT="$REPO_ROOT" NUCLEUS_GC_EXPIRY="$_gl_expiry" \
+      sudo env NUCLEUS_REPO_ROOT="$REPO_ROOT" NUCLEUS_LOG_EXPIRY="$_gl_expiry" \
         "$REPO_ROOT/src/scripts/services/log-gc-system.sh"
     else
       warn "system log dir '$_gl_system_log_dir' not writable and cannot escalate; skipping"

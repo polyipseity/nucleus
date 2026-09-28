@@ -27,7 +27,7 @@ $logMaxSize = if ($loggingDefaults.maxSize.default) { [int]$loggingDefaults.maxS
 $logMaxFiles = if ($loggingDefaults.maxFiles.default) { [int]$loggingDefaults.maxFiles.default } else { 4 }
 $logCompress = if ($null -ne $loggingDefaults.compress.default) { [bool]$loggingDefaults.compress.default } else { $true }
 
-$logExpiry = if ($env:NUCLEUS_GC_EXPIRY) { $env:NUCLEUS_GC_EXPIRY } else { '7d' }
+$logExpiry = if ($env:NUCLEUS_LOG_EXPIRY) { $env:NUCLEUS_LOG_EXPIRY } else { '7d' }
 
 Invoke-LogRotation -Path (Get-NucleusSystemLogDir) -MaxSize $logMaxSize -MaxFiles $logMaxFiles -Compress $logCompress
 Invoke-LogExpiry -Path (Get-NucleusSystemLogDir) -Expiry $logExpiry

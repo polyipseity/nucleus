@@ -7,6 +7,8 @@ set -eu
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
+# shellcheck source=../lib/log-expiry.sh
+. "$SCRIPT_DIR/../lib/log-expiry.sh"
 
 # derive_repo_root() resolves NUCLEUS_REPO_ROOT when it is a live path and
 # rejects Nix store snapshots; an unresolvable root falls through to the
@@ -30,4 +32,4 @@ else
 fi
 
 rotate_logs_in_directory "$(nucleus_system_log_dir)" "$_lgs_maxsize" "$_lgs_maxfiles" "$_lgs_compress"
-expire_logs_in_directory "$(nucleus_system_log_dir)" "${NUCLEUS_GC_EXPIRY:-7d}"
+expire_logs_in_directory "$(nucleus_system_log_dir)" "$(resolve_log_expiry)"
