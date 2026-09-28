@@ -1468,10 +1468,10 @@ do_repair() {
   fi
 
   if [ "$undetermined" -gt 0 ]; then
-    # WHY: a mount left alone is not a repaired mount, so the command fails
+    # WHY: an undetermined mount is not a repaired mount, so the command fails
     #   rather than reporting a success it did not perform, and the count says
     #   how many need a second look.
-    error "repair could not determine the state of $undetermined mount(s); those were left alone. $(fskit_remedy)"
+    error "repair could not determine the state of $undetermined mount(s); the warning for each names the mount and the reason. $(fskit_remedy)"
     exit 1
   fi
 
