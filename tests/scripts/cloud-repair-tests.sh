@@ -72,6 +72,9 @@ JSON
 #   FAKE_ATTACH_AFTER_KICKS — the volume appears only from this launch on, which
 #                      is how FSKit looks when it refuses the first attempts and
 #                      serves a later one.
+#   FAKE_MOUNT_TABLE_SLOW  — seconds the mount-table read blocks for, which is
+#                      how a volume hung in the kernel looks: the read is still
+#                      going when its bound expires.
 FAKE_MOUNT_MAP="$_tmp/mount-map"
 FAKE_JOBS_LOADED="$_tmp/jobs-loaded"
 FAKE_MOUNTS="$_tmp/mounts"
@@ -82,10 +85,11 @@ FAKE_KICK_COUNT="$_tmp/kick-count"
 FAKE_KILLALL_STATUS=0
 FAKE_NO_MOUNT_ON_KICKSTART=0
 FAKE_ATTACH_AFTER_KICKS=""
+FAKE_MOUNT_TABLE_SLOW=""
 FAKE_UNAME_S=Darwin
 export FAKE_MOUNT_MAP FAKE_JOBS_LOADED FAKE_MOUNTS FAKE_ACTIONS FAKE_LAUNCHCTL_LOG
 export FAKE_DAEMON_KILLED FAKE_KICK_COUNT FAKE_KILLALL_STATUS FAKE_NO_MOUNT_ON_KICKSTART
-export FAKE_ATTACH_AFTER_KICKS FAKE_UNAME_S
+export FAKE_ATTACH_AFTER_KICKS FAKE_MOUNT_TABLE_SLOW FAKE_UNAME_S
 
 printf 'local.cloud-mount.GoogleDrive\t%s\n' "$FAKE_HOME/clouds/GoogleDrive" >"$FAKE_MOUNT_MAP"
 printf 'local.cloud-mount.OneDrive\t%s\n' "$FAKE_HOME/clouds/OneDrive" >>"$FAKE_MOUNT_MAP"
@@ -186,13 +190,25 @@ FAKE_PLUTIL
 
 cat >"$_tmp/bin/mount" <<'FAKE_MOUNT'
 #!/usr/bin/env bash
+# WHY: the real sleep, not the fake one: the fake sleep is the thing under test
+#   in this suite, and charging a hung-volume delay to it would make the case
+#   that distinguishes the two meaningless.
+if [ -n "${FAKE_MOUNT_TABLE_SLOW:-}" ]; then
+  exec "$REAL_SLEEP" "$FAKE_MOUNT_TABLE_SLOW"
+fi
 cat "$FAKE_MOUNTS"
 FAKE_MOUNT
 
-# The repair waits for mounts over a bounded window; the fake makes that wait
-# cost no wall-clock time.
+# WHY: a fractional duration is the exception. A poll cadence is not a delay
+#   the caller wants to skip, it is the unit the bound is counted in, so
+#   returning at once would express a ten-second bound as fifty process spawns
+#   racing the probe child. Whole-second waits are the repair's own settling
+#   delays and stay free.
 cat >"$_tmp/bin/sleep" <<'FAKE_SLEEP'
 #!/usr/bin/env bash
+case "${1:-}" in
+*.*) exec "$REAL_SLEEP" "$1" ;;
+esac
 exit 0
 FAKE_SLEEP
 
@@ -212,6 +228,11 @@ FAKE_ID
 
 chmod +x "$_tmp/bin/launchctl" "$_tmp/bin/killall" "$_tmp/bin/sudo" "$_tmp/bin/plutil" \
   "$_tmp/bin/mount" "$_tmp/bin/sleep" "$_tmp/bin/uname" "$_tmp/bin/id"
+# The real sleep, resolved before the fakes reach PATH: the bounded-read case
+# below needs a child whose wall-clock duration the suite controls, and the
+# fake must not be the thing being measured.
+REAL_SLEEP="$(command -v sleep)"
+export REAL_SLEEP
 PATH="$_tmp/bin:$PATH"
 export PATH
 
@@ -288,8 +309,10 @@ reset_world() {
   FAKE_KILLALL_STATUS=0
   FAKE_NO_MOUNT_ON_KICKSTART=0
   FAKE_ATTACH_AFTER_KICKS=""
+  FAKE_MOUNT_TABLE_SLOW=""
   FAKE_UNAME_S=Darwin
-  export FAKE_KILLALL_STATUS FAKE_NO_MOUNT_ON_KICKSTART FAKE_ATTACH_AFTER_KICKS FAKE_UNAME_S
+  export FAKE_KILLALL_STATUS FAKE_NO_MOUNT_ON_KICKSTART FAKE_ATTACH_AFTER_KICKS FAKE_MOUNT_TABLE_SLOW
+  export FAKE_UNAME_S
 }
 
 # mark_blocked <label> — a fresh blocked record, as the mount wrapper leaves it.
@@ -382,5 +405,34 @@ assert_mentions "the relaunched mount" "$(cat "$_out")" "mounted: OneDrive"
 assert_eq "the repair launched the agent again" "2" "$(grep -c '^kickstart local.cloud-mount.OneDrive$' "$FAKE_ACTIONS")"
 FAKE_ATTACH_AFTER_KICKS=""
 export FAKE_ATTACH_AFTER_KICKS
+
+section "6" "a bounded read is bounded in wall-clock time"
+
+# WHY: svc_run_bounded and fskit_restart_daemon express their bound as a number
+#   of poll intervals, so the interval's wall-clock cost is the bound. A fake
+#   sleep that returns at once collapses that bound into a race between the
+#   probe child being scheduled and the parent completing bound*5 process
+#   spawns. Both arms of the collapsed bound are asserted here, because both
+#   sit on the recorded failure: a read that lost the race came back 124, and
+#   svc_mount_table_contains answers 124 as "already mounted", so the repair
+#   skipped the row and emitted no action for it. The children take real
+#   wall-clock time because a slow child is the case the bound exists for, and a
+#   modelled one would measure the model instead of the contract.
+_bounded_rc=0
+svc_run_bounded 2 "$REAL_SLEEP" 1.4 >/dev/null 2>&1 || _bounded_rc=$?
+assert_eq "a bounded read waits for a child that finishes inside the bound" "0" "$_bounded_rc"
+
+# A volume hung in the kernel blocks the mount table past its bound. The child is
+# four times the bound so the timeout cannot be a rounding accident on either side
+# of the fix.
+reset_world
+FAKE_MOUNT_TABLE_SLOW=4
+export FAKE_MOUNT_TABLE_SLOW
+if svc_mount_table_contains "$FAKE_HOME/clouds/OneDrive" 1; then
+  assert_pass "a mount table that outlived its bound reports the path present"
+else
+  assert_fail "a mount table that outlived its bound" "the path was reported absent, so a repair would mount a volume that may already be attached"
+fi
+reset_world
 
 finish_tests
