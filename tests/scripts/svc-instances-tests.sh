@@ -302,6 +302,49 @@ assert_eq "a mount table that could not be read counts as mounted" "0" "$_mount_
 assert_mentions "an unreadable mount table is reported" "$_mount_out" "could not read the mount table"
 FAKE_MOUNT_FAIL=''
 
+# WHY: the two-valued predicate cannot tell a mount that is present from a
+#   table that could not be read, so a caller that must report cannot see the
+#   difference. These pin the third answer before anything consumes it.
+_state=""
+_state="$(svc_mount_table_state /mnt/any 10)"
+assert_eq "a readable table without the path is absent" "absent" "$_state"
+
+FAKE_MOUNT_FAIL=1
+_state=""
+_state="$(svc_mount_table_state /mnt/any 10)"
+assert_eq "a table that could not be read is unknown" "unknown:mount-status-1" "$_state"
+FAKE_MOUNT_FAIL=''
+
+# WHY: FAKE_MOUNT_SLOW makes the reader delay before it answers, so a bound of
+#   one second elapses first. The state must be unknown, not absent.
+FAKE_MOUNT_SLOW=30
+_state=""
+_state="$(svc_mount_table_state /mnt/any 1)"
+assert_eq "a probe that outlives its bound is unknown" "unknown:probe-bound" "$_state"
+FAKE_MOUNT_SLOW=''
+
+# WHY: a read that succeeded and printed nothing is genuinely empty, which does
+#   establish the absence, so it is absent rather than unknown.
+_state=""
+_state="$(svc_mount_table_state /mnt/any 10)"
+assert_eq "an empty table that was read is absent" "absent" "$_state"
+
+# WHY: present must still read as present through the new function, otherwise
+#   the wrapper in the next step has nothing to wrap. The harness spells the
+#   table FAKE_MOUNT_TABLE; the fake reader prints it on stdout.
+FAKE_MOUNT_TABLE='devfs on /mnt/any (msdos)'
+_state=""
+_state="$(svc_mount_table_state /mnt/any 10)"
+assert_eq "a listed path is present" "present" "$_state"
+FAKE_MOUNT_TABLE=""
+
+# WHY: silence is the contract. The two polling callers run this every tick, and
+#   a warn here would write one line per tick for the whole timeout. The state
+#   itself goes to stdout, so only the stream is asserted.
+_state_err=""
+_state_err="$(svc_mount_table_state /mnt/any 10 2>&1 >/dev/null)"
+assert_eq "the state function writes nothing to stderr" "" "$_state_err"
+
 # WHY: a probe that outlives its bound models a hung volume, which must never be
 # read as "free" or the next mount lands on top of it.
 FAKE_MOUNT_TABLE='fake://vol on /mnt/yes (fake)'

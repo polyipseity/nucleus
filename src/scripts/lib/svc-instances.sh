@@ -247,40 +247,73 @@ svc_remount_until() {
   done
 }
 
-# svc_mount_table_contains — Whether the mount table lists a path.
+# svc_mount_table_state — Three-valued answer to "is this path mounted?".
 # Args: $1 — absolute mount point; $2 — probe bound in seconds (default 10).
-# Returns 0 when the path is mounted, 1 when it is not.
-# WHY: every path that cannot establish the path's absence reports "mounted".  A
-#   probe that outlives its bound (a volume hung in the kernel) and a table that
-#   could not be read at all both answer that way, because the callers act on
-#   "not mounted" by starting a mount on top of the volume:
-#   svc_wait_mount_released reports the volume released so a reload begins, and
-#   nucleus-cloud repair launches the mount agent.
-# WHY: a read that succeeded and printed nothing is a genuinely empty mount
-#   table, which does establish the absence, so it answers "not mounted".
-svc_mount_table_contains() {
+# Prints: present, absent, or unknown:<reason> to stdout. Always returns 0.
+#   <reason> is probe-bound when the read outlived its bound, or mount-status-<n>
+#   when the reader itself exited non-zero.
+# WHY: the predicate below cannot tell a path that is present from a table that
+#   could not be read, because it answers "present" for both so that no caller
+#   ever starts a mount on top of a possibly-mounted volume. That is the right
+#   answer for a caller that acts, and the wrong one for a caller that reports,
+#   so the undeterminable case gets its own value here and the predicate keeps
+#   the two-valued contract every existing caller depends on.
+# WHY: this prints and nothing else. svc_wait_mount_released polls it every 0.5s
+#   and svc_remount_until every 5s, so a warning emitted here would write one
+#   line per tick for the entire timeout of a genuinely hung volume.
+svc_mount_table_state() {
   local mount_point="$1" bound="${2:-10}" status=0 table=""
 
-  # check-suppress:suppression_doc: the reader's own status is classified below rather than propagated; a failed read is answered conservatively.
+  # check-suppress:suppression_doc: the reader's own status is classified below rather than propagated; the
+  #   bound is carried by the return code, which is re-read immediately.
   table="$(svc_run_bounded "$bound" mount 2>/dev/null)" || status=$?
   if [ "$status" -eq 124 ]; then
+    printf 'unknown:probe-bound\n'
     return 0
   fi
-  # WHY: a mount that exited non-zero (missing binary, killed, error) read
-  #   nothing, and a failed read is not evidence of absence — the status is what
-  #   tells it apart from a table that was read and happened to be empty.
   if [ "$status" -ne 0 ]; then
-    warn -l svc-instances "could not read the mount table (mount exited $status); assuming '$mount_point' is mounted."
+    printf 'unknown:mount-status-%s\n' "$status"
     return 0
   fi
   if [ -z "$table" ]; then
-    warn -l svc-instances "the mount table is empty; assuming '$mount_point' is not mounted."
-    return 1
+    printf 'absent\n'
+    return 0
   fi
-
   case "$table" in
-  *" on $mount_point ("*) return 0 ;;
-  *) return 1 ;;
+  *" on $mount_point ("*) printf 'present\n' ;;
+  *) printf 'absent\n' ;;
+  esac
+  return 0
+}
+
+# svc_mount_table_contains — Whether the mount table lists a path.
+# Args: $1 — absolute mount point; $2 — probe bound in seconds (default 10).
+# Returns 0 when the path is mounted or when that could not be determined, 1
+#   when the table was read and does not list it.
+# WHY: every path that cannot establish the path's absence reports "mounted".
+#   The callers act on "not mounted" by starting a mount on top of the volume,
+#   so undeterminable answers must keep reading as present. Callers that report
+#   use svc_mount_table_state instead, which keeps the third answer.
+# WHY: the two warnings below are kept even though the state function is
+#   silent. They are terminal for this predicate's callers, which do not poll
+#   on the same condition, and removing them drops diagnostics that existing
+#   tests at tests/scripts/svc-instances-tests.sh assert. The 124 path stays
+#   silent, as it has always been, because a bounded read that times out is the
+#   expected shape of a hung volume and the polling callers hit it repeatedly.
+svc_mount_table_contains() {
+  local state
+  state="$(svc_mount_table_state "$@")"
+  case "$state" in
+  present) return 0 ;;
+  absent)
+    warn -l svc-instances "the mount table is empty or does not list '$1'; reporting it as not mounted."
+    return 1
+    ;;
+  unknown:probe-bound) return 0 ;;
+  unknown:mount-status-*)
+    warn -l svc-instances "could not read the mount table (mount exited ${state##*-}); assuming '$1' is mounted."
+    return 0
+    ;;
   esac
 }
 
