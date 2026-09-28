@@ -307,7 +307,7 @@ FAKE_MOUNT_FAIL=''
 #   difference. These pin the third answer before anything consumes it.
 _state=""
 _state="$(svc_mount_table_state /mnt/any 10)"
-assert_eq "a readable table without the path is absent" "absent" "$_state"
+assert_eq "a readable table without the path is absent" "absent:empty" "$_state"
 
 FAKE_MOUNT_FAIL=1
 _state=""
@@ -327,7 +327,26 @@ FAKE_MOUNT_SLOW=''
 #   establish the absence, so it is absent rather than unknown.
 _state=""
 _state="$(svc_mount_table_state /mnt/any 10)"
-assert_eq "an empty table that was read is absent" "absent" "$_state"
+assert_eq "an empty table that was read is absent" "absent:empty" "$_state"
+
+# WHY: a table that was read and lists other paths is a different token from an
+#   empty one, which is what lets the predicate warn on the empty table and stay
+#   silent on the ordinary not-listed answer.
+FAKE_MOUNT_TABLE='devfs on /mnt/other (msdos)'
+_state=""
+_state="$(svc_mount_table_state /mnt/any 10)"
+assert_eq "a readable table that lists other paths is absent and not empty" "absent:not-listed" "$_state"
+
+# WHY: svc_remount_until polls the predicate every 5 s for the whole budget
+#   while a remount is in progress, so the not-listed answer must be negative
+#   and silent. The token assertion above does not prove the predicate keeps the
+#   two absent reasons apart, and that silence is the whole of the fix.
+_mount_err=""
+_mount_rc=0
+_mount_err="$(svc_mount_table_contains /mnt/any 2>&1 >/dev/null)" || _mount_rc=$?
+assert_eq "a readable table that lists other paths is not mounted" "1" "$_mount_rc"
+assert_eq "the predicate stays silent for a readable table that lists other paths" "" "$_mount_err"
+FAKE_MOUNT_TABLE=""
 
 # WHY: present must still read as present through the new function, otherwise
 #   the wrapper in the next step has nothing to wrap. The harness spells the
