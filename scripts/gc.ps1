@@ -34,10 +34,19 @@
   All file operations are scoped to the primary user profile.  The script is
   idempotent and safe to re-run.
 
+  With -DryRun every destructive step reports what it would do through
+  Write-NucleusDryRun and removes nothing, matching gc.sh --dry-run.  Each step
+  is guarded on its own, so a preview cannot fall through into a real
+  collection the way an unparameterised invocation could.
+
 .PARAMETER ModuleDir
   Path to the Windows helper module directory. When omitted, auto-derives
   from RepoRoot as src\platforms\Windows\modules so callers can skip it when
   RepoRoot is provided (default: '').
+
+.PARAMETER DryRun
+  Report what would be collected and remove nothing, matching gc.sh --dry-run
+  (default: $false).
 
 .PARAMETER NoNixGc
   Accepted but ignored on Windows (POSIX-only) (default: $false).
@@ -114,6 +123,7 @@ param(
   [ValidateSet('all', 'cleanup-nix', 'preferences')]
   [string]$Action = 'all',
   [string]$ModuleDir = $(if ($env:NUCLEUS_GC_MODULE_DIR) { $env:NUCLEUS_GC_MODULE_DIR } else { '' }),
+  [switch]$DryRun,
   [switch]$NoNixGc,
   [switch]$NoHmGc,
   [switch]$NoToolCacheGc,
@@ -226,7 +236,12 @@ function Clear-DirectoryContentsIfPresent {
   }
 
   try {
-    Get-ChildItem -LiteralPath $Path -Force -ErrorAction Stop | Remove-Item -Recurse -Force -ErrorAction Stop
+    $entries = @(Get-ChildItem -LiteralPath $Path -Force -ErrorAction Stop)
+    if ($DryRun) {
+      Write-NucleusDryRun "would clear $($entries.Count) item(s) from $Label at '$Path'"
+      return
+    }
+    $entries | Remove-Item -Recurse -Force -ErrorAction Stop
   }
   catch {
     Write-NucleusWarning "failed to gc $Label at '$Path' — $($_.Exception.Message)"
@@ -244,6 +259,11 @@ function Remove-VMGcItem {
 
     [switch]$Recurse
   )
+
+  if ($DryRun) {
+    Write-NucleusDryRun "would remove $Label '$($Item.Name)'"
+    return
+  }
 
   if (-not $PSCmdlet.ShouldProcess($Item.FullName, "Remove $Label")) {
     return
@@ -277,6 +297,11 @@ function Clear-GitCache {
   $gitDirs = Get-ChildItem -LiteralPath $DevRoot -Directory -Recurse -Filter '.git' -Force -ErrorAction SilentlyContinue
   foreach ($gitDir in $gitDirs) {
     $repoRoot = $gitDir.Parent.FullName
+
+    if ($DryRun) {
+      Write-NucleusDryRun "would clear git cache and state files and run 'git gc --auto' in '$repoRoot'"
+      continue
+    }
 
     if (-not $PSCmdlet.ShouldProcess($repoRoot, "Clear Git cache and state files")) {
       continue
@@ -454,7 +479,7 @@ function Invoke-CleanupNix {
 
 switch ($Action) {
   'cleanup-nix' {
-    Invoke-CleanupNix
+    Invoke-CleanupNix -WhatIf:$DryRun
   }
   'preferences' {
     Write-NucleusInfo "preferences gc is macOS-only; no Windows action performed"
@@ -464,7 +489,11 @@ switch ($Action) {
     # ---- Step 1: stale wallpaper gc ----------------------------------------
     if (-not $NoWallpaperGc) {
   $wallpaperOutputDir = Join-Path -Path $env:USERPROFILE -ChildPath "Pictures\wallpapers"
-  Remove-StaleWallpaper -RepoRoot $resolvedRepoRoot -User $env:USERNAME -OutputDir $wallpaperOutputDir
+  if ($DryRun) {
+    Write-NucleusDryRun "would remove stale wallpapers from '$wallpaperOutputDir'"
+  } else {
+    Remove-StaleWallpaper -RepoRoot $resolvedRepoRoot -User $env:USERNAME -OutputDir $wallpaperOutputDir
+  }
 }
 
 # ---- Step 2: tool cache gc -------------------------------------------------
@@ -483,6 +512,8 @@ if (-not $NoToolCacheGc) {
   $cargoCacheCmd = Get-Command -Name "cargo-cache" -ErrorAction SilentlyContinue
   if ($null -eq $cargoCacheCmd) {
     Write-NucleusInfo "cargo-cache unavailable; skipping cargo cache gc"
+  } elseif ($DryRun) {
+    Write-NucleusDryRun "would run 'cargo-cache -r all'"
   } else {
     & $cargoCacheCmd.Source -r all
   }
@@ -491,7 +522,11 @@ if (-not $NoToolCacheGc) {
 
   if (Test-Path -LiteralPath $repoDirenvDir -PathType Container) {
     try {
-      Remove-Item -LiteralPath $repoDirenvDir -Recurse -Force -ErrorAction Stop
+      if ($DryRun) {
+        Write-NucleusDryRun "would remove repo-local direnv cache '$repoDirenvDir'"
+      } else {
+        Remove-Item -LiteralPath $repoDirenvDir -Recurse -Force -ErrorAction Stop
+      }
     }
     catch {
       Write-NucleusWarning "failed to remove repo-local direnv cache '$repoDirenvDir' — $($_.Exception.Message)"
@@ -513,10 +548,14 @@ if (-not $NoScoopGc) {
     Write-NucleusInfo "scoop not installed; skipping scoop gc"
   } else {
     Add-NucleusPathEntry -Path $scoopShims
-    Write-NucleusInfo "running scoop cleanup..."
-    scoop cleanup *
-    if ($LASTEXITCODE -ne 0) {
-      Write-NucleusWarning "scoop cleanup exited with code $LASTEXITCODE"
+    if ($DryRun) {
+      Write-NucleusDryRun "would run 'scoop cleanup *'"
+    } else {
+      Write-NucleusInfo "running scoop cleanup..."
+      scoop cleanup *
+      if ($LASTEXITCODE -ne 0) {
+        Write-NucleusWarning "scoop cleanup exited with code $LASTEXITCODE"
+      }
     }
   }
 }
@@ -527,6 +566,8 @@ if (-not $NoOllamaGc) {
   $ollamaCmd = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaCmd) {
     Write-NucleusInfo "ollama not installed; skipping ollama model gc"
+  } elseif ($DryRun) {
+    Write-NucleusDryRun "would remove Ollama models absent from the declarative manifest"
   } else {
     Invoke-AISync -GcOnly -RepoRoot $resolvedRepoRoot -ServerReadyTimeoutSeconds 0
   }
@@ -534,7 +575,11 @@ if (-not $NoOllamaGc) {
 
 # ---- Step 7b: sccache cache clearing ----------------------------------------
 if (-not $NoSccacheGc) {
-  Clear-SccacheCache
+  if ($DryRun) {
+    Write-NucleusDryRun "would stop the sccache server and clear its cache"
+  } else {
+    Clear-SccacheCache
+  }
 }
 
 # ---- Step 6: stale VM artifact removal ------------------------------------
@@ -585,9 +630,20 @@ if (-not $NoVMGc) {
       # Windows run would collect VM data while POSIX did not.
       $vmGcArgs = @('gc')
       if ($GCVMData) { $vmGcArgs += '--gc-data' }
-      & bash $vmSh @vmGcArgs
-      if ($LASTEXITCODE -ne 0) {
-        Write-NucleusWarning "vm.sh gc exited with code $LASTEXITCODE"
+      if ($DryRun) {
+        # WHY: bash is not invoked.  vm.sh accepts --dry-run, but producing a
+        # preview by executing a second script whose dry-run paths are not
+        # covered here would trade the whole point of the switch for a
+        # prettier message.
+        Write-NucleusDryRun "would run 'vm.sh gc' for stale VM artifacts"
+      } else {
+        & bash $vmSh @vmGcArgs
+        # WHY: $LASTEXITCODE is only read next to the invocation.  A stale
+        # value from an earlier external command would otherwise raise a
+        # misleading warning on a dry run that ran nothing.
+        if ($LASTEXITCODE -ne 0) {
+          Write-NucleusWarning "vm.sh gc exited with code $LASTEXITCODE"
+        }
       }
     }
   }
@@ -616,13 +672,23 @@ if (-not $NoLogGc) {
     $systemLogDir = Get-NucleusSystemLogDir
     $logExpiry = if ($env:NUCLEUS_LOG_EXPIRY) { $env:NUCLEUS_LOG_EXPIRY } else { '7d' }
 
-    Invoke-LogRotation -Path $logDir -MaxSize $logMaxSize -MaxFiles $logMaxFiles -Compress $logCompress
-    Invoke-LogExpiry -Path $logDir -Expiry $logExpiry
+    if ($DryRun) {
+      Write-NucleusDryRun "would rotate managed logs in '$logDir' and expire archives older than $logExpiry"
+    } else {
+      Invoke-LogRotation -Path $logDir -MaxSize $logMaxSize -MaxFiles $logMaxFiles -Compress $logCompress
+      Invoke-LogExpiry -Path $logDir -Expiry $logExpiry
+    }
 
     if ($systemLogDir -and ($systemLogDir -ne $logDir)) {
       if (Test-NucleusLogDirWritable -Path $systemLogDir) {
-        Invoke-LogRotation -Path $systemLogDir -MaxSize $logMaxSize -MaxFiles $logMaxFiles -Compress $logCompress
-        Invoke-LogExpiry -Path $systemLogDir -Expiry $logExpiry
+        if ($DryRun) {
+          Write-NucleusDryRun "would rotate managed logs in '$systemLogDir' and expire archives older than $logExpiry"
+        } else {
+          Invoke-LogRotation -Path $systemLogDir -MaxSize $logMaxSize -MaxFiles $logMaxFiles -Compress $logCompress
+          Invoke-LogExpiry -Path $systemLogDir -Expiry $logExpiry
+        }
+      } elseif ($DryRun) {
+        Write-NucleusDryRun "would escalate system log rotation in '$systemLogDir' to the 'log-gc-system' scheduled task"
       } else {
         try {
           Start-ScheduledTask -TaskName 'log-gc-system' -TaskPath '\nucleus\' -ErrorAction Stop

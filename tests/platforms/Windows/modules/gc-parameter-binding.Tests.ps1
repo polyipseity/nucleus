@@ -42,6 +42,10 @@ BeforeAll {
         [pscustomobject]@{ Switch = 'NoLogGc' }
         [pscustomobject]@{ Switch = 'NoJournaldGc' }
         [pscustomobject]@{ Switch = 'GCVMData' }
+        # WHY: DryRun is a mode switch rather than a no-* skip switch, but it
+        # binds through the same param block and defaults the same way, so it
+        # rides the same map instead of growing a second reporting mechanism.
+        [pscustomobject]@{ Switch = 'DryRun' }
     )
 
     # The eleven env vars the switches used to default from, named here rather
@@ -158,6 +162,18 @@ Describe 'nucleus-gc parameter block' {
                 $state[$entry.Switch] | Should -BeFalse -Because "only -NoOllamaGc was passed"
             }
         }
+    }
+
+    # WHY: gc.sh defaults --dry-run to off, and a Windows run that collected
+    # for real was unreviewable, so -DryRun has to bind true explicitly rather
+    # than merely existing in the block.
+    It 'binds -DryRun true when it is passed on the command line' {
+        $result = Invoke-ParamBlockStub -ParamText (Get-GcParamBlock) -Arguments @('-DryRun')
+        $result.ExitCode | Should -Be 0 -Because "the block must bind; stderr was: $($result.Stderr)"
+
+        $state = ConvertTo-SwitchState -Stdout $result.Stdout
+        $state.ContainsKey('DryRun') | Should -BeTrue -Because 'the stub must report DryRun'
+        $state['DryRun'] | Should -BeTrue -Because '-DryRun was passed'
     }
 
     # WHY: the eleven NUCLEUS_GC_NO_* variables were removed because nothing on any
