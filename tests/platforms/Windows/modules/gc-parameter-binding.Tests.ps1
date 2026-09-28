@@ -41,6 +41,7 @@ BeforeAll {
         [pscustomobject]@{ Switch = 'NoVMGc'; Variable = 'NUCLEUS_GC_NO_VM_GC' }
         [pscustomobject]@{ Switch = 'NoLogGc'; Variable = 'NUCLEUS_GC_NO_LOG_GC' }
         [pscustomobject]@{ Switch = 'NoJournaldGc'; Variable = 'NUCLEUS_GC_NO_JOURNALD_GC' }
+        [pscustomobject]@{ Switch = 'GCVMData'; Variable = '' }
     )
 
     function Get-GcParamBlock {
@@ -102,8 +103,16 @@ BeforeAll {
         $state = @{}
         foreach ($pair in ($Stdout -split '\|')) {
             $parts = $pair -split '=', 2
-            if ($parts.Count -eq 2) {
-                $state[$parts[0]] = [System.Convert]::ToBoolean($parts[1])
+            # WHY: stdout comes back through ReadToEnd, so the last pair keeps the
+            # child's trailing newline and would read as "False\n" rather than
+            # "False". Without the trim, the last switch in the map is never
+            # reported and the assertion blames that switch for a newline it did
+            # not cause. An unbound switch also interpolates to nothing, so the
+            # value is checked against the two literals rather than converted
+            # blind: converting an empty string throws a FormatException and the
+            # failure never reaches the assertion that would name the switch.
+            if ($parts.Count -eq 2 -and $parts[1].Trim() -in @('True', 'False')) {
+                $state[$parts[0]] = [System.Convert]::ToBoolean($parts[1].Trim())
             }
         }
         return $state
@@ -140,7 +149,12 @@ Describe 'nucleus-gc parameter block' {
     # that the environment no longer reaches them, so the defaults cannot creep back.
     It 'ignores NUCLEUS_GC_NO_* entirely, so the switches are command-line only' {
         $env = @{}
-        foreach ($entry in $Script:SwitchMap) { $env[$entry.Variable] = 'true' }
+        foreach ($entry in $Script:SwitchMap) {
+            # WHY: GCVMData is positive and names no variable. Writing an empty
+            # name would hand the child a degenerate "=true" entry, which macOS
+            # tolerates and Windows never had verified.
+            if ($entry.Variable) { $env[$entry.Variable] = 'true' }
+        }
         $env['NUCLEUS_GC_NO_NIX'] = 'true'
 
         $result = Invoke-ParamBlockStub -ParamText (Get-GcParamBlock) -Environment $env

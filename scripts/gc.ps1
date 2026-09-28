@@ -78,6 +78,10 @@
 .PARAMETER NoVMGc
   Skip stale VM artifact removal (default: $false).
 
+.PARAMETER GCVMData
+  Collect orphaned VM data (default: $false).
+  Runs vm.sh gc --gc-data, which is what gc.sh does when asked to.
+
 .PARAMETER NoSystemGc
   Skip system GC (default: $false). Accepted but ignored on Windows (POSIX-only).
 
@@ -119,6 +123,7 @@ param(
   [switch]$NoSccacheGc,
   [switch]$NoWallpaperGc,
   [switch]$NoVMGc,
+  [switch]$GCVMData,
   [switch]$NoLogGc,
   [switch]$NoJournaldGc,
   [switch]$NoSystemGc,
@@ -574,7 +579,13 @@ if (-not $NoVMGc) {
     if (-not (Test-Path -LiteralPath $vmSh -PathType Leaf)) {
       Write-NucleusWarning "vm.sh not found at $vmSh; skipping VM artifact gc"
     } else {
-      & bash $vmSh gc
+      # WHY: the switch is positive. gc.sh defaults vm_data_gc to false, so
+      # --gc-data is opt-in there. A -NoVmDataGc spelling would default to
+      # $false, which on a "No" switch means "do not skip", so every weekly
+      # Windows run would collect VM data while POSIX did not.
+      $vmGcArgs = @('gc')
+      if ($GCVMData) { $vmGcArgs += '--gc-data' }
+      & bash $vmSh @vmGcArgs
       if ($LASTEXITCODE -ne 0) {
         Write-NucleusWarning "vm.sh gc exited with code $LASTEXITCODE"
       }

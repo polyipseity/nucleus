@@ -51,7 +51,9 @@ Describe "Windows VM disk-model parity (P8)" {
 
   It "gc.ps1 Step 6 delegates VM-artifact GC to vm.sh gc" {
     $content = Get-GcPs1Content
-    $content | Should -Match ([regex]::Escape('& bash $vmSh gc'))
+    $content | Should -Match ([regex]::Escape('& bash $vmSh @vmGcArgs'))
+    $content | Should -Match ([regex]::Escape("if (`$GCVMData) { `$vmGcArgs += '--gc-data' }"))
+    $content | Should -Match ([regex]::Escape("`$vmGcArgs = @('gc')"))
     $content | Should -Not -Match ([regex]::Escape('$_.enabled -eq $true'))
     $content | Should -Not -Match ([regex]::Escape('-Filter "*.qcow2"'))
   }
