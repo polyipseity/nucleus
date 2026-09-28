@@ -275,7 +275,7 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
       Type = "oneshot";
       ExecStart = "${logGcUser}/bin/nucleus-log-gc-user";
       Environment = [
-        "NUCLEUS_GC_EXPIRY=${config.modules.gc.expiry}"
+        "NUCLEUS_LOG_EXPIRY=${config.nucleus.logging.rotation.expiry}"
       ];
     };
   };

@@ -230,7 +230,7 @@ in
       Label = "local.log-gc-user";
       ProgramArguments = [ "${logGcUser}/bin/nucleus-log-gc-user" ];
       EnvironmentVariables = {
-        NUCLEUS_GC_EXPIRY = config.modules.gc.expiry;
+        NUCLEUS_LOG_EXPIRY = config.nucleus.logging.rotation.expiry;
       };
       RunAtLoad = false;
       # WHY: StartCalendarInterval is broken on this system — see posix/base.nix.

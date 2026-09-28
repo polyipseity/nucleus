@@ -56,6 +56,16 @@ in
         default = true;
         description = "Whether to compress rotated archives with gzip (runtime source: services.schema.json definitions.loggingEntry.properties).";
       };
+
+      # WHY: log retention is deliberately not derived from modules.gc.expiry. The
+      # two were one variable, NUCLEUS_GC_EXPIRY, so raising GC retention silently
+      # raised log retention. A literal default keeps them independent; an operator
+      # who wants them coupled can still set both.
+      expiry = mkOption {
+        type = types.str;
+        default = "7d";
+        description = "Age at which rotated log archives are deleted. Independent of modules.gc.expiry by design, and read at runtime via NUCLEUS_LOG_EXPIRY (resolved by src/scripts/lib/log-expiry.sh).";
+      };
     };
 
     sanitize = mkOption {

@@ -137,7 +137,7 @@ in
               "exec ${logGcSystem}/bin/nucleus-log-gc-system"
             ];
             EnvironmentVariables = {
-              NUCLEUS_GC_EXPIRY = config.modules.gc.expiry;
+              NUCLEUS_LOG_EXPIRY = config.nucleus.logging.rotation.expiry;
             };
             RunAtLoad = false;
             # WHY: StartCalendarInterval is broken on this system — the
@@ -154,6 +154,7 @@ in
             ProgramArguments = [ "${gcWeekly}/bin/nucleus-gc-weekly" ];
             EnvironmentVariables = {
               NUCLEUS_GC_EXPIRY = config.modules.gc.expiry;
+              NUCLEUS_LOG_EXPIRY = config.nucleus.logging.rotation.expiry;
               NUCLEUS_GC_GENERATIONS_KEEP = toString config.modules.gc.generationsKeep;
               NUCLEUS_USERNAME = username;
             };

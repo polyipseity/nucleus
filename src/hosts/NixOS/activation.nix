@@ -170,7 +170,7 @@ in
       Type = "oneshot";
       ExecStart = "${logGcSystem}/bin/nucleus-log-gc-system";
       Environment = [
-        "NUCLEUS_GC_EXPIRY=${config.modules.gc.expiry}"
+        "NUCLEUS_LOG_EXPIRY=${config.nucleus.logging.rotation.expiry}"
       ];
     };
   };
@@ -195,7 +195,7 @@ in
       Type = "oneshot";
       ExecStart = "${logGcUser}/bin/nucleus-log-gc-user";
       Environment = [
-        "NUCLEUS_GC_EXPIRY=${config.modules.gc.expiry}"
+        "NUCLEUS_LOG_EXPIRY=${config.nucleus.logging.rotation.expiry}"
       ];
     };
   };
@@ -245,6 +245,7 @@ in
       ExecStart = "${gcWeekly}/bin/nucleus-gc-weekly";
       Environment = [
         "NUCLEUS_GC_EXPIRY=${config.modules.gc.expiry}"
+        "NUCLEUS_LOG_EXPIRY=${config.nucleus.logging.rotation.expiry}"
         "NUCLEUS_GC_GENERATIONS_KEEP=${toString config.modules.gc.generationsKeep}"
         "NUCLEUS_USERNAME=${username}"
       ];
