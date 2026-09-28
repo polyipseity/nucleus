@@ -174,13 +174,17 @@ run_main() {
   if ! declare -f backend_prepare >/dev/null 2>&1; then
     install_mocks
   fi
-  # Loudness control for the whole backend interface. The call below this
+  # Loudness control for the whole mock interface. The call below this
   # function is `run_main 2>/dev/null || rc=$?`, which discards stderr AND
-  # disables `set -e` for the entire call chain — so an undefined backend_*
-  # would otherwise surface only as an empty field in a health record, never as
-  # a failure (task-61 finding 1: `backend_remedy` was absent from every
-  # install_mocks while the other seven were present). Checking all eight here
-  # turns "silently empty data" into an explicit failing assertion.
+  # disables `set -e` for the entire call chain, so a stub this suite forgot
+  # to define would surface only as an empty field in a health record, never
+  # as a failure (task-61 finding 1: `backend_remedy` was absent from every
+  # install_mocks while the other seven were present). Every other assertion
+  # in the suite reads what that call produced, so an omission has to fail
+  # here rather than quietly empty them. This does NOT check the production
+  # backends: install_mocks defines all eight names itself, so a real backend
+  # that dropped one would leave this assertion green. Coverage of the real
+  # backends belongs in a suite that does not mock.
   local _cm_missing=''
   local _cm_fn
   for _cm_fn in backend_prepare backend_args backend_mount \
@@ -592,12 +596,15 @@ section "3c" "a mount table that cannot be read is not a running mount"
 # not disprove. The Linux backend used to expose that predicate as backend_probe;
 # the wrapper was an orphan and was deleted, and the backend now answers
 # backend_probe_state through svc_mount_table_state, which keeps the third value.
-# The attach wait loop is such a caller by position and a reporter by use: it
-# sets live on the two-valued answer, so a table nobody could read exited the
+# The attach wait loop was such a caller by position and a reporter by use: it
+# set live on the two-valued answer, so a table nobody could read exited the
 # loop on its first tick, recorded the service running and successful, and
 # deleted the capture file holding the only real evidence. The macOS backend
-# reads the same undeterminable input as not-live, so the two platforms answered
-# one condition in opposite ways.
+# never had that input to be unsure about: its probe is a per-path query, and
+# anything short of a positive answer was already the not-live answer. The two
+# platforms therefore applied opposite conventions to one condition, and a
+# mount neither could confirm live came out running on Linux and not-live on
+# macOS.
 #
 # Three separate assertions, because the three are separately wrong on the buggy
 # path: the record, the evidence, and the lesson the remedy text teaches.
