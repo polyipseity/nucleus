@@ -337,10 +337,10 @@ _state=""
 _state="$(svc_mount_table_state /mnt/any 10)"
 assert_eq "a readable table that lists other paths is absent and not empty" "absent:not-listed" "$_state"
 
-# WHY: svc_remount_until polls the predicate every 5 s for the whole budget
-#   while a remount is in progress, so the not-listed answer must be negative
-#   and silent. The token assertion above does not prove the predicate keeps the
-#   two absent reasons apart, and that silence is the whole of the fix.
+# WHY: svc_wait_mount_released polls the predicate every 0.5 s for the whole
+#   timeout, so the not-listed answer must be negative and silent. The token
+#   assertion above does not prove the predicate keeps the two absent reasons
+#   apart, and that silence is the whole of the fix.
 _mount_err=""
 _mount_rc=0
 _mount_err="$(svc_mount_table_contains /mnt/any 2>&1 >/dev/null)" || _mount_rc=$?
@@ -535,6 +535,25 @@ assert_eq "the budget bounds the relaunch" "1|2" "$(relaunch_rc /mnt/absent 20)|
 : >"$FAKE_ATTEMPT_LIVE"
 assert_eq "the launch cap bounds the relaunch" "1|3" "$(relaunch_rc /mnt/absent 100)|$(kick_count)"
 FAKE_MOUNT_AFTER_KICKS=""
+
+# WHY: an unreadable table is not evidence that the volume is attached, and this
+# is the one caller that reports: scripts/svc.sh prints "is mounted" on a zero
+# return, so returning 0 here would report a mount this function never
+# confirmed. A kick on the same run can land on a volume that is in fact
+# attached, which is the destructive half of the same bug.
+# A budget of 0 ends the run on the first tick without sleeping, so the suite
+# does not pay the poll interval; the fake reader is exported, so the probe
+# still reaches it.
+: >"$FAKE_KICK_CALLS"
+: >"$FAKE_ATTEMPT_LIVE"
+FAKE_MOUNT_FAIL=1
+assert_eq "an unreadable mount table is not reported as attached" "1" "$(relaunch_rc /mnt/any 0)"
+# A budget of 0 returns before the loop reaches a kick, so the no-kick claim
+# needs a budget it can outlast. The section's instant sleep makes those extra
+# ticks cost no wall time, so this only pays five more probes.
+assert_eq "a table that is never readable is not reported as attached within the budget" "1" "$(relaunch_rc /mnt/any 20)"
+assert_eq "a table that is never readable is never kicked" "0" "$(kick_count)"
+FAKE_MOUNT_FAIL=''
 FAKE_MOUNT_TABLE=""
 PATH="$_path_before"
 export PATH

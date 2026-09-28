@@ -208,8 +208,10 @@ svc_wait_mount_released() {
 #       $3 — sudo prefix ("" or "sudo"); $4 — budget in seconds;
 #       $5 — seconds between launches (default 5); $6 — most launches to make
 #       (default 4).
-# Returns 0 as soon as the mount table lists the path, 1 when the budget or the
-# launch cap is reached with the path still absent.
+# Returns 0 only when the mount table lists the path. Returns 1 when the budget
+# or the launch cap is reached without that, which includes a run in which the
+# table was never readable: an unknown answer polls without spending a launch,
+# so the budget is the only bound that ends it.
 # WHY: FSKit can refuse the first attempts right after its daemon restarts (macFUSE
 #   status 3/4) while a later one serves the volume, and the mount agent no longer
 #   retries a provider refusal on its own (it stops and records a blocked marker),
@@ -219,29 +221,40 @@ svc_wait_mount_released() {
 #   succeed.
 svc_remount_until() {
   local mount_point="$1" target="$2" sudo_prefix="$3" budget="$4" interval="${5:-5}" max_launches="${6:-4}"
-  local waited=0 launches=1 running
+  local waited=0 launches=1 running _srm_state
 
   while :; do
-    if svc_mount_table_contains "$mount_point"; then
+    _srm_state="$(svc_mount_table_state "$mount_point")"
+    if [ "$_srm_state" = present ]; then
       return 0
     fi
     if [ "$waited" -ge "$budget" ] || [ "$launches" -ge "$max_launches" ]; then
       return 1
     fi
-    running=false
-    # WHY: `grep -q` stops at its first match, which SIGPIPEs the probe while it
-    #   is still writing; under `set -o pipefail` that reads as a failed probe
-    #   and a launch that is still in flight would be kicked again. Reading the
-    #   whole output costs nothing here and removes the window.
-    # check-suppress:suppression_doc: a job that is not loaded or not running is the question being asked, not an error.
-    if $sudo_prefix launchctl print "$target" 2>/dev/null | grep 'state = running' >/dev/null; then
-      running=true
-    fi
-    if [ "$running" = false ]; then
-      # check-suppress:suppression_doc: a launch that fails is retried within the bound; the attempt's output is the agent's log, not this command's.
-      $sudo_prefix launchctl kickstart -k "$target" >/dev/null 2>&1 || true
-      launches=$((launches + 1))
-    fi
+    case "$_srm_state" in
+    unknown:*)
+      # WHY: the table could not be read, so whether the volume is attached is
+      #   unknown, and a kick can land on a volume that is in fact attached. This
+      #   polls without spending a launch; the budget check above still ends the
+      #   run, with a 1, so a table that never reads cannot spin forever.
+      ;;
+    *)
+      running=false
+      # WHY: `grep -q` stops at its first match, which SIGPIPEs the probe while it
+      #   is still writing; under `set -o pipefail` that reads as a failed probe
+      #   and a launch that is still in flight would be kicked again. Reading the
+      #   whole output costs nothing here and removes the window.
+      # check-suppress:suppression_doc: a job that is not loaded or not running is the question being asked, not an error.
+      if $sudo_prefix launchctl print "$target" 2>/dev/null | grep 'state = running' >/dev/null; then
+        running=true
+      fi
+      if [ "$running" = false ]; then
+        # check-suppress:suppression_doc: a launch that fails is retried within the bound; the attempt's output is the agent's log, not this command's.
+        $sudo_prefix launchctl kickstart -k "$target" >/dev/null 2>&1 || true
+        launches=$((launches + 1))
+      fi
+      ;;
+    esac
     sleep "$interval"
     waited=$((waited + interval))
   done
@@ -300,8 +313,8 @@ svc_mount_table_state() {
 #   so undeterminable answers must keep reading as present. Callers that report
 #   use svc_mount_table_state instead, which keeps the third answer.
 # WHY: only the empty table warns. The not-listed answer is the ordinary reading
-#   while a remount is under way, and svc_remount_until polls this every 5s for
-#   the whole budget, so a warn there would write one line per tick.
+#   while a remount is under way, and svc_wait_mount_released polls this every
+#   0.5s for the whole timeout, so a warn there would write one line per tick.
 svc_mount_table_contains() {
   local state
   state="$(svc_mount_table_state "$@")"
