@@ -1446,7 +1446,12 @@ do_repair() {
   done
 
   if [ "$failures" -gt 0 ]; then
-    error "repair finished with $failures failure(s); $(fskit_remedy)"
+    # WHY: this block exits before the undetermined one below, so a run with both
+    #   would drop the count of the mounts left alone. Naming it here keeps the
+    #   summary accounting for every mount the repair did not bring back.
+    undetermined_note=""
+    [ "$undetermined" -gt 0 ] && undetermined_note=" and could not determine the state of $undetermined mount(s), which were left alone"
+    error "repair finished with $failures failure(s)$undetermined_note; $(fskit_remedy)"
     exit 1
   fi
 

@@ -75,6 +75,9 @@ JSON
 #   FAKE_MOUNT_TABLE_SLOW  — seconds the mount-table read blocks for, which is
 #                      how a volume hung in the kernel looks: the read is still
 #                      going when its bound expires.
+#   FAKE_MOUNT_FAIL_ONCE — the first mount-table read exits 1 and later reads
+#                      succeed, so one row is undeterminable and the rest are
+#                      attempted against a readable table.
 FAKE_MOUNT_MAP="$_tmp/mount-map"
 FAKE_JOBS_LOADED="$_tmp/jobs-loaded"
 FAKE_MOUNTS="$_tmp/mounts"
@@ -197,6 +200,14 @@ cat >"$_tmp/bin/mount" <<'FAKE_MOUNT'
 if [ -n "${FAKE_MOUNT_FAIL:-}" ]; then
   exit "$FAKE_MOUNT_FAIL"
 fi
+# WHY: a reader that fails every read leaves every row undeterminable and no row
+#   attempted, so the run that also carries a genuine failure cannot be built
+#   from it. Failing only the first read makes that run: the first row is left
+#   alone and the rest are attempted against a table that reads normally.
+if [ -n "${FAKE_MOUNT_FAIL_ONCE:-}" ] && [ ! -e "${FAKE_MOUNTS}.fail-once" ]; then
+  : >"${FAKE_MOUNTS}.fail-once"
+  exit 1
+fi
 # WHY: the real sleep, not the fake one: the fake sleep is the thing under test
 #   in this suite, and charging a hung-volume delay to it would make the case
 #   that distinguishes the two meaningless.
@@ -307,6 +318,8 @@ reset_world() {
   printf 'fake://root on / (fake)\n' >"$FAKE_MOUNTS"
   rm -f "$FAKE_DAEMON_KILLED"
   : >"$FAKE_KICK_COUNT"
+  # WHY: the fail-once marker is toolchain state, so a fresh world reads the table.
+  rm -f "${FAKE_MOUNTS}.fail-once"
   rm -f "$STATE_DIR"/*.json
   rm -f "$FAKE_HOME/Library/LaunchAgents"/*.plist
   # Point svc_health to the fake home so blocked records land in STATE_DIR.
@@ -448,8 +461,7 @@ reset_world local.cloud-mount.OneDrive
 export FAKE_MOUNT_FAIL=1
 # WHY: the bug. An unreadable table answers "present", so repair skipped the
 #   row, counted no failure, still printed "cloud mounts repaired", and still
-#   exited 0. Exit status and message are asserted together, because on the old
-#   code each of them alone would have been satisfiable by accident.
+#   exited 0.
 assert_eq "repair fails when it could not read the mount table" "1" "$(run_repair OneDrive --timeout 2)"
 assert_mentions "an undeterminable mount is named" "$(cat "$_out")" "could not determine"
 # check-suppress:suppression_doc: grep exits 1 on a zero match count, which is the passing case here
@@ -463,5 +475,23 @@ reset_world local.cloud-mount.OneDrive
 #   repaired the mounts, or the fix has only made repair always fail.
 assert_eq "repair still succeeds when the table can be read" "0" "$(run_repair OneDrive --timeout 2)"
 assert_mentions "repair still reports success on the success path" "$(cat "$_out")" "cloud mounts repaired"
+
+section "8" "repair names both counts when a mount also could not come back"
+
+# WHY: a run with a genuine failure and an undeterminable mount must name both, or
+#   the summary is back to not accounting for a mount it left alone. FAKE_MOUNT_FAIL
+#   alone cannot build that run: it fails every read, so every row is
+#   undeterminable and none is attempted.
+reset_world local.cloud-mount.GoogleDrive local.cloud-mount.OneDrive
+FAKE_NO_MOUNT_ON_KICKSTART=1
+FAKE_MOUNT_FAIL_ONCE=1
+export FAKE_NO_MOUNT_ON_KICKSTART FAKE_MOUNT_FAIL_ONCE
+assert_eq "a failure alongside an undeterminable mount fails the command" "1" "$(run_repair --timeout 2)"
+assert_mentions "the combined summary names the failure" "$(cat "$_out")" "1 failure(s)"
+assert_mentions "the combined summary names the undeterminable mount" "$(cat "$_out")" "could not determine the state of 1 mount(s)"
+# check-suppress:suppression_doc: grep exits 1 on a zero match count, which is the passing case here
+assert_eq "the combined run does not claim success" "0" \
+  "$(grep -c 'cloud mounts repaired' "$_out" || true)"
+unset FAKE_NO_MOUNT_ON_KICKSTART FAKE_MOUNT_FAIL_ONCE
 
 finish_tests
