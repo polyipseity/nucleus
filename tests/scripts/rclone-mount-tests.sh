@@ -183,7 +183,7 @@ run_main() {
   # turns "silently empty data" into an explicit failing assertion.
   local _cm_missing=''
   local _cm_fn
-  for _cm_fn in backend_prepare backend_args backend_mount backend_probe \
+  for _cm_fn in backend_prepare backend_args backend_mount \
     backend_probe_state backend_class backend_is_transient backend_unmount \
     backend_remedy; do
     if ! declare -f "$_cm_fn" >/dev/null 2>&1; then
@@ -195,8 +195,8 @@ run_main() {
   fi
   # Export all mock/backend functions so the subshell inherits them.
   # MOCK_BACKEND_REMEDY/backend_remedy are in this list for the same reason as
-  # the other seven: the runner invokes all eight, and an unexported one leaves
-  # the child with a command-not-found that run_main's `|| rc=$?` hides.
+  # the other seven the runner invokes: an unexported one leaves the child with
+  # a command-not-found that run_main's `|| rc=$?` hides.
   export -f MOCK_BACKEND_PREPARE MOCK_BACKEND_ARGS MOCK_BACKEND_MOUNT \
     MOCK_BACKEND_PROBE MOCK_BACKEND_PROBE_STATE MOCK_BACKEND_CLASSIFY \
     MOCK_BACKEND_IS_TRANSIENT MOCK_BACKEND_UNMOUNT MOCK_BACKEND_REMEDY \
@@ -587,15 +587,17 @@ test_dead_mount_stops_attach_wait_early() {
 
 section "3c" "a mount table that cannot be read is not a running mount"
 
-# The Linux backend answers backend_probe through svc_mount_table_contains,
-# which returns 0 for every unknown:* state because a caller that ACTS on the
-# answer must never start a mount on a volume it could not disprove. The attach
-# wait loop is such a caller by position and a reporter by use: it sets live on
-# the same zero return, so a table nobody could read exited the loop on its
-# first tick, recorded the service running and successful, and deleted the
-# capture file holding the only real evidence. The macOS backend reads the same
-# undeterminable input as not-live, so the two platforms answered one condition
-# in opposite ways.
+# svc_mount_table_contains still answers 0 for every unknown:* state, because a
+# caller that ACTS on the answer must never start a mount on a volume it could
+# not disprove. The Linux backend used to expose that predicate as backend_probe;
+# the wrapper was an orphan and was deleted, and the backend now answers
+# backend_probe_state through svc_mount_table_state, which keeps the third value.
+# The attach wait loop is such a caller by position and a reporter by use: it
+# sets live on the two-valued answer, so a table nobody could read exited the
+# loop on its first tick, recorded the service running and successful, and
+# deleted the capture file holding the only real evidence. The macOS backend
+# reads the same undeterminable input as not-live, so the two platforms answered
+# one condition in opposite ways.
 #
 # Three separate assertions, because the three are separately wrong on the buggy
 # path: the record, the evidence, and the lesson the remedy text teaches.
