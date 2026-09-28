@@ -1446,7 +1446,7 @@ do_repair() {
       #   came back is unknown. Calling it mounted and clearing its record
       #   would both claim a success the repair did not perform and erase the
       #   evidence a later apply needs, so it counts as undetermined instead.
-      warn "could not determine whether mount '$mount_id' ($mount_point) came back (${_cm_state#unknown:}); leaving it alone"
+      warn "could not determine whether mount '$mount_id' ($mount_point) came back after the relaunch (${_cm_state#unknown:}); its health record was left in place"
       undetermined=$((undetermined + 1))
       ;;
     *)

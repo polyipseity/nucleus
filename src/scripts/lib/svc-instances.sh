@@ -209,9 +209,9 @@ svc_wait_mount_released() {
 #       $5 — seconds between launches (default 5); $6 — most launches to make
 #       (default 4).
 # Returns 0 only when the mount table lists the path. Returns 1 when the budget
-# or the launch cap is reached without that, which includes a run in which the
-# table was never readable: an unknown answer polls without spending a launch,
-# so the budget is the only bound that ends it.
+# or the launch cap is reached without that. A run whose state is unknown:*
+# for the whole budget returns 1 too: an unknown answer polls without spending a
+# launch, so the budget is the only bound that ends it.
 # WHY: FSKit can refuse the first attempts right after its daemon restarts (macFUSE
 #   status 3/4) while a later one serves the volume, and the mount agent no longer
 #   retries a provider refusal on its own (it stops and records a blocked marker),

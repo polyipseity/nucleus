@@ -559,8 +559,8 @@ FAKE_MOUNT_AFTER_KICKS=""
 # confirmed. A kick on the same run can land on a volume that is in fact
 # attached, which is the destructive half of the same bug.
 # A budget of 0 ends the run on the first tick without sleeping, so the suite
-# does not pay the poll interval; the fake reader is exported, so the probe
-# still reaches it.
+# does not pay the poll interval; the fake reader is a script on PATH and
+# FAKE_MOUNT_FAIL is exported, so the probe still reaches it.
 : >"$FAKE_KICK_CALLS"
 : >"$FAKE_ATTEMPT_LIVE"
 FAKE_MOUNT_FAIL=1
