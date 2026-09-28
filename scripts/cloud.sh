@@ -1432,17 +1432,29 @@ do_repair() {
     # check-suppress:suppression_doc: the report pass below names every mount that did not come back, so a failed relaunch is not an error here.
     svc_remount_until "$mount_point" "$target" "$sudo_prefix" "$timeout" || true
 
-    if svc_mount_table_contains "$mount_point"; then
+    _cm_state="$(svc_mount_table_state "$mount_point")"
+    case "$_cm_state" in
+    present)
       say "mounted: $mount_id ($mount_point)"
       # WHY: a mount that came back is no longer blocked, so the record that
       #   gated it is re-armed here — otherwise every later apply re-reports a
       #   problem the repair already fixed.
       svc_health_clear "$label"
-    else
+      ;;
+    unknown:*)
+      # WHY: the table could not be read a second time, so whether this mount
+      #   came back is unknown. Calling it mounted and clearing its record
+      #   would both claim a success the repair did not perform and erase the
+      #   evidence a later apply needs, so it counts as undetermined instead.
+      warn "could not determine whether mount '$mount_id' ($mount_point) came back (${_cm_state#unknown:}); leaving it alone"
+      undetermined=$((undetermined + 1))
+      ;;
+    *)
       # check-suppress:suppression_doc: every unrecovered mount is reported before the command fails, so one missing drive cannot hide the others.
       error "not mounted: $mount_id ($mount_point)" || true
       failures=$((failures + 1))
-    fi
+      ;;
+    esac
   done
 
   if [ "$failures" -gt 0 ]; then
@@ -1456,10 +1468,9 @@ do_repair() {
   fi
 
   if [ "$undetermined" -gt 0 ]; then
-    # WHY: a mount left alone because the table could not read it is not a
-    #   repaired mount. Reporting success here is the defect this fixes, so
-    #   the command fails instead, and the count says how many need a
-    #   second look. See fskit_remedy for the operator's next step.
+    # WHY: a mount left alone is not a repaired mount, so the command fails
+    #   rather than reporting a success it did not perform, and the count says
+    #   how many need a second look.
     error "repair could not determine the state of $undetermined mount(s); those were left alone. $(fskit_remedy)"
     exit 1
   fi

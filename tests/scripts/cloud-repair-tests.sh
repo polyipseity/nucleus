@@ -78,6 +78,10 @@ JSON
 #   FAKE_MOUNT_FAIL_ONCE — the first mount-table read exits 1 and later reads
 #                      succeed, so one row is undeterminable and the rest are
 #                      attempted against a readable table.
+#   FAKE_MOUNT_FAIL_AFTER — the first N mount-table reads succeed and every
+#                      later one exits 1, so a table that is readable at the
+#                      decision probe and unreadable at the verify probe one
+#                      read later.
 FAKE_MOUNT_MAP="$_tmp/mount-map"
 FAKE_JOBS_LOADED="$_tmp/jobs-loaded"
 FAKE_MOUNTS="$_tmp/mounts"
@@ -208,6 +212,20 @@ if [ -n "${FAKE_MOUNT_FAIL_ONCE:-}" ] && [ ! -e "${FAKE_MOUNTS}.fail-once" ]; th
   : >"${FAKE_MOUNTS}.fail-once"
   exit 1
 fi
+# WHY: the verify probe reads the table again after the decision probe already
+#   answered, so the case it needs is a table readable for the first N reads and
+#   unreadable from the next one on. Counting the reads is what expresses "the
+#   first read has to succeed": a second marker can only say that some later
+#   read fails, which is what FAKE_MOUNT_FAIL_ONCE already says.
+if [ -n "${FAKE_MOUNT_FAIL_AFTER:-}" ]; then
+  _reads=0
+  if [ -e "${FAKE_MOUNTS}.reads" ]; then _reads="$(cat "${FAKE_MOUNTS}.reads")"; fi
+  _reads=$((_reads + 1))
+  printf '%s' "$_reads" >"${FAKE_MOUNTS}.reads"
+  if [ "$_reads" -gt "$FAKE_MOUNT_FAIL_AFTER" ]; then
+    exit 1
+  fi
+fi
 # WHY: the real sleep, not the fake one: the fake sleep is the thing under test
 #   in this suite, and charging a hung-volume delay to it would make the case
 #   that distinguishes the two meaningless.
@@ -318,8 +336,9 @@ reset_world() {
   printf 'fake://root on / (fake)\n' >"$FAKE_MOUNTS"
   rm -f "$FAKE_DAEMON_KILLED"
   : >"$FAKE_KICK_COUNT"
-  # WHY: the fail-once marker is toolchain state, so a fresh world reads the table.
-  rm -f "${FAKE_MOUNTS}.fail-once"
+  # WHY: the fail-once marker and the read counter are toolchain state, so a
+  #   fresh world reads the table.
+  rm -f "${FAKE_MOUNTS}.fail-once" "${FAKE_MOUNTS}.reads"
   rm -f "$STATE_DIR"/*.json
   rm -f "$FAKE_HOME/Library/LaunchAgents"/*.plist
   # Point svc_health to the fake home so blocked records land in STATE_DIR.
@@ -463,7 +482,7 @@ export FAKE_MOUNT_FAIL=1
 #   row, counted no failure, still printed "cloud mounts repaired", and still
 #   exited 0.
 assert_eq "repair fails when it could not read the mount table" "1" "$(run_repair OneDrive --timeout 2)"
-assert_mentions "an undeterminable mount is named" "$(cat "$_out")" "could not determine"
+assert_mentions "an undeterminable mount is named" "$(cat "$_out")" "could not determine whether mount 'OneDrive'"
 # check-suppress:suppression_doc: grep exits 1 on a zero match count, which is the passing case here
 assert_eq "repair does not claim a success it did not have" "0" \
   "$(grep -c 'cloud mounts repaired' "$_out" || true)"
@@ -493,5 +512,51 @@ assert_mentions "the combined summary names the undeterminable mount" "$(cat "$_
 assert_eq "the combined run does not claim success" "0" \
   "$(grep -c 'cloud mounts repaired' "$_out" || true)"
 unset FAKE_NO_MOUNT_ON_KICKSTART FAKE_MOUNT_FAIL_ONCE
+
+section "9" "the table is readable at the decision probe and unreadable at the verify probe"
+
+# WHY: the defect this pins is one probe later than the one section 7 covers. A
+#   mode that fails every read cannot build that case: the decision probe
+#   answers unknown, the loop continues, and the verify probe is never reached.
+#   The table has to be readable for the read that starts the mount and
+#   unreadable for the read that checks it, which is what a volume hung in the
+#   kernel looks like after the mount attempt.
+reset_world local.cloud-mount.OneDrive
+mark_blocked local.cloud-mount.OneDrive
+FAKE_MOUNT_FAIL_AFTER=1
+export FAKE_MOUNT_FAIL_AFTER
+assert_eq "a mount the verify probe cannot confirm fails the command" "1" "$(run_repair OneDrive --timeout 2)"
+# check-suppress:suppression_doc: grep exits 1 on a zero match count, which is the passing case here
+assert_eq "an unconfirmable mount is not reported as mounted" "0" \
+  "$(grep -c 'mounted: OneDrive' "$_out" || true)"
+# WHY: this needle is the per-row warning's, not the summary's. The summary
+#   reads "could not determine the state of 1 mount(s)" and names no mount, so
+#   only the warning tells the operator which drive was left alone.
+assert_mentions "an unconfirmable mount is named" "$(cat "$_out")" \
+  "could not determine whether mount 'OneDrive'"
+assert_mentions "an unconfirmable mount carries the reason" "$(cat "$_out")" "mount-status-1"
+# check-suppress:suppression_doc: grep exits 1 on a zero match count, which is the passing case here
+assert_eq "an unconfirmable mount does not claim success" "0" \
+  "$(grep -c 'cloud mounts repaired' "$_out" || true)"
+if svc_health_is_blocked local.cloud-mount.OneDrive; then
+  assert_pass "an unconfirmable mount keeps its blocked record"
+else
+  assert_fail "an unconfirmable mount keeps its blocked record" \
+    "the record was cleared, so a later apply no longer re-reports the drive"
+fi
+
+reset_world local.cloud-mount.OneDrive
+mark_blocked local.cloud-mount.OneDrive
+# WHY: the control. The same run without the mode has to reach the present arm,
+#   print the mounted line, clear the record, and exit 0. Without it the
+#   assertions above are also satisfied by a repair that never confirms a mount.
+unset FAKE_MOUNT_FAIL_AFTER
+assert_eq "a confirmable mount still exits 0" "0" "$(run_repair OneDrive --timeout 2)"
+assert_mentions "a confirmable mount" "$(cat "$_out")" "mounted: OneDrive"
+if svc_health_is_blocked local.cloud-mount.OneDrive; then
+  assert_fail "a confirmable mount clears its blocked record" "the blocked record survived the repair"
+else
+  assert_pass "a confirmable mount clears its blocked record"
+fi
 
 finish_tests
