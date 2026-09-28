@@ -90,7 +90,10 @@ FAKE_SYSTEMCTL
 # assertions describe the table contract instead of whatever this host mounts.
 #   FAKE_MOUNT_TABLE — the table the probe reports.
 #   FAKE_MOUNT_SLOW  — sleep this long first: a probe that outlives its bound,
-#                      which is how a hung volume blocks inside the kernel.
+#                      which is how a hung volume blocks inside the kernel. The
+#                      delay comes before every other branch, so a reader can be
+#                      slow AND fail, which is what a hung volume looks like to a
+#                      caller that keeps polling it.
 #   FAKE_MOUNT_UNTIL — report the table for this many calls, then report
 #                      nothing: a volume that finishes unmounting while it is
 #                      being waited on.
@@ -100,16 +103,20 @@ FAKE_SYSTEMCTL
 #   FAKE_MOUNT_FAIL  — exit with this status printing nothing: a reader that
 #                      could not read the table at all, as opposed to one that
 #                      read an empty table.
+# Every read is counted in FAKE_MOUNT_CALLS whatever it then answers, so an
+# assertion can say how many polls a bounded loop made.
 cat >"$_tmp/bin/mount" <<'FAKE_MOUNT'
 #!/usr/bin/env bash
+calls=0
+[ -f "${FAKE_MOUNT_CALLS:?}" ] && calls="$(cat "$FAKE_MOUNT_CALLS")"
+calls=$((calls + 1))
+printf '%s' "$calls" >"$FAKE_MOUNT_CALLS"
+[ -n "${FAKE_MOUNT_SLOW:-}" ] && "$REAL_SLEEP" "$FAKE_MOUNT_SLOW"
 if [ -n "${FAKE_MOUNT_FAIL:-}" ]; then
   exit "$FAKE_MOUNT_FAIL"
 fi
 if [ -n "${FAKE_MOUNT_UNTIL:-}" ]; then
-  calls=0
   [ -f "${FAKE_MOUNT_CALLS:?}" ] && calls="$(cat "$FAKE_MOUNT_CALLS")"
-  calls=$((calls + 1))
-  printf '%s' "$calls" >"$FAKE_MOUNT_CALLS"
   [ "$calls" -gt "$FAKE_MOUNT_UNTIL" ] && exit 0
 fi
 if [ -n "${FAKE_MOUNT_AFTER_KICKS:-}" ]; then
@@ -117,10 +124,15 @@ if [ -n "${FAKE_MOUNT_AFTER_KICKS:-}" ]; then
   [ -n "$kicks" ] || kicks=0
   [ "$kicks" -lt "$FAKE_MOUNT_AFTER_KICKS" ] && exit 0
 fi
-[ -n "${FAKE_MOUNT_SLOW:-}" ] && sleep "$FAKE_MOUNT_SLOW"
 printf '%s\n' "${FAKE_MOUNT_TABLE:-}"
 FAKE_MOUNT
 chmod +x "$_tmp/bin/launchctl" "$_tmp/bin/systemctl" "$_tmp/bin/mount"
+# The reader's own delay is always the real sleep, resolved before anything in
+# this suite puts a fast one on PATH: FAKE_MOUNT_SLOW models a reader blocked
+# inside the kernel, and a modelled cost would measure the model rather than the
+# wall clock the bound is expressed in.
+REAL_SLEEP="$(command -v sleep)"
+export REAL_SLEEP
 PATH="$_tmp/bin:$PATH"
 export PATH
 FAKE_MOUNT_TABLE=""
@@ -500,10 +512,13 @@ export PATH
 
 # WHY: FSKit can refuse the first attempts right after its daemon restarts, so
 # the relaunch is bounded twice — by the launch cap and by the budget — and a
-# launch that is still in flight is never interrupted.
+# launch that is still in flight is never interrupted. The loop's own output is
+# captured rather than left on this command's stdout, so a diagnostic it prints
+# can be asserted on without landing in the status the callers compare.
 relaunch_rc() { # <path> <budget> [interval] [max-launches]
   local _rc=0
-  svc_remount_until "$1" "gui/501/local.cloud-mount.iCloud" "" "$2" "${3:-5}" "${4:-4}" || _rc=$?
+  svc_remount_until "$1" "gui/501/local.cloud-mount.iCloud" "" "$2" "${3:-5}" "${4:-4}" \
+    >"$_tmp/relaunch.out" 2>&1 || _rc=$?
   printf '%s' "$_rc"
 }
 kick_count() {
@@ -511,6 +526,12 @@ kick_count() {
   _kicks="$(cat "$FAKE_KICK_CALLS" 2>/dev/null)"
   [ -n "$_kicks" ] || _kicks=0
   printf '%s' "$_kicks"
+}
+mount_reads() {
+  local _reads
+  _reads="$(cat "$FAKE_MOUNT_CALLS" 2>/dev/null)"
+  [ -n "$_reads" ] || _reads=0
+  printf '%s' "$_reads"
 }
 
 : >"$FAKE_KICK_CALLS"
@@ -570,6 +591,33 @@ assert_eq "an unreadable mount table is not reported as attached" "1" "$(relaunc
 # ticks cost no wall time, so this only pays five more probes.
 assert_eq "a table that is never readable is not reported as attached within the budget" "1" "$(relaunch_rc /mnt/any 20)"
 assert_eq "a table that is never readable is never kicked" "0" "$(kick_count)"
+
+# WHY: the caller has said it is starting the mount, and the next thing it says
+#   about the table comes after the budget expires, so without a line here the
+#   wait is silent. One line and not one per tick: the loop polls for the whole
+#   budget, and a notice per poll is the spam svc_mount_table_state avoids by
+#   printing nothing at all. Counted, not just matched, so a per-tick notice
+#   fails this even though the first-tick one is present.
+assert_eq "an unreadable table is announced once for the whole wait" "1" \
+  "$(grep -c "the mount table for '/mnt/any' could not be read" "$_tmp/relaunch.out" || true)"
+assert_mentions "the announcement names the reason and the wait" \
+  "$(cat "$_tmp/relaunch.out")" "could not be read (mount-status-1); waiting up to 20s"
+
+# WHY: the budget is the operator's wait, so it is wall clock. A poll costs the
+#   reader's own time on top of the interval, and counting only the intervals
+#   made the run last as long as the polls did — three times the stated budget
+#   in precisely the case the unknown arm exists for, since a table nobody can
+#   read spends no launch and is polled until the budget ends it. The read count
+#   is the discriminator: a 2s reader against a 4s budget is two polls of wall
+#   clock and five intervals, so the two accountings cannot both pass this. The
+#   section's instant sleep is what separates them, and the reader sleeps for
+#   real because a modelled cost would measure the model instead of the clock.
+: >"$FAKE_KICK_CALLS"
+: >"$FAKE_MOUNT_CALLS"
+FAKE_MOUNT_SLOW=2
+assert_eq "the budget is wall clock, not a count of sleep intervals" "1|2|0" \
+  "$(relaunch_rc /mnt/any 4 1)|$(mount_reads)|$(kick_count)"
+FAKE_MOUNT_SLOW=''
 FAKE_MOUNT_FAIL=''
 FAKE_MOUNT_TABLE=""
 PATH="$_path_before"

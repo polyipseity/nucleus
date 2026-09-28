@@ -137,34 +137,27 @@ backend_mount() {
 _backend_capture=""
 _backend_rclone_pid=""
 
-# backend_probe — report whether the mount point is a LIVE MOUNT.
-# Args: $1 — mount_point.
-# Exit: 0 when mounted, 1 when not mounted.
-#
-# WHY: this asks about MOUNT STATE, never about directory contents. An empty
-#   remote root is a legitimate state (a freshly created cloud folder), so a
-#   content test reports a healthy mount as dead: the runner never sets live,
-#   retries `mountAttempts` times, and leaves the service permanently blocked at
-#   `mount-failed` on a mount that actually succeeded.
-# This is the same PREDICATE the macOS backend asks via diskutil — "is this path
-#   a live mount?" — answered here with this host's mount state, through the
-#   repository's single mount-table predicate: svc_mount_table_contains
-#   (src/scripts/lib/svc-instances.sh). Delegating rather than re-parsing keeps
-#   one implementation of the question, so `nucleus-cloud repair` and this probe
-#   can never disagree about whether a mount point is mounted.
-backend_probe() {
-  svc_mount_table_contains "$1"
-}
-
 # backend_probe_state — the mount table's three-valued answer for a mount point.
 # Args: $1 — mount point.
 # Prints: present, absent:<reason> or unknown:<reason>. Always returns 0.
-# WHY: backend_probe cannot tell a path that IS mounted from a table that could
-#   not be read, because it answers 0 for both so that no caller starts a mount
-#   on a volume it could not disprove. The attach wait loop in rclone-mount.sh is
-#   a caller that reports rather than acts — it sets live on the answer, and then
-#   records the service running and deletes the capture file — so it reads this
-#   instead and keeps the third value.
+# WHY: the question is MOUNT STATE, never directory contents. An empty remote
+#   root is a legitimate state (a freshly created cloud folder), so a content
+#   test reports a healthy mount as dead: the runner never sets live, retries
+#   `mountAttempts` times, and leaves the service permanently blocked at
+#   `mount-failed` on a mount that actually succeeded. This is the same question
+#   the macOS backend asks via diskutil, answered here with this host's mount
+#   state.
+# WHY: the three values rather than a bare status. The two-valued predicate
+#   answers 0 both for a live mount and for a table that could not be read, so
+#   that no caller starts a mount on a volume it could not disprove. The attach
+#   wait loop in rclone-mount.sh is a caller that reports rather than acts — it
+#   sets live on the answer, and then records the service running and deletes the
+#   capture file — so it reads this instead and keeps the third value.
+# WHY: delegating rather than re-parsing is what keeps one implementation of the
+#   question. Every mount-state caller on this platform answers through
+#   svc_mount_table_state: this function, the predicate svc_wait_mount_released
+#   polls, and the two probes `nucleus-cloud repair` runs, so none of them can
+#   disagree about whether a mount point is mounted.
 backend_probe_state() {
   svc_mount_table_state "$1"
 }

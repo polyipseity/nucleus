@@ -243,7 +243,7 @@ backend_mount() {
 _backend_capture=""
 _backend_rclone_pid=""
 
-# backend_probe — check if the volume is live.
+# backend_probe — the per-path volume query backend_probe_state wraps.
 # Args: $1 — mount_point.
 backend_probe() {
   local mount_point="$1"

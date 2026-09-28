@@ -211,7 +211,7 @@ svc_wait_mount_released() {
 # Returns 0 only when the mount table lists the path. Returns 1 when the budget
 # or the launch cap is reached without that. A run whose state is unknown:*
 # for the whole budget returns 1 too: an unknown answer polls without spending a
-# launch, so the budget is the only bound that ends it.
+# launch, so no launch cap can end such a run and the budget is what ends it.
 # WHY: FSKit can refuse the first attempts right after its daemon restarts (macFUSE
 #   status 3/4) while a later one serves the volume, and the mount agent no longer
 #   retries a provider refusal on its own (it stops and records a blocked marker),
@@ -221,14 +221,28 @@ svc_wait_mount_released() {
 #   succeed.
 svc_remount_until() {
   local mount_point="$1" target="$2" sudo_prefix="$3" budget="$4" interval="${5:-5}" max_launches="${6:-4}"
-  local waited=0 launches=1 running _srm_state
+  local start=$SECONDS slept=0 launches=1 announced=false running _srm_state
 
   while :; do
     _srm_state="$(svc_mount_table_state "$mount_point")"
     if [ "$_srm_state" = present ]; then
       return 0
     fi
-    if [ "$waited" -ge "$budget" ] || [ "$launches" -ge "$max_launches" ]; then
+    # WHY: the budget is wall clock, measured from the first poll. Every poll
+    #   also pays the reader's own time under svc_run_bounded, so a clock that
+    #   advanced only by the interval slept below ran to roughly three times the
+    #   stated budget in exactly the case the unknown arm exists for: a table
+    #   nobody can read, polled every 5s, each poll taking the 10s probe bound.
+    #   The wait is a promise to the operator, and rclone-mount.sh:158 bounds
+    #   its attach loop the same way.
+    # WHY: the seconds slept are a second bound on that same budget, not a
+    #   second budget. An unknown answer spends no launch, so the launch cap can
+    #   never end such a run, and a `sleep` that returns without waiting would
+    #   leave elapsed time as the only thing bounding a loop that makes no
+    #   progress of its own. Where a poll costs more than the interval, as in
+    #   that case, the wall clock is what ends the run first.
+    if [ $((SECONDS - start)) -ge "$budget" ] || [ "$slept" -ge "$budget" ] ||
+      [ "$launches" -ge "$max_launches" ]; then
       return 1
     fi
     case "$_srm_state" in
@@ -237,6 +251,18 @@ svc_remount_until() {
       #   unknown, and a kick can land on a volume that is in fact attached. This
       #   polls without spending a launch; the budget check above still ends the
       #   run, with a 1, so a table that never reads cannot spin forever.
+      # WHY one notice, and only the first: the caller has already said it is
+      #   starting this mount, and the next thing it would say about the table
+      #   is the warning it reports after the budget expires, so a wait of up to
+      #   a full budget passes with nothing said about it. The loop itself stays
+      #   silent per tick — that reasoning is why svc_mount_table_state prints
+      #   nothing — so this one line is what tells the operator the run is
+      #   waiting on a read rather than on the mount.
+      if [ "$announced" = false ]; then
+        notice -l svc-instances \
+          "the mount table for '$mount_point' could not be read (${_srm_state#unknown:}); waiting up to ${budget}s for it"
+        announced=true
+      fi
       ;;
     *)
       running=false
@@ -256,7 +282,7 @@ svc_remount_until() {
       ;;
     esac
     sleep "$interval"
-    waited=$((waited + interval))
+    slept=$((slept + interval))
   done
 }
 
