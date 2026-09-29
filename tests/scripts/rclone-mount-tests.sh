@@ -699,19 +699,22 @@ test_exhaustion_keeps_the_last_attempt_class() {
   # and every attempt reaches classification. A child that died instead would be
   # testing a different path.
   FAKE_SLEEP=6
-  # rclone's own stderr. Nothing in this test reads this file: install_mocks
-  # replaces backend_class with MOCK_BACKEND_CLASSIFY, so the class comes from
-  # the stub below rather than from this line. The stub is the honest choice
-  # because what this test is about is the exhaustion record inheriting the last
-  # attempt's class, so the class has to be the one thing held under the test's
-  # control; letting a real classifier read rclone's output would be testing the
+  # rclone's own stderr. The fake rclone fixture reads this file and writes it to
+  # the captured stderr (the `cat "$FAKE_ERRFILE" >&2` at line 68 of this file),
+  # and nothing downstream consumes that content: install_mocks replaces
+  # backend_class with MOCK_BACKEND_CLASSIFY, so the class comes from the stub
+  # below rather than from this line. The stub is the honest choice because what
+  # this test is about is the exhaustion record inheriting the last attempt's
+  # class, so the class has to be the one thing held under the test's control;
+  # letting a real classifier read rclone's output would be testing the
   # classifier instead of the record.
   printf 'fuse: transient I/O error talking to the remote endpoint\n' >"$home/rclone.err"
   FAKE_ERRFILE="$home/rclone.err"
   # A readable table that reports the mount as absent. The run believes that
-  # answer and still runs out of attempts, which is the point: nothing here is
-  # unreadable, so the class must come from rclone rather than from a failed
-  # read being guessed at.
+  # answer and still runs out of attempts, which is the point: the read here
+  # succeeds, so the probe_unknown override does not fire and the runner keeps
+  # the classifier's own class rather than guessing one in place of a read that
+  # failed.
   FAKE_PROBE_STATE="absent:not-listed"
   export FAKE_MARKER FAKE_CALLS FAKE_REMOTES FAKE_SLEEP FAKE_ERRFILE FAKE_PROBE_STATE
   install_mocks
