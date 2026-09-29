@@ -16,9 +16,23 @@ BeforeAll {
 
   # Capture functions into test scope.
   $Script:TestDir = Join-Path ([System.IO.Path]::GetTempPath()) 'nucleus-log-tests'
+
+  # The module resolves services.json through the repository root. The Windows CI
+  # harness exports it, but a local run does not, so a file that leaves the variable
+  # unset makes every case here depend on the shell that happens to launch it.
+  $Script:OriginalRepoRoot = $env:NUCLEUS_REPO_ROOT
+  $env:NUCLEUS_REPO_ROOT = (Resolve-Path (Join-Path $PSScriptRoot '../../../..')).Path
+
+  # These cases assert the Windows log tail, so the host key has to resolve to the
+  # Windows entry. Without this a machine whose ambient NUCLEUS_HOST names another
+  # host resolves that host's directory and the assertion measures the wrong host.
+  $Script:OriginalHost = $env:NUCLEUS_HOST
+  $env:NUCLEUS_HOST = 'Windows'
 }
 
 AfterAll {
+  $env:NUCLEUS_REPO_ROOT = $Script:OriginalRepoRoot
+  $env:NUCLEUS_HOST = $Script:OriginalHost
   if (Test-Path -LiteralPath $Script:TestDir -PathType Container) {
     Remove-Item -LiteralPath $Script:TestDir -Recurse -Force
   }
