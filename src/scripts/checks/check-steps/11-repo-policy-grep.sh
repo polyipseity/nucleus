@@ -14,6 +14,7 @@ _POLICY_GREP_CHECKS=(
   "suppression audit|run_suppression_audit|ctx"
   "cloud-mount invariants|run_cloud_mount_invariants|ctx"
   "service supervision invariants|run_service_supervision_invariants|ctx"
+  "srt wrapper invariants|run_srt_wrapper_invariants|ctx"
 )
 
 run_repo_policy_grep() {
@@ -838,5 +839,81 @@ run_service_supervision_invariants() {
     return 1
   fi
   say "no service supervision invariant violations found."
+  return 0
+}
+
+# run_srt_wrapper_invariants -- every srt-wrapped command separates the
+# user's arguments from srt's own option parser.
+#
+# srt is a commander program: the options it declares (-h, -V, -d, -s, -c,
+# --control-fd) are consumed wherever they appear, including after the wrapped
+# command.  Without the end-of-options marker, `pi --help` prints srt's usage
+# instead of starting pi, and `pi -c <arg>` loses the argument with no error at
+# all.  Every forwarder therefore has to write the marker itself.
+#
+# The marker is what makes this check safe to run over its own source: both
+# patterns are regexes, so neither matches the line it is written on, and a
+# literal invocation left in a comment is dropped by the comment filter below.
+# No exclusion list is needed, and none is registered for this scan.
+run_srt_wrapper_invariants() {
+  local -n ctx="$1"
+  shift
+  local _files=("$@")
+  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
+  cd "$_repo_root" || return 1
+  local _failed=0
+
+  # `srt -c '<string>'` is deliberately not a candidate: the string is a single
+  # argv element behind -c, so it exposes no per-argument flag to srt's parser.
+  # Only the `srt command <tool>` form forwards a list, and that list is what
+  # needs the marker.
+  local _invocation='(^|[^A-Za-z0-9_./-])srt[[:space:]]+command[[:space:]]+[^[:space:]]+'
+  local _separated='srt[[:space:]]+command[[:space:]]+[^[:space:]]+[[:space:]]+--([[:space:]]|$)'
+
+  local _grep_files=()
+  if $_has_args; then
+    local _f
+    for _f in "${_files[@]}"; do
+      case "$_f" in
+      *.sh | *.zsh | *.ps1 | *.nix) _grep_files+=("$_f") ;;
+      esac
+    done
+    if [ "${#_grep_files[@]}" -eq 0 ]; then
+      say "0 wrapper files in scope, nothing to check."
+      return 0
+    fi
+  else
+    mapfile -t _grep_files < <(
+      find src/ scripts/ \( -name '*.sh' -o -name '*.zsh' -o -name '*.ps1' -o -name '*.nix' \) -print |
+        filter_gitignored
+    )
+  fi
+
+  # A candidate line that is not exonerating, and does not start with `#`, is a
+  # violation.  The comment filter below is what keeps this check from reporting
+  # itself: the two patterns are regexes, so they never match their own source,
+  # and the one literal invocation left in this file sits in a comment.
+  if [ "${#_grep_files[@]}" -gt 0 ]; then
+    local _unseparated
+    _unseparated=$(
+      printf '%s\0' "${_grep_files[@]}" |
+        xargs -0 grep -HnE "$_invocation" |
+        grep -vE "$_separated" |
+        grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' ||
+        true
+    ) # check-suppress:suppression_doc: grep exits 1 when every wrapper already separates its arguments, which is the expected result
+    if [ -n "$_unseparated" ]; then
+      local _offender
+      while IFS= read -r _offender; do
+        error "$_offender forwards the user's arguments to srt without --; srt parses its own options, so put -- between the wrapped command and the forwarded arguments"
+      done <<<"$_unseparated"
+      _failed=1
+    fi
+  fi
+
+  if [ "$_failed" -ne 0 ]; then
+    return 1
+  fi
+  say "every srt wrapper separates its forwarded arguments."
   return 0
 }

@@ -333,6 +333,58 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
 
   if ($ssViolations -gt 0) { $failed = $true } else { Write-Message 'no service supervision invariant violations found.' }
 
+  # --- SRT wrapper invariants ---
+  # srt is a commander program: the options it declares (-h, -V, -d, -s, -c,
+  # --control-fd) are consumed wherever they appear, including after the wrapped
+  # command, so `pi --help` prints srt's own usage and `pi -c <arg>` loses the
+  # argument with no error at all.  Every forwarder must write the marker.
+  Write-Message "--- srt wrapper invariants ---"
+  $swViolations = 0
+  # `srt -c '<string>'` is deliberately not a candidate: the string is a single
+  # argv element behind -c, so it exposes no per-argument flag to srt's parser.
+  $swInvocation = '(^|[^A-Za-z0-9_./-])srt\s+command\s+\S+'
+  $swSeparated = 'srt\s+command\s+\S+\s+--(\s|$)'
+
+  # The comment filter below is what keeps this check from reporting itself: both
+  # patterns are regexes, so neither matches the line it is written on, and a
+  # literal invocation left in a comment is dropped.
+  $swFiles = @()
+  if ($HasArgs) {
+    $swFiles = @(
+      $PositionalArgs |
+        Where-Object { $_ -match '\.(sh|zsh|ps1|nix)$' }
+    )
+  } else {
+    foreach ($swDir in @('src', 'scripts')) {
+      $swDirPath = Join-Path -Path $r -ChildPath $swDir
+      if (-not (Test-Path -LiteralPath $swDirPath)) { continue }
+      $swFiles += @(
+        Get-ChildItem -LiteralPath $swDirPath -Recurse -File -Include *.sh, *.zsh, *.ps1, *.nix |
+          Select-GitIgnored |
+          ForEach-Object { $_ }
+      )
+    }
+  }
+
+  if ($swFiles.Count -gt 0) {
+    $swUnseparated = @(
+      Select-String -Path $swFiles -Pattern $swInvocation |
+        Where-Object { $_.Line -notmatch $swSeparated } |
+        Where-Object { $_.Line -notmatch '^\s*#' }
+    )
+    foreach ($swHit in $swUnseparated) {
+      $swRelative = if ($swHit.Path.StartsWith($r)) {
+        ($swHit.Path.Substring($r.Length).TrimStart([char[]]"\/")) -replace '\\', '/'
+      } else {
+        $swHit.Path
+      }
+      Write-ErrorMessage "$($swRelative):$($swHit.LineNumber) forwards the user's arguments to srt without --; srt parses its own options, so put -- between the wrapped command and the forwarded arguments"
+      $swViolations++
+    }
+  }
+
+  if ($swViolations -gt 0) { $failed = $true } else { Write-Message 'every srt wrapper separates its forwarded arguments.' }
+
   if ($failed) {
     Write-ErrorMessage "repository policy (grep-heavy) check failed"
     return $false
