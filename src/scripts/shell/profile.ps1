@@ -639,7 +639,15 @@ function pi-unrestricted {
   # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- name is the user-facing command that bypasses the srt sandbox; renaming would break muscle memory
   [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
   param()
-  & pi @args
+  # WHY: calling `pi` here would re-enter the wrapper above and stay sandboxed.
+  #      Every PATH entry carries its own pi under Nix, so the first application
+  #      is the one a bare lookup resolves to.
+  # check-suppress:suppression_doc: probe whether pi is installed; throws when absent
+  $piApplication = Get-Command pi -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+  if (-not $piApplication) {
+    Write-Error "pi is not installed. Run 'nucleus-apply' to install it." -ErrorAction Stop
+  }
+  & $piApplication.Source @args
 }
 
 # --- nucleus-* argument completers ---
