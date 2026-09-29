@@ -676,11 +676,12 @@ test_unreadable_mount_table_does_not_record_running() {
 section "3d" "the exhaustion record keeps the last attempt's own class"
 
 # The exhaustion record is the one a supervisor reads after a run has given up,
-# and it is the only place the last attempt's diagnosis is still reachable: the
-# per-attempt record is overwritten by the next attempt. It used to be written
-# from a hardcoded class whatever rclone's own output had said, so a run whose
-# last attempt was told the failure was transient came out as mount-failed, and
-# the operator was sent to the remote instead of at the read the runner made.
+# and it is the only place the last attempt's diagnosis is still reachable: a
+# transient attempt writes no health record of its own, so the classification
+# the loop last assigned is the only one that carries forward. It used to be
+# written from a hardcoded class whatever rclone's own output had said, so a run
+# whose last attempt was told the failure was transient came out as mount-failed,
+# and the operator was sent to the remote instead of at the read the runner made.
 test_exhaustion_keeps_the_last_attempt_class() {
   local home bin state class
   home="$(create_home)"
@@ -698,8 +699,13 @@ test_exhaustion_keeps_the_last_attempt_class() {
   # and every attempt reaches classification. A child that died instead would be
   # testing a different path.
   FAKE_SLEEP=6
-  # rclone's own stderr, which is what the real backend_class reads to decide
-  # the class. Its line is the only thing in this test that says "transient".
+  # rclone's own stderr. Nothing in this test reads this file: install_mocks
+  # replaces backend_class with MOCK_BACKEND_CLASSIFY, so the class comes from
+  # the stub below rather than from this line. The stub is the honest choice
+  # because what this test is about is the exhaustion record inheriting the last
+  # attempt's class, so the class has to be the one thing held under the test's
+  # control; letting a real classifier read rclone's output would be testing the
+  # classifier instead of the record.
   printf 'fuse: transient I/O error talking to the remote endpoint\n' >"$home/rclone.err"
   FAKE_ERRFILE="$home/rclone.err"
   # A readable table that reports the mount as absent. The run believes that

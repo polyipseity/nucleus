@@ -263,13 +263,16 @@ _cm_main() {
   done
 
   # Exhausted all attempts — write blocked record.
-  # WHY: the last attempt's own diagnosis must not be overwritten. Every retry
-  #   replaced the per-attempt record, so $class is the only surviving statement
-  #   about why the run ended, and substituting a hardcoded mount-failed here
-  #   would discard it — sending the operator to the remote when what stopped
-  #   the run was the budget. Reading $class here is not a scope error: it is
-  #   declared `local` inside the attempt loop above, and bash scopes `local` to
-  #   the enclosing function, so the name still resolves after the loop closes.
+  # WHY: the last attempt's own diagnosis must not be overwritten. $class holds
+  #   the last attempt's classification because the loop reassigns it on every
+  #   pass, and it is the only statement about why the run ended that survives
+  #   the loop: a transient attempt writes no health record at all, so nothing
+  #   else carries the classification forward, and substituting a hardcoded
+  #   mount-failed here would discard it — sending the operator to the remote
+  #   when what stopped the run was the budget. Reading $class here is not a
+  #   scope error: it is declared `local` inside the attempt loop above, and
+  #   bash scopes `local` to the enclosing function rather than the block, so
+  #   the name still resolves after the loop closes.
   local final_class="$class"
   if [ "$probe_unknown" = true ]; then
     final_class="io-transient"
