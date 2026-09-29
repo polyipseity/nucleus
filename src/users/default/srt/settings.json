@@ -211,10 +211,10 @@
       "/nix/var/nix/daemon-socket/socket",
       "/nix/var/nix/daemon-socket/socket/",
       "/private/var/run/determinate-nixd.socket",
+      "/private/var/run/mDNSResponder",
       "/private/var/run/nix-daemon.socket",
       "/var/run/determinate-nixd.socket",
       "/var/run/nix-daemon.socket",
-      "/private/var/run/mDNSResponder",
       "~/.gnupg/S.gpg-agent",
       "~/.gnupg/S.gpg-agent.extra"
     ],
