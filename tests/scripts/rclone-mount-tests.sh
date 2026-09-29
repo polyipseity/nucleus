@@ -122,10 +122,10 @@ create_home() {
 setup_env() {
   HOME="$1"
   PATH="$2:$PATH"
-  # Clear the lifetime and probe controls before each test. They are exported, so
-  # a test that sets one would otherwise hand it to every test that follows and
-  # quietly change what their mock rclone or mock probe does.
-  unset FAKE_ATTEMPTS_FILE FAKE_EXIT_WHEN_RUNNING FAKE_PROBE_STATE FAKE_PROBE_STATE_FILE
+  # Clear the lifetime, stderr and probe controls before each test. They are
+  # exported, so a test that sets one would otherwise hand it to every test that
+  # follows and quietly change what their mock rclone or mock probe does.
+  unset FAKE_ATTEMPTS_FILE FAKE_ERRFILE FAKE_EXIT_WHEN_RUNNING FAKE_PROBE_STATE FAKE_PROBE_STATE_FILE FAKE_SLEEP
   NUCLEUS_RCLONE_REMOTE="OneDrive:Backups"
   NUCLEUS_RCLONE_MOUNT_POINT="$1/clouds/OneDrive"
   NUCLEUS_RCLONE_ARGS=""
