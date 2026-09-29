@@ -50,7 +50,7 @@ _defined_by() { # <backend file> <name>... — the names the backend defines
       for _name in "$@"; do
         declare -f "$_name" >/dev/null 2>&1 && printf '%s\n' "$_name"
       done
-      exit 0
+      return 0
     fi
   )
 }
@@ -64,7 +64,7 @@ _sourced_by() { # <backend file> — 0 when it sources and adds a function
     local _before _after
     _before="$(declare -F | wc -l)"
     # shellcheck source=/dev/null # reason: backend path is a runtime parameter
-    . "$_file" || exit 1
+    . "$_file" || return 1
     _after="$(declare -F | wc -l)"
     [ "$_after" -gt "$_before" ]
   )
