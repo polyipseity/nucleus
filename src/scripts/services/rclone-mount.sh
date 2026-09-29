@@ -197,6 +197,10 @@ _cm_main() {
       # successful start would register a phantom restart on every mount.
       svc_health_set_running "$instance"
       svc_health_record_success "$instance"
+      # WHY: reaching running ends the failure the pointer was written for, and a
+      #   record still naming a retained capture file would point whoever reads it
+      #   at evidence for a mount that is now healthy.
+      svc_health_set "$instance" evidence null
       rm -f "$capture_file" "$mount_args_file"
 
       # Watch for the mount to stay alive or exit.
@@ -231,7 +235,7 @@ _cm_main() {
     #   is true, and the success path above exits at its own line before reaching
     #   this case. exit_reason holds only those three strings and `attached` is
     #   the one that cannot arrive here, so the first arm already matches every
-    #   ending this function can produce, and the `*)` arm two arms down matches
+    #   ending that can arrive at this point, and the second arm, `*)`, matches
     #   none: an exit_reason landing there is one of our own strings renamed or
     #   mistyped. io-transient is the safe reading of a state this code cannot
     #   place: the class whose remedy is to try again, which costs a retry, over
@@ -270,9 +274,29 @@ _cm_main() {
     #   supports, so the file is the only remaining record of what the mount was
     #   doing while the read kept failing. Kept and named rather than dropped
     #   silently; at most one file per attempt survives a run.
+    #
+    # WHY: the record carries the path because the log line does not suffice.
+    #   Log lines rotate, so a file nothing else points at is a file a later run
+    #   cannot find.
+    #
+    # WHY: one field and not a list. It names the most recent file kept, so a run
+    #   that keeps a file on each of several attempts leaves the earlier ones
+    #   unreachable again. That limit is written down here so the next reader
+    #   meets it in the code rather than rediscovering it.
     if [ "$probe_unknown" = true ]; then
+      # WHY: svc_health_set interpolates the value into a jq program, so a bare
+      #   path is a jq syntax error. The call returns non-zero and the runner,
+      #   which sets no strict mode, discards the write silently.
+      svc_health_set "$instance" evidence "\"$capture_file\""
       notice -l cloud-drives "$instance: rclone output kept at $capture_file"
     else
+      # WHY: no clear of the evidence field accompanies this removal. This branch
+      #   removes THIS attempt's file, and the field can only ever name an
+      #   earlier attempt's kept file, so it never names the one going away. A
+      #   run that kept a file on an unreadable table and then reached this
+      #   branch on a later attempt would strand that earlier file on disk with
+      #   nothing pointing at it, which is the condition the field exists to
+      #   remove.
       rm -f "$capture_file"
     fi
     rm -f "$mount_args_file"

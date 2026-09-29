@@ -609,7 +609,7 @@ section "3c" "a mount table that cannot be read is not a running mount"
 # Three separate assertions, because the three are separately wrong on the buggy
 # path: the record, the evidence, and the lesson the remedy text teaches.
 test_unreadable_mount_table_does_not_record_running() {
-  local home bin state class kept
+  local home bin state class kept evidence
   home="$(create_home)"
   bin="$(setup_fake_rclone)"
   # A 2s attach budget against a table that never reads. The budget is the
@@ -660,6 +660,17 @@ test_unreadable_mount_table_does_not_record_running() {
   else
     assert_fail "unknown-table-keeps-capture" "kept='${kept:-<none>}' (expected a file still holding rclone's output)"
   fi
+  # The line naming the kept file is a log line, and log lines rotate. The
+  # health record is the only thing that outlives them, so a file nothing can
+  # reach is the same as a file that was not kept. Asserted against the path
+  # this same run named on stdout, so a pass proves the two agree rather than
+  # proving some non-empty string was stored.
+  evidence="$(health_field evidence)"
+  if [ -n "$evidence" ] && [ "$evidence" = "$kept" ]; then
+    assert_pass "the health record points at the capture file the run kept"
+  else
+    assert_fail "unknown-table-evidence-field" "evidence='${evidence:-<none>}' kept='${kept:-<none>}'"
+  fi
   if [ "$class" = "io-transient" ]; then
     assert_pass "an unreadable mount table is classified io-transient, not mount-failed"
   else
@@ -671,6 +682,178 @@ test_unreadable_mount_table_does_not_record_running() {
     rm -f "$kept"
   fi
   rm -rf "$home" "$bin"
+}
+
+section "3e" "the evidence pointer does not outlive the record that needs it"
+
+# The other half of the pointer's lifecycle. A run that keeps a capture file has
+# to say where, and a run that reaches running has to stop saying so: the field
+# is a pointer into the failure evidence, and a healthy instance has no failure
+# to point at. Left in place, it outlives the record that made it true and sends
+# whoever reads the record after a recovery to look for a file the record no
+# longer has anything to do with.
+test_successful_mount_clears_a_stale_evidence_pointer() {
+  local home bin marker state evidence
+  home="$(create_home)"
+  bin="$(setup_fake_rclone)"
+  # An attach budget long enough for the mount to be seen, and the marker that
+  # makes the probe answer present: the same shape as the section 2 success
+  # cases, which is the only thing in this suite that drives a running mount.
+  setup_env "$home" "$bin" 10
+  marker="$home/clouds/OneDrive/.marker"
+  FAKE_MARKER="$marker"
+  FAKE_CALLS="$home/calls"
+  FAKE_REMOTES="OneDrive:"
+  FAKE_EXIT_WHEN_RUNNING=8
+  export FAKE_MARKER FAKE_CALLS FAKE_REMOTES FAKE_EXIT_WHEN_RUNNING
+  install_mocks
+
+  # The pointer an earlier run would have left. The path names nothing that
+  # exists, and nothing this run creates or deletes, so the assertion below can
+  # only be answered by the field being cleared.
+  # check-suppress:suppression_doc: test helper sources lib via a runtime repo path
+  # shellcheck disable=SC1091 # reason: source path resolves at runtime from the test tree
+  . "$REPO_ROOT/src/scripts/lib/service-health.sh"
+  svc_health_set "$NUCLEUS_CLOUD_MOUNT_INSTANCE" evidence "\"$home/left-over\""
+
+  local rc=0
+  run_main 2>/dev/null || rc=$?
+
+  state="$(health_field state)"
+  evidence="$(health_field evidence)"
+  # state is part of the condition because an empty field is also what a run
+  # that never attached leaves behind: nothing writes evidence except the
+  # retention branch, so without requiring the running record this assertion
+  # would pass on a mount that never mounted.
+  if [ "$state" = "running" ] && [ -z "$evidence" ]; then
+    assert_pass "a successful mount clears a stale evidence pointer"
+  else
+    assert_fail "running-keeps-stale-evidence" "state=$state evidence='${evidence:-<none>}' (expected a running record with no evidence pointer)"
+  fi
+  rm -rf "$home" "$bin"
+}
+
+section "3f" "a kept file survives a later attempt that removes only its own"
+
+# The limit of a single-field pointer, pinned. The field names the most recent
+# file kept; this case is about the file an earlier attempt kept, which a later
+# attempt's own cleanup must not strand. A clear on the cleanup branch would
+# leave the record blocked with no pointer while the file it used to name still
+# sits on disk, so the assertion below is the one that goes red if such a clear
+# is ever added.
+test_removing_this_attempts_file_keeps_an_earlier_pointer() {
+  local home bin attempts_file kept evidence
+  home="$(create_home)"
+  bin="$(setup_fake_rclone)"
+  setup_env "$home" "$bin" 2
+  NUCLEUS_MOUNT_ATTEMPTS=3
+  NUCLEUS_MOUNT_BACKOFF="0,0"
+  export NUCLEUS_MOUNT_ATTEMPTS NUCLEUS_MOUNT_BACKOFF
+  FAKE_MARKER="$home/clouds/OneDrive/.marker"
+  FAKE_CALLS="$home/calls"
+  FAKE_REMOTES="OneDrive:"
+  # The child outlives the attach budget, so every attempt ends on the budget
+  # and reaches the retention branch rather than the early child-death break.
+  FAKE_SLEEP=6
+  export FAKE_MARKER FAKE_CALLS FAKE_REMOTES FAKE_SLEEP
+
+  # One counter per ATTEMPT, the same device the retry test uses: a shell local
+  # does not survive into the subshell the mocks are exported to. The mount
+  # increments it, the probe reads it.
+  attempts_file="$home/attempts"
+  printf '0\n' >"$attempts_file"
+  MOCK_BACKEND_MOUNT() {
+    local rclone_bin="$1"
+    shift
+    # check-suppress:suppression_doc: _backend_capture is set in the runner's scope before this mock is called
+    local n
+    n="$(head -1 "$attempts_file")"
+    printf '%s\n' "$((n + 1))" >"$attempts_file"
+    "$rclone_bin" mount "$@" 2>"$_backend_capture" &
+    _backend_rclone_pid=$!
+  }
+  # Attempt 1 cannot read the mount table and keeps its capture file. Attempts 2
+  # and 3 read it fine and report the mount absent, so each of them removes its
+  # own capture file on the retention branch's other arm.
+  MOCK_BACKEND_PROBE_STATE() {
+    if [ "$(head -1 "$attempts_file")" -le 1 ]; then
+      printf 'unknown:mount-status-32\n'
+    else
+      printf 'absent:not-listed\n'
+    fi
+  }
+  MOCK_BACKEND_PROBE() {
+    case "$(MOCK_BACKEND_PROBE_STATE "$@")" in
+    present | unknown:*) return 0 ;;
+    *) return 1 ;;
+    esac
+  }
+  # Every class transient, so attempts 2 and 3 retry instead of blocking on the
+  # first readable answer and the run reaches the exhaustion record.
+  MOCK_BACKEND_IS_TRANSIENT() { return 0; }
+  export -f MOCK_BACKEND_MOUNT MOCK_BACKEND_PROBE MOCK_BACKEND_PROBE_STATE \
+    MOCK_BACKEND_IS_TRANSIENT
+  install_mocks
+
+  local rc=0
+  # rc cannot discriminate: the runner exits 0 on a blocked mount exactly as it
+  # does on a running one, which is this suite's standing exit contract.
+  run_main >"$home/out" 2>/dev/null || rc=$?
+
+  local state kept_lines
+  state="$(health_field state)"
+  evidence="$(health_field evidence)"
+  kept="$(sed -n 's/.*rclone output kept at //p' "$home/out" | head -1)"
+  kept_lines="$(grep -c 'rclone output kept at' "$home/out" 2>/dev/null || printf '0')"
+  # All three parts are needed. A record that never went blocked, or a run that
+  # kept nothing, would both leave an empty field and satisfy a weaker form of
+  # this assertion; the file check is what proves the pointer still resolves to
+  # something on disk rather than to a name nothing wrote.
+  if [ "$state" = "blocked" ] && [ "$kept_lines" = "1" ] &&
+    [ -n "$evidence" ] && [ "$evidence" = "$kept" ] && [ -f "$evidence" ]; then
+    assert_pass "removing this attempt's file leaves an earlier kept file reachable"
+  else
+    assert_fail "cleanup-strands-kept-file" "state=$state kept_lines=$kept_lines evidence='${evidence:-<none>}' kept='${kept:-<none>}'"
+  fi
+  if [ -n "$evidence" ]; then
+    rm -f "$evidence"
+  fi
+  rm -rf "$home" "$bin"
+
+  # Restore the defaults so the following tests are unaffected.
+  MOCK_BACKEND_MOUNT() {
+    local rclone_bin="$1"
+    shift
+    # check-suppress:suppression_doc: _backend_capture is set in the runner's scope before this mock is called
+    "$rclone_bin" mount "$@" 2>"$_backend_capture" &
+    _backend_rclone_pid=$!
+  }
+  MOCK_BACKEND_PROBE_STATE() {
+    if [ -n "${FAKE_PROBE_STATE:-}" ]; then
+      printf '%s\n' "$FAKE_PROBE_STATE"
+      return
+    fi
+    if [ -n "${FAKE_PROBE_STATE_FILE:-}" ] && [ -f "$FAKE_PROBE_STATE_FILE" ] &&
+      [ "$(head -1 "$FAKE_PROBE_STATE_FILE")" -le 1 ]; then
+      printf 'absent:not-listed\n'
+      return
+    fi
+    if [ -f "${FAKE_MARKER:-}" ]; then
+      printf 'present\n'
+    else
+      printf 'absent:not-listed\n'
+    fi
+  }
+  MOCK_BACKEND_PROBE() {
+    case "$(MOCK_BACKEND_PROBE_STATE "$@")" in
+    present | unknown:*) return 0 ;;
+    *) return 1 ;;
+    esac
+  }
+  MOCK_BACKEND_IS_TRANSIENT() { return 1; }
+  export -f MOCK_BACKEND_MOUNT MOCK_BACKEND_PROBE MOCK_BACKEND_PROBE_STATE \
+    MOCK_BACKEND_IS_TRANSIENT
+  install_mocks
 }
 
 section "3d" "the exhaustion record keeps the last attempt's own class"
@@ -1361,6 +1544,8 @@ test_mount_passes_remote_and_point_to_rclone
 test_transient_error_retries_and_succeeds
 test_dead_mount_stops_attach_wait_early
 test_unreadable_mount_table_does_not_record_running
+test_successful_mount_clears_a_stale_evidence_pointer
+test_removing_this_attempts_file_keeps_an_earlier_pointer
 test_exhaustion_keeps_the_last_attempt_class
 test_terminal_failure_writes_blocked_record
 test_unconfigured_remote_exits_0
