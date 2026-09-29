@@ -716,6 +716,13 @@ test_successful_mount_clears_a_stale_evidence_pointer() {
   . "$REPO_ROOT/src/scripts/lib/service-health.sh"
   svc_health_set "$NUCLEUS_CLOUD_MOUNT_INSTANCE" evidence "\"$home/left-over\""
 
+  # WHY this guard is a field check and not a return-code check: a value jq
+  #   cannot parse makes svc_health_set return 1, and under `set -e` that aborts
+  #   the suite on the line above — loud, not vacuous. What does pass vacuously
+  #   is a seed jq accepts and stores nothing, which is what this catches.
+  [ -n "$(svc_health_get "$NUCLEUS_CLOUD_MOUNT_INSTANCE" evidence)" ] ||
+    assert_fail "stale-evidence-not-seeded" "the seeded pointer never landed, so the clear asserted below would pass on an empty field"
+
   local rc=0
   run_main 2>/dev/null || rc=$?
 
@@ -804,7 +811,11 @@ test_removing_this_attempts_file_keeps_an_earlier_pointer() {
   state="$(health_field state)"
   evidence="$(health_field evidence)"
   kept="$(sed -n 's/.*rclone output kept at //p' "$home/out" | head -1)"
-  kept_lines="$(grep -c 'rclone output kept at' "$home/out" 2>/dev/null || printf '0')"
+  # WHY no `|| printf '0'`: grep -c prints the count AND returns 1 when nothing
+  #   matches, so the fallback appended a second 0 and the failure message below
+  #   showed a two-line value. This form keeps grep's own 0 for that case and
+  #   fills 0 only when grep could not read the file at all.
+  kept_lines="$(grep -c 'rclone output kept at' "$home/out" 2>/dev/null)" || kept_lines=0
   # All three parts are needed. A record that never went blocked, or a run that
   # kept nothing, would both leave an empty field and satisfy a weaker form of
   # this assertion; the file check is what proves the pointer still resolves to

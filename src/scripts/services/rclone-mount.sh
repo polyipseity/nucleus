@@ -164,7 +164,7 @@ _cm_main() {
       # WHY: backend_probe_state, not backend_probe. The two-valued answer is 0
       #   both for a live mount and for a table that could not be read, and this
       #   loop acts on that 0 by recording the service running and deleting the
-      #   evidence, so only the three-valued answer is safe here: an unknown
+      #   capture file, so only the three-valued answer is safe here: an unknown
       #   state falls through to the same poll the absent state takes, spending
       #   no attempt and issuing no restart of its own, and the budget below is
       #   what ends the run.
@@ -297,6 +297,15 @@ _cm_main() {
       #   branch on a later attempt would strand that earlier file on disk with
       #   nothing pointing at it, which is the condition the field exists to
       #   remove.
+      #
+      # WHY: not a contradiction with the success path above, which clears the
+      #   pointer and strands an earlier kept file in exactly this way. The two
+      #   branches differ on whether the record still has a failure to name: a
+      #   blocked record keeps the pointer because whoever reads it still has to
+      #   find that file, while a running record drops it because pointing at
+      #   evidence for a healthy mount is the worse of the two errors. A file
+      #   kept and then recovered past is stranded either way; only the running
+      #   record forgets where it was.
       rm -f "$capture_file"
     fi
     rm -f "$mount_args_file"

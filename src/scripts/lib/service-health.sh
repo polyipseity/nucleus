@@ -14,11 +14,13 @@
 #     "restarts": [],
 #     "generation": null,
 #     "lastExit": 0,
-#     "evidence": "<absolute path>" | absent }
+#     "evidence": null | "<absolute path>" }
 #
-# `evidence` is absent from a fresh record and from every record whose instance
-# is not a mount runner; the runner writes it when it keeps a capture file and
-# clears it when the instance reaches running. Nothing renders it.
+# `evidence` is absent until the runner first writes it, and stays absent in
+# every record whose instance is not a mount runner. The runner writes it when
+# it keeps a capture file and sets it back to null when the instance reaches
+# running, so a healthy mount reads as the key present and null, not as a key
+# that was never there. Nothing renders it.
 #
 # Writers, per field. There is no single writer for the whole record, and the
 # two jobs are deliberately different: the runner classifies a MOUNT (mounted,
@@ -35,7 +37,10 @@
 #                           (the supervisor's own last exit)
 #   generation              watchdog only — the supervisor run token
 #   restarts, reportedState watchdog only
-#   evidence                runner only — the capture file a run kept, cleared on running
+#   evidence                runner only — the capture file a run kept, nulled on
+#                           running.  svc_health_clear (the repair path) leaves
+#                           it: it names a file the runner kept and never
+#                           deletes, so there the pointer is still true.
 #   boot                    svc_health_init and svc_health_set_blocked
 #   attempts                svc_health_init only — no production caller advances it
 #
