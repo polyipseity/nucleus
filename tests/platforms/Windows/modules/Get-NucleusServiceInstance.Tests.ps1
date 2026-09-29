@@ -175,8 +175,14 @@ Describe 'Get-NucleusConfiguredInstanceList' {
   }
 
   It 'throws when no repository root can be resolved' {
-    $env:NUCLEUS_REPO_ROOT = $null
-    { Get-NucleusConfiguredInstanceList -HostEntry $Script:MountEntry } | Should -Throw '*no repository root*'
+    $savedRepoRoot = $env:NUCLEUS_REPO_ROOT
+    try {
+      $env:NUCLEUS_REPO_ROOT = $null
+      { Get-NucleusConfiguredInstanceList -HostEntry $Script:MountEntry } | Should -Throw '*no repository root*'
+    }
+    finally {
+      $env:NUCLEUS_REPO_ROOT = $savedRepoRoot
+    }
   }
 
   It 'rejects a prefix-match entry of an unsupported type' {
