@@ -6,7 +6,13 @@
     <USER root>/state/service-stats/<instance>.json (or ProgramData for
     system-scope instances).
 
-    Record schema matches the POSIX version exactly.
+    Record schema matches the POSIX version exactly. The key set written here is the
+    record's fixed key set: the block setters below assign to these keys directly, which
+    is safe only because every key they touch is one Initialize-HealthRecord writes. A
+    key outside this list goes through Set-HealthField, which can add one. The evidence
+    field is deliberately not in the list, mirroring svc_health_init: it stays absent from
+    every record whose instance is not a mount runner, and the runner itself creates it
+    the first time it keeps a capture file.
 
     ShouldProcess gating is deliberately partial: it covers the New/Set/Remove verbs
     that PSScriptAnalyzer's PSUseShouldProcessForStateChangingFunctions inspects, so the
@@ -141,7 +147,11 @@ function Set-HealthField {
     param(
         [Parameter(Mandatory)][string]$Instance,
         [Parameter(Mandatory)][string]$Field,
-        [Parameter(Mandatory)]$Value
+        # WHY AllowNull alongside Mandatory: "this field has no value" is a value this
+        #   setter has to accept, because the mount runner clears the evidence field by
+        #   writing JSON null when a mount reaches running. A Mandatory parameter
+        #   without it rejects $null at binding time, before the write is attempted.
+        [Parameter(Mandatory)][AllowNull()]$Value
     )
     # One gate covers every mutation below, including creating the record when it
     # is absent, so -WhatIf reports (and skips) the whole write.
@@ -154,7 +164,13 @@ function Set-HealthField {
     }
     $tmp = "$file.tmp.$PID"
     $json = Get-Content -Raw $file | ConvertFrom-Json
-    $json.$Field = $Value
+    # WHY Add-Member rather than assignment: ConvertFrom-Json yields a PSCustomObject
+    #   whose property set is exactly the keys the record carries, so `$json.$Field = $Value`
+    #   throws "The property 'evidence' cannot be found on this object" for any field the
+    #   record does not already have. -Force overwrites an existing key, so this one call
+    #   covers both the add and the update, and the POSIX side reaches the same shape
+    #   through jq, which creates a missing key on assignment.
+    $json | Add-Member -NotePropertyName $Field -NotePropertyValue $Value -Force
     $json | ConvertTo-Json -Depth 4 | Set-Content -Path $tmp -NoNewline
     Move-Item -Path $tmp -Destination $file -Force
 }
@@ -260,6 +276,10 @@ function Set-HealthReported {
 #   blocked until the old timestamps aged out.  Dropping .restarts is what makes
 #   this a re-arm rather than a status reset.  Mirrors svc_health_clear in
 #   src/scripts/lib/service-health.sh.
+# WHY the evidence field is left alone: it names a capture file the runner kept and
+#   never deletes, so the pointer is still true here and clearing it would strand that
+#   file on disk with nothing naming it.  Only the mount runner's success path clears
+#   it, because reaching running ends the failure it was written for.
 function Clear-HealthRecord {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Instance)
