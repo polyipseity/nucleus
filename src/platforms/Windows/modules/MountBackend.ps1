@@ -159,48 +159,66 @@ function Mount-Backend-Mount {
     $proc
 }
 
-# Mount-Backend-Probe — report whether the mount point is a LIVE MOUNT.
-# Returns $true when mounted, $false when not mounted.
+# Mount-Backend-ProbeState — report the mount state of a mount point as a token.
+# Prints exactly one of: present, absent:not-listed, unknown:dir-unreadable.
+# Returns nothing; the caller reads the token from the success stream.
 #
-# WHY: this asks about MOUNT STATE, never alone about directory contents.  An empty
-#   remote root is a legitimate state (a freshly created cloud folder), and reporting
-#   it as dead makes the runner retry `mountAttempts` times and leave the service
-#   permanently blocked at mount-failed on a mount that actually succeeded.  Linux
-#   answers the same question through the mount table (mount-backend-linux.sh ->
-#   svc_mount_table_contains) and macOS through diskutil; Windows has no mount table,
-#   so it asks this host's mount state and keeps the content check as a SECOND
-#   signal.
+# WHY three tokens and not a bool.  The question is mount state, and Windows has no
+#   mount table, so the answer is inferred from the mount-point directory.  A
+#   directory this process may not read lists as zero entries, so a count test
+#   answers not-mounted for it, and the attach loop then records a failure whose
+#   cause is a permission and sends the operator to the remote.
+#   backend_probe_state in mount-backend-darwin.sh prints the same three tokens, and
+#   the attach loop in rclone-mount.ps1 tests the `unknown:` prefix alone, so the
+#   reason after the prefix is this platform's own.
 #
-# WHY the union rather than a replacement: the reparse-point test is an assumption
-#   about WinFsp that cannot be confirmed from here, so it is added as an ADDITIONAL
-#   reason to call a path mounted.  If the assumption holds, empty-but-mounted starts
-#   working; if it does not, behaviour is exactly the previous status quo.  Treating
-#   everything as mounted is NOT an option - the transition back to not-mounted is
-#   what makes revival work.
+# WHY the reparse-point test is kept rather than replaced.  A WinFsp directory mount
+#   is expected to be a reparse point in its own right, and that assumption cannot be
+#   confirmed from here, so it stays as an ADDITIONAL reason to answer present.  If it
+#   holds, an empty-but-mounted remote root stops being reported dead; if it does not,
+#   the answer is the previous status quo.  Answering present for everything is not an
+#   option, because the transition back to not-mounted is what makes revival work.
+#
+# WHY a try/catch rather than a null check or a count of $Error.  Get-Item returns a
+#   DirectoryInfo for a directory this process may not read, so `-not $item` never
+#   fires; and $Error is a process-wide sink that any earlier command can have written
+#   to, so a count taken across this call would attribute someone else's error to it.
+#   The thrown exception is scoped to the one call that failed.  The POSIX side makes
+#   the same choice from the same shape, keying on `ls -A`'s own exit status.
 #
 # UNVERIFIED on Windows: that a WinFsp DIRECTORY mount is exposed as a reparse point
 #   (and therefore carries FileAttributes.ReparsePoint on the mount-point directory
 #   itself).  Confirm on a real Windows host by starting a mount and inspecting
 #   (Get-Item -Force <mount point>).Attributes.  Until then the content check remains
 #   the effective signal for a non-empty remote root.
-function Mount-Backend-Probe {
+function Mount-Backend-ProbeState {
     [CmdletBinding()]
-    [OutputType([bool])]
+    [OutputType([string])]
     param([Parameter(Mandatory)][string]$MountPoint)
 
     if (-not (Test-Path -LiteralPath $MountPoint)) {
-        return $false
+        Write-Output 'absent:not-listed'
+        return
     }
 
-    # A WinFsp directory mount is expected to be a reparse point in its own right.
     $item = Get-Item -LiteralPath $MountPoint -Force
     if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
-        return $true
+        Write-Output 'present'
+        return
     }
 
-    # check-suppress:suppression_doc: an unreadable or empty directory is the not-mounted answer, decided by the content test immediately below.
-    $items = @(Get-ChildItem -Path $MountPoint -ErrorAction SilentlyContinue)
-    return ($items.Count -gt 0)
+    try {
+        $items = @(Get-ChildItem -LiteralPath $MountPoint -ErrorAction Stop)
+    } catch {
+        Write-Output 'unknown:dir-unreadable'
+        return
+    }
+
+    if ($items.Count -gt 0) {
+        Write-Output 'present'
+        return
+    }
+    Write-Output 'absent:not-listed'
 }
 
 # Mount-Backend-Unmount — release the volume.
