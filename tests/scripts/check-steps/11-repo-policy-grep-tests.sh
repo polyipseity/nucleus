@@ -247,3 +247,150 @@ if [ "$failures" -ne 0 ]; then
   exit 1
 fi
 echo "PASS: activation tool resolution"
+
+# ---------------------------------------------------------------------------
+# srt wrapper invariants (run_srt_wrapper_invariants)
+#
+# srt parses its own options wherever they appear, so a wrapper that forwards
+# arguments without `--` loses them: `pi --help` prints srt's usage and
+# `pi -c <arg>` drops both arguments silently. The scan is driven with explicit
+# positional files (HAS_ARGS=true) so it never depends on the gitignore filter
+# being available inside a temporary fixture tree.
+# ---------------------------------------------------------------------------
+
+# Run the srt sub-check over one or more files and capture its combined output.
+# $@: file paths, relative to the repository root.
+run_srt_scan() {
+  local _file
+  for _file in "$@"; do
+    [ -f "$_file" ] || return 1
+  done
+  local -A _srt_ctx=([HAS_ARGS]=true [REPO_ROOT]="$REPO_ROOT")
+  _out=$(
+    cd "$REPO_ROOT" || return 1
+    run_srt_wrapper_invariants _srt_ctx "$@" 2>&1
+  )
+}
+
+# Does the report blame this file? Matched on the basename plus the trailing
+# "forwards the user's arguments" text, so a match can only come from the
+# violation line and not from the fixture path echoed elsewhere.
+srt_blames() {
+  case "$_out" in
+  *"$(basename -- "$1"):"*"forwards the user's arguments"*) return 0 ;;
+  *) return 1 ;;
+  esac
+}
+
+srt_fixture() {
+  local _root
+  _root=$(mktemp -d)
+  mkdir -p "$_root/src/scripts/shell"
+  printf '%s\n' "$@" >"$_root/src/scripts/shell/probe.sh"
+  printf '%s\n' "$_root/src/scripts/shell/probe.sh"
+}
+
+# The defect itself: a wrapper forwarding without the marker must be reported.
+# The positive control matters more than the negative half, because a scan that
+# reads nothing reports nothing and would pass a naive "no violation" assertion.
+test_srt_unseparated_wrapper_is_reported() {
+  local _probe _rc
+  _probe=$(srt_fixture 'srt command pi "$@"')
+  run_srt_scan "$_probe"
+  _rc=$?
+  rm -rf "$(dirname -- "$(dirname -- "$_probe")")"
+  if [ "$_rc" -eq 0 ]; then
+    fail "a wrapper without the separator was not reported" "$_out"
+    return 1
+  fi
+  if srt_blames "$_probe"; then
+    return 0
+  fi
+  fail "the report does not name the offending file" "$_out"
+  return 1
+}
+
+# An argument that merely starts with a dash is still forwarded verbatim, so
+# `pi -p x` has to be reported. Without the word-boundary tail on the exonerating
+# pattern this line would pass as if `--` were present.
+test_srt_leading_dash_argument_is_reported() {
+  local _probe _rc
+  _probe=$(srt_fixture 'srt command pi -p x')
+  run_srt_scan "$_probe"
+  _rc=$?
+  rm -rf "$(dirname -- "$(dirname -- "$_probe")")"
+  if [ "$_rc" -ne 0 ] && srt_blames "$_probe"; then
+    return 0
+  fi
+  fail "a wrapper whose first forwarded argument is a flag was not reported" "$_out"
+  return 1
+}
+
+# The fixed shape must pass, otherwise the rule would reject the repository's own
+# wrappers. Asserted on both real host wrappers, not on a copy of them.
+test_srt_separated_wrapper_is_accepted() {
+  local _rc
+  run_srt_scan src/scripts/shell/init.zsh src/scripts/shell/profile.ps1
+  _rc=$?
+  if [ "$_rc" -ne 0 ]; then
+    fail "the shipped wrappers were reported" "$_out"
+    return 1
+  fi
+  return 0
+}
+
+# Neither a comment quoting the invocation nor the `srt -c '<string>'` form is a
+# violation: the string sits behind -c as one argument and exposes no per-argument
+# flag for srt's parser to steal. The unseparated line alongside them is the
+# positive control, so an exclusion that suppressed everything would still fail.
+test_srt_comment_and_c_form_are_ignored() {
+  local _probe _rc
+  _probe=$(srt_fixture '# example: srt command pi "$@"' "srt -c 'pi --help'" 'srt command pi -- "$@"' 'srt command pi --help')
+  run_srt_scan "$_probe"
+  _rc=$?
+  rm -rf "$(dirname -- "$(dirname -- "$_probe")")"
+  if [ "$_rc" -eq 0 ]; then
+    fail "the scan reported nothing, so the exclusions were not exercised" "$_out"
+    return 1
+  fi
+  # Exactly the last line is the violation.
+  if [ "$(grep -c "forwards the user's arguments" <<<"$_out")" -ne 1 ]; then
+    fail "expected exactly one violation, got:" "$_out"
+    return 1
+  fi
+  return 0
+}
+
+# The step files carry the rule's own wording. Scanning them must find nothing:
+# that is what lets the scan cover its own source without an exclusion list.
+test_srt_step_files_are_not_self_reported() {
+  local _rc
+  run_srt_scan \
+    src/scripts/checks/check-steps/11-repo-policy-grep.sh \
+    src/scripts/checks/check-steps/11-repo-policy-grep.ps1
+  _rc=$?
+  if [ "$_rc" -ne 0 ]; then
+    fail "the check reported its own step files" "$_out"
+    return 1
+  fi
+  return 0
+}
+
+srt_failures=0
+for test in \
+  test_srt_unseparated_wrapper_is_reported \
+  test_srt_leading_dash_argument_is_reported \
+  test_srt_separated_wrapper_is_accepted \
+  test_srt_comment_and_c_form_are_ignored \
+  test_srt_step_files_are_not_self_reported; do
+  if ! "$test"; then
+    echo "FAIL: $test"
+    srt_failures=$((srt_failures + 1))
+  fi
+done
+
+if [ "$srt_failures" -ne 0 ]; then
+  echo "FAIL: $srt_failures srt wrapper invariant test(s) failed"
+  exit 1
+fi
+echo "PASS: srt wrapper invariants"

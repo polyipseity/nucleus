@@ -875,8 +875,17 @@ run_srt_wrapper_invariants() {
     local _f
     for _f in "${_files[@]}"; do
       case "$_f" in
-      *.sh | *.zsh | *.ps1 | *.nix) _grep_files+=("$_f") ;;
+      *.sh | *.zsh | *.ps1 | *.nix) ;;
+      *) continue ;;
       esac
+      # The whole-repo branch reads src/ and scripts/ only, so drop tests/ here
+      # too and keep the two modes in agreement. A test that proves this rule
+      # works has to contain a violating example, and a fixture is not a shipped
+      # wrapper. ref: allow-and-deny-lists.instructions.md#B9
+      case "$_f" in
+      tests/* | */tests/*) continue ;;
+      esac
+      _grep_files+=("$_f")
     done
     if [ "${#_grep_files[@]}" -eq 0 ]; then
       say "0 wrapper files in scope, nothing to check."

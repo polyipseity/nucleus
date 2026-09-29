@@ -62,6 +62,7 @@ Categories A–D, dummy key rules below. New exclusions: category ID, tier, `# r
 | B6 | `12-repo-policy-pattern.sh`, `.ps1`, `13-repo-policy-data.sh`, `.ps1` | `vendor/` | T3 | Supplemented by Select-GitIgnored | Quarterly |
 | B7 | `step-runner.sh`, `.ps1` | `vendor/` | T3 | Supplemented by filter_gitignored/Select-GitIgnored | Quarterly |
 | B8 | `cleanup-nix-build-artifacts.sh` | `vendor/` | T3 | Structural | Quarterly |
+| B9 | `11-repo-policy-grep.sh`, `.ps1` | `tests/` in the srt wrapper scan only | T3 | Scoped mode receives whatever file the caller passes, so the hook would otherwise scan test files that the whole-repo branch never reads, and the two modes would disagree about the same tree. The suite that proves the rule has to carry a violating example, and a fixture string is not a shipped wrapper | Quarterly |
 
 ### Category C — Content-pattern (grep -v)
 
@@ -95,4 +96,4 @@ Registry: `src/modules/dummy-keys.json` (validated against `src/modules/dummy-ke
 
 - **Quarterly**: audit T3 — files exist, patterns justified, no new hard-coded excludes.
 - **Shared-content**: per `embedded-content.instructions.md` § Shared cross-platform content.
-- **Trigger**: check step added/removed/renumbered. **Last reviewed**: 2026-09-27.
+- **Trigger**: check step added/removed/renumbered. **Last reviewed**: 2026-09-30.

@@ -350,9 +350,14 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   # literal invocation left in a comment is dropped.
   $swFiles = @()
   if ($HasArgs) {
+    # The whole-repo branch reads src/ and scripts/ only, so drop tests/ here
+    # too and keep the two modes in agreement. A test that proves this rule
+    # works has to contain a violating example, and a fixture is not a shipped
+    # wrapper. ref: allow-and-deny-lists.instructions.md#B9
     $swFiles = @(
       $PositionalArgs |
-        Where-Object { $_ -match '\.(sh|zsh|ps1|nix)$' }
+        Where-Object { $_ -match '\.(sh|zsh|ps1|nix)$' } |
+        Where-Object { $_ -notmatch '(^|[\\/])tests[\\/]' }
     )
   } else {
     foreach ($swDir in @('src', 'scripts')) {
