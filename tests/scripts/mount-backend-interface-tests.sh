@@ -3,12 +3,14 @@
 # runner calls.
 #
 # rclone-mount-tests.sh checks the same eight inside install_mocks, which defines
-# them itself — which is why 73318ae2 could drop backend_probe from the Linux
+# them itself — which is how backend_probe could be dropped from the Linux
 # backend and leave that check green. This suite mocks nothing: it asks only
 # whether the name exists, not what it does.
 #
-# The eight are the backend_* calls in src/scripts/services/rclone-mount.sh.
-# A ninth call added there needs adding here; this suite does not read the runner.
+# The eight are the backend_* calls in src/scripts/services/rclone-mount.sh,
+# which also reads the _backend_capture and _backend_rclone_pid variables that
+# this suite leaves unchecked. A ninth call added there needs adding here; this
+# suite does not read the runner.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -39,28 +41,43 @@ _defined_by() { # <backend file> <name>... — the names the backend defines
   local _file="$1"
   shift
   (
+    # WHY the guarded source and the trailing success: unguarded, a failed
+    # source ends this subshell, and a loop ending on a failed test returns
+    # that failure. Either ends the caller's assignment before the eight run.
     # shellcheck source=/dev/null # reason: backend path is a runtime parameter
-    . "$_file"
-    local _name
-    for _name in "$@"; do
-      if declare -f "$_name" >/dev/null 2>&1; then
-        printf '%s\n' "$_name"
-      fi
-    done
+    if . "$_file"; then
+      local _name
+      for _name in "$@"; do
+        declare -f "$_name" >/dev/null 2>&1 && printf '%s\n' "$_name"
+      done
+      exit 0
+    fi
+  )
+}
+
+# WHY the canary tests sourcing, not a name. A name-based probe reports a
+# sourcing failure as a missing interface the day that name is deleted as dead
+# code; what a backend owes is a clean source and functions, not any one name.
+_sourced_by() { # <backend file> — 0 when it sources and adds a function
+  local _file="$1"
+  (
+    local _before _after
+    _before="$(declare -F | wc -l)"
+    # shellcheck source=/dev/null # reason: backend path is a runtime parameter
+    . "$_file" || exit 1
+    _after="$(declare -F | wc -l)"
+    [ "$_after" -gt "$_before" ]
   )
 }
 
 _check_backend() { # <platform> <backend file>
   local _platform="$1" _file="$2" _name _defined
 
-  # WHY backend_repair, which the runner never calls. Every assertion below
-  # reports a name missing when the subshell sourced nothing, so an empty result
-  # would otherwise read as a backend that defines nothing at all.
-  if [ -n "$(_defined_by "$_file" backend_repair)" ]; then
-    assert_pass "$_platform backend sourced, backend_repair defined"
+  if _sourced_by "$_file"; then
+    assert_pass "$_platform backend sourced and defined functions"
   else
     assert_fail "$_platform-backend-not-sourced" \
-      "sourcing $_file defined no function, so every name below is reported missing for a reason that is not a missing interface"
+      "sourcing $_file failed or it defined no function, so every name below is reported missing for a reason that is not a missing interface"
   fi
 
   _defined="$(_defined_by "$_file" "${_INTERFACE_NAMES[@]}")"
