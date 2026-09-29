@@ -246,7 +246,7 @@ _backend_rclone_pid=""
 # backend_probe_state — the three-valued answer for a mount point.
 # Args: $1 — mount point.
 # Prints: present, absent:not-listed or unknown:dir-unreadable. Always returns 0.
-# WHY: the question is mount state, and diskutil answers it here. Only a host
+# WHY: the question is mount state, and diskutil decides it here. Only a host
 #   with no diskutil at all falls back to the directory test, whose one
 #   unresolvable case is a directory this caller may not read.
 # WHY: the reason after the prefix is this platform's own; the attach loop in
@@ -255,11 +255,13 @@ _backend_rclone_pid=""
 backend_probe_state() {
   local mount_point="$1"
 
-  # WHY: a diskutil on PATH is asked, and one that names no volume HAS answered:
-  # the path holds no volume. Falling through to the directory test would read a
-  # mount point holding leftover files as an attached volume, and the attach loop
-  # acts on `present` by recording the service running and deleting the capture
-  # file. Only a host with no diskutil leaves the question open.
+  # WHY: a diskutil on PATH is asked, and one that names no volume answers not
+  # mounted. Falling through to the directory test would read a mount point
+  # holding leftover files as an attached volume, and the attach loop acts on
+  # `present` by recording the service running and deleting the capture file.
+  # Narrowing: a diskutil that cannot answer reads the same -- same exit status
+  # and first stderr line -- so it too answers absent, and unknown:dir-unreadable
+  # is reserved for a caller-unreadable directory on a host with no diskutil.
   if command -v diskutil >/dev/null 2>&1; then
     if diskutil info "$mount_point" 2>/dev/null | grep -q "Volume Name"; then
       printf 'present\n'

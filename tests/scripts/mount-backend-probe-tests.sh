@@ -2,7 +2,7 @@
 # mount-backend-{linux,darwin}.sh — backend_probe_state answers about MOUNT
 # STATE and keeps the undeterminable answer. The two backends reach that answer
 # from different evidence, so both are exercised here: Linux from a mount table,
-# darwin from diskutil, which decides alone whenever it can run.
+# darwin from diskutil.
 #
 # The regression this guards is D54: the probe used to require a non-empty
 # directory, so a mounted-but-empty remote root (a freshly created cloud folder)
@@ -132,7 +132,7 @@ case "$_contains_out" in
 *) assert_fail "mount-probe-unreadable-reason" "the predicate did not name the reader's status: $_contains_out" ;;
 esac
 
-# ── darwin: diskutil answers whenever it can run at all ─────────────────────
+# ── darwin: diskutil on PATH decides alone ───────────────────────────────────
 # The macOS backend is sourced last, after every assertion above, because it
 # redefines the backend_* names they read. macos-fskit.sh is sourced with it and
 # only defines functions, so this runs on a Linux host unchanged. diskutil is
@@ -164,9 +164,10 @@ present) assert_pass "on darwin a diskutil that names a volume answers for an em
   "a diskutil that named a volume left an empty mount point reading as [$_darwin_named_state]" ;;
 esac
 
-# ── a diskutil that RAN and named no volume has answered: not mounted ───────
-# The shim is on PATH and names nothing, so the probe asked and got an answer:
-# the path holds no volume. The directory is non-empty on purpose. Reading it as
+# ── a diskutil on PATH that names no volume: not mounted ───────────────────
+# The shim is on PATH and names nothing, which is what `diskutil info` does for
+# a path holding no volume: it exits non-zero with its message on stderr, and the
+# probe discards both. The directory is non-empty on purpose. Reading it as
 # present tells the attach loop a mount is live, and the loop acts on that by
 # recording the service running, clearing the evidence pointer and deleting the
 # capture file for a mount that never attached.
@@ -177,7 +178,7 @@ SHIM
 chmod +x "$_shim_dir/diskutil"
 _darwin_full_state="$(backend_probe_state "$_darwin_full")"
 case "$_darwin_full_state" in
-absent:not-listed) assert_pass "a diskutil that ran and named no volume reports a non-empty mount point as not mounted" ;;
+absent:not-listed) assert_pass "a diskutil that names no volume reports a non-empty mount point as not mounted" ;;
 *) assert_fail "darwin-probe-nonempty-unmounted" \
   "a non-empty mount point read as [$_darwin_full_state] although diskutil named no volume — leftover files would be recorded as a healthy mount" ;;
 esac
