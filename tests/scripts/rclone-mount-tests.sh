@@ -811,10 +811,8 @@ test_removing_this_attempts_file_keeps_an_earlier_pointer() {
   state="$(health_field state)"
   evidence="$(health_field evidence)"
   kept="$(sed -n 's/.*rclone output kept at //p' "$home/out" | head -1)"
-  # WHY no `|| printf '0'`: grep -c prints the count AND returns 1 when nothing
-  #   matches, so the fallback appended a second 0 and the failure message below
-  #   showed a two-line value. This form keeps grep's own 0 for that case and
-  #   fills 0 only when grep could not read the file at all.
+  # WHY the `||`: grep -c prints the count and returns 1 on no match, so the
+  #   branch fires there and on a read failure alike; 0 is right for both.
   kept_lines="$(grep -c 'rclone output kept at' "$home/out" 2>/dev/null)" || kept_lines=0
   # All three parts are needed. A record that never went blocked, or a run that
   # kept nothing, would both leave an empty field and satisfy a weaker form of

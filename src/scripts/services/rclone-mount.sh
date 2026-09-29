@@ -299,13 +299,10 @@ _cm_main() {
       #   remove.
       #
       # WHY: not a contradiction with the success path above, which clears the
-      #   pointer and strands an earlier kept file in exactly this way. The two
-      #   branches differ on whether the record still has a failure to name: a
-      #   blocked record keeps the pointer because whoever reads it still has to
-      #   find that file, while a running record drops it because pointing at
-      #   evidence for a healthy mount is the worse of the two errors. A file
-      #   kept and then recovered past is stranded either way; only the running
-      #   record forgets where it was.
+      #   pointer and strands an earlier kept file. A blocked record still has a
+      #   failure to name and keeps the pointer, and svc_health_clear leaves it
+      #   as well, so a run that ends blocked strands a kept file only through
+      #   the second-keep overwrite written down above.
       rm -f "$capture_file"
     fi
     rm -f "$mount_args_file"
