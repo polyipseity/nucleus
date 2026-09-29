@@ -161,13 +161,13 @@ _cm_main() {
     # ending from probe_state.
     local exit_reason=""
     while [ $((SECONDS - attach_start)) -lt "$attach_seconds" ]; do
-      # WHY: backend_probe_state, not backend_probe. The two-valued answer is 0
-      #   both for a live mount and for a table that could not be read, and this
-      #   loop acts on that 0 by recording the service running and deleting the
-      #   capture file, so only the three-valued answer is safe here: an unknown
-      #   state falls through to the same poll the absent state takes, spending
-      #   no attempt and issuing no restart of its own, and the budget below is
-      #   what ends the run.
+      # WHY: backend_probe_state, which keeps the third value. A two-valued answer
+      #   is 0 both for a live mount and for a table that could not be read, and
+      #   this loop acts on that 0 by recording the service running and deleting
+      #   the capture file, so only the three-valued answer is safe here: an
+      #   unknown state falls through to the same poll the absent state takes,
+      #   spending no attempt and issuing no restart of its own, and the budget
+      #   below is what ends the run.
       probe_state="$(backend_probe_state "$mount_point")"
       if [ "$probe_state" = present ]; then
         live=true

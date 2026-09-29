@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # mount-backend-{linux,darwin}.sh — backend_probe_state answers about MOUNT
-# STATE, never content, and keeps the undeterminable answer. The two backends
-# reach that answer from different evidence, so both are exercised here: the
-# Linux one from a mount table, the darwin one from a query that cannot run.
+# STATE and keeps the undeterminable answer. The two backends reach that answer
+# from different evidence, so both are exercised here: Linux from a mount table,
+# darwin from diskutil, which decides alone whenever it can run.
 #
 # The regression this guards is D54: the probe used to require a non-empty
 # directory, so a mounted-but-empty remote root (a freshly created cloud folder)
@@ -132,37 +132,74 @@ case "$_contains_out" in
 *) assert_fail "mount-probe-unreadable-reason" "the predicate did not name the reader's status: $_contains_out" ;;
 esac
 
-# ── darwin: a query that could not run is not evidence of absence ────────────
+# ── darwin: diskutil answers whenever it can run at all ─────────────────────
 # The macOS backend is sourced last, after every assertion above, because it
-# redefines the backend_* names they read. diskutil is shimmed for the same
-# reason the mount table is: the state under test is a diskutil that cannot run,
-# which a healthy host cannot be relied on to produce. macos-fskit.sh is sourced
-# with it and only defines functions, so this runs on a Linux host unchanged.
+# redefines the backend_* names they read. macos-fskit.sh is sourced with it and
+# only defines functions, so this runs on a Linux host unchanged. diskutil is
+# shimmed for the same reason the mount table is: a real host's diskutil cannot
+# be relied on to name a volume on demand, and the situations below differ only
+# in what the shim does.
 # shellcheck source=../../src/scripts/lib/mount-backend-darwin.sh
 . "$SCRIPT_DIR/../../src/scripts/lib/mount-backend-darwin.sh"
 
+_darwin_empty="$_work/darwin-empty"
+_darwin_full="$_work/darwin-full"
+_darwin_unreadable="$_work/darwin-unreadable"
+mkdir -p "$_darwin_empty" "$_darwin_full" "$_darwin_unreadable"
+: >"$_darwin_full/an-entry"
+chmod 000 "$_darwin_unreadable"
+
+# ── a diskutil that names a volume answers, whatever the directory holds ─────
+# The empty directory is the discriminating input: the content test alone would
+# call it absent, so `present` here can only have come from diskutil.
+cat >"$_shim_dir/diskutil" <<'SHIM'
+#!/bin/sh
+echo "   Volume Name: test-volume"
+SHIM
+chmod +x "$_shim_dir/diskutil"
+_darwin_named_state="$(backend_probe_state "$_darwin_empty")"
+case "$_darwin_named_state" in
+present) assert_pass "on darwin a diskutil that names a volume answers for an empty mount point" ;;
+*) assert_fail "darwin-probe-named-volume" \
+  "a diskutil that named a volume left an empty mount point reading as [$_darwin_named_state]" ;;
+esac
+
+# ── a diskutil that RAN and named no volume has answered: not mounted ───────
+# The shim is on PATH and names nothing, so the probe asked and got an answer:
+# the path holds no volume. The directory is non-empty on purpose. Reading it as
+# present tells the attach loop a mount is live, and the loop acts on that by
+# recording the service running, clearing the evidence pointer and deleting the
+# capture file for a mount that never attached.
 cat >"$_shim_dir/diskutil" <<'SHIM'
 #!/bin/sh
 exit 7
 SHIM
 chmod +x "$_shim_dir/diskutil"
-
-_darwin_full="$_work/darwin-full"
-_darwin_empty="$_work/darwin-empty"
-_darwin_unreadable="$_work/darwin-unreadable"
-mkdir -p "$_darwin_full" "$_darwin_empty" "$_darwin_unreadable"
-: >"$_darwin_full/an-entry"
-chmod 000 "$_darwin_unreadable"
-
-# ── a diskutil that cannot run must not disable the only other probe ─────────
-# The directory is readable and non-empty, so the directory test has an answer.
-# Returning from inside the diskutil branch leaves the function with none, and
-# reports a mount it never looked at as not mounted.
 _darwin_full_state="$(backend_probe_state "$_darwin_full")"
 case "$_darwin_full_state" in
-present) assert_pass "a diskutil that cannot run still leaves the darwin directory test able to answer" ;;
-*) assert_fail "darwin-probe-shadowed-fallback" \
-  "a readable non-empty mount point read as [$_darwin_full_state] once diskutil could not run" ;;
+absent:not-listed) assert_pass "a diskutil that ran and named no volume reports a non-empty mount point as not mounted" ;;
+*) assert_fail "darwin-probe-nonempty-unmounted" \
+  "a non-empty mount point read as [$_darwin_full_state] although diskutil named no volume — leftover files would be recorded as a healthy mount" ;;
+esac
+
+# ── with no diskutil on PATH the directory test is the only evidence ─────────
+# PATH is replaced rather than filtered: the host's own diskutil lives in
+# /usr/sbin, so removing the shim would leave the tool reachable and this
+# situation would collapse into the one above. The directory links only `ls`,
+# the one external the fallback calls, so anything else the probe reaches for
+# fails here instead of resolving from the host.
+_host_path="$PATH"
+_nodisk_path="$_work/no-diskutil-path"
+mkdir -p "$_nodisk_path"
+ln -s "$(command -v ls)" "$_nodisk_path/ls"
+PATH="$_nodisk_path"
+
+# ── a non-empty directory is the only evidence a volume is attached ──────────
+_darwin_full_fallback_state="$(backend_probe_state "$_darwin_full")"
+case "$_darwin_full_fallback_state" in
+present) assert_pass "with no diskutil to ask, a non-empty mount point reads as mounted" ;;
+*) assert_fail "darwin-probe-fallback-nonempty" \
+  "a non-empty mount point read as [$_darwin_full_fallback_state] with no diskutil to ask" ;;
 esac
 
 # WHY the readability is asserted before the answer: the undeterminable case
@@ -204,6 +241,7 @@ absent:not-listed) assert_pass "a missing mount point reads as not mounted on da
   "a missing mount point read as [$_darwin_missing_state] (expected absent:not-listed)" ;;
 esac
 
+PATH="$_host_path"
 chmod 755 "$_darwin_unreadable"
 
 finish_tests
