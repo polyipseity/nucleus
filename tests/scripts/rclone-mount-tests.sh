@@ -673,6 +673,73 @@ test_unreadable_mount_table_does_not_record_running() {
   rm -rf "$home" "$bin"
 }
 
+section "3d" "the exhaustion record keeps the last attempt's own class"
+
+# The exhaustion record is the one a supervisor reads after a run has given up,
+# and it is the only place the last attempt's diagnosis is still reachable: the
+# per-attempt record is overwritten by the next attempt. It used to be written
+# from a hardcoded class whatever rclone's own output had said, so a run whose
+# last attempt was told the failure was transient came out as mount-failed, and
+# the operator was sent to the remote instead of at the read the runner made.
+test_exhaustion_keeps_the_last_attempt_class() {
+  local home bin state class
+  home="$(create_home)"
+  bin="$(setup_fake_rclone)"
+  # A 2s attach budget and two attempts: enough to run out of attempts, and
+  # short enough that the retry path is the one being taken.
+  setup_env "$home" "$bin" 2
+  NUCLEUS_MOUNT_ATTEMPTS=2
+  NUCLEUS_MOUNT_BACKOFF="0,0"
+  export NUCLEUS_MOUNT_ATTEMPTS NUCLEUS_MOUNT_BACKOFF
+  FAKE_MARKER="$home/clouds/OneDrive/.marker"
+  FAKE_CALLS="$home/calls"
+  FAKE_REMOTES="OneDrive:"
+  # The child outlives the attach budget, so the attach wait ends on the budget
+  # and every attempt reaches classification. A child that died instead would be
+  # testing a different path.
+  FAKE_SLEEP=6
+  # rclone's own stderr, which is what the real backend_class reads to decide
+  # the class. Its line is the only thing in this test that says "transient".
+  printf 'fuse: transient I/O error talking to the remote endpoint\n' >"$home/rclone.err"
+  FAKE_ERRFILE="$home/rclone.err"
+  # A readable table that reports the mount as absent. The run believes that
+  # answer and still runs out of attempts, which is the point: nothing here is
+  # unreadable, so the class must come from rclone rather than from a failed
+  # read being guessed at.
+  FAKE_PROBE_STATE="absent:not-listed"
+  export FAKE_MARKER FAKE_CALLS FAKE_REMOTES FAKE_SLEEP FAKE_ERRFILE FAKE_PROBE_STATE
+  install_mocks
+  # The classifier answers io-transient, as the real backends do when rclone's
+  # output names a transient condition.
+  MOCK_BACKEND_CLASSIFY() { printf 'io-transient'; }
+  # Transient, so the run retries and reaches the exhaustion record instead of
+  # blocking on the first attempt.
+  MOCK_BACKEND_IS_TRANSIENT() { [ "$1" = "io-transient" ]; }
+  export -f MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT
+
+  local rc=0
+  # rc cannot discriminate: the runner exits 0 on a blocked mount exactly as it
+  # does on a running one, which is this suite's standing exit contract.
+  run_main >/dev/null 2>&1 || rc=$?
+
+  state="$(health_field state)"
+  class="$(health_field class)"
+  # state is read so the class assertion below cannot pass on a record that was
+  # never blocked: an exhaustion run ends blocked, and a run that stopped after
+  # one attempt would leave the same class for a different reason.
+  if [ "$state" = "blocked" ] && [ "$class" = "io-transient" ]; then
+    assert_pass "the exhaustion record keeps the last attempt's own class"
+  else
+    assert_fail "exhaustion-drops-last-class" "state=$state class=$class (expected a blocked record classed io-transient)"
+  fi
+  rm -rf "$home" "$bin"
+
+  # Restore the defaults so the following tests are unaffected.
+  MOCK_BACKEND_CLASSIFY() { printf 'mount-failed'; }
+  MOCK_BACKEND_IS_TRANSIENT() { return 1; }
+  export -f MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT
+}
+
 section "4" "terminal failure → blocked record"
 
 test_terminal_failure_writes_blocked_record() {
@@ -814,7 +881,8 @@ test_health_record_class_and_remedy_on_blocked() {
   local rc=0
   run_main 2>/dev/null || rc=$?
 
-  # After 3 failed transient attempts, it writes blocked with "mount-failed".
+  # After 3 failed transient attempts, it writes blocked carrying the last
+  # attempt's class.
   local state class remedy
   state="$(health_field state)"
   class="$(health_field class)"
@@ -824,13 +892,21 @@ test_health_record_class_and_remedy_on_blocked() {
   else
     assert_fail "health-blocked-detail" "state=$state class=$class"
   fi
-  # The assertion this test is NAMED for. Exhaustion path writes final_class
-  # "mount-failed" (rclone-mount.sh:220-221), so remedy must be the exact string
-  # backend_remedy produces for it. Pre-fix this is "" — see task-61 finding 1.
-  if [ "$remedy" = "remedy:mount-failed" ]; then
-    assert_pass "health record shows the remedy after exhaustion"
+  # The assertion this test is NAMED for. The exhaustion record no longer names
+  # a class of its own: it inherits the last attempt's classification, and
+  # probe_unknown is the one case where that value is set explicitly rather than
+  # carried over. The remedy to assert is therefore the one belonging to
+  # whatever class the record ended up holding. Pinning a literal class here
+  # would re-assert the hardcoded constant this test used to name, and would go
+  # red again the next time the classification improves. The stub emits
+  # remedy:<class> (see MOCK_BACKEND_REMEDY), so a pass proves the class the
+  # record holds is the one that reached backend_remedy, and a record pairing a
+  # class with another class's remedy fails. Task-61 finding 1 was the empty
+  # remedy this replaced.
+  if [ -n "$class" ] && [ "$remedy" = "remedy:$class" ]; then
+    assert_pass "a blocked record carries the remedy for the class it holds"
   else
-    assert_fail "health-blocked-remedy" "remedy='$remedy' (expected 'remedy:mount-failed')"
+    assert_fail "blocked-remedy-matches-class" "class='$class' remedy='$remedy'"
   fi
   rm -rf "$home" "$bin"
 
@@ -1276,6 +1352,7 @@ test_mount_passes_remote_and_point_to_rclone
 test_transient_error_retries_and_succeeds
 test_dead_mount_stops_attach_wait_early
 test_unreadable_mount_table_does_not_record_running
+test_exhaustion_keeps_the_last_attempt_class
 test_terminal_failure_writes_blocked_record
 test_unconfigured_remote_exits_0
 test_health_record_created_on_startup

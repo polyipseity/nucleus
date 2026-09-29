@@ -263,11 +263,14 @@ _cm_main() {
   done
 
   # Exhausted all attempts — write blocked record.
-  # WHY: the same reasoning as the per-attempt class. A run that spent its whole
-  #   budget on a table that could not be read has not exhausted the mount, and
-  #   recording mount-failed would point the operator at the remote instead of
-  #   at the read.
-  local final_class="mount-failed"
+  # WHY: the last attempt's own diagnosis must not be overwritten. Every retry
+  #   replaced the per-attempt record, so $class is the only surviving statement
+  #   about why the run ended, and substituting a hardcoded mount-failed here
+  #   would discard it — sending the operator to the remote when what stopped
+  #   the run was the budget. Reading $class here is not a scope error: it is
+  #   declared `local` inside the attempt loop above, and bash scopes `local` to
+  #   the enclosing function, so the name still resolves after the loop closes.
+  local final_class="$class"
   if [ "$probe_unknown" = true ]; then
     final_class="io-transient"
   fi
