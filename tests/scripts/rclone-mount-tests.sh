@@ -222,77 +222,6 @@ run_main() {
 # _cm_dispatch_backend would source.  Since we never call _cm_dispatch_backend,
 # we define the interface ourselves.
 
-# Default mocks: succeed at prepare, emit args, detect volume via marker.
-MOCK_BACKEND_PREPARE() { return 0; }
-MOCK_BACKEND_ARGS() {
-  printf '%s\n' "$1" # remote
-  printf '%s\n' "$2" # mount_point
-  printf '%s\n' "--vfs-cache-mode"
-  printf '%s\n' "full"
-}
-MOCK_BACKEND_MOUNT() {
-  local rclone_bin="$1"
-  shift
-  # check-suppress:suppression_doc: _backend_capture is set in the runner's scope before this mock is called
-  "$rclone_bin" mount "$@" 2>"$_backend_capture" &
-  _backend_rclone_pid=$!
-}
-# MOCK_BACKEND_PROBE_STATE — the mount table's three-valued answer: present, an
-# absent:<reason>, or an unknown:<reason>. The attach wait loop reads this, not
-# MOCK_BACKEND_PROBE, because a zero return cannot tell a mount that is present
-# from a table that could not be read.
-#
-# FAKE_PROBE_STATE pins the answer outright, which is how a table that cannot be
-# read is modelled. FAKE_PROBE_STATE_FILE mirrors the attempt counter the retry
-# test uses: one counter per ATTEMPT, not per probe, so the failing attempt
-# misses for its whole budget and the retry is what the test actually exercises.
-# With neither set, the answer is derived from the marker the way a readable
-# table reports one.
-MOCK_BACKEND_PROBE_STATE() {
-  if [ -n "${FAKE_PROBE_STATE:-}" ]; then
-    printf '%s\n' "$FAKE_PROBE_STATE"
-    return
-  fi
-  if [ -n "${FAKE_PROBE_STATE_FILE:-}" ] && [ -f "$FAKE_PROBE_STATE_FILE" ] &&
-    [ "$(head -1 "$FAKE_PROBE_STATE_FILE")" -le 1 ]; then
-    printf 'absent:not-listed\n'
-    return
-  fi
-  if [ -f "${FAKE_MARKER:-}" ]; then
-    printf 'present\n'
-  else
-    printf 'absent:not-listed\n'
-  fi
-}
-# MOCK_BACKEND_PROBE — the two-valued view, answering the way
-# svc_mount_table_contains answers, so the mock carries the same contract the
-# Linux backend's probe does: a table that could not be read returns 0. That
-# 0 is correct for a caller that acts on the answer, and it is why the attach
-# wait loop cannot use this function to decide a mount is live.
-MOCK_BACKEND_PROBE() {
-  case "$(MOCK_BACKEND_PROBE_STATE "$@")" in
-  present | unknown:*) return 0 ;;
-  *) return 1 ;;
-  esac
-}
-MOCK_BACKEND_CLASSIFY() {
-  printf 'mount-failed'
-}
-MOCK_BACKEND_IS_TRANSIENT() {
-  return 1 # terminal by default
-}
-MOCK_BACKEND_UNMOUNT() { return 0; }
-# MOCK_BACKEND_REMEDY — the eighth member of the backend interface. It must
-# exist: without it the runner's `remedy="$(backend_remedy "$class")"` is a
-# command-not-found that the suite's `run_main 2>/dev/null || rc=$?` swallows
-# (the `||` also disables `set -e` for the whole call), so the record was
-# silently written with remedy:"" and the path had zero coverage. The
-# deliberately non-prose value (`remedy:<class>`) makes the exact stub visible
-# in an assertion, so a pass proves THIS stub ran rather than any other filler.
-MOCK_BACKEND_REMEDY() {
-  printf 'remedy:%s' "${1:-<no-class>}"
-}
-
 # install_mocks — export mock functions so they override the real ones.
 install_mocks() {
   backend_prepare() { MOCK_BACKEND_PREPARE "$@"; }
@@ -308,6 +237,91 @@ install_mocks() {
     backend_probe_state backend_class backend_is_transient backend_unmount \
     backend_remedy
 }
+
+# restore_default_mocks — the suite's default mocks, in the one place both the
+# suite's own starting state and a test's tail get them from. A test that
+# overrides a mock calls this instead of copying the default back: a hand copy
+# keeps working when the default here changes, so the edit the copy exists to
+# survive lands silently, and whichever copy ran first becomes the effective
+# default for every test after it.
+restore_default_mocks() {
+  # Default mocks: succeed at prepare, emit args, detect volume via marker.
+  MOCK_BACKEND_PREPARE() { return 0; }
+  MOCK_BACKEND_ARGS() {
+    printf '%s\n' "$1" # remote
+    printf '%s\n' "$2" # mount_point
+    printf '%s\n' "--vfs-cache-mode"
+    printf '%s\n' "full"
+  }
+  MOCK_BACKEND_MOUNT() {
+    local rclone_bin="$1"
+    shift
+    # check-suppress:suppression_doc: _backend_capture is set in the runner's scope before this mock is called
+    "$rclone_bin" mount "$@" 2>"$_backend_capture" &
+    _backend_rclone_pid=$!
+  }
+  # MOCK_BACKEND_PROBE_STATE — the mount table's three-valued answer: present, an
+  # absent:<reason>, or an unknown:<reason>. The attach wait loop reads this, not
+  # MOCK_BACKEND_PROBE, because a zero return cannot tell a mount that is present
+  # from a table that could not be read.
+  #
+  # FAKE_PROBE_STATE pins the answer outright, which is how a table that cannot be
+  # read is modelled. FAKE_PROBE_STATE_FILE mirrors the attempt counter the retry
+  # test uses: one counter per ATTEMPT, not per probe, so the failing attempt
+  # misses for its whole budget and the retry is what the test actually exercises.
+  # With neither set, the answer is derived from the marker the way a readable
+  # table reports one.
+  MOCK_BACKEND_PROBE_STATE() {
+    if [ -n "${FAKE_PROBE_STATE:-}" ]; then
+      printf '%s\n' "$FAKE_PROBE_STATE"
+      return
+    fi
+    if [ -n "${FAKE_PROBE_STATE_FILE:-}" ] && [ -f "$FAKE_PROBE_STATE_FILE" ] &&
+      [ "$(head -1 "$FAKE_PROBE_STATE_FILE")" -le 1 ]; then
+      printf 'absent:not-listed\n'
+      return
+    fi
+    if [ -f "${FAKE_MARKER:-}" ]; then
+      printf 'present\n'
+    else
+      printf 'absent:not-listed\n'
+    fi
+  }
+  # MOCK_BACKEND_PROBE — the two-valued view, answering the way
+  # svc_mount_table_contains answers, so the mock carries the same contract the
+  # Linux backend's probe does: a table that could not be read returns 0. That
+  # 0 is correct for a caller that acts on the answer, and it is why the attach
+  # wait loop cannot use this function to decide a mount is live.
+  MOCK_BACKEND_PROBE() {
+    case "$(MOCK_BACKEND_PROBE_STATE "$@")" in
+    present | unknown:*) return 0 ;;
+    *) return 1 ;;
+    esac
+  }
+  MOCK_BACKEND_CLASSIFY() {
+    printf 'mount-failed'
+  }
+  MOCK_BACKEND_IS_TRANSIENT() {
+    return 1 # terminal by default
+  }
+  MOCK_BACKEND_UNMOUNT() { return 0; }
+  # MOCK_BACKEND_REMEDY — the eighth member of the backend interface. It must
+  # exist: without it the runner's `remedy="$(backend_remedy "$class")"` is a
+  # command-not-found that the suite's `run_main 2>/dev/null || rc=$?` swallows
+  # (the `||` also disables `set -e` for the whole call), so the record was
+  # silently written with remedy:"" and the path had zero coverage. The
+  # deliberately non-prose value (`remedy:<class>`) makes the exact stub visible
+  # in an assertion, so a pass proves THIS stub ran rather than any other filler.
+  MOCK_BACKEND_REMEDY() {
+    printf 'remedy:%s' "${1:-<no-class>}"
+  }
+  export -f MOCK_BACKEND_PREPARE MOCK_BACKEND_ARGS MOCK_BACKEND_MOUNT \
+    MOCK_BACKEND_PROBE MOCK_BACKEND_PROBE_STATE MOCK_BACKEND_CLASSIFY \
+    MOCK_BACKEND_IS_TRANSIENT MOCK_BACKEND_UNMOUNT MOCK_BACKEND_REMEDY
+  install_mocks
+}
+
+restore_default_mocks
 
 # ── Tests ────────────────────────────────────────────────────────────────────
 section "1" "startup and backend_prepare"
@@ -342,11 +356,9 @@ test_prepare_success_proceeds_to_mount() {
   fi
   rm -rf "$home" "$bin"
 
-  # Restore the default mock so subsequent tests are not affected: the override
-  # writes through a `local home` that is unbound once this function returns,
-  # so leaving it installed would abort a later caller under `set -u`.
-  MOCK_BACKEND_PREPARE() { return 0; }
-  export -f MOCK_BACKEND_PREPARE
+  # Restore the defaults, or the override leaks: it writes through a `local home`
+  # that is unbound once this function returns, which aborts a later caller.
+  restore_default_mocks
 }
 
 test_prepare_blocks_returns_20() {
@@ -377,9 +389,7 @@ test_prepare_blocks_returns_20() {
   fi
   rm -rf "$home" "$bin"
 
-  # Restore the default mock so subsequent tests are not affected.
-  MOCK_BACKEND_PREPARE() { return 0; }
-  export -f MOCK_BACKEND_PREPARE
+  restore_default_mocks
 }
 
 section "2" "successful mount"
@@ -515,19 +525,10 @@ test_transient_error_retries_and_succeeds() {
   fi
   rm -rf "$home" "$bin"
 
-  # Restore default mocks so subsequent tests are not affected. The probe control
-  # needs no matching restore: setup_env unsets it before every test, so the file
-  # pointer does not follow this one into the tests that come after.
-  MOCK_BACKEND_CLASSIFY() { printf 'mount-failed'; }
-  MOCK_BACKEND_IS_TRANSIENT() { return 1; }
-  MOCK_BACKEND_MOUNT() {
-    local rclone_bin="$1"
-    shift
-    # check-suppress:suppression_doc: _backend_capture is set in the runner's scope before this mock is called
-    "$rclone_bin" mount "$@" 2>"$_backend_capture" &
-    _backend_rclone_pid=$!
-  }
-  export -f MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT MOCK_BACKEND_MOUNT
+  # The probe controls need no matching restore: setup_env unsets them before
+  # every test, so the file pointer does not follow this one into the tests that
+  # come after.
+  restore_default_mocks
 }
 
 section "3b" "a mount that dies during startup is classified without waiting out the budget"
@@ -575,18 +576,7 @@ test_dead_mount_stops_attach_wait_early() {
   fi
   rm -rf "$home" "$bin"
 
-  # Restore defaults so the following tests are unaffected. The probe is not
-  # among them: setup_env clears FAKE_PROBE_STATE before every test.
-  MOCK_BACKEND_CLASSIFY() { printf 'mount-failed'; }
-  MOCK_BACKEND_IS_TRANSIENT() { return 1; }
-  MOCK_BACKEND_MOUNT() {
-    local rclone_bin="$1"
-    shift
-    # check-suppress:suppression_doc: _backend_capture is set in the runner's scope before this mock is called
-    "$rclone_bin" mount "$@" 2>"$_backend_capture" &
-    _backend_rclone_pid=$!
-  }
-  export -f MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT MOCK_BACKEND_MOUNT
+  restore_default_mocks
 }
 
 section "3c" "a mount table that cannot be read is not a running mount"
@@ -829,40 +819,7 @@ test_removing_this_attempts_file_keeps_an_earlier_pointer() {
   fi
   rm -rf "$home" "$bin"
 
-  # Restore the defaults so the following tests are unaffected.
-  MOCK_BACKEND_MOUNT() {
-    local rclone_bin="$1"
-    shift
-    # check-suppress:suppression_doc: _backend_capture is set in the runner's scope before this mock is called
-    "$rclone_bin" mount "$@" 2>"$_backend_capture" &
-    _backend_rclone_pid=$!
-  }
-  MOCK_BACKEND_PROBE_STATE() {
-    if [ -n "${FAKE_PROBE_STATE:-}" ]; then
-      printf '%s\n' "$FAKE_PROBE_STATE"
-      return
-    fi
-    if [ -n "${FAKE_PROBE_STATE_FILE:-}" ] && [ -f "$FAKE_PROBE_STATE_FILE" ] &&
-      [ "$(head -1 "$FAKE_PROBE_STATE_FILE")" -le 1 ]; then
-      printf 'absent:not-listed\n'
-      return
-    fi
-    if [ -f "${FAKE_MARKER:-}" ]; then
-      printf 'present\n'
-    else
-      printf 'absent:not-listed\n'
-    fi
-  }
-  MOCK_BACKEND_PROBE() {
-    case "$(MOCK_BACKEND_PROBE_STATE "$@")" in
-    present | unknown:*) return 0 ;;
-    *) return 1 ;;
-    esac
-  }
-  MOCK_BACKEND_IS_TRANSIENT() { return 1; }
-  export -f MOCK_BACKEND_MOUNT MOCK_BACKEND_PROBE MOCK_BACKEND_PROBE_STATE \
-    MOCK_BACKEND_IS_TRANSIENT
-  install_mocks
+  restore_default_mocks
 }
 
 section "3d" "the exhaustion record keeps the last attempt's own class"
@@ -935,10 +892,7 @@ test_exhaustion_keeps_the_last_attempt_class() {
   fi
   rm -rf "$home" "$bin"
 
-  # Restore the defaults so the following tests are unaffected.
-  MOCK_BACKEND_CLASSIFY() { printf 'mount-failed'; }
-  MOCK_BACKEND_IS_TRANSIENT() { return 1; }
-  export -f MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT
+  restore_default_mocks
 }
 
 section "4" "terminal failure → blocked record"
@@ -992,15 +946,7 @@ test_terminal_failure_writes_blocked_record() {
   fi
   rm -rf "$home" "$bin"
 
-  # Restore default mocks so subsequent tests are not affected. The probe is not
-  # among them: setup_env clears FAKE_PROBE_STATE before every test.
-  MOCK_BACKEND_CLASSIFY() { printf 'mount-failed'; }
-  MOCK_BACKEND_IS_TRANSIENT() { return 1; }
-  export -f MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT
-  backend_probe() { MOCK_BACKEND_PROBE "$@"; }
-  backend_class() { MOCK_BACKEND_CLASSIFY "$@"; }
-  backend_is_transient() { MOCK_BACKEND_IS_TRANSIENT "$@"; }
-  export -f backend_probe backend_class backend_is_transient
+  restore_default_mocks
 }
 
 test_unconfigured_remote_exits_0() {
@@ -1111,11 +1057,7 @@ test_health_record_class_and_remedy_on_blocked() {
   fi
   rm -rf "$home" "$bin"
 
-  # Restore default mocks so subsequent tests are not affected. The probe is not
-  # among them: setup_env clears FAKE_PROBE_STATE before every test.
-  MOCK_BACKEND_CLASSIFY() { printf 'mount-failed'; }
-  MOCK_BACKEND_IS_TRANSIENT() { return 1; }
-  export -f MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT
+  restore_default_mocks
 }
 
 section "6" "exit codes"
@@ -1171,11 +1113,7 @@ test_exit_0_on_blocked_record() {
   fi
   rm -rf "$home" "$bin"
 
-  # Restore default mocks so subsequent tests are not affected. The probe is not
-  # among them: setup_env clears FAKE_PROBE_STATE before every test.
-  MOCK_BACKEND_CLASSIFY() { printf 'mount-failed'; }
-  MOCK_BACKEND_IS_TRANSIENT() { return 1; }
-  export -f MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT
+  restore_default_mocks
 }
 
 section "7" "backend_prepare failure"
@@ -1205,11 +1143,10 @@ test_prepare_failure_exits_20() {
   else
     assert_fail "prepare-exit-20" "rc=$rc state=$(health_field state)"
   fi
-  # The default MOCK_BACKEND_PREPARE is a load-time statement (line 180), not
-  # part of install_mocks, so this override would otherwise survive into every
-  # later test and make prepare fail for them by inheritance.
-  MOCK_BACKEND_PREPARE() { return 0; }
-  export -f MOCK_BACKEND_PREPARE
+  # install_mocks does not touch MOCK_BACKEND_PREPARE, so without this the
+  # override would survive into every later test and make prepare fail by
+  # inheritance.
+  restore_default_mocks
   rm -rf "$home" "$bin"
 }
 
@@ -1238,10 +1175,8 @@ test_prepare_failure_writes_blocked() {
   else
     assert_fail "prepare-blocked" "state=$(health_field state) class=$(health_field class)"
   fi
-  # Restore the default (see test_prepare_failure_exits_20): install_mocks does
-  # not redefine it, so without this the provider-version override leaks.
-  MOCK_BACKEND_PREPARE() { return 0; }
-  export -f MOCK_BACKEND_PREPARE
+  # Restore the default (see test_prepare_failure_exits_20).
+  restore_default_mocks
   rm -rf "$home" "$bin"
 }
 
