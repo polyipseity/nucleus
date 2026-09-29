@@ -334,7 +334,10 @@ EOF
 # Excluded: vscode, cursor (have built-in protections; no srt needed).
 pi() {
   command -v srt >/dev/null 2>&1 || { echo "error: srt (sandbox-runtime) is required but not installed. Run 'nucleus-apply' to install it." >&2; return 1; }
-  srt command pi "$@"
+  # WHY: srt parses its own options (-h, -V, -d, -s, -c, --control-fd) wherever
+  #      they appear, so without "--" a plain `pi --help` prints srt's help and
+  #      `pi -c <arg>` loses the argument without an error.
+  srt command pi -- "$@"
 }
 
 pi-unrestricted() {

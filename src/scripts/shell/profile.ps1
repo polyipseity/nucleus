@@ -629,7 +629,10 @@ function pi {
   if (-not (Get-Command srt -ErrorAction SilentlyContinue)) {
     Write-Error "srt (sandbox-runtime) is required but not installed. Run 'nucleus-apply' to install it." -ErrorAction Stop
   }
-  srt command pi @args
+  # WHY: srt parses its own options (-h, -V, -d, -s, -c, --control-fd) wherever
+  #      they appear, so without "--" a plain `pi --help` prints srt's help and
+  #      `pi -c <arg>` loses the argument without an error.
+  srt command pi -- @args
 }
 
 function pi-unrestricted {
