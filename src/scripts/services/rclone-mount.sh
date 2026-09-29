@@ -218,18 +218,25 @@ _cm_main() {
     #   rclone's output and answers mount-failed when it finds no cause there,
     #   which would blame the mount for a read nobody could make and send the
     #   operator to check the remote. io-transient is the class whose remedy is
-    #   to try again, so the unreadable answer overrides the classifier, and the
-    #   override is keyed on how the wait ended rather than on probe_state, which
-    #   on its own cannot tell a budget expiry from a child that died first.
+    #   to try again, so the unreadable probe answer overrides the classifier.
+    #   probe_state on its own cannot tell a budget expiry from a child that
+    #   died first, so the case is keyed on the ending — but both reachable
+    #   endings take the same arm, and that arm still tests probe_state, so the
+    #   ending selects the arm, not the class that gets recorded. What keying on
+    #   the ending buys is the `*)` arm: an ending the code cannot place takes
+    #   the same branch as an unreadable table, instead of keeping whatever
+    #   backend_class answered for it.
     #
     # WHY: no `attached` arm, because the wait can only end attached when live
     #   is true, and the success path above exits at its own line before reaching
-    #   this case. The arm below therefore matches no ending this function can
-    #   produce, so an exit_reason that lands there is one of our own strings
-    #   renamed or mistyped, and io-transient is the safe reading of a state
-    #   this code cannot place: the class whose remedy is to try again, which
-    #   costs a retry, over the terminal classes, which stop the run and point
-    #   the operator at the remote on the strength of a read that never completed.
+    #   this case. exit_reason holds only those three strings and `attached` is
+    #   the one that cannot arrive here, so the first arm already matches every
+    #   ending this function can produce, and the `*)` arm two arms down matches
+    #   none: an exit_reason landing there is one of our own strings renamed or
+    #   mistyped. io-transient is the safe reading of a state this code cannot
+    #   place: the class whose remedy is to try again, which costs a retry, over
+    #   the terminal classes, which stop the run and point the operator at the
+    #   remote on the strength of a read that never completed.
     case "$exit_reason" in
     child-exited | budget)
       if [ "${probe_state#unknown:}" != "$probe_state" ]; then
@@ -290,19 +297,24 @@ _cm_main() {
   # Exhausted all attempts — write blocked record.
   # WHY: the last attempt's own diagnosis must not be overwritten. $class holds
   #   the last attempt's classification because the loop reassigns it on every
-  #   pass, and no health record carries that classification out of the loop: a
-  #   transient attempt writes no health record at all, and the capture file kept
-  #   on the unreadable-table path holds rclone's raw output rather than a class,
-  #   so substituting a hardcoded mount-failed here would discard the one
-  #   classification the run produced — sending the operator to the remote when
-  #   what stopped the run was the budget. Reading $class here is not a scope
-  #   error: it is declared `local` inside the attempt loop above, and bash
-  #   scopes `local` to the enclosing function rather than the block, so the
-  #   name still resolves after the loop closes.
+  #   pass it makes, and no other health record carries that classification out
+  #   of the loop: a transient attempt writes no health record at all, and the
+  #   capture file kept on the unreadable-table path holds rclone's raw output
+  #   rather than a class, so substituting a hardcoded mount-failed here would
+  #   discard the one classification the run produced — sending the operator to
+  #   the remote when what stopped the run was the budget. Reading $class here
+  #   is not a scope error: it is declared `local` inside the attempt loop above,
+  #   and bash scopes `local` to the enclosing function rather than the block, so
+  #   the name still resolves after the loop closes.
   #
-  # WHY: a NUCLEUS_MOUNT_ATTEMPTS that is not a number leaves final_class empty
-  #   rather than wrong — `[ 1 -le abc ]` fails, the loop body never runs, and
-  #   `class` is never assigned. It is not reachable from a valid config:
+  # WHY: a NUCLEUS_MOUNT_ATTEMPTS that is not a number leaves `class` unset —
+  #   `[ 1 -le abc ]` fails, the loop body never runs, and nothing assigns it —
+  #   so final_class below is empty and probe_unknown is still false. That is
+  #   the outcome the paragraph above argues against, not a benign one:
+  #   backend_remedy answers an empty class from its `*)` arm, "check remote
+  #   configuration and credentials", and the record is written with that empty
+  #   class and that remedy, pointing the operator at the remote on the strength
+  #   of a read that never happened. It is not reachable from a valid config:
   #   services.schema.json pins mountAttempts to a minimum of 1 and the
   #   schema-validation check step validates the file, so nothing here guards it.
   local final_class="$class"
