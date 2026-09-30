@@ -118,6 +118,42 @@ BeforeAll {
     return $path
   }
 
+  # Block-DirectoryReadAccess — make a directory this process cannot list.
+  #
+  # WHY an ACL rather than a mode: NTFS has no POSIX mode bits, so `chmod 000`
+  #   leaves the directory fully readable on Windows and the probe answers
+  #   absent, which is the case these tests are not about. mount-backend.Tests.ps1
+  #   carries the same helper and asserts unknown:dir-unreadable from it on this
+  #   runner.
+  # WHY read without execute: a directory needs EXECUTE to be traversed and READ
+  #   to be listed, and only the listing is what the probe depends on. Denying
+  #   execute would stop the probe reaching the directory at all.
+  function Block-DirectoryReadAccess {
+    param([Parameter(Mandatory)][string]$Path)
+
+    if ($IsWindows) {
+      $null = & icacls $Path /deny "$($env:USERNAME):(R)" 2>&1
+      return 'icacls'
+    }
+    $null = & chmod 000 $Path
+    return 'chmod'
+  }
+
+  # Unblock-DirectoryReadAccess — put the permissions back so the sweep can
+  # delete the tree.
+  function Unblock-DirectoryReadAccess {
+    param(
+      [Parameter(Mandatory)][string]$Path,
+      [Parameter(Mandatory)][string]$Method
+    )
+
+    if ($Method -eq 'icacls') {
+      $null = & icacls $Path /remove:d "$($env:USERNAME)" 2>&1
+      return
+    }
+    $null = & chmod 700 $Path
+  }
+
   # Invoke-MountAttempt — run the real runner against the fixture backend.
   function Invoke-MountAttempt {
     param([hashtable]$Extra = @{})
@@ -262,7 +298,14 @@ Describe 'rclone-mount.ps1 retry loop' {
   Context 'mount point this process may not read' {
 
     BeforeEach {
-      $null = & chmod 000 $script:MountPoint
+      $script:DenyMethod = Block-DirectoryReadAccess -Path $script:MountPoint
+    }
+
+    # WHY here rather than AfterAll: each case gets a fresh mount point under its
+    #   own case root, and AfterAll's recursive delete cannot list a denied
+    #   directory, so a deny left in place would leak the whole tree.
+    AfterEach {
+      Unblock-DirectoryReadAccess -Path $script:MountPoint -Method $script:DenyMethod
     }
 
     It 'blocks as io-transient rather than reporting the classifier diagnosis' {
