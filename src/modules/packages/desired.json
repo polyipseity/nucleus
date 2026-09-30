@@ -261,6 +261,10 @@
         "why": "Logic analyzer CLI; absent from WinGet; provisioned via nucleus custom Scoop bucket."
       },
       {
+        "name": "whisper-cpp",
+        "why": "Local speech-to-text runtime (whisper-cli, whisper-stream); absent from WinGet; Scoop main bucket ships both binaries on x64/x86 but omits whisper-stream.exe on arm64."
+      },
+      {
         "name": "zig",
         "why": "Zig compiler toolchain; build-time dependency for source-built packages (Invoke-SourceBuild)."
       }
