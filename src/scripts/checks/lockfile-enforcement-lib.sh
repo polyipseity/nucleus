@@ -292,8 +292,11 @@ _lfe_check_whisper() {
     [ -z "$_file" ] && continue
     local _sri _want _got _path
     # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
+    # `type` guards rather than a bare .hash: a malformed entry whose value is a
+    # string would make jq raise on `.hash`, and the 2>/dev/null below would
+    # then hide the one entry the operator needs to see.
     # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
-    _sri="$(printf '%s' "$_lf" | "$_jq" -r --arg f "$_file" '(.whisper // {})[$f].hash // empty' 2>/dev/null)" || continue
+    _sri="$(printf '%s' "$_lf" | "$_jq" -r --arg f "$_file" '(.whisper // {})[$f] | if type == "object" then .hash // empty else empty end' 2>/dev/null)" || continue
     [ -z "$_sri" ] && continue
     # SRI is base64, sha256_of_file yields hex, so one side has to be decoded.
     # `base64 -d` is accepted by both FreeBSD base64 and GNU coreutils, and od
