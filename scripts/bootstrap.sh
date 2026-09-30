@@ -279,6 +279,24 @@ provision_pwsh_modules() {
   local _lockfile="$REPO_ROOT/src/lockfiles/lockfile.json"
   [ -f "$_lockfile" ] || return 0
 
+  # WHY the privilege command is resolved here and handed over as an argument:
+  #   bootstrap.sh never re-executes itself as root, so the pwsh child would run
+  #   unprivileged and PowerShellGet would refuse to remove a root-owned copy of
+  #   a pinned module. The helper splits that removal into an elevated child of
+  #   its own and keeps the install unprivileged, so all this call site has to do
+  #   is name the command to escalate through.
+  local _sudo
+  # WHY no warning when sudo is absent: a host with no copy to remove converges
+  #   without it, so a warning here would fire on every run of a host that has
+  #   nothing to converge. The helper raises the failure by name, naming the copy
+  #   and its owner, at the point where a removal is actually required.
+  # check-suppress:suppression_doc: an absent sudo is passed on rather than raised here, because the helper decides whether a removal is needed
+  if command -v sudo >/dev/null 2>&1; then
+    _sudo="$(command -v sudo)"
+  else
+    _sudo=''
+  fi
+
   local _modules
   _modules=$("$_pwsh" -NoProfile -Command "
     \$lf = Get-Content -Raw '$(cygpath -w "$_lockfile" 2>/dev/null || echo "$_lockfile")' | ConvertFrom-Json
@@ -288,7 +306,7 @@ provision_pwsh_modules() {
   while IFS='|' read -r _name _version; do
     [ -n "$_name" ] || continue
     "$SCRIPT_DIR/../src/scripts/packages/install-pwsh-module.sh" \
-      "$_pwsh" "$_name" "$_version"
+      "$_pwsh" "$_name" "$_version" "$_sudo"
   done <<<"$_modules"
 }
 

@@ -70,8 +70,30 @@ exit "${IPM_STUB_EXIT:-0}"
 STUB
 chmod +x "$TMP_DIR/pwsh-stub"
 
+# Stand-in for the privilege command the helper escalates through. It records
+# the argv the elevated child was handed, one element per line, so a case can
+# assert on what the removal was pointed at. With IPM_SUDO_EXEC=1 it runs that
+# child as the same user, which is what the cases driving real pwsh need; with
+# it unset it reports success without running anything, for the cases whose own
+# harness already stands in for the removal.
+cat >"$TMP_DIR/sudo-stub" <<'STUB'
+#!/usr/bin/env bash
+# check-suppress:suppression_doc: the log name is required, not optional
+: "${IPM_SUDO_LOG:?IPM_SUDO_LOG must name the log file}"
+printf '%s\n' "$@" >>"$IPM_SUDO_LOG"
+printf -- '---\n' >>"$IPM_SUDO_LOG"
+if [ "${IPM_SUDO_EXEC:-0}" = 1 ]; then
+  exec "$@"
+fi
+exit 0
+STUB
+chmod +x "$TMP_DIR/sudo-stub"
+
 export IPM_STUB_LOG="$TMP_DIR/recorded-program.ps1"
 export IPM_STUB_EXIT=0
+export IPM_SUDO_LOG="$TMP_DIR/recorded-sudo.log"
+export IPM_SUDO_STUB="$TMP_DIR/sudo-stub"
+export IPM_SUDO_EXEC=0
 
 # The copy the harness reports: a version at or above the pin, at a base path no
 # real module has, so an assertion on the message can only match if the program
@@ -101,15 +123,19 @@ PS_INSTALL="Install-Module -Name ${PS}moduleName"
 PS_LIST="Get-Module -ListAvailable -Name ${PS}moduleName"
 PS_LOADED_GUARD="if (Get-Module -Name ${PS}moduleName)"
 
-# run_installer MODULE VERSION: run the installer against the stand-in and
-# leave the recorded program in IPM_STUB_LOG. Sets RUN_STATUS to the installer's
-# exit status.
+# run_installer MODULE VERSION [PRIVILEGE]: run the installer against the
+# stand-in and leave the recorded program in IPM_STUB_LOG. PRIVILEGE defaults to
+# the privilege stub, and an empty value is passed through as the empty fourth
+# argument, which is what a caller with no sudo on PATH passes. Sets RUN_STATUS
+# to the installer's exit status.
 RUN_STATUS=0
 RUN_STUB_STDERR=''
 run_installer() {
+  local _privilege="${3-$IPM_SUDO_STUB}"
   : >"$IPM_STUB_LOG"
+  : >"$IPM_SUDO_LOG"
   RUN_STUB_STDERR=''
-  bash "$INSTALLER" "$TMP_DIR/pwsh-stub" "$1" "$2" 2>"$TMP_DIR/stub-err.txt" || RUN_STATUS=$?
+  bash "$INSTALLER" "$TMP_DIR/pwsh-stub" "$1" "$2" "$_privilege" 2>"$TMP_DIR/stub-err.txt" || RUN_STATUS=$?
   RUN_STUB_STDERR="$(cat "$TMP_DIR/stub-err.txt")"
 }
 
@@ -162,7 +188,9 @@ RUN_STDERR=''
 run_installer_real() {
   local module_root="$1"
   RUN_STATUS=0
-  HOME="$IPM_TEST_HOME" PSModulePath="$module_root" bash "$INSTALLER" "$(command -v pwsh)" "$2" "$3" \
+  : >"$IPM_SUDO_LOG"
+  IPM_SUDO_EXEC=1 HOME="$IPM_TEST_HOME" PSModulePath="$module_root" \
+    bash "$INSTALLER" "$(command -v pwsh)" "$2" "$3" "$IPM_SUDO_STUB" \
     >"$TMP_DIR/real-out.txt" 2>"$TMP_DIR/real-err.txt" || RUN_STATUS=$?
   RUN_STDOUT="$(cat "$TMP_DIR/real-out.txt")"
   RUN_STDERR="$(cat "$TMP_DIR/real-err.txt")"
@@ -208,7 +236,10 @@ function Get-Module {
   #   pipeline object, so the program's own @() around the call would collect a
   #   single element that happens to be an array, and every filter downstream
   #   would see one object whose properties enumerate to both copies.
-  if ($script:ipmListCalls -eq 1) { return @($shadow) }
+  if ($script:ipmListCalls -eq 1) {
+    if ($env:IPM_FAKE_PRE_INSTALL -eq 'pin-and-shadow') { return @($pin, $shadow) }
+    return @($shadow)
+  }
   if ($env:IPM_FAKE_POST_INSTALL -eq 'leftover') { return @($pin, $shadow) }
   if ($env:IPM_FAKE_POST_INSTALL -eq 'lower') { return @($pin, $lower) }
   return @($pin)
@@ -236,12 +267,13 @@ function Remove-Module {
 HARNESS
 }
 
-# run_shadowed_program MODULE VERSION POST_INSTALL_STATE: record the program the
-# installer hands pwsh, then run it through the harness. Sets RUN_STATUS,
-# RUN_STDOUT, RUN_STDERR and RUN_CALLS.
-RUN_CALLS=''
+# run_shadowed_program MODULE VERSION POST_INSTALL [PRE_INSTALL]: record the
+# program the installer hands pwsh, then run it through the harness. PRE_INSTALL
+# defaults to a listing of the shadowing copy alone; 'pin-and-shadow' reports the
+# converged pin beside it, which is the state where a removal has to run and the
+# pin must survive it. Sets RUN_STATUS, RUN_STDOUT, RUN_STDERR and RUN_CALLS.
 run_shadowed_program() {
-  run_installer "$1" "$2"
+  run_installer "$1" "$2" "${4-$IPM_SUDO_STUB}"
   cp "$IPM_STUB_LOG" "$TMP_DIR/recorded-for-harness.ps1"
   write_shadow_harness
   : >"$TMP_DIR/calls.log"
@@ -254,6 +286,7 @@ run_shadowed_program() {
     IPM_FAKE_USER_PATH="$IPM_FAKE_USER_PATH" \
     IPM_FAKE_LOWER_VERSION="$IPM_FAKE_LOWER_VERSION" \
     IPM_FAKE_LOWER_BASE="$IPM_FAKE_LOWER_BASE" \
+    IPM_FAKE_PRE_INSTALL="${4-shadow}" \
     IPM_FAKE_POST_INSTALL="$3" \
     IPM_CALL_LOG="$TMP_DIR/calls.log" \
     pwsh -NoProfile -File "$TMP_DIR/shadow-harness.ps1" \
@@ -597,5 +630,72 @@ test_post_install_check_throws_and_names_the_surviving_copy
 test_post_install_check_reads_the_state_left_by_the_install
 test_post_install_check_passes_when_only_the_pin_is_left
 test_post_install_check_passes_when_a_lower_copy_survives
+
+test_elevates_the_removal_and_keeps_the_install_unprivileged() {
+  run_installer Pester 6.2.0
+  if grep -qF "${PS}privilegeCommand ${PS}pwshBinary" "$IPM_STUB_LOG" &&
+    grep -qF "${PS}removalProgram" "$IPM_STUB_LOG" &&
+    grep -qF "Install-Module -Name ${PS}moduleName" "$IPM_STUB_LOG"; then
+    assert_pass "installer: elevates the removal through the privilege command and installs outside it"
+  else
+    assert_fail "installer: elevates the removal through the privilege command and installs outside it" "recorded program: $(cat "$IPM_STUB_LOG")"
+  fi
+}
+
+test_removal_is_narrowed_to_the_versions_that_shadow() {
+  run_installer Pester 6.2.0
+  if grep -qF "Uninstall-Module -Name ${PS}moduleName -RequiredVersion" "$IPM_STUB_LOG"; then
+    assert_pass "installer: the elevated removal targets one version at a time"
+  else
+    assert_fail "installer: the elevated removal targets one version at a time" "recorded program: $(cat "$IPM_STUB_LOG")"
+  fi
+  if grep -v '^[[:space:]]*#' "$IPM_STUB_LOG" | grep -qF -- '-AllVersions'; then
+    assert_fail "installer: the elevated removal never sweeps every version" "the recorded program still passes -AllVersions"
+  else
+    assert_pass "installer: the elevated removal never sweeps every version"
+  fi
+}
+
+test_elevated_removal_never_carries_the_converged_pin() {
+  run_installer Pester 6.2.0
+  if grep -qF "${PS}shadowVersions = @(${PS}shadowing" "$IPM_STUB_LOG"; then
+    assert_pass "installer: the versions handed to the removal come from the shadowing set"
+  else
+    assert_fail "installer: the versions handed to the removal come from the shadowing set" "recorded program: $(cat "$IPM_STUB_LOG")"
+  fi
+}
+
+test_requires_a_privilege_command_only_when_a_copy_shadows() {
+  run_installer Pester 6.2.0
+  if grep -qF "if (-not ${PS}privilegeCommand)" "$IPM_STUB_LOG" &&
+    grep -qF 'no privilege command was supplied' "$IPM_STUB_LOG"; then
+    assert_pass "installer: a shadowing copy with no privilege command fails by name"
+  else
+    assert_fail "installer: a shadowing copy with no privilege command fails by name" "recorded program: $(cat "$IPM_STUB_LOG")"
+  fi
+}
+
+test_missing_privilege_command_fails_when_a_copy_shadows_the_pin() {
+  run_shadowed_program ProbeMod 2.0.0 clean ''
+  if [ "$RUN_STATUS" -eq 0 ]; then
+    assert_fail "installer: a shadowing copy with no privilege command aborts the run" "exited 0; stdout=$RUN_STDOUT"
+    return
+  fi
+  # WHY no assertion on the message text: PowerShell renders a thrown error
+  # across wrapped, colour-coded lines, so any fixed phrase is a formatting
+  # detail to keep re-fixing. The text is pinned by the case above; what has
+  # to be proven here is that the run stops before the install.
+  if ! printf '%s' "$RUN_STDOUT" | grep -qF 'installing ProbeMod 2.0.0'; then
+    assert_pass "installer: a shadowing copy with no privilege command aborts before installing"
+  else
+    assert_fail "installer: a shadowing copy with no privilege command aborts before installing" "stdout=$RUN_STDOUT stderr=$RUN_STDERR"
+  fi
+}
+
+test_elevates_the_removal_and_keeps_the_install_unprivileged
+test_removal_is_narrowed_to_the_versions_that_shadow
+test_elevated_removal_never_carries_the_converged_pin
+test_requires_a_privilege_command_only_when_a_copy_shadows
+test_missing_privilege_command_fails_when_a_copy_shadows_the_pin
 
 finish_tests
