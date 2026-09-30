@@ -111,7 +111,7 @@ function Test-ManagedSshPrivateKey {
     New-Item -ItemType SymbolicLink -Path $probeLink -Target $PrivateKeyPath -ErrorAction Stop > $null
   }
   catch {
-    Remove-Item -LiteralPath $probeDir -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $probeDir -Recurse -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: staging already failed and the throw below reports it; a failed removal leaves an empty temp dir
     throw "verification: ERROR — could not stage managed SSH private key '$PrivateKeyPath' for probing: $($_.Exception.Message)"
   }
 
@@ -161,7 +161,7 @@ function Test-ManagedSshPrivateKey {
   }
   finally {
     # The temp directory holds only the symlink, never key material.
-    Remove-Item -LiteralPath $probeDir -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $probeDir -Recurse -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: the probe dir holds only a symlink, never key material; a failed removal leaks an empty temp dir
   }
 }
 
