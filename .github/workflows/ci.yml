@@ -59,8 +59,8 @@ jobs:
       # the job dies during provisioning. GITHUB_TOKEN is always available here
       # and needs read access only, so a read-only fork token is enough.
       NIX_CONFIG: |
-        experimental-features = nix-command flakes
         access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+        experimental-features = nix-command flakes
       # Verbose mode: set to 'true' for full step output, or a comma-separated
       # list of step IDs (e.g. 'nix-flake-eval') for targeted debugging.
       # Default: quiet (headers + summaries only).
