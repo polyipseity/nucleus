@@ -86,9 +86,16 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         # leave a copy behind for the next one to trip over.
         $script:copies = @()
         $script:removedDirectories = @()
+        $script:grantedPaths = @()
+        $script:removedModules = @()
         $script:installCalls = @()
 
         Mock Get-Module { return $script:copies }
+        # WHY mocked: the real helper would take ownership of whatever path it is
+        # given. The CI bootstrap step exercises it for real; here it only has to
+        # record that the sweep asked for it, and where.
+        Mock Enable-ModuleTreeRemoval { $script:grantedPaths += $Path }
+        Mock Remove-Module { $script:removedModules += $Name }
         Mock Install-Module { $script:installCalls += $RequiredVersion }
         # Records instead of deleting, so a case can assert WHICH directories the
         # sweep reached. The delete itself is covered by the orphan case below,
@@ -160,6 +167,49 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         $script:installCalls | Should -Be @('6.2.0')
         # Nothing was installed before this run, so there is nothing to sweep.
         @($script:removedDirectories) | Should -BeNullOrEmpty
+    }
+
+    It 'grants delete access before removing a copy outside the per-user path' {
+        $imageCopy = Get-ModuleCopy -Version '3.4.0' -Scope 'MachineModules'
+        Initialize-ModuleDirectory -ModuleBase $imageCopy.ModuleBase
+        $script:copies = @($imageCopy)
+
+        Invoke-PowerShellModuleSetup
+
+        # The CI runner's copy of Pester 3.4.0 is TrustedInstaller-owned under
+        # Program Files, and a plain Remove-Item on it is denied even elevated.
+        $script:grantedPaths | Should -Contain $imageCopy.ModuleBase
+        $script:removedDirectories | Should -Contain $imageCopy.ModuleBase
+    }
+
+    It 'leaves the per-user pin alone and grants it nothing' {
+        $pin = Get-ModuleCopy -Version '6.2.0' -Scope 'CurrentUserModules'
+        Initialize-ModuleDirectory -ModuleBase $pin.ModuleBase
+        $script:copies = @($pin)
+
+        Invoke-PowerShellModuleSetup
+
+        # Taking ownership of a tree this repository installed itself would be a
+        # permission change with nothing behind it.
+        @($script:grantedPaths) | Should -BeNullOrEmpty
+        @($script:removedDirectories) | Should -BeNullOrEmpty
+        @($script:installCalls) | Should -BeNullOrEmpty
+    }
+
+    It 'unloads a loaded copy before deleting it' {
+        $imageCopy = Get-ModuleCopy -Version '3.4.0' -Scope 'MachineModules'
+        Initialize-ModuleDirectory -ModuleBase $imageCopy.ModuleBase
+        $script:copies = @($imageCopy)
+
+        Invoke-PowerShellModuleSetup
+
+        # WHY the assertion is weaker than it looks: the Get-Module mock answers
+        # every call, so it reports a loaded module whenever any copy is listed.
+        # In production the unload is attempted for a loaded copy and skipped for
+        # an unloaded one, and either way the removal is what the next assertion
+        # actually proves.
+        $script:removedModules | Should -Contain 'Pester'
+        $script:removedDirectories | Should -Contain $imageCopy.ModuleBase
     }
 
     It 'deletes the directory rather than only recording it' {

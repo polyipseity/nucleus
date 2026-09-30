@@ -22,8 +22,9 @@ function Invoke-PowerShellModuleSetup {
         here for Windows parity)
 
     Requires PowerShellGet to be available (built into PowerShell 5.1+ and
-    pwsh 7+). Modules are installed at CurrentUser scope so no admin rights
-    are needed.
+    pwsh 7+). Modules are installed at CurrentUser scope, but removing a copy
+    that the image or another admin installed does need elevation, because that
+    copy can be owned by TrustedInstaller.
 
   .EXAMPLE
     Invoke-PowerShellModuleSetup
@@ -103,14 +104,31 @@ function Invoke-PowerShellModuleSetup {
     if ($sweepTargets.Count -gt 0) {
       Write-NucleusInfo -CommandName 'Invoke-PowerShellModuleSetup' "removing $($sweepTargets.Count) conflicting version(s) of $moduleName..."
 
+      # WHY unload first: a copy already loaded into this session keeps its files
+      # open, and the delete below then fails on a locked file. The macOS
+      # bootstrap log shows the same module reported as in use, where the removal
+      # was skipped and a stale copy survived beside the pin.
+      if (Get-Module -Name $moduleName) {
+        Remove-Module -Name $moduleName -Force
+      }
+
       foreach ($copy in $sweepTargets) {
-        # WHY the skip: a copy Uninstall-Module already took on an earlier run is
-        # registered in Get-Module but gone from disk, so its absence is the
-        # converged state rather than a failure. Anything still there is removed
-        # below, and a removal that fails throws rather than leaving a copy behind.
+        # WHY the skip: a copy an earlier run already took is still listed by
+        # Get-Module but gone from disk, so its absence is the converged state
+        # rather than a failure. Anything still there is removed below, and a
+        # removal that fails throws rather than leaving a copy behind.
         if (-not (Test-Path $copy.ModuleBase)) {
           continue
         }
+
+        # WHY ownership only outside the per-user path: a copy there is ours, so
+        # it is already removable. A copy anywhere else came from the image or
+        # from another admin and may be owned by TrustedInstaller, which is what
+        # made Remove-Item fail on the CI runner image.
+        if ($copy.ModuleBase -notlike "$currentUserModulePath*") {
+          Enable-ModuleTreeRemoval -Path $copy.ModuleBase
+        }
+
         Remove-Item -Path $copy.ModuleBase -Recurse -Force -ErrorAction Stop
         Write-NucleusInfo -CommandName 'Invoke-PowerShellModuleSetup' "removed $moduleName directory at $($copy.ModuleBase)"
       }
@@ -126,5 +144,59 @@ function Invoke-PowerShellModuleSetup {
 
     Write-NucleusInfo -CommandName 'Invoke-PowerShellModuleSetup' "installing $moduleName version $requiredVersion..."
     Install-Module -Name $moduleName -RequiredVersion $requiredVersion -Force -Scope CurrentUser -AllowClobber -ErrorAction Stop
+  }
+}
+
+
+function Enable-ModuleTreeRemoval {
+  <#
+  .SYNOPSIS
+    Makes a module tree this process is about to delete actually deletable.
+
+  .DESCRIPTION
+    A module copy found outside the per-user module path was put there by the OS
+    image or by another administrator, and may be owned by TrustedInstaller.
+    Remove-Item then fails with "Access to the path ... is denied" even for an
+    elevated administrator. Taking ownership and granting this account full
+    control over the tree is what makes the removal possible at all.
+
+    Only call this for a tree this repository is removing on purpose. Granting
+    full control is a real permission change, not a cleanup step.
+
+  .PARAMETER Path
+    The module directory to make removable.
+
+  .EXAMPLE
+    Enable-ModuleTreeRemoval -Path 'C:\Program Files\WindowsPowerShell\Modules\Pester\3.4.0'
+
+  .NOTES
+    Requires elevation, which the Windows bootstrap already runs under.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [string]$Path
+  )
+
+  # WHY this principal: it is the account doing the delete, and it is the value
+  #   the delete-protection helper in this repository already uses.
+  $principal = "$env:USERDOMAIN\$env:USERNAME"
+
+  # WHY /A: hand ownership to the Administrators group, which an elevated
+  #   activation belongs to, rather than to the interactive user, which may be
+  #   a different account on a shared host.
+  $takeownResult = (& takeown.exe /F $Path /A /R /D Y 2>&1) | Out-String
+  if ($LASTEXITCODE -ne 0) {
+    Write-NucleusError -CommandName 'Invoke-PowerShellModuleSetup' "could not take ownership of $Path : $takeownResult"
+    throw
+  }
+
+  # WHY (OI)(CI) and /T: a module is consumed through the files inside its
+  #   directory, so a grant on the directory entry alone would still leave the
+  #   contents undeletable.
+  $grantResult = (& icacls $Path /grant "${principal}:(OI)(CI)F" /T 2>&1) | Out-String
+  if ($LASTEXITCODE -ne 0) {
+    Write-NucleusError -CommandName 'Invoke-PowerShellModuleSetup' "could not grant delete access to $Path : $grantResult"
+    throw
   }
 }
