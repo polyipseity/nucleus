@@ -7,9 +7,11 @@ function Invoke-PowerShellModuleSetup {
     Reads the `psgallery` section of lockfile.json and installs each listed
     module at the pinned version. A pin is either a version string or a
     {version, hash} object; only the version is used here. Every discovered copy
-    of a listed module is removed first, whatever its version or scope, so a
-    stale copy cannot shadow the pin. The pin is then installed under CurrentUser
-    unless a copy at that version is already there.
+    of a listed module at or above the pin is removed first, whatever its scope,
+    so no copy can shadow the pin. A copy below the pin is left where it is:
+    PowerShell loads the highest version available, so such a copy is inert. The
+    pin is then installed under CurrentUser unless a copy at that version is
+    already there.
 
     This is additive-only: modules present but not in the lockfile are left
     untouched (no zap/uninstall). PowerShell modules are shared state with
@@ -72,15 +74,14 @@ function Invoke-PowerShellModuleSetup {
       continue
     }
 
-    # Remove every copy that is present, not just the first.
+    # Remove every copy that is not converged and can still shadow the pin.
     # WHY the whole set: Get-Module -ListAvailable returns one entry per version
-    # AND per scope, and a runner image carrying Pester 5.9.0 beside 3.4.0 leaves
-    # the second copy in the module path. Removing one entry leaves the other
-    # exactly where it was, where it shadows the pin and makes the Install-Module
-    # below warn that 3.4.0 is unsupported.
+    # AND per scope, and a host carrying two copies at or above the pin leaves
+    # the second one in the module path. Removing one entry leaves the other
+    # exactly where it was, where it still shadows the pin.
     # WHY the sweep runs before anything is skipped: the old short-circuit sat
     # ahead of this block, so a host that already had the pin never removed the
-    # stale copy beside it, and a stale copy shadows the pin in the module path.
+    # copy beside it that could shadow it.
     $existing = @(Get-Module -ListAvailable -Name $moduleName)
     $converged = @($existing | Where-Object {
         $_.Version -eq [Version]$requiredVersion -and
@@ -88,18 +89,28 @@ function Invoke-PowerShellModuleSetup {
       })
     # WHY the directories and not Uninstall-Module: -AllVersions works from the
     # PSGallery package store, where the name is one package, so it cannot spare
-    # the converged copy and would take it along with the stale ones. Removing
-    # each copy by its own path is the only selective form available, and it also
-    # covers a runner-image copy that has no package record to uninstall through.
+    # the converged copy and would take it along with the rest. Removing each copy
+    # by its own path is the only selective form available, and it also covers a
+    # copy that has no package record to uninstall through.
     # WHY the converged copy is spared: it is the pin, in the scope this module
     # installs to, so removing it would force a PSGallery round trip on every run
-    # to put back what was already right. Every other copy goes, including a
-    # machine-scope copy of the pinned version, which is not the scope this module
-    # owns and can shadow the pin it is.
+    # to put back what was already right. The version floor below still takes out
+    # a machine-scope copy of the pinned version, which is not the scope this
+    # module owns and outranks the pin in the module path.
+    # WHY at or above the pin rather than merely different from it: PowerShell
+    # loads the highest version available, so a copy below the pin is inert and
+    # cannot shadow it, and this repository has no reason to delete a module the
+    # Windows image ships. That is the Pester 3.4.0 the GitHub runner image
+    # carries under Program Files beside a 6.2.0 pin, and trying to delete it is
+    # what turned that runner red before any check or test step ran.
+    # WHY a copy exactly at the pin stays a target: PowerShell breaks a version
+    # tie by path order, so a copy of the pin at a scope this module does not own
+    # outranks the per-user one.
     # WHY derived from $converged rather than testing the same predicate twice:
-    #   the two lists have to partition $existing exactly, and a second copy of the
-    #   rule is the one way they could stop doing that.
-    $sweepTargets = @($existing | Where-Object { $converged -notcontains $_ })
+    #   both lists come from the same listing, so the converged copy is guaranteed
+    #   to be spared, and a second copy of the rule is the one way that could stop
+    #   holding.
+    $sweepTargets = @($existing | Where-Object { $_.Version -ge [Version]$requiredVersion -and $converged -notcontains $_ })
 
     if ($sweepTargets.Count -gt 0) {
       Write-NucleusInfo -CommandName 'Invoke-PowerShellModuleSetup' "removing $($sweepTargets.Count) conflicting version(s) of $moduleName..."

@@ -2,13 +2,15 @@
 .SYNOPSIS
     Pester coverage for Invoke-PowerShellModuleSetup PSGallery convergence.
 .DESCRIPTION
-    The module removes every discovered copy of a pinned module and reinstalls the
-    pin at CurrentUser scope. Two copies used to be a real failure: the old code
-    took only the first Get-Module -ListAvailable result, so on a runner image
-    carrying Pester 5.9.0 beside 3.4.0 the second copy survived and Install-Module
-    warned that it was unsupported. The suite drives the real module against a
-    temp fixture repo root with Get-Module, Uninstall-Module, Install-Module and
-    Remove-Item mocked, so no module is touched and no network call happens.
+    The module removes every discovered copy of a pinned module that is at or
+    above the pin and reinstalls the pin at CurrentUser scope. Two copies used to
+    be a real failure: the old code took only the first Get-Module -ListAvailable
+    result, so the second copy survived and Install-Module warned that it was
+    unsupported. A copy below the pin is left alone, because PowerShell loads the
+    highest version available and such a copy is inert. The suite drives the real
+    module against a temp fixture repo root with Get-Module, Uninstall-Module,
+    Install-Module and Remove-Item mocked, so no module is touched and no network
+    call happens.
 .NOTES
     Environment variables: (none)
     Exit codes: 0 on success; 1 on failure
@@ -110,35 +112,59 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         }
     }
 
-    It 'removes every copy and installs the pin when two versions are present' {
-        $newer = Get-ModuleCopy -Version '5.9.0' -Scope 'MachineModules'
-        $stale = Get-ModuleCopy -Version '3.4.0' -Scope 'MachineModules'
+    It 'removes every copy above the pin and installs the pin when two versions are present' {
+        $newer = Get-ModuleCopy -Version '7.0.0' -Scope 'MachineModules'
+        $older = Get-ModuleCopy -Version '6.5.0' -Scope 'MachineModules'
         Initialize-ModuleDirectory -ModuleBase $newer.ModuleBase
-        Initialize-ModuleDirectory -ModuleBase $stale.ModuleBase
-        $script:copies = @($newer, $stale)
+        Initialize-ModuleDirectory -ModuleBase $older.ModuleBase
+        $script:copies = @($newer, $older)
 
         Invoke-PowerShellModuleSetup
 
         # Both directories, not just the first. The old code removed one, so the
-        # stale copy survived and the install below warned about it.
+        # second copy survived and the install below warned about it.
         $script:removedDirectories | Should -Contain $newer.ModuleBase
-        $script:removedDirectories | Should -Contain $stale.ModuleBase
+        $script:removedDirectories | Should -Contain $older.ModuleBase
         @($script:removedDirectories).Count | Should -Be 2
         $script:installCalls | Should -Contain '6.2.0'
     }
 
-    It 'removes the stale copy and keeps the converged pin when the pinned version is already present' {
+    It 'leaves a copy below the pin on disk while still sweeping one above it' {
+        $higher = Get-ModuleCopy -Version '7.0.0' -Scope 'MachineModules'
+        $lower = Get-ModuleCopy -Version '3.4.0' -Scope 'MachineModules'
+        Initialize-ModuleDirectory -ModuleBase $higher.ModuleBase
+        Initialize-ModuleDirectory -ModuleBase $lower.ModuleBase
+        $script:copies = @($higher, $lower)
+
+        Invoke-PowerShellModuleSetup
+
+        # The version floor: PowerShell loads the highest version available, so a
+        # copy under the pin cannot shadow it and stays where the image put it.
+        # This is the Pester 3.4.0 the runner image ships beside a 6.2.0 pin, and
+        # deleting it is what turned that runner red.
+        @($script:removedDirectories) | Should -Not -Contain $lower.ModuleBase
+        Test-Path -LiteralPath $lower.ModuleBase | Should -BeTrue
+        # A copy this module does not sweep is a copy it must not take ownership
+        # of either.
+        @($script:grantedPaths) | Should -Not -Contain $lower.ModuleBase
+        # The floor spares only what is below the pin: the copy above it still goes.
+        $script:removedDirectories | Should -Contain $higher.ModuleBase
+        @($script:removedDirectories).Count | Should -Be 1
+        $script:installCalls | Should -Contain '6.2.0'
+    }
+
+    It 'removes the copy above the pin and keeps the converged pin when the pinned version is already present' {
         $pin = Get-ModuleCopy -Version '6.2.0' -Scope 'CurrentUserModules'
-        $stale = Get-ModuleCopy -Version '3.4.0' -Scope 'MachineModules'
+        $higher = Get-ModuleCopy -Version '6.5.0' -Scope 'MachineModules'
         Initialize-ModuleDirectory -ModuleBase $pin.ModuleBase
-        Initialize-ModuleDirectory -ModuleBase $stale.ModuleBase
-        $script:copies = @($pin, $stale)
+        Initialize-ModuleDirectory -ModuleBase $higher.ModuleBase
+        $script:copies = @($pin, $higher)
 
         Invoke-PowerShellModuleSetup
 
         # The case the old early `continue` skipped: the pin was satisfied, so it
-        # returned before removing anything and the stale copy stayed.
-        $script:removedDirectories | Should -Contain $stale.ModuleBase
+        # returned before removing anything and the shadowing copy stayed.
+        $script:removedDirectories | Should -Contain $higher.ModuleBase
         @($script:removedDirectories).Count | Should -Be 1
         # The pin is already where this module installs, so taking it away would
         # buy a PSGallery round trip per run and no change.
@@ -170,14 +196,16 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
     }
 
     It 'grants delete access before removing a copy outside the per-user path' {
-        $imageCopy = Get-ModuleCopy -Version '3.4.0' -Scope 'MachineModules'
+        $imageCopy = Get-ModuleCopy -Version '6.2.0' -Scope 'MachineModules'
         Initialize-ModuleDirectory -ModuleBase $imageCopy.ModuleBase
         $script:copies = @($imageCopy)
 
         Invoke-PowerShellModuleSetup
 
-        # The CI runner's copy of Pester 3.4.0 is TrustedInstaller-owned under
-        # Program Files, and a plain Remove-Item on it is denied even elevated.
+        # A machine-scope copy at the pin version is a target, because PowerShell
+        # breaks a version tie by path order. Such a copy under Program Files can
+        # be TrustedInstaller-owned, and a plain Remove-Item on it is denied even
+        # elevated.
         $script:grantedPaths | Should -Contain $imageCopy.ModuleBase
         $script:removedDirectories | Should -Contain $imageCopy.ModuleBase
     }
@@ -197,7 +225,7 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
     }
 
     It 'unloads a loaded copy before deleting it' {
-        $imageCopy = Get-ModuleCopy -Version '3.4.0' -Scope 'MachineModules'
+        $imageCopy = Get-ModuleCopy -Version '6.5.0' -Scope 'MachineModules'
         Initialize-ModuleDirectory -ModuleBase $imageCopy.ModuleBase
         $script:copies = @($imageCopy)
 
@@ -216,7 +244,7 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         # A recorded Remove-Item is not a removal. This is the guard on the mock
         # above: without a case that finds the directory gone, every other case
         # would pass whether or not the sweep touched the disk.
-        $orphan = Get-ModuleCopy -Version '3.4.0' -Scope 'MachineModules'
+        $orphan = Get-ModuleCopy -Version '6.5.0' -Scope 'MachineModules'
         Initialize-ModuleDirectory -ModuleBase $orphan.ModuleBase
         $script:copies = @($orphan)
 
