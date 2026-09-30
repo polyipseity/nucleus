@@ -42,7 +42,7 @@ for _fwm_entry in "${_fwm_entries[@]}"; do
   _fwm_source="${_fwm_entry#*	}"
 
   if [ ! -f "$_fwm_source" ]; then
-    die -l whisper "model source missing at $_fwm_source — the fetchurl derivation was not realised"
+    die -l whisper "model source missing at $_fwm_source: the fetchurl derivation was not realised"
   fi
 
   _fwm_target="$_fwm_model_dir/$_fwm_file"
