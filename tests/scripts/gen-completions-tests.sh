@@ -20,6 +20,7 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 cd "$REPO_ROOT"
 
 require_command pwsh "gen-completions: PowerShell generator (profile.ps1 completer inventory)"
+require_command zsh "gen-completions: zsh parses the generated completions"
 
 _gen_script="src/scripts/completions/gen-completions.sh"
 _COMPLETIONS_DIR="src/modules/completions/zsh"
@@ -70,7 +71,7 @@ if [ "$_coverage_ok" -eq 1 ]; then
   assert_pass "gen-completions: all ${#_NUCLEUS_COMMANDS[@]} commands have zsh completion files"
 fi
 
-# 5. Generated headers on every host; zsh syntax wherever a zsh parser exists.
+# 5. Generated headers and zsh syntax on every host.
 _gen_ok=1
 for _zsh_f in "$_COMPLETIONS_DIR"/_nucleus "$_COMPLETIONS_DIR"/_nucleus-*; do
   [ -f "$_zsh_f" ] || continue
@@ -79,24 +80,14 @@ for _zsh_f in "$_COMPLETIONS_DIR"/_nucleus "$_COMPLETIONS_DIR"/_nucleus-*; do
     assert_fail "gen-completions: generated header" "$_name lacks GENERATED header"
     _gen_ok=0
   fi
-  if command -v zsh >/dev/null 2>&1; then
-    # check-suppress:suppression_doc: zsh -n stderr is not needed; the exit code decides the assertion.
-    if ! zsh -n "$_zsh_f" 2>/dev/null; then
-      assert_fail "gen-completions: zsh -n" "$_name syntax error"
-      _gen_ok=0
-    fi
+  # check-suppress:suppression_doc: zsh -n stderr is not needed; the exit code decides the assertion.
+  if ! zsh -n "$_zsh_f" 2>/dev/null; then
+    assert_fail "gen-completions: zsh -n" "$_name syntax error"
+    _gen_ok=0
   fi
 done
 if [ "$_gen_ok" -eq 1 ]; then
-  if command -v zsh >/dev/null 2>&1; then
-    assert_pass "gen-completions: all generated files have headers and pass zsh -n"
-  else
-    # WHY: zsh -n needs the zsh parser, which nucleus does not install before
-    #   apply (CI bootstraps with --no-apply). The headers are still asserted
-    #   above; naming the missing half keeps the gap visible without reporting a
-    #   check that never ran.
-    assert_pass "gen-completions: all generated files have GENERATED headers (zsh -n not run: no zsh parser on this host)"
-  fi
+  assert_pass "gen-completions: all generated files have headers and pass zsh -n"
 fi
 
 # 6. update lockfile dynamic value completion via --list-sections.
@@ -240,12 +231,6 @@ NUCLEUS_REPO_ROOT="$_fx_repo" bash "$_gen_script" >/dev/null 2>&1 || _fx_gen_rc=
 _fx_file="$_fx_repo/src/modules/completions/zsh/_nucleus-utils"
 if [ "$_fx_gen_rc" -ne 0 ]; then
   assert_fail "gen-completions: metacharacters in a subcommand description" "generator exited $_fx_gen_rc against the stub repo root"
-elif ! command -v zsh >/dev/null 2>&1; then
-  # WHY: both assertions below decode the generated file with the zsh parser, so
-  #   this host cannot check the metacharacter round-trip at all. The generator
-  #   still ran and its exit status is asserted above; naming the missing half
-  #   keeps the gap visible without reporting a check that never ran.
-  assert_pass "gen-completions: metacharacter round-trip not checkable here (no zsh parser); generator exit status asserted above"
 else
   # check-suppress:suppression_doc: zsh -n stderr is not needed; the exit code decides the assertion.
   if zsh -n "$_fx_file" 2>/dev/null; then

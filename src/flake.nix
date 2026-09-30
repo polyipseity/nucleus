@@ -726,6 +726,11 @@
               pkgs.findutils
               pkgs.git
               pkgs.powershell
+              # WHY: srt-pi-wrapper-tests.sh parses the extracted zsh wrappers and
+              # gen-completions-tests.sh runs `zsh -n` on the generated completions.
+              # The Ubuntu runner image ships no zsh, so both suites need one from
+              # the store.
+              pkgs.zsh
               # WHY: android-config-tests creates a test APK with zip; not a system
               # utility on Ubuntu (only macOS ships it via Xcode CLT).
               pkgs.zip
