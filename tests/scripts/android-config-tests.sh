@@ -22,7 +22,7 @@ export NUCLEUS_ANDROID_CONFIG_DIR
 . "$REPO_ROOT/src/scripts/vms/android-config.sh"
 
 export NUCLEUS_VM_ANDROID_REBOOT_SETTLE_SECONDS=0
-export NUCLEUS_VM_ANDROID_POLL_INTERVAL=0.1
+export NUCLEUS_VM_ANDROID_POLL_INTERVAL=1
 export NUCLEUS_VM_ANDROID_SIDLELOAD_PROBE_TIMEOUT=1
 
 _reported=''
@@ -403,17 +403,29 @@ EOF
   PATH="$_af_bin:$PATH"
   export PATH
 
+  # WHY the flag: the product's output went to a file only this case can read,
+  # and a failure that is not the exit status alone (no flash, no prompt) had
+  # nothing to show. Collect the verdict of the three assertions and print the
+  # captured output once at the end, on failure only.
+  _af_gufr_failed=0
   if ! vm_android_config Android 0 --gapps >"$_tmp/out.txt" 2>&1; then
     echo "FAIL: --gapps should proceed when recovery ADB is unauthorized"
     TESTS_FAILED=$((TESTS_FAILED + 1))
+    _af_gufr_failed=1
   fi
   if [ ! -f "$_af_flash_log" ]; then
     echo "FAIL: expected fastboot flash recovery when unauthorized"
     TESTS_FAILED=$((TESTS_FAILED + 1))
+    _af_gufr_failed=1
   fi
   if ! grep -q 'Enable ADB' "$_tmp/out.txt"; then
     echo "FAIL: expected Enable ADB guidance after fastboot flash"
     TESTS_FAILED=$((TESTS_FAILED + 1))
+    _af_gufr_failed=1
+  fi
+  if [ "$_af_gufr_failed" -ne 0 ]; then
+    echo "FAIL: vm_android_config --gapps output for the three assertions above:"
+    sed 's/^/  /' "$_tmp/out.txt"
   fi
 }
 

@@ -2099,11 +2099,28 @@ vm_android_fastboot_list_state() {
 
 # vm_android_wait_tick TIMEOUT ELAPSED DEFAULT_POLL
 #   Sleep min(poll, timeout - elapsed); echo new elapsed.
+#   TIMEOUT, ELAPSED, DEFAULT_POLL and NUCLEUS_VM_ANDROID_POLL_INTERVAL are
+#   integer seconds. A poll interval of 0 or less never advances, so only
+#   positive integers are accepted.
+# WHY no fractional poll: elapsed is accumulated with shell arithmetic and
+# $((0 + 0.1)) is a syntax error, so accepting a fraction would abort the wait
+# loop instead of polling. The comparison below is `[ -lt ]`, which reports a
+# fraction as a failed test and then sleeps out the whole timeout with no
+# message, so a bad value is named and rejected instead.
 vm_android_wait_tick() {
   _awt_timeout="$1"
   _awt_elapsed="$2"
   _awt_default_poll="$3"
   _awt_poll="${NUCLEUS_VM_ANDROID_POLL_INTERVAL:-$_awt_default_poll}"
+  _awt_poll_bad=''
+  case "$_awt_poll" in
+  '' | *[!0-9]*) _awt_poll_bad=1 ;;
+  *) [ "$_awt_poll" -ge 1 ] || _awt_poll_bad=1 ;;
+  esac
+  if [ -n "$_awt_poll_bad" ]; then
+    error "NUCLEUS_VM_ANDROID_POLL_INTERVAL must be a positive integer number of seconds: $_awt_poll"
+    return 1
+  fi
   _awt_remain=$((_awt_timeout - _awt_elapsed))
   if [ "$_awt_remain" -le 0 ]; then
     printf '%s' "$_awt_elapsed"
