@@ -90,7 +90,11 @@ function Sync-WhisperModel {
         Write-NucleusInfo -CommandName 'whisper' "$modelName already matches the pin; skipping download"
         continue
       }
-      Write-NucleusInfo -CommandName 'whisper' "$modelName does not match the pin ($deployedSri); re-downloading"
+      # Both digests, wanted first, matching the wording of the POSIX
+      # `_lfe_check_whisper` probe. Reporting only the deployed one leaves the
+      # operator to re-hash the lockfile by hand to tell a truncated file from a
+      # stale pin.
+      Write-NucleusInfo -CommandName 'whisper' "$modelName does not match the pin (expected $expectedSri, found $deployedSri); re-downloading"
     }
 
     if (-not (Test-Path -LiteralPath $modelDir -PathType Container)) {
