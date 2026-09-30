@@ -306,7 +306,7 @@ function Sync-HermesConfig {
   # WHY @() around the probe: a cmdlet matching nothing yields $null, so a later
   #   @() wrap would invert this comparison without failing loudly. The cache
   #   directory is itself absent on a fresh host, which -ErrorAction covers.
-  $chromiumInstalled = @(Get-ChildItem -Path (Join-Path -Path $playwrightCacheDir -ChildPath 'chromium-*') -Directory -ErrorAction SilentlyContinue)
+  $chromiumInstalled = @(Get-ChildItem -Path (Join-Path -Path $playwrightCacheDir -ChildPath 'chromium-*') -Directory -ErrorAction SilentlyContinue) # check-suppress:suppression_doc: the cache directory is absent on a fresh host, and an absent path is the answer this probe asks for
 
   if ($chromiumInstalled.Count -eq 0) {
     # Chromium not installed - attempt to install via bun.
@@ -343,7 +343,7 @@ function Sync-HermesConfig {
   # default location, so a failed install has to leave the variable alone. The
   # probe is repeated rather than trusting the install's exit code, because the
   # install is the one step here that can fail quietly.
-  $chromiumPresent = @(Get-ChildItem -Path (Join-Path -Path $playwrightCacheDir -ChildPath 'chromium-*') -Directory -ErrorAction SilentlyContinue).Count -gt 0
+  $chromiumPresent = @(Get-ChildItem -Path (Join-Path -Path $playwrightCacheDir -ChildPath 'chromium-*') -Directory -ErrorAction SilentlyContinue).Count -gt 0 # check-suppress:suppression_doc: repeats the probe above, so it takes the same absent-path answer rather than raising
   if (-not $chromiumPresent) {
     Write-NucleusWarning "[$label] no Playwright Chromium found - leaving PLAYWRIGHT_BROWSERS_PATH unchanged"
   } else {
