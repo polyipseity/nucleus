@@ -4,14 +4,19 @@
 # Positional arguments:
 #   $1  — space-separated "target->name" pairs (symlink farm entries)
 #   $2  — path to verbose log (default: systemLogDir/symlink-farm.log)
+#   $FARM_DIR  — farm directory override, default /usr/local/bin.  Tests point
+#                this at a temp dir; production never sets it.
 #
 # For each pair, create the symlink if it doesn't match.
-# Remove any symlink in /usr/local/bin/ that points to a Nix store path
+# Remove any symlink in the farm that points to a Nix store path
 # but is NOT in the current farm (GC).
 #
 # Safety:
-#   - Only operates on symlinks (-L), never touches regular files.
-#   - Only GCs symlinks pointing to /nix/store/* (ignores non-Nix symlinks).
+#   - The GC sweep only removes symlinks (-L) pointing to /nix/store/*, so it
+#     ignores regular files and non-Nix symlinks.
+#   - The create loop does replace whatever occupies a managed link name,
+#     including a regular file, because a stale file there would block the
+#     symlink.  Only names this farm manages are affected.
 #   - Marker file (.nucleus-symlink-farm) is skipped during farm GC sweeps.
 set -eu
 
@@ -19,7 +24,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../../../scripts/lib/lib.sh
 . "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
 
-FARM_DIR="/usr/local/bin"
+FARM_DIR="${FARM_DIR:-/usr/local/bin}"
 FARM_MARKER=".nucleus-symlink-farm"
 
 # Log file location.
@@ -43,7 +48,8 @@ _log() {
 # Parse current farm entries into an indexed array.
 IFS=' ' read -r -a entries <<<"$1"
 
-_created=0
+_active=0
+_broken=0
 for entry in "${entries[@]}"; do
   target="${entry%%->*}"
   link_name="${entry##*->}"
@@ -52,14 +58,23 @@ for entry in "${entries[@]}"; do
   if [ -L "$link_path" ]; then
     current_target="$(readlink "$link_path")"
     if [ "$current_target" = "$target" ]; then
-      continue # already correct
+      # The link text matches, but the store path behind it may be gone after a
+      # GC.  A link whose target does not resolve is reported, not counted as
+      # active: a dangling shim is a mapping bug, not a converged farm.
+      if [ -e "$link_path" ]; then
+        _active=$((_active + 1))
+      else
+        _broken=$((_broken + 1))
+        warn -l symlink-farm "$link_name → $target does not exist; the mapping in apple-sdk-tools.nix points at a missing store path"
+      fi
+      continue
     fi
   fi
 
   /bin/rm -f "$link_path"
   /bin/ln -s "$target" "$link_path"
   _log "$link_name → $target"
-  _created=$((_created + 1))
+  _active=$((_active + 1))
 done
 
 # GC: remove /nix/store symlinks not in the active farm
@@ -87,4 +102,4 @@ for link_path in "$FARM_DIR"/*; do
   fi
 done
 
-say -l symlink-farm "$_created active symlinks, $_gc_count GC'd (log: $LOG_FILE)"
+say -l symlink-farm "$_active active symlinks, $_gc_count GC'd, $_broken dangling (log: $LOG_FILE)"
