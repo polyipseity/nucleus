@@ -15,6 +15,16 @@
 - WhatsApp has no Linux client. Use WhatsApp Web in the browser; the NixOS `apps.json` entry is intentionally `omitted`.
 - Harness bridge (desktop reminders, remote approvals, and remote prompts for Cursor, VS Code Copilot Chat, opencode, and pi): it needs the Hermes gateway, which the MacBook enables by default, so set `services.hermes-agent.gateway.enable = true` for this host before anything can arrive remotely; the `harness-bridge` plugin is enabled by `nucleus-apply`. Provision a channel once — seal `TELEGRAM_BOT_TOKEN`, or `NTFY_TOPIC` with `NTFY_TOKEN`, or `DISCORD_BOT_TOKEN`, in your SOPS file — list it in `src/users/<user>/env-secrets.json` with `consumers: ["hermes-agent"]`, turn that platform on in the gateway config (`platforms.<name>.enabled`), and re-run `nucleus-apply`. Check the gateway with `systemctl --user status hermes-agent`. Notifications go to every channel in `nucleus-config get harness-notify.channels`; narrow that key (for example `nucleus-config set harness-notify.channels '["ntfy"]'`) to mute the rest, or run `nucleus-config set harness-notify.enable false` to stop the whole bridge on this machine. Remote approvals are opt-in and off by default, so every tool call is answered locally until you run `nucleus-config set harness-approval.enable true`; remote prompts need no opt-in (`harness-drive.enable` is on), and turning it off keeps the finished-turn notification while queued prompts are dropped. Reply `/harness approve <id>` or `/harness deny <id>` to answer a pending tool call, `/harness sessions` to list what is pending, and `/harness send <harness> <text>` to inject a prompt into a waiting session. An unanswered request asks locally instead, after `nucleus-config get harness-approval.timeout-seconds` (default 120 s), so the `timeout` on each hook in `~/.agents/hooks/harness-notify.json` and `~/.cursor/hooks.json` must stay larger. Every decision is appended to `~/.local/share/nucleus/logs/harness-bridge.log`. All four harnesses can be driven remotely here; Cursor ignores remote prompts on Windows only.
 
+## speech to text
+
+- `whisper-cpp` 1.9.2 transcribes audio locally. `whisper-cli` reads a file, `whisper-stream` reads the microphone live. There is no nucleus wrapper: run the upstream binaries directly.
+- The model `ggml-base.en.bin` is deployed by `nucleus-apply` to `~/.local/share/nucleus/models/ggml-base.en.bin`. Nothing to download by hand, and a model whose digest has drifted is re-fetched on the next apply.
+- Transcribe a file: `whisper-cli -m ~/.local/share/nucleus/models/ggml-base.en.bin -f <audio-file>`.
+- Transcribe live: `whisper-stream -m ~/.local/share/nucleus/models/ggml-base.en.bin`. The default rolling window is the mode to use interactively.
+- For discrete, parseable segments rather than a rolling window, add `--step 0`.
+- `whisper-stream` is an SDL2 app, so a window opens while it runs; close the window to stop.
+- PipeWire captures the microphone. Check what it sees with `pw-cli list-sources`; a missing source there is a PipeWire problem, not a whisper.cpp one.
+
 ## command shortcuts
 
 - `-g`, `-ga`, `-gb`, `-gc`, `-gca`, `-gcl`, `-gco`, `-gd`, `-gf`, `-gff`, `-gl`, `-gp`, `-gpl`, `-gplf`, `-gs`, `-gst`, `-gsw` — git commands
