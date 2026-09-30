@@ -1,3 +1,8 @@
+# Test-ScoopShim lives in lib/ because it is a generic Scoop predicate, not part
+# of this step's convergence flow. It resolves shim paths through
+# Get-NucleusScoopShimsDir, which apply.ps1 has already loaded.
+. (Join-Path -Path $PSScriptRoot -ChildPath '..\lib\Test-ScoopShim.ps1')
+
 function Invoke-ScoopSetup {
   <#
   .SYNOPSIS
@@ -28,6 +33,9 @@ function Invoke-ScoopSetup {
                          absent from WinGet; Scoop extras bucket.
       - sigrok-cli     — logic analyzer CLI; absent from WinGet; provisioned
                          via nucleus custom Scoop bucket (NSIS installer).
+      - whisper-cpp    — local speech-to-text runtime (whisper-cli for files,
+                         whisper-stream for live microphone input); absent
+                         from WinGet; Scoop main bucket.
       - zig            — Zig compiler toolchain; build-time dependency for
                          source-built packages (Invoke-SourceBuild).
 
@@ -196,8 +204,7 @@ function Invoke-ScoopSetup {
       Write-NucleusError -CommandName 'scoop' "'scoop install $installSpec' failed (exit $LASTEXITCODE)"
       return
     }
-    if (-not (Test-Path (Join-Path (Get-NucleusScoopShimsDir) "$pkgName.cmd")) -and
-        -not (Test-Path (Join-Path (Get-NucleusScoopShimsDir) "$pkgName.exe"))) {
+    if (-not (Test-ScoopShim -PackageName $pkgName)) {
       Write-NucleusError -CommandName 'scoop' "'$pkgName' installed but no shim found under '$(Get-NucleusScoopShimsDir)'"
       return
     }
