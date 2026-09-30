@@ -599,6 +599,44 @@ Test-OnlySteps-LastValueWin
 Test-OnlySteps-UnknownIdError
 Test-FailFastReport-ReplaysFailedStep
 
+function Test-SaveFileListCache-NoPathBeyondSymlink {
+    . $stepRunner
+    $script:HAS_ARGS = $false
+    $script:positionalArgs = @()
+    # WHY the warning is the assertion, not the cache contents: Select-GitIgnored
+    # drops a pathspec it cannot evaluate before returning, so the cache never
+    # holds one either way. What differs is whether the walk handed it any, and
+    # it says so by warning.
+    $records = @(Save-FileListCache 3>&1)
+    $beyond = @($records | Where-Object {
+            $_ -is [System.Management.Automation.WarningRecord] -and
+            $_.Message -like '*Select-GitIgnored*symlink*'
+        })
+    if ($beyond.Count -eq 0) {
+        Assert-Pass "Save-FileListCache feeds git no path beyond a symlink"
+    }
+    else {
+        Assert-Fail "Save-FileListCache feeds git no path beyond a symlink" $beyond[0].Message
+    }
+    # WHY this second half: a fix that stopped the walk at the link would also
+    # clear the warning while quietly dropping the files the link points at, so
+    # the real locations have to still be in the cache.
+    $cached = @($script:CachedYamlFiles)
+    $twins = @('config.yaml', 'plugin.yaml')
+    $missed = @($twins | Where-Object {
+            $leaf = $_
+            -not ($cached | Where-Object { (Split-Path -Leaf $_) -eq $leaf -and $_ -notlike '*user-registry*' })
+        })
+    if ($missed.Count -eq 0) {
+        Assert-Pass "Save-FileListCache still holds the files the fixture link points at"
+    }
+    else {
+        Assert-Fail "Save-FileListCache still holds the files the fixture link points at" "missing: $($missed -join ', ')"
+    }
+}
+
+Test-SaveFileListCache-NoPathBeyondSymlink
+
 Write-Output "`n--- Step-runner PS1 unit tests: $($script:passCount) passed, $($script:failCount) failed ---"
 Write-Output ""
 

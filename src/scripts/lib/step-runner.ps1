@@ -473,7 +473,15 @@ function Read-Argument {
 # --- File caching ---
 function Save-FileListCache {
   $script:CachedNixFiles = Get-ChildItem -Recurse -Filter '*.nix' | Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object Name | Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#B7 -- structural invariant; gitignore filter applied on top
-  $script:CachedYamlFiles = Get-ChildItem -Recurse -Include '*.yml', '*.yaml' | Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object Name | Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#B7 -- structural invariant; gitignore filter applied on top
+  # WHY two -Filter calls rather than -Include: -Include makes -Recurse follow
+  # directory symlinks, so the walk descends the tests/fixtures/user-registry
+  # link into src/users/default and yields every file there a second time under
+  # a pathspec git check-ignore rejects as beyond a symbolic link. -Filter does
+  # not follow them, which is why the three lines around this one already use
+  # it. Each dropped path duplicated a file the list already held at its real
+  # path, so nothing was scanned less. The bash twin reaches the same result
+  # through find, which does not follow symlinks by default.
+  $script:CachedYamlFiles = @((Get-ChildItem -Recurse -Filter '*.yml') + (Get-ChildItem -Recurse -Filter '*.yaml')) | Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object Name | Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#B7 -- structural invariant; gitignore filter applied on top
   $script:CachedJsonFiles = Get-ChildItem -Path 'src' -Recurse -Filter '*.json' | Where-Object { $_.Name -notmatch '\.schema\.json$' -and $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object Name | Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#A7,#B7 -- schema files are meta; vendor is structural invariant; gitignore filter applied on top
   $script:CachedShellFiles = Get-ChildItem -Path 'src/scripts' -Recurse -Filter '*.sh' | Sort-Object Name | Select-GitIgnored
 }
