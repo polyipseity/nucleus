@@ -14,7 +14,9 @@ let
   allTools = {
     # ── Language runtimes ──
     python3 = "${pkgs.python3}/bin/python3";
-    pip3 = "${pkgs.python3}/bin/pip3";
+    # The /usr/bin/pip3 shim exists on macOS, but nixpkgs python3 3.14 ships no
+    # pip3 binary, so there is nothing to point it at.
+    pip3 = null;
 
     # ── Compilers & toolchain ──
     cc = "${pkgs.llvmPackages.clang}/bin/clang";
@@ -25,7 +27,9 @@ let
     "clang++" = "${pkgs.llvmPackages.clang}/bin/clang++";
     gcc = "${pkgs.gcc}/bin/gcc";
     "g++" = "${pkgs.gcc}/bin/g++";
-    cpp = "${pkgs.llvmPackages.clang}/bin/clang-cpp";
+    # The /usr/bin/cpp shim exists, but the clang wrapper provides `cpp`, not
+    # `clang-cpp`; nothing under that name resolves.
+    cpp = null;
     ld = "${pkgs.llvmPackages.lld}/bin/ld.lld";
 
     # ── Version control ──
