@@ -7,10 +7,13 @@
     be a real failure: the old code took only the first Get-Module -ListAvailable
     result, so the second copy survived and Install-Module warned that it was
     unsupported. A copy below the pin is left alone, because PowerShell loads the
-    highest version available and such a copy is inert. The suite drives the real
-    module against a temp fixture repo root with Get-Module, Uninstall-Module,
-    Install-Module and Remove-Item mocked, so no module is touched and no network
-    call happens.
+    highest version available and such a copy is inert. A copy that cannot be
+    removed is recorded against that copy and thrown once at the end, so the
+    remaining copies are still swept and the pin is still installed. The suite
+    drives the real module against a temp fixture repo root with Get-Module,
+    Uninstall-Module, Install-Module, Remove-Item, Enable-ModuleTreeRemoval and
+    Clear-ModuleTreeReadOnlyAttribute mocked, so no module is touched, no
+    ownership or attribute change runs, and no network call happens.
 .NOTES
     Environment variables: (none)
     Exit codes: 0 on success; 1 on failure
@@ -89,20 +92,30 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         $script:copies = @()
         $script:removedDirectories = @()
         $script:grantedPaths = @()
+        $script:clearedReadOnlyPaths = @()
         $script:removedModules = @()
         $script:installCalls = @()
+        $script:undeletablePaths = @()
+        # WHY the one shared ordered log: the read-only clearing and the delete
+        # are separate mocked calls, and a case cannot prove which came first
+        # from two unordered lists.
+        $script:operationLog = @()
 
         Mock Get-Module { return $script:copies }
         # WHY mocked: the real helper would take ownership of whatever path it is
         # given. The CI bootstrap step exercises it for real; here it only has to
         # record that the sweep asked for it, and where.
-        Mock Enable-ModuleTreeRemoval { $script:grantedPaths += $Path }
+        Mock Enable-ModuleTreeRemoval { $script:grantedPaths += $Path; $script:operationLog += "grant:$Path" }
+        # WHY mocked for the same reason: the real helper shells out to attrib,
+        # and a case only needs to know that the sweep asked for it, and where.
+        Mock Clear-ModuleTreeReadOnlyAttribute { $script:clearedReadOnlyPaths += $Path; $script:operationLog += "clear-readonly:$Path" }
         Mock Remove-Module { $script:removedModules += $Name }
         Mock Install-Module { $script:installCalls += $RequiredVersion }
         # Records instead of deleting, so a case can assert WHICH directories the
         # sweep reached. The delete itself is covered by the orphan case below,
         # which lets this through for one run.
         Mock Remove-Item {
+            $script:operationLog += "remove:$Path"
             $script:removedDirectories += $Path
             # WHY the API call: the cmdlet is mocked, so a case asserting the
             # directory is gone would otherwise pass or fail on the mock rather
@@ -252,5 +265,98 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
 
         $script:removedDirectories | Should -Contain $orphan.ModuleBase
         Test-Path -LiteralPath $orphan.ModuleBase | Should -BeFalse
+    }
+
+    It 'keeps sweeping the other copies when one copy cannot be removed' {
+        $stubborn = Get-ModuleCopy -Version '6.5.0' -Scope 'MachineModules'
+        $newer = Get-ModuleCopy -Version '7.0.0' -Scope 'MachineModules'
+        $older = Get-ModuleCopy -Version '6.3.0' -Scope 'MachineModules'
+        foreach ($copy in @($stubborn, $newer, $older)) {
+            Initialize-ModuleDirectory -ModuleBase $copy.ModuleBase
+        }
+        $script:copies = @($newer, $stubborn, $older)
+        # The runner image shape: one copy is denied, and the copies behind it in
+        # the listing still have to go. The old code stopped at the first failure.
+        # WHY script scope and not a closure variable: a mock body is evaluated
+        # outside the It scope, so the path has to reach it through $script.
+        $script:undeletablePaths = @($stubborn.ModuleBase)
+        Mock Remove-Item {
+            throw "Access to the path '$Path\Pester.bat' is denied."
+        } -ParameterFilter { $script:undeletablePaths -contains $Path }
+
+        { Invoke-PowerShellModuleSetup } | Should -Throw
+
+        $script:removedDirectories | Should -Not -Contain $stubborn.ModuleBase
+        Test-Path -LiteralPath $stubborn.ModuleBase | Should -BeTrue
+        $script:removedDirectories | Should -Contain $newer.ModuleBase
+        $script:removedDirectories | Should -Contain $older.ModuleBase
+        Test-Path -LiteralPath $newer.ModuleBase | Should -BeFalse
+    }
+
+    It 'still installs the pin when a copy could not be removed' {
+        $stubborn = Get-ModuleCopy -Version '6.5.0' -Scope 'MachineModules'
+        Initialize-ModuleDirectory -ModuleBase $stubborn.ModuleBase
+        $script:copies = @($stubborn)
+        $script:undeletablePaths = @($stubborn.ModuleBase)
+        Mock Remove-Item {
+            throw "Access to the path '$Path' is denied."
+        } -ParameterFilter { $script:undeletablePaths -contains $Path }
+
+        { Invoke-PowerShellModuleSetup } | Should -Throw
+
+        # The pin is the point of the module, so one undeletable image copy must
+        # not cost the host its pin as well. The failure is still raised, after
+        # the install rather than instead of it.
+        $script:installCalls | Should -Contain '6.2.0'
+    }
+
+    It 'reports every copy that could not be removed in one failure' {
+        $first = Get-ModuleCopy -Version '6.5.0' -Scope 'MachineModules'
+        $second = Get-ModuleCopy -Version '7.0.0' -Scope 'MachineModules'
+        $removable = Get-ModuleCopy -Version '6.3.0' -Scope 'MachineModules'
+        foreach ($copy in @($first, $second, $removable)) {
+            Initialize-ModuleDirectory -ModuleBase $copy.ModuleBase
+        }
+        $script:copies = @($first, $second, $removable)
+        $script:undeletablePaths = @($first.ModuleBase, $second.ModuleBase)
+        Mock Remove-Item {
+            throw "Access to the path '$Path' is denied."
+        } -ParameterFilter { $script:undeletablePaths -contains $Path }
+
+        $failure = { Invoke-PowerShellModuleSetup } | Should -Throw -PassThru
+
+        # Every failed copy is named with its version and its path, so the one
+        # throw is the whole report rather than the first copy the loop hit.
+        $failure.Exception.Message | Should -BeLike '*Pester 6.5.0 at *'
+        $failure.Exception.Message | Should -BeLike '*Pester 7.0.0 at *'
+        $failure.Exception.Message | Should -BeLike "*$($first.ModuleBase)*"
+        $failure.Exception.Message | Should -BeLike "*$($second.ModuleBase)*"
+        # The copy that could be removed still was.
+        $script:removedDirectories | Should -Contain $removable.ModuleBase
+    }
+
+    It 'clears the read-only attribute before the delete and only outside the per-user path' {
+        $imageCopy = Get-ModuleCopy -Version '6.5.0' -Scope 'MachineModules'
+        $userCopy = Get-ModuleCopy -Version '7.0.0' -Scope 'CurrentUserModules'
+        Initialize-ModuleDirectory -ModuleBase $imageCopy.ModuleBase
+        Initialize-ModuleDirectory -ModuleBase $userCopy.ModuleBase
+        $script:copies = @($imageCopy, $userCopy)
+
+        Invoke-PowerShellModuleSetup
+
+        # A read-only file inside an image tree is denied exactly the way a
+        # permission problem is, so the attribute has to be cleared before the
+        # delete rather than diagnosed after it failed.
+        $clearIndex = [array]::IndexOf($script:operationLog, "clear-readonly:$($imageCopy.ModuleBase)")
+        $removeIndex = [array]::IndexOf($script:operationLog, "remove:$($imageCopy.ModuleBase)")
+        $clearIndex | Should -BeGreaterThan -1
+        $removeIndex | Should -BeGreaterThan -1
+        $clearIndex | Should -BeLessThan $removeIndex
+        $script:clearedReadOnlyPaths | Should -Contain $imageCopy.ModuleBase
+        # The per-user copy is ours, so its attributes are not rewritten even
+        # though it is above the pin and therefore a sweep target.
+        @($script:clearedReadOnlyPaths) | Should -Not -Contain $userCopy.ModuleBase
+        @($script:grantedPaths) | Should -Not -Contain $userCopy.ModuleBase
+        $script:removedDirectories | Should -Contain $userCopy.ModuleBase
     }
 }
