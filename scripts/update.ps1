@@ -154,8 +154,10 @@ function Invoke-LockfileBump {
   . (Join-Path $repoRoot 'src/platforms/Windows/modules/lib/PsGalleryPin.ps1')
 
   # Canonical section list, shared by --list-sections and by token validation so
-  # the two can never drift out of sync.
-  $validSectionsCsv = 'bun,cargo,cargo-binstall,cursor,pi,psgallery,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows'
+  # the two can never drift out of sync. whisper is listed but not updatable: a
+  # model pin is a (revision, hash) pair that has to be chosen together, so no
+  # tool can recompute one from the other.
+  $validSectionsCsv = 'bun,cargo,cargo-binstall,cursor,pi,psgallery,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,whisper,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows'
 
   # --list-sections: print the canonical section names and exit 0 (no lockfile
   # read required, matching the bash twin's early-exit behavior).
@@ -200,7 +202,7 @@ function Invoke-LockfileBump {
   # Explicitly-selected sections without an updater are kept manual; warn so the
   # run does not silently skip them (mirrors the bash twin's no-updater warning).
   foreach ($tok in $sectionTokens) {
-    if (",source-builds,cursor,vscode,suggestions.homebrew.masApps,suggestions.opencode,suggestions.vm-setup.windows,version," -match ",$tok,") {
+    if (",source-builds,cursor,vscode,whisper,suggestions.homebrew.masApps,suggestions.opencode,suggestions.vm-setup.windows,version," -match ",$tok,") {
       Write-NucleusWarning "section '$tok' has no updater — kept manual"
     }
   }
