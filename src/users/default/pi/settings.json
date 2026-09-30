@@ -1,5 +1,10 @@
 {
   "$schema": "./settings.schema.json",
+  "compaction": {
+    "enabled": true,
+    "keepRecentTokens": 32768,
+    "reserveTokens": 32768
+  },
   "defaultModel": "mimo-v2.5",
   "defaultProjectTrust": "ask",
   "defaultProvider": "opencode-go",
