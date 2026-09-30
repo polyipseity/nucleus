@@ -804,7 +804,7 @@ do_start() {
   Darwin)
     case "$vm_type" in
     macOS)
-      require_command tart "brew install cirruslabs/cli/tart"
+      require_command tart "brew install openai/tools/tart"
       local tart_softnet_expose
       tart_softnet_expose="$(jq -r --arg id "$vm_id" '[.VMs[] | select(.id == $id) | .portForwards[] | "\(.hostPort):\(.guestPort)"] | join(",")' "$MANIFEST")"
       exec tart run --net-softnet --net-softnet-allow=0.0.0.0/0 --net-softnet-expose "$tart_softnet_expose" "$vm_id"

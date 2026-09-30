@@ -12,7 +12,7 @@
 #     .
 #
 # Prerequisites:
-#   - tart CLI installed (brew install cirruslabs/cli/tart)
+#   - tart CLI installed (brew install openai/tools/tart)
 #   - packer installed (pkgs.packer in managedPackages)
 #   - Apple Silicon Mac (Tart requires Virtualization.framework)
 #

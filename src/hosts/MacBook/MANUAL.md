@@ -63,7 +63,7 @@
 - `nucleus-cloud reset` — reset local replica state
 - `nucleus-update` — update repository
 - `nucleus-vm setup` — build and provision VMs from `src/modules/vms/VMs.json`
-  - **macOS guest** (tart): automatic on Apple Silicon. Requires `brew install cirruslabs/cli/tart`. Start with `tart run MacBook [--no-graphics]`.
+  - **macOS guest** (tart): automatic on Apple Silicon. Requires `brew install openai/tools/tart`. Start with `tart run MacBook [--no-graphics]`.
   - **NixOS guest**: automatic; `nixos-generators` builds QCOW2.
   - **Windows 11 guest**: ISO auto-downloaded (Mido on POSIX, Fido on Windows); pass `--windows-iso /path/to/Win11.iso` to skip.
   - **Android guest** (LineageOS): UTM preferences and guest audio workarounds are repo-managed. Workflow, flags, and UTM freeze recovery: `.agents/instructions/vm-management.instructions.md` (android-config, Android UTM freeze). Run `nucleus-vm android-config Android` without flags for step-by-step instructions.
