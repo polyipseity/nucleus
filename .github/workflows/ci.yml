@@ -58,6 +58,14 @@ jobs:
       # a new revision, so an unauthenticated fetch intermittently gets a 429 and
       # the job dies during provisioning. GITHUB_TOKEN is always available here
       # and needs read access only, so a read-only fork token is enough.
+      #
+      # That token covers the api.github.com leg only. The fetch then redirects
+      # to codeload.github.com, and neither curl nor Nix forwards Authorization
+      # across a cross-host redirect, so the archive arrives unauthenticated and
+      # is throttled per IP. The 429 still in the log comes from that second
+      # request, cannot be configured away, and costs each job about a minute of
+      # retry. Caching the fetcher cache would skip the download, but that is 452
+      # MB of upload per lockfile change, a poor trade for a minute.
       NIX_CONFIG: |
         access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
         experimental-features = nix-command flakes
@@ -77,6 +85,10 @@ jobs:
         with:
           determinate: false
 
+      # The FlakeHub 401 and the failure annotation it raises are expected on
+      # every run. No FlakeHub account is registered, by choice; the action falls
+      # back to the GHA cache, so the job stays green. Accepted deliberately, and
+      # not a broken cache.
       - name: Cache Nix store (POSIX)
         if: runner.os != 'Windows'
         uses: DeterminateSystems/magic-nix-cache-action@908b263ff629f4cc17666315b7fd3ec127c6244d  # v14 # zizmor: ignore[cache-poisoning] intentional Nix store cache on trusted CI runners
