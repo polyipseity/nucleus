@@ -331,6 +331,36 @@
       },
       "description": "WinGet package identifiers and versions. Package ID → version string. Lockfile is the sole version authority — only `nucleus-update lockfile` may change WinGet versions.",
       "type": "object"
+    },
+    "whisper": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "hash": {
+            "description": "SHA256 of the model file in SRI form (sha256-<base64>).",
+            "pattern": "^sha256-[A-Za-z0-9+/]{43}=$",
+            "type": "string"
+          },
+          "revision": {
+            "description": "Upstream repository commit the url resolves to. A HuggingFace `main` ref is mutable, so the revision is what makes the download reproducible.",
+            "pattern": "^[0-9a-f]{40}$",
+            "type": "string"
+          },
+          "url": {
+            "description": "Download URL. Must embed the revision, otherwise the pinned hash rejects every update that changes the file.",
+            "pattern": "^https://",
+            "type": "string"
+          }
+        },
+        "required": [
+          "hash",
+          "revision",
+          "url"
+        ],
+        "type": "object"
+      },
+      "description": "whisper.cpp ggml model weights. Model file name → {url, revision, hash}. No package manager ships these; the lockfile is the only pin authority.",
+      "type": "object"
     }
   },
   "required": [
@@ -345,7 +375,8 @@
     "uv",
     "version",
     "vm-setup",
-    "winget"
+    "winget",
+    "whisper"
   ],
   "title": "nucleus lockfile",
   "type": "object"

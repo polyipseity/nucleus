@@ -16,6 +16,10 @@ $script:NucleusRepoRoot = (Resolve-Path (Join-Path -Path $PSScriptRoot -ChildPat
 # Resolve-NucleusFlakePin the revision expected by a "flake:<node>" pin.
 . (Join-Path -Path $script:NucleusRepoRoot -ChildPath 'src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1')
 . (Join-Path -Path $script:NucleusRepoRoot -ChildPath 'src\platforms\Windows\modules\lib\Resolve-NucleusFlakePin.ps1')
+# Get-NucleusSriHash is the single SRI-form SHA256 implementation in the repo;
+# the whisper probe compares against the lockfile in SRI, so it must not
+# re-derive the encoding locally.
+. (Join-Path -Path $script:NucleusRepoRoot -ChildPath 'src\platforms\Windows\modules\lib\PsGalleryPin.ps1')
 
 function Invoke-LockfileEnforcement {
   [CmdletBinding()]
@@ -259,6 +263,36 @@ function Invoke-LockfileEnforcement {
         else {
           & $InfoFn "superpowers.$expectedRev`: checkout present at $pluginDir"
         }
+      }
+    }
+  }
+
+  # --- whisper ggml model weights ---
+  # No package manager ships these, so every version probe above is blind to a
+  # drifted model.  Sync-WhisperModel.ps1 deploys them under the nucleus user
+  # root from the revision-pinned URL, and this probe re-hashes the deployed
+  # file against the lockfile SRI: a truncated download, a failed write or a
+  # manual replacement is invisible until whisper-cli silently misbehaves.
+  if ($Lockfile.ContainsKey('whisper')) {
+    $modelDir = Join-Path (Get-NucleusUserRoot) 'models'
+    foreach ($modelName in @($Lockfile.whisper.Keys)) {
+      $pin = $Lockfile.whisper.$modelName
+      $expectedSri = $pin.hash
+      if ([string]::IsNullOrWhiteSpace($expectedSri)) {
+        & $ErrorFn "whisper.$modelName`: lockfile entry has no hash"; $errors++
+        continue
+      }
+      $modelPath = Join-Path -Path $modelDir -ChildPath $modelName
+      if (-not (Test-Path -LiteralPath $modelPath -PathType Leaf)) {
+        & $ErrorFn "whisper.$modelName`: not deployed at $modelPath"; $errors++
+        continue
+      }
+      $actualSri = Get-NucleusSriHash -Path $modelPath
+      if ($actualSri -ne $expectedSri) {
+        & $ErrorFn "whisper.$modelName`: expected $expectedSri, found $actualSri"; $errors++
+      }
+      else {
+        & $InfoFn "whisper.$modelName`: present ($expectedSri)"
       }
     }
   }

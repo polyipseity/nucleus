@@ -49,6 +49,7 @@
     "iwck": "3.10",
     "qemu": "9.0.0",
     "sigrok-cli": "0.7.2",
+    "whisper-cpp": "1.9.4",
     "zig": "0.16.0"
   },
   "source-builds": {
@@ -337,5 +338,12 @@
     "waterlan.dos2unix": "7.5.6",
     "WinFsp.WinFsp": "2.1.25156",
     "Zoom.Zoom": "7.0.38856"
+  },
+  "whisper": {
+    "ggml-base.en.bin": {
+      "hash": "sha256-oDd5yG3zMjB19eeWyyzlAp8A7Ihp7uP9+4l6/jbG0AI=",
+      "revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base.en.bin"
+    }
   }
 }

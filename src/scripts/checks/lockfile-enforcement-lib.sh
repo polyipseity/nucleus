@@ -271,6 +271,55 @@ EOF
   return $_rc
 }
 
+# Verify each pinned whisper model is deployed under the nucleus user root and
+# still hashes to the pinned value.
+#
+# WHY the lockfile is the only authority for these: no package manager ships the
+# ggml weights, so every other probe is blind to a drifted model. POSIX deploys
+# them from a pkgs.fetchurl output, which enforces the hash in the store, but the
+# deployed copy under <nucleusUserRoot>/models is an ordinary file that a
+# truncated download, a failed disk write or a manual replacement can corrupt,
+# and that copy is the one whisper-cli actually opens.
+_lfe_check_whisper() {
+  local _lf="$1" _jq="$2"
+  if [ -z "${NUCLEUS_USER_ROOT:-}" ]; then
+    error "NUCLEUS_USER_ROOT is unset; cannot verify the whisper model (source src/scripts/lib/lib.sh first)"
+    return 1
+  fi
+  local _files _rc=0
+  _files="$(printf '%s' "$_lf" | "$_jq" -r '(.whisper // {}) | keys[]' 2>/dev/null)" || return 0
+  while IFS= read -r _file; do
+    [ -z "$_file" ] && continue
+    local _sri _want _got _path
+    # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
+    # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
+    _sri="$(printf '%s' "$_lf" | "$_jq" -r --arg f "$_file" '(.whisper // {})[$f].hash // empty' 2>/dev/null)" || continue
+    [ -z "$_sri" ] && continue
+    # SRI is base64, sha256_of_file yields hex, so one side has to be decoded.
+    # `base64 -d` is accepted by both FreeBSD base64 and GNU coreutils, and od
+    # is in the base system on both hosts. -v is load-bearing: without it od
+    # replaces a run of identical bytes with `*`, which would silently truncate
+    # the hash of an all-zero file instead of reporting a mismatch.
+    _want="$(printf '%s' "${_sri#sha256-}" | base64 -d | od -An -v -tx1 | tr -d ' \n')"
+    _path="$NUCLEUS_USER_ROOT/models/$_file"
+    if [ ! -f "$_path" ]; then
+      error "whisper.$_file: not deployed at $_path"
+      _rc=1
+      continue
+    fi
+    _got="$(sha256_of_file "$_path")"
+    if [ "$_got" != "$_want" ]; then
+      error "whisper.$_file: expected sha256:$_want, found $_got"
+      _rc=1
+    else
+      say -l whisper "$_file present (sha256:$_want)"
+    fi
+  done <<EOF
+$_files
+EOF
+  return $_rc
+}
+
 # Always warn that each `suggestions` sub-section is non-authoritative
 # (warn-only per the invariant).  Never errors.
 _lfe_warn_suggestions() {
@@ -442,6 +491,7 @@ _lfe_run_core() {
   _lfe_check_rustup "$_lf_data" "$_jq" || _failures=$((_failures + 1))
   _lfe_check_psgallery "$_lf_data" "$_jq" || _failures=$((_failures + 1))
   _lfe_check_superpowers "$_lf_data" "$_jq" || _failures=$((_failures + 1))
+  _lfe_check_whisper "$_lf_data" "$_jq" || _failures=$((_failures + 1))
 
   _lfe_check_opencode "$_lf_data" "$_jq"
   _lfe_check_vscode "$_lf_data" "$_jq"

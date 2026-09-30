@@ -23,6 +23,7 @@ The consolidated lockfile at `src/lockfiles/lockfile.json` pins tool and package
 | `ollama` | `string → string` | Ollama model → digest hash |
 | `pi` | `string → string` | Pi coding agent extension → version |
 | `psgallery` | `string → string`; hash pins `{version, hash}` | PowerShell module → version (PSGallery) |
+| `whisper` | `object; {url, revision, hash}` | whisper.cpp ggml model file → revision + SRI hash |
 
 Homebrew has no native lockfile — pins live under `homebrew`; activation runs `brew bundle --force` from nix-darwin's Brewfile.
 
@@ -36,9 +37,17 @@ PSGallery has no release-age delay feature, so the mitigation is the version pin
 
 The `psgallery` probe (`_lfe_check_psgallery`) verifies the installed module version only. The installed artifact is the extracted module directory, not the nupkg, so `hash` is not verifiable against an installation; it pins the artifact the declarative module path fetches.
 
+### `whisper` pins
+
+`whisper` is a pinned root for a data file rather than a program: no package manager ships the whisper.cpp ggml weights (the Scoop manifest says so in its own `notes`), so the lockfile is the only pin. Entries are always the object form, because a bare version string cannot express a content hash.
+
+`revision` is the upstream commit the `url` resolves to, and the `url` must embed it. A HuggingFace `main` ref is mutable, so without the revision the same URL yields different bytes and the pinned hash rejects every legitimate update. Upgrading a model is a two-step change: pick the new revision, re-derive `hash` with `nix store prefetch-file`, and update both fields together.
+
+Both probes re-hash the deployed copy under `<nucleus USER root>/models` and compare against `hash`: `_lfe_check_whisper` on POSIX (which decodes the SRI to hex with `base64 -d | od -An -v -tx1`, the `-v` being load-bearing — without it `od` collapses a run of identical bytes to `*` and a hash of all zeros would silently compare as a prefix), and the `whisper` block in `Invoke-LockfileEnforcement` on Windows (which compares SRI directly via `Get-NucleusSriHash`). Hashing the deployed copy rather than trusting the fetch is deliberate: on Windows nothing else verifies a 141 MB download, and on POSIX the store path is verified at build time while the copy `whisper-cli` actually opens is an ordinary file.
+
 ## Two-tier model
 
-- **Pinned root** — authoritative. Enforcement lib (`lockfile-enforcement-lib.*`) compares installed versions against pins, reports drift. Pinned: `bun`, `cargo-binstall`, `cursor` (editor plugins, filesystem-based enforcement including `superpowers` via a pinned checkout), `pi`, `psgallery`, `rustup`, `scoop`, `source-builds`, `uv`, `version`, `vm-setup`, `winget`. Probes are scoped to the current host's declared packages in `src/modules/packages/desired.json`, so a Windows-only package is never reported as drift on macOS.
+- **Pinned root** — authoritative. Enforcement lib (`lockfile-enforcement-lib.*`) compares installed versions against pins, reports drift. Pinned: `bun`, `cargo-binstall`, `cursor` (editor plugins, filesystem-based enforcement including `superpowers` via a pinned checkout), `pi`, `psgallery`, `rustup`, `scoop`, `source-builds`, `uv`, `version`, `vm-setup`, `whisper`, `winget`. Probes are scoped to the current host's declared packages in `src/modules/packages/desired.json`, so a Windows-only package is never reported as drift on macOS. `whisper` is the one pinned root with no corresponding registry entry: it pins a data file, and its probe is keyed on the lockfile section alone.
 - **`suggestions`** — warn-only, never enforced, never causes check failure. Sub-sections: `cursor`, `homebrew` (masApps only), `ollama`, `opencode`, `vscode`, `vm-setup.windows`.
 
 ## Invariant
@@ -57,7 +66,7 @@ Removed: `suggestions.nixpkgs`, `suggestions.homebrew.brews`/`casks`. Retained: 
 
 ## Canonical classification
 
-- **Root (pinned):** `bun`, `uv`, `cargo-binstall`, `rustup`, `psgallery`, `scoop`, `winget`, `vm-setup`, `source-builds`/`version`, `pi`, `cursor` (editor plugins — filesystem-based enforcement including `superpowers` via a pinned checkout).
+- **Root (pinned):** `bun`, `uv`, `cargo-binstall`, `rustup`, `psgallery`, `scoop`, `whisper`, `winget`, `vm-setup`, `source-builds`/`version`, `pi`, `cursor` (editor plugins — filesystem-based enforcement including `superpowers` via a pinned checkout).
 - **`suggestions` (warn-only):** `cursor` (editor extensions), `homebrew.masApps`, `ollama`, `opencode`, `vscode`, `vm-setup.windows`.
 
 ## Shared probe library
