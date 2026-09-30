@@ -36,7 +36,7 @@
       "additionalProperties": {
         "$ref": "#/definitions/versionOrHash"
       },
-      "description": "Bun-installed global package versions. Package name → version string or VCS hash pin.",
+      "description": "Bun-resolved package versions: global installs plus packages fetched ephemerally with `bun x`. Package name → version string or VCS hash pin.",
       "type": "object"
     },
     "cargo-binstall": {

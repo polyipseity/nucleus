@@ -34,6 +34,13 @@ Describe 'Sync-HermesConfig harness-bridge plugin link' {
         $null = Set-Content -Path (Join-Path $pluginSourceDir 'plugin.yaml') -Value 'name: harness-bridge' -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
         $script:pluginSource = $pluginSourceDir
 
+        # The install branch reads its playwright pin from the lockfile, the same
+        # path Sync-HermesConfig uses on a real host.
+        $lockfileDir = Join-Path $script:repoRoot 'src\lockfiles'
+        $null = New-Item -ItemType Directory -Path $lockfileDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+        $lockfile = [ordered]@{ bun = [ordered]@{ playwright = '1.63.0' } }
+        Set-Content -Path (Join-Path $lockfileDir 'lockfile.json') -Value ($lockfile | ConvertTo-Json -Depth 4)  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
+
         $script:homeRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-hermeshome-" + [guid]::NewGuid().ToString('N'))
         $script:localAppData = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-hermeslad-" + [guid]::NewGuid().ToString('N'))
         $null = New-Item -ItemType Directory -Path $script:homeRoot -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
@@ -44,11 +51,35 @@ Describe 'Sync-HermesConfig harness-bridge plugin link' {
         $script:originalLocalAppData = $env:LOCALAPPDATA
         $script:originalAppData = $env:APPDATA
         Set-Variable -Name HOME -Value $script:homeRoot -Force
+        # WHY here: Sync-HermesConfig reads $HOME for the Playwright cache, and with
+        #   no chromium-* present the real installer runs, which downloads from npm
+        #   in the middle of a unit test. The child path string matches the one the
+        #   module builds so the probe matches on every platform.
+        $null = New-Item -ItemType Directory -Path (Join-Path -Path (Join-Path -Path $script:homeRoot -ChildPath '.cache\ms-playwright') -ChildPath 'chromium-1194') -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         $env:LOCALAPPDATA = $script:localAppData
         # The startup-folder sweep joins $env:APPDATA, which is Windows-only.
         $script:appData = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-hermesappdata-" + [guid]::NewGuid().ToString('N'))
         $null = New-Item -ItemType Directory -Path $script:appData -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         $env:APPDATA = $script:appData
+
+        # Save-BunRecorder - a stand-in bun that records the arguments it was
+        # handed, so the install call can be asserted without running playwright.
+        #
+        # WHY two implementations: the call operator runs a file, not a command
+        #   line, so the stand-in has to be something the host can execute. Same
+        #   shape as the rclone stand-in, for the same reason.
+        $script:BunRecordPath = Join-Path $script:homeRoot 'bun-args.txt'
+        function Save-BunRecorder {
+            $path = Join-Path -Path $script:homeRoot -ChildPath 'stand-in-bun'
+            if ($IsWindows) {
+                $path = "$path.cmd"
+                Set-Content -Path $path -Value @('@echo off', ('echo %* > "{0}"' -f $script:BunRecordPath), 'exit /b 0')  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
+                return $path
+            }
+            Set-Content -Path $path -Value @('#!/bin/sh', ('echo "$*" > "{0}"' -f $script:BunRecordPath), 'exit 0')  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
+            $null = & chmod 755 $path  # check-suppress:suppression_doc: chmod returns nothing; the exit status is not the subject of this setup
+            return $path
+        }
 
         # The symlink privilege probe, the User-scope environment writes, the
         # hermes CLI lookup, and the delete-protection helpers are all stubbed so
@@ -62,6 +93,7 @@ Describe 'Sync-HermesConfig harness-bridge plugin link' {
 
         # hermes is not installed in this sandbox: the enable half warns and stops.
         Mock Get-HermesCliPath { return $null }
+        Mock Get-HermesBunPath { return $null }
         Mock Get-HermesGatewayService { return $null }
         Mock Get-HermesGatewayTask { return $null }
     }
@@ -139,5 +171,33 @@ Describe 'Sync-HermesConfig harness-bridge plugin link' {
         Sync-HermesConfig -Enabled:$false -User 'testuser' -RepoRoot $script:repoRoot > $null
 
         Test-Path -LiteralPath $script:pluginLink | Should -Be $false
+    }
+
+    It 'installs the pinned Playwright Chromium with bun and leaves the env var alone when none appears' {
+        # A stand-in bun that installs nothing is the interesting case: the code
+        # chose the version itself, so a cache that stays empty must not be
+        # advertised to hermes as holding browsers.
+        $emptyHome = Join-Path $script:homeRoot ('empty-' + [guid]::NewGuid().ToString('N'))
+        $null = New-Item -ItemType Directory -Path $emptyHome -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+        $bunRecorder = Save-BunRecorder
+        Mock Get-HermesBunPath { return $bunRecorder }
+        $envWrites = @()
+        Mock Write-HermesUserEnvVar { $envWrites += $Name }
+
+        $previousHome = $HOME
+        Set-Variable -Name HOME -Value $emptyHome -Force
+        try {
+            $warnings = @()
+            Sync-HermesConfig -Enabled:$true -User 'testuser' -RepoRoot $script:repoRoot -WarningVariable warnings > $null
+        } finally {
+            Set-Variable -Name HOME -Value $previousHome -Force
+        }
+
+        # The version has to come from the lockfile pin, not from whatever the
+        # registry serves, and bun replaces npx per package-installation-scope.
+        (Get-Content -Raw -LiteralPath $script:BunRecordPath) | Should -Match 'playwright@1\.63\.0'
+        (Get-Content -Raw -LiteralPath $script:BunRecordPath) | Should -Match 'install chromium'
+        ($warnings -join ' ') | Should -Match 'leaving PLAYWRIGHT_BROWSERS_PATH unchanged'
+        $envWrites | Should -Not -Contain 'PLAYWRIGHT_BROWSERS_PATH'
     }
 }

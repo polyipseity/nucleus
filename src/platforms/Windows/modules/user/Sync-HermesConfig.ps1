@@ -144,6 +144,31 @@ function Get-HermesCliPath {
   return $hermesCli.Source
 }
 
+function Get-HermesBunPath {
+  <#
+  .SYNOPSIS
+    Resolves the bun executable, or returns $null when it is not installed.
+
+  .DESCRIPTION
+    bun itself comes from the WinGet DSC package, so PATH is the whole search;
+    the managed bun bin dir holds what `bun install -g` wrote, not the runtime.
+    Several executables can match, so the first wins, mirroring shell PATH
+    resolution.  A function boundary keeps the absence case stub-able for tests.
+  .OUTPUTS
+    Absolute path to the bun executable, or $null.
+  #>
+  [CmdletBinding()]
+  [OutputType([string])]
+  param()
+
+  # check-suppress:suppression_doc: bun may not be installed; absence is the expected case and is reported by the caller
+  $bun = Get-Command -Name 'bun' -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($null -eq $bun) {
+    return $null
+  }
+  return $bun.Source
+}
+
 function Sync-HermesConfig {
   [CmdletBinding()]
   param(
@@ -278,40 +303,55 @@ function Sync-HermesConfig {
   # On Windows, we check if browsers are installed in the standard location
   # and set PLAYWRIGHT_BROWSERS_PATH if needed.
   $playwrightCacheDir = Join-Path -Path $HOME -ChildPath '.cache\ms-playwright'
-  # check-suppress:suppression_doc: directory may not exist; probe is best-effort
-  $chromiumInstalled = Get-ChildItem -Path (Join-Path -Path $playwrightCacheDir -ChildPath 'chromium-*') -Directory -ErrorAction SilentlyContinue
+  # WHY @() around the probe: a cmdlet matching nothing yields $null, so a later
+  #   @() wrap would invert this comparison without failing loudly. The cache
+  #   directory is itself absent on a fresh host, which -ErrorAction covers.
+  $chromiumInstalled = @(Get-ChildItem -Path (Join-Path -Path $playwrightCacheDir -ChildPath 'chromium-*') -Directory -ErrorAction SilentlyContinue)
 
-  if ($null -eq $chromiumInstalled) {
-    # Chromium not installed - attempt to install via npx
-    $npxBin = $null
-    if ($null -ne $hermesBin) {
-      $hermesStorePath = Split-Path -Path (Split-Path -Path $hermesBin -Parent) -Parent
-      $npxCandidate = Join-Path -Path $hermesStorePath -ChildPath 'bin\npx'
-      if (Test-Path -Path $npxCandidate) {
-        $npxBin = $npxCandidate
-      }
+  if ($chromiumInstalled.Count -eq 0) {
+    # Chromium not installed - attempt to install via bun.
+    # WHY the lockfile for the version: `bun x` resolves latest by default, so an
+    #   unpinned call downloads whatever the registry serves at apply time. The pin
+    #   is read the same way Sync-SuperpowersPlugin reads its own, and a missing
+    #   entry is an error rather than an unversioned install.
+    $lockfilePath = Join-Path -Path $RepoRoot -ChildPath 'src\lockfiles\lockfile.json'
+    if (-not (Test-Path -LiteralPath $lockfilePath)) {
+      Write-NucleusError -CommandName $label "lockfile not found at $lockfilePath"
     }
-    if ($null -eq $npxBin) {
-      # check-suppress:suppression_doc: npx may not be installed; probe is best-effort
-      $npxBin = Get-Command -Name 'npx' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
+    $lockfile = Get-Content -LiteralPath $lockfilePath -Raw | ConvertFrom-Json
+    if ($null -eq $lockfile.bun -or $null -eq $lockfile.bun.playwright) {
+      Write-NucleusError -CommandName $label 'lockfile must declare bun.playwright'
     }
+    $playwrightVersion = $lockfile.bun.playwright
 
-    if ($null -ne $npxBin) {
-      Write-NucleusNotice "[$label] installing Playwright Chromium..."
-      & $npxBin playwright install --with-deps chromium
-      Write-NucleusNotice "[$label] Playwright Chromium installed"
+    $bunBin = Get-HermesBunPath
+    if ($null -eq $bunBin) {
+      Write-NucleusWarning "[$label] bun not found - cannot install Playwright Chromium"
     } else {
-      Write-NucleusWarning "[$label] npx not found — cannot install Playwright Chromium"
+      Write-NucleusNotice "[$label] installing Playwright Chromium $playwrightVersion..."
+      # WHY no --with-deps: Playwright rejects the flag on Windows, and the
+      #   browsers are the only thing missing here.
+      & $bunBin x "playwright@$playwrightVersion" install chromium
+      Write-NucleusNotice "[$label] Playwright Chromium installed"
     }
   } else {
-    Write-NucleusNotice "[$label] Playwright Chromium already installed — skipping"
+    Write-NucleusNotice "[$label] Playwright Chromium already installed - skipping"
   }
 
-  # Set PLAYWRIGHT_BROWSERS_PATH if not already set
-  $currentValue = Get-HermesUserEnvVar -Name 'PLAYWRIGHT_BROWSERS_PATH'
-  if ($currentValue -ne $playwrightCacheDir) {
-    Write-HermesUserEnvVar -Name 'PLAYWRIGHT_BROWSERS_PATH' -Value $playwrightCacheDir
-    Write-NucleusNotice "[$label] set PLAYWRIGHT_BROWSERS_PATH to $playwrightCacheDir"
+  # Set PLAYWRIGHT_BROWSERS_PATH only when a browser is really there. Naming a
+  # cache that holds nothing hides the browsers hermes already keeps in its own
+  # default location, so a failed install has to leave the variable alone. The
+  # probe is repeated rather than trusting the install's exit code, because the
+  # install is the one step here that can fail quietly.
+  $chromiumPresent = @(Get-ChildItem -Path (Join-Path -Path $playwrightCacheDir -ChildPath 'chromium-*') -Directory -ErrorAction SilentlyContinue).Count -gt 0
+  if (-not $chromiumPresent) {
+    Write-NucleusWarning "[$label] no Playwright Chromium found - leaving PLAYWRIGHT_BROWSERS_PATH unchanged"
+  } else {
+    $currentValue = Get-HermesUserEnvVar -Name 'PLAYWRIGHT_BROWSERS_PATH'
+    if ($currentValue -ne $playwrightCacheDir) {
+      Write-HermesUserEnvVar -Name 'PLAYWRIGHT_BROWSERS_PATH' -Value $playwrightCacheDir
+      Write-NucleusNotice "[$label] set PLAYWRIGHT_BROWSERS_PATH to $playwrightCacheDir"
+    }
   }
 
   # Expose the harness bridge inside chat: the plugin adds /harness, which is
