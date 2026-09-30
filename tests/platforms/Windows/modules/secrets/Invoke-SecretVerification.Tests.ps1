@@ -1,36 +1,35 @@
 <#
 .SYNOPSIS
-    Pester tests for the Windows managed SSH private key passphrase probe.
+    Pester tests for the Windows managed SSH private key validity probe.
 
 .DESCRIPTION
     Test-ManagedSshPrivateKey decides whether a managed SSH private key is acceptable
     on Windows.  Before this check existed, Invoke-SecretVerification asserted only that
-    each managed key file existed and was non-empty, so Windows accepted a
-    passphrase-protected key that the POSIX verifier
-    (src/scripts/secrets/verify-secret-decryption.sh) rejects.  The two hosts disagreed
-    about whether the same managed state was acceptable.
+    each managed key file existed and was non-empty, so a malformed key passed on
+    Windows while the POSIX verifier
+    (src/scripts/secrets/verify-secret-decryption.sh) rejected it.  The two hosts
+    disagreed about whether the same managed state was acceptable.
 
-    The probe runs `ssh-keygen -y -P ""`, which derives from the PRIVATE key and
-    supplies an empty passphrase.  A passphrase-protected key is therefore rejected
-    because the supplied passphrase is wrong -- not because the file is missing.  The
-    same reasoning is why -e is not used: it reads the unencrypted openssh-key-v1
-    header, which a protected key still has.
+    The probe is two checks.  The file's first line must carry an OpenSSH private key
+    PEM header, and `ssh-keygen -l -f` must report a fingerprint.  -l reads the
+    cleartext public-key blob out of the openssh-key-v1 container, so it succeeds
+    whether or not the key carries a passphrase; a passphrase-protected managed key
+    is valid.  The header check is what -l cannot do: on its own -l also accepts a
+    bare .pub public key file, which is why the public-key case below must be rejected.
 
     EXECUTION STATUS -- read before trusting a green result.
-    Authored on macOS, where this session has no Windows host.  All 3 cases were
-    executed against the real OpenSSH ssh-keygen on macOS and passed (3 passed,
-    0 failed, 0 skipped).  That covers the probe's KEY SEMANTICS, which do not depend
-    on the host OS: which keys are accepted, and the failure names the offending file.
-    It does NOT cover ARGUMENT PASSING, which is PowerShell-edition-dependent and is
+    Authored on macOS, where this session has no Windows host.  The cases were
+    executed against the real OpenSSH ssh-keygen on macOS and passed.  That covers the
+    probe's KEY SEMANTICS, which do not depend on the host OS: which keys are
+    accepted, which are rejected, and that a failure names the offending file.  It
+    does NOT cover ARGUMENT PASSING, which is PowerShell-edition-dependent and is
     the part a Windows host has to prove.  None of these cases has been executed on
     Windows, where the following remain unverified:
-      - that the `-P ""` empty-argv encoding in the Arguments string survives Windows
-        PowerShell 5.1's native binder as a single empty argument rather than being
-        dropped or collapsed (the reason the probe uses Process + an Arguments string
-        instead of a PowerShell value);
-      - that a passphrase prompt really takes EOF and exits non-zero rather than
-        blocking, i.e. the stdin-close and bounded-wait guard actually prevents a
-        stalled apply on that host;
+      - that the Arguments string's quoted path survives Windows PowerShell 5.1's
+        native binder as one argument (the reason the probe uses Process with an
+        Arguments string instead of passing a PowerShell value);
+      - that Get-Content -TotalCount 1 reads the header the same way under 5.1;
+      - that a missing key file is rejected by name rather than by a hung ssh-keygen;
       - the apply.ps1 wiring that resolves ssh-keygen and passes -SshKeygenExe;
       - Resolve-Executable against the Windows candidate paths;
       - the step-1 managed-ssh-key-paths enumeration in Invoke-SecretVerification.
@@ -116,14 +115,64 @@ BeforeAll {
         }
     }
 
-    # Two real keys, because the distinction under test is a property of the key file
-    # that only ssh-keygen can judge: a fixture stub could not tell them apart.
+    # Three real keys, because the distinction under test is a property of the key
+    # file that only ssh-keygen can judge: a fixture stub could not tell them apart.
     $script:KeyRoot = Join-Path ([IO.Path]::GetTempPath()) ("secret-verification-$([guid]::NewGuid())")
     New-Item -ItemType Directory -Path $script:KeyRoot -Force > $null
     $script:PlainKey = Join-Path $script:KeyRoot 'ssh_personal_plain'
     $script:LockedKey = Join-Path $script:KeyRoot 'ssh_personal_locked'
     Initialize-TestSshKey -Path $script:PlainKey
     Initialize-TestSshKey -Path $script:LockedKey -Protected
+
+    # The public-key fixture is the one case a hand-written file could stand in for,
+    # but deriving it keeps it honest: it is a real .pub that ssh-keygen -l accepts,
+    # so a pass can only come from the header check rejecting it.
+    $script:PublicKey = Join-Path $script:KeyRoot 'ssh_personal_plain.pub'
+    $deriveInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $deriveInfo.FileName = $script:sshKeygen
+    $deriveInfo.Arguments = '-y -f "' + $script:PlainKey + '"'
+    $deriveInfo.UseShellExecute = $false
+    $deriveInfo.RedirectStandardInput = $true
+    $deriveInfo.RedirectStandardOutput = $true
+    $deriveInfo.RedirectStandardError = $true
+    $derive = [System.Diagnostics.Process]::Start($deriveInfo)
+    $derive.StandardInput.Close()
+    $deriveOut = $derive.StandardOutput.ReadToEndAsync()
+    $deriveError = $derive.StandardError.ReadToEndAsync()
+    if (-not $derive.WaitForExit(30000)) {
+        $derive.Kill()
+        throw "test setup: ssh-keygen did not exit within 30 s while deriving the public key fixture."
+    }
+    $derive.WaitForExit()
+    if ($derive.ExitCode -ne 0) {
+        throw "test setup: ssh-keygen could not derive a public key fixture: $($deriveError.Result.Trim())"
+    }
+    Set-Content -LiteralPath $script:PublicKey -Value $deriveOut.Result -NoNewline
+
+    # A file that exists, is non-empty, and is not a key at all.  The old
+    # existence-only check passed it, which is why the probe exists.
+    $script:GarbageKey = Join-Path $script:KeyRoot 'ssh_personal_garbage'
+    Set-Content -LiteralPath $script:GarbageKey -Value 'this is not a private key' -NoNewline
+
+    # A path that was never created.  Proves the probe rejects a missing file by name
+    # rather than handing ssh-keygen a path that does not resolve.
+    $script:MissingKey = Join-Path $script:KeyRoot 'ssh_personal_absent'
+
+    # The shadowing regression. materialize writes <key>.pub beside <key>, and
+    # ssh-keygen -l -f <key> prefers that sibling, reporting ITS fingerprint without
+    # opening the private key.  A broken private key next to a valid .pub therefore
+    # looks fine unless the probe goes through a sibling-free path.  Built by cutting
+    # a real key short, because a literal PEM block would trip the private-key
+    # detector in prek.
+    $script:ShadowedKey = Join-Path $script:KeyRoot 'ssh_personal_shadowed'
+    $keyLines = Get-Content -LiteralPath $script:PlainKey
+    # Keep the header and a partial first base64 line: that line carries the whole
+    # public blob, so it has to be cut mid-line for the file to stop parsing.
+    # Newline separated, not -NoNewline, which would run the two together and make
+    # the header check reject it for the wrong reason.
+    $truncatedBody = $keyLines[0] + [Environment]::NewLine + $keyLines[1].Substring(0, 40) + [Environment]::NewLine
+    Set-Content -LiteralPath $script:ShadowedKey -Value $truncatedBody -NoNewline
+    Copy-Item -LiteralPath $script:PublicKey -Destination "$script:ShadowedKey.pub" -Force
 }
 
 AfterAll {
@@ -145,33 +194,92 @@ Describe 'Test-ManagedSshPrivateKey' {
     }
 
     Context 'unencrypted key' {
-        It 'accepts a managed private key readable with an empty passphrase' {
+        It 'accepts a managed private key that carries no passphrase' {
             # Pending Windows host execution: this proves the key semantics, not that
-            # `-P ""` survives the 5.1 native binder.  An unencrypted key is the case a
-            # collapsed or over-quoted empty argument would FALSE-REJECT, so a pass here
-            # is evidence about argument encoding and a pass under 5.1 is still required.
+            # the quoted path in the Arguments string survives the 5.1 native binder.
             { Test-ManagedSshPrivateKey -SshKeygenExe $script:sshKeygen -PrivateKeyPath $script:PlainKey } |
                 Should -Not -Throw
         }
     }
 
     Context 'passphrase-protected key' {
-        It 'rejects a passphrase-protected key and names the offending file' {
-            # Pending Windows host execution: this proves the rejection and the
-            # attribution, not that a prompt takes EOF instead of blocking on that host.
-            # The defect: an existence-only check passes this key, so Windows accepts a
-            # state the POSIX host rejects.
+        It 'accepts a passphrase-protected key, which is a valid private key' {
+            # The contract this guards: a protected key is valid, and -l reads the
+            # cleartext public-key blob without ever needing the passphrase.  The
+            # previous -y -P "" probe rejected it, which made a correctly managed
+            # key a hard activation failure.
+            { Test-ManagedSshPrivateKey -SshKeygenExe $script:sshKeygen -PrivateKeyPath $script:LockedKey } |
+                Should -Not -Throw
+        }
+    }
+
+    Context 'public key file' {
+        It 'rejects a bare public key file, which ssh-keygen -l alone would accept' {
+            # The gap the header check closes.  -l reports a fingerprint for this file
+            # just as readily as for a private key, so without the header check this
+            # case would pass and a public key could be materialised in place of the
+            # private one it stands in for.
+            # Pending Windows host execution: proves the rejection, not that
+            # Get-Content -TotalCount 1 reads the same header under 5.1.
             $threw = $null
             try {
-                Test-ManagedSshPrivateKey -SshKeygenExe $script:sshKeygen -PrivateKeyPath $script:LockedKey
+                Test-ManagedSshPrivateKey -SshKeygenExe $script:sshKeygen -PrivateKeyPath $script:PublicKey
             }
             catch {
                 $threw = $_.Exception.Message
             }
             $threw | Should -Not -BeNullOrEmpty
-            # Attribution: the message must name this key, so a failure among several
+            # Attribution: the message must name this file, so a failure among several
             # enumerated managed keys is diagnosable.
-            $threw | Should -BeLike "*$(Split-Path -Path $script:LockedKey -Leaf)*"
+            $threw | Should -BeLike "*$(Split-Path -Path $script:PublicKey -Leaf)*"
+        }
+    }
+
+    Context 'public key shadowing the private key' {
+        It 'rejects a broken private key even when a valid .pub sits beside it' {
+            # The regression that makes the sibling-free probe necessary. Probing the
+            # managed path directly lets ssh-keygen -l read <key>.pub instead, so a
+            # corrupt private key would pass. Without this case the symlink in the
+            # probe could be dropped and the check would silently stop working.
+            $threw = $null
+            try {
+                Test-ManagedSshPrivateKey -SshKeygenExe $script:sshKeygen -PrivateKeyPath $script:ShadowedKey
+            }
+            catch {
+                $threw = $_.Exception.Message
+            }
+            $threw | Should -Not -BeNullOrEmpty
+            $threw | Should -BeLike "*$(Split-Path -Path $script:ShadowedKey -Leaf)*"
+        }
+    }
+
+    Context 'unparsable key' {
+        It 'rejects a file that is not a key and names the offending file' {
+            # Existence is not validity: this file exists and is non-empty, so the
+            # check that preceded the probe accepted it.
+            $threw = $null
+            try {
+                Test-ManagedSshPrivateKey -SshKeygenExe $script:sshKeygen -PrivateKeyPath $script:GarbageKey
+            }
+            catch {
+                $threw = $_.Exception.Message
+            }
+            $threw | Should -Not -BeNullOrEmpty
+            $threw | Should -BeLike "*$(Split-Path -Path $script:GarbageKey -Leaf)*"
+        }
+
+        It 'rejects a managed key path that does not exist' {
+            # Rejected before ssh-keygen runs, so a stale manifest entry fails by name
+            # rather than surfacing as an empty fingerprint.
+            $threw = $null
+            try {
+                Test-ManagedSshPrivateKey -SshKeygenExe $script:sshKeygen -PrivateKeyPath $script:MissingKey
+            }
+            catch {
+                $threw = $_.Exception.Message
+            }
+            $threw | Should -Not -BeNullOrEmpty
+            $threw | Should -BeLike "*$(Split-Path -Path $script:MissingKey -Leaf)*"
         }
     }
 }

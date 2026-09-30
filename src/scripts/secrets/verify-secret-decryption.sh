@@ -41,19 +41,37 @@ while IFS= read -r _vsd_private_key_path; do
   fi
   # A file that exists is not a key that works: an unparsable private key makes
   # ssh report "invalid format" and fall back to no authentication, and a running
-  # agent hides that by answering first.  Derive the public half to prove OpenSSH
-  # can read the file.  -y derives from the private key, and -P '' supplies an
-  # empty passphrase, so a passphrase-protected key is REJECTED (the supplied
-  # passphrase is simply wrong) while activation still cannot answer a prompt.
-  # -e was wrong here: it reads the unencrypted header of the openssh-key-v1
-  # format, which a protected key still has, so it accepted every protected key.
-  # WHY: a managed key must work unattended, so requiring a passphrase is a failure.
-  _vsd_derived_public_key="$(
-    "$_vsd_ssh_keygen_bin" -y -P '' -f "$_vsd_private_key_path" </dev/null
-  )" || true # check-suppress:suppression_doc: ssh-keygen -y exits non-zero for a malformed, unreadable, or passphrase-protected key; the empty output is handled below.
-  if [ -z "$_vsd_derived_public_key" ]; then
-    die -l secrets "managed SSH private key at '$_vsd_private_key_path' is not a usable OpenSSH private key (ssh-keygen -y failed, so it is unreadable or passphrase-protected); fix the SOPS value or re-run materialize-user-secrets."
+  # agent hides that by answering first.  Prove OpenSSH can read the file.
+  #
+  # Two parts, because neither alone is enough.  The header check rejects a bare
+  # .pub file, which ssh-keygen -l happily fingerprints.  The -l check then
+  # proves the container parses; it reads the cleartext public-key blob out of
+  # the openssh-key-v1 format, so it works on a protected key without the
+  # passphrase and never prompts.  Deriving with -y -P '' would be wrong here:
+  # the empty passphrase is simply incorrect for a protected key, so it rejected
+  # every key that is perfectly valid.
+  #
+  # WHY: the probe runs through a symlink in a private temp dir.  Given the
+  # managed key path directly, ssh-keygen -l prefers the sibling <key>.pub when
+  # one exists and reports THAT key's fingerprint, never reading the private key.
+  # Every managed key has its .pub beside it, so probing in place would make
+  # this check a no-op that passes a corrupt private key.  A symlink to the real
+  # path has no sibling to be picked up, and unlike a copy it never puts key
+  # material in a second place.
+  _vsd_probe_dir="$(/usr/bin/mktemp -d)"
+  trap '/bin/rm -rf "$_vsd_probe_dir"' EXIT
+  /bin/ln -s "$_vsd_private_key_path" "$_vsd_probe_dir/key"
+
+  if ! /usr/bin/grep -qE '^-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----$' "$_vsd_private_key_path"; then
+    die -l secrets "managed SSH private key at '$_vsd_private_key_path' is not a valid OpenSSH private key (no private-key PEM header); fix the SOPS value or re-run materialize-user-secrets."
   fi
+  # check-suppress:suppression_doc: ssh-keygen -l exits non-zero for a malformed or truncated key; the empty output is reported below with the file name.
+  _vsd_key_fingerprint="$("$_vsd_ssh_keygen_bin" -l -f "$_vsd_probe_dir/key" </dev/null)" || true
+  if [ -z "$_vsd_key_fingerprint" ]; then
+    die -l secrets "managed SSH private key at '$_vsd_private_key_path' is not a valid OpenSSH private key (ssh-keygen -l could not read it); fix the SOPS value or re-run materialize-user-secrets."
+  fi
+  /bin/rm -rf "$_vsd_probe_dir"
+  trap - EXIT
 done <"$_vsd_ssh_key_paths_manifest"
 
 # --- 2. GPG key presence in keyring ---

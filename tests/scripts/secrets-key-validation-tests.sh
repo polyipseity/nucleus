@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Test: verify-secret-decryption rejects a materialized SSH private key that
-# OpenSSH cannot read.
+# Test: verify-secret-decryption accepts every valid OpenSSH private key and
+# rejects what is not one.
 #
-# A managed key that merely exists is not a key that works: an unparsable file
-# makes ssh report "invalid format" and fall back to no authentication, which a
-# running agent hides by answering first. The suite drives the real script with
-# stub gpg/ssh-to-age and a real ssh-keygen.
+# The check exists because an unparsable private key makes ssh report "invalid
+# format" and fall back to no authentication, which a running agent hides by
+# answering first.  Validity is the whole contract: a passphrase-protected key is
+# a valid key, so it passes.  The suite drives the real script with stub
+# gpg/ssh-to-age and a real ssh-keygen.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -54,33 +55,61 @@ run_verify() {
 }
 
 # fixture <dir> <private-key-path> <private-key-contents-kind>
-# kind: generated | garbage | protected | absent
+# kind: generated | protected | public | truncated | garbage | absent
 build_case() {
   local _dir="$1" _key="$2" _kind="$3"
   make_fixture "$_dir"
   case "$_kind" in
   generated) ssh-keygen -q -t ed25519 -N '' -f "$_key" >/dev/null ;;
+  protected) ssh-keygen -q -t ed25519 -N 'sekrit' -f "$_key" >/dev/null ;;
+  public)
+    # A bare public key standing where a private key belongs.  ssh-keygen -l
+    # fingerprints it happily, so only the PEM header check rejects it.
+    ssh-keygen -q -t ed25519 -N '' -f "$_key" >/dev/null
+    ssh-keygen -y -f "$_key" >"$_key.pub"
+    mv "$_key.pub" "$_key"
+    ;;
+  truncated)
+    # A valid private key cut mid-way through its base64 body, so the PEM header
+    # still reads correctly and only ssh-keygen -l can reject it.  Derived at
+    # runtime from a real key rather than written as a literal PEM block, which
+    # the private-key detector in prek flags.
+    #
+    # The cut has to land inside the first base64 line: that line already holds
+    # the whole ed25519 public blob, so dropping whole trailing lines leaves a
+    # file ssh-keygen still reads.
+    ssh-keygen -q -t ed25519 -N '' -f "$_key" >/dev/null
+    {
+      sed -n '1p' "$_key"
+      sed -n '2p' "$_key" | cut -c1-40
+    } >"$_key.trunc"
+    mv "$_key.trunc" "$_key"
+    chmod 600 "$_key"
+    ;;
   garbage)
     echo 'this is not a private key' >"$_key"
     chmod 600 "$_key"
     ;;
-  protected) ssh-keygen -q -t ed25519 -N 'sekrit' -f "$_key" >/dev/null ;;
   absent) : ;;
   esac
   printf '%s\n' "$_key" >"$_dir/managed-ssh-key-paths"
 }
 
-test_readable_key_passes() {
+# expect_acceptance <name> <kind> — the script must exit 0 without an ERROR.
+expect_acceptance() {
+  local _name="$1" _kind="$2"
   local _dir _key _out _rc
   _dir="$(mktemp -d)"
   _key="$_dir/ssh_personal_test"
-  build_case "$_dir" "$_key" generated
+  build_case "$_dir" "$_key" "$_kind"
   _out="$(mktemp)"
   _rc="$(run_verify "$_dir" "$_key" "$_out")"
-  if [ "$_rc" -eq 0 ] && ! grep -q 'ERROR' "$_out"; then
-    assert_pass "a readable managed private key passes verification"
+  if [ "$_rc" -ne 0 ]; then
+    assert_fail "$_name" "rejected a valid key: $(head -2 "$_out" | tr '\n' ' ')"
+  elif grep -q 'ERROR' "$_out"; then
+    assert_fail "$_name" "reported an error: $(head -2 "$_out" | tr '\n' ' ')"
   else
-    assert_fail "a readable managed private key passes verification" "exit $_rc: $(head -2 "$_out" | tr '\n' ' ')"
+    assert_pass "$_name"
   fi
   rm -f "$_out"
   rm -rf "$_dir"
@@ -106,12 +135,45 @@ expect_rejection() {
   rm -rf "$_dir"
 }
 
-test_readable_key_passes
-# A managed key must work unattended, so a protected key is a failure — and it
-# must be reported, never answered: the script supplies an empty passphrase so
-# activation cannot block on a prompt.
-expect_rejection "a passphrase-protected managed private key fails verification" protected "not a usable OpenSSH private key"
-expect_rejection "an unparsable managed private key fails verification" garbage "not a usable OpenSSH private key"
+# The regression that made -l unusable on the real host.  materialize-user-secrets
+# writes <key>.pub next to <key>, and ssh-keygen -l -f <key> prefers that sibling:
+# it reports the PUBLIC key's fingerprint and never opens the private key.  A
+# corrupt private key beside a valid .pub therefore reads as fine.  Probing
+# through a sibling-free symlink is what makes the check real.
+test_shadowing_public_sibling_cannot_mask_a_broken_private_key() {
+  local _dir _key _out _rc
+  _dir="$(mktemp -d)"
+  _key="$_dir/ssh_personal_test"
+  build_case "$_dir" "$_key" truncated
+  # A valid public key derived from a different, intact key, at the path ssh-keygen
+  # would prefer over the private one.
+  ssh-keygen -q -t ed25519 -N '' -f "$_dir/other" >/dev/null
+  cp "$_dir/other.pub" "$_key.pub"
+  _out="$(mktemp)"
+  _rc="$(run_verify "$_dir" "$_key" "$_out")"
+  if [ "$_rc" -eq 0 ]; then
+    assert_fail "a broken private key is rejected even with a valid .pub sibling" "the .pub shadowed the private key; verification passed"
+  elif ! grep -qF 'not a valid OpenSSH private key' "$_out"; then
+    assert_fail "a broken private key is rejected even with a valid .pub sibling" "output does not name the failure: $(head -2 "$_out" | tr '\n' ' ')"
+  else
+    assert_pass "a broken private key is rejected even with a valid .pub sibling"
+  fi
+  rm -f "$_out"
+  rm -rf "$_dir"
+}
+
+expect_acceptance "a readable managed private key passes verification" generated
+# A passphrase-protected key is a valid key.  Rejecting it meant demanding a
+# key that works with no passphrase, which is a property of the deployment, not
+# of the key, and the agent supplies it through AddKeysToAgent/UseKeychain.
+expect_acceptance "a passphrase-protected managed private key passes verification" protected
+expect_rejection "an unparsable managed private key fails verification" garbage "not a valid OpenSSH private key"
+# Header present, body unreadable: only the ssh-keygen -l check catches this.
+expect_rejection "a truncated private key body fails verification" truncated "ssh-keygen -l could not read it"
+# The gap a bare -l check leaves open: a public key parses and fingerprints, so
+# only the PEM header check rejects it.
+expect_rejection "a public key in place of a private key fails verification" public "not a valid OpenSSH private key"
 expect_rejection "a managed private key that is absent fails verification" absent "missing or empty"
 
+test_shadowing_public_sibling_cannot_mask_a_broken_private_key
 finish_tests

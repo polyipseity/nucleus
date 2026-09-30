@@ -109,8 +109,10 @@ in
   #
   # Five checks (in order):
   #   1. Materialization sanity: managed SSH keys, Git identity, and manifest
-  #      files exist and are non-empty, and every managed SSH private key is
-  #      parsable (an unreadable key authenticates as nothing).
+  #      files exist and are non-empty, and every managed SSH private key is a
+  #      valid OpenSSH private key (an unreadable key authenticates as nothing).
+  #      A passphrase-protected key is valid and passes; see
+  #      verify-secret-decryption.sh for what the probe can and cannot prove.
   #   2. GPG key presence: every fingerprint in managed-gpg-keys is in the
   #      keyring.
   #   3. GPG SOPS recipient check for all SOPS files.

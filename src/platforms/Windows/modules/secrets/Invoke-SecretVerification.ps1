@@ -7,8 +7,8 @@
     Verifies that all SOPS files have the correct recipients registered and that
     managed secret artefacts are present on disk.  The SOPS recipient checks read
     unencrypted metadata rather than performing live decryption, but a managed
-    private SSH key is probed directly for unattended usability, so a
-    passphrase-protected key fails here exactly as it does on the POSIX host.
+    private SSH key is probed directly for validity, so an unparsable key fails
+    here exactly as it does on the POSIX host.
 
     ConvertFrom-SshEd25519PublicKeyToAgePubKey is provided by
     convert-sshpublickeytoage.ps1, which apply.ps1 dot-sources before this file
@@ -22,29 +22,35 @@
 function Test-ManagedSshPrivateKey {
   <#
   .SYNOPSIS
-    Probe one managed SSH private key for unattended usability.
+    Probe one managed SSH private key for validity.
 
   .DESCRIPTION
     A file that exists is not a key that works.  An unparsable private key makes ssh
     report "invalid format" and fall back to no authentication, and a running agent
-    hides that by answering first.  Derive the public half to prove OpenSSH can read
-    the file.  -y derives from the PRIVATE key and an empty -P makes the derivation
-    fail for a passphrase-protected key, because the supplied passphrase is wrong.
+    hides that by answering first.
 
-    -e is deliberately not used: it reads the unencrypted header of the
-    openssh-key-v1 format, which a protected key still has, so it accepted every
-    protected key.
+    Validity means OpenSSH can read the file as a private key, and a
+    passphrase-protected key is valid.  ssh-keygen -l reads the cleartext public-key
+    blob out of the openssh-key-v1 container, so it succeeds with or without a
+    passphrase, never prompts, and never reads stdin.
 
-    This probe cannot answer an interactive prompt, and that is enforced rather than
-    assumed: standard input is closed as soon as the probe starts, so a passphrase
-    prompt takes EOF and exits non-zero instead of blocking, and the wait is bounded
-    so a wedged process cannot stall apply.  A key an operator could unlock by typing
-    the passphrase is therefore still rejected, which is the whole point -- a managed
-    key has to work unattended.
+    -l also accepts a bare .pub public key file, so the first line is required to
+    carry a private-key PEM header.  The two checks together are what separates a
+    private key from a public one; either alone would let the wrong file through.
 
-    Mirrors the probe in src/scripts/secrets/verify-secret-decryption.sh, which closes
-    stdin with </dev/null for the same reason.  The two hosts must agree on whether
-    the same managed key is acceptable.
+    The probe runs through a symlink under a private temp directory.  Given the
+    managed key path itself, -l prefers the sibling <key>.pub and reports THAT
+    key's fingerprint without opening the private key, which would turn this into
+    a check that passes a corrupt private key.  The symlink has no sibling to be
+    picked up, and it never copies key material.
+
+    Accepted limit: -l validates the container and the embedded public key, not the
+    ciphertext.  A key whose private bytes are corrupt or truncated still reports a
+    fingerprint.  Detecting that needs the passphrase, which this probe does not have
+    and must never be given, so corruption surfaces at first use rather than here.
+
+    Mirrors the probe in src/scripts/secrets/verify-secret-decryption.sh.  The two hosts
+    must agree on whether the same managed key is acceptable.
 
   .PARAMETER SshKeygenExe
     Absolute path to the ssh-keygen executable.
@@ -57,8 +63,8 @@ function Test-ManagedSshPrivateKey {
     it throws rather than hanging activation.
 
   .OUTPUTS
-    None.  Throws naming the offending file when the key cannot be read with an
-    empty passphrase, so the failure is attributable to one key.
+    None.  Throws naming the offending file when the key is not a valid OpenSSH
+    private key, so the failure is attributable to one key.
   #>
   [CmdletBinding()]
   param(
@@ -78,60 +84,84 @@ function Test-ManagedSshPrivateKey {
     throw "verification: ERROR — managed SSH private key path '$PrivateKeyPath' contains a double quote, which cannot be passed to ssh-keygen safely."
   }
 
-  # The empty passphrase is encoded as "" INSIDE an argument string rather than passed
-  # as a PowerShell value.  Windows PowerShell 5.1 is a live path here: apply.ps1 has no
-  # #Requires -Version and re-elevates into the caller's host, and 5.1's native-argument
-  # binder can drop or collapse a separate empty-string argument.  Either outcome loses
-  # -P entirely, and a lost -P turns a rejection into a prompt.
-  #   -P ""   is the empty argument under both 5.1 and 7 when it appears in this string.
-  #   -P ''   and -P $var are the same single empty argument either way, so neither is
-  #           any safer; only the comment claiming otherwise was wrong.
-  #   '""' as a VALUE is wrong: empty on 5.1, but two quote characters on 7, which would
-  #     false-reject an unencrypted key.
-  #   Start-Process -ArgumentList cannot express this -- it joins on spaces and drops the
-  #     empty element.  --% cannot take a variable.
-  $probeArguments = '-y -P "" -f "' + $PrivateKeyPath + '"'
-
-  $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-  $startInfo.FileName = $SshKeygenExe
-  $startInfo.Arguments = $probeArguments
-  $startInfo.UseShellExecute = $false
-  $startInfo.RedirectStandardInput = $true
-  $startInfo.RedirectStandardOutput = $true
-  $startInfo.RedirectStandardError = $true
-
-  $probe = [System.Diagnostics.Process]::Start($startInfo)
-  if ($null -eq $probe) {
-    throw "verification: ERROR — could not start ssh-keygen to probe managed SSH private key '$PrivateKeyPath'."
+  # -l reports a fingerprint for a bare .pub file as readily as for a private key,
+  # so the header is what proves this file holds private key material.  Read it
+  # directly rather than through ssh-keygen: a file that is not there, or not
+  # readable, has to be rejected by name either way, and Test-Path would report a
+  # directory as present.
+  $privateKeyHeader = '^\-\-\-\-\-BEGIN [A-Z0-9 ]*PRIVATE KEY\-\-\-\-\-$'
+  if (-not (Test-Path -LiteralPath $PrivateKeyPath -PathType Leaf)) {
+    throw "verification: ERROR — managed SSH private key at '$PrivateKeyPath' does not exist or is not a regular file; fix the SOPS value or re-run the secret materialization."
+  }
+  $keyHeaderLine = Get-Content -LiteralPath $PrivateKeyPath -TotalCount 1 -ErrorAction Stop
+  if ($keyHeaderLine -cnotmatch $privateKeyHeader) {
+    throw "verification: ERROR — managed SSH private key at '$PrivateKeyPath' does not start with an OpenSSH private key header (found: '$keyHeaderLine'); ssh-keygen -l would accept a public key file here, so this is rejected before the probe. Fix the SOPS value or re-run the secret materialization."
   }
 
-  # Close stdin before waiting.  This, not the argument spelling, is what makes a
-  # passphrase prompt impossible to answer.
-  $probe.StandardInput.Close()
-
-  # Drain both pipes concurrently.  Reading them only after the wait would deadlock on a
-  # full pipe buffer, because the child blocks writing while the parent blocks waiting.
-  $stdout = $probe.StandardOutput.ReadToEndAsync()
-  $stderr = $probe.StandardError.ReadToEndAsync()
-
-  if (-not $probe.WaitForExit($TimeoutSeconds * 1000)) {
-    $probe.Kill()
-    throw "verification: ERROR — ssh-keygen did not exit within $TimeoutSeconds s while probing managed SSH private key '$PrivateKeyPath'; refusing to continue, because an unanswered prompt would otherwise stall apply."
+  # Probe through a symlink in a private temp directory.  Given the managed key
+  # path directly, ssh-keygen -l prefers the sibling <key>.pub when one exists and
+  # reports THAT key's fingerprint without ever opening the private key, so a
+  # corrupt private key beside a valid .pub would read as fine.  Windows
+  # materializes the pair the same way POSIX does, so the shadowing applies here
+  # too.  A symlink carries no second copy of the key material.
+  $probeDir = Join-Path ([IO.Path]::GetTempPath()) ("nucleus-key-probe-" + [guid]::NewGuid())
+  New-Item -ItemType Directory -Path $probeDir -Force > $null
+  $probeLink = Join-Path $probeDir 'key'
+  try {
+    New-Item -ItemType SymbolicLink -Path $probeLink -Target $PrivateKeyPath -ErrorAction Stop > $null
   }
-  # The bounded overload can return while the redirected pipes are still draining; the
-  # parameterless overload waits for them to reach EOF.
-  $probe.WaitForExit()
+  catch {
+    Remove-Item -LiteralPath $probeDir -Recurse -Force -ErrorAction SilentlyContinue
+    throw "verification: ERROR — could not stage managed SSH private key '$PrivateKeyPath' for probing: $($_.Exception.Message)"
+  }
 
-  # ssh-keygen -y exits non-zero for a malformed, unreadable, or passphrase-protected
-  # key.  Only stdout is consulted, so the failure is decided by an empty derivation
-  # rather than by the exit code, exactly as the POSIX probe does.
-  $derivedPublicKey = $stdout.Result
-  if ([string]::IsNullOrWhiteSpace($derivedPublicKey)) {
-    $probeDiagnostic = $stderr.Result.Trim()
-    if ([string]::IsNullOrWhiteSpace($probeDiagnostic)) {
-      $probeDiagnostic = 'ssh-keygen wrote no diagnostic to stderr'
+  try {
+    $probeArguments = '-l -f "' + $probeLink + '"'
+
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = $SshKeygenExe
+    $startInfo.Arguments = $probeArguments
+    $startInfo.UseShellExecute = $false
+    $startInfo.RedirectStandardInput = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+
+    $probe = [System.Diagnostics.Process]::Start($startInfo)
+    if ($null -eq $probe) {
+      throw "verification: ERROR — could not start ssh-keygen to probe managed SSH private key '$PrivateKeyPath'."
     }
-    throw "verification: ERROR — managed SSH private key at '$PrivateKeyPath' is not a usable OpenSSH private key (ssh-keygen -y derived no public key, so it is unreadable or passphrase-protected): $probeDiagnostic; fix the SOPS value or re-run the secret materialization."
+
+    # Close stdin before waiting, so nothing the probe writes can stall on an unanswered read.
+    $probe.StandardInput.Close()
+
+    # Drain both pipes concurrently.  Reading them only after the wait would deadlock on a
+    # full pipe buffer, because the child blocks writing while the parent blocks waiting.
+    $stdout = $probe.StandardOutput.ReadToEndAsync()
+    $stderr = $probe.StandardError.ReadToEndAsync()
+
+    if (-not $probe.WaitForExit($TimeoutSeconds * 1000)) {
+      $probe.Kill()
+      throw "verification: ERROR — ssh-keygen did not exit within $TimeoutSeconds s while probing managed SSH private key '$PrivateKeyPath'; refusing to continue, because an unbounded wait would stall apply."
+    }
+    # The bounded overload can return while the redirected pipes are still draining; the
+    # parameterless overload waits for them to reach EOF.
+    $probe.WaitForExit()
+
+    # ssh-keygen -l exits non-zero for a malformed or unreadable key.  Only stdout is
+    # consulted, so the failure is decided by an empty fingerprint line rather than by
+    # the exit code, exactly as the POSIX probe does.
+    $keyFingerprint = $stdout.Result
+    if ([string]::IsNullOrWhiteSpace($keyFingerprint)) {
+      $probeDiagnostic = $stderr.Result.Trim()
+      if ([string]::IsNullOrWhiteSpace($probeDiagnostic)) {
+        $probeDiagnostic = 'ssh-keygen wrote no diagnostic to stderr'
+      }
+      throw "verification: ERROR — managed SSH private key at '$PrivateKeyPath' is not a valid OpenSSH private key (ssh-keygen -l reported no fingerprint, so OpenSSH cannot read it): $probeDiagnostic; fix the SOPS value or re-run the secret materialization."
+    }
+  }
+  finally {
+    # The temp directory holds only the symlink, never key material.
+    Remove-Item -LiteralPath $probeDir -Recurse -Force -ErrorAction SilentlyContinue
   }
 }
 
@@ -147,11 +177,12 @@ function Invoke-SecretVerification {
 
     1. Materialization sanity: managed SSH key files, git-identity env, and
        managed-key manifest files exist and are non-empty.  Every private key listed
-       in managed-ssh-key-paths is then probed with ssh-keygen -y and an empty
-       passphrase, so a key that cannot be read unattended -- malformed or
-       passphrase-protected -- is rejected rather than passing an existence check.
-       The probe closes its own stdin and bounds its wait, so a key that would
-       otherwise prompt is rejected instead of stalling the run.
+       in managed-ssh-key-paths is then probed for validity: the file must carry an
+       OpenSSH private key header, and ssh-keygen -l must read a fingerprint from it.
+       A passphrase-protected key passes, because -l reads the cleartext public-key
+       blob and never needs the passphrase; a malformed or public key file is
+       rejected.  The probe closes its own stdin and bounds its wait so a wedged
+       ssh-keygen cannot stall the run.
        Mirrors the POSIX verifier in src/scripts/secrets/verify-secret-decryption.sh.
     2. GPG key presence: the managed primary fingerprint recorded in the
        managed-gpg-keys manifest is present in the GPG keyring.
@@ -182,7 +213,7 @@ function Invoke-SecretVerification {
 
   .PARAMETER SshKeygenExe
     Absolute path to the ssh-keygen executable, used to probe each managed SSH
-    private key for unattended usability.
+    private key for validity.
 
   .PARAMETER HostKeyPath
     Path to this machine's SSH host private key (used only for the host-key
@@ -274,7 +305,7 @@ function Invoke-SecretVerification {
 
   # -------------------------------------------------------------------------
   # 1. Materialization sanity: key files must exist and be non-empty, and every
-  # managed SSH private key must be readable with an empty passphrase.
+  # managed SSH private key must be a valid OpenSSH private key.
   # -------------------------------------------------------------------------
   Write-NucleusInfo -CommandName 'verification' "[1/5] checking secret materialization..."
   $sanityPaths = @($sshKeyPath, $sshPublicKeyPath, $managedGpgKeysManifest, $managedSshKeysManifest, $managedSshKeyPathsManifest, $gitIdentityPath)
@@ -284,7 +315,7 @@ function Invoke-SecretVerification {
     }
   }
 
-  # Existence is not usability.  The manifest enumerates every managed private key,
+  # Existence is not validity.  The manifest enumerates every managed private key,
   # including the personal one checked above, and each is probed so a failure names
   # the offending key file rather than the manifest as a whole.
   foreach ($managedKeyLine in (Get-Content -LiteralPath $managedSshKeyPathsManifest)) {
