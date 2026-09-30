@@ -367,6 +367,7 @@ $EnableAgentsClawHubSkillsParity = -not $noUserStateParity
 $EnablePiExtensionsParity = -not $noUserStateParity
 $EnableOpenCodeConfigParity = -not $noUserStateParity
 $EnableSuperpowersParity = -not $noUserStateParity
+$EnableWhisperModelParity = -not $noUserStateParity
 $EnableBunParity = -not $noUserStateParity
 $EnableCloudDrivesParity = -not $noUserStateParity
 $EnableSymlinkParity = -not $noUserStateParity
@@ -514,6 +515,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-PiAgentConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-OpenCodeConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-SuperpowersPlugin.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-WhisperModel.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-SymlinkManifest.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-DevRepoCatalog.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-DiscordMusicRPC.ps1")
@@ -930,6 +932,10 @@ Sync-AgentsConfig -RepoRoot $repoRoot -User $sessionUser -Enabled:$EnableAgentsC
 # Superpowers is fetched before the pi/opencode links and the skills layer that
 # consume its checkout.
 Sync-SuperpowersPlugin -RepoRoot $repoRoot -Enabled:$EnableSuperpowersParity
+# The model is fetched after Invoke-ScoopSetup so the binary and the weights it
+# opens converge in dependency order. The download is large, so it runs late
+# and independently of the agents layer above.
+Sync-WhisperModel -RepoRoot $repoRoot -Enabled:$EnableWhisperModelParity
 Sync-OpenCodeConfig -RepoRoot $repoRoot -User $sessionUser -Enabled:$EnableOpenCodeConfigParity
 Sync-AgentsSkillManifest -RepoRoot $repoRoot -User $sessionUser -Enabled:$EnableAgentsSkillsParity -ExtraSkillsSource $superpowersSkillsSource
 Sync-PiAgentConfig -RepoRoot $repoRoot -User $sessionUser -Enabled:$EnablePiExtensionsParity
