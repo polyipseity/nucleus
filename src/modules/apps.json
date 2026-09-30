@@ -74,6 +74,7 @@
         "kind": "macos-launchagent",
         "path": "/Applications/Stats.app",
         "bundleId": "eu.exelban.Stats",
+        "justification": "Stats also ships eu.exelban.Stats.LaunchAtLogin, an embedded Service-Management helper that registers through SMAppService. macOS 13+ lets only the owning app unregister it, so it is turned off once in Stats' own settings (Start at login) and this LaunchAgent stays the sole launch mechanism. Without that step Stats runs twice at login.",
         "statusIcon": {
           "kind": "macos-defaults-key",
           "domain": "com.apple.controlcenter",
