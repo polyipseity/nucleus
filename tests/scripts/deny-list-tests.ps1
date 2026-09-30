@@ -59,6 +59,30 @@ try {
     Assert-Fail 'Select-GitIgnored batch keeps tracked and removes ignored' "got: $($batch -join ', ')"
   }
 
+  # The symlinked fixture (tests/fixtures/user-registry/src/users/default) is a
+  # tracked symlink to src/users/default, so a recursive walk yields paths git
+  # cannot address. All three paths go through ONE call: git rejects the whole
+  # batch, and a per-path call would never produce the failure being pinned.
+  $beyondLink = Join-Path $repoRoot 'tests/fixtures/user-registry/src/users/default/discord-music-rpc/config.yaml'
+  $symlinkWarnings = @()
+  $symlinkBatch = @('result', $tracked, $beyondLink |
+    Select-GitIgnored -WarningVariable symlinkWarnings -WarningAction SilentlyContinue)
+  if ($symlinkBatch.Count -eq 1 -and $symlinkBatch[0] -eq $tracked) {
+    Assert-Pass 'Select-GitIgnored keeps filtering the rest of a batch containing a symlink-escaped path'
+  } else {
+    Assert-Fail 'Select-GitIgnored keeps filtering the rest of a batch containing a symlink-escaped path' "got: $($symlinkBatch -join ', ')"
+  }
+
+  # The pass-through warning already quotes the offending pathspec, so naming the
+  # path is not enough to tell the two behaviours apart: the drop has to say so.
+  $namedWarning = @($symlinkWarnings | Where-Object {
+      $_.Message -match 'dropped' -and $_.Message -match [regex]::Escape($beyondLink) })
+  if ($namedWarning.Count -gt 0) {
+    Assert-Pass 'Select-GitIgnored warns that it dropped the symlink-escaped path'
+  } else {
+    Assert-Fail 'Select-GitIgnored warns that it dropped the symlink-escaped path' "warnings: $($symlinkWarnings -join ' | ')"
+  }
+
   $empty = @(Get-FilteredList -InputPaths @(''))
   if ($empty.Count -eq 0) {
     Assert-Pass 'Select-GitIgnored empty input produces empty output'
