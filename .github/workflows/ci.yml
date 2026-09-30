@@ -51,7 +51,16 @@ jobs:
     env:
       # Keep flake support centralized at the job level so individual commands
       # stay readable while still working on fresh CI environments.
-      NIX_CONFIG: experimental-features = nix-command flakes
+      #
+      # WHY the access token: the hermes-agent flake input is fetched from
+      # api.github.com, which caps unauthenticated callers at 60 requests per
+      # hour per IP. Hosted runners share those IPs and the Nix cache is cold on
+      # a new revision, so an unauthenticated fetch intermittently gets a 429 and
+      # the job dies during provisioning. GITHUB_TOKEN is always available here
+      # and needs read access only, so a read-only fork token is enough.
+      NIX_CONFIG: |
+        experimental-features = nix-command flakes
+        access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
       # Verbose mode: set to 'true' for full step output, or a comma-separated
       # list of step IDs (e.g. 'nix-flake-eval') for targeted debugging.
       # Default: quiet (headers + summaries only).
