@@ -995,6 +995,14 @@ let
       };
       winget = "9NBDXK71NK08";
     };
+    # No `winget` id exists for whisper-cpp; the Windows twin is the Scoop
+    # main-bucket entry in src/modules/packages/desired.json. The ggml weights
+    # are pinned separately under the `whisper` lockfile section, because no
+    # package manager ships them.
+    whisper-cpp = {
+      category = "cli";
+      nixpkgs = "whisper-cpp";
+    };
     winfsp = {
       category = "cli";
       platforms = [ "linux" ];
