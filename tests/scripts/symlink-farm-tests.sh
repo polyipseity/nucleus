@@ -36,22 +36,40 @@ require_command sh "sh is a symlink-farm fixture target"
 # pass the existence test and then fail the GC's prefix test.  realpath is what
 # puts the host's own toolchain back on its true store path, and resolving at
 # runtime keeps the suite portable instead of pinning one host's store hashes.
-resolve_store_path() {
-  local _bin="$1" _real
-  _real="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$(command -v "$_bin")")"
-  case "$_real" in
-  /nix/store/*) printf '%s\n' "$_real" ;;
-  *)
-    echo "symlink-farm fixtures: ${_bin} must resolve into /nix/store, got: ${_real}" >&2
-    exit 1
-    ;;
-  esac
+#
+# The resolver returns 1 instead of exiting: an exit here runs inside a command
+# substitution, so it would kill the suite before finish_tests and leave the
+# runner with no tally.  Assigning the store paths from this function in the
+# suite's own shell keeps assert_fail and finish_tests reachable.
+STORE_A=""
+STORE_B=""
+_fixture_error=""
+resolve_fixture_targets() {
+  local _bin _real
+  for _bin in bash sh; do
+    if ! _real="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$(command -v "$_bin")")"; then
+      _fixture_error="${_bin}: realpath failed for $(command -v "$_bin")"
+      return 1
+    fi
+    case "$_real" in
+    /nix/store/*) ;;
+    *)
+      _fixture_error="${_bin} must resolve into /nix/store, got: ${_real}"
+      return 1
+      ;;
+    esac
+    case "$_bin" in
+    bash) STORE_A="$_real" ;;
+    sh) STORE_B="$_real" ;;
+    esac
+  done
 }
 
-STORE_A="$(resolve_store_path bash)"
-readonly STORE_A
-STORE_B="$(resolve_store_path sh)"
-readonly STORE_B
+if ! resolve_fixture_targets; then
+  assert_fail "symlink-farm fixtures resolve into /nix/store" "$_fixture_error"
+  finish_tests
+fi
+readonly STORE_A STORE_B
 
 # The script writes only inside FARM_DIR and the log path it is handed, so a
 # temp farm is enough isolation.
