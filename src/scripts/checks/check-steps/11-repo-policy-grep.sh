@@ -199,7 +199,7 @@ run_activation_tool_resolution() {
 
   # Activation-script directories (subset of all scripts).
   local _activation_dirs=(
-    src/scripts/packages src/scripts/shell src/scripts/agents
+    src/scripts/ai src/scripts/packages src/scripts/shell src/scripts/agents
     src/scripts/secrets src/scripts/services src/scripts/vms
     src/scripts/configs src/scripts/editors src/scripts/integrations
     src/scripts/completions

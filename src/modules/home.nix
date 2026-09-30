@@ -260,6 +260,7 @@ in
     ./shell
     ./shell
     ./terminal-activations.nix
+    ./voice-transcription.nix
     ./wallpapers.nix
   ];
 
