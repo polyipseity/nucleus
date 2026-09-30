@@ -394,3 +394,221 @@ if [ "$srt_failures" -ne 0 ]; then
   exit 1
 fi
 echo "PASS: srt wrapper invariants"
+
+# ---------------------------------------------------------------------------
+# PowerShell suppression audit (run_suppression_audit, the .ps1 half)
+#
+# The PowerShell twin audits .ps1 for unannotated suppressions. Without the
+# mirror a bad suppression is only ever caught on the Windows host, so these
+# tests drive the POSIX rule over .ps1 fixtures and check it accepts exactly
+# what the twin accepts: a comment line, an annotation on the line itself, an
+# annotation on the line above, and the tests/ exemption for the four patterns
+# that carry it.
+#
+# The scan is driven with explicit positional files (HAS_ARGS=true) so it never
+# depends on the gitignore filter being available inside a temporary fixture
+# tree, the same reason the srt section above does it.
+# ---------------------------------------------------------------------------
+
+PS1_FILES=()
+SH_FILES=()
+NIX_FILES=()
+
+# Run the audit over the given .ps1 files and capture its combined output.
+run_ps1_supp_scan() {
+  PS1_FILES=("$@")
+  local -A _ps1_ctx=(
+    [HAS_ARGS]=true
+    [REPO_ROOT]="$REPO_ROOT"
+    [SH_FILES]="SH_FILES"
+    [PS1_FILES]="PS1_FILES"
+    [NIX_FILES]="NIX_FILES"
+  )
+  _out=$(
+    cd "$REPO_ROOT" || return 1
+    run_suppression_audit _ps1_ctx 2>&1
+  )
+}
+
+# Write a .ps1 fixture holding the given lines and print its path.
+# $1: directory to create under a fresh temp root, remaining args: file lines.
+ps1_fixture() {
+  local _root
+  _root=$(mktemp -d)
+  mkdir -p "$_root/$1"
+  printf '%s\n' "${@:2}" >"$_root/$1/probe.ps1"
+  printf '%s\n' "$_root/$1/probe.ps1"
+}
+
+ps1_fixture_root() {
+  printf '%s\n' "$(dirname -- "$(dirname -- "$1")")"
+}
+
+# Does the report blame this file, line and pattern? Matched on the basename
+# plus the reported line and label, so a match can only come from the
+# violation line and not from the fixture path echoed elsewhere.
+ps1_blames() {
+  case "$_out" in
+  *"$(basename -- "$1"):$2 ($3)"*) return 0 ;;
+  *) return 1 ;;
+  esac
+}
+
+# The defect itself. Without this the acceptance tests below would pass against
+# a scan that reads nothing.
+test_ps1_undocumented_suppression_is_reported() {
+  local _probe _root _rc
+  _probe=$(ps1_fixture src "\$a = Get-Item 'p' -ErrorAction SilentlyContinue")
+  _root=$(ps1_fixture_root "$_probe")
+  run_ps1_supp_scan "$_probe"
+  _rc=$?
+  rm -rf "$_root"
+  if [ "$_rc" -eq 0 ]; then
+    fail "an unannotated PowerShell suppression was not reported" "$_out"
+    return 1
+  fi
+  if ps1_blames "$_probe" 1 '-ErrorAction SilentlyContinue'; then
+    return 0
+  fi
+  fail "the report does not name the offending file and line" "$_out"
+  return 1
+}
+
+# The documented form: the check id on the line itself.
+test_ps1_same_line_annotation_documents() {
+  local _probe _root _rc
+  _probe=$(ps1_fixture src "# check-suppress:suppression_doc: probe; the null check below handles it" "\$a = Get-Item 'p' -ErrorAction SilentlyContinue # check-suppress:suppression_doc: probe; the null check below handles it")
+  _root=$(ps1_fixture_root "$_probe")
+  run_ps1_supp_scan "$_probe"
+  _rc=$?
+  rm -rf "$_root"
+  if [ "$_rc" -ne 0 ]; then
+    fail "an annotation on the same line was not accepted" "$_out"
+    return 1
+  fi
+  return 0
+}
+
+# The annotation on the line above is the form the shipped scripts use, and the
+# form a stricter rule than the twin's would reject.
+test_ps1_preceding_line_annotation_documents() {
+  local _probe _root _rc
+  _probe=$(ps1_fixture src "# check-suppress:suppression_doc: probe; the null check below handles it" "\$a = Get-Item 'p' -ErrorAction SilentlyContinue")
+  _root=$(ps1_fixture_root "$_probe")
+  run_ps1_supp_scan "$_probe"
+  _rc=$?
+  rm -rf "$_root"
+  if [ "$_rc" -ne 0 ]; then
+    fail "an annotation on the preceding line was not accepted" "$_out"
+    return 1
+  fi
+  return 0
+}
+
+# A comment that names the pattern explains it and is not a violation. The
+# shipped Invoke-ScoopSetup.ps1 has this exact shape, so a rule that scanned
+# comment lines would report the repository's own file.
+test_ps1_comment_line_is_not_a_violation() {
+  local _rc
+  run_ps1_supp_scan src/platforms/Windows/modules/setup/Invoke-ScoopSetup.ps1
+  _rc=$?
+  if [ "$_rc" -ne 0 ]; then
+    fail "a comment naming the pattern was reported" "$_out"
+    return 1
+  fi
+  return 0
+}
+
+# No annotation documents this one: it discards a result by piping it away, so
+# the only fix is to not do it. The annotation on the line is the positive
+# control that the scan read the file.
+test_ps1_annotated_out_null_is_still_reported() {
+  local _probe _root _rc
+  _probe=$(ps1_fixture src "Get-Item 'z' | Out-Null # check-suppress:suppression_doc: discarded")
+  _root=$(ps1_fixture_root "$_probe")
+  run_ps1_supp_scan "$_probe"
+  _rc=$?
+  rm -rf "$_root"
+  if [ "$_rc" -eq 0 ]; then
+    fail "an annotated '| Out-Null' was not reported" "$_out"
+    return 1
+  fi
+  if ps1_blames "$_probe" 1 '| Out-Null'; then
+    return 0
+  fi
+  fail "the report does not name the '| Out-Null' line" "$_out"
+  return 1
+}
+
+# The suppression family is not enforced under tests/. Four patterns carry that
+# exemption and three do not, so the same unannotated fixture must report only
+# the three.
+test_ps1_tests_directory_exemption() {
+  local _probe _root _rc _reported
+  _probe=$(ps1_fixture tests "\$a = Get-Item 'p' -ErrorAction SilentlyContinue" "\$b = & cmd /c ver 2>\$null" "\$null = Get-Item 'r'" "[void](Get-Item 'u')" "try { Get-Item 's' } catch {}" "Get-Item 'z' | Out-Null")
+  _root=$(ps1_fixture_root "$_probe")
+  run_ps1_supp_scan "$_probe"
+  _rc=$?
+  rm -rf "$_root"
+  if [ "$_rc" -eq 0 ]; then
+    fail "the tests/ scan reported nothing, so the exemptions were not exercised" "$_out"
+    return 1
+  fi
+  _reported=$(grep -c "probe.ps1:" <<<"$_out")
+  if [ "$_reported" -ne 2 ]; then
+    fail "expected 2 reported lines in tests/, got $_reported" "$_out"
+    return 1
+  fi
+  if ps1_blames "$_probe" 5 'empty catch {}' && ps1_blames "$_probe" 6 '| Out-Null'; then
+    return 0
+  fi
+  fail "the patterns without a tests/ exemption were not reported" "$_out"
+  return 1
+}
+
+# The step files carry the literal pattern text of this scan, so they are
+# excluded. The unannotated probe alongside them is the control: a scan that
+# reported nothing at all would otherwise pass.
+test_ps1_step_files_are_not_self_reported() {
+  local _probe _root
+  _probe=$(ps1_fixture src "\$a = Get-Item 'p' -ErrorAction SilentlyContinue")
+  _root=$(ps1_fixture_root "$_probe")
+  run_ps1_supp_scan \
+    src/scripts/checks/check-steps/11-repo-policy-grep.ps1 \
+    src/scripts/checks/check-steps/12-repo-policy-pattern.ps1 \
+    src/scripts/checks/check-steps/13-repo-policy-data.ps1 \
+    "$_probe"
+  rm -rf "$_root"
+  if ! ps1_blames "$_probe" 1 '-ErrorAction SilentlyContinue'; then
+    fail "the positive control was not reported, so the absence is not evidence" "$_out"
+    return 1
+  fi
+  case "$_out" in
+  *11-repo-policy-grep.ps1* | *12-repo-policy-pattern.ps1* | *13-repo-policy-data.ps1*)
+    fail "an excluded step file was reported" "$_out"
+    return 1
+    ;;
+  esac
+  return 0
+}
+
+ps1_failures=0
+for test in \
+  test_ps1_undocumented_suppression_is_reported \
+  test_ps1_same_line_annotation_documents \
+  test_ps1_preceding_line_annotation_documents \
+  test_ps1_comment_line_is_not_a_violation \
+  test_ps1_annotated_out_null_is_still_reported \
+  test_ps1_tests_directory_exemption \
+  test_ps1_step_files_are_not_self_reported; do
+  if ! "$test"; then
+    echo "FAIL: $test"
+    ps1_failures=$((ps1_failures + 1))
+  fi
+done
+
+if [ "$ps1_failures" -ne 0 ]; then
+  echo "FAIL: $ps1_failures PowerShell suppression audit test(s) failed"
+  exit 1
+fi
+echo "PASS: PowerShell suppression audit"
