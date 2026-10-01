@@ -4,7 +4,7 @@
 
 **Goal:** Remove dead/trivial grep-only tests, consolidate fragmented test files, and convert high-value grep-based tests to behavioral tests that validate behavior rather than implementation text.
 
-**Architecture:** The repo has ~49 Nix test files, ~27 Pester files, ~50 shell/PS test files, and 19 check steps. The dominant anti-pattern is `containsRegex` / `lib.hasInfix` / `grep` assertions against `builtins.readFile` source text — these test that specific strings exist in source files, not that behavior is correct. When implementation text changes (reflow, rename, restructure), these tests break even though behavior is preserved.
+**Architecture:** The repo has ~49 Nix test files, ~27 Pester files, ~50 shell/PS test files, and 19 check steps. The dominant anti-pattern is `containsRegex` / `lib.hasInfix` / `grep` assertions against `builtins.readFile` source text. These test that specific strings exist in source files, not that behavior is correct. When implementation text changes (reflow, rename, restructure), these tests break even though behavior is preserved.
 
 **Tech Stack:** Nix (`nix-instantiate --eval`), Pester (PowerShell), Bash (`test-lib.sh`), step-runner framework
 
@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Tests must use `builtins.seq (builtins.deepSeq ... null)` or equivalent to force evaluation
-- No real-user test coupling — use `tests/fixtures/user-registry/` only
+- No real-user test coupling: use `tests/fixtures/user-registry/` only
 - POSIX tests use `test-lib.sh`; Windows tests use Pester
 - Check steps run via step-runner with wave parallelism
 - `testing.instructions.md` conventions are authoritative
@@ -26,18 +26,18 @@
 
 | Category | Count | Classification |
 |----------|-------|---------------|
-| Check steps (01–19) | 19 steps | **All KEEP** — every step validates a real invariant |
+| Check steps (01–19) | 19 steps | **All KEEP**, every step validates a real invariant |
 | Nix module tests | 30 files | 12 KEEP, 8 FIX, 4 CONSOLIDATE, 6 REMOVE |
 | Nix integration tests | 9 files | 4 KEEP, 4 FIX, 1 REMOVE |
 | Nix host tests | 7 files | 3 KEEP, 1 FIX, 3 REMOVE |
 | Nix platform tests | 2 files | 1 KEEP, 1 FIX |
 | Script-level tests | ~50 files | ~45 KEEP, ~5 REMOVE |
-| Pester tests | 27 files | **All KEEP** — well-structured behavioral tests |
+| Pester tests | 27 files | **All KEEP**, well-structured behavioral tests |
 | Test infrastructure | 4 files | **All KEEP** |
 
 ### The dominant anti-pattern
 
-~25 test files use `builtins.readFile ../../src/...` followed by `containsRegex` / `lib.hasInfix` to check that specific text strings exist in source files. These are **implementation-coupled regression guards** — they verify text, not behavior. They break on code reflow, variable renaming, or comment changes while providing zero behavioral assurance.
+~25 test files use `builtins.readFile ../../src/...` followed by `containsRegex` / `lib.hasInfix` to check that specific text strings exist in source files. These are **implementation-coupled regression guards**: they verify text, not behavior. They break on code reflow, variable renaming, or comment changes while providing zero behavioral assurance.
 
 ---
 
@@ -49,7 +49,7 @@ Safe deletions. These tests provide zero or near-zero behavioral value.
 
 - [ ] **Step 1: Delete `tests/modules/macos-homebrew-exclusion-tests.nix`**
 
-  This file has a detailed comment describing what it SHOULD test, but the body is `{ success = true; message = "..."; }` — zero assertions. It's a no-op.
+  This file has a detailed comment describing what it SHOULD test, but the body is `{ success = true; message = "..."; }`, so zero assertions. It's a no-op.
 
   ```bash
   rm tests/modules/macos-homebrew-exclusion-tests.nix
@@ -93,7 +93,7 @@ Safe deletions. These tests provide zero or near-zero behavioral value.
 
 - [ ] **Step 1: Delete `tests/integration/config-composition-tests.nix`**
 
-  17 grep assertions checking that import paths like `"../../modules/core.nix"` exist in source files. These are pure implementation coupling — `nix flake check` already validates that all imports resolve. If an import breaks, the build fails. These grep tests add nothing.
+  17 grep assertions checking that import paths like `"../../modules/core.nix"` exist in source files. These are pure implementation coupling. `nix flake check` already validates that all imports resolve. If an import breaks, the build fails. These grep tests add nothing.
 
   ```bash
   rm tests/integration/config-composition-tests.nix
@@ -193,12 +193,12 @@ Merge related small test files into cohesive suites.
 
 - [ ] **Step 1: Read existing files**
 
-  Read `tests/modules/cloud-launchd-agents-tests.nix` (46 lines). The deleted `cloud-mount-paths-tests.nix` had one assertion — fold its invariant into the new file.
+  Read `tests/modules/cloud-launchd-agents-tests.nix` (46 lines). The deleted `cloud-mount-paths-tests.nix` had one assertion, so fold its invariant into the new file.
 
 - [ ] **Step 2: Create `tests/modules/cloud-drive-tests.nix`**
 
   ```nix
-  # tests/modules/cloud-drive-tests.nix — Cloud drive launchd agents and mount paths.
+  # tests/modules/cloud-drive-tests.nix: Cloud drive launchd agents and mount paths.
 
   let
     inherit (import ../lib.nix) assert' containsRegex;
@@ -310,7 +310,7 @@ These tests have real invariants worth preserving, but their grep-based approach
   Instead of checking text patterns, import the symlinks module with fixture data and verify the output attributes:
 
   ```nix
-  # tests/modules/symlinks-tests.nix — Per-user symlink wiring (behavioral).
+  # tests/modules/symlinks-tests.nix: Per-user symlink wiring (behavioral).
 
   let
     fixtures = import ../fixtures { };
@@ -370,7 +370,7 @@ These tests have real invariants worth preserving, but their grep-based approach
   Import the treefmt configuration and verify the evaluation produces expected formatter configs:
 
   ```nix
-  # tests/modules/treefmt-tests.nix — treefmt formatter enablement (behavioral).
+  # tests/modules/treefmt-tests.nix: treefmt formatter enablement (behavioral).
 
   let
     lib = import <nixpkgs/lib>;
@@ -419,7 +419,7 @@ These tests have real invariants worth preserving, but their grep-based approach
   Parse `services.json` with `builtins.fromJSON` and validate the data structure directly:
 
   ```nix
-  # tests/integration/svc-tests.nix — Service management (behavioral).
+  # tests/integration/svc-tests.nix: Service management (behavioral).
 
   let
     lib = import <nixpkgs/lib>;
@@ -511,7 +511,7 @@ These tests have valuable invariants but test the wrong thing. Fix the approach 
 
 - [ ] **Step 1: Read the current file**
 
-  Identify which assertions are pure-logic (backend selection, override precedence) — **keep those**. Identify nix-index timer grep assertions — **remove those** (they test text, not timer behavior).
+  Identify which assertions are pure-logic (backend selection, override precedence): **keep those**. Identify nix-index timer grep assertions and **remove those** (they test text, not timer behavior).
 
 - [ ] **Step 2: Remove grep assertions, keep behavioral ones**
 
@@ -559,7 +559,7 @@ These tests have valuable invariants but test the wrong thing. Fix the approach 
 
 - [ ] **Step 2: Keep mock-data tests, remove grep assertions**
 
-  The mock-data ordering tests validate activation dependency logic — keep them. Remove the `builtins.readFile` + `containsRegex` blocks that check source file text.
+  The mock-data ordering tests validate activation dependency logic, so keep them. Remove the `builtins.readFile` + `containsRegex` blocks that check source file text.
 
 - [ ] **Step 3: Verify and commit**
 
@@ -615,7 +615,7 @@ These tests have valuable invariants but test the wrong thing. Fix the approach 
 
 - [ ] **Step 1: Read the file**
 
-  Check if the grep assertions (e.g., `grep -Fq '#MacBook'`) are testing behavior or just text. If it's checking that `apply.sh` references PascalCase flake hosts, that's a text check — but it's also a real invariant (lowercase hosts would break the flake reference).
+  Check if the grep assertions (e.g., `grep -Fq '#MacBook'`) are testing behavior or just text. If it's checking that `apply.sh` references PascalCase flake hosts, that's a text check, but it's also a real invariant (lowercase hosts would break the flake reference).
 
 - [ ] **Step 2: Classify and act**
 

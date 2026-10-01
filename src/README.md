@@ -40,7 +40,7 @@ Policy and invariants: `AGENTS.md` and `.agents/instructions/`.
 
 ## Directory roots
 
-Nucleus owns at most **two native roots per host**: one USER root and one SYSTEM root, both fully native per-OS — plus a `~/.nucleus` convenience hub (Windows: `%USERPROFILE%\.nucleus`) for every user. User-intended dirs (`clouds`, `dev`, `virtual machines`, `Pictures/wallpapers`, `Downloads`) are excluded and stay as is.
+Nucleus owns at most **two native roots per host**: one USER root and one SYSTEM root, both fully native per-OS, plus a `~/.nucleus` convenience hub (Windows: `%USERPROFILE%\.nucleus`) for every user. User-intended dirs (`clouds`, `dev`, `virtual machines`, `Pictures/wallpapers`, `Downloads`) are excluded and stay as is.
 
 **Hard rule: nucleus code references only root paths** (`<root>/logs`, `<root>/state`, `<root>/config`, `<root>/run`, `<root>/caddy`). The physical conventional locations (`/var/log/nucleus`, `~/Library/Logs/nucleus`, `/run/nucleus`, `~/.local/state/nucleus`, …) are reached only via root→conventional symlinks created by activation (and by systemd `StateDirectory`/`LogsDirectory`/`RuntimeDirectory`). They must never appear in service runtime code. Symlink direction is fixed: `~/.nucleus` → roots, and roots → conventional targets. Never reversed. `~/.nucleus` is never a data root and is never written to by services.
 

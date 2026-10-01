@@ -246,7 +246,7 @@ for ($ti = 0; $ti -lt $totalTasks; $ti++) {
     Write-Output '  TIMEOUT (>600s)'
   } elseif ($proc.ExitCode -ne 0) {
     $exitCode = $proc.ExitCode
-    # Non-zero exit — try to parse stdout as JSON for structured error
+    # Non-zero exit: try to parse stdout as JSON for structured error
     try {
       $parsed = $stdout.Trim() | ConvertFrom-Json
       $isError = if ($null -ne $parsed.Error) { $parsed.Error } else { $true }
@@ -260,7 +260,7 @@ for ($ti = 0; $ti -lt $totalTasks; $ti++) {
     }
     Write-Output "  FAILED: $errorMsg"
   } else {
-    # Success — parse JSON
+    # Success: parse JSON
     try {
       $parsed = $stdout.Trim() | ConvertFrom-Json
       if ($parsed.Error) {
