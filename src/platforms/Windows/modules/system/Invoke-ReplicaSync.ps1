@@ -3,30 +3,13 @@
   Synchronize enabled cloud replicas declared in src/users/.
 
 .DESCRIPTION
-  Windows counterpart to scripts/replica-sync.sh. Reads per-user replica
-  definitions from src/users/ and performs pull-only replica
-  convergence (`rclone sync remote -> local`).
-
-  Replica policy is strict:
-    - pull is supported
-    - push and bidirectional are rejected
-  This preserves remote read-only behavior for replica automation.
-
-.PARAMETER RepoRoot
-  Repository root path.
+  Windows counterpart of scripts/replica-sync.sh. Reads per-user replica definitions
+  from src/users/ and runs pull-only convergence (`rclone sync remote -> local`).
+  Push and bidirectional replicas are rejected, keeping remotes read-only for replica
+  automation.
 
 .PARAMETER DryRun
   Prints planned rclone commands without executing them.
-
-.PARAMETER ReplicaId
-  Optional replica id filter; when provided only the matching replica runs.
-
-.EXAMPLE
-  Invoke-ReplicaSync -RepoRoot 'C:\Users\admin\nucleus' -DryRun
-
-.EXAMPLE
-  Invoke-ReplicaSync -RepoRoot 'C:\Users\admin\nucleus' -ReplicaId 'photos'
-
 .NOTES
   Environment variables:
     NUCLEUS_HOST  Host identifier used for host-matching logic.
@@ -91,9 +74,8 @@ function Invoke-ReplicaSync {
     }
   }
   catch {
-    # Non-Windows PowerShell hosts (for example CI/parser checks on macOS)
-    # do not implement WindowsIdentity. Keep a username fallback so dry-runs
-    # and syntax validations remain cross-platform friendly.
+    # Non-Windows hosts (CI and parser checks on macOS) lack WindowsIdentity, so
+    # fall back to a username and keep dry-runs cross-platform.
     Write-Verbose "replica-sync: WindowsIdentity unavailable; using username fallback '$currentUserPrincipal'"
   }
 
@@ -530,10 +512,9 @@ function Invoke-ReplicaSync {
     }
     if ($provider -eq 'OneDrive') {
       if ($remotePath -eq '/') {
-        # Keep the defensive root probe/filter generation for Personal Vault,
-        # but let the real sync use OneDrive's default recursive listing path.
-        # For full-root pull replicas, forcing --disable ListR makes syncs
-        # pathologically slow.
+        # Keep the defensive root probe for Personal Vault but let the real sync
+        # use OneDrive's default recursive listing: forcing --disable ListR makes
+        # full-root pull replicas pathologically slow.
         $runtimeFilterPath = Get-OneDriveRootFilterFile -ReplicaId $id -LocalDir $localDir -RemoteRef $remoteRef -RemoteExcludes $gcValues.RemoteExcludes -BlockedRoots $gcValues.BlockedRoots -IsDryRun:$DryRun
         if ($null -ne $resolvedFilterPath) {
           $commonArgs += @('--filter-from', $resolvedFilterPath)

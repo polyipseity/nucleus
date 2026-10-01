@@ -4,25 +4,22 @@
   matching the Nix config-utils.nix contract.
 
 .DESCRIPTION
-  Every config in src/modules/configs/ should use these functions to ensure
-  consistent deployment semantics. See .agents/instructions/app-config-policy.instructions.md
-  for the priority ordering and "why not #1" comment rule.
+  Deployment semantics for src/modules/configs/, ordered by
+  .agents/instructions/app-config-policy.instructions.md. Every function returns
+  .Changed and .Message so callers log uniformly.
 
-  These functions use Developer-Mode symlinks (available through
-  Microsoft.Windows.Settings/DeveloperMode in system.dsc.yml).
+  Symlinks need Developer Mode, enabled through Microsoft.Windows.Settings/
+  DeveloperMode in system.dsc.yml.
 
-  Each function returns an object with .Changed ($true/$false) and .Message so
-  callers can log uniformly.
-
-  Cross-platform consistency: deduplication is case-insensitive (weakest
-  constraint — works on NTFS, POSIX, and Nix). Symlink detection follows
-  symlinks (Test-Path), matching Nix pathExists and POSIX -e.
+  Cross-platform consistency: deduplication is case-insensitive (the weakest
+  constraint, works on NTFS, POSIX, and Nix) and symlink detection follows links
+  (Test-Path), matching Nix pathExists and POSIX -e.
 #>
 
 function Deploy-WritableSymlink {
   <#
   .SYNOPSIS
-    Method 1 (default) -- creates a bidirectional writable symlink.
+    Method 1 (default): creates a bidirectional writable symlink.
   .PARAMETER Name
     Unique identifier for logging.
   .PARAMETER RepoRoot
@@ -83,7 +80,7 @@ function Deploy-WritableSymlink {
 function Deploy-ReadOnly {
   <#
   .SYNOPSIS
-    Method 2 (fallback) -- copies a file with ReadOnly attribute.
+    Method 2 (fallback): copies a file with the ReadOnly attribute.
   .PARAMETER Name
     Unique identifier for logging.
   .PARAMETER RepoRoot
@@ -145,7 +142,7 @@ function Deploy-ReadOnly {
 function Deploy-Merge {
   <#
   .SYNOPSIS
-    Method 3 (fallback) -- merges managed settings into an app-owned config file.
+    Method 3 (fallback): merges managed settings into an app-owned config file.
   .PARAMETER Name
     Unique identifier for logging.
   .PARAMETER TargetPath

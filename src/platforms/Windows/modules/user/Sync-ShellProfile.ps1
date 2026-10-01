@@ -4,49 +4,18 @@ function Sync-ShellProfile {
     Converges a managed shell-parity block in PowerShell profile files.
 
   .DESCRIPTION
-    Writes or removes a bounded managed block in:
-      - CurrentUserCurrentHost profile
-      - CurrentUserAllHosts profile
+    Writes or removes a bounded managed block in the CurrentUserCurrentHost and
+    CurrentUserAllHosts profiles. The managed content comes from the shared
+    cross-platform profile src/scripts/shell/profile.ps1, which is also embedded
+    by src/modules/pwsh.nix on POSIX hosts, so shell parity has one source.
 
-    Managed content is read from the shared cross-platform profile
-    src/scripts/shell/profile.ps1 (canonical source; also embedded by
-    src/modules/pwsh.nix on POSIX hosts) and substituted into the managed
-    block, intentionally mirroring key POSIX shell workflow behavior:
-      - direnv integration (if direnv is present)
-      - PSReadLine predictive history completion and menu-style tab expansion
-        (if PSReadLine module is available; bundled with pwsh on all supported hosts)
-      - zoxide smart directory navigation (if zoxide is present)
-      - fzf Ctrl+R fuzzy history search via PSReadLine key handler
-        (if fzf is present and PSReadLine is available)
-      - pay-respects command correction hook (if pay-respects is present; installed
-        via cargo-binstall by Invoke-CargoBinstallSetup)
-      - common aliases (`-g`, `-ga`, `-gb`, `-gc`, `-gca`, `-gcl`, `-gco`, `-gd`, `-gf`, `-gl`, `-gp`,
-        `-gpl`, `-optimize-pdf-*` (Ghostscript PDF presets), `-gsw`, `-gst`, `-la`, `-ll` (eza preferred, Get-ChildItem fallback),
-        `-n`, `-na`, `-nb`, `-nc`, `-nci`, `-ncl`, `-nf`, `-nff`, `-ni`, `-nl`, `-no`, `-nr`, `-nrm`, `-nt`, `-nu`, `-nup`, `-nw`, `-nx` (bun shortcuts, if bun present), `-v`)
-      - Python ban: blocks system-wide python/pip to prevent accidental
-         modifications to system environment
-      - Build tool ban: blocks system-wide bun/cargo/rustc/uv direct invocation;
-        passes through when DIRENV_DIR is set (active direnv/devShell context)
-        or when the managed default dev environment is active for repositories
-        that do not ship direnv/Nix metadata
+    Also converges the PSScriptAnalyzerSettings reference symlink next to the
+    CurrentUserCurrentHost profile, mirroring POSIX pwsh.nix (method 1).
 
-    Also converges (creates/removes) the provisioned PSScriptAnalyzerSettings
-    reference symlink next to the CurrentUserCurrentHost profile, mirroring
-    POSIX pwsh.nix deployment (method 1 writable symlink).
-
-    Cleanup behavior when disabled removes only the managed block and the
-    settings symlink.
+    Disabling removes only the managed block and the settings symlink.
 
   .PARAMETER Enabled
-    Whether managed shell parity should be enforced. Mandatory: caller must
-    explicitly choose true (apply) or false (cleanup). False removes the managed
-    block from profile files.
-
-  .EXAMPLE
-    Sync-ShellProfile -Enabled:$true
-
-  .EXAMPLE
-    Sync-ShellProfile -Enabled:$false
+    Mandatory: true applies the block, false removes it.
 
   .NOTES
     Environment variables: NUCLEUS_REPO_ROOT — must be set by caller (apply.ps1
@@ -68,16 +37,13 @@ function Sync-ShellProfile {
   # (nucleus-managed framing; brackets reserved for machine-managed regions).
   $managedBlockStart = '# >>> begin nucleus-managed: shell profile >>>'
   $managedBlockEnd = '# <<< end nucleus-managed: shell profile <<<'
-  # User-scope package manager bin directories are prepended before the
-  # direnv hook initializes so they are always part of the environment
-  # direnv saves and restores, regardless of whether the directories
-  # existed at profile load time.  No existence guard: non-existent dirs
-  # in PATH are harmless and the unconditional add ensures a new terminal
-  # opened after apply sees the correct PATH immediately.
+  # Prepended before the direnv hook so the directories are part of the
+  # environment direnv saves and restores. No existence guard: a missing dir in
+  # PATH is harmless, and the unconditional add means a terminal opened after
+  # apply sees the right PATH.
   # Sources: ManagedPaths.ps1 -> managed-paths.nix (pathComponents.append).
-  # Compute from the canonical path list so additions only need updating in
-  # one place.  Each entry (e.g. '.bun\bin') produces a variable definition,
-  # a guard, and a PATH assignment.
+  # Each entry (e.g. '.bun\bin') produces a variable definition, a guard, and a
+  # PATH assignment.
   $prependLines = $nucleusPathComponents.Prepend | ForEach-Object {
     $__binName = $_ -replace '^\.(.+)\\bin$', '$1'
     $__binVar  = "${__binName}BinDir"
@@ -100,10 +66,9 @@ function Sync-ShellProfile {
   # src/scripts/shell/profile.ps1.  Read it back here and substitute the three
   # platform-specific tokens so shell-parity content has a single source of
   # truth: the managed PATH prepend/append snippets and the LLVM bin directory.
-  # The `-replace` substitutions are safe: the replacement snippets contain no
-  # `$1`-style regex group references (.NET leaves unknown `$name` sequences
-  # literal), and the prepend/append lines are embedded via `$managedBlockStart`
-  # marker on both sides.
+  # The three -replace substitutions are safe: the snippets carry no `$1`-style
+  # group references, which .NET leaves literal, and the prepend/append lines sit
+  # between the $managedBlockStart marker on both sides.
   $managedBlock = @($managedBlockStart) + (((Get-Content -Raw (Join-Path $PSScriptRoot -ChildPath '..\..\..\..\scripts\shell\profile.ps1')) -replace '__NUCLEUS_PREPEND_PATH__', ($prependLines -join "`r`n") -replace '__NUCLEUS_APPEND_PATH__', ($appendLines -join "`r`n") -replace '__NUCLEUS_LLVM_BIN_DIR__', (Get-NucleusLLVMBinDir)) -split '\r?\n') + @($managedBlockEnd)
 
   $profilePaths = @(
@@ -162,8 +127,7 @@ function Sync-ShellProfile {
     }
   }
 
-  # Provisioned PSScriptAnalyzerSettings reference copy (method 1 writable
-  # symlink), mirroring POSIX pwsh.nix deployment.
+  # Method 1 writable symlink, mirroring POSIX pwsh.nix deployment.
   $currentUserHostProfile = $PROFILE.CurrentUserCurrentHost
   if (-not [string]::IsNullOrWhiteSpace($currentUserHostProfile)) {
     $profileDirectory = Split-Path -Path $currentUserHostProfile -Parent

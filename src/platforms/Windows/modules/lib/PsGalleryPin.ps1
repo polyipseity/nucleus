@@ -1,12 +1,10 @@
-# PsGalleryPin.ps1 — PSGallery nupkg pin helpers for Windows tooling.
+# PsGalleryPin.ps1 - PSGallery nupkg pin helpers for Windows tooling.
 #
-# lockfile.json's `psgallery` entries are either a plain version string or a
-# {version, hash} object, where `hash` is the SHA256 of the PSGallery nupkg in
-# SRI form (sha256-<base64>). PSGallery has no release-age feature, so the
-# version pin plus that nupkg hash is the substitution mitigation.
-#
-# `nucleus-update lockfile` dot-sources this file to recompute the hash on a
-# version bump; a hash is never carried over from the previous version.
+# lockfile.json's `psgallery` entries are a plain version string or a
+# {version, hash} object whose `hash` is the nupkg SHA256 in SRI form. PSGallery has
+# no release-age feature, so the version pin plus that hash is the mitigation.
+# `nucleus-update lockfile` dot-sources this file to recompute the hash on a version
+# bump; a hash is never carried over from the previous version.
 
 # Compute the SRI-form SHA256 ('sha256-<base64>') of a file.
 function Get-NucleusSriHash {
@@ -30,9 +28,8 @@ function Get-NucleusSriHash {
   }
 }
 
-# Fetch one PSGallery module nupkg and return its SRI-form SHA256. Returns an
-# empty string when the download fails, so the caller must treat empty as a
-# failed recomputation and leave the lockfile entry unchanged.
+# Fetch one PSGallery module nupkg and return its SRI-form SHA256. Empty means the
+# download failed, so the caller leaves the lockfile entry unchanged.
 function Get-PsgalleryNupkgHash {
   [CmdletBinding()]
   [OutputType([string])]

@@ -3,20 +3,14 @@
   SSH host key bootstrap helper.
 
 .DESCRIPTION
-  Mirrors generate_ssh_host_key_if_needed in src/scripts/apply.sh.
-  Verify the Windows SSH host Ed25519 key exists before
-  register-hostagekey.ps1 tries to derive the machine age public key from
-  the corresponding .pub file.  On a fresh machine the key is absent until the
-  OpenSSH Server Windows service first starts; this module starts the service
-  briefly to trigger automatic key generation when the service is already
-  installed but the key file has not yet been written.
+  Windows twin of generate_ssh_host_key_if_needed in src/scripts/apply.sh. The
+  host key is absent on a fresh machine until the OpenSSH Server service first
+  starts, so this starts it briefly to trigger generation when the service is
+  installed but the key file is not.
 
 .NOTES
   Environment variables:
     ProgramData  Path to the ProgramData directory (default: C:\ProgramData).
-
-  Exit codes:
-    This module does not emit exit codes.
 #>
 function Initialize-SSHHostKey {
   <#
@@ -24,41 +18,12 @@ function Initialize-SSHHostKey {
     Verify the Windows SSH host Ed25519 key exists, generating it if absent.
 
   .DESCRIPTION
-    Checks whether the SSH host Ed25519 private key exists and returns
-    immediately if it does (idempotent; safe to call on every apply run).
+    Returns immediately when the key exists (idempotent). Otherwise starts sshd
+    briefly to make Windows OpenSSH generate the key, waits up to
+    StartupTimeoutSeconds, then restores the original running state.
 
-    If the key is absent and the Windows sshd service is already installed
-    (for example from a prior apply that installed OpenSSH via WinGet DSC),
-    starts the service briefly to trigger automatic host key generation by
-    Windows OpenSSH, waits up to StartupTimeoutSeconds for the key to appear,
-    then restores the service to its original running state.
-
-    If sshd is not yet installed (first-ever apply on a fresh machine before
-    WinGet DSC has run), emits an advisory warning and returns without error.
-    After DSC installs OpenSSH and Sync-OpenSSHServer starts the service,
-    the keys will be generated in the same apply run and the trailing call to
-    Register-HostAgeKey will complete registration automatically.
-
-  .PARAMETER MachineSshHostKeyPath
-    Path to the SSH host Ed25519 private key file.
-    Defaults to C:\ProgramData\ssh\ssh_host_ed25519_key.
-
-  .PARAMETER StartupTimeoutSeconds
-    Maximum seconds to wait for sshd to generate host keys after the service
-    is started.  Defaults to 10.
-
-  .EXAMPLE
-    Initialize-SSHHostKey
-
-  .EXAMPLE
-    Initialize-SSHHostKey -MachineSshHostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key'
-
-  .NOTES
-    Environment variables:
-      (none)    No environment variables used.
-
-    Exit codes:
-      0 on success; 1 on error.
+    A missing sshd warns and returns without error; Register-HostAgeKey
+    completes registration on a later apply.
   #>
   [CmdletBinding()]
   param(
@@ -77,22 +42,17 @@ function Initialize-SSHHostKey {
   # check-suppress:suppression_doc: probe whether sshd is installed; Get-Service throws when absent.
   $sshdService = Get-Service -Name 'sshd' -ErrorAction SilentlyContinue
   if ($null -eq $sshdService) {
-    # sshd not yet installed: advisory warning only.  Initialize-SSHHostKey
-    # runs before DSC and Sync-OpenSSHServer on each apply.  If sshd is absent
-    # (fresh machine without the OpenSSH Server optional feature), the host key
-    # cannot be generated yet.  Sync-OpenSSHServer (called later in this run)
-    # will skip gracefully when the service is missing, and the trailing
-    # Register-HostAgeKey call completes registration on a future apply once
-    # sshd is available.
+    # sshd absent on a fresh machine without the OpenSSH Server feature: warn.
+    # Sync-OpenSSHServer and the trailing Register-HostAgeKey call finish the
+    # job on a later apply.
     Write-NucleusWarning -CommandName 'SSH' ("sshd service not installed; SSH host key cannot be " +
                    "generated yet.  Keys will be generated when sshd is available " +
                    "(enable the OpenSSH Server Windows optional feature).")
     return
   }
 
-  # Service is installed but key absent: start it briefly so Windows OpenSSH
-  # generates host key files automatically, then restore the prior state.
-  # Convergence responsibility (Automatic startup, firewall rule) belongs to
+  # Start the service briefly so Windows OpenSSH generates the host key files,
+  # then restore the prior state. Startup and firewall convergence belongs to
   # Sync-NucleusOpenSshServer, called later in the apply run.
   $wasRunning = $sshdService.Status -eq 'Running'
   if (-not $wasRunning) {
@@ -100,9 +60,8 @@ function Initialize-SSHHostKey {
     Start-Service -Name 'sshd'
   }
 
-  # Poll for key creation.  Windows OpenSSH generates host keys synchronously
-  # on first service start, but a brief polling interval ensures the filesystem
-  # view is consistent before the key is read by subsequent steps.
+  # Windows OpenSSH writes the key on first start, but polling keeps the
+  # filesystem view consistent for the steps that read it next.
   $elapsed = 0
   while (-not (Test-Path -Path $MachineSshHostKeyPath) -and $elapsed -lt $StartupTimeoutSeconds) {
     Start-Sleep -Seconds 1
@@ -110,8 +69,7 @@ function Initialize-SSHHostKey {
   }
 
   if (-not $wasRunning) {
-    # Restore the service to stopped so this function does not leave sshd
-    # running unexpectedly; proper enablement is handled by Sync-OpenSSHServer.
+    # Do not leave sshd running; Sync-OpenSSHServer owns enablement.
     Stop-Service -Name 'sshd' -Force
   }
 

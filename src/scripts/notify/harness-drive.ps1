@@ -3,34 +3,32 @@
   Ends a harness turn on Windows: notify, then inject one queued remote prompt.
 
 .DESCRIPTION
-  Windows twin of harness-drive.sh.  Every "the agent stopped" hook calls this
-  instead of harness-notify, because the same moment is when a prompt queued with
-  `/harness send <harness> <text>` can be delivered.  The stop-hook payload on
+  Windows twin of harness-drive.sh. Every "the agent stopped" hook calls this
+  instead of harness-notify, because that is the moment a prompt queued with
+  `/harness send <harness> <text>` can be delivered. The stop-hook payload on
   stdin is forwarded to harness-notify.ps1 <harness> done, so the notification
   half keeps one definition.
 
-  Continuation document (stdout) — exactly one queued prompt is consumed:
+  Continuation document (stdout), at most one queued prompt consumed:
 
     cursor   {"followup_message":"<text>"}                       (Cursor native)
     copilot  {"hookSpecificOutput":{"hookEventName":"Stop",
               "decision":"block","reason":"<text>"}}             (VS Code native)
     others   no output (pi and opencode are driven through their own APIs)
 
-  With nothing queued, cursor and copilot receive {} and the others nothing.
-
   One prompt per turn, consumed before it is printed: the queue is the only loop
   guard, so a command file can never be delivered twice.
 
   Cursor ignores `followup_message` on Windows (forum.cursor.com/t/155078: valid
   JSON, exit 0, agent does not continue), so remote driving of Cursor sessions
-  works on macOS and NixOS only.  Nothing here compensates for that: a workaround
+  works on macOS and NixOS only. Nothing here compensates for that: a workaround
   would have to fake user input into the harness.
 
-  This file is deployed verbatim to <USER root>\bin and reached from harness
-  hooks through the %USERPROFILE%\.local\bin\harness-drive.cmd shim, so it is
-  deliberately self-contained: importing the shared Format-NucleusOutput module
-  would require a repository path baked into the deployed copy.  The warning
-  helper below still emits the F1 shape (`<cmd>: warning: <msg>`) to stderr.
+  Deployed verbatim to <USER root>\bin and reached from harness hooks through the
+  %USERPROFILE%\.local\bin\harness-drive.cmd shim, so it stays self-contained:
+  importing the shared Format-NucleusOutput module would bake a repository path
+  into the deployed copy. The warning helper below still emits the F1 shape
+  (`<cmd>: warning: <msg>`) to stderr.
 
 .PARAMETER Harness
   Harness name: pi, opencode, cursor, or copilot.
@@ -220,11 +218,9 @@ function Get-QueuedHarnessPrompt {
   .SYNOPSIS
     Reads the newest queued prompt for one harness.
   .DESCRIPTION
-    Newest by file name: the bridge names each entry "<epoch>-<id>.json", so an
-    ordinal maximum is the most recently queued prompt.  Nothing is deleted here;
-    the caller consumes the file before printing its text.
-  .PARAMETER CommandDir
-    Absolute path to the harness's command queue directory.
+    Newest by file name: entries are named "<epoch>-<id>.json", so an ordinal
+    maximum is the most recent. Nothing is deleted here; the caller consumes the
+    file before printing its text.
   #>
   [CmdletBinding()]
   [OutputType([hashtable])]
@@ -337,12 +333,9 @@ function Send-HarnessDriveNotification {
   .SYNOPSIS
     Forwards the stop-hook payload to harness-notify as a `done` event.
   .DESCRIPTION
-    WHY a child process: harness-drive has already consumed the hook's standard
-    input, and an in-process `&` call would hand harness-notify the drained
-    console stream instead of the payload.  A child pwsh receives the payload as
-    real standard input, exactly like the POSIX twin pipes it.
-  .PARAMETER Harness
-    Harness whose turn ended.
+    WHY a child process: harness-drive already consumed the hook's standard
+    input, so an in-process `&` call would hand harness-notify the drained
+    console stream instead of the payload.
   .PARAMETER Payload
     Raw stop-hook payload, or an empty string when there was none.
   #>

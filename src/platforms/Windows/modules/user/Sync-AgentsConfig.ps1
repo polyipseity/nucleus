@@ -3,16 +3,14 @@
   Sync the user-level ~/.agents directory as a managed per-subdir layout.
 
 .DESCRIPTION
-  Creates %USERPROFILE%\.agents\ as a real directory, then creates a per-entry
-  directory symbolic link inside it for every top-level entry in the resolved
-  agents overlay (src\users\<username>\agents\ with src\users\default\ as
-  fallback) except skills\.
+  Creates %USERPROFILE%\.agents\ as a real directory, then a per-entry symlink inside it
+  for every top-level entry of the resolved agents overlay (src\users\<username>\agents\
+  with src\users\default\ as fallback), except skills\.
 
-  skills\ is excluded here because it is managed by Sync-AgentsSkillManifest and may
-  contain fetched (clawhub) skill downloads that must not be committed.  Using
-  a real ~/.agents\ directory with per-subdir symlinks (rather than a single
-  whole-dir symlink) lets clawhub write into ~/.agents\skills\ without those
-  writes landing inside the tracked repo tree.
+  skills\ belongs to Sync-AgentsSkillManifest and may hold fetched clawhub downloads
+  that must stay out of the tracked repo tree, which the real directory plus
+  per-subdir symlinks allows: clawhub writes into ~/.agents\skills\ without those writes
+  landing in the repo.
 
   Conflict handling:
     - Whole-dir symlink at ~/.agents  -> fail fast (remove manually).
@@ -21,30 +19,17 @@
     - Real path at sub-entry      -> fail fast (no silent overwrite).
     - Stale per-subdir symlink    -> removed (source entry deleted from repo).
 
-  Directory symbolic links require Developer Mode or an elevated session.
-  Developer Mode is enabled on this machine via system.dsc.yml
-  (Microsoft.Windows.Settings/DeveloperMode), which permits unprivileged symlink
-  creation.  Symlinks are preferred over NTFS junctions because they are a proper
-  POSIX-equivalent reparse point and are followed correctly by cross-host tooling
-  (editors, language servers) that inspects the link target rather than traversal
-  through reparse data.
-
-.PARAMETER RepoRoot
-  Absolute path to the root of the nucleus repository checkout.  apply.ps1
-  resolves this from $PSScriptRoot and passes it explicitly.
+  Directory symlinks need Developer Mode or an elevated session; system.dsc.yml
+  (Microsoft.Windows.Settings/DeveloperMode) enables Developer Mode here. Symlinks beat
+  NTFS junctions because editors and language servers follow the link target rather than
+  NTFS reparse data.
 
 .PARAMETER Enabled
-  Whether per-subdir symlinks should be managed. Mandatory: caller must
-  explicitly choose true (ensure symlinks exist) or false (remove managed
-  symlinks). When $false, unrecognised symlinks and real directories are
-  left untouched.
+  Mandatory: true ensures the managed symlinks exist, false removes them, leaving
+  unrecognised symlinks and real directories untouched.
 
 .EXAMPLE
   Sync-AgentsConfig -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$true
-
-.EXAMPLE
-  # Remove all managed per-subdir symlinks (cleanup path):
-  Sync-AgentsConfig -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$false
 
 .NOTES
   Environment variables: (none)
@@ -67,8 +52,8 @@ function Sync-AgentsConfig {
 
   . (Join-Path -Path $PSScriptRoot -ChildPath "..\Set-ManagedSymlinkDeleteProtection.ps1")
 
-  # Directory symlinks require Developer Mode or an elevated session.  Check
-  # once upfront so any failure message is actionable rather than cryptic.
+  # Directory symlinks need Developer Mode or an elevated session. Check once
+  # upfront so the failure message is actionable.
   if ($Enabled) {
     $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     $devModeKey  = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
@@ -81,8 +66,8 @@ function Sync-AgentsConfig {
   }
 
   if (-not $Enabled) {
-    # Cleanup path: remove per-subdir symlinks that point into the managed source.
-    # Leave unrecognised symlinks and real directories untouched.
+    # Cleanup path: remove per-subdir symlinks pointing into the managed source,
+    # leaving unrecognised symlinks and real directories untouched.
     if (Test-Path -LiteralPath $agentsDir -PathType Container) {
       $children = Get-ChildItem -LiteralPath $agentsDir -Force
       foreach ($child in $children) {
@@ -130,7 +115,7 @@ function Sync-AgentsConfig {
     Write-NucleusInfo -CommandName 'agents-config' "Sync-AgentsConfig: created $agentsDir"
   }
 
-  # Remove stale per-subdir symlinks whose resolved overlay entry no longer exists.
+  # Remove stale per-subdir symlinks whose overlay entry is gone.
   $existingChildren = Get-ChildItem -LiteralPath $agentsDir -Force
   foreach ($child in $existingChildren) {
     if ($child.Name -eq "skills") { continue }  # managed by Sync-AgentsSkillManifest
@@ -154,8 +139,8 @@ function Sync-AgentsConfig {
     }
   }
 
-  # Create or update per-entry symlinks for every merged first-level entry except
-  # skills\ (managed independently by Sync-AgentsSkillManifest).
+  # Create or update per-entry symlinks for every first-level entry except skills\
+  # (managed independently by Sync-AgentsSkillManifest).
   foreach ($entryName in $entryNames) {
     if ($entryName -eq "skills") { continue }  # owned by Sync-AgentsSkillManifest
     $entryPath = Resolve-UserConfigFirstLevelEntry -User $User -ConfigName 'agents' -EntryName $entryName -RepoRoot $RepoRoot
@@ -168,7 +153,7 @@ function Sync-AgentsConfig {
         if ([string]::Equals($linkItem.Target, $entryPath, [System.StringComparison]::OrdinalIgnoreCase)) {
           continue  # Correct symlink — no-op.
         }
-        # Wrong target (e.g. leftover from a previous checkout path): replace.
+        # Wrong target (leftover from a previous checkout path): replace.
         Remove-ManagedSymlinkDeleteProtection -Context "agents-config" -Path $linkPath
         Remove-Item -LiteralPath $linkPath -Force
       } else {

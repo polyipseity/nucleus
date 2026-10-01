@@ -3,14 +3,10 @@
   Remote-access parity helpers for Windows.
 
 .DESCRIPTION
-  Applies SSH-server remote access posture with explicit managed cleanup path.
+  Applies the SSH-server remote access posture with an explicit managed cleanup path.
 
 .NOTES
-  Environment variables:
-    (none)    No environment variables used.
-
-  Exit codes:
-    This module does not emit exit codes.
+  Environment variables: (none)
 #>
 function Sync-OpenSSHServer {
   <#
@@ -18,8 +14,8 @@ function Sync-OpenSSHServer {
     Converges OpenSSH Server startup, auth policy, and firewall access.
 
   .DESCRIPTION
-    Enables OpenSSH Server for remote administration and aligns auth
-    posture with key-focused remote access:
+    Enables OpenSSH Server for remote administration and aligns auth posture with
+    key-focused remote access:
       - Service startup type: Automatic
       - Service state: Running
       - sshd_config managed keys:
@@ -27,12 +23,10 @@ function Sync-OpenSSHServer {
           KbdInteractiveAuthentication no
           PasswordAuthentication no
 
-    AuthorizedKeysFile is set to two paths: `.ssh/authorized_keys` (standard
-    extensibility path for future keys) and `.ssh/ssh_personal_%u.pub` (the
-    SOPS-materialized personal public key, where %u expands to the connecting
-    username at auth time).  The key is not embedded in the repository; sshd is
-    pointed at the materialized path so the authorized key follows the secret
-    management lifecycle without duplication.
+    AuthorizedKeysFile carries two paths: `.ssh/authorized_keys` for future keys and
+    `.ssh/ssh_personal_%u.pub`, the SOPS-materialized personal key (%u expands to the
+    connecting username). The key is not embedded in the repo, so the authorized key
+    follows the secret lifecycle without duplication.
 
     Also enables the built-in "OpenSSH-Server-In-TCP" firewall rule.
 
@@ -42,20 +36,11 @@ function Sync-OpenSSHServer {
       - Disabling the firewall rule
 
   .PARAMETER Enabled
-    Whether remote-access parity should be enforced. False applies cleanup.
-
-  .EXAMPLE
-    Sync-OpenSSHServer -Enabled:$true
-
-  .EXAMPLE
-    Sync-OpenSSHServer -Enabled:$false
+    False applies cleanup.
 
   .NOTES
-    Environment variables:
-      (none)    No environment variables used.
-
-    Exit codes:
-      0 on success; 1 on error.
+    Environment variables: (none)
+    Exit codes: 0 on success; 1 on error.
   #>
   param(
     [Parameter()]

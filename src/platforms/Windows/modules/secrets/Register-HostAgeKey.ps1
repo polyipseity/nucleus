@@ -3,18 +3,11 @@
     Machine age key auto-registration for SOPS decryption on this host.
 
 .DESCRIPTION
-    Mirrors register_host_age_key_if_needed in src/scripts/apply.sh.
-    Derives the machine age public key from the Windows SSH host public key,
-    inserts it into .sops.yaml if not already present, and rewraps every
-    SOPS-encrypted file so this machine can decrypt them.
-
-    ConvertFrom-SshEd25519PublicKeyToAgePubKey is provided by
-    convert-sshpublickeytoage.ps1, which apply.ps1 dot-sources before this file
-    (alphabetical order so 'c' < 'r').
+    Windows twin of register_host_age_key_if_needed in src/scripts/apply.sh.
+    Throws on failure.
 
 .NOTES
     Environment variables: (none)
-    Exit codes: N/A — library script; functions use throw on failure.
 #>
 
 function Register-HostAgeKey {
@@ -24,57 +17,17 @@ function Register-HostAgeKey {
     .sops.yaml and rewraps all SOPS-encrypted files.
 
   .DESCRIPTION
-    Derives the machine age public key from the Windows SSH host key at
-    C:\ProgramData\ssh\ssh_host_ed25519_key.pub using
-    ConvertFrom-SshEd25519PublicKeyToAgePubKey (a passphrase-free public-key
-    conversion; no private key material is accessed).
+    Derives the machine age public key from the SSH host key at
+    C:\ProgramData\ssh\ssh_host_ed25519_key.pub, inserts it into .sops.yaml if
+    missing, and rewraps every SOPS-encrypted file. Idempotent: an already
+    registered key returns immediately.
 
-    If the derived age public key is already present in .sops.yaml the function
-    returns immediately (idempotent; safe to call on every apply).
+    Insertion preserves the existing line-ending style and lands above the
+    "# -- machine keys end; personal SSH backup key below --" marker; a missing
+    marker fails fast.
 
-    If the key is new:
-      1. Detects and preserves the existing line-ending style of .sops.yaml
-         (LF from POSIX commits) to avoid spurious whitespace diffs.
-      2. Inserts the new key line immediately before the marker comment
-         "    # -- machine keys end; personal SSH backup key below --".
-      3. Verifies the insertion succeeded; fails fast if the marker is missing.
-      4. Rewraps every SOPS-encrypted file with `sops updatekeys --yes` so the
-         new machine recipient can decrypt them.
-      5. Prints git commands to commit the changes; does not commit automatically.
-
-    Requires the primary GPG key in the keyring so sops updatekeys can
-    re-encrypt data keys for all recipients.  Fails with a clear error and a
-    gpg --import hint if GPG decryption fails during sops updatekeys.
-
-  .PARAMETER MachineSshHostKeyPubPath
-    Path to this machine's SSH host Ed25519 public key.
-    Defaults to C:\ProgramData\ssh\ssh_host_ed25519_key.pub.
-
-  .PARAMETER SopsExe
-    Absolute path to the sops executable.
-
-  .PARAMETER SopsYamlPath
-    Absolute path to .sops.yaml in the repository root.
-
-  .PARAMETER SecretsDir
-    Absolute path to the directory containing the SOPS secret YAML files
-    (src/secrets).
-
-  .PARAMETER RepoRoot
-    Absolute path to the nucleus repository root (overlay wallpapers enumerated
-    from src/users/<user>/wallpapers/).
-
-  .EXAMPLE
-    Register-HostAgeKey `
-      -MachineSshHostKeyPubPath 'C:\ProgramData\ssh\ssh_host_ed25519_key.pub' `
-      -SopsExe 'C:\...\sops.exe' `
-      -SopsYamlPath 'C:\...\nucleus\.sops.yaml' `
-      -SecretsDir 'C:\...\nucleus\src\secrets' `
-      -RepoRoot 'C:\...\nucleus'
-
-  .NOTES
-    Environment variables: (none)
-    Exit codes: N/A — library function; throws on failure.
+    Needs the primary GPG key in the keyring so sops updatekeys can re-encrypt
+    data keys for all recipients.
   #>
   [CmdletBinding()]
   param(
@@ -95,17 +48,15 @@ function Register-HostAgeKey {
   )
 
   if (-not (Test-Path -Path $MachineSshHostKeyPubPath)) {
-    # Advisory: host key may not yet exist on a freshly installed system that
-    # has not yet enabled the OpenSSH server feature.  Registration cannot
-    # proceed without it; warn and skip rather than hard-failing apply.
+    # A freshly installed system may not have the host key yet (OpenSSH server
+    # feature not enabled). Warn and skip rather than hard-failing apply.
     Write-NucleusWarning -CommandName 'sops' "$MachineSshHostKeyPubPath not found; skipping machine age key auto-registration."
     return
   }
 
-  # Derive the age public key from the SSH host public key.  The conversion is
-  # passphrase-free: only the public key is required (the private key is not
-  # read).  ConvertFrom-SshEd25519PublicKeyToAgePubKey is provided by
-  # convert-sshpublickeytoage.ps1, dot-sourced before this file.
+  # Conversion is passphrase-free: only the public key is read.
+  # ConvertFrom-SshEd25519PublicKeyToAgePubKey comes from
+  # ConvertFrom-SshEd25519PublicKeyToAgePubKey.ps1, dot-sourced before this file.
   $sshPubKeyLine = (Get-Content -Path $MachineSshHostKeyPubPath -Raw).Trim()
   $agePub = ConvertFrom-SshEd25519PublicKeyToAgePubKey -SshPublicKeyLine $sshPubKeyLine
 
@@ -118,14 +69,12 @@ function Register-HostAgeKey {
 
   Write-NucleusInfo -CommandName 'sops' "registering machine age key in .sops.yaml and rewrapping SOPS files..."
 
-  # Detect the existing line-ending style so the file is written back with the
-  # same convention.  .sops.yaml is committed from POSIX systems and uses LF;
-  # preserving LF avoids a spurious CRLF diff that would require a manual fixup.
+  # .sops.yaml is committed from POSIX with LF, so write back the style found
+  # rather than producing a CRLF diff that needs a manual fixup.
   $eol = if ($rawContent.Contains("`r`n")) { "`r`n" } else { "`n" }
 
-  # Insert the new age key line immediately before the marker comment that
-  # separates machine recipients from the personal SSH backup key.  The marker
-  # so new machine keys are always grouped above the backup entry.
+  # Insert above the marker that separates machine recipients from the personal
+  # SSH backup key, so machine keys always group above the backup entry.
   $marker = "    # -- machine keys end; personal SSH backup key below --"
   $newKeyLine = "    - $agePub"
   if (-not ($rawContent -like "*$marker*")) {
@@ -137,8 +86,8 @@ function Register-HostAgeKey {
   # Write back with UTF-8 without BOM to match the existing file encoding.
   [System.IO.File]::WriteAllText($SopsYamlPath, $newContent, [System.Text.UTF8Encoding]::new($false))
 
-  # Verify insertion; catches the case where Replace silently produced no change
-  # due to an encoding mismatch or unexpected whitespace in the marker.
+  # Verify the insertion: Replace can silently do nothing on an encoding
+  # mismatch or unexpected whitespace in the marker.
   $verifyContent = [System.IO.File]::ReadAllText($SopsYamlPath)
   if (-not ($verifyContent -like "*$agePub*")) {
     throw "sops: ERROR — failed to insert machine age key into .sops.yaml; " +
@@ -155,7 +104,7 @@ function Register-HostAgeKey {
       $sopsFiles += $userSecretFiles
     }
   }
-  # Dynamically include overlay wallpaper blobs so new wallpapers are automatically rewrapped.
+  # Overlay wallpaper blobs are dynamic, so include whatever exists now.
   $usersRoot = Join-Path -Path $RepoRoot -ChildPath 'src\users'
   if (Test-Path -Path $usersRoot) {
     # check-suppress:suppression_doc: probe -- no encrypted wallpaper blobs may exist; empty result handled.

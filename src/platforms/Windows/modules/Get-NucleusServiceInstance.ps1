@@ -4,14 +4,13 @@
 
 .DESCRIPTION
   A prefix-match entry stands in for one runtime service per configured instance, so the
-  concrete ids only exist at runtime. This module is the single Windows implementation of
-  that mapping and mirrors src/scripts/lib/svc-instances.sh: scripts/svc.ps1 (list, status,
-  actions, verify) resolves through it.
+  concrete ids exist only at runtime. This module is the Windows implementation of that
+  mapping, mirroring src/scripts/lib/svc-instances.sh, and scripts/svc.ps1 resolves through it.
 
-  Scheduled-task ids are folder-qualified: a task named NucleusCloudMount-iCloud in the
-  \NucleusCloudMount\ folder has the id \NucleusCloudMount\NucleusCloudMount-iCloud, and a
-  task registered in the root folder has its bare name as the id. The registry splits that
-  id across two fields: taskPath is the folder, service is the task-name prefix.
+  Scheduled-task ids are folder-qualified: NucleusCloudMount-iCloud in the
+  \NucleusCloudMount\ folder has the id \NucleusCloudMount\NucleusCloudMount-iCloud, while a
+  root-folder task keeps its bare name. The registry splits that id in two: taskPath is the
+  folder, service is the task-name prefix.
 
 .NOTES
   Requirements: Get-ScheduledTask for live enumeration.
@@ -26,12 +25,6 @@ function Get-NucleusInstanceId {
   .PARAMETER TaskFolder
     Task folder path as reported by Get-ScheduledTask. May be empty or a lone separator
     for the root folder.
-
-  .PARAMETER TaskName
-    Task name.
-
-  .OUTPUTS
-    System.String
   #>
   [CmdletBinding()]
   [OutputType([string])]
@@ -220,9 +213,9 @@ function Get-NucleusPrefixInstanceList {
       $instanceId
     }
   }
-  # WHY: emit the ids normally and let callers wrap the call in @(). Preserving
-  # array shape here (a leading comma) would make @(Get-...) a one-element array
-  # holding the real array, which silently breaks every .Count check.
+  # WHY: emit the ids normally and let callers wrap the call in @(). Preserving array
+  # shape here with a leading comma would make @(Get-...) a one-element array holding
+  # the real array, which silently breaks every .Count check.
   return [string[]]@($instances | Sort-Object -Unique)
 }
 
@@ -326,9 +319,9 @@ function Get-NucleusConfiguredInstanceList {
   foreach ($record in $records) {
     foreach ($mount in @($record.cloudDrives.mounts)) {
       if ($null -eq $mount) { continue }
-      # WHY: a mount without a configured remote is declared but never instantiated, and
-      #   the enabled test is shared with the catalog generator so both agree on which
-      #   mounts are expected to exist.
+      # WHY: a mount with no configured remote is declared but never instantiated, and
+      # the enabled test is shared with the catalog generator so both agree on which
+      # mounts should exist.
       if (-not (Test-NucleusMountEnabled -Mount $mount)) { continue }
       if (-not $mount.ContainsKey('remoteName')) { continue }
       if ($null -eq $mount.remoteName) { continue }

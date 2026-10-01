@@ -4,31 +4,17 @@ function Invoke-SteamCMDSetup {
     Provisions the SteamCMD binary at RimSort's expected steamcmd_install_path.
 
   .DESCRIPTION
-    Windows counterpart to the POSIX provision-steamcmd.sh activation hook.
-    Downloads the SteamCMD zip from Valve's CDN and extracts it into
-    <steamcmd_install_path>/steamcmd/ so that RimSort finds the executable
-    at its expected path without prompting the user.
+    Windows counterpart of the POSIX provision-steamcmd.sh hook. Downloads the
+    SteamCMD zip from Valve's CDN into <steamcmd_install_path>/steamcmd/, because
+    RimSort looks for the executable at that exact path instead of searching PATH.
 
-    RimSort checks for the executable at <steamcmd_install_path>/steamcmd/<exe>
-    but does not use PATH — the file must exist at the expected path.
-
-    The steamcmd_install_path is resolved by merging the base RimSort settings
-    (rimsort.json) with the host overlay (rimsort.Windows.json) to produce
-    platform-correct paths, mirroring the lib.recursiveUpdate merge done at
-    Nix eval time in home.nix.
+    steamcmd_install_path comes from merging the base RimSort settings with the
+    host overlay, mirroring the lib.recursiveUpdate merge home.nix does at Nix
+    eval time.
 
   .PARAMETER Enabled
-    True provisions SteamCMD. False is a no-op (RimSort cleanup removes
-    steamcmd_install_path keys, not the binary directory).
-
-  .PARAMETER Users
-    Mandatory: array of managed user records from Load-UserRegistry.ps1.
-
-  .PARAMETER RepoRoot
-    Absolute path to the repository root.
-
-  .EXAMPLE
-    Invoke-SteamCMDSetup -Enabled:$true -Users $userRegistry.users -RepoRoot $env:NUCLEUS_REPO_ROOT
+    False is a no-op: RimSort cleanup removes steamcmd_install_path keys, not the
+    binary directory.
 
   .NOTES
     Environment variables: (none)
@@ -52,7 +38,6 @@ function Invoke-SteamCMDSetup {
 
   $steamcmdZipUrl = "https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip"
 
-  # Resolve the host key for overlay path construction.
   # Get-NucleusHostKey is defined in Get-NucleusHostPlatform.ps1.
   . (Join-Path -Path $RepoRoot -ChildPath 'src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1')
   $hostKeyName = Get-NucleusHostKey

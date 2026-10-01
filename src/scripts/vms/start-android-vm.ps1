@@ -4,27 +4,20 @@
 
 .DESCRIPTION
   Launches aarch64 Android (GSI-based) VM under QEMU with TCG acceleration
-  (no WHPX for cross-arch guests), UEFI firmware, GPU/display, USB tablet
-  input, and ADB port forwarding.
+  (no WHPX for cross-arch guests), UEFI firmware, GPU/display, USB tablet input,
+  and ADB port forwarding.
 
-  Shared canonical file (embedded-content policy): consumed by vm.sh
-  (windows-qemu start script generation) and Start-AndroidVM.ps1 (thin
-  wrapper). Keep single-source — do not embed a copy elsewhere.
+  Canonical file: vm.sh embeds it for the Windows QEMU start script and
+  Start-AndroidVM.ps1 is a thin wrapper, so this body stays the single source.
 
-  Expects disk images with filenames rendered by vm.sh via
-  __ANDROID_SYSTEM_IMAGE__ / __ANDROID_USERDATA_IMAGE__ / __ANDROID_GSI_IMAGE__ /
-  __ANDROID_NVRAM_IMAGE__ tokens:
-    - <id> (system).qcow2 (system overlay, vda)  under ~\virtual machines\data\
-    - <id> (nvram).fd     (UEFI vars, pflash, writable) under ~\virtual machines\data\
-    - <userdataImage>   (userdata partition, vdb) under ~\virtual machines\data\
-    - <gsiImage>        (optional GSI system image, vdc, read-only) under ~\virtual machines\src\Android\
-
-  Firmware path defaults to the edk2-aarch64 UEFI image bundled with QEMU's
-  standard installation layout (Scoop/manual).
+  Disk names arrive as __ANDROID_SYSTEM_IMAGE__ / __ANDROID_USERDATA_IMAGE__ /
+  __ANDROID_GSI_IMAGE__ / __ANDROID_NVRAM_IMAGE__ tokens: the overlays and UEFI
+  vars live under ~\virtual machines\data\, the optional read-only GSI payload
+  under ~\virtual machines\src\Android\.
 
 .NOTES
-  Requires qemu-system-aarch64 in PATH (Scoop package: qemu).
-  Run this script directly to launch the Android VM.
+  Requires qemu-system-aarch64 in PATH (Scoop package: qemu). Firmware defaults
+  to the edk2-aarch64 UEFI image in QEMU's standard installation layout.
 #>
 
 #Requires -Version 7.4
@@ -49,9 +42,9 @@ $diskSystem   = Join-Path $dataDir '__ANDROID_SYSTEM_IMAGE__'
 $diskUserdata = Join-Path $dataDir '__ANDROID_USERDATA_IMAGE__'
 $diskGsi      = Join-Path $androidSrcDir '__ANDROID_GSI_IMAGE__'
 $uefiCode     = Join-Path $firmwareDir 'edk2-aarch64-code.fd'
-# WHY: UEFI vars are per-VM writable state, so they live under data/ (like
-# every writable disk), never in the shared firmware dir (concurrent
-# corruption across VMs); the vars image is seeded once by vm-setup.
+# WHY: UEFI vars are per-VM writable state, so they live under data/ with every
+# other writable disk, never in the shared firmware dir where concurrent VMs
+# would corrupt them; vm-setup seeds the vars image once.
 $uefiVars     = Join-Path $dataDir '__ANDROID_NVRAM_IMAGE__'
 
 # Validate required disks.

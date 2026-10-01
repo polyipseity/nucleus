@@ -5,26 +5,12 @@ function Invoke-SourceBuild {
     build system) for the Windows host.
 
   .DESCRIPTION
-    Reads the source-builds package registry (source-builds.json) and the
-    repository lockfile for VCS hash pins, then ensures each package is
-    built and installed at the pinned revision.  On each apply it:
+    Reads the source-builds registry and the lockfile VCS pins, then ensures
+    each package is built at the pinned revision: clone or fetch, run the build
+    system, copy the binary into the install root.
 
-      1. Checks the install cache for each package at the pinned revision.
-      2. Clones or fetches the git repository at the pinned commit.
-      3. Invokes the build system (currently only 'zig').
-      4. Copies the built binary to the install directory.
-      5. Prepends the install directory to PATH.
-
-    Packages absent from the registry are pruned from the install root
-    (zap-style).  Build-time dependencies (e.g. zig) must be installed
-    beforehand by Invoke-ScoopSetup.
-
-    Mirrors the declarative mkDerivation pattern from nixpkgs for the
-    Windows host, using a JSON registry + VCS hash pins in lockfile.json
-    instead of a Nix expression.
-
-  .EXAMPLE
-    Invoke-SourceBuild
+    Packages absent from the registry are pruned from the install root.
+    Build-time dependencies such as zig come from Invoke-ScoopSetup.
 
   .NOTES
     Environment variables: (none)
@@ -33,17 +19,14 @@ function Invoke-SourceBuild {
   [CmdletBinding()]
   param()
 
-  # Derive repo root from script location (src/platforms/Windows/modules/setup/ -> repo root is 5 levels up).
+  # 5 levels up from src/platforms/Windows/modules/setup/ is the repo root.
   $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
   $lockfilePath = Join-Path $repoRoot "src\lockfiles\lockfile.json"
   $registryPath = Resolve-Path "$PSScriptRoot\..\source-builds.json"
 
-  # Install root for source-built packages.
   $installRoot = Join-Path $env:USERPROFILE "source-builds"
-  # Cache root for cloned repositories (avoids re-cloning on every apply).
   $cacheRoot = Join-Path $env:USERPROFILE "source-builds\.cache"
 
-  # Guard: registry must exist.
   if (-not (Test-Path $registryPath)) {
     Write-NucleusError -CommandName 'Invoke-SourceBuild' "registry not found at '$registryPath'"
     return
@@ -59,7 +42,7 @@ function Invoke-SourceBuild {
   }
   $sourceBuildPins = if ($lockfile -and $lockfile.'source-builds') { $lockfile.'source-builds' } else { @{} }
 
-  # --- Prune: remove installed packages absent from registry ---
+  # Prune: remove installed packages absent from registry
   if (Test-Path $installRoot) {
     $installedDirs = Get-ChildItem -Directory $installRoot | ForEach-Object { $_.Name }
     $registryIds = @{}; foreach ($pkg in $registry.packages) { $registryIds[$pkg.id] = $true }
@@ -73,7 +56,7 @@ function Invoke-SourceBuild {
     }
   }
 
-  # --- Build / install each registry package ---
+  # Build / install each registry package
   foreach ($pkg in $registry.packages) {
     $pkgId = $pkg.id
     $pin = $sourceBuildPins.$pkgId
@@ -95,7 +78,7 @@ function Invoke-SourceBuild {
     $checkPattern = $pkg.checkVersionPattern
     $deps = $pkg.dependencies
 
-    # --- Dependency guard ---
+    # Dependency guard
     $missingDep = $false
     foreach ($dep in $deps) {
       # check-suppress:suppression_doc: probe -- build dependency may not be installed; if-guard checks absence below.
@@ -107,13 +90,13 @@ function Invoke-SourceBuild {
     }
     if ($missingDep) { continue }
 
-    # --- Check if already installed at correct revision ---
+    # Already installed at the correct revision?
     $markerPath = Join-Path $installDir ".sourcebuild-rev"
     $alreadyInstalled = $false
     if (Test-Path $markerPath) {
       $installedRev = Get-Content $markerPath -Raw | ForEach-Object { $_.Trim() }
       if ($installedRev -eq $rev) {
-        # Also verify the binary exists and produces a plausible version string.
+        # Also verify the binary exists and reports a plausible version string.
         if (Test-Path $binaryPath) {
           try {
             $versionOutput = & $binaryPath $checkArgs 2>&1 | Out-String
@@ -133,7 +116,7 @@ function Invoke-SourceBuild {
       continue
     }
 
-    # --- Clone / fetch the repository ---
+    # Clone / fetch the repository
     $repoCacheDir = Join-Path $cacheRoot $pkgId
     if (-not (Test-Path $repoCacheDir)) {
       Write-NucleusInfo -CommandName 'Invoke-SourceBuild' "cloning $pkgId from $sourceUrl"
@@ -145,7 +128,7 @@ function Invoke-SourceBuild {
       }
     }
 
-    # Fetch and checkout the pinned revision.
+    # Fetch and checkout the pinned revision (tag or commit).
     Push-Location $repoCacheDir
     try {
       # Fetch the specific revision (works for both tags and commits).
@@ -159,7 +142,7 @@ function Invoke-SourceBuild {
       Pop-Location
     }
 
-    # --- Build ---
+    # Build
     Write-NucleusInfo -CommandName 'Invoke-SourceBuild' "building $pkgId v$version with $buildSystem"
     Push-Location $repoCacheDir
     try {
@@ -180,7 +163,7 @@ function Invoke-SourceBuild {
       Pop-Location
     }
 
-    # --- Install binary ---
+    # Install binary
     $builtBinary = Join-Path -Path $repoCacheDir -ChildPath $binarySubDir -AdditionalChildPath $binaryName
     if (-not (Test-Path $builtBinary)) {
       Write-NucleusError -CommandName 'Invoke-SourceBuild' "built binary not found at '$builtBinary' for '$pkgId'"
@@ -193,7 +176,7 @@ function Invoke-SourceBuild {
     Write-NucleusInfo -CommandName 'Invoke-SourceBuild' "installed $pkgId v$version to '$installDir'"
   }
 
-  # --- Update PATH for this session ---
+  # Update PATH for this session
   if (Test-Path $installRoot) {
     $installedDirs = Get-ChildItem -Directory $installRoot | ForEach-Object { $_.Name } | Where-Object { $_ -ne '.cache' }
     foreach ($dirName in $installedDirs) {

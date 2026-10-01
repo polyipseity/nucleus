@@ -4,36 +4,17 @@ function Sync-RimSortConfig {
     Applies the repository-managed RimSort instance settings for each managed user.
 
   .DESCRIPTION
-    Merges a small repository-managed RimSort settings subset into each
-    user's live %LOCALAPPDATA%\RimSort\settings.json file. The managed
-    subset contains per-instance paths (game folder, config folder, local
-    mods, workshop folder) and Steam integration flags that are resolved
-    from the per-host overlay JSON in the repository.
+    Merges a repository-managed RimSort settings subset into each user's live
+    %LOCALAPPDATA%\RimSort\settings.json: per-instance paths (game folder, config
+    folder, local mods, workshop folder) and Steam integration flags, resolved from the
+    per-host overlay JSON.
 
-    This function ensures the instances.Default nesting exists before
-    merging managed keys into it, preserving all unmanaged keys (theme,
-    sorting, window state, SteamCMD settings) unchanged.
-
-    False removes only the managed keys so the app can fall back to its
-    own defaults or autodetect without losing other instance data.
+    The instances.Default nesting is created before merging so every unmanaged key
+    (theme, sorting, window state, SteamCMD settings) survives. Disabling removes only
+    the managed keys, letting the app fall back to its own defaults.
 
   .PARAMETER Enabled
     True applies the managed values. False removes only the managed keys.
-
-  .PARAMETER Users
-    Mandatory: array of managed user records from Load-UserRegistry.ps1.
-
-  .PARAMETER HostName
-    Host name for resolving the per-host overlay (e.g. "Windows").
-
-  .PARAMETER RepoRoot
-    Absolute path to the repository root.
-
-  .EXAMPLE
-    Sync-RimSortConfig -Enabled:$true -Users $userRegistry.users -HostName 'Windows' -RepoRoot $env:NUCLEUS_REPO_ROOT
-
-  .EXAMPLE
-    Sync-RimSortConfig -Enabled:$false -Users $userRegistry.users -HostName 'Windows' -RepoRoot $env:NUCLEUS_REPO_ROOT
 
   .NOTES
     Environment variables: (none)

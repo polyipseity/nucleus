@@ -4,43 +4,22 @@
 
 .DESCRIPTION
   Provides a uniform CLI for listing, showing, hiding, and verifying menu-bar /
-  tray icon visibility across hosts, driven by src/modules/apps.json, the
-  canonical registry.  This mirrors autostart.ps1 but targets the app's native
-  menu-bar / tray icon preference rather than auto-start.
+  tray icon visibility across hosts, driven by src/modules/apps.json.
 
-  Semantic difference from auto-start (driving constraint):
-    Auto-start is OR — app-native OR our Run key ⇒ app launches, so we DISABLE
-    the native setting and own a separate mechanism.
-    Icon visibility is AND — the icon shows only if (app-native show setting =
-    desired) AND (OS allows it). There is no separate "our mechanism"; the
-    app's native preference IS the control.  We therefore SET the native
-    preference to the desired state and never disable it.  Inverted keys are
-    expressed via iconVisibleValue / iconHiddenValue, not via a disable flag.
+  Icon visibility is AND: the icon shows only if the app-native show setting
+  matches the desired state AND the OS allows it. The native preference is the
+  control, so it is SET to the desired state and never disabled. Inverted keys
+  are expressed via iconVisibleValue / iconHiddenValue, not a disable flag.
 
   Windows note: tray-icon visibility is app-specific and often has no universal
-  OS toggle.  A Windows entry with a statusIcon block either declares a host
-  script (`activation-script`) that sets the app's native tray setting, or is
-  `manual`: no script can converge it and no readable preference exists to
-  verify against, exactly like autostart's macos-system-extension.
-
-.PARAMETER Action
-  The operation to perform: list, status, show, hide, apply, verify.
-
-.PARAMETER AppName
-  One or more app keys to target.  Required for show/hide; optional for
-  status/verify — defaults to all.
-
-.PARAMETER Json
-  Output machine-readable JSON instead of formatted tables.
-
-.PARAMETER Help
-  Show detailed help.
+  OS toggle. An entry either declares a host script (`activation-script`) that
+  sets the app's native tray setting, or is `manual`, exactly like autostart's
+  macos-system-extension.
 
 .EXAMPLE
   .\menu-bar.ps1 list
   .\menu-bar.ps1 status Parsec,Steam
   .\menu-bar.ps1 hide Parsec
-  .\menu-bar.ps1 show Steam
   .\menu-bar.ps1 apply
   .\menu-bar.ps1 verify
   .\menu-bar.ps1 list -Json
@@ -74,10 +53,7 @@ if ($Help) {
   exit 0
 }
 
-# A missing action is an error, matching menu-bar.sh (message on stderr, exit 1).
-# Sync-MenuBar.ps1:49 throws on a non-zero exit, so this file's exit status is
-# load-bearing, though that caller always passes apply and never reaches here.
-# The exit is stated rather than left to how Write-NucleusError ends the script.
+# A missing action is an error, matching menu-bar.sh (stderr, exit 1).
 if (-not $Action) {
   Write-NucleusError "missing action (list, status, show, hide, apply, verify)"
   exit 1
@@ -114,9 +90,7 @@ foreach ($key in $RegistryRaw.Keys) {
   }
 }
 
-# ---------------------------------------------------------------------------
 # Windows native preference helpers (SET, never disable)
-# ---------------------------------------------------------------------------
 
 # MenuBarNativeSet — Write the native preference to the desired state.
 # Never disables the native setting; SETs it.
@@ -170,14 +144,12 @@ function Get-MenuBarActualVisible {
     return 'manual'
   }
   # No Windows-launchable status-icon kind exposes a readable native preference
-  # ('activation-script' runs a host script we cannot query), so the icon state
-  # cannot be probed — report no match and let verify surface the gap.
+  # ('activation-script' runs a host script we cannot query), so verify surfaces
+  # the gap instead.
   return $false
 }
 
-# ---------------------------------------------------------------------------
 # Per-app state resolution
-# ---------------------------------------------------------------------------
 
 # MenuBarConverge — Apply declared icon state for one app.
 # SETs the native preference to the desired state; never disables it.
@@ -192,9 +164,7 @@ function Invoke-MenuBarConverge {
   }
 }
 
-# ---------------------------------------------------------------------------
 # Action implementations
-# ---------------------------------------------------------------------------
 
 function Resolve-AppNameList {
   param([string[]]$Names)
@@ -314,7 +284,7 @@ switch ($Action) {
       $declared = [bool]$Registry[$key].hostEntry.statusIcon.iconVisible
       $actual = Get-MenuBarActualVisible -Entry $Registry[$key]
       if ($actual -eq 'manual') {
-        # Manual entries are declared but not auto-provisioned; no drift check.
+        # Manual entries are declared but not auto-provisioned, so nothing to check.
         continue
       }
       if ($declared -ne $actual) {

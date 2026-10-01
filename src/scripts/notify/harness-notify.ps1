@@ -13,31 +13,25 @@
   bot tokens of its own for notifications and no gateway process needs to be
   running for bot-token platforms.
 
-  This file is deployed verbatim to <USER root>\bin and reached from harness
-  hooks through the %USERPROFILE%\.local\bin\harness-notify.cmd shim, so it is
-  deliberately self-contained: importing the shared Format-NucleusOutput module
-  would require a repository path baked into the deployed copy.  The warning
-  helper below still emits the F1 shape (`<cmd>: warning: <msg>`) to stderr.
-
-.PARAMETER Harness
-  Harness name: pi, opencode, cursor, or copilot.
+  Deployed verbatim to <USER root>\bin and reached from harness hooks through the
+  %USERPROFILE%\.local\bin\harness-notify.cmd shim, so it stays self-contained:
+  importing the shared Format-NucleusOutput module would bake a repository path
+  into the deployed copy. The warning helper below still emits the F1 shape
+  (`<cmd>: warning: <msg>`) to stderr.
 
 .PARAMETER EventName
-  Lifecycle event: done, needs-input, approval, or error.  Named EventName
-  because PowerShell reserves `Event` as an automatic variable.
+  Lifecycle event: done, needs-input, approval, or error. Named EventName because
+  PowerShell reserves `Event` as an automatic variable.
 
 .PARAMETER Text
-  Optional body.  When omitted, stdin is read: raw text, or a hook JSON object
+  Optional body. When omitted, stdin is read: raw text, or a hook JSON object
   from which .message/.prompt/.text/.tool_name is extracted.
 
 .EXAMPLE
   pwsh -NoProfile -File harness-notify.ps1 pi done 'finished the refactor'
 
-.EXAMPLE
-  '{"message":"session idle"}' | pwsh -NoProfile -File harness-notify.ps1 opencode done
-
 .NOTES
-  Exit codes: always 0.  A notification is best-effort; it must never block or
+  Exit codes: always 0. A notification is best-effort; it must never block or
   fail the harness that emitted it, and hook runners treat a non-zero exit as a
   denial in some harnesses.
 
@@ -130,8 +124,8 @@ function Get-HarnessBridgeNotifyConfig {
   $raw = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8
   if ([string]::IsNullOrWhiteSpace($raw)) { return $config }
 
-  # Malformed JSON throws: the caller treats that as "not notifying", matching
-  # the POSIX twin.
+  # Malformed JSON throws: the caller treats that as "not notifying", matching the
+  # POSIX twin.
   $parsed = ConvertFrom-Json -InputObject $raw -AsHashtable
   if ($parsed -isnot [hashtable] -or -not $parsed.ContainsKey('harness-notify')) { return $config }
   $section = $parsed['harness-notify']
@@ -147,12 +141,8 @@ function Send-HarnessNotification {
     Fans one normalized lifecycle event out to every configured Hermes channel.
   .PARAMETER Harness
     Harness name used as the subject prefix.
-  .PARAMETER Event
-    Normalized event name.
   .PARAMETER Text
     Optional body; the event label is used when it is empty.
-  .PARAMETER ConfigPath
-    Absolute path to the nucleus runtime config file.
   #>
   [CmdletBinding()]
   param(
@@ -224,7 +214,6 @@ try {
     exit 0
   }
 
-  # Body: explicit argument wins, otherwise stdin (raw text or hook JSON).
   if ([string]::IsNullOrWhiteSpace($Text) -and [Console]::IsInputRedirected) {
     $stdin = [Console]::In.ReadToEnd()
     if (-not [string]::IsNullOrWhiteSpace($stdin)) {

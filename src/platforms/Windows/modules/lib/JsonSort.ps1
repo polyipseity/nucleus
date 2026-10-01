@@ -1,25 +1,19 @@
-# JsonSort.ps1 — deterministic JSON serialization helpers for Windows tooling.
+# JsonSort.ps1 - deterministic JSON serialization for Windows tooling.
 #
-# Generated JSON artifacts committed to the repo (e.g. winget-packages.json,
-# lockfile.json) must be byte-stable across runs so diffs show only real
-# changes. ConvertTo-Json does NOT sort object keys (it preserves insertion
-# order) and Set-Content -NoNewline strips the trailing newline, so callers
-# that write committed artifacts must sort keys/arrays and append a newline.
-#
-# These helpers produce multi-line, 2-space-indented JSON with sorted keys and
-# sorted arrays and a single trailing newline, matching the Nix `toSortedJSON`
-# helper in src/modules/lib/json.nix.
+# Committed JSON artifacts must be byte-stable so diffs show only real changes.
+# ConvertTo-Json keeps insertion order and Set-Content -NoNewline drops the
+# trailing newline, so callers sort first and this module appends one newline.
+# Output matches the Nix toSortedJSON helper in src/modules/lib/json.nix.
 
 using namespace System.Collections
 using namespace System.Collections.Generic
 using namespace System.Text
 
-# Recursively sort object keys case-sensitively and array elements (when all
-# elements are strings) so the serialized output is deterministic.
+# Sorts object keys case-sensitively and string-only array elements.
 function ConvertTo-SortedJsonObject {
   [CmdletBinding()]
-  # Polymorphic by design: the container shapes the input can produce are declared;
-  # raw scalar, or $null depending on the input shape.
+  # WHY: the input can also be a raw scalar or $null, so the declared types are
+  # the container shapes only.
   [OutputType([System.Collections.Specialized.OrderedDictionary], [System.Collections.Generic.List[object]])]
   param(
     [Parameter(Mandatory, ValueFromPipeline)]
@@ -53,8 +47,6 @@ function ConvertTo-SortedJsonObject {
   }
 }
 
-# Serialize a value to a deterministic JSON string: multi-line, 2-space
-# indented, sorted keys, sorted string arrays, and exactly one trailing newline.
 function ConvertTo-SortedJson {
   [CmdletBinding()]
   param(
@@ -67,8 +59,8 @@ function ConvertTo-SortedJson {
 
   process {
     $sorted = ConvertTo-SortedJsonObject -InputObject $InputObject
-    # ConvertTo-Json without -Compress emits 2-space-indented multi-line JSON
-    # and a single trailing newline, matching the Nix toSortedJSON helper.
+    # Without -Compress, ConvertTo-Json emits 2-space-indented multi-line JSON
+    # and a single trailing newline.
     return ConvertTo-Json -InputObject $sorted -Depth $Depth
   }
 }

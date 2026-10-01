@@ -3,16 +3,16 @@
   Requests a remote approval decision for a harness tool call (Windows).
 
 .DESCRIPTION
-  Windows twin of harness-approval.sh.  A blocking harness hook (Cursor
+  Windows twin of harness-approval.sh. A blocking harness hook (Cursor
   beforeShellExecution, VS Code Copilot PreToolUse, pi tool_call, opencode
   permission) calls this, then maps the printed decision onto its own response
-  shape.  The request appears on every configured Hermes channel and is answered
+  shape. The request appears on every configured Hermes channel and is answered
   with `/harness approve <id>` or `/harness deny <id>`; `/harness status` lists
   what is still outstanding.
 
-  This file is deployed verbatim to <USER root>\bin and reached through the
-  %USERPROFILE%\.local\bin\harness-approval.cmd shim, so it is deliberately
-  self-contained (see harness-notify.ps1 for the same reasoning).
+  Deployed verbatim to <USER root>\bin and reached through the
+  %USERPROFILE%\.local\bin\harness-approval.cmd shim, so it stays self-contained
+  (see harness-notify.ps1 for the same reasoning).
 
   `ask` means "no remote decision" — the harness must fall back to its own local
   prompt.  Every path prints a decision and exits 0: a harness hook that fails is
@@ -23,16 +23,13 @@
   Harness name (pi, opencode, cursor, copilot), or the literal `hook` to select
   hook mode.
 
-.PARAMETER Tool
-  Tool name, or — in hook mode — the harness name.
-
 .PARAMETER Summary
-  Human-readable description of the call.  Optional in hook mode, where the
+  Human-readable description of the call. Optional in hook mode, where the
   description is extracted from the hook payload on stdin.
 
 .PARAMETER TimeoutSeconds
-  Optional wait override; the configured harness-approval.timeout-seconds is used
-  when omitted or zero.
+  Wait override; the configured harness-approval.timeout-seconds is used when
+  omitted or zero.
 
 .EXAMPLE
   pwsh -NoProfile -File harness-approval.ps1 cursor Shell 'git push --force'
@@ -124,11 +121,8 @@ function Get-HarnessBridgeApprovalConfig {
   .SYNOPSIS
     Reads the master flag, the approval gate and the timeout over the defaults.
   .DESCRIPTION
-    Keeps the config sections apart: both sections declare an enable flag, and
-    flattening them into one hashtable would let the approval flag shadow the
-    master flag.
-  .PARAMETER ConfigPath
-    Absolute path to the nucleus runtime config file.
+    Keeps the config sections apart: both declare an enable flag, and flattening
+    them into one hashtable would let the approval flag shadow the master flag.
   #>
   [CmdletBinding()]
   [OutputType([hashtable])]
@@ -162,12 +156,7 @@ function ConvertTo-HarnessApprovalDocument {
   .SYNOPSIS
     Renders a decision in the calling harness's own vocabulary.
   .DESCRIPTION
-    `ask` is a valid value in every shape, so the neutral answer is always
-    expressible.
-  .PARAMETER Harness
-    Calling harness name.
-  .PARAMETER Decision
-    allow, deny, or ask.
+    `ask` is valid in every shape, so the neutral answer is always expressible.
   #>
   [CmdletBinding()]
   [OutputType([string])]
@@ -202,10 +191,8 @@ function Read-HarnessBridgeHookPayload {
   .SYNOPSIS
     Extracts the tool name and one-line action description from a hook payload.
   .DESCRIPTION
-    The wired hook payloads (Cursor beforeShellExecution, Copilot PreToolUse) are
-    JSON objects, but a harness may also hand over plain text, so both shapes are
-    answered: JSON yields tool_name/tool_input when present, anything else is
-    carried through as the description.
+    The wired payloads (Cursor beforeShellExecution, Copilot PreToolUse) are JSON
+    objects, but a harness may hand over plain text, so both shapes are answered.
   #>
   [CmdletBinding()]
   [OutputType([hashtable])]
@@ -257,16 +244,8 @@ function Request-HarnessApproval {
   <#
   .SYNOPSIS
     Announces a pending tool call and waits for a remote decision.
-  .PARAMETER Harness
-    Harness that asked for the decision.
-  .PARAMETER Tool
-    Tool name.
-  .PARAMETER Summary
-    One-line description of the call.
   .PARAMETER TimeoutSeconds
     How long to wait for an answer.
-  .PARAMETER UserRoot
-    Absolute path to the nucleus USER root.
   #>
   [CmdletBinding()]
   [OutputType([string])]

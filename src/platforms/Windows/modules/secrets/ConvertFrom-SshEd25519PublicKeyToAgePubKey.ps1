@@ -3,15 +3,11 @@
     SSH Ed25519 to age public key conversion for SOPS age recipient management.
 
 .DESCRIPTION
-    Provides ConvertFrom-SshEd25519PublicKeyToAgePubKey, a pure-PowerShell
-    implementation of the ssh-to-age public-key conversion path.  Used by both
-    invoke-secretverification.ps1 (SOPS recipient checks) and
-    register-hostagekey.ps1 (machine age key auto-registration) so a
-    single authoritative implementation is shared across both call sites.
+    Pure-PowerShell equivalent of `ssh-to-age -i`, shared by
+    Invoke-SecretVerification.ps1 and Register-HostAgeKey.ps1. Throws on failure.
 
 .NOTES
     Environment variables: (none)
-    Exit codes: N/A — library script; functions use throw on failure.
 #>
 
 function ConvertFrom-SshEd25519PublicKeyToAgePubKey {
@@ -20,31 +16,16 @@ function ConvertFrom-SshEd25519PublicKeyToAgePubKey {
     Converts an SSH Ed25519 public key to an age bech32 public key.
 
   .DESCRIPTION
-    Parses the SSH wire format (RFC 4253) to extract the raw 32-byte Ed25519
-    public key, converts it from the Edwards curve representation to the
-    Montgomery/X25519 form used by age (birational map u = (1+y)/(1-y) mod p),
-    then bech32-encodes the result with HRP "age".
-
-    Uses System.Numerics.BigInteger for the 255-bit field arithmetic and [long]
-    arithmetic for the bech32 bit-conversion loop to avoid overflow.
-
-    This mirrors the `ssh-to-age -i <pubkey.pub>` conversion used on POSIX hosts
-    to derive age public keys from SSH public keys without accessing any
-    passphrase-protected private key material.  No external tool is required.
+    Parses the SSH wire format (RFC 4253), maps the Edwards key to the
+    Montgomery/X25519 form age uses (u = (1+y)/(1-y) mod p), then bech32-encodes
+    it with HRP "age". Uses BigInteger for the field arithmetic and [long] for
+    the bit conversion, which would overflow otherwise.
 
   .PARAMETER SshPublicKeyLine
-    Full SSH public key line in OpenSSH authorized_keys format,
-    e.g. "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5... optional-comment".
+    Full SSH public key line, e.g. "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5... optional-comment".
 
   .OUTPUTS
     [string] bech32-encoded age public key, e.g. "age1...".
-
-  .EXAMPLE
-    ConvertFrom-SshEd25519PublicKeyToAgePubKey "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5..."
-
-  .NOTES
-    Environment variables: (none)
-    Exit codes: N/A — library function; throws on failure.
   #>
   [CmdletBinding()]
   param(
@@ -59,8 +40,7 @@ function ConvertFrom-SshEd25519PublicKeyToAgePubKey {
   }
   [byte[]]$blob = [System.Convert]::FromBase64String($parts[1])
 
-  # SSH wire format (RFC 4253): uint32 name-len + name-bytes + uint32 key-len + key-bytes.
-  # Read the algorithm name length (big-endian uint32) and skip past it.
+  # Skip the algorithm name: uint32 name-len + name-bytes (RFC 4253).
   [long]$nameLen = ([long]$blob[0] -shl 24) -bor ([long]$blob[1] -shl 16) -bor `
                    ([long]$blob[2] -shl 8) -bor [long]$blob[3]
   [int]$offset = 4 + [int]$nameLen
@@ -74,41 +54,33 @@ function ConvertFrom-SshEd25519PublicKeyToAgePubKey {
   }
   [byte[]]$ed25519Key = $blob[$offset..($offset + 31)]
 
-  # Convert Ed25519 (Edwards curve) public key to X25519 (Montgomery curve) public key.
-  # Ed25519 key bytes: 32-byte little-endian y-coordinate; bit 255 (high bit of byte[31])
-  # carries the sign of the x-coordinate and is cleared before reading y.
-  # Birational map: u = (1 + y) / (1 - y) mod p, p = 2^255 - 19.
-  # This is the same computation that `ssh-to-age -i` performs internally.
+  # Ed25519 to X25519 via the birational map u = (1 + y) / (1 - y) mod p.
+  # Only y is needed, so clear the x-sign bit (high bit of byte[31]) first.
   [byte[]]$yBytes = $ed25519Key.Clone()
   $yBytes[31] = $yBytes[31] -band 0x7f  # clear x-sign bit; only y is needed
 
-  # Append a 0x00 byte so BigInteger treats the little-endian buffer as non-negative.
+  # The 0x00 byte keeps BigInteger from reading the buffer as negative.
   [byte[]]$yBuf = New-Object byte[] 33
   [Array]::Copy($yBytes, $yBuf, 32)
   $y = [System.Numerics.BigInteger]::new($yBuf)
 
-  # p = 2^255 - 19 (the shared prime for Curve25519 / Ed25519).
   $two = [System.Numerics.BigInteger]::new(2)
   $p = [System.Numerics.BigInteger]::Pow($two, 255) - [System.Numerics.BigInteger]::new(19)
   $one = [System.Numerics.BigInteger]::One
 
-  # u = (1 + y) * inv(1 - y) mod p.  Use (p + 1 - y) to keep the denominator positive.
+  # p + 1 - y keeps the denominator positive. Fermat: inv(a) = a^(p-2) mod p.
   $num      = ($one + $y) % $p
   $denom    = ($p + $one - $y) % $p
-  # Modular inverse via Fermat's little theorem: inv(a) = a^(p-2) mod p (p is prime).
   $denomInv = [System.Numerics.BigInteger]::ModPow($denom, $p - $two, $p)
   $u        = ($num * $denomInv) % $p
 
-  # Encode u as 32 bytes little-endian (the X25519 / age public key).
-  # ToByteArray() may omit leading zero bytes or append a sign byte; normalise to 32 bytes.
+  # ToByteArray() drops leading zero bytes and can append a sign byte, so normalise to 32.
   [byte[]]$uRaw = $u.ToByteArray()
   [byte[]]$x25519Key = New-Object byte[] 32
   [Array]::Copy($uRaw, $x25519Key, [Math]::Min($uRaw.Length, 32))
 
-  # Convert 32 bytes (8-bit groups) to 5-bit groups for the bech32 data field.
-  # Implements convertbits(data, 8, 5, pad=True) from BIP-0173.  We accumulate
-  # up to 13 bits at a time (8 new + at most 4 carried) and mask to 13 bits to
-  # keep arithmetic in range for [long] without overflow risk.
+  # convertbits(data, 8, 5, pad=True) from BIP-0173. Masking to 13 bits keeps the
+  # accumulator in range for [long].
   $data5 = [System.Collections.Generic.List[int]]::new()
   [long]$acc = 0
   [int]$bits = 0
@@ -154,11 +126,9 @@ function ConvertFrom-SshEd25519PublicKeyToAgePubKey {
   }
   [long]$polymod = $c -bxor 1
 
-  # Extract 6 checksum 5-bit values from the 30-bit polymod, most-significant
-  # group first (i=5 gives bits 29-25; i=0 gives bits 4-0).
+  # 6 checksum values from the 30-bit polymod, most-significant group first.
   $checksum = for ($i = 5; $i -ge 0; $i--) { [int](($polymod -shr (5 * $i)) -band 0x1f) }
 
-  # Assemble the final bech32 string: HRP + "1" + encoded(data5 + checksum).
   $charset = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l'
   $sb = [System.Text.StringBuilder]::new()
   $null = $sb.Append($hrp + '1')  # check-suppress:suppression_doc: Append returns StringBuilder, discarded

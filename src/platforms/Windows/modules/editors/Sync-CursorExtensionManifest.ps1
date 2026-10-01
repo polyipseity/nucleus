@@ -3,19 +3,9 @@
   Converges managed Cursor extension parity.
 
 .DESCRIPTION
-  Converges a managed extension baseline on the `cursor` CLI when available.
-  Missing CLI is treated as a warning so bootstrap can proceed before first
-  app launch PATH updates settle.
-
-  Each extension is installed with --pre-release --force so the latest
-  pre-release build is fetched; Cursor falls back to stable automatically
-  when a pre-release channel does not exist for an extension.
-
-  Individual extension failures are reported as warnings but do not abort
-  the sync so a single unavailable extension does not break the entire
-  baseline convergence.
-
-  Cleanup behavior when disabled removes only managed extensions.
+  Installs or removes a managed extension set on the `cursor` CLI. A missing CLI
+  warns and returns so bootstrap proceeds before the first app launch settles PATH.
+  Per-extension failures warn without aborting the sync.
 
 .NOTES
   Environment variables: USERPROFILE
@@ -28,33 +18,22 @@ function Sync-CursorExtensionManifest {
     Converges managed Cursor extension parity.
 
   .DESCRIPTION
-    Installs or removes a managed extension set on the `cursor` CLI when
-    available. The managed extension list is identical to the VS Code
-    baseline so both editors share the same extension payload.
-
-    Version pins come from lockfile.json suggestions.cursor.
+    Installs or removes a managed extension set on the `cursor` CLI. The managed
+    list is the VS Code baseline, so both editors carry the same payload, and the
+    version pins come from lockfile.json suggestions.cursor.
 
   .PARAMETER Enabled
-    Whether managed extension parity should be enforced. Mandatory: caller
-    must explicitly choose true (install managed extensions) or false
-    (remove managed extensions).
-
-  .EXAMPLE
-    Sync-CursorExtensionManifest -Enabled:`$true
-
-  .EXAMPLE
-    Sync-CursorExtensionManifest -Enabled:`$false
+    Mandatory: true installs managed extensions, false removes them.
   #>
   param(
     [Parameter(Mandatory)]
     [bool]$Enabled
   )
 
-  # Derive repo root from script location (src/platforms/Windows/modules/editors/ -> repo root is 5 levels up).
+  # 5 levels up from src/platforms/Windows/modules/editors/ is the repo root.
   $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
   $lockfilePath = Join-Path $repoRoot "src\lockfiles\lockfile.json"
 
-  # Read version-pinning data from the consolidated lockfile.
   $lockfile = @{}
   if (Test-Path $lockfilePath) {
     $lockfile = Get-Content $lockfilePath -Raw | ConvertFrom-Json
@@ -142,9 +121,7 @@ function Sync-CursorExtensionManifest {
     if ($Enabled) {
       $version = $cursorVersions.$extensionId
       $installSpec = if ($version) { "${extensionId}@${version}" } else { $extensionId }
-      # tinymist: install stable only — pre-release builds have caused
-      # editor crashes.  All other extensions use --pre-release; Cursor
-      # falls back to stable when a pre-release channel does not exist.
+      # tinymist stays on stable: its pre-release builds crash the editor.
       if ($extensionId -eq 'myriad-dreamin.tinymist') {
         $output = & $cliPath --install-extension $installSpec --force 2>&1
       } else {
@@ -162,11 +139,8 @@ function Sync-CursorExtensionManifest {
   }
 
   if ($Enabled -and (Test-Path $extDir)) {
-    # Prune the extensions directory so the managed baseline is the sole
-    # source of truth.  Extension folders are named publisher.name-version;
-    # match against managed IDs (publisher.name) using a prefix check.
-    # For managed extensions with a lockfile pin, also remove folders whose
-    # embedded version does not match (version-aware reconciliation).
+    # Extension folders are publisher.name-version, so match managed IDs
+    # (publisher.name) by prefix, then drop the ones whose version misses the pin.
     Get-ChildItem -Path $extDir -Directory | ForEach-Object {
       $folderName = $_.Name
       $matchedId = $managedExtensions | Where-Object { $folderName -like "$_-*" -or $folderName -eq $_ } | Select-Object -First 1
@@ -185,14 +159,13 @@ function Sync-CursorExtensionManifest {
       }
     }
 
-    # extensions.json is a derived manifest Cursor writes on startup; a stale
-    # one hides newly added managed extensions on the next launch.  Remove it
-    # unconditionally so Cursor rescans the directory from the actual contents.
+    # Cursor rewrites this manifest on startup, and a stale one hides newly added
+    # managed extensions until then. Removing it forces a rescan.
     # check-suppress:suppression_doc: file may not exist before first Cursor launch; best-effort cleanup.
     Remove-Item -Path (Join-Path $extDir 'extensions.json') -Force -ErrorAction Ignore
 
-    # .obsolete is Cursor's deferred-deletion marker; remove it so the bridge
-    # fully owns the directory state.  WHY: file may not exist; best-effort cleanup.
+    # Cursor's deferred-deletion marker; remove it so the bridge owns directory state.
+    # WHY: file may not exist; best-effort cleanup.
     Remove-Item -Path (Join-Path $extDir '.obsolete') -Force -ErrorAction Ignore
   }
 }
