@@ -543,40 +543,48 @@ test_copy_below_the_pin_beside_the_pin_exits_zero() {
 
 # The other side of the same boundary: the same stale version inside the
 # per-user module path is a removal target, because that tree is what this script
-# installs into. The removal then fails on the PSGallery record the copy has
-# never had, which is what proves the sweep was pointed at that copy.
+# installs into. PowerShellGet cannot uninstall it, since the copy has never had
+# a package record, so the assertion is the only thing that decides it: the stale
+# directory is gone and the converged pin is still there.
 test_stale_copy_inside_the_user_module_path_is_swept() {
-  local stale_dir="$IPM_USER_MODULE_ROOT/ProbeMod/1.0.0"
+  local stale_dir="$IPM_USER_MODULE_ROOT/ProbeMod/1.0.0" pin_dir="$IPM_USER_MODULE_ROOT/ProbeMod/2.0.0"
+  local stale_gone=false pin_kept=false
   write_fake_module "$IPM_USER_MODULE_ROOT" ProbeMod 1.0.0
   write_fake_module "$IPM_USER_MODULE_ROOT" ProbeMod 2.0.0
   run_installer_real "$TMP_DIR/empty-root" ProbeMod 2.0.0
-  rm -rf "$stale_dir"
-  if [ "$RUN_STATUS" -eq 0 ]; then
-    assert_fail "installer: sweeps a stale copy inside the module path" "exited 0; stdout=$RUN_STDOUT stderr=$RUN_STDERR"
-    return
-  fi
+  [ -d "$stale_dir" ] || stale_gone=true
+  [ -d "$pin_dir" ] && pin_kept=true
+  rm -rf "$IPM_USER_MODULE_ROOT/ProbeMod"
   if ! printf '%s' "$RUN_STDOUT" | grep -qF 'removing 1 stale or shadowing ProbeMod version(s)'; then
     assert_fail "installer: sweeps a stale copy inside the module path" "the sweep named a different set; stdout=$RUN_STDOUT stderr=$RUN_STDERR"
     return
   fi
-  if printf '%s' "$RUN_STDERR" | grep -qF '1.0.0'; then
-    assert_pass "installer: sweeps a stale copy inside the module path"
-  else
-    assert_fail "installer: sweeps a stale copy inside the module path" "exited $RUN_STATUS without naming the stale copy; stdout=$RUN_STDOUT stderr=$RUN_STDERR"
+  if [ "$stale_gone" != true ]; then
+    assert_fail "installer: sweeps a stale copy inside the module path" "the stale copy is still on disk; stdout=$RUN_STDOUT stderr=$RUN_STDERR"
+    return
   fi
+  if [ "$pin_kept" != true ]; then
+    assert_fail "installer: sweeps a stale copy inside the module path" "the sweep took the converged pin with it; stdout=$RUN_STDOUT stderr=$RUN_STDERR"
+    return
+  fi
+  assert_pass "installer: sweeps a stale copy inside the module path"
 }
 
-# The other side of the same boundary, and the reason the check above is a rule
-# rather than a switch being turned off. Three copies straddle the pin: only the
-# one above it is swept, so the count in the message is the assertion that
-# separates 3.0.0 and 2.0.0 from 1.0.0. The sweep then stops on the refusal that
-# has no PSGallery package record behind it, which is what fails the run.
+# A copy above the pin is a sweep target at any scope, and the count in the
+# message is what separates 3.0.0 from 1.0.0, since both sit in the same tree.
+# The run goes on to install afterwards, which fails here only because ProbeMod
+# is not a module PSGallery knows, so the assertions stay on the directories.
 test_copy_above_the_pin_is_swept_and_the_run_fails() {
   local module_root="$TMP_DIR/above-pin-root"
+  local above_dir="$module_root/ProbeMod/3.0.0" below_dir="$module_root/ProbeMod/1.0.0"
+  local above_gone=false below_kept=false
   write_fake_module "$module_root" ProbeMod 1.0.0
   write_fake_module "$module_root" ProbeMod 3.0.0
   write_fake_module "$IPM_USER_MODULE_ROOT" ProbeMod 2.0.0
   run_installer_real "$module_root" ProbeMod 2.0.0
+  [ -d "$above_dir" ] || above_gone=true
+  [ -d "$below_dir" ] && below_kept=true
+  rm -rf "$module_root" "$IPM_USER_MODULE_ROOT/ProbeMod"
   if [ "$RUN_STATUS" -eq 0 ]; then
     assert_fail "installer: a copy above the pin is swept and the run fails" "exited 0; stdout=$RUN_STDOUT stderr=$RUN_STDERR"
     return
@@ -587,8 +595,12 @@ test_copy_above_the_pin_is_swept_and_the_run_fails() {
   fi
   # Without this the case could be passing on a sweep of all three copies, which
   # is the behaviour the rule change removed.
-  if printf '%s' "$RUN_STDOUT" | grep -qF 'installing'; then
-    assert_fail "installer: a copy above the pin is swept and the run fails" "the install carried on beside the copy the sweep could not remove; stdout=$RUN_STDOUT"
+  if [ "$above_gone" != true ]; then
+    assert_fail "installer: a copy above the pin is swept and the run fails" "the copy above the pin is still on disk; stdout=$RUN_STDOUT"
+    return
+  fi
+  if [ "$below_kept" != true ]; then
+    assert_fail "installer: a copy above the pin is swept and the run fails" "the copy below the pin was removed; stdout=$RUN_STDOUT"
     return
   fi
   # stderr has to name the module, or a non-zero status could be pwsh failing for
@@ -749,6 +761,42 @@ test_requires_a_privilege_command_only_when_a_copy_shadows() {
   fi
 }
 
+# The removal runs as root, and a root session has no entry for the user's
+# module tree, so the program under test gets a copy it cannot see on its own
+# module path. It has to add the copy's path first, and the directory has to be
+# gone afterwards. Without that line Uninstall-Module reports the version as not
+# installed and the stale copy survives, which is what aborted the operator's
+# apply.
+test_elevated_removal_deletes_a_copy_the_child_cannot_see() {
+  local root_home="$TMP_DIR/root-home" program="$TMP_DIR/removal.ps1"
+  local stale_dir="$IPM_USER_MODULE_ROOT/ProbeMod/1.0.0" status=0 survived=true
+  mkdir -p "$root_home"
+  write_fake_module "$IPM_USER_MODULE_ROOT" ProbeMod 1.0.0
+  run_installer ProbeMod 1.0.0
+  # WHY extract the shipped program instead of writing one here: a hand-written
+  #   copy would prove the copy, not the installer. The recorded program is
+  #   indented, so the here-string markers are matched on content.
+  sed -n "/removalProgram = @'/,/^[[:space:]]*'@/p" "$IPM_STUB_LOG" | sed '1d;$d' >"$program"
+  if [ ! -s "$program" ]; then
+    rm -rf "$stale_dir"
+    assert_fail "installer: the removal child deletes a copy it cannot see" "the installer shipped no removal program"
+    return
+  fi
+  HOME="$root_home" pwsh -NoProfile -File "$program" ProbeMod "1.0.0|$stale_dir" \
+    >"$TMP_DIR/removal-out.txt" 2>&1 || status=$?
+  [ -d "$stale_dir" ] || survived=false
+  local output
+  output="$(cat "$TMP_DIR/removal-out.txt")"
+  rm -rf "$stale_dir"
+  if [ "$survived" = true ]; then
+    assert_fail "installer: the removal child deletes a copy it cannot see" "the copy survived; pwsh said: $output"
+  elif [ "$status" -ne 0 ]; then
+    assert_fail "installer: the removal child deletes a copy it cannot see" "pwsh exited $status after removing the copy; pwsh said: $output"
+  else
+    assert_pass "installer: the removal child deletes a copy it cannot see"
+  fi
+}
+
 test_missing_privilege_command_fails_when_a_copy_shadows_the_pin() {
   run_shadowed_program ProbeMod 2.0.0 clean ''
   if [ "$RUN_STATUS" -eq 0 ]; then
@@ -769,6 +817,7 @@ test_missing_privilege_command_fails_when_a_copy_shadows_the_pin() {
 test_elevates_the_removal_and_keeps_the_install_unprivileged
 test_removal_is_narrowed_to_the_versions_that_shadow
 test_elevated_removal_never_carries_the_converged_pin
+test_elevated_removal_deletes_a_copy_the_child_cannot_see
 test_requires_a_privilege_command_only_when_a_copy_shadows
 test_missing_privilege_command_fails_when_a_copy_shadows_the_pin
 
