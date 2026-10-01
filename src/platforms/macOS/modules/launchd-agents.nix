@@ -196,7 +196,7 @@ in
         NUCLEUS_LOG_EXPIRY = config.nucleus.logging.rotation.expiry;
       };
       RunAtLoad = false;
-      # WHY: StartCalendarInterval is broken on this system — see posix/base.nix.
+      # WHY: StartCalendarInterval is broken on this system: see posix/base.nix.
       StartInterval = 86400;
     };
   };

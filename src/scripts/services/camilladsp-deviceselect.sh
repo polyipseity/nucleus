@@ -277,7 +277,7 @@ PYEOF
 
   # WHY: the raw probe value doubles as the device-cache key, so keep it before the capture-device rejection below. `|| true` rather than `|| _probe=""`, because a detector that prints a name but exits non-zero still yields that name.
   local _probe
-  # check-suppress:suppression_doc: detection failure is non-fatal — falls through to fallback path
+  # check-suppress:suppression_doc: detection failure is non-fatal: falls through to fallback path
   _probe=$(camilladsp_detect_default_output 2>/dev/null) || true
 
   local detected_device="$_probe"
@@ -308,7 +308,7 @@ PYEOF
   fi
 
   if [ -z "$detected_device" ]; then
-    # check-suppress:suppression_doc: detection failure is non-fatal — passes through with empty device
+    # check-suppress:suppression_doc: detection failure is non-fatal: passes through with empty device
     detected_device=$(camilladsp_detect_first_available "$capture_device" "$_probe" 2>/dev/null) || true
   fi
 

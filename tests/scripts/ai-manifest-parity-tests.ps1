@@ -1,5 +1,5 @@
 #Requires -Version 7.4
-# WHY: grep-based — the defect guarded here is a divergence between the ai
+# WHY: grep-based: the defect guarded here is a divergence between the ai
 # twins: each declares its own model manifest path, and nothing reported the
 # disagreement. The broken path lives in this script, which cannot be invoked
 # without a live Ollama host, so the only observable surface is the two sources

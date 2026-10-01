@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# WHY: grep-based — `bump-lockfile` was folded into `nucleus-update lockfile`,
+# WHY: grep-based: `bump-lockfile` was folded into `nucleus-update lockfile`,
 # but text naming the removed command survived in two opposite directions. Six
 # sites told a reader to run a command that no longer exists, including a JSON
 # schema description, which is what an agent reads before editing the

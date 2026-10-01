@@ -96,7 +96,7 @@ write_vm_directory_readme() {
     warn "README template not found at $TEMPLATES_DIR/README.md; writing minimal guide"
     {
       printf '# virtual machines\n\n'
-      # shellcheck disable=SC2016 # reason: single quotes intentional — backticks must not expand
+      # shellcheck disable=SC2016 # reason: single quotes intentional: backticks must not expand
       printf 'This directory stores VM artifacts managed by `nucleus-vm`.\n'
     } >"$_wvdr_readme"
   fi

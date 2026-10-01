@@ -253,7 +253,7 @@ fi
 
 section 4 "Reload goes through the helper"
 
-# WHY: grep-only — the defect was a call site that swallowed the bootstrap
+# WHY: grep-only: the defect was a call site that swallowed the bootstrap
 # result, so the contract under test is "every call site reloads through the
 # helper". The pattern matches an invocation (an argument follows launchctl)
 # and not a message that merely names the command.
@@ -575,8 +575,8 @@ assert_count "an unblocked restart never restarts the FSKit daemon" 0 "$(_fskit_
 
 section 9 "A cloud mount whose volume never comes back fails the restart"
 
-# WHY: the agent exits 0 when the provider refuses the volume, so the volume —
-# not the job's state, is what decides whether the restart worked.
+# WHY: the agent exits 0 when the provider refuses the volume, so the volume
+# not the job's state decides whether the restart worked.
 FAKE_MOUNT_APPEAR_AFTER=""
 reset_cli stopped "$_cli_mount" 2 restart local.cloud-mount.iCloud
 assert_count "a volume that never attaches fails the restart" 1 "$captured_status"

@@ -323,7 +323,7 @@ function Invoke-LockfileBump {
             $new = $resp.versions[0].num
           }
         } catch {
-          $new = $null  # check-suppress:suppression_doc: API failure — cargo search below is the only other version source
+          $new = $null  # check-suppress:suppression_doc: API failure; cargo search below is the only other version source
         }
         if ([string]::IsNullOrEmpty($new)) {
           # check-suppress:suppression_doc: probe -- crate may not exist; stderr suppressed for clean output.

@@ -256,7 +256,7 @@ svc_run_bounded() {
       # check-suppress:suppression_doc: the command already outlived its bound; signalling and reaping a process that ignores the signal must not change the timeout answer.
       kill -TERM "$pid" 2>/dev/null || true
       sleep 0.2
-      # check-suppress:suppression_doc: same as above — the kill and the reap are best effort, the bound is the answer.
+      # check-suppress:suppression_doc: same as above: the kill and the reap are best effort, the bound is the answer.
       kill -KILL "$pid" 2>/dev/null || true
       # check-suppress:suppression_doc: same as above.
       wait "$pid" 2>/dev/null || true

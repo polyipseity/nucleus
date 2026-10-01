@@ -232,7 +232,7 @@ run_activation_tool_resolution() {
     done
     if [ "${#_find_dirs[@]}" -gt 0 ]; then
       mapfile -t _candidate_files < <(
-        # shellcheck disable=SC2046 # reason: echo expands the find array safely — no globbing risk
+        # shellcheck disable=SC2046 # reason: echo expands the find array safely, no globbing risk
         find "${_find_dirs[@]}" -name '*.sh' -print |
           filter_gitignored |
           LC_ALL=C sort |
@@ -532,7 +532,7 @@ run_package_manager_enforcement() {
   fi
 
   local _grep_files=()
-  # shellcheck disable=SC2178 # reason: nameref to context array — shellcheck sees string assignment but the ref resolves to an array
+  # shellcheck disable=SC2178 # reason: nameref to context array; shellcheck sees string assignment but the ref resolves to an array
   local -n _sh_files="${ctx[SH_FILES]}"
   # shellcheck disable=SC2178 # reason: nameref to context array
   local -n _ps1_files="${ctx[PS1_FILES]}"
@@ -651,7 +651,7 @@ run_suppression_audit() {
       xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
         _safe="$(echo "$2" | tr "/" "_")"
         _out="$1/${_safe}.out"
-        _grep_pattern="shellcheck disable=|check-suppress:"  # reason: self-reference — grep pattern literal, not a suppression
+        _grep_pattern="shellcheck disable=|check-suppress:"  # reason: self-reference: grep pattern literal, not a suppression
         grep -Hn -E "$_grep_pattern" "$2" \
           | grep -v -E "reason:|suppression_doc:|config-method|embedded-content|packer_validate|SuppressMessageAttribute" \
           | sed "s/^/undoc_supp:/" >> "$_out" 2>/dev/null || true  # check-suppress:suppression_doc: grep exits 1 on no matches; an empty .out file is the clean signal

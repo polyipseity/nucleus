@@ -294,7 +294,7 @@ function Invoke-CheckSh {
 
 switch ($Action) {
   'packer' {
-    # WHY: filter --verbose/--no-verbose/--only-steps from Paths — these flags are only for the step pipeline (all action); subcommands don't understand them.
+    # WHY: filter --verbose/--no-verbose/--only-steps from Paths: these flags are only for the step pipeline (all action); subcommands don't understand them.
     $PackerPaths = @($Paths | Where-Object { $_ -notmatch '^--verbose' -and $_ -ne '--no-verbose' -and $_ -notmatch '^--only-steps' })
     Invoke-CheckPacker @PackerPaths -WindowsTemplateOverride $WindowsTemplateOverride -AnnotationCheckOnly:$AnnotationCheckOnly -ValidateOnly:$ValidateOnly
     exit $LASTEXITCODE

@@ -101,7 +101,7 @@ function Sync-OpenSSHServer {
   if ($Enabled) {
     Set-Service -Name 'sshd' -StartupType Automatic
     Start-Service -Name 'sshd'
-    # WHY: Firewall rule toggle is conditional on user preference — DSC
+    # WHY: Firewall rule toggle is conditional on user preference: DSC
     # Microsoft.Windows.Settings/Firewall only supports global on/off, not
     # individual rule management. The built-in OpenSSH rule exists on every
     # Windows install; we only enable/disable it.

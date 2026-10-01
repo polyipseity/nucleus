@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# WHY: grep-based — the defect guarded here is a divergence between the ai
+# WHY: grep-based: the defect guarded here is a divergence between the ai
 # twins: each declares its own model manifest path, and nothing reported the
 # disagreement. The broken path lives in the Windows script, which no POSIX
 # gate can invoke, so the only observable surface is the two sources compared

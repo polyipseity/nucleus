@@ -51,7 +51,7 @@ function Show-NucleusNotification {
   # check-suppress:SuppressMessageAttribute: PSAvoidUsingEmptyCatchBlock -- notification is best-effort; all errors intentionally swallowed
   [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingEmptyCatchBlock', '')]
   param([string]$Title, [string]$Message)
-  # check-suppress:suppression_doc: BurntToast module is optional — fall back to MessageBox.
+  # check-suppress:suppression_doc: BurntToast module is optional: fall back to MessageBox.
   if (Get-Module -ListAvailable -Name BurntToast -ErrorAction SilentlyContinue) {
     try {
       New-BurntToastNotification -Text $Title, $Message -ErrorAction Stop

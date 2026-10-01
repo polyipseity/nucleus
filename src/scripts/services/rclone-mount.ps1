@@ -52,7 +52,7 @@ Initialize-HealthRecord -Instance $instance
 
 $prepareRc = Mount-Backend-Prepare -Instance $instance
 if ($prepareRc -eq 20) {
-    # WHY: Write-Output, not Write-Host — this script is the body of a scheduled task
+    # WHY: Write-Output, not Write-Host: this script is the body of a scheduled task
     #   whose stdout is captured to stdout.log, while the verbose and information streams
     #   are hidden under the default preference variables, so those would silently drop
     #   the operator's mount diagnostics.  Every Write-Host below follows this same rule.

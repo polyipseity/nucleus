@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# WHY: grep-based — the defect guarded here is a rename that did not reach the
+# WHY: grep-based: the defect guarded here is a rename that did not reach the
 # text citing it. src/modules/lib/env-catalog.nix became env-secrets.nix
 # (72f1e7de), but 28 citations across 10 tracked files kept the old name, and
 # nothing reported them. An agent reading one of those citations is pointed at

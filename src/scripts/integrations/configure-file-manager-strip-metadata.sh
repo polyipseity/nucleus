@@ -5,7 +5,7 @@
 set -eu
 
 if [ $# -gt 0 ]; then
-  # WHY: --dialog — Nautilus Scripts cannot declare per-file-type filtering, so
+  # WHY: --dialog: Nautilus Scripts cannot declare per-file-type filtering, so
   # this entry is offered for every selection; the modal popup is the only
   # feedback the user gets about a file that was skipped.
   exec nucleus-utils strip-metadata --dialog "$@"

@@ -122,8 +122,8 @@ in
     (assert' (containsString "@('telegram', 'ntfy', 'discord')" (read "/src/scripts/notify/harness-notify.ps1")) "the PowerShell harness-notify must mirror the same channel default")
 
     # --- Per-action gates: master on, approval off, drive on ---
-    # WHY: each flag lives in every layer that reads it — the two nucleus-config
-    # implementations plus a fallback literal inside each script — with nothing
+    # WHY: each flag lives in every layer that reads it: the two nucleus-config
+    # implementations plus a fallback literal inside each script: with nothing
     # shared between them, so the declared text is the only available check.  The
     # shipped state is deliberately "notify, do not broker": a host opts into
     # remote approvals, and never the other way round.

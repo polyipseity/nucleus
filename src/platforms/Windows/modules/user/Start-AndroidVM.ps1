@@ -17,6 +17,6 @@
 
 $ErrorActionPreference = 'Stop'
 
-# WHY: shared cross-platform content per embedded-content policy — delegate
+# WHY: shared cross-platform content per embedded-content policy: delegate
 # to the canonical script instead of duplicating the start logic here.
 & (Join-Path $PSScriptRoot '..\..\..\..\scripts\vms\start-android-vm.ps1')

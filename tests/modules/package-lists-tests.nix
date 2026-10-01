@@ -135,7 +135,7 @@ let
   # core.nix) is observable without a full host configuration.
   # WHY no `options` entry in specialArgs: specialArgs win over the module
   # system's own module arguments, so passing `options = { }` replaces core.nix's
-  # options tree and silently makes its `options ? environment` guard false —
+  # options tree and silently makes its `options ? environment` guard false,
   # environment.systemPackages then stays at this stub's empty default and the
   # shared package set is unobservable.
   lib = import <nixpkgs/lib>;

@@ -175,7 +175,7 @@ do_sync() {
           _model_name="${model%%:*}"
           _model_tag="${model#*:}"
           [ "$_model_tag" = "$model" ] && _model_tag="latest"
-          # shellcheck disable=SC2016 # reason: jq filter variables use $p, $n, $t — not shell expansion
+          # shellcheck disable=SC2016 # reason: jq filter variables use $p, $n, $t; not shell expansion
           _expected_digest=$(jq -r --arg p "$profile" --arg n "$_model_name" --arg t "$_model_tag" '
             .ollama[$p][] | select(.name == $n and .tag == $t) | .digest // empty' "$LOCKFILE" 2>/dev/null || true) # check-suppress:suppression_doc: model may not be pulled yet; digest probe expected to fail.
           if [ -n "$_expected_digest" ]; then
@@ -388,7 +388,7 @@ do_endpoint() {
     printf '%.0s-' {1..70}
     printf '\n'
     for _svc in ollama litellm; do
-      # shellcheck disable=SC2016 # reason: jq filter uses $svc — not shell expansion
+      # shellcheck disable=SC2016 # reason: jq filter uses $svc; not shell expansion
       _network=$(jq -c --arg svc "$_svc" '.[$svc].network // empty' "$SERVICES_JSON")
       if [ -z "$_network" ]; then
         continue

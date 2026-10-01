@@ -78,7 +78,7 @@ extract_flags() {
       sed -E 's/^[[:space:]]*//'
   } |
     grep -vxE -- '-h|--help' |
-    LC_ALL=C sort -u || true # check-suppress:suppression_doc: no flag tokens in either source is a valid result (help-only commands) — the pipeline then emits nothing.
+    LC_ALL=C sort -u || true # check-suppress:suppression_doc: no flag tokens in either source is a valid result (help-only commands); the pipeline then emits nothing.
 }
 
 # '|'-separated bare lowercase [a-z0-9-] words on the usage summary line.
@@ -87,7 +87,7 @@ extract_subcommands() {
     sed -E 's/^usage: [^[:space:]]+[[:space:]]*//' |
     tr '|' '\n' |
     sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' |
-    grep -E '^[a-z][a-z0-9-]*$' || true # check-suppress:suppression_doc: no subcommands in the usage line is a valid result — the pipeline then emits nothing.
+    grep -E '^[a-z][a-z0-9-]*$' || true # check-suppress:suppression_doc: no subcommands in the usage line is a valid result; the pipeline then emits nothing.
 }
 
 # The first help-body line whose first token is the subcommand, minus leading

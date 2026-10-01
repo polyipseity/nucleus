@@ -33,7 +33,7 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
       $dummySelfLeaf = $selfLeaf
       $dummySelfShLeaf = $selfShLeaf
 
-      # WHY: if-expression output is pipeline-enumerated — an empty branch yields $null, crashing the .Count check below under StrictMode; the @() wrapper forces an array
+      # WHY: if-expression output is pipeline-enumerated: an empty branch yields $null, crashing the .Count check below under StrictMode; the @() wrapper forces an array
       $dummyFiles = @(if ($HasArgs) {
         @($PositionalArgs | Where-Object {
             $_ -notmatch '(^|[\\/])(src[\\/]secrets[\\/]|vendor[\\/]|tests[\\/]fixtures[\\/])' -and
@@ -80,7 +80,7 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
 
   $preflightViolations = @()
 
-  # WHY: if-expression output is pipeline-enumerated — an empty branch yields $null, crashing the .Count check below under StrictMode; the @() wrapper forces an array
+  # WHY: if-expression output is pipeline-enumerated: an empty branch yields $null, crashing the .Count check below under StrictMode; the @() wrapper forces an array
   $ps1Files = @(if ($HasArgs) {
     if ($Context.Ps1Files) { $Context.Ps1Files } else { @($PositionalArgs | Where-Object { $_ -like '*.ps1' }) }
   } else {
@@ -110,7 +110,7 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
 
   $embeddedViolations = @()
 
-  # WHY: if-expression output is pipeline-enumerated — an empty branch yields $null, crashing the .Count checks below under StrictMode; the @() wrapper forces an array
+  # WHY: if-expression output is pipeline-enumerated: an empty branch yields $null, crashing the .Count checks below under StrictMode; the @() wrapper forces an array
   $embeddedPs1Files = @(if ($HasArgs) {
     if ($Context.Ps1Files) { $Context.Ps1Files } else { @($PositionalArgs | Where-Object { $_ -like '*.ps1' }) }
   } else {

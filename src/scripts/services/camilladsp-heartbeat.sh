@@ -102,7 +102,7 @@ except Exception:
 
   _target=""
   if [ -f "$config_file" ]; then
-    # check-suppress:suppression_doc: detection failure is non-fatal — empty target is treated as "skip" by the push decision
+    # check-suppress:suppression_doc: detection failure is non-fatal: empty target is treated as "skip" by the push decision
     _target=$(camilladsp_target_playback_device "$config_file" 2>/dev/null) || true
   fi
 

@@ -130,7 +130,7 @@ in
               NUCLEUS_LOG_EXPIRY = config.nucleus.logging.rotation.expiry;
             };
             RunAtLoad = false;
-            # WHY: StartCalendarInterval is broken on this system — the
+            # WHY: StartCalendarInterval is broken on this system: the
             # com.apple.launchd.calendarinterval event channel shows active=0
             # and all StartCalendarInterval daemons have runs=0. StartInterval
             # fires 24h after last run; less predictable but reliable.

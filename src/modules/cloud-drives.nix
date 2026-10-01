@@ -423,7 +423,7 @@ in
                 Label = mountUnitName mount;
                 ProgramArguments = [ "${mkRcloneMountScript mount}/bin/nucleus-cloud-mount-${mount.id}" ];
                 RunAtLoad = true;
-                # WHY: no KeepAlive — the watchdog owns revival on every host.
+                # WHY: no KeepAlive: the watchdog owns revival on every host.
                 #   A non-zero exit means a transient failure; the runner retries
                 #   internally with bounded backoff.  A zero exit means the mount
                 #   was blocked or stopped intentionally.  KeepAlive created a
@@ -470,7 +470,7 @@ in
                   ExecStartPre = "${mkEnsureMountPoint mountPoint}";
                   ExecStart = "${mkRcloneMountScript mount}/bin/nucleus-cloud-mount-${mount.id}";
                   ExecStop = mkFusermountUnmount mountPoint;
-                  # WHY: no Restart policy — the watchdog owns revival on every host.
+                  # WHY: no Restart policy: the watchdog owns revival on every host.
                   # A non-zero exit means a transient failure; the runner retries
                   # internally with bounded backoff.  A zero exit means the mount
                   # was blocked or stopped intentionally.

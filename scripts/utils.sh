@@ -257,10 +257,10 @@ do_strip_metadata() {
   fi
 
   local mat2_cmd
-  # check-suppress:suppression_doc: mat2 is optional — OOXML files fall through to warning when absent.
+  # check-suppress:suppression_doc: mat2 is optional: OOXML files fall through to warning when absent.
   mat2_cmd="$(command -v mat2 2>/dev/null || true)"
   local et_cmd
-  # check-suppress:suppression_doc: exiftool is optional — non-Office files fall through to warning when absent.
+  # check-suppress:suppression_doc: exiftool is optional: non-Office files fall through to warning when absent.
   et_cmd="$(command -v exiftool 2>/dev/null || true)"
 
   local f bak
