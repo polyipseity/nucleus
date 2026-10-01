@@ -47,7 +47,7 @@ fi
   \$privilegeCommand = '$_ipm_privilege'
   # WHY the removal program travels inside this one: it is handed the version
   #   and path pairs the listing below produced. It runs in its own process
-  #   because a privileged copy cannot be removed from this one, and
+  #   because a copy this process cannot remove is the normal case, and
   #   -ErrorAction Stop makes a refused removal abort rather than leave a shadow
   #   behind.
   \$removalProgram = @'
@@ -67,13 +67,21 @@ if (Get-Module -Name \$moduleName) {
   \$target = @(\$_ -split '\|', 2)
   \$version = \$target[0]
   \$base = \$target[1]
-  # WHY the base joins the module path before the removal: this child runs as
-  #   root, and a root module path holds no entry for the user's module tree, so
-  #   Uninstall-Module would report the version as not installed and delete
-  #   nothing.
-  \$env:PSModulePath = \$base + [IO.Path]::PathSeparator + \$env:PSModulePath
   Write-Host ('install-pwsh-module: elevated removal of ' + \$moduleName + ' ' + \$version + ' at ' + \$base) -ForegroundColor Yellow
-  Uninstall-Module -Name \$moduleName -RequiredVersion \$version -Force -ErrorAction Stop
+  # WHY the fallback: Uninstall-Module resolves through PowerShellGet's package
+  #   records, so a copy that PowerShellGet never installed, or one whose record
+  #   did not survive a restore, is reported as no match at any privilege level
+  #   and in any module path. The directory is the thing the parent listed, so
+  #   removing it clears the copy either way.
+  # WHY the capitalised keywords: the activation tool check reads this file line
+  #   by line and only reads a command it can spell in lower case, so a
+  #   line-leading try is read as a bare external command. PowerShell keywords
+  #   are case-insensitive. The same reason keeps the guard below on one line.
+  Try { Uninstall-Module -Name \$moduleName -RequiredVersion \$version -Force -ErrorAction Stop } Catch { Get-ChildItem -LiteralPath \$base -Recurse -Force | ForEach-Object { \$_.IsReadOnly = \$false }; Remove-Item -LiteralPath \$base -Recurse -Force -ErrorAction Stop }
+  # WHY the guard: the copy shadows the pin until its directory is gone, so a
+  #   removal that reported success without deleting anything has to fail here
+  #   rather than let the install proceed over the shadow.
+  if (Test-Path -LiteralPath \$base) { throw ('install-pwsh-module: ' + \$base + ' survived the removal of ' + \$moduleName + ' ' + \$version) }
 }
 '@
   # WHY the first entry of PSModulePath: PowerShellGet installs CurrentUser scope
