@@ -1,24 +1,16 @@
 #
 # Smart playback device detection for CamillaDSP (Windows).
 #
-# Provides Resolve-CamillaDSPPlaybackDevice which reads a config YAML file,
-# detects the playback device when devices.playback.device is null using this
-# priority chain:
-#   1. System default output (via WASAPI COM)
-#   2. Last saved default (from state file, maintained across pushes)
-#   3. First available device (deterministic sorted-name fallback)
-# When playback.device is already set, the config is returned unchanged.
+# Resolve-CamillaDSPPlaybackDevice reads a config YAML file and, when
+# devices.playback.device is null, detects one in this order: system default output
+# (WASAPI COM), last saved default (state file), first available device (sorted-name
+# fallback). A config that already sets playback.device is returned unchanged.
 #
-# The capture device is always excluded from autodetection to prevent audio
-# loops (output → capture → processed → output again).
+# The capture device is always excluded, to prevent an audio loop
+# (output -> capture -> processed -> output again).
 #
-# Detection helpers (Get-CamillaDSPDefaultPlaybackDevice,
-# Get-CamillaDSPAvailablePlaybackDeviceList, Get-CamillaDSPFirstAvailablePlaybackDevice,
-# Get-CamillaDSPLastDevice, Save-CamillaDSPLastDevice) are mockable for unit tests.
-#
-# State file: %LOCALAPPDATA%\nucleus\camilladsp\last-device.txt persists the
-# last device pushed to CamillaDSP, used as fallback when no system default
-# is detected.
+# State file: %LOCALAPPDATA%\nucleus\camilladsp\last-device.txt holds the last device
+# pushed to CamillaDSP, used as fallback when no system default is detected.
 #
 # Dependencies: PowerShell 7+, powershell-yaml module
 #
@@ -69,9 +61,9 @@ function Get-CamillaDSPAvailablePlaybackDeviceList {
     return $null
   }
 
-  # Sort by name (case-sensitive, ascending) so selection is stable across
-  # reboots and Windows updates and matches the macOS/Linux case-sensitive
-  # ordering, instead of relying on undocumented EnumAudioEndpoints enumeration order.
+  # Sort by name (case-sensitive, ascending) so selection stays stable across reboots
+  # and Windows updates and matches the macOS/Linux ordering, instead of relying on
+  # undocumented EnumAudioEndpoints enumeration order.
   return ($names | Sort-Object)
 }
 
@@ -91,9 +83,10 @@ function Get-CamillaDSPFirstAvailablePlaybackDevice {
 
 # --- Last saved default state file ---
 
-# WHY: $env:LOCALAPPDATA is null off Windows, so resolving the state dir unconditionally
-# made this library impossible to source on macOS/Linux and blocked its test suite there.
-# Mirror the POSIX library's XDG state location on those platforms; Windows is unchanged.
+# WHY: $env:LOCALAPPDATA is null off Windows, so resolving the state dir
+# unconditionally made this library impossible to source on macOS/Linux and
+# blocked its test suite there. Mirrors the POSIX library's XDG state location on
+# those platforms; Windows is unchanged.
 $script:CamillaDSPStateDir = if ($IsWindows) {
   Join-Path $env:LOCALAPPDATA 'nucleus\camilladsp'
 } else {
@@ -142,7 +135,7 @@ function Resolve-CamillaDSPPlaybackDevice {
   $playbackDevice = $cfg.devices.playback.device
   $captureDevice = $cfg.devices.capture.device
 
-  # Non-null playback device → pass through unchanged.
+  # Non-null playback device passes through unchanged.
   if ($null -ne $playbackDevice) {
     return $yaml
   }
@@ -150,17 +143,15 @@ function Resolve-CamillaDSPPlaybackDevice {
   # Detect system default playback device via WASAPI COM.
   $detected = Get-CamillaDSPDefaultPlaybackDevice
 
-  # Hard invariant: if detected device matches capture device, reject it.
-  # The capture device must never be used as playback — it would create
-  # an audio loop (output → capture → processed → output again).
+  # Hard invariant: the capture device must never be used as playback, which would
+  # create an audio loop (output -> capture -> processed -> output again).
   if ($detected -eq $captureDevice) {
     $detected = $null
   }
 
-  # Fallback 1: last saved default (maintains previously used device).
-  # Validate that the saved device still exists on the system — if a USB DAC
-  # was unplugged, fall through to first-available instead of pushing a
-  # nonexistent device name to CamillaDSP.
+  # Fallback 1: last saved default. Rejected when the device is gone from the
+  # system, since pushing a nonexistent name would fail; the run falls through to
+  # first-available instead.
   if (-not $detected) {
     $savedDevice = Get-CamillaDSPLastDevice
     if ($savedDevice -and $savedDevice -ne $captureDevice) {
@@ -168,8 +159,8 @@ function Resolve-CamillaDSPPlaybackDevice {
       if ($null -ne $allDevices -and ($allDevices -contains $savedDevice)) {
         $detected = $savedDevice
       }
-      # If enumeration failed ($null) or device missing, $detected stays null
-      # and we fall through to fallback 2 (first available).
+      # Enumeration failure ($null) or a missing device leaves $detected null, so
+      # this falls through to fallback 2.
     }
   }
 
@@ -178,7 +169,7 @@ function Resolve-CamillaDSPPlaybackDevice {
     $detected = Get-CamillaDSPFirstAvailablePlaybackDevice -CaptureDevice $captureDevice
   }
 
-  # Nothing available → pass through with empty device.
+  # Nothing available: pass through with an empty device.
   if (-not $detected) {
     return $yaml
   }
@@ -201,11 +192,8 @@ function Get-CamillaDSPResolvedPlaybackDeviceName {
     [string]$ConfigPath
   )
 
-  # Return the playback device name that detection would currently select for
-  # the given config (the device Resolve-CamillaDSPPlaybackDevice would set), or
-  # $null if detection yields nothing. Used by the heartbeat to detect when the
-  # live device has drifted from the desired device (e.g. the system default
-  # output device changed).
+  # The device the heartbeat compares the live device against, or $null when
+  # detection yields nothing, so it can detect a drift away from the desired device.
   if (-not (Test-Path $ConfigPath)) {
     return $null
   }

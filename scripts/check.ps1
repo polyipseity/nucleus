@@ -1,14 +1,12 @@
 # check.ps1 — Consolidated repository validation script (Windows).
 #
-# Thin orchestrator — sources check-lib.ps1 for framework, check-steps.ps1 for step
-# registration, then runs the orchestration pipeline.
-#
-# See check-lib.ps1, step-runner.ps1, and files in check-steps/ for step logic.
+# Thin orchestrator: sources check-lib.ps1 for the framework and check-steps.ps1 for
+# step registration, then runs the pipeline.
 #
 # Arguments:
 #   -Action <all|packer|sh|pwsh>  Which check to run (default: all).
 #                     all    Run every check via the step pipeline.
-#                     packer Run the Packer template validation (check-packer.ps1).
+#                     packer Run the Packer template validation.
 #                     sh     Run the shell script lint (ShellCheck).
 #                     pwsh   Run check-pwsh.ps1.
 #   --full           Run all checks including whole-repo checks (default).
@@ -21,7 +19,6 @@
 #   --no-verbose     Suppress step output streaming (default).
 #   --only-steps=<ids>  Run only steps with the given comma-separated IDs.
 #   (paths)          Files to check; restricts --scoped to matching files.
-#                     For subcommands, passed through to the underlying script.
 #
 # Environment variables:
 #   NUCLEUS_REPO_ROOT  Override the detected repository root path.
@@ -39,7 +36,7 @@ param(
   [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
   [string[]]$Paths = @(),
 
-  # Pass-through flags for the inlined packer subcommand (previously check-packer.ps1).
+  # Pass-through flags for the inlined packer subcommand.
   [string]$WindowsTemplateOverride = '',
   [switch]$AnnotationCheckOnly,
   [switch]$ValidateOnly
@@ -67,11 +64,9 @@ function Invoke-CheckPacker {
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$Paths = @(),
 
-    # Test seam: point the packer_validate annotation check at a different
-    # template file (packer_validate annotation is enforced by check-packer itself).
+    # Test seam: point the packer_validate annotation check at a different template file.
     [string]$WindowsTemplateOverride = '',
 
-    # Test seam: run only the packer_validate annotation check, then exit.
     [switch]$AnnotationCheckOnly,
 
     [switch]$ValidateOnly
@@ -79,9 +74,6 @@ function Invoke-CheckPacker {
 
   Set-Location -Path $RepoRoot
 
-  # -------------------------------------------------------------------------
-  # packer_validate annotation check (Category 1 machine-parsing invariant)
-  # -------------------------------------------------------------------------
   $packerWindowsTemplate = if ($WindowsTemplateOverride) {
     $WindowsTemplateOverride
   } else {
@@ -148,9 +140,6 @@ function Invoke-CheckPacker {
     exit 0
   }
 
-  # -------------------------------------------------------------------------
-  # Phase 1: Formatting check (skipped with -ValidateOnly)
-  # -------------------------------------------------------------------------
   if (-not $ValidateOnly) {
     if ($Paths.Count -gt 0) {
       Write-NucleusInfo -CommandName check-packer 'Checking Packer formatting for specified paths...'
@@ -167,9 +156,6 @@ function Invoke-CheckPacker {
     }
   }
 
-  # -------------------------------------------------------------------------
-  # Phase 2: Template validation
-  # -------------------------------------------------------------------------
   $lockfilePath = Join-Path -Path $RepoRoot -ChildPath 'src/lockfiles/lockfile.json'
   $lockfileData = Get-Content -Path $lockfilePath -Raw | ConvertFrom-Json -AsHashtable
   $nixArch = if ([Environment]::Is64BitOperatingSystem) {
@@ -254,8 +240,8 @@ function Invoke-CheckSh {
   .SYNOPSIS
     Lint repository shell scripts with ShellCheck.
   .DESCRIPTION
-    Discovers tracked *.sh files via git ls-files (excluding vendor/) or accepts
-    explicit paths. Flags match src/modules/lib/script-tree.nix: -x -S style.
+    Discovers tracked *.sh files via git ls-files (excluding vendor/) or accepts explicit
+    paths. Flags match src/modules/lib/script-tree.nix: -x -S style.
   #>
   [CmdletBinding()]
   param(
@@ -287,8 +273,8 @@ function Invoke-CheckSh {
 
     $exitCode = 0
     foreach ($path in $Paths) {
-      # --source-path=<script dir> mirrors treefmt.nix's source-path = "SCRIPTDIR":
-      # lets shellcheck resolve `# shellcheck source=` directives relative to each script's own directory.
+      # --source-path=<script dir> mirrors treefmt.nix's source-path = "SCRIPTDIR", so
+      # shellcheck resolves `# shellcheck source=` against each script's own directory.
       & $shellcheck.Source -x --source-path="$(Split-Path -Parent $path)" -S style $path
       if ($LASTEXITCODE -ne 0) {
         $exitCode = $LASTEXITCODE

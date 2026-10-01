@@ -3,22 +3,11 @@
   Unified service management and log inspection for Windows (windows-native, windows-schtask).
 
 .DESCRIPTION
-  Provides a uniform CLI for listing, starting, stopping, restarting,
-  enabling, disabling, and inspecting logs of services across Windows
-  service types:
-    - windows-native:  standard Windows services (Get-Service, sc.exe)
-    - windows-schtask: Scheduled tasks (Get-ScheduledTask etc.)
-
-  Services are defined in src/modules/services.json (the canonical registry).
-
-  Services are addressed by registry key. Entries flagged prefixMatch stand in for one
-  runtime service per instance: list and status print each instance id, and every action
-  accepts either the registry key (which acts on all live instances) or an exact instance
-  id. A prefix-match key with no live instance is reported as n/a, and acting on it fails
-  with "no instances found".
-
-  An instance the user registry declares but Windows does not run is listed as not-loaded:
-  acting on that exact id fails with a remedy, while acting on the registry key warns and
+  Services come from src/modules/services.json, addressed by registry key. Entries flagged
+  prefixMatch stand in for one runtime service per instance: list and status print each
+  instance id, and every action takes either the key (all live instances) or an exact
+  instance id. An instance the user registry declares but Windows does not run reports
+  not-loaded: acting on that exact id fails with a remedy, acting on the key warns and
   keeps the exit status of the instances that did run. Nothing is loaded automatically.
 
 .PARAMETER Action
@@ -26,29 +15,8 @@
   endpoint, logs, log-paths, log-config.
 
 .PARAMETER ServiceName
-  One or more service names to target (required for start/stop/restart/enable/disable;
-  optional for status — defaults to all). For endpoint, first is service name, second (optional) is endpoint name.
-
-.PARAMETER Json
-  Output machine-readable JSON instead of formatted tables.
-
-.PARAMETER Help
-  Show detailed help.
-
-.EXAMPLE
-  .\svc.ps1 list
-  .\svc.ps1 status ollama,sshd
-  .\svc.ps1 start ollama
-  .\svc.ps1 restart jellyfin
-  .\svc.ps1 status \NucleusCloudMount\NucleusCloudMount-iCloud
-  .\svc.ps1 endpoint jellyfin http
-  .\svc.ps1 list -Json
-  .\svc.ps1 logs
-  .\svc.ps1 logs ollama -n 50
-  .\svc.ps1 logs jellyfin --raw
-  .\svc.ps1 log-paths ollama
-  .\svc.ps1 log-config ollama,jellyfin
-  .\svc.ps1 log-config ollama -Json
+  Service names to target. For endpoint, first is the service name and the optional second
+  is the endpoint name.
 
 .NOTES
   Environment variables: NUCLEUS_REPO_ROOT.
@@ -91,24 +59,14 @@ if (-not $Action) {
   exit 1
 }
 
-# ---------------------------------------------------------------------------
-# Initialization
-# ---------------------------------------------------------------------------
-
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Get-Item $PSScriptRoot).Parent.FullName }
 $ServicesJson = Join-Path $RepoRoot "src\modules\services.json"
 $NucleusHost = 'Windows'
 
-# ── Self-elevation ──────────────────────────────────────────────────────────────
-# Set when elevation was requested but could not be obtained (UAC cancelled /
-# no admin). In that case system-scope entries are skipped with a warning
-# rather than failing the whole run (rule-2 "cannot escalate" branch).
+# Set when elevation was requested but could not be obtained (UAC cancelled / no admin).
+# System-scope entries are then skipped with a warning instead of failing the run.
 $SkipSystemScope = $false
 
-# System-scope operations (native services, scheduled tasks) require admin.
-# When the caller is not elevated, re-exec via RunAs so the operation can
-# actually run. If elevation is impossible (UAC cancelled / no admin), warn and
-# skip only the system-scope entries rather than failing the whole run.
 $isAdmin = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $Elevated -and -not $isAdmin) {
   $params = @{
@@ -133,8 +91,6 @@ if (-not $Elevated -and -not $isAdmin) {
   if ($null -eq $proc) {
     Remove-Item $paramsJsonPath -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: temp file cleanup; failure harmless (%TEMP% recycled)
     Write-NucleusWarning "svc: elevation unavailable (UAC cancelled or no admin) — system-scope operations will be skipped"
-    # Continue un-elevated: user-scope operations still work; system-scope
-    # entries are skipped below via $SkipSystemScope.
     $SkipSystemScope = $true
   } else {
     $proc.WaitForExit()
@@ -168,37 +124,11 @@ foreach ($svc in $RegistryRaw.Keys) {
 . (Join-Path -Path $RepoRoot -ChildPath "src\platforms\Windows\modules\Invoke-LogManagement.ps1")
 . (Join-Path -Path $RepoRoot -ChildPath "src\platforms\Windows\modules\Get-NucleusServiceInstance.ps1")
 
-# ---------------------------------------------------------------------------
-# Service resolution
-# ---------------------------------------------------------------------------
-
 function New-ResolvedRow {
   <#
   .SYNOPSIS
-    Builds one resolution row.
-
-  .DESCRIPTION
-    A row carries the registry key it came from, the display name to print, the host entry
-    the status/action helpers consume, the concrete instance id it addresses, and its class
-    (live, pseudo or error).
-
-  .PARAMETER RegistryKey
-    Registry key from services.json, or ERROR:<name> for an unresolvable name.
-
-  .PARAMETER DisplayName
-    Name to print in the ID/Name columns.
-
-  .PARAMETER HostEntry
-    Host entry hashtable; carries only an error field for error rows.
-
-  .PARAMETER InstanceId
-    Concrete instance id (equals the registry key for whole-service rows).
-
-  .PARAMETER Class
-    live, pseudo or error.
-
-  .OUTPUTS
-    System.Collections.Hashtable
+    Builds one resolution row: the registry key, display name, host entry, instance id and
+    class (live, pseudo, configured or error) the status and action helpers consume.
   #>
   # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- pure builder of an in-memory row; no system state changes
   [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
@@ -225,20 +155,9 @@ function Resolve-RegistryEntry {
   .SYNOPSIS
     Emits the resolution rows for one registry entry.
 
-  .DESCRIPTION
-    An ordinary entry yields one live row. A prefix-match entry yields one live row per
-    live instance plus one configured row per instance the user registry declares but
-    Windows does not run; when it has neither, a single pseudo row keeps the registry host
-    entry unchanged so scope filtering still works, and nothing is probed.
-
-  .PARAMETER Key
-    Registry key.
-
-  .PARAMETER Entry
-    Filtered registry entry (@{ displayName; description; network; hostEntry }).
-
-  .OUTPUTS
-    System.Collections.Hashtable[]
+  # A prefix-match entry with neither live nor declared instances yields one pseudo row
+  # carrying the registry host entry unchanged, so scope filtering still works and nothing
+  # is probed.
   #>
   param(
     [string]$Key,
@@ -289,18 +208,9 @@ function Resolve-InstanceId {
   .SYNOPSIS
     Resolves a concrete instance id that is not a registry key.
 
-  .DESCRIPTION
-    list and status print concrete instance ids, so those ids must be accepted as
-    arguments. Membership is checked against live enumeration first and the declared
-    (configured) instances second: an id that matches a prefix-match entry's prefix but is
-    neither live nor declared yields an error row naming the prefix, and a name matching no
-    prefix yields nothing so the caller reports it as unknown.
-
-  .PARAMETER Name
-    Requested name.
-
-  .OUTPUTS
-    System.Collections.Hashtable, or $null when no prefix-match entry claims the name.
+  # list and status print concrete instance ids, so they must be accepted as arguments.
+  # An id under a prefix-match prefix that is neither live nor declared yields an error row
+  # naming the prefix; a name matching no prefix yields $null so the caller calls it unknown.
   #>
   param(
     [string]$Name
@@ -338,17 +248,8 @@ function Resolve-InstanceId {
 function Resolve-ServiceName {
   <#
   .SYNOPSIS
-    Resolves the requested service names into service rows.
-
-  .DESCRIPTION
-    Rows carry the class list and status render from, so no caller re-derives instance ids.
-    With no names, every registry entry is resolved (prefix-match entries included).
-
-  .PARAMETER Names
-    Requested service names; empty resolves every registry entry.
-
-  .OUTPUTS
-    System.Collections.Hashtable[]
+    Resolves the requested service names into rows. With no names, every registry entry is
+    resolved, prefix-match entries included.
   #>
   param(
     [string[]]$Names
@@ -380,20 +281,8 @@ function Resolve-ServiceName {
 }
 
 function Get-InstanceArgument {
-  <#
-  .SYNOPSIS
-    Returns the instance id of a resolution row, or an empty string for whole-service rows.
-
-  .DESCRIPTION
-    Log lookups take an instance id only when the row addresses a concrete instance, so the
-    registry key and the instance id are compared rather than assumed to differ.
-
-  .PARAMETER Row
-    Resolution row from Resolve-ServiceName.
-
-  .OUTPUTS
-    System.String
-  #>
+  # Log lookups take an instance id only for a row addressing a concrete instance, so the
+  # key and the id are compared rather than assumed to differ.
   param(
     [hashtable]$Row
   )
@@ -407,16 +296,9 @@ function New-StatusRow {
   .SYNOPSIS
     Builds one status-table row from a resolution row.
 
-  .DESCRIPTION
-    Live rows are probed through Get-ServiceStatus. Configured rows are declared but not
-    running, so they report not-loaded without a probe; pseudo and error rows have no
-    runtime identity and report n/a, since a probe would report a false inactive status.
-
-  .PARAMETER ResolvedRow
-    Resolution row from Resolve-ServiceName.
-
-  .OUTPUTS
-    System.Collections.Hashtable
+  # Configured rows are declared but not running, so they report not-loaded without a probe.
+  # Pseudo and error rows have no runtime identity and report n/a, since a probe would
+  # report a false inactive status.
   #>
   # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- pure builder of an in-memory row; the probe itself is read-only
   [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
@@ -444,8 +326,6 @@ function New-StatusRow {
   return $status
 }
 
-# Returns $true when the resolved registry entry is a system-scope service
-# (requires admin). Used to skip such entries when elevation is unavailable.
 function Test-ServiceIsSystemScope {
   param(
     [hashtable]$ResolvedEntry
@@ -454,10 +334,6 @@ function Test-ServiceIsSystemScope {
   if ($null -eq $plat -or -not $plat.ContainsKey('scope')) { return $false }
   return $plat.scope -eq 'system'
 }
-
-# ---------------------------------------------------------------------------
-# Status helpers
-# ---------------------------------------------------------------------------
 
 function Get-ServiceStatus {
   param(
@@ -550,10 +426,6 @@ function Invoke-ServiceAction {
   }
 }
 
-# ---------------------------------------------------------------------------
-# Action implementations
-# ---------------------------------------------------------------------------
-
 function Format-StatusTable {
   param(
     [object[]]$Rows
@@ -583,10 +455,6 @@ function Format-StatusTable {
   }
   return $lines -join "`n"
 }
-
-# ---------------------------------------------------------------------------
-# Log helpers
-# ---------------------------------------------------------------------------
 
 function Get-HostService {
   $Registry.Keys | Sort-Object
@@ -627,21 +495,9 @@ function Get-ServiceLogDirList {
   .SYNOPSIS
     Lists the log directories of a service, or of one of its instances.
 
-  .DESCRIPTION
-    Top-level logging.dirs covers the whole service. A prefix-match host entry adds
-    logging.instanceDirs, whose <instance> placeholder expands to the instance suffix;
-    without -InstanceId every live instance is expanded so an aggregate query still
-    reports all of them.
-
-  .PARAMETER ServiceKey
-    Registry key.
-
-  .PARAMETER InstanceId
-    Concrete instance id (e.g. \NucleusCloudMount\NucleusCloudMount-iCloud); omit for a
-    whole-service query.
-
-  .OUTPUTS
-    System.String[]
+  # Top-level logging.dirs covers the whole service. A prefix-match host entry adds
+  # logging.instanceDirs, whose <instance> placeholder expands to the instance suffix;
+  # without InstanceId every live instance is expanded so an aggregate query reports all.
   #>
   param([string]$ServiceKey, [string]$InstanceId)
 
@@ -771,12 +627,8 @@ function Show-ServiceList {
   .SYNOPSIS
     Lists every resolved service row with its log availability.
 
-  .DESCRIPTION
-    Instance rows are listed under their concrete instance id so a prefix-match entry is
-    visible per instance, matching the POSIX listing.
-
-  .OUTPUTS
-    System.String[]
+  # Instance rows are listed under their concrete instance id so a prefix-match entry is
+  # visible per instance, matching the POSIX listing.
   #>
   $lines = @()
   foreach ($row in (Resolve-ServiceName -Names @())) {
@@ -883,7 +735,7 @@ switch ($Action) {
 
       if ($entry.class -eq 'configured') {
         # A named not-loaded id is a failed request; the registry key is an aggregate, so
-        # warning keeps the exit status of the instances that did run.
+        # a warning keeps the exit status of the instances that did run.
         if ($ServiceName -contains $entry.instanceId) {
           Write-NucleusError "$($entry.instanceId) — configured but not loaded (run 'nucleus-apply', or start it with the service manager)"
           $overallExit = 1
@@ -1065,8 +917,8 @@ switch ($Action) {
   'log-config' {
     $targets = if ($ServiceName.Count -gt 0) { $ServiceName } else { @() }
     $hasError = $false
-    # Instance rows share their registry entry's logging configuration, so the key
-    # list is de-duplicated: one config block per registry entry.
+    # Instance rows share their registry entry's logging configuration, so one config
+    # block per registry entry is enough.
     $seen = @()
     foreach ($row in (Resolve-ServiceName -Names $targets)) {
       if ($row.class -eq 'error') {

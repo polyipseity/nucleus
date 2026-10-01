@@ -4,12 +4,11 @@ function Invoke-BunSetup {
     Idempotently converges the declarative bun global package set.
 
   .DESCRIPTION
-    Maintains a managed set of JS CLI tools installed via `bun install -g`.
-    On each apply it queries bun's global package.json for the actually
-    installed set, removes anything installed but absent from the desired list
-    (zap-style, mirroring homebrew's cleanup = "zap"), and installs any
-    desired packages that are missing at versions pinned in the repository
-    lockfile.
+    Converges the desired set of JS CLI tools installed via `bun install -g`.
+    On each apply it reads bun's global package.json, removes anything installed
+    but absent from the desired list (zap-style, mirroring homebrew's cleanup =
+    "zap"), and installs desired packages that are missing or pinned at a
+    different version in the repository lockfile.
 
     Only packages absent from WinGet, Scoop, and cargo-binstall are managed
     here, following the repository preference hierarchy
@@ -20,12 +19,9 @@ function Invoke-BunSetup {
     "binary" override naming the installed executable when it differs from the
     unscoped package basename.
 
-    Requires bun to be on PATH (installed from WinGet by system/packages.dsc.yml).
-    Prepends %USERPROFILE%\.bun\bin to PATH internally so bun-installed
-    binaries are accessible in subsequent steps of the same apply session.
-
-  .EXAMPLE
-    Invoke-BunSetup
+    Requires bun on PATH (installed from WinGet by system/packages.dsc.yml), and
+    prepends %USERPROFILE%\.bun\bin so bun-installed binaries are reachable for
+    the rest of the apply session.
 
   .NOTES
     Environment variables: (none)
@@ -42,7 +38,6 @@ function Invoke-BunSetup {
   # desired-package registry.
   . (Join-Path -Path $repoRoot -ChildPath "src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1")
 
-  # Read version-pinning data from the consolidated lockfile.
   $lockfile = @{}
   if (Test-Path $lockfilePath) {
     $lockfile = Get-Content $lockfilePath -Raw | ConvertFrom-Json
@@ -50,7 +45,7 @@ function Invoke-BunSetup {
   $bunVersions = if ($lockfile -and $lockfile.bun) { $lockfile.bun } else { @{} }
 
   # Declarative desired-state list from the shared registry (single source of
-  # truth: src/modules/packages/desired.json).  Entries are objects; an entry's
+  # truth: src/modules/packages/desired.json). An entry's
   # "binary" names the installed executable when it differs from the unscoped
   # package basename (e.g. @anthropic-ai/sandbox-runtime installs 'srt').
   $desiredPath = Join-Path $repoRoot "src\modules\packages\desired.json"
@@ -106,22 +101,19 @@ function Invoke-BunSetup {
       }
     }
     catch {
-      # || SilentlyContinue equivalent: parse failure treats installed set as
-      # empty — safe because any desired packages will simply be re-installed.
+      # A parse failure leaves the installed set empty, which is safe: every
+      # desired package is simply re-installed.
       Write-NucleusWarning -CommandName 'Invoke-BunSetup' "could not parse '$bunGlobalJson'; treating as empty installed set"
     }
   }
 
-  # Packages installed but not desired: zap-style removal.
-  # Mirrors homebrew cleanup = "zap": removes anything installed but absent
-  # from the declared desired set, regardless of how it was installed.
+  # Zap-style removal: anything installed but absent from the desired set goes,
+  # regardless of how it was installed.
   $toRemove = @($installedPackages | Where-Object { $desiredPackages -notcontains $_ })
 
-  # Desired packages not yet in bun's global package.json, or whose binary is
-  # absent from ~\.bun\bin, or installed at a version different from the
-  # lockfile pin (version-aware reconciliation).  Binary name = last path
-  # component after '/' so @scope/name becomes name (bun uses the unscoped
-  # name for the bin).
+  # Desired packages absent from bun's global package.json, whose binary is missing
+  # from ~\.bun\bin, or installed at a version other than the lockfile pin. The
+  # binary name is the last path component after '/', so @scope/name becomes name.
   $toInstall = @($desiredPackages | Where-Object {
     $pkg = $_
     $binName = if ($binaryNames.ContainsKey($pkg)) { $binaryNames[$pkg] } else { ($pkg -split '/')[-1] }
@@ -155,10 +147,10 @@ function Invoke-BunSetup {
 
   # node-gyp toolchain: allowlisted packages run lifecycle scripts, and bun
   # rebuilds a native dependency through node-gyp when it cannot use the shipped
-  # prebuild.  POSIX passes pkgs.python3 into install-bun-packages.sh; on Windows
-  # the interpreter comes from the DSC-provisioned Python 3.13 and node-gyp has to
-  # be told about it explicitly — the elevated apply session can carry a PATH
-  # snapshot taken before WinGet installed Python.  WHY: only probed when an
+  # prebuild. POSIX passes pkgs.python3 into install-bun-packages.sh; on Windows
+  # the interpreter comes from the DSC-provisioned Python 3.13 and node-gyp needs
+  # to be told about it explicitly, since the elevated apply session can carry a
+  # PATH snapshot taken before WinGet installed Python. WHY: only probed when an
   # install is actually pending, so an already-converged machine never depends on
   # the interpreter being on PATH.
   if ($toInstall.Count -gt 0 -and -not $env:npm_config_python) {

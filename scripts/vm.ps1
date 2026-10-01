@@ -5,17 +5,13 @@
 .DESCRIPTION
   Subcommands: setup, sync, build-system, list, status, start, stop, upgrade, reset, android-config, inject, resize, gc, pack, unpack.
 
+  setup:   Full provision, delegating to Invoke-VMSetup.ps1 (phase 1 Packer build,
+           phase 2 QEMU start scripts + disk images).
   sync:    Refresh VM config (descriptors, start/stop scripts). Non-destructive.
   build-system: Build/rebuild a single type's system image (src/<type>/system image.qcow2).
   inject:   Re-run in-place disk injection for one VM (--force recreates the data disk; destructive).
-  setup:   Full provision: config sync + image build + disk setup.
-           Delegates to Invoke-VMSetup.ps1 (phase 1: Packer build,
-           phase 2: QEMU start scripts + disk images).
   list:    List VMs from the manifest.
   status:  Show VM configuration (same as list with more detail).
-  start:   Start a VM (not yet implemented).
-  stop:    Stop a VM (not yet implemented).
-  upgrade: Upgrade an Android VM image (not yet implemented on Windows).
   reset:   Factory-reset an Android VM userdata disk (data/<id>.qcow2).
   android-config: Android post-provision (recovery, GApps, ADB keys, Magisk, root, fake Wi-Fi).
     Flags (after VM name; omit all flags to print the manual):
@@ -25,44 +21,16 @@
       --root                Enable rooted debugging (dev options, persist.sys.root_access).
       --fake-wifi           Create wlan0 via virt_wifi on eth0 (requires Magisk su).
       --fake-wifi-revert    Remove persisted fake Wi-Fi and restore eth0.
-  resize:  Grow-only resize of the writable disk (data/<id>.qcow2) to an
-           explicit size (e.g. 64GB); pass --allow-shrink to shrink instead.
-  gc:      Remove stale VM artifacts. Delegates to Invoke-VMSetup -Gc.
-           Default GC preserves disabled VM entries; pass --gc-disabled
-           to clear them too.
-  pack:    Strip trivially regenerable artifacts (generated start/stop
-           scripts, src/<type>/Packer/ + stale dot-dirs) so the tree can be
-           copied as-is to another host.
-           Dry-run by default; pass --force to perform. Refuses while any
-           VM is running.
-  unpack:  Regenerate per-platform VM artifacts (start/stop scripts +
-           pack/unpack wrappers) from the <id>.vm.json descriptors in the
-           VM directory, after copying a packed tree to this host.
-           Complements pack; re-renders start/stop scripts (PowerShell) for
-           every descriptor, enabled or disabled. Data files are consumed
-           as-is. Pass --dry-run to preview.
+  resize:  Grow-only resize of the writable disk (data/<id>.qcow2); pass --allow-shrink to shrink.
+  gc:      Remove stale VM artifacts. Default GC preserves disabled VM entries; pass
+           --gc-disabled to clear them too.
+  pack:    Strip trivially regenerable artifacts so the tree copies as-is to another
+           host. Dry-run by default; pass --force to perform. Refuses while any VM runs.
+  unpack:  Regenerate per-platform VM artifacts from the <id>.vm.json descriptors after
+           copying a packed tree here. Pass --dry-run to preview.
 
 .PARAMETER Action
   The operation to perform: setup, sync, build-system, list, status, start, stop, upgrade, reset, android-config, inject, resize, gc, pack, unpack.
-
-.PARAMETER SubcommandArgs
-  Additional arguments passed after the subcommand (flags, VM names, etc.).
-
-.PARAMETER Help
-  Show detailed help.
-
-.EXAMPLE
-  .\vm.ps1 setup
-  .\vm.ps1 setup --windows-iso C:\ISOs\Win11.iso --headful
-  .\vm.ps1 setup --gc
-  .\vm.ps1 gc
-  .\vm.ps1 gc --gc-disabled
-  .\vm.ps1 list
-  .\vm.ps1 status
-  .\vm.ps1 pack
-  .\vm.ps1 pack --force
-  .\vm.ps1 unpack
-  .\vm.ps1 unpack --dry-run
 
 .NOTES
   Environment variables: NUCLEUS_REPO_ROOT.
@@ -95,11 +63,10 @@ if ($Help) {
   exit 0
 }
 
-# A missing action is an error, matching vm.sh (message on stderr, exit 1):
-# callers act on the result of a VM operation, so a run that performed nothing
-# must not read as success. The action list is the twin's, in the twin's order
-# rather than this file's ValidateSet order, so the two platforms report the
-# same set.
+# A missing action is an error, matching vm.sh (message on stderr, exit 1): a run
+# that performed nothing must not read as success. The action list is the twin's,
+# in the twin's order rather than this file's ValidateSet order, so both platforms
+# report the same set.
 if (-not $Action) {
   Write-NucleusError "missing action (setup, sync, build-system, list, status, start, stop, upgrade, reset, android-config, inject, gc, resize, pack, unpack)"
   exit 1
@@ -111,10 +78,6 @@ if (-not $env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT = $RepoRoot }
 . (Join-Path $RepoRoot 'src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1')
 . (Join-Path $RepoRoot 'src\platforms\Windows\modules\SizeStrings.ps1')
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 function Get-VMManifest {
   if (-not (Test-Path $ManifestPath)) {
     Write-NucleusError "VM manifest not found at $ManifestPath"
@@ -122,10 +85,6 @@ function Get-VMManifest {
   }
   return Get-Content $ManifestPath -Raw | ConvertFrom-Json
 }
-
-# ---------------------------------------------------------------------------
-# Subcommand implementations
-# ---------------------------------------------------------------------------
 
 function Invoke-VMSync {
   $module = Join-Path $RepoRoot 'src\platforms\Windows\modules\system\Invoke-VMSetup.ps1'
@@ -761,13 +720,12 @@ function Invoke-VMUnpack {
         Write-NucleusWarning "unpack — shared Android start script not found: $androidTemplate"
       }
     } else {
-      # Windows QEMU start scripts mirror Invoke-VMSetup.ps1 rendering: the
-      # cross-host templates stay single-source and all tokens come from the
-      # descriptor JSON document.
+      # Windows QEMU start scripts mirror Invoke-VMSetup.ps1 rendering, so the
+      # cross-host templates stay single-source.
       $hostFwds = @($vmDoc.portForwards | ForEach-Object { "hostfwd=tcp::$($_.hostPort)-:$($_.guestPort)" }) -join ','
       $ramBytes = ConvertFrom-SizeString $vmDoc.ram
-      # Relocatable writable-disk path: data/<id>.qcow2 relative to the VM
-      # tree root (the templates cd/Push-Location before invoking QEMU).
+      # Relocatable writable-disk path: data/<id>.qcow2 relative to the VM tree
+      # root (the templates cd/Push-Location before invoking QEMU).
       $diskPath = Join-Path 'data' "$vmId.qcow2"
       $qemuArch = if ($env:PROCESSOR_ARCHITECTURE -match 'ARM64|ARM') { 'aarch64' } else { 'x86_64' }
       $qemuSystem = Join-Path $env:USERPROFILE "scoop\apps\qemu\current\qemu-system-$qemuArch.exe"
@@ -813,9 +771,8 @@ function Invoke-VMUnpack {
       }
     }
 
-    # Stop script (PowerShell).  The .sh variant is not rendered for
-    # windows-qemu hosts (stop-posix.sh dispatches to tart/utmctl/virsh only),
-    # mirroring the POSIX lib.
+    # Stop script (PowerShell). The .sh variant is not rendered for windows-qemu
+    # hosts (stop-posix.sh dispatches to tart/utmctl/virsh only).
     $stopPs1Template = Join-Path $templatesDir 'stop-host.ps1'
     if (Test-Path -LiteralPath $stopPs1Template -PathType Leaf) {
       $content = (Get-Content -LiteralPath $stopPs1Template -Raw)
@@ -875,10 +832,6 @@ function Write-VmUnpackFile {
     Write-NucleusInfo "unpack (dry-run): would write $Path"
   }
 }
-
-# ---------------------------------------------------------------------------
-# Dispatch
-# ---------------------------------------------------------------------------
 
 switch ($Action) {
   'setup'   { Invoke-VMSetup }

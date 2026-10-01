@@ -1,14 +1,11 @@
 # cloud.ps1 — Nucleus cloud management CLI (Windows).
 #
-# PowerShell twin of scripts/cloud.sh.  Single-file dispatcher that routes each
-# subcommand to an inlined function:
-#
-#   setup   -> Invoke-CloudSetup    (verify/create rclone remotes, validate
-#                                    credentials, sync display names, and
-#                                    optionally run nucleus apply)
-#   reset   -> Invoke-ReplicaReset  (remove local replica data and rclone
-#                                    cache; local-only, never touches remote)
-#   sync    -> Invoke-ReplicaSync   (pull-only replica sync, remote -> local)
+# PowerShell twin of scripts/cloud.sh. Dispatches to:
+#   setup -> Invoke-CloudSetup   (verify/create rclone remotes, validate
+#                                 credentials, optionally run nucleus apply)
+#   reset -> Invoke-ReplicaReset (remove local replica data and rclone cache;
+#                                 local-only, never touches remote)
+#   sync  -> Invoke-ReplicaSync  (pull-only replica sync, remote -> local)
 #
 # Usage: .\scripts\cloud.ps1 <setup|reset|sync> [options]
 #
@@ -71,8 +68,8 @@ if ($Help) {
 # -NoApply is the default; -Apply wins when both are supplied.
 $apply = $Apply -and -not $NoApply
 
-# Pass -RepoRoot through to the underlying scripts via NUCLEUS_REPO_ROOT, which
-# is the env var they consult for repo-root resolution.
+# Pass -RepoRoot through to the underlying scripts via NUCLEUS_REPO_ROOT, the env
+# var they consult for repo-root resolution.
 if ($RepoRoot) {
   $env:NUCLEUS_REPO_ROOT = $RepoRoot
 }
@@ -95,23 +92,13 @@ function Invoke-CloudSetup {
     Guides one-time cloud remote setup and validates cloud mount automation.
 
   .DESCRIPTION
-    Performs a bounded cloud-drive setup workflow:
-      1. verifies required rclone remotes exist (GoogleDrive, iCloud, OneDrive)
-      2. creates each missing remote with the correct provider type and
-         repo-configured backend defaults, then prompts for authentication
-         (no manual menu navigation required)
-      3. validates each remote's credentials work (via rclone lsd); recreates any
-         remote with stale auth tokens to avoid manual config deletion
-      4. optionally runs `nix run <repo>/src#apply` if -Apply switch provided
+    Verifies the required rclone remotes exist, creates each missing one with the
+    correct provider type and repo-configured backend defaults, prompts for
+    authentication, then validates credentials with rclone lsd and recreates any
+    remote with stale auth tokens.
 
   .PARAMETER Apply
     Run nucleus apply to converge cloud mount services (default: $false).
-
-  .EXAMPLE
-    Invoke-CloudSetup
-
-  .EXAMPLE
-    Invoke-CloudSetup -Apply
 
   .NOTES
     Environment variables: NUCLEUS_APPLY.
@@ -182,19 +169,15 @@ function Invoke-CloudSetup {
 
     .DESCRIPTION
       Reads the assembled user registry from src/users/ and returns the single configured
-      iCloud service (`drive` or `photos`) for the current user's matching remote.
-      If there is no explicit entry, or multiple entries disagree, the function
-      defaults the remote config to `drive` and lets mount commands override per
-      entry with `--iclouddrive-service`
+      iCloud service (`drive` or `photos`) for the current user's matching remote. With
+      no explicit entry, or entries that disagree, the remote config defaults to `drive`
+      and mount commands override per entry with `--iclouddrive-service`.
 
     .PARAMETER RepoRoot
       Absolute path to the repository root.
 
     .PARAMETER RemoteName
       rclone remote name being configured.
-
-    .EXAMPLE
-      Resolve-ICloudServiceForRemote -RepoRoot 'C:\dev\nucleus' -RemoteName 'iCloud'
     #>
     param(
       [Parameter(Mandatory)]
@@ -254,11 +237,10 @@ function Invoke-CloudSetup {
       Returns backend-specific arguments for `rclone config create`.
 
     .DESCRIPTION
-      `rclone config create` takes defaults for unanswered options. The iCloud
-      backend requires interactive answers for Apple ID, password (the Apple
-      account password), and 2FA, so this function adds `--all` to force the
-      full question flow. The iCloud service choice is passed explicitly so
-      rclone skips the drive-vs-photos question.
+      `rclone config create` takes defaults for unanswered options, so the iCloud
+      backend needs `--all` to force the full question flow for Apple ID, password and
+      2FA. The service choice is passed explicitly so rclone skips the drive-vs-photos
+      question.
 
     .PARAMETER ProviderType
       The rclone backend type string.
@@ -268,9 +250,6 @@ function Invoke-CloudSetup {
 
     .PARAMETER RepoRoot
       Absolute path to the repository root.
-
-    .EXAMPLE
-      Get-ProviderCreateArgument -ProviderType 'iclouddrive' -RemoteName 'iCloud' -RepoRoot 'C:\dev\nucleus'
     #>
     param(
       [Parameter(Mandatory)]
@@ -307,10 +286,10 @@ function Invoke-CloudSetup {
   }
 
   if ($missingRemotes.Count -gt 0) {
-    # Inject rclone config passphrase from materialized secret so remote creation
-    # inherits it and rclone encrypts the new config with the managed passphrase.
-    # WHY: conditional: secret file may be absent before Windows apply has
-    # materialized it; benign absence — rclone uses an unencrypted config.
+    # Inject the rclone config passphrase from the materialized secret so remote
+    # creation inherits it and rclone encrypts the new config with it.
+    # WHY: conditional, since the secret may be absent before Windows apply has
+    # materialized it; rclone then uses an unencrypted config.
     $rclonePassFile = Join-Path $HOME 'AppData\Local\nucleus\secrets\rclone-config-pass'
     if (Test-Path -Path $rclonePassFile -PathType Leaf) {
       $Env:RCLONE_CONFIG_PASS = (Get-Content -Path $rclonePassFile -Raw).Trim()
@@ -343,8 +322,8 @@ function Invoke-CloudSetup {
 
   Write-NucleusInfo 'required remotes are configured.'
 
-  # Validate credentials; recreate remotes with stale auth so the user can refresh
-  # tokens without manually deleting and rebuilding the config.
+  # Recreate remotes with stale auth so the user can refresh tokens without
+  # deleting and rebuilding the config by hand.
   # check-suppress:suppression_doc: cloud providers rotate tokens; the user should not need to manually
   # delete remotes to recover from expired credentials.
   Write-NucleusInfo 'validating remote credentials with root-only listings...'
@@ -396,9 +375,8 @@ function Invoke-CloudSetup {
 
   Write-NucleusInfo 'all credentials valid.'
 
-  # Ensure acknowledge_abuse is set on GoogleDrive to prevent 403 errors on
-  # publicly-shared files. This is required for rclone to download files shared
-  # via Google Drive links with "anyone with the link" permissions.
+  # Ensure acknowledge_abuse is set on GoogleDrive, without which rclone gets 403
+  # on files shared with "anyone with the link".
   # check-suppress:suppression_doc: probe -- rclone may not be configured yet; exit code checked downstream.
   $gdListed = & rclone listremotes 2>$null
   if ($LASTEXITCODE -eq 0 -and ($gdListed -contains 'GoogleDrive:')) {
@@ -452,12 +430,6 @@ function Invoke-ReplicaReset {
 
   .PARAMETER ReplicaId
     Optional replica id filter (default: none; all replicas reset).
-
-  .EXAMPLE
-    Invoke-ReplicaReset
-
-  .EXAMPLE
-    Invoke-ReplicaReset -DryRun
 
   .NOTES
     Environment variables: NUCLEUS_DRY_RUN, NUCLEUS_REPLICA_ID.
@@ -514,12 +486,6 @@ function Invoke-ReplicaSync {
 
   .PARAMETER ReplicaId
     Optional replica id filter; when provided only the matching replica runs (default: none; all replicas run).
-
-  .EXAMPLE
-    Invoke-ReplicaSync
-
-  .EXAMPLE
-    Invoke-ReplicaSync -DryRun
 
   .NOTES
     Environment variables: NUCLEUS_DRY_RUN, NUCLEUS_REPLICA_ID.

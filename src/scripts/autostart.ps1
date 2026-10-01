@@ -66,29 +66,22 @@ if ($Help) {
 }
 
 # A missing action is an error, matching autostart.sh (message on stderr, exit 1).
-# Sync-AppAutostart.ps1:47 throws on a non-zero exit, so this file's exit status
-# is load-bearing, though that caller always passes apply and never reaches here.
-# The exit is stated rather than left to how Write-NucleusError ends the script.
+# Sync-AppAutostart.ps1:47 throws on a non-zero exit, so the exit status is stated
+# rather than left to how Write-NucleusError ends the script.
 if (-not $Action) {
   Write-NucleusError "missing action (list, status, enable, disable, apply, verify)"
   exit 1
 }
 
-# ---------------------------------------------------------------------------
-# Initialization
-# ---------------------------------------------------------------------------
-
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Get-Item $PSScriptRoot).Parent.Parent.FullName }
 $AppsJson = Join-Path $RepoRoot "src\modules\apps.json"
 $NucleusHost = 'Windows'
 
-# Read and parse registry
 if (-not (Test-Path $AppsJson)) {
   throw "autostart: app registry not found at $AppsJson"
 }
 $RegistryRaw = Get-Content $AppsJson -Raw | ConvertFrom-Json -AsHashtable
 
-# Filter to Windows-relevant apps
 $Registry = @{}
 foreach ($key in $RegistryRaw.Keys) {
   if ($key.StartsWith('$')) { continue }
@@ -102,13 +95,8 @@ foreach ($key in $RegistryRaw.Keys) {
   }
 }
 
-# ---------------------------------------------------------------------------
-# Windows auto-start helpers (our uniform mechanism)
-# ---------------------------------------------------------------------------
-
 $RunKeyPath = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 
-# AppRunKeyValueName — Derive OUR Run-key value name for an app.
 # Prefixed with "nucleus-" so it never collides with an app-shipped value
 # (e.g. Steam's own "Steam" value), keeping our mechanism distinct and
 # removable in isolation.
@@ -117,7 +105,6 @@ function AppRunKeyValueName {
   return "nucleus-$Key"
 }
 
-# RunKeyEntryExists — $true/$false whether OUR Run-key value is present.
 function Test-RunKeyEntry {
   param([string]$Key)
   $valueName = AppRunKeyValueName -Key $Key
@@ -126,7 +113,6 @@ function Test-RunKeyEntry {
   return ($null -ne $v)
 }
 
-# RunKeyEntryWrite — Create OUR Run-key value pointing at the app path.
 function Enable-RunKeyEntry {
   param([string]$Key, [string]$Path)
   if (-not (Test-Path -Path $RunKeyPath)) {
@@ -137,7 +123,6 @@ function Enable-RunKeyEntry {
   Write-NucleusInfo -CommandName 'autostart' "enabled $Key via Run key"
 }
 
-# RunKeyEntryRemove — Delete OUR Run-key value if present.
 function Disable-RunKeyEntry {
   param([string]$Key)
   $valueName = AppRunKeyValueName -Key $Key
@@ -148,8 +133,7 @@ function Disable-RunKeyEntry {
   }
 }
 
-# NativeRunKeyRemove — Delete any app-shipped Run-key value whose data
-# references the app path, neutralizing the app's native auto-start.
+# Neutralizes the app's native auto-start.
 function Unregister-NativeRunKey {
   param([string]$Path)
   if (-not (Test-Path -Path $RunKeyPath)) { return }
@@ -169,8 +153,7 @@ function Unregister-NativeRunKey {
   }
 }
 
-# NativeStartupShortcutRemove — Delete any app-shipped Startup-folder .lnk
-# whose target references the app path, neutralizing the app's native auto-start.
+# Neutralizes the app's native auto-start.
 function Unregister-NativeStartupShortcut {
   param([string]$Path)
   $startupPath = [Environment]::GetFolderPath('Startup')
@@ -188,11 +171,6 @@ function Unregister-NativeStartupShortcut {
   }
 }
 
-# ---------------------------------------------------------------------------
-# Per-app state resolution
-# ---------------------------------------------------------------------------
-
-# AppActualState — 'enabled'/'disabled' reflecting whether OUR mechanism has it.
 function Get-AppActualState {
   param([string]$Key, [hashtable]$Entry)
   $kind = $Entry.hostEntry.kind
@@ -214,7 +192,6 @@ function Get-AppActualState {
   }
 }
 
-# AppConverge — Apply declared state for one app.
 function Invoke-AppConverge {
   param([string]$Key, [hashtable]$Entry)
   $kind = $Entry.hostEntry.kind
@@ -223,8 +200,8 @@ function Invoke-AppConverge {
 
   switch ($kind) {
     'windows-run-key' {
-      # Neutralize any app-shipped Run-key/Startup entry so only our
-      # uniform mechanism remains.
+      # Neutralize any app-shipped Run-key/Startup entry so only our uniform
+      # mechanism remains.
       Unregister-NativeRunKey -Path $path
       Unregister-NativeStartupShortcut -Path $path
       if ($enabled) {
@@ -252,9 +229,9 @@ function Invoke-AppConverge {
       }
     }
     'manual' {
-      # No programmable mechanism exists for this app on this host: the state is
-      # declared in the registry but never converged, so report the manual steps
-      # and succeed instead of failing apply on an app we cannot automate.
+      # No programmable mechanism exists for this app on this host, so the state
+      # is declared in the registry but never converged. Report the manual steps
+      # and succeed instead of failing apply on an app that cannot be automated.
       $instructions = if ($Entry.hostEntry.ContainsKey('approvalInstructions')) { $Entry.hostEntry.approvalInstructions } else { '' }
       if ([string]::IsNullOrEmpty($instructions)) {
         Write-NucleusWarning "$Key — manual entry; not auto-provisioned"

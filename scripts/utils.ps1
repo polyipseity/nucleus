@@ -2,33 +2,23 @@
 .SYNOPSIS
   Grouped nucleus user utilities.
 .DESCRIPTION
-  Currently provides two subcommands:
+  Subcommands:
   - optimize-pdf: optimize PDF files using Ghostscript with backup/restore.
-  - strip-metadata: strip file metadata with mat2/exiftool. PDF and legacy
-    OLE2 files are skipped with a warning. Inputs that cannot be processed are
-    listed at the end of the run; with -Dialog that list is shown in a modal
-    popup.
+  - strip-metadata: strip file metadata with mat2/exiftool. PDF and legacy OLE2
+    files are skipped with a warning; inputs that could not be processed are
+    listed at the end of the run.
 .PARAMETER Action
   The subcommand to run: optimize-pdf, strip-metadata.
 .PARAMETER Preset
   Ghostscript PDF settings preset: default, ebook, prepress, printer, screen.
-  Default: default. Maps to the optimize-pdf --preset option.
-.PARAMETER RemoveBackup
-  Switch. Remove the .bak backup file on success (kept by default). Maps to
-  the optimize-pdf --rm-bak and strip-metadata --rm-bak options.
 .PARAMETER Dialog
-  Switch (strip-metadata only). Show one modal popup after the run listing
-  every input that was not processed. Needed by GUI callers: the context-menu
-  verb runs with -WindowStyle Hidden, which discards stdout and stderr, so a
-  modal dialog is the only feedback the user cannot miss.
+  Switch (strip-metadata only). Show one modal popup listing every input that was
+  not processed. Needed by GUI callers: the context-menu verb runs with
+  -WindowStyle Hidden, which discards stdout and stderr.
 .PARAMETER File
   One or more file paths to process.
-.PARAMETER Help
-  Show detailed help.
-.EXAMPLE
-  .\utils.ps1 optimize-pdf document.pdf
-  .\utils.ps1 strip-metadata report.docx
-  .\utils.ps1 strip-metadata -Dialog report.docx
+.NOTES
+  Maps to the optimize-pdf --preset and --rm-bak and strip-metadata --rm-bak options.
 #>
 [CmdletBinding()]
 param(
@@ -57,9 +47,6 @@ $null = $PSBoundParameters
 
 $ErrorActionPreference = 'Stop'
 
-# Show-NucleusNotification — Display a Windows toast notification if BurntToast
-# is available; fall back to System.Windows.Forms.MessageBox.
-# Args: title, message.
 function Show-NucleusNotification {
   # check-suppress:SuppressMessageAttribute: PSAvoidUsingEmptyCatchBlock -- notification is best-effort; all errors intentionally swallowed
   [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingEmptyCatchBlock', '')]
@@ -81,10 +68,8 @@ function Show-NucleusNotification {
   }
 }
 
-# Show-NucleusPopup — Display a modal dialog that stays on screen until it is
-# dismissed. Unlike Show-NucleusNotification this never degrades to a toast: the
-# caller passes -Dialog precisely because nothing else is visible.
-# Args: title, message.
+# Never degrades to a toast: the caller passes -Dialog because nothing else is
+# visible.
 function Show-NucleusPopup {
   # check-suppress:SuppressMessageAttribute: PSAvoidUsingEmptyCatchBlock -- the dialog is best-effort; the run already reported the same list to stderr
   [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingEmptyCatchBlock', '')]
@@ -97,14 +82,9 @@ function Show-NucleusPopup {
   }
 }
 
-# ConvertTo-NucleusStripMetadataReport — Build the -Dialog popup body.
-# Args: processed count, total count, "<reason>|<path>" entries for the inputs
-# that were not processed.
-# WHY: the list is capped — a message box has no scrollbar, so an unbounded list
-# would push the buttons off screen instead of showing the tail.
-# WHY: ASCII bullet, separator, and ellipsis only — Windows PowerShell 5.1
-# decodes a BOM-less .ps1 as ANSI, so a non-ASCII glyph would reach the popup as
-# mojibake.
+# WHY: the list is capped, since a message box has no scrollbar. ASCII only,
+# because Windows PowerShell 5.1 decodes a BOM-less .ps1 as ANSI and a non-ASCII
+# glyph would reach the popup as mojibake.
 function ConvertTo-NucleusStripMetadataReport {
   param(
     [int]$Processed,
@@ -135,9 +115,8 @@ if ($Help) {
   exit 0
 }
 
-# A bare invocation prints the usage summary and succeeds, matching utils.sh
-# (usage on stdout, exit 0): asking which subcommand to run is not a failure,
-# and a caller reading stdout must see the same summary on either platform.
+# A bare invocation prints the usage summary and succeeds, matching utils.sh:
+# asking which subcommand to run is not a failure.
 if (-not $Action) {
   $scriptName = Split-Path -Leaf $PSCommandPath
   Write-NucleusInfo "usage: $scriptName optimize-pdf [[-Preset] <name>] [[-RemoveBackup]] [-File] <path>... | strip-metadata [[-RemoveBackup]] [[-Dialog]] [-File] <path>..."
@@ -151,7 +130,6 @@ if (-not $Action) {
   exit 0
 }
 
-# Import ghostscript invocation helper.
 # Sync-ShellProfile defines Invoke-NucleusGhostscript; define inline as fallback.
 # check-suppress:suppression_doc: probe whether function is already defined; Get-Command throws when absent.
 if (-not (Get-Command Invoke-NucleusGhostscript -ErrorAction SilentlyContinue)) {
@@ -166,7 +144,6 @@ if (-not (Get-Command Invoke-NucleusGhostscript -ErrorAction SilentlyContinue)) 
   }
 }
 
-# Import exiftool invocation helper.
 # check-suppress:suppression_doc: probe whether function is already defined; Get-Command throws when absent.
 if (-not (Get-Command Invoke-NucleusExifTool -ErrorAction SilentlyContinue)) {
   function Invoke-NucleusExifTool {
@@ -231,9 +208,8 @@ switch ($Action) {
       exit 1
     }
 
-    # Every input that was not processed, as "<reason>|<path>", collected across
-    # the whole run: -Dialog reports them together, because one hidden host
-    # cannot show anything per file.
+    # Collected across the whole run, because one hidden host cannot show
+    # anything per file.
     $notProcessed = [System.Collections.Generic.List[string]]::new()
     $processed = 0
     $failed = 0
@@ -264,7 +240,7 @@ switch ($Action) {
         continue
       }
       if ($ext -in @('.docx', '.xlsx', '.pptx')) {
-        # OOXML: use mat2 for comprehensive metadata stripping.
+        # OOXML goes through mat2.
         # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
         if (-not (Get-Command mat2 -ErrorAction SilentlyContinue)) {
           Write-NucleusWarning "mat2 not found, cannot strip OOXML metadata: $f"
@@ -295,10 +271,8 @@ switch ($Action) {
           Show-NucleusNotification -Title 'strip metadata' -Message "Skipped legacy OLE2 (unsupported format): $f"
         }
       } else {
-        # Other formats: use exiftool.
-        # WHY: backup first, then in-place strip on the original — .bak holds
-        # the untouched original, so an interrupt leaves either the original or
-        # the stripped file, never a half-written one.
+        # WHY: backup first, then in-place strip, so an interrupt leaves either
+        # the original or the stripped file, never a half-written one.
         Copy-Item -LiteralPath $f -Destination $bak -Force
         try {
           Invoke-NucleusExifTool @(
@@ -320,8 +294,7 @@ switch ($Action) {
       }
     }
 
-    # Report once, after every input has been attempted: -Dialog exists because
-    # the GUI caller has no terminal to read.
+    # Reported once, after every input has been attempted.
     if ($Dialog -and $notProcessed.Count -gt 0) {
       $reportArgs = @{
         Processed = $processed
