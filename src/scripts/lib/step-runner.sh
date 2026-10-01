@@ -1,26 +1,19 @@
 #!/usr/bin/env bash
-# Step runner library for check and test orchestrators.
-# Provides step registration, execution, timing, and aggregation.
-# Sourced by check-lib.sh and test-lib.sh.
-#
-# Guard against re-sourcing — step files source independently and
-# re-sourcing would wipe step registration arrays, leaving only the last step.
+# Step runner library for check and test orchestrators. Sourced by check-lib.sh
+# and test-lib.sh.
+# Re-sourcing would wipe the step registration arrays, leaving only the last step.
 [ -n "${_NUCLEUS_STEP_RUNNER_SOURCED-}" ] && return
 _NUCLEUS_STEP_RUNNER_SOURCED=1
 
 # shellcheck source=./deny-list.sh
-# Self-derived dir: do NOT rely on ambient SCRIPT_DIR — test harnesses source
-# this file from their own directories, and a wrong path would print
-# "No such file or directory" for every subshell invocation.
+# WHY self-derived dir: test harnesses source this file from their own
+# directories, so ambient SCRIPT_DIR resolves to the wrong path.
 _NUCLEUS_STEP_RUNNER_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 . "$_NUCLEUS_STEP_RUNNER_DIR/deny-list.sh"
 
 # shellcheck source=./lib.sh
 . "$_NUCLEUS_STEP_RUNNER_DIR/lib.sh"
 
-# --- Step registration ---
-# Indexed arrays: step ids, numbers, names, function names, and the declared
-# applicability (platform, mode, requires) resolved at dispatch time.
 declare -a _STEP_IDS=()
 declare -a _STEP_NUMBERS=()
 declare -a _STEP_NAMES=()
@@ -28,8 +21,7 @@ declare -a _STEP_FUNCS=()
 declare -a _STEP_PLATFORMS=()
 declare -a _STEP_MODES=()
 declare -a _STEP_REQUIRES=()
-# Per-step "not applicable (<reason>)" / "not-selected" states keyed by step
-# number, populated at dispatch and rendered by aggregate_results as '–'.
+# Populated at dispatch, rendered by aggregate_results as '–'.
 declare -A _NOT_RUN_STATES=()
 
 register_step() {
@@ -37,15 +29,12 @@ register_step() {
 
   case "$#" in
   3)
-    # 3-arg form: <id> <name> <func>; number derives from the caller file's NN- prefix.
     _id="$1" _name="$2" _func="$3"
     ;;
   4)
-    # 4-arg unit-test form: <id> <number> <name> <func>.
     _id="$1" _n="$2" _name="$3" _func="$4"
     ;;
   6)
-    # 6-arg declared form: <id> <name> <func> <platform> <mode> <requires>.
     _id="$1" _name="$2" _func="$3" _platform="$4" _mode="$5" _requires="$6"
     ;;
   *)
@@ -54,7 +43,6 @@ register_step() {
     ;;
   esac
 
-  # Validate the declared tokens; an unknown token is a registration-time bug.
   case "$_platform" in
   any | posix | windows) ;;
   *)
@@ -135,9 +123,6 @@ register_step() {
   _STEP_REQUIRES+=("$_requires")
 }
 
-# --- Wave parallelism infrastructure ---
-# Each step writes .exit, .time, .name files to _wave_tmpdir.
-# Results are aggregated at the end.
 _wave_tmpdir=""
 _wave_tmpdir_created=false
 
@@ -169,7 +154,6 @@ _wave_cleanup() {
   fi
 }
 
-# --- Nix lock ---
 # ref: step-runner.instructions.md
 NUCLEUS_NIX_LOCK="${TMPDIR:-/tmp}/nucleus-nix.lock"
 
@@ -203,11 +187,9 @@ nucleus_nix_locked() {
   return "$_lock_ret"
 }
 
-# --- Nix pin ---
 # ref: tooling-and-validation.instructions.md
-# Point <nixpkgs> at the flake-locked input so a step never resolves it through
-# this machine's channel or registry. Idempotent per process: the first call
-# resolves and exports the path, later calls reuse it.
+# Point <nixpkgs> at the flake-locked input so no step resolves it through this
+# machine's channel or registry. The first call pins it; later calls reuse it.
 nucleus_pin_nixpkgs() {
   local _repo_root="$1"
   local _pin_out
@@ -228,9 +210,8 @@ nucleus_pin_nixpkgs() {
   export NIX_PATH="nixpkgs=$NUCLEUS_PINNED_NIXPKGS"
 }
 
-# Defaults for when parse_args hasn't been called (e.g. unit tests that source
-# this library directly). run_all_steps reads all three eagerly while building
-# the step context, so they must always be bound under `set -u`.
+# WHY bound here: parse_args may be uncalled (unit tests source this lib directly)
+# and run_all_steps reads all of them eagerly under `set -u`.
 HAS_ARGS=${HAS_ARGS:-false}
 FAIL_FAST=${FAIL_FAST:-false}
 ONLINE=${ONLINE:-false}
@@ -256,7 +237,6 @@ _format_duration_s() {
   awk -v ms="${1:-0}" 'BEGIN { printf "%.3f s", ms / 1000 }'
 }
 
-# --- _run_step wrapper ---
 _run_step() {
   local _n="$1" _name="$2" _func="$3" _id="$4"
   shift 4
@@ -309,13 +289,9 @@ _run_step() {
   fi
 }
 
-# --- Step applicability ---
 # ref: step-runner.instructions.md -- declared applicability replaces step-level skipping.
-# The runner decides, from registration-time declarations, whether a step runs; a
-# step file never probes its own prerequisites or reports a skip sentinel.
-# _step_platform_applicable <platform> -- true when the declared platform matches
-# this host. This runner only executes on POSIX hosts, so `posix` and `any` apply
-# and `windows` does not.
+# The runner decides whether a step runs; a step file never probes its own
+# prerequisites or reports a skip sentinel.
 _step_platform_applicable() {
   case "$1" in
   any | posix) return 0 ;;
@@ -323,7 +299,6 @@ _step_platform_applicable() {
   esac
 }
 
-# _step_mode_applicable <mode> -- true when the declared mode matches this run.
 # HAS_ARGS is the runner's scoped/full determination (positional args or --scoped).
 _step_mode_applicable() {
   case "$1" in
@@ -333,7 +308,6 @@ _step_mode_applicable() {
   esac
 }
 
-# _step_prerequisite_met <requires> -- true when the declared prerequisite holds.
 _step_prerequisite_met() {
   case "$1" in
   none) return 0 ;;
@@ -344,9 +318,8 @@ _step_prerequisite_met() {
   esac
 }
 
-# _step_run_state <id> <platform> <mode> <requires> -- print the state of a step
-# that will not run, or nothing when it runs. Selection is checked first: an
-# unselected step is reported as not-selected, never as not applicable.
+# Prints the state of a step that will not run, or nothing when it runs.
+# Selection is checked first: an unselected step reports not-selected.
 _step_run_state() {
   local _id="$1" _platform="$2" _mode="$3" _requires="$4" _sel
   if [ "${#ONLY_STEPS[@]}" -gt 0 ]; then
@@ -371,8 +344,7 @@ _step_run_state() {
   return 0
 }
 
-# validate_only_steps -- hard-error when ONLY_STEPS names an unregistered id. A
-# typo would otherwise narrow the run to nothing and report success.
+# A typo in ONLY_STEPS would otherwise narrow the run to nothing and report success.
 validate_only_steps() {
   local _only _kid _known _known_list
   _known_list=""
@@ -393,7 +365,6 @@ validate_only_steps() {
   done
 }
 
-# --- Argument parsing ---
 parse_args() {
   ONLINE=false
   SCOPED=false
@@ -519,7 +490,6 @@ parse_args() {
   fi
 }
 
-# --- File caching ---
 cache_file_lists() {
   # shellcheck disable=SC2034 # reason: consumed by step files 03 and 11 via transitive sourcing
   readarray -t CACHED_NIX_FILES < <(
@@ -547,16 +517,13 @@ cache_file_lists() {
   )
 }
 
-# --- run_all_steps ---
 run_all_steps() {
   _wave_cleanup_stale
   _wave_init
   cache_file_lists
 
-  # Build the shared context object once; every step receives it explicitly as
-  # its first argument (the name of this assoc array) so no step reads enclosing
-  # globals. Subshells copy the parent's variables, but explicit context keeps
-  # the contract identical to the PowerShell runner and removes ambient reads.
+  # Every step receives this object as its first argument, so no step reads
+  # enclosing globals and the contract matches the PowerShell runner.
   local -A STEP_CTX=()
   STEP_CTX[HAS_ARGS]="$HAS_ARGS"
   STEP_CTX[REPO_ROOT]="$REPO_ROOT"
@@ -599,7 +566,6 @@ run_all_steps() {
     fi
   done
 
-  # Only applicable, selected steps count toward the run progress.
   _total=${#_pending_indices[@]}
 
   local _pos=0 _batch_end _batch_i _wait_ret _fail_fast=false
@@ -649,23 +615,18 @@ run_all_steps() {
   done
 }
 
-# --- _print_step_line ---
-# One step's summary line (state glyph, duration, name). Shared by the fail-fast
-# abort and aggregate_results so a failing step renders identically whether or
-# not the summary is reached.
+# One step's summary line, shared by the fail-fast abort and aggregate_results so
+# a failing step renders identically either way.
 _print_step_line() {
   local _i="$1" _glyph="$2" _color="$3"
   local _n="${_STEP_NUMBERS[$_i]}" _name="${_STEP_NAMES[$_i]}"
   local _elapsed_ms _duration_s
   _elapsed_ms=$(cat "$_wave_tmpdir/step-$_n.time" 2>/dev/null || echo 0)
   _duration_s=$(_format_duration_s "$_elapsed_ms")
-  # _n is the zero-padded NN- prefix string; 10# forces decimal so %d doesn't parse it as octal.
   printf '  %sstep %2d%s  %s%s%s  %s%8s%s  %s\n' "${_nuc_c1_dim}" "$((10#${_n}))" "${_nuc_c1_reset}" "$_color" "$_glyph" "${_nuc_c1_reset}" "${_nuc_c1_dim}" "$_duration_s" "${_nuc_c1_reset}" "$_name"
 }
 
-# --- _replay_step_output ---
-# Replays a step's captured stdout/stderr. Header-only lines the step printed are
-# highlighted like the summary does.
+# Replays a step's captured stdout/stderr, highlighting the header lines.
 _replay_step_output() {
   local _n="${_STEP_NUMBERS[$1]}"
   [ -f "$_wave_tmpdir/step-$_n.out" ] || return 0
@@ -676,28 +637,22 @@ _replay_step_output() {
   fi
 }
 
-# --- _step_reports_no_scope ---
-# True when a step's captured output carries the no-scope convention. A
-# filtering step whose scope was empty exits 0, so without this its only news —
-# why it checked nothing — is discarded and a ✓ sits beside a step that did no
-# work. Matching the message couples the runner to prose, which
-# no-scope-message-tests.sh turns into an enforced invariant over every step.
+# True when a step's output carries the no-scope convention. A filtering step with
+# an empty scope exits 0, so without this its only news (why it checked nothing)
+# is dropped and a ✓ sits beside a step that did no work. no-scope-message-tests.sh
+# enforces the convention over every step.
 _step_reports_no_scope() {
   local _out="$_wave_tmpdir/step-${_STEP_NUMBERS[$1]}.out"
   [ -f "$_out" ] || return 1
-  # WHY the label branch: every step emits through say/Write-Message, which
+  # WHY anchor at the label boundary: steps emit through say/Write-Message, which
   # prefix `<label>: `, so a real line reads `05-lockfile-validation: 0 lockfile
-  # files in scope — nothing to validate.` and never starts with `0`. Anchoring
-  # at the label boundary, not the line start, is what makes this match in
-  # production; an earlier `^0 ` anchor matched only a bare echo in the test.
+  # files in scope` and never starts with `0`. A `^0 ` anchor matched a bare echo
+  # in the test and nothing in production.
   grep -qE '(^|: )0 .+ in scope' "$_out"
 }
 
-# --- _report_fail_fast ---
-# Reports the steps that failed before a fail-fast abort. A fail-fast abort exits
-# before aggregate_results, which is the only other place step output is replayed,
-# so without this the run reports that steps started and never why one failed —
-# the pre-push hook cannot pass --no-fail-fast to work around it.
+# A fail-fast abort exits before aggregate_results, the only other place step
+# output is replayed, and the pre-push hook cannot pass --no-fail-fast.
 _report_fail_fast() {
   local _i _failed=""
   printf '\n'
@@ -726,7 +681,7 @@ aggregate_results() {
     _n="${_STEP_NUMBERS[$_i]}"
     _name="${_STEP_NAMES[$_i]}"
     if [ -n "${_NOT_RUN_STATES[$_n]:-}" ]; then
-      # Not-applicable and not-selected steps show '–' for state and duration.
+      # '–' for state and duration.
       printf '  %sstep %2d%s  %s–%s  %s%8s%s  %s\n' "${_nuc_c1_dim}" "$((10#${_n}))" "${_nuc_c1_reset}" "${_nuc_c1_yellow}" "${_nuc_c1_reset}" "${_nuc_c1_dim}" "–" "${_nuc_c1_reset}" "$_name"
       continue
     fi
@@ -736,7 +691,7 @@ aggregate_results() {
     _total_elapsed=$((_total_elapsed + _elapsed))
     _duration_s=$(_format_duration_s "$_elapsed")
 
-    # _n is the zero-padded NN- prefix string; 10# forces decimal so %d doesn't parse it as octal.
+    # 10# forces decimal so %d doesn't read the zero-padded NN- prefix as octal.
     if [ "$_exit_code" -eq 0 ]; then
       _print_step_line "$_i" "✓" "${_nuc_c1_green}"
     else
@@ -744,8 +699,6 @@ aggregate_results() {
       _failed_steps="$_failed_steps$((10#${_n})) "
     fi
 
-    # In quiet mode, only replay output for failed steps (so errors are visible).
-    # In verbose mode, replay all output.
     local _step_id="${_STEP_IDS[$_i]}"
     local _should_replay=false
     if [ "${#VERBOSE_IDS[@]}" -gt 0 ]; then
@@ -756,14 +709,12 @@ aggregate_results() {
         fi
       done
     fi
-    # Always replay failed steps regardless of verbose mode
+    # failed steps replay regardless of verbose mode
     if [ "$_exit_code" -ne 0 ]; then
       _should_replay=true
     fi
-    # WHY: also replay a passing step that had nothing in scope. Its exit code is
-    # 0 and its output is otherwise dropped, so the run reports the same ✓ for
-    # "checked and found nothing" and "never ran" — the ambiguity this removes.
-    # Exit codes are untouched.
+    # WHY: also replay a passing step with nothing in scope, so the run does not
+    # report the same ✓ for "checked and found nothing" and "never ran".
     if _step_reports_no_scope "$_i"; then
       _should_replay=true
     fi
@@ -787,7 +738,6 @@ aggregate_results() {
   fi
 }
 
-# --- Pre-flight check ---
 preflight_check() {
   require_command actionlint
   require_command check-jsonschema

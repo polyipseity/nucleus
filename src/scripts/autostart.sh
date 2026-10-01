@@ -1,28 +1,21 @@
 #!/usr/bin/env bash
-# Provides a uniform CLI for listing, enabling, disabling, and verifying
-# GUI/user app auto-start across hosts, driven by src/modules/apps.json
-# (the canonical registry).  This mirrors nucleus-svc but targets login/boot
-# auto-start apps rather than background daemons.
+# Uniform CLI over src/modules/apps.json for listing, enabling, disabling, and
+# verifying GUI/user app auto-start. This mirrors nucleus-svc but targets
+# login/boot auto-start apps rather than background daemons.
 #
 # Usage: nucleus-autostart <action> [app...] [options]
-#   Actions: list, status, enable, disable, apply, verify.
 #
-# Policy (driving constraint): we never let an app manage its own startup.
-# If an app exposes a native auto-start setting, convergence disables it, then
-# control enable/disable through exactly one uniform mechanism we own:
-#   macOS   — LaunchAgent plists we write/remove in ~/Library/LaunchAgents/
-#             (system extensions use systemextensionsctl best-effort + manual)
-#   NixOS   — an XDG autostart .desktop we write/remove
-#   Windows — a Run-key entry or Startup-folder .lnk we write/remove
+# Policy: an app never manages its own startup. Convergence disables the native
+# setting and drives exactly one mechanism we own:
+#   macOS   LaunchAgent plists in ~/Library/LaunchAgents/
+#   NixOS   an XDG autostart .desktop
+#   Windows a Run-key entry or Startup-folder .lnk
 #
-# Prerequisites: apps.json in the repo; jq; osascript (macOS system extensions only) or the relevant
-# platform tooling.  Exit conditions: non-zero when an app name does not
-# resolve, an action fails, or verify finds a disabled app that is still
-# starting (or an enabled app that is not).
+# Exit non-zero when an app name does not resolve, an action fails, or verify
+# finds drift.
 
 set -euo pipefail
 
-# Resolve symlinks so SCRIPT_DIR works from Nix wrapper symlinks.
 _self="$0"
 if [ -h "$_self" ]; then
   _target="$(readlink "$_self")"
@@ -59,8 +52,6 @@ MacBook | NixOS | Windows) ;;
 *) error "unsupported host '$HOST'" ;;
 esac
 
-# read_registry — Parse apps.json and return JSON filtered to current host.
-# Output: compact JSON on stdout; exits non-zero if the file or jq is missing.
 read_registry() {
   if [ ! -f "$APPS_JSON" ]; then
     error "app registry not found at $APPS_JSON"
@@ -81,15 +72,9 @@ read_registry() {
   ' "$APPS_JSON"
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# macOS LaunchAgent plist helpers
-# ──────────────────────────────────────────────────────────────────────────────
-
-# LAUNCHAGENTS_DIR — user-scoped LaunchAgent plist directory.
 LAUNCHAGENTS_DIR="$HOME/Library/LaunchAgents"
-# On macOS, resolve the console user's home so plists go to the real
-# user's ~/Library/LaunchAgents/, not /var/root/Library/LaunchAgents/
-# when this script runs as root during darwin-rebuild switch.
+# WHY console user home: this runs as root under darwin-rebuild switch, where
+# $HOME is /var/root, so plists would land in the wrong Library.
 if [ "$HOST" = "MacBook" ]; then
   # check-suppress:suppression_doc: /dev/console may not exist in headless/SSH; dscl may fail if user record is missing; both are expected and handled by the empty-check below.
   _console_user_home="$(stat -f%Su /dev/console 2>/dev/null | xargs -I{} dscl . -read "/Users/{}" NFSHomeDirectory 2>/dev/null | awk '{print $2}' || true)"
@@ -98,25 +83,21 @@ if [ "$HOST" = "MacBook" ]; then
   fi
 fi
 
-# macos_launchagent_label BUNDLE_ID — stdout the nucleus-owned plist label.
 macos_launchagent_label() {
   local bundle_id="$1"
   printf 'local.%s' "$bundle_id"
 }
 
-# macos_launchagent_path BUNDLE_ID — stdout the nucleus-owned plist path.
 macos_launchagent_path() {
   local bundle_id="$1"
   printf '%s/%s.plist' "$LAUNCHAGENTS_DIR" "$(macos_launchagent_label "$bundle_id")"
 }
 
-# macos_launchagent_exists BUNDLE_ID — stdout "true"/"false".
 macos_launchagent_exists() {
   local bundle_id="$1"
   [ -f "$(macos_launchagent_path "$bundle_id")" ] && printf 'true' || printf 'false'
 }
 
-# macos_app_binary_path APP_PATH — stdout the executable path inside a .app bundle.
 # Reads CFBundleExecutable from the bundle's Info.plist. Returns the .app path
 # as fallback when resolution fails (e.g. missing Info.plist, non-Mach-O bundle).
 macos_app_binary_path() {
@@ -134,11 +115,9 @@ macos_app_binary_path() {
   printf '%s' "$app_path"
 }
 
-# macos_launchagent_ensure BUNDLE_ID APP_PATH — write nucleus-owned plist (idempotent).
 macos_launchagent_ensure() {
   local bundle_id="$1" app_path="$2"
-  # Resolve the actual binary inside the .app bundle — launchd cannot
-  # execute a .app directory directly; execvp() requires an executable file.
+  # WHY the binary inside the bundle: launchd cannot execute a .app directory.
   local binary_path
   binary_path="$(macos_app_binary_path "$app_path")"
   local label plist_path
@@ -166,22 +145,18 @@ macos_launchagent_ensure() {
 PLIST
 }
 
-# macos_launchagent_remove BUNDLE_ID — delete nucleus-owned plist.
 macos_launchagent_remove() {
   local bundle_id="$1"
   rm -f "$(macos_launchagent_path "$bundle_id")"
 }
 
-# macos_remove_app_launchagent BUNDLE_ID APP_PATH — delete app-owned plist
-# (e.g. ~/Library/LaunchAgents/com.lwouis.alt-tab-macos.plist) if its Program
-# matches the given app path, in either plist form. Safety: never remove a plist
-# whose program points elsewhere or cannot be determined.
+# Delete an app-owned plist whose Program matches the app path, in either plist
+# form. Never removes a plist whose program points elsewhere.
 macos_remove_app_launchagent() {
   local bundle_id="$1" app_path="$2"
   [ -n "$app_path" ] || return 0
   local plist_path="$LAUNCHAGENTS_DIR/${bundle_id}.plist"
   [ -f "$plist_path" ] || return 0
-  # ProgramArguments form: the first <string> inside the array.
   local plist_program
   # The `|` address delimiter avoids escaping the `/` in `</key>`: with `/`
   # delimiters BSD sed terminates the address early and fails with
@@ -198,15 +173,11 @@ macos_remove_app_launchagent() {
   fi
 }
 
-# macos_fskit_module_registered ID — stdout "true"/"false" via FSKit's own
-# enabled-module list.
-# FSKit file-system extensions live in Apple's File System Extension plugin point,
-# which systemextensionsctl does not report, and PluginKit rejects a module that is
-# not inside a SIP-protected app — so pluginkit reports the macFUSE module as
-# absent even while its volumes mount.
-# WHY: the enabled-module list is the signal macOS makes readable to a script, and
-# a module that is listed counts as present; a list that cannot be read answers
-# "false" rather than claiming a registration nothing confirmed.
+# FSKit extensions live in Apple's File System Extension plugin point, which
+# systemextensionsctl does not report, and PluginKit rejects a module outside a
+# SIP-protected app, so pluginkit reports macFUSE absent while its volumes mount.
+# WHY the enabled-module list: it is the signal macOS exposes to a script, and a
+# listed module counts as present. An unreadable list answers "false".
 macos_fskit_module_registered() {
   local bundle_id="$1"
   case "$(fskit_module_state "$bundle_id")" in
@@ -215,12 +186,9 @@ macos_fskit_module_registered() {
   esac
 }
 
-# macos_system_extension_present ID — stdout "true"/"false".
-# Network/cmio/endpoint-security extensions come from systemextensionsctl. FSKit
-# file-system extensions (e.g. macFUSE) never appear there and are read from
-# FSKit's own enabled-module list instead. TCC-granted helper tools (e.g. Chrome
-# Remote Desktop Host) appear in neither and stay manual-approval-only via the
-# entry's approvalInstructions.
+# Network/cmio/endpoint-security extensions come from systemextensionsctl. TCC
+# helpers (e.g. Chrome Remote Desktop Host) appear in neither and stay
+# manual-approval-only via the entry's approvalInstructions.
 macos_system_extension_present() {
   local bundle_id="$1"
   if command -v systemextensionsctl >/dev/null 2>&1 &&
@@ -231,31 +199,22 @@ macos_system_extension_present() {
   fi
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# NixOS XDG autostart helpers (run as the target user)
-# ──────────────────────────────────────────────────────────────────────────────
-
-# app_desktop_filename — Derive OUR autostart .desktop filename for an app.
-# Prefixed with "nucleus-" and space-sanitized so it never collides with an
-# app-shipped file (e.g. steam.desktop), keeping our mechanism distinct and
-# removable in isolation.
+# WHY the "nucleus-" prefix: it never collides with an app-shipped file such as
+# steam.desktop, so our entry stays removable in isolation.
 app_desktop_filename() {
   local key="$1"
   printf 'nucleus-%s.desktop' "$(printf '%s' "$key" | tr ' ' '-')"
 }
 
-# xdg_autostart_dir — stdout the current user's XDG autostart directory.
 xdg_autostart_dir() {
   printf '%s/autostart' "${XDG_CONFIG_HOME:-$HOME/.config}"
 }
 
-# xdg_desktop_exists NAME — stdout "true"/"false".
 xdg_desktop_exists() {
   local name="$1"
   if [ -f "$(xdg_autostart_dir)/$name" ]; then printf 'true'; else printf 'false'; fi
 }
 
-# xdg_desktop_write NAME EXEC_PATH — create OUR autostart .desktop.
 xdg_desktop_write() {
   local name="$1" exec_path="$2"
   local dir
@@ -271,15 +230,13 @@ X-GNOME-Autostart-Delay=0
 DESKTOP
 }
 
-# xdg_desktop_remove NAME — delete OUR autostart .desktop if present.
 xdg_desktop_remove() {
   local name="$1"
   rm -f "$(xdg_autostart_dir)/$name"
 }
 
-# xdg_native_autostart_remove EXEC_PATH — delete any app-shipped .desktop whose
-# Exec references the app binary, neutralizing the app's native auto-start
-# (e.g. the steam.desktop Steam writes when "Start on login" is toggled).
+# Delete any app-shipped .desktop whose Exec references the app binary, e.g. the
+# steam.desktop Steam writes when "Start on login" is toggled.
 xdg_native_autostart_remove() {
   local exec_path="$1"
   local dir
@@ -297,19 +254,12 @@ xdg_native_autostart_remove() {
   done
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# NixOS per-user dispatch (root activation converges every real user)
-# ──────────────────────────────────────────────────────────────────────────────
-
-# nixos_real_user_homes — stdout one home dir per real user (under /home).
 nixos_real_user_homes() {
   find /home -maxdepth 1 -mindepth 1 -type d 2>/dev/null
 }
 
-# nixos_dispatch_per_user ACTION — Re-exec autostart.sh ACTION once per real
-# user so each user's ~/.config/autostart is converged.  Each child runs with
-# HOME and NUCLEUS_USERNAME set to that user; NUCLEUS_AUTOSTART_AS_USER guards
-# against re-dispatching inside the child.
+# Re-exec this script once per real user so each ~/.config/autostart converges.
+# NUCLEUS_AUTOSTART_AS_USER stops the child from dispatching again.
 nixos_dispatch_per_user() {
   local action="$1"
   local overall=0
@@ -334,18 +284,11 @@ nixos_dispatch_per_user() {
   return "$overall"
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Per-app state resolution
-# ──────────────────────────────────────────────────────────────────────────────
-
-# app_bundle_id — Extract bundleId from entry JSON.
 app_bundle_id() {
   local entry_json="$1"
   echo "$entry_json" | jq -r '.hostEntry.bundleId // empty'
 }
 
-# app_declared_display ENTRY_JSON — stdout the declared auto-start state, or
-# "manual" when the host has no mechanism a script can converge.
 app_declared_display() {
   local entry_json="$1"
   if [ "$(echo "$entry_json" | jq -r '.hostEntry.kind')" = "manual" ]; then
@@ -355,8 +298,6 @@ app_declared_display() {
   fi
 }
 
-# app_actual_state KEY ENTRY_JSON — stdout "enabled"/"disabled"/"unknown".
-# Reflects whether OUR uniform mechanism currently has the app starting.
 app_actual_state() {
   local key="$1" entry_json="$2"
   local kind
@@ -372,8 +313,8 @@ app_actual_state() {
     fi
     ;;
   macos-system-extension)
-    # macOS-only kind. Off macOS there is no approval surface to probe, so report
-    # unknown rather than calling macOS tooling that cannot exist on this host.
+    # WHY unknown off macOS: there is no approval surface to probe, so do not call
+    # macOS tooling that cannot exist on this host.
     if [ "$HOST" != "MacBook" ]; then
       printf 'unknown'
       return 0
@@ -404,10 +345,8 @@ app_actual_state() {
   esac
 }
 
-# app_converge KEY ENTRY_JSON — Apply declared state for one app.
-# Every kind we can converge first neutralizes the app's own native auto-start
-# (so only our mechanism remains), then we add or remove our entry per
-# `autostartEnabled`.
+# Every converged kind first neutralizes the app's own native auto-start, so
+# only our mechanism remains.
 app_converge() {
   local key="$1" entry_json="$2"
   local kind enabled path name
@@ -424,7 +363,7 @@ app_converge() {
       return 1
     fi
     # Remove any app-owned LaunchAgent plist (e.g. AltTab's startAtLogin plist)
-    # that would start the app independently of our mechanism.
+    # so the app does not start independently of our mechanism.
     macos_remove_app_launchagent "$bundle_id" "$path" || true # check-suppress:suppression_doc: app-owned plist may be absent; removal is best-effort.
     if [ "$enabled" = "true" ]; then
       macos_launchagent_ensure "$bundle_id" "$path" || die -l "$key" "failed to ensure LaunchAgent plist"
@@ -433,9 +372,8 @@ app_converge() {
     fi
     ;;
   macos-system-extension)
-    # System extensions cannot be enabled/disabled from the shell; approval is
-    # manual. Surface a per-app reminder (approvalInstructions) and report
-    # actual presence; never pretend we forced the state.
+    # WHY report rather than fail: approval is manual, so surface
+    # approvalInstructions and never pretend we forced the state.
     if [ "$HOST" != "MacBook" ]; then
       error -l "$key" "kind 'macos-system-extension' is macOS-only, but host is '$HOST'"
       return 1
@@ -446,8 +384,7 @@ app_converge() {
     if [ "$enabled" = "true" ]; then
       if [ -n "$bundle_id" ] && [ "$(macos_fskit_module_registered "$bundle_id")" = "true" ]; then
         # FSKit's enabled-module list is what a script can read; the enablement
-        # toggle itself stays manual, so report the listing instead of repeating
-        # approval instructions that may already be satisfied.
+        # toggle itself stays manual.
         say -l "$key" "FSKit module registered — it is listed in FSKit's enabled file-system extensions."
       elif [ -n "$bundle_id" ] && [ "$(macos_system_extension_present "$bundle_id")" = "true" ]; then
         say -l "$key" "system extension present (approved)."
@@ -461,9 +398,8 @@ app_converge() {
     fi
     ;;
   manual)
-    # No programmable mechanism exists for this app on this host: the state is
-    # declared in the registry but never converged, so report the manual steps
-    # and succeed instead of failing apply on an app we cannot automate.
+    # No programmable mechanism exists here: the state is declared but never
+    # converged, so report the manual steps instead of failing apply.
     local manual_instructions
     manual_instructions=$(echo "$entry_json" | jq -r '.hostEntry.approvalInstructions // empty')
     if [ -n "$manual_instructions" ]; then
@@ -473,8 +409,7 @@ app_converge() {
     fi
     ;;
   nixos-xdg-desktop)
-    # Neutralize any app-shipped autostart .desktop (e.g. steam.desktop)
-    # so only our uniform mechanism remains.
+    # Neutralize any app-shipped autostart .desktop (e.g. steam.desktop).
     xdg_native_autostart_remove "$path"
     name=$(app_desktop_filename "$key")
     if [ "$enabled" = "true" ]; then
@@ -489,10 +424,6 @@ app_converge() {
     ;;
   esac
 }
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Action implementations
-# ──────────────────────────────────────────────────────────────────────────────
 
 do_list() {
   local registry
@@ -546,7 +477,6 @@ do_status() {
 do_enable() { do_set true; }
 do_disable() { do_set false; }
 
-# do_set — Enable or disable a named app's auto-start via our mechanism.
 do_set() {
   local value="$1"
   if [ "${#app_names[@]}" -eq 0 ]; then
@@ -563,7 +493,7 @@ do_set() {
       overall=1
       continue
     fi
-    # Override the declared `autostartEnabled` with the requested action for this run.
+    # Override the declared autostartEnabled for this run.
     local overridden
     overridden=$(echo "$entry" | jq --argjson v "$value" '.hostEntry.autostartEnabled = $v')
     if ! app_converge "$app" "$overridden"; then
@@ -598,7 +528,7 @@ do_verify() {
     declared=$(app_declared_display "$entry_json")
     actual=$(app_actual_state "$key" "$entry_json")
     if [ "$actual" = "manual" ]; then
-      # Manual entries are declared but not auto-provisioned; no drift check.
+      # Manual entries are declared but not auto-provisioned.
       continue
     fi
     if { [ "$declared" = "true" ] && [ "$actual" != "enabled" ]; } ||
@@ -613,8 +543,7 @@ do_verify() {
   say "all apps converged to declared state"
 }
 
-# resolve_app_names — Resolve requested names to registry entries.
-# Output: tab lines key\tdisplay\tentryJson.  Unknown names → ERROR: rows.
+# Tab lines key\tdisplay\tentryJson; unknown names become ERROR: rows.
 resolve_app_names() {
   local registry="$1"
   shift
@@ -633,8 +562,6 @@ resolve_app_names() {
     fi
   done
 }
-
-# Main
 
 json_output=false
 action=""
@@ -670,8 +597,7 @@ done
   exit 1
 }
 
-# On NixOS, root activation must converge every real user's autostart dir.
-# Dispatch once per user (guarded so children don't re-dispatch), then exit.
+# NixOS root activation must converge every real user's autostart dir.
 if [ "$HOST" = "NixOS" ] && [ "$(id -u)" -eq 0 ] && [ "${NUCLEUS_AUTOSTART_AS_USER:-}" != "1" ]; then
   case "$action" in
   apply | verify | enable | disable)

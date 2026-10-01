@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
-# OS detection, lifecycle ordering (pre-apply checks → rebuild → post-apply
-# provisioning), and error-boundary handling. Heavy logic in sibling scripts.
+# OS detection, lifecycle ordering, and error boundaries. Heavy logic lives in
+# sibling scripts.
 set -euo pipefail
 
-# Refuse to run as root — privilege escalation (sudo) is managed internally
-# by the script when needed rather than relying on an already-elevated caller.
+# Refuse to run as root: the script escalates with sudo itself when needed.
 if [ "$(id -u)" -eq 0 ]; then
   printf '%s\n' "error: this script must not be run as root. Run as a regular user (sudo is used internally when needed)." >&2
   exit 1
@@ -15,20 +14,14 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck source=lib/lib.sh
 . "$SCRIPT_DIR/lib/lib.sh"
 
-# Usage
 usage() {
   usage_std 'apply.sh' '[--ai-sync|--no-ai-sync] [--replica-sync|--no-replica-sync] [--store-audit|--no-store-audit] [--target-user=<name>] [--username=<name>] [--vm-sync|--no-vm-sync] [--vm-setup|--no-vm-setup]' \
     'Dispatch the Nix apply command for the current host.'
   exit 0
 }
 
-# ── Subcommand dispatch ───────────────────────────────────────────────────────
-# health-check / audit-store run standalone (inlining scripts/health-check.sh
-# and scripts/audit-store.sh); the default apply path falls through to the
-# existing flag parsing + OS-specific rebuild flow below, which stays unchanged.
-#
-# do_health_check — Inlines scripts/health-check.sh: disk/connectivity/secret
-# (and opt-in log/store-audit) pre-flight checks.
+# Subcommand dispatch: health-check and audit-store run standalone; the default
+# apply path falls through to the flag parsing and rebuild flow below.
 do_health_check() {
   REPO_ROOT="$(derive_repo_root)"
 
@@ -78,8 +71,6 @@ do_health_check() {
     shift
   done
 
-  # check_disk_space — Fails when the repo filesystem has less free space than
-  # the threshold.
   check_disk_space() {
     min_kb=$((min_free_bytes / 1024))
     available_kb=$(df -Pk "$REPO_ROOT" | awk 'NR == 2 { print $4 }')
@@ -91,7 +82,6 @@ do_health_check() {
     return 0
   }
 
-  # check_connectivity — Verifies reachability of GitHub and cache.nixos.org.
   check_connectivity() {
     if ! curl -fsSI --max-time 10 https://github.com >/dev/null; then
       error "connectivity check failed for https://github.com"
@@ -104,7 +94,6 @@ do_health_check() {
     return 0
   }
 
-  # check_secret_health — Decrypt-checks every SOPS-managed secret file.
   check_secret_health() {
     _sch_machine_key="$(nucleus_machine_age_key_path)"
     if [ -f "$_sch_machine_key" ]; then
@@ -121,8 +110,6 @@ do_health_check() {
     return 0
   }
 
-  # check_log_health — Validates log dirs and per-service log files against the
-  # rotation and sanitize policy in services.json.
   check_log_health() {
     log_dir="$(nucleus_log_dir)"
     system_log_dir="$(nucleus_system_log_dir)"
@@ -164,7 +151,6 @@ do_health_check() {
           if [ "$size" -gt "$threshold" ]; then
             warn "'$log_file' ($size bytes) exceeds 80% of rotation max ($max_size bytes)"
           fi
-          # Trigger immediate rotation when file exceeds maxSize
           if [ "$size" -gt "$max_size" ]; then
             notice "'$log_file' ($size bytes) exceeds maxSize ($max_size bytes); rotating now"
             rotate_log_file "$log_file" "$max_size" "4" "true"
@@ -226,7 +212,6 @@ do_health_check() {
   nuc_done "$@"
 }
 
-# do_audit_store — Inlines scripts/audit-store.sh: Nix store baseline report.
 do_audit_store() {
   REPO_ROOT="$(derive_repo_root)"
   export REPO_ROOT
@@ -256,7 +241,6 @@ apply)
   ;;
 esac
 
-# Flag parsing
 ai_sync=true
 replica_sync=false
 vm_sync=true
@@ -317,8 +301,8 @@ done
 REPO_ROOT="$(derive_repo_root)"
 export NUCLEUS_REPO_ROOT="$REPO_ROOT"
 
-# Prefer the live checkout when nucleus-apply dispatches a store snapshot.
-# WHY: store-bundled apply.sh can lag behind git pull until the next rebuild.
+# WHY the live checkout: a store-bundled apply.sh lags behind git pull until the
+# next rebuild.
 _aar_self="$(CDPATH='' cd -P -- "$(dirname -- "$0")" && pwd)/$(basename -- "$0")"
 _aar_live="$REPO_ROOT/src/scripts/apply.sh"
 if [ -f "$_aar_live" ]; then
@@ -329,10 +313,8 @@ if [ -f "$_aar_live" ]; then
 fi
 unset _aar_self _aar_live _aar_live_resolved
 
-# Augment PATH with the user Nix profile bin directory so Nix-managed binaries
-# (e.g. ssh-to-age, sops) are available when the script is invoked directly
-# rather than through `nix run .#apply` (which adds them via runtimeInputs).
-# The guard avoids redundant PATH modifications when already present.
+# WHY the profile bin: ssh-to-age and sops must resolve when the script is invoked
+# directly, not through `nix run .#apply` (which sets runtimeInputs).
 _nix_profile_bin="$HOME/.nix-profile/bin"
 case ":$PATH:" in
 *":$_nix_profile_bin:"*) ;;
@@ -345,27 +327,20 @@ case ":$PATH:" in
 esac
 unset _nix_profile_bin
 
-# Resolve src/scripts/ for apply-internal script delegation.
 _ash_script_dir="$(cd "$(dirname -- "$0")" && pwd -P)"
 
 run_nix() {
-  # --option min-free 0 suppresses auto-GC during the apply pipeline. The
-  # config file (nix.custom.conf) sets min-free to avoid runaway store growth,
-  # but during apply the NIX_CONFIG override may not take effect before eval
-  # reads the config file. The CLI flag takes precedence unconditionally.
+  # WHY min-free 0: the NIX_CONFIG override may not reach the config file before
+  # eval reads it, and the CLI flag always wins, so auto-GC stays off for apply.
   NIX_CONFIG="$(merge_nix_config)" NIX_PATH="nixpkgs=flake:nixpkgs" nix --option warn-dirty false --option min-free 0 "$@"
 }
 
 run_nix_as_root() {
-  # Color env vars and TERM keep nix build-progress rendering intact; empty
-  # values are treated as unset by _nuc_color_init, keeping non-color runs
-  # byte-identical.  Note: activation scripts never receive these vars —
-  # nix-darwin's generated activate script runs under `#!/usr/bin/env -i`,
-  # wiping the env before any activation script executes, so activation output
-  # is plain by design (see logging spec "External exceptions").  The Nix eval
-  # Nix eval is hermetic: the env catalog is a static Nix attrset in the repo tree,
-  # so no NUCLEUS_REPO_ROOT forwarding is needed (and --impure is dropped from
-  # the darwin-rebuild invocation).
+  # WHY pass the color vars: empty values read as unset to _nuc_color_init, so
+  # non-color runs stay byte-identical. Activation scripts never see them, since
+  # nix-darwin's activate script runs under `#!/usr/bin/env -i`.
+  # Nix eval is hermetic here: the env catalog is a static attrset in the repo
+  # tree, so no NUCLEUS_REPO_ROOT forwarding is needed and --impure is dropped.
   NIX_CONFIG_VALUE="$(merge_nix_config)"
   sudo -H env \
     "NIX_CONFIG=$NIX_CONFIG_VALUE" \
@@ -381,10 +356,8 @@ start_sudo_keepalive() {
   # Prompt for the sudo password once, before build output floods the terminal.
   sudo -v
 
-  # Background loop refreshes the sudo timestamp every 55 s so a long rebuild
-  # does not prompt mid-build.  Dies when the parent exits.  I/O redirected to
-  # /dev/null so that the background children do not hold stdout/stderr open
-  # when the script is piped (which would cause the reader to hang).
+  # Refresh the sudo timestamp so a long rebuild does not prompt mid-build. The
+  # loop dies with the parent and holds no stdio, so a piped run does not hang.
   SCRIPT_PID=$$
   {
     while true; do
@@ -408,10 +381,8 @@ run_health_check() {
 }
 
 run_pre_build() {
-  # Pre-build the full derivation closure so the system activation is near-instant.
-  # Hard-error on failure: the activation builds the same derivation and would
-  # fail with the same error — continuing only wastes time and produces confusing
-  # double-failure output.
+  # WHY hard-error: the activation builds the same derivation and would fail with
+  # the same error, so continuing only doubles the failure output.
   _rpb_host="$(resolve_nucleus_host)"
   case "$_rpb_host" in
   MacBook)
@@ -427,7 +398,6 @@ run_pre_build() {
     fi
     ;;
   *)
-    # Standalone Home Manager — pre-build the user's activation package.
     _rpb_user="${target_user:-${NUCLEUS_USERNAME:-$(id -un)}}"
     say -l pre-build "pre-building home-manager derivation closure for $_rpb_user..."
     if ! run_nix build --no-link "$REPO_ROOT/src#homeConfigurations.$_rpb_user.activationPackage"; then
@@ -438,8 +408,6 @@ run_pre_build() {
 }
 
 run_caddy_local_ca_trust() {
-  # Delegate to src/scripts/services/caddy-trust.sh for Caddy local CA trust
-  # (retry loop with caddy --address 127.0.0.1:2019).
   _rclct_script="$REPO_ROOT/src/scripts/services/caddy-trust.sh"
   if [ ! -f "$_rclct_script" ]; then
     say -l caddy-trust "caddy-trust.sh not found at $_rclct_script; skipping local CA trust"
@@ -453,9 +421,8 @@ run_caddy_local_ca_trust() {
 }
 
 run_pin_flake_inputs() {
-  # Build the flakeInputs output into a persistent profile so the daily GC
-  # keeps flake-input *-source paths alive between applies (otherwise they are
-  # re-fetched from cache.nixos.org on every apply).
+  # Pin flake inputs into a profile so daily GC keeps the *-source paths alive;
+  # otherwise every apply re-fetches them from cache.nixos.org.
   _rpfi_profile="/nix/var/nix/profiles/flake-inputs"
   say -l flake-inputs "pinning flake inputs to $_rpfi_profile..."
   if ! run_nix_as_root build --profile "$_rpfi_profile" "$REPO_ROOT/src#flakeInputs"; then
@@ -465,7 +432,6 @@ run_pin_flake_inputs() {
 }
 
 run_post_apply() {
-  # Delegate all post-apply provisioning to src/scripts/post-apply.sh.
   # Each step is best-effort: failures warn but do not abort apply.
   local _target="${1:-}"
   local _flags=(--repo-root "$REPO_ROOT")
@@ -478,18 +444,12 @@ run_post_apply() {
 }
 
 run_terminal_activations() {
-  # Run activation commands that require the user's terminal TCC context
-  # (macOS Full Disk Access / Accessibility), serialised by the
-  # write-terminal-activations HM activation step to
-  # $NUCLEUS_USER_ROOT/terminal-activations.list.
-  #
-  # This runs after the rebuild so the manifest exists, but before any
-  # post-apply steps that may depend on the terminal-context changes.
-  #
-  # ── Policy ──────────────────────────────────────────────────────
-  # This stage is a LAST RESORT for macOS TCC-sensitive commands only.
-  # See src/modules/terminal-activations.nix for the full policy.
-  # ─────────────────────────────────────────────────────────────────
+  # Commands needing the user's terminal TCC context (macOS Full Disk Access,
+  # Accessibility), serialised by the write-terminal-activations HM step into
+  # $NUCLEUS_USER_ROOT/terminal-activations.list. Runs after the rebuild so the
+  # manifest exists, before post-apply steps that may depend on those changes.
+  # Last resort for macOS TCC workarounds only; the full policy lives in
+  # src/modules/terminal-activations.nix.
   _rta_manifest="$NUCLEUS_USER_ROOT/terminal-activations.list"
   if [ ! -f "$_rta_manifest" ]; then
     return
@@ -518,8 +478,8 @@ run_terminal_activations() {
 
 case "$(uname -s)" in
 Darwin)
-  # nix-darwin manages both the system layer and the user Home Manager
-  # profile.  darwin-rebuild invokes sudo internally for system activation.
+  # nix-darwin manages the system layer and the user Home Manager profile, and
+  # darwin-rebuild invokes sudo internally for the system activation.
   if [ -n "$target_user" ]; then
     say -l apply "--target-user is ignored on Darwin system rebuilds (host-level configuration selects the Home Manager user)."
   fi
@@ -528,9 +488,7 @@ Darwin)
   "$_ash_script_dir/secrets/register-host-age-key.sh" --repo-root "$REPO_ROOT"
   run_health_check
   run_pre_build
-  # Start linux-builder if not running (only on MacBook).
-  # The builder is disabled by default to save ~500 MiB RAM.
-  # Auto-stop via trap ensures cleanup on any exit (success, failure, interrupt).
+  # linux-builder saves ~500 MiB RAM when idle; the trap stops it on any exit.
   _lb_started=false
   if command -v nucleus-svc >/dev/null 2>&1; then
     if ! nucleus-svc status linux-builder >/dev/null 2>&1; then
@@ -544,16 +502,14 @@ Darwin)
       fi
     fi
   fi
-  # Activation scripts run under `env -i` and cannot read NUCLEUS_REPO_ROOT;
-  # materialize it at the SYSTEM root so derive_repo_root resolves REPO_ROOT
-  # during activation (menu-bar/autostart convergence depend on it).
+  # Activation scripts run under `env -i` and cannot read NUCLEUS_REPO_ROOT, so
+  # record the root at the SYSTEM root where derive_repo_root finds it (menu-bar
+  # and autostart convergence depend on it).
   sudo -H install -d -m 0755 "/Library/Application Support/nucleus"
   printf '%s\n' "$REPO_ROOT" | sudo -H tee "/Library/Application Support/nucleus/repo-root" >/dev/null
-  # `-H` sets HOME to root's home so Nix does not inherit a user-owned HOME
-  # while running as root (which otherwise produces ownership warnings).
+  # WHY -H: root-owned HOME keeps Nix from inheriting a user-owned one.
   run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#MacBook"
-  # Refresh the recorded live repo root after the rebuild in case the checkout
-  # moved during activation. This file is the value derive_repo_root() consumes.
+  # refresh the recorded live repo root in case the checkout moved during activation
   _post_rebuild_repo_root="$(derive_repo_root)"
   printf '%s\n' "$_post_rebuild_repo_root" | sudo -H tee "/Library/Application Support/nucleus/repo-root" >/dev/null
   run_pin_flake_inputs
@@ -561,7 +517,6 @@ Darwin)
   "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
   run_caddy_local_ca_trust sudo
   run_post_apply MacBook
-  # Stop linux-builder if we started it (cleanup handled by trap on normal exit).
   if [ "$_lb_started" = true ]; then
     # check-suppress:suppression_doc: builder may already be stopped by trap; ignore stop failure.
     nucleus-svc stop linux-builder >/dev/null 2>&1 || true
@@ -569,8 +524,8 @@ Darwin)
   ;;
 Linux)
   if [ -f /etc/NIXOS ]; then
-    # NixOS: use nixos-rebuild so the system layer and the embedded
-    # home-manager module are applied in a single atomic activation.
+    # nixos-rebuild applies the system layer and the embedded home-manager
+    # module in one atomic activation.
     if [ -n "$target_user" ]; then
       say -l apply "--target-user is ignored on NixOS system rebuilds (host-level configuration selects the Home Manager user)."
     fi
@@ -579,15 +534,13 @@ Linux)
     "$_ash_script_dir/secrets/register-host-age-key.sh" --repo-root "$REPO_ROOT"
     run_health_check
     run_pre_build
-    # Activation scripts run under `env -i` and cannot read NUCLEUS_REPO_ROOT;
-    # record the live root at the SYSTEM root so derive_repo_root resolves
-    # REPO_ROOT during activation (menu-bar/autostart convergence depend on it).
+    # Activation scripts run under `env -i`, so record the live root at the
+    # SYSTEM root where derive_repo_root finds it.
     sudo -H install -d -m 0755 "/var/lib/nucleus"
     printf '%s\n' "$REPO_ROOT" | sudo -H tee "/var/lib/nucleus/repo-root" >/dev/null
     # Keep root invocations on root-owned HOME for consistent Nix behavior.
     run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#NixOS"
-    # Refresh the recorded live repo root after the rebuild in case the checkout
-    # moved during activation. This file is the value derive_repo_root() consumes.
+    # refresh in case the checkout moved during activation
     _post_rebuild_repo_root="$(derive_repo_root)"
     printf '%s\n' "$_post_rebuild_repo_root" | sudo -H tee "/var/lib/nucleus/repo-root" >/dev/null
     run_pin_flake_inputs
@@ -596,9 +549,8 @@ Linux)
     run_caddy_local_ca_trust sudo
     run_post_apply NixOS
   else
-    # Standalone Home Manager (plain Linux or WSL): no NixOS system layer,
-    # no sudo required — keepalive is not started.
-    # The profile name must match the homeConfigurations key in flake.nix.
+    # Standalone Home Manager (plain Linux or WSL): no system layer and no sudo,
+    # so no keepalive. The profile name matches the homeConfigurations key.
     target_username="${target_user:-${NUCLEUS_USERNAME:-$(id -un)}}"
     run_health_check
     run_pre_build
