@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
-# Ends a harness turn: notify, then inject one queued remote prompt.
-#
-# Every "the agent stopped" hook calls this instead of `harness-notify`, because
-# the same moment is when a prompt queued with `/harness send <harness> <text>`
-# can be delivered.  The hook payload on stdin is forwarded verbatim to
-# `harness-notify.sh <harness> done`, so the notification half has one definition.
+# Ends a harness turn: notify, then inject one queued remote prompt. The stdin
+# hook payload is forwarded verbatim to `harness-notify.sh <harness> done`, so
+# the notification half has one definition.
 #
 # Usage: harness-drive <harness>
 #   harness  pi | opencode | cursor | copilot
@@ -17,13 +14,10 @@
 #   others   no output (pi and opencode are driven through their own APIs)
 # With nothing queued, cursor and copilot receive {} and the others nothing.
 #
-# One prompt per turn, consumed before it is printed: the queue is the only
-# loop guard, so a command file can never be delivered twice.
-#
 # Cursor ignores `followup_message` on Windows (forum.cursor.com/t/155078: valid
 # JSON, exit 0, agent does not continue), so remote driving of Cursor sessions
-# works on macOS and NixOS only.  Nothing here compensates for that: a
-# workaround would have to fake user input into the harness.
+# works on macOS and NixOS only. Nothing here compensates for that: a workaround
+# would have to fake user input into the harness.
 #
 # Exit status is always 0: a stop hook that fails is surfaced as a failed turn,
 # and no part of this path may block the harness.
@@ -46,7 +40,6 @@ if [ -z "$_hd_harness" ]; then
   exit 0
 fi
 
-# Nothing is rendered for harnesses without a stop-hook continuation document.
 _hd_empty() {
   case "$1" in
   cursor | copilot) printf '{}\n' ;;
@@ -54,9 +47,8 @@ _hd_empty() {
   esac
 }
 
-# Renders the continuation in the calling harness's own vocabulary.  Encoding is
-# always done by jq: a hand-built JSON document would break on the first quote,
-# backslash or newline in a prompt.
+# Encoding is always done by jq: a hand-built JSON document would break on the
+# first quote, backslash or newline in a prompt.
 _hd_render() { # <harness> <text>
   case "$1" in
   cursor)
@@ -115,8 +107,8 @@ fi
 
 _hd_commands="$(derive_nucleus_user_root)/state/harness-bridge/commands/$_hd_harness"
 
-# Driving has its own gate, and it is checked after the notification: with
-# driving off the turn is still announced, it just never continues.
+# Driving has its own gate, checked after the notification: with driving off the
+# turn is still announced, it just never continues.
 if [ "$(jq -r '."harness-drive".enable' <<<"$_hd_config")" != "true" ]; then
   # WHY: a prompt queued while driving is off can never be delivered, and
   # delivering it hours later (after the flag is flipped back) would be worse

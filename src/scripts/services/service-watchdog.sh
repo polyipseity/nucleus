@@ -3,20 +3,8 @@
 # Service watchdog: detects and breaks loops, revives stopped services. One rule
 # table, all hosts, no OS names. Prefix-match entries expand per instance.
 #
-# Rules, in evaluation order. The numbers are names, not positions: Rule 5 runs
-# before Rule 4, and Rule 4b sits between Rule 2 and the supervisor probe.
-#   1. user-disabled → skip (explicit user intent)
-#   2. Blocked record exists → report once, do nothing
-#   4b. record already says not-loaded → report once, no action until apply
-#   3. supervisor_live + looping → block + stop
-#   5. Live + broken (EX_CONFIG 78 etc) → repair
-#   4. Not live + not blocked → start (revival, the only mechanism)
-#
-# Reads services.json filtered to this host and the requested scope, skipping
-# on-demand services. Runs indefinitely, sleeping the cloud-drive lifecycle's
-# watchdogTickSeconds between ticks. --oneshot runs a single iteration, and
-# --scope user|system covers one launchd/systemd domain; without it every scope
-# on this host is covered.
+# Rule order is 1, 2, 4b, 3, 5, 4. The numbers are labels, not positions: Rule 5
+# runs before Rule 4, and Rule 4b sits between Rule 2 and the supervisor probe.
 
 set -euo pipefail
 
@@ -43,9 +31,6 @@ _watchdog_dispatch_supervisor() {
   esac
 }
 
-# The two macOS launchd jobs pass one --scope each (the root system daemon and
-# the per-user agent), so scope selects WHICH entries a daemon covers. An absent
-# --scope covers every scope, which is what a manual --oneshot run wants.
 _oneshot=false
 _scope_filter=""
 while [ $# -gt 0 ]; do
@@ -86,8 +71,6 @@ _watchdog_services_json() {
   printf '%s/src/modules/services.json' "$(derive_repo_root)"
 }
 
-# How long a service may stay down before revival is attempted. Reading it keeps
-# the interval from drifting away from the policy in services.json.
 _watchdog_interval_seconds() {
   local services_json="" value=""
   services_json="$(_watchdog_services_json)"
@@ -101,8 +84,7 @@ _watchdog_interval_seconds() {
   printf '%s' "${value:-300}"
 }
 
-# Seconds allowed for one supervisor repair call, distinct from the tick
-# interval above, which bounds the gap between ticks.
+# Distinct from the tick interval, which bounds the gap between ticks.
 _watchdog_repair_timeout_seconds() {
   local services_json="" value=""
   services_json="$(_watchdog_services_json)"
@@ -114,7 +96,6 @@ _watchdog_repair_timeout_seconds() {
   printf '%s' "${value:-30}"
 }
 
-# Read one field from a host entry as a raw string.
 _watchdog_entry_field() {
   local entry="$1" path="$2" fallback="$3" value
   # check-suppress:suppression_doc: best-effort field read; a malformed entry falls back to the declared default
@@ -155,11 +136,9 @@ _watchdog_not_loaded_notice() {
 }
 
 # WHY: POSIX twin of Get-NucleusConfiguredInstanceList. An instance declared in
-#   src/users/<user>/cloud-drives.json is expected to run even while no unit
-#   exists for it, so discovery must read the registry and not only the
-#   supervisor, or such an instance is invisible to the watchdog and can never
-#   be reported. A registry that cannot be read yields nothing rather than
-#   fabricated ids.
+#   src/users/<user>/cloud-drives.json must be discovered from the registry and
+#   not only from the supervisor, or it is invisible to the watchdog and can
+#   never be reported. An unreadable registry yields nothing, not fabricated ids.
 _watchdog_configured_instances() {
   local entry="$1" repo_root mounts
   repo_root="$(derive_repo_root)"
@@ -170,7 +149,6 @@ _watchdog_configured_instances() {
   svc_configured_instance_ids "$entry" "$mounts"
 }
 
-# One tick: check all services on this host.
 _watchdog_tick() {
   local services_json
   services_json="$(_watchdog_services_json)"
@@ -208,8 +186,6 @@ _watchdog_tick() {
     if [ "$prefix_match" = "true" ]; then
       _watchdog_check_prefix "$svc_key" "$svc_type" "$host_entry"
     else
-      # Health is keyed by the service key while the supervisor addresses the
-      # declared unit name (local.ollama, ollama.service).
       local unit_name
       unit_name="$(_watchdog_entry_field "$host_entry" '.service' "$svc_key")"
       _watchdog_check_instance "$svc_key" "$svc_type" "$host_entry" "$svc_key" "$unit_name"
@@ -251,10 +227,9 @@ _watchdog_check_prefix() {
     _watchdog_check_instance "$svc_key" "$svc_type" "$host_entry" "$instance"
   done <<<"$live_instances"
 
-  # Instances the registry declares that the supervisor does not have. They are
-  # passed as configured so Rule 1 reports them instead of trying to start a unit
-  # that does not exist. An instance that is live is skipped: it is already
-  # covered above and is not "missing".
+  # Instances the registry declares that the supervisor does not have. Passed as
+  # configured so Rule 1 reports them instead of starting a unit that does not
+  # exist. A live instance is skipped: it is already covered above.
   configured_instances="$(_watchdog_configured_instances "$host_entry")"
   while IFS= read -r instance; do
     [ -n "$instance" ] || continue
@@ -271,29 +246,25 @@ _watchdog_scope_flag() {
   fi
 }
 
-# _watchdog_scope_selected — 0 when this invocation covers the entry's scope.
 # WHY: one root daemon and one per-user agent run this same code, one per scope.
 #   Ignoring the requested scope made each daemon cover the other's as well: the
-#   user agent then probed system units, found them not live (a user cannot read
-#   the system manager), and reached for them through sudo, which cannot prompt
-#   inside launchd, while the root daemon revived the user agent's own services
-#   at the same time.
+#   user agent probed system units, found them not live (a user cannot read the
+#   system manager), and reached for them through sudo, which cannot prompt inside
+#   launchd, while the root daemon revived the user agent's own services.
 _watchdog_scope_selected() {
   local entry_scope
   [ -n "$_scope_filter" ] || return 0
   entry_scope="$(_watchdog_entry_field "$1" '.scope' '')"
-  # An entry that declares no scope is covered by both daemons, so it can never
-  # be silently orphaned by the filter.
+  # An entry with no declared scope is covered by both daemons, so the filter can
+  # never orphan it.
   if [ -z "$entry_scope" ]; then
     return 0
   fi
   [ "$entry_scope" = "$_scope_filter" ]
 }
 
-# Check one instance.
-# Args: $1 — service key; $2 — host type; $3 — host entry JSON;
-#       $4 — health-record instance id;
-#       $5 — supervisor unit name (optional; defaults to $4).
+# Args: $1 svc key, $2 host type, $3 host entry JSON, $4 health-record instance id,
+# $5 supervisor unit name (defaults to $4), $6 configured (defaults to false).
 _watchdog_check_instance() {
   local svc_key="$1" svc_type="$2" host_entry="$3" instance="$4"
   [ -n "$instance" ] || return 0
@@ -328,7 +299,7 @@ _watchdog_check_instance() {
   #   Rule 1 decision depends on that answer.
   declared_unit_path="$(_watchdog_entry_field "$host_entry" '.unitPath' '')"
 
-  # Rule 1: explicitly disabled by the user, or absent? Only a manual re-enable
+  # Rule 1: explicitly disabled by the user, or absent. Only a manual re-enable
   # (nucleus-apply) changes this. The Windows twin (Test-ServiceInstance Rule 1)
   # additionally classifies a registry-declared instance with no unit as
   # not-loaded, reported once instead of started.
@@ -339,7 +310,6 @@ _watchdog_check_instance() {
     return 0
   fi
 
-  # Rule 2: blocked record?
   if svc_health_is_blocked "$instance"; then
     local class remedy _blocked_state
     class=$(svc_health_get "$instance" "class" 2>/dev/null || echo "unknown")
@@ -354,9 +324,9 @@ _watchdog_check_instance() {
     return 0
   fi
 
-  # Rule 4b: not-loaded record, informational only. The record, not the probe, is
-  # the input: the classification is written by whichever tick found the instance
-  # missing (Rule 1), and only nucleus-apply re-arms it.
+  # Rule 4b: the record, not the probe, is the input. The classification is
+  # written by whichever tick found the instance missing (Rule 1), and only
+  # nucleus-apply re-arms it.
   local _state
   _state="$(_watchdog_health_field "$instance" "state")"
   if [ "$_state" = "not-loaded" ]; then
@@ -364,8 +334,7 @@ _watchdog_check_instance() {
     return 0
   fi
 
-  # Probe the supervisor. Both backends expose the same arity, so there is no
-  # per-type branching beyond the status command itself.
+  # Both backends expose the same arity, so only the status command differs.
   local is_live=false print_out="" generation="" last_exit=0 repair_timeout=0 repair_rc=0
   case "$svc_type" in
   macos-launchctl)
@@ -388,16 +357,14 @@ _watchdog_check_instance() {
   last_exit="${last_exit:-0}"
 
   if [ "$is_live" = true ]; then
-    # Rule 3's input is folded in here: the health record is the only place a
-    # restart is counted, so the supervisor's generation token is compared
-    # against the last observation on every tick.
+    # The health record is the only place a restart is counted, so the generation
+    # token is compared against the last observation on every tick.
     local stored
     stored="$(_watchdog_health_field "$instance" "generation")"
 
-    # A null or absent generation has never been observed: adopt the token and record
-    # nothing, so a cold start is never mistaken for a restart. Only a missing
-    # value counts as unobserved; a token that legitimately reads zero must still
-    # be compared, or the service's first restart would be swallowed.
+    # An absent generation has never been observed: adopt the token and record
+    # nothing, so a cold start is never mistaken for a restart. A token that
+    # legitimately reads zero is still compared, or the first restart is swallowed.
     if [ -n "$stored" ]; then
       if [ "$generation" != "$stored" ]; then
         # WHY: one restart per observed change, never (current - stored). The token
@@ -422,21 +389,18 @@ _watchdog_check_instance() {
     fi
 
     if svc_health_is_looping "$instance"; then
-      # Health-record-driven loop detection: covers both counter-incrementing
-      # restart loops and self-looping daemons (e.g. betterdisplay-heartbeat).
       notice "watchdog: $instance is looping (generation=$generation, last_exit=$last_exit); stopping"
       if ! svc_health_set_blocked "$instance" "crash-loop" "supervisor is restarting the job in a loop"; then
         warn "watchdog: could not record the block for $instance"
       fi
       # The block is recorded either way, so a failed unload is reported rather
-      # than fatal — the next tick retries it.
+      # than fatal, and the next tick retries it.
       if ! supervisor_stop "$target" "$scope"; then
         warn "watchdog: could not unload $instance after blocking it"
       fi
       return 0
     fi
 
-    # Rule 5: live but last exit was EX_CONFIG (78) → repair.
     case "$last_exit" in
     78)
       notice "watchdog: $instance exited with EX_CONFIG (78); repairing"
@@ -454,11 +418,9 @@ _watchdog_check_instance() {
       ;;
     esac
 
-    # Stable.
     return 0
   fi
 
-  # Rule 4: not live and not blocked.
   notice "watchdog: $instance is not running; starting"
   if ! supervisor_start "$target" "$declared_unit_path" "$scope"; then
     warn "watchdog: could not start $instance"

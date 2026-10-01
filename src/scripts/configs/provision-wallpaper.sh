@@ -47,10 +47,9 @@ lock_wallpaper_dir() {
 }
 
 fail_wallpaper_provision() {
-  # Lock first so the managed directory is never left writable, then emit
-  # the primary error.  error returns 1, so in non-exempt callers errexit
-  # aborts with status 1 before the final exit 1; in exempt contexts the
-  # explicit exit 1 runs.  Either way: message printed, exit status 1.
+  # Lock first so the managed directory is never left writable, then emit the
+  # primary error. error returns 1, so in non-exempt callers errexit aborts with
+  # status 1 before the final exit 1; in exempt contexts the explicit exit 1 runs.
   if ! lock_wallpaper_dir; then
     error "failed to re-lock wallpaper directory after an earlier error." || true # check-suppress:suppression_doc: error's failure status is deliberately consumed because the wrapper manages its own failure flow (re-lock then exit 1).
   fi
@@ -59,7 +58,7 @@ fail_wallpaper_provision() {
 }
 
 wallpaper_pre_copy_setup() {
-  # Refuse to operate on symlinks or non-directories to avoid writing or
+  # Refuse to operate on symlinks or non-directories, to avoid writing or
   # deleting outside the intended managed wallpaper location.
   if [ -L "$_pictures_dir" ]; then
     fail_wallpaper_provision "wallpaper directory path $_pictures_dir is a symlink; refusing to manage wallpapers there."
@@ -91,8 +90,8 @@ wallpaper_pre_copy_setup() {
 }
 
 # Copy each wallpaper from the SOPS decrypted secret directory into
-# $_pictures_dir.  Takes a JSON array of wallpaper items, the path to jq,
-# and the SOPS symlink path.
+# $_pictures_dir. Takes a JSON array of wallpaper items, jq, and the SOPS
+# symlink path.
 wallpaper_provision_copy_items() {
   _items_json="$1"
   _jq_bin="$2"
@@ -160,8 +159,8 @@ wallpaper_provision_symlink_unencrypted() {
 }
 
 wallpaper_post_copy_teardown() {
-  # Stale gc: remove decrypted files that no longer have a matching overlay
-  # .sops source so the gallery does not show deleted assets.
+  # Remove decrypted files whose overlay .sops source is gone, so the gallery
+  # does not show deleted assets.
   _script_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
   # shellcheck source=../lib/resolve-user-config.sh
   . "$_script_dir/../lib/resolve-user-config.sh"
@@ -195,13 +194,12 @@ wallpaper_post_copy_teardown() {
     say "removed stale wallpaper $baseName (no matching overlay source)."
   done
 
-  # Apply gallery / slideshow mode.
   # macOS: use desktoppr to set the wallpaper source to the decrypted folder.
   # This avoids brittle AppleScript and private database mutation paths while
   # keeping the assignment in a user-session-safe command line tool.
   # GNOME: generate wallpaper-gallery.xml listing all decrypted images, then
-  #        point picture-uri at the XML file.  Each image displays for 595 s
-  #        with a 5 s overlay transition (600 s / 10 min total per slide).
+  #        point picture-uri at the XML file. Each image displays for 595 s with
+  #        a 5 s overlay transition (600 s / 10 min total per slide).
   hasWallpapers=0
   for img in "$_pictures_dir"/*; do
     [ -e "$img" ] || continue
@@ -292,9 +290,9 @@ wallpaper_post_copy_teardown() {
         "$prevImg" "$firstImg"
       printf '</background>\n'
     } >"$_xml_tmp_final"
-    # 444: the gallery descriptor is regenerated on every activation; GUI
-    # consumers need only read access.  Immutability prevents accidental
-    # manual edits from silently overriding managed state.
+    # 444: the gallery descriptor is regenerated on every activation and GUI
+    # consumers need only read access. Immutability prevents accidental manual
+    # edits from silently overriding managed state.
     chmod 444 "$_xml_tmp_final"
     mv "$_xml_tmp_final" "$xmlFile"
     if ! gsettings set org.gnome.desktop.background picture-uri "file://$xmlFile"; then
@@ -307,9 +305,6 @@ wallpaper_post_copy_teardown() {
     rm -f "$tmpXml"
   fi
 
-  # Lock the directory down after activation to prevent accidental rename,
-  # deletion, or entry-level mutation outside managed runs while keeping it
-  # readable/traversable for the user and desktop services.
   if ! lock_wallpaper_dir; then
     exit 1
   fi

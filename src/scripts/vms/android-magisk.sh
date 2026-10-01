@@ -12,8 +12,6 @@ NUCLEUS_MAGISK_PATCH_REMOTE='/data/local/tmp/nucleus-magisk-patch'
 NUCLEUS_MAGISK_STOCK_BOOT_REMOTE='/data/local/tmp/nucleus-stock-boot.img'
 NUCLEUS_ROOT_PROPS_SERVICE='/data/adb/service.d/nucleus-root-props.sh'
 
-# vm_android_magisk_apk_lib_dir VM_INDEX
-#   Magisk APK lib/ subdirectory for this guest CPU ABI.
 vm_android_magisk_apk_lib_dir() {
   _amal_vm_index="$1"
   _amal_type="$(jq -r ".VMs[$_amal_vm_index].type" "$MANIFEST")"
@@ -30,8 +28,6 @@ vm_android_magisk_apk_lib_dir() {
   esac
 }
 
-# vm_android_enable_usb_debugging VM_INDEX
-#   Enable Developer options and USB debugging via settings (booted system, via Magisk su).
 vm_android_enable_usb_debugging() {
   _aeud_vm_index="$1"
   _aeud_serial="$(vm_android_adb_serial "$_aeud_vm_index")"
@@ -43,8 +39,6 @@ vm_android_enable_usb_debugging() {
   sleep 2
 }
 
-# vm_android_guest_has_magisk_su VM_INDEX
-#   True when Magisk su is available on a booted guest.
 vm_android_guest_has_magisk_su() {
   _agms_vm_index="$1"
   _agms_serial="$(vm_android_adb_serial "$_agms_vm_index")"
@@ -56,8 +50,6 @@ vm_android_guest_has_magisk_su() {
   adb -s "$_agms_serial" shell 'su -c id -u' 2>/dev/null | tr -d '\r' | grep -qx '0'
 }
 
-# vm_android_su_getprop VM_INDEX NAME
-#   Read a getprop value via Magisk su on a booted guest.
 vm_android_su_getprop() {
   _asugp_vm_index="$1"
   _asugp_name="$2"
@@ -66,8 +58,6 @@ vm_android_su_getprop() {
   adb -s "$_asugp_serial" shell "su -c $(printf '%q' "getprop $_asugp_name")" 2>/dev/null | tr -d '\r\n'
 }
 
-# vm_android_root_props_boot_script
-#   Guest Magisk service.d script that re-applies persist.sys.root_access each boot.
 vm_android_root_props_boot_script() {
   cat <<'EOF'
 #!/system/bin/sh
@@ -76,8 +66,7 @@ resetprop persist.sys.root_access 3
 EOF
 }
 
-# vm_android_restore_ro_debuggable_user VM_INDEX
-#   Repair ro.debuggable=1 left by a prior broken --root run (must stay 0 on user builds).
+# Repair ro.debuggable=1 left by a prior broken --root run (must stay 0 on user builds).
 vm_android_restore_ro_debuggable_user() {
   _ardu_vm_index="$1"
   _ardu_serial="$(vm_android_adb_serial "$_ardu_vm_index")"
@@ -93,8 +82,6 @@ vm_android_restore_ro_debuggable_user() {
   fi
 }
 
-# vm_android_verify_root_props_via_su VM_INDEX
-#   Confirm persist.sys.root_access=3 and ro.debuggable=0 via Magisk su getprop.
 vm_android_verify_root_props_via_su() {
   _avrps_vm_index="$1"
   _avrps_root_access=''
@@ -113,8 +100,6 @@ vm_android_verify_root_props_via_su() {
   fi
 }
 
-# vm_android_smoke_test_dev_options VM_INDEX
-#   Open Developer options and fail when Settings cannot set logd persist properties.
 vm_android_smoke_test_dev_options() {
   _astdo_vm_index="$1"
   _astdo_serial="$(vm_android_adb_serial "$_astdo_vm_index")"
@@ -128,8 +113,6 @@ vm_android_smoke_test_dev_options() {
   fi
 }
 
-# vm_android_persist_root_props_service VM_INDEX
-#   Install nucleus-root-props.sh under Magisk service.d.
 vm_android_persist_root_props_service() {
   _aprps_vm_index="$1"
   _aprps_serial="$(vm_android_adb_serial "$_aprps_vm_index")"
@@ -144,8 +127,6 @@ chmod 755 $NUCLEUS_ROOT_PROPS_SERVICE"
   fi
 }
 
-# vm_android_config_root VM_INDEX
-#   Enable dev options and Lineage persist.sys.root_access (Magisk su only).
 vm_android_config_root() {
   _acr_vm_index="$1"
   _acr_serial="$(vm_android_adb_serial "$_acr_vm_index")"
@@ -185,8 +166,6 @@ vm_android_config_root() {
   say "rooted debugging enabled on $_acr_serial (Magisk su, persist.sys.root_access=3); next: --fake-wifi"
 }
 
-# vm_android_download_boot_image VM_INDEX
-#   Cache the jqssun boot image matching this guest architecture.
 vm_android_download_boot_image() {
   _adbi_vm_index="$1"
   _adbi_suffix="$(vm_android_recovery_asset_suffix "$_adbi_vm_index")"
@@ -226,8 +205,7 @@ vm_android_download_boot_image() {
   printf '%s\n' "$_adbi_img"
 }
 
-# vm_android_download_magisk_apk VM_INDEX
-#   Download and cache the Magisk APK from Android.magiskUrl in the manifest.
+# Download and cache the Magisk APK from Android.magiskUrl in the manifest.
 vm_android_download_magisk_apk() {
   _adma_vm_index="$1"
   _adma_url="$(jq -r ".VMs[$_adma_vm_index].Android.magiskUrl" "$MANIFEST")"
@@ -256,7 +234,6 @@ vm_android_download_magisk_apk() {
 }
 
 # vm_android_magisk_stage_patch_kit MAGISK_APK VM_INDEX OUT_DIR
-#   Extract Magisk boot_patch.sh and guest-native binaries from the APK zip layout.
 vm_android_magisk_stage_patch_kit() {
   _amspk_apk="$1"
   _amspk_vm_index="$2"
@@ -314,7 +291,6 @@ vm_android_magisk_stage_patch_kit() {
 }
 
 # vm_android_magisk_guest_patch_boot VM_INDEX BOOT_IMG OUT_IMG MAGISK_APK
-#   Patch boot.img on the booted guest using Magisk's boot_patch.sh (APK lib/*.so layout).
 vm_android_magisk_guest_patch_boot() {
   _amgp_vm_index="$1"
   _amgp_boot="$2"
@@ -349,8 +325,6 @@ vm_android_magisk_guest_patch_boot() {
   say "patched boot image: $_amgp_out"
 }
 
-# vm_android_magisk_flash_boot VM_INDEX PATCHED_BOOT_IMG
-#   Flash a Magisk-patched boot image via fastboot.
 vm_android_magisk_flash_boot() {
   _amfb_vm_index="$1"
   _amfb_img="$2"
@@ -375,8 +349,6 @@ vm_android_magisk_flash_boot() {
   say "flashed Magisk boot image; waiting for system boot..."
 }
 
-# vm_android_magisk_install_apk VM_INDEX MAGISK_APK
-#   Install the Magisk manager APK on a booted, authorized guest.
 vm_android_magisk_install_apk() {
   _amia_vm_index="$1"
   _amia_apk="$2"
@@ -405,7 +377,6 @@ vm_android_magisk_install_apk() {
 }
 
 # vm_android_install_adb_keys_via_su VM_INDEX PUBKEY_PATH
-#   Install host adbkey.pub via Magisk su on a booted user build.
 vm_android_install_adb_keys_via_su() {
   _aiakvs_vm_index="$1"
   _aiakvs_pubkey="$2"
@@ -421,8 +392,7 @@ vm_android_install_adb_keys_via_su() {
   adb -s "$_aiakvs_serial" shell "su -c $(printf '%q' "mkdir -p /data/misc/adb && cp $_aiakvs_remote /data/misc/adb/adb_keys && chmod 640 /data/misc/adb/adb_keys && chown system:shell /data/misc/adb/adb_keys && restorecon /data/misc/adb/adb_keys 2>/dev/null || chcon u:object_r:adb_keys_file:s0 /data/misc/adb/adb_keys && rm -f $_aiakvs_remote && setprop ctl.restart adbd")"
 }
 
-# vm_android_install_adb_keys VM_INDEX PUBKEY_PATH
-#   Push host adbkey.pub to /data/misc/adb/adb_keys with correct owner, mode, and SELinux context.
+# Push host adbkey.pub to /data/misc/adb/adb_keys with correct owner, mode, and SELinux context.
 vm_android_install_adb_keys() {
   _aiak_vm_index="$1"
   _aiak_pubkey="$2"
@@ -436,8 +406,6 @@ vm_android_install_adb_keys() {
   adb -s "$_aiak_serial" shell 'setprop ctl.restart adbd' 2>/dev/null || true
 }
 
-# vm_android_config_magisk VM_INDEX
-#   Full Magisk install + configure pipeline for booted Lineage (jqssun user build).
 vm_android_config_magisk() {
   _acm_vm_index="$1"
   _acm_serial="$(vm_android_adb_serial "$_acm_vm_index")"

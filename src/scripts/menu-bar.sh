@@ -1,25 +1,23 @@
 #!/usr/bin/env bash
 # Provides a uniform CLI for listing, showing, hiding, and verifying menu-bar /
 # tray icon visibility across hosts, driven by src/modules/apps.json (the
-# canonical registry).  This mirrors nucleus-autostart but targets the app's
-# native menu-bar / tray icon preference rather than auto-start.
+# canonical registry). Mirrors nucleus-autostart but targets the app's native
+# menu-bar / tray icon preference rather than auto-start.
 #
 # Usage: nucleus-menu-bar <action> [app...] [options]
 #   Actions: list, status, show, hide, apply, verify.
 #
 # Semantic difference from auto-start (driving constraint):
-#   Auto-start is OR — app-native OR our login item ⇒ app launches, so we
-#   DISABLE the native setting and own a separate mechanism.
-#   Icon visibility is AND — the icon shows only if (app-native show setting =
-#   desired) AND (OS allows it). There is no separate "our mechanism"; the
-#   app's native preference IS the control.  We therefore SET the native
-#   preference to the desired state and never disable it.  Inverted keys
-#   (e.g. BetterDisplay hideMenuIcon) are expressed via iconVisibleValue /
-#   iconHiddenValue, not via a disable flag.
+#   Auto-start is OR: app-native OR our login item means the app launches, so we
+#   disable the native setting and own a separate mechanism. Icon visibility is
+#   AND: the icon shows only if (app-native show setting = desired) AND (OS
+#   allows it). The app's native preference IS the control, so we SET it to the
+#   desired state and never disable it. Inverted keys (e.g. BetterDisplay
+#   hideMenuIcon) are expressed via iconVisibleValue / iconHiddenValue.
 #
 # Prerequisites: apps.json in the repo; jq; defaults (macOS) or the relevant
-# platform tooling.  Exit conditions: non-zero when an app name does not
-# resolve, an action fails, or verify finds drift.
+# platform tooling. Exit conditions: non-zero when an app name does not resolve,
+# an action fails, or verify finds drift.
 
 set -euo pipefail
 
@@ -59,8 +57,8 @@ MacBook | NixOS | Windows) ;;
 *) error "unsupported host '$HOST'" ;;
 esac
 
-# read_registry — Parse apps.json and return JSON filtered to current host,
-# keeping only entries that declare a statusIcon block.
+# Parse apps.json and return JSON filtered to the current host, keeping only
+# entries that declare a statusIcon block.
 read_registry() {
   if [ ! -f "$APPS_JSON" ]; then
     error "app registry not found at $APPS_JSON"
@@ -82,13 +80,10 @@ read_registry() {
   ' "$APPS_JSON"
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
 # macOS native preference helpers (run as the console user)
-# ──────────────────────────────────────────────────────────────────────────────
 
-# menu_bar_value_for VISIBLE ENTRY_JSON — stdout the native value to write
-# (iconVisibleValue when visible, iconHiddenValue when hidden), typed per
-# valueType.  Inverted keys are handled here, not by a disable flag.
+# menu_bar_value_for VISIBLE ENTRY_JSON — stdout the native value to write,
+# typed per valueType. Inverted keys are handled here, not by a disable flag.
 menu_bar_value_for() {
   local visible="$1" entry_json="$2"
   local value_type
@@ -100,10 +95,9 @@ menu_bar_value_for() {
   fi
 }
 
-# menu_bar_native_set ENTRY_JSON VISIBLE — Write the native preference to the
-# desired state.  Never disables the native setting; SETs it.  A manual entry
-# declares a state config cannot converge; the gap is surfaced via list/verify,
-# so we skip the SET and return 0.
+# menu_bar_native_set ENTRY_JSON VISIBLE — SET the native preference to the
+# desired state, never disable it. A manual entry declares a state config cannot
+# converge; the gap is surfaced via list/verify, so skip the SET and return 0.
 menu_bar_native_set() {
   local entry_json="$1" visible="$2"
   local kind domain key plist_path value
@@ -174,7 +168,6 @@ menu_bar_native_set() {
 }
 
 # menu_bar_actual_visible KEY ENTRY_JSON — stdout "true"/"false"/"unknown".
-# Reads the native preference and compares to the desired visible value.
 menu_bar_actual_visible() {
   local key="$1" entry_json="$2"
   local kind domain key_name plist_path value_type current desired_visible
@@ -221,9 +214,7 @@ menu_bar_actual_visible() {
   fi
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
 # NixOS per-user dispatch (root activation converges every real user)
-# ──────────────────────────────────────────────────────────────────────────────
 
 nixos_real_user_homes() {
   find /home -maxdepth 1 -mindepth 1 -type d 2>/dev/null
@@ -253,11 +244,9 @@ nixos_dispatch_per_user() {
   return "$overall"
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
 # Per-app state resolution
-# ──────────────────────────────────────────────────────────────────────────────
 
-# menu_bar_converge KEY ENTRY_JSON — Apply declared icon state for one app.
+# menu_bar_converge KEY ENTRY_JSON — apply the declared icon state for one app.
 # SETs the native preference to the desired state; never disables it.
 menu_bar_converge() {
   local key="$1" entry_json="$2"
