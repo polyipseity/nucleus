@@ -3,10 +3,6 @@
 # disabling services across macOS (launchctl) and NixOS (systemctl). Services
 # live in src/modules/services.json, the canonical registry.
 #
-# Usage: nucleus-svc <action> [service...] [options]
-#   Actions: list, status, start, stop, restart, enable, disable, verify,
-#   endpoint, logs, log-paths, log-config. See usage() for per-action flags.
-#
 # SVC_DOMAIN_FILTER sets the default domain (user|system|all) when no
 # --user/--system flag is given (default: all).
 #
@@ -73,8 +69,8 @@ MacBook | NixOS) ;;
 *) error "unsupported host '$HOST'" ;;
 esac
 
-# Escalation versus hard-error: if the sudo binary exists we escalate (sudo may
-# prompt); if it is entirely absent, system-domain operations cannot run.
+# WHY: escalate whenever the sudo binary exists, hard-error only when it is
+# entirely absent, since system-domain operations cannot run without it.
 SUDO_BIN_AVAILABLE=false
 if command -v sudo >/dev/null 2>&1; then
   SUDO_BIN_AVAILABLE=true
@@ -102,12 +98,9 @@ read_registry() {
   ' "$SERVICES_JSON"
 }
 
-# `configured` row per instance the user registry declares but this host does
-# not run, a `pseudo` row when a prefix-match entry has neither, and one plain
-# `live` row otherwise. Row format: key\tdisplay\tplatformJson\tinstance\tclass.
 # WHY: a prefix-match entry stands in for one runtime service per configured
-# instance, so every consumer needs the same expansion. Emitting the rows here
-# keeps list, status, actions, verify and logs operating on identical ids.
+# instance, so every consumer needs the same expansion. Rows are
+# key<TAB>display<TAB>platformJson<TAB>instance<TAB>class.
 resolve_entry() {
   local key="$1" display="$2" plat_json="$3" instances configured instance suffix
 
@@ -139,9 +132,9 @@ resolve_entry() {
   fi
 }
 
-# WHY: prefix matching lets users run `svc status jelly` instead of needing
-# the full id; unresolved names become ERROR:<name> rows — carrying the name —
-# so callers can surface them without aborting mid-output.
+# WHY: prefix matching lets users run 'svc status jelly' instead of the full id.
+# Unresolved names become ERROR:<name> rows that carry the name, so callers can
+# surface them without aborting mid-output.
 resolve_service_names() {
   local registry="$1"
   shift
@@ -204,15 +197,15 @@ resolve_instance_name() {
     "$(svc_instance_entry "$plat_json" "$name")" "$name"
 }
 
-# WHY: discovery consults the registry once per prefix-match entry, and every
-# consultation runs the loader — memoizing keeps one loader invocation per run.
+# WHY: every prefix-match entry would otherwise run the loader again; memoizing
+# keeps one loader invocation per run.
 configured_mounts() {
   printf '%s\n' "$_configured_mounts"
 }
 
-# WHY: the loader needs jq and a live repo root, and its failure must abort the
-# command instead of silently reporting "nothing configured"; resolving it here
-# (not inside resolve_entry's command substitutions) keeps that failure fatal.
+# WHY: the loader needs jq and a live repo root. Resolving it here rather than
+# inside resolve_entry's command substitutions keeps its failure fatal instead of
+# silently reporting "nothing configured".
 init_configured_mounts() {
   local registry="$1"
 
@@ -239,7 +232,7 @@ row_is_named() {
   return 1
 }
 
-# WHY: reporting such a row as "inactive" would be a lie — nothing was probed.
+# WHY: reporting such a row as "inactive" would be a lie: nothing was probed.
 placeholder_status_json() {
   case "$1" in
   pseudo) printf '{"status":"n/a","running":false,"enabled":false,"pid":null,"crashLoop":"-"}\n' ;;
@@ -247,9 +240,9 @@ placeholder_status_json() {
   esac
 }
 
-# WHY: status needs two probes — the list probe can miss services in a
-# transient state that `launchctl print` reports as running, so a fallback
-# print check is layered on before declaring the service inactive.
+# WHY: the list probe misses services in a transient state that launchctl print
+# reports as running, so a fallback print check runs before declaring the
+# service inactive.
 svc_status() {
   local name="$1"
   local entry_json="$2"
@@ -354,10 +347,9 @@ svc_status() {
     ;;
   esac
 
-  # A blocked instance is a nucleus-side state, not a service-manager one, so it
-  # is added here for every platform: the marker key is the concrete instance id,
-  # which is what every caller passes as the name.  The marker reports
-  # "blocked <class>"; the JSON carries the class alone.
+  # WHY: a blocked instance is a nucleus-side state, not a service-manager one.
+  # The marker key is the concrete instance id every caller passes as the name;
+  # the JSON carries the class alone.
   if svc_health_is_blocked "$name"; then
     blocked="blocked $(svc_health_get "$name" "class")"
     remedy="$(svc_health_get "$name" "remedy")"
@@ -369,20 +361,14 @@ svc_status() {
     '. + {blocked: (if $b == "clear" then null else ($b | sub("^blocked "; "")) end), blockedRemedy: (if $r == "" then null else $r end)}'
 }
 
-# spawn-scheduled / waiting / EX_CONFIG state.
-# Does bootout+bootstrap to fully reload. Returns 0 if recovery was done.
-# The unload is waited out before the bootstrap (see launchctl_bootout_wait), and
-# a reload that leaves the service unloaded is reported as an error, not a warning.
-#
-# Handles three cases `launchctl start` alone cannot fix: spawn-scheduled (a
-# server shutdown left the service in limbo), waiting (terminal exit code), and
-# last exit code 78 (EX_CONFIG, which launchd will not retry). All need a full
-# bootout+bootstrap cycle to clear the exit memory.
-#
-# On macOS 26+ SIP blocks unsigned Nix store binaries for system daemons with a
-# non-root UserName, producing exit 78 at boot. Every MacBook daemon uses the
-# /bin/sh wrapper to pass the SIP gate
-# (.agents/instructions/macos-service-hardening.instructions.md).
+# WHY: spawn-scheduled, waiting and exit code 78 (EX_CONFIG, which launchd will
+# not retry) all need a full bootout+bootstrap to clear the exit memory, because
+# launchctl start alone cannot. The unload is waited out before the bootstrap
+# (launchctl_bootout_wait) since macOS 26+ unloads asynchronously, and a reload
+# that leaves the service unloaded is an error rather than a warning.
+# WHY: macOS 26+ SIP blocks unsigned store binaries for system daemons with a
+# non-root UserName, which is what produces exit 78 at boot. See
+# .agents/instructions/macos-service-hardening.instructions.md.
 recover_launchctl_service() {
   local domain="$1" svc_id="$2" sudo_prefix="$3" uid="$4"
   local target
@@ -437,9 +423,8 @@ poll_service_status() {
   return 1
 }
 
-# WHY: a daemon can report "running" while its listener is still binding;
-# checking registered ports catches that race, which manager state alone
-# would miss.
+# WHY: a daemon can report "running" while its listener is still binding, so
+# the registered ports are checked for that race.
 poll_service_ready() {
   _psr_name="$1"
   _psr_entry_json="$2"
@@ -469,7 +454,6 @@ EOF
   return 0
 }
 
-# Reads launchctl print / systemctl status and extracts state + exit code.
 service_diagnostic() {
   local entry_json="$1"
   local svc_type svc_id
@@ -494,8 +478,6 @@ service_diagnostic() {
   esac
 }
 
-# Handles manual starts and orphans from previous wrappers that sit outside the
-# service manager's kill domain.
 # WHY: launchctl/systemctl can only terminate processes in their tracked tree,
 # so a stray process on a service port would survive a restart and keep the new
 # instance from binding.
@@ -512,20 +494,18 @@ $_csp_ports
 EOF
 }
 
-# CLOUD_MOUNT_RELEASE_TIMEOUT — Seconds a stop/restart waits for a cloud mount
-# to leave the mount table before refusing to reload its agent.
 # WHY: a reload that starts while the previous volume is still attached gets the
-# new mount destroyed as a duplicate, which leaves the drive missing until the
-# next reboot.
+# new mount destroyed as a duplicate, leaving the drive missing until the next
+# reboot.
 CLOUD_MOUNT_RELEASE_TIMEOUT=30
 
-# Bounds for bringing a cloud mount back after a restart or a provider repair.
-# WHY: FSKit can refuse the first attempts right after its daemon restarts, so the
-# launch is retried within a budget instead of failing on the first refusal.
-# WHY: the attach budget is deliberately not declared here. wait_cloud_mount_attached
-# reads services.json cloud-drive.lifecycle.mountAttachTimeoutSeconds, the same
-# field the runner receives as NUCLEUS_MOUNT_ATTACH_SECONDS, so this CLI can
-# never quote a budget its host's policy no longer declares.
+# WHY: FSKit can refuse the first attempts right after its daemon restarts, so
+# the launch is retried within a budget instead of failing on the first refusal.
+# WHY: the attach budget is deliberately not declared here.
+# wait_cloud_mount_attached reads services.json
+# cloud-drive.lifecycle.mountAttachTimeoutSeconds, the same field the runner
+# receives as NUCLEUS_MOUNT_ATTACH_SECONDS, so this CLI can never quote a budget
+# its host's policy no longer declares.
 CLOUD_MOUNT_REPAIR_TIMEOUT=30
 
 cloud_mount_point() {
@@ -549,11 +529,9 @@ wait_cloud_mount_released() {
   return 1
 }
 
-# blocked, before anything reloads its agent.
-# WHY: an agent reloaded into a wedged provider refuses the volume again and writes
-# another blocked marker, so the provider is repaired first, and only when a
-# fresh marker says the provider was the reason — an unblocked mount keeps the
-# previous behaviour exactly.
+# WHY: an agent reloaded into a wedged provider refuses the volume again and
+# writes another blocked marker, so the provider is repaired first, and only when
+# a fresh marker says the provider was the reason.
 repair_cloud_mount_provider() {
   local name="$1" instance="$2"
 
@@ -607,9 +585,9 @@ svc_action() {
     scope=$(echo "$entry_json" | jq -r '.scope // "system"')
     local launchd_domain
     launchd_domain=$(echo "$entry_json" | jq -r '.launchdDomain // "gui"')
-    # The system domain is implied by scope and carries no uid; launchdDomain names
-    # only the per-user domain. Normalizing here keeps target, recover and the
-    # bootstrap domain on the same domain.
+    # WHY: the system domain is implied by scope and carries no uid; launchdDomain
+    # names only the per-user domain. Normalizing here keeps target, recover and
+    # the bootstrap domain on the same domain.
     [ "$scope" = "system" ] && launchd_domain="system"
     local uid
     uid="${REAL_USER_UID:-$(id -u)}"
@@ -636,9 +614,8 @@ svc_action() {
         repair_cloud_mount_provider "$name" "$svc_id" || return 1
       fi
       recover_launchctl_service "$launchd_domain" "$svc_id" "$sudo_prefix" "$uid" || {
-        # WHY: a loaded job only needs starting, an unloaded one needs loading
-        # again, and either failure is reported with launchctl's own output
-        # instead of being discarded.
+        # WHY: a loaded job only needs starting and an unloaded one loading again;
+        # either failure is reported with launchctl's own output.
         local start_out="" start_domain=""
         start_domain="$(launchctl_bootstrap_domain "$launchd_domain" "$uid")"
         if launchctl_job_loaded "$target" "$sudo_prefix"; then
@@ -677,7 +654,7 @@ svc_action() {
         repair_cloud_mount_provider "$name" "$svc_id" || return 1
       fi
       # WHY: release the volume before anything reloads the agent, or the reload
-      #   destroys the new mount as a duplicate.
+      # destroys the new mount as a duplicate.
       if [ -n "$cloud_mount" ]; then
         # check-suppress:suppression_doc: the agent may already be stopped; kill on an absent job must not abort the reload.
         $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 || true
@@ -693,10 +670,6 @@ svc_action() {
             grep -q "state = running" || break
           sleep 1
         done
-        # WHY: the reload is only safe once the unload has completed: macOS 26+
-        # unloads asynchronously, and a bootstrap in between fails with
-        # "Bootstrap failed: 5:" while the finished bootout leaves the service
-        # unloaded.
         if ! launchctl_bootout_wait "$target" "$sudo_prefix"; then
           error "$name — launchctl bootout did not unload $target; service not reloaded"
           return 1
@@ -775,12 +748,9 @@ svc_action() {
   esac
 }
 
-# Action implementations
-
-# WHY: system-domain entries are skipped without passwordless sudo so the
-# table never shows misleading "inactive" rows for unqueryable services.
-# class and remedy; nothing when the instance is not blocked.
-# WHY: the row's columns are fixed-width service-manager state, and the remedy is
+# WHY: system-domain entries are skipped without passwordless sudo so the table
+# never shows misleading "inactive" rows for unqueryable services.
+# WHY: the row's columns are fixed-width service-manager state and the remedy is
 # too long for one, so a blocked instance is reported under its row instead of
 # widening the table for every service.
 print_blocked_note() {
@@ -935,7 +905,7 @@ do_status() {
 
 # WHY: actions resolve through the same expansion as list/status, so a
 # prefix-match key acts on every live instance and a printed id is always a
-# valid argument — an unresolvable name is the only "not found" outcome.
+# valid argument; an unresolvable name is the only "not found" outcome.
 do_action() {
   if [ "${#service_names[@]}" -eq 0 ]; then
     error "missing service name for $action"
@@ -1002,7 +972,7 @@ do_action() {
   return "$overall_exit"
 }
 
-# WHY: verify is the health gate — its exit code alone must be enough for
+# WHY: verify is the health gate: its exit code alone must be enough for
 # cron/CI wrappers to alert, so it returns non-zero on any inactive service.
 do_verify() {
   local registry
@@ -1051,9 +1021,8 @@ do_verify() {
   say "all services active"
 }
 
-# svc endpoint <service> [<endpoint-name>]
-# WHY: endpoints are host-independent (the same host:port on every host),
-# so filtering by host would hide valid data.
+# WHY: endpoints are host-independent (the same host:port on every host), so
+# filtering by host would hide valid data.
 do_endpoint() {
   local svc_name="${service_names[0]:-}"
   local endpoint_name="${service_names[1]:-}"
@@ -1094,10 +1063,6 @@ do_endpoint() {
     fi
   fi
 }
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Log subcommand helpers
-# ──────────────────────────────────────────────────────────────────────────────
 
 # WHY: sorting keeps logs/log-paths output deterministic, and the $ prefix
 # marks registry metadata entries that are not real services.
@@ -1226,10 +1191,6 @@ show_journald_logs() {
   journalctl -u "$unit" -n "$lines" --no-pager -o cat "${since_arg[@]}" | "$sanitize_cmd"
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Log action implementations
-# ──────────────────────────────────────────────────────────────────────────────
-
 # WHY: logs parses its own value-bearing flags out of service_names because
 # the main parser treats everything after the action as plain service names.
 do_logs() {
@@ -1295,7 +1256,6 @@ do_logs() {
   fi
 
   while IFS=$'\t' read -r key display svc_json instance row_class; do
-    # WHY: log helpers want an instance id or empty for a whole-service row.
     local instance_qualifier=""
     if [ "$instance" != "$key" ]; then instance_qualifier="$instance"; fi
 
@@ -1339,16 +1299,15 @@ do_logs() {
   done <<<"$entries"
 }
 
-# WHY: printing paths (not content) lets users open logs in their preferred
-# tool and keeps this action side-effect free. Instance rows resolve to their
-# own per-instance directories so the paths match what the service writes.
+# WHY: printing paths (not content) lets users open logs in their preferred tool
+# and keeps this action side-effect free. Instance rows resolve to their own
+# per-instance directories so the paths match what the service writes.
 do_log_paths() {
   local registry entries
   registry=$(read_registry)
   entries=$(resolve_service_names "$registry" "${service_names[@]}")
 
   while IFS=$'\t' read -r key display svc_json instance row_class; do
-    # WHY: log helpers want an instance id or empty for a whole-service row.
     local instance_qualifier=""
     if [ "$instance" != "$key" ]; then instance_qualifier="$instance"; fi
     if [ "$row_class" = "error" ]; then

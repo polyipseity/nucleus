@@ -1,17 +1,6 @@
 #!/usr/bin/env bash
 # Nucleus cloud management CLI.
 #
-#   setup   Verify/create rclone remotes, validate credentials, sync display
-#           names from the user registry, optionally run nucleus apply
-#   reset   Remove local replica data and rclone cache so the next sync starts
-#           clean. Local only, never touches remote data
-#   sync    Pull-only replica sync (remote to local) for every enabled replica
-#           declared in src/users/ for the current user
-#   repair  Restart the macOS macFUSE/FSKit provider, then restart and verify the
-#           declared cloud mounts. macOS only
-#
-# Usage: nucleus-cloud <setup|reset|sync|repair> [options]
-#
 # Needs rclone and jq on PATH plus the repo checkout with src/users/.
 
 set -euo pipefail
@@ -71,8 +60,6 @@ usage() {
 EOF
 }
 
-# Reads the configured iCloud service for a remote from the assembled user registry,
-# answering `drive` or `photos`.
 resolve_icloud_service_for_remote() {
   _ics_repo_root="$1"
   _ics_remote_name="$2"
@@ -293,7 +280,6 @@ remote_provider_create_args() {
   esac
 }
 
-# Destructive, so it honors --dry-run.
 run_local_cmd() {
   if [ "$dry_run" = true ]; then
     dry_run "would run: $*"
@@ -308,8 +294,6 @@ _load_users_registry() {
     --repo-root "$REPO_ROOT"
 }
 
-# Reads a GC-config field (files|dirs|remoteExcludes|blockedRoots) for a provider
-# from the user registry cloudDrives.replicaGc domain.
 load_provider_gc_entries() {
   _provider="$1"
   _field="$2"
@@ -544,7 +528,6 @@ resolve_filter_path() {
   esac
 }
 
-# Temporarily grants owner write access for convergence.
 set_replica_tree_writable() {
   _target_dir="$1"
 
@@ -576,9 +559,6 @@ set_replica_tree_read_only() {
 
   chmod -R a-w "$_target_dir"
 }
-
-# setup: verify/create rclone remotes, validate credentials, sync display names,
-# optionally run nucleus apply.
 
 do_setup() {
   apply=false
@@ -787,8 +767,6 @@ EOF
   say "setup complete"
 }
 
-# reset: remove local replica data and rclone cache (local only).
-
 do_reset() {
   dry_run=false
   replica_id_filter=""
@@ -943,8 +921,6 @@ do_reset() {
   say "completed successfully"
 }
 
-# sync: pull-only replica sync (remote to local).
-
 do_sync() {
   dry_run=false
   replica_id_filter=""
@@ -1051,7 +1027,7 @@ do_sync() {
   printf '%s\n' "$replica_lines" >"$replica_lines_file"
 
   # The replica list is staged in a temp file so the loop reads from a real file
-  # descriptor — a pipeline would run the loop body in a subshell and lose the
+  # descriptor; a pipeline would run the loop body in a subshell and lose the
   # failures counter.
   while IFS="$(printf '\t')" read -r id direction local_path remote_path provider icloud_service filters_file read_write display_name; do
     if [ -n "$replica_id_filter" ] && [ "$id" != "$replica_id_filter" ]; then
@@ -1072,7 +1048,7 @@ do_sync() {
     provider_remote_excludes="$(load_provider_gc_entries "$provider" "remoteExcludes")"
     provider_blocked_roots="$(load_provider_gc_entries "$provider" "blockedRoots")"
 
-    # Replicas are pull-only by policy — a push would overwrite cloud state.
+    # Replicas are pull-only by policy; a push would overwrite cloud state.
     if [ "$direction" != "pull" ]; then
       warn "[$display_name] unsupported direction '$direction'; replicas are pull-only by policy"
       failures=$((failures + 1))
@@ -1160,15 +1136,12 @@ do_sync() {
   say "completed successfully"
 }
 
-# repair: restart the macOS macFUSE/FSKit provider, then restart and verify the
-# declared cloud mounts.
 # WHY: macOS serves macFUSE volumes through the FSKit file-system extension, and
-#   macFUSE 5.x can leave that subsystem wedged after an unmount: every later
-#   mount then fails with "File system extension not found"/"not enabled" (macFUSE
-#   status 3/4) or "mount(8) returned 69" while FSKit's own module list still
-#   names the module. Re-registering the extension or mounting again only deepens
-#   the wedge, so the one repair is the daemon restart the macFUSE maintainers
-#   prescribe; the mounts then come back on their own agents.
+# macFUSE 5.x can leave that subsystem wedged after an unmount: every later mount
+# then fails with "File system extension not found"/"not enabled" (macFUSE status
+# 3/4) or "mount(8) returned 69" while FSKit's own module list still names the
+# module. Re-registering the extension or mounting again only deepens the wedge,
+# so the one repair is the daemon restart the macFUSE maintainers prescribe.
 # ref: https://github.com/macfuse/macfuse/issues/1132
 do_repair() {
   timeout=60
