@@ -1,4 +1,14 @@
-# Daily user log rotation for Windows scheduled tasks and manual use.
+# Daily log rotation for Windows scheduled tasks and manual use.
+#
+# The system tree is root-owned, so the scheduled task runs it elevated; the
+# user tree runs as the logged-on user.
+
+[CmdletBinding()]
+param (
+  [Parameter(Mandatory)]
+  [ValidateSet('user', 'system')]
+  [string]$Scope
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -8,7 +18,7 @@ Import-Module $modulePath -Force
 
 $repoRoot = $env:NUCLEUS_REPO_ROOT
 if ([string]::IsNullOrWhiteSpace($repoRoot)) {
-  Write-NucleusError -CommandName log-gc-user 'NUCLEUS_REPO_ROOT not set'
+  Write-NucleusError -CommandName log-gc 'NUCLEUS_REPO_ROOT not set'
 }
 
 $moduleDir = Join-Path -Path $repoRoot -ChildPath 'src\platforms\Windows\modules'
@@ -19,7 +29,7 @@ try {
   $schemaContent = Get-Content -LiteralPath $schemaPath -Raw | ConvertFrom-Json
   $loggingDefaults = $schemaContent.definitions.loggingEntry.properties
 } catch {
-  Write-NucleusWarning -CommandName log-gc-user "failed to parse services.schema.json; using hardcoded defaults — $($_.Exception.Message)"
+  Write-NucleusWarning -CommandName log-gc "failed to parse services.schema.json; using hardcoded defaults, $($_.Exception.Message)"
   $loggingDefaults = $null
 }
 
@@ -28,7 +38,7 @@ $logMaxFiles = if ($loggingDefaults.maxFiles.default) { [int]$loggingDefaults.ma
 $logCompress = if ($null -ne $loggingDefaults.compress.default) { [bool]$loggingDefaults.compress.default } else { $true }
 
 $logExpiry = if ($env:NUCLEUS_LOG_EXPIRY) { $env:NUCLEUS_LOG_EXPIRY } else { '7d' }
-$userLogDir = Get-NucleusLogDir
+$logDir = if ($Scope -eq 'system') { Get-NucleusSystemLogDir } else { Get-NucleusLogDir }
 
-Invoke-LogRotation -Path $userLogDir -MaxSize $logMaxSize -MaxFiles $logMaxFiles -Compress $logCompress
-Invoke-LogExpiry -Path $userLogDir -Expiry $logExpiry
+Invoke-LogRotation -Path $logDir -MaxSize $logMaxSize -MaxFiles $logMaxFiles -Compress $logCompress
+Invoke-LogExpiry -Path $logDir -Expiry $logExpiry

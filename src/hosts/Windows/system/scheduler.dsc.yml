@@ -105,12 +105,12 @@ properties:
             Write-Output "log-gc-system: NUCLEUS_REPO_ROOT not set; run via apply.ps1"
             exit 1
           }
-          $LogGcScript = Join-Path $RepoRoot "src\scripts\services\log-gc-system.ps1"
+          $LogGcScript = Join-Path $RepoRoot "src\scripts\services\log-gc.ps1"
           if (-not (Test-Path -LiteralPath $LogGcScript -PathType Leaf)) {
-            Write-Output "log-gc-system: src/scripts/services/log-gc-system.ps1 not found"
+            Write-Output "log-gc-system: src/scripts/services/log-gc.ps1 not found"
             exit 1
           }
-          & $LogGcScript
+          & $LogGcScript -Scope system
         Trigger: Daily
         AtTime: 12:00
         DaysInterval: 1
@@ -133,12 +133,12 @@ properties:
             Write-Output "log-gc-user: NUCLEUS_REPO_ROOT not set; run via apply.ps1"
             exit 1
           }
-          $LogGcScript = Join-Path $RepoRoot "src\scripts\services\log-gc-user.ps1"
+          $LogGcScript = Join-Path $RepoRoot "src\scripts\services\log-gc.ps1"
           if (-not (Test-Path -LiteralPath $LogGcScript -PathType Leaf)) {
-            Write-Output "log-gc-user: src/scripts/services/log-gc-user.ps1 not found"
+            Write-Output "log-gc-user: src/scripts/services/log-gc.ps1 not found"
             exit 1
           }
-          & $LogGcScript
+          & $LogGcScript -Scope user
         Trigger: Daily
         AtTime: 12:00
         DaysInterval: 1
