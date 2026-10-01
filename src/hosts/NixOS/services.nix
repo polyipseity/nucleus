@@ -1,8 +1,5 @@
-# NixOS/services.nix — Right-click context menu entries for Linux file managers.
-#
-# Adds "open nucleus manual" to Nautilus (GNOME) and Dolphin (KDE) context
-# menus. Both delegate to a shared script that resolves the host manual path
-# via NUCLEUS_REPO_ROOT at runtime and opens it with xdg-open.
+# NixOS/services.nix - context-menu entries for Nautilus and Dolphin. Both
+# delegate to one script that resolves the host manual through NUCLEUS_REPO_ROOT.
 {
   config,
   lib,
@@ -36,10 +33,12 @@ let
     '';
   };
 
-  # Ghostscript PDF optimization presets (quality descending).
-  # Sorting policy: manually maintained in quality-descending order with numbering.
-  # Must match macOS and Windows ordering ((1) default → (2) prepress → (3) printer → (4) ebook → (5) screen).
-  # Numbering in parentheses after the "optimize PDF - " prefix ensures correct sort order on all platforms.
+  # PDF optimization presets, numbered so they sort on every platform and kept
+  # by hand in quality-descending order to match macOS and Windows.
+  # check-suppress:config-method: method 1 (writable symlink) -- repo edits take effect without rebuild.
+  # Nautilus Scripts cannot declare a MIME filter, so the entry applies to
+  # every selection and strip-metadata reports what it could not process in a
+  # modal dialog. Declared formats: src/modules/lib/strip-metadata-types.nix.
   optimizePdfPresets = [
     "default"
     "prepress"
@@ -78,14 +77,11 @@ let
 in
 lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
   home.file = {
-    # Nautilus: right-click → Scripts → open nucleus manual
     ".local/share/nautilus/scripts/open nucleus manual" = {
       source = "${openManualScript}/bin/nucleus-open-manual";
       executable = true;
     };
 
-    # Nautilus: right-click → Scripts → optimize PDF - (N) <preset> (5 presets)
-    # Nautilus scripts have no MIME filtering; each script guards with file --mime-type.
     ".local/share/nautilus/scripts/optimize PDF - (1) default" = {
       source = optimizePdfNautilusScripts.default;
       executable = true;
@@ -107,7 +103,6 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
       executable = true;
     };
 
-    # Nautilus: right-click → Scripts → strip metadata
     ".local/share/nautilus/scripts/strip metadata" = {
       source = "${stripMetadataNautilusScript}/bin/nucleus-strip-metadata-nautilus";
       executable = true;
@@ -115,11 +110,9 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
 
   };
 
-  # Method-1 (writable) symlinks to the live repo, created at activation time against the
-  # LIVE repo root so repo edits take effect without rebuild. The writable/immutable
-  # decision is owned by managedSymlinkPaths; these entries run before
-  # protect-out-of-store-symlinks so the link is hardened if immutable.
-  # check-suppress:config-method: method 1 (writable symlink) -- repo edits take effect without rebuild.
+  # Writable symlinks to the live repo, created against the LIVE repo root so repo
+  # edits take effect without a rebuild. These run before
+  # protect-out-of-store-symlinks so the links get hardened.
   home.activation = {
     # Shared script that Nautilus and Dolphin both invoke.
     seed-open-manual = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
@@ -128,7 +121,6 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
         "src/scripts/integrations/open-host-manual.sh" \
     '';
 
-    # Dolphin: right-click → open nucleus manual.
     # check-suppress:config-method: method 1 (writable symlink) -- repo edits take effect without rebuild.
     seed-nucleus-manual-desktop = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \

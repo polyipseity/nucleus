@@ -1,13 +1,7 @@
-# hosts/NixOS/camilladsp.nix — CamillaDSP daemon and config heartbeat.
-#
-# Both units run as the primary user so they can access user-level config at
-# ~/.config/camilladsp/. Config is deployed by Home Manager in modules/home.nix.
-# The daemon is a system service (User = username); the heartbeat is a systemd
-# USER service, because it only pushes a per-user config file and talks to a
-# loopback websocket — the same scope as the macOS launchd agent and the Windows
-# per-user scheduled task. Both units capture to journald, like every other NixOS
-# service (src/modules/posix/logging.nix); the stdout.log/stderr.log file pair is the
-# macOS and Windows rule, not this host's.
+# hosts/NixOS/camilladsp.nix - CamillaDSP daemon and config heartbeat. Both run
+# as the primary user to reach ~/.config/camilladsp/, which Home Manager deploys
+# via modules/home.nix. The daemon is a system service, the heartbeat a systemd
+# USER service. Both log to journald like every other NixOS service.
 {
   pkgs,
   username,
@@ -47,8 +41,8 @@ in
       "network-online.target"
       "sound.target"
     ];
-    # Only the state dir is prepared: the daemon's output goes to journald, so there is
-    # no file capture target to create.
+    # Only the state dir: the daemon logs to journald, so there is no
+    # file capture target to create.
     preStart = ''
       mkdir -p '%h/.local/state/camilladsp'
     '';
@@ -63,17 +57,14 @@ in
   };
 
   # WHY a systemd USER service: the heartbeat only pushes a per-user config file and
-  # speaks to a loopback websocket, so it needs no system-level capability. Running it
-  # in the user's own manager gives it the same scope as the macOS launchd agent and the
-  # Windows per-user task. Two consequences, both intentional:
-  #   - it cannot order against camilladsp.service (system units are invisible to user
-  #     managers), so it tolerates the daemon being absent and simply skips its tick;
-  #   - it is deliberately NOT made to linger, so it starts with the user's session
-  #     rather than at boot. Do not "fix" that by enabling linger.
-  # WHY no StandardOutput/StandardError: NixOS services capture to journald
-  # (src/modules/posix/logging.nix). The stdout.log/stderr.log file pair is the macOS and
-  # Windows rule; adding file redirects here would make this the one NixOS service that
-  # logs differently from every other one.
+  # speaks to a loopback websocket, so it needs no system-level capability, which
+  # matches the macOS launchd agent and the Windows per-user task scope. Two
+  # consequences, both intentional: it cannot order against camilladsp.service
+  # (system units are invisible to user managers) so it skips its tick when the
+  # daemon is absent, and it is deliberately NOT set to linger, so it starts with
+  # the session rather than at boot. Do not enable linger.
+  # WHY no StandardOutput/StandardError: NixOS services log to journald
+  # (src/modules/posix/logging.nix); file pairs are the macOS and Windows rule.
   systemd.user.services.camilladsp-heartbeat = {
     description = "CamillaDSP config heartbeat";
     serviceConfig = {

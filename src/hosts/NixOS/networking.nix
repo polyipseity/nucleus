@@ -1,8 +1,7 @@
-# NixOS/networking.nix — Hostname and network management for the NixOS host.
+# NixOS/networking.nix - hostname and network management.
 { ... }: {
-  # mDNS/Bonjour discovery parity with macOS for easier local host discovery.
-  # Source: NixOS Avahi service option.
-  # https://mynixos.com/nixpkgs/option/services.avahi.enable
+  # mDNS/Bonjour discovery, matching macOS for local host discovery.
+  # Source: https://mynixos.com/nixpkgs/option/services.avahi.enable
   services.avahi = {
     enable = true;
     nssmdns4 = true;
@@ -13,31 +12,24 @@
     };
   };
 
-  # Enable the nftables-based stateful firewall; blocks unsolicited inbound.
-  # Source: NixOS firewall option.
-  # https://mynixos.com/nixpkgs/option/networking.firewall.enable
+  # Stateful firewall, blocks unsolicited inbound.
+  # Source: https://mynixos.com/nixpkgs/option/networking.firewall.enable
   networking.firewall.enable = true;
-  # Titlecase hostname preserves consistent local discovery and machine identity
-  # semantics for the NixOS host.
+  # Titlecase hostname keeps local discovery and machine identity consistent.
   networking.hostName = "NixOS";
-  # Use NetworkManager for DHCP/Wi-Fi instead of the legacy wpa_supplicant setup.
-  # Source: NixOS NetworkManager option.
-  # https://mynixos.com/nixpkgs/option/networking.networkmanager.enable
+  # NetworkManager for DHCP/Wi-Fi, not the legacy wpa_supplicant setup.
+  # Source: https://mynixos.com/nixpkgs/option/networking.networkmanager.enable
   networking.networkmanager.enable = true;
-  # Randomize MAC address on each Wi-Fi connect (random).
-  # Source: NixOS NetworkManager Wi-Fi option.
-  # https://mynixos.com/nixpkgs/option/networking.networkmanager.wifi.macAddress
+  # Randomize MAC per Wi-Fi connect.
+  # Source: https://mynixos.com/nixpkgs/option/networking.networkmanager.wifi.macAddress
   networking.networkmanager.wifi.macAddress = "random";
-  # Randomize MAC address during Wi-Fi scanning (default true; set explicitly).
-  # Source: NixOS NetworkManager Wi-Fi option.
-  # https://mynixos.com/nixpkgs/option/networking.networkmanager.wifi.scanRandMacAddress
+  # Randomize MAC while scanning.
+  # Source: https://mynixos.com/nixpkgs/option/networking.networkmanager.wifi.scanRandMacAddress
   networking.networkmanager.wifi.scanRandMacAddress = true;
 
-  # Wake-on-LAN parity with macOS (pmset womp=1) and Windows (WakeOnMagicPacket).
-  # The NixOS declarative option is interface-name-specific:
-  #   networking.interfaces."<iface>".wakeOnLan.enable = true;
-  # Discover the primary wired interface name with:
+  # Wake-on-LAN parity with macOS (pmset womp=1) and Windows. The NixOS option is
+  # interface-name-specific, so it stays manual for now:
   #   ip -o link show | awk '/ether/ {print $2}' | tr -d ':'
-  # Then add the option above with the real name and remove this comment.
-  # Until then, see src/hosts/NixOS/MANUAL.md for the manual enablement step.
+  # then networking.interfaces."<iface>".wakeOnLan.enable = true. See
+  # src/hosts/NixOS/MANUAL.md.
 }

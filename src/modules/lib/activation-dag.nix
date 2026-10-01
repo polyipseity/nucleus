@@ -1,17 +1,8 @@
-# src/modules/lib/activation-dag.nix — Shared activation DAG dependencies.
+# src/modules/lib/activation-dag.nix - activation entry names shared by every
+# POSIX Home Manager host. Host modules append their own entries after importing
+# this list instead of duplicating it, so a new shared entry lands here once.
 #
-# Home Manager activation entry names that are defined in shared modules
-# (agents.nix, secrets.nix, home.nix, etc.) and referenced by every POSIX
-# Home Manager host (macOS, NixOS, Linux).
-#
-# Host-specific modules append their own entries after importing this list
-# instead of duplicating the shared set.  When adding a new shared activation
-# entry, add its name here so all hosts inherit it automatically.
-#
-# Usage in host configs:
-#   sharedActivationDeps = (import ../lib/activation-dag.nix) ++ [
-#     "hostSpecificEntry"
-#   ];
+#   sharedActivationDeps = (import ../lib/activation-dag.nix) ++ [ "entry" ];
 [
   "install-agent-skills"
   "symlink-agent-config"

@@ -1,13 +1,12 @@
-# MacBook/networking.nix — Network identity and firewall policy for the MacBook.
-#
-# ref: activation.nix -- nix-darwin postActivation hook constraint
+# MacBook/networking.nix - network identity and firewall policy.
+# ref: activation.nix - nix-darwin postActivation hook constraint
 { lib, pkgs, ... }:
 let
   activationBundle = pkgs.callPackage ../../modules/lib/script-tree.nix { };
 in
 {
-  # Application-level firewall: block unsigned inbound connections while
-  # allowing binaries that are code-signed by a trusted authority.
+  # Application-level firewall: block unsigned inbound connections, allow
+  # code-signed binaries.
   networking.applicationFirewall = {
     allowSigned = true; # allow signed apps to accept inbound connections
     blockAllIncoming = false;
@@ -19,34 +18,17 @@ in
     # disabled to keep remote-desktop discovery working
   };
 
-  # ---------------------------------------------------------------------------
-  # enableScreenSharing (postActivation fragment)
-  # Enable macOS Screen Sharing (VNC/ARD protocol) as the remote-desktop server
-  # for this host.  macOS does not ship a native RDP server; Screen Sharing is
-  # the platform equivalent and is accessible from Microsoft Remote Desktop
-  # clients (which support connecting to Macs) as well as any VNC client.
-  # blockAllIncoming = false in the firewall config already permits the inbound
-  # VNC port (5900); no additional firewall rule is needed.
-  #
-  # nix-darwin does not expose a services.screensharing option in this version;
-  # the LaunchDaemon plist is already installed by macOS and just needs its
-  # Disabled override cleared.
-  #
-  # launchctl load -w writes to the override database.  When the daemon is
-  # already loaded, launchctl prints "Service already loaded" to stderr and may
-  # return non-zero — this is expected steady-state behaviour, not an error.
-  # Error suppression justification (all three conditions met):
-  #   (1) Expected and benign: the daemon being already loaded is normal
-  #       steady-state on an already-configured machine.
-  #   (2) WHY comment: see above.
-  #   (3) Checked afterward: launchctl list verifies the daemon is present in
-  #       the system service table so a genuine load failure (e.g. missing
-  #       plist) is still caught.
-  # ---------------------------------------------------------------------------
+  # Screen Sharing is the remote-desktop server: macOS has no native RDP, and
+  # the firewall block above already permits the inbound VNC port. This nixpkgs
+  # version has no services.screensharing option, so the macOS LaunchDaemon
+  # plist just needs its Disabled override cleared.
+  # launchctl load -w reports "Service already loaded" and may exit non-zero in
+  # that steady state; launchctl list afterwards confirms the daemon is
+  # registered.
   system.activationScripts.postActivation.text = lib.mkBefore ''"${activationBundle}/src/hosts/MacBook/scripts/macos-setup-networking.sh"'';
 
-  # Hostname values are intentionally titlecase to match the machine identity
-  # and preserve local discovery semantics on macOS.
+  # Titlecase hostname matches the machine identity and keeps local discovery
+  # working on macOS.
   networking.computerName = "MacBook";
   networking.hostName = "MacBook";
   networking.localHostName = "MacBook";

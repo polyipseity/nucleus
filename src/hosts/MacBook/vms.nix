@@ -1,15 +1,7 @@
-# MacBook/vms.nix — UTM VM configuration templates for the macOS host.
-#
-# Generates UTM 4.x QEMU-backend config.plist templates for each VM declared in
-# src/modules/vms/VMs.json.  Templates are written to
-# ~/Library/Application Support/nucleus/vms/<name>-config.plist at Home Manager activation time
-# and consumed by scripts/vm.sh (nucleus-vm setup) to create UTM bundles
-# without PlistBuddy invocations.
-#
-# The UUID for each VM is derived deterministically from the VM id via SHA-256
-# (src/modules/vms/vm-identity.nix) so re-provisioning from scratch always
-# produces the same UTM identity.
-#
+# MacBook/vms.nix - UTM config.plist templates for each VM in VMs.json. vm.sh
+# copies them into the UTM bundle, so no PlistBuddy at provisioning time.
+# UUIDs derive from the VM id via SHA-256 (vm-identity.nix), so a rebuild
+# reproduces the same UTM identity.
 # Source: https://github.com/utmapp/UTM/blob/main/Configuration/UTMQemuConfiguration.swift
 { pkgs, lib, ... }:
 let
@@ -21,10 +13,9 @@ let
 
   isArm = pkgs.stdenv.hostPlatform.isAarch64;
 
-  # Windows images in this repository are built as x86_64 QCOW2 artefacts.
-  # Keep UTM system architecture aligned with the guest image architecture,
-  # not with the host CPU architecture, so Apple Silicon hosts do not try to
-  # import x86_64 guest bundles as aarch64 virtual machines.
+  # Windows images are built as x86_64 QCOW2. Architecture follows the guest
+  # image, not the host CPU, so Apple Silicon does not import x86_64 bundles as
+  # aarch64.
   vmArch =
     vm:
     if vm.type == "Android" then
@@ -37,34 +28,26 @@ let
       "x86_64";
   vmMachine = vm: if vmArch vm == "x86_64" then "q35" else "virt";
 
-  # UTM cannot use HVF for x86_64 guest emulation on Apple Silicon hosts.
-  # Keep Hypervisor false in that case so imports/starts do not fail with an
-  # invalid accelerator path; native-arch guests still use acceleration.
+  # HVF cannot accelerate an x86_64 guest on Apple Silicon, and Hypervisor true
+  # there fails the import with an invalid accelerator path.
   qemuHypervisor = vm: if isArm then vmArch vm == "aarch64" else true;
 
-  # QEMU display card appropriate for the guest OS.
-  # Linux/NixOS VMs use VirtIO GPU so UTM exposes an active display on both
-  # Apple Silicon and Intel hosts.
-  #
-  # Android display/renderer requirements: see vm-management.instructions.md.
+  # VirtIO GPU so UTM exposes an active display on Apple Silicon and Intel.
   displayCard = vm: if vm.type == "Windows" then "virtio-vga" else "virtio-gpu-pci";
 
-  # UTM 4.x sharing mode selector.
-  # Modern UTM uses DirectoryShareMode/DirectoryShareReadOnly (not the legacy
-  # DirectorySharing/ReadOnlySharing keys).  UTM import expects enum display
-  # names (WebDAV/None), not lowercase raw values.
+  # UTM 4.x wants the enum display name (WebDAV/None) under DirectoryShareMode,
+  # not the legacy DirectorySharing key with a lowercase value.
   directoryShareMode =
     vm: if vm.shareDevDir then "<string>WebDAV</string>" else "<string>None</string>";
 
-  # Match firmware mode to the guest image build contract:
-  # - Windows images are built BIOS/MBR (Autounattend.xml), so disable UEFI.
-  # - NixOS images are qcow-efi on aarch64 and qcow (BIOS) on x86_64.
+  # Firmware mode follows the guest image build contract: Windows images are
+  # BIOS/MBR (Autounattend.xml), NixOS images are qcow-efi on aarch64 and qcow
+  # (BIOS) on x86_64.
   qemuUefiBoot = vm: vm.type != "Windows" && vmArch vm == "aarch64";
 
-  # Bundle ImageNames are guest-agnostic natural-language disk names; the
-  # canonical payloads they hard-link to are resolved by vm.sh at
-  # provisioning time (userdata overlay under data/, read-only GSI under
-  # src/Android/) from the manifest Android group.
+  # ImageNames are guest-agnostic disk names; vm.sh resolves the payloads they
+  # hard-link to from the manifest Android group (userdata overlay under data/,
+  # read-only GSI under src/Android/).
   androidDrives =
     vm:
     if vm.type != "Android" then
@@ -103,8 +86,8 @@ let
         </dict>
       '';
 
-  # UTM PortForward entries derived from the manifest portForwards so the
-  # plist always matches VMs.json (host ports in the 22000-22099 range).
+  # PortForward entries come from the manifest, so the plist always matches
+  # VMs.json (host ports in the 22000-22099 range).
   portForwardEntries =
     vm:
     lib.concatMapStrings (p: ''
@@ -118,7 +101,7 @@ let
       </dict>
     '') vm.portForwards;
 
-  # Android disables audio ("none") to avoid SPICE/CoreAudio deadlock; see vm-management.instructions.md.
+  # Android disables audio ("none") to avoid the SPICE/CoreAudio deadlock.
   vmSound =
     vm:
     if vm.sound == "none" then
@@ -133,8 +116,8 @@ let
         </array>
       '';
 
-  # UTM 4.x QEMU-backend plist template.  Indented strings in Nix strip the
-  # common leading whitespace (6 spaces here), producing a 0-based document.
+  # Nix strips the common leading whitespace from indented strings, so the
+  # 6-space indent below yields a 0-based document.
   mkConfigPlist =
     vm:
     builtins.replaceStrings
@@ -183,9 +166,7 @@ let
       (builtins.readFile ../../modules/vms/utm-config.plist.xml);
 in
 {
-  # Write a UTM config.plist template for each VM declared in VMs.json.
-  # vm.sh copies the appropriate template into the UTM bundle at
-  # provisioning time so PlistBuddy is no longer needed at runtime.
+
   home.file = builtins.listToAttrs (
     builtins.map (vm: {
       name = "Library/Application Support/nucleus/vms/${vm.id}-config.plist";

@@ -1,11 +1,4 @@
-# src/treefmt.nix — treefmt formatter multiplexer configuration.
-#
-# treefmt-nix module imported by flake.nix via mkWrapper.
-# Configures which formatters are enabled and their settings.
-#
-# Enabled: nixfmt, deadnix, yamllint, shellcheck, shfmt, taplo, packer,
-#          actionlint, pinact, zizmor
-# Disabled: mdformat, typos (see WHY in programs)
+# src/treefmt.nix - treefmt configuration, imported by flake.nix via mkWrapper.
 
 { ... }:
 {
@@ -17,11 +10,11 @@
     yamllint.enable = true;
     shellcheck = {
       enable = true;
-      # resolves `# shellcheck source=` directives relative to each script's directory
+      # SCRIPTDIR resolves `# shellcheck source=` relative to each script dir,
+      # and external-sources follows the sourced files it needs.
       source-path = "SCRIPTDIR";
-      # follow external sourced files (required for source-path to work)
       external-sources = true;
-      # Explicitly enforce the lowest severity so ALL findings fail the build.
+      # Lowest severity, so every finding fails the build.
       severity = "style";
     };
 

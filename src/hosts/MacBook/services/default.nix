@@ -1,25 +1,12 @@
-# MacBook/services.nix — General macOS service configurations.
+# MacBook/services.nix - shared daemon cache flush that runs after both the
+# Automator workflow and App bundle sub-modules deploy, so NSServicesStatus and
+# LaunchServices changes take effect in one activation.
 #
-# Coordinates Automator workflow bundles (services/automator-workflows/default.nix) and
-# App bundles (services/app-bundles/default.nix) deployment. This file handles shared
-# daemon cache flush that runs after both sub-modules have deployed, so changes
-# from both Automator workflows (NSServicesStatus) and App bundles
-# (LaunchServices registration) take effect in one activation.
-#
-# For Automator workflows (.workflow bundles appearing in right-click →
-# Quick Actions or menu bar → Services): see automator-workflows/default.nix
-#
-# For App bundles (.app bundles appearing in menu bar → Services):
-# see app-bundles/default.nix
-#
-# Sorting policy — all service entry lists across both sub-modules are
-# manually maintained in their declared order; no automatic re-sorting.
-#   currentNucleusAppBundles: alphabetical by appDir.
-#   currentNucleusWorkflows: alphabetical by entry name, with the 5 Optimize
-#     PDF presets grouped as a block sorted quality-descending and numbered
-#     ((1) default → (2) prepress → (3) printer → (4) ebook → (5) screen) so the
-#     bundle directory names sort correctly. This is the cross-platform
-#     convention (same on NixOS and Windows).
+# Sorting policy: both sub-modules keep their entry lists by hand, no automatic
+# re-sorting. currentNucleusAppBundles is alphabetical by appDir;
+# currentNucleusWorkflows is alphabetical by entry name with the 5 Optimize PDF
+# presets grouped and numbered quality-descending so bundle directory names sort
+# correctly. Same convention on NixOS and Windows.
 { lib, pkgs, ... }:
 let
   activationBundle = pkgs.callPackage ../../../modules/lib/script-tree.nix { };
@@ -42,10 +29,8 @@ in
   # Inject shared helpers into sub-modules.
   _module.args = { inherit mkPresentationModes; };
 
-  # Shared cache flush that runs after both Automator workflows and App bundles
-  # have been deployed. Each sub-module handles its own deploy and prune
-  # lifecycle; this entry ensures final cache coherency, including the forced
-  # pbs rescan that makes renamed or pruned workflows visible without a logout.
+  # Runs after both sub-modules deploy, including the forced pbs rescan that
+  # makes renamed or pruned workflows visible without a logout.
   home.activation.macos-flush-services-cache =
     lib.hm.dag.entryAfter [ "macos-deploy-automator-workflows" "macos-deploy-app-bundles" ]
       ''

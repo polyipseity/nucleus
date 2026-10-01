@@ -25,10 +25,9 @@ let
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
 {
-  # User-scope gitconfig (~/.gitconfig) as a method-1 (writable) symlink to the
-  # selected repo file, created at activation time against the LIVE repo root so
-  # repo changes take effect without rebuild. HM's backupFileExtension renames a
-  # pre-existing regular file to ~/.gitconfig.bak (same folder) on first activation.
+  # User-scope gitconfig (~/.gitconfig), method-1 (writable) symlink to the
+  # selected repo file against the LIVE repo root. HM's backupFileExtension
+  # renames a pre-existing regular file to ~/.gitconfig.bak on first activation.
   # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
   home.activation.seed-git-gitconfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
@@ -37,9 +36,9 @@ in
       "${hostName}"
   '';
 
-  # User-scope ignore file (~/.config/git/ignore) as a method-1 (writable) symlink
-  # to the selected repo file; core.excludesFile in the user gitconfig points here.
-  # Git has no global-scoped ignore file, so ignore content lives at user scope.
+  # User-scope ignore file (~/.config/git/ignore), method-1 (writable) symlink;
+  # core.excludesFile in the user gitconfig points here. Git has no globally
+  # scoped ignore file, so ignore content lives at user scope.
   # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
   home.activation.seed-git-gitignore = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
@@ -49,10 +48,8 @@ in
   '';
 
   home.activation.assemble-git-empty-template = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    # Ensure the empty template directory exists so `init.templateDir` always
-    # points at an existing (but empty) directory.  This suppresses the 15+ sample
-    # hook scripts and description file that Git otherwise copies into every new
-    # .git directory from the system template store.
+    # An empty init.templateDir suppresses the 15+ sample hooks and description
+    # file Git would otherwise copy into every new .git directory.
     mkdir -p "$HOME/.config/git/empty_template"
   '';
 }

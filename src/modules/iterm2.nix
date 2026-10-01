@@ -1,12 +1,7 @@
-# iTerm2 terminal emulator configuration.
-#
-# Houses iTerm2 shell integration script, Dynamic Profiles directory symlink,
-# and zsh initContent sourcing guard.  NSUserDefaults keys are in
-# src/hosts/MacBook/defaults.nix (darwin context, where
-# system.defaults.CustomUserPreferences is available).
-#
-# Parity note: iTerm2 is macOS-only.  No equivalent exists on NixOS/Windows.
-#
+# iTerm2 configuration: shell integration script, Dynamic Profiles symlink, and
+# the zsh sourcing guard. NSUserDefaults keys live in hosts/MacBook/defaults.nix
+# (darwin context, where CustomUserPreferences is available).
+# macOS-only; no NixOS or Windows equivalent.
 # Source: https://iterm2.com/documentation.html
 {
   config,
@@ -26,11 +21,9 @@ let
     else
       config.home.username;
 
-  # Pinned iTerm2 zsh shell integration script placed at
-  # ~/.iterm2_shell_integration.zsh via home.file.  The script enables command
-  # marks, command history, directory reporting, and in-terminal image display
-  # in iTerm2 sessions; it is sourced at zsh startup via programs.zsh.initContent.
-  # Update sha256 when iTerm2 publishes a new integration revision:
+  # Pinned iTerm2 zsh shell integration script. Enables command marks, history,
+  # directory reporting, and in-terminal images in iTerm2 sessions. Update the
+  # hash when iTerm2 publishes a new revision:
   #   nix-prefetch-url https://iterm2.com/shell_integration/zsh
   iterm2ZshIntegration = pkgs.fetchurl {
     url = "https://iterm2.com/shell_integration/zsh";
@@ -57,11 +50,9 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
     ".iterm2_shell_integration.zsh".source = iterm2ZshIntegration;
   };
 
-  # Method-1 (writable) symlink for the iTerm2 Dynamic Profiles directory. Created
-  # at activation time against the LIVE repo root so profile edits take effect
-  # without rebuild. The writable/immutable decision is owned by managedSymlinkPaths;
-  # this entry must run before protect-out-of-store-symlinks so the link is hardened
-  # if immutable.
+  # Writable symlink to the Dynamic Profiles directory, created against the LIVE
+  # repo root so profile edits take effect without a rebuild. Runs before
+  # protect-out-of-store-symlinks so the link gets hardened.
   # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
   home.activation.seed-iterm2-dynamic-profiles = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
@@ -69,10 +60,8 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
       "${overlay.toRepoRelPath iterm2DynamicProfilesDir}" \
   '';
 
-  # Source iTerm2 shell integration when the script is present.  The test-e
-  # guard makes this a no-op in non-iTerm2 terminals (VS Code terminal, SSH,
-  # Ghostty, etc.) where the iTerm2 escape sequences produce no useful output
-  # and may be visible as raw control codes.
+  # The test-e guard keeps this a no-op outside iTerm2 (VS Code terminal, SSH,
+  # Ghostty), where the escape sequences show up as raw control codes.
   programs.zsh.initContent = ''
     test -e "$HOME/.iterm2_shell_integration.zsh" && source "$HOME/.iterm2_shell_integration.zsh"
   '';

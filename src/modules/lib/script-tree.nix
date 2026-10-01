@@ -1,23 +1,18 @@
-# src/modules/lib/script-tree.nix — Single derivation bundling scripts for activation
-# and writeNucleusShellApplication wrappers. Bundles:
-#   - src/scripts/ (cross-host POSIX)
-#   - src/platforms/ (platform activation scripts)
-#   - src/hosts/<Host>/scripts/ (host-only activation scripts; selective, not full hosts tree)
-# The $out/ layout mirrors the repo root under $out/src/, making paths repo-root-relative.
-# Shellcheck runs in nucleus-check sh / CI, not at derivation build time.
+# src/modules/lib/script-tree.nix - one derivation bundling src/scripts/,
+# src/platforms/, and each host's scripts/ under $out/src/, so bundled paths stay
+# repo-root-relative. Shellcheck runs in nucleus-check sh / CI, not at build time.
 #
-# WHY: every bundled directory is interpolated on its own; none of the parent
-# trees (repo root, src/) may be referenced. A shell glob over
-# `${../../../src}/hosts/*/scripts` interpolates all of src/, which makes every
-# edit anywhere under src/ a new input here — re-keying this derivation and
-# every nucleus-*-app wrapper built from it.
+# WHY: each directory is interpolated on its own and no parent tree is
+# referenced. A glob over `${../../../src}/hosts/*/scripts` interpolates all of
+# src/, which re-keys this derivation and every nucleus-*-app wrapper on any
+# edit under src/.
 { pkgs }:
 
 let
   inherit (pkgs) lib;
 
-  # Hosts are discovered at eval time so adding a host's scripts/ dir needs no
-  # edit here; only directories that exist are interpolated.
+  # Eval-time discovery: a new host scripts/ dir needs no edit here, and only
+  # directories that exist are interpolated.
   hostScriptTrees =
     map
       (host: {

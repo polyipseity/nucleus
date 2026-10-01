@@ -1,13 +1,7 @@
-# MacBook/jellyfin.nix — Host-level singleton Jellyfin daemon + HTTPS ingress.
-#
-# Runs one shared Jellyfin instance for the whole host instead of one
-# LaunchAgent per Home Manager user.
-#
-# HTTPS is provided by the shared https-proxy module; this file only declares
-# the Jellyfin daemon and the virtual host entry for the proxy.
-#
-# Sources:
-# - https://jellyfin.org/docs/general/post-install/networking/reverse-proxy/
+# MacBook/jellyfin.nix - one shared Jellyfin instance for the whole host instead
+# of a LaunchAgent per Home Manager user. HTTPS comes from the shared
+# https-proxy module; this file declares the daemon and its virtual host.
+# Source: https://jellyfin.org/docs/general/post-install/networking/reverse-proxy/
 {
   config,
   lib,
@@ -43,12 +37,11 @@ in
 {
   launchd.daemons.jellyfin = {
     serviceConfig = {
-      # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons
-      # with non-root UserName (EX_CONFIG 78). /bin/sh is Apple-signed and
-      # ref: macos-service-hardening.instructions.md -- SIP /bin/sh wrapper
-      # Upstream <https://github.com/nix-darwin/nix-darwin/issues/1219> tracks
-      # making launchd services show descriptive names; do not revisit until
-      # that issue is resolved.
+      # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons with
+      # a non-root UserName (EX_CONFIG 78), and /bin/sh is Apple-signed.
+      # ref: macos-service-hardening.instructions.md - SIP /bin/sh wrapper
+      # Do not revisit until
+      # <https://github.com/nix-darwin/nix-darwin/issues/1219> is resolved.
       ProgramArguments = [
         "/bin/sh"
         "-c"

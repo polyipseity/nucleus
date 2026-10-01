@@ -1,17 +1,13 @@
-# platforms/macOS/modules/finder-sidebar.nix — Finder sidebar favorites automation.
-#
-# Provides Nix-level helpers for deterministic Finder sidebar state via
-# mysides.  Used by macos.nix activation hooks.
+# platforms/macOS/modules/finder-sidebar.nix - deterministic Finder sidebar state
+# via mysides, used by macos.nix activation hooks.
 { config, lib, ... }:
 let
-  # URI-encode a string for use in file:// URLs consumed by `mysides add`.
-  # `mysides` expects properly encoded URIs; raw spaces cause silent failures.
+  # mysides needs encoded file:// URIs; raw spaces fail silently. lib.escapeURL
+  # (RFC 3986) encodes, then : and / are decoded back so the URI stays valid.
   # Source: https://en.wikipedia.org/wiki/Percent-encoding
-  # Uses nixpkgs lib.escapeURL (RFC 3986) then decodes structural characters
-  # (: and /) back so file:// URIs remain valid.
   uriEncode = url: builtins.replaceStrings [ "%3A" "%2F" ] [ ":" "/" ] (lib.escapeURL url);
 
-  # Canonical list of managed Finder favorites and ordering.
+  # Managed Finder favorites, in order.
   finderSidebarManagedFavorites = [
     {
       name = "Applications";
@@ -58,16 +54,15 @@ in
 rec {
   inherit finderSidebarManagedFavorites;
 
-  # Number of managed favorites; used to scope the sidebar-order comparison
-  # to the exact count of expected entries.
+  # Managed favorite count, used to scope the sidebar-order comparison.
   finderSidebarManagedCount = builtins.length finderSidebarManagedFavorites;
 
-  # Keep expected sidebar order derivable from the managed favorites list.
+  # Expected order, derived from the managed favorites list.
   finderSidebarExpectedOrder = builtins.concatStringsSep "|" (
     map (favorite: favorite.name) finderSidebarManagedFavorites
   );
 
-  # Paths guaranteed by macOS to exist under $HOME — skip symlink guard.
+  # macOS guarantees these under $HOME, so the symlink guard is skipped.
   finderSidebarAlwaysExist = [
     "Applications"
     "Desktop"
