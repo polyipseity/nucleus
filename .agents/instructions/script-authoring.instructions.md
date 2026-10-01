@@ -8,95 +8,70 @@ applyTo: "scripts/**, src/scripts/**, src/**/*.ps1, src/platforms/Windows/module
 
 ## Placement and naming
 
-Name scripts for the task they perform. Choose the extension matching the intended shell or runtime. Move a script into the source tree if it becomes application code rather than repo automation.
+Name a script for the task it performs and pick the extension matching the runtime. Move it into `src/` once it is application code rather than repo automation. `src/scripts/apply.sh` lives under `src/` because the flake embeds it as `apps.apply`; doc and line-ending rules are the same as for `scripts/`.
 
-`src/scripts/apply.sh` lives under `src/` because it is embedded in the flake as `apps.apply`; same doc and line-ending rules as `scripts/`.
-
-**Host-specific placement rule**: `src/hosts/<Host>/scripts/` = host-specific feature. `src/platforms/<Platform>/scripts/` = platform-shared behavior. Cross-platform features belong in non-host subdirectories (`services/`, `configs/`, `packages/`, `editors/`, `secrets/`, `shell/`, `agents/`, `lib/`, `integrations/`). See `cross-host-feature-parity.instructions.md` for deduplication policy.
-
-## Per-directory naming patterns
-
-Non-host subdirectories: **verb-first** (`<verb>-<target>.<ext>`, most subdirs), **entity-first** (`<entity>-<role>.<ext>`, `services/` only), **lib** (`<domain>.sh`). Host-specific scripts use `<prefix>-<verb>-<target>.<ext>` (`macos-`, `nixos-`, etc.).
+`src/hosts/<Host>/scripts/` is host-specific, `src/platforms/<Platform>/scripts/` is platform-shared, and anything applicable to both POSIX hosts belongs in a shared subdirectory (`services/`, `configs/`, `packages/`, `editors/`, `secrets/`, `shell/`, `agents/`, `lib/`, `integrations/`). Deduplication policy is in `cross-host-feature-parity.instructions.md`. Shared subdirectories are verb-first (`<verb>-<target>.<ext>`), except `services/` which is entity-first (`<entity>-<role>.<ext>`) and `lib/` (`<domain>.sh`); host-specific scripts take a platform prefix.
 
 ## Cross-platform coordination
 
-`scripts/bootstrap.sh` and `scripts/bootstrap.ps1` are paired entry points for the same intent — keep capability parity. When adding a dependency or behavior on one platform, update the other in the same change. Shared version pins live in `scripts/bootstrap-versions.env`.
+`scripts/bootstrap.sh` and `scripts/bootstrap.ps1` are paired entry points for the same intent and keep capability parity: add a dependency on one platform and add it to the other in the same change. Shared version pins live in `scripts/bootstrap-versions.env`.
+
+Keep scripts non-interactive with predictable exit codes and idempotent operations. No Bash-only features in `.sh` unless documented, and full cmdlet names over PowerShell aliases. When a script's location or behavior changes, re-check `.github/workflows/ci.yml` and any instruction file that names it.
 
 ## Relative pathing convention
 
-All scripts that source other files must derive their directory via SCRIPT_DIR and source via SCRIPT_DIR-relative paths. Standard form:
-
-```sh
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-. "$SCRIPT_DIR/relative/path"
-```
-
-`pwd -P` resolves symlinks; `CDPATH=''` prevents interference. Never use bare `$(dirname "$0")` in a source line. Scripts in `scripts/` that resolve via `$_self` (symlink-safe) use `dirname -- "$_self"` instead.
+A script that sources another file derives its own directory and sources relative to that, exactly `SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"`. `pwd -P` resolves symlinks and `CDPATH=''` prevents interference. Never use bare `$(dirname "$0")` in a source line. Scripts under `scripts/` reached through a symlink use `dirname -- "$_self"`.
 
 ## CLI option and variable naming
 
-Use `--XXX`/`--no-XXX` flag pairs. Shell variables use bare positive names (`ai_sync`, not `do_ai_sync`). PowerShell uses `[switch]$AISync` + `[switch]$NoAISync`.
+Use `--XXX` / `--no-XXX` flag pairs, and a bare positive shell variable name (`ai_sync`, not `do_ai_sync`) with conditions testing `"$x" = false`.
 
 | Aspect | Convention |
 | ----------------- | --------------------------------------------------------- |
-| Shell variable | `ai_sync=true` (positive, no prefix) |
-| Conditional check | `if [ "$ai_sync" = false ]` |
 | POSIX CLI flag | `--ai-sync` / `--no-ai-sync` |
 | PowerShell param | `[switch]$AISync` + `[switch]$NoAISync` |
 | PowerShell call | `-AISync` / `-NoAISync` |
 
 ## Line endings and permissions
 
-Respect `.editorconfig` and `.gitattributes` for line endings. Every `.sh`, `.ps1`, and `.bat` script file must have its executable bit tracked in Git (`100755`). Set it with `git update-index --chmod=+x <path>`. Non-script data files (`.yml`, `.json`, `.nix`, `bootstrap-versions.env`) must remain `100644`.
+Every `.sh`, `.ps1`, and `.bat` file must keep its executable bit in Git (`100755`, set with `git update-index --chmod=+x <path>`); non-script data files (`.yml`, `.json`, `.nix`, `bootstrap-versions.env`) must stay `100644`. Line endings follow `.editorconfig` and `.gitattributes`.
 
 ## Sorting
 
-Sort all unordered lists alphabetically: package lists, shell aliases, `extraGroups`, `nix.settings.experimental-features`, `case` branch labels, environment variable blocks. Do not sort semantically significant order (`boot.initrd.availableKernelModules`, ordered `imports`, `case` branches where matching order matters like a catch-all `*`). Avoid repository-brand prefixes (`nucleus*`) in new Nix identifiers unless needed for disambiguation.
-
-## Portability and safety
-
-Keep scripts non-interactive by default. Prefer explicit error handling, predictable exit codes, and idempotent operations. Do not assume Bash-only features in `.sh` unless documented. Prefer full cmdlet names over aliases in PowerShell.
+Sort unordered lists alphabetically: package lists, shell aliases, `extraGroups`, `nix.settings.experimental-features`, `case` branch labels, environment variable blocks. Never sort semantically significant order (`boot.initrd.availableKernelModules`, ordered `imports`, `case` branches where a catch-all `*` must match last), and avoid `nucleus*` prefixes on new Nix identifiers unless disambiguation demands it.
 
 ## Privilege-gating policy
 
-A privilege is "required" only when the operation cannot succeed without it.
+A privilege counts as required only when the operation cannot succeed without it.
 
-1. **Default (`src/` code, non-user-facing paths):** if required but unavailable, **hard-error** (exit non-zero). No warn-and-continue. No fallback to a degraded non-privileged path.
-2. **User-facing exception (`scripts/` only — `nucleus-*` CLI set):** escalate to obtain the privilege (POSIX: `sudo`; Windows: `RunAs`). Warn-and-skip only if escalation is genuinely impossible.
-3. **Inverse family — hard-refuse when already elevated:** scripts that manage escalation internally (`scripts/bootstrap.sh`, `scripts/bootstrap.ps1`, `src/scripts/apply.sh`, `src/hosts/Windows/apply.ps1`) refuse to run already-elevated. Windows provisioning to `%ProgramData%\nucleus\bin` runs under `RunAs` — no non-admin fallback.
-4. **Non-escalatable privileges (warn-and-skip):** macOS Full Disk Access (TCC grant), `nucleus-apply health-check` diagnostics, `Invoke-VMSetup.ps1` WHPX detection.
-5. Applies to all platforms.
+1. Default (`src/` code, non-user-facing paths): if required but unavailable, hard-error with a non-zero exit. No warn-and-continue, no degraded non-privileged path.
+2. User-facing exception (`scripts/` only, the `nucleus-*` CLI set): escalate to get it (POSIX `sudo`, Windows `RunAs`), and warn-and-skip only when escalation is genuinely impossible.
+3. Inverse family: scripts that manage escalation internally (`scripts/bootstrap.sh`, `scripts/bootstrap.ps1`, `src/scripts/apply.sh`, `src/hosts/Windows/apply.ps1`) hard-refuse to run already elevated. Windows provisioning to `%ProgramData%\nucleus\bin` runs under `RunAs` with no non-admin fallback.
+4. Non-escalatable privileges warn and skip: macOS Full Disk Access, `nucleus-apply health-check` diagnostics, `Invoke-VMSetup.ps1` WHPX detection.
+5. This holds on every platform.
 
-**Jellyfin admin token** (`.Policy.IsAdministrator`): not covered by this policy. Missing token = hard-error, not warn-and-skip. This is a configuration-prerequisite check, not an escalation case.
+A missing Jellyfin admin token (`.Policy.IsAdministrator`) is not an escalation case: it is a configuration prerequisite, so it hard-errors.
 
-## CWD independence — all `nucleus-*` commands must work from any working directory
+## CWD independence
 
-Root resolution via `derive_repo_root()` in `src/scripts/lib/lib.sh` (priority: `NUCLEUS_REPO_ROOT` → `<SYSTEM root>/repo-root` (macOS `/Library/Application Support/nucleus/repo-root`, NixOS `/var/lib/nucleus/repo-root`) → `SCRIPT_DIR` walk → `git rev-parse`). Values that point into `/nix/store/` are rejected at every source, so a store snapshot can never be used as the repo root. `scripts/apply.sh` writes the live checkout path to `<SYSTEM root>/repo-root` before and after each rebuild; `src/modules/posix/security.nix` preserves `NUCLEUS_REPO_ROOT` through `sudo`.
-
-Scripts must not assume cwd is inside the repository. Script-specific `--repo-root` flags are acceptable overrides but not the sole mechanism.
+Every `nucleus-*` command works from any working directory. `derive_repo_root()` in `src/scripts/lib/lib.sh` resolves the root in this order: `NUCLEUS_REPO_ROOT`, the SYSTEM root `repo-root` file (macOS `/Library/Application Support/nucleus/repo-root`, NixOS `/var/lib/nucleus/repo-root`), a `SCRIPT_DIR` walk, `git rev-parse`. Values pointing into `/nix/store/` are rejected at every source, so a store snapshot can never become the repo root. `scripts/apply.sh` writes the live checkout path to that file before and after each rebuild, and `src/modules/posix/security.nix` preserves `NUCLEUS_REPO_ROOT` through `sudo`. A script-specific `--repo-root` flag is an acceptable override, never the only mechanism.
 
 ## Runtime configuration (`nucleus-config`)
 
-Runtime toggles live at `~/.local/state/nucleus/config.json` (outside `~/.config/` so changes survive rebuilds), resolved identically on every host. Toggles default to `true` when absent, enforced by `scripts/config.sh` / `scripts/config.ps1`. Services read the config file directly for early-boot compatibility. When adding a toggle: add a default entry to both script implementations, and read the key in consuming code (including direct readers) with the same default as that entry.
+Toggles live at `~/.local/state/nucleus/config.json`, outside `~/.config/` so they survive rebuilds, and resolve identically on every host. They default to `true` when absent. `scripts/config.sh` / `scripts/config.ps1` enforce them while services read the file directly for early-boot compatibility. A new toggle needs a default entry in both script implementations and the same default at every read site.
 
 ## Terminology in examples
 
-Use `admin` for primary/elevated users and `guest` for secondary/unprivileged users in all code examples and documentation.
-
-## Tooling alignment
-
-Keep script behavior consistent with CI, `AGENTS.md`, and prompt guidance. If a script wraps project tooling, keep underlying commands discoverable. When script location or behavior changes, re-check `.github/workflows/ci.yml`, and any prompt or instruction files that reference it.
+Use `admin` for the primary or elevated user and `guest` for a secondary or unprivileged one, in code examples and documentation alike.
 
 ## apply.sh health-check SOPS identity
 
-The `health-check` subcommand must export `SOPS_AGE_KEY_FILE` pointing at the machine age key — resolve it with `nucleus_machine_age_key_path` from `src/scripts/lib/lib.sh`, never a literal path — before its `sops -d` probe loop. `sops` does not search that path by default, so without it `sops` falls through to GPG, which may lack the key. The path is the one `sops.age.keyFile` declares in `src/modules/secrets.nix`; see `check_secret_health()` in `src/scripts/apply.sh`.
+`health-check` must export `SOPS_AGE_KEY_FILE` at the machine age key before its `sops -d` probe loop, resolved with `nucleus_machine_age_key_path` from `src/scripts/lib/lib.sh` and never a literal path. `sops` does not search that path by default and falls through to GPG, which may lack the key. The path is the one `sops.age.keyFile` declares in `src/modules/secrets.nix`; see `check_secret_health()` in `src/scripts/apply.sh`.
 
 ## Machine age key auto-registration
 
-`apply.sh` calls `generate_ssh_host_key_if_needed` then `register_host_age_key_if_needed` before `darwin-rebuild`/`nixos-rebuild`. First checks for `/etc/ssh/ssh_host_ed25519_key`; if absent, runs `sudo env "PATH=$PATH" ssh-keygen -A` (Darwin/NixOS only). Derives machine age key via `ssh-to-age -i`; if new, inserts before the `# -- machine keys end --` marker, rewraps SOPS files, and prints `git add`/`git commit` commands (operator commits manually). Requires GPG keyring. Tools from `mkApplyApp` `runtimeInputs`. Windows: `Register-HostAgeKey` in `src/platforms/Windows/modules/secrets/Register-HostAgeKey.ps1`.
+`src/scripts/apply.sh` runs `secrets/generate-ssh-host-key.sh` then `secrets/register-host-age-key.sh` before `darwin-rebuild` or `nixos-rebuild`. The latter generates `/etc/ssh/ssh_host_ed25519_key` when missing, derives the machine age key with `ssh-to-age -i`, and when the key is new inserts it before the marker `    # -- machine keys end; personal SSH backup key below --`, rewraps the SOPS files, and prints the `git add`/`git commit` commands for the operator. It needs a GPG keyring and the tools from `mkApplyApp` `runtimeInputs`. Windows: `Register-HostAgeKey` in `src/platforms/Windows/modules/secrets/Register-HostAgeKey.ps1`.
 
-## Pre-provision key adoption semantics
+## SSH key adoption
 
-`ssh-key-adopt` (POSIX) and `Sync-NucleusSecretFile` (Windows) flush the SSH agent when the recorded fingerprint differs from the newly materialized one. Three cases: (1) manifest absent, key present → flush (first provision), (2) manifest exists, key rotated → flush, (3) manifest exists, key unchanged → no flush (idempotent).
-
-Do not add `[ -n "$old_fingerprint" ]` (POSIX) or `$oldSshFingerprint -ne ''` (Windows) guards — they would skip the flush on first provision, leaving stale keys.
+`adopt-ssh-key.sh` (POSIX) and `Sync-SecretFile` (Windows) flush the SSH agent when the recorded fingerprint differs from the newly materialized one. Do not add an `[ -n "$old_fingerprint" ]` guard on the POSIX side or an `-ne ''` guard on the Windows side: either one skips the flush on first provision and leaves stale keys.

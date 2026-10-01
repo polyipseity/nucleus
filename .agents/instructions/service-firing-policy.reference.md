@@ -5,68 +5,37 @@ name: "Service Firing Policy Reference"
 
 # Service firing policy reference
 
+Per-host mechanism, scope, and unit path live in `src/modules/services.json`. Read them there; this file only classifies services by how they fire and records the rules the JSON cannot express.
+
 ## Default templates per platform
 
 | | Persistent daemon (auto-start + crash recovery) | Periodic oneshot (timer-triggered, exit between runs) |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| ----------------- | --------------------------------------------------------- | --------------------------------------------------------- |
 | **macOS launchd** | `RunAtLoad = true; KeepAlive = true;` | `StartInterval` or `StartCalendarInterval`; `KeepAlive = false` |
 | **NixOS systemd** | `wantedBy = ["multi-user.target"]` (system) / `["default.target"]` (user); `Restart = "always"` | `systemd.timers` (calendar/`OnUnitActiveSec`) + `Type = "oneshot"` service |
 | **Windows** | SCM: `StartType = Automatic`; scheduled task: `AtLogOn`/`AtStartup`. Internal `while ($true)` loop for keepalive. | Scheduled task: calendar trigger or `Once` + `Repetition` |
 
 ## Persistent daemons (default)
 
-| Service | macOS | NixOS | Windows |
-| ------------------------- | ------------------------------------------- | ------------------------- | ---------------------- |
-| `betterdisplay-heartbeat` | launchd `agent`, user | — (N/A) | — (N/A) |
-| `caddy` | launchd `daemon`, system | SCM | SCM |
-| `camilladsp` | launchd `daemon`, system | systemd `service`, system | scheduled task, user |
-| `camilladsp-heartbeat` | launchd `agent`, user | systemd `service`, system | scheduled task, user |
-| `camillagui-backend` | launchd `daemon`, system | systemd `service`, system | scheduled task, user |
-| `cloud-drive` | launchd `agent`, user | systemd `service`, user | scheduled task, user |
-| `discord-music-rpc` | launchd `agent`, user | systemd `service`, user | scheduled task, user |
-| `jellyfin` | launchd `daemon`, system | systemd `service`, system | SCM |
-| `linux-builder` | launchd `daemon`, system | — (N/A) | — (N/A) |
-| `litellm` | launchd `daemon`, system | systemd `service`, system | SCM |
-| `ollama` | launchd `daemon`, system | systemd `service`, system | SCM |
-| `rdp` | — (N/A) | — (N/A) | SCM |
-| `service-watchdog` | launchd `daemon`, system | systemd `service`, system | scheduled task, system |
-| `service-watchdog-user` | launchd `agent`, user | systemd `service`, user | — (N/A: the system task reconciles every user) |
-| `ssh-agent` | launchd `agent`, user (built-in) | systemd `service`, user | SCM |
-| `sshd` | launchd `daemon`, system (socket-activated) | systemd `service`, system | SCM |
+`betterdisplay-heartbeat`, `caddy`, `camilladsp`, `camilladsp-heartbeat`, `camillagui-backend`, `cloud-drive`, `discord-music-rpc`, `hermes-agent`, `jellyfin`, `linux-builder`, `litellm`, `ollama`, `rdp`, `redis`, `service-watchdog`, `service-watchdog-user`, `ssh-agent`, `sshd`.
+
+Everything not in the oneshot list below fires this way, so a new service defaults to a persistent daemon.
 
 ## Periodic oneshots (exceptions)
 
-| Service | macOS | NixOS | Windows | Rationale |
-| -------------------------- | ---------------------------------------------------- | ------------------------------------------------------ | ---------------------------------- | -------- |
-| `gc-weekly` | launchd `daemon`, StartInterval=86400 | systemd `timer`, system (Sun 12:00, `Persistent=true`) | scheduled task (Weekly, Sun 12:00) | Full `gc.sh` as root; user homedir via `sudo -u` |
-| `log-gc-system` | launchd `daemon`, StartInterval=86400 | systemd `timer`, system (daily 12:00, `Persistent=true`) | scheduled task (Daily, 12:00) | System log rotation (root-owned logs) |
-| `log-gc-user` | launchd `agent`, StartInterval=86400 | systemd `timer`, user (daily 12:00, `Persistent=true`) | scheduled task (Daily, 12:00) | User log rotation |
-| `nix-index-update` | launchd `agent`, StartCalendarInterval (daily 12:00) | systemd `timer`, user (daily 12:00, `Persistent=true`) | — (N/A) | Nix ecosystem only |
-| `dev-ds-store-gc` | launchd `agent`, StartCalendarInterval (daily 12:00) | — (N/A) | — (N/A) | macOS `.DS_Store` cleanup |
-| `dev-spotlight-exclusions` | launchd `agent`, StartCalendarInterval (daily 12:00) | — (N/A) | — (N/A) | macOS Spotlight metadata |
-| `icloud-exclusions` | launchd `agent`, StartInterval=3600 | — (N/A) | — (N/A) | macOS iCloud xattr drift |
+| Service | Cadence | Why not a daemon |
+| --- | --- | --- |
+| `gc-weekly` | `StartInterval=86400`, Sun 12:00, `Persistent=true` | full `gc.sh` as root plus the user homedir via `sudo -u` |
+| `log-gc-system` | `StartInterval=86400`, daily 12:00 | system log rotation of root-owned logs |
+| `log-gc-user` | `StartInterval=86400`, daily 12:00 | user log rotation |
+| `nix-index-update` | `StartCalendarInterval`, daily 12:00 | Nix ecosystem only; Windows uses Scoop |
+| `icloud-exclusions` | `StartInterval=3600` | macOS iCloud xattr drift |
 
-`gc-weekly` log overlap with daily `log-gc-user`/`log-gc-system` is intentional and idempotent. `duperemove` (NixOS only): weekly btrfs dedup on `/nix/store`.
+`gc-weekly` overlapping the daily log GCs is intentional and idempotent. `duperemove` is NixOS-only and runs weekly over `/nix/store`.
 
 ## Internal loop pattern
 
-Persistent daemons needing periodic work use internal sleep loops instead of platform timers. Why: platform timers become crash recovery only; fixes Windows `Duration` cap (P1D stopped repeating after 24 h).
-
-```bash
-# POSIX
-while true; do
-  do_work "$@"
-  sleep "$INTERVAL"
-done
-```
-
-```powershell
-# Windows
-while ($true) {
-  Do-Work
-  Start-Seconds -Seconds $Interval
-}
-```
+A persistent daemon that also needs periodic work uses an internal sleep loop instead of a platform timer. Platform timers give crash recovery only, and an internal loop gets around the Windows scheduled-task `Duration` cap, where a `P1D` repetition stopped repeating after 24 hours.
 
 ## Interval configuration
 
@@ -82,13 +51,11 @@ while ($true) {
 | Service | Reason |
 | -------------------------- | ------ |
 | `betterdisplay-heartbeat` | macOS-only virtual screen app |
-| `dev-ds-store-gc` | `.DS_Store` is Finder/Spotlight convention |
-| `dev-spotlight-exclusions` | `.metadata_never_index` is macOS filesystem attr |
-| `icloud-exclusions` | `com.apple.fileprovider.ignore#P` xattr is macOS-only |
-| `gui-env` | `launchctl setenv` + `launchctl config user path`; login-time coverage |
-| `linux-builder` | Nix Linux builder VM; NixOS runs Linux natively |
+| `gui-env` | `launchctl setenv` plus `launchctl config user path`; needs login-time coverage |
+| `icloud-exclusions` | `com.apple.fileprevider.ignore#P` xattr is macOS-only |
+| `linux-builder` | Nix Linux builder VM; NixOS builds Linux natively |
 
-POSIX-only: `nix-index-update` — Nix ecosystem only; Windows uses Scoop.
+`nix-index-update` is POSIX-only: Nix ecosystem, no Windows equivalent.
 
 ## ssh-agent and sshd
 

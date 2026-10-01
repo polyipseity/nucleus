@@ -6,88 +6,44 @@ applyTo: "src/modules/posix/base.nix, src/modules/configs/nix/**, src/flake.nix,
 
 # Nix store space policy
 
-## Canonical store policy
+## Store settings
 
-Managed in [`posix/base.nix`](../../src/modules/posix/base.nix) (NixOS `nix.settings`) and mirrored in [`nix.custom.conf`](../../src/modules/configs/nix/nix.custom.conf) on MacBook (`nix.enable = false` under Determinate Nix).
+Settings live in [`posix/base.nix`](../../src/modules/posix/base.nix) (NixOS `nix.settings`) and [`nix.custom.conf`](../../src/modules/configs/nix/nix.custom.conf) on MacBook (`nix.enable = false` under Determinate Nix). Read them there instead of trusting a copy. `min-free`/`max-free` are GC pressure thresholds; the `apply.sh` `health-check` `--min-free-bytes` (16 GB) is a separate system-wide check and not the same number.
 
-| Setting | Value | Notes |
-| ------- | ----- | ----- |
-| `auto-optimise-store` | `true` | Hard-link deduplication; no per-rebuild full `nix store optimise` |
-| `keep-derivations` / `keep-outputs` | `true` | Intentional — supports `nix-shell` and rollback |
-| `lazy-trees` | `true` | Reduces eval-time copy of flake source trees |
-| `eval-cores` | `0` (`auto`) | Parallel Nix evaluation |
-| `min-free` | `16 GB` | GC trigger when store volume free space drops below this during builds |
-| `max-free` | `64 GB` | Target free space after automatic GC |
+Two invariants are invisible in those files. `keep-derivations`/`keep-outputs` stay `true` because `nix-shell` and rollback need them. GC is age-based (`nix-collect-garbage --delete-older-than` in `posix/base.nix`, [`nix-store-gc.sh`](../../src/scripts/services/nix-store-gc.sh), [`gc.sh`](../../scripts/gc.sh)), never `-d`.
 
-Different from [`apply.sh`](../../scripts/apply.sh) `health-check` `--min-free-bytes` (16 GB system-wide).
+Generation retention keeps the newest `generationsKeep` (default 7) and anything newer than `expiry` (default 7d), configured in [`gc-options.nix`](../../src/modules/lib/gc-options.nix) and overridable through `NUCLEUS_GC_GENERATIONS_KEEP` / `NUCLEUS_GC_EXPIRY` or the `nucleus-gc` flags.
 
-Age-based GC: `nix-collect-garbage --delete-older-than` ([`posix/base.nix`](../../src/modules/posix/base.nix), [`nix-store-gc.sh`](../../src/scripts/services/nix-store-gc.sh), [`gc.sh`](../../scripts/gc.sh)). Never `-d`.
+Scheduling: daily `nixStoreGc` runs `nix-store-gc.sh`; weekly `gc-weekly` runs `gc.sh` as root plus the user homedir via `sudo -u`.
 
-**Generation retention:** newest `generationsKeep` (default 7) AND newer than `expiry` (default 7d). Config: [`gc-options.nix`](../../src/modules/lib/gc-options.nix); override: `NUCLEUS_GC_GENERATIONS_KEEP`/`NUCLEUS_GC_EXPIRY` + `nucleus-gc` flags.
+Host `/nix`: MacBook is the APFS volume (Determinate). NixOS is Btrfs `@nix` ([`disks.nix`](../../src/hosts/NixOS/hardware/disks.nix), [`btrfs-options.nix`](../../src/hosts/NixOS/btrfs-options.nix)) with `compress-force=zstd` and `noatime`; the NixOS guest image uses the same layout ([`src/vms/NixOS/formats/`](../../src/vms/NixOS/formats/)).
 
-**Scheduling:** daily `nixStoreGc` → `nix-store-gc.sh`; weekly `gc-weekly` → `gc.sh` (root + user via `sudo -u`) + `duperemove` on btrfs `/nix/store` ([`duperemove-store.sh`](../../src/scripts/services/duperemove-store.sh)).
+## Btrfs measurement and maintenance
 
-**Host `/nix`:** MacBook — APFS volume (Determinate); `min-free`/`max-free` apply. NixOS — Btrfs `@nix` ([`disks.nix`](../../src/hosts/NixOS/hardware/disks.nix), [`btrfs-options.nix`](../../src/hosts/NixOS/btrfs-options.nix)), `compress-force=zstd`, `noatime`. Guest: same ([`src/vms/NixOS/formats/`](../../src/vms/NixOS/formats/)).
+`compress-force=zstd` on `@` and `@nix` forces on substituted paths ([nix#3550](https://github.com/NixOS/nix/issues/3550)), so `df` and `du` under-report. Measure with `compsize` or `btdu`.
 
-## Btrfs compression and measurement
+NixOS runs `duperemove` weekly over `/nix/store` from `gc-weekly` through `gc.sh` into [`duperemove-store.sh`](../../src/scripts/services/duperemove-store.sh) with `--hashfile=/var/lib/duperemove/hashfile`. `nucleus-gc --no-duperemove-gc` opts out.
 
-- `compress-force=zstd` on `@` and `@nix` — forces on substituted paths ([nix#3550](https://github.com/NixOS/nix/issues/3550)); `df`/`du` under-report; use `compsize` or `btdu`
+## `$out` layout and runtime copies
 
-## `$out` layout and duplication
-
-`writeNucleusShellApplication` ([`flake.nix`](../../src/flake.nix)): `$out/scripts` + `$out/src`, entry at `$out/<scriptName>.sh`. No `bundleDefault`. Each app symlinks shared derivations (two symlinks, no per-app tree duplication). Shellcheck in CI only. Call-site: [`nix-authoring.instructions.md`](nix-authoring.instructions.md).
-
-## Runtime copies (reflink)
+`writeNucleusShellApplication` ([`flake.nix`](../../src/flake.nix)) puts `scripts` and `src` under `$out` with the entry at `$out/<scriptName>.sh`, and sets no `bundleDefault`. Each app symlinks the shared derivations, so the tree is not duplicated per app. Call-site rules are in [`nix-authoring.instructions.md`](nix-authoring.instructions.md).
 
 | Host | Store FS | Reflink at runtime |
 | ---- | -------- | ------------------ |
-| MacBook | APFS (`/nix` volume) | `copy_with_reflink` in `lib.sh` for wallpaper/VM images on CoW volume |
-| NixOS | Btrfs `@nix` subvolume | `copy_with_reflink` for wallpaper/VM qcow on same btrfs partition |
+| MacBook | APFS (`/nix` volume) | `copy_with_reflink` in `lib.sh` for wallpaper and VM images |
+| NixOS | Btrfs `@nix` | `copy_with_reflink` for wallpaper and VM qcow |
 | Windows | No Nix store | N/A |
 
-D3: [`equaliser`](../../src/flake.nix) and [`camillagui-backend`](../../src/hosts/MacBook/camilladsp.nix) ship self-contained `.app` bundles — must copy, not symlink (breaks macOS app isolation and code signing). E3: [`core.nix`](../../src/modules/core.nix) registers same `pkgs.<attr>` in `environment.systemPackages` + `home.packages` — one store path, dual PATH, intentional.
+Two deliberate exceptions. `equaliser` and `camillagui-backend` ship self-contained `.app` bundles and must be copied, never symlinked, because macOS app isolation and code signing break on a symlink. `core.nix` registers the same `pkgs.<attr>` in `environment.systemPackages` and `home.packages` to get one store path with dual PATH entries.
 
-## Rejected items
+## Rejected
 
-| ID | Item | Why rejected |
-| ---- | ---- | ------------ |
-| B7 | `keep-derivations` / `keep-outputs` = `false` | Breaks `nix-shell` / rollback |
-| B8 | `nix store optimise` after every rebuild | Too slow; use `auto-optimise-store` + `nix.optimise.automatic` |
-| C3 | `nix-collect-garbage -d` | Destructive; age-based GC exists |
-| C7 | Default expiry 7d → 3d | Too aggressive; use `--nix-expiry` to opt in |
-| A8 | Content-addressed script bundles | Experimental; premature |
-| E3 | "Fix" dual `sharedPackages` | Intentional design |
-
-## Active btrfs maintenance (NixOS)
-
-| ID | Item | Policy |
-| ---- | ---- | ------ |
-| F2 | btrfs + `duperemove` | Weekly via `gc-weekly` → `gc.sh` → [`duperemove-store.sh`](../../src/scripts/services/duperemove-store.sh) on `/nix/store` (`--hashfile=/var/lib/duperemove/hashfile`). Opt out: `nucleus-gc --no-duperemove-gc`. |
-| F4 | `@nix` subvolume + `noatime` | Provisioned on NixOS host and guest images. |
-
-## Not applicable
-
-| ID | Item | Why |
-| ---- | ---- | --- |
-| F1 | Enable APFS clones | Mac `/nix` already APFS |
-| F3 | ZFS online dedup | No ZFS in repo |
-| F5 | CoW FS for reflink ingestion | Upstream Nix required |
-| D2-Win | VM reflink on Windows | NTFS — no APFS-style reflink |
-| D4 | Windows wallpaper hardlink/reflink | NTFS; symlink sufficient |
-| G1 | Reflink copy into Nix store | Not implemented upstream |
-| G2 | Incremental `nix store optimise` | [nix#9450](https://github.com/NixOS/nix/issues/9450) |
-| G4 | Bind-mount sandbox files | [nix#8965](https://github.com/NixOS/nix/pull/8965) |
-| G5 | Derivation hardlink hints | Closed wontfix [nix#1272](https://github.com/NixOS/nix/issues/1272) |
-| G6 | Content-addressed store paths | Experimental upstream CLI |
-| G7 | `.flakeignore` / lazy self inputs | [nix#4097](https://github.com/NixOS/nix/issues/4097); `lazy-trees` partial mitigation |
-| G9 | nix-darwin #1551 version gate | No version gating in nucleus |
+| Item | Why |
+| ---- | --- |
+| `keep-derivations` / `keep-outputs = false` | breaks `nix-shell` and rollback |
+| `nix store optimise` after every rebuild | too slow; `auto-optimise-store` plus `nix.optimise.automatic` covers it |
+| `nix-collect-garbage -d` | destructive; age-based GC exists |
 
 ## Store audit
 
-Opt-in: `--store-audit` or `NUCLEUS_HEALTH_CHECK_STORE_AUDIT=1`. Manual: `nix run .#apply audit-store`.
-
-Report sections: top closures via `nix path-info --json`, grouped by store path prefix; generation count; reclaim hint (→ `nucleus-gc`); GC roots by category; stale `result` symlinks; Linux-builder VM store (MacBook only).
-
-**Note:** duplicate checkouts each pin `.direnv/flake-inputs` GC roots — consolidate or `nucleus-gc` after removing stale repos.
-
-G8: [`linux-builder.nix`](../../src/hosts/MacBook/linux-builder.nix) — aarch64-linux builds in NixOS VM with separate `/nix/store`. Align substituters/trusted keys, `builders-use-substitutes = true`, scheduled builder-side GC.
+Opt in with `--store-audit` or `NUCLEUS_HEALTH_CHECK_STORE_AUDIT=1`. Duplicate checkouts each pin a `.direnv/flake-inputs` GC root, so a store that will not shrink usually means stale repos: consolidate them or run `nucleus-gc`.
