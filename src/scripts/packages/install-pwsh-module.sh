@@ -11,8 +11,10 @@ set -euo pipefail
 _ipm_pwsh="$1"
 _ipm_module="$2"
 _ipm_version="$3"
-# WHY the default: the activation entries in src/modules/pwsh.nix pass no
-#   privilege command, and a host with nothing to remove does not need one.
+# WHY empty is still allowed: a caller with nothing to remove converges without
+#   one, and the program below names the copy and its owner when a removal
+#   turns out to be needed. The Home Manager entries in src/modules/pwsh.nix and
+#   scripts/bootstrap.sh both pass a resolved sudo.
 _ipm_privilege="${4:-}"
 
 # WHY the skips stay non-fatal: a host with no pwsh yet, or a lockfile with no

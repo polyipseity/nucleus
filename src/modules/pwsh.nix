@@ -28,6 +28,14 @@ let
 
   agentEnv = import ./shell/agent-env-vars.nix;
 
+  # WHY the split: nixpkgs marks sudo Linux-only, and macOS ships its own at
+  #   /usr/bin/sudo, which is already on a user session's PATH.
+  # WHY it is passed at all: the Home Manager activation runs as this user, so
+  #   the installer needs the command to escalate through for a copy it cannot
+  #   remove itself. apply.sh keeps the sudo timestamp alive, so this never
+  #   prompts during an apply.
+  sudoCommand = if pkgs.stdenv.hostPlatform.isLinux then "${pkgs.sudo}/bin/sudo" else "/usr/bin/sudo";
+
   # A single-host key resolves to null on other hosts, so the consumer guards on
   # the empty string and stays inert there.
   optionalEnv = value: if value == null then "" else value;
@@ -119,7 +127,8 @@ in
     "${activationBundle}/src/scripts/packages/install-pwsh-module.sh" \
       "${pkgs.powershell}/bin/pwsh" \
       "Pester" \
-      "${pwshPesterVersion}"
+      "${pwshPesterVersion}" \
+      "${sudoCommand}"
   '';
 
   # Needed by Invoke-ScriptAnalyzer in src/scripts/checks/check-pwsh.ps1.
@@ -127,7 +136,8 @@ in
     "${activationBundle}/src/scripts/packages/install-pwsh-module.sh" \
       "${pkgs.powershell}/bin/pwsh" \
       "PSScriptAnalyzer" \
-      "${pwshAnalyzerVersion}"
+      "${pwshAnalyzerVersion}" \
+      "${sudoCommand}"
   '';
 
   # Needed by the locked DSC validation phase in scripts/check.ps1.
@@ -135,6 +145,7 @@ in
     "${activationBundle}/src/scripts/packages/install-pwsh-module.sh" \
       "${pkgs.powershell}/bin/pwsh" \
       "powershell-yaml" \
-      "${pwshYamlVersion}"
+      "${pwshYamlVersion}" \
+      "${sudoCommand}"
   '';
 }
