@@ -9,66 +9,36 @@ name: "Host/Platform Naming Reference"
 
 | Layer | Values | Role |
 | ----- | ------ | ---- |
-| **Host** | `MacBook`, `NixOS`, `Windows` | Primary lookup key: services, env-catalog, config paths, flake attrs, `NUCLEUS_HOST`, user registry maps |
+| **Host** | `MacBook`, `NixOS`, `Windows` | Primary lookup key: services, env catalog, config paths, flake attrs, `NUCLEUS_HOST`, user registry maps |
 | **Platform** | `macOS`, `NixOS`, `Windows` | OS-family entity; owns `flags` (`darwin`, `posix`, `linux`, `win32`); VM guest `type` |
-| **Implementation** | `uname`, `stdenv.isDarwin`, nixpkgs `system` | Boundary only — map immediately via `host-platform-registry.json` |
+| **Implementation** | `uname`, `stdenv.isDarwin`, nixpkgs `system` | Boundary only, mapped immediately through the registry |
 
-## Rules
+Data keyed by physical machine identity uses a host key. Data about OS-family semantics or flags uses a platform key. Anything coming from nixpkgs, the kernel, or a third-party API keeps its upstream name and gets mapped at the boundary.
 
-- Host JSON entries reference platform by name only (`"platform": "macOS"`). Never put flags on host objects.
-- Flags live in `host-platform-registry.json` → `platforms.<PlatformKey>.flags` only.
-- Lookup host first. When flags needed: `platformForHost(host)` → `flagsForPlatform(platform)`.
-- `services.json` uses `hosts.MacBook|NixOS|Windows`, not `platforms.macos|nixos|windows`.
-- Flake configuration attrs: `darwinConfigurations.MacBook`, `nixosConfigurations.NixOS`.
-- Env-catalog `values` keys and `resolveValue` use host names (`MacBook`, not `macOS`).
-- Config paths under `src/modules/configs/` use host directory names (`MacBook/`, `NixOS/`, `Windows/`).
-- Script prefixes (`macos-`, `nixos-`) and nixpkgs `meta.platforms` are implementation boundaries — do not rename to host keys.
-
-## Decision tree
-
-1. Data keyed by physical machine identity? → **Host key** (`MacBook`, `NixOS`, `Windows`).
-2. Data about OS-family semantics or flags? → **Platform key** (`macOS`, `NixOS`, `Windows`).
-3. Data from nixpkgs, kernel, or third-party API? → Keep upstream naming; map at boundary via registry helpers.
+Flags live only in `host-platform-registry.json` under `platforms.<PlatformKey>.flags`, never on host objects, and a host JSON entry references its platform by name (`"platform": "macOS"`). So `services.json` is keyed `hosts.MacBook|NixOS|Windows`, the env catalog `values` keys and `resolveValue` take host names, `src/modules/configs/` directories use host names, and the flake exposes `darwinConfigurations.MacBook` and `nixosConfigurations.NixOS`. Script prefixes (`macos-`, `nixos-`) and nixpkgs `meta.platforms` stay implementation-bound; do not rename them to host keys. Check step 8 enforces this on the service registry.
 
 ## Canonical helpers
 
 | Surface | Host resolution | Platform / flags |
 | ------- | --------------- | ---------------- |
-| Nix | `host-platform.nix` → `platformForHost`, `flagsForHost` | `flagsForPlatform` |
+| Nix (`host-platform.nix`) | `platformForHost` | `flagsForPlatform`, `flagsForHost` |
 | POSIX shell | `resolve_nucleus_host` | `nucleus_platform_for_host`, `nucleus_flag_for_host` |
-| PowerShell | `Get-NucleusHostKey` (`$env:NUCLEUS_HOST` or `Windows`) | `Get-NucleusPlatformForHost`, `Test-NucleusPlatformFlag` in `Get-NucleusHostPlatform.ps1` |
+| PowerShell (`Get-NucleusHostPlatform.ps1`) | `Get-NucleusHostKey` (`$env:NUCLEUS_HOST` or `Windows`) | `Get-NucleusPlatformForHost`, `Test-NucleusPlatformFlag` |
 
-## SSOT files
-
-- `src/modules/host-platform-registry.json` — host → platform refs; platform → flags
-- `src/modules/services.json` — per-service `hosts.*` with required `platform` field
-- `src/modules/lib/env-secrets.nix` — `values.MacBook|NixOS|Windows`
-
-## Audit
-
-Host vs platform vs implementation naming enforced by service-registry validation (check step 8).
+SSOT: `src/modules/host-platform-registry.json` for host to platform and platform to flags, `src/modules/services.json` for per-service `hosts.*` with its required `platform` field, `src/modules/lib/env-secrets.nix` for `values.MacBook|NixOS|Windows`.
 
 ## Cross-surface identifier mapping
 
 | Surface | Convention | Example |
 | ------- | ---------- | ------- |
-| Nix/POSIX activation entries (`home.activation.*`, `system.activationScripts.*`, `nucleus.terminalActivations.*`) | kebab-case, verb-first (see `activation-scripts.instructions.md`) | `write-terminal-activations` |
+| Nix/POSIX activation entries (`home.activation.*`, `system.activationScripts.*`, `nucleus.terminalActivations.*`) | kebab-case, verb-first (`activation-scripts.instructions.md`) | `write-terminal-activations` |
 | DSC file IDs | `<scope>/<kebab-name>.dsc.yml` | `user/shell.dsc.yml` |
 | PowerShell functions/modules | PascalCase with approved verbs (`Sync-*`, `Deploy-*`, `Invoke-*`, `Get-*`, `Set-*`) | `Sync-TerminalActivation` |
 | POSIX apply step functions (`src/scripts/apply.sh`) | snake_case `run_*` | `run_terminal_activations` |
 | Stage labels (`src/scripts/apply.sh`, `src/hosts/Windows/apply.ps1`) | `<label>:` kebab-case | `terminal-activations:` |
 
-### Worked cross-boundary pair
+One step, four spellings: `write-terminal-activations`, `Sync-TerminalActivation`, `terminal-activations:`, `run_terminal_activations`. The singular/plural asymmetry is deliberate (PowerShell singular, activation and stage plural), so do not "fix" it.
 
-`write-terminal-activations` ↔ `Sync-TerminalActivation` ↔ `terminal-activations:` ↔ `run_terminal_activations` — same step, all surfaces. Singular/plural asymmetry is deliberate (PowerShell singular, activation/stage plural). Do not "fix" this.
+Kept as is: `Disable-SteamAutoStartup` keeps the approved `Disable` verb, and the `config-utils.nix` generated names (`unprotectSymlink_${name}` and friends) stay exempt from kebab-case, mirrored on Windows by the `Deploy-*` names in `ConfigHelpers.ps1`.
 
-### Kept-as-is decisions
-
-- `Disable-SteamAutoStartup` keeps approved `Disable` verb.
-- `config-utils.nix` generated names (`unprotectSymlink_${name}` etc.) exempt from kebab-case; Windows mirrors with `ConfigHelpers.ps1` `Deploy-*` names.
-
-### Known stage-label gaps
-
-Documented parity gaps (not fixed):
-- POSIX `apply.sh` lacks `svc:`, `vm-setup:`, `vm-sync:` labels Windows emits.
-- Windows `apply.ps1` lacks `health-check:` and `caddy-local-ca-trust:` labels POSIX emits.
+Known stage-label gaps, not fixed: POSIX `apply.sh` lacks the `svc:`, `vm-setup:`, and `vm-sync:` labels Windows emits, and Windows `apply.ps1` lacks the `health-check:` and `caddy-local-ca-trust:` labels POSIX emits.

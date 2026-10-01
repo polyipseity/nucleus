@@ -5,7 +5,7 @@ name: "VM Reference"
 
 # VM reference
 
-## Host × Guest Matrix
+## Host × guest matrix
 
 | Host \ Guest | macOS | NixOS | Windows |
 | ------------ | ------------- | --------------- | --------------- |
@@ -13,9 +13,9 @@ name: "VM Reference"
 | NixOS | not supported | libvirt/KVM | libvirt/KVM |
 | Windows | not supported | QEMU standalone | QEMU standalone |
 
-macOS guest: Tart only (Apple Virtualization.framework). No automated Tart→UTM handoff.
+A macOS guest runs under Tart only (Apple Virtualization.framework), with no automated Tart to UTM handoff. Provisioning host (`hosts[]`, `NUCLEUS_HOST`) is the physical machine, not the guest `type`.
 
-## Guest identity — field contract
+## Guest identity: field contract
 
 | Field | Use for | Never use for |
 | --- | --- | --- |
@@ -24,61 +24,25 @@ macOS guest: Tart only (Apple Virtualization.framework). No automated Tart→UTM
 | `type` | `~/…/src/<type>/`, build templates, per-type GC | Disk filenames, CLI selection, UUID |
 | `hostname` | In-guest `hostName`/`ComputerName`; must equal `name` | Artifact paths, domain names |
 
-Provisioning host (`hosts[]`, `NUCLEUS_HOST`) is the physical machine, not guest `type`.
+`src/modules/vms/VMs.schema.json` is the field list, including which fields are required, which are nullable (`Windows.isoUrl`, `Android.gsiUrl`), and the per-type blocks that are required for one `type` and forbidden for the others. Read it instead of a copy of the table.
 
-### Template tokens
+Template tokens: `__VM_ID__` for domain, bundle, and paths; `__VM_DISPLAY__` for the UTM label or libvirt title; `__GUEST_HOSTNAME__` for the Autounattend and Packer install.
 
-`__VM_ID__` → domain/bundle/paths. `__VM_DISPLAY__` → UTM label/libvirt title. `__GUEST_HOSTNAME__` → Autounattend/Packer install.
-
-### Path layout
-
-Runtime: `~/virtual machines/src/<type>/`. Build templates: `src/vms/<type>/`. Disks: `~/virtual machines/data/<id>.qcow2`. `src/vms/templates/` is shared scaffolding, not a type directory.
-
-## VM manifest — required fields
-
-| Field | Type | Description |
-| --- | --- | --- |
-| `id` | string | File paths, domains, UUID/MAC, CLI |
-| `name` | string | Display label (UTM/virt-manager, CLI tables) |
-| `type` | string | `"Android"`, `"NixOS"`, `"Windows"`, `"macOS"` |
-| `enabled` | bool | Provisioned |
-| `hosts` | array | `"MacBook"`, `"NixOS"`, `"Windows"`; non-empty |
-| `cpus` | int | Virtual CPUs |
-| `ram` | string | Size string (e.g. `"8GB"`) |
-| `diskSize` | string | Boot disk size |
-| `shareDevDir` | bool | Mount `~/dev` via VirtioFS |
-| `sound` | string | `"intel-hda"` or `"none"` |
-| `portForwards` | array | `{guestPort, hostPort}` pairs |
-| `hostname` | string | Must equal `name` |
-| `minImageSize` | string | Minimum image size floor |
-| `macAddressPrefix` | string | Guest NIC MAC prefix |
-
-Type-specific fields (all required when `type` matches, forbidden otherwise):
-
-| `type` | Fields |
-| --- | --- |
-| `"Android"` | `systemImage`, `userdataImage`, `gsiImage`, `gsiUrl` (nullable), `gappsUrl` (MindTheGapps zip) |
-| `"macOS"` | `version` (e.g. `"tahoe"`) |
-| `"Windows"` | `edition` (e.g. `"pro"`), `isoUrl` (nullable: `null` = auto-resolve) |
-
-All fields required. Nullable: `Windows.isoUrl`, `Android.gsiUrl`.
+Paths: runtime `~/virtual machines/src/<type>/`, build templates `src/vms/<type>/`, disks `~/virtual machines/data/<id>.qcow2`. `src/vms/templates/` is shared scaffolding, not a type directory.
 
 ## Size suffix grammar
 
-All size fields use suffixed strings. Identical grammar across parsers (`size.nix`, `size.sh`, `SizeStrings.ps1`); malformed strings abort.
+All size fields take suffixed strings, and the three parsers (`size.nix`, `size.sh`, `SizeStrings.ps1`) share this grammar. Malformed strings abort.
 
 ```text
 ^[0-9]+ ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$
 ```
 
-- Decimal: `kB`, `MB`, `GB`, `TB` (powers of 10). Binary: `kiB`, `MiB`, `GiB`, `TiB` (powers of 2).
-- Optional space allowed: `"8GB"`, `"8 GB"`. `KB`/`KiB` invalid; `k` always lowercase.
-- Canonical: decimal (`"8GB"`, `"128GB"`). Binary accepted but not convention.
-- Suffix carries unit; property names carry none. Internal unit: integer bytes.
+Decimal suffixes are powers of 10, binary ones powers of 2. A space before the suffix is allowed (`"8GB"`, `"8 GB"`); `KB` and `KiB` are invalid and `k` is always lowercase. Decimal is canonical, binary is accepted but not conventional. The suffix carries the unit, the property name carries none, and the internal unit is integer bytes.
 
 ## Port forwarding
 
-`portForwards`: `{guestPort, hostPort}` pairs. All forwards and probes derive from this — never hard-code. **Reserved:** `22000–22099`.
+`portForwards` holds `{guestPort, hostPort}` pairs. Every forward and probe derives from it, so a literal host port is a bug. `22000` to `22099` is reserved.
 
 | VM | Host port(s) | Guest port | Service |
 | ---- | ------------- | ------------ | --------- |
@@ -88,47 +52,36 @@ All size fields use suffixed strings. Identical grammar across parsers (`size.ni
 | Android | `22040` | `5555` | ADB |
 | Android | `22041` | `5554` | Emulator console |
 
-- Non-Android: one `guestPort: 22`. Android: `5555` (ADB) + `5554` (console), no `22`.
-- UTM/QEMU/libvirt render generically. QEMU/Packer: `hostfwd=tcp::<hostPort>-:<guestPort>`.
-- Probes resolve by `guestPort` (`22` SSH, `5555` ADB), never literal host port.
+Non-Android guests forward `22` only; Android forwards `5555` and `5554` and no `22`. Probes resolve by `guestPort` (`22` SSH, `5555` ADB).
 
 | Backend | Forward mechanism | Host-local access |
 | --------- | ------------------- | ------------------- |
 | UTM (Emulated) | `PortForward` plist dicts from manifest | `localhost:<hostPort>` |
 | Windows QEMU | `hostfwd` in start scripts | `localhost:<hostPort>` |
 | libvirt/KVM | passt `<portForward><range start='hostPort' to='guestPort'/></portForward>` | `localhost:<hostPort>` |
-| Tart (macOS) | `--net-softnet-expose hostPort:guestPort` | Use `tart ip <name>` + SSH guest port `22` (softnet-expose does not bind loopback) |
+| Tart (macOS) | `--net-softnet-expose hostPort:guestPort` | `tart ip <name>` plus SSH on guest port `22`, since softnet-expose does not bind loopback |
 | Android | Same as QEMU host backend | `adb connect localhost:<hostPort for guest 5555>` |
 
-Host tooling: `adb`/`fastboot` for `android-config`. POSIX: `pkgs.android-tools` in `core.nix`. Windows: `Google.PlatformTools` via WinGet.
+`adb` and `fastboot` come from `pkgs.android-tools` in `core.nix` on POSIX and `Google.PlatformTools` via WinGet on Windows.
 
 ## Disk format
 
-QCOW2 throughout. Runtime disks in `data/`; system images in `src/<type>/`. macOS/NixOS: `~/virtual machines/data/<id>.qcow2`; Windows: `%USERPROFILE%\virtual machines\data\<id>.qcow2`. UTM hard-links into bundle.
+QCOW2 throughout. Runtime disks live in `data/` and system images in `src/<type>/`: `~/virtual machines/data/<id>.qcow2` on macOS and NixOS, `%USERPROFILE%\virtual machines\data\<id>.qcow2` on Windows. UTM hard-links disks into the bundle.
 
-UEFI vars: macOS/Windows `data/<id> (nvram).fd`; NixOS uses libvirt NVRAM. System images: `~/virtual machines/src/<type>/system image.qcow2` (phase 1 builds once; phase 2 creates overlay).
+UEFI vars are `data/<id> (nvram).fd` on macOS and Windows, with libvirt NVRAM on NixOS. A system image at `~/virtual machines/src/<type>/system image.qcow2` is built once, then backed by a writable overlay.
 
-`src/vms/templates/README.md` token-replaced; preserve `__VM_DIR_DISPLAY__`. Changes require `test_vm_readme_template_content` reconciliation.
+`src/vms/templates/README.md` is token-replaced, so preserve `__VM_DIR_DISPLAY__`; a change requires `test_vm_readme_template_content` reconciliation.
 
-## macOS — Tart
+## macOS: Tart and UTM
 
-- Backend: Tart CLI (Apple Virtualization.framework); macOS only. Store: `~/virtual machines/tart/vms/<id>/`.
-- Build: Packer + `tart-cli` plugin from GHCR. Start: `tart run --net-softnet --net-softnet-expose <hostPort>:<guestPort> <id>`. SSH: `tart ip <id>` + port 22.
-- Running: `tart list --format json` + `.Running == true` via `vm_get_running_ids`.
+Tart stores bundles in `~/virtual machines/tart/vms/<id>/`, is built with Packer plus the `tart-cli` plugin from GHCR, and starts as `tart run --net-softnet --net-softnet-expose <hostPort>:<guestPort> <id>`. Running state comes from `tart list --format json` with `.Running == true` through `vm_get_running_ids`.
 
-## macOS — UTM
+UTM uses QEMU with the bundle at `~/virtual machines/<id>.utm/` and `config.plist` pre-generated by `src/hosts/MacBook/vms.nix`, which `vm.sh setup` copies in. Disks are hard links only, writable overlays backing onto `Data/system base.qcow2` for the UTM sandbox, with `efi_vars.fd` adopted into `data/<id> (nvram).fd`; Android adds extra disk links. Networking is emulated (QEMU user/slirp), so a vmnet-shared backend drops the forwards. `vm.sh setup` compares the template against the bundle with `cmp -s`, not against the Nix source, so run `nucleus-apply` after a manifest change. `utmctl` is `/Applications/UTM.app/Contents/MacOS/utmctl` and running VMs are the entries whose `Status != stopped`.
 
-- Backend: UTM 4.x QEMU. Bundle: `~/virtual machines/<id>.utm/`.
-- Config: `config.plist` pre-generated by `src/hosts/MacBook/vms.nix`; `vm.sh setup` copies into bundle.
-- Disks: hard links only. Writable overlays back onto `Data/system base.qcow2` (hard link to `src/<type>/system image.qcow2`) for UTM sandbox. Android adds extra disk links. `efi_vars.fd` adopted into `data/<id> (nvram).fd`.
-- Network: emulated (QEMU user/slirp) — vmnet-shared drops forwards.
-- Template drift: `vm.sh setup` compares template vs bundle (`cmp -s`), not vs Nix source. Run `nucleus-apply` after manifest changes.
-- `utmctl`: `/Applications/UTM.app/Contents/MacOS/utmctl`. Running: filter `Status != stopped` via `vm_get_running_ids`.
+## NixOS: libvirt/KVM
 
-## NixOS — libvirt/KVM
+Infrastructure is `src/hosts/NixOS/vms.nix` with `qemu_kvm`, `virt-manager`, `virt-viewer`, `virtiofsd`, and `passt`, plus the `kvm` and `libvirtd` groups. The domain XML is pre-generated at `/etc/nucleus/vms/<name>-domain.xml` and `vm.sh setup` runs `virsh define`. Networking is passt, with VirtioFS, SPICE, and OVMF+swtpm. Start through `start-<name>.sh`/`.ps1` or `virt-manager`.
 
-Infrastructure: `src/hosts/NixOS/vms.nix`. Packages: `qemu_kvm`, `virt-manager`, `virt-viewer`, `virtiofsd`, `passt`. Groups: `kvm`, `libvirtd`. Domain XML pre-generated at `/etc/nucleus/vms/<name>-domain.xml`; `vm.sh setup` → `virsh define`. Networking: passt. VirtioFS, SPICE, OVMF+swtpm. Start: `start-<name>.sh`/`.ps1` or `virt-manager`.
+## Windows: QEMU via Scoop
 
-## Windows — QEMU via Scoop
-
-QEMU via Scoop (`Invoke-ScoopSetup.ps1`). Disks/start scripts in `%USERPROFILE%\virtual machines\`. Start: `start-<name>.ps1`. VirtioFS requires `virtiofsd` as separate process (see `~/virtual machines/README.md`).
+QEMU comes from Scoop through `Invoke-ScoopSetup.ps1`, with disks and start scripts in `%USERPROFILE%\virtual machines\` and `start-<name>.ps1` to launch. VirtioFS needs `virtiofsd` as a separate process (see `~/virtual machines/README.md`).

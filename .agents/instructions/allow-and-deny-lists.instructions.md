@@ -6,7 +6,7 @@ applyTo: "scripts/**, src/**, tests/**"
 
 # Allow and deny list policy
 
-Registry of all hard-coded filter lists. Every filter: category, justification, tier.
+Every hard-coded filter list carries a category id, a justification, and a tier.
 
 ## Tiers
 
@@ -14,30 +14,20 @@ Registry of all hard-coded filter lists. Every filter: category, justification, 
 2. **T2 (Self-prune, must error).** Post-check: confirm each exclusion still holds. Stale → error.
 3. **T3 (Track).** `# ref: allow-and-deny-lists.instructions.md` at site. Quarterly review.
 
-## Inline comment
-
-`# ref: <target> -- <just>` — e.g. `# ref: allow-and-deny-lists.instructions.md#A12 -- pip/npm in comments`. `--` separator, never em dash. No `reason:` keyword.
-
 ## Gitignore-based denylist
 
-Library: `src/scripts/lib/deny-list.sh` (`filter_gitignored`, `find_git_tracked`), `deny-list.ps1` (`Select-GitIgnored`, `Get-GitTrackedFile`).
+`src/scripts/lib/deny-list.sh` (`filter_gitignored`, `find_git_tracked`), `deny-list.ps1` (`Select-GitIgnored`, `Get-GitTrackedFile`).
 
-1. File lists pipe through `filter_gitignored`/`Select-GitIgnored` (automatic via `cache_file_lists()`).
-2. Hard-coded exclusions only for non-gitignore reasons. Remove `.gitignore`-duplicates.
-3. Structural dir exclusions (e.g. `vendor/`) as find `-prune` + filter → Category B.
-4. `git` required — missing fails `preflight_check()`.
-
-| Layer | Usage |
-| --- | --- |
-| `step-runner` | Sources lib; `require_command git`; `cache_file_lists()` pipes |
-| Check steps | POSIX: 11, 14; PowerShell: 7, 9, 14 |
-| `test-lib.sh` | Discovery pipes through filter |
+1. File lists pipe through the filter. `step-runner.sh` does it inside `cache_file_lists()`; POSIX check steps 11, 12, 13 and PowerShell steps 07, 11, 12, 13 call it themselves.
+2. Hard-coded exclusions only for non-gitignore reasons. Drop `.gitignore` duplicates.
+3. Structural dir exclusions (`vendor/`) as find `-prune` plus the filter, Category B.
+4. `git` is required; a missing one fails `require_command` in the step-runner preflight.
 
 ## Instance registry
 
-Categories A–D, dummy key rules below. New exclusions: category ID, tier, `# ref:`.
+A new exclusion needs a category id, tier, and `# ref:`.
 
-### Category A — Filename-based
+### Category A: filename-based
 
 | ID | Files | Excluded | Tier | Reason | Verify |
 | --- | --- | --- | --- | --- | --- |
@@ -47,12 +37,12 @@ Categories A–D, dummy key rules below. New exclusions: category ID, tier, `# r
 | A7 | `step-runner.sh`, `.ps1` | `*.schema.json` | T3 | Narrow glob | Quarterly |
 | A8 | `07-schema-validation.sh`, `.ps1` | **Schema definitions:** `*.schema.json`. **External formats (no published schema):** `*/users/*/cursor/*.json`, `*/users/*/iterm2/DynamicProfiles/*.json`, `*/users/*/obsidian/*.json`, `*/users/*/qtpass/*.json`, `*/users/*/rimsort/*.json`, `*/configs/camilladsp/*`, `*/configs/camillagui-backend/*`, `*/users/*/discord-music-rpc/*`, `*/users/*/agents/hooks/*.json`, `*/users/*/agents/skills/*/_meta.json`, `*/configs/litellm/*`, `*/users/*/hermes/plugins/*/plugin.yaml`, `*/users/*/vscode/mcp.json`, `*/users/*/vscode/chatLanguageModels*.json`, `*/.sops.yaml`. **Tool config:** `.yamllint.yml` (yamllint's own schema rejects `$schema`). **Infrastructure:** `*/vendor/*`, `*/secrets/*`, `*/.github/*` | T3 | Nucleus-owned data: `$schema` required (we write our own). External formats: use published `$schema` when available; never roll our own. Exempt when no published schema exists. | Quarterly |
 | A9 | `11-repo-policy-grep.sh` | self-file (basename) | T3 | Self-ref contains literal patterns detected | Quarterly |
-| A10 | `11-repo-policy-grep.sh` | `android-fake-wifi-guest-setup.sh`, `android-fake-wifi-guest-revert.sh` | T3 | Android guest scripts run inside the guest, which has no Nix store and cannot accept a store-path arg or a PATH prepend, so the `ip`/`modprobe`/`rmmod` there cannot be resolved by the mechanism this check enforces. The whole file is excluded rather than the token, because there is no store in the guest to resolve against. | Quarterly |
-| A11 | `scripts/gc.sh` | `command -v` tool lookups | T3 | `scripts/` is outside the check's scanned `_activation_dirs`, so a lookup here is not a stored exclusion but a relocation. Recorded because the rule is still satisfied: `duperemove-store.sh` takes the binary as `$_duperemove_bin="$1"` and invokes `"$_duperemove_bin"`, which is the `_X_bin="$1"` contract. The real constraint is narrower than "NixOS-only": the derivation carrying `runtimeInputs` is `gcWeekly` in `src/modules/gc-activations.nix`, shared by `posix/base.nix` and `hosts/NixOS/activation.nix`, so a NixOS-only package cannot be added without splitting the wrapper. `duperemove`, `cargo-cache`, `ollama`, `jq` and `journalctl` are all resolved this way. | Quarterly |
-| A12 | `11-repo-policy-grep.sh` | patterns `repo-policy-.*\.(sh\|ps1)`, `repository-policy.*\.(sh\|ps1)`, `1[123]-repo-policy-.*\.sh` (stored list, not filenames) | T3 | The package-manager scan bans bare `pip`/`npm` install, and the step files carry that literal in their own detection patterns and error strings. The patterns are a superset of the files that exist: the first matches nothing, the second matches `repository-policy-awk-tests.sh`, and the third matches the six step files plus their tests. Excluded by basename and glob from the whole-repo branch; `$pmeExcludeNames` in the twin | Quarterly |
-| A13 | `11-repo-policy-grep.sh` | `configure-gpg-agent.sh` | T3 | Part of the store-path-arg resolution `_exclude_pattern` in `run_store_path_arg_usage`: its `_*_bin` variables are configuration parameters rather than commands, so the scan would report false positives. The self-file basenames in the same pattern are A9. The android guest scripts are excluded by a separate list in `run_activation_tool_resolution` and recorded as A10; `src/scripts/secrets/` is in `_activation_dirs`, so that function's filter does not exclude `configure-gpg-agent.sh` | Quarterly |
+| A10 | `11-repo-policy-grep.sh` | `android-fake-wifi-guest-setup.sh`, `android-fake-wifi-guest-revert.sh` | T3 | The guest has no Nix store, so its `ip`/`modprobe`/`rmmod` cannot resolve against one. The whole file is excluded, not the token. | Quarterly |
+| A11 | `scripts/gc.sh` | `command -v` tool lookups | T3 | `scripts/` is outside the scanned `_activation_dirs`, so a lookup here is a relocation, not a stored exclusion. `duperemove-store.sh` takes the binary as `$_duperemove_bin="$1"`, which is the `_X_bin="$1"` contract. A NixOS-only package cannot be added to the `gcWeekly` wrapper's `runtimeInputs` without splitting it. | Quarterly |
+| A12 | `11-repo-policy-grep.sh` | patterns `repo-policy-.*\.(sh\|ps1)`, `repository-policy.*\.(sh\|ps1)`, `1[123]-repo-policy-.*\.sh` (stored list, not filenames) | T3 | The package-manager scan bans bare `pip`/`npm` install and the step files carry that literal in their own patterns and error strings. The list is a superset of what exists: the first matches nothing, the second matches `repository-policy-awk-tests.sh`, the third the six step files plus their tests. Excluded by basename and glob in the whole-repo branch; `$pmeExcludeNames` in the twin | Quarterly |
+| A13 | `11-repo-policy-grep.sh` | `configure-gpg-agent.sh` | T3 | Part of the store-path-arg `_exclude_pattern` in `run_store_path_arg_usage`: its `_*_bin` variables are config parameters, not commands. The self-file basenames in the same pattern are A9; the android guest scripts are A10, excluded by a separate list in `run_activation_tool_resolution` | Quarterly |
 
-### Category B — Directory-based
+### Category B: directory-based
 
 | ID | Files | Excluded | Tier | Reason | Verify |
 | --- | --- | --- | --- | --- | --- |
@@ -62,38 +52,31 @@ Categories A–D, dummy key rules below. New exclusions: category ID, tier, `# r
 | B6 | `12-repo-policy-pattern.sh`, `.ps1`, `13-repo-policy-data.sh`, `.ps1` | `vendor/` | T3 | Supplemented by Select-GitIgnored | Quarterly |
 | B7 | `step-runner.sh`, `.ps1` | `vendor/` | T3 | Supplemented by filter_gitignored/Select-GitIgnored | Quarterly |
 | B8 | `cleanup-nix-build-artifacts.sh` | `vendor/` | T3 | Structural | Quarterly |
-| B9 | `11-repo-policy-grep.sh`, `.ps1` | `tests/` in the srt wrapper scan only | T3 | Scoped mode receives whatever file the caller passes, so the hook would otherwise scan test files that the whole-repo branch never reads, and the two modes would disagree about the same tree. The suite that proves the rule has to carry a violating example, and a fixture string is not a shipped wrapper | Quarterly |
+| B9 | `11-repo-policy-grep.sh`, `.ps1` | `tests/` in the srt wrapper scan only | T3 | Scoped mode receives whatever file the caller passes, so the hook would scan test files the whole-repo branch never reads. The suite proving the rule has to carry a violating example, and a fixture string is not a shipped wrapper | Quarterly |
 
-### Category C — Content-pattern (grep -v)
+### Category C: content pattern (grep -v)
 
 | ID | Files | Pattern | Tier | Reason | Verify |
 | --- | --- | --- | --- | --- | --- |
 | C3 | `apple-sdk-override.sh` | env vars in nix output | T3 | Debug suppression | Quarterly |
-| C4 | `scripts/check.sh packer` | `Warning: A checksum of 'none'...` block | T3 | No stable Win11 checksums; `iso_checksum = "none"` intentional in `src/vms/Windows/packer.pkr.hcl` (39, 228) | Quarterly |
+| C4 | `scripts/check.sh packer` | `Warning: A checksum of 'none'...` block | T3 | No stable Win11 checksums; `iso_checksum = "none"` is intentional in `src/vms/Windows/packer.pkr.hcl` | Quarterly |
 | C5 | `12-repo-policy-pattern.sh`, `.ps1`, `13-repo-policy-data.sh`, `.ps1` | self-file | T3 | Self-ref contains literal patterns | Quarterly |
 
-### Category D — Allowlists
+### Category D: allowlists
 
 | ID | Files | Entry | Tier | Reason | Verify |
 | --- | --- | --- | --- | --- | --- |
 | D1 | `05-lockfile-validation.ps1` | `lfOverlapExceptions`: `astral-sh.ty`, `Windows` | T2 | `astral-sh.ty`: legitimate overlap. `Windows`: host key in `suggestions.vm-setup`, not a package name; overlaps with `suggestions.ollama.Windows` | Error if stale |
 | D2 | `lifecycle-allowlist.json` | All entries | T2 | Supply-chain hardening | Error if stale (`check.sh`) |
 | D3 | `supply-chain-hardening.instructions.md` | Allowlist (cross-ref) | — | External | See that file |
-| D4 | `tests/modules/posix-module-imports-tests.nix` | `hostScopedModules`: `security.nix` | T2 | `security.sudo` is a NixOS-only option, so the macOS-shared `posix/` aggregator cannot carry `security.nix`; the NixOS host imports it directly from its entrypoint | Error if stale (`nix-tests`) |
-| D5 | `tests/platforms/Windows/modules/gc-parity.Tests.ps1` | `$DestructiveCommands` | T2 | A command absent from the list is silently skipped by the dry-run guard walk, so renaming or removing a helper in `scripts/gc.ps1` would disarm the coverage check instead of failing it | Error if stale (`has no stale entry in the destructive-command list`) |
-| D6 | `tests/platforms/Windows/modules/gc-parity.Tests.ps1` | `$PosixOnlyCapabilities` | T2 | `gc.ps1` carries these switches only for CLI parity with `gc.sh`; the list must name exactly the switches that `gc.ps1`'s own help text documents as POSIX-only | Error if stale (`documents exactly the POSIX-only capabilities as accepted and ignored`) |
+| D4 | `tests/modules/posix-module-imports-tests.nix` | `hostScopedModules`: `security.nix` | T2 | `security.sudo` is NixOS-only, so the macOS-shared `posix/` aggregator cannot carry `security.nix`; the NixOS host imports it directly | Error if stale (`nix-tests`) |
+| D5 | `tests/platforms/Windows/modules/gc-parity.Tests.ps1` | `$DestructiveCommands` | T2 | A command absent from the list is silently skipped by the dry-run guard walk, so renaming a helper in `scripts/gc.ps1` disarms the coverage check instead of failing it | Error if stale (`has no stale entry in the destructive-command list`) |
+| D6 | `tests/platforms/Windows/modules/gc-parity.Tests.ps1` | `$PosixOnlyCapabilities` | T2 | The list must name exactly the switches `gc.ps1` documents as POSIX-only | Error if stale (`documents exactly the POSIX-only capabilities as accepted and ignored`) |
 
-## Dummy key management
+## Dummy keys
 
-Registry: `src/modules/dummy-keys.json` (validated against `src/modules/dummy-keys.schema.json`).
-
-- `sk-` + 4+ alphanumerics placeholder → must resolve to `dummyKeys.<name>.value`.
-- New entries: `value` (exact literal), `consumers` (paths), `note` (why).
-- Consumers use registry `value` verbatim.
-- Step 13 (`run_dummy_key_uniformity`) enforces.
+`src/modules/dummy-keys.json`, validated against `src/modules/dummy-keys.schema.json`. A `sk-` placeholder of 4 or more alphanumerics must resolve to `dummyKeys.<name>.value`, consumers use that value verbatim, and every entry carries `value`, `consumers`, and `note`. Step 13 (`run_dummy_key_uniformity`) enforces it.
 
 ## Review
 
-- **Quarterly**: audit T3 — files exist, patterns justified, no new hard-coded excludes.
-- **Shared-content**: per `embedded-content.instructions.md` § Shared cross-platform content.
-- **Trigger**: check step added/removed/renumbered. **Last reviewed**: 2026-09-30.
+Quarterly audit of the T3 rows: files still exist, patterns still justified, no new hard-coded excludes. Also re-review when a check step is added, removed, or renumbered. Last reviewed 2026-09-30.
