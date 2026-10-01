@@ -1,4 +1,4 @@
-# tests/lib.nix — Shared test helpers for Nix tests.
+# tests/lib.nix: Shared test helpers for Nix tests.
 
 rec {
   # Simple assertion helper with descriptive errors.
@@ -8,7 +8,7 @@ rec {
   flatten = text: builtins.replaceStrings [ "\n" "\r" ] [ " " " " ] text;
   # Regex-like match via builtins.match with .* prefix/suffix.
   containsRegex = pattern: haystack: builtins.match ".*${pattern}.*" (flatten haystack) != null;
-  # Pure substring search — no regex, avoids special-char issues.
+  # Pure substring search, no regex, avoids special-char issues.
   containsString =
     needle: haystack:
     let

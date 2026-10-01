@@ -1,4 +1,4 @@
-# NixOS/jellyfin.nix — Host-level singleton Jellyfin service + HTTPS ingress.
+# NixOS/jellyfin.nix: Host-level singleton Jellyfin service + HTTPS ingress.
 #
 # Jellyfin must run once per host (shared across all users). Running it as a
 # system service avoids one-instance-per-Home-Manager-user fanout.
@@ -9,7 +9,7 @@
 # - https://jellyfin.org/docs/general/post-install/networking/reverse-proxy/
 { ... }:
 let
-  # Centralized service registry — single source of truth for network config.
+  # Centralized service registry: single source of truth for network config.
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
   jellyfinHttpPort = servicesJSON.jellyfin.network.http.port;
   jellyfinHttpsPort = servicesJSON.jellyfin.network.https.port;

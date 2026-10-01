@@ -1,4 +1,4 @@
-# tests/integration/apps-json-tests.nix — Structural invariant tests for app auto-start and menu-bar.
+# tests/integration/apps-json-tests.nix: Structural invariant tests for app auto-start and menu-bar.
 #
 # Validates apps.json data integrity: host validity, autostart wiring,
 # statusIcon structure, and scope invariants.

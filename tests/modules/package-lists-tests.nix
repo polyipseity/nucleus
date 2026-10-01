@@ -1,4 +1,4 @@
-# tests/modules/package-lists-tests.nix — Guard the centralized desired-package registry.
+# tests/modules/package-lists-tests.nix: Guard the centralized desired-package registry.
 #
 # Verifies:
 #   • src/modules/packages/desired.json parses and declares every manager x host key

@@ -1,4 +1,4 @@
-# src/modules/hermes-agent.nix — Nucleus wrapper for upstream hermes-agent Home Manager module.
+# src/modules/hermes-agent.nix: Nucleus wrapper for upstream hermes-agent Home Manager module.
 #
 # Wraps upstream's `programs.hermes-agent` and `services.hermes-agent`. API keys
 # go in the per-user env-secrets.json with consumers: ["hermes-agent"] plus the

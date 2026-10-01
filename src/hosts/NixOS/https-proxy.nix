@@ -1,4 +1,4 @@
-# NixOS/https-proxy.nix — Map nucleus.httpsProxy.virtualHosts to services.caddy.
+# NixOS/https-proxy.nix: Map nucleus.httpsProxy.virtualHosts to services.caddy.
 #
 # Enables the NixOS Caddy module with the admin endpoint and per-virtual-host
 # TLS termination so all host-shared services declared via

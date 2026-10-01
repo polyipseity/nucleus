@@ -46,7 +46,7 @@
   settings.excludes = [
     # discord-music-rpc app writes its config only when the schema needs
     # migration (diff-driven, stat-cached), so treefmt should not touch the
-    # managed file — it only manages files that the project owns exclusively.
+    # managed file; it only manages files that the project owns exclusively.
     "src/users/*/discord-music-rpc/config.yaml"
     "vendor/**"
   ];

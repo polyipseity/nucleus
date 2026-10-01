@@ -1,4 +1,4 @@
-# tests/modules/vm-setup-tests.nix — VM provisioning manifest and NixOS module options.
+# tests/modules/vm-setup-tests.nix: VM provisioning manifest and NixOS module options.
 
 let
   lib = import <nixpkgs/lib>;
@@ -68,7 +68,7 @@ let
       }";
 
   # ---------------------------------------------------------------------------
-  # Phase 2 — VM sizes are suffixed strings (kB/MB/GB/TB and kiB/MiB/GiB/TiB)
+  # Phase 2: VM sizes are suffixed strings (kB/MB/GB/TB and kiB/MiB/GiB/TiB)
   # ---------------------------------------------------------------------------
   # The Nix parser (src/modules/lib/size.nix) is the reference implementation;
   # src/scripts/lib/size.sh and src/platforms/Windows/modules/SizeStrings.ps1 must
@@ -364,7 +364,7 @@ let
       }";
 
   # minImageSize must match the suffixed-size grammar (decimal kB/MB/GB/TB or
-  # binary kiB/MiB/GiB/TiB; case-sensitive — KB/KiB are invalid).
+  # binary kiB/MiB/GiB/TiB, case-sensitive; KB/KiB are invalid).
   test_min_image_size_pattern =
     let
       badSizes = builtins.filter (
@@ -394,7 +394,7 @@ let
       }";
 
   # The UTM MAC must derive its prefix from the manifest's macAddressPrefix
-  # field — no hard-coded 52: default in the generator.
+  # field, so no hard-coded 52: default in the generator.
   # Type-specific group objects: a VM carries the group named by its type
   # (Android/macOS/Windows) and no other; NixOS/Linux carry no group.
   groupTypes = [
@@ -560,7 +560,7 @@ let
 
   # hosts must be present and a non-empty array of valid host names
   # (["MacBook", "NixOS", "Windows"]) on every VM; the null "all hosts"
-  # shorthand is not allowed — each VM lists the hosts it provisions on.
+  # shorthand is not allowed: each VM lists the hosts it provisions on.
   validHosts = [
     "MacBook"
     "NixOS"
@@ -620,7 +620,7 @@ let
   # MAC derivation must match the pinned SHA-256 vectors.
 
   # The MacBook host must derive identities from the shared library using the
-  # VM id (runtime truth) — never a local re-implementation keyed on name.
+  # VM id (runtime truth), never a local re-implementation keyed on name.
   mkDomainXml =
     vm:
     let

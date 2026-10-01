@@ -1,4 +1,4 @@
-# hosts/MacBook/https-proxy.nix — HTTPS proxy launchd service.
+# hosts/MacBook/https-proxy.nix: HTTPS proxy launchd service.
 #
 # Service-manager-specific fragment imported alongside the shared module.
 # The shared option definitions are in src/modules/https-proxy.nix.

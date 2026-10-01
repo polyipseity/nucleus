@@ -1,4 +1,4 @@
-# tests/modules/env-secrets-tests.nix — env/env-secrets.json invariants.
+# tests/modules/env-secrets-tests.nix: env/env-secrets.json invariants.
 #
 # Validates the secrets structure, consumer scoping, sopsSource split,
 # name patterns, env var derivation, uniqueness, and schema compliance.

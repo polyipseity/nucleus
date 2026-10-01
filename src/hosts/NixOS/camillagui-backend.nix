@@ -1,4 +1,4 @@
-# hosts/NixOS/camillagui-backend.nix — CamillaDSP GUI systemd service.
+# hosts/NixOS/camillagui-backend.nix: CamillaDSP GUI systemd service.
 #
 # Runs as the primary user so the daemon can access user-level config at
 # ~/.config/camillagui-backend/. Config is deployed by Home Manager in

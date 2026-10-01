@@ -168,7 +168,7 @@ let
 
       # WHY: rclone stats the mount point before mounting and refuses to mount
       #   when it is missing, while macFUSE creates a /Volumes mount point only
-      #   as part of the mount itself — and /Volumes is root-owned, so a
+      #   as part of the mount itself, and /Volumes is root-owned, so a
       #   user-scope activation could not create it either.  Mounts therefore
       #   live directly under the user's home directory, as on every other host.
       mountPoint = "${currentUserHome}/${mount.localPath}";
@@ -220,7 +220,7 @@ let
         # WHY: the wrapper records a provider failure against the supervisor unit
         #   identity, which is the key every service command and the watchdog use.
         NUCLEUS_CLOUD_MOUNT_INSTANCE = mountServiceId mount;
-        # Lifecycle policy — derived from services.json cloud-drive.lifecycle.
+        # Lifecycle policy: derived from services.json cloud-drive.lifecycle.
         NUCLEUS_MOUNT_ATTEMPTS = toString cloudDriveLifecycle.mountAttempts;
         NUCLEUS_MOUNT_BACKOFF = lib.concatStringsSep "," (
           map toString cloudDriveLifecycle.mountRetryBackoffSeconds
@@ -234,7 +234,7 @@ let
   # WHY a generated script rather than a `/bin/sh -c '…'` unit line: lib.escapeShellArg
   #   emits its own single quotes, which collide with the surrounding ones.  For a mount
   #   point containing a space the quoted argument closed early, so `sh -c` ran
-  #   `fusermount3 -u "/Users/a"` — the path split at the first space and the remainder
+  #   `fusermount3 -u "/Users/a"`: the path split at the first space and the remainder
   #   became separate words, leaving the volume mounted and the stale mount blocking the
   #   next start.  Escaped exactly once, inside the script where bash parses it, the path
   #   always arrives as ONE argument; the unit line is then a bare store path with no
@@ -364,7 +364,7 @@ in
       #   bootout/bootstrap drops a volume still attached under the previous
       #   layout.  A mount-point change leaves clouds/<id> occupied by that live
       #   mount until the refresh runs, and convergence correctly refuses a live
-      #   mount — so running it first deadlocks the apply, because the entry that
+      #   mount, so running it first deadlocks the apply, because the entry that
       #   can clear the state is only reached afterwards.  NixOS defines no
       #   setupLaunchAgents entry (its systemd unit creates the mount point), so
 

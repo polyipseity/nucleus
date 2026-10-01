@@ -158,7 +158,7 @@ let
   gcApps = import ../../../modules/gc-activations.nix { inherit pkgs; };
   inherit (gcApps) logGcUser;
 
-  # guiEnvAgent — launchd login agent that manages GUI-environment PATH and
+  # guiEnvAgent: launchd login agent that manages GUI-environment PATH and
   # env vars.  All Nix-computed values are passed as CLI args to the script.
   guiEnvAgent = pkgs.writeNucleusShellApplication {
     name = "gui-env";

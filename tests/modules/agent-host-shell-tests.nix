@@ -1,4 +1,4 @@
-# tests/modules/agent-host-shell-tests.nix — VS Code agent-host wrapper wiring.
+# tests/modules/agent-host-shell-tests.nix: VS Code agent-host wrapper wiring.
 #
 # src/modules/posix/agent-host-shell.nix lost its importer in f90f0943, so no
 # activation has owned the wrapper since. Nothing failed loudly: a fresh NixOS
@@ -8,7 +8,7 @@
 # cannot drift apart again.
 #
 # The previous version of this file was deleted in 5ded7fda because it hand-wrote
-# a wrapper string and then asserted that its own string contained it — a
+# a wrapper string and then asserted that its own string contained it: a
 # tautology that exercised nothing in the module. Every value below is read from
 # the evaluated module or from the committed settings file, never restated from
 # the module being checked.
@@ -25,7 +25,7 @@ let
   # Both package sets are pinned to an explicit system. An unpinned
   # `import <nixpkgs> { }` resolves to the HOST, so the darwin evaluation below
   # would silently become x86_64-linux on the ubuntu-latest leg of the CI matrix
-  # and take the NixOS branch in agent-host-shell.nix — leaving the darwin branch
+  # and take the NixOS branch in agent-host-shell.nix: leaving the darwin branch
   # of the module verified on one host only, with nothing reporting the gap. Same
   # trap as tests/modules/posix-module-imports-tests.nix, where it was the one P0
   # this effort caught late. Evaluation only, nothing is built, so either host

@@ -1,4 +1,4 @@
-# modules/lib/apple-sdk-tools.nix — xcrun shim-to-nixpkgs mapping.
+# modules/lib/apple-sdk-tools.nix: xcrun shim-to-nixpkgs mapping.
 #
 # Null marks a shim that exists but has nothing to point at.
 #

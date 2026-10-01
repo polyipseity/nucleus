@@ -1,4 +1,4 @@
-# Starship cross-shell prompt — shared config for all hosts.
+# Starship cross-shell prompt: shared config for all hosts.
 {
   config,
   lib,

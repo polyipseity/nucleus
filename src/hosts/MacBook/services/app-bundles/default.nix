@@ -1,4 +1,4 @@
-# MacBook/services/app-bundles.nix — macOS App bundles deployed via LaunchServices.
+# MacBook/services/app-bundles.nix: macOS App bundles deployed via LaunchServices.
 #
 # WHY: home.activation, not home.file. LaunchServices does not follow symlinks
 # when it discovers Service provider bundles, so a home.file symlink into the

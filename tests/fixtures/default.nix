@@ -1,4 +1,4 @@
-# Policy: tests must not reference real src/users/<username>/ identities — use test-user fixture only.
+# Policy: tests must not reference real src/users/<username>/ identities; use test-user fixture only.
 {
   lib ? import <nixpkgs/lib>,
 }:

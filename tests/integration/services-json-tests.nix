@@ -1,4 +1,4 @@
-# tests/integration/services-json-tests.nix — Structural invariant tests for service management.
+# tests/integration/services-json-tests.nix: Structural invariant tests for service management.
 #
 # Validates services.json data integrity: schema reference, required services,
 # host validity, scope correctness, per-user justification, watchdog wiring,

@@ -1,4 +1,4 @@
-# tests/modules/package-parity-tests.nix — Cross-platform package presence.
+# tests/modules/package-parity-tests.nix: Cross-platform package presence.
 #
 # Verifies managedPackages in core.nix:
 #   • every entry's nixpkgs attr resolves in nixpkgs

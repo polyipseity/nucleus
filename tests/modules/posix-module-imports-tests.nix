@@ -1,4 +1,4 @@
-# tests/modules/posix-module-imports-tests.nix — POSIX module import wiring and age-key path drift.
+# tests/modules/posix-module-imports-tests.nix: POSIX module import wiring and age-key path drift.
 #
 # Commit f90f0943 consolidated the per-host Nix imports into
 # src/modules/posix/default.nix and silently dropped two modules on the floor:

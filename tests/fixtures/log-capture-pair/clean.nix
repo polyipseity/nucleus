@@ -1,4 +1,4 @@
-# Fixture: correct service log capture — the stdout.log/stderr.log pair.
+# Fixture: correct service log capture, the stdout.log/stderr.log pair.
 {
   launchd.agents."fixture-agent" = {
     config = {

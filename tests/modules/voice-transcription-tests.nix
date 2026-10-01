@@ -1,4 +1,4 @@
-# tests/modules/voice-transcription-tests.nix — local speech-to-text capability.
+# tests/modules/voice-transcription-tests.nix: local speech-to-text capability.
 #
 # Verifies:
 #   • whisper-cpp is registered in managedPackages in src/modules/core.nix, and
@@ -37,7 +37,7 @@ let
   # WHY split on the entry terminator "\n    };": an entry body is indented 6
   # spaces and nested sub-attrs deeper, so a 4-space line ending occurs only on
   # the entry's own close brace. Splitting on a bare "\n    " indent does NOT
-  # work — it matches the first four of the body's six spaces and yields a
+  # work: it matches the first four of the body's six spaces and yields a
   # segment holding nothing but the opening line. A regex capture group is also
   # avoided, because lib.strings.splitString returns captured groups as a flat
   # list rather than a list of matches.
@@ -66,7 +66,7 @@ let
   declaresNixpkgsAttr = lib.hasInfix "nixpkgs = \"whisper-cpp\"" whisperEntry;
 
   # ---------------------------------------------------------------------------
-  # Both binaries in the resolved derivation — deliberately NOT asserted here.
+  # Both binaries in the resolved derivation: deliberately NOT asserted here.
   #
   # nixpkgs' installCheckPhase runs only `whisper-cli --help` and never touches
   # whisper-stream, so nothing in the package set itself proves the stream

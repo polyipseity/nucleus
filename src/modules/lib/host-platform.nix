@@ -1,8 +1,8 @@
-# host-platform.nix — Host and platform registry helpers.
+# host-platform.nix: Host and platform registry helpers.
 #
 # Host names (MacBook, NixOS, Windows) are primary lookup keys.
 # Platform keys (macOS, NixOS, Windows) own implementation flags.
-# Host JSON entries reference platform by name only — flags are never on hosts.
+# Host JSON entries reference platform by name only; flags are never on hosts.
 {
   pkgs ? null,
 }:

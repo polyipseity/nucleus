@@ -1,4 +1,4 @@
-# src/modules/lib/users-overlay.nix — Per-user homedir overlay path selection.
+# src/modules/lib/users-overlay.nix: Per-user homedir overlay path selection.
 #
 # Overlay resolution is first-level only: each first-level file or directory is
 # resolved independently, and deeper paths inherit that entry in whole. Registry

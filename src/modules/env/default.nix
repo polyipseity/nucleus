@@ -1,4 +1,4 @@
-# modules/env/default.nix — Home Manager module for env var catalog.
+# modules/env/default.nix: Home Manager module for env var catalog.
 #
 # Registers the _nucleus.envVars option so the catalog is introspectable
 # via config._nucleus.envVars in other modules.

@@ -1,4 +1,4 @@
-# src/modules/lib/config-utils.nix — Shared config deployment helpers.
+# src/modules/lib/config-utils.nix: Shared config deployment helpers.
 #
 # Priority ordering and the "why not method 1" rule live in
 # .agents/instructions/app-config-policy.instructions.md

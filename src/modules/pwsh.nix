@@ -98,7 +98,7 @@ in
 
   # Provisioned PSScriptAnalyzer settings file: Severity filter and ExcludeRules.
   # This is a reference copy that can be passed to Invoke-ScriptAnalyzer
-  # via -Settings. PSSA does not auto-discover this path — it only discovers
+  # via -Settings. PSSA does not auto-discover this path; it only discovers
   # PSScriptAnalyzerSettings.psd1 in the sibling directory of the analyzed file.
   # The CI copies consumed by src/scripts/checks/check-pwsh.ps1 live at
   # scripts/check-PSScriptAnalyzerSettings.psd1 and

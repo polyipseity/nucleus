@@ -1,4 +1,4 @@
-# MacBook/ai.nix — System-wide AI inference daemons on macOS.
+# MacBook/ai.nix: System-wide AI inference daemons on macOS.
 #
 # launchd.daemons, not launchd.agents: inference servers and gateways serve
 # every user and start at boot, not at login.

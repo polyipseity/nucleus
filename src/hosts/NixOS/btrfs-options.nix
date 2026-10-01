@@ -1,4 +1,4 @@
-# hosts/NixOS/btrfs-options.nix — Shared Btrfs mount options for NixOS host and guest images.
+# hosts/NixOS/btrfs-options.nix: Shared Btrfs mount options for NixOS host and guest images.
 _: {
   root = [
     "subvol=@"

@@ -1,4 +1,4 @@
-# src/modules/lib/mount-identity.nix — canonical supervisor unit identity for cloud mounts.
+# src/modules/lib/mount-identity.nix: canonical supervisor unit identity for cloud mounts.
 #
 # The unit DEFINITION and the runner's health key must come from one definition.
 # The runner records health against the id the watchdog enumerates back out of

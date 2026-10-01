@@ -1,4 +1,4 @@
-# modules/lib/env-secrets.nix — Centralized environment variable secrets catalog.
+# modules/lib/env-secrets.nix: Centralized environment variable secrets catalog.
 #
 # Callers MUST pass `username`. Do NOT add a fallback chain (no default null,
 # no config.home.username fallback, no getEnv "USER" fallback). Every caller

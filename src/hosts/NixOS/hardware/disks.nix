@@ -1,4 +1,4 @@
-# hosts/NixOS/hardware/disks.nix — Disk-related hardware defaults for CI-safe evaluation.
+# hosts/NixOS/hardware/disks.nix: Disk-related hardware defaults for CI-safe evaluation.
 #
 # Template until real hardware-configuration.nix values are merged. NixOS needs a
 # root filesystem and a bootloader device during evaluation, so mkDefault

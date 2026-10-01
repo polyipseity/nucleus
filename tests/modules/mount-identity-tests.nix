@@ -1,4 +1,4 @@
-# tests/modules/mount-identity-tests.nix — cloud-mount supervisor unit identity.
+# tests/modules/mount-identity-tests.nix: cloud-mount supervisor unit identity.
 #
 # The runner records health against an instance id; the watchdog enumerates that
 # same id back out of the supervisor.  Both must resolve to ONE name per host, or

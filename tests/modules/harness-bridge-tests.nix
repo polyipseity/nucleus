@@ -1,12 +1,12 @@
-# tests/modules/harness-bridge-tests.nix — harness bridge wiring and default parity.
+# tests/modules/harness-bridge-tests.nix: harness bridge wiring and default parity.
 #
 # The bridge answers harness hooks through bare command names, so one shared hook
 # definition drives every platform.  Two failures this test makes loud:
 #
-#   1. a hook that names a command no platform deploys — a silent no-op inside
+#   1. a hook that names a command no platform deploys: a silent no-op inside
 #      someone else's tool, where the user only notices the missing notification;
 #   2. the entry points, the declared defaults, and the hook timeout budget
-#      drifting apart — the approval wait is exactly why the hook timeout has to
+#      drifting apart; the approval wait is exactly why the hook timeout has to
 #      stay larger than it.
 #
 # Run with: nix-instantiate --eval --strict tests/modules/harness-bridge-tests.nix
@@ -37,7 +37,7 @@ let
 
   # WHY: neither invariant has a runtime surface to test against.  The hook either
   # answers inside its timeout or the harness kills it, and the channel default is
-  # declared four times — bash, PowerShell, and two JSON literals — with no shared
+  # declared four times: bash, PowerShell, and two JSON literals, with no shared
   # value between them.  Comparing the declared text is the only available check,
   # so the literals below are quoted exactly and in order: reordering the channels
   # or dropping one fails the test.

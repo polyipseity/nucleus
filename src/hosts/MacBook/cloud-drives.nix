@@ -1,4 +1,4 @@
-# MacBook/cloud-drives.nix — host-scoped cloud replica override.
+# MacBook/cloud-drives.nix: host-scoped cloud replica override.
 #
 # Keep Google Drive pull-replica disabled on MacBook while preserving the
 # shared pull-only sync direction and all other replica defaults.

@@ -1,4 +1,4 @@
-# src/modules/lib/hermes-secrets.nix — Pure selection and coverage checks for the
+# src/modules/lib/hermes-secrets.nix: Pure selection and coverage checks for the
 # hermes-agent SOPS secrets.
 #
 # No `pkgs`, `lib` or file access on purpose: the two rules that decide whether

@@ -1,4 +1,4 @@
-# hosts/MacBook/camillagui-backend.nix — CamillaDSP GUI launchd service.
+# hosts/MacBook/camillagui-backend.nix: CamillaDSP GUI launchd service.
 #
 # Runs as the primary user via UserName so the daemon can access user-level
 # config at $HOME/.config/camillagui-backend/. Config is deployed by Home

@@ -1,4 +1,4 @@
-# MacBook/manual-installations.nix — imperative installers for manual-only apps.
+# MacBook/manual-installations.nix: imperative installers for manual-only apps.
 #
 # Limited to software neither nixpkgs nor Homebrew manages.
 #

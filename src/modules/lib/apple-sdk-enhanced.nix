@@ -1,4 +1,4 @@
-# modules/lib/apple-sdk-enhanced.nix — Enhanced apple-sdk with real tool symlinks.
+# modules/lib/apple-sdk-enhanced.nix: Enhanced apple-sdk with real tool symlinks.
 #
 # The original apple-sdk has an empty usr/bin/ (only xcrun → xcbuild).
 # This layers symlinks to real nixpkgs tools so that every xcrun shim

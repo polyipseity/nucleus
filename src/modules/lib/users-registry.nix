@@ -1,4 +1,4 @@
-# src/modules/lib/users-registry.nix — Assemble per-user registry records from
+# src/modules/lib/users-registry.nix: Assemble per-user registry records from
 # src/users/<username>/ domain JSON files with src/users/default/ fallback.
 #
 # Host-keyed fields (homeDirectory, localPath, target, enable) resolve to scalars

@@ -1,20 +1,20 @@
-# src/modules/lib/strip-metadata-types.nix — input formats `nucleus-utils strip-metadata` accepts.
+# src/modules/lib/strip-metadata-types.nix: input formats `nucleus-utils strip-metadata` accepts.
 #
 # WHY: one declared set instead of one copy per surface. Three surfaces decide
-# whether the action is offered, each in its own vocabulary — macOS Quick Action
+# whether the action is offered, each in its own vocabulary: macOS Quick Action
 # NSSendFileTypes (UTIs), KDE Dolphin MimeType (MIME types) and Windows
-# context-menu verbs (extensions) — and drift between them is silent: a format
+# context-menu verbs (extensions), and drift between them is silent: a format
 # missing from one list simply stops appearing in that file manager.
 # tests/integration/strip-metadata-tests.nix fails when a surface drifts.
 #
 # WHY: PDF (com.adobe.pdf) is in no list. No CLI tool rewrites PDF metadata in
 # place without invalidating signatures, so strip-metadata refuses PDFs;
 # offering the action for a format the tool must refuse made the feature look
-# broken — the action ran and appeared to do nothing. Where the platform can
+# broken. The action ran and appeared to do nothing. Where the platform can
 # filter the input it does: NSSendFileTypes and Dolphin MimeType are
 # inclusion-only (Apple defines no exclusion key), so the refusal is expressed
 # as an allow-list. Where it cannot (Nautilus Scripts declare no type filter)
-# the caller reports the refusal in a modal dialog — see `--dialog` in
+# the caller reports the refusal in a modal dialog: see `--dialog` in
 # scripts/utils.sh.
 #
 # WHY: Apple's media supertypes are listed alongside the specific UTIs they

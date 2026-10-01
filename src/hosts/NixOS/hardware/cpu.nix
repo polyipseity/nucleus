@@ -1,4 +1,4 @@
-# hosts/NixOS/hardware/cpu.nix — CPU-adjacent early-boot module requirements.
+# hosts/NixOS/hardware/cpu.nix: CPU-adjacent early-boot module requirements.
 #
 # Keep initrd module ordering intact because early-boot probing depends on load
 # sequence; this list is intentionally not alphabetized.

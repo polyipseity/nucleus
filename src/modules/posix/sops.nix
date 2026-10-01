@@ -1,4 +1,4 @@
-# src/modules/posix/sops.nix — Machine age-key derivation for POSIX hosts.
+# src/modules/posix/sops.nix: Machine age-key derivation for POSIX hosts.
 #
 # Derives the age identity from /etc/ssh/ssh_host_ed25519_key under the SYSTEM
 # root, where the Home Manager sops-nix instance can read it without root.

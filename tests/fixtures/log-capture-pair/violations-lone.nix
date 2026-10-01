@@ -1,4 +1,4 @@
-# Fixture: a lone capture stream — its sibling is neither captured nor discarded.
+# Fixture: a lone capture stream: its sibling is neither captured nor discarded.
 {
   launchd.agents."fixture-lone" = {
     config = {

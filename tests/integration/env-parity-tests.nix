@@ -1,4 +1,4 @@
-# tests/integration/env-parity-tests.nix — Windows env var parity between the Nix
+# tests/integration/env-parity-tests.nix: Windows env var parity between the Nix
 # catalog and the Windows DSC files.
 #
 # Asserted in the Nix lane because a Windows host has no Nix toolchain, so the
