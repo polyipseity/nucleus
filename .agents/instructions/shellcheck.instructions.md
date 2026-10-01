@@ -11,6 +11,7 @@ applyTo: "scripts/**/*.sh, src/scripts/**/*.sh, src/vms/**/*.sh, tests/**/*.sh"
 Rewrite first: quote the variable, use a static `# shellcheck source=` path, or restructure the line. Suppression is the last resort.
 
 - Every `# shellcheck disable=` needs `# reason:` on the same line. Step 11 fails a suppression line without it.
+- A continuation line under a `# shellcheck` directive never starts with `# shellcheck`; that reads as a malformed directive (SC1072, SC1073).
 - SC1090 and SC1091 may never be suppressed; use `# shellcheck source=`. Directives resolve against each script's own directory, since `src/treefmt.nix` sets `source-path = "SCRIPTDIR"`. The one exception is a file that cannot exist at analysis time, such as `$HOME/.nix-profile/etc/profile.d/nix.sh` in `bootstrap.sh`, which still needs a `# reason:`.
 - No file-level suppressions. Scope to the triggered line, or wrap a multi-line expression in `disable`/`enable`.
 - `vendor/` is exempt; shellcheck invocations skip it.
