@@ -322,6 +322,62 @@
       }
     }
   },
+  "ds-store-gc": {
+    "description": "Daily removal of stale .DS_Store files from dev checkouts",
+    "displayName": "DS Store cleanup",
+    "logging": {
+      "capture": "all"
+    },
+    "hosts": {
+      "MacBook": {
+        "justification": "User agent: the scan covers the user's own checkouts, and a full sweep takes long enough that apply must not block on it.",
+        "launchdDomain": "gui",
+        "platform": "macOS",
+        "scope": "user",
+        "service": "local.ds-store-gc",
+        "type": "macos-launchctl",
+        "unitPath": "~/Library/LaunchAgents/local.ds-store-gc.plist"
+      },
+      "NixOS": {
+        "justification": "Finder creates these files, so a NixOS checkout has none to remove.",
+        "platform": "NixOS",
+        "type": "omitted"
+      },
+      "Windows": {
+        "justification": "Finder creates these files, so a Windows checkout has none to remove.",
+        "platform": "Windows",
+        "type": "omitted"
+      }
+    }
+  },
+  "gui-env": {
+    "description": "Login agent that publishes the managed env and PATH into the launchd GUI domain",
+    "displayName": "GUI environment",
+    "logging": {
+      "capture": "all"
+    },
+    "hosts": {
+      "MacBook": {
+        "justification": "Shell session variables never reach the GUI domain, so launchctl setenv has to run as the logged-in user.",
+        "launchdDomain": "gui",
+        "platform": "macOS",
+        "scope": "user",
+        "service": "local.gui-env",
+        "type": "macos-launchctl",
+        "unitPath": "~/Library/LaunchAgents/local.gui-env.plist"
+      },
+      "NixOS": {
+        "justification": "There is no launchd GUI domain; systemd user environment is set from the environment module.",
+        "platform": "NixOS",
+        "type": "omitted"
+      },
+      "Windows": {
+        "justification": "There is no launchd GUI domain; the same values reach PowerShell through the user environment block.",
+        "platform": "Windows",
+        "type": "omitted"
+      }
+    }
+  },
   "hermes-agent": {
     "description": "AI agent gateway \u2014 messaging integrations (Telegram, Discord, Slack) and cron jobs",
     "displayName": "Hermes Agent",
@@ -357,6 +413,34 @@
         "type": "windows-native",
         "platform": "Windows",
         "justification": "SCM Windows Service via `hermes gateway install --service-type service`. nucleus runs elevated so SCM install is available. Service name `hermes-gateway` for default HERMES_HOME."
+      }
+    }
+  },
+  "icloud-exclusions": {
+    "description": "Hourly correction of Finder metadata-ignore markers on iCloud Drive roots",
+    "displayName": "iCloud exclusions",
+    "logging": {
+      "capture": "all"
+    },
+    "hosts": {
+      "MacBook": {
+        "justification": "User agent: Finder sets the xattr in the user's own iCloud Drive roots, and apply runs the same script synchronously, so the agent only repairs drift.",
+        "launchdDomain": "gui",
+        "platform": "macOS",
+        "scope": "user",
+        "service": "local.icloud-exclusions",
+        "type": "macos-launchctl",
+        "unitPath": "~/Library/LaunchAgents/local.icloud-exclusions.plist"
+      },
+      "NixOS": {
+        "justification": "The marker is an iCloud Drive File Provider convention; the host has no such volume.",
+        "platform": "NixOS",
+        "type": "omitted"
+      },
+      "Windows": {
+        "justification": "The marker is set by macOS Finder. The Windows host still reads the icloud-exclusions registry domain, but schedules nothing.",
+        "platform": "Windows",
+        "type": "omitted"
       }
     }
   },
@@ -492,6 +576,69 @@
         "service": "nucleus-litellm",
         "type": "windows-native",
         "platform": "Windows"
+      }
+    }
+  },
+  "log-gc-system": {
+    "description": "Daily removal of expired system-scope log archives",
+    "displayName": "Log rotation (system)",
+    "logging": {
+      "capture": "all"
+    },
+    "hosts": {
+      "MacBook": {
+        "justification": "System daemon: the log tree it prunes is root-owned, so a user agent cannot reach it.",
+        "platform": "macOS",
+        "scope": "system",
+        "service": "local.log-gc-system",
+        "type": "macos-launchctl",
+        "unitPath": "/Library/LaunchDaemons/local.log-gc-system.plist"
+      },
+      "NixOS": {
+        "justification": "System timer: the log tree it prunes is root-owned, so a user unit cannot reach it.",
+        "platform": "NixOS",
+        "scope": "system",
+        "service": "nucleus-log-gc-system.service",
+        "type": "nixos-systemctl",
+        "unitPath": "/etc/systemd/system/nucleus-log-gc-system.service"
+      },
+      "Windows": {
+        "platform": "Windows",
+        "service": "log-gc-system",
+        "taskPath": "\\nucleus\\",
+        "type": "windows-schtask"
+      }
+    }
+  },
+  "log-gc-user": {
+    "description": "Daily removal of expired user-scope log archives",
+    "displayName": "Log rotation (user)",
+    "logging": {
+      "capture": "all"
+    },
+    "hosts": {
+      "MacBook": {
+        "justification": "User agent: it prunes the user's own log tree, which a root daemon would have to hand back to the user.",
+        "launchdDomain": "gui",
+        "platform": "macOS",
+        "scope": "user",
+        "service": "local.log-gc-user",
+        "type": "macos-launchctl",
+        "unitPath": "~/Library/LaunchAgents/local.log-gc-user.plist"
+      },
+      "NixOS": {
+        "justification": "User timer: it prunes the user's own log tree, which a root unit would have to hand back to the user.",
+        "platform": "NixOS",
+        "scope": "user",
+        "service": "log-gc-user.service",
+        "type": "nixos-systemctl",
+        "unitPath": "~/.config/systemd/user/log-gc-user.service"
+      },
+      "Windows": {
+        "platform": "Windows",
+        "service": "log-gc-user",
+        "taskPath": "\\nucleus\\",
+        "type": "windows-schtask"
       }
     }
   },
@@ -652,6 +799,38 @@
       }
     }
   },
+  "sccache-gc": {
+    "description": "Daily clearing of the sccache compilation cache",
+    "displayName": "sccache cleanup",
+    "logging": {
+      "capture": "all"
+    },
+    "hosts": {
+      "MacBook": {
+        "justification": "User agent: the sccache cache lives under the user's home directory.",
+        "launchdDomain": "gui",
+        "platform": "macOS",
+        "scope": "user",
+        "service": "local.sccache-gc",
+        "type": "macos-launchctl",
+        "unitPath": "~/Library/LaunchAgents/local.sccache-gc.plist"
+      },
+      "NixOS": {
+        "justification": "User timer: the sccache cache lives under the user's home directory.",
+        "platform": "NixOS",
+        "scope": "user",
+        "service": "sccache-gc.service",
+        "type": "nixos-systemctl",
+        "unitPath": "~/.config/systemd/user/sccache-gc.service"
+      },
+      "Windows": {
+        "platform": "Windows",
+        "service": "sccache-gc",
+        "taskPath": "\\nucleus\\",
+        "type": "windows-schtask"
+      }
+    }
+  },
   "service-watchdog": {
     "description": "Periodic service watchdog that detects and restarts stuck nucleus services",
     "displayName": "Service Watchdog",
@@ -720,6 +899,34 @@
         "justification": "User-scope watchdog not needed on Windows \u2014 scheduled task runs with system scope",
         "type": "omitted",
         "platform": "Windows"
+      }
+    }
+  },
+  "spotlight-exclusions": {
+    "description": "Daily reapplication of Spotlight metadata-ignore markers to build output dirs",
+    "displayName": "Spotlight exclusions",
+    "logging": {
+      "capture": "all"
+    },
+    "hosts": {
+      "MacBook": {
+        "justification": "User agent: the marker files live under the user's home directory.",
+        "launchdDomain": "gui",
+        "platform": "macOS",
+        "scope": "user",
+        "service": "local.spotlight-exclusions",
+        "type": "macos-launchctl",
+        "unitPath": "~/Library/LaunchAgents/local.spotlight-exclusions.plist"
+      },
+      "NixOS": {
+        "justification": "Spotlight is a macOS search index; a Linux host has nothing to exclude from it.",
+        "platform": "NixOS",
+        "type": "omitted"
+      },
+      "Windows": {
+        "justification": "Spotlight is a macOS search index; Windows Search honours a different mechanism that the repo does not manage.",
+        "platform": "Windows",
+        "type": "omitted"
       }
     }
   },
