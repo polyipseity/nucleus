@@ -6,25 +6,21 @@ applyTo: "scripts/**, src/**, tests/**"
 
 # Comment annotations
 
-Policy for comment-based annotations across all platforms and file types (sh, zsh, ps1, nix, dsc.yml, hcl, md).
-
-## Machine-parsing invariant
-
-**Category 1-2 families MUST be machine-parsed; Category 3-4 may NOT be.** Each family's registry lists its live consumer.
+Grammar for comment annotations across sh, zsh, ps1, nix, dsc.yml, hcl, md.
 
 ## Grammar
 
-`# <prefix>: <reason>` (plain) or `# <prefix>: <subject> -- <reason>` (subject).
+`# <prefix>: <reason>` (plain) or `# <prefix>: <subject> -- <reason>` (subject). `--` is the only separator, never an em dash. `method N` is lowercase. A trailing annotation swallows the rest of the line. `reason:` is gone except inside a shellcheck directive.
 
 | Prefix | Cat | Plain | Subject |
 | --- | --- | --- | --- |
 | `check-suppress:<id>` | 1 | `# check-suppress:suppression_doc: grep no-match exit 1 is expected here` | `# check-suppress:embedded-content: exception 3 (C# interop, <=25 lines) -- P/Invoke classes stay inline` |
 | `ref` | 4 | `# ref: allow-and-deny-lists.instructions.md#A12` | `# ref: allow-and-deny-lists.instructions.md#A12 -- pip/npm patterns` |
-| `WHY` / `TODO` | 4 | `# WHY: <reason>` / `# TODO: <text>` — colon mandatory | — |
+| `WHY` / `TODO` | 4 | `# WHY: <reason>` / `# TODO: <text>`, colon mandatory | not used |
 
-Rules: `--` only separator (never em dash). `reason:` eliminated except shellcheck inner `# reason:` (Cat 2). `method N` lowercase. Trailing annotation swallows rest of line.
+Categories 1 and 2 are machine-parsed and each registry row names its consumer. Categories 3 and 4 may not be machine-parsed.
 
-## Category 1 — Tool-enforced → `# check-suppress:<check id>: ...` (ALL machine-parsed)
+## Category 1: tool-enforced
 
 | Family | Check id | Consumer |
 | --- | --- | --- |
@@ -35,40 +31,27 @@ Rules: `--` only separator (never em dash). `reason:` eliminated except shellche
 | `# check-suppress:packer_validate: ...` | `packer_validate` | `scripts/check.ps1` + `.sh` |
 | `\|\| true` / `$null =` / `[void]` | `suppression_doc` | step 11 (`tests/` exempt) |
 
-**Suppression semantics:** `|| true`, `$null =`, `[void]` are suppression patterns, not rationale. Justify with `# check-suppress:suppression_doc:`, never `# WHY:`. **Counting:** CODE-ONLY. `git grep -h 'check-suppress:<id>:' -- '*.ps1' '*.sh' '*.nix' '*.zsh' | wc -l`.
+`|| true`, `$null =`, and `[void]` are suppression patterns, not rationale. Justify each with `# check-suppress:suppression_doc:`, never `# WHY:`. Count annotations in code only (`*.ps1`, `*.sh`, `*.nix`, `*.zsh`), not in comments.
 
-## Category 2 — Tool-fixed (ALL machine-parsed)
+## Category 2: tool-fixed
 
 | Family | Consumer |
 | --- | --- |
 | `# shellcheck disable=SCxxxx` / `# shellcheck source=` (+ `# reason:`) | shellcheck |
 | `[SuppressMessageAttribute('Rule','')]` | PSScriptAnalyzer |
 | `# >>> begin nucleus-managed: <subject> >>>` / `# <<< end ... <<<` | the managing script |
-| `<!-- markdownlint-disable ... -->` | markdownlint (config-only) |
+| `<!-- markdownlint-disable ... -->` | markdownlint (config only) |
 
-## Category 3-4 — Structural + human-readable (NOT machine-parsed)
+## Categories 3 and 4: human-readable
 
-Cat 3: Dividers, DSC headers. Cat 4: `# ref: <target> -- <just>`. `# WHY: <reason>` — colon mandatory. `# TODO: <text>`. Ex-`# Source:` / `# See:` in DSC → `# ref:`.
+Cat 3 covers dividers and DSC headers. Cat 4 covers `# ref: <target> -- <just>`, `# WHY: <reason>`, and `# TODO: <text>`. In DSC YAML the forms `# Source:`, `# See:`, and `# Cross-reference:` are wrong; use `# ref:`.
 
-## Check-id registry
+`# WHY:` explains a non-obvious decision. It is not for suppressions, tool-enforced markers, references, or TODOs. `# ref:` cites policy, a dependency, or a source of truth.
 
-New tool-enforced markers MUST register check id + machine consumer before use. IDs: `suppression_doc` (step 11), `SuppressMessageAttribute` (step 11), `packer_validate` (`scripts/check.*`), `embedded-content` (step 13), `config-method` (step 12).
+A new tool-enforced marker must register its check id and machine consumer before first use. Registered ids: `suppression_doc` (step 11), `SuppressMessageAttribute` (step 11), `packer_validate` (`scripts/check.*`), `embedded-content` (step 13), `config-method` (step 12).
 
-## `# WHY:` and `# ref:` usage
+## Enforcement
 
-**WHY:** Explain non-obvious decisions (WHY-not-WHAT). NOT for suppressions, tool-enforced, references, or TODOs. **ref:** Policy citations, dependency notes, source-of-truth pointers. No `reason:` keyword, no em dash.
+Wired: `iso_checksum = "none"` without `packer_validate:` (step 1), and bare `|| true` / `$null =` / `[void]` / `2>$null` / `-ErrorAction SilentlyContinue` in production code (step 11, `tests/` exempt).
 
-## Enforcement greps
-
-| Gate | Wired? |
-| --- | --- |
-| `# WHY [^:]` = 0 | no |
-| `# TODO[^:]` = 0 | no |
-| `# undoc-supp:` = 0 | no |
-| bare `Inline by embedded-content` = 0 | no |
-| capital `# Method` = 0 | no |
-| no `—` after `# check-suppress:` or `# ref:` | no |
-| `# ref:.*reason:` = 0 | no |
-| `# (Source\|Cross-reference\|See):` = 0 in dsc.yml | no |
-| `iso_checksum = "none"` without `packer_validate:` | step 1 |
-| bare `\|\| true` / `$null =` / `[void]` / `2>$null` / `-ErrorAction SilentlyContinue` in production = 0 | step 11 (`tests/` exempt) |
+Not wired, so a violation only shows up in review: `# WHY` without a colon, `# TODO` without a colon, `# undoc-supp:`, a bare `Inline by embedded-content`, a capitalised `# Method`, an em dash after `# check-suppress:` or `# ref:`, `reason:` in a `# ref:`, and `# Source:`/`# See:` in dsc.yml.

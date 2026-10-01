@@ -7,78 +7,44 @@ alwaysApply: true
 
 # Output and error handling
 
-## Severity decision model
+## Severity
 
-Pick severity by whether the operation must succeed for the host to be correct.
+Severity depends on whether the host is correct without the operation.
 
-- **ERROR (hard-error):** required convergence/config ops. Abort: POSIX `die`/`error` + `exit 1`; PS1 `Write-NucleusError` + `throw`. Includes: privilege gap on `src/`, inverse-family elevated refusal, activation convergence failure, secrets/identity failure, symlink/ACL hardening failure, Jellyfin admin-token absence, allow/deny-list staleness (Tier 2), missing preflight tool, cloud-drive path conflict.
-- **WARNING:** best-effort, safe to skip. Needs `# check-suppress:suppression_doc: reason`. Never `|| true` without reason.
-- **INFO / NOTICE:** progress, success, dry-run. Never for failures.
+ERROR hard-fails: required convergence or config work. POSIX `die`/`error` then `exit 1`, PowerShell `Write-NucleusError` then `throw`. It covers a privilege gap in `src/`, an inverse-family script refusing to run elevated, activation convergence failure, secrets or identity failure, symlink and ACL hardening failure, a missing Jellyfin admin token, a stale Tier 2 allow or deny list entry, a missing preflight tool, and a cloud-drive path conflict. Activation scripts never `warn` past a required convergence failure.
 
-No "warning instead of error because the failure is inconvenient."
+WARNING is for best-effort work that is safe to skip, and needs `# check-suppress:suppression_doc: <reason>`. INFO and NOTICE cover progress, success, and dry runs, never failures.
 
-### Activation scripts
+Never downgrade an error because the failure is inconvenient. Never `|| true`, `2>/dev/null`, or `-ErrorAction SilentlyContinue` without that annotation. Never substitute a default for a missing or failed value, and never add a fallback path.
 
-Hard-error on required convergence failure — `warn` + continue banned. See `activation-scripts.instructions.md`.
+Every warning and error needs a disposition: `fix`, `upstream`, `by-design`, or `consequence`, with the evidence line. "Benign" without proof is a violation.
 
-### Prohibitions
+## Message formats
 
-Never downgrade errors. Never `|| true`/`2>/dev/null`/`-ErrorAction SilentlyContinue` without `# check-suppress:suppression_doc: reason`. Never mask missing values with defaults. Never add fallbacks.
+F1 message line: `[<ts> ]<cmd>: [<level>: ]<msg>`, timestamp optional and dim. `<cmd>` is the basename minus `.sh` or `nucleus-`. Levels are `notice`, `error`, `warning`, and `[dry-run]`; `done` prints no message. `error` and `warning` go to stderr, the rest to stdout. Helpers: `say`, `notice`, `error`, `warn`, `dry_run`, `nuc_done`, `die` in `src/scripts/lib/lib.sh`, and `Write-Nucleus*` in `Format-NucleusOutput.psm1`. Help and usage text carries no `cmd:` prefix.
 
-### Disposition
+F2 step chrome: `[step NN] <content>`, zero-padded to two digits with a `10#` guard, marker dim, content in the default color, console only.
 
-Every warning/error: capture line, classify (`fix`/`upstream`/`by-design`/`consequence`), record evidence. "Benign" without proof = violation.
+F3 header marker: `=== [N] <title> ===`, bold cyan, no `cmd:` prefix. A step that does not run appends `not applicable (<reason>)` or `not-selected`.
 
----
+F4 table: two-space indent, green check, red cross, and a yellow en dash for not applicable or not selected, with dim labels.
 
-## Message format taxonomy
+F5 machine-readable stdout: `--json` emits one JSON object or array with an integer `"version"` via `jq` or `ConvertTo-Json -Compress`, `--list-*` emits one entry per line and exits 0, and errors still go to stderr as F1.
 
-### F1: Message line
+## Console color
 
-Form: `[<ts> ]<cmd>: [<level>: ]<msg>`. Timestamp optional dim (daemon logs). `<cmd>` = basename minus `.sh`/`nucleus-`. Levels: `notice`, `error`, `warning`, `[dry-run]`; `done` no message. `error`/`warning` → stderr; rest stdout.
+Sixteen named colors only, plus dim, underline (`4m`), and underline-cyan (`4;36m`). Semantic coloring runs after the quote pass: URLs get underline-cyan, single-quoted spans get blue. Regex only, no markup delimiters. POSIX uses `_nuc_semantic_color` in `lib.sh`, PowerShell `ConvertTo-NucleusSemanticColor` in `Format-NucleusOutput.psm1`.
 
-POSIX helpers in `src/scripts/lib/lib.sh`: `say`, `notice`, `error`, `warn`, `dry_run`, `nuc_done`, `die`. PS1 `Write-Nucleus*` in `Format-NucleusOutput.psm1`. Help/usage has no `cmd:` prefix.
+A non-empty `NO_COLOR` turns decoration off. `FORCE_COLOR` set to anything but 0, or `CLICOLOR_FORCE`, turns it on. Otherwise it follows per-stream tty and `TERM != dumb`. PowerShell also requires `$Host.UI.SupportsVirtualTerminal` and `-not [Console]::IsOutputRedirected`. The engine owns `NO_COLOR` and sets `$PSStyle.OutputRendering = PlainText`; the output module must not mutate it.
 
-### F2: Step chrome
-
-`[step NN] <content>` — zero-padded `%2d`, `10#` guard; marker dim, content default; console-only.
-
-### F3: Header markers
-
-`=== [N] <title> ===` — bold cyan, no `cmd:` prefix. A step that does not run appends `not applicable (<reason>)` or `not-selected`.
-
-### F4: Tables
-
-Two-space indent; ✓ green / ✗ red / – (en dash) yellow for not applicable or not selected; dim labels.
-
-### F5: Machine-readable stdout
-
-`--json`: single JSON object/array with INTEGER `"version"` via `jq`/`ConvertTo-Json -Compress`. `--list-*`: one/line, exit 0. Errors to stderr as F1.
-
----
-
-## Console color spec
-
-Palette: bold/red/yellow/magenta/green/cyan/blue/dim, underline (`4m`), underline-cyan (`4;36m`). 16 named colors only. POSIX vars in lib.sh: `_nuc_c{1,2}_blue`, `_nuc_c{1,2}_underline`, `_nuc_c{1,2}_ulcyan`.
-
-Semantic coloring: URLs → underline-cyan; single-quoted → blue. Quote pass first. Regex-only, no markup delimiters. Applied by `_nuc_semantic_color` (lib.sh) and `ConvertTo-NucleusSemanticColor` (Format-NucleusOutput.psm1).
-
-Detection: `NO_COLOR` non-empty → off (strips all decoration). `FORCE_COLOR` non-0 / `CLICOLOR_FORCE` → on. Else per-stream tty AND `TERM != dumb`. PS1 additionally checks `$Host.UI.SupportsVirtualTerminal` AND `-not [Console]::IsOutputRedirected`. Engine owns `NO_COLOR` → `$PSStyle.OutputRendering = PlainText`; module must NOT mutate it. Color in shared helpers only — no raw ANSI, `tput`, `echo -e` elsewhere (check step 12).
-
----
+Color lives in the shared helpers only. `repository-policy.awk` in logging-format mode, run by check step 12, fails raw ANSI literals, `tput`, `echo -e`, `[char]27`, and backtick-e everywhere outside its own color-helper allowlist.
 
 ## Log storage and rotation
 
-Roots from `services.json` `$logging`: MacBook `~/Library/Application Support/nucleus/logs` + `/Library/Application Support/nucleus/logs`; NixOS `~/.local/share/nucleus/logs` + `/var/lib/nucleus/logs`; Windows `%LOCALAPPDATA%\nucleus\log` + `%ProgramData%\nucleus\log`. Override: `NUCLEUS_LOG_DIR`/`NUCLEUS_SYSTEM_LOG_DIR`. **Capture mechanism is per host: NixOS services log to journald; macOS and Windows capture each stream to its own file — `<dir>/stdout.log` and `<dir>/stderr.log`.** Where a file is captured, merging the two streams, capturing only one of them, and discarding one to `/dev/null` are prohibited on every host, which is where the platform default would otherwise silently swallow it; unit paths are hardcoded per module and enforced by check step 12 (`repo-policy-pattern`). `logging.capture` selects *which* streams are captured (`stderr` means only `stderr.log` exists), never the destination shape, and drives display/rotation/health-check. Rotation: copy-truncate + gzip, 7d expiry, thresholds from the `services.schema.json` `$logging` defaults. Health-check triggers immediate rotation when a file exceeds maxSize.
+Roots come from `services.json` `$logging` and are overridable with `NUCLEUS_LOG_DIR` and `NUCLEUS_SYSTEM_LOG_DIR`. NixOS services log to journald. macOS and Windows capture each stream to its own file, `<dir>/stdout.log` and `<dir>/stderr.log`.
 
----
+Where a file is captured, merging the two streams, capturing one and dropping the other, and discarding a stream to `/dev/null` are all prohibited: the platform default would swallow it silently. Unit paths are hardcoded per module and check step 12 enforces the pair. `logging.capture` selects which streams are captured, never the destination shape, and drives display, rotation, and health-check.
 
-## External exceptions
+Rotation is copy-truncate plus gzip, 7d expiry, with thresholds from the `services.schema.json` `$logging` defaults. Health-check rotates immediately when a file passes `maxSize`.
 
-New passthrough requires spec entry + rationale. Categories: third-party passthrough (nix, brew, cargo, git hooks, winget, adb/qemu), probe suppression, pwsh host rendering, vendored scripts, static doc, bootstrap, VM templates, Nix/Darwin activation scripts, shell-init, framework-local PS1, daemon log writers, test-harness, fixtures, status/diff/event-log, documented third-party (sops, rclone, tart, packer, duperemove, journalctl).
-
----
-
-## Enforcement
-
-Check step 12 bans raw ANSI/`tput`/`echo -e`/`[char]27`/backtick-e/legacy `==== NN` outside 9-file allowlist: lib.sh, step-runner.sh, step-runner.ps1, test-lib.sh, test-lib.ps1, Format-NucleusOutput.psm1, Format-NucleusOutput.Tests.ps1, Invoke-LogManagement.ps1, log-management.Tests.ps1.
+Sanctioned passthrough categories, for output that is not a nucleus message: third-party passthrough (nix, brew, cargo, git hooks, winget, adb, qemu), probe suppression, pwsh host rendering, vendored scripts, static doc, bootstrap, VM templates, Nix and Darwin activation scripts, shell-init, framework-local PS1, daemon log writers, test harness, fixtures, status/diff/event-log, and documented third-party tools (sops, rclone, tart, packer, duperemove, journalctl).

@@ -6,124 +6,45 @@ applyTo: "src/scripts/lib/step-runner.sh, src/scripts/lib/step-runner.ps1, scrip
 
 # Step-runner framework interface specification
 
-Both POSIX (`step-runner.sh`) and PowerShell (`step-runner.ps1`) implementations must conform.
+`step-runner.sh` and `step-runner.ps1` are one interface with two implementations. A rule stated here applies to both unless it names a platform.
 
-## Spec A: Step registration
+## Registration
 
-```text
-register_step(id, name, func)                                 # 3-arg: platform=any mode=any requires=none
-register_step(id, name, func, platform, mode, requires)       # 6-arg: declared applicability
-register_step(id, number, name, func)                         # 4-arg: unit tests only ($2 must be [0-9]+)
-  Arity is exactly 3, 4 or 6; the 4-arg form is unit-tests only.
-  id: non-empty, no digits, unique, kebab-case. number: positive, unique.
-  3-arg: number from NN- prefix (error if missing). 4-arg: explicit (unit tests only).
-  name: display name. func: (ctx, ...files).
-  platform: any | posix | windows. posix = macOS and NixOS only; windows = Windows only.
-  mode: any | full | scoped. scoped = run with positional file args; full = whole-repo run.
-  requires: none | nix | network | sops-machine-key | deployed-host.
-  Validation (hard failure): id digit/empty/dup; number dup; unknown token.
-    register_step: unknown platform token 'darwin' (expected posix|windows|any)
-  Effect: appends to step arrays (POSIX _STEP_IDS/_STEP_PLATFORMS/_STEP_MODES/_STEP_REQUIRES; PS1 $script:StepIds/…).
-PowerShell named form: Register-Step -Id -Name -Action [-Number] [-Platform] [-Mode] [-Requires]; defaults any/any/none.
-```
+`register_step(id, name, func)` defaults to `any`/`any`/`none`; the 6-argument form declares applicability; the 4-argument form takes an explicit number and exists only for unit tests. Ids are unique, kebab-case, digit-free, and take their number from the `NN-` filename prefix. Tokens are `platform`: `any|posix|windows` (`posix` covers macOS and NixOS), `mode`: `any|full|scoped`, and `requires`: `none|nix|network|sops-machine-key|deployed-host`. An unknown token, a duplicate number, or an underivable number is a registration-time hard error. PowerShell spells it `Register-Step -Id -Name -Action [-Number] [-Platform] [-Mode] [-Requires]`.
 
-## Spec B: `--only-steps` flag
+## Run state
 
-```text
-Flag: --only-steps=id1,id2,id3 (= mandatory; no space-separated form). check-pwsh.ps1 uses -OnlyStep <PSSA|Syntax>.
-Comma-separated step IDs, whitespace trimmed, duplicates deduped. Empty = no-op.
-Execution: an id not selected → "=== [<number>] <name> === not-selected" (not run, no exit effect).
-Errors: unknown id is a hard error with the known-id list; no negation flag and no alias. Multiple flags last wins.
-Interactions: selection is applied before the platform/mode/requires checks; --fail-fast unaffected.
-```
+The runner, never the step, decides whether a step runs, and it reports every skip in the header:
 
-## Spec C: `--format` removal (post-removal behavior)
+- id excluded by `--only-steps` → `not-selected`, checked first so it is never reported as not applicable
+- `posix` on Windows or `windows` on POSIX → `not applicable (platform: <token>)`
+- `scoped` without positional args, `full` with them → `not applicable (mode: <token>)`
+- missing prerequisite → `not applicable (requires: <token>)`
 
-```text
-Step 01 (code-formatting): always runs `treefmt` in-place (no --fail-on-change).
-Pipelines may silently reformat — run `git status --short` after and commit `style(...)` fixes.
-  POSIX: treefmt + Darwin supplements + check-packer --validate-only
-  PS1: native CLIs (shfmt, yamllint, taplo, packer fmt, actionlint, pinact, zizmor, check-packer)
-  Same output format.
-```
+A step that does not run never affects the exit code (0 pass, 1 fail) and never prints "passed" or "no issues found".
 
-## Spec D: `--skip-system-build` removal
+`--only-steps=id1,id2` is mandatory-`=` and comma-separated; whitespace is trimmed, duplicates collapse, an empty value is a no-op, and the last flag wins. An unregistered id is a hard error listing the known ids, because a typo would otherwise narrow the run to nothing and report success. Selection is applied before the platform, mode, and requires checks, and it does not affect `--fail-fast`.
 
-```text
-Test step 04 (system-config-build):
-  POSIX: declares `requires sops-machine-key`; the runner reports it not applicable when the key is absent.
-  Windows: no counterpart — the system build has no PowerShell twin. No flag controls execution.
-```
+Step 01 runs `treefmt` in place, so a pipeline can reformat files silently: run `git status --short` afterwards and commit the result as a `style(...)` change. Test step 04 declares `requires sops-machine-key` and Windows has no counterpart for it.
 
-## Spec E: PS1 parallelism
+## PowerShell dispatch
 
-```text
-Invoke-StepPipeline:
-  - Waves capped at PARALLEL_JOBS (default: CPU count).
-  - [PowerShell]::Create() + BeginInvoke() per step (one runspace; no RunspacePool/Start-Job).
-  - Per-step stdout/exit/timing → step-N.* files in wave temp dir.
-  - Live [step NN] on stderr; ordered replay step-number order.
-  - Timing: `%.3f s` summary; internal integer ms. POSIX: $EPOCHREALTIME / Time::HiRes / date +%s%3N.
-  - Exit code 0 (all selected applicable steps passed) or 1 (any failed). Fail-fast: stop after current wave.
-```
+`Invoke-StepPipeline` runs steps in waves capped at `PARALLEL_JOBS` (CPU count by default), one `[PowerShell]::Create()` runspace per step driven with `BeginInvoke`, and replays results in step-number order. Not `RunspacePool` or `Start-Job`, because those are the constructs that make runspace state unpredictable for the steps below.
 
-### Output color
+## Step 7 `$schema` enforcement
 
-F2/F4 palette via `_nuc_color_init` (POSIX, `src/scripts/lib/lib.sh`) / `$PSStyle` (PS1, `Format-NucleusOutput.psm1`). No raw ANSI/tput/echo-e (check step 12).
+Nucleus-owned JSON and YAML requires an inline `$schema` pointing at a co-located schema file. External formats use their published `$schema` when one exists and never a hand-rolled one. The exception list is the A8 row in `allow-and-deny-lists.instructions.md`; a missing, non-string, or dangling `$schema` is a per-file error, and the step fails if any file errored. POSIX and Windows behave identically.
 
-- F1: `notice` bold blue; semantic coloring (URLs underline-cyan, quotes blue).
-- F2: `[step NN]` dim. F4: ✓ green / ✗ red / – (en dash) yellow for not applicable or not selected; labels dim.
-- Captured files plain. Gated by NO_COLOR / FORCE_COLOR / tty (`output-handling.instructions.md`).
+## Adding or renumbering steps
 
-## Spec F: Declared applicability
+Step numbers come from the `NN-` prefix of `src/scripts/checks/check-steps/<nn>-*.{sh,ps1}`. A number must describe what the step does, so opening a new group means renumbering. Renaming means moving the step and its test together and sweeping every reference: `TEST_FILE`/`$testFile`, `# shellcheck source=`, `repository-policy.awk`, prose "step N", and generator or installer comments. Do the rename in one commit before creating the new pair. Test-pipeline steps follow the same rules; shell validation lives in test step 5, not in the check pipeline.
 
-```text
-The runner decides whether a registered step runs, from its declaration:
-  - selection: an id excluded by --only-steps → "not-selected";
-  - platform: posix needs macOS or NixOS, windows needs Windows → "not applicable (platform: <token>)";
-  - mode: scoped needs positional args, full needs none → "not applicable (mode: <token>)";
-  - requires: nix | network | sops-machine-key | deployed-host → "not applicable (requires: <token>)".
-A step never probes its own prerequisites; the runner owns run-state.
-Not-applicable and not-selected steps never affect the exit code (0 pass / 1 fail).
-Never output "passed" or "no issues found" for a step that did not run.
-```
+## No ambient shared state
 
-## Adding or renumbering check steps
+A step reads its context parameter and its own locals, nothing else. The context is the first parameter: `$Context.<Field>` in PowerShell, `${ctx[...]}` in Bash via `local -n ctx="$1"`. Private accumulators stay out of shared scope. Documented env inputs are the exception (`REPO_ROOT`, `NUCLEUS_REPO_ROOT`, `PARALLEL_JOBS`), each needing a `# WHY:` when it is not self-evident.
 
-Step numbers from `NN-` filename prefix of `src/scripts/checks/check-steps/<nn>-*.{sh,ps1}`. IDs digit-free kebab-case. Renumbering = filename change + reference sweep.
+PowerShell runspaces cannot inherit `$script:` state, so a read either fails or races; Bash subshells copy globals silently, so a write leaks into the parent. The context object is the only channel.
 
-References to move: `TEST_FILE`/`$testFile`, `# shellcheck source=`, prose "step N", `repository-policy.awk`, generator/installer comments, test pairs.
+## Output color
 
-- **No blind appending** — number must reflect what the step actually does.
-- **Group first, number second** — a step that opens a new group needs justification and renumbering.
-- **Rename first, then create** — `git mv` step+test pairs, update all references, create new pair, one atomic commit.
-- **Test-pipeline steps**: same principles.
-
-Shell validation runs in test step 5, not check pipeline.
-
-## Spec G: Step 7 `$schema` enforcement
-
-```text
-For every JSON/YAML file in scope (except exceptions):
-  1. Presence: lacks `$schema` + not in EXCEPTION_LIST → ERROR "Missing $schema in <filepath>"
-  2. Validity: relative path + file missing → ERROR "Schema file not found: '<path>' (referenced from <filepath>)"
-  3. Format: empty or non-string → ERROR "Invalid $schema in <filepath>: must be a non-empty string"
-  Continue checking all files (non-fatal per-file).
-
-  EXCEPTION_LIST: the A8 registry row in allow-and-deny-lists.instructions.md.
-  Policy: nucleus-owned data requires $schema (we write our own schemas).
-  External formats: use published $schema when available; never roll our own.
-
-  Aggregation: collect all → step fails if any. "ERROR: <N> file(s) missing or invalid $schema"
-  Cross-platform: identical.
-```
-
-## No ambient passing of shared state
-
-Steps must not read enclosing-scope state not passed as parameters. State flows through the context object only.
-
-Context as first parameter: PowerShell `$Context.<Field>` (`[PSObject]` from `step-runner.ps1`); Bash `${ctx[...]}` (associative array via `local -n ctx="$1"` from `step-runner.sh`).
-
-Steps read only context + own `local`/`$local:` vars. Private accumulators must not be written to shared scope. Exception: documented env inputs (`REPO_ROOT`, `NUCLEUS_REPO_ROOT`, `PARALLEL_JOBS`) — mark with `# WHY:` if non-obvious.
-
-Why: PowerShell runspaces cannot inherit `$script:` — reads fail or corrupt via concurrent access. Bash subshells copy globals silently.
+F2 and F4 palette via `_nuc_color_init` (`src/scripts/lib/lib.sh`) and `$PSStyle` (`Format-NucleusOutput.psm1`): `notice` bold blue, `[step NN]` dim, green check, red cross, yellow en dash for not applicable or not selected, dim labels. Captured files stay plain. Raw ANSI, `tput`, and `echo -e` are banned outside the shared helpers (check step 12). Gating: `output-handling.instructions.md`.
