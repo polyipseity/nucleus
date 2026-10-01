@@ -6,17 +6,17 @@ applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/Windows/**/*.yml, scripts/**, sr
 
 # Package installation scope
 
-User-level only. System-wide prohibited except system infrastructure (nix-darwin `environment.systemPackages`, WinGet DSC registry).
-
-## Cross-host package manager hierarchy
+User-level only. System-wide is limited to system infrastructure: nix-darwin `environment.systemPackages`, the NixOS system config, and the WinGet DSC registry.
 
 | Scope | macOS (nix-darwin) | NixOS | Windows |
 | --- | --- | --- | --- |
-| **System packages** | `nixpkgs` via `environment.systemPackages` | `nixpkgs` via NixOS system config | WinGet DSC (`system-packages.dsc.yml`) |
-| **User CLI tools** | `nixpkgs` via `home.packages` | `nixpkgs` via `home.packages` | WinGet DSC + Scoop |
-| **Global JS packages** | `bun install -g` | `bun install -g` | `bun install -g` |
-| **Prebuilt binaries** | N/A | N/A | `cargo-binstall`, Scoop |
-| **Python tools** | `uv tool install` | `uv tool install` | `uv tool install` |
+| System packages | `nixpkgs` via `environment.systemPackages` | `nixpkgs` via NixOS system config | WinGet DSC (`system-packages.dsc.yml`) |
+| User CLI tools | `nixpkgs` via `home.packages` | `nixpkgs` via `home.packages` | WinGet DSC + Scoop |
+| Global JS packages | `bun install -g` | `bun install -g` | `bun install -g` |
+| Prebuilt binaries | N/A | N/A | `cargo-binstall`, Scoop |
+| Python tools | `uv tool install` | `uv tool install` | `uv tool install` |
+
+Install form: Python via `uv tool install`, never `pip install --system`. Rust via devShell, then `cargo-binstall`, then `cargo install`, landing in `~/.cargo/bin`. JS via `bun install -g` only, never `npm install -g` (POSIX `agents.nix`, Windows `Invoke-BunSetup.ps1`).
 
 ## System-install-only tools
 
@@ -29,41 +29,29 @@ Not for interactive dev use:
 | `rustup` | `pkgs.rustup` (POSIX) / `Rustlang.Rustup` (Win) | toolchain manager; default `none` |
 | `uv` | nixpkgs / WinGet | `uv tool install` for system Python |
 | `prek` | nixpkgs | system-wide Git hook manager |
-| `python` / `pip` | **banned** | all Python via devShell or uv venv |
-| `npm` / `npx` / `node` / `corepack` | **banned** | all JS via bun |
+| `python` / `pip` | banned | all Python via devShell or uv venv |
+| `npm` / `npx` / `node` / `corepack` | banned | all JS via bun |
 
 ## Shell-level enforcement
 
-Blocked tools overridden as shell functions intercepting toward devShell.
+Blocked tools are overridden as shell functions that intercept toward devShell: `$DIRENV_DIR` → devShell → alternative bundle → error. Educational blocks (`npm`/`npx`/`node`/`corepack`, `pip`/`pip3`, `python`/`python3`) ban outright.
 
-- **POSIX (zsh)** — `src/scripts/shell/init.zsh` functions. Flow: `$DIRENV_DIR` → devShell → alternative bundle → error. Educational blocks (`npm`/`npx`/`node`/`corepack`, `pip`/`pip3`, `python`/`python3`) ban directly.
-- **PowerShell** — `src/scripts/shell/profile.ps1` (shared, consumed by `pwsh.nix` on POSIX, `Sync-ShellProfile.ps1` on Windows). Same flow.
+- POSIX zsh: `src/scripts/shell/init.zsh`.
+- PowerShell: `src/scripts/shell/profile.ps1` (shared, consumed by `pwsh.nix` on POSIX and `Sync-ShellProfile.ps1` on Windows).
 
-PATH via `home.sessionPath` (→ `~/.zshenv`), not `initContent` — survives direnv deactivation.
+`DIRENV_DIR` pass-through is required in every blocking function. Not blocked: `cargo-binstall`, `cargo-cache`, `rustup`, `ruff`, `ty`.
 
-## devShell
+PATH goes through `home.sessionPath` (→ `~/.zshenv`), not `initContent`, so it survives direnv deactivation.
 
-Project-specific work. Managed default for repos without direnv/Nix: `bun`, `cargo`/`rustc`, `prek`, `uv`. Auto via direnv with `use flake`; manual via `nix develop`; alternative via managed profile. Windows: WSL or managed PowerShell. POSIX toolchain from `rust-toolchain.toml`.
-
-## Adding/changing blocked tools
-
-1. Add to `src/modules/shell/default.nix` (`initContent`), follow existing pattern. 2. Add equivalent to `src/scripts/shell/profile.ps1`. 3. Update this file. 4. If devShell tool, add to `devShells.default` in `src/flake.nix`. `DIRENV_DIR` pass-through required in every blocking function. Not blocked: `cargo-binstall`, `cargo-cache`, `rustup`, `ruff`, `ty`.
-
-## Tool installation
-
-- **Python:** `uv tool install`. Never `pip install --system`.
-- **Rust:** devShell → `cargo-binstall` → `cargo install`. To `~/.cargo/bin`.
-- **JavaScript:** `bun install -g` only (POSIX: `agents.nix`; Windows: `Invoke-BunSetup.ps1`). Never `npm install -g`.
+To change the blocked set: edit `initContent` in `src/modules/shell/default.nix` and the matching block in `profile.ps1`, update this file, and add devShell tools to `devShells.default` in `src/flake.nix`.
 
 ## Managed package classification
 
-Declared once in `src/modules/core.nix` `managedPackages`. `category`: `"cli"` → nixpkgs; `"gui"` → Homebrew (cask preferred) on macOS, nixpkgs on NixOS. Ship GUI component → classify `"gui"`.
+Declared once in `managedPackages` in `src/modules/core.nix`, alphabetically. `category: "cli"` → nixpkgs; `"gui"` → Homebrew cask on macOS, nixpkgs on NixOS, so an app shipping a GUI component is `"gui"`. Platform-specific entries add `platforms` (`platforms = [ "darwin" ]`); Homebrew-only entries set `missingNixAttrs`. Remove duplicates from `NixOS/desktop.nix`.
 
-Platform-specific packages add `platforms` field (e.g. `platforms = ["darwin"]` for `iterm2`, `rectangle`, `stats`, `utm`). Homebrew-only: use `missingNixAttrs`. Add to `managedPackages` alphabetically; remove duplicates from `NixOS/desktop.nix`.
+An entry whose bare `nixpkgs` attr is not the derivation to deploy carries `nixpkgsPackage`, with `nixpkgs` still required as the availability probe. Never contribute a second derivation for the same binary: `buildEnv` collides on it, nix-darwin's `system-path` keeps the first, and Home Manager's `home-manager-path` refuses to build, so replace the entry instead (`pass` deploys `pkgs.pass.withExtensions (extensions: [ extensions.pass-otp ])`).
 
-An entry whose bare `nixpkgs` attr is not the derivation to deploy carries `nixpkgsPackage` (a derivation) to override it; `nixpkgs` stays required as the availability probe. Never contribute a second derivation for the same binary: `buildEnv` collides on it (nix-darwin `system-path` keeps the first, Home Manager's `home-manager-path` refuses to build), so replace the entry instead — e.g. `pass` deploys `pkgs.pass.withExtensions (extensions: [ extensions.pass-otp ])`.
-
-Removing a tap-qualified Homebrew formula (`zackelia/formulae/bclm`) requires its tap to outlive it: nix-homebrew untaps undeclared taps before `brew bundle --zap` runs its cleanup, and the cleanup can then neither resolve nor uninstall the still-installed orphan, aborting activation with `Error: No available formula with the name "<tap>/<formula>"` after the profile has already moved to the new generation. Uninstall the formula on every MacBook (`brew uninstall --force <formula>`) before the commit that drops the tap from `nix-homebrew.taps`/`trust`; no migration shim belongs in the repo.
+Dropping a tap-qualified Homebrew formula leaves its tap to outlive it: nix-homebrew untaps undeclared taps before `brew bundle --zap` cleanup, which then aborts activation on an orphaned formula after the profile already moved. Uninstall the formula on every MacBook before the commit that drops the tap; no migration shim belongs in the repo.
 
 ## Violations
 

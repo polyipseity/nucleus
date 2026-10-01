@@ -5,48 +5,34 @@ name: "Citation Quality Reference"
 
 # Citation quality reference
 
-Keep URLs and content correct to prevent drift.
-
 ## Source preference
 
-1. **Developer/API docs**: `developer.apple.com/documentation/*`, `learn.microsoft.com/en-us/*`, official references, IETF RFCs.
-2. **User help** (when developer docs absent): `support.apple.com/en-us/guide/*`, KB articles, vendor blogs. Support page where dev doc exists → add `# WHY:`.
-3. **Avoid**: mirrors, archived copies, third-party rewrites, forums, Reddit, SO, expired/redirect links.
+1. Developer and API docs: `developer.apple.com/documentation/*`, `learn.microsoft.com/en-us/*`, official references, IETF RFCs.
+2. User help only when no developer doc exists: `support.apple.com/en-us/guide/*`, KB articles, vendor blogs. When a dev doc does exist, cite it and add a `# WHY:` for the choice.
+3. Never cite mirrors, archived copies, third-party rewrites, forums, Reddit, Stack Overflow, or expired and redirected links.
 
 ## URL standardization
 
-Apple support URLs must include `en-us`. ✅ `https://support.apple.com/en-us/HT123456`. ❌ `https://support.apple.com/HT123456` (no locale). Canonical URLs without query params. Include article IDs for stability.
+Apple support URLs include `en-us`, so `https://support.apple.com/en-us/HT123456` and never `https://support.apple.com/HT123456`. Keep URLs canonical, without query params, and with the article id so the link stays resolvable.
 
 ## Deprecation hygiene
 
-Never cite deprecated APIs as current. Deprecated in historical context → mark deprecated, cite notice, cite replacement:
+Never cite a deprecated API as current. In historical context, mark it deprecated and cite both the notice and the replacement:
 
 ```nix
-# Old approach (deprecated): use Carbon Text Services Manager
-# Modern approach: use InputMethodKit
+# Old approach (deprecated): Carbon Text Services Manager.
+# Modern approach: InputMethodKit.
 # Source: https://developer.apple.com/documentation/inputmethodkit
 ```
 
 ## Citation style
 
-Citations adjacent to the claim:
+The citation sits next to the claim it supports, or at the top of the comment block when the claim spans several lines:
 
 ```nix
 # Prevent .DS_Store files on network and removable volumes.
 # Source: https://support.apple.com/en-us/HT208209
 "com.apple.desktopservices" = {
   DSDontWriteNetworkStores = true;
-};
-```
-
-Multi-line: source at top of comment block:
-
-```nix
-# Software Update: check, download, and install automatically.
-# Source: https://support.apple.com/en-us/guide/deployment/manage-software-updates-depafd2fad80/web
-"com.apple.SoftwareUpdate" = {
-  AutomaticCheckEnabled = true;
-  AutomaticDownload = true;
-  CriticalUpdateInstall = true;
 };
 ```

@@ -6,70 +6,40 @@ applyTo: "src/modules/configs/**, src/modules/**/*.nix, src/hosts/**/*.nix, src/
 
 # Application config policy
 
-All configs in `src/modules/configs/` follow this method priority:
+Method priority for `src/modules/configs/`. Method 1 is the default; any deviation needs `# check-suppress:config-method: method N (name) -- <technical reason>`, and preference is not a technical reason.
 
-### Method 1 — Bidirectional writable symlink (default)
+## Method 1: bidirectional writable symlink
 
-Symlink from app config path into repo tree. Edits reflect immediately; no reactivation needed.
+Symlink the app config path into the repo tree. POSIX: `seed-writable-symlink.sh` (`entryAfter [ "linkGeneration" ]`, re-anchored via `derive_repo_root`). Windows: `New-Item -ItemType SymbolicLink` to `$env:NUCLEUS_REPO_ROOT`, via `Deploy-WritableSymlink` in `ConfigHelpers.ps1`.
 
-**POSIX:** `src/scripts/configs/seed-writable-symlink.sh` from `home.activation` (`entryAfter [ "linkGeneration" ]`), re-anchored to live root via `derive_repo_root`. **Windows:** `New-Item -ItemType SymbolicLink` targeting `$env:NUCLEUS_REPO_ROOT`. See `Deploy-WritableSymlink` in `ConfigHelpers.ps1`.
+Never use `mkOutOfStoreSymlink` with a `repoRoot`-derived path: `repoRoot = ../.` copies into read-only `/nix/store/*-source`, so writes fail `EACCES`. See `src/platforms/macOS/scripts/macos-configure-linearmouse.sh`.
 
-> **Never use `mkOutOfStoreSymlink` with a `repoRoot`-derived path.** `repoRoot = ../.` copies into read-only `/nix/store/*-source` — writes fail `EACCES`. Reference: `src/platforms/macOS/scripts/macos-configure-linearmouse.sh`.
+Writable-vs-immutable is owned by `managedSymlinkPaths` in `src/modules/home.nix`: `writable = true` stays unhardened, everything else is re-hardened by `protect-out-of-store-symlinks`. The helper takes no writable flag and never calls protect/unprotect.
 
-Writable-vs-immutable owned by `managedSymlinkPaths` (`src/modules/home.nix`): `writable = true` stays unhardened; others re-hardened by `protect-out-of-store-symlinks`. Helper must NOT take a writable flag or call protect/unprotect.
+Applies when the app tolerates a symlink without overwriting it with generated state. An app that auto-writes needs the key committed, auto-write disabled, or Method 2/3.
 
-**Use when** app tolerates a symlink without overwriting it with auto-generated state. Apps that auto-write (e.g. `redhat.vscode-yaml`) need the key committed, auto-write disabled, or Method 2/3.
+## Method 2: read-only deployment
 
-### Method 2 — Read-only deployment (alternative)
+Nix `xdg.configFile` (POSIX), `Copy-Item` + `ReadOnly` (Windows). Only when the app overwrites the config with generated state, or the platform blocks symlinks (macOS LaunchServices refuses them for `.app` bundles). Invalid for a system-level path or "no user writes it".
 
-Read-only copy at app config path. Nix `xdg.configFile` (POSIX); `Copy-Item` + `ReadOnly` (Windows).
+## Method 3: selective merge
 
-**Use when:** app overwrites config with auto-generated state, or platform limitation (e.g. macOS LaunchServices refuses symlinks for .app bundles). **Not valid:** system-level path (use writable symlink), "no user writes it" (Method 1 is correct), or "immutability preference."
+Managed subset in the repo, merged into the live config at activation, key-wise for JSON and section-wise for INI. Use when the app keeps its own state in the same file (Obsidian `obsidian.json`, Picard `Picard.ini`).
 
-### Method 3 — Selective merge (alternative)
+## Method 4: runtime direct read
 
-Managed subset stored in repo, merged into live config at activation. Key-wise (JSON) or section-wise (INI); app-owned data preserved.
+Nucleus-owned scripts only, reading config through `$NUCLEUS_REPO_ROOT`.
 
-**Use when** app manages its own state in the same file (e.g. Obsidian `obsidian.json`, Picard `Picard.ini`).
+## Host-specific lib/ subdirectory
 
-### Method 4 — Runtime direct read (nucleus infrastructure only)
+`src/modules/configs/<name>/lib/` holds overrides the application auto-loads (direnv `lib/*.sh`). Base config stays valid on all hosts; an override deploys only where it applies, documented in the lib header and the deployment module. Example: `src/users/default/direnv/lib/apple-sdk-override.sh`, a macOS `_nix()` override, POSIX deployment via `shell/default.nix`; Windows deploys only base `direnvrc`.
 
-Script reads config directly via `$NUCLEUS_REPO_ROOT`. For nucleus-owned scripts only.
+## Per-user overrides
 
-### Priority rule
+`src/users/<username>/<config>/` over `src/users/default/<config>/`, see `user-config-placement.instructions.md`. Merge order `defaults // platform_overrides // user_overrides`, override fields declared in the user registry (`src/users/<username>/<domain>.json`), merge implemented in the target platform's activation code (`users-registry.nix`, `Load-UserRegistry.ps1`). Method 1 still applies under `src/users/`.
 
-1. Method 1 by default. Method 2 only with documented technical constraint making Method 1 impossible.
-2. Method 2 if 1 unsuitable. Method 3 if 2 unsuitable. Method 4 for nucleus-owned infrastructure only.
-3. Deviation from Method 1 requires `# check-suppress:config-method: method N (name) -- <reason>`.
-4. Equivalent deployment on all applicable hosts. Document N/A for hosts without the application.
+## Storage, parity, tests
 
-### Host-specific lib/ subdirectory convention
+Store the format the app reads: JSON when it reads JSON, its native format otherwise.
 
-`src/modules/configs/<name>/lib/` holds host-specific overrides auto-loaded by the application (e.g. direnv `lib/*.sh`). Platform-specific; deploying to other hosts is dead code. Rules: base config valid on all hosts; overrides deploy only on needed hosts; document in lib file header and deployment module comment; N/A for hosts without the app.
-
-Example: `src/users/default/direnv/lib/apple-sdk-override.sh` — macOS `_nix()` override, deployed on POSIX via `shell/default.nix`; Windows deploys only base `direnvrc`.
-
-### User-scoped configs
-
-Per-user configs in `src/users/<username>/<config>/` with `src/users/default/<config>/` as template. See `user-config-placement.instructions.md`. Selection: `mkUserOverlay` (POSIX), `Resolve-UserConfig*` (Windows). Registry domains use `users-registry.nix`. Outside step-19 scan — no `# check-suppress:config-method` needed for `src/users/**`, but method-1 rule applies.
-
-## Management workflow
-
-### Storage location
-
-**JSON file** if app reads JSON directly. **Native format** if app does not read JSON — store in the format app reads.
-
-### Per-user override pattern
-
-Merge order: `defaults // platform_overrides // user_overrides`. Define override fields in user registry (`src/users/<username>/<domain>.json`). Nix: `users-registry.nix`; Windows: `Load-UserRegistry.ps1`. Implement merge in target platform's activation code. Add tests.
-
-### Cross-platform parity
-
-Audit all three hosts. For each with the app: defaults centrally defined, override fields in registry, merge order applied, tests cover enabled hosts. Single-host apps need `# WHY:`. See `cross-host-feature-parity.instructions.md`.
-
-### Checklist
-
-- Storage: JSON or native format. Add defaults, override fields, merge logic.
-- Activate on all platforms or document exceptions with `# WHY:`.
-- Add tests; verify `nix flake check` and all tests pass.
-- Verify `# check-suppress:config-method: method N` cites technical reason, not preference.
+Implement on every host that has the app, with a `# WHY:` for single-host apps (`cross-host-feature-parity.instructions.md`). Cover enabled hosts with tests and run `nix flake check`.

@@ -4,53 +4,40 @@ name: "AI Model Selection"
 applyTo: "scripts/ai.sh, src/modules/ai.nix, src/modules/configs/ollama/**, src/modules/configs/litellm/**, src/users/*/vscode/chatLanguageModels.*.json, src/hosts/*/ai.nix, src/platforms/Windows/modules/system/Invoke-AISync.ps1, src/platforms/Windows/modules/system/Sync-LiteLLMService.ps1"
 ---
 
-# AI Model Selection
+# AI model selection
 
-## Profile key convention
+## Profile keys
 
-`src/modules/configs/ollama/models.json` keys by **host name** (PascalCase, matching `networking.hostName` / `ComputerName`):
+`src/modules/configs/ollama/models.json` keys by host name in PascalCase, matching `networking.hostName` and `ComputerName`: `MacBook`, `NixOS`, `Windows`. No lowercase or generic names; a new host also needs detection in `Invoke-AISync.ps1`.
 
-| Key | Host | Resolved by |
-| --- | --- | --- |
-| `MacBook` | macOS | `scripts/ai.sh` |
-| `NixOS` | NixOS | `scripts/ai.sh` |
-| `Windows` | Windows | `Invoke-AISync.ps1` |
-
-Exact hostname only — no lowercase, no generic names. New hosts: update detection in `Invoke-AISync.ps1`.
-
-## Hardware constraints
+## Hardware budgets
 
 | Host | Budget | Notes |
 | --- | --- | --- |
-| `MacBook` | ≤ 16 GB GPU (~17–18 GB OK) | 24 GB unified RAM; Metal; flash attention + q4_0 KV cache |
+| `MacBook` | ≤ 16 GB GPU (~17-18 GB OK) | 24 GB unified RAM; Metal; flash attention + q4_0 KV cache |
 | `NixOS` | ≤ 6 GB VRAM (model ≤ ~5 GB) | `services.ollama.acceleration = "cuda"`; `MemoryMax = "16G"` |
-| `Windows` | ≤ 6 GB VRAM | Same as NixOS |
+| `Windows` | ≤ 6 GB VRAM | same as NixOS |
 
 ## Cross-file sync
 
-Update in the same change: `src/modules/configs/ollama/models.json`, `src/users/default/vscode/chatLanguageModels.{MacBook,NixOS,Windows}.json`. Each host's `chatLanguageModels` IDs must be a subset of the host key in `models.json`. No stale entries.
+One change updates `src/modules/configs/ollama/models.json` and `src/users/default/vscode/chatLanguageModels.{MacBook,NixOS,Windows}.json`. Each host's `chatLanguageModels` IDs must be a subset of that host's key in `models.json`, with no stale entries.
 
 ## Quantization
 
-Tags: `<base>-<quant>`. No q3 or lower GGUF variants exist in Ollama.
+Tags are `<base>-<quant>`. No q3 or lower GGUF variants exist in Ollama.
 
 | Suffix | Size vs Q4_K_M | Quality | When |
 | --- | --- | --- | --- |
-| `q4_K_M` | baseline | baseline | Default |
-| `q8_0` | ~1.7× | better | MacBook only when headroom allows |
-| `fp16`/`bf16` | ~2× | near-lossless | MacBook small models only |
+| `q4_K_M` | baseline | baseline | default |
+| `q8_0` | ~1.7x | better | MacBook with headroom |
+| `fp16`/`bf16` | ~2x | near-lossless | MacBook small models |
 | `it-qat` | same as Q4_K_M | approaches BF16 | Gemma models (gemma3, gemma4) |
 | `nvfp4` | slightly smaller | similar | NVIDIA GPU only |
-| `mxfp8` | ~1.5× | good | NVIDIA GPU or Apple MLX |
-| `mlx-bf16` | ~2× | near-lossless | Apple MLX; MacBook with headroom |
+| `mxfp8` | ~1.5x | good | NVIDIA GPU or Apple MLX |
+| `mlx-bf16` | ~2x | near-lossless | Apple MLX; MacBook with headroom |
 
-**Preference**: larger param count > better quantization. 27B `q4_K_M` > 14B `q8_0`. **MacBook**: `q4_K_M` default; `it-qat` when available; `e4b-it-bf16` for `gemma4:e4b`. **NixOS/Windows**: `q4_K_M` only. Metadata lives in `src/modules/configs/ollama/models.json`; do not duplicate it.
+Larger param count beats better quantization: 27B `q4_K_M` over 14B `q8_0`. MacBook takes `q4_K_M` by default, `it-qat` when available, and `e4b-it-bf16` for `gemma4:e4b`. NixOS and Windows take `q4_K_M` only.
 
 ## Tool-calling verification
 
-Before committing a model change relying on tool calling:
-
-1. Start Ollama with the new model.
-2. Run a function-call curl test against the running model.
-3. Record the outcome — `tool-calling curl-tested on <host>: PASS` or `FAIL` — in the change's commit message. This rule has no file to record it in, so do not add a comment block to hold the result.
-4. Do not deploy until tool calling passes on that host.
+A model change that relies on tool calling is not ready to deploy until a function-call curl test against the running model passes on that host. Start Ollama with the model, run the test, and record `tool-calling curl-tested on <host>: PASS` or `FAIL` in the change's commit message. The rule has no file to record it in, so no comment block gets added for it.
