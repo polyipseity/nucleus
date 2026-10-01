@@ -1159,7 +1159,7 @@ function Invoke-AndroidReset {
     New-Item -ItemType Directory -Path $dataDir -Force > $null
   }
 
-  # Step 1: ensure system image exists (download if missing; reset does not force upgrade)
+  # Step 1: ensure the system image exists. Reset does not force an upgrade.
   if (-not (Test-Path -LiteralPath $systemImg -PathType Leaf)) {
     Write-NucleusInfo -CommandName android-config "downloading LineageOS base image for '$VmId'..."
     $suffix = Get-AndroidRecoveryAssetSuffix -Vm $vm
@@ -1202,7 +1202,7 @@ function Invoke-AndroidReset {
     Write-NucleusInfo -CommandName android-config "system image already exists: $systemImg"
   }
 
-  # Step 2: reset userdata disk
+  # Step 2: reset the userdata disk
   if (Test-Path -LiteralPath $userdataImg -PathType Leaf) {
     Write-NucleusInfo -CommandName android-config 'resetting Android userdata disk...'
     Remove-Item -LiteralPath $userdataImg -Force

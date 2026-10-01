@@ -3,38 +3,28 @@
   Idempotently converges the declarative pi coding agent extension set.
 
 .DESCRIPTION
-  Maintains a managed set of pi extensions installed with `pi install`.  On each
-  apply it derives the installed set from pi's own records — the "packages" array
-  in %USERPROFILE%\.pi\agent\settings.json unioned with the dependencies in
-  %USERPROFILE%\.pi\agent\npm\package.json — removes anything installed but
-  absent from the desired list (zap-style), and installs any desired extension
-  that is missing or present at a version different from the repository lockfile
-  pin.
+  Derives the installed pi extension set from pi's own records (the "packages"
+  array in %USERPROFILE%\.pi\agent\settings.json unioned with the dependencies in
+  %USERPROFILE%\.pi\agent\npm\package.json), then installs anything desired that is
+  missing or at the wrong version and removes anything undesired.
 
-  Versions come from the "pi" section of src\lockfiles\lockfile.json; install
-  specs are built as "npm:<name>@<version>" because pi's source parser accepts
-  only npm:, git: and local-path forms — a bare "name@version" is rejected.
+  Versions come from the "pi" section of src\lockfiles\lockfile.json and the
+  desired list from src\modules\packages\desired.json ("pi" -> current host), the
+  same file install-pi-packages.sh consumes. Install specs are built as
+  "npm:<name>@<version>" because pi's source parser rejects a bare "name@version".
 
-  The desired list itself comes from the shared registry
-  src\modules\packages\desired.json ("pi" -> current host), the same file POSIX
-  install-pi-packages.sh consumes.
+  WHY: a directory listing is not a valid record of what pi manages, since the npm
+  tree also holds node_modules.
 
-  Mirrors the install-pi-packages POSIX activation in src/modules/agents.nix.
-
-  Every failure is a hard error: a registry/lockfile that cannot be read, an
-  unresolvable pi executable, and any failed pi install/remove all report an
-  error and return without pretending the machine converged.
-
-  Requires pi on PATH — installed by Invoke-BunSetup as
-  @earendil-works/pi-coding-agent.  Prepends %USERPROFILE%\.bun\bin to PATH
-  internally so a pi installed during this apply run is usable here.
+  Every failure is a hard error: an unreadable registry or lockfile, an
+  unresolvable pi executable, and any failed install or removal report an error
+  rather than pretending the machine converged.
 
 .EXAMPLE
   Invoke-PiSetup
 
 .NOTES
   Environment variables: (none)
-  Exit codes: 0 on success; non-zero on failure.
 #>
 function Invoke-PiSetup {
   [CmdletBinding()]
@@ -85,9 +75,7 @@ function Invoke-PiSetup {
     }
   }
 
-  # Installed set: pi's settings.json registry (authoritative record of what pi
-  # manages) unioned with the npm-install record.  A directory listing
-  # is not a valid source — the npm tree also contains node_modules.
+  # pi's records are the authoritative installed set.
   $settingsPath = Join-Path $HOME ".pi\agent\settings.json"
   $installRecordPath = Join-Path $HOME ".pi\agent\npm\package.json"
   $installedPackages = @()
@@ -103,8 +91,8 @@ function Invoke-PiSetup {
     }
     foreach ($spec in @($settings.packages)) {
       if ([string]::IsNullOrWhiteSpace($spec)) { continue }
-      # Specs are "npm:<name>@<version>"; keep the leading @ of scoped names by
-      # stripping only an @ that is not preceded by a path separator.
+      # Keep the leading @ of a scoped name by stripping only an @ not preceded by a
+      # path separator.
       $name = $spec -replace '^npm:', ''
       $name = $name -replace '@[^/@]*$', ''
       $installedPackages += $name
@@ -127,13 +115,12 @@ function Invoke-PiSetup {
     }
   }
 
-  # A package can appear in both records; collapse duplicates so it is neither
-  # installed nor removed twice.
+  # Collapse duplicates so a package is neither installed nor removed twice.
   $installedPackages = @($installedPackages | Sort-Object -Unique)
 
-  # pi spawns the bare command "bun" for every npm: install (npmCommand in
-  # src/users/default/pi/settings.json), so bun's own directory must be
-  # on the child PATH — the managed bin dir only holds bun-installed binaries.
+  # WHY: pi spawns the bare command "bun" for every npm: install (npmCommand in
+  # src/users/default/pi/settings.json), so bun's own directory must be on the child
+  # PATH; the managed bin dir only holds bun-installed binaries.
   # check-suppress:suppression_doc: probe -- bun is provisioned by the WinGet DSC baseline; absence is reported below.
   $bunCommand = Get-Command bun -ErrorAction SilentlyContinue | Select-Object -First 1
   if (-not $bunCommand) {
@@ -155,11 +142,10 @@ function Invoke-PiSetup {
     throw "Invoke-PiSetup: $errMessage"
   }
 
-  # Extensions installed but not desired: zap-style removal.
+  # zap-style removal
   $toRemove = @($installedPackages | Where-Object { $desiredPackages -notcontains $_ })
 
-  # Desired extensions that are missing, or present at a version different from
-  # the lockfile pin (version-aware reconciliation).
+  # version-aware reconciliation against the lockfile pin
   $toInstall = @($desiredPackages | Where-Object {
     $pkg = $_
     if ($installedPackages -notcontains $pkg) { return $true }

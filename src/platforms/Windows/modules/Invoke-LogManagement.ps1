@@ -3,15 +3,13 @@
   Log directory helpers and management functions for nucleus services.
 
 .DESCRIPTION
-  Provides functions for log paths, sanitization, rotation (copy-truncate), and
-  time-based expiry. Paths are read from services.json $logging for Windows.
+  Log directory helpers, sanitization, rotation (copy-truncate), and time-based
+  expiry. Paths come from services.json $logging.
 
 .NOTES
   Environment variables:
     NUCLEUS_LOG_DIR / NUCLEUS_SYSTEM_LOG_DIR override JSON paths when set.
     NUCLEUS_REPO_ROOT required for JSON path resolution.
-  Exit codes:
-    0 on success; 1 on error.
 #>
 
 . (Join-Path $PSScriptRoot 'Get-NucleusHostPlatform.ps1')
@@ -56,13 +54,8 @@ function Get-NucleusLogDir {
   <#
   .SYNOPSIS
     Returns the user-level log directory path.
-  .DESCRIPTION
-    Reads logDir from services.json $logging for Windows. Creates the directory
-    when -PassThru is specified.
   .PARAMETER PassThru
     When specified, creates the directory and returns the path.
-  .EXAMPLE
-    Get-NucleusLogDir
   #>
   [CmdletBinding()]
   param(
@@ -86,13 +79,8 @@ function Get-NucleusSystemLogDir {
   <#
   .SYNOPSIS
     Returns the system-level log directory path.
-  .DESCRIPTION
-    Reads systemLogDir from services.json $logging for Windows. Creates the
-    directory when -PassThru is specified.
   .PARAMETER PassThru
     When specified, creates the directory and returns the path.
-  .EXAMPLE
-    Get-NucleusSystemLogDir
   #>
   [CmdletBinding()]
   param(
@@ -117,13 +105,11 @@ function Test-NucleusLogDirWritable {
   .SYNOPSIS
     Returns $true when the current user can write to the given log directory.
   .DESCRIPTION
-    Probes writability without mutating files: tries to open the directory for
-    write access. Used to decide whether log rotation/expiry can run inline or
-    must escalate to the system-level scheduled task.
+    Probes writability by opening the directory for write access without mutating
+    files, which is how the caller decides between inline rotation and escalation
+    to the system-level scheduled task.
   .PARAMETER Path
     Directory path to probe.
-  .EXAMPLE
-    Test-NucleusLogDirWritable -Path (Get-NucleusSystemLogDir)
   #>
   [CmdletBinding()]
   [OutputType([bool])]
@@ -156,16 +142,8 @@ function ConvertTo-SanitizedText {
   <#
   .SYNOPSIS
     Strips ANSI escape sequences and control characters from text input.
-  .DESCRIPTION
-    Reads text from the pipeline or a file and removes ANSI escape sequences
-    (colors, cursor movement, OSC sequences), carriage returns, and ASCII
-    control characters (except tab and newline).
   .PARAMETER InputObject
     String to sanitize. Accepts pipeline input.
-  .EXAMPLE
-    "hello\x1b[31mworld" | ConvertTo-SanitizedText
-  .EXAMPLE
-    Get-Content -Path log.txt | ConvertTo-SanitizedText
   #>
   [CmdletBinding()]
   param(
@@ -226,8 +204,8 @@ function Invoke-LogExpiry {
   if ($days -le 0) { return }
 
   $cutoff = (Get-Date).AddDays(-$days)
-  # Rotation writes archives as name.N.log (see Invoke-LogRotation), so expiry must match
-  # both that naming and the legacy .log.N / dated log_* naming.
+  # WHY: the pattern must match both the name.N.log written by Invoke-LogRotation
+  # and the legacy .log.N and dated log_* naming.
   $pattern = '(\.log\.\d+(\.gz)?$|\.\d+\.log(\.gz)?$|^log_.*\.log$|\.log\.gz$)'
 
   # check-suppress:suppression_doc: probe -- no expired log files may exist; pipeline handles empty result.
@@ -243,8 +221,9 @@ function Invoke-LogRotation {
   .SYNOPSIS
     Rotates log files in a directory tree based on size.
   .DESCRIPTION
-    Recursively scans for *.log files. When a file exceeds MaxSize, copy-truncate
-    rotation preserves the inode (POSIX parity). Archives shift .1 through MaxFiles.
+    Recursively scans for *.log files. A file over MaxSize is rotated with
+    copy-truncate, which preserves the inode for POSIX parity, and archives shift
+    .1 through MaxFiles.
   .PARAMETER Path
     Root directory containing log files to rotate.
   .PARAMETER MaxSize
@@ -253,8 +232,6 @@ function Invoke-LogRotation {
     Number of rotated archives to keep (default: 4).
   .PARAMETER Compress
     Whether to compress rotated archives with gzip (default: $true).
-  .EXAMPLE
-    Invoke-LogRotation -Path (Join-Path (Get-NucleusLogDir) 'discord-music-rpc')
   #>
   [CmdletBinding()]
   param(
@@ -287,7 +264,7 @@ function Invoke-LogRotation {
     $baseName = $file.BaseName
     $dir = $file.DirectoryName
 
-    # Remove the oldest archive if at max
+    # drop the oldest archive when at max
     $oldest = $MaxFiles
     $oldestPath = Join-Path -Path $dir -ChildPath "$baseName.$oldest.log"
     if (Test-Path -LiteralPath $oldestPath -PathType Leaf) {
@@ -300,7 +277,7 @@ function Invoke-LogRotation {
       }
     }
 
-    # Shift existing archives: N → N+1
+    # shift N -> N+1
     for ($i = $MaxFiles - 1; $i -ge 1; $i--) {
       $src = Join-Path -Path $dir -ChildPath "$baseName.$i.log"
       $dst = Join-Path -Path $dir -ChildPath "$baseName.$($i + 1).log"
@@ -316,7 +293,7 @@ function Invoke-LogRotation {
       }
     }
 
-    # Copy-truncate: copy to .1.log, then truncate in-place
+    # copy-truncate keeps the inode
     $archivePath = Join-Path -Path $dir -ChildPath "$baseName.1.log"
     Copy-Item -LiteralPath $file.FullName -Destination $archivePath -Force
     $truncateStream = [System.IO.File]::Open(

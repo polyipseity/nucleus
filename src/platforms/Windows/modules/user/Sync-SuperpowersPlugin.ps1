@@ -5,46 +5,29 @@
 .DESCRIPTION
   Fetches the superpowers plugin at the revision pinned in
   src\lockfiles\lockfile.json (cursor.superpowers) into
-  <nucleus user root>\plugins\superpowers, then links it for the tools that
-  consume it:
+  <nucleus user root>\plugins\superpowers, then links it for both consumers:
 
     %USERPROFILE%\.pi\agent\extensions\superpowers.ts -> <plugin>\.pi\extensions\superpowers.ts
     %USERPROFILE%\.opencode\plugins\superpowers        -> <plugin>\.opencode\plugins\superpowers.js
 
-  Both links are created unconditionally: pi and opencode are provisioned on
-  Windows (opencode through the SST.opencode WinGet package), so neither is a
-  conditional consumer.
+  Both links are unconditional because pi and opencode are provisioned on Windows
+  (opencode through the SST.opencode WinGet package).
 
-  Convergence is idempotent: a checkout already at the pinned revision is left
-  alone, and a link already pointing at the plugin is a no-op.  Any git failure
-  is a hard error — the plugin drives agent behaviour, so a stale or missing
-  checkout must not pass silently.
+  Idempotent: a checkout already at the pin is left alone and a link already
+  pointing at the plugin is a no-op. Any git failure is a hard error, since the
+  plugin drives agent behaviour and a stale checkout must not pass silently.
 
-  When $Enabled is $false the function removes only the two managed links and
-  the managed checkout directory; a foreign file in either link path is left in
-  place with a warning.
+  Disabling removes only the two managed links and the managed checkout
+  directory; a foreign file in either link path stays with a warning.
 
 .PARAMETER RepoRoot
-  Absolute path to the nucleus repository checkout root.  apply.ps1 resolves it
-  from $PSScriptRoot and passes it explicitly.
+  Absolute path to the nucleus repository checkout root.
 
 .PARAMETER Enabled
-  Whether the plugin should be provisioned. Mandatory: the caller chooses
-  explicitly between converging and removing the managed state.
-
-.OUTPUTS
-  None.  Writes status messages to the host.
-
-.EXAMPLE
-  Sync-SuperpowersPlugin -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$true
-
-.EXAMPLE
-  # Remove the managed checkout and links:
-  Sync-SuperpowersPlugin -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$false
+  Whether the plugin should be provisioned.
 
 .NOTES
   Environment variables: (none)
-  Exit codes: 0 on success; non-zero on failure
 #>
 function Sync-SuperpowersPlugin {
   [CmdletBinding()]
@@ -82,8 +65,8 @@ function Sync-SuperpowersPlugin {
   $piLinkTarget = Join-Path -Path $pluginDir -ChildPath '.pi\extensions\superpowers.ts'
   $opencodeLinkTarget = Join-Path -Path $pluginDir -ChildPath '.opencode\plugins\superpowers.js'
 
-  # Replace or create a managed symlink, never clobbering a foreign path.  Links
-  # are preferred over copies so edits in the checkout reach both tools.
+  # Replace or create a managed symlink, never clobbering a foreign path. Links
+  # beat copies so an edit in the checkout reaches both tools.
   # check-suppress:config-method: method 1 (writable symlink) -- the plugin checkout is the single source of truth; both tools read it through these links.
   $setLink = {
     param([string]$LinkPath, [string]$Target)
@@ -135,8 +118,7 @@ function Sync-SuperpowersPlugin {
     return
   }
 
-  # Symlinks require Developer Mode or an elevated session on Windows; other
-  # platforms create them without elevation.
+  # symlinks need Developer Mode or elevation on Windows
   if ($IsWindows) {
     $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     $devModeKey = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"

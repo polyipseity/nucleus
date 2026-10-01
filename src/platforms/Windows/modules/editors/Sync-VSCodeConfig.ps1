@@ -5,17 +5,13 @@
 .DESCRIPTION
   Replaces VS Code's per-channel config files and directories with symlinks
   into the live repo tree (src/users/<user>/vscode/) so every VS Code write
-  appears immediately as an unstaged git diff rather than being silently managed
-  away by a deployment layer.
+  appears immediately as an unstaged git diff.
 
-  Supersedes sync-vscodesettings.ps1, which used a managed-key merge
-  approach that prevented VS Code from owning its own settings file.  The
-  symlink approach gives the repo complete, transparent ownership of all VS
-  Code config while still allowing VS Code to write through the link freely.
+  Supersedes sync-vscodesettings.ps1, which used a managed-key merge that
+  prevented VS Code from owning its own settings file.
 
 .NOTES
   Environment variables: USERDOMAIN, USERNAME
-  Exit codes: 0 on success; non-zero on failure
 #>
 
 function Sync-VSCodeConfig {
@@ -30,53 +26,32 @@ function Sync-VSCodeConfig {
     (Code - Insiders) channels, creates a symlink from the VS Code User data
     directory into $RepoRoot\src\modules\configs\vscode\.
 
-    keybindings uses a host-specific repo source file
-    (keybindings.Windows.json) so that Windows key shortcuts are tracked
-    independently from MacBook (keybindings.MacBook.json) and NixOS
-    (keybindings.NixOS.json) without cross-host pollution in a shared file.
-    chatLanguageModels.Windows.json is managed by a name-keyed merge-overwrite
-    (Merge-VSChatLanguageModel) instead of a symlink, so that VS Code can
-    write model updates back without breaking the repo link.
+    keybindings uses a host-specific repo source file (keybindings.Windows.json)
+    so Windows shortcuts stay independent of the MacBook and NixOS files.
+    chatLanguageModels.Windows.json is managed by a name-keyed merge
+    (Merge-VSChatLanguageModel) instead of a symlink, so VS Code can write model
+    updates back without breaking the repo link.
 
     Conflict handling applied to each item:
-      Correct symlink     — no-op.
-      Wrong symlink       — remove, create correct symlink.
-      Real file or dir    — fail fast (merge wanted content into the repo
-                            target and remove the conflict, then re-run apply).
-      Absent              — create symlink (parent directories created as
-                            needed).
+      Correct symlink   - no-op.
+      Wrong symlink     - remove, create correct symlink.
+      Real file or dir  - fail fast.
+      Absent            - create symlink with parent directories as needed.
 
-    Cleanup path (-Enabled:$false): removes every managed symlink that points
-    to our repo config dir; VS Code recreates plain files on next launch.
-    Symlinks not pointing to our config dir are left untouched.
+    Cleanup path (-Enabled:$false) removes every managed symlink pointing at our
+    repo config dir; symlinks pointing elsewhere are left alone.
 
-    Symlink creation on Windows requires either Developer Mode or an elevated
-    session.
+    Symlink creation requires either Developer Mode or an elevated session.
 
   .PARAMETER RepoRoot
-    Absolute path to the repository root.  Mandatory: passed explicitly so the
-    function does not re-derive the repo from the working directory and to
-    ensure callers are aware of which repository will be modified.
+    Absolute path to the repository root.
 
   .PARAMETER Enabled
-    Whether VS Code config symlinks should be managed. Mandatory: caller must
-    explicitly choose true (create/validate symlinks) or false (remove managed
-    symlinks). No implicit default is permitted.
+    Create and validate symlinks when true, remove them when false.
 
   .PARAMETER Username
-    Username for which VS Code config is being managed. Explicitly passed to
-    ensure caller is aware of which user's profile will be modified. Defaults to
-    the current user if omitted, but the parameter must be present in the
-    signature to force awareness of user context.
-
-  .OUTPUTS
-    None.  Writes informational messages to the host output stream.
-
-  .EXAMPLE
-    Sync-VSCodeConfig -RepoRoot "C:\Users\admin\nucleus" -Enabled:$true -Username 'admin'
-
-  .EXAMPLE
-    Sync-VSCodeConfig -RepoRoot "C:\Users\admin\nucleus" -Enabled:$false -Username 'guest'
+    User whose config overlay supplies the managed files. Defaults to the
+    current user.
   #>
   param(
     [Parameter(Mandatory)]
@@ -88,9 +63,8 @@ function Sync-VSCodeConfig {
   )
 
 
-  # The nested helpers below read this through the enclosing scope, which hides
-  # the read from PSReviewUnusedParameter; binding it locally keeps the data
-  # flow visible.
+  # WHY: the nested helpers read this through the enclosing scope, which hides the
+  # read from PSReviewUnusedParameter; binding it locally keeps the data flow visible.
   $effectiveUsername = $Username
 
   if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
@@ -109,8 +83,7 @@ function Sync-VSCodeConfig {
     return Resolve-UserConfigFirstLevelEntry -User $User -ConfigName 'vscode' -EntryName $EntryName -RepoRoot $RepoRoot
   }
 
-  # Symlinks on Windows require Developer Mode or an elevated session.  Check
-  # once upfront so the failure message is actionable rather than cryptic.
+  # Check Developer Mode once upfront so the failure names the missing privilege.
   if ($Enabled) {
     $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     $devModeKey = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
@@ -127,8 +100,8 @@ function Sync-VSCodeConfig {
   $userProfile = [Environment]::GetFolderPath('UserProfile')
   $appDataRoaming = Join-Path -Path $userProfile -ChildPath "AppData\Roaming"
 
-  # Both stable and insiders channels share the same repo-backed config so
-  # edits in either channel appear in the same git diff.
+  # Both channels share one repo-backed config, so an edit in either appears in
+  # the same git diff.
   $channelDirs = @(
     (Join-Path -Path $appDataRoaming -ChildPath "Code\User"),
     (Join-Path -Path $appDataRoaming -ChildPath "Code - Insiders\User")
@@ -136,9 +109,7 @@ function Sync-VSCodeConfig {
 
   $vscodeHostName = 'Windows'
 
-  # Managed single files: ordered hashtable of repo file name -> channel-side
-  # file name.  chatLanguageModels is managed separately via
-  # Merge-VSChatLanguageModel (name-keyed merge, not a symlink).
+  # Ordered hashtable of repo file name -> channel-side file name.
   $managedFiles = [ordered]@{
     # check-suppress:config-method: method 1 (writable symlink) -- VS Code reads its keybindings from a known path
     "keybindings.$vscodeHostName.json" = "keybindings.json"
@@ -150,10 +121,9 @@ function Sync-VSCodeConfig {
     "tasks.json"                      = "tasks.json"
   }
 
-  # Managed directories: ordered hashtable of repo dir alias -> channel-side
-  # relative path inside the User/ data directory.  copilot-memories uses a
-  # short repo alias because VS Code stores memories under a long per-extension
-  # subpath that is inconvenient to navigate in a git tree.
+  # Ordered hashtable of repo dir alias -> channel-side relative path in User/.
+  # WHY: copilot-memories gets a short repo alias because VS Code nests memories
+  # under a long per-extension subpath that is awkward in a git tree.
   $managedDirs = [ordered]@{
     "copilot-memories" = "globalStorage\github.copilot-chat\memory-tool\memories"
     "profiles"         = "profiles"
@@ -167,10 +137,9 @@ function Sync-VSCodeConfig {
       Name-keyed merge-overwrite of chatLanguageModels from repo source to VS Code dest.
 
     .DESCRIPTION
-      Reads the repo source and destination JSON arrays, then for each object in the
-      repo source, replaces a destination object with the same .name (or appends if
-      not found).  Written back to $DestFile so VS Code can save new model entries
-      that survive the next sync.
+      Replaces each destination object whose .name matches a repo object, appending
+      repo objects with no match. Written back to $DestFile so VS Code-added model
+      entries survive the next sync.
     #>
     param(
       [Parameter(Mandatory)]
@@ -216,9 +185,7 @@ function Sync-VSCodeConfig {
       $linkPath   = Join-Path -Path $channelDir  -ChildPath $linkFileName
 
       if (-not $Enabled) {
-        # Cleanup: remove the symlink only when it points to our repo target.
-        # A symlink pointing elsewhere was not created by us and must not be
-        # disturbed.
+        # A symlink pointing elsewhere was not created by us, so leave it alone.
         if (Test-Path -LiteralPath $linkPath) {
           $item = Get-Item -LiteralPath $linkPath
           $isSymlink = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
@@ -240,8 +207,7 @@ function Sync-VSCodeConfig {
         }
 
         if ($isSymlink) {
-          # Wrong symlink target (e.g. leftover from old managed-key approach).
-          # Remove and recreate pointing to the repo.
+          # Wrong target (e.g. leftover from the old managed-key approach).
           Remove-ManagedSymlinkDeleteProtection -Context "vscode-config" -Path $linkPath
           Remove-Item -LiteralPath $linkPath -Force
         } else {

@@ -3,18 +3,14 @@
   Ensure CamillaDSP heartbeat scheduled task is converged on Windows.
 
 .DESCRIPTION
-  Manages the CamillaDSP heartbeat lifecycle:
-    1. Creates or removes a logon scheduled task that runs
-       src/scripts/services/camilladsp-heartbeat.ps1 (persistent-loop daemon with
-       exponential backoff) through a generated logging wrapper, so the
-       heartbeat's output lands in its declared log directory.
-
-  The heartbeat re-applies the config when CamillaDSP restarts after the
-  underlying audio device disappears and reappears (same function as
-  camilladsp-heartbeat on macOS/NixOS).
+  Registers or removes a logon scheduled task that runs
+  src/scripts/services/camilladsp-heartbeat.ps1, a persistent-loop daemon with
+  exponential backoff. The heartbeat re-applies the config when CamillaDSP
+  restarts after the underlying audio device disappears and reappears, matching
+  camilladsp-heartbeat on macOS and NixOS.
 
 .PARAMETER Enabled
-  True registers the heartbeat scheduled task.  False removes it.
+  True registers the scheduled task, false removes it.
 
 .PARAMETER CamillaDSPPort
   CamillaDSP websocket API port (read from services.json by default).
@@ -22,18 +18,9 @@
 .PARAMETER ConfigFile
   Path to the CamillaDSP config.yml (read from state by default).
 
-.EXAMPLE
-  Sync-CamillaDSPHeartbeatService -Enabled:$true
-
-.EXAMPLE
-  Sync-CamillaDSPHeartbeatService -Enabled:$false
-
 .NOTES
   Environment variables:
     (none)
-
-  Exit codes:
-    0 on success; 1 on error.
 #>
 function Sync-CamillaDSPHeartbeatService {
   [CmdletBinding()]
@@ -81,17 +68,17 @@ function Sync-CamillaDSPHeartbeatService {
   # Resolve path to the shared heartbeat script.
   $heartbeatScript = Join-Path $PSScriptRoot "..\..\..\..\..\src\scripts\services\camilladsp-heartbeat.ps1"
 
-  # The heartbeat is user-scope, so it logs into the user log root under its own
-  # directory name. That directory is provisioned from services.json
-  # logging.dirs.user by Invoke-EnsureLogDir.
+  # WHY: a user-scope heartbeat logs into the user log root under its own directory
+  # name, and that directory is provisioned from services.json logging.dirs.user by
+  # Invoke-EnsureLogDir.
   $serviceLogDir = Join-Path -Path (Get-NucleusLogDir) -ChildPath "camilladsp-heartbeat"
   # WHY: the pair, not a single merged file. logging.capture selects which streams are
   # captured, never the destination shape (house default: stdout.log + stderr.log).
   $stdoutLogFile = Join-Path -Path $serviceLogDir -ChildPath "stdout.log"
   $stderrLogFile = Join-Path -Path $serviceLogDir -ChildPath "stderr.log"
 
-  # A scheduled task action cannot redirect a process's streams, so point the task
-  # at a generated wrapper that does. Mirrors Sync-LiteLLMService's run wrapper.
+  # WHY: a scheduled task action cannot redirect a process's streams, so the task
+  # runs a generated wrapper that does. Mirrors Sync-LiteLLMService's run wrapper.
   $wrapperDir = Join-Path -Path $HOME -ChildPath ".config\camilladsp\bin"
   $null = New-Item -Path $wrapperDir -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
   $wrapperScript = Join-Path -Path $wrapperDir -ChildPath "heartbeat-run.ps1"
@@ -112,10 +99,10 @@ function Sync-CamillaDSPHeartbeatService {
   $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- task may not be registered yet; $null check below handles absence
   $wasRunning = $false
   if ($null -ne $existingTask) {
-    # Capture running state before unregister: Unregister-ScheduledTask kills the
-    # live instance, and the new registration won't auto-start until the next logon
-    # trigger. Restarting explicitly closes the gap for a live session so the updated
-    # heartbeat script is loaded by the running process (mirrors macOS bootout+bootstrap+kickstart).
+    # WHY: capture running state first. Unregister-ScheduledTask kills the live instance
+    # and the new registration will not auto-start until the next logon trigger, so
+    # an explicit restart closes the gap and loads the updated heartbeat script
+    # (mirrors macOS bootout+bootstrap+kickstart).
     $wasRunning = $existingTask.State -eq 'Running'
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
   }

@@ -8,7 +8,6 @@
 
 .NOTES
   Environment variables: USERPROFILE
-  Exit codes: 0 on success; non-zero on failure
 #>
 
 function Sync-VSCodeExtensionManifest {
@@ -17,32 +16,15 @@ function Sync-VSCodeExtensionManifest {
     Converges managed VS Code extension parity for stable and insiders.
 
   .DESCRIPTION
-    Installs or removes a managed extension set on both `code` and
-    `code-insiders` CLIs when available. Missing CLIs are treated as a warning
-    so bootstrap can proceed before first app launch PATH updates settle.
+    Installs or removes the managed set on both the `code` and `code-insiders`
+    CLIs. A missing CLI is a warning so bootstrap can proceed before the first
+    app launch settles PATH.
 
-    Each extension is installed with --pre-release --force so the latest
-    pre-release build is fetched; VS Code falls back to stable automatically
-    when a pre-release channel does not exist for an extension.
-    myriad-dreamin.tinymist is installed without --pre-release because its
-    pre-release builds have caused editor crashes on some machines.
-
-    Individual extension failures are reported as warnings but do not abort
-    the sync so a single unavailable extension does not break the entire
-    baseline convergence.
-
-    Cleanup behavior when disabled removes only managed extensions.
+    Individual failures are warnings and do not abort the sync, so one
+    unavailable extension cannot break convergence of the whole baseline.
 
   .PARAMETER Enabled
-    Whether managed extension parity should be enforced. Mandatory: caller
-    must explicitly choose true (install managed extensions) or false
-    (remove managed extensions).
-
-  .EXAMPLE
-    Sync-VSCodeExtensionManifest -Enabled:`$true
-
-  .EXAMPLE
-    Sync-VSCodeExtensionManifest -Enabled:`$false
+    Install managed extensions when true, remove them when false.
   #>
   param(
     [Parameter(Mandatory)]
@@ -145,8 +127,8 @@ function Sync-VSCodeExtensionManifest {
       if ($Enabled) {
         $version = $vscodeVersions.$extensionId
         $installSpec = if ($version) { "${extensionId}@${version}" } else { $extensionId }
-        # tinymist: install stable only — pre-release builds have caused
-        # editor crashes.  All other extensions use --pre-release; VS Code
+        # WHY: tinymist gets stable only, because its pre-release builds have caused
+        # editor crashes. Every other extension uses --pre-release, and VS Code
         # falls back to stable when a pre-release channel does not exist.
         if ($extensionId -eq 'myriad-dreamin.tinymist') {
           $output = & $cliPath --install-extension $installSpec --force 2>&1
@@ -167,11 +149,8 @@ function Sync-VSCodeExtensionManifest {
     }
 
     if ($Enabled -and (Test-Path $channel.ExtDir)) {
-      # Prune the extensions directory so the managed baseline is the sole
-      # source of truth.  Extension folders are named publisher.name-version;
-      # match against managed IDs (publisher.name) using a prefix check.
-      # For managed extensions with a lockfile pin, also remove folders whose
-      # embedded version does not match (version-aware reconciliation).
+      # Folders are named publisher.name-version, so match managed IDs (publisher.name)
+      # with a prefix check and drop those whose embedded version misses the pin.
       Get-ChildItem -Path $channel.ExtDir -Directory | ForEach-Object {
         $folderName = $_.Name
         $matchedId = $managedExtensions | Where-Object { $folderName -like "$_-*" -or $folderName -eq $_ } | Select-Object -First 1
@@ -190,14 +169,13 @@ function Sync-VSCodeExtensionManifest {
         }
       }
 
-      # extensions.json is a derived manifest VS Code writes on startup; a stale
-      # one hides newly added managed extensions on the next launch.  Remove it
-      # unconditionally so VS Code rescans the directory from the actual contents.
+      # WHY: extensions.json is a derived manifest VS Code writes on startup, and a
+      # stale one hides newly added managed extensions on the next launch.
       # check-suppress:suppression_doc: file may not exist before first VS Code launch; best-effort cleanup.
       Remove-Item -Path (Join-Path $channel.ExtDir 'extensions.json') -Force -ErrorAction Ignore
 
-      # .obsolete is VS Code's deferred-deletion marker; remove it so the bridge
-      # fully owns the directory state.  WHY: file may not exist; best-effort cleanup.
+      # WHY: .obsolete is VS Code's deferred-deletion marker; removing it lets the bridge
+      # fully own the directory state.
       Remove-Item -Path (Join-Path $channel.ExtDir '.obsolete') -Force -ErrorAction Ignore
     }
   }

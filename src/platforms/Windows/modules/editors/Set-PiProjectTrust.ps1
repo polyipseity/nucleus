@@ -4,12 +4,11 @@
 
 .DESCRIPTION
   Reads the shared trust path list from src/scripts/editors/trust-paths.json and
-  writes trust entries for each canonicalized path to %USERPROFILE%\.pi\agent\trust.json.
-  Non-fatal on IO errors; warns to stderr so the operator is informed.
+  writes trust entries for each canonicalized path to
+  %USERPROFILE%\.pi\agent\trust.json. IO errors are non-fatal.
 
 .NOTES
   Environment variables: HOME, USERPROFILE
-  Exit codes: 0 on success; non-zero on failure (non-fatal warnings on stderr)
 #>
 
 function Set-PiProjectTrust {
@@ -18,29 +17,16 @@ function Set-PiProjectTrust {
   Pre-trust shared directories in pi coding agent's project trust database.
 
 .DESCRIPTION
-  Pi coding agent stores project trust decisions in ~/.pi/agent/trust.json
-  (Windows: %USERPROFILE%\.pi\agent\trust.json).  This function reads the
-  shared trust path list from src/scripts/editors/trust-paths.json, expands
-  ~ to $HOME, canonicalizes each path, and writes trust entries.
+  Pi stores project trust decisions in ~/.pi/agent/trust.json (Windows:
+  %USERPROFILE%\.pi\agent\trust.json). This function reads the shared trust
+  path list from src/scripts/editors/trust-paths.json, expands ~ to $HOME,
+  canonicalizes each path, and writes the entries.
 
-  The function is a no-op when:
-    - Enabled is $false.
-    - trust-paths.json is absent or contains no valid paths.
-    - All trust entries are already present (idempotent re-apply).
-
-  Non-fatal on IO errors; warns to stderr so the operator is informed but
-  apply continues.
+  A no-op when Enabled is $false, trust-paths.json is absent or lists no valid
+  paths, or every entry is already present. IO errors warn and let apply continue.
 
 .PARAMETER Enabled
   When $false, skips the trust write without error.
-
-.EXAMPLE
-    Set-PiProjectTrust
-  # Pre-trusts shared directories in pi's trust database.
-
-.EXAMPLE
-    Set-PiProjectTrust -Enabled:$false
-  # No-op; skips all trust DB writes.
 #>
     [CmdletBinding(SupportsShouldProcess = $true)]
     param(
@@ -52,7 +38,7 @@ function Set-PiProjectTrust {
         return
     }
 
-    # Locate trust-paths.json via the repo root derived from $PSScriptRoot.
+    # repo root is four levels above src/platforms/Windows/modules/editors/
     $repoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)))
     $trustPathsFile = Join-Path -Path $repoRoot -ChildPath "src\scripts\editors\trust-paths.json"
 
@@ -69,11 +55,10 @@ function Set-PiProjectTrust {
         return
     }
 
-    # Trust file location.
     $trustDir = Join-Path -Path $HOME -ChildPath ".pi\agent"
     $trustPath = Join-Path -Path $trustDir -ChildPath "trust.json"
 
-    # Read existing trust data (create if absent).
+    # existing entries, empty when the file is absent
     $trustData = @{}
     if (Test-Path -Path $trustPath) {
         try {
@@ -88,11 +73,11 @@ function Set-PiProjectTrust {
         }
     }
 
-    # Expand ~ and canonicalize each path.
+    # expand ~ and canonicalize
     $added = $false
     foreach ($raw in $rawPaths) {
         $expanded = $raw -replace '^~', $HOME
-        # Canonicalize via GetFullPath (mirrors pi's realpathSync).
+        # WHY: GetFullPath mirrors pi's realpathSync, so both agree on the key.
         try {
             $canonical = [System.IO.Path]::GetFullPath($expanded)
         } catch {
@@ -112,13 +97,13 @@ function Set-PiProjectTrust {
         return
     }
 
-    # Write back sorted JSON with 2-space indent and trailing newline.
+    # sorted JSON with 2-space indent and a trailing newline
     if ($PSCmdlet.ShouldProcess("pi trust database", "Set")) {
         try {
             if (-not (Test-Path -Path $trustDir)) {
                 New-Item -Path $trustDir -ItemType Directory -Force > $null
             }
-            # Build sorted PSCustomObject for deterministic output.
+            # sorted output is deterministic
             $sorted = [PSCustomObject]@{}
             foreach ($key in ($trustData.Keys | Sort-Object)) {
                 $sorted | Add-Member -NotePropertyName $key -NotePropertyValue $trustData[$key]

@@ -5,20 +5,13 @@ function Invoke-CamillaGUISetup {
     Windows.
 
   .DESCRIPTION
-    Downloads the camillagui-backend prebuilt bundle from GitHub releases if
-    not installed or if the installed version differs from the lockfile pin.
-    Extracts the full camillagui_backend directory to
-    %USERPROFILE%\.local\bin\camillagui_backend\ and ensures the directory is
-    on PATH.
+    Downloads the camillagui-backend prebuilt bundle from GitHub releases when
+    it is not installed or the installed version misses the lockfile pin, then
+    extracts camillagui_backend into %USERPROFILE%\.local\bin\ and puts it on
+    PATH.
 
-    camillagui-backend is not available in WinGet, Scoop, or cargo-binstall,
-    so a direct GitHub release download is used instead.
-
-  .EXAMPLE
-    Invoke-CamillaGUISetup
-
-  .NOTES
-    Exit codes: 0 on success; non-zero on failure.
+    WHY a direct release download: camillagui-backend is in neither WinGet,
+    Scoop, nor cargo-binstall.
   #>
   [CmdletBinding()]
   param()
@@ -26,11 +19,9 @@ function Invoke-CamillaGUISetup {
   $installDir = Join-Path $HOME ".local\bin\camillagui_backend"
   $binaryPath = Join-Path $installDir "camillagui_backend.exe"
 
-  # Derive repo root from script location (src/platforms/Windows/modules/setup/ -> repo root is 5 levels up).
   $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
   $lockfilePath = Join-Path $repoRoot "src\lockfiles\lockfile.json"
 
-  # Read version-pinning data from the consolidated lockfile.
   $lockfile = @{}
   if (Test-Path $lockfilePath) {
     $lockfile = Get-Content $lockfilePath -Raw | ConvertFrom-Json
@@ -38,7 +29,6 @@ function Invoke-CamillaGUISetup {
   $desiredVersion = if ($lockfile.'camillagui-backend' -is [string]) { $lockfile.'camillagui-backend' } else { "4.1.0" }
   $desiredVersion = $desiredVersion.TrimStart('v')
 
-  # Check if already installed at the desired version.
   $alreadyConverged = $false
   if (Test-Path $binaryPath) {
     $alreadyConverged = $true
@@ -49,13 +39,12 @@ function Invoke-CamillaGUISetup {
     return
   }
 
-  # Download and extract prebuilt bundle from GitHub releases.
   $zipUrl = "https://github.com/HEnquist/camillagui-backend/releases/download/v${desiredVersion}/bundle_windows_amd64.zip"
   $tempDir = Join-Path $env:TEMP "camillagui-backend-setup"
   $zipPath = Join-Path $tempDir "camillagui-backend.zip"
 
   try {
-    # Clean any partial previous download.
+    # drop any partial previous download
     if (Test-Path $tempDir) {
       Remove-Item -Recurse -Force $tempDir
     }
@@ -70,7 +59,7 @@ function Invoke-CamillaGUISetup {
     }
 
     Write-NucleusInfo -CommandName 'camillagui-backend-setup' "extracting to $installDir"
-    # Ensure parent directory exists.
+    # parent directory may not exist yet
     $parentDir = Split-Path $installDir -Parent
     New-Item -ItemType Directory -Force -Path $parentDir > $null
 
@@ -78,11 +67,11 @@ function Invoke-CamillaGUISetup {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $zip = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
     try {
-      # Remove existing installation first to avoid stale files from old versions.
+      # remove the old install first so stale files cannot survive
       if (Test-Path $installDir) {
         Remove-Item -Recurse -Force $installDir
       }
-      # Extract only entries under the camillagui_backend/ prefix.
+      # only entries under the camillagui_backend/ prefix
       $entries = $zip.Entries | Where-Object { $_.FullName -like "camillagui_backend/*" -and $_.Name -ne "" }
       foreach ($entry in $entries) {
         $relativePath = $entry.FullName.Substring("camillagui_backend/".Length)
@@ -97,7 +86,7 @@ function Invoke-CamillaGUISetup {
       $zip.Dispose()
     }
 
-    # Verify extraction.
+    # verify the extraction
     if (-not (Test-Path $binaryPath)) {
       Write-NucleusError -CommandName 'camillagui-backend-setup' "extraction failed — $binaryPath not found"
       return
@@ -117,7 +106,7 @@ function Invoke-CamillaGUISetup {
     New-Item -Path $configPath -ItemType SymbolicLink -Target $configSource -Force > $null
     Write-NucleusInfo -CommandName 'camillagui-backend-setup' "symlinked config to $configPath"
   } finally {
-    # Clean up temp directory.
+    # drop the temp directory
     if (Test-Path $tempDir) {
       Remove-Item -Recurse -Force $tempDir
     }

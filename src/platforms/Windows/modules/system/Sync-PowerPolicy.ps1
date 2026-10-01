@@ -14,10 +14,7 @@ function Sync-PowerPolicy {
 
   .NOTES
     Environment variables:
-      (none)    No environment variables used.
-
-    Exit codes:
-      0 on success; 1 on error.
+      (none)
   #>
   param(
     [Parameter(Mandatory)]
@@ -29,9 +26,9 @@ function Sync-PowerPolicy {
     throw "powercfg executable not found at '$powercfg'."
   }
 
-  # powercfg uses the active power-scheme GUID for hidden lid settings such as
-  # LIDACTION.  Resolve it once up front so both convergence and cleanup paths
-  # target the same live scheme instead of guessing a vendor-specific default.
+  # WHY: resolve the active scheme GUID up front, so both convergence and cleanup
+  # target the same live scheme for hidden lid settings such as LIDACTION instead
+  # of a guessed vendor default.
   $activeSchemeOutput = & $powercfg /getactivescheme
   if ($LASTEXITCODE -ne 0) {
     throw "Failed to resolve the active Windows power scheme. Exit code: $LASTEXITCODE"
@@ -112,9 +109,8 @@ function Sync-PowerPolicy {
     Invoke-PowerCfgChecked -Arguments @('/change', 'disk-timeout-dc', '10') -FailureMessage 'Failed to restore battery disk timeout.'
     Invoke-PowerCfgChecked -Arguments @('/setactive', $activeSchemeGuid) -FailureMessage 'Failed to reactivate the current power scheme after restoring defaults.'
 
-    # Clean up the DSC-managed KeepAliveTime registry value when power policy
-    # is disabled.  DSC sets this declaratively (power-policy.dsc.yml), but the
-    # disable path must remove it because DSC resources are always-applied.
+    # WHY: KeepAliveTime is declarative via power-policy.dsc.yml, but the disable
+    # path must remove it because DSC resources are always-applied.
     # check-suppress:suppression_doc: probe whether KeepAliveTime exists before removing; Get-ItemProperty throws when absent.
     if (Get-ItemProperty -Path $tcpParamsPath -Name 'KeepAliveTime' -ErrorAction SilentlyContinue) {
       Remove-ItemProperty -Path $tcpParamsPath -Name 'KeepAliveTime'

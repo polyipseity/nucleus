@@ -4,22 +4,13 @@ function Sync-LibreOfficeXcu {
     Applies repository-managed LibreOffice metadata-stripping entries into each managed user's registrymodifications.xcu.
 
   .DESCRIPTION
-    Converges managed XCU entries (RemovePersonalInfoOnSave and user profile
-    data fields) into each managed user's
-    %APPDATA%\LibreOffice\4\user\registrymodifications.xcu without symlinks
-    or hardlinks.
-
-    LibreOffice owns registrymodifications.xcu and overwrites it on every
-    close, so Method 1 (symlink) is not viable. This module uses Method 3
-    (merge) to inject managed metadata-stripping entries while preserving
-    any user-configured settings outside managed keys. If the XCU file does
-    not exist, it is created.
-
-    When disabled, only managed entries are removed from the XCU file;
-    unmanaged content is preserved.
+    Converges managed XCU entries (RemovePersonalInfoOnSave and user profile data
+    fields) into each managed user's
+    %APPDATA%\LibreOffice\4\user\registrymodifications.xcu. The file is created
+    when absent; disabling removes only managed entries.
 
   .PARAMETER Enabled
-    True applies managed values. False removes only managed XCU entries.
+    True applies managed values, false removes only managed XCU entries.
 
   .PARAMETER Users
     Mandatory: array of managed user records from Load-UserRegistry.ps1.
@@ -27,15 +18,8 @@ function Sync-LibreOfficeXcu {
   .PARAMETER RepoRoot
     Absolute path to the repository root.
 
-  .EXAMPLE
-    Sync-LibreOfficeXcu -Enabled:$true -Users $userRegistry.users -RepoRoot $env:NUCLEUS_REPO_ROOT
-
-  .EXAMPLE
-    Sync-LibreOfficeXcu -Enabled:$false -Users $userRegistry.users -RepoRoot $env:NUCLEUS_REPO_ROOT
-
   .NOTES
     Environment variables: (none)
-    Exit codes: 0 on success; non-zero on failure
   #>
   [CmdletBinding()]
   param(
@@ -154,7 +138,7 @@ function Sync-LibreOfficeXcu {
   function Write-XcuDocument {
     <#
     .SYNOPSIS
-      Writes an XCU XML document to disk with UTF-8 encoding and XML declaration.
+      Writes an XCU XML document as UTF-8 with an XML declaration.
     #>
     param(
       [Parameter(Mandatory = $true)]
@@ -237,8 +221,8 @@ function Sync-LibreOfficeXcu {
     $nsMgr = New-Object System.Xml.XmlNamespaceManager($Xml.NameTable)
     $nsMgr.AddNamespace('oor', $OorNs)
 
-    # Gating the in-memory mutation is what makes -WhatIf effective for the
-    # persisted file: the caller writes the document unchanged.
+    # WHY: gating the in-memory mutation is what makes -WhatIf effective for the
+    # persisted file, because the caller writes the document unchanged.
     if (-not $PSCmdlet.ShouldProcess($Prop.GetAttribute('oor:name', $OorNs), 'set the XCU property value')) {
       return
     }
@@ -300,8 +284,8 @@ function Sync-LibreOfficeXcu {
     .SYNOPSIS
       Removes managed entries from the XCU document.
     .DESCRIPTION
-      For each managed entry, removes the matching <prop> from its <item>.
-      If an <item> has no remaining children after cleanup, it is removed entirely.
+      Removes each matching <prop> from its <item>, then drops any <item> left
+      with no children.
     #>
     [CmdletBinding(SupportsShouldProcess)]
     param(
@@ -344,7 +328,7 @@ function Sync-LibreOfficeXcu {
       }
     }
 
-    # Remove empty items (no remaining props).
+    # items left with no props
     $items = $Xml.SelectSingleNode('/oor:items', $nsMgr)
     if ($null -ne $items) {
       foreach ($item in @($items.ChildNodes)) {
@@ -378,7 +362,7 @@ function Sync-LibreOfficeXcu {
       continue
     }
 
-    # Cleanup: remove managed entries from the XCU file.
+    # Removes only the managed entries.
     if (-not (Test-Path -LiteralPath $xcuPath -PathType Leaf)) {
       Write-NucleusInfo -CommandName 'Sync-LibreOfficeXcu' "LibreOffice XCU cleanup complete for $username."
       continue

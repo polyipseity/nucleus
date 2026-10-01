@@ -1,9 +1,8 @@
 Register-Step -Id "windows-pester" -Name "Windows Pester tests" -Platform windows -Action {
   param([Parameter(Mandatory)][PSObject]$Context)
 
-  # These Pester suites exercise Windows-only behavior (Windows service dispatch,
-  # DSC wiring, etc.). -Platform windows keeps the step off other hosts, where
-  # $PSScriptRoot-relative module loading breaks inside a step-runner runspace.
+  # These suites cover Windows-only behavior. -Platform windows keeps the step off
+  # other hosts, where $PSScriptRoot-relative loading breaks in a step runspace.
   $RepoRoot = $Context.RepoRoot
 
   $windowsTestRoots = @(
@@ -25,15 +24,12 @@ Register-Step -Id "windows-pester" -Name "Windows Pester tests" -Platform window
     return $true
   }
 
-  # WHY each suite runs in its own child pwsh:
-  #   - the runner's session is under Set-StrictMode -Version Latest (scripts/test.ps1)
-  #     and Pester test blocks inherit strict mode from their caller, so the suites would
-  #     run stricter here than anywhere else — POSIX suites are separate processes and
-  #     the step 5 suites run in fresh runspaces;
-  #   - process-level state (environment variables, imported modules, globals) must not
-  #     carry between suites. That coupling already leaked a fixture repo root into a
-  #     concurrent suite and masked failures in CI, and a fresh process cannot.
-  # Each child also gets NUCLEUS_REPO_ROOT the way the bash harness provides REPO_ROOT.
+  # WHY each suite gets its own child pwsh: Pester blocks inherit strict mode from
+  # their caller, so the suites would run stricter here than anywhere else, and
+  # process state (env vars, imported modules, globals) must not carry between
+  # suites. That coupling already leaked a fixture repo root into a concurrent
+  # suite and masked CI failures. Each child also gets NUCLEUS_REPO_ROOT the way
+  # the bash harness provides REPO_ROOT.
   $runnerPath = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "nucleus-pester-runner-$([System.Guid]::NewGuid().ToString('N')).ps1"
   $runnerSource = @'
 param([Parameter(Mandatory)][string]$SuitePath)
@@ -74,8 +70,8 @@ exit 0
     }
 
     $process = [System.Diagnostics.Process]::Start($psi)
-    # Both streams are read concurrently: the pipes have bounded buffers, so the child
-    # would deadlock on a full stdout pipe while stderr drains.
+    # WHY: the pipes have bounded buffers, so the child would deadlock on a full
+    # stdout pipe while stderr drains.
     $stdout = $process.StandardOutput.ReadToEndAsync()
     $stderr = $process.StandardError.ReadToEndAsync()
     $process.WaitForExit()
@@ -102,13 +98,12 @@ exit 0
     }
   }
 
-  # Declared expected skips, per suite. A skip that is not listed here fails the
-  # step. Per-suite rather than one repo-wide total, so a skip cannot be moved
-  # between suites to keep the count stable.
+  # An unlisted skip fails the step. Per-suite rather than one repo-wide total, so a
+  # skip cannot move between suites to keep the count stable.
   #
-  # WHY each entry is legitimate: Sync-AgentsSkillManifest resolves the managed
-  # skill symlink by its Windows target, which is not meaningful on a POSIX
-  # filesystem, so the case is platform-conditional rather than missing.
+  # WHY this entry is legitimate: Sync-AgentsSkillManifest resolves the managed skill
+  # symlink by its Windows target, which is meaningless on a POSIX filesystem, so the
+  # case is platform-conditional rather than missing.
   $expectedSkips = @{
     'Sync-AgentsSkillManifest.Tests.ps1' = if ($IsWindows) { 0 } else { 1 }
   }
@@ -129,7 +124,7 @@ exit 0
       if ($outcome.Errors.Trim()) { Write-ErrorMessage $outcome.Errors.Trim() }
 
       if (-not $outcome.Result) {
-        # Fail closed: a suite that never reported a result did not run.
+        # A suite that reported no result did not run.
         Write-ErrorMessage "Pester: $suiteName reported no result (exit $($outcome.ExitCode))."
         $failedSuites.Add($suiteName)
         continue

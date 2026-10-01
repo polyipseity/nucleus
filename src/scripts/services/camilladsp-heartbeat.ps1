@@ -4,12 +4,7 @@
 
 .DESCRIPTION
   Pushes the current config if camilladsp is not in "Running" state.
-  Runs indefinitely with exponential backoff (persistent daemon pattern —
-  launched by scheduled task AtLogOn).
-  Mirrors camilladsp-heartbeat.sh (POSIX counterpart).
-
-  Base delay: 5 s, max delay: 300 s.
-  Resets to base on success, doubles on failure.
+  Base delay 5 s, max 300 s, reset to base on success and double on failure.
 #>
 
 param(
@@ -22,21 +17,17 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# ── Smart device detection ────────────────────────────────────────────────
+# Smart device detection
 . "$PSScriptRoot/camilladsp-deviceselect.ps1"
 
-# ── Exponential backoff ────────────────────────────────────────────────────
 $baseSleep = 5
 $maxSleep = 300
 $currentSleep = $baseSleep
 
-# ── Main loop (persistent daemon pattern) ──────────────────────────────────
 while ($true) {
-  # ── Runtime toggles from config.json ───────────────────────────────────
-  # camilladsp.heartbeat — master switch for this loop.
-  # camilladsp.enable    — gates automatic device binding (default true).
-  #   With binding off the loop still runs, so the service stays loaded and the
-  #   websocket API stays up for camillagui, but nothing opens an audio input.
+  # camilladsp.heartbeat gates the loop, camilladsp.enable gates device binding.
+  # With binding off the loop still runs so the websocket API stays up for
+  # camillagui, but nothing opens an audio input.
   #   WHY: an open capture device lights the OS microphone privacy indicator,
   #   which is costly on this hardware — set this false to stop that. Mirrors
   #   the POSIX heartbeat.
@@ -58,22 +49,18 @@ while ($true) {
 
   $success = $false
 
-  # ── Check current state — skip only when Running AND live device matches target ──
-  # The target device is what detection would currently select. When the system
-  # default output device changes, the target differs from the live device, so
-  # the config must be re-pushed. A null target is never pushed (it would set
-  # the device to null).
+  # Skip only when Running AND the live device already matches the target, so a
+  # changed default output device still forces a push. A null target is never
+  # pushed because that would set the device to null.
   $targetDevice = $null
   if (Test-Path $ConfigFile) {
     $targetDevice = Get-CamillaDSPResolvedPlaybackDeviceName -ConfigPath $ConfigFile
   }
 
-  # ── Did the config change since the last push? ──────────────────────────
-  # Compared against what we last pushed, so edits made through camillagui are
-  # never reverted here. A missing state file means "changed", so the first tick
-  # after boot always pushes. Mirrors camilladsp_config_changed in the POSIX lib.
-  # The target device is part of the fingerprint because the config file stores a
-  # null playback device — resolution happens at push time.
+  # Compared against the last push so camillagui edits survive. A missing state
+  # file counts as changed, so the first tick after boot always pushes. The
+  # target is part of the fingerprint because the config stores a null playback
+  # device and resolution happens at push time.
   $lastPushFile = Join-Path $HOME ".local\state\camilladsp\last-push.txt"
   $configChanged = $true
   if (Test-Path $lastPushFile) {
@@ -121,7 +108,7 @@ while ($true) {
   }
 
   if (-not $success) {
-    # ── Push config ──────────────────────────────────────────────────────
+    # Push config
     if (Test-Path $ConfigFile) {
       try {
         # Resolve playback device: patches empty device in config with system default.

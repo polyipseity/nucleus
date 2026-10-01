@@ -1,10 +1,9 @@
 #Requires -Version 7.4
-# test.ps1 — Repository test suite runner (Windows).
+# test.ps1 - Repository test suite runner (Windows).
 #
-# Thin orchestrator — sources test-lib.ps1 for framework, test-steps.ps1 for step
-# registration, then runs the orchestration pipeline.
-#
-# See test-lib.ps1, step-runner.ps1, and files in test-steps/ for step logic.
+# Sources test-lib.ps1 for the framework and test-steps.ps1 for step
+# registration, then runs the orchestration pipeline. Step logic lives in
+# test-lib.ps1, step-runner.ps1, and files in test-steps/.
 #
 # Arguments:
 #   --fail-fast         Exit immediately on first failure (default).

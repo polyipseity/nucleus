@@ -6,8 +6,8 @@
   Reads per-user jellyfin.libraries declarations, resolves ~ paths against
   each user's homeDirectory, resolves account credentials from per-user SOPS
   secrets, merges specs by name (first writer wins), and applies them via the
-  Jellyfin HTTP API.  Runs after Sync-JellyfinAccountCatalog so accounts exist before
-  library provisioning attempts authentication.
+  Jellyfin HTTP API. Runs after Sync-JellyfinAccountCatalog so accounts exist
+  before library provisioning authenticates.
 
   API behavior source (upstream Jellyfin):
   - GET /Library/VirtualFolders
@@ -18,9 +18,6 @@
 .NOTES
   Environment variables:
     NUCLEUS_HOST  Host identifier for context-aware operations.
-
-  Exit codes:
-    This module does not emit exit codes.
 #>
 function ConvertTo-JellyfinLibraryOptionsCanonical {
   param(
@@ -102,15 +99,13 @@ function Sync-JellyfinLibraryCatalog {
     merges specs by library name (first writer wins), and applies them to the
     host-shared Jellyfin server.
 
-    Authentication uses the same per-user secret pattern as Sync-JellyfinAccountCatalog:
-    credentials are resolved from each user's src\secrets\users\<name>.yml via
-    Get-Secret and tried against /Users/AuthenticateByName.  Startup bootstrap
-    is attempted when no existing credential works.
+    Authentication follows the Sync-JellyfinAccountCatalog pattern: credentials
+    resolve from each user's src\secrets\users\<name>.yml via Get-Secret and are
+    tried against /Users/AuthenticateByName, with a startup bootstrap attempted
+    when no existing credential works.
 
-    The function is idempotent:
-      - Missing libraries are created.
-      - Existing libraries have their LibraryOptions updated.
-      - Libraries not in any declaration are left untouched.
+    Idempotent: missing libraries are created, existing ones have their
+    LibraryOptions updated, and undeclared libraries are left untouched.
 
   .PARAMETER RepoRoot
     Absolute path to the repository root.
@@ -131,7 +126,7 @@ function Sync-JellyfinLibraryCatalog {
     Absolute path to sops.exe.
 
   .PARAMETER BaseUrl
-    Jellyfin API base URL. Defaults to http://127.0.0.1:8096 (or read from services.json).
+    Jellyfin API base URL. Defaults to http://127.0.0.1:8096 or services.json.
 
   .EXAMPLE
     Sync-JellyfinLibraryCatalog -RepoRoot 'C:\Users\admin\nucleus' -UserRecords $records `
@@ -175,7 +170,7 @@ function Sync-JellyfinLibraryCatalog {
     $BaseUrl = if ($svc.jellyfin.network.http) { "http://$($svc.jellyfin.network.http.host):$($svc.jellyfin.network.http.port)" } else { 'http://127.0.0.1:8096' }
   }
 
-  # 1. Build library specs and collect auth credentials from all users.
+  # Collect library specs and auth credentials from every user.
   $librarySpecs = @()
   $authCreds = @()
 
@@ -257,7 +252,7 @@ function Sync-JellyfinLibraryCatalog {
     return
   }
 
-  # 2. Merge by name (first writer wins with warning).
+  # Merge by name; a duplicate name keeps the first declaration.
   $mergedSpecs = @{}
   foreach ($spec in $librarySpecs) {
     $lowerName = $spec.name.ToLowerInvariant()
@@ -268,7 +263,7 @@ function Sync-JellyfinLibraryCatalog {
     $mergedSpecs[$lowerName] = $spec
   }
 
-  # 3. Define Invoke-JellyfinApi helper (same implementation as account sync).
+  # Invoke-JellyfinApi, same implementation as account sync.
   $authHeaderBase = 'MediaBrowser Client="nucleus-apply", DeviceId="windows-apply", Device="Windows", Version="1.0.0"'
 
   function Invoke-JellyfinApi {
@@ -328,7 +323,7 @@ function Sync-JellyfinLibraryCatalog {
     }
   }
 
-  # 4. Wait up to 60s for Jellyfin API readiness.
+  # Wait up to 60s for API readiness.
   $serverReady = $false
   foreach ($second in 1..60) {
     $ping = Invoke-JellyfinApi -Method GET -Path '/System/Info/Public'
@@ -344,8 +339,7 @@ function Sync-JellyfinLibraryCatalog {
     return
   }
 
-  # 5. Acquire admin token: try each resolved user's credentials, fall back to
-  #    startup bootstrap.
+  # Try each resolved user's credentials, then fall back to startup bootstrap.
   $adminToken = $null
   foreach ($cred in $authCreds) {
     $auth = Invoke-JellyfinApi -Method POST -Path '/Users/AuthenticateByName' -Body @{
@@ -396,7 +390,7 @@ function Sync-JellyfinLibraryCatalog {
     throw "jellyfin/library: no admin Jellyfin account configured; configure your own admin account before library items can be synced."
   }
 
-  # 6. GET /Library/VirtualFolders — list existing.
+  # List the existing virtual folders.
   $existingFolders = Invoke-JellyfinApi -Method GET -Path '/Library/VirtualFolders' -Token $adminToken
   if ($existingFolders.StatusCode -ne 200) {
     Write-NucleusWarning -CommandName 'jellyfin/library' 'failed to list virtual folders; skipping library convergence.'
@@ -411,12 +405,12 @@ function Sync-JellyfinLibraryCatalog {
     }
   }
 
-  # 7. For each declared library: create if missing, update LibraryOptions if exists.
+  # Create each declared library when missing, update LibraryOptions when it exists.
   foreach ($spec in $mergedSpecs.Values) {
     $lowerName = $spec.name.ToLowerInvariant()
     $existing = $existingByName[$lowerName]
 
-    # Build LibraryOptions payload.
+    # Build the LibraryOptions payload.
     $opts = $spec.options
     $imageOptions = @()
     if ($opts.imageOptions.Backdrop) {
@@ -464,7 +458,7 @@ function Sync-JellyfinLibraryCatalog {
     }
 
     if (-not $existing) {
-      # Create new library.
+      # create the library
       $queryParams = "name=$([System.Uri]::EscapeDataString($spec.name))&collectionType=$([System.Uri]::EscapeDataString($spec.collectionType))"
       foreach ($path in $spec.paths) {
         $queryParams += "&paths=$([System.Uri]::EscapeDataString($path))"
@@ -483,7 +477,7 @@ function Sync-JellyfinLibraryCatalog {
       }
     }
     else {
-      # Update existing library options.
+      # update the library options
       if (Test-JellyfinLibraryOptionsMatch -Current $existing.LibraryOptions -Desired $libraryOptions) {
         continue
       }

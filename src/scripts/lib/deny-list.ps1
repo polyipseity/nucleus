@@ -1,13 +1,9 @@
 #Requires -Version 7.4
 # Gitignore-aware denylist library for PowerShell.
-# Provides functions to filter out gitignored paths from file lists.
 # Sourced by step-runner.ps1 and check-lib.ps1.
 
 Set-StrictMode -Version Latest
 
-# Invoke-GitCheckIgnore - runs one `git check-ignore --stdin` pass and returns
-# its exit code with both captured streams.
-#
 # WHY: git check-ignore --stdin does not strip a trailing CR, so a CRLF byte
 # sequence matches no pattern and the filter silently no-ops. Piping through
 # PowerShell always terminates input with Environment.NewLine, so the paths are
@@ -33,8 +29,8 @@ function Invoke-GitCheckIgnore {
   $psi.ArgumentList.Add('--stdin')
 
   $process = [System.Diagnostics.Process]::Start($psi)
-  # Both streams are read concurrently before stdin is written: the pipes have
-  # bounded buffers, so a large path list would deadlock on a full stdout pipe.
+  # WHY: both streams are read before stdin is written, because the pipes have
+  # bounded buffers and a large path list would deadlock on a full stdout pipe.
   $stdout = $process.StandardOutput.ReadToEndAsync()
   $stderr = $process.StandardError.ReadToEndAsync()
   $process.StandardInput.Write(($Path -join "`n") + "`n")
@@ -48,9 +44,7 @@ function Invoke-GitCheckIgnore {
   }
 }
 
-# Select-GitIgnored — reads paths from pipeline input, filters out gitignored paths.
-# Uses git check-ignore --stdin for batch-mode efficiency, writing git's stdin
-# directly so the byte stream is LF-exact on every platform.
+# filters pipeline paths through git check-ignore --stdin in batch mode.
 function Select-GitIgnored {
   [CmdletBinding()]
   [OutputType([System.Collections.Generic.List[string]])]
@@ -72,7 +66,7 @@ function Select-GitIgnored {
   end {
     if ($allPaths.Count -eq 0) { return }
 
-    # If not in a git repo, pass through everything
+    # Outside a repo every path passes through
     if (-not (Test-Path '.git') -and -not $env:GIT_DIR) {
       $allPaths
       return
@@ -82,12 +76,12 @@ function Select-GitIgnored {
       Select-Object -First 1
 
     # WHY: git check-ignore --stdin answers 128 for the WHOLE batch when any
-    # pathspec lies beyond a symlink, so one such path would disarm the filter
-    # for every other path in the call. The paths git names are dropped and the
-    # query repeats; a dropped path carries no ignore status, and the file it
-    # shadows is enumerated at its real path, so it leaves the result. A round
-    # that names nothing this batch actually holds is a plain failure, and that
-    # is what keeps the loop finite.
+    # pathspec lies beyond a symlink, so one such path would disarm the filter for
+    # every other path in the call. The paths git names are dropped and the query
+    # repeats; a dropped path carries no ignore status, and the file it shadows is
+    # enumerated at its real path, so it leaves the result. A round that names
+    # nothing this batch actually holds is a plain failure, and that is what keeps
+    # the loop finite.
     $pending = [System.Collections.Generic.List[string]]::new()
     foreach ($candidate in $allPaths) { $pending.Add($candidate) }
     $skipped = [System.Collections.Generic.List[string]]::new()
@@ -96,7 +90,7 @@ function Select-GitIgnored {
     while ($true) {
       $query = Invoke-GitCheckIgnore -GitExecutable $gitCommand.Source -Path $pending
       if ($query.ExitCode -le 1) {
-        # Exit 0: at least one path ignored; exit 1: none ignored (empty set).
+        # Exit 0 or 1: exit 1 is an empty ignored set, not a failure.
         $ignoredSet = [System.Collections.Generic.HashSet[string]]::new(
           [System.StringComparer]::OrdinalIgnoreCase)
         foreach ($line in ($query.StandardOutput -split "`n")) {
@@ -112,8 +106,8 @@ function Select-GitIgnored {
         ForEach-Object { $_.Groups[1].Value } |
         Where-Object { $pending.Contains($_) })
       if ($beyond.Count -eq 0) {
-        # Exit 128 with no resolvable pathspec: a broken repo or a missing
-        # index. The documented contract is pass-through, but never silently.
+        # Exit 128 with no resolvable pathspec: a broken repo or a missing index.
+        # The contract is pass-through, but never silently.
         Write-Warning "Select-GitIgnored: git check-ignore failed (exit $($query.ExitCode)): $($query.StandardError.Trim())"
         $allPaths
         return
@@ -138,7 +132,7 @@ function Select-GitIgnored {
   }
 }
 
-# Get-GitTrackedFile — finds files matching a glob pattern and filters out gitignored ones.
+# resolves a glob to tracked files, minus gitignored ones.
 function Get-GitTrackedFile {
   [CmdletBinding()]
   param(

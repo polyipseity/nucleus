@@ -4,50 +4,30 @@
 
 
 .DESCRIPTION
-  Windows counterpart to scripts/ai.sh sync subcommand.  Reads the model manifest at
-  src/modules/configs/ollama/models.json, selects the `Windows` profile (always used on
-  Windows), and converges the locally installed Ollama model set:
+  Windows counterpart to scripts/ai.sh sync. Reads src/modules/configs/ollama/models.json,
+  selects the `Windows` profile, then pulls every manifest model that is not
+  installed and removes every installed model the manifest does not list.
 
-    1. Pull any model in the manifest that is not already installed.
-       (Skipped when -GcOnly is specified.)
-    2. Remove any locally installed model absent from the manifest.
-       The manifest is the canonical registry; orphaned models are
-       removed to reclaim disk space.
-
-  The function is a no-op when the ollama binary is absent or the Ollama
-  server is unreachable, so it is safe to call at any time — including
-  before the first apply.ps1 run.
+  A no-op when the ollama binary is absent or the server is unreachable, so it is
+  safe to call before the first apply.ps1 run.
 
 .PARAMETER RepoRoot
-  Root of the repository.  Defaults to two levels above $PSScriptRoot
-  (i.e. the repo root when called from src\platforms\Windows\modules).
+  Root of the repository.
 
 .PARAMETER DryRun
   Print planned actions without executing pulls or removals.
 
 .PARAMETER GcOnly
-  Skip model pulls; only remove locally installed models absent from the
-  manifest.  Used by scripts/gc.ps1 for space reclamation without
-  downloading new models.
+  Skip model pulls and only remove unlisted models. Used by scripts/gc.ps1.
 
 .PARAMETER ServerReadyTimeoutSeconds
-  Bounded wait time for the Ollama server to become responsive before sync
-  exits with a benign skip. Pass 0 to disable waiting.
-
-
-.EXAMPLE
-  . .\src\platforms\Windows\modules\Invoke-AISync.ps1
-  Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -ServerReadyTimeoutSeconds 60
-  Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -GcOnly -ServerReadyTimeoutSeconds 0
-  Invoke-AISync -RepoRoot "C:\Users\admin\nucleus" -DryRun -ServerReadyTimeoutSeconds 60
+  Bounded wait for the Ollama server before exiting with a benign skip. 0 disables
+  waiting.
 
 .NOTES
   Environment variables:
     OLLAMA_HOST  Ollama API endpoint (default: http://127.0.0.1:11434).
     NUCLEUS_HOST  Host identifier for model profile selection.
-
-  Exit codes:
-    0 on success; 1 on error.
 #>
 
 function Invoke-AISync {
@@ -107,16 +87,15 @@ function Invoke-AISync {
   $manifestPath     = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\configs\ollama\models.json"
   $lockfilePath     = Join-Path -Path $resolvedRepoRoot -ChildPath "src\lockfiles\lockfile.json"
 
-  # Override OLLAMA_HOST to point directly at Ollama (not LiteLLM) so that
-  # model list/pull/rm commands talk to the inference backend directly instead
-  # of routing through the AI gateway proxy.  The default user env var in
-  # user/env.dsc.yml points at LiteLLM (127.0.0.1:4000).
+  # WHY: point OLLAMA_HOST at Ollama rather than LiteLLM, so model list/pull/rm
+  # talk to the inference backend instead of the gateway proxy. The default user
+  # env var in user/env.dsc.yml points at LiteLLM (127.0.0.1:4000).
   # check-suppress:suppression_doc: probe -- services.json may not exist; $null-conditional access handles absence gracefully.
   $svc = Get-Content -Raw (Join-Path $resolvedRepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json
   $env:OLLAMA_HOST = if ($svc.ollama.network.default) { "$($svc.ollama.network.default.host):$($svc.ollama.network.default.port)" } else { '127.0.0.1:11434' }
 
-  # Determine the active model profile.  NUCLEUS_AI_SYNC_PROFILE env var overrides
-  # the resolved host key, enabling cross-platform testing on Windows.
+  # NUCLEUS_AI_SYNC_PROFILE overrides the resolved host key, which enables
+  # cross-platform testing on Windows.
   if ([string]::IsNullOrWhiteSpace($env:NUCLEUS_REPO_ROOT)) {
     $env:NUCLEUS_REPO_ROOT = $resolvedRepoRoot
   }
@@ -134,10 +113,8 @@ function Invoke-AISync {
     throw "ai: ServerReadyTimeoutSeconds must be zero or greater."
   }
 
-  # Probe the server with `ollama list`.  A non-zero exit means the server is
-  # not yet running; after a fresh apply the service can still be starting even
-  # though the binary is already installed, so wait for a bounded period before
-  # giving up with a benign skip.
+  # WHY: wait rather than skip immediately. After a fresh apply the service can
+  # still be starting even though the binary is installed.
   function Invoke-OllamaList {
     $output = @(& $ollamaCmd.Source list 2>&1)
     return @{
@@ -173,9 +150,8 @@ function Invoke-AISync {
   $manifest      = Get-Content -Raw -Path $manifestPath | ConvertFrom-Json
   $desiredModels = @($manifest.models.$profileName)
 
-  # Parse `ollama list` output.  Format: NAME  ID  SIZE  MODIFIED (header + rows).
-  # Skip the header line (index 0) and extract the first whitespace-delimited
-  # field (model name) from each subsequent non-blank line.
+  # NAME  ID  SIZE  MODIFIED, header plus rows; skip index 0 and take the first
+  # whitespace-delimited field of each later non-blank line.
   $installedModels = @(
     $listOutput |
       Select-Object -Skip 1 |
@@ -197,12 +173,12 @@ function Invoke-AISync {
         if ($LASTEXITCODE -ne 0) {
           Write-NucleusError -CommandName 'ai' "ollama pull $model failed with exit code $LASTEXITCODE"
         } else {
-          # Verify pull succeeded via ollama list
+          # Verify the pull via ollama list
           $pullCheck = @(& $ollamaCmd.Source list 2>&1 | Select-Object -Skip 1 | ForEach-Object { ($_ -split '\s+')[0] } | Where-Object { $_ -ne '' })
           if ($pullCheck -notcontains $model) {
             Write-NucleusError -CommandName 'ai' "$model was pulled but is not in 'ollama list'"
           } else {
-            # Lockfile digest verification (optional)
+            # optional lockfile digest check
             if (Test-Path $lockfilePath) {
               $lockfile = Get-Content -Raw -Path $lockfilePath | ConvertFrom-Json
               $modelParts = $model -split ':'
@@ -227,8 +203,8 @@ function Invoke-AISync {
   }
 
   # Remove locally installed models absent from the manifest.
-  # The manifest is the canonical registry; any model not listed here
-  # is considered orphaned and is removed to reclaim disk space.
+  # WHY: the manifest is the canonical registry, so an unlisted model is orphaned
+  # and removed to reclaim disk space.
   foreach ($model in $installedModels) {
     if ($desiredModels -contains $model) {
       continue

@@ -14,8 +14,7 @@ Register-Step -Id "app-registry" -Name "App auto-start registry validation" -Pla
   }
   else {
     $apps = Get-Content $appJson -Raw | ConvertFrom-Json -AsHashtable
-    # The valid kinds come from the schema enum, so this check cannot drift from
-    # the schema the way a second hardcoded list would.
+    # WHY: the enums come from the schema, so this check cannot drift from it.
     $appSchema = Join-Path $r "src\modules\apps.schema.json"
     $validKinds = (Get-Content $appSchema -Raw | ConvertFrom-Json).definitions.autostartKind.enum
     $validIconKinds = (Get-Content $appSchema -Raw | ConvertFrom-Json).definitions.statusIconKind.enum
@@ -30,7 +29,7 @@ Register-Step -Id "app-registry" -Name "App auto-start registry validation" -Pla
         $hEntry = $entry.hosts[$hostName]
         if ($hEntry -isnot [hashtable]) { continue }
 
-        # Omitted hosts must have justification.
+        # WHY: an omitted host states why the app is inapplicable.
         $type = if ($hEntry.ContainsKey('type')) { $hEntry.type } else { 'missing' }
         if ($type -eq 'omitted') {
           $hasJust = $hEntry.ContainsKey('justification') -and -not [string]::IsNullOrEmpty($hEntry.justification)
@@ -41,8 +40,8 @@ Register-Step -Id "app-registry" -Name "App auto-start registry validation" -Pla
           continue
         }
 
-        # autostartEnabled is required for every kind we launch and forbidden for
-        # 'manual' — nothing is launched, so a toggle there would be a lie.
+        # WHY: required for every launched kind, forbidden for 'manual', where a
+        # toggle would claim a start that never happens.
         $entryKind = if ($hEntry.ContainsKey('kind')) { $hEntry.kind } else { 'missing' }
         $enabled = if ($hEntry.ContainsKey('autostartEnabled')) { $hEntry.autostartEnabled } else { $null }
         if ($entryKind -eq 'manual') {
@@ -56,8 +55,8 @@ Register-Step -Id "app-registry" -Name "App auto-start registry validation" -Pla
           $appErrors++
         }
 
-        # kind must be in the valid enum (if present), and a platform-prefixed
-        # kind must match its host platform.
+        # WHY: a platform-prefixed kind that disagrees with its host platform
+        # cannot be converged by the right script.
         if ($entryKind -ne 'missing') {
           $kind = $entryKind
           if ($kind -notin $validKinds) {
@@ -77,8 +76,8 @@ Register-Step -Id "app-registry" -Name "App auto-start registry validation" -Pla
             $appErrors++
           }
 
-          # Kinds no script can converge still need approvalInstructions: that
-          # text is the only guidance the report prints.
+          # WHY: approvalInstructions is the only guidance the report prints
+          # for a kind no script can converge.
           if ($kind -in @('macos-system-extension', 'manual')) {
             $hasApproval = $hEntry.ContainsKey('approvalInstructions') -and -not [string]::IsNullOrEmpty($hEntry.approvalInstructions)
             if (-not $hasApproval) {
@@ -88,9 +87,7 @@ Register-Step -Id "app-registry" -Name "App auto-start registry validation" -Pla
           }
         }
 
-        # The status-icon kinds follow the same two rules as the auto-start
-        # kinds: they must come from the schema enum, and a platform prefix
-        # must match the host.
+        # WHY: status-icon kinds follow the same enum and platform-prefix rules.
         if ($hEntry.ContainsKey('statusIcon') -and $null -ne $hEntry.statusIcon) {
           $iconKind = if ($hEntry.statusIcon.ContainsKey('kind')) { $hEntry.statusIcon.kind } else { 'missing' }
           if ($iconKind -notin $validIconKinds) {
