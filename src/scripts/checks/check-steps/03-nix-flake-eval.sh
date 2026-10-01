@@ -27,7 +27,7 @@ run_nix_flake_eval() {
 
   if $_ne_eval; then
     # WHY: <nixpkgs> comes from the flake-locked input, never from this
-    # machine's channel — the evals below must not depend on the ambient one.
+    # machine's channel; the evals below must not depend on the ambient one.
     if ! nucleus_pin_nixpkgs "$_repo_root"; then
       _ne_exit=1
     fi

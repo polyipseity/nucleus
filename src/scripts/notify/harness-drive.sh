@@ -7,7 +7,7 @@
 #   harness  pi | opencode | cursor | copilot
 #   stdin    the harness stop-hook payload, if any (JSON)
 #
-# Continuation document (stdout) — exactly one queued prompt is consumed:
+# Continuation document (stdout): exactly one queued prompt is consumed:
 #   cursor   {"followup_message":"<text>"}                       (Cursor native)
 #   copilot  {"hookSpecificOutput":{"hookEventName":"Stop",
 #             "decision":"block","reason":"<text>"}}             (VS Code native)

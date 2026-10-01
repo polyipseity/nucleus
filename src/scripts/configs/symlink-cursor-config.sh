@@ -12,7 +12,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _scc_repo_root="$1"
 _scc_username="$2"
-# Skip exporting NUCLEUS_REPO_ROOT when the path is a Nix store snapshot —
+# Skip exporting NUCLEUS_REPO_ROOT when the path is a Nix store snapshot;
 # derive_repo_root() will fall back to the system repo-root file silently.
 if [ -n "$_scc_repo_root" ] && case "$_scc_repo_root" in /nix/store/*) false ;; *) true ;; esac then
   export NUCLEUS_REPO_ROOT="$_scc_repo_root"

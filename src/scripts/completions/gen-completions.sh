@@ -140,7 +140,7 @@ capture_help() {
   local _cmd="$1" _out="$2" _sh_rel
   _sh_rel="$(sh_for_command "$_cmd")"
   : >"$_out"
-  [ -n "$_sh_rel" ] || return 0 # no .sh source — the fixed --help group only.
+  [ -n "$_sh_rel" ] || return 0 # no .sh source: the fixed --help group only.
   # check-suppress:suppression_doc: help output is stdout-only per the output-format contract; stderr is suppressed.
   if ! bash "$REPO_ROOT/$_sh_rel" --help >"$_out" 2>/dev/null; then
     error "nucleus-$_cmd: --help failed (every .sh command supports --help; a failure is a real bug)"

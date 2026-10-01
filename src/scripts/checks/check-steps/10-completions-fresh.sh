@@ -3,7 +3,7 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-# The canonical nucleus-* command set (alphabetical) — the coverage contract
+# The canonical nucleus-* command set (alphabetical): the coverage contract
 # shared with src/scripts/completions/gen-completions.sh and tests/scripts/gen-completions-tests.sh.
 _NUCLEUS_COMMANDS=(ai apply bootstrap check cloud config gc utils svc test update vm)
 

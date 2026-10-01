@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# HTTPS proxy daemon — runs Caddy for all configured virtual hosts.
+# HTTPS proxy daemon: runs Caddy for all configured virtual hosts.
 # Config path provided as env var CADDYFILE_PATH or first positional arg.
 # Caddy resolved from PATH.
 # Usage: https-proxy-daemon.sh [caddyfile]

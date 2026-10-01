@@ -15,7 +15,7 @@
 # NUCLEUS_REPO_ROOT (via derive_repo_root).
 #
 # Prerequisites: nix with flakes; sops only when its stage is enabled.
-# Exits 1 when a selected stage fails — flake errors are reported explicitly,
+# Exits 1 when a selected stage fails, flake errors are reported explicitly,
 # and sops failures abort via set -e.
 
 set -euo pipefail
@@ -55,7 +55,7 @@ EOF
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# update subcommand — update flake inputs and rewrap SOPS-managed files.
+# update subcommand: update flake inputs and rewrap SOPS-managed files.
 # ──────────────────────────────────────────────────────────────────────────────
 
 do_update() {
@@ -130,7 +130,7 @@ do_update() {
   # rewrap_sops_files
   #   Re-encrypts every SOPS-managed repository asset with the recipient set
   #   declared in .sops.yaml. WHY: after machine age/GPG keys are added or
-  #   removed, ciphertext is still bound to the old set — new machines could
+  #   removed, ciphertext is still bound to the old set, so new machines could
   #   not decrypt it. updatekeys rewraps in place without touching plaintext.
   rewrap_sops_files() {
     # Rewrap every encrypted repository asset so recipients stay in sync with
@@ -168,7 +168,7 @@ do_update() {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# lockfile subcommand — query each available tool for the current version of
+# lockfile subcommand: query each available tool for the current version of
 # each pinned item and write an updated lockfile atomically. Inlined from
 # scripts/bump-lockfile.sh.
 # ──────────────────────────────────────────────────────────────────────────────
@@ -372,7 +372,7 @@ EOF
     while IFS= read -r key; do
       [ -z "$key" ] && continue
       if printf '%s\n' "$data" | jq -e --arg k "$key" '(.["cargo-binstall"][$k] | type) == "object"' >/dev/null; then
-        continue # VCS hash-pin entry — no crates.io query can update the rev
+        continue # VCS hash-pin entry: no crates.io query can update the rev
       fi
       old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.["cargo-binstall"] // {})[$k] // empty')
       [ -z "$old" ] && continue
@@ -462,7 +462,7 @@ EOF
     while IFS= read -r key; do
       [ -z "$key" ] && continue
       if printf '%s\n' "$data" | jq -e --arg k "$key" '(.uv[$k] | type) == "object"' >/dev/null; then
-        continue # VCS hash-pin entry — no CLI query can update the rev
+        continue # VCS hash-pin entry: no CLI query can update the rev
       fi
       old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.uv // {})[$k] // empty')
       [ -z "$old" ] && continue

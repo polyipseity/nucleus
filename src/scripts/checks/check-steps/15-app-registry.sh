@@ -5,7 +5,7 @@
 
 register_step "app-registry" "App auto-start registry validation" run_app_registry posix full none
 
-# _kind_in_enum <kind> <array-name> — true when the named array holds <kind>.
+# _kind_in_enum <kind> <array-name>: true when the named array holds <kind>.
 _kind_in_enum() {
   local -n _haystack="$2"
   local _item
@@ -15,7 +15,7 @@ _kind_in_enum() {
   return 1
 }
 
-# _platform_for_kind <kind> — print the platform a platform-prefixed kind
+# _platform_for_kind <kind>: print the platform a platform-prefixed kind
 # belongs to, or nothing when the kind is platform-neutral.
 _platform_for_kind() {
   case "$1" in

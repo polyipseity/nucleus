@@ -82,7 +82,7 @@ read_registry() {
 
 # macOS native preference helpers (run as the console user)
 
-# menu_bar_value_for VISIBLE ENTRY_JSON — stdout the native value to write,
+# menu_bar_value_for VISIBLE ENTRY_JSON: stdout the native value to write,
 # typed per valueType. Inverted keys are handled here, not by a disable flag.
 menu_bar_value_for() {
   local visible="$1" entry_json="$2"
@@ -95,7 +95,7 @@ menu_bar_value_for() {
   fi
 }
 
-# menu_bar_native_set ENTRY_JSON VISIBLE — SET the native preference to the
+# menu_bar_native_set ENTRY_JSON VISIBLE: SET the native preference to the
 # desired state, never disable it. A manual entry declares a state config cannot
 # converge; the gap is surfaced via list/verify, so skip the SET and return 0.
 menu_bar_native_set() {
@@ -167,7 +167,7 @@ menu_bar_native_set() {
   esac
 }
 
-# menu_bar_actual_visible KEY ENTRY_JSON — stdout "true"/"false"/"unknown".
+# menu_bar_actual_visible KEY ENTRY_JSON: stdout "true"/"false"/"unknown".
 menu_bar_actual_visible() {
   local key="$1" entry_json="$2"
   local kind domain key_name plist_path value_type current desired_visible
@@ -246,7 +246,7 @@ nixos_dispatch_per_user() {
 
 # Per-app state resolution
 
-# menu_bar_converge KEY ENTRY_JSON — apply the declared icon state for one app.
+# menu_bar_converge KEY ENTRY_JSON: apply the declared icon state for one app.
 # SETs the native preference to the desired state; never disables it.
 menu_bar_converge() {
   local key="$1" entry_json="$2"
@@ -314,7 +314,7 @@ do_status() {
 do_show() { do_set true; }
 do_hide() { do_set false; }
 
-# do_set — Show or hide a named app's icon by setting the native preference.
+# do_set: show or hide a named app's icon by setting the native preference.
 do_set() {
   local value="$1"
   if [ "${#app_names[@]}" -eq 0 ]; then
@@ -379,7 +379,7 @@ do_verify() {
   say "all app icons converged to declared state"
 }
 
-# resolve_app_names — Resolve requested names to registry entries.
+# resolve_app_names: resolve requested names to registry entries.
 # Output: tab lines key\tdisplay\tentryJson.  Unknown names → ERROR: rows.
 resolve_app_names() {
   local registry="$1"

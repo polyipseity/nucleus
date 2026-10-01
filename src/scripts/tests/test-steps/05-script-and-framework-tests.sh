@@ -141,7 +141,7 @@ _run_parallel_script_tests() {
     fi
     # Judged here rather than inside the xargs job: this runs in the step's own
     # shell, where the tally checker is defined, and it leaves the parallel job
-    # one job — run the suite and record its status.
+    # one job, run the suite and record its status.
     if ! _reason=$(check_suite_tally "$_script" "$_capture_file" "$_status"); then
       printf '%s (%s)\n' "$_script" "$_reason" >>"$_failed_list"
     elif [ "$_status" -ne 0 ]; then

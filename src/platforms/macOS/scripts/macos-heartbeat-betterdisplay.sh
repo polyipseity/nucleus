@@ -4,9 +4,9 @@
 # tracking and loop detection come from svc_health and the watchdog.
 #
 # Environment variables (with built-in defaults):
-#   BD_BIN  — path to BetterDisplay executable
-#   BD_APP  — path to BetterDisplay .app bundle
-#   DISPLAY_NAME — virtual display name to monitor
+#   BD_BIN:       path to BetterDisplay executable
+#   BD_APP:       path to BetterDisplay .app bundle
+#   DISPLAY_NAME: virtual display name to monitor
 
 set +e # heartbeat is fully soft-fail; never abort on individual check failure
 

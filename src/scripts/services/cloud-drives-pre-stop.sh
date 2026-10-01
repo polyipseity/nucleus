@@ -40,7 +40,7 @@ while IFS= read -r _psd_entry; do
   _psd_local_path="$(printf '%s\n' "$_psd_entry" | "$_psd_jq_bin" -r '.localPath')"
   _psd_service_label="$(printf '%s\n' "$_psd_entry" | "$_psd_jq_bin" -r '.serviceLabel // empty')"
 
-  # Skip mounts without a service label — these have no LaunchAgent.
+  # Skip mounts without a service label: these have no LaunchAgent.
   [ -n "$_psd_service_label" ] || continue
 
   _psd_mount_point="$HOME/$_psd_local_path"

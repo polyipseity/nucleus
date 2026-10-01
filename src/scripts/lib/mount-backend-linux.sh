@@ -123,8 +123,8 @@ backend_mount() {
 _backend_capture=""
 _backend_rclone_pid=""
 
-# backend_probe_state — the mount table's three-valued answer for a mount point.
-# Args: $1 — mount point.
+# backend_probe_state: the mount table's three-valued answer for a mount point.
+# Args: $1: mount point.
 # Prints: present, absent:<reason> or unknown:<reason>. Always returns 0.
 # WHY: the question is MOUNT STATE, never directory contents. An empty remote
 #   root is a legitimate state, so a content test reports a healthy mount as
@@ -155,7 +155,7 @@ backend_repair() {
   printf 'Mount will be retried on next watchdog tick.\n'
 }
 
-# backend_provider_refusal — always false on Linux (no FSKit/extension concept).
+# backend_provider_refusal: always false on Linux (no FSKit/extension concept).
 backend_provider_refusal() {
   return 1
 }

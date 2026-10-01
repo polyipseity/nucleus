@@ -3,16 +3,16 @@
 # the top of a bundle script via SCRIPT_DIR-relative dot-sourcing.
 #
 # Parsing convention:
-#   --key value    — stores "$key=$value" in _ab_args
-#   --flag         — stores "$flag=1" in _ab_args
-#   --             — end of named args; remaining tokens are positional
+#   --key value:     stores "$key=$value" in _ab_args
+#   --flag:          stores "$flag=1" in _ab_args
+#   --:              end of named args; remaining tokens are positional
 #   Everything after the first positional token is treated as positional.
 #
 # After _ab_parse_args "$@":
-#   _ab_get_arg key       — prints value for --key, empty if not set
-#   _ab_get_arg_bool flag — prints 1 if --flag was passed, 0 otherwise
-#   _ab_positional        — semicolon-joined positional args (use IFS splitting)
-#   _ab_positional_count  — number of positional args
+#   _ab_get_arg key:       prints value for --key, empty if not set
+#   _ab_get_arg_bool flag: prints 1 if --flag was passed, 0 otherwise
+#   _ab_positional:        semicolon-joined positional args (use IFS splitting)
+#   _ab_positional_count:  number of positional args
 #
 # Internal names start with _ab_ to avoid collision. read/printf run with IFS
 # set to newline for multi-line safety.
@@ -73,7 +73,7 @@ _ab_get_arg() {
   return 0
 }
 
-# _ab_get_arg_bool FLAG — prints 1 if --FLAG was passed, 0 otherwise
+# _ab_get_arg_bool FLAG: prints 1 if --FLAG was passed, 0 otherwise
 _ab_get_arg_bool() {
   _ab_key="$1"
   while IFS= read -r _ab_line; do

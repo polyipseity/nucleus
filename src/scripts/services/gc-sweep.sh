@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Weekly garbage collection for Nix VM artifacts, build outputs, and caches.
 # Also runs log rotate/expire (gc.sh step 9); daily log-gc-* jobs cover the
-# same paths — overlap is intentional and idempotent.
+# same paths, overlap is intentional and idempotent.
 set -eu
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
