@@ -46,14 +46,17 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         # cannot pass by accident through some other entry.
         $fixture = @{ psgallery = [ordered]@{ Pester = '6.2.0' } } | ConvertTo-Json -Depth 4
 
-        # The module reads the per-user module path as the last PSModulePath entry,
-        # so pointing that at a temp directory is what lets a case place a copy at
-        # CurrentUser scope without writing to the real one. Restored in AfterAll,
-        # because the Pester step runs every suite in one process.
+        # The module resolves the per-user module path from the Documents folder
+        # and the PowerShell edition, so a temp tree is supplied through the
+        # override parameter rather than through $env:PSModulePath. Pointing
+        # PSModulePath at it no longer steers anything, and a case that placed a
+        # copy there would be testing a path the module never reads.
         $script:currentUserRoot = Join-Path $script:tempRoot 'CurrentUserModules'
         $null = New-Item -ItemType Directory -Path $script:currentUserRoot -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
-        $script:originalPsmPath = $env:PSModulePath
-        $env:PSModulePath = (Join-Path $script:tempRoot 'MachineModules') + [IO.Path]::PathSeparator + $script:currentUserRoot
+        # WHY one scriptblock for every case: the override is what keeps the suite
+        # off the real per-user directory, so a call site that omits it would read
+        # and delete the host's own modules.
+        $script:invokeSetup = { Invoke-PowerShellModuleSetup -CurrentUserModulePath $script:currentUserRoot }
         $null = Set-Content -Path (Join-Path $script:fakeRoot 'src\lockfiles\lockfile.json') -Value $fixture  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
         Copy-Item -LiteralPath (Join-Path $script:realRepoRoot 'src\platforms\Windows\modules\setup\Invoke-PowerShellModuleSetup.ps1') -Destination (Join-Path $script:fakeSetupDir 'Invoke-PowerShellModuleSetup.ps1')
         . (Join-Path $script:fakeSetupDir 'Invoke-PowerShellModuleSetup.ps1')
@@ -83,7 +86,6 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
     }
 
     AfterAll {
-        $env:PSModulePath = $script:originalPsmPath
         if ($script:tempRoot -and (Test-Path -LiteralPath $script:tempRoot)) {
             # check-suppress:suppression_doc: cleanup in test teardown -- failure is acceptable
             Remove-Item -LiteralPath $script:tempRoot -Recurse -Force -ErrorAction SilentlyContinue
@@ -148,7 +150,7 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         Initialize-ModuleDirectory -ModuleBase $older.ModuleBase
         $script:copies = @($newer, $older)
 
-        Invoke-PowerShellModuleSetup
+        & $script:invokeSetup
 
         # Both directories, not just the first. The old code removed one, so the
         # second copy survived and the install below warned about it.
@@ -165,7 +167,7 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         Initialize-ModuleDirectory -ModuleBase $lower.ModuleBase
         $script:copies = @($higher, $lower)
 
-        Invoke-PowerShellModuleSetup
+        & $script:invokeSetup
 
         # The image owns this tree, so a copy under the pin there stays: it
         # cannot shadow the pin. This is the Pester 3.4.0 the runner image ships
@@ -186,7 +188,7 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         Initialize-ModuleDirectory -ModuleBase $stale.ModuleBase
         $script:copies = @($stale)
 
-        Invoke-PowerShellModuleSetup
+        & $script:invokeSetup
 
         # Our own tree holds one version of a managed module, and a stale copy
         # beside the pin is what leaves Get-Module -ListAvailable reporting two.
@@ -211,7 +213,7 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
             }
         }
 
-        $failure = { Invoke-PowerShellModuleSetup } | Should -Throw -PassThru
+        $failure = { & $script:invokeSetup } | Should -Throw -PassThru
 
         # Both the module and what was found, so the reader does not have to run
         # the listing again to learn what took the slot.
@@ -226,7 +228,7 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         Initialize-ModuleDirectory -ModuleBase $higher.ModuleBase
         $script:copies = @($pin, $higher)
 
-        Invoke-PowerShellModuleSetup
+        & $script:invokeSetup
 
         # The case the old early `continue` skipped: the pin was satisfied, so it
         # returned before removing anything and the shadowing copy stayed.
@@ -243,7 +245,7 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         Initialize-ModuleDirectory -ModuleBase $pinElsewhere.ModuleBase
         $script:copies = @($pinElsewhere)
 
-        Invoke-PowerShellModuleSetup
+        & $script:invokeSetup
 
         # CurrentUser is the scope this module owns, so a pin sitting in the
         # machine scope is a copy it has to converge rather than accept.
@@ -254,7 +256,7 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
     It 'installs the pin when nothing is present' {
         $script:copies = @()
 
-        Invoke-PowerShellModuleSetup
+        & $script:invokeSetup
 
         $script:installCalls | Should -Be @('6.2.0')
         # Nothing was installed before this run, so there is nothing to sweep.
@@ -266,7 +268,7 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         Initialize-ModuleDirectory -ModuleBase $imageCopy.ModuleBase
         $script:copies = @($imageCopy)
 
-        Invoke-PowerShellModuleSetup
+        & $script:invokeSetup
 
         # A machine-scope copy at the pin version is a target, because PowerShell
         # breaks a version tie by path order. Such a copy under Program Files can
@@ -281,7 +283,7 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         Initialize-ModuleDirectory -ModuleBase $pin.ModuleBase
         $script:copies = @($pin)
 
-        Invoke-PowerShellModuleSetup
+        & $script:invokeSetup
 
         # Taking ownership of a tree this repository installed itself would be a
         # permission change with nothing behind it.
@@ -295,7 +297,7 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         Initialize-ModuleDirectory -ModuleBase $imageCopy.ModuleBase
         $script:copies = @($imageCopy)
 
-        Invoke-PowerShellModuleSetup
+        & $script:invokeSetup
 
         # WHY the assertion is weaker than it looks: the Get-Module mock answers
         # every call, so it reports a loaded module whenever any copy is listed.
@@ -314,7 +316,7 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         Initialize-ModuleDirectory -ModuleBase $orphan.ModuleBase
         $script:copies = @($orphan)
 
-        Invoke-PowerShellModuleSetup
+        & $script:invokeSetup
 
         $script:removedDirectories | Should -Contain $orphan.ModuleBase
         Test-Path -LiteralPath $orphan.ModuleBase | Should -BeFalse
@@ -337,7 +339,7 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
             throw "Access to the path '$Path\Pester.bat' is denied."
         } -ParameterFilter { $script:undeletablePaths -contains $Path }
 
-        { Invoke-PowerShellModuleSetup } | Should -Throw
+        { & $script:invokeSetup } | Should -Throw
 
         $script:removedDirectories | Should -Not -Contain $stubborn.ModuleBase
         Test-Path -LiteralPath $stubborn.ModuleBase | Should -BeTrue
@@ -355,7 +357,7 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
             throw "Access to the path '$Path' is denied."
         } -ParameterFilter { $script:undeletablePaths -contains $Path }
 
-        { Invoke-PowerShellModuleSetup } | Should -Throw
+        { & $script:invokeSetup } | Should -Throw
 
         # The pin is the point of the module, so one undeletable image copy must
         # not cost the host its pin as well. The failure is still raised, after
@@ -376,7 +378,7 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
             throw "Access to the path '$Path' is denied."
         } -ParameterFilter { $script:undeletablePaths -contains $Path }
 
-        $failure = { Invoke-PowerShellModuleSetup } | Should -Throw -PassThru
+        $failure = { & $script:invokeSetup } | Should -Throw -PassThru
 
         # Every failed copy is named with its version and its path, so the one
         # throw is the whole report rather than the first copy the loop hit.
@@ -395,7 +397,7 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         Initialize-ModuleDirectory -ModuleBase $userCopy.ModuleBase
         $script:copies = @($imageCopy, $userCopy)
 
-        Invoke-PowerShellModuleSetup
+        & $script:invokeSetup
 
         # A read-only file inside an image tree is denied exactly the way a
         # permission problem is, so the attribute has to be cleared before the
@@ -411,5 +413,48 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         @($script:clearedReadOnlyPaths) | Should -Not -Contain $userCopy.ModuleBase
         @($script:grantedPaths) | Should -Not -Contain $userCopy.ModuleBase
         $script:removedDirectories | Should -Contain $userCopy.ModuleBase
+    }
+
+    It 'reads the pin as converged when a foreign tool appended its own modules directory' {
+        # The GitHub runner shape: SQL Server tooling appends its modules directory
+        # to PSModulePath, and that entry is last. It is here to pin the end-to-end
+        # behavior, that a foreign entry cannot disturb convergence. The guard on
+        # where the path comes from is the two resolver cases below, because this
+        # case supplies the override and so never reaches live resolution.
+        $originalPsmPath = $env:PSModulePath
+        $env:PSModulePath = $script:currentUserRoot + [IO.Path]::PathSeparator + (Join-Path $script:tempRoot 'Microsoft SQL Server\130\Tools\PowerShell\Modules')
+        try {
+            $pin = Get-ModuleCopy -Version '6.2.0' -Scope 'CurrentUserModules'
+            Initialize-ModuleDirectory -ModuleBase $pin.ModuleBase
+            $script:copies = @($pin)
+
+            & $script:invokeSetup
+
+            # The pin sits where PowerShellGet puts it, so the run has nothing to
+            # do. A PSModulePath-based path would miss it, install over it, and then
+            # fail the post-install check that produced the red runner.
+            @($script:installCalls) | Should -BeNullOrEmpty
+            @($script:removedDirectories) | Should -BeNullOrEmpty
+            @($script:grantedPaths) | Should -BeNullOrEmpty
+            Test-Path -LiteralPath $pin.ModuleBase | Should -BeTrue
+        } finally {
+            $env:PSModulePath = $originalPsmPath
+        }
+    }
+
+    It 'resolves the PowerShell 7 module directory under the documents root' {
+        # These two cases are the guard on the resolution itself. Reading the last
+        # PSModulePath entry instead fails them both, because that entry is neither
+        # argument. Verified by restoring the positional read and rerunning: the
+        # other 16 cases still pass and only these two fail.
+        Get-CurrentUserModulePath -DocumentsRoot $script:tempRoot -PowerShellEdition 'Core' |
+            Should -Be (Join-Path (Join-Path $script:tempRoot 'PowerShell') 'Modules')
+    }
+
+    It 'resolves the Windows PowerShell module directory under the documents root' {
+        # The Windows host orchestrator can be run by hand under either edition, and
+        # they keep their CurrentUser trees in sibling leaf directories.
+        Get-CurrentUserModulePath -DocumentsRoot $script:tempRoot -PowerShellEdition 'Desktop' |
+            Should -Be (Join-Path (Join-Path $script:tempRoot 'WindowsPowerShell') 'Modules')
     }
 }
