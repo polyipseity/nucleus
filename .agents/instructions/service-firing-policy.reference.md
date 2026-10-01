@@ -29,7 +29,11 @@ Everything not in the oneshot list below fires this way, so a new service defaul
 | `log-gc-system` | `StartInterval=86400`, daily 12:00 | system log rotation of root-owned logs |
 | `log-gc-user` | `StartInterval=86400`, daily 12:00 | user log rotation |
 | `nix-index-update` | `StartCalendarInterval`, daily 12:00 | Nix ecosystem only; Windows uses Scoop |
+| `sccache-gc` | `StartCalendarInterval`, daily 12:00 | a cache clear takes seconds and needs no crash recovery |
+| `ds-store-gc` | `StartCalendarInterval`, daily 12:00 | dev-tree cleanup, nothing to keep alive |
+| `spotlight-exclusions` | `StartCalendarInterval`, daily 12:00 | dev-tree cleanup, nothing to keep alive |
 | `icloud-exclusions` | `StartInterval=3600` | macOS iCloud xattr drift |
+| `gui-env` | `RunAtLoad` | login one-shot; the values it exports are what login needs, not a process |
 
 `gc-weekly` overlapping the daily log GCs is intentional and idempotent. `duperemove` is NixOS-only and runs weekly over `/nix/store`.
 
@@ -51,6 +55,8 @@ A persistent daemon that also needs periodic work uses an internal sleep loop in
 | Service | Reason |
 | -------------------------- | ------ |
 | `betterdisplay-heartbeat` | macOS-only virtual screen app |
+| `ds-store-gc` | Finder creates the files it removes |
+| `spotlight-exclusions` | `.metadata_never_index` is a Spotlight convention |
 | `gui-env` | `launchctl setenv` plus `launchctl config user path`; needs login-time coverage |
 | `icloud-exclusions` | `com.apple.fileprevider.ignore#P` xattr is macOS-only |
 | `linux-builder` | Nix Linux builder VM; NixOS builds Linux natively |
