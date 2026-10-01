@@ -315,9 +315,111 @@ test_step14_removed_skip_constructs_detection() {
   return 0
 }
 
+# --- text hygiene behavioral tests ---
+
+# The em dash is composed at runtime: step 12 scans tracked .sh files, this file
+# included, so a literal byte here would be a finding against the gate's own
+# test. Same reason as the removed-skip list above.
+_EM_DASH=$(printf '\xe2\x80\x94')
+
+test_step14_text_hygiene_clean_comment() {
+  local _tmp _out _ret
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  printf '# a clean comment with a colon: nothing to flag\n' >"$_tmp/clean.sh"
+  run_text_hygiene_policy true "$_tmp" "$_tmp/clean.sh" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -ne 0 ]; then
+    echo "FAIL: a clean comment should pass the text hygiene policy"
+    cat "$_out"
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  [ "$_ret" -eq 0 ]
+}
+
+test_step14_text_hygiene_comment_dash_fails() {
+  local _tmp _out _ret
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  printf '# prose %s here\n' "$_EM_DASH" >"$_tmp/dirty.sh"
+  printf '<#\n.DESCRIPTION\n  help %s here\n#>\n' "$_EM_DASH" >"$_tmp/dirty.ps1"
+  run_text_hygiene_policy true "$_tmp" "$_tmp/dirty.sh" "$_tmp/dirty.ps1" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -eq 0 ] || ! grep -q 'em dash in prose' "$_out"; then
+    echo "FAIL: an em dash in a comment or a help block should fail the text hygiene policy"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+test_step14_text_hygiene_string_and_fence_allowed() {
+  local _tmp _out _ret _fence
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  # The fence is composed so the shellcheck single-quote rule stays quiet.
+  _fence=$(printf '\140\140\140')
+  printf 'error "service %s not found"\n' "$_EM_DASH" >"$_tmp/strings.sh"
+  printf 'prose with no dash\n\n%s\ncode %s stays\n%s\n' "$_fence" "$_EM_DASH" "$_fence" >"$_tmp/doc.md"
+  run_text_hygiene_policy true "$_tmp" "$_tmp/strings.sh" "$_tmp/doc.md" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -ne 0 ]; then
+    echo "FAIL: an em dash in a quoted string or a markdown fence should pass the text hygiene policy"
+    cat "$_out"
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  [ "$_ret" -eq 0 ]
+}
+
+test_step14_text_hygiene_markdown_prose_fails() {
+  local _tmp _out _ret
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  printf 'markdown prose %s here\n' "$_EM_DASH" >"$_tmp/doc.md"
+  run_text_hygiene_policy true "$_tmp" "$_tmp/doc.md" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -eq 0 ] || ! grep -q 'doc.md:1: em dash in prose' "$_out"; then
+    echo "FAIL: an em dash in markdown prose should fail and report file:line"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+test_step14_text_hygiene_placeholder_cell_allowed() {
+  local _tmp _out _ret
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  printf '| id | tier | reason |\n| --- | --- | --- |\n| D3 | %s | external |\n' "$_EM_DASH" >"$_tmp/doc.md"
+  run_text_hygiene_policy true "$_tmp" "$_tmp/doc.md" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -ne 0 ]; then
+    echo "FAIL: a table cell holding only the em dash is a placeholder and should pass"
+    cat "$_out"
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  [ "$_ret" -eq 0 ]
+}
+
 failures=0
 for test in \
   test_step14_removed_skip_constructs_detection \
+  test_step14_text_hygiene_clean_comment \
+  test_step14_text_hygiene_comment_dash_fails \
+  test_step14_text_hygiene_string_and_fence_allowed \
+  test_step14_text_hygiene_markdown_prose_fails \
+  test_step14_text_hygiene_placeholder_cell_allowed \
   test_step14_naming_behavioral_positive \
   test_step14_naming_behavioral_negative \
   test_step14_naming_behavioral_exemption \

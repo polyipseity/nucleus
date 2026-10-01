@@ -17,6 +17,7 @@ _POLICY_PATTERN_CHECKS=(
   "activation naming policy|run_activation_naming_policy|files"
   "config method compliance|run_config_method_compliance|files"
   "logging format policy|run_logging_format_policy|files"
+  "text hygiene|run_text_hygiene_policy|files"
   "removed skip mechanism|run_removed_skip_mechanism|files"
   "nix file structure|run_nix_file_structure|files"
   "log capture pair policy|run_log_capture_pair_policy|files"
@@ -225,6 +226,45 @@ _policy_scan_target() {
   "$_POLICY_STEP_SELF_SH" | "$_POLICY_STEP_SELF_PS1" | 11-repo-policy-grep.ps1 | 13-repo-policy-data.ps1) return 1 ;;
   esac
   [[ "$_pst_file" =~ $_pst_ext_re ]]
+}
+
+run_text_hygiene_policy() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
+  local _files=("$@")
+  cd "$_repo_root" || return 1
+
+  local _th_errors=0
+  # .md carries prose, the rest carry comment syntax. A trailing comment on a
+  # code line is out of scope: the same line can hold a string carrying the
+  # dash, and a line-based scan cannot tell the two apart.
+  local _th_ext_re='\.(md|sh|zsh|ps1|psm1|nix|yml|yaml)$'
+  local _th_files=()
+  local _f
+  if $_has_args; then
+    for _f in "${_files[@]}"; do
+      if _policy_scan_target "$_f" "$_th_ext_re"; then _th_files+=("$_f"); fi
+    done
+  else
+    while IFS= read -r _f; do
+      if _policy_scan_target "$_f" "$_th_ext_re"; then _th_files+=("$_f"); fi
+    done < <(git ls-files | filter_gitignored)
+  fi
+
+  if [ "${#_th_files[@]}" -gt 0 ]; then
+    local _th_violation
+    while IFS= read -r _th_violation; do
+      _th_errors=$((_th_errors + 1))
+      error "$_th_violation"
+    done < <(awk -v mode=em-dash -f "$_AWK_PATH" "${_th_files[@]}")
+  fi
+
+  if [ "$_th_errors" -gt 0 ]; then
+    error "text hygiene policy check failed with $_th_errors error(s)"
+    return 1
+  fi
+  say "text hygiene policy passed."
+  return 0
 }
 
 run_logging_format_policy() {

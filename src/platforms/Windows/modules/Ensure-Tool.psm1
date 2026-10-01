@@ -9,7 +9,7 @@
     This is the Windows counterpart to require_command/ensure_tool in
     src/scripts/lib.sh.
 
-    POLICY: This module MUST NOT accept an InstallCommand parameter — preflight
+    POLICY: This module MUST NOT accept an InstallCommand parameter. Preflight
     checks must fail hard on missing tools, not suggest ad-hoc installation.
     Provisioning and preflight are separate: bootstrap/apply installs tools;
     preflight only verifies presence (see tooling-and-validation.instructions.md).

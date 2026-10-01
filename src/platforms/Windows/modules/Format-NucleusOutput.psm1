@@ -28,7 +28,7 @@
 # One-time color detection at import (console-only invariant, F spec).
 # NO_COLOR wins; FORCE_COLOR (not "0") / CLICOLOR_FORCE force on; otherwise
 # virtual-terminal support AND output not redirected. $PSStyle.OutputRendering
-# is NOT touched — the engine owns NO_COLOR/TERM handling.
+# is NOT touched; the engine owns NO_COLOR/TERM handling.
 $script:NucleusColorOn = $false
 if ($env:NO_COLOR) {
     $script:NucleusColorOn = $false
