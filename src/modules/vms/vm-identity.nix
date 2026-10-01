@@ -1,26 +1,24 @@
 # src/modules/vms/vm-identity.nix — deterministic VM identity derivation.
 #
-# The UUID and MAC address of a guest are pure SHA-256 functions of the guest
-# id, so re-provisioning the same VM always reproduces the same identity and a
-# payload copied to another machine keeps its identity (pack/unpack). Changing
-# a guest's id is a breaking identity change.
+# UUID and MAC are pure SHA-256 functions of the guest id, so re-provisioning
+# reproduces the same identity and pack/unpack keeps it. Changing a guest id is a
+# breaking identity change.
 #
-# The same derivation is re-implemented in shell (vm_mk_uuid/vm_mk_mac_address
-# in src/scripts/lib/vm.sh) and PowerShell (src/platforms/Windows/modules/system/
-# Invoke-VMSetup.ps1); tests pin both twins against the known vectors here
-# (tests/modules/vm-setup-tests.nix and tests/platforms/Windows/modules/system/vm-disk-model-parity.Tests.ps1).
+# The same derivation exists in shell (vm_mk_uuid/vm_mk_mac_address in
+# src/scripts/lib/vm.sh) and PowerShell (Invoke-VMSetup.ps1); tests pin both
+# twins against the vectors here.
 let
-  # Format a SHA-256 hex digest as an 8-4-4-4-12 UUID.
+  # 8-4-4-4-12 UUID from a SHA-256 hex digest.
   uuidFromDigest =
     h:
     "${builtins.substring 0 8 h}-${builtins.substring 8 4 h}-${builtins.substring 12 4 h}-${builtins.substring 16 4 h}-${builtins.substring 20 12 h}";
 in
 {
-  # Derive a deterministic UUID from the VM id (format: 8-4-4-4-12 hex).
+  # Deterministic UUID from the VM id.
   mkUuid = id: uuidFromDigest (builtins.hashString "sha256" id);
 
-  # Derive a deterministic locally-administered unicast MAC from the VM id,
-  # with the prefix taken from the manifest's macAddressPrefix field.
+  # Locally-administered unicast MAC from the VM id, prefixed with the
+  # manifest's macAddressPrefix.
   mkMacAddress =
     id: prefix:
     let

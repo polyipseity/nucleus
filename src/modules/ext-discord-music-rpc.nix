@@ -24,8 +24,7 @@ let
 
   discordMusicRpcConfigFile = overlay.selectFile "discord-music-rpc" "config.yaml";
 
-  # Activation helper bundle (seed-writable-symlink.sh) resolved at eval time;
-  # the helper itself resolves the LIVE repo root at activation time.
+  # The helper resolves the LIVE repo root at activation time, not at eval.
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 
   # Per-user service enable flag from src/users/ services.json (default: enabled).
@@ -80,9 +79,8 @@ let
       websockets
     ];
 
-    # Remove the git dependency from pyproject.toml so pip does not attempt to
-    # clone the repository at build time.  pypresence is provided via
-    # propagatedBuildInputs above.
+    # Drop the git dependency so pip does not clone pypresence at build time;
+    # propagatedBuildInputs above already provides it.
     postPatch = ''
       substituteInPlace pyproject.toml \
         --replace 'pypresence @ git+https://github.com/f0e/pypresence.git@66f43b724c8b9df9a34c96c90cee113b23d5a301' \
@@ -97,12 +95,9 @@ in
     {
       home.packages = [ discord-music-rpc ];
 
-      # Method-1 (writable) symlink for the discord-music-rpc config file. Created
-      # at activation time against the LIVE repo root so the app can write config
-      # back through to the repo (repo changes take effect without rebuild). The
-      # writable/immutable decision is owned by managedSymlinkPaths; this entry
-      # must run before protect-out-of-store-symlinks so the link is hardened if
-      # immutable.
+      # Writable symlink against the LIVE repo root so the app writes config
+      # back into the repo. The writable/immutable decision belongs to
+      # managedSymlinkPaths; this runs before protect-out-of-store-symlinks.
       # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
       home.activation.seed-discord-music-rpc-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
         "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
@@ -111,16 +106,13 @@ in
       '';
     }
 
-    # macOS: launchd agent keeps the tray app running persistently after login.
-    # This module is imported into the Home Manager config (home-manager.users),
-    # so use HM-native launchd.agents with domain = "gui" (installs to
-    # ~/Library/LaunchAgents) rather than environment.userLaunchAgents, which is
-    # a nix-darwin top-level option and does not exist in the HM context.
+    # HM-native launchd.agents with domain = "gui", not
+    # environment.userLaunchAgents, which is a nix-darwin top-level option and
+    # does not exist in the HM context.
     (lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && userEnable) {
       launchd.agents."discord-music-rpc" = {
-        # HM's launchd module filters agents by a per-agent `enable` flag (defaults
-        # false via mkEnableOption), so without this the agent is silently dropped
-        # and no plist is generated in ~/Library/LaunchAgents.
+        # HM's launchd module defaults each agent `enable` to false, so without
+        # this the agent is dropped and no plist is generated.
         enable = true;
         domain = "gui";
         config = {

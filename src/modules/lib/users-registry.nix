@@ -1,13 +1,11 @@
 # src/modules/lib/users-registry.nix — Assemble per-user registry records from
 # src/users/<username>/ domain JSON files with src/users/default/ fallback.
 #
-# Host-keyed fields (homeDirectory, localPath, target, enable) resolve to
-# scalars for the requested hostName. symlinks.targets maps are
-# left intact.
+# Host-keyed fields (homeDirectory, localPath, target, enable) resolve to scalars
+# for the requested hostName; symlinks.targets maps are left intact.
 #
-# Merge contract: per-domain JSON is merged with lib.recursiveUpdate, so a
-# user override of an array field REPLACES the default list wholesale (no
-# element-wise union). This is intended — do not change it to a union.
+# Merge contract: lib.recursiveUpdate, so a user override of an array field
+# REPLACES the default list wholesale. Intended, do not change it to a union.
 {
   lib,
   repoRoot,
@@ -33,11 +31,8 @@ let
       { };
 
   # Deep-merge a user domain over the default via lib.recursiveUpdate.
-  # Attrs recurse, but when a value on BOTH sides is a list/array the user
-  # (RHS) list FULLY REPLACES the default (LHS) list — lists are not merged
-  # element-wise. This is intended: a user override of an array field (e.g.
-  # symlinks.targets, icloud-exclusions.excludedDirNames) replaces the whole
-  # list, not a union with the default. Do not "fix" this into a union.
+  # Attrs recurse; when both sides hold a list the user list replaces the
+  # default wholesale, never element-wise. Do not turn this into a union.
   mergeRecords = default: user: lib.recursiveUpdate default user;
 
   isHostMap =
@@ -122,10 +117,9 @@ let
       symlinks = (loadMergedDomain username "symlinks.json").symlinks or [ ];
       devRepos = resolveDevRepos (loadMergedDomain username "dev-repos.json");
       envVars = loadMergedDomain username "env-vars.json";
-      # Per-user secret catalog. Separate from the system secret catalog
-      # (src/modules/env/env-secrets.json, materialized by env-secrets-sops.nix):
-      # users declare their own consumer-scoped secrets here and override the
-      # default list wholesale, like every other domain.
+      # Users declare their own consumer-scoped secrets here, separate from the
+      # system catalog in src/modules/env/env-secrets.json, and override the
+      # default list wholesale like every other domain.
       envSecrets = loadMergedDomain username "env-secrets.json";
       iCloudExclusions = loadMergedDomain username "icloud-exclusions.json";
       jellyfin = loadMergedDomain username "jellyfin.json";

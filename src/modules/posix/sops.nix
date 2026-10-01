@@ -1,25 +1,16 @@
 # src/modules/posix/sops.nix — Machine age-key derivation for POSIX hosts.
 #
-# Derives the age secret identity from /etc/ssh/ssh_host_ed25519_key and writes
-# it under the nucleus SYSTEM root (path resolved by
-# src/scripts/secrets/derive-host-age-key.sh) so the Home Manager sops-nix
-# instance can decrypt SOPS secrets without root.
+# Derives the age identity from /etc/ssh/ssh_host_ed25519_key under the SYSTEM
+# root, where the Home Manager sops-nix instance can read it without root.
 #
-# Why a dedicated derived file rather than sshKeyPaths in Home Manager:
-#   /etc/ssh/ssh_host_ed25519_key is owned root:wheel (macOS) or root:root
-#   (NixOS) with mode 0600. The Home Manager sops-nix instance runs as the
-#   regular user; ssh-to-age must read the private key to derive the age
-#   identity and fails with "permission denied" in that context. System
-#   activation runs as root and CAN read the host key, so we derive the age
-#   identity there and write it to a path the user can read: on NixOS the file
-#   under /var/lib/nucleus is owned root:nucleus-sops (mode 0640), on nix-darwin
-#   the primary user owns it (mode 0600). Home Manager references it through
-#   sops.age.keyFile in secrets.nix.
+# Not via Home Manager sshKeyPaths: the host key is root-owned mode 0600 and
+# ssh-to-age fails with "permission denied" as a regular user. System activation
+# runs as root, reads the host key, and writes a file the user can read (NixOS
+# root:nucleus-sops 0640, nix-darwin primary user 0600). secrets.nix references
+# it through sops.age.keyFile.
 #
-# Idempotency:
-#   ssh-to-age is deterministic for a given SSH key; repeated runs always
-#   produce identical output. We always overwrite to keep the file current if
-#   the host key is ever rotated.
+# Always overwrites: ssh-to-age is deterministic, so a host key rotation takes
+# effect on the next run.
 {
   lib,
   pkgs,
@@ -46,10 +37,8 @@ in
   users.groups.${sopsGroup} = lib.mkIf (!isDarwin) { };
 
   # WHY: the group grants read access to a key that decrypts every SOPS secret.
-  # The grant is broad and permanent: the user registry records no per-user
-  # decrypt capability, so a narrower grant is not expressible, and the group
-  # carries no privilege beyond reading the key. Narrowing it requires recording
-  # that fact in the registry first.
+  # The grant cannot be narrower: the user registry records no per-user decrypt
+  # capability, so recording that has to come first.
   users.users = lib.mkIf (!isDarwin) (
     lib.genAttrs (builtins.attrNames users) (_name: {
       extraGroups = lib.mkAfter [ sopsGroup ];

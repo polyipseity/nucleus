@@ -1,22 +1,15 @@
 # LibreOffice metadata-stripping baseline: configured across all platforms
 # by merging managed entries into registrymodifications.xcu.
 #
-# Two managed settings:
-#   1. RemovePersonalInfoOnSaving — strips author, timestamps, editing duration
-#      from document properties on save.
-#   2. UserProfile/Data cleared — removes identity fields (name, email, company)
-#      so metadata is never embedded in the first place.
-#
-# Dependencies:
-#   - libreOfficeDefaultSettings: parsed baseline from the per-user overlay JSON file.
+# RemovePersonalInfoOnSaving strips author, timestamps, and editing duration on
+# save; clearing UserProfile/Data keeps identity fields out in the first place.
 {
   lib,
   libreOfficeDefaultSettings,
   ...
 }:
 let
-  # User Data fields to clear. Each becomes an empty-string XCU entry
-  # under /org.openoffice.UserProfile/Data.
+  # Each becomes an empty-string XCU entry under /org.openoffice.UserProfile/Data.
   userProfileDataFields = [
     "c"
     "country"
@@ -45,7 +38,7 @@ let
   # XCU item path for the save-time metadata stripping toggle.
   scriptingPath = "/org.openoffice.Office.Common/Security/Scripting";
 
-  # Build the managed entries from the per-user overlay settings.
+  # Managed entries from the per-user overlay settings.
   removePersonalInfoEntries =
     if libreOfficeDefaultSettings.removePersonalInfoOnSave then
       [
@@ -73,7 +66,7 @@ let
   # Combined list of all managed XCU entries.
   libreOfficeManagedXcuEntries = removePersonalInfoEntries ++ clearUserProfileEntries ++ extraEntries;
 
-  # Render entries into "path|name|value" triples for the merge script.
+  # Rendered as "path|name|value" triples.
   renderXcuEntry = entry: "${entry.path}|${entry.name}|${entry.value}";
 
   # Shell-escaped argument string for the merge script.

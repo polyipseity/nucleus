@@ -13,27 +13,20 @@ let
   hasLaunchdDaemonsOption = options ? launchd && options.launchd ? daemons;
 
   nixStoreSettings = {
-    # Opportunistically deduplicate equal store paths via hard-linking to
-    # reduce steady-state disk usage on both hosts.
     auto-optimise-store = true;
-    # Keep flakes and modern nix CLI enabled consistently on both hosts.
     experimental-features = [
       "flakes"
       "nix-command"
     ];
-    # Substituter settings are managed in nix.custom.conf (method 2 read-only)
-    # because nix.enable = false under Determinate Nix on macOS — nix-darwin's
-    # nix.settings has no effect on substituters in that configuration.
-    # Preserve derivation/output metadata for active shells and rollback
-    # workflows so GC does not prune still-useful build context.
+    # Substituters live in nix.custom.conf (method 2): nix.enable = false under
+    # Determinate Nix on macOS, so nix.settings does not reach them there.
+    # Both flags keep rollback and nix-shell working after GC.
     keep-derivations = true;
     keep-outputs = true;
     lazy-trees = true;
     eval-cores = 0;
-    # GC pressure thresholds (shared across hosts). min-free matches the
-    # health-check free-space limit (scripts/health-check.{sh,ps1}
-    # min_free_bytes) so the daemon starts reclaiming at the same point
-    # pre-flight would block; max-free is 4x headroom in the same unit.
+    # min-free matches the health-check limit in scripts/health-check.{sh,ps1}
+    # so the daemon starts reclaiming where pre-flight starts blocking.
     min-free = 16000000000; # 16 GB
     max-free = 64000000000; # 64 GB
   };
@@ -56,10 +49,8 @@ in
     }
 
     (lib.optionalAttrs (!hasLaunchdDaemonsOption) {
-      # /etc/gitconfig is a writable symlink to the per-host gitconfig in the repo
-      # tree so local Git defaults can be adjusted in-place without rebuild. A
-      # same-folder .bak preserves any system-owned original the first time a real
-      # file is replaced. Activation script creates the
+      # Writable symlink into the repo tree, with a same-folder .bak for any
+      # system-owned original replaced the first time.
       # check-suppress:config-method: method 1 (writable symlink) -- symlink; runs as root via nucleus-apply.
       system.activationScripts.gitconfig = lib.mkAfter gitconfigActivation;
 
@@ -125,9 +116,8 @@ in
           };
         };
 
-        # Daily system log rotation — rotates root-owned system log files that
-        # user-context gc cannot write. Cross-host parity with NixOS systemd
-        # timer and Windows scheduled task.
+        # System logs are root-owned, so user-context gc cannot rotate them.
+        # Parity with the NixOS systemd timer and the Windows scheduled task.
         launchd.daemons."log-gc-system" = {
           serviceConfig = {
             Label = "local.log-gc-system";

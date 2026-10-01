@@ -1,21 +1,17 @@
-# modules/lib/apple-sdk-tools.nix — Authoritative xcrun shim-to-nixpkgs mapping.
+# modules/lib/apple-sdk-tools.nix — xcrun shim-to-nixpkgs mapping.
 #
-# Every xcrun shim in /usr/bin/ gets an explicit entry.  Non-null = provisioned
-# (symlinked into the enhanced SDK).  Null = known but not yet provisioned —
-# placeholder for future work.
+# Null marks a shim that exists but has nothing to point at.
 #
 # Regenerate the shim list on any macOS version:
 #   for f in /usr/bin/*; do otool -L "$f" 2>/dev/null | grep -q libxcselect && basename "$f"; done | sort
-# The xcrun shim source (xcode_select) is Apple-proprietary and not published
-# as open source; on-disk inspection is the ground truth.
-# When macOS adds/removes shims, update `allTools` below to match.
+# xcode_select is proprietary and unpublished, so on-disk inspection is the
+# ground truth. When macOS adds or removes a shim, update allTools below.
 { pkgs, ... }:
 let
   allTools = {
     # ── Language runtimes ──
     python3 = "${pkgs.python3}/bin/python3";
-    # The /usr/bin/pip3 shim exists on macOS, but nixpkgs python3 3.14 ships no
-    # pip3 binary, so there is nothing to point it at.
+    # nixpkgs python3 ships no pip3 binary, so the shim has no target.
     pip3 = null;
 
     # ── Compilers & toolchain ──
@@ -27,8 +23,7 @@ let
     "clang++" = "${pkgs.llvmPackages.clang}/bin/clang++";
     gcc = "${pkgs.gcc}/bin/gcc";
     "g++" = "${pkgs.gcc}/bin/g++";
-    # The /usr/bin/cpp shim exists, but the clang wrapper provides `cpp`, not
-    # `clang-cpp`; nothing under that name resolves.
+    # The clang wrapper provides `cpp`, not `clang-cpp`, so nothing resolves.
     cpp = null;
     ld = "${pkgs.llvmPackages.lld}/bin/ld.lld";
 
@@ -64,11 +59,8 @@ let
     gperf = "${pkgs.gperf}/bin/gperf";
 
     # ── Apple/Xcode build tools ──
-    # These come from xcbuild (reimplementation) — already in apple-sdk's
-    # usr/bin/ via the xcrun symlink.  No override needed.
-    # xcrun, xcode-select, xcodebuild, actool, ibtool, PlistBuddy — handled
-    # by xcbuild.  We intentionally do NOT override these — xcbuild's
-    # implementations are purpose-built for the Nix SDK.
+    # xcbuild already provides these through the xcrun symlink, purpose-built
+    # for the Nix SDK, so there is no override here.
 
     # ── Known but NOT currently provisioned ──
     as = null; # cctools, rarely needed standalone
@@ -136,11 +128,10 @@ let
     pbxcp = null;
   };
 
-  # ── Subset of allTools for the /usr/local/bin/ symlink farm ────────
-  # Only the most commonly needed tools that GUI apps `spawn()` by name
-  # (python3, git, make) or that users commonly type in terminals.
-  # NOTE: cannot use `inherit (allTools)` here because some names contain
-  # `+` which is not a valid Nix identifier token.
+  # Subset of allTools for the /usr/local/bin/ symlink farm: what GUI apps
+  # spawn() by name, plus what people type in a terminal.
+  # Cannot use `inherit (allTools)`: some names contain `+`, which is not a
+  # valid Nix identifier.
   farmSet = {
     python3 = allTools.python3;
     pip3 = allTools.pip3;

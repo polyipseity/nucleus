@@ -1,14 +1,7 @@
 # MacBook/ai.nix — System-wide AI inference daemons on macOS.
 #
-# Provides:
-#   • Ollama — launchd system daemon (127.0.0.1:11434)
-#   • LiteLLM — launchd system daemon (127.0.0.1:4000)
-#
-# Why system daemons (launchd.daemons) instead of user agents (launchd.agents):
-# Inference servers and API gateways serve all users and should start at boot,
-# not after login.  The corresponding Home Manager module
-# (modules/ai.nix) provides the ollama CLI, OLLAMA_HOST session
-# variable, and oterm client.
+# launchd.daemons, not launchd.agents: inference servers and gateways serve
+# every user and start at boot, not at login.
 {
   config,
   lib,
@@ -45,8 +38,6 @@ let
     hostName = "MacBook";
   };
   resolveValue = name: envVars.resolveValue name "MacBook";
-  # Daemon env vars from the centralized catalog.
-  # Provides NIX_SSL_CERT_FILE (HTTPS) and NUCLEUS_HOST (host identity).
   litellmEnv = lib.filterAttrs (_name: value: value != null) {
     NIX_SSL_CERT_FILE = resolveValue "NIX_SSL_CERT_FILE";
     NUCLEUS_HOST = resolveValue "NUCLEUS_HOST";
@@ -54,11 +45,8 @@ let
     REDIS_PORT = resolveValue "REDIS_PORT";
     REDIS_USERNAME = resolveValue "REDIS_USERNAME";
   };
-  # Ollama daemon env vars: OLLAMA_* runtime tunables excluding OLLAMA_HOST.
-  # OLLAMA_HOST is excluded because the ollama server must bind to the default
-  # port (11434), not the LiteLLM proxy port (4000).  OLLAMA_HOST is set by
-  # the gui-env LaunchAgent for CLI clients that should route through the
-  # proxy.
+  # OLLAMA_HOST is left out: the server must bind the default port, not the
+  # LiteLLM proxy port. The gui-env LaunchAgent sets it for CLI clients.
   ollamaEnv =
     litellmEnv
     // lib.filterAttrs (_name: value: value != null) {
@@ -73,23 +61,16 @@ let
     scriptName = "src/scripts/services/litellm-daemon";
   };
 
-  # Centralized service registry — single source of truth for network config.
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
-  # Redis endpoint for LiteLLM consumer wiring (the Redis server itself is
-  # owned by the shared src/modules/redis.nix module).
   redisCfg = servicesJSON.redis.network.default;
 in
 {
-  # Local Redis instance for LiteLLM coordination and response caching is
-  # provided by the shared src/modules/redis.nix module (launchd.daemons."redis").
+  # The Redis server is declared by src/modules/redis.nix, not here.
 
-  # Keys without a dot become `local.<key>` in launchd; keys with a dot become
-  # `org.nixos.<key>`. Keep keys dot-free so the generated label matches
-  # `services.json` (which expects `local.litellm`/`local.ollama`).
+  # A dotted key becomes `org.nixos.<key>` in the generated label, so keep the
+  # keys dot-free to match what `services.json` expects.
   launchd.daemons."litellm" = {
     serviceConfig = {
-      # Explicit label to match services.json (which expects local.litellm).
-      # Without this, nix-darwin auto-generates org.nixos.litellm.
       Label = "local.litellm";
       # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons
       # with non-root UserName (EX_CONFIG 78). /bin/sh is Apple-signed and
@@ -104,10 +85,9 @@ in
       KeepAlive = true;
       RunAtLoad = true;
       UserName = username;
-      # launchd has no native ordering primitive, so the litellm daemon waits
-      # for the local Redis server to accept connections before starting
-      # (opt-in via LITELLM_REDIS_POLL_TICKS; set here to match the keyfile
-      # poll timeout so boot-time races with local.redis are covered).
+      # launchd has no ordering primitive, so the daemon waits for Redis to
+      # accept connections before starting. Ticks match the keyfile poll
+      # timeout, which covers the boot-time race with local.redis.
       EnvironmentVariables = litellmEnv // {
         LITELLM_REDIS_POLL_TICKS = "60";
         LITELLM_REDIS_HOST = redisCfg.host;
@@ -120,12 +100,9 @@ in
     };
   };
 
-  # Guard: if the env-secrets catalog declares AI keys but the resolved secretArgs is
-  # empty, the LiteLLM daemon would start with no API-key pairs and every
-  # `default` request fails with "Missing credentials". This happens when the
-  # catalog (src/modules/env/env-secrets.json) is out of sync with sops.secrets
-  # (e.g. a key was added to the catalog but not to system.yml). Fail fast
-  # with a clear message naming the missing secret.
+  # With no KEYFILE:ENVVAR pair the daemon starts and every `default` request
+  # fails with "Missing credentials", which happens when the catalog and
+  # sops.secrets disagree. Fail fast naming the missing secret.
   assertions = [
     {
       assertion =
@@ -144,7 +121,6 @@ in
 
   launchd.daemons."ollama" = {
     serviceConfig = {
-      # Explicit label to match services.json (which expects local.ollama).
       Label = "local.ollama";
       # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons
       # with non-root UserName (EX_CONFIG 78). /bin/sh is Apple-signed and
@@ -157,10 +133,6 @@ in
       KeepAlive = true;
       RunAtLoad = true;
       UserName = username;
-      # Source: src/modules/lib/env-secrets.nix (OLLAMA_* entries).
-      # The catalog is the canonical list for these values.  OLLAMA_HOST
-      # is excluded so the daemon binds to the default port (11434).  OLLAMA_HOST
-      # is set by the gui-env LaunchAgent for CLI clients.
       EnvironmentVariables = ollamaEnv;
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/ollama/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/ollama/stderr.log";

@@ -1,11 +1,8 @@
 # Decrypts SOPS-encrypted wallpaper blobs from src/users/<user>/wallpapers/encrypted/
 # (first-level overlay merge with src/users/default/wallpapers/encrypted/) into
-# ~/Pictures/wallpapers/ with a 10-minute rotating slideshow on macOS
-# (desktoppr folder mode) and GNOME (wallpaper-gallery.xml).
-# Activation runs after gpg-import so the keyring import has already
-# happened before wallpaper decryption attempts.
-# Multi-user aware: discovers managed users from users-registry, uses
-# config.home.username for current-user wallpaper provisioning.
+# ~/Pictures/wallpapers/, with a 10-minute rotating slideshow on macOS
+# (desktoppr folder mode) and GNOME (wallpaper-gallery.xml). Activation runs
+# after gpg-import so the keyring is in place before decryption.
 {
   config,
   lib,
@@ -23,13 +20,11 @@ let
 
   managedUserNames = builtins.attrNames users;
 
-  # Convert a wallpaper filename into a stable secret key suffix so sops-nix
-  # keys remain path-safe while still being traceable to the source file.
+  # Path-safe but traceable to the source file.
   sanitizeSecretSuffix =
     value: lib.replaceStrings [ " " "(" ")" "." "-" ] [ "_" "" "" "_" "_" ] value;
 
-  # Build normalized wallpaper item metadata for a user once so secret
-  # generation and activation wiring share the same source of truth.
+  # Shared by secret generation and activation wiring.
   mkWallpaperItemsForUser =
     userName:
     map (
@@ -75,14 +70,13 @@ let
   currentUsername = config.home.username;
   currentUserHome = config.home.homeDirectory;
 
-  # Items list for the activation script - use current user's merged overlay.
+  # For the current user's merged overlay.
   wallpaperItemsForCurrentUser = mkWallpaperItemsForUser currentUsername;
 
   hasEncryptedWallpapers = (wallpaperPaths.listEncryptedWallpaperBlobs currentUsername) != [ ];
   hasUnencryptedWallpapers = (wallpaperPaths.listUnencryptedWallpaperFiles currentUsername) != [ ];
 
-  # desktoppr is darwin-only; keep this reference lazy so Linux evaluation
-  # does not attempt to instantiate an unsupported package.
+  # Lazy so Linux evaluation never instantiates the darwin-only package.
   desktopprBinPath =
     if pkgs.stdenv.hostPlatform.isDarwin then "${pkgs.desktoppr}/bin/desktoppr" else "";
 

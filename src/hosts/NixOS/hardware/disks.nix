@@ -1,14 +1,12 @@
 # hosts/NixOS/hardware/disks.nix — Disk-related hardware defaults for CI-safe evaluation.
 #
-# This host profile is a template until real hardware-configuration.nix values
-# are merged. NixOS requires a root filesystem and bootloader device during
-# evaluation; mkDefault placeholders keep flake checks green while allowing
-# real machine values to override these defaults later.
+# Template until real hardware-configuration.nix values are merged. NixOS needs a
+# root filesystem and a bootloader device during evaluation, so mkDefault
+# placeholders keep flake checks green while a real machine overrides them.
 #
-# First install: partition with Btrfs, create subvolumes @ (root) and @nix
-# (/nix), mount @ at /mnt and @nix at /mnt/nix, then nixos-install. Run
-# nixos-generate-config after install and merge host-specific facts (UUIDs,
-# EFI /boot, swap, bootloader device paths) into this file. See MANUAL.md.
+# First install: partition with Btrfs, create @ (root) and @nix (/nix), mount @
+# at /mnt and @nix at /mnt/nix, then nixos-install. Run nixos-generate-config
+# after install and merge UUIDs, EFI /boot, swap, and bootloader paths here.
 { lib, ... }:
 let
   btrfsOptions = import ../btrfs-options.nix { };
@@ -27,7 +25,7 @@ in
     neededForBoot = true;
   };
 
-  # Uncomment and set device after install when merging hardware-configuration.nix:
+  # Uncomment and set after merging hardware-configuration.nix:
   # fileSystems."/boot" = lib.mkDefault {
   #   device = "/dev/disk/by-partlabel/EFI";
   #   fsType = "vfat";

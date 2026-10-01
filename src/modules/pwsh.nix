@@ -28,17 +28,15 @@ let
 
   agentEnv = import ./shell/agent-env-vars.nix;
 
-  # Catalog entries keyed to a single host resolve to null elsewhere; the
-  # PowerShell block that consumes such a token guards on the empty string and
-  # stays inert on hosts that get the value from their session environment.
+  # A single-host key resolves to null on other hosts, so the consumer guards on
+  # the empty string and stays inert there.
   optionalEnv = value: if value == null then "" else value;
 
   lockfile = builtins.fromJSON (builtins.readFile ../lockfiles/lockfile.json);
 
-  # A psgallery pin is either a version string or a {version, hash} object — that
-  # union is the schema's contract, not a fallback. A missing pin throws rather
-  # than defaulting, so a renamed or removed module cannot silently install an
-  # empty version spec.
+  # A pin is a version string or a {version, hash} object, which is the schema's
+  # contract rather than a fallback. A missing pin throws, so a renamed module
+  # cannot install an empty spec.
   psgalleryVersion =
     module:
     let
@@ -78,8 +76,7 @@ let
         (envVars.resolveValue "LD" envVars.currentHost)
         (optionalEnv (envVars.resolveValue "SSH_AUTH_SOCK" envVars.currentHost))
         "${managedPaths.defaultDevTools}"
-        # macOS system tool: the SSH agent block runs only where the macOS
-        # gpg-agent socket exists, and /usr/bin is always on PATH there.
+        # macOS only: the SSH agent block needs the gpg-agent socket there.
         "/usr/bin/tty"
         "${pkgs.gnupg}/bin/gpg-connect-agent"
         (lib.concatStringsSep " " agentEnv.agentEnvVarNames)
@@ -89,15 +86,14 @@ let
         ""
       ]
       (builtins.readFile ../scripts/shell/init.ps1 + builtins.readFile ../scripts/shell/profile.ps1)
-  # PSScriptAnalyzerSettings.psd1 — Method 3 (consumed by src/scripts/checks/check-pwsh.ps1 at CI time via -Settings); refer to scripts/check-PSScriptAnalyzerSettings.psd1 and scripts/test-PSScriptAnalyzerSettings.psd1.
+  # A reference copy for Invoke-ScriptAnalyzer -Settings. PSSA does not
+  # auto-discover this path, only a settings file beside the analyzed file.
   ;
 
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
 {
-  # Place the PowerShell profile at the CurrentUserCurrentHost location for
-  # interactive pwsh sessions.  On macOS and Linux, pwsh reads this path from
-  # $PROFILE.CurrentUserCurrentHost at startup.
+  # CurrentUserCurrentHost, where pwsh looks for the profile.
   home.file.".config/powershell/Microsoft.PowerShell_profile.ps1".text = profileContent;
 
   # Provisioned PSScriptAnalyzer settings file: Severity filter and ExcludeRules.
@@ -107,11 +103,9 @@ in
   # The CI copies consumed by src/scripts/checks/check-pwsh.ps1 live at
   # scripts/check-PSScriptAnalyzerSettings.psd1 and
   # scripts/test-PSScriptAnalyzerSettings.psd1 (Method 3).
-  # ~/.config/powershell/PSScriptAnalyzerSettings.psd1 as a method-1 (writable) symlink to
-  # the selected repo file, created at activation time against the LIVE repo root so repo
-  # changes take effect without rebuild. The writable/immutable decision is owned by
-  # managedSymlinkPaths; this entry must run before protect-out-of-store-symlinks so the
-  # link is hardened if immutable.
+  # Written against the live repo root so repo changes take effect without a
+  # rebuild. Must run before protect-out-of-store-symlinks so the link gets
+  # hardened; the writable/immutable decision is owned by managedSymlinkPaths.
   # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
   home.activation.seed-pwsh-psscriptanalyzer-settings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
@@ -119,10 +113,8 @@ in
       "${overlay.toRepoRelPath (overlay.selectFile "pwsh" "PSScriptAnalyzerSettings.psd1")}" \
   '';
 
-  # Install Pester for Windows Pester test suites if pwsh is available.
-  # This enables Invoke-Pester in src/scripts/tests/test-steps/06-windows-pester.ps1.
-  # Runtime module install stays imperative: tests clean up module state after
-  # each run for isolation, and a declarative Nix store path is read-only.
+  # Stays imperative: the suite resets module state between runs for isolation
+  # and a store path is read-only.
   home.activation.install-pwsh-pester = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     "${activationBundle}/src/scripts/packages/install-pwsh-module.sh" \
       "${pkgs.powershell}/bin/pwsh" \
@@ -130,8 +122,7 @@ in
       "${pwshPesterVersion}"
   '';
 
-  # Install PSScriptAnalyzer for PowerShell linting if pwsh is available.
-  # This enables the lint phase in src/scripts/checks/check-pwsh.ps1.
+  # Needed by Invoke-ScriptAnalyzer in src/scripts/checks/check-pwsh.ps1.
   home.activation.install-pwsh-script-analyzer = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     "${activationBundle}/src/scripts/packages/install-pwsh-module.sh" \
       "${pkgs.powershell}/bin/pwsh" \
@@ -139,8 +130,7 @@ in
       "${pwshAnalyzerVersion}"
   '';
 
-  # Install powershell-yaml for locked DSC validation if pwsh is available.
-  # This enables the locked DSC validation phase in scripts/check.ps1.
+  # Needed by the locked DSC validation phase in scripts/check.ps1.
   home.activation.install-pwsh-yaml = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     "${activationBundle}/src/scripts/packages/install-pwsh-module.sh" \
       "${pkgs.powershell}/bin/pwsh" \

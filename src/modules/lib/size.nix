@@ -1,13 +1,13 @@
-# Size string parsing shared by VM provisioning.  src/scripts/lib/size.sh and
+# Size string parsing shared by VM provisioning. src/scripts/lib/size.sh and
 # src/platforms/Windows/modules/SizeStrings.ps1 implement the IDENTICAL grammar;
 # keep all three in sync (see test_size_grammar_parity_across_implementations).
 #
 # Grammar: ^([0-9]+) ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$
 #   - Decimal prefixes (kB/MB/GB/TB) multiply by powers of 10.
 #   - Binary prefixes (kiB/MiB/GiB/TiB) multiply by powers of 2.
-#   - A single optional space between the number and the prefix is allowed.
-#   - The grammar is case-sensitive: KB, KiB and lowercase prefixes are invalid.
-# Invalid strings abort evaluation with an error (never coerce to a value).
+#   - One optional space between number and prefix is allowed.
+#   - Case-sensitive: KB, KiB and lowercase prefixes are invalid.
+# Invalid strings abort evaluation rather than coercing to a value.
 let
   factors = {
     kB = 1000;
@@ -22,7 +22,7 @@ let
   grammar = "^([0-9]+) ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$";
 in
 {
-  # parse SIZE_STRING — exact byte count, or an evaluation error when invalid.
+  # Exact byte count, or an evaluation error when invalid.
   parse =
     input:
     let
@@ -33,7 +33,7 @@ in
     else
       builtins.fromJSON (builtins.elemAt m 0) * factors.${builtins.elemAt m 1};
 
-  # ceilMib BYTES — round UP to whole MiB so allocated guest memory never
-  # under-allocates the declared size (UTM and the QEMU -m flag use MiB).
+  # Rounds UP to whole MiB so guest memory never under-allocates the declared
+  # size (UTM and the QEMU -m flag take MiB).
   ceilMib = bytes: (bytes + 1048576 - 1) / 1048576;
 }
