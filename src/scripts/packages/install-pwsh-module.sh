@@ -84,9 +84,10 @@ if (Get-Module -Name \$moduleName) {
   if (Test-Path -LiteralPath \$base) { throw ('install-pwsh-module: ' + \$base + ' survived the removal of ' + \$moduleName + ' ' + \$version) }
 }
 '@
-  # WHY the first entry of PSModulePath: PowerShellGet installs CurrentUser scope
-  #   there, which leads the list on the hosts this script runs on. The Windows
-  #   twin reads the last entry, because Windows PowerShell 5 appends it there.
+  # WHY the first entry of PSModulePath: the CurrentUser install directory on
+  #   non-Windows is \$HOME/.local/share/powershell/Modules, and pwsh puts the PS7
+  #   user path first on the hosts this script runs on. The Windows twin resolves
+  #   the same value from the Documents folder rather than from this variable.
   \$currentUserModulePath = @(\$env:PSModulePath -split [IO.Path]::PathSeparator | Where-Object { \$_ })[0]
   \$available = @(Get-Module -ListAvailable -Name \$moduleName)
   # WHY the converged copy is the pin under that path: Get-Module -ListAvailable
