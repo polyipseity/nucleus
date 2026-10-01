@@ -63,12 +63,12 @@ PowerSession.exe convert <file>.cast <file>.txt
 The conversion:
 
 1. Strips all ANSI escape codes (colors, cursor movements, bold/italic formatting).
-2. Resolves screen overwrites via the embedded `avt` (abstract virtual terminal) library — text that was displayed and then overwritten is removed from the output.
+2. Resolves screen overwrites via the embedded `avt` (abstract virtual terminal) library: text that was displayed and then overwritten is removed from the output.
 3. Produces a chronological plain-text log of the visible terminal state.
 
 ### Important: final state only
 
-`asciinema convert txt` renders only the **final visible screen state** — the encoder calls `feed_str()` for every event but `flush()` once at the end, discarding intermediate frames. No `--fps` or equivalent exists on `asciinema convert` or `play`.
+`asciinema convert txt` renders only the **final visible screen state**: the encoder calls `feed_str()` for every event but `flush()` once at the end, discarding intermediate frames. No `--fps` or equivalent exists on `asciinema convert` or `play`.
 
 ## Frame-by-frame extraction
 
@@ -80,7 +80,7 @@ When you need the individual screen states over time (e.g., for animating a prog
 | ---- | ------ | -------------------- | ----- |
 | Python `pyte` script (below) | Plain text | Yes (real terminal emulator) | `pip install pyte`; pure Python VT100 emulator, handles cursor moves, clears, scrolls |
 | Node.js `@xterm/headless` script (below) | Plain text | Yes (real terminal emulator) | `npm install @xterm/headless`; official xterm.js headless, full xterm compatibility |
-| Everything else (`asciinema convert txt`, `agg`, `svg-term-cli`, `asciicast-to-svg`, etc.) | Image / final-only text | No | No existing CLI outputs frame-by-frame text — the scripts below fill this gap |
+| Everything else (`asciinema convert txt`, `agg`, `svg-term-cli`, `asciicast-to-svg`, etc.) | Image / final-only text | No | No existing CLI outputs frame-by-frame text, so the scripts below fill this gap |
 
 ### What actually works
 
@@ -257,10 +257,10 @@ processAsciicast('input.cast', 'ai_ready_timeline.md');
 
 #### Other approaches (less practical)
 
-- **svg-term-cli --at**: renders frames as SVG; brittle to scrape `<text>` elements from — multi-line output is lossy.
+- **svg-term-cli --at**: renders frames as SVG; brittle to scrape `<text>` elements from, so multi-line output is lossy.
 - **avt Rust library**: the canonical frame loop (`Vt::builder()` → `feed_str()` → `Snapshot::from_vt()` → `same_visual()` dedup) but requires a custom Rust program; no prebuilt CLI exposes it.
 - **asciicast-to-svg .text()**: npm package with a `.text()` method returning raw terminal text, but stepping all frames needs manual `stdout` event iteration.
-- **Headless browser + asciinema player**: seek via JS API and extract DOM text — works but heavy overhead (Puppeteer/Playwright).
+- **Headless browser + asciinema player**: seek via JS API and extract DOM text. Works but heavy overhead (Puppeteer/Playwright).
 
 ### asciicast v3 format primer
 

@@ -75,6 +75,6 @@ Analyze session patterns to suggest agent setup improvements.
 
 ## SQL idioms
 
-- Date math: `datetime('now', '-1 day')` — NOT `now() - INTERVAL '1 day'` (this is SQLite, not PostgreSQL).
+- Date math: `datetime('now', '-1 day')`, NOT `now() - INTERVAL '1 day'` (this is SQLite, not PostgreSQL).
 - FTS5 text search: `SELECT * FROM search_index WHERE content MATCH 'search terms'`.
 - Only read-only queries: `SELECT` and `WITH` only (the tool enforces this).

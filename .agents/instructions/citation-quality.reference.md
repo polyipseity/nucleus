@@ -1,5 +1,5 @@
 ---
-description: "Reference: citation quality rules — source preference, URL standardization, deprecation hygiene, and citation style in code/config. Read on demand when citing external sources in code comments or documentation."
+description: "Reference: citation quality rules: source preference, URL standardization, deprecation hygiene, and citation style in code/config. Read on demand when citing external sources in code comments or documentation."
 name: "Citation Quality Reference"
 ---
 

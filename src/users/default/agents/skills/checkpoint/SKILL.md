@@ -3,7 +3,7 @@ name: checkpoint
 version: 1.0.0
 description: |
   Save session state for context compaction survival. Called automatically
-  during plan and implement-plan workflows at natural break points — after
+  during plan and implement-plan workflows at natural break points, after
   each phase, before subagent calls, and at context pressure.
 ---
 
@@ -29,7 +29,7 @@ Each checkpoint captures:
 
 ## How to save
 
-> **Memory tool availability:** If the `memory` tool is not in the available tool list, call `activate_vs_code_interaction` with no arguments first — it is a one-shot call that permanently unlocks VS Code interaction tools.
+> **Memory tool availability:** If the `memory` tool is not in the available tool list, call `activate_vs_code_interaction` with no arguments first. It is a one-shot call that permanently unlocks VS Code interaction tools.
 
 1. Run `date -u +%Y-%m-%dT%H%M%S` for ISO timestamp.
 2. Construct path `/memories/session/checkpoint-<datetime>.md`.

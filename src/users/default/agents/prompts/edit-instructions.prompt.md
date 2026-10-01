@@ -1,6 +1,6 @@
 ---
 name: edit-instructions
-description: "Use when editing .instructions.md files — guides placement decisions for new guidance (inline vs new bullet vs new section vs new file)."
+description: "Use when editing .instructions.md files: guides placement decisions for new guidance (inline vs new bullet vs new section vs new file)."
 disable-model-invocation: true
 argument-hint: "target instruction file path"
 ---

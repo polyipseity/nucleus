@@ -9,7 +9,7 @@
 | `flake.nix` / `flake.lock` | Flake entry, packages, `nix run` apps, host configurations |
 | `hosts/` | Per-host modules and apply entrypoints |
 | `modules/` | Shared Nix logic imported by hosts |
-| `users/` | Per-user overlays — see [users/README.md](users/README.md) |
+| `users/` | Per-user overlays, see [users/README.md](users/README.md) |
 | `scripts/` | Activation and service scripts (not the repo-root `scripts/` CLI folder) |
 | `secrets/` | Repo-level SOPS YAML |
 | `vms/` | VM templates and per-platform artifact dirs |
@@ -40,7 +40,7 @@ Policy and invariants: `AGENTS.md` and `.agents/instructions/`.
 
 ## Directory roots
 
-Nucleus owns at most **two native roots per host** — one USER root and one SYSTEM root, both fully native per-OS — plus a `~/.nucleus` convenience hub (Windows: `%USERPROFILE%\.nucleus`) for every user. User-intended dirs (`clouds`, `dev`, `virtual machines`, `Pictures/wallpapers`, `Downloads`) are excluded and stay as-is.
+Nucleus owns at most **two native roots per host**: one USER root and one SYSTEM root, both fully native per-OS — plus a `~/.nucleus` convenience hub (Windows: `%USERPROFILE%\.nucleus`) for every user. User-intended dirs (`clouds`, `dev`, `virtual machines`, `Pictures/wallpapers`, `Downloads`) are excluded and stay as is.
 
 **Hard rule: nucleus code references only root paths** (`<root>/logs`, `<root>/state`, `<root>/config`, `<root>/run`, `<root>/caddy`). The physical conventional locations (`/var/log/nucleus`, `~/Library/Logs/nucleus`, `/run/nucleus`, `~/.local/state/nucleus`, …) are reached only via root→conventional symlinks created by activation (and by systemd `StateDirectory`/`LogsDirectory`/`RuntimeDirectory`). They must never appear in service runtime code. Symlink direction is fixed: `~/.nucleus` → roots, and roots → conventional targets. Never reversed. `~/.nucleus` is never a data root and is never written to by services.
 
@@ -66,8 +66,8 @@ NixOS
 Windows
   %USERPROFILE%\.nucleus\user    -> %LOCALAPPDATA%\nucleus
   %USERPROFILE%\.nucleus\system  -> %ProgramData%\nucleus
-  %LOCALAPPDATA%\nucleus\         (USER root — LocalAppData is already conventional)
-  %ProgramData%\nucleus\          (SYSTEM root — ProgramData is already conventional)
+  %LOCALAPPDATA%\nucleus\         (USER root: LocalAppData is already conventional)
+  %ProgramData%\nucleus\          (SYSTEM root: ProgramData is already conventional)
 ```
 
 Accepted exceptions (not nucleus roots, left unchanged): `/usr/local/*` (impure Homebrew/macFUSE/battery), `/nix` (OS `synthetic.conf`), `%USERPROFILE%\.agents` (standard agent-tool location), `/run/secrets` (sops-nix default), `C:\ProgramData\ssh` (OS-owned), scheduled-task registry/HKLM/HKCU env vars, and `/etc/nucleus/bin` (nvim two-mechanism path).
