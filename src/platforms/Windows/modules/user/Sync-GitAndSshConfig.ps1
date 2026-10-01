@@ -4,45 +4,21 @@ function Sync-GitAndSshConfig {
     Converges Git + SSH user configuration for all managed Windows users.
 
   .DESCRIPTION
-    Applies a managed Git baseline and an SSH host block for GitHub for every
-    user in $Users:
-      - system scope: <Git install>\etc\gitconfig symlinked to the repo's
-        <Host>.gitconfig (installer shipped defaults only: core.fscache,
-        credential.helper, http.sslBackend; mirrors the POSIX /etc/gitconfig
-        symlink), with a same-folder .bak backup of any installer-owned
-        original and restore on disable
-      - per-user: commit.gpgsign=true, tag.gpgsign=true, core.symlinks=true,
-        core.autocrlf=true (Windows checkouts stay CRLF on disk and LF in the
-        repo), fetch.prune=true, fetch.pruneTags=false, pull.ff=true,
-        pull.rebase=false, push.followTags=true, push.autoSetupRemote=true,
-        gpg.format=openpgp, init.defaultBranch, init.templateDir,
-        core.excludesFile, url.git@github.com:.insteadOf=https://github.com/,
-        user.useConfigOnly
-      - user.name / user.email / user.signingkey (from SOPS-managed identity)
-      - ~/.ssh/config managed block for Host github.com (per-user key path)
-      - ssh-agent service startup set to Automatic (for session persistence)
+    Applies a managed Git baseline and an SSH host block for GitHub per user in
+    $Users: a system-scope <Git install>\etc\gitconfig symlinked to the repo's
+    <Host>.gitconfig (mirroring the POSIX /etc/gitconfig symlink), a per-user
+    .gitconfig and ignore symlinked the same way, identity in the [include] file,
+    and ~/.ssh/config managed for Host github.com.
 
-    When -Enabled:$false is passed, the system-scope symlink is removed (and the
-    .bak original restored if present), and managed Git keys and the SSH block
-    are removed. Unmanaged settings remain untouched.
+    -Enabled:$false removes the managed symlinks and restores a .bak original
+    when one exists. Unmanaged settings stay untouched.
 
   .PARAMETER Enabled
-    Whether managed Git/SSH parity should be enforced. False triggers cleanup.
-
-  .PARAMETER Users
-    List of usernames for which managed Git/SSH state is applied.
-
-  .EXAMPLE
-    Sync-GitAndSshConfig -Enabled:$true -Users @('admin', 'guest')
-
-  .EXAMPLE
-    Sync-GitAndSshConfig -Enabled:$false -Users @('admin', 'guest')
+    False triggers cleanup instead of convergence.
 
   .NOTES
-    Environment variables: SystemDrive — used to resolve each user's profile
-      directory for per-user Git and SSH configuration. NUCLEUS_HOST — the
-      canonical hostname ("Windows") that selects the per-host config files.
-    Exit codes: 0 on success; non-zero on failure
+    Environment variables: SystemDrive resolves each user profile directory;
+    NUCLEUS_HOST selects the per-host config files.
   #>
   param(
     [Parameter()]
@@ -52,17 +28,13 @@ function Sync-GitAndSshConfig {
     [string[]]$Users
   )
 
-  # Per-host config filenames (<Host>.gitconfig/.gitignore) mirror POSIX git.nix
-  # hostName threading; NUCLEUS_HOST is set by apply.ps1 and hard-fails here
-  # instead of guessing.
-  # WHY: no fallback -- a missing hostname would silently target the wrong repo file.
+  # WHY no fallback: a missing NUCLEUS_HOST would silently target the wrong repo file.
   $hostName = $env:NUCLEUS_HOST
   if ([string]::IsNullOrWhiteSpace($hostName)) {
     throw 'Sync-GitAndSshConfig: NUCLEUS_HOST must be set (apply.ps1 sets it to the canonical hostname).'
   }
 
   foreach ($User in $Users) {
-    # Resolve the target profile path explicitly from the managed username.
     # check-suppress:suppression_doc: a user-scoped write via the --global flag targets the current process user, so
     # we need deterministic per-user paths to converge each managed profile.
     $userHome = Join-Path -Path $env:SystemDrive -ChildPath "Users\$User"
@@ -77,8 +49,7 @@ function Sync-GitAndSshConfig {
     $userGitConfigDir = Join-Path -Path $userHome -ChildPath '.config\git'
     # check-suppress:config-method: method 1 (writable symlink) -- per-user ignore file symlinked to the repo's <Host>.gitignore (git has no global-scoped ignore; core.excludesFile at user scope is the only mechanism).
     $userIgnorePath = Join-Path -Path $userGitConfigDir -ChildPath 'ignore'
-    # Identity include file referenced by [include] path in <Host>.gitconfig;
-    # writable by this provisioner without touching the symlinked config.
+    # Identity include file referenced by [include] path in <Host>.gitconfig.
     $identityConfigPath = Join-Path -Path $userGitConfigDir -ChildPath 'identity'
     $identityKv = @{}
     $hasCompleteIdentity = $false
@@ -125,10 +96,9 @@ function Sync-GitAndSshConfig {
       $existingSshLines = @(Get-Content -Path $sshConfigPath)
     }
 
-    # Find the Host github.com section by parsing SSH config structure.
-    # A section starts at a `Host <pattern>` line and spans contiguous lines
-    # until the next `Host` directive or EOF. We replace its directives while
-    # preserving the Host line itself.
+    # WHY parse the section: a section spans from its `Host` line to the next
+    # `Host` directive or EOF, and blank lines belong to the separator, not the
+    # body.
     $githubSectionStart = -1
     $githubSectionEnd = -1
     for ($i = 0; $i -lt $existingSshLines.Count; $i++) {
@@ -141,8 +111,7 @@ function Sync-GitAndSshConfig {
           if ($existingSshLines[$j] -match '^\s*Host\s+') {
             break
           }
-          # Skip blank lines before the section end (trailing blank lines belong
-          # to the section separator, not the section body).
+          # Blank lines before the section end belong to the separator.
           if ([string]::IsNullOrWhiteSpace($existingSshLines[$j])) {
             continue
           }
@@ -155,11 +124,10 @@ function Sync-GitAndSshConfig {
     $outputSshLines = @()
     if ($Enabled) {
       if ($githubSectionStart -ge 0) {
-        # Replace the found section: keep lines before, inject managed block, skip old body.
+        # Replace the section: keep the lines before it, inject the managed block, drop the old body.
         for ($i = 0; $i -lt $githubSectionStart; $i++) {
           $outputSshLines += $existingSshLines[$i]
         }
-        # Remove trailing blank lines from preceding section for clean output.
         while ($outputSshLines.Count -gt 0 -and [string]::IsNullOrWhiteSpace($outputSshLines[-1])) {
           $outputSshLines = $outputSshLines[0..($outputSshLines.Count - 2)]
         }
@@ -167,22 +135,18 @@ function Sync-GitAndSshConfig {
           $outputSshLines += ''
         }
         $outputSshLines += $desiredSshBlock
-        # Append all lines after the old section end.
         for ($i = $githubSectionEnd; $i -lt $existingSshLines.Count; $i++) {
           $outputSshLines += $existingSshLines[$i]
         }
       }
       else {
-        # No existing Host github.com — append managed block at end.
         $outputSshLines = @($existingSshLines)
-        # Ensure leading blank line separator.
         if ($outputSshLines.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace($outputSshLines[-1])) {
           $outputSshLines += ''
         }
         $outputSshLines += $desiredSshBlock
       }
 
-      # Validate that all required directives are present in the deployed block.
       $requiredDirectives = @('HostName', 'IdentityFile', 'AddKeysToAgent')
       $deployedText = $outputSshLines -join "`n"
       foreach ($directive in $requiredDirectives) {
@@ -192,7 +156,6 @@ function Sync-GitAndSshConfig {
       }
     }
     else {
-      # Disabled: remove the managed Host github.com section if present.
       if ($githubSectionStart -ge 0) {
         for ($i = 0; $i -lt $githubSectionStart; $i++) {
           $outputSshLines += $existingSshLines[$i]
@@ -200,7 +163,6 @@ function Sync-GitAndSshConfig {
         for ($i = $githubSectionEnd; $i -lt $existingSshLines.Count; $i++) {
           $outputSshLines += $existingSshLines[$i]
         }
-        # Clean up any doubled blank lines from the removal.
         $cleaned = @()
         $prevBlank = $false
         foreach ($line in $outputSshLines) {
@@ -216,7 +178,6 @@ function Sync-GitAndSshConfig {
       }
     }
 
-    # Write SSH config, removing file if no content remains.
     $hasNonWhitespaceLines = ($outputSshLines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0
     if ($hasNonWhitespaceLines) {
       [System.IO.File]::WriteAllLines($sshConfigPath, $outputSshLines, [System.Text.UTF8Encoding]::new($false))
@@ -249,17 +210,16 @@ function Sync-GitAndSshConfig {
       Save-RegularFileBackup -Path $userIgnorePath -BackupPath "$userIgnorePath.bak"
       New-Item -ItemType SymbolicLink -Path $userIgnorePath -Target $ignoreSource -Force > $null
 
-      # Create an empty template directory so `init.templateDir` points at an
-      # existing (but empty) directory, suppressing the sample hooks and legacy
-      # description file that Git otherwise copies into every new .git.
+      # WHY the empty template dir: init.templateDir pointing at an existing empty
+      # directory suppresses the sample hooks Git otherwise copies into every
+      # new .git.
       $emptyTemplateDir = Join-Path -Path $userGitConfigDir -ChildPath 'empty_template'
       if (-not (Test-Path -Path $emptyTemplateDir)) {
         New-Item -ItemType Directory -Path $emptyTemplateDir -Force > $null
       }
 
-      # Per-user identity lives in the include file referenced by [include] path
-      # in <Host>.gitconfig; the symlinked .gitconfig is never written.  The
-      # include file is also writable when the config itself is read-only.
+      # WHY the include file: the symlinked .gitconfig is never written, so identity
+      # keys go to the file [include] names.
       if ($hasCompleteIdentity) {
         foreach ($identitySetting in @('user.name', 'user.email', 'user.signingkey')) {
           & $gitExecutable config --file $identityConfigPath $identitySetting $identityKv[$identitySetting.Substring(5)]
@@ -273,9 +233,8 @@ function Sync-GitAndSshConfig {
       }
     }
     else {
-      # Disabled: remove the user-scope symlinks and restore any backed-up
-      # originals.  A missing .bak simply means the path was managed; nothing to
-      # restore.  The identity include file is managed state and is removed.
+      # Disabled: remove the user-scope symlinks and restore any backed-up originals.
+      # A missing .bak means the path was managed, nothing to restore.
       foreach ($managedPath in @($userGitConfigPath, $userIgnorePath)) {
         Restore-FileBackup -Path $managedPath -BackupPath "$managedPath.bak"
       }
@@ -311,9 +270,8 @@ function Sync-GitAndSshConfig {
       New-Item -ItemType SymbolicLink -Path $systemConfigPath -Target $managedSource -Force > $null
     }
     else {
-      # WHY: only a managed symlink is removed; a regular file here is unmanaged
-      # state (e.g. a newer installer-owned file) and must not be deleted over a
-      # stale .bak.
+      # WHY restore rather than delete: only a managed symlink is removed, and a
+      # regular file here is unmanaged state (e.g. a newer installer-owned file).
       Restore-FileBackup -Path $systemConfigPath -BackupPath $systemConfigBackup
     }
   }
@@ -330,21 +288,17 @@ function Sync-GitAndSshConfig {
   }
 }
 
-# Backup/restore of unmanaged originals displaced by managed symlinks.  Extracted
-# from Sync-GitAndSshConfig so the backup-once (first original wins) and
-# lossless-restore semantics are unit-testable; see
-# tests/hosts/Windows/configuration/git-config-helpers.Tests.ps1.
+# WHY extracted: backup-once and lossless restore are unit-tested separately,
+# see tests/hosts/Windows/configuration/git-config-helpers.Tests.ps1.
 
 function Save-RegularFileBackup {
   <#
   .SYNOPSIS
     Moves a regular file at $Path to $BackupPath before a managed symlink replaces it.
   .DESCRIPTION
-    When a regular file occupies $Path and no backup exists yet, it is moved to
-    $BackupPath so disabling can restore it (backup-once: the first original
-    wins; a stale .bak is never overwritten and the current file stays for the
-    symlink to replace, matching POSIX `ln -sf`).  A symlink at $Path is
-    managed state and is left untouched.
+    Backup-once: the first original wins, a stale .bak is never overwritten, and
+    the current file stays for the symlink to replace, matching POSIX `ln -sf`.
+    A symlink at $Path is managed state and is left untouched.
   #>
   param(
     [Parameter(Mandatory = $true)]
@@ -366,11 +320,9 @@ function Restore-FileBackup {
   .SYNOPSIS
     Removes a managed symlink at $Path and restores $BackupPath when present.
   .DESCRIPTION
-    A symlink at $Path is managed state and is removed.  If $Path is then
-    absent and $BackupPath exists, $BackupPath is moved back to $Path (lossless
-    restore of the unmanaged original).  A missing backup means no pre-existing
-    original; nothing is restored.  A regular file at $Path is unmanaged state
-    (e.g. a newer installer-owned file) and is left untouched.
+    A managed symlink at $Path is removed, then $BackupPath moves back when it
+    exists (lossless restore of the unmanaged original). A missing backup means
+    no pre-existing original; a regular file at $Path is unmanaged state.
   #>
   param(
     [Parameter(Mandatory = $true)]

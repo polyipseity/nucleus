@@ -3,20 +3,12 @@
     Post-apply secret health check for SOPS file recipient verification.
 
 .DESCRIPTION
-    Mirrors the POSIX verify-secret-decryption Home Manager activation in secrets.nix.
-    Verifies that all SOPS files have the correct recipients registered and that
-    managed secret artefacts are present on disk.  The SOPS recipient checks read
-    unencrypted metadata rather than performing live decryption, but a managed
-    private SSH key is probed directly for validity, so an unparsable key fails
-    here exactly as it does on the POSIX host.
+    Mirrors the POSIX verify-secret-decryption activation in secrets.nix. SOPS
+    recipient checks read unencrypted metadata, but a managed private SSH key is
+    probed directly, so an unparsable key fails here as it does on POSIX.
 
     ConvertFrom-SshEd25519PublicKeyToAgePubKey is provided by
-    convert-sshpublickeytoage.ps1, which apply.ps1 dot-sources before this file
-    (alphabetical order so 'c' < 'i').
-
-.NOTES
-    Environment variables: (none)
-    Exit codes: N/A — library script; functions use throw on failure.
+    convert-sshpublickeytoage.ps1, which apply.ps1 dot-sources before this file.
 #>
 
 function Test-ManagedSshPrivateKey {
@@ -25,46 +17,34 @@ function Test-ManagedSshPrivateKey {
     Probe one managed SSH private key for validity.
 
   .DESCRIPTION
-    A file that exists is not a key that works.  An unparsable private key makes ssh
-    report "invalid format" and fall back to no authentication, and a running agent
-    hides that by answering first.
+    A file that exists is not a key that works: an unparsable private key makes
+    ssh report "invalid format" and fall back to no authentication, and a running
+    agent hides that by answering first.
 
-    Validity means OpenSSH can read the file as a private key, and a
-    passphrase-protected key is valid.  ssh-keygen -l reads the cleartext public-key
-    blob out of the openssh-key-v1 container, so it succeeds with or without a
-    passphrase, never prompts, and never reads stdin.
+    Validity means OpenSSH can read the file, and a passphrase-protected key is
+    valid. ssh-keygen -l reads the cleartext public-key blob out of the
+    openssh-key-v1 container, so it succeeds with or without a passphrase, never
+    prompts, and never reads stdin. -l also accepts a bare .pub file, so the
+    header check is what separates a private key from a public one.
 
-    -l also accepts a bare .pub public key file, so the first line is required to
-    carry a private-key PEM header.  The two checks together are what separates a
-    private key from a public one; either alone would let the wrong file through.
+    The probe runs through a symlink under a private temp directory: given the
+    managed key path, -l prefers the sibling <key>.pub and reports THAT key's
+    fingerprint without opening the private key. The symlink has no sibling to be
+    picked up and never copies key material.
 
-    The probe runs through a symlink under a private temp directory.  Given the
-    managed key path itself, -l prefers the sibling <key>.pub and reports THAT
-    key's fingerprint without opening the private key, which would turn this into
-    a check that passes a corrupt private key.  The symlink has no sibling to be
-    picked up, and it never copies key material.
+    Accepted limit: -l validates the container and the embedded public key, not
+    the ciphertext, and detecting ciphertext corruption needs the passphrase this
+    probe must never be given. Corruption surfaces at first use.
 
-    Accepted limit: -l validates the container and the embedded public key, not the
-    ciphertext.  A key whose private bytes are corrupt or truncated still reports a
-    fingerprint.  Detecting that needs the passphrase, which this probe does not have
-    and must never be given, so corruption surfaces at first use rather than here.
-
-    Mirrors the probe in src/scripts/secrets/verify-secret-decryption.sh.  The two hosts
-    must agree on whether the same managed key is acceptable.
-
-  .PARAMETER SshKeygenExe
-    Absolute path to the ssh-keygen executable.
-
-  .PARAMETER PrivateKeyPath
-    Absolute path to the managed SSH private key to probe.
+    Mirrors src/scripts/secrets/verify-secret-decryption.sh so both hosts agree on
+    whether the same managed key is acceptable.
 
   .PARAMETER TimeoutSeconds
-    Upper bound on how long ssh-keygen may run before the probe gives up.  Exceeding
-    it throws rather than hanging activation.
+    Upper bound on how long ssh-keygen may run. Exceeding it throws rather than
+    hanging activation.
 
   .OUTPUTS
-    None.  Throws naming the offending file when the key is not a valid OpenSSH
-    private key, so the failure is attributable to one key.
+    None. Throws naming the offending file, so the failure is attributable.
   #>
   [CmdletBinding()]
   param(
@@ -78,17 +58,15 @@ function Test-ManagedSshPrivateKey {
     [int]$TimeoutSeconds = 15
   )
 
-  # A double quote in the path would be parsed as an argument separator below, silently
-  # probing some other file instead of the one the manifest named.  Refuse it loudly.
+  # A double quote in the path would parse as an argument separator, probing some
+  # other file. Refuse it loudly.
   if ($PrivateKeyPath.Contains('"')) {
     throw "verification: ERROR — managed SSH private key path '$PrivateKeyPath' contains a double quote, which cannot be passed to ssh-keygen safely."
   }
 
-  # -l reports a fingerprint for a bare .pub file as readily as for a private key,
-  # so the header is what proves this file holds private key material.  Read it
-  # directly rather than through ssh-keygen: a file that is not there, or not
-  # readable, has to be rejected by name either way, and Test-Path would report a
-  # directory as present.
+  # WHY read the header here: -l accepts a bare .pub file as readily as a private
+  # key, and an absent or unreadable file has to be rejected by name either way,
+  # which Test-Path would not do for a directory.
   $privateKeyHeader = '^\-\-\-\-\-BEGIN [A-Z0-9 ]*PRIVATE KEY\-\-\-\-\-$'
   if (-not (Test-Path -LiteralPath $PrivateKeyPath -PathType Leaf)) {
     throw "verification: ERROR — managed SSH private key at '$PrivateKeyPath' does not exist or is not a regular file; fix the SOPS value or re-run the secret materialization."
@@ -98,12 +76,9 @@ function Test-ManagedSshPrivateKey {
     throw "verification: ERROR — managed SSH private key at '$PrivateKeyPath' does not start with an OpenSSH private key header (found: '$keyHeaderLine'); ssh-keygen -l would accept a public key file here, so this is rejected before the probe. Fix the SOPS value or re-run the secret materialization."
   }
 
-  # Probe through a symlink in a private temp directory.  Given the managed key
-  # path directly, ssh-keygen -l prefers the sibling <key>.pub when one exists and
-  # reports THAT key's fingerprint without ever opening the private key, so a
-  # corrupt private key beside a valid .pub would read as fine.  Windows
-  # materializes the pair the same way POSIX does, so the shadowing applies here
-  # too.  A symlink carries no second copy of the key material.
+  # WHY the symlink: -l prefers the sibling <key>.pub and reports THAT
+  # fingerprint without opening the private key, so a corrupt private key beside
+  # a valid .pub would read as fine. Windows materializes the pair the same way.
   $probeDir = Join-Path ([IO.Path]::GetTempPath()) ("nucleus-key-probe-" + [guid]::NewGuid())
   New-Item -ItemType Directory -Path $probeDir -Force > $null
   $probeLink = Join-Path $probeDir 'key'
@@ -131,11 +106,10 @@ function Test-ManagedSshPrivateKey {
       throw "verification: ERROR — could not start ssh-keygen to probe managed SSH private key '$PrivateKeyPath'."
     }
 
-    # Close stdin before waiting, so nothing the probe writes can stall on an unanswered read.
+    # Close stdin before waiting, so nothing the probe writes stalls on an unanswered read.
     $probe.StandardInput.Close()
 
-    # Drain both pipes concurrently.  Reading them only after the wait would deadlock on a
-    # full pipe buffer, because the child blocks writing while the parent blocks waiting.
+    # WHY concurrently: reading after the wait deadlocks on a full pipe buffer.
     $stdout = $probe.StandardOutput.ReadToEndAsync()
     $stderr = $probe.StandardError.ReadToEndAsync()
 
@@ -143,13 +117,12 @@ function Test-ManagedSshPrivateKey {
       $probe.Kill()
       throw "verification: ERROR — ssh-keygen did not exit within $TimeoutSeconds s while probing managed SSH private key '$PrivateKeyPath'; refusing to continue, because an unbounded wait would stall apply."
     }
-    # The bounded overload can return while the redirected pipes are still draining; the
-    # parameterless overload waits for them to reach EOF.
+    # The bounded overload can return while the pipes still drain; the parameterless
+    # one waits for EOF.
     $probe.WaitForExit()
 
-    # ssh-keygen -l exits non-zero for a malformed or unreadable key.  Only stdout is
-    # consulted, so the failure is decided by an empty fingerprint line rather than by
-    # the exit code, exactly as the POSIX probe does.
+    # WHY stdout only: the exit code is not the signal, an empty fingerprint line
+    # is, exactly as the POSIX probe does.
     $keyFingerprint = $stdout.Result
     if ([string]::IsNullOrWhiteSpace($keyFingerprint)) {
       $probeDiagnostic = $stderr.Result.Trim()
@@ -172,76 +145,20 @@ function Invoke-SecretVerification {
     each registered backend.
 
   .DESCRIPTION
-    Runs five checks in order, mirroring the POSIX verify-secret-decryption
-    activation in src/modules/secrets.nix:
+    Runs five checks in order, mirroring the POSIX verifier:
 
-    1. Materialization sanity: managed SSH key files, git-identity env, and
-       managed-key manifest files exist and are non-empty.  Every private key listed
-       in managed-ssh-key-paths is then probed for validity: the file must carry an
-       OpenSSH private key header, and ssh-keygen -l must read a fingerprint from it.
-       A passphrase-protected key passes, because -l reads the cleartext public-key
-       blob and never needs the passphrase; a malformed or public key file is
-       rejected.  The probe closes its own stdin and bounds its wait so a wedged
-       ssh-keygen cannot stall the run.
-       Mirrors the POSIX verifier in src/scripts/secrets/verify-secret-decryption.sh.
-    2. GPG key presence: the managed primary fingerprint recorded in the
-       managed-gpg-keys manifest is present in the GPG keyring.
-    3. GPG SOPS recipient check: extracts the fp: value from each SOPS
-       file's plaintext sops.pgp[].fp metadata and verifies that fingerprint
-       is present in the secret keyring.  SOPS records the encryption subkey
-       fingerprint rather than the primary key fingerprint in the fp: field;
-       comparing the primary fingerprint directly produces false failures when
-       SOPS chose a subkey (e.g., a Kyber encryption subkey).
-       Combined with check 2, this confirms GPG has the private key material
-       to decrypt once the passphrase is provided.
-       Accumulates failures and reports all failing files.
-       Hard error — GPG is the last-resort global backup.
-    4. Personal SSH age recipient check: derives the age public key from the
-       managed personal SSH public key file (passphrase-free public-key
-       conversion via ConvertFrom-SshEd25519PublicKeyToAgePubKey), then
-       searches each SOPS file's plaintext sops.age[].recipient metadata for
-       that key.  No private key passphrase is required.
-       Accumulates failures and reports all failing files.
-       Hard error — the personal SSH key is the designated personal backup
-       age recipient in .sops.yaml.
-    5. Machine SSH host key existence: advisory warning if
-       C:\ProgramData\ssh\ssh_host_ed25519_key is absent (warning-only because
-       on first bootstrap the key may not yet be registered in .sops.yaml).
-
-  .PARAMETER GpgExe
-    Absolute path to the gpg executable.
-
-  .PARAMETER SshKeygenExe
-    Absolute path to the ssh-keygen executable, used to probe each managed SSH
-    private key for validity.
-
-  .PARAMETER HostKeyPath
-    Path to this machine's SSH host private key (used only for the host-key
-    existence advisory check).
-
-  .PARAMETER Username
-    Username whose materialized secret artefacts are inspected.
-
-  .PARAMETER SecretsDir
-    Absolute path to the directory containing the SOPS secret YAML files
-    (src/secrets).
-
-  .PARAMETER RepoRoot
-    Absolute path to the nucleus repository root (overlay wallpapers enumerated
-    from src/users/<user>/wallpapers/).
-
-  .EXAMPLE
-    Invoke-SecretVerification `
-      -GpgExe 'C:\Program Files\GnuPG\bin\gpg.exe' `
-      -SshKeygenExe 'C:\Windows\System32\OpenSSH\ssh-keygen.exe' `
-      -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
-      -Username 'admin' `
-      -SecretsDir '.\src\secrets' `
-      -RepoRoot '.\'
-
-  .NOTES
-    Environment variables: (none)
-    Exit codes: N/A — library function; throws on failure.
+    1. Materialization sanity: managed key files, git-identity env and the
+       managed-key manifests exist and are non-empty, and every key listed in
+       managed-ssh-key-paths is probed. A passphrase-protected key passes.
+    2. GPG key presence: the fingerprint in the managed-gpg-keys manifest is in
+       the keyring.
+    3. GPG SOPS recipient check on each SOPS file's unencrypted metadata,
+       accumulating failures. Hard error: GPG is the last-resort global backup.
+    4. Personal SSH age recipient check: the age key derived from the managed
+       public SSH key must appear in each SOPS file. Hard error: it is the
+       designated personal age recipient in .sops.yaml.
+    5. Machine SSH host key existence: advisory only, because on first
+       bootstrap the key may not be registered in .sops.yaml yet.
   #>
   [CmdletBinding()]
   param(
@@ -303,10 +220,7 @@ function Invoke-SecretVerification {
     }
   }
 
-  # -------------------------------------------------------------------------
-  # 1. Materialization sanity: key files must exist and be non-empty, and every
-  # managed SSH private key must be a valid OpenSSH private key.
-  # -------------------------------------------------------------------------
+  # 1. Materialization sanity.
   Write-NucleusInfo -CommandName 'verification' "[1/5] checking secret materialization..."
   $sanityPaths = @($sshKeyPath, $sshPublicKeyPath, $managedGpgKeysManifest, $managedSshKeysManifest, $managedSshKeyPathsManifest, $gitIdentityPath)
   foreach ($sanityPath in $sanityPaths) {
@@ -315,9 +229,8 @@ function Invoke-SecretVerification {
     }
   }
 
-  # Existence is not validity.  The manifest enumerates every managed private key,
-  # including the personal one checked above, and each is probed so a failure names
-  # the offending key file rather than the manifest as a whole.
+  # WHY probe each key: existence is not validity, and probing names the
+  # offending key file instead of the manifest as a whole.
   foreach ($managedKeyLine in (Get-Content -LiteralPath $managedSshKeyPathsManifest)) {
     $managedKeyPath = $managedKeyLine.Trim()
     if ([string]::IsNullOrWhiteSpace($managedKeyPath)) {
@@ -330,9 +243,7 @@ function Invoke-SecretVerification {
   }
   Write-NucleusInfo -CommandName 'verification' "[1/5] materialization sanity: OK"
 
-  # -------------------------------------------------------------------------
-  # 2. GPG key presence: the managed fingerprint must be in the keyring.
-  # -------------------------------------------------------------------------
+  # 2. GPG key presence.
   Write-NucleusInfo -CommandName 'verification' "[2/5] checking GPG key presence..."
   $managedFpr = (Get-Content -Path $managedGpgKeysManifest -Raw).Trim()
   if ([string]::IsNullOrWhiteSpace($managedFpr)) {
@@ -344,24 +255,18 @@ function Invoke-SecretVerification {
   }
   Write-NucleusInfo -CommandName 'verification' "[2/5] GPG key presence: OK ($managedFpr)"
 
-  # -------------------------------------------------------------------------
   # 3. GPG SOPS recipient check for all SOPS files.
-  # Extract the fp: value from each file's unencrypted sops.pgp[].fp metadata
-  # and verify that fingerprint is present in the secret keyring.  SOPS records
-  # the encryption subkey fingerprint rather than the primary key fingerprint;
-  # comparing the primary fingerprint directly produces false failures when SOPS
-  # chose a subkey (e.g., a Kyber encryption subkey).  Combined with check 2,
-  # this confirms GPG has the private key material to decrypt.
-  # YAML SOPS files store fp as "    fp: HEX" (whitespace-prefixed, unquoted);
-  # binary SOPS files (e.g. wallpaper blobs) use JSON format with
-  # "\"fp\": \"HEX\"" (quoted key and value).  Both formats are handled below.
-  # -------------------------------------------------------------------------
+  # WHY the subkey: SOPS records the encryption subkey fingerprint in fp:, and
+  # comparing the primary fingerprint directly gives false failures when SOPS
+  # chose a subkey. Together with check 2 this confirms GPG holds the private
+  # key material.
+  # WHY two formats: YAML SOPS files store fp unquoted and whitespace-prefixed,
+  # binary blobs (wallpapers) store it JSON-quoted.
   Write-NucleusInfo -CommandName 'verification' "[3/5] checking GPG recipient registration in all SOPS files..."
   $gpgFailures = @()
   foreach ($sopsFile in $sopsTestFiles) {
-    # The combined regex matches both YAML (\s+fp:) and JSON ("fp":) formats.
-    # [regex]::Match extracts the hex fingerprint directly, so no separate
-    # quote-stripping step is needed for JSON-encoded values.
+    # WHY one regex: it matches both YAML (\s+fp:) and JSON ("fp":), and the hex
+    # match extracts the fingerprint without a separate quote-stripping step.
     $fpLine = Get-Content -Path $sopsFile | Where-Object { $_ -match '(?:\s+fp:|\s*"fp":)\s' } | Select-Object -First 1
     $sopsGpgFp = if ($fpLine) { [regex]::Match($fpLine, '[0-9A-Fa-f]{40,}').Value } else { '' }
     if ([string]::IsNullOrWhiteSpace($sopsGpgFp) -or -not ($allSecretKeysFpr -like "*$sopsGpgFp*")) {
@@ -373,15 +278,9 @@ function Invoke-SecretVerification {
   }
   Write-NucleusInfo -CommandName 'verification' "[3/5] GPG SOPS recipient check: OK"
 
-  # -------------------------------------------------------------------------
   # 4. Personal SSH age recipient check for all SOPS files.
-  # Derive the age public key from the managed SSH public key file (passphrase-
-  # free; the public key carries no secret material) and search each SOPS
-  # file's plaintext sops.age[] metadata for the derived key value.
-  # YAML SOPS files store the key as "recipient: age1..." (unquoted); binary
-  # SOPS files (e.g. wallpaper blobs) use JSON format with both the key name
-  # and value double-quoted.  Searching for the bare age key value handles both.
-  # -------------------------------------------------------------------------
+  # The age key is derived from the public key, so no passphrase is needed, and
+  # searching for the bare value covers both the YAML and JSON encodings.
   Write-NucleusInfo -CommandName 'verification' "[4/5] checking personal SSH age recipient registration in all SOPS files..."
   if (-not (Test-Path -Path $sshPublicKeyPath)) {
     throw "verification: ERROR — managed personal SSH public key not found at $sshPublicKeyPath; cannot derive age public key for recipient check."
@@ -400,9 +299,7 @@ function Invoke-SecretVerification {
   }
   Write-NucleusInfo -CommandName 'verification' "[4/5] SSH age SOPS recipient check: OK ($sshAgePub)"
 
-  # -------------------------------------------------------------------------
-  # 5. Machine SSH host key existence check (advisory warning only).
-  # -------------------------------------------------------------------------
+  # 5. Machine SSH host key existence, advisory only.
   Write-NucleusInfo -CommandName 'verification' "[5/5] checking machine SSH host key..."
   if (-not (Test-Path -Path $HostKeyPath)) {
     Write-NucleusWarning -CommandName 'verification' "$HostKeyPath missing; this machine cannot be the primary SOPS age recipient until the host key is registered in .sops.yaml."

@@ -3,38 +3,11 @@
   Provision hermes-agent directory, environment, and SCM service on Windows.
 
 .DESCRIPTION
-  Ensures %USERPROFILE%\data\hermes-agent\ exists, symlinks %USERPROFILE%\.hermes\
-  to it, sets HERMES_HOME as a User environment variable, deploys the
-  harness-bridge plugin under HERMES_HOME, enables it, unprovisions any
-  outdated HermesGateway Scheduled Task, installs the SCM Windows Service,
-  and ensures PLAYWRIGHT_BROWSERS_PATH is set for browser tools.
-
-  This is the Windows equivalent of the POSIX activation entries in hermes-agent.nix.
-
-.PARAMETER Enabled
-  Whether hermes-agent config provisioning should be managed.
-
-.PARAMETER RepoRoot
-  Absolute path to the repository root, used to resolve the per-user overlay
-  that owns the harness-bridge plugin tree.
-
-.PARAMETER User
-  Username from the user registry, used to resolve the per-user overlay.
-
-.EXAMPLE
-  Sync-HermesConfig -Enabled:$true -RepoRoot 'C:\Users\guest\repos\nucleus' -User 'guest'
-
-.EXAMPLE
-  # Cleanup path: remove the managed harness-bridge link only.
-  Sync-HermesConfig -Enabled:$false -RepoRoot 'C:\Users\guest\repos\nucleus' -User 'guest'
-
-.NOTES
-  Exit codes: 0 on success; non-zero on failure
+  Windows equivalent of the POSIX activation entries in hermes-agent.nix.
 #>
 # WHY: symlink creation needs SeCreateSymbolicLinkPrivilege (elevated session or
-# Developer Mode).  Probing once produces an actionable message instead of a raw
-# .NET privilege exception from New-Item.  Defined at file scope (like
-# Sync-PiAgentConfig's Test-PiSymlinkPrivilege) so hosts and tests can stub it.
+# Developer Mode). Probing once gives an actionable message instead of a raw
+# .NET privilege exception from New-Item, and file scope lets hosts and tests stub it.
 function Test-HermesSymlinkPrivilege {
   $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
   if ($isAdmin) { return $true }
@@ -46,18 +19,12 @@ function Test-HermesSymlinkPrivilege {
 
 . (Join-Path -Path $PSScriptRoot -ChildPath '..\Set-ManagedSymlinkDeleteProtection.ps1')
 
-# WHY these two wrappers exist: the module writes User-scope environment
-# variables, and a static [System.Environment] call cannot be stubbed.  A
-# function boundary keeps the behaviour testable without touching the real user
-# environment store.
+# WHY a function boundary: the module writes User-scope environment variables,
+# and a static [System.Environment] call cannot be stubbed.
 function Get-HermesUserEnvVar {
   <#
   .SYNOPSIS
     Reads a User-scope environment variable.
-  .PARAMETER Name
-    Variable name.
-  .OUTPUTS
-    The stored value, or $null when it is not set.
   #>
   [CmdletBinding()]
   [OutputType([string])]
@@ -73,10 +40,6 @@ function Write-HermesUserEnvVar {
   <#
   .SYNOPSIS
     Writes a User-scope environment variable.
-  .PARAMETER Name
-    Variable name.
-  .PARAMETER Value
-    Value to store.
   #>
   [CmdletBinding()]
   param(
@@ -94,8 +57,6 @@ function Get-HermesGatewayService {
   <#
   .SYNOPSIS
     Returns the hermes-gateway SCM service, or $null when it is not installed.
-  .OUTPUTS
-    The service object, or $null.
   #>
   [CmdletBinding()]
   [OutputType([object])]
@@ -109,8 +70,6 @@ function Get-HermesGatewayTask {
   <#
   .SYNOPSIS
     Returns the outdated HermesGateway scheduled task, or $null when absent.
-  .OUTPUTS
-    The task object, or $null.
   #>
   [CmdletBinding()]
   [OutputType([object])]
@@ -126,11 +85,8 @@ function Get-HermesCliPath {
     Resolves the hermes executable, or returns $null when it is not installed.
 
   .DESCRIPTION
-    `Get-Command hermes` can return several executables when more than one copy
-    is on PATH, so the first match wins, mirroring shell PATH resolution.  A
+    The first Get-Command match wins, mirroring shell PATH resolution, and the
     function boundary keeps the absence case stub-able for tests.
-  .OUTPUTS
-    Absolute path to the hermes executable, or $null.
   #>
   [CmdletBinding()]
   [OutputType([string])]
@@ -151,11 +107,7 @@ function Get-HermesBunPath {
 
   .DESCRIPTION
     bun itself comes from the WinGet DSC package, so PATH is the whole search;
-    the managed bun bin dir holds what `bun install -g` wrote, not the runtime.
-    Several executables can match, so the first wins, mirroring shell PATH
-    resolution.  A function boundary keeps the absence case stub-able for tests.
-  .OUTPUTS
-    Absolute path to the bun executable, or $null.
+    the first match wins and the boundary keeps absence stub-able for tests.
   #>
   [CmdletBinding()]
   [OutputType([string])]
@@ -183,11 +135,9 @@ function Sync-HermesConfig {
   )
 
   $label = 'hermes-config'
-  # WHY: HERMES_HOME is where the CLI keeps its config and user plugins
-  # (hermes_constants.get_hermes_home: context override → HERMES_HOME → the
-  # platform-native default, which on Windows is %LOCALAPPDATA%\hermes).  nucleus
-  # owns that value, so the plugin link is placed in the root the CLI reads, and
-  # the process copy is set below so this run's CLI calls agree with it.
+  # WHY: the CLI reads its root from HERMES_HOME (context override → env var →
+  # platform default), so nucleus pins it to %LOCALAPPDATA%\hermes and the
+  # plugin link lands in that root.
   $defaultHermesHome = Join-Path -Path $env:LOCALAPPDATA -ChildPath 'hermes'
   $hermesPluginRelPath = 'plugins\harness-bridge'
   $pluginLink = Join-Path -Path (Join-Path -Path $defaultHermesHome -ChildPath 'plugins') -ChildPath 'harness-bridge'
@@ -206,17 +156,13 @@ function Sync-HermesConfig {
   $hermesDataDir = Join-Path -Path $dataDir -ChildPath 'hermes-agent'
   $hermesSymlinkTarget = Join-Path -Path $HOME -ChildPath '.hermes'
 
-  # Ensure ~/data/hermes-agent/ exists
   if (-not (Test-Path -Path $hermesDataDir)) {
     New-Item -ItemType Directory -Path $hermesDataDir -Force > $null
     Write-NucleusNotice "[$label] created directory: data/hermes-agent"
   }
 
-  # Create directory symlink ~/.hermes/ -> ~/data/hermes-agent/
-  # WHY no -PathType SymbolicLink: PowerShell 7 dropped that enumerator, and
-  # nucleus runs pwsh 7 on Windows, so the link is recognised through LinkType
-  # instead.  A link whose target is gone is replaced rather than left in place,
-  # which is what the previous form could not express.
+  # WHY no -PathType: pwsh 7 dropped that enumerator, so LinkType decides, and a
+  # link whose target is gone is replaced rather than left in place.
   # check-suppress:suppression_doc: probing an optional path; absence is the expected signal and the null check below handles it.
   $hermesTargetItem = Get-Item -LiteralPath $hermesSymlinkTarget -Force -ErrorAction SilentlyContinue
   if ($null -ne $hermesTargetItem -and $hermesTargetItem.LinkType -eq 'SymbolicLink') {
@@ -226,7 +172,7 @@ function Sync-HermesConfig {
       $hermesTargetItem = $null
     }
   } elseif ($null -ne $hermesTargetItem -and $hermesTargetItem.PSIsContainer) {
-    # Unprovisioning the old layout: a real directory was used before the symlink.
+    # WHY: a real directory was used here before the symlink layout.
     Remove-Item -Path $HOME\.hermes -Recurse -Force
     Write-NucleusNotice "[$label] removed real ~/.hermes directory (creating symlink)"
     $hermesTargetItem = $null
@@ -241,12 +187,9 @@ function Sync-HermesConfig {
     Write-NucleusNotice "[$label] created symlink: $hermesSymlinkTarget -> $hermesDataDir"
   }
 
-  # Set HERMES_HOME environment variable (upstream default)
-  # WHY: nucleus installs via uv tool install which doesn't set HERMES_HOME.
-  # The upstream installer sets it to %LOCALAPPDATA%\hermes, but nucleus
-  # doesn't use the upstream installer, so nucleus writes the same value and
-  # sets the process copy too: hermes also writes runtime state under
-  # HERMES_HOME, and the plugin link above has to be in that same root.
+  # WHY: uv tool install does not set HERMES_HOME and the upstream installer is
+  # not used, so nucleus writes the same value plus the process copy, since
+  # hermes writes runtime state under that root too.
   $currentHermesHome = Get-HermesUserEnvVar -Name 'HERMES_HOME'
   if ($null -eq $currentHermesHome -or $currentHermesHome -ne $defaultHermesHome) {
     Write-HermesUserEnvVar -Name 'HERMES_HOME' -Value $defaultHermesHome
@@ -254,10 +197,8 @@ function Sync-HermesConfig {
   }
   $env:HERMES_HOME = $defaultHermesHome
 
-  # Unprovision outdated HermesGateway Scheduled Task (if present)
-  # WHY: if the user previously ran `hermes gateway install` (creating a
-  # Scheduled Task), remove it before installing the SCM service to avoid
-  # conflicts. This is cleanup, not migration.
+  # WHY: a Scheduled Task from an earlier `hermes gateway install` conflicts with
+  # the SCM service installed below. Cleanup, not migration.
   # check-suppress:suppression_doc: task may not exist; probe is best-effort
   $existingTask = Get-HermesGatewayTask
   if ($null -ne $existingTask) {
@@ -265,7 +206,6 @@ function Sync-HermesConfig {
     Unregister-ScheduledTask -TaskName 'HermesGateway' -Confirm:$false
   }
 
-  # Unprovision outdated Startup-folder droppers
   $startupDir = Join-Path -Path $env:APPDATA -ChildPath 'Microsoft\Windows\Start Menu\Programs\Startup'
   # check-suppress:suppression_doc: no matching items is expected; probe is best-effort
   $startupHermes = Get-ChildItem -Path $startupDir -Filter '*hermes*' -ErrorAction SilentlyContinue
@@ -274,10 +214,8 @@ function Sync-HermesConfig {
     Write-NucleusNotice "[$label] removed outdated startup item: $($f.Name)"
   }
 
-  # Install SCM Windows Service
-  # WHY: SCM provides quadratic-backoff auto-restart on crash (PR #50200),
-  # matching macOS launchd KeepAlive and Linux systemd Restart=always.
-  # Requires admin rights (nucleus-apply runs elevated).
+  # WHY: SCM gives quadratic-backoff auto-restart on crash (PR #50200), matching
+  # launchd KeepAlive and systemd Restart=always. Needs admin rights.
   # check-suppress:suppression_doc: hermes may not be installed; probe is best-effort
   $hermesBin = Get-HermesCliPath
   if ($null -ne $hermesBin) {
@@ -292,27 +230,20 @@ function Sync-HermesConfig {
     Write-NucleusWarning "[$label] hermes binary not found — cannot install SCM service"
   }
 
-  # Verify SCM service exists
   # check-suppress:suppression_doc: service may not exist; probe is best-effort
   $svc = Get-HermesGatewayService
   if ($null -eq $svc) {
     Write-NucleusWarning "[$label] hermes-gateway SCM service not found after install"
   }
 
-  # Playwright browsers path management
-  # On Windows, we check if browsers are installed in the standard location
-  # and set PLAYWRIGHT_BROWSERS_PATH if needed.
   $playwrightCacheDir = Join-Path -Path $HOME -ChildPath '.cache\ms-playwright'
-  # WHY @() around the probe: a cmdlet matching nothing yields $null, so a later
-  #   @() wrap would invert this comparison without failing loudly. The cache
-  #   directory is itself absent on a fresh host, which -ErrorAction covers.
+  # WHY @() around the probe: a cmdlet matching nothing yields $null, so the
+  #   .Count comparison below would invert silently.
   $chromiumInstalled = @(Get-ChildItem -Path (Join-Path -Path $playwrightCacheDir -ChildPath 'chromium-*') -Directory -ErrorAction SilentlyContinue) # check-suppress:suppression_doc: the cache directory is absent on a fresh host, and an absent path is the answer this probe asks for
 
   if ($chromiumInstalled.Count -eq 0) {
-    # Chromium not installed - attempt to install via bun.
-    # WHY the lockfile for the version: `bun x` resolves latest by default, so an
-    #   unpinned call downloads whatever the registry serves at apply time. The pin
-    #   is read the same way Sync-SuperpowersPlugin reads its own, and a missing
+    # WHY the lockfile pin: `bun x` resolves latest by default, so an unpinned
+    #   call downloads whatever the registry serves at apply time, and a missing
     #   entry is an error rather than an unversioned install.
     $lockfilePath = Join-Path -Path $RepoRoot -ChildPath 'src\lockfiles\lockfile.json'
     if (-not (Test-Path -LiteralPath $lockfilePath)) {
@@ -329,8 +260,7 @@ function Sync-HermesConfig {
       Write-NucleusWarning "[$label] bun not found - cannot install Playwright Chromium"
     } else {
       Write-NucleusNotice "[$label] installing Playwright Chromium $playwrightVersion..."
-      # WHY no --with-deps: Playwright rejects the flag on Windows, and the
-      #   browsers are the only thing missing here.
+      # WHY no --with-deps: Playwright rejects the flag on Windows.
       & $bunBin x "playwright@$playwrightVersion" install chromium
       Write-NucleusNotice "[$label] Playwright Chromium installed"
     }
@@ -338,11 +268,8 @@ function Sync-HermesConfig {
     Write-NucleusNotice "[$label] Playwright Chromium already installed - skipping"
   }
 
-  # Set PLAYWRIGHT_BROWSERS_PATH only when a browser is really there. Naming a
-  # cache that holds nothing hides the browsers hermes already keeps in its own
-  # default location, so a failed install has to leave the variable alone. The
-  # probe is repeated rather than trusting the install's exit code, because the
-  # install is the one step here that can fail quietly.
+  # WHY repeat the probe: naming a cache that holds nothing hides the browsers
+  # hermes keeps in its own default location, and the install can fail quietly.
   $chromiumPresent = @(Get-ChildItem -Path (Join-Path -Path $playwrightCacheDir -ChildPath 'chromium-*') -Directory -ErrorAction SilentlyContinue).Count -gt 0 # check-suppress:suppression_doc: repeats the probe above, so it takes the same absent-path answer rather than raising
   if (-not $chromiumPresent) {
     Write-NucleusWarning "[$label] no Playwright Chromium found - leaving PLAYWRIGHT_BROWSERS_PATH unchanged"
@@ -354,11 +281,9 @@ function Sync-HermesConfig {
     }
   }
 
-  # Expose the harness bridge inside chat: the plugin adds /harness, which is
-  # the inbound half of the bridge (approve/deny and `/harness send`).
   # WHY imperative: POSIX converges the plugin list through
-  # services.hermes-agent.settings, but on Windows it lives in ~/.hermes/config.yaml,
-  # which upstream rewrites at runtime, so the CLI is the convergent interface.
+  # services.hermes-agent.settings, but on Windows the list lives in
+  # ~/.hermes/config.yaml, which upstream rewrites at runtime.
   $pluginSource = Resolve-UserConfigFile -User $User -ConfigName 'hermes' -RelativePath $hermesPluginRelPath -RepoRoot $RepoRoot
   $pluginDir = Split-Path -Path $pluginLink -Parent
   if (-not (Test-Path -Path $pluginDir -PathType Container)) {
@@ -398,9 +323,8 @@ function Sync-HermesConfig {
 
   $pluginShow = & $hermesCliPath plugins show harness-bridge
   if ($LASTEXITCODE -ne 0) {
-    # The link above is where the pinned CLI looks for user plugins
-    # ($HERMES_HOME/plugins), so an undiscovered plugin here is a real failure
-    # rather than a Windows-specific gap.
+    # WHY this is a real failure: the pinned CLI looks for user plugins under
+    # $HERMES_HOME/plugins, which is where the link above points.
     # check-suppress:suppression_doc: Write-Error must not terminate before throw propagates the same failure
     Write-NucleusError -CommandName $label "[$label] hermes does not see the harness-bridge plugin at $pluginLink" -ErrorAction SilentlyContinue
     throw "[$label] hermes does not see the harness-bridge plugin at $pluginLink"
@@ -411,8 +335,8 @@ function Sync-HermesConfig {
     return
   }
 
-  # --no-allow-tool-override keeps the call non-interactive: the plugin registers a
-  # slash command and never replaces a built-in tool.
+  # WHY --no-allow-tool-override: the plugin registers a slash command and never
+  # replaces a built-in tool.
   & $hermesCliPath plugins enable harness-bridge --no-allow-tool-override
   if ($LASTEXITCODE -ne 0) {
     # check-suppress:suppression_doc: Write-Error must not terminate before throw propagates the same failure
@@ -421,7 +345,7 @@ function Sync-HermesConfig {
   }
 
   $pluginShow = & $hermesCliPath plugins show harness-bridge
-  # WHY the positive form: on an array, -notmatch returns the lines that do NOT
+  # WHY the positive form: on an array, -notmatch returns the lines that do not
   # match, so it is true for almost any output.
   if ($LASTEXITCODE -ne 0 -or -not ($pluginShow -match 'Status:\s*enabled')) {
     # check-suppress:suppression_doc: Write-Error must not terminate before throw propagates the same failure

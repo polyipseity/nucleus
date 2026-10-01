@@ -3,57 +3,20 @@
   Install bootstrap dependencies for the nucleus environment on Windows.
 
 .DESCRIPTION
-  Installs GnuPG (directly from the NSIS installer) and SOPS via winget
-  using pinned versions from scripts/bootstrap-versions.env.
-  Runs a pre-flight health check before invoking apply when -Apply is used.
-  Use -Apply to run the Windows apply script after dependency installation.
-
-.PARAMETER Apply
-  Install dependencies, then run src/hosts/Windows/apply.ps1 (default: $false).
-
-.PARAMETER ForceAdmin
-  Allow running as Administrator. Use in CI environments where elevation cannot
-  be avoided (default: $false).
+  Installs GnuPG (directly from the NSIS installer) and SOPS via winget using
+  pinned versions from scripts/bootstrap-versions.env.
 
 .PARAMETER ApplyArgs
   Optional arguments passed through to src/hosts/Windows/apply.ps1 (default: empty).
   Use -- before positional passthrough args (e.g., .\bootstrap.ps1 -Apply -- -DryRun).
-
-.PARAMETER NoAISync
-  Suppresses the post-apply Ollama model sync step. Forwarded to apply.ps1 as
-  -NoAISync when -Apply is used (default: $false).
-
-.PARAMETER ReplicaSync
-  Run the post-apply cloud replica sync step. Forwarded to apply.ps1 as
-  -ReplicaSync when -Apply is used (default: $false).
 
 .PARAMETER TargetUser
   Accepted for cross-platform CLI parity. Only effective on the POSIX apply
   path (nix run .#apply -- --target-user=<name>). On Windows this flag is
   accepted but ignored (default: none).
 
-.PARAMETER Help
-  Show this help message and exit.
-
-.EXAMPLE
-  .\bootstrap.ps1
-  Install bootstrap dependencies only.
-
-.EXAMPLE
-  .\bootstrap.ps1 -Apply
-  Install dependencies, then run the apply flow.
-
-.EXAMPLE
-  .\bootstrap.ps1 -Apply -- -Help
-  Install dependencies, then show help for the apply script (using -- passthrough).
-
-.EXAMPLE
-  .\bootstrap.ps1 -Apply -NoAISync
-  Install dependencies and run apply, skipping AI model sync.
-
 .NOTES
   Environment variables: NUCLEUS_APPLY, NUCLEUS_AI_SYNC, NUCLEUS_REPLICA_SYNC, NUCLEUS_TARGET_USER.
-  Exit codes: 0 on success; non-zero on failure.
 #>
 [CmdletBinding()]
 param(
@@ -86,8 +49,8 @@ $ErrorActionPreference = "Stop"
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
-# Refuse to run as Administrator — privilege escalation is managed internally
-# when needed rather than relying on an already-elevated caller.
+# WHY refuse: elevation is managed internally when needed, so an already-elevated
+# caller hides whether a step actually needs it.
 $isAdmin = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if ($isAdmin -and -not $ForceAdmin) {
   Write-NucleusError "this script must not be run as Administrator. Run as a regular user (elevation is managed internally when needed)."
@@ -107,20 +70,11 @@ function Get-RequiredVersionSetting {
     Returns a required string value from a parsed settings dictionary.
 
   .DESCRIPTION
-    Looks up $Key in $Settings and returns its value as a trimmed string.
-    Throws a descriptive error if the key is absent or its value is blank,
-    preventing silent failures when a version pin is missing from the
-    bootstrap-versions.env file.
-
-  .PARAMETER Settings
-    An IDictionary (typically ordered hashtable) returned by
-    Import-BootstrapVersionTable.
-
-  .PARAMETER Key
-    The settings key to look up (e.g. 'NUCLEUS_GNUPG_VERSION').
+    Returns the trimmed value of $Key, throwing when it is absent or blank so a
+    missing version pin cannot fail silently.
 
   .OUTPUTS
-    [string]  The non-empty value associated with $Key.
+    [string] The non-empty value associated with $Key.
   #>
   param(
     [Parameter(Mandatory = $true)]
@@ -143,17 +97,12 @@ function Import-BootstrapVersionTable {
     Parses a shell-compatible KEY=value env file into an ordered hashtable.
 
   .DESCRIPTION
-    Reads $FilePath line by line and extracts KEY=value pairs using the
-    pattern ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$.  Comment lines (starting with
-    #) and blank lines are silently skipped.  Values wrapped in single or
-    double quotes have the outer quotes stripped.  Keys retain their original
-    casing.
-
-  .PARAMETER FilePath
-    Absolute or relative path to the bootstrap-versions.env file.
+    Reads $FilePath line by line and extracts KEY=value pairs using
+    ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$. Comments and blank lines are skipped, outer
+    quotes are stripped, and keys keep their original casing.
 
   .OUTPUTS
-    [ordered hashtable]  Parsed key/value pairs in file order.
+    [ordered hashtable] Parsed key/value pairs in file order.
   #>
   param(
     [Parameter(Mandatory = $true)]
@@ -196,23 +145,13 @@ function Invoke-WingetPackageInstall {
     Installs or verifies a winget package at an optional pinned version.
 
   .DESCRIPTION
-    Runs `winget install` with non-interactive flags.  Handles two outcomes
-    gracefully without throwing:
-      - Exit code 0: package was installed or upgraded successfully.
-      - Exit code -1978335189 (WINGET_ERROR_NO_APPLICABLE_UPDATE): package is
-        already at the requested version or no applicable upgrade exists.
-
-    When $Version is provided the function first attempts an exact-version
-    install.  If that fails with any code other than the above two, it falls
-    back to installing the latest available version.  This lets version pins
-    work correctly while degrading gracefully when a specific version is
-    withdrawn from the WinGet source.
-
-  .PARAMETER Id
-    WinGet package identifier (e.g. 'Git.Git').
+    Runs `winget install` with non-interactive flags. Exit code 0 and
+    -1978335189 (WINGET_ERROR_NO_APPLICABLE_UPDATE) both return without
+    throwing; any other code falls back to the latest available version, so a
+    withdrawn pin degrades instead of failing.
 
   .PARAMETER Version
-    Optional.  Exact version string to install.  When omitted, the latest
+    Optional. Exact version string to install. When omitted, the latest
     available version is installed.
   #>
   # check-suppress:SuppressMessageAttribute: PSAvoidUsingEmptyCatchBlock -- catch guards against terminating errors from Stop-Process when the process already exited; -ErrorAction SilentlyContinue handles the common case
@@ -238,15 +177,13 @@ function Invoke-WingetPackageInstall {
     "--id"
     $Id
     "--silent"
-    # WHY: pin to community source — msstore lacks HashiCorp/SOPS packages and
-    # its agreement prompt blocks source resolution on fresh CI runners.
+    # WHY the winget source: msstore lacks the HashiCorp/SOPS packages and its
+    # agreement prompt blocks source resolution on fresh CI runners.
     "--source"
     "winget"
   )
 
-  # WHY: timeout-300s: safety net for any winget install that might hang
-  # (e.g. NSIS installers that spawn resident child processes). GnuPG is
-  # installed directly via Install-GnuPGDirect to avoid this class of issue.
+  # WHY 300s: a safety net for an install that hangs on a resident child process.
   # Ref: https://github.com/fleetdm/fleet/pull/50025
   $TimeoutSeconds = 300
 
@@ -310,26 +247,15 @@ function Install-GnuPGDirect {
     Installs GnuPG directly from the NSIS installer, bypassing winget.
 
   .DESCRIPTION
-    Winget's --silent flag does not suppress the GpgEX regsvr32 dialog on
-    headless CI systems, causing the install to hang indefinitely. Running
-    the NSIS installer directly with /S (silent) and /D=path still blocks
-    on a modal MessageBox (regsvr32 gpgex6.dll failure, no /SD default).
-    We poll the installer's own MainWindowHandle and close it after a grace
-    period. Success is verified via the Add/Remove Programs registry entry
-    (the ARP entry is written in the installer's last hidden section, so the
-    exit code alone is unreliable on the timeout path).
+    winget --silent does not suppress the GpgEX regsvr32 dialog on headless CI,
+    and the NSIS installer blocks on a modal MessageBox even with /S (no /SD
+    default). The installer's own MainWindowHandle is polled and closed after a
+    grace period; success is verified through the Add/Remove Programs entry,
+    which inst.nsi writes in its last hidden section, so the exit code alone is
+    unreliable on the timeout path.
 
-    Ref: Fleet PR https://github.com/fleetdm/fleet/pull/50025
-    Ref: Fleet commit https://github.com/fleetdm/fleet/commit/5326bed
-
-  .PARAMETER Version
-    GnuPG version string (e.g. '2.5.21').
-
-  .PARAMETER InstallerDate
-    Build date portion of the installer filename (e.g. '20260702').
-
-  .PARAMETER InstallerSha256
-    Expected SHA-256 hash of the installer EXE.
+    Ref: https://github.com/fleetdm/fleet/pull/50025
+    Ref: https://github.com/fleetdm/fleet/commit/5326bed
   #>
   param(
     [Parameter(Mandatory = $true)]
@@ -345,7 +271,6 @@ function Install-GnuPGDirect {
   $installDir = Join-Path ${env:ProgramFiles} 'GnuPG'
   $gpgExe = Join-Path $installDir 'gpg.exe'
 
-  # Skip if already installed at the correct version.
   if (Test-Path -Path $gpgExe -PathType Leaf) {
     $installedVersion = & $gpgExe --version 2>&1 | Select-Object -First 1
     if ($installedVersion -match [regex]::Escape($Version)) {
@@ -359,7 +284,6 @@ function Install-GnuPGDirect {
   $tempDir = Join-Path $env:TEMP "gnupg-install-$Version"
   $installerPath = Join-Path $tempDir $installerName
 
-  # Create temp directory and download installer.
   if (-not (Test-Path -Path $tempDir)) {
     New-Item -ItemType Directory -Path $tempDir -Force > $null
   }
@@ -373,22 +297,15 @@ function Install-GnuPGDirect {
     throw "Failed to download GnuPG installer from $installerUrl : $_"
   }
 
-  # Verify installer hash.
   $actualHash = (Get-FileHash -Path $installerPath -Algorithm SHA256).Hash
   if ($actualHash -ne $InstallerSha256) {
     throw "GnuPG installer hash mismatch: expected $InstallerSha256, got $actualHash"
   }
 
-  # Run the NSIS installer with /S (silent) and /D=path (install directory).
-  # WHY: The GnuPG NSIS installer calls RegDLL on gpgex6.dll (the GpgEX shell
-  # extension). On headless CI, regsvr32 fails and spawns a modal MessageBox
-  # with no /SD default — the /S flag does NOT suppress these. The dialog
-  # window belongs to the installer process itself, not to regsvr32/gpgex
-  # children (Fleet confirmed via 5326bed). We poll the installer's own
-  # MainWindowHandle and close it after a grace period so the install can
-  # continue to the ARP registry entry (written in the last hidden section).
-  # Success is verified via the ARP entry, not the exit code, because a
-  # killed installer (timeout path) has a meaningless exit code.
+  # WHY the window polling: the GnuPG NSIS installer calls RegDLL on gpgex6.dll,
+  # and on headless CI regsvr32 fails and opens a modal MessageBox with no /SD
+  # default that /S does not suppress. The dialog belongs to the installer
+  # process itself, not to regsvr32/gpgex children (Fleet 5326bed).
   Write-NucleusInfo "Installing GnuPG $Version to $installDir"
   $proc = Start-Process -FilePath $installerPath -ArgumentList "/S", "/D=$installDir" -PassThru -NoNewWindow
   $TimeoutSeconds = 420
@@ -401,8 +318,6 @@ function Install-GnuPGDirect {
     $proc.Refresh()
     if ($proc.HasExited) { break }
 
-    # After grace period, close any window the installer owns.
-    # The dialog is on the installer process itself, not on child processes.
     if ((Get-Date) -gt $graceDeadline -and $proc.MainWindowHandle -ne [IntPtr]::Zero) {
       Write-NucleusInfo "Closing installer dialog window ('$($proc.MainWindowTitle)')"
       # check-suppress:suppression_doc: return value discarded; close is best-effort
@@ -423,17 +338,14 @@ function Install-GnuPGDirect {
     Write-NucleusInfo "Install exit code: $($proc.ExitCode)"
   }
 
-  # Kill resident daemon processes spawned by the installer.
-  # Leaving them running holds file locks that make later gpg operations fail.
   $daemons = @('gpg-agent', 'dirmngr', 'keyboxd', 'scdaemon', 'gpg-connect-agent', 'gpgme-w32spawn', 'gpa', 'launch-gpa')
   foreach ($daemon in $daemons) {
     # check-suppress:suppression_doc: daemon may not be running; best-effort stop
     Stop-Process -Name $daemon -Force -ErrorAction SilentlyContinue
   }
 
-  # Success = ARP entry exists. The exit code is unreliable on the timeout path
-  # (killed installer) and inst.nsi writes the ARP entry in its last hidden
-  # section — so the entry is the canonical signal that the install completed.
+  # WHY the ARP entry: a killed installer (timeout path) has a meaningless exit
+  # code, and inst.nsi writes the entry in its last hidden section.
   $arpKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*'
   $arpKey32 = 'HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
   $arpKeyUser = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*'
@@ -458,11 +370,11 @@ function Invoke-RepositoryDirenvAllowIfAvailable {
 
   .DESCRIPTION
     Runs `direnv allow` only when direnv is available, `.envrc` exists, and the
-    bootstrap repository root basename is exactly `nucleus`. This keeps auto-allow
-    scope intentionally narrow and avoids trusting non-nucleus checkouts.
+    bootstrap repository root basename is exactly `nucleus`, which keeps
+    auto-allow narrow and avoids trusting non-nucleus checkouts.
 
-    Failures are warnings (non-fatal) because direnv allow is convenience-only
-    and must not block dependency bootstrap or apply.
+    Failures are warnings because direnv allow is convenience-only and must not
+    block bootstrap or apply.
   #>
   [CmdletBinding()]
   param()
@@ -494,11 +406,9 @@ function Install-Uv {
     Installs uv if not already available.
 
   .DESCRIPTION
-    Downloads and runs the official uv installer from astral.sh. uv is
-    required for installing Python-based check tools (yamllint,
-    check-jsonschema) that have no WinGet or Scoop package. The installer
-    places uv.exe in $env:LOCALAPPDATA\uv; this function refreshes PATH
-    and propagates the directory to GITHUB_PATH for subsequent CI steps.
+    Downloads and runs the official uv installer from astral.sh. uv is needed
+    for the Python check tools (yamllint, check-jsonschema) that have no WinGet
+    or Scoop package.
   #>
   [CmdletBinding()]
   param()
@@ -519,14 +429,11 @@ function Install-Uv {
     throw "Failed to download uv installer: $_"
   }
 
-  # WHY: -NoModifyPath prevents the installer from modifying shell profiles.
-  # The uv installer is a PowerShell script invoked via & in the same process.
-  # $LASTEXITCODE is only set by native/external commands (.exe, .bat), not by
-  # PowerShell scripts, so it remains $null here regardless of outcome. The
-  # Get-Command check below is the reliable post-condition guard.
+  # WHY -NoModifyPath: the installer is a PowerShell script invoked with & in this
+  # process, so $LASTEXITCODE stays $null and the Get-Command check below is the
+  # reliable post-condition guard.
   & $installScript -NoModifyPath
 
-  # WHY: The uv installer places binaries in ~/.local/bin, not %LOCALAPPDATA%\uv.
   $uvDir = Join-Path $env:USERPROFILE '.local\bin'
   if ($env:PATH -notlike "*$uvDir*") {
     $env:PATH = "$uvDir;$env:PATH"
@@ -546,8 +453,8 @@ if (-not (Get-Command -Name winget -ErrorAction SilentlyContinue)) {
 
 $BootstrapVersions = Import-BootstrapVersionTable -FilePath $VersionsFilePath
 
-# GnuPG requires direct NSIS installation — winget's --silent flag does not
-# suppress the GpgEX regsvr32 dialog on headless CI, causing a hang.
+# WHY here rather than winget: --silent does not suppress the GpgEX regsvr32
+  # dialog on headless CI, so the install hangs.
 # Ref: https://github.com/fleetdm/fleet/pull/50025
 $gnupgVersion = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_GNUPG_VERSION"
 $gnupgDate = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_GNUPG_INSTALLER_DATE"
@@ -563,17 +470,18 @@ foreach ($package in $BootstrapPackageVersions.GetEnumerator()) {
   Invoke-WingetPackageInstall -Id $package.Key -Version $package.Value
 }
 
-# Provisioning: install lockfile-pinned PowerShell modules (Pester, PSScriptAnalyzer,
-# powershell-yaml). Preflight in check.ps1/test.ps1 only asserts availability.
+# Provisioning: install lockfile-pinned PowerShell modules (Pester,
+# PSScriptAnalyzer, powershell-yaml). Preflight in check.ps1/test.ps1 only
+# asserts availability.
 $moduleSetupPath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\setup\Invoke-PowerShellModuleSetup.ps1'
 if (Test-Path -Path $moduleSetupPath) {
   . $moduleSetupPath
   Invoke-PowerShellModuleSetup
 }
 
-# Provision check pipeline tools (actionlint, pinact, shfmt, taplo, yq, zizmor).
-# Same WinGet IDs as src/hosts/Windows/system/packages.dsc.yml.
-# yamllint is installed separately via uv (no WinGet ID).
+# Check pipeline tools. Same WinGet IDs as
+# src/hosts/Windows/system/packages.dsc.yml; yamllint comes from uv (no WinGet
+# ID).
 $checkTools = @(
     'rhysd.actionlint'
     'suzuki-shunsuke.pinact'
@@ -585,22 +493,16 @@ $checkTools = @(
 foreach ($tool in $checkTools) {
     Invoke-WingetPackageInstall -Id $tool
 }
-# Refresh PATH from registry so newly installed tools are available in the
-# current process. In GitHub Actions, also propagate the WinGet Links directory
-# and the uv tool bin directory to $env:GITHUB_PATH so subsequent steps can
-# find WinGet-installed and uv-installed binaries.
-# WHY: WinGet modifies PATH in the registry but the change is invisible to the
-# current and child processes until the terminal restarts (winget-cli#549).
-# uv tool install places binaries in ~\.local\bin; GITHUB_PATH is the only
-# mechanism to propagate PATH additions across GitHub Actions steps.
+# WHY: WinGet writes PATH in the registry, invisible to this and child
+# processes until the terminal restarts (winget-cli#549). GITHUB_PATH is the
+# only mechanism that propagates PATH additions across CI steps.
 $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User')
 $uvToolBin = Join-Path $env:USERPROFILE '.local\bin'
 if ($env:PATH -notlike "*$uvToolBin*") {
     $env:PATH = "$uvToolBin;$env:PATH"
 }
-# Install uv before attempting uv tool installs. uv is not pre-installed on
-# GitHub Actions Windows runners and is required for yamllint and
-# check-jsonschema (no WinGet or Scoop packages exist for these).
+# WHY before the uv tool installs below: CI runners ship no uv and it is
+# required for yamllint and check-jsonschema.
 Install-Uv
 
 if ($env:GITHUB_PATH) {
@@ -608,8 +510,7 @@ if ($env:GITHUB_PATH) {
     if (Test-Path $winGetLinks) {
         Add-Content -Path $env:GITHUB_PATH -Value $winGetLinks
     }
-    # Propagate uv's own binary directory so uv is available in subsequent
-    # CI steps (each step runs in a fresh process).
+    # Propagate uv's own binary directory so uv is available in later CI steps.
     $uvDir = Join-Path $env:LOCALAPPDATA 'uv'
     if (Test-Path $uvDir) {
         Add-Content -Path $env:GITHUB_PATH -Value $uvDir
@@ -649,9 +550,8 @@ if ($Apply) {
     throw "Apply script not found: $applyScriptPath"
   }
 
-  # Windows apply requires an explicit module path so operators are aware of
-  # which helper modules will be loaded. Add a default here unless the caller
-  # already provided an explicit override in -ApplyArgs.
+  # WHY an explicit ModuleDir: operators need to know which helper modules the
+  # apply flow loads, so a default is added unless the caller already passed one.
   $effectiveApplyArgs = @($ApplyArgs)
   $applyArgsText = ($effectiveApplyArgs -join " ")
   if ($applyArgsText -notmatch "(?i)(^|\s)-ModuleDir(\s|$)") {
@@ -665,8 +565,8 @@ if ($Apply) {
   # Cross-platform CLI parity: forward flags that apply.ps1 accepts.
   if ($NoAISync) { $effectiveApplyArgs += "-NoAISync" }
   if ($ReplicaSync) { $effectiveApplyArgs += "-ReplicaSync" }
-  # TargetUser is POSIX-only (nix apply --target-user); accepted but not
-  # forwarded on Windows since apply.ps1 does not implement this param.
+  # TargetUser is POSIX-only (nix apply --target-user) and apply.ps1 has no such
+  # parameter, so it is not forwarded.
   if ($TargetUser) {
     Write-Debug "bootstrap: -TargetUser accepted but ignored on Windows (POSIX-only)"
   }

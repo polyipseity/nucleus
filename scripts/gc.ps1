@@ -3,119 +3,30 @@
   Perform bounded garbage collection on Windows hosts.
 
 .DESCRIPTION
-  Windows-side counterpart to scripts/gc.sh.  Runs the following steps in
-  order, each independently skippable:
+  Windows counterpart to scripts/gc.sh. Every step is independently skippable
+  and scoped to the primary user profile, so the script is idempotent.
 
-    1. Remove stale decrypted wallpaper files under %USERPROFILE%\Pictures\wallpapers
-       that no longer have a matching overlay *.sops blob under src/users/*/wallpapers/.
-    2. GC bun/cargo/rustc/uv caches and the nucleus repo-local .direnv
-       environment. cargo-cache remains the authoritative gc path for the
-       Cargo registry/git/advisory-db cache when present; rustc-specific temp
-       state is cleared via rustup's tmp directory.
-    3. Remove stale .git cache/state files (gitk.cache, gc.log, stale lock/state
-       files, deprecated branches/remotes/ dirs, refs/original/) and run
-       `git gc --auto` in repos under ~/dev.  Active operation detection
-       prevents state file removal during in-progress merges/rebase/bisects.
-       Guarded by the NoGitCacheGc switch.
-    4. Remove old Scoop app versions and installer caches via `scoop cleanup *`.
-       Guarded by a Scoop presence check so the step is a no-op when Scoop is
-       not yet installed (e.g. before the first apply.ps1 run).
-    5. Remove locally installed Ollama models absent from the declarative manifest
-       at src/modules/configs/ollama/models.json.  Uses Invoke-AISync -GcOnly so no new
-       model pulls are triggered — GC only reclaims space.  Guarded by an ollama
-       presence check so the step is a no-op when Ollama is not installed.
-    6. Remove stale VM build artifacts (Packer directories, pre-built disk
-       images) for VMs no longer declared in src/modules/vms/VMs.json.
-       Guarded by the NoVMGc switch.
-    7. Rotate managed log files via copy-truncate using rotation parameters
-       from src/modules/services.json.
-       Guarded by the NoLogGc switch.
-
-  All file operations are scoped to the primary user profile.  The script is
-  idempotent and safe to re-run.
-
-  With -DryRun every destructive step reports what it would do through
-  Write-NucleusDryRun and removes nothing, matching gc.sh --dry-run.  Each step
-  is guarded on its own, so a preview cannot fall through into a real
-  collection the way an unparameterised invocation could.
-
-.PARAMETER ModuleDir
-  Path to the Windows helper module directory. When omitted, auto-derives
-  from RepoRoot as src\platforms\Windows\modules so callers can skip it when
-  RepoRoot is provided (default: '').
+  -DryRun reports each destructive step through Write-NucleusDryRun and removes
+  nothing. The step guards make a preview impossible to turn into a real run.
 
 .PARAMETER DryRun
-  Report what would be collected and remove nothing, matching gc.sh --dry-run
-  (default: $false).
-
-.PARAMETER NoNixGc
-  Accepted but ignored on Windows (POSIX-only) (default: $false).
-
-.PARAMETER NoHmGc
-  Accepted but ignored on Windows (POSIX-only) (default: $false).
-
-.PARAMETER NoToolCacheGc
-  Skip bun/cargo/rustc/uv and repo-local .direnv cache gc (default: $false).
-
-.PARAMETER NoGitCacheGc
-  Skip stale .git cache/state cleanup and git gc --auto in repos under ~/dev (default: $false).
-
-.PARAMETER NoOllamaGc
-  Skip Ollama orphaned model removal even when ollama is installed (default: $false).
-
-.PARAMETER NoScoopGc
-  Skip Scoop cache and old-version gc even when Scoop is installed (default: $false).
-
-.PARAMETER NoWallpaperGc
-  Skip stale wallpaper file gc (default: $false).
-
-.PARAMETER NoLogGc
-  Skip log rotation (default: $false).
-
-.PARAMETER NoJournaldGc
-  Accepted but ignored on Windows (POSIX-only) (default: $false).
+  Report what would be collected and remove nothing (default: $false).
 
 .PARAMETER LogMaxSize
-  Log rotation max file size in bytes before rotation (default: from services.schema.json loggingEntry default).
+  Rotation threshold in bytes (default: loggingEntry.maxSize in services.schema.json).
 
 .PARAMETER LogMaxFiles
-  Number of rotated archives to keep (default: from services.schema.json loggingEntry default).
+  Rotated archives to keep (default: loggingEntry.maxFiles in services.schema.json).
 
 .PARAMETER LogCompress
-  Whether to compress rotated logs (default: from services.schema.json loggingEntry default).
-
-.PARAMETER NoVMGc
-  Skip stale VM artifact removal (default: $false).
+  Whether to gzip rotated logs (default: loggingEntry.compress in services.schema.json).
 
 .PARAMETER GCVMData
-  Collect orphaned VM data (default: $false).
-  Runs vm.sh gc --gc-data, which is what gc.sh does when asked to.
-
-.PARAMETER NoSystemGc
-  Skip system GC (default: $false). Accepted but ignored on Windows (POSIX-only).
-
-.PARAMETER NoNixArtifactsGc
-  Skip stale nix build-artifact symlink removal (default: $false). Accepted but ignored on Windows (POSIX-only).
-
-.PARAMETER NoDuperemoveGc
-  Skip duperemove store deduplication (default: $false). Accepted but ignored on Windows (POSIX-only).
-
-.PARAMETER Expiry
-  Master expiry override for both HM and Nix GC durations (e.g. "14d", "30d") (default: "7d"). Accepted but ignored on Windows (POSIX-only).
-
-.PARAMETER HmExpiry
-  Home Manager generation expiry duration in nix format (e.g. "7d") (default: "7d"). Accepted but ignored on Windows (POSIX-only).
-
-.PARAMETER NixExpiry
-  Nix store GC --delete-older-than duration (e.g. "7d", "30d") (default: "7d"). Accepted but ignored on Windows (POSIX-only).
-
-.EXAMPLE
-  .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -RepoRoot "C:\Users\admin\nucleus"
-  .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -RepoRoot "C:\Users\admin\nucleus" -NoToolCacheGc
+  Collect orphaned VM data (default: $false). Runs vm.sh gc --gc-data, which is
+  what gc.sh does when asked to.
 
 .NOTES
   Environment variables: NUCLEUS_GC_HM_EXPIRY, NUCLEUS_GC_LOG_COMPRESS, NUCLEUS_GC_LOG_MAX_FILES, NUCLEUS_GC_LOG_MAX_SIZE, NUCLEUS_GC_MODULE_DIR, NUCLEUS_GC_NIX_EXPIRY, NUCLEUS_LOG_EXPIRY, NUCLEUS_REPO_ROOT.
-  Exit codes: 0 on success; non-zero on failure.
 #>
 [CmdletBinding()]
 param(
@@ -181,10 +92,8 @@ if ([string]::IsNullOrWhiteSpace($ModuleDir)) {
   $ModuleDir = Join-Path $RepoRoot 'src\platforms\Windows\modules'
 }
 
-# -NoNixGc, -NoHmGc, -NoJournaldGc, -NoSystemGc, -NoNixArtifactsGc, and
-# -NoDuperemoveGc are accepted but ignored on Windows: nix, system GC, nix
-# artifacts and duperemove have no Windows form. Accepted for cross-platform CLI
-# parity with gc.sh, which carries the same flags.
+# WHY accepted: cross-platform CLI parity with gc.sh, which carries the same
+# flags for nix, system GC, nix artifacts, duperemove and the expiry values.
 if ($NoNixGc) {
   Write-NucleusWarning "-NoNixGc accepted but ignored on Windows (POSIX-only)"
 }
@@ -207,8 +116,6 @@ if ($NoDuperemoveGc) {
   Write-NucleusWarning "-NoDuperemoveGc accepted but ignored on Windows (POSIX-only)"
 }
 
-# -Expiry, -HmExpiry, -NixExpiry are accepted but ignored on Windows
-# (POSIX-only options from gc.sh). Accepted for cross-platform CLI parity.
 if ($Expiry) {
   Write-NucleusWarning "-Expiry accepted but ignored on Windows (POSIX-only)"
 }
@@ -308,7 +215,6 @@ function Clear-GitCache {
     }
 
     try {
-      # Detect active Git operation.
       $activeOp = $false
       $activeMarkers = @(
         'MERGE_HEAD', 'rebase-merge', 'rebase-apply', 'BISECT_LOG',
@@ -328,19 +234,17 @@ function Clear-GitCache {
         }
       }
 
-      # Remove gitk cache.
       $gitkCache = Join-Path $gitDir.FullName 'gitk.cache'
       if (Test-Path -LiteralPath $gitkCache -PathType Leaf) {
         Remove-Item -LiteralPath $gitkCache -Force -ErrorAction Stop
       }
 
-      # Remove gc.log (allows git gc --auto to run again).
+      # WHY remove gc.log: it is what keeps `git gc --auto` from running again.
       $gcLog = Join-Path $gitDir.FullName 'gc.log'
       if (Test-Path -LiteralPath $gcLog -PathType Leaf) {
         Remove-Item -LiteralPath $gcLog -Force -ErrorAction Stop
       }
 
-      # Remove lock files except index.lock.
       # check-suppress:suppression_doc: probe -- lock files may not exist; empty result is handled
       $lockFiles = Get-ChildItem -LiteralPath $gitDir.FullName -Filter '*.lock' -File -Force -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -ne 'index.lock' }  # ref: allow-and-deny-lists.instructions.md#A5 -- Git invariant; index.lock must never be cleaned
@@ -348,9 +252,7 @@ function Clear-GitCache {
         Remove-Item -LiteralPath $lockFile.FullName -Force -ErrorAction Stop
       }
 
-      # Remove stale state files when no active operation.
-      # Uses dynamic glob patterns to discover stale files, so new Git state
-      # files are automatically picked up without maintaining a hard-coded list.
+      # WHY the glob: new Git state files are picked up without a hard-coded list.
       if (-not $activeOp) {
         $stateFiles = Get-ChildItem -LiteralPath $gitDir.FullName -File |
           Where-Object { $_.Name -match '(_HEAD$|^BISECT_|^AUTO_MERGE$|^SQUASH_MSG$)' }
@@ -359,7 +261,6 @@ function Clear-GitCache {
         }
       }
 
-      # Remove deprecated directories if empty.
       $depDirs = @('branches', 'remotes')
       foreach ($depDir in $depDirs) {
         $depPath = Join-Path $gitDir.FullName $depDir
@@ -372,7 +273,7 @@ function Clear-GitCache {
         }
       }
 
-      # Remove refs/original/ via git update-ref (handles packed-refs).
+      # WHY update-ref: it also sees refs packed into packed-refs.
       # check-suppress:suppression_doc: refs/original/ may not exist; empty/null result is handled
       $originalRefs = & git -C $repoRoot for-each-ref --format='%(refname)' refs/original/ 2>$null
       if ($originalRefs) {
@@ -393,7 +294,7 @@ function Clear-GitCache {
         }
       }
 
-      # Run git gc --auto (delegates object pruning, reflog expiry, etc. to Git).
+      # WHY delegate: Git owns object pruning and reflog expiry.
       # check-suppress:suppression_doc: some repos may fail during gc; best-effort
       & git -C $repoRoot gc --auto 2>$null
     }
@@ -427,9 +328,8 @@ function Invoke-CleanupNix {
 
   $_found = $false
 
-  # Recursively scan for result and result-* symlinks without following symlinks.
-  # Manual directory walk avoids Get-ChildItem -Recurse which follows reparse points.
-  # Use an index cursor to avoid range-operator edge cases with single-element arrays.
+  # WHY a manual walk: Get-ChildItem -Recurse follows reparse points, and the
+  # index cursor avoids range-operator edge cases on single-element arrays.
   $_dirIndex = 0
   $_directories = @($resolvedRepoRoot)
 
@@ -588,13 +488,12 @@ if (-not $NoVMGc) {
   $srcDir = Join-Path $vmDir "src"
   $manifest = Join-Path $resolvedRepoRoot "src\modules\vms\VMs.json"
 
-  # If VM directories do not exist, there is nothing to clean.
   if (-not (Test-Path -LiteralPath $vmDir -PathType Container)) {
     Write-NucleusInfo "VM directory not found; skipping VM artifact gc"
   } elseif (-not (Test-Path -LiteralPath $manifest -PathType Leaf)) {
     Write-NucleusWarning "manifest '$manifest' not found; skipping VM artifact gc"
   } elseif (Test-Path -LiteralPath $srcDir -PathType Container) {
-    # Remove temporary Packer build directories under src/<type>/Packer/.
+    # Packer build dirs under src/<type>/Packer/.
     # check-suppress:suppression_doc: probe -- type directories may not exist; ForEach-Object handles empty result.
     Get-ChildItem -LiteralPath $srcDir -Directory -ErrorAction SilentlyContinue | ForEach-Object {
       $packerDir = Join-Path $_.FullName 'Packer'
@@ -603,7 +502,7 @@ if (-not $NoVMGc) {
       }
     }
 
-    # Remove leftover Packer temporary build directories (dot-prefixed, from interrupted runs).
+    # Dot-prefixed Packer dirs left by interrupted runs.
     # check-suppress:suppression_doc: probe -- type directories may not exist; ForEach-Object handles empty result.
     Get-ChildItem -LiteralPath $srcDir -Directory -ErrorAction SilentlyContinue | ForEach-Object {
       # check-suppress:suppression_doc: probe -- stale temporary directories may not exist; Where-Object handles empty result.
@@ -614,32 +513,25 @@ if (-not $NoVMGc) {
         }
     }
 
-    # WHY: keep-set has one source of truth in src/scripts/lib/vm.sh — the old
-    # enabled-only name sweep deleted non-regenerable type system images of
-    # disabled/other-host guests (e.g. Android (system).qcow2, Windows.qcow2);
-    # vm.sh gc preserves every manifest guest by default (--gc-disabled narrows).
-    # Start/stop scripts are regenerated for every manifest guest and stripped
-    # by pack; descriptor staleness is owned by vm_gc_orphan_descriptors.
+    # WHY the keep-set has one owner: the old enabled-only sweep deleted
+    # non-regenerable system images of disabled or other-host guests, and
+    # vm.sh gc preserves every manifest guest unless --gc-disabled narrows it.
     $vmSh = Join-Path $resolvedRepoRoot 'scripts\vm.sh'
     if (-not (Test-Path -LiteralPath $vmSh -PathType Leaf)) {
       Write-NucleusWarning "vm.sh not found at $vmSh; skipping VM artifact gc"
     } else {
-      # WHY: the switch is positive. gc.sh defaults vm_data_gc to false, so
-      # --gc-data is opt-in there. A -NoVmDataGc spelling would default to
-      # $false, which on a "No" switch means "do not skip", so every weekly
-      # Windows run would collect VM data while POSIX did not.
+      # WHY the switch is positive: gc.sh defaults vm_data_gc to false, and a
+      # -NoVmDataGc spelling would default to $false, meaning do not skip.
       $vmGcArgs = @('gc')
       if ($GCVMData) { $vmGcArgs += '--gc-data' }
       if ($DryRun) {
-        # WHY: bash is not invoked.  vm.sh accepts --dry-run, but producing a
-        # preview by executing a second script whose dry-run paths are not
-        # covered here would trade the whole point of the switch for a
-        # prettier message.
+        # WHY no second bash call: vm.sh accepts --dry-run, but previewing through a
+        # script whose dry-run paths are not covered here would trade the point
+        # of the switch for a prettier message.
         Write-NucleusDryRun "would run 'vm.sh gc' for stale VM artifacts"
       } else {
         & bash $vmSh @vmGcArgs
-        # WHY: $LASTEXITCODE is only read next to the invocation.  A stale
-        # value from an earlier external command would otherwise raise a
+        # WHY read it here: a stale value from an earlier command would raise a
         # misleading warning on a dry run that ran nothing.
         if ($LASTEXITCODE -ne 0) {
           Write-NucleusWarning "vm.sh gc exited with code $LASTEXITCODE"
