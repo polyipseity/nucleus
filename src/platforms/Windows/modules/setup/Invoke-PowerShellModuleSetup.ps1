@@ -4,15 +4,18 @@ function Invoke-PowerShellModuleSetup {
     Idempotently installs PowerShell modules pinned in the repository lockfile.
   .DESCRIPTION
     Reads the `psgallery` section of lockfile.json and installs each module at
-    its pinned version; a {version, hash} pin uses only the version. Every copy
-    at or above the pin is removed first, whatever its scope, so none can shadow
-    it. A copy below the pin stays: PowerShell loads the highest version, so it
-    is inert. Additive only, since PowerShell modules are shared with
-    non-nucleus workflows.
-    A copy that cannot be removed does not stop the run: the failure is
-    recorded, the sweep continues, the pin is still installed, and every failure
-    is thrown once at the end. Deleting a copy outside the per-user module path
-    takes ownership of the tree, grants this account full control and clears
+    its pinned version; a {version, hash} pin uses only the version. A copy at or
+    above the pin is removed first, whatever its scope, so none can shadow it. A
+    copy below the pin is removed only under the per-user module path, which is
+    the tree this module owns; a copy below the pin anywhere else stays, because
+    it cannot shadow the pin and the OS image put it there. Additive only, since
+    PowerShell modules are shared with non-nucleus workflows.
+    After the install the pin is verified under the per-user module path, so an
+    install that reports success without landing is a failure rather than a pass.
+    A failure does not stop the run: it is recorded, the sweep continues, the
+    other pins are still installed, and every failure is thrown once at the end.
+    Deleting a copy outside the per-user module path takes ownership of the
+    tree, grants this account full control and clears
     read-only, because a read-only file in an image-owned tree is denied for a
     reason an ACL grant does not address.
     Removing an image- or other-admin-owned copy needs elevation even though
@@ -40,7 +43,7 @@ function Invoke-PowerShellModuleSetup {
 
   $currentUserModulePath = @($env:PSModulePath -split [IO.Path]::PathSeparator | Where-Object { $_ })[-1]
 
-  $removalFailures = @()
+  $convergenceFailures = @()
 
   foreach ($entry in $psGalleryModules.PSObject.Properties) {
     $moduleName = $entry.Name
@@ -48,7 +51,7 @@ function Invoke-PowerShellModuleSetup {
     $requiredVersion = if ($pin -is [string]) { $pin } else { $pin.version }
 
     if ([string]::IsNullOrWhiteSpace($requiredVersion)) {
-      Write-NucleusWarning -CommandName 'Invoke-PowerShellModuleSetup' "$moduleName has no pinned version — skipping"
+      Write-NucleusWarning -CommandName 'Invoke-PowerShellModuleSetup' "$moduleName has no pinned version, skipping"
       continue
     }
 
@@ -62,12 +65,14 @@ function Invoke-PowerShellModuleSetup {
     # to put back what was already right. The version floor below still takes out
     # a machine-scope copy of the pinned version, which is not the scope this
     # module owns and outranks the pin in the module path.
-    # WHY at or above the pin rather than merely different from it: PowerShell
-    # loads the highest version available, so a copy below the pin is inert and
-    # cannot shadow it, and this repository has no reason to delete a module the
-    # Windows image ships. That is the Pester 3.4.0 the GitHub runner image
-    # carries under Program Files beside a 6.2.0 pin, and trying to delete it is
-    # what turned that runner red before any check or test step ran.
+    # WHY a copy below the pin is a target only under the per-user path: that is
+    # the tree this module owns, and a stale copy beside the pin is what leaves
+    # Get-Module -ListAvailable reporting two versions of the same module. Outside
+    # that path the copy stays, because it cannot shadow the pin and this
+    # repository has no reason to delete a module the image ships. That is the
+    # Pester 3.4.0 the GitHub runner image carries under Program Files beside a
+    # 6.2.0 pin, and trying to delete it is what turned that runner red before
+    # any check or test step ran.
     # WHY a copy exactly at the pin stays a target: PowerShell breaks a version
     # tie by path order, so a copy of the pin at a scope this module does not own
     # outranks the per-user one.
@@ -75,7 +80,11 @@ function Invoke-PowerShellModuleSetup {
     #   both lists come from the same listing, so the converged copy is guaranteed
     #   to be spared, and a second copy of the rule is the one way that could stop
     #   holding.
-    $sweepTargets = @($existing | Where-Object { $_.Version -ge [Version]$requiredVersion -and $converged -notcontains $_ })
+    $sweepTargets = @($existing | Where-Object {
+        if ($converged -contains $_) { return $false }
+
+        return ($_.Version -ge [Version]$requiredVersion) -or ($_.ModuleBase -like "$currentUserModulePath*")
+      })
 
     if ($sweepTargets.Count -gt 0) {
       Write-NucleusInfo -CommandName 'Invoke-PowerShellModuleSetup' "removing $($sweepTargets.Count) conflicting version(s) of $moduleName..."
@@ -126,7 +135,7 @@ function Invoke-PowerShellModuleSetup {
           # on a guess sends the reader after the wrong thing. What the probes
           # prove is reported; the rest is reported as unknown.
           $evidence = Get-ModuleRemovalDiagnosis -Path $copy.ModuleBase -Failure $failureMessage
-          $removalFailures += "$moduleName $($copy.Version) at $($copy.ModuleBase): $failureMessage. Evidence: $evidence"
+          $convergenceFailures += "$moduleName $($copy.Version) at $($copy.ModuleBase): $failureMessage. Evidence: $evidence"
           # WHY Continue: the caller runs under $ErrorActionPreference Stop, where
           # an unsuppressed Write-Error would end the very sweep this catch exists
           # to keep going.
@@ -145,14 +154,38 @@ function Invoke-PowerShellModuleSetup {
 
     Write-NucleusInfo -CommandName 'Invoke-PowerShellModuleSetup' "installing $moduleName version $requiredVersion..."
     Install-Module -Name $moduleName -RequiredVersion $requiredVersion -Force -Scope CurrentUser -AllowClobber -ErrorAction Stop
+
+    # WHY a second listing: the install is the only step that can put the pin
+    # under the per-user path, so the listing taken before it cannot prove
+    # anything about the result.
+    $available = @(Get-Module -ListAvailable -Name $moduleName)
+    $installed = @($available | Where-Object {
+        $_.Version -eq [Version]$requiredVersion -and
+        $_.ModuleBase -like "$currentUserModulePath*"
+      })
+    if ($installed.Count -gt 0) {
+      Write-NucleusInfo -CommandName 'Invoke-PowerShellModuleSetup' "$moduleName $requiredVersion is installed at CurrentUser scope"
+      continue
+    }
+
+    # WHY the found list in the message: "not installed" alone sends the reader
+    # back to the same listing that already said so. What was found names the
+    # copy that took the slot, which is the answer the reader needs.
+    $found = (@($available | ForEach-Object { "$($_.Version) at $($_.ModuleBase)" }) -join '; ')
+    if (-not $found) { $found = 'no copy of this module' }
+    $convergenceFailures += "$moduleName $($requiredVersion): not installed under $currentUserModulePath after the install; found: $found"
+    # WHY Continue: the caller runs under $ErrorActionPreference Stop, where an
+    # unsuppressed Write-Error would end the sweep over the remaining pins.
+    Write-NucleusError -CommandName 'Invoke-PowerShellModuleSetup' "$moduleName $requiredVersion is not installed under $currentUserModulePath; found: $found" -ErrorAction Continue
   }
 
   # WHY here and not at the first failure: every remaining copy was still swept
-  # and every pin still installed before this point, so one throw carries the
-  # whole picture instead of hiding the copies behind the first one that failed.
-  if ($removalFailures.Count -gt 0) {
-    $failureReport = $removalFailures -join [Environment]::NewLine
-    throw "Invoke-PowerShellModuleSetup: $($removalFailures.Count) conflicting module copy removal(s) failed, so this host is not fully converged. Every other copy was still swept and every pin still installed. Failures:$([Environment]::NewLine)$failureReport"
+  # and every reachable pin still installed before this point, so one throw
+  # carries the whole picture instead of hiding the copies behind the first one
+  # that failed.
+  if ($convergenceFailures.Count -gt 0) {
+    $failureReport = $convergenceFailures -join [Environment]::NewLine
+    throw "Invoke-PowerShellModuleSetup: $($convergenceFailures.Count) module convergence failure(s), so this host is not fully converged. Every sweepable copy was still removed and every reachable pin still installed. Failures:$([Environment]::NewLine)$failureReport"
   }
 }
 

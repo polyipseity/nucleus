@@ -2,14 +2,18 @@
 .SYNOPSIS
     Pester coverage for Invoke-PowerShellModuleSetup PSGallery convergence.
 .DESCRIPTION
-    The module removes every discovered copy of a pinned module that is at or
-    above the pin and reinstalls the pin at CurrentUser scope. Two copies used to
-    be a real failure: the old code took only the first Get-Module -ListAvailable
-    result, so the second copy survived and Install-Module warned that it was
-    unsupported. A copy below the pin is left alone, because PowerShell loads the
-    highest version available and such a copy is inert. A copy that cannot be
-    removed is recorded against that copy and thrown once at the end, so the
-    remaining copies are still swept and the pin is still installed. The suite
+    The module removes every discovered copy of a pinned module that can
+    shadow the pin or sits under the per-user module path, then installs the pin
+    at CurrentUser scope and verifies it landed. Two copies used to be a real
+    failure: the old code took only the first Get-Module -ListAvailable result,
+    so the second copy survived and Install-Module warned that it was
+    unsupported. A copy below the pin is removed only under the per-user module
+    path, which this module owns; outside it the copy stays, because it cannot
+    shadow the pin and the OS image put it there. A pin that is not under the
+    per-user module path after the install is reported, so an install that
+    reports success without landing is a failure. A failure is recorded against
+    what failed and thrown once at the end, so the remaining copies are still
+    swept and the other pins are still installed. The suite
     drives the real module against a temp fixture repo root with Get-Module,
     Uninstall-Module, Install-Module, Remove-Item, Enable-ModuleTreeRemoval and
     Clear-ModuleTreeReadOnlyAttribute mocked, so no module is touched, no
@@ -96,12 +100,17 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         $script:removedModules = @()
         $script:installCalls = @()
         $script:undeletablePaths = @()
+        # Mirrors what the real cmdlets leave behind: Install-Module puts the pin
+        # under the per-user module path, so the next listing sees it. Without
+        # this the post-install check would read the pre-install listing and fail
+        # every install case for the wrong reason.
+        $script:installedCopies = @()
         # WHY the one shared ordered log: the read-only clearing and the delete
         # are separate mocked calls, and a case cannot prove which came first
         # from two unordered lists.
         $script:operationLog = @()
 
-        Mock Get-Module { return $script:copies }
+        Mock Get-Module { return @($script:copies) + @($script:installedCopies) }
         # WHY mocked: the real helper would take ownership of whatever path it is
         # given. The CI bootstrap step exercises it for real; here it only has to
         # record that the sweep asked for it, and where.
@@ -110,7 +119,14 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         # and a case only needs to know that the sweep asked for it, and where.
         Mock Clear-ModuleTreeReadOnlyAttribute { $script:clearedReadOnlyPaths += $Path; $script:operationLog += "clear-readonly:$Path" }
         Mock Remove-Module { $script:removedModules += $Name }
-        Mock Install-Module { $script:installCalls += $RequiredVersion }
+        Mock Install-Module {
+            $script:installCalls += $RequiredVersion
+            $script:installedCopies += [PSCustomObject]@{
+                Name       = $Name
+                Version    = [Version]$RequiredVersion
+                ModuleBase = Join-Path $script:currentUserRoot (Join-Path $Name $RequiredVersion)
+            }
+        }
         # Records instead of deleting, so a case can assert WHICH directories the
         # sweep reached. The delete itself is covered by the orphan case below,
         # which lets this through for one run.
@@ -142,7 +158,7 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         $script:installCalls | Should -Contain '6.2.0'
     }
 
-    It 'leaves a copy below the pin on disk while still sweeping one above it' {
+    It 'leaves a copy below the pin outside the per-user path while still sweeping one above it' {
         $higher = Get-ModuleCopy -Version '7.0.0' -Scope 'MachineModules'
         $lower = Get-ModuleCopy -Version '3.4.0' -Scope 'MachineModules'
         Initialize-ModuleDirectory -ModuleBase $higher.ModuleBase
@@ -151,10 +167,9 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
 
         Invoke-PowerShellModuleSetup
 
-        # The version floor: PowerShell loads the highest version available, so a
-        # copy under the pin cannot shadow it and stays where the image put it.
-        # This is the Pester 3.4.0 the runner image ships beside a 6.2.0 pin, and
-        # deleting it is what turned that runner red.
+        # The image owns this tree, so a copy under the pin there stays: it
+        # cannot shadow the pin. This is the Pester 3.4.0 the runner image ships
+        # beside a 6.2.0 pin, and deleting it is what turned that runner red.
         @($script:removedDirectories) | Should -Not -Contain $lower.ModuleBase
         Test-Path -LiteralPath $lower.ModuleBase | Should -BeTrue
         # A copy this module does not sweep is a copy it must not take ownership
@@ -164,6 +179,44 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         $script:removedDirectories | Should -Contain $higher.ModuleBase
         @($script:removedDirectories).Count | Should -Be 1
         $script:installCalls | Should -Contain '6.2.0'
+    }
+
+    It 'removes a copy below the pin when it sits under the per-user module path' {
+        $stale = Get-ModuleCopy -Version '5.9.0' -Scope 'CurrentUserModules'
+        Initialize-ModuleDirectory -ModuleBase $stale.ModuleBase
+        $script:copies = @($stale)
+
+        Invoke-PowerShellModuleSetup
+
+        # Our own tree holds one version of a managed module, and a stale copy
+        # beside the pin is what leaves Get-Module -ListAvailable reporting two.
+        $script:removedDirectories | Should -Contain $stale.ModuleBase
+        Test-Path -LiteralPath $stale.ModuleBase | Should -BeFalse
+        # The tree is already ours, so it needs no ownership or attribute change.
+        @($script:grantedPaths) | Should -Not -Contain $stale.ModuleBase
+        @($script:clearedReadOnlyPaths) | Should -Not -Contain $stale.ModuleBase
+        $script:installCalls | Should -Contain '6.2.0'
+    }
+
+    It 'throws when the pin is not under the per-user module path after the install' {
+        $script:copies = @()
+        # An install that reports success and lands nothing: the next listing
+        # carries a different version instead of the pin.
+        Mock Install-Module {
+            $script:installCalls += $RequiredVersion
+            $script:installedCopies += [PSCustomObject]@{
+                Name       = $Name
+                Version    = [Version]'5.9.0'
+                ModuleBase = Join-Path $script:currentUserRoot (Join-Path $Name '5.9.0')
+            }
+        }
+
+        $failure = { Invoke-PowerShellModuleSetup } | Should -Throw -PassThru
+
+        # Both the module and what was found, so the reader does not have to run
+        # the listing again to learn what took the slot.
+        $failure.Exception.Message | Should -BeLike '*Pester 6.2.0: not installed under*'
+        $failure.Exception.Message | Should -BeLike '*5.9.0*'
     }
 
     It 'removes the copy above the pin and keeps the converged pin when the pinned version is already present' {
