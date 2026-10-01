@@ -134,7 +134,7 @@ let
 
   # Not an activation hook: a full scan of a large worktree would noticeably
   # delay `nix run .#apply`.
-  devSpotlightExclusions = pkgs.writeNucleusShellApplication {
+  spotlightExclusions = pkgs.writeNucleusShellApplication {
     name = "spotlight-exclusions";
     runtimeInputs = [ ];
     scriptName = "src/platforms/macOS/scripts/macos-configure-spotlight-exclusions";
@@ -142,7 +142,7 @@ let
 
   # Not an activation hook, same reason as the Spotlight markers: deleting
   # stale .DS_Store files takes noticeable time on a large checkout.
-  devDsStoreGc = pkgs.writeNucleusShellApplication {
+  dsStoreGc = pkgs.writeNucleusShellApplication {
     name = "ds-store-gc";
     runtimeInputs = [ ];
     scriptName = "src/scripts/services/ds-store-gc";
@@ -230,7 +230,7 @@ in
     domain = "gui";
     config = {
       Label = "local.ds-store-gc";
-      ProgramArguments = [ "${devDsStoreGc}/bin/nucleus-ds-store-gc" ];
+      ProgramArguments = [ "${dsStoreGc}/bin/nucleus-ds-store-gc" ];
       RunAtLoad = false;
       StartCalendarInterval = [
         {
@@ -247,7 +247,7 @@ in
     config = {
       Label = "local.spotlight-exclusions";
       ProgramArguments = [
-        "${devSpotlightExclusions}/bin/nucleus-spotlight-exclusions"
+        "${spotlightExclusions}/bin/nucleus-spotlight-exclusions"
         (builtins.concatStringsSep " " devSpotlightExcludedDirectoryNames)
       ];
       RunAtLoad = false;
