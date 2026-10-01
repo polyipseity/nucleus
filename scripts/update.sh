@@ -196,7 +196,6 @@ EOF
   LOCKFILE_REL="src/lockfiles/lockfile.json"
   LOCKFILE_ABS="$REPO_ROOT/$LOCKFILE_REL"
 
-  # Pre-flight checks
   require_command jq
 
   if [ ! -f "$LOCKFILE_ABS" ]; then
@@ -204,13 +203,11 @@ EOF
     exit 1
   fi
 
-  # Canonical section names (alphabetical). cargo aliases cargo-binstall; the
-  # legacy bare tokens nixos-iso / tart-images normalize to vm-setup children.
-  # whisper is listed but not updatable: a model pin is a (revision, hash) pair
-  # that has to be chosen together, so no tool can recompute one from the other.
+  # cargo aliases cargo-binstall; nixos-iso / tart-images normalize to
+  # vm-setup children. whisper has no updater: a (revision, hash) pair has to be
+  # chosen together, so nothing can recompute one from the other.
   _VALID_SECTIONS_CSV="bun,cargo,cargo-binstall,cursor,pi,psgallery,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,whisper,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows"
 
-  # Parse flags (comma-separated, defaults to all)
   SECTIONS=""
   VERIFY=false
   VERIFY_INSTALLED=false
@@ -244,9 +241,8 @@ EOF
     shift
   done
 
-  # Validate and normalize --sections tokens: trim whitespace, map legacy bare
-  # sub-section names (nixos-iso, tart-images) and the cargo alias to canonical
-  # dotted form, and reject anything unknown.
+  # Tokens are trimmed, legacy bare names and the cargo alias map to their dotted
+  # form, and unknown tokens are rejected.
   _is_valid_section() {
     local token="$1"
     case ",$_VALID_SECTIONS_CSV," in
@@ -276,9 +272,8 @@ EOF
     SECTIONS="${SECTIONS%,}"
   fi
 
-  # Explicitly-selected sections without an updater are kept manual; warn so the
-  # run does not silently skip them. Parent tokens (homebrew, vm-setup) do not
-  # warn for their no-updater children.
+  # Sections with no updater stay manual; warn instead of skipping silently.
+  # Parent tokens (homebrew, vm-setup) do not warn for their children.
   if [ -n "$SECTIONS" ]; then
     IFS=',' read -ra _tokens <<<"$SECTIONS"
     for _tok in "${_tokens[@]}"; do
@@ -301,7 +296,7 @@ EOF
     return 1
   }
 
-  # suggestions_enabled mirrors section_enabled but for the suggestions.* subtree.
+  # Same as section_enabled but for the suggestions.* subtree.
   suggestions_enabled() {
     local name="$1"
     [ -z "$SECTIONS" ] && return 0 # no filter = all enabled
@@ -317,34 +312,28 @@ EOF
     return 1
   }
 
-  # Helpers
   changed=false
   log_update() {
     say "updating $1.$2 from $3 to $4"
     changed=true
   }
 
-  # SRI SHA256 (sha256-<base64>) of a PSGallery nupkg, the form the lockfile's
-  # psgallery object pins record. Prints nothing when the fetch fails; every
-  # caller must treat empty output as a failed recomputation and must not write
-  # the entry.
+  # SRI SHA256 of a PSGallery nupkg, the form object pins record. Prints nothing
+  # on failure, so an empty result means the entry must not be written.
   psgallery_nupkg_hash() {
     nix store prefetch-file --json --hash-type sha256 \
       "https://www.powershellgallery.com/api/v2/package/$1/$2" 2>/dev/null | jq -er '.hash' 2>/dev/null
   }
 
-  # Read lockfile
   data=$(cat "$LOCKFILE_ABS")
 
-  # --verify-installed: verify installed tool versions against the pinned
-  # lockfile sections and exit (never writes). Delegates to the shared probe
-  # library; the host key scopes the probes to the packages this host manages.
+  # Delegates to the shared probe library; the host key scopes the probes to the
+  # packages this host manages.
   if $VERIFY_INSTALLED; then
     verify_installed_versions "$REPO_ROOT" "$(resolve_nucleus_host)"
     exit $?
   fi
 
-  # winget — winget show --id <id>
   if section_enabled winget; then
     if command -v winget >/dev/null 2>&1; then
       while IFS= read -r key; do
@@ -362,7 +351,6 @@ EOF
     fi
   fi
 
-  # scoop — scoop info <pkg>
   if section_enabled scoop; then
     if command -v scoop >/dev/null 2>&1; then
       while IFS= read -r key; do
@@ -380,7 +368,6 @@ EOF
     fi
   fi
 
-  # cargo-binstall — crates.io API (alias: cargo)
   if section_enabled cargo-binstall; then
     while IFS= read -r key; do
       [ -z "$key" ] && continue
@@ -390,8 +377,7 @@ EOF
       old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.["cargo-binstall"] // {})[$k] // empty')
       [ -z "$old" ] && continue
 
-      # Query crates.io for the latest stable version (User-Agent required;
-      # crates.io returns 403 without it), falling back to cargo search.
+      # crates.io returns 403 without a User-Agent, so fall back to cargo search.
       # check-suppress:suppression_doc: crates.io API may be unreachable or return a non-JSON error page; the cargo search fallback handles failure.
       new=$(curl -fsSL -A "nucleus-update-lockfile" "https://crates.io/api/v1/crates/$key" 2>/dev/null | jq -r '.crate.max_stable_version // .versions[0].num // empty' 2>/dev/null) || new=""
       if [ -z "$new" ]; then
@@ -409,7 +395,6 @@ EOF
     done < <(printf '%s\n' "$data" | jq -r '(.["cargo-binstall"] // {}) | keys[]')
   fi
 
-  # bun — npm registry API (curl)
   if section_enabled bun; then
     if command -v curl >/dev/null 2>&1; then
       while IFS= read -r key; do
@@ -427,11 +412,9 @@ EOF
     fi
   fi
 
-  # pi — npm registry API (curl).  Same endpoint as bun: pi's extensions are
-  # published to npm and the lockfile stores package name -> version.  Pins
-  # shaped as objects are VCS/rev pins and are not registry-updatable.
-  # Versions published within the minimumReleaseAge window are skipped to
-  # avoid a pin that bun install would reject (supply-chain hardening).
+  # Pins shaped as objects are VCS/rev pins and are not registry-updatable.
+  # Versions published within the minimumReleaseAge window are skipped, or bun
+  # install would reject the pin (supply-chain hardening).
   if section_enabled pi; then
     if command -v curl >/dev/null 2>&1; then
       _pi_age_threshold=$(($(date +%s) - ${MINIMUM_RELEASE_AGE:-432000}))
@@ -458,7 +441,6 @@ EOF
     fi
   fi
 
-  # uv — uv tool list
   if section_enabled uv; then
     declare -A uv_installed=()
     while IFS= read -r line; do
@@ -492,7 +474,6 @@ EOF
     done < <(printf '%s\n' "$data" | jq -r '(.uv // {}) | keys[]')
   fi
 
-  # rustup — rustc +<ch> --version
   if section_enabled rustup; then
     while IFS= read -r key; do
       [ -z "$key" ] && continue
@@ -512,7 +493,6 @@ EOF
     done < <(printf '%s\n' "$data" | jq -r '(.rustup // {}) | keys[]')
   fi
 
-  # psgallery — Find-Module via pwsh -NoProfile
   if section_enabled psgallery; then
     while IFS= read -r key; do
       [ -z "$key" ] && continue
@@ -521,8 +501,7 @@ EOF
       old=$(printf '%s\n' "$old_entry" | jq -r 'if type == "object" then .version else . end')
       new=$(pwsh -NoProfile -Command "Find-Module -Name '$key' | Select-Object -ExpandProperty Version" 2>/dev/null | head -1 | tr -d '[:space:]')
       # WHY: Find-Module renders its warnings on stdout, so an unreachable
-      # PSGallery yields escape-coded noise instead of a version. Never write that
-      # through as a pin — leave the entry unchanged and say so.
+      # PSGallery yields escape-coded noise; never write that as a pin.
       case "$new" in
       *[!0-9A-Za-z.+-]*)
         warn "psgallery.$key: could not resolve a version — leaving the entry unchanged"
@@ -531,8 +510,7 @@ EOF
       esac
       if [ -n "$new" ] && [ "$new" != "$old" ]; then
         if [ "$(printf '%s\n' "$old_entry" | jq -r 'type')" = object ]; then
-          # Object-form pins carry the nupkg hash; recompute it for the new
-          # version so a bump never leaves a stale hash behind.
+          # Recompute the nupkg hash so a bump never leaves a stale hash behind.
           new_hash=$(psgallery_nupkg_hash "$key" "$new") || new_hash=""
           if [ -z "$new_hash" ]; then
             warn "psgallery.$key: could not fetch the nupkg hash for $new — leaving the entry unchanged"
@@ -548,7 +526,6 @@ EOF
     done < <(printf '%s\n' "$data" | jq -r '(.psgallery // {}) | keys[]')
   fi
 
-  # cursor — cursor --list-extensions --show-versions
   if suggestions_enabled suggestions.cursor; then
     cursor_output=""
     if command -v cursor >/dev/null 2>&1; then
@@ -582,7 +559,6 @@ EOF
     fi
   fi
 
-  # vscode — code/code-insiders --list-extensions --show-versions
   if suggestions_enabled suggestions.vscode; then
     vscode_output=""
     if command -v code >/dev/null 2>&1; then
@@ -657,7 +633,6 @@ EOF
     done < <(printf '%s\n' "$data" | jq -r '(.suggestions.ollama // {}) | keys[]')
   fi
 
-  # nixos-iso — Query NixOS channel for latest ISO URL and its SHA-256
   if section_enabled vm-setup.nixos-iso; then
     while IFS= read -r arch; do
       [ -z "$arch" ] && continue
@@ -690,7 +665,6 @@ EOF
     done < <(printf '%s\n' "$data" | jq -r '(.["vm-setup"]["nixos-iso"] // {}) | keys[]')
   fi
 
-  # tart-images — Query GHCR OCI registry for Cirrus CI macOS base image digests
   if section_enabled vm-setup.tart-images; then
     while IFS= read -r os_version; do
       [ -z "$os_version" ] && continue
@@ -735,7 +709,6 @@ EOF
     done < <(printf '%s\n' "$data" | jq -r '(.["vm-setup"]["tart-images"] // {}) | keys[]')
   fi
 
-  # Compute the diff for --verify mode
   if $VERIFY; then
     _data_sorted=$(printf '%s\n' "$data" | jq -S .)
     # check-suppress:suppression_doc: diff exits 1 when files differ; output is needed for the [ -n "$_diff" ] check.
@@ -749,18 +722,14 @@ EOF
     exit 0
   fi
 
-  # Skip the write when no section produced a change.
   if [ "$changed" != true ]; then
     say "no changes — lockfile up to date"
     exit 0
   fi
 
-  # Stamp the timestamp right before the atomic write. Sort keys recursively
-  # (jq -S) so the on-disk file is deterministic and matches the PowerShell
-  # writer's ConvertTo-Json ordering.
+  # jq -S keeps the file deterministic and matches the PowerShell writer.
   data=$(printf '%s\n' "$data" | jq -S --arg d "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.updated = $d')
 
-  # Atomic write
   tmpfile=$(mktemp "$LOCKFILE_ABS.tmp.XXXXXX")
   trap 'rm -f "$tmpfile"' EXIT
 
@@ -770,14 +739,10 @@ EOF
   say "wrote $LOCKFILE_REL"
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Main dispatch
-# ──────────────────────────────────────────────────────────────────────────────
-
 # WHY: the subcommand word is captured first, then dropped (tolerating its
 # absence) so every do_* handler receives only its own remaining options. A
-# leading flag (or no word) defaults to the `update` subcommand so legacy
-# `nucleus-update [--flake ...]` invocations keep working unchanged.
+# leading flag (or no word) defaults to `update` so legacy
+# `nucleus-update [--flake ...]` invocations keep working.
 action="${1:-update}"
 case "$action" in
 -h | --help | help)

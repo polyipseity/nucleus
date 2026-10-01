@@ -22,8 +22,6 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
     return $false
   }
 
-  # Coverage: a zsh _nucleus-<cmd> file, a pwsh Register-ArgumentCompleter entry,
-  # and a defined $nucleus<Cmd>Flags array per command.
   Write-Message "--- coverage: zsh + pwsh completions for every nucleus-* command ---"
   $commands = @(
     'ai', 'apply', 'bootstrap', 'check', 'cloud', 'config', 'gc',
@@ -37,12 +35,11 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
     $pascal = (($command.Split('-') | ForEach-Object { $_.Substring(0, 1).ToUpperInvariant() + $_.Substring(1) }) -join '')
     $hasZsh = Test-Path -Path (Join-Path $zshDir "_nucleus-$command") -PathType Leaf
     # WHY: match the registration at the line start, so a mention inside a comment
-    # or another command's name (nucleus-svc vs nucleus-service-watchdog) cannot
-    # stand in for a real completer entry.
+    # or another command's name cannot stand in for a real entry.
     $hasCompleter = [regex]::IsMatch($profileText, "(?m)^Register-ArgumentCompleter -CommandName nucleus-$command\s")
-    # WHY: anchored to the line start with '=', i.e. the definition. The completer
-    # body mentions the same variable, so a name-anywhere match stayed green while
-    # nothing defined it -- that is how the missing utils inventory shipped.
+    # WHY: anchored to the line start with '=', the definition. The completer body
+    # mentions the same variable, so a name-anywhere match stayed green while
+    # nothing defined it, which is how the missing utils inventory shipped.
     $hasFlagVar = [regex]::IsMatch($profileText, "(?m)^\`$nucleus${pascal}Flags\s*=")
     if (-not ($hasZsh -and $hasCompleter -and $hasFlagVar)) {
       $missing += "$command (zsh:$hasZsh completer:$hasCompleter flagvar:$hasFlagVar)"
@@ -53,8 +50,7 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
     return $false
   }
 
-  # A completer naming a variable the generator no longer emits completes nothing,
-  # and the generated region is the only definition site.
+  # A completer naming a variable the generator no longer emits completes nothing.
   Write-Message "--- every referenced flag inventory is defined ---"
   $undefined = @()
   foreach ($name in @([regex]::Matches($profileText, '\$nucleus[A-Za-z0-9]*Flags\b') | ForEach-Object { $_.Value } | Sort-Object -Unique)) {
@@ -67,8 +63,7 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
     return $false
   }
 
-  # The update lockfile completer completes -Sections via scripts/update.sh
-  # -ListSections, so that parameter must exist.
+  # The update lockfile completer completes -Sections, so update.sh needs -ListSections.
   Write-Message "--- --list-* introspection contract ---"
   $updatePath = Join-Path $r 'scripts\update.sh'
   if (-not (Select-String -Path $updatePath -Pattern 'list-sections' -SimpleMatch -Quiet)) {

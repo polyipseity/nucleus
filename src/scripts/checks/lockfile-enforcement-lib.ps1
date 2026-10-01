@@ -7,17 +7,16 @@
 # logic serves both the check step (Write-Message / Write-WarningMessage /
 # Write-ErrorMessage) and bump-lockfile.ps1 (Write-NucleusInfo / etc.).
 #
-# WHY: ManagedPaths.ps1 is dot-sourced for Get-NucleusUserRoot so the USER-root
-# paths below come from the canonical Windows declaration instead of a
-# hardcoded %LOCALAPPDATA%\nucleus string.
+# WHY: ManagedPaths.ps1 supplies Get-NucleusUserRoot, so the USER-root paths
+# below come from the canonical declaration instead of a literal.
 $script:NucleusRepoRoot = (Resolve-Path (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..')).Path
 . (Join-Path -Path $script:NucleusRepoRoot -ChildPath 'src\platforms\Windows\modules\ManagedPaths.ps1')
 # Get-NucleusHostKey scopes the probes to this host; Resolve-NucleusFlakePin
 # resolves the revision behind a "flake:<node>" pin.
 . (Join-Path -Path $script:NucleusRepoRoot -ChildPath 'src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1')
 . (Join-Path -Path $script:NucleusRepoRoot -ChildPath 'src\platforms\Windows\modules\lib\Resolve-NucleusFlakePin.ps1')
-# Get-NucleusSriHash is the repo's only SRI SHA256, and the lockfile stores the
-# whisper hash in SRI, so the probe must not re-derive the encoding.
+# Get-NucleusSriHash is the repo's only SRI SHA256 and the whisper pin stores SRI,
+# so the probe must not re-derive the encoding.
 . (Join-Path -Path $script:NucleusRepoRoot -ChildPath 'src\platforms\Windows\modules\lib\PsGalleryPin.ps1')
 
 function Invoke-LockfileEnforcement {
@@ -33,10 +32,9 @@ function Invoke-LockfileEnforcement {
 
   $errors = 0
 
-  # Probes cover only the packages this host declares in
-  # src/modules/packages/desired.json, so a pin kept for another host is not
-  # reported as drift. $desiredEntries holds the entries whose pins need extra
-  # handling; a manager absent from the registry keeps lockfile-only behaviour.
+  # Probes cover only the packages this host declares in desired.json, so a pin
+  # kept for another host is not reported as drift. A manager absent from the
+  # registry keeps lockfile-only behaviour.
   $hostKey = Get-NucleusHostKey
   $desiredNames = @{}
   $desiredEntries = @{}
@@ -56,7 +54,6 @@ function Invoke-LockfileEnforcement {
     }
   }
 
-  # --- bun (global packages) ---
   if (Get-Command bun -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
     $globalJson = Join-Path $env:USERPROFILE '.\bun\install\global\package.json'
     if (Test-Path $globalJson) {
@@ -74,7 +71,6 @@ function Invoke-LockfileEnforcement {
     } else { & $InfoFn "bun: no global package.json; skipping" }
   } else { & $InfoFn "bun: not installed; skipping enforcement" }
 
-  # --- uv (tools) ---
   if (Get-Command uv -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
     $uvList = & uv tool list 2>$null  # check-suppress:suppression_doc: list command may emit noise/errors when the tool store is uninitialised; empty output is treated as no-installs and drift is still reported below
     $uvSec = if ($Lockfile.ContainsKey('uv')) { $Lockfile.uv } else { @{} }
@@ -91,7 +87,6 @@ function Invoke-LockfileEnforcement {
     }
   } else { & $InfoFn "uv: not installed; skipping enforcement" }
 
-  # --- uv tools pinned to a flake.lock revision ---
   # A flake-pinned tool has no lockfile version, so the probe compares uv's
   # PEP 610 commit_id against the revision the flake node resolves to.
   if (Get-Command uv -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
@@ -126,7 +121,6 @@ function Invoke-LockfileEnforcement {
     }
   } else { & $InfoFn "uv: not installed; skipping flake-pinned revision enforcement" }
 
-  # --- cargo-binstall (crates) ---
   if (Get-Command cargo -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
     $cargoList = & cargo install --list 2>$null  # check-suppress:suppression_doc: list command may emit noise/errors when the tool store is uninitialised; empty output is treated as no-installs and drift is still reported below
     $cbSec = if ($Lockfile.ContainsKey('cargo-binstall')) { $Lockfile.'cargo-binstall' } else { @{} }
@@ -143,7 +137,6 @@ function Invoke-LockfileEnforcement {
     }
   } else { & $InfoFn "cargo: not installed; skipping enforcement" }
 
-  # --- rustup (stable toolchain) ---
   if (Get-Command rustup -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
     $date = if ($Lockfile.ContainsKey('rustup') -and $Lockfile.rustup.ContainsKey('stable')) { $Lockfile.rustup.stable } else { $null }
     if ($null -ne $date) {
@@ -155,7 +148,6 @@ function Invoke-LockfileEnforcement {
     } else { & $InfoFn "rustup: no stable pin in lockfile; skipping" }
   } else { & $InfoFn "rustup: not installed; skipping enforcement" }
 
-  # --- psgallery (PowerShell modules) ---
   # A pin is a version string or a {version, hash} object; only the version is
   # enforceable, because an install is an extracted directory, not the nupkg.
   if (Get-Command pwsh -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
@@ -169,7 +161,6 @@ function Invoke-LockfileEnforcement {
     }
   } else { & $InfoFn "psgallery: not installed; skipping enforcement" }
 
-  # --- scoop ---
   if (Get-Command scoop -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
     $scoopList = & scoop list 2>$null  # check-suppress:suppression_doc: list command may emit noise/errors when the tool store is uninitialised; empty output is treated as no-installs and drift is still reported below
     $scoopSec = if ($Lockfile.ContainsKey('scoop')) { $Lockfile.scoop } else { @{} }
@@ -186,7 +177,6 @@ function Invoke-LockfileEnforcement {
     }
   } else { & $InfoFn "scoop: not installed; skipping enforcement" }
 
-  # --- winget ---
   if (Get-Command winget -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
     $wingetList = & winget list 2>$null  # check-suppress:suppression_doc: list command may emit noise/errors when the tool store is uninitialised; empty output is treated as no-installs and drift is still reported below
     $wingetSec = if ($Lockfile.ContainsKey('winget')) { $Lockfile.winget } else { @{} }
@@ -202,15 +192,14 @@ function Invoke-LockfileEnforcement {
     }
   } else { & $InfoFn "winget: not installed; skipping enforcement" }
 
-  # --- source-builds (VCS/rev pins are not version-verifiable) ---
+  # source-builds: VCS/rev pins are not version-verifiable
   if ($Lockfile.ContainsKey('source-builds')) {
     & $InfoFn "source-builds: VCS/rev-pinned — not version-verifiable, skipping enforcement"
   }
 
-  # --- cursor superpowers (managed checkout + extension links) ---
-  # Sync-Superpowers.ps1 checks the plugin out at the pinned revision under the
-  # user root, so the probe verifies the checkout revision. The POSIX symlink
-  # into /nix/store is not observable from Windows.
+  # Sync-Superpowers.ps1 checks the plugin out at the pinned revision, so the
+  # probe verifies the checkout; the POSIX symlink into /nix/store is not
+  # observable from Windows.
   $expectedRev = $null
   if ($Lockfile.ContainsKey('cursor') -and $Lockfile.cursor.ContainsKey('superpowers')) {
     $expectedRev = $Lockfile.cursor.superpowers.rev
@@ -231,10 +220,10 @@ function Invoke-LockfileEnforcement {
       }
       else {
         # WHY: the whole output is captured before its first line is taken. Piping the
-        # native command into `Select-Object -First 1` stops it after one line and left
-        # $LASTEXITCODE holding another command's status, which made a valid checkout
-        # look broken. stderr goes to its own file so the revision on stdout is
-        # unambiguous.
+        # native command into `Select-Object -First 1` stops it after one line and
+        # left $LASTEXITCODE holding another command's status, which made a valid
+        # checkout look broken. stderr goes to its own file so the revision on
+        # stdout is unambiguous.
         $headStderrFile = [System.IO.Path]::GetTempFileName()
         try {
           $headLines = @(& $git.Source -C $pluginDir rev-parse HEAD 2>$headStderrFile)
@@ -258,10 +247,9 @@ function Invoke-LockfileEnforcement {
     }
   }
 
-  # --- whisper ggml model weights ---
-  # No package manager ships these weights, so every version probe above is
-  # blind to a drifted model. Sync-WhisperModel.ps1 deploys them under the user
-  # root; the probe re-hashes the deployed file against the lockfile SRI.
+  # No package manager ships the whisper weights, so every version probe above is
+  # blind to a drifted model; the probe re-hashes the deployed file against the
+  # lockfile SRI instead.
   if ($Lockfile.ContainsKey('whisper')) {
     $modelDir = Join-Path (Get-NucleusUserRoot) 'models'
     foreach ($modelName in @($Lockfile.whisper.Keys)) {
@@ -286,18 +274,16 @@ function Invoke-LockfileEnforcement {
     }
   }
 
-  # --- suggestions.opencode (warn-only, not version-verifiable) ---
-  # opencode plugins use git+URL with no installed-version query, so each entry
-  # is reported at info level and never errors.
+  # suggestions.opencode: git+URL pins have no installed-version query, so each
+  # entry is reported at info level and never errors.
   if ($Lockfile.ContainsKey('suggestions') -and $Lockfile.suggestions.ContainsKey('opencode')) {
     foreach ($entry in $Lockfile.suggestions.opencode.Keys) {
       & $InfoFn "suggestions.opencode.$entry`: VCS-pinned — not version-verifiable, skipping"
     }
   }
 
-  # --- suggestions.vscode (warn-only verify probe) ---
-  # Warn-only per the suggestions invariant, and not locked on POSIX, where
-  # flake.lock owns the extension list.
+  # suggestions.vscode: warn-only per the suggestions invariant, and not locked on
+  # POSIX, where flake.lock owns the extension list.
   $codeExe = $null
   if (Get-Command code -ErrorAction SilentlyContinue) { $codeExe = 'code' }  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
   elseif (Get-Command code-insiders -ErrorAction SilentlyContinue) { $codeExe = 'code-insiders' }  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
@@ -315,8 +301,8 @@ function Invoke-LockfileEnforcement {
     }
   } else { & $InfoFn "vscode: no code CLI; skipping suggestions.vscode verify" }
 
-  # --- suggestions.cursor (warn-only verify probe) ---
-  # Warn-only per the suggestions invariant; no cursor CLI is a clean skip.
+  # suggestions.cursor: warn-only per the suggestions invariant; no cursor CLI is a
+  # clean skip.
   $cursorExe = $null
   if (Get-Command cursor -ErrorAction SilentlyContinue) { $cursorExe = 'cursor' }  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
   if ($null -ne $cursorExe) {
@@ -333,7 +319,7 @@ function Invoke-LockfileEnforcement {
     }
   } else { & $InfoFn "cursor: no cursor CLI; skipping suggestions.cursor verify" }
 
-  # --- suggestions: always warn (non-authoritative) ---
+  # suggestions: always warn, since the section is non-authoritative
   if ($Lockfile.ContainsKey('suggestions')) {
     foreach ($sub in $Lockfile.suggestions.Keys) {
       & $WarnFn "suggestions.$sub`: non-authoritative suggestion — not enforced (warn-only per invariant)"
