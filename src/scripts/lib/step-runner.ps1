@@ -7,8 +7,7 @@ Set-StrictMode -Version Latest
 
 . (Join-Path $PSScriptRoot "deny-list.ps1")
 
-# --- Color support (F2/F3/F4) ---
-# WHY: unified color detection — FORCE_COLOR/CLICOLOR_FORCE force on, NO_COLOR forces off,
+# WHY: FORCE_COLOR/CLICOLOR_FORCE force on, NO_COLOR forces off,
 # otherwise VT support + not redirected. Never mutates $PSStyle.OutputRendering.
 $script:NucColorOn = $false
 if ($env:NO_COLOR -and $env:NO_COLOR.Length -gt 0) {
@@ -36,7 +35,6 @@ if ($script:NucColorOn) {
   $script:NucStyleReset = ''
 }
 
-# --- Step registration ---
 $script:StepIds = [System.Collections.Generic.List[string]]::new()
 $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
 $script:StepNames = [System.Collections.Generic.List[string]]::new()
@@ -44,8 +42,7 @@ $script:StepNames = [System.Collections.Generic.List[string]]::new()
 # not inherit the caller's function scope, so a closure over the lib's Write-*
 # helpers silently fails ("not recognized"). The pipeline rebuilds the action via
 # [scriptblock]::Create($Action.ToString()) inside the runspace's own scope after
-# dot-sourcing the lib, so helpers resolve. Storing the [scriptblock] (not a
-# string) also lets unit tests invoke actions directly via & $script:StepActions[i].
+# dot-sourcing the lib, so helpers resolve.
 $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
 # Applicability declared at registration. The runner renders every step as ran,
 # `not applicable (<reason>)`, or `not-selected`; a step file never probes its own
@@ -53,12 +50,7 @@ $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
 $script:StepPlatforms = [System.Collections.Generic.List[string]]::new()
 $script:StepModes = [System.Collections.Generic.List[string]]::new()
 $script:StepRequires = [System.Collections.Generic.List[string]]::new()
-# Path to the framework lib (check-lib.ps1 / test-lib.ps1) the runspace dot-sources
-# so step actions can call Write-ErrorMessage / Write-Message / etc.
 $script:StepLibPath = $null
-
-# --only-steps narrowing (empty array = run every step) and the per-step states
-# the summary renders as '–'. Populated by Read-Argument and Invoke-StepPipeline.
 $script:OnlySteps = @()
 $script:NotRunStates = @{}
 
@@ -97,17 +89,14 @@ function Register-Step {
     throw "Register-Step: unknown requires token '$Requires' (expected none|nix|network|sops-machine-key|deployed-host)"
   }
 
-  # Validate id not empty (Spec A).
   if ([string]::IsNullOrEmpty($Id)) {
     throw "Step ID must not be empty"
   }
 
-  # Validate id contains no digits (Spec A).
   if ($Id -match '\d') {
     throw "Step ID '$Id' contains forbidden digit"
   }
 
-  # Validate unique id (Spec A).
   if ($script:StepIds -contains $Id) {
     throw "Duplicate step ID '$Id'"
   }
@@ -122,12 +111,10 @@ function Register-Step {
     $Number = [int]$Matches[1]
   }
 
-  # Validate explicit number is a positive integer (0 is the derive sentinel).
   if ($Number -lt 1) {
     throw "Step number must be a positive integer, got $Number"
   }
 
-  # Validate unique number (Spec A).
   if ($script:StepNumbers -contains $Number) {
     throw "Duplicate step number $Number"
   }
@@ -135,16 +122,12 @@ function Register-Step {
   $script:StepIds.Add($Id)
   $script:StepNumbers.Add($Number)
   $script:StepNames.Add($Name)
-  # Store the action scriptblock. Unit tests invoke it directly via
-  # & $script:StepActions[i]; the pipeline converts it to text for the runspace
-  # via [scriptblock]::Create($Action.ToString()) (see Invoke-StepPipeline).
   $script:StepActions.Add($Action)
   $script:StepPlatforms.Add($Platform)
   $script:StepModes.Add($Mode)
   $script:StepRequires.Add($Requires)
 }
 
-# --- Step applicability ---
 # ref: step-runner.instructions.md -- declared applicability replaces step-level skipping
 
 function Test-StepPlatformApplicable {
@@ -160,7 +143,7 @@ function Test-StepPlatformApplicable {
 }
 
 # WHY: $script:HAS_ARGS is the runner's scoped/full determination (positional args
-# or --scoped vs --full), not the raw positional count -- a --scoped run is a
+# or --scoped vs --full), not the raw positional count, so a --scoped run is a
 # scoped run even without paths.
 function Test-StepModeApplicable {
   param(
@@ -188,9 +171,8 @@ function Test-StepPrerequisite {
     'network' { [bool]$script:ONLINE }
     'sops-machine-key' {
       # System-root machine age key, mirroring sops.age.keyFile in
-      # src/modules/secrets.nix. Get-Secret.ps1 already declares the Windows
-      # form of this same path, so the three forms below are the declared
-      # nucleus system roots, not a second convention.
+      # src/modules/secrets.nix. Get-Secret.ps1 declares the Windows form of the
+      # same path, so the three forms below are the declared nucleus system roots.
       $machineAgeKeyPath = if ($IsWindows) {
         if ([string]::IsNullOrWhiteSpace($env:ProgramData)) { $null } else { Join-Path -Path $env:ProgramData -ChildPath 'nucleus\sops\age\machine.txt' }
       } elseif ($IsMacOS) {
@@ -215,9 +197,9 @@ function Test-StepPrerequisite {
   }
 }
 
-# Get-StepRunState — the printed state of a step that does not run, or $null when
-# it runs. Selection wins over the declarations: an unselected step is not
-# reported as not-applicable.
+# The printed state of a step that does not run, or $null when it runs.
+# Selection wins over the declarations: an unselected step is not reported as
+# not-applicable.
 function Get-StepRunState {
   param(
     [Parameter(Mandatory)]
@@ -244,9 +226,9 @@ function Get-StepRunState {
   return $null
 }
 
-# Get-StepSelection — split, trim, dedupe, and validate a comma-separated --only-steps
-# value. WHY: an unknown id is a hard error; a typo would otherwise narrow the run
-# to nothing and report success.
+# Split, trim, dedupe, and validate a comma-separated --only-steps value.
+# WHY: an unknown id is a hard error; a typo would otherwise narrow the run to
+# nothing and report success.
 function Get-StepSelection {
   param(
     [string]$Value
@@ -276,20 +258,14 @@ function Set-StepLibPath {
   }
 }
 
-# --- Step-number derivation helper ---
-# Returns the step number for use inside step actions (e.g. step-numbered diagnostics).
 # Prefers $Context.StepNumber (set by Invoke-StepPipeline per runspace step),
-# because $MyInvocation.PSCommandPath is EMPTY inside a runspace — the step
-# action is an in-memory scriptblock, not a file, so the filename-derived
-# fallback cannot work there. Falls back to the filename prefix only on the
-# main thread (non-runspace) where $MyInvocation.PSCommandPath is populated.
+# because $MyInvocation.PSCommandPath is EMPTY inside a runspace: the step
+# action is an in-memory scriptblock, not a file. Falls back to the filename
+# prefix only on the main thread, where $MyInvocation.PSCommandPath is populated.
 function Get-StepNumber {
   param(
-    # WHY: the step context carries StepNumber. In the runspace, $MyInvocation.
-    # PSCommandPath is EMPTY, so the filename fallback is unavailable; the caller
-    # passes $Context explicitly. For direct/main-thread invocations (e.g. unit
-    # tests) where $Context is not supplied, we fall back to the registering
-    # file's NN- prefix via $MyInvocation.PSCommandPath.
+    # WHY: the step context carries StepNumber. A direct invocation that passes no
+    # Context falls back to the registering file's NN- prefix below.
     [PSObject]$Context
   )
   $ctx = $Context
@@ -303,7 +279,6 @@ function Get-StepNumber {
   [int]((Split-Path -Leaf $MyInvocation.PSCommandPath) -replace '^(\d{2})-.*', '$1')
 }
 
-# --- Wave parallelism infrastructure ---
 $script:WaveTmpDir = $null
 
 function Initialize-WaveTempDir {
@@ -321,7 +296,6 @@ function Remove-WaveTempDir {
   }
 }
 
-# --- Invoke-Step wrapper ---
 # Owns ALL orchestration I/O: timing, section headers, exit file writing, fail-fast.
 # Step actions receive params and write messages to stdout only.
 function Invoke-Step {
@@ -336,17 +310,15 @@ function Invoke-Step {
 
   $stepStart = [System.Diagnostics.Stopwatch]::StartNew()
 
-  # 1. Write section header + step name
   "`n=== [$Number] $Name ===" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.out") -Encoding utf8
   $Name | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.name") -Encoding utf8 -NoNewline
 
-  # 2. Run step action, capture ALL output
   $exitCode = 0
   try {
     $stepParams = @{ HasArgs = $script:HAS_ARGS; RepoRoot = $RepoRoot; WaveTmpDir = $script:WaveTmpDir; PositionalArgs = $script:positionalArgs }
     $result = & $Action @stepParams
-    # Steps signal pass ($true) or fail ($false); the return value is the LAST
-    # pipeline element.
+    # Steps signal pass ($true) or fail ($false), and the return value is the
+    # LAST pipeline element.
     $status = @($result)[-1]
     if ($status -eq $false) { $exitCode = 1 }
   } catch {
@@ -354,19 +326,16 @@ function Invoke-Step {
     Write-Output "ERROR: $_"
   }
 
-  # 3. Write exit code and timing (framework owns these files)
   "$exitCode" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.exit") -Encoding utf8 -NoNewline
   $stepStart.Stop()
   $elapsedMs = $stepStart.ElapsedMilliseconds
   "$elapsedMs" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.time") -Encoding utf8 -NoNewline
 
-  # 4. Fail-fast check
   if ($exitCode -ne 0 -and $script:FAIL_FAST) {
     exit $exitCode
   }
 }
 
-# --- Argument parsing ---
 function Read-Argument {
   param([string[]]$Arguments)
   $script:FAIL_FAST = $false
@@ -470,24 +439,18 @@ function Read-Argument {
   }
 }
 
-# --- File caching ---
 function Save-FileListCache {
   $script:CachedNixFiles = Get-ChildItem -Recurse -Filter '*.nix' | Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object Name | Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#B7 -- structural invariant; gitignore filter applied on top
   # WHY two -Filter calls rather than -Include: -Include makes -Recurse follow
-  # directory symlinks, so the walk descends the tests/fixtures/user-registry
-  # link into src/users/default and yields every file there a second time under
-  # a pathspec git check-ignore rejects as beyond a symbolic link. -Filter does
-  # not follow them, which is why the three lines around this one already use
-  # it. Each dropped path duplicated a file the list already held at its real
-  # path, so nothing was scanned less. The bash twin reaches the same result
-  # through find, which does not follow symlinks by default.
+  # directory symlinks, so the walk descends the tests/fixtures/user-registry link
+  # into src/users/default and yields every file there a second time under a
+  # pathspec git check-ignore rejects as beyond a symbolic link. The bash twin
+  # reaches the same result through find, which does not follow symlinks.
   $script:CachedYamlFiles = @((Get-ChildItem -Recurse -Filter '*.yml') + (Get-ChildItem -Recurse -Filter '*.yaml')) | Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object Name | Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#B7 -- structural invariant; gitignore filter applied on top
   $script:CachedJsonFiles = Get-ChildItem -Path 'src' -Recurse -Filter '*.json' | Where-Object { $_.Name -notmatch '\.schema\.json$' -and $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object Name | Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#A7,#B7 -- schema files are meta; vendor is structural invariant; gitignore filter applied on top
   $script:CachedShellFiles = Get-ChildItem -Path 'src/scripts' -Recurse -Filter '*.sh' | Sort-Object Name | Select-GitIgnored
 }
 
-# --- Invoke-StepPipeline ---
-# Parallel dispatch capped at PARALLEL_JOBS (wave batches).
 function Invoke-StepPipeline {
   Initialize-WaveTempDir
   Save-FileListCache
@@ -560,36 +523,24 @@ function Invoke-StepPipeline {
       # WHY: each runspace must get its OWN InitialSessionState. The default
       # InitialSessionState is shared process-wide; parallel runspaces autoloading
       # core modules into it race and corrupt the shared command table ("An item
-      # with the same key has already been added" / "Destination array was not
-      # long enough"), which silently kills runspaces. CreateDefault() gives each
-      # runspace a full-language session with its own module state, isolating
-      # autoload into independent session states.
-      # WHY: the runspace body must NOT call Join-Path (or any cmdlet that
-      # autoloads Microsoft.PowerShell.Management) during parallel startup. 14
-      # runspaces autoloading that module into fresh ISS instances simultaneously
-      # races and kills the runspaces. We build all per-step temp paths with
-      # string concatenation ("$WaveTmpDir/step-$Number.xxx") instead of Join-Path
-      # inside the body.
+      # with the same key has already been added"), which silently kills runspaces.
+      # WHY: the runspace body must NOT call Join-Path (or any cmdlet that autoloads
+      # Microsoft.PowerShell.Management) during parallel startup: 14 runspaces
+      # autoloading it into fresh ISS instances at once races and kills them, so
+      # per-step temp paths are built by string concatenation.
       $iss = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
       $ps = [System.Management.Automation.PowerShell]::Create($iss)
 
-      # WHY: dot-source the framework lib SYNCHRONOUSLY in the main thread
-      # (before BeginInvoke) so each runspace's session state is fully
-      # initialized without racing. 14 runspaces dot-sourcing the lib in parallel
-      # corrupt the shared module/command state and silently kill the runspaces
-      # (no exception surfaces; the runspace dies during the dot-source). Running
-      # the dot-source here, sequentially per runspace, avoids the race while the
-      # step itself still runs in parallel via BeginInvoke. The lib helpers
-      # (Write-ErrorMessage, Get-StepNumber, etc.) persist in the
-      # runspace session state and are available to the step body below.
+      # WHY: dot-source the framework lib SYNCHRONOUSLY in the main thread (before
+      # BeginInvoke). 14 runspaces dot-sourcing it in parallel corrupt the shared
+      # module and command state and die silently during the dot-source, while the
+      # step itself still runs in parallel through BeginInvoke.
       $setup = {
         param($LibPath)
         if ($LibPath -and (Test-Path -LiteralPath $LibPath)) {
-          # WHY: check-lib.ps1 / test-lib.ps1 expect $FrameworkDir and $RepoRoot
-          # to be set in their scope (they dot-source step-runner.ps1 via
-          # $FrameworkDir and import modules via $RepoRoot). The main thread sets
-          # these before dot-sourcing the lib, but a runspace does not inherit the
-          # caller's scope, so derive both from the lib path and set them here.
+          # WHY: check-lib.ps1 / test-lib.ps1 expect $FrameworkDir and $RepoRoot in
+          # their scope. A runspace does not inherit the caller's scope, so both
+          # are derived from the lib path here.
           # $LibPath = <RepoRoot>/src/scripts/{checks,tests}/<lib>.ps1
           #   Split-Path x2 -> <RepoRoot>/src/scripts ; join 'lib' -> FrameworkDir
           #   Split-Path x4 -> <RepoRoot>
@@ -600,10 +551,9 @@ function Invoke-StepPipeline {
           # PSSA cannot see the cross-scope read, so reference it here to avoid a
           # false PSUseDeclaredVarsMoreThanAssignments warning.
           $null = $RepoRoot  # check-suppress:suppression_doc: cross-scope read by dot-sourced lib; PSSA cannot track it
-          # WHY: step-runner.ps1 dot-sources deny-list.ps1 via $PSScriptRoot, but
-          # $PSScriptRoot is empty inside a runspace, so that dot-source silently
-          # fails. Load deny-list.ps1 explicitly from the lib dir so Select-GitIgnored
-          # and friends are available to the step body.
+          # WHY: $PSScriptRoot is empty inside a runspace, so step-runner.ps1's own
+          # deny-list.ps1 dot-source silently fails. Load it explicitly from the
+          # lib dir so Select-GitIgnored and friends reach the step body.
           . (Join-Path $FrameworkDir 'deny-list.ps1')
           . $LibPath
         }
@@ -614,10 +564,9 @@ function Invoke-StepPipeline {
       })
       $null = $ps.Invoke()  # check-suppress:suppression_doc: Invoke runs setup synchronously; output discarded
 
-      # WHY: clone the shared context per step so StepNumber reflects THIS step.
-      # The step action (and Get-StepNumber) reads $Context.StepNumber; a shared
-      # context object cannot carry a per-step number, and $MyInvocation.PSCommandPath
-      # is empty inside a runspace so the filename-derived fallback is unavailable.
+      # WHY: clone the shared context per step so StepNumber reflects THIS step, and
+      # $MyInvocation.PSCommandPath is empty inside a runspace so the
+      # filename-derived fallback is unavailable.
       $stepContext = $contextObject.PSObject.Copy()
       $stepContext.StepNumber = $n
       $stepContext.StepId = $id
@@ -625,13 +574,10 @@ function Invoke-StepPipeline {
       $null = $ps.AddScript({  # check-suppress:suppression_doc: AddScript returns the pipeline for chaining; discarded
         param($Number, $Name, $ActionText, $Context, $WaveTmpDir, $FAIL_FAST, $Dim, $Reset)
 
-        # WHY: the framework lib was already dot-sourced synchronously (see
-        # $setup above), so its Write-* helpers are in this
-        # runspace's session state. We only run the step action here.
-        # WHY: publish the step context to script scope so Get-StepNumber (a
-        # function that cannot see this scriptblock's $Context parameter) can
-        # read $script:Context.StepNumber. $MyInvocation.PSCommandPath is EMPTY
-        # inside a runspace, so the filename fallback is unavailable here.
+        # WHY: the framework lib was already dot-sourced synchronously (see $setup
+        # above), so this runs the step action only. The step context goes to
+        # script scope because Get-StepNumber cannot see this scriptblock's
+        # $Context parameter.
         $script:Context = $Context
         $stepStart = [System.Diagnostics.Stopwatch]::StartNew()
         $outFile = "$WaveTmpDir/step-$Number.out"
@@ -728,10 +674,8 @@ function Invoke-StepPipeline {
   }
 }
 
-# --- Format-StepLine ---
 # One step's summary line (state glyph, duration, name). Shared by the fail-fast
-# abort and Format-StepSummary so a failing step renders identically whether or
-# not the summary is reached.
+# abort and Format-StepSummary so a failing step renders identically either way.
 function Format-StepLine {
   param(
     [Parameter(Mandatory)][int]$Number,
@@ -747,7 +691,6 @@ function Format-StepLine {
   "$($script:NucStyleDim)  step {0,2}  $Color{1}$($script:NucStyleReset)$($script:NucStyleDim)  {2,8}  $($script:NucStyleReset){3}" -f $Number, $Glyph, (Format-StepDuration -Milliseconds ([int]$elapsed)), $name | Write-Output
 }
 
-# --- Write-StepReplay ---
 # Replays a step's captured stdout/stderr, highlighting header-only lines the way
 # the summary does.
 function Write-StepReplay {
@@ -761,10 +704,9 @@ function Write-StepReplay {
   }
 }
 
-# --- Test-StepReportsNoScope ---
 # True when a step's captured output carries the no-scope convention. A
-# filtering step whose scope was empty exits 0, so without this its only news —
-# why it checked nothing — is discarded and a ✓ sits beside a step that did no
+# filtering step whose scope was empty exits 0, so without this its only news,
+# why it checked nothing, is discarded and a ✓ sits beside a step that did no
 # work. Matching the message couples the runner to prose, which
 # no-scope-message-tests.sh turns into an enforced invariant over every step.
 function Test-StepReportsNoScope {
@@ -772,19 +714,17 @@ function Test-StepReportsNoScope {
   $outFile = Join-Path $script:WaveTmpDir "step-$Number.out"
   if (-not (Test-Path $outFile)) { return $false }
   # WHY the label branch: Write-Message renders "<label>: <message>", so a real
-  # line reads "05-lockfile-validation: 0 lockfile files in scope — nothing to
-  # validate." and never starts with "0". This mirrors the POSIX pattern in
-  # step-runner.sh so the twins detect the same thing.
+  # line reads "05-lockfile-validation: 0 lockfile files in scope" and never
+  # starts with "0". This mirrors the POSIX pattern in step-runner.sh.
   foreach ($line in @(Get-Content -Path $outFile)) {
     if ($line -match '(^|: )0 .+ in scope') { return $true }
   }
   return $false
 }
 
-# --- Format-FailFastReport ---
 # Reports the steps that failed before a fail-fast abort. The abort exits before
-# Format-StepSummary, which is the only other place step output is replayed, so
-# without this the run reports that steps started and never why one failed — the
+# Format-StepSummary, the only other place step output is replayed, so without
+# this the run reports that steps started and never why one failed, and the
 # pre-push hook cannot pass --no-fail-fast to work around it.
 function Format-FailFastReport {
   param([Parameter(Mandatory)][int[]]$Number)
@@ -835,10 +775,9 @@ function Format-StepSummary {
     $stepId = $script:StepIds[$i]
     $isVerbose = $script:VerboseIds -contains '*' -or $script:VerboseIds -contains $stepId
     $isFailed = $exitCode -ne '0'
-    # WHY: also replay a passing step that had nothing in scope. Its exit code is
-    # 0 and its output is otherwise dropped, so the run reports the same ✓ for
-    # "checked and found nothing" and "never ran" — the ambiguity this removes.
-    # Exit codes are untouched.
+    # WHY: a passing step that had nothing in scope is replayed too. Its exit code
+    # is 0 and its output is otherwise dropped, so the run would print the same ✓
+    # for "checked and found nothing" and "never ran".
     $isNoScope = Test-StepReportsNoScope -Number $n
     if ($isVerbose -or $isFailed -or $isNoScope) {
       Write-StepReplay -Number $n
@@ -865,7 +804,6 @@ function Format-StepSummary {
   }
 }
 
-# --- Test-Prerequisite ---
 function Test-Prerequisite {
   Assert-ToolAvailable -Name 'actionlint' -Type 'Command'
   Assert-ToolAvailable -Name 'check-jsonschema' -Type 'Command'

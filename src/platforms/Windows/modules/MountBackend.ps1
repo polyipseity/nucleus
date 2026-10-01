@@ -2,10 +2,7 @@
 .SYNOPSIS
     Mount backend for Windows: WinFsp.
 .DESCRIPTION
-    Implements Mount-Backend-* functions for the cloud-mount core runner.
-    All WinFsp specifics live here — the core runner never mentions them.
-.PARAMETER Instance
-    Service instance key for health record writes.
+    WinFsp specifics stay in this file; the core runner never names them.
 #>
 [CmdletBinding()]
 param()
@@ -15,7 +12,6 @@ $ErrorActionPreference = 'Stop'
 $Script:_BackendCapture = $null
 $Script:_BackendRclonePid = $null
 
-# Mount-Backend-Class — classify a failure from stderr capture.
 function Mount-Backend-Class {
     [CmdletBinding()]
     [OutputType([string])]
@@ -44,7 +40,6 @@ function Mount-Backend-Class {
     return 'mount-failed'
 }
 
-# Mount-Backend-Remedy — return the remedy text for a class.
 function Mount-Backend-Remedy {
     [CmdletBinding()]
     [OutputType([string])]
@@ -60,7 +55,6 @@ function Mount-Backend-Remedy {
     }
 }
 
-# Mount-Backend-IsTransient — return true if the class is transient (retryable).
 function Mount-Backend-IsTransient {
     [CmdletBinding()]
     [OutputType([bool])]
@@ -68,13 +62,11 @@ function Mount-Backend-IsTransient {
     $Class -in @('provider-refusal', 'io-transient')
 }
 
-# Mount-Backend-Prepare — ensure WinFsp is installed and its launcher is running.
 function Mount-Backend-Prepare {
     [CmdletBinding()]
     [OutputType([int])]
     param([Parameter(Mandatory)][string]$Instance)
 
-    # Check WinFsp is installed.
     # check-suppress:suppression_doc: a missing command throws; the -not test on the next line is the absence probe
     $winfsp = Get-Command 'winfsp-x64.dll' -ErrorAction SilentlyContinue
     if (-not $winfsp) {
@@ -83,20 +75,17 @@ function Mount-Backend-Prepare {
             $regPath = 'HKLM:\SOFTWARE\WinFsp'
         }
         if (-not (Test-Path $regPath)) {
-            # WinFsp not installed.
             . "$PSScriptRoot\ServiceHealth.ps1"
             Set-HealthBlocked -Instance $Instance -Class 'provider-refusal' -Remedy 'install WinFsp via winget install WinFsp.WinFsp'
             return 20
         }
     }
 
-    # Ensure WinFsp Launcher service is running.
     # check-suppress:suppression_doc: an absent service leaves $svc null, so the -and guard below skips the start and not-running is the answer
     $svc = Get-Service -Name 'WinFsp.Launcher' -ErrorAction SilentlyContinue
     if ($svc -and $svc.Status -ne 'Running') {
-        # WHY: the refusal is reported through the module's own channel.  rclone-mount.ps1 has
-        #   no try/catch and handles only rc 20, so an escaping exception kills the mount loop
-        #   before any health record exists and leaves the watchdog a record it cannot act on.
+        # WHY: rclone-mount.ps1 has no try/catch and handles only rc 20, so an escaping
+        #   exception kills the mount loop before any health record exists.
         try {
             Start-Service -Name 'WinFsp.Launcher'
         } catch {
@@ -109,7 +98,6 @@ function Mount-Backend-Prepare {
     return 0
 }
 
-# Mount-Backend-ArgumentList — emit Windows-specific rclone mount flags.
 function Mount-Backend-ArgumentList {
     [CmdletBinding()]
     [OutputType([string[]])]
@@ -120,8 +108,8 @@ function Mount-Backend-ArgumentList {
         [string]$ExtraArgs = ''
     )
 
-    # WHY: $rcloneFlags, not $args — $args is the automatic variable, and
-    #   reassigning it has undesired side effects.
+    # WHY: $rcloneFlags, not $args, which is the automatic variable and has
+    #   undesired side effects when reassigned.
     $rcloneFlags = @($Remote, $MountPoint,
         '--vfs-cache-mode', 'full',
         '--vfs-cache-max-age', '1h',
@@ -138,59 +126,39 @@ function Mount-Backend-ArgumentList {
     $rcloneFlags
 }
 
-# Mount-Backend-Mount — invoke rclone with the resolved flags.
 function Mount-Backend-Mount {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string]$RcloneBin,
-        # WHY: $MountArgs, not $Args — $args is the automatic variable.
+        # WHY: $MountArgs, not $Args, which is the automatic variable.
         [Parameter(Mandatory)][string[]]$MountArgs,
         [Parameter(Mandatory)][string]$CaptureFile
     )
 
     $Script:_BackendCapture = $CaptureFile
-    # WHY: the array must be FLAT.  `('mount', $MountArgs)` uses the comma operator, which
-    #   nests $MountArgs as a single element (System.Object[]), and Start-Process rejects it:
-    #   "Cannot convert 'System.Object[]' to the type 'System.String' required by
-    #   parameter 'ArgumentList'".  Concatenating keeps one flat string array.
+    # WHY: the array must be flat. `('mount', $MountArgs)` nests $MountArgs as one
+    #   System.Object[] element and Start-Process rejects that. Concatenating keeps it flat.
     $proc = Start-Process -FilePath $RcloneBin -ArgumentList (@('mount') + $MountArgs) `
         -NoNewWindow -PassThru -RedirectStandardError $CaptureFile
     $Script:_BackendRclonePid = $proc.Id
     $proc
 }
 
-# Mount-Backend-ProbeState — report the mount state of a mount point as a token.
 # Prints exactly one of: present, absent:not-listed, unknown:dir-unreadable.
-# Returns nothing; the caller reads the token from the success stream.
 #
-# WHY three tokens and not a bool.  The question is mount state, and Windows has no
-#   mount table, so the answer is inferred from the mount-point directory.  A
-#   directory this process may not read lists as zero entries, so a count test
-#   answers not-mounted for it, and the attach loop then records a failure whose
-#   cause is a permission and sends the operator to the remote.
-#   backend_probe_state in mount-backend-darwin.sh prints the same three tokens, and
-#   the attach loop in rclone-mount.ps1 tests the `unknown:` prefix alone, so the
-#   reason after the prefix is this platform's own.
+# WHY three tokens and not a bool. Windows has no mount table, so the state is inferred
+#   from the mount-point directory, and a directory this process may not read lists as
+#   empty. A count test would report that as not-mounted and send the operator to the
+#   remote. backend_probe_state in mount-backend-darwin.sh prints the same three tokens,
+#   and the attach loop in rclone-mount.ps1 tests the `unknown:` prefix alone.
 #
-# WHY the reparse-point test is kept rather than replaced.  A WinFsp directory mount
-#   is expected to be a reparse point in its own right, and that assumption cannot be
-#   confirmed from here, so it stays as an ADDITIONAL reason to answer present.  If it
-#   holds, an empty-but-mounted remote root stops being reported dead; if it does not,
-#   the answer is the previous status quo.  Answering present for everything is not an
-#   option, because the transition back to not-mounted is what makes revival work.
+# WHY the reparse-point test stays as an additional reason to answer present, and why a
+#   try/catch wraps Get-ChildItem rather than testing $item or counting $Error: Get-Item
+#   returns a DirectoryInfo for an unreadable directory so `-not $item` never fires, and
+#   $Error is a process-wide sink any earlier command can have written to.
 #
-# WHY a try/catch rather than a null check or a count of $Error.  Get-Item returns a
-#   DirectoryInfo for a directory this process may not read, so `-not $item` never
-#   fires; and $Error is a process-wide sink that any earlier command can have written
-#   to, so a count taken across this call would attribute someone else's error to it.
-#   The thrown exception is scoped to the one call that failed.  The POSIX side makes
-#   the same choice from the same shape, keying on `ls -A`'s own exit status.
-#
-# UNVERIFIED on Windows: that a WinFsp DIRECTORY mount is exposed as a reparse point
-#   (and therefore carries FileAttributes.ReparsePoint on the mount-point directory
-#   itself).  Confirm on a real Windows host by starting a mount and inspecting
-#   (Get-Item -Force <mount point>).Attributes.  Until then the content check remains
-#   the effective signal for a non-empty remote root.
+# UNVERIFIED on Windows: that a WinFsp directory mount is exposed as a reparse point on
+#   the mount point itself. Confirm on a real host with (Get-Item -Force <mount point>).Attributes.
 function Mount-Backend-ProbeState {
     [CmdletBinding()]
     [OutputType([string])]
@@ -221,12 +189,10 @@ function Mount-Backend-ProbeState {
     Write-Output 'absent:not-listed'
 }
 
-# Mount-Backend-Unmount — release the volume.
 function Mount-Backend-Unmount {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$MountPoint)
 
-    # Kill any rclone processes using this mount point.
     # check-suppress:suppression_doc: no rclone process running is the normal case; Get-Process throws instead of returning an empty set
     Get-Process -Name 'rclone' -ErrorAction SilentlyContinue |
         Where-Object { $_.CommandLine -match [regex]::Escape($MountPoint) } |
@@ -234,7 +200,6 @@ function Mount-Backend-Unmount {
         Stop-Process -Force -ErrorAction SilentlyContinue
 }
 
-# Mount-Backend-Repair — restart WinFsp Launcher service.
 function Mount-Backend-Repair {
     [CmdletBinding()]
     param()
@@ -242,15 +207,12 @@ function Mount-Backend-Repair {
     # check-suppress:suppression_doc: repair is a no-op when WinFsp is absent, which the -not $svc test below selects
     $svc = Get-Service -Name 'WinFsp.Launcher' -ErrorAction SilentlyContinue
     if ($svc) {
-        # WHY: Write-Output, not Write-Host — Write-Host goes to the information stream,
-        #   which a scheduled task's stdout/stderr redirection does not collect, and the
-        #   verbose/information streams are hidden under the default preference variables,
-        #   so the restart notice would be lost.  This function is currently unreferenced;
-        #   keep the output on the success stream if a caller is added.
+        # WHY: Write-Output, not Write-Host, whose information stream a scheduled task's
+        #   stdout/stderr redirection does not collect. Unreferenced today, so the message
+        #   is the only outcome signal a future caller gets.
         Write-Output "Restarting WinFsp.Launcher service..."
-        # WHY: the success line follows the restart rather than preceding it, so it is only
-        #   emitted when the restart actually returned.  This function is unreferenced and
-        #   has no return-code contract, so the message is the only outcome signal it has.
+        # WHY: the success line follows the restart, so it prints only when the restart
+        #   actually returned.
         try {
             Restart-Service -Name 'WinFsp.Launcher' -Force
         } catch {
@@ -263,7 +225,6 @@ function Mount-Backend-Repair {
     }
 }
 
-# Mount-Backend-ProviderRefusal — whether the failure was a provider refusal.
 function Mount-Backend-ProviderRefusal {
     [CmdletBinding()]
     [OutputType([bool])]
