@@ -6,24 +6,19 @@ applyTo: "tests/**, src/hosts/Windows/**/*.yml, src/platforms/Windows/modules/**
 
 # Testing guidelines
 
-Every feature addition or breaking change requires tests. Layout mirrors `src/` (see `AGENTS.md`). Two methodologies: Nix-based tests (macOS/NixOS) and Pester (Windows).
+Every feature addition or breaking change requires tests. Layout mirrors `src/` (see `AGENTS.md`). Nix-based tests run on macOS/NixOS, Pester on Windows.
 
 ## Fail-fast convention
 
-| Script | Default | Rationale |
-| ------------------------ | ------------------------------------- | ----- |
-| `check.sh` / `check.ps1` | **NOT fail-fast** (accumulate all) | Report all issues. |
-| `test.sh` / `test.ps1` | **Fail-fast** (exit on first failure) | CI/push: reduce noise and CI time. |
-
-Both accept `--fail-fast` / `--no-fail-fast`. prek hooks use defaults; CI always passes `--no-fail-fast`.
+`check.sh` / `check.ps1` accumulate all failures so one run reports everything. `test.sh` / `test.ps1` exit on the first failure to keep CI quiet and fast. Both accept `--fail-fast` / `--no-fail-fast`. prek hooks use the defaults; CI always passes `--no-fail-fast`.
 
 ## Quick start
 
 ```bash
 # Nix tests
-nix-instantiate --eval tests/modules/core-tests.nix
-nix-instantiate --eval tests/modules/module-imports-tests.nix
-nix-instantiate --eval --strict -A summary tests/modules/vm-setup-manifest-tests.nix  # VM setup (attr `summary`)
+nix-instantiate --eval --strict tests/modules/package-parity-tests.nix
+nix-instantiate --eval --strict tests/modules/posix-module-imports-tests.nix
+nix-instantiate --eval --strict -A summary tests/modules/vm-setup-manifest-tests.nix  # attr is `summary`
 cd src && nix flake check
 ```
 
@@ -34,135 +29,87 @@ Invoke-Pester -Path tests/platforms/Windows/modules/ -Verbose
 
 ## Nix testing strategy
 
-### Layer 1: Static evaluation (flake check)
+### Layer 1: Static evaluation
 
-`nix flake check` evaluates all host configs without building. Catches syntax errors, unresolved imports, mistyped options. Runs every commit.
+`nix flake check` evaluates every host config without building, catching syntax errors, unresolved imports, and mistyped options.
 
 ### Layer 2: Pure logic tests
 
-**Locations:** `tests/modules/*.nix`, `tests/integration/*.nix`, `tests/hosts/*/*.nix`
+Under `tests/modules/`, `tests/integration/`, `tests/hosts/`. Use `assert'` from `tests/lib.nix` and force the result with `builtins.seq (builtins.deepSeq <tests> null)` or `builtins.all`.
 
-Uses `nix-instantiate --eval` with assertion helpers for package categorization, option defaults/constraints, conditional logic, list filtering, string manipulation.
-
-```nix
-{ lib ? import <nixpkgs/lib> }:
-let
-  assert' = cond: msg: if !cond then builtins.throw msg else null;
-  test_ripgrep_parity = assert' (builtins.elem "ripgrep" [ "git" "ripgrep" "zsh" ]) "ripgrep parity missing";
-in
-builtins.seq (builtins.deepSeq { inherit test_ripgrep_parity; } null)
-  { success = true; message = "Package parity checks passed"; }
-```
-
-Run: `nix-instantiate --eval --strict tests/modules/package-parity-tests.nix`
-
-**Force evaluation is mandatory.** Nix is lazy — test files that only count tests report green with zero tests run. Use `assert cond;`, `builtins.seq (builtins.deepSeq <tests> null)`, `builtins.all`, or `success = <derived value>`. Enforced by test step 1 (`nix-test-eval`).
-
-Prohibited: `success = true` with only `builtins.length` refs; 1-arg `builtins.seq (builtins.deepSeq <tests>)` (WHNF, forces nothing).
+Forcing evaluation is mandatory: Nix is lazy, so a test file that only counts tests reports green with zero tests run. Prohibited: `success = true` with only `builtins.length` references, and the one-argument `builtins.seq (builtins.deepSeq <tests>)`, which forces nothing.
 
 ### No real-user test coupling
 
-Tests must not reference real `src/users/<username>/` directories (except `default` — production-managed identity).
+Tests must not reference a real `src/users/<username>/` directory. `default` is the exception: it is the production-managed baseline.
 
 | Pattern | When |
 | --- | --- |
 | `tests/fixtures/user-registry/` + `test-user` + `--repo-root` | Registry, cloud-drives, symlinks, any discovered-user test |
 | `src/users/default/` reads | Baseline template content only |
 | Temp-dir users (`alice`, `bob`) + `-RepoRoot` | Overlay resolution unit tests (ConfigHelpers) |
-| Dynamic `primaryUser` from `load-user-registry.sh` | Integration tests evaling live repo |
+| Dynamic `primaryUser` from `load-user-registry.sh` | Integration tests evaluating the live repo |
 
-**Prohibited:** hardcoded usernames matching production dirs, copying production data into assertions, test-only users under production `src/users/`.
+Prohibited: hardcoded usernames matching production dirs, production data copied into assertions, test-only users created under production `src/users/`.
 
-**Fixtures:** `test-user` under `tests/fixtures/user-registry/src/users/`. Constants: `tests/fixtures/fixtures.nix`, `tests/scripts/user-registry-fixture.sh`. `default` symlinks to live `src/users/default` — edits are production edits.
+Fixtures live in `tests/fixtures/user-registry/src/users/` (`test-user`), with constants in `tests/fixtures/default.nix` and helpers in `tests/scripts/user-registry-fixture.sh`. The fixture `default` symlinks to the live `src/users/default`, so edits there are production edits.
 
-### Layer 3: Module import validation
+### Layer 3: Module import wiring
 
-`tests/modules/module-imports-tests.nix` verifies all shared modules import cleanly, dependencies are acyclic, option paths correctly scoped.
+`tests/modules/posix-module-imports-tests.nix` enumerates `src/modules/posix/` and compares it against the aggregator, so a module dropped from `src/modules/posix/default.nix` fails the suite. Nothing else can catch that class: an unreferenced module is valid Nix, and neither `nix flake check` nor a rebuild warns. The same file also pins the module allowlist and the machine age-key path across its three spellings.
 
 ### Test troubleshooting
 
-- **macOS regex**: libc++ `std::regex` treats `\(` as capturing group. Use `[(]`.
-- **Cascading failures**: `assert'` reveals first failure only. Replace with recording no-op to find all.
-- **Template refactoring**: tests must read template files after inline→`builtins.readFile`.
-- **Deadnix**: flags `let` bindings not forced by return. Remove or force with `deepSeq`:
-    ```nix
-    builtins.seq (builtins.deepSeq { inherit binding1 binding2; } null) { success = true; }
-    ```
-  Do not suppress deadnix.
+- macOS `std::regex` treats `\(` as a capturing group. Use `[(]`.
+- `assert'` reports only the first failure. Swap in a recording no-op to find the rest.
+- deadnix flags `let` bindings the return never forces. Remove the binding or force it with `deepSeq`; never suppress deadnix.
+- After refactoring a template inline to `builtins.readFile`, tests must read the extracted file.
 
 ## Windows testing strategy (Pester)
 
-Location: `tests/platforms/Windows/modules/**/*.Tests.ps1` (package installation, registry, file system, security).
-
-```powershell
-Invoke-Pester -Path tests/platforms/Windows/modules/ -Verbose
-Invoke-Pester -Path tests/platforms/Windows/modules/config-method.Tests.ps1
-```
-
-DSC dry-run: `winget configure --what-if .\src\hosts\Windows\{system,system-packages,user,user-env,user-context}.dsc.yml`
+`tests/platforms/Windows/modules/**/*.Tests.ps1`.
 
 ## Adding new tests
 
-- Contract-breaking: add Nix logic or Pester tests. Bug fix: reproducing case if non-obvious.
-Commit atomically with implementation. Naming: `tests/<area>/<topic>-tests.nix` / `tests/platforms/Windows/modules/<area>/<feature>.Tests.ps1`
+Contract-breaking change: add Nix logic or Pester tests. Bug fix: a reproducing case when the behavior is not obvious. Commit tests atomically with the implementation. Name them `tests/<area>/<topic>-tests.nix` and `tests/platforms/Windows/modules/<area>/<feature>.Tests.ps1`.
 
-## Anti-pattern: assertions that cannot discriminate
+## Assertions must discriminate
 
-An assertion on a value which cannot distinguish the outcomes it claims to test proves nothing. The rclone mount runner exits 0 on a running mount, on a blocked one, on a terminal failure and on an exhausted retry alike, so every `rc -eq 0` assertion over it passed regardless — one test named for retry had never exercised retry. The same shape hides in expectations derived from the host under test, and in gates that compare two lists which are both empty.
+An assertion on a value that cannot distinguish the outcomes it claims to test proves nothing. The rclone mount runner exits 0 on a running mount, a blocked one, a terminal failure, and an exhausted retry alike, so every `rc -eq 0` assertion over it passed regardless. The same shape hides in expectations derived from the host under test and in gates comparing two lists that are both empty.
 
-Before writing an assertion, ask what result would make it fail. If every reachable outcome produces the same value, it is not a test. Assert the discriminating fact — the attempt count, the recorded state, the resolved path — not the summary that all paths share, and prove it by breaking the behaviour and confirming the assertion fires.
+Before writing an assertion, name the result that would make it fail. Assert that discriminating fact (attempt count, recorded state, resolved path), not the summary every path shares, then break the behavior and confirm the assertion fires.
 
 ## Anti-pattern: grep-only Nix tests
 
-Tests that use `builtins.readFile` + `containsRegex` / `lib.hasInfix` to check that specific text exists in source files are **implementation-coupled**. They break on code reflow, renaming, or comment changes while providing zero behavioral assurance.
+`builtins.readFile` plus `containsRegex` or `lib.hasInfix` is implementation-coupled: it breaks on reflow, renames, or comment edits and asserts no behavior.
 
-**Acceptable grep usage:**
-- Checking that a banned pattern does NOT appear (e.g., `!containsRegex "pip install"`)
-- Validating annotation presence (e.g., `containsRegex "# check-suppress:"`)
-- Checking for specific error message text in expected-failure tests
-- Shell script invariants where parsing is the only viable approach (add `# WHY:` comment)
+Acceptable: proving a banned pattern is absent (`!containsRegex "pip install"`), validating annotation presence, matching expected error text in a failure test, and parsing shell scripts when nothing else works (add a `# WHY:` comment).
 
-**Unacceptable grep usage:**
-- Checking that a function name exists in a file
-- Checking that an import path is present
-- Checking that a specific string literal appears in source code
-
-Convert unacceptable patterns to behavioral tests that evaluate the module with fixture data and verify output attributes. When grep is the only viable approach (shell scripts, modules requiring config args), add a `# WHY:` comment explaining the necessity.
+Unacceptable: asserting a function name, an import path, or a string literal exists in a source file. Convert those to behavioral tests that evaluate the module with fixture data and check output attributes.
 
 ## Test script gotchas
 
-Test scripts only, not production code.
+Test scripts only, never production code.
 
-- **Assert-Pass style**: `tests/scripts/check-steps/` are plain pwsh scripts with PASS/FAIL output — Pester discovers 0 tests. Run directly, check exit code. Wired into step 5 (`script-and-framework-tests`). Follow group-aware rename-first rules from `step-runner.instructions.md`.
-- **PowerShell**:
-  - `exit` is not catchable by `try/catch` — spawn subprocess, check `$LASTEXITCODE` + output.
-  - `Write-ErrorMessage`/`Write-Message` from `test-lib.ps1` — tests asserting UNDEFINED pass standalone but fail in-suite.
-  - `& script.ps1` does not set `$LASTEXITCODE`.
-  - `test.ps1` fail-fast kills process before summary. Use `--no-fail-fast` for debugging.
-- **Comments**: no `__TOKEN__`-delimited names in `.sh` test comments. No both fragments of same-line regex in one comment. Neither rule is machine-enforced; they are review requirements.
-- **Fail-closed suites**: a suite that sources `tests/scripts/test-lib.sh` must end with
-  `finish_tests`. It is the only sanctioned exit and the only emitter of the `# nucleus-tally`
-  line that test step 5 requires, so a suite that exits early, or calls it from a branch that
-  never runs, is reported as `no tally` instead of passing. The tally carries only
-  `passed` and `failed`: there is no skip count, because a case that cannot run on this host
-  asserts the host-correct expectation instead of stepping aside. Prerequisites fail loudly through
-  the library's `require_command`, never a skip-guard. Note that `src/scripts/lib/lib.sh`
-  defines a `die`-based `require_command` for production scripts: a suite sourcing both
-  libraries gets that one, and the missing tally is what surfaces the mistake. The
-  `nucleus-test` app provides `python3` with PyYAML, so run suites through it (or
-  `nix run ./src#test`) rather than from a bare shell, which must supply its own
-  interpreter.
-- **Mechanics**: `.sh` with shebangs must be executable; `.ps1` stay 644. Libs derive `REPO_ROOT` themselves. `cache_file_lists()` stubs must init `CACHED_*_FILES=()` (SC2178).
+- `tests/scripts/check-steps/` are plain pwsh scripts with PASS/FAIL output. Pester discovers 0 tests, so run them directly and check the exit code. Test step 5 (`script-and-framework-tests`) wires them.
+- `exit` is not catchable by `try/catch`; spawn a subprocess and read `$LASTEXITCODE` plus its output.
+- `& script.ps1` does not set `$LASTEXITCODE`.
+- Tests asserting `UNDEFINED` pass standalone but fail in-suite: `test-lib.ps1` defines `Write-ErrorMessage`/`Write-Message`.
+- `test.ps1` fail-fast kills the process before the summary; debug with `--no-fail-fast`.
+- `.sh` test comments carry no `__TOKEN__`-delimited names and no two fragments of the same-line regex. Review requirements only, nothing machine-parses them.
+- A suite sourcing `tests/scripts/test-lib.sh` must end with `finish_tests`. It is the only sanctioned exit and the only emitter of the `# nucleus-tally` line test step 5 requires, so an early exit or a call in a branch that never runs is reported as `no tally`. The tally carries only `passed` and `failed`: a case that cannot run on this host asserts the host-correct expectation rather than skipping, and a missing prerequisite fails loudly through the library's `require_command`. `src/scripts/lib/lib.sh` also defines a `die`-based `require_command`, so a suite sourcing both libraries gets that one and surfaces the mistake as a missing tally.
+- Run suites through the `nucleus-test` app, which provides `python3` with PyYAML. A bare shell must supply its own interpreter.
+- `.sh` files with shebangs must be executable; `.ps1` stay 644. Libraries derive `REPO_ROOT` themselves. `cache_file_lists()` stubs must initialize `CACHED_*_FILES=()` (SC2178).
 
 ## CI integration
 
-Push/PR/manual. POSIX: `nix run ./src#test`. Windows: `bootstrap.ps1` → `test.ps1`.
+Push, PR, and manual runs. POSIX: `nix run ./src#test`. Windows: `bootstrap.ps1` then `test.ps1`.
 
 ## Validation checklist
 
 - [ ] `find tests/modules tests/integration tests/hosts -name '*.nix' -exec nix-instantiate --eval {} +`
 - [ ] `cd src && nix flake check`
-- [ ] `nix run ./src#check-sh`
+- [ ] `nix run ./src#check`
 - [ ] `pwsh -File scripts/check-pwsh.ps1 -OnlyStep PSSA`
 - [ ] `pwsh -File scripts/check-pwsh.ps1 -OnlyStep Syntax -Settings scripts/test-PSScriptAnalyzerSettings.psd1`
 - [ ] `pwsh -File scripts/test.ps1 --only-steps=nix-tests`
