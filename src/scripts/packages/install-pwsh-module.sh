@@ -43,10 +43,11 @@ fi
   #   sudo runs a root environment, where a Nix-packaged pwsh is not resolvable.
   \$pwshBinary = '$_ipm_pwsh'
   \$privilegeCommand = '$_ipm_privilege'
-  # WHY the removal program travels inside this one: it is handed the versions
-  #   the listing below produced. It runs in its own process because a privileged
-  #   copy cannot be removed from this one, and -ErrorAction Stop makes a refused
-  #   removal abort rather than leave a shadow behind.
+  # WHY the removal program travels inside this one: it is handed the version
+  #   and path pairs the listing below produced. It runs in its own process
+  #   because a privileged copy cannot be removed from this one, and
+  #   -ErrorAction Stop makes a refused removal abort rather than leave a shadow
+  #   behind.
   \$removalProgram = @'
 \$ErrorActionPreference = 'Stop'
 # WHY the unload: a loaded copy holds its files open, which is what made
@@ -61,8 +62,16 @@ if (Get-Module -Name \$moduleName) {
   #   at the same name, and only the version narrows the removal. A sweep would
   #   take the pin with them.
 \$args | Select-Object -Skip 1 | ForEach-Object {
-  Write-Host ('install-pwsh-module: elevated removal of ' + \$moduleName + ' ' + \$_) -ForegroundColor Yellow
-  Uninstall-Module -Name \$moduleName -RequiredVersion \$_ -Force -ErrorAction Stop
+  \$target = @(\$_ -split '\|', 2)
+  \$version = \$target[0]
+  \$base = \$target[1]
+  # WHY the base joins the module path before the removal: this child runs as
+  #   root, and a root module path holds no entry for the user's module tree, so
+  #   Uninstall-Module would report the version as not installed and delete
+  #   nothing.
+  \$env:PSModulePath = \$base + [IO.Path]::PathSeparator + \$env:PSModulePath
+  Write-Host ('install-pwsh-module: elevated removal of ' + \$moduleName + ' ' + \$version + ' at ' + \$base) -ForegroundColor Yellow
+  Uninstall-Module -Name \$moduleName -RequiredVersion \$version -Force -ErrorAction Stop
 }
 '@
   # WHY the first entry of PSModulePath: PowerShellGet installs CurrentUser scope
@@ -96,10 +105,10 @@ if (Get-Module -Name \$moduleName) {
     #   external command. No other script under src/scripts carries one.
     if (-not \$privilegeCommand) { \$failure = 'install-pwsh-module: ' + \$moduleName + ' ' + \$requiredVersion + ' cannot be converged: ' + ((@(\$shadowing | ForEach-Object { '' + \$_.Version + ' at ' + \$_.ModuleBase })) -join '; ') + ' is stale or can shadow the pin and no privilege command was supplied to remove it'; throw \$failure }
     Write-Host ('install-pwsh-module: removing ' + \$shadowing.Count + ' stale or shadowing ' + \$moduleName + ' version(s) as ' + \$privilegeCommand + '...') -ForegroundColor Yellow
-    \$shadowVersions = @(\$shadowing | ForEach-Object { '' + \$_.Version } | Select-Object -Unique)
-    # WHY the call operator rather than a pipeline: the versions are arguments to
+    \$shadowTargets = @(\$shadowing | ForEach-Object { '' + \$_.Version + '|' + \$_.ModuleBase } | Select-Object -Unique)
+    # WHY the call operator rather than a pipeline: the targets are arguments to
     #   the child, and a native command takes them the way it takes any argv.
-    & \$privilegeCommand \$pwshBinary -NoProfile -CommandWithArgs \$removalProgram \$moduleName @(\$shadowVersions)
+    & \$privilegeCommand \$pwshBinary -NoProfile -CommandWithArgs \$removalProgram \$moduleName @(\$shadowTargets)
     if (\$LASTEXITCODE -ne 0) {
       # WHY the owner is read here: PowerShellGet reports \"in use or you don't
       #   have the required permissions\" for a copy this user cannot remove, and

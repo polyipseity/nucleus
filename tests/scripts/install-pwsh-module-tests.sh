@@ -731,10 +731,11 @@ test_removal_is_narrowed_to_the_versions_that_shadow() {
 
 test_elevated_removal_never_carries_the_converged_pin() {
   run_installer Pester 6.2.0
-  if grep -qF "${PS}shadowVersions = @(${PS}shadowing" "$IPM_STUB_LOG"; then
-    assert_pass "installer: the versions handed to the removal come from the shadowing set"
+  if grep -qF "${PS}shadowTargets = @(${PS}shadowing" "$IPM_STUB_LOG" &&
+    grep -qF "+ '|' + ${PS}_.ModuleBase" "$IPM_STUB_LOG"; then
+    assert_pass "installer: the targets handed to the removal are the shadowing copies with their paths"
   else
-    assert_fail "installer: the versions handed to the removal come from the shadowing set" "recorded program: $(cat "$IPM_STUB_LOG")"
+    assert_fail "installer: the targets handed to the removal are the shadowing copies with their paths" "recorded program: $(cat "$IPM_STUB_LOG")"
   fi
 }
 
