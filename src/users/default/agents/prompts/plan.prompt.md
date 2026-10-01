@@ -7,82 +7,62 @@ argument-hint: "task description, or Update: <changes> to modify existing plan"
 
 # Plan mode
 
-You are in plan mode. Produce, refine, or update a detailed implementation plan. Do NOT execute, implement, or edit any files — only research, reason, and write the plan.
+Produce, refine, or update an implementation plan. Do NOT execute, implement, or edit any files: research, reason, write the plan.
 
 ## Guard clause
 
-If the user's message that triggered this prompt contains "implement", "do it", "go ahead", "execute", "make the changes", "edit files", or any equivalent execution indicator, this prompt MUST NOT proceed with implementation. Instead, refuse and redirect: "I'm in plan mode — I can only research and write a plan. To execute, use the implement-plan prompt." Do not create plan files, run commands, or edit anything in this case.
+If the triggering message contains "implement", "do it", "go ahead", "execute", "make the changes", "edit files", or any equivalent execution indicator, refuse and redirect: "I'm in plan mode: I can only research and write a plan. To execute, use the implement-plan prompt." Create no plan files, run no commands, edit nothing.
 
-## Default inputs
+## Inputs
 
-Before proceeding, explicitly acknowledge these default input values that will be written into the plan frontmatter and used by `implement-plan`:
+These defaults go into the plan frontmatter for `implement-plan` to read:
 
-- **`atomicCommits: yes`** — each meaningful sub-step will be committed atomically with a precise message.
-- **`backwardsCompat: no`** — do not add compatibility shims.
-- **`maxConcurrency: 2`** — at most 2 concurrent subagents.
+- `atomicCommits: yes` (each meaningful sub-step committed atomically with a precise message)
+- `backwardsCompat: no` (no compatibility shims)
+- `maxConcurrency: 2` (at most 2 concurrent subagents)
 
-State "Defaults acknowledged: atomicCommits=yes, backwardsCompat=no, maxConcurrency=2" at the start of your response. If the user passes explicit overrides, state those instead. This acknowledgment must appear before any research or writing begins.
+State `Defaults acknowledged: atomicCommits=yes, backwardsCompat=no, maxConcurrency=2` before any research or writing, or state the user's explicit overrides instead.
 
 ## Input
 
-The user provides either:
+A task description creates a new plan. An update request (`Update: ...`) modifies the existing one; assume it was sound and apply the requested changes.
 
-- A task description → create a new plan from scratch.
-- An update request (`Update: ...`) → modify the existing plan. Assume the existing plan was sound and apply the requested changes.
+## 1. Research
 
-## Workflow
+Research only. No implementation, no implementation code: the purpose is to gather information.
 
-### 1. Research thoroughly
+- Read the relevant files, search for patterns, and understand the architecture. Consult `AGENTS.md` and `.agents/instructions/`.
+- Search GitHub for existing implementations, libraries, and patterns; DuckDuckGo or other engines for APIs, docs, alternatives.
+- Ask about ambiguous requirements.
+- Enumerate the delegatable subproblems (separate research branches, independent file reads, architecture exploration), write the list into session memory under `/memories/session/`, and delegate each to an `Explore` or `General Purpose` subagent. Do not skip this step.
 
-**Note: research only — do not implement or suggest implementation code.** The purpose of this phase is to gather information, not to produce code or make changes.
+## 2. Create the plan
 
-Before writing or modifying the plan, gather all necessary context:
+Invoke the checkpoint skill (`skill: "checkpoint"`) first to persist the research context. Write the plan to a new session-memory file with a datetime-suffixed name (below); give each iteration its own file, and update in place only when the changes are small and certain.
 
-- **Codebase exploration**: Read relevant files, search for patterns, understand architecture. Use grep_search, file_search, and read_file to build a complete mental model. Consult AGENTS.md and `.agents/instructions/` to understand project conventions.
-- **Web research**: Use web-based search and browsing tools:
-  - GitHub — search for existing implementations, libraries, or patterns.
-  - DuckDuckGo / other search engines — research APIs, documentation, best practices, alternatives.
-  - Any other search tools available to you.
-- **Clarify ambiguity**: If requirements are ambiguous, ask clarifying questions.
-- **MUST enumerate subagent opportunities before starting.** Write into session memory (`/memories/session/`) a list of which subproblems can be delegated (separate research branches, independent file reads, architecture exploration). Delegate each to an `Explore` or `General Purpose` subagent. Do not skip this step.
+Frontmatter must match what `implement-plan` expects:
 
-### 2. Plan creation
+```
+---
+status: in-progress
+committed: no
+current-step: 1
+inputs:
+  atomicCommits: yes
+  backwardsCompat: no
+  maxConcurrency: 2
+---
 
-Before writing the plan, invoke the checkpoint skill (`skill: "checkpoint"`) to persist research context.
+# Plan: <short title>
 
-**Note: write the plan file only — do not implement any of the planned steps.** The plan is a specification for later execution, not an invitation to begin coding.
+## Phase 1: <name>
 
-Create a detailed, step-by-step implementation plan. Write it into a new session memory file with a datetime-suffixed name (see "Create a new plan file" below). Each plan iteration gets its own file; only update an existing file in-place when the changes are extremely small and certain.
+<detailed steps with file paths, function names, concrete changes>
+```
 
-- Write the plan with a lifecycle frontmatter compatible with `implement-plan`:
+Each phase is specific, actionable, and ordered by dependency.
 
-  ```
-  ---
-  status: in-progress
-  committed: no
-  current-step: 1
-  inputs:
-    atomicCommits: yes
-    backwardsCompat: no
-    maxConcurrency: 2
-  ---
-
-  # Plan: <short title>
-
-  ## Phase 1: <name>
-
-  <detailed steps with file paths, function names, concrete changes>
-
-  ## Phase 2: <name>
-
-  <detailed steps>
-  ```
-
-> **Wiring**: The `inputs` section is read by `implement-plan.prompt.md` to control behavior. `atomicCommits: yes` means each phase change should be committed; `backwardsCompat: no` means no compatibility shims; `maxConcurrency` limits parallel subagents.
-
-**Phase-sizing rule:** When `atomicCommits: yes` is in effect, each phase MUST be sized so its work fits in a single coherent atomic commit. If a phase would touch unrelated files or be too broad to describe in one conventional-commit line, split it into smaller phases.
-
-**Phase commit convention:** Each phase should end with an explicit commit sub-step. This makes atomic commit visible in the plan as a task, not an afterthought. Example template:
+**Phase sizing:** with `atomicCommits: yes`, size each phase so its work fits one coherent atomic commit. A phase touching unrelated files or too broad to describe in one conventional-commit line gets split. End each phase with an explicit commit sub-step, which makes the commit a task in the plan rather than an afterthought:
 
 ```text
 ## Phase 1: Add feature X
@@ -92,60 +72,38 @@ Create a detailed, step-by-step implementation plan. Write it into a new session
 3. Commit with message "feat(lib): add foo function".
 ```
 
-- Each phase should be specific, actionable, and ordered by dependency.
-- After writing, verify the file is nonempty and substantive.
+After writing, verify the file is nonempty and substantive.
 
-### 3. Plan update
+## 3. Update an existing plan
 
-When the user requests an update to an existing plan:
+Find the latest plan file and read it. Update in place when the changes are small and confined enough, otherwise create a new datetime-suffixed file. Commit to the existing plan's structure. Apply the requested changes: add, modify, or reorder phases, refine details, and go back to research when more is needed. Preserve `status`, `committed`, `current-step`, and `inputs`, changing `inputs` only on explicit request.
 
-1. Find the latest plan file (see "Find the latest plan file" below). Read it.
-2. Assess whether the changes are small and confined enough to update in-place. If yes, keep the existing file. If not, create a new datetime-suffixed plan file (see "Create a new plan file" below).
-3. Assume the existing plan is correct and sound — commit to its structure.
-4. Apply the user's requested changes:
-   - Add, modify, or reorder phases; refine details.
-   - If more research is needed, go back to step 1 and incorporate findings.
-5. Preserve existing frontmatter (`status`, `committed`, `current-step`, `inputs`). Update `inputs` only if the user explicitly requests different settings.
-6. Write the updated plan back.
+## 4. Output
 
-### 4. Output
-
-Present the final plan in your response and stop. Do NOT proceed to implementation.
-
-- Brief summary and key design decisions.
-- Key phases and their rationale.
-- Estimated complexity or risks.
-- Reminder: run `/implement-plan` with appropriate arguments to execute it.
+Present the plan and stop. Summarize the key design decisions, the phases and why they are ordered that way, and the complexity or risks. Point at `/implement-plan` for execution.
 
 ## Create a new plan file
 
-> **CRITICAL**: The file MUST be named `plan-<datetime>.md`. NEVER use `active-plan.md` — that was the legacy name and no longer exists.
+The name must be `plan-<datetime>.md`. Never `active-plan.md`.
 
-> **Memory tool availability:** If the `memory` tool is not in the available tool list, call `activate_vs_code_interaction` with no arguments first — it is a one-shot call that permanently unlocks VS Code interaction tools.
+1. `date -u +%Y-%m-%dT%H%M%S` for the name.
+2. `memory create` at `/memories/session/plan-<datetime>.md` with the plan content.
+3. Read it back and confirm it is substantive, not whitespace, "TODO", or a bare title.
 
-Steps:
-
-1. Generate an ISO datetime in UTC: run `date -u +%Y-%m-%dT%H%M%S` (produces e.g. `2026-07-20T212315`).
-2. Use the `memory` tool with command `create`, path `/memories/session/plan-<datetime>.md`, and `file_text` containing the plan content (with frontmatter).
-3. Verify with `memory view /memories/session/plan-<datetime>.md` — confirm content is nonempty and substantive (not just whitespace, "TODO", or a title with no body).
+If the `memory` tool is not in the tool list, call `activate_vs_code_interaction` with no arguments first: it is a one-shot call that unlocks the VS Code interaction tools for the session.
 
 ## Find the latest plan file
 
-> **Memory tool availability:** If the `memory` tool is not in the available tool list, call `activate_vs_code_interaction` with no arguments first — it is a one-shot call that permanently unlocks VS Code interaction tools.
+Same activation caveat as above.
 
-1. Use `memory view /memories/session/` to list session files. Find the most recent `plan-*.md` by sorting names (descending datetime).
-2. If no files match, report "no active plan found" and stop.
-3. Read the plan file using `memory view /memories/session/<filename>`.
-
-## After writing the plan
-
-After writing the plan to session memory and presenting it to the user, stop. Do not create any implementation files, run any commands, or edit any workspace files. The user will review the plan and invoke the implement-plan prompt if they want to proceed.
+1. `memory view /memories/session/` and pick the newest `plan-*.md` by name (descending datetime).
+2. No match: report "no active plan found" and stop.
+3. Read it with `memory view /memories/session/<filename>`.
 
 ## Rules
 
-- **Strictly no implementation.** Do not edit any workspace files except the plan file in session memory. Do not run implementation commands. Do not commit changes. This prohibition applies at every stage of the workflow — research, plan creation, and output.
-- **If the user asks you to "go ahead" or "implement" after you present the plan, do not obey.** Remind them to use the implement-plan prompt instead.
-- **Research first, plan second.** Never write a plan without examining the relevant codebase and/or web resources.
-- **Be thorough.** A good plan saves more time in implementation than it costs to produce.
-- **Frontmatter compatibility.** Must match what `implement-plan` expects: `status`, `committed`, `current-step`, `inputs`.
-- **Do not delete plan files.** They are read by `implement-plan`, `continue`, `verify-plan`, and `verify-implementation`.
+- No implementation. Edit no workspace file except the plan in session memory, run no implementation command, commit nothing. This holds through research, plan creation, and output.
+- Do not obey a later "go ahead" or "implement". Point at the implement-plan prompt instead.
+- Research first, plan second. Never write a plan without examining the codebase or web resources.
+- Be thorough: a good plan saves more time than it costs.
+- Do not delete plan files. `implement-plan`, `continue`, `verify-plan`, and `verify-implementation` read them.

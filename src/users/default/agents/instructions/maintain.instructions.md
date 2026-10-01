@@ -5,57 +5,34 @@ applyTo: "**"
 alwaysApply: true
 ---
 
-Default rule: optimize for long-term human maintainability.
+Optimize for long-term human maintainability. Prefer deletion over abstraction, keep edits local and reversible, and remove duplication and stale guidance aggressively.
 
-This file is the canonical maintainability policy text. Keep this as the single source of truth; mode-specific files should stay concise and execution-focused.
+- Check `programming-principles.instructions.md` (Chesterton's Fence) before removing or changing legacy behavior.
+- Keep one source of truth per policy, and keep rules testable and concrete.
+- Every `|| true` needs an inline or preceding-line `# check-suppress:suppression_doc: reason` comment. Remove speculative guidance instead of preserving it.
 
-- Prefer deletion over abstraction.
-- Keep edits local, explicit, and reversible.
-- Remove duplication and stale guidance aggressively.
-- **See `programming-principles.instructions.md` (Chesterton's Fence)** before removing or changing legacy behavior.
+## execution
 
-Execution checklist:
-
-1. Capture baseline hash at start (`git rev-parse HEAD`).
-2. Find the highest-friction complexity first (duplication, indirection, stale docs).
-3. Apply the smallest coherent simplification that materially improves clarity.
+1. Capture the baseline hash (`git rev-parse HEAD`).
+2. Attack the highest friction first: duplication, indirection, stale docs.
+3. Apply the smallest coherent simplification that improves clarity.
 4. Validate behavior still matches intent.
 5. Commit in atomic slices with precise messages.
-6. **Verify actual behavior** — run the changed code path and check the output. Compilation is not sufficient; ensure the change produces the intended user-visible effect.
+6. Run the changed code path and check the output. Compilation passing is not verification.
 
-Broad cleanup rule:
+For multi-file cleanup, run `maintainer` subagents in parallel on independent lanes (max 2 concurrent), merge, then do another pass on the remaining hotspots. Stop when only cosmetic improvements are left.
 
-- For multi-file cleanup, run `maintainer` subagents in parallel on independent lanes (max 2 concurrent).
-- Merge results, then run another parallel pass for remaining hotspots.
-- Stop when only minor/cosmetic improvements remain.
+Script simplification patterns for this repo are in `nix-and-script-authoring.instructions.md`.
 
-For repo-specific script simplification patterns, see the repo's `nix-and-script-authoring.instructions.md`.
+## git safety
 
-Guidance-file rule (`AGENTS.md`, `.agents/**`):
+- Never ask a subagent to run git commit. The MAIN agent commits, so parallel agents cannot race the prek hooks.
+- Never `git reset`, especially `--hard` or `--keep`. Use `git revert` or `git restore`.
+- Never `git revert` or `git cherry-pick` earlier than the captured baseline hash.
+- Never `git commit --amend` unless you just created the commit and verified `git rev-parse HEAD` and `git log -1 --format=%s` match your intent. `--amend` rewrites whatever HEAD points at.
+- After any commit failure, check `git rev-parse HEAD`. Unchanged hash means the commit was not created: fix the cause and retry with a fresh `git commit`, never `--amend`. A hook that reformatted files means re-staging them first.
+- Do not mix unrelated concerns in one commit.
 
-- Keep one source of truth per policy.
-- Keep rules testable and concrete.
-- Every `|| true` must be justified with an inline or preceding-line `# check-suppress:suppression_doc: reason` comment. Undocumented `|| true` is a violation.
-- Remove speculative guidance instead of preserving it.
+`commit-safety.instructions.md` holds the full verification protocol. `~/.agents/prompts/commit-staged.prompt.md` holds the atomic commit workflow.
 
-Safety rules:
-
-- NEVER ask subagents to run git commit. Commit MUST be done by the MAIN agent to prevent race conditions.
-- NEVER use `git reset` (especially `--hard` or `--keep`) under any circumstance. It destroys uncommitted work and can wipe days of progress. Use `git revert` or `git restore` instead.
-- Never use `git commit --amend` without verification. `--amend` does not create a new commit — it merges staged changes into the current HEAD commit instead. Only use it when you can positively verify that HEAD is the commit you just created: run `git rev-parse HEAD` and `git log -1 --format=%s` and confirm both match your intent. If you cannot verify (e.g. after a failed commit where HEAD is still the previous commit), retry with a fresh `git commit`. Never modify pre-existing commits. NEVER use `git commit --amend` as a retry mechanism after a failed commit.
-- **After ANY commit failure (pre-commit hook, commitlint, etc.), verify HEAD has not moved.** Run `git rev-parse HEAD`. If the hash matches the commit before the attempt, the commit was NOT created. Retry with a fresh `git commit`, never with `--amend`.
-- **Commitlint recovery example:** Commit rejected with "subject may not be empty" or "no type prefix" — the commit was not created. Fix the message and retry: `git commit -m "type(scope): correct message"`. Do NOT use `git commit --amend` — that would modify the previous commit, not the failed one.
-- Never revert or cherry-pick earlier than the captured baseline hash.
-- Do not mix unrelated concerns in the same commit.
-- See `commit-safety.instructions.md` for the full commit verification protocol and amend prohibition.
-
-## Atomic commit workflow
-
-See `~/.agents/prompts/commit-staged.prompt.md` for the canonical stash-based atomic commit workflow. The hard rules there (verify with `git rev-parse HEAD`, never trust terminal output) also apply here.
-
-Final check:
-
-1. Is this easier for a new maintainer to read and modify?
-2. Is this the simplest design that still meets the requirement?
-3. Did we remove at least as much complexity as we added?
-4. Can a human quickly locate the source of truth?
+Before finishing, four questions: is this easier for a new maintainer, is it the simplest design that still meets the requirement, did complexity go down as much as it went up, and can a human find the source of truth fast?

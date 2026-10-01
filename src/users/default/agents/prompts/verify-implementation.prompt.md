@@ -7,73 +7,38 @@ argument-hint: "optional: specific phase or file to focus verification on"
 
 # Verify plan implementation
 
-You are in verification mode. Check whether an active plan is fully implemented. Do NOT execute, implement, or edit any files — only research, compare, and report.
+Check whether an active plan is fully implemented. Do NOT execute, implement, or edit any files: research, compare, report.
 
 ## Guard clause
 
-If the user's message that triggered this prompt contains "implement", "do it", "go ahead", "execute", "make the changes", or any equivalent execution indicator, refuse and redirect: "I'm in verify mode — I can only check and plan. To execute, use the implement-plan prompt."
+If the triggering message contains "implement", "do it", "go ahead", "execute", "make the changes", or any equivalent, refuse and redirect: "I'm in verify mode: I can only check and plan. To execute, use the implement-plan prompt."
 
-## Workflow
+If the `memory` tool is missing from the tool list, call `activate_vs_code_interaction` with no arguments first: it is a one-shot call that unlocks the VS Code interaction tools.
 
-### 1. Retrieve the plan
+## 1. Retrieve the plan
 
-> **Memory tool availability:** If the `memory` tool is not in the available tool list, call `activate_vs_code_interaction` with no arguments first — it is a one-shot call that permanently unlocks VS Code interaction tools.
+1. `memory view /memories/session/` and pick the newest `plan-*.md` by name (descending datetime). None: report "No active plan found, nothing to verify." and stop.
+2. Read it with `memory view /memories/session/<filename>`.
+3. Parse the frontmatter (`status`, `current-step`, `committed`, `inputs`) for context. Never short-circuit on `status: completed`: verify regardless.
+4. Load the newest `checkpoint-*.md` from the same listing for supplementary context (work done, files touched, pending decisions). None is fine.
 
-1. Find the latest plan file:
-   - Use `memory view /memories/session/` to list session memory files.
-   - Find the most recent `plan-*.md` by sorting names (descending datetime).
-   - If no files match, report: "No active plan found — nothing to verify." and stop.
-2. Read the plan file using `memory view /memories/session/<filename>`.
-3. Parse the frontmatter for context (`status`, `current-step`, `committed`). Do not short-circuit on any status value — proceed to verify regardless.
-4. Parse `inputs` from frontmatter. Record `atomicCommits`, `backwardsCompat`, `maxConcurrency` for awareness — not used during verification but helpful context for the report.
-5. Find and load the latest checkpoint for supplementary context:
-   - Use `memory view /memories/session/` to list session files. Find the most recent `checkpoint-*.md` by sorting names (descending datetime).
-   - If a checkpoint exists, read it using `memory view /memories/session/<filename>` — the checkpoint's "Work done" and "Next steps" sections provide rich verification context (what was just implemented, what files were touched, pending decisions).
-   - If no checkpoint exists, proceed without it.
+## 2. Verify completeness
 
-### 2. Verify completeness
+Collect the full list of expected outcomes from every phase and step, then check each against the workspace: read modified files for the intended change, confirm new files exist at the expected path, confirm removed files are gone, and search for behavioral outcomes by their patterns, imports, or references.
 
-For every phase and step in the plan:
+Delegate separate phases or large file sets to `Explore` subagents so the main context stays focused. Log every step as passed or failed with its evidence.
 
-1. **Check what was supposed to happen.** Each plan step names files to modify, functions to change, or behavior to add. Collect the full list of expected outcomes.
-2. **Verify each expected outcome against the workspace:**
-   - For file changes: read the file and confirm the intended modification exists.
-   - For new files: confirm the file exists at the expected path.
-   - For removed files: confirm the file no longer exists.
-   - For behavioral outcomes: search for the expected patterns, imports, or references.
-3. **Use subagents for independent verification lanes.** Delegate separate phases or large file sets to Explore subagents to keep the main context focused.
-4. **Log each finding** — for every step, record whether it passed or failed verification, with the evidence.
+With `inputs.atomicCommits: yes`, compare `git log --oneline` against the plan phases and flag any phase with no matching commit: "Phase N has no commit: changes may be uncommitted or lost."
 
-5. **When plan `inputs.atomicCommits` is `yes`**, also verify that commits exist matching the plan:
-   - Run `git log --oneline` and compare commit messages against plan phases.
-   - If a plan phase has no corresponding commit, flag it as a gap: "Phase N has no commit — changes may be uncommitted or lost."
+## 3. Report or remediate
 
-### 3. Report or remediate
+No gaps: report "Plan fully implemented, no gaps found.", optionally with a summary of the phases and key files.
 
-**If all steps are fully implemented with no gaps:**
+With gaps: name each incomplete step with expected versus actual evidence, and do NOT implement fixes. Instead write a remediation sub-plan. Find the latest plan file, or create a new datetime-suffixed one when none exists; read it; set `status` back to `in-progress` if it was `completed`; set `current-step` to the first failed step; add the gaps as ordered steps with exact file paths, their dependencies, and `current-step` set to the first gap's phase number; write it back. Updating the original plan keeps it the single source of truth.
 
-- Report: "Plan fully implemented — no gaps found."
-- Optionally include a summary of what was implemented (phases and key files).
+Then stop, present the findings and the remediation plan, and remind the user to run `/implement-plan`.
 
-**If gaps exist:**
-
-- Report which steps are incomplete or missing, with specific evidence (expected vs actual).
-- **Do NOT implement fixes.** Instead, create a remediation sub-plan:
-  1. Find the latest plan file (find-latest-plan pattern). If none exists, create a new datetime-suffixed plan file.
-  2. Read the existing plan, update its `status` back to `in-progress` if it was marked `completed`, and adjust `current-step` to the first failed step.
-  3. Write the updated plan back — this preserves the original plan as the single source of truth, augmented with remediation steps.
-
-  The remediation sub-plan should include:
-  - The specific gaps found.
-  - Ordered steps to close each gap, referencing exact file paths.
-  - Any dependencies between remediation steps.
-  - The `current-step` set to the first gap's phase number.
-
-- Then stop. Present the verification findings and the remediation plan to the user. Remind them to run `/implement-plan` to execute the remediation.
-
-### 4. Output format
-
-**Success output:**
+## Output format
 
 ```
 ## Verification result: OK
@@ -81,18 +46,16 @@ For every phase and step in the plan:
 Plan "<title>" is fully implemented.
 
 ### What was done
-- Phase 1: <summary> — verified
-- Phase 2: <summary> — verified
+- Phase 1: <summary>: verified
+- Phase 2: <summary>: verified
 ```
-
-**Gap output:**
 
 ```
 ## Verification result: GAPS FOUND
 
 ### Missing or incomplete
-- Phase 1, step 2: `<description>` — expected `<X>`, found `<Y>`
-- Phase 2, step 1: `<description>` — file `<path>` does not exist
+- Phase 1, step 2: `<description>`: expected `<X>`, found `<Y>`
+- Phase 2, step 1: `<description>`: file `<path>` does not exist
 
 ### Remediation plan
 Updated plan file with remediation steps. Run `/implement-plan` to execute.
@@ -100,7 +63,7 @@ Updated plan file with remediation steps. Run `/implement-plan` to execute.
 
 ## Rules
 
-- **Strictly no implementation.** Do not edit any workspace files (except updating the plan in session memory). Do not run implementation commands. Do not commit changes.
-- **Research thoroughly.** Read files, search for patterns, use subagents — do not guess whether something was implemented.
-- **Be precise.** Cite exact file paths, line numbers, and expected vs actual content.
-- **If unsure about a step, flag it as a gap.** Better to over-report than miss an incomplete step.
+- No implementation: edit no workspace file except the plan in session memory, run no implementation command, commit nothing.
+- Research thoroughly with files, searches, and subagents. Never guess whether something was implemented.
+- Cite exact paths, line numbers, and expected versus actual content.
+- When unsure, flag it as a gap. Over-reporting beats missing an incomplete step.

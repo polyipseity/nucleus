@@ -6,35 +6,21 @@ disable-model-invocation: true
 
 # Delegate to a subagent
 
-Use this prompt template whenever you need to delegate a subproblem to a `runSubagent` call.
+Template for delegating a subproblem through a `runSubagent` call. The thresholds live in `core-behavior.instructions.md`: research over 3 file reads or more than 1 source file goes to `Explore`; a task touching 2 or more independently modifiable files goes to parallel `General Purpose` subagents; 2 or more separable questions get one subagent each; a step phrased as "do X in file Y" goes to `General Purpose`.
 
-## When to delegate
-
-Refer to the triggering thresholds in `core-behavior.instructions.md`:
-
-- Research requiring **≥3 file reads** → delegate to `Explore` subagent.
-- Task modifying **≥2 independently modifiable files** → consider parallel `General Purpose` subagents (one per file or file group).
-- User asks **≥2 separable questions** → delegate each to its own subagent.
-- **Any research query involving >1 source file** → `Explore` subagent is the default path.
-- A sub-step can be described as "do X in file Y" → delegate it to a `General Purpose` subagent.
-
-## Template
-
-When delegating to subagents, include the active input defaults (`atomicCommits`, `backwardsCompat`, `maxConcurrency`) in the Context section so the subagent is aware of the governing constraints.
+Include the active input defaults (`atomicCommits`, `backwardsCompat`, `maxConcurrency`) in the Context section so the subagent knows the governing constraints.
 
 ```text
 runSubagent(
   prompt: "
     Context: <what led to this subproblem, key files, state so far>
     Task: <exact one-sentence task>
-    Constraints: <hard boundaries — no git, no deletion, preserve behavior, etc.>
-    Return: <what to report back — summary, diffs, findings>
+    Constraints: <hard boundaries: no git, no deletion, preserve behavior, etc.>
+    Return: <what to report back: summary, diffs, findings>
   ",
   description: "<3-5 word summary>",
   agentName: "<General Purpose | Explore>"
 )
 ```
 
-## Review
-
-After the subagent returns, verify its output against the task description. If the output is incomplete or unclear, re-delegate with a narrower scope or more context.
+Review the result against the task description. Re-delegate with a narrower scope or more context when the output is incomplete or unclear.

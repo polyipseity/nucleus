@@ -9,180 +9,97 @@ Default operating mode for all agent interactions.
 
 ## Communication
 
-- **Respond in English only.** Never output in another language unless the user explicitly requests it.
-- Keep responses short, direct, technical, and actionable.
-- Avoid motivational padding, repeated plans, and redundant restatements.
-- Prioritize correctness, traceability, and completion.
+- Respond in English unless the user asks for another language.
+- Keep responses short, direct, and actionable. No motivational padding, repeated plans, or restatements.
 
 ## Execution
 
-- Break non-trivial tasks into explicit, ordered steps and execute them end-to-end without unnecessary manual handoffs.
-- Prefer parallel execution for independent reads, searches, and validations to reduce latency and context churn.
-- After each execution burst, report concise progress and the immediate next action.
-- Keep reasoning explicit but compact: show decision-critical logic, omit filler.
-- **Verify changes thoroughly before finishing: use the `get_errors` tool (when available via VS Code) after each editing round to catch early errors, then run syntax/lint/tests/runtime checks relevant to the task.**
-- **Consult project architecture docs** (AGENTS.md, .agents/instructions/) before placing new code. Do not guess code organization.
-- **CRITICAL: immutable by default in all code.** Before writing any variable, constant, parameter, field, property, return type, data structure, or interface — default to the immutable variant. Reach for mutable only when mutation is the core purpose of the value, and even then minimize the scope of mutability. This principle is universal and language-independent: `const` over `let`/`var`, `val` over `var`, `readonly` properties, `readonly T[]`/`ReadonlyMap`/`ReadonlySet` over mutable collections, frozen dataclasses, immutable records, read-only borrows/views over mutable references. Every mutable choice must be a deliberate, justifiable decision — mutability is never the default. When the type system offers an immutable variant, always use it unless you can positively demonstrate why mutation is required. See `programming-principles.instructions.md` (Tier 4) for the overarching immutability-by-default principle and `typing-conventions.instructions.md` for language-specific immutable type rules.
-- **Enable VS Code interaction early.** If you need the `memory` tool (session/repo/user notes) or any VS Code interaction tool, call `activate_vs_code_interaction` with no arguments before using them. It is a one-shot unlock; do not assume these tools are absent — activate first, then use. This is the required setup step, not a fallback path.
-- **No fallbacks (control-flow or value-masking).** Never add a fallback path or a silent default. If a primary path fails or a dependency is absent, report the failure — do not silently fall back to a different implementation. Never mask a missing or failed value with a default (`or ""`, `?? ""`, `|| ""`, `dict.get(k, "")`, `unwrap_or("")`, `except: pass`, swallowing `try/except`, `-ErrorAction SilentlyContinue` without a stated reason, `2>$null` without an annotation). Fallbacks hide real problems, make debugging harder, and accumulate complexity. If you find yourself writing a fallback, reconsider: the simplest fix is to make the primary path work correctly.
-- **Git boundary.** Never perform git operations (commit, push, checkout, stash, add, reset, restore — any `git` command) unless the task explicitly asks for them. When the user says "do not touch git", treat it as a hard invariant: do not run any `git` command, do not suggest git operations, do not prepare staged content for future commits.
-- **Submodule boundary — absolute prohibition.** Never modify files inside a git submodule or run git operations within one unless the user explicitly asks you to work on that submodule. This is a hard invariant. "Apply changes to pkg X" or "replicate commits to pkg X" is NOT permission — only explicit "work inside submodule X" or equivalent qualifies.
-- **Actionable alternative:** when a task targets a submodule path, use absolute paths from the parent repo root for reading only. Stop and ask the user if changes are needed inside a submodule.
-- **Git commit enforcement.** When the task requires committing, delegate to the `commit-keeper` subagent via `runSubagent`. The commit-keeper agent follows `commit-safety.instructions.md` for verification, failure recovery, and amend prohibition. If the `commit-keeper` subagent is unavailable, the main agent MUST read and follow `commit-safety.instructions.md` directly, acting as commit-keeper.
-- **Subagent git boundary.** Subagents (Explore, General Purpose, and all other delegation types except commit-keeper during the commit step itself) must never run `git commit` or `git push`. Only the main agent commits and pushes. Concurrent git operations from multiple agents cause prek hook races on shared tools (treefmt and Nix eval-cache).
-- **Defer privileged operations.** If a task requires `sudo`, admin elevation, or any operation that cannot run as the current user, do not execute it. Instead, note the required privilege in the completion summary and prompt the user to run it.
-- See `.agents/instructions/execution-details.instructions.md` for multi-edit recovery and tool-retry discipline.
-- **Strict scope adherence.** When the user says "only do X", "only fix X", or otherwise scopes the task to a specific pass, phase, file, or rule, do exactly that scope and nothing else. Do not fix related issues, do not improve surrounding code, do not pre-emptively address future passes, or re-organize or refactor outside the stated scope. The user will explicitly ask for follow-up work if needed.
-- **Enumerate subagent opportunities before starting.** Before executing any task, explicitly list which subproblems could be delegated to subagents. Write this list into session memory (`/memories/session/`) if the task is complex. Do not skip this step.
-- **Record animated CLIs/TUIs with asciinema.** For detailed usage, invoke the skill: `skill: "asciinema"`.
-- **Terminal output: NEVER pipe, always redirect to file.** This is a hard rule — see "Terminal output pipes" section below.
+- Break non-trivial work into ordered steps and finish them end to end.
+- Parallelize independent reads, searches, and validations.
+- After each burst, report progress and the next action.
+- Verify before finishing: run the syntax, lint, test, or runtime checks relevant to the task. Use `get_errors` after each editing round when VS Code interaction is available.
+- Read the project architecture docs (`AGENTS.md`, `.agents/instructions/`) before placing new code.
+- **Immutable by default.** Every variable, field, return type, and collection reaches for the immutable variant first: `const` over `let`, `readonly` properties, `readonly T[]`, frozen records, read-only borrows. Mutability needs a stated reason. See `programming-principles.instructions.md` and `typing-conventions.instructions.md`.
+- **No fallbacks.** When a primary path fails or a dependency is missing, report the failure. Never add a fallback branch or mask a missing value with a default (`or ""`, `?? ""`, `|| ""`, `dict.get(k, "")`, `unwrap_or("")`, a swallowing `except`, `-ErrorAction SilentlyContinue` without a stated reason, `2>$null` without an annotation). Fix the primary path instead.
+- **Git boundary.** Run no git command unless the task asks for it. When the user says "do not touch git", do not run git, suggest git, or stage anything.
+- **Commit delegation.** When the task requires committing, delegate to the `commit-keeper` subagent. If it is unavailable, act as commit-keeper yourself and follow `commit-safety.instructions.md`.
+- **Subagent git boundary.** No subagent runs `git commit` or `git push` except commit-keeper during the commit step. Concurrent git operations from several agents race the prek hooks.
+- **Submodule boundary.** Never touch files inside a git submodule unless the user explicitly asks to work in that submodule. Reading through absolute paths from the parent repo root is fine; changes there need an explicit request.
+- **Defer privileged operations.** Do not run anything needing `sudo` or admin elevation. Name the required privilege in the completion summary and let the user run it.
+- **Strict scope adherence.** When the user scopes a task to one pass, phase, file, or rule, do exactly that. Do not fix adjacent issues or pre-empt later passes.
+- Enumerate which subproblems could be delegated before starting, and record the list in session memory for complex tasks.
+- Record animated CLIs and TUIs with asciinema: invoke the `asciinema` skill.
 
 ## Never silently skip warnings or errors
 
-When a task is to fix warnings/errors, or any run emits them, EVERY warning and
-error MUST be accounted for. Silently omitting, waving away, or labelling
-something "benign" without proof is forbidden — it hides real problems and leaves
-the task incomplete.
+Every warning and error gets accounted for. Calling one "benign" without proof hides a real problem.
 
-- **Enumerate everything.** List each warning/error with the exact output line and
-  its source (file/step). Do not summarize groups away.
-- **Disposition each one.** Every item gets exactly one of: `fix` (in nucleus
-  code), `upstream` (cannot fix here — name the project and the issue), `by-design`
-  (intentional, cite the flag/code), or `consequence` (caused by another item — fix
-  the root, not the symptom).
-- **Benign requires proof.** "Benign"/"expected" is only valid with evidence: the
-  service is confirmed running, the flag is intentional, the upstream bug is named,
-  or the condition is documented. A bare assertion is not enough.
-- **No silent exclusions.** If an item is excluded from the fix list, the plan must
-  still show it with its disposition and proof. An item absent from the plan is an
-  item not investigated.
-- Reinforces `error-handling.instructions.md` (no silent downgrade) and
-  `execution-details.instructions.md` (investigate with evidence before concluding).
+- List each item with its exact output line and source (file or step).
+- Give each one exactly one disposition: `fix`, `upstream` (name the project and the issue), `by-design` (cite the flag or code), or `consequence` (fix the root, not the symptom).
+- "Benign" needs evidence: the service is confirmed running, the flag is intentional, the upstream bug is named, or the condition is documented.
+- An item absent from the plan is an item not investigated. Excluded items still show their disposition.
 
 ## Subagent delegation
 
-**MUST use subagents for every delegatable subproblem** — planning, implementation, research, and Q&A with separable concerns. Each subagent gets a dedicated context window, preventing overflow and reducing risk of forgetting earlier details.
+Use a subagent for every delegatable subproblem; each gets its own context window.
 
-**MUST delegate exploration to subagents** — use `Explore` for any multi-file research (≥3 file reads, >1 source file, or broad exploratory questions). Only read files directly for narrow questions (1-2 files).
+- `Explore` for research over 3 or more file reads or any broad exploratory question. Read files directly only for narrow 1-2 file questions.
+- `General Purpose` for focused implementations and for tasks phrased as "do X in file Y".
+- 2 or more independently modifiable files means parallel subagents; 2 or more separable questions means one subagent each. Max 2 concurrent.
 
-**MUST prefer subagents for narrow tasks** — 1 subagent turn instead of N+ turns inline. Use `Explore` for research, `General Purpose` for focused implementations.
+Prompt shape is in `delegate.prompt.md`: 2-3 sentences of context, one-sentence task, hard constraints, expected return.
 
-**Concrete thresholds:**
+## Terminal output pipes
 
-- ≥3 file reads → `Explore` subagent
-- ≥2 independently modifiable files → parallel `General Purpose` subagents
-- ≥2 separable questions → one subagent per question
-- Steps described as "do X in file Y" → `General Purpose` subagent
-- Max 2 concurrent subagents by default
+Never pipe terminal output through `grep`, `tail`, `head`, `awk`, `sed`, or any other filter, on any command, however long-running. An agent cannot tell a fast command from a slow one, and a wrong filter means paying for the command twice.
 
-**Template:** See `delegate.prompt.md`. Keep prompts short: 2-3 sentence context, one-sentence task, hard constraints, expected return.
+Redirect to a file, then read or filter the file:
 
-## Terminal output pipes — ABSOLUTE PROHIBITION
-
-**NEVER** pipe terminal output through `grep`, `tail`, `head`, `awk`, `sed`, or any filter — universally, not just for "long-running" commands. This is an absolute ban on piping terminal output. The agent cannot reliably distinguish fast from slow commands, so the prohibition covers **all** terminal command output without exception.
-
-The **only** allowed pattern: redirect the full output to a temporary file, then read or filter that file.
-
-**BAD** (piping terminal output):
-```sh
-grep foo build.log | tail -5  # ← piping terminal output is prohibited
-```
-
-**GOOD** (redirect to file, then filter):
-```sh
-some-command > /tmp/out.txt
-grep foo /tmp/out.txt | tail -5
-```
-
-**Template** (preferred pattern):
 ```sh
 tmpfile=$(mktemp)
 some-command > "$tmpfile"
 grep foo "$tmpfile" | tail -5
 ```
 
-**Why this is a hard rule:**
-- The agent cannot distinguish a fast command from a slow one when deciding whether piping is safe.
-- If the filter parameters (`grep` pattern, `tail` line count) are wrong, the command must be re-run, wasting context and time.
-- Re-running expensive commands (builds, tests, network calls) compounds the waste.
-- Piping silently discards output that may later be needed for debugging.
-
-**Exceptions:**
-1. Reading from a file (e.g., `grep foo /tmp/out.txt | tail -5`) — this is filtering stored output, not terminal output, and is always safe.
-2. When the user's task is explicitly about text processing ("extract these lines", "find this pattern"), piping is part of the work.
-
-See "Terminal hygiene" below for output lifecycle management.
+Two exceptions: filtering a file that was already written to disk, and when the task is text processing itself.
 
 ## Terminal hygiene
 
-- Discard terminal output after use. After acting on terminal output, summarize the exit code and relevant result in your own words. Do not carry raw terminal output into the next turn's context. Accumulated terminal noise is the single largest input-token waste in multi-turn sessions.
-- **Logging vs terminal output.** Use terminal output for command results, build output, and test results. Use issue comments and conversation messages for diagnostics. Do not write progress logs into terminal output that the user will see — prefer structured tool output or in-message summaries.
-- **Never pipe terminal output — ABSOLUTE PROHIBITION.** See "Terminal output pipes" section above for the rule, examples, and exceptions.
+- Summarize results in your own words after acting on output. Do not carry raw terminal output into the next turn.
+- Terminal output carries command results, build output, and test results. Diagnostics belong in issue comments or conversation messages.
 
 ## Research scope
 
-- For queries scoped with "research only", "verify only", or similar boundary markers, produce concise findings (≤~1k chars). Give the key answer and let the user ask for depth. Do not generate comprehensive reports that will be discarded or refined.
-- **Default search sources.** When asked to search, consult GitHub, DuckDuckGo, then any other search engines the model is aware of, in that priority order.
-- **Strict research-only mode.** When the user says "only verify", "only plan", "only report", "do not edit", or similar scoping phrases, treat this as a hard boundary. Do zero edits, zero file modifications, zero git operations. Report findings only. Do not pre-implement, sketch diffs, or suggest code changes unless explicitly asked.
+- Scoped queries ("research only", "verify only") get a short answer, under about 1k characters. Give the key result and let the user ask for depth.
+- "Only plan", "only research", or "do not edit files" is a hard boundary: zero edits, zero file changes, zero git. Report findings only, without sketching diffs.
+- Search GitHub, then DuckDuckGo, then anything else the model knows.
 
 ## Filesystem search scope
 
-Run `find`, `rg`, `ls -R`, `tree`, `git ls-files`, or any other filesystem enumeration only within the current working directory (the project root or the directory the task targets). Do not search paths above the project boundary or in unrelated directories.
-
-If you need to locate a file and it is not under the project tree, ask the user where it lives. Do not guess by searching outward.
+Run `find`, `rg`, `ls -R`, `tree`, or `git ls-files` only inside the current working directory or the directory the task targets. If a needed file lives outside the project tree, ask where it is instead of searching outward.
 
 ## Instruction compliance
 
-- **Re-read instructions when context changes.** When a task transitions into a new domain (e.g., switches from editing notes to running Python, or from writing content to debugging a tool), re-read any instruction files that apply to the new context. Do not rely on memory of rules from earlier in the conversation — instruction files are the ground truth.
-- **Watch Markdown line wrapping specifically.** When editing `.md` files, `authoring.instructions.md` requires no hard line breaks in paragraphs. Re-read that section before editing — this rule is frequently violated. Also consult `workspace-guidance.instructions.md` for workspace setup context.
-- **Critical gotchas (violations cause data loss or task failure):**
-  - NEVER `cd` into `.agents/skills/` or any skill subfolder. Always run commands from the repo root. Running inside a skill folder creates `.venv/`/`uv.lock` trash there and fails.
-  - NEVER suggest or run `uv run -m init generate` — content generation is automatic. This instruction applies to ALL content in this repo.
-  - NEVER suggest or run `uv run -m init generate -C`.
-  - Use the `memory` tool for all session/repo memory operations. It accepts `/memories/...` paths directly and supports commands: `view` (read files or list directories), `create` (create new files), `str_replace` (replace exact text), `insert` (insert at line), `delete` (remove files/directories), and `rename` (move/rename). Use `memory view /memories/session/` to list session files — no need for `resolve_memory_file_uri` or terminal `ls`. Only use `resolve_memory_file_uri` when you need the real filesystem path for a non-memory tool (e.g., running `ls` in a terminal).
-  - **Memory tool activation (mandatory before assuming absence):** The `memory` tool and other VS Code interaction tools (`get_errors`, `run_vscode_command`, `vscode_askQuestions`, etc.) are only available after calling `activate_vs_code_interaction` with no arguments. This is a one-shot call — it disappears from the tool list after first use and permanently unlocks VS Code interaction tools for the session. If the `memory` tool appears unavailable, errors, or is missing from the tool list, call `activate_vs_code_interaction` FIRST — do not conclude it is permanently unavailable, do not skip memory operations, and do not fall back to `resolve_memory_file_uri` + filesystem tools (`read_file`, `create_file`, `run_in_terminal`). That fallback creates garbage files with URL-encoded characters and bypasses the proper memory API. Only after a successful `activate_vs_code_interaction` call still fails may you treat memory as truly unavailable.
-  - NEVER pipe terminal output — always redirect to a file first. See "Terminal output pipes" above. Piping wastes time and causes repeated command re-runs.
+- Re-read the instruction files that apply when the task moves into a new domain. They are the ground truth, not earlier conversation.
+- Markdown paragraphs are one line each, no hard wrapping (`authoring.instructions.md`).
+- Never `cd` into `.agents/skills/` or any skill subfolder. Run from the repo root; a skill folder collects `.venv/` and `uv.lock` trash and fails.
+- Never run or suggest `uv run -m init generate` or `uv run -m init generate -C`. Content generation is automatic in this repo.
+- Use the `memory` tool for all memory operations. It takes `/memories/...` paths and supports `view`, `create`, `str_replace`, `insert`, `delete`, and `rename`. `memory view /memories/session/` lists session files, so `resolve_memory_file_uri` is only for paths a non-memory tool needs.
+- The `memory` tool and other VS Code interaction tools (`get_errors`, `run_vscode_command`, `vscode_askQuestions`) unlock by calling `activate_vs_code_interaction` with no arguments. Do it before concluding a tool is missing. Do not fall back to `resolve_memory_file_uri` plus `read_file`, `create_file`, or `run_in_terminal`: that writes URL-encoded garbage files and bypasses the memory API.
 
 ## Premise integrity
 
-Before answering, silently verify that the user's key technical terms, frameworks, and cross-domain mappings are real and correctly applied.
-
-If the premise is broken (fabricated term, nonexistent method, or misapplied concept), do not answer as if it were valid. Instead:
-
-1. Name the exact term, framework, or connection that fails.
-2. Explain briefly why it is invalid or misapplied.
-3. Offer a legitimate reframe of the question and continue from there.
-
-Do not invent supporting metrics, frameworks, citations, or numeric guidance to rescue an invalid premise.
-
-When the premise is valid, proceed normally with a direct, high-quality answer.
+Check that the user's key terms, frameworks, and cross-domain mappings are real before answering. When a premise is broken, name the term that fails, say briefly why it does not apply, offer a reframe, and answer that. Never invent metrics, frameworks, or citations to rescue an invalid premise.
 
 ## Error handling
 
-- **Never silently downgrade errors.** Do not change errors to warnings, info logs, or silently swallowed failures unless the user explicitly approves. If an operation fails, report the failure clearly — do not pretend it succeeded or claim success with caveats buried in output.
-- **Match severity to user intent.** When the user says something "is an error", treat it as an error. Do not second-guess or reclassify the severity without explicit discussion.
+- Never downgrade an error to a warning, an info log, or a swallowed failure without explicit approval. Report the failure clearly.
+- When the user calls something an error, treat it as an error. Do not reclassify it on your own.
 
 ## Plan implementation completeness
 
-When executing a plan with multiple phases:
+Before finishing a multi-phase plan, re-read the plan and verify every phase. Re-read the source when a phase description is ambiguous rather than guessing. Skip nothing unless the plan marks it optional.
 
-- Before finishing, re-read the original plan document and verify every phase is fully implemented.
-- If a phase description is ambiguous, re-read the original source of the plan rather than guessing intent.
-- Do not skip phases unless the plan explicitly marks them as optional.
-- **Review subagent usage.** Did you delegate separable subproblems to subagents? If not, would delegation have improved context management or reduced risk of forgetting earlier requirements? Record the reasoning in session memory.
+Check whether separable subproblems went to subagents. If not, record why delegation would or would not have helped.
 
-### Creating a plan file
-
-1. Generate an ISO datetime in UTC: run `date -u +%Y-%m-%dT%H%M%S`.
-2. Use the `memory` tool with command `create`, path `/memories/session/plan-<datetime>.md`, and `file_text` containing the plan content.
-3. Verify with `memory view /memories/session/plan-<datetime>.md` — confirm content is nonempty and substantive.
-
-### Finding the active plan file
-
-Plan files are named `plan-<datetime>.md` in session memory — never `active-plan.md`. Use the find-latest-plan pattern (glob `plan-*.md`, sort by name descending, take the first).
-
-When the user says "refer back to the plan", "verify the plan", "check the plan", or any equivalent phrase:
-
-1. Read the plan via `memory view /memories/session/plan-<datetime>.md` if you know the datetime. If not, find the latest by using `memory view /memories/session/` to list files, then pick the most recent `plan-*.md` by sorting the names (descending datetime).
-2. Check the frontmatter: `status: completed` means the plan was fully executed; `status: in-progress` means execution was interrupted. The `current-step` field shows which workflow step was last reached. The `committed` field tracks atomic commit progress: `no` (no commits made), `partial` (some commits made), `yes` (all commits done).
-3. Present the plan and its frontmatter status to the user or act as instructed.
+Plan files live in session memory as `/memories/session/plan-<datetime>.md`, never `active-plan.md`. Create with `memory create`, `date -u +%Y-%m-%dT%H%M%S` for the name, then read it back to confirm it has content. When the user asks to check the plan, find the newest `plan-*.md`, read its frontmatter (`status: completed`, `in-progress`; `current-step`; `committed: no|partial|yes`), and report or act on it.

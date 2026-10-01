@@ -5,27 +5,24 @@ applyTo: "**"
 alwaysApply: true
 ---
 
-Default rule: write for readability in raw form, not for rendered aesthetics.
+Write for readability in raw form, not for rendered aesthetics.
 
 ## Markdown line wrapping
 
-**CRITICAL: write each Markdown paragraph as a continuous single line — let the viewer handle wrapping. Do not insert hard line breaks.** Markdown viewers render content readably — hard-wrapping only makes raw files harder to navigate and edit.
-
-**Exception**: when a validator or linter enforces a maximum line length, follow the tool's requirement.
+Write each paragraph as one continuous line and let the viewer wrap it. Hard line breaks only make the raw file harder to navigate and edit. When a validator enforces a maximum line length, that wins.
 
 ## `.instructions.md` editing rules
 
-`.instructions.md` files are loaded as agent context and must stay concise.
+These files load as agent context, so they stay concise.
 
-- **Prefer inline integration.** A two-word tweak to an existing paragraph is better than a new bullet. A new bullet in an existing list is better than a new section. A new section is better than appending to the file end.
-- **Place by topic, not by end-of-file.** Find the most specific existing section that matches each fact. If a fact belongs inside an existing paragraph or bullet list, integrate it there — do not add a section elsewhere.
-- **Split facts across sections.** When a concept touches multiple topics, place each fragment in the section where it belongs rather than dumping everything in one place.
-- **Plan all edits first.** Before applying any changes, decide all edits across all target sections and files. Order edits bottom-up within each file and apply with a single `multi_replace_string_in_file` call per file.
-- **No historical asides.** Never annotate what changed, what a value used to be, or what a construct replaced (e.g. "(changed from a to b)", "previously lived in ...", "no longer exists", "replaces historical ..."). State the rule as it is now; if prior state matters for a decision, consult `programming-principles.instructions.md` (Chesterton's Fence) and read git history instead of embedding it in the doc.
+- Prefer inline integration: a tweak to an existing paragraph beats a new bullet, a new bullet beats a new section, and a new section beats appending to the end of the file.
+- Place by topic. Put each fact in the most specific existing section it fits, and split a fact that touches several topics across those sections rather than dumping it in one place.
+- Plan every edit before applying any: decide the edits across all target sections and files, order them bottom-up within each file, and apply them in one call per file.
+- No historical asides. Never annotate what changed, what a value used to be, or what a construct replaced. State the rule as it is now and read git history when prior state matters (see `programming-principles.instructions.md`).
 
 ## Document conventions
 
-- **Sentence case headings.** Capitalize only the first word and proper nouns.
-- **Code references.** Wrap file paths, command names, and inline code in backticks.
-- **Parallel list structure.** Keep bullet items grammatically parallel — all nouns, all imperatives, or all full sentences, not a mix.
-- **Minimal emphasis.** Use **bold** for key terms and rules only. Overused emphasis dilutes its effect.
+- Sentence case headings: capitalize the first word and proper nouns only.
+- Wrap file paths, command names, and inline code in backticks.
+- Keep bullet items grammatically parallel: all nouns, all imperatives, or all full sentences.
+- Use bold for key terms and rules only.

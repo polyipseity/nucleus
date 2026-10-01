@@ -5,16 +5,16 @@ disable-model-invocation: true
 argument-hint: Optional scope (e.g., `target=src/modules/` or `target=scripts/`). Default: entire codebase.
 ---
 
-# Maintainability Improvement Loop
+# Maintainability improvement loop
 
-Aggressively remove unnecessary complexity across code, docs, and AI customizations. Preserve behavior.
+Remove unnecessary complexity across code, docs, and AI customizations while preserving behavior.
 
 ## Workflow
 
-1. Capture baseline hash with `git rev-parse HEAD`; never roll back earlier.
-2. Resolve `${input:target}` to scope (default `**/*`).
-3. Partition scope into independent lanes.
-4. Run parallel `maintainer` subagents, one per lane, using:
+1. Capture the baseline hash with `git rev-parse HEAD`; never roll back earlier.
+2. Resolve `${input:target}`, default `**/*`.
+3. Partition the scope into independent lanes.
+4. Run parallel `maintainer` subagents, one per lane:
 
    ```text
    Improve maintainability across __LANE_SCOPE__.
@@ -25,23 +25,17 @@ Aggressively remove unnecessary complexity across code, docs, and AI customizati
    (3) remaining hotspots, (4) recommended atomic commit slices.
    ```
 
-5. Merge lane results and commit in atomic slices.
-6. Re-run another parallel wave for remaining hotspots.
-7. Stop when all lanes are down to minor/cosmetic improvements.
+5. Merge the lane results and commit in atomic slices.
+6. Run another parallel wave on the remaining hotspots.
+7. Stop when every lane is down to cosmetic improvements.
 
 ## Constraints
 
-- NEVER ask subagents to run git commit. Commit MUST be done by the MAIN agent to prevent race conditions.
+- NEVER ask a subagent to run git commit. The MAIN agent commits, so parallel agents cannot race the prek hooks.
 - No speculative refactors.
 - Preserve behavior and repository conventions.
 - Keep commits small, coherent, and reversible.
 
 ## Final output
 
-- Baseline hash.
-- Waves run.
-- Commits (subject + SHA) and boundary rationale.
-- Files modified.
-- Simplifications by category.
-- Remaining hotspots.
-- Final maintainability rating.
+Baseline hash, waves run, commits (subject plus SHA) with the boundary rationale for each, files modified, simplifications by category, remaining hotspots, and a final maintainability rating.

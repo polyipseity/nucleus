@@ -5,123 +5,65 @@ disable-model-invocation: true
 argument-hint: "scope=session,repo | memoryName= | target=repo"
 ---
 
-# Fuse Memories into Agent Instructions
+# Fuse memories into agent instructions
 
-No confirmation or clarification. Proceed automatically with defaults.
+Proceed automatically with defaults. No confirmation, no clarification.
 
 ## Inputs
-
-Scope and memoryName are AND-ed — only memories matching both are selected.
 
 | Input | Default | Values |
 |-------|---------|--------|
 | `${input:scope}` | `session,repo` | Comma-separated from `session`, `repo`, `user` |
-| `${input:memoryName}` | (all) | Comma-separated filenames without `.md`. Omit for all in scope. |
-| `${input:target}` | `repo` | `repo` → `.agents/instructions/` (project root), `user` → `~/.agents/instructions/` |
+| `${input:memoryName}` | (all) | Comma-separated filenames without `.md`; omit for all in scope |
+| `${input:target}` | `repo` | `repo` for `.agents/instructions/`, `user` for `~/.agents/instructions/` |
 
-## Memory paths
+`scope` and `memoryName` are AND-ed: only memories matching both are selected.
 
-| Scope | Canonical path |
-|-------|----------------|
-| `session` | `/memories/session/<name>.md` |
-| `repo` | `/memories/repo/<name>.md` |
-| `user` | `/memories/<name>.md` |
+Memory paths: `session` is `/memories/session/<name>.md`, `repo` is `/memories/repo/<name>.md`, `user` is `/memories/<name>.md`.
 
-## Probe — find and list memories
+If the `memory` tool is not in the tool list, call `activate_vs_code_interaction` with no arguments first: it is a one-shot call that unlocks the VS Code interaction tools. Discover memory files with `memory view /memories/<scope>/`, never with `list_dir`, `file_search`, or `resolve_memory_file_uri`.
 
-Memory files at `/memories/session/` and `/memories/repo/` are directly listable via `memory view`. Do not use filesystem operations (`list_dir`, `file_search`, `resolve_memory_file_uri`) for memory file discovery.
+## Probe
 
-> **Memory tool availability:** If the `memory` tool is not in the available tool list, call `activate_vs_code_interaction` with no arguments first — it is a one-shot call that permanently unlocks VS Code interaction tools.
-
-1. **Check context metadata** — scan `<repoMemory>` and `<sessionMemory>` blocks in context for all available filenames. Filter by `${input:memoryName}` if set.
-2. **List directly via memory tool** — for active scopes, use `memory view /memories/<scope>/` to list available memory files.
-3. **Fail closed** — If all probe methods return zero files, report: "No memory files found at scopes `${input:scope}`. Aborting." and stop.
+Scan the `<repoMemory>` and `<sessionMemory>` context blocks for filenames, filter by `${input:memoryName}` when set, then list the active scopes with `memory view /memories/<scope>/`. Fail closed: zero files means report "No memory files found at scopes `${input:scope}`. Aborting." and stop.
 
 ## Read
 
-Read all confirmed memory files and all `.instructions.md` files at the target location.
+Read each confirmed memory file with `memory view`, and read every `.instructions.md` file at the target in full, recording each `##` section heading and its line range.
 
-> **Memory tool availability:** If the `memory` tool is not in the available tool list, call `activate_vs_code_interaction` with no arguments first — it is a one-shot call that permanently unlocks VS Code interaction tools.
+## Evaluate
 
-1. Read memory files using `memory view /memories/<scope>/<name>.md`.
-2. Read all `.instructions.md` files at target: `read_file` each one in full.
-3. **Segment each instruction file by section headings** (top-level `##` blocks). Record the heading name and line range for each section.
-
-## Evaluate — assess memory staleness
-
-Break each memory file into atomic facts. For each fact, apply these checks from cheapest to most expensive:
+Break each memory file into atomic facts and judge each one:
 
 | Signal | Method |
 |--------|--------|
-| **Codebase contradiction** | Search codebase for the key claim. If current code contradicts it → outdated. |
-| **Reference death** | Check referenced files, functions, commands still exist. If any are missing → outdated. |
-| **Instruction supersession** | Cross-reference against current `.instructions.md` files. If an instruction already covers the topic and is authoritative → outdated. |
-| **Git timestamps** (optional, high cost) | Get memory file timestamp via terminal `ls -l` on the resolved URI (use `resolve_memory_file_uri` — valid because it targets a terminal command, not a memory tool). If memory predates changes to referenced code → likely outdated. |
-| **Ambiguous / unverifiable** | Fact cannot be verified or falsified against current workspace → uncertain. |
+| Codebase contradiction | Search the codebase for the claim; current code contradicting it means outdated |
+| Reference death | Check the referenced files, functions, and commands still exist |
+| Instruction supersession | A current `.instructions.md` already covers the topic authoritatively |
+| Git timestamps (optional, costly) | `ls -l` on the resolved URI, which `resolve_memory_file_uri` is valid for here since the target is a terminal command; a memory predating changes to the code it references is likely outdated |
+| Ambiguous | Cannot be verified or falsified against the workspace |
 
-Verdicts: **current** → absorb, **discard** → remove (provably wrong), **update** → correct then absorb, **ignore** → discard (outdated but harmless), **uncertain** → discard (unverifiable).
+Verdicts: **current** absorbs, **discard** removes (provably wrong), **update** corrects then absorbs, **ignore** discards (outdated but harmless), **uncertain** discards (unverifiable). Print the verdict per fact before acting.
 
-### Report before acting
+## Absorb
 
-Print evaluation summary with each fact's verdict. Example:
+Only **current** and **update** facts proceed. Match each to the target file by topic keywords, then to a specific section where one fits. A fact spanning several topics gets split across files or sections.
 
-```
-memory-foo.md:
-  ✅ "run prek for formatting" — current
-  ❌ "use build.sh" — discard (file removed)
-  🔄 "deploy via rsync" — update (now uses nucleus-apply)
-```
+Place rather than append: rewrite the matching paragraph inline, add a bullet to an existing list in the right position, add one short paragraph or bullet at the end of a relevant section, and only as a last resort add a section at the end of `core-behavior.instructions.md`.
 
-## Absorb — cohesive multi-location edits
-
-### Analyze and match
-
-Only facts with verdict **current** or **update** proceed to matching. Facts with verdict **discard**, **ignore**, or **uncertain** are excluded from absorption.
-
-For each qualifying fact, find the best target:
-
-1. **Match by topic keywords** — intersect memory keywords with instruction file names, section headings, and content.
-2. **If a fact matches a specific section** → integrate it into that section, within the relevant paragraph or bullet list.
-3. **If a fact matches an instruction file but no specific section** → add it as a new subsection or bullet at the logical location within that file.
-4. **If a fact spans multiple topics** → split it across multiple instruction files or sections as appropriate.
-
-### Place, don't append
-
-For each matched fact + target section, decide the edit strategy:
-
-- **Existing paragraph matches** → rewrite the paragraph inline to incorporate the fact.
-- **Existing bullet list exists** → add a new bullet in the appropriate position (alphabetically or logically).
-- **Existing section lacks relevant content** → add a single short paragraph or bullet at the end of the section.
-- **No section fits any fact** → as last resort, add a concise section at the end of `core-behavior.instructions.md`.
-
-Do not bulk-append to the end of files unless every other placement was tried and failed.
-
-### Order of edits (critical)
-
-1. First, plan *all* edits across *all* memory files and *all* instruction files in one pass.
-2. Group edits by target file.
-3. For each target file, order edits bottom-up (last line first) to preserve line numbers.
-4. Apply all edits for one file in a single `multi_replace_string_in_file` call.
+Order the edits: plan all of them across all memory and instruction files in one pass, group by target file, order bottom-up within each file so line numbers hold, then apply each file's edits in a single `multi_replace_string_in_file` call.
 
 ## Delete
 
-Delete all specified memory files unconditionally. The file has served its purpose — absorbed facts are in the instruction files, and unabsorbed facts (discard/ignore/uncertain) are not worth preserving.
-
-Use `memory delete /memories/<scope>/<name>.md`.
-
-If any edit in the previous step failed, keep the file and report the failure.
+Delete every specified memory file with `memory delete /memories/<scope>/<name>.md`. The file has served its purpose: absorbed facts now live in the instruction files and the rest were not worth preserving. When an edit in the previous step failed, keep the file and report the failure instead.
 
 ## Verify
 
-1. Re-read each modified `.instructions.md` file.
-2. Confirm all facts from the original memory are present and accurately expressed.
-3. Prune redundancy: if the same fact appears twice in the same file, keep only the better-placed instance.
-4. Check voice: the result should read as if the knowledge was always there — no awkward transitions, no verbatim memory dumps.
+Re-read each modified instruction file and confirm the facts are present and accurately expressed. Prune any fact now stated twice in the same file, keeping the better-placed instance. Check the voice: it should read as if the knowledge was always there, with no transitions and no memory dumps.
 
 ## Rules
 
-- Prefer modifying existing content over adding new; new bullets over new lists.
-- Never verbatim dump memories — rephrase to the target instruction file's voice.
-- If a memory is already fully covered, skip it.
-- No editorial markers ("Added from memory:", "Note:").
-- Delete all specified memory files unconditionally. If any edit in the previous step failed, keep the file and report the failure.
+- Prefer modifying existing content over adding new, and a new bullet over a new list.
+- Never dump memories verbatim. Rephrase into the target file's voice.
+- Skip a memory that is already fully covered.
+- No editorial markers such as "Added from memory:" or "Note:".

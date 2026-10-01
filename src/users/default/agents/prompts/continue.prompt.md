@@ -4,23 +4,21 @@ description: Resume work after an interruption reusing existing context.
 disable-model-invocation: true
 ---
 
-You are resuming after an interruption.
+You are resuming after an interruption. Continue from the exact next incomplete step. Do not re-read conversation history or workspace files beyond what the task needs.
 
-- Continue from the exact next incomplete step. Do not re-read conversation history or workspace files.
-- **First, check for an in-progress implementation plan:** (If the `memory` tool is not available, call `activate_vs_code_interaction` with no arguments first — it is a one-shot call that permanently unlocks VS Code interaction tools.)
-  1. Find the latest plan file:
-     - Use `memory view /memories/session/` to list session memory files.
-     - Find the most recent `plan-*.md` by sorting names (descending datetime).
-     - If no files match, no active plan is found — proceed normally (skip steps 2-6).
-  2. Read the plan file using `memory view /memories/session/<filename>` — it contains the active plan with a lifecycle frontmatter.
-  3. Parse the frontmatter to recover input variables (`atomicCommits`, `backwardsCompat`, `maxConcurrency`) and current progress (`status`, `current-step`, `committed`). If any input is missing from the frontmatter, fall back to built-in defaults (`atomicCommits=yes`, `backwardsCompat=no`, `maxConcurrency=2`). Log the recovered values. Re-apply these as hard constraints. If `atomicCommits: yes`, atomic commit rules from implement-plan step 2 apply in full — commit after each meaningful sub-step, before subagent spawning, and after subagent returns. Preserve the `committed` value as-is — it carries over from the interrupted session.
-  4. If `status` is `completed`, report that the plan is already finished and skip re-execution.
-  5. Otherwise, resume executing from the `current-step` value using the `implement-plan` workflow. Do NOT restart the plan.
-  6. Find and load the latest checkpoint for supplementary context:
-     - Use `memory view /memories/session/` to list session files. Find the most recent `checkpoint-*.md` by sorting names (descending datetime).
-     - If a checkpoint exists, read it using `memory view /memories/session/<filename>` — the checkpoint's "Work done" and "Next steps" sections provide rich resumption context (what was accomplished, what files were touched, pending decisions).
-     - If no checkpoint exists, proceed without it.
-- After loading the plan and checkpoint context, invoke `skill: "checkpoint"` to save a resumption checkpoint. This anchors the resumed session state so future interruptions can restore from this point.
-- If no active plan is found, proceed normally. Do not re-read session notes or workspace files beyond what's needed for the task.
-- Recall the exact user prompt before continuing. If one is provided below, use it; otherwise reconstruct from memory.
-- Do not trust subagent failure reports at face value — the agent harness that returns subagent output may fail partway through (e.g. a transient network error), discarding the subagent's result message. File edits the subagent made before the failure are preserved. If a subagent reports failure, inspect what it may have already done on disk, then re-run it with remaining work.
+## Check for an active plan
+
+If the `memory` tool is not in the tool list, call `activate_vs_code_interaction` with no arguments first: it is a one-shot call that unlocks the VS Code interaction tools.
+
+1. `memory view /memories/session/` and pick the newest `plan-*.md` by name (descending datetime). No match means no active plan: proceed normally and skip the rest.
+2. Read it with `memory view /memories/session/<filename>`.
+3. Parse the frontmatter for the inputs (`atomicCommits`, `backwardsCompat`, `maxConcurrency`) and the progress (`status`, `current-step`, `committed`). Fall back to the built-in defaults (`atomicCommits=yes`, `backwardsCompat=no`, `maxConcurrency=2`) for anything missing, log the recovered values, and re-apply them as hard constraints. With `atomicCommits: yes`, the atomic-commit rules from implement-plan step 2 apply in full: commit after each meaningful sub-step, before spawning a subagent, and after a subagent returns. Preserve `committed` as-is, since it carries over from the interrupted session.
+4. `status: completed` means the plan is finished: report that and skip re-execution.
+5. Otherwise resume from `current-step` using the `implement-plan` workflow. Do NOT restart the plan.
+6. Load the newest `checkpoint-*.md` from the same listing for its "Work done" and "Next steps" sections. None is fine.
+
+After loading the plan and checkpoint context, invoke `skill: "checkpoint"` to anchor the resumed state for any future interruption.
+
+Recall the exact user prompt before continuing: use the one provided below, or reconstruct it from memory.
+
+Do not trust a subagent failure report at face value. The harness may fail partway through, for instance on a transient network error, and discard the subagent's result message while preserving the file edits it already made. Inspect what it may have done on disk, then re-run it with the remaining work.

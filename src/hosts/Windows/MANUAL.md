@@ -1,51 +1,35 @@
 # Windows manual steps
 
-- Generate `rclone_config_pass` in `src/secrets/users-<username>.yml` via `openssl rand -hex 64`, commit, re-run `nucleus-apply`. If remotes exist without encryption, delete `%USERPROFILE%\.config\rclone\rclone.conf` first.
-- Run `nucleus-cloud setup` in PowerShell and complete `rclone config` for GoogleDrive, iCloud, and OneDrive.
-- Open MusicBrainz Picard, sign in, and add AcoustID API key under Options.
-- Run Equalizer APO configurator to select your playback device, then reboot.
-- Launch Peace Equalizer APO, use Effects > Limiter sliders or pre-amplification to cap output.
-- Caddy local-CA trust runs automatically. If missing: run `caddy trust --address 127.0.0.1:2019` in an elevated PowerShell.
-- Starship prompt is active in all shells. Requires a Nerd Font (configured automatically via `CaskaydiaCove Nerd Font`).
-- OBS virtual camera: `obs-virtualcam` ships inside the OBS Studio install (`OBSProject.OBSStudio`, gated by `managedPackages."obs-studio".enable`). Start the virtual camera from OBS and it appears as a DirectShow device in other apps.
-- Chrome Remote Desktop Host is installed declaratively as `Google.ChromeRemoteDesktopHost` (WinGet). To accept connections, open <https://remotedesktop.google.com/access> in Chrome and finish "Set up remote access". The installer owns the service; activation does not start or stop it.
-- Harness bridge (desktop reminders, remote approvals, and remote prompts for VS Code Copilot Chat, opencode, and pi): the Hermes gateway runs as the `hermes-gateway` SCM service that `nucleus-apply` installs, and apply also enables the `harness-bridge` plugin and deploys the hook entry points with shims in `%USERPROFILE%\.local\bin`. Provision a channel once — seal `TELEGRAM_BOT_TOKEN`, or `NTFY_TOPIC` with `NTFY_TOKEN`, or `DISCORD_BOT_TOKEN`, in your SOPS file — list it in `src/users/<user>/env-secrets.json` with `consumers: ["hermes-agent"]`, turn that platform on in the gateway config (`platforms.<name>.enabled`), and re-run `nucleus-apply`. Notifications go to every channel in `nucleus-config get harness-notify.channels`; narrow that key (for example `nucleus-config set harness-notify.channels '["ntfy"]'`) to mute the rest, or run `nucleus-config set harness-notify.enable false` to stop the whole bridge on this machine, and `nucleus-apply -NoUserStateParity` to remove the shims entirely. Remote approvals are opt-in and off by default, so every tool call is answered locally until you run `nucleus-config set harness-approval.enable true`; remote prompts need no opt-in (`harness-drive.enable` is on), and turning it off keeps the finished-turn notification while queued prompts are dropped. Reply `/harness approve <id>` or `/harness deny <id>` to answer a pending tool call, `/harness sessions` to list what is pending, and `/harness send <harness> <text>` to inject a prompt into a waiting session. An unanswered request asks locally instead, after `nucleus-config get harness-approval.timeout-seconds` (default 120 s), so the `timeout` on each hook in `%USERPROFILE%\.agents\hooks\harness-notify.json` and `%USERPROFILE%\.cursor\hooks.json` must stay larger. Every decision is appended to `%LOCALAPPDATA%\nucleus\log\harness-bridge.log`. Cursor ignores remote prompts on Windows (upstream bug), so drive Cursor sessions from macOS or NixOS.
+Steps `nucleus-apply` cannot do. Everything else is already converged.
+
+## apps
+
+1. Equalizer APO: run the configurator to pick the playback device, then reboot.
+2. Peace Equalizer APO: cap output with the Effects > Limiter sliders or with pre-amplification.
+3. OBS virtual camera: start the virtual camera from OBS and it appears as a DirectShow device in other apps. `obs-virtualcam` ships inside the `OBSProject.OBSStudio` install, so there is nothing to install separately.
+4. Chrome Remote Desktop Host is installed declaratively as `Google.ChromeRemoteDesktopHost` (WinGet). To accept connections, finish "Set up remote access" at <https://remotedesktop.google.com/access>. The installer owns the service; apply neither starts nor stops it.
+5. Picard: sign in and add the AcoustID API key under Options.
+6. Starship is active in every shell and needs a Nerd Font. Apply installs `DEVCOM.JetBrainsMonoNerdFont`, so select it as the terminal font.
+
+## secrets and remotes
+
+1. Generate `rclone_config_pass`: `openssl rand -hex 64` into `rclone_config_pass` in `src/secrets/users/<username>.yml`, commit, re-run `nucleus-apply`. Delete `%USERPROFILE%\.config\rclone\rclone.conf` first when unencrypted remotes exist.
+2. Run `nucleus-cloud setup` in PowerShell and complete `rclone config` for GoogleDrive, iCloud, and OneDrive.
+
+## recovery
+
+1. Caddy local-CA trust runs during apply. To redo it, run `caddy trust --address 127.0.0.1:2019` in an elevated PowerShell.
 
 ## speech to text
 
-- `whisper-cpp` 1.9.2 transcribes audio locally. `whisper-cli` reads a file, `whisper-stream` reads the microphone live. There is no nucleus wrapper: run the upstream binaries directly.
-- The model `ggml-base.en.bin` is deployed by `nucleus-apply` to `%LOCALAPPDATA%\nucleus\models\ggml-base.en.bin`. Nothing to download by hand, and a model whose digest has drifted is re-fetched on the next apply.
-- Transcribe a file: `whisper-cli -m "$env:LOCALAPPDATA\nucleus\models\ggml-base.en.bin" -f <audio-file>`.
-- Transcribe live: `whisper-stream -m "$env:LOCALAPPDATA\nucleus\models\ggml-base.en.bin"`. The default rolling window is the mode to use interactively.
-- For discrete, parseable segments rather than a rolling window, add `--step 0`.
-- `whisper-stream` is an SDL2 app, so a window opens while it runs; close the window to stop.
-- A PowerShell session that is not the interactive desktop session has no microphone, so `whisper-stream` captures nothing there; run it from a terminal on the desktop.
+1. Transcribe a file: `whisper-cli -m "$env:LOCALAPPDATA\nucleus\models\ggml-base.en.bin" -f <audio-file>`.
+2. Transcribe live: `whisper-stream -m "$env:LOCALAPPDATA\nucleus\models\ggml-base.en.bin"`. Add `--step 0` for discrete segments instead of a rolling window.
+3. `whisper-stream` opens an SDL2 window; close it to stop. Run it from a terminal on the desktop: a PowerShell session outside the interactive desktop session has no microphone and captures nothing.
 
-## command shortcuts
+## harness bridge
 
-- `-g`, `-ga`, `-gb`, `-gc`, `-gca`, `-gcl`, `-gco`, `-gd`, `-gf`, `-gff`, `-gl`, `-gp`, `-gpl`, `-gplf`, `-gs`, `-gst`, `-gsw` — git commands
-- `-optimize-pdf-default`, `-optimize-pdf-ebook`, `-optimize-pdf-prepress`, `-optimize-pdf-printer`, `-optimize-pdf-screen` — Ghostscript PDF optimization profiles
-- `-la`, `-ll` — `eza -la`
-- `-n`, `-na`, `-nb`, `-nc`, `-nci`, `-ncl`, `-nf`, `-nff`, `-ni`, `-nl`, `-no`, `-nr`, `-nrm`, `-nt`, `-nu`, `-nup`, `-nw`, `-nx` — bun commands
-- `-v` — `nvim`
+Apply installs the `hermes-gateway` SCM service, enables the `harness-bridge` plugin, and deploys the hook entry points as `.cmd` shims in `%USERPROFILE%\.local\bin`. To provision a channel once: seal `TELEGRAM_BOT_TOKEN`, or `NTFY_TOPIC` with `NTFY_TOKEN`, or `DISCORD_BOT_TOKEN` in your SOPS file, list it in `src/users/<user>/env-secrets.json` with `consumers: ["hermes-agent"]`, set `platforms.<name>.enabled` in the gateway config, then re-run `nucleus-apply`.
 
-## nucleus commands
+Remote approvals are off by default: `nucleus-config set harness-approval.enable true` to enable them. `nucleus-config get harness-notify.channels` lists the notification channels; `nucleus-config set harness-notify.enable false` stops the bridge on this machine, and `nucleus-apply -NoUserStateParity` removes the shims entirely.
 
-- `nucleus-ai` — manage AI models (sync, list, status, endpoint, config)
-- `nucleus-apply` — apply configuration
-- `nucleus-bootstrap` — bootstrap system
-- `nucleus-update lockfile` — update version pins in `src/lockfiles/lockfile.json`; `-Sections <csv>` selects sections (`cargo` aliases `cargo-binstall`; sub-section names like `vm-setup.nixos-iso`); `-Verify` checks without writing; `-ListSections` lists valid section names; `-VerifyInstalled` compares installed versions against pins and exits 1 on drift
-- `suggestions.*` sections (homebrew.masApps, ollama, vscode, vm-setup.windows) are warn-only and never enforced. `-VerifyInstalled` always warns for them.
-- `nucleus-check pwsh` — check PowerShell syntax
-- `nucleus-check sh` — check POSIX shell syntax
-- `nucleus-cloud setup` — configure cloud remotes and re-apply
-- `nucleus-gc` — run Nix garbage collection (VM GC policy: `vm-management.instructions.md`)
-- `nucleus-utils optimize-pdf` — optimize PDF files with Ghostscript (keeps .bak backup by default; use `--rm-bak` to remove)
-- `nucleus-apply health-check` — run health checks
-- `nucleus-cloud sync` — pull cloud replicas
-- `nucleus-cloud reset` — reset local replica state
-- `nucleus-update` — update repository
-- `nucleus-vm setup` — build and provision VMs from `src/modules/vms/VMs.json`. Requires QEMU (managed by Scoop). Guest converge is automatic; run `.\src\hosts\Windows\apply.ps1` inside the guest for manual re-converge.
-  - **NixOS guest**: uses Packer (ISO auto-downloaded).
-  - **Windows 11 guest**: ISO auto-resolved; fallback `-WindowsIso C:\path\to\Win11.iso` (download from <https://www.microsoft.com/software-download/windows11>). Use `-Accelerator whpx` if Windows HyperVisor Platform is enabled. Run `start-<name>.ps1` in `%USERPROFILE%\virtual machines\`.
-  - **Android guest** (LineageOS): QEMU backend via `start-android-vm.ps1`; ADB at `localhost:22040`. See `.agents/instructions/vm-management.instructions.md` (android-config). Run `nucleus-vm android-config Android` without flags for step-by-step instructions.
+Cursor ignores remote prompts on Windows (upstream bug), so drive Cursor sessions from macOS or NixOS. The rules behind those switches and the `/harness` commands are in `.agents/instructions/agents-and-skills.instructions.md`.

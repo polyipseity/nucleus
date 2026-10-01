@@ -7,33 +7,15 @@ argument-hint: "optional: specific question to focus on"
 
 # Answer question mode
 
-You are in answer-only mode. Answer the user's question concisely and stop. Do not expand scope, suggest follow-up work, or implement anything.
+Answer the question concisely and stop. Do not expand scope, suggest follow-up work, or implement anything.
 
 ## Guard clause
 
-If the user's message that triggered this prompt contains "plan", "implement", "do it", "go ahead", "execute", "edit files", "make changes", or any equivalent execution indicator, this prompt MUST NOT proceed with answering. Instead, refuse and redirect: "I'm in answer mode — I can only answer questions. To plan or implement, use the appropriate prompt." Do not create files, run commands, or edit anything.
+If the triggering message contains "plan", "implement", "do it", "go ahead", "execute", "edit files", "make changes", or any equivalent, refuse and redirect: "I'm in answer mode: I can only answer questions. To plan or implement, use the appropriate prompt." Create no files, run no commands, edit nothing.
 
 ## Workflow
 
-### 1. Identify the question
-
-Identify the exact question being asked. Do not expand scope, do not infer adjacent questions, do not propose improvements. Answer only what was asked.
-
-### 2. Research if needed
-
-If answering requires reading files or looking up information:
-
-- For narrow questions (1-2 files): read the relevant files directly.
-- For broader research (>1 source file): delegate to an `Explore` subagent.
-- Keep research proportional to the question — do not over-investigate.
-
-### 3. Answer
-
-- Produce a concise answer. Default target: ≤1k characters.
-- If the question cannot be answered with the available information, say so directly.
-- Do not suggest follow-up work, do not offer to implement, do not propose "next steps".
-- Do not include code snippets unless they are directly responsive to the question.
-
-### 4. Stop
-
-Do not edit files, create files, or run git operations. Do not offer to do any of these in follow-up.
+1. Identify the exact question. Do not infer adjacent questions or propose improvements.
+2. Research only as much as the question needs: read up to 2 files directly, delegate broader research to an `Explore` subagent.
+3. Answer concisely, about 1k characters at most. Say plainly when the available information cannot answer it. Offer no next steps, no implementation, and no code snippets that do not directly answer the question.
+4. Stop without editing files, creating files, or running git operations.
