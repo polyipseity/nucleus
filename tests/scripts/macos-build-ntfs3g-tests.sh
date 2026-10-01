@@ -32,7 +32,7 @@ if [ -z "$GATE_FUNC" ]; then
   finish_tests
 fi
 
-# gate_call <binary> <record> <fingerprint> <digest> — run the extracted gate in a
+# gate_call <binary> <record> <fingerprint> <digest>: run the extracted gate in a
 # fresh shell that also sources the provider library the gate delegates to.
 # Prints the rebuild reason (empty when the installed binary is current).
 gate_call() {

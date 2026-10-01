@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# supervisor_enabled — the REAL launchd and systemd predicates.
+# supervisor_enabled: the REAL launchd and systemd predicates.
 #
 # The regression this guards: the service-watchdog suite's mock of
 # `supervisor_enabled` derives "enabled" from test knobs and never consults the
 # machine, so it substitutes for the function under test and can prove nothing
-# about it. Two real defects shipped green behind that mock — a launchd predicate
+# about it. Two real defects shipped green behind that mock, a launchd predicate
 # that read a plist key nothing in the product writes (so macOS's only disable
 # mechanism, `launchctl disable`, was invisible and Rule 1 never skipped a
 # user-disabled job), and a systemd predicate that read an EMPTY `is-enabled`
@@ -14,7 +14,7 @@
 # and always calls the real `supervisor_enabled`. Stubbing the function itself is
 # the defect being closed here.
 #
-# Both adapters deliberately define the same `supervisor_enabled` name — in
+# Both adapters deliberately define the same `supervisor_enabled` name, in
 # production the watchdog sources exactly one of them. Sourcing both into one
 # shell would silently let the last one win, so every probe below runs in a
 # subshell that sources ONLY the adapter under test.
@@ -36,10 +36,10 @@ ARGS_LOG="$HOME/launchctl-args.log"
 REAL_LAUNCHCTL="$(command -v launchctl || true)"
 
 # --- external-command stubs (never the predicate) ----------------------------
-# FAKE_PRINT_DISABLED — the exact reply shape of `launchctl print-disabled`,
+# FAKE_PRINT_DISABLED: the exact reply shape of `launchctl print-disabled`,
 # which lists every overridden label in both directions.
 FAKE_PRINT_DISABLED=''
-# FAKE_IS_ENABLED — the exact reply shape of `systemctl is-enabled`.
+# FAKE_IS_ENABLED: the exact reply shape of `systemctl is-enabled`.
 FAKE_IS_ENABLED=''
 
 launchctl() {
@@ -54,7 +54,7 @@ systemctl() {
   printf '%s\n' "$FAKE_IS_ENABLED"
 }
 
-# launchd_enabled_state <target> [scope] — the REAL launchd predicate's verdict.
+# launchd_enabled_state <target> [scope]: the REAL launchd predicate's verdict.
 launchd_enabled_state() {
   (
     # shellcheck source=../../src/scripts/lib/supervisor-launchd.sh
@@ -63,7 +63,7 @@ launchd_enabled_state() {
   )
 }
 
-# systemd_enabled_state <unit> [scope] — the REAL systemd predicate's verdict.
+# systemd_enabled_state <unit> [scope]: the REAL systemd predicate's verdict.
 systemd_enabled_state() {
   (
     # shellcheck source=../../src/scripts/lib/supervisor-systemd.sh
@@ -72,7 +72,7 @@ systemd_enabled_state() {
   )
 }
 
-# write_plist <label> [extra-dict-entries] — a minimal but real plist.
+# write_plist <label> [extra-dict-entries]: a minimal but real plist.
 write_plist() { # <label> [extra]
   mkdir -p "$LAUNCHAGENTS"
   printf '<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict><key>Label</key><string>%s</string>%s</dict></plist>\n' \
@@ -92,7 +92,7 @@ assert_state() { # <name> <expected> <producer> <target> [unit path] [scope]
   fi
 }
 
-# override_reply <line...> — a print-disabled reply containing the given entries,
+# override_reply <line...>: a print-disabled reply containing the given entries,
 # each already in the command's own `"<label>" => enabled|disabled` shape.
 override_reply() {
   local out=$'\tdisabled services = {\n' entry
@@ -289,7 +289,7 @@ section 9 "launchd: a declared unit path outside the default directory"
 # WHY (the F5-b case): supervisor_start and supervisor_repair consume the
 #   declared unit path, but supervisor_enabled used to derive the DEFAULT path
 #   itself (supervisor_unit_path "$target" ""), so a job installed at a declared
-#   non-default path read as ABSENT — and Rule 1 SKIPS an absent job forever:
+#   non-default path read as ABSENT, and Rule 1 SKIPS an absent job forever:
 #   never revived, never repaired. One declared policy, two algorithms.
 F5B_DIR="$(mktemp -d)"
 mkdir -p "$F5B_DIR"

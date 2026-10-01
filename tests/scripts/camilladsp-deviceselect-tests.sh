@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for src/scripts/services/camilladsp-deviceselect.sh —
+# Tests for src/scripts/services/camilladsp-deviceselect.sh:
 # smart playback device detection for CamillaDSP.
 
 set -euo pipefail
@@ -11,7 +11,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 DEVICESELECT_SH="$SCRIPT_DIR/../../src/scripts/services/camilladsp-deviceselect.sh"
 
 # Prerequisites: the suite parses the device list with Python, so a missing
-# interpreter or PyYAML fails the suite rather than skipping it — skip-guards
+# interpreter or PyYAML fails the suite rather than skipping it, skip-guards
 # are banned (tooling-and-validation.instructions.md).
 require_command python3 "camilladsp-deviceselect tests parse the device list with Python"
 if ! python3 -c "import yaml" 2>/dev/null; then
@@ -96,12 +96,12 @@ yaml.dump(cfg, open('$patched', 'w'), default_flow_style=False, sort_keys=False)
 # camilladsp_resolve_playback_device.
 #
 # Mock globals set by each test before calling _run_resolve:
-#   _MOCK_DEFAULT_OUTPUT  — value for camilladsp_detect_default_output
-#   _MOCK_FIRST_AVAILABLE — value for camilladsp_detect_first_available
-#   _MOCK_DEFAULT_RC      — return code for camilladsp_detect_default_output (default 0)
-#   _MOCK_FIRST_RC        — return code for camilladsp_detect_first_available (default 0)
-#   _MOCK_LAST_DEVICE     — value for camilladsp_load_last_device
-#   _MOCK_LAST_RC         — return code for camilladsp_load_last_device (default 1)
+#   _MOCK_DEFAULT_OUTPUT: value for camilladsp_detect_default_output
+#   _MOCK_FIRST_AVAILABLE: value for camilladsp_detect_first_available
+#   _MOCK_DEFAULT_RC: return code for camilladsp_detect_default_output (default 0)
+#   _MOCK_FIRST_RC: return code for camilladsp_detect_first_available (default 0)
+#   _MOCK_LAST_DEVICE: value for camilladsp_load_last_device
+#   _MOCK_LAST_RC: return code for camilladsp_load_last_device (default 1)
 
 _MOCK_DEFAULT_OUTPUT=""
 _MOCK_FIRST_AVAILABLE=""
@@ -340,7 +340,7 @@ test_macos_default_output_detection() {
   fi
 }
 
-# Test 9: real macOS JSON fallback — output-only filtering + case-sensitive ordering.
+# Test 9: real macOS JSON fallback, output-only filtering + case-sensitive ordering.
 # Includes an input-only mic (excluded), the capture device (excluded), and two
 # output devices whose case-sensitive vs case-insensitive ordering differs
 # ("Banana" < "apple" case-sensitively, the reverse case-insensitively).
@@ -374,7 +374,7 @@ JSON
     _camilladsp_list_available_macos "$_capture"
   ' _ "$DEVICESELECT_SH" "$json" "BlackHole 2ch")
   # Case-sensitive ascending: "Banana" (B=66) precedes "apple" (a=97); mic and
-  # capture are excluded. First line is "Banana" — proves case-sensitive ordering.
+  # capture are excluded. First line is "Banana", proves case-sensitive ordering.
   local first_line
   first_line=$(head -1 <<<"$result")
   if [ "$first_line" = "Banana" ]; then
@@ -384,7 +384,7 @@ JSON
   fi
 }
 
-# Test 10: real-shape enumeration regression — fixture byte-identical in shape to actual
+# Test 10: real-shape enumeration regression, fixture byte-identical in shape to actual
 # `system_profiler SPAudioDataType -json` on a MacBook: string _properties, flat keys,
 # per-device srate/transport, one default output device, one built-in output device, and
 # an input-only mic. Guards the flat-key assumption and proves the coreaudio_default_*
@@ -571,11 +571,11 @@ test_last_saved_missing_falls_through() {
   fi
 }
 
-# Test 17: skip-decision invariant — a null live device on a running instance
+# Test 17: skip-decision invariant, a null live device on a running instance
 # must NEVER be skipped (it must be pushed). This is the regression guard for
 # the broken "skip when Running" logic that let a null device stick forever.
 # The decision now also re-pushes when the live device differs from the target
-# (the device detection would currently select) — i.e. when the system default
+# (the device detection would currently select), i.e. when the system default
 # output device changes. A null target is never pushed.
 test_needs_push_decision() {
   # Format: state|live|target|expected  (expected = skip or push)
@@ -630,7 +630,7 @@ test_needs_push_decision() {
   fi
 }
 
-# Test 17: target device helper — returns the device detection would currently
+# Test 17: target device helper, returns the device detection would currently
 # select (the device camilladsp_resolve_playback_device would set), or empty
 # when detection yields nothing. This is what the heartbeat compares against.
 test_target_playback_device() {

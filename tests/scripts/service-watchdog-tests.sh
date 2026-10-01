@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for src/scripts/services/service-watchdog.sh — the rewritten watchdog
+# Tests for src/scripts/services/service-watchdog.sh, the rewritten watchdog
 # with canonical instance keys, svc_health_* records, and health-record-driven
 # loop detection.
 #
@@ -9,7 +9,7 @@
 # run_tick_errexit, which carries the daemon's own shell options; and section 22
 # runs a tick in a REAL child bash process.  So the tick IS covered here, with
 # mocked supervisors and health records.  What is out of scope is a LIVE host
-# with a real supervisor — and nothing else covers that either: the Stage 9
+# with a real supervisor, and nothing else covers that either: the Stage 9
 # runbook that would is deferred and has never executed, so no artifact should
 # be cited in its place.  Each test seeds a svc_health record, configures fake
 # launchctl/systemctl via PATH, and asserts the correct supervisor actions and
@@ -55,7 +55,7 @@ NUCLEUS_USER_ROOT="$(user_root_for_home "$HOME")"
 export NUCLEUS_USER_ROOT
 
 # Source lib.sh in the parent shell so derive_nucleus_user_root is available.
-# Do NOT export _NUCLEUS_LIB_SOURCED — subshells need to source lib.sh fresh
+# Do NOT export _NUCLEUS_LIB_SOURCED, subshells need to source lib.sh fresh
 # (they inherit the exported _nuc_prefix which lib.sh preserves).
 . "$REPO_ROOT/src/scripts/lib/lib.sh"
 
@@ -84,20 +84,20 @@ cat >"$_tmp/repo/src/modules/services.json" <<'JSON'
 JSON
 
 # ── Fake launchctl ──────────────────────────────────────────────────────────
-# FAKE_LIVE — space-separated labels the fake considers loaded.
-# FAKE_STATE — the "state = ..." value printed by launchctl print.
-# FAKE_EXIT_CODE — optional "last exit code" line.
-# FAKE_DISABLED — space-separated labels whose "print" returns "not found"
+# FAKE_LIVE: space-separated labels the fake considers loaded.
+# FAKE_STATE: the "state = ..." value printed by launchctl print.
+# FAKE_EXIT_CODE: optional "last exit code" line.
+# FAKE_DISABLED: space-separated labels whose "print" returns "not found"
 #   (models an unloadable job). Also drives the supervisor_enabled mock, which
 #   models a user-disabled job by returning false for these labels.
-# FAKE_LAUNCHCTL_LOG — file where mutating calls are appended.
+# FAKE_LAUNCHCTL_LOG: file where mutating calls are appended.
 cat >"$_tmp/bin/launchctl" <<'FAKE'
 #!/usr/bin/env bash
 _booted_out="${FAKE_BOOTED_OUT:-/dev/null}"
 case "${1:-}" in
 list)
   printf 'PID\tStatus\tLabel\n'
-  # FAKE_LIST — labels `launchctl list` enumerates (defaults to FAKE_LIVE).
+  # FAKE_LIST: labels `launchctl list` enumerates (defaults to FAKE_LIVE).
   # Kept separate because a listed-but-not-loaded job is a real state: notably
   # the not-loaded record a prefix-match service reports for its instances.
   for _label in ${FAKE_LIST:-${FAKE_LIVE:-}}; do printf '4242\t0\t%s\n' "$_label"; done
@@ -145,9 +145,9 @@ esac
 FAKE
 
 # ── Fake systemctl ──────────────────────────────────────────────────────────
-# FAKE_UNITS — space-separated unit names the fake reports as loaded.
-# FAKE_SYSTEMCTL_STATE — "active" or "failed" for is-active.
-# FAKE_SYSTEMCTL_LOG — file where mutating calls are appended.
+# FAKE_UNITS: space-separated unit names the fake reports as loaded.
+# FAKE_SYSTEMCTL_STATE: "active" or "failed" for is-active.
+# FAKE_SYSTEMCTL_LOG: file where mutating calls are appended.
 cat >"$_tmp/bin/systemctl" <<'FAKE'
 #!/usr/bin/env bash
 case " $* " in
@@ -193,7 +193,7 @@ export PATH
 # These replace supervisor-launchd.sh / supervisor-systemd.sh so tests run on
 # any host.  Behaviour is driven by FAKE_* environment variables and the
 # launchctl/systemctl fakes on PATH.  Signatures mirror the production contract:
-#   supervisor_enabled   <target> [unit path] [scope]  — false when FAKE_DISABLED or FAKE_ABSENT holds it
+#   supervisor_enabled   <target> [unit path] [scope]: false when FAKE_DISABLED or FAKE_ABSENT holds it
 #   supervisor_live      <probe output>
 #   supervisor_generation <target> [scope]
 #   supervisor_last_exit <target> [scope]
@@ -250,7 +250,7 @@ supervisor_last_exit() {
   *) systemctl "$(mock_scope_flag "$scope")" show "$target" -p ExecMainStatus --value 2>/dev/null || printf '0' ;;
   esac
 }
-# mock_scope_flag — the systemctl flag selecting a unit's manager.
+# mock_scope_flag: the systemctl flag selecting a unit's manager.
 # shellcheck disable=SC2329 # reason: invoked by the mock supervisor_generation/supervisor_last_exit, which are themselves invoked indirectly
 mock_scope_flag() {
   if [ "${1:-user}" = "system" ]; then printf '%s' "--system"; else printf '%s' "--user"; fi
@@ -319,7 +319,7 @@ eval "$(awk '/^_watchdog_[a-z_]+\(\)/ || /^supervisor_/ { p = 1 } p { print } p 
 # shellcheck source=../src/scripts/lib/service-health.sh
 . "$SERVICE_HEALTH"
 # Export sourcing guard so subshells don't re-source service-health.sh.
-# lib.sh guard is NOT exported — subshells need lib.sh for derive_nucleus_user_root.
+# lib.sh guard is NOT exported, subshells need lib.sh for derive_nucleus_user_root.
 export _NUCLEUS_SERVICE_HEALTH_SOURCED
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
@@ -328,7 +328,7 @@ state_dir="$(svc_health_state_dir)"
 captured_output=""
 captured_status=0
 
-# run_check_instance — run _watchdog_check_instance once and capture output.
+# run_check_instance: run _watchdog_check_instance once and capture output.
 # Forwards every argument, so a caller can also supply the supervisor unit name
 # (arg 5) that the tick resolves from the entry's declared `.service`.
 run_check_instance() {
@@ -339,7 +339,7 @@ run_check_instance() {
   )" || captured_status=$?
 }
 
-# run_check_prefix — run _watchdog_check_prefix once and capture output.
+# run_check_prefix: run _watchdog_check_prefix once and capture output.
 run_check_prefix() {
   captured_status=0
   captured_output="$(
@@ -521,7 +521,7 @@ assert_contains "nixos looping is stopped" "$captured_output" "looping"
 assert_contains "nixos stop was called" "$(cat "$_tmp/systemctl.log")" "stop"
 rm -f "$state_dir/cloud-mount-iCloud.service.json"
 
-# ── Section 7: Prefix expansion — not-loaded reported, unknown skipped ─────
+# ── Section 7: Prefix expansion, not-loaded reported, unknown skipped ─────
 section 7 "Prefix expansion handles per-instance records"
 
 mkdir -p "$state_dir"
@@ -721,7 +721,7 @@ section 15 "The tick records supervisor restarts into the health record"
 
 # D26: no production code path wrote the restarts array, so svc_health_is_looping
 # could never reach a threshold for any service except the one heartbeat that
-# calls record_restart directly — every suite passed only because it seeded the
+# calls record_restart directly, every suite passed only because it seeded the
 # array.  The watchdog now folds the supervisor's generation token in on every
 # tick, so a restart is detected from the token changing.
 _d26_record="$state_dir/local.ollama.json"
@@ -744,7 +744,7 @@ run_check_instance "ollama" "macos-launchctl" "$ollama_sys" "local.ollama"
 assert_eq "first observation records no restart" "0" "$(restart_len)"
 assert_eq "first observation adopts the token" "0" "$(generation_of)"
 
-# (b) A token that changed between ticks is one restart, and the array GROWS —
+# (b) A token that changed between ticks is one restart, and the array GROWS:
 # the writer is reached from production code, not from a seed.
 FAKE_RUNS=1
 export FAKE_RUNS
@@ -761,8 +761,8 @@ else
   assert_fail "a surviving tick stamps lastSuccess" "lastSuccess=$(success_of)"
 fi
 
-# (d) Zero is a legitimate token — systemd's NRestarts reads 0 on a healthy unit
-# — so only null/absent may mean unobserved.  A zero sentinel would re-baseline on
+# (d) Zero is a legitimate token, systemd's NRestarts reads 0 on a healthy unit
+#, so only null/absent may mean unobserved.  A zero sentinel would re-baseline on
 # every tick and swallow the service's first restart.
 rm -f "$_d26_record"
 FAKE_RUNS=0
@@ -817,7 +817,7 @@ section 16 "The requested scope selects which entries are covered"
 
 # D33: each plist passes --scope (the root daemon one value, the per-user agent
 # the other), but the flag was absent from the argument case, so it was swallowed
-# and every daemon covered both scopes — including the user agent reaching for
+# and every daemon covered both scopes, including the user agent reaching for
 # system units through sudo, which cannot prompt inside launchd.
 cat >"$_tmp/repo/src/modules/services.json" <<'JSON'
 {
@@ -876,7 +876,7 @@ rm -f "$state_dir/ollama.json"
 section 17 "The injected services.json path is the one read"
 
 # D34: the plists inject NUCLEUS_SERVICES_JSON because the root daemon cannot
-# derive the repo — HOME is /var/root and the script lives in the Nix store — so
+# derive the repo; HOME is /var/root and the script lives in the Nix store, so
 # derivation produced a path that does not exist and the tick returned no-op.
 mkdir -p "$_tmp/injected"
 cat >"$_tmp/injected/services.json" <<'JSON'
@@ -914,7 +914,7 @@ section 18 "launchd exit-status shapes are parsed to an integer"
 
 # D36: `launchctl print` writes "last exit code = 78: EX_CONFIG" and
 # "last exit code = (never exited)".  The parser read the raw remainder, so the
-# health write received `78:` / `(never` — not a JSON literal — and under set -e
+# health write received `78:` / `(never`, not a JSON literal, and under set -e
 # that aborted the whole tick on the first live job that had never exited.  It
 # also made Rule 5's EX_CONFIG repair unreachable, since "78:" is never "78".
 _d36_bin="$_tmp/d36bin"
@@ -973,7 +973,7 @@ section 19 "A self-recording daemon is blocked by the uniform loop rule"
 # records each relaunch itself through svc_health_record_restart
 # (macos-heartbeat-betterdisplay.sh:50).  Loop protection must therefore reach
 # it through exactly the same predicate and the same Rule 3 branch as a cloud
-# mount — nothing about this service is special-cased.  Its health record is
+# mount, nothing about this service is special-cased.  Its health record is
 # keyed by the service key while launchd addresses the declared label, so the
 # check is called with the record key and the unit separately: that split is the
 # asymmetry the watchdog resolves internally, and a check that conflated the two
@@ -983,7 +983,7 @@ bd_label="local.betterdisplay-heartbeat"
 bd_record="$state_dir/$bd_health_key.json"
 bd_entry='{"type":"macos-launchctl","scope":"user","launchdDomain":"gui","service":"local.betterdisplay-heartbeat","unitPath":"~/Library/LaunchAgents/local.betterdisplay-heartbeat.plist"}'
 
-bd_relaunch() { # <count> — the daemon's own recording call, repeated
+bd_relaunch() { # <count>: the daemon's own recording call, repeated
   local _n=0
   while [ "$_n" -lt "$1" ]; do
     svc_health_record_restart "$bd_health_key" "relaunch" >/dev/null 2>&1
@@ -1021,7 +1021,7 @@ assert_eq "the daemon recorded five relaunches" 5 "$(bd_restarts)"
 assert_eq "the uniform predicate trips on the daemon's own restarts" "yes" "$(bd_looping)"
 
 # (c) The watchdog acts on it.  The supervisor's run token is unchanged between
-#     ticks, so the tick records a success — which clears the consecutive count
+#     ticks, so the tick records a success, which clears the consecutive count
 #     but not the hourly one.  The hourly bound is therefore what keeps the loop
 #     detected here, and the block must still land.
 bd_relaunch 5
@@ -1040,10 +1040,10 @@ rm -f "$bd_record"
 # ── Section 20: A corrupt record must not abort the tick (F1) ─────────────
 section 20 "A corrupt record does not abort the tick"
 
-# run_tick_errexit — as run_tick, but with the daemon's own shell options.
+# run_tick_errexit: as run_tick, but with the daemon's own shell options.
 # WHY: the daemon runs `set -euo pipefail`, and this abort happens ONLY under
 # errexit.  The ordinary runner deliberately disables it so an assertion failure
-# cannot kill the suite — which is exactly why the suite could not see this class
+# cannot kill the suite, which is exactly why the suite could not see this class
 # before, even though the class had already fired once in production.
 run_tick_errexit() {
   captured_status=0
@@ -1074,7 +1074,7 @@ assert_contains "the service behind the corrupt record is still checked" "$captu
   "local.cloud-mount.bbb-healthy is not running"
 
 # Direct guard assertion: the accessor is what makes a corrupt record survivable
-# under errexit, so call it plainly — exactly as the tick does — and require it to
+# under errexit, so call it plainly, exactly as the tick does, and require it to
 # report and return success instead of propagating jq's failure.
 _direct_status=0
 _direct_out="$(
@@ -1129,7 +1129,7 @@ assert_eq "the declared mount is recorded as not-loaded" "not-loaded" \
   "$(jq -r '.state' "$state_dir/local.cloud-mount.iCloud.json")"
 assert_eq "the declared mount is never loaded" 0 "$(calls_made "$_tmp/launchctl.log")"
 
-# Nothing declared must mean nothing reported — the report follows the registry,
+# Nothing declared must mean nothing reported, the report follows the registry,
 # not the label prefix.
 rm -f "$state_dir/local.cloud-mount.iCloud.json"
 printf '{"mounts":[]}\n' >"$_tmp/repo/src/users/testuser/cloud-drives.json"
@@ -1160,13 +1160,13 @@ section 22 "A corrupt record does not abort a real subprocess tick"
 # WHY this section exists even though §20 tests the same fixture: §20 calls
 #   _watchdog_tick IN-PROCESS, inside a command substitution that sits in an
 #   `||` list.  Bash suppresses errexit for a command in that position, so §20
-#   passes on the PRE-FIX code and cannot see the production abort at all — a
+#   passes on the PRE-FIX code and cannot see the production abort at all, a
 #   test that cannot fail is not coverage.  This section runs the same real
 #   libraries in a REAL child bash process, where `set -euo pipefail` is
 #   genuinely live: the same condition the KeepAlive daemon runs under.
 #   The mocks this suite defines are shell functions, and `export -f` hands them
 #   to the child unchanged, so the only difference from §20 is the PROCESS
-#   BOUNDARY (and therefore errexit) — not the fixture, and not the supervisor.
+#   BOUNDARY (and therefore errexit), not the fixture, and not the supervisor.
 F1_DRIVER="$_tmp/f1-subprocess-tick.sh"
 cat >"$F1_DRIVER" <<'DRIVER'
 #!/usr/bin/env bash
@@ -1176,13 +1176,13 @@ set -euo pipefail
 unset _NUCLEUS_LIB_SOURCED _NUCLEUS_SERVICE_HEALTH_SOURCED
 # WHY two roots: the LIBRARIES are sourced from the real checkout, while
 #   NUCLEUS_REPO_ROOT points lib.sh's own derive_repo_root() at the sandbox stub
-#   the suite populates — so registry reads stay hermetic without mocking the
+#   the suite populates, so registry reads stay hermetic without mocking the
 #   resolver.
 . "$F1_LIB_ROOT/src/scripts/lib/lib.sh"
 . "$F1_LIB_ROOT/src/scripts/lib/macos-launch-services.sh"
 . "$F1_LIB_ROOT/src/scripts/lib/svc-instances.sh"
 # The watchdog ends with `_watchdog_main "$@"`, which would loop forever, so
-# extract function definitions only — the same extraction the suite performs.
+# extract function definitions only, the same extraction the suite performs.
 eval "$(awk '/^_watchdog_[a-z_]+\(\)/ || /^supervisor_/ { p = 1 } p { print } p && /^}/ { p = 0; next } /^[^_]/ && !/^#/ && !/^$/ && p == 0 { next }' "$F1_WATCHDOG")"
 # The CLI parser is part of the skipped top level, so its two globals must be
 # initialised here: _watchdog_scope_selected reads $_scope_filter under `set -u`.
@@ -1192,7 +1192,7 @@ _oneshot=false
 _watchdog_tick
 DRIVER
 
-# run_subprocess_tick — run one tick in a child bash process and capture its
+# run_subprocess_tick: run one tick in a child bash process and capture its
 # exit status and combined output.  The `||` list here suppresses errexit in
 # THIS shell only; the child is a separate process running its own `set -e`.
 run_subprocess_tick() {
@@ -1210,7 +1210,7 @@ run_subprocess_tick() {
   )" || captured_status=$?
 }
 
-# Same two records as §20 — corrupt first, healthy second — so the only
+# Same two records as §20, corrupt first, healthy second, so the only
 # variable changed is the process boundary.
 FAKE_LIST="local.cloud-mount.aaa-broken local.cloud-mount.bbb-healthy"
 FAKE_LIVE=""
@@ -1250,7 +1250,7 @@ section 23 "A repair call is bounded by the declared watchdogRepairTimeoutSecond
 
 # A repair (live + last exit 78) is a bootout+bootstrap, and a dead macFUSE/FSKit
 # volume blocks inside the kernel.  Unbounded, ONE hung repair stalls the whole
-# tick and every instance after it goes unchecked — which is why the value
+# tick and every instance after it goes unchecked, which is why the value
 # bounding a single repair call is declared in services.json and read per tick.
 # These checks pin that the value is ENFORCED, and that neither an absent nor a
 # malformed value can make the call unbounded.  All three are behavioural: the
@@ -1263,13 +1263,13 @@ supervisor_repair() {
   printf 'started\n' >>"$_repair_marker"
   # WHY the redirect: this sleep is deliberately longer than the declared bound,
   #   and a background process still holding the captured stdout pipe would keep
-  #   the command substitution open until it exited — making the elapsed-time
+  #   the command substitution open until it exited, making the elapsed-time
   #   check below measure the sleep instead of the bound.
   sleep 5 >/dev/null 2>&1
   printf 'completed\n' >>"$_repair_marker"
 }
 
-# repair_policy — write a one-key registry carrying $1, or none when ABSENT.
+# repair_policy: write a one-key registry carrying $1, or none when ABSENT.
 repair_policy() {
   mkdir -p "$_tmp/repair-policy"
   if [ "$1" = "ABSENT" ]; then
@@ -1285,7 +1285,7 @@ seed_repair_record() {
     >"$state_dir/local.cloud-mount.iCloud.json"
 }
 
-# repair_started / repair_completed — grep -q, so a missing marker reads as absent
+# repair_started / repair_completed: grep -q, so a missing marker reads as absent
 # WITHOUT the `grep -c` trap: grep -c prints 0 AND returns 1 on no match, so it would
 # have to be guarded with `|| printf 0`, emitting `0\n0` and silently defeating the
 # comparison.  Distinct markers, because "the repair started" and "the repair ran to
@@ -1376,8 +1376,8 @@ else
 fi
 # The warning differs by CONTEXT, and both are correct: run_check_instance runs the
 # tick under `set +euo pipefail` (nounset OFF), so `$((abc * 5))` evaluates the stray
-# name to 0 and the call is abandoned immediately; with nounset ON — the daemon's own
-# environment — the evaluation itself fails and svc_run_bounded refuses the call
+# name to 0 and the call is abandoned immediately; with nounset ON, the daemon's own
+# environment, the evaluation itself fails and svc_run_bounded refuses the call
 # before backgrounding it.  Either way the tick survives and the failure is reported;
 # the regression this pins is the SILENT one.
 if printf '%s' "$captured_output" | grep -qE 'timed out after|could not repair'; then
@@ -1403,7 +1403,7 @@ section 24 "An unknown supervisor type is skipped instead of aborting it"
 
 # WHY a REAL child process (F2-a): `run_check_prefix` deliberately wraps its
 #   call in `set +euo pipefail`, so an unassigned variable is NOT an error
-#   there — any test built on that helper passes on pre-fix code and cannot see
+#   there, any test built on that helper passes on pre-fix code and cannot see
 #   the production abort. That is the same "test that cannot fail" trap §22
 #   documents, one level down.
 # F2-a: _watchdog_check_prefix's `case` had NO default arm while live_instances

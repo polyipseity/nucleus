@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test: harness-approval.sh request/response contract — a blocking harness hook
+# Test: harness-approval.sh request/response contract, a blocking harness hook
 # must get exactly one of allow|deny|ask on stdout, in every path, and must exit
 # 0 even when the broker is unreachable.
 #

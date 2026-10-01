@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Shell tests asserting activation scripts hard-error on convergence failure.
 # Activation scripts must abort (non-zero exit) when a required convergence op
-# fails — no silent error, no warning replacing an error.
+# fails, no silent error, no warning replacing an error.
 #
 # Run with: bash tests/scripts/activation-hard-error-tests.sh
 set -euo pipefail

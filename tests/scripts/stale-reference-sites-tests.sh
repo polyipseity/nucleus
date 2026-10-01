@@ -6,7 +6,7 @@
 # lockfile. Ten other lines still say "bump-lockfile", and every one of them is
 # correct: they describe the deletion, or they are test fixtures.
 #
-# A mechanical sweep cannot tell those two groups apart — that is why a prior
+# A mechanical sweep cannot tell those two groups apart, that is why a prior
 # pass produced a wrong list. This test encodes the distinction as an explicit
 # allowlist and asserts it in BOTH directions: every surviving mention must be
 # allowlisted, and every allowlisted line must still exist. A new stale
@@ -30,7 +30,7 @@ require_command git "the mention scan enumerates tracked files with git grep"
 # guard itself would be exactly that.
 _SELF="tests/scripts/stale-reference-sites-tests.sh"
 
-# file|line|substring — one entry per line that may legitimately mention the
+# file|line|substring: one entry per line that may legitimately mention the
 # removed command. The line number is what makes the entry a *byte* proof rather
 # than a substring one: a previous version grepped the whole file for the
 # substring, so a reword that preserved the keyword both counted as present and
@@ -137,7 +137,7 @@ _no_unexpected_mention_survives() {
 
 # The must-not-touch proof. A previous version grepped the whole file for the
 # substring, so a reworded line that kept the keyword was both counted as
-# present and whitelisted by the very substring under test — circular. This
+# present and whitelisted by the very substring under test, circular. This
 # compares the pinned line byte-for-byte between the working tree and HEAD: the
 # line must exist, must still contain its distinguishing substring, and must be
 # identical to the last commit. Reword, delete, reorder or shift it and this

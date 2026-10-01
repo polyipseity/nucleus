@@ -231,7 +231,7 @@ test_steamcmd_install_path() {
     assert_fail "steamcmd: steamcmd_install_path expanded" "expected $expected, got $steamcmd"
   fi
 
-  # Verify idempotent — tilde expands to same absolute path on re-merge.
+  # Verify idempotent, tilde expands to same absolute path on re-merge.
   run_merge "$settings" "$managed"
   steamcmd=$(json_get "$settings" "d['instances']['Default']['steamcmd_install_path']")
   if [ "$steamcmd" = "\"$expected\"" ]; then

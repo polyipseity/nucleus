@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for src/scripts/lib/svc-instances.sh — instance id derivation, anchored
+# Tests for src/scripts/lib/svc-instances.sh, instance id derivation, anchored
 # live enumeration, per-instance log directories, and not-loaded markers.
 
 set -euo pipefail
@@ -45,7 +45,7 @@ print)
   if [ -n "${FAKE_JOB_ALWAYS:-}" ]; then
     printf 'state = %s\n' "$FAKE_JOB_ALWAYS"
     [ "$FAKE_JOB_ALWAYS" = running ] && printf '\tpid = 4242\n'
-    # FAKE_JOB_BULK — padding after the state lines, so a reader that stops at
+    # FAKE_JOB_BULK: padding after the state lines, so a reader that stops at
     # its first match leaves this writer mid-write; that is the real shape of
     # `launchctl print`, whose output does not fit one pipe buffer. The padding
     # is one blocking write from this shell, so the signal reaches the writer
@@ -88,19 +88,19 @@ FAKE_SYSTEMCTL
 # --- Fake mount table --------------------------------------------------------
 # The mount probes read the table through `mount`, so a fake one makes the
 # assertions describe the table contract instead of whatever this host mounts.
-#   FAKE_MOUNT_TABLE — the table the probe reports.
-#   FAKE_MOUNT_SLOW  — sleep this long first: a probe that outlives its bound,
+#   FAKE_MOUNT_TABLE: the table the probe reports.
+#   FAKE_MOUNT_SLOW: sleep this long first: a probe that outlives its bound,
 #                      which is how a hung volume blocks inside the kernel. The
 #                      delay comes before every other branch, so a reader can be
 #                      slow AND fail, which is what a hung volume looks like to a
 #                      caller that keeps polling it.
-#   FAKE_MOUNT_UNTIL — report the table for this many calls, then report
+#   FAKE_MOUNT_UNTIL: report the table for this many calls, then report
 #                      nothing: a volume that finishes unmounting while it is
 #                      being waited on.
-#   FAKE_MOUNT_AFTER_KICKS — report nothing until the fake launchctl has been
+#   FAKE_MOUNT_AFTER_KICKS: report nothing until the fake launchctl has been
 #                      asked to kickstart this many times: a provider that
 #                      refuses the first attempts and serves a later one.
-#   FAKE_MOUNT_FAIL  — exit with this status printing nothing: a reader that
+#   FAKE_MOUNT_FAIL: exit with this status printing nothing: a reader that
 #                      could not read the table at all, as opposed to one that
 #                      read an empty table.
 # Every read is counted in FAKE_MOUNT_CALLS whatever it then answers, so an
@@ -153,7 +153,7 @@ LAUNCHCTL_ENTRY='{"type": "macos-launchctl","service":"local.cloud-mount.","scop
 SYSTEMCTL_ENTRY='{"type": "nixos-systemctl","service":"cloud-mount-","scope":"user","prefixMatch":true}'
 SCHTASK_ENTRY='{"type": "windows-schtask","service":"NucleusCloudMount-","taskPath":"\\NucleusCloudMount","prefixMatch":true}'
 
-# assert_eq — Compare an actual value with the expected one.
+# assert_eq: Compare an actual value with the expected one.
 assert_eq() { # <test name> <expected> <actual>
   if [ "$2" = "$3" ]; then
     assert_pass "$1"
@@ -230,7 +230,7 @@ assert_eq "the mount id is the instance suffix, not the instance id" "/home/u/cl
   "$(svc_cloud_mount_point "$LAUNCHCTL_ENTRY" "$MOUNTS_JSON" 'local.cloud-mount.OneDrive' '/home/u')"
 assert_eq "a trailing slash in the home does not double up" "/home/u/clouds/iCloud" \
   "$(svc_cloud_mount_point "$LAUNCHCTL_ENTRY" "$MOUNTS_JSON" 'local.cloud-mount.iCloud' '/home/u/')"
-# mount_point_with_home <home> — The mount point with the base taken from HOME
+# mount_point_with_home <home>: The mount point with the base taken from HOME
 # instead of the optional argument.
 mount_point_with_home() { # <home>
   HOME="$1" svc_cloud_mount_point "$LAUNCHCTL_ENTRY" "$MOUNTS_JSON" 'local.cloud-mount.iCloud'
@@ -251,7 +251,7 @@ assert_eq "a systemd instance resolves through the same mounts array" "/home/u/c
 
 section 6 "Bounded command probes"
 
-# bounded_rc — Exit status of a command run under svc_run_bounded.
+# bounded_rc: Exit status of a command run under svc_run_bounded.
 bounded_rc() { # <seconds> <command...>
   local _rc=0
   svc_run_bounded "$@" || _rc=$?
@@ -272,7 +272,7 @@ fi
 
 section 7 "Mount table probe"
 
-# mount_table_rc <path> [probe bound] — probe status with the fake table the
+# mount_table_rc <path> [probe bound]: probe status with the fake table the
 # caller set.
 mount_table_rc() { # <path> [bound]
   local _rc=0
@@ -401,7 +401,7 @@ assert_eq "a probe that outlives its bound counts as mounted" "0" "$(mount_table
 FAKE_MOUNT_SLOW=''
 
 # WHY: svc_wait_mount_released is the call a reload makes, and the two unreadable
-# paths must agree — a reader that failed and a probe that outlived its bound
+# paths must agree, a reader that failed and a probe that outlived its bound
 # describe the same condition, and answering them differently is what let a
 # reload start on top of a volume that was still attached.
 FAKE_MOUNT_TABLE=''
@@ -430,7 +430,7 @@ if svc_wait_mount_released /mnt/wait 1; then
 else
   assert_pass "a mount that never releases reports the timeout"
 fi
-# wait_released_rc <path> <timeout> — status of the mount release wait.
+# wait_released_rc <path> <timeout>: status of the mount release wait.
 wait_released_rc() { # <path> <timeout>
   local _rc=0
   svc_wait_mount_released "$1" "$2" || _rc=$?
@@ -511,7 +511,7 @@ PATH="$_tmp/fastbin:$PATH"
 export PATH
 
 # WHY: FSKit can refuse the first attempts right after its daemon restarts, so
-# the relaunch is bounded twice — by the launch cap and by the budget — and a
+# the relaunch is bounded twice, by the launch cap and by the budget, and a
 # launch that is still in flight is never interrupted. The loop's own output is
 # captured rather than left on this command's stdout, so a diagnostic it prints
 # can be asserted on without landing in the status the callers compare.
@@ -605,7 +605,7 @@ assert_mentions "the announcement names the reason and the wait" \
 
 # WHY: the budget is the operator's wait, so it is wall clock. A poll costs the
 #   reader's own time on top of the interval, and counting only the intervals
-#   made the run last as long as the polls did — three times the stated budget
+#   made the run last as long as the polls did, three times the stated budget
 #   in precisely the case the unknown arm exists for, since a table nobody can
 #   read spends no launch and is polled until the budget ends it. The read count
 #   is the discriminator: a 2s reader against a 4s budget is two polls of wall

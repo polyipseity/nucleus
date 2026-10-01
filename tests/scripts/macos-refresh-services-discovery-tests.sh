@@ -15,7 +15,7 @@
 #   * the pbs binary is a caller argument (the Nix wrapper supplies the store
 #     path), so a hardcoded path would run a different build than the one the
 #     caller resolved;
-#   * `-update` is the flag that forces a complete rescan — pbs rejects a bare
+#   * `-update` is the flag that forces a complete rescan, pbs rejects a bare
 #     invocation with a usage message and exit status 1, so a dropped flag turns
 #     the rescan into a failure.
 #
@@ -48,7 +48,7 @@ eval "$RESCAN_FUNC"
 TEST_UID="4242"
 TEST_USER="testuser"
 
-# make_argv_recorder <path> <log> — executable that appends its argv to <log>,
+# make_argv_recorder <path> <log>: executable that appends its argv to <log>,
 # one space-joined line per invocation.
 make_argv_recorder() {
   cat >"$1" <<STUB
@@ -58,7 +58,7 @@ STUB
   chmod +x "$1"
 }
 
-# make_self_path_recorder <path> <marker> — executable that appends its own path
+# make_self_path_recorder <path> <marker>: executable that appends its own path
 # to <marker>, the way a real binary identifies which binary ran.
 make_self_path_recorder() {
   cat >"$1" <<STUB
@@ -68,7 +68,7 @@ STUB
   chmod +x "$1"
 }
 
-# make_exec_launchctl <path> — launchctl stand-in that runs the command it was
+# make_exec_launchctl <path>: launchctl stand-in that runs the command it was
 # handed. Real launchctl runs that command inside the target session, which is
 # how the suite observes the binary rescan_pbs_services actually chose.
 make_exec_launchctl() {
@@ -82,7 +82,7 @@ STUB
   chmod +x "$1"
 }
 
-# make_exit_stub <path> <status> — executable that exits with a fixed status.
+# make_exit_stub <path> <status>: executable that exits with a fixed status.
 make_exit_stub() {
   cat >"$1" <<STUB
 #!/bin/sh
@@ -91,7 +91,7 @@ STUB
   chmod +x "$1"
 }
 
-# recorded_invocations <log> — how many invocations the recorder logged.
+# recorded_invocations <log>: how many invocations the recorder logged.
 recorded_invocations() {
   if [ -f "$1" ]; then
     wc -l <"$1" | tr -d ' '
@@ -100,7 +100,7 @@ recorded_invocations() {
   fi
 }
 
-# recorded_line <log> <n> — the n-th recorded invocation, empty when absent.
+# recorded_line <log> <n>: the n-th recorded invocation, empty when absent.
 recorded_line() {
   if [ -f "$1" ]; then
     sed -n "$2p" "$1"

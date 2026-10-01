@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Test: no real-user test coupling — tests must not reference production
+# Test: no real-user test coupling, tests must not reference production
 # src/users/<username>/ directories (except default).
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"

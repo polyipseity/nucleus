@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Layout tests: every writeNucleusShellApplication call site produces one
-# identical $out layout — $out/scripts and $out/src are symlinks to the
+# identical $out layout; $out/scripts and $out/src are symlinks to the
 # shared bundles, and the entry script is reachable at $out/<scriptName>.sh.
 # This guards the uniform-layout refactor: no per-call-site divergence, no
 # repo-root detection, no bundleDefault toggle.
 #
 # Also guards the script tree's input set: it must depend on the script
 # directories only, never on the whole src/ tree (which would re-key the
-# shared tree — and every app built from it — on any edit under src/).
+# shared tree, and every app built from it, on any edit under src/).
 #
 # Representative packages:
 #   - nucleus-gc            (scripts/-prefixed entry: scripts/gc)

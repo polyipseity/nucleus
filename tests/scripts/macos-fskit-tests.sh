@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for src/scripts/lib/macos-fskit.sh — the FSKit module-state probe and the
+# Tests for src/scripts/lib/macos-fskit.sh, the FSKit module-state probe and the
 # kill-and-respawn repair path.
 #
 # The probe decides whether a mount attempt is skipped, so its contract matters
@@ -41,7 +41,7 @@ esac
 exit 1
 FAKE_PLUTIL
 
-# FAKE_FSKIT_PIDS — PIDs answered by successive `launchctl print` calls, the last
+# FAKE_FSKIT_PIDS: PIDs answered by successive `launchctl print` calls, the last
 # one repeating. A daemon that never respawns answers the same PID every time.
 cat >"$_tmp/bin/launchctl" <<'FAKE_LAUNCHCTL'
 #!/usr/bin/env bash
@@ -113,7 +113,7 @@ FAKE_FSKIT_LISTING='[
 assert_eq "a list without macFUSE reads as disabled" "disabled" "$(fskit_macfuse_module_state)"
 
 # WHY: the probe gates a mount attempt, so a failed probe must not read as a
-# missing module — that would skip a mount that could have succeeded.
+# missing module, that would skip a mount that could have succeeded.
 FAKE_FSKIT_LISTING=""
 FAKE_PLUTIL_STATUS=1
 assert_eq "a failed probe reads as unknown" "unknown" "$(fskit_module_state io.macfuse.app.fsmodule.macfuse)"
@@ -175,7 +175,7 @@ assert_mentions "the remedy" "$(fskit_remedy)" "killall fskitd"
 section "macos-fskit" "provider repair"
 
 # WHY: the repair has to distinguish "the subsystem needed a restart" from "the
-# module is gone" — the second needs the operator, and only an error says so.
+# module is gone", the second needs the operator, and only an error says so.
 : >"$FAKE_KILLALL_LOG"
 : >"$FAKE_FSKIT_COUNTER"
 FAKE_FSKIT_PIDS='100 200'

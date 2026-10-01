@@ -11,7 +11,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 
-# assert_case <label> <expected> <actual> — compare a checker's "<rc>:<reason>".
+# assert_case <label> <expected> <actual>: compare a checker's "<rc>:<reason>".
 assert_case() {
   if [ "$2" = "$3" ]; then
     assert_pass "$1"
@@ -20,7 +20,7 @@ assert_case() {
   fi
 }
 
-# _tally_check <suite> <capture> <status> — run the runner-side tally checker in a
+# _tally_check <suite> <capture> <status>: run the runner-side tally checker in a
 # subshell (it lives in the test-framework library, which reassigns globals) and
 # echo "<rc>:<reason>".
 _tally_check() {
@@ -100,7 +100,7 @@ test_all_consumers_end_with_finish_tests() {
   fi
 }
 
-# _stray_exits <file> — line numbers of `exit` statements that are not inside a
+# _stray_exits <file>: line numbers of `exit` statements that are not inside a
 # heredoc body. A mock stub's exit belongs to another process, so only an exit
 # outside a heredoc is the suite's own.
 _stray_exits() {
@@ -173,7 +173,7 @@ EOF
 }
 
 # finish_tests is the only sanctioned exit: an exit that bypasses it fails the
-# suite without a tally, which the runner reports — but catching it here keeps a
+# suite without a tally, which the runner reports, but catching it here keeps a
 # suite that can never reach its tally from getting that far.
 test_no_consumer_exits_outside_a_heredoc() {
   local _dir _file _hits _stray=""

@@ -57,7 +57,7 @@ test_absent_path_is_silent_no_op() {
 # whether or not the host provides chflags: macOS sets the immutable flag on the
 # symlink, while NixOS protection is detection-based, because chattr needs
 # CAP_LINUX_IMMUTABLE and a user-scope activation cannot grant it. The cases below
-# assert the same contract — exit 0, no output — on every host, so a non-zero exit
+# assert the same contract, exit 0, no output, on every host, so a non-zero exit
 # or any output is a regression on either.
 
 test_dangling_symlink_is_accepted() {
@@ -96,7 +96,7 @@ test_flag_failure_reports_f1_error() {
 
 # Linux cannot set the immutable flag from a user-scope activation (chattr needs
 # CAP_LINUX_IMMUTABLE), so the library must not invoke it: reinstating the call would
-# fail EPERM and — because a genuine flag failure is fatal — abort every NixOS apply.
+# fail EPERM and, because a genuine flag failure is fatal, abort every NixOS apply.
 test_no_chattr_invocation() {
   if grep -qE 'chattr[[:space:]]+-h' "$SH_LIB"; then
     assert_fail "library does not invoke chattr" "found a chattr invocation in $SH_LIB"

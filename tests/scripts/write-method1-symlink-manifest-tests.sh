@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for src/scripts/configs/write-method1-symlink-manifest.sh — the writer that
+# Tests for src/scripts/configs/write-method1-symlink-manifest.sh, the writer that
 # publishes the step-19 candidate list.
 #
 # Contract: the manifest is a plain file (not a store symlink) whose lines are

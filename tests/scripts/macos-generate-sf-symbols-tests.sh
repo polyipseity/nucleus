@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for macos-generate-sf-symbols.sh — the SF Symbols name list generator.
+# Tests for macos-generate-sf-symbols.sh, the SF Symbols name list generator.
 #
 # The generator is macOS-only, so most cases drive it with a fake `plutil` that
 # emits fixture names (public + private bundles, including the private bundle's
@@ -29,7 +29,7 @@ CMP_BIN="$(command -v cmp)"
 
 OUT="$NUCLEUS_USER_ROOT/state/sf-symbols.txt"
 
-# mtime_of <path> — epoch mtime of <path>, portable across GNU and BSD stat.
+# mtime_of <path>: epoch mtime of <path>, portable across GNU and BSD stat.
 # GNU `stat -f` is --file-system: it exits 0 and prints a filesystem block, so a
 # `stat -f %m ... || stat -c %Y` shim silently captures that block instead of an
 # mtime. The variant is therefore chosen by validating the output is a bare

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for src/scripts/lib/macos-fuse-provider.sh — the macFUSE provider
+# Tests for src/scripts/lib/macos-fuse-provider.sh, the macFUSE provider
 # fingerprint recorded next to the ntfs-3g build fingerprint.
 #
 # That digest is the only guard against provider drift: macFUSE is installed by a
@@ -18,7 +18,7 @@ LIB_SH="$SCRIPT_DIR/../../src/scripts/lib/lib.sh"
 FUSE_PROVIDER_LIB="$SCRIPT_DIR/../../src/scripts/lib/macos-fuse-provider.sh"
 PROVIDER_FIXTURE="$SCRIPT_DIR/../fixtures/fuse-provider"
 
-# provider_call <function> [args...] — run a library call in a fresh shell that
+# provider_call <function> [args...]: run a library call in a fresh shell that
 # sources lib.sh (sha256_of_file, error) and the provider library first.  The
 # subshell keeps the suite's set -euo pipefail from interacting with functions
 # whose whole contract is their exit status, and keeps the library's globals out
@@ -34,7 +34,7 @@ provider_call() {
   ' macos-fuse-provider-tests "$LIB_SH" "$FUSE_PROVIDER_LIB" "$function_name" "$@"
 }
 
-# seed_provider_root <parent_dir> — copy the fixture tree to <parent_dir>/provider
+# seed_provider_root <parent_dir>: copy the fixture tree to <parent_dir>/provider
 # and print the copy's path, so no case can disturb the checked-in fixtures.
 #
 # The printed path is NOT canonicalized: the library has to tolerate any spelling
@@ -47,7 +47,7 @@ seed_provider_root() {
   printf '%s\n' "$parent_dir/provider"
 }
 
-# seed_pkgutil_stub <dir> <exit_status> <receipt_line>... — write a pkgutil
+# seed_pkgutil_stub <dir> <exit_status> <receipt_line>...: write a pkgutil
 # stand-in that prints the receipt lines and exits with <exit_status>.
 # macfuse_pkg_version takes the tool path as an argument, so any receipt shape
 # can be driven on any host, including one whose output contradicts its status.
@@ -68,7 +68,7 @@ STUB
   printf '%s\n' "$stub"
 }
 
-# assert_digest_rejects_missing <test_name> <relative_path> — remove one required
+# assert_digest_rejects_missing <test_name> <relative_path>: remove one required
 # provider file in a fresh copy and require the digest to refuse a value: a
 # partial provider must fail loudly rather than fingerprint a truncated tree.
 assert_digest_rejects_missing() {
@@ -116,7 +116,7 @@ test_digest_is_stable_and_root_independent() {
 
 # The digest has to be a function of the provider's *content*, not of the path
 # used to reach it: the guard compares it with a value recorded by an earlier
-# activation, so a spelling change alone would otherwise rebuild the binary — and
+# activation, so a spelling change alone would otherwise rebuild the binary, and
 # a symlinked /var (as $TMPDIR has on macOS) makes that the common case.
 test_digest_is_independent_of_a_symlinked_root_spelling() {
   local work root canonical via_link first second rc_canonical=0 rc_link=0
@@ -379,8 +379,8 @@ test_macfuse_pkg_version_fails_when_pkgutil_fails
 # The provider helper resolves the provider library with /bin/realpath, so these
 # cases run wherever that path exists: macOS, and any Linux whose /bin is the
 # usr-merge (Ubuntu CI included). Where it does not (NixOS keeps no /bin beyond
-# /bin/sh), the helper cannot run at all — and the product is macOS-only (macFUSE)
-# — so the cases name that absence explicitly rather than standing aside.
+# /bin/sh), the helper cannot run at all, and the product is macOS-only (macFUSE)
+#, so the cases name that absence explicitly rather than standing aside.
 # Gate on the capability, not on the OS: an OS gate would have kept these cases
 # silent on Linux CI, which is where a regression in the digest would land unseen.
 if [ -x /bin/realpath ]; then

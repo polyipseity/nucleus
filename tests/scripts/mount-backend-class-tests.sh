@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# mount-backend-class-tests.sh — provider-failure classification on macOS.
+# mount-backend-class-tests.sh: provider-failure classification on macOS.
 #
 # backend_class must separate the two provider classes the MODULE STATE distinguishes:
 #
-#   provider-refusal — the extension is PRESENT but switched off; transient, so the
+#   provider-refusal: the extension is PRESENT but switched off; transient, so the
 #                      runner retries it after the user re-enables it.
-#   provider-version — anything else: the extension IS listed yet the mount still failed,
+#   provider-version: anything else: the extension IS listed yet the mount still failed,
 #                      or its state could not be read (`unknown`); terminal, so the
 #                      runner blocks at once instead of retrying.
 #
@@ -14,12 +14,12 @@
 # what this suite pins is the module-state split alone.
 #
 # Collapsing the two into one value loses the classification AND loses the terminal
-# verdict, which means retrying a provider failure that no retry can clear — the
+# verdict, which means retrying a provider failure that no retry can clear, the
 # behaviour that produced the original restart storm (macFUSE 5.3.3 against 5.4.0).
 #
 # WHY the module-state function is stubbed rather than read: the real FSKit state lives in
-# a /Library/Group Containers plist a suite must not depend on.  backend_class — the code
-# under test — is the REAL function, and the stub only supplies the one input it cannot
+# a /Library/Group Containers plist a suite must not depend on.  backend_class, the code
+# under test, is the REAL function, and the stub only supplies the one input it cannot
 # obtain offline.
 # shellcheck shell=bash
 set -euo pipefail
@@ -43,7 +43,7 @@ trap 'rm -f "$CAPTURE"' EXIT
 # An FSKit/provider-refusal line that backend_class's own regex matches.
 FSKIT_PATTERN='File system extension not enabled'
 
-# classify_with STATE PATTERN — stub the module state, write PATTERN into the capture,
+# classify_with STATE PATTERN: stub the module state, write PATTERN into the capture,
 # and print the REAL backend_class verdict.
 classify_with() {
   local state="$1" pattern="$2"
@@ -105,7 +105,7 @@ fi
 # DIFFERS between hosts.  darwin (and Windows) retry `provider-refusal`, because the user
 # can switch the extension back on and the retry then succeeds; Linux must not, because
 # nothing there can re-enable anything.  A cross-host declaration therefore could only be
-# wrong on some host — which is why `transientClasses` was removed from services.json, and
+# wrong on some host, which is why `transientClasses` was removed from services.json, and
 # this suite's former cross-check against it was deleted with it rather than left asserting
 # agreement with an absent field.  The real per-host classification is pinned below.
 if backend_is_transient "io-transient"; then

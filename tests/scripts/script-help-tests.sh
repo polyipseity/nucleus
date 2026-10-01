@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests for the help and missing-input paths of the four grouped PowerShell
-# entry points — scripts/utils.ps1, ai.ps1, svc.ps1, vm.ps1 — the Windows twins
+# entry points, scripts/utils.ps1, ai.ps1, svc.ps1, vm.ps1, the Windows twins
 # of scripts/<name>.sh.
 #
 # Why a bash suite drives pwsh: the contract is "the two platforms answer the
@@ -11,8 +11,8 @@
 # Three behaviours are pinned, all of them invisible from the source alone:
 #   * `-Help` (and `-h`) must print the help block to stdout, write NOTHING to
 #     stderr and exit 0. Get-Help only finds a script's comment-based help when
-#     the help block is the first thing in the file, so a leading `#!` line — or
-#     a missing-action error raised before Get-Help runs — silently degrades the
+#     the help block is the first thing in the file, so a leading `#!` line, or
+#     a missing-action error raised before Get-Help runs, silently degrades the
 #     request to the bare syntax line. Section 1 and section 4 cover both.
 #   * A bare invocation must carry the twin's severity: utils/ai print a usage
 #     summary and exit 0 (asking which subcommand to run is not a failure),
@@ -51,7 +51,7 @@ _PS_OUT="$(mktemp)"
 _PS_ERR="$(mktemp)"
 trap 'rm -f "$_PS_OUT" "$_PS_ERR"' EXIT
 
-# run_ps <script> [args...] — run one entry point through pwsh, capturing stdout
+# run_ps <script> [args...]: run one entry point through pwsh, capturing stdout
 # into PS_STDOUT, stderr into PS_STDERR and the status into PS_EXIT. Arguments
 # are pwsh parameter tokens (switches) and are passed unquoted, as a caller would
 # type them: a quoted '-Help' binds as a positional string, not as a parameter.
@@ -69,7 +69,7 @@ run_ps() {
   PS_STDERR="$(cat "$_PS_ERR")"
 }
 
-# run_sh <script> — run the .sh twin the same way (SH_STDOUT/SH_STDERR/SH_EXIT).
+# run_sh <script>: run the .sh twin the same way (SH_STDOUT/SH_STDERR/SH_EXIT).
 run_sh() {
   local _script="$1"
   SH_EXIT=0
@@ -78,7 +78,7 @@ run_sh() {
   SH_STDERR="$(cat "$_PS_ERR")"
 }
 
-# one_line — flatten a rendered PowerShell error record into one clean line.
+# one_line: flatten a rendered PowerShell error record into one clean line.
 # Write-Error wraps its message at the console width, indents the continuation and
 # paints the text with ANSI colours, so the action list has to be unwrapped before
 # it can be compared with the twin's single-line message. The pipe is thrown away
@@ -88,7 +88,7 @@ one_line() {
   sed -E $'s/\x1b\\[[0-9;]*m//g' | tr -d '\r' | tr '\n' ' ' | tr -d '|' | tr -s ' '
 }
 
-# action_list — print the action list of a "missing action" error line, or
+# action_list: print the action list of a "missing action" error line, or
 # nothing when the text does not carry one. Matched on the "error:" prefix: a
 # thrown PowerShell error record also echoes the offending source line, whose
 # truncated copy of the message has no closing parenthesis and would otherwise
@@ -98,7 +98,7 @@ action_list() {
     sed -E 's/^error: missing action \((.*)\)$/\1/' || printf ''
 }
 
-# subcommands_for <script> — the subcommand list this entry point advertises.
+# subcommands_for <script>: the subcommand list this entry point advertises.
 subcommands_for() {
   case "$1" in
   utils) printf '%s\n' "${UTILS_SUBCOMMANDS[@]}" ;;
@@ -107,7 +107,7 @@ subcommands_for() {
   esac
 }
 
-# stderr_carries_error — true when a captured stderr holds an error line. The
+# stderr_carries_error: true when a captured stderr holds an error line. The
 # prefix a message carries is not asserted: the output module derives it from
 # the calling file's path (a separate concern this suite does not own).
 stderr_carries_error() {

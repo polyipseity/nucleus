@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test: harness-drive.sh contract — the turn-end entry point announces the
+# Test: harness-drive.sh contract, the turn-end entry point announces the
 # finished turn, consumes exactly one prompt queued by `/harness send`, and
 # renders the continuation in the calling harness's own document shape.
 #

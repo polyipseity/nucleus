@@ -3,7 +3,7 @@
 #
 # The script converges the battery charge ceiling through plain sysfs writes.  It
 # takes the power_supply class root as its argument, which is what lets the suite
-# drive it end to end against a fixture tree — no root and no real battery — and
+# drive it end to end against a fixture tree, no root and no real battery, and
 # assert what it leaves behind, including the failures it must not swallow.
 
 set -euo pipefail
@@ -16,7 +16,7 @@ CHARGE_LIMIT_SCRIPT="$SCRIPT_DIR/../../src/platforms/NixOS/scripts/nixos-configu
 EXPECTED_END=80
 EXPECTED_START=75
 
-# make_battery <root> <name> [attribute...] — create a battery directory with the
+# make_battery <root> <name> [attribute...]: create a battery directory with the
 # listed charge-control attributes seeded to a value the script has to change, so
 # a run that never writes is visible.
 make_battery() {
@@ -29,13 +29,13 @@ make_battery() {
   done
 }
 
-# run_script <root> — run the charge-limit script against a fixture root, print
+# run_script <root>: run the charge-limit script against a fixture root, print
 # its combined output, and return its exit status.
 run_script() {
   bash "$CHARGE_LIMIT_SCRIPT" "$1" 2>&1
 }
 
-# read_value <path> — the value left behind, or empty when the file is missing.
+# read_value <path>: the value left behind, or empty when the file is missing.
 read_value() {
   local path="$1" value=""
   if [ ! -e "$path" ]; then

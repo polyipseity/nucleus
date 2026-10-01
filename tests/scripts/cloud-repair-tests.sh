@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# nucleus-cloud repair — FSKit provider repair, the mount restarts it drives, and
+# nucleus-cloud repair; FSKit provider repair, the mount restarts it drives, and
 # the verification that ends it.
 #
 # WHY: a wedged macOS FSKit subsystem makes every mount attempt fail with "File
@@ -61,24 +61,24 @@ JSON
 # --- Fake toolchain ----------------------------------------------------------
 # Every command the repair touches is faked: the suite must never restart a real
 # FSKit daemon, kickstart a real agent, or read this host's mount table.
-#   FAKE_MOUNT_MAP      — label<TAB>mount point, so a restart can "mount" a path.
-#   FAKE_JOBS_LOADED    — labels launchd reports as loaded.
-#   FAKE_MOUNTS         — the fake mount table.
-#   FAKE_ACTIONS        — ordered action log (killall/kickstart/bootstrap).
-#   FAKE_KILLALL_STATUS — non-zero models a failed daemon restart.
-#   FAKE_DAEMON_KILLED  — set once killall ran; the FSKit daemon answers a new pid.
-#   FAKE_UNAME_S        — the platform the repair sees.
-#   FAKE_NO_MOUNT_ON_KICKSTART — a restarted agent whose mount never appears.
-#   FAKE_ATTACH_AFTER_KICKS — the volume appears only from this launch on, which
+#   FAKE_MOUNT_MAP: label<TAB>mount point, so a restart can "mount" a path.
+#   FAKE_JOBS_LOADED: labels launchd reports as loaded.
+#   FAKE_MOUNTS: the fake mount table.
+#   FAKE_ACTIONS: ordered action log (killall/kickstart/bootstrap).
+#   FAKE_KILLALL_STATUS: non-zero models a failed daemon restart.
+#   FAKE_DAEMON_KILLED: set once killall ran; the FSKit daemon answers a new pid.
+#   FAKE_UNAME_S: the platform the repair sees.
+#   FAKE_NO_MOUNT_ON_KICKSTART: a restarted agent whose mount never appears.
+#   FAKE_ATTACH_AFTER_KICKS: the volume appears only from this launch on, which
 #                      is how FSKit looks when it refuses the first attempts and
 #                      serves a later one.
-#   FAKE_MOUNT_TABLE_SLOW  — seconds the mount-table read blocks for, which is
+#   FAKE_MOUNT_TABLE_SLOW: seconds the mount-table read blocks for, which is
 #                      how a volume hung in the kernel looks: the read is still
 #                      going when its bound expires.
-#   FAKE_MOUNT_FAIL_ONCE — the first mount-table read exits 1 and later reads
+#   FAKE_MOUNT_FAIL_ONCE: the first mount-table read exits 1 and later reads
 #                      succeed, so one row is undeterminable and the rest are
 #                      attempted against a readable table.
-#   FAKE_MOUNT_FAIL_AFTER — the first N mount-table reads succeed and every
+#   FAKE_MOUNT_FAIL_AFTER: the first N mount-table reads succeed and every
 #                      later one exits 1, so a table that is readable at the
 #                      decision probe and unreadable at the verify probe one
 #                      read later.
@@ -104,7 +104,7 @@ printf 'local.cloud-mount.OneDrive\t%s\n' "$FAKE_HOME/clouds/OneDrive" >>"$FAKE_
 cat >"$_tmp/bin/launchctl" <<'FAKE_LAUNCHCTL'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$FAKE_LAUNCHCTL_LOG"
-_attach() { # <label> — a restarted agent mounts its configured path
+_attach() { # <label>: a restarted agent mounts its configured path
   local _path
   _path="$(awk -v l="$1" '$1 == l { print $2 }' "$FAKE_MOUNT_MAP")"
   if [ -n "$_path" ]; then printf 'fake://vol on %s (macfuse)\n' "$_path" >>"$FAKE_MOUNTS"; fi
@@ -114,7 +114,7 @@ print)
   case "${2:-}" in
   system/*)
     # The FSKit daemon: it reports a pid, and a pid different from the one before
-    # only once it was killed — which is what fskit_restart_daemon waits for.
+    # only once it was killed, which is what fskit_restart_daemon waits for.
     if [ -f "$FAKE_DAEMON_KILLED" ]; then
       printf 'pid = %s\n' "$((2000 + $(wc -l <"$FAKE_LAUNCHCTL_LOG")))"
     else
@@ -276,7 +276,7 @@ export PATH
 # fake home, so the suite has to derive the same path the same way: with the fake
 # toolchain on PATH, with NUCLEUS_USER_ROOT cleared (run_repair unsets it for the
 # subprocess), and with the platform the repair will see. Deriving it against an
-# already-set NUCLEUS_USER_ROOT silently resolved — and reset_world deleted — the
+# already-set NUCLEUS_USER_ROOT silently resolved, and reset_world deleted, the
 # real user's service-health records, while the subprocess wrote to the fake home
 # instead, so no health assertion could observe the repair's own writes.
 FAKE_UNAME_S=Darwin
@@ -319,7 +319,7 @@ assert_untouched() { # <slug> <label>
   fi
 }
 
-# run_repair <args...> — invoke nucleus-cloud repair against the fixture repo.
+# run_repair <args...>: invoke nucleus-cloud repair against the fixture repo.
 # Prints the exit status; output is left in $_out.
 run_repair() {
   _rc=0
@@ -328,7 +328,7 @@ run_repair() {
   printf '%s' "$_rc"
 }
 
-# reset_world <loaded-labels...> — fresh state: nothing mounted, given labels loaded.
+# reset_world <loaded-labels...>: fresh state: nothing mounted, given labels loaded.
 reset_world() {
   : >"$FAKE_LAUNCHCTL_LOG"
   : >"$FAKE_ACTIONS"
@@ -354,7 +354,7 @@ reset_world() {
   export FAKE_UNAME_S
 }
 
-# mark_blocked <label> — a fresh blocked record, as the mount wrapper leaves it.
+# mark_blocked <label>: a fresh blocked record, as the mount wrapper leaves it.
 mark_blocked() {
   svc_health_set_blocked "$1" "fskit-provider" "run sudo killall fskitd"
 }
@@ -396,7 +396,7 @@ else
 fi
 assert_untouched "a disabled mount" local.cloud-mount.Disabled
 # WHY: the daemon restart is what unwedges FSKit, so it has to happen before any
-#   mount attempt — a start on a stale subsystem is what fails with status 3/4.
+#   mount attempt, a start on a stale subsystem is what fails with status 3/4.
 if [ "$(grep -n '^killall fskitd$' "$FAKE_ACTIONS" | head -n1 | cut -d: -f1)" = "1" ]; then
   assert_pass "the daemon restart comes before the mount restarts"
 else

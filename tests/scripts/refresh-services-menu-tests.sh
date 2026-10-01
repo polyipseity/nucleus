@@ -13,7 +13,7 @@
 # absolute path. Absolute paths cannot be intercepted from PATH, so the suite
 # prepends a stub uname that prints Linux: the composite becomes a no-op while
 # the script still reaches its console-user branch and rescan. That stub is
-# load-bearing — without it this suite would kill live services.
+# load-bearing: without it this suite would kill live services.
 #
 # Every stub lives in a mktemp tree. The suite never touches
 # ~/Library/Services, pbs, Finder, or any other system state.
@@ -50,7 +50,7 @@ fi
 
 # ---- Stubs ----
 
-# make_linux_uname <path> — prints Linux so refresh_services_menu's Darwin case
+# make_linux_uname <path>: prints Linux so refresh_services_menu's Darwin case
 # never matches and its absolute-path kills never run.
 make_linux_uname() {
   cat >"$1" <<'STUB'
@@ -60,7 +60,7 @@ STUB
   chmod +x "$1"
 }
 
-# make_recording_exec_launchctl <path> <log> — records its argv as one
+# make_recording_exec_launchctl <path> <log>: records its argv as one
 # space-joined line and then executes the command it was handed. Real launchctl
 # runs that command inside the target session, which is how the suite observes
 # the exact pbs binary the script chose. The six leading words are launchctl's
@@ -75,7 +75,7 @@ STUB
   chmod +x "$1"
 }
 
-# make_self_path_recorder <path> <marker> — records its own path, the way a real
+# make_self_path_recorder <path> <marker>: records its own path, the way a real
 # binary identifies which binary ran.
 make_self_path_recorder() {
   cat >"$1" <<STUB
@@ -85,7 +85,7 @@ STUB
   chmod +x "$1"
 }
 
-# make_exit_stub <path> <status> — executable that exits with a fixed status.
+# make_exit_stub <path> <status>: executable that exits with a fixed status.
 make_exit_stub() {
   cat >"$1" <<STUB
 #!/bin/sh
@@ -94,7 +94,7 @@ STUB
   chmod +x "$1"
 }
 
-# recorded_invocations <log> — how many invocations the recorder logged.
+# recorded_invocations <log>: how many invocations the recorder logged.
 recorded_invocations() {
   if [ -f "$1" ]; then
     wc -l <"$1" | tr -d ' '
@@ -103,7 +103,7 @@ recorded_invocations() {
   fi
 }
 
-# recorded_line <log> <n> — the n-th recorded invocation, empty when absent.
+# recorded_line <log> <n>: the n-th recorded invocation, empty when absent.
 recorded_line() {
   if [ -f "$1" ]; then
     sed -n "$2p" "$1"
@@ -180,7 +180,7 @@ test_rescan_call_site_is_wired() {
   local invocations
   invocations="$(recorded_invocations "$RUN_LOG")"
   # Zero invocations on a host with a console user means the rescan call is gone
-  # or its guard no longer fires — the exact regression the extracted-function
+  # or its guard no longer fires, the exact regression the extracted-function
   # suite cannot see.
   if [ "$invocations" -eq "$EXPECTED_INVOCATIONS" ]; then
     assert_pass "refresh-services-menu.sh records $EXPECTED_INVOCATIONS launchctl invocation(s) on the $BRANCH"
@@ -196,7 +196,7 @@ test_rescan_exact_argv() {
   local recorded
   recorded="$(recorded_line "$RUN_LOG" 1)"
   # Full-string equality, not a prefix test: the whole line is the contract, so
-  # reordering the uid/sudo/user arguments — or dropping -update — shows up here.
+  # reordering the uid/sudo/user arguments, or dropping -update, shows up here.
   if [ "$recorded" = "$EXPECTED_LINE" ]; then
     assert_pass "refresh-services-menu.sh passes asuser <uid> <sudo> -H -u <user> <pbs> -update"
   else

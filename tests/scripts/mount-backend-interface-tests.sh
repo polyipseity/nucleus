@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# mount-backend-interface-tests.sh — the real backends define every name the
+# mount-backend-interface-tests.sh: the real backends define every name the
 # runner calls.
 #
 # rclone-mount-tests.sh checks the same eight inside install_mocks, which defines
-# them itself — which is how backend_probe could be dropped from the Linux
+# them itself, which is how backend_probe could be dropped from the Linux
 # backend and leave that check green. This suite mocks nothing: it asks only
 # whether the name exists, not what it does.
 #
@@ -37,7 +37,7 @@ _INTERFACE_NAMES=(
 # WHY a subshell per backend, and never two backends in one shell. They define
 # the same names, so a second source answers for the first and a backend that
 # never sourced would be reported complete.
-_defined_by() { # <backend file> <name>... — the names the backend defines
+_defined_by() { # <backend file> <name>...: the names the backend defines
   local _file="$1"
   shift
   (
@@ -58,7 +58,7 @@ _defined_by() { # <backend file> <name>... — the names the backend defines
 # WHY the canary tests sourcing, not a name. A name-based probe reports a
 # sourcing failure as a missing interface the day that name is deleted as dead
 # code; what a backend owes is a clean source and functions, not any one name.
-_sourced_by() { # <backend file> — 0 when it sources and adds a function
+_sourced_by() { # <backend file>: 0 when it sources and adds a function
   local _file="$1"
   (
     local _before _after

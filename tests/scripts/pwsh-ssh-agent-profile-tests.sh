@@ -23,7 +23,7 @@ PS_SOCKET_STATE='if ($null -eq $env:SSH_AUTH_SOCK) { "absent" } else { $env:SSH_
 # shellcheck disable=SC2016 # reason: PowerShell variable references, not shell expansion
 PS_TTY_STATE='if ($null -eq $env:GPG_TTY) { "absent" } else { $env:GPG_TTY }'
 
-# make_profile <ssh-auth-sock-value> — substitute the tokens, write the result to
+# make_profile <ssh-auth-sock-value>: substitute the tokens, write the result to
 # a temporary .ps1 (pwsh hands an extensionless path to the macOS document
 # handler instead of dot-sourcing it) and print its path.
 #
@@ -49,7 +49,7 @@ make_profile() {
   printf '%s\n' "$_out"
 }
 
-# discard_profile <profile> — remove the temporary directory the profile lives in.
+# discard_profile <profile>: remove the temporary directory the profile lives in.
 discard_profile() {
   rm -rf "$(dirname -- "$1")"
 }

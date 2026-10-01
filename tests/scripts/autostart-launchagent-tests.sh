@@ -4,7 +4,7 @@
 #
 # The regression this guards: parsing only the ProgramArguments array left an
 # app-owned plist that declares the scalar <key>Program</key> (AltTab) registered,
-# so the app started twice — once from its own agent and once from ours.
+# so the app started twice, once from its own agent and once from ours.
 #
 # Also guards FSKit file-system extensions: they are invisible to
 # systemextensionsctl, and PluginKit rejects a module that is not inside a
@@ -215,7 +215,7 @@ PLIST
 PLIST
 }
 
-# run_autostart ACTION APP OUT_FILE [FSKIT_MODULE_LISTED] [HOST] — run one
+# run_autostart ACTION APP OUT_FILE [FSKIT_MODULE_LISTED] [HOST]: run one
 # autostart action against the fixture repo with the macOS-only externals stubbed
 # so the run is hermetic. FSKIT_MODULE_LISTED selects the FSKit enabled-module list
 # the probe reads: "true" names the macFUSE module, "other" names a different

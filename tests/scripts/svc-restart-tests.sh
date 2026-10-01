@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests for the launchd unload/bootstrap handoff in
-# src/scripts/lib/macos-launch-services.sh — the macOS >= 26 asynchronous
+# src/scripts/lib/macos-launch-services.sh: the macOS >= 26 asynchronous
 # `bootout` race that left a managed service unloaded and silent: `bootstrap`
 # issued right after `bootout` fails with "Bootstrap failed: 5: Input/output
 # error" because the job is still loaded, and the pending unload then removes it
@@ -35,16 +35,16 @@ export FAKE_LOG FAKE_STATE FAKE_PENDING FAKE_BOOTSTRAP_CALLS
 
 # --- Fake service manager -----------------------------------------------------
 # Models only the behaviour the race depends on.
-#   print      — reports the job while `state` is `loaded`; a pending unload
+#   print: reports the job while `state` is `loaded`; a pending unload
 #                (`FAKE_BOOTOUT_DELAY` probes) flips the state to `absent` once
 #                it is spent, which is how an asynchronous `bootout` looks.
-#   bootout    — queues that pending unload instead of completing immediately.
-#   bootstrap  — returns the real macOS code 5 when the job is still loaded, and
+#   bootout: queues that pending unload instead of completing immediately.
+#   bootstrap: returns the real macOS code 5 when the job is still loaded, and
 #                loads it otherwise. FAKE_CONFLICT_ONCE limits that to the first
 #                attempt (the case where `print` cannot see the real state and
 #                only a retry saves the reload), and FAKE_BOOTSTRAP_FAIL forces a
 #                non-race failure whose message must survive to the caller.
-#   sleep      — instant so the bounded poll costs no wall-clock time.
+#   sleep: instant so the bounded poll costs no wall-clock time.
 cat >"$_tmp/bin/launchctl" <<'FAKE_LAUNCHCTL'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >>"$FAKE_LOG"
@@ -106,7 +106,7 @@ _TARGET="gui/501/local.cloud-mount.OneDrive"
 _PLIST="/Users/example/Library/LaunchAgents/local.cloud-mount.OneDrive.plist"
 _DOMAIN="gui/501"
 
-# reset_fixture <loaded|absent> — fresh fake state and call log per assertion.
+# reset_fixture <loaded|absent>: fresh fake state and call log per assertion.
 reset_fixture() { # <state>
   printf '%s\n' "$1" >"$FAKE_STATE"
   printf '0\n' >"$FAKE_PENDING"
@@ -124,12 +124,12 @@ bootstrap_calls() {
   fi
 }
 
-# count_calls <command> — how many times the fake recorded that command.
+# count_calls <command>: how many times the fake recorded that command.
 count_calls() {
   awk -v pat="^$1" '$0 ~ pat { n++ } END { print n + 0 }' "$FAKE_LOG"
 }
 
-# contains <text> <needle> — substring test, kept out of an `if` condition so
+# contains <text> <needle>, substring test, kept out of an `if` condition so
 # the surrounding `case` cannot be confused with shfmt's list parsing.
 contains() {
   case "$1" in
@@ -445,7 +445,7 @@ FAKE
 chmod +x "$_cli/bin/launchctl" "$_cli/bin/mount" "$_cli/bin/sleep" \
   "$_cli/bin/plutil" "$_cli/bin/sudo" "$_cli/bin/killall"
 
-# run_cli — Run the CLI against the stub registry with the fakes on PATH.
+# run_cli: Run the CLI against the stub registry with the fakes on PATH.
 run_cli() { # <svc.sh args...>
   env NUCLEUS_HOST=MacBook \
     NUCLEUS_REPO_ROOT="$_cli/repo" \
@@ -474,12 +474,12 @@ reset_cli() { # <job state> <mount table> <release after>
   captured_output="$(run_cli "${@:4}" 2>&1)" || captured_status=$?
 }
 
-# timeline_index — First line number of a timeline entry (0 when absent).
+# timeline_index: First line number of a timeline entry (0 when absent).
 timeline_index() { # <substring>
   awk -v pat="$1" 'index($0, pat) { print NR; exit } END { if (NR == 0) print 0 }' "$FAKE_TIMELINE"
 }
 
-# _fskit_killcount — how many times the FSKit subsystem was signalled.
+# _fskit_killcount: how many times the FSKit subsystem was signalled.
 _fskit_killcount() {
   grep -c '^killall fskitd' "$FAKE_TIMELINE"
 }
@@ -576,7 +576,7 @@ assert_count "an unblocked restart never restarts the FSKit daemon" 0 "$(_fskit_
 section 9 "A cloud mount whose volume never comes back fails the restart"
 
 # WHY: the agent exits 0 when the provider refuses the volume, so the volume —
-# not the job's state — is what decides whether the restart worked.
+# not the job's state, is what decides whether the restart worked.
 FAKE_MOUNT_APPEAR_AFTER=""
 reset_cli stopped "$_cli_mount" 2 restart local.cloud-mount.iCloud
 assert_count "a volume that never attaches fails the restart" 1 "$captured_status"

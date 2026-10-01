@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # WHY: the runner detects "this step had nothing in scope" by matching the
-# message text (`0 <thing> in scope — …`). That couples the runner to prose, so
+# message text (`0 <thing> in scope; …`). That couples the runner to prose, so
 # rewording any such message would silently disable the replay and the run would
 # go back to showing a ✓ beside a step that did no work. This suite makes the
 # coupling an enforced invariant instead: it asserts the runner's behaviour
@@ -135,7 +135,7 @@ test_predicate_matches_a_labelled_production_line() {
 # fixture is a labelled line carrying no count at all, so it exercises the
 # "not a no-scope report" verdict rather than anything about anchors. Note the
 # shipped pattern keeps a `^0` alternative, so a bare `0 <thing> in scope` line
-# is still a match — that is intended, and a separate test covers it.
+# is still a match, that is intended, and a separate test covers it.
 test_predicate_ignores_an_ordinary_labelled_line() {
   local _tmp _result
   _tmp="$(mktemp -d)"

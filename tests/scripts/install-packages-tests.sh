@@ -274,7 +274,7 @@ test_cargo_binstall_passes_version_pins() {
   # `cargo uninstall` against their installed crates. CARGO_HOME must be
   # neutralised too: cargo resolves CARGO_HOME ahead of $HOME/.cargo, so
   # setting HOME alone still leaks the real crate set when the operator has
-  # CARGO_HOME exported. No cargo stub exists here — the real binary runs.
+  # CARGO_HOME exported. No cargo stub exists here, the real binary runs.
   # Mirrors the HOME="$tmp" guard the bun and pi cases already use.
   if HOME="$tmp" CARGO_HOME="$tmp/.cargo" run_pkg_script install-cargo-binstall-packages.sh "$tmp" \
     "$(command -v jq)" "$(command -v awk)" \

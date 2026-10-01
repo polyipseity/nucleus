@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for src/scripts/lib/service-health.sh — the single per-instance health
+# Tests for src/scripts/lib/service-health.sh, the single per-instance health
 # record: its canonical schema, the loop policy it enforces, and the re-arm
 # semantics every caller depends on.  Assertions describe that contract, not
 # whatever state this host happens to hold: the suite runs against a temp
@@ -32,14 +32,14 @@ assert_eq() { # <name> <expected> <actual>
   fi
 }
 
-# rec <instance> <jq expression> — raw field access direct from the file, so a
+# rec <instance> <jq expression>, raw field access direct from the file, so a
 # null reads back as `null` rather than as the empty string svc_health_get
 # renders it to.  Distinguishing the two is the point of the sentinel section.
 rec() { # <instance> <expr>
   jq -r "$2" "$(svc_health_state_file "$1")" 2>/dev/null || printf 'missing'
 }
 
-# record_rc <instance> <field> <value> — svc_health_set's status, without
+# record_rc <instance> <field> <value>: svc_health_set's status, without
 # tripping `set -e` on the failure cases the suite asserts on.
 record_rc() { # <instance> <field> <value>
   local _rc=0
@@ -65,13 +65,13 @@ is_reported_rc() { # <instance> <expected>
   printf '%s' "$_rc"
 }
 
-looping_of() { # <instance> — "yes"/"no", the predicate every caller acts on
+looping_of() { # <instance>: "yes"/"no", the predicate every caller acts on
   if svc_health_is_looping "$1"; then printf 'yes'; else printf 'no'; fi
 }
 
 status_of() { svc_health_status "$1"; }
 
-# seed_record <instance> <restartCount> <lastSuccess> — write a canonical record
+# seed_record <instance> <restartCount> <lastSuccess>: write a canonical record
 # whose restarts all sit inside the last hour, so loop-boundary cases are built
 # from real timestamps instead of hand-edited JSON.
 seed_record() { # <instance> <restartCount> <lastSuccess>
@@ -103,7 +103,7 @@ assert_eq "init creates the record file" "0" \
   "$([ -f "$(svc_health_state_file "$_crud")" ] && printf '0' || printf '1')"
 
 # A reader may index any documented field, so every one must exist from the
-# first write — an absent key is a missing field, not a null one.
+# first write, an absent key is a missing field, not a null one.
 for _field in state class remedy attempts reportedState boot lastSuccess restarts generation lastExit; do
   if jq -e --arg f "$_field" 'has($f)' "$(svc_health_state_file "$_crud")" >/dev/null 2>&1; then
     assert_pass "the record carries '$_field'"
@@ -434,8 +434,8 @@ section 10 "The boot identity tracks the OS, so a reboot can clear a block"
 # svc_health_boot_id must ASK THE OS on every call.  It previously cached the
 # answer in <state dir>/.boot-id and read it back forever, so the value could not
 # change across a reboot and the documented reboot-clears-a-block path was
-# unreachable.  Only the OS probe is stubbed here — a test cannot reboot the
-# host — and every other line runs the real implementation.
+# unreachable.  Only the OS probe is stubbed here, a test cannot reboot the
+# host, and every other line runs the real implementation.
 _boot_dir="$(svc_health_state_dir)"
 rm -f "$_boot_dir/.boot-id"
 

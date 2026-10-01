@@ -22,7 +22,7 @@ readonly CONFIG_SH
 
 require_command jq "the config CLI parses JSON with jq"
 
-# _cfg HOME ARGS... — run the CLI against an isolated config file. The script
+# _cfg HOME ARGS...: run the CLI against an isolated config file. The script
 # resolves the config path from HOME at startup, so a per-test HOME is the whole
 # isolation boundary.
 _cfg() { # <home> <args...>
@@ -39,7 +39,7 @@ _new_home() {
   mktemp -d
 }
 
-# _t_get_prints_default_false — the headline case: a default-off boolean.
+# _t_get_prints_default_false: the headline case: a default-off boolean.
 _t_get_prints_default_false() {
   local home out rc=0
   home="$(_new_home)"
@@ -52,7 +52,7 @@ _t_get_prints_default_false() {
   fi
 }
 
-# _t_get_prints_user_false — a false written by the user, through `set` as the
+# _t_get_prints_user_false: a false written by the user, through `set` as the
 # MANUALs instruct, so the round trip is covered end to end.
 _t_get_prints_user_false() {
   local home out rc=0

@@ -18,7 +18,7 @@ SSOT="src/modules/lib/env-secrets.nix"
 
 require_command git "the citation scan enumerates tracked files with git grep"
 
-# This file names the dead filename twice by design — once in the header that
+# This file names the dead filename twice by design, once in the header that
 # explains the defect, once in the DEAD_FILENAME constant that drives the scan.
 # Both scans therefore exclude this path explicitly. Without the exclusion the
 # suite is green only while the file is untracked, because `git grep` reads
@@ -34,7 +34,7 @@ _dead_citations() {
 
 # Rule B. Rule A forbids only the one filename this branch happened to rename.
 # A rename can equally break a .json, .yml or .ps1 reference and Rule A would
-# stay silent — which is how the parked Sync-LiteLLMService finding survived a
+# stay silent, which is how the parked Sync-LiteLLMService finding survived a
 # review that had already looked at this file. This rule forbids `env-catalog`
 # followed by a file extension (a path reference) while leaving the bare
 # concept alone, because "services, env-catalog, config paths" in

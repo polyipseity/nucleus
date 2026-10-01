@@ -28,7 +28,7 @@ readonly SKIP_SIGNAL
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "$WORK_DIR"' EXIT
 
-# scan MODE FILE... — print the scan's stdout for MODE.  The exit status is
+# scan MODE FILE...: print the scan's stdout for MODE.  The exit status is
 # discarded on purpose: the consumers are process substitutions that read only
 # stdout, so the output is the only observable a rule can fire through.
 scan() {
@@ -76,7 +76,7 @@ test_awk_program_compiles() {
   fi
 }
 
-# assert_mode_reports NAME MODE FILE EXPECTED — the rule must print a line
+# assert_mode_reports NAME MODE FILE EXPECTED: the rule must print a line
 # carrying EXPECTED for the fixture that violates it.
 assert_mode_reports() {
   local _name="$1" _mode="$2" _file="$3" _expected="$4" _out

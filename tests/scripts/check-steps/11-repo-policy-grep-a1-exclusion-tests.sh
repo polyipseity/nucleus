@@ -10,7 +10,7 @@
 #
 # WHY this asserts absence rather than evaluating a guard: the self-prune was
 # removed, so there is no control flow left to execute. A test that extracted
-# and ran the block would evaluate nothing and pass for any input — the
+# and ran the block would evaluate nothing and pass for any input, the
 # non-discriminating-assertion shape this project has produced repeatedly.
 # Pinning the absence is the only assertion with a reachable failure mode.
 #
@@ -39,14 +39,14 @@ assert_fail() {
   fail_count=$((fail_count + 1))
 }
 
-# extract_pme_sh — the POSIX package-manager enforcement function, from its
+# extract_pme_sh: the POSIX package-manager enforcement function, from its
 # opening brace to the line that closes it. The self-prune lived inside this
 # function and nowhere else.
 extract_pme_sh() {
   awk '/^run_package_manager_enforcement\(\) \{$/ {grab=1} grab {print} grab && /^\}$/ {exit}' "$STEP_SH"
 }
 
-# extract_pme_ps1 — the PowerShell package-manager section, from its header to
+# extract_pme_ps1: the PowerShell package-manager section, from its header to
 # the next section header.
 extract_pme_ps1() {
   awk '/# --- Package manager enforcement ---/ {grab=1} grab {print} grab && /# --- Suppression audit ---/ {exit}' "$STEP_PS1"

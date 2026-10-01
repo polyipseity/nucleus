@@ -75,7 +75,7 @@ test_short_command_is_reported() {
 
 # Two runs over the same tree must agree. The candidate list is built by find,
 # whose sibling order is filesystem-dependent, so without an explicit sort the
-# scanned set — and therefore the report — is not reproducible.
+# scanned set, and therefore the report, is not reproducible.
 test_scan_is_deterministic() {
   local _root _first _second
   _root=$(make_fixture '  ip link show wlan0')
@@ -119,7 +119,7 @@ test_one_line_case_does_not_blind() {
 # Per-file state must reset. The first script ends with a multi-line `case`
 # whose esac is absent, so the parser leaves case_depth raised at EOF. With no
 # FNR == 1 reset the second script is skipped wholesale by the case_depth rule
-# — the same mechanism as the original blind spot. The leaking file must sort
+#, the same mechanism as the original blind spot. The leaking file must sort
 # first, and candidates are sorted by path, so it lives in agents/, which
 # precedes configs/.
 test_state_resets_between_files() {

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Tests for the BetterDisplay headless virtual-screen specification:
-#   macos-configure-headless-display.sh — the create path
-#   macos-heartbeat-betterdisplay.sh     — the 60 s reconcile/recreate path
-#   macos-display-resolutions.sh         — the exclusion that keeps the virtual
+#   macos-configure-headless-display.sh: the create path
+#   macos-heartbeat-betterdisplay.sh: the 60 s reconcile/recreate path
+#   macos-display-resolutions.sh: the exclusion that keeps the virtual
 #                                          screen out of external-monitor matching
 #
 # The two create sites MUST agree on the virtual-screen parameters: the

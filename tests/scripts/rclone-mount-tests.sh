@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# rclone-mount-tests.sh — tests for the rewritten cloud-mount core runner.
+# rclone-mount-tests.sh: tests for the rewritten cloud-mount core runner.
 #
 # The runner (src/scripts/services/rclone-mount.sh) dispatches to mount-backend-
 # darwin.sh or mount-backend-linux.sh, uses svc_health_* for health records, and
@@ -9,13 +9,13 @@
 # blocked record, and health record lifecycle.
 #
 # Exit contract:
-#   0 — the ONLY exit for every failure path: backend_prepare failure, a
+#   0: the ONLY exit for every failure path: backend_prepare failure, a
 #       pre-existing block, a terminal class, and exhausted retries. Returning
-#       non-zero would be read by the supervisor as "start it again" — the
+#       non-zero would be read by the supervisor as "start it again", the
 #       restart storm this runner exists to prevent (src/scripts/services/
 #       rclone-mount.sh:33 explains this). Verify failure by reading the health
 #       record's state/class/remedy, NEVER by the exit code.
-#   <watch_status> — the only non-zero exit: the mount attached, then the rclone
+#   <watch_status>: the only non-zero exit: the mount attached, then the rclone
 #       process died; its status is propagated verbatim (rclone-mount.sh:179).
 #   NOT returned: 1 / 2 / 3 / 20. Those were the contract of an earlier runner.
 # shellcheck shell=bash
@@ -107,7 +107,7 @@ STUB
 }
 
 # ── Setup helpers ────────────────────────────────────────────────────────────
-# create_home — minimal HOME with mount-point directory and nucleus root.
+# create_home: minimal HOME with mount-point directory and nucleus root.
 create_home() {
   local h
   h="$(mktemp -d)"
@@ -117,7 +117,7 @@ create_home() {
   printf '%s' "$h"
 }
 
-# setup_env — common env vars for the runner.
+# setup_env: common env vars for the runner.
 # Args: $1 = home, $2 = fake rclone bin dir
 setup_env() {
   HOME="$1"
@@ -144,18 +144,18 @@ setup_env() {
     NUCLEUS_USER_ROOT FAKE_HEALTH_FILE
 }
 
-# health_file — path to the health record for the current test instance.
+# health_file: path to the health record for the current test instance.
 # One spelling, also handed to the fake rclone by setup_env.
 health_file() {
   printf '%s' "$FAKE_HEALTH_FILE"
 }
 
-# health_field — read a single field from the health record via jq.
+# health_field: read a single field from the health record via jq.
 health_field() {
   jq -r ".$1 // empty" "$(health_file)" 2>/dev/null
 }
 
-# run_main — invoke _cm_main in a subshell with the mocked backend functions.
+# run_main: invoke _cm_main in a subshell with the mocked backend functions.
 # The runner's _cm_main calls `exit` to propagate the runner's exit code; wrapping
 # in a subshell confines that exit so finish_tests can still run.
 # Pre-set sourcing guards so _cm_dispatch_backend inside _cm_main does not
@@ -222,7 +222,7 @@ run_main() {
 # _cm_dispatch_backend would source.  Since we never call _cm_dispatch_backend,
 # we define the interface ourselves.
 
-# install_mocks — export mock functions so they override the real ones.
+# install_mocks: export mock functions so they override the real ones.
 install_mocks() {
   backend_prepare() { MOCK_BACKEND_PREPARE "$@"; }
   backend_args() { MOCK_BACKEND_ARGS "$@"; }
@@ -238,7 +238,7 @@ install_mocks() {
     backend_remedy
 }
 
-# restore_default_mocks — the suite's default mocks, in the one place both the
+# restore_default_mocks: the suite's default mocks, in the one place both the
 # suite's own starting state and a test's tail get them from. A test that
 # overrides a mock calls this instead of copying the default back: a hand copy
 # keeps working when the default here changes, so the edit the copy exists to
@@ -260,7 +260,7 @@ restore_default_mocks() {
     "$rclone_bin" mount "$@" 2>"$_backend_capture" &
     _backend_rclone_pid=$!
   }
-  # MOCK_BACKEND_PROBE_STATE — the mount table's three-valued answer: present, an
+  # MOCK_BACKEND_PROBE_STATE: the mount table's three-valued answer: present, an
   # absent:<reason>, or an unknown:<reason>. The attach wait loop reads this, not
   # MOCK_BACKEND_PROBE, because a zero return cannot tell a mount that is present
   # from a table that could not be read.
@@ -287,7 +287,7 @@ restore_default_mocks() {
       printf 'absent:not-listed\n'
     fi
   }
-  # MOCK_BACKEND_PROBE — the two-valued view, answering the way
+  # MOCK_BACKEND_PROBE: the two-valued view, answering the way
   # svc_mount_table_contains answers, so the mock carries the same contract the
   # Linux backend's probe does: a table that could not be read returns 0. That
   # 0 is correct for a caller that acts on the answer, and it is why the attach
@@ -305,7 +305,7 @@ restore_default_mocks() {
     return 1 # terminal by default
   }
   MOCK_BACKEND_UNMOUNT() { return 0; }
-  # MOCK_BACKEND_REMEDY — the eighth member of the backend interface. It must
+  # MOCK_BACKEND_REMEDY: the eighth member of the backend interface. It must
   # exist: without it the runner's `remedy="$(backend_remedy "$class")"` is a
   # command-not-found that the suite's `run_main 2>/dev/null || rc=$?` swallows
   # (the `||` also disables `set -e` for the whole call), so the record was
@@ -708,7 +708,7 @@ test_successful_mount_clears_a_stale_evidence_pointer() {
 
   # WHY this guard is a field check and not a return-code check: a value jq
   #   cannot parse makes svc_health_set return 1, and under `set -e` that aborts
-  #   the suite on the line above — loud, not vacuous. What does pass vacuously
+  #   the suite on the line above, loud, not vacuous. What does pass vacuously
   #   is a seed jq accepts and stores nothing, which is what this catches.
   [ -n "$(svc_health_get "$NUCLEUS_CLOUD_MOUNT_INSTANCE" evidence)" ] ||
     assert_fail "stale-evidence-not-seeded" "the seeded pointer never landed, so the clear asserted below would pass on an empty field"
@@ -964,7 +964,7 @@ test_unconfigured_remote_exits_0() {
   local rc=0
   run_main 2>/dev/null || rc=$?
 
-  # Runner does not check remote config — mount proceeds regardless.
+  # Runner does not check remote config, mount proceeds regardless.
   # The claim is that the runner does not gate on the remote being configured,
   # so what must be observed is the mount proceeding -- not rc, which is 0
   # whether or not it did.
@@ -1182,8 +1182,8 @@ test_prepare_failure_writes_blocked() {
 
 test_prepare_default_restored_after_failure_tests() {
   # Runs immediately after the two prepare-failure tests. Before their fix,
-  # MOCK_BACKEND_PREPARE still returned 20 here — the default is a load-time
-  # statement, not part of install_mocks — so every test appended afterwards
+  # MOCK_BACKEND_PREPARE still returned 20 here, the default is a load-time
+  # statement, not part of install_mocks, so every test appended afterwards
   # inherited a failing prepare. This assertion is what notices that leak.
   local label="MOCK_BACKEND_PREPARE default restored after the prepare-failure tests"
   if MOCK_BACKEND_PREPARE; then
@@ -1195,7 +1195,7 @@ test_prepare_default_restored_after_failure_tests() {
 
 # ── Real-backend argument-vector harness (section 22) ────────────────────────
 # Sections 1-7 mock backend_mount with a VERBATIM COPY of the production body,
-# and setup_fake_rclone records "$*" — every argument joined by spaces.
+# and setup_fake_rclone records "$*", every argument joined by spaces.
 # A collapsed argument vector is therefore indistinguishable from a correct one:
 # the blob still contains the remote and the mount point as substrings, so a
 # `grep -qF` assertion passes.  That is how a one-blob argv shipped unnoticed.
@@ -1207,7 +1207,7 @@ test_prepare_default_restored_after_failure_tests() {
 #     library, so the argument assembly in rclone-mount.sh is genuinely
 #     exercised rather than re-implemented by the mock.
 
-# setup_argv_recorder — rclone shim that records argc and each argument
+# setup_argv_recorder: rclone shim that records argc and each argument
 # verbatim, escaping embedded newlines so one argument never spans two lines.
 setup_argv_recorder() {
   local dir
@@ -1228,7 +1228,7 @@ STUB
   printf '%s' "$dir"
 }
 
-# run_main_real_backend — run _cm_main with the REAL backend_args and REAL
+# run_main_real_backend: run _cm_main with the REAL backend_args and REAL
 # backend_mount from the named backend library, overriding only the
 # OS-dependent predicates (probe/class/transient/unmount).
 #
@@ -1277,12 +1277,12 @@ run_main_real_backend() {
   )
 }
 
-# argv_field — read a recorded field from the argv file.
+# argv_field: read a recorded field from the argv file.
 argv_field() {
   sed -n "s/^$1=//p" "$ARGV_FILE" | head -1
 }
 
-# assert_real_backend_argv — assert the argument vector reaching the recorder.
+# assert_real_backend_argv: assert the argument vector reaching the recorder.
 # Args: $1 = label, $2 = expected remote, $3 = expected mount point.
 assert_real_backend_argv() {
   local label="$1" want_remote="$2" want_point="$3"
@@ -1315,7 +1315,7 @@ assert_real_backend_argv() {
   assert_pass "$label: argc=$argc, remote and space-containing mount point are each one argument"
 }
 
-# real_backend_case — drive the real backend with a space-containing mount point.
+# real_backend_case: drive the real backend with a space-containing mount point.
 # Args: $1 = backend library basename, $2 = label.
 real_backend_case() {
   local backend_name="$1" label="$2"
@@ -1362,11 +1362,11 @@ section "23" "declared backoff schedule (single policy, clamped)"
 #
 # Reachability: the retry loop sleeps only while `attempt < attempts`, so with the
 # declared values (mountAttempts 3, schedule [20, 40]) both hosts sleep on attempts 1 and 2
-# only — inside the list, where they already agree.  The divergence is therefore
+# only, inside the list, where they already agree.  The divergence is therefore
 # LATENT, not live: it arms the moment `mountAttempts` is raised past len(schedule) + 1.
 # The rule is asserted directly below so the landmine cannot arm silently.
 
-# backoff_values — print "<attempt> <seconds>" for each attempt the declared policy
+# backoff_values: print "<attempt> <seconds>" for each attempt the declared policy
 # runs.  Sources the runner in a subshell so _cm_get_backoff is the REAL
 # implementation rather than a re-statement of it.
 backoff_values() {

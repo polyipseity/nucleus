@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for do_strip_metadata in scripts/utils.sh — the function behind
+# Tests for do_strip_metadata in scripts/utils.sh, the function behind
 # `nucleus-utils strip-metadata`, which the macOS "strip metadata" Quick
 # Action, the NixOS file-manager integrations, and the Windows context-menu
 # entries all call.
@@ -11,7 +11,7 @@
 #     stderr, so the dialog is the ONLY feedback the user can see. A message the
 #     user never sees is indistinguishable from a broken action, which is why
 #     the aggregation contract is pinned here rather than in a terminal;
-#   * one dialog per run — not one per skipped file, and not none — is the part
+#   * one dialog per run, not one per skipped file, and not none, is the part
 #     that is invisible from a shell and obvious in the GUI, so every case
 #     asserts the dialog COUNT as well as its text;
 #   * the report must travel as argv: spliced into the AppleScript source, a
@@ -88,10 +88,10 @@ error() {
 # shellcheck disable=SC2329 # reason: invoked from the eval'd do_strip_metadata body
 _error_report() { error "$@"; }
 
-# make_osascript_stub <path> <log> — executable `osascript` stand-in. It records
+# make_osascript_stub <path> <log>: executable `osascript` stand-in. It records
 # one line per invocation: `CALL` followed by `|`-separated argv, with the final
 # field always the message body. Each argument's newlines are escaped so one
-# invocation stays one line — a multi-line body would otherwise spill across
+# invocation stays one line, a multi-line body would otherwise spill across
 # records and truncate every later assertion at its first line. The field layout
 # is what lets a case assert both what the dialog says and which argv slot
 # carries the paths: the difference between a body passed as an argument and
@@ -111,7 +111,7 @@ STUB
   chmod +x "$1"
 }
 
-# make_exit_stub <path> <name> <log> <status> — executable tool stand-in that
+# make_exit_stub <path> <name> <log> <status>: executable tool stand-in that
 # records its own invocation and exits with <status>.
 make_exit_stub() {
   cat >"$1" <<STUB
@@ -122,7 +122,7 @@ STUB
   chmod +x "$1"
 }
 
-# make_fixture_toolchain <bin-dir> <log-prefix> <exiftool-status> — the two
+# make_fixture_toolchain <bin-dir> <log-prefix> <exiftool-status>: the two
 # strippers the function resolves with command -v, plus the notifier. mat2 and
 # exiftool are stubs so no fixture is really rewritten. WARN_LOG/ERROR_LOG are
 # pointed inside the case's tree so the extracted function's warn/error calls are
@@ -136,10 +136,10 @@ make_fixture_toolchain() {
   ERROR_LOG="$2.errors"
 }
 
-# make_file <path> — an input file with distinguishable content.
+# make_file <path>: an input file with distinguishable content.
 make_file() { printf 'fixture\n' >"$1"; }
 
-# run_strip_metadata <bin-dir> <args...> — run the extracted function in a
+# run_strip_metadata <bin-dir> <args...>: run the extracted function in a
 # subshell whose PATH starts with the stub bin directory, so command -v resolves
 # the stubs and the suite's own exports stay out of its environment.
 run_strip_metadata() {
@@ -152,7 +152,7 @@ run_strip_metadata() {
   )
 }
 
-# dialog_count <log> — invocations that asked for a modal dialog (as opposed to
+# dialog_count <log>: invocations that asked for a modal dialog (as opposed to
 # a transient notification).
 dialog_count() {
   local _n=0
@@ -163,7 +163,7 @@ dialog_count() {
   printf '%s' "$_n"
 }
 
-# dialog_body <log> — the message body of the last dialog invocation, empty
+# dialog_body <log>: the message body of the last dialog invocation, empty
 # when no dialog was requested. Reading the dialog record by kind instead of by
 # position keeps the assertions independent of how many notifications the same
 # run also emits.
@@ -173,7 +173,7 @@ dialog_body() {
   fi
 }
 
-# dialog_script_text <log> — the `-e` AppleScript source of the last dialog
+# dialog_script_text <log>: the `-e` AppleScript source of the last dialog
 # invocation: everything except the argv-only body.
 dialog_script_text() {
   if [ -f "$1" ]; then
@@ -181,7 +181,7 @@ dialog_script_text() {
   fi
 }
 
-# notification_body <log> — the message body of the last notification
+# notification_body <log>: the message body of the last notification
 # invocation, empty when none was posted.
 notification_body() {
   if [ -f "$1" ]; then
@@ -189,7 +189,7 @@ notification_body() {
   fi
 }
 
-# bullet_count <text> — how many list entries the report body carries.
+# bullet_count <text>: how many list entries the report body carries.
 bullet_count() {
   local _n=0
   # check-suppress:suppression_doc: grep exits 1 when nothing matches, which is the zero-count branch.
@@ -418,7 +418,7 @@ section 4 "Usage line"
 
 # The usage line is the one place the command names itself, and the completion
 # generator parses it (`usage: <name> <spec>`), so the name must come from the
-# script path — `basename "$$0"` printed the process id there instead.
+# script path; `basename "$$0"` printed the process id there instead.
 test_usage_line_names_the_script() {
   local work out status=0 first prog
   work="$(mktemp -d)"

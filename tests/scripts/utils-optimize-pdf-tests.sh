@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for do_optimize_pdf in scripts/utils.sh — the function behind the
+# Tests for do_optimize_pdf in scripts/utils.sh, the function behind the
 # `nucleus-utils optimize-pdf` subcommand that the macOS "optimize PDF" Quick
 # Action runs.
 #
@@ -69,7 +69,7 @@ error() {
   fi
 }
 
-# make_gs_stub <path> <argv_log> <exit_status> <payload> — executable `gs`
+# make_gs_stub <path> <argv_log> <exit_status> <payload>: executable `gs`
 # stand-in. It records the path it was invoked as plus its argv, writes
 # <payload> to the path named by its own -sOutputFile= argument (a real gs
 # writes the optimized PDF there), and exits with <exit_status>. Recording the
@@ -88,7 +88,7 @@ STUB
   chmod +x "$1"
 }
 
-# recorded_invocations <log> — how many invocations the recorder logged.
+# recorded_invocations <log>: how many invocations the recorder logged.
 recorded_invocations() {
   if [ -f "$1" ]; then
     wc -l <"$1" | tr -d ' '
@@ -97,14 +97,14 @@ recorded_invocations() {
   fi
 }
 
-# recorded_line <log> <n> — the n-th recorded invocation, empty when absent.
+# recorded_line <log> <n>: the n-th recorded invocation, empty when absent.
 recorded_line() {
   if [ -f "$1" ]; then
     sed -n "$2p" "$1"
   fi
 }
 
-# file_content <path> — the file's contents with the trailing newline dropped,
+# file_content <path>: the file's contents with the trailing newline dropped,
 # empty when the file is missing. A missing output then reads as a mismatch
 # instead of aborting the suite.
 file_content() {
@@ -113,7 +113,7 @@ file_content() {
   fi
 }
 
-# run_optimize_pdf <stub_dir> <tmpdir> <args...> — run the extracted function in
+# run_optimize_pdf <stub_dir> <tmpdir> <args...>: run the extracted function in
 # a subshell whose PATH starts with the stub bin directory and whose TMPDIR
 # points inside the case's mktemp tree. The subshell keeps both exports out of
 # the suite, and the explicit TMPDIR is what stops the function's fallback to a
@@ -255,7 +255,7 @@ test_gs_output_replaces_the_input_and_the_backup_is_kept_by_default() {
 
   # The stub writes only to the path named by -sOutputFile=, so the optimized
   # content landing at the input path is proof that gs was handed the right
-  # output target — a missing -sOutputFile would leave the input empty.
+  # output target, a missing -sOutputFile would leave the input empty.
   if [ "$status" -eq 0 ] && [ "$(file_content "$pdf")" = "optimized-by-stub" ]; then
     assert_pass "gs output lands at the input path on success"
   else

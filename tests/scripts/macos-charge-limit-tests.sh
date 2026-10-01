@@ -3,7 +3,7 @@
 # src/hosts/MacBook/scripts/macos-charge-limit.sh.
 #
 # The script converges exactly one gate: the `battery` CLI, which writes the
-# firmware-level SMC charging gate.  Two failures would be silent — the gate
+# firmware-level SMC charging gate.  Two failures would be silent, the gate
 # being dropped from the script, and the user-dependent Shortcuts path being
 # reintroduced, which would put a hand-built shortcut back into the apply path.
 # Both are asserted by parsing; the script body never runs, because it needs root
@@ -21,7 +21,7 @@ HOMEBREW_NIX="$SCRIPT_DIR/../../src/hosts/MacBook/homebrew.nix"
 FLAKE_NIX="$SCRIPT_DIR/../../src/flake.nix"
 ACTIVATION_NIX="$SCRIPT_DIR/../../src/hosts/MacBook/activation.nix"
 
-# assert_invokes <pattern> — the script must contain this literal, so a dropped
+# assert_invokes <pattern>: the script must contain this literal, so a dropped
 # invocation cannot pass unnoticed.
 assert_invokes() {
   local pattern="$1"
@@ -32,7 +32,7 @@ assert_invokes() {
   fi
 }
 
-# assert_absent <file> <pattern> <description> — the pattern must not appear.
+# assert_absent <file> <pattern> <description>: the pattern must not appear.
 # WHY: parsing is allowed here because these patterns are code paths, not
 #   present-in-source assertions: the invocation that would be reintroduced
 #   cannot be exercised without root plus the GUI Shortcuts helper.

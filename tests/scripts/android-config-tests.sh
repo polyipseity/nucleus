@@ -774,7 +774,7 @@ run_case() {
   _current_case="$1"
   _rc_before="$TESTS_FAILED"
   # WHY: a fatal signal that the suite does not trap cannot run the EXIT trap, so
-  # the case that is running has to be on the log before it starts — otherwise a
+  # the case that is running has to be on the log before it starts, otherwise a
   # death like that reports the file name and nothing else. The tool line names
   # the host fact the product's require_command calls depend on: a case that dies
   # in there writes its error into a redirect only the case can see.

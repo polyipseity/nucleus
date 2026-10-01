@@ -28,7 +28,7 @@ _COMPLETIONS_DIR="src/modules/completions/zsh"
 _ps_gen_script="src/scripts/completions/gen-completions.ps1"
 _profile_ps1="src/scripts/shell/profile.ps1"
 
-# The canonical nucleus-* command set (alphabetical) — must match the generator.
+# The canonical nucleus-* command set (alphabetical), must match the generator.
 # Subcommands are covered by their parent completion files, not as standalone
 # commands: check packer/sh/pwsh, gc cleanup-nix/preferences, apply
 # health-check/audit-store, cloud setup/reset/sync/repair, update lockfile.
@@ -211,7 +211,7 @@ _fx_desc="Strip a file's \"\$HOME\" metadata"
   printf 'esac\n'
 } >"$_fx_repo/scripts/utils.sh"
 
-# _fx_decode <generated-file> — print the description the file's own two quoting
+# _fx_decode <generated-file>: print the description the file's own two quoting
 # layers yield for the subcommand spec, mirroring how _arguments splits the spec
 # into its third field and evals the ((...)) action content.
 _fx_decode() {

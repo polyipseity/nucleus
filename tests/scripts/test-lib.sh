@@ -2,7 +2,7 @@
 # Shared test library: counters, assertions, and color helpers.
 # Source this after setting SCRIPT_DIR and/or REPO_ROOT.
 
-# Test state isolation — must run before any lib.sh / service-health.sh sourcing.
+# Test state isolation, must run before any lib.sh / service-health.sh sourcing.
 # Sets HOME and NUCLEUS_USER_ROOT to a temp dir so that derive_nucleus_user_root
 # never resolves to the developer's real state directory.  lib.sh:38 uses
 # ${VAR:=$(default)}, so any pre-set value is preserved and not overwritten.
@@ -18,7 +18,7 @@ init_test_state() {
   mkdir -p "$_tmp_home/.repo"
 }
 
-# Nothing initialises on source — every suite must call init_test_state
+# Nothing initialises on source, every suite must call init_test_state
 # itself BEFORE the first lib.sh / service-health.sh source, or it gets no
 # isolation at all.  Two suites do more: cloud-repair additionally unsets
 # NUCLEUS_USER_ROOT around its own STATE_DIR derivation (deriving it against an
@@ -84,9 +84,9 @@ assert_fail() {
   ((++TESTS_FAILED))
 }
 
-# finish_tests — Print the tally and exit with the suite's status. Assertions only
+# finish_tests: Print the tally and exit with the suite's status. Assertions only
 # bump a counter, so a suite that never turns the tally into an exit status reports
-# success to the runner — which sees only the exit status — no matter what it
+# success to the runner, which sees only the exit status, no matter what it
 # asserted. Must be the last statement of every suite that sources this library.
 #
 # There is no skip counter: a case that cannot run on this host asserts the
@@ -107,21 +107,21 @@ finish_tests() {
     printf '\n%s%d passed%s\n' "$GREEN" "$TESTS_PASSED" "$NC"
   fi
   # Machine-readable tally, asserted by test step 05. A suite that exits without
-  # reaching this line cannot prove it ran its assertions — the one failure its
+  # reaching this line cannot prove it ran its assertions, the one failure its
   # exit status alone cannot express.
   printf '# nucleus-tally passed=%d failed=%d\n' \
     "$TESTS_PASSED" "$TESTS_FAILED"
   exit "$_status"
 }
 
-# extract_func NAME FILE — print a top-level function definition (opening
+# extract_func NAME FILE: print a top-level function definition (opening
 # `NAME() {` through the column-0 closing `}`) from a script without executing the
 # script body. Lets a suite exercise a script-local function in isolation.
 extract_func() {
   awk -v name="$1" '$0 == name "() {" { p = 1 } p { print } p && $0 == "}" { p = 0; exit }' "$2"
 }
 
-# user_root_for_home HOME — print the per-user nucleus root for a HOME on this
+# user_root_for_home HOME: print the per-user nucleus root for a HOME on this
 # platform. Mirrors derive_nucleus_user_root (src/scripts/lib/lib.sh), which
 # switches on `uname -s`: macOS nests the root under Library/Application Support,
 # every other POSIX host under .local/share. Suites that seed state for a script
@@ -134,7 +134,7 @@ user_root_for_home() { # <home>
   esac
 }
 
-# require_command — Fail the suite when a provisioned prerequisite is missing.
+# require_command: Fail the suite when a provisioned prerequisite is missing.
 # Skip-guards are banned (tooling-and-validation.instructions.md): a missing tool
 # is a suite failure the tally has to record, not a silent pass. finish_tests
 # exits, so the call is terminal even from inside a function.
@@ -144,5 +144,5 @@ require_command() { # <name> <reason>
   finish_tests
 }
 
-# section — Print a section header to stdout (F3, mirrors lib.sh section()).
+# section; Print a section header to stdout (F3, mirrors lib.sh section()).
 section() { printf '\n%s=== [%s] %s ===%s\n' "$CYAN" "$1" "$2" "$NC"; }

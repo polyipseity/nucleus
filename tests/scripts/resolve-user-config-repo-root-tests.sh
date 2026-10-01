@@ -15,14 +15,14 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 RESOLVER="$SCRIPT_DIR/../../src/scripts/lib/resolve-user-config.sh"
 readonly RESOLVER
 
-# _rrc_make_live_checkout DIR — fake live checkout that derive_repo_root accepts
+# _rrc_make_live_checkout DIR: fake live checkout that derive_repo_root accepts
 # (src/flake.nix marker) plus an agents/skills overlay entry.
 _rrc_make_live_checkout() {
   mkdir -p "$1/src/users/default/agents/skills"
   printf 'marker\n' >"$1/src/flake.nix"
 }
 
-# _rrc_resolve [ENV...] — resolve the agents/skills overlay entry for test-user
+# _rrc_resolve [ENV...]: resolve the agents/skills overlay entry for test-user
 # in a fresh shell, printing only stdout.
 _rrc_resolve() {
   env "$@" bash -c '. "'"$RESOLVER"'"; resolve_user_config_first_level_entry test-user agents skills' 2>/dev/null

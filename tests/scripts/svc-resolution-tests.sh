@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# End-to-end resolution tests for scripts/svc.sh — a prefix-match registry entry
+# End-to-end resolution tests for scripts/svc.sh, a prefix-match registry entry
 # must resolve to concrete instance ids that list, status, actions, and verify
 # all agree on.
 
@@ -131,7 +131,7 @@ printf 'journald line for %s\n' "$*"
 FAKE
 chmod +x "$_tmp/bin/systemctl" "$_tmp/bin/journalctl"
 
-# run_svc — Run the CLI against the stub registry with fake managers on PATH.
+# run_svc: Run the CLI against the stub registry with fake managers on PATH.
 run_svc() { # <svc.sh args...>
   env NUCLEUS_HOST="${SVC_TEST_HOST:-MacBook}" \
     NUCLEUS_REPO_ROOT="$_tmp/repo" \
@@ -146,7 +146,7 @@ run_svc() { # <svc.sh args...>
     bash "$SVC_SH" "$@"
 }
 
-# assert_eq — Compare an actual value with the expected one.
+# assert_eq: Compare an actual value with the expected one.
 assert_eq() { # <test name> <expected> <actual>
   if [ "$2" = "$3" ]; then
     assert_pass "$1"
@@ -155,7 +155,7 @@ assert_eq() { # <test name> <expected> <actual>
   fi
 }
 
-# assert_contains — Assert a captured output block contains a substring.
+# assert_contains: Assert a captured output block contains a substring.
 assert_contains() { # <test name> <haystack> <needle>
   case "$2" in
   *"$3"*) assert_pass "$1" ;;
@@ -163,7 +163,7 @@ assert_contains() { # <test name> <haystack> <needle>
   esac
 }
 
-# assert_not_contains — Assert a captured output block lacks a substring.
+# assert_not_contains: Assert a captured output block lacks a substring.
 assert_not_contains() { # <test name> <haystack> <needle>
   case "$2" in
   *"$3"*) assert_fail "$1" "expected output not to contain '$3', got: $2" ;;
@@ -171,10 +171,10 @@ assert_not_contains() { # <test name> <haystack> <needle>
   esac
 }
 
-# captured_output / captured_status — Results of the last run_cli call.
+# captured_output / captured_status: Results of the last run_cli call.
 captured_output=""
 captured_status=0
-# run_cli — Run the CLI, capturing combined output and exit status.
+# run_cli: Run the CLI, capturing combined output and exit status.
 run_cli() { # <svc.sh args...>
   captured_status=0
   captured_output="$(run_svc "$@" 2>&1)" || captured_status=$?

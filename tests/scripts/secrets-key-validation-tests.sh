@@ -19,7 +19,7 @@ VERIFY_SCRIPT="$REPO_ROOT/src/scripts/secrets/verify-secret-decryption.sh"
 require_command jq "jq is required to drive verify-secret-decryption"
 require_command ssh-keygen "ssh-keygen is required to materialize fixture keys"
 
-# make_fixture <dir> — build a fixture tree whose only variable is the private
+# make_fixture <dir>: build a fixture tree whose only variable is the private
 # key. Empty GPG-fingerprint and SOPS manifests keep checks 2-4 on the paths that
 # need no real keyring, and the two stubs answer the probes those checks make.
 make_fixture() {
@@ -35,7 +35,7 @@ make_fixture() {
   echo '[]' >"$_dir/sops.json"
 }
 
-# run_verify <fixture-dir> <private-key-path> <output-file> — print the exit code.
+# run_verify <fixture-dir> <private-key-path> <output-file>: print the exit code.
 run_verify() {
   local _dir="$1" _private_key="$2" _out="$3" _rc=0
   "$VERIFY_SCRIPT" \
@@ -95,7 +95,7 @@ build_case() {
   printf '%s\n' "$_key" >"$_dir/managed-ssh-key-paths"
 }
 
-# expect_acceptance <name> <kind> — the script must exit 0 without an ERROR.
+# expect_acceptance <name> <kind>: the script must exit 0 without an ERROR.
 expect_acceptance() {
   local _name="$1" _kind="$2"
   local _dir _key _out _rc

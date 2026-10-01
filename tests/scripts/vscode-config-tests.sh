@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Shell tests for src/scripts/editors/symlink-vscode-config.sh: the
-# chatLanguageModels.json merge-copy behavior — corrupt-file recovery,
+# chatLanguageModels.json merge-copy behavior, corrupt-file recovery,
 # name-keyed merge that preserves VS Code-added entries, and the index-0
 # repo-entry refresh (regression guard for the jq merge warning).
 #

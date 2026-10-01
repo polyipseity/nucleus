@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# cloud-drives-units-tests.sh — argv correctness of the generated systemd unit scripts.
+# cloud-drives-units-tests.sh: argv correctness of the generated systemd unit scripts.
 #
 # The NixOS units create their mount point and unmount their volume via
 # `pkgs.writeShellScript` bodies generated in src/modules/cloud-drives.nix.  A mount
 # point containing a space is the failure mode these tests exist for: when the path was
 # interpolated into a `/bin/sh -c '…'` line, `lib.escapeShellArg`'s single quotes were
 # consumed by the OUTER parse, the then-bare path was handed to `sh -c`, and it split at
-# the first space — `fusermount3 -u /Users/a` — leaving the volume mounted and the stale
+# the first space; `fusermount3 -u /Users/a`, leaving the volume mounted and the stale
 # mount blocking the next start.
 #
 # WHY this parses the Nix source instead of evaluating the module: the bodies are
 # `writeShellScript` derivations, and evaluating the module requires nixpkgs, which is
 # unreachable offline in this environment.  Extraction is the only viable approach here;
-# every ASSERTION is behavioural — the extracted body is executed with a space-containing
+# every ASSERTION is behavioural, the extracted body is executed with a space-containing
 # path and the recorded argv is inspected, rather than a string being pattern-matched.
 # shellcheck shell=bash
 set -euo pipefail
@@ -37,7 +37,7 @@ SHIM="$WORK/shim"
 mkdir -p "$SHIM"
 trap 'rm -rf "$WORK"' EXIT
 
-# make_shim NAME — install a recorder that logs its argv, one argument per line.
+# make_shim NAME: install a recorder that logs its argv, one argument per line.
 make_shim() {
   local name="$1"
   cat >"$SHIM/$name" <<'SHIM_BODY'
@@ -55,7 +55,7 @@ SHIM_BODY
 make_shim fusermount3
 make_shim mkdir
 
-# extract_script_body NAME — print the `writeShellScript "NAME" ''…''` body.
+# extract_script_body NAME: print the `writeShellScript "NAME" ''…''` body.
 # Prints nothing when the Nix file no longer contains such a body, which the caller
 # treats as a failure: a reverted fix must fail loudly rather than skip.
 extract_script_body() {
@@ -66,7 +66,7 @@ extract_script_body() {
   ' "$NIX_FILE"
 }
 
-# run_body BODY PROGRAM — execute BODY with the shims on PATH and print the recorder log.
+# run_body BODY PROGRAM: execute BODY with the shims on PATH and print the recorder log.
 run_body() {
   local body="$1" program="$2" rec="$WORK/$2.rec"
   printf '#!/bin/sh\n%s\n' "$body" >"$WORK/body.sh"
@@ -75,7 +75,7 @@ run_body() {
   cat "$rec"
 }
 
-# check_body NAME PROGRAM — assert the generated body delivers a space-containing path
+# check_body NAME PROGRAM: assert the generated body delivers a space-containing path
 # as exactly ONE argument, and that it does not re-introduce the nested quoting.
 check_body() {
   local name="$1" program="$2"

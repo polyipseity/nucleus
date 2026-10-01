@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# cloud-drives-setup.sh — mount-path convergence and replica directories.
+# cloud-drives-setup.sh: mount-path convergence and replica directories.
 #
-# Every host mounts rclone drives at clouds/<id>, a real directory — macOS
+# Every host mounts rclone drives at clouds/<id>, a real directory, macOS
 # included, because rclone stats the mount point before mounting and macFUSE only
 # creates a /Volumes mount point while mounting a volume. The regressions this
 # guards: treating the mount path as a symlink again, and a re-apply that fails
-# or destroys state it must leave alone — a mounted drive makes its mount point
+# or destroys state it must leave alone, a mounted drive makes its mount point
 # look occupied, and the leftover symlink of the retired /Volumes layout must
 # fail loudly with a paste-ready remedy instead of being followed or deleted.
 set -euo pipefail
@@ -138,7 +138,7 @@ test_mount_path_symlink_error_without_a_label_stays_generic() {
   rm -rf "$home"
 }
 
-# mark_blocked <home> <service label> — a fresh blocked record, as the mount
+# mark_blocked <home> <service label>: a fresh blocked record, as the mount
 # wrapper leaves it when the FSKit provider refuses the volume. Written into the
 # test's own root so it cannot leak into a later test.
 mark_blocked() { # <home> <label>

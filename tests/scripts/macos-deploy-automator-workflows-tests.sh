@@ -42,14 +42,14 @@ fi
 # a stub instead of touching the real preferences domain.
 eval "$PRUNE_FUNC"
 
-# make_defaults_stub <path> <shell body> — install an executable `defaults` stub.
+# make_defaults_stub <path> <shell body>: install an executable `defaults` stub.
 # Bodies used below: print an identifier, `exit 1` (unreadable), `exit 0` (empty).
 make_defaults_stub() {
   printf '#!/bin/sh\n%s\n' "$2" >"$1"
   chmod +x "$1"
 }
 
-# make_bundle <services_dir> <bundle_name> <identifier> — write a minimal
+# make_bundle <services_dir> <bundle_name> <identifier>: write a minimal
 # .workflow bundle carrying a CFBundleIdentifier.
 make_bundle() {
   local bundle="$1/$2"
@@ -66,7 +66,7 @@ make_bundle() {
 EOF
 }
 
-# write_desired <file> [bundle_name ...] — one declared directory name per line,
+# write_desired <file> [bundle_name ...]: one declared directory name per line,
 # which is exactly the `jq -r '.[].dir'` shape the deployer feeds the pruner
 # (suffix included).
 write_desired() {
@@ -78,7 +78,7 @@ write_desired() {
   fi
 }
 
-# installed_bundles <services_dir> — sorted bare names of the bundles still on disk.
+# installed_bundles <services_dir>: sorted bare names of the bundles still on disk.
 installed_bundles() {
   find "$1" -mindepth 1 -maxdepth 1 -name '*.workflow' | sed 's|.*/||' | sort
 }
@@ -293,7 +293,7 @@ test_prune_tolerates_an_empty_services_directory() {
 require_command jq "the deployer consumes the workflow list through jq"
 JQ_BIN="$(command -v jq)"
 
-# make_store_bundle <store_root> <workflow_dir_name> <identifier> — build a source
+# make_store_bundle <store_root> <workflow_dir_name> <identifier>: build a source
 # bundle shaped like the derivation output the deployer copies from.
 make_store_bundle() {
   local bundle="$1/$2"
@@ -310,7 +310,7 @@ EOF
   : >"$bundle/Contents/QuickLook/Thumbnail.png"
 }
 
-# workflow_json_entry <dir> <source> <enablement_key> — one element of the array
+# workflow_json_entry <dir> <source> <enablement_key>: one element of the array
 # the Nix expression hands the deployer, built with the jq the deployer uses.
 workflow_json_entry() {
   # shellcheck disable=SC2016 # reason: jq program text; $dir/$key/$source are jq variables, not shell expansions
@@ -322,7 +322,7 @@ workflow_json_entry() {
     "$program"
 }
 
-# make_reading_defaults_stub <path> — a `defaults` that answers an identifier
+# make_reading_defaults_stub <path>: a `defaults` that answers an identifier
 # query from the bundle's own Info.plist and records every write in
 # $DEFAULTS_STUB_RECORD, the way the real binary talks to the preferences domain.
 make_reading_defaults_stub() {
@@ -343,7 +343,7 @@ STUB
   chmod +x "$1"
 }
 
-# make_recorder_stub <path> <log> — an executable that appends its argv to <log>.
+# make_recorder_stub <path> <log>: an executable that appends its argv to <log>.
 make_recorder_stub() {
   cat >"$1" <<STUB
 #!/bin/sh
@@ -426,7 +426,7 @@ test_deploy_end_to_end_converges_bundles_and_preferences() {
   fi
 
   # 3. One dictionary write, holding both declared keys and their presentation
-  #    modes — this is the half a deleted write or a broken key accumulation drops.
+  #    modes, this is the half a deleted write or a broken key accumulation drops.
   local writes
   writes="$(cat "$record" 2>/dev/null || true)"
   if [ "$(printf '%s\n' "$writes" | wc -l | tr -d ' ')" = "1" ] &&

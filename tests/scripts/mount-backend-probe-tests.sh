@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# mount-backend-{linux,darwin}.sh — backend_probe_state answers about MOUNT
+# mount-backend-{linux,darwin}.sh, backend_probe_state answers about MOUNT
 # STATE and keeps the undeterminable answer. The two backends reach that answer
 # from different evidence, so both are exercised here: Linux from a mount table,
 # darwin from diskutil.
@@ -23,7 +23,7 @@ init_test_state
 . "$SCRIPT_DIR/../../src/scripts/lib/mount-backend-linux.sh"
 
 # The probe reads the host mount state through `mount`. A shim on PATH supplies a
-# table the test controls, so the mounted-empty case can be exercised at all —
+# table the test controls, so the mounted-empty case can be exercised at all:
 # a real empty mount would need a real FUSE mount, which a suite must not create.
 _shim_dir="$(mktemp -d "${TMPDIR:-/tmp}/mbp-shim.XXXXXX")"
 _table="$(mktemp "${TMPDIR:-/tmp}/mbp-table.XXXXXX")"
