@@ -340,8 +340,8 @@ Describe 'Get-HealthBootId boot identity' {
   # Get-HealthBootId must ASK THE OS on every call.  It previously cached the answer
   # in the state dir's .boot-id file and read it back forever, so the value could
   # not change across a reboot and the documented reboot-clears-a-block path was
-  # unreachable.  Only the OS probe is stubbed here — a test cannot reboot the
-  # host — and every other line runs the real implementation.
+  # unreachable.  Only the OS probe is stubbed here: a test cannot reboot the
+  # host, and every other line runs the real implementation.
   #
   # One stub, driven by a variable, so there is a single definition and the two
   # boots differ solely in their value.  A null value models an OS that cannot

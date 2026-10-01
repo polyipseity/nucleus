@@ -7,7 +7,7 @@
     keep it out of ~/.cursor/), re-runs are idempotent, a wrong-target symlink
     is relinked, and disabled runs remove the managed link.
 .NOTES
-    Environment variables: (none — $HOME is overridden at script scope)
+    Environment variables: (none: $HOME is overridden at script scope)
     Exit codes: 0 on success; 1 on failure
     Symlink creation requires elevation or Developer Mode on Windows; not
     required on macOS/Linux where the tests also run.

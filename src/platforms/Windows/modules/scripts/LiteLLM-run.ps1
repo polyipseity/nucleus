@@ -3,7 +3,7 @@
 $LITELLM_LOG = 'WARNING'
 $secretsDir = Join-Path -Path $env:ProgramData -ChildPath 'nucleus\secrets'
 # __KEY_SPECS__ is replaced by Sync-LiteLLMService.ps1 with a JSON array of
-# { file, env } objects — one per available AI API key.
+# { file, env } objects: one per available AI API key.
 $keySpecs = '__KEY_SPECS__' | ConvertFrom-Json
 foreach ($spec in $keySpecs) {
   $keyPath = Join-Path -Path $secretsDir -ChildPath $spec.file

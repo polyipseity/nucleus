@@ -173,7 +173,7 @@ function Sync-AgentsSkillManifest {
                      -and $linkItem.LinkType -eq 'SymbolicLink'
       if ($isSymlink) {
         if ([string]::Equals($linkItem.Target, $sourcePath, [System.StringComparison]::OrdinalIgnoreCase)) {
-          continue  # Correct symlink — no-op.
+          continue  # Correct symlink: no-op.
         }
         # wrong target
         Remove-ManagedSymlinkDeleteProtection -Context "skills" -Path $linkPath

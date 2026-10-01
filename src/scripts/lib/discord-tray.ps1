@@ -1,6 +1,6 @@
 # Converge Discord's system-tray icon visibility by editing its settings.json.
 # Discord rewrites settings.json on launch, so this must run while Discord is
-# closed (activation runs at login/apply, before the app opens — acceptable).
+# closed (activation runs at login/apply, before the app opens; acceptable).
 #
 # Usage: discord-tray.ps1 <visible> [appKey]
 #   visible: $true/$false (or "true"/"false")

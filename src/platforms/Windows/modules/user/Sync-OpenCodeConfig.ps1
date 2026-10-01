@@ -15,7 +15,7 @@
 
   The agents and commands links bridge to the single shared agent-asset tree in
   ~\.agents\ (agents -> agents\, commands -> prompts\), so nothing is duplicated.
-  Both must already exist — Sync-AgentsConfig creates them — and a missing target
+  Both must already exist: Sync-AgentsConfig creates them, and a missing target
   is a hard error rather than a dangling link.
 
   When $Enabled is $false the function removes only the three managed links.

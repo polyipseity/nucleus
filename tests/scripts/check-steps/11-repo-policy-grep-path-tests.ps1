@@ -90,7 +90,7 @@ if (-not $derivationMatch.Success) {
 }
 $derivation = $derivationMatch.Groups['expr'].Value
 
-# Invoke-ConsumerRule — run the shipped derivation and allowlist comparison over
+# Invoke-ConsumerRule: run the shipped derivation and allowlist comparison over
 # a caller set, and report what the step would flag.
 #
 # WHY the inputs are Windows-shaped: the separator the file walk produces is the

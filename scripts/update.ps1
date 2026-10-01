@@ -81,7 +81,7 @@ if ($Help) {
 $repoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path }
 
 # ---------------------------------------------------------------------------
-# Invoke-UpdateAll — flake input updates + SOPS recipient rewrap
+# Invoke-UpdateAll: flake input updates + SOPS recipient rewrap
 # ---------------------------------------------------------------------------
 function Invoke-UpdateAll {
   [CmdletBinding()]
@@ -134,7 +134,7 @@ function Invoke-UpdateAll {
 }
 
 # ---------------------------------------------------------------------------
-# Invoke-LockfileBump — query each available tool for the current version of
+# Invoke-LockfileBump: query each available tool for the current version of
 # each pinned item and write an updated lockfile atomically. Inlined from the
 # deleted scripts/bump-lockfile.ps1 (folded into `nucleus-update lockfile`).
 function Invoke-LockfileBump {
@@ -310,7 +310,7 @@ function Invoke-LockfileBump {
     if ($ht.ContainsKey('cargo-binstall') -and $ht['cargo-binstall'] -is [hashtable]) {
       foreach ($key in @($ht['cargo-binstall'].Keys)) {
         if ($ht['cargo-binstall'][$key] -is [hashtable]) {
-          continue  # object entry — no version query applies
+          continue  # object entry: no version query applies
         }
         $old = $ht['cargo-binstall'][$key]
         $new = $null
@@ -437,7 +437,7 @@ function Invoke-LockfileBump {
         if ($ht.ContainsKey('uv') -and $ht['uv'] -is [hashtable]) {
           foreach ($key in @($ht['uv'].Keys)) {
             if ($ht['uv'][$key] -is [hashtable]) {
-              continue  # VCS hash-pin entry — no CLI query can update the rev
+              continue  # VCS hash-pin entry: no CLI query can update the rev
             }
             $old = $ht['uv'][$key]
             if ($uvInstalled.ContainsKey($key)) {

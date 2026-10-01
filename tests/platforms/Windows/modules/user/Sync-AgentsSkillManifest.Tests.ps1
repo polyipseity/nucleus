@@ -9,7 +9,7 @@
     managed skill links while leaving foreign directories, and (on Windows) that
     the enabled path links every source entry.
 .NOTES
-    Environment variables: (none — $HOME is overridden at script scope)
+    Environment variables: (none: $HOME is overridden at script scope)
     Exit codes: 0 on success; 1 on failure
     The enabled-path test runs on Windows only: the Developer-Mode guard is a
     Windows platform requirement.  icacls is shimmed off Windows.

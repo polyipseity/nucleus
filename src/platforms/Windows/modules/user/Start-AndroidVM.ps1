@@ -3,7 +3,7 @@
   Start the Android virtual machine via QEMU on Windows.
 
 .DESCRIPTION
-  Thin wrapper — the canonical start logic lives in the shared file
+  Thin wrapper: the canonical start logic lives in the shared file
   src/scripts/vms/start-android-vm.ps1 (embedded-content policy). vm.sh also
   renders start-<name>.ps1 from that same shared file; keep this wrapper thin
   so QEMU arguments stay single-source.

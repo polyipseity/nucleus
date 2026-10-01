@@ -51,8 +51,8 @@ BeforeAll {
     param([string[]]$Arguments)
     # WHY: the fixture repo root is handed to the child through the child's own
     # environment. Setting $env:NUCLEUS_REPO_ROOT here would leak into every
-    # suite running concurrently in this process — steps share one PowerShell
-    # process — so a child spawned by another suite would resolve the wrong repo
+    # suite running concurrently in this process: steps share one PowerShell
+    # process, so a child spawned by another suite would resolve the wrong repo
     # root (scripts/check.ps1 reads NUCLEUS_REPO_ROOT when it is set).
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $Script:PwshExe

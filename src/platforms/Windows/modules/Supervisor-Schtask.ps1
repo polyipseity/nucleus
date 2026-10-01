@@ -27,7 +27,7 @@ param()
 
 $ErrorActionPreference = 'Stop'
 
-# Split-SupervisorTarget — split a folder-qualified task id into path and name.
+# Split-SupervisorTarget: split a folder-qualified task id into path and name.
 function Split-SupervisorTarget {
     <#
     .SYNOPSIS

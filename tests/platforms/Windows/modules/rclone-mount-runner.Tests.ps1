@@ -7,7 +7,7 @@
   single-sourced from
   cloud-drive.lifecycle in services.json, and the Windows generator injects it as
   NUCLEUS_MOUNT_ATTEMPTS / NUCLEUS_MOUNT_BACKOFF / NUCLEUS_MOUNT_ATTACH_SECONDS.
-  The POSIX runner consumes the same three with `:?` — required, no fallback.
+  The POSIX runner consumes the same three with `:?`, required, no fallback.
 
   A default in the runner is therefore a SECOND policy definition that can drift
   from the registry, which is what this file pins: a missing value must fail
@@ -49,7 +49,7 @@ BeforeAll {
     'NUCLEUS_MOUNT_BACKOFF'
   )
 
-  # Invoke-Runner — run the real runner in a CHILD process with a controlled
+  # Invoke-Runner: run the real runner in a CHILD process with a controlled
   # environment. A child is required: the runner is a script, not a function
   # module, and the throw must be observed as the process outcome.
   function Invoke-Runner {
@@ -81,13 +81,13 @@ BeforeAll {
     return $env
   }
 
-  # MountFixtureRoot — the repo root whose modules dir the runner loads.
+  # MountFixtureRoot: the repo root whose modules dir the runner loads.
   $script:FixtureRoot = Join-Path -Path $repoRoot.Path -ChildPath 'tests/fixtures/windows-mount-runner/repo'
 
-  # Save-StandInRclone — an executable that stands in for rclone.
+  # Save-StandInRclone: an executable that stands in for rclone.
   #
   # WHY two implementations: Start-Process runs a file, not a command line, so the
-  #   stand-in has to be something the host can execute — a shebang script on POSIX, a
+  #   stand-in has to be something the host can execute: a shebang script on POSIX, a
   #   .cmd on Windows. Both write one line to stderr, which is what the classifier
   #   reads, and both exit 1, which is what a mount that never attaches does.
   # WHY MarkerName: the stand-in writes the marker into the mount point it is handed
@@ -118,7 +118,7 @@ BeforeAll {
     return $path
   }
 
-  # Block-DirectoryReadAccess — make a directory this process cannot list.
+  # Block-DirectoryReadAccess: make a directory this process cannot list.
   #
   # WHY an ACL rather than a mode: NTFS has no POSIX mode bits, so `chmod 000`
   #   leaves the directory fully readable on Windows and the probe answers
@@ -139,7 +139,7 @@ BeforeAll {
     return 'chmod'
   }
 
-  # Unblock-DirectoryReadAccess — put the permissions back so the sweep can
+  # Unblock-DirectoryReadAccess: put the permissions back so the sweep can
   # delete the tree.
   function Unblock-DirectoryReadAccess {
     param(
@@ -154,7 +154,7 @@ BeforeAll {
     $null = & chmod 700 $Path
   }
 
-  # Invoke-MountAttempt — run the real runner against the fixture backend.
+  # Invoke-MountAttempt: run the real runner against the fixture backend.
   function Invoke-MountAttempt {
     param([hashtable]$Extra = @{})
 

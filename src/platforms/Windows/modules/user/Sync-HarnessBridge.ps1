@@ -51,7 +51,7 @@
   Format-NucleusOutput.psm1 (Write-Nucleus*), both dot-sourced by apply.ps1.
 
   Exit codes: this function does not emit exit codes; failures are reported as
-  warnings.  Deployed hook entry points are best-effort by contract — a missing
+  warnings.  Deployed hook entry points are best-effort by contract; a missing
   shim only stops remote control, it never blocks a harness session.
 #>
 

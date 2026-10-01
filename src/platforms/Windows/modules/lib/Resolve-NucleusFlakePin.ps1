@@ -1,4 +1,4 @@
-# Resolve-NucleusFlakePin.ps1 — resolve a flake.lock node into an install source.
+# Resolve-NucleusFlakePin.ps1: resolve a flake.lock node into an install source.
 #
 # A tool declared with "pin": "flake:<node>" in src/modules/packages/desired.json
 # must match the revision the declarative POSIX provisioning uses, which no

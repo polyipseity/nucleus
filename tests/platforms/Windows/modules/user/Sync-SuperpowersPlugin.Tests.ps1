@@ -7,7 +7,7 @@
     wrong-target relink, refusal to overwrite a foreign file, hard failure when
     the pin cannot be fetched, and disable-path cleanup.
 .NOTES
-    Environment variables: (none — $HOME and %LOCALAPPDATA% are overridden at script scope)
+    Environment variables: (none: $HOME and %LOCALAPPDATA% are overridden at script scope)
     Exit codes: 0 on success; 1 on failure
     Symlink creation requires elevation or Developer Mode on Windows; not
     required on macOS/Linux where the tests also run.  icacls is shimmed off

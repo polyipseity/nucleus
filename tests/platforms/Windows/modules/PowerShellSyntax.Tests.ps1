@@ -5,7 +5,7 @@
 # Invoke-CamillaDSPSetup.ps1 and Invoke-CamillaGUISetup.ps1 once carried) is a
 # parser error: the file cannot be dot-sourced at all.  apply.ps1 dot-sources
 # every setup and user module before running a single step, so such a file
-# aborts a Windows apply before any convergence happens — and no Windows-only
+# aborts a Windows apply before any convergence happens, and no Windows-only
 # test run would report it, because the failure precedes the tests.
 #
 # Run with: pwsh -NoProfile tests/platforms/Windows/modules/PowerShellSyntax.Tests.ps1

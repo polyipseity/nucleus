@@ -54,7 +54,7 @@ Describe 'Invoke-PowerShellModuleSetup PSGallery convergence' {
         Copy-Item -LiteralPath (Join-Path $script:realRepoRoot 'src\platforms\Windows\modules\setup\Invoke-PowerShellModuleSetup.ps1') -Destination (Join-Path $script:fakeSetupDir 'Invoke-PowerShellModuleSetup.ps1')
         . (Join-Path $script:fakeSetupDir 'Invoke-PowerShellModuleSetup.ps1')
 
-        # Get-ModuleCopy — the shape Get-Module -ListAvailable yields: one entry
+        # Get-ModuleCopy: the shape Get-Module -ListAvailable yields: one entry
         # per version and per scope, each with the ModuleBase the sweep deletes.
         function Get-ModuleCopy {
             param(

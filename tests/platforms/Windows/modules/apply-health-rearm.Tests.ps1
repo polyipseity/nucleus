@@ -6,7 +6,7 @@
   Clear-HealthRecordAll is defined and unit-tested, but a defined-and-tested function is
   not a wired one.  The defect this guards against was that the re-arm had NO
   production call site, so a blocked instance survived apply and cleared only on
-  reboot — while two separate comments (service-watchdog.ps1:18 and
+  reboot, while two separate comments (service-watchdog.ps1:18 and
   ServiceHealth.ps1:40) asserted that apply cleared it.
 
   The Windows SCM/Task Scheduler runtime cannot be exercised from this host, so the

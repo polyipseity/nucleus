@@ -12,9 +12,9 @@
   expose no controllable tray setting simply omit the statusIcon block.
 
   Cross-platform parity:
-    macOS   — activation script in MacBook/activation.nix (defaults write)
-    NixOS   — activation script in desktop.nix (per-user dispatch)
-    Windows — this module
+    macOS: activation script in MacBook/activation.nix (defaults write)
+    NixOS: activation script in desktop.nix (per-user dispatch)
+    Windows: this module
 
 .PARAMETER Enabled
   When true, converge app tray icons to the registry. When false, skip.

@@ -203,7 +203,7 @@ function Sync-VSCodeConfig {
         $isSymlink = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
 
         if ($isSymlink -and [string]::Equals($item.Target, $repoTarget, [System.StringComparison]::OrdinalIgnoreCase)) {
-          continue  # Correct symlink — no-op.
+          continue  # Correct symlink: no-op.
         }
 
         if ($isSymlink) {
@@ -248,7 +248,7 @@ function Sync-VSCodeConfig {
         $isSymlink = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
 
         if ($isSymlink -and [string]::Equals($item.Target, $repoTarget, [System.StringComparison]::OrdinalIgnoreCase)) {
-          continue  # Correct symlink — no-op.
+          continue  # Correct symlink: no-op.
         }
 
         if ($isSymlink) {

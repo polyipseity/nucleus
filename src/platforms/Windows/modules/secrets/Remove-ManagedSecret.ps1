@@ -8,7 +8,7 @@
 
 .NOTES
     Environment variables: (none)
-    Exit codes: N/A — library script; functions use throw on failure.
+    Exit codes: N/A, library script; functions use throw on failure.
 #>
 
 function Remove-ManagedSecret {
@@ -35,7 +35,7 @@ function Remove-ManagedSecret {
 
   .NOTES
     Environment variables: (none)
-    Exit codes: N/A — library function; supports -WhatIf for dry-run.
+    Exit codes: N/A, library function; supports -WhatIf for dry-run.
   #>
   [CmdletBinding(SupportsShouldProcess = $true)]
   param(

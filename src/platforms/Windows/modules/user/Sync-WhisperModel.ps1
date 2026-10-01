@@ -2,8 +2,8 @@
 .SYNOPSIS
     Converge the whisper.cpp ggml model weights under the nucleus user root.
 .DESCRIPTION
-    No package manager ships the whisper.cpp model weights — the Scoop manifest
-    says so in its own `notes` — so this module downloads the revision-pinned
+    No package manager ships the whisper.cpp model weights: the Scoop manifest
+    says so in its own `notes`, so this module downloads the revision-pinned
     file named in the lockfile's `whisper` section and re-hashes it against the
     pinned SRI value before moving it into place.
 

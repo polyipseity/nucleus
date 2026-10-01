@@ -179,13 +179,13 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
         Remove-Item -Path $captureFile -ErrorAction SilentlyContinue
     }
 
-    # Terminal class — stop immediately.
+    # Terminal class: stop immediately.
     if (-not (Mount-Backend-IsTransient -Class $class)) {
         Set-HealthBlocked -Instance $instance -Class $class -Remedy $remedy
         exit 0
     }
 
-    # Transient — backoff and retry.
+    # Transient: backoff and retry.
     if ($attempt -lt $attempts) {
         # The declared schedule is CLAMPED, never extrapolated (services.schema.json,
         # mountRetryBackoffSeconds): an attempt past the end of the list reuses the last declared value,
@@ -198,7 +198,7 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
     }
 }
 
-# All attempts exhausted — blocked.
+# All attempts exhausted: blocked.
 # WHY: the last attempt's own diagnosis must not be overwritten.  $class holds the last
 #   attempt's classification because the loop reassigns it on every pass it makes, and
 #   no other health record carries that classification out of the loop: a transient

@@ -92,7 +92,7 @@ foreach ($key in $RegistryRaw.Keys) {
 
 # Windows native preference helpers (SET, never disable)
 
-# MenuBarNativeSet — Write the native preference to the desired state.
+# MenuBarNativeSet: Write the native preference to the desired state.
 # Never disables the native setting; SETs it.
 function Set-MenuBarNative {
   [CmdletBinding(SupportsShouldProcess)]
@@ -134,7 +134,7 @@ function Set-MenuBarNative {
   return 0
 }
 
-# MenuBarActualVisible — $true/$false whether the native preference matches the
+# MenuBarActualVisible: $true/$false whether the native preference matches the
 # desired visible value.
 function Get-MenuBarActualVisible {
   param([hashtable]$Entry)
@@ -151,7 +151,7 @@ function Get-MenuBarActualVisible {
 
 # Per-app state resolution
 
-# MenuBarConverge — Apply declared icon state for one app.
+# MenuBarConverge: Apply declared icon state for one app.
 # SETs the native preference to the desired state; never disables it.
 function Invoke-MenuBarConverge {
   param([string]$Key, [hashtable]$Entry)

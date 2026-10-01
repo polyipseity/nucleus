@@ -1,4 +1,4 @@
-# check.ps1 — Consolidated repository validation script (Windows).
+# check.ps1: consolidated repository validation script (Windows).
 #
 # Thin orchestrator: sources check-lib.ps1 for the framework and check-steps.ps1 for
 # step registration, then runs the pipeline.

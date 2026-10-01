@@ -80,7 +80,7 @@ BeforeAll {
 
   # Pester v5 cannot Mock commands that do not exist in the session (verified
   # empirically), so every mocked command absent from non-Windows CI hosts needs
-  # a stub definition first — log-management helpers sourced by svc.ps1 and
+  # a stub definition first, log-management helpers sourced by svc.ps1 and
   # Windows-only cmdlets. Each Mock below overrides its stub.
   function Get-NucleusLogDir { throw 'stub: Get-NucleusLogDir' }
   function Get-NucleusSystemLogDir { throw 'stub: Get-NucleusSystemLogDir' }

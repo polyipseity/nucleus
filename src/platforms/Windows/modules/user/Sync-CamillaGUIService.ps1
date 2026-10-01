@@ -39,7 +39,7 @@ function Sync-CamillaGUIService {
   if (-not $Enabled) {
     # DSC handles task removal via scheduler-user.dsc.yml. The PowerShell
     # module only removes the task when the feature is explicitly disabled
-    # (cleanup path) — DSC does not provide a "disable and remove" toggle.
+    # (cleanup path): DSC does not provide a "disable and remove" toggle.
     # check-suppress:suppression_doc: probe -- task may not exist; $null check handles missing task.
     $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     if ($null -ne $existingTask) {

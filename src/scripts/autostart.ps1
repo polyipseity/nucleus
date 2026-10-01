@@ -11,7 +11,7 @@
   Policy (driving constraint): we never let an app manage its own startup.
   If an app exposes a native auto-start setting, convergence disables it, then
   control enable/disable through exactly one uniform mechanism we own:
-    Windows — a Run-key entry (HKCU\Software\Microsoft\Windows\CurrentVersion\Run)
+    Windows: a Run-key entry (HKCU\Software\Microsoft\Windows\CurrentVersion\Run)
               or a Startup-folder .lnk we write/remove.
 
 .PARAMETER Action
@@ -19,7 +19,7 @@
 
 .PARAMETER AppName
   One or more app keys to target (required for enable/disable; optional for
-  status/verify — defaults to all).
+  status/verify: defaults to all).
 
 .PARAMETER Json
   Output machine-readable JSON instead of formatted tables.

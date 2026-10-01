@@ -10,7 +10,7 @@
 
 .NOTES
     Environment variables: (none)
-    Exit codes: N/A — library script; functions use throw on failure.
+    Exit codes: N/A, library script; functions use throw on failure.
 #>
 
 function Sync-SecretFile {
@@ -69,7 +69,7 @@ function Sync-SecretFile {
 
   .NOTES
     Environment variables: (none)
-    Exit codes: N/A — library function; uses throw on failure.
+    Exit codes: N/A, library function; uses throw on failure.
   #>
   param(
     [Parameter(Mandatory = $true)]

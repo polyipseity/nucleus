@@ -1,4 +1,4 @@
-# SizeStrings.ps1 — suffixed size string parsing shared by VM provisioning.
+# SizeStrings.ps1: suffixed size string parsing shared by VM provisioning.
 # Implements the IDENTICAL grammar as src/modules/lib/size.nix and
 # src/scripts/lib/size.sh; keep all three in sync.
 

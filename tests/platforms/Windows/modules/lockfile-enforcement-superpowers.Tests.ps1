@@ -6,7 +6,7 @@
     checkout: a missing checkout, a directory that is not a git checkout, a
     checkout at the wrong revision and a checkout at the pinned revision.
 .NOTES
-    Environment variables: (none — %LOCALAPPDATA% is overridden at script scope)
+    Environment variables: (none: %LOCALAPPDATA% is overridden at script scope)
     Exit codes: 0 on success; 1 on failure
     The suite runs on macOS/Linux as well; only the fixture paths differ.
 #>

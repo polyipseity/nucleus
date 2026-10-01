@@ -48,7 +48,7 @@ $onlySteps = 'repo-policy-pattern'
 $fixtureDir = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "nucleus-repository-policy-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $fixtureDir -Force > $null
 
-# Invoke-LoggingFormatPolicy — run step 12 over the given files.
+# Invoke-LoggingFormatPolicy: run step 12 over the given files.
 # Returns a hashtable with the child's exit code and combined output.
 function Invoke-LoggingFormatPolicy {
   param([string[]]$Paths)

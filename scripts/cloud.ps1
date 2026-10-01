@@ -1,4 +1,4 @@
-# cloud.ps1 — Nucleus cloud management CLI (Windows).
+# cloud.ps1: nucleus cloud management CLI (Windows).
 #
 # PowerShell twin of scripts/cloud.sh. Dispatches to:
 #   setup -> Invoke-CloudSetup   (verify/create rclone remotes, validate

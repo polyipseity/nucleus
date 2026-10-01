@@ -8,7 +8,7 @@
     is reinstalled at the pinned version, and a missing desired-package registry
     is a hard error rather than a silent skip.
 .NOTES
-    Environment variables: (none — $HOME is overridden at script scope)
+    Environment variables: (none: $HOME is overridden at script scope)
     Exit codes: 0 on success; 1 on failure
     The recording shim is written as pi.cmd on Windows and as an executable
     pi script elsewhere so the suite also runs on macOS/Linux.

@@ -51,7 +51,7 @@ function Get-NucleusInstanceIdPrefix {
 
   .DESCRIPTION
     A scheduled-task entry declares the folder in taskPath and the task-name prefix in
-    service, so the id prefix combines both — '\NucleusCloudMount' plus
+    service, so the id prefix combines both: '\NucleusCloudMount' plus
     'NucleusCloudMount-' yields '\NucleusCloudMount\NucleusCloudMount-'.
 
   .PARAMETER HostEntry
@@ -84,8 +84,8 @@ function Get-NucleusInstanceSuffix {
     Returns the per-instance suffix of a concrete instance id (the mount id).
 
   .DESCRIPTION
-    The suffix names the instance-specific runtime state — log directories, crash-loop
-    state — so it must derive from the registry prefix rather than be stored separately.
+    The suffix names the instance-specific runtime state: log directories, crash-loop
+    state, so it must derive from the registry prefix rather than be stored separately.
     The unit-type suffix (.service) is dropped when present.
 
   .PARAMETER HostEntry
@@ -186,7 +186,7 @@ function Get-NucleusPrefixInstanceList {
     Host entry hashtable of the prefix-match entry.
 
   .OUTPUTS
-    System.String[] — concrete instance ids, sorted; empty when none exist.
+    System.String[]: concrete instance ids, sorted; empty when none exist.
     Callers must wrap the call in @() to keep a single id an array.
 
   .EXAMPLE
@@ -239,7 +239,7 @@ function Test-NucleusMountEnabled {
     Single mount hashtable from the user registry.
 
   .OUTPUTS
-    System.Boolean — true when the mount is enabled.
+    System.Boolean: true when the mount is enabled.
 
   .EXAMPLE
     if (-not (Test-NucleusMountEnabled -Mount $mount)) { continue }
@@ -270,14 +270,14 @@ function Get-NucleusConfiguredInstanceList {
     Host entry hashtable of the prefix-match entry.
 
   .PARAMETER Username
-    Single user record to read. When omitted, every user is read — the watchdog runs
+    Single user record to read. When omitted, every user is read: the watchdog runs
     as SYSTEM and reconciles all users.
 
   .PARAMETER RepoRoot
     Absolute repository root. Defaults to $env:NUCLEUS_REPO_ROOT.
 
   .OUTPUTS
-    System.String[] — expected instance ids, sorted; empty when none are declared.
+    System.String[]: expected instance ids, sorted; empty when none are declared.
     Callers must wrap the call in @() to keep a single id an array.
 
   .EXAMPLE

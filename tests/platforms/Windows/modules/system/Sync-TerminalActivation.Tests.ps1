@@ -90,7 +90,7 @@ Describe 'Sync-TerminalActivation behavior' {
             "New-Item -Path '$markerPath' -ItemType File -Force"
         ) | Out-File -LiteralPath $manifestPath -Encoding ASCII
 
-        # Should not throw — errors are non-fatal.
+        # Should not throw: errors are non-fatal.
         { Sync-TerminalActivation } | Should -Not -Throw
         Test-Path -LiteralPath $markerPath | Should -Be $true
     }

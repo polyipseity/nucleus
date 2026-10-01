@@ -10,9 +10,9 @@
   only our mechanism remains.
 
   Cross-platform parity:
-    macOS   — login item removal in MacBook/activation.nix (osascript)
-    NixOS   — activation script in desktop.nix (XDG .desktop removal)
-    Windows — this module
+    macOS: login item removal in MacBook/activation.nix (osascript)
+    NixOS: activation script in desktop.nix (XDG .desktop removal)
+    Windows: this module
 
 .PARAMETER Enabled
   When true, converge app auto-start to the registry. When false, skip.

@@ -264,7 +264,7 @@ function Test-ServiceInstance {
     Set-HealthField -Instance $Instance -Field 'generation' -Value $generation
     Set-HealthLastExitCode -Instance $Instance -ExitCode $lastExit
 
-    # Rule 3: live but looping — break the loop, never restart it.
+    # Rule 3: live but looping: break the loop, never restart it.
     if (Test-HealthLooping -Instance $Instance) {
       Write-NucleusNotice -CommandName 'service-watchdog' -Message "$Instance is looping; stopping it"
       Set-HealthBlocked -Instance $Instance -Class 'crash-loop' -Remedy 'restart-loop'
@@ -272,7 +272,7 @@ function Test-ServiceInstance {
       return
     }
 
-    # Rule 5: live but broken — repair in place so it is not counted as a restart.
+    # Rule 5: live but broken: repair in place so it is not counted as a restart.
     if ($lastExit -eq 78) {
       Write-NucleusNotice -CommandName 'service-watchdog' -Message "$Instance exited 78 (EX_CONFIG); repairing it"
       $repairTimeout = Get-WatchdogLifecycleDuration -Name 'watchdogRepairTimeoutSeconds' -Default 30
@@ -288,7 +288,7 @@ function Test-ServiceInstance {
     return
   }
 
-  # Rule 4: not live and not blocked — the only revival path.
+  # Rule 4: not live and not blocked: the only revival path.
   Write-NucleusNotice -CommandName 'service-watchdog' -Message "$Instance is not running; starting it"
   Supervisor-Start -Target $Target
 }

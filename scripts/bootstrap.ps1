@@ -325,7 +325,7 @@ function Install-GnuPGDirect {
     }
   }
   if (-not $proc.HasExited) {
-    # Timeout — kill the installer and any leftover children.
+    # Timeout: kill the installer and any leftover children.
     Write-NucleusInfo "Installer still running after ${TimeoutSeconds}s; stopping it."
     try {
       # check-suppress:suppression_doc: process may already have exited; -ErrorAction SilentlyContinue handles the common case

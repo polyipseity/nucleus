@@ -1,5 +1,5 @@
 #Requires -Version 7.4
-# Tests for src/scripts/services/camilladsp-deviceselect.ps1 —
+# Tests for src/scripts/services/camilladsp-deviceselect.ps1:
 # smart playback device detection for CamillaDSP (Windows).
 
 [CmdletBinding()]
@@ -54,9 +54,9 @@ devices:
 
 # Run one detection entry point in a scope where the COM-backed detection
 # helpers are replaced by mocks, so no audio stack is required.
-# $EntryPoint — 'resolve' (Resolve-CamillaDSPPlaybackDevice) or 'resolved'
+# $EntryPoint: 'resolve' (Resolve-CamillaDSPPlaybackDevice) or 'resolved'
 #               (Get-CamillaDSPResolvedPlaybackDeviceName)
-# $Mocks      — hashtable of Default / First / Last / Available values
+# $Mocks: hashtable of Default / First / Last / Available values
 function Invoke-WithMockedDetection {
   param(
     [string]$ConfigYaml,
@@ -93,9 +93,9 @@ function Invoke-WithMockedDetection {
 }
 
 # Run Resolve-CamillaDSPPlaybackDevice with mocked detection helpers.
-# $Default  — value returned by Get-CamillaDSPDefaultPlaybackDevice (or $null)
-# $First    — value returned by Get-CamillaDSPFirstAvailablePlaybackDevice (or $null)
-# $Last     — value returned by Get-CamillaDSPLastDevice (or $null)
+# $Default: value returned by Get-CamillaDSPDefaultPlaybackDevice (or $null)
+# $First: value returned by Get-CamillaDSPFirstAvailablePlaybackDevice (or $null)
+# $Last: value returned by Get-CamillaDSPLastDevice (or $null)
 function Invoke-Resolve {
   param(
     [string]$ConfigYaml,
@@ -167,7 +167,7 @@ if ($cfg.devices.playback.type -eq 'CoreAudio') {
   Assert-Fail 'field preservation' "expected 'CoreAudio', got '$($cfg.devices.playback.type)'"
 }
 
-# Test 7: target device helper — returns the device detection would currently
+# Test 7: target device helper: returns the device detection would currently
 # select (the device Resolve-CamillaDSPPlaybackDevice would set), or $null when
 # detection yields nothing. This is what the heartbeat compares against so it
 # re-pushes when the system default output device changes.
@@ -208,7 +208,7 @@ if ([string]::IsNullOrEmpty($target)) {
   Assert-Fail 'target helper no devices' "expected empty, got '$target'"
 }
 
-# Test 8: push-decision matrix — mirrors the POSIX camilladsp_needs_push logic.
+# Test 8: push-decision matrix: mirrors the POSIX camilladsp_needs_push logic.
 # Skip (return $true) only when Running AND (null target OR (live non-empty AND
 # live == target AND the config is unchanged)). Re-push when the live device
 # differs from the target (system default changed) or the config file changed.

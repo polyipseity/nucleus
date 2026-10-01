@@ -3,8 +3,8 @@
     Pester parity tests for Windows env var wiring that needs no Nix toolchain.
 .DESCRIPTION
     Compares the Windows DSC files, Sync-ShellProfile.ps1 and apply.ps1 against
-    each other. The assertions that need the Nix catalog — which vars are
-    Windows-applicable and in which scope — live in
+    each other. The assertions that need the Nix catalog: which vars are
+    Windows-applicable and in which scope: live in
     tests/integration/env-parity-tests.nix and run in the Nix test lane, because
     a Windows host has no Nix toolchain to evaluate the catalog with.
 

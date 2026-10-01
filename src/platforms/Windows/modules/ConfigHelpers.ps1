@@ -198,7 +198,7 @@ function Deploy-Merge {
     }
   }
 
-  # INI merge mode — merge all keys under [setting] section.
+  # INI merge mode: merge all keys under [setting] section.
   if ($MergeMode -eq "ini") {
     $lines = @()
     if (Test-Path -Path $TargetPath -PathType Leaf) {

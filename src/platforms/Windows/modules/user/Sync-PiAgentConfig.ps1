@@ -15,7 +15,7 @@
 
   Both sources are resolved through the per-user overlay
   (Resolve-UserConfigFirstLevelEntry / Resolve-UserConfigFile), so a per-user
-  override wins over src\users\default\pi\ — no src\users\default path is
+  override wins over src\users\default\pi\, no src\users\default path is
   hardcoded here.
 
   Mirrors src/scripts/agents/symlink-pi-agent-config.sh on POSIX hosts.  Skills

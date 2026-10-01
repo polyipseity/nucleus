@@ -5,7 +5,7 @@
 
 .DESCRIPTION
   Scans the repository root for `result` and `result-*` symlinks and removes
-  them.  Only removes symlinks — real files or directories are preserved.
+  them.  Only removes symlinks. Real files or directories are preserved.
 
 .PARAMETER RepoRoot
   Absolute path to the repository root.  Defaults to $env:NUCLEUS_REPO_ROOT

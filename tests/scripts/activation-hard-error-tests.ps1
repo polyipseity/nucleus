@@ -1,7 +1,7 @@
 #Requires -Version 7.4
 # Tests asserting Windows activation modules hard-error when the child
 # convergence script fails.  Sync-MenuBar / Sync-AppAutostart must abort
-# (throw) on a failed convergence — no silent swallow of the child's exit code.
+# (throw) on a failed convergence, no silent swallow of the child's exit code.
 #
 # Run with: pwsh -NoProfile tests/scripts/activation-hard-error-tests.ps1
 
@@ -35,7 +35,7 @@ function Assert-Fail {
   $script:failCount++
 }
 
-# New-TempRepoWithFailingScript — Create a temp repo root whose
+# New-TempRepoWithFailingScript: Create a temp repo root whose
 # src/scripts/<name> exits 1, so the Sync-* module's child invocation fails.
 function New-TempRepoWithFailingScript {
   [CmdletBinding(SupportsShouldProcess)]

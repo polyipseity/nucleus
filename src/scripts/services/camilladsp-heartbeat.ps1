@@ -29,7 +29,7 @@ while ($true) {
   # With binding off the loop still runs so the websocket API stays up for
   # camillagui, but nothing opens an audio input.
   #   WHY: an open capture device lights the OS microphone privacy indicator,
-  #   which is costly on this hardware — set this false to stop that. Mirrors
+  #   which is costly on this hardware. Set this false to stop that. Mirrors
   #   the POSIX heartbeat.
   $bindEnabled = $true
   $nucleusCfgFile = Join-Path $HOME ".local\state\nucleus\config.json"
@@ -103,7 +103,7 @@ while ($true) {
       }
     }
   } catch {
-    # Can't connect — will retry with backoff.
+    # Can't connect, will retry with backoff.
     $null = $_  # check-suppress:suppression_doc: $_ discarded in ForEach-Object, side-effect-only iteration
   }
 
@@ -123,7 +123,7 @@ while ($true) {
         Set-Content -Path $lastPushFile -NoNewline -Value ((Get-FileHash -Path $ConfigFile -Algorithm SHA256).Hash + "|" + $targetDevice)
         $success = $true
       } catch {
-        # Device may be gone — retry with backoff.
+        # Device may be gone, retry with backoff.
         $null = $_  # check-suppress:suppression_doc: $_ discarded in ForEach-Object, side-effect-only iteration
       }
     }

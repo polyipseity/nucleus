@@ -64,8 +64,8 @@ BeforeAll {
   # ScheduledTasks is a Windows-only module; the generator calls these before and after
   # writing the wrapper.  Stubs keep the wrapper write on the real code path.
   # WHY the suppressions below: these are test doubles, not cmdlets.  Each shadows a real
-  # ScheduledTasks cmdlet under its exact name — that name IS the shadowing mechanism, so it
-  # cannot be renamed away — and each returns a [pscustomobject] without touching system
+  # ScheduledTasks cmdlet under its exact name: that name IS the shadowing mechanism, so it
+  # cannot be renamed away, and each returns a [pscustomobject] without touching system
   # state.  Their parameters exist only so the stub signature matches how
   # Sync-CloudDriveCatalog calls the real cmdlet, which PSScriptAnalyzer cannot see across
   # the file boundary (the documented PSReviewUnusedParameter limitation).

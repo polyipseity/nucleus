@@ -3,7 +3,7 @@
   Canonical Windows-side declaration of managed PATH directories.
 
 .DESCRIPTION
-  Mirrors pathComponents in src/modules/lib/managed-paths.nix — that file is the
+  Mirrors pathComponents in src/modules/lib/managed-paths.nix: that file is the
   authoritative cross-platform source; this module is the Windows-side
   consumer equivalent.  Every PowerShell script that needs to prepend managed
   bin directories should reference the variables or function here rather than
@@ -11,9 +11,9 @@
 
   Variables are scoped script: to prevent leaks when dot-sourced.
 
-  $script:nucleusPathComponents — hash table with Prepend/Append arrays (relative)
-  $script:nucleusPrependRegistry — registry-format paths (%USERPROFILE%-prefixed)
-  Get-NucleusManagedBinDir         — resolves a single bin dir by component name
+  $script:nucleusPathComponents: hash table with Prepend/Append arrays (relative)
+  $script:nucleusPrependRegistry: registry-format paths (%USERPROFILE%-prefixed)
+  Get-NucleusManagedBinDir: resolves a single bin dir by component name
 #>
 
 # Canonical source: src/modules/lib/managed-paths.nix (pathComponents)

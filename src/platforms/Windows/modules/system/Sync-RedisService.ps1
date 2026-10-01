@@ -95,7 +95,7 @@ function Sync-RedisService {
 
   if ($null -eq $redisServer) {
     # Install Redis via WinGet when absent. The version is pinned in
-    # src/lockfiles/lockfile.json (winget section) — `nucleus-update lockfile` is the only
+    # src/lockfiles/lockfile.json (winget section): `nucleus-update lockfile` is the only
     # authorized version changer.
     Write-NucleusInfo -CommandName 'redis' "redis-server not found; installing via WinGet (tporadowski.redis)"
     # check-suppress:suppression_doc: probe whether winget is available; throws when absent.

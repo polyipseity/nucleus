@@ -7,7 +7,7 @@
     sources, re-runs are idempotent, and a disabled run removes the managed links
     without disturbing unmanaged content.
 .NOTES
-    Environment variables: (none — $HOME is overridden at script scope)
+    Environment variables: (none: $HOME is overridden at script scope)
     Exit codes: 0 on success; 1 on failure
     Symlink creation requires elevation or Developer Mode on Windows; not
     required on macOS/Linux where the tests also run.

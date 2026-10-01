@@ -18,7 +18,7 @@ function Sync-ShellProfile {
     Mandatory: true applies the block, false removes it.
 
   .NOTES
-    Environment variables: NUCLEUS_REPO_ROOT — must be set by caller (apply.ps1
+    Environment variables: NUCLEUS_REPO_ROOT: must be set by caller (apply.ps1
     exports it) when the settings symlink is enabled.
     Exit codes: 0 on success; non-zero on failure
   #>

@@ -312,7 +312,7 @@ function Sync-CursorConfig {
     Write-NucleusInfo -CommandName $label "linked $linkPath -> $entryPath"
   }
 
-  # Class C: Cursor IDE settings — symlink settings.json into the IDE User dir
+  # Class C: Cursor IDE settings: symlink settings.json into the IDE User dir
   # (separate from ~/.cursor/, which holds CLI-side config).
   $ideSettingsSource = Resolve-UserConfigFirstLevelEntry -User $Username -ConfigName 'cursor' -EntryName 'settings.json' -RepoRoot $RepoRoot
   $appDataRoaming = Join-Path -Path $HOME -ChildPath 'AppData\Roaming'

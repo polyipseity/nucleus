@@ -7,7 +7,7 @@
     idempotent, a missing bridge target or missing overlay config is a hard
     error, disabled removes only managed links, and a foreign file is preserved.
 .NOTES
-    Environment variables: (none — $HOME is overridden at script scope)
+    Environment variables: (none: $HOME is overridden at script scope)
     Exit codes: 0 on success; 1 on failure
     Symlink creation requires elevation or Developer Mode on Windows; not
     required on macOS/Linux where the tests also run.  icacls is shimmed off

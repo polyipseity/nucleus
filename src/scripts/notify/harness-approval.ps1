@@ -14,7 +14,7 @@
   %USERPROFILE%\.local\bin\harness-approval.cmd shim, so it stays self-contained
   (see harness-notify.ps1 for the same reasoning).
 
-  `ask` means "no remote decision" — the harness must fall back to its own local
+  `ask` means "no remote decision": the harness must fall back to its own local
   prompt.  Every path prints a decision and exits 0: a harness hook that fails is
   treated as a denial by some harnesses, which would turn a broker outage into a
   blocked session.

@@ -32,7 +32,7 @@ function Sync-SymlinkManifest {
     Sync-SymlinkManifest -Enabled:$false -UserRecords @(@{ name = 'admin'; homeDirectory = 'C:\Users\admin'; symlinks = @() })
 
   .NOTES
-    Environment variables: USERDOMAIN, USERNAME — used for delete-protection ACLs.
+    Environment variables: USERDOMAIN, USERNAME: used for delete-protection ACLs.
     Exit codes: 0 on success; non-zero on failure
   #>
   [CmdletBinding()]

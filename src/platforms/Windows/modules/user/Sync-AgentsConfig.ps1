@@ -151,7 +151,7 @@ function Sync-AgentsConfig {
                      -and $linkItem.LinkType -eq 'SymbolicLink'
       if ($isSymlink) {
         if ([string]::Equals($linkItem.Target, $entryPath, [System.StringComparison]::OrdinalIgnoreCase)) {
-          continue  # Correct symlink — no-op.
+          continue  # Correct symlink: no-op.
         }
         # Wrong target (leftover from a previous checkout path): replace.
         Remove-ManagedSymlinkDeleteProtection -Context "agents-config" -Path $linkPath

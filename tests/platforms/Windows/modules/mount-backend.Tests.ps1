@@ -63,7 +63,7 @@ BeforeAll {
   # An attached mount whose remote root happens to be empty.
   $null = New-Item -ItemType SymbolicLink -Path $script:MountedEmpty -Target $target
 
-  # Block-DirectoryReadAccess — make a directory this process cannot list, and give the
+  # Block-DirectoryReadAccess: make a directory this process cannot list, and give the
   # test a way to undo it.
   #
   # WHY two implementations: POSIX denies the read bit on the directory, Windows has no
@@ -84,7 +84,7 @@ BeforeAll {
     return 'chmod'
   }
 
-  # Unblock-DirectoryReadAccess — put the permissions back so the suite can delete the tree.
+  # Unblock-DirectoryReadAccess: put the permissions back so the suite can delete the tree.
   function Unblock-DirectoryReadAccess {
     param(
       [Parameter(Mandatory)][string]$Path,

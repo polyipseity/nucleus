@@ -42,7 +42,7 @@ function Sync-UserPath {
       - Our entries in Machine scope come before all User-scope entries in
         the CreateEnvironmentBlock merge order [Machine];[User].
       - Non-interactive sessions (services without LoadUserProfile) resolve
-        %USERPROFILE% to system profile dirs — acceptable since our tools
+        %USERPROFILE% to system profile dirs; acceptable since our tools
         (bun, cargo, uv) are interactive-only.
   #>
   param(
