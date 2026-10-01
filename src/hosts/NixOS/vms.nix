@@ -1,20 +1,12 @@
-# NixOS/vms.nix — KVM/libvirt virtual machine infrastructure for the NixOS host.
-#
-# Enables the libvirtd hypervisor so QEMU/KVM guests can be managed via virsh
-# and virt-manager.  Guest VMs are declared in src/modules/vms/VMs.json and
-# provisioned by scripts/vm.sh (run via `nucleus-vm setup`).
-#
-# Disk images are stored under ~/virtual machines/data/ and ~/virtual machines/src/
-# in QCOW2 format, enabling copy-based migration to UTM (macOS) or QEMU (Windows)
-# without conversion.  The directory is local-only and excluded from cloud sync.
-#
-# VirtioFS (virtiofsd) provides zero-copy host-directory sharing between the
-# NixOS host and Linux guests.  Each guest mounts the shared ~/dev tree at
-# /home/<user>/dev inside the VM for seamless cross-host development.
-#
-# Domain XML is generated at Nix evaluation time and installed to
-# /var/lib/nucleus/vms/<name>-domain.xml (the nucleus SYSTEM root) so vm.sh
-# can call virsh define without needing to inline the XML at provisioning time.
+# NixOS/vms.nix - KVM/libvirt virtual machine infrastructure for the NixOS host.
+# Guests are declared in src/modules/vms/VMs.json and provisioned by
+# scripts/vm.sh (`nucleus-vm setup`).  Disk images live under
+# ~/virtual machines/{data,src}/ in QCOW2, which copies to UTM (macOS) and QEMU
+# (Windows) without conversion; the tree is local-only and excluded from cloud
+# sync.  VirtioFS (virtiofsd) shares ~/dev with Linux guests, mounted at
+# /home/<user>/dev inside the VM.  Domain XML is generated at Nix evaluation
+# time and installed to /var/lib/nucleus/vms/<name>-domain.xml (the nucleus
+# SYSTEM root) so vm.sh can call virsh define without inlining the XML.
 {
   lib,
   pkgs,
@@ -46,9 +38,8 @@ let
 
   videoModel = vm: if vm.type == "Windows" then "vga" else "virtio";
 
-  # Optional VirtioFS filesystem element appended after <channel>.
-  # The leading \n keeps it on its own line at 4-space indent (matching the
-  # surrounding device elements in the 2-space-indented XML template below).
+  # Optional VirtioFS element appended after <channel>.  The leading \n keeps it
+  # on its own line at the surrounding 4-space indent of the XML template.
   virtiofsDev =
     vm:
     if !vm.shareDevDir then
@@ -60,12 +51,11 @@ let
       + "\n      <target dir='dev'/>"
       + "\n    </filesystem>";
 
-  # Android-specific disk attachments for GSI-based Android VM images.
-  # The system disk is the writable data/<id> (system).qcow2 overlay over
-  # src/Android/system image.qcow2 (src/ stays pristine); userdata is a
-  # writable qcow2; the GSI image is attached read-only only when the
-  # Android group's gsiUrl is set.  Image filenames come from the manifest
-  # Android group so VMs.json is the canonical source.
+  # Android disk attachments for GSI images.  The system disk is the writable
+  # data/<id> (system).qcow2 overlay over src/Android/system image.qcow2, which
+  # stays pristine; userdata is a writable qcow2; the GSI image attaches
+  # read-only only when the Android group's gsiUrl is set.  Filenames come from
+  # the manifest Android group, so VMs.json stays canonical.
   androidDisks =
     vm:
     if vm.type != "Android" then
@@ -90,20 +80,18 @@ let
         + "    </disk>"
       );
 
-  # Firmware block selecting UEFI (Android) or legacy BIOS (non-Android).
-  # Android requires AArch64 UEFI via AAVMF for GSI boot; non-Android VMs
-  # use the standard hvm type with the host-appropriate arch/machine baked
-  # in.
+  # Firmware block: UEFI for Android, legacy BIOS otherwise.  GSI boot needs
+  # AArch64 UEFI via AAVMF; other guests take the standard hvm type with the
+  # host-appropriate arch and machine.
   vmFirmware =
     vm:
     if vm.type == "Android" then
       "<os firmware='efi'>\n"
       + "    <type arch='aarch64' machine='virt'>hvm</type>\n"
       + "    <loader type='pflash' readonly='yes' secure='no'>/usr/share/AAVMF/AAVMF_CODE.secboot.fd</loader>\n"
-      # WHY: <nvram> is a template path — libvirt creates a per-domain
-      # writable NVRAM copy and preserves it across defines/reboots, so UEFI
-      # vars stay per-VM without our own data/ copy (don't fight libvirt's
-      # lifecycle).
+      # WHY: <nvram> is a template path: libvirt creates a per-domain
+      # writable NVRAM copy and preserves it across defines and reboots, so UEFI
+      # vars stay per-VM without our own data/ copy.
       + "    <nvram>/usr/share/AAVMF/AAVMF_VARS.fd</nvram>\n"
       + "    <boot dev='hd'/>\n"
       + "  </os>"
@@ -113,16 +101,14 @@ let
       + "    <boot dev='hd'/>\n"
       + "  </os>";
 
-  # USB tablet input device for precise pointer tracking in Android.
-  # Android's default emulated mouse is imprecise; a USB tablet provides
-  # absolute coordinates matching the display.
+  # USB tablet gives Android absolute pointer coordinates; the default emulated
+  # mouse is imprecise.
   androidInput = vm: if vm.type != "Android" then "" else "<input type='tablet' bus='usb'/>";
 
-  # AC97 sound device for Android VM audio output.
   androidSound = vm: if vm.type != "Android" then "" else "<sound model='ac97'/>";
 
-  # passt port-forward ranges derived from the manifest portForwards so the
-  # libvirt domain XML always matches VMs.json (host ports in 22000-22099).
+  # passt ranges come from the manifest portForwards, so the XML matches
+  # VMs.json (host ports 22000-22099).
   portForwardRanges =
     vm:
     lib.concatMapStrings (pf: ''
@@ -131,8 +117,7 @@ let
       </portForward>
     '') vm.portForwards;
 
-  # User-mode network interface with passt backend for manifest-driven port
-  # forwarding (replaces the default libvirt NAT network).
+  # User-mode network with a passt backend, replacing the libvirt NAT network.
   networkInterface =
     vm:
     "<interface type='user'>\n"
@@ -141,8 +126,8 @@ let
     + (portForwardRanges vm)
     + "    </interface>";
 
-  # Libvirt domain XML template.  Indented strings in Nix strip the common
-  # leading whitespace (6 spaces here), producing a 0-based XML document.
+  # The Nix indented string strips the common leading whitespace, producing a
+  # 0-based XML document.
   mkDomainXml =
     vm:
     builtins.replaceStrings
@@ -179,8 +164,8 @@ let
       # check-suppress:config-method: method 4 (runtime direct read) -- builtins.readFile embeds at eval time
       (builtins.readFile ../../modules/vms/nixos-domain.xml);
 
-  # Pre-generate libvirt domain XML for each declared VM into the nix store so
-  # the activation script can install it to the SYSTEM root.  Keyed by VM id.
+  # Each VM's domain XML, generated into the nix store for activation to install
+  # to the SYSTEM root.  Keyed by VM id.
   vmXmlFiles = lib.listToAttrs (
     builtins.map (
       vm: lib.nameValuePair vm.id (pkgs.writeText "nucleus-${vm.id}-domain.xml" (mkDomainXml vm))
@@ -188,47 +173,38 @@ let
   );
 in
 {
-  # Enable KVM-accelerated QEMU virtualisation via the libvirt management API.
-  # runAsRoot = false runs the QEMU child process as the calling user rather
-  # than root, which is safer and sufficient for unprivileged KVM access.
+  # KVM-accelerated QEMU through the libvirt management API.  runAsRoot = false
+  # runs the QEMU child as the calling user, which is safer and enough for
+  # unprivileged KVM access.
   # Source: https://mynixos.com/nixpkgs/option/virtualisation.libvirtd.enable
   virtualisation.libvirtd = {
     enable = true;
     qemu = {
-      # Keep QEMU pinned to the KVM-optimised build (strips TCG where unused).
+      # KVM-optimised build; TCG is stripped because it goes unused here.
       # Source: https://mynixos.com/nixpkgs/option/virtualisation.libvirtd.qemu.package
       package = pkgs.qemu_kvm;
-      # Let the per-user QEMU process run as the calling user, not root.
+      # Run the per-user QEMU process as the calling user, not root.
       # Source: https://mynixos.com/nixpkgs/option/virtualisation.libvirtd.qemu.runAsRoot
       runAsRoot = false;
-      # swtpm emulates a TPM 2.0 chip required by Windows 11 and some secure
-      # NixOS setups.
+      # swtpm emulates the TPM 2.0 chip Windows 11 needs.
       # Source: https://mynixos.com/nixpkgs/option/virtualisation.libvirtd.qemu.swtpm.enable
       swtpm.enable = true;
     };
   };
 
-  # Enable SPICE USB redirection so USB devices plugged into the host can be
-  # forwarded into a running guest session.
+  # SPICE USB redirection forwards host USB devices into a running guest.
   # Source: https://mynixos.com/nixpkgs/option/virtualisation.spiceUSBRedirection.enable
   virtualisation.spiceUSBRedirection.enable = true;
 
-  # Add the managed user to the groups that gate KVM and libvirt access.
-  #   kvm:      grants direct /dev/kvm device access for hardware acceleration.
-  #   libvirtd: grants unprivileged virsh/virt-manager management over the
-  #             system-level libvirtd socket.
+  # kvm gates /dev/kvm access for hardware acceleration; libvirtd gates
+  # unprivileged virsh and virt-manager on the system-level socket.
   # Source: https://mynixos.com/nixpkgs/option/users.users
   users.users.${username}.extraGroups = lib.mkAfter [
     "kvm"
     "libvirtd"
   ];
 
-  # System-level packages needed for VM management and disk provisioning.
-  #   virt-manager:  GTK GUI for creating and managing KVM guests.
-  #   virt-viewer:   SPICE/VNC client for connecting to guest consoles.
-  #   qemu_kvm:      CLI tools including qemu-img for QCOW2 disk management.
-  #   virtiofsd:     VirtioFS daemon for zero-copy host→guest directory shares.
-  #   passt:         userspace network backend for libvirt user-mode port forwards.
+  # VM management and disk provisioning tools.
   # Source: https://mynixos.com/nixpkgs/option/environment.systemPackages
   environment.systemPackages = with pkgs; [
     passt
@@ -238,11 +214,9 @@ in
     virtiofsd
   ];
 
-  # Pre-generate libvirt domain XML for each declared VM so vm.sh can
-  # call `virsh define /var/lib/nucleus/vms/<id>-domain.xml` without needing to
-  # inline or template the XML at provisioning time.  environment.etc always
-  # nests under /etc, so we write the files directly to the SYSTEM root via a
-  # system activation script (mode 0444, readable by all for virsh define).
+  # Install the domain XML so vm.sh can call `virsh define` on it.
+  # environment.etc always nests under /etc, so a system activation script writes
+  # to the SYSTEM root (mode 0444, readable by all).
   # Source: https://mynixos.com/nixpkgs/option/system.activationScripts
   system.activationScripts.nixos-vms-xml = lib.mkBefore ''
     install -d -m 0755 /var/lib/nucleus/vms
@@ -253,10 +227,8 @@ in
     )}
   '';
 
-  # Declare the VM disk-image base under the excluded `virtual machines` tree
-  # (item 3).  The data/ and src/ subdirs hold QCOW2 images provisioned by
-  # vm.sh; this is a user-intended directory, not a nucleus root, so it stays
-  # under ~/virtual machines and is excluded from cloud sync.
+  # Disk-image base under the excluded `virtual machines` tree (item 3), which is
+  # user-intended rather than a nucleus root and stays out of cloud sync.
   systemd.tmpfiles.rules = lib.mkAfter [
     "d ${homeDir}/virtual machines/data 0755 ${username} users -"
     "d ${homeDir}/virtual machines/src 0755 ${username} users -"

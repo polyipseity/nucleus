@@ -1,6 +1,5 @@
-# NixOS/activation.nix — NixOS system activation hooks for the generic Linux host.
-#
-# All scripts run during nixos-rebuild switch as root.
+# NixOS/activation.nix - NixOS system activation hooks for the generic Linux host.
+# Every script runs during nixos-rebuild switch as root.
 {
   config,
   lib,
@@ -14,10 +13,9 @@ let
   linuxServices = lib.filterAttrs (
     _: svc: svc ? hosts.NixOS && svc.hosts.NixOS ? type && svc.hosts.NixOS.type != "omitted"
   ) servicesJSON;
-  # NOTE: `svc.logging` is accessed unguarded so a service that omits its
-  # `logging` block fails Nix eval loudly (instead of being silently skipped).
-  # `dirs` may be absent (services with no log files), so only that level is
-  # guarded with `or {}` / `or []`.
+  # NOTE: `svc.logging` is read unguarded so a service that omits its `logging`
+  # block fails Nix eval loudly instead of being silently skipped.  Only the
+  # inner `dirs` level is guarded, since services with no log files omit it.
   linuxSystemLogDirs = lib.unique (
     lib.flatten (
       lib.mapAttrsToList (
@@ -29,9 +27,10 @@ let
       ) linuxServices
     )
   );
-  # User log dirs are provisioned too, and chowned to the service user, because this
-  # activation runs as root: without it every NixOS service that writes a log file would
-  # have to create the dir in its own unit (macOS and Windows provision from the registry).
+  # User log dirs are provisioned too and chowned to the service user, since this
+  # activation runs as root.  Without it every service that writes a log file
+  # would create the dir in its own unit; macOS and Windows provision from the
+  # registry.
   linuxUserLogDirs = lib.unique (
     lib.flatten (
       lib.mapAttrsToList (
@@ -43,19 +42,16 @@ let
       ) linuxServices
     )
   );
-  # Bundle services.json into the nix store so the systemd watchdog can
-  # read it without needing NUCLEUS_REPO_ROOT.  Same approach as the
-  # macOS launchd watchdog (MacBook/service-watchdog.nix).
+  # Bundle services.json into the nix store so the systemd watchdog reads it
+  # without NUCLEUS_REPO_ROOT, like the macOS launchd watchdog.
   servicesJson = import ../../modules/lib/services-json-path.nix { };
 
   activationBundle = pkgs.callPackage ../../modules/lib/script-tree.nix { };
 
-  # Shared nucleus root constants + activation helpers (Phase 1).
   nucleusRoots = import ../../modules/lib/nucleus-roots.nix { inherit lib pkgs; };
   userHome = config.users.users.${username}.home;
   userGroup = config.users.users.${username}.group;
 
-  # Shared GC application derivations (plan item 6).
   gcApps = import ../../modules/gc-activations.nix { inherit pkgs; };
   inherit (gcApps)
     logGcUser
@@ -65,29 +61,23 @@ let
     ;
 in
 {
-  # ---------------------------------------------------------------------------
   # nixos-launch-nvim.sh
-  # Creates a deterministic symlink at /etc/nucleus/bin/nvim that
-  # vscode-neovim can use (the extension does not expand ${userHome} or ~).
-  # Resolves the nvim path from the home-manager profile directory so that no
-  # username is hardcoded, matching Home Manager's useUserPackages = true layout.
-  # ---------------------------------------------------------------------------
+  # Deterministic symlink at /etc/nucleus/bin/nvim for vscode-neovim, which does
+  # not expand ${userHome} or ~.  The target comes from the home-manager profile
+  # directory, so no username is hardcoded (matching useUserPackages = true).
   system.activationScripts.nixos-launch-nvim = lib.mkAfter ''
     "${activationBundle}/src/scripts/editors/launch-nvim.sh" "${
       config.home-manager.users.${username}.home.profileDirectory
     }/bin/nvim"
   '';
 
-  # ---------------------------------------------------------------------------
   # nixos-nucleus-root-symlinks
-  # Create the physical conventional dirs + root→conventional symlinks BEFORE
-  # log-dirs-init so `mkdir -p <root>/logs` resolves through the symlink into
-  # the physical target (e.g. /var/log/nucleus).  Also creates the ~/.nucleus
-  # hub (user → USER root, system → SYSTEM root) for the managed user.
-  # Activation (and ONLY activation) creates these; services reference only
-  # root paths.  All nucleus config lives directly in the USER root
-  # (~/.local/share/nucleus) — there is no legacy config location.
-  # ---------------------------------------------------------------------------
+  # Create the physical conventional dirs plus root->conventional symlinks
+  # BEFORE log-dirs-init, so `mkdir -p <root>/logs` resolves through the symlink
+  # into the physical target (e.g. /var/log/nucleus).  Also creates the ~/.nucleus
+  # hub for the managed user.  Only activation creates these; services reference
+  # root paths only.  All nucleus config lives in the USER root
+  # (~/.local/share/nucleus), with no legacy config location.
   system.activationScripts.nixos-nucleus-root-symlinks = lib.mkBefore ''
     ${nucleusRoots.mkNucleusRootSymlinks {
       inherit userHome;
@@ -99,17 +89,14 @@ in
     }}
   '';
 
-  # ---------------------------------------------------------------------------
   # nixos-ensure-log-dirs
-  # Create system and user log directories for all nucleus systemd services before they
-  # start, chowning the user dirs to the service user.
-  # WHY: Log directory creation is imperative because it must run AFTER the
-  # root symlinks resolve (Nix activation ordering is alphabetical, not
-  # dependency-based). systemd LogsDirectory creates under /var/log/ (wrong
-  # path — nucleus logs live under /var/lib/nucleus/logs/). StateDirectory
-  # creates under /var/lib/ but cannot create nested paths like
-  # nucleus/logs/<subdir>. Neither handles the activation ordering constraint.
-  # ---------------------------------------------------------------------------
+  # Create the system and user log directories for every nucleus systemd service
+  # before it starts, chowning user dirs to the service user.
+  # WHY: imperative, because it must run AFTER the root symlinks resolve and Nix
+  # activation order is alphabetical, not dependency-based.  systemd
+  # LogsDirectory creates under /var/log/ (wrong path; nucleus logs live in
+  # /var/lib/nucleus/logs/) and StateDirectory creates under /var/lib/ but cannot
+  # make nested paths like nucleus/logs/<subdir>.
   system.activationScripts.nixos-ensure-log-dirs = lib.mkAfter ''
     "${activationBundle}/src/scripts/services/log-dirs-init.sh" \
       "${config.nucleus.logging.systemLogDir}" \
@@ -121,15 +108,9 @@ in
       "${username}:${userGroup}"
   '';
 
-  # ---------------------------------------------------------------------------
-  # Service watchdog — persistent daemon for stuck nucleus services.
-  # Internal 300s sleep loop.  Cross-host parity:
-  #   macOS   — launchd daemon (KeepAlive=true, internal 300s loop)
-  #   NixOS   — systemd service (Restart=always, internal 300s loop)
-  #   Windows — scheduled task AtStartup (internal 300s loop)
-  # --scope system keeps this root service to system-domain units; a root
+  # System-scope service watchdog for stuck nucleus services, internal 300s sleep
+  # loop.  --scope system keeps this root service to system-domain units; a root
   # process has no user manager, so user-domain coverage is a separate unit.
-  # ---------------------------------------------------------------------------
   systemd.services."nucleus-service-watchdog" = {
     description = "Nucleus service watchdog — restart stuck services";
     environment.NUCLEUS_SERVICES_JSON = "${servicesJson}";
@@ -141,14 +122,8 @@ in
     wantedBy = [ "multi-user.target" ];
   };
 
-  # ---------------------------------------------------------------------------
-  # User-scope service watchdog — the user's own systemd manager.  Runs in the
-  # user session so `systemctl --user` resolves (a root process has no user
-  # manager and would log a false restart).  Cross-host parity:
-  #   macOS   — launchd agent (local.service-watchdog-user)
-  #   NixOS   — systemd user service (this unit)
-  #   Windows — the scheduled task runs with system scope and covers all users
-  # ---------------------------------------------------------------------------
+  # User-scope watchdog, in the user's own systemd manager so `systemctl --user`
+  # resolves; a root process has no user manager and would log a false restart.
   systemd.user.services."nucleus-service-watchdog-user" = {
     description = "Nucleus user service watchdog — restart stuck user services";
     environment.NUCLEUS_SERVICES_JSON = "${servicesJson}";
@@ -160,10 +135,8 @@ in
     wantedBy = [ "default.target" ];
   };
 
-  # ---------------------------------------------------------------------------
-  # Daily system log rotation — rotates /var/log/nucleus as root because
-  # user-context gc cannot write root-owned service logs.
-  # ---------------------------------------------------------------------------
+  # Daily system log rotation.  Root, because user-context gc cannot write
+  # root-owned service logs.
   systemd.services."nucleus-log-gc-system" = {
     description = "Daily system log rotation for nucleus services";
     serviceConfig = {
@@ -184,11 +157,7 @@ in
     wantedBy = [ "timers.target" ];
   };
 
-  # ---------------------------------------------------------------------------
-  # Daily user log rotation — rotates ~/.local/share/nucleus/logs as the
-  # user (not root). Cross-host parity with macOS launchd agent and
-  # Windows scheduled task.
-  # ---------------------------------------------------------------------------
+  # Daily user log rotation, as the user rather than root.
   systemd.user.services."nucleus-log-gc-user" = {
     description = "Daily user log rotation for nucleus services";
     serviceConfig = {
@@ -209,9 +178,7 @@ in
     wantedBy = [ "timers.target" ];
   };
 
-  # ---------------------------------------------------------------------------
-  # Daily Nix store GC — intersection generation prune + collect-garbage.
-  # ---------------------------------------------------------------------------
+  # Daily Nix store GC: intersection generation prune plus collect-garbage.
   systemd.services."nucleus-nix-store-gc" = {
     description = "Daily Nix store garbage collection";
     serviceConfig = {
@@ -235,9 +202,7 @@ in
     wantedBy = [ "timers.target" ];
   };
 
-  # ---------------------------------------------------------------------------
-  # Weekly garbage collection — full gc.sh as root with user steps via sudo -u.
-  # ---------------------------------------------------------------------------
+  # Weekly full gc.sh as root, with the user steps via sudo -u.
   systemd.services."nucleus-gc-weekly" = {
     description = "Weekly garbage collection (VM, build, cache artifacts)";
     serviceConfig = {
@@ -261,12 +226,10 @@ in
     wantedBy = [ "timers.target" ];
   };
 
-  # ---------------------------------------------------------------------------
   # nixos-verify-nucleus-services
-  # Warn-only check that all managed services are running after activation.
-  # Failing to start a service should not block activation, but the warning
-  # surfaces issues for post-apply investigation.
-  # ---------------------------------------------------------------------------
+  # Warn-only check that every managed service runs after activation: a service
+  # that fails to start should not block activation, but the warning surfaces it
+  # for post-apply investigation.
   system.activationScripts.nixos-verify-nucleus-services = lib.mkAfter ''
     if command -v nucleus-svc >/dev/null 2>&1; then
       if ! nucleus-svc verify; then

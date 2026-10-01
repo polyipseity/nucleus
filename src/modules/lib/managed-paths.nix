@@ -1,20 +1,13 @@
-# modules/lib/managed-paths.nix — Canonical declaration of managed PATH
-# components and related helpers.
+# modules/lib/managed-paths.nix - Canonical declaration of managed PATH
+# components and helpers.
 #
-# Mirrors ManagedPaths.ps1 (Windows) — keep the two files in sync.
-#
-# Takes only `pkgs` — no config, lib, or username dependency.
-# Returns: { defaultDevTools, pathComponents, cargoBinDir,
-#   toShellPrependPath, toShellAppendPath, toShellPrependGuard,
-#   toShellAppendGuard, toAbsolutePrependPath, toAbsoluteAppendPath,
-#   toPowerShellPrependSnippet, toPowerShellAppendSnippet,
-#   toLaunchctlConfigPath }
+# Mirrors ManagedPaths.ps1 (Windows); keep the two in sync.
+# Takes only `pkgs`, no config, lib, or username dependency.
 { pkgs, ... }:
 let
   lib = pkgs.lib;
 
-  # ── Fallback toolchain ──────────────────────────────────────────────
-  # symlinkJoin of bun + prek + uv for repos without direnv/Nix devShell.
+  # Fallback toolchain for repos without direnv or a Nix devShell.
   defaultDevTools = pkgs.symlinkJoin {
     name = "default-dev-tools";
     paths = [
@@ -24,25 +17,20 @@ let
     ];
   };
 
-  # ── User-scoped `node` → `bun` shim ────────────────────────────────
-  # The repository bans system-wide Node.js; bun is the sole JS runtime.  bun's
-  # node-compat mode runs Node.js scripts, so a `node` symlink to `bun` lets
-  # `node <script>` invocations (e.g. inside `bun run` child shells, GUI apps)
-  # resolve to bun without installing a separate Node.js.  Installed into
-  # ~/.local/bin (already on the managed append PATH) so it is reachable by
-  # subprocess PATHs.  Interactive `node()` in init.zsh still blocks — this is
-  # infrastructure on PATH, not a license to use node interactively.
+  # User-scoped `node` -> `bun` shim.  bun's node-compat mode runs Node.js
+  # scripts, so a `node` symlink to `bun` resolves `node <script>` (inside
+  # `bun run` child shells, GUI apps) without installing Node.js.  Installed
+  # into ~/.local/bin, already on the managed append PATH, so subprocesses
+  # resolve it.  Interactive `node()` in init.zsh still blocks: this is
+  # infrastructure on PATH, not a licence to run node interactively.
   nodeShim = pkgs.runCommand "node-shim" { } ''
     mkdir -p "$out/bin"
     ln -s "${pkgs.bun}/bin/bun" "$out/bin/node"
   '';
 
-  # ── PATH components ─────────────────────────────────────────────────
-  # Managed PATH directories split into prepend (before system default) and
-  # append (after system default) groups.  Each consumer renders these as
-  # platform-appropriate PATH strings.
-  # Prepend: directories that appear before the system default PATH.
-  # Append: directories that appear after the system default PATH.
+  # Managed PATH directories, split into prepend (before the system default
+  # PATH) and append (after it).  Consumers render each group as a
+  # platform-appropriate PATH string.
   pathComponents = {
     prepend = [ ];
     append = [
@@ -52,16 +40,14 @@ let
     ];
   };
 
-  # Named reference: .cargo/bin (rustup shim).  Consumers must use this instead
-  # of hardcoded indices into pathComponents.append.
+  # Named reference to the .cargo/bin rustup shim.  Consumers use this instead
+  # of a hardcoded index into pathComponents.append.
   cargoBinDir = builtins.elemAt pathComponents.append 1;
 
-  # ── Helper: render launchctl config user path string ───────────────
-  # Returns a colon-joined absolute PATH string for use in
-  # sudo launchctl config user path.  Takes homeDir as an argument
-  # (e.g. "${config.home.homeDirectory}") and renders all managed
-  # directories as absolute paths including system fallbacks.
-  # Used by gui-env-path in macos.nix.
+  # Colon-joined absolute PATH string for `sudo launchctl config user path`.
+  # Takes homeDir (e.g. "${config.home.homeDirectory}") and renders every
+  # managed directory plus the system fallbacks.  Used by gui-env-path in
+  # macos.nix.
   toLaunchctlConfigPath =
     homeDir:
     let
@@ -85,44 +71,30 @@ let
       ]
     );
 
-  # ── Helper: render generic shell PATH prepend string ───────────────
-  # Same format as toShellPrependPath but for the append position.
   toShellPrependPath = builtins.concatStringsSep ":" (map (p: "$HOME/${p}") pathComponents.prepend);
 
-  # ── Helper: render generic shell PATH append string ────────────────
-  # Same format as toShellPrependPath but for the append position.
   toShellAppendPath = builtins.concatStringsSep ":" (map (p: "$HOME/${p}") pathComponents.append);
 
-  # ── Helper: render absolute PATH prepend string ────────────────────
-  # Like toShellPrependPath but resolves the home directory at build
-  # time: takes homeDir (e.g. "${config.home.homeDirectory}") and renders
-  # managed dirs as absolute paths.  For launchd argv, where no shell
-  # expansion occurs (the sh -c wrapper single-quotes arguments).
+  # Like toShellPrependPath but resolves the home directory at build time.
+  # For launchd argv, where no shell expansion occurs because the `sh -c`
+  # wrapper single-quotes its arguments.
   toAbsolutePrependPath =
     homeDir: builtins.concatStringsSep ":" (map (p: "${homeDir}/${p}") pathComponents.prepend);
 
-  # ── Helper: render absolute PATH append string ─────────────────────
-  # Same as toAbsolutePrependPath but for the append group.
   toAbsoluteAppendPath =
     homeDir: builtins.concatStringsSep ":" (map (p: "${homeDir}/${p}") pathComponents.append);
 
-  # ── Helper: shell prepend guard (:suffix) ─────────────────────────
-  # Expands to "<prepend>:" when prepend renders non-empty, empty string
-  # otherwise.  Computed at Nix time to avoid nested ${} in Nix string
-  # interpolation (which Nix cannot parse).
+  # Expands to "<prepend>:" when prepend renders non-empty, "" otherwise.
+  # Computed at Nix time because Nix cannot parse nested ${} inside a string
+  # interpolation.
   toShellPrependGuard = lib.optionalString (toShellPrependPath != "") "${toShellPrependPath}:";
 
-  # ── Helper: shell append guard (:prefix) ──────────────────────────
-  # Expands to ":<append>" when append renders non-empty, empty string
-  # otherwise.  Computed at Nix time to avoid nested ${} in Nix string
-  # interpolation (which Nix cannot parse).
   toShellAppendGuard = lib.optionalString (toShellAppendPath != "") ":${toShellAppendPath}";
 
-  # ── Helper: render PowerShell PATH-prepend snippet ─────────────────
-  # Returns a complete PowerShell block that prepends all managed dirs to
-  # $env:PATH with existence guards (Test-Path) and dedup guards (notlike).
-  # Derived from pathComponents.prepend — additions need only one update.
-  # Used by pwsh.nix to generate the HM-managed PowerShell profile.
+  # Complete PowerShell block that prepends every managed dir to $env:PATH with
+  # existence (Test-Path) and dedup (notlike) guards.  Derived from
+  # pathComponents.prepend, so a new dir needs one update only.  pwsh.nix renders
+  # it into the HM-managed PowerShell profile.
   toPowerShellPrependSnippet =
     let
       entries = builtins.map (p: builtins.replaceStrings [ "/" ] [ "\\" ] p) pathComponents.prepend;
@@ -142,9 +114,6 @@ let
       Remove-Variable __nucleusBinPaths, __nucleusBinPath -ErrorAction SilentlyContinue
     '';
 
-  # ── Helper: render PowerShell PATH-append snippet ──────────────────
-  # Same structure as toPowerShellPrependSnippet but appends to PATH
-  # instead of prepending.  Derived from pathComponents.append.
   toPowerShellAppendSnippet =
     let
       entries = builtins.map (p: builtins.replaceStrings [ "/" ] [ "\\" ] p) pathComponents.append;

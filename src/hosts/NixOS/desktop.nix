@@ -1,129 +1,87 @@
-# NixOS/desktop.nix — Desktop, power management, and remote-access services.
-#
-# Enables both GNOME and KDE Plasma desktop managers with their respective
-# archive managers (File Roller and Ark) so users can switch between
-# desktop environments without losing GUI archiving capability.
-# The underlying p7zip engine is available system-wide.
-# Cross-platform context menu parity: both desktops include terminal opening
-# actions in file manager context menus (nautilus-open-terminal, dolphin).
-# Power management is declared here alongside the desktop services because
-# all three concerns (desktop environment, remote access, power posture) share
-# the same NixOS services layer.
+# NixOS/desktop.nix - Desktop, power management, and remote-access services.
+# Both GNOME and KDE Plasma ship an archive manager (File Roller, Ark) and a
+# terminal-opening context-menu action, so switching desktops loses neither.
+# Power management lives here because desktop, remote access, and power posture
+# all use the NixOS services layer.
 { lib, pkgs, ... }:
 
 let
-  # Bundle scripts into the nix store so activation can read them without
-  # needing NUCLEUS_REPO_ROOT.  Same approach as activation.nix.
+  # Bundle scripts into the nix store so activation reads them without
+  # NUCLEUS_REPO_ROOT, like activation.nix.
   activationBundle = pkgs.callPackage ../../modules/lib/script-tree.nix { };
 in
 {
-  # Load the virtual KMS (vkms) kernel module to provide a software-only
-  # display device when no physical monitor is connected.  This mirrors the
-  # BetterDisplay HeadlessDisplay virtual screen on macOS: remote-desktop
-  # clients (Parsec in particular) and the display manager can use the virtual
-  # framebuffer when the lid is closed or no monitor is attached.
-  # vkms is a kernel-native virtual DRM/KMS driver; it does not replace GPU
-  # drivers — it adds a virtual display alongside any real hardware.
+  # vkms gives a software-only display when no monitor is attached, mirroring the
+  # macOS BetterDisplay HeadlessDisplay.  It is a kernel-native virtual DRM
+  # driver, adding a display alongside any real GPU rather than replacing it.
   boot.kernelModules = [ "vkms" ];
 
-  # OBS Studio virtual camera.  OBS itself is installed via the cross-host
-  # managedPackages registry (core.nix "obs-studio"); we only pull in the
-  # virtual-camera backend here.  package = null avoids a second (wrapped) OBS
-  # install — the module's enableVirtualCamera still wires v4l2loopback and
-  # polkit independently of the package attr.  v4l2loopback ships its own udev
-  # rules, so no extra services.udev.extraRules are needed.
+  # OBS comes from the cross-host registry (core.nix "obs-studio"), so only the
+  # virtual-camera backend is pulled in here.  package = null avoids a second
+  # wrapped install; enableVirtualCamera wires v4l2loopback and polkit on its own.
   programs.obs-studio.enable = true;
   programs.obs-studio.package = null;
   programs.obs-studio.enableVirtualCamera = true;
 
-  # Enable X11 server and desktop managers.
   services.xserver = {
     enable = true;
   };
 
-  # Enable GNOME desktop environment with File Roller archive manager.
   services.desktopManager.gnome.enable = true;
-
-  # Enable KDE Plasma 6 desktop environment with Ark archive manager.
   services.desktopManager.plasma6.enable = true;
 
-  # Use a display manager that can launch both GNOME and KDE sessions.
+  # One display manager for both sessions.
   services.displayManager.gdm.enable = true;
 
-  # GNOME (seahorse) and Plasma (ksshaskpass) both define programs.ssh.askPassword.
-  # Pin one deterministic askpass implementation so full toplevel evaluation
-  # does not fail with conflicting option values when both desktops are enabled.
+  # seahorse (GNOME) and ksshaskpass (Plasma) both set programs.ssh.askPassword;
+  # pinning one implementation keeps full toplevel evaluation from failing on
+  # conflicting values while both desktops are enabled.
   programs.ssh.askPassword = lib.mkForce "${pkgs.kdePackages.ksshaskpass}/bin/ksshaskpass";
 
-  # Install graphical archive managers per desktop environment.
   environment.systemPackages =
     (with pkgs; [
-      # GNOME archive manager.
       file-roller
-
-      # KDE archive manager with built-in terminal opening support.
       kdePackages.ark
-
-      # Ensure the 7z engine is available globally for both GUI tools
-      # (though p7zip is also declared in modules/core.nix, re-declare here
-      # for explicit system-level availability in case core is not applied).
       p7zip
 
-      # Terminal emulators for "Open in Terminal" context menu actions.
+      # Terminal emulators for the "Open in Terminal" context menu action.
       gnome-terminal # default terminal for GNOME "Open in Terminal"
       kdePackages.konsole # default terminal for KDE "Open in Terminal"
 
-      # Battery efficiency daemon: dynamic governor tuning based on AC/battery
-      # state gives better laptop efficiency without hard-coding static CPU caps.
+      # Dynamic governor tuning by AC/battery state beats static CPU caps.
       auto-cpufreq
 
-      # Remote-desktop clients for outbound access from this host.
-      # Parsec is used for low-latency GPU-accelerated remote gaming/work sessions.
-      # Chrome Remote Desktop has no nixpkgs package; see MANUAL.md for the Debian
-      # package install and the one-time browser authorization required for
-      # inbound CRD access (X11 logins only).
+      # Outbound remote desktop.  Parsec covers low-latency GPU sessions;
+      # Chrome Remote Desktop has no nixpkgs package, so MANUAL.md covers the
+      # Debian install and the one-time browser authorization for inbound access
+      # (X11 logins only).
       parsec-bin
 
-      # Productivity and creative applications.
-      # GIMP and Krita: raster and digital painting editors.
-      # LibreOffice: office suite.
-      # Blender: 3D modelling, animation, and rendering.
-      # Zoom: video conferencing.
-      # pass: Unix password manager (compatible with gopass on Windows).
-      # qtpass: Qt GUI frontend for pass/gopass.
-      # Blender, Krita, LibreOffice, Picard, and Zoom are provided via
-      # sharedPackages from modules/core.nix (managedPackages) — listed
-      # here for context only; they come from core.nix environment.systemPackages.
       easyeffects # graphical PipeWire audio processing GUI
       gimp
       pass
       qtpass
 
-      # WHY: zenity draws the modal dialog that the "strip metadata" Nautilus
-      # entry uses to report inputs it could not process.
+      # WHY: zenity draws the modal dialog the "strip metadata" Nautilus entry
+      # uses to report inputs it could not process.
       zenity
     ])
     ++ lib.optionals (pkgs.gnome ? nautilus-open-terminal) [
       pkgs.gnome.nautilus-open-terminal # adds "Open in Terminal" to Files context menu when available
     ];
 
-  # Enable GNOME services if GNOME is enabled above.
-  # NTFS mount policy: see filesystems.nix.
+  # GNOME core apps.  NTFS mount policy lives in filesystems.nix.
   services.gnome.core-apps.enable = true;
 
-  # Run auto-cpufreq as the managed NixOS power optimizer daemon.
+  # auto-cpufreq is the managed power optimizer daemon.  GNOME may enable
+  # power-profiles-daemon by default, and both would fight over CPU governor
+  # policy, so power-profiles-daemon stays off.
   services.auto-cpufreq.enable = true;
-
-  # GNOME may enable power-profiles-daemon by default, but that service
-  # conflicts with auto-cpufreq (both attempt to control CPU governor policy).
-  # Keep auto-cpufreq as the sole power tuner.
   services.power-profiles-daemon.enable = false;
 
-  # CPU governor profiles mirror macOS lowpowermode parity:
-  #   battery (lowpowermode=1 equivalent): powersave governor, prefer-power EPP,
-  #     turbo disabled — reduces heat and extends runtime when on battery.
-  #   charger (lowpowermode=0 equivalent): performance governor, prefer-performance
-  #     EPP, turbo auto — allows full CPU throughput when on AC power.
+  # Governor profiles mirroring macOS lowpowermode: powersave, prefer-power EPP
+  # and no turbo on battery; performance, prefer-performance EPP and turbo auto on
+  # AC.
   services.auto-cpufreq.settings = {
     battery = {
       energy_performance_preference = "power";
@@ -137,94 +95,71 @@ in
     };
   };
 
-  # Charge cap: hold the pack at 80 % and resume at 75 % on hardware whose
-  # battery exposes the standard power_supply charge-control attributes.  This
-  # belongs beside the CPU governor profiles above because it is the same power
-  # posture; hardware without the attributes is reported, not failed, so the
-  # switch still succeeds on a machine that cannot cap charge.
-  # Cross-platform parity: macOS converges the same 80 % ceiling through the
-  # `battery` CLI; its native Charge Limit is a manual setting (MANUAL.md).
+  # Charge cap: hold the pack at 80 % and resume at 75 % where the battery
+  # exposes the standard power_supply charge-control attributes.  Hardware
+  # without the attributes is reported rather than failed, so the switch still
+  # succeeds there.  macOS converges the same ceiling through the `battery` CLI.
   system.activationScripts.nixos-configure-charge-limit.text = lib.mkAfter ''
     "${activationBundle}/src/platforms/NixOS/scripts/nixos-configure-charge-limit.sh" \
       "/sys/class/power_supply"
   '';
 
-  # logind lid-close behaviour: keep the machine awake with the lid closed on
-  # every power source so long-running AI agents and remote-desktop sessions do
-  # not die just because the panel was shut.  linux.nix already disables idle
-  # sleep on both AC and battery; lid handling must match that always-on
-  # posture instead of reintroducing a suspend path only for the lid switch.
+  # Keep the machine awake with the lid closed on every power source, so
+  # long-running agents and remote-desktop sessions survive a closed panel;
+  # linux.nix already disables idle sleep on AC and battery.
   services.logind.settings.Login = {
     HandleLidSwitch = "ignore";
     HandleLidSwitchDocked = "ignore";
     HandleLidSwitchExternalPower = "ignore";
   };
 
-  # TCP keepalive parity: maintain persistent SSH tunnels and remote-desktop
-  # connections through idle periods.  Mirrors macOS pmset tcpkeepalive=1.
-  #   tcp_keepalive_time:   60 s before the first keepalive probe is sent.
-  #   tcp_keepalive_intvl:  10 s between subsequent probes.
-  #   tcp_keepalive_probes:  6 consecutive failures before the connection is dropped.
+  # TCP keepalive parity with macOS pmset tcpkeepalive=1, so SSH tunnels and
+  # remote-desktop connections survive idle periods: first probe after 60 s, then
+  # every 10 s, dropped after 6 consecutive failures.
   boot.kernel.sysctl = {
     "net.ipv4.tcp_keepalive_intvl" = 10;
     "net.ipv4.tcp_keepalive_probes" = 6;
     "net.ipv4.tcp_keepalive_time" = 60;
   };
 
-  # xrdp provides a standard RDP (Remote Desktop Protocol) server so this host
-  # can be reached from any RDP client (Windows built-in Remote Desktop,
-  # Microsoft Remote Desktop for macOS, Remmina, etc.).
-  # defaultWindowManager starts a GNOME session per xrdp connection; each
-  # connection gets its own isolated X11 session rather than sharing the console
-  # session, which avoids input conflicts when multiple remote sessions are
-  # active simultaneously.
-  # openFirewall = true opens TCP 3389 in the NixOS firewall automatically;
-  # without this the RDP port would be blocked by the default deny policy.
+  # xrdp serves RDP to any client.  defaultWindowManager starts a GNOME session per
+  # connection, each with its own isolated X11 session, which avoids input
+  # conflicts; openFirewall opens TCP 3389, blocked by the default deny policy
+  # otherwise.
   services.xrdp = {
     defaultWindowManager = "${pkgs.gnome-session}/bin/gnome-session";
     enable = true;
     openFirewall = true;
   };
 
-  # physlock: lock the keyboard at the driver layer for cleaning.
-  # The console switches to a blank text screen; type your password to unlock.
+  # physlock locks the keyboard at the driver layer for cleaning: the console
+  # switches to a blank text screen and the password unlocks it.
   services.physlock = {
     enable = true;
     allowAnyUser = true;
   };
 
-  # Steam game distribution platform.
-  # hardware.graphics.enable32Bit provides the 32-bit Mesa/Vulkan drivers
-  # required by Steam's 32-bit game runtime.  programs.steam.enable wires up
-  # system integration: udev rules, required runtime libraries, and the Steam
-  # binary itself.
-  # Channel note: no Steam beta/preview channel is exposed as a NixOS module
-  # option; programs.steam always tracks the latest stable release.
-  # Cross-platform parity: macOS uses the Homebrew steam cask; Windows uses
-  # Valve.Steam in system/packages.dsc.yml.
+  # Steam: hardware.graphics.enable32Bit brings the 32-bit Mesa/Vulkan drivers its
+  # game runtime needs, and programs.steam.enable wires udev rules, runtime
+  # libraries, and the binary.  No preview channel exists as a module option, so
+  # this tracks stable.
   hardware.graphics.enable32Bit = true;
   programs.steam.enable = true;
 
-  # Registry-driven GUI app auto-start (replaces the inline steam-autostart
-  # disable).  Reads apps.json and converges every NixOS app to its declared
-  # state via our uniform XDG-autostart mechanism, neutralizing any app-shipped
-  # .desktop (e.g. steam.desktop) so only our mechanism remains.
+  # Registry-driven GUI app auto-start: converges every app to its declared
+  # XDG-autostart state, neutralizing any app-shipped .desktop (e.g.
+  # steam.desktop) so only our mechanism remains.
   system.activationScripts.nixos-configure-app-autostart.text = lib.mkAfter ''
     "${activationBundle}/src/hosts/NixOS/scripts/nixos-configure-app-autostart.sh"
   '';
 
-  # Registry-driven per-app menu-bar / tray icon convergence (mirrors the macOS
-  # icon mechanism).  Reads apps.json and SETs each app's native icon preference
-  # to its declared state.  Most entries are omitted on NixOS, so this is a
-  # no-op unless a Linux-native tray setting is declared.
+  # Registry-driven menu-bar and tray icon convergence, mirroring the macOS
+  # mechanism.  Most entries are omitted on NixOS, so this no-ops by default.
   system.activationScripts.nixos-configure-menu-bar.text = lib.mkAfter ''
     "${activationBundle}/src/hosts/NixOS/scripts/nixos-configure-menu-bar.sh"
   '';
 
-  # EasyEffects: graphical PipeWire audio processing GUI with plugin-based
-  # limiter, compressor, equalizer, and other DSP effects.
-  # Usage: open the EasyEffects GUI, navigate to Effects > Output > Add Effect,
-  # and select Limiter or Compressor. Community preset vaults (like
-  # Digitalone1/EasyEffects-Presets) can be cloned into
-  # ~/.local/share/easyeffects/output/.
+  # EasyEffects: PipeWire audio processing GUI.  Add a Limiter or Compressor under
+  # Effects > Output; preset vaults such as Digitalone1/EasyEffects-Presets clone
+  # into ~/.local/share/easyeffects/output/.
 }

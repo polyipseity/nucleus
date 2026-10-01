@@ -21,14 +21,12 @@ let
   activationBundle = pkgs.callPackage ../../../modules/lib/script-tree.nix { };
 in
 lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
-  # Home Manager exposes GNOME settings via `dconf.*` (not `programs.dconf`).
-  # Enabling this keeps `dconf.settings` declarative and idempotent.
+  # Home Manager exposes GNOME settings via `dconf.*` (not `programs.dconf`), which
+  # keeps `dconf.settings` declarative and idempotent.
   dconf.enable = true;
 
   dconf.settings = {
-    # Input source baseline parity:
-    # - Keep US layout as default (matches macOS login/default source intent).
-    # - Leave additional IME engines to user-installed ibus engines.
+    # US layout as the default source; extra IME engines come from ibus.
     "org/gnome/desktop/input-sources" = {
       sources = [
         (lib.hm.gvariant.mkTuple [
@@ -38,8 +36,8 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
       ];
     };
 
-    # macOS global UX parity: 24h clock, visible date/weekday/seconds,
-    # reduced window animation, always-visible battery percentage.
+    # macOS UX parity: 24h clock, visible date, weekday and seconds, no window
+    # animation, always-visible battery percentage.
     "org/gnome/desktop/interface" = {
       clock-format = "24h";
       clock-show-date = true;
@@ -55,7 +53,7 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
       disable-lock-screen = false;
     };
 
-    # Fast key repeat parity with aggressive macOS key-repeat defaults.
+    # Fast key repeat, matching the macOS defaults.
     "org/gnome/desktop/peripherals/keyboard" = {
       delay = lib.hm.gvariant.mkUint32 250;
       repeat = true;
@@ -69,8 +67,8 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
       tap-to-click = true;
     };
 
-    # Privacy/history defaults favor lower persistent UI/state noise while still
-    # preserving explicit discoverability controls in file/navigation surfaces.
+    # Lower persistent UI and history noise, while keeping file and navigation
+    # surfaces discoverable.
     "org/gnome/desktop/privacy" = {
       old-files-age = lib.hm.gvariant.mkUint32 30;
       remember-recent-files = false;
@@ -84,8 +82,7 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
       disable-external = false;
     };
 
-    # GTK file chooser visibility defaults: show hidden files and keep key
-    # columns visible for richer file metadata in open/save dialogs.
+    # GTK file chooser: filename entry, hidden files, and key columns visible.
     "org/gtk/settings/file-chooser" = {
       location-mode = "filename-entry";
       show-hidden = true;
@@ -93,35 +90,36 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
       show-type-column = true;
     };
 
-    # Security invariant parity: lock immediately once session idles.
+    # Lock the session as soon as it idles.
     "org/gnome/desktop/screensaver" = {
       lock-delay = lib.hm.gvariant.mkUint32 0;
       lock-enabled = true;
     };
 
-    # Aggressive display idle (1 minute) to mirror macOS display sleep policy.
+    # Display idles after one minute, matching the macOS display sleep policy.
     "org/gnome/desktop/session" = {
       idle-delay = lib.hm.gvariant.mkUint32 60;
     };
 
-    # Terminal focus-follow-mouse parity from macOS Terminal preferences.
+    # Follow-mouse focus, as in macOS Terminal preferences.
     "org/gnome/desktop/wm/preferences" = {
       focus-mode = "sloppy";
     };
 
-    # Screenshot defaults parity: PNG to Desktop.
+    # Screenshots save as PNG on the Desktop.
     "org/gnome/gnome-screenshot" = {
       auto-save-directory = "file://${config.home.homeDirectory}/Desktop";
       default-file-type = "png";
     };
 
-    # Window-management parity: edge tiling and per-display workspace behavior.
+    # Window management: edge tiling, workspaces on every display.
     "org/gnome/mutter" = {
       edge-tiling = true;
       workspaces-only-on-primary = false;
     };
 
-    # Finder-ish file-browser defaults where GNOME has equivalents.
+    # Nautilus defaults: list view, permanent delete, full path titles, hidden files,
+    # thumbnails.
     "org/gnome/nautilus/preferences" = {
       default-folder-viewer = "list-view";
       show-directory-item-counts = "always";
@@ -131,12 +129,12 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
       show-image-thumbnails = "always";
     };
 
-    # Keep user extensions enabled to avoid hiding shell capabilities by default.
+    # User extensions stay enabled so shell capabilities are not hidden by default.
     "org/gnome/shell" = {
       disable-user-extensions = false;
     };
 
-    # Night Shift parity (18:00 → 06:00, warm tone).
+    # Night Shift, 18:00 to 06:00 at a warm tone.
     "org/gnome/settings-daemon/plugins/color" = {
       night-light-enabled = true;
       night-light-schedule-automatic = false;
@@ -145,13 +143,10 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
       night-light-temperature = lib.hm.gvariant.mkUint32 3700;
     };
 
-    # Battery suspend is disabled (type = "nothing", timeout = 0) so that
-    # remote-desktop sessions (xrdp, Chrome Remote Desktop, Parsec) survive
-    # when the machine is on battery.  Sleeping on battery would silently
-    # disconnect active remote sessions and block new inbound connections.
-    # Both AC and battery postures are set to "nothing" so behavior is
-    # consistent regardless of power source — avoiding confusing disconnects
-    # that only happen when the laptop is unplugged.
+    # Battery sleep is off (type "nothing", timeout 0) so remote-desktop sessions
+    # (xrdp, Chrome Remote Desktop, Parsec) survive on battery; sleeping would
+    # silently disconnect active sessions and block inbound connections.  AC and
+    # battery postures match so behaviour does not change on unplug.
     "org/gnome/settings-daemon/plugins/power" = {
       sleep-inactive-ac-timeout = lib.hm.gvariant.mkUint32 0;
       sleep-inactive-ac-type = "nothing";
@@ -161,52 +156,34 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
   };
 
   home.activation = {
-    # -----------------------------------------------------------------------
-    # buildNixIndex
-    # Starts a background nix-index build on first provision so the database
-    # is available shortly after provisioning without waiting for the daily
-    # systemd timer.  Subsequent refreshes are handled by the timer.
-    #
-    # The build is backgrounded to avoid blocking the activation chain; a full
-    # nix-index build takes several minutes.  Output is suppressed because
-    # nix-index emits verbose per-channel progress on stdout that would
-    # pollute the activation log.  This suppression is intentional: (1) a
-    # failed build is benign (pay-respects falls back to not suggesting
-    # packages), (2) this comment explains why, and (3) the timer and any
-    # subsequent provision run serve as implicit follow-up checks.
-    # -----------------------------------------------------------------------
+    # build-nix-index: start a background nix-index build on first provision so
+    # the database is ready before the daily systemd timer fires, and later
+    # refreshes come from that timer.  A full build takes minutes, so it is
+    # backgrounded, and stdout is dropped because nix-index prints per-channel
+    # progress that would swamp the activation log.  A failed build is benign:
+    # pay-respects falls back to suggesting nothing and the timer retries.
     build-nix-index = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/packages/update-nix-index.sh" \
         "${pkgs.nix-index}/bin/nix-index" \
         ""
     '';
 
-    # -----------------------------------------------------------------------
-    # ensure-dev-directory
-    # Creates ~/dev when absent so NixOS mirrors the macOS
-    # ensure-dev-directory behaviour.  VS Code workspace trust and editor
-    # tooling rely on the directory existing on all hosts.
-    # -----------------------------------------------------------------------
+    # ensure-dev-directory: create ~/dev when absent, mirroring macOS, since
+    # VS Code workspace trust and the editor tooling expect it on every host.
     ensure-dev-directory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       mkdir -p "$HOME/dev"
     '';
 
   };
 
-  # --------------------------------------------------------------------------
-  # nix-index-update systemd service and timer
-  # Keeps the nix-index file database current so pay-respects can suggest
-  # `nix profile install` commands when an unknown command is typed.
-  #
-  # The timer fires daily (12:00, Persistent=true) so the DB stays fresh even
-  # after mid-week package installs on intermittently used machines.
-  # buildNixIndex handles the
-  # first-provision case so the DB is available before the timer first fires.
-  # --------------------------------------------------------------------------
+  # nix-index-update service and timer, keeping the file database current so
+  # pay-respects can suggest `nix profile install` for an unknown command.  Daily
+  # at 12:00 with Persistent=true, so the database stays fresh on machines that
+  # sit off overnight; the first-provision build covers the initial case.
   systemd.user.services."nix-index-update" = {
     Unit = {
       Description = "Rebuild nix-index file database";
-      # Defer until network is available so channel index fetches succeed.
+      # After network.target so channel index fetches succeed.
       After = "network.target";
     };
     Service = {
@@ -220,10 +197,8 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
       Description = "Daily nix-index database refresh";
     };
     Timer = {
-      # Fire daily at 12:00 local time.  Persistent=true ensures the timer
-      # catches up on the next login when the machine was off at the
-      # scheduled time, preventing the DB from going stale on laptops that
-      # are not powered on overnight every day.
+      # Daily at 12:00.  Persistent=true catches up on next login, which bounds
+      # cache growth on intermittently used machines.
       OnCalendar = "12:00:00";
       Persistent = true;
       Unit = "nix-index-update.service";
@@ -233,10 +208,8 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
     };
   };
 
-  # --------------------------------------------------------------------------
-  # Daily sccache cache clearing
-  # Clears the sccache compilation cache every day at 12:00. Cross-host parity
-  # with macOS launchd agent and Windows scheduled task.
+  # Daily sccache cache clearing at 12:00, matching the macOS agent and the
+  # Windows scheduled task.
   systemd.user.services."sccache-gc" = {
     Unit = {
       Description = "Daily sccache cache clearing";
@@ -252,9 +225,8 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
       Description = "Daily sccache cache clearing timer";
     };
     Timer = {
-      # Fire daily at 12:00 local time. Persistent=true ensures the timer
-      # catches up on the next login when the machine was off at the scheduled
-      # time, preventing unbounded cache growth on intermittently used machines.
+      # Daily at 12:00.  Persistent=true catches up on next login, which bounds
+      # cache growth on intermittently used machines.
       OnCalendar = "12:00:00";
       Persistent = true;
       Unit = "sccache-gc.service";
@@ -264,9 +236,8 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
     };
   };
 
-  # --------------------------------------------------------------------------
-  # Daily user log rotation — rotates user-scope nucleus logs at noon.
-  # Cross-host parity with macOS launchd agent and Windows scheduled task.
+  # Daily rotation of user-scope nucleus logs at noon, matching the macOS agent
+  # and the Windows scheduled task.
   systemd.user.services."log-gc-user" = {
     Unit = {
       Description = "Daily user log rotation for nucleus services";
@@ -294,16 +265,12 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
     };
   };
 
-  # --------------------------------------------------------------------------
-  # Audio MIME type defaults — keep VLC as the default handler for all audio
-  # formats that MusicBrainz Picard claims in its desktop file.  Without
-  # explicit overrides, installation order determines which application handles
-  # double-clicks on audio files, which causes Picard (a tagger, not a player)
-  # to open instead of VLC.
+  # VLC handles every audio format Picard claims in its desktop file.  Without
+  # explicit overrides, installation order decides the handler, so double-clicking
+  # an audio file opens Picard (a tagger) instead of the player.
   # Sources:
   # https://specifications.freedesktop.org/mime-apps-spec/1.0/
   # https://wiki.videolan.org/VLC_Features_Formats/
-  # --------------------------------------------------------------------------
   xdg.mimeApps = {
     enable = true;
     defaultApplications = lib.genAttrs [
