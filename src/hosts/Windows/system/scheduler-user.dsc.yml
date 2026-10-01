@@ -1,18 +1,14 @@
 ---
 # WinGet DSC v3 - user-level scheduled tasks (nucleus services)
 #
-# These tasks run in the logged-in user's context (AtLogOn). DSC registers
-# the task skeleton; PowerShell Sync-* modules handle dynamic config
-# resolution, wrapper-script generation, and live restarts.
-#
-# Tasks with complex dynamic arguments (CamillaDSP wrapper, Cloud Drive
-# per-mount tasks) remain in PowerShell — DSC cannot express the full
-# lifecycle for those.
+# These run in the logged-in user's context. DSC registers the task skeleton;
+# the PowerShell Sync-* modules resolve dynamic config, generate wrapper scripts
+# and restart services. Tasks whose arguments are computed at runtime (CamillaDSP
+# wrapper, per-mount Cloud Drive tasks) stay in PowerShell for that reason.
 $schema: https://aka.ms/configuration-dsc-schema/0.2
 properties:
   configurationVersion: 0.2.0
   resources:
-    # ── CamillaGUI backend ────────────────────────────────────────────────────
     - resource: Microsoft.Windows.Settings/TaskScheduler
       directives:
         description: >-
@@ -38,7 +34,6 @@ properties:
         RunOnlyWhenNetworkAvailable: false
         RunOnlyIfLoggedOn: true
 
-    # ── Discord Music RPC ─────────────────────────────────────────────────────
     - resource: Microsoft.Windows.Settings/TaskScheduler
       directives:
         description: >-
@@ -63,7 +58,6 @@ properties:
         RunOnlyWhenNetworkAvailable: false
         RunOnlyIfLoggedOn: true
 
-    # ── Replica Sync (daily fallback) ─────────────────────────────────────────
     - resource: Microsoft.Windows.Settings/TaskScheduler
       directives:
         description: >-

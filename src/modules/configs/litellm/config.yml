@@ -1,49 +1,31 @@
 ---
-# LiteLLM proxy configuration — shared across all hosts.
+# LiteLLM proxy configuration, shared across all hosts. Gateway on 127.0.0.1:4000.
+# Every request routes through the single generic `default` model; the order
+# tiers on its deployments are the failover order. API keys come from SOPS secrets.
 #
-# AI gateway on 127.0.0.1:4000.  Routes all requests through a single
-# generic `default` model backed by multiple remote providers, using
-# simple-shuffle routing with weighted failover across order tiers.
-# API keys from SOPS secrets.
+# Routing: simple-shuffle picks an endpoint within an order tier, and
+# enable_weighted_failover re-picks from the healthy endpoints in that same tier on
+# a retryable failure before falling through to the next tier. See router_settings.
 #
-# Routing: simple-shuffle randomly selects an endpoint within each order
-# tier.  When `enable_weighted_failover` is set, a retryable failure
-# excludes the failed endpoint and re-picks from remaining healthy ones
-# in the same tier before falling through to the next tier.
+# Redis carries utilization tracking, cooldown state, prompt-cache affinity and
+# response caching. REDIS_HOST/REDIS_PORT/REDIS_USERNAME are non-secret vars from
+# env-secrets.nix; REDIS_PASSWORD and REDIS_USER_LITELLM_PASSWORD are SOPS secrets
+# through the KEYFILE:ENVVAR pipeline.
 #
-# Redis: required for utilization tracking, cooldown state, prompt-cache
-# affinity, and response caching.  REDIS_HOST/REDIS_PORT/REDIS_USERNAME
-# are non-secret env vars from the env-secrets.nix registry.
-# REDIS_PASSWORD and REDIS_USER_LITELLM_PASSWORD are SOPS secrets via
-# the KEYFILE:ENVVAR pipeline.
+# Each api_key below is an environment variable (e.g. os.environ/KEY_AI_OPENCODE_ZEN)
+# that the daemon scripts export before litellm starts. On POSIX litellm-daemon.sh
+# takes KEYFILE:ENVVAR args from the ai.nix service and exports each pair it finds;
+# sops-nix decrypts src/secrets/system.yml to /run/secrets/key_* at boot. On Windows
+# LiteLLM-run.ps1 reads every env_key_* file and uppercases the name
+# (env_key_ai_foo → KEY_AI_FOO).
 #
-# Env var lifecycle
-# ────────────────
-# Each api_key entry below references an environment variable (e.g.
-# os.environ/KEY_AI_OPENCODE_ZEN).  These env vars are populated at
-# runtime by the platform-specific daemon scripts before litellm starts:
-#
-#   POSIX (NixOS/macOS):
-#     litellm-daemon.sh receives KEYFILE:ENVVAR positional args from
-#     the systemd/launchd service (ai.nix).  For each pair, if KEYFILE
-#     exists, the script reads its contents and exports the env var.
-#     Key files come from sops-nix, which decrypts src/secrets/system.yml
-#     to /run/secrets/key_* at boot.
-#
-#   Windows:
-#     LiteLLM-run.ps1 reads all env_key_* files from the SOPS secrets
-#     directory, strips the env_ prefix, and uppercases each name
-#     (env_key_ai_foo → KEY_AI_FOO).
-#
-# To add a new provider: add the SOPS key to system.yml (env_key_<name>),
-# add a model_list entry here, and add the mapping to src/modules/lib/env-secrets.nix.
-# The env var name is derived automatically by uppercasing the full key name.
+# To add a provider: add the SOPS key to system.yml (env_key_<name>), add a
+# model_list entry here, and map it in src/modules/lib/env-secrets.nix. The env var
+# name is the full key name uppercased.
 
 litellm_settings:
   # Drop unsupported client params (e.g. max_tokens) per-endpoint.
   drop_params: true
-  # Redis-backed response cache.  Also required for prompt-cache affinity
-  # and usage-based routing state coordination.
   cache: true
   cache_params:
     type: redis
@@ -51,55 +33,38 @@ litellm_settings:
     port: os.environ/REDIS_PORT
     password: os.environ/REDIS_USER_LITELLM_PASSWORD
     username: os.environ/REDIS_USERNAME
-    # Namespace prefix for all LiteLLM Redis keys.  Prevents collisions
-    # with other services sharing the same Redis instance.
+    # Namespace prefix, so other services on the same Redis do not collide.
     namespace: "litellm"
-  # Register the Cline custom handler.  The handler module lives next
-  # to the config file (deployed via symlink by apply.sh / Windows service).
-  # get_instance_fn resolves "cline_handler.cline_handler" relative to
-  # the config file directory.
+  # Register the Cline custom handler; cline_handler.py must sit next to this file.
   custom_provider_map:
     - provider: cline
       custom_handler: cline_handler.cline_handler
 
-# WARNING suppresses per-request INFO chatter while still capturing
-# errors, warnings, and startup diagnostics.
 general_settings:
   environment_variables:
+    # WARNING drops per-request INFO chatter while keeping errors and startup diagnostics.
     LITELLM_LOG: WARNING
 
 router_settings:
-  # Exclude deployments that fail health checks from the routing pool.
   enable_health_check_routing: true
-  # Pre-flight checks: cooldown status, context limits, prompt-cache
-  # affinity.  Mandatory for `order` prioritization.
+  # Mandatory for `order` prioritization.
   enable_pre_call_checks: true
-  # Intra-tier failover: on a retryable failure, exclude the failed
-  # deployment and re-pick from the remaining deployments in the same
-  # order tier before falling through to the next tier.  Only works
-  # with `simple-shuffle` and async entrypoints.
+  # Intra-tier failover: on a retryable failure, exclude the failed deployment and
+  # re-pick from the remaining deployments in the same order tier before falling
+  # through. Only works with `simple-shuffle` and async entrypoints.
   enable_weighted_failover: true
-  # Prompt-cache stickiness: routes requests with cached context
-  # prefixes to the endpoint that holds the warm cache entry,
-  # bypassing load balancing.
+  # Prompt-cache stickiness: a request whose context prefix is already cached goes to
+  # the endpoint holding that warm entry, bypassing load balancing.
   optional_pre_call_checks:
     - prompt_caching
-  # Selects the endpoint with the lowest utilization ratio relative
-  # to its tpm/rpm ceiling within each order tier.
   routing_strategy: simple-shuffle
-  # Request-level retry budget across all order tiers.
   num_retries: 10
-  # Minimum delay (seconds) between retry attempts.
   retry_after: 5
-  # Failures per endpoint before temporary cooldown.
   allowed_fails: 2
-  # Cooldown duration (seconds).
   cooldown_time: 300
-  # Per-request HTTP timeout (seconds).
   timeout: 30
 
 model_list:
-  # ---- Ollama models ----
 
   # - model_name: ollama_chat/devstral-small-2:24b
   #   litellm_params:
@@ -125,10 +90,7 @@ model_list:
   #       max_input_tokens: 32000
   #       max_output_tokens: 16000
 
-  # ---- Default model (generic, remote-backed) ----
-  # Usage-based routing v2: picks the endpoint with lowest utilization
-  # within each order tier.  Order provides failover: tier 1 → 2.
-  # tpm/rpm ceilings drive the utilization ratio.
+  # Order is the failover tier: the lowest order that is healthy serves the request.
 
   - model_name: default
     litellm_params:
@@ -164,12 +126,9 @@ model_list:
       model_info:
         max_input_tokens: 256000
         max_output_tokens: 16000
-    # Cool this deployment down on its first HTTP 400 instead of waiting for
-    # the router-wide allowed_fails threshold.  CommandCode reports credit
-    # exhaustion as 400, which litellm otherwise never cools down.
-    # WHY: litellm resolves allowed_fails_policy only from the deployment's own
-    # model_info (cooldown_handlers._get_deployment_cooldown_policy); the same
-    # key under litellm_params is inert.
+    # CommandCode reports credit exhaustion as HTTP 400, which litellm never cools down.
+    # WHY: litellm reads allowed_fails_policy only from the deployment's own model_info
+    # (cooldown_handlers._get_deployment_cooldown_policy); under litellm_params it is inert.
     model_info:
       allowed_fails_policy:
         BadRequestErrorAllowedFails: 0

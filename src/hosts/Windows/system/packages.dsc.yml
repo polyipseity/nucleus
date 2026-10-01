@@ -1,8 +1,5 @@
 ---
 # WinGet DSC v3 - system-level package baseline for Windows host
-# Package ID policy: prefer human-readable named IDs (for example
-# `Microsoft.PowerToys`) over opaque Microsoft Store-generated IDs. Use
-# generated IDs only when the Store package has no stable named identifier.
 # ref: https://learn.microsoft.com/windows/package-manager/winget/ -- WinGet package manager documentation
 # ref: https://github.com/microsoft/winget-pkgs -- WinGet package manifest repository; source of truth for package ID validity
 $schema: https://aka.ms/configuration-dsc-schema/0.2

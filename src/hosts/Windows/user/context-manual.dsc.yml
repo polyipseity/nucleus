@@ -4,7 +4,6 @@ $schema: https://aka.ms/configuration-dsc-schema/0.2
 properties:
   configurationVersion: 0.2.0
   resources:
-    # Right-click "open nucleus manual" for all files
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: servicesFileVerb
       directives:
@@ -25,7 +24,6 @@ properties:
           "Start-Process (Join-Path $HOME 'dev\nucleus\src\hosts\Windows\MANUAL.md')"
         valueType: String
 
-    # Right-click "open nucleus manual" for folders
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: servicesDirVerb
       directives:

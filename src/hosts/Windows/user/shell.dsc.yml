@@ -1,10 +1,8 @@
 ---
 # WinGet DSC v3 - user-level shell autorun (cmd AutoRun)
 #
-# Note: cmd.exe has no equivalent of HIST_IGNORE_SPACE or ignoredups.
-# Commands prefixed with a space or consecutive duplicates will still appear
-# in doskey /history. This is a fundamental platform limitation; no workaround
-# exists.
+# cmd.exe has no equivalent of HIST_IGNORE_SPACE or ignoredups, so space-prefixed
+# and duplicate commands still land in doskey /history. No workaround exists.
 $schema: https://aka.ms/configuration-dsc-schema/0.2
 properties:
   configurationVersion: 0.2.0

@@ -1,15 +1,16 @@
 ---
 # WinGet DSC v3 - user-level "strip metadata" context menu entries
-# One entry per Office extension (docx/xlsx/pptx + doc/xls/ppt).
-# -Dialog: the verb runs with -WindowStyle Hidden, so stdout and stderr are
-# discarded; the modal popup is what tells the user that a selected file
-# (legacy OLE2, or a PDF passed on the command line) was not processed.
-# Sorting policy: alphabetical by extension. No automatic sorting.
+#
+# One verb plus one command per Office extension, kept in manual alphabetical
+# order rather than auto-sorted.
+#
+# -Dialog is required: the verb runs -WindowStyle Hidden, so its stdout and stderr
+# are discarded and the modal popup is the only feedback when a selected file
+# (legacy OLE2, or a PDF on the command line) was not processed.
 $schema: https://aka.ms/configuration-dsc-schema/0.2
 properties:
   configurationVersion: 0.2.0
   resources:
-    # .docx — Word (OOXML)
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: stripMetadataVerbDocx
       directives:
@@ -29,7 +30,6 @@ properties:
           "nucleus-utils strip-metadata -Dialog '%1'"
         valueType: String
 
-    # .xls — Excel (legacy binary)
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: stripMetadataVerbXls
       directives:
@@ -49,7 +49,6 @@ properties:
           "nucleus-utils strip-metadata -Dialog '%1'"
         valueType: String
 
-    # .xlsx — Excel (OOXML)
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: stripMetadataVerbXlsx
       directives:
@@ -69,7 +68,6 @@ properties:
           "nucleus-utils strip-metadata -Dialog '%1'"
         valueType: String
 
-    # .ppt — PowerPoint (legacy binary)
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: stripMetadataVerbPpt
       directives:
@@ -89,7 +87,6 @@ properties:
           "nucleus-utils strip-metadata -Dialog '%1'"
         valueType: String
 
-    # .pptx — PowerPoint (OOXML)
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: stripMetadataVerbPptx
       directives:
@@ -109,7 +106,6 @@ properties:
           "nucleus-utils strip-metadata -Dialog '%1'"
         valueType: String
 
-    # .doc — Word (legacy binary)
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: stripMetadataVerbDoc
       directives:
