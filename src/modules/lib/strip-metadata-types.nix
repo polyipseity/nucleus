@@ -24,18 +24,16 @@
 # PDF: com.adobe.pdf conforms to public.data and public.composite-content only.
 # Source: https://developer.apple.com/library/archive/documentation/Miscellaneous/Reference/UTIRef/Articles/System-DeclaredUniformTypeIdentifiers.html
 let
-  # dedupSorted — byte-ordered unique list. Every surface must serialize
-  # identically, and several formats share a MIME type or UTI (the ODF and OGG
-  # families), so duplicates would otherwise reach the .desktop and plist.
+  # Byte-ordered unique list: every surface must serialize identically, and the
+  # ODF and OGG families share a MIME type or UTI.
   dedupSorted =
     list:
     builtins.sort builtins.lessThan (
       builtins.foldl' (acc: item: if builtins.elem item acc then acc else acc ++ [ item ]) [ ] list
     );
 
-  # Formats strip-metadata rewrites in place: mat2 for OOXML, exiftool for the
-  # rest. `extensions` is dot-free and non-empty — the Windows context menu
-  # registers one verb per extension.
+  # mat2 for OOXML, exiftool for the rest. `extensions` is dot-free and
+  # non-empty because the Windows context menu registers one verb per extension.
   supported = [
     {
       extensions = [ "docx" ];
@@ -155,9 +153,8 @@ let
     }
   ];
 
-  # Formats no CLI tool can rewrite in place. The surfaces that exist to explain
-  # a refusal (Windows context menu, Nautilus report) still offer them; the
-  # filtering surfaces (macOS Quick Action, Dolphin) do not.
+  # The surfaces that explain a refusal (Windows context menu, Nautilus report)
+  # offer these; the filtering surfaces do not.
   unsupported = [
     {
       extensions = [ "doc" ];
@@ -185,17 +182,14 @@ in
 {
   inherit supported unsupported;
 
-  # macOS: NSSendFileTypes of the strip metadata Quick Action. `unsupported`
-  # formats are deliberately not offered — the action must not appear for input
+  # `unsupported` is deliberately absent: the action must not appear for input
   # the tool will refuse.
   macosSendFileTypes = dedupSorted (macosSupertypes ++ map (format: format.uti) supported);
 
-  # Dolphin service menu: `MimeType=` of nucleus-strip-metadata.desktop. Unlike
-  # macOS this also covers `unsupported`: Dolphin can show the refusal, and an
-  # old .doc would otherwise get no explanation at all.
+  # Dolphin can show the refusal, so this covers `unsupported` where macOS
+  # cannot: an old .doc would otherwise get no explanation at all.
   dolphinMimeTypes = dedupSorted (builtins.concatMap (format: format.mimes) all);
 
-  # Every declared extension, dot-free — the vocabulary the Windows registry
-  # verbs and the parity test work in.
+  # The vocabulary the Windows registry verbs and the parity test work in.
   allExtensions = dedupSorted (builtins.concatMap (format: format.extensions) all);
 }

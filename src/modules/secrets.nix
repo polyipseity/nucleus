@@ -24,9 +24,8 @@ let
   userSecretFilePath = ../secrets/users + "/${currentUsername}.yml";
   hasUserSecretFile = builtins.pathExists userSecretFilePath;
 
-  # Spelled once for both consumers: sops.age.keyFile below, and the
-  # derive-host-age-key.sh invocation further down. The shell readers resolve
-  # this same value through nucleus_machine_age_key_path.
+  # Spelled once for sops.age.keyFile and the derive-host-age-key.sh
+  # invocation; the shell readers resolve it through nucleus_machine_age_key_path.
   machineAgeKeyPath =
     if pkgs.stdenv.hostPlatform.isDarwin then
       "/Library/Application Support/nucleus/sops/age/machine.txt"
@@ -36,22 +35,17 @@ let
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
 {
-  # Machine age key derived from /etc/ssh/ssh_host_ed25519_key by
-  # src/scripts/secrets/derive-host-age-key.sh, which writes it under the
-  # nucleus SYSTEM root and chowns it per its owner-spec argument
-  # (root:nucleus-sops 0640 on NixOS, the primary user 0600 on macOS).
-  # gnupgHome is intentionally absent:
-  # sops-nix rejects setting both keyFile and gnupgHome simultaneously.
-  # sshKeyPaths must be empty: the host private key is root-only; HM reads
-  # the derived identity from keyFile instead (same root-only-key constraint).
+  # Derived from /etc/ssh/ssh_host_ed25519_key by
+  # src/scripts/secrets/derive-host-age-key.sh under the nucleus SYSTEM root.
+  # gnupgHome is absent because sops-nix rejects setting both it and keyFile;
+  # sshKeyPaths is empty because the host private key is root-only and HM reads
+  # the derived identity from keyFile.
   sops.age = {
     keyFile = machineAgeKeyPath;
     sshKeyPaths = [ ];
   };
 
-  # Propagate rclone config passphrase availability to shell.nix and
-  # cloud-drives.nix via nucleus.rclone options so those modules do not need
-  # to re-check the filesystem themselves.
+  # Lets shell.nix and cloud-drives.nix skip their own filesystem check.
   nucleus.rclone.configPassEnabled = hasUserSecretFile;
   nucleus.rclone.configPassSecretPath = lib.mkIf hasUserSecretFile rcloneConfigPassPath;
 
@@ -75,12 +69,8 @@ in
       };
   };
 
-  # --------------------------------------------------------------------------
-  # materialize-user-secrets
-  # Decrypts src/secrets/users/<username>.yml and writes GPG, SSH, Git, and
-  # rclone material directly via decrypt-sops.sh instead of sops-nix secret
-  # paths for per-user payloads.
-  # --------------------------------------------------------------------------
+  # Decrypts src/secrets/users/<username>.yml through decrypt-sops.sh, which
+  # writes the per-user payloads where sops-nix secret paths cannot.
   home.activation.materialize-user-secrets = lib.mkIf hasUserSecretFile (
     lib.hm.dag.entryAfter [ "sops-nix" ] ''
       "${activationBundle}/src/scripts/secrets/materialize-user-secrets.sh" \
@@ -97,28 +87,11 @@ in
     ''
   );
 
-  # --------------------------------------------------------------------------
-  # verify-secret-decryption
-  # Post-activation health check that verifies ALL SOPS files can be decrypted
-  # by each registered backend after materialize-user-secrets has completed.
-  #
-  # Covers:
-  #   - src/secrets/users/<username>.yml (when present)
-  #   - src/users/<username>/wallpapers/encrypted/*.sops  (overlay merge with default)
-  # All use the same .sops.yaml key groups (age_devices + primary_gpg).
-  #
-  # Five checks (in order):
-  #   1. Materialization sanity: managed SSH keys, Git identity, and manifest
-  #      files exist and are non-empty, and every managed SSH private key is a
-  #      valid OpenSSH private key (an unreadable key authenticates as nothing).
-  #      A passphrase-protected key is valid and passes; see
-  #      verify-secret-decryption.sh for what the probe can and cannot prove.
-  #   2. GPG key presence: every fingerprint in managed-gpg-keys is in the
-  #      keyring.
-  #   3. GPG SOPS recipient check for all SOPS files.
-  #   4. Personal SSH age recipient check for all SOPS files.
-  #   5. Machine SSH host key existence (warning-only).
-  # --------------------------------------------------------------------------
+  # Checks every registered SOPS file against every backend, after
+  # materialize-user-secrets: materialization sanity (a passphrase-protected
+  # SSH key is valid; see verify-secret-decryption.sh for what the probe
+  # cannot prove), GPG key presence, GPG SOPS recipients, personal SSH age
+  # recipients, then the machine host key (warning-only).
   home.activation.verify-secret-decryption =
     let
       overlayLib = import ./lib/users-overlay.nix { inherit lib; };

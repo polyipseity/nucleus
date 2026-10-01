@@ -1,33 +1,17 @@
 # src/modules/lib/users-overlay.nix — Per-user homedir overlay path selection.
 #
-# App trees under src/users/<username>/ merge with src/users/default/<app>/ at
-# first level only: each first-level file or directory is resolved independently;
-# deeper paths inherit the chosen first-level entry in whole. Registry JSON
-# domains use users-registry.nix instead.
+# Overlay resolution is first-level only: each first-level file or directory is
+# resolved independently, and deeper paths inherit that entry in whole. Registry
+# JSON domains go through users-registry.nix instead.
 #
-# Cross-platform consistency: deduplication is case-insensitive (weakest
-# constraint — works on NTFS, POSIX, and Nix). Symlink detection follows
-# symlinks (builtins.pathExists), matching POSIX -e and Windows Test-Path.
-#
-# selectUserConfigSource: host-specific files at
-#   src/users/<username>/<config>/<Host>.<ext>
-# with src/users/default/<config>/<Host>.<ext> fallback.
-#
-# selectUserConfigFirstLevelEntry: one first-level name under <config>/.
-#
-# selectUserConfigFile: relative paths where the first segment selects the
-# first-level overlay entry; remaining segments are resolved inside that entry.
-#
-# listUserConfigFirstLevelEntries: union of first-level names from user and
-# default config dirs (user wins on name collision at resolve time).
-#
-# mkUserOverlay: binds effectiveUsername/repoRoot/hostName to the selectors.
+# Case-insensitive deduplication is the weakest constraint that works on NTFS,
+# POSIX, and Nix alike. Symlink detection follows symlinks
+# (builtins.pathExists), matching POSIX -e and Windows Test-Path.
 { lib }:
 let
-  # Deduplicate case-insensitively, keeping first occurrence.
-  # Per-user entries come before default entries in the input list,
-  # so first-occurrence-wins means per-user wins on name collision.
-  # O(n²) but the list is tiny (<20 first-level entries).
+  # Per-user entries are listed before default entries, so keeping the first
+  # occurrence resolves a name collision in favour of the per-user tree.
+  # O(n^2), but the list holds fewer than 20 entries.
   uniqueStrings =
     strings:
     let
@@ -131,15 +115,12 @@ rec {
       hostName ? null,
     }:
     let
-      # WHY: `repoRoot` is the eval-time path literal, but under Nix flake eval the
-      # repo is copied into the store (e.g. `/nix/store/<hash>-nucleus-physical`),
-      # so the literal `repoRoot` prefix no longer matches the actual path. A naive
-      # `repoRoot + "/"` strip therefore fails and `toRepoRelPath` returns an
-      # absolute store path, which `seed-writable-symlink.sh` then wrongly joins
-      # onto the live repo root (producing a dangling symlink and aborting apply).
-      # Every nucleus repo has `src/` at its root and every selector resolves under
-      # `src/`, so strip through the `/src/` boundary to obtain the repo-relative
-      # path (`src/...`) regardless of where the eval-time copy landed.
+      # WHY: under Nix flake eval the repo is copied into the store, so the literal
+      # `repoRoot` prefix no longer matches and a naive strip returns an
+      # absolute store path that seed-writable-symlink.sh then joins onto the
+      # live repo root, producing a dangling symlink. Every nucleus repo has
+      # `src/` at its root and every selector resolves under `src/`, so strip
+      # through the `/src/` boundary.
       toRepoRelPath =
         absolutePath:
         let

@@ -1,21 +1,12 @@
 # modules/lib/env-secrets.nix — Centralized environment variable secrets catalog.
 #
-# This file contains the catalog of all managed environment variables and
-# the resolution logic for rendering them per-host.  It internally imports
-# managed-paths.nix for PATH-related catalog entries but does NOT re-export
-# those bindings — callers should import managed-paths.nix directly for
-# PATH-specific needs.
+# Callers MUST pass `username`. Do NOT add a fallback chain (no default null,
+# no config.home.username fallback, no getEnv "USER" fallback). Every caller
+# has `username` via specialArgs or a local binding.
 #
-# Callers MUST pass `username`.  Do NOT add a fallback chain (no default null,
-# no config.home.username fallback, no getEnv "USER" fallback).  Every caller
-# has `username` available via specialArgs or as a local binding — use it.
-#
-# Each catalog entry uses a `values` attrset:
-#   { default?, MacBook?, NixOS?, Windows? }
-# - `default` applies to any host not explicitly keyed.
-# - If a host key is absent AND `default` is absent, the host is not applicable.
-# Use: import ./lib/env-secrets.nix { inherit config pkgs lib username hostName; }
-# Returns: { catalog, allVars, systemVars, macBookAllVars, resolveValue, ... }
+# Each catalog entry uses `values = { default?, MacBook?, NixOS?, Windows? }`:
+# `default` applies to any host not keyed, and a host with neither a key nor
+# `default` is not applicable.
 {
   pkgs,
   lib,
@@ -32,8 +23,6 @@
 let
   managedPaths = import ./managed-paths.nix { inherit pkgs; };
   appleSdkEnhanced = import ./apple-sdk-enhanced.nix { inherit pkgs lib; };
-
-  # ── Shared values used by multiple catalog entries ──────────────────
 
   allUsers = import ./users-registry.nix {
     lib = pkgs.lib;
@@ -71,13 +60,11 @@ let
   litellmEndpoint = servicesJSON.litellm.network.default;
   ollamaHost = "${litellmEndpoint.host}:${toString litellmEndpoint.port}";
 
-  # ── Catalog ─────────────────────────────────────────────────────────
   # Each entry:
   #   values:  attrset { default?, MacBook?, NixOS?, Windows? }
   #   why:     inline justification
   #   userSpecific: true if the value depends on the logged-in user (default false)
   catalog = {
-    # ── Compiler toolchain ──────────────────────────────────────────
     CC = {
       values = {
         default = "${pkgs.llvmPackages.clang}/bin/clang";
@@ -100,7 +87,6 @@ let
       why = "Nix LD for native builds \u2014 all-process on all hosts. On Windows, resolved from PATH by Machine-scope DSC.";
     };
 
-    # ── Compiler caching (sccache) ──────────────────────────────────
     CMAKE_C_COMPILER_LAUNCHER = {
       values = {
         default = "${pkgs.sccache}/bin/sccache";
@@ -146,7 +132,6 @@ let
       why = "Normalise home-directory prefix in sccache cache keys so the same project checked out under different parent paths produces cache hits. Set per-user because the value depends on the logged-in user's home directory.";
     };
 
-    # ── Rust test runner (nextest) ────────────────────────────────
     NEXTEST_TEST_THREADS = {
       values = {
         default = "4";
@@ -155,7 +140,6 @@ let
       why = "Limit cargo-nextest test runner concurrency to 4 parallel test threads across all hosts. Set all-process (not just shell) so IDE/debugger integrations also respect the cap.";
     };
 
-    # ── macOS-specific developer toolchain ───────────────────────────
     DEVELOPER_DIR = {
       values = {
         MacBook = "${appleSdkEnhanced}";
@@ -182,7 +166,6 @@ let
       why = "Nix-managed SSL cert bundle for all processes outside nix-daemon build environments. On NixOS, nix-daemon sets this for its own builds but GUI/CLI tools outside systemd also need it. Not applicable on Windows (no Nix store).";
     };
 
-    # ── Editors ──────────────────────────────────────────────────────
     EDITOR = {
       values = {
         MacBook = "nvim";
@@ -200,7 +183,6 @@ let
       why = "Set by programs.neovim.defaultEditor on macOS (nvim activated) and NixOS. Windows Machine-scope DSC sets nvim for all-process parity.";
     };
 
-    # ── OpenCode ─────────────────────────────────────────────────────
     OPENCODE_DISABLE_AUTOUPDATE = {
       values = {
         default = "true";
@@ -208,7 +190,6 @@ let
       why = "Managed environment pins OpenCode; auto-updates introduce version skew. Now set on Windows too via Machine-scope DSC.";
     };
 
-    # ── AI / Ollama ──────────────────────────────────────────────────
     OLLAMA_HOST = {
       values = {
         default = ollamaHost;
@@ -216,7 +197,6 @@ let
       why = "Point CLI clients at LiteLLM proxy (127.0.0.1:4000) on all OSes instead of Ollama directly.";
     };
 
-    # ── Redis (LiteLLM coordination + response cache) ──────────────
     REDIS_HOST = {
       values = {
         default = "127.0.0.1";
@@ -236,8 +216,6 @@ let
       why = "Redis ACL username for LiteLLM proxy. Non-secret; set on all hosts.";
     };
 
-    # Ollama runtime tunables (all hosts).
-    # Set on all OSes for consistent inference behaviour.
     OLLAMA_FLASH_ATTENTION = {
       values = {
         default = "1";
@@ -257,7 +235,6 @@ let
       why = "Compress KV cache with 4-bit quantisation to halve RAM footprint on all hosts.";
     };
 
-    # ── Password store ───────────────────────────────────────────────
     PASSWORD_STORE_DIR = {
       values = {
         default = passwordStoreDir;
@@ -289,7 +266,6 @@ let
       why = "gopass config override value for password store path from src/users/<username>/password-store.json. Windows uses literal %USERPROFILE% for User-scope DSC.";
     };
 
-    # ── Host identity ────────────────────────────────────────────────
     NUCLEUS_HOST = {
       values = {
         MacBook = "MacBook";
@@ -299,11 +275,9 @@ let
       why = "Canonical host name for VM host-scoping and host-aware consumers. Windows set in system/env.dsc.yml at Machine scope.";
     };
 
-    # ── macOS GUI environment PATH (append-only; user-specific) ──
-    # PATH at runtime is (system default) with managed dirs prepended before and
-    # appended after.  This catalog entry holds only the append portion — the
-    # prepend portion is handled in guiEnvAgent and gui-env-path in macos.nix.
-    # Set by gui-env-path (activation) and gui-env (login agent) in macos.nix.
+    # Runtime PATH is the system default with managed dirs prepended and
+    # appended around it. This entry is the append half; the prepend half lives
+    # in guiEnvAgent and gui-env-path in macos.nix.
     PATH = {
       values = {
         MacBook = managedPaths.toShellAppendPath;
@@ -313,7 +287,6 @@ let
       why = "Managed PATH (append portion) for macOS GUI apps. All managed dirs are appended to avoid shadowing system executables. Propagated via gui-env-path activation step (launchctl setenv + launchctl config user path) and the one-shot gui-env LaunchAgent at login.";
     };
 
-    # ── Starship prompt ─────────────────────────────────────────────
     STARSHIP_CACHE = {
       values = {
         default = "${resolvedHomeDirectory}/.cache/starship";
@@ -331,11 +304,10 @@ let
       why = "Starship config path. POSIX uses out-of-store symlink. Windows uses literal %USERPROFILE%.";
     };
 
-    # ── SSH agent ───────────────────────────────────────────────────
-    # nix-darwin exports the gpg-agent SSH socket for POSIX shells only (its
-    # shell snippet in /etc/zshenv is sourced by zsh/bash/fish).  PowerShell
-    # sources no such file, so it reads this entry through the profile token,
-    # and the macOS GUI domain receives it via macBookAllVars -> gui-env.
+    # nix-darwin exports the gpg-agent SSH socket to POSIX shells only (its
+    # snippet in /etc/zshenv is sourced by zsh/bash/fish). PowerShell reads this
+    # entry through the profile token, and the macOS GUI domain through
+    # macBookAllVars -> gui-env.
     SSH_AUTH_SOCK = {
       values = {
         MacBook = "${resolvedHomeDirectory}/.gnupg/S.gpg-agent.ssh";
@@ -344,7 +316,6 @@ let
       why = "gpg-agent SSH socket (macOS). Default gpgconf location, serving the SSH protocol because src/modules/posix/gnupg.nix sets enableSSHSupport.";
     };
 
-    # ── Cross-OS compatibility ──────────────────────────────────────
     HOME = {
       values = {
         Windows = "%USERPROFILE%";
@@ -359,7 +330,6 @@ let
       why = "Cross-OS parity: nixpkgs flake lookup via <nixpkgs> in Nix expressions.";
     };
 
-    # ── Playwright browsers (system-wide) ──────────────────────────
     PLAYWRIGHT_BROWSERS_PATH = {
       values = {
         default = "${pkgs.playwright-driver.browsers}";
@@ -368,9 +338,7 @@ let
     };
   };
 
-  # ── Resolve value for an entry on a given host ───────────────────
-  # Returns the host-specific value, or `default` if no host key exists, or null
-  # if neither the host key nor `default` is present (host not applicable).
+  # The host value, else `default`, else null when the host is not applicable.
   resolveValue =
     name: host:
     let
@@ -390,11 +358,8 @@ let
     in
     if userOverride != null then userOverride else hostValue;
 
-  # ── Current host name (from caller) ──────────────────────────────
   currentHost = hostName;
 
-  # ── Generic filter over attrNames ────────────────────────────────
-  # Takes predicate (name, entry -> bool) and target host for value resolution.
   filterAttrsByEntry =
     pred: host:
     builtins.listToAttrs (
@@ -415,23 +380,19 @@ let
       ) (builtins.attrNames catalog)
     );
 
-  # ── allVars ───────────────────────────────────────────────────────
-  # All vars for current POSIX host, excluding PATH (handled separately
-  # via activation/profile).  Host applicability is implicit from resolveValue.
+  # Every var for the current POSIX host except PATH, which activation and the
+  # profile handle separately.
   allVars = filterAttrsByEntry (
     name: entry:
     (!entry ? excludeFromAll || !entry.excludeFromAll) && resolveValue name currentHost != null
   ) currentHost;
 
-  # ── systemVars ───────────────────────────────────────────────────
   # Non-user-specific vars for NixOS environment.variables.
   systemVars = filterAttrsByEntry (
     name: entry: (!entry ? userSpecific || !entry.userSpecific) && resolveValue name "NixOS" != null
   ) "NixOS";
 
-  # ── macBookAllVars ───────────────────────────────────────────────
-  # All MacBook vars (both user and non-user) for the gui-env LaunchAgent.
-  # PATH is excluded (handled separately via activation/agent scripts).
+  # Every MacBook var for the gui-env LaunchAgent, PATH excepted.
   macBookAllVars =
     let
       host = "MacBook";
@@ -453,7 +414,7 @@ let
       ) relevant
     );
 
-  # ── Introspection for Windows parity tests ───────────────────────
+  # Read by the Windows parity tests.
   toJsonManifest = builtins.toJSON (
     builtins.map (
       name:

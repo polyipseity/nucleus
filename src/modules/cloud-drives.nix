@@ -1,6 +1,5 @@
-# Declarative rclone mounts and pull-only replicas per user.
-# Per-user config in src/users/ under "cloudDrives" domain files.
-# Requires FUSE (macFUSE FSKit on macOS, fuse3 on NixOS) and rclone remote configured.
+# Declarative rclone mounts and pull-only replicas per user, configured in
+# src/users/ under the "cloudDrives" domain files.
 args@{
   config,
   lib,
@@ -23,11 +22,6 @@ let
       replicas = [ ];
     };
 
-  # ---------------------------------------------------------------------------
-  # Option type definitions
-  # ---------------------------------------------------------------------------
-
-  # Shared enum type aliases — used by both mount and replica submodules.
   providerEnum = lib.types.enum [
     "GoogleDrive"
     "iCloud"
@@ -162,25 +156,16 @@ let
     };
   };
 
-  # ---------------------------------------------------------------------------
-  # Internal helper computations (evaluated inside config to avoid ordering
-  # issues with the options fixed-point)
-  # ---------------------------------------------------------------------------
-
-  # Supervisor unit identity for a mount.  The unit definition, the convergence
-  # script's remedy, and the runner's recorded health key all derive from these,
-  # so they cannot diverge — see lib/mount-identity.nix for why that matters.
   isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
   mountIdentity = import ./lib/mount-identity.nix;
   mountUnitName = mount: mountIdentity.unitName isDarwin mount.id;
   mountServiceId = mount: mountIdentity.serviceId isDarwin mount.id;
 
-  # Build a rclone mount wrapper script for macOS LaunchAgents.
-  # Uses the full Nix store path to rclone so the agent is not PATH-dependent.
+  # The full store path to rclone, so the agent does not depend on PATH.
   mkRcloneMountScript =
     mount:
     let
-      # Mount point for an entry.
+
       # WHY: rclone stats the mount point before mounting and refuses to mount
       #   when it is missing, while macFUSE creates a /Volumes mount point only
       #   as part of the mount itself — and /Volumes is root-owned, so a
@@ -285,7 +270,7 @@ let
       };
     };
 
-  # Canonical scheduled-sync timer mapping. Repository policy mandates 12:00 slots.
+  # Repository policy mandates 12:00 slots.
   mkScheduledSyncLaunchdCalendar =
     interval:
     if interval == "weekly" then
@@ -357,16 +342,14 @@ in
       ) config.nucleus.cloudDrives.mounts;
     in
     lib.mkMerge [
-      # -----------------------------------------------------------------------
-      # macOS: pre-stop cloud mount agents before setupLaunchAgents
+
       # WHY: during setupLaunchAgents bootout+bootstrap, the old mount's FSKit
       #   volume may still be attached when the new mount starts.  The new mount
       #   script detects the stale volume and runs diskutil unmount force, which
       #   can trigger lsd to re-register the FSKit extension with a new UUID
       #   (Apple bug on macOS 26).  The subsequent mount then fails with a stale
       #   UUID reference.  Pre-stopping agents and waiting for volumes to release
-      #   eliminates the stale volume, the force-unmount, and the UUID mismatch.
-      # -----------------------------------------------------------------------
+
       (lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && declaredMountAgents != [ ]) {
         home.activation.cloud-drives-pre-stop = lib.hm.dag.entryBefore [ "setupLaunchAgents" ] ''
           "${activationBundle}/src/scripts/services/cloud-drives-pre-stop.sh" \
@@ -375,10 +358,6 @@ in
         '';
       })
 
-      # -----------------------------------------------------------------------
-      # Shared: directory structure
-      # cloud-drives-setup: creates ~/clouds/ and converges each entry's path — a
-      # symlink to the FSKit mount point on macOS, a real directory elsewhere.
       # WHY: anchor this after both writeBoundary and setupLaunchAgents.  HM
       #   requires side-effecting entries to run after writeBoundary, and on
       #   macOS setupLaunchAgents is the entry whose plist compare followed by
@@ -388,8 +367,7 @@ in
       #   mount — so running it first deadlocks the apply, because the entry that
       #   can clear the state is only reached afterwards.  NixOS defines no
       #   setupLaunchAgents entry (its systemd unit creates the mount point), so
-      #   there the writeBoundary anchor is the one that applies.
-      # -----------------------------------------------------------------------
+
       {
         home.activation.cloud-drives-setup =
           lib.hm.dag.entryAfter [ "writeBoundary" "setupLaunchAgents" ]
@@ -420,27 +398,20 @@ in
             '';
       }
 
-      # -----------------------------------------------------------------------
-      # Shared: clear stale fskit-provider blocked markers (core provisioning)
       # WHY: nucleus-apply provisions the system.  A blocked marker from a
       #   previous failed mount attempt is stale after apply re-registers the
       #   extension and restarts agents.  Clearing it is normal provisioning
-      #   behavior — applies to ALL services, not just cloud mounts.
-      # -----------------------------------------------------------------------
+
       {
         home.activation.reset-service-health = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
           "${activationBundle}/src/scripts/services/reset-service-health.sh"
         '';
       }
 
-      # -----------------------------------------------------------------------
-      # macOS: LaunchAgents for rclone-backed mounts
-      # -----------------------------------------------------------------------
-      # This module is imported into the Home Manager config (home-manager.users
-      # via sharedModules), so use HM-native launchd.agents with domain = "gui"
-      # (installs to ~/Library/LaunchAgents) rather than
-      # environment.userLaunchAgents, which is a nix-darwin top-level option and
-      # does not exist in the HM context.
+      # This module is imported into the Home Manager config, so use HM-native
+      # launchd.agents with domain = "gui" (installs to ~/Library/LaunchAgents);
+      # environment.userLaunchAgents is a nix-darwin top-level option and does not
+      # exist in the HM context.
       (lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && declaredMountAgents != [ ]) {
         launchd.agents = builtins.listToAttrs (
           map (mount: {
@@ -468,9 +439,7 @@ in
                 #   relies on launchd's own signal delivery to the job.  This budget is
                 #   what gives that delivery room to complete before SIGKILL.
                 ExitTimeOut = 60;
-                # Log errors to ~/Library/Logs for easier debugging.
-                # Capture both stdout and stderr so mount activity is fully
-                # inspectable (remote not configured, network unavailable, etc.).
+                # Both streams go to ~/Library/Logs for easier debugging.
                 StandardOutPath = "${config.nucleus.logging.logDir}/cloud-mount-${mount.id}/stdout.log";
                 StandardErrorPath = "${config.nucleus.logging.logDir}/cloud-mount-${mount.id}/stderr.log";
               };
@@ -479,9 +448,6 @@ in
         );
       })
 
-      # -----------------------------------------------------------------------
-      # NixOS: systemd user services for rclone-backed mounts
-      # -----------------------------------------------------------------------
       (lib.mkIf (pkgs.stdenv.hostPlatform.isLinux && rcloneMounts != [ ]) {
         systemd.user.services = builtins.listToAttrs (
           map (mount: {
@@ -517,12 +483,6 @@ in
         );
       })
 
-      # -----------------------------------------------------------------------
-      # macOS: LaunchAgents for per-replica scheduled replica-sync timers
-      # -----------------------------------------------------------------------
-      # HM-native launchd.agents with domain = "gui" (see mount block note):
-      # this module is imported into the Home Manager config, not the darwin
-      # config, so environment.userLaunchAgents is not available here.
       (lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && declaredScheduledSyncReplicas != [ ]) {
         launchd.agents = builtins.listToAttrs (
           map (replica: {
@@ -549,9 +509,6 @@ in
         );
       })
 
-      # -----------------------------------------------------------------------
-      # NixOS: systemd services/timers for per-replica scheduled replica-sync
-      # -----------------------------------------------------------------------
       (lib.mkIf (pkgs.stdenv.hostPlatform.isLinux && scheduledSyncReplicas != [ ]) {
         systemd.user.services = builtins.listToAttrs (
           map (replica: {
