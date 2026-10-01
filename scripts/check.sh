@@ -1,31 +1,5 @@
 #!/usr/bin/env bash
-# Fast pre-commit checks. PowerShell syntax only; full PSSA runs in the test pipeline (pre-push).
-#
-# Thin orchestrator — sources check-lib.sh for framework, check-steps.sh for step
-# registration, then runs the orchestration pipeline.
-#
-# See check-lib.sh, step-runner.sh, and files in check-steps/ for step logic.
-#
-# Arguments:
-#   --fail-fast       Exit immediately on first failure.
-#   --no-fail-fast    Accumulate all failures (default).
-#   --scoped          Skip whole-repo checks (path-scoped mode).
-#   --full            Force whole-repo checks even with paths.
-#   --online          Run online determinism checks.
-#   --verbose         Stream all step output (default: headers + summaries only).
-#   --verbose=<ids>   Stream only the specified comma-separated step IDs.
-#   --no-verbose      Suppress step output streaming (default).
-#   --only-steps=<ids>  Run only the steps with the given comma-separated IDs.
-#   (paths)           Files to check; passes paths through to sub-checkers and
-#                     skips whole-repo checks (always-run checks that don't support path filtering).
-#
-# Environment variables:
-#   NUCLEUS_REPO_ROOT  Override the detected repository root path.
-#
-# Exit conditions:
-#   0 on success; non-zero on any check failure.
-# By default, all checks run and failures accumulate (report-at-end).
-# Use --fail-fast to exit immediately on the first failure.
+# Fast pre-commit checks. PSSA and Nix tests run in the test pipeline.
 set -euo pipefail
 
 # Resolve symlinks so SCRIPT_DIR works from Nix wrapper symlinks.
@@ -46,19 +20,15 @@ _NUCLEUS_CHECKS_DIR="$(CDPATH='' cd -- "$_ORCH_SCRIPT_DIR/../src/scripts/checks"
 # shellcheck source=../src/scripts/checks/check-steps.sh
 . "$_NUCLEUS_CHECKS_DIR/check-steps.sh"
 
-# Disable Nix auto-GC for the whole scripted pipeline. The Data volume is
-# frequently >90% full; Nix's default min-free (40GiB) then triggers auto-GC
-# that deletes flake-input source trees another parallel step still needs
-# mid-eval (see src/scripts/lib/lib.sh merge_nix_config). min-free = 0 keeps
-# inputs stable across parallel steps.
-# Override usage to list subcommands alongside the full-run options.
+# Disable Nix auto-GC for the whole scripted pipeline. The Data volume is often
+# >90% full, so Nix's default min-free (40GiB) triggers auto-GC that deletes
+# flake-input source trees a parallel step still needs mid-eval (see
+# src/scripts/lib/lib.sh merge_nix_config).
 usage() {
   usage_std "check.sh" "[packer|pwsh|sh] [--fail-fast|--no-fail-fast] [--scoped|--full] [--online] [--verbose[=<ids>]] [--no-verbose] [--only-steps=<ids>] [path ...]" "Run repository validation checks. With a subcommand, run only that check; without one, run all checks with parallel step dispatch (capped at PARALLEL_JOBS). Subcommands: packer (Packer template validation), pwsh (PowerShell syntax + naming lint), sh (shell script lint). Default: scoped if paths given, full otherwise."
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# packer subcommand — inline body of scripts/check-packer.sh
-# ──────────────────────────────────────────────────────────────────────────────
+# packer subcommand, inline body of scripts/check-packer.sh
 
 do_packer() {
   REPO_ROOT=$(derive_repo_root)
@@ -92,9 +62,9 @@ do_packer() {
 
   require_command jq
 
-  # Skip packer validation inside SRT sandbox — packer plugins need Unix sockets
-  # for IPC, but the sandbox blocks socket creation (allowAllUnixSockets: false).
-  # Source: src/users/default/srt/settings.json
+  # Packer plugins need Unix sockets for IPC and the sandbox blocks socket
+  # creation (allowAllUnixSockets: false).
+  # ref: src/users/default/srt/settings.json
   if [ "${SANDBOX_RUNTIME:-0}" = "1" ]; then
     notice "Packer validation skipped (SRT sandbox blocks Unix sockets)"
     return 0
@@ -102,13 +72,11 @@ do_packer() {
 
   require_command packer
 
-  # Share plugin cache across Packer invocations to avoid re-downloading plugins.
-  # This is the recommended pattern per Packer docs:
+  # Recommended pattern, sharing the plugin cache across invocations:
   # https://developer.hashicorp.com/packer/docs/plugins#plugin-cache
   export PACKER_PLUGIN_CACHE_DIR="${PACKER_PLUGIN_CACHE_DIR:-$HOME/.cache/packer/plugins}"
 
-  # Determine system architecture for reading the NixOS ISO checksum from lockfile.
-  # Lockfile uses nixpkgs-style arch names: x86_64-linux, aarch64-linux.
+  # The lockfile uses nixpkgs arch names (x86_64-linux, aarch64-linux), uname does not.
   _arch="$(uname -m)"
   case "$_arch" in
   x86_64) _nix_arch="x86_64-linux" ;;
@@ -119,10 +87,9 @@ do_packer() {
     ;;
   esac
 
-  # Read NixOS ISO digest from lockfile for the current arch.
   _nixos_digest="$(jq -r --arg arch "$_nix_arch" '(."vm-setup"."nixos-iso" // {})[$arch].digest // "none"' "$REPO_ROOT/src/lockfiles/lockfile.json")"
 
-  # Check formatting (skipped with --validate-only; step 01 treefmt/packer fmt covers formatting).
+  # Formatting is skipped with --validate-only; step 01 covers packer fmt.
   if ! $_validate_only; then
     if [ "$#" -gt 0 ]; then
       packer fmt -check "$@"
@@ -135,14 +102,12 @@ do_packer() {
   # resolution and relative path references).
   # Each template may require different -var flags for required variables.
   #
-  # Filter the known checksum-none warning (windows template only). WHY:
-  # Microsoft publishes no stable Windows 11 ISO checksums, so
-  # src/vms/Windows/packer.pkr.hcl intentionally sets iso_checksum to "none"
-  # (see the variable description at line 39 and check-suppress comment at
-  # line 228). The packer validate exit code below is still enforced -- only
-  # the expected warning text is hidden. The filter is authorized by the
-  # check_packer_validate_annotations gate below (Category 1 machine-parsing
-  # invariant: the annotation must exist before the warning may be hidden).
+  # Filter the known checksum-none warning (Windows template only). Microsoft
+  # publishes no stable Windows 11 ISO checksums, so
+  # src/vms/Windows/packer.pkr.hcl sets iso_checksum to "none" on purpose. The
+  # packer validate exit code below is still enforced; only the expected
+  # warning text is hidden. check_packer_validate_annotations authorizes the
+  # filter: the annotation must exist before the warning may be hidden.
   _filter_known_packer_warnings() {
     awk '
       /Warning: A checksum of .none. was specified/ { skip=1 }
@@ -151,12 +116,9 @@ do_packer() {
     '
   }
 
-  # packer_validate annotation gate (Category 1 machine-parsing invariant).
-  # The Windows template sets iso_checksum to "none"; that choice MUST carry the
-  # `# check-suppress:packer_validate:` annotation on the same iso_checksum
-  # line. This script and scripts/check-packer.ps1 are the annotation's machine
-  # consumers. When iso_checksum resolves to "none" without the annotation,
-  # validation fails.
+  # packer_validate annotation gate: iso_checksum resolving to "none" must carry
+  # `# check-suppress:packer_validate:` on that line. scripts/check-packer.ps1
+  # consumes the same annotation.
   check_packer_validate_annotations() {
     local tpl="$REPO_ROOT/src/vms/Windows/packer.pkr.hcl"
     [ -f "$tpl" ] || return 0
@@ -213,22 +175,20 @@ do_packer() {
       vars=(-var macos_version=14.0 -var vm_id=dummy -var cpus=2 -var memory_gib=4 -var disk_size_gib=40 -var guest_username=dummy -var guest_password=dummy -var ssh_username=dummy -var ssh_password=dummy -var tart_image_ref=dummy -var vm_hostname=dummy)
       ;;
     esac
-    # 2>&1 into the filter: the warning goes to stderr; pipefail keeps the
-    # packer validate exit code authoritative.
+    # 2>&1 into the filter: the warning goes to stderr, and pipefail keeps
+    # the packer validate exit code authoritative.
     (cd "$dir" && packer init . && packer validate "${vars[@]}" . 2>&1 | _filter_known_packer_warnings)
   }
 
-  # Preflight: install plugins sequentially to avoid "text file busy" race.
-  # Both NixOS and Windows need the qemu plugin; downloading it twice in
-  # parallel causes a write conflict on the cached plugin binary.
+  # Preflight: install plugins sequentially. NixOS and Windows share the qemu
+  # plugin, and a parallel download races on the cached binary ("text file busy").
   (cd src/vms/NixOS && packer init .) || true   # check-suppress:suppression_doc: plugin download may already be cached; init failure is non-fatal
   (cd src/vms/Windows && packer init .) || true # check-suppress:suppression_doc: plugin download may already be cached; init failure is non-fatal
   if [ "$(uname)" = "Darwin" ]; then
     (cd src/vms/macOS && packer init .) || true # check-suppress:suppression_doc: plugin download may already be cached; init failure is non-fatal
   fi
 
-  # Parallel validation: each VM directory validates independently.
-  # Uses temp exit files for race-free aggregation (same pattern as check.sh).
+  # Each VM directory validates independently; temp exit files aggregate race-free.
   _pkr_tmpdir=$(mktemp -d) || {
     error "failed to create temp directory for packer validation"
     exit 1
@@ -245,7 +205,7 @@ do_packer() {
     echo "$_vd_exit" >"$_pkr_tmpdir/exit-windows"
   } &
 
-  # macOS template uses the Tart plugin which is macOS-only.
+  # The macOS template needs the Tart plugin, which is macOS-only.
   if [ "$(uname)" = "Darwin" ]; then
     {
       _vd_exit=0
@@ -273,9 +233,7 @@ do_packer() {
   fi
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# sh subcommand — ShellCheck lint (shellcheck -x -S style)
-# ──────────────────────────────────────────────────────────────────────────────
+# sh subcommand, ShellCheck lint (shellcheck -x -S style)
 
 do_sh() {
   REPO_ROOT=$(derive_repo_root)
@@ -285,10 +243,10 @@ do_sh() {
     usage_std "check.sh sh" "[--scoped] [path ...]" "Validate shell script syntax and lint quality with treefmt (ShellCheck). With no arguments, checks all tracked *.sh files from Git. With arguments, checks only the provided paths. Use --scoped to skip whole-repo discovery when no paths are given."
   }
 
-  # --source-path=SCRIPTDIR lets shellcheck resolve `# shellcheck source=` directives
-  # relative to each script's own directory (e.g. bootstrap-versions.env alongside bootstrap.sh).
-  # -x enables following external sources.
-  # Flag order: long options first, -x second. Flags live in src/treefmt.nix (source-path = "SCRIPTDIR"); the Windows twin (scripts/check.ps1, Invoke-CheckSh) passes --source-path per file.
+  # --source-path=SCRIPTDIR resolves `# shellcheck source=` against each script's
+  # own directory (e.g. bootstrap-versions.env next to bootstrap.sh), and -x
+  # follows external sources. Flags live in src/treefmt.nix; scripts/check.ps1
+  # (Invoke-CheckSh) passes --source-path per file.
   _SCOPED=false
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -312,11 +270,10 @@ do_sh() {
   done
 
   if [ "$#" -gt 0 ]; then
-    # Paths given: always run treefmt on them, regardless of --scoped.
+    # Paths given: treefmt runs on them regardless of --scoped.
     treefmt --fail-on-change "$@"
     count="$#"
   elif $_SCOPED; then
-    # --scoped with no paths: nothing to check.
     say 'no shell scripts to check (scoped mode).'
     exit 0
   else
@@ -333,9 +290,7 @@ do_sh() {
   say "shell script check passed for $count files."
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# pwsh subcommand — PowerShell syntax (check-pwsh.ps1)
-# ──────────────────────────────────────────────────────────────────────────────
+# pwsh subcommand, PowerShell syntax (check-pwsh.ps1)
 
 do_pwsh() {
   local _exit=0
@@ -343,9 +298,7 @@ do_pwsh() {
   return $_exit
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
 # Main dispatch
-# ──────────────────────────────────────────────────────────────────────────────
 
 # WHY: the subcommand word is captured first, then dropped (tolerating its
 # absence) so every do_* handler receives only its own remaining options.

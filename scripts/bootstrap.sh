@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# Installs Nix if not already present, then optionally runs the apply flow to
-# converge the full system configuration. By default installs dependencies only.
-# Pass --apply to also run the apply flow.
+# Installs Nix and the Nix-managed bootstrap dependencies, then optionally
+# runs the apply flow.
 
 set -euo pipefail
 
-# Refuse to run as root — privilege escalation (sudo) is managed internally
-# by the script when needed rather than relying on an already-elevated caller.
+# Refuse to run as root: privilege escalation is managed internally with sudo
+# rather than relying on an already-elevated caller.
 if [ "$(id -u)" -eq 0 ] && [ "${force_admin:-false}" = false ]; then
   error "this script must not be run as root. Run as a regular user (sudo is used internally when needed)."
 fi
@@ -27,7 +26,6 @@ VERSIONS_FILE="$SCRIPT_DIR/bootstrap-versions.env"
 apply="${NUCLEUS_APPLY:-false}"
 force_admin=false
 
-# Flag parsing
 ai_sync="${NUCLEUS_AI_SYNC:-true}"
 replica_sync="${NUCLEUS_REPLICA_SYNC:-false}"
 target_user="${NUCLEUS_TARGET_USER:-}"
@@ -94,12 +92,10 @@ while [ "$#" -gt 0 ]; do
 done
 
 run_nix() {
-  # Execute nix with the merged config for this script invocation.
-  # Suppress the repeated dirty-tree warning so bootstrap/apply logs surface
-  # actionable failures instead of identical VCS status noise.
-  # NIX_PATH is set explicitly because darwin-rebuild's export NIX_PATH=${NIX_PATH:-}
-  # would otherwise clear it, overriding the nix-path config option.
-  # --quiet suppresses store path listings and copying lines in CI (NUCLEUS_VERBOSE=false).
+  # warn-dirty off so bootstrap and apply logs surface real failures instead of
+  # repeated VCS status noise. NIX_PATH is explicit because darwin-rebuild's
+  # `export NIX_PATH=${NIX_PATH:-}` would clear it and override the nix-path
+  # config option. --quiet drops store path listings outside verbose mode.
   _nix_quiet_flags=()
   if [ "${NUCLEUS_VERBOSE:-false}" = "false" ]; then
     _nix_quiet_flags=(--quiet)
@@ -109,17 +105,9 @@ run_nix() {
 }
 
 load_bootstrap_versions() {
-  # Dot-sources bootstrap-versions.env into the current shell with `set -a`
-  # (auto-export) so every variable defined in the file is exported and
-  # available to child processes such as the Nix installer.
-  #
-  # Validates that the two mandatory variables NUCLEUS_NIX_INSTALLER_SHA256
-  # and NUCLEUS_NIX_INSTALLER_URL are both present and non-empty; exits 1 with
-  # a descriptive error if either is missing.
-  #
-  # Outputs (exported shell variables):
-  #   NIX_INSTALLER_SHA256  — expected SHA-256 hex digest of the installer
-  #   NIX_INSTALLER_URL     — download URL for the Nix installer script
+  # `set -a` auto-exports every variable, so the pins reach the installer child.
+  # Both NUCLEUS_NIX_INSTALLER_SHA256 and NUCLEUS_NIX_INSTALLER_URL are
+  # mandatory and a missing one is a hard error.
   if [ ! -f "$VERSIONS_FILE" ]; then
     error "expected bootstrap versions file at $VERSIONS_FILE"
   fi
@@ -142,20 +130,9 @@ load_bootstrap_versions() {
 }
 
 bootstrap_nix_if_missing() {
-  # Installs Nix via the official installer script when `nix` is not already
-  # present in PATH.  No-op if Nix is already installed.
-  #
-  # Steps:
-  #   1. Download the installer from NIX_INSTALLER_URL to a temp file.
-  #   2. Verify the SHA-256 digest against NIX_INSTALLER_SHA256 (unless the
-  #      placeholder value is set, in which case a warning is printed and
-  #      verification is skipped — intended only for development).
-  #   3. Run the installer with --yes --no-daemon (single-user install).
-  #   4. Source the Nix profile script so the `nix` command is immediately
-  #      available in the current session without reopening a shell.
-  #   5. Verify that `nix` is now in PATH using require_command.
-  #
-  # Requires: curl, sha256sum or shasum or openssl (for checksum verification)
+  # Runs the official installer when nix is absent. The pinned digest is
+  # verified unless the placeholder value is set, which is a development-only
+  # case. Requires curl.
   if command -v nix >/dev/null 2>&1; then
     return
   fi
@@ -178,7 +155,7 @@ bootstrap_nix_if_missing() {
   rm -f "$installer_path"
 
   if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
-    # Not available in Nix build sandbox — only at runtime after Nix install.
+    # Not available in the Nix build sandbox, only at runtime after the install.
     # shellcheck disable=SC1091 # reason: file doesn't exist at shellcheck analysis time (created by Nix installer at bootstrap runtime)
     . "$HOME/.nix-profile/etc/profile.d/nix.sh"
   elif [ -f "/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh" ]; then
@@ -189,17 +166,9 @@ bootstrap_nix_if_missing() {
 }
 
 allow_repo_direnv_if_available() {
-  # Auto-allow this repository's .envrc when direnv is installed.
-  # This keeps first-run developer UX smooth: entering the repo immediately
-  # loads the nix-direnv-managed devShell without an extra manual allow step.
-  #
-  # Scope guard: only allow the canonical nucleus repository root. This avoids
-  # implicitly trusting arbitrary checkouts that happen to include this script.
-  #
-  # Non-fatal behavior is intentional:
-  # - direnv might not be installed yet on fresh machines.
-  # - .envrc may be absent in forks/partial checkouts.
-  # - failing hard here would block bootstrap/apply for a convenience feature.
+  # Auto-allow the canonical repo .envrc so the first `cd` loads the devShell.
+  # Only the nucleus checkout is allowed, and every failure is non-fatal: direnv
+  # may be absent and .envrc may be missing in partial checkouts.
   if ! command -v direnv >/dev/null 2>&1; then
     return
   fi
@@ -218,20 +187,9 @@ allow_repo_direnv_if_available() {
 }
 
 ensure_macos_nix_mount() {
-  # Create the /nix synthetic mount point on macOS before any Nix
-  # installation is attempted.
-  #
-  # macOS does not allow creating top-level directories on the root filesystem
-  # (APFS volume seal).  Nix requires /nix, so it must be declared in
-  # /etc/synthetic.conf and materialised by the apfs.util launch daemon during
-  # boot.
-  #
-  # Behaviour:
-  #   - No-op on non-macOS platforms.
-  #   - No-op if /nix already exists (e.g. after reboot or prior install).
-  #   - Appends 'nix' to /etc/synthetic.conf via sudo if not already present.
-  #   - Prints a reboot reminder and exits 1; the user must reboot and then
-  #     re-run bootstrap.sh to complete installation.
+  # macOS seals the root volume, so a top-level /nix cannot be created. It has
+  # to be declared in /etc/synthetic.conf and materialised by apfs.util at boot,
+  # which means a reboot before the install can continue.
   if [ "$(uname -s)" != "Darwin" ]; then
     return
   fi
@@ -265,13 +223,11 @@ else
   say "Bootstrap dependencies already present, skipping installation."
 fi
 
-# ── PowerShell module provisioning ──────────────────────────────────────────
-# Mirror of Invoke-PowerShellModuleSetup.ps1 (Windows bootstrap).
-# Reads lockfile.json psgallery section; installs each module at pinned version.
-# A pin is either a version string or a {version, hash} object; only the version
-# is passed on (the helper installs through Install-Module, which cannot verify
-# a nupkg hash).
-# Uses the same install-pwsh-module.sh helper as Nix activation.
+# PowerShell module provisioning, mirror of Invoke-PowerShellModuleSetup.ps1.
+# Reads the lockfile.json psgallery section and installs each module at its
+# pinned version. A pin is either a version string or a {version, hash} object;
+# only the version is passed on, since Install-Module cannot verify a nupkg
+# hash. Shares install-pwsh-module.sh with Nix activation.
 provision_pwsh_modules() {
   local _pwsh="$1"
   [ -x "$_pwsh" ] || return 0

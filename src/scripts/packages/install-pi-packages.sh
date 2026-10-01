@@ -1,18 +1,12 @@
 #!/usr/bin/env bash
-# Idempotently converges the declarative pi coding agent npm package set.
-#
-# Reads the desired packages from src/modules/packages/desired.json (host-keyed
-# single source of truth; versions pinned by the lockfile `pi` section),
-# compares against the packages pi actually manages (its settings.json registry
-# unioned with the npm-install record), installs missing or drifted packages,
-# and removes undesired ones.
+# Converges the declarative pi package set from src/modules/packages/desired.json,
+# with versions pinned by the lockfile `pi` section.
 #
 # Args: $1 = jq bin, $2 = pi bin, $3 = awk bin, $4 = sed bin,
 #       $5 = desired packages JSON, $6 = bun bin dir
 set -euo pipefail
 
-# SC2094 avoidance: trap-based cleanup eliminates read/write-same-file
-# pipeline warnings — temp files are cleaned on EXIT instead of inline.
+# SC2094 avoidance: the EXIT trap cleans up temp files instead of inline.
 _ipp_desired=""
 _ipp_installed=""
 _ipp_to_remove=""
@@ -35,10 +29,9 @@ _sed_bin="$4"
 _ipp_desired_json="$5"
 _ipp_bun_bin="$6"
 
-# Add pi's directory and bun's directory to PATH.  pi is the runner; bun is
-# required because pi spawns the bare command "bun" for every npm: install
-# (npmCommand in src/users/default/pi/settings.json), so it must be
-# resolvable in the child environment, not merely callable by absolute path.
+# pi runs the runner, and bun must be on PATH because pi spawns the bare
+# command "bun" for every npm: install (npmCommand in
+# src/users/default/pi/settings.json).
 _pi_bin_dir="$(dirname "$_pi_bin")"
 _sed_bin_dir="$(dirname "$_sed_bin")"
 PATH="$_pi_bin_dir:$_ipp_bun_bin:$_sed_bin_dir:$PATH"
@@ -51,8 +44,6 @@ if ! "$_ipp_bun_bin/bun" --version >/dev/null; then
   die -l pi "$_ipp_bun_bin/bun is not runnable; pi spawns 'bun' for npm-installs"
 fi
 
-# Read version pins from the consolidated lockfile so installs are
-# reproducible (closes the drift root cause).
 _ipp_lockfile=""
 # check-suppress:suppression_doc: repo-root auto-detection may fail on non-deployed hosts; absence falls back to unpinned install.
 _ipp_repo_root="$(derive_repo_root 2>/dev/null || true)"
@@ -60,28 +51,25 @@ if [ -n "$_ipp_repo_root" ] && [ -f "$_ipp_repo_root/src/lockfiles/lockfile.json
   _ipp_lockfile="$_ipp_repo_root/src/lockfiles/lockfile.json"
 fi
 
-# Desired-state list from src/modules/packages/desired.json: an array of
-# {"name": <npm package>} objects.  Only packages not available in nixpkgs
-# belong here.  Versions are pinned from the lockfile `pi` section (see
-# _ipp_install_spec).
+# An array of {"name": <npm package>} objects holding the packages nixpkgs
+# does not have.
 _ipp_desired="$(mktemp)"
 # shellcheck disable=SC2016 # reason: jq program body must not be expanded by shell
 printf '%s\n' "$_ipp_desired_json" |
   "$_jq_bin" -r '.[].name' >"$_ipp_desired" ||
   die -l pi "could not parse the desired pi package list"
 
-# Get the packages pi actually manages.  The authoritative registry is
-# ~/.pi/agent/settings.json (`packages` holds specs such as
-# "npm:@scope/pkg@1.2.3"); it is unioned with the physical install record in
-# ~/.pi/agent/npm/package.json.  Directory listing is NOT a valid source: the
-# npm tree also contains node_modules and other non-package entries.
+# The packages pi actually manages: ~/.pi/agent/settings.json (specs such as
+# "npm:@scope/pkg@1.2.3") unioned with the install record in
+# ~/.pi/agent/npm/package.json. A directory listing is not a valid source, since
+# the npm tree also holds node_modules.
 _ipp_settings_json="$HOME/.pi/agent/settings.json"
 _ipp_install_record="$HOME/.pi/agent/npm/package.json"
 _ipp_installed="$(mktemp)"
 _ipp_installed_versions="$(mktemp)"
 if [ -f "$_ipp_settings_json" ]; then
-  # Strip the npm scheme and any trailing @version.  A scoped name keeps its
-  # leading @ because the version suffix only matches an @ not followed by /.
+  # Strip the npm scheme and any trailing @version. A scoped name keeps its
+  # leading @, since the version suffix only matches an @ not followed by /.
   # shellcheck disable=SC2016 # reason: jq program body must not be expanded by shell
   if ! "$_jq_bin" -r '(.packages // [])[] | sub("^npm:"; "") | sub("@[^/@]*$"; "")' "$_ipp_settings_json" >>"$_ipp_installed"; then
     die -l pi "could not parse the pi package registry: $_ipp_settings_json"
@@ -97,16 +85,14 @@ if [ -f "$_ipp_install_record" ]; then
     die -l pi "could not parse the pi install record: $_ipp_install_record"
   fi
 fi
-# A package can appear in both records; collapse duplicates so it is neither
-# installed nor removed twice.
+# A package can appear in both records, so collapse duplicates.
 if [ -s "$_ipp_installed" ]; then
   # shellcheck disable=SC2016 # reason: awk program body must not be expanded by shell
   "$_gawk_bin" '!seen[$0]++' "$_ipp_installed" >"$_ipp_installed.dedup" && mv "$_ipp_installed.dedup" "$_ipp_installed"
 fi
 
-# Packages installed but not desired: zap-style removal.
-# Mirrors homebrew cleanup = "zap": removes anything installed but absent
-# from the declared desired set, regardless of how it was installed.
+# Removal mirrors homebrew zap: anything installed but absent from the desired
+# set goes, regardless of how it was installed.
 _ipp_to_remove="$(mktemp)"
 while IFS= read -r _ipp_pkg; do
   [ -z "$_ipp_pkg" ] && continue
@@ -115,8 +101,7 @@ while IFS= read -r _ipp_pkg; do
   fi
 done <"$_ipp_installed"
 
-# Desired packages not yet installed, or installed at a version different
-# from the lockfile pin (version-aware reconciliation).
+# Desired packages missing or installed at a version other than the pin.
 _ipp_to_install="$(mktemp)"
 while IFS= read -r _ipp_pkg; do
   [ -z "$_ipp_pkg" ] && continue
@@ -144,8 +129,8 @@ while IFS= read -r _ipp_pkg; do
         _ipp_needs_install=1
       fi
       ;;
-    # A revision pin has no version to compare: pi records a git dependency,
-    # so the pinned revision must appear in the recorded value.
+    # A revision pin has no comparable version, so the pinned revision must appear
+    # in the recorded value.
     rev:*)
       case "$_ipp_installed_version" in
       *"${_ipp_lock_pin#rev:}"*) ;;
@@ -171,9 +156,8 @@ while IFS= read -r _ipp_pkg; do
   [ -z "$_ipp_pkg" ] && continue
   _ipp_spec="npm:$_ipp_pkg"
   if [ -n "$_ipp_lockfile" ]; then
-    # A revision pin becomes pi's git source form: "git:<url>#<rev>".  pi's
-    # parser rejects "git+<url>" (it only understands "git:"), and a leading
-    # git+ in the lockfile source is stripped so the emitted spec stays valid.
+    # A revision pin becomes pi's git source form "git:<url>#<rev>". pi rejects
+    # "git+<url>", so a leading git+ in the lockfile source is stripped.
     # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
     _ipp_pin="$("$_jq_bin" -r --arg p "$_ipp_pkg" '
       (.pi // {})[$p] as $e
@@ -190,34 +174,24 @@ while IFS= read -r _ipp_pkg; do
   say -l pi "$_ipp_pkg installed successfully"
 done <"$_ipp_to_install"
 
-# ---------------------------------------------------------------------------
-# Patch pi-subagents for Nix-store compatibility
-# ---------------------------------------------------------------------------
-# When pi-coding-agent is installed as a Nix package, its package root lives
-# inside /nix/store — a read-only path where bun's hoisted peer dependencies
-# (@earendil-works/chord, @earendil-works/pi-server) are invisible to the
-# extension's findHostPeerPackageDir upward walk.  Two patches fix this:
+# Patch pi-subagents for Nix-store compatibility.
 #
-# 1. runner-aliases.ts — the supplement fallback was gated on Pi 0.85.0 exactly
-#    and only covered pi-server.  We widen it to cover ANY missing specifier
-#    by checking the extension's own node_modules (where bun hoists them).
-#
-# 2. runner-server-preload.mjs — the ESM hook only intercepted pi-server.
-#    We generalise it to intercept any specifier present in the JITI_ALIAS map.
-#
-# Both patches are idempotent: the grep guard detects whether the old pattern
-# is still present before replacing.
-# ---------------------------------------------------------------------------
+# A Nix package root lives in the read-only /nix/store, where bun's hoisted peer
+# dependencies (@earendil-works/chord, @earendil-works/pi-server) are invisible
+# to the extension's findHostPeerPackageDir upward walk. Two patches widen the
+# supplement fallback and the ESM hook from the pi-server-only form they shipped
+# in to any missing specifier. Each is idempotent: a grep guard checks for the
+# old pattern before replacing.
 _apply_pi_subagents_patches() {
   local _ext_root="$HOME/.pi/agent/npm/node_modules/pi-subagents"
   local _aliases="$_ext_root/src/runs/background/runner-aliases.ts"
   local _preload="$_ext_root/runner-server-preload.mjs"
 
-  # --- Patch 1: runner-aliases.ts — widen supplement fallback ---
+  # Patch 1: widen the supplement fallback in runner-aliases.ts
   if [ -f "$_aliases" ] && grep -q 'readManifest(piPackageRoot)?.version === "0.85.0"' "$_aliases" 2>/dev/null; then
     # Replace the version-gated, pi-server-only supplement with a generic
-    # fallback that works for any missing specifier at any pi version.
-    # Uses sed line-range delete + file insert (portable across macOS/Linux).
+    # fallback. sed line-range delete plus file insert, portable across macOS
+    # and Linux.
     local _tmp _block
     _tmp="$(mktemp)"
     _block="$(mktemp)"
@@ -237,21 +211,20 @@ _apply_pi_subagents_patches() {
 			}
 		}
 BLOCK
-    # Delete the old block (comment + if + inner if + closing braces = lines 133-147)
+    # Delete the old block (comment, if, inner if, closing braces, lines 133-147)
     sed '133,147d' "$_tmp" >"$_tmp.sed" && mv "$_tmp.sed" "$_tmp"
     # Insert the new block before the "if (target" line (now at line 133)
     sed '132r '"$_block" "$_tmp" >"$_tmp.sed" && mv "$_tmp.sed" "$_tmp"
-    # Update the header comment to reflect the new behaviour
+    # Update the header comment to match the new behaviour
     sed 's|Only Pi 0.85.0.s missing server exports may come from this extension.|Supplement any missing host peer from the extension own node_modules (bun-hoisted packages invisible from the Nix store path).|' "$_tmp" >"$_tmp.sed" && mv "$_tmp.sed" "$_tmp"
     mv "$_tmp" "$_aliases"
     rm -f "$_block"
     say -l pi "patched runner-aliases.ts — widened supplement fallback"
   fi
 
-  # --- Patch 2: runner-server-preload.mjs — generalise interceptor ---
+  # Patch 2: generalise the interceptor in runner-server-preload.mjs
   if [ -f "$_preload" ] && grep -q 'specifier === "@earendil-works/pi-server"' "$_preload" 2>/dev/null; then
-    # Replace the hardcoded pi-server check with a generic JITI_ALIAS lookup.
-    # Use single-quoted sed expression to avoid shell quote conflicts.
+    # Single-quoted sed expression, to avoid shell quote conflicts.
     sed 's/if (specifier === "@earendil-works\/pi-server" || specifier === "@earendil-works\/pi-server\/unix") {/if (aliases[specifier]) {/' "$_preload" >"$_preload.sed" && mv "$_preload.sed" "$_preload"
     # Update the header comment
     sed 's|Only loaded when the parent supplies Pi 0.85.0.s missing server exports.|Intercept all supplemented host peer specifiers via the JITI_ALIAS map.|' "$_preload" >"$_preload.sed" && mv "$_preload.sed" "$_preload"

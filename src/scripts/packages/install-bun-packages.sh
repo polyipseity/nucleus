@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Idempotently converges the declarative bun global package set.
-#
-# The desired set comes from src/modules/packages/desired.json (host-keyed
-# single source of truth); versions are pinned by the lockfile `bun` section.
+# Converges the declarative bun global package set from
+# src/modules/packages/desired.json, with versions pinned by the lockfile `bun`
+# section.
 #
 # Positional args: <jq-bin> <bun-bin> <awk-bin> <node-gyp-bin> <python3-bin> <make-bin> <desired-json>
 # The node-gyp toolchain args exist because allowlisted packages run lifecycle
@@ -10,8 +9,7 @@
 # `node-gyp rebuild` for native dependencies whose prebuild metadata it ignores.
 set -euo pipefail
 
-# SC2094 avoidance: trap-based cleanup eliminates read/write-same-file
-# pipeline warnings — temp files are cleaned on EXIT instead of inline.
+# SC2094 avoidance: the EXIT trap cleans up temp files instead of inline.
 _ibp_desired=""
 _ibp_desired_names=""
 _ibp_installed=""
@@ -28,18 +26,15 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 _jq_bin="$1"
 _bun_bin="$2"
 _gawk_bin="$3"
-# node-gyp toolchain: bun runs lifecycle scripts for allowlisted packages, and a
-# native dependency without usable prebuild metadata is rebuilt through node-gyp,
-# which needs a Python interpreter and make.  The activation PATH provides
-# neither, so the toolchain is passed in explicitly.
+# The activation PATH provides neither a Python interpreter nor make, so the
+# toolchain is passed in explicitly.
 _ibp_node_gyp_bin="$4"
 _ibp_python3_bin="$5"
 _ibp_make_bin="$6"
 _ibp_desired_json="$7"
 
-# Add bun's and the node-gyp toolchain's directories to PATH so bun is callable
-# and the lifecycle-script children (node-gyp -> python3, make) resolve their
-# tools.
+# bun must be callable and the lifecycle-script children (node-gyp -> python3,
+# make) must resolve their tools.
 _bun_bin_dir="$(dirname "$_bun_bin")"
 _ibp_node_gyp_dir="$(dirname "$_ibp_node_gyp_bin")"
 _ibp_python3_dir="$(dirname "$_ibp_python3_bin")"
@@ -60,18 +55,15 @@ if [ ! -x "$_ibp_make_bin" ]; then
   die -l bun "$_ibp_make_bin not found in nix store; node-gyp requires make"
 fi
 
-# WHY: node-gyp is pointed at the store wrapper instead of letting bun resolve
-# its own (which would fetch from the network), and at the store's Python rather
-# than searching PATH where an interpreter may be stdlib-less or absent.  The
-# nixpkgs wrapper already exports npm_config_nodedir, so no headers are
-# downloaded.
+# WHY: node-gyp is pointed at the store wrapper rather than letting bun fetch
+# its own, and at the store's Python rather than searching PATH where an
+# interpreter may be stdlib-less or absent. The nixpkgs wrapper already exports
+# npm_config_nodedir, so no headers are downloaded.
 export npm_config_node_gyp="$_ibp_node_gyp_bin"
 export npm_config_python="$_ibp_python3_bin"
 
-# Read version pins from the consolidated lockfile so installs are
-# reproducible (closes the drift root cause).  Falls back to unpinned
-# install if the lockfile is unavailable (best-effort, mirrors Windows
-# Invoke-BunSetup.ps1).
+# Pins come from the lockfile, falling back to an unpinned install when it is
+# unavailable (mirrors Windows Invoke-BunSetup.ps1).
 _ibp_lockfile=""
 # check-suppress:suppression_doc: repo-root auto-detection may fail on non-deployed hosts; absence falls back to unpinned install.
 _ibp_repo_root="$(derive_repo_root 2>/dev/null || true)"
@@ -82,13 +74,11 @@ if [ -n "$_ibp_repo_root" ] && [ -f "$_ibp_repo_root/src/lockfiles/lifecycle-all
   _ibp_lifecycle_allowlist="$_ibp_repo_root/src/lockfiles/lifecycle-allowlist.json"
 fi
 
-# Desired-state list from src/modules/packages/desired.json: an array of
-# {"name": <npm package>, "binary"?: <installed binary name>} objects.  Only
-# packages absent from nixpkgs and cargo-binstall belong here (install
-# preference: nixpkgs > cargo binstall > cargo > bun > uv).
-# Written as "<name>\t<binary>" so the binary-existence check can honour an
-# explicit override; the default binary is the unscoped package basename.
-# Versions are pinned from the lockfile `bun` section (see _ibp_install_spec).
+# An array of {"name": <npm package>, "binary"?: <installed binary name>}
+# objects, holding only the packages absent from nixpkgs and cargo-binstall
+# (preference: nixpkgs > cargo binstall > cargo > bun > uv). Written as
+# "<name>\t<binary>" so an explicit binary override wins; the default is the
+# unscoped package basename.
 _ibp_desired="$(mktemp)"
 # shellcheck disable=SC2016 # reason: jq program body must not be expanded by shell
 printf '%s\n' "$_ibp_desired_json" |
@@ -98,24 +88,20 @@ _ibp_desired_names="$(mktemp)"
 # shellcheck disable=SC2016 # reason: awk script body must not be expanded by shell
 "$_gawk_bin" -F'\t' '{print $1}' "$_ibp_desired" >"$_ibp_desired_names"
 
-# Get actually installed global packages from bun's authoritative package
-# registry (zap-style: remove any installed package absent from the desired
-# list, regardless of prior managed state).  The global package.json is
-# bun's canonical record of all globally-installed packages.
+# Installed packages come from bun's global package.json, its canonical record.
 _ibp_global_json="$HOME/.bun/install/global/package.json"
 _ibp_installed="$(mktemp)"
 _ibp_installed_versions="$(mktemp)"
 if [ -f "$_ibp_global_json" ]; then
   # check-suppress:suppression_doc: parse failure on a malformed or partially-written file treats the installed set as empty -- safe because desired packages will simply be re-installed on the next run.
   "$_jq_bin" -r '.dependencies // {} | keys[]' "$_ibp_global_json" >"$_ibp_installed" || true
-  # name<TAB>version for version-aware reconciliation against the lockfile pin.
+  # name<TAB>version for version-aware reconciliation against the pin.
   # check-suppress:suppression_doc: parse failure on a malformed or partially-written file treats the installed set as empty -- safe because desired packages will simply be re-installed on the next run.
   "$_jq_bin" -r '.dependencies // {} | to_entries[] | "\(.key)\t\(.value)"' "$_ibp_global_json" >"$_ibp_installed_versions" || true
 fi
 
-# Packages installed but not desired: zap-style removal.
-# Mirrors homebrew cleanup = "zap": removes anything installed but absent
-# from the declared desired set, regardless of how it was installed.
+# Removal mirrors homebrew zap: anything installed but absent from the desired
+# set goes, regardless of how it was installed.
 _ibp_to_remove="$(mktemp)"
 while IFS= read -r _ibp_pkg; do
   [ -z "$_ibp_pkg" ] && continue
@@ -124,11 +110,9 @@ while IFS= read -r _ibp_pkg; do
   fi
 done <"$_ibp_installed"
 
-# Desired packages not yet in bun's global package.json, whose binary is
-# absent from ~/.bun/bin, or installed at a version different from the
-# lockfile pin (version-aware reconciliation).  Binary name = last path
-# component after '/' so @scope/name becomes name (bun uses the unscoped
-# basename as the binary name).
+# Desired packages absent from the global package.json, whose binary is missing
+# from ~/.bun/bin, or installed at a version other than the pin. The binary name
+# is the last path component, so @scope/name becomes name.
 _ibp_to_install="$(mktemp)"
 while IFS= read -r _ibp_pkg; do
   [ -z "$_ibp_pkg" ] && continue
@@ -184,9 +168,8 @@ while IFS= read -r _ibp_pkg; do
     [ -n "$_ibp_pin" ] && _ibp_spec="$_ibp_pin"
   fi
   say -l bun "installing $_ibp_spec"
-  # Check if package is in lifecycle-allowlist; allowlisted packages run
-  # lifecycle scripts (postinstall etc.) which some packages require for
-  # native module compilation and model downloads.
+  # Allowlisted packages run lifecycle scripts (postinstall and friends) that
+  # some packages need for native module compilation and model downloads.
   _ibp_allow_lifecycle=0
   if [ -n "$_ibp_lifecycle_allowlist" ]; then
     # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
@@ -195,8 +178,8 @@ while IFS= read -r _ibp_pkg; do
     fi
   fi
   # WHY: the machine-wide bunfig.toml sets `install.linker = "isolated"`, and bun
-  # then links a global package's binaries only into the global node_modules/.bin —
-  # $BUN_INSTALL/bin is left empty, so the installed CLI never reaches PATH
+  # then links a global package's binaries only into the global node_modules/.bin,
+  # leaving $BUN_INSTALL/bin empty so the CLI never reaches PATH
   # (oven-sh/bun#30450). Global installs are pinned back to the hoisted linker,
   # which is where the existence check below expects the binary.
   if [ "$_ibp_allow_lifecycle" -eq 1 ]; then
