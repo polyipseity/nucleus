@@ -12,12 +12,13 @@
 # red line, and a post-install listing fails the run when a copy that can shadow
 # the pin survives it.
 #
-# Which copies those are is the rule the runner turned red over. PowerShell loads
-# the highest version available, so a copy below the pin is inert and is left
-# alone; a copy at or above the pin, at any scope, is a target, because a tie on
-# version is broken by path order. The early exit has to name both facts
-# separately, since nothing shadowing the pin is also true on a host that has no
-# pin at all.
+# Which copies those are: at or above the pin is a target at any scope, because a
+# tie on version is broken by path order, and below the pin is a target inside the
+# per-user module path, which is the tree this script installs into. Outside that
+# path a lower copy stays, because PowerShell never loads it and the Windows runner
+# image ships Pester 3.4.0 whose deletion turned that runner red. The early exit
+# has to name the pin and the set separately, since an empty set is also true on a
+# host that has no pin at all.
 #
 # Those three are asserted on the recorded program, which cannot tell a working
 # program from a reordered one, so a second group runs the real thing. A copy
@@ -240,6 +241,7 @@ function Get-Module {
     if ($env:IPM_FAKE_PRE_INSTALL -eq 'pin-and-shadow') { return @($pin, $shadow) }
     return @($shadow)
   }
+  if ($env:IPM_FAKE_POST_INSTALL -eq 'no-pin') { return @($shadow) }
   if ($env:IPM_FAKE_POST_INSTALL -eq 'leftover') { return @($pin, $shadow) }
   if ($env:IPM_FAKE_POST_INSTALL -eq 'lower') { return @($pin, $lower) }
   return @($pin)
@@ -435,11 +437,31 @@ test_no_unannotated_suppression_in_the_installer() {
 test_skips_pwsh_when_the_binary_is_not_executable() {
   : >"$IPM_STUB_LOG"
   RUN_STATUS=0
-  bash "$INSTALLER" "$TMP_DIR/not-a-pwsh" Pester 6.2.0 || RUN_STATUS=$?
-  if [ "$RUN_STATUS" -eq 0 ] && [ ! -s "$IPM_STUB_LOG" ]; then
+  bash "$INSTALLER" "$TMP_DIR/not-a-pwsh" Pester 6.2.0 >"$TMP_DIR/skip-out.txt" 2>&1 || RUN_STATUS=$? # WHY the line is asserted: the skip has to stay non-fatal, and a skip that
+  #   prints nothing is indistinguishable from an activation entry that never ran.
+  if [ "$RUN_STATUS" -ne 0 ] || [ -s "$IPM_STUB_LOG" ]; then
+    assert_fail "installer: no-ops without running pwsh when the binary is missing" "exit=$RUN_STATUS, recorded=$(wc -c <"$IPM_STUB_LOG" | tr -d ' ') bytes"
+    return
+  fi
+  if grep -qF 'pwsh is not at' "$TMP_DIR/skip-out.txt"; then
     assert_pass "installer: no-ops without running pwsh when the binary is missing"
   else
-    assert_fail "installer: no-ops without running pwsh when the binary is missing" "exit=$RUN_STATUS, recorded=$(wc -c <"$IPM_STUB_LOG" | tr -d ' ') bytes"
+    assert_fail "installer: no-ops without running pwsh when the binary is missing" "the skip said nothing: $(cat "$TMP_DIR/skip-out.txt")"
+  fi
+}
+
+test_skips_with_a_line_when_the_lockfile_pins_no_version() {
+  : >"$IPM_STUB_LOG"
+  RUN_STATUS=0
+  bash "$INSTALLER" "$TMP_DIR/pwsh-stub" ProbeMod '' >"$TMP_DIR/skip-empty-out.txt" 2>&1 || RUN_STATUS=$?
+  if [ "$RUN_STATUS" -ne 0 ] || [ -s "$IPM_STUB_LOG" ]; then
+    assert_fail "installer: no-ops with a line of its own when no version is pinned" "exit=$RUN_STATUS, recorded=$(wc -c <"$IPM_STUB_LOG" | tr -d ' ') bytes"
+    return
+  fi
+  if grep -qF 'pins no version for ProbeMod' "$TMP_DIR/skip-empty-out.txt"; then
+    assert_pass "installer: no-ops with a line of its own when no version is pinned"
+  else
+    assert_fail "installer: no-ops with a line of its own when no version is pinned" "the skip said nothing: $(cat "$TMP_DIR/skip-empty-out.txt")"
   fi
 }
 
@@ -472,6 +494,7 @@ test_keeps_the_early_exit_when_the_pin_is_already_converged
 test_early_exit_names_the_pin_and_the_shadowing_separately
 test_no_unannotated_suppression_in_the_installer
 test_skips_pwsh_when_the_binary_is_not_executable
+test_skips_with_a_line_when_the_lockfile_pins_no_version
 test_emits_the_program_without_shell_interpretation
 
 section 2 "install-pwsh-module behaviour under real pwsh"
@@ -492,24 +515,54 @@ test_only_a_lower_copy_still_attempts_the_install() {
   fi
 }
 
-# The rule the change exists for. 1.0.0 beside the 2.0.0 pin is the CI runner's
-# Pester 5.9.0, and treating it as a target is what turned that runner red. A
-# target predicate of "version differs from the pin" sweeps it and fails, so this
-# case is the one that discriminates between the two predicates.
+# The rule that keeps a lower copy outside the per-user module path. PowerShell
+# never loads it in its favour, it is not this script's tree, and deleting it is
+# what turned the Windows runner image red. The directory is checked on disk
+# afterwards, because a run that reported no removal could still have removed it.
 test_copy_below_the_pin_beside_the_pin_exits_zero() {
   local module_root="$TMP_DIR/below-pin-root"
   write_fake_module "$module_root" ProbeMod 1.0.0
   write_fake_module "$IPM_USER_MODULE_ROOT" ProbeMod 2.0.0
   run_installer_real "$module_root" ProbeMod 2.0.0
   if [ "$RUN_STATUS" -ne 0 ]; then
-    assert_fail "installer: exits zero when a copy below the pin sits beside it" "exited $RUN_STATUS; stdout=$RUN_STDOUT stderr=$RUN_STDERR"
+    assert_fail "installer: leaves a copy below the pin outside the module path alone" "exited $RUN_STATUS; stdout=$RUN_STDOUT stderr=$RUN_STDERR"
     return
   fi
   if printf '%s' "$RUN_STDOUT" | grep -qF 'is already converged' &&
     ! printf '%s' "$RUN_STDOUT" | grep -qF 'removing'; then
-    assert_pass "installer: exits zero when a copy below the pin sits beside it"
+    assert_pass "installer: leaves a copy below the pin outside the module path alone"
   else
-    assert_fail "installer: exits zero when a copy below the pin sits beside it" "stdout=$RUN_STDOUT stderr=$RUN_STDERR"
+    assert_fail "installer: leaves a copy below the pin outside the module path alone" "stdout=$RUN_STDOUT stderr=$RUN_STDERR"
+  fi
+  if [ -f "$module_root/ProbeMod/1.0.0/ProbeMod.psd1" ]; then
+    assert_pass "installer: the copy outside the module path is still on disk afterwards"
+  else
+    assert_fail "installer: the copy outside the module path is still on disk afterwards" "$module_root/ProbeMod/1.0.0 was removed"
+  fi
+}
+
+# The other side of the same boundary: the same stale version inside the
+# per-user module path is a removal target, because that tree is what this script
+# installs into. The removal then fails on the PSGallery record the copy has
+# never had, which is what proves the sweep was pointed at that copy.
+test_stale_copy_inside_the_user_module_path_is_swept() {
+  local stale_dir="$IPM_USER_MODULE_ROOT/ProbeMod/1.0.0"
+  write_fake_module "$IPM_USER_MODULE_ROOT" ProbeMod 1.0.0
+  write_fake_module "$IPM_USER_MODULE_ROOT" ProbeMod 2.0.0
+  run_installer_real "$TMP_DIR/empty-root" ProbeMod 2.0.0
+  rm -rf "$stale_dir"
+  if [ "$RUN_STATUS" -eq 0 ]; then
+    assert_fail "installer: sweeps a stale copy inside the module path" "exited 0; stdout=$RUN_STDOUT stderr=$RUN_STDERR"
+    return
+  fi
+  if ! printf '%s' "$RUN_STDOUT" | grep -qF 'removing 1 stale or shadowing ProbeMod version(s)'; then
+    assert_fail "installer: sweeps a stale copy inside the module path" "the sweep named a different set; stdout=$RUN_STDOUT stderr=$RUN_STDERR"
+    return
+  fi
+  if printf '%s' "$RUN_STDERR" | grep -qF '1.0.0'; then
+    assert_pass "installer: sweeps a stale copy inside the module path"
+  else
+    assert_fail "installer: sweeps a stale copy inside the module path" "exited $RUN_STATUS without naming the stale copy; stdout=$RUN_STDOUT stderr=$RUN_STDERR"
   fi
 }
 
@@ -528,7 +581,7 @@ test_copy_above_the_pin_is_swept_and_the_run_fails() {
     assert_fail "installer: a copy above the pin is swept and the run fails" "exited 0; stdout=$RUN_STDOUT stderr=$RUN_STDERR"
     return
   fi
-  if ! printf '%s' "$RUN_STDOUT" | grep -qF 'removing 1 conflicting ProbeMod version(s)'; then
+  if ! printf '%s' "$RUN_STDOUT" | grep -qF 'removing 1 stale or shadowing ProbeMod version(s)'; then
     assert_fail "installer: a copy above the pin is swept and the run fails" "the sweep did not name exactly the one copy above the pin; stdout=$RUN_STDOUT stderr=$RUN_STDERR"
     return
   fi
@@ -622,14 +675,34 @@ test_post_install_check_passes_when_only_the_pin_is_left() {
   fi
 }
 
+# The check the leftover set could not make: an install that returns without
+# leaving the pin behind reads as success when the only question asked is what
+# could shadow it. The listing after the install carries no copy of the pin at
+# all, which is the state this case has to tell apart from a clean run.
+test_post_install_check_throws_when_the_pin_is_missing() {
+  run_shadowed_program ProbeMod 2.0.0 no-pin
+  if [ "$RUN_STATUS" -eq 0 ]; then
+    assert_fail "installer: throws when the pin is not installed after the install" "exited 0; stdout=$RUN_STDOUT stderr=$RUN_STDERR"
+    return
+  fi
+  if printf '%s' "$RUN_STDERR" | grep -qF 'ProbeMod' &&
+    printf '%s' "$RUN_STDERR" | grep -qF '2.0.0'; then
+    assert_pass "installer: throws when the pin is not installed after the install"
+  else
+    assert_fail "installer: throws when the pin is not installed after the install" "exited $RUN_STATUS without naming the missing pin; stderr=$RUN_STDERR"
+  fi
+}
+
 test_only_a_lower_copy_still_attempts_the_install
 test_copy_below_the_pin_beside_the_pin_exits_zero
+test_stale_copy_inside_the_user_module_path_is_swept
 test_copy_above_the_pin_is_swept_and_the_run_fails
 test_pin_only_module_root_exits_zero_without_installing
 test_post_install_check_throws_and_names_the_surviving_copy
 test_post_install_check_reads_the_state_left_by_the_install
 test_post_install_check_passes_when_only_the_pin_is_left
 test_post_install_check_passes_when_a_lower_copy_survives
+test_post_install_check_throws_when_the_pin_is_missing
 
 test_elevates_the_removal_and_keeps_the_install_unprivileged() {
   run_installer Pester 6.2.0
