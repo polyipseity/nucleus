@@ -1,6 +1,5 @@
 # shellcheck shell=bash
 # shellcheck source=../check-lib.sh
-# (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
 register_step "lockfile-validation" "Lockfile validation" run_lockfile_validation posix any none
@@ -17,7 +16,7 @@ run_lockfile_validation() {
   local _lfpath="src/lockfiles/lockfile.json"
   local _lf_al_path="src/lockfiles/lifecycle-allowlist.json"
 
-  # Skip when scoped to files outside this step's scope (no lockfile JSON files).
+  # WHY: skip when scoped to files outside this step's scope.
   if $_has_args; then
     local _f _has_lf_files=0
     for _f in "${_files[@]}"; do
@@ -33,7 +32,7 @@ run_lockfile_validation() {
     fi
   fi
 
-  # --- Overlap check ---
+  # Overlap check.
   local _lf_overlap_issues=0
   if [ ! -f "$_lfpath" ]; then
     error "lockfile.json not found at $_lfpath"
@@ -41,8 +40,8 @@ run_lockfile_validation() {
   else
     local _lf_overlap_exceptions='["astral-sh.ty","Windows"]' # ref: allow-and-deny-lists.instructions.md#D1
     local _lf_overlaps
-    # Note: cursor and vscode are both VS Code–based editors; identical
-    # extension IDs across these two sections are expected and excluded.
+    # WHY: cursor and vscode are both VS Code editors, so identical extension IDs across the
+    # two sections are expected and excluded.
     _lf_overlaps=$(jq -r --argjson exceptions "$_lf_overlap_exceptions" '
       [
         (to_entries[] | select(.key != "suggestions" and .key != "ollama" and (.value | type == "object")) | .key as $s | (.value | keys)[] | {s: $s, p: .}),
@@ -68,7 +67,7 @@ run_lockfile_validation() {
     say "lockfile.json consistency: no overlapping packages across sections"
   fi
 
-  # --- Lifecycle allowlist validation ---
+  # Lifecycle allowlist validation.
   if [ ! -f "$_lf_al_path" ]; then
     error "lifecycle-allowlist.json not found at $_lf_al_path"
     _lf_al_errors=$((_lf_al_errors + 1))
@@ -98,15 +97,15 @@ run_lockfile_validation() {
     say "lifecycle-allowlist.json: valid (entry count: $_lf_al_count)"
   fi
 
-  # Section validation (non-empty, no placeholders) is enforced by
-  # lockfile.schema.json via step 07 (schema-validation). This step
-  # only handles cross-section overlap and lifecycle-allowlist checks.
+  # WHY: this step only handles cross-section overlap and lifecycle-allowlist checks.
+  # Section validation (non-empty, no placeholders) is enforced by lockfile.schema.json via
+  # step 07.
 
   say "lockfile.json validation passed"
   [ "$_lf_errors" -eq 0 ]
 }
 
-# run_online_determinism — Verify lockfile freshness against registries (requires network).
+# WHY: needs network. Verify lockfile freshness against the registries.
 run_online_determinism() {
   local -n ctx="$1"
   local _repo_root="${ctx[REPO_ROOT]}"
@@ -121,7 +120,7 @@ run_online_determinism() {
   fi
 }
 
-# run_locked_dsc_validation — Verify DSC package versions match lockfile pins.
+# Verify DSC package versions match the lockfile pins.
 run_locked_dsc_validation() {
   local -n ctx="$1"
   local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"

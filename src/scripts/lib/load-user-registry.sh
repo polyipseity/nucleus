@@ -1,14 +1,9 @@
 #!/usr/bin/env bash
-# src/scripts/lib/load-user-registry.sh — Assemble the user registry from
-# src/users/<username>/ domain JSON files with src/users/default/ fallback.
+# Assembles the user registry from src/users/<username>/ domain JSON files, falling back to
+# src/users/default/, and prints it as a username-keyed JSON object on stdout.
 #
-# Outputs the assembled registry as JSON on stdout (username-keyed object).
-#
-# Usage:
-#   load-user-registry.sh [--host MacBook|NixOS|Windows] [--repo-root PATH]
-#
-# Environment:
-#   NUCLEUS_REPO_ROOT  Repository root when --repo-root is omitted.
+# Usage: load-user-registry.sh [--host MacBook|NixOS|Windows] [--repo-root PATH]
+#   NUCLEUS_REPO_ROOT supplies the repo root when --repo-root is omitted.
 
 set -euo pipefail
 

@@ -1,15 +1,7 @@
 #!/usr/bin/env bash
-# Idempotent dev repo clone/symlink helpers.
-# Requires env vars: HOME, PATH (with git), GIT_SSH_COMMAND.
-# Agent helpers (_nucleus_protect_symlink, _nucleus_unprotect_symlink) must
-# be sourced before calling any ensure_* function below.
-#
-# Nix wrapper sets devReposErrors=0, repoRoot, and devDir=$HOME/dev, then
-# sources this lib and generates the repo/submodule iteration loops.
+# Idempotent dev repo clone/symlink helpers. Needs HOME, PATH (with git), and GIT_SSH_COMMAND.
+# The Nix wrapper sets devReposErrors=0, repoRoot, and devDir=$HOME/dev before sourcing this lib.
 
-# Track non-fatal provisioning errors so activation output is quiet on
-# expected no-op paths but still explicit when actionable failures
-# occur.
 devReposErrors=${devReposErrors:-0}
 
 report_error() {
@@ -18,10 +10,8 @@ report_error() {
   error -l provision-dev-repos "$1" || return 0
 }
 
-# Convert declarative repo paths into real filesystem paths for the
-# managed user. Relative paths live under $HOME; ~/... expands to the
-# same place explicitly because quoted shell arguments suppress tilde
-# expansion.
+# Convert declarative repo paths into real paths for the managed user. Relative paths live under
+# $HOME; ~/... expands to the same place explicitly because quoted arguments suppress tilde.
 resolve_repo_path() {
   pathInput="$1"
 
@@ -41,11 +31,10 @@ resolve_repo_path() {
   esac
 }
 
-# Repo-root-backed symlinks must point at the live checkout, never the
-# immutable Nix store -source snapshot produced at flake eval time. The live
-# root is resolved at runtime via derive_repo_root (env -> <SYSTEM root>/repo-root
-# -> SCRIPT_DIR offset -> git rev-parse) — the same resolver every other consumer
-# uses. Failing fast here avoids quietly linking dev repos to a stale store path.
+# Repo-root-backed symlinks must point at the live checkout, never the immutable Nix store
+# -source snapshot produced at flake eval time. derive_repo_root resolves the live root at
+# runtime (env -> <SYSTEM root>/repo-root -> SCRIPT_DIR offset -> git rev-parse), so a stale
+# store path never reaches a dev repo.
 resolve_repo_root_target() {
   local liveRoot
   if ! liveRoot="$(derive_repo_root 2>/dev/null)" || [ -z "$liveRoot" ] || [ ! -d "$liveRoot" ]; then
@@ -61,15 +50,13 @@ expand_glob_paths() {
   baseDir="$1"
   pattern="$2"
 
-  # Use shell globbing with set -f/+f to safely expand patterns
   if [ -d "$baseDir" ]; then
     # shellcheck disable=SC2086 # reason: word splitting intentional for shell glob expansion
     cd "$baseDir" && ls -1d $pattern 2>/dev/null
   fi
 }
 
-# Read direct submodule paths from the repository .gitmodules file.
-# Direct submodules are those listed in .gitmodules without nesting.
+# Read direct submodule paths from .gitmodules: those listed there without nesting.
 list_direct_submodules() {
   repoTarget="$1"
 
@@ -83,7 +70,7 @@ list_direct_submodules() {
   done
 }
 
-# Helper function: create a symlink for a repository.
+# Clone or update a repository, no submodule logic.
 ensure_symlink() {
   local symlinkTarget="$1"
   local symlinkPath="$2"
@@ -100,7 +87,6 @@ ensure_symlink() {
   if [ -L "$symlinkPath" ]; then
     currentTarget=$(readlink "$symlinkPath")
     if [ "$currentTarget" = "$symlinkTarget" ]; then
-      # Symlink already correct; skip silently (idempotent)
       return 0
     fi
 
@@ -116,13 +102,11 @@ ensure_symlink() {
 
   if ln -s "$symlinkTarget" "$symlinkPath"; then
     _nucleus_protect_symlink "provision-dev-repos" "$symlinkPath"
-    # Symlink created successfully (idempotent)
   else
     report_error "failed to create symlink for $repoName"
   fi
 }
 
-# Helper function: clone or update a repository (no submodule logic here).
 ensure_repo() {
   local repoUrl="$1"
   local repoTarget="$2"
@@ -138,9 +122,7 @@ ensure_repo() {
     return 0
   fi
 
-  # Check if repo is initialized.
   if [ -d "$repoTarget/.git" ]; then
-    # Repo already initialized; verify/update remote.
     if [ -d "$repoTarget" ]; then
       if ! currentRemote=$(cd "$repoTarget" && git config --get remote.origin.url 2>&1); then
         report_error "failed to read remote for $repoName ($currentRemote)"
@@ -149,7 +131,6 @@ ensure_repo() {
 
       if [ "$currentRemote" != "$repoUrl" ]; then
         if remoteErr=$(cd "$repoTarget" && git remote set-url origin "$repoUrl" 2>&1); then
-          # Remote updated successfully (idempotent)
           :
         else
           report_error "failed to update remote for $repoName ($remoteErr)"
@@ -160,7 +141,6 @@ ensure_repo() {
     return 0
   fi
 
-  # Repo not initialized; clone it.
   if [ -e "$repoTarget" ] && [ ! -d "$repoTarget" ]; then
     report_error "$repoTarget exists and is not a directory"
     return 0
@@ -172,7 +152,6 @@ ensure_repo() {
   fi
 
   if cloneErr=$(git clone "$repoUrl" "$repoTarget" 2>&1); then
-    # Repository cloned successfully (idempotent)
     return 0
   else
     report_error "failed to clone $repoName from $repoUrl ($cloneErr)"
@@ -180,7 +159,7 @@ ensure_repo() {
   fi
 }
 
-# Helper function: clone direct submodules from a directory path.
+# Clone direct submodules from a directory path.
 # Arguments: directoryPath recursive(0|1) directoryLabel
 resolve_submodule_branch() {
   local repoPath="$1"
@@ -261,9 +240,7 @@ clone_directory_submodules() {
   local submoduleTarget
   local submoduleErr
 
-  # Directory must exist and have a .gitmodules file
   if [ ! -f "$dirPath/.gitmodules" ]; then
-    # No submodules configured in this directory; benign no-op.
     return 0
   fi
 
@@ -272,12 +249,10 @@ clone_directory_submodules() {
     return 0
   fi
 
-  # Initialize each direct submodule
   for submodulePath in $directSubmodules; do
     submoduleTarget="$dirPath/$submodulePath"
 
     if [ -e "$submoduleTarget/.git" ]; then
-      # Already initialized; idempotent no-op.
       continue
     fi
 

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Expires old Home Manager generations, runs nix store GC, removes stale
-# decrypted wallpapers, gc's tool caches, and removes locally installed
-# Ollama models absent from the manifest.
+# Expires old Home Manager generations, gc's the Nix store and tool caches, drops stale
+# decrypted wallpapers, and removes Ollama models absent from the manifest.
 
 set -euo pipefail
 
@@ -19,8 +18,8 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 # shellcheck source=../src/scripts/lib/log-expiry.sh
 . "$SCRIPT_DIR/../src/scripts/lib/log-expiry.sh"
 
-# Subcommand dispatch. gc.sh normally runs the full default GC below; a leading
-# subcommand word runs a single targeted operation instead and exits.
+# A leading subcommand word runs one targeted operation and exits; with none, the full
+# default GC below runs.
 action="${1:-}"
 case "$action" in
 cleanup-nix | preferences)
@@ -561,7 +560,7 @@ gc_sccache_cache_if_available() {
 
 gc_vm_artifacts_if_present() {
   #
-  # WHY: keep-set has one source of truth in src/scripts/lib/vm.sh — vm_gc_vms
+  # WHY: keep-set has one source of truth in src/scripts/lib/vm.sh, vm_gc_vms
   vm_dir="${HOME}/virtual machines"
   src_dir="$vm_dir/src"
   manifest="$REPO_ROOT/src/modules/vms/VMs.json"
@@ -627,8 +626,6 @@ gc_vm_artifacts_if_present() {
   "$REPO_ROOT/scripts/vm.sh" gc "${_gc_vm_extra_args[@]}"
 }
 
-# do_cleanup_nix — Remove stale Nix build result symlinks (result, result-*)
-# from the repo root. Delegates to the shared build-artifact cleanup body.
 do_cleanup_nix() {
   _cnba_options=""
   while [ "$#" -gt 0 ]; do
@@ -656,7 +653,7 @@ do_cleanup_nix() {
   nuc_done "$@"
 }
 
-# do_macos_preferences — macOS-only: purge stale managed user preference domains.
+# WHY: macOS-only. Purges stale managed user preference domains.
 do_macos_preferences() {
   if [ "$(uname -s)" != "Darwin" ]; then
     error "preferences subcommand is macOS-only"
@@ -805,9 +802,9 @@ if [ "$journald_gc" = true ]; then
   fi
 fi
 
-# WHY: Scoop exists only on Windows, so gc.ps1 owns the cache clearing and this
-# flag exists for command-line parity. It is reported rather than ignored silently,
-# because a user carrying a flag set across hosts should learn it did nothing here.
+# WHY: Scoop exists only on Windows, so gc.ps1 owns cache clearing and this flag is here
+# for command-line parity. Report it instead of ignoring it silently: a user carrying a flag
+# set across hosts should learn it did nothing here.
 if [ "$scoop_gc" = false ]; then
   warn "--no-scoop-gc accepted but ignored on POSIX (Scoop is Windows-only)"
 fi

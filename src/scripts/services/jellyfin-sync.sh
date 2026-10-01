@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
-# Reads per-user jellyfin declarations from src/users/, resolves
-# credentials from SOPS secrets, and applies them to a running Jellyfin server
-# via its HTTP API.
+# Reads per-user Jellyfin declarations from src/users/, resolves credentials from SOPS
+# secrets, and applies them to a running server over its HTTP API.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 . "$SCRIPT_DIR/../lib/lib.sh"
 
-# Empty by default: derive_repo_root() resolves NUCLEUS_REPO_ROOT when it is a
-# live path and rejects Nix store snapshots.
+# WHY: empty by default. derive_repo_root() resolves NUCLEUS_REPO_ROOT when it is a live
+# path and rejects Nix store snapshots.
 REPO_ROOT=""
 
 export SOPS_AGE_KEY_FILE="${SOPS_AGE_KEY_FILE:-$(nucleus_machine_age_key_path)}"
@@ -56,17 +55,15 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Derive repo root only after CLI argument parsing so --repo-root takes
-# precedence.  The activation script runs with env -i (cleared environment),
-# so NUCLEUS_REPO_ROOT is not available there and derive_repo_root would fail
-# if called early.
+# WHY: derive the repo root after CLI parsing so --repo-root wins. The activation script
+# runs with env -i, so NUCLEUS_REPO_ROOT is unavailable there and derive_repo_root would fail
+# early.
 if [ -z "$REPO_ROOT" ]; then
   REPO_ROOT="$(derive_repo_root)"
 fi
 
-# If explicit tool paths were provided, define shell function wrappers so all
-# bare jq/sops invocations resolve to the pinned binary without changing every
-# call site.
+# WHY: shell function wrappers for explicit tool paths, so bare jq/sops invocations resolve
+# to the pinned binary without touching every call site.
 if [ -n "${_JFS_JQ_PATH:-}" ]; then
   jq() { "$_JFS_JQ_PATH" "$@"; }
 fi
@@ -131,7 +128,6 @@ _jfs_load_users_registry() {
     --repo-root "$REPO_ROOT"
 }
 
-# Converge Jellyfin user accounts declared in src/users/.
 _jfs_sync_accounts() {
   if ! _jfsa_users_registry="$(_jfs_load_users_registry)"; then
     return
@@ -204,7 +200,7 @@ _jfs_sync_accounts() {
     return
   fi
 
-  # Probe readiness; startup can lag behind service registration after apply.
+  # WHY: probe readiness. Startup can lag behind service registration after apply.
   _jfsa_waited=0
   while [ "$_jfsa_waited" -lt 60 ]; do
     if curl -fsS --max-time 5 "$_jfs_base_url/System/Info/Public" >/dev/null 2>&1; then
@@ -368,7 +364,6 @@ _jfs_sync_accounts() {
   rm -f "$_jfsa_resolved_file"
 }
 
-# Normalize LibraryOptions to the POST payload shape for drift comparison.
 _jfs_library_options_match() {
   local _jfsl_current="$1"
   local _jfsl_desired="$2"
@@ -403,7 +398,6 @@ _jfs_library_options_match() {
   ' >/dev/null
 }
 
-# Converge Jellyfin library folders declared in src/users/.
 _jfs_sync_libraries() {
   if ! _jfsl_users_registry="$(_jfs_load_users_registry)"; then
     return
@@ -630,10 +624,9 @@ _jfs_sync_libraries() {
     _jfsl_primary_limit="$(printf '%s' "$_jfsl_options" | jq -r '.imageOptions.Primary.limit // 1')"
     _jfsl_image_fetchers="$(printf '%s' "$_jfsl_options" | jq -c '.imageFetchers // ["Embedded Image Extractor","Screen Grabber"]')"
 
-    # Boolean options that default to true must be read with an explicit null
-    # check: `//` also skips an explicit `false`, which would push `true` back
-    # to the server and silently re-enable a library option the user turned off.
-    # The `// false` siblings below are unaffected — `false` is already the
+    # WHY: boolean options that default to true need an explicit null check. `//` also skips
+    # an explicit `false`, pushing `true` back to the server and silently re-enabling an
+    # option the user turned off. The `// false` siblings are unaffected: false is already the
     # value they would produce.
     _jfsl_library_options="$(jq -cn \
       --argjson enabled "$(printf '%s' "$_jfsl_options" | jq 'if .enabled == null then true else .enabled end')" \

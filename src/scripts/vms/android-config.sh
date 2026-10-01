@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# Post-provision Android guest configuration: MindTheGapps sideload, ADB key
-# install, Magisk root, and fake Wi-Fi.
-#
-# Invoked by nucleus-vm android-config after vm_init sets MANIFEST, VM_DIR, SRC_DIR.
+# Post-provision Android guest config: MindTheGapps sideload, ADB keys, Magisk root, fake Wi-Fi.
+# Invoked by nucleus-vm android-config after vm_init sets MANIFEST, VM_DIR, and SRC_DIR.
 #
 # Usage: android-config.sh <vm-name> <vm-index> [--gapps] [--adb-keys]
 #        [--magisk] [--root] [--fake-wifi] [--fake-wifi-revert]

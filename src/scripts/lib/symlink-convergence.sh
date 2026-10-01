@@ -1,18 +1,12 @@
 # shellcheck shell=sh
-# Shared symlink convergence functions for managing directory-based symlink
-# collections.  Assumes _nucleus_{un,}protect_symlink from
-# symlink-hardening.sh are available at call sites.
-#
-# Provided functions:
-#   _nucleus_remove_stale_symlinks
-#   _nucleus_converge_symlinks
+# Shared symlink convergence for directory-based collections. Call sites must have
+# _nucleus_{un,}protect_symlink from symlink-hardening.sh available.
 
 # _nucleus_remove_stale_symlinks TARGET_DIR SOURCE_PREFIX LABEL [SKIP_NAMES]
 #
-# Removes symlinks from TARGET_DIR whose targets start with SOURCE_PREFIX but
-# whose target no longer exists (neither as a regular file/dir nor as a broken
-# symlink — the latter is excluded because the link may still be intentional).
-# SKIP_NAMES is a space-separated list of basenames to leave untouched.
+# Removes symlinks from TARGET_DIR whose targets start with SOURCE_PREFIX but no longer
+# resolve. Broken symlinks stay: the link may still be intentional. SKIP_NAMES is a
+# space-separated list of basenames to leave untouched.
 _nucleus_remove_stale_symlinks() {
   _nrs_target="$1"
   _nrs_source="$2"
@@ -39,12 +33,10 @@ _nucleus_remove_stale_symlinks() {
 # _nucleus_converge_symlinks SOURCE_DIR TARGET_DIR LABEL FIND_TYPE \
 #   CONFLICT_TEST CONFLICT_MSG_SUFFIX [SKIP_NAMES]
 #
-# Creates or updates symlinks in TARGET_DIR for each entry in SOURCE_DIR.
-# FIND_TYPE is a find(1) type qualifier (e.g. "-type d") or "" for all entry
-# types.  CONFLICT_TEST is a test(1) operator (e.g. "-d" or "-e") applied to
-# the target path when it exists as a non-symlink.  On conflict the message
-# "LABEL: LINK_PATH CONFLICT_MSG_SUFFIX" is printed before exit(1).
-# SKIP_NAMES is a space-separated list of basenames to skip.
+# Creates or updates symlinks in TARGET_DIR for each entry in SOURCE_DIR. FIND_TYPE is a
+# find(1) type qualifier such as "-type d", or "" for all entry types. CONFLICT_TEST is a
+# test(1) operator such as "-d" applied to the target when it exists as a non-symlink; a
+# conflict prints "LABEL: LINK_PATH CONFLICT_MSG_SUFFIX" and exits 1.
 _nucleus_converge_symlinks() {
   _ncs_source="$1"
   _ncs_target="$2"
@@ -83,9 +75,8 @@ _nucleus_converge_symlinks() {
 # _nucleus_converge_overlay_entry SOURCE_PATH TARGET_LINK LABEL CONFLICT_TEST \
 #   CONFLICT_MSG_SUFFIX
 #
-# Symlinks one overlay-resolved first-level config entry (file or directory)
-# into TARGET_LINK. Requires resolve-user-config.sh at the call site when using
-# merged iteration helpers below.
+# Symlinks one overlay-resolved first-level config entry into TARGET_LINK. The merged
+# helpers below need resolve-user-config.sh sourced at the call site.
 _nucleus_converge_overlay_entry() {
   _coe_source="$1"
   _coe_link="$2"
@@ -114,8 +105,8 @@ _nucleus_converge_overlay_entry() {
 # _nucleus_converge_merged_config_symlinks USERNAME CONFIG_NAME \
 #   TARGET_DIR LABEL FIND_TYPE CONFLICT_TEST CONFLICT_MSG_SUFFIX [SKIP_NAMES]
 #
-# Converges first-level merged overlay entries into TARGET_DIR. Skips SKIP_NAMES.
-# Requires resolve-user-config.sh to be sourced before symlink-convergence.sh.
+# Converges first-level merged overlay entries into TARGET_DIR, skipping SKIP_NAMES.
+# Requires resolve-user-config.sh sourced before symlink-convergence.sh.
 _nucleus_converge_merged_config_symlinks() {
   _cmc_username="$1"
   _cmc_config_name="$2"

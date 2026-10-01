@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
-# LiteLLM AI gateway daemon.
-# Reads SOPS-decrypted API key files and starts litellm.
+# Starts the LiteLLM gateway with SOPS-decrypted API key files.
 #
 # Usage: litellm-daemon.sh <config> <poll_timeout> [KEYFILE:ENVVAR ...]
-#
 #   config          Path to litellm-config.yml
 #   poll_timeout    Polling timeout in 5-second ticks (0 = no polling)
-#   KEYFILE:ENVVAR  Pairs of key file path and env var name to export.
-#                   Zero or more pairs — zero means no remote keys.
+#   KEYFILE:ENVVAR  Key file path and env var name to export, paired. Zero pairs is valid.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -19,9 +16,8 @@ poll_timeout="${LITELLM_EVAL_TIMEOUT:-${2:?}}"
 _poll_ticks="$poll_timeout"
 shift 2 || true # check-suppress:suppression_doc: shift fails when config and poll_timeout are supplied via env vars (no positional args)
 
-# Poll for each key file when configured (macOS launchd needs to handle
-# the boot-time race with sops-install-secrets; systemd on NixOS restarts
-# quickly enough that polling is unnecessary).
+# WHY: poll each key file when configured. macOS launchd needs this to handle the boot-time
+# race with sops-install-secrets; systemd on NixOS restarts fast enough without it.
 _wait_for_keyfile() {
   _path="$1"
   _ticks="$2"
@@ -62,11 +58,9 @@ for _spec in "$@"; do
   fi
 done
 
-# Opt-in Redis readiness gate. launchd has no native ordering primitive, so
-# when LITELLM_REDIS_POLL_TICKS is set we wait for the local Redis server to
-# accept a TCP connection before starting litellm. This covers the boot-time
-# race between local.redis and local.litellm on macOS (systemd on NixOS orders
-# via After=/Wants= instead). The gate is a no-op when the var is unset.
+# Opt-in Redis readiness gate, covering the macOS boot-time race between local.redis and
+# local.litellm; systemd orders via After=/Wants= instead. launchd has no ordering primitive,
+# so LITELLM_REDIS_POLL_TICKS waits for a TCP connect. No-op when unset.
 _redis_ticks="${LITELLM_REDIS_POLL_TICKS:-0}"
 if [ "${_redis_ticks}" -gt 0 ]; then
   _redis_host="${LITELLM_REDIS_HOST:-127.0.0.1}"
@@ -87,9 +81,8 @@ if [ "${_redis_ticks}" -gt 0 ]; then
   fi
 fi
 
-# The logging config is created by the user-scope seeder
-# (home.activation.seed-litellm-config) and this daemon starts at boot, so wait for
-# it — like the Redis block above — before deciding it is missing.
+# The logging config comes from the user-scope seeder (home.activation.seed-litellm-config)
+# and this daemon starts at boot, so wait for it as the Redis block above does.
 _log_config_deadline="${LITELLM_LOG_CONFIG_WAIT_SECONDS:-60}"
 if [ -n "${LITELLM_LOG_CONFIG:-}" ] && [ ! -f "$LITELLM_LOG_CONFIG" ]; then
   warn "waiting for the litellm logging config at $LITELLM_LOG_CONFIG ..."
@@ -100,10 +93,9 @@ if [ -n "${LITELLM_LOG_CONFIG:-}" ] && [ ! -f "$LITELLM_LOG_CONFIG" ]; then
   done
 fi
 
-# WHY: the flag is passed as a quoted argument in each branch instead of being
-# assembled into a string, because the macOS path contains a space
-# ("Library/Application Support/nucleus/...") and an unquoted expansion splits it
-# into a truncated value plus a stray positional argument.
+# WHY: the flag is a quoted argument in each branch rather than an assembled string. The
+# macOS path has a space ("Library/Application Support/nucleus/..."), and an unquoted
+# expansion splits it into a truncated value plus a stray positional argument.
 if [ -n "${LITELLM_LOG_CONFIG:-}" ]; then
   if [ ! -f "$LITELLM_LOG_CONFIG" ]; then
     die -l litellm-daemon "LITELLM_LOG_CONFIG=$LITELLM_LOG_CONFIG does not exist after ${_log_config_deadline}s; home.activation.seed-litellm-config did not converge"

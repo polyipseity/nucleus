@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Secret decryption health verification (5 checks).
-# Consumes SOPS file manifest, materialized artefact paths, and tool paths at activation time.
+# Secret decryption health verification: materialization, GPG presence, GPG and SSH age
+# recipients, machine age key. Takes the SOPS manifest, materialized paths, and tool paths.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -21,7 +21,6 @@ _vsd_gpg_manifest_path="$1"
 _vsd_ssh_key_paths_manifest="$2"
 _vsd_ssh_adopt_manifest="$3"
 
-# --- 1. Materialization sanity check ---
 for _vsd_path in \
   "$_vsd_git_identity_path" \
   "$_vsd_ssh_private_key_path" \
@@ -39,25 +38,21 @@ while IFS= read -r _vsd_private_key_path; do
   if [ ! -s "$_vsd_private_key_path" ]; then
     die -l secrets "managed SSH private key missing or empty at '$_vsd_private_key_path'."
   fi
-  # A file that exists is not a key that works: an unparsable private key makes
-  # ssh report "invalid format" and fall back to no authentication, and a running
-  # agent hides that by answering first.  Prove OpenSSH can read the file.
+  # A file that exists is not a key that works: an unparsable private key makes ssh report
+  # "invalid format" and fall back to no authentication, and a running agent hides that by
+  # answering first. Prove OpenSSH can read it.
   #
-  # Two parts, because neither alone is enough.  The header check rejects a bare
-  # .pub file, which ssh-keygen -l happily fingerprints.  The -l check then
-  # proves the container parses; it reads the cleartext public-key blob out of
-  # the openssh-key-v1 format, so it works on a protected key without the
-  # passphrase and never prompts.  Deriving with -y -P '' would be wrong here:
-  # the empty passphrase is simply incorrect for a protected key, so it rejected
-  # every key that is perfectly valid.
+  # Two parts, because neither alone is enough. The header check rejects a bare .pub file,
+  # which ssh-keygen -l happily fingerprints. The -l check then proves the container parses;
+  # it reads the cleartext public-key blob out of the openssh-key-v1 format, so it works on
+  # a protected key without the passphrase and never prompts. Deriving with -y -P '' would
+  # be wrong: the empty passphrase is simply incorrect for a protected key.
   #
-  # WHY: the probe runs through a symlink in a private temp dir.  Given the
-  # managed key path directly, ssh-keygen -l prefers the sibling <key>.pub when
-  # one exists and reports THAT key's fingerprint, never reading the private key.
-  # Every managed key has its .pub beside it, so probing in place would make
-  # this check a no-op that passes a corrupt private key.  A symlink to the real
-  # path has no sibling to be picked up, and unlike a copy it never puts key
-  # material in a second place.
+  # WHY: the probe runs through a symlink in a private temp dir. Given the managed key path
+  # directly, ssh-keygen -l prefers the sibling <key>.pub and reports that key's fingerprint,
+  # never reading the private key. Every managed key has its .pub beside it, so probing in
+  # place would pass a corrupt private key. A symlink has no sibling to pick up, and unlike a
+  # copy it never puts key material in a second place.
   _vsd_probe_dir="$(/usr/bin/mktemp -d)"
   trap '/bin/rm -rf "$_vsd_probe_dir"' EXIT
   /bin/ln -s "$_vsd_private_key_path" "$_vsd_probe_dir/key"
@@ -74,7 +69,6 @@ while IFS= read -r _vsd_private_key_path; do
   trap - EXIT
 done <"$_vsd_ssh_key_paths_manifest"
 
-# --- 2. GPG key presence in keyring ---
 _vsd_gpg_manifest="$_vsd_gpg_manifest_path"
 # check-suppress:suppression_doc: GnuPG may fail if GNUPGHOME doesn't exist yet on first activation; the subsequent grep check handles empty output.
 _vsd_gpg_all_secret_fprs="$(GNUPGHOME="$_vsd_gpg_home" \
@@ -86,7 +80,6 @@ while IFS= read -r _vsd_managed_fpr; do
   fi
 done <"$_vsd_gpg_manifest"
 
-# --- 3. GPG SOPS recipient check for all SOPS files ---
 _vsd_gpg_failures=""
 while IFS= read -r _vsd_entry; do
   [ -z "$_vsd_entry" ] && continue
@@ -103,7 +96,6 @@ if [ -n "$_vsd_gpg_failures" ]; then
   die -l secrets "GPG SOPS decryption check failed for:$_vsd_gpg_failures; managed GPG key may not be registered in .sops.yaml."
 fi
 
-# --- 4. Personal SSH age recipient check for all SOPS files ---
 _vsd_ssh_age_pub=""
 _vsd_ssh_failures=""
 # check-suppress:suppression_doc: ssh-to-age may fail if the SSH public key hasn't been materialized yet (first bootstrap); empty result is handled below.
@@ -123,7 +115,6 @@ if [ -n "$_vsd_ssh_failures" ]; then
   die -l secrets "personal SSH key age-backend SOPS decryption check failed for:$_vsd_ssh_failures; SSH key may not be registered in .sops.yaml as an age recipient."
 fi
 
-# --- 5. Machine age key existence check (warning-only) ---
 _vsd_machine_age_key="$(nucleus_machine_age_key_path)"
 if [ ! -f "$_vsd_machine_age_key" ]; then
   warn -l secrets "$_vsd_machine_age_key missing; this machine cannot be a SOPS age device recipient until the host key is registered in .sops.yaml and derive-host-age-key.sh has run successfully."

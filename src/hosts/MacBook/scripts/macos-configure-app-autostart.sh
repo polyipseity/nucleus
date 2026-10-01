@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
-# Converge GUI app auto-start to the apps.json registry on macOS.
-# WHY: this replaces the ad-hoc per-app login-item scripts (MiddleClick,
-# Mounty) and the inline steam-autostart disable with a single registry-driven
-# mechanism we fully own.  Every app declares its desired state in apps.json;
-# we disable the app's native auto-start setting (disableNative) and then
-# enable/disable exactly one uniform mechanism (login item or system extension)
-# so no app-owned startup path remains active.
+# Converge GUI app auto-start to the apps.json registry on macOS. Runs as root during
+# darwin-rebuild switch; console-user resolution happens inside the helper, so headless and SSH
+# sessions degrade gracefully.
 #
-# Runs as root during darwin-rebuild switch; console-user resolution happens
-# inside the helper so it degrades gracefully on headless/SSH sessions.
+# WHY: this replaces the ad-hoc per-app login-item scripts (MiddleClick, Mounty) and the
+# inline steam-autostart disable with one registry-driven mechanism we own. Each app declares
+# its desired state in apps.json; we disable its native auto-start (disableNative), then
+# enable or disable exactly one uniform mechanism (login item or system extension), so no
+# app-owned startup path stays active.
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../../../scripts/lib/lib.sh
@@ -16,9 +15,9 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../../../scripts/lib/macos-console-user.sh
 . "$SCRIPT_DIR/../../../scripts/lib/macos-console-user.sh"
 
-# Resolve the repo checkout root so we can read apps.json regardless of how
-# this script is invoked (Nix activation bundle vs. direct run). derive_repo_root()
-# resolves a live NUCLEUS_REPO_ROOT and rejects Nix store snapshots.
+# WHY: resolve the repo checkout root to read apps.json however this script is invoked (Nix
+# activation bundle or direct run). derive_repo_root() takes a live NUCLEUS_REPO_ROOT and
+# rejects Nix store snapshots.
 REPO_ROOT="$(derive_repo_root)" || die -l autostart "cannot resolve the nucleus repo root; run nucleus-apply before this activation step."
 export NUCLEUS_REPO_ROOT="$REPO_ROOT"
 

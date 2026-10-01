@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# VS Code config symlinks activation.
-# Called by home-manager activation symlink-vscode-config.
-# Provides: ensure_file_symlink, ensure_dir_symlink (from symlink-hardening.sh)
+# VS Code config symlinks activation, called by the home-manager entry of the same name.
+# Needs ensure_file_symlink and ensure_dir_symlink from symlink-hardening.sh.
 
 set -euo pipefail
 
@@ -18,9 +17,8 @@ _vsym_keybindings_file="$5"
 _vsym_chat_language_models_file="$6"
 _vsym_jq_bin="$7"
 
-# Skip exporting NUCLEUS_REPO_ROOT when the path is a Nix store snapshot —
-# derive_repo_root() falls back to the system repo-root file, so config symlinks
-# resolve to the live checkout instead of a read-only store snapshot.
+# WHY: skip exporting NUCLEUS_REPO_ROOT for a Nix store snapshot. derive_repo_root() falls
+# back to the system repo-root file, so config symlinks resolve to the live checkout.
 if [ -n "$_vsym_repo_root" ] && case "$_vsym_repo_root" in /nix/store/*) false ;; *) true ;; esac then
   export NUCLEUS_REPO_ROOT="$_vsym_repo_root"
 fi
@@ -42,19 +40,16 @@ for _vsym_base_dir in "$_vsym_stable_base" "$_vsym_insiders_base"; do
   ensure_file_symlink "$_vsym_settings" "$_vsym_base_dir/settings.json"
   ensure_file_symlink "$_vsym_keybindings" "$_vsym_base_dir/keybindings.json"
 
-  # chatLanguageModels is merge-copied rather than symlinked so that
-  # per-machine Ollama model entries added by VS Code directly are
-  # preserved across activations while repo-source entries are refreshed.
+  # WHY: chatLanguageModels is merge-copied, not symlinked, so per-machine Ollama entries VS
+  # Code adds survive activation while repo-source entries refresh.
   _chat_lm_path="$_vsym_base_dir/chatLanguageModels.json"
   if [ -L "$_chat_lm_path" ]; then
     _nucleus_unprotect_symlink "VS Code" "$_chat_lm_path"
     rm "$_chat_lm_path"
   fi
   if [ -s "$_chat_lm_path" ] 2>/dev/null; then
-    # A corrupt (unparseable) existing file cannot be merged; replace it from
-    # the repo source (authoritative for managed entries) rather than keeping
-    # the corrupt content. VS Code-added entries in a corrupt file are
-    # unrecoverable anyway.
+    # WHY: a corrupt file cannot be merged, so replace it from the repo source, which is
+    # authoritative for managed entries. VS Code-added entries there are unrecoverable anyway.
     # shellcheck disable=SC2016 # reason: jq filter body must not be expanded by shell
     if ! "$_vsym_jq_bin" -e . "$_chat_lm_path" >/dev/null 2>&1; then
       warn -l "VS Code" "existing $_chat_lm_path is not valid JSON; replacing from repo source."
@@ -80,8 +75,8 @@ for _vsym_base_dir in "$_vsym_stable_base" "$_vsym_insiders_base"; do
   if [ -n "$_vsym_profiles" ] && [ -e "$_vsym_profiles" ]; then
     ensure_dir_symlink "$_vsym_profiles" "$_vsym_base_dir/profiles"
   fi
-  # Copilot Chat stores memories under a deep per-extension subpath;
-  # the repo uses a flat alias so the directory is easy to navigate.
+  # WHY: Copilot Chat buries memories under a deep per-extension subpath; the flat alias
+  # keeps the directory easy to navigate.
   ensure_dir_symlink "$_vsym_copilot_memories" \
     "$_vsym_base_dir/globalStorage/github.copilot-chat/memory-tool/memories"
 done

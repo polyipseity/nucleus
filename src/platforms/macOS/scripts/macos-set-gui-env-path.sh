@@ -14,9 +14,6 @@ _mge_managed_set="$3"
 _mge_all_vars_block="$4"
 _mge_launchctl_config_path="$5"
 
-# Strip stale managed entries from launchctl PATH, then prepend + append
-# managed dirs for the GUI launchd domain.
-
 CURRENT_PATH="$(/bin/launchctl getenv PATH 2>/dev/null || true)" # check-suppress:suppression_doc: launchctl may not be available (early boot, non-GUI session); fall back to $PATH
 if [ -z "$CURRENT_PATH" ]; then
   CURRENT_PATH="$PATH"
@@ -35,11 +32,10 @@ for __component in $CURRENT_PATH; do
 done
 IFS="$old_IFS"
 
-# Compose PATH from non-empty fragments only (prepend may be empty, cleaned
-# may be empty when every PATH entry is managed, append may be empty).  A
-# guard expression cannot express "join non-empty segments with a single
-# colon": when prepend AND cleaned are both empty, the append guard's leading
-# colon survives and the PATH starts with an empty entry (= cwd).
+# WHY: compose PATH from non-empty fragments only. Prepend, cleaned, and append can each be
+# empty, and a guard expression cannot join non-empty segments with a single colon: when
+# prepend AND cleaned are both empty, the append guard's leading colon survives and the PATH
+# starts with an empty entry (= cwd).
 _mge_path=""
 for _mge_frag in "$_mge_prepend" "$_mge_cleaned" "$_mge_append"; do
   [ -n "$_mge_frag" ] || continue
@@ -51,14 +47,13 @@ for _mge_frag in "$_mge_prepend" "$_mge_cleaned" "$_mge_append"; do
 done
 /bin/launchctl setenv PATH "$_mge_path"
 
-# ── All other GUI env vars (user and non-user) ──
+# All other GUI env vars, user and non-user.
 eval "$_mge_all_vars_block"
 
-# ── NUCLEUS_REPO_ROOT from system repo-root file ──
-# WHY: NUCLEUS_REPO_ROOT was removed from the env catalog to prevent Nix store
-# path poisoning, but some scripts still read it directly.  Set it here from
-# the authoritative system repo-root file so GUI processes always see the
-# correct live checkout path.
+# NUCLEUS_REPO_ROOT, from the system repo-root file.
+# WHY: NUCLEUS_REPO_ROOT left the env catalog to prevent Nix store path poisoning, but some
+# scripts still read it directly. Set it from the authoritative system repo-root file so GUI
+# processes see the live checkout path.
 _mge_repo_root_file="/Library/Application Support/nucleus/repo-root"
 if [ -f "$_mge_repo_root_file" ] && IFS= read -r _mge_repo_root_val <"$_mge_repo_root_file" 2>/dev/null; then
   case "$_mge_repo_root_val" in
@@ -66,9 +61,8 @@ if [ -f "$_mge_repo_root_file" ] && IFS= read -r _mge_repo_root_val <"$_mge_repo
   esac
 fi
 
-# Set persistent per-user launchd PATH for LaunchServices .app bundles.
-# Uses user.plist (not system.plist) because the PATH contains user-specific
-# directories.
+# WHY: user.plist, not system.plist. The PATH holds user-specific directories, and
+# LaunchServices .app bundles read the per-user launchd PATH.
 _mge_desired_path="$_mge_launchctl_config_path"
 _mge_current_path="$(/usr/libexec/PlistBuddy -c 'Print PathEnvironmentVariable' /private/var/db/com.apple.xpc.launchd/config/user.plist 2>/dev/null || true)" # check-suppress:suppression_doc: user.plist may not exist before first launchctl config write; read fails gracefully
 

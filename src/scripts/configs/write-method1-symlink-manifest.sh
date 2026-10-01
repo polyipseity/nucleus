@@ -1,23 +1,19 @@
 #!/usr/bin/env bash
-# Write the deployed method-1 symlink manifest consumed by check step 13.
+# Writes the method-1 symlink manifest consumed by check step 13.
 #
-# The manifest is the deployed source of truth for "which paths must resolve into
-# the LIVE repo root": it is generated from the same Nix value that feeds the
-# unprotect/protect activations (managedSymlinkPaths) plus the agent, cursor and
-# editor overlay roots. Generating it is the point: a hand-maintained list of the
-# same set drifts from the deployed one, and the check then passes paths nobody
-# deploys while missing paths that are.
-#
-# Directory entries are walked one level by the step; file entries are inspected
-# directly.
+# WHY: the manifest is the source of truth for which paths must resolve into the live repo
+# root, so it is generated from the same Nix value that feeds the unprotect/protect
+# activations (managedSymlinkPaths) plus the agent, cursor, and editor overlay roots. A
+# hand-maintained list of that set drifts, and the check then passes paths nobody deploys
+# while missing paths that are. The step walks directory entries one level and inspects
+# file entries directly.
 #
 # Usage: write-method1-symlink-manifest <manifest-path> <paths-json> <jq-bin>
 #   <manifest-path>  absolute path to write; parent directories are created
 #   <paths-json>     JSON array of absolute path strings, in a stable order
 #   <jq-bin>         store path of jq
-# Exit: 0 on success; non-zero when an entry is not an absolute path — a relative
-#       entry would make the step's walk depend on the caller's working
-#       directory, so it is refused rather than written.
+# Exit: 0 on success; non-zero when an entry is not absolute, because a relative entry would
+#       make the step's walk depend on the caller's working directory.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -28,7 +24,6 @@ _manifest="$1"
 _paths_json="$2"
 _jq_bin="$3"
 
-# Validate every entry before writing anything.
 while IFS= read -r _m1_entry; do
   case "$_m1_entry" in
   /*) ;;
@@ -37,8 +32,8 @@ while IFS= read -r _m1_entry; do
 done < <(printf '%s' "$_paths_json" | "$_jq_bin" -r '.[]')
 
 mkdir -p "$(dirname "$_manifest")"
-# Write beside the target and move into place so a reader never sees a partial
-# manifest, and so the final rename cannot cross a filesystem boundary.
+# Write beside the target and move into place so a reader never sees a partial manifest and
+# the rename cannot cross a filesystem boundary.
 _m1_tmp="$_manifest.tmp.$$"
 trap 'rm -f "$_m1_tmp"' EXIT
 
