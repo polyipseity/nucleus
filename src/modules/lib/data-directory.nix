@@ -1,12 +1,10 @@
-# src/modules/lib/data-directory.nix — Centralized ~/data provisioning manifest.
+# src/modules/lib/data-directory.nix - Centralized ~/data provisioning manifest.
 #
-# Defines system-level operations for the provision-data-directory.sh script.
-# Each module that needs to create directories, files, or symlinks under ~/data
-# adds its entries here. The manifest is consumed by the activation entry in
-# home.nix.
+# Modules add their ~/data entries here and home.nix's activation entry passes
+# the merged manifest to provision-data-directory.sh.
 #
-# Invariant: the script only creates. It never deletes files, folders, or
-# symlinks. If a target already exists, it is left untouched.
+# Invariant: the script only creates. It never deletes, and an existing target
+# is left untouched.
 {
   lib,
   config,
@@ -15,12 +13,9 @@
 let
   homeDir = config.home.homeDirectory;
 
-  # Base operations applied on every host. Apps add their entries via
-  # lib.mkMerge in the config section.
   baseOps = [ ];
 
-  # Hermes-agent directory provisioning. The entire ~/.hermes/ directory is
-  # symlinked to ~/data/hermes-agent/ so all hermes state lives under ~/data/.
+  # All hermes state lives under ~/data.
   hermesOps = [
     {
       op = "dir";
@@ -34,8 +29,6 @@ let
   ];
 in
 {
-  # The manifest is a list of operation attrsets. Each module appends its ops
-  # via lib.mkMerge. The final merged list is passed to the shell script.
   options.nucleus.dataDirectory.manifest = lib.mkOption {
     type = lib.types.listOf lib.types.attrs;
     default = [ ];

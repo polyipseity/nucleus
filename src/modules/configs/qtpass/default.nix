@@ -1,12 +1,6 @@
-# QtPass settings baseline (screenshot-verified): shared across all platforms
-# unless overridden by platform-specific settings in the per-user overlay file.
-#
-# This module returns the merged settings and the shell-command fragments for
-# applying them via `defaults` (macOS) or INI-file manipulation (Linux).
-#
-# Dependencies:
-#   - passwordStoreDir: resolved path to the password store root.
-#   - qtPassDefaultSettings: parsed baseline from the per-user overlay JSON file.
+# QtPass settings baseline, shared across platforms unless the per-user overlay
+# overrides them. Returns the merged settings plus the command fragments that
+# apply them through `defaults` (macOS) or INI edits (Linux).
 {
   lib,
   pkgs,
@@ -15,21 +9,18 @@
   ...
 }:
 let
-  # check-suppress:config-method: method 3 (merge) -- shared baseline from declarative JSON. The JSON file is
-  # the canonical settings file consumed by both Nix (POSIX merge) and Windows
-  # activation. QtPass settings are merged into platform-native stores
-  # (macOS: defaults, Linux: INI, Windows: registry), so Method 1 (symlink)
-  # does not apply.
+  # check-suppress:config-method: method 3 (merge) -- shared baseline from declarative JSON. The JSON is
+  # canonical for both Nix (POSIX merge) and Windows activation, and the
+  # settings land in platform-native stores (macOS defaults, Linux INI,
+  # Windows registry), so a symlink does not apply.
   qtPassPlatformSettings = lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
-    # macOS keeps Hide on close disabled, per the requested platform-specific
-    # exception to the shared QtPass baseline.
+    # Platform exception to the shared baseline.
     hideOnClose = false;
   };
 
-  # Pin the gpg executable to the managed gnupg package so QtPass never resolves a
-  # garbage-collectable nix store hash (or a system gpg) that may read a different
-  # keyring. The Windows path resolves gpg at runtime in Sync-QtPassConfig.ps1
-  # because the shared qtpass.json is written verbatim to the registry there.
+  # Pin gpg to the managed gnupg so QtPass never resolves a garbage-collectable
+  # store hash or a system gpg reading a different keyring. Windows resolves it
+  # at runtime in Sync-QtPassConfig.ps1, which writes qtpass.json to the registry.
   qtPassManagedSettings = (qtPassDefaultSettings // qtPassPlatformSettings) // {
     gpgExecutable = lib.getExe pkgs.gnupg;
     passStore = "${lib.removeSuffix "/" passwordStoreDir}/";

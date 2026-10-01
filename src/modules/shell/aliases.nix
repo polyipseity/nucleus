@@ -1,23 +1,14 @@
-# modules/shell/aliases.nix — Shared interactive shell aliases for all hosts.
+# modules/shell/aliases.nix - Shared interactive shell aliases for all hosts.
 #
-# Keep keys strictly alphabetical so diffs stay deterministic and accidental
-# duplicate alias intent is easy to detect during review.
+# Keys stay alphabetical so diffs stay deterministic.
 { }:
 #
-# Policy: full form
-# All option values MUST use long-form names (--patch, --all, --message, etc.)
-# wherever a long form exists. Short-form single-letter flags are prohibited.
-#
-# Exceptions (options with no long-form equivalent):
-# - git clean -d (no --directory long form in git clean)
-# - Ghostscript -sDEVICE=/-d* options (option-type prefixes, not short flags)
+# Long forms only wherever one exists. No long form: git clean -d, and the
+# Ghostscript -sDEVICE/-d option prefixes.
 {
-  # --- Git aliases ---
-  # Naming conventions:
-  # - Prefix = base git command (all `git log` aliases start with `-gl`).
-  # - `-gca*` = amend (every alias starting with `-gca` expands to `git commit --amend ...`).
-  # - No casing distinction (case-insensitive on Windows).
-  # - Double letter = more: more verbose, more forceful, or full form.
+  # Prefix = base git command, so every `git log` alias starts with -gl. Casing
+  # carries no meaning (Windows is case-insensitive). A doubled letter means the
+  # longer form: -nf is fmt, -nff is format.
   "-g" = "git";
   "-ga" = "git add";
   "-gap" = "git add --patch";
@@ -32,7 +23,7 @@
   "-gcam" = "git commit --amend --message";
   "-gcl" = "git clone";
   # git clean matrix: prefix = force level (dry-run / force / double-force),
-  # suffix = ignore scope (none / x include ignored / xx only ignored).
+  # suffix = ignore scope (none / x includes ignored / xx only ignored).
   "-gclean" = "git clean --dry-run -d";
   "-gcleanf" = "git clean --force -d";
   "-gcleanff" = "git clean --force --force -d";
@@ -86,8 +77,8 @@
   "-gs" = "git status --short --branch";
   "-gsh" = "git show";
   "-gss" = "git status";
-  # WHY: bare `git stash` (not `push`): no-arg still pushes (default subcommand),
-  # and any stash subcommand works via args (e.g. `-gst list`).
+  # WHY: bare `git stash`, not `git stash push`: the default subcommand still
+  # pushes and any stash subcommand works through args (`-gst list`).
   "-gst" = "git stash";
   "-gstd" = "git stash drop";
   "-gstl" = "git stash list";
@@ -98,9 +89,8 @@
   "-gt" = "git tag";
   "-gtd" = "git tag --delete";
   "-gtl" = "git tag --list";
-  # --- Ghostscript PDF optimization presets ---
-  # CompatibilityLevel is pinned to 2.0 (latest as of 2026-05); bump when a
-  # newer PDF compatibility target is released by Ghostscript.
+  # CompatibilityLevel is pinned to 2.0; bump when Ghostscript ships a newer
+  # PDF compatibility target.
   "-optimize-pdf-default" =
     "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/default -dNOPAUSE -dQUIET -dBATCH";
   "-optimize-pdf-prepress" =
@@ -111,16 +101,12 @@
     "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/ebook -dNOPAUSE -dQUIET -dBATCH";
   "-optimize-pdf-screen" =
     "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH";
-  # --- ExifTool metadata stripping ---
   "-strip-metadata" = "exiftool -all=";
-  # --- Non-git aliases ---
   "-la" = "eza --long --all";
   "-ll" = "eza --long --all";
-  # bun shortcuts — mirror the Windows bun function aliases in profile.ps1 managed block.
-  # -n is the bare bun command; each other alias maps one concise suffix to a bun subcommand.
-  # -no (outdated) reads like a negation prefix but o = outdated; the -n* namespace keeps it unambiguous.
-  # -nf is fmt and -nff is format; bun accepts both spellings, the double letter maps to the longer form.
-  # Excluded (YAGNI): audit, info, init, patch, pm, publish, repl, unlink.
+  # -n is bare bun, each suffix maps to one subcommand. -no reads like a negation
+  # but o is outdated. Excluded as unused: audit, info, init, patch, pm,
+  # publish, repl, unlink.
   "-n" = "bun";
   "-na" = "bun add";
   "-nb" = "bun build";
@@ -139,8 +125,7 @@
   "-nup" = "bun upgrade";
   "-nw" = "bun why";
   "-nx" = "bun x";
-  # Terminal clearing — `cls` alias for cross-platform parity (Windows/PowerShell
-  # and cmd.exe both use cls; this makes zsh accept it too).
+  # Cross-platform parity: PowerShell and cmd.exe both use cls.
   "cls" = "clear";
   "-v" = "nvim";
 }

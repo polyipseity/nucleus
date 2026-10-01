@@ -1,9 +1,7 @@
-# MacBook/service-watchdog.nix — Periodic service watchdog for launchd services.
+# MacBook/service-watchdog.nix - Periodic service watchdog for launchd services.
 #
-# Runs every 5 minutes, detects services stuck in EX_CONFIG / waiting /
-# spawn-scheduled states, and recovers them via bootout+bootstrap.
-# Handles services whose KeepAlive launchd daemons exited with a non-retryable
-# code (exit 78 = EX_CONFIG) and would otherwise stay in penalty box forever.
+# Recovers services stuck in EX_CONFIG (exit 78), waiting, or spawn-scheduled,
+# which launchd would otherwise leave in the penalty box.
 {
   config,
   lib,
@@ -14,9 +12,8 @@
 }:
 let
   nucleusSvcWatchdog = "${nucleusApps.nucleus-service-watchdog}/bin/nucleus-service-watchdog";
-  # Bundle services.json into the nix store so launchd-rooted daemons
-  # can read it — they cannot access iCloud Drive paths even through
-  # the ~/dev/nucleus symlink (macOS sandbox restriction).
+  # launchd-rooted daemons cannot read an iCloud Drive path, even through the
+  # ~/dev/nucleus symlink, so services.json is bundled into the store.
   servicesJson = import ../../modules/lib/services-json-path.nix { };
 
   envVars = import ../../modules/lib/env-secrets.nix {
@@ -30,9 +27,8 @@ let
   };
   resolveValue = name: envVars.resolveValue name "MacBook";
   daemonEnv = lib.filterAttrs (_name: value: value != null) {
-    # launchd does not set HOME for root daemons (no UserName). lib.sh
-    # needs HOME for derive_nucleus_user_root(). Provide it explicitly.
-    # Root's home on macOS is always /var/root.
+    # launchd sets no HOME for a root daemon, and lib.sh needs one for
+    # derive_nucleus_user_root(). Root's macOS home is always /var/root.
     HOME = "/var/root";
     NIX_SSL_CERT_FILE = resolveValue "NIX_SSL_CERT_FILE";
     NUCLEUS_HOST = resolveValue "NUCLEUS_HOST";
@@ -42,12 +38,9 @@ in
   launchd.daemons."service-watchdog" = {
     serviceConfig = {
       Label = "local.service-watchdog";
-      # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons
-      # with non-root UserName (EX_CONFIG 78). /bin/sh is Apple-signed and
       # ref: macos-service-hardening.instructions.md -- SIP /bin/sh wrapper
-      # Upstream <https://github.com/nix-darwin/nix-darwin/issues/1219> tracks
-      # making launchd services show descriptive names; do not revisit until
-      # that issue is resolved.
+      # Upstream <https://github.com/nix-darwin/nix-darwin/issues/1219> owns
+      # descriptive launchd names; leave the label alone until it lands.
       ProgramArguments = [
         "/bin/sh"
         "-c"

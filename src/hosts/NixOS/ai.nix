@@ -1,13 +1,7 @@
-# hosts/NixOS/ai.nix — NixOS system-level AI inference stack.
+# hosts/NixOS/ai.nix - NixOS system-level AI inference stack.
 #
-# Provides:
-#   • Ollama — local LLM inference server on 127.0.0.1:11434
-#   • LiteLLM — AI gateway proxy on 127.0.0.1:4000 that routes client requests
-#     to multiple remote providers with order-based failover.
-#
-# The Home Manager module modules/ai.nix provides the ollama CLI binary,
-# OLLAMA_HOST session variable, and the oterm client on all POSIX hosts
-# including this one.
+# LiteLLM routes client requests to remote providers with order-based failover.
+# modules/ai.nix provides the CLI and the OLLAMA_HOST session variable.
 {
   config,
   lib,
@@ -25,7 +19,6 @@ let
     runtimeInputs = [ pkgs.litellm ];
     scriptName = "src/scripts/services/litellm-daemon";
   };
-  # Centralized service registry — single source of truth for network config.
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
   ollamaCfg = servicesJSON.ollama.network.default;
   secrets = builtins.fromJSON (builtins.readFile ../../modules/env/env-secrets.json);
@@ -44,15 +37,10 @@ let
   };
 in
 {
-  # LiteLLM AI gateway — systemd service on 127.0.0.1:4000.
-  # Since nixpkgs has no services.litellm module yet, we define the service
-  # manually.  ExecStart uses a shell wrapper that reads SOPS-decrypted API key
-  # files and exports them as environment variables before launching LiteLLM —
-  # systemd's EnvironmentFile expects KEY=VALUE format, but sops-nix writes the
-  # raw value.
-  # systemd captures service stdout/stderr to journald by default; access
-  # logs with: journalctl -u litellm.  The log level is set to WARNING by
-  # general_settings.environment_variables.LITELLM_LOG in the shared config.
+  # nixpkgs has no services.litellm module, so the service is defined here.
+  # ExecStart runs a shell wrapper that exports SOPS-decrypted API keys as
+  # environment variables: systemd's EnvironmentFile wants KEY=VALUE, sops-nix
+  # writes the raw value.
   systemd.services.litellm = {
     description = "LiteLLM AI Gateway Proxy";
     wantedBy = [ "multi-user.target" ];
@@ -73,7 +61,6 @@ in
       }";
       Restart = "always";
       User = "litellm";
-      # Protect against resource exhaustion and information leaks.
       PrivateTmp = true;
       NoNewPrivileges = true;
       MemoryMax = "2G";
@@ -94,16 +81,11 @@ in
     # Ollama should use a CUDA-capable package on compatible NVIDIA setups.
     package = pkgs.ollama-cuda;
 
-    # Compress the KV cache with 4-bit quantisation to halve KV-cache RAM
-    # footprint, enable flash attention to reduce attention memory overhead,
-    # and set a 32 k token default context window so models that default to
-    # 2 k or 4 k do not silently truncate long conversations.
-    # Source: Ollama runtime environment-variable references.
+    # 4-bit KV cache and flash attention halve the memory cost; the 32 k
+    # default context stops models that default to 2 k or 4 k from silently
+    # truncating long conversations.
     # https://github.com/ollama/ollama/blob/main/docs/faq.md
     # https://github.com/ollama/ollama/blob/main/envconfig/config.go
-    # Ollama runtime env vars sourced from the centralized catalog.
-    # See src/modules/lib/env-secrets.nix (OLLAMA_FLASH_ATTENTION,
-    # OLLAMA_CONTEXT_LENGTH, OLLAMA_KV_CACHE_TYPE entries).
     environmentVariables =
       let
         envVars' = import ../../modules/lib/env-secrets.nix {
@@ -124,22 +106,16 @@ in
       };
   };
 
-  # System-wide Redis instance for LiteLLM coordination and response caching is
-  # provided by the shared src/modules/redis.nix module
-  # (services.redis.servers.nucleus). The LiteLLM service above orders after
-  # nucleus-redis.service, which that module defines.
+  # Redis coordination and response caching for LiteLLM lives in the shared
+  # src/modules/redis.nix as services.redis.servers.nucleus.
 
-  # Cap the Ollama systemd service at 16 GB RSS so an oversized model pull
-  # or runaway inference session cannot exhaust RAM and cause OOM kills of
-  # unrelated system services.  macOS has no equivalent RLIMIT-based RAM cap
-  # mechanism via launchd; the loopback-only binding and model manifest are
-  # the macOS memory guard instead.
-  # Source: systemd resource-control MemoryMax semantics.
+  # Cap Ollama at 16 GB RSS so an oversized model pull or runaway session cannot
+  # OOM-kill unrelated services. macOS has no launchd equivalent; the loopback
+  # bind and the model manifest are the guard there.
   # https://man7.org/linux/man-pages/man5/systemd.resource-control.5.html
   systemd.services.ollama.serviceConfig.MemoryMax = "16G";
 
-  # Dedicated system user for the LiteLLM service. Required for privilege
-  # separation — runs as non-root with access only to its own SOPS secrets.
+  # System user for privilege separation: non-root, own secrets only.
   users.users.litellm = {
     isSystemUser = true;
     group = "litellm";
@@ -147,12 +123,9 @@ in
   };
   users.groups.litellm = { };
 
-  # Guard: if the env-secrets catalog declares AI keys but the resolved secretArgs is
-  # empty, the LiteLLM service would start with no API-key pairs and every
-  # `default` request fails with "Missing credentials". This happens when the
-  # catalog (src/modules/env/env-secrets.json) is out of sync with sops.secrets
-  # (e.g. a key was added to the catalog but not to system.yml). Fail fast
-  # with a clear message naming the missing secret.
+  # A catalog with AI keys but no resolved secretArgs starts LiteLLM with no
+  # KEYFILE:ENVVAR pairs and every `default` request fails with
+  # "Missing credentials". Report the keys the SOPS file is missing.
   assertions = [
     {
       assertion =

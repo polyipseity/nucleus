@@ -18,13 +18,11 @@ in
       description = "User-level log directory for nucleus services.";
     };
 
-    # macOS SIP log path restriction: on macOS 26+, SIP blocks non-root
-    # launchd daemons from writing to /Library/Logs/ (EX_CONFIG 78).
-    # /Library/Application Support/nucleus/logs is the approved native SYSTEM root.
-    # /tmp/ works for testing; /Library/Logs/ is blocked.
-    # The same SIP restriction also blocks unsigned binary execution at boot;
-    # all MacBook daemons work around it via /bin/sh wrapper
-    # (.agents/instructions/macos-service-hardening.instructions.md).
+    # macOS 26+ SIP blocks non-root launchd daemons from writing to /Library/Logs/
+    # (EX_CONFIG 78), so the SYSTEM root is /Library/Application Support/nucleus/logs.
+    # The same restriction blocks unsigned store binaries at boot, hence the
+    # /bin/sh wrapper documented in
+    # .agents/instructions/macos-service-hardening.instructions.md.
     systemLogDir = mkOption {
       type = types.str;
       default = loggingPaths.systemLogDir;
@@ -32,12 +30,8 @@ in
       description = "System-level log directory for nucleus services.";
     };
 
-    # Rotation defaults live in services.schema.json definitions.loggingEntry
-    # .properties (maxSize 10000000 / maxFiles 4 / compress true / sanitize
-    # true) and are consumed at runtime by scripts/gc.sh, scripts/gc.ps1, and
-    # scripts/apply.sh (health-check subcommand) (per-service overrides from services.json). The
-    # Nix options below mirror those defaults for build-time references only;
-    # runtime tooling reads the JSON schema, not these options.
+    # Runtime tooling reads services.schema.json, not these options; they exist for
+    # build-time references and per-service overrides come from services.json.
     rotation = {
       maxSize = mkOption {
         type = types.int;
@@ -57,10 +51,8 @@ in
         description = "Whether to compress rotated archives with gzip (runtime source: services.schema.json definitions.loggingEntry.properties).";
       };
 
-      # WHY: log retention is deliberately not derived from modules.gc.expiry. The
-      # two were one variable, NUCLEUS_GC_EXPIRY, so raising GC retention silently
-      # raised log retention. A literal default keeps them independent; an operator
-      # who wants them coupled can still set both.
+      # WHY: retention is not derived from modules.gc.expiry. They were one variable,
+      # NUCLEUS_GC_EXPIRY, so raising GC retention silently raised log retention.
       expiry = mkOption {
         type = types.str;
         default = "7d";
@@ -74,12 +66,10 @@ in
       description = "Whether to strip control characters (ANSI escapes, \\r) from log output (runtime source: services.schema.json definitions.loggingEntry.properties).";
     };
 
-    # logging.capture is consumed by runtime tooling only: scripts/svc.sh
-    # (log display), scripts/gc.sh/ps1 and scripts/apply.sh (health-check subcommand) (whether a
-    # service's logs are rotated and size-checked). It is NOT wired to
-    # launchd/systemd unit output paths — those are hardcoded per module via
-    # StandardOutPath/StandardErrorPath (macOS) or journald (NixOS), and
-    # wiring capture to unit paths is explicitly out of scope.
+    # logging.capture is read by scripts/svc.sh, scripts/gc.sh/ps1, and the
+    # apply.sh health check. It is not wired to unit output paths: those are
+    # hardcoded per module as StandardOutPath/StandardErrorPath (macOS) or
+    # journald (NixOS).
     captureDefault = mkOption {
       type = types.enum [
         "all"

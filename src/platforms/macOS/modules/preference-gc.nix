@@ -1,19 +1,12 @@
-# platforms/macOS/modules/preference-gc.nix — Managed macOS preference domain GC.
+# platforms/macOS/modules/preference-gc.nix - Managed macOS preference domain GC.
 #
-# Provides the domain list and drift-reset script for purging stale user
-# preference state before declarative re-assertion.
+# Domain list and drift-reset script, so a stale manual override in
+# ~/Library/Preferences cannot survive the declarative write pass.
 { ... }:
 let
-  # Domains intentionally reset before each Home Manager write pass so stale
-  # manual overrides do not survive forever in ~/Library/Preferences.
-  #
-  # This list mirrors domains explicitly managed by this repository across:
-  #   - system.defaults typed options (dock/finder/screencapture/trackpad/...)
-  #   - system.defaults.CustomUserPreferences payloads
-  #   - user activation defaults hooks (Safari/universalaccess/symbolichotkeys)
-  #
-  # Keep this list alphabetically sorted for easy drift reviews.
-  # Source for preference-domain write semantics: defaults(1).
+  # Resets run before each Home Manager write pass. A new system.defaults option,
+  # CustomUserPreferences payload, or activation defaults hook has to add its
+  # domain here too. Keep the list alphabetically sorted.
   # https://www.manpagez.com/man/1/defaults/
   resetUserPreferenceDomains = [
     "NSGlobalDomain"

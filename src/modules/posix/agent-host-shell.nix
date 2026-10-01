@@ -1,9 +1,8 @@
 # Wrapper for VS Code agent-host terminals (sets agent env vars).
 #
-# The wrapper lives at the SYSTEM root bin (root-owned), so it must be written
-# by a system activation script (root context), not a Home Manager activation.
-# nix-darwin only honors the hardcoded activation fragment names, so macOS uses
-# postActivation; NixOS supports a custom kebab-case name.
+# It lives at the SYSTEM root bin, so a root-context system activation script
+# writes it. nix-darwin only honors hardcoded fragment names, hence
+# postActivation there; NixOS takes a custom kebab-case name.
 {
   lib,
   pkgs,
@@ -17,10 +16,9 @@ let
     mkIf
     ;
 
-  # Resolve the shell binary that the wrapper will exec.
   realShellExe = lib.getExe pkgs.zsh;
 
-  # Stable path referenced by agentHostProfile VS Code setting.
+  # Stable path the agentHostProfile VS Code setting points at.
   wrapperPath =
     if pkgs.stdenv.hostPlatform.isDarwin then
       "/Library/Application Support/nucleus/bin/agent-host-shell"
@@ -38,12 +36,9 @@ in
     };
   };
 
-  # The wrapper is always written by a system activation script (root context).
-  # Each platform branch is wrapped in `mkIf` (a deferred thunk) rather than a
-  # bare `if/then/else`: a bare conditional evaluates its `pkgs` reference while
-  # the `config` attribute is being constructed, which forces `pkgs` resolution
-  # through `_module.args` (needing `config`) and recurses. `mkIf` defers the
-  # reference until after `config` is available.
+  # Each platform branch is a deferred thunk: a bare `if` evaluates its `pkgs`
+  # reference while `config` is being constructed, which forces `pkgs`
+  # resolution through `_module.args` and recurses.
   config = lib.mkMerge [
     (mkIf pkgs.stdenv.hostPlatform.isDarwin {
       # Fragment from src/modules/posix/agent-host-shell.nix

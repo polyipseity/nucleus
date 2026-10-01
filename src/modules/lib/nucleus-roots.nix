@@ -1,17 +1,15 @@
-# Nucleus consolidated root paths and activation helpers (Phase 1).
+# Nucleus consolidated root paths and activation helpers.
 #
-# Nucleus owns at most two native roots per host (USER root + SYSTEM root)
-# plus a ~/.nucleus hub for every user. All nucleus code references ONLY
-# root paths, never physical conventional locations (/var/log/nucleus,
-# ~/Library/Logs/nucleus, etc.).
+# At most two native roots per host, plus a ~/.nucleus hub per user. Code
+# references only root paths, never the physical conventional locations they
+# point at.
 #
 #   macOS:   USER  ~/Library/Application Support/nucleus
 #            SYSTEM /Library/Application Support/nucleus
 #   NixOS:   USER  ~/.local/share/nucleus
 #            SYSTEM /var/lib/nucleus
 #
-# Pure function (not a module): call with `lib` + `pkgs` to obtain the path
-# derivations and shell-script-text helpers used by host activation.
+# Pure function, not a module: call with `lib` + `pkgs`.
 { lib, pkgs }:
 let
   isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
@@ -27,13 +25,12 @@ let
 
   nucleusHubDirFor = userHome: "${userHome}/.nucleus";
 
-  # root -> conventional symlinks (direction: root owns the symlink; the
-  # conventional dir is the target). Also creates the physical conventional
-  # dirs, since activation is the ONLY place that should do so.
+  # The root owns the symlink and the conventional directory is its target. The
+  # physical conventional dirs are created here because activation is the only
+  # place that should.
   #
-  # `userHome` is the target user's home. `userName` (optional) is chowned
-  # onto the user-root symlinks + physical user dirs when provided (system
-  # activation runs as root, so user-owned paths would otherwise be root).
+  # `userName` is chowned onto the user-root symlinks and physical user dirs
+  # when given, since system activation runs as root.
   mkNucleusRootSymlinks =
     {
       userHome,
@@ -80,8 +77,7 @@ let
       ${chownUser}
     '';
 
-  # ~/.nucleus hub: user -> USER root, system -> SYSTEM root
-  # (direction: ~/.nucleus -> roots; the hub owns the symlinks).
+  # ~/.nucleus hub, pointing at the roots rather than the other way round.
   mkNucleusHub =
     {
       userHome,

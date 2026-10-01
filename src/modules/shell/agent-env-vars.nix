@@ -1,16 +1,11 @@
-# shell/agent-env-vars.nix — AI agent session detection environment variables.
+# shell/agent-env-vars.nix - AI agent session detection environment variables.
 #
-# Canonical list of environment variable names that AI
-# coding agents set to identify their sessions.  shell.nix, pwsh.nix, and
-# Sync-ShellProfile.ps1 (Windows) all use this list.  Keep additions and
-# removals here, then update the consumers.
-#
-# Env var reference: https://docs.anthropic.com/en/docs/claude-code/overview
-# (upstream tools list is fragmented; this is a curated union of well-known
-#  agent identifiers)
+# Canonical list of the variables coding agents set to mark a non-human
+# session. shell.nix, pwsh.nix and Sync-ShellProfile.ps1 consume it; add or
+# remove a name here and in those consumers.
+# https://docs.anthropic.com/en/docs/claude-code/overview
 {
-  # Alphabetical list of env var names that AI coding agents set to identify
-  # non-human sessions.
+  # Keep alphabetical.
   agentEnvVarNames = [
     "AGENT"
     "AI_AGENT"
@@ -27,8 +22,8 @@
     "TRAE_AI_SHELL_ID"
     "VSCODE_AGENT"
   ];
-  # POSIX filesystem marker path for Devin agent sessions.
+  # Devin agent session marker path.
   devinPosixPath = "/opt/.devin";
-  # Windows filesystem marker path for Devin agent sessions.
+  # Windows spelling of the same marker path.
   devinWindowsPath = "C:\\opt\\.devin";
 }

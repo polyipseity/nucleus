@@ -1,8 +1,4 @@
-# MacBook/homebrew.nix — Homebrew package declarations for the MacBook host.
-#
-# nix-darwin's homebrew module is the declarative bridge: on every activation
-# it runs `brew bundle` from a generated Brewfile, then removes any formula/cask
-# not listed here (cleanup = "zap" also removes app data).
+# MacBook/homebrew.nix - Homebrew package declarations for the MacBook host.
 {
   config,
   lib,
@@ -17,10 +13,6 @@ let
   # Package overlap decisions are centralized in modules/core.nix.
   coreManagedBrews = config.nucleus.macos.homebrew.brews;
   coreManagedCasks = config.nucleus.macos.homebrew.casks;
-
-  # CLI formulae managed via Homebrew.
-  # These are tools unavailable in nixpkgs or where the Homebrew build is
-  # preferred (e.g. tightly coupled to macOS internals).
   staticManagedBrews = [
     "openai/tools/softnet" # Runtime dependency of tart; must be declared to survive brew bundle --zap cleanup
     "openai/tools/tart" # macOS VM hypervisor using Apple Virtualization.framework (requires code-signed binary)
@@ -31,12 +23,10 @@ let
 
   managedBrews = builtins.sort (a: b: a < b) (lib.unique (staticManagedBrews ++ coreManagedBrews));
 
-  # GUI applications managed via Homebrew Cask.
-  # Dual-source casks (for example Google Chrome, VS Code, VLC) are selected
-  # from core.nix and merged below so backend switches stay centralized.
-  # Google Gemini is intentionally not managed on macOS: its global launcher
-  # competes with Raycast, and the app does not expose a stable declarative
-  # preference key we can enforce to reserve Option+Space for Raycast only.
+  # Dual-source casks (Google Chrome, VS Code, VLC) come from core.nix and are
+  # merged below so backend switches stay centralized.
+  # Google Gemini is not managed here: its global launcher competes with
+  # Raycast and exposes no declarative preference key to reserve Option+Space.
   staticManagedCasks = [
     "alt-tab" # Windows-style alt-tab switcher
     "appcleaner" # Thorough app uninstaller
@@ -62,17 +52,15 @@ let
     "whatsapp@beta" # WhatsApp pre-release client
   ];
 
-  # QtPass (GUI frontend for pass/gopass) is routed to nixpkgs on macOS via
-  # nucleus.packages.selection.backendOverrides in core.nix (the Homebrew cask
-  # is broken/notarized), so it is contributed by core.nix's managedNixPackages
-  # rather than listed here. Windows uses WinGet IJHack.QtPass.
+  # QtPass goes to nixpkgs on macOS through
+  # nucleus.packages.selection.backendOverrides in core.nix, because the cask
+  # is not notarized. Windows uses WinGet IJHack.QtPass.
   managedCasks = builtins.sort (a: b: a < b) (lib.unique (staticManagedCasks ++ coreManagedCasks));
 in
 {
 
-  # nix-homebrew pins Homebrew binary and all tap definitions via flake.lock,
-  # making Homebrew fully declarative and supply-chain hardened.
-  # Taps are derived from here rather than auto-derived from package lists.
+  # nix-homebrew pins the Homebrew binary and every tap definition through
+  # flake.lock, so taps are declared here rather than derived from the packages.
   nix-homebrew = {
     enable = true;
     user = username;
@@ -85,8 +73,7 @@ in
       "smudge/homebrew-smudge" = smudge-smudge;
     };
     trust = {
-      # Trust openai/tools as a whole tap because softnet is a transitive
-      # dependency of tart that cannot be enumerated statically.
+      # softnet is a transitive tart dependency that cannot be enumerated statically.
       taps = [ "openai/tools" ];
       formulae = [
         "smudge/smudge/nightlight"
@@ -106,17 +93,13 @@ in
     # sudo with no TTY to confirm.
     onActivation.extraFlags = [ "--force" ];
 
-    # Derive tap names from nix-homebrew config, which pins each tap's
-    # git commit via flake.lock.
     taps = builtins.attrNames config.nix-homebrew.taps;
     brews = managedBrews;
     casks = managedCasks;
 
-    # Mac App Store apps managed via brew bundle's `mas` stanza.
-    # Requires the managed user to be signed in to the App Store.
+    # The managed user must be signed in to the App Store.
     masApps = {
-      # Amphetamine is Mac App Store-only; masApps is the canonical declarative
-      # install surface in nix-darwin's Homebrew bridge for this host.
+      # Mac App Store only, so masApps is the only declarative install surface.
       Amphetamine = 937984704;
     };
   };
