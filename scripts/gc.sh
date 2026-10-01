@@ -767,7 +767,7 @@ gc_logs() {
     elif command -v sudo >/dev/null 2>&1 && [ "$(id -u)" -ne 0 ]; then
       say "system log dir '$_gl_system_log_dir' not writable by current user; escalating to root"
       sudo env NUCLEUS_REPO_ROOT="$REPO_ROOT" NUCLEUS_LOG_EXPIRY="$_gl_expiry" \
-        "$REPO_ROOT/src/scripts/services/log-gc-system.sh"
+        "$REPO_ROOT/src/scripts/services/log-gc.sh" system
     else
       warn "system log dir '$_gl_system_log_dir' not writable and cannot escalate; skipping"
     fi

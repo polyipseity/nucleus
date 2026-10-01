@@ -73,7 +73,7 @@ in
       let
         # Shared GC application derivations (plan item 6).
         gcApps = import ../gc-activations.nix { inherit pkgs; };
-        inherit (gcApps) logGcSystem nixStoreGc gcWeekly;
+        inherit (gcApps) logGc nixStoreGc gcWeekly;
       in
       {
         # Determinate Nix keeps nix-darwin `nix.enable = false`, so use launchd
@@ -124,7 +124,7 @@ in
             ProgramArguments = [
               "/bin/sh"
               "-c"
-              "exec ${logGcSystem}/bin/nucleus-log-gc-system"
+              "exec ${logGc}/bin/nucleus-log-gc system"
             ];
             EnvironmentVariables = {
               NUCLEUS_LOG_EXPIRY = config.nucleus.logging.rotation.expiry;

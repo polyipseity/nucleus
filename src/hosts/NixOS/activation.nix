@@ -54,8 +54,7 @@ let
 
   gcApps = import ../../modules/gc-activations.nix { inherit pkgs; };
   inherit (gcApps)
-    logGcUser
-    logGcSystem
+    logGc
     nixStoreGc
     gcWeekly
     ;
@@ -141,7 +140,7 @@ in
     description = "Daily system log rotation for nucleus services";
     serviceConfig = {
       Type = "oneshot";
-      ExecStart = "${logGcSystem}/bin/nucleus-log-gc-system";
+      ExecStart = "${logGc}/bin/nucleus-log-gc system";
       Environment = [
         "NUCLEUS_LOG_EXPIRY=${config.nucleus.logging.rotation.expiry}"
       ];
@@ -162,7 +161,7 @@ in
     description = "Daily user log rotation for nucleus services";
     serviceConfig = {
       Type = "oneshot";
-      ExecStart = "${logGcUser}/bin/nucleus-log-gc-user";
+      ExecStart = "${logGc}/bin/nucleus-log-gc user";
       Environment = [
         "NUCLEUS_LOG_EXPIRY=${config.nucleus.logging.rotation.expiry}"
       ];

@@ -106,11 +106,14 @@ EOF
     gc_logs
   ' nucleus-gc-test "$LIB_SH" >/dev/null 2>&1
 
-  if grep -q 'log-gc-system.sh' "$MOCK_RECORD" &&
+  # The mock sudo records one argument per line, so the script path and the
+  # scope selector are asserted separately.
+  if grep -q 'services/log-gc\.sh$' "$MOCK_RECORD" &&
+    grep -qx 'system' "$MOCK_RECORD" &&
     grep -q "ROTATE $user_dir" "$MOCK_RECORD" &&
     grep -q "EXPIRE $user_dir" "$MOCK_RECORD" &&
     ! grep -qi 'skipping' "$MOCK_RECORD"; then
-    assert_pass "gc_logs escalates non-writable system log dir to root via sudo log-gc-system.sh"
+    assert_pass "gc_logs escalates non-writable system log dir to root via sudo log-gc.sh system"
   else
     assert_fail "gc-escalate" "unexpected record: $(cat "$MOCK_RECORD")"
   fi

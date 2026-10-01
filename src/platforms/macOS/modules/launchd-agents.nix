@@ -154,9 +154,9 @@ let
     scriptName = "src/scripts/services/sccache-gc";
   };
 
-  # WHY: logGcUser is centralized in gc-activations.nix for cross-host reuse.
+  # WHY: logGc is centralized in gc-activations.nix for cross-host reuse.
   gcApps = import ../../../modules/gc-activations.nix { inherit pkgs; };
-  inherit (gcApps) logGcUser;
+  inherit (gcApps) logGc;
 
   # guiEnvAgent: launchd login agent that manages GUI-environment PATH and
   # env vars.  All Nix-computed values are passed as CLI args to the script.
@@ -191,7 +191,10 @@ in
     domain = "gui";
     config = {
       Label = "local.log-gc-user";
-      ProgramArguments = [ "${logGcUser}/bin/nucleus-log-gc-user" ];
+      ProgramArguments = [
+        "${logGc}/bin/nucleus-log-gc"
+        "user"
+      ];
       EnvironmentVariables = {
         NUCLEUS_LOG_EXPIRY = config.nucleus.logging.rotation.expiry;
       };

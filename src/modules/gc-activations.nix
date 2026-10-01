@@ -1,28 +1,22 @@
 # Shared nucleus GC application derivations (cross-host).
 #
-# The three nucleus GC scripts (system log rotation, Nix store GC, weekly
-# sweep) are byte-identical across hosts; only the service/timer wrappers
-# differ (systemd on NixOS, launchd on macOS).  This module exposes the shared
+# The nucleus GC scripts (log rotation, Nix store GC, weekly sweep) are
+# byte-identical across hosts; only the service/timer wrappers differ
+# (systemd on NixOS, launchd on macOS).  This module exposes the shared
 # writeNucleusShellApplication derivations so both platform activation files
 # import them instead of duplicating the definitions (plan item 6).
 { pkgs }:
 {
-  logGcSystem = pkgs.writeNucleusShellApplication {
-    name = "log-gc-system";
+  logGc = pkgs.writeNucleusShellApplication {
+    name = "log-gc";
     runtimeInputs = [ pkgs.jq ];
-    scriptName = "src/scripts/services/log-gc-system";
+    scriptName = "src/scripts/services/log-gc";
   };
 
   nixStoreGc = pkgs.writeNucleusShellApplication {
     name = "nix-store-gc";
     runtimeInputs = [ pkgs.nix ];
     scriptName = "src/scripts/services/nix-store-gc";
-  };
-
-  logGcUser = pkgs.writeNucleusShellApplication {
-    name = "log-gc-user";
-    runtimeInputs = [ pkgs.jq ];
-    scriptName = "src/scripts/services/log-gc-user";
   };
 
   gcWeekly = pkgs.writeNucleusShellApplication {
