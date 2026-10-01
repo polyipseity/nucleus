@@ -7,7 +7,6 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Platform wi
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 
-  # Skip when scoped to files outside this step's scope (no lockfile JSON files).
   if ($HasArgs) {
     $hasLfFiles = @($PositionalArgs | Where-Object { $_ -match '(lockfile|lifecycle-allowlist)\.json$' }).Count -gt 0
     if (-not $hasLfFiles) {
@@ -32,7 +31,6 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Platform wi
     foreach ($section in $lf.Keys) {
       if ($section -eq 'ollama') { continue }
       if ($section -eq 'suggestions') {
-        # Scan nested suggestions sections (homebrew.masApps, cursor, vscode)
         foreach ($sub in $lf['suggestions'].Keys) {
           if ($lf['suggestions'][$sub] -is [hashtable]) {
             foreach ($pkg in $lf['suggestions'][$sub].Keys) {
@@ -55,9 +53,8 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Platform wi
         }
       }
     }
-    # Cursor and VS Code are both VS Code–based editors; identical extension IDs
-    # across these two sections are expected and excluded from overlap checks.
-    # Root cursor/vscode sections (editor plugins) also overlap with suggestions pairs.
+    # Cursor and VS Code are VS Code-based editors, so identical extension IDs
+    # across those sections and their suggestions pairs are expected.
     $vscodeBased = @('suggestions.cursor', 'suggestions.vscode', 'cursor', 'vscode')
     foreach ($entry in $pkgToSections.GetEnumerator()) {
       if ((@($entry.Value)).Count -gt 1 -and $entry.Key -notin $lfOverlapExceptions) {
@@ -123,15 +120,14 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Platform wi
   $lfAlCount = if ($null -ne $lfAl -and $lfAl -is [hashtable]) { $lfAl.Count } else { 0 }
   Write-Message "lifecycle-allowlist.json: valid (entry count: $lfAlCount)"
 
-  # Section validation (non-empty, no placeholders) is enforced by
-  # lockfile.schema.json via step 07 (schema-validation). This step
-  # only handles cross-section overlap and lifecycle-allowlist checks.
+  # lockfile.schema.json enforces section validation (non-empty, no placeholders)
+  # via step 07; this step covers overlap and the lifecycle allowlist only.
 
   Write-Message "lockfile.json validation passed"
   return $true
 }
 
-# run_online_determinism — Verify lockfile freshness against registries (requires network).
+# Invoke-OnlineDeterminism: verify lockfile freshness against registries (requires network).
 function Invoke-OnlineDeterminism {
   param(
     [Parameter(Mandatory)]
@@ -151,7 +147,7 @@ function Invoke-OnlineDeterminism {
   return $false
 }
 
-# Invoke-LockedDscValidation — Verify DSC package versions match lockfile pins.
+# Invoke-LockedDscValidation: verify DSC package versions match lockfile pins.
 function Invoke-LockedDscValidation {
   param(
     [Parameter(Mandatory)]

@@ -3,35 +3,27 @@
   Parse-validates and lints repository PowerShell files.
 
 .DESCRIPTION
-  Syntax validation: uses the built-in PowerShell parser
-  (`System.Management.Automation.Language.Parser`) to validate `.ps1` syntax
-  without executing scripts.
-
-  PSScriptAnalyzer lint: runs `Invoke-ScriptAnalyzer` at Error, Warning, and
-  Information severity on all enabled rules.
+  Validates .ps1 syntax with the built-in parser and lints with
+  PSScriptAnalyzer. Neither phase executes the scripts.
 
 .PARAMETER Settings
-  Path to a PSScriptAnalyzerSettings .psd1 file. Controls which rules and
-  severities are enabled. Defaults to check-PSScriptAnalyzerSettings.psd1
-  (excludes three slow rules — PSAvoidUsingCmdletAliases,
-  PSUseCmdletCorrectly, PSShouldProcess — plus
-  PSUseBOMForUnicodeEncodedFile, which is auto-fixable and low value).
-  Pass test settings for full coverage:
+  PSScriptAnalyzerSettings .psd1 controlling enabled rules and severities.
+  Defaults to check-PSScriptAnalyzerSettings.psd1, which excludes the slow
+  aliases, cmdlet-correctness and ShouldProcess rules plus the auto-fixable
+  PSUseBOMForUnicodeEncodedFile. Pass test settings for full coverage:
   -Settings scripts/test-PSScriptAnalyzerSettings.psd1
 
 .PARAMETER OnlyStep
-  Run only the named check. Recognized values:
-  - `PSSA` — run only PSScriptAnalyzer lint (test step 2 leans on this for the full-rule pass).
-  - `Syntax` — run only parser syntax validation.
-  Unknown step names cause an error. Omit to run both.
+  Run only the named step, `PSSA` (lint; test step 2 leans on it for the
+  full-rule pass) or `Syntax` (parser validation). Omit to run both.
+  An unknown name is an error.
 
 .PARAMETER Scoped
-  If specified and no paths are given, skip Git discovery (no files to check).
-  Used by check.sh/check.ps1 in scoped mode to skip whole-repo discovery.
+  With no paths given, skip Git discovery and report nothing to check. Used by
+  check.sh/check.ps1 in scoped mode to skip whole-repo discovery.
 
 .PARAMETER Paths
-  Optional file paths to check. When omitted, all tracked `*.ps1` files from
-  `git ls-files` are checked (default: none; all tracked .ps1 files).
+  Paths to check. Omitted, every tracked *.ps1 file is checked.
 
 .EXAMPLE
   nix run ./src#check-pwsh
@@ -54,10 +46,9 @@ param(
   [string]$Settings = '',
   [string[]]$OnlyStep = @(),
   [switch]$Scoped,
-  # ValueFromRemainingArguments is required, not decorative: without it a
-  # [string[]] at Position 0 binds the first path and rejects the second, so
-  # `check.ps1 pwsh a.ps1 b.ps1` fails on b.ps1. Callers pass whole sets of
-  # paths, not single files.
+  # ValueFromRemainingArguments is required: without it a [string[]] at
+  # Position 0 binds the first path and rejects the second, so
+  # `check.ps1 pwsh a.ps1 b.ps1` fails on b.ps1. Callers pass whole sets.
   [Parameter(Position = 0, ValueFromRemainingArguments = $true)]
   [string[]]$Paths = @($env:NUCLEUS_CHECK_PATHS -split ';' | Where-Object { $_ })
 )
@@ -85,7 +76,6 @@ if (-not $Paths -or $Paths.Count -eq 0) {
   exit 0
 }
 
-# Validate OnlyStep entries against known step names.
 $knownStepNames = [System.Collections.Generic.HashSet[string]]::new(
   [System.StringComparer]::OrdinalIgnoreCase
 )
@@ -102,9 +92,7 @@ $onlyStepSet = [System.Collections.Generic.HashSet[string]]::new(
 foreach ($t in $OnlyStep) {
     $null = $onlyStepSet.Add($t) }  # check-suppress:suppression_doc: Add returns bool, discarded
 
-# ---------------------------------------------------------------------------
 # Syntax validation.
-# ---------------------------------------------------------------------------
 $runSyntax = $onlyStepSet.Count -eq 0 -or $onlyStepSet.Contains('Syntax')
 if ($runSyntax) {
   $parseErrors = @($Paths | Sort-Object -Unique | ForEach-Object -Parallel {
@@ -138,23 +126,18 @@ if ($runSyntax) {
   Write-NucleusInfo -CommandName check-pwsh ("PowerShell syntax check passed for {0} files." -f $Paths.Count)
 }
 
-# ---------------------------------------------------------------------------
 # PSScriptAnalyzer lint.
-# ---------------------------------------------------------------------------
 $runPssa = $onlyStepSet.Count -eq 0 -or $onlyStepSet.Contains('PSSA')
 if ($runPssa) {
-  # Preflight: PSScriptAnalyzer is required.
   if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
     throw 'PSScriptAnalyzer module is required for lint phase. Install with: Install-Module PSScriptAnalyzer -Scope CurrentUser'
   }
 
-  # Scope PSModulePath to reduce module-discovery overhead during PSSA rule evaluation.
-  # Preserve the current pwsh's module paths (already correct for the running binary).
-  # Intentionally not overwriting $env:PSModulePath — the default value from the
-  # running pwsh already includes all required module directories.
+  # $env:PSModulePath stays as the running pwsh provides it, which already
+  # carries every module directory the enabled rules need.
 
     Import-Module PSScriptAnalyzer
-    # Pre-import commonly-used modules to reduce PSSA's implicit Get-Command overhead during rule evaluation.
+    # Pre-import PSReadLine to cut the implicit Get-Command overhead PSSA pays per rule.
     Import-Module PSReadLine -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: PSReadLine may be absent in CI/non-interactive shells; this import is a performance optimization, not required
 
     $settingsFile = $Settings
@@ -182,9 +165,6 @@ if ($runPssa) {
       Rules = @{}
     }
     if ($diags) {
-      # WHY: Write-NucleusError → Write-Error is terminating under the script-wide
-      # $ErrorActionPreference = 'Stop'; scope Continue so every diagnostic renders
-      # before the exit-1 summary (the problems matcher consumes all of them).
       $ErrorActionPreference = 'Continue'
       $diags | ForEach-Object {
         Write-NucleusError -CommandName check-pwsh ('{0}:{1}:{2}: [{3}] {4}' -f $_.ScriptPath, $_.Line, $_.Column, $_.Severity, $_.Message)
@@ -197,10 +177,8 @@ if ($runPssa) {
     Write-NucleusInfo -CommandName check-pwsh ("PowerShell lint check passed for {0} files." -f $Paths.Count)
 }
 
-# The success path must exit explicitly. Callers that invoke this in-process --
-# check.ps1 reads $LASTEXITCODE straight after -- get no value when the script
-# simply falls off the end, and under Set-StrictMode reading an unset variable
-# is a terminating error, so a passing run reports as a failure. The early
-# success exits above already do this; this is the same contract for the path
-# that actually does the work.
+# The success path must exit explicitly: check.ps1 reads $LASTEXITCODE straight
+# after this call, and under Set-StrictMode an unset variable is a terminating
+# error, so falling off the end reports a passing run as a failure. The early
+# exits above follow the same contract.
 exit 0

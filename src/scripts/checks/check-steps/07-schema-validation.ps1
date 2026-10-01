@@ -1,9 +1,9 @@
 Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Platform windows -Mode any -Requires none -Action {
   param([Parameter(Mandatory)][PSObject]$Context)
 
-  # Single source of truth for A8 exception list: files that don't need $schema.
-  # Policy: nucleus-owned data requires $schema (we write our own schemas).
-  # External formats: use published $schema when available; never roll our own.
+  # Single source of truth for the A8 exception list: files that need no $schema.
+  # Nucleus-owned data requires $schema (we write our own schemas); external
+  # formats use the published one where it exists and never a hand-rolled one.
   # ref: allow-and-deny-lists.instructions.md#A8
   function Skip-SchemaFile([string]$FilePath) {
     $f = $FilePath
@@ -39,7 +39,6 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Pla
   $PositionalArgs = $Context.PositionalArgs
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 
-  # Build manifest of file->schema pairs.
   $manifest = [System.Collections.Generic.List[hashtable]]::new()
 
   if ($HasArgs) {
@@ -49,14 +48,13 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Pla
       if (Skip-SchemaFile $absSf) { continue }
       if ($absSf -like '*.json') {
         $schema = try { (Get-Content $absSf -Raw | ConvertFrom-Json -AsHashtable)['$schema'] } catch { $null }
-        # Skip external schema URLs (HTTP/HTTPS) — not local schema files; check-jsonschema would try to download them.
+        # External schema URLs are not local files; check-jsonschema would try to download them.
         if ($schema -and $schema -notmatch '^https?://') {
           $schemafile = if ($schema -match '^\.') { [System.IO.Path]::GetFullPath((Join-Path (Split-Path $absSf -Parent) $schema)) } else { $schema }
           $manifest.Add(@{SchemaFile = $schemafile; InstanceFile = $absSf })
         }
       } elseif ($absSf -like '*.yml' -or $absSf -like '*.yaml') {
         $schema = try { (ConvertFrom-Yaml -Yaml (Get-Content $absSf -Raw))['$schema'] } catch { $null }
-        # Skip external schema URLs (HTTP/HTTPS) — not local schema files; check-jsonschema would try to download them.
         if ($schema -and $schema -notmatch '^https?://') {
           $schemafile = if ($schema -match '^\.') { [System.IO.Path]::GetFullPath((Join-Path (Split-Path $absSf -Parent) $schema)) } else { $schema }
           $manifest.Add(@{SchemaFile = $schemafile; InstanceFile = $absSf })
@@ -69,7 +67,6 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Pla
       $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.Name -notlike '*.schema.json'  # ref: allow-and-deny-lists.instructions.md#B3,#A7 -- structural invariants; schema files are meta
     } | ForEach-Object {
       $schema = try { (Get-Content $_.FullName -Raw | ConvertFrom-Json -AsHashtable)['$schema'] } catch { $null }
-      # Skip external schema URLs (HTTP/HTTPS) — not local schema files; check-jsonschema would try to download them.
       if ($schema -and $schema -notmatch '^https?://') {
         if ($schema -match '^\.') {
           $schemafile = [System.IO.Path]::GetFullPath((Join-Path $_.DirectoryName $schema))
@@ -84,7 +81,6 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Pla
       $_.FullName -notmatch '[/\\]vendor[/\\]'  # ref: allow-and-deny-lists.instructions.md#B3 -- structural invariant; gitignore filter applied on top
     } | ForEach-Object { $_.FullName } | Select-GitIgnored | ForEach-Object {
       $schema = try { (ConvertFrom-Yaml -Yaml (Get-Content $_ -Raw))['$schema'] } catch { $null }
-      # Skip external schema URLs (HTTP/HTTPS) — not local schema files; check-jsonschema would try to download them.
       if ($schema -and $schema -notmatch '^https?://') {
         if ($schema -match '^\.') {
           $schemafile = [System.IO.Path]::GetFullPath((Join-Path (Split-Path $_ -Parent) $schema))
@@ -98,14 +94,11 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Pla
 
   $jsonschemaErrors = 0
 
-  # $schema presence and format check (Spec G)
+  # $schema presence and format check
 
-
-  # Collect all files in scope for $schema presence check
   $allFiles = [System.Collections.Generic.List[string]]::new()
   if ($HasArgs) {
     foreach ($sf in $PositionalArgs) {
-      # Normalize relative paths to absolute so exception patterns match consistently.
       $absSf = if ([System.IO.Path]::IsPathRooted($sf)) { $sf } else { [System.IO.Path]::GetFullPath((Join-Path $r $sf)) }
       if ($absSf -like '*.json' -or $absSf -like '*.yml' -or $absSf -like '*.yaml') {
         $allFiles.Add($absSf)
@@ -124,7 +117,7 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Pla
     if (Skip-SchemaFile $f) { continue }
 
     if ($f -like '*.json') {
-      # Skip non-object JSON (arrays, primitives) — they cannot have root-level $schema.
+      # Arrays and primitives cannot carry a root-level $schema.
       $content = try { Get-Content $f -Raw | ConvertFrom-Json -AsHashtable } catch { $null }
       if ($null -eq $content -or $content -isnot [System.Collections.Hashtable]) {
         continue
@@ -157,7 +150,7 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Pla
   }
 
   if ($manifest.Count -gt 0) {
-    # Group by schemafile and validate sequentially.
+    # One validator invocation per schema file.
     $groups = $manifest | Group-Object SchemaFile
     foreach ($group in $groups) {
       $schemaFile = $group.Name

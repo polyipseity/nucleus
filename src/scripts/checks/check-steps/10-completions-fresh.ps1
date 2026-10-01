@@ -15,7 +15,6 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 
-  # 1. Drift: the generated inventory must match src/scripts/completions/gen-completions.ps1.
   Write-Message "--- generated completer inventory matches generator ---"
   & (Join-Path $r 'src\scripts\completions\gen-completions.ps1') -Check
   if ($LASTEXITCODE -ne 0) {
@@ -23,8 +22,8 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
     return $false
   }
 
-  # 2. Coverage: every nucleus-* command needs a zsh _nucleus-<cmd> file, a pwsh
-  #    Register-ArgumentCompleter entry, and a DEFINED $nucleus<Cmd>Flags array.
+  # Coverage: a zsh _nucleus-<cmd> file, a pwsh Register-ArgumentCompleter entry,
+  # and a defined $nucleus<Cmd>Flags array per command.
   Write-Message "--- coverage: zsh + pwsh completions for every nucleus-* command ---"
   $commands = @(
     'ai', 'apply', 'bootstrap', 'check', 'cloud', 'config', 'gc',
@@ -54,9 +53,8 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
     return $false
   }
 
-  # 2b. Every flag inventory the profile REFERENCES must be DEFINED in it. The
-  #     generated region is the only definition site, so a completer naming a
-  #     variable the generator no longer emits completes nothing at all.
+  # A completer naming a variable the generator no longer emits completes nothing,
+  # and the generated region is the only definition site.
   Write-Message "--- every referenced flag inventory is defined ---"
   $undefined = @()
   foreach ($name in @([regex]::Matches($profileText, '\$nucleus[A-Za-z0-9]*Flags\b') | ForEach-Object { $_.Value } | Sort-Object -Unique)) {
@@ -69,8 +67,8 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
     return $false
   }
 
-  # 3. Introspection contract: the update lockfile completer completes -Sections
-  #    values via scripts/update.sh -ListSections; that parameter must exist.
+  # The update lockfile completer completes -Sections via scripts/update.sh
+  # -ListSections, so that parameter must exist.
   Write-Message "--- --list-* introspection contract ---"
   $updatePath = Join-Path $r 'scripts\update.sh'
   if (-not (Select-String -Path $updatePath -Pattern 'list-sections' -SimpleMatch -Quiet)) {

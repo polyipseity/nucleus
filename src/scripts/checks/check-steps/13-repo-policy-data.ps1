@@ -29,7 +29,6 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
       $registeredDummyValues = @($dummyRegistryData['dummyKeys'].Values | ForEach-Object { $_.value })
 
       # Rule: every hardcoded sk- style API key literal (sk-[A-Za-z0-9]{4,}) in tracked files must be a registered dummyKeys value.
-      # Exclude this check's own files: their source contains the literal pattern text.
       # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
       $dummySelfLeaf = $selfLeaf
       $dummySelfShLeaf = $selfShLeaf
@@ -81,7 +80,6 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
 
   $preflightViolations = @()
 
-  # Find all .ps1 files
   # WHY: if-expression output is pipeline-enumerated — an empty branch yields $null, crashing the .Count check below under StrictMode; the @() wrapper forces an array
   $ps1Files = @(if ($HasArgs) {
     if ($Context.Ps1Files) { $Context.Ps1Files } else { @($PositionalArgs | Where-Object { $_ -like '*.ps1' }) }
@@ -90,7 +88,6 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
   })
 
   if ($ps1Files.Count -gt 0) {
-    # Exclude this check's own file: its source contains the literal pattern text.
     # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariant; self-refs are dynamic
     $selMatches = Select-String -Path $ps1Files -Pattern 'Assert-ToolAvailable.*-InstallCommand' -AllMatches |
       Where-Object { (Split-Path -Leaf $_.Path) -notin $allStepLeaves }
@@ -123,7 +120,6 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
   $writeCommands = @('Set-Content', 'Add-Content', 'Out-File', 'Tee-Object')
 
   foreach ($file in $embeddedPs1Files) {
-    # Exclude this check's own file: its source contains the literal here-string patterns.
     # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
     if ((Split-Path -Leaf $file) -in $allStepLeaves) { continue }
 
@@ -141,7 +137,7 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
     $fileLines = @(Get-Content -Path $file)
 
     foreach ($hs in $hereStrings) {
-      # Content lines = all lines minus the opener line and the closer line.
+      # Content lines exclude the opener and closer lines.
       $contentLines = ($hs.Extent.Text -split "`r?`n").Count - 2
       if ($contentLines -le 10) { continue }
 
@@ -201,7 +197,7 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
 
   Write-Message "--- agents policy ---"
 
-  # Commit-staged body match moved to test suite (14-agents-policy-tests.sh)
+  # Commit-staged body match lives in the test suite (tests/scripts/check-steps/agents-prompt-parity-tests.sh)
 
   $instructionFiles = Get-ChildItem -Path (Join-Path $r '.agents\instructions') -Filter '*.instructions.md' -File
   foreach ($instr in $instructionFiles) {

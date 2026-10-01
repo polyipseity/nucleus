@@ -197,10 +197,9 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   if ($cmViolations -gt 0) { $failed = $true } else { Write-Message 'no cloud-mount invariant violations found.' }
 
   # --- Service supervision invariants ---
-  # The rewrite locked in one loop policy, one threshold source and one retry
-  # owner for every service.  Every assertion below fails if a later change
-  # reintroduces a second copy of one of them; none inspects service identity,
-  # because loop protection is deliberately not configurable per service.
+  # Each assertion fails when a later change reintroduces a second loop policy,
+  # threshold source or retry owner. None inspects service identity: loop
+  # protection is deliberately not configurable per service.
   Write-Message "--- service supervision invariants ---"
   $ssViolations = 0
   $ssHealthLib = 'src/scripts/lib/service-health.sh'
@@ -211,9 +210,9 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   # are excluded from the reference scan to keep their verdicts identical
   $ssStepLeaves = @('11-repo-policy-grep.sh', '11-repo-policy-grep.ps1')
 
-  # Thresholds live once, in the POSIX health library, and are compared there
-  # only through their constants.  A second definition or a bare numeric
-  # comparison is a second policy that can drift from the watchdog's.
+  # Thresholds live in the POSIX health library and are compared only through
+  # their constants; a second definition or a bare number is a policy that can
+  # drift from the watchdog's.
   $ssHealthLibPath = Join-Path -Path $r -ChildPath $ssHealthLib
   if (Test-Path -LiteralPath $ssHealthLibPath) {
     foreach ($ssName in @('_SVC_HEALTH_LOOP_RESTARTS', '_SVC_HEALTH_LOOP_CONSECUTIVE', '_SVC_HEALTH_WARN_RESTARTS')) {
@@ -250,8 +249,8 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   }
 
   # Loop protection is a property of the health record, never a per-service
-  # setting.  Only each service entry's own keys are inspected, so the
-  # legitimate cloud-drive.lifecycle block stays out of scope by design.
+  # setting; only each entry's own keys are inspected, so the legitimate
+  # cloud-drive.lifecycle block stays out of scope.
   $ssServicesJsonPath = Join-Path -Path $r -ChildPath $ssServicesJson
   if (Test-Path -LiteralPath $ssServicesJsonPath) {
     $ssServices = $null
@@ -288,7 +287,7 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
     $ssViolations++
   }
 
-  # Retry and backoff belong to the shared runner alone.  A mount backend or the
+  # Retry and backoff belong to the shared runner alone; a mount backend or
   # setup step that sleeps is a second retry owner, which is how the original
   # restart storm ran without backoff.
   $ssMountFiles = @(
@@ -334,10 +333,9 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   if ($ssViolations -gt 0) { $failed = $true } else { Write-Message 'no service supervision invariant violations found.' }
 
   # --- SRT wrapper invariants ---
-  # srt is a commander program: the options it declares (-h, -V, -d, -s, -c,
-  # --control-fd) are consumed wherever they appear, including after the wrapped
-  # command, so `pi --help` prints srt's own usage and `pi -c <arg>` loses the
-  # argument with no error at all.  Every forwarder must write the marker.
+  # srt consumes its own options (-h, -V, -d, -s, -c, --control-fd) wherever they
+  # appear, so `pi --help` prints srt's usage and `pi -c <arg>` loses the argument
+  # silently. Every forwarder must write the -- marker.
   Write-Message "--- srt wrapper invariants ---"
   $swViolations = 0
   # `srt -c '<string>'` is deliberately not a candidate: the string is a single
@@ -345,15 +343,15 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   $swInvocation = '(^|[^A-Za-z0-9_./-])srt\s+command\s+\S+'
   $swSeparated = 'srt\s+command\s+\S+\s+--(\s|$)'
 
-  # The comment filter below is what keeps this check from reporting itself: both
-  # patterns are regexes, so neither matches the line it is written on, and a
-  # literal invocation left in a comment is dropped.
+  # The comment filter below keeps this check from reporting itself: both patterns
+  # are regexes, so neither matches the line it is written on, and a literal
+  # invocation left in a comment is dropped.
   $swFiles = @()
   if ($HasArgs) {
-    # The whole-repo branch reads src/ and scripts/ only, so drop tests/ here
-    # too and keep the two modes in agreement. A test that proves this rule
-    # works has to contain a violating example, and a fixture is not a shipped
-    # wrapper. ref: allow-and-deny-lists.instructions.md#B9
+    # The whole-repo branch reads src/ and scripts/ only, so drop tests/ here too
+    # and keep both modes in agreement: a test proving this rule needs a violating
+    # example, and a fixture is not a shipped wrapper.
+    # ref: allow-and-deny-lists.instructions.md#B9
     $swFiles = @(
       $PositionalArgs |
         Where-Object { $_ -match '\.(sh|zsh|ps1|nix)$' } |

@@ -19,7 +19,6 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   $cfgDir = Join-Path -Path $r -ChildPath "src\modules\configs"
   $cfgErrors = 0
 
-  # Single-pass: collect all config file basenames, run one Select-String across src/
   $cfgFiles = Get-ChildItem -Path $cfgDir -Recurse -File
   $srcFiles = Get-ChildItem -Path (Join-Path $r "src") -Recurse -Include '*.nix', '*.ps1', '*.sh' |
     Where-Object { $_.FullName -notmatch '[\/]vendor[\/]' -and $_.FullName -notmatch '[\/]configs[\/]' } |
@@ -28,10 +27,8 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   $cfgPatterns = @($cfgFiles | ForEach-Object { $_.Name } | Sort-Object -Unique)
   # WHY: Select-GitIgnored returns path strings; piping strings to Select-String searches them as content, so -Path is required to read the actual files
   $cfgSelectOutput = Select-String -Path $srcFiles -Pattern $cfgPatterns -SimpleMatch
-  # Single-pass: collect all check-suppress:config-method lines for preceding-line checking
+  # WHY: refs may use a ${hostName} template that no raw basename matches.
   $cfgMethodOutput = Select-String -Path $srcFiles -Pattern '# check-suppress:config-method'
-  # WHY: refs may use a ${hostName} template (e.g. git/${hostName}.gitconfig) that no
-  # raw basename substring-matches; gather those lines for per-file resolution below.
   $cfgTemplateOutput = Select-String -Path $srcFiles -Pattern '${hostName}' -SimpleMatch
 
   $parallelJobs = [Environment]::ProcessorCount
@@ -45,7 +42,8 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
     # Skip infrastructure files and Nix modules inside configs/  # ref: allow-and-deny-lists.instructions.md#A2 -- infrastructure files are not configs
     if ($basename -in '.gitkeep', '.gitignore') { return $null }
     if ($basename -like '*.schema.json') { return $null }
-    # Skip Nix module files — imported as modules (e.g. `import ./configs/qtpass {}`), not deployed as config files. The import references the directory, not the file; basename `default.nix` matches hundreds of unrelated references.
+  # Skip Nix modules: they are imported as directories, and basename 'default.nix'
+  # matches hundreds of unrelated references.
     if ($basename -like '*.nix') { return $null }
 
     # Skip agent customization files (consumed as a directory via Method 4)  # ref: allow-and-deny-lists.instructions.md#A2 -- agents/* consumed as directory
@@ -56,7 +54,7 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
     # ref: allow-and-deny-lists.instructions.md#A2 -- non-standard deployment mechanisms
     if ($relPath -in 'hermes-agent/SOUL.md', 'ollama/models.json') { return $null }
 
-    # Check against cached Select-String output -- relative path first, then basename
+    # Relative path first, then basename.
     $refs = @($using:cfgSelectOutput | Where-Object { $_.Line -match [regex]::Escape($relPath) })
     if ($refs.Count -eq 0) {
       $refs = @($using:cfgSelectOutput | Where-Object { $_.Line -match [regex]::Escape($basename) })
@@ -82,7 +80,6 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
         $hasMethod = $true
         break
       }
-      # Check up to 5 preceding lines for the annotation (comment blocks may span multiple lines)
       if ($ref.LineNumber -gt 1) {
         $searchLimit = [Math]::Max(1, $ref.LineNumber - 10)
         for ($pn = $ref.LineNumber - 1; $pn -ge $searchLimit; $pn--) {
@@ -118,10 +115,7 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
 
   Write-Message "--- activation naming policy ---"
 
-  # Collect activation entry definitions as "file:line:name" lines across the three
-  # namespaces (home.activation, system.activationScripts, nucleus.terminalActivations).
   $nsRegex = '(home\.activation|system\.activationScripts|nucleus\.terminalActivations)'
-  # Attrset entry lines: name[.sub] = <lib.* value> or name[.sub] = (value on next line).
   # Nested-content lines (config = {, Unit = {, bundle_id = "...") never match.
   # WHY: group 1 captures the entry name (mirrors the .sh sed s/^[[:space:]]*([a-zA-Z0-9_-]+).*/\1/); group 2 is the optional .sub suffix and must not be used for the name
   $entryRegex = '^\s*([a-zA-Z0-9_-]+)(\.[a-zA-Z0-9_-]+)?\s*=\s*(lib\.(mkIf|mkAfter|mkBefore|mkForce|mkOverride|mkOrder|hm\.dag\.entry(A|Before|Order|After))|\s*$)'
@@ -152,12 +146,10 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
         $line = $lines[$i]
         if ($line -match '^\s*#') { continue }
 
-        # Dotted definitions: home.activation.<name> = ...
         if ($line -match $dottedRegex) {
           $definitions += "$file`:$($i + 1):$(($Matches[0] -split '\.')[-1])"
         }
 
-        # Attrset definitions: <ns> = { <name> = ...; }; regions
         if (-not $inBlock -and $line -match ($nsRegex + '\s*=[^;]*\{')) {
           $inBlock = $true
           $depth = 0
@@ -213,7 +205,6 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   Write-Message "--- logging format policy ---"
 
   $lfErrors = 0
-  # Exclude this check's own files: their source contains the literal pattern text.
   # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
   $lfSelfLeaf = $selfLeaf
   $lfSelfShLeaf = $selfShLeaf
@@ -236,11 +227,9 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   })
 
   if ($lfFiles.Count -gt 0) {
-    # Allowlist: the shared color helpers, their tests, and the log sanitizer
-    # are the only sanctioned ANSI emitters. WHY: Invoke-LogManagement.ps1 is
-    # the log sanitizer (it must reference ESC patterns to strip them) and its
-    # tests feed ESC input, so both join the allowlist alongside the helper
-    # modules and their tests.
+    # WHY: Invoke-LogManagement.ps1 is the log sanitizer and its tests feed ESC
+    # input, so both must reference ESC patterns; the color helpers and their tests
+    # are the other sanctioned emitters.
     $lfAllowlisted = @('lib.sh', 'step-runner.sh', 'step-runner.ps1', 'test-lib.sh', 'test-lib.ps1',
       'Format-NucleusOutput.psm1', 'Format-NucleusOutput.Tests.ps1', 'Invoke-LogManagement.ps1', 'log-management.Tests.ps1')
     $lfScanned = @($lfFiles | Where-Object { (Split-Path -Leaf $_) -notin $lfAllowlisted })
@@ -279,9 +268,9 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
         $lfErrors++
       }
       # WHY: -CaseSensitive matches the awk twin (repository-policy.awk), whose
-      # regex is case-sensitive by construction. Without it, Select-String's
-      # case-insensitive default flags any lowercase-e example, including a
-      # comment that names the automatic Event variable.
+      # regex is case-sensitive by construction. Select-String's case-insensitive
+      # default would flag any lowercase-e example, including a comment naming the
+      # automatic Event variable.
       foreach ($m in (Select-String -Path $lfPsFiles -Pattern '`e' -CaseSensitive)) {
         Write-ErrorMessage "$($m.Path):$($m.LineNumber): backtick-e escape literal (use PSStyle helpers)"
         $lfErrors++
@@ -289,8 +278,8 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
     }
   }
 
-  # Self-check: the color spec requires NO_COLOR handling in both shared helpers.
-  # Guarded on existence so fixture trees in tests skip this content probe.
+  # The spec requires NO_COLOR handling in both helpers; the probe is guarded on
+  # existence so fixture trees skip it.
   $libShPath = Join-Path $r 'src\scripts\lib\lib.sh'
   if ((Test-Path -LiteralPath $libShPath) -and -not (Select-String -Path $libShPath -Pattern 'NO_COLOR' -Quiet)) {
     Write-ErrorMessage "src/scripts/lib/lib.sh does not reference NO_COLOR (logging-format self-check)"
