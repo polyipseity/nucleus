@@ -79,13 +79,11 @@ if ($ParamsJson -and (Test-Path $ParamsJson)) {
   $Elevated = $true
 }
 
-# Format-NucleusOutput: shared F1 output formatting.  Must load before any
-# Sync-* / Invoke-* module that emits Write-Nucleus* messages.
+  # Load first: every module below emits Write-Nucleus* messages.
 $resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 Import-Module (Join-Path -Path $resolvedModuleDir -ChildPath "Format-NucleusOutput.psm1")
 
-# Refuse to run as Administrator — privilege escalation is managed internally
-# when needed rather than relying on an already-elevated caller.
+# Refuse to run as Administrator; elevation is managed internally.
 $isAdmin = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if ($isAdmin -and -not $Elevated) {
   Write-NucleusError -CommandName apply "This script must not be run as Administrator. Run as a regular user (elevation is managed internally when needed)."
@@ -112,7 +110,6 @@ switch ($Action) {
     exit 0
   }
   "apply" {
-    # Default flow continues below.
   }
   default {
     Write-NucleusError -CommandName apply "Unknown action '$Action'. Valid actions: apply, health-check, audit-store."
@@ -209,22 +206,19 @@ if (-not $Elevated) {
   exit $exitCode
 }
 
-# Managed PATH data: canonical list of user-scope bin directories.
-# Must be loaded before any Sync-* or Invoke-* module that references
-# $nucleusPathComponents, $nucleusPrependRegistry, or Get-NucleusManagedBinDir.
+# Load first: modules below read $nucleusPathComponents, $nucleusPrependRegistry,
+# and Get-NucleusManagedBinDir.
 . (Join-Path -Path $resolvedModuleDir -ChildPath "ManagedPaths.ps1")
 
-# Root utilities: shared helpers with no single domain affinity.
-# Config deployment helpers (Deploy-WritableSymlink, Resolve-UserConfigSource):
-# must load before any Sync-* module that deploys managed configs.
+# Config helpers (Deploy-WritableSymlink, Resolve-UserConfigSource) load before
+# any Sync-* module deploys a managed config.
 . (Join-Path -Path $resolvedModuleDir -ChildPath "New-NucleusHub.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "ConfigHelpers.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Load-UserRegistry.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-LogManagement.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Resolve-Executable.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Test-ArchivingStack.ps1")
-# ServiceHealth.ps1 must load before the apply-time health re-arm that calls
-# Clear-HealthRecordAll (see the re-arm step below the user-state syncs).
+# Load before the apply-time health re-arm, which calls Clear-HealthRecordAll.
 . (Join-Path -Path $resolvedModuleDir -ChildPath "ServiceHealth.ps1")
 # secrets/: decryption, SOPS age key management, and secret materialization.
 # ConvertFrom-SshEd25519PublicKeyToAgePubKey must be loaded before any file that
@@ -319,9 +313,8 @@ if (-not $Elevated) {
 . (Join-Path -Path $wallpapersModuleDir -ChildPath "Remove-StaleWallpaper.ps1")
 . (Join-Path -Path $wallpapersModuleDir -ChildPath "Sync-WallpaperInventory.ps1")
 
-# Load the user registry from src/users/ domain files. This declarative
-# configuration defines all users managed by this Windows host (primary and
-# secondary). Validate that all users in -Users parameter are registered.
+# Load the user registry from src/users/ domain files, which defines every user
+# this host manages. Validate that all users in -Users are registered.
 $resolvedConfigDir = (Resolve-Path -Path $ConfigDir).Path
 $machineSshHostKeyPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_host_ed25519_key"
 
@@ -414,7 +407,7 @@ foreach ($configuredUser in $userRegistry.users) {
     if ([string]::IsNullOrWhiteSpace($userConfigFile)) {
       continue
     }
-    # Prevent path traversal: entries must be plain filenames relative to user/.
+    # Path traversal guard: entries must be plain filenames relative to user/.
     if ($userConfigFile -match '[\\/]|\.\.') {
       throw "User '$($configuredUser.name)' dscConfigFiles entry '$userConfigFile' contains path separators or '..'; entries must be plain filenames relative to the user/ directory"
     }
@@ -467,9 +460,9 @@ if ($EnableHostAgeKeyRegistration) {
     -RepoRoot $repoRoot
 }
 
-# Create the per-user ~/.nucleus hub (user -> %LOCALAPPDATA%\nucleus,
-# system -> %ProgramData%\nucleus) for every managed user. Runs in the
-# elevated apply.ps1 context so junctions can be created under each profile.
+# The per-user ~/.nucleus hub (user -> %LOCALAPPDATA%\nucleus,
+# system -> %ProgramData%\nucleus) needs the elevated context to create
+# junctions under each profile.
 foreach ($user in $Users) {
   $userRecord = @($userRegistry.users | Where-Object { $_.name -eq $user }) | Select-Object -First 1
   if ($null -eq $userRecord -or [string]::IsNullOrWhiteSpace($userRecord.homeDirectory)) {
@@ -574,30 +567,28 @@ foreach ($configFile in $effectiveConfigFiles) {
 
 wevtutil sl Application /ms:209715200 2>$null  # check-suppress:suppression_doc: may already be at desired size; wevtutil exits non-zero but this is harmless
 
-# Scoop bucket and app provisioning must run after DSC installs Scoop.Scoop.
-# scoop shims are written to a user-local directory that is not on PATH in
-# the current session until explicitly prepended; Invoke-ScoopSetup handles
-# that prepend internally.
-# rustup toolchain management runs after WinGet DSC has installed Rustlang.Rustup.
-# Must run before Invoke-CargoBinstallSetup so the stable toolchain (and its
-# cargo binary) are available for compilation fallback.
+# After WinGet DSC installs Scoop.Scoop, since the shims directory is not on
+# PATH until Invoke-ScoopSetup prepends it.
+# rustup runs after WinGet DSC installs Rustlang.Rustup, and before
+# Invoke-CargoBinstallSetup so the stable toolchain and its cargo binary exist
+# for the compilation fallback.
 Invoke-RustupSetup -User $sessionUser -RepoRoot $repoRoot
 Invoke-ScoopSetup
-# cargo-binstall managed packages run after Invoke-ScoopSetup has installed
-# cargo-binstall from Scoop and prepended the shims directory to PATH.
+# After Invoke-ScoopSetup installs cargo-binstall and prepends the shims
+# directory to PATH.
 Invoke-CargoBinstallSetup
-# bun global packages run after WinGet DSC has installed Oven-sh.Bun.
-# bun-setup prepends ~/.bun/bin to PATH internally for this session.
+# After WinGet DSC installs Oven-sh.Bun; Invoke-BunSetup prepends ~/.bun/bin
+# to PATH for this session.
 if ($EnableBunParity) {
   Invoke-BunSetup
 }
-# pi extensions converge from the shared registry; pi itself is a bun global
-# package, so this runs after bun-setup has made the pi CLI reachable.
+# pi itself is a bun global package, so this runs after Invoke-BunSetup made
+# the pi CLI reachable.
 if ($EnablePiExtensionsParity) {
   Invoke-PiSetup
 }
-# uv global tools run after WinGet DSC has installed astral-sh.uv.
-# uv-setup prepends ~/.local/bin to PATH internally for this session.
+# After WinGet DSC installs astral-sh.uv; Invoke-UvSetup prepends ~/.local/bin
+# to PATH for this session.
 Invoke-UvSetup
 # PowerShell modules: pinned versions for DSC validation and code hygiene.
 Invoke-PowerShellModuleSetup
@@ -677,8 +668,8 @@ if ($null -eq $EnableDevReposParity) {
   $EnableDevReposParity = $devReposEnabled
 }
 
-# Keep dev repo provisioning after Git/SSH config so clones see the same
-# secret/key ordering across macOS, NixOS, and Windows.
+# After Git/SSH config, so clones see the same secret and key ordering as
+# macOS and NixOS.
 Sync-DevRepoCatalog -Enabled:$EnableDevReposParity -Repositories $devRepositories
 Sync-ShellProfile -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $repoRoot
 # check-suppress:config-method: method 1 (writable symlink) -- bun and uv configs symlinked to repo files.
@@ -698,14 +689,13 @@ if ($EnableCloudDrivesParity) {
     Sync-CloudDriveCatalog -UserConfig $userRecord -HomeDirectory $userRecord.homeDirectory
   }
 }
-# Apply-time service-health re-arm: clear every instance's health record so that
-# neither a blocked state nor a loop history survives an apply.  A block is
-# otherwise cleared only by reboot (the record's boot id no longer matches), so
-# without this step a blocked service stays blocked across applies even though
-# apply just re-provisioned and restarted it.  Mirrors the POSIX
+# The health re-arm clears every instance record so no blocked state or loop
+# history survives an apply. A block otherwise clears only on reboot, when the
+# record's boot id stops matching, so a blocked service would stay blocked even
+# though apply just restarted it. Mirrors the POSIX
 # home.activation.reset-service-health step in src/modules/cloud-drives.nix.
 Clear-HealthRecordAll
-# Ensure all nucleus log subdirectories exist before starting services.
+# Ensure the log subdirectories exist before services start.
 Invoke-EnsureLogDir -ServicesJson (Join-Path -Path $repoRoot -ChildPath "src\modules\services.json")
 Sync-CaddyService -RepoRoot $repoRoot -Enabled:`$true
 Sync-CaddyLocalCA -RepoRoot $repoRoot -Enabled:$true
@@ -722,10 +712,9 @@ Sync-LiteLLMService -RepoRoot $repoRoot -Enabled:`$true -GpgExe $gpgExe -HostKey
 Sync-RedisService -RepoRoot $repoRoot -Enabled:`$true
 Sync-ReplicaSyncScheduledTask -RepoRoot $repoRoot -Enabled:$EnableCloudDrivesParity
 Sync-OpenSSHServer -Enabled:$EnableRemoteAccessParity
-# Re-run host age key registration after Sync-OpenSSHServer has started
-# the sshd service (which generates host keys on a fresh machine).  This second
-# call is a no-op when the key is already registered; on first-ever apply it
-# completes registration in the same run without requiring a second apply.
+# Re-run after Sync-OpenSSHServer has started sshd, which generates host keys
+# on a fresh machine. No-op once the key is registered, so a first apply
+# completes without a second run.
 if ($EnableHostAgeKeyRegistration) {
   Register-HostAgeKey `
     -MachineSshHostKeyPubPath $machineSshHostKeyPubPath `
