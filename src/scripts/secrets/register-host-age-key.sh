@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
-# Derives this machine's age public key from its SSH host public key and
-# registers it in .sops.yaml as a new recipient, then rewraps every
-# SOPS-encrypted file so the machine can decrypt them on first apply.
-# Must run before Nix activation (darwin-rebuild / nixos-rebuild) because
-# derive-host-age-key.sh writes the machine age key only during activation.
+# Derive this machine's age public key from its SSH host public key, register it
+# in .sops.yaml, then rewrap every SOPS file so this machine decrypts them on
+# first apply.
+#
+# WHY before darwin-rebuild / nixos-rebuild: derive-host-age-key.sh writes the
+# machine age key only after system activation, while sops-nix decrypts during it,
+# so the machine key must already be a recipient. The SSH host public key is
+# created by the OS at install time.
+#
+# Prereqs: ssh-to-age and sops on PATH, the primary GPG key in the keyring, and
+# the "    # -- machine keys end; personal SSH backup key below --" marker in
+# .sops.yaml.
 
 set -euo pipefail
 
@@ -30,21 +37,6 @@ if [ -z "$_rak_repo_root" ]; then
   _rak_repo_root="$(derive_repo_root)"
 fi
 
-# Why before darwin-rebuild / nixos-rebuild:
-#   derive-host-age-key.sh writes the machine age key under the nucleus SYSTEM
-#   root only after the system activation
-#   completes.  On the first apply the machine key must already be a
-#   .sops.yaml recipient before sops-nix
-#   attempts to decrypt secrets.  The SSH host public key is created by
-#   the OS at install time and is available before any Nix activation.
-#
-# Prerequisites:
-#   - /etc/ssh/ssh_host_ed25519_key.pub must exist (OS-generated)
-#   - The primary GPG key must be in the keyring so sops updatekeys can
-#     re-encrypt data keys for all recipients including the new machine
-#   - ssh-to-age and sops must be on PATH (provided by mkApplyApp runtimeInputs)
-#   - .sops.yaml must contain the marker comment on its own line:
-#       "    # -- machine keys end; personal SSH backup key below --"
 _rak_host_pub="/etc/ssh/ssh_host_ed25519_key.pub"
 _rak_sops_yaml="$_rak_repo_root/.sops.yaml"
 
@@ -92,20 +84,16 @@ sops:   gpg --import <backup-key-file>"
   fi
 done
 
-# Rewrap wallpaper blobs (enumerated at runtime; count is unknown at script
-# parse time).  Read from a temp-file list rather than a pipe so that a
-# `sops updatekeys` failure exits the outer script via set -eu; exit 1
-# inside a pipe subshell would be silently swallowed.
+# WHY a temp-file list: the wallpaper set is only known at runtime, and a
+# `sops updatekeys` failure inside a pipe subshell would be swallowed by set -eu.
 if [ -d "$_rak_repo_root/src/users" ]; then
   _rak_wallpaper_list="$(mktemp)"
   find "$_rak_repo_root/src/users" -path '*/wallpapers/encrypted/*.sops' -type f \
     >"$_rak_wallpaper_list"
   while IFS= read -r _rak_wallpaper; do
     if ! sops updatekeys --yes "$_rak_wallpaper"; then
-      # Temp file is not explicitly removed here because exit 1 terminates
-      # the script immediately; the OS reclaims /tmp files on reboot.
-      # Removing it inside the read-loop body would trigger SC2094 (the
-      # same variable appears in both `rm` and `done < file`).
+      # WHY no rm: exit 1 ends the script and the OS reclaims /tmp on reboot. Removing
+      # it in the read-loop body would trip SC2094.
       die -l sops "sops updatekeys failed for $_rak_wallpaper.
 sops: Ensure the primary GPG key is imported first:
 sops:   gpg --import <backup-key-file>"

@@ -1,15 +1,12 @@
 #!/usr/bin/env bash
-# Converge Discord's system-tray icon visibility by editing its settings.json.
-# Discord rewrites settings.json on launch, so this must run while Discord is
-# closed (activation runs at login/apply, before the app opens — acceptable).
+# Set the boolean "systemTray" key in Discord's settings.json.
+#
+# WHY this must run while Discord is closed: Discord rewrites settings.json on
+# launch and would drop the change. Activation runs before the app opens.
 #
 # Usage: discord-tray.sh <visible> [appKey]
-#   visible: true|false (case-insensitive; also accepts 1/0/visible/hidden)
-#   appKey:  "Discord" (stable) or "Discord Canary" (canary); defaults to stable.
-#
-# Edits ~/.config/discord/settings.json (stable) or
-# ~/.config/discordcanary/settings.json (canary), setting the boolean
-# "systemTray" key. Idempotent.
+#   visible: true|false, also 1/0/visible/hidden/show/hide
+#   appKey:  Discord (stable) or a Canary variant; defaults to stable.
 
 set -euo pipefail
 

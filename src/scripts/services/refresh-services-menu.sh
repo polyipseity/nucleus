@@ -1,15 +1,9 @@
 #!/usr/bin/env bash
-# ---- refreshServicesMenu ---------------------------------------------------
-# Refresh LaunchServices and pasteboard daemon caches so newly deployed
-# Automator workflows and App bundles appear in the Services menu and
-# Quick Actions immediately, then force pbs to rescan those directories so
-# pruned and renamed bundles stop being served from its caches.
+# Refresh LaunchServices and pasteboard daemon caches so new Automator
+# workflows and App bundles appear in the Services menu immediately, then force
+# pbs to rescan so pruned bundles stop being served from its caches.
 #
 # Args: PBS_BIN LAUNCHCTL_BIN SUDO_BIN
-#
-# Sourced functions: refresh_services_menu, rescan_pbs_services
-# (macos-launch-services.sh), _nucleus_resolve_console_user
-# (macos-console-user.sh)
 
 set -euo pipefail
 
@@ -25,8 +19,8 @@ _rsm_pbs_bin="$1"
 _rsm_launchctl_bin="$2"
 _rsm_sudo_bin="$3"
 
-# Daemon caches first: pbs has to re-read pbs.plist, which holds the enabled
-# state the deploy steps just wrote, before the rescan publishes it.
+# pbs must re-read pbs.plist first: it holds the enabled state the deploy steps
+# just wrote, and the rescan below publishes it.
 refresh_services_menu
 
 # WHY: the rescan needs the console user's session. pbs keeps per-user caches,

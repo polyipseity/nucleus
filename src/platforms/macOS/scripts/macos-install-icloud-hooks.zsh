@@ -1,21 +1,8 @@
-# macOS-only iCloud exclusion hooks.
-# WHY: macOS-only: com.apple.fileprovider.ignore#P is a macOS FileProvider
-# xattr with no equivalent on NixOS/Windows.
+# WHY macOS-only: com.apple.fileprovider.ignore#P is a macOS FileProvider xattr
+# with no equivalent on NixOS/Windows.
 #
-# Variables below are substituted via Nix replaceStrings at build time.
-#
-# Trigger paths:
-#   1) chpwd hook: entering directories performs a best-effort recursive
-#      pass under iCloud-managed roots.
-#   2) mkdir wrapper: newly created matching directories are marked
-#      immediately.
-#   3) precmd hook: after each command, checks immediate children of
-#      $PWD (depth 1) for newly created excluded dirs.  This catches
-#      tools like npm install, git clone, pip install that create
-#      directories via syscalls without using mkdir.
-#
-# Existing directories are also covered by the activation-time recursive
-# pass in modules/macos.nix.
+# __UPPERCASE_TOKEN__ variables below are substituted via Nix replaceStrings at
+# build time.
 
 typeset -ga __nucleus_icloud_excluded_names=( __ICLOUD_EXCLUDED_NAMES__ )
 
@@ -77,13 +64,8 @@ __nucleus_mark_icloud_exclusions_under() {
   __nucleus_is_icloud_managed_path "$root_path" || return 0
   [[ "${#__nucleus_icloud_excluded_names[@]}" -gt 0 ]] || return 0
 
-  # Build find predicate with -prune to stop recursion into excluded dirs.
-  # Note: this find-prune excludes directories for performance (avoiding
-  # descent into large dirs). For file-processing scripts, use
-  # deny-list.sh's filter_gitignored instead.
-  # Pattern: ( -name A -prune -o -name B -prune -o ... -o -type d )
-  # This avoids descending into node_modules, .venv, etc. during interactive
-  # chpwd hook, which would freeze the terminal for 10+ seconds on large repos.
+  # WHY -prune: descending into node_modules and .venv freezes the interactive
+# chpwd hook for 10+ seconds on a large repo.
   local -a __icloud_find_args
   __icloud_find_args=()
   local __icloud_n=0
@@ -116,10 +98,9 @@ autoload -Uz add-zsh-hook
 add-zsh-hook chpwd __nucleus_check_icloud_exclusions_on_pwd_change
 __nucleus_check_icloud_exclusions_on_pwd_change
 
-# Lightweight precmd check: scans only immediate children of $PWD (-maxdepth 1)
-# so tools that create excluded directories without mkdir (npm install,
-# git clone, pip install, etc.) get marked promptly.  Unlike the chpwd
-# hook, this must be fast — it runs after every command.
+# WHY depth 1: npm install, git clone and pip install create directories
+# through syscalls that bypass the mkdir wrapper, and this runs after every
+# command, so it must stay cheap.
 __nucleus_check_icloud_exclusions_immediate() {
   [[ "${#__nucleus_icloud_excluded_names[@]}" -gt 0 ]] || return 0
   local __candidate
@@ -130,17 +111,14 @@ __nucleus_check_icloud_exclusions_immediate() {
 
 add-zsh-hook precmd __nucleus_check_icloud_exclusions_immediate
 
-# Override mkdir to check for excluded directories after creation.
 mkdir() {
   /bin/mkdir "$@"
   local _mkdir_status=$?
 
-  # Only process if mkdir succeeded and we're not in dry-run mode.
   if [[ $_mkdir_status -eq 0 ]]; then
     for arg in "$@"; do
       # Skip option flags (starting with -)
       if [[ ! "$arg" =~ ^- ]]; then
-        # Check if the path exists (was created successfully)
         if [[ -d "$arg" ]]; then
           __nucleus_check_icloud_exclusion "$arg"
         fi

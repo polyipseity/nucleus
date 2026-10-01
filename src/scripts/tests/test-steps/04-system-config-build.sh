@@ -5,10 +5,8 @@
 register_step "system-config-build" "System config build" run_system_config_build any any sops-machine-key
 
 # _sops_secrets_available <host> <repo-root>
-# Returns 0 when every sops secret referenced by src/hosts/<host>/sops.nix is
-# present in its encrypted sopsFile (decryptable with the machine age key),
-# 1 otherwise. Parses the sops.nix for `sops.secrets."<name>"` blocks and the
-# `sopsFile = <path>` each block points at (relative to the sops.nix dir).
+# 0 when every secret in src/hosts/<host>/sops.nix is decryptable from its
+# sopsFile with the machine age key, 1 otherwise.
 _sops_secrets_available() {
   local _host="$1" _repo_root="$2"
   local _sops_nix="$_repo_root/src/hosts/$_host/sops.nix"
@@ -17,8 +15,7 @@ _sops_secrets_available() {
   local _sops_dir
   _sops_dir="$(CDPATH='' cd -- "$(dirname -- "$_sops_nix")" && pwd)"
 
-  # Collect (secret-name, sopsFile) pairs. sopsFile paths are relative to the
-  # sops.nix directory.
+  # sopsFile paths are relative to the sops.nix directory.
   local _name="" _file="" _rel="" _abs="" _ok=0 _missing=()
   while IFS= read -r _line; do
     if [[ "$_line" == *sops.secrets.* ]] && [[ "$_line" == *\"* ]]; then
@@ -63,12 +60,9 @@ run_system_config_build() {
   _host="$(resolve_nucleus_host)"
   export NUCLEUS_REPO_ROOT="$_repo_root"
 
-  # The runner gates this step on the sops machine age key (requires
-  # sops-machine-key), so reaching here means the key exists. The host's sops.nix
-  # references secrets that must exist (encrypted) in their sopsFile: a key wired
-  # into sops.nix but missing from the encrypted material is a real repo
-  # inconsistency the build cannot recover from, so fail hard with the specific
-  # diagnostic instead of letting a generic eval error surface.
+  # The runner gates this step on sops-machine-key, so the key exists here. A
+  # secret wired into sops.nix but absent from the encrypted material is a repo
+  # inconsistency the build cannot recover from, so fail with the diagnostic.
   if ! _sops_secrets_available "$_host" "$_repo_root"; then
     error "sops secret material unavailable for host $_host"
     return 1
@@ -91,10 +85,9 @@ run_system_config_build() {
     ;;
   esac
 
-  # WHY: the system build contends on the SQLite eval cache and flakehub
-  # fetch lock when it overlaps with the other nix steps (01/03); serialize it.
-  # min-free = 0 disables Nix auto-GC so a full Data volume can't delete
-  # flake-input source trees mid-eval (see merge_nix_config in lib.sh).
+  # WHY: this build contends on the SQLite eval cache and the flakehub fetch lock
+  # with the other nix steps, so it is serialized. min-free = 0 disables Nix
+  # auto-GC so a full Data volume cannot delete flake-input trees mid-eval.
   _nix_cfg="$(merge_nix_config)"
   if [ "$quiet_mode" = true ]; then
     NIX_CONFIG="$_nix_cfg" nucleus_nix_locked nix build --no-link --keep-going --print-out-paths "./src#$_attr" >/dev/null || _exit_code=$?

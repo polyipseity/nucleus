@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
-# RimSort settings merge: merges managed instance keys (paths, Steam
-# integration flags) into settings.json while preserving app-owned
-# theme, sorting, and window-state settings.
+# Merge managed instance keys (paths, Steam integration flags) into
+# RimSort's settings.json, preserving app-owned theme, sorting and window state.
 #
-# Method 3 (merge) -- RimSort owns settings.json and overwrites it on
-# every save. A symlink would let app-owned writes reach the repo file.
-# Merge injects managed keys into instances.Default while preserving
-# all other settings.
+# WHY merge and not a symlink (method 3): RimSort owns the file and rewrites it
+# on every save, so a symlink would let app-owned writes reach the repo.
 
 set -euo pipefail
 
@@ -37,10 +34,8 @@ esac
 mkdir -p "$(dirname "$_rimsort_settings_path")"
 _rimsort_merge_json "$_mrs_python3_bin" "$_rimsort_settings_path" "$_mrs_settings_json"
 
-# Ensure the Steam Workshop directory exists so RimSort can validate the
-# configured workshop_folder path.  Steam only creates this directory after
-# the first Workshop mod download; without it, RimSort disables Steam client
-# integration on startup.
+# WHY: Steam creates the workshop folder only after the first mod download, and
+# without it RimSort disables Steam integration on startup.
 _workshop_folder="$($_mrs_python3_bin -c "
 import json, os, sys
 with open(sys.argv[1]) as f:
@@ -51,10 +46,8 @@ print(os.path.expanduser(path))
 if [ -n "$_workshop_folder" ]; then
   mkdir -p "$_workshop_folder"
 
-  # Ensure the Steam Workshop ACF metadata file exists so RimSort
-  # validates the workshop folder.  Steam generates this file on first
-  # game launch or workshop download; without it, RimSort disables
-  # Steam client integration.
+  # WHY the ACF: Steam writes it on first game launch or workshop download, and
+  # RimSort validates the workshop folder against it.
   _acf_file="$($_mrs_python3_bin -c "
 import json, os, sys
 from pathlib import Path

@@ -11,10 +11,8 @@ run_nix_tests() {
   local _exit_code=0
   local _tmp_failed
 
-  # WHY: <nixpkgs> must be the flake-locked input, not this machine's channel —
-  # three tests/ files import <nixpkgs>, and validating them against a drifting
-  # channel is both non-reproducible and broken where the channel is
-  # unreachable. The eval phases below inherit the exported NIX_PATH.
+  # WHY pin <nixpkgs> to the flake-locked input: validating against this
+  # machine's channel is non-reproducible and breaks where it is unreachable.
   if ! nucleus_pin_nixpkgs "$_repo_root"; then
     return 1
   fi
@@ -39,12 +37,8 @@ run_nix_tests() {
     return "$_exit_code"
   fi
 
-  # WHY: nix-instantiate evals contend on the shared SQLite eval cache and
-  # ~/.cache/nix/flake-registry.json when test steps 1/4/5 run concurrently;
-  # hold the nix lock for the whole eval phase so cross-step nix invocations
-  # serialize. Evals run serially (xargs -P 1) because the shared eval cache
-  # wants a single writer — <nixpkgs> is pinned by nucleus_pin_nixpkgs above,
-  # so these evals no longer race on flake-registry updates for it.
+  # WHY the lock and serial evals: test steps 1/4/5 contend on the shared SQLite
+  # eval cache and flake-registry.json, and that cache wants a single writer.
   nucleus_nix_locked _run_eval_phase "$_tmp_failed"
 
   if [ -s "$_tmp_failed" ]; then
@@ -60,9 +54,8 @@ run_nix_tests() {
   return "$_exit_code"
 }
 
-# Runs the serial nix-instantiate phase under the nix lock (see
-# nucleus_nix_locked in step-runner.sh). Failures are recorded in the temp
-# file passed as $1; the lock wrapper's exit status is not a test verdict.
+# Serial nix-instantiate phase under the nix lock. Failures go to the file
+# passed as $1; the lock wrapper's exit status is not a test verdict.
 _run_eval_phase() {
   local _tmp_failed="$1"
 

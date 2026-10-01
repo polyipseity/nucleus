@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# Cloud drive directory structure setup: mount points (a real directory on every
-# host, macOS included) and replica directories.  A mount that the previous
-# attempt left blocked is reported with its recorded remedy, so a missing drive
-# is never silent.
+# Create the mount point and replica directories. A mount blocked by the previous
+# attempt is reported with its recorded remedy, so a missing drive is never silent.
 set -eu
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -11,21 +9,17 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../lib/svc-instances.sh
 . "$SCRIPT_DIR/../lib/svc-instances.sh"
 
-# Ensure a managed real directory exists at PATH.
-# Usage: _cd_ensure_real_directory "$HOME/path/to/mountpoint" "mount display name" "local.cloud-mount.gdrive"
-# SERVICE_LABEL names the supervisor unit that owns a mount at this path (the
-# macOS LaunchAgent label, or the systemd unit base name); it is quoted in the
-# remedy when the path is a symlink, and may be empty.
+# _cd_ensure_real_directory PATH DISPLAY_NAME SERVICE_LABEL
+# WHY SERVICE_LABEL: it names the supervisor unit owning a mount there (macOS
+# LaunchAgent label, systemd unit base name) so the remedy can quote it. May be empty.
 _cd_ensure_real_directory() {
   _cd_path="$1"
   _cd_name="$2"
   _cd_service_label="${3-}"
 
   if [ -L "$_cd_path" ]; then
-    # WHY: a symlink here is either the leftover of the retired /Volumes mount
-    #   layout — whose mount point never came into existence, so the link dangles
-    #   — or a user-placed link.  The link carries no data, but a mount attached
-    #   through it does, so the agent that owns it is named before the removal.
+    # WHY: a symlink here is either the leftover of the retired /Volumes layout,
+    #   whose mount point never existed so the link dangles, or a user-placed link.
     #   The literal $(id -u) is for the operator to paste, not to expand.
     _cd_remedy="fix manually and re-apply"
     if [ -n "$_cd_service_label" ]; then
@@ -38,9 +32,8 @@ _cd_ensure_real_directory() {
     printf '%s\n' "cloud-drives (${_cd_name}): error: $_cd_path exists and is not a directory; fix manually and re-apply" >&2
     exit 1
   fi
-  # WHY: a mounted cloud drive makes this path look occupied, and re-applying must
-  #   stay idempotent, so occupancy is not rejected here — rclone owns that check
-  #   and refuses a non-empty mount point with its own message.
+  # WHY not an error: only a provider repair brings the volume back, and the mount
+  #   records that itself once it attaches. The marker is boot-scoped.
   mkdir -p "$_cd_path"
 }
 
@@ -48,22 +41,18 @@ _vsd_jq_bin="$1"
 _vsd_mounts_json="$2"
 _vsd_replicas_json="$3"
 
-# Create the top-level clouds/ directory tree.
 mkdir -p "$HOME/clouds"
 
-# Process mounts: the mount point is a real directory on every host, macOS
-# included — rclone stats the mount point before mounting, so macFUSE never gets
-# the chance to create one under /Volumes.
+# WHY a real directory on macOS too: rclone stats the mount point before
+# mounting, so macFUSE never creates one under /Volumes.
 while IFS= read -r _vsd_entry; do
   [ -z "$_vsd_entry" ] && continue
   _vsd_local_path="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.localPath')"
   _vsd_service_label="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.serviceLabel // empty')"
   _cd_ensure_real_directory "$HOME/$_vsd_local_path" "$_vsd_local_path" "$_vsd_service_label"
 
-  # WHY a warning, not an error: only a provider repair brings the volume back,
-  #   and the mount records that itself once it attaches — failing the apply here
-  #   would block the convergence of everything else for a state it cannot fix.
-  #   The marker is boot-scoped, so a reboot (the standing remedy) clears it.
+  # WHY a warning, not an error: failing the apply here would block convergence
+  #   of everything else for a state this script cannot fix.
   if [ -n "$_vsd_service_label" ]; then
     if svc_health_is_blocked "$_vsd_service_label"; then
       _vsd_class=$(svc_health_get "$_vsd_service_label" "class" 2>/dev/null || echo "unknown")
@@ -73,7 +62,6 @@ while IFS= read -r _vsd_entry; do
   fi
 done < <(printf '%s\n' "$_vsd_mounts_json" | "$_vsd_jq_bin" -r -c '.[]')
 
-# Process replicas: ensure each replica directory or symlink exists.
 while IFS= read -r _vsd_entry; do
   [ -z "$_vsd_entry" ] && continue
   _vsd_local_path="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.localPath')"
@@ -81,10 +69,9 @@ while IFS= read -r _vsd_entry; do
   _vsd_is_special_icloud="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.isSpecialICloud')"
 
   if [ "$_vsd_is_special_icloud" = "true" ]; then
-    # macOS-only exception: iCloudReplica must point to native CloudDocs
-    # storage so we do not duplicate Apple's iCloud integration with a
-    # second managed tree.  Only reachable on Darwin (the isSpecialICloud
-    # flag is set at Nix eval time based on pkgs.stdenv.hostPlatform.isDarwin).
+    # WHY: iCloudReplica must point at native CloudDocs storage so we do not run a
+    #   second managed tree beside Apple's own iCloud integration. The
+    #   isSpecialICloud flag is set at Nix eval time on Darwin only.
     _vsd_icloud_native_target="$HOME/Library/Mobile Documents"
     _vsd_icloud_replica_path="$HOME/$_vsd_local_path"
 

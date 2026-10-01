@@ -35,8 +35,8 @@ run_app_registry() {
   local _app_json="src/modules/apps.json"
   local _app_schema="src/modules/apps.schema.json"
 
-  # The valid kinds are read from the schema enum. A second hardcoded list is
-  # what let step 15 reject a kind the schema already accepted.
+  # WHY read the enum from the schema: a second hardcoded list is what let step
+  # 15 reject a kind the schema already accepted.
   local -a _valid_kinds=()
   local _valid_kind
   while IFS= read -r _valid_kind; do
@@ -53,7 +53,7 @@ run_app_registry() {
     error "apps.json not found at $_app_json"
     _app_errors=$((_app_errors + 1))
   else
-    # Every app must declare all three hosts or use omitted + justification.
+    # Every app declares all three hosts or uses omitted + justification.
     while IFS=$'\t' read -r _name _host _type _has_justification; do
       if [ "$_type" = "omitted" ] && [ "$_has_justification" != "true" ]; then
         error "apps.json: '$_name' host '$_host' is omitted but missing justification"
@@ -70,14 +70,13 @@ run_app_registry() {
         (if .value.type == "omitted" then (.value.justification | type == "string" and length > 0) else true end | tostring)
       ] | @tsv' "$_app_json")
 
-    # autostartEnabled must be boolean, and kind must be in the schema enum;
-    # a platform-prefixed kind must match its host platform.
+    # autostartEnabled must be boolean and kind must be in the schema enum; a
+    # platform-prefixed kind must match its host platform.
     while IFS=$'\t' read -r _name _host _type _platform _enabled _kind _has_approval; do
-      # Omitted hosts carry no runtime fields; the first loop already validated
-      # their justification. Skip boolean/kind checks for them.
+      # Omitted hosts carry no runtime fields; the first loop checked their
+      # justification.
       [ "$_type" = "omitted" ] && continue
-      # autostartEnabled is required for every kind we launch and forbidden for
-      # 'manual' — nothing is launched, so a toggle there would be a lie.
+      # WHY: nothing launches under a manual kind, so a toggle there would lie.
       if [ "$_kind" = "manual" ]; then
         if [ "$_enabled" != "missing" ]; then
           error "apps.json: '$_name' host '$_host' kind 'manual' must not set autostartEnabled"
@@ -97,9 +96,8 @@ run_app_registry() {
         _app_errors=$((_app_errors + 1))
       fi
 
-      # A platform-prefixed kind belongs to that platform alone. Deriving the
-      # platform from the prefix is what keeps the naming honest: a macOS-only
-      # mechanism can no longer be declared on Linux or Windows.
+      # WHY derive the platform from the prefix: it stops a macOS-only mechanism
+      # being declared on Linux or Windows.
       local _kind_platform
       _kind_platform=$(_platform_for_kind "$_kind")
       if [ -n "$_kind_platform" ] && [ "$_kind_platform" != "$_platform" ]; then
@@ -107,8 +105,8 @@ run_app_registry() {
         _app_errors=$((_app_errors + 1))
       fi
 
-      # Kinds no script can converge still need approvalInstructions: that text
-      # is the only guidance the report prints.
+      # WHY approvalInstructions: no script can converge these kinds, so that
+      # text is the only guidance the report prints.
       case "$_kind" in
       macos-system-extension | manual)
         if [ "$_has_approval" != "true" ]; then
@@ -131,8 +129,7 @@ run_app_registry() {
         (if (.value | has("approvalInstructions")) and (.value.approvalInstructions | type == "string") and (.value.approvalInstructions | length > 0) then "true" else "false" end)
       ] | @tsv' "$_app_json")
 
-    # The status-icon kinds follow the same two rules as the auto-start kinds:
-    # they must come from the schema enum, and a platform prefix must match.
+    # Status-icon kinds follow the same two rules: schema enum, matching prefix.
     while IFS=$'\t' read -r _name _host _platform _icon_kind; do
       if ! _kind_in_enum "$_icon_kind" _valid_icon_kinds; then
         error "apps.json: '$_name' host '$_host' has invalid statusIcon kind '$_icon_kind'"

@@ -1,20 +1,17 @@
 #!/usr/bin/env bash
-# Converge GUI app auto-start to the apps.json registry on NixOS.
-# WHY: this replaces the inline nixos-disable-steam-autostart activation script
-# with a single registry-driven mechanism we fully own.  Every app declares its
-# desired state in apps.json; we disable the app's native auto-start setting
-# (disableNative) and then enable/disable exactly one uniform mechanism (an XDG
-# autostart .desktop we write/remove) so no app-owned startup path remains
-# active.  Runs as root during nixos-rebuild switch and converges every real
-# user's ~/.config/autostart via the CLI's per-user dispatch.
+# Converge GUI app auto-start to the apps.json registry.
+#
+# WHY the registry CLI: it owns the one uniform mechanism per app (an XDG
+# autostart .desktop) after the native auto-start is disabled, so no app-owned
+# startup path stays active. The CLI dispatches per user, covering every real
+# user's ~/.config/autostart.
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../../../scripts/lib/lib.sh
 . "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
 
-# Resolve the repo checkout root so we can read apps.json regardless of how
-# this script is invoked (Nix activation bundle vs. direct run). derive_repo_root()
-# resolves a live NUCLEUS_REPO_ROOT and rejects Nix store snapshots.
+# WHY resolve the root here: apps.json must be readable whether this runs from
+# the Nix activation bundle or directly, and derive_repo_root rejects store snapshots.
 REPO_ROOT="$(derive_repo_root)" || die -l autostart "cannot resolve the nucleus repo root; run nucleus-apply before this activation step."
 export NUCLEUS_REPO_ROOT="$REPO_ROOT"
 

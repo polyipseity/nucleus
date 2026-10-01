@@ -1,19 +1,11 @@
 #!/usr/bin/env bash
-# SteamCMD provisioning: creates the directory structure and binary at
-# RimSort's expected steamcmd_install_path so the app does not need to
-# download SteamCMD at runtime.
+# Provision SteamCMD at RimSort's expected steamcmd_install_path, so the app
+# does not download it at runtime. RimSort checks for the executable under
+# <steamcmd_install_path>/steamcmd/<exe> and does not use PATH.
 #
-# RimSort checks for the executable at <steamcmd_install_path>/steamcmd/<exe>
-# but does not use PATH — the file must exist at the expected path.
-#
-# On macOS: symlinks <prefix>/steamcmd to the Nix store's share/steamcmd
-# directory containing the native macOS SteamCMD binary.
-#
-# On NixOS: creates <prefix>/steamcmd/ as a directory with a symlink
-# steamcmd.sh → Nix store's steamcmd wrapper which invokes steam-run
-# (FHS environment) internally.
-#
-# Called by home-manager activation provision-steamcmd.
+# macOS: symlink <prefix>/steamcmd to the store's share/steamcmd holding the
+# native binary. NixOS: a directory with steamcmd.sh symlinked to the store
+# wrapper, which invokes steam-run (FHS) internally.
 
 set -euo pipefail
 
@@ -26,12 +18,11 @@ _ps_rimsort_settings_json="$3"
 # Resolve steamcmd_install_path from the merged RimSort settings JSON.
 _ps_steamcmd_prefix="$("$_ps_python3_bin" "$SCRIPT_DIR/provision-steamcmd.py" "$_ps_rimsort_settings_json")"
 
-# Nothing to do if the path is empty (Windows host — handled by PowerShell).
+# Nothing to do when empty: the Windows host handles this through PowerShell.
 if [ -z "$_ps_steamcmd_prefix" ]; then
   exit 0
 fi
 
-# Expand ~ to $HOME.
 _ps_steamcmd_prefix="${_ps_steamcmd_prefix#\~}"
 _ps_steamcmd_prefix="${HOME}${_ps_steamcmd_prefix}"
 
@@ -39,8 +30,6 @@ _ps_steamcmd_dir="$_ps_steamcmd_prefix/steamcmd"
 
 case "$(uname -s)" in
 Darwin)
-  # Symlink the entire steamcmd directory to the Nix store's share/steamcmd.
-  # The macOS native binary needs no FHS wrapper.
   _ps_store_bins="$_ps_steamcmd_nix_path/share/steamcmd"
   if [ -L "$_ps_steamcmd_dir" ]; then
     rm -f "$_ps_steamcmd_dir"
@@ -50,9 +39,7 @@ Darwin)
   ln -s "$_ps_store_bins" "$_ps_steamcmd_dir"
   ;;
 Linux)
-  # The Nix store's steamcmd wrapper (bin/steamcmd) handles steam-run
-  # and file deployment internally.  Symlink steamcmd.sh to it so
-  # RimSort finds the executable at its expected path.
+  # WHY symlink steamcmd.sh: RimSort looks for the executable at that exact name.
   mkdir -p "$_ps_steamcmd_dir"
   ln -sf "$_ps_steamcmd_nix_path/bin/steamcmd" "$_ps_steamcmd_dir/steamcmd.sh"
   ;;
