@@ -11,81 +11,64 @@ Proceed automatically with best-effort defaults and context.
 
 ## Workflow
 
-1. **Read staged changes**
-   Run this exact command:
+1. **Read the staged changes** with this exact command:
 
    ```shell
    git diff --cached --name-status --no-color && git --no-pager diff --cached --staged --patch --no-color
    ```
 
-   If not executed, produce a best-effort commit message from context and stop.
+   If it has not run, write a best-effort message from context and stop.
 
-2. **Compose commit message**
-   Inspect Command 1 output and repository conventions (`CONTRIBUTING.md`, `.agents/`, `package.json`, `commitlint`, `prek.toml`, `CHANGELOG.md`, etc.). Build a commit message with:
-   - Short subject (~50 chars)
-   - Optional body (each line ≤72 chars; bullets allowed)
-   - Footer (`BREAKING CHANGE` / `Refs` / `Ticket`), including `${input:extra}` when provided
+2. **Compose the message** from that output and the repository's own conventions (`.agents/`, `CONTRIBUTING.md`, `package.json`, commitlint config, `prek.toml`): a short subject around 50 chars, an optional body with each line 72 chars or fewer, and a footer (`BREAKING CHANGE`, `Refs`, `Ticket`) that includes `${input:extra}` when given. Prefer whatever tooling enforces; fall back to Conventional Commits. If commitlint rejects the message, rewrap it and retry with a fresh `git commit`.
 
-   Prefer tooling-enforced rules; Conventional Commits when unclear. If the commit is rejected by commitlint, rewrap and retry with a fresh `git commit`. NEVER use `git commit --amend` — the commit was not created, so `--amend` would modify whatever HEAD currently points to (a pre-existing commit), destroying history. After composing, proceed to step 3.
+   Never use `git commit --amend`. A rejected commit was never created, so `--amend` would rewrite whatever HEAD points at and destroy a pre-existing commit.
 
-3. **Validate with commitlint**
-   Before running `git commit`, validate the message with commitlint:
-   - **Detect project setup.** Check for a commitlint config (`.commitlintrc.*`, `commitlint.config.*`) in the project root. If not found, check for a documented conflicting convention (CONTRIBUTING.md / README.md specifies `gitmoji` or custom schema). Conflicting convention + no commitlint config → skip validation (project opts out).
-   - **Run validation.** From the project root:
-     - **Bash/zsh:** `echo "<full message>" | bun x commitlint 2>&1`
-     - **PowerShell:** `"<full message>" | bun x commitlint 2>&1`
-     - **If `bun x commitlint` fails to resolve the config's `extends` deps** (e.g. `Cannot find package 'conventional-changelog-conventionalcommits'` from `noop.js`), install into a temp dir and run from there — never install in the project repo:
-
-       ```bash
-       tmpdir=$(mktemp -d)
-       trap 'rm -rf "$tmpdir"' EXIT
-       cp package.json bun.lock "$tmpdir"/
-       ln -s "$PWD/.commitlintrc.mjs" "$tmpdir/.commitlintrc.mjs"
-       (cd "$tmpdir" && bun install --frozen-lockfile --no-summary)
-       echo "<full message>" | (cd "$tmpdir" && bun run commitlint)
-       ```
-
-       Copy whichever lockfile exists (`bun.lock`, `package-lock.json`, `yarn.lock`). If no manifest, replace the `cp` line with a minimal `package.json` (devDependencies `@commitlint/cli` + `@commitlint/config-conventional`). The commitlint config must live inside the temp dir (`extends` resolves relative to the config file's location, not the cwd). Use `bun run commitlint` — no `node` binary assumed. The `trap` cleans up; never create/modify `package.json`/`bun.lock`/`node_modules` in the project repo.
-     - Structural conventional-commit check (type-prefix, format) is the LAST resort: only if `bun` is unavailable or the temp-dir install cannot complete.
-   - **On failure.** Fix the message and re-run if no conflicting convention is documented. Do not proceed to `git commit` until validation passes. If commitlint fails with a tool error (not a lint error), report and stop. If the failure is `Cannot find package 'conventional-changelog-conventionalcommits'` (config `extends` unresolvable by `bun x`), use the temp-dir install fallback — `bun x commitlint --default-config` is not a workaround.
-   - **On success.** Go to step 4.
-
-4. **Create the commit**
-   If `${input:commitNow}` is `no`, skip and only present the message.
-   Otherwise, run the appropriate command:
-   - **PowerShell (Windows):**
-
-     ```powershell
-     (@'
-     <full commit message>
-     '@ | git commit --file=-) ; git rev-parse HEAD
-     ```
-
-     Use single-quoted here-strings (`@'...'@`) to avoid expansion.
-
-   - **Bash/zsh (Linux/macOS):**
+3. **Validate with commitlint** before committing, unless the project documents a conflicting convention (gitmoji, custom schema) and ships no commitlint config. Run `echo "<full message>" | bun x commitlint 2>&1` in bash/zsh or `"<full message>" | bun x commitlint 2>&1` in PowerShell. When `bun x` cannot resolve the config's `extends` deps (`Cannot find package 'conventional-changelog-conventionalcommits'`), install into a temp dir and run from there; `--default-config` is not a workaround:
 
      ```bash
-     (git commit --file - <<'MSG'
-     <full commit message>
-     MSG
-     ) && git rev-parse HEAD
+     tmpdir=$(mktemp -d)
+     trap 'rm -rf "$tmpdir"' EXIT
+     cp package.json bun.lock "$tmpdir"/
+     ln -s "$PWD/.commitlintrc.mjs" "$tmpdir/.commitlintrc.mjs"
+     (cd "$tmpdir" && bun install --frozen-lockfile --no-summary)
+     echo "<full message>" | (cd "$tmpdir" && bun run commitlint)
      ```
 
-     Use `<<'MSG'` to prevent shell expansion. If `MSG` appears in the message, choose another delimiter.
+     Copy whichever lockfile exists (`bun.lock`, `package-lock.json`, `yarn.lock`); with no manifest, write a minimal `package.json` carrying `@commitlint/cli` and `@commitlint/config-conventional` instead of the `cp` line. The commitlint config must live inside the temp dir, because `extends` resolves relative to the config file, not the cwd. Use `bun run commitlint`, since no `node` binary is assumed. Never create or modify `package.json`, `bun.lock`, or `node_modules` in the project.
 
-   If heredoc quoting fails, retry up to 3 times with a different delimiter. For other failures, report the error and do not modify the index.
+   A structural check of the `type(scope): subject` shape is the last resort, for when bun is unavailable or the temp install cannot complete. On a lint failure, fix the message and re-run, and do not commit until it passes; on a tool error, report it and stop.
 
-5. **Verify commit** — Run `git rev-parse HEAD` and `git log -1 --format=%s`. Confirm the hash is new and the message matches. If they show the previous commit's message, the commit was not created — retry with a fresh `git commit` (not `--amend`).
+4. **Create the commit.** If `${input:commitNow}` is `no`, present the message and stop. Otherwise:
 
-6. **Output** — Staged files, detected convention, commit message, and result (SHA or skip reason).
+   PowerShell (Windows), with a single-quoted here-string so nothing expands:
+
+   ```powershell
+   (@'
+   <full commit message>
+   '@ | git commit --file=-) ; git rev-parse HEAD
+   ```
+
+   Bash/zsh (Linux/macOS), with `<<'MSG'` to prevent shell expansion; pick another delimiter if `MSG` appears in the message:
+
+   ```bash
+   (git commit --file - <<'MSG'
+   <full commit message>
+   MSG
+   ) && git rev-parse HEAD
+   ```
+
+   Retry a failed heredoc quoting up to 3 times with a different delimiter. For any other failure, report the error and leave the index alone.
+
+5. **Verify.** Run `git rev-parse HEAD` and `git log -1 --format=%s`. The hash must be new and the message must match. Seeing the previous commit's message means nothing was created: retry with a fresh `git commit`, never `--amend`.
+
+6. **Report** the staged files, the convention detected, the message, and the result (SHA or skip reason).
 
 ## Rules
 
-- Only run the two approved shell commands. Do not change the index (`git add`, `git reset`, etc.).
-- Never run `bun install` or any package install to enable commitlint IN THE PROJECT REPO. If `bun x commitlint` fails to resolve config deps, install into a temp dir (`mktemp -d`) and run from there, then clean up. Never create/modify `package.json`/`bun.lock`/`node_modules` in the project. If such artifacts were accidentally created in a repo that must not have them, delete them before finishing; never commit them.
+- Run only the two approved shell commands. Do not touch the index: no `git add`, no `git reset`.
+- Never run `bun install` or any install to enable commitlint inside the project repo. Use a temp dir (`mktemp -d`) and clean it up. If artifacts such as `node_modules/`, `package.json`, or a lockfile were created in a repo that must not have them, delete them before finishing and never commit them.
 
 ## Inputs
 
-- `${input:extra}` — optional footer text
-- `${input:commitNow}` — `no` to skip committing; defaults to commit
+- `${input:extra}`: optional footer text
+- `${input:commitNow}`: `no` to skip committing; defaults to commit
