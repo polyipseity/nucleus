@@ -1,13 +1,8 @@
 # src/modules/hermes-agent.nix — Nucleus wrapper for upstream hermes-agent Home Manager module.
 #
-# Imports the upstream `homeManagerModules.default` HM module directly from
-# the flake-parts output. The upstream module manages `programs.hermes-agent`
-# (CLI) and `services.hermes-agent` (gateway + backend daemons) with
-# platform-native service management (launchd on macOS, systemd on Linux).
-#
-# Per-host overrides (gateway.enable, model defaults) are applied here.
-# API keys: declare secrets in your per-user env-secrets.json with
-# consumers: ["hermes-agent"] and matching entries in your SOPS file.
+# Wraps upstream's `programs.hermes-agent` and `services.hermes-agent`. API keys
+# go in the per-user env-secrets.json with consumers: ["hermes-agent"] plus the
+# matching SOPS entries.
 {
   config,
   lib,
@@ -21,12 +16,11 @@ let
   sopsUtils = import ./lib/sops-utils.nix;
   inherit (sopsUtils) parseSopsKeys;
 
-  # Selection and coverage auditing of the catalog live in their own pure library,
-  # so both rules are fixture-testable without a NixOS evaluation.
+  # Secret selection and coverage auditing live in a pure library so both rules
+  # are fixture-testable without a NixOS evaluation.
   hermesSecretUtils = import ./lib/hermes-secrets.nix;
 
-  # Per-user overlay resolver, so the bridge plugin is selected through the same
-  # user-overridable contract as every other per-user tree.
+  # Resolves the bridge plugin through the shared per-user overlay contract.
   overlay = (import ./lib/users-overlay.nix { inherit lib; }).mkUserOverlay {
     effectiveUsername = config.home.username;
     inherit repoRoot hostName;
@@ -35,20 +29,15 @@ let
   # Shared activation-script bundle (same derivation every activation block uses).
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 
-  # The flake-parts output already binds `inputs` internally —
-  # homeManagerModules.default is a standard HM module {config, lib, ...}:
+  # homeManagerModules.default is a standard HM module {config, lib, ...}.
   upstreamModule = hermes-agent.homeManagerModules.default;
 
-  # Upstream's default package (`full`) is `minimal.override` with a
-  # dependency-group list written inline in its `nix/packages.nix`, and nothing
-  # exports that list. Read it back by evaluating that file with a stubbed
-  # flake-parts context and capturing the argument upstream passes to `override`.
-  #
-  # The host's real `stdenv` is passed through deliberately: upstream's own
-  # `lib.optionals pkgs.stdenv.isLinux [ "matrix" ]` then resolves for the
-  # target platform, so the extracted list already carries or omits `matrix`.
-  # `isLinux` is shadowed to keep upstream's deprecated alias from emitting a
-  # nixpkgs deprecation warning.
+  # Upstream's `full` package is `minimal.override` with the dependency-group list
+  # written inline in `nix/packages.nix` and exported nowhere, so read it back by
+  # evaluating that file with a stubbed flake-parts context. The host's real
+  # stdenv is passed through so upstream's own `isLinux` test resolves for the
+  # target platform and the extracted list already carries `matrix`; isLinux is
+  # shadowed to silence the deprecated alias.
   upstreamFullDependencyGroups =
     ((import "${hermes-agent}/nix/packages.nix" { inherit (hermes-agent) inputs; }).perSystem {
       pkgs = {
@@ -66,11 +55,8 @@ let
       };
     }).packages.default;
 
-  # Resolve the per-user secret catalog through the user registry, so a
-  # src/users/<username>/env-secrets.json override is merged over
-  # src/users/default/env-secrets.json by the same contract as every other domain
-  # (user wins; an array field is replaced wholesale, never unioned). System
-  # secrets are a separate catalog (src/modules/env/env-secrets.json).
+  # Resolved through the user registry, so a per-user env-secrets.json overrides
+  # the default domain by the shared contract. System secrets are separate.
   allUsers = import ./lib/users-registry.nix {
     lib = pkgs.lib;
     repoRoot = ../..;
@@ -79,9 +65,8 @@ let
   userRecord = allUsers.${config.home.username} or { };
   userSecrets = userRecord.envSecrets or { };
 
-  # Filter secrets by consumer and group them by `sopsSource`; `or [ ]` keeps this
-  # total so the assertion below reports a missing domain with its own message
-  # instead of a raw attribute error.
+  # WHY `or [ ]`: keeps this total so the assertion reports a missing domain with
+  # its own message instead of a raw attribute error.
   hermesSecretGroups = hermesSecretUtils.selectHermesSecrets (userSecrets.secrets or [ ]);
   hermesSecrets = hermesSecretGroups.all;
 
@@ -93,9 +78,8 @@ let
     else
       ../secrets/users + "/${config.home.username}.yml";
 
-  # Parse SOPS file keys for eval-time assertion.
-  # A group is checked against its own file only — and only when it has entries —
-  # because an absent file would otherwise be indistinguishable from an empty one.
+  # A group is checked against its own file, and only when it has entries, since
+  # an absent file is otherwise indistinguishable from an empty one.
   hermesSystemSecrets = hermesSecretGroups.system;
   hermesUserSecrets = hermesSecretGroups.user;
 
@@ -120,13 +104,10 @@ let
       userKeys = hermesUserSopsKeys;
     }).all;
 
-  # Upstream builds ~/.hermes/.env by concatenating every `environmentFiles`
-  # entry verbatim, so each entry must be dotenv-formatted (`KEY=value`). The
-  # env-secrets catalog stores each secret as a bare value, so the raw sops paths
-  # cannot be passed through: python-dotenv reads a bare line as a key with an
-  # unknown value and drops it, leaving the gateway unauthenticated without any
-  # error. A sops template renders the catalog's `envVar` names onto the
-  # decrypted values, which is the shape upstream consumes.
+  # WHY a template: upstream concatenates `environmentFiles` verbatim, so each
+  # entry must be dotenv (`KEY=value`). The catalog stores bare values, and
+  # python-dotenv drops a bare line, leaving the gateway unauthenticated with no
+  # error. The template renders envVar names onto the decrypted values.
   hermesEnvTemplate = "hermes-env";
   hermesEnvTemplatePath = config.sops.templates.${hermesEnvTemplate}.path;
 in
@@ -146,8 +127,8 @@ in
       message = "hermes-agent: could not read upstream's `full` dependency-group list — nix/packages.nix layout changed";
     }
     {
-      # The registry tolerates an absent domain file (it yields { }); without this
-      # assertion a moved/renamed default catalog would silently wire no secrets.
+      # The registry tolerates an absent domain file, so without this assertion a
+      # moved or renamed default catalog would silently wire no secrets.
       assertion = userSecrets ? secrets;
       message = "hermes-agent: no merged env-secrets domain for '${config.home.username}' — src/users/default/env-secrets.json is missing or has no 'secrets' key";
     }
@@ -164,19 +145,11 @@ in
     }) hermesSecrets
   );
 
-  # WHY: upstream reads `environmentFiles` during `hermesAgentSetup`, and on macOS
-  # sops-nix materializes those files from an asynchronous LaunchAgent — ordering
-  # the consumer merely `entryAfter [ "sops-nix" ]` does not guarantee they exist
-  # when the read happens, which produced one warning per unreadable path. The
-  # barrier polls for the rendered template, which sops-install-secrets writes
-  # after the secrets and exposes only once it swaps the generation symlink.
-  # `entryBetween` takes the BEFORE list first: this entry runs before
-  # hermesAgentSetup and after setupLaunchAgents (which copies the sops-nix plist
-  # into ~/Library/LaunchAgents before it can be bootstrapped) and sops-nix, whose
-  # activation only bootstraps the LaunchAgent. `setupLaunchAgents` does not exist
-  # on Linux, where the DAG ignores unknown names and sops-nix runs synchronously.
-  # Gated on a non-empty secret list so hosts without hermes secrets declare no
-  # entry.
+  # WHY: macOS sops-nix materializes secrets from an async LaunchAgent, so
+  # entryAfter does not guarantee the file exists at read time. entryBetween
+  # lists BEFORE first: this runs before hermesAgentSetup and after
+  # setupLaunchAgents (which copies the plist in before bootstrap) and sops-nix.
+  # setupLaunchAgents is absent on Linux, where sops-nix runs synchronously.
   home.activation.wait-for-hermes-secrets = lib.mkIf (hermesSecrets != [ ]) (
     lib.hm.dag.entryBetween [ "hermesAgentSetup" ] [ "setupLaunchAgents" "sops-nix" ] ''
       "${activationBundle}/src/scripts/secrets/wait-for-sops-secrets.sh" \
@@ -184,11 +157,9 @@ in
     ''
   );
 
-  # `config.sops.placeholder.<name>` is defined by sops-nix only while
-  # `sops.templates` is non-empty, so the template is also what makes the
-  # placeholder map available. Skipped wholesale (not an empty template) when no
-  # hermes secret is declared — an empty template is a hard error in
-  # sops-install-secrets.
+  # sops-nix defines `config.sops.placeholder` only while templates are
+  # non-empty, so the template is also what makes the map exist. Skipped
+  # wholesale when no secret is declared, since an empty template is fatal.
   sops.templates = lib.optionalAttrs (hermesSecrets != [ ]) {
     ${hermesEnvTemplate} = {
       mode = "0400";
@@ -205,36 +176,22 @@ in
   services.hermes-agent = {
     enable = lib.mkDefault true;
     gateway.enable = if hostName == "MacBook" then lib.mkDefault true else lib.mkDefault false;
-    # Wire the rendered dotenv file into the service environment. An empty secret
-    # value is legitimate (the key is simply not configured yet) and renders as
-    # `KEY=`, which hermes reads as unconfigured; the barrier above waits for the
-    # file to appear and never for non-emptiness.
+    # An empty secret value is legitimate and renders as `KEY=`, which hermes
+    # reads as unconfigured.
     environmentFiles = lib.mkIf (hermesSecrets != [ ]) [ hermesEnvTemplatePath ];
 
-    # Declarative plugin enablement. Hermes gates every user-installed plugin on
-    # `plugins.enabled`, and `settings` is written to config.yaml (deep-merged
-    # with runtime edits) while the command line is installed — independent of
-    # whether this host runs the gateway service. The bridge plugin itself is
-    # symlinked into ~/.hermes/plugins/ by the activation below.
+    # Hermes gates user plugins on `plugins.enabled`, and `settings` is written to
+    # config.yaml, independent of whether the gateway runs here.
     settings.plugins.enabled = [ "harness-bridge" ];
 
-    # WHY: upstream's default package is `full`, which includes the `voice`
-    # group (faster-whisper -> ctranslate2/onnxruntime/torch/transformers).
-    # Those build from source for 30-80 min each on aarch64-darwin with no
-    # binary cache, and upstream's overlay is a pure alias to its own package
-    # so nucleus cannot substitute wheels for them. Subtracting the group from
-    # upstream's own list keeps every other integration while dropping the
-    # expensive ML closure, and follows upstream adding or removing an
-    # integration instead of silently desynchronising this file.
-    # `matrix` needs no special-casing here: it is already present or absent
-    # depending on the platform upstream evaluated for.
+    # WHY drop `voice`: its ML closure builds from source for 30-80 min each on
+    # aarch64-darwin with no binary cache, and upstream's overlay is a pure alias
+    # so nucleus cannot substitute wheels. Removing it from upstream's own list
+    # tracks upstream's integrations instead of freezing a copy here.
     extraDependencyGroups = lib.remove "voice" upstreamFullDependencyGroups;
   };
 
-  # ── Harness bridge plugin ───────────────────────────────────────────
-  # Method-1 writable symlink into the live repo tree, so the plugin can be
-  # edited without a rebuild. `settings.plugins.enabled` above is what makes
-  # Hermes load it.
+  # Writable symlink into the live repo tree, so the plugin edits without a rebuild.
   home.activation.seed-hermes-harness-bridge-plugin = lib.mkIf config.programs.hermes-agent.enable (
     lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
@@ -244,11 +201,8 @@ in
     ''
   );
 
-  # ── Logging: symlink launchd logs into nucleus log directory ───────────
-  # WHY: the upstream launchd plist hardcodes StandardOutPath/StandardErrorPath
-  # to ~/Library/Logs/hermes-agent.log and ~/Library/Logs/hermes-agent.err.log.
-  # There is no upstream option to override these paths. Symlinks from the
-  # nucleus log directory make `nucleus-svc logs hermes-agent` find the files.
+  # WHY: the upstream plist hardcodes the log paths and offers no override, so
+  # symlinks from the nucleus log directory make `nucleus-svc logs` find them.
   home.activation.symlink-hermes-logs = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin (
     lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       _hermes_log_dir="${config.home.homeDirectory}/Library/Application Support/nucleus/logs/hermes-agent"
@@ -263,8 +217,6 @@ in
     ''
   );
 
-  # Playwright browsers are provisioned system-wide via pkgs.playwright-driver.browsers
-  # in core.nix, with PLAYWRIGHT_BROWSERS_PATH set in env-secrets.nix. Windows has
-  # no Nix store, so Sync-HermesConfig provisions its own from the bun.playwright
-  # pin in src/lockfiles/lockfile.json instead.
+  # Playwright browsers come from pkgs.playwright-driver.browsers in core.nix.
+  # Windows has no store, so Sync-HermesConfig uses the bun.playwright pin.
 }

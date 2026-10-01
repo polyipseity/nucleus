@@ -10,9 +10,7 @@
       url = "github:NousResearch/hermes-agent/v2026.8.31";
       inputs.nixpkgs.follows = "nixpkgs";
       # WHY: v2026.8.31 is the first release exposing homeManagerModules.default
-      # (PR #84178, merged 2026-08-19); v2026.7.7 lacked the attribute. The
-      # `voice` dependency group (ML source builds) is excluded in
-      # src/modules/hermes-agent.nix.
+      # (PR #84178). The `voice` dependency group is excluded in src/modules/hermes-agent.nix.
     };
     home-manager = {
       url = "github:nix-community/home-manager";
@@ -94,15 +92,13 @@
       usersMacBook = loadUserRegistry "MacBook";
       usersNixOS = loadUserRegistry "NixOS";
 
-      # Primary user is platform-independent; derive from the macOS registry view.
+      # WHY: the primary user is platform-independent, so any registry view works.
       users = usersMacBook;
 
-      # Filter users by isPrimary=true and extract the attr name.
       username = builtins.head (
         builtins.filter (name: users.${name}.isPrimary) (builtins.attrNames users)
       );
 
-      # home-manager.users attrset: each user gets home.nix and sops-nix.
       mkHomeManagerUsers =
         hostName: userModulesPath: hostUsers:
         builtins.mapAttrs (name: user: {
@@ -120,7 +116,6 @@
           ];
         }) hostUsers;
 
-      # Supported architectures.
       systems = {
         linux = "x86_64-linux";
         mac = "aarch64-darwin";
@@ -222,9 +217,8 @@
               };
             })
             (_final: prev: {
-              # camillagui-backend is a PyInstaller one-file bundle: Python app
-              # data is appended after Mach-O section boundaries, so stripping
-              # removes the appended PKG archive.
+              # WHY no strip: a PyInstaller bundle carries its Python data past the
+              # Mach-O section boundaries, so stripping drops the appended PKG.
               camillagui-backend = prev.stdenv.mkDerivation rec {
                 pname = "camillagui-backend";
                 version = "4.1.0";
@@ -266,7 +260,7 @@
                     ''
                       mkdir -p $out/libexec/camillagui-backend $out/bin
                       cp -r * $out/libexec/camillagui-backend/
-                      # Windows .exe — no symlink needed; the setup script references libexec directly.
+                      # Windows needs no bin symlink: the setup script references libexec directly.
                     ''
                   else
                     ''
@@ -293,9 +287,8 @@
             (
               _final: prev:
               prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
-                # RimSort tarballs now extract to a RimSort.app/ directory (a
-                # complete .app bundle).  Copy it into $out/Applications so
-                # Spotlight and launch services can discover it.
+                # WHY: tarballs extract to a RimSort.app/ bundle, which Spotlight and
+                # launch services only discover under $out/Applications.
                 rimsort = prev.stdenv.mkDerivation rec {
                   pname = "rimsort";
                   version = "1.12.0";
@@ -334,10 +327,8 @@
             (
               _final: prev:
               prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
-                # SteamCMD is a macOS-only derivation; nixpkgs only provides the
-                # Linux variant (x86_64-linux).  Download Valve's macOS tarball
-                # and install the native binary so RimSort can find it at its
-                # expected steamcmd_install_path without downloading it at runtime.
+                # WHY: nixpkgs ships only the Linux variant, and RimSort needs the
+                # native binary at steamcmd_install_path without a runtime download.
                 steamcmd = prev.stdenv.mkDerivation rec {
                   pname = "steamcmd";
                   version = "20180104";
@@ -347,7 +338,7 @@
                     hash = "sha256-jswXyJiOWsrcx45jHEhJD3YVDy36ps+Ne0tnsJe9dTs=";
                   };
 
-                  # The tarball extracts files flat (no top-level directory).
+                  # WHY: the tarball extracts flat, so unpackPhase must not search for a directory.
                   preUnpack = ''
                     mkdir $name
                     cd $name
@@ -374,14 +365,12 @@
               }
             )
             (_final: prev: {
-              # CamillaDSP: cross-platform audio processing engine.
-              # macOS/Linux use the standard build; Windows uses the prebuilt
-              # binary from GitHub releases (not available in WinGet/Scoop).
+              # WHY: Windows takes the GitHub release binary, which is on neither
+              # WinGet nor Scoop.
               camilladsp = prev.stdenv.mkDerivation rec {
                 pname = "camilladsp";
                 version = "4.1.3";
-                # Tarball is flat (single file, no subdirectory) — skip
-                # unpackPhase's directory-finding logic.
+                # WHY: the tarball is a single flat file, so unpackPhase must not search for a directory.
                 sourceRoot = ".";
 
                 src =
@@ -440,15 +429,11 @@
             (
               _final: prev:
               prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
-                # SteamCMD Windows variant — pre-fetched zip from Valve's CDN.
               }
             )
             (_final: prev: {
-              # Darwin fixup runs strip -S over all of $out/lib (including
-              # site-packages). cctools/llvm-strip mis-handles .ico COFF data and
-              # inflates icons to hundreds of MB. Remove once nixpkgs closes
-              # https://github.com/NixOS/nixpkgs/pull/539458 (darwin stdenv
-              # stripExclude for *.ico / *.cur).
+              # WHY: Darwin strip inflates .ico/.cur files to hundreds of MB, so
+              # exclude them until https://github.com/NixOS/nixpkgs/pull/539458 lands.
               litellm = prev.litellm.overridePythonAttrs (_: {
                 stripExclude = [
                   "*.ico"
@@ -459,9 +444,8 @@
             (
               _final: prev:
               let
-                # Pin GnuPG to 2.5.x so PQC/Kyber subkeys can be decrypted.
-                # The nixpkgs 2.4.x patch stack is intentionally dropped here,
-                # because those patches target the 2.4 branch only.
+                # WHY: pinned to 2.5.x so PQC/Kyber subkeys decrypt. The nixpkgs
+                # patch stack is dropped because it targets the 2.4 branch only.
                 gnupg25 = prev.callPackage "${nixpkgs}/pkgs/tools/security/gnupg/24.nix" {
                   enableMinimal = false;
                   guiSupport = prev.stdenv.hostPlatform.isDarwin;
@@ -488,11 +472,9 @@
                 gnupg24 = gnupg25_pinned;
               }
             )
-            # hermes-agent: adds pkgs.hermes-agent via overlay so the upstream
-            # Nix module's default package resolves correctly.
+            # WHY: the upstream Nix module's default package resolves through pkgs.
             hermes-agent.overlays.default
-            # Expose writeNucleusShellApplication via pkgs so all module and
-            # host files can use it without importing from flake.nix.
+            # Exposed via pkgs so modules use it without importing from flake.nix.
             (final: _prev: { writeNucleusShellApplication = writeNucleusShellApplication final; })
           ];
         };
@@ -500,8 +482,7 @@
       pkgsLinux = mkPkgs systems.linux;
       pkgsMac = mkPkgs systems.mac;
 
-      # nixpkgs with rust-overlay, for devShells only (separate from mkPkgs
-      # to avoid affecting the system/hm evaluations).
+      # WHY separate from mkPkgs: rust-overlay must not affect system or HM evals.
       mkDevPkgs =
         system:
         import nixpkgs {
@@ -512,14 +493,12 @@
       pkgsDevLinux = mkDevPkgs systems.linux;
       pkgsDevMac = mkDevPkgs systems.mac;
 
-      # VS Code Marketplace derivations from nix-vscode-extensions, for
-      # editors.nix (extensions not yet packaged in nixpkgs).
+      # WHY nix-vscode-extensions: those extensions are not packaged in nixpkgs.
       vsCodeMarketplaceMac = nix-vscode-extensions.extensions.${systems.mac}.vscode-marketplace;
       vsCodeMarketplaceLinux = nix-vscode-extensions.extensions.${systems.linux}.vscode-marketplace;
 
-      # Unified shell app builder. Uses script-tree for repo-root-relative script
-      # paths (src/scripts/, src/platforms/, src/hosts/) and scripts-bundle for
-      # scripts/ (user CLIs). Creates a thin wrapper at $out/bin/nucleus-${name}
+      # Unified shell app builder. script-tree serves repo paths, scripts-bundle
+      # serves scripts/. Wrapper lands at $out/bin/nucleus-${name}.
       writeNucleusShellApplication =
         pkgs:
         {
@@ -544,18 +523,15 @@
           ''
             mkdir -p "$out/bin"
 
-            # Uniform layout: mirror repo hierarchy as-is (deduplicated store paths).
-            # Every call site gets the same $out/scripts + $out/src so SCRIPT_DIR-relative
-            # resolution works identically from the store path. No per-call-site divergence.
+            # WHY: every call site gets the same $out/scripts + $out/src, so
+            # SCRIPT_DIR-relative resolution behaves identically from the store.
             ln -s ${thisScriptsBundle}/scripts "$out/scripts"
             ln -s ${thisScriptTree}/src "$out/src"
 
             ${
               if text != null then
                 ''
-                  # Write script directly from text parameter — no mirror tree or exec-discovery.
-                  # The body below is inlined, so it INHERITS the `set -euo pipefail` above
-                  # (no exec, no boundary).
+                  # Inlined body, so it inherits the strict mode set above (no exec boundary).
                   cat > "$out/bin/nucleus-${name}" << 'WRAPPER'
                   #!${pkgs.runtimeShell}
                   set -euo pipefail
@@ -571,14 +547,9 @@
                 ''
               else
                 ''
-                  # Create thin wrapper. Resolve symlinks so it works through
-                  # home-manager profile symlinks, then exec the store-bundled script.
-                  # WHY `set -euo pipefail` above is NOT enough for the store script: shell
-                  # options are not inherited across `exec`, so the setting hardens the
-                  # wrapper itself (symlink resolution, cd) but NOT the script it execs.
-                  # A store script that needs strict mode must set it in its own body —
-                  # do not assume this line reaches it.  Some runners deliberately do not
-                  # (see the WHY in src/scripts/services/rclone-mount.sh).
+                  # Thin wrapper: resolve symlinks (profile links), then exec the store script.
+                  # WHY the strict mode above stops here: shell options do not cross `exec`,
+                  # so a store script that needs strict mode must set it in its own body.
                   cat > "$out/bin/nucleus-${name}" << 'WRAPPER'
                   #!${pkgs.runtimeShell}
                   set -euo pipefail
@@ -596,8 +567,8 @@
                       *) _self="$(CDPATH="" cd -- "$(dirname -- "$_self")" && pwd -P)/$_target" ;;
                     esac
                   done
-                  # $out/scripts + $out/src are always mirrored, so the store script is
-                  # the canonical path — no repo-root detection, no fallback.
+                  # $out/scripts + $out/src are always mirrored, so the store script is the
+                  # canonical path, no repo-root detection, no fallback.
                   _store_root="$(CDPATH="" cd -- "$(dirname -- "$_self")/.." && pwd)"
                   exec "$_store_root/${scriptName}.sh" "$@"
                   WRAPPER
@@ -609,9 +580,8 @@
           inherit meta;
         };
 
-      # Derive flake `apps` entries from the single nucleusApps registration so
-      # PATH, `nix run`, and `packages` stay in lockstep. Keyed by the short name
-      # (strip the `nucleus-` prefix); program points at the app's bin wrapper.
+      # WHY: apps derives from the single mkNucleusApps registration, so PATH,
+      # `nix run`, and `packages` cannot drift apart. Key is the short name.
       mkNucleusAppsAsFlakeApps =
         apps:
         nixpkgs.lib.mapAttrs' (
@@ -627,22 +597,18 @@
 
       mkTreefmtWrapper = _system: pkgs: treefmt-nix.lib.mkWrapper pkgs ./treefmt.nix;
 
-      # Build the full set of nucleus app packages for a given package set.
-      # Used by home-manager (home.packages) and flake packages output.
-      # All user-facing CLIs source src/scripts/lib via SCRIPT_DIR-relative paths.
+      # Single registration surface for every nucleus-* command.
       mkNucleusApps =
         pkgs: treefmtWrapper:
         let
           nucleusApp = args: writeNucleusShellApplication pkgs args;
-          # Canonical list of managed macOS preference domains (see
-          # preference-gc.nix). Exposed to nucleus-gc so `gc preferences` can
-          # purge stale state without duplicating the list.
+          # WHY: nucleus-gc needs the domain list without importing preference-gc.nix.
           managedPrefDomains = import ./platforms/macOS/modules/preference-gc.nix { };
         in
         {
           nucleus-apply = nucleusApp {
             name = "apply";
-            # Windows twin: scripts/apply.ps1 (consumed by src/hosts/Windows/apply.ps1).
+            # Windows twin: scripts/apply.ps1.
             scriptName = "src/scripts/apply";
             runtimeInputs = [
               pkgs.curl
@@ -726,16 +692,11 @@
               pkgs.findutils
               pkgs.git
               pkgs.powershell
-              # WHY: srt-pi-wrapper-tests.sh parses the extracted zsh wrappers and
-              # gen-completions-tests.sh runs `zsh -n` on the generated completions.
-              # The Ubuntu runner image ships no zsh, so both suites need one from
-              # the store.
+              # WHY: the runner image ships no zsh, and two suites need it.
               pkgs.zsh
-              # WHY: android-config-tests creates a test APK with zip; not a system
-              # utility on Ubuntu (only macOS ships it via Xcode CLT).
+              # WHY: android-config-tests needs zip, which Ubuntu does not ship.
               pkgs.zip
-              # WHY: camilladsp-deviceselect parses YAML fixtures with python3, and the
-              # wrapper exports PATH so every spawned step and suite inherits it.
+              # WHY: camilladsp-deviceselect parses YAML fixtures, and PATH is exported once.
               (pkgs.python3.withPackages (p: [ p.pyyaml ]))
               treefmtWrapper
             ];
@@ -759,10 +720,8 @@
       nucleusAppsMac = mkNucleusApps pkgsMac (mkTreefmtWrapper systems.mac pkgsMac);
       nucleusAppsLinux = mkNucleusApps pkgsLinux (mkTreefmtWrapper systems.linux pkgsLinux);
 
-      # Retain every flake-input source tree across daily GC. Built into the
-      # /nix/var/nix/profiles/flake-inputs profile by apply.sh after a
-      # successful rebuild, so nix-collect-garbage cannot prune the *-source
-      # paths the next evaluation needs.
+      # WHY: apply.sh adds this to the flake-inputs profile after a successful
+      # rebuild, so GC cannot prune the *-source paths the next evaluation needs.
       mkFlakeInputsPkg =
         pkgs: inputs:
         pkgs.runCommand "flake-inputs" { } (
@@ -797,12 +756,8 @@
       };
       flakeInputsLinux = flakeInputsMac;
 
-      # Daemon-only packages: NOT nucleus apps (not in mkNucleusApps), so they
-      # are never on PATH, via `nix run`, or in `packages`. Daemons resolve them
-      # by store path through the per-host nucleusApps merge below. Built per-host
-      # so the shared script-tree/scripts-bundle derivations stay on the host's
-      # native system (aarch64-darwin / x86_64-linux) instead of forcing a
-      # cross-system build that no configured builder can satisfy.
+      # WHY per-host: a shared derivation would force a cross-system build no
+      # configured builder can satisfy. Not a nucleus app, so never on PATH.
       serviceWatchdogPkgMac = writeNucleusShellApplication pkgsMac {
         name = "service-watchdog";
         scriptName = "src/scripts/services/service-watchdog";
@@ -816,14 +771,7 @@
 
     in
     {
-      # -----------------------------------------------------------------------
-      # apps — runnable via `nix run .#<name>`.
-      # Each host exposes:
-      #   apply         — the main orchestration entry point
-      #   darwin-rebuild / home-manager / nixos-rebuild — engine binaries
-      #     pinned to the same nixpkgs revision used by this flake, so the
-      #     apply script does not have to locate them from the system PATH.
-      # -----------------------------------------------------------------------
+      # WHY pin the engines here: the apply script must not find rebuild binaries on PATH.
       apps = {
         "${systems.mac}" = mkNucleusAppsAsFlakeApps nucleusAppsMac // {
           darwin-rebuild = {
@@ -845,14 +793,9 @@
         };
       };
 
-      # -----------------------------------------------------------------------
-      # darwinConfigurations — nix-darwin host for the MacBook.
-      # Home Manager is embedded as a nix-darwin module so that the single
-      # `darwin-rebuild switch` command activates both system and user config.
-      # -----------------------------------------------------------------------
+      # Home Manager is embedded so one `darwin-rebuild switch` activates system and user config.
       darwinConfigurations.MacBook = darwin.lib.darwinSystem {
-        # Reuse the shared package set so allowUnfree policy from mkPkgs is
-        # applied consistently to both system and embedded Home Manager evals.
+        # WHY share the set: one allowUnfree policy for system and embedded HM evals.
         pkgs = pkgsMac;
         specialArgs = {
           hostName = "MacBook";
@@ -877,13 +820,11 @@
           nix-homebrew.darwinModules.nix-homebrew
           home-manager.darwinModules.home-manager
           {
-            # Preserve pre-existing dotfiles on first activation instead of
-            # aborting when Home Manager would overwrite them.
+            # WHY: a first activation must not abort on existing dotfiles.
             home-manager.backupFileExtension = "bak";
 
-            # Share the system nixpkgs instance to avoid a duplicate evaluation.
+            # WHY: reuse the system instance instead of evaluating it twice.
             home-manager.useGlobalPkgs = true;
-            # Install user packages into the user profile rather than /etc.
             home-manager.useUserPackages = true;
             home-manager.extraSpecialArgs = {
               hostName = "MacBook";
@@ -902,13 +843,8 @@
         ];
       };
 
-      # -----------------------------------------------------------------------
-      # nixosConfigurations — NixOS host for the generic Linux machine.
-      # Same Home Manager embedding pattern as the Darwin host.
-      # -----------------------------------------------------------------------
       nixosConfigurations.NixOS = nixpkgs.lib.nixosSystem {
-        # Keep NixOS evaluation aligned with the same pinned package set and
-        # unfree policy used by the rest of the flake outputs.
+        # WHY: same pinned set and unfree policy as the Darwin host.
         pkgs = pkgsLinux;
         specialArgs = {
           hostName = "NixOS";
@@ -926,8 +862,6 @@
           ./modules/env/env-secrets-sops.nix
           home-manager.nixosModules.home-manager
           {
-            # Mirror the Darwin behavior so first switch is non-destructive when
-            # user-owned files already exist at Home Manager target paths.
             home-manager.backupFileExtension = "bak";
 
             home-manager.useGlobalPkgs = true;
@@ -953,11 +887,6 @@
         "${systems.linux}" = mkTreefmtWrapper systems.linux pkgsLinux;
       };
 
-      # -----------------------------------------------------------------------
-      # packages — installable via `nix profile add .#bootstrap-deps`.
-      # bootstrap-deps is a symlink-joined set of the tools used for manual
-      # secret lifecycle tasks during bootstrap (gnupg, sops, ssh-to-age).
-      # -----------------------------------------------------------------------
       packages = {
         "${systems.mac}" = {
           treefmt = mkTreefmtWrapper systems.mac pkgsMac;
@@ -993,13 +922,8 @@
         };
       };
 
-      # -----------------------------------------------------------------------
-      # winget-packages — Nix-generated list of WinGet package IDs that are
-      # enabled for the Windows host, derived from the shared package registry
-      # (managedPackages in core.nix). Committed as
-      # src/hosts/Windows/system/winget-packages.json and consumed by apply.ps1
-      # to filter packages.dsc.yml (Windows does not run Nix).
-      # -----------------------------------------------------------------------
+      # Committed as src/hosts/Windows/system/winget-packages.json and read by
+      # apply.ps1, since Windows does not evaluate Nix.
       winget-packages = pkgsMac.writeText "winget-packages.json" (
         let
           evaluated = nixpkgs.lib.evalModules {
@@ -1007,11 +931,10 @@
             modules = [
               ./modules/core.nix
               {
-                # core.nix reads this for macOS backend selection; harmless here.
+                # core.nix reads this for macOS backend selection; unused in this eval.
                 nucleus.packages.selection.backend = "policy";
               }
-              # core.nix sets `assertions`; that option is normally provided by
-              # NixOS/nix-darwin, so declare a stub for this standalone eval.
+              # core.nix sets `assertions`, normally provided by NixOS/nix-darwin.
               {
                 options.assertions = nixpkgs.lib.mkOption {
                   type = nixpkgs.lib.types.listOf nixpkgs.lib.types.attrs;
@@ -1024,7 +947,7 @@
               lib = nixpkgs.lib;
               pkgs = pkgsMac;
               options = { };
-              # core.nix resolves the current host from the `hostName` module arg.
+              # core.nix resolves the host from the `hostName` module arg.
               hostName = "Windows";
             };
           };
@@ -1035,30 +958,11 @@
         }
       );
 
-      # -----------------------------------------------------------------------
-      # devShells — entered via `nix develop .#<name>` or auto-loaded by
-      # nix-direnv when an .envrc with `use flake` is present.
-      #
-      #   default   — general development tools: bun (JS runtime), uv (Python
-      #               package manager), Rust toolchain via rust-overlay (reads
-      #               rust-toolchain.toml when present in the project root;
-      #               falls back to the latest stable default otherwise), prek
-      #               (Git hook manager for repos that opt in via prek.toml),
-      #               treefmt (formatter multiplexer via treefmt-nix), powershell (pwsh) for pre-commit
-      #               validation, and packer for VM template builds.
-      #               Auto-loaded by nix-direnv from the repo root .envrc.
-      #   bootstrap — bootstrap tool set (gnupg, sops, ssh-to-age) for manual
-      #               secret lifecycle tasks during initial provisioning.
-      # -----------------------------------------------------------------------
       devShells = {
         "${systems.mac}" = {
           default =
             let
-              # Prefer the project's rust-toolchain.toml when present; fall back
-              # to the latest stable default profile (cargo, rustc, clippy,
-              # rustfmt).  rust-overlay parses the file and assembles a
-              # Nix-patched toolchain distinct from the system pkgs.rustup install
-              # so devShell toolchain versions are reproducible and version-pinned.
+              # WHY: rust-overlay pins the toolchain so the devShell stays reproducible.
               rustToolchain =
                 if builtins.pathExists ../rust-toolchain.toml then
                   pkgsDevMac.rust-bin.fromRustupToolchainFile ../rust-toolchain.toml
@@ -1081,22 +985,13 @@
                 pkgsDevMac.yamllint
                 pkgsDevMac.zizmor
               ];
-              # libiconv is required by the macOS linker when building Rust/C projects
-              # (ld: library not found for -liconv). It is included in glibc on Linux
-              # so no equivalent addition is needed in the Linux devShell.
+              # WHY: the macOS linker needs -liconv; glibc ships it on Linux.
               buildInputs = [ pkgsDevMac.libiconv ];
-              # sccache-wrapped C/C++ compilers for non-CMake projects that
-              # read CC/CXX directly. CMake projects use CMAKE_C_COMPILER_LAUNCHER
-              # (set globally via env-secrets) instead.
+              # WHY: CMake projects use CMAKE_C_COMPILER_LAUNCHER from env-secrets.
               CC = "${pkgsDevMac.sccache}/bin/sccache ${pkgsDevMac.llvmPackages.clang}/bin/clang";
               CXX = "${pkgsDevMac.sccache}/bin/sccache ${pkgsDevMac.llvmPackages.clang}/bin/clang++";
-              # Ensure EDITOR/VISUAL are always set to nvim inside the devShell.
-              # When nix-direnv activates via `use flake`, its `nix print-dev-env`
-              # does not inherit the parent shell's variables. If the parent shell
-              # happens to have EDITOR=nano (from nix-darwin's mkDefault), direnv
-              # will not correct it because the devShell derivation does not set
-              # EDITOR.  Explicitly declaring these here makes print-dev-env emit
-              # `export EDITOR="nvim"`, so direnv applies the right value.
+              # WHY: `nix print-dev-env` does not inherit the parent shell's
+              # variables, so print-dev-env must emit EDITOR/VISUAL itself.
               EDITOR = "nvim";
               VISUAL = "nvim";
             };
@@ -1133,14 +1028,9 @@
                 pkgsDevLinux.yamllint
                 pkgsDevLinux.zizmor
               ];
-              # sccache-wrapped C/C++ compilers for non-CMake projects that
-              # read CC/CXX directly. CMake projects use CMAKE_C_COMPILER_LAUNCHER
-              # (set globally via env-secrets) instead.
+              # WHY: CMake projects use CMAKE_C_COMPILER_LAUNCHER from env-secrets.
               CC = "${pkgsDevLinux.sccache}/bin/sccache ${pkgsDevLinux.llvmPackages.clang}/bin/clang";
               CXX = "${pkgsDevLinux.sccache}/bin/sccache ${pkgsDevLinux.llvmPackages.clang}/bin/clang++";
-              # Same rationale as the macOS devShell: force a correct EDITOR/VISUAL
-              # so that nix-direnv activation does not inherit stale values from
-              # the parent shell (e.g. nix-darwin's /etc/zshenv default).
               EDITOR = "nvim";
               VISUAL = "nvim";
             };
@@ -1154,12 +1044,6 @@
         };
       };
 
-      # -----------------------------------------------------------------------
-      # homeConfigurations — standalone Home Manager profile.
-      # Used on plain Linux and WSL where neither NixOS nor nix-darwin manages
-      # the system layer.  Evaluated against the Linux package set so the same
-      # profile can be applied to WSL (which is x86_64-linux) without changes.
-      # -----------------------------------------------------------------------
       homeConfigurations.${username} = home-manager.lib.homeManagerConfiguration {
         extraSpecialArgs = {
           hostName = "NixOS";

@@ -1,14 +1,7 @@
-# Interactive shell configuration shared across all managed hosts.
-#
-# History exclusion features enabled here:
-#   - HIST_IGNORE_SPACE: exclude commands starting with a space
-#   - HIST_IGNORE_DUPS:  exclude consecutive duplicate commands
-#
-# When adding a new shell (bash, fish, nushell, etc.), enable the equivalent:
-#   - bash:   HISTCONTROL=ignorespace:ignoredups
-#   - fish:   fish_history ignore-space (or custom function)
-#   - nu:     $env.config.shell_integration.history.exclude_patterns or similar
-#   - cmd.exe: no equivalent — cannot be implemented
+# Interactive shell configuration shared across all managed hosts. The history
+# exclusions (HIST_IGNORE_SPACE, HIST_IGNORE_DUPS) need per-shell equivalents
+# when a new shell is added: bash HISTCONTROL=ignorespace:ignoredups, fish
+# fish_history ignore-space, nu history.exclude_patterns. cmd.exe has none.
 {
   config,
   lib,
@@ -27,8 +20,7 @@ let
     inherit effectiveUsername repoRoot hostName;
   };
 
-  # Dedicated alias/env fragments keep list-like attrsets isolated so sort order
-  # can be audited without scanning unrelated shell options.
+  # Alias/env fragments stay isolated so sort order can be audited on its own.
   shellAliases = import ./aliases.nix { };
   managedPaths = import ../lib/managed-paths.nix { inherit pkgs; };
   envVarsHelpers = import ../lib/env-secrets.nix {
@@ -41,19 +33,15 @@ let
       ;
   };
 
-  # Canonical AI agent session detection names.  Shared with
-  # pwsh.nix and Sync-ShellProfile.ps1 (Windows).
+  # AI agent session detection names, shared with pwsh.nix and Sync-ShellProfile.ps1.
   agentEnv = import ./agent-env-vars.nix;
 
-  # All env vars are sourced from the centralized catalog.
   mergedSessionVariables = envVarsHelpers.allVars;
 
-  # Keep iCloud exclusion names and managed root paths in one declarative source
-  # (src/users/) so activation-time recursive marking and interactive shell hooks
-  # converge on the same directory-name and managed-root policy.
-  # Only Mobile Documents subpaths are valid managed roots here: the ignore xattr
-  # is a native iCloud File Provider mechanism and must not be applied to legacy
-  # convenience aliases like ~/Downloads/iCloud or ~/clouds/iCloud.
+  # WHY: iCloud exclusion names and managed roots live in src/users/ so
+  # activation and the interactive hooks share one policy. Only Mobile Documents
+  # subpaths qualify, since the ignore xattr is a File Provider mechanism and
+  # would break aliases like ~/Downloads/iCloud.
   _iCloudCfg =
     let
       currentUser = config.home.username;
@@ -95,16 +83,11 @@ in
     builtins.removeAttrs nucleusApps [ "nucleus-service-watchdog" ]
   );
 
-  # direnv: automatically loads/unloads per-directory environments.
-  # nix-direnv: caches nix-shell/flake devShells so re-entering a directory
-  # does not trigger a full Nix evaluation each time.
   programs.direnv = {
     enable = true;
     nix-direnv.enable = true;
   };
 
-  # zoxide: a faster 'cd' that learns frequently used directories.
-  # Integrates with zsh so 'z <query>' works in interactive sessions.
   programs.zoxide = {
     enable = true;
     enableZshIntegration = true;
@@ -117,18 +100,11 @@ in
     shellAliases = shellAliases;
     syntaxHighlighting.enable = true; # command colouring (valid = green, etc.)
 
-    # -----------------------------------------------------------------------
-    # initContent: pay-respects shell integration + system-wide Python ban
-    # -----------------------------------------------------------------------
-    # pay-respects is initialised here rather than via a shell alias because
-    # `eval "$(pay-respects zsh --alias)"` creates a zsh FUNCTION named `f`
-    # that captures shell history and auto-executes the corrected command via
-    # eval.  A plain alias (aliases.nix) would shadow the function — aliases
-    # expand before functions in zsh — leaving `f` as a bare binary invocation
-    # that neither executes the fix nor records it in history.
-    # The build-tool ban wrappers follow; they must remain as functions (not aliases)
-    # so they can emit multi-line guidance via heredoc and pass through when in a
-    # devShell (DIRENV_DIR set) or via the managed default toolchain.
+    # pay-respects needs initContent rather than an alias: `eval "$(pay-respects
+    # zsh --alias)"` defines a zsh FUNCTION, and an alias would expand first and
+    # leave `f` as a bare binary call that neither fixes nor records the command.
+    # The build-tool bans must also stay functions, so they can emit heredoc
+    # guidance and pass through in a devShell.
     initContent =
       builtins.replaceStrings
         [
@@ -156,38 +132,19 @@ in
         (builtins.readFile ../../scripts/shell/init.zsh);
   };
 
-  # User-scope package manager bin directories from the centralized catalog.
-  # home.sessionPath writes to ~/.zshenv (via the HM session-vars mechanism)
-  # which is sourced before ~/.zshrc (where the direnv hook lives), so these
-  # entries are always part of the "original" PATH state that direnv saves and
-  # restores — fixing the reliability issue of .zshrc-based PATH guards that
-  # only run once at startup.
-  # Sources: see pathComponents in src/modules/lib/managed-paths.nix.
-  #   Prepends:    (before system default PATH)
-  #   Appends:     bun install -g   → ~/.bun/bin   (BUN_INSTALL_BIN default)
-  #                cargo-binstall   → ~/.cargo/bin  (CARGO_HOME/bin default)
-  #                uv tool install  → ~/.local/bin  (XDG_BIN_HOME default)
-  # Sole declaration site for home.sessionPath and home.sessionVariables.
-  # No other file sets these — all env vars flow through the centralized
-  # catalog in src/modules/lib/env-secrets.nix.
+  # WHY ~/.zshenv: direnv saves and restores the PATH it sees at shell start, so
+  # PATH must be complete before ~/.zshrc. Sole declaration site for
+  # home.sessionPath; every env var flows through the catalog in
+  # src/modules/lib/env-secrets.nix. pathComponents live in managed-paths.nix.
   home.sessionPath =
     (builtins.map (p: "${config.home.homeDirectory}/${p}") managedPaths.pathComponents.prepend)
     ++ (builtins.map (p: "${config.home.homeDirectory}/${p}") managedPaths.pathComponents.append);
 
   home.sessionVariables = mergedSessionVariables;
 
-  # Global bun configuration: set a 5-day minimum release age for all package
-  # installs (bun install -g, bun add, etc.). Bun reads bunfig.toml from $HOME
-  # by default.
-  # Source: https://bun.sh/docs/runtime/bunfig#install
-  # Global bun configuration: set a 5-day minimum release age for all package
-  # installs (bun install -g, bun add, etc.) and enable exact version pinning
-  # in package.json (no caret ranges). Bun reads bunfig.toml from $HOME by default.
-  # Source: https://bun.sh/docs/runtime/bunfig#install
-  # ~/.bunfig.toml as a method-1 (writable) symlink to the selected repo file, created
-  # at activation time against the LIVE repo root so repo changes take effect without
-  # rebuild. The writable/immutable decision is owned by managedSymlinkPaths; this entry
-  # must run before protect-out-of-store-symlinks so the link is hardened if immutable.
+  # 5-day minimum release age plus exact version pinning. Source:
+  # https://bun.sh/docs/runtime/bunfig#install
+  # Seeded against the LIVE repo root so repo edits apply without a rebuild.
   # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
   home.activation.seed-bunfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
@@ -195,15 +152,9 @@ in
       "${overlay.toRepoRelPath (overlay.selectFile "bun" "bunfig.toml")}" \
   '';
 
-  # Global Cargo configuration: per-platform linker selection.
-  # Cargo evaluates cfg(target_os = "...") against the host build target at
-  # config-load time — non-matching sections are silently ignored.
-  #
-  #   Linux   → mold via clang -fuse-ld=mold (fastest ELF linker)
-  #   macOS   → native Apple ld64 via cc     (system default, explicit for clarity)
-  #   Windows → rust-lld bundled with Rust    (zero-install, lld-link)
-  # ~/.cargo/config.toml as a method-1 (writable) symlink to the selected repo file, created
-  # at activation time against the LIVE repo root so repo changes take effect without rebuild.
+  # Cargo matches cfg(target_os) against the host target, so non-matching
+  # sections are silently ignored: Linux uses mold, macOS native ld64, Windows
+  # the bundled rust-lld.
   # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
   home.activation.seed-cargo-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
@@ -211,9 +162,7 @@ in
       "${overlay.toRepoRelPath (overlay.selectFile "cargo" "config.toml")}" \
   '';
 
-  # Global nextest configuration: test runner UI settings.
-  # ~/.config/nextest/config.toml as a method-1 (writable) symlink to the selected repo file,
-  # created at activation time against the LIVE repo root so repo changes take effect without rebuild.
+  # nextest runner UI settings.
   # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
   home.activation.seed-nextest-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
@@ -221,30 +170,11 @@ in
       "${overlay.toRepoRelPath (overlay.selectFile "nextest" "config.toml")}" \
   '';
 
-  # ---------------------------------------------------------------------------
-  # Direnv: cross-platform base config + host-specific lib overrides
-  # ---------------------------------------------------------------------------
-  # The base direnvrc is cross-platform content deployed on all hosts. The apple-sdk
-  # _nix() override has been moved to a lib/ file (auto-sourced by direnv before
-  # direnvrc) so that Windows can deploy only the base config without dead code.
-  #
-  # apple-sdk's nix-support/setup-hook exports DEVELOPER_DIR, SDKROOT, and
-  # NIX_APPLE_SDK_VERSION during nix print-dev-env evaluation.  These vars enter
-  # direnv's managed environment set via the profile.rc that nix-direnv caches.
-  # When you leave a direnv-managed directory, direnv strips all managed vars,
-  # breaking xcrun until the next login shell re-sources hm-session-vars.
-  #
-  # The lib/apple-sdk-override.sh _nix() override filters those three variables
-  # from the print-dev-env stdout before nix-direnv caches them.  They never enter
-  # the managed set, so they survive directory transitions.
-  #
-  # direnv auto-sources ~/.config/direnv/lib/*.sh before ~/.config/direnv/direnvrc
-  # and before the .envrc.  Since nix-direnv defines _nix in lib/hm-nix-direnv.sh,
-  # our override in lib/ takes effect before the .envrc calls use_flake.
-  # The _nix_direnv_nix variable is set by nix-direnv's _nix_direnv_preflight()
-  # at the start of use_flake, so referencing it from the override is safe.
-  # ~/.config/direnv/direnvrc as a method-1 (writable) symlink to the selected repo file, created
-  # at activation time against the LIVE repo root so repo changes take effect without rebuild.
+  # WHY the lib/ override: apple-sdk's setup-hook exports DEVELOPER_DIR, SDKROOT
+  # and NIX_APPLE_SDK_VERSION into the set direnv manages and strips on leave,
+  # breaking xcrun. Filtering them out of print-dev-env keeps them out of that
+  # set. direnv sources lib/*.sh before direnvrc, so the override runs before
+  # use_flake sets _nix_direnv_nix.
   # check-suppress:config-method: method 1 (writable symlink) -- cross-platform base config.
   home.activation.seed-direnvrc = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
@@ -252,10 +182,7 @@ in
       "${overlay.toRepoRelPath (overlay.selectFile "direnv" "direnvrc")}" \
   '';
 
-  # Host-specific apple-sdk _nix() override, auto-sourced by direnv before direnvrc.
-  # ~/.config/direnv/lib/apple-sdk-override.sh as a method-1 (writable) symlink to the selected
-  # repo file, created at activation time against the LIVE repo root so repo changes take effect
-  # without rebuild.
+  # WHY POSIX only: Windows deploys the base direnvrc without this override.
   # check-suppress:config-method: method 1 (writable symlink) -- POSIX-only; Windows deploys only the base config.
   home.activation.seed-direnv-apple-sdk-override = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
@@ -263,12 +190,9 @@ in
       "${overlay.toRepoRelPath (overlay.selectFile "direnv" "lib/apple-sdk-override.sh")}" \
   '';
 
-  # Global uv configuration: exact pinning and supply-chain hardening.
-  # uv reads uv.toml from $XDG_CONFIG_HOME/uv/uv.toml (~/.config/uv/uv.toml).
-  # Source: https://docs.astral.sh/uv/reference/settings/#add-bounds
-  # Source: https://docs.astral.sh/uv/reference/settings/#exclude-newer
-  # ~/.config/uv/uv.toml as a method-1 (writable) symlink to the selected repo file, created at
-  # activation time against the LIVE repo root so repo changes take effect without rebuild.
+  # Exact pinning and supply-chain hardening. Sources:
+  # https://docs.astral.sh/uv/reference/settings/#add-bounds
+  # https://docs.astral.sh/uv/reference/settings/#exclude-newer
   # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
   home.activation.seed-uv-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
@@ -276,31 +200,14 @@ in
       "${overlay.toRepoRelPath (overlay.selectFile "uv" "uv.toml")}" \
   '';
 
-  # User-scoped `node` → `bun` shim so `node` resolves to bun on the managed
-  # append PATH (bun run child shells, GUI apps).  Repo bans system Node.js.
-  # ~/.local/bin is already in home.sessionPath (pathComponents.append), so no
-  # PATH change is needed.  Interactive `node()` in init.zsh still blocks.
+  # User-scoped `node` shim resolving to bun. ~/.local/bin is already on the
+  # append PATH; init.zsh still blocks an interactive `node`.
   home.file.".local/bin/node" = {
     source = "${managedPaths.nodeShim}/bin/node";
   };
 
-  # ---------------------------------------------------------------------------
-  # install-zsh-completions
-  # Idempotently generates zsh completion files for CLI tools whose Nix packages
-  # do not auto-bundle them into fpath, writing into the writable user-local
-  # completion directory created in initContent.
-  #
-  # For each tool with a completion subcommand (bat, gh, uv, etc.), this step:
-  #   * Probes the tool binary directly from the Nix store (no PATH dependency).
-  #   * Skips regeneration if the completion file exists and is newer than the
-  #     tool binary (mtime freshness check).
-  #   * Fails gracefully if a completion subcommand exits non-zero (soft-fail).
-  #
-  # Completion generation stays imperative: it probes tool binaries from the
-  # Nix store at runtime. Embedding completions in every package is not yet
-  # standard practice.
-  # ---------------------------------------------------------------------------
-
+  # Probes each tool's Nix store binary, skips regeneration when the completion
+  # file is newer than the binary, and soft-fails on a non-zero subcommand exit.
   home.activation = {
     install-zsh-completions = lib.hm.dag.entryAfter [ "install-cargo-binstall-packages" ] ''
       "${activationBundle}/src/scripts/shell/install-zsh-completions.sh" \

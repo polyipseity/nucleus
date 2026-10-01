@@ -9,25 +9,15 @@
   ...
 }:
 let
-  # Cross-platform shared package registry. Each package is declared exactly
-  # once with full cross-platform metadata (nixpkgs attr, Homebrew, WinGet).
-  # field: nixpkgs — nixpkgs attribute name (the package's derivation path).
-  # field: homebrew — optional { kind = "formula"|"cask"; name = "..." }.
-  # field: winget — optional WinGet package id string (e.g. "Anysphere.Cursor").
-  # field: platforms — restrict to specific platforms (["darwin"] or ["linux"]).
-  #   Buildability axis only; governs darwin/linux nix provisioning. Default
-  #   (absent): both darwin and linux. Kept separate from `enable` (provisioning map).
-  # field: enable — optional per-host provisioning map { MacBook = bool; NixOS = bool;
-  #   Windows = bool }. Absent hosts default to enabled, so new hosts can never
-  #   silently diverge. This is the canonical registry for enable/disable
-  #   across all hosts. Distinct from `platforms`: `platforms` is the build-capability
-  #   axis (which OS families can build/install the package); `enable` is the
-  #   provisioning axis (whether the package is actually installed on a given host).
-  # Category rules: cli → nixpkgs; gui → Homebrew (cask preferred) on macOS.
-  #   On NixOS: all packages go to nixpkgs unconditionally.
-  # If a package ships any GUI component (binary, UI, daemon), classify as "gui".
-  # pkgs.cargo must not be added to the shared set: it conflicts with
-  # pkgs.rustup, which provides the same bin/cargo. Activation script
+  # Shared package registry. Each package is declared once with its full
+  # cross-platform metadata. `nixpkgs` is the attribute name, `homebrew` is an
+  # optional { kind = "formula"|"cask"; name }, `winget` an optional WinGet id.
+  # `platforms` filters the nix provisioning axis and defaults to both darwin
+  # and linux. `enable` is a per-host provisioning map, distinct from
+  # `platforms`, and an absent host defaults to enabled so new hosts cannot
+  # silently diverge. cli routes to nixpkgs, gui to Homebrew on macOS and to
+  # nixpkgs on NixOS; any GUI component makes an entry gui.
+  # pkgs.cargo must not be added: it conflicts with pkgs.rustup over bin/cargo.
   # install-cargo-binstall-packages takes cargo as a store-path argument.
   managedPackages = {
     "7zip" = {
@@ -127,9 +117,7 @@ let
       nixpkgs = "check-jsonschema";
     };
     "chrome-remote-desktop" = {
-      # macOS gets the Homebrew cask (MacBook/homebrew.nix) and Windows the WinGet
-      # package; no nixpkgs attribute exists (nixpkgs#34084 closed as not planned),
-      # so NixOS installs nothing.
+      # nixpkgs has no attr for this (nixpkgs#34084), so NixOS installs nothing.
       category = "gui";
       homebrew = {
         kind = "cask";
@@ -160,11 +148,8 @@ let
       nixpkgs = "mat2";
     };
     cursor = {
-      # Single source of truth for Cursor enable/disable across all hosts.
-      # `enable` is the per-host provisioning map; every host is explicitly disabled,
-      # so Cursor stays off everywhere (no host enables it). A host omitted from
-      # `enable` would default to enabled, so all three are listed to prevent
-      # silent divergence on new hosts.
+      # Single source of truth for Cursor enable/disable. Every host is listed
+      # and disabled, since an omitted host would default to enabled.
       enable = {
         MacBook = false;
         NixOS = false;
@@ -328,10 +313,8 @@ let
       winget = "Google.Chrome";
     };
     "google-chrome@canary" = {
-      # nixpkgs provides the stable `google-chrome` attr, but the canary channel
-      # is macOS-only via the Homebrew cask (MacBook/homebrew.nix) and Windows
-      # via WinGet canary; the stable nixpkgs attr is intentionally not the
-      # install path for the canary channel.
+      # Why the stable attr is not the canary path: the canary ships via the
+      # Homebrew cask on macOS and WinGet canary on Windows.
       category = "gui";
       homebrew = {
         kind = "cask";
@@ -440,8 +423,7 @@ let
       nixpkgs = "litellm";
     };
     llvm = {
-      # Distinct from the llvmPackages.* clang/lldb/lld entries (separate base
-      # entries below); this is the top-level LLVM meta-package.
+      # The top-level LLVM meta-package, distinct from the llvmPackages.* base entries.
       category = "cli";
       homebrew = {
         kind = "formula";
@@ -557,8 +539,7 @@ let
       winget = "Google.NotoSerif.CJK.TC";
     };
     "obs-studio" = {
-      # Stable OBS Studio. Enabled on every platform (no beta channel exists in
-      # nixpkgs, so stable is the uniform choice across macOS/NixOS/Windows).
+      # Stable OBS Studio: nixpkgs has no beta channel, so stable is uniform.
       category = "gui";
       homebrew = {
         kind = "cask";
@@ -646,11 +627,9 @@ let
         name = "pass";
       };
       nixpkgs = "pass";
-      # WHY: pass-otp is a separate package, not a top-level nixpkgs attr, and
-      # pass only loads it from SYSTEM_EXTENSION_DIR. The wrapper must replace
-      # the plain attr: contributing both would collide on bin/pass (nix-darwin
-      # system-path keeps the first, Home Manager's home-manager-path refuses to
-      # build). `nixpkgs` stays required as the availability probe.
+      # WHY: pass-otp is not a top-level attr and pass loads it from
+      # SYSTEM_EXTENSION_DIR. Contributing both would collide on bin/pass, so
+      # the wrapper replaces the plain attr. `nixpkgs` stays the probe.
       nixpkgsPackage = pkgs.pass.withExtensions (extensions: [ extensions.pass-otp ]);
       winget = "GnuPG.pass";
     };
@@ -679,8 +658,7 @@ let
       winget = "Microsoft.PowerToys";
     };
     powersession = {
-      # WinGet-only: absent from nixpkgs (darwin+linux) and Homebrew. Windows
-      # installs via WinGet; disable nix/homebrew routing on the other hosts.
+      # WHY: absent from nixpkgs, so disable nix routing on the other hosts.
       enable = {
         MacBook = false;
         NixOS = false;
@@ -712,9 +690,7 @@ let
       winget = "Python.Python.3.13";
     };
     qtpass = {
-      # macOS installs via nixpkgs (pkgs.qtpass); the Homebrew cask is
-      # broken/notarized. Routed to nixpkgs on macOS via
-      # nucleus.packages.selection.backendOverrides.
+      # WHY: the cask is broken on macOS, so route it to nixpkgs there.
       category = "gui";
       nixpkgs = "qtpass";
       winget = "IJHack.QtPass";
@@ -973,8 +949,7 @@ let
       winget = "Microsoft.VisualStudioCode";
     };
     "visual-studio-code@insiders" = {
-      # Was darwin-only for nix; now also provisioned on Windows via WinGet.
-      # No nixpkgs attr for the insiders build, so it is not on nixpkgs.
+      # Also provisioned on Windows via WinGet; no attr for the insiders build.
       platforms = [ "darwin" ];
       category = "gui";
       homebrew = {
@@ -985,9 +960,7 @@ let
     };
     "whatsapp-beta" = {
       # Allow-list is source-agnostic: the converter matches `settings.id`
-      # regardless of `source: msstore`, so the Store id is a valid winget id.
-      # macOS beta cask is in MacBook/homebrew.nix; no nixpkgs attr, so it is
-      # not on nixpkgs.
+      # regardless of `source: msstore`.
       category = "gui";
       homebrew = {
         kind = "cask";
@@ -995,10 +968,8 @@ let
       };
       winget = "9NBDXK71NK08";
     };
-    # No `winget` id exists for whisper-cpp; the Windows twin is the Scoop
-    # main-bucket entry in src/modules/packages/desired.json. The ggml weights
-    # are pinned separately under the `whisper` lockfile section, because no
-    # package manager ships them.
+    # WHY: no `winget` id exists, so Windows takes the Scoop entry in
+    # src/modules/packages/desired.json. Weights are pinned under `whisper`.
     whisper-cpp = {
       category = "cli";
       nixpkgs = "whisper-cpp";
@@ -1062,11 +1033,7 @@ let
   packageConfig = config.nucleus.packages.selection;
   managedPackageNames = builtins.attrNames managedPackages;
 
-  # Resolve whether a managed package is enabled for a given host.
-  # `enable` is a per-host provisioning map; absent entries default to enabled, so new
-  # hosts can never silently diverge. Host-agnostic: takes hostName explicitly
-  # so the Windows-resolved set can be computed anywhere Nix runs (Windows itself
-  # does not run Nix).
+  # WHY: `enable` takes hostName explicitly, so the Windows set resolves anywhere Nix runs.
   managedPackageEnabledForHost =
     hostName: packageName:
     let
@@ -1080,15 +1047,12 @@ let
     in
     enableMap.${hostName} or true;
 
-  # Current host. Resolved from the `hostName` module arg, which the flake
-  # passes in every eval context (darwin/nixos specialArgs, home-manager
-  # extraSpecialArgs). `config.networking.hostName` is unset inside the
-  # embedded Home Manager eval, so reading it there silently yields "" and
-  # defeats the per-host `enable` map — hence no fallback.
+  # WHY no fallback: `config.networking.hostName` is unset inside the embedded
+  # Home Manager eval, where reading it silently yields "" and defeats `enable`.
   currentHost = hostName;
   enabledManagedPackageNames = builtins.filter (managedPackageEnabledForHost currentHost) managedPackageNames;
 
-  # CLI → nixpkgs, GUI → homebrew. If a package ships any GUI component, classify as "gui".
+  # CLI to nixpkgs, GUI to homebrew. Any GUI component makes an entry gui.
   defaultBackendForCategory = category: if category == "cli" then "nixpkgs" else "homebrew";
 
   # Priority: overrides > policy > global backend.
@@ -1108,8 +1072,7 @@ let
     }) enabledManagedPackageNames
   );
 
-  # Platform compatibility check: a package's `platforms` field restricts which
-  # platforms receive it. Default (absent) = both darwin and linux.
+  # Platform compatibility check. Default (absent) is both darwin and linux.
   managedPackagePlatformCompatible =
     packageName:
     let
@@ -1127,11 +1090,8 @@ let
     else
       true;
 
-  # Split a managed package's dotted `nixpkgs` attribute into a path list so it
-  # can be resolved against the nested pkgs attrset. `builtins.hasAttr`/
-  # `getAttr` treat a dotted string as a single literal top-level name and do
-  # NOT traverse the path, so nested attrs (e.g. "llvmPackages_latest.llvm")
-  # must be split first.
+  # WHY split: hasAttr/getAttr treat a dotted string as one literal top-level
+  # name, so nested attrs such as "llvmPackages_latest.llvm" need a path list.
   nixPkgsAttrPath =
     packageName:
     let
@@ -1139,21 +1099,16 @@ let
     in
     if attr == null then [ ] else lib.strings.splitString "." attr;
 
-  # Whether the managed entry's nixpkgs attribute path resolves in this pkgs
-  # instance. An entry with no `nixpkgs` attribute yields the empty path, which
-  # `lib.hasAttrByPath`/`lib.getAttrFromPath` would read as the whole `pkgs`
-  # attrset, so the empty path is rejected explicitly.
+  # WHY reject the empty path: hasAttrByPath would read it as the whole pkgs
+  # attrset for an entry that has no `nixpkgs` attribute.
   nixPackageAttrPresent =
     packageName:
     nixPkgsAttrPath packageName != [ ] && lib.hasAttrByPath (nixPkgsAttrPath packageName) pkgs;
 
-  # Derivation for a managedPackages entry routed to nixpkgs. An entry may carry
-  # `nixpkgsPackage` when the bare `nixpkgs` attribute is not the derivation we
-  # want on PATH (e.g. `pass` needs its OTP extension wrapped into the binary);
-  # `nixpkgs` stays required as the availability probe.
-  # WHY getAttrFromPath: unlike attrByPath with a null default it throws when the
-  # path is missing, so an entry that still cannot resolve fails loudly instead
-  # of contributing `null` to buildEnv's paths.
+  # Derivation for a nixpkgs-routed entry. `nixpkgsPackage` overrides the
+  # derivation while `nixpkgs` stays the availability probe.
+  # WHY getAttrFromPath: unlike attrByPath with a null default it throws on a
+  # missing path, so an unresolvable entry fails loudly.
   managedNixPackageDerivation =
     packageName:
     managedPackages.${packageName}.nixpkgsPackage
@@ -1173,20 +1128,14 @@ let
     && !(lib.hasAttrByPath (nixPkgsAttrPath packageName) pkgs)
   ) enabledManagedPackageNames;
 
-  # Cross-platform nixpkgs packages from the managed set.
-  # On macOS: respects backend selection (only if routed to nixpkgs).
-  # On NixOS: all platform-compatible packages go to nixpkgs unconditionally.
-  # WHY meta.available: managedPackages.platforms is a coarse darwin/linux
-  # filter, but some packages only build for one Linux arch (e.g. discord-canary
-  # is x86_64-linux only; the nixos-generators guest builds aarch64-linux).
-  # meta.available reads lazily and does NOT trigger check-meta's refusal
-  # assertion, so filtering by it safely drops arch-incompatible packages.
+  # Cross-platform nixpkgs packages. macOS respects backend selection; NixOS
+  # takes every platform-compatible package.
+  # WHY meta.available: platforms is a coarse darwin/linux filter, while some
+  # packages build for one Linux arch only. meta.available reads lazily and does
+  # NOT trip check-meta's refusal assertion.
 
-  # Packages already contributed to the Home Manager / system path by a
-  # dedicated programs.* module (e.g. programs.neovim) on POSIX hosts.
-  # Listing them here too would add a second, conflicting derivation to
-  # buildEnv's paths. Windows still provisions them via WinGet, and the
-  # managedPackages entry is retained for settings lookup + parity tests.
+  # Excluded: a programs.* module already contributes these, and a second
+  # derivation would collide in buildEnv's paths. Windows still uses WinGet.
   posixProgramsProvidedPackages = [
     "neovim"
   ];
@@ -1229,11 +1178,8 @@ let
         let
           meta = managedPackages.${packageName};
         in
-        # WHY: only emit when the package is darwin-compatible (per-entry
-        # `platforms`) and actually carries a Homebrew block. WinGet-only
-        # entries drop their `homebrew` block but still resolve to the homebrew
-        # backend, so the `meta.homebrew or null` guard skips them instead of
-        # crashing on the absent `meta.homebrew.kind` attribute.
+        # WHY: WinGet-only entries drop `homebrew` but still resolve to the
+        # homebrew backend, so the kind guard skips them.
         if
           managedPackageBackends.${packageName} == "homebrew"
           && managedPackagePlatformCompatible packageName
@@ -1269,11 +1215,8 @@ let
 
   sharedPackages =
     managedNixPackages
-    # WHY: camillagui-backend ships only via the nucleus flake overlay (a
-    # PyInstaller bundle; vanilla nixpkgs has no such attribute).  The real
-    # NixOS/Darwin hosts get it through mkPkgs' overlays, but standalone
-    # evaluations like the nixos-generators guest build use plain nixpkgs, so
-    # append it only when the evaluating package set actually provides it.
+    # WHY: the flake overlay is the only source, and a plain nixpkgs eval
+    # (the nixos-generators guest) does not carry it.
     ++ (lib.optionals (pkgs ? camillagui-backend) [ pkgs.camillagui-backend ])
     ++ (lib.optionals (pkgs ? rimsort) [ pkgs.rimsort ])
     ++ lib.optional (treefmtPackage != null) treefmtPackage;
@@ -1360,13 +1303,9 @@ in
 
   config = lib.mkMerge [
     {
-      # WHY: the `treefmtPackage ? null` default in the function signature above
-      # is not honoured — the module system resolves every `functionArgs` entry
-      # through `config._module.args` after passing the external args, so an
-      # evaluator that does not supply the argument (the nixos-generators guest
-      # build) throws "attribute 'treefmtPackage' missing" instead of taking the
-      # signature default. Declared with mkDefault so the concrete wrapper
-      # src/flake.nix passes via specialArgs still wins.
+      # WHY mkDefault: the signature default is not honoured, because the module
+      # system resolves every functionArgs entry through `config._module.args`.
+      # The wrapper src/flake.nix passes via specialArgs still wins.
       _module.args.treefmtPackage = lib.mkDefault null;
     }
 
@@ -1399,10 +1338,8 @@ in
         }) managedPackageNames
       );
 
-      # Windows-resolved WinGet ID set (host-agnostic; identical wherever Nix runs).
-      # Windows installs via WinGet, an axis orthogonal to the nix `platforms`
-      # field (which governs darwin/linux nix provisioning only). Any entry with
-      # a `winget` id enabled for Windows enters the set regardless of `platforms`.
+      # WHY: WinGet is orthogonal to the nix `platforms` field, which governs
+      # darwin/linux provisioning only.
       nucleus.windows.wingetPackages.packages = builtins.sort (a: b: a < b) (
         builtins.map (n: managedPackages.${n}.winget) (
           builtins.filter (
