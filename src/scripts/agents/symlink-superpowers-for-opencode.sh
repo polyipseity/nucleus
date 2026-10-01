@@ -1,13 +1,8 @@
 #!/usr/bin/env bash
-# Creates method-1 symlink for OpenCode superpowers plugin.
-#
-# Creates:
-#   ~/.opencode/plugins/superpowers → Nix store superpowers plugin
-#
-# The superpowers plugin is fetched via builtins.fetchGit and symlinked to
-# <nucleusUserRoot>/plugins/superpowers. This script creates a method-1
-# symlink from ~/.opencode/plugins/superpowers to the Nix store target.
-# Uses derive_nucleus_user_root() for platform-specific paths.
+# Creates ~/.opencode/plugins/superpowers -> the Nix store superpowers plugin.
+# The plugin is fetched via builtins.fetchGit and symlinked to
+# <nucleusUserRoot>/plugins/superpowers, so this is the method-1 symlink from
+# there. Paths come from derive_nucleus_user_root().
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -18,13 +13,11 @@ _spo_superpowers_plugin="$(derive_nucleus_user_root)/plugins/superpowers/.openco
 _spo_link_dir="$HOME/.opencode/plugins"
 _spo_link="$_spo_link_dir/superpowers"
 
-# Ensure ~/.opencode/plugins/ exists.
 if [ ! -d "$_spo_link_dir" ]; then
   mkdir -p "$_spo_link_dir"
   say -l opencode-superpowers "created $_spo_link_dir"
 fi
 
-# Create method-1 symlink if target exists.
 if [ -L "$_spo_link" ]; then
   if [ "$(readlink "$_spo_link")" != "$_spo_superpowers_plugin" ]; then
     rm "$_spo_link"

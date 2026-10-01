@@ -1,23 +1,15 @@
 # shellcheck shell=sh
-# Source this file (conceptually; in Nix it is inlined via builtins.readFile) to
-# make the following functions available in home-manager activation scripts.
-#
-# Provided functions:
-#   _nucleus_protect_symlink       — set the immutable flag on a symlink (macOS uchg)
-#   _nucleus_unprotect_symlink     — clear the immutable flag from a symlink (macOS)
-#   _nucleus_symlink_error         — emit the F1 error line for a failed flag change
 # Set/clear immutable flags on symlinks so managed agent config symlinks are
-# not accidentally removed or replaced outside of an apply run. Only macOS can do
-# this from a user-scope activation; Linux enforces the contract by detection
-# instead — see the WHY in each Linux arm.
+# not removed or replaced outside an apply run. Only macOS can do this from a
+# user-scope activation; Linux enforces the contract by detection, see the WHY
+# in each Linux arm.
 
-# WHY: a flag change that genuinely fails is an error, not a warning, and an
-# absent path is not a failure at all — several managed symlinks are created by
-# the post-linkGeneration seeders, so unprotect/protect legitimately run before
-# they exist.  Failures return non-zero instead of exiting here because this
-# library is inlined into activation blocks via builtins.readFile and is sourced
-# by scripts that do not all provide `die`; every caller runs under `set -e`,
-# so the non-zero return aborts the activation.
+# WHY: a flag change that genuinely fails is an error, and an absent path is not
+# a failure at all: the post-linkGeneration seeders create several managed
+# symlinks, so unprotect/protect legitimately run before they exist. Failures
+# return non-zero instead of exiting because this library is inlined into
+# activation blocks and sourced by scripts that do not all provide `die`; every
+# caller runs under `set -e`, so the non-zero return aborts the activation.
 _nucleus_symlink_error() {
   _nse_context="$1"
   _nse_message="$2"
@@ -44,18 +36,13 @@ _nucleus_protect_symlink() {
     fi
     ;;
   Linux)
-    # WHY: this platform cannot set the immutable attribute from a user-scope
-    # activation. chattr requires CAP_LINUX_IMMUTABLE — "Only the superuser or a
-    # process possessing the CAP_LINUX_IMMUTABLE capability can set or clear this
-    # attribute" (chattr(1), https://man7.org/linux/man-pages/man1/chattr.1.html) —
-    # and Home Manager activation runs as the login user. nucleus deliberately does
-    # not ship e2fsprogs on that PATH: with the binary present the call would fail
-    # EPERM, and because a genuine flag failure is fatal here it would abort every
-    # NixOS apply. The contract is therefore enforced by detection rather than
-    # prevention: check step 13 (method-one-symlink-resolution) fails when a managed
-    # symlink does not resolve into the live repo, and
-    # home.activation.verify-managed-symlink-paths fails when a seeded path is
-    # missing. macOS keeps real prevention via uchg.
+    # WHY: chattr needs CAP_LINUX_IMMUTABLE, which a login-user activation does
+    # not have, and nucleus does not ship e2fsprogs on that PATH: with the
+    # binary present the call would fail EPERM, and a genuine flag failure is
+    # fatal here, so every NixOS apply would abort. The contract is enforced by
+    # detection instead: check step 13 fails when a managed symlink does not
+    # resolve into the live repo, and home.activation.verify-managed-symlink-paths
+    # fails when a seeded path is missing. macOS keeps prevention via uchg.
     ;;
   esac
 }
@@ -75,14 +62,12 @@ _nucleus_unprotect_symlink() {
     fi
     ;;
   Linux)
-    # WHY: see the matching arm in _nucleus_protect_symlink — the capability is
-    # unavailable in a user-scope activation, so there is nothing to clear and
-    # NixOS relies on detection (check step 13 + verify-managed-symlink-paths).
+    # WHY: see _nucleus_protect_symlink; the capability is unavailable in a
+    # user-scope activation, so NixOS relies on detection.
     ;;
   esac
 }
 
-# ensure_file_symlink TARGET LINK
 # Creates LINK as a symlink pointing to TARGET (a file).
 ensure_file_symlink() {
   _efs_target="$1"
@@ -102,7 +87,6 @@ ensure_file_symlink() {
   _nucleus_protect_symlink "VS Code" "$_efs_link"
 }
 
-# ensure_dir_symlink TARGET LINK
 # Creates LINK as a symlink pointing to TARGET (a directory).
 ensure_dir_symlink() {
   _eds_target="$1"

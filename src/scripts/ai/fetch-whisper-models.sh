@@ -2,12 +2,11 @@
 # Deploy the ggml speech-to-text weights pinned in the lockfile's `whisper`
 # section into <nucleus USER root>/models.
 #
-# The weights are a pkgs.fetchurl derivation, so the Nix store already enforced
-# the pinned hash at build time. This script only deploys and stays idempotent:
-# it compares the SHA-256 of the deployed copy with the SHA-256 of the store
-# source and rewrites the copy when they differ.
+# The weights are a pkgs.fetchurl derivation, so the store already enforced the
+# pinned hash at build time. This script only deploys: it compares the SHA-256
+# of the deployed copy against the store source and rewrites on a mismatch.
 #
-# WHY a copy rather than a symlink into /nix/store: a plain symlink under a home
+# WHY a copy rather than a symlink into /nix/store: a symlink under a home
 # directory is not a GC root, so nix-collect-garbage can delete the store path
 # and leave the link dangling. These weights are user data, not build output.
 #
@@ -31,9 +30,9 @@ _fwm_hash_of() {
   "$_fwm_sha256sum_bin" "$1" | cut -d' ' -f1
 }
 
-# Read the entries with mapfile and loop over the array rather than piping into
-# `while read`: a pipeline body runs in a subshell, so `die` inside it would
-# exit only that subshell and the activation would continue past the failure.
+# WHY: mapfile plus a loop, not a pipe into `while read`: a pipeline body runs
+# in a subshell, so `die` inside it would exit only that subshell and the
+# activation would continue past the failure.
 # shellcheck disable=SC2016 # reason: the jq program is single-quoted on purpose
 mapfile -t _fwm_entries < <(printf '%s' "$_fwm_models_json" | "$_fwm_jq_bin" -r '.[] | [.file, .source] | @tsv')
 

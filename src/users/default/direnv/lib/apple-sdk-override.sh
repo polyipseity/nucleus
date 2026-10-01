@@ -1,23 +1,15 @@
 #!/usr/bin/env bash
-# ---------------------------------------------------------------------------
-# apple-sdk _nix() override: filter DEVELOPER_DIR, SDKROOT, NIX_APPLE_SDK_VERSION
-# from nix print-dev-env output before nix-direnv caches them.
-# ---------------------------------------------------------------------------
+# apple-sdk _nix() override: filter DEVELOPER_DIR, SDKROOT, and
+# NIX_APPLE_SDK_VERSION out of nix print-dev-env before nix-direnv caches them.
 #
-# Why lib/ (not direnvrc):
-#   direnv auto-sources ~/.config/direnv/lib/*.sh before ~/.config/direnv/direnvrc
-#   and before the .envrc.  Since nix-direnv defines _nix in lib/hm-nix-direnv.sh,
-#   this override (sourced before direnvrc) takes effect before .envrc calls use_flake.
-#   See: https://direnv.net/man/direnv-stdlib.1.html
+# WHY lib/ and not direnvrc: direnv auto-sources lib/*.sh before direnvrc and
+# before .envrc, and nix-direnv defines _nix in lib/hm-nix-direnv.sh, so this
+# override lands before .envrc calls use_flake.
+# https://direnv.net/man/direnv-stdlib.1.html
 #
-# Why POSIX-only (not Windows):
-#   DEVELOPER_DIR, SDKROOT, and NIX_APPLE_SDK_VERSION are apple-sdk environment
-#   variables set by nix-support/setup-hook during macOS nix builds.  They don't
-#   exist on Linux (NixOS) or Windows — the grep is a no-op there, but the file
-#   is deployed on all POSIX hosts via the shared shell.nix module.  No conditional
-#   needed; the runtime behavior is correct on all platforms.
-#
-# See also: app-config-policy.instructions.md (Host-specific lib/ subdirectory convention)
+# WHY POSIX-only: the three variables are set by nix-support/setup-hook during
+# macOS nix builds. The grep is a no-op on Linux and Windows, and the file is
+# deployed on every POSIX host, so no platform conditional is needed.
 _nix() {
   local _has_pe=0
   for _arg in "$@"; do

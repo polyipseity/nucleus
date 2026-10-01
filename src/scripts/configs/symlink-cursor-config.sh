@@ -27,7 +27,7 @@ if [ ! -d "$_scc_agents_dir" ]; then
   exit 1
 fi
 
-# Ensure ~/.cursor exists as a real (writable) directory.
+# Ensure ~/.cursor is a real (writable) directory.
 if [ ! -d "$_scc_cursor_dir" ]; then
   mkdir "$_scc_cursor_dir"
   say -l "$_scc_label" "created $HOME/.cursor"
@@ -127,9 +127,8 @@ _scc_converge_mapped_file_symlinks \
   "$_scc_agents_dir/prompts" ".prompt.md" \
   "$_scc_cursor_dir/commands" ".md"
 
-# Class B: Cursor-native entries from the first-level merged cursor overlay.
-# settings.json is skipped here: it targets the IDE User dir (Class C), not
-# ~/.cursor/.
+# Class B: first-level merged cursor overlay, less settings.json, which class C
+# places in the IDE User dir instead.
 _scc_overlay_skip_names="rules agents commands skills settings.json"
 _nucleus_remove_stale_merged_symlinks \
   "$_scc_cursor_dir" "$_scc_username" "cursor" "$_scc_label" "$_scc_overlay_skip_names"
@@ -140,8 +139,8 @@ _nucleus_converge_merged_config_symlinks \
   "is not a managed symlink — merge any wanted content into the source entry and remove it, then re-run apply." \
   "$_scc_overlay_skip_names"
 
-# Class C: Cursor IDE settings — symlink settings.json into the IDE User dir
-# (separate from ~/.cursor/, which holds CLI-side config).
+# Class C: the Cursor IDE User dir, separate from ~/.cursor/ which holds
+# CLI-side config.
 case "$(uname -s)" in
 Darwin)
   _scc_ide_user_dir="$HOME/Library/Application Support/Cursor/User"

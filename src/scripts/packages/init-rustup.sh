@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Rustup initialisation for POSIX hosts.
-# Consumes rustup store path at activation time.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -10,10 +9,9 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 _rustup_bin="$1"
 _rustup_jq="${2:-jq}"
 
-# Read version pins from the consolidated lockfile so the toolchain is
-# reproducible (closes the drift root cause).  Falls back to the bare
-# channel if the lockfile is unavailable (best-effort, mirrors Windows
-# Invoke-RustupSetup.ps1).
+# WHY: the lockfile pin is the toolchain pin, so the install is reproducible.
+# Falls back to the bare channel when the lockfile is unavailable, mirroring
+# Invoke-RustupSetup.ps1.
 _rustup_lockfile=""
 # check-suppress:suppression_doc: repo-root auto-detection may fail on non-deployed hosts; absence falls back to bare stable.
 _rustup_repo_root="$(derive_repo_root 2>/dev/null || true)"
@@ -21,15 +19,14 @@ if [ -n "$_rustup_repo_root" ] && [ -f "$_rustup_repo_root/src/lockfiles/lockfil
   _rustup_lockfile="$_rustup_repo_root/src/lockfiles/lockfile.json"
 fi
 
-# Add rustup's directory to PATH so the tool is available for
-# subsequent operations that expect it on PATH.
+# Add rustup's directory to PATH for the operations that follow.
 _rustup_bin_dir="$(dirname "$_rustup_bin")"
 PATH="$_rustup_bin_dir:$PATH"
 export PATH
 
-# A missing store binary is a convergence failure, not a warning: the
-# activation entry exists precisely to initialise rustup, and cargo-binstall
-# depends on the stable toolchain it installs.
+# WHY: a missing store binary is a convergence failure, not a warning: this
+# activation entry exists to initialise rustup, and cargo-binstall depends on
+# the stable toolchain it installs.
 if [ ! -x "$_rustup_bin" ]; then
   die -l rustup "$_rustup_bin not found in nix store; cannot initialise the Rust toolchain"
 fi
@@ -40,17 +37,13 @@ fi
 "$_rustup_bin" default none
 say -l rustup "default toolchain set to none"
 
-# Install the stable toolchain so cargo +stable is available for
-# cargo-binstall compilation (fallback) and cargo install --list operations.
-# Mirrors Windows Invoke-RustupSetup desiredChannels=["stable"] behavior.
+# Install stable so cargo-binstall has a toolchain to compile with. Mirrors
+# Invoke-RustupSetup desiredChannels=["stable"].
 #
-# Toolchain spec construction (rustup grammar): the -YYYY-MM-DD archive-date
-# suffix is ONLY valid for nightly. stable/beta are rolling channels and
-# reject a date suffix, so a lockfile pin like "2026-04-14" must NOT be
-# appended to them. We therefore install the bare channel name for
-# stable/beta and use the pin verbatim only for nightly (where the date is a
-# real archive selector). The version pin for stable/beta is recorded in the
-# lockfile for tracking only, not used in the install spec.
+# WHY: the -YYYY-MM-DD archive-date suffix is only valid for nightly.
+# stable/beta are rolling channels and reject it, so a pin like "2026-04-14"
+# must not be appended to them: those install by bare channel name, with the
+# lockfile pin recorded for tracking only.
 _rustup_channels="stable"
 if [ -n "$_rustup_lockfile" ]; then
   # check-suppress:suppression_doc: jq parse failure on a malformed lockfile falls back to bare stable -- safe, the toolchain still installs.

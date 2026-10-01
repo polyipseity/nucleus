@@ -1,21 +1,14 @@
 # shellcheck shell=sh
+# Shared console user/UID resolution for macOS activation scripts. Source this
+# file (or inline it via Nix) in activation contexts that must run privileged
+# commands as the console session's user.
 #
-# Shared console user/UID resolution for macOS activation scripts.
-# Source this file (or inline via Nix) in activation script contexts
-# that need to resolve the current console session's user and run
-# privileged commands as that user.
+# WHY: the UID comes from stat(1) on /dev/console rather than from id(1) on the
+# username, so every caller resolves it the same way regardless of ordering.
 #
-# The function reads /dev/console directly via stat(1) rather than
-# deriving the UID from the username with id(1), making each caller
-# independent of activation ordering.
-#
-# Provides:
-#   _nucleus_resolve_console_user  — resolve console user into globals
-#   $_nucleus_console_uid          — numeric UID, e.g. 501
-#   $_nucleus_console_user         — short username, e.g. "jane"
-#
-# Returns 0 on success.  Returns 1 when /dev/console is inaccessible
-# (headless/SSH session), empty, or the UID is 0 (root session).
+# _nucleus_resolve_console_user fills $_nucleus_console_uid and
+# $_nucleus_console_user, and returns 1 when /dev/console is inaccessible
+# (headless or SSH session), empty, or owned by root.
 
 _nucleus_resolve_console_user() {
   _nucleus_console_uid="$(/usr/bin/stat -f%u /dev/console 2>/dev/null || true)"   # check-suppress:suppression_doc: /dev/console inaccessible in headless/SSH session; handled by the empty check below

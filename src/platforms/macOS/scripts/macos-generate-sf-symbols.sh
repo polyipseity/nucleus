@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # Generate the SF Symbols name list from the macOS SFSymbols private framework.
 #
-# SF Symbols is an Apple-only API, so the list is macOS-only data and is never
-# committed; it is regenerated on every nucleus-apply into the macOS USER root's
-# state directory. The sf-symbols skill greps that generated file instead of a
-# committed copy, so it tracks whatever macOS version is installed.
+# The list is Apple-only data, so it is never committed: every nucleus-apply
+# regenerates it into the macOS USER root's state directory, and the sf-symbols
+# skill greps that file, so it tracks the installed macOS version.
 #
 # Two Apple plists back the list:
 #   CoreGlyphs.bundle        public symbols
@@ -14,8 +13,6 @@
 # older `plutil -p | grep '=>'` recipe did. The private bundle also ships
 # internal placeholders whose keys begin with a 32-character uppercase hex ID;
 # those are filtered out, leaving names only.
-#
-# Usage: macos-generate-sf-symbols.sh <plutil-bin> <grep-bin> <sort-bin> <cmp-bin>
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -41,8 +38,8 @@ trap 'rm -f "$_tmp"' EXIT
   "$_plutil_bin" -extract symbols raw -o - "${_framework_resources}/CoreGlyphsPrivate.bundle/Contents/Resources/name_availability.plist"
 } | "$_grep_bin" -vE '^[0-9A-F]{32}' | LC_ALL=C "$_sort_bin" -u >"$_tmp"
 
-# Idempotent: the output is deterministic, so a rerun on the same macOS leaves
-# the file byte-identical and its mtime untouched.
+# WHY: the output is deterministic, so a rerun on the same macOS leaves the
+# file byte-identical and its mtime untouched.
 if [ -f "$_out" ] && "$_cmp_bin" -s "$_tmp" "$_out"; then
   rm -f "$_tmp"
 else

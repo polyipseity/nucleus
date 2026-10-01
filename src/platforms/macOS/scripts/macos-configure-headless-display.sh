@@ -2,19 +2,9 @@
 # Maintain exactly one BetterDisplay virtual screen named "HeadlessDisplay"
 # and keep it connected for clamshell remote-desktop fallback.
 #
-# BetterDisplay free-tier constraint:
-#   Runtime `set -connected=on` can fail without Pro on some builds, even
-#   for virtual screens. To avoid paid-feature dependencies, this script
-#   repairs state by recreating the virtual screen with `-connected=on`
-#   instead of relying on connection toggles.
-#
-# Steps:
-#   1. Launch BetterDisplay in the background if it is not already running.
-#   2. Query BetterDisplay identifiers for `HeadlessDisplay`.
-#   3. If there are zero/multiple instances, rebuild to one clean instance.
-#   4. If the single instance exists but is disconnected, rebuild it.
-#
-# No-op if BetterDisplay is not installed.
+# WHY: runtime `set -connected=on` can fail without Pro on some builds, even for
+# virtual screens, so the screen is recreated with `-connected=on` rather than
+# toggled. No-op if BetterDisplay is not installed.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -32,17 +22,13 @@ _bd_cli() {
 }
 
 create_headless_display() {
-  # Use documented virtual-screen parameters and force connected state at
-  # creation time so fallback remains available with the lid closed.
-  # Source: BetterDisplay CLI virtual-screen flags.
+  # WHY: the flags come from the BetterDisplay CLI virtual-screen docs.
   # https://github.com/waydabber/BetterDisplay/wiki
-  #
-  # multiplierStep x aspect is the logical size, and -virtualScreenHiDPI doubles
+  # multiplierStep x aspect is the logical size and -virtualScreenHiDPI doubles
   # it into the framebuffer: 80 x 16:10 = 1280x800 logical / 2560x1600
-  # framebuffer. That matches the built-in display's own logical size, so a
-  # remote session sees the same layout as the local screen. The heartbeat
-  # recreate path passes the same value; tests/scripts/macos-headless-display-tests.sh
-  # fails if the two sites drift.
+  # framebuffer, matching the built-in display's logical size so a remote
+  # session sees the same layout. macos-heartbeat-betterdisplay.sh passes the
+  # same value and macos-headless-display-tests.sh fails if the two drift.
   "$BD_BIN" create \
     -type=VirtualScreen \
     -virtualScreenName="$DISPLAY_NAME" \
@@ -54,8 +40,7 @@ create_headless_display() {
 }
 
 discard_headless_displays() {
-  # Discard by BetterDisplay tag IDs so we only touch managed virtual
-  # screens and avoid affecting physical monitors.
+  # Discard by tag ID so only managed virtual screens are touched.
   for tag_id in $1; do
     if ! "$BD_BIN" discard -tagID="$tag_id"; then
       die "failed to discard duplicate BetterDisplay virtual screen tagID=$tag_id."

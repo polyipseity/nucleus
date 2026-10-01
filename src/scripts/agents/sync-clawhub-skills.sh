@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # ClawHub fetched skill convergence (install + stale cleanup).
-# Consumes tool paths, PATH guards, and the manifest path at activation time;
-# the repo root is resolved via derive_repo_root() so the manifest is read from
-# the live checkout, never a read-only Nix store snapshot.
+# WHY: the repo root is resolved via derive_repo_root() so the manifest is read
+# from the live checkout, never a read-only Nix store snapshot.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -17,21 +16,16 @@ _scs_path_append="$3"
 _scs_manifest_rel="$4"
 _scs_clawhub_bin="$5"
 
-# Resolve the live repo root at activation time.
 _scs_repo_root="$(derive_repo_root)" || die -l clawhub "cannot resolve repo root for the fetched skill manifest"
 
 _scs_do_sync=true
 
-# Add managed bin directories (managed-paths.nix pathComponents) to PATH
-# so the ClawHub binary installed by install-bun-packages is on PATH for
-# this activation step.
+# Add the managed bin directories (managed-paths.nix pathComponents) so the
+# ClawHub binary installed by install-bun-packages is on PATH here.
 PATH="${_scs_path_prepend}$PATH${_scs_path_append}"
 export PATH
 
-# Path to the declarative fetched skill manifest.  Slugs listed here are
-# downloaded by ClawHub; slugs absent from the manifest are cleaned up
-# from ~/.agents/skills/ when their .clawhub/origin.json marker is
-# present.
+# The manifest lists the fetched slugs; a slug absent from it is stale.
 _scs_manifest="$_scs_repo_root/$_scs_manifest_rel"
 if [ ! -f "$_scs_manifest" ]; then
   say -l clawhub "manifest not found at $_scs_manifest; skipping fetched skill sync"
@@ -50,16 +44,13 @@ fi
 
 _scs_skills_dir="$HOME/.agents/skills"
 
-# Ensure ~/.agents/skills/ exists.  The skills activation creates
-# it during home-manager switch; this guards against running before that
-# activation has run.
+# WHY: the skills activation creates this during home-manager switch; guard
+# against running before that activation has run.
 if [ ! -d "$_scs_skills_dir" ]; then
   mkdir -p "$_scs_skills_dir"
 fi
 
-# Probe for the ClawHub CLI.  ClawHub must be pre-installed by the
-# install-bun-packages activation before this step is called; this step
-# never installs ClawHub itself.
+# install-bun-packages owns installing the ClawHub CLI; this step never does.
 if [ "$_scs_do_sync" = true ] && ! command -v clawhub >/dev/null 2>&1; then
   warn -l clawhub "clawhub not found in PATH; install-bun-packages must complete before fetched skill sync; skipping"
   _scs_do_sync=false
@@ -68,10 +59,8 @@ fi
 if [ "$_scs_do_sync" = true ]; then
   say -l clawhub "running fetched skill sync..."
 
-  # Install or update each skill from the manifest.
-  #   --workdir "$HOME/.agents" installs to $HOME/.agents/skills/<slug>/
-  #                            (default --dir value is "skills")
-  #   --no-input               disables interactive prompts for apply safety
+  # --workdir "$HOME/.agents" installs to $HOME/.agents/skills/<slug>/
+  #   (the default --dir is "skills"); --no-input keeps it non-interactive
   while IFS= read -r _scs_slug; do
     [ -z "$_scs_slug" ] && continue
     _scs_skill_path="$_scs_skills_dir/$_scs_slug"
@@ -88,8 +77,8 @@ if [ "$_scs_do_sync" = true ]; then
       chmod -R u+w "$_scs_skill_path"
     fi
     say -l clawhub "installing/updating fetched skill '$_scs_slug'..."
-    # Best-effort: non-zero exit from ClawHub is non-fatal because the
-    # system apply already succeeded and skill sync is additive.
+    # WHY: a non-zero exit from ClawHub is non-fatal, because the system apply
+    # already succeeded and skill sync is additive.
     if "$_scs_clawhub_bin" install --workdir "$HOME/.agents" --no-input "$_scs_slug"; then
       # Lock installed content so files cannot be modified outside a
       # managed apply run.  The unlock above re-opens write access before

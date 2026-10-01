@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
-# Configure or revert fake Wi-Fi on an Android guest via the virt_wifi kernel module.
-# Requires root (su) on the guest. Called by android-config.sh and nucleus-vm android-config.
-#
-# Usage: android-fake-wifi.sh enable|revert <adb-serial>
-#
-# Environment: none required beyond a working adb in PATH.
+# Configure or revert fake Wi-Fi on an Android guest via the virt_wifi kernel
+# module. Needs root (su) on the guest. Called by android-config.sh and
+# nucleus-vm android-config.
 set -euo pipefail
 
 SCRIPT_DIR="${NUCLEUS_ANDROID_CONFIG_DIR:-}"
@@ -24,8 +21,8 @@ usage() {
   usage_std "$(basename "$0")" "enable|revert <adb-serial>"
 }
 
-# Guest script run under su to load virt_wifi and create wlan0 from the virtio ethernet NIC.
-# Lineage virtio targets use eth0 only; rename it so ConnectivityService treats wlan0 as Wi-Fi.
+# WHY: a lineage virtio target exposes eth0 only, and Android's
+# ConnectivityService only treats wlan0 as Wi-Fi, so the NIC is renamed.
 vm_android_fake_wifi_guest_setup_script() {
   cat "$SCRIPT_DIR/android-fake-wifi-guest-setup.sh"
 }
@@ -35,7 +32,8 @@ vm_android_fake_wifi_guest_revert_script() {
   cat "$SCRIPT_DIR/android-fake-wifi-guest-revert.sh"
 }
 
-# TCP ADB can list "device" while shell hangs until disconnect+reconnect.
+# WHY: TCP ADB can report "device" while the shell hangs, so the session is
+# dropped and reconnected instead of waiting on a hung probe.
 vm_android_fake_wifi_adb_reconnect() {
   _vafw_serial="$1"
   # check-suppress:suppression_doc: disconnect drops stale sessions; reconnect kicks the host-side transport.
@@ -104,9 +102,9 @@ vm_android_fake_wifi_run_as_root() {
   return 1
 }
 
-# Run a multi-line guest script via su without fragile nested quoting.
-# When ASYNC=true, set NUCLEUS_FAKE_WIFI_ASYNC=1 so link changes run in a guest
-# background subshell (eth0 carries the forwarded ADB port).
+# Run a guest script via su without nested quoting. ASYNC=true sets
+# NUCLEUS_FAKE_WIFI_ASYNC=1 so the link change runs in a guest background
+# subshell, since eth0 carries the forwarded ADB port.
 vm_android_fake_wifi_run_guest_script() {
   _vafw_serial="$1"
   _vafw_script="$2"
@@ -121,7 +119,7 @@ vm_android_fake_wifi_run_guest_script() {
   fi
 }
 
-# Poll only immediately after an async guest link change (not on idle reconnects).
+# Poll only right after an async guest link change, not on idle reconnects.
 vm_android_fake_wifi_wait_for_adb_after_async() {
   _vafw_serial="$1"
   _vafw_timeout="${2:-30}"

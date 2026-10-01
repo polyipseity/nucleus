@@ -1,11 +1,5 @@
 # shellcheck shell=bash
-# Mount backend for Linux: fuse3.
-# Implements the backend_* interface for the cloud-mount core runner.
-#
-# No filesystem extension concept — all failures are classified by error text.
-#
-# Usage:
-#   . "$SCRIPT_DIR/../lib/mount-backend-linux.sh"
+# Mount backend for Linux: fuse3. Failures are classified by error text.
 
 [ -n "${_NUCLEUS_MOUNT_BACKEND_LINUX_SOURCED-}" ] && return
 _NUCLEUS_MOUNT_BACKEND_LINUX_SOURCED=1
@@ -18,7 +12,6 @@ _MOUNT_BACKEND_LINUX_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" 
 # shellcheck source=svc-instances.sh
 [ -n "${_NUCLEUS_SVC_INSTANCES_SOURCED-}" ] || . "$_MOUNT_BACKEND_LINUX_DIR/svc-instances.sh"
 
-# backend_class — classify a failure from stderr capture.
 backend_class() {
   local capture="$1"
   [ -f "$capture" ] || {
@@ -54,7 +47,6 @@ backend_class() {
   printf 'mount-failed\n'
 }
 
-# backend_remedy — return the remedy text for a class.
 backend_remedy() {
   local class="$1"
   case "$class" in
@@ -66,7 +58,6 @@ backend_remedy() {
   esac
 }
 
-# backend_is_transient — return 0 if the class is transient (retryable).
 backend_is_transient() {
   local class="$1"
   case "$class" in
@@ -75,11 +66,9 @@ backend_is_transient() {
   return 1
 }
 
-# backend_prepare — ensure fuse3 is available.
 backend_prepare() {
   local instance="$1"
 
-  # Check if fuse module is loaded.
   if [ ! -e /dev/fuse ]; then
     if command -v modprobe >/dev/null 2>&1; then
       # check-suppress:suppression_doc: best-effort modprobe; may fail on non-modular kernels
@@ -91,7 +80,6 @@ backend_prepare() {
     fi
   fi
 
-  # Verify fusermount3 is available.
   if ! command -v fusermount3 >/dev/null 2>&1; then
     svc_health_set_blocked "$instance" "mount-failed" "fusermount3 not found; install fuse3"
     return 20
@@ -100,7 +88,6 @@ backend_prepare() {
   return 0
 }
 
-# backend_args — emit Linux-specific rclone mount flags.
 backend_args() {
   local remote="$1" mount_point="$2" read_only="$3" extra_args="$4"
 
@@ -126,7 +113,6 @@ backend_args() {
   fi
 }
 
-# backend_mount — invoke rclone.
 backend_mount() {
   local rclone_bin="$1"
   shift
@@ -141,35 +127,24 @@ _backend_rclone_pid=""
 # Args: $1 — mount point.
 # Prints: present, absent:<reason> or unknown:<reason>. Always returns 0.
 # WHY: the question is MOUNT STATE, never directory contents. An empty remote
-#   root is a legitimate state (a freshly created cloud folder), so a content
-#   test reports a healthy mount as dead: the runner never sets live, retries
-#   `mountAttempts` times, and leaves the service permanently blocked at
-#   `mount-failed` on a mount that actually succeeded. This is the same question
-#   the macOS backend asks via diskutil, answered here with this host's mount
-#   state.
-# WHY: the three values rather than a bare status. The two-valued predicate
-#   answers 0 both for a live mount and for a table that could not be read, so
-#   that no caller starts a mount on a volume it could not disprove. The attach
-#   wait loop in rclone-mount.sh is a caller that reports rather than acts — it
-#   sets live on the answer, and then records the service running and deletes the
-#   capture file — so it reads this instead and keeps the third value.
-# WHY: delegating rather than re-parsing is what keeps one implementation of the
-#   question. Every mount-state caller on this platform answers through
-#   svc_mount_table_state: this function, the predicate svc_wait_mount_released
-#   polls, and the two probes `nucleus-cloud repair` runs, so none of them can
-#   disagree about whether a mount point is mounted.
+#   root is a legitimate state, so a content test reports a healthy mount as
+#   dead and the service stays blocked at `mount-failed` on a mount that
+#   succeeded.
+# WHY: three values, because a two-valued predicate answers "live" for a table
+#   that could not be read, and a caller would then act on a volume it could not
+#   disprove.
+# WHY: delegating keeps one implementation. Every mount-state caller on this
+#   platform answers through svc_mount_table_state, so none can disagree.
 backend_probe_state() {
   svc_mount_table_state "$1"
 }
 
-# backend_unmount — release the volume.
 backend_unmount() {
   local mount_point="$1"
   # check-suppress:suppression_doc: best-effort unmount; fusermount may fail if nothing is mounted
   fusermount3 -u "$mount_point" 2>/dev/null || true
 }
 
-# backend_repair — unmount and remount.
 backend_repair() {
   local mount_point="${1:-}"
   if [ -n "$mount_point" ]; then

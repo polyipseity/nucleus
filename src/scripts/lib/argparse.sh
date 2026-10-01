@@ -1,9 +1,6 @@
 # shellcheck shell=sh
-# Shared CLI argument parser for nucleus activation bundle scripts.
-#
-# Source this at the top of each bundle script via:
-#   SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-#   . "$SCRIPT_DIR/../lib/argparse.sh"
+# Shared CLI argument parser for nucleus activation bundle scripts. Source it at
+# the top of a bundle script via SCRIPT_DIR-relative dot-sourcing.
 #
 # Parsing convention:
 #   --key value    — stores "$key=$value" in _ab_args
@@ -17,10 +14,9 @@
 #   _ab_positional        — semicolon-joined positional args (use IFS splitting)
 #   _ab_positional_count  — number of positional args
 #
-# All internal names start with _ab_ to avoid collision.
-# Uses read/printf with IFS=\n for multi-line safety.
+# Internal names start with _ab_ to avoid collision. read/printf run with IFS
+# set to newline for multi-line safety.
 
-# Reset state
 _ab_args_file=$(mktemp)
 _ab_positional_file=$(mktemp)
 _ab_positional_count=0
@@ -63,7 +59,7 @@ _ab_parse_args() {
   done
 }
 
-# _ab_get_arg KEY — prints the value for --KEY, empty if not set
+# Prints the value for --KEY, empty if not set
 _ab_get_arg() {
   _ab_key="$1"
   while IFS= read -r _ab_line; do
@@ -95,5 +91,4 @@ _ab_cleanup() {
   rm -f "$_ab_args_file" "$_ab_positional_file"
 }
 
-# Registers cleanup on EXIT
 trap _ab_cleanup EXIT

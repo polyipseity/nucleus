@@ -5,11 +5,10 @@
 # Schedule: 18:00 -> 06:00, colour temperature 50 % (~4000 K).
 # Source: https://github.com/smudge/nightlight
 #
-# WHY: Night Shift operations (temperature, schedule, on/off) require a live
-# GUI session with CoreBrightness XPC available.  During headless activation
-# (no display attached, lid closed, or remote SSH) these commands fail even
-# though the configuration is correct.  Downgraded to warnings so activation
-# continues; the setting will take effect on next GUI login.
+# WHY: Night Shift operations (temperature, schedule, on/off) need a live GUI
+# session with CoreBrightness XPC available. During headless activation (no
+# display, lid closed, or remote SSH) they fail even though the configuration is
+# correct, so they warn and the setting takes effect at next GUI login.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -24,9 +23,9 @@ if [ -x "/opt/homebrew/bin/nightlight" ]; then
     warn "failed to configure Nightlight schedule."
   fi
 
-  # Read current temperature; skip setting if already at target value.
-  # When the console user has a GUI session, run via launchctl asuser so
-  # the CoreBrightness XPC service (needs WindowServer) is reachable.
+  # Skip setting when the temperature already sits at the target.
+  # WHY: launchctl asuser reaches the CoreBrightness XPC service, which needs
+  # WindowServer and therefore a real GUI session.
   current_temp=$("$NL_BIN" temp 2>/dev/null || true) # check-suppress:suppression_doc: nightlight temp can fail in headless activation (no GUI XPC); idempotency path must not abort
   if [ "$current_temp" != "50" ]; then
     if _nucleus_resolve_console_user; then
