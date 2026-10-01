@@ -156,23 +156,32 @@ for _fixture in "NucleusProbeFixtureObj:9.9.9" "NucleusProbeFixturePlain:8.8.8";
   fi
 done
 
-# A pinned version that cannot match the installed one proves the probe really
-# queries the installed module rather than only echoing the pin.
+# A pin that cannot match the installed version proves the probe queries the
+# installed module instead of echoing the pin. A fixture module on PSModulePath
+# supplies the installed side, so the assertion holds on a host that has no
+# PSGallery module installed at all.
+_FAKE_MOD="NucleusDriftProbe"
+_FAKE_VER="0.0.1"
+_FAKE_PIN="9.9.9"
+_FAKE_ROOT="$(mktemp -d)"
+mkdir -p "$_FAKE_ROOT/$_FAKE_MOD"
+printf '%s\n' "@{ ModuleVersion = \"$_FAKE_VER\"; RootModule = \"$_FAKE_MOD.psm1\" }" >"$_FAKE_ROOT/$_FAKE_MOD/$_FAKE_MOD.psd1"
+: >"$_FAKE_ROOT/$_FAKE_MOD/$_FAKE_MOD.psm1"
 _drift_out="$(
   set +e
+  export PSModulePath="$_FAKE_ROOT${PSModulePath:+:$PSModulePath}"
   # shellcheck disable=SC1090 # reason: repo-root-relative path, resolved at runtime
   . "$REPO_ROOT/src/scripts/lib/lib.sh"
   # shellcheck disable=SC1090 # reason: repo-root-relative path, resolved at runtime
   . "$ENFORCEMENT_LIB"
-  _lfe_check_psgallery '{"psgallery":{"Pester":"0.0.1","PSScriptAnalyzer":{"hash":"'"$SRI_ABC"'","version":"0.0.1"}}}' jq 2>&1
+  _lfe_check_psgallery "{\"psgallery\":{\"$_FAKE_MOD\":\"$_FAKE_PIN\"}}" jq 2>&1
   echo "probe-run-complete"
 )"
-for _mod in Pester PSScriptAnalyzer; do
-  if printf '%s\n' "$_drift_out" | grep -qE "psgallery.$_mod: expected 0\.0\.1, installed [0-9]"; then
-    assert_pass "the probe compares the $_mod pin against the installed version"
-  else
-    assert_fail "the probe compares the $_mod pin against the installed version" "$(printf '%s' "$_drift_out" | tr '\n' '|')"
-  fi
-done
+rm -rf "$_FAKE_ROOT"
+if printf '%s\n' "$_drift_out" | grep -qF "psgallery.$_FAKE_MOD: expected $_FAKE_PIN, installed $_FAKE_VER"; then
+  assert_pass "the probe compares the pin against the installed version"
+else
+  assert_fail "the probe compares the pin against the installed version" "$(printf '%s' "$_drift_out" | tr '\n' '|')"
+fi
 
 finish_tests
