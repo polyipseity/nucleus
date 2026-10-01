@@ -1,25 +1,18 @@
 #!/usr/bin/env bash
-# Device detection and config-push library for CamillaDSP playback device
-# selection. Sourced by camilladsp-run.sh and camilladsp-heartbeat.sh. Needs
-# python3 (yaml), websocat, jq, SwitchAudioSource (macOS),
-# shasum/sha256sum and wpctl/pactl/aplay (Linux).
+# Device detection and config-push library for CamillaDSP playback device selection,
+# sourced by camilladsp-run.sh and camilladsp-heartbeat.sh. Needs python3 (yaml),
+# websocat, jq, SwitchAudioSource (macOS), shasum/sha256sum and wpctl/pactl/aplay
+# (Linux).
 #
-# Detection order for a null devices.playback.device: system default output,
-# last saved default validated against the available devices, first available in
-# sorted-name order. The capture device is never selected, since playback and
-# capture on one device is an audio loop.
+# Detection order for a null devices.playback.device: system default output, last saved
+# default validated against the available devices, first available in sorted-name order.
+# The capture device is never selected, since playback and capture on one device is an
+# audio loop.
 #
-# The raw enumerator is expensive on macOS (system_profiler, coreaudiod and TCC
-# work), so anything inside a polling loop uses the cached wrapper, which
-# re-enumerates the moment the probe, capture device, TTL or a required device
-# says the cache cannot answer.
-#
-# State files under ${XDG_STATE_HOME:-$HOME/.local/state}/camilladsp/:
-#   last-device.txt         last device pushed, fallback when no default is detected
-#   last-push.txt           fingerprint of the last config pushed
-#   available-devices.txt   cached device enumeration
-#   available-devices.meta  cache key: probe, capture device, timestamp
-# Touched once per config push (heartbeat tick), never by the run supervisor.
+# The raw enumerator is expensive on macOS (system_profiler, coreaudiod and TCC work),
+# so anything inside a polling loop uses the cached wrapper, which re-enumerates the
+# moment the probe, capture device, TTL or a required device says the cache cannot
+# answer.
 set -euo pipefail
 
 _LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -44,12 +37,10 @@ CAMILLADSP_LAST_PUSH_FILE="$CAMILLADSP_STATE_DIR/last-push.txt"
 CAMILLADSP_DEVICE_CACHE_FILE="$CAMILLADSP_STATE_DIR/available-devices.txt"
 CAMILLADSP_DEVICE_CACHE_META_FILE="$CAMILLADSP_STATE_DIR/available-devices.meta"
 
-# Safety net for device changes the probe cannot observe, not the latency bound
-# for observable changes, which re-enumerate immediately.
+# Safety net for device changes the probe cannot observe, not the latency bound for observable changes, which re-enumerate immediately.
 camilladsp_device_cache_ttl() { printf '%s' "${CAMILLADSP_DEVICE_CACHE_TTL:-300}"; }
 
-# macOS: SwitchAudioSource -c answers the default output name in <1ms with no
-# TCC cost, unlike system_profiler. Needs switchaudio-osx from managedPackages.
+# macOS: SwitchAudioSource -c answers the default output name in <1ms with no TCC cost, unlike system_profiler. Needs switchaudio-osx from managedPackages.
 _camilladsp_detect_macos() {
   SwitchAudioSource -c 2>/dev/null || return 1
 }
@@ -103,9 +94,7 @@ camilladsp_detect_default_output() {
   esac
 }
 
-# macOS: enumerate output-capable devices (presence of coreaudio_device_output),
-# excluding the capture device. Device flags are flat top-level keys on real
-# system_profiler output.
+# macOS: enumerate output-capable devices (presence of coreaudio_device_output), excluding the capture device. Device flags are flat top-level keys on real system_profiler output.
 _camilladsp_list_available_macos() {
   local capture_device="$1"
   local output
@@ -179,11 +168,7 @@ camilladsp_list_available_devices() {
   esac
 }
 
-# Reuse the cached list only when the probe and the capture device are unchanged,
-# required_device is absent or listed, and the cache is younger than the TTL.
-# Requiring a device the caller needs is what keeps the stale-entry path honest:
-# a caller looking for an unlisted device gets a fresh read on the same tick, so
-# device removal is noticed within one tick.
+# Reuse the cached list only when the probe and capture device are unchanged, required_device is absent or listed, and the cache is younger than the TTL. Requiring a device the caller needs is what keeps the stale-entry path honest: a caller looking for an unlisted device gets a fresh read on the same tick, so device removal is noticed within one tick.
 camilladsp_list_available_devices_cached() {
   local capture_device="$1"
   local probe="$2"
@@ -228,9 +213,7 @@ camilladsp_list_available_devices_cached() {
   printf '%s\n' "$devices"
 }
 
-# Called when camilladsp rejects a config, since the resolved device is probably
-# gone even though the cache still lists it. Deliberately not called on transport
-# failures: an unreachable websocket must not make every tick re-enumerate.
+# Called when camilladsp rejects a config, since the resolved device is probably gone even though the cache still lists it. Deliberately not called on transport failures: an unreachable websocket must not make every tick re-enumerate.
 camilladsp_invalidate_device_cache() {
   rm -f "$CAMILLADSP_DEVICE_CACHE_FILE" "$CAMILLADSP_DEVICE_CACHE_META_FILE"
 }
@@ -241,9 +224,7 @@ camilladsp_detect_first_available() {
   camilladsp_list_available_devices_cached "$capture_device" "$probe" | head -1
 }
 
-# Used when enumeration succeeds and the saved device is genuinely gone (state
-# copied from another machine): without this every later tick retries the same
-# doomed lookup.
+# Used when enumeration succeeds and the saved device is genuinely gone (state copied from another machine): without this every later tick retries the same doomed lookup.
 camilladsp_clear_last_device() {
   rm -f "$CAMILLADSP_LAST_DEVICE_FILE"
 }
@@ -255,7 +236,6 @@ camilladsp_save_last_device() {
   printf '%s' "$device" >"$CAMILLADSP_LAST_DEVICE_FILE"
 }
 
-# Returns 1 when the state file is missing or empty.
 camilladsp_load_last_device() {
   if [ -s "$CAMILLADSP_LAST_DEVICE_FILE" ]; then
     cat "$CAMILLADSP_LAST_DEVICE_FILE"
@@ -264,12 +244,9 @@ camilladsp_load_last_device() {
   return 1
 }
 
-# --- Main resolve function ---
-
 camilladsp_resolve_playback_device() {
   local config_file="$1"
 
-  # Single Python call: read playback device and capture device in one pass.
   local _devices
   local _tmpfile
   _tmpfile=$(mktemp) || {
@@ -298,17 +275,14 @@ PYEOF
     return 0
   fi
 
-  # The raw probe value doubles as the device-cache key, so keep it before the
-  # capture-device rejection below. `|| true` rather than `|| _probe=""`: a
-  # detector that prints a name but exits non-zero still yields that name.
+  # WHY: the raw probe value doubles as the device-cache key, so keep it before the capture-device rejection below. `|| true` rather than `|| _probe=""`, because a detector that prints a name but exits non-zero still yields that name.
   local _probe
   # check-suppress:suppression_doc: detection failure is non-fatal — falls through to fallback path
   _probe=$(camilladsp_detect_default_output 2>/dev/null) || true
 
   local detected_device="$_probe"
 
-  # Hard invariant: the capture device must never become playback, which would
-  # create an audio loop (output to capture to processed output).
+  # Hard invariant: the capture device must never become playback, which would create an audio loop (output to capture to processed output).
   if [ -n "$detected_device" ] && [ "$detected_device" = "$capture_device" ]; then
     detected_device=""
   fi
@@ -359,8 +333,6 @@ PYEOF
   rm -f "$_patchfile"
 }
 
-# --- Push decision and config push ---
-
 # The device detection would currently select, or empty when it yields nothing.
 # The heartbeat uses it to see whether the live device drifted from the desired one.
 camilladsp_target_playback_device() {
@@ -379,12 +351,8 @@ except Exception:
 "
 }
 
-# Pure skip decision. Returns 1 (skip) only when camilladsp is Running, the live
-# device equals the target, and the config still matches the last push, so the
-# heartbeat re-pushes on a changed default output or an edited config.
-# A null target is skipped only while Running; a stopped instance is still
-# pushed, because the resolver falls back to the first available device and a
-# null device is never actually pushed.
+# Pure skip decision. Returns 1 (skip) only when camilladsp is Running, the live device equals the target, and the config still matches the last push, so the heartbeat re-pushes on a changed default output or an edited config.
+# A null target is skipped only while Running; a stopped instance is still pushed, because the resolver falls back to the first available device and a null device is never actually pushed.
 camilladsp_needs_push() {
   local state="$1"
   local live_device="$2"
@@ -401,8 +369,7 @@ camilladsp_needs_push() {
   return 0
 }
 
-# The config stores a null playback device, so the device must be part of the
-# fingerprint; otherwise a device change would look like no change.
+# WHY: the config stores a null playback device, so the device must be part of the fingerprint; otherwise a device change would look like no change.
 camilladsp_config_fingerprint() {
   local config_file="$1"
   local target_device="$2"
@@ -432,8 +399,7 @@ camilladsp_record_push() {
   printf '%s' "$fingerprint" >"$CAMILLADSP_LAST_PUSH_FILE"
 }
 
-# Resolve the config and push it via SetConfig over the websocket API, retrying
-# with a fixed delay. --device skips resolution and patches the config directly.
+# Resolve the config and push it via SetConfig over the websocket API, retrying with a fixed delay. --device skips resolution and patches the config directly.
 camilladsp_push_config() {
   local ws_port="${WS_PORT:-1234}"
   local config_file="$HOME/.config/camilladsp/configs/config.yml"
@@ -512,8 +478,7 @@ print(d if d is not None else '')
         fi
         return 0
       fi
-      # Rejected by camilladsp rather than unreachable, so the resolved device is
-      # probably gone even though the cache still lists it.
+      # Rejected by camilladsp rather than unreachable, so the resolved device is probably gone even though the cache still lists it.
       camilladsp_invalidate_device_cache
     fi
     [ "$_i" -lt "$retries" ] && sleep "$retry_delay"

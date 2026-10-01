@@ -1,30 +1,18 @@
 #!/usr/bin/env bash
-# Managed cargo-binstall package convergence (install + zap).
-# Consumes the desired crate list from src/modules/packages/desired.json at
-# activation time; versions are pinned by the lockfile `cargo-binstall` section.
+# Managed cargo-binstall package convergence (install + zap). Reads the desired crate
+# list from src/modules/packages/desired.json at activation time; versions are pinned by
+# the lockfile `cargo-binstall` section. Install priority: nixpkgs > cargo binstall >
+# cargo > bun > uv.
 #
-# Cargo resolution: uses nixpkgs cargo directly (store-path arg).
-# cargo-binstall is also supplied as a store-path arg (arg 5), not probed
-# from PATH — ShellCheck cannot verify PATH-resolved commands at activation
-# time, so external tools must be passed by absolute store path.
-# Runtime path probing (~/.cargo/bin) is prohibited.
-# External tools MUST be passed as absolute store-path arguments; bare
-# PATH-resolved commands are forbidden and enforced by the
-# `activation-tool-resolution` check (step 17).
-#
-# RUSTC_WRAPPER: set to the absolute sccache store path (arg 6, optional — an
-# empty value leaves the wrapper unset) so cargo
-# (invoked by cargo-binstall's compilation fallback) finds sccache even
-# though Home Manager activation resets PATH.
-#
-# Install priority: nixpkgs > cargo binstall > cargo > bun > uv.
+# External tools MUST be passed as absolute store-path arguments: ShellCheck cannot
+# verify PATH-resolved commands at activation time, so bare commands are forbidden and
+# the activation-tool-resolution check (step 17) enforces it. Runtime probing of
+# ~/.cargo/bin is prohibited.
 set -euo pipefail
 
-# SC2094 avoidance: trap-based cleanup eliminates read/write-same-file
-# pipeline warnings — temp files are cleaned on EXIT instead of inline.
-# Every name the cleanup trap touches is declared here, so the trap stays
-# safe under `set -u` when it fires on an early abort before the mktemp
-# assignments have run.
+# WHY: the cleanup trap runs on EXIT instead of inline, which also clears the SC2094
+# read/write-same-file warning. Every name it touches is declared here so it stays safe
+# under `set -u` when it fires before the mktemp assignments have run.
 _icp_desired=""
 _icp_installed=""
 _icp_installed_versions=""
@@ -42,19 +30,13 @@ _icp_gawk_bin="$2"
 _icp_desired_crates_json="$3"
 _icp_cargo_bin="$4"
 _icp_cargo_binstall_bin="$5"
-# WHY: ${6:-} not $6 — sccache is optional (the RUSTC_WRAPPER block below
-# only sets it when non-empty), so a caller that has no sccache store path
-# must be able to omit the argument entirely. Under `set -u` a bare `$6`
-# aborted before the optionality check could ever run.
+# WHY: ${6:-} not $6, because sccache is optional and a caller with no sccache store path must be able to omit the argument; under `set -u` a bare `$6` aborted before the optionality check could run.
 _icp_sccache_bin="${6:-}"
 if [ -z "$_icp_cargo_binstall_bin" ]; then
   die -l cargo-binstall "cargo-binstall store-path bin argument (arg 5) is required"
 fi
 
-# Read version pins from the consolidated lockfile so installs are
-# reproducible (closes the drift root cause).  Falls back to unpinned
-# install if the lockfile is unavailable (best-effort, mirrors Windows
-# Invoke-CargoBinstallSetup.ps1).
+# Pins come from the lockfile so installs are reproducible. An unavailable lockfile falls back to an unpinned install, mirroring Windows Invoke-CargoBinstallSetup.ps1.
 _icp_lockfile=""
 _icp_repo_root="$(derive_repo_root 2>/dev/null || true)" # check-suppress:suppression_doc: repo-root auto-detection may fail on non-deployed hosts; absence falls back to unpinned install.
 if [ -n "$_icp_repo_root" ] && [ -f "$_icp_repo_root/src/lockfiles/lockfile.json" ]; then
@@ -65,27 +47,22 @@ fi
 PATH="$PATH:${_icp_cargo_bin%/*}"
 export PATH
 
-# Set RUSTC_WRAPPER to the absolute sccache store path so cargo
-# (invoked by cargo-binstall's compilation fallback) finds sccache
-# even though HM activation resets PATH to a minimal set.
-# Empty arg is tolerated — the wrapper is simply not set.
+# RUSTC_WRAPPER points at the absolute sccache store path so cargo, invoked by
+# cargo-binstall's compilation fallback, finds sccache even though Home Manager activation
+# resets PATH. An empty arg simply leaves the wrapper unset.
 if [ -n "$_icp_sccache_bin" ]; then
   RUSTC_WRAPPER="$_icp_sccache_bin"
   export RUSTC_WRAPPER
 fi
 
-# Desired crates from src/modules/packages/desired.json: an array of
-# {"name": <crate>, "binary"?: <installed binary name>} objects.  An empty
-# array = no cargo-binstall-managed crates on this host.  The optional binary
-# name is consumed on Windows (Invoke-CargoBinstallSetup); POSIX converges on
-# the crate name alone.
+# Desired crates: an array of {"name": <crate>, "binary"?: <installed binary name>}
+# objects, and an empty array means this host manages none. The optional binary name is
+# consumed on Windows (Invoke-CargoBinstallSetup); POSIX converges on the crate name.
 _icp_desired="$(mktemp)"
 # shellcheck disable=SC2016 # reason: jq program body must not be expanded by shell
 printf '%s\n' "$_icp_desired_crates_json" | "$_icp_jq_bin" -r '.[].name' >"$_icp_desired"
 
-# Get actually installed crates from `cargo install --list` (zap-style).
-# Output format: "crate-name vX.Y.Z:" on header lines; extract the
-# crate name (first field) from lines matching that pattern.
+# Installed crates from `cargo install --list`, whose header lines read "crate-name vX.Y.Z:".
 _icp_installed="$(mktemp)"
 _icp_installed_versions="$(mktemp)"
 # shellcheck disable=SC2016 # reason: awk script body must not be expanded by shell
@@ -103,8 +80,7 @@ while IFS= read -r _icp_crate; do
   fi
 done <"$_icp_installed"
 
-# Desired crates not yet installed, or installed at a version different from
-# the lockfile pin (version-aware reconciliation -> reinstall).
+# Desired crates absent or installed at a version other than the pin, so they are reinstalled.
 _icp_to_install="$(mktemp)"
 while IFS= read -r _icp_crate; do
   [ -z "$_icp_crate" ] && continue
@@ -140,8 +116,7 @@ while IFS= read -r _icp_crate; do
   say -l cargo-binstall "'$_icp_crate' removed"
 done <"$_icp_to_remove"
 
-# Install desired crates not currently installed, or whose installed
-# version differs from the lockfile pin (re-install to converge).
+# Install desired crates missing or drifted from the pin.
 while IFS= read -r _icp_crate; do
   [ -z "$_icp_crate" ] && continue
   _icp_spec="$_icp_crate"

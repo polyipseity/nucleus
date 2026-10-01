@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# macOS launchctl and LaunchServices helpers for home-manager activation. Every
-# refresh_* function is a no-op off macOS.
+# macOS launchctl and LaunchServices helpers for home-manager activation. Every refresh_* function is a no-op off macOS.
 register_handler() {
   local duti_bin="$1"
   local handler="$2"
@@ -12,8 +11,7 @@ register_handler() {
   done
 }
 
-# macOS 25+ requires gui/<uid>/<service> for the user domain and
-# system/<service> for the system domain. Older macOS accepted bare service ids.
+# macOS 25+ requires gui/<uid>/<service> and system/<service>; older macOS accepted bare service ids.
 launchctl_target() {
   local domain="$1" uid="$2" label="$3"
   case "$domain" in
@@ -24,9 +22,7 @@ launchctl_target() {
   esac
 }
 
-# A root process (a system daemon) still addresses the logged-in user's gui
-# session, so there the console user's uid is the session owner. /dev/console is
-# unreadable when nobody is logged in, and root is then the only uid left.
+# A root process still addresses the logged-in user's gui session, so there the console user's uid is the session owner. /dev/console is unreadable when nobody is logged in, and root is then the only uid left.
 launchctl_session_uid() {
   local uid
   uid="$(id -u)"
@@ -38,11 +34,7 @@ launchctl_session_uid() {
   printf '%s' "$uid"
 }
 
-# WHY: launchdDomain names only the per-user domain (gui vs user) and is absent
-#   from system-scope entries. Defaulting it to "gui" for every entry addresses a
-#   system daemon inside the GUI session, where launchd has never loaded it, so
-#   every status probe reports "not loaded" and every start targets a domain the
-#   job does not belong to.
+# WHY: launchdDomain names only the per-user domain (gui vs user) and is absent from system-scope entries. Defaulting it to "gui" for every entry addresses a system daemon inside the GUI session, where launchd has never loaded it, so every status probe reports "not loaded" and every start targets a domain the job does not belong to.
 supervisor_resolve_target() {
   local scope="$1" domain="$2" label="$3"
   case "$scope" in
@@ -62,21 +54,14 @@ launchctl_bootstrap_domain() {
   esac
 }
 
-# WHY: loaded is a different question from "state = running": a job that is
-#   loaded but not running is not missing, and a job that is missing cannot be
-#   started by `launchctl start`.
+# WHY: loaded is a different question from "state = running", because a job that is loaded but not running is not missing, and `launchctl start` cannot start a job that is missing.
 launchctl_job_loaded() {
   local target="$1" sudo_prefix="$2"
   # check-suppress:suppression_doc: an unloaded job is the question being asked, not an error.
   $sudo_prefix launchctl print "$target" >/dev/null 2>&1
 }
 
-# WHY: macOS 26+ unloads asynchronously, so a `bootstrap` issued right after
-#   `bootout` can fail with "Bootstrap failed: 5: Input/output error" because the
-#   job is still loaded — and the bootout that completes afterwards then leaves
-#   the service unloaded and silent.  Home Manager's activation uses
-#   `launchctl bootout --wait` for the same reason; polling covers older macOS,
-#   where --wait does not exist.
+# WHY: macOS 26+ unloads asynchronously, so a `bootstrap` issued right after `bootout` can fail with "Bootstrap failed: 5: Input/output error" while the job is still loaded, and the bootout that completes afterwards leaves the service unloaded and silent. Home Manager uses `launchctl bootout --wait` for the same reason; the poll covers older macOS, where --wait does not exist.
 launchctl_bootout_wait() {
   local target="$1" sudo_prefix="$2"
   local major
@@ -103,11 +88,7 @@ launchctl_bootout_wait() {
 }
 
 # Prints launchctl's own output on failure so a caller can quote the reason.
-# WHY: bootstrapping an already-loaded job only fails with "Bootstrap failed: 5:
-#   Input/output error", so the loaded case is the healthy case and is never
-#   passed to launchctl.  Code 5 on an unloaded job means a preceding
-#   asynchronous bootout has not finished yet, so the unload is waited out and
-#   the bootstrap retried instead of the service being reported as broken.
+# WHY: bootstrapping an already-loaded job only fails with "Bootstrap failed: 5: Input/output error", so the loaded case is the healthy case and never reaches launchctl. Code 5 on an unloaded job means a preceding asynchronous bootout has not finished, so the unload is waited out and the bootstrap retried instead of the service being reported as broken.
 launchctl_bootstrap_plist() {
   local domain="$1" plist="$2" target="$3" sudo_prefix="$4"
   if launchctl_job_loaded "$target" "$sudo_prefix"; then
@@ -209,8 +190,7 @@ refresh_shared_filelistd() {
   esac
 }
 
-# launchctl kickstart preserves window state, so prefer it over killall.
-# Finder always lives in the gui domain.
+# launchctl kickstart preserves window state, so prefer it over killall, and Finder always lives in the gui domain.
 refresh_finder_launchd() {
   case "$(uname -s)" in
   Darwin)
@@ -219,7 +199,7 @@ refresh_finder_launchd() {
   esac
 }
 
-# WallpaperAgent holds folder contents in memory; kill forces a re-read.
+# WallpaperAgent holds folder contents in memory, so kill forces a re-read.
 refresh_wallpaper_agent() {
   case "$(uname -s)" in
   Darwin)
@@ -236,9 +216,7 @@ refresh_desktop_services() {
   refresh_finder_launchd
   refresh_system_ui
 }
-# Full flush of the Services menu pipeline: cfprefsd, lsd, pbs, sleep, Finder.
-# Run after deploying or removing .app bundles so the menu updates without a
-# logout.
+# Full flush of the Services menu pipeline. Run after deploying or removing .app bundles so the menu updates without a logout.
 refresh_services_menu() {
   case "$(uname -s)" in
   Darwin)
@@ -255,15 +233,9 @@ refresh_services_menu() {
   esac
 }
 
-# WHY: killing pbs only re-reads its caches, and the FSEvents change detection
-#   never fires for a bundle replaced or renamed in place, so a renamed workflow
-#   kept its stale registration and new ones stayed invisible until the next
-#   login. `pbs -update` rescans and rewrites the userdef cache and the services
-#   pasteboard the menus are built from. A bare `pbs` is not an option: this
-#   build prints usage and exits 1.
+# WHY: killing pbs only re-reads its caches and FSEvents never fires for a bundle replaced or renamed in place, so a renamed workflow kept its stale registration and new ones stayed invisible until the next login. `pbs -update` rescans and rewrites the cache the menus are built from, and a bare `pbs` is not an option because this build prints usage and exits 1.
 #
-# Runs in the console user's session because pbs caches are per user; as root it
-# would refresh root's services instead.
+# Runs in the console user's session because pbs caches are per user; as root it would refresh root's services instead.
 rescan_pbs_services() {
   local _rps_pbs_bin _rps_launchctl_bin _rps_sudo_bin _rps_uid _rps_user
   _rps_pbs_bin="$1"

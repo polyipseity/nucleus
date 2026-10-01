@@ -1,12 +1,10 @@
 # shellcheck shell=bash
 # Instance resolution for prefix-match services (services.json host entries with
-# prefixMatch: true). A prefix-match entry such as cloud-drive stands in for one
-# runtime service per configured instance; the concrete ids exist only at
-# runtime. Needs jq plus launchctl (macOS) or systemctl (NixOS). Function
-# definitions only, no top-level side effects.
+# prefixMatch: true). Needs jq plus launchctl (macOS) or systemctl (NixOS).
+# Function definitions only, no top-level side effects.
 
-# WHY: log directories are named from the mount id, not from the full runtime id,
-# so the registry needs a deterministic way to build the directory name.
+# WHY: log directories are named from the mount id, not the full runtime id, so
+# the registry needs a deterministic way to build the directory name.
 svc_instance_suffix() {
   local entry="$1" instance="$2" base prefix
 
@@ -65,8 +63,7 @@ svc_prefix_instances() {
   printf '%s\n' "$matches" | LC_ALL=C sort -u
 }
 
-# Templates carry an <instance> token that expands to the instance suffix; the
-# service creates the directories, never apply.
+# Templates carry an <instance> token expanded to the instance suffix; the service creates the directories, never apply.
 svc_instance_log_dirs() {
   local entry="$1" log_root="$2" system_root="$3" instance="$4"
   local suffix subdir
@@ -81,14 +78,8 @@ svc_instance_log_dirs() {
   done <<<"$(printf '%s' "$entry" | jq -r '.logging.instanceDirs.system[]? // empty')"
 }
 
-# WHY: ids come from the registry, not from storage, so the mount manifest drives
-#   provisioning and discovery alike. `enable` defaults to true; a mount without a
-#   configured remote is declared but never instantiated.
-# WHY: the enabled test is `.enable != false`, NOT `.enable // true`. jq's `//`
-#   substitutes its right operand when the left is null OR FALSE, so `// true`
-#   cannot express "absent means enabled, but an explicit false means disabled"
-#   and enumerated deliberately disabled mounts as configured. The Windows twin
-#   (Test-NucleusMountEnabled) implements the same rule.
+# WHY: ids come from the registry, not from storage, so the mount manifest drives provisioning and discovery alike, and a mount without a configured remote is declared but never instantiated.
+# WHY: the enabled test is `.enable != false`, NOT `.enable // true`, because jq's `//` substitutes on null OR FALSE and enumerated deliberately disabled mounts as configured. Test-NucleusMountEnabled implements the same rule.
 svc_configured_instance_ids() {
   local entry="$1" mounts="$2" svc_type prefix task_path ids
 
@@ -115,9 +106,7 @@ svc_configured_instance_ids() {
   esac
 }
 
-# WHY: the registry is the input the cloud-drives Nix module consumes, so
-# discovery cannot drift from provisioning. Scope is the invoking user; a user
-# with no registry entry declares no mounts.
+# WHY: the registry is the input the cloud-drives Nix module consumes, so discovery cannot drift from provisioning. Scope is the invoking user.
 svc_configured_mounts() {
   local repo_root="$1" host="$2" username="${3:-${SUDO_USER:-$(id -un)}}" lib_dir
 
@@ -126,10 +115,7 @@ svc_configured_mounts() {
     jq -c --arg user "$username" '.[$user].cloudDrives.mounts // []'
 }
 
-# WHY: the path is <home>/<localPath>, the derivation src/modules/cloud-drives.nix
-#   feeds the mount wrapper, so the runtime side never invents a second spelling
-#   of the registry's mount location. The loader already resolved host-keyed
-#   localPath variants, so only a string is a mount point.
+# WHY: the path is <home>/<localPath>, the spelling src/modules/cloud-drives.nix feeds the mount wrapper, so the runtime side never invents a second one. The loader already resolved host-keyed localPath variants, so only a string is a mount point.
 svc_cloud_mount_point() {
   local entry="$1" mounts="$2" instance="$3" home="${4:-${HOME:-}}" suffix local_path
 
@@ -144,9 +130,7 @@ svc_cloud_mount_point() {
   printf '%s/%s\n' "${home%/}" "$local_path"
 }
 
-# WHY: a service manager reload must not start while the previous volume is
-#   still attached, or the new mount is destroyed as a duplicate and the drive
-#   stays missing until a reboot. Callers report the timeout instead of reloading.
+# WHY: a reload must not start while the previous volume is still attached, or the new mount is destroyed as a duplicate and the drive stays missing until a reboot. Callers report the timeout.
 svc_wait_mount_released() {
   local mount_point="$1" timeout="${2:-30}" ticks=0 max_ticks
 
@@ -164,15 +148,8 @@ svc_wait_mount_released() {
   return 0
 }
 
-# An unknown:* answer for the whole budget returns 1 too: it polls without
-# spending a launch, so no launch cap can end such a run.
-# WHY: FSKit can refuse the first attempts right after its daemon restarts (macFUSE
-#   status 3/4) while a later one serves the volume, and the mount agent no longer
-#   retries a provider refusal on its own (it stops and records a blocked marker),
-#   so the bounded retry belongs to the command that wants the mount up. A launch
-#   that is still in flight is never interrupted: an attach may legitimately take
-#   its own bound, and kicking it again would destroy an attempt that could still
-#   succeed.
+# WHY: FSKit can refuse the first attempts right after its daemon restarts (macFUSE status 3/4) while a later one serves the volume, and the mount agent no longer retries a provider refusal on its own, so the bounded retry belongs to the command that wants the mount up. A launch still in flight is never interrupted: an attach may take its own bound, and kicking it again would destroy an attempt that could still succeed.
+# An unknown:* answer for the whole budget returns 1 too: it polls without spending a launch, so no launch cap can end such a run.
 svc_remount_until() {
   local mount_point="$1" target="$2" sudo_prefix="$3" budget="$4" interval="${5:-5}" max_launches="${6:-4}"
   local start=$SECONDS slept=0 launches=1 announced=false running _srm_state
@@ -182,30 +159,15 @@ svc_remount_until() {
     if [ "$_srm_state" = present ]; then
       return 0
     fi
-    # WHY: the budget is wall clock, measured from the first poll. Every poll
-    #   also pays the reader's own time, so a clock that advanced only by the
-    #   interval slept below ran to roughly three times the stated budget in the
-    #   one case the unknown arm exists for: a table nobody can read, polled every
-    #   5s, each poll taking the 10s probe bound. The seconds slept are a second
-    #   bound on the same budget, not a second budget: an unknown answer spends no
-    #   launch, so the launch cap can never end such a run, and a `sleep` that
-    #   returned without waiting would leave elapsed time as the only thing
-    #   bounding a loop that makes no progress of its own.
+    # WHY: the budget is wall clock from the first poll, and the seconds slept are a second bound on that same budget, not a second budget. Every poll also pays the reader's own time, so a clock advanced only by the interval ran roughly three times the stated budget in the one case the unknown arm exists for.
     if [ $((SECONDS - start)) -ge "$budget" ] || [ "$slept" -ge "$budget" ] ||
       [ "$launches" -ge "$max_launches" ]; then
       return 1
     fi
     case "$_srm_state" in
     unknown:*)
-      # WHY: the table could not be read, so whether the volume is attached is
-      #   unknown, and a kick can land on a volume that is in fact attached. This
-      #   polls without spending a launch, and the budget check above still ends
-      #   the run, so a table that never reads cannot spin forever.
-      # WHY one notice, and only the first: the caller has already said it is
-      #   starting this mount, so the only thing left to say about the table is
-      #   the warning it reports after the budget expires. The loop stays silent
-      #   per tick, so this one line is what tells the operator the run is waiting
-      #   on a read rather than on the mount.
+      # WHY: the table could not be read, so a kick can land on a volume that is in fact attached. This polls without spending a launch, and the budget check above still ends the run.
+      # WHY one notice, and only the first: the caller already said it is starting this mount, so this line is what tells the operator the run is waiting on a read rather than on the mount.
       if [ "$announced" = false ]; then
         notice -l svc-instances \
           "the mount table for '$mount_point' could not be read (${_srm_state#unknown:}); waiting up to ${budget}s for it"
@@ -214,10 +176,7 @@ svc_remount_until() {
       ;;
     *)
       running=false
-      # WHY: `grep -q` stops at its first match, which SIGPIPEs the probe while it
-      #   is still writing; under `set -o pipefail` that reads as a failed probe
-      #   and a launch still in flight would be kicked again. Reading the whole
-      #   output costs nothing and removes the window.
+      # WHY: `grep -q` stops at its first match and SIGPIPEs the still-writing probe, which under `set -o pipefail` reads as a failed probe and kicks a launch still in flight. Reading the whole output costs nothing.
       # check-suppress:suppression_doc: a job that is not loaded or not running is the question being asked, not an error.
       if $sudo_prefix launchctl print "$target" 2>/dev/null | grep 'state = running' >/dev/null; then
         running=true
@@ -234,18 +193,9 @@ svc_remount_until() {
   done
 }
 
-# WHY: the predicate below cannot tell a path that is present from a table that
-#   could not be read, because it answers "present" for both so that no caller
-#   ever starts a mount on top of a possibly-mounted volume. That is the right
-#   answer for a caller that acts and the wrong one for a caller that reports, so
-#   the undeterminable case gets its own value here.
-# WHY: the two absent reasons are kept apart because the predicate warns on only
-#   one of them. An empty table means the read returned nothing at all, which is
-#   worth telling the user about; a table that does not list the path is the
-#   ordinary answer while a remount is under way.
-# WHY: this prints and nothing else. svc_wait_mount_released polls it every 0.5s
-#   and svc_remount_until every 5s, so a warning here would write one line per
-#   tick for the whole timeout of a genuinely hung volume.
+# WHY: the predicate below cannot tell a path that is present from a table it could not read, because it answers "present" for both so no caller starts a mount on top of a possibly-mounted volume. That is right for a caller that acts and wrong for one that reports, so the undeterminable case gets its own value here.
+# WHY: the two absent reasons stay apart because the predicate warns on only one. An empty table read nothing at all, which is worth telling the user; a table that does not list the path is the ordinary answer while a remount runs.
+# WHY: this prints and nothing else. svc_wait_mount_released polls it every 0.5s and svc_remount_until every 5s, so a warning here would write one line per tick for the whole timeout.
 svc_mount_table_state() {
   local mount_point="$1" bound="${2:-10}" status=0 table=""
 
@@ -271,12 +221,8 @@ svc_mount_table_state() {
   return 0
 }
 
-# WHY: callers act on "not mounted" by starting a mount on top of the volume, so
-#   an undeterminable answer must keep reading as present. Callers that report use
-#   svc_mount_table_state instead, which keeps the third answer.
-# WHY: only the empty table warns. svc_wait_mount_released polls this every 0.5s
-#   for the whole timeout, so a warn on the not-listed answer would write one line
-#   per tick.
+# WHY: callers act on "not mounted" by starting a mount on top of the volume, so an undeterminable answer must keep reading as present. Callers that report use svc_mount_table_state instead.
+# WHY: only the empty table warns, because this is polled every 0.5s for the whole timeout.
 svc_mount_table_contains() {
   local state
   state="$(svc_mount_table_state "$@")"
@@ -295,10 +241,7 @@ svc_mount_table_contains() {
   esac
 }
 
-# WHY: a hung macFUSE/FSKit volume blocks the mount table and any stat of the
-#   volume inside the kernel, and these scripts have no 'timeout' binary on
-#   PATH, so a probe that can touch a mount carries its own bound. One dead volume
-#   would otherwise hang the watchdog and the whole nucleus-svc CLI.
+# WHY: a hung macFUSE/FSKit volume blocks the mount table and any stat of the volume inside the kernel, and these scripts have no 'timeout' binary on PATH, so a probe that can touch a mount carries its own bound. One dead volume would hang the watchdog and the whole nucleus-svc CLI.
 svc_run_bounded() {
   local bound="$1"
   shift
@@ -326,8 +269,7 @@ svc_run_bounded() {
   wait "$pid"
 }
 
-# WHY: the list is written by this shell, so a reader that stops at its first
-# match would SIGPIPE the write and report a present value as missing.
+# WHY: the list is written by this shell, so a reader stopping at its first match would SIGPIPE the write and report a present value as missing.
 svc_list_contains() {
   local list="$1" value="$2"
 

@@ -1,35 +1,18 @@
 #!/usr/bin/env bash
-# ---- buildNtfs3g ----------------------------------------------------------
-# Build polyipseity/ext.ntfs-3g from source.
-# Arguments: fingerprint buildToolsPath aclocalPath ntfs3gSrc cc cxx cppFlags
-#            linkFlags configureFlags cryptoPatchPath rootbindirPatchPath
-#            installHookPatchPath fuseProviderPatchPath sdkRoot cFlags cxxFlags
-#            sdkDevDir
+# Builds polyipseity/ext.ntfs-3g from source.
 #
-# Rebuilds when the installed binary or the build record is missing, when the
-# Nix fingerprint (argument 1) changed, or when the observed macFUSE provider
-# digest changed.
-#
-# CC/CXX/CPPFLAGS/CFLAGS/CXXFLAGS/LDFLAGS are exported here so ./configure and
+# Rebuilds when the installed binary or the build record is missing, when the Nix
+# fingerprint (argument 1) changed, or when the observed macFUSE provider digest
+# changed. CC/CXX/CPPFLAGS/CFLAGS/CXXFLAGS/LDFLAGS are exported so ./configure and
 # make resolve them from the environment.
 #
-# WHY: build from source, not nixpkgs:
-#   The polyipseity fork of ntfs-3g (commit f0e5cb0) links against the macFUSE
-#   installation at /usr/local/lib/libfuse.dylib, an impure dependency that Nix
-#   sandbox builds cannot resolve, so we build imperatively during activation.
-#
-# WHY: activation script vs Nix derivation:
-#   A pure Nix derivation would require macFUSE headers and dylib inside the
-#   sandbox — impractical when macFUSE is installed into fixed system paths.
-#   The activation script runs after Homebrew, guaranteeing macFUSE is installed
-#   before we build ntfs-3g.
-#
-# WHY: not ntfs-3g from nixpkgs:
-#   The nixpkgs package builds against the macFUSE stub headers and nothing in
-#   its closure selects a FUSE backend, so its mounts land on macFUSE's
-#   kernel-extension backend — a kext this host must never approve.  This fork is
-#   built against the installed macFUSE, so mounts can select the FSKit backend
-#   (-o backend=fskit), the kext-free path on macOS 27.
+# WHY build from source in activation rather than from nixpkgs: the polyipseity fork
+# (commit f0e5cb0) links against the macFUSE install under /usr/local/lib, an impure
+# dependency no sandbox build can resolve, and activation runs after Homebrew so
+# macFUSE is installed first. The nixpkgs package instead builds against macFUSE stub
+# headers and selects the kernel-extension backend, a kext this host must never
+# approve; this fork is built against the installed macFUSE so mounts can select the
+# FSKit backend (-o backend=fskit), the kext-free path on macOS 27.
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../../../scripts/lib/lib.sh
@@ -58,13 +41,11 @@ SDK_DEV_DIR="${17:?ntfs-3g build: missing sdkDevDir arg}"
 export CC CXX CPPFLAGS CFLAGS="$C_FLAGS" CXXFLAGS="$CXX_FLAGS"
 export SDKROOT="$SDK_ROOT"
 # WHY: the nix clang-wrapper's darwin-sdk-setup.bash overrides SDKROOT from
-#   DEVELOPER_DIR_arm64_apple_darwin (already set in the activation env via
-#   xcode-select --switch) or a hardcoded apple-sdk-14.4 fallback, ignoring the
-#   SDKROOT we export.  Pointing DEVELOPER_DIR_arm64_apple_darwin at the
-#   enhanced SDK root makes the wrapper resolve the correct SDK instead of
-#   erroring with "unable to find sdk: 'macosx'".  Unset DEVELOPER_DIR so the
-#   wrapper does not emit "Multiple conflicting values" and fall back to a
-#   wrong SDK.
+#   DEVELOPER_DIR_arm64_apple_darwin (already set by xcode-select --switch) or a
+#   hardcoded apple-sdk-14.4 fallback, ignoring the SDKROOT we export, so pointing
+#   it at the enhanced SDK root makes the wrapper resolve the right SDK instead of
+#   erroring with "unable to find sdk: 'macosx'". Unset DEVELOPER_DIR so the wrapper
+#   does not emit "Multiple conflicting values" and fall back to a wrong SDK.
 export DEVELOPER_DIR_arm64_apple_darwin="$SDK_DEV_DIR"
 unset DEVELOPER_DIR
 
@@ -74,10 +55,7 @@ PROVIDER_ROOT=/usr/local
 NTFS3G_BIN=/usr/local/bin/ntfs-3g
 PKGUTIL_BIN=/usr/sbin/pkgutil
 
-# Reason the installed ntfs-3g must be rebuilt; prints nothing while it is
-# current.  Arguments: binary record fingerprint provider_digest — the observed
-# state is passed in rather than read from the constants above, so the gate can
-# be exercised against fixtures (tests/scripts/macos-build-ntfs3g-tests.sh).
+# Reason the installed ntfs-3g must be rebuilt; prints nothing while current. The observed state is passed in rather than read from the constants above, so the gate can be exercised against fixtures (tests/scripts/macos-build-ntfs3g-tests.sh).
 ntfs3g_rebuild_reason() {
   if ! [ -x "$1" ]; then
     printf '%s\n' "binary missing"
@@ -90,16 +68,7 @@ ntfs3g_rebuild_reason() {
   fi
 }
 
-# WHY: macFUSE is an impure build input.  Homebrew installs it (cask
-#   macfuse@dev, which declares auto_updates) into /usr/local, so the library
-#   and headers this build links against can be replaced with no repository
-#   change and no change to the Nix fingerprint.  The digest of the consumed
-#   provider files is therefore observed on every activation: without it a
-#   macFUSE upgrade leaves the installed ntfs-3g holding an absolute
-#   /usr/local/lib/libfuse.<abi>.dylib load path that no longer resolves.
-# The helper is part of buildFingerprint (providerFingerprintScript in
-# ntfs-3g.nix): an edit that changes what the digest covers without changing its
-# value would otherwise leave the field-2 comparison below unchanged.
+# WHY: macFUSE is an impure build input. Homebrew's cask macfuse@dev declares auto_updates and installs into /usr/local, so the library and headers can be replaced with no repository change and no change to the Nix fingerprint. The digest of the consumed provider files is therefore observed on every activation: without it a macFUSE upgrade leaves the installed ntfs-3g holding an absolute /usr/local/lib/libfuse.<abi>.dylib load path that no longer resolves. The helper is part of buildFingerprint (providerFingerprintScript in ntfs-3g.nix), so an edit that changes what the digest covers without changing its value would leave the field-2 comparison below unchanged.
 if ! PROVIDER_DIGEST="$(fuse_provider_digest "$PROVIDER_ROOT")"; then
   error -l ntfs-3g "macFUSE under $PROVIDER_ROOT is not fingerprinted — install or repair it (Homebrew cask macfuse@dev)"
   exit 1
@@ -111,9 +80,7 @@ if [ -n "$REBUILD_REASON" ]; then
   MACFUSE_VERSION="$(macfuse_pkg_version "$PKGUTIL_BIN")" || exit 1
   PROVIDER_IDENTITY="$(fuse_provider_identity "$PROVIDER_ROOT" "$MACFUSE_VERSION")" || exit 1
   say -l ntfs-3g "building from source: $REBUILD_REASON (log: $LOG_FILE)"
-  # WHY: prepend (not append) so nix gnumake shadows BSD /usr/bin/make.  BSD
-  #   make cannot parse the GNU Makefiles ./configure generates, aborting the
-  #   build with "Something went wrong bootstrapping makefile fragments".
+  # WHY: prepend (not append) so nix gnumake shadows BSD /usr/bin/make, which cannot parse the GNU Makefiles ./configure generates.
   export PATH="$BUILD_TOOLS_PATH:$PATH"
   export ACLOCAL_PATH="$ACLOCAL_PATH_VALUE"
   BUILD_DIR="$(mktemp -d)"
@@ -127,28 +94,9 @@ if [ -n "$REBUILD_REASON" ]; then
     printf '[%s] ntfs-3g: build started (provider %s, digest %s)\n' \
       "$(date '+%Y-%m-%d %H:%M:%S')" "$PROVIDER_IDENTITY" "$PROVIDER_DIGEST"
 
-    # Patch configure.ac: remove crypto autodetect block (AM_PATH_LIBGCRYPT
-    # and PKG_CHECK_MODULES(GNUTLS macros undefined without library deps),
-    # fix rootbindir/rootlibdir defaults from /bin:/lib to /usr/local/*
-    # (SIP), and fix install-exec-hook to handle missing .so/.dylib files
-    # on Darwin.  Patch src/Makefile.am to name the macFUSE dylib instead of
-    # fuse-t, by absolute path so libtool never reads macFUSE's libfuse.la and
-    # never inherits its -liconv/-licucore dependency_libs (the nixpkgs
-    # apple-sdk has no stubs for either).
-    # WHY: chain every step with && so the group's exit status is the first
-    #   failure.  A rejected patch or a failed autotools/configure step leaves a
-    #   tree that can still build, so the build would otherwise install sources
-    #   that are not what the fingerprint describes and record them as the
-    #   current install.  Chaining rather than exiting: the group's output is
-    #   redirected to the log file, so exiting early would suppress the console
-    #   BUILD FAILED report below.
-    # WHY: keep macFUSE out of LDFLAGS during configure — autoconf link probes
-    #   fail when every test binary must link macFUSE under nix clang wrappers.
-    # WHY: pass LDFLAGS on the make command line, not only via export.
-    #   ./configure writes "LDFLAGS =" (empty) into every Makefile, and a
-    #   Makefile-defined LDFLAGS overrides the environment variable of the same
-    #   name.  Without the command-line form the libntfs-3g link loses
-    #   -framework CoreFoundation and fails on the nfconv CoreFoundation calls.
+    # WHY: chain every step with && so the group's exit status is the first failure. A rejected patch or a failed autotools/configure step leaves a tree that can still build, so the build would otherwise install sources the fingerprint does not describe and record them as the current install. Chaining rather than exiting, because the group output goes to the log file and an early exit would suppress the console BUILD FAILED report below.
+    # WHY: keep macFUSE out of LDFLAGS during configure, since autoconf link probes fail when every test binary must link macFUSE under nix clang wrappers.
+    # WHY: pass LDFLAGS on the make command line as well as the export. ./configure writes "LDFLAGS =" (empty) into every Makefile and a Makefile-defined LDFLAGS overrides the environment variable, so without the command-line form the libntfs-3g link loses -framework CoreFoundation and fails on the nfconv calls.
     printf '[%s] ntfs-3g: patching...\n' "$(date '+%Y-%m-%d %H:%M:%S')" &&
       patch -p1 <"$CRYPTO_PATCH_PATH" &&
       patch -p1 <"$ROOTBINDIR_PATCH_PATH" &&
@@ -181,8 +129,6 @@ if [ -n "$REBUILD_REASON" ]; then
   say -l ntfs-3g "build complete — log at $(/bin/realpath "$LOG_FILE")"
 
   /bin/mkdir -p "$(dirname "$FINGERPRINT_FILE")"
-  # Line 1 is the Nix fingerprint (source, patches, toolchain, flags, this
-  # script), line 2 the observed provider digest; both gate the next rebuild.
-  # Line 3 names the provider for diagnostics and never gates anything.
+  # Line 1 is the Nix fingerprint and line 2 the provider digest; both gate the next rebuild. Line 3 names the provider for diagnostics and never gates anything.
   printf '%s\n%s\n%s\n' "$CURRENT_FINGERPRINT" "$PROVIDER_DIGEST" "$PROVIDER_IDENTITY" >"$FINGERPRINT_FILE"
 fi
