@@ -630,9 +630,9 @@
         "justification": "User timer: it prunes the user's own log tree, which a root unit would have to hand back to the user.",
         "platform": "NixOS",
         "scope": "user",
-        "service": "log-gc-user.service",
+        "service": "nucleus-log-gc-user.service",
         "type": "nixos-systemctl",
-        "unitPath": "~/.config/systemd/user/log-gc-user.service"
+        "unitPath": "~/.config/systemd/user/nucleus-log-gc-user.service"
       },
       "Windows": {
         "platform": "Windows",
