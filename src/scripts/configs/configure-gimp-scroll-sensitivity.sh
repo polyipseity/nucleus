@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
-# Reduce GIMP zoom sensitivity to 25% of upstream default by setting the
-# drag-zoom-speed token in the active user gimprc to 25.0 (default 100.0).
+# Set drag-zoom-speed to 25.0 (upstream default 100.0) in the active user
+# gimprc.
 #
-# Why this token: GIMP upstream exposes drag-zoom-speed as a persisted
-# display config token.  Mouse-wheel zoom on macOS uses native scroll
-# deltas and does not have an equivalent persisted sensitivity token.
-# This hook therefore converges the closest supported persistent control.
+# Why: mouse-wheel zoom on macOS uses native scroll deltas and has no
+# equivalent persisted sensitivity token, so this is the closest supported
+# persistent control.
 #
-# Version tracking rule: always target the major.minor branch of the GIMP
-# app provisioned by Nucleus (/Applications/GIMP.app), rather than using a
-# hardcoded version list, so new app upgrades keep working automatically.
+# WHY: target the major.minor branch of the provisioned GIMP.app instead of a
+# hardcoded version list, so upgrades keep working.
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../lib/lib.sh
@@ -33,8 +31,7 @@ if _nucleus_resolve_console_user; then
     gimp_version_raw="$(/usr/bin/defaults read "$gimp_app_info" CFBundleShortVersionString 2>/dev/null || true)"
   fi
 
-  # Derive major.minor branch used by GIMP's config directory layout,
-  # e.g. 3.2.4 -> 3.2
+  # 3.2.4 -> 3.2
   gimp_version_branch="$(printf '%s' "$gimp_version_raw" | /usr/bin/awk -F. 'NF >= 2 { print $1 "." $2 }')"
   if [ -z "$gimp_version_branch" ]; then
     warn -l gimp "unable to determine installed GIMP major.minor version from /Applications/GIMP.app; skipping sensitivity convergence."
@@ -52,8 +49,8 @@ if _nucleus_resolve_console_user; then
       fi
 
       if [ -f "$gimprc_file" ]; then
-        # Keep all other user settings intact: only replace or append the
-        # drag-zoom-speed token.
+        # WHY: only the drag-zoom-speed token is touched, so every other user
+        # setting survives.
         if /usr/bin/grep -Eq '^\(drag-zoom-speed[[:space:]]+[^)]*\)$' "$gimprc_file"; then
           if ! /usr/bin/sed -E -i.bak 's#^\(drag-zoom-speed[[:space:]]+[^)]*\)$#(drag-zoom-speed 25.0)#' "$gimprc_file"; then
             die -l gimp "failed to update drag-zoom-speed in $gimprc_file."

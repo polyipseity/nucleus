@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 # Manages runtime configuration for nucleus services.
-# Config is stored at ~/.local/state/nucleus/config.json on every host (see
-# script-authoring.instructions.md).
 # Subcommands: get, set, list.
 
 set -euo pipefail
@@ -18,9 +16,9 @@ fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
-# WHY: one canonical location on every host. Resolving this per-OS made the CLI disagree
-# with scripts/config.ps1 and with the documented path, so automation reading the documented
-# path would silently see no config at all.
+# WHY: one canonical location on every host. Resolving this per-OS made the
+# CLI disagree with scripts/config.ps1 and with the documented path, so
+# automation reading the documented path saw no config at all.
 CONFIG_FILE="$HOME/.local/state/nucleus/config.json"
 
 usage() {
@@ -34,8 +32,7 @@ EOF
 
 require_command jq
 
-# Default values for all known config keys.
-# Used as fallback when file/key is absent, so users can discover available options.
+# Fallback for an absent file or key, so users can discover the options.
 DEFAULTS='{
   "camilladsp": {
     "enable": true,
@@ -59,7 +56,6 @@ ensure_config_dir() {
   mkdir -p "$(dirname "$CONFIG_FILE")"
 }
 
-# Merge user config over defaults, output merged JSON.
 merge_config() {
   if [ -f "$CONFIG_FILE" ]; then
     jq -n --argjson defaults "$DEFAULTS" --argjson user "$(cat "$CONFIG_FILE")" '
@@ -77,8 +73,8 @@ merge_config() {
   fi
 }
 
-# _key_path_json <section.key> — print the dot-separated key as a jq path array.
-# Built with jq so a key containing a quote or backslash cannot produce invalid JSON.
+# WHY a jq path array: a key containing a quote or backslash cannot produce
+# invalid JSON that way.
 _key_path_json() {
   jq -n --arg key "$1" '$key | split(".")'
 }
@@ -87,11 +83,10 @@ cmd_get() {
   if [ $# -eq 0 ]; then
     merge_config
   else
-    # WHY a path walk instead of a `.section.key // null` filter: jq's alternative
-    # operator treats `false` as false-y, so `false // null` is null and an off
-    # boolean printed nothing and exited 1 — indistinguishable from a missing key.
-    # The walk fails only when a segment is absent, so `false` and `null` values
-    # are printed while an unknown key keeps the "no output, exit 1" contract.
+    # WHY a path walk and not `.section.key // null`: jq treats `false` as false-y,
+    # so an off boolean printed nothing and exited 1, indistinguishable from a
+    # missing key. The walk fails only on an absent segment, so `false` and
+    # `null` print while an unknown key keeps the no-output, exit 1 contract.
     path_json="$(_key_path_json "$1")"
     merged=$(merge_config)
     if ! val=$(printf '%s' "$merged" | jq -r --argjson path "$path_json" '
@@ -115,12 +110,11 @@ cmd_set() {
   shift
   raw_value="$*"
 
-  # Convert dot-separated key to jq path JSON array
   path_json="$(_key_path_json "$key")"
 
-  # WHY `try/catch` and not `fromjson? // $raw`: jq's alternative operator treats a
-  # parsed `false` (and `null`) as false-y, so `set <key> false` stored the string
-  # "false" instead of the boolean. Only a parse failure should fall back to raw.
+  # WHY `try/catch` and not `fromjson? // $raw`: jq treats a parsed `false` or
+  # `null` as false-y, so `set <key> false` stored the string "false". Only a
+  # parse failure should fall back to raw.
   if [ -f "$CONFIG_FILE" ]; then
     jq --argjson path "$path_json" --arg raw "$raw_value" '
       setpath($path; (try ($raw | fromjson) catch $raw))
@@ -133,9 +127,9 @@ cmd_set() {
 }
 
 cmd_list() {
-  # WHY `type != …` and not `scalars`: `paths(f)` keeps a leaf only when f yields
-  # something truthy, so `paths(scalars)` dropped every `false` leaf and the
-  # default-off flags were missing from the listing entirely.
+  # WHY `type != ...` and not `scalars`: `paths(f)` keeps a leaf only when f is
+  # truthy, so `paths(scalars)` dropped every `false` leaf and the default-off
+  # flags were missing from the listing.
   merge_config | jq -r '
     paths(type != "object" and type != "array") as $p
     | { key: ($p | join(".")), val: getpath($p) | tojson }

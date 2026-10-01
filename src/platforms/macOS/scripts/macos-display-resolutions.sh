@@ -1,25 +1,10 @@
 #!/usr/bin/env bash
 # Configure external display resolutions to match the built-in MacBook display.
-# Uses displayplacer to match all external monitors to the built-in screen's
-# current mode so remote-desktop clients see a consistent resolution.
-#
-# WHY: displayplacer requires WindowServer context (CoreGraphics).  When no
-# display is attached or the session is headless (SSH, lid-closed without
-# clamshell mode), applying modes fails even though the config is valid.
-# Downgraded to warnings so activation continues; resolutions are re-applied
-# on the next activation with a GUI session.
-#
-# Algorithm:
-#   1. Identify the built-in screen's persistent ID and its current mode.
-#   2. If the built-in is on mode 4 (high-DPI Retina mode), apply it first
-#      to ensure the reference resolution is set correctly.
-#   3. Re-read the current mode string to obtain target width/height and
-#      the scaling flag.
-#   4. For each external display, find the mode whose width >= target width
-#      and height <= target height (so it fits within the same logical area)
-#      with the smallest height (closest match without overshooting).
-#
 # No-op if displayplacer is not installed.
+#
+# WHY: displayplacer requires WindowServer context (CoreGraphics). A headless
+# session (SSH, lid closed without clamshell) fails even with a valid config,
+# so failures warn and the next activation with a GUI session re-applies.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -29,28 +14,25 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 DP_BIN="/opt/homebrew/bin/displayplacer"
 
-# The BetterDisplay virtual screen "HeadlessDisplay" reports itself to
-# displayplacer as an ordinary external display, so it must be excluded by
-# identity rather than by display type. Its size is owned by
-# macos-configure-headless-display.sh.
+# The BetterDisplay virtual screen reports itself as an ordinary external
+# display, so exclude it by identity. macos-configure-headless-display.sh owns
+# its size.
 VIRTUAL_DISPLAY_PERSISTENT_ID="4A560A93-4311-4F80-A757-F69D8BE2A082"
 VIRTUAL_DISPLAY_SERIAL_ID="s2865085837"
 
 if [ -x "$DP_BIN" ]; then
   FULL_LIST=$("$DP_BIN" list)
 
-  # Locate the persistent ID of the built-in MacBook screen.
   PRIMARY_ID=$(echo "$FULL_LIST" | /usr/bin/awk '
     /^Persistent screen id:/ { last_id=$4 }
     /Type: MacBook built in screen/ { print last_id; exit }
   ')
 
-  # Fall back to the first listed display if the built-in label is absent.
+  # First listed display, if the built-in label is absent.
   if [ -z "$PRIMARY_ID" ]; then
     PRIMARY_ID=$(echo "$FULL_LIST" | /usr/bin/grep "Persistent screen id:" | /usr/bin/head -n 1 | /usr/bin/awk '{print $4}')
   fi
 
-  # Read the mode 4 string for the primary display (native HiDPI mode).
   MODE4_STR=$(echo "$FULL_LIST" | /usr/bin/awk -v id="$PRIMARY_ID" '
     $0 ~ id { found=1 }
     found && /^  mode 4:/ {
@@ -61,7 +43,7 @@ if [ -x "$DP_BIN" ]; then
     }
   ')
 
-  # If mode 4 is not available, read whichever mode is currently active.
+  # Fall back to the active mode when mode 4 is missing.
   if [ -z "$MODE4_STR" ]; then
     MODE4_STR=$(echo "$FULL_LIST" | /usr/bin/awk -v id="$PRIMARY_ID" '
       $0 ~ id { found=1 }
@@ -74,19 +56,14 @@ if [ -x "$DP_BIN" ]; then
     ')
   fi
 
-  # Check if mode 4 is already the current mode on the primary display.
-  # displayplacer apply needs WindowServer context (GUI session); skip when
-  # already at the target mode to avoid spurious errors during headless
-  # activation.
+  # Applying needs a GUI session, so skip when mode 4 is already current.
   MODE4_CURRENT=$(echo "$FULL_LIST" | /usr/bin/awk -v id="$PRIMARY_ID" '
     $0 ~ id { found=1 }
     found && /mode 4:.*<-- current mode/ { print "yes"; exit }
   ')
 
-  # Apply the target mode on the primary display and refresh the list.
-  # Run via launchctl asuser when a GUI session is available (displayplacer
-  # needs CoreGraphics/WindowServer context); fall back to direct invocation
-  # otherwise so the command still works under test or headless apply.
+  # WHY: asuser when a GUI session exists, direct invocation otherwise, so the
+  # command still runs under test or a headless apply.
   if [ -n "$MODE4_STR" ] && [ "$MODE4_CURRENT" != "yes" ]; then
     if _nucleus_resolve_console_user; then
       if ! /bin/launchctl asuser "$_nucleus_console_uid" "$DP_BIN" "id:$PRIMARY_ID $MODE4_STR"; then
@@ -101,8 +78,6 @@ if [ -x "$DP_BIN" ]; then
     FULL_LIST=$("$DP_BIN" list)
   fi
 
-  # Read the mode that is now active on the primary display to use as
-  # the reference resolution for external monitors.
   TARGET_STR=$(echo "$FULL_LIST" | /usr/bin/awk -v id="$PRIMARY_ID" '
     $0 ~ id { found=1 }
     found && /<-- current mode/ {
@@ -113,7 +88,6 @@ if [ -x "$DP_BIN" ]; then
     }
   ')
 
-  # Extract width, height, and scaling flag from the target mode string.
   T_W=$(echo "$TARGET_STR" | /usr/bin/sed -E 's/.*res:([0-9]+)x.*/\1/')
   T_H=$(echo "$TARGET_STR" | /usr/bin/sed -E 's/.*res:[0-9]+x([0-9]+).*/\1/')
   T_SCALING=""
@@ -121,7 +95,6 @@ if [ -x "$DP_BIN" ]; then
     T_SCALING="scaling:on"
   fi
 
-  # For each external display, select the best matching mode and apply it.
   for ID in $(echo "$FULL_LIST" | /usr/bin/grep "Persistent screen id:" | /usr/bin/awk '{print $4}'); do
     if [ "$ID" = "$PRIMARY_ID" ]; then
       continue
@@ -129,23 +102,21 @@ if [ -x "$DP_BIN" ]; then
 
     DISPLAY_BLOCK=$(echo "$FULL_LIST" | /usr/bin/sed -n "/^Persistent screen id: $ID/,/^Persistent screen id:/p")
 
-    # WHY: the HeadlessDisplay virtual screen is not a physical monitor. Matching
-    # it here would re-inflate the framebuffer that macos-configure-headless-display.sh
-    # deliberately keeps at 2560x1600. Both identifiers are checked because a
-    # discard-and-recreate can change the macOS-assigned persistent id.
+    # WHY: matching the virtual screen would re-inflate the framebuffer that
+    # macos-configure-headless-display.sh keeps at 2560x1600. Both identifiers
+    # are checked because a discard-and-recreate changes the persistent id.
     if [ "$ID" = "$VIRTUAL_DISPLAY_PERSISTENT_ID" ] ||
       printf '%s\n' "$DISPLAY_BLOCK" | /usr/bin/grep -qF "$VIRTUAL_DISPLAY_SERIAL_ID"; then
       continue
     fi
 
     MODES=$(printf '%s\n' "$DISPLAY_BLOCK" | /usr/bin/grep "^  mode " | /usr/bin/sed 's/^  mode [0-9]*: //')
-    # When the primary uses HiDPI scaling, restrict candidates to HiDPI modes.
+    # HiDPI primary means HiDPI candidates only.
     if [ -n "$T_SCALING" ]; then
       MODES=$(echo "$MODES" | /usr/bin/grep "scaling:on")
     fi
 
-    # Pick the mode with the smallest height that is still >= target width
-    # and <= target height (fits the same logical area, highest PPI wins).
+    # Smallest height that still fits the same logical area, so PPI wins.
     BEST_MODE=$(echo "$MODES" | /usr/bin/awk -v tw="$T_W" -v th="$T_H" '{ w=substr($0,index($0,"res:")+4); gsub(/[^0-9].*/,"",w); h=substr($0,index($0,"x")+1); gsub(/[^0-9].*/,"",h); if (w+0>=tw+0 && h+0<=th+0 && h+0>0) print w+0, h+0, $0 }' | /usr/bin/sort -n | /usr/bin/head -n 1 | /usr/bin/cut -d' ' -f3- | /usr/bin/sed 's/ <-- current mode$//')
 
     if [ -n "$BEST_MODE" ]; then

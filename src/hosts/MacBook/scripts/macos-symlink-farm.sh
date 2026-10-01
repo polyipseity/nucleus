@@ -1,23 +1,16 @@
 #!/usr/bin/env bash
-# macos-symlink-farm.sh — Manage /usr/local/bin symlink farm for nixpkgs tools.
+# macos-symlink-farm.sh - manage /usr/local/bin symlinks for nixpkgs tools.
 #
 # Positional arguments:
-#   $1  — space-separated "target->name" pairs (symlink farm entries)
-#   $2  — path to verbose log (default: systemLogDir/symlink-farm.log)
-#   $FARM_DIR  — farm directory override, default /usr/local/bin.  Tests point
-#                this at a temp dir; production never sets it.
+#   $1  space-separated "target->name" pairs
+#   $2  verbose log path, default systemLogDir/symlink-farm.log
+#   $FARM_DIR  farm directory override, default /usr/local/bin. Tests point
+#              this at a temp dir; production never sets it.
 #
-# For each pair, create the symlink if it doesn't match.
-# Remove any symlink in the farm that points to a Nix store path
-# but is NOT in the current farm (GC).
-#
-# Safety:
-#   - The GC sweep only removes symlinks (-L) pointing to /nix/store/*, so it
-#     ignores regular files and non-Nix symlinks.
-#   - The create loop does replace whatever occupies a managed link name,
-#     including a regular file, because a stale file there would block the
-#     symlink.  Only names this farm manages are affected.
-#   - Marker file (.nucleus-symlink-farm) is skipped during farm GC sweeps.
+# The GC sweep removes only symlinks into /nix/store that are not in the
+# current farm. The create loop does replace a regular file occupying a
+# managed link name, because a stale file there would block the symlink.
+# The marker file is skipped during the sweep.
 set -eu
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -27,12 +20,10 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 FARM_DIR="${FARM_DIR:-/usr/local/bin}"
 FARM_MARKER=".nucleus-symlink-farm"
 
-# Log file location.
 NUCLEUS_SYSTEM_LOG_DIR="${NUCLEUS_SYSTEM_LOG_DIR:-/Library/Application Support/nucleus/logs}"
 LOG_FILE="${2:-$NUCLEUS_SYSTEM_LOG_DIR/symlink-farm.log}"
 /bin/mkdir -p "$(dirname "$LOG_FILE")"
 
-# Verbose mode: when set, detail echoes go to stdout too.
 NUCLEUS_VERBOSE="${NUCLEUS_VERBOSE:-}"
 
 _log() {
@@ -42,10 +33,8 @@ _log() {
   fi
 }
 
-# Ensure farm directory exists
 /bin/mkdir -p "$FARM_DIR"
 
-# Parse current farm entries into an indexed array.
 IFS=' ' read -r -a entries <<<"$1"
 
 _active=0
@@ -58,9 +47,8 @@ for entry in "${entries[@]}"; do
   if [ -L "$link_path" ]; then
     current_target="$(readlink "$link_path")"
     if [ "$current_target" = "$target" ]; then
-      # The link text matches, but the store path behind it may be gone after a
-      # GC.  A link whose target does not resolve is reported, not counted as
-      # active: a dangling shim is a mapping bug, not a converged farm.
+      # WHY: the store path behind a matching link can be gone after a GC, so
+      # resolve it. A dangling shim is a mapping bug, not a converged farm.
       if [ -e "$link_path" ]; then
         _active=$((_active + 1))
       else
@@ -85,7 +73,6 @@ for link_path in "$FARM_DIR"/*; do
   if [ -L "$link_path" ]; then
     target="$(readlink "$link_path")"
     if [[ "$target" == /nix/store/* ]]; then
-      # Check if link_name is in the active entries list.
       _is_active=false
       for entry in "${entries[@]}"; do
         [ "${entry##*->}" = "$link_name" ] && {

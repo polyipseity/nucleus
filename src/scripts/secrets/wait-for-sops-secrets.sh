@@ -1,20 +1,17 @@
 #!/usr/bin/env bash
-# Wait for sops-nix to materialize the given paths (secret files or rendered
-# templates) before their consumers read them.
+# Wait for sops-nix to materialize the given paths before their consumers read
+# them.
 #
 # WHY: on macOS sops-nix installs secrets through a LaunchAgent, so an activation
 # entry ordered merely `entryAfter [ "sops-nix" ]` does not gate on the files
-# landing on disk — the agent is asynchronous and the consumer would read a path
-# that does not exist yet.
+# landing: the agent is asynchronous and the consumer would read a missing path.
 #
-# Existence — not non-emptiness — is the contract: sops-nix writes every declared
-# secret unconditionally, and an empty value is legitimate (an operator who has not
-# filled the key in yet). A file that never appears means sops-nix did not run at
-# all, which is a hard error for a declared consumer.
+# WHY existence and not non-emptiness: sops-nix writes every declared secret
+# unconditionally and an empty value is legitimate. A file that never appears
+# means sops-nix did not run, which is a hard error for a declared consumer.
 #
 # Usage: wait-for-sops-secrets <path> [<path> ...]
-# Env:   NUCLEUS_SOPS_WAIT_SECONDS — deadline in seconds (default 30)
-# Exit:  1 when any path is missing after the deadline (the message lists them)
+# Env:   NUCLEUS_SOPS_WAIT_SECONDS, deadline in seconds, default 30
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"

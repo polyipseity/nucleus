@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Trusts Caddy's locally-managed CA root certificate so that `tls internal`
-# reverse proxy targets are recognized without client-side certificate
-# warnings. Applies generally to every local reverse proxy using the same
-# Caddy PKI authority.
+# Trust Caddy's locally-managed CA root so `tls internal` targets are
+# recognized without client-side certificate warnings. Any local reverse proxy
+# on the same Caddy PKI authority benefits.
 
 set -euo pipefail
 
@@ -58,18 +57,16 @@ while [ "$_ct_attempt" -lt 20 ]; do
   sleep 1
 done
 
-# If we're in sudo mode and Caddy was unreachable, the launchd service may be
-# stuck in penalty box (EX_CONFIG). Attempt a fresh bootstrap to recover.
-# macOS 26+ SIP blocks unsigned Nix store binaries for system daemons with
-# non-root UserName; the /bin/sh wrapper avoids this. See
-# .agents/instructions/macos-service-hardening.instructions.md.
+# WHY: an unreachable Caddy in sudo mode can mean the launchd service sits in
+# the penalty box (EX_CONFIG). A fresh bootstrap recovers it. See
+# macos-service-hardening.instructions.md for the macOS 26+ SIP case.
 if [ "$_ct_mode" = "sudo" ]; then
   warn -l caddy-trust "attempting launchd service recovery via bootout/bootstrap..."
   _ct_proxy_target=system/org.nixos.httpsProxy
   _ct_proxy_plist=/Library/LaunchDaemons/org.nixos.httpsProxy.plist
-  # WHY: see launchctl_bootout_wait — macOS 26+ unloads asynchronously, so a
-  #   bootstrap issued before the unload completes fails with "Bootstrap failed:
-  #   5:" and the HTTPS proxy stays unloaded.
+  # WHY: macOS 26+ unloads asynchronously, so a bootstrap issued before the
+  #   unload finishes fails with "Bootstrap failed: 5:" and the proxy stays
+  #   unloaded.
   _ct_reload_out=""
   if launchctl_bootout_wait "$_ct_proxy_target" sudo &&
     _ct_reload_out=$(launchctl_bootstrap_plist system "$_ct_proxy_plist" "$_ct_proxy_target" sudo); then

@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
-# Test-specific framework library.
-# Sources step-runner.sh and sets test-specific defaults.
+# Test framework library: sources step-runner.sh and sets test defaults.
 #
-# Guard against re-sourcing — step files source this independently and
-# re-sourcing would overwrite SCRIPT_DIR and REPO_ROOT.
+# Guard against re-sourcing: step files source this independently, and a second
+# source would overwrite SCRIPT_DIR and REPO_ROOT.
 [ -n "${_NUCLEUS_TEST_LIB_SOURCED-}" ] && return
 _NUCLEUS_TEST_LIB_SOURCED=1
 
-# Resolve SCRIPT_DIR relative to this file so it works when sourced from
-# standalone step files without a pre-set SCRIPT_DIR.
+# WHY: relative to this file, so a standalone step file works without a
+# pre-set SCRIPT_DIR.
 _self="${BASH_SOURCE[0]:-$0}"
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 
@@ -18,16 +17,14 @@ NUCLEUS_LIB_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/../lib" && pwd)"
 # shellcheck source=../lib/step-runner.sh
 . "$NUCLEUS_LIB_DIR/step-runner.sh"
 
-# Test-specific defaults
 export FAIL_FAST=true
 quiet_mode=false
 REPO_ROOT=$(derive_repo_root)
 cd "$REPO_ROOT" || exit
 
-# Override parse_args to add test-specific flags
 parse_args() {
-  # Mirror step-runner.sh parse_args defaults so run_all_steps' context object
-  # has every key bound (test mode never runs online and takes no positional args).
+  # Mirror the step-runner.sh defaults so run_all_steps' context object has
+  # every key bound (test mode never runs online and takes no positional args).
   ONLINE=false
   SCOPED=false
   FULL=false
@@ -109,7 +106,6 @@ parse_args() {
     esac
   done
 
-  # No positional arguments accepted
   if [ "$#" -gt 0 ]; then
     error "unexpected argument '$1'"
     usage >&2
@@ -117,10 +113,9 @@ parse_args() {
   fi
 }
 
-# Override cache_file_lists for test-specific file caching
 cache_file_lists() {
   TEST_NIX_FILES=$(find tests -name '*.nix' -type f ! -name 'lib.nix' -print | filter_gitignored | sort) # ref: allow-and-deny-lists.instructions.md#A6 -- test helper library excluded from namespace of test files; gitignore filter applied on top
-  # Self-pruning: verify excluded file still exists (A6)
+  # Self-pruning: the A6 exclusion is stale once tests/lib.nix moves.
   if [ ! -f "tests/lib.nix" ]; then
     error "stale exclusion: tests/lib.nix no longer exists — remove ! -name 'lib.nix' from find"
     return 1
@@ -129,15 +124,10 @@ cache_file_lists() {
   readarray -t TEST_NIX_FILES_ARR <<<"$TEST_NIX_FILES"
 }
 
-# check_suite_tally — Verify that a suite reached its tally, and that the tally
-# agrees with the exit status. The runner sees only the exit status, so a suite
-# that exits early — or calls finish_tests from a branch it never reaches — looks
-# exactly like one that passed. Suites that do not source the consumer library
-# have no tally and are not subject to the contract.
-#
-# Prints the reason and returns 1 when the tally is missing, duplicated, reports
-# failures, or contradicts the status; returns 0 silently only when the suite is
-# not a consumer or recorded a clean pass.
+# check_suite_tally -- the runner sees only the exit status, so a suite that
+# exits early, or calls finish_tests from a branch it never reaches, looks
+# exactly like one that passed. A suite that does not source this library has
+# no tally and is exempt.
 #   $1 = suite path, $2 = capture file, $3 = exit status
 check_suite_tally() {
   local _suite="$1" _capture="$2" _status="$3"
@@ -165,7 +155,7 @@ check_suite_tally() {
     return 1
   fi
   # A suite that failed on purpose and said so must still be named as failing:
-  # the runner's failure list carries the reason, so the count belongs in it.
+  # the count belongs in the runner's failure list.
   if [ "$_failed" -gt 0 ]; then
     printf 'tally reports %s failed\n' "$_failed"
     return 1
@@ -173,7 +163,6 @@ check_suite_tally() {
   return 0
 }
 
-# Override preflight_check for test-specific tools
 preflight_check() {
   require_command nix
   require_command nix-instantiate
@@ -185,7 +174,8 @@ preflight_check() {
   require_command check-jsonschema
   # WHY: camilladsp-deviceselect parses YAML fixtures, so declaring it here fails the
   # pipeline once, up front, instead of as one suite among many in step 05. The module
-  # probe is a second line because require_command tests command presence only.
+  # WHY: the module probe is a second line because require_command tests command
+  # presence only.
   require_command python3
   python3 -c 'import yaml' >/dev/null 2>&1 || die "python3 cannot import yaml"
 }

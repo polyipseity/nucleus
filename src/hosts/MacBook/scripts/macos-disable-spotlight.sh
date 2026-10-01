@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
 # Disable Spotlight so Cmd+Space can be reused by alternate launchers such as
-# Raycast.  Each layer independently covers a vector:
-#   1) disable hotkeys 61/64/65 as the console user,
-#   2) force immediate hotkey reload with activateSettings -u,
-#   3) disable indexing with mdutil,
-#   4) clear stale /.Spotlight-V100 cache.
+# Raycast. Four layers, each covering a vector on its own: disable hotkeys
+# 61/64/65 as the console user, force the hotkey reload with activateSettings
+# -u, disable indexing with mdutil, and clear the stale /.Spotlight-V100 cache.
 #
-# This must stay in root system activation (not user activation) because
-# mdutil/launchctl service control are privileged operations.
+# WHY root system activation rather than user activation: mdutil and launchctl
+# service control are privileged.
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../../../scripts/lib/macos-console-user.sh

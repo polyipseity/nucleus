@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
-# Post-apply provisioning: jellyfin sync, AI model sync, replica sync,
-# VM setup/sync, garbage collection, and manual display.  Called by apply.sh
-# after the system rebuild completes.  Each step is best-effort: failures
-# warn but do not abort (the system configuration has already been applied).
+# Post-apply provisioning: jellyfin sync, AI model sync, replica sync, VM
+# setup/sync, garbage collection, and the manual display. Called by apply.sh
+# after the rebuild. Each step is best-effort: failures warn but do not abort,
+# because the system configuration is already applied.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=lib/lib.sh
 . "$SCRIPT_DIR/lib/lib.sh"
 
-# ── Flag defaults ──────────────────────────────────────────────────
-# Empty by default: derive_repo_root() resolves NUCLEUS_REPO_ROOT when it is a
-# live path and rejects Nix store snapshots.
+# WHY empty by default: derive_repo_root() resolves NUCLEUS_REPO_ROOT when it
+# is a live path and rejects Nix store snapshots.
 _repo_root=""
 _ai_sync=true
 _replica_sync=false
@@ -19,7 +18,6 @@ _vm_setup=false
 _vm_sync=true
 _target=""
 
-# ── Parse arguments ────────────────────────────────────────────────
 while [ $# -gt 0 ]; do
   case "$1" in
   --repo-root)
@@ -65,7 +63,6 @@ if [ -z "$_repo_root" ]; then
   }
 fi
 
-# ── Per-run apply log ──────────────────────────────────────────────
 _apply_log=""
 apply_log_init() {
   if [ -z "$_apply_log" ]; then
@@ -74,8 +71,6 @@ apply_log_init() {
     _apply_log="$_ali_dir/apply-$(date -u +%Y%m%dT%H%M%SZ).log"
   fi
 }
-
-# ── Post-apply steps ───────────────────────────────────────────────
 
 run_jellyfin_sync() {
   _rjs_script="$_repo_root/src/scripts/services/jellyfin-sync.sh"
@@ -188,7 +183,6 @@ run_manual_display() {
   printf '\n'
 }
 
-# ── Main sequence ──────────────────────────────────────────────────
 main() {
   run_jellyfin_sync
   run_ai_sync

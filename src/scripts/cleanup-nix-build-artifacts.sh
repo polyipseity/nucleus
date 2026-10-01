@@ -1,18 +1,12 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash # uses process substitution and read -d for safe null-delimited find output
-# Remove stale `result` and `result-*` symlinks left by `nix build`,
-# `nix run ... -o result`, or `nixos-generators`.
+# Remove stale `result` and `result-*` symlinks from `nix build`,
+# `nix run ... -o result`, or `nixos-generators`. Real files and directories
+# with these names are preserved, since they cannot be build artifacts.
 #
-# Only removes symlinks — real files or directories with these names are
-# preserved (with a warning) since they cannot be `result` artifacts.
-#
-# Source from entry-point scripts after sourcing lib.sh.
-#
-# Options (read from $_cnba_options):
-#   --dry-run  Print actions instead of executing them.
-#
-# Environment variables:
-#   REPO_ROOT  Repository root (must be set before sourcing).
+# Sourced from entry points after lib.sh. Options come from
+# $_cnba_options: --dry-run prints actions instead of executing them.
+# REPO_ROOT must be set before sourcing.
 
 [ -n "${REPO_ROOT:-}" ] || {
   error -l cleanup-nix-build-artifacts "REPO_ROOT is not set"
@@ -33,9 +27,7 @@ done
 
 _cnba_found=false
 
-# Recursively scan for result and result-* symlinks without following symlinks
-# (find default behavior — no -L flag) to avoid traversing into Nix store or
-# other large trees.
+# find without -L, so the scan never traverses into the store.
 while IFS= read -r -d '' _cnba_path; do
   if [ -L "$_cnba_path" ]; then
     _cnba_target="$(readlink "$_cnba_path")"
@@ -51,8 +43,8 @@ while IFS= read -r -d '' _cnba_path; do
     warn "found non-symlink at $_cnba_path — skipping (not a Nix build artifact)"
   fi
 done < <(
-  # Note: this find-prune excludes structural directories for performance.
-  # For file-processing scripts, use deny-list.sh's filter_gitignored instead.
+  # WHY: prune the structural directories for speed. File-processing scripts
+  # use deny-list.sh's filter_gitignored instead.
   # ref: allow-and-deny-lists.instructions.md#B8 -- structural invariant
   find "$REPO_ROOT" \
     -path "$REPO_ROOT/.git" -prune -o \

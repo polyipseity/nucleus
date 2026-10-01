@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sets up ~/.agents/ with per-entry symlinks into the resolved agents overlay dir.
+# Set up ~/.agents/ with per-entry symlinks into the resolved agents overlay.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -12,20 +12,18 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _as_repo_root="$1"
 _as_username="$2"
-# Skip exporting NUCLEUS_REPO_ROOT when the path is a Nix store snapshot —
-# derive_repo_root() will fall back to the system repo-root file silently.
+# WHY: a Nix store snapshot would be a bad NUCLEUS_REPO_ROOT, and
+# derive_repo_root() would fall back to the system repo-root file silently.
 if [ -n "$_as_repo_root" ] && case "$_as_repo_root" in /nix/store/*) false ;; *) true ;; esac then
   export NUCLEUS_REPO_ROOT="$_as_repo_root"
 fi
 
 _as_agents_dir="$HOME/.agents"
 
-# Ensure ~/.agents exists as a real (writable) directory.
 if [ ! -d "$_as_agents_dir" ]; then
   mkdir "$_as_agents_dir"
   say -l agents-config "created $HOME/.agents"
 elif [ -e "$_as_agents_dir" ] && [ ! -d "$_as_agents_dir" ]; then
-  # Unexpected non-directory file: fail fast.
   die -l agents-config "$HOME/.agents exists but is not a directory — remove it and re-run apply."
 fi
 
@@ -38,10 +36,8 @@ _nucleus_converge_merged_config_symlinks \
   "is not a managed symlink — merge any wanted content into the source entry and remove it, then re-run apply." \
   "skills pi-extensions"
 
-# Create the ~/.config/opencode/opencode.jsonc symlink to the repo-hosted
-# user config. Resolved at activation time (rather than via Nix-level
-# mkOutOfStoreSymlink) so the link still works after the repo root path
-# changes between rebuilds.
+# WHY resolved here rather than through mkOutOfStoreSymlink: the link has to
+# survive the repo root path changing between rebuilds.
 mkdir -p "$HOME/.config/opencode"
 if ! _as_opencode_source="$(resolve_user_config_file "$_as_username" "opencode" "opencode.jsonc")"; then
   die -l agents-config "cannot resolve the opencode.jsonc overlay source for user '$_as_username' — checked src/users/{$_as_username, default}/opencode/opencode.jsonc"

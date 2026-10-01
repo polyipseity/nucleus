@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Create nucleus log directories for all services before they start, so stderr/stdout
-# capture targets and service log files exist on disk.
+# Create the nucleus log directories before services start, so capture
+# targets exist on disk.
 #
 # Args:
 #   1  system log root
@@ -27,10 +27,10 @@ if [ -n "$_sys_log_dir" ]; then
   done
 fi
 
-# User-level log dirs. macOS activation may run before anyone has logged in, so the
-# console user — not $HOME, which is root's — supplies the home dir and the owner. Linux
-# is handed both explicitly for the same reason: nixos-rebuild activation runs as root
-# and there is no console user to infer from.
+# WHY: macOS activation can run before anyone logs in, so the console user
+# supplies the home dir and owner, not $HOME (root's). Linux is handed both
+# explicitly because nixos-rebuild activation runs as root with no console
+# user to infer from.
 if [ -n "$_user_log_subdirs" ]; then
   _user_log_ready=false
   if [ "$(uname -s)" = "Darwin" ]; then
@@ -40,7 +40,7 @@ if [ -n "$_user_log_subdirs" ]; then
       _user_log_owner="${_console_user#/Users/}:staff"
       _user_log_ready=true
     fi
-    # No console user (headless/SSH): leave this to the next apply that has one.
+    # Headless or SSH: leave it to the next apply that has a console user.
   elif [ -n "$_user_log_home" ] && [ -n "$_user_log_owner" ]; then
     _user_log_ready=true
   else

@@ -1,13 +1,7 @@
 # shellcheck shell=bash
-# Store audit helpers for nucleus hosts.
-#
-# Source from entry-point scripts after sourcing lib.sh and setting REPO_ROOT.
-#
-# Privileged sections (generations on Darwin, linux-builder VM launchd) call
-# audit_store_acquire_privileges at the start of audit_store_report.
-#
-# Environment variables:
-#   REPO_ROOT  Repository root (required).
+# Store audit helpers. Source from entry-point scripts after lib.sh, with
+# REPO_ROOT set. audit_store_acquire_privileges covers the privileged parts
+# (Darwin generations, linux-builder launchd).
 
 [ -n "${REPO_ROOT:-}" ] || {
   error -l audit-store "REPO_ROOT is not set"
@@ -43,8 +37,7 @@ _audit_store_start_sudo_keepalive() {
   trap 'kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true' EXIT INT TERM
 }
 
-# Acquire sudo once on macOS before slow store scans and privileged audits.
-# Skips when already root or when a caller (e.g. nucleus-apply) refreshed sudo.
+# WHY: skipped when already root or when the caller already refreshed sudo.
 audit_store_acquire_privileges() {
   if ! _audit_store_privileges_required || [ "$(id -u)" -eq 0 ]; then
     return 0
@@ -74,7 +67,6 @@ _audit_store_linux_builder_ready() {
     return 0
   fi
 
-  # Fallback to launchctl check.
   if launchctl print "system/${_as_lb_label}" >/dev/null 2>&1; then
     return 0
   fi
@@ -405,9 +397,8 @@ audit_linux_builder_store() {
     return 1
   fi
 
-  # Start linux-builder if not running (only on MacBook).
-  # The builder is disabled by default to save ~500 MiB RAM.
-  # Auto-stop via trap ensures cleanup on any exit (success, failure, interrupt).
+  # The builder is disabled by default to save ~500 MiB RAM, so it is started
+  # here and stopped by the trap below on any exit.
   _albs_lb_started=false
   if command -v nucleus-svc >/dev/null 2>&1; then
     if ! nucleus-svc status linux-builder >/dev/null 2>&1; then
