@@ -1,26 +1,16 @@
 #!/usr/bin/env bash
 # ---- enableScreenSharing ---------------------------------------------------
-# Enable macOS Screen Sharing (VNC/ARD protocol) as the remote-desktop server
-# for this host.  macOS does not ship a native RDP server; Screen Sharing is
-# the platform equivalent and is accessible from Microsoft Remote Desktop
-# clients (which support connecting to Macs) as well as any VNC client.
-# blockAllIncoming = false in the firewall config already permits the inbound
-# VNC port (5900); no additional firewall rule is needed.
+# macOS has no native RDP server, so Screen Sharing (VNC/ARD) is the
+# remote-desktop equivalent and Microsoft Remote Desktop clients can reach it.
+# blockAllIncoming = false in the firewall config already permits 5900.
 #
-# nix-darwin does not expose a services.screensharing option in this version;
-# the LaunchDaemon plist is already installed by macOS and just needs its
-# Disabled override cleared.
+# nix-darwin exposes no services.screensharing option here, so the plist macOS
+# installs itself only needs its Disabled override cleared.
 #
-# launchctl load -w writes to the override database.  When the daemon is
-# already loaded, launchctl prints "Service already loaded" to stderr and may
-# return non-zero — this is expected steady-state behaviour, not an error.
-# Error suppression justification (all three conditions met):
-#   (1) Expected and benign: the daemon being already loaded is normal
-#       steady-state on an already-configured machine.
-#   (2) WHY comment: see above.
-#   (3) Checked afterward: launchctl list verifies the daemon is present in
-#       the system service table so a genuine load failure (e.g. missing
-#       plist) is still caught.
+# WHY the exit status is ignored: launchctl load -w prints "Service already
+#   loaded" to stderr and may exit non-zero once the daemon is loaded, which is
+#   steady state, not failure. The launchctl list check below still catches a
+#   genuine load failure such as a missing plist.
 #
 # check-suppress:suppression_doc: Screen Sharing daemon may already be loaded; launchctl load -w
 # exits 1 for already-loaded services.
@@ -35,12 +25,10 @@ if ! /bin/launchctl list com.apple.screensharing >/dev/null 2>&1; then
 fi
 
 # ---- wifiPrivateAddress ----------------------------------------------------
-# macOS does not expose a CLI to configure per-network Private Wi-Fi Address
-# (Fixed/Rotating/Off). The SystemConfiguration plist is SIP-protected and
-# the airport binary was removed in Sequoia. Private Wi-Fi Address is
-# enabled by default (Fixed per SSID) — each SSID gets a unique private MAC
-# that stays stable across reconnects. To switch a network to Rotating mode
-# (changes ~24h), use:
+# No CLI configures per-network Private Wi-Fi Address: the SystemConfiguration
+# plist is SIP-protected and the airport binary was removed in Sequoia. It is
+# on by default (Fixed per SSID), so each SSID keeps one stable private MAC. To
+# switch a network to Rotating (~24h):
 #   System Settings > Wi-Fi > [Network] > Private Wi-Fi Address > Rotating
 _WIFI_IFACE=$(/usr/sbin/networksetup -listallhardwareports 2>/dev/null |
   /usr/bin/awk '/Wi-Fi|AirPort/{getline; gsub(/^Device: /,""); print; exit}')

@@ -1,17 +1,15 @@
 #!/usr/bin/env bash
-# Resolves per-user homedir overlay paths. Mirrors users-overlay.nix.
+# Resolves per-user homedir overlay paths, mirroring users-overlay.nix.
 #
-# Repo root resolution is delegated to derive_repo_root() (lib.sh) — never
-# re-implemented here, so store snapshots are rejected and the system
-# repo-root file is the single fallback for every caller.
-#
-# Cross-platform consistency: deduplication is case-insensitive (weakest
-# constraint — works on NTFS, POSIX, and Nix). Symlink detection follows
-# symlinks (-e only), matching Nix pathExists and Windows Test-Path.
+# Repo root resolution is delegated to derive_repo_root() in lib.sh, so store
+# snapshots stay rejected and the system repo-root file is the one fallback.
+# Deduplication is case-insensitive, the weakest constraint that works on NTFS,
+# POSIX and Nix. Symlink detection follows links (-e only), matching Nix
+# pathExists and Windows Test-Path.
 set -euo pipefail
 
-# Source lib.sh from this library's own directory (callers set SCRIPT_DIR to
-# their own location, so resolve relative to this file).
+# Callers set SCRIPT_DIR to their own location, so source lib.sh relative to
+# this file.
 _LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=lib.sh
 . "$_LIB_DIR/lib.sh"

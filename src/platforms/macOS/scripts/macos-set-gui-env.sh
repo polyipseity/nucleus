@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Strip stale managed entries from PATH, then prepend + append managed dirs.
-# All values can be passed via env vars or CLI args:
+# Values come from env vars or CLI args:
 #   GUI_ENV_PREPEND_PATH  / $1 = prepend PATH fragment  (colon-separated, may be empty)
 #   GUI_ENV_APPEND_PATH   / $2 = append PATH fragment  (colon-separated)
 #   GUI_ENV_DEDUP_SET_HOME / $3 = managed dedup set     (colon-separated absolute paths)
@@ -8,8 +8,8 @@
 #   GUI_ENV_LAUNCHCTL            = launchctl binary      (default /bin/launchctl; override in tests)
 set -eu
 
-# `:-` not `:?`: empty prepend/append are legitimate (managedPaths.prepend is
-# currently empty); `:?` killed the whole agent at login with exit 1.
+# `:-` not `:?`: an empty prepend/append is legitimate (managedPaths.prepend is
+# currently empty); `:?` killed the agent at login with exit 1.
 __nucleus_prepend="${GUI_ENV_PREPEND_PATH:-${1:-}}"
 __nucleus_append="${GUI_ENV_APPEND_PATH:-${2:-}}"
 __nucleus_managed_set="${GUI_ENV_DEDUP_SET_HOME:-${3:-}}"
@@ -29,11 +29,10 @@ for __component in $PATH; do
 done
 IFS="$old_IFS"
 
-# Compose PATH from non-empty fragments only (prepend may be empty, cleaned
-# may be empty when every PATH entry is managed, append may be empty).  A
-# guard expression cannot express "join non-empty segments with a single
-# colon": when prepend AND cleaned are both empty, the append guard's leading
-# colon survives and the PATH starts with an empty entry (= cwd).
+# Join only the non-empty fragments: no guard expression can express "join
+# non-empty segments with a single colon". When prepend and cleaned are both
+# empty, the append guard's leading colon survives and PATH starts with an empty
+# entry (= cwd).
 __nucleus_path=""
 for __nucleus_frag in "$__nucleus_prepend" "$__nucleus_cleaned" "$__nucleus_append"; do
   [ -n "$__nucleus_frag" ] || continue
@@ -49,10 +48,9 @@ done
 eval "$__all_vars"
 
 # ── NUCLEUS_REPO_ROOT from system repo-root file ──
-# WHY: NUCLEUS_REPO_ROOT was removed from the env catalog to prevent Nix store
-# path poisoning, but some scripts still read it directly.  Set it here from
-# the authoritative system repo-root file so GUI processes always see the
-# correct live checkout path.
+# WHY: NUCLEUS_REPO_ROOT left the env catalog to prevent Nix store path
+#   poisoning, but some scripts still read it. Set it from the authoritative
+#   system repo-root file so GUI processes see the live checkout.
 __nucleus_repo_root_file="/Library/Application Support/nucleus/repo-root"
 if [ -f "$__nucleus_repo_root_file" ] && IFS= read -r __nucleus_repo_root_val <"$__nucleus_repo_root_file" 2>/dev/null; then
   case "$__nucleus_repo_root_val" in

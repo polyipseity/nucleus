@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Process runner for CamillaDSP. Starts camilladsp with --no_config and
+# Process runner for CamillaDSP: starts camilladsp with --no_config and
 # supervises the single process until it exits.
 #
 # This script never pushes a config. The heartbeat is the only pusher, which
-# keeps a single writer for the audio graph and lets the camilladsp.enable
-# toggle gate binding in exactly one place. Pushing here as well meant two
-# writers racing at boot, each tearing down and rebuilding the CoreAudio graph.
+# keeps one writer for the audio graph and lets camilladsp.enable gate binding
+# in one place. Pushing here too meant two writers racing at boot, each tearing
+# down and rebuilding the CoreAudio graph.
 #
-# Dependencies: camilladsp — PATH managed via writeShellApplication runtimeInputs
+# Dependencies: camilladsp, on PATH via writeShellApplication runtimeInputs
 #
 # Usage: camilladsp-run.sh [--port PORT] [--statefile PATH] [--logfile FILE]
 set -euo pipefail
@@ -17,7 +17,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../lib/lib.sh"
 . "$SCRIPT_DIR/../lib/require-command.sh"
 
-# --- Argument parsing ---
+# Argument parsing
 ws_port="${WS_PORT:-1234}"
 state_file="$HOME/.local/state/camilladsp/statefile.yml"
 log_file=""
@@ -44,7 +44,7 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-# Auto-detect log file when not specified
+# Detect the log file when unspecified
 if [ -z "$log_file" ]; then
   log_file="$(nucleus_log_dir)/camilladsp/camilladsp.log"
 fi
@@ -53,9 +53,9 @@ mkdir -p "$(dirname "$state_file")" "$(dirname "$log_file")"
 
 require_command camilladsp
 
-# Start camilladsp in background and supervise the single process until it exits.
+# Start camilladsp in the background and supervise it until it exits.
 camilladsp -p "$ws_port" --statefile "$state_file" -w --no_config -o "$log_file" &
 pid=$!
 
-# Wait for camilladsp to exit
+# Block until camilladsp exits
 wait "$pid"

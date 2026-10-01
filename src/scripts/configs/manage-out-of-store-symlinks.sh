@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Manage out-of-store symlinks (protect/unprotect/verify) using a JSON path manifest.
-# Handles the inline logic from home.nix unprotect-out-of-store-symlinks /
-# protect-out-of-store-symlinks / verify-managed-symlink-paths activation blocks.
+# Manage out-of-store symlinks (protect/unprotect/verify) from a JSON path
+# manifest, covering what home.nix activation blocks used to inline.
 #
 # Usage: manage-out-of-store-symlinks (protect|unprotect|verify) <context> <paths-json> <jq-bin>
 set -euo pipefail
@@ -21,16 +20,15 @@ _do_managed_paths() {
   _context="$1"
   _paths_json="$2"
   _jq_bin="$3"
-  # Each entry is { path, writable ? false }. Writable entries are managed (still
-  # unprotect-before update so a previously-immutable link is cleared once) but are
-  # never hardened immutable, so apps can write through them. Non-writable entries
-  # are hardened immutable (uchg/chattr +i) per the default managed-symlink contract.
+  # Each entry is { path, writable ? false }. A writable entry is still managed,
+  # so an immutable link is cleared once, but is never hardened so apps can write
+  # through it. A non-writable entry is hardened immutable (uchg/chattr +i).
   echo "$_paths_json" | "$_jq_bin" -r '.[] | [.path, (.writable // false)] | @tsv' | while IFS=$'\t' read -r _p _writable; do
     [ -n "$_p" ] || continue
     case "$_action" in
     protect)
       if [ "$_writable" = "true" ]; then
-        # Writable managed symlink: clear any stale immutable flag, then leave writable.
+        # Writable link: clear a stale immutable flag, then leave it writable.
         _nucleus_unprotect_symlink "$_context" "$_p"
       else
         _nucleus_protect_symlink "$_context" "$_p"
@@ -41,12 +39,10 @@ _do_managed_paths() {
   done
 }
 
-# verify — every managed path must exist once the post-linkGeneration seeders have
-# run. Unprotect tolerates an absent path because it runs *before* those seeders;
-# this action runs *after* them, so absence means the creating activation step did
-# not converge and the application would silently read a nonexistent config. A
-# dangling symlink is the same defect with the link left behind, so both are
-# hard errors.
+# verify runs after the post-linkGeneration seeders, so an absent path means the
+# creating step did not converge and the app would read a nonexistent config.
+# Unprotect tolerates absence because it runs before those seeders. A dangling
+# symlink is the same defect with the link left behind, so both are hard errors.
 _do_verify() {
   _v_context="$1"
   _v_paths_json="$2"

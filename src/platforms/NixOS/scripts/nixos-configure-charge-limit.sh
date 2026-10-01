@@ -1,21 +1,14 @@
 #!/usr/bin/env bash
-# Cap battery charging so a mostly-docked Linux machine does not sit at 100 %.
+# Cap battery charging so a mostly-docked machine does not sit at 100 %.
 #
-# Positional arguments:
-#   $1 — power_supply class root (default: /sys/class/power_supply)
+# Usage: nixos-configure-charge-limit.sh [power_supply_root]
+# Exits non-zero when a required write or read-back fails.
 #
-# Exit conditions: 0 when every battery that supports a charge limit carries the
-# managed values (or no battery supports one), non-zero when a required write or
-# read-back fails.
-#
-# WHY: capping charge is the most effective lever on battery wear, and Linux
-#   exposes it as a plain sysfs attribute (`charge_control_end_threshold`), so no
-#   vendor daemon has to be installed and trusted.  Hardware without the
-#   attribute cannot cap charge at all; that is reported, not failed.
-#
-# WHY a resume level below the ceiling: `charge_control_start_threshold` is
-#   written only where the attribute exists, and it sits below the 80 % ceiling
-#   so the pack is not re-charged after every 1 % discharge.
+# WHY a sysfs attribute: Linux exposes the cap as a plain file, so no vendor
+#   daemon has to be installed. Hardware without it cannot cap charge, which is
+#   reported rather than failed.
+# WHY a resume level below the ceiling: the pack is not recharged after every
+#   1 % discharge.
 
 set -euo pipefail
 
@@ -28,10 +21,9 @@ charge_limit_start=75
 
 power_supply_root="${1:-/sys/class/power_supply}"
 
-# write_threshold <path> <value> — write the value, then read it back.
+# write_threshold <path> <value>
 # WHY the read-back: firmware that rejects or clamps the request keeps the old
-#   value, and reporting that silent no-op as converged would leave the pack
-#   charging to 100 % while activation claims the limit is in place.
+#   value, and a silent no-op would report the limit as converged.
 write_threshold() {
   local path="$1" value="$2" current
   if ! printf '%s\n' "$value" >"$path"; then
@@ -59,8 +51,7 @@ for battery_dir in "$power_supply_root"/BAT*; do
     continue
   fi
   battery_count=$((battery_count + 1))
-  # WHY this order: the ceiling is written before the resume level, because the
-  #   kernel rejects a resume level that sits above the current ceiling.
+  # WHY this order: the kernel rejects a resume level above the current ceiling.
   write_threshold "$end_path" "$charge_limit_end"
   start_path="$battery_dir/charge_control_start_threshold"
   if [ -e "$start_path" ]; then

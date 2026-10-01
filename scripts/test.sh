@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
-# Runs the full repository test suite with parallel step dispatch (Nix steps serialized via lock).
-#
-# Thin orchestrator — sources test-lib.sh for framework, test-steps.sh for step
-# registration, then runs the orchestration pipeline.
-#
-# See test-lib.sh, step-runner.sh, and files in test-steps/ for step logic.
+# Runs the full repository test suite with parallel step dispatch, Nix steps
+# serialized behind a lock. Orchestrates only: test-lib.sh holds the framework,
+# test-steps/ the step logic.
 #
 # Arguments:
 #   -q|--quiet           Suppress success/progress output across applicable steps.
@@ -18,8 +15,7 @@
 # Environment variables:
 #   NUCLEUS_REPO_ROOT  Override the detected repository root path.
 #
-# Exit conditions:
-#   0 on success; non-zero on any check failure.
+# Exits non-zero on any check failure.
 set -uo pipefail
 
 # Resolve symlinks so SCRIPT_DIR works from Nix wrapper symlinks.
@@ -40,11 +36,10 @@ _NUCLEUS_TESTS_DIR="$(CDPATH='' cd -- "$_ORCH_SCRIPT_DIR/../src/scripts/tests" &
 # shellcheck source=../src/scripts/tests/test-steps.sh
 . "$_NUCLEUS_TESTS_DIR/test-steps.sh"
 
-# Disable Nix auto-GC for the whole scripted pipeline. The Data volume is
-# frequently >90% full; Nix's default min-free (40GiB) then triggers auto-GC
-# that deletes flake-input source trees another parallel step still needs
-# mid-eval (see src/scripts/lib/lib.sh merge_nix_config). min-free = 0 keeps
-# inputs stable across parallel steps.
+# Disable Nix auto-GC for the pipeline: the Data volume is often >90% full, and
+# the 40GiB min-free then triggers a GC that deletes flake-input source trees
+# another parallel step still needs (see merge_nix_config in
+# src/scripts/lib/lib.sh). min-free = 0 keeps inputs stable.
 NIX_CONFIG="$(merge_nix_config)"
 export NIX_CONFIG
 

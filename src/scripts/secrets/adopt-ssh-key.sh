@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Tracks the fingerprint of the managed personal SSH public key in
-# $NUCLEUS_USER_ROOT/managed-ssh-keys and flushes the in-memory SSH agent
-# when the fingerprint changes (i.e., the key was rotated in the SOPS secret).
+# Track the fingerprint of the managed personal SSH public key in
+# $NUCLEUS_USER_ROOT/managed-ssh-keys and flush the agent when it changes, which
+# is how a key rotated in the SOPS secret reaches new connections.
 
 set -euo pipefail
 
@@ -17,9 +17,8 @@ nucleus_config_dir="$NUCLEUS_USER_ROOT"
 managed_ssh_manifest="$nucleus_config_dir/managed-ssh-keys"
 
 if [ ! -f "$_ssh_pub_path" ]; then
-  # Not a hard error: sops-nix reports its own failure if materialization
-  # did not complete.  Warn and skip so this activation does not mask the
-  # upstream sops-nix error with a different message.
+  # Not a hard error: sops-nix reports its own materialization failure, and
+  # warning here keeps this activation from masking it with another message.
   warn -l secrets "managed SSH public key not found at '$_ssh_pub_path'; skipping fingerprint adoption."
 else
   # check-suppress:suppression_doc: SSH public key may not exist yet on first provision; ssh-keygen -lf exits 1 for missing/invalid keys.
@@ -34,12 +33,11 @@ else
     fi
 
     if [ "$old_fingerprint" != "$new_fingerprint" ]; then
-      # Flush in-memory SSH agent so stale cached key material is cleared.
-      # The guard intentionally omits the `[ -n "$old_fingerprint" ]` check
-      # so that on first provision (absent manifest, empty old_fingerprint)
-      # any pre-placed key already loaded in the agent is also evicted.
-      # AddKeysToAgent=yes in the SSH config re-loads the new key on the
-      # next outbound SSH connection.
+      # Flush the agent so stale key material is cleared. The guard deliberately
+      # omits `[ -n "$old_fingerprint" ]` so first provision, where the manifest
+      # is absent and the value is empty, still evicts a pre-placed key.
+      # AddKeysToAgent=yes in the SSH config re-loads the new key on the next
+      # outbound connection.
       warn -l secrets "managed SSH key fingerprint changed ($old_fingerprint -> $new_fingerprint); flushing SSH agent."
       # check-suppress:suppression_doc: ssh-add -D fails when no agent is running; benign since nothing needs flushing.
       "$_ssh_add_bin" -D 2>/dev/null || true
@@ -47,8 +45,7 @@ else
 
     mkdir -p "$nucleus_config_dir"
     printf '%s\n' "$new_fingerprint" >"$managed_ssh_manifest"
-    # Restrict manifest to owner-read-only: SSH fingerprint data can be
-    # used to correlate keys across systems; minimise unnecessary visibility.
+    # Owner-read-only: a fingerprint correlates keys across systems.
     chmod 600 "$managed_ssh_manifest"
   fi
 fi

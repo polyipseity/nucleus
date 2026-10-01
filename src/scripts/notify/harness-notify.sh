@@ -1,38 +1,32 @@
 #!/usr/bin/env bash
 # Normalizes a coding-harness lifecycle event into a Hermes notification.
+# Every harness (pi, opencode, Cursor, VS Code Copilot Chat) funnels its hook
+# payload through here so formatting, channel selection and failure handling have
+# one definition.
 #
-# Every provisioned harness (pi, opencode, Cursor, VS Code Copilot Chat) funnels
-# its hook payload through this single entry point so message formatting, channel
-# selection and failure handling have one definition.
-#
-# Delivery goes through `hermes send`, which reuses the platform credentials and
-# channel configuration the Hermes gateway already owns (~/.hermes/.env and
-# ~/.hermes/config.yaml).  nucleus therefore stores no bot tokens of its own for
-# notifications, and no gateway process needs to be running for bot-token
-# platforms.
+# Delivery goes through `hermes send`, which reuses the credentials and channel
+# config the gateway already owns (~/.hermes/.env, ~/.hermes/config.yaml). nucleus
+# stores no bot tokens of its own and needs no running gateway.
 #
 # Usage: harness-notify <harness> <event> [text]
 #   harness  pi | opencode | cursor | copilot
 #   event    done | needs-input | approval | error
-#   text     Optional body.  When omitted, stdin is read: raw text, or a hook
+#   text     Optional body. When omitted, stdin is read: raw text, or a hook
 #            JSON object from which a message field is extracted.
 #
-# Exit status is always 0.  A notification is best-effort; it must never block or
-# fail the harness that emitted it, and hook runners treat a non-zero exit as a
-# denial in some harnesses.
+# Always exits 0. A hook runner in some harnesses reads a non-zero exit as a
+# denial, so a failed notification must never block the harness that emitted it.
 #
 # Config (~/.local/state/nucleus/config.json, `nucleus-config`):
 #   harness-notify.enable    boolean, default true
-#   harness-notify.channels  array of `hermes send` targets, default
-#                            ["telegram", "ntfy", "discord"]; a channel the
-#                            host has not set up simply fails its delivery and
-#                            is reported as a warning
+#   harness-notify.channels  hermes send targets, default
+#                            ["telegram", "ntfy", "discord"]; a channel the host
+#                            has not set up fails delivery and warns
 #   harness-notify.max-chars integer body cap, default 1200
 #
-# The other two gates belong to their own entry points and do not change what
-# this script sends: `harness-approval.enable` (default false) answers tool calls
-# locally, and `harness-drive.enable` (default true) decides whether a queued
-# prompt is injected after a finished turn.
+# The other two gates live in their own entry points: `harness-approval.enable`
+# (default false) answers tool calls, `harness-drive.enable` (default true)
+# decides whether a queued prompt is injected after a finished turn.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -56,15 +50,15 @@ done | needs-input | approval | error) ;;
   ;;
 esac
 
-# WHY: defaults are mirrored from scripts/config.sh DEFAULTS (the SSOT for
-# runtime toggles).  Reading the file directly keeps this path usable from
-# harness hooks, which run outside any nucleus activation context.
+# WHY: defaults are mirrored from scripts/config.sh DEFAULTS, the SSOT for
+#   runtime toggles. Reading the file directly keeps this path usable from
+#   harness hooks, which run outside any nucleus activation context.
 _hn_defaults='{"enable":true,"channels":["telegram","ntfy","discord"],"max-chars":1200}'
 _hn_user_config='{}'
 if [ -f "$HOME/.local/state/nucleus/config.json" ]; then
   # WHY: an unreadable config takes the unparsable exit, message included, so
-  # both platforms report one string per action and `set -e` cannot kill a hook
-  # before it writes anything.
+  #   both platforms report one string per action and `set -e` cannot kill a
+  #   hook before it writes anything.
   if ! _hn_user_config="$(cat "$HOME/.local/state/nucleus/config.json")"; then
     warn "could not parse nucleus config — not notifying"
     exit 0
@@ -89,7 +83,7 @@ if [ -z "$_hn_text" ] && [ ! -t 0 ]; then
   _hn_stdin="$(cat)"
   case "$_hn_stdin" in
   \{*)
-    # A malformed payload is not an error here: fall back to the raw text.
+    # A malformed payload is not an error: fall back to the raw text.
     if ! _hn_text="$(jq -r '.message // .prompt // .text // .tool_name // ""' <<<"$_hn_stdin" 2>/dev/null)"; then
       _hn_text="$_hn_stdin"
     fi

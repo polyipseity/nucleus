@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # shellcheck source=../check-lib.sh
-# (provides say, error, warn, require_command, derive_repo_root, register_step)
+# Provides say, error, warn, require_command, derive_repo_root, register_step.
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
 register_step "schema-validation" "Schema validation (JSON/YAML)" run_schema_validation posix any none
@@ -18,20 +18,20 @@ run_schema_validation() {
     return 1
   }
 
-  # Collect file -- schema pairs into a temp manifest.
+  # Pair every file with its schema in one temp manifest.
   local _js_manifest="$_js_tmpdir/manifest"
   local _js_schema_files=()
 
-  # Single source of truth for A8 exception list: files that don't need $schema.
-  # Policy: nucleus-owned data requires $schema (we write our own schemas).
-  # External formats: use published $schema when available; never roll our own.
+  # SSOT for the A8 exception list: nucleus-owned data requires $schema (we
+  # write our own schemas), external formats use the published $schema when one
+  # exists.
   # ref: allow-and-deny-lists.instructions.md#A8
   skip_schema_file() {
     local _f="$1"
     case "$_f" in
-    # Schema definitions / meta
+    # Schema definitions, meta
     *.schema.json) return 0 ;;
-    # External formats (no published schema available)
+    # External formats with no published schema
     */users/*/cursor/*.json | */users/*/iterm2/DynamicProfiles/*.json | */users/*/obsidian/*.json | */users/*/qtpass/*.json | */users/*/rimsort/*.json | */configs/camilladsp/* | */configs/camillagui-backend/* | */users/*/discord-music-rpc/* | */users/*/agents/hooks/*.json | */users/*/agents/skills/*/_meta.json | */configs/litellm/* | */users/*/hermes/plugins/*/plugin.yaml | */users/*/vscode/mcp.json | */users/*/vscode/chatLanguageModels*.json | */.sops.yaml | */.yamllint.yml)
       return 0
       ;;
@@ -49,7 +49,7 @@ run_schema_validation() {
       *.json | *.yml | *.yaml) ;;
       *) continue ;;
       esac
-      # Normalize relative paths to absolute so exception patterns match consistently.
+      # Relative paths become absolute so the exception patterns match.
       local _abs
       _abs="$(cd "$_repo_root" && realpath -- "$_sf" 2>/dev/null || echo "$_PWD/$_sf")"
       skip_schema_file "$_abs" && continue
@@ -62,14 +62,14 @@ run_schema_validation() {
     done
   fi
 
-  # $schema presence and format check (Spec G)
+  # $schema presence and format
   local _missing_schema=0
   for _f in "${_js_schema_files[@]}"; do
     skip_schema_file "$_f" && continue
 
     case "$_f" in
     *.json)
-      # Skip non-object JSON (arrays, primitives) — they cannot have root-level $schema.
+      # Arrays and primitives carry no root-level $schema.
       _is_object=$(jq -r 'if type == "object" then "true" else "false" end' "$_f" 2>/dev/null)
       if [ "$_is_object" != "true" ]; then
         continue
@@ -140,7 +140,7 @@ run_schema_validation() {
     done
   fi
 
-  # Group by schema and dispatch via xargs -P
+  # Group by schema, dispatch through xargs -P
   if [ -s "$_js_manifest" ]; then
     sort -k1 "$_js_manifest" | awk -F'\t' '
       BEGIN { gid = 0; cur = "" }
@@ -192,7 +192,7 @@ run_schema_validation() {
     fi
   fi
 
-  # GitHub schema validation -- always-run
+  # GitHub schema validation, always runs
   check-jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.yml || _jsonschema_errors=$((_jsonschema_errors + 1))
   check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml || _jsonschema_errors=$((_jsonschema_errors + 1))
 

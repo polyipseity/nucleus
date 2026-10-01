@@ -22,19 +22,18 @@ while IFS= read -r _vsd_entry; do
 
   _vsd_app_path="$APP_DIR/$_vsd_app_dir"
   mkdir -p "$APP_DIR"
-  # Nix store outputs are read-only; strip that before deletion to avoid
-  # Permission denied on the next generation switch.
+  # Nix store outputs are read-only, so strip that before deletion.
   chmod -R +w "$_vsd_app_path" 2>/dev/null || true # check-suppress:suppression_doc: dir may not exist on first apply
   rm -rf "$_vsd_app_path"
   cp -R "$_vsd_store_path" "$APP_DIR/"
 
   "$LSREGISTER" -R -f "$_vsd_app_path" || true # check-suppress:suppression_doc: LaunchServices may reject unsigned bundles; not fatal
 
-  # Enable the service in NSServicesStatus so it appears in the Services
-  # menu and right-click context menu without manual toggling in
+  # Enable the service in NSServicesStatus so it appears in the Services menu
+  # and the right-click context menu without a manual toggle in
   # System Settings > Extensions > Services.
-  # Service key format: "<NSBundleIdentifier> - <NSMenuItem.default> - <NSMessage>"
-  # Uses presentation_modes dict (macOS 14+) instead of legacy
+  # Key format: "<NSBundleIdentifier> - <NSMenuItem.default> - <NSMessage>".
+  # presentation_modes (macOS 14+) replaces the legacy
   # enabled_context_menu/enabled_services_menu booleans.
   _vsd_enablement_key="$_vsd_bundle_id - $_vsd_menu_item - $_vsd_message"
   /usr/bin/defaults write pbs NSServicesStatus -dict-add "$_vsd_enablement_key" \

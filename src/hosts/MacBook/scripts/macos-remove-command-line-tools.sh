@@ -1,17 +1,14 @@
 #!/usr/bin/env bash
-# ---- macos-remove-command-line-tools -----------------------------------------
 # Remove Apple's Command Line Tools install tree on each apply.
 #
-# WHY: nucleus provisions a Nix-only developer toolchain (apple-sdk-enhanced +
-# LLVM via absolute CC/CXX/LD). Apple CLT files are not used and cost ~1 GB when
-# present. pkgutil receipts on /Library/Apple/System are SIP-protected and are
-# not removed here — Software Update may still offer CLT installs.
+# WHY: nucleus provisions a Nix-only toolchain (apple-sdk-enhanced + LLVM via
+# absolute CC/CXX/LD). CLT files go unused and cost ~1 GB. The pkgutil receipts
+# on /Library/Apple/System are SIP-protected and stay, so Software Update may
+# still offer a CLT install.
 #
-# Positional arguments:
-#   $1 — path to verbose log file (e.g. systemLogDir/command-line-tools.log)
-#
-# Scope: /Library/Developer/CommandLineTools only. Does not touch Xcode.app,
-# pkgutil receipts, or other /Library/Developer paths.
+# Usage: macos-remove-command-line-tools <path to verbose log file>
+# Scope is /Library/Developer/CommandLineTools only: no Xcode.app, no receipts,
+# no other /Library/Developer path.
 set -eu
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
