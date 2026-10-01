@@ -1,4 +1,4 @@
-# MacBook/defaults.nix — declarative macOS system.defaults for the MacBook.
+# MacBook/defaults.nix - declarative macOS system.defaults for the MacBook.
 {
   lib,
   repoRoot,
@@ -29,8 +29,8 @@ let
     cangjieInputMethod
   ];
 
-  # Loaded from src/users/<user>/autocorrect/wordlist.txt (overlay; default is
-  # empty): one word per line, sorted alphabetically.
+  # Word list from src/users/<user>/autocorrect/wordlist.txt (the default
+  # template is empty). Identity substitutions, so the words stay unchanged.
   # check-suppress:config-method: method 3 (merge / defaults-based) -- not Method 1 (symlink) because macOS
   # NSUserDictionaryReplacementItems is managed via the `defaults` system
   # preference store, not a file path. There is no file to symlink. The value
@@ -77,8 +77,8 @@ in
       "NSGlobalDomain" = {
         NSQuitAlwaysKeepsWindows = true;
 
-        # Keep Finder context-menu Services at the default threshold so core
-        # entries such as "New Terminal at Folder" stay discoverable on right-click.
+        # Keep the Finder Services threshold at the default so entries like
+        # "New Terminal at Folder" stay on the right-click menu.
         NSServicesMinimumItemCountForContextSubmenu = 0;
 
         NSToolbarTitleViewRolloverDelay = 0.0;
@@ -115,15 +115,11 @@ in
         kDimTime = 5; # dim after 5 seconds
       };
 
-      # iCloud: disable "Optimize Mac Storage" and enable syncing so macOS
-      # maintains a full local mirror of iCloud Drive instead of offloading files
-      # to the cloud when space is low. An activation hook forcibly downloads all
-      # iCloud files via `brctl download` at apply-time to ensure local presence.
-      # Constraints: (1) if physical storage < total iCloud size, macOS will
-      # ignore OptimizeStorage; (2) system updates / cache clears can trigger
-      # re-indexing, causing files to appear as cloud-only until re-downloaded;
-      # (3) manual recovery available via `brctl download`. See AGENTS.md
-      # security invariants for drift reset handling.
+      # iCloud: a full local mirror instead of offloading. An activation hook
+      # runs `brctl download` for every file at apply time. macOS ignores
+      # OptimizeStorage when storage is smaller than the iCloud total, and
+      # updates or cache clears can re-index files as cloud-only; `brctl
+      # download` is the recovery.
       "com.apple.CloudDocs" = {
         BRCloudDriveSyncingEnabled = true; # enable iCloud Drive syncing
         OptimizeStorage = false; # disable "Optimize Mac Storage"
@@ -144,8 +140,8 @@ in
         ImportToCloudEnabled = 1;
       };
 
-      # The Siri shortcut launches Siri in text-input mode, so it does not
-      # collide with Raycast's Option+Space.
+      # Siri here opens text input, so it does not collide with Raycast's
+      # Option+Space.
       "com.apple.Siri" = {
         KeyboardShortcut = 3; # 3 = double-press Command: invoke Type to Siri
         StatusMenuVisible = false; # hide Siri from the menu bar; keep chrome minimal
@@ -161,7 +157,7 @@ in
         CriticalUpdateInstall = true;
       };
 
-      # Hidden UI here; the hotkey, indexing, and cache are handled in the
+      # Hidden UI only; the hotkey, indexing, and cache are handled by the
       # activation script disableSpotlightHotkey.
       "com.apple.Spotlight" = {
         MenuItemHidden = 1; # Hide menu-bar button
@@ -208,8 +204,8 @@ in
       };
 
       # Control Centre: hide the battery percentage (the allow-listed Stats app
-      # shows it); tighten status-item spacing to the minimum (0 is the floor;
-      # 4 is the manual fallback if icons overlap).
+      # shows it) and set status-item spacing to the 0 floor, with 4 as the
+      # fallback when icons overlap.
       "com.apple.controlcenter" = {
         NSStatusItemSelectionPadding = 0; # pixels of padding around selected item
         NSStatusItemSpacing = 0; # pixels between status items
@@ -227,12 +223,10 @@ in
         wdev-tr = 0;
       };
 
-      # WHY: in CustomUserPreferences: Finder reads these from the user domain
-      # (~/.Library/Preferences/com.apple.finder.plist), not system domain.
-      # These settings MUST be written via CustomUserPreferences to take effect.
+      # WHY the user domain: Finder reads these from ~/.Library/Preferences/
+      # com.apple.finder.plist, so system.defaults.finder does not take effect.
       "com.apple.finder" = {
-        # These are intentionally kept in user domain (not system.defaults.finder) because
-        # Finder only respects them when written to per-user preferences.
+        # No typed nix-darwin finder option exists for this key.
         CreateDesktop = true; # allow files/icons on the Desktop
         ShowExternalHardDrivesOnDesktop = true; # show external drives on Desktop
         ShowHardDrivesOnDesktop = true; # show internal hard drives on Desktop
@@ -242,8 +236,7 @@ in
         FXICloudDriveDesktop = true;
         FXICloudDriveDocuments = true;
 
-        # Keep the empty-trash confirmation prompt enabled. This key is not a
-        # typed nix-darwin finder option, so we set it as a custom default.
+        # Not a typed nix-darwin finder option, hence the custom default.
         WarnOnEmptyTrash = true;
 
         DesktopViewSettings = {
@@ -280,10 +273,10 @@ in
         "spans-displays" = true;
       };
 
-      # WHY: Most Raycast settings live in SQLite database (Raycast internals), not
-      # plist. We configure only documented/stable plist keys here. Advanced settings
-      # like Pop to Root timeout, Escape behavior, Navigation bindings, and Root Search
-      # Sensitivity require manual configuration in Raycast UI → Settings → Advanced.
+      # WHY: most Raycast settings live in its SQLite database, not a plist, so
+      # only documented plist keys are set here. Pop to Root timeout, Escape
+      # behavior, navigation bindings, and Root Search Sensitivity need the
+      # Raycast UI under Settings > Advanced.
       "com.raycast.macos" = {
         LaunchAtLogin = false; # Managed by nucleus autostart system
         Appearance = "system"; # Auto Dark/Light based on time of day
@@ -297,8 +290,8 @@ in
 
         DeveloperMode = true; # Enable development mode
         AutoReloadOnSave = true; # Auto-reload on script save
-        # Note: Additional dev settings (Use Node production, logging, disable pop to root)
-        # are database-only; configure manually in Settings → Advanced → Developer Tools
+        # The other dev settings (Node production, logging, pop to root) are
+        # database-only, so they stay in Settings > Advanced > Developer Tools.
 
       };
       "com.apple.terminal" = {
@@ -309,20 +302,17 @@ in
         autoConnect = true;
       };
 
-      # Note: com.apple.iCloud.fmip.preferences is an internal Apple domain with
+      # WHY: com.apple.iCloud.fmip.preferences is an internal Apple domain with
       # no public developer documentation; keys are empirically observed.
       "com.apple.iCloud.fmip.preferences" = {
         ArchiveVaultEnabled = 1;
       };
 
-      #
-      # nativeAutoBrightnessManagement stays off: with macOS auto brightness
-      # also on, the two brightness owners fight and the panel ratchets up with
-      # no user input (waydabber/BetterDisplay #4421, #5234, mitigated by
-      # #4589). This host runs BetterDisplay for the HeadlessDisplay virtual
-      # screen only.
-      #
-      # The @Display:2 suffix is the tagID for the built-in panel.
+      # WHY nativeAutoBrightnessManagement stays off: with macOS auto
+      # brightness also on, the two brightness owners fight and the panel
+      # ratchets up with no user input (waydabber/BetterDisplay #4421, #5234,
+      # mitigated by #4589). This host runs BetterDisplay for the HeadlessDisplay
+      # virtual screen only. The @Display:2 suffix is the built-in panel tagID.
       "pro.betterdisplay.BetterDisplay" = {
         LaunchAtLogin = false;
         ShowResolutionsAsList = true;
@@ -337,9 +327,8 @@ in
         SUEnablePrerelease = false;
       };
 
-      # AltTab: declare switcher behavior explicitly (including values that
-      # match upstream defaults) so rebuilds keep runtime behavior stable.
-      #
+      # WHY declare values that match upstream defaults: rebuilds then keep the
+      # runtime behavior stable.
       "com.lwouis.alt-tab-macos" = {
         appearanceStyle = "2"; # titles
         appearanceSize = "3"; # auto
@@ -401,8 +390,7 @@ in
         crashPolicy = "2"; # always send crash reports
       };
 
-      # LinearMouse: configure menu bar visibility, battery indicator,
-      # dock visibility, and launch-at-login behavior.
+      # iTerm2 app-level preferences, not per-profile settings.
       "org.linearmouse.LinearMouse" = {
         showInDock = true;
         launchAtLogin = false;
@@ -410,24 +398,20 @@ in
         SUAutomaticallyUpdate = false;
       };
 
-      # iTerm2 terminal emulator app-level preferences (not per-profile settings).
-      #
+      # iTerm2 app-level preferences (not per-profile settings).
       "com.googlecode.iterm2" = {
-        # Set the default profile GUID to the Dynamic Profile defined in
+        # KEY_DEFAULT_GUID picks the profile for new windows and tabs when none
+        # is selected.
         # check-suppress:config-method: method 1 (writable symlink) -- src/users/default/iterm2/DynamicProfiles/default-profile.json via iterm2.nix
-        # This key (KEY_DEFAULT_GUID) tells iTerm2 which profile to use for
-        # new windows/tabs when no other profile is explicitly selected.
         "Default Bookmark Guid" = "9B6E253F-0528-4F8A-A025-4FD279C73DB1";
         # Allow clipboard access from terminal applications.
         "AllowClipboardAccess" = true;
-        # Bootstrap daemon: supports shell integration without requiring a full
-        # app launch.
+        # Supports shell integration without a full app launch.
         "BootstrapDaemon" = true;
         # Enable "Open in iTerm" Finder right-click context menu.
         "EnableFindersService" = true;
-        # Pre-answer the first-launch "may we show you tips?" permission prompt
-        # so iTerm2 skips that dialog on a fresh provision and goes straight to
-        # showing tips.  Simulates the state where the user already answered yes.
+        # Pre-answer the first-launch tips prompt so a fresh provision goes
+        # straight to showing tips.
         "NoSyncPermissionToShowTip" = true;
         "NoSyncTipOfTheDay" = true;
         # Blocks other processes from reading keystrokes.
@@ -435,9 +419,8 @@ in
         # Disable in-app update checks; updates are managed declaratively.
         "SUCheckAtStartup" = false;
         "SUEnableAutomaticChecks" = false;
-        # Suppress the "Warn about short-lived sessions" dialog for each profile.
-        # The NeverWarnAboutShortLivedSessions_<GUID> key silences the iTermWarning
-        # that fires when a session ends within shortLivedSessionDuration (default 3s).
+        # The NeverWarnAboutShortLivedSessions_<GUID> key silences the
+        # iTermWarning that fires when a session ends inside shortLivedSessionDuration.
         "NeverWarnAboutShortLivedSessions_743F1344-118A-4E38-8CB0-D7319D34EF8C" = true;
         "NeverWarnAboutShortLivedSessions_9B6E253F-0528-4F8A-A025-4FD279C73DB1" = true;
         # Suppress the secure-keyboard-entry warning when opening a command.
@@ -445,19 +428,15 @@ in
       };
 
       # Amphetamine: declaratively enable the Power Protect install toggle.
-      # WHY: partial declarative only: upstream requires users to place the
-      # helper script and sudoers fragment manually due platform restrictions;
-      # this key activates that feature path once those files exist.
-      # Parity note: this feature is macOS-only; there is no equivalent
-      # Power Protect surface on NixOS/Windows in this repository.
-      # Menu-bar allow-list: Amphetamine is menu-bar-only by design (LSUIElement);
-      # it must never get a hide key.
+      # WHY partial declarative only: upstream wants the helper script and a
+      # sudoers fragment placed by hand, and this key activates that feature
+      # path once they exist. Amphetamine is menu-bar-only by design
+      # (LSUIElement), so it must never get a hide key.
       "com.if.Amphetamine" = {
         "Enable Power Protect Install" = true;
       };
 
-      # VS Code (stable and Insiders): disable ApplePressAndHold so held
-      # keys repeat. Required for vim motions (h/j/k/l) via vscode-neovim.
+      # WHY: held keys must repeat for vim motions (h/j/k/l) via vscode-neovim.
       "com.microsoft.VSCode" = {
         ApplePressAndHoldEnabled = false;
       };
@@ -465,12 +444,11 @@ in
         ApplePressAndHoldEnabled = false;
       };
 
-      # Menu-bar allow-list: Stats replaces the macOS battery item, so its icon
-      # must stay visible; it must never get a hide key.
+      # Stats replaces the macOS battery item, so its icon must stay visible and
+      # must never get a hide key.
       "eu.exelban.Stats" = { };
     };
 
-    # Dock settings
     dock = {
       autohide = true; # hide Dock chrome by default; summon on edge hover
       expose-group-apps = true; # Mission Control groups windows by application
@@ -486,8 +464,6 @@ in
       tilesize = 128; # base icon size
     };
 
-    # Finder settings (user domain via system.defaults.finder; some settings
-    # like desktop visibility are defined in CustomUserPreferences instead)
     finder = {
       _FXShowPosixPathInTitle = true; # show full POSIX path in title bar
       AppleShowAllFiles = true; # always show hidden files in Finder
@@ -500,35 +476,27 @@ in
       ShowStatusBar = true; # show item count / available space bar
     };
 
-    # CustomSystemPreferences — arbitrary system-level defaults not exposed as
-    # first-class nix-darwin options.  Written with `sudo defaults write`.
+    # CustomSystemPreferences: arbitrary system-level defaults with no
+    # first-class nix-darwin option, written with `sudo defaults write`.
     CustomSystemPreferences = {
-      # Enable automatic crash-report and diagnostic submission to Apple.
       "com.apple.SubmitDiagInfo".SubmitDiagInfo = true;
 
-      # Ambient-light-sensor threshold that drives keyboard backlight brightness.
-      # 25 maps to roughly half brightness in subdued lighting conditions.
-      # Note: com.apple.iokit.AmbientLightSensor is a kernel IOKit domain with
-      # no public Apple developer reference; values are empirically calibrated.
+      # 25 is roughly half brightness in subdued light. WHY the empirical values:
+      # com.apple.iokit.AmbientLightSensor is a kernel IOKit domain with no
+      # public Apple developer reference.
       "com.apple.iokit.AmbientLightSensor"."Keyboard Backlight Error Condition" = 25;
     };
 
-    # loginwindow — login-screen presentation settings.
     loginwindow.LoginwindowText = "✨";
-
-    # Screenshot settings
     screencapture = {
       disable-shadow = true; # omit window drop-shadow from screenshots
       location = "~/Desktop"; # default save location
-      # WHY: target is explicitly set: keep clipboard-first capture behavior as the
-      # default while still retaining a deterministic file-save location for
-      # workflows that explicitly switch target back to file.
+      # WHY the explicit target: keep clipboard-first capture as the default
+      # while retaining a deterministic file-save location.
       target = "clipboard"; # default capture destination
       type = "png"; # default file format
     };
 
-    # Trackpad settings (system-level; fine-grained per-app settings are in
-    # CustomUserPreferences.com.apple.AppleMultitouchTrackpad above)
     trackpad = {
       Clicking = true; # tap to click
       TrackpadThreeFingerDrag = true; # drag windows with three fingers

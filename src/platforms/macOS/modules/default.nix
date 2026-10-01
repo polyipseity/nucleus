@@ -23,10 +23,8 @@ let
 
   finderSidebar = import ./finder-sidebar.nix { inherit config lib pkgs; };
 
-  # macOS LaunchAgents (sccache-gc, log-gc-user, betterdisplay-heartbeat,
-  # ds-store-gc, spotlight-exclusions, nix-index-update, icloud-exclusions,
-  # service-watchdog-user, gui-env).  Imported as a fragment and merged into
-  # the isDarwin-guarded config below; only ever loaded on macOS.
+  # macOS LaunchAgents, imported as a fragment and merged into the
+  # isDarwin-guarded config below.
   launchdAgents = import ./launchd-agents.nix {
     inherit
       config
@@ -108,11 +106,10 @@ let
 
   dutiBin = "${pkgs.duti}/bin/duti";
 
-  # Periodic heartbeat script for the BetterDisplay virtual screen.
-  # Lives in the Nix store so the LaunchAgent ProgramArguments path is stable
-  # across home-manager generations without a home.file symlink.
-  # set +e at the top makes all operations fully soft-fail so launchd never
-  # marks the agent as failed and throttles future invocations.
+  # Periodic heartbeat script for the BetterDisplay virtual screen. The Nix
+  # store path keeps the LaunchAgent ProgramArguments stable across home-manager
+  # generations, and set +e makes every operation soft-fail so launchd never
+  # throttles the agent.
   sanitizeICloudManagedRoots =
     roots:
     let
@@ -239,14 +236,8 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
     '';
 
     # mac-app-util trampolines
-    # Create Spotlight/Raycast-indexable .app wrappers for standalone GUI
-    # binaries that lack .app bundles (e.g. Homebrew formula binaries like
-    # Krokiet and Czkawka). Trampolines are AppleScript-compiled .app bundles
-    # that launch the target binary, making them discoverable by Spotlight
-    # and Raycast.
-    # WHY: mac-app-util's HM module (sync-trampolines) only processes .app
-    # bundles in ~/Applications/Home Manager Apps/. Homebrew binaries are not
-    # .app bundles, so we call mktrampoline directly.
+    # WHY not the HM module: sync-trampolines only processes .app bundles in
+    # ~/Applications/Home Manager Apps/, and Homebrew binaries are not bundles.
     # Source: https://github.com/hraban/mac-app-util
     macos-create-app-trampolines = lib.hm.dag.entryAfter [ "macos-install-raycast-aliases" ] ''
       _trampoline_dir="${config.home.homeDirectory}/Applications/Nucleus App Aliases"
@@ -272,47 +263,33 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
     '';
 
     # macos-configure-icloud-exclusions
-    # Marks directories matching configured names with the com.apple.fileprovider
-    # .ignore#P xattr to exclude them from iCloud sync. This prevents large
-    # directories (e.g., node_modules, .venv) from syncing across devices.
-    # Scope guard:
-    #   1. Managed roots come from the centralized src/users/ registry.
-    #   2. At evaluation time we discard any root outside Library/Mobile Documents.
-    #   3. At runtime we recurse only inside those native iCloud directories.
-    #   4. find -prune stops descent into excluded directories, keeping scans fast.
-    # Configuration: excludedDirNames from src/users/ (e.g., ["node_modules"])
+    # Marks matching directories with the com.apple.fileprovider .ignore#P xattr
+    # so they stay out of iCloud sync.
+    # Scope guard: roots come from the src/users/ registry, evaluation discards
+    # anything outside Library/Mobile Documents, recursion stays inside those
+    # directories, and find -prune keeps the scan fast. Names come from
+    # src/users/.
     # Source: https://developer.apple.com/documentation/fileprovider
     macos-configure-icloud-exclusions = lib.hm.dag.entryAfter [ "cloud-drives-setup" ] ''
       "${activationBundle}/src/platforms/macOS/scripts/macos-configure-icloud-exclusions.sh" "${pkgs.jq}/bin/jq" "${pkgs.findutils}/bin/find" ${lib.escapeShellArg icloudExcludedDirsJson} ${lib.escapeShellArg icloudManagedRootsJson}
     '';
 
     # macos-check-privacy-permissions
-    # Detects privacy-gated preference access problems early and emits an
-    # explicit Full Disk Access remediation block so activation logs explain why
-    # subsequent defaults writes may fail.
-    # Probe strategy:
-    #   1. Attempt a write/delete probe on a privacy-gated domain.
-    #   2. If the probe fails with permission text, print a highlighted FDA
-    #      guide so later defaults-write failures are actionable.
-    #   3. Continue activation either way so non-privacy-gated settings still
-    #      converge in the same run.
+    # Probe a privacy-gated domain, print the FDA guide when the probe hits
+    # permission text, and continue either way so ungated settings still
+    # converge in the same run.
     macos-check-privacy-permissions = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/platforms/macOS/scripts/macos-configure-preflight-privacy.sh" "${repoRoot}"
     '';
 
-    # ensure-dev-directory (cross-host)
-    # Ensures ~/dev exists before any dev-tree maintenance runs.
-    # WHY: separate activation: the directory itself is cross-host provisioning
-    # state, while the macOS-only cleanup/indexing steps below are session-side
-    # maintenance concerns.
+    # WHY separate from ~/dev: the directory is cross-host provisioning state,
+    # while the macOS-only cleanup and indexing steps are session-side work.
     ensure-dev-directory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       mkdir -p "$HOME/dev"
     '';
 
-    # macos-reload-dock
-    # Restarts Dock so declarative Dock defaults take effect immediately.
-    # WHY: separate activation: Dock refresh is a UI cache reload, not dev-tree
-    # maintenance. Keeping it independent avoids fake coupling with ~/dev work.
+    # WHY separate from ~/dev: a Dock refresh is a UI cache reload, and coupling
+    # it to dev-tree work would be fake.
     macos-reload-dock = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/platforms/macOS/scripts/macos-reload-dock-preference-state.sh"
     '';
@@ -336,29 +313,25 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
     '';
 
     # macos-generate-sf-symbols
-    # Regenerates the SF Symbols name list from the macOS SFSymbols framework
-    # into the USER root's state dir. The list used to be a committed 10,943-line
-    # data file; generating it instead keeps it in step with the installed macOS
-    # and keeps generated data out of the repository. The sf-symbols skill greps
-    # the generated file.
-    # WHY: /usr/bin/plutil is a macOS system binary with no nixpkgs attribute
-    #   (nixpkgs.aarch64-darwin lacks `plutil`), so it is passed as its stable
-    #   absolute path; grep, sort, and cmp are store paths.
+    # WHY generate the SF Symbols list: the committed 10,943-line data file
+    # drifted from the installed macOS, and generated data does not belong in
+    # the repository. The sf-symbols skill greps the generated file.
+    # WHY /usr/bin/plutil: it is a macOS system binary with no nixpkgs
+    # attribute (nixpkgs.aarch64-darwin lacks `plutil`), so it is passed as its
+    # stable absolute path; grep, sort, and cmp are store paths.
     macos-generate-sf-symbols = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/platforms/macOS/scripts/macos-generate-sf-symbols.sh" "/usr/bin/plutil" "${pkgs.gnugrep}/bin/grep" "${pkgs.coreutils}/bin/sort" "${pkgs.diffutils}/bin/cmp"
     '';
   };
 
-  # WHY: terminal-activations (last resort): Safari and accessibility defaults
-  # require Full Disk Access (FDA), which is lost when running inside a sudo
-  # process tree during darwin-rebuild switch.  Execute them in the user's
-  # terminal context via the terminal-activations manifest so macOS TCC grants
-  # are inherited.
+  # WHY terminal-activations (last resort): Full Disk Access is lost inside the
+  # sudo process tree of darwin-rebuild switch, so these run in the user's
+  # terminal context where the TCC grant is inherited.
   nucleus.terminalActivations = {
     macos-configure-passwords-defaults = {
-      # WHY: terminal-activations (last resort): the PassKit daemon reverts
-      # writes made during darwin-rebuild switch, so the live user-terminal
-      # context is required for the .policy domain values to persist.
+      # WHY terminal-activations (last resort): the PassKit daemon reverts writes
+      # made during darwin-rebuild switch, so the .policy domain values only
+      # persist from a live user-terminal context.
       command = "${activationBundle}/src/platforms/macOS/scripts/macos-configure-passwords-defaults.sh";
       order = 55;
     };
@@ -373,16 +346,13 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
   };
 
   # gui-env-path
-  # Single activation-time mechanism for macOS GUI environment variables.
-  # This step handles ALL GUI env var propagation at activation time:
-  #   1. launchctl setenv PATH — managed PATH with dedup (launchd-direct/XPC)
-  #   2. launchctl setenv for all non-PATH vars from env-secrets (EDITOR,
-  #      OLLAMA_HOST, etc.)
-  #   3. sudo launchctl config user path — persistent per-user PATH for LaunchServices
-  #      .app bundles (requires reboot on first set).
-  #      KNOWN BROKEN: https://github.com/nix-darwin/nix-darwin/issues/1080 —
-  #      `launchctl config` is unreliable or broken on many macOS versions;
-  #      .app bundles launched via LaunchServices fall back to the default PATH.
+  # Single activation-time mechanism for macOS GUI environment variables:
+  # launchctl setenv PATH with dedup, launchctl setenv for every non-PATH var
+  # from env-secrets (EDITOR, OLLAMA_HOST, and so on), and sudo launchctl config
+  # user path for the persistent per-user LaunchServices PATH.
+  # KNOWN BROKEN: nix-darwin issue 1080. `launchctl config` is unreliable on
+  # many macOS versions, so .app bundles launched via LaunchServices fall back
+  # to the default PATH.
   # NUCLEUS_REPO_ROOT is resolved from the system repo-root file at runtime,
   # not set via launchctl (the env var was removed from the catalog in commit
   # 01ebf5e8 to prevent Nix store path poisoning).

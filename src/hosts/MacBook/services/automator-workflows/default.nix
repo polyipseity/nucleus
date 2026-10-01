@@ -1,76 +1,40 @@
-# MacBook/services/automator-workflows.nix — macOS Automator workflow bundles.
+# MacBook/services/automator-workflows.nix - macOS Automator workflow bundles.
 #
-# These Automator .workflow bundles appear in the right-click context menu →
-# Quick Actions and the menu bar → Services in Finder and other apps. They are
-# deployed to ~/Library/Services/.
+# These Automator .workflow bundles appear in the right-click context menu and
+# in Services. They are deployed to ~/Library/Services/.
 #
-# Each workflow's Info.plist uses NSSendFileTypes with the appropriate UTI:
-# - "open nucleus manual.workflow" uses "public.item" (broad scope, available
-#   for any file or folder selection — the action ignores input anyway).
-# - All "optimize PDF - *.workflow" use "com.adobe.pdf" so the context menu
-#   only appears for PDF files.
-# - "strip metadata.workflow" uses an allow-list of the formats
-#   `nucleus-utils strip-metadata` can rewrite, declared in
-#   src/modules/lib/strip-metadata-types.nix — the same set is the reference for
-#   the Dolphin service menu MIME types and for the Windows context-menu
-#   extensions (a subset of it).
+# WHY strip metadata is an allow-list, not "public.item": NSSendFileTypes is
+# inclusion-only and Apple defines no exclusion key, so withholding the action
+# means narrowing the list. Under "public.item" it was offered for PDFs, which
+# strip-metadata must refuse. Types outside the list stay reachable from the
+# CLI, and the workflow reports every input it did not process in one dialog.
 #
-# WHY: strip metadata is an allow-list, not "public.item":
-#   NSSendFileTypes is inclusion-only — Apple defines no exclusion key — so
-#   "everything except PDFs" cannot be expressed as a rule; narrowing the list
-#   is the only way to withhold the action. Under "public.item" the action was
-#   offered for PDFs, which strip-metadata must refuse (no CLI tool rewrites PDF
-#   metadata without invalidating signatures), and the action then appeared to
-#   do nothing. Whatever the workflow does hand over is reported as a whole
-#   rather than per file: strip-metadata lists every input it did not process in
-#   one modal dialog (scripts/utils.sh, --dialog). Types outside the list, PDFs
-#   included, stay reachable from the CLI.
+# WHY "com.adobe.pdf" and never "public.pdf": the UTI "public.pdf" has never
+# existed on macOS. Preview.app and every Apple built-in Automator PDF action
+# use "com.adobe.pdf". "public.pdf" is a common hallucination; reject it.
 #
-# WARNING about UTI choice: The UTI "public.pdf" has NEVER existed on macOS.
-# Apple's UTI hierarchy defines "public.png", "public.jpeg", "public.html" etc.,
-# but NOT "public.pdf". The system assigns "com.adobe.pdf" to all .pdf files.
-# Preview.app and all Apple built-in Automator PDF actions use "com.adobe.pdf".
-# "public.pdf" is a common AI hallucination — if you see it suggested, reject it.
+# WHY home.activation and not home.file: home.file symlinks into the Nix store,
+# and a symlinked .workflow bundle is not discoverable by the service menu.
+# That is a Method 2 read-only deployment, so activation copies each bundle.
 #
-# WHY: home.activation instead of home.file:
-#   home.file creates a symlink to the Nix store, but Automator .workflow
-#   bundles stored as symlinks are not discoverable by the service menu
-#   system. This is a required Method 2 (read-only deployment) case;
-#   see .agents/instructions/app-config-policy.instructions.md.
-#   A home.activation script that copies workflows on each generation
-#   switch guarantees they are registered.
+# SF Symbol rules:
+#   - Verify every name against the macOS private framework. Community lists
+#     are incomplete. <USER root>/state/sf-symbols.txt is generated from the
+#     framework at activation, never downloaded, never committed.
+#   - One name for NSIconName (Info.plist) and systemImageName (document.wflow).
+#   - No custom TIFF icons: SF Symbols are resolution-independent and handle
+#     dark and light mode natively.
+#   - NSBackgroundColorName only affects the Touch Bar; set it to "background".
+#   - Check the symbol's introduction year in name_availability.plist against
+#     the host's minimum version.
+#   - Known issue: NSIconName can keep a Quick Action out of the Services menu.
+#     Current workflows ship it and are confirmed to appear.
 #
-# WHY: home.file for manual.md:
-#   The manual.md file is symlinked via home.file so the workflow's shell
-#   script can find it at $HOME/Library/Application Support/nucleus/manual.md without needing
-#   NUCLEUS_REPO_ROOT at runtime.
-#
-# SF Symbol icon policy:
-#   - Hard rule: always verify SF Symbol names against the macOS private
-#     framework — never rely on third-party lists alone. Community lists
-#     are often incomplete (e.g. missing entries that the framework includes).
-#     Use `~/Library/Application Support/nucleus/state/sf-symbols.txt` for quick
-#     grep-based lookup — it is generated from the framework at activation, not
-#     downloaded, and not committed.
-#   - Uniform naming: use the same name for NSIconName (Info.plist) and
-#     systemImageName (document.wflow) for cross-surface consistency.
-#   - No custom TIFF icons: SF Symbols are resolution-independent and
-#     handle dark/light mode natively.
-#   - NSBackgroundColorName only affects the Touch Bar — set to "background".
-#   - QuickLook/Thumbnail.png is the Get Info window icon (256×256 SF Symbol
-#     render), generated at Nix build time via an Objective-C program using
-#     AppKit. The `thumbnailSymbol` field below drives generation. Regenerate
-#     when changing the symbol name for a workflow.
-#   - Finder display: Thumbnail.png alone is not enough. The deploy script
-#     calls NSWorkspace.setIcon:forFile:options: (via set-workflow-icon.m)
-#     to register the icon with IconServices and set the FinderInfo xattr.
-#     This must run at deploy time (not build time) because IconServices
-#     caches icons by exact file path.
-#   - macOS version floor: check the symbol's introduction year in the
-#     framework's name_availability.plist against the host's minimum version.
-#   - Known issue: NSIconName can prevent a Quick Action from appearing
-#     in the Services menu (Apple Community thread). Current workflows
-#     are deployed with it set and are confirmed to appear.
+# Thumbnail.png is the Get Info window icon, a 256x256 render produced at build
+# time from the thumbnailSymbol field. Thumbnail.png alone is not enough: the
+# deploy script also calls NSWorkspace.setIcon:forFile:options: to register the
+# icon with IconServices, which caches by exact file path, so it cannot happen
+# at build time.
 {
   lib,
   pkgs,
@@ -79,14 +43,9 @@
   ...
 }:
 let
-  # Base path to committed workflow source directories.
-  # Each workflow source is referenced as "${workflowsDir}/<name>.workflow" to
-  # avoid parsing issues with spaces in path names.
+  # Quoted so a path with spaces never reaches the Nix path parser.
   workflowsDir = ./.;
 
-  # Baked at eval time from NUCLEUS_REPO_ROOT (set by apply.sh).
-
-  # Path to the ObjC thumbnail generator source.
   thumbnailGenSrc = ../../scripts/generate-automator-thumbnails.m;
 
   # Compiled ObjC program that registers custom Finder icons via NSWorkspace.setIcon:.
@@ -96,14 +55,11 @@ let
       -o "$out" "${../../scripts/set-workflow-icon.m}"
   '';
 
-  # Sanitize a workflow directory name into a valid Nix store-path name.
-  # WHY: store-path names allow only [A-Za-z0-9+._?=-]; the "(N)" preset numbering
-  # carries parentheses, which Nix rejects in a derivation name.
+  # WHY: store-path names allow only [A-Za-z0-9+._?=-], and the "(N)" preset
+  # numbering carries parentheses, which Nix rejects in a derivation name.
   sanitizeStoreName = builtins.replaceStrings [ " " "(" ")" ] [ "-" "" "" ];
 
   # Build a workflow bundle with QuickLook/Thumbnail.png generated at build time.
-  # Compiles the ObjC SF Symbol renderer with clang (stdenv), runs it headless,
-  # and produces a 256×256 PNG. The deploy script copies the entire bundle.
   buildWorkflowWithThumbnail =
     wf:
     wf
@@ -118,24 +74,13 @@ let
       '';
     };
 
-  # Currently deployed Automator workflows. Add new workflows here.
-  # Each entry has:
-  #   - dir: workflow directory name in ~/Library/Services/
-  #   - enablementKey: key for NSServicesStatus enablement
-  #   - source: path to copy from (before thumbnail overlay)
-  #   - thumbnailSymbol: SF Symbol name for QuickLook/Thumbnail.png
-  #   - presentationModes: dict for NSServicesStatus enablement
-  #
-  # Sorting policy: primary sort is alphabetical by entry name. Exceptions:
-  # - the 5 Optimize PDF presets are grouped as a single block and internally
-  #   sorted quality-descending ((1) default → (2) prepress → (3) printer → (4) ebook → (5) screen).
-  #   Numbering in parentheses after the "optimize PDF - " prefix ensures correct
-  #   sort order on every platform (macOS Automator menu, NixOS Nautilus, Windows Explorer).
-  # Each block is positioned by its primary name alphabetically. This is the
-  # cross-platform convention (same on NixOS and Windows).
-  # Deployment order always follows the declared order below. No automatic sorting.
+  # Sort alphabetically by entry name, except the Optimize PDF presets, which
+  # form one block ordered quality-descending. The "(N)" prefix makes that order
+  # sort correctly everywhere, and every block sits at its primary name. This is
+  # the cross-platform convention, kept in NixOS and Windows too. Deployment
+  # follows the declared order; nothing is sorted automatically.
   currentNucleusWorkflows = map buildWorkflowWithThumbnail [
-    # Alphabetical before "optimize" — open nucleus manual
+    # Alphabetical before "optimize": open nucleus manual
     {
       dir = "open nucleus manual.workflow";
       enablementKey = "com.nucleus.OpenNucleusManual - open nucleus manual - runWorkflowAsService";
@@ -148,7 +93,7 @@ let
         TouchBar = true;
       };
     }
-    # Optimize PDF presets block — quality-descending, numbered for sort order
+    # Optimize PDF presets block, quality-descending and numbered for sort order
     {
       dir = "optimize PDF - (1) default.workflow";
       enablementKey = "com.nucleus.OptimizePDF.default - optimize PDF - (1) default - runWorkflowAsService";
@@ -209,7 +154,7 @@ let
         TouchBar = true;
       };
     }
-    # Alphabetical after "optimize" — strip metadata (single unified workflow)
+    # Alphabetical after "optimize": strip metadata (single unified workflow)
     {
       dir = "strip metadata.workflow";
       enablementKey = "com.nucleus.StripMetadata - strip metadata - runWorkflowAsService";
@@ -237,8 +182,8 @@ in
 {
   home.file."Library/Application Support/nucleus/manual.md".source = ../../MANUAL.md;
 
-  # CLI entry: `nucleus-open-manual` in ~/.local/lib/nucleus/open-manual.
-  # Uses the shared open-host-manual.sh with the manual path as positional arg.
+  # WHY symlink rather than copy: the workflow script needs the manual at a
+  # fixed path without NUCLEUS_REPO_ROOT at runtime.
   home.file.".local/lib/nucleus/open-manual" = {
     source = "${openManualScript}/bin/nucleus-open-manual";
     executable = true;

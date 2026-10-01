@@ -1,17 +1,11 @@
-# MacBook/activation.nix — nix-darwin system activation hooks for the MacBook.
+# MacBook/activation.nix - nix-darwin system activation hooks for the MacBook.
 #
-# All scripts run as root during `darwin-rebuild switch`.  Because
-# system.activationScripts is a nix-darwin-only option they are guaranteed to
-# execute on macOS; no OS check inside the shell body is needed.
+# All scripts run as root during `darwin-rebuild switch`.
 #
-# WHY: postActivation.text, not custom script names:
-#   nix-darwin's activation-scripts.nix (rev 8c62fba) assembles only a fixed
-#   hardcoded list of named scripts into the activate binary.  Any name outside
-#   that list (e.g. configureBatteryPolicy, enableScreenSharing) is silently
-#   ignored.  The user extension points are extraActivation (before openssh)
-#   and postActivation (after homebrew, last before the gc-root symlink).
-#   lib.mkBefore ensures these fragments are prepended before home-manager's
-#   HM activation call, which is also appended to postActivation.text.
+# WHY postActivation.text and not custom script names: nix-darwin's
+# activation-scripts.nix (rev 8c62fba) assembles only a fixed hardcoded list of
+# named scripts into the activate binary, and any other name is silently
+# ignored. The user extension points are extraActivation and postActivation.
 {
   config,
   lib,
@@ -25,11 +19,9 @@ let
     _: svc: svc ? hosts.MacBook && svc.hosts.MacBook ? type && svc.hosts.MacBook.type != "omitted"
   ) servicesJSON;
 
-  # NOTE: `svc.logging` is accessed unguarded so a service that omits its
-  # `logging` block fails Nix eval loudly (instead of being silently skipped,
-  # which previously let launchd crash with EX_CONFIG 78 for a missing log
-  # dir). `dirs` may be absent (services with no log files), so only that level
-  # is guarded with `or {}` / `or []`.
+  # WHY `svc.logging` is unguarded: a service that omits the block must fail eval
+  # loudly, not be silently skipped and crash launchd with EX_CONFIG 78.
+  # `dirs` is optional, so only that level is guarded.
   systemLogDirs = lib.unique (
     lib.flatten (
       lib.mapAttrsToList (
@@ -92,59 +84,37 @@ let
     )
   );
 
-  # Baked at eval time from NUCLEUS_REPO_ROOT (set by apply.sh). Used to
-  # resolve the repo checkout root in activation blocks that embed or invoke
-  # repo-local scripts.
   activationBundle = pkgs.callPackage ../../modules/lib/script-tree.nix { };
 
   macBookUserLogDirSuffix = lib.removePrefix "~/" servicesJSON."$logging".MacBook.logDir;
 
-  # Enhanced apple-sdk with real tool symlinks in usr/bin/ so xcrun shims
-  # resolve to nixpkgs tools.  Used by configureXcodeSelect below.
+  # Enhanced apple-sdk, so xcrun shims resolve to nixpkgs tools.
   appleSdkEnhanced = import ../../modules/lib/apple-sdk-enhanced.nix { inherit pkgs lib; };
 
-  # Symlink farm tool entries for /usr/local/bin/.  GUI apps that spawn()
-  # tools by name (python3, git, make) resolve via PATH without xcrun.
+  # GUI apps that spawn() tools by name resolve via PATH without xcrun.
   appleSdkTools = import ../../modules/lib/apple-sdk-tools.nix { inherit pkgs; };
   symlinkFarmEntries = lib.concatStringsSep " " (
     lib.mapAttrsToList (name: target: "${target}->${name}") appleSdkTools.symlinkFarmTools
   );
 
-  # Nucleus root + hub activation helpers (Phase 1).  Returns shell text that
-  # creates the USER/SYSTEM roots, their root->conventional symlinks, and the
-  # ~/.nucleus hub.  Console user is resolved at activation time.
   nucleusRoots = import ../../modules/lib/nucleus-roots.nix { inherit lib pkgs; };
 in
 {
-  # ---------------------------------------------------------------------------
-  # Declarative power-management settings handled by nix-darwin's power module.
-  # These translate to systemsetup / pmset calls at activation time.
-  #   computer = "never" — idle sleep disabled            (was: pmset -a sleep 0)
-  #   display  = 1       — display sleeps after 1 minute to save power
-  #   harddisk = "never" — disk sleep disabled            (was: pmset -a disksleep 0)
-  #   restartAfterPowerFailure is intentionally omitted because this machine
-  #   model/firmware does not support it; setting it at all causes activation
-  #   failure on this hardware.
-  # ---------------------------------------------------------------------------
   power.sleep.computer = "never";
   power.sleep.display = 1;
   power.sleep.harddisk = "never";
+  # WHY no restartAfterPowerFailure: this model and firmware do not support it,
+  # and setting it at all fails activation.
   # power.restartAfterPowerFailure = true;  # Keep the comment and keep it disabled.
 
-  # ---------------------------------------------------------------------------
-  # extraActivation — runs before openssh / Homebrew bundle.
-  # ---------------------------------------------------------------------------
   system.activationScripts.extraActivation.text = ''
     # ---- ensure-macfuse-install-dirs -----------------------------------------------
-    # macFUSE installs its headers into /usr/local/include and its libraries into
-    # /usr/local/lib, and its Homebrew cask postflight sets ownership on both of
-    # those directories, so both must exist before the cask installs.
+    # WHY: the macFUSE cask postflight sets ownership on both directories, so
+    # they must exist before the cask installs.
     /bin/mkdir -p /usr/local/include /usr/local/lib
 
     # ---- ensure-nucleus-roots ------------------------------------------------------
-    # Create the USER/SYSTEM nucleus roots, their root->conventional symlinks, and
-    # the ~/.nucleus hub for the console user.  Resolved at activation time because
-    # the console user is not known at eval time.
+    # The console user is unknown at eval time, so resolve it at activation time.
     # check-suppress:suppression_doc: /dev/console may not exist; guards handle empty/root.
     _console_user="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
     if [ -n "$_console_user" ] && [ "$_console_user" != "root" ]; then
@@ -162,10 +132,8 @@ in
       fi
     fi
 
-    # WHY: Log directory creation is imperative because it must run AFTER the
-    # root symlinks resolve (Home Manager activation ordering is alphabetical,
-    # not dependency-based). The shared log-dirs-init.sh handles macOS-specific
-    # user log dirs with chown for console user.
+    # WHY imperative: Home Manager orders activation alphabetically, not by
+    # dependency, so this must run after the root symlinks resolve.
     "${activationBundle}/src/scripts/services/log-dirs-init.sh" \
       "${config.nucleus.logging.systemLogDir}" \
       "${builtins.toString systemLogDirs}" \
@@ -174,49 +142,17 @@ in
       "${macBookUserLogDirSuffix}"
   '';
 
-  # ---------------------------------------------------------------------------
-  # postActivation fragments (all macbook-specific activation scripts)
-  #
-  # lib.mkBefore (priority 500) positions these fragments before the
-  # home-manager activation call that nix-darwin appends to postActivation.text
-  # at default priority 1000.  Each logical section is separated by a shell
-  # comment banner for readability in the assembled activate script.
-  #
-  # Scripts included:
-  #   configureBatteryPolicy           — pmset AC/battery policy
-  #   configureChargeLimit             — 80 % charge cap via the battery CLI
-  #   configureSshAccess               — allow all users SSH access by removing com.apple.access_ssh group
-  #   configureGimpScrollSensitivity   — GIMP drag-zoom-speed (25% of default)
-  #   configureLinearMousePreferences  — LinearMouse update-check suppression
-  #   configureMiddleClick             — 4-finger gesture + native login item
-  #   configureMountyLoginItem         — native Mounty helper login item (SMLoginItemSetEnabled)
-  #   configureMissionControlSpansDisplays — spans-displays per-user pref
-  #   configureMonitorColorProfile     — clear ColorSync device cache
-  #   clearFinderCache                 — purge stale Finder state for desktop visibility
-  #   configureNvimLauncher            — macOS-specific neovim launcher
-  #   configureUtmPrefs                — UTM global preferences (renderer, server, capture, screenshot policy)
-  #   disableSpotlight                 — disable all Spotlight hotkeys + service
-  #   removeCommandLineTools           — delete Apple CLT install tree (not receipts)
-  #   configureXcodeSelect             — xcode-select --switch to apple-sdk-enhanced
-  # ---------------------------------------------------------------------------
+  # WHY lib.mkBefore: it puts these fragments ahead of the home-manager call
+  # that nix-darwin appends to postActivation.text at priority 1000.
   system.activationScripts.postActivation.text = lib.mkBefore ''
     # ---- remove-command-line-tools -----------------------------------------------
     "${activationBundle}/src/hosts/MacBook/scripts/macos-remove-command-line-tools.sh" \
       "${config.nucleus.logging.systemLogDir}/command-line-tools.log"
 
     # ---- configure-xcode-select --------------------------------------------------
-    # Point the system developer directory at the Nix apple-sdk store path so
-    # xcrun (invoked by rustc/cargo for SDK discovery) works without Xcode CLT
-    # installed.  remove-command-line-tools above deletes the CLT tree when
-    # present; this switch is the system-level hook for non-shell process trees.
-    # Without both steps, native-code builds outside a Nix devShell can trigger
-    # the CLT installation dialog.
-    # WHY: xcode-select --switch (not just DEVELOPER_DIR):
-    #   DEVELOPER_DIR only helps processes that inherit the shell environment.
-    #   launchd services, VS Code tasks with non-shell exec, and other non-shell
-    #   process trees rely on the system-level developer directory set via
-    #   /usr/bin/xcode-select.  The activation script runs as root during
-    #   darwin-rebuild switch, so no sudo wrapper is needed.
+    # WHY xcode-select and not only DEVELOPER_DIR: DEVELOPER_DIR reaches only
+    # processes that inherit the shell environment, and rustc and cargo need SDK
+    # discovery in launchd services and other non-shell process trees too.
     /usr/bin/xcode-select --switch "${appleSdkEnhanced}"
 
     # ---- configure-symlink-farm ------------------------------------------------
@@ -231,33 +167,22 @@ in
     "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-battery-policy.sh"
 
     # ---- configure-charge-limit --------------------------------------------------
-    # WHY: the `battery` CLI writes the firmware-level SMC charging gate and
-    #   installs a headless LaunchAgent (com.battery.app), so the 80 % cap holds
-    #   without the tray being open.  It is the only gate that can be converged:
-    #   the native macOS 26.4+ Charge Limit has no pmset key, no
-    #   configuration-profile payload, and no CLI, so it stays a one-time manual
-    #   setting (see MANUAL.md).  The tray icon is not declaratively hideable
-    #   either; the menu-bar convergence below handles it.
+    # WHY the `battery` CLI: it is the only convergent gate for the 80 % cap. The
+    # native macOS Charge Limit has no pmset key, no profile payload, and no CLI,
+    # so it stays a manual setting (see MANUAL.md).
     "${activationBundle}/src/hosts/MacBook/scripts/macos-charge-limit.sh"
 
     # ---- macos-configure-menu-bar-icons --------------------------------------------
-    # Registry-driven per-app menu-bar / tray icon convergence (replaces the ad-hoc
-    # defaults keys in defaults.nix and the standalone LuLu plist script).  Reads
-    # apps.json and SETs each app's native icon preference to its declared state.
     "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-menu-bar-icons.sh"
 
     # ---- macos-configure-menu-bar -------------------------------------------------
-    # System menu-bar items (Spotlight, Siri, Input Menu, Control-Centre battery,
-    # NSStatusItem spacing) — these are not apps and have no apps.json entry, so
-    # they stay here.
+    # System items have no apps.json entry, so they stay here.
     "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-menu-bar.sh"
 
     # ---- configure-ssh-access -----------------------------------------------------
-    # Allow all users to connect via SSH by removing the macOS access-control
-    # group. When com.apple.access_ssh does not exist, sshd allows any user
-    # (subject to sshd_config AllowUsers/AllowGroups).
-    # See: System Settings → General → Sharing → Remote Login → (i) → "Allow
-    # access for: All Users"
+    # Deleting com.apple.access_ssh is what allows all users. When the group is
+    # already absent, sshd allows any user subject to AllowUsers/AllowGroups.
+    # See System Settings > General > Sharing > Remote Login > (i) > Allow access for.
     if /usr/sbin/dseditgroup -o delete -q com.apple.access_ssh 2>/dev/null; then
       echo "ssh: removed com.apple.access_ssh group; all users can now connect via SSH."
     else
@@ -265,17 +190,12 @@ in
     fi
 
     # ---- configure-app-autostart ------------------------------------------------
-    # Registry-driven GUI app auto-start (replaces ad-hoc MiddleClick/Mounty login
-    # items and the inline steam-autostart disable).  Reads apps.json and converges
-    # every macOS app to its declared state via our uniform mechanism.
     "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-app-autostart.sh"
     # ---- configure-linearmouse-preferences --------------------------------------
     "${activationBundle}/src/hosts/MacBook/scripts/macos-set-linearmouse-prefs.sh"
     # ---- configure-utm-prefs ----------------------------------------------------
-    # Provision UTM's global preferences in the sandboxed app container
-    # (renderer Default, server hardening, capture keys, NoSaveScreenshot) so
-    # they stay pinned across app updates.
-    # Runs unconditionally: idempotent, and harmless when UTM is absent.
+    # WHY the app container: the sandboxed prefs survive UTM updates. Runs
+    # unconditionally, it is idempotent and harmless when UTM is absent.
     "${activationBundle}/src/hosts/MacBook/scripts/macos-set-utm-prefs.sh"
     # ---- configure-gimp-scroll-sensitivity ---------------------------------------
     "${activationBundle}/src/scripts/configs/configure-gimp-scroll-sensitivity.sh"
@@ -284,16 +204,8 @@ in
     "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-mission-control.sh"
 
     # ---- configure-monitor-color-profile ------------------------------------------
-    # Clears the ColorSync device-profile cache so that newly connected monitors
-    # re-trigger profile detection and pick up the correct ICC profile.
-    # ColorSync is a macOS-only subsystem; NixOS uses colord for ICC profile
-    # management (handled by GNOME) and Windows has its own Color Management
-    # subsystem — neither requires an equivalent cache-clearing step here.
-    # Guard with a file-existence check: on fresh installs or machines with no
-    # custom color profile the plist never exists, and `defaults delete` on a
-    # missing domain emits a noisy "Domain not found" error that is neither a
-    # real failure nor actionable.  Using [ -f ] avoids that entirely — if the
-    # file is present we delete it; if not, there is nothing to do.
+    # WHY the guard: `defaults delete` on a missing domain prints a noisy
+    # "Domain not found" that is neither a real failure nor actionable.
     if [ -f /Library/Preferences/com.apple.ColorSync.DeviceCache.plist ]; then
       /usr/bin/defaults delete /Library/Preferences/com.apple.ColorSync.DeviceCache
     fi
@@ -316,9 +228,7 @@ in
     fi
 
     # ---- verifyNucleusServices ---------------------------------------------------
-    # Warn-only verification that all managed services are running.
-    # Failing to start a service should not block activation, but the warning
-    # surfaces issues that operators can investigate post-apply.
+    # Warn-only: a service that failed to start must not block activation.
     if command -v nucleus-svc >/dev/null 2>&1; then
       if ! nucleus-svc verify; then
         echo "svc: some services are inactive (non-fatal; check journalctl for details)" >&2
