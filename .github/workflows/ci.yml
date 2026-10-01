@@ -79,6 +79,13 @@ jobs:
         with:
           persist-credentials: false
 
+      # "warning: unknown setting 'build-provenance-tags'" is expected on every
+      # POSIX run and is not a repo defect. nix-installer-action v22 writes that
+      # setting to nix.conf whatever `determinate` is set to, and `determinate: false`
+      # installs upstream Nix, which has no such setting. Nothing in this repository
+      # sets it, and no check step reads it, so the warning is left in the log rather
+      # than suppressed.
+      # Source: https://github.com/DeterminateSystems/nix-installer-action/pull/236
       - name: Install Nix (POSIX)
         if: runner.os != 'Windows'
         uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25  # v22
