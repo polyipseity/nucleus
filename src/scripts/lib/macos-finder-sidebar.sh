@@ -1,30 +1,19 @@
 #!/usr/bin/env bash
-# Finder sidebar favorites library functions.
-#
-# All functions take their required data as function parameters. The caller
-# (activation script) passes Nix-derived values.
-
-# Source lib.sh from this library's own directory (callers set SCRIPT_DIR to
-# their own location, so resolve relative to this file).
+# Finder sidebar favorites library. Every function takes its data as parameters; the
+# activation script passes Nix-derived values.
 _LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=lib.sh
 . "$_LIB_DIR/lib.sh"
 unset _LIB_DIR
 
-# ---------------------------------------------------------------------------
-# Ensure directories referenced by managed Finder favorites exist.
-# System-owned directories (~/Desktop, ~/Downloads, etc.) are created
-# unconditionally; managed favorites use a symlink-safe guard.
-# ---------------------------------------------------------------------------
+# Directories referenced by managed favorites: system-owned ones are created
+# unconditionally, managed ones only when neither a directory nor a symlink exists.
 finder_ensure_directories() {
   local favorites_json="$1"
   local jq_bin="$2"
   _ensure_tmp=$(mktemp)
   printf '%s\n' "$favorites_json" | "$jq_bin" -r '.[] | .name' >"$_ensure_tmp"
   while IFS= read -r _name; do
-    # System-owned favorites (Applications, Desktop, Documents, Downloads,
-    # Music, Movies, Pictures) always exist; managed favorites may be
-    # symlinks and must not be overwritten.
     case "$_name" in
     Applications | Desktop | Documents | Downloads | Music | Movies | Pictures)
       mkdir -p "$HOME/$_name"
@@ -40,13 +29,8 @@ finder_ensure_directories() {
   unset _ensure_tmp
 }
 
-# ---------------------------------------------------------------------------
-# Pre-remove managed favorites and default extras by name.
-# Removes known favorites + default sidebar entries ("/", user home alias,
+# Pre-remove managed favorites plus the default entries ("/", user home alias,
 # ".Trash") that reappear after daemon restarts.
-# Soft-fail (|| true) because mysides is known to segfault on corrupted
-# bookmarks — activation must not abort.
-# ---------------------------------------------------------------------------
 finder_pre_remove() {
   local favorites_json="$1"
   local jq_bin="$2"
@@ -68,11 +52,8 @@ finder_pre_remove() {
   unset _pr_tmp
 }
 
-# ---------------------------------------------------------------------------
-# Clear all current sidebar favorites by iterating over `mysides list`
-# output. Uses a temp file to avoid subshell isolation (while-read in
-# pipelines creates a subshell in POSIX sh).
-# ---------------------------------------------------------------------------
+# Clear every favorite. Uses a temp file: while-read in a pipeline runs in a subshell
+# under POSIX sh, so the loop variables would be lost.
 finder_clear_all() {
   local mysides_bin="$1"
   _clear_tmp=$(mktemp)
@@ -88,11 +69,7 @@ finder_clear_all() {
   unset _clear_tmp
 }
 
-# ---------------------------------------------------------------------------
-# Add managed favorites (strict mode).
-# Each favorite addition logs a failure message to stderr on error.
-# Returns 1 if any addition fails (caller must decide how to propagate).
-# ---------------------------------------------------------------------------
+# Add managed favorites, returning 1 if any addition failed.
 finder_add_managed_strict() {
   local favorites_json="$1"
   local jq_bin="$2"
@@ -114,11 +91,7 @@ finder_add_managed_strict() {
   return "$_add_failed"
 }
 
-# ---------------------------------------------------------------------------
-# Add managed favorites (best-effort mode).
-# Failures are silently ignored — used after Finder desktop restart to
-# restore favorites without aborting if mysides encounters transient errors.
-# ---------------------------------------------------------------------------
+# Add managed favorites, ignoring failures. Used after the Finder desktop restart.
 finder_add_managed_best_effort() {
   local favorites_json="$1"
   local jq_bin="$2"
@@ -136,9 +109,7 @@ finder_add_managed_best_effort() {
   unset _add_tmp _jq
 }
 
-# ---------------------------------------------------------------------------
-# Remove default extras that reappear after daemon restarts.
-# ---------------------------------------------------------------------------
+# Default extras that reappear after daemon restarts.
 finder_remove_default_extras() {
   local mysides_bin="$1"
   # check-suppress:suppression_doc: mysides is known to segfault on corrupted bookmarks; soft-fail prevents activation abort.
@@ -149,13 +120,7 @@ finder_remove_default_extras() {
   "$mysides_bin" remove ".Trash" >/dev/null 2>&1 || true
 }
 
-# ---------------------------------------------------------------------------
-# Full sidebar reconciliation.
-# ---------------------------------------------------------------------------
-
-# Strict mode — used during initial activation.
-# Returns 1 if any favorite addition failed (caller propagates to
-# _finder_sidebar_failed).
+# Strict mode, used during initial activation. Returns 1 if any addition failed.
 finder_reconcile_strict() {
   local favorites_json="$1"
   local jq_bin="$2"
@@ -168,8 +133,7 @@ finder_reconcile_strict() {
   return "$_strict_failed"
 }
 
-# Best-effort mode — used after Finder desktop restart to restore favorites
-# without aborting if mysides encounters transient errors.
+# Best-effort mode, used after the Finder desktop restart.
 finder_reconcile_best_effort() {
   local favorites_json="$1"
   local jq_bin="$2"
@@ -180,10 +144,8 @@ finder_reconcile_best_effort() {
   finder_remove_default_extras "$mysides_bin"
 }
 
-# ---------------------------------------------------------------------------
-# Full Finder sidebar activation orchestration.
-# Called from macos-configure-finder-sidebar activation block.
-# ---------------------------------------------------------------------------
+# Full activation orchestration, called from the macos-configure-finder-sidebar
+# activation block.
 finder_configure_sidebar() {
   local favorites_json="$1"
   local jq_bin="$2"
@@ -208,7 +170,6 @@ finder_configure_sidebar() {
     _finder_sidebar_failed=1
   fi
 
-  # Refresh finder-related daemons in-session
   # check-suppress:suppression_doc: daemon may not be running; killall exits 1, activation must not abort.
   /usr/bin/killall sharedfilelistd 2>/dev/null || true
   # check-suppress:suppression_doc: see killall sharedfilelistd -- daemon may not be running.

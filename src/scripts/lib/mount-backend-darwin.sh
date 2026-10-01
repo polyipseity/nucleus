@@ -1,12 +1,7 @@
 # shellcheck shell=bash
-# Mount backend for macOS: macFUSE/FSKit.
-# Implements the backend_* interface for the cloud-mount core runner.
-#
-# All FSKit/macFUSE specifics live here — the core runner never mentions them.
+# Mount backend for macOS: macFUSE/FSKit. Every FSKit/macFUSE specific lives here,
+# so the core runner never mentions them.
 # ref: https://github.com/macfuse/macfuse/issues/1132
-#
-# Usage:
-#   . "$SCRIPT_DIR/../lib/mount-backend-darwin.sh"
 
 [ -n "${_NUCLEUS_MOUNT_BACKEND_DARWIN_SOURCED-}" ] && return
 _NUCLEUS_MOUNT_BACKEND_DARWIN_SOURCED=1
@@ -19,8 +14,7 @@ _MOUNT_BACKEND_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd
 # shellcheck source=service-health.sh
 [ -n "${_NUCLEUS_SERVICE_HEALTH_SOURCED-}" ] || . "$_MOUNT_BACKEND_DIR/service-health.sh"
 
-# backend_class — classify a failure from stderr capture.
-# Args: $1 — stderr capture file path.
+# Args: $1 stderr capture file path.
 # Outputs: class token string. One of: provider-refusal, provider-version,
 #   io-transient, auth, remote-not-found, path-permission, mount-failed.
 backend_class() {
@@ -30,23 +24,14 @@ backend_class() {
     return
   }
 
-  # FSKit/provider refusal patterns.
-  # The module state decides retry policy: provider-refusal is transient and is retried,
-  # provider-version is terminal and blocks at once.  Retrying a provider failure is what
-  # produced the original restart storm.
-  # fskit_macfuse_module_state answers exactly three values (enabled|disabled|unknown), so
-  # this branch reads:
-  #   disabled — the extension is PRESENT but switched off.  The user must re-enable it,
-  #     and a re-enable can succeed, so this is the one provider state worth retrying.
-  #   everything else — `enabled`, `unknown`, or an unexpected/empty value.  Either the
-  #     module IS listed and the mount failed anyway, or its state could not be read at
-  #     all; neither is a condition a retry can clear, so both are terminal.
-  # WHY this function does NOT check a macFUSE version: the version judgement is made in
-  # backend_prepare below, which blocks provider-version up front when the installed
-  # macFUSE predates 5.4.0 (the first release built against the macOS 27 FSKit
-  # volume-operation APIs).  Reaching this branch with `enabled` therefore means a listed
-  # module whose mount still failed — terminal is the safe reading, since a retry that
-  # cannot help is exactly the storm this classification exists to prevent.
+  # fskit_macfuse_module_state answers enabled|disabled|unknown. `disabled` means the
+  # extension is present but switched off, which a re-enable can clear, so it is the one
+  # provider state worth retrying. Anything else is a module that was listed and failed
+  # anyway, or a state nobody could read, and a retry clears neither. Retrying provider
+  # failures is what produced the restart storm.
+  # WHY no macFUSE version check here: backend_prepare blocks provider-version up front
+  # when the installed macFUSE predates the FSKit volume-operation APIs, so reaching here
+  # with `enabled` means a listed module whose mount still failed.
   if grep -qE 'File system extension not (found|enabled)|fuse: mount failed with error|mount\(8\) returned 69|MFMount.*not enabled' "$capture"; then
     if [ "$(fskit_macfuse_module_state)" = "disabled" ]; then
       printf 'provider-refusal\n'
@@ -56,25 +41,21 @@ backend_class() {
     return
   fi
 
-  # Authentication errors.
   if grep -qE 'Unauthorized|Invalid credentials|unauthorized_request|auth.*failed|401' "$capture"; then
     printf 'auth\n'
     return
   fi
 
-  # Remote not found.
   if grep -qE 'not found|does not exist|Unknown remote|could not list files|directory not found' "$capture"; then
     printf 'remote-not-found\n'
     return
   fi
 
-  # Path/permission errors.
   if grep -qE 'permission denied|operation not permitted|access denied|mount point.*not a directory|No such file or directory' "$capture"; then
     printf 'path-permission\n'
     return
   fi
 
-  # Transient I/O.
   if grep -qE 'connection refused|connection reset|timeout|resource temporarily unavailable|device or resource busy' "$capture"; then
     printf 'io-transient\n'
     return
@@ -83,8 +64,7 @@ backend_class() {
   printf 'mount-failed\n'
 }
 
-# backend_remedy — return the remedy text for a class.
-# Args: $1 — class token.
+# Args: $1 class token.
 backend_remedy() {
   local class="$1"
   case "$class" in
@@ -109,7 +89,7 @@ backend_remedy() {
   esac
 }
 
-# backend_is_transient — return 0 if the class is transient (retryable).
+# Return 0 if the class is transient (retryable).
 backend_is_transient() {
   local class="$1"
   case "$class" in
@@ -118,7 +98,7 @@ backend_is_transient() {
   return 1
 }
 
-# _macfuse_version_gte — return 0 if $1 >= $2 (dot-separated semver).
+# Return 0 if $1 >= $2 (dot-separated semver).
 _macfuse_version_gte() {
   local IFS='.'
   read -ra v1 <<<"$1"
@@ -131,14 +111,11 @@ _macfuse_version_gte() {
   return 0
 }
 
-# backend_prepare — ensure the FUSE layer is present and at the required version.
-# Writes a health record and returns 20 for user-action required.
-# This is the ONLY place that registers/re-registers the filesystem extension.
-# Args: $1 — instance key.
+# The only place that registers/re-registers the filesystem extension.
+# Args: $1 instance key. Returns 20 for user action required.
 backend_prepare() {
   local instance="$1"
 
-  # Verify macFUSE binary exists.
   local macfuse_bin="/Library/Filesystems/macfuse.fs/Contents/Resources/macfuse.app/Contents/MacOS/macfuse"
   if [ ! -x "$macfuse_bin" ]; then
     macfuse_bin="/opt/homebrew/bin/macfuse"
@@ -148,9 +125,8 @@ backend_prepare() {
     fi
   fi
 
-  # WHY: FSKit volume operations require macFUSE 5.4.0+ on macOS 27.
-  # Earlier versions lack the FSKit daemon interface.  Pin the version in
-  # Homebrew config; this check prevents silent failures from stale installs.
+  # WHY: FSKit volume operations need macFUSE 5.4.0+ on macOS 27. Earlier versions lack
+  # the FSKit daemon interface, and this check stops a stale install failing silently.
   local installed_version
   installed_version=$("$macfuse_bin" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "0.0.0")
   if ! _macfuse_version_gte "$installed_version" "5.4.0"; then
@@ -158,49 +134,39 @@ backend_prepare() {
     return 20
   fi
 
-  # One-time install to re-register the filesystem extension if needed.
-  # WHY: only called when the extension is not enabled; never --force per attempt.
+  # WHY: never --force per attempt. This only runs when the extension is off.
   if ! fskit_extension_is_enabled; then
     # check-suppress:suppression_doc: best-effort re-registration; failure blocks the mount
     /opt/homebrew/bin/brew install --cask --no-quarantine macfuse@dev 2>/dev/null || true
   fi
 
-  # Check FSKit module state.
   local module_state
   module_state="$(fskit_macfuse_module_state)"
   case "$module_state" in
   enabled)
-    # Everything is fine, proceed.
     return 0
     ;;
   disabled)
-    # Module not enabled — user action needed.
     svc_health_set_blocked "$instance" "provider-refusal" "$(backend_remedy provider-refusal)"
     return 20
     ;;
   unknown)
-    # Cannot read the list — try to proceed; rclone will report if it fails.
-    # WHY this fails OPEN while backend_class fails CLOSED for the same `unknown` state:
-    # the two answer different questions.  prepare asks "may I proceed?" — refusing here
-    # would block a mount that may work, under a class that misdescribes the condition.
-    # class asks "what kind of failure is this?" — and a provider failure the module state
-    # cannot explain is not something a retry can clear, so it is terminal.  Composed,
-    # they yield "attempt once, then block": no path retries an unexplained provider
-    # failure indefinitely.  Do not "fix" either one to match the other.
+    # WHY this fails OPEN while backend_class fails CLOSED for the same `unknown`: they
+    # answer different questions. prepare asks "may I proceed?", so refusing would block a
+    # mount that may work, under a class that misdescribes it. class asks "what kind of
+    # failure is this?", and a provider failure nobody can explain is not something a retry
+    # clears. Composed, they attempt once, then block. Do not make either match the other.
     return 0
     ;;
   esac
 
-  # Not reachable through the three declared states above, but stated explicitly rather
-  # than left to fall out of the `case`: an unexpected value fails OPEN, exactly like
-  # `unknown`.  The mount is attempted, and rclone plus backend_class report the real
-  # failure; failing closed here would block the mount under a class that misdescribes it.
+  # An unexpected value fails OPEN like `unknown`: the mount is attempted and rclone
+  # plus backend_class report the real failure.
   return 0
 }
 
-# backend_args — emit macOS-specific rclone mount flags.
-# Args: $1 — remote; $2 — mount_point; $3 — read_only ("true"/"false");
-#   $4 — extra_args (newline-separated).
+# Args: $1 remote, $2 mount_point, $3 read_only ("true"/"false"), $4 extra_args
+# (newline-separated).
 backend_args() {
   local remote="$1" mount_point="$2" read_only="$3" extra_args="$4"
 
@@ -221,17 +187,15 @@ backend_args() {
     printf '%s\n' "--read-only"
   fi
 
-  # FSKit backend args (macOS 27+).
+  # FSKit backend args, macOS 27+.
   printf '%s\n' "-obackend=fskit"
 
-  # Append any extra args.
   if [ -n "$extra_args" ]; then
     printf '%s\n' "$extra_args"
   fi
 }
 
-# backend_mount — invoke rclone with the resolved flags.
-# Args: $1 — rclone binary path; remaining args — mount flags (from backend_args).
+# Args: $1 rclone binary path, remaining args mount flags (from backend_args).
 backend_mount() {
   local rclone_bin="$1"
   shift
@@ -239,29 +203,26 @@ backend_mount() {
   _backend_rclone_pid=$!
 }
 
-# _backend_capture — stderr capture file for the current attempt.
+# Stderr capture file for the current attempt.
 _backend_capture=""
 _backend_rclone_pid=""
 
-# backend_probe_state — the three-valued answer for a mount point.
-# Args: $1 — mount point.
+# Args: $1 mount point.
 # Prints: present, absent:not-listed or unknown:dir-unreadable. Always returns 0.
-# WHY: the question is mount state, and diskutil decides it here. Only a host
-#   with no diskutil at all falls back to the directory test, whose one
-#   unresolvable case is a directory this caller may not read.
-# WHY: the reason after the prefix is this platform's own; the attach loop in
+# WHY: the question is mount state and diskutil decides it. Only a host with no
+#   diskutil falls back to the directory test.
+# WHY: the reason after the prefix is this platform's own. The attach loop in
 #   rclone-mount.sh tests the prefix alone, and the Linux reasons name a reader's
 #   status and a bound, so reusing one here would give one token two meanings.
 backend_probe_state() {
   local mount_point="$1"
 
-  # WHY: a diskutil on PATH is asked, and one that names no volume answers not
-  # mounted. Falling through to the directory test would read a mount point
-  # holding leftover files as an attached volume, and the attach loop acts on
-  # `present` by recording the service running and deleting the capture file.
-  # Narrowing: a diskutil that cannot answer reads the same -- same exit status
-  # and first stderr line -- so it too answers absent, and unknown:dir-unreadable
-  # is reserved for a caller-unreadable directory on a host with no diskutil.
+  # WHY: a diskutil that names no volume answers not mounted. Falling through to the
+  # directory test would read leftover files in a mount point as an attached volume, and
+  # the attach loop acts on `present` by recording the service running and deleting the
+  # capture file. A diskutil that cannot answer reads the same, so it too answers absent,
+  # and unknown:dir-unreadable stays reserved for a caller-unreadable directory on a host
+  # with no diskutil.
   if command -v diskutil >/dev/null 2>&1; then
     if diskutil info "$mount_point" 2>/dev/null | grep -q "Volume Name"; then
       printf 'present\n'
@@ -291,8 +252,7 @@ backend_probe_state() {
   return 0
 }
 
-# backend_unmount — release the volume.
-# Args: $1 — mount_point.
+# Args: $1 mount_point.
 backend_unmount() {
   local mount_point="$1"
   if command -v diskutil >/dev/null 2>&1; then
@@ -304,8 +264,7 @@ backend_unmount() {
   fi
 }
 
-# backend_repair — repair the provider (fskitd restart + approval guidance).
-# Args: $1 — instance key (optional, for health record).
+# Args: $1 instance key (optional, for health record).
 backend_repair() {
   local instance="${1:-}"
   printf 'Restarting fskitd...\n'
@@ -330,8 +289,7 @@ backend_repair() {
   fi
 }
 
-# backend_provider_refusal — whether the failure was a provider refusal.
-# Args: $1 — stderr capture file.
+# Args: $1 stderr capture file.
 backend_provider_refusal() {
   local capture="$1"
   [ -f "$capture" ] || return 1
