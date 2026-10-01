@@ -20,11 +20,19 @@ function Invoke-PowerShellModuleSetup {
     reason an ACL grant does not address.
     Removing an image- or other-admin-owned copy needs elevation even though
     the pin installs at CurrentUser.
+  .PARAMETER CurrentUserModulePath
+    Overrides the resolved per-user module directory. The Pester suite points this
+    at a temp tree, because a live resolution would name the real per-user
+    directory of whichever host runs the suite.
   .NOTES
     Requires PowerShellGet (built into PowerShell 5.1+ and pwsh 7+).
   #>
   [CmdletBinding()]
-  param()
+  param(
+    [Parameter()]
+    [AllowEmptyString()]
+    [string]$CurrentUserModulePath
+  )
 
   $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
   $lockfilePath = Join-Path $repoRoot "src\lockfiles\lockfile.json"
@@ -41,7 +49,17 @@ function Invoke-PowerShellModuleSetup {
     return
   }
 
-  $currentUserModulePath = @($env:PSModulePath -split [IO.Path]::PathSeparator | Where-Object { $_ })[-1]
+  # WHY resolved rather than read from PSModulePath: PowerShellGet decides where
+  #   Install-Module -Scope CurrentUser writes from the Documents folder and the
+  #   PowerShell edition, and never consults $env:PSModulePath at all. Reading that
+  #   variable by position is what had this function reject every pin it had just
+  #   installed on the GitHub runner, where SQL Server tooling appends
+  #   C:\Program Files\Microsoft SQL Server\<version>\Tools\PowerShell\Modules\ and
+  #   that entry is the last one.
+  # Source: https://github.com/PowerShell/PowerShellGetv2/blob/master/src/PowerShellGet/private/modulefile/PartOne.ps1
+  if ([string]::IsNullOrWhiteSpace($CurrentUserModulePath)) {
+    $CurrentUserModulePath = Get-CurrentUserModulePath
+  }
 
   $convergenceFailures = @()
 
@@ -187,6 +205,103 @@ function Invoke-PowerShellModuleSetup {
     $failureReport = $convergenceFailures -join [Environment]::NewLine
     throw "Invoke-PowerShellModuleSetup: $($convergenceFailures.Count) module convergence failure(s), so this host is not fully converged. Every sweepable copy was still removed and every reachable pin still installed. Failures:$([Environment]::NewLine)$failureReport"
   }
+}
+
+
+function Get-CurrentUserModulePath {
+  <#
+  .SYNOPSIS
+    Resolves the per-user PowerShell module directory of the running account.
+
+  .DESCRIPTION
+    PowerShellGet derives the directory that Install-Module -Scope CurrentUser writes
+    to from [Environment]::GetFolderPath('MyDocuments') and the PowerShell edition,
+    and never from $env:PSModulePath. This mirrors that computation so a caller can
+    predict where a pin landed and verify it, which is the only reason the value is
+    worth resolving.
+
+    The edition decides the leaf directory. PowerShell 7 uses PowerShell\Modules and
+    Windows PowerShell 5.1 uses WindowsPowerShell\Modules, and both are reachable
+    because the Windows host orchestrator can be run by hand under either.
+
+    The empty-documents-root branch mirrors PowerShellGet's own fallback rather than
+    failing, because a prediction that disagrees with the installer is the same
+    defect in a different place.
+
+  .PARAMETER DocumentsRoot
+    The Documents folder to resolve under. Defaults to the running account's, which
+    moves with folder redirection and with OneDrive.
+
+  .PARAMETER PowerShellEdition
+    The PowerShell edition, which selects the leaf directory name. Defaults to the
+    running session's.
+
+  .OUTPUTS
+    System.String. The CurrentUser modules directory.
+
+  .EXAMPLE
+    Get-CurrentUserModulePath
+
+  .EXAMPLE
+    Get-CurrentUserModulePath -DocumentsRoot 'C:\Users\runneradmin\Documents' -PowerShellEdition 'Core'
+
+  .NOTES
+    Windows only. PowerShellGet resolves the non-Windows CurrentUser path through
+    [Platform]::SelectProductNameForDirectory('USER_MODULES') instead.
+
+    Sources:
+    https://github.com/PowerShell/PowerShellGetv2/blob/master/src/PowerShellGet/private/modulefile/PartOne.ps1
+    https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_psmodulepath
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter()]
+    [AllowEmptyString()]
+    [string]$DocumentsRoot,
+
+    [Parameter()]
+    [AllowEmptyString()]
+    [string]$PowerShellEdition
+  )
+
+  if ([string]::IsNullOrWhiteSpace($DocumentsRoot)) {
+    # WHY the catch: a locked-down or headless profile can make the call fail, and
+    #   PowerShellGet treats that as an empty path rather than an error. Matching it
+    #   is what keeps this prediction pointing at the same directory.
+    try {
+      $DocumentsRoot = [Environment]::GetFolderPath('MyDocuments')
+    } catch {
+      $DocumentsRoot = ''
+    }
+  }
+
+  if ([string]::IsNullOrWhiteSpace($PowerShellEdition)) {
+    $PowerShellEdition = $PSVersionTable.PSEdition
+  }
+
+  # WHY the edition rather than $PSHOME's path shape: the edition is the value the
+  #   two supported hosts differ on, and $IsWindows does not exist under 5.1.
+  if ($PowerShellEdition -eq 'Desktop') {
+    $powerShellRootName = 'WindowsPowerShell'
+    $profileRoot = $env:USERPROFILE
+  } else {
+    $powerShellRootName = 'PowerShell'
+    $profileRoot = $HOME
+  }
+
+  # WHY the guard inside the branch: the profile root is only consulted when the
+  #   Documents folder is unavailable, so a host that resolved Documents never
+  #   depends on it.
+  $powerShellRoot = if ([string]::IsNullOrWhiteSpace($DocumentsRoot)) {
+    if ([string]::IsNullOrWhiteSpace($profileRoot)) {
+      throw "Get-CurrentUserModulePath: neither the Documents folder nor the user profile root resolved, so the CurrentUser module path is unknown. PowerShellEdition='$PowerShellEdition'"
+    }
+    Join-Path $profileRoot "Documents\$powerShellRootName"
+  } else {
+    Join-Path $DocumentsRoot $powerShellRootName
+  }
+
+  return Join-Path $powerShellRoot 'Modules'
 }
 
 
