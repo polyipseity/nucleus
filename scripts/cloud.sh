@@ -1,21 +1,18 @@
 #!/usr/bin/env bash
 # Nucleus cloud management CLI.
 #
-# Subcommands:
 #   setup   Verify/create rclone remotes, validate credentials, sync display
-#           names from the user registry, and optionally run nucleus apply.
-#   reset   Remove local replica data and rclone cache directories so the next
-#           sync starts from a clean local state (local-only; never touches
-#           remote data).
-#   sync    Pull-only replica sync (remote -> local) for every enabled replica
-#           declared in src/users/ for the current user.
-#   repair  Restart the macOS macFUSE/FSKit provider, then restart and verify
-#           the declared cloud mounts (macOS only; a wedged FSKit subsystem is
-#           what leaves a mount missing with no error the user can act on).
+#           names from the user registry, optionally run nucleus apply
+#   reset   Remove local replica data and rclone cache so the next sync starts
+#           clean. Local only, never touches remote data
+#   sync    Pull-only replica sync (remote to local) for every enabled replica
+#           declared in src/users/ for the current user
+#   repair  Restart the macOS macFUSE/FSKit provider, then restart and verify the
+#           declared cloud mounts. macOS only
 #
 # Usage: nucleus-cloud <setup|reset|sync|repair> [options]
 #
-# Prerequisites: rclone and jq on PATH, and the repo checkout with src/users/.
+# Needs rclone and jq on PATH plus the repo checkout with src/users/.
 
 set -euo pipefail
 
@@ -74,13 +71,8 @@ usage() {
 EOF
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Shared helpers
-# ──────────────────────────────────────────────────────────────────────────────
-
-# Reads the configured iCloud service for a remote from the assembled user registry.
-# Args: $1 — repo root; $2 — remote name; $3 — assembled user registry JSON.
-# Output: `drive` or `photos`.
+# Reads the configured iCloud service for a remote from the assembled user registry,
+# answering `drive` or `photos`.
 resolve_icloud_service_for_remote() {
   _ics_repo_root="$1"
   _ics_remote_name="$2"
@@ -144,7 +136,6 @@ collect_missing_remotes() {
   printf '%s\n' "$_missing"
 }
 
-# Collect enabled mount service IDs from the user registry for this user.
 collect_configured_mount_service_ids() {
   _ccmsi_registry="$1"
 
@@ -166,11 +157,8 @@ collect_configured_mount_service_ids() {
     <<<"$_ccmsi_registry"; } 2>/dev/null || true # check-suppress:suppression_doc: user registry may be empty or malformed; empty result is handled.
 }
 
-# Detect the launchd domain for a service label by probing gui then user domains.
-# Cloud-mount services are not in services.json — they are dynamically created
-# by cloud-drives.nix — so we query launchd at runtime for domain discovery.
-# Args: $1 — service label; $2 — uid.
-# Output: "gui" or "user".
+# Cloud-mount services are not in services.json, they are created dynamically by
+# cloud-drives.nix, so the domain comes from probing launchd at runtime.
 _detect_launchd_domain() {
   local label="$1" uid="$2"
   if launchctl print "gui/${uid}/${label}" >/dev/null 2>&1; then
@@ -182,8 +170,6 @@ _detect_launchd_domain() {
   fi
 }
 
-# Restart managed cloud mount services so refreshed remote descriptions and
-# credentials are reflected immediately in mounted volumes.
 restart_cloud_mount_services() {
   _rcms_registry="$1"
   _rcms_mount_rows="$(collect_configured_mount_service_ids "$_rcms_registry")"
@@ -261,11 +247,6 @@ EOF
   esac
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# FSKit provider repair
-# ──────────────────────────────────────────────────────────────────────────────
-
-# _repair_mount_rows <mounts-json> — enabled cloud mounts as id<TAB>localPath.
 # WHY: the mount points come from the same user-registry loader that nucleus-svc
 #   and the watchdog read, so the repair targets the mounts the runtime side
 #   actually declares (disabled entries included in the registry are skipped).
@@ -278,7 +259,6 @@ _repair_mount_rows() {
   ' <<<"$1"
 }
 
-# _repair_mount_target <label> <uid> — launchctl target of a cloud-mount agent.
 # WHY: both the restart and the bounded relaunch below act on the same target, and
 #   resolving it once keeps the two from disagreeing about the domain.
 _repair_mount_target() {
@@ -287,7 +267,6 @@ _repair_mount_target() {
   launchctl_target "$(_detect_launchd_domain "$label" "$uid")" "$uid" "$label"
 }
 
-# Maps a known remote name to its rclone provider type string.
 remote_provider_type() {
   case "$1" in
   GoogleDrive) printf 'drive' ;;
@@ -297,8 +276,6 @@ remote_provider_type() {
   esac
 }
 
-# Selects backend-specific create arguments.
-# Args: $1 — rclone provider type; $2 — remote name; $3 — repo root.
 remote_provider_create_args() {
   _rpca_provider_type="$1"
   _rpca_remote_name="$2"
@@ -316,7 +293,7 @@ remote_provider_create_args() {
   esac
 }
 
-# run_local_cmd — Execute a destructive command, honoring --dry-run.
+# Destructive, so it honors --dry-run.
 run_local_cmd() {
   if [ "$dry_run" = true ]; then
     dry_run "would run: $*"
@@ -331,9 +308,8 @@ _load_users_registry() {
     --repo-root "$REPO_ROOT"
 }
 
-# load_provider_gc_entries PROVIDER FIELD
-#   Reads a GC-config field (files|dirs|remoteExcludes|blockedRoots) for a
-#   provider from the user registry cloudDrives.replicaGc domain.
+# Reads a GC-config field (files|dirs|remoteExcludes|blockedRoots) for a provider
+# from the user registry cloudDrives.replicaGc domain.
 load_provider_gc_entries() {
   _provider="$1"
   _field="$2"
@@ -344,7 +320,6 @@ load_provider_gc_entries() {
   '
 }
 
-# run_cmd — Executes a command, or prints it under --dry-run.
 run_cmd() {
   if [ "$dry_run" = true ]; then
     dry_run "would run: $*"
@@ -353,8 +328,6 @@ run_cmd() {
   "$@"
 }
 
-# record_unique_name LIST_FILE NAME
-#   Appends NAME to LIST_FILE once.
 record_unique_name() {
   _list_file="$1"
   _name="$2"
@@ -368,8 +341,6 @@ record_unique_name() {
   fi
 }
 
-# remote_top_level_path_accessible REMOTE_REF ENTRY_NAME
-#   Probes whether a top-level remote entry can actually be listed.
 remote_top_level_path_accessible() {
   _remote_ref="$1"
   _entry_name="$2"
@@ -382,8 +353,6 @@ remote_top_level_path_accessible() {
     --max-duration 1m >/dev/null 2>&1
 }
 
-# should_skip_onedrive_root_entry ENTRY_NAME BLOCKED_ROOT_ENTRIES
-#   Returns 0 when ENTRY_NAME must not be synced.
 should_skip_onedrive_root_entry() {
   _entry_name="$1"
   _blocked_root_entries="$2"
@@ -396,9 +365,6 @@ should_skip_onedrive_root_entry() {
   printf '%s\n' "$_blocked_root_entries" | grep -Fxq "$_entry_lc"
 }
 
-# build_onedrive_root_filter_file ID LOCAL_DIR REMOTE_REF REMOTE_EXCLUDES BLOCKED_ROOT_ENTRIES
-#   Builds a runtime rclone filter file restricting the pull to top-level
-#   entries that are present and actually accessible.
 build_onedrive_root_filter_file() {
   _id="$1"
   _local_dir="$2"
@@ -504,8 +470,6 @@ build_onedrive_root_filter_file() {
   printf '%s\n' "$_filter_file"
 }
 
-# gc_local_macos_artifacts TARGET_DIR FILE_GLOBS DIR_NAMES
-#   Deletes macOS metadata artifacts from a replica tree after sync.
 gc_local_macos_artifacts() {
   _target_dir="$1"
   _file_globs="$2"
@@ -529,8 +493,6 @@ gc_local_macos_artifacts() {
   done
 }
 
-# ensure_macos_icloud_replica_symlink RELATIVE_PATH
-#   Make ~/RELATIVE_PATH a symlink to ~/Library/Mobile Documents.
 ensure_macos_icloud_replica_symlink() {
   _relative_path="$1"
   _native_target="$HOME/Library/Mobile Documents"
@@ -564,8 +526,6 @@ ensure_macos_icloud_replica_symlink() {
   say "[iCloud] linked $_replica_path -> $_native_target"
 }
 
-# resolve_filter_path CANDIDATE
-#   Expands a filters-file path from users.json into an absolute path.
 resolve_filter_path() {
   _candidate="$1"
   case "$_candidate" in
@@ -584,8 +544,7 @@ resolve_filter_path() {
   esac
 }
 
-# set_replica_tree_writable TARGET_DIR
-#   Temporarily grant owner write access for convergence.
+# Temporarily grants owner write access for convergence.
 set_replica_tree_writable() {
   _target_dir="$1"
 
@@ -618,10 +577,8 @@ set_replica_tree_read_only() {
   chmod -R a-w "$_target_dir"
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# setup subcommand — verify/create rclone remotes, validate credentials, sync
-# display names, and optionally run nucleus apply.
-# ──────────────────────────────────────────────────────────────────────────────
+# setup: verify/create rclone remotes, validate credentials, sync display names,
+# optionally run nucleus apply.
 
 do_setup() {
   apply=false
@@ -664,9 +621,8 @@ do_setup() {
   }
 
   if [ -n "$missing_remotes" ]; then
-    # Inject rclone config passphrase from materialized SOPS secret so the remote
-    # creation flow inherits it and rclone encrypts the new config entry with the
-    # managed passphrase automatically.
+    # Inject the rclone config passphrase from the materialized SOPS secret so
+    # the new config entry is encrypted with the managed passphrase.
     _rclone_pass_file="$NUCLEUS_USER_ROOT/secrets/rclone-config-pass"
     if [ -s "$_rclone_pass_file" ]; then
       RCLONE_CONFIG_PASS="$(cat "$_rclone_pass_file")"
@@ -704,9 +660,8 @@ do_setup() {
 
   say "required remotes are configured."
 
-  # Validate each remote's credentials; recreate any remote that fails so stale
-  # auth tokens can be refreshed without manually deleting and rebuilding the
-  # config.
+  # Recreate any remote that fails so stale auth tokens refresh without a manual
+  # delete and rebuild.
   say "validating remote credentials with root-only listings..."
   _stale_remotes=""
   for _remote in $required_remotes; do
@@ -757,7 +712,6 @@ do_setup() {
 
   say "all credentials valid."
 
-  # Acknowledge Google Drive abuse flag so rclone can download flagged files.
   if rclone listremotes | grep -Fxq 'GoogleDrive:'; then
     _current_abuse="$({
       rclone config dump | jq -r '.GoogleDrive.acknowledge_abuse // "false"'
@@ -803,7 +757,6 @@ do_setup() {
           continue
         fi
 
-        # Skip no-op updates to avoid unnecessary provider re-auth prompts.
         _current_description="$({
           rclone config dump | jq -r --arg remote "$remote_name" '.[$remote].description // empty'
         } 2>/dev/null || true)" # check-suppress:suppression_doc: token/URL may not be resolvable; best-effort extraction with downstream guards.
@@ -834,16 +787,13 @@ EOF
   say "setup complete"
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# reset subcommand — remove local replica data and rclone cache (local-only).
-# ──────────────────────────────────────────────────────────────────────────────
+# reset: remove local replica data and rclone cache (local only).
 
 do_reset() {
   dry_run=false
   replica_id_filter=""
 
-  # Flags are parsed strictly — unknown arguments abort so a typo can never
-  # silently reset the wrong replica set.
+  # Unknown arguments abort so a typo can never reset the wrong replica set.
   while [ "$#" -gt 0 ]; do
     case "$1" in
     --dry-run)
@@ -905,9 +855,8 @@ do_reset() {
 
   username="$(id -un)"
   host="$(resolve_nucleus_host)"
-  # The query filters to enabled replicas that name a remote — a replica
-  # without a configured remote has nothing to reset, and disabled replicas
-  # must not be touched.
+  # The query filters to enabled replicas that name a remote: a replica without a
+  # configured remote has nothing to reset, and disabled replicas stay untouched.
   replica_lines="$({
     jq -r --arg username "$username" '
       .[$username].cloudDrives.replicas // []
@@ -942,9 +891,8 @@ do_reset() {
 
     local_root="$HOME/$local_path"
 
-    # macOS iCloud Drive replicas are represented as symlinks to the native
-    # CloudDocs path. Never recurse into that target during reset; only remove
-    # the symlink itself so remotes and native-managed content remain untouched.
+    # macOS iCloud Drive replicas are symlinks to the native CloudDocs path. Never
+    # recurse into that target during reset; remove only the symlink itself.
     if [ "$host" = "MacBook" ] && [ "$provider" = "iCloud" ] && [ "$icloud_service" = "drive" ]; then
       if [ -L "$local_root" ]; then
         if ! run_local_cmd rm -f "$local_root"; then
@@ -958,8 +906,7 @@ do_reset() {
 
     # For non-exception replicas, reset means clearing local replica data only.
     if [ -e "$local_root" ] || [ -L "$local_root" ]; then
-      # A previous sync can leave the tree read-only; u+w is restored before rm
-      # so removal succeeds. Failure is tolerated (may be symlink/already writable).
+      # A previous sync can leave the tree read-only, so u+w is restored before rm.
       if ! run_local_cmd chmod -R u+w "$local_root" 2>/dev/null; then
         : # Ignore chmod errors (may be symlink or already writable)
       fi
@@ -996,9 +943,7 @@ do_reset() {
   say "completed successfully"
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# sync subcommand — pull-only replica sync (remote -> local).
-# ──────────────────────────────────────────────────────────────────────────────
+# sync: pull-only replica sync (remote to local).
 
 do_sync() {
   dry_run=false
@@ -1215,20 +1160,15 @@ do_sync() {
   say "completed successfully"
 }
 
-# ──────────────────────────────────────────────────────────────────────────────
-# repair
-# ──────────────────────────────────────────────────────────────────────────────
-
-# repair [mount-id...] [--timeout SECS] [--repo-root PATH] — Restart the macOS
-# macFUSE/FSKit provider, then restart and verify the declared cloud mounts.
-#
+# repair: restart the macOS macFUSE/FSKit provider, then restart and verify the
+# declared cloud mounts.
 # WHY: macOS serves macFUSE volumes through the FSKit file-system extension, and
 #   macFUSE 5.x can leave that subsystem wedged after an unmount: every later
 #   mount then fails with "File system extension not found"/"not enabled" (macFUSE
 #   status 3/4) or "mount(8) returned 69" while FSKit's own module list still
-#   names the module.  Re-registering the extension or mounting again only
-#   deepens the wedge, so the one repair is the daemon restart the macFUSE
-#   maintainers prescribe; the mounts then come back on their own agents.
+#   names the module. Re-registering the extension or mounting again only deepens
+#   the wedge, so the one repair is the daemon restart the macFUSE maintainers
+#   prescribe; the mounts then come back on their own agents.
 # ref: https://github.com/macfuse/macfuse/issues/1132
 do_repair() {
   timeout=60
@@ -1333,8 +1273,6 @@ do_repair() {
   uid="$(id -u)"
   mounts_json="$(svc_configured_mounts "$REPO_ROOT" "$host" "$username")"
 
-  # Rows are materialized before use so the loops below read a stable array
-  # rather than re-running the loader for every mount point.
   while IFS="$tab" read -r mount_id local_path; do
     [ -n "$mount_id" ] || continue
     label="${label_prefix}${mount_id}"
@@ -1397,11 +1335,10 @@ do_repair() {
       continue
       ;;
     unknown:*)
-      # WHY: the table could not be read, so nothing is known about this
-      #   mount. Starting one anyway is what the "unknown answers present"
-      #   rule exists to prevent, and skipping it silently is what made
-      #   repair report a success it did not perform. Count it and fail the
-      #   command so the operator sees the mount was left alone.
+      # WHY: the table could not be read, so nothing is known about this mount.
+      #   Starting one anyway is what the "unknown answers present" rule exists to
+      #   prevent, and skipping it silently made repair report a success it did not
+      #   perform, so it counts as undetermined and the command fails.
       warn "could not determine whether mount '$mount_id' ($mount_point) is mounted (${_cm_state#unknown:}); leaving it alone"
       undetermined=$((undetermined + 1))
       continue
@@ -1412,10 +1349,9 @@ do_repair() {
     target="$(_repair_mount_target "$label" "$uid")"
     plist="$HOME/Library/LaunchAgents/$label.plist"
 
-    # WHY: an unloaded agent cannot be kickstarted, so a repair that finds one
-    #   with an installed plist loads it first.  A loaded-but-wedged agent still
-    #   reports a running state while its volume never attached, so it is
-    #   restarted instead of waited on.
+    # WHY: an unloaded agent cannot be kickstarted, so one with an installed plist is
+    #   loaded first. A loaded-but-wedged agent still reports a running state while
+    #   its volume never attached, so it is restarted instead of waited on.
     if [ -f "$plist" ] && ! launchctl_job_loaded "$target" "$sudo_prefix"; then
       domain="$(launchctl_bootstrap_domain "$(_detect_launchd_domain "$label" "$uid")" "$uid")"
       # check-suppress:suppression_doc: the bounded relaunch below is the check; a bootstrap that fails leaves the job unloaded and the relaunch reports the outcome.
@@ -1425,10 +1361,10 @@ do_repair() {
       $sudo_prefix launchctl kickstart -k "$target" >/dev/null 2>&1 || true
     fi
 
-    # WHY the bounded relaunch: FSKit can refuse the first attempts right after
-    #   its daemon restarts while a later one serves the volume, and the mount
-    #   runner stops on a provider refusal instead of retrying it, so the
-    #   bounded retry belongs to the command that wants the mount up.
+    # WHY the bounded relaunch: FSKit can refuse the first attempts right after its
+    #   daemon restarts while a later one serves the volume, and the mount runner
+    #   stops on a provider refusal instead of retrying it, so the bounded retry
+    #   belongs to the command that wants the mount up.
     # check-suppress:suppression_doc: the report pass below names every mount that did not come back, so a failed relaunch is not an error here.
     svc_remount_until "$mount_point" "$target" "$sudo_prefix" "$timeout" || true
 
@@ -1436,16 +1372,15 @@ do_repair() {
     case "$_cm_state" in
     present)
       say "mounted: $mount_id ($mount_point)"
-      # WHY: a mount that came back is no longer blocked, so the record that
-      #   gated it is re-armed here — otherwise every later apply re-reports a
-      #   problem the repair already fixed.
+      # WHY: a mount that came back is no longer blocked, so its record is re-armed here
+      #   rather than letting every later apply re-report a fixed problem.
       svc_health_clear "$label"
       ;;
     unknown:*)
-      # WHY: the table could not be read a second time, so whether this mount
-      #   came back is unknown. Calling it mounted and clearing its record
-      #   would both claim a success the repair did not perform and erase the
-      #   evidence a later apply needs, so it counts as undetermined instead.
+      # WHY: the table could not be read a second time, so whether this mount came back
+      #   is unknown. Calling it mounted and clearing its record would claim a
+      #   success the repair did not perform and erase the evidence a later apply
+      #   needs, so it counts as undetermined instead.
       warn "could not determine whether mount '$mount_id' ($mount_point) came back after the relaunch (${_cm_state#unknown:}); its health record was left in place"
       undetermined=$((undetermined + 1))
       ;;
@@ -1459,8 +1394,7 @@ do_repair() {
 
   if [ "$failures" -gt 0 ]; then
     # WHY: this block exits before the undetermined one below, so a run with both
-    #   would drop the count of the mounts whose state is unknown. Naming it here
-    #   keeps the summary accounting for every mount the repair did not bring back.
+    #   would drop the count of the mounts whose state is unknown.
     undetermined_note=""
     [ "$undetermined" -gt 0 ] && undetermined_note=" and could not determine the state of $undetermined mount(s); the warning for each names the mount and the reason"
     error "repair finished with $failures failure(s)$undetermined_note; $(fskit_remedy)"
@@ -1468,19 +1402,14 @@ do_repair() {
   fi
 
   if [ "$undetermined" -gt 0 ]; then
-    # WHY: an undetermined mount is not a repaired mount, so the command fails
-    #   rather than reporting a success it did not perform, and the count says
-    #   how many need a second look.
+    # WHY: an undetermined mount is not a repaired mount, so the command fails rather
+    #   than reporting a success it did not perform.
     error "repair could not determine the state of $undetermined mount(s); the warning for each names the mount and the reason. $(fskit_remedy)"
     exit 1
   fi
 
   say "cloud mounts repaired"
 }
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Main dispatch
-# ──────────────────────────────────────────────────────────────────────────────
 
 action="${1:-help}"
 case "$action" in

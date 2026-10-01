@@ -1,73 +1,31 @@
 # shellcheck shell=bash
-# Unified per-instance health record for nucleus services.
-# Replaces the separate crash-loop state and blocked-marker files with a
-# single JSON file per instance in <nucleus_user_root>/state/service-stats/.
+# Unified per-instance health record for nucleus services, one JSON file per
+# instance in <nucleus_user_root>/state/service-stats/.
 #
-# Record schema:
-#   { "state": "running|stopped|blocked",
-#     "class": null | "<class-token>",
-#     "remedy": null | "<remedy-text>",
-#     "attempts": 0,
-#     "reportedState": null,
-#     "boot": "<boot-id>",
-#     "lastSuccess": 0,
-#     "restarts": [],
-#     "generation": null,
-#     "lastExit": 0,
-#     "evidence": null | "<absolute path>" }
-#
-# `evidence` is absent until the runner first writes it, and stays absent in
-# every record whose instance is not a mount runner. The runner writes it when
-# it keeps a capture file and sets it back to null when the instance reaches
-# running, so a healthy mount reads as the key present and null, not as a key
-# that was never there. Nothing renders it.
-#
-# Writers, per field. There is no single writer for the whole record, and the
-# two jobs are deliberately different: the runner classifies a MOUNT (mounted,
+# Two writers, deliberately different: the runner classifies a MOUNT (mounted,
 # provider-refused, attempts exhausted) while the watchdog classifies the
-# SUPERVISOR (crash-looping, not-loaded). They necessarily meet on the fields
-# both can observe.
-#
-#   state, class, remedy    runner (rclone-mount.sh, mount-backend-*: running,
-#                           provider-refusal, mount-failed) AND the watchdog
-#                           (crash-loop, not-loaded)
-#   lastSuccess             runner (a successful mount) AND the watchdog (a tick
-#                           that observed an unchanged supervisor token)
-#   lastExit                runner (the mount watch's status) AND the watchdog
-#                           (the supervisor's own last exit)
-#   generation              watchdog only — the supervisor run token
-#   restarts, reportedState watchdog only
-#   evidence                runner only — the capture file a run kept, nulled on
-#                           running.  svc_health_clear (the repair path) leaves
-#                           it: it names a file the runner kept and never
-#                           deletes, so there the pointer is still true.
-#   boot                    svc_health_init and svc_health_set_blocked
-#   attempts                svc_health_init only — no production caller advances it
-#
-# Only svc_health_clear (the repair path, once a mount is confirmed back) removes
-# class/remedy; nothing else clears a block.  The apply-time re-arm is
-# src/scripts/services/reset-service-health.sh — it removes the records outright,
-# which is why no clear-all counterpart lives in this library.
+# SUPERVISOR (crash-looping, not-loaded). They meet only on fields both can
+# observe: state, class, remedy, lastSuccess, lastExit. generation, restarts and
+# reportedState are watchdog-only; evidence is runner-only.
 #
 # WHY lastExit has two writers without interfering: Rule 5 dispatches on
 #   lastExit == 78 (EX_CONFIG), and both writers report the same underlying
-#   value — the runner takes the mount watch's status, the watchdog the
-#   supervisor's record of that same process — so whichever ran last, the
-#   comparison sees the exit the supervisor actually observed.
+#   value, the mount watch's status and the supervisor's record of that same
+#   process, so whichever ran last the comparison sees the exit the supervisor
+#   actually observed.
 #
-# `generation` is the supervisor's run token as of the last observation, and it
-# is the single input to loop detection: the watchdog records a restart whenever
-# the token changes between ticks.  It is null until the first observation, and
-# null is the ONLY unobserved sentinel — the token itself may legitimately read
-# zero (systemd's NRestarts), so zero cannot double as "never observed" without
-# swallowing each service's first restart.
+# `generation` is the supervisor run token as of the last observation and the
+# single input to loop detection. It is null until the first observation, and
+# null is the only unobserved sentinel: the token itself may legitimately read
+# zero (systemd's NRestarts).
 #
-# Usage:
-#   . "$SCRIPT_DIR/../lib/service-health.sh"
+# `evidence` stays null once a mount reaches running rather than disappearing,
+# and svc_health_clear leaves it alone because it names a file the runner kept
+# and never deletes.
 #
-#   svc_health_set_state "cloud-mount-iCloud" "blocked"
-#   svc_health_set_blocked "cloud-mount-iCloud" "provider-refusal" "re-enable macFUSE"
-#   if svc_health_is_blocked "cloud-mount-iCloud"; then ... fi
+# Only svc_health_clear removes class/remedy. The apply-time re-arm is
+# src/scripts/services/reset-service-health.sh, which removes the records
+# outright, so no clear-all counterpart lives here.
 
 [ -n "${_NUCLEUS_SERVICE_HEALTH_SOURCED-}" ] && return
 _NUCLEUS_SERVICE_HEALTH_SOURCED=1
@@ -77,19 +35,17 @@ _SVC_HEALTH_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pw
 # shellcheck source=lib.sh
 [ -n "${_NUCLEUS_LIB_SOURCED-}" ] || . "$_SVC_HEALTH_LIB_DIR/lib.sh"
 
-# Loop policy — the single definition of every loop threshold. The detector and
-# the status formatter both read these, so the two can never disagree.
+# Loop policy, read by both the detector and the status formatter so the two can
+# never disagree.
 readonly _SVC_HEALTH_LOOP_RESTARTS=10
 readonly _SVC_HEALTH_LOOP_CONSECUTIVE=5
 readonly _SVC_HEALTH_WARN_RESTARTS=5
 
-# svc_health_state_dir — returns the state directory path.
 svc_health_state_dir() {
   local root="${NUCLEUS_USER_ROOT:-$(derive_nucleus_user_root)}"
   printf '%s/state/service-stats' "$root"
 }
 
-# svc_health_state_file — returns the state file path for a service instance.
 svc_health_state_file() {
   local instance="$1"
   printf '%s/%s.json' "$(svc_health_state_dir)" "$instance"
@@ -98,27 +54,15 @@ svc_health_state_file() {
 # Sentinel for "the OS could not report a boot time" — see svc_health_boot_id.
 _SVC_HEALTH_BOOT_UNKNOWN='unknown'
 
-# svc_health_os_boot_time — the operating system's current boot time.
+# The value is identical throughout one boot and different after a reboot. It is
+# recomputed on every call and never cached, because a cached value cannot change
+# across a reboot, which is the entire point of it.
 #
-# Contract: the value is IDENTICAL throughout one boot and DIFFERENT after a
-# reboot. It is recomputed on every call and deliberately NOT cached, because a
-# cached value cannot change across a reboot — which is the entire point of it.
-# The output is an opaque non-empty token; empty means the OS could not report a
-# boot time at all.
-#
-# The sources are per host, because the hosts expose different facilities, but
-# all of them satisfy the same contract:
-#   Linux  /proc/stat "btime" — an exact boot epoch, the most precise source
-#   Linux  `uptime -s`        — the same value as text, when /proc is unavailable
-#   macOS  kern.boottime      — "{ sec = <epoch>, usec = 0 }"; needs sysctl
-#   macOS  `who -b`           — the utmpx boot record, and the ONLY source that
-#                               works where sysctl is denied (sandboxed contexts)
-# WHY `uptime -s` is not the universal source: it does not exist on macOS (it
-# exits 1 with "illegal option -- s"), which is why the macOS branches exist.
-# WHY the `who -b` token carries no year: it renders the boot time without one,
-# so two boots at the same month/day/time in different years produce the same
-# token. That direction is fail-closed (a block persists), which is the safe
-# side — see svc_health_boot_id.
+# Sources, all satisfying that contract: /proc/stat btime, `uptime -s` when
+# /proc is unavailable, sysctl kern.boottime, and `who -b`, the only source that
+# works where sysctl is denied. `uptime -s` does not exist on macOS, which is why
+# the macOS branches exist. The `who -b` token carries no year, so two boots in
+# different years can produce the same token; that direction fails closed.
 svc_health_os_boot_time() {
   local _v=""
   # check-suppress:suppression_doc: best-effort probe; no output means this source is unavailable
@@ -151,23 +95,15 @@ svc_health_os_boot_time() {
 
 # svc_health_boot_id — the boot identity stamped into a record.
 #
-# WHY this is recomputed rather than cached in a file (it previously read a
-# sticky `<state dir>/.boot-id`): the record's `boot` is compared against this
-# value to decide whether a block is still in force, so the value MUST change
-# when the OS reboots. A cached copy cannot, which left the documented "a reboot
-# clears a block" contract unreachable — on macOS the cached value was
-# additionally only a creation timestamp, because the `uptime -s` it was built
-# from always failed there and fell through to `date +%s`.
-#
-# WHY an unavailable boot time yields a sentinel rather than an empty value or a
-# fresh `date +%s`: clearing a block is driven by the stored boot DIFFERING from
-# this value, so fabricating a value when the OS cannot be asked would make every
-# block read as stale — silently voiding the protection that exists to stop a
-# restart storm, and doing so with no operator signal. The sentinel instead means
-# "this is not evidence of a reboot", and svc_health_is_blocked keeps the block.
-# Failing closed costs a blocked instance nothing that the apply-time re-arm
-# (nucleus-apply, which removes the records) cannot fix; failing open re-admits
-# the restart storm, which is the harm the block exists to prevent.
+# WHY recomputed rather than cached in a file: the record's `boot` is compared
+# against this value to decide whether a block is still in force, so it MUST
+# change when the OS reboots and a cached copy cannot.
+# WHY an unavailable boot time yields a sentinel rather than empty or a fresh
+# `date +%s`: clearing a block is driven by the stored boot differing from this
+# value, so a fabricated value would make every block read as stale, voiding the
+# protection against a restart storm with no operator signal. The sentinel means
+# "not evidence of a reboot" and keeps the block. Failing closed costs nothing the
+# apply-time re-arm cannot fix; failing open re-admits the storm.
 svc_health_boot_id() {
   local _boot
   _boot="$(svc_health_os_boot_time)"
@@ -178,7 +114,6 @@ svc_health_boot_id() {
   printf '%s' "$_boot"
 }
 
-# svc_health_init — ensure the state file exists with defaults.
 svc_health_init() {
   local instance="$1" file
   file="$(svc_health_state_file "$instance")"
@@ -192,15 +127,12 @@ svc_health_init() {
   mv "$tmp" "$file"
 }
 
-# svc_health_read — read the full JSON record. Prints nothing if missing.
 svc_health_read() {
   local instance="$1" file
   file="$(svc_health_state_file "$instance")"
   [ -f "$file" ] && cat "$file"
 }
 
-# svc_health_get — read a single field from the record.
-# Args: $1 — instance; $2 — field name (e.g. state, class, remedy, generation, lastExit).
 svc_health_get() {
   local instance="$1" field="$2" file
   file="$(svc_health_state_file "$instance")"
@@ -208,8 +140,7 @@ svc_health_get() {
   jq -r ".$field // empty" "$file" 2>/dev/null
 }
 
-# svc_health_set — write a field to the record. Atomic via tmp+mv.
-# Args: $1 — instance; $2 — field; $3 — value (JSON-encoded string, number, null).
+# Writes through a tmp file plus mv, so a reader never sees a partial record.
 svc_health_set() {
   local instance="$1" field="$2" value="$3" file tmp
   file="$(svc_health_state_file "$instance")"
@@ -232,12 +163,10 @@ svc_health_set() {
   mv "$tmp" "$file"
 }
 
-# svc_health_set_state — update the state field.
 svc_health_set_state() {
   svc_health_set "$1" "state" "\"$2\""
 }
 
-# svc_health_set_blocked — set state to blocked with class and remedy.
 svc_health_set_blocked() {
   local instance="$1" class="$2" remedy="$3"
   svc_health_init "$instance"
@@ -256,7 +185,6 @@ svc_health_set_blocked() {
   mv "$tmp" "$file"
 }
 
-# svc_health_set_running — update state, clear class/remedy.
 svc_health_set_running() {
   local instance="$1"
   svc_health_set "$instance" "state" "\"running\""
@@ -264,14 +192,11 @@ svc_health_set_running() {
   svc_health_set "$instance" "remedy" "null"
 }
 
-# svc_health_is_blocked — return 0 if the instance has a fresh blocked record.
-# Fresh means the record was written during the CURRENT boot, so a record from a
-# previous boot stops gating the service — that is how a reboot clears a block
-# (the other way being the apply-time re-arm).
+# Fresh means the record was written during the current boot, so a record from a
+# previous boot stops gating the service. That is how a reboot clears a block.
 # WHY the unknown/absent guards: when the OS cannot report a boot time, or the
-# record carries no boot stamp at all, a mismatch is NOT evidence of a reboot,
-# so the block is KEPT (fail closed). See svc_health_boot_id for why failing
-# closed is the safe direction here.
+# record carries no boot stamp, a mismatch is not evidence of a reboot, so the
+# block is kept.
 svc_health_is_blocked() {
   local instance="$1" state boot current
   state="$(svc_health_get "$instance" "state")"
@@ -283,8 +208,6 @@ svc_health_is_blocked() {
   [ "$boot" = "$current" ]
 }
 
-# svc_health_is_reported — return 0 if the current state has been reported.
-# Args: $1 — instance key; $2 — expected reportedState string.
 svc_health_is_reported() {
   local instance="$1" expected="$2"
   local current
@@ -292,21 +215,13 @@ svc_health_is_reported() {
   [ "$current" = "$expected" ]
 }
 
-# svc_health_mark_reported — mark the current state as reported.
-# Args: $1 — instance key; $2 — reportedState string.
 svc_health_mark_reported() {
   svc_health_set "$1" "reportedState" "\"$2\""
 }
 
-# svc_health_clear — re-arm the instance: drop class, remedy, and reportedState,
-# return state to "stopped", and drop the restart history, so that neither a
-# blocked state NOR a loop history survives the re-arm.
-# WHY: svc_health_is_looping reads .restarts (via svc_health_restart_count and
-#   svc_health_consecutive_failures), so a clear that kept the history would be
-#   re-blocked by the watchdog's Rule 3 on the very next tick and would stay
-#   blocked until the old timestamps aged out.  Dropping .restarts is what makes
-#   this a re-arm rather than a status reset.
-# Called by repair once a mount is confirmed back.
+# WHY drop .restarts: svc_health_is_looping reads it, so a clear that kept the
+#   history would be re-blocked by the watchdog's Rule 3 on the very next tick
+#   and stay blocked until the old timestamps aged out.
 svc_health_clear() {
   local instance="$1" file tmp
   file="$(svc_health_state_file "$instance")"
@@ -319,7 +234,6 @@ svc_health_clear() {
   mv "$tmp" "$file"
 }
 
-# svc_health_record_restart — append a restart timestamp, prune entries >1 hour.
 svc_health_record_restart() {
   local instance="$1" reason="${2:-}"
   svc_health_init "$instance"
@@ -340,7 +254,6 @@ svc_health_record_restart() {
   fi
 }
 
-# svc_health_record_success — update lastSuccess to now.
 svc_health_record_success() {
   local instance="$1"
   svc_health_init "$instance"
@@ -355,7 +268,9 @@ svc_health_record_success() {
   mv "$tmp" "$file"
 }
 
-# svc_health_restart_count — count restarts in the last hour.
+# WHY: a corrupt record must be reported, never read as a healthy zero, which
+#   would let the loop detector fail open and print OK for a service that may
+#   be in a restart storm.
 svc_health_restart_count() {
   local instance="$1" file
   file="$(svc_health_state_file "$instance")"
@@ -378,12 +293,11 @@ svc_health_restart_count() {
   printf '%s' "$count"
 }
 
-# svc_health_consecutive_failures — count restarts newer than lastSuccess.
-# WHY: lastSuccess is bound to a variable first.  Inside `[.restarts[]? |
-#   select(...)]` the current value is a restart timestamp — a number — so
-#   selecting on `.lastSuccess` there indexes a number, jq fails, and the
-#   fallback below reports zero.  The fast consecutive-failure rule then never
-#   fires and only the 10-restarts-per-hour rule can break a loop.
+# WHY lastSuccess is bound to a variable first: inside `[.restarts[]? |
+#   select(...)]` the current value is a restart timestamp, a number, so
+#   selecting on `.lastSuccess` there indexes a number, jq fails, and the fallback
+#   reports zero. The fast consecutive-failure rule then never fires and only the
+#   10-restarts-per-hour rule can break a loop.
 svc_health_consecutive_failures() {
   local instance="$1" file
   file="$(svc_health_state_file "$instance")"
@@ -391,7 +305,7 @@ svc_health_consecutive_failures() {
     echo 0
     return
   }
-  # WHY: same as svc_health_restart_count — a corrupt record is reported rather
+  # WHY: same as svc_health_restart_count, a corrupt record is reported rather
   #   than silently counted as zero failures.
   local count
   if ! count="$(jq -r '(.lastSuccess // 0) as $ls | [.restarts[]? | select(. > $ls)] | length' "$file" 2>/dev/null)"; then
@@ -402,8 +316,6 @@ svc_health_consecutive_failures() {
   printf '%s' "$count"
 }
 
-# svc_health_is_looping — return 0 if the service is in a crash loop.
-# Looping criteria live in the _SVC_HEALTH_LOOP_* constants above.
 svc_health_is_looping() {
   local count consecutive
   count="$(svc_health_restart_count "$1")"
@@ -413,10 +325,9 @@ svc_health_is_looping() {
   [ "$count" -ge "$_SVC_HEALTH_LOOP_RESTARTS" ] || [ "$consecutive" -ge "$_SVC_HEALTH_LOOP_CONSECUTIVE" ]
 }
 
-# svc_health_status — print status string for a service.
-# "OK", "N/hr" (warning, 5-9 restarts), or "LOOP" (crash-looping).
-# WHY: LOOP is decided by svc_health_is_looping, the same predicate the watchdog
-# acts on, so the reported status can never disagree with the enforced policy.
+# "OK", "N/hr" (warning, 5-9 restarts), or "LOOP" (crash-looping). LOOP is
+# decided by the same predicate the watchdog acts on, so the reported status can
+# never disagree with the enforced policy.
 svc_health_status() {
   local count
   count="$(svc_health_restart_count "$1")"
@@ -430,12 +341,10 @@ svc_health_status() {
   fi
 }
 
-# svc_health_set_last_exit — update lastExit.
 svc_health_set_last_exit() {
   svc_health_set "$1" "lastExit" "$2"
 }
 
-# svc_health_render_status — produce a JSON snippet suitable for svc.sh status.
 # Combines the blocked note and crash-loop status in one object.
 svc_health_render_status() {
   local instance="$1"

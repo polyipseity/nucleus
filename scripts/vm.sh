@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# Unified CLI for managing VMs across all hosts (macOS, NixOS, Windows).
-# Consolidates build, provision, start, stop, and lifecycle operations.
-# VMs are defined in src/modules/vms/VMs.json (the canonical manifest).
+# Unified CLI for VM lifecycle across macOS, NixOS and Windows: build,
+# provision, start, stop and everything else. VMs live in
+# src/modules/vms/VMs.json, the canonical manifest.
 #
 # Commands: setup|sync|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack [vm...] [options].
-# Guest credentials are resolved from the per-user SOPS secret file referenced
-# by src/users/ vm-guest keys; see resolve_vm_guest_credentials.
+# Guest credentials come from the per-user SOPS secret file referenced by the
+# src/users/ vm-guest keys, see resolve_vm_guest_credentials.
 #
-# Environment variables read: NUCLEUS_VM_SECRET_OWNER, USER, NUCLEUS_REPO_ROOT,
-# NUCLEUS_HOST (see lib.sh derive_repo_root / resolve_nucleus_host).
+# Reads NUCLEUS_VM_SECRET_OWNER, USER, NUCLEUS_REPO_ROOT and NUCLEUS_HOST (see
+# lib.sh derive_repo_root and resolve_nucleus_host).
 #
-# Prerequisites: sops and jq, plus the per-host hypervisor tools (tart, utmctl,
-# virsh, qemu). Exits 1 with an error message on missing tools, unknown
-# arguments, or manifest lookup failures.
+# Needs sops, jq and the per-host hypervisor tools (tart, utmctl, virsh, qemu).
+# Exits 1 with an error message on a missing tool, unknown argument or manifest
+# lookup failure.
 
 set -euo pipefail
 
@@ -34,16 +34,11 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 # shellcheck disable=SC1094 # reason: vm.sh contains inline PowerShell content (backtick-escaped $) that shellcheck cannot parse; pre-existing constraint from the library
 . "$SCRIPT_DIR/../src/scripts/lib/vm.sh"
 
-# ---------------------------------------------------------------------------
 # VM guest credential helpers (SOPS owner resolution and drift fingerprint).
-# ---------------------------------------------------------------------------
 
-# current_vm_secret_owner
-#   Determines which user owns the SOPS VM secrets: NUCLEUS_VM_SECRET_OWNER
-#   (explicit override), then $USER, then `id -un` as last resort. WHY: the
-#   owner selects the per-user secret file src/secrets/users/<owner>.yml, so
-#   resolution order is override -> session user -> system user. Outputs the
-#   owner name on stdout; returns 1 when none can be determined.
+# WHY: the owner selects the per-user secret file src/secrets/users/<owner>.yml,
+# so the order is explicit override, then session user, then system user.
+# Returns 1 when none can be determined.
 current_vm_secret_owner() {
   if [ -n "${NUCLEUS_VM_SECRET_OWNER:-}" ]; then
     printf '%s\n' "$NUCLEUS_VM_SECRET_OWNER"
@@ -63,13 +58,11 @@ current_vm_secret_owner() {
   return 1
 }
 
-# resolve_vm_guest_credentials
-#   Resolves the VM guest username/password from the per-user SOPS secret file
-#   referenced by src/users/ vmGuest secret-key entries, setting the globals
-#   vm_secret_owner, vm_guest_username, vm_guest_password. WHY: credentials
-#   stay out of the manifest and are decrypted only at runtime, so the
-#   plaintext never touches disk or the flake. Returns 1 with an error message
-#   on any failure so callers can degrade gracefully (see do_setup).
+# vm_secret_owner, vm_guest_username and vm_guest_password from the per-user
+# SOPS secret file named by the src/users/ vmGuest secret-key entries.
+# WHY: credentials stay out of the manifest and are decrypted only at runtime,
+# so the plaintext never touches disk or the flake. Returns 1 with an error
+# message on any failure so callers can degrade gracefully (see do_setup).
 resolve_vm_guest_credentials() {
   _rvgc_owner=''
   _rvgc_secret_file=''
@@ -129,19 +122,12 @@ resolve_vm_guest_credentials() {
   return 0
 }
 
-# vm_guest_credentials_hash
-#   Prints a SHA-256 fingerprint of the resolved guest credentials. WHY: the
-#   fingerprint lets provisioning detect when SOPS secrets changed and the
-#   guest's stored credentials are stale (drift).  Delegates to
-#   vm_sha256_input (src/scripts/lib/vm.sh) so all VM fingerprints share one
-#   tool chain.
+# WHY: the fingerprint lets provisioning detect that the SOPS secrets changed
+# and the guest's stored credentials are stale. Delegates to vm_sha256_input so
+# all VM fingerprints share one tool chain.
 vm_guest_credentials_hash() {
   printf '%s\n%s' "$vm_guest_username" "$vm_guest_password" | vm_sha256_input
 }
-
-# ---------------------------------------------------------------------------
-# Usage
-# ---------------------------------------------------------------------------
 
 usage() {
   usage_std "$(basename "$0")" "setup|sync|build-system|list|status|start|stop|upgrade|reset|android-config|inject|gc|resize|pack|unpack [vm...] [options]"
@@ -214,10 +200,6 @@ Android android-config flags (after VM name; omit all flags to print the manual)
 EOF
 }
 
-# ---------------------------------------------------------------------------
-# Defaults
-# ---------------------------------------------------------------------------
-
 # WHY: GSI image downloads require explicit license acceptance, so the flag
 # defaults to off rather than silently accepting Google's license terms.
 dry_run=false
@@ -240,11 +222,8 @@ repo_root_override=''
 action=''
 vm_args=()
 
-# ---------------------------------------------------------------------------
-# Global flag parse + subcommand dispatch  (svc.sh pattern)
 # WHY: parsing is two-pass (global flags here, subcommand flags in
 # filtered_vm_args) so options work in any position relative to the action.
-# ---------------------------------------------------------------------------
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -354,10 +333,8 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-# Filter subcommand flags from vm_args (can appear before or after subcommand,
-# same pattern as svc.sh --json/--verbose filtering).
-# WHY: folding post-subcommand flags into the same option set makes flag
-# order irrelevant; unknown flags only warn so subcommand flags can pass.
+# WHY: folding post-subcommand flags into the same option set makes flag order
+# irrelevant; unknown flags only warn so subcommand flags can pass.
 filtered_vm_args=()
 for arg in "${vm_args[@]}"; do
   case "$arg" in
@@ -399,7 +376,6 @@ done
   exit 1
 }
 
-# Validate scalars
 # WHY: validating before dispatch fails fast with a precise message instead
 # of surfacing the same error deep inside a subcommand build.
 case "$windows_iso_source" in
@@ -415,15 +391,9 @@ case "$windows_iso_retries" in
   ;;
 esac
 
-# ---------------------------------------------------------------------------
-# Common helpers
-# ---------------------------------------------------------------------------
-
-# resolve_manifest
-#   Locates the VM manifest and derives the VM/image/template directories
-#   from it. WHY: paths derive from REPO_ROOT rather than being hard-coded,
-#   so --repo-root overrides and Nix store layouts keep working. Exits 1
-#   when the manifest is missing.
+# WHY: paths derive from REPO_ROOT rather than being hard-coded, so
+# --repo-root overrides and Nix store layouts keep working. Exits 1 when the
+# manifest is missing.
 resolve_manifest() {
   MANIFEST="$REPO_ROOT/src/modules/vms/VMs.json"
   VMS_DIR="$REPO_ROOT/src/vms"
@@ -435,7 +405,6 @@ resolve_manifest() {
   fi
 }
 
-# resolve_target_vm VM_ID — look up a VM by id in the manifest, print
 # "type<tab>index" or exit with error.
 # WHY: the index is the manifest position used to address the VM in build
 # commands, not a runtime identifier.
@@ -450,12 +419,7 @@ resolve_target_vm() {
   printf '%s\t%s\n' "$_rtv_type" "$_rtv_index"
 }
 
-# ---------------------------------------------------------------------------
-# Subcommand implementations
-# ---------------------------------------------------------------------------
-
-# vm_prepare_vm_command
-#   Shared preamble for setup and sync: resolve manifest, init runtime, ensure
+# Shared preamble for setup and sync: resolve manifest, init runtime, ensure
 #   VM directories exist, and write the directory README.
 vm_prepare_vm_command() {
   require_command jq
@@ -515,20 +479,18 @@ vm_prepare_vm_command() {
   write_vm_directory_readme
 }
 
-# do_sync
-#   Non-destructive config refresh: descriptors, scripts, UTM plist +
-#   registration, and libvirt define.  Skips image build and disk work.
+# Non-destructive config refresh: descriptors, scripts, UTM plist +
+# registration, and libvirt define.  Skips image build and disk work.
 do_sync() {
   vm_prepare_vm_command
   vm_sync_config_phase
   nuc_done "$@"
 }
 
-# do_setup
-#   Full lifecycle: resolve credentials, init the runtime, build images, run
-#   host-specific provisioners, then optionally GC. WHY: credential failure
-#   degrades to no-drift-detection instead of aborting, so a missing secret
-#   file cannot block provisioning of VMs that need no guest access.
+# Full lifecycle: resolve credentials, init the runtime, build images, run
+# host-specific provisioners, then optionally GC. WHY: credential failure
+# degrades to no-drift-detection instead of aborting, so a missing secret
+# file cannot block provisioning of VMs that need no guest access.
 do_setup() {
   vm_prepare_vm_command
   vm_sync_config_phase
@@ -583,12 +545,11 @@ do_setup() {
   nuc_done "$@"
 }
 
-# do_build_system
-#   Builds/rebuilds a single type's system image (src/<type>/system
-#   image.qcow2) without touching per-VM data disks or config sync.
+# Builds/rebuilds a single type's system image (src/<type>/system
+# image.qcow2) without touching per-VM data disks or config sync.
 #   WHY: the type image is identity-free and shared by every VM of the type;
-#   per-VM identity is injected onto the data disk at provision time, so a
-#   rebuild never needs per-VM state.
+# per-VM identity is injected onto the data disk at provision time, so a
+# rebuild never needs per-VM state.
 do_build_system() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest
@@ -618,13 +579,12 @@ do_build_system() {
   nuc_done "$@"
 }
 
-# do_inject
-#   Re-runs in-place disk injection for one VM: applies the per-VM guest
-#   identity (hostname, username, password, SSH key) into the existing data
-#   disk without recreating it, then refreshes the provision markers.
+# Re-runs in-place disk injection for one VM: applies the per-VM guest
+# identity (hostname, username, password, SSH key) into the existing data
+# disk without recreating it, then refreshes the provision markers.
 #   --force recreates the data disk first (destructive; prints a warning).
 #   WHY: injection is the offline remediation for per-VM credential/config
-#   drift — it runs on a stopped VM and never touches other VMs' disks.
+# drift — it runs on a stopped VM and never touches other VMs' disks.
 do_inject() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest
@@ -654,7 +614,6 @@ do_inject() {
 }
 
 # Annotate a VM name with its running state.
-# Returns "running", "stopped", or "unknown".
 _vm_state() {
   _vs_name="$1"
   _vs_running_set="$2"
@@ -665,10 +624,9 @@ _vm_state() {
   fi
 }
 
-# do_list
-#   Lists enabled VMs scoped to the current host, annotated with live
-#   running/stopped state. WHY: the jq host filter mirrors the manifest's
-#   hosts field, so each machine only sees the VMs it can actually manage.
+# Lists enabled VMs scoped to the current host, annotated with live
+# running/stopped state. WHY: the jq host filter mirrors the manifest's
+# hosts field, so each machine only sees the VMs it can actually manage.
 do_list() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest
@@ -699,11 +657,10 @@ do_list() {
   fi
 }
 
-# do_status
-#   Shows CPUs/RAM and live state for enabled VMs on this host, optionally
-#   filtered to names given after the subcommand. WHY: the suffixed ram string
-#   is parsed to bytes and displayed as whole decimal GB so the table stays
-#   readable.
+# Shows CPUs/RAM and live state for enabled VMs on this host, optionally
+# filtered to names given after the subcommand. WHY: the suffixed ram string
+# is parsed to bytes and displayed as whole decimal GB so the table stays
+# readable.
 do_status() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest
@@ -767,10 +724,9 @@ do_status() {
   fi
 }
 
-# do_start
-#   Starts a single VM, preferring the per-VM start script generated by
-#   setup — it encodes hypervisor-specific launch options — and falling back
-#   to direct hypervisor invocation when setup has not run yet.
+# Starts a single VM, preferring the per-VM start script generated by
+# setup — it encodes hypervisor-specific launch options — and falling back
+# to direct hypervisor invocation when setup has not run yet.
 do_start() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest
@@ -838,10 +794,9 @@ do_start() {
   esac
 }
 
-# do_stop
-#   Stops a single VM, preferring the generated stop script like do_start.
+# Stops a single VM, preferring the generated stop script like do_start.
 #   WHY: on Linux, ACPI shutdown (virsh shutdown) is tried first so the
-#   guest flushes state; virsh destroy is reserved for hung guests.
+# guest flushes state; virsh destroy is reserved for hung guests.
 do_stop() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest
@@ -904,11 +859,10 @@ do_stop() {
   esac
 }
 
-# do_upgrade
-#   Re-downloads and replaces the OS image of an Android VM. WHY: only
+# Re-downloads and replaces the OS image of an Android VM. WHY: only
 #   Android consumes a standalone downloaded GSI image (hence the license
-#   flag); the other types are built locally from the manifest, so an
-#   "upgrade" errors out rather than silently rebuilding.
+# flag); the other types are built locally from the manifest, so an
+# "upgrade" errors out rather than silently rebuilding.
 do_upgrade() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest
@@ -955,10 +909,9 @@ do_upgrade() {
   say "upgrade complete for '$vm_id'"
 }
 
-# do_reset
-#   Factory-resets Android VM user state by recreating the canonical userdata
-#   disk at data/<id>.qcow2.  WHY: restricted to Android because the GSI
-#   image model is the only one where user state can be discarded cleanly.
+# Factory-resets Android VM user state by recreating the canonical userdata
+# disk at data/<id>.qcow2.  WHY: restricted to Android because the GSI
+# image model is the only one where user state can be discarded cleanly.
 do_reset() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest
@@ -1005,8 +958,7 @@ do_reset() {
   say "reset complete for '$vm_id'"
 }
 
-# do_android_config
-#   Post-provision Android guest setup (recovery, GApps, ADB keys, root, fake Wi-Fi).
+# Post-provision Android guest setup (recovery, GApps, ADB keys, root, fake Wi-Fi).
 do_android_config() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest
@@ -1054,11 +1006,10 @@ do_android_config() {
   vm_android_config "$vm_id" "$vm_index" "${config_flags[@]}"
 }
 
-# do_resize
-#   Grows (or with --allow-shrink shrinks) a VM's writable disk to an
-#   explicit byte count.  WHY: the disk's virtual size can only be changed
-#   by resizing the image itself; shrinking can destroy data beyond the new
-#   end, so it requires the explicit --allow-shrink opt-in.
+# Grows (or with --allow-shrink shrinks) a VM's writable disk to an
+# explicit byte count.  WHY: the disk's virtual size can only be changed
+# by resizing the image itself; shrinking can destroy data beyond the new
+# end, so it requires the explicit --allow-shrink opt-in.
 do_resize() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest
@@ -1083,10 +1034,9 @@ do_resize() {
   nuc_done "$@"
 }
 
-# do_gc
-#   Removes stale VM artifacts: non-provisioned VMs, leftover disks, and
-#   generation markers. WHY: GC is opt-in (--gc) rather than automatic
-#   because artifact deletion is destructive and must stay explicit.
+# Removes stale VM artifacts: non-provisioned VMs, leftover disks, and
+# generation markers. WHY: GC is opt-in (--gc) rather than automatic
+# because artifact deletion is destructive and must stay explicit.
 do_gc() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest
@@ -1109,12 +1059,11 @@ do_gc() {
   nuc_done "$@"
 }
 
-# do_pack
-#   Strips trivially regenerable artifacts (UTM bundles, generated
-#   start/stop scripts, src/<type>/Packer/ + stale dot-dirs) so the VM tree
-#   can be copied as-is to another host.
+# Strips trivially regenerable artifacts (UTM bundles, generated
+# start/stop scripts, src/<type>/Packer/ + stale dot-dirs) so the VM tree
+# can be copied as-is to another host.
 #   WHY: pack complements setup — setup regenerates the wrappers, pack
-#   strips them into a compact payload for transfer.  Default is dry-run;
+# strips them into a compact payload for transfer.  Default is dry-run;
 #   --force performs.  Refuses while any VM is running.
 do_pack() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
@@ -1143,15 +1092,14 @@ do_pack() {
   nuc_done "$@"
 }
 
-# do_unpack
-#   Regenerates per-platform VM artifacts (start/stop scripts + pack/unpack
-#   wrappers, UTM bundles, libvirt domains) from the <id>.vm.json descriptors
-#   in the VM directory, after copying a packed tree to the target host.
+# Regenerates per-platform VM artifacts (start/stop scripts + pack/unpack
+# wrappers, UTM bundles, libvirt domains) from the <id>.vm.json descriptors
+# in the VM directory, after copying a packed tree to the target host.
 #   WHY: unpack complements pack — pack strips regenerable wrappers, unpack
-#   rebuilds them from the descriptors on the destination.  Requires the
-#   target's nucleus config applied (provides the Nix-rendered plist/domain
-#   templates); data files are consumed as-is.  Default is perform; --dry-run
-#   previews.
+# rebuilds them from the descriptors on the destination.  Requires the
+# target's nucleus config applied (provides the Nix-rendered plist/domain
+# templates); data files are consumed as-is.  Default is perform; --dry-run
+# previews.
 do_unpack() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest
@@ -1174,9 +1122,7 @@ do_unpack() {
   nuc_done "$@"
 }
 
-# ---------------------------------------------------------------------------
 # Dispatch
-# ---------------------------------------------------------------------------
 
 case "$action" in
 setup | sync | build-system | list | status | start | stop | upgrade | reset | inject | gc | resize | pack | unpack) "do_$action" ;;

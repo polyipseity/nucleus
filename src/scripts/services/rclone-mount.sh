@@ -1,39 +1,31 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Cloud-mount core runner (POSIX).
-# Bounded retry with backoff, classification, health records.
-# Dispatches to mount-backend-darwin.sh or mount-backend-linux.sh.
-# No OS/FUSE/supervisor names — all host details in adapters.
+# Cloud-mount core runner (POSIX). Bounded retry with backoff, failure
+# classification and health records, with host details left to the adapters in
+# mount-backend-*.sh. Consumed by the macOS LaunchAgent and the NixOS systemd
+# unit.
 #
-# Consumed by:
-#   macOS LaunchAgent (via writeNucleusShellApplication)
-#   NixOS systemd unit (same derivation, different backend)
+# Environment, injected by Nix extraEnv or the shell wrapper:
+#   NUCLEUS_RCLONE_REMOTE       rclone remote
+#   NUCLEUS_RCLONE_MOUNT_POINT  local mount path
+#   NUCLEUS_RCLONE_ARGS         newline-separated rclone flags
+#   NUCLEUS_CLOUD_MOUNT_INSTANCE instance key (e.g. "iCloud")
 #
-# Environment (injected by Nix extraEnv or shell wrapper):
-#   NUCLEUS_RCLONE_REMOTE       — rclone remote
-#   NUCLEUS_RCLONE_MOUNT_POINT  — local mount path
-#   NUCLEUS_RCLONE_ARGS         — newline-separated rclone flags
-#   NUCLEUS_CLOUD_MOUNT_INSTANCE — instance key (e.g. "iCloud")
+# Lifecycle policy, injected by Nix from services.json cloud-drive.lifecycle:
+#   NUCLEUS_MOUNT_ATTEMPTS      max retry attempts
+#   NUCLEUS_MOUNT_BACKOFF       comma-separated backoff seconds
+#   NUCLEUS_MOUNT_ATTACH_SECONDS attach budget
 #
-# Lifecycle policy (injected by Nix from services.json cloud-drive.lifecycle):
-#   NUCLEUS_MOUNT_ATTEMPTS      — max retry attempts
-#   NUCLEUS_MOUNT_BACKOFF       — comma-separated backoff seconds
-#   NUCLEUS_MOUNT_ATTACH_SECONDS — attach budget
-#
-# WHY: this runner deliberately sets no shell strict mode.  It is launched through the
-#   generated nucleus app wrapper (writeNucleusShellApplication in src/flake.nix), which
-#   does set `set -euo pipefail` — but shell options do NOT survive `exec`, so that
-#   setting hardens the wrapper, not this script.  (The wrapper's inline-`text` branch is
-#   hardened; the thin-wrapper branch is not.)  Failure handling here is explicit instead:
-#   `cmd || rc=$?` where the status is inspected, `|| true` for best-effort cleanup, and
-#   explicit `exit` codes.  Adding `set -e` would CHANGE control flow in the retry loop,
-#   because several calls must be allowed to fail: the svc_health_* writes (deliberately
-#   non-fatal; see the F1/F5 fixes) and backend_mount, whose failure must still reach the
-#   attach wait, the failure classification, the blocked record and the retry.  Aborting
-#   instead of classifying exits the unit, which invites the supervisor to revive it —
-#   the restart storm this design exists to prevent.  The Windows runner hardens itself
-#   with $ErrorActionPreference = 'Stop'; that asymmetry is deliberate and documented, not
-#   an oversight.
+# WHY: no shell strict mode. The generated app wrapper sets `set -euo pipefail`
+#   but shell options do not survive `exec`, so that hardens the wrapper, not
+#   this script. Failure handling here is explicit instead. Adding `set -e`
+#   would change control flow in the retry loop, where several calls must be
+#   allowed to fail: the svc_health_* writes, and backend_mount, whose failure
+#   must still reach the attach wait, the classification, the blocked record and
+#   the retry. Aborting instead of classifying exits the unit and invites the
+#   supervisor to revive it, the restart storm this design exists to prevent.
+#   The Windows runner hardens itself with $ErrorActionPreference = 'Stop'; that
+#   asymmetry is deliberate.
 
 [ -n "${_NUCLEUS_RCLONE_MOUNT_SOURCED-}" ] && return
 _NUCLEUS_RCLONE_MOUNT_SOURCED=1
@@ -44,7 +36,6 @@ _CM_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=../lib/service-health.sh
 [ -n "${_NUCLEUS_SERVICE_HEALTH_SOURCED-}" ] || . "$_CM_DIR/../lib/service-health.sh"
 
-# Dispatch to the correct mount backend based on OS.
 _cm_dispatch_backend() {
   case "$(uname -s)" in
   Darwin)
@@ -58,19 +49,14 @@ _cm_dispatch_backend() {
   esac
 }
 
-# _cm_parse_backoff — parse the backoff schedule into an array.
 _cm_parse_backoff() {
   local backoff_csv="${NUCLEUS_MOUNT_BACKOFF:?}"
   IFS=',' read -ra _cm_backoff <<<"$backoff_csv"
 }
 
-# _cm_get_backoff — get the backoff seconds for a given attempt (1-indexed).
-#
-# WHY: the declared schedule is CLAMPED, never extrapolated (services.schema.json,
-#   mountRetryBackoffSeconds).  An attempt past the end of the list reuses the last declared value, so
-#   every delay this runner sleeps is a value services.json actually declares and no runner
-#   invents one of its own.  The Windows runner clamps identically (rclone-mount.ps1), and
-#   the two hosts must not diverge on this rule.
+# WHY: the declared schedule is clamped, never extrapolated (services.schema.json,
+#   mountRetryBackoffSeconds), so every delay this runner sleeps is a value
+#   services.json declares. The Windows runner clamps identically.
 _cm_get_backoff() {
   local attempt="$1"
   local _cm_idx=$((attempt - 1))
@@ -81,7 +67,6 @@ _cm_get_backoff() {
   printf '%s' "${_cm_backoff[$_cm_idx]}"
 }
 
-# main — the core mount loop.
 _cm_main() {
   local instance="${NUCLEUS_CLOUD_MOUNT_INSTANCE:?}"
   local remote="${NUCLEUS_RCLONE_REMOTE:?}"
@@ -93,16 +78,11 @@ _cm_main() {
   local attempts="${NUCLEUS_MOUNT_ATTEMPTS:?}"
   local attach_seconds="${NUCLEUS_MOUNT_ATTACH_SECONDS:?}"
 
-  # Dispatch to the correct backend.
   _cm_dispatch_backend
-
-  # Parse backoff schedule.
   _cm_parse_backoff
-
-  # Initialize health record.
   svc_health_init "$instance"
 
-  # Backend prepare (idempotent; may write blocked record + return 20).
+  # Backend prepare is idempotent and may write a blocked record, returning 20.
   local prepare_rc=0
   backend_prepare "$instance" || prepare_rc=$?
   if [ "$prepare_rc" -eq 20 ]; then
@@ -110,14 +90,11 @@ _cm_main() {
     exit 0
   fi
 
-  # Bounded retry loop.
   local attempt=1
-  # Set when the last attach wait ended on a mount table that could not be read.
-  # Read by the per-attempt class below and by the exhaustion record, both of
-  # which need to say "the read failed" rather than "the mount failed".
+  # Set when the last attach wait ended on a mount table that could not be read,
+  # so the record can say the read failed rather than the mount failed.
   local probe_unknown=false
   while [ "$attempt" -le "$attempts" ]; do
-    # If a blocked record exists, do not attempt.
     if svc_health_is_blocked "$instance"; then
       notice -l cloud-drives "$instance: blocked (class=$(svc_health_get "$instance" "class")); not attempting"
       exit 0
@@ -125,23 +102,19 @@ _cm_main() {
 
     notice -l cloud-drives "$instance: mount attempt $attempt/$attempts"
 
-    # Set up stderr capture for classification.
     local capture_file
     capture_file="$(mktemp)"
     _backend_capture="$capture_file"
 
-    # Run rclone mount via backend.
     local mount_args_file
     mount_args_file="$(mktemp)"
     backend_args "$remote" "$mount_point" "$read_only" "$rclone_args" >"$mount_args_file"
-    # WHY: backend_args emits ONE TOKEN PER LINE.  Passing "$(<file)" collapses that to a
-    #   SINGLE argument, because double quotes suppress field splitting — rclone then
-    #   receives one blob where it expects remote, mount point and flags as separate argv
-    #   entries, and rejects it with its usage message.  Read the file line-by-line into an
-    #   array instead: "${mount_args[@]}" passes each token as a discrete argument while
-    #   preserving any token that itself contains a space, which matters because a mount
-    #   point can live under a path containing spaces.  Empty lines are skipped rather than
-    #   emitted as empty arguments.  (No mapfile: the interpreter is bash 3.2 on macOS.)
+    # WHY: backend_args emits one token per line. Passing "$(<file)" collapses that
+    #   into a single argument, so rclone receives one blob where it expects the
+    #   remote, mount point and flags as separate argv entries. Reading the file
+    #   line by line preserves a token that itself contains a space, which matters
+    #   because a mount point can live under a path with spaces. (No mapfile: the
+    #   interpreter is bash 3.2 on macOS.)
     local -a mount_args=()
     local _cm_arg_line
     while IFS= read -r _cm_arg_line; do
@@ -155,19 +128,15 @@ _cm_main() {
     local attach_start=$SECONDS
     local live=false
     local probe_state=""
-    # How the wait below ended, as opposed to what its last probe answered. The
-    # two disagree whenever the loop breaks out on a dead child after a readable
-    # absent answer, so the classification keys on this rather than inferring an
-    # ending from probe_state.
+    # How the wait ended, as opposed to what its last probe answered. The two
+    # disagree when the loop breaks on a dead child after a readable absent answer.
     local exit_reason=""
     while [ $((SECONDS - attach_start)) -lt "$attach_seconds" ]; do
-      # WHY: backend_probe_state, which keeps the third value. A two-valued answer
-      #   is 0 both for a live mount and for a table that could not be read, and
-      #   this loop acts on that 0 by recording the service running and deleting
-      #   the capture file, so only the three-valued answer is safe here: an
-      #   unknown state falls through to the same poll the absent state takes,
-      #   spending no attempt and issuing no restart of its own, and the budget
-      #   below is what ends the run.
+      # WHY: backend_probe_state keeps the third value. A two-valued answer is 0
+      #   both for a live mount and for a table that could not be read, and this
+      #   loop acts on that 0 by recording the service running and deleting the
+      #   capture file. An unknown state takes the same poll as absent, spends no
+      #   attempt, and the budget below ends the run.
       probe_state="$(backend_probe_state "$mount_point")"
       if [ "$probe_state" = present ]; then
         live=true
@@ -175,12 +144,11 @@ _cm_main() {
         break
       fi
       # WHY: a mount that dies during startup would otherwise be polled for the
-      #   whole budget -- 45s x 3 attempts in production -- before anything
-      #   classified it, even though the capture file already held the reason.
-      #   An unreaped child is a zombie and kill -0 succeeds on a zombie, but
-      #   the probe and sleep below are themselves foreground children, so bash
-      #   reaps between polls and the worst case is one extra poll, not the
-      #   full budget.
+      #   whole budget before anything classified it, even though the capture file
+      #   already held the reason. An unreaped child is a zombie and kill -0
+      #   succeeds on a zombie, but the probe and sleep are themselves foreground
+      #   children, so bash reaps between polls and the worst case is one extra
+      #   poll, not the full budget.
       if ! kill -0 "${_backend_rclone_pid:-}" 2>/dev/null; then
         exit_reason="child-exited"
         break
@@ -191,9 +159,8 @@ _cm_main() {
     [ -n "$exit_reason" ] || exit_reason="budget"
 
     if [ "$live" = true ]; then
-      # Mount succeeded — record and watch.
-      # No generation bump here: the run token belongs to the supervisor, and the
-      # watchdog records a restart from a change in it.  Advancing it on a
+      # No generation bump here: the run token belongs to the supervisor and the
+      # watchdog records a restart from a change in it, so advancing it on a
       # successful start would register a phantom restart on every mount.
       svc_health_set_running "$instance"
       svc_health_record_success "$instance"
@@ -203,11 +170,9 @@ _cm_main() {
       svc_health_set "$instance" evidence null
       rm -f "$capture_file" "$mount_args_file"
 
-      # Watch for the mount to stay alive or exit.
       local watch_status=0
       wait "$_backend_rclone_pid" || watch_status=$?
 
-      # Mount exited — record and exit.
       svc_health_set_last_exit "$instance" "$watch_status"
       # check-suppress:suppression_doc: best-effort unmount after mount failure
       backend_unmount "$mount_point" 2>/dev/null || true
@@ -220,27 +185,15 @@ _cm_main() {
     class="$(backend_class "$capture_file")"
     # WHY: an unreadable table says nothing about the mount. backend_class reads
     #   rclone's output and answers mount-failed when it finds no cause there,
-    #   which would blame the mount for a read nobody could make and send the
-    #   operator to check the remote. io-transient is the class whose remedy is
-    #   to try again, so the unreadable probe answer overrides the classifier.
-    #   probe_state on its own cannot tell a budget expiry from a child that
-    #   died first, so the case is keyed on the ending — but both reachable
-    #   endings take the same arm, and that arm still tests probe_state, so the
-    #   ending selects the arm, not the class that gets recorded. What keying on
-    #   the ending buys is the `*)` arm: an ending the code cannot place takes
-    #   the same branch as an unreadable table, instead of keeping whatever
-    #   backend_class answered for it.
+    #   blaming the mount for a read nobody could make and sending the operator to
+    #   check the remote. io-transient is the class whose remedy is to try again.
     #
-    # WHY: no `attached` arm, because the wait can only end attached when live
-    #   is true, and the success path above exits at its own line before reaching
-    #   this case. exit_reason holds only those three strings and `attached` is
-    #   the one that cannot arrive here, so the first arm already matches every
-    #   ending that can arrive at this point, and the second arm, `*)`, matches
-    #   none: an exit_reason landing there is one of our own strings renamed or
-    #   mistyped. io-transient is the safe reading of a state this code cannot
-    #   place: the class whose remedy is to try again, which costs a retry, over
-    #   the terminal classes, which stop the run and point the operator at the
-    #   remote on the strength of a read that never completed.
+    # WHY: there is no `attached` arm, because the wait can only end attached when
+    #   live is true, and the success path exits before reaching this case. The
+    #   `*)` arm therefore covers an ending this code cannot place, and reads it
+    #   as io-transient: the class that costs a retry, over the terminal classes
+    #   that stop the run and point the operator at the remote on the strength of
+    #   a read that never completed.
     case "$exit_reason" in
     child-exited | budget)
       if [ "${probe_state#unknown:}" != "$probe_state" ]; then
@@ -272,48 +225,30 @@ _cm_main() {
     #   the health record is the whole diagnosis there. On the unreadable-table
     #   path the class is one this runner chose rather than one rclone's output
     #   supports, so the file is the only remaining record of what the mount was
-    #   doing while the read kept failing. Kept and named rather than dropped
-    #   silently; at most one file per attempt survives a run.
-    #
-    # WHY: the record carries the path because the log line does not suffice.
-    #   Log lines rotate, so a file nothing else points at is a file a later run
-    #   cannot find.
-    #
-    # WHY: one field and not a list. It names the most recent file kept, so a run
-    #   that keeps a file on each of several attempts leaves the earlier ones
-    #   unreachable again. That limit is written down here so the next reader
-    #   meets it in the code rather than rediscovering it.
+    #   doing. It is named rather than dropped silently, since log lines rotate.
+    #   The record carries one path, not a list, so a run that keeps a file on
+    #   several attempts leaves the earlier ones unreachable.
     if [ "$probe_unknown" = true ]; then
       # WHY: svc_health_set interpolates the value into a jq program, so a bare
-      #   path is a jq syntax error. The call returns non-zero and the runner,
-      #   which sets no strict mode, discards the write silently.
+      #   path is a jq syntax error the runner would discard silently.
       svc_health_set "$instance" evidence "\"$capture_file\""
       notice -l cloud-drives "$instance: rclone output kept at $capture_file"
     else
-      # WHY: no clear of the evidence field accompanies this removal. This branch
-      #   removes THIS attempt's file, and the field can only ever name an
-      #   earlier attempt's kept file, so it never names the one going away. A
-      #   run that kept a file on an unreadable table and then reached this
-      #   branch on a later attempt would strand that earlier file on disk with
-      #   nothing pointing at it, which is the condition the field exists to
-      #   remove.
-      #
-      # WHY: not a contradiction with the success path above, which clears the
-      #   pointer and strands an earlier kept file. A blocked record still has a
-      #   failure to name and keeps the pointer, and svc_health_clear leaves it
-      #   as well, so a run that ends blocked strands a kept file only through
-      #   the second-keep overwrite written down above.
+      # WHY: no clear of the evidence field accompanies this removal. The field
+      #   can only name an earlier attempt's kept file, so it never names the one
+      #   going away. A run that kept a file on an unreadable table and reached
+      #   this branch later strands that earlier file, which is the condition
+      #   the field exists to remove. The success path strands one too, and a
+      #   blocked record still has a failure to name.
       rm -f "$capture_file"
     fi
     rm -f "$mount_args_file"
 
-    # Check if transient — terminal classes stop immediately.
     if ! backend_is_transient "$class"; then
       svc_health_set_blocked "$instance" "$class" "$remedy"
       exit 0
     fi
 
-    # Transient — backoff and retry.
     if [ "$attempt" -lt "$attempts" ]; then
       local backoff
       backoff=$(_cm_get_backoff "$attempt")
@@ -324,29 +259,15 @@ _cm_main() {
     attempt=$((attempt + 1))
   done
 
-  # Exhausted all attempts — write blocked record.
   # WHY: the last attempt's own diagnosis must not be overwritten. $class holds
-  #   the last attempt's classification because the loop reassigns it on every
-  #   pass it makes, and no other health record carries that classification out
-  #   of the loop: a transient attempt writes no health record at all, and the
-  #   capture file kept on the unreadable-table path holds rclone's raw output
-  #   rather than a class, so substituting a hardcoded mount-failed here would
-  #   discard the one classification the run produced — sending the operator to
-  #   the remote when what stopped the run was the budget. Reading $class here
-  #   is not a scope error: it is declared `local` inside the attempt loop above,
-  #   and bash scopes `local` to the enclosing function rather than the block, so
-  #   the name still resolves after the loop closes.
-  #
-  # WHY: a NUCLEUS_MOUNT_ATTEMPTS that is not a number leaves `class` unset —
-  #   `[ 1 -le abc ]` fails, the loop body never runs, and nothing assigns it —
-  #   so final_class below is empty and probe_unknown is still false. That is
-  #   the outcome the paragraph above argues against, not a benign one:
-  #   backend_remedy answers an empty class from its `*)` arm, "check remote
-  #   configuration and credentials", and the record is written with that empty
-  #   class and that remedy, pointing the operator at the remote on the strength
-  #   of a read that never happened. It is not reachable from a valid config:
-  #   services.schema.json pins mountAttempts to a minimum of 1 and the
-  #   schema-validation check step validates the file, so nothing here guards it.
+  #   it because the loop reassigns it on every pass, no other health record
+  #   carries that classification out of the loop, and the capture file kept on
+  #   the unreadable-table path holds rclone's raw output rather than a class. A
+  #   substituted mount-failed would discard the one classification the run
+  #   produced. Reading $class here is not a scope error: `local` binds to the
+  #   enclosing function, not the block, so the name still resolves after the
+  #   loop closes. A NUCLEUS_MOUNT_ATTEMPTS that is not a number leaves the loop
+  #   body unrun and $class empty, which services.schema.json rules out.
   local final_class="$class"
   if [ "$probe_unknown" = true ]; then
     final_class="io-transient"
@@ -358,7 +279,6 @@ _cm_main() {
   exit 0
 }
 
-# Run if executed directly (not sourced).
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   _cm_main "$@"
 fi

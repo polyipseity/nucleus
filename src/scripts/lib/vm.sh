@@ -2,8 +2,8 @@
 # Source this file from the vm-setup dispatcher, then call vm_init with
 # all config values as positional parameters to make data flow explicit.
 # Example:
-#   . "$SCRIPT_DIR/vm.sh"
-#   vm_init "$REPO_ROOT" "$VM_DIR" ...
+# . "$SCRIPT_DIR/vm.sh"
+# vm_init "$REPO_ROOT" "$VM_DIR" ...
 #
 # HARD PROHIBITION: ALL variables used by this library MUST be initialized
 # via vm_init(). Do NOT rely on variables set by the sourcing script — that
@@ -13,9 +13,8 @@
 # it to vm_init() and pass it from the caller. Suppressing SC2153 is
 # FORBIDDEN — it hides the violation.
 
-# copy_with_reflink SRC DST
-#   Copy SRC to DST using a CoW reflink when supported (APFS, btrfs, xfs);
-#   otherwise fall back to plain cp. Uses cp -L to follow symlink sources.
+# Copy SRC to DST using a CoW reflink when supported (APFS, btrfs, xfs);
+# otherwise fall back to plain cp. Uses cp -L to follow symlink sources.
 copy_with_reflink() {
   _cwr_src="$1"
   _cwr_dst="$2"
@@ -25,9 +24,8 @@ copy_with_reflink() {
   cp -L "$_cwr_src" "$_cwr_dst"
 }
 
-# vm_init — Initialize all shared config variables from explicit
-# positional parameters. Called after sourcing so shellcheck can trace every
-# variable assignment through the function call.
+# Initializes every shared config variable from explicit positional parameters.
+# Called after sourcing so shellcheck can trace each assignment through the call.
 vm_init() {
   REPO_ROOT="$1"
   VM_DIR="$2"
@@ -93,10 +91,9 @@ vm_ensure_type_src_dirs() {
   done < <(jq -r '.VMs[].type' "$MANIFEST" | sort -u)
 }
 
-# write_vm_directory_readme
-#   Writes a cross-host usage guide into the managed VM directory so operators
-#   can transfer VM artifacts between hosts and run guest-specific converge
-#   commands without relying on generated helper scripts.
+# Writes a cross-host usage guide into the managed VM directory so operators
+# can transfer VM artifacts between hosts and run guest-specific converge
+# commands without relying on generated helper scripts.
 write_vm_directory_readme() {
   _wvdr_readme="$VM_DIR/README.md"
   if [ "$dry_run" = true ]; then
@@ -119,9 +116,8 @@ write_vm_directory_readme() {
   fi
 }
 
-# ensure_tart_vm_dir
-#   Co-locates Tart's VM store inside the managed ~/virtual machines directory
-#   by symlinking ~/.tart → ~/virtual machines/tart so Tart artifacts (VMs and
+# Co-locates Tart's VM store inside the managed ~/virtual machines directory
+# by symlinking ~/.tart → ~/virtual machines/tart so Tart artifacts (VMs and
 #   OCI cache) stay alongside UTM bundles in one tree for unified backup.
 #   Only runs on Darwin; Tart uses Apple's Virtualization.framework.
 ensure_tart_vm_dir() {
@@ -148,7 +144,6 @@ ensure_tart_vm_dir() {
   say "linked tart storage: $_etd_default -> $_etd_target"
 }
 
-# should_include_host HOSTS_JSON — returns 0 if the VM should run on the
 # current host.  HOSTS_JSON is the raw JSON value of the VM's "hosts" field
 # (a string array of host names).  A VM whose hosts list omits the current
 # host is excluded.
@@ -158,8 +153,6 @@ should_include_host() {
   printf '%s' "$_sjh_json" | jq -e --arg host "$NUCLEUS_HOST" 'contains([$host])' >/dev/null 2>&1
 }
 
-# Helpers
-
 run_cmd() {
   if [ "$dry_run" = true ]; then
     dry_run "$*"
@@ -168,11 +161,10 @@ run_cmd() {
   fi
 }
 
-# validate_qcow2_image PATH LABEL MIN_VIRTUAL_SIZE
-#   Verifies that a QCOW2 image exists, is non-empty, and (when qemu-img is
-#   available) reports format=qcow2 with a sensible virtual size.  The
-#   minimum virtual size must be passed explicitly from the manifest
-#   minImageSize so every call site applies the VM's declared floor.
+# Verifies that a QCOW2 image exists, is non-empty, and (when qemu-img is
+# available) reports format=qcow2 with a sensible virtual size.  The
+# minimum virtual size must be passed explicitly from the manifest
+# minImageSize so every call site applies the VM's declared floor.
 validate_qcow2_image() {
   _vqi_path="$1"
   _vqi_label="$2"
@@ -213,11 +205,10 @@ validate_qcow2_image() {
   return 0
 }
 
-# vm_resolve_guest_ssh_public_key USERNAME REPO_ROOT
-#   Prints the first readable SSH public key under ~/.ssh per
-#   src/modules/vms/vm-guest-ssh-public-key-paths.json. Static id_*.pub paths are
-#   tried before username templates (ssh_personal_{username}.pub, etc.).
-#   Returns 1 when no key exists.
+# Reads the first SSH public key under ~/.ssh listed by
+# src/modules/vms/vm-guest-ssh-public-key-paths.json. Static id_*.pub paths come
+# before username templates (ssh_personal_{username}.pub and friends).
+# Returns 1 when no key exists.
 vm_resolve_guest_ssh_public_key() {
   _vrgspk_username="$1"
   _vrgspk_repo_root="$2"
@@ -259,18 +250,16 @@ vm_resolve_guest_ssh_public_key() {
   return 1
 }
 
-# vm_type_config_marker_path TYPE
-#   Returns the sidecar marker path storing the type-config fingerprint for
-#   the type system image (src/<type>/system image.vm-type-config-sha256).
+# Returns the sidecar marker path storing the type-config fingerprint for
+# the type system image (src/<type>/system image.vm-type-config-sha256).
 #   WHY: the type system image is identity-free and shared by every VM of the
-#   type; the marker lives next to it (src/<type>/), not under a per-VM name.
+# type; the marker lives next to it (src/<type>/), not under a per-VM name.
 vm_type_config_marker_path() {
   local _vtcmp_type="$1"
   vm_src_path "$_vtcmp_type" "${VM_TYPE_MARKER_BASE}.vm-type-config-sha256"
 }
 
-# vm_type_config_marker_matches EXPECTED_FINGERPRINT MARKER_PATH
-#   Returns 0 when MARKER_PATH exists and equals EXPECTED.
+# Returns 0 when MARKER_PATH exists and equals EXPECTED.
 vm_type_config_marker_matches() {
   local _vtcmm_expected="$1" _vtcmm_marker="$2" _vtcmm_actual
   if [ ! -f "$_vtcmm_marker" ]; then
@@ -280,16 +269,14 @@ vm_type_config_marker_matches() {
   [ "$_vtcmm_actual" = "$_vtcmm_expected" ]
 }
 
-# vm_provision_marker_path DISK_PATH
-#   Returns the sidecar marker path storing the per-VM provision fingerprint
-#   for the writable data disk DISK_PATH (data/<id>.qcow2.vm-provision-sha256).
+# Returns the sidecar marker path storing the per-VM provision fingerprint
+# for the writable data disk DISK_PATH (data/<id>.qcow2.vm-provision-sha256).
 vm_provision_marker_path() {
   local _vpmp_disk="$1"
   printf '%s.vm-provision-sha256\n' "$_vpmp_disk"
 }
 
-# vm_provision_marker_matches EXPECTED_FINGERPRINT MARKER_PATH
-#   Returns 0 when MARKER_PATH exists and equals EXPECTED.
+# Returns 0 when MARKER_PATH exists and equals EXPECTED.
 vm_provision_marker_matches() {
   local _vpmm_expected="$1" _vpmm_marker="$2" _vpmm_actual
   if [ ! -f "$_vpmm_marker" ]; then
@@ -299,11 +286,10 @@ vm_provision_marker_matches() {
   [ "$_vpmm_actual" = "$_vpmm_expected" ]
 }
 
-# vm_sha256_input
-#   Prints the SHA-256 fingerprint of stdin using the first available tool:
-#   sha256sum -> shasum -a 256 -> openssl dgst -sha256.  WHY: macOS ships
-#   shasum/openssl but not sha256sum, and each tool's output format differs
-#   (hence the awk column).  Returns 1 when no SHA-256 tool is available.
+# Prints the SHA-256 fingerprint of stdin using the first available tool:
+# sha256sum -> shasum -a 256 -> openssl dgst -sha256.  WHY: macOS ships
+# shasum/openssl but not sha256sum, and each tool's output format differs
+# (hence the awk column).  Returns 1 when no SHA-256 tool is available.
 vm_sha256_input() {
   if command -v sha256sum >/dev/null 2>&1; then
     sha256sum | awk '{print $1}'
@@ -324,14 +310,13 @@ vm_sha256_input() {
   return 1
 }
 
-# vm_type_config_fingerprint TYPE
-#   Prints a SHA-256 fingerprint of the type's build config inputs: the
-#   type-scoped config files under src/vms/<type>/ (contents, not just paths)
-#   plus src/flake.lock.  NixOS hashes base-guest.nix and every resolved src/
-#   import, the formats/ and disk-image/ trees; Windows hashes Autounattend.xml,
-#   patches/ and packer.pkr.hcl; macOS hashes packer.pkr.hcl.  WHY: flake.lock
-#   pins the nixos-generators/Packer revisions.  Returns 1 when no SHA-256
-#   tool is available or a resolved import is missing.
+# Prints a SHA-256 fingerprint of the type's build config inputs: the
+# type-scoped config files under src/vms/<type>/ (contents, not just paths)
+# plus src/flake.lock.  NixOS hashes base-guest.nix and every resolved src/
+# import, the formats/ and disk-image/ trees; Windows hashes Autounattend.xml,
+# patches/ and packer.pkr.hcl; macOS hashes packer.pkr.hcl.  WHY: flake.lock
+# pins the nixos-generators/Packer revisions.  Returns 1 when no SHA-256
+# tool is available or a resolved import is missing.
 vm_type_config_fingerprint() {
   local _vtcf_type="$1" _vtcf_import _vtcf_imports _vtcf_missing
   case "$_vtcf_type" in
@@ -385,15 +370,14 @@ vm_type_config_fingerprint() {
   } | vm_sha256_input
 }
 
-# vm_type_image_fingerprint TYPE
-#   Prints the fingerprint gating the type system image rebuild: the
-#   type-config fingerprint, plus the guest credential fingerprint for
+# Prints the fingerprint gating the type system image rebuild: the
+# type-config fingerprint, plus the guest credential fingerprint for
 #   Windows and macOS.  WHY: POSIX NixOS builds (nixos-generators) are
-#   identity-free, so config alone gates the type image; Windows/macOS builds
-#   bake guest identity (Autounattend.xml tokens, Tart packer vars) into the
-#   base image, and macOS has no per-VM injection path at all, so the type
-#   marker must track credentials for those types (documented exception to the
-#   identity-free type image invariant).
+# identity-free, so config alone gates the type image; Windows/macOS builds
+# bake guest identity (Autounattend.xml tokens, Tart packer vars) into the
+# base image, and macOS has no per-VM injection path at all, so the type
+# marker must track credentials for those types (documented exception to the
+# identity-free type image invariant).
 vm_type_image_fingerprint() {
   local _vtif_type="$1" _vtif_config
   _vtif_config="$(vm_type_config_fingerprint "$_vtif_type")" || return 1
@@ -404,13 +388,12 @@ vm_type_image_fingerprint() {
   fi
 }
 
-# vm_provision_fingerprint NAME
-#   Prints the per-VM provision fingerprint for the data disk of manifest VM
+# Prints the per-VM provision fingerprint for the data disk of manifest VM
 #   NAME: the contents of every file under src/vms/guests/<name>/ (the per-VM
-#   guest identity), the provision-relevant manifest fields (hostname,
-#   shareDevDir, portForwards), and the guest credential fingerprint.  WHY:
-#   this is the drift key for in-place re-injection — any change to per-VM
-#   identity, wiring, or credentials invalidates it.
+# guest identity), the provision-relevant manifest fields (hostname,
+# shareDevDir, portForwards), and the guest credential fingerprint.  WHY:
+# this is the drift key for in-place re-injection — any change to per-VM
+# identity, wiring, or credentials invalidates it.
 vm_provision_fingerprint() {
   local _vpf_name="$1" _vpf_guest_dir="$VMS_DIR/guests/$1"
   {
@@ -422,37 +405,32 @@ vm_provision_fingerprint() {
   } | vm_sha256_input
 }
 
-# vm_parse_utm_registered_names_from_list
-#   Parse utmctl list table output on stdin; emit registered VM names (one per
-#   line). WHY: registration lists every catalog entry regardless of Status.
+# Parse utmctl list table output on stdin; emit registered VM names (one per
+# line). WHY: registration lists every catalog entry regardless of Status.
 vm_parse_utm_registered_names_from_list() {
   awk 'NR > 1 { print $3 }'
 }
 
-# vm_parse_utm_running_names_from_list
-#   Parse utmctl list table output on stdin; emit names whose Status is not
-#   stopped (starting, started, pausing, paused, resuming, stopping).
+# Parse utmctl list table output on stdin; emit names whose Status is not
+# stopped (starting, started, pausing, paused, resuming, stopping).
 vm_parse_utm_running_names_from_list() {
   awk 'NR > 1 { sub(/ +$/, "", $2); if ($2 != "stopped") print $3 }'
 }
 
-# vm_parse_tart_registered_names_from_list
-#   Parse tart list table output on stdin; emit catalog names (one per line).
+# Parse tart list table output on stdin; emit catalog names (one per line).
 #   WHY: the name column is existence in Tart's store, not running state.
 vm_parse_tart_registered_names_from_list() {
   awk 'NR > 1 { print $2 }'
 }
 
-# vm_parse_tart_running_names_from_json
-#   Parse tart list --format json on stdin; emit names with Running == true.
+# Parse tart list --format json on stdin; emit names with Running == true.
 #   WHY: table layout changes across Tart releases; JSON .Running is stable.
 vm_parse_tart_running_names_from_json() {
   require_command jq
   jq -r '.[] | select(.Running == true) | .Name'
 }
 
-# vm_get_utm_registered_names
-#   Registered UTM VM names from the live hypervisor (not running state).
+# Registered UTM VM names from the live hypervisor (not running state).
 vm_get_utm_registered_names() {
   if [ ! -x "${UTMCTL:-/Applications/UTM.app/Contents/MacOS/utmctl}" ]; then
     return 0
@@ -460,17 +438,15 @@ vm_get_utm_registered_names() {
   "$UTMCTL" list 2>/dev/null | vm_parse_utm_registered_names_from_list
 }
 
-# vm_get_tart_registered_names
-#   Registered Tart VM/image names from the live hypervisor (not running state).
+# Registered Tart VM/image names from the live hypervisor (not running state).
 vm_get_tart_registered_names() {
   command -v tart >/dev/null 2>&1 || return 0
   tart list 2>/dev/null | vm_parse_tart_registered_names_from_list
 }
 
-# vm_get_running_ids
-#   Query hypervisors for currently running VM ids. Outputs one id per line;
-#   empty output means nothing is running. WHY: state is read from the live
-#   hypervisor rather than the manifest, so list/status reflect reality (e.g.
+# Query hypervisors for currently running VM ids. Outputs one id per line;
+# empty output means nothing is running. WHY: state is read from the live
+# hypervisor rather than the manifest, so list/status reflect reality (e.g.
 #   VMs started outside nucleus).
 vm_get_running_ids() {
   case "$(uname -s)" in
@@ -497,8 +473,7 @@ vm_get_running_ids() {
   esac
 }
 
-# wait_for_utm_registration NAME
-#   Polls utmctl list until VM NAME appears or timeout is reached.
+# Polls utmctl list until VM NAME appears or timeout is reached.
 wait_for_utm_registration() {
   _wfur_name="$1"
   _wfur_attempt=1
@@ -515,11 +490,6 @@ wait_for_utm_registration() {
   return 1
 }
 
-# run_with_backoff LABEL COMMAND [ARG...]
-# Args:
-#   $1 — human-readable operation label
-#   $2.. — command and arguments to execute
-# Retries failed network operations with exponential backoff when
 # --windows-iso-retries is greater than 0.
 run_with_backoff() {
   _rwb_label="$1"
@@ -556,7 +526,6 @@ run_with_backoff() {
 }
 
 # Wait for a guest to become reachable via QEMU GA or SSH.
-# Returns 0 if guest is ready, 1 on timeout.
 vm_wait_for_guest() {
   _wg_name="$1"
   _wg_type="$2"
@@ -624,13 +593,9 @@ vm_wait_for_guest() {
   return 1
 }
 
-# vm_write_start_script DOC HOST_KIND
-# Args:
-#   $1 — JSON document for the VM: the self-describing descriptor when present
-#        (vm_vm_json VM_ID), otherwise the manifest entry.  Fields read:
-#        id/name/type/cpus/ram/portForwards (+ the Android group when present).
-#   $2 — host runtime kind (darwin-utm|darwin-tart|nixos-libvirt|windows-qemu)
-# Writes a host-side helper script to start the VM runtime from ~/virtual machines.
+# Writes the host-side helper script that starts the VM runtime from
+# ~/virtual machines. Fields read from the manifest entry (vm_vm_json VM_ID when
+# present): id/name/type/cpus/ram/portForwards plus the Android group.
 vm_write_start_script() {
   _wss_doc="$1"
   _wss_host_kind="$2"
@@ -783,12 +748,6 @@ vm_write_start_script() {
   say "wrote start helper scripts: $_wss_path_sh, $_wss_path_ps1"
 }
 
-# vm_write_stop_script DOC HOST_KIND
-# Args:
-#   $1 — JSON document for the VM (see vm_write_start_script): the
-#        self-describing descriptor when present, otherwise the manifest entry.
-#   $2 — host runtime kind (darwin-utm|darwin-tart|nixos-libvirt|windows-qemu)
-# Writes a host-side helper script to stop the VM runtime from ~/virtual machines.
 vm_write_stop_script() {
   _wst_doc="$1"
   _wst_host_kind="$2"
@@ -850,11 +809,10 @@ vm_write_stop_script() {
 
 # All-guests script pass
 
-# vm_script_host_kind VM_TYPE
-#   Prints the host runtime kind for the current host and guest type
-#   (darwin-tart|darwin-utm|nixos-libvirt|windows-qemu).  Mirrors the
-#   provisioner dispatch in scripts/vm.sh so helper scripts are written for
-#   every host without a live hypervisor check.
+# Prints the host runtime kind for the current host and guest type
+# (darwin-tart|darwin-utm|nixos-libvirt|windows-qemu).  Mirrors the
+# provisioner dispatch in scripts/vm.sh so helper scripts are written for
+# every host without a live hypervisor check.
 vm_script_host_kind() {
   case "$(uname -s)" in
   Darwin)
@@ -877,10 +835,9 @@ vm_script_host_kind() {
   esac
 }
 
-# vm_write_all_guest_scripts
-#   Writes start/stop helper scripts (BOTH .sh and .ps1 variants) for EVERY
-#   manifest guest — enabled or disabled, host-matched or not — so scripts/
-#   serves all VMs without a live manifest (mirrors vm_write_descriptors).
+# Writes start/stop helper scripts (BOTH .sh and .ps1 variants) for EVERY
+# manifest guest — enabled or disabled, host-matched or not — so scripts/
+# serves all VMs without a live manifest (mirrors vm_write_descriptors).
 #   Renders from vm_vm_json (descriptor-first, manifest fallback).
 vm_write_all_guest_scripts() {
   local _wags_count _wags_i _wags_id _wags_type _wags_host_kind _wags_doc
@@ -898,10 +855,9 @@ vm_write_all_guest_scripts() {
   vm_write_pack_unpack_scripts
 }
 
-# vm_write_pack_unpack_scripts
-#   Writes the global pack/unpack wrappers (BOTH variants) that delegate to
-#   the nucleus-vm pack/unpack subcommands so pack operations work without
-#   typing the subcommand (open question 6: thin delegation wrappers).
+# Writes the global pack/unpack wrappers (BOTH variants) that delegate to
+# the nucleus-vm pack/unpack subcommands so pack operations work without
+# typing the subcommand (open question 6: thin delegation wrappers).
 vm_write_pack_unpack_scripts() {
   mkdir -p "$VM_DIR/scripts"
   if [ "$dry_run" = true ]; then
@@ -935,10 +891,9 @@ EOF
 
 # VM iteration helper
 
-# vm_for_each CALLBACK [ARGS...]
-#   Iterates VMs in MANIFEST, skipping disabled or host-mismatched entries.
+# Iterates VMs in MANIFEST, skipping disabled or host-mismatched entries.
 #   For each enabled VM, calls CALLBACK with positional args:
-#     vm_id vm_type vm_hosts vm_index [ARGS...]
+# vm_id vm_type vm_hosts vm_index [ARGS...]
 vm_for_each() {
   local _callback="$1"
   shift
@@ -977,10 +932,9 @@ vm_for_each() {
   done
 }
 
-# vm_get_expected_vm_ids
-#   Prints a newline-separated list of VM names from the manifest that are
-#   enabled and match the current host.  Reuses the same filter logic as
-#   vm_for_each but without the callback dispatch.
+# Prints a newline-separated list of VM names from the manifest that are
+# enabled and match the current host.  Reuses the same filter logic as
+# vm_for_each but without the callback dispatch.
 vm_get_expected_vm_ids() {
   if [ -z "$NUCLEUS_HOST" ]; then
     return 0
@@ -993,29 +947,26 @@ vm_get_expected_vm_ids() {
   ' "$MANIFEST"
 }
 
-# vm_get_manifest_vm_ids
-#   Prints a newline-separated list of ALL VM names present in the manifest,
-#   regardless of enabled state or host match.  Used by default GC so only
-#   entries absent from VMs.json entirely are cleared; disabled entries are
-#   preserved unless --gc-disabled is passed.
+# Prints a newline-separated list of ALL VM names present in the manifest,
+# regardless of enabled state or host match.  Used by default GC so only
+# entries absent from VMs.json entirely are cleared; disabled entries are
+# preserved unless --gc-disabled is passed.
 vm_get_manifest_vm_ids() {
   jq -r '.VMs[] | .id' "$MANIFEST"
 }
 
-# vm_descriptor_path VM_ID
-#   Prints the path of the self-describing descriptor for a VM:
-#   <VM_DIR>/<VM_ID>.vm.json.
+# Prints the path of the self-describing descriptor for a VM:
+# <VM_DIR>/<VM_ID>.vm.json.
 vm_descriptor_path() {
   printf '%s/%s.vm.json\n' "$VM_DIR" "$1"
 }
 
-# vm_vm_json VM_ID
-#   Prints the JSON document used to render a VM's artifacts: the
-#   self-describing descriptor (<VM_DIR>/<VM_ID>.vm.json) when present, else
-#   the manifest entry.  Descriptor-first so unpack (and setup on a
-#   descriptor-carrying tree) renders from the packed/authoritative source;
-#   the manifest fallback keeps a fresh tree working before descriptors are
-#   written.  Mirror of the descriptor shape built by vm_write_descriptor.
+# Prints the JSON document used to render a VM's artifacts: the
+# self-describing descriptor (<VM_DIR>/<VM_ID>.vm.json) when present, else
+# the manifest entry.  Descriptor-first so unpack (and setup on a
+# descriptor-carrying tree) renders from the packed/authoritative source;
+# the manifest fallback keeps a fresh tree working before descriptors are
+# written.  Mirror of the descriptor shape built by vm_write_descriptor.
 vm_vm_json() {
   _vvj_desc="$(vm_descriptor_path "$1")"
   if [ -f "$_vvj_desc" ]; then
@@ -1025,10 +976,9 @@ vm_vm_json() {
   fi
 }
 
-# vm_mk_uuid NAME
-#   Prints the deterministic 8-4-4-4-12 UUID for a VM, derived from the
+# Prints the deterministic 8-4-4-4-12 UUID for a VM, derived from the
 #   SHA-256 of the guest id. Mirrors mkUuid in src/hosts/MacBook/vms.nix
-#   (uuidFromDigest of hashString "sha256" id).
+# (uuidFromDigest of hashString "sha256" id).
 vm_mk_uuid() {
   local _vmu_id="$1" _vmu_h
   _vmu_h="$(printf '%s' "$_vmu_id" | vm_sha256_input)" || return 1
@@ -1036,10 +986,9 @@ vm_mk_uuid() {
     "${_vmu_h:0:8}" "${_vmu_h:8:4}" "${_vmu_h:12:4}" "${_vmu_h:16:4}" "${_vmu_h:20:12}"
 }
 
-# vm_mk_mac_address NAME PREFIX
-#   Prints the deterministic MAC address (PREFIX + 5 hex octets) for a VM,
-#   derived from the SHA-256 of "mac:<NAME>". Mirrors mkMacAddress in
-#   src/hosts/MacBook/vms.nix.
+# Prints the deterministic MAC address (PREFIX + 5 hex octets) for a VM,
+# derived from the SHA-256 of "mac:<NAME>". Mirrors mkMacAddress in
+# src/hosts/MacBook/vms.nix.
 vm_mk_mac_address() {
   local _vmm_id="$1" _vmm_prefix="$2" _vmm_h
   _vmm_h="$(printf 'mac:%s' "$_vmm_id" | vm_sha256_input)" || return 1
@@ -1047,10 +996,9 @@ vm_mk_mac_address() {
     "$_vmm_prefix" "${_vmm_h:0:2}" "${_vmm_h:2:2}" "${_vmm_h:4:2}" "${_vmm_h:6:2}" "${_vmm_h:8:2}"
 }
 
-# vm_derive_arch TYPE
-#   Prints the guest architecture for a VM type. Mirrors vmArch in
-#   src/hosts/MacBook/vms.nix: Android is always aarch64, Windows always
-#   x86_64, other types follow the host architecture.
+# Prints the guest architecture for a VM type. Mirrors vmArch in
+# src/hosts/MacBook/vms.nix: Android is always aarch64, Windows always
+# x86_64, other types follow the host architecture.
 vm_derive_arch() {
   local _vda_type="$1" _vda_host
   case "$_vda_type" in
@@ -1070,9 +1018,8 @@ vm_derive_arch() {
   esac
 }
 
-# vm_derive_machine ARCH
-#   Prints the QEMU machine type for an architecture. Mirrors vmMachine in
-#   src/hosts/MacBook/vms.nix: x86_64 → q35, everything else → virt.
+# Prints the QEMU machine type for an architecture. Mirrors vmMachine in
+# src/hosts/MacBook/vms.nix: x86_64 → q35, everything else → virt.
 vm_derive_machine() {
   if [ "$1" = "x86_64" ]; then
     printf 'q35\n'
@@ -1081,9 +1028,8 @@ vm_derive_machine() {
   fi
 }
 
-# vm_derive_uefi TYPE ARCH
-#   Prints whether the guest boots via UEFI. Mirrors qemuUefiBoot in
-#   src/hosts/MacBook/vms.nix: every non-Windows aarch64 guest uses UEFI.
+# Prints whether the guest boots via UEFI. Mirrors qemuUefiBoot in
+# src/hosts/MacBook/vms.nix: every non-Windows aarch64 guest uses UEFI.
 vm_derive_uefi() {
   if [ "$1" != "Windows" ] && [ "$2" = "aarch64" ]; then
     printf 'true\n'
@@ -1092,14 +1038,13 @@ vm_derive_uefi() {
   fi
 }
 
-# vm_write_descriptor ID TYPE INDEX
-#   Writes the self-describing descriptor <ID>.vm.json for the manifest VM at
+# Writes the self-describing descriptor <ID>.vm.json for the manifest VM at
 #   INDEX: manifest fields (id/name/type/enabled/cpus/ram/diskSize/
-#   portForwards + the type group when present) plus derived hardware identity
-#   (uuid/mac/arch/machine/uefi), the disks array, and createdBy. Written for
+# portForwards + the type group when present) plus derived hardware identity
+# (uuid/mac/arch/machine/uefi), the disks array, and createdBy. Written for
 #   EVERY manifest guest (enabled or disabled) so scripts/ and unpack can
-#   serve disabled VMs without a live manifest. Atomic (temp + mv); honors
-#   dry_run.
+# serve disabled VMs without a live manifest. Atomic (temp + mv); honors
+# dry_run.
 vm_write_descriptor() {
   local _vwd_id="$1" _vwd_type="$2" _vwd_index="$3"
   local _vwd_path _vwd_uuid _vwd_mac_prefix _vwd_mac _vwd_arch _vwd_machine _vwd_uefi
@@ -1177,9 +1122,8 @@ vm_write_descriptor() {
   say "wrote VM descriptor: $_vwd_path"
 }
 
-# vm_write_descriptors
-#   Writes a descriptor for EVERY guest in the manifest (enabled or disabled,
-#   host-matched or not), unlike vm_for_each.
+# Writes a descriptor for EVERY guest in the manifest (enabled or disabled,
+# host-matched or not), unlike vm_for_each.
 vm_write_descriptors() {
   local _count _i _id _type
   _count="$(jq '.VMs | length' "$MANIFEST")"
@@ -1196,11 +1140,10 @@ vm_write_descriptors() {
 
 UTMCTL="/Applications/UTM.app/Contents/MacOS/utmctl"
 
-# re_register_utm_bundle NAME BUNDLE
-#   Force UTM to reload bundle config by temporarily preserving the bundle,
-#   deleting the registered VM entry, then reopening the preserved bundle.
+# Force UTM to reload bundle config by temporarily preserving the bundle,
+# deleting the registered VM entry, then reopening the preserved bundle.
 #   WHY: UTM can keep stale runtime config for already-registered VMs even
-#   after config.plist is refreshed in-place.
+# after config.plist is refreshed in-place.
 re_register_utm_bundle() {
   local _rr_name="$1" _rr_bundle="$2" _rr_backup
   _rr_backup="${_rr_bundle}.reimport"
@@ -1242,13 +1185,12 @@ re_register_utm_bundle() {
 
 # Credential marker helper
 
-# resize_and_mark_image IMAGE_PATH MARKER_PATH FINGERPRINT [DISK_BYTES]
-#   Writes FINGERPRINT to MARKER_PATH for drift detection.  When DISK_BYTES
-#   is specified, also resizes IMAGE_PATH via qemu-img before marking
-#   (qemu-img accepts bare byte counts).  Grow-only: the image is only
-#   resized when its current virtual size is below DISK_BYTES; it is never
-#   shrunk here.  WHY: a shrink can destroy data beyond the new end, so
-#   shrinking is opt-in via 'nucleus-vm resize --allow-shrink' only.
+# Writes FINGERPRINT to MARKER_PATH for drift detection.  When DISK_BYTES
+# is specified, also resizes IMAGE_PATH via qemu-img before marking
+# (qemu-img accepts bare byte counts).  Grow-only: the image is only
+# resized when its current virtual size is below DISK_BYTES; it is never
+# shrunk here.  WHY: a shrink can destroy data beyond the new end, so
+# shrinking is opt-in via 'nucleus-vm resize --allow-shrink' only.
 resize_and_mark_image() {
   local _rmi_file="$1" _rmi_marker="$2" _rmi_fingerprint="$3" _rmi_disk_bytes="${4:-}"
   local _rmi_current_size
@@ -1270,13 +1212,11 @@ resize_and_mark_image() {
   printf '%s\n' "$_rmi_fingerprint" >"$_rmi_marker"
 }
 
-# vm_resize_vm NAME SIZE_BYTES ALLOW_SHRINK
-#   Grows (or with ALLOW_SHRINK=true shrinks) the writable disk of manifest
-#   VM NAME to SIZE_BYTES.  The writable disk is always data/<name>.qcow2 —
-#   for Android that disk IS its userdata image, so resizing it resizes the
-#   user's data disk.  Refuses to shrink without ALLOW_SHRINK (a shrink can
-#   destroy data beyond the new end) and refuses while the VM is running.
-#   Prints the old and new virtual sizes.
+# Grows (or with ALLOW_SHRINK=true shrinks) the writable disk of manifest VM
+# NAME to SIZE_BYTES. That disk is always data/<name>.qcow2, which for Android is
+# its userdata image, so resizing it resizes the user's data. Refuses to shrink
+# without ALLOW_SHRINK (a shrink can destroy data beyond the new end) and refuses
+# while the VM is running. Prints the old and new virtual sizes.
 vm_resize_vm() {
   local _rvm_id="$1" _rvm_size_bytes="$2" _rvm_allow_shrink="$3"
   local _rvm_type _rvm_disk _rvm_old_size _rvm_running _rvm_qemu_args
@@ -1320,26 +1260,25 @@ vm_resize_vm() {
 
 # data disk provisioning helper
 
-# vm_ensure_data_disk NAME
-#   Verify the writable data disk for NAME under the managed layout:
-#     src/<type>/system image.qcow2 — pristine type system image (read-only base)
-#     data/<name>.qcow2             — writable data disk backing the type system
-#                                     image at its absolute path (on macOS the
-#                                     backing is the bundle-local system base
-#                                     link — UTM's sandbox only exposes the
-#                                     bundle to QEMUHelper)
+# Verify the writable data disk for NAME under the managed layout:
+# src/<type>/system image.qcow2 — pristine type system image (read-only base)
+# data/<name>.qcow2             — writable data disk backing the type system
+# image at its absolute path (on macOS the
+# backing is the bundle-local system base
+# link — UTM's sandbox only exposes the
+# bundle to QEMUHelper)
 #   Everything (type, system image, manifest sizes, sidecar marker paths, and
-#   the per-VM provision fingerprint) is derived from NAME alone.  Cases:
+# the per-VM provision fingerprint) is derived from NAME alone.  Cases:
 #   1. Data disk missing → create as an overlay on the type system image and
-#      write provision markers.
+# write provision markers.
 #   2. Data disk exists and validates → KEEP it — never recreate, truncate, or
-#      re-base an existing data disk.
+# re-base an existing data disk.
 #   3. Data disk invalid → warn and skip unless --force (default tells the
-#      operator to run 'nucleus-vm reset <name>'; --force recreates with a
-#      printed destructive warning).
+# operator to run 'nucleus-vm reset <name>'; --force recreates with a
+# printed destructive warning).
 #   4. Virtual size < manifest diskSize → auto-grow (never shrink).
 #   Provision drift on a valid disk is reported by vm_provision_one (the
-#   provision orchestrator), which owns the drift-to-inject hint.
+# provision orchestrator), which owns the drift-to-inject hint.
 vm_ensure_data_disk() {
   local _edd_name="$1"
   local _edd_type _edd_disk _edd_disk_valid _edd_backing _edd_virtual_size
@@ -1441,24 +1380,23 @@ vm_ensure_data_disk() {
   return 0
 }
 
-# vm_ensure_android_system_overlay NAME
-#   Verify the Android system overlay for NAME under the managed layout:
-#     src/Android/system image.qcow2 — pristine Android system image (read-only base)
-#     data/<name> (system).qcow2     — persistent writable overlay backing the
+# Verify the Android system overlay for NAME under the managed layout:
+# src/Android/system image.qcow2 — pristine Android system image (read-only base)
+# data/<name> (system).qcow2     — persistent writable overlay backing the
 #                                      Android system image at its absolute
-#                                      path (on macOS the backing is the
-#                                      bundle-local system base link — UTM's
-#                                      sandbox only exposes the bundle to
+# path (on macOS the backing is the
+# bundle-local system base link — UTM's
+# sandbox only exposes the bundle to
 #                                      QEMUHelper)
 #   The overlay carries the guest /system partition so recovery sideload
-#   (GApps) keeps working while src/ stays pristine.  Cases:
+# (GApps) keeps working while src/ stays pristine.  Cases:
 #   1. Overlay missing → create as an overlay on the Android system image and
-#      write provision markers.
+# write provision markers.
 #   2. Overlay exists and validates → KEEP it — never recreate, truncate, or
-#      re-base; adopt a stale provision marker (Android semantics: derived
-#      from the base, never injected).
+# re-base; adopt a stale provision marker (Android semantics: derived
+# from the base, never injected).
 #   3. Overlay invalid → warn and skip (manual deletion + re-setup is the
-#      destructive path).
+# destructive path).
 #   No grow logic: the overlay inherits the base virtual size.
 vm_ensure_android_system_overlay() {
   local _easo_name="$1"
@@ -1536,16 +1474,15 @@ vm_ensure_android_system_overlay() {
   return 0
 }
 
-# vm_provision_one NAME
-#   Phase-2 per-VM provision orchestrator (shared by every runtime's setup
-#   callback): make sure the writable data disk for NAME exists — create
-#   overlay, keep existing — then reports provision drift (per-VM identity,
-#   wiring, or credentials) for in-place re-injection while the VM is
-#   stopped.  Host-specific wiring
-#   (UTM bundle link, libvirt sync, start scripts) stays in the setup
-#   callbacks; this function owns the shared disk+markers decision.  Drift
-#   never triggers automatic recreation or injection at setup — the operator
-#   runs 'nucleus-vm inject NAME'.
+# Phase-2 per-VM provision orchestrator (shared by every runtime's setup
+# callback): make sure the writable data disk for NAME exists — create
+# overlay, keep existing — then reports provision drift (per-VM identity,
+# wiring, or credentials) for in-place re-injection while the VM is
+# stopped.  Host-specific wiring
+# (UTM bundle link, libvirt sync, start scripts) stays in the setup
+# callbacks; this function owns the shared disk+markers decision.  Drift
+# never triggers automatic recreation or injection at setup — the operator
+# runs 'nucleus-vm inject NAME'.
 vm_provision_one() {
   local _vpo_name="$1" _vpo_type _vpo_disk _vpo_provision_marker _vpo_provision_fp _vpo_running
 
@@ -1586,9 +1523,8 @@ vm_provision_one() {
   return 0
 }
 
-# vm_link_android_userdata_to_utm_bundle NAME INDEX [BUNDLE_DATA_DIR]
-#   Ensure Android.utm/Data/user data.qcow2 is a hard link to data/<id>.qcow2
-#   (G1a write-through).  Canonical data/ is the source of truth when present.
+# Ensure Android.utm/Data/user data.qcow2 is a hard link to data/<id>.qcow2
+# (G1a write-through).  Canonical data/ is the source of truth when present.
 #   Never deletes userdata disks — only ln -f when canonical exists.
 vm_link_android_userdata_to_utm_bundle() {
   _lautb_name="$1"
@@ -1623,12 +1559,11 @@ vm_link_android_userdata_to_utm_bundle() {
   return 0
 }
 
-# vm_system_overlay_backing NAME TYPE
-#   Prints the absolute backing path for a writable overlay on TYPE's system
-#   image.  On macOS (UTM runtime) the backing must live inside the UTM bundle
-#   (<name>.utm/Data/system base.qcow2) so the sandboxed QEMUHelper — whose
-#   file access is scoped to the bundle — can open it; elsewhere it is the
-#   pristine src/<type>/system image.qcow2 base.
+# Prints the absolute backing path for a writable overlay on TYPE's system
+# image.  On macOS (UTM runtime) the backing must live inside the UTM bundle
+# (<name>.utm/Data/system base.qcow2) so the sandboxed QEMUHelper — whose
+# file access is scoped to the bundle — can open it; elsewhere it is the
+# pristine src/<type>/system image.qcow2 base.
 vm_system_overlay_backing() {
   local _sob_name="$1" _sob_type="$2"
   case "$(uname -s)" in
@@ -1637,11 +1572,10 @@ vm_system_overlay_backing() {
   esac
 }
 
-# vm_link_system_base_to_utm_bundle NAME TYPE [BUNDLE_DATA_DIR]
-#   Ensure <name>.utm/Data/system base.qcow2 is a hard link to the TYPE system
-#   image (read-only canonical → bundle).  WHY: on macOS, UTM's sandboxed
+# Ensure <name>.utm/Data/system base.qcow2 is a hard link to the TYPE system
+# image (read-only canonical → bundle).  WHY: on macOS, UTM's sandboxed
 #   QEMUHelper can only open files inside the bundle, so the writable overlay
-#   in data/ must back onto this bundle-local hard link of the pristine base.
+# in data/ must back onto this bundle-local hard link of the pristine base.
 #   Never deletes base images — only ln -f when the canonical exists.
 vm_link_system_base_to_utm_bundle() {
   _lsbtb_name="$1"
@@ -1674,13 +1608,12 @@ vm_link_system_base_to_utm_bundle() {
   return 0
 }
 
-# vm_link_nvram_to_utm_bundle NAME [BUNDLE_DATA_DIR]
-#   Adopt UTM's generated <name>.utm/Data/efi_vars.fd into the canonical
-#   data/<name> (nvram).fd and re-link it back into the bundle.  WHY: UEFI
-#   variables are per-VM writable state, so they belong in data/ alongside
-#   every other writable disk; UTM generates efi_vars.fd on first import, so
-#   adoption copies bundle → canonical when missing/different, then ln -f
-#   re-links so later UTM writes land in the canonical file.
+# Adopt UTM's generated <name>.utm/Data/efi_vars.fd into the canonical
+# data/<name> (nvram).fd and re-link it back into the bundle.  WHY: UEFI
+# variables are per-VM writable state, so they belong in data/ alongside
+# every other writable disk; UTM generates efi_vars.fd on first import, so
+# adoption copies bundle → canonical when missing/different, then ln -f
+# re-links so later UTM writes land in the canonical file.
 vm_link_nvram_to_utm_bundle() {
   _lntb_name="$1"
   _lntb_bundle_data_dir="${2:-}"
@@ -1711,12 +1644,11 @@ vm_link_nvram_to_utm_bundle() {
   return 0
 }
 
-# vm_remove_utm_screenshot BUNDLE
-#   Delete a stale UTM screenshot at the bundle root
-#   (<bundle>/screenshot.png).  WHY: UTM saves screenshots to the bundle
-#   root (kUTMBundleScreenshotFilename), and with NoSaveScreenshot = true the
-#   screenshot is only deleted on the next VM start — provisioning purges it
-#   immediately so bundles never carry stale screenshots.
+# Delete a stale UTM screenshot at the bundle root
+# (<bundle>/screenshot.png).  WHY: UTM saves screenshots to the bundle
+# root (kUTMBundleScreenshotFilename), and with NoSaveScreenshot = true the
+# screenshot is only deleted on the next VM start — provisioning purges it
+# immediately so bundles never carry stale screenshots.
 vm_remove_utm_screenshot() {
   local bundle="$1"
 
@@ -1733,20 +1665,19 @@ vm_remove_utm_screenshot() {
   say "removed stale UTM screenshot: $bundle/screenshot.png"
 }
 
-# vm_inject_guest NAME
-#   Re-run in-place disk injection for one VM: applies the per-VM guest
-#   identity (hostname, username, password, SSH key) into the existing data
-#   disk without recreating it, then refreshes the provision marker so the
-#   disk matches current inputs.  Dispatches by type:
+# Re-run in-place disk injection for one VM: applies the per-VM guest
+# identity (hostname, username, password, SSH key) into the existing data
+# disk without recreating it, then refreshes the provision marker so the
+# disk matches current inputs.  Dispatches by type:
 #     NixOS   — qemu-nbd attach + nixos-enter applying src/vms/guests/<id>/guest.nix
 #     Windows — libguestfs offline customization (virt-customize --in-place)
-#     macOS   — tart clone of the type base VM (the clone is the per-VM layer)
+# macOS   — tart clone of the type base VM (the clone is the per-VM layer)
 #     Android — no injection; the userdata disk is created empty and needs no
-#               identity (marker adoption only)
+# identity (marker adoption only)
 #   Refuses to run while the VM is running, and recreates the data disk first
-#   when --force is set (destructive — prints a warning).  WHY: per-VM
-#   identity is injected offline at setup time, never over the network, so a
-#   fresh data disk gets its identity before first boot.
+# when --force is set (destructive — prints a warning).  WHY: per-VM
+# identity is injected offline at setup time, never over the network, so a
+# fresh data disk gets its identity before first boot.
 vm_inject_guest() {
   local _vig_name="$1"
   local _vig_type _vig_running _vig_disk _vig_provision_marker _vig_provision_fp
@@ -1828,15 +1759,14 @@ vm_inject_guest() {
   return 0
 }
 
-# vm_inject_nixos NAME
-#   Offline NixOS guest identity injection: attach data/<name>.qcow2 via
-#   qemu-nbd, mount the btrfs root subvolume, stage the repo's src/ tree
-#   inside the guest (preserving the relative imports of the guest config),
-#   then apply src/vms/guests/<id>/guest.nix with nixos-enter.  The guest
-#   config imports guest-identity.nix (written here from the resolved
+# Offline NixOS guest identity injection: attach data/<name>.qcow2 via
+# qemu-nbd, mount the btrfs root subvolume, stage the repo's src/ tree
+# inside the guest (preserving the relative imports of the guest config),
+# then apply src/vms/guests/<id>/guest.nix with nixos-enter.  The guest
+# config imports guest-identity.nix (written here from the resolved
 #   NUCLEUS_VM_GUEST_* values) so the Nix layer reads no environment variables
-#   at eval time.  Runs tools directly — qemu-nbd and mount typically need root
-#   and fail visibly when unprivileged.
+# at eval time.  Runs tools directly — qemu-nbd and mount typically need root
+# and fail visibly when unprivileged.
 vm_inject_nixos() {
   local _vix_name="$1"
   local _vix_disk _vix_guest_nix _vix_guest_identity _vix_mnt _vix_nbd _vix_part _vix_i
@@ -1953,12 +1883,11 @@ EOF
   return 0
 }
 
-# vm_inject_windows NAME
-#   Offline Windows guest identity injection via libguestfs: virt-customize
+# Offline Windows guest identity injection via libguestfs: virt-customize
 #   --in-place edits data/<name>.qcow2 directly — sets the computer name,
-#   creates the guest user with the SOPS password, and injects the SSH
-#   public key.  WHY: Windows cannot be configured by writing files into the
-#   disk blind; libguestfs handles the NTFS + registry work offline.
+# creates the guest user with the SOPS password, and injects the SSH
+# public key.  WHY: Windows cannot be configured by writing files into the
+# disk blind; libguestfs handles the NTFS + registry work offline.
 vm_inject_windows() {
   local _viw_name="$1"
   local _viw_disk _viw_username _viw_password _viw_hostname _viw_key_file _viw_args
@@ -2009,10 +1938,9 @@ vm_inject_windows() {
   return 0
 }
 
-# vm_inject_macos NAME
-#   Per-VM macOS identity layer via tart clone: the clone of the type base
+# Per-VM macOS identity layer via tart clone: the clone of the type base
 #   VM IS the per-VM writable layer (APFS copy-on-write), so no disk surgery
-#   is needed — cloning from the identity-free type base is the injection.
+# is needed — cloning from the identity-free type base is the injection.
 vm_inject_macos() {
   local _vim_name="$1"
   local _vim_type
@@ -2071,8 +1999,7 @@ vm_android_fastboot_serial() {
   printf 'tcp:localhost:%s\n' "$(vm_android_fastboot_host_port "$1")"
 }
 
-# vm_android_fastboot_probe SERIAL GETVAR_NAME
-#   Return 0 when fastboot answers GETVAR_NAME within the probe timeout.
+# Return 0 when fastboot answers GETVAR_NAME within the probe timeout.
 vm_android_fastboot_probe() {
   _afp_serial="$1"
   _afp_getvar="$2"
@@ -2082,8 +2009,7 @@ vm_android_fastboot_probe() {
   printf '%s' "$_afp_out" | grep -q "^${_afp_getvar}:"
 }
 
-# vm_android_fastboot_list_state VM_INDEX
-#   Return fastboot state for the manifest serial: fastboot or offline.
+# Return fastboot state for the manifest serial: fastboot or offline.
 #   TCP fastboot (QEMU/jqssun) never appears in `fastboot devices`; probe with getvar.
 vm_android_fastboot_list_state() {
   _afls_vm_index="$1"
@@ -2097,11 +2023,10 @@ vm_android_fastboot_list_state() {
   printf 'offline\n'
 }
 
-# vm_android_wait_tick TIMEOUT ELAPSED DEFAULT_POLL
-#   Sleep min(poll, timeout - elapsed); echo new elapsed.
+# Sleep min(poll, timeout - elapsed); echo new elapsed.
 #   TIMEOUT, ELAPSED, DEFAULT_POLL and NUCLEUS_VM_ANDROID_POLL_INTERVAL are
-#   integer seconds. A poll interval of 0 or less never advances, so only
-#   positive integers are accepted.
+# integer seconds. A poll interval of 0 or less never advances, so only
+# positive integers are accepted.
 # WHY no fractional poll: elapsed is accumulated with shell arithmetic and
 # $((0 + 0.1)) is a syntax error, so accepting a fraction would abort the wait
 # loop instead of polling. The comparison below is `[ -lt ]`, which reports a
@@ -2134,8 +2059,7 @@ vm_android_wait_tick() {
   printf '%s' "$((_awt_elapsed + _awt_sleep))"
 }
 
-# vm_android_fastboot_wait VM_INDEX [TIMEOUT]
-#   Wait until fastboot reports the manifest serial as fastboot.
+# Wait until fastboot reports the manifest serial as fastboot.
 vm_android_fastboot_wait() {
   _afw_vm_index="$1"
   _afw_timeout="${2:-180}"
@@ -2170,8 +2094,7 @@ vm_android_adb_get_state() {
   adb -s "$_aas_serial" get-state 2>/dev/null || printf 'unknown\n'
 }
 
-# vm_android_adb_refresh VM_INDEX
-#   Reset the TCP ADB session so adb devices reflects the current guest mode.
+# Reset the TCP ADB session so adb devices reflects the current guest mode.
 vm_android_adb_refresh() {
   _afr_vm_index="$1"
   _afr_serial="$(vm_android_adb_serial "$_afr_vm_index")"
@@ -2181,9 +2104,8 @@ vm_android_adb_refresh() {
   adb connect "$_afr_serial" >/dev/null 2>&1 || true
 }
 
-# vm_android_adb_list_state VM_INDEX
-#   Return adb devices state for the manifest serial: device, unauthorized,
-#   offline, recovery, sideload, or unknown.
+# Return adb devices state for the manifest serial: device, unauthorized,
+# offline, recovery, sideload, or unknown.
 vm_android_adb_list_state() {
   _als_vm_index="$1"
   _als_serial="$(vm_android_adb_serial "$_als_vm_index")"
@@ -2201,15 +2123,13 @@ vm_android_adb_list_state() {
   printf 'offline\n'
 }
 
-# vm_android_adb_poll_state VM_INDEX
-#   Refresh the TCP session and return the current adb state.
+# Refresh the TCP session and return the current adb state.
 vm_android_adb_poll_state() {
   vm_android_adb_refresh "$1"
   vm_android_adb_list_state "$1"
 }
 
-# vm_android_adb_wait_authorized VM_INDEX [TIMEOUT]
-#   Wait until the guest reports an authorized booted system (adb state device).
+# Wait until the guest reports an authorized booted system (adb state device).
 vm_android_adb_wait_authorized() {
   _awa_vm_index="$1"
   _awa_timeout="${2:-600}"
@@ -2248,8 +2168,7 @@ vm_android_adb_wait_authorized() {
   return 1
 }
 
-# vm_android_guest_boot_completed VM_INDEX
-#   True when the booted guest reports sys.boot_completed=1.
+# True when the booted guest reports sys.boot_completed=1.
 vm_android_guest_boot_completed() {
   _agbc_vm_index="$1"
 
@@ -2260,8 +2179,7 @@ vm_android_guest_boot_completed() {
   [ "$(vm_android_shell_getprop "$_agbc_vm_index" sys.boot_completed)" = "1" ]
 }
 
-# vm_android_adb_wait_boot_completed VM_INDEX [TIMEOUT]
-#   Wait until adb is authorized and sys.boot_completed=1 (safe for pm/adb install).
+# Wait until adb is authorized and sys.boot_completed=1 (safe for pm/adb install).
 vm_android_adb_wait_boot_completed() {
   _awbc_vm_index="$1"
   _awbc_timeout="${2:-600}"
@@ -2310,8 +2228,7 @@ vm_android_adb_wait_boot_completed() {
   return 1
 }
 
-# vm_android_adb_wait_sideload VM_INDEX [TIMEOUT]
-#   Wait until ADB reports sideload (refreshes the TCP session each poll).
+# Wait until ADB reports sideload (refreshes the TCP session each poll).
 vm_android_adb_wait_sideload() {
   _aws_vm_index="$1"
   _aws_timeout="${2:-120}"
@@ -2346,8 +2263,7 @@ vm_android_adb_wait_sideload() {
   return 1
 }
 
-# vm_android_adb_connect VM_INDEX [TIMEOUT]
-#   Connect ADB and wait until the guest reports device, recovery, or sideload.
+# Connect ADB and wait until the guest reports device, recovery, or sideload.
 vm_android_adb_connect() {
   _aac_vm_index="$1"
   _aac_timeout="${2:-150}"
@@ -2366,8 +2282,7 @@ vm_android_adb_connect() {
   return 1
 }
 
-# vm_android_shell_getprop VM_INDEX NAME
-#   Return a trimmed getprop value from the guest, or empty when unavailable.
+# Return a trimmed getprop value from the guest, or empty when unavailable.
 vm_android_shell_getprop() {
   _asgp_vm_index="$1"
   _asgp_name="$2"
@@ -2375,8 +2290,7 @@ vm_android_shell_getprop() {
   adb -s "$_asgp_serial" shell getprop "$_asgp_name" 2>/dev/null | tr -d '\r\n'
 }
 
-# vm_android_guest_shell_is_root VM_INDEX
-#   True when adb shell runs as uid 0 (recovery native root shell).
+# True when adb shell runs as uid 0 (recovery native root shell).
 vm_android_guest_shell_is_root() {
   _agsr_vm_index="$1"
   _agsr_serial="$(vm_android_adb_serial "$_agsr_vm_index")"
@@ -2384,8 +2298,7 @@ vm_android_guest_shell_is_root() {
   adb -s "$_agsr_serial" shell 'id -u' 2>/dev/null | tr -d '\r' | grep -qx '0'
 }
 
-# vm_android_recovery_asset_suffix VM_INDEX
-#   jqssun recovery image name suffix (arm64only or x86_64) for this guest.
+# jqssun recovery image name suffix (arm64only or x86_64) for this guest.
 vm_android_recovery_asset_suffix() {
   _aras_vm_index="$1"
   _aras_type="$(jq -r ".VMs[$_aras_vm_index].type" "$MANIFEST")"
@@ -2395,8 +2308,7 @@ vm_android_recovery_asset_suffix() {
   esac
 }
 
-# vm_android_jqssun_release_tag_for_asset ASSET_NAME
-#   Resolve the current jqssun release tag via the releases/latest/download redirect.
+# Resolve the current jqssun release tag via the releases/latest/download redirect.
 vm_android_jqssun_release_tag_for_asset() {
   _jrta_asset="$1"
   _jrta_location=''
@@ -2429,8 +2341,7 @@ vm_android_jqssun_release_tag_for_asset() {
   printf '%s\n' "$_jrta_tag"
 }
 
-# vm_android_jqssun_asset_url TAG ASSET_SUBSTRING
-#   Find a release asset download URL on GitHub without the REST API.
+# Find a release asset download URL on GitHub without the REST API.
 vm_android_jqssun_asset_url() {
   _jau_tag="$1"
   _jau_substring="$2"
@@ -2462,8 +2373,7 @@ vm_android_jqssun_asset_url() {
   printf 'https://github.com%s\n' "$_jau_path"
 }
 
-# vm_android_download_userdebug_recovery VM_INDEX
-#   Download and cache the jqssun userdebug recovery image for sideloading GApps.
+# Download and cache the jqssun userdebug recovery image for sideloading GApps.
 vm_android_download_userdebug_recovery() {
   _adur_vm_index="$1"
   _adur_suffix="$(vm_android_recovery_asset_suffix "$_adur_vm_index")"
@@ -2502,8 +2412,7 @@ vm_android_download_userdebug_recovery() {
   return 0
 }
 
-# vm_android_guest_has_userdebug_recovery VM_INDEX
-#   True when recovery/sideload ADB reports a userdebug/eng build (LineageOS 23 sets ro.debuggable=0).
+# True when recovery/sideload ADB reports a userdebug/eng build (LineageOS 23 sets ro.debuggable=0).
 vm_android_guest_has_userdebug_recovery() {
   _aghur_vm_index="$1"
   _aghur_state="$(vm_android_adb_poll_state "$_aghur_vm_index")"
@@ -2523,8 +2432,7 @@ vm_android_guest_has_userdebug_recovery() {
   return 1
 }
 
-# vm_android_ensure_userdebug_recovery VM_INDEX
-#   Flash the cached userdebug recovery via fastboot unless the guest already reports userdebug.
+# Flash the cached userdebug recovery via fastboot unless the guest already reports userdebug.
 vm_android_ensure_userdebug_recovery() {
   _aeur_vm_index="$1"
   _aeur_img="$(vm_src_path Android "$VM_ANDROID_RECOVERY_IMG")"
@@ -2566,8 +2474,7 @@ vm_android_ensure_userdebug_recovery() {
   fi
 }
 
-# vm_android_adb_wait_recovery VM_INDEX [TIMEOUT]
-#   Wait until ADB reports recovery or sideload (no booted-system RSA authorization).
+# Wait until ADB reports recovery or sideload (no booted-system RSA authorization).
 vm_android_adb_wait_recovery() {
   _awr_vm_index="$1"
   _awr_timeout="${2:-300}"
@@ -2771,8 +2678,7 @@ vm_build_android_image() {
     say "Android image build skipped for '$_vai_id' (prerequisite missing or build failed; see above)"
 }
 
-# vm_prune_and_write_all_guest_scripts
-#   Removes stale scripts/ helpers then regenerates the full all-guests set.
+# Removes stale scripts/ helpers then regenerates the full all-guests set.
 vm_prune_and_write_all_guest_scripts() {
   for _pwgas_f in "$VM_DIR/scripts"/*.sh "$VM_DIR/scripts"/*.ps1; do
     [ -f "$_pwgas_f" ] || continue
@@ -2781,9 +2687,8 @@ vm_prune_and_write_all_guest_scripts() {
   vm_write_all_guest_scripts
 }
 
-# vm_validate_utm_plist_template NAME
-#   Validates the Nix-rendered UTM plist template for NAME.  On success sets
-#   _vupt_template to the template path and returns 0.
+# Validates the Nix-rendered UTM plist template for NAME.  On success sets
+# _vupt_template to the template path and returns 0.
 vm_validate_utm_plist_template() {
   local _vupt_name="$1"
 
@@ -2834,9 +2739,8 @@ vm_validate_utm_plist_template() {
   return 0
 }
 
-# vm_apply_utm_plist_and_register NAME BUNDLE TEMPLATE_DRIFT_CONFIG
-#   Copies the managed plist into an existing UTM bundle and makes sure UTM has
-#   the VM registered (open on first import; re-register on config drift).
+# Copies the managed plist into an existing UTM bundle and makes sure UTM has
+# the VM registered (open on first import; re-register on config drift).
 vm_apply_utm_plist_and_register() {
   local _ap_name="$1" _ap_bundle="$2" _ap_template_drift="$3"
   local _ap_config_plist="$_ap_bundle/config.plist"
@@ -2873,8 +2777,7 @@ vm_apply_utm_plist_and_register() {
   fi
 }
 
-# vm_sync_utm — Config-only UTM refresh: plist copy + registration when the
-#   bundle already exists.  Skips disk/image work (use vm_setup_utm for that).
+# bundle already exists.  Skips disk/image work (use vm_setup_utm for that).
 vm_sync_utm() {
   local vm_id="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local vm_display bundle config_plist template_drift_config
@@ -2925,8 +2828,7 @@ vm_sync_utm_vms() {
   say "macOS VM sync complete"
 }
 
-# vm_sync_libvirt — Config-only libvirt refresh: virsh define from the
-#   Nix-installed domain XML.  Skips disk/overlay provisioning.
+# Nix-installed domain XML.  Skips disk/overlay provisioning.
 vm_sync_libvirt() {
   local vm_id="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local _xml_file
@@ -2971,8 +2873,7 @@ vm_sync_libvirt_vms() {
   say "NixOS VM sync complete"
 }
 
-# vm_warn_running_vms_needing_restart
-#   Warn when VMs are running so the user knows to restart for config changes.
+# Warn when VMs are running so the user knows to restart for config changes.
 vm_warn_running_vms_needing_restart() {
   local _wrvnr_running _wrvnr_name
 
@@ -2984,8 +2885,7 @@ vm_warn_running_vms_needing_restart() {
   done
 }
 
-# vm_sync_config_phase — Non-destructive config refresh shared by nucleus-vm
-#   sync and the first phase of nucleus-vm setup.
+# sync and the first phase of nucleus-vm setup.
 vm_sync_config_phase() {
   vm_write_descriptors
   vm_prune_and_write_all_guest_scripts
@@ -3240,16 +3140,15 @@ vm_setup_libvirt() {
 
 # Phase 1 — Build images (if absent)
 
-# vm_build_nixos TYPE DISK_BYTES
-#   Builds the NixOS guest type system image via nixos-generators (pinned as a
-#   flake input in src/flake.nix).  The image is identity-free and shared by
-#   every VM of the type; per-VM identity is injected onto the data disk at
-#   provision time.  On macOS this requires an aarch64-linux builder;
-#   enable nix.linux-builder.enable in the macOS host config so the Nix daemon
-#   delegates Linux derivations to the Virtualization.framework-backed builder
+# Builds the NixOS guest type system image via nixos-generators (pinned as a
+# flake input in src/flake.nix).  The image is identity-free and shared by
+# every VM of the type; per-VM identity is injected onto the data disk at
+# provision time.  On macOS this requires an aarch64-linux builder;
+# enable nix.linux-builder.enable in the macOS host config so the Nix daemon
+# delegates Linux derivations to the Virtualization.framework-backed builder
 #   VM created by nix-darwin.  Most derivations are fetched from the binary
-#   cache; hostname-specific ones (e.g. etc-hostname) are configuration-specific
-#   and cannot be cached.
+# cache; hostname-specific ones (e.g. etc-hostname) are configuration-specific
+# and cannot be cached.
 vm_build_nixos() {
   _vm_type="$1"
   _disk_bytes="$2"
@@ -3336,13 +3235,9 @@ vm_build_nixos() {
   say "NixOS image ready: $_out"
 }
 
-# download_windows_iso_mido CACHED_ISO EDITION
-#   Downloads a Windows 11 ISO using vendor/qvm-create-windows-qube/windows/isos/mido.sh.
-#   Mido is the secure Microsoft Windows Downloader for UNIX systems.
-#   The EDITION parameter maps to a Mido media identifier.
-#   Returns 0 on success, 1 on failure.
-#   Requires curl in PATH.
-#   Source: https://github.com/QubesOS/qvm-create-windows-qube
+# Downloads a Windows 11 ISO with the Mido downloader from
+# vendor/qvm-create-windows-qube. Needs curl in PATH.
+# ref: https://github.com/QubesOS/qvm-create-windows-qube
 download_windows_iso_mido() {
   _mido_cached="$1"
   _mido_edition="$2"
@@ -3433,9 +3328,8 @@ EOF
   return 0
 }
 
-# download_windows_iso_fido CACHED_ISO EDITION
-#   Downloads a Windows 11 ISO using vendor/Fido/Fido.ps1 (the same engine
-#   that drives Rufus download automation).  Moves the downloaded ISO to
+# Downloads a Windows 11 ISO using vendor/Fido/Fido.ps1 (the same engine
+# that drives Rufus download automation).  Moves the downloaded ISO to
 #   CACHED_ISO on success; returns 0 on success, 1 on failure.
 #   Requires pwsh (PowerShell Core) in PATH.
 #   Source: https://github.com/pbatard/Fido
@@ -3484,11 +3378,10 @@ download_windows_iso_fido() {
   return 0
 }
 
-# download_windows_iso_fido_url_nonwindows CACHED_ISO EDITION
-#   Resolves a Windows ISO URL via vendor/Fido/Fido.ps1 -GetUrl, then downloads
-#   it with curl.  This is a non-Windows fallback for Darwin/Linux hosts when
+# Resolves a Windows ISO URL via vendor/Fido/Fido.ps1 -GetUrl, then downloads
+# it with curl.  This is a non-Windows fallback for Darwin/Linux hosts when
 #   Mido's consumer path fails.  A temporary script copy is patched at runtime
-#   to bypass Fido's Windows-only guard; vendor sources remain unchanged.
+# to bypass Fido's Windows-only guard; vendor sources remain unchanged.
 #   Source: https://github.com/pbatard/Fido
 download_windows_iso_fido_url_nonwindows() {
   _fido_cached="$1"
@@ -3576,11 +3469,10 @@ download_windows_iso_fido_url_nonwindows() {
   return 0
 }
 
-# vm_build_windows TYPE DISK_BYTES EDITION
-#   Builds the Windows 11 guest type system image using Packer and the
+# Builds the Windows 11 guest type system image using Packer and the
 #   Autounattend.xml answer file at src/vms/Windows/Autounattend.xml.
 #   The image is identity-free and shared by every VM of the type; per-VM
-#   identity is injected onto the data disk at provision time.
+# identity is injected onto the data disk at provision time.
 vm_build_windows() {
   _vm_type="$1"
   _disk_bytes="$2"
@@ -3939,12 +3831,11 @@ EOF
   say "Windows 11 image ready: $_out"
 }
 
-# vm_build_macos TYPE DISK_BYTES RAM_BYTES CPUS MACOS_VERSION
-#   Builds the macOS guest VM using the Packer Tart plugin.  Requires tart
-#   and packer to be installed; only runs on Darwin hosts (Tart uses Apple
+# Builds the macOS guest VM using the Packer Tart plugin.  Requires tart
+# and packer to be installed; only runs on Darwin hosts (Tart uses Apple
 #   Virtualization.framework which is not available on other platforms).
 #   The resulting VM is stored in ~/virtual machines/tart/vms/<name>/ (via
-#   the ~/.tart symlink created by ensure_tart_vm_dir).
+# the ~/.tart symlink created by ensure_tart_vm_dir).
 #   Source: https://github.com/cirruslabs/packer-plugin-tart
 vm_build_macos() {
   _vm_type="$1"
@@ -4021,9 +3912,8 @@ vm_build_macos() {
   say "macOS VM '$_vm_type' built and registered in tart"
 }
 
-# prune_stale_build_dirs
-#   Removes orphaned dot-prefixed Packer build temporary directories that may
-#   have been left behind by interrupted or crashed builds.
+# Removes orphaned dot-prefixed Packer build temporary directories that may
+# have been left behind by interrupted or crashed builds.
 prune_stale_build_dirs() {
   if [ ! -d "$SRC_DIR" ]; then
     return 0
@@ -4039,13 +3929,12 @@ prune_stale_build_dirs() {
   done
 }
 
-# vm_build_system TYPE
-#   Builds/rebuilds the type-scoped system image (src/<type>/system
-#   image.qcow2) once for TYPE, using the first enabled, host-matched manifest
-#   entry of TYPE for build parameters (disk size, edition, macOS version).
+# Builds/rebuilds the type-scoped system image (src/<type>/system
+# image.qcow2) once for TYPE, using the first enabled, host-matched manifest
+# entry of TYPE for build parameters (disk size, edition, macOS version).
 #   WHY: the type image is identity-free and shared by every VM of the type;
-#   per-VM identity is injected onto the data disk at provision time, never
-#   baked into the image.
+# per-VM identity is injected onto the data disk at provision time, never
+# baked into the image.
 vm_build_system() {
   _bs_type="$1"
 
@@ -4085,7 +3974,6 @@ vm_build_system() {
     ;;
   Android)
     # Android system/GSI images are downloaded per-VM (gsiUrl) by
-    # vm_build_android_image; there is no type-scoped Android image.
     return 0
     ;;
   *)
@@ -4119,9 +4007,8 @@ vm_build_images() {
 
 # macOS / Tart (macOS guests)
 
-# vm_setup_tart_vms — Phase 2 provisioning checks for macOS-type VM guests.
-#   The Packer Tart build already registered the VM in tart's store; this
-#   function validates registration and reports runtime entry points.
+# The Packer Tart build already registered the VM in tart's store; this
+# function validates registration and reports runtime entry points.
 #   Source: https://github.com/cirruslabs/tart
 vm_setup_tart_vms() {
   if ! command -v tart >/dev/null 2>&1; then
@@ -4173,12 +4060,11 @@ vm_setup_libvirt_vms() {
 
 # Windows / QEMU
 
-# vm_setup_windows_qemu — Callback for vm_for_each on Windows. Provisions the
-#   writable runtime disk per VM: Windows guests get a data/<id>.qcow2 overlay
-#   over images/<type>.base.qcow2 (mirroring vm_setup_libvirt and the
+# writable runtime disk per VM: Windows guests get a data/<id>.qcow2 overlay
+# over images/<type>.base.qcow2 (mirroring vm_setup_libvirt and the
 #   PowerShell vm-setup Pass A); Android guests get a standalone
-#   data/<id>.qcow2 userdata disk plus the data/<id> (system).qcow2 system
-#   overlay (system/GSI src/ payloads stay pristine).
+# data/<id>.qcow2 userdata disk plus the data/<id> (system).qcow2 system
+# overlay (system/GSI src/ payloads stay pristine).
 vm_setup_windows_qemu() {
   local vm_id="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local vm_display disk_path _prebuilt
@@ -4256,15 +4142,12 @@ vm_setup_windows_qemu_vms() {
   say "Windows VM setup complete; use the generated start-<name> scripts to start VMs"
 }
 
-# Garbage collection for non-provisioned VM artifacts
-
-# vm_gc_vms — Top-level GC dispatcher.  Called from the vm.sh main flow
-#   when --gc is passed.  Removes VM artifacts (Tart VMs, UTM bundles,
-#   libvirt domains, disk images, credential markers, VM descriptors) for
-#   VMs not in the expected set.  By default only entries absent from
+# Garbage collection for non-provisioned VM artifacts: runs when --gc is passed
+# and removes VM artifacts (Tart VMs, UTM bundles, libvirt domains, disk images,
+# credential markers, VM descriptors) for VMs not in the expected set.  By default only entries absent from
 #   VMs.json entirely are cleared; disabled entries are preserved unless
 #   --gc-disabled is passed, which narrows the expected set to
-#   enabled-and-host-matched VMs.
+# enabled-and-host-matched VMs.
 vm_gc_vms() {
   # WHY: default GC keeps disabled entries; only names absent from the
   if [ "$gc_disabled_mode" = true ]; then
@@ -4298,7 +4181,6 @@ vm_gc_vms() {
   say "GC — done"
 }
 
-# gc_tart_vms EXPECTED_NAMES — Remove Tart VMs not in the expected set.
 gc_tart_vms() {
   _gct_expected="$1"
   command -v tart >/dev/null 2>&1 || return
@@ -4314,7 +4196,6 @@ gc_tart_vms() {
   done
 }
 
-# gc_utm_bundles EXPECTED_NAMES — Remove UTM bundles not in the expected set.
 gc_utm_bundles() {
   _gcu_expected="$1"
   [ -d /Applications/UTM.app ] || return
@@ -4331,7 +4212,6 @@ gc_utm_bundles() {
   done
 }
 
-# gc_libvirt_vms EXPECTED_NAMES — Remove libvirt domains not in the expected set.
 gc_libvirt_vms() {
   _gcl_expected="$1"
   command -v virsh >/dev/null 2>&1 || return
@@ -4348,8 +4228,7 @@ gc_libvirt_vms() {
   done
 }
 
-# vm_gc_src_keep_set_for_type TYPE EXPECTED_NAMES — Print canonical src/<type>/
-#   filenames that must be preserved for expected VMs of TYPE.
+# filenames that must be preserved for expected VMs of TYPE.
 vm_gc_src_keep_set_for_type() {
   _gcsksft_type="$1"
   _gcsksft_expected="$2"
@@ -4372,10 +4251,9 @@ vm_gc_src_keep_set_for_type() {
   ' "$MANIFEST"
 }
 
-# vm_gc_disk_keep_set DIR EXPECTED_NAMES — Print the full filenames (with
-#   extension) of every disk image under DIR that must be preserved for the
-#   expected VMs.  data/ keeps writable disks (<id>.qcow2) when gc_data_mode
-#   is enabled.
+# extension) of every disk image under DIR that must be preserved for the
+# expected VMs.  data/ keeps writable disks (<id>.qcow2) when gc_data_mode
+# is enabled.
 vm_gc_disk_keep_set() {
   _gcdks_dir="$1"
   _gcdks_expected="$2"
@@ -4390,9 +4268,8 @@ vm_gc_disk_keep_set() {
   ' "$MANIFEST"
 }
 
-# vm_gc_orphan_disks EXPECTED_NAMES — Remove disk images not in the
-#   manifest-derived keep-set for the expected VMs (see vm_gc_src_keep_set_for_type
-#   and vm_gc_disk_keep_set).
+# manifest-derived keep-set for the expected VMs (see vm_gc_src_keep_set_for_type
+# and vm_gc_disk_keep_set).
 vm_gc_orphan_disks() {
   _gcod_expected="$1"
 
@@ -4430,10 +4307,9 @@ vm_gc_orphan_disks() {
   fi
 }
 
-# vm_gc_orphan_markers EXPECTED_NAMES — Remove guest marker files (type-config
-#   and provision fingerprints) that are no longer meaningful.  src/<type>/
-#   markers gate the type system image; data/ sidecar markers are removed when
-#   their disk image is gone (only when gc_data_mode is enabled).
+# Removes guest marker files (type-config and provision fingerprints) that are no
+# longer meaningful. src/<type>/ markers gate the type system image; data/ sidecar
+# markers are removed when their disk image is gone (only when gc_data_mode is on).
 vm_gc_orphan_markers() {
   _gcom_expected="$1"
 
@@ -4475,11 +4351,10 @@ vm_gc_orphan_markers() {
   fi
 }
 
-# vm_gc_orphan_descriptors EXPECTED_NAMES — Remove VM descriptors
-#   ($VM_DIR/<id>.vm.json) whose guest is not in the expected set.
+# ($VM_DIR/<id>.vm.json) whose guest is not in the expected set.
 #   WHY: descriptors are keyed to the expected set rather than to disk
-#   existence because macOS/tart guests keep their disks in tart's store;
-#   a disk-based check would delete their descriptors on every GC run.
+# existence because macOS/tart guests keep their disks in tart's store;
+# a disk-based check would delete their descriptors on every GC run.
 vm_gc_orphan_descriptors() {
   _gcods_expected="$1"
 
@@ -4495,18 +4370,18 @@ vm_gc_orphan_descriptors() {
   done
 }
 
-# vm_pack_vms — Strip trivially regenerable artifacts from the VM directory
-#   so the tree can be copied as-is to another host (nucleus-vm pack).
-#   Default is dry-run: prints planned removals.  --force performs them.
-#   Refuses while any VM is running.  WHY: pack removes only artifacts that
-#   are a pure function of kept inputs plus a trivial command (no downloads,
-#   no build time) plus transient junk: UTM bundles (rebuilt by setup from
-#   the plist template + ln -f + open), generated start/stop scripts
-#   (sed-rendered), and src/<type>/Packer/ + stale dot-dirs (Packer junk).
+# Strips trivially regenerable artifacts from the VM directory so the tree can be
+# copied as-is to another host (nucleus-vm pack). Default is dry-run: prints
+# planned removals. --force performs them. Refuses while any VM is running.
+# WHY: pack removes only artifacts that
+# are a pure function of kept inputs plus a trivial command (no downloads,
+# no build time) plus transient junk: UTM bundles (rebuilt by setup from
+# the plist template + ln -f + open), generated start/stop scripts
+# (sed-rendered), and src/<type>/Packer/ + stale dot-dirs (Packer junk).
 #   Everything else — data disks, Android userdata, type system images +
-#   markers, installer
+# markers, installer
 #   ISOs, descriptors, runtime markers, tart store, README, and the
-#   pack/unpack wrappers — is payload or data and stays.
+# pack/unpack wrappers — is payload or data and stays.
 vm_pack_vms() {
   local _pv_running
   _pv_running="$(vm_get_running_ids)"
@@ -4562,14 +4437,13 @@ vm_pack_vms() {
   fi
 }
 
-# vm_unpack_ensure_data_disk NAME TYPE
-#   Restores the data disk after pack.  The data disk (data/<name>.qcow2) is
-#   recreated only when absent — never rebuilt (its content is user data by
-#   design); when present it is kept as-is (pack never removes it).  Backs
-#   <VM_DIR>/src/<type>/system image.qcow2 directly (absolute path; on macOS
-#   the bundle-local system base — see vm_system_overlay_backing).  Returns
-#   1 when the type system image is missing (packed trees always carry it, so
-#   this signals a broken tree).
+# Restores the data disk after pack.  The data disk (data/<name>.qcow2) is
+# recreated only when absent — never rebuilt (its content is user data by
+# design); when present it is kept as-is (pack never removes it).  Backs
+# <VM_DIR>/src/<type>/system image.qcow2 directly (absolute path; on macOS
+# the bundle-local system base — see vm_system_overlay_backing).  Returns
+# 1 when the type system image is missing (packed trees always carry it, so
+# this signals a broken tree).
 vm_unpack_ensure_data_disk() {
   _uedd_name="$1"
   _uedd_type="$2"
@@ -4601,19 +4475,18 @@ vm_unpack_ensure_data_disk() {
   fi
 }
 
-# vm_unpack_vms — Regenerate per-platform VM artifacts from the descriptors
-#   (<id>.vm.json) in the VM directory, after copying a packed tree to a
-#   target host (nucleus-vm unpack; complements vm_pack_vms).  For EVERY
-#   descriptor — enabled or disabled — start/stop helper scripts (BOTH .sh
-#   and .ps1 variants) are re-rendered from the descriptor fields via
-#   vm_write_start_script/vm_write_stop_script, and the pack/unpack wrappers
-#   are refreshed.  Bundle/domain creation happens only for enabled
-#   descriptors (mirrors setup): UTM (Darwin) re-creates the bundle dir +
-#   cp the Nix-rendered plist template + chmod +w + link disks into Data/ +
-#   open + wait for registration; libvirt (Linux) virsh define + ensure
-#   data disks; Windows re-renders start scripts (PowerShell).  Dependency:
-#   the target's nucleus config must be applied (provides the plist/domain
-#   templates); copied data files are consumed as-is — never modified.
+# (<id>.vm.json) in the VM directory, after copying a packed tree to a
+# target host (nucleus-vm unpack; complements vm_pack_vms).  For EVERY
+# descriptor — enabled or disabled — start/stop helper scripts (BOTH .sh
+# and .ps1 variants) are re-rendered from the descriptor fields via
+# vm_write_start_script/vm_write_stop_script, and the pack/unpack wrappers
+# are refreshed.  Bundle/domain creation happens only for enabled
+# descriptors (mirrors setup): UTM (Darwin) re-creates the bundle dir +
+# cp the Nix-rendered plist template + chmod +w + link disks into Data/ +
+# open + wait for registration; libvirt (Linux) virsh define + ensure
+# data disks; Windows re-renders start scripts (PowerShell).  Dependency:
+# the target's nucleus config must be applied (provides the plist/domain
+# templates); copied data files are consumed as-is — never modified.
 vm_unpack_vms() {
   if [ "$dry_run" = true ]; then
     dry_run "unpack mode enabled — printing planned regeneration (pass --force to perform)"

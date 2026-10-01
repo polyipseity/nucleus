@@ -1,34 +1,6 @@
 #!/usr/bin/env bash
-# Source this file (conceptually; in Nix it is inlined via builtins.readFile) to
-# make macOS LaunchServices/launchctl helper functions available in
-# home-manager activation scripts.  All functions are no-ops on non-macOS.
-#
-# Provided functions:
-#   register_handler             — set default UTI handler via duti
-#   launchctl_target             — build a launchctl service target specifier
-#   launchctl_session_uid        — uid owning the per-user launchd domain
-#   supervisor_resolve_target    — launchctl target for a service entry
-#   launchctl_bootstrap_domain   — build a launchctl bootstrap domain target
-#   launchctl_job_loaded         — is a launchd job loaded?
-#   launchctl_bootout_wait       — unload a launchd job and wait for the unload
-#   launchctl_bootstrap_plist    — load a plist, tolerating an already-loaded job
-#   refresh_cfprefsd             — kill cfprefsd (CFPreferences daemon)
-#   refresh_pbs                  — kill pbs (Pasteboard Server)
-#   refresh_lsd                  — rebuild Launch Services database
-#   refresh_finder               — restart Finder (killall)
-#   refresh_finder_launchd       — restart Finder (launchctl, preserves windows)
-#   refresh_dock                 — restart Dock
-#   refresh_tiswitcher           — refresh TISwitcher input-source daemon
-#   refresh_system_ui            — restart SystemUIServer + WindowManager
-#   refresh_shared_filelistd     — restart sharedfilelistd
-#   refresh_wallpaper_agent     — restart WallpaperAgent (wallpaper folder)
-#   wait_for_daemons             — brief sleep for daemon flush settlement
-#   refresh_desktop_services     — composite: Finder+SystemUI (launchctl)
-#   refresh_services_menu        — composite: cfprefsd+pbs+sleep
-#   rescan_pbs_services          — force a full pbs Services rescan (console user)
-
-# register_handler DUTI_BIN BUNDLE_ID UTI [UTI ...]
-# Sets BUNDLE_ID as the default handler for each UTI across all roles.
+# macOS launchctl and LaunchServices helpers for home-manager activation. Every
+# refresh_* function is a no-op off macOS.
 register_handler() {
   local duti_bin="$1"
   local handler="$2"
@@ -40,16 +12,8 @@ register_handler() {
   done
 }
 
-# launchctl_target — Build a macOS launchctl service target specifier.
-# Pure formatter: domain + uid + label → target string. No environment
-# dependencies, no defaults — every caller MUST provide all three.
-#
-# macOS 25+ requires gui/<uid>/<service> for user domain and
-# system/<service> for system domain. Older macOS accepted bare service IDs.
-#
-# Args: $1 — domain ("system", "gui", or "user")
-#       $2 — uid (numeric; ignored for system domain)
-#       $3 — service label
+# macOS 25+ requires gui/<uid>/<service> for the user domain and
+# system/<service> for the system domain. Older macOS accepted bare service ids.
 launchctl_target() {
   local domain="$1" uid="$2" label="$3"
   case "$domain" in
@@ -60,11 +24,9 @@ launchctl_target() {
   esac
 }
 
-# launchctl_session_uid — the uid that owns the per-user launchd domain.
-# The effective uid is the right answer whenever a user runs the probe, but a
-# root process (a system daemon) still addresses the logged-in user's gui
-# session, so there the console user's uid is the session owner.  /dev/console
-# is unreadable when nobody is logged in, and root is then the only uid left.
+# A root process (a system daemon) still addresses the logged-in user's gui
+# session, so there the console user's uid is the session owner. /dev/console is
+# unreadable when nobody is logged in, and root is then the only uid left.
 launchctl_session_uid() {
   local uid
   uid="$(id -u)"
@@ -76,17 +38,11 @@ launchctl_session_uid() {
   printf '%s' "$uid"
 }
 
-# supervisor_resolve_target — the launchctl target for a service entry.
-# The domain follows from the declared scope: a system-scope job is
-# "system/<label>" and carries no uid; a user-scope job is
-# "<launchdDomain>/<uid>/<label>".
 # WHY: launchdDomain names only the per-user domain (gui vs user) and is absent
-#   from system-scope entries.  Defaulting it to "gui" for every entry addresses
-#   a system daemon inside the GUI session, where launchd has never loaded it,
-#   so every status probe reports "not loaded" and every start targets a domain
-#   the job does not belong to.
-# Args: $1 — scope ("user" | "system"); $2 — launchdDomain (user scope only);
-#       $3 — unit label.
+#   from system-scope entries. Defaulting it to "gui" for every entry addresses a
+#   system daemon inside the GUI session, where launchd has never loaded it, so
+#   every status probe reports "not loaded" and every start targets a domain the
+#   job does not belong to.
 supervisor_resolve_target() {
   local scope="$1" domain="$2" label="$3"
   case "$scope" in
@@ -95,14 +51,7 @@ supervisor_resolve_target() {
   esac
 }
 
-# launchctl_bootstrap_domain — Build a macOS launchctl bootstrap domain target.
-# Pure formatter: domain + uid → bootstrap domain string. No environment
-# dependencies, no defaults — every caller MUST provide both.
-#
-# bootstrap expects a domain target (system or gui/<uid>), not a service target.
-#
-# Args: $1 — domain ("system", "gui", or "user")
-#       $2 — uid (numeric; ignored for system domain)
+# bootstrap takes a domain target (system or gui/<uid>), not a service target.
 launchctl_bootstrap_domain() {
   local domain="$1" uid="$2"
   case "$domain" in
@@ -113,24 +62,15 @@ launchctl_bootstrap_domain() {
   esac
 }
 
-# launchctl_job_loaded — Is a launchd job currently loaded?
-# Args: $1 — launchctl service target (e.g. "gui/501/local.cloud-mount.iCloud")
-#       $2 — sudo prefix ("" or "sudo")
-# Returns: 0 when the job is loaded, launchctl's own non-zero status otherwise.
-# WHY: loaded is what `launchctl` answers directly, and it is a different
-#   question from "state = running": a job that is loaded but not running is not
-#   missing, and a job that is missing cannot be started by `launchctl start`.
+# WHY: loaded is a different question from "state = running": a job that is
+#   loaded but not running is not missing, and a job that is missing cannot be
+#   started by `launchctl start`.
 launchctl_job_loaded() {
   local target="$1" sudo_prefix="$2"
   # check-suppress:suppression_doc: an unloaded job is the question being asked, not an error.
   $sudo_prefix launchctl print "$target" >/dev/null 2>&1
 }
 
-# launchctl_bootout_wait — Unload a launchd job and wait until it is really gone.
-# Args: $1 — launchctl service target (e.g. "gui/501/local.cloud-mount.iCloud")
-#       $2 — sudo prefix ("" or "sudo")
-# Returns: 0 when the job is no longer loaded (or was never loaded), 1 when it is
-#          still loaded after the bounded wait.
 # WHY: macOS 26+ unloads asynchronously, so a `bootstrap` issued right after
 #   `bootout` can fail with "Bootstrap failed: 5: Input/output error" because the
 #   job is still loaded — and the bootout that completes afterwards then leaves
@@ -162,15 +102,7 @@ launchctl_bootout_wait() {
   return 1
 }
 
-# launchctl_bootstrap_plist — Load a plist into a launchd domain, tolerating an
-# already-loaded job and the asynchronous-unload race.
-# Args: $1 — bootstrap domain target (e.g. "gui/501", "system")
-#       $2 — plist path (e.g. "$HOME/Library/LaunchAgents/local.foo.plist")
-#       $3 — launchctl service target of that same job (e.g. "gui/501/local.foo")
-#       $4 — sudo prefix ("" or "sudo")
-# Output: launchctl's own output when the job could not be loaded; nothing on
-#         success, so a caller can quote the reason in its own error.
-# Returns: 0 when the job is loaded afterwards, 1 otherwise.
+# Prints launchctl's own output on failure so a caller can quote the reason.
 # WHY: bootstrapping an already-loaded job only fails with "Bootstrap failed: 5:
 #   Input/output error", so the loaded case is the healthy case and is never
 #   passed to launchctl.  Code 5 on an unloaded job means a preceding
@@ -202,9 +134,7 @@ launchctl_bootstrap_plist() {
   return 1
 }
 
-# refresh_cfprefsd — Kill cfprefsd (CFPreferences daemon) on macOS.
-# Caches all defaults read/write in process memory; kill forces re-read from
-# plist on next access.  No-op on non-macOS.
+# cfprefsd caches defaults in process memory; kill forces a re-read from the plist.
 refresh_cfprefsd() {
   case "$(uname -s)" in
   Darwin)
@@ -214,9 +144,7 @@ refresh_cfprefsd() {
   esac
 }
 
-# refresh_pbs — Kill pbs (Pasteboard Server + Services manager) on macOS.
-# Caches NSServicesStatus at startup; kill forces re-read of pbs.plist so
-# new/changed services appear in menus.  No-op on non-macOS.
+# pbs caches NSServicesStatus at startup; kill forces a re-read of pbs.plist.
 refresh_pbs() {
   case "$(uname -s)" in
   Darwin)
@@ -226,9 +154,7 @@ refresh_pbs() {
   esac
 }
 
-# refresh_lsd — Rebuild the Launch Services database on macOS.
-# Kills lsd (Launch Services Daemon); on restart it rebuilds from scratch,
-# picking up newly registered .app bundles.  No-op on non-macOS.
+# lsd rebuilds its database from scratch on restart, picking up new .app bundles.
 refresh_lsd() {
   case "$(uname -s)" in
   Darwin)
@@ -238,8 +164,6 @@ refresh_lsd() {
   esac
 }
 
-# refresh_finder — Restart Finder on macOS via killall.
-# No-op on non-macOS.
 refresh_finder() {
   case "$(uname -s)" in
   Darwin)
@@ -249,8 +173,6 @@ refresh_finder() {
   esac
 }
 
-# refresh_dock — Restart Dock on macOS via killall.
-# No-op on non-macOS.
 refresh_dock() {
   case "$(uname -s)" in
   Darwin)
@@ -259,9 +181,8 @@ refresh_dock() {
     ;;
   esac
 }
-# refresh_tiswitcher — Refresh TISwitcher (input-source switcher daemon).
-# Sends HUP so custom key layout / TIS preferences reload without restarting
-# the whole input-method pipeline.
+# HUP reloads custom key layout and TIS preferences without restarting the
+# input-method pipeline.
 refresh_tiswitcher() {
   case "$(uname -s)" in
   Darwin)
@@ -270,8 +191,6 @@ refresh_tiswitcher() {
   esac
 }
 
-# refresh_system_ui — Restart SystemUIServer (menu bar extras) and
-# WindowManager (Spaces) on macOS.
 refresh_system_ui() {
   case "$(uname -s)" in
   Darwin)
@@ -282,7 +201,6 @@ refresh_system_ui() {
   esac
 }
 
-# refresh_shared_filelistd — Restart sharedfilelistd (Finder sidebar daemon).
 refresh_shared_filelistd() {
   case "$(uname -s)" in
   Darwin)
@@ -291,9 +209,8 @@ refresh_shared_filelistd() {
   esac
 }
 
-# refresh_finder_launchd — Restart Finder via launchctl kickstart.
-# Preserves window state. Preferred over killall for desktop refreshes.
-# Finder is always in the GUI domain — not configurable.
+# launchctl kickstart preserves window state, so prefer it over killall.
+# Finder always lives in the gui domain.
 refresh_finder_launchd() {
   case "$(uname -s)" in
   Darwin)
@@ -302,10 +219,7 @@ refresh_finder_launchd() {
   esac
 }
 
-# refresh_wallpaper_agent — Restart WallpaperAgent on macOS to force re-read
-# of wallpaper folder contents after provisioning new wallpapers.
-# WallpaperAgent holds folder contents in-memory; kill forces re-read.
-# No-op on non-macOS.
+# WallpaperAgent holds folder contents in memory; kill forces a re-read.
 refresh_wallpaper_agent() {
   case "$(uname -s)" in
   Darwin)
@@ -314,22 +228,17 @@ refresh_wallpaper_agent() {
   esac
 }
 
-# wait_for_daemons — Brief sleep for killed daemons to flush and restart.
 wait_for_daemons() {
   /bin/sleep 1
 }
 
-# refresh_desktop_services — Composite: restart UI daemons for desktop config
-# changes. Preserves Finder window state via launchctl kickstart.
 refresh_desktop_services() {
   refresh_finder_launchd
   refresh_system_ui
 }
-# refresh_services_menu — Full flush of the Services menu pipeline on macOS.
-# Kills cfprefsd, lsd, pbs, waits 1 s, then restarts Finder.
-# Call this after deploying or removing .app bundles so the Services menu
-# reflects the new state without a logout/reboot.
-# No-op on non-macOS.
+# Full flush of the Services menu pipeline: cfprefsd, lsd, pbs, sleep, Finder.
+# Run after deploying or removing .app bundles so the menu updates without a
+# logout.
 refresh_services_menu() {
   case "$(uname -s)" in
   Darwin)
@@ -346,22 +255,15 @@ refresh_services_menu() {
   esac
 }
 
-# rescan_pbs_services PBS_BIN LAUNCHCTL_BIN SUDO_BIN UID USER
-# Force a complete Services rescan and refresh the services pasteboard.
+# WHY: killing pbs only re-reads its caches, and the FSEvents change detection
+#   never fires for a bundle replaced or renamed in place, so a renamed workflow
+#   kept its stale registration and new ones stayed invisible until the next
+#   login. `pbs -update` rescans and rewrites the userdef cache and the services
+#   pasteboard the menus are built from. A bare `pbs` is not an option: this
+#   build prints usage and exits 1.
 #
-# WHY: killing pbs only re-reads its caches. pbs detects changed Services via
-# FSEvents, which never fires for a bundle replaced or renamed in place, so a
-# renamed workflow kept its stale registration and newly provisioned ones
-# stayed invisible until the next login. `pbs -update` does a complete rescan
-# and rewrites the userdef cache and the services pasteboard that the menus are
-# built from (verified: 2 of 7 nucleus services registered before, 7 after).
-#
-# A bare `pbs` run is not an option: this build rejects it with
-# `Usage: pbs [-debug] [-dump] [-dump_cache] [-read_bundle file] [-update]
-# [-flush] language1 language2...` on stderr and exit status 1.
-#
-# Runs in the console user's session: pbs keeps per-user caches, so running it
-# as root would refresh root's Services instead of the logged-in user's.
+# Runs in the console user's session because pbs caches are per user; as root it
+# would refresh root's services instead.
 rescan_pbs_services() {
   local _rps_pbs_bin _rps_launchctl_bin _rps_sudo_bin _rps_uid _rps_user
   _rps_pbs_bin="$1"

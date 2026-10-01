@@ -1,25 +1,22 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Service watchdog — detects and breaks loops, revives stopped services.
-# Rewritten for the cloud-mount rewrite: one rule table, all hosts, no OS names.
+# Service watchdog: detects and breaks loops, revives stopped services. One rule
+# table, all hosts, no OS names. Prefix-match entries expand per instance.
 #
-# Rules (identical on every host), listed in the order they are EVALUATED.
-# The numbers are names, not positions: Rule 5 runs before Rule 4, and Rule 4b
-# sits between Rule 2 and the supervisor probe.
-#   1. user-disabled → skip (explicit user intent, documented)
+# Rules, in evaluation order. The numbers are names, not positions: Rule 5 runs
+# before Rule 4, and Rule 4b sits between Rule 2 and the supervisor probe.
+#   1. user-disabled → skip (explicit user intent)
 #   2. Blocked record exists → report once, do nothing
 #   4b. record already says not-loaded → report once, no action until apply
 #   3. supervisor_live + looping → block + stop
 #   5. Live + broken (EX_CONFIG 78 etc) → repair
-#   4. Not live + not blocked → start (revival — the only mechanism)
+#   4. Not live + not blocked → start (revival, the only mechanism)
 #
-# Reads services.json, filters to the current host and to the requested scope,
-# skips on-demand services.  Prefix-match entries are expanded per instance.
-#
-# Runs indefinitely, sleeping the cloud-drive lifecycle's watchdogTickSeconds between
-# ticks (persistent daemon).  Use --oneshot for a single iteration (manual or CI).
-# Use --scope user|system to cover one launchd/systemd domain; without it every
-# scope on this host is covered.
+# Reads services.json filtered to this host and the requested scope, skipping
+# on-demand services. Runs indefinitely, sleeping the cloud-drive lifecycle's
+# watchdogTickSeconds between ticks. --oneshot runs a single iteration, and
+# --scope user|system covers one launchd/systemd domain; without it every scope
+# on this host is covered.
 
 set -euo pipefail
 
@@ -29,13 +26,10 @@ _WATCHDOG_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=../lib/service-health.sh
 [ -n "${_NUCLEUS_SERVICE_HEALTH_SOURCED-}" ] || . "$_WATCHDOG_DIR/../lib/service-health.sh"
 # shellcheck source=../lib/svc-instances.sh
-# WHY: no guard variable — svc-instances.sh is a pure definition library with no
-#   top-level side effects (stated in its own header), so re-sourcing it is a
-#   no-op redefinition. Its header names this watchdog as a consumer; the
-#   configured-instance enumeration below is the call site it refers to.
+# WHY no guard variable: svc-instances.sh is a pure definition library, so
+#   re-sourcing it is a no-op redefinition.
 . "$_WATCHDOG_DIR/../lib/svc-instances.sh"
 
-# Dispatch to the correct supervisor backend.
 _watchdog_dispatch_supervisor() {
   case "$(uname -s)" in
   Darwin)
@@ -49,11 +43,9 @@ _watchdog_dispatch_supervisor() {
   esac
 }
 
-# Parse CLI args.
 # The two macOS launchd jobs pass one --scope each (the root system daemon and
-# the per-user agent), so scope selects WHICH entries a daemon covers rather
-# than being a decorative flag.  An absent --scope covers every scope, which is
-# what a manual --oneshot run wants.
+# the per-user agent), so scope selects WHICH entries a daemon covers. An absent
+# --scope covers every scope, which is what a manual --oneshot run wants.
 _oneshot=false
 _scope_filter=""
 while [ $# -gt 0 ]; do
@@ -69,7 +61,6 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-# Main loop.
 _watchdog_main() {
   _watchdog_dispatch_supervisor
 
@@ -84,12 +75,9 @@ _watchdog_main() {
   done
 }
 
-# Path to the services registry this watchdog reads.
 # The plist injects the store path as NUCLEUS_SERVICES_JSON because a root
-# launchd daemon cannot reach the repo: HOME is /var/root and the script itself
-# lives in the Nix store, so derivation has nothing to walk.  Preferring the
-# injected path is what makes the deployed daemon functional; derivation stays
-# for interactive and test use, where no such variable is set.
+# launchd daemon cannot reach the repo: HOME is /var/root and the script lives
+# in the Nix store. Derivation stays for interactive and test use.
 _watchdog_services_json() {
   if [ -n "${NUCLEUS_SERVICES_JSON:-}" ]; then
     printf '%s' "$NUCLEUS_SERVICES_JSON"
@@ -98,34 +86,28 @@ _watchdog_services_json() {
   printf '%s/src/modules/services.json' "$(derive_repo_root)"
 }
 
-# Seconds between ticks — how long a service may stay down before revival is even
-# attempted.  Reading it keeps the interval from drifting away from the policy
-# declared in services.json.
+# How long a service may stay down before revival is attempted. Reading it keeps
+# the interval from drifting away from the policy in services.json.
 _watchdog_interval_seconds() {
   local services_json="" value=""
   services_json="$(_watchdog_services_json)"
   if [ -f "$services_json" ]; then
     # WHY the quoted key: `cloud-drive` contains a hyphen, which jq parses as
-    #   subtraction — `.cloud-drive...` is a COMPILE error (drive/0 is not defined),
-    #   so the unquoted form silently fell through to the default below and the
-    #   declared value was never read on POSIX.  The Windows twin reads the same key
-    #   by name and honoured it, so the two hosts disagreed while both claimed to read
-    #   one policy.
+    #   subtraction, so the unquoted form is a compile error that silently fell
+    #   through to the default while the Windows twin honoured the same key.
     # check-suppress:suppression_doc: best-effort policy read; an absent lifecycle block falls back to the declared default
     value="$(jq -r '."cloud-drive".lifecycle.watchdogTickSeconds // empty' "$services_json" 2>/dev/null || true)"
   fi
   printf '%s' "${value:-300}"
 }
 
-# Seconds allowed for ONE supervisor repair call before it is abandoned as timed
-# out.  Distinct from the tick interval above, which bounds the gap BETWEEN ticks.
+# Seconds allowed for one supervisor repair call, distinct from the tick
+# interval above, which bounds the gap between ticks.
 _watchdog_repair_timeout_seconds() {
   local services_json="" value=""
   services_json="$(_watchdog_services_json)"
   if [ -f "$services_json" ]; then
-    # WHY the quoted key: see _watchdog_interval_seconds — an unquoted hyphenated key
-    #   is a jq compile error, so this reader used to return the default unconditionally
-    #   and the declared repair bound never reached svc_run_bounded on POSIX.
+    # WHY the quoted key: see _watchdog_interval_seconds.
     # check-suppress:suppression_doc: best-effort policy read; an absent lifecycle block falls back to the declared default
     value="$(jq -r '."cloud-drive".lifecycle.watchdogRepairTimeoutSeconds // empty' "$services_json" 2>/dev/null || true)"
   fi
@@ -133,7 +115,6 @@ _watchdog_repair_timeout_seconds() {
 }
 
 # Read one field from a host entry as a raw string.
-# Args: $1 — host entry JSON; $2 — jq path; $3 — default when absent.
 _watchdog_entry_field() {
   local entry="$1" path="$2" fallback="$3" value
   # check-suppress:suppression_doc: best-effort field read; a malformed entry falls back to the declared default
@@ -141,14 +122,10 @@ _watchdog_entry_field() {
   printf '%s' "${value:-$fallback}"
 }
 
-# Read one health-record field without letting a corrupt record abort the tick.
-# WHY: the call sites are PLAIN assignments inside plain-called functions, so
-#   `set -e` is live at them. A non-zero jq status would kill the daemon
-#   mid-tick and leave EVERY service after the corrupt one unchecked — the same
-#   class as the supervisor-parser crash, one layer down. The failure is warned
-#   and an empty value returned, never a healthy default, so a corrupt record
-#   can never read as "fine".
-# Args: $1 — instance id; $2 — field name.
+# WHY: the call sites are plain assignments inside plain-called functions, so
+#   `set -e` is live at them and a non-zero jq status would kill the daemon
+#   mid-tick, leaving every service after the corrupt one unchecked. The failure
+#   is warned and returns empty, never a healthy default.
 _watchdog_health_field() {
   local value
   if ! value="$(svc_health_get "$1" "$2")"; then
@@ -159,13 +136,9 @@ _watchdog_health_field() {
   printf '%s' "$value"
 }
 
-# Record and report "configured but not loaded" for one instance, once.
-# WHY: the POSIX twin of the Windows writer (Write-NotLoadedNotice in
-#   service-watchdog.ps1), reached from the same place — the rule that declines
-#   to start a service the registry declares but the supervisor does not have.
-#   The record's reportedState suppresses repeats, so neither host needs a
-#   separate marker file.
-# Args: $1 — health-record instance id.
+# WHY: POSIX twin of the Windows writer (Write-NotLoadedNotice in
+#   service-watchdog.ps1), reached from the same rule. The record's reportedState
+#   suppresses repeats, so neither host needs a separate marker file.
 _watchdog_not_loaded_notice() {
   local instance="$1"
   if [ "$(_watchdog_health_field "$instance" "state")" != "not-loaded" ]; then
@@ -181,14 +154,12 @@ _watchdog_not_loaded_notice() {
   fi
 }
 
-# Instances the user registry declares for one prefix-match entry.
-# WHY: the POSIX twin of Get-NucleusConfiguredInstanceList. An instance declared
-#   in src/users/<user>/cloud-drives.json is expected to run even while no unit
+# WHY: POSIX twin of Get-NucleusConfiguredInstanceList. An instance declared in
+#   src/users/<user>/cloud-drives.json is expected to run even while no unit
 #   exists for it, so discovery must read the registry and not only the
-#   supervisor — otherwise such an instance is invisible to the watchdog and can
-#   never be reported. svc-instances.sh owns the registry-to-instance mapping.
-#   A registry that cannot be read yields nothing rather than fabricated ids.
-# Args: $1 — host entry JSON.
+#   supervisor, or such an instance is invisible to the watchdog and can never
+#   be reported. A registry that cannot be read yields nothing rather than
+#   fabricated ids.
 _watchdog_configured_instances() {
   local entry="$1" repo_root mounts
   repo_root="$(derive_repo_root)"
@@ -208,7 +179,6 @@ _watchdog_tick() {
   local host_key
   host_key="$(resolve_nucleus_host)"
 
-  # Resolve all service keys BEFORE the loop (D5 fix).
   local svc_keys
   # check-suppress:suppression_doc: best-effort operation; failure is non-fatal
   svc_keys=$(jq -r 'keys[] | select(startswith("$") | not)' "$services_json" 2>/dev/null || true)
@@ -216,8 +186,8 @@ _watchdog_tick() {
   local svc_key
   for svc_key in $svc_keys; do
     local host_entry
-    # Service keys contain hyphens, which jq reads as subtraction in ".$key" —
-    # bind both lookup parts with --arg so every service resolves.
+    # Service keys contain hyphens, which jq reads as subtraction in '.$key', so
+    # both lookup parts bind with --arg and every service resolves.
     # check-suppress:suppression_doc: best-effort operation; failure is non-fatal
     host_entry=$(jq -c --arg key "$svc_key" --arg host "$host_key" '.[$key].hosts[$host] // empty' "$services_json" 2>/dev/null || true)
     [ -n "$host_entry" ] || continue
@@ -238,8 +208,8 @@ _watchdog_tick() {
     if [ "$prefix_match" = "true" ]; then
       _watchdog_check_prefix "$svc_key" "$svc_type" "$host_entry"
     else
-      # Health is keyed by the service key; the supervisor addresses the
-      # declared unit name (e.g. local.ollama, ollama.service).
+      # Health is keyed by the service key while the supervisor addresses the
+      # declared unit name (local.ollama, ollama.service).
       local unit_name
       unit_name="$(_watchdog_entry_field "$host_entry" '.service' "$svc_key")"
       _watchdog_check_instance "$svc_key" "$svc_type" "$host_entry" "$svc_key" "$unit_name"
@@ -247,10 +217,9 @@ _watchdog_tick() {
   done
 }
 
-# Check all instances for a prefix-match service.
 # The instance id is the concrete unit/label, so expansion matches the service
-# prefix directly — a launchd target is "<domain>/<uid>/<label>", never the
-# label alone, and `launchctl list` prints labels only.
+# prefix directly: a launchd target is "<domain>/<uid>/<label>" and `launchctl
+# list` prints labels only.
 _watchdog_check_prefix() {
   local svc_key="$1" svc_type="$2" host_entry="$3"
   local service_name scope live_instances configured_instances instance
@@ -270,12 +239,9 @@ _watchdog_check_prefix() {
     ;;
   *)
     # WHY: an unmatched type must skip the entry, not abort the tick. `live_instances`
-    #   is a bare `local`, and an unassigned local is UNBOUND under `set -u`
-    #   (measured: rc=127), so reaching `$live_instances` below killed the whole
-    #   tick instead of skipping one entry. This mirrors `_watchdog_check_instance`'s
-    #   own `*) return 0` arm — and returns identically, because that sibling returns
-    #   0 for an unknown type too, so the configured-instance loop below could never
-    #   have done anything with it either.
+    #   is a bare `local`, and an unassigned local is unbound under `set -u`
+    #   (measured: rc=127), so reaching it below killed the whole tick instead of
+    #   skipping one entry.
     return 0
     ;;
   esac
@@ -297,7 +263,6 @@ _watchdog_check_prefix() {
   done <<<"$configured_instances"
 }
 
-# Map a declared scope to the systemctl flag selecting that manager.
 _watchdog_scope_flag() {
   if [ "${1:-user}" = "system" ]; then
     printf '%s' "--system"
@@ -310,11 +275,9 @@ _watchdog_scope_flag() {
 # WHY: one root daemon and one per-user agent run this same code, one per scope.
 #   Ignoring the requested scope made each daemon cover the other's as well: the
 #   user agent then probed system units, found them not live (a user cannot read
-#   the system manager), and reached for them through sudo — which cannot prompt
-#   inside launchd — while the root daemon revived the user agent's own services
-#   at the same time.  An entry that declares no scope is covered by both, so it
-#   can never be silently orphaned.
-# Args: $1 — host entry JSON.
+#   the system manager), and reached for them through sudo, which cannot prompt
+#   inside launchd, while the root daemon revived the user agent's own services
+#   at the same time.
 _watchdog_scope_selected() {
   local entry_scope
   [ -n "$_scope_filter" ] || return 0
@@ -334,13 +297,11 @@ _watchdog_scope_selected() {
 _watchdog_check_instance() {
   local svc_key="$1" svc_type="$2" host_entry="$3" instance="$4"
   [ -n "$instance" ] || return 0
-  # $6 — true when the user registry declares this instance but the supervisor
-  # has no unit for it; the POSIX twin of the Windows IsConfigured flag.
   local is_configured="${6:-false}"
 
   local target scope declared_unit_path unit_id
-  # The supervisor addresses the declared unit name, which is not the health
-  # record key: a single-unit service records health under its service key
+  # The supervisor addresses the declared unit name, which is not the health record
+  # key: a single-unit service records health under its service key
   # (betterdisplay-heartbeat) while launchd/systemd address the declared
   # label/unit (local.betterdisplay-heartbeat, ollama.service). A prefix-match
   # family passes the concrete instance id, which is both.
@@ -362,19 +323,15 @@ _watchdog_check_instance() {
     ;;
   esac
 
-  # Declared unit path from services.json; the backend expands __INSTANCE__ and ~.
-  # WHY this is read before Rule 1: supervisor_enabled consumes it too — it is
-  #   what lets the predicate find a job whose file sits at a declared non-default
-  #   path, and Rule 1's skip decision depends on that answer. Reading it here
-  #   also keeps it away from a bare `local` being UNBOUND under `set -u`, which
-  #   would abort the whole tick instead of skipping one instance.
+  # WHY this is read before Rule 1: supervisor_enabled consumes it too, so a job
+  #   whose file sits at a declared non-default path is still found, and the
+  #   Rule 1 decision depends on that answer.
   declared_unit_path="$(_watchdog_entry_field "$host_entry" '.unitPath' '')"
 
-  # Rule 1: is the service explicitly disabled by the user, or absent?
-  # A disabled service must not be auto-started; only a manual re-enable
-  # (nucleus-apply) changes this.  The Windows twin (Test-ServiceInstance Rule 1)
-  # additionally classifies an instance the registry declares but the supervisor
-  # does not have as not-loaded, and reports it once instead of starting it.
+  # Rule 1: explicitly disabled by the user, or absent? Only a manual re-enable
+  # (nucleus-apply) changes this. The Windows twin (Test-ServiceInstance Rule 1)
+  # additionally classifies a registry-declared instance with no unit as
+  # not-loaded, reported once instead of started.
   if ! supervisor_enabled "$target" "$declared_unit_path" "$scope"; then
     if [ "$is_configured" = true ]; then
       _watchdog_not_loaded_notice "$instance"
@@ -397,10 +354,9 @@ _watchdog_check_instance() {
     return 0
   fi
 
-  # Rule 4b: not-loaded record → informational only (no action until nucleus-apply).
-  # The record, not the probe, is the input: the classification is written by
-  # whichever tick found the instance missing (Rule 1), and only nucleus-apply
-  # re-arms it.
+  # Rule 4b: not-loaded record, informational only. The record, not the probe, is
+  # the input: the classification is written by whichever tick found the instance
+  # missing (Rule 1), and only nucleus-apply re-arms it.
   local _state
   _state="$(_watchdog_health_field "$instance" "state")"
   if [ "$_state" = "not-loaded" ]; then
@@ -434,23 +390,20 @@ _watchdog_check_instance() {
   if [ "$is_live" = true ]; then
     # Rule 3's input is folded in here: the health record is the only place a
     # restart is counted, so the supervisor's generation token is compared
-    # against the last observation on every tick.  A token that changed between
-    # ticks means the supervisor started a new run; an unchanged token means the
-    # instance survived the whole tick.
+    # against the last observation on every tick.
     local stored
     stored="$(_watchdog_health_field "$instance" "generation")"
 
-    # A null/absent generation has never been observed: adopt the token and
-    # record nothing, so a cold start is never mistaken for a restart.  Only a
-    # missing value counts as unobserved — a token that legitimately reads zero
-    # must still be compared, or the service's first restart would be swallowed.
+    # A null or absent generation has never been observed: adopt the token and record
+    # nothing, so a cold start is never mistaken for a restart. Only a missing
+    # value counts as unobserved; a token that legitimately reads zero must still
+    # be compared, or the service's first restart would be swallowed.
     if [ -n "$stored" ]; then
       if [ "$generation" != "$stored" ]; then
-        # WHY: one restart per observed change, never (current - stored).  The
-        #   token is a run count on launchd and systemd, but process identity or
-        #   a run *time* on Windows, where the difference is elapsed seconds and
-        #   would fabricate thousands of restarts out of a single one.  Both
-        #   platforms must agree, so the comparison is inequality only.
+        # WHY: one restart per observed change, never (current - stored). The token
+        #   is a run count on launchd and systemd but process identity or a run
+        #   time on Windows, where the difference is elapsed seconds and would
+        #   fabricate thousands of restarts out of one.
         if ! svc_health_record_restart "$instance" "supervisor"; then
           warn "watchdog: could not record a restart for $instance"
         fi
@@ -487,9 +440,9 @@ _watchdog_check_instance() {
     case "$last_exit" in
     78)
       notice "watchdog: $instance exited with EX_CONFIG (78); repairing"
-      # WHY the bound: a repair that hangs — a dead macFUSE volume blocks inside the
-      #   kernel — would otherwise stall the whole tick, and every instance after this
-      #   one would go unchecked.  124 is svc_run_bounded's timeout status.
+      # WHY the bound: a repair that hangs, such as one blocked inside the kernel by a
+      #   dead macFUSE volume, would stall the tick and leave every instance after
+      #   this one unchecked. 124 is svc_run_bounded's timeout status.
       repair_timeout="$(_watchdog_repair_timeout_seconds)"
       svc_run_bounded "$repair_timeout" supervisor_repair "$target" "$declared_unit_path" "$scope" || repair_rc=$?
       if [ "$repair_rc" -eq 124 ]; then
@@ -505,7 +458,7 @@ _watchdog_check_instance() {
     return 0
   fi
 
-  # Rule 4: not live + not blocked → revival via supervisor_start.
+  # Rule 4: not live and not blocked.
   notice "watchdog: $instance is not running; starting"
   if ! supervisor_start "$target" "$declared_unit_path" "$scope"; then
     warn "watchdog: could not start $instance"
