@@ -2,46 +2,23 @@ function Invoke-PowerShellModuleSetup {
   <#
   .SYNOPSIS
     Idempotently installs PowerShell modules pinned in the repository lockfile.
-
   .DESCRIPTION
-    Reads the `psgallery` section of lockfile.json and installs each listed
-    module at the pinned version. A pin is either a version string or a
-    {version, hash} object; only the version is used here. Every discovered copy
-    of a listed module at or above the pin is removed first, whatever its scope,
-    so no copy can shadow the pin. A copy below the pin is left where it is:
-    PowerShell loads the highest version available, so such a copy is inert. The
-    pin is then installed under CurrentUser unless a copy at that version is
-    already there.
-
-    A copy that cannot be removed does not stop the rest of the work: the
-    failure is recorded together with whatever could be proven about it, the
-    sweep moves on to the next copy, the pin is still installed, and every
-    collected failure is thrown once at the end of the run. Before a copy
-    outside the per-user module path is deleted, the module takes ownership of
-    the tree, grants this account full control, and clears the read-only
-    attribute across it, because a read-only file inside an image-owned tree is
-    denied for a reason an ACL grant does not address.
-
-    This is additive-only: modules present but not in the lockfile are left
-    untouched (no zap/uninstall). PowerShell modules are shared state with
-    non-nucleus workflows, so removal would be destructive.
-
-    Currently managed:
-      - Pester — required by scripts/test.ps1 for Windows Pester test suites
-      - powershell-yaml — required by scripts/check.ps1 for locked DSC validation
-      - PSScriptAnalyzer — (managed via Nix HM activation on POSIX, installed
-        here for Windows parity)
-
-    Requires PowerShellGet to be available (built into PowerShell 5.1+ and
-    pwsh 7+). Modules are installed at CurrentUser scope, but removing a copy
-    that the image or another admin installed does need elevation, because that
-    copy can be owned by TrustedInstaller.
-
-  .EXAMPLE
-    Invoke-PowerShellModuleSetup
-
+    Reads the `psgallery` section of lockfile.json and installs each module at
+    its pinned version; a {version, hash} pin uses only the version. Every copy
+    at or above the pin is removed first, whatever its scope, so none can shadow
+    it. A copy below the pin stays: PowerShell loads the highest version, so it
+    is inert. Additive only, since PowerShell modules are shared with
+    non-nucleus workflows.
+    A copy that cannot be removed does not stop the run: the failure is
+    recorded, the sweep continues, the pin is still installed, and every failure
+    is thrown once at the end. Deleting a copy outside the per-user module path
+    takes ownership of the tree, grants this account full control and clears
+    read-only, because a read-only file in an image-owned tree is denied for a
+    reason an ACL grant does not address.
+    Removing an image- or other-admin-owned copy needs elevation even though
+    the pin installs at CurrentUser.
   .NOTES
-    Exit codes: 0 on success; non-zero on failure.
+    Requires PowerShellGet (built into PowerShell 5.1+ and pwsh 7+).
   #>
   [CmdletBinding()]
   param()
@@ -55,32 +32,19 @@ function Invoke-PowerShellModuleSetup {
   }
 
   $lockfile = Get-Content $lockfilePath -Raw | ConvertFrom-Json
-  # WHY no nupkg hash check here: Install-Module installs from PSGallery by name
-  # and cannot install a verified local nupkg, so hashing a separate download
-  # would not cover the artifact that lands on disk. The {hash} pin is consumed
-  # by the hash-pinned declarative module path instead; this installer is
-  # version-pinned only.
   $psGalleryModules = if ($lockfile.psgallery) { $lockfile.psgallery } else { @{} }
 
   if ($psGalleryModules.Count -eq 0) {
     return
   }
 
-  # WHY the last entry: PowerShellGet installs CurrentUser scope into the per-user
-  #   module path, which is the last entry of PSModulePath on every platform this
-  #   module runs on. Deriving it beats hardcoding the Windows PowerShell 5 path,
-  #   which PowerShell 7 no longer uses.
   $currentUserModulePath = @($env:PSModulePath -split [IO.Path]::PathSeparator | Where-Object { $_ })[-1]
 
-  # WHY it spans every module and not just one: a copy this process cannot delete
-  # must not cost the host the pins that come after it, so each failure is
-  # recorded where it happens and the whole set is raised once at the end.
   $removalFailures = @()
 
   foreach ($entry in $psGalleryModules.PSObject.Properties) {
     $moduleName = $entry.Name
     $pin = $entry.Value
-    # A psgallery pin is either a version string or a {version, hash} object.
     $requiredVersion = if ($pin -is [string]) { $pin } else { $pin.version }
 
     if ([string]::IsNullOrWhiteSpace($requiredVersion)) {
@@ -88,24 +52,11 @@ function Invoke-PowerShellModuleSetup {
       continue
     }
 
-    # Remove every copy that is not converged and can still shadow the pin.
-    # WHY the whole set: Get-Module -ListAvailable returns one entry per version
-    # AND per scope, and a host carrying two copies at or above the pin leaves
-    # the second one in the module path. Removing one entry leaves the other
-    # exactly where it was, where it still shadows the pin.
-    # WHY the sweep runs before anything is skipped: the old short-circuit sat
-    # ahead of this block, so a host that already had the pin never removed the
-    # copy beside it that could shadow it.
     $existing = @(Get-Module -ListAvailable -Name $moduleName)
     $converged = @($existing | Where-Object {
         $_.Version -eq [Version]$requiredVersion -and
         $_.ModuleBase -like "$currentUserModulePath*"
       })
-    # WHY the directories and not Uninstall-Module: -AllVersions works from the
-    # PSGallery package store, where the name is one package, so it cannot spare
-    # the converged copy and would take it along with the rest. Removing each copy
-    # by its own path is the only selective form available, and it also covers a
-    # copy that has no package record to uninstall through.
     # WHY the converged copy is spared: it is the pin, in the scope this module
     # installs to, so removing it would force a PSGallery round trip on every run
     # to put back what was already right. The version floor below still takes out

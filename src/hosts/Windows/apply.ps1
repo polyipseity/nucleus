@@ -1,256 +1,39 @@
 <#
 .SYNOPSIS
   Apply the configuration for Windows.
-
 .DESCRIPTION
-  Orchestrates the Windows configuration lifecycle in a single script:
-    1. Load helper functions from $ModuleDir one-function module files.
-    2. Materialize primary-user secrets from src/secrets via SOPS.
-    3. Materialize wallpaper blobs and remove stale decrypted files.
-    4. Resolve each DSC config file relative to $ConfigDir.
-    5. Pass each file to Invoke-WingetConfiguration, which substitutes
-       the __NUCLEUS_ACTIVE_WALLPAPER__ token (when present) and runs
-       `winget configure`.
-    6. Provision Scoop buckets, cargo-binstall, and bun global packages.
-    7. Converge user-level shell/editor/Git/SSH parity state.
-    8. Converge remote-access and power posture parity state.
-  The script is idempotent: re-running it re-applies all DSC resources and
-  converges any drift from the desired state.
-
-  Filesystem scope: the system volume NTFS layout is an OS default nucleus does
-  not repartition or reformat at apply. Managed storage-related policy includes
-  WinFsp (packages.dsc.yml), Storage Sense (storage-sense.dsc.yml), and long
-  paths (long-paths.dsc.yml). See .agents/instructions/host-filesystem-scope.instructions.md.
-
-.PARAMETER ConfigDir
-  Directory that contains the DSC YAML files.  Defaults to the directory
-  containing this script ($PSScriptRoot).
-
+  Loads the helper modules, materializes secrets and wallpapers, applies every
+  DSC file through Invoke-WingetConfiguration, provisions Scoop, cargo-binstall
+  and bun, then converges user-level shell, editor, Git/SSH, remote-access and
+  power state. Idempotent: a rerun re-applies and repairs drift.
 .PARAMETER ConfigFiles
-  Ordered list of DSC YAML filenames to apply.  Defaults to
-  @('system/scheduler.dsc.yml', 'system/developer-mode.dsc.yml',
-  'system/firewall.dsc.yml', 'system/taskbar.dsc.yml',
-  'system/computer-name.dsc.yml', 'system/long-paths.dsc.yml',
-  'system/storage-sense.dsc.yml', 'system/font-substitutes.dsc.yml',
-  'system/remote-desktop.dsc.yml', 'system/power-policy.dsc.yml',
-  'system/packages.dsc.yml').
-  Filenames are resolved relative to $ConfigDir.
-
-  Per-user DSC files can be declared in src/users/<username>/windows.json under each
-  user's dscConfigFiles array.  apply.ps1 appends those files for every user
-  listed in -Users (de-duplicated, preserving order) so each managed user can
-  declare their own user-level DSC configs without editing script code.
-
+  Ordered DSC filenames, resolved against $ConfigDir. Per-user files declared in
+  src/users/<username>/windows.json under dscConfigFiles are appended for every
+  user in -Users, de-duplicated and order-preserving.
 .PARAMETER ModuleDir
-  Path to the directory containing one-function Windows helper modules.
-  Mandatory: caller must explicitly pass the module directory so they are
-  aware of which modules will be loaded and executed.
-
+  Directory of one-function Windows helper modules. Mandatory, so callers know
+  which modules run.
 .PARAMETER Users
-  Array of usernames to configure. Mandatory: each user in this list gets
-  their secrets materialized, SSH keys adopted, and home directory state
-  converged. Callers must explicitly pass this list so they are aware of
-  which user profiles will be modified. The current Windows session user must
-  appear in this list for user-state parity steps.
-  Example: -Users @('admin', 'guest')
-
-  Note: For full multi-user support where each user gets their own secrets,
-  SSH keys, and home directory state, run apply.ps1 separately for each user:
-    .\apply.ps1 -ModuleDir "C:\path\to\src\platforms\Windows\modules" -Users @('admin')
-    .\apply.ps1 -ModuleDir "C:\path\to\src\platforms\Windows\modules" -Users @('guest')
-  This way each user gets properly isolated secret materialization.
-
-.PARAMETER EnableAgentsConfigParity
-  Enable managed per-subdir symlinks in %USERPROFILE%\.agents\ pointing into
-  src\modules\configs\agents\ (excluding skills\) so coding agents write
-  directly into the repo tree.  False removes managed symlinks (cleanup path).
-
-.PARAMETER EnableAgentsSkillsParity
-  Enable managed per-skill symlinks in %USERPROFILE%\.agents\skills\ for
-  committed (bundled / AGPL-compatible) skills in
-  src\modules\configs\agents\skills\.  False removes managed skill symlinks
-  (cleanup path); fetched clawhub downloads in that directory are left intact.
-
-.PARAMETER EnableAgentsClawHubSkillsParity
-  Download and update fetched (non-AGPL-compatible) skills listed in
-  src\modules\configs\agents\clawhub-skills.json into
-  %USERPROFILE%\.agents\skills\ via the ClawHub CLI.  Managed by
-  Sync-AgentsClawHubSkillManifest.  False skips the sync; already-downloaded
-  skill directories are left intact (no cleanup path needed because ClawHub
-  downloads are self-contained real directories, not managed symlinks).
-
-.PARAMETER EnableSecretsParity
-  Enable managed secret materialization and managed SSH key cleanup fallback.
-
-.PARAMETER EnableBunParity
-  Enable managed bun global package provisioning (pi-coding-agent and future bun-only tools).
-
-.PARAMETER EnableCloudDrivesParity
-  Enable managed cloud drive mount directory provisioning and rclone remote verification
-  for each configured user. False skips provisioning without error.
-
-.PARAMETER EnableSymlinkParity
-  Enable managed symlink provisioning from src/users/. Each link is created only
-  for entries that declare a Windows target and receives delete-protection ACLs.
-  False removes only previously managed symlinks.
-
-.PARAMETER EnableGitSshParity
-  Enable managed user-level Git/SSH parity convergence and block cleanup logic.
-
-.PARAMETER EnableHostAgeKeyRegistration
-  Register this machine's SSH host public key as an age recipient in .sops.yaml
-  and rewrap all SOPS-encrypted files on first apply.  Idempotent: no-op when
-  the key is already registered.  Disable to skip registration (e.g. on
-  machines where the SSH host key is not yet a designated SOPS recipient).
-
-.PARAMETER EnablePowerParity
-  Enable managed Windows power policy parity convergence and cleanup fallback.
-
-.PARAMETER EnablePicardParity
-  Enable managed MusicBrainz Picard native INI convergence and cleanup fallback.
-
-.PARAMETER EnableObsidianParity
-  Enable managed Obsidian advanced-settings parity convergence and cleanup
-  fallback while preserving unmanaged vault metadata in the live app config.
-
-.PARAMETER EnableRimSortParity
-  Enable managed RimSort instance-paths and Steam-integration parity convergence
-  and cleanup fallback while preserving unmanaged theme and UI settings.
-
-.PARAMETER EnableQtPassParity
-  Enable managed QtPass Settings/Template tab parity convergence and cleanup fallback.
-
-.PARAMETER EnableLibreOfficeParity
-  Enable managed LibreOffice metadata-stripping XCU merge on Windows.
-  Strips personal info on save and clears user profile data fields.
-
-.PARAMETER EnableRdpParity
-  Enable managed Windows built-in RDP convergence and cleanup fallback.
-
-.PARAMETER EnableRemoteAccessParity
-  Enable managed OpenSSH remote-access convergence and cleanup fallback.
-
-.PARAMETER EnableWiFiParity
-  Enable managed Wi-Fi MAC address randomization parity convergence and cleanup
-  fallback.  Mirrors the NixOS networking.networkmanager.wifi.macAddress and
-  macOS Private Wi-Fi Address features.
-
-.PARAMETER EnableShellParity
-  Enable managed PowerShell profile parity block and cleanup fallback.
-
-.PARAMETER EnableVsCodeExtensionsParity
-  Enable managed VS Code extension parity convergence and cleanup fallback.
-
-.PARAMETER EnableVsCodeSettingsParity
-  Enable managed VS Code config symlinks (settings, keybindings, MCP, tasks,
-  snippets, prompts, profiles, and Copilot memories) pointing into the live
-  repo tree.  False removes managed symlinks (cleanup path); VS Code recreates
-  plain files on next launch.
-
-.PARAMETER EnableDevDirectoryParity
-  Create %USERPROFILE%\dev when absent.  Mirrors the MacBook and NixOS
-  ensure-dev-directory activation which provisions ~/dev across all hosts.
-  False skips creation without error.
-
-.PARAMETER EnableDevReposParity
-  Enable provisioning of development repositories (nucleus symlink, monorepo,
-  and monorepo-private) in %USERPROFILE%\dev. Defaults to enabled when the
-  current user's devRepos.enable is true in the user registry.
-  False skips provisioning without error.
-
-.PARAMETER EnableVsCodeWorkspaceTrustParity
-  Enable managed VS Code workspace trust for %USERPROFILE%\dev.  Writes the
-  trust entry directly to state.vscdb via Bun's built-in bun:sqlite module so
-  the folder opens without a trust prompt.  False skips the write; no cleanup
-  is needed because VS Code manages its own trust DB state.
-
-.PARAMETER EnablePiProjectTrustParity
-  Enable managed pi coding agent project trust for shared directories.
-  Writes trust entries to %USERPROFILE%\.pi\agent\trust.json so pi loads
-  project resources without a trust prompt.  False skips the write.
-
-.PARAMETER EnableHarnessBridgeParity
-  Enable deployment of the harness-bridge hook entry points and their PATH
-  shims (%USERPROFILE%\.local\bin\harness-notify.cmd and harness-approval.cmd
-  calling the copies in the nucleus USER root).  False removes the managed shims
-  and copies, so harness hooks answer locally.
-
+  Usernames to configure. Mandatory. Each user gets secrets materialized, SSH
+  keys adopted and home directory state converged, so the session user must
+  appear here. Run once per user to keep secret materialization isolated.
 .PARAMETER NoAISync
-  When specified, suppresses the post-apply Ollama model sync step.  Useful in
-  CI or on low-bandwidth connections where model pulls (2-20 GB each) are
-  undesirable.
-
+  Skip the post-apply Ollama model sync, whose model pulls run 2-20 GB each.
 .PARAMETER ReplicaSync
-  When specified, runs the post-apply cloud replica sync step.  By default
-  apply skips replica sync to avoid long blocking runs; a scheduled daily sync
-  already converges replicas.
-
+  Run the post-apply cloud replica sync, which apply skips by default because a
+  scheduled daily sync already converges replicas.
 .PARAMETER VMSetup
-  When specified, runs full post-apply VM provisioning (image build + disk setup).
-  Includes config sync.  Skipped by default because disk pre-allocation is slow.
-
+  Run full post-apply VM provisioning (image build and disk setup), which
+  includes config sync. Off by default because disk pre-allocation is slow.
 .PARAMETER NoVMSync
-  When specified, skips the post-apply VM config refresh (descriptors and
-  start/stop scripts).  By default apply runs a lightweight sync after every
-  apply unless -VMSetup is set.
-.PARAMETER MinFreeDiskGB
-  Minimum free space threshold (GiB) used by the pre-flight health check.
-
-.PARAMETER Help
-  When present, prints this help text and exits without applying anything.
-
+  Skip the lightweight VM descriptor and script refresh apply runs after every
+  apply.
 .PARAMETER Action
-  Selects the command surface to run.  Defaults to "apply" (the existing
-  configuration lifecycle, unchanged).  "health-check" and "audit-store" are
-  standalone actions merged from the deleted scripts/health-check.ps1 and
-  scripts/audit-store.ps1.  No Windows helper scripts exist for these yet, so
-  each is a thin stub that reports not-implemented and exits 0.
-
-.EXAMPLE
-  # Apply with explicit module directory and user list:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -Users @('admin')
-
-.EXAMPLE
-  # Apply only the user-level DSC file:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -Users @('admin') -ConfigFiles @('user/wallpaper.dsc.yml')
-
-.EXAMPLE
-  # Apply while explicitly scoping secret materialization to one user:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -Users @('admin')
-
-.EXAMPLE
-  # Apply while skipping the post-apply Ollama model sync:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -Users @('admin') -NoAISync
-
-.EXAMPLE
-  # Apply and opt in to immediate post-apply replica sync:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -Users @('admin') -ReplicaSync
-
-.EXAMPLE
-  # Apply while disabling machine age key auto-registration in .sops.yaml:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -Users @('admin') -EnableHostAgeKeyRegistration:$false
-
-.EXAMPLE
-  # Apply while disabling managed VS Code settings parity (cleanup only):
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -Users @('admin') -EnableVsCodeSettingsParity:$false
-
-.EXAMPLE
-  # Apply while disabling managed remote-access parity (cleanup only):
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -Users @('admin', 'guest') -EnableRemoteAccessParity:$false
-
+  Command surface to run: "apply" (default), or "health-check" and "audit-store",
+  which are stubs that report not-implemented and exit 0.
 .NOTES
-  Environment variables:
-    NUCLEUS_REPO_ROOT   Path to the nucleus repository root (auto-detected from script path).
-    NUCLEUS_HOST   Must be set to "Windows" for apply behavior.
-    USERNAME       Current Windows username.
-    HOME           User home directory.
-    LOCALAPPDATA   Local application data path.
-    ProgramData    System-wide application data path.
-    ProgramFiles   System program files path.
-    USERPROFILE    User profile directory.
-
-  Exit codes:
-    0 on success; 1 on error.
+  Environment: NUCLEUS_REPO_ROOT, NUCLEUS_HOST (must be "Windows"), USERNAME,
+  HOME, LOCALAPPDATA, ProgramData, ProgramFiles, USERPROFILE.
 #>
 [CmdletBinding()]
 param(
@@ -278,8 +61,6 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# If -ParamsJson was provided (by self-elevation), deserialize all parameters
-# from the temp JSON file instead of from command-line arguments.
 if ($ParamsJson -and (Test-Path $ParamsJson)) {
   $p = Get-Content $ParamsJson -Raw | ConvertFrom-Json
   $ConfigDir = $p.ConfigDir
@@ -311,12 +92,6 @@ if ($isAdmin -and -not $Elevated) {
   exit 1
 }
 
-# ── Subcommand dispatch ─────────────────────────────────────────────────────────
-# The nucleus command surface was merged: health-check and audit-store are now
-# standalone actions of apply.ps1 instead of separate scripts.  The default
-# "apply" action falls through to the existing apply flow below, unchanged.
-# The standalone actions delegate to the Windows twin scripts/apply.ps1 so the
-# twin is not dead code (mirrors how svc.ps1 / gc.ps1 are consumed below).
 $actionRepoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..\..\..")).Path
 $applyScript = Join-Path -Path $actionRepoRoot -ChildPath "scripts\apply.ps1"
 switch ($Action) {
@@ -347,7 +122,6 @@ switch ($Action) {
 
 if ($Help) { Get-Help $PSCommandPath -Detailed; return }
 
-# Compose internal Enable-* flags from high-level -No* switches for downstream guards.
 $noOptionalParity = $NoOptionalParity
 $noSecretsParity = $NoSecretsParity -or $noOptionalParity
 $noUserStateParity = $NoUserStateParity -or $noOptionalParity
@@ -385,8 +159,6 @@ $EnableCamillaDSPHeartbeatServiceParity = -not $noUserStateParity
 $EnableCamillaGUIServiceParity = -not $noUserStateParity
 $EnableAppAutostartParity = -not $noUserStateParity
 $EnableMenuBarParity = -not $noUserStateParity
-# EnableDevReposParity defaults to $null (deferred to devRepos registry).
-# When user-state is skipped, force $false instead.
 $EnableDevReposParity = if ($noUserStateParity) { $false } else { $null }
 $EnableVsCodeExtensionsParity = -not $noUserStateParity
 $EnableVsCodeSettingsParity = -not $noUserStateParity
@@ -401,10 +173,6 @@ $userModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "user"
 $editorsModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "editors"
 $wallpapersModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers"
 
-# ── Self-elevation ──────────────────────────────────────────────────────────────
-# Match the POSIX model: non-admin caller → internal elevation → all subsequent
-# operations execute with admin privileges.  No fallback code for "not admin" is
-# needed after this point.
 if (-not $Elevated) {
   $params = @{
     ConfigDir        = $ConfigDir
@@ -614,8 +382,6 @@ $prekCandidates = @(
 
 $sopsExe = Resolve-Executable -Name "sops" -CandidatePaths $sopsCandidates
 $gpgExe = Resolve-Executable -Name "gpg" -CandidatePaths $gpgCandidates
-# Required by Invoke-SecretVerification to prove each managed SSH private key is
-# readable with an empty passphrase, the same probe the POSIX verifier performs.
 $sshKeygenExe = Resolve-Executable -Name "ssh-keygen" -CandidatePaths $sshKeygenCandidates
 $prekExe = if ($prekCandidates.Count -gt 0) {
   Resolve-Executable -Name "prek" -CandidatePaths $prekCandidates
@@ -623,9 +389,6 @@ $prekExe = if ($prekCandidates.Count -gt 0) {
   $null
 }
 
-# Define shared path variables before any registration or pre-flight step so
-# both Register-HostAgeKey and the pre-flight loop reference the same
-# resolved paths without duplicate definitions later in the script.
 $secretsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\secrets"
 $machineSshHostKeyPubPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_host_ed25519_key.pub"
 $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\")).Path
@@ -634,7 +397,6 @@ $userRegistry = & (Join-Path -Path $resolvedModuleDir -ChildPath "Load-UserRegis
 $registeredUserNames = @($userRegistry.users.name)
 $selectedUserRecords = @($userRegistry.users | Where-Object { $Users -contains $_.name })
 
-# Validate that all explicitly provided users exist in the registry.
 foreach ($user in $Users) {
   if ($user -notin $registeredUserNames) {
     Write-NucleusError -CommandName apply "User '$user' not found in registry. Registered users: $($registeredUserNames -join ', ')" -ErrorAction Stop
@@ -642,10 +404,6 @@ foreach ($user in $Users) {
   }
 }
 
-# Build effective DSC file list from explicit -ConfigFiles plus optional
-# per-user extensions declared in the user registry (`dscConfigFiles`).  This keeps
-# DSC selection declarative and user-scoped while preserving the canonical
-# system/user baseline defaults.
 $effectiveConfigFiles = @($ConfigFiles)
 foreach ($configuredUser in $userRegistry.users) {
   if ($configuredUser.name -notin $Users) {
@@ -683,21 +441,10 @@ $sessionUserRecord = @($userRegistry.users | Where-Object { $_.name -eq $session
 $sessionWallpaperOutputDir = Join-Path -Path $sessionUserRecord.homeDirectory -ChildPath "Pictures\wallpapers"
 $sopsYamlPath = Join-Path -Path $repoRoot -ChildPath ".sops.yaml"
 
-# Expose the repo root to any subprocesses (e.g. DSC script resources) that
-# may need to locate repo-relative files.  $env:NUCLEUS_REPO_ROOT is forwarded
-# through to DSC and subsequent activation steps.
-# Cross-reference: env-variable-scope.instructions.md
-# Nix-side source of truth: src/modules/lib/env-secrets.nix
 $env:NUCLEUS_REPO_ROOT = $repoRoot
 
-# Process-level NUCLEUS_HOST for this run (subprocesses see it immediately).
-# Persistence is handled by system/env.dsc.yml (Machine scope via DSC).
 $env:NUCLEUS_HOST = "Windows"
 
-# NUCLEUS_REPO_ROOT: set dynamically per-activation because the repo path
-# varies by machine (clone location).  Storing it in DSC would bake in an
-# absolute path, breaking portability.  Write directly to Machine scope
-# (requires elevation — guaranteed by self-elevation above).
 $existingRoot = [Environment]::GetEnvironmentVariable("NUCLEUS_REPO_ROOT", "Machine")
 if ($existingRoot -ne $repoRoot) {
   [Environment]::SetEnvironmentVariable("NUCLEUS_REPO_ROOT", $repoRoot, "Machine")
@@ -707,17 +454,10 @@ if ($existingRoot -ne $repoRoot) {
   }
 }
 
-# Ensure the SSH host key exists before age key registration.  On a fresh
-# machine the key is absent until the OpenSSH Server service first starts;
-# Initialize-SSHHostKey starts it briefly if the service is installed
-# but the key has not yet been written.
 if ($EnableHostAgeKeyRegistration) {
   Initialize-SSHHostKey -MachineSshHostKeyPath $machineSshHostKeyPath
 }
 
-# Auto-register this machine's age key in .sops.yaml if not already present.
-# Must run before the pre-flight secret decryption check so that on the very
-# first apply the machine can already decrypt its own SOPS-encrypted secrets.
 if ($EnableHostAgeKeyRegistration) {
   Register-HostAgeKey `
     -MachineSshHostKeyPubPath $machineSshHostKeyPubPath `
@@ -763,12 +503,7 @@ else {
   Remove-ManagedSecret -Users $Users
 }
 
-# Materialize decrypted wallpapers ahead of DSC so user/wallpaper.dsc.yml can resolve an
-# explicit active wallpaper path deterministically.
 
-# Post-materialization health check: verify all SOPS files are decryptable by
-# both the GPG and personal SSH age backends, and that managed artefacts exist.
-# Mirrors the POSIX verify-secret-decryption Home Manager activation.
 foreach ($user in $Users) {
   $userSecretFile = Join-Path -Path $secretsDir -ChildPath "users\$user.yml"
   if (-not (Test-Path -Path $userSecretFile -PathType Leaf)) {
@@ -786,8 +521,6 @@ foreach ($user in $Users) {
 $activeWallpaperPath = Sync-WallpaperInventory -RepoRoot $repoRoot -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
 Remove-StaleWallpaper -RepoRoot $repoRoot -User $sessionUser -OutputDir $sessionWallpaperOutputDir
 
-# Generate locked DSC from lockfile before applying. Output goes to
-# .generated/ (not the repo tree) so generated artifacts stay out of git.
 $lockfilePath = Join-Path -Path $PSScriptRoot -ChildPath "..\..\lockfiles\lockfile.json"
 $generatedDir = Join-Path -Path $resolvedConfigDir -ChildPath ".generated"
 New-Item -Path $generatedDir -ItemType Directory -Force > $null
@@ -802,9 +535,6 @@ ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir 
 ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/font-substitutes.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $generatedDir -ChildPath "system/font-substitutes.locked.dsc.yml")
 ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/remote-desktop.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $generatedDir -ChildPath "system/remote-desktop.locked.dsc.yml")
 
-# Single-source overlap enable state for Windows (generated by Nix from
-# managedPackages in core.nix; committed as winget-packages.json so Windows
-# apply always has it without running Nix). Drops disabled WinGet resources.
 $wingetPackagesPath = Join-Path -Path $PSScriptRoot -ChildPath "..\..\hosts\Windows\system\winget-packages.json"
 $enabledWingetPackages = $null
 if (Test-Path -Path $wingetPackagesPath) {
@@ -823,7 +553,6 @@ if (Test-Path -Path $wingetPackagesPath) {
 }
 ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/packages.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/packages.locked.dsc.yml") -EnabledPackages $enabledWingetPackages
 
-# Replace system DSC files with locked variants in effective config list.
 $effectiveConfigFiles = @($effectiveConfigFiles | ForEach-Object {
   if ($_ -eq "system/scheduler.dsc.yml") { ".generated/system/scheduler.locked.dsc.yml" }
   elseif ($_ -eq "system/scheduler-user.dsc.yml") { ".generated/system/scheduler-user.locked.dsc.yml" }
@@ -843,8 +572,6 @@ foreach ($configFile in $effectiveConfigFiles) {
   Invoke-WingetConfiguration -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath $configFile) -WallpaperPath $activeWallpaperPath
 }
 
-# Set Windows Application Event Log max size to 200 MB.
-# No declarative DSC resource exists for this; wevtutil is the canonical tool.
 wevtutil sl Application /ms:209715200 2>$null  # check-suppress:suppression_doc: may already be at desired size; wevtutil exits non-zero but this is harmless
 
 # Scoop bucket and app provisioning must run after DSC installs Scoop.Scoop.
@@ -874,21 +601,13 @@ if ($EnablePiExtensionsParity) {
 Invoke-UvSetup
 # PowerShell modules: pinned versions for DSC validation and code hygiene.
 Invoke-PowerShellModuleSetup
-# CamillaDSP prebuilt binary runs after PATH is fully configured (no WinGet
-# package available; downloads from GitHub releases).
 Invoke-CamillaDSPSetup
 # camillagui-backend prebuilt bundle (same rationale as CamillaDSP).
 Invoke-CamillaGUISetup
-# Source-built packages: git clone + build system at pinned revisions.
-# Requires zig from Scoop (installed by Invoke-ScoopSetup above) and
-# git from WinGet (system/packages.dsc.yml).
 Invoke-SourceBuild
 
-# Ensure the live nucleus checkout installs its own Git hooks during the same
-# provision run that installs or updates prek itself.
 Install-PrekHook -PrekExecutablePath $prekExe -RepositoryRoot $repoRoot
 
-# Build dev repositories list from user registry, resolving symlink targets.
 $currentUser = [System.Environment]::UserName
 $userDevRepos = $null
 foreach ($user in $userRegistry.users) {
@@ -910,7 +629,6 @@ if ($userDevRepos -and $userDevRepos.repositories) {
       target = (Join-Path -Path $userHome -ChildPath $repo.target)
     }
 
-    # Resolve symlink: if marked as symlinkFromRepoRoot, target is $repoRoot
     if ($repo.symlinkFromRepoRoot) {
       $repoEntry.symlink = $repoRoot
     }
@@ -922,19 +640,10 @@ if ($userDevRepos -and $userDevRepos.repositories) {
   }
 }
 
-# Skill files shipped by the superpowers plugin are layered into
-# ~/.agents/skills/ alongside the committed skills.  The source exists only once
-# the plugin checkout has been provisioned, which is why the skills sync treats
-# a missing extra source as informational rather than fatal.
 $superpowersSkillsSource = Join-Path -Path (Get-NucleusUserRoot) -ChildPath 'plugins\superpowers\skills'
 
 Sync-AgentsConfig -RepoRoot $repoRoot -User $sessionUser -Enabled:$EnableAgentsConfigParity
-# Superpowers is fetched before the pi/opencode links and the skills layer that
-# consume its checkout.
 Sync-SuperpowersPlugin -RepoRoot $repoRoot -Enabled:$EnableSuperpowersParity
-# The model is fetched after Invoke-ScoopSetup so the binary and the weights it
-# opens converge in dependency order. The download is large, so it runs late
-# and independently of the agents layer above.
 Sync-WhisperModel -RepoRoot $repoRoot -Enabled:$EnableWhisperModelParity
 Sync-OpenCodeConfig -RepoRoot $repoRoot -User $sessionUser -Enabled:$EnableOpenCodeConfigParity
 Sync-AgentsSkillManifest -RepoRoot $repoRoot -User $sessionUser -Enabled:$EnableAgentsSkillsParity -ExtraSkillsSource $superpowersSkillsSource

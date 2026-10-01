@@ -1,7 +1,4 @@
 # Home Manager entrypoint shared by all three host types.
-# Multi-user aware: uses effectiveUsername / managedUsername dynamically
-# rather than hardcoding a username. Respects per-user config from the
-# user registry.
 {
   config,
   lib,
@@ -15,9 +12,8 @@
   ...
 }:
 let
-  # Determine the effective user context for this Home Manager evaluation.
   # managedUsername/managedUser are injected by mkHomeManagerUsers for
-  # multi-user host evaluations; fallback to legacy args for standalone usage.
+  # multi-user host evaluations; username is the standalone fallback.
   effectiveUsername = if managedUsername != null then managedUsername else username;
 
   effectiveUser =
@@ -28,9 +24,6 @@ let
     else
       { };
 
-  # Derive the home directory from platform conventions. Keeping this local to
-  # the module avoids relying on ad-hoc `_module.args` plumbed through every
-  # call site.
   resolvedHomeDirectory =
     if effectiveUser ? homeDirectory then
       effectiveUser.homeDirectory
@@ -39,7 +32,6 @@ let
     else
       "/home/${effectiveUsername}";
 
-  # Nucleus user-level root for system-wide app configs (litellm, etc.).
   # Matches the path derive_repo_root() computes at runtime.
   nucleusUserRoot =
     if hostName == "MacBook" then
@@ -74,9 +66,6 @@ let
     );
   };
 
-  # LibreOffice manages registrymodifications.xcu and overwrites it on close.
-  # Load the per-user overlay settings and derive managed XCU entries for
-  # metadata stripping (RemovePersonalInfoOnSave) and user data clearing.
   # check-suppress:config-method: method 3 (merge) -- LibreOffice owns registrymodifications.xcu and
   # overwrites it on exit. A symlink would be replaced. Merge injects managed
   # entries while preserving user-configured settings outside managed keys.
@@ -87,37 +76,18 @@ let
     );
   };
 
-  # Obsidian reads its global app settings directly from obsidian.json, but the
-  # file also contains dynamic vault metadata written by the app itself. Load
-  # the managed settings from a declarative config file so they are versioned
-  # and merge them into the live file without clobbering vault data.
-  #
-  # WHY: nativeMenus is not configured: nativeMenus is stored per-vault in
-  # appearance.json (.obsidian/appearance.json), not in obsidian.json. We cannot
-  # manage vault-specific files without reading the vault path from obsidian.json,
-  # which is app-owned state that changes at runtime.
-  #
-  # WHY: checkSlowStartup is not configured: checkSlowStartup is localStorage-backed
-  # and vault-specific. It cannot be declaratively managed via obsidian.json.
+  # WHY: nativeMenus and checkSlowStartup are not configured: the first is stored
+  # per-vault in appearance.json, the second is localStorage-backed. Both need the
+  # vault path, which is app-owned state that changes at runtime.
   # check-suppress:config-method: method 3 (merge) -- see the activation entry below for full rationale.
   obsidianManagedSettings = builtins.fromJSON (
     builtins.readFile (selectUserAppConfigFile "obsidian" "obsidian.json")
   );
   obsidianManagedSettingsJson = builtins.toJSON obsidianManagedSettings;
 
-  # RimSort stores per-instance paths and Steam integration flags in
-  # settings.json alongside dynamic theme, sorting, and window-state
-  # settings written by the app.  Merge only the managed keys (game
-  # folder, config folder, local mods, workshop, Steam integration)
-  # into instances.Default so declarative paths converge without
-  # clobbering app-owned UI state.
-  #
-  # WHY: Steam integration is configured here (not left to autodetect)
-  # because autodetect only runs on empty fields and may silently
-  # disable integration when the workshop path validation fails.
-  # Pre-populating the fields ensures the autodetect button preserves
-  # them on future clicks.
-  #
+  # WHY: Steam integration fields are pre-populated because autodetect only runs
+  # on empty fields and can silently disable integration when workshop path
+  # validation fails.
   # check-suppress:config-method: method 3 (merge) -- cannot use Method 1 (symlink) because RimSort owns
   # settings.json and writes theme, sorting, and window state into it.
   # A symlink would let those app-owned writes reach the repo file,
@@ -133,17 +103,11 @@ let
     lib.recursiveUpdate rimsortManagedSettings rimsortHostSettings
   );
 
-  # Out-of-store symlink paths protected across activation cycles.
-  # Expanded from $HOME to resolvedHomeDirectory at eval time so the JSON
-  # token carries absolute paths and no shell expansion is needed at runtime.
   # Each entry is { path, writable ? false }. `writable = false` (default) hardens
-  # the symlink immutable (uchg on macOS — the only platform where a user-scope
-  # activation can set the flag) so it cannot be deleted or written
-  # through; `writable = true` keeps it managed (still unprotect-before/re-protect-after)
-  # but never immutable, so apps can write the active config back through it.
-  # A `method 1 (writable symlink)` deployment MUST be `writable = true`; the
-  # requirement is stated in the config-method policy the paths above follow.
-  # No check step enforces it, so the invariant lives here and nowhere else.
+  # the symlink immutable (uchg on macOS, the only platform where a user-scope
+  # activation can set the flag); `writable = true` stays managed but never
+  # immutable, so an app can write the active config back through it. No check
+  # step enforces the pairing, so the invariant lives here.
   managedSymlinkPaths = [
     { path = "${resolvedHomeDirectory}/iCloud"; }
     {
@@ -162,7 +126,7 @@ let
       path = "${resolvedHomeDirectory}/.srt-settings.json";
       writable = true;
     }
-    # LiteLLM config and handler symlinks — repo edits take effect on service restart.
+    # LiteLLM config and handler symlinks, editable in the repo and picked up on service restart.
     {
       path = "${nucleusUserRoot}/litellm-config.yml";
       writable = true;
@@ -182,13 +146,9 @@ let
   ];
   managedSymlinkPathsJson = builtins.toJSON managedSymlinkPaths;
 
-  # Deployed candidate list for check step 13 (method-1 links must resolve into the
-  # LIVE repo root). Generated here instead of restated inside the check step, whose
-  # hand-maintained array had already drifted from the deployed set and covered none
-  # of the trees that held the 17 stale links. Directory entries are walked one level
-  # by the step; file entries are inspected directly. The VS Code channel directories
-  # mirror editors.nix's stableBaseDir / insidersBaseDir split, which is spelled with
-  # a literal `$HOME` there and so cannot be reused verbatim as an absolute entry.
+  # Generated here rather than restated inside check step 13, whose hand-maintained
+  # array had already drifted from the deployed set. The VS Code channel directories
+  # cannot be reused verbatim from editors.nix, which spells $HOME literally.
   method1ManifestPaths =
     map (entry: entry.path) managedSymlinkPaths
     ++ [
@@ -213,12 +173,9 @@ let
         ]
     );
 
-  # Picard baseline defaults are sourced from the canonical native INI file.
-  # We apply these defaults with merge-overwrite semantics.
   # check-suppress:config-method: method 3 (merge) -- Picard INI defaults are merged with user overrides.
   picardDefaultsIniText = builtins.readFile (selectUserAppConfigFile "picard" "Picard.ini");
 
-  # Path to the checked-out dotfiles/ directory at the root of this repo.
   dotfilesRoot = ../dotfiles;
 
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
@@ -268,22 +225,18 @@ in
     home = {
       username = effectiveUsername;
       homeDirectory = lib.mkForce resolvedHomeDirectory;
-      # Pin the Home Manager state version; changing this after initial
-      # activation requires a deliberate migration.
+      # Changing this after initial activation requires a deliberate migration.
       stateVersion = "24.11";
     };
 
-    # Change CWD to a safe location before any activation steps. The Nix build
-    # directory that darwin-rebuild inherits as CWD can be deleted during
-    # activation, causing harmless but noisy getcwd errors.
+    # darwin-rebuild inherits the Nix build directory as CWD, and activation can
+    # delete it, so move to a safe path first.
     home.activation.ensure-safe-cwd = lib.hm.dag.entryBefore [ "checkLinkTargets" ] ''
       cd /
     '';
 
-    # Initialize the pass password store on first activation.  The .password-store
-    # directory may already exist (created by earlier provisioning) but without a
-    # .gpg-id file pass cannot encrypt or decrypt entries.  Run pass init once
-    # with the primary GPG key so QtPass and the pass CLI have a usable store.
+    # pass cannot encrypt or decrypt entries without .gpg-id, so init once with
+    # the primary GPG key.
     #
     # WHY: managed-gpg-keys tracks imported keys by fingerprint; the primary RSA
     # key (978C2F10BDD68D5A7E2B12FA5E029A4348667405) is the canonical signing
@@ -297,15 +250,8 @@ in
       fi
     '';
 
-    # QtPass keeps its own persisted settings store, which can override
-    # PASSWORD_STORE_DIR and GUI behavior when launched outside the shell.
-    #
-    # - macOS: configure the com.ijhack.QtPass defaults domain.
-    # - Linux: configure Qt's INI-backed settings file (QSettings).
-    #
-    # Keep both aligned with the per-user passwordStoreDir and the shared
-    # screenshot-backed Settings + Template tab baseline, while still allowing
-    # centralized per-user overrides from flake.nix.
+    # QtPass persists its own settings (macOS defaults domain, Linux QSettings INI),
+    # which can override PASSWORD_STORE_DIR and GUI behavior outside the shell.
     # check-suppress:config-method: method 3 (merge) -- cannot use Method 1 (symlink) because QtPass manages
     # its own UI preferences via QSettings (macOS: defaults, Linux: INI,
     # Windows: registry). A symlink does not apply to these platform-native
@@ -319,14 +265,8 @@ in
         ${lib.escapeShellArg qtpassModule.qtPassSecondaryIniCommands}
     '';
 
-    # LibreOffice manages registrymodifications.xcu (XML settings store) and
-    # overwrites it on every close. Merge the metadata-stripping entries at
-    # activation so personal info removal and user data clearing stay converged.
-    #
-    # - macOS: ~/Library/Application Support/LibreOffice/4/user/registrymodifications.xcu
-    # - Linux: ~/.config/libreoffice/4/user/registrymodifications.xcu
-    # The merge script handles both paths via the file argument.
-    # Windows uses an equivalent PowerShell module (Sync-LibreOfficeXcu.ps1).
+    # The merge script takes the per-platform XCU path; Windows uses
+    # Sync-LibreOfficeXcu.ps1.
     # check-suppress:config-method: method 3 (merge) -- cannot use Method 1 (symlink) because
     # LibreOffice owns registrymodifications.xcu and overwrites it on exit.
     # Merge applies managed metadata-stripping defaults while preserving
@@ -343,10 +283,6 @@ in
         ${libreOfficeModule.libreOfficeMergeArgs}
     '';
 
-    # Picard reads native INI settings from ~/.config/MusicBrainz/Picard.ini
-    # on macOS and Linux. Merge-overwrite defaults from the canonical
-    # Picard.ini baseline file, then layer per-user [setting] overrides.
-    # Always preserve unmanaged keys and sections.
     # check-suppress:config-method: method 3 (merge) -- cannot use Method 1 (symlink) because Picard manages
     # its INI through UI preferences (window state, plugin tokens, user
     # settings that should persist across applies). A symlink would let app
@@ -359,11 +295,6 @@ in
         ""
     '';
 
-    # Obsidian stores app-global settings in obsidian.json alongside dynamic
-    # vault metadata.  Merge only the managed advanced-setting keys into that
-    # file so the declarative defaults converge without clobbering vault lists
-    # or other app-owned state.
-    #
     # check-suppress:config-method: method 3 (merge) -- cannot use Method 1 (symlink) because Obsidian owns
     # obsidian.json and writes vault metadata (vault paths, window state) into
     # it. A symlink would let those app-owned writes reach the repo file,
@@ -375,11 +306,6 @@ in
         ${lib.escapeShellArg obsidianManagedSettingsJson}
     '';
 
-    # RimSort settings.json contains per-instance paths, Steam integration
-    # flags, and app-owned theme/UI state.  Merge managed keys into
-    # instances.Default so declarative paths converge without clobbering
-    # runtime settings.
-    #
     # check-suppress:config-method: method 3 (merge) -- cannot use Method 1 (symlink) because RimSort owns
     # settings.json and writes theme, sorting, and window state into it.
     # A symlink would let those app-owned writes reach the repo file,
@@ -391,10 +317,7 @@ in
         ${lib.escapeShellArg rimsortManagedSettingsJson}
     '';
 
-    # Provision SteamCMD at RimSort's expected steamcmd_install_path so the
-    # app does not need to download it at runtime.  On macOS the Nix store's
-    # native binary is symlinked; on NixOS the store's steamcmd wrapper
-    # (which invokes steam-run) is linked.
+    # macOS links the store binary, NixOS the steam-run wrapper.
     home.activation.provision-steamcmd = lib.hm.dag.entryAfter [ "merge-rimsort-json" ] ''
       "${activationBundle}/src/scripts/configs/provision-steamcmd.sh" \
         "${pkgs.python3}/bin/python3" \
@@ -412,11 +335,8 @@ in
       "${activationBundle}/src/scripts/configs/manage-out-of-store-symlinks.sh" "protect" "home.nix" '${managedSymlinkPathsJson}' "${pkgs.jq}/bin/jq"
     '';
 
-    # Method-1 (writable) symlink for the camilladsp config directory. Created at
-    # activation time against the LIVE repo root so the GUI can write config.yml
-    # back through to the repo (repo changes take effect without rebuild). The
-    # writable/immutable decision is owned by managedSymlinkPaths; this entry must
-    # run before protect-out-of-store-symlinks so the link is hardened if immutable.
+    # Runs before protect-out-of-store-symlinks so a writable link is hardened
+    # if the entry is not marked writable.
     # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
     home.activation.seed-camilladsp-configs = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
@@ -425,9 +345,6 @@ in
         "${hostName}"
     '';
 
-    # Method-1 (writable) symlink for the camillagui-backend config file. Created at
-    # activation time against the LIVE repo root so repo edits show without rebuild.
-    # The GUI does not write this file, but it must still point at the live repo.
     # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
     home.activation.seed-camillagui-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
@@ -436,9 +353,6 @@ in
         "${hostName}"
     '';
 
-    # Method-1 (writable) symlink for srt (sandbox-runtime) settings. Uses the
-    # standard user overlay pattern: src/users/default/srt/settings.json as
-    # default, src/users/<username>/srt/settings.json for per-user overrides.
     # check-suppress:config-method: method 1 (writable symlink) -- srt settings are user-overridable via the standard overlay pattern.
     home.activation.seed-srt-settings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
@@ -446,9 +360,6 @@ in
         "${overlay.toRepoRelPath (overlay.selectFile "srt" "settings.json")}"
     '';
 
-    # Method-1 (writable) symlinks for LiteLLM config and handler files.
-    # All host services reference this well-known path; repo edits take effect
-    # on service restart without re-running apply.
     # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
     home.activation.seed-litellm-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
@@ -467,11 +378,9 @@ in
         "src/modules/configs/litellm/logging_formatter.py"
     '';
 
-    # Managed symlink paths are seeded by the activation steps above, so they must
-    # exist once every seeder has run: a missing path means the owning seeder did
-    # not converge and the application would silently read a nonexistent config.
-    # Unprotect tolerates absence because it runs before these seeders; this check
-    # runs after them, which is the only point where absence is a defect.
+    # Runs after every seeder: a missing path means the owning seeder did not
+    # converge and the app would read a nonexistent config. Unprotect tolerates
+    # absence because it runs before the seeders.
     home.activation.verify-managed-symlink-paths =
       lib.hm.dag.entryAfter
         [
@@ -486,9 +395,8 @@ in
           "${activationBundle}/src/scripts/configs/manage-out-of-store-symlinks.sh" "verify" "home.nix" '${managedSymlinkPathsJson}' "${pkgs.jq}/bin/jq"
         '';
 
-    # Publish the step-19 candidate manifest. An activation artifact rather than a
-    # home.file entry: the audited nucleus root then holds a plain file instead of a
-    # store symlink, and the path has exactly one Nix-side literal.
+    # An activation artifact rather than a home.file entry, so the audited nucleus
+    # root holds a plain file instead of a store symlink.
     home.activation.write-method1-symlink-manifest = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/configs/write-method1-symlink-manifest.sh" \
         "${nucleusUserRoot}/method1-symlink-manifest.txt" \
@@ -496,10 +404,7 @@ in
         "${pkgs.jq}/bin/jq"
     '';
 
-    # Centralized ~/data provisioning. Ensures ~/data exists and creates
-    # directories, files, and symlinks as specified in the manifest. Runs
-    # after linkGeneration so user-specific symlinks.json entries are not
-    # clobbered. The script never deletes anything.
+    # Runs after linkGeneration so symlinks.json entries are not clobbered.
     home.activation.provision-data-directory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/configs/provision-data-directory.sh" \
         "${config.home.homeDirectory}" \
@@ -507,9 +412,7 @@ in
         "${pkgs.jq}/bin/jq"
     '';
 
-    # Override the default logDir (which uses ~) with a proper absolute path.
-    # The launchd StandardErrorPath/StandardOutPath option types require an
-    # absolute path and do not expand ~.
+    # The launchd path option types require an absolute path and do not expand ~.
     nucleus.logging.logDir = lib.mkDefault (
       builtins.replaceStrings [ "~" ] [ config.home.homeDirectory ] loggingPaths.logDirTemplate
     );
@@ -517,9 +420,8 @@ in
     # Allow Home Manager to manage its own activation and generation GC.
     programs.home-manager.enable = true;
 
-    # Declaratively symlink dotfile directories/files into the home directory.
-    # Each entry is guarded by pathExists so a missing dotfiles subtree does not
-    # cause an eval error on a fresh checkout.
+    # Each entry is guarded by pathExists so a fresh checkout without the
+    # dotfiles subtree still evaluates.
     home.file = lib.mkMerge [
       (lib.optionalAttrs (builtins.pathExists (dotfilesRoot + "/.config")) {
         ".config".source = dotfilesRoot + "/.config";
@@ -528,8 +430,6 @@ in
         ".gitconfig".source = dotfilesRoot + "/.gitconfig";
       })
       (lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
-        # Keep iCloud Drive reachable from a short, stable path for all managed
-        # macOS users so scripts and shell workflows avoid long spaced paths.
         "iCloud".source =
           config.lib.file.mkOutOfStoreSymlink "${resolvedHomeDirectory}/Library/Mobile Documents/com~apple~CloudDocs";
       })

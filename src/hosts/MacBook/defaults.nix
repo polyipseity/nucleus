@@ -1,7 +1,4 @@
-# MacBook/defaults.nix — Declarative macOS system.defaults for the MacBook.
-#
-# All settings are applied by nix-darwin via the `defaults write` mechanism
-# during `darwin-rebuild switch`.  They are grouped below by subsystem.
+# MacBook/defaults.nix — declarative macOS system.defaults for the MacBook.
 {
   lib,
   repoRoot,
@@ -14,44 +11,31 @@ let
     inherit effectiveUsername repoRoot;
   };
 
-  # ---------------------------------------------------------------------------
-  # Input method definitions
-  # The HIToolbox AppleEnabledInputSources list must be a complete ordered set;
-  # the first entry is used as the default source at login.
-  # ---------------------------------------------------------------------------
-
-  # Traditional Cangjie input method (part of the macOS TCIM bundle).
+  # HIToolbox needs the complete ordered list; the first entry is the login default.
   cangjieInputMethod = {
     "Bundle ID" = "com.apple.inputmethod.TCIM";
     InputSourceKind = "Input Method";
     "Input Method Identifier" = "com.apple.inputmethod.TCIM.Cangjie";
   };
 
-  # Standard US QWERTY keyboard layout.
   usKeyboard = {
     InputSourceKind = "Keyboard Layout";
     "Keyboard Layout ID" = 0;
     "Keyboard Layout Name" = "U.S.";
   };
 
-  # Ordered list: US keyboard first (default at login), Cangjie second.
   inputMethods = [
     usKeyboard
     cangjieInputMethod
   ];
 
-  # ---------------------------------------------------------------------------
-  # Autocorrect suppression word list
-  # Loaded from src/users/<user>/autocorrect/wordlist.txt (overlay; default is empty):
-  # one word per line, sorted alphabetically. Identity substitutions (word → word)
-  # prevent macOS from autocorrecting technical terms and product names.
+  # Loaded from src/users/<user>/autocorrect/wordlist.txt (overlay; default is
+  # empty): one word per line, sorted alphabetically.
   # check-suppress:config-method: method 3 (merge / defaults-based) -- not Method 1 (symlink) because macOS
   # NSUserDictionaryReplacementItems is managed via the `defaults` system
   # preference store, not a file path. There is no file to symlink. The value
   # is read from wordlist.txt at Nix eval time and written into the defaults
   # domain during darwin-rebuild.
-  # This is macOS-only (no NixOS/Windows equivalent).
-  # ---------------------------------------------------------------------------
   autocorrectWords = builtins.filter (w: w != "") (
     builtins.filter builtins.isString (
       # check-suppress:config-method: method 4 (runtime embedded at eval time) -- wordlist.txt is read at Nix evaluation time and embedded into the Nix store. No deployment step needed.
@@ -61,10 +45,6 @@ let
 in
 {
   system.defaults = {
-    # -------------------------------------------------------------------------
-    # NSGlobalDomain — system-wide defaults written to the global preferences
-    # domain, affecting most applications unless they override the value.
-    # -------------------------------------------------------------------------
     NSGlobalDomain = {
       AppleFontSmoothing = 0; # disable subpixel anti-aliasing (better on Retina)
       AppleICUForce24HourTime = true; # 24-hour clock regardless of locale
@@ -93,58 +73,35 @@ in
       "com.apple.trackpad.scaling" = 3.0; # maximum trackpad tracking speed
     };
 
-    # -------------------------------------------------------------------------
-    # CustomUserPreferences — arbitrary per-app defaults not exposed as
-    # first-class nix-darwin options.  Written with `defaults write <domain>`.
-    # -------------------------------------------------------------------------
     CustomUserPreferences = {
-      # NSGlobalDomain: global preferences that don't fit nix-darwin typed options.
       "NSGlobalDomain" = {
-        # Disable "Close windows when quitting an application" so that
-        # macOS preserves and restores application windows across quit/launch
-        # cycles. This key is not exposed by nix-darwin's typed options.
         NSQuitAlwaysKeepsWindows = true;
 
         # Keep Finder context-menu Services at the default threshold so core
-        # entries such as "New Terminal at Folder" remain discoverable from a
-        # right-click without requiring keyboard-only fallbacks.
-        # This key is not exposed by nix-darwin's typed options.
+        # entries such as "New Terminal at Folder" stay discoverable on right-click.
         NSServicesMinimumItemCountForContextSubmenu = 0;
 
-        # Make toolbar title rollover hints appear instantly. This key is
-        # currently outside nix-darwin's typed NSGlobalDomain option set.
         NSToolbarTitleViewRolloverDelay = 0.0;
 
-        # Text substitution dictionary that suppresses autocorrect for
-        # technical terms and product names used frequently in this setup.
-        # This key is not available as a typed nix-darwin NSGlobalDomain
-        # option, so it is declared as a custom preference payload.
-        # Word list is loaded from the per-user autocorrect overlay — edit
-        # src/users/<username>/autocorrect/wordlist.txt (default template is empty).
-        # All entries are identity substitutions
-        # (word → word) so macOS leaves them unchanged instead of autocorrecting.
+        # Word list from src/users/<username>/autocorrect/wordlist.txt (default
+        # template is empty). Identity substitutions leave the words unchanged.
         NSUserDictionaryReplacementItems = builtins.map (w: {
           replace = w;
           "with" = w;
         }) autocorrectWords;
 
-        # Treat Caps Lock as a per-app input-source switch (e.g. EN ↔ Cangjie).
         TISCapslockLanguageSwitch = true;
       };
 
-      # Activity Monitor: show CPU usage in the Dock icon; refresh every second.
       "com.apple.ActivityMonitor" = {
         IconType = 5; # CPU history graph in Dock icon
         UpdatePeriod = 1; # refresh interval in seconds
       };
 
-      # Opt out of Apple personalised advertising.
       "com.apple.AdLib" = {
         allowApplePersonalizedAdvertising = false;
       };
 
-      # Trackpad: silent click (ActuationStrength 0), lightest click threshold,
-      # force-touch feedback enabled, three-finger drag instead of Mission Control.
       "com.apple.AppleMultitouchTrackpad" = {
         ActuationStrength = 0; # silent (haptic-only) click feedback
         FirstClickThreshold = 0; # lightest click force required
@@ -152,9 +109,6 @@ in
         TrackpadThreeFingerDrag = true; # drag windows with three fingers
       };
 
-      # Keyboard backlight: auto-adjust brightness; dim after 5 s of inactivity.
-      # Note: com.apple.BezelServices is an undocumented private preference domain;
-      # keys are community-documented (no official Apple developer reference).
       "com.apple.BezelServices" = {
         dAuto = true; # auto-adjust keyboard backlight to ambient light
         kDim = true; # dim keyboard backlight when idle
@@ -175,39 +129,29 @@ in
         OptimizeStorage = false; # disable "Optimize Mac Storage"
       };
 
-      # Input sources: set the full ordered list of enabled input methods,
-      # select the first one (US keyboard) as the active source, and configure
-      # dictation and keyboard behaviour.
       "com.apple.HIToolbox" = {
         AppleDictationAutoEnable = true; # auto-enable dictation system-wide
         AppleEnabledInputSources = inputMethods;
         AppleSelectedInputSources = [ (builtins.head inputMethods) ];
       };
 
-      # Disable the Gatekeeper quarantine flag that shows "Downloaded from the
-      # Internet" dialogs for files opened from other machines / archives.
       "com.apple.LaunchServices" = {
         LSQuarantine = false;
       };
 
-      # iCloud Photos: enable library sync and automatic import.
       "com.apple.Photos" = {
         CloudPhotosEnabled = 1;
         ImportToCloudEnabled = 1;
       };
 
-      # Siri: enable the double-press Command shortcut for Type to Siri so the
-      # keyboard shortcut launches Siri in text-input mode. This does not
-      # conflict with Raycast's Option+Space binding.
+      # The Siri shortcut launches Siri in text-input mode, so it does not
+      # collide with Raycast's Option+Space.
       "com.apple.Siri" = {
         KeyboardShortcut = 3; # 3 = double-press Command: invoke Type to Siri
         StatusMenuVisible = false; # hide Siri from the menu bar; keep chrome minimal
         TypeToSiriEnabled = true; # type queries instead of speaking them
       };
 
-      # Software Update: check for and download updates automatically; install
-      # critical (security) updates, macOS version updates, and system data files
-      # without prompting. Pre-release / beta updates are explicitly disabled.
       "com.apple.SoftwareUpdate" = {
         AllowPreReleaseInstallation = false; # disable beta / pre-release macOS updates
         AutomaticCheckEnabled = true;
@@ -217,56 +161,35 @@ in
         CriticalUpdateInstall = true;
       };
 
-      # Spotlight: disable completely to eliminate UI chrome and background indexing.
-      # Raycast is the primary launcher; Spotlight adds no value and consumes resources.
-      # Complete disabling happens in three stages:
-      #   1. Hide UI (this plist section)
-      #   2. Disable hotkey 61 (in macos.nix activation: disableSpotlightHotkey)
-      #   3. Stop indexing + clear cache (in macos.nix activation: disableSpotlightHotkey)
+      # Hidden UI here; the hotkey, indexing, and cache are handled in the
+      # activation script disableSpotlightHotkey.
       "com.apple.Spotlight" = {
         MenuItemHidden = 1; # Hide menu-bar button
         FederatedSearchMaximumCount = 0; # Disable web search/suggestions
       };
 
-      # TextEdit: default to plain text mode instead of RTF.
       "com.apple.TextEdit" = {
         RichText = false;
       };
 
-      # Keyboard: Fn key acts as standard function keys (F1–F12) by default.
       "com.apple.TextInput.Kybd".FnKeyUsage = 1;
 
-      # Hide the Input Menu (language switcher) from the menu bar: keyboard
-      # switching happens via a hotkey, so the menu icon is redundant chrome.
       "com.apple.TextInputMenu".visible = false;
 
-      # Hide the macOS 14+ (Sequoia) input-source status item in the new Control
-      # Centre menu bar model (value 0 hides it).
       "com.apple.TextInputMenuAgent" = {
         "NSStatusItem VisibleCC Item-0" = 0;
       };
 
-      # Voice Memos: always record at uncompressed (lossless) quality.
-      # RCVoiceMemosAudioQualityKey controls recording format:
-      #   0 = AAC (compressed) — the factory default, trades quality for file size
-      #   1 = Uncompressed (AIFF/WAV lossless) — preferred here because recordings
-      #       retain full fidelity for archival, transcription, and re-export; any
-      #       lossy transcoding can be done downstream on a copy without degrading
-      #       the original capture.
-      # Voice Memos is Apple-only; no Windows/NixOS equivalent exists.
       "com.apple.VoiceMemos" = {
         RCVoiceMemosAudioQualityKey = 1;
       };
 
-      # Window Manager: enable click-to-show-desktop, hide Stage Manager widgets
-      # for lower visual noise, and keep window tiling enabled (macOS 15+).
       "com.apple.WindowManager" = {
         EnableStandardClickToShowDesktop = true;
         StandardHideWidgets = true; # hide Stage Manager widget strip to reduce persistent chrome
         WindowTilingEnabled = true; # enable drag-to-edge window tiling (Sequoia)
       };
 
-      # Siri / dictation backend preferences.
       "com.apple.assistant.support" = {
         "Assistant Enabled" = true;
         "Auto Punctuation Enabled" = true; # insert punctuation during dictation
@@ -274,14 +197,12 @@ in
         "Siri Data Sharing Opt-In Status" = 1; # opt in to Siri improvement program
       };
 
-      # macOS tips and suggestions: disable persistent notifications.
       # These interrupt focus and offer limited value for power-user workflows.
       "com.apple.tips" = {
         LastSeenVersionForAutoStartTip = 99999; # mark all tips as already seen
         ShowTipOfTheDay = false; # disable daily tip notification entirely
       };
 
-      # App Store: enable automatic app updates.
       "com.apple.commerce" = {
         AutoUpdate = true;
       };
@@ -294,15 +215,11 @@ in
         NSStatusItemSpacing = 0; # pixels between status items
       };
 
-      # Prevent macOS from writing .DS_Store files on network and removable
-      # volumes. macOS does not provide an equivalent supported toggle for local
-      # APFS/HFS+ folders.
       "com.apple.desktopservices" = {
         DSDontWriteNetworkStores = true;
         DSDontWriteUSBStores = true;
       };
 
-      # Dock: disable Stage Manager / Widget corner zones (value 0 = no-op).
       "com.apple.dock" = {
         wdev-bl = 0;
         wdev-br = 0;
@@ -310,12 +227,10 @@ in
         wdev-tr = 0;
       };
 
-      # Finder: desktop visibility, iCloud Drive folder pinning, and UI prefs.
       # WHY: in CustomUserPreferences: Finder reads these from the user domain
       # (~/.Library/Preferences/com.apple.finder.plist), not system domain.
       # These settings MUST be written via CustomUserPreferences to take effect.
       "com.apple.finder" = {
-        # Desktop visibility: show mounted drives, external drives, servers, removable media.
         # These are intentionally kept in user domain (not system.defaults.finder) because
         # Finder only respects them when written to per-user preferences.
         CreateDesktop = true; # allow files/icons on the Desktop
@@ -324,9 +239,6 @@ in
         ShowMountedServersOnDesktop = true; # show mounted NFS/SMB shares on Desktop
         ShowRemovableMediaOnDesktop = true; # show USB drives and optical media on Desktop
 
-        # Keep Desktop and Documents in iCloud Drive. These knobs are not
-        # currently part of nix-darwin's typed `system.defaults.finder` set,
-        # so they are expressed as custom domain values.
         FXICloudDriveDesktop = true;
         FXICloudDriveDocuments = true;
 
@@ -334,8 +246,6 @@ in
         # typed nix-darwin finder option, so we set it as a custom default.
         WarnOnEmptyTrash = true;
 
-        # Desktop icon layout: keep deterministic icon geometry and snap every
-        # icon to Finder's grid so drag/reorder actions remain tidy by default.
         DesktopViewSettings = {
           IconViewSettings = {
             arrangeBy = "grid";
@@ -350,7 +260,6 @@ in
         QLEnableTextSelection = true;
       };
 
-      # Menu bar clock: full date + time with seconds.
       "com.apple.menuextra.clock" = {
         DateFormat = "EEE y-MM-dd HH:mm:ss";
         ShowDate = 1;
@@ -358,93 +267,62 @@ in
         ShowSeconds = true;
       };
 
-      # Screensaver: require password immediately after the screensaver engages.
       "com.apple.screensaver" = {
         askForPassword = true;
         askForPasswordDelay = 0; # seconds before password is required (0 = immediately)
       };
 
-      # Dictation shortcut: double-press Right Command key (value 2).
       "com.apple.speech.recognition.AppleSpeechRecognition.prefs" = {
         DictationShortcut = 2;
       };
 
-      # Mission Control: span desktops across multiple displays so every monitor
-      # follows the same active Space when switching desktops.
       "com.apple.spaces" = {
         "spans-displays" = true;
       };
 
-      # Raycast: comprehensive declarative configuration of all plist-settable options.
       # WHY: Most Raycast settings live in SQLite database (Raycast internals), not
       # plist. We configure only documented/stable plist keys here. Advanced settings
       # like Pop to Root timeout, Escape behavior, Navigation bindings, and Root Search
       # Sensitivity require manual configuration in Raycast UI → Settings → Advanced.
       "com.raycast.macos" = {
-        # --- Startup & Window Behavior ---
         LaunchAtLogin = false; # Managed by nucleus autostart system
         Appearance = "system"; # Auto Dark/Light based on time of day
         WindowMode = "default"; # Use default window (not compact)
         ShowFavoritesInCompactMode = true; # Show favorites in compact mode
 
-        # --- Appearance & Text ---
-        # Text size: default/medium (Raycast's baseline; plist key unclear, may be UI-only)
-        # Menu Bar: explicitly disabled above to reduce persistent chrome
-
-        # --- Network & Security ---
         UseSystemNetworkSettings = true; # Web proxy from macOS System Settings
         CertificatesProvider = "Keychain"; # Use Keychain for certificate validation
 
-        # --- Extensions & Providers ---
         FaviconProvider = "Raycast"; # Raycast's built-in favicon resolver
 
-        # --- Developer Tools ---
         DeveloperMode = true; # Enable development mode
         AutoReloadOnSave = true; # Auto-reload on script save
         # Note: Additional dev settings (Use Node production, logging, disable pop to root)
         # are database-only; configure manually in Settings → Advanced → Developer Tools
 
       };
-      # Terminal: focus follows mouse pointer (hover to focus without clicking).
       "com.apple.terminal" = {
         FocusFollowsMouse = "YES";
       };
 
-      # Universal Control: automatically connect to nearby Mac/iPad.
       "com.apple.universalcontrol" = {
         autoConnect = true;
       };
 
-      # Archive Vault and Password/Passkey Autofill settings.
-      # Handles iCloud Archive Vault, Safari password autofill, and verification
-      # code management as shown in System Settings > Passwords.
       # Note: com.apple.iCloud.fmip.preferences is an internal Apple domain with
       # no public developer documentation; keys are empirically observed.
       "com.apple.iCloud.fmip.preferences" = {
-        # Archive Vault: encrypt Mac content with password-protected storage.
-        # This enables the Archive Vault feature in iCloud+ settings.
         ArchiveVaultEnabled = 1;
       };
 
-      # BetterDisplay: launch at login, show resolutions as a flat list, use
-      # maximum native resolution by default, configure update settings, enable
-      # crash reporting, disable professional features (licensing), and set delay
-      # values for display transitions.
       #
-      # nativeAutoBrightnessManagement off: the app must not interact with macOS
-      # auto brightness for the built-in panel. While auto brightness is on the
-      # two brightness owners fight, and the display ratchets up to the ceiling
-      # without any user input (upstream waydabber/BetterDisplay #4421, #5234).
-      # Upstream's mitigation is this very option (#4589, "prevent the app to
-      # interact with auto brightness"). BetterDisplay is on this host for the
-      # HeadlessDisplay virtual screen only, so it has no business controlling
-      # brightness at all.
+      # nativeAutoBrightnessManagement stays off: with macOS auto brightness
+      # also on, the two brightness owners fight and the panel ratchets up with
+      # no user input (waydabber/BetterDisplay #4421, #5234, mitigated by
+      # #4589). This host runs BetterDisplay for the HeadlessDisplay virtual
+      # screen only.
       #
-      # The @Display:2 suffix is BetterDisplay's tagID for the built-in panel
-      # (builtIn@Display:2 = 1 and name@Display:2 = "Color LCD" in this domain);
-      # the app stores its per-display settings with that suffix.
-      #
-      # Note: preferences domain is pro.betterdisplay.BetterDisplay (not com.betterdisplay).
+      # The @Display:2 suffix is the tagID for the built-in panel.
       "pro.betterdisplay.BetterDisplay" = {
         LaunchAtLogin = false;
         ShowResolutionsAsList = true;
@@ -463,17 +341,14 @@ in
       # match upstream defaults) so rebuilds keep runtime behavior stable.
       #
       "com.lwouis.alt-tab-macos" = {
-        # --- Requested appearance ---
         appearanceStyle = "2"; # titles
         appearanceSize = "3"; # auto
         appearanceTheme = "2"; # system
         shortcutStyle = "0"; # focus on release
         previewFocusedWindow = "false";
 
-        # --- Requested multi-display behavior ---
         showOnScreen = "1"; # screen including mouse
 
-        # --- Requested controls ---
         shortcutCount = "2";
         holdShortcut = "⌥";
         nextWindowShortcut = "→";
@@ -516,11 +391,9 @@ in
         vimKeysEnabled = "false";
         mouseHoverEnabled = "false";
 
-        # --- Requested other settings ---
         cursorFollowFocus = "0"; # never
         trackpadHapticFeedbackEnabled = "true";
 
-        # --- Requested general settings ---
         startAtLogin = "false";
         captureWindowsInBackground = "true";
         language = "0"; # system default
@@ -597,9 +470,7 @@ in
       "eu.exelban.Stats" = { };
     };
 
-    # -------------------------------------------------------------------------
     # Dock settings
-    # -------------------------------------------------------------------------
     dock = {
       autohide = true; # hide Dock chrome by default; summon on edge hover
       expose-group-apps = true; # Mission Control groups windows by application
@@ -615,10 +486,8 @@ in
       tilesize = 128; # base icon size
     };
 
-    # -------------------------------------------------------------------------
     # Finder settings (user domain via system.defaults.finder; some settings
     # like desktop visibility are defined in CustomUserPreferences instead)
-    # -------------------------------------------------------------------------
     finder = {
       _FXShowPosixPathInTitle = true; # show full POSIX path in title bar
       AppleShowAllFiles = true; # always show hidden files in Finder
@@ -631,10 +500,8 @@ in
       ShowStatusBar = true; # show item count / available space bar
     };
 
-    # -------------------------------------------------------------------------
     # CustomSystemPreferences — arbitrary system-level defaults not exposed as
     # first-class nix-darwin options.  Written with `sudo defaults write`.
-    # -------------------------------------------------------------------------
     CustomSystemPreferences = {
       # Enable automatic crash-report and diagnostic submission to Apple.
       "com.apple.SubmitDiagInfo".SubmitDiagInfo = true;
@@ -646,14 +513,10 @@ in
       "com.apple.iokit.AmbientLightSensor"."Keyboard Backlight Error Condition" = 25;
     };
 
-    # -------------------------------------------------------------------------
     # loginwindow — login-screen presentation settings.
-    # -------------------------------------------------------------------------
     loginwindow.LoginwindowText = "✨";
 
-    # -------------------------------------------------------------------------
     # Screenshot settings
-    # -------------------------------------------------------------------------
     screencapture = {
       disable-shadow = true; # omit window drop-shadow from screenshots
       location = "~/Desktop"; # default save location
@@ -664,10 +527,8 @@ in
       type = "png"; # default file format
     };
 
-    # -------------------------------------------------------------------------
     # Trackpad settings (system-level; fine-grained per-app settings are in
     # CustomUserPreferences.com.apple.AppleMultitouchTrackpad above)
-    # -------------------------------------------------------------------------
     trackpad = {
       Clicking = true; # tap to click
       TrackpadThreeFingerDrag = true; # drag windows with three fingers

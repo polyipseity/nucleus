@@ -1,68 +1,27 @@
 <#
 .SYNOPSIS
   Build VM images (if needed) and provision VMs on Windows.
-
 .DESCRIPTION
-  Combines the former Invoke-VMBuild and Invoke-VMSetup into one module.
-  Phase 1 (build): builds type system QCOW2 images using Packer for each type
-  declared in src\modules\VMs.json, if absent at
-  %USERPROFILE%\virtual machines\src\<type>\system image.qcow2.  For NixOS guests on
-  Windows, Packer downloads the NixOS ISO automatically (src\vms\NixOS\packer.pkr.hcl).
-  For Windows 11 guests, a local ISO is required (-WindowsIso).
-
-  Phase 2 (provision): creates QEMU start scripts and provisions the per-VM
-  data disk (a qcow2 overlay over the type system image) for each VM,
-  eliminating the manual OS installation step previously required with empty
-  disks.
-
-  Called by scripts\vm.ps1 (alias: nucleus-vm setup).
-  Not invoked automatically during nucleus apply — run manually when setting
-  up a new machine or rebuilding VM images.
-
-  Source:
-  - https://developer.hashicorp.com/packer/plugins/builders/qemu
-  - https://www.qemu.org/docs/master/system/invocation.html
-  - https://github.com/pbatard/Fido
-
+  Phase 1 (build) builds the type system QCOW2 with Packer when it is absent.
+  Phase 2 (provision) creates the QEMU start scripts and the per-VM overlay
+  data disk, so no manual OS install is needed. Called by scripts\vm.ps1
+  (nucleus-vm setup); never run from apply.
 .NOTES
-  Environment variables:
-    NUCLEUS_HOST                Host identifier for VM selection.
-    NUCLEUS_VM_SECRET_OWNER     SOPS identity for VM guest secrets.
-    USERNAME                    Current user for secret resolution.
-    VM_DIR_OVERRIDE             Optional override for VM storage directory.
-    PROCESSOR_ARCHITECTURE      Used for WHPX auto-detection.
-
-    Exit codes:
-      This module does not emit exit codes.
+  Environment: NUCLEUS_HOST, NUCLEUS_VM_SECRET_OWNER, USERNAME, VM_DIR_OVERRIDE,
+  PROCESSOR_ARCHITECTURE (WHPX auto-detection).
 #>
 . (Join-Path $PSScriptRoot 'Get-VMGuestSshPublicKey.ps1')
 function Wait-GuestReady {
   <#
   .SYNOPSIS
     Wait for a QEMU guest to become ready via the guest agent.
-
   .DESCRIPTION
-    Polls the QEMU Guest Agent named pipe (qga-<VmId>) with guest-ping
-    commands until the guest responds or the timeout expires.
-
-  .PARAMETER VmId
-    ID of the VM whose guest agent pipe to poll.
-
+    Polls the guest agent named pipe (qga-<VmId>) until the guest responds or
+    the timeout expires.
   .PARAMETER TimeoutSeconds
-    Maximum seconds to wait before returning $false. Defaults to 150.
-
+    Maximum seconds to wait before returning $false.
   .OUTPUTS
-    System.Boolean.  $true if the guest responded, $false on timeout.
-
-  .EXAMPLE
-    Wait-GuestReady -VmId 'NixOS' -TimeoutSeconds 120
-
-  .NOTES
-    Environment variables:
-      (none)    No environment variables used.
-
-    Exit codes:
-      This function does not emit exit codes.
+    System.Boolean. $true if the guest responded, $false on timeout.
   #>
     [CmdletBinding()]
     [OutputType([bool])]
@@ -158,68 +117,24 @@ function Invoke-VMSetup {
   <#
   .SYNOPSIS
     Build VM disk images and provision VMs on Windows.
-
   .DESCRIPTION
-    Orchestrates VM lifecycle: builds type system QCOW2 images using Packer
-    (Phase 1) and creates QEMU start scripts with per-VM data disks (Phase 2).
-    Supports NixOS, Windows 11, and macOS guest types.
-
-  .PARAMETER RepoRoot
-    Absolute path to the repository root.
-
+    Phase 1 builds the type system QCOW2 with Packer, Phase 2 creates the QEMU
+    start scripts and per-VM data disks. Supports NixOS, Windows 11, and macOS.
   .PARAMETER WindowsIso
-    Path to the Windows 11 ISO. Optional when Windows.isoUrl is set in VMs.json;
-    the URL is used to auto-download the installer on first run.
-
-  .PARAMETER NixOSOnly
-    Build and provision only the NixOS guest.
-
-  .PARAMETER WindowsOnly
-    Build and provision only the Windows 11 guest.
-
+    Path to the Windows 11 ISO. Optional when Windows.isoUrl is set in VMs.json,
+    which then auto-downloads the installer on first run.
   .PARAMETER WindowsIsoSource
-    Windows installer ISO resolution strategy. Auto: Windows.isoUrl cache/download
-    first, then Fido fallback. Url: use only -WindowsIso or Windows.isoUrl (no
-    downloader fallback). Fido: use only local cache/Fido when -WindowsIso is omitted.
-
-  .PARAMETER WindowsIsoRetries
-    Retry attempts for Windows ISO network downloads.
-
+    ISO strategy: Auto (Windows.isoUrl cache or download, then Fido), Url (no
+    downloader fallback), Fido (cache or Fido only).
   .PARAMETER Accelerator
-    QEMU accelerator for image builds. Defaults to tcg (always works).
-    When tcg is used, auto-detects WHPX (Windows Hypervisor Platform) and
-    upgrades to whpx automatically if enabled.
-
-  .PARAMETER Headful
-    Run guest image builds headful (headless=false) for interactive debugging
-    of installer issues.
-
-  .PARAMETER DryRun
-    Print planned actions without modifying any state.
-
-  .EXAMPLE
-    Invoke-VMSetup -RepoRoot 'C:\Users\admin\nucleus'
-
-  .EXAMPLE
-    Invoke-VMSetup -RepoRoot 'C:\Users\admin\nucleus' -NixOSOnly -Headful
-
-  .EXAMPLE
-    Invoke-VMSetup -RepoRoot 'C:\Users\admin\nucleus' -WindowsOnly -WindowsIso 'C:\ISOs\Win11_23H2.iso'
-
+    QEMU accelerator for image builds. Defaults to tcg, which always works, then
+    auto-upgrades to WHPX when it is enabled.
   .NOTES
-    Environment variables:
-      NUCLEUS_HOST                Host identifier for VM selection.
-      NUCLEUS_VM_SECRET_OWNER     SOPS identity for VM guest secrets.
-      USERNAME                    Current user for secret resolution.
-      VM_DIR_OVERRIDE             Optional override for VM storage directory.
-      PROCESSOR_ARCHITECTURE      Used for WHPX auto-detection.
-
-    Exit codes:
-      This function does not emit exit codes.
+    Environment: NUCLEUS_HOST, NUCLEUS_VM_SECRET_OWNER, USERNAME, VM_DIR_OVERRIDE,
+    PROCESSOR_ARCHITECTURE (WHPX auto-detection).
   #>
     [CmdletBinding()]
     param(
-        # Absolute path to the repository root.
         [Parameter(Mandatory)]
         [string]$RepoRoot,
 
@@ -228,10 +143,8 @@ function Invoke-VMSetup {
         # Download from: https://www.microsoft.com/software-download/windows11
         [string]$WindowsIso = '',
 
-        # Build and provision only the NixOS guest.
         [switch]$NixOSOnly,
 
-        # Build and provision only the Windows 11 guest.
         [switch]$WindowsOnly,
 
         # Windows installer ISO resolution strategy.
@@ -241,7 +154,6 @@ function Invoke-VMSetup {
         [ValidateSet('auto', 'url', 'fido')]
         [string]$WindowsIsoSource = 'Auto',
 
-        # Retry attempts for Windows ISO network downloads.
         [int]$WindowsIsoRetries = 0,
 
         # QEMU accelerator for image builds. Defaults to tcg (always works).
@@ -250,34 +162,18 @@ function Invoke-VMSetup {
         # Source: https://developer.hashicorp.com/packer/plugins/builders/qemu
         [string]$Accelerator = 'tcg',
 
-        # Run guest image builds headful (headless=false) for interactive
-        # debugging of installer issues.
         [switch]$Headful,
 
-        # Print planned actions without modifying any state.
         [switch]$DryRun,
 
-        # Remove orphaned VM disk images and credential markers.
         [switch]$Gc,
 
-        # Also clear disabled VM entries during GC.
-        # WHY: default GC preserves disabled entries; only names absent from
-        # VMs.json entirely are cleared.  -GcDisabled opts into clearing
-        # disabled entries too.
         [switch]$GcDisabled,
 
-        # Also GC orphaned runtime disks in data/ (default GC preserves data/).
         [switch]$GcData,
 
-        # Config-only refresh: descriptors and start/stop scripts.  Skips image
-        # build and disk provisioning.  Used by nucleus-vm sync and apply.
         [switch]$SyncOnly,
 
-        # Build-only refresh: build/rebuild only TYPE's system image and return
-        # without config sync or Phase 2 disk provisioning.  Used by
-        # nucleus-vm build-system.  WHY: the type image is identity-free and
-        # shared by every VM of the type; per-VM identity is injected onto the
-        # data disk at provision time, so a rebuild never needs per-VM state.
         [string]$BuildSystemType = ''
     )
 
@@ -512,10 +408,6 @@ function Invoke-VMSetup {
             [string]$GuestSecretHash
         )
 
-        # WHY: Windows-host type builds bake guest identity (Autounattend.xml
-        # tokens, packer vars) into the base image, so the type marker must
-        # track config and credentials.  (The POSIX NixOS build is
-        # identity-free and gated on config alone.)
         $hashBytes = [System.Security.Cryptography.SHA256]::HashData(
             [System.Text.Encoding]::UTF8.GetBytes("$TypeConfigHash`n$GuestSecretHash")
         )
@@ -671,9 +563,6 @@ function Invoke-VMSetup {
             $Vm
         )
 
-        # NUCLEUS_HOST env var identifies the current host.  The Vm.hosts
-        # field (null = all hosts, or a string array of host names) determines
-        # whether this VM should run here.
         $nucleusHost = [string]$env:NUCLEUS_HOST
         if ([string]::IsNullOrWhiteSpace($nucleusHost)) {
             $nucleusHost = 'Windows'
@@ -751,9 +640,6 @@ function Invoke-VMSetup {
             return
         }
 
-        # Deterministic hardware identity mirrors vm_mk_uuid / vm_mk_mac_address
-        # in scripts/lib/vm.sh (and the MacBook vms.nix mkUuid/mkMacAddress)
-        # so descriptors are identical across hosts and platforms.
         $macPrefix = [string]$Vm.macAddressPrefix
         if ([string]::IsNullOrWhiteSpace($macPrefix)) {
             throw "vm-setup: VM '$($Vm.id)' must declare macAddressPrefix in src\modules\VMs.json"
@@ -832,9 +718,6 @@ function Invoke-VMSetup {
         )
 
         if ($Vm.type -eq 'Android') {
-            # The Android QEMU start script is shared canonical content
-            # (embedded-content policy); render the shared file instead of an
-            # embedded copy.
             $androidStartPath = Join-Path $RepoRoot 'src\scripts\vms\start-android-vm.ps1'
             if (-not (Test-Path -LiteralPath $androidStartPath -PathType Leaf)) {
                 throw "vm-setup: shared Android VM start script not found: $androidStartPath"
@@ -860,8 +743,6 @@ function Invoke-VMSetup {
         }
 
         $hostArch = $env:PROCESSOR_ARCHITECTURE
-        # The QEMU system binary is host-arch based (mirrors the POSIX
-        # windows-qemu render); the descriptor arch is type-based.
         $vmArch = if ($hostArch -eq 'ARM64') { 'aarch64' } else { 'x86_64' }
         $qemuSystem = Join-Path $QemuDir "qemu-system-$vmArch.exe"
         $machine = if ($vmArch -eq 'x86_64') { 'q35' } else { 'virt' }
@@ -869,21 +750,15 @@ function Invoke-VMSetup {
 
         $ramBytes = ConvertFrom-SizeString $Vm.ram
         $hostFwds = ($Vm.portForwards | ForEach-Object { "hostfwd=tcp::$($_.hostPort)-:$($_.guestPort)" }) -join ','
-        # Relocatable writable-disk path: data/<id>.qcow2 relative to the VM
-        # tree root (the rendered templates cd/Push-Location before QEMU).
         $diskPath = Join-Path 'data' "$($Vm.id).qcow2"
 
         $display = 'sdl'
         $vga = if ($Vm.type -eq 'Windows') { 'std' } else { 'virtio' }
 
-        # Determine VirtioFS shared directory argument.
         # check-suppress:embedded-content: exception 1 (data-driven/generated content) -- per-VM conditional args
         $virtiofsArgs = ''
         if ($Vm.shareDevDir) {
             $devDir = Join-Path $env:USERPROFILE 'dev'
-            # VirtioFS on Windows requires virtiofsd running separately.
-            # Add a placeholder reminder; the start script shows how to launch
-            # virtiofsd before starting the guest.
             $virtiofsArgs = @"
 
 # To enable ~/dev directory sharing:
@@ -1029,7 +904,6 @@ function Invoke-VMSetup {
         $guestPassword = $guestCredential.Secret
         $guestSecretHash = $guestCredential.Hash
 
-        # Export SSH public key for NixOS guest provisioning (guests/NixOS/guest.nix uses it for authorized_keys).
         $sshPublicKey = Get-VMGuestSshPublicKey -RepoRoot $RepoRoot -Username $guestCredential.AccountName
         if ($null -ne $sshPublicKey) {
             $env:NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY = $sshPublicKey
@@ -1100,11 +974,6 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         }
     }
 
-    # -------------------------------------------------------------------------
-    # Config sync — descriptors and start/stop scripts (all manifest guests).
-    # Runs before image build; shared with nucleus-vm sync (-SyncOnly).
-    # WHY: build-only mode must not touch descriptors/scripts or Phase 2 disks.
-    # -------------------------------------------------------------------------
 
     if (-not $BuildSystemType) {
         $scoopQemuDir = Join-Path $env:USERPROFILE 'scoop\apps\qemu\current'
@@ -1162,11 +1031,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
     }
     }
 
-    # -------------------------------------------------------------------------
-    # Phase 1 — Build type-scoped system images (once per type, not per VM)
-    # -------------------------------------------------------------------------
 
-    # Prune orphaned dot-prefixed Packer build temp dirs under src/<type>/.
     if (Test-Path -LiteralPath $srcDir -PathType Container) {
         # check-suppress:suppression_doc: probe -- no type directories may exist; foreach handles empty result.
         foreach ($typeDir in Get-ChildItem -LiteralPath $srcDir -Directory -ErrorAction SilentlyContinue) {
@@ -1180,10 +1045,6 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         }
     }
 
-    # Distinct enabled+host-matched types to build, honoring -NixOSOnly /
-    # -WindowsOnly / -BuildSystemType filters.  WHY: the type system image is
-    # identity-free and shared by every VM of the type; per-VM identity is
-    # injected onto the data disk in Phase 2.
     $buildTypes = @(
         foreach ($vm in $vmDef.VMs) {
             if (-not (Test-VMEnabled -Vm $vm)) { continue }
@@ -1196,8 +1057,6 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
     ) | Sort-Object -Unique
 
     foreach ($buildType in $buildTypes) {
-        # Representative (first enabled+host-matched) VM of the type supplies
-        # build parameters; build once per type, not once per VM.
         $repVm = $vmDef.VMs | Where-Object {
             $_.type -eq $buildType -and (Test-VMEnabled -Vm $_) -and (Test-VMHostMatch -Vm $_)
         } | Select-Object -First 1
@@ -1234,10 +1093,6 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                     -VmsDir $vmsDir -SrcDir $srcDir -DryRun:$DryRun
             }
             'Android' {
-                # Android system/GSI images are fetched from the manifest
-                # Android group (gsiUrl) and cannot be automated here; the
-                # writable data/<id>.qcow2 userdata disk is provisioned in
-                # Phase 2.
                 Write-NucleusInfo -CommandName vm-setup "Android image must be obtained from the manifest Android group (gsiUrl); place system/GSI images under $(Get-VMTypeSrcDir -SrcDir $srcDir -Type 'Android')"
             }
             'macOS' {
@@ -1250,14 +1105,10 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
     }
 
     if ($BuildSystemType) {
-        # Build-only mode: the type image build above is the entire request.
         Write-NucleusInfo -CommandName vm-setup "system image build complete for type '$BuildSystemType'"
         return
     }
 
-    # -------------------------------------------------------------------------
-    # Phase 2 — Provision VMs (disk provisioning)
-    # -------------------------------------------------------------------------
 
     if (-not $DryRun) {
         New-Item -ItemType Directory -Path $dataDir -Force > $null
@@ -1269,24 +1120,14 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             continue
         }
 
-        # Apply host-scoping filter.  VMs that list a hosts array that does
-        # not include the current NUCLEUS_HOST are skipped.
         if (-not (Test-VMHostMatch -Vm $vm)) {
             Write-NucleusInfo -CommandName vm-setup "VM '$($vm.id)' is not available on host '$env:NUCLEUS_HOST'; skipping"
             continue
         }
 
-        # Apply -NixOSOnly / -WindowsOnly filter.
         if ($NixOSOnly   -and $vm.type -ne 'NixOS')   { continue }
         if ($WindowsOnly -and $vm.type -ne 'Windows') { continue }
 
-        # Pass A — disk provisioning (enabled-only, mirroring
-        # vm_ensure_data_disk): the writable data disk is a qcow2 overlay over
-        # src/<type>/system image.qcow2 created with an absolute backing path.
-        # Android's userdata disk is a standalone qcow2 (no base).
-        # Data-preservation invariants: an existing valid data disk is never
-        # recreated/truncated during setup; provision drift (missing or stale
-        # marker) warns for in-place injection only (never auto-wipes).
         Write-NucleusInfo -CommandName vm-setup "configuring VM '$($vm.name)'..."
 
         $minSizeBytes = ConvertFrom-SizeString $vm.minImageSize
@@ -1294,10 +1135,6 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         $systemImageValid = (Test-Path $systemImage) -and (Test-Qcow2Image -ImagePath $systemImage -ImageLabel "system image '$($vm.type)'" -MinBytes $minSizeBytes)
 
         if ($vm.type -eq 'Android') {
-            # Android userdata: standalone writable qcow2 created at the
-            # manifest disk size (system/GSI images are read-only payload
-            # under src/<type>/).  Mirrors the POSIX Android provisioning
-            # branch, including the provision-marker write/adoption.
             $userdataPath = Join-Path -Path $dataDir -ChildPath "$($vm.id).qcow2"
             $userdataProvisionMarker = Get-VMProvisionMarkerPath -BasePath $userdataPath
             $userdataProvisionHash = Get-VMProvisionHash -Vm $vm -GuestSecretHash $guestSecretHash -RepoRoot $RepoRoot
@@ -1321,10 +1158,6 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             } else {
                 Write-NucleusInfo -CommandName vm-setup "Android userdata disk already exists: $userdataPath"
                 if (-not (Test-VMMarker -ExpectedHash $userdataProvisionHash -MarkerPath $userdataProvisionMarker)) {
-                    # WHY: Android userdata is created empty and never
-                    # injected; a missing or stale marker only means the
-                    # inputs changed, so adopt it (marker adoption only, no
-                    # injection, no drift report).
                     Write-NucleusInfo -CommandName vm-setup "refreshing provision marker for Android userdata '$($vm.id)'"
                     if (-not $DryRun) {
                         Set-Content -Path $userdataProvisionMarker -Value $userdataProvisionHash -Encoding UTF8
@@ -1334,12 +1167,6 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                 }
             }
 
-            # Android system overlay: persistent writable qcow2 overlay over
-            # src/Android/system image.qcow2 (absolute backing path) carrying
-            # the guest /system partition so recovery sideload (GApps) keeps
-            # working while src/ stays pristine.  Create-once/preserve;
-            # marker adoption on drift (Android semantics: derived from the
-            # base, never injected).
             $systemOverlayPath = Join-Path -Path $dataDir -ChildPath "$($vm.id) (system).qcow2"
             $systemOverlayProvisionMarker = Get-VMProvisionMarkerPath -BasePath $systemOverlayPath
             if (-not (Test-Path -LiteralPath $systemOverlayPath -PathType Leaf)) {
@@ -1365,10 +1192,6 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             } else {
                 Write-NucleusInfo -CommandName vm-setup "Android system overlay already exists: $systemOverlayPath"
                 if (-not (Test-VMMarker -ExpectedHash $userdataProvisionHash -MarkerPath $systemOverlayProvisionMarker)) {
-                    # WHY: Android system overlay is derived from the base and
-                    # never injected; a missing or stale marker only means the
-                    # inputs changed, so adopt it (marker adoption only, no
-                    # injection, no drift report).
                     Write-NucleusInfo -CommandName vm-setup "refreshing provision marker for Android system overlay '$($vm.id)'"
                     if (-not $DryRun) {
                         Set-Content -Path $systemOverlayProvisionMarker -Value $userdataProvisionHash -Encoding UTF8
@@ -1408,11 +1231,6 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         $diskProvisionMarker = Get-VMProvisionMarkerPath -BasePath $diskPath
         $provisionHash = Get-VMProvisionHash -Vm $vm -GuestSecretHash $guestSecretHash -RepoRoot $RepoRoot
 
-        # Data disk provisioning (mirrors vm_ensure_data_disk):
-        # - data disk valid: keep it; on provision drift (missing or stale
-        #   marker) warn for in-place injection (never recreate)
-        # - data disk invalid: keep it and warn (reset is the destructive path)
-        # - data disk absent: create as an overlay on the system image
         if (Test-Path $diskPath) {
             if (Test-Qcow2Image -ImagePath $diskPath -ImageLabel "data disk '$($vm.id)'" -MinBytes $minSizeBytes) {
                 Write-NucleusInfo -CommandName vm-setup "data disk already exists: $diskPath"
@@ -1446,8 +1264,6 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             Write-NucleusWarning -CommandName vm-setup "system image not found or invalid for '$($vm.id)': $systemImage; skipping"
         }
 
-        # Grow-only auto-grow: bring the data disk's virtual size up to the
-        # manifest disk size (never shrink).  Mirrors vm_ensure_data_disk.
         $diskBytes = ConvertFrom-SizeString $vm.diskSize
         $dataDiskSize = Get-VMQcow2VirtualSize -ImagePath $diskPath
         if ($dataDiskSize -gt 0 -and $diskBytes -gt $dataDiskSize) {
@@ -1470,8 +1286,6 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
     if ($Gc) {
         Write-NucleusInfo -CommandName vm-setup 'GC — scanning for non-provisioned VM artifacts...'
         if ($GcDisabled) {
-            # WHY: -GcDisabled opts into clearing disabled entries, so only
-            # enabled-and-host-matched names are expected.
             $expectedNames = @(
                 foreach ($vm in $vmDef.VMs) {
                     if ((Test-VMEnabled $vm) -and (Test-VMHostMatch $vm)) {

@@ -1,58 +1,23 @@
 <#
 .SYNOPSIS
   Runs the consolidated Windows update workflow.
-
 .DESCRIPTION
-  Executes the native Windows update sequence in one command. The -Action
-  parameter selects the scope:
-    all      (default) flake input updates + SOPS rewrap + lockfile bump
-    lockfile           only the lockfile-bumping step
-
-  The lockfile-bumping logic was folded in from the deleted
-  scripts/bump-lockfile.ps1 (the nucleus command surface merged
-  `bump-lockfile` into `nucleus-update lockfile`).
-
-  Uses the NUCLEUS_REPO_ROOT environment variable to locate the repository
-  root; falls back to the parent of the script directory.
-
-.PARAMETER Action
-  Scope to run: 'all' (default) or 'lockfile'.
-
-.PARAMETER NoFlake
-  Do not run nix flake update (default: $false). Only applies to -Action all.
-
-.PARAMETER NoSops
-  Do not run sops updatekeys (default: $false). Only applies to -Action all.
-
+  -Action all (default) runs flake input updates, the SOPS rewrap, and the
+  lockfile bump. -Action lockfile runs only the lockfile step. The repository
+  root comes from NUCLEUS_REPO_ROOT, falling back to the parent of the script
+  directory.
 .PARAMETER Sections
-  Comma-separated section names to update (default: all). Only applies to
-  -Action lockfile. Legacy bare tokens (nixos-iso, tart-images) and the cargo
-  alias normalize to their canonical dotted form; unknown tokens are rejected.
-
+  Comma-separated section names (default: all). Legacy bare tokens
+  (nixos-iso, tart-images) and the cargo alias normalize to their canonical
+  dotted form; unknown tokens are rejected.
 .PARAMETER Verify
-  Check for updates without writing; exit 1 if changes would be made. Only
-  applies to -Action lockfile.
-
+  Check for updates without writing; exit 1 if changes would be made.
 .PARAMETER VerifyInstalled
-  Verify installed tool versions against the pinned lockfile sections; exit 1
-  on drift. Never writes. Only applies to -Action lockfile.
-
+  Verify installed tool versions against the pins; exit 1 on drift. Never writes.
 .PARAMETER ListSections
-  Print valid section names, one per line, and exit 0. Only applies to
-  -Action lockfile.
-
-.EXAMPLE
-  .\update.ps1
-
-.EXAMPLE
-  .\update.ps1 -Action lockfile
-
-.EXAMPLE
-  .\update.ps1 -NoFlake -NoSops
-
+  Print valid section names, one per line, and exit 0.
 .NOTES
-  Environment variables: NUCLEUS_NO_FLAKE, NUCLEUS_NO_SOPS, NUCLEUS_REPO_ROOT.
-  Exit codes: 0 on success; non-zero on failure.
+  Environment: NUCLEUS_NO_FLAKE, NUCLEUS_NO_SOPS, NUCLEUS_REPO_ROOT.
 #>
 [CmdletBinding()]
 param(
@@ -80,9 +45,6 @@ if ($Help) {
 
 $repoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path }
 
-# ---------------------------------------------------------------------------
-# Invoke-UpdateAll — flake input updates + SOPS recipient rewrap
-# ---------------------------------------------------------------------------
 function Invoke-UpdateAll {
   [CmdletBinding()]
   param(
@@ -133,11 +95,6 @@ function Invoke-UpdateAll {
   }
 }
 
-# ---------------------------------------------------------------------------
-# Invoke-LockfileBump — query each available tool for the current version of
-# each pinned item and write an updated lockfile atomically. Inlined from the
-# deleted scripts/bump-lockfile.ps1 (folded into `nucleus-update lockfile`).
-# ---------------------------------------------------------------------------
 function Invoke-LockfileBump {
   [CmdletBinding()]
   param(
@@ -147,20 +104,12 @@ function Invoke-LockfileBump {
     [switch]$ListSections
   )
 
-  # Source the deterministic JSON serialization helpers for sorted key output.
   . (Join-Path $repoRoot 'src/platforms/Windows/modules/lib/JsonSort.ps1')
 
-  # Source the PSGallery pin helpers (SRI hash of a downloaded nupkg).
   . (Join-Path $repoRoot 'src/platforms/Windows/modules/lib/PsGalleryPin.ps1')
 
-  # Canonical section list, shared by --list-sections and by token validation so
-  # the two can never drift out of sync. whisper is listed but not updatable: a
-  # model pin is a (revision, hash) pair that has to be chosen together, so no
-  # tool can recompute one from the other.
   $validSectionsCsv = 'bun,cargo,cargo-binstall,cursor,pi,psgallery,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,whisper,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows'
 
-  # --list-sections: print the canonical section names and exit 0 (no lockfile
-  # read required, matching the bash twin's early-exit behavior).
   if ($ListSections) {
     foreach ($s in ($validSectionsCsv -split ',')) {
       Write-NucleusInfo $s
@@ -176,11 +125,6 @@ function Invoke-LockfileBump {
     exit 1
   }
 
-  # All sections run when no explicit selection is supplied. Parse and normalize
-  # the --sections token list exactly like the bash twin: trim whitespace per
-  # token, map legacy bare sub-section names and the cargo alias to canonical
-  # dotted form, and reject anything unknown.
-  # Section list is declared once above; reuse it for token validation.
   $sectionTokens = @()
   if (-not [string]::IsNullOrEmpty($Sections)) {
     foreach ($tok in ($Sections -split ',')) {
@@ -199,8 +143,6 @@ function Invoke-LockfileBump {
     }
   }
 
-  # Explicitly-selected sections without an updater are kept manual; warn so the
-  # run does not silently skip them (mirrors the bash twin's no-updater warning).
   foreach ($tok in $sectionTokens) {
     if (",source-builds,cursor,vscode,whisper,suggestions.homebrew.masApps,suggestions.opencode,suggestions.vm-setup.windows,version," -match ",$tok,") {
       Write-NucleusWarning "section '$tok' has no updater — kept manual"
@@ -209,10 +151,6 @@ function Invoke-LockfileBump {
 
   function Write-Update {
     param([string]$Section, [string]$Key, [string]$OldValue, [string]$NewValue)
-    # Change tracker: every mutation flows through this function, so the flag
-    # decides whether the write path stamps 'updated' and rewrites the file.
-    # $script: scope is required — functions run in a child scope and a plain
-    # assignment would only update the function-local copy.
     $script:changed = $true
     Write-NucleusInfo "updating ${Section}.${Key} from ${OldValue} to ${NewValue}"
   }
@@ -228,10 +166,6 @@ function Invoke-LockfileBump {
 
   function Test-SuggestionsEnabled {
     param([string]$Name)
-    # Suggestions sections are warn-only audit data, never authoritative pins.
-    # They are selected only by an explicit suggestions.* token (or the default
-    # all-sections run). A parent token (suggestions, suggestions.homebrew) also
-    # selects all of its dotted children.
     if ([string]::IsNullOrEmpty($Sections)) { return $true }
     foreach ($token in $sectionTokens) {
       if ($token.StartsWith('suggestions') -and ($Name -eq $token -or $Name.StartsWith("$token."))) { return $true }
@@ -262,9 +196,6 @@ function Invoke-LockfileBump {
   $lockfile = $rawJson | ConvertFrom-Json -Depth 32
   $ht = ConvertTo-Hashtable $lockfile
 
-  # --verify-installed: verify installed tool versions against the pinned
-  # lockfile sections and exit (never writes). Delegates to the shared probe
-  # library used by the check step so behavior stays identical.
   if ($VerifyInstalled) {
     . (Join-Path $repoRoot 'src/scripts/checks/lockfile-enforcement-lib.ps1')
     $drift = Invoke-LockfileEnforcement `
@@ -275,14 +206,11 @@ function Invoke-LockfileBump {
     exit $drift
   }
 
-  # Change tracking: the timestamp is stamped and the file written only when at
   # least one section produced a change (set by Write-Update). Stamping before
   # the queries would make every run rewrite the file (timestamp churn).
   $changed = $false
 
-  # -------------------------------------------------------------------------
   # winget — winget show --id <id>
-  # -------------------------------------------------------------------------
   if (Test-SectionEnabled 'winget') {
     if (Get-Command -Name 'winget' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
       if ($ht.ContainsKey('winget') -and $ht['winget'] -is [hashtable]) {
@@ -306,9 +234,7 @@ function Invoke-LockfileBump {
     }
   }
 
-  # -------------------------------------------------------------------------
   # scoop — scoop info <pkg>
-  # -------------------------------------------------------------------------
   if (Test-SectionEnabled 'scoop') {
     if (Get-Command -Name 'scoop' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
       if ($ht.ContainsKey('scoop') -and $ht['scoop'] -is [hashtable]) {
@@ -330,9 +256,7 @@ function Invoke-LockfileBump {
     }
   }
 
-  # -------------------------------------------------------------------------
   # cargo-binstall — crates.io API
-  # -------------------------------------------------------------------------
   if (Test-SectionEnabled 'cargo-binstall') {
     if ($ht.ContainsKey('cargo-binstall') -and $ht['cargo-binstall'] -is [hashtable]) {
       foreach ($key in @($ht['cargo-binstall'].Keys)) {
@@ -377,9 +301,7 @@ function Invoke-LockfileBump {
     }
   }
 
-  # -------------------------------------------------------------------------
   # bun — npm registry API (curl)
-  # -------------------------------------------------------------------------
   if (Test-SectionEnabled 'bun') {
     if (Get-Command -Name 'curl' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
       if ($ht.ContainsKey('bun') -and $ht['bun'] -is [hashtable]) {
@@ -402,13 +324,6 @@ function Invoke-LockfileBump {
     }
   }
 
-  # -------------------------------------------------------------------------
-  # pi — npm registry API (curl).  pi's extensions are published to npm and the
-  # lockfile stores package name -> version.  Object-shaped pins are VCS/rev
-  # pins, which the registry cannot update.
-  # -------------------------------------------------------------------------
-  # Versions published within the minimumReleaseAge window are skipped to
-  # avoid a pin that bun install would reject (supply-chain hardening).
   if (Test-SectionEnabled 'pi') {
     if (Get-Command -Name 'curl' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
       if ($ht.ContainsKey('pi') -and $ht['pi'] -is [hashtable]) {
@@ -442,16 +357,11 @@ function Invoke-LockfileBump {
     }
   }
 
-  # -------------------------------------------------------------------------
-  # uv — uv tool list
-  # -------------------------------------------------------------------------
   if (Test-SectionEnabled 'uv') {
     if (Get-Command -Name 'uv' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
       # check-suppress:suppression_doc: probe -- uv may not be installed; stderr suppressed for clean output.
       $uvOutput = & uv tool list 2>$null
       if ($uvOutput) {
-        # Build hashtable from uv tool list output.
-        # Format: "package@version" or "package v1.0.0" or "- package@version"
         $uvInstalled = @{}
         foreach ($line in $uvOutput) {
           $line = $line.Trim()
@@ -495,19 +405,14 @@ function Invoke-LockfileBump {
     }
   }
 
-  # -------------------------------------------------------------------------
   # rustup — rustc +<channel> --version
-  # -------------------------------------------------------------------------
   if (Test-SectionEnabled 'rustup') {
     if (Get-Command -Name 'rustup' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
-      # Get installed toolchains
       # check-suppress:suppression_doc: probe -- rustup may not be installed; stderr suppressed for clean output.
       $toolchains = & rustup toolchain list 2>$null
       $toolchainSet = @{}
       if ($toolchains) {
         foreach ($tc in $toolchains) {
-          # Line format: "stable-aarch64-pc-windows-msvc (default)"
-          # Extract the channel name (everything before first '-')
           $channel = ($tc -split '-', 2)[0].Trim()
           if (-not [string]::IsNullOrEmpty($channel)) {
             $toolchainSet[$channel] = $true
@@ -522,10 +427,6 @@ function Invoke-LockfileBump {
             # check-suppress:suppression_doc: probe -- toolchain may not be installed; stderr suppressed for clean output.
             $versionOutput = & rustc "+$key" --version 2>$null
             if ($versionOutput) {
-              # nightly pins carry a valid -YYYY-MM-DD archive suffix; record the
-              # full nightly-YYYY-MM-DD spec. stable/beta are rolling channels
-              # pinned by version (X.Y.Z) — a date suffix is invalid for them, so
-              # record the bare version instead of the release date.
               if ($key -eq 'nightly' -or $key -match '^nightly-\d{4}-\d{2}-\d{2}$') {
                 $match = [regex]::Match($versionOutput, 'nightly-\d{4}-\d{2}-\d{2}')
               } else {
@@ -547,15 +448,11 @@ function Invoke-LockfileBump {
     }
   }
 
-  # -------------------------------------------------------------------------
-  # psgallery — Find-Module via pwsh -NoProfile
-  # -------------------------------------------------------------------------
   if (Test-SectionEnabled 'psgallery') {
     if (Get-Command -Name 'pwsh' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
       if ($ht.ContainsKey('psgallery') -and $ht['psgallery'] -is [hashtable]) {
         foreach ($key in @($ht['psgallery'].Keys)) {
           $pin = $ht['psgallery'][$key]
-          # A psgallery pin is either a version string or a {version, hash} object.
           $isObjectPin = $pin -is [hashtable]
           $old = if ($isObjectPin) { $pin['version'] } else { $pin }
           # check-suppress:suppression_doc: probe -- module may not exist in PSGallery; stderr suppressed for clean output.
@@ -571,8 +468,6 @@ function Invoke-LockfileBump {
             }
             if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
               if ($isObjectPin) {
-                # Object-form pins carry the nupkg hash; recompute it for the new
-                # version so a bump never leaves a stale hash behind.
                 $newHash = Get-PsgalleryNupkgHash -ModuleName $key -Version $new
                 if ([string]::IsNullOrEmpty($newHash)) {
                   Write-NucleusWarning "psgallery.$key`: could not fetch the nupkg hash for $new — leaving the entry unchanged"
@@ -593,10 +488,6 @@ function Invoke-LockfileBump {
     }
   }
 
-  # -------------------------------------------------------------------------
-  # suggestions.cursor — cursor --list-extensions --show-versions
-  # Warn-only audit data.
-  # -------------------------------------------------------------------------
   if (Test-SuggestionsEnabled 'suggestions.cursor') {
     $cursorOutput = $null
     # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
@@ -608,7 +499,6 @@ function Invoke-LockfileBump {
     }
 
     if ($cursorOutput) {
-      # Build extension map from output lines "publisher.extension@version"
       $cursorExts = @{
       }
       foreach ($line in $cursorOutput) {
@@ -639,10 +529,6 @@ function Invoke-LockfileBump {
     }
   }
 
-  # -------------------------------------------------------------------------
-  # suggestions.cursor — cursor --list-extensions --show-versions
-  # Warn-only audit data.
-  # -------------------------------------------------------------------------
   if (Test-SuggestionsEnabled 'suggestions.cursor') {
     $cursorOutput = $null
     # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
@@ -654,7 +540,6 @@ function Invoke-LockfileBump {
     }
 
     if ($cursorOutput) {
-      # Build extension map from output lines "publisher.extension@version"
       $cursorExts = @{}
       foreach ($line in $cursorOutput) {
         $line = $line.Trim()
@@ -684,10 +569,6 @@ function Invoke-LockfileBump {
     }
   }
 
-  # -------------------------------------------------------------------------
-  # suggestions.vscode — code / code-insiders --list-extensions --show-versions
-  # Warn-only audit data (Windows installs --pre-release --force; POSIX uses flake.lock).
-  # -------------------------------------------------------------------------
   if (Test-SuggestionsEnabled 'suggestions.vscode') {
     $vscodeOutput = $null
     # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
@@ -703,7 +584,6 @@ function Invoke-LockfileBump {
     }
 
     if ($vscodeOutput) {
-      # Build extension map from output lines "publisher.extension@version"
       $vscodeExts = @{}
       foreach ($line in $vscodeOutput) {
         $line = $line.Trim()
@@ -733,10 +613,6 @@ function Invoke-LockfileBump {
     }
   }
 
-  # -------------------------------------------------------------------------
-  # suggestions.ollama — ollama show <name>:<tag> --format json
-  # Warn-only audit data.
-  # -------------------------------------------------------------------------
   if (Test-SuggestionsEnabled 'suggestions.ollama') {
     # Point at the Ollama daemon directly, bypassing the LiteLLM proxy that
     # home.sessionVariables.OLLAMA_HOST (127.0.0.1:4000) normally routes to.
@@ -782,9 +658,6 @@ function Invoke-LockfileBump {
     }
   }
 
-  # -------------------------------------------------------------------------
-  # vm-setup.nixos-iso — Query NixOS channel for latest ISO URL and SHA-256
-  # -------------------------------------------------------------------------
   if (Test-SectionEnabled 'vm-setup.nixos-iso') {
     if ($ht.ContainsKey('vm-setup') -and $ht['vm-setup'].ContainsKey('nixos-iso') -and $ht['vm-setup']['nixos-iso'] -is [hashtable]) {
       foreach ($arch in @($ht['vm-setup']['nixos-iso'].Keys)) {
@@ -828,9 +701,6 @@ function Invoke-LockfileBump {
     }
   }
 
-  # -------------------------------------------------------------------------
-  # vm-setup.tart-images — Query GHCR OCI registry for Cirrus CI macOS base image digests
-  # -------------------------------------------------------------------------
   if (Test-SectionEnabled 'vm-setup.tart-images') {
     if ($ht.ContainsKey('vm-setup') -and $ht['vm-setup'].ContainsKey('tart-images') -and $ht['vm-setup']['tart-images'] -is [hashtable]) {
       foreach ($osVersion in $ht['vm-setup']['tart-images'].Keys) {
@@ -839,7 +709,6 @@ function Invoke-LockfileBump {
         $oldDigest = $entry['digest']
         if ([string]::IsNullOrEmpty($oldImage)) { continue }
 
-        # Extract OCI repo name from image URI
         $imageRepo = $oldImage -replace '^ghcr\.io/', ''
         if ([string]::IsNullOrEmpty($imageRepo)) {
           Write-NucleusWarning "no image repo found for ${osVersion}, skipping"
@@ -847,11 +716,9 @@ function Invoke-LockfileBump {
         }
 
         try {
-          # Get anonymous GHCR token
           $tokenResp = Invoke-RestMethod -Uri "https://ghcr.io/token?service=ghcr.io&scope=repository:${imageRepo}:pull"
           $token = $tokenResp.token
 
-          # Query manifest for digest
           $headers = @{
             'Authorization' = "Bearer $token"
             'Accept' = 'application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json'
@@ -877,11 +744,6 @@ function Invoke-LockfileBump {
     }
   }
 
-  # -------------------------------------------------------------------------
-  # --verify: compare the mutated in-memory lockfile against the on-disk file
-  # and exit without writing. Differs from the write path below, which stamps
-  # the timestamp and rewrites the file.
-  # -------------------------------------------------------------------------
   if ($Verify) {
     $newJson = ($ht | ConvertTo-Json -Depth 10)
     $oldJson = (Get-Content -Path $lockfileAbs -Raw -Encoding UTF8).Trim()
@@ -900,9 +762,6 @@ function Invoke-LockfileBump {
     exit 0
   }
 
-  # -------------------------------------------------------------------------
-  # Atomic write
-  # -------------------------------------------------------------------------
   if (-not $changed) {
     Write-NucleusInfo 'no changes — lockfile up to date'
     return
@@ -932,9 +791,7 @@ function Invoke-LockfileBump {
   }
 }
 
-# ---------------------------------------------------------------------------
 # Dispatch
-# ---------------------------------------------------------------------------
 if ($Action -eq 'lockfile') {
   Invoke-LockfileBump -Sections $Sections -Verify:$Verify -VerifyInstalled:$VerifyInstalled -ListSections:$ListSections
 } else {

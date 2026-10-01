@@ -1,27 +1,14 @@
-# This file is managed by nucleus (src/scripts/shell/profile.ps1).
-# Manual edits will be overwritten on the next apply.
-#
-# Shared PowerShell profile content, deployed to both platforms:
-# - POSIX (macOS, NixOS): embedded by src/modules/pwsh.nix after init.ps1 via
-#   builtins.readFile.  The __NUCLEUS_*__ tokens are replaced with empty strings,
-#   leaving the `if ($IsWindows)` blocks inert.
-# - Windows: read by src/platforms/Windows/modules/user/Sync-ShellProfile.ps1, which
-#   substitutes __NUCLEUS_PREPEND_PATH__/__NUCLEUS_APPEND_PATH__ with the managed
-#   PATH snippets and __NUCLEUS_LLVM_BIN_DIR__ with the LLVM bin directory, then
-#   writes the result into the user's PowerShell profile managed block.
-#
-# Includes sandbox-runtime (srt) agent wrapping: pi runs inside
-# srt by default for filesystem/network isolation. Use pi-unrestricted
-# to bypass the sandbox.
+# Managed by nucleus; manual edits are overwritten on the next apply.
+# POSIX: embedded by src/modules/pwsh.nix with the __NUCLEUS_*__ tokens emptied,
+# leaving the `if ($IsWindows)` blocks inert. Windows: Sync-ShellProfile.ps1
+# substitutes the PATH snippets and the LLVM bin directory.
+# pi runs inside srt for filesystem and network isolation; pi-unrestricted skips it.
 
-# Managed PATH: prepend/append dirs, substituted by the embedding host
-# (Sync-ShellProfile.ps1 on Windows; empty on POSIX).
+# Managed PATH: prepend/append dirs, empty on POSIX.
 __NUCLEUS_PREPEND_PATH__
 __NUCLEUS_APPEND_PATH__
 
 if ($IsWindows) {
-  # Load rclone config passphrase from materialized secret for automatic config
-  # file encryption in interactive and scripted rclone invocations.
   # WHY: conditional: secret file may be absent before apply has materialized it.
   $_rclonePassFile = Join-Path $HOME "AppData\Local\nucleus\secrets\rclone-config-pass"
   if (Test-Path -Path $_rclonePassFile -PathType Leaf) {
@@ -30,24 +17,15 @@ if ($IsWindows) {
     # check-suppress:suppression_doc: resource may already be released; idempotent cleanup, not error swallowing.
     Remove-Variable -Name _rclonePassFile -ErrorAction SilentlyContinue
   }
-  # LLVM/Clang: add LLVM bin directory to PATH for the current session so
-  # newly provisioned hosts can run clang/ld.lld immediately.
-  # CC/CXX/LD are set at Machine scope via system/env.dsc.yml for
-  # all-process visibility.  Source: src/modules/lib/env-secrets.nix.
+  # Session PATH only. CC/CXX/LD are set at Machine scope in system/env.dsc.yml;
+  # source: src/modules/lib/env-secrets.nix.
   $llvmBinDir = "__NUCLEUS_LLVM_BIN_DIR__"
   if ((Test-Path $llvmBinDir) -and ($env:PATH -notlike "*$llvmBinDir*")) {
     $env:PATH = "$env:PATH;$llvmBinDir"
   }
-  # AI agent session detection: suppress pay-respects when VSCODE_AGENT,
-  # CLAUDECODE, etc. are set.
-  # Source of truth for env var names: src/modules/shell/agent-env-vars.nix.
-  # Windows variant; POSIX hosts get Test-NucleusAgentSession from init.ps1
-  # (token-based, /opt/.devin marker only).
   function Test-NucleusAgentSession {
-    # Standard AI agent environment variables
     if (Test-Path env:AGENT) { return $true }
     if (Test-Path env:AI_AGENT) { return $true }
-    # Tool-specific environment variables
     if (Test-Path env:VSCODE_AGENT) { return $true }
     if (Test-Path env:CLAUDECODE) { return $true }
     if (Test-Path env:CLAUDE_CODE) { return $true }
@@ -60,7 +38,6 @@ if ($IsWindows) {
     if (Test-Path env:AUGMENT_AGENT) { return $true }
     if (Test-Path env:NUCLEUS_AGENT_SESSION) { return $true }
     if (Test-Path env:OPENCODE_CLIENT) { return $true }
-    # Devin filesystem marker
     if (Test-Path "/opt/.devin") { return $true }
     if (Test-Path "C:\opt\.devin") { return $true }
     return $false
@@ -73,9 +50,6 @@ if (Get-Command direnv -ErrorAction SilentlyContinue) {
   . ([ScriptBlock]::Create((& direnv hook pwsh | Out-String)))
 }
 
-# PSReadLine: predictive history completion and menu-style tab expansion.
-# Guards with module availability probe so the profile loads on hosts where
-# PSReadLine is absent or an unexpected version is installed.
 if (Get-Module -ListAvailable -Name PSReadLine) {
   Import-Module PSReadLine
   Set-PSReadLineOption -PredictionSource History
@@ -100,11 +74,6 @@ if (Get-Command starship -ErrorAction SilentlyContinue) {
   . ([ScriptBlock]::Create((& starship init powershell | Out-String)))
 }
 
-# ---------------------------------------------------------------
-# Interactive-feature suppression in AI agent sessions
-# ---------------------------------------------------------------
-# When an AI agent is detected, disable PSReadLine and other interactive
-# features that serve no purpose and clutter output in non-human sessions.
 if (Test-NucleusAgentSession) {
   # check-suppress:suppression_doc: module may not be loaded in non-interactive sessions
   Remove-Module PSReadLine -ErrorAction SilentlyContinue
@@ -112,12 +81,6 @@ if (Test-NucleusAgentSession) {
   function prompt { "PS> " }
 }
 
-# ---------------------------------------------------------------
-# pay-respects shell hook
-# ---------------------------------------------------------------
-# Only initialise in interactive, non-agent, and available sessions.
-# In non-interactive or AI agent sessions, pay-respects would block on
-# its interactive prompt with no user to respond.
 # check-suppress:suppression_doc: tool-availability guard -- pay-respects may not be installed
 if ([Environment]::UserInteractive -and -not (Test-NucleusAgentSession) -and (Get-Command pay-respects -ErrorAction SilentlyContinue)) {
   . ([ScriptBlock]::Create((& pay-respects pwsh --alias | Out-String)))
@@ -205,10 +168,6 @@ if (-not $script:__nucleusPrekPromptWrapped) {
 
 Invoke-PrekHookInstallIfNeeded
 
-# fzf: fuzzy history search on Ctrl+R via a PSReadLine key handler.
-# Reads the PSReadLine history file directly so all sessions are searchable.
-# Guard requires both fzf and PSReadLine to avoid silently failing on a
-# host where fzf is installed but the module is missing.
 # check-suppress:suppression_doc: tool-availability guard -- fzf may not be installed
 if ((Get-Command fzf -ErrorAction SilentlyContinue) -and (Get-Module -ListAvailable -Name PSReadLine)) {
   Set-PSReadLineKeyHandler -Key "Ctrl+r" -ScriptBlock {
@@ -227,11 +186,6 @@ if ((Get-Command fzf -ErrorAction SilentlyContinue) -and (Get-Module -ListAvaila
   }
 }
 
-# Git shell aliases — mirrors src/modules/shell/aliases.nix
-# Use Add-ShellAlias (not `function` or inline `New-Item -Path Function:`) for all shell aliases.
-# Set-Item with the Function:global: prefix creates functions in the global scope even when
-# called from inside a wrapper function, and bypasses PSUseApprovedVerbs by avoiding
-# a FunctionDefinitionAst — the one and only AST node type that rule inspects.
 # Naming conventions:
 # - Prefix = base git command (all `git log` aliases start with `-gl`).
 # - `-gca*` = amend (every alias starting with `-gca` expands to `git commit --amend ...`).
@@ -307,7 +261,6 @@ Add-ShellAlias '-grs' { & git reset @Args }
 Add-ShellAlias '-grsh' { & git reset --soft HEAD~ @Args }
 Add-ShellAlias '-grshh' { & git reset --hard HEAD~ @Args }
 Add-ShellAlias '-grv' { & git remote --verbose @Args }
-# git status in short format with branch info, restored from git history.
 Add-ShellAlias '-gs' { & git status --short --branch @Args }
 Add-ShellAlias '-gsh' { & git show @Args }
 Add-ShellAlias '-gss' { & git status @Args }
@@ -324,7 +277,6 @@ Add-ShellAlias '-gt' { & git tag @Args }
 Add-ShellAlias '-gtd' { & git tag --delete @Args }
 Add-ShellAlias '-gtl' { & git tag --list @Args }
 
-# --- Ghostscript PDF optimization aliases ---
 function Invoke-NucleusGhostscript {
   # check-suppress:suppression_doc: tool-availability guard -- Ghostscript CLI may not be installed
   if (Get-Command gs -ErrorAction SilentlyContinue) {
@@ -344,19 +296,14 @@ function Invoke-NucleusGhostscript {
   throw "Ghostscript CLI not found. Expected one of: gs, gswin64c, gswin32c"
 }
 
-# CompatibilityLevel is pinned to 2.0 (latest as of 2026-05); bump when a
-# newer PDF compatibility target is released by Ghostscript.
 Add-ShellAlias '-optimize-pdf-default' { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/default  -dNOPAUSE -dQUIET -dBATCH @Args }
 Add-ShellAlias '-optimize-pdf-prepress' { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/prepress -dNOPAUSE -dQUIET -dBATCH @Args }
 Add-ShellAlias '-optimize-pdf-printer' { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/printer  -dNOPAUSE -dQUIET -dBATCH @Args }
 Add-ShellAlias '-optimize-pdf-ebook' { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/ebook    -dNOPAUSE -dQUIET -dBATCH @Args }
 Add-ShellAlias '-optimize-pdf-screen' { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen   -dNOPAUSE -dQUIET -dBATCH @Args }
 
-# ExifTool metadata stripping.
 Add-ShellAlias '-strip-metadata' { Invoke-NucleusExifTool -all= @Args }
 
-# la/ll: prefer eza for colour, icons, and extended metadata; fall back to
-# Get-ChildItem when eza is absent so the profile loads on unmanaged machines.
 # check-suppress:suppression_doc: tool-availability guard -- eza may not be installed
 if (Get-Command eza -ErrorAction SilentlyContinue) {
   Add-ShellAlias '-la' { & eza --long --all @Args }
@@ -366,8 +313,6 @@ if (Get-Command eza -ErrorAction SilentlyContinue) {
   Add-ShellAlias '-ll' { Get-ChildItem -Force @Args }
 }
 
-# bun shortcuts: mirrors the full -n* alias set in shell/aliases.nix on POSIX hosts.
-# Guarded so the profile loads safely on machines where bun is not yet installed.
 # check-suppress:suppression_doc: tool-availability guard -- bun may not be installed
 if (Get-Command bun -ErrorAction SilentlyContinue) {
   Add-ShellAlias '-n' { & bun @Args }
@@ -419,10 +364,6 @@ function Invoke-NucleusPythonScopedTool {
   return $true
 }
 
-# Intercept python invocations: pass through only to the
-# WinGet-managed Python installed by this repo on Windows
-# (Python.Python.3.13 at %LOCALAPPDATA%\Programs\Python\Python313\python.exe).
-# Everything else triggers the educational ban message.
 function python {
   if (Invoke-NucleusPythonScopedTool -ToolName "python" @Args) {
     return
@@ -444,9 +385,6 @@ function python {
   Write-Warning "         - $venvHint (use pre-existing project venv)"
   return 1
 }
-# Intercept python3 invocations: route through the python wrapper.
-# On Windows there is no python3.exe (only python.exe); on POSIX hosts the
-# resolution chain is identical, so both platforms share this function.
 function python3 {
   if (Invoke-NucleusPythonScopedTool -ToolName "python3" @Args) {
     return
@@ -473,10 +411,6 @@ function pip3 {
   pip @Args
 }
 
-# Intercept npm/npx/node/corepack invocations.
-# These tools are NOT installed by this repository. The sole JS runtime
-# and package manager is bun.  Users who separately installed Node.js
-# should use bun equivalents instead.
 function npm {
   Write-Warning "shell: warning: system-wide npm is not used in this environment."
   Write-Warning "         Use bun equivalents instead:"
@@ -508,9 +442,6 @@ function corepack {
   return 1
 }
 
-# Route managed development tools through an active direnv context, a
-# rust-toolchain.toml project context (cargo/rustc only), or the
-# user-scoped fallback toolchain for unmanaged repositories.
 function Invoke-NucleusManagedDevTool {
   param(
     [Parameter(Mandatory = $true)]
@@ -523,10 +454,6 @@ function Invoke-NucleusManagedDevTool {
     [object[]]$ToolArguments
   )
 
-  # On Windows, the managed dev tools are only present on PATH inside an
-  # active context (direnv devShell or rust-toolchain.toml project).  If
-  # the tool is not on PATH at all, no context can satisfy the call and the
-  # caller prints the educational ban message.
   # check-suppress:suppression_doc: presence probe -- tool may be absent; conditional branch handles the result immediately.
   $application = Get-Command -Name $ToolName -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
   if ($IsWindows -and $null -eq $application) {
@@ -541,10 +468,6 @@ function Invoke-NucleusManagedDevTool {
     }
   }
 
-  # rust-toolchain.toml in the current directory → project context
-  # for cargo/rustc.  rustup (default none) reads the toolchain file
-  # and routes cargo/rustc to the pinned toolchain so project builds
-  # work without a full devShell or direnv context.
   if ($ToolName -in @('cargo', 'rustc') -and (Test-Path -Path (Join-Path (Get-Location).Path 'rust-toolchain.toml') -PathType Leaf)) {
     # check-suppress:suppression_doc: tool-availability guard -- tool may not be in project context
     if ($null -ne $application) {
@@ -564,13 +487,6 @@ function Invoke-NucleusManagedDevTool {
   return $false
 }
 
-# System-wide build tool block: redirect bun/cargo/rustc/uv to warnings.
-# These tools are installed globally for system package management only.
-# When DIRENV_DIR is set, a direnv environment (devShell) is active.
-# When a rust-toolchain.toml exists in the current directory, cargo/rustc
-# pass through to the rustup shim.  Otherwise, fall back to the managed
-# default toolchain installed by apply (POSIX-only; Windows keeps the
-# user-scoped managed PATH instead, so no separate fallback bin root).
 function bun {
   $fallbackBinDirectory = if ($IsWindows) { $null } else { "${NUCLEUS_DEFAULT_DEV_TOOLS}/bin" }
   if (Invoke-NucleusManagedDevTool -ToolName "bun" -FallbackBinDirectory $fallbackBinDirectory @Args) {
@@ -617,13 +533,6 @@ function uv {
   return 1
 }
 
-# ---------------------------------------------------------------
-# Sandbox-runtime (srt) agent wrapping
-# ---------------------------------------------------------------
-# By default, pi runs inside srt for filesystem/network isolation.
-# Use pi-unrestricted to bypass the sandbox.
-#
-# Excluded: vscode, cursor (have built-in protections; no srt needed).
 function pi {
   # check-suppress:suppression_doc: probe whether srt is installed; throws when absent
   if (-not (Get-Command srt -ErrorAction SilentlyContinue)) {
@@ -650,9 +559,6 @@ function pi-unrestricted {
   & $piApplication.Source @args
 }
 
-# --- nucleus-* argument completers ---
-# Register argument completers for all nucleus commands to provide
-# tab-completion for subcommands, flags, and dynamic values.
 
 # --- BEGIN GENERATED completer flag inventory ---
 # GENERATED by src/scripts/completions/gen-completions.ps1 - do not hand-edit.
@@ -826,7 +732,6 @@ $nucleusVmFlags = @(
 
 # --- END GENERATED ---
 
-# Helper: resolve the nucleus repo root for dynamic completions.
 function Resolve-NucleusRepoRoot {
   if ($env:NUCLEUS_REPO_ROOT) {
     return $env:NUCLEUS_REPO_ROOT
@@ -836,8 +741,6 @@ function Resolve-NucleusRepoRoot {
   if ($gitRoot -and (Test-Path (Join-Path $gitRoot "src/flake.nix"))) {
     return $gitRoot
   }
-  # Windows: profile functions are invoked via apply.ps1 which sets
-  # NUCLEUS_REPO_ROOT; outside the repo no fallback exists.
   if ($IsWindows) {
     throw "Resolve-NucleusRepoRoot: NUCLEUS_REPO_ROOT not set; run via apply.ps1"
   }

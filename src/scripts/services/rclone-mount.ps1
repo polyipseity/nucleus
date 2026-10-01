@@ -1,25 +1,18 @@
 <#
 .SYNOPSIS
-    Cloud-mount core runner (Windows).
+    Cloud-mount core runner (Windows): bounded retry with backoff, classification,
+    and health records. Dispatches to MountBackend.ps1.
 .DESCRIPTION
-    Bounded retry with backoff, classification, health records.
-    Dispatches to MountBackend.ps1. No OS/FUSE/supervisor names.
-
-    Environment (injected by the wrapper or caller):
-      NUCLEUS_RCLONE_REMOTE, NUCLEUS_RCLONE_MOUNT_POINT, NUCLEUS_RCLONE_ARGS,
-      NUCLEUS_RCLONE_BIN, NUCLEUS_RCLONE_READ_ONLY,
-      NUCLEUS_CLOUD_MOUNT_INSTANCE, NUCLEUS_MOUNT_ATTEMPTS,
-      NUCLEUS_MOUNT_BACKOFF, NUCLEUS_MOUNT_ATTACH_SECONDS.
+    Environment injected by the wrapper or caller: NUCLEUS_RCLONE_REMOTE,
+    NUCLEUS_RCLONE_MOUNT_POINT, NUCLEUS_RCLONE_ARGS, NUCLEUS_RCLONE_BIN,
+    NUCLEUS_RCLONE_READ_ONLY, NUCLEUS_CLOUD_MOUNT_INSTANCE, NUCLEUS_MOUNT_ATTEMPTS,
+    NUCLEUS_MOUNT_BACKOFF, NUCLEUS_MOUNT_ATTACH_SECONDS.
 #>
 [CmdletBinding()]
 param()
 
 $ErrorActionPreference = 'Stop'
 
-# ── Resolve repo root ──────────────────────────────────────────────────────
-# Same bootstrap as src/scripts/services/service-watchdog.ps1: NUCLEUS_REPO_ROOT
-# wins (the machine-wide value apply.ps1 writes), and the PSScriptRoot walk
-# covers a direct run from the live checkout.
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) {
     $env:NUCLEUS_REPO_ROOT
 } else {
@@ -55,10 +48,8 @@ $backoffCsv = $env:NUCLEUS_MOUNT_BACKOFF
 if (-not $backoffCsv) { throw 'NUCLEUS_MOUNT_BACKOFF not set' }
 $backoffSchedule = $backoffCsv -split ',' | ForEach-Object { [int]$_.Trim() }
 
-# Initialize health record.
 Initialize-HealthRecord -Instance $instance
 
-# Backend prepare.
 $prepareRc = Mount-Backend-Prepare -Instance $instance
 if ($prepareRc -eq 20) {
     # WHY: Write-Output, not Write-Host — this script is the body of a scheduled task
@@ -69,7 +60,6 @@ if ($prepareRc -eq 20) {
     exit 0
 }
 
-# Bounded retry loop.
 for ($attempt = 1; $attempt -le $attempts; $attempt++) {
     if (Test-HealthBlocked -Instance $instance) {
         $class = Get-HealthField -Instance $instance -Field 'class'
@@ -79,36 +69,27 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
 
     Write-Output "$instance`: mount attempt $attempt/$attempts"
 
-    # WHY: the instance id is folder-qualified (\NucleusCloudMount\NucleusCloudMount-iCloud),
-    # so it cannot be used raw in a path — the embedded separators would nest this file
-    # under a directory that does not exist and -RedirectStandardError would then fail
-    # terminally.  Get-HealthSafeInstanceName owns the one instance -> path-safe mapping,
-    # so reuse it rather than repeating the substitution here.
+    # WHY: the instance id is folder-qualified, so raw it would nest this file under a
+    #   directory that does not exist and -RedirectStandardError would fail terminally.
+    #   Get-HealthSafeInstanceName owns that mapping.
     $captureFile = Join-Path $env:TEMP "rclone-capture-$(Get-HealthSafeInstanceName -Instance $instance)-$PID.txt"
 
-    # Build mount args.
     $mountArgs = Mount-Backend-ArgumentList -Remote $remote -MountPoint $mountPoint -ReadOnly $readOnly -ExtraArgs $rcloneArgs
 
-    # Start rclone mount through the backend's single mount entry point (POSIX delegates
-    # the same way); it prepends the 'mount' subcommand itself.
     $proc = Mount-Backend-Mount -RcloneBin $rcloneBin -MountArgs $mountArgs -CaptureFile $captureFile
 
-    # Wait for the volume to appear.
     $live = $false
     $start = [DateTimeOffset]::Now
-    # What the last probe answered, and how this wait ended.  The two disagree
-    # whenever the loop breaks out on a dead child after a readable absent answer, so
-    # the classification below keys on the ending rather than inferring one from the
-    # probe token.
+    # The classification below keys on how the wait ended, not on the probe token:
+    # the two disagree whenever the loop breaks out on a dead child after a readable
+    # absent answer.
     $probeState = ''
     $exitReason = ''
-    # WHY Mount-Backend-ProbeState, which keeps the third value.  A two-valued answer
+    # WHY Mount-Backend-ProbeState, which keeps the third value. A two-valued answer
     #   is $false both for a live mount and for a directory this process may not read,
-    #   and this loop acts on that $false by recording the service running and deleting
-    #   the capture file, so only the three-valued answer is safe here: an unknown
-    #   state falls through to the same poll the absent state takes, spending no
-    #   attempt and issuing no restart of its own, and the budget below is what ends
-    #   the run.
+    #   and this loop treats that $false as a running service and deletes the capture
+    #   file, so an unknown state must poll like the absent state and let the budget
+    #   end the run.
     while (([DateTimeOffset]::Now - $start).TotalSeconds -lt $attachSeconds) {
         $probeState = Mount-Backend-ProbeState -MountPoint $mountPoint
         if ($probeState -eq 'present') {
@@ -116,11 +97,10 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
             $exitReason = 'attached'
             break
         }
-        # WHY: a mount that dies during startup would otherwise be polled for the whole
-        #   budget before anything classified it, even though the capture file already
-        #   held the reason.  Process.HasExited is the counterpart of the POSIX `kill -0`
-        #   probe and, unlike it, is exact: Windows reaps the child itself, so there is
-        #   no zombie window in which a dead child still reads as alive.
+        # WHY: a mount that dies during startup would be polled for the whole budget
+        #   while the capture file already held the reason. Process.HasExited is exact,
+        #   unlike the POSIX `kill -0`: Windows reaps the child, so a dead child never
+        #   reads as alive.
         if ($proc.HasExited) {
             $exitReason = 'child-exited'
             break
@@ -139,7 +119,6 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
         # check-suppress:suppression_doc: best-effort capture cleanup; the file is this attempt's own and the record no longer names it
         Remove-Item -Path $captureFile -ErrorAction SilentlyContinue
 
-        # Wait for rclone to exit.
         $proc.WaitForExit()
         $exitCode = $proc.ExitCode
 
@@ -149,26 +128,18 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
         exit $exitCode
     }
 
-    # Classify failure.
     $class = Mount-Backend-Class -CaptureFile $captureFile
 
-    # WHY: an unreadable mount point says nothing about the mount.  Mount-Backend-Class
-    #   reads rclone's output and answers mount-failed when it finds no cause there,
-    #   which would blame the mount for a read nobody could make and send the operator
-    #   to check the remote.  io-transient is the class whose remedy is to try again, so
-    #   the unreadable probe answer overrides the classifier.
-    #   The ending on its own cannot tell a budget expiry from a child that died first,
-    #   so the case is keyed on the ending — but both reachable endings take the same
-    #   arm, and that arm still tests the probe token, so the ending selects the arm,
-    #   not the class that gets recorded.  What keying on the ending buys is the
-    #   default arm: an ending this code cannot place takes the same branch as an
-    #   unreadable directory, instead of keeping whatever Mount-Backend-Class answered
-    #   for it.  io-transient is the safe reading of a state this code cannot place: the
-    #   class whose remedy is to try again, which costs a retry, over the terminal
-    #   classes, which stop the run and point the operator at the remote on the
-    #   strength of a read that never completed.  There is no `attached` arm, because
-    #   the wait can only end attached when $live is true, and the success path above
-    #   exits at its own line before reaching this switch.
+    # WHY: an unreadable mount point says nothing about the mount. Mount-Backend-Class
+    #   answers mount-failed when rclone's output carries no cause, which would blame
+    #   the mount for a read nobody could make. io-transient costs a retry instead of
+    #   stopping the run on a read that never completed.
+    #   The case is keyed on the ending because the ending cannot tell a budget expiry
+    #   from a child that died first, and both endings take the same arm, which still
+    #   tests the probe token. An ending this code cannot place lands in the default
+    #   arm with the unreadable directory rather than keeping the classifier's answer.
+    #   There is no `attached` arm: the wait only ends attached when $live is true, and
+    #   the success path exits before this switch.
     $probeUnknown = $false
     switch ($exitReason) {
         { $_ -in @('child-exited', 'budget') } {
@@ -193,27 +164,13 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
 
     Write-Output "$instance`: attempt $attempt failed (class=$class, $remedy)"
 
-    # WHY: the capture file is dropped on every other path because the class in the
-    #   health record is the whole diagnosis there.  On the unreadable-mount-point path
-    #   the class is one this runner chose rather than one rclone's output supports, so
-    #   the file is the only remaining record of what the mount was doing while the read
-    #   kept failing.  Kept and named rather than dropped silently; at most one file per
-    #   attempt survives a run.
-    #
-    # WHY: the record carries the path because the log line does not suffice.  Log
-    #   lines rotate, so a file nothing else points at is a file a later run cannot find.
-    #
-    # WHY: one field and not a list.  It names the most recent file kept, so a run that
-    #   keeps a file on each of several attempts leaves the earlier ones unreachable
-    #   again.  That limit is written down here so the next reader meets it in the code
-    #   rather than rediscovering it.
-    #
-    # WHY: no clear of the evidence field accompanies the removal below.  That branch
-    #   removes THIS attempt's file, and the field can only ever name an earlier
-    #   attempt's kept file, so it never names the one going away.  A run that kept a
-    #   file on an unreadable mount point and then reached this branch on a later
-    #   attempt strands that earlier file on disk with nothing pointing at it, which is
-    #   the condition the field exists to remove.
+    # WHY keep the capture file only on the unreadable-mount-point path: there the
+    #   class is one this runner chose, not one rclone's output supports, so the file
+    #   is the only record of what the mount was doing. The record names the path
+    #   because log lines rotate, and it holds one path, not a list, so a run that
+    #   keeps a file on several attempts leaves earlier ones unreachable. Removing
+    #   this attempt's file never clears the field, because the field can only name
+    #   an earlier attempt's file.
     if ($probeUnknown) {
         Set-HealthField -Instance $instance -Field 'evidence' -Value $captureFile
         Write-Output "$instance`: rclone output kept at $captureFile"

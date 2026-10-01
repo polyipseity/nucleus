@@ -1,6 +1,4 @@
 # Cross-platform editor configuration and VS Code extensions.
-# Extension backend: nixpkgs on Linux vs Homebrew/nixpkgs on macOS;
-# extensions managed by symlink-vscode-extensions on all backends.
 {
   config,
   lib,
@@ -15,18 +13,10 @@
   ...
 }:
 let
-  # Capture NUCLEUS_REPO_ROOT at eval time as fallback for home-manager activation,
-  # which runs as the user and does not inherit the sudo-level env var.
-
-  # Platform switch used to keep one declarative config while selecting the
-  # backend that integrates best on each OS.
   isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
 
-  # Safe accessor for VS Code Marketplace extensions provided by
-  # nix-vscode-extensions.  Returns a single-element list when the extension is
-  # indexed, or an empty list with a trace warning when absent (e.g. for very
-  # recently published extensions not yet in the index snapshot).  The list
-  # wrapper lets callers use this in builtins.concatLists without special-casing.
+  # An extension missing from the index snapshot degrades to empty with a trace
+  # warning, so a new upstream publish cannot fail eval.
   mkMktx =
     pub: name:
     let
@@ -37,79 +27,47 @@ let
     else
       builtins.trace "VS Code: ${pub}.${name} not in marketplace index — skipping" [ ];
 
-  # Canonical extension set shared by both platforms, sorted alphabetically by
-  # publisher.name.  A missing marketplace entry degrades gracefully to an empty
-  # contribution rather than failing eval.
-  # On all platforms, symlink-vscode-extensions symlinks each extension into the
-  # writable ~/.vscode/extensions and ~/.vscode-insiders/extensions directories
-  # so both stable and insiders channels share an identical extension payload.
+  # Canonical extension set shared by both platforms, sorted by publisher.name.
   sharedExtensions = builtins.concatLists [
-    # asvetliakov
     (mkMktx "asvetliakov" "vscode-neovim")
-    # arrterian
     (mkMktx "arrterian" "nix-env-selector")
-    # astral-sh
     (mkMktx "astral-sh" "ty")
-    # charliermarsh
     [ pkgs.vscode-extensions.charliermarsh.ruff ]
-    # christian-kohler
     [ pkgs.vscode-extensions.christian-kohler.npm-intellisense ]
     [ pkgs.vscode-extensions.christian-kohler.path-intellisense ]
-    # cl
     (mkMktx "cl" "eide")
-    # cschlosser
     (mkMktx "cschlosser" "doxdocgen")
-    # davidanson
     [ pkgs.vscode-extensions.davidanson.vscode-markdownlint ]
-    # dbaeumer
     [ pkgs.vscode-extensions.dbaeumer.vscode-eslint ]
-    # docker
     [ pkgs.vscode-extensions.docker.docker ]
-    # editorconfig
     [ pkgs.vscode-extensions.editorconfig.editorconfig ]
-    # esbenp
     [ pkgs.vscode-extensions.esbenp.prettier-vscode ]
-    # github
     [ pkgs.vscode-extensions.github.codespaces ]
     (mkMktx "github" "remotehub")
     [ pkgs.vscode-extensions.github.vscode-github-actions ]
-    # heaths
     (mkMktx "heaths" "vscode-guid")
-    # ibm
     [ pkgs.vscode-extensions.ibm.output-colorizer ]
-    # icrawl
     (mkMktx "icrawl" "discord-vscode")
-    # james-yu
     [ pkgs.vscode-extensions.james-yu.latex-workshop ]
-    # jnoortheen
     [ pkgs.vscode-extensions.jnoortheen.nix-ide ]
-    # keroc
     (mkMktx "keroc" "hex-fmt")
-    # mark-hansen
     (mkMktx "mark-hansen" "hledger-vscode")
-    # mkhl
     (mkMktx "mkhl" "direnv")
-    # ms-azuretools
     [ pkgs.vscode-extensions.ms-azuretools.vscode-containers ]
-    # ms-ceintl
     [ pkgs.vscode-extensions.ms-ceintl.vscode-language-pack-zh-hant ]
-    # ms-python
     [ pkgs.vscode-extensions.ms-python.debugpy ]
     [ pkgs.vscode-extensions.ms-python.python ]
     (mkMktx "ms-python" "vscode-python-envs")
-    # ms-toolsai
     [ pkgs.vscode-extensions.ms-toolsai.datawrangler ]
     [ pkgs.vscode-extensions.ms-toolsai.jupyter ]
     [ pkgs.vscode-extensions.ms-toolsai.jupyter-keymap ]
     [ pkgs.vscode-extensions.ms-toolsai.jupyter-renderers ]
     [ pkgs.vscode-extensions.ms-toolsai.vscode-jupyter-cell-tags ]
     [ pkgs.vscode-extensions.ms-toolsai.vscode-jupyter-slideshow ]
-    # ms-vscode-remote
     [ pkgs.vscode-extensions.ms-vscode-remote.remote-containers ]
     [ pkgs.vscode-extensions.ms-vscode-remote.remote-ssh ]
     [ pkgs.vscode-extensions.ms-vscode-remote.remote-ssh-edit ]
     [ pkgs.vscode-extensions.ms-vscode-remote.remote-wsl ]
-    # ms-vscode
     [ pkgs.vscode-extensions.ms-vscode.cmake-tools ]
     (mkMktx "ms-vscode" "cpp-devtools")
     [ pkgs.vscode-extensions.ms-vscode.cpptools ]
@@ -124,46 +82,29 @@ let
     (mkMktx "ms-vscode" "vscode-chat-customizations-evaluations")
     (mkMktx "ms-vscode" "vscode-serial-monitor")
     [ pkgs.vscode-extensions.ms-vscode.vscode-speech ]
-    # ms-vsliveshare
     [ pkgs.vscode-extensions.ms-vsliveshare.vsliveshare ]
-    # myriad-dreamin (stable only — pre-release builds have caused editor crashes)
+    # myriad-dreamin, stable only: pre-release builds have crashed the editor
     [ pkgs.vscode-extensions.myriad-dreamin.tinymist ]
-    # redhat
     [ pkgs.vscode-extensions.redhat.vscode-yaml ]
-    # rust-lang
     [ pkgs.vscode-extensions.rust-lang.rust-analyzer ]
-    # s-nlf-fh
     (mkMktx "s-nlf-fh" "glassit")
-    # sjhuangx
     (mkMktx "sjhuangx" "vscode-scheme")
-    # sst-dev
     (mkMktx "sst-dev" "opencode-v2")
-    # streetsidesoftware
     [ pkgs.vscode-extensions.streetsidesoftware.code-spell-checker ]
-    # svelte
     [ pkgs.vscode-extensions.svelte.svelte-vscode ]
-    # takumii
     (mkMktx "takumii" "markdowntable")
-    # tamasfe
     [ pkgs.vscode-extensions.tamasfe.even-better-toml ]
-    # tweag
     (mkMktx "tweag" "vscode-nickel")
-    # vadimcn
     [ pkgs.vscode-extensions.vadimcn.vscode-lldb ]
   ];
 
-  # Materialize the extension list under a deterministic Nix-store directory so
-  # all VS Code app bundles (both stable and insiders, Homebrew or nixpkgs) can
-  # consume the exact same extension payload via per-extension symlinks in the
-  # symlink-vscode-extensions activation.
+  # One store directory so every channel and backend consumes the same payload.
   extensionStore = pkgs.symlinkJoin {
     name = "vscode-extensions";
     paths = sharedExtensions;
   };
 
-  # Per-channel User data directories referenced by the symlink-vscode-config activation.
-  # These are shell strings whose $HOME is intentionally left unexpanded so the
-  # activation script evaluates them at runtime with the actual home directory.
+  # $HOME stays unexpanded so the activation script resolves it at runtime.
   stableBaseDir =
     if isDarwin then "$HOME/Library/Application Support/Code/User" else "$HOME/.config/Code/User";
 
@@ -173,29 +114,15 @@ let
     else
       "$HOME/.config/Code - Insiders/User";
 
-  # Per-host VS Code overlay files use canonical hostName suffixes
-  # (MacBook, NixOS, Windows) — same pattern as chatLanguageModels.
+  # Per-host overlay files, same pattern as chatLanguageModels.
   vsCodeHostFile = name: "${name}.${hostName}.json";
   # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
   vsCodeKeybindingsFile = vsCodeHostFile "keybindings";
   # check-suppress:config-method: method 3 (merge) -- name-keyed merge preserves VS Code-added model entries while refreshing repo entries.
   vsCodeChatLanguageModelsFile = vsCodeHostFile "chatLanguageModels";
 
-  # Python script that inserts a workspace trust entry for ~/dev into VS Code's
-  # SQLite state database (globalStorage/state.vscdb) for both stable and
-  # insiders channels.  pkgs.writeText is used instead of a shell heredoc to
-  # avoid the column-0 delimiter constraint imposed by Nix ''...'' indentation
-  # stripping; Nix strips the 4-space common prefix automatically, yielding
-  # valid zero-indented Python.
-  #
-  # The script is non-fatal: a locked or absent DB produces a warning on stderr
-  # so that a running VS Code instance or a fresh install (never launched) does
-  # not break the activation chain.
-  #
-  # The script exits immediately when ~/dev does not yet exist (no-op for
-  # edge cases such as a first-run race before ensure-dev-directory completes).
-  # Resolve the active managed user record so Neovim settings can follow the
-  # same per-user override model used by other application configs.
+  # Resolve the active managed user record so Neovim settings follow the same
+  # per-user override model as other application configs.
   effectiveUsername =
     if managedUsername != null then
       managedUsername
@@ -212,8 +139,6 @@ let
     else
       { };
 
-  # Utility: resolve app-scoped per-user settings overrides consistently.
-  # This keeps the common `defaults // user.settings` pattern centralized.
   userAppSettings =
     appName:
     if
@@ -228,10 +153,8 @@ let
 
   managedAppSettings = appName: defaults: defaults // (userAppSettings appName);
 
-  # Neovim startup config is native init.lua (not a generated JSON/YAML format).
-  # This default enables a targeted workaround for the upstream nvim/xterm.js
-  # shifted-number regression in VS Code-family terminals and kitty-protocol
-  # terminals where shifted digits can arrive as <S-1>…<S-0> keycodes.
+  # Workaround for the upstream nvim/xterm.js shifted-number regression, where
+  # shifted digits arrive as <S-1> to <S-0> keycodes in VS Code and kitty.
   neovimDefaultSettings = {
     enableShiftNumberSymbolsWorkaround = true;
     shiftNumberTerminalPrograms = [
@@ -243,8 +166,6 @@ let
 
   neovimManagedSettings = managedAppSettings "neovim" neovimDefaultSettings;
 
-  # Keep this map small and explicit; it targets US layout symbols produced by
-  # shifted digits and only activates inside selected terminal hosts.
   shiftNumberMap = {
     "1" = "!";
     "2" = "@";
@@ -280,30 +201,21 @@ in
   programs.neovim = {
     enable = true;
     defaultEditor = true; # sets $EDITOR and $VISUAL to nvim
-    # Pin explicit values to avoid version-gated default warnings and to adopt
-    # the new Home Manager defaults intentionally.
+    # Pinned to avoid version-gated default warnings.
     withPython3 = false;
     withRuby = false;
   };
 
-  # Keep Neovim in native init.lua format and route managed defaults through a
-  # single generated file so per-user overrides remain declarative.
   xdg.configFile."nvim/init.lua".text = neovimInitLua;
 
-  # Keep VS Code binaries in nixpkgs on non-Darwin systems. On Darwin, package
-  # installation backend is selected in core.nix and must not be duplicated
-  # here, or backend overrides would diverge between modules.
+  # The Darwin backend is selected in core.nix, so it must not be duplicated here.
   home.packages =
     lib.optionals (!isDarwin) [ pkgs.vscode ]
     ++ lib.optionals (!isDarwin && pkgs ? vscode-insiders) [ pkgs.vscode-insiders ];
 
   programs.vscode = {
-    # Enable native Home Manager integration on non-Darwin hosts so the VS Code
-    # binary is registered via the HM module.  On Darwin the backend is selected
-    # in core.nix (Homebrew or nixpkgs) and must not be duplicated here.
-    # Extension management is handled exclusively by symlink-vscode-extensions on all
-    # platforms; do not add extensions here to avoid a dual-manager conflict where
-    # both HM and the bridge simultaneously write to ~/.vscode/extensions.
+    # Extensions are managed only by symlink-vscode-extensions; adding them here
+    # would give HM and the bridge two writers for ~/.vscode/extensions.
     enable = !isDarwin;
     package = pkgs.vscode;
   };
@@ -311,41 +223,19 @@ in
   programs.cursor =
     lib.mkIf (!isDarwin && (config.nucleus.packages.enabled.cursor or false) && pkgs ? code-cursor)
       {
-        # Gating: the resolved enable state
-        # (managedPackages.cursor, honoring hosts.NixOS or falling back to enable).
-        # Agent config is bridged separately via cursor.nix (symlink-cursor-config).
         enable = true;
         package = pkgs.code-cursor;
       };
 
   home.activation = {
-    # -------------------------------------------------------------------------
-    # symlink-vscode-config
     # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-    # Replaces VS Code's per-channel config files with symlinks into the live
-    # repo tree (src/users/<user>/vscode/) so that every VS Code write
-    # (settings change, keybinding edit, MCP server addition, Copilot memory)
-    # appears immediately as an unstaged git diff.
-    #
-    # Files managed: settings.json, keybindings.<host>.json (linked as
-    #   keybindings.json), chatLanguageModels.<host>.json (merge-copied as
-    #   chatLanguageModels.json), mcp.json, tasks.json.
-    # Directories managed: snippets/, prompts/, profiles/,
-    #   and globalStorage/github.copilot-chat/memory-tool/memories/
-    #   (aliased in the repo as copilot-memories/).
-    #
-    # Both stable (Code) and insiders (Code - Insiders) channels are handled
-    # so both app variants share the same repo-backed config.
+    # VS Code writes land in the live repo tree as an unstaged diff.
     #
     # Symlink policy:
     #   - Correct symlink → no-op.
     #   - Wrong symlink → remove, create correct symlink.
     #   - Real file or directory at target path → fail; fix manually and re-apply.
     #   - Absent → create symlink (parent dirs created as needed).
-    #
-    # Repo root is resolved from $NUCLEUS_REPO_ROOT (set by apply.sh before invoking
-    # darwin-rebuild / nixos-rebuild and forwarded through sudo).
-    # -------------------------------------------------------------------------
     symlink-vscode-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/editors/symlink-vscode-config.sh" \
         "${repoRoot}" \
@@ -357,70 +247,27 @@ in
         "${pkgs.jq}/bin/jq"
     '';
 
-    # -----------------------------------------------------------------------
-    # symlink-vscode-extensions
-    # Populates both ~/.vscode/extensions and ~/.vscode-insiders/extensions
-    # with per-extension symlinks into the Nix-managed extension store.  This
-    # bridge runs unconditionally on ALL platforms (macOS and Linux) and for
-    # BOTH channels (stable and insiders) so extension parity is guaranteed
-    # regardless of the VS Code installation backend (Homebrew or nixpkgs).
-    #
-    # The directory must remain a real writable path rather than a symlink to
-    # the Nix store because VS Code writes extensions.json inside it at startup;
-    # a whole-directory store symlink would cause EACCES.  Instead, keep a real
-    # writable directory and populate it with per-extension symlinks.
-    # -----------------------------------------------------------------------
+    # VS Code writes extensions.json at startup, so the directory stays real and
+    # writable; a whole-directory store symlink would give EACCES.
     symlink-vscode-extensions = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/editors/bridge-vscode-extensions.sh" "${extensionStore}"
     '';
 
-    # -----------------------------------------------------------------------
-    # symlink-cursor-extensions
-    # Populates ~/.cursor/extensions with per-extension symlinks into the
-    # same Nix-managed extension store used by VS Code.  This bridge runs
-    # unconditionally on ALL platforms so Cursor extensions mirror the VS
-    # Code extension set regardless of installation backend.
-    #
-    # Directory policy: same as VS Code bridge — real writable directory
-    # with per-extension symlinks, not a whole-directory store symlink.
-    # -----------------------------------------------------------------------
+    # Same store and directory policy as the VS Code bridge.
     symlink-cursor-extensions = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/editors/bridge-cursor-extensions.sh" "${extensionStore}"
     '';
 
     # -----------------------------------------------------------------------
-    # trust-vscode-workspace
-    # Inserts a workspace trust entry for ~/dev into VS Code's SQLite state
-    # database (globalStorage/state.vscdb) for both stable and insiders
-    # channels so that the repository workspace opens without a trust prompt.
-    #
-    # VS Code workspace trust state lives in the SQLite DB, not in
-    # settings.json; the settings.json keys only control the trust UI
-    # (banner, startup prompt, empty-window behavior) and cannot pre-trust a
-    # specific folder.  The DB is written directly via Python's built-in
-    # sqlite3 module to avoid adding a heavyweight dependency.
-    #
-    # The activation is non-fatal when the DB is absent (VS Code not yet
-    # launched once) or locked (VS Code currently running); both conditions
-    # produce a warning to stderr so the operator is informed but the
-    # activation chain is not interrupted.
-    #
-    # The Python script exits immediately when ~/dev is absent (edge case:
-    # first-run race before ensure-dev-directory completes).
-    # -----------------------------------------------------------------------
+    # Trust state lives in the SQLite DB, not settings.json: the settings keys
+    # only control the trust UI and cannot pre-trust a folder. A missing or
+    # locked DB warns instead of failing, so a first run does not break.
     trust-vscode-workspace = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/editors/trust-vscode-workspace.sh" "${pkgs.python3}/bin/python3"
     '';
 
-    # -----------------------------------------------------------------------
-    # trust-pi-project
-    # Inserts project trust entries for shared trust paths into
-    # ~/.pi/agent/trust.json so pi coding agent loads project resources
-    # (extensions, skills, settings) without a trust prompt.
-    #
-    # Reads the same trust-paths.json used by trust-vscode-workspace,
-    # ensuring both editors trust identical directories.
-    # -----------------------------------------------------------------------
+    # Shares trust-paths.json with trust-vscode-workspace so both trust the
+    # same directories.
     trust-pi-project = lib.hm.dag.entryAfter [ "trust-vscode-workspace" ] ''
       "${activationBundle}/src/scripts/editors/trust-pi-project.sh" "${pkgs.python3}/bin/python3"
     '';
