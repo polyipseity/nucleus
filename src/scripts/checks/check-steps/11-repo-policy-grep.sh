@@ -31,7 +31,6 @@ run_store_path_arg_usage() {
   cd "$_repo_root" || return 1
   local _violations=0
 
-  # This step only applies to shell scripts.
   if $_has_args; then
     local _f _has_sh_files=0
     for _f in "${_files[@]}"; do
@@ -48,17 +47,14 @@ run_store_path_arg_usage() {
     fi
   fi
 
-  # Collect candidate files: all .sh files under scripts/ and src/scripts/ (not
-  # test fixtures, not check steps themselves).
   # ref: comment-annotations.instructions.md#C1 -- self-derived basenames for exclusion
   # shellcheck disable=SC2155 # reason: basename's exit status is irrelevant; self-derived for exclusion
   local _self_sh="$(basename "${BASH_SOURCE[0]}")"
   local _self_ps1="${_self_sh%.sh}.ps1"
   local _candidate_files=()
 
-  # Files excluded from this check: their _X_bin variables are used as config
-  # parameters (not commands), so the check would produce false positives.
-  # The self-file basenames are A9; configure-gpg-agent.sh is A13.
+  # _X_bin here is a config parameter, not a command, so matching it is a false
+  # positive (A9 self-file basenames, A13 configure-gpg-agent.sh).
   # ref: allow-and-deny-lists.instructions.md#A13 -- _*_bin values are config parameters, not commands
   local _exclude_pattern='('"$_self_sh"'|'"$_self_ps1"'|configure-gpg-agent\.sh)$'
 
@@ -73,7 +69,7 @@ run_store_path_arg_usage() {
     for _f in "${_candidate_files[@]}"; do
       local _base
       _base="$(basename "$_f")"
-      # Apply same exclusions as non-args branch (basename check + regex).
+      # Same exclusions as the whole-repo branch below.
       case "$_base" in
       "$_self_sh" | "$_self_ps1") continue ;;
       esac
@@ -96,8 +92,7 @@ run_store_path_arg_usage() {
     return 0
   fi
 
-  # Collect ALL .sh files for cross-file usage search (variables may be
-  # exported and consumed in other scripts, e.g., _ds_gawk_bin).
+  # Unfiltered second list: a variable declared in one script can be consumed in another.
   local _all_sh_files=()
   if $_has_args; then
     for _f in "${_candidate_files[@]}"; do
@@ -110,7 +105,6 @@ run_store_path_arg_usage() {
     )
   fi
 
-  # Phase 1: extract _X_bin="$N" declarations from candidate files.
   local _decls=()
   local _file
   for _file in "${_candidate_files[@]}"; do
@@ -125,8 +119,6 @@ run_store_path_arg_usage() {
     return 0
   fi
 
-  # Phase 2: for each declared variable, verify it has at least one command/PATH
-  # usage across all shell scripts.
   local _decl _var _line_num
   for _decl in "${_decls[@]}"; do
     _file="${_decl%%:*}"
@@ -197,7 +189,6 @@ run_activation_tool_resolution() {
     fi
   fi
 
-  # Activation-script directories (subset of all scripts).
   local _activation_dirs=(
     src/scripts/ai src/scripts/packages src/scripts/shell src/scripts/agents
     src/scripts/secrets src/scripts/services src/scripts/vms
@@ -206,9 +197,8 @@ run_activation_tool_resolution() {
   )
 
   # ref: comment-annotations.instructions.md#C1 -- self-derived basename for self-exclusion
-  # The android guest scripts are excluded as a class: they execute inside the
-  # guest, which has no Nix store, so `ip` there cannot be given a store-path arg
-  # or a PATH prepend. Recorded as A10 rather than left as a bare glob.
+  # The android guest scripts run in a guest with no Nix store, so their `ip` can
+  # take neither a store-path arg nor a PATH prepend.
   # ref: allow-and-deny-lists.instructions.md#A10 -- guest scripts have no Nix store to resolve against
   # shellcheck disable=SC2155 # reason: basename's exit status is irrelevant; self-derived for exclusion
   local _self_sh="$(basename "${BASH_SOURCE[0]}")"
@@ -256,7 +246,6 @@ run_activation_tool_resolution() {
     return 0
   fi
 
-  # --- Build dynamic allowlist of repo-defined functions ---
   local _lib_funcs_file
   _lib_funcs_file=$(mktemp)
   # shellcheck disable=SC2155 # reason: mktemp exit status checked below
@@ -270,7 +259,6 @@ run_activation_tool_resolution() {
     grep -rh -E '^function[[:space:]]+[a-zA-Z_][a-zA-Z_0-9]*' src/scripts/lib/ 2>/dev/null |
       sed 's/^function[[:space:]]*//' | sed 's/[[:space:]].*//' | sort -u
     {
-      # Activation-script directories (subset of all scripts).
       grep -h -E '^[[:space:]]*[a-zA-Z_][a-zA-Z_0-9]*[[:space:]]*\(\)' "${_candidate_files[@]}" 2>/dev/null |
         sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*().*//' |
         grep -E '^[a-zA-Z_][a-zA-Z_0-9]*$' | sort -u
@@ -280,7 +268,6 @@ run_activation_tool_resolution() {
     }
   } >"$_lib_funcs_file"
 
-  # --- Awk scan ---
   local _awk_program
   # check-suppress:embedded-content: exception 1 (data-driven/generated) -- awk program for activation tool resolution
   read -r -d '' _awk_program <<'AWKEOF'
@@ -300,9 +287,8 @@ BEGIN {
   for (i in a) allow[a[i]] = 1;  delete a
 }
 
-# One awk invocation scans every candidate file, so per-file state must be
-# reset here. Without it a single unbalanced construct in one file silently
-# blinds every file scanned after it.
+# One awk run covers every file, so per-file state resets here; without it one
+# unbalanced construct blinds every file scanned after it.
 FNR == 1 {
   in_heredoc = 0
   heredoc_delim = ""
@@ -343,20 +329,17 @@ in_heredoc {
 
 /^[[:space:]]*(#|$)/ { next }
 
-# An awk or jq program is passed as a quoted argument, usually to a resolved
-# binary such as "$_x_awk_bin". Its body is program text, not shell. This has
-# to sit above both the case rules and the bare-quote rule below: the case
-# rules would otherwise read a program line that looks like a case opener as
-# real shell and raise case_depth, and the bare-quote rule would consume the
-# opening line and leave the rest of the body to be read as commands.
+# An awk or jq body passed to a resolved binary is program text, not shell. This
+# rule has to sit above the case and bare-quote rules: a program line that looks
+# like a case opener would raise case_depth, and the bare-quote rule would leave
+# the rest of the body to be read as commands.
 in_embedded {
   if (index($0, embedded_close) > 0) in_embedded = 0
   next
 }
 {
-  # Walk the quotes that start a word, since a quote inside a token is part of
-  # that token. The first one that does not close on its own line opens a
-  # multi-line argument.
+  # Walk quotes that start a word: a quote inside a token belongs to it, so the
+  # first quote that does not close on its own line opens a multi-line argument.
   rest = $0
   opener = ""
   while (match(rest, /(^|[[:space:]])[`'\"]/)) {
@@ -376,9 +359,8 @@ in_embedded {
   }
 }
 
-# A one-line `case ... esac` closes on its own line, so matching the opener and
-# doing `next` would leave the depth raised with nothing to lower it. Only
-# raise depth when the line does not already contain the terminator.
+# A one-line `case ... esac` carries its own terminator, so raise depth only when
+# the line does not already close it.
 /^[[:space:]]*case[[:space:]]/ {
   if ($0 !~ /(^|[^-[:alnum:]_])esac([[:space:]]|$)/) case_depth++
   next
@@ -425,9 +407,8 @@ case_depth > 0 { next }
 
 {
   line = $0
-  # A trailing backslash continues the command onto the next line. Without
-  # this the continuation is read as a command of its own, and a leading path
-  # like 2>/dev/null is stripped to its basename and reported.
+  # A trailing backslash continues the command; without this the continuation is
+  # read as its own command and a leading 2>/dev/null is reported as a bare binary.
   if (pending != "") {
     line = pending " " line
     pending = ""
@@ -499,12 +480,9 @@ AWKEOF
 
   local _awk_violations
   _awk_violations=$(
-    # One awk invocation sees every candidate file, so the program resets
-    # in_heredoc/case_depth/in_embedded on FNR == 1. Without that reset a
-    # single construct the parser cannot balance blinds every later file, and
-    # a green result here would be evidence of nothing. The reset and the
-    # embedded-program routing exist for that reason, not for the checks
-    # themselves.
+    # The program resets in_heredoc/case_depth/in_embedded on FNR == 1 because
+    # one awk run sees every file; without the reset an unbalanced construct
+    # blinds every later file and a green result here proves nothing.
     # shellcheck disable=SC2046 # reason: printf safely expands the array
     printf '%s\0' "${_candidate_files[@]}" |
       xargs -0 awk -v LIB_FUNCS_FILE="$_lib_funcs_file" "$_awk_program" 2>/dev/null
@@ -605,7 +583,7 @@ run_package_manager_enforcement() {
   return 0
 }
 
-# Suppression audit: detect undocumented error suppressions.
+# Suppression audit: undocumented error suppressions.
 # ref: allow-and-deny-lists.instructions.md#A9
 run_suppression_audit() {
   local -n ctx="$1"
@@ -641,10 +619,10 @@ run_suppression_audit() {
   done
   _files=("${_filtered[@]}")
 
-  # The PowerShell suppression set. Scoped mode takes the .ps1 positional list,
+  # Same scan over PowerShell. Scoped mode takes the .ps1 positional list,
   # whole-repo mode enumerates every .ps1 outside vendor/ behind the gitignore
-  # filter, the same tree the twin reads. The repo-policy step leaves are
-  # dropped in both modes: they carry the literal pattern text of this scan.
+  # filter. The repo-policy step files are dropped in both modes because they
+  # carry this scan's own pattern text.
   # ref: allow-and-deny-lists.instructions.md#A12 -- the step files hold the scan's own patterns
   local _ps1_candidates=()
   # shellcheck disable=SC2178 # reason: nameref to context array
@@ -706,13 +684,9 @@ run_suppression_audit() {
   done
 
   if [ "${#_ps1_files[@]}" -gt 0 ]; then
-    # The PowerShell half of the audit, mirroring Get-UndocSuppViolation in
-    # 11-repo-policy-grep.ps1 pattern for pattern. A match on a comment line is
-    # dropped, and any other match is documented when the line itself carries
-    # the check id or the line above carries it. That last form is deliberately
-    # looser than the same-line form, which is why a suppression named in a WHY
-    # comment above the probe it explains is accepted; a stricter rule here would
-    # report files the twin passes.
+    # Mirrors Get-UndocSuppViolation in 11-repo-policy-grep.ps1. A comment-line
+    # match is dropped; otherwise the check id must sit on the line or the line
+    # above, which is looser on purpose so a WHY above the probe it explains counts.
     # WHY case-insensitive: PowerShell -match is, and the two implementations
     #   must not disagree over a file that spells a parameter differently.
     # WHY repo-relative: the whole-repo branch enumerates paths from the repo
@@ -728,8 +702,8 @@ function add_pattern(p, l, c, e) {
   exempt[_count] = e
 }
 
-# The path is compared repo-relative, so a checkout that merely lives under a
-# directory named tests is still audited.
+# Repo-relative, so a checkout that merely lives under a directory named tests
+# is still audited.
 function is_tests(path,   rel, root_lc) {
   root_lc = tolower(ROOT)
   rel = path
@@ -742,9 +716,8 @@ function is_tests(path,   rel, root_lc) {
 }
 
 BEGIN {
-  # One entry per audited pattern: ERE, report label, the check id that
-  # documents it (empty means no annotation documents it), and whether the
-  # tests/ exemption applies to this pattern.
+  # One entry per pattern: ERE, report label, documenting check id (empty when
+  # no annotation documents it), and whether the tests/ exemption applies.
   add_pattern("2>[$]null", "2>$null", "suppression_doc", 1)
   add_pattern("-erroraction silentlycontinue", "-ErrorAction SilentlyContinue", "suppression_doc", 1)
   add_pattern("catch[[:space:]]*\\{[[:space:]]*\\}", "empty catch {}", "suppression_doc", 0)
@@ -763,8 +736,7 @@ FNR == 1 { prev = ""; _under_tests = is_tests(FILENAME) }
       if (exempt[_i] && _under_tests) continue
       if (line !~ pat[_i]) continue
       if (id[_i] != "") {
-        # The id is stored as the registry spells it and lowered here, because
-        # the line it is matched against is lowered.
+        # The registry spells the id in mixed case and the matched line is lowercased.
         _id = tolower(id[_i])
         if (line ~ ("# check-suppress:" _id "[ \t:]")) continue
         if (FNR > 1 && prev ~ ("# check-suppress:" _id)) continue
@@ -803,8 +775,7 @@ AWKEOF
   return 0
 }
 
-# run_cloud_mount_invariants — verify the two-interface invariants.
-# Core cloud-mount files must not contain OS-specific FUSE/supervisor names.
+# Core cloud-mount files must not name OS-specific FUSE or supervisor backends.
 run_cloud_mount_invariants() {
   local _ctx_name="$1"
   shift
@@ -821,7 +792,7 @@ run_cloud_mount_invariants() {
     fi
   done
 
-  # One macfuse install call site (darwin backend only).
+  # Exactly one macfuse install call site, in the darwin backend.
   local _install_count
   _install_count=$(grep -rl 'macfuse install\|brew install.*macfuse' src/scripts/lib/ src/scripts/services/ 2>/dev/null | wc -l || true) # check-suppress:suppression_doc: grep exits 1 when no install site matches; || echo 0 appended a second 0 under pipefail so the exactly-one assertion below never fired
   if [ "$_install_count" -ne 1 ]; then
@@ -836,11 +807,9 @@ run_cloud_mount_invariants() {
   return 0
 }
 
-# run_service_supervision_invariants — verify the uniform supervision policy.
-# The rewrite locked in one loop policy, one threshold source, and one retry
-# owner.  Every assertion below fails if a later change reintroduces a second
-# copy of one of them; none of them inspects service identity, because loop
-# protection is deliberately not configurable per service.
+# One loop policy, one threshold source, one retry owner. Every assertion below
+# fails if a later change adds a second copy; none inspects service identity,
+# because loop protection is deliberately not configurable per service.
 run_service_supervision_invariants() {
   local _ctx_name="$1"
   shift
@@ -849,9 +818,9 @@ run_service_supervision_invariants() {
   local _watchdog="src/scripts/services/service-watchdog.sh"
   local _services_json="src/modules/services.json"
 
-  # Thresholds live once, in the POSIX health library, and are compared there
-  # only through their constants.  A second definition or a bare numeric
-  # comparison is a second policy that can drift from the watchdog's.
+  # Thresholds live once in the POSIX health library and are compared only
+  # through their constants; a second definition or a bare number is a policy
+  # that can drift from the watchdog's.
   if [ -f "$_health_lib" ]; then
     local _name _defs
     for _name in _SVC_HEALTH_LOOP_RESTARTS _SVC_HEALTH_LOOP_CONSECUTIVE _SVC_HEALTH_WARN_RESTARTS; do
@@ -884,9 +853,9 @@ run_service_supervision_invariants() {
     fi
   fi
 
-  # Loop protection is a property of the health record, never a per-service
-  # setting.  Only the service entry's own keys are inspected, so the
-  # legitimate cloud-drive.lifecycle block stays out of scope by design.
+  # Loop protection is a property of the health record, so only the service
+  # entry's own keys are inspected and the cloud-drive.lifecycle block stays out
+  # of scope.
   if [ -f "$_services_json" ]; then
     local _forbidden
     if ! _forbidden=$(jq -r '
@@ -907,16 +876,14 @@ run_service_supervision_invariants() {
     fi
   fi
 
-  # The POSIX watchdog supervises through the supervisor backend alone; the
-  # PowerShell it once carried made it unable to check anything on this host.
+  # The watchdog runs on POSIX hosts only, so it must contain no PowerShell.
   if [ -f "$_watchdog" ] && grep -qiE 'ScheduledTask|schtask|ConvertTo-Json' "$_watchdog"; then
     error "$_ctx_name: $_watchdog contains PowerShell; the POSIX watchdog runs on POSIX hosts only"
     _failed=1
   fi
 
-  # Retry and backoff belong to the shared runner alone.  A mount backend or
-  # the setup step that sleeps is a second retry owner, which is how the
-  # original restart storm ran without backoff.
+  # Retry and backoff belong to the shared runner alone; a sleeping mount
+  # backend or setup step is a second retry owner.
   local _mount_path_file
   for _mount_path_file in src/scripts/lib/mount-backend-darwin.sh src/scripts/lib/mount-backend-linux.sh src/scripts/services/cloud-drives-setup.sh; do
     [ -f "$_mount_path_file" ] || continue
@@ -926,8 +893,8 @@ run_service_supervision_invariants() {
     fi
   done
 
-  # Only the watchdog may act on the loop predicate.  A service script that
-  # calls it is enforcing a private throttle instead of reporting health.
+  # Only the watchdog may act on the loop predicate; a service script calling it
+  # enforces a private throttle instead of reporting health.
   local _consumers
   _consumers=$(grep -rnE 'svc_health_is_looping[[:space:]]+[^[:space:]]' --include='*.sh' src/scripts/ scripts/ |
     grep -vE ':[0-9]+:[[:space:]]*#' |
@@ -952,19 +919,18 @@ run_service_supervision_invariants() {
   return 0
 }
 
-# run_srt_wrapper_invariants -- every srt-wrapped command separates the
-# user's arguments from srt's own option parser.
+# run_srt_wrapper_invariants -- every srt-wrapped command separates the user's
+# arguments from srt's own option parser.
 #
-# srt is a commander program: the options it declares (-h, -V, -d, -s, -c,
-# --control-fd) are consumed wherever they appear, including after the wrapped
-# command.  Without the end-of-options marker, `pi --help` prints srt's usage
-# instead of starting pi, and `pi -c <arg>` loses the argument with no error at
-# all.  Every forwarder therefore has to write the marker itself.
+# srt is a commander program: it consumes its own options (-h, -V, -d, -s, -c,
+# --control-fd) wherever they appear, including after the wrapped command.
+# Without the end-of-options marker `pi --help` prints srt's usage and `pi -c
+# <arg>` loses the argument with no error at all, so every forwarder writes the
+# marker.
 #
-# The marker is what makes this check safe to run over its own source: both
-# patterns are regexes, so neither matches the line it is written on, and a
-# literal invocation left in a comment is dropped by the comment filter below.
-# No exclusion list is needed, and none is registered for this scan.
+# The check is safe over its own source: both patterns are regexes, so neither
+# matches the line it is written on, and the one literal invocation in this file
+# sits in a comment the comment filter drops. No exclusion list is needed.
 run_srt_wrapper_invariants() {
   local -n ctx="$1"
   shift
@@ -973,10 +939,9 @@ run_srt_wrapper_invariants() {
   cd "$_repo_root" || return 1
   local _failed=0
 
-  # `srt -c '<string>'` is deliberately not a candidate: the string is a single
-  # argv element behind -c, so it exposes no per-argument flag to srt's parser.
-  # Only the `srt command <tool>` form forwards a list, and that list is what
-  # needs the marker.
+  # `srt -c '<string>'` is not a candidate: the string is one argv element
+  # behind -c, so it exposes no per-argument flag. Only `srt command <tool>`
+  # forwards a list, and that list is what needs the marker.
   local _invocation='(^|[^A-Za-z0-9_./-])srt[[:space:]]+command[[:space:]]+[^[:space:]]+'
   local _separated='srt[[:space:]]+command[[:space:]]+[^[:space:]]+[[:space:]]+--([[:space:]]|$)'
 
@@ -989,9 +954,8 @@ run_srt_wrapper_invariants() {
       *) continue ;;
       esac
       # The whole-repo branch reads src/ and scripts/ only, so drop tests/ here
-      # too and keep the two modes in agreement. A test that proves this rule
-      # works has to contain a violating example, and a fixture is not a shipped
-      # wrapper. ref: allow-and-deny-lists.instructions.md#B9
+      # too; a suite proving this rule needs a violating example, and a fixture
+      # is not a shipped wrapper. ref: allow-and-deny-lists.instructions.md#B9
       case "$_f" in
       tests/* | */tests/*) continue ;;
       esac
@@ -1008,10 +972,6 @@ run_srt_wrapper_invariants() {
     )
   fi
 
-  # A candidate line that is not exonerating, and does not start with `#`, is a
-  # violation.  The comment filter below is what keeps this check from reporting
-  # itself: the two patterns are regexes, so they never match their own source,
-  # and the one literal invocation left in this file sits in a comment.
   if [ "${#_grep_files[@]}" -gt 0 ]; then
     local _unseparated
     _unseparated=$(

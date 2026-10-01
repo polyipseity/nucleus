@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
-# Check-specific framework library.
-# Sources step-runner.sh and sets check-specific defaults.
+# Check-specific framework library: sources step-runner.sh and sets the
+# check-specific defaults.
 #
-# Guard against re-sourcing — step files source this independently and
-# re-sourcing would overwrite SCRIPT_DIR and REPO_ROOT.
+# Guard against re-sourcing, which would overwrite SCRIPT_DIR and REPO_ROOT.
 [ -n "${_NUCLEUS_CHECK_LIB_SOURCED-}" ] && return
 _NUCLEUS_CHECK_LIB_SOURCED=1
 
-# Resolve SCRIPT_DIR relative to this file so it works when sourced from
-# standalone step files without a pre-set SCRIPT_DIR.
+# Resolve SCRIPT_DIR relative to this file so it works when sourced from a
+# standalone step file without a pre-set SCRIPT_DIR.
 _self="${BASH_SOURCE[0]:-$0}"
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 
@@ -59,7 +58,6 @@ filter_scoped_files() {
     "$_fsf_dir"/*)
       _fsf_base="${_fsf_f##*/}"
       for _fsf_ext in "${_fsf_ext_list[@]}"; do
-        # Strip leading * from glob for case match
         local _fsf_pat="${_fsf_ext#\*}"
         case "$_fsf_base" in
         *"$_fsf_pat")
@@ -73,8 +71,8 @@ filter_scoped_files() {
   done
 }
 
-# Run a step's sub-checks in declared order, announcing each label and failing the
-# whole step when any sub-check fails.
+# Run a step's sub-checks in declared order, failing the whole step when any
+# sub-check fails.
 # Usage: run_policy_checks <ctx-name> <step-label> <spec-array-name> [files ...]
 #   A spec is "<label>|<function>|<style>": "ctx" passes the context name to the
 #   sub-check, "files" passes the context's HAS_ARGS and REPO_ROOT. Sub-checks keep

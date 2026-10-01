@@ -1,23 +1,13 @@
 # shellcheck shell=bash
-# Shared probe library for lockfile version enforcement.
-#
-# Provides the per-tool version probes (_lfe_check_*) and one entry point:
-#   - verify_installed_versions : used by `update lockfile --verify-installed`;
-#                                 standalone (no check-lib dependency) — reads
-#                                 the lockfile, runs the pinned probes, always
-#                                 warns for suggestions, returns 1 on drift.
-#
-# Probes are scoped to the packages the current host actually manages, read
-# from the shared registry at src/modules/packages/desired.json.  A
-# Windows-only package must never be reported as drift on macOS (and vice
-# versa), so the desired set — not the lockfile section — decides what is
-# probed.
+# Lockfile version probes for the update action. Probes are scoped to the
+# packages the host manages (src/modules/packages/desired.json), so a
+# Windows-only pin is never reported as drift on macOS. verify_installed_versions
+# is the standalone entry point.
 #
 # Requires: say, warn, error (from lib.sh / check-lib.sh) and jq on PATH.
 
-# Emit the package names this host manages, keyed by manager, from the shared
-# desired-package registry.  Fails loudly when the registry is unreadable: a
-# silent fallback would re-introduce cross-host false drift.
+# Package names this host manages, from the shared registry. An unreadable
+# registry is fatal: a silent fallback would re-introduce cross-host false drift.
 _lfe_desired_names() {
   local _host="$1" _jq="$2"
   local _desired="src/modules/packages/desired.json"
@@ -43,9 +33,8 @@ _lfe_desired_names() {
   printf '%s\n' "$_names"
 }
 
-# Emit the keys of one lockfile section that this host manages.  Empty output
-# means the host manages nothing in that section, so the probe has nothing to
-# check.
+# Lockfile keys in one section that this host manages; empty output means the
+# host manages nothing there, so the probe has nothing to check.
 _lfe_scoped_keys() {
   local _lf="$1" _jq="$2" _section="$3" _desired="$4"
   # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the section -- safe.
@@ -54,9 +43,8 @@ _lfe_scoped_keys() {
     '(.[$s] // {}) | keys[] as $k | select(($d[$s] // []) | index($k)) | $k' 2>/dev/null || return 0
 }
 
-# Compare installed bun global packages against the host's declared bun set.
-# String pins are version-checked; object (VCS/rev) pins are not
-# version-verifiable here and are skipped.  Returns 1 if any drift found.
+# Installed bun globals against the host's declared bun set. Object (VCS/rev)
+# pins are not version-verifiable here, so they are skipped.
 _lfe_check_bun() {
   local _lf="$1" _jq="$2" _desired="$3"
   local _bun
@@ -81,7 +69,6 @@ _lfe_check_bun() {
     # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
     _pin="$(printf '%s' "$_lf" | "$_jq" -r --arg p "$_pkg" '(.bun // {})[$p] // empty' 2>/dev/null)" || true # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
     [ -z "$_pin" ] && continue
-    # Object (VCS/rev) pins are not version-verifiable from the installed record.
     if [ "${_pin%"${_pin#?}"}" = '{' ]; then
       say -l bun "$_pkg: VCS-pinned (rev) — not version-verifiable, skipping"
       continue
@@ -100,7 +87,6 @@ EOF
   return $_rc
 }
 
-# Compare installed uv tools against the host's declared uv set.
 _lfe_check_uv() {
   local _lf="$1" _jq="$2" _desired="$3"
   local _uv
@@ -124,9 +110,8 @@ _lfe_check_uv() {
     # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
     _pin="$(printf '%s' "$_lf" | "$_jq" -r --arg p "$_tool" '(.uv // {})[$p] // empty' 2>/dev/null)" || true # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
     [ -z "$_pin" ] && continue
-    # An object (VCS/rev) pin has no version to compare: uv records the
-    # resolved commit for the install (PEP 610), so verify that instead of
-    # silently skipping the tool.
+    # An object pin has no version to compare: uv records the resolved commit
+    # (PEP 610), so verify that instead of skipping the tool.
     if [ "${_pin%"${_pin#?}"}" = '{' ]; then
       # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
       # check-suppress:suppression_doc: jq parse failure on a malformed lockfile pin skips the revision -- drift is reported below when the revision cannot be read.
@@ -156,9 +141,9 @@ EOF
   return $_rc
 }
 
-# Print the commit uv recorded for an installed tool: PEP 610 keeps the
-# resolved revision in <tool>/lib/python*/site-packages/*.dist-info/direct_url.json.
-# Returns 1 when the tool has no such record.
+# Commit uv recorded for an installed tool, from
+# <tool>/lib/python*/site-packages/*.dist-info/direct_url.json. Returns 1 when
+# the tool has no such record.
 _lfe_uv_installed_commit() {
   local _tool="$1" _jq="$2"
   local _root="${UV_TOOL_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/uv/tools}/$_tool"
@@ -170,7 +155,6 @@ _lfe_uv_installed_commit() {
   "$_jq" -r '.vcs_info.commit_id // empty' "$_record" 2>/dev/null || true
 }
 
-# Compare installed cargo-binstall crates against the host's declared crate set.
 _lfe_check_cargo_binstall() {
   local _lf="$1" _jq="$2" _desired="$3"
   local _cargo
@@ -210,7 +194,6 @@ EOF
   return $_rc
 }
 
-# Compare installed rustup stable toolchain against the lockfile `rustup.stable` pin.
 _lfe_check_rustup() {
   local _lf="$1" _jq="$2"
   local _rustup
@@ -236,11 +219,10 @@ _lfe_check_rustup() {
   return 1
 }
 
-# Compare installed PowerShell modules against the lockfile `psgallery` section.
-# A pin is either a version string or a {version, hash} object; the installed
-# module is an extracted directory rather than the pinned nupkg, so only the
-# version is verifiable here. The {hash} pin is consumed by the hash-pinned
-# declarative module path instead.
+# Installed PowerShell modules against the psgallery pins. A pin is a version
+# string or a {version, hash} object, and the installed module is an extracted
+# directory rather than the pinned nupkg, so only the version is verifiable
+# here; the hash pin is consumed by the hash-pinned declarative module path.
 _lfe_check_psgallery() {
   local _lf="$1" _jq="$2"
   local _pwsh
@@ -274,12 +256,11 @@ EOF
 # Verify each pinned whisper model is deployed under the nucleus user root and
 # still hashes to the pinned value.
 #
-# WHY the lockfile is the only authority for these: no package manager ships the
-# ggml weights, so every other probe is blind to a drifted model. POSIX deploys
-# them from a pkgs.fetchurl output, which enforces the hash in the store, but the
-# deployed copy under <nucleusUserRoot>/models is an ordinary file that a
-# truncated download, a failed disk write or a manual replacement can corrupt,
-# and that copy is the one whisper-cli actually opens.
+# WHY the lockfile is the only authority: no package manager ships the ggml
+# weights, and the deployed copy under <nucleusUserRoot>/models is the file
+# whisper-cli opens, which a truncated download or a manual replacement can
+# corrupt. The pkgs.fetchurl output that enforces the hash in the store is not
+# that file.
 _lfe_check_whisper() {
   local _lf="$1" _jq="$2"
   if [ -z "${NUCLEUS_USER_ROOT:-}" ]; then
@@ -292,17 +273,14 @@ _lfe_check_whisper() {
     [ -z "$_file" ] && continue
     local _sri _want _got _path
     # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
-    # `type` guards rather than a bare .hash: a malformed entry whose value is a
-    # string would make jq raise on `.hash`, and the 2>/dev/null below would
-    # then hide the one entry the operator needs to see.
+    # `type` guards rather than a bare .hash: a string value would make jq
+    # raise, and the 2>/dev/null below would hide the entry the operator needs.
     # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
     _sri="$(printf '%s' "$_lf" | "$_jq" -r --arg f "$_file" '(.whisper // {})[$f] | if type == "object" then .hash // empty else empty end' 2>/dev/null)" || continue
     [ -z "$_sri" ] && continue
-    # SRI is base64, sha256_of_file yields hex, so one side has to be decoded.
-    # `base64 -d` is accepted by both FreeBSD base64 and GNU coreutils, and od
-    # is in the base system on both hosts. -v is load-bearing: without it od
-    # replaces a run of identical bytes with `*`, which would silently truncate
-    # the hash of an all-zero file instead of reporting a mismatch.
+    # SRI is base64 and sha256_of_file yields hex, so one side is decoded. `od -v`
+    # is load-bearing: without it od collapses a run of identical bytes to `*`,
+    # truncating the hash of an all-zero file instead of reporting a mismatch.
     _want="$(printf '%s' "${_sri#sha256-}" | base64 -d | od -An -v -tx1 | tr -d ' \n')"
     _path="$NUCLEUS_USER_ROOT/models/$_file"
     if [ ! -f "$_path" ]; then
@@ -323,8 +301,7 @@ EOF
   return $_rc
 }
 
-# Always warn that each `suggestions` sub-section is non-authoritative
-# (warn-only per the invariant).  Never errors.
+# Warn for every `suggestions` sub-section, never an error.
 _lfe_warn_suggestions() {
   local _lf="$1" _jq="$2"
   local _subs
@@ -339,13 +316,11 @@ $_subs
 EOF
 }
 
-# Compare the Nix-store symlink against the lockfile cursor.superpowers pin.
-# The symlink at <nucleusUserRoot>/plugins/superpowers points into /nix/store/
-# when the declarative builtins.fetchGit derivation has been evaluated.
-# WHY: the user root is host-specific — macOS uses
-# ~/Library/Application Support/nucleus, NixOS ~/.local/share/nucleus — so it is
-# read from NUCLEUS_USER_ROOT, exported by src/scripts/lib/lib.sh, which every
-# caller sources before loading this library.
+# Nix-store symlink for the superpowers plugin against the cursor.superpowers
+# pin.
+# WHY the user root comes from NUCLEUS_USER_ROOT: it is host-specific (macOS
+# ~/Library/Application Support/nucleus, NixOS ~/.local/share/nucleus) and every
+# caller sources lib.sh, which exports it.
 _lfe_check_superpowers() {
   local _lf="$1" _jq="$2"
   if [ -z "${NUCLEUS_USER_ROOT:-}" ]; then
@@ -374,11 +349,8 @@ _lfe_check_superpowers() {
   return 0
 }
 
-# Warn-only probe for `suggestions.opencode` (editor plugins).  Checks
-# that each managed plugin entry is present in the lockfile map and
-# reports info-level messages for VCS-pinned entries that cannot be
-# version-verified.  Never errors: opencode is a suggestions section
-# (warn-only per the invariant).  Returns 0 always.
+# Warn-only for suggestions.opencode: every managed entry is VCS-pinned, so
+# there is no version to verify. Never errors.
 _lfe_check_opencode() {
   local _lf="$1" _jq="$2"
   local _oc
@@ -399,12 +371,9 @@ EOF
   return 0
 }
 
-# Warn-only probe for `suggestions.vscode` (editor extensions).  Runs
-# `code --list-extensions --show-versions` (fallback `code-insiders`) and
-# compares each managed extension's installed version to the lockfile map.
-# Never errors: vscode is a suggestions section (warn-only per the invariant)
-# and is not actually locked on all platforms (POSIX locks via flake.lock).
-# Skips gracefully when no `code` CLI is installed.  Returns 0 always.
+# Warn-only for suggestions.vscode, the one duplication exception in the lockfile
+# rules: Windows cannot evaluate Nix, so the probe compares installed extension
+# versions. Never errors.
 _lfe_check_vscode() {
   local _lf="$1" _jq="$2"
   local _code
@@ -438,11 +407,7 @@ EOF
   return 0
 }
 
-# Warn-only probe for `suggestions.cursor` (editor extensions).  Runs
-# `cursor --list-extensions --show-versions` and compares each managed
-# extension's installed version to the lockfile map.  Never errors: cursor
-# is a suggestions section (warn-only per the invariant).  Skips gracefully
-# when no `cursor` CLI is installed.  Returns 0 always.
+# Warn-only for suggestions.cursor, compared the same way; never errors.
 _lfe_check_cursor() {
   local _lf="$1" _jq="$2"
   local _cursor
@@ -476,9 +441,8 @@ EOF
   return 0
 }
 
-# Shared core: given the lockfile data, the host key and a jq path, run the
-# pinned probes scoped to the host's declared package set, and always warn for
-# suggestions.  Returns 1 if any pinned section has version drift.
+# Run the pinned probes against the host's declared package set, then always
+# warn for suggestions. Returns the number of pinned sections with drift.
 _lfe_run_core() {
   local _lf_data="$1" _jq="$2" _host="$3"
   local _failures=0
@@ -504,10 +468,8 @@ _lfe_run_core() {
   return "$_failures"
 }
 
-# Standalone entry point for `update lockfile --verify-installed`.  Reads the
-# lockfile, runs the pinned probes scoped to the host's declared package set,
-# always warns for suggestions, and returns 1 if any pinned section has version
-# drift.
+# Entry point for `update lockfile --verify-installed`. Reads the lockfile and
+# returns 1 if any pinned section has version drift.
 verify_installed_versions() {
   local _repo_root="${1:-$PWD}" _host="${2:-}"
   cd "$_repo_root" || return 1
@@ -538,7 +500,7 @@ verify_installed_versions() {
     return 1
   fi
 
-  # Guard against set -e (update.sh) aborting on the non-zero count.
+  # `|| _failures=$?` keeps set -e in update.sh from aborting on the count.
   _lfe_run_core "$_lf_data" "$_jq" "$_host" || _failures=$?
   if [ "$_failures" -gt 0 ]; then
     error "lockfile verification found $_failures pinned section(s) with version drift"

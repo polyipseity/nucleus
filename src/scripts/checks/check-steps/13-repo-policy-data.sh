@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # shellcheck source=../check-lib.sh
-# (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
 register_step "repo-policy-data" "Repository policy (data-driven)" run_repo_policy_data posix any none
 
-# Sub-checks in output order, as "<label>|<function>|<style>".
 _POLICY_DATA_CHECKS=(
   "dummy key uniformity|run_dummy_key_uniformity|files"
   "preflight install command policy|run_preflight_install_command_policy|ctx"
@@ -31,7 +29,8 @@ run_dummy_key_uniformity() {
   local _dummy_registered _dummy_hits _dummy_files=()
   local _file _rest _line _lit _f
 
-  # Rule: every hardcoded sk- style API key literal (sk-[A-Za-z0-9]{4,}) in tracked files must be a registered dummyKeys value.
+  # Every hardcoded sk- literal (sk-[A-Za-z0-9]{4,}) in a tracked file must be a
+  # registered dummyKeys value.
   _dummy_registered=$(mktemp) || {
     error "failed to create temp file"
     return 1
@@ -52,7 +51,7 @@ run_dummy_key_uniformity() {
     return 1
   }
 
-  # Exclude this check's own files: their source contains the literal pattern text.
+  # Exclude this check's own files: their source carries the literal pattern.
   # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
   local _dummy_self_sh
   _dummy_self_sh="$(basename "${BASH_SOURCE[0]}")"
@@ -117,12 +116,11 @@ run_preflight_install_command_policy() {
   cd "$_repo_root" || return 1
 
   local _errors=0
-  # Exclude this check's own sibling file: its source contains the literal pattern text.
+  # Exclude this check's own sibling file: its source carries the literal pattern.
   # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariant; self-refs are dynamic
   local _self_ps1
   _self_ps1="$(basename "${BASH_SOURCE[0]}" .sh).ps1"
 
-  # Collect PowerShell files
   local -n _ps1_files_ctx="${ctx[PS1_FILES]}"
   local _ps1_files=()
   if $_has_args; then
@@ -183,7 +181,7 @@ run_agents_policy() {
   cd "$_repo_root" || return 1
   local _agents_errors=0
 
-  # Commit-staged body match moved to test suite (agents-prompt-parity-tests.sh)
+  # Commit-staged body match lives in the test suite (agents-prompt-parity-tests.sh)
 
   local _instr
   while IFS= read -r -d '' _instr; do
@@ -247,21 +245,22 @@ run_embedded_content_enforcement() {
   cd "$_repo_root" || return 1
 
   local _errors=0
-  # Exclude this check's own file: its source contains the literal heredoc-detection patterns.
+  # Exclude this check's own file: its source carries the literal heredoc patterns.
   # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
   local _self_sh
   _self_sh="$(basename "${BASH_SOURCE[0]}")"
-  # Also exclude the grep-heavy step file which contains a large awk program heredoc
+  # The grep-heavy step file is excluded too: it embeds a large awk program heredoc
   local _grep_step_sh="11-repo-policy-grep.sh"
 
-  # Embedded-content policy scope for POSIX: src/scripts/** (see .agents/instructions/embedded-content.instructions.md).
+  # Scope: src/scripts/** (see .agents/instructions/embedded-content.instructions.md).
   local _sh_files=()
   if $_has_args; then
     filter_scoped_files _sh_files "${_files[@]}" src/scripts '*.sh'
   else
     discover_files _sh_files "$_repo_root" src/scripts '*.sh'
   fi
-  # Exclude this check's own file: its source contains the literal heredoc-detection patterns.
+  # Exclude this check's own file again: the filter above narrows by directory
+  # only, and the self-exclusion belongs to the same C5 class.
   # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
   local _filtered=()
   local _f
@@ -290,9 +289,9 @@ run_embedded_content_enforcement() {
   return 0
 }
 
-# run_method1_symlink_resolution — Verify deployed method-1 symlinks point at
-# the live repo root, not a read-only /nix/store/*-source snapshot.
-# Only runs when the manifest exists (deployed-host requirement).
+# run_method1_symlink_resolution: a deployed method-1 symlink must point at the
+# live repo root, not a read-only /nix/store/*-source snapshot. Runs only when
+# the manifest exists (deployed-host requirement).
 run_method1_symlink_resolution() {
   local -n ctx="$1"
   local _repo_root="${ctx[REPO_ROOT]}"
@@ -302,7 +301,6 @@ run_method1_symlink_resolution() {
   local _manifest
   _manifest="$(derive_nucleus_user_root)/method1-symlink-manifest.txt"
 
-  # Skip if manifest doesn't exist (not a deployed host).
   if [ ! -f "$_manifest" ]; then
     say "no method-1 symlink manifest found — skipping."
     return 0

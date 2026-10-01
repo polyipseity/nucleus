@@ -1,6 +1,5 @@
 # shellcheck shell=bash
 # shellcheck source=../check-lib.sh
-# (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
 register_step "nix-flake-eval" "Nix flake evaluation" run_nix_flake_eval posix any none
@@ -17,14 +16,12 @@ run_nix_flake_eval() {
 
   local -n _nix_files="${ctx[NIX_FILES]}"
   if $_has_args; then
-    # Scoped mode: evaluate only when the scoped files include .nix changes.
+    # Scoped mode evaluates only when the scoped files include .nix changes.
     if [ "${#_nix_files[@]}" -gt 0 ]; then
       _ne_eval=true
     fi
   else
-    # Full mode: always evaluate the flake regardless of git diff — a clean
-    # tree must still be checked (issue 8; the diff gate used to skip
-    # evaluation entirely when nothing changed since HEAD).
+    # Full mode always evaluates: a clean tree must still be checked.
     _ne_eval=true
   fi
 
@@ -37,13 +34,11 @@ run_nix_flake_eval() {
 
     # WHY: both evals write the shared SQLite eval cache; serialize them with
     # the test steps' nix invocations (pre-push check and test may overlap).
-    # WHY: builtins.currentSystem is unavailable under pure eval (the default
-    # for `nix eval`), so the previous probe — suppressed stderr plus a
-    # hardcoded aarch64-darwin fallback — silently reported the darwin system
-    # on every host and made the eval below target the wrong packages set on
-    # Linux.  `nix config show system` is pure, cheap, and reports the system
-    # in effect (it follows a configured `system = …`, exactly as `nix build`
-    # would).
+    # WHY: builtins.currentSystem is unavailable under pure eval, so a probe
+    # that suppressed stderr and fell back to a hardcoded aarch64-darwin
+    # reported the darwin system on every host and made the eval below target
+    # the wrong package set on Linux. `nix config show system` is pure, cheap,
+    # and follows a configured `system = ...` exactly as `nix build` would.
     local sys
     sys="$(nucleus_nix_locked nix config show system)"
     if ! nucleus_nix_locked nix eval "path:./src#packages.$sys" >/dev/null; then
@@ -54,13 +49,12 @@ run_nix_flake_eval() {
 
     # Committed generated artifacts must equal their flake derivation.
     # WHY: src/hosts/Windows/system/winget-packages.json cannot be generated on
-    # Windows (no Nix there), so it is committed — and this is the only
-    # byte-exact (format-inclusive) check of it; the always-run nix-tests step
-    # compares the parsed entry set on every POSIX host instead.
-    # WHY: ./src#winget-packages is built with the macOS package set
-    # (src/flake.nix), so it is an aarch64-darwin derivation that no other host
-    # can build.  Check it only where the host system matches, and report
-    # explicitly that it was not checked elsewhere rather than implying a pass.
+    # Windows, so it is committed, and this is the only byte-exact (format
+    # inclusive) check of it; the always-run nix-tests step compares the parsed
+    # entry set on every POSIX host instead.
+    # WHY: ./src#winget-packages builds the macOS package set, so it is an
+    # aarch64-darwin derivation no other host can build. Check it only where the
+    # host system matches, and say it was not checked elsewhere.
     local _ne_ga_out
     if [ "$sys" != "aarch64-darwin" ]; then
       say "winget allow-list freshness not checked: ./src#winget-packages is an aarch64-darwin derivation (host system: $sys)."
@@ -88,9 +82,9 @@ run_nix_flake_eval() {
   return $_ne_exit
 }
 
-# run_hermetic_eval — Prove the Nix layer evaluates without any forwarded environment
-# variable and without --impure. The env catalog is a static Nix attrset in the
-# repo tree, so the flake must now evaluate cleanly with NUCLEUS_REPO_ROOT unset.
+# run_hermetic_eval: prove the Nix layer evaluates with no forwarded
+# environment variable and no --impure. The env catalog is a static attrset in
+# the repo tree, so the flake must evaluate with NUCLEUS_REPO_ROOT unset.
 run_hermetic_eval() {
   local -n ctx="$1"
   local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
@@ -107,7 +101,7 @@ run_hermetic_eval() {
   local _nix_cfg
   _nix_cfg="$(merge_nix_config)"
 
-  # --- Darwin: must build hermetically (exit 0) ---
+  # Darwin must build hermetically (exit 0)
   if ! nucleus_nix_locked env -u NUCLEUS_REPO_ROOT \
     NIX_CONFIG="$_nix_cfg" \
     nix build "./src#darwinConfigurations.MacBook.config.system.build.toplevel" --dry-run >/dev/null; then
@@ -117,7 +111,7 @@ run_hermetic_eval() {
     say "darwin hermetic eval passed (no env vars, no --impure)."
   fi
 
-  # --- NixOS: hermetic eval must reach the assertion stage, not fail on impurity ---
+  # NixOS must reach the assertion stage, not fail on impurity
   local _nixos_out
   _nixos_out="$(mktemp)"
   if nucleus_nix_locked env -u NUCLEUS_REPO_ROOT \
@@ -141,7 +135,7 @@ run_hermetic_eval() {
   return $_exit
 }
 
-# run_nixf_tidy — Run nixf-tidy on Nix files for lint checks.
+# run_nixf_tidy: lint Nix files.
 run_nixf_tidy() {
   local -n ctx="$1"
   local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"

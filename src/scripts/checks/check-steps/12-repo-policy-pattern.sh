@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # shellcheck source=../check-lib.sh
-# (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
 _REPO_POLICY_STEP_DIR="$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _AWK_PATH="$_REPO_POLICY_STEP_DIR/repository-policy.awk"
-# Every repo-policy step file carries the literal pattern text the scans below search
+# Every repo-policy step file carries the literal pattern text the scans search
 # for, so each scan skips the whole set, itself included.
 # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
 _POLICY_STEP_SELF_SH="$(basename "${BASH_SOURCE[0]}")"
@@ -14,7 +13,6 @@ _POLICY_STEP_SELF_PS1="${_POLICY_STEP_SELF_SH%.sh}.ps1"
 
 register_step "repo-policy-pattern" "Repository policy (pattern-based)" run_repo_policy_pattern posix any none
 
-# Sub-checks in output order, as "<label>|<function>|<style>".
 _POLICY_PATTERN_CHECKS=(
   "activation naming policy|run_activation_naming_policy|files"
   "config method compliance|run_config_method_compliance|files"
@@ -64,19 +62,17 @@ run_config_method_compliance() {
       _tmpdir="$1"
       _f="$2"
       _basename=$(basename "$_f")
-      # Skip infrastructure files and Nix modules inside configs/  # ref: allow-and-deny-lists.instructions.md#A2 -- infrastructure files are not configs
+      # ref: allow-and-deny-lists.instructions.md#A2 -- infrastructure files are not configs
       case "$_basename" in
         .gitkeep|.gitignore|*.schema.json) exit 0 ;;
       esac
       _result_file="$_tmpdir/${_basename}.result"
       _relpath="${_f#*configs/}"
-      # Check for disallowed config methods
       if grep -q "^[^#]*configs\." "$_f" 2>/dev/null; then
         echo "ERROR:$_relpath uses configs. method" >> "$_result_file"
       fi
     ' _ "$_cfg_par_tmpdir"
 
-  # Aggregate results
   local _result_file _eline
   for _result_file in "$_cfg_par_tmpdir"/*.result; do
     [ -f "$_result_file" ] || continue
@@ -128,12 +124,10 @@ run_activation_naming_policy() {
     return 1
   }
 
-  # Collect activation entry definitions as "file:line:name" lines across the three
-  # namespaces (home.activation, system.activationScripts, nucleus.terminalActivations).
+  # Activation entry definitions as "file:line:name" across the three namespaces.
   local _ns_re='(home\.activation|system\.activationScripts|nucleus\.terminalActivations)'
-  # Attrset entry lines: name[.sub] = <lib.* value> or name[.sub] = (value on next line).
-  # Nested-content lines (config = {, Unit = {, bundle_id = "...") never match.
-  # The trailing $ is an EOL anchor inside the pattern value (double-quoted, so no expansion).
+  # Matches an attrset entry line and no nested-content line (`config = {`,
+  # `Unit = {`, `bundle_id = "..."`). The trailing $ anchors the pattern value.
   local _entry_re="^[[:space:]]*[a-zA-Z0-9_-]+(\\.[a-zA-Z0-9_-]+)?[[:space:]]*=[[:space:]]*(lib\\.(mkIf|mkAfter|mkBefore|mkForce|mkOverride|mkOrder|hm\\.dag\\.entry(A|Before|Order|After))|[[:space:]]*$)"
 
   local _nix_files=()
@@ -144,15 +138,14 @@ run_activation_naming_policy() {
   fi
 
   if [ "${#_nix_files[@]}" -gt 0 ]; then
-    # Dotted definitions: home.activation.<name> = ...
     printf '%s\0' "${_nix_files[@]}" |
       xargs -0 grep -HnoE "([^a-zA-Z0-9_.]|^)${_ns_re}\\.[a-zA-Z0-9_-]+" 2>/dev/null |
       sed -E 's/^([^:]+:[0-9]+:).*\.([a-zA-Z0-9_-]+)$/\1\2/' >>"$_names_file" ||
       true # check-suppress:suppression_doc: grep exits 1 when no dotted definitions are found; an empty result file is the clean state
 
-    # Attrset definitions: <ns> = { <name> = ...; }; regions (entry-value filter
-    # avoids capturing nested-attrset content lines; `=` emits the line number,
-    # `paste` pairs it with the extracted name)
+    # Attrset definitions: <ns> = { <name> = ...; } regions. The entry-value
+    # filter avoids capturing nested-attrset content lines, `=` emits the line
+    # number, and `paste` pairs it with the extracted name.
     for _f in "${_nix_files[@]}"; do
       sed -nE "/${_ns_re}[[:space:]]*=[^;]*\\{/,/^[[:space:]]*\\};/ {
         /${_entry_re}/ {
@@ -166,8 +159,7 @@ run_activation_naming_policy() {
 
   sort -u -o "$_names_file" "$_names_file"
 
-  # Normalize absolute paths to be relative to the repo root so the
-  # regex filters (which expect src/... paths) work correctly.
+  # The filters expect src/... paths, so strip the absolute repo root.
   if [ -s "$_names_file" ]; then
     local _normalized
     _normalized=$(mktemp)
@@ -179,10 +171,8 @@ run_activation_naming_policy() {
   grep -v -E '^(src/platforms/macOS|src/hosts/MacBook)/' "$_names_file" |
     cut -d: -f3 |
     sort -u >"$_shared_file"
-  # Cross-host activation names registered in activation-dag.nix are shared across
-  # platforms and need no macos- prefix even when only the macOS file is scanned
-  # (scoped mode). Seed the shared set from the canonical registry so the carve-out
-  # holds regardless of which files the hook passes.
+  # Cross-host names registered in activation-dag.nix are shared even when only a
+  # macOS file is scanned, so seed the shared set from that canonical registry.
   if [ -f src/modules/lib/activation-dag.nix ]; then
     grep -oE '"[a-zA-Z0-9_-]+"' src/modules/lib/activation-dag.nix |
       tr -d '"' >>"$_shared_file"
@@ -223,9 +213,8 @@ run_activation_naming_policy() {
   return 0
 }
 
-# True when a pattern scan may read "$1": it matches the caller's extension regex,
-# and is neither vendored code, a secret, nor a test fixture (fixtures hold violation
-# samples on purpose).
+# A pattern scan may read "$1" when it matches the caller's extension regex and is
+# not vendored code, a secret, or a test fixture (fixtures hold violation samples).
 # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariants; vendored and secret files are separate concerns
 _policy_scan_target() {
   local _pst_file="$1" _pst_ext_re="$2"
@@ -246,8 +235,6 @@ run_logging_format_policy() {
 
   local _lf_errors=0
 
-  # Logging-format policy scope: tracked script files outside vendored code,
-  # secrets, and test fixtures (fixtures deliberately hold violation samples).
   # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariants; vendored and secret files are separate concerns
   local _lf_ext_re='\.(sh|zsh|ps1|psm1)$'
   local _lf_files=()
@@ -273,8 +260,8 @@ run_logging_format_policy() {
     done < <(awk -v mode=logging-format -f "$_awk_path" "${_lf_files[@]}")
   fi
 
-  # Self-check: the color spec requires NO_COLOR handling in both shared helpers.
-  # Guarded on existence so fixture trees in tests skip this content probe.
+  # The color spec requires NO_COLOR in both shared helpers; the existence guard
+  # lets a fixture tree skip the probe.
   if [ -f src/scripts/lib/lib.sh ] && ! grep -q 'NO_COLOR' src/scripts/lib/lib.sh; then
     _lf_errors=$((_lf_errors + 1))
     error "src/scripts/lib/lib.sh does not reference NO_COLOR (logging-format self-check)"
@@ -292,11 +279,10 @@ run_logging_format_policy() {
   return 0
 }
 
-# --- removed skip mechanism --------------------------------------------------------------------
 # ref: step-runner.instructions.md -- declared applicability replaces step-level skipping
-# Every step declares platform/mode/requires at registration and the runner decides; a step that
-# cannot run is reported as not applicable, never as skipped. This scan keeps both halves of that
-# contract honest: no step may reintroduce a skip path, and no shared helper may grow one back.
+# Every step declares platform/mode/requires at registration and the runner
+# decides, so a step that cannot run is never skipped. No step may reintroduce a
+# skip path, and no shared helper may grow one back.
 run_removed_skip_mechanism() {
   local _has_args="$1" _repo_root="$2"
   shift 2
@@ -319,8 +305,7 @@ run_removed_skip_mechanism() {
   fi
 
   if [ "${#_rsk_files[@]}" -gt 0 ]; then
-    # Pattern scan lives in the sibling .awk file, which excludes the two runners, its own rule
-    # list, and both gate steps by filename.
+    # The .awk file excludes the two runners, its own rule list, and both gate steps.
     local _awk_path="$_AWK_PATH"
 
     local _violation
@@ -364,14 +349,12 @@ run_nix_file_structure() {
   if [ "${#_nix_files[@]}" -gt 0 ]; then
     local _f _dir _base _dirbase
     for _f in "${_nix_files[@]}"; do
-      # Pattern 1: <name>.nix alongside <name>/ directory
       _dir="${_f%.nix}"
       if [ -d "$_dir" ]; then
         _nfs_errors=$((_nfs_errors + 1))
         error "nix file structure: '$_f' exists alongside directory '$_dir/' — move to '$_dir/default.nix' (nix-authoring.instructions.md)"
       fi
 
-      # Pattern 2: <name>/<name>.nix (should be <name>/default.nix)
       _base="$(basename "$_f" .nix)"
       _dirbase="$(basename "$(dirname "$_f")")"
       if [ "$_base" = "$_dirbase" ]; then
@@ -389,13 +372,12 @@ run_nix_file_structure() {
   return 0
 }
 
-# Service log-capture pair policy: a captured service stream always goes to its own
-# file, <dir>/stdout.log and <dir>/stderr.log (output-handling.instructions.md).
-# Merging the streams, capturing only one, and discarding one to /dev/null are all
-# prohibited, on every host.
-# WHY the narrow scope: this targets SERVICE capture points only — launchd/systemd
-# capture directives and the wrappers that redirect a service's output. Ad-hoc
-# `2>/dev/null` on a single command is the suppression-audit concern (step 11).
+# A captured service stream always goes to its own file, <dir>/stdout.log and
+# <dir>/stderr.log (output-handling.instructions.md). Merging the streams,
+# capturing one, and discarding one to /dev/null are prohibited on every host.
+# WHY the narrow scope: this targets SERVICE capture points (launchd/systemd
+# directives and the wrappers that redirect a service's output). An ad-hoc
+# `2>/dev/null` on one command belongs to the suppression audit (step 11).
 run_log_capture_pair_policy() {
   local _has_args="$1" _repo_root="$2"
   shift 2
@@ -404,7 +386,6 @@ run_log_capture_pair_policy() {
 
   local _lcp_errors=0
 
-  # Scope excludes test fixtures, which deliberately hold violation samples.
   # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariants; vendored and secret files are separate concerns
   local _lcp_ext_re='\.(nix|sh|ps1|psm1|yml)$'
   local _lcp_files=()
@@ -443,7 +424,7 @@ run_log_capture_pair_policy() {
 
     # Rule 3: capture is both-or-neither per file, per directive family.
     # WHY boolean presence: a file may own several services, so only the lone-stream
-    # case is a violation — with one stream captured and the other discarded, the
+    # case is a violation; with one stream captured and the other discarded, the
     # discarded stream lands in whatever the platform default is.
     local _lcp_launchd_out=false _lcp_launchd_err=false
     if grep -q 'StandardOutPath' "$_f"; then _lcp_launchd_out=true; fi
