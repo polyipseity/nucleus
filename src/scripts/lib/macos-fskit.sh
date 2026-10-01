@@ -1,57 +1,39 @@
 # shellcheck shell=bash
 # FSKit provider state for the macFUSE file-system extension (macOS).
 #
-# macOS serves macFUSE volumes through an FSKit file-system module
-# (io.macfuse.app.fsmodule.macfuse and its -local variant) owned by the FSKit
-# subsystem (fskitd).  macFUSE 5.x can leave that subsystem wedged after an
-# unmount: the client then reports "File system extension not found" (macFUSE
-# status 3), "File system extension not enabled" (4) and "mount(8) returned 69"
-# (EX_UNAVAILABLE), while FSKit's on-disk module list still names the module.
-# The list therefore gates a mount attempt but never proves one will succeed,
-# and the remedy is a daemon restart, not a re-registration.
+# macFUSE 5.x can wedge fskitd after an unmount: the client then reports "File
+# system extension not found" (3), "not enabled" (4) and "mount(8) returned 69"
+# (EX_UNAVAILABLE) while FSKit's on-disk module list still names the module. The
+# list gates an attempt but never proves one succeeds, and the remedy is a daemon
+# restart, not a re-registration.
 # ref: https://github.com/macfuse/macfuse/issues/1132
 #
-# Usage:
-#   SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
-#   . "$SCRIPT_DIR/../lib/macos-fskit.sh"
-#   state="$(fskit_macfuse_module_state)"   # enabled|disabled|unknown
-#   fskit_restart_daemon 30                 # kill fskitd, wait for the new daemon
-#
-# Callers gate on the host: every probe answers "unknown"/"stopped" when the
-# macOS-only tools are absent, so a caller that must not act on macOS keeps its
-# own host check instead of relying on a probe to fail loudly.
-#
-# Pure function definitions only — no top-level side effects on import.
+# Every probe answers "unknown"/"stopped" when the macOS-only tools are absent,
+# so a caller that must not act on macOS keeps its own host check.
 
 [ -n "${_NUCLEUS_MACOS_FSKIT_SOURCED-}" ] && return
 _NUCLEUS_MACOS_FSKIT_SOURCED=1
 
-# Bundle identifiers the macFUSE FSKit extension registers under.  A re-register
-# can drop the main identifier and keep the -local one, so both count.
+# A re-register can drop the main identifier and keep the -local one, so both count.
 FSKIT_MACFUSE_BUNDLE_IDS="io.macfuse.app.fsmodule.macfuse io.macfuse.app.fsmodule.macfuse-local"
 
-# FSKit's system daemon.  A restart is the remedy the macFUSE maintainers give
-# for a wedged subsystem; launchctl cannot perform it (SIP refuses kickstart).
+# WHY: a signal restarts it through launchd, launchctl kickstart is refused by SIP.
 FSKIT_DAEMON_LABEL="com.apple.filesystems.fskitd"
 
-# fskit_settings_plist — Path of the plist listing FSKit's enabled modules.
-# WHY: FSKit's own list, not PluginKit — pkd rejects a file-system module that
-#   is not inside a SIP-protected app, so a pluginkit probe reports the macFUSE
-#   module as absent even while its volumes mount successfully.
+# WHY: FSKit's own list, not PluginKit. pkd rejects a file-system module outside
+# a SIP-protected app, so a pluginkit probe reports macFUSE absent while its
+# volumes mount fine.
 fskit_settings_plist() {
   printf '%s/Library/Group Containers/group.com.apple.fskit.settings/enabledModules.plist\n' "${HOME:-}"
 }
 
-# fskit_remedy — Operator remedy for a wedged FSKit provider, for status output
-# and blocked markers.
 fskit_remedy() {
   printf 'run '\''sudo killall fskitd'\'' (nucleus-cloud repair), then re-enable macFUSE in System Settings > General > Login Items & Extensions > By category > File System Extensions when it is missing from FSKit'\''s module list\n'
 }
 
-# fskit_module_state <bundleID> — "enabled", "disabled", or "unknown".
-# WHY: "unknown" for an unreadable list, never "disabled": the probe decides
-#   whether an attempt is skipped, so a probe failure must not read as a
-#   missing module.
+# WHY: "unknown" for an unreadable list, never "disabled". The probe decides
+# whether an attempt is skipped, so a probe failure must not read as a missing
+# module.
 fskit_module_state() {
   local bundle_id="$1" plist listing
   [ -n "$bundle_id" ] || return 1
@@ -71,8 +53,6 @@ fskit_module_state() {
   fi
 }
 
-# fskit_macfuse_module_state — "enabled" when any macFUSE module is listed,
-# "disabled" when the list is readable and names none, "unknown" otherwise.
 fskit_macfuse_module_state() {
   local bundle_id state
   state="unknown"
@@ -90,14 +70,12 @@ fskit_macfuse_module_state() {
   printf 'disabled\n'
 }
 
-# fskit_daemon_pid — PID of the FSKit daemon, empty when it is not running.
 fskit_daemon_pid() {
   if ! command -v launchctl >/dev/null 2>&1; then return 0; fi
   # check-suppress:suppression_doc: the daemon may be absent or SIGPIPE the probe; an empty PID is the answer this reports.
   launchctl print "system/$FSKIT_DAEMON_LABEL" 2>/dev/null | awk '/pid =/{print $3; exit}' || true
 }
 
-# fskit_daemon_state — "running" or "stopped" for the FSKit daemon.
 fskit_daemon_state() {
   if [ -n "$(fskit_daemon_pid)" ]; then
     printf 'running\n'
@@ -106,12 +84,9 @@ fskit_daemon_state() {
   fi
 }
 
-# fskit_restart_daemon [waitSeconds] — Restart the FSKit subsystem.
-# WHY: killall, not launchctl kickstart — SIP refuses to kickstart this system
-#   daemon (exit 150, "Operation not permitted while System Integrity Protection
-#   is engaged"), while a signal restarts it through launchd.
-# Returns non-zero when the daemon does not come back with a new PID within the
-# bound; the caller reports the remedy instead of retrying the mount blindly.
+# WHY: killall, not launchctl kickstart, SIP refuses to kickstart this system
+# daemon (exit 150). Non-zero when no new PID appears within the bound, so the
+# caller reports the remedy instead of retrying the mount blindly.
 fskit_restart_daemon() {
   local wait_seconds="${1:-30}"
   local pid_before pid_after ticks max_ticks kill_status=0
@@ -151,15 +126,9 @@ fskit_restart_daemon() {
   return 1
 }
 
-# fskit_repair_provider [waitSeconds] — Repair the provider: restart the FSKit
-# subsystem, then report whether the macFUSE module is usable again.
-# Output: "ok" when the daemon respawned and a macFUSE module is listed,
-# "module-disabled" when it respawned but no module is listed (only the operator
-# can re-enable it), "unknown" when the module list cannot be read.
-# Returns non-zero for everything but "ok", and prints the remedy with the error.
 # WHY the module check after the restart: a restart fixes a wedged subsystem,
-#   never a module that FSKit no longer serves, and the two are indistinguishable
-#   from the client side (both report "not enabled").
+# never a module FSKit no longer serves, and the client side cannot tell them
+# apart since both report "not enabled".
 fskit_repair_provider() {
   local state
 

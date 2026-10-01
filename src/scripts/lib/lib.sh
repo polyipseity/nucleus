@@ -1,30 +1,16 @@
 # shellcheck shell=sh
-# Source this at the top of nucleus POSIX shell scripts after setting SCRIPT_DIR.
-# Provides shared functions (usage_std, derive_repo_root).
-#
-# Guard against re-sourcing — step files source this independently and
-# re-sourcing would redundantly re-export PARALLEL_JOBS and redefine functions.
+# Source at the top of nucleus POSIX shell scripts after setting SCRIPT_DIR.
+# Re-sourcing is redundant: step files source this independently, and a second
+# pass re-exports PARALLEL_JOBS and redefines the functions.
 [ -n "${_NUCLEUS_LIB_SOURCED-}" ] && return
 _NUCLEUS_LIB_SOURCED=1
-#
-# Usage:
-#   SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
-#   . "${SCRIPT_DIR}/../src/scripts/lib.sh"
-#
-# Environment variables:
-#   NUCLEUS_REPO_ROOT  Repository root path. Falls back to auto-detection if unset.
-#   PARALLEL_JOBS      Worker count for parallel operations. Auto-detected from CPU count if unset.
 
-# Auto-scale parallelism to available CPU cores.
-# Override via PARALLEL_JOBS environment variable.
 : "${PARALLEL_JOBS:=$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 2)}"
 export PARALLEL_JOBS
 
-# Nucleus USER root (native per-OS). Mirrors nucleusUserRootFor in
-# src/modules/lib/nucleus-roots.nix. All nucleus user-scoped data lives here;
-# never under ~/.config/nucleus (legacy migration source only).
-#   macOS:  ~/Library/Application Support/nucleus
-#   NixOS:  ~/.local/share/nucleus
+# Mirrors nucleusUserRootFor in src/modules/lib/nucleus-roots.nix. All
+# user-scoped data lives here, never under ~/.config/nucleus (legacy
+# migration source only).
 derive_nucleus_user_root() {
   case "$(uname -s)" in
   Darwin) printf '%s\n' "$HOME/Library/Application Support/nucleus" ;;
@@ -32,16 +18,11 @@ derive_nucleus_user_root() {
   esac
 }
 
-# Nucleus USER root (native per-OS). Mirrors nucleusUserRootFor in
-# src/modules/lib/nucleus-roots.nix. Exported so all sourced scripts reference
-# the canonical root, never ~/.config/nucleus (legacy migration source only).
 : "${NUCLEUS_USER_ROOT:=$(derive_nucleus_user_root)}"
 export NUCLEUS_USER_ROOT
 
-# Nucleus SYSTEM-root machine age key, derived from the host SSH key by
-# src/scripts/secrets/derive-host-age-key.sh during system activation.
-# The system root is resolved from the same services.json manifest the log dir
-# comes from, so a root change in the manifest moves both without a second edit.
+# Derived from the host SSH key by src/scripts/secrets/derive-host-age-key.sh.
+# Shares the services.json system root with the log dir, so one edit moves both.
 nucleus_machine_age_key_path() {
   _nmakp_root="$(dirname -- "$(nucleus_system_log_dir)")" || return 1
   printf '%s\n' "$_nmakp_root/sops/age/machine.txt"
@@ -58,25 +39,16 @@ usage_std() {
   fi
 }
 
-# Auto-derived command prefix for output helpers.
-# Strips "nucleus-" prefix if present; falls back to basename.
-# WHY: only set if unset — tests export a correct prefix before subshells
-# source this file, and unconditionally overwriting it breaks notice output.
+# WHY: only set if unset, tests export a correct prefix before subshells source
+# this file, and unconditionally overwriting it breaks notice output.
 : "${_nuc_prefix:=$(basename "$0")}"
-# Strip .sh extension for cleaner prefix (e.g., "svc:" instead of "svc.sh:")
 _nuc_prefix="${_nuc_prefix%.sh}"
 case "$_nuc_prefix" in
 nucleus-*) _nuc_prefix="${_nuc_prefix#nucleus-}" ;;
 esac
 
-# Console color detection (console-only invariant). Computes per-stream flags
-# _nuc_color_1 (stdout) / _nuc_color_2 (stderr) plus the escape variables
-# _nuc_c1_* / _nuc_c2_* (empty strings when disabled). Idempotent.
-# Rules (see .agents/instructions/logging.instructions.md):
-#   NO_COLOR set non-empty        -> off for both streams
-#   FORCE_COLOR set and != "0"    -> on for both streams (chalk convention)
-#   CLICOLOR_FORCE set non-empty  -> on for both streams
-#   else                          -> per-stream [ -t N ] AND TERM != dumb
+# Per-stream color flags _nuc_color_1/_2 and escape variables _nuc_c1_*/_nuc_c2_*,
+# empty when disabled. Rules: .agents/instructions/output-handling.instructions.md
 _nuc_color_init() {
   [ -n "${_nuc_color_initialized-}" ] && return 0
   _nuc_color_initialized=1
@@ -153,23 +125,18 @@ _nuc_color_init() {
 }
 _nuc_color_init
 
-# Output helpers — use these instead of raw printf/echo.
-# All derive the <cmd>: prefix automatically from the script name; pass
-# -l <label> to override it (e.g. `say -l ai "msg"` -> `ai: msg`).
-# F1 grammar: [<ts> ]<cmd>: [<level>: ]<msg>; color is applied only when the
-# target stream supports it (see _nuc_color_init) and never in files.
+# Output helpers. F1 grammar and colour rules:
+# .agents/instructions/output-handling.instructions.md
 
-# _nuc_semantic_color <ulcyan> <blue> <reset> — Apply semantic inline coloring
-# to a message on stdin, writing to stdout. URL spans -> underline-cyan;
-# single-quoted spans -> blue. Emits markup ONLY through the color variables
-# (empty when the stream is color-disabled), so plain output stays
-# byte-identical. Never use markup delimiters (e.g. backticks) — they would
-# trigger shell command substitution inside double-quoted printf call sites.
+# _nuc_semantic_color <ulcyan> <blue> <reset> colors a message read from stdin.
+# WHY: markup goes only through the color variables, which are empty when the
+# stream is color-disabled, so plain output stays byte-identical. Never use
+# markup delimiters such as backticks, they would run command substitution
+# inside a double-quoted printf call site.
 _nuc_semantic_color() {
   _nsc_ulcyan="$1"
   _nsc_blue="$2"
   _nsc_reset="$3"
-  # Color-on only: empty args (disabled stream) -> byte-identical passthrough.
   [ -n "$_nsc_ulcyan" ] || {
     cat
     return 0
@@ -179,7 +146,6 @@ _nuc_semantic_color() {
     -e "s|https\{0,1\}://[^[:space:]'\"]*|${_nsc_ulcyan}&${_nsc_reset}|g"
 }
 
-# say — Print an info message to stdout.
 say() {
   _say_label="$_nuc_prefix"
   if [ "${1-}" = "-l" ]; then
@@ -190,7 +156,6 @@ say() {
   printf '%s\n' "${_nuc_c1_bold}${_say_label}${_nuc_c1_reset}: $_say_msg"
 }
 
-# error — Print an error message to stderr and return 1.
 error() {
   _err_label="$_nuc_prefix"
   if [ "${1-}" = "-l" ]; then
@@ -202,7 +167,6 @@ error() {
   return 1
 }
 
-# warn — Print a warning message to stderr.
 warn() {
   _warn_label="$_nuc_prefix"
   if [ "${1-}" = "-l" ]; then
@@ -213,7 +177,6 @@ warn() {
   printf '%s\n' "${_nuc_c2_bold}${_warn_label}${_nuc_c2_reset}: ${_nuc_c2_bold}${_nuc_c2_yellow}warning${_nuc_c2_reset}: $_warn_msg" >&2
 }
 
-# dry_run — Print a dry-run message to stdout.
 dry_run() {
   _dry_label="$_nuc_prefix"
   if [ "${1-}" = "-l" ]; then
@@ -224,7 +187,6 @@ dry_run() {
   printf '%s\n' "${_nuc_c1_bold}${_dry_label}${_nuc_c1_reset}: ${_nuc_c1_bold}${_nuc_c1_magenta}[dry-run]${_nuc_c1_reset} $_dry_msg"
 }
 
-# notice — Print a notice message to stdout (F1 [notice] level, bold blue).
 notice() {
   _notice_label="$_nuc_prefix"
   if [ "${1-}" = "-l" ]; then
@@ -235,10 +197,8 @@ notice() {
   printf '%s\n' "${_nuc_c1_bold}${_notice_label}${_nuc_c1_reset}: ${_nuc_c1_bold}${_nuc_c1_blue}[notice]${_nuc_c1_reset} $_notice_msg"
 }
 
-# section — Print a section header to stdout (F3).
 section() { printf '\n%s=== [%s] %s ===%s\n' "${_nuc_c1_bold}${_nuc_c1_cyan}" "$1" "$2" "${_nuc_c1_reset}"; }
 
-# nuc_done — Print a completion message to stdout.
 nuc_done() {
   _done_label="$_nuc_prefix"
   if [ "${1-}" = "-l" ]; then
@@ -248,13 +208,12 @@ nuc_done() {
   printf '%s\n' "${_nuc_c1_bold}${_done_label}${_nuc_c1_reset}: ${_nuc_c1_bold}${_nuc_c1_green}done${_nuc_c1_reset}"
 }
 
-# die — Print an error message to stderr and exit 1.
 die() {
   error "$@"
   exit 1
 }
 
-# Resolution order: NUCLEUS_REPO_ROOT env var, <SYSTEM root>/repo-root, SCRIPT_DIR+offset, then git rev-parse.
+# NUCLEUS_REPO_ROOT, then <SYSTEM root>/repo-root, SCRIPT_DIR walk, then git.
 derive_repo_root() {
   if [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ]; then
     case "$NUCLEUS_REPO_ROOT" in
@@ -274,8 +233,8 @@ derive_repo_root() {
   esac
   _drr_system_file="${NUCLEUS_REPO_ROOT_SYSTEM_FILE:-$_drr_default_system_file}"
   if [ -f "$_drr_system_file" ]; then
-    # WHY: sudo/su reset the environment; <SYSTEM root>/repo-root (materialized at
-    # apply time) gives all-process repo-root availability on POSIX hosts.
+    # WHY: sudo/su reset the environment, and <SYSTEM root>/repo-root is
+    # materialized at apply time, so it gives all-process availability.
     IFS= read -r _drr_system_root <"$_drr_system_file" ||
       _drr_system_root="" # check-suppress:suppression_doc: unreadable system file treated as absent.
     case "$_drr_system_root" in
@@ -293,9 +252,8 @@ derive_repo_root() {
       return 0
     fi
   fi
-  # Resolve SCRIPT_DIR to the physical path before traversal so symlink chains
-  # (e.g. /Users -> /System/Volumes/Data/Users, iCloud Drive) do not interfere
-  # with directory climbing.
+  # WHY: physical path first, or a symlink chain such as /Users or iCloud Drive
+  # breaks the climb.
   _drr_base="$(CDPATH='' cd -P -- "${SCRIPT_DIR:?}" 2>/dev/null && pwd)" || true # check-suppress:suppression_doc: SCRIPT_DIR may not exist or be unset; fall through to git fallback.
   if [ -n "$_drr_base" ]; then
     for _drr_offset in ".." "../.." "../../.."; do
@@ -317,7 +275,6 @@ derive_repo_root() {
   return 1
 }
 
-# Resolution order: NUCLEUS_HOST env var, then uname auto-detection.
 resolve_nucleus_host() {
   if [ -n "${NUCLEUS_HOST:-}" ]; then
     printf '%s\n' "$NUCLEUS_HOST"
@@ -330,14 +287,11 @@ resolve_nucleus_host() {
   esac
 }
 
-# supervisor_resolve_unit_path — expand a declared supervisor unit path.
-# Args: $1 — declared path (may hold a __INSTANCE__ placeholder); $2 — instance id.
-# A leading ~/ expands to $HOME. The placeholder resolves to the instance's
-# distinguishing part: prefix-match services declare a path whose literal text
-# around the token also appears in the instance id (e.g.
-# "local.cloud-mount.__INSTANCE__.plist" for instance "local.cloud-mount.iCloud"),
-# so the value is the instance with the template basename's literal prefix and
-# suffix removed. A declared path without the placeholder is returned verbatim.
+# Args: declared path (may hold a __INSTANCE__ placeholder), instance id. The
+# placeholder takes the instance with the basename's literal prefix and suffix
+# around the token removed, so "local.cloud-mount.__INSTANCE__.plist" with
+# instance "local.cloud-mount.iCloud" yields "iCloud". A path without the
+# placeholder returns verbatim. A leading ~/ expands to $HOME.
 supervisor_resolve_unit_path() {
   _srup_declared="$1" _srup_instance="$2"
   case "$_srup_declared" in
@@ -352,8 +306,8 @@ supervisor_resolve_unit_path() {
     if [ -n "$_srup_litpre" ]; then
       case "$_srup_value" in "$_srup_litpre"*) _srup_value="${_srup_value#"$_srup_litpre"}" ;; esac
     fi
-    # POSIX sh has no ${var/pat/rep}; split on the first placeholder occurrence
-    # and rejoin, matching bash's first-match substitution semantics.
+    # WHY: POSIX sh has no ${var/pat/rep}, so split at the first placeholder and
+    # rejoin, matching bash first-match substitution.
     _srup_head="${_srup_declared%%__INSTANCE__*}"
     _srup_tail="${_srup_declared#*__INSTANCE__}"
     _srup_declared="${_srup_head}${_srup_value}${_srup_tail}"
@@ -366,15 +320,11 @@ supervisor_resolve_unit_path() {
 }
 
 merge_nix_config() {
-  # WHY: min-free = 0 disables Nix automatic GC for scripted pipelines.  On
-  # APFS the whole container (not just the /nix volume) sets free space, so a
-  # full Data volume makes every nix command trigger auto-GC, which deletes
-  # flake-input source trees while a multi-step pipeline still needs them
-  # (nucleus-apply failed with "path ...-source/lib/services/lib.nix does not
-  # exist" on MacBook).  Store cleanup is explicit instead: daily nixStoreGc,
-  # weekly gc-weekly, and apply.sh's post-apply run_gc.  NIX_CONFIG lines
-  # override the min-free/max-free in nix.custom.conf, so appending
-  # min-free = 0 here wins.
+  # WHY: min-free = 0 disables Nix automatic GC for scripted pipelines. On APFS
+  # the whole container sets free space, so a full Data volume makes every nix
+  # command trigger auto-GC and delete flake-input source trees mid-pipeline.
+  # Store cleanup is explicit instead (nixStoreGc, gc-weekly, post-apply run_gc),
+  # and NIX_CONFIG lines override min-free/max-free in nix.custom.conf.
   _mnc_base="${1:-experimental-features = nix-command flakes}"
   if [ -n "${NIX_CONFIG:-}" ]; then
     printf '%s\n%s\nmin-free = 0' "$NIX_CONFIG" "$_mnc_base"
@@ -389,10 +339,8 @@ require_command() {
   fi
 }
 
-# Pre-flight availability check with a hint to run nucleus-apply.
-# Unlike require_command, this is meant for the pre-flight block and
-# gives a user-friendly message linking to the provisioning system.
-# Does NOT attempt nix profile install — see package-installation-scope.
+# Pre-flight variant of require_command with a nucleus-apply hint. Does not
+# install anything, see package-installation-scope.instructions.md.
 ensure_tool() {
   if ! command -v "$1" >/dev/null 2>&1; then
     error "$1 is required but was not found in PATH"
@@ -401,8 +349,7 @@ ensure_tool() {
   fi
 }
 
-# run_command_with_timeout SECONDS COMMAND...
-#   Run COMMAND in the background; return its exit code, or 124 on timeout.
+# run_command_with_timeout SECONDS COMMAND... exits 124 on timeout.
 run_command_with_timeout() {
   _rcwt_timeout="$1"
   shift
@@ -425,7 +372,6 @@ run_command_with_timeout() {
   )
 }
 
-# Tries sha256sum, shasum -a 256, then openssl dgst -sha256.
 sha256_of_file() {
   _sof_file="$1"
 
@@ -443,13 +389,11 @@ sha256_of_file() {
   openssl dgst -sha256 "$_sof_file" | awk '{ print $2 }'
 }
 
-# Path to host-platform-registry.json in the nucleus repo.
 nucleus_host_platform_registry_path() {
   _nhprp_repo="$(derive_repo_root)" || return 1
   printf '%s\n' "$_nhprp_repo/src/modules/host-platform-registry.json"
 }
 
-# Read platform key for a host from host-platform-registry.json.
 nucleus_platform_for_host() {
   _npfh_host="${1:-}"
   if [ -z "$_npfh_host" ]; then
@@ -465,7 +409,6 @@ nucleus_platform_for_host() {
   printf '%s\n' "$_npfh_platform"
 }
 
-# Test whether a platform flag is set for a host (via registry platforms section).
 nucleus_flag_for_host() {
   _nffh_host="${1:-}"
   _nffh_flag="${2:-}"
@@ -479,13 +422,11 @@ nucleus_flag_for_host() {
   jq -e --arg p "$_nffh_platform" --arg f "$_nffh_flag" '.platforms[$p].flags[$f] == true' "$_nffh_json" >/dev/null
 }
 
-# Path to services.json in the nucleus repo.
 nucleus_services_json_path() {
   _nsjp_repo="$(derive_repo_root)" || return 1
   printf '%s\n' "$_nsjp_repo/src/modules/services.json"
 }
 
-# Expand ~ in POSIX log path templates.
 nucleus_expand_log_path() {
   _nelp_path="$1"
   case "$_nelp_path" in
@@ -502,7 +443,6 @@ nucleus_expand_log_path() {
   esac
 }
 
-# Read logDir or systemLogDir from services.json $logging for the current host.
 nucleus_log_path_from_json() {
   _nlpfj_field="$1"
 
@@ -528,25 +468,20 @@ nucleus_log_path_from_json() {
   fi
 }
 
-# Host-aware user log directory.
 nucleus_log_dir() {
   nucleus_log_path_from_json logDir
 }
 
-# Host-aware system log directory.
 nucleus_system_log_dir() {
   nucleus_log_path_from_json systemLogDir
 }
 
-# Caddy state directory sibling to the system log root (/Library/Application Support/nucleus/caddy).
 nucleus_caddy_state_dir() {
   _ncsd_sys="$(nucleus_system_log_dir)" || return 1
   printf '%s\n' "$(dirname -- "$_ncsd_sys")/caddy"
 }
 
-# sccache_cache_dir — Resolve the local sccache disk cache directory.
-# Honors SCCACHE_DIR when set; otherwise uses platform defaults from upstream
-# sccache Local.md.
+# SCCACHE_DIR when set, otherwise the defaults in upstream sccache Local.md.
 sccache_cache_dir() {
   if [ -n "${SCCACHE_DIR:-}" ]; then
     printf '%s\n' "$SCCACHE_DIR"
@@ -559,8 +494,7 @@ sccache_cache_dir() {
   esac
 }
 
-# clear_sccache_cache — Stop the sccache server and delete local cache files.
-# sccache has no --clear flag; disk cache must be removed directly.
+# WHY: sccache has no --clear flag, so the disk cache is removed directly.
 clear_sccache_cache() {
   if ! command -v sccache >/dev/null 2>&1; then
     warn "sccache unavailable; skipping sccache cache gc"
@@ -577,10 +511,8 @@ clear_sccache_cache() {
   fi
 }
 
-# Strip ANSI escapes, \r, and control chars (keep tab, newline).
+# Strips ANSI and OSC sequences, \r, and control chars, keeping tab and newline.
 log_sanitize() {
-  # Strip ANSI escape sequences and OSC sequences, remove \r, strip
-  # control chars except tab (\x09) and newline (\x0A).
   sed -e 's/\x1b\[[0-9;]*[a-zA-Z]//g' \
     -e 's/\x1b\][^\x07\x1b]*\x07//g' \
     -e 's/\x1b[PX^_].*\x1b\\//g' \
@@ -588,10 +520,8 @@ log_sanitize() {
     tr -d '\000-\010\013\014\016-\037'
 }
 
-# rotate_log_file — Copy-truncate a single log file if it exceeds MAXSIZE.
-# Preserves the inode so open file descriptors (launchd/systemd) stay valid.
-# Archives are shifted: .1 (newest) through .$maxfiles (oldest).
-# When compress is "true", the .1 archive is gzip-compressed to .1.gz.
+# Copy-truncate keeps the inode, so open launchd/systemd descriptors stay valid.
+# Archives shift .1 (newest) through .$maxfiles, and .1.gz when compress is true.
 rotate_log_file() {
   _rlf_logfile="$1"
   _rlf_maxsize="${2:-10000000}" # bytes
@@ -610,10 +540,8 @@ rotate_log_file() {
   fi
 
   if [ "$_rlf_maxfiles" -gt 0 ]; then
-    # Remove oldest archive
     rm -f "$_rlf_logfile.$_rlf_maxfiles" "$_rlf_logfile.$_rlf_maxfiles.gz"
 
-    # Shift existing archives
     _rlf_i=$((_rlf_maxfiles - 1))
     while [ "$_rlf_i" -ge 1 ]; do
       [ -f "$_rlf_logfile.$_rlf_i" ] && mv "$_rlf_logfile.$_rlf_i" "$_rlf_logfile.$((_rlf_i + 1))"
@@ -621,7 +549,6 @@ rotate_log_file() {
       _rlf_i=$((_rlf_i - 1))
     done
 
-    # Copy-truncate: copy to archive, then truncate in-place
     if ! cp "$_rlf_logfile" "$_rlf_logfile.1"; then
       warn "failed to rotate '$_rlf_logfile': archive copy failed"
       return 0
@@ -631,19 +558,15 @@ rotate_log_file() {
       return 0
     fi
 
-    # Compress the newest archive if requested
     if [ "$_rlf_compress" = "true" ]; then
       # check-suppress:suppression_doc: archived log may not exist yet on first rotation; gzip -f exits 1 for missing files.
       gzip -f "$_rlf_logfile.1" 2>/dev/null || true
     fi
   else
-    # maxfiles=0: just truncate, keep no archives
     : >"$_rlf_logfile"
   fi
 }
 
-# rotate_logs_in_directory — Iterate over all *.log files under DIR and rotate
-# each one via rotate_log_file.  Uses POSIX find for portability.
 rotate_logs_in_directory() {
   _rld_dir="$1"
   _rld_maxsize="${2:-10000000}" # bytes
@@ -657,7 +580,6 @@ rotate_logs_in_directory() {
   done
 }
 
-# Parse duration strings like 7d or 24h into whole-day counts for find -mtime.
 parse_expiry_days() {
   _ped_exp="${1:-7d}"
   case "$_ped_exp" in
@@ -667,7 +589,6 @@ parse_expiry_days() {
   esac
 }
 
-# Delete rotated archives and dated application logs older than EXPIRY (default 7d).
 expire_logs_in_directory() {
   _eld_dir="$1"
   _eld_expiry="${2:-7d}"
@@ -681,10 +602,6 @@ expire_logs_in_directory() {
     -mtime +"${_eld_days}" -delete
 }
 
-# kill_processes_on_port — Kill all processes listening on PORT.
-# Uses lsof -ti :PORT to find PIDs. Sends SIGTERM, waits 2s, then SIGKILL
-# survivors. No-op if port is free.
-# Returns 0 if port freed, 1 if still occupied.
 kill_processes_on_port() {
   _klp_port="$1"
 
@@ -694,11 +611,9 @@ kill_processes_on_port() {
   _klp_pids="$(lsof -ti :"$_klp_port" 2>/dev/null)" || true
   [ -z "$_klp_pids" ] && return 0
 
-  # SIGTERM
   # check-suppress:suppression_doc: process may have already exited before SIGTERM arrives.
   printf '%s\n' "$_klp_pids" | xargs kill -TERM 2>/dev/null || true
 
-  # Wait up to 2s (4 x 0.5s)
   _klp_i=0
   while [ "$_klp_i" -lt 4 ]; do
     # check-suppress:suppression_doc: no process may be listening on this port; empty result is expected.
@@ -708,7 +623,6 @@ kill_processes_on_port() {
     _klp_i=$((_klp_i + 1))
   done
 
-  # SIGKILL survivors
   # check-suppress:suppression_doc: process may have already exited before SIGKILL arrives.
   printf '%s\n' "$_klp_pids" | xargs kill -KILL 2>/dev/null || true
   sleep 0.5
@@ -719,10 +633,8 @@ kill_processes_on_port() {
   return 1
 }
 
-# wait_for_port — Poll for PORT to enter LISTEN state.
-# Polls lsof -i :PORT every 0.5s up to TIMEOUT seconds (default 5). HOST
-# param is accepted for API consistency but unused on macOS/Linux.
-# Returns 0 when port appears in LISTEN state, 1 on timeout.
+# Polls lsof -i :PORT every 0.5s up to TIMEOUT seconds, default 5. HOST is
+# accepted for API consistency and unused.
 wait_for_port() {
   _wfp_port="$1"
   _wfp_host="${2:-}" # unused on macOS/Linux
@@ -742,10 +654,8 @@ wait_for_port() {
   return 1
 }
 
-# extract_ports — Parse network endpoints from a service entry JSON.
-# Input: a JSON string (platform-filtered service entry with optional network
-# block). Output: one "host port" line per named endpoint, newline-separated.
-# Returns empty if no network key.
+# Platform-filtered service entry JSON in, one "host port" line per endpoint out,
+# empty when the entry has no network block.
 extract_ports() {
   _ep_json="$1"
 

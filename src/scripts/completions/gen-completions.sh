@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
-# Generate zsh completion files for every nucleus-* command from its --help
-# output (the CLI is the source of truth; the help contract is enforced by
-# logging.instructions.md). Idempotent: generating twice yields
-# byte-identical files. --check regenerates into a temp dir and fails listing
-# every differing checked-in file (enforced by check step 10-completions-fresh).
+# Generate zsh completions for every nucleus-* command from its --help output;
+# the CLI is the source of truth. Idempotent, and --check fails listing every
+# differing checked-in file (check step 10-completions-fresh).
 # Generated files must not be edited by hand.
 set -euo pipefail
 
@@ -23,20 +21,21 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd -P)"
 REPO_ROOT="$(derive_repo_root)"
 COMPLETIONS_DIR="$REPO_ROOT/src/modules/completions/zsh"
 
-# The canonical nucleus-* command set (alphabetical) — the coverage contract
+# The canonical nucleus-* command set (alphabetical), the coverage contract
 # shared with check step 10-completions-fresh and the generator tests.
 COMMANDS=(ai apply bootstrap check cloud config gc svc test update utils vm)
 
-# Map a command to its .sh help source (the executable contract).
+# Subcommands whose usage line does not enumerate them cleanly (config embeds
+# argument syntax between names). Descriptions still come from the live --help body.
 sh_for_command() {
   case "$1" in
   *) printf '%s\n' "scripts/$1.sh" ;;
   esac
 }
 
-# Known subcommand inventory for commands whose usage summary line does not
-# enumerate subcommands cleanly (config embeds argument syntax between names).
-# Subcommand descriptions are still extracted from the live --help body.
+# Subcommands whose usage line does not enumerate them cleanly (config embeds
+# argument syntax between names). Descriptions still come from the live --help
+# body.
 known_subcommands() {
   case "$1" in
   svc) printf '%s\n' "list|status|start|stop|restart|enable|disable|verify|endpoint|logs|log-paths|log-config" ;;
@@ -56,30 +55,23 @@ usage() {
   usage_std "$(basename "$0")" "generate|--check|--help" "Generate zsh completion files for every nucleus-* command from its --help output. Default action: generate (write files in place). --check regenerates into a temp dir and fails (exit 1) listing every differing file. Files are generated — do not edit by hand."
 }
 
-# extract_flags <help-file> — flag tokens from two sources, excluding the
-# always-emitted -h/--help group, deduped and sorted in the C locale for
-# byte-stable output:
-#   1. the usage summary line's bracketed groups ([--ai-sync|--no-ai-sync],
-#      [-q|--quiet], [--dry-run], [--target-user=<name>]). Only tokens INSIDE
-#      brackets are taken, so subcommand words like log-config never leak a
-#      -config token; |-alternates split into separate flags; `--flag=<name>`
-#      and `--flag <name>` value placeholders are stripped (the space form
-#      matters because placeholders like <comma-separated> embed dashes); and
-#      the bare -- end-of-options marker ([-- <apply-args>...]) never matches
-#      because a flag token requires a letter after the dashes.
-#   2. each help-body flag line: the leading flag cluster of the line
-#      (whitespace then '-' then |-separated flags). Anchoring to the line
-#      start avoids description words like "machine-readable" leaking tokens.
+# Flag tokens from the usage summary line's bracketed groups and from each
+# help-body flag line, minus the always-emitted -h/--help group, deduped and
+# sorted in the C locale. Brackets only, so subcommand words never leak a
+# -config token; |-alternates split apart; value placeholders are stripped
+# (`--flag=<name>` and `--flag <name>`); the bare -- marker never matches since a
+# flag token needs a letter. Help-body flags anchor to the line start, so
+# description words such as "machine-readable" leak nothing.
 extract_flags() {
   {
-    # Usage summary line: the bracketed groups only.
+    # Help-body flag lines.
     grep -E '^usage: ' "$1" | head -n1 |
       grep -oE '\[[^]]*\]' |
       sed -E 's/^\[//; s/\]$//' |
       sed -E 's/ <[^]]*>//g; s/=<[^]]*>//g' |
       tr '|' '\n' |
       grep -oE -- '(-|--)[a-z0-9][a-z0-9-]*'
-    # Help-body flag lines: the leading |-separated flag cluster of each line.
+    # Help-body flag lines.
     grep -E '^[[:space:]]*-' "$1" |
       grep -oE '^[[:space:]]*(-|--)[a-z0-9][a-z0-9-]*(\|(-|--)[a-z0-9][a-z0-9-]*)*' |
       tr '|' '\n' |
@@ -89,8 +81,7 @@ extract_flags() {
     LC_ALL=C sort -u || true # check-suppress:suppression_doc: no flag tokens in either source is a valid result (help-only commands) — the pipeline then emits nothing.
 }
 
-# extract_subcommands <help-file> — subcommand names from the usage summary
-# line: '|' -separated tokens that are bare lowercase [a-z0-9-] words.
+# '|'-separated bare lowercase [a-z0-9-] words on the usage summary line.
 extract_subcommands() {
   grep -E '^usage: ' "$1" | head -n1 |
     sed -E 's/^usage: [^[:space:]]+[[:space:]]*//' |
@@ -99,8 +90,8 @@ extract_subcommands() {
     grep -E '^[a-z][a-z0-9-]*$' || true # check-suppress:suppression_doc: no subcommands in the usage line is a valid result — the pipeline then emits nothing.
 }
 
-# sub_description <help-file> <subcommand> — the first help-body line whose
-# first token is the subcommand, minus leading [arg]/<arg> groups; '' when none.
+# The first help-body line whose first token is the subcommand, minus leading
+# [arg]/<arg> groups; '' when none.
 sub_description() {
   local _line
   _line="$(grep -E "^[[:space:]]*${2}($|[[:space:]])" "$1" | head -n1)" || true # check-suppress:suppression_doc: no help-body line for the subcommand → empty description.
@@ -125,13 +116,10 @@ sub_description() {
     sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//; s/\.$//'
 }
 
-# escape_zsh_spec_text <text> — escape text that ends up inside a generated
-# `_arguments` spec word, which is quoted twice. The order is load-bearing:
-#   1. the description is double-quoted for the eval `_arguments` runs on the
-#      ((...)) action content, so \ " $ and ` must stay literal there;
-#   2. the whole spec word is single-quoted in the generated file, so a bare '
-#      is written as '\'' (close, escape, reopen). Doing this first would make
-#      step 1 escape the backslashes it introduces.
+# Escapes text that ends up inside a generated _arguments spec word, quoted
+# twice. Order is load-bearing: escape \ " $ and ` first, since the double-quoted
+# eval action needs them literal, then a bare ' as '\'', since the spec word is
+# single-quoted. The other order makes step 1 escape the backslashes it adds.
 escape_zsh_spec_text() {
   local _text
   # shellcheck disable=SC2016 # reason: the sed program is a regex metacharacter string for the tool, not shell expansion.
@@ -139,8 +127,6 @@ escape_zsh_spec_text() {
   printf '%s\n' "$_text" | sed -E "s/'/'\\\\''/g"
 }
 
-# flag_desc <flag> — human-readable flag description: leading dashes stripped,
-# remaining dashes turned into spaces (--tool-cache-gc → "tool cache gc").
 flag_desc() {
   local _f="$1"
   _f="${_f#--}"
@@ -149,8 +135,7 @@ flag_desc() {
   printf '%s\n' "$_f"
 }
 
-# capture_help <command> <out-file> — run the command's .sh --help into the
-# file; every .sh command supports --help, so a failure is a real bug.
+# Every .sh command supports --help, so a failure here is a real bug.
 capture_help() {
   local _cmd="$1" _out="$2" _sh_rel
   _sh_rel="$(sh_for_command "$_cmd")"
@@ -163,9 +148,9 @@ capture_help() {
   fi
 }
 
-# emit_svc_glue — the hand-written services.json runtime function, preserved
-# verbatim (behavioral glue exception; only the flag/subcommand inventory is
-# generated). Per-command glue template for nucleus-svc.
+# The hand-written services.json runtime function, preserved verbatim
+# (behavioral glue exception; only the flag and subcommand inventory is
+# generated).
 emit_svc_glue() {
   cat <<'ZSH_GLUE'
 _nucleus_svc_services() {
@@ -186,7 +171,7 @@ _nucleus_svc_services() {
 ZSH_GLUE
 }
 
-# generate_command_file <command> <out-dir> — write src/modules/completions/zsh/_nucleus-<command>.
+# Writes src/modules/completions/zsh/_nucleus-<command>.
 generate_command_file() {
   local _cmd="$1" _out_dir="$2"
   local _out_file="$_out_dir/_nucleus-$_cmd"
@@ -229,7 +214,7 @@ generate_command_file() {
     _sub_line="$_sub_line))"
   fi
 
-  # Flags: sorted, deduped; a --<X> flag gets dynamic value completion when the
+  # Flags: sorted, deduped. A --<X> flag gets dynamic value completion when the
   # command also exposes --list-<X> (values come from the live CLI at runtime).
   while IFS= read -r _f; do
     _flags_arr+=("$_f")
@@ -250,8 +235,6 @@ generate_command_file() {
     if [ -n "$_suffix" ]; then
       for _list_suffix in "${_list_suffixes[@]}"; do
         if [ "$_list_suffix" = "$_suffix" ]; then
-          # --<X> gets dynamic value completion when the command also exposes
-          # --list-<X> (values come from the live CLI at runtime).
           _spec="${_f}:${_suffix%s} name:->$_suffix"
           _dyn_state="$_suffix"
           break
@@ -266,8 +249,7 @@ $_spec"
     fi
   done
 
-  # Assemble the file via a temp + atomic rename so concurrent readers (e.g.
-  # the smoke tests) never observe a half-written completion file.
+  # Temp plus atomic rename, so a concurrent reader never sees a half-written file.
   {
     printf '#compdef nucleus-%s\n' "$_cmd"
     printf '\n'
@@ -319,8 +301,7 @@ $_spec"
   rm -f "$_help_tmp"
 }
 
-# generate_dispatcher <out-dir> — regenerate the _nucleus dispatcher that
-# completes `nucleus-<TAB>` with every command name.
+# Regenerates the _nucleus dispatcher that completes `nucleus-<TAB>`.
 generate_dispatcher() {
   local _out_dir="$1"
   local _out_file="$_out_dir/_nucleus"
@@ -345,7 +326,6 @@ generate_dispatcher() {
   mv -f "$_tmp_file" "$_out_file"
 }
 
-# generate_all <out-dir> — generate every command file plus the dispatcher.
 generate_all() {
   local _out_dir="$1"
   mkdir -p "$_out_dir"
