@@ -518,9 +518,12 @@
         "unitPath": "~/Library/LaunchAgents/local.nix-index-update.plist"
       },
       "NixOS": {
-        "justification": "The agent is a macOS launchd job in this repository; no equivalent is deployed on Linux.",
-        "type": "omitted",
-        "platform": "NixOS"
+        "justification": "User systemd service and timer, deployed by src/platforms/NixOS/modules/default.nix. User scope because the nix-index database is per-user cache state under ~/.cache/nix-index.",
+        "scope": "user",
+        "service": "nix-index-update.service",
+        "type": "nixos-systemctl",
+        "platform": "NixOS",
+        "unitPath": "~/.config/systemd/user/nix-index-update.service"
       },
       "Windows": {
         "justification": "Nix is not available on Windows; command suggestions come from Scoop there.",
