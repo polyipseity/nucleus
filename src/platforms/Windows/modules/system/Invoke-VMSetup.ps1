@@ -954,8 +954,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
     }
 
     # Auto-detect WHPX when the user has not specified a non-default accelerator.
-    # WHPX (Windows Hypervisor Platform) is significantly faster than tcg software
-    # emulation and should be used when available.
+    # WHPX is far faster than tcg software emulation.
     # Source: https://learn.microsoft.com/en-us/virtualization/hyper-v-on-windows/user-guide/nested-virtualization
     if (-not $SyncOnly -and $Accelerator -eq 'tcg') {
         try {
@@ -1201,10 +1200,8 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                 }
             }
 
-            # Per-VM UEFI NVRAM: writable vars state lives under data/ (like
-            # every writable disk); seed once from the shared firmware vars
-            # template that qemu-img ships alongside (the start script
-            # references data/<id> (nvram).fd).
+            # Writable NVRAM vars live under data/ with the disks, seeded once
+            # from the shared firmware template qemu-img ships alongside.
             $nvramImagePath = Join-Path -Path $dataDir -ChildPath "$($vm.id) (nvram).fd"
             if (-not (Test-Path -LiteralPath $nvramImagePath -PathType Leaf)) {
                 if ($null -eq $qemuImg) {
@@ -1334,10 +1331,6 @@ function Invoke-VMSystemBuild {
 
     .EXAMPLE
       Invoke-VMSystemBuild -RepoRoot 'C:\Users\admin\nucleus' -Type NixOS
-
-    .NOTES
-      Environment variables: NUCLEUS_HOST, NUCLEUS_VM_SECRET_OWNER, USERNAME,
-      VM_DIR_OVERRIDE.
     #>
     [CmdletBinding()]
     param(
@@ -1369,10 +1362,6 @@ function Invoke-VMSync {
     Invoke-VMSetup -RepoRoot $RepoRoot -DryRun:$DryRun -SyncOnly
 }
 
-# Test-Qcow2Image — Validates a QCOW2 image file before reuse.
-#
-# Ensures the image exists, has a non-zero size, and (when qemu-img is
-# available) reports format=qcow2 with a sensible virtual size.
 function Test-Qcow2Image {
     [CmdletBinding()]
     [OutputType([bool])]
@@ -1430,12 +1419,8 @@ function Test-Qcow2Image {
     return $true
 }
 
-# Invoke-BuildNixosImage — Builds the NixOS guest image using Packer.
-#
-# On macOS/NixOS, scripts/vm.sh uses nixos-generators directly (faster,
-# no Packer needed).  On Windows, Packer with the QEMU builder downloads the
-# NixOS minimal ISO and runs a shell provisioner to install NixOS
-# (src\vms\NixOS\packer.pkr.hcl).
+# Windows uses Packer with the QEMU builder; macOS and NixOS build the same
+# image through nixos-generators (src\vms\NixOS\packer.pkr.hcl).
 function Invoke-BuildNixosImage {
     [CmdletBinding()]
     param(
@@ -1539,9 +1524,6 @@ function Invoke-BuildNixosImage {
     Write-NucleusInfo -CommandName vm-setup "NixOS image ready: $outPath"
 }
 
-# Invoke-FidoWindowsIso — Download a Windows 11 ISO using vendor/Fido/Fido.ps1
-# (the same engine that drives Rufus download automation).  Returns the full
-# path to the downloaded ISO on success or an empty string on failure.
 # Requires the vendor/Fido submodule to be checked out.
 # Source: https://github.com/pbatard/Fido
 function Invoke-FidoWindowsIso {
@@ -1578,7 +1560,7 @@ function Invoke-FidoWindowsIso {
     }
 
     Write-NucleusInfo -CommandName vm-setup "downloading Windows 11 ISO via Fido (edition=$Edition)..."
-    # Run Fido in a temp dir; it downloads the ISO to the working directory.
+    # Fido downloads into its working directory.
     # Source: https://github.com/pbatard/Fido#usage
     $tmpDir = New-TemporaryFile | ForEach-Object { Remove-Item $_; New-Item -ItemType Directory -Path $_ }
     try {
@@ -1630,12 +1612,9 @@ function Invoke-FidoWindowsIso {
     }
 }
 
-# Invoke-BuildWindowsImage — Builds the Windows 11 guest image using Packer.
-#
-# Requires a Windows 11 ISO path (-WindowsIso).  Uses SATA disk during the
-# build (no VirtIO drivers needed during install) then installs VirtIO drivers
-# post-install so the resulting image boots with the VirtIO disk interface used
-# during normal operation.
+# Uses SATA during the build (no VirtIO drivers needed during install), then
+# installs VirtIO drivers so the image boots on the VirtIO interface used in
+# normal operation.
 function Invoke-BuildWindowsImage {
     [CmdletBinding()]
     param(
@@ -1698,13 +1677,12 @@ function Invoke-BuildWindowsImage {
         $WindowsIso = $cachedIso
     }
 
-    # Resolve the installer ISO: use -WindowsIso if provided, otherwise try the
-    # VMs.json Windows.isoUrl field as a download source.
+    # -WindowsIso first, then Windows.isoUrl as a download source.
     if (-not $WindowsIso -and $WindowsIsoSource -ne 'Fido' -and $WindowsIsoUrl) {
         Write-NucleusInfo -CommandName vm-setup "downloading Windows installer from Windows.isoUrl..."
         if (-not $DryRun) {
-            # Use curl.exe (available on Windows 10 1803+) for large ISO downloads;
-            # Invoke-WebRequest buffers the full file in memory before writing to disk.
+            # curl.exe streams to disk; Invoke-WebRequest buffers the whole file
+            # in memory first.
             # Source: https://curl.se/docs/manpage.html
             # check-suppress:suppression_doc: probe whether curl.exe is available; Get-Command throws when absent.
             if (-not (Get-Command curl.exe -ErrorAction SilentlyContinue)) {
@@ -1747,7 +1725,7 @@ function Invoke-BuildWindowsImage {
         }
     }
 
-    # If still no ISO resolved, attempt download via vendor/Fido/Fido.ps1.
+    # No ISO resolved yet; try vendor/Fido/Fido.ps1.
     if (-not $WindowsIso -and $WindowsIsoSource -ne 'Url') {
         $WindowsIso = Invoke-FidoWindowsIso `
             -RepoRoot $RepoRoot `
@@ -1756,7 +1734,7 @@ function Invoke-BuildWindowsImage {
             -Retries $WindowsIsoRetries `
             -DryRun:$DryRun
     }
-    # If ISO is still empty after all resolution attempts, fail with instructions.
+    # Still empty after every resolution attempt; fail with instructions.
     if (-not $WindowsIso) {
         if ($WindowsIsoSource -eq 'Url') {
             Write-NucleusInfo -CommandName vm-setup 'windowsIsoSource=Url selected and no cached URL-based installer was resolved'

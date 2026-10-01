@@ -5,23 +5,11 @@ function Invoke-RustupSetup {
 
   .DESCRIPTION
     Install only the declared set of Rust toolchain channels.
-    On each apply it queries `rustup toolchain list` for the actually installed
-    toolchains, removes any whose channel prefix is not in the desired list
-    (zap-style), and installs any desired channel not currently present.
-
-    Toolchain names from rustup include the host triple suffix (e.g.
-    "stable-x86_64-pc-windows-msvc").  The channel is extracted as the
-    component before the first dash, so "stable-x86_64-pc-windows-msvc"
-    has channel "stable".
 
     Requires rustup to be on PATH (installed from WinGet by system/packages.dsc.yml).
 
   .EXAMPLE
     Invoke-RustupSetup
-
-  .NOTES
-    Environment variables: (none)
-    Exit codes: 0 on success; non-zero on failure.
   #>
   [CmdletBinding()]
   param(
@@ -41,24 +29,20 @@ function Invoke-RustupSetup {
 
   $lockfilePath = Join-Path $RepoRoot "src\lockfiles\lockfile.json"
 
-  # Read version-pinning data from the consolidated lockfile.
   $lockfile = @{}
   if (Test-Path $lockfilePath) {
     $lockfile = Get-Content $lockfilePath -Raw | ConvertFrom-Json
   }
   $rustupVersions = if ($lockfile -and $lockfile.rustup) { $lockfile.rustup } else { @{} }
 
-  # Declarative desired-state list of toolchain channels.  Add a channel name
-  # here to install it; remove it to trigger removal on the next apply.  Use
-  # the short channel name without the host triple (rustup appends the host
-  # triple automatically).
+  # Add a channel name here to install it, remove it to trigger removal.
+  # Use the short name; rustup appends the host triple.
   $desiredChannels = @(
-    # Stable Rust toolchain; required by cargo-binstall for compilation fallback
-    # and used as the default toolchain for all Rust development.
+    # Stable is the cargo-binstall compilation fallback and the Rust default.
     'stable'
   )
 
-  # Guard: rustup must be accessible after WinGet DSC has installed Rustlang.Rustup.
+  # WinGet DSC installs Rustlang.Rustup before this runs.
   # check-suppress:suppression_doc: probe -- rustup may not be installed; if-guard checks absence below.
   if (-not (Get-Command rustup -ErrorAction SilentlyContinue)) {
     Write-NucleusError -CommandName 'Invoke-RustupSetup' "rustup not found on PATH; ensure Rustlang.Rustup was installed by WinGet DSC before calling this function"
@@ -66,32 +50,22 @@ function Invoke-RustupSetup {
   }
 
   # Prepend ~/.cargo/bin so cargo binaries (including cargo uninstall, used
-  # by Invoke-CargoBinstallSetup) are accessible after rustup sets up a
-  # toolchain in this session.
-  # Canonical source: ManagedPaths.ps1 -> managed-paths.nix (pathComponents).
+  # by Invoke-CargoBinstallSetup) resolve in this session.
   $cargoBinDir = Get-NucleusManagedBinDir "cargo"
   if ($env:PATH -notlike "*$cargoBinDir*") {
     $env:PATH = "$env:PATH;$cargoBinDir"
   }
 
-  # Get actually installed toolchains from rustup.  `rustup toolchain list`
-  # emits lines like "stable-x86_64-pc-windows-msvc (default)" or
-  # "nightly-x86_64-pc-windows-msvc".  The first whitespace-delimited token
-  # is the full toolchain name.
+  # The active toolchain carries a "(default)" suffix; the first token is the name.
   $rawToolchains = @(rustup toolchain list 2>&1 | Where-Object { $_ -match '\S' })
   $installedToolchains = @($rawToolchains | ForEach-Object { ($_ -split '\s+')[0] })
 
-  # Extract the channel from each installed toolchain name by taking everything
-  # before the first dash.  Examples:
-  #   stable-x86_64-pc-windows-msvc  → stable
-  #   nightly-x86_64-pc-windows-msvc → nightly
-  #   1.75.0-x86_64-pc-windows-msvc  → 1.75.0 (pinned version, not a channel)
+  # The channel is the part before the first dash; a pinned version is 1.75.0.
   $installedChannels = @($installedToolchains | ForEach-Object { ($_ -split '-')[0] })
 
-  # Toolchains to remove: installed ones whose channel is not in the desired
-  # list, OR whose installed nightly archive date does not match the lockfile
-  # pin. stable/beta are rolling channels pinned by version (tracked only, not
-  # in the spec), so they are removed solely by channel-name membership.
+  # Remove an installed toolchain when its channel is not desired, or when a
+  # nightly pin's archive date does not match. stable/beta are rolling, pinned
+  # by version only, so membership is the whole test.
   $toRemove = @($installedToolchains | Where-Object {
     $channel = ($_ -split '-')[0]
     if ($desiredChannels -notcontains $channel) { return $true }
@@ -105,13 +79,11 @@ function Invoke-RustupSetup {
     return $false
   })
 
-  # Channels to install: desired ones not currently present in any installed toolchain.
   $toInstall = @($desiredChannels | Where-Object {
     $channel = $_
     $installedChannels -notcontains $channel
   })
 
-  # Remove toolchains whose channel is not in the desired list.
   foreach ($toolchain in $toRemove) {
     Write-NucleusInfo -CommandName 'rustup' "removing toolchain '$toolchain'"
     rustup toolchain remove $toolchain
@@ -122,11 +94,9 @@ function Invoke-RustupSetup {
     Write-NucleusInfo -CommandName 'rustup' "'$toolchain' removed"
   }
 
-  # Install desired channels not currently present with version pinning from lockfile.
   foreach ($channel in $toInstall) {
-    # nightly pins carry a valid -YYYY-MM-DD archive suffix and are used
-    # verbatim; stable/beta are rolling channels installed by name alone (their
-    # version pin is tracked, not appended to the spec).
+    # A nightly pin carries a -YYYY-MM-DD archive suffix and is used verbatim;
+    # stable/beta are installed by name alone.
     $pin = $rustupVersions.$channel
     $channelSpec = if ($pin -and $pin -match '^nightly(-\d{4}-\d{2}-\d{2})?$') { $pin } else { $channel }
     Write-NucleusInfo -CommandName 'rustup' "installing toolchain '$channelSpec'"
@@ -146,7 +116,6 @@ function Invoke-RustupSetup {
   # toolchain explicitly via rust-toolchain.toml or a +channel override.
   # check-suppress:suppression_doc: a global default channel silently masks missing per-project toolchain
   # files and makes the effective compiler version opaque.
-  # `rustup default none` is idempotent.
   Write-NucleusInfo -CommandName 'rustup' "setting global default toolchain to none"
   rustup default none
   if ($LASTEXITCODE -ne 0) {

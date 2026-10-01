@@ -5,58 +5,35 @@ function Invoke-CargoBinstallSetup {
 
   .DESCRIPTION
     Maintains a managed set of Rust CLI binaries installed via cargo-binstall.
-    On each apply it queries `cargo install --list` for the actually installed
-    set and removes anything not in the desired list (zap-style), then installs
-    any desired packages that are missing via `cargo-binstall --no-confirm` at
-    versions pinned in the repository lockfile.
 
     Only packages absent from both WinGet and Scoop are managed here, following
     the repository preference hierarchy (nixpkgs/winget > scoop > cargo binstall > cargo > bun > uv).
 
-    Currently managed:
-      - cargo-cache    — reclaim disk space from ~/.cargo registry, git, and
-                         advisory-db clones; fills the Windows cargo-cache gap
-                         (no WinGet package ID; not in Scoop)
-      - pay-respects   — command correction tool (actively maintained fork of
-                         thefuck); fills the Windows pay-respects gap
-                         (no WinGet package ID; not in Scoop)
-
     Requires cargo-binstall to be on PATH (installed from Scoop main bucket by
-    Invoke-ScoopSetup).  Prepends %USERPROFILE%\.cargo\bin to PATH internally
+    Invoke-ScoopSetup). Prepends %USERPROFILE%\.cargo\bin to PATH internally
     so `cargo uninstall` (removal path) works even when the calling session
     was started before rustup initialised PATH.
 
   .EXAMPLE
     Invoke-CargoBinstallSetup
-
-  .NOTES
-    Environment variables: (none)
-    Exit codes: 0 on success; non-zero on failure.
   #>
   [CmdletBinding()]
   param()
 
-  # Derive repo root from script location (src/platforms/Windows/modules/setup/ -> repo root is 5 levels up).
   $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
   $lockfilePath = Join-Path $repoRoot "src\lockfiles\lockfile.json"
 
-  # Get-NucleusHostKey resolves the canonical host key used to slice the shared
-  # desired-package registry.
   . (Join-Path -Path $repoRoot -ChildPath "src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1")
 
-  # Read version-pinning data from the consolidated lockfile.
   $lockfile = @{}
   if (Test-Path $lockfilePath) {
     $lockfile = Get-Content $lockfilePath -Raw | ConvertFrom-Json
   }
   $cargoBinstallVersions = if ($lockfile -and $lockfile.'cargo-binstall') { $lockfile.'cargo-binstall' } else { @{} }
 
-  # Structured desired-state list from the shared registry (single source of
-  # truth: src/modules/packages/desired.json).  Each entry yields a CrateName
-  # (published on crates.io) and a BinaryName (the executable placed in
-  # ~/.cargo/bin); the two differ when a crate installs a binary under a
-  # different name (for example nickel-lang-lsp installs nls.exe).  An entry
-  # without a "binary" field installs a binary named after the crate.
+  # CrateName and BinaryName differ when a crate installs its binary under
+  # another name (nickel-lang-lsp installs nls.exe). No "binary" field means
+  # the binary is named after the crate.
   $desiredPath = Join-Path $repoRoot "src\modules\packages\desired.json"
   if (-not (Test-Path -LiteralPath $desiredPath)) {
     Write-NucleusError -CommandName 'Invoke-CargoBinstallSetup' "desired package registry not found at '$desiredPath'"
@@ -76,12 +53,10 @@ function Invoke-CargoBinstallSetup {
       }
     })
 
-  # cargo-binstall and `cargo uninstall` both operate on this directory.
-  # Canonical source: ManagedPaths.ps1 -> managed-paths.nix (pathComponents).
   $cargoBinDir = Get-NucleusManagedBinDir "cargo"
 
-  # Prepend ~/.cargo/bin so `cargo uninstall` (removal path) finds the cargo
-  # binary even when the calling session predates rustup's PATH initialisation.
+  # `cargo uninstall` (removal path) needs cargo on PATH even when the calling
+  # session predates rustup's PATH initialisation.
   if ($env:PATH -notlike "*$cargoBinDir*") {
     $env:PATH = "$env:PATH;$cargoBinDir"
   }
@@ -93,9 +68,8 @@ function Invoke-CargoBinstallSetup {
     return
   }
 
-  # Resolve sccache absolute path for RUSTC_WRAPPER override.
-  # Ensures cargo install (cargo-binstall fallback) finds sccache
-  # even when the session PATH is restricted.
+  # sccache as RUSTC_WRAPPER so the cargo install fallback finds it even when
+  # the session PATH is restricted.
   $savedRustcWrapper = $env:RUSTC_WRAPPER
   # check-suppress:suppression_doc: probe -- sccache may not be installed; EnvVarOverride block handles absence.
   $_sccacheCmd = Get-Command sccache -ErrorAction SilentlyContinue
@@ -103,10 +77,7 @@ function Invoke-CargoBinstallSetup {
     $env:RUSTC_WRAPPER = $_sccacheCmd.Source
   }
 
-  # Get actually installed crates from `cargo install --list` (zap-style:
-  # remove any installed crate absent from the desired list, regardless of
-  # prior managed state).  `cargo install --list` emits lines of the form
-  # "name vX.Y.Z:" for each installed crate.
+  # `cargo install --list` emits "name vX.Y.Z:" per installed crate.
   $cargoListOutput = @(cargo install --list 2>&1)
   $installedVersions = @{}
   $installedCrates = @(
@@ -118,21 +89,17 @@ function Invoke-CargoBinstallSetup {
       }
   )
 
-  # Crates installed but not desired: zap-style removal.
-  # Mirrors homebrew cleanup = "zap": removes anything installed but absent
-  # from the declared desired set, regardless of how it was installed.
+  # Removing an installed crate absent from the declared set, however it got installed.
   $desiredCrateNames = @($desiredPackages | ForEach-Object { $_.CrateName })
   $toRemove = @($installedCrates | Where-Object { $desiredCrateNames -notcontains $_ })
 
-  # Desired crates not yet installed OR installed at a version different from
-  # the lockfile pin (version-aware reconciliation).
+  # Missing, or installed at a version other than the pin.
   $toInstall = @($desiredPackages | Where-Object {
     $crateName = $_.CrateName
     $isInstalled = $installedCrates -contains $crateName
     if (-not $isInstalled) { return $true }
     $entry = $cargoBinstallVersions.$crateName
     if ($entry -is [string]) {
-      # Version-pinned entry: reinstall if version mismatch.
       if (-not $entry) { return $false }
       $installedVersion = $installedVersions[$crateName]
       return $installedVersion -ne $entry
@@ -151,12 +118,10 @@ function Invoke-CargoBinstallSetup {
     Write-NucleusInfo -CommandName 'cargo-binstall-setup' "$pkg uninstalled"
   }
 
-  # Install additions (fresh installs and version-mismatch reinstalls).
   foreach ($pkg in $toInstall) {
     $crateName = $pkg.CrateName
     $entry = $cargoBinstallVersions.$crateName
     if ($entry -is [string]) {
-      # Version-pinned entry: install via cargo-binstall.
       $version = $entry
       $installSpec = if ($version) { "$crateName@$version" } else { $crateName }
       Write-NucleusInfo -CommandName 'cargo-binstall-setup' "installing $installSpec"
@@ -166,7 +131,6 @@ function Invoke-CargoBinstallSetup {
         return
       }
     } else {
-      # Hash-pinned entry: install directly from VCS via cargo install.
       $source = $entry.source
       $rev = $entry.rev
       Write-NucleusInfo -CommandName 'cargo-binstall-setup' "installing $crateName from $source @ $rev"
@@ -187,6 +151,5 @@ function Invoke-CargoBinstallSetup {
     Write-NucleusInfo -CommandName 'cargo-binstall-setup' "all managed packages already converged — skipping"
   }
 
-  # Restore RUSTC_WRAPPER to its original value.
   $env:RUSTC_WRAPPER = $savedRustcWrapper
 }

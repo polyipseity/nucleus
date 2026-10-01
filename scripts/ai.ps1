@@ -13,10 +13,6 @@
     endpoint   Show AI service endpoints (ollama, litellm).
     config     Show effective AI configuration.
 
-  Data sources:
-    - src/modules/configs/ollama/models.json  — model manifest
-    - src/modules/services.json    — service definitions (ollama + litellm)
-
 .PARAMETER Action
   The operation to perform: sync, list, status, endpoint, config.
 
@@ -37,14 +33,8 @@
 
 .EXAMPLE
   .\ai.ps1 sync
-  .\ai.ps1 list
   .\ai.ps1 list -Profile MacBook
-  .\ai.ps1 list -Json
-  .\ai.ps1 status
   .\ai.ps1 status -Json
-  .\ai.ps1 endpoint
-  .\ai.ps1 config
-  .\ai.ps1 sync -DryRun
 
 .NOTES
   Environment variables: NUCLEUS_REPO_ROOT, NUCLEUS_AI_SYNC_TIMEOUT, NUCLEUS_AI_SYNC_PROFILE.
@@ -93,19 +83,11 @@ if (-not $Action) {
   exit 0
 }
 
-# ---------------------------------------------------------------------------
-# Initialization
-# ---------------------------------------------------------------------------
-
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Get-Item $PSScriptRoot).Parent.FullName }
 if (-not $env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT = $RepoRoot }
 . (Join-Path $RepoRoot 'src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1')
 $ModelsJson = Join-Path $RepoRoot "src\modules\configs\ollama\models.json"
 $ServicesJson = Join-Path $RepoRoot "src\modules\services.json"
-
-# ---------------------------------------------------------------------------
-# Sync subcommand
-# ---------------------------------------------------------------------------
 
 function Invoke-AiSync {
   $modulePath = Join-Path $RepoRoot "src\platforms\Windows\modules\system\Invoke-AISync.ps1"
@@ -118,10 +100,6 @@ function Invoke-AiSync {
 
   Invoke-AISync -RepoRoot $RepoRoot -DryRun:$DryRun -GcOnly:$GcOnly -ServerReadyTimeoutSeconds $(if ($env:NUCLEUS_AI_SYNC_TIMEOUT) { [int]$env:NUCLEUS_AI_SYNC_TIMEOUT } else { 60 })
 }
-
-# ---------------------------------------------------------------------------
-# List subcommand
-# ---------------------------------------------------------------------------
 
 function Invoke-AiList {
   if (-not (Test-Path -LiteralPath $ModelsJson)) {
@@ -145,37 +123,28 @@ function Invoke-AiList {
     return ($allModels | ConvertTo-Json -Compress)
   }
 
-  # Tabular output: Profile<tab>Model1, Model2, ...
   foreach ($_profile in ($allModels.PSObject.Properties.Name | Sort-Object)) {
     $models = @($allModels.$_profile) -join ', '
     Write-Output ("{0,-12} {1}" -f $_profile, $models)
   }
 }
 
-# ---------------------------------------------------------------------------
-# Status subcommand
-# ---------------------------------------------------------------------------
-
 function Invoke-AiStatus {
-  # Check ollama binary availability
   $ollamaCmd = Get-Command "ollama" -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- expected on fresh systems
   $ollamaAvailable = $null -ne $ollamaCmd
 
-  # Check ollama service
   try {
     $ollamaService = Get-Service -Name "ollama" -ErrorAction Stop
   } catch {
     $ollamaService = $null
   }
 
-  # Check litellm service
   try {
     $litellmService = Get-Service -Name "nucleus-litellm" -ErrorAction Stop
   } catch {
     $litellmService = $null
   }
 
-  # Read manifest
   $desiredCount = 0
   $profileName = Get-NucleusHostKey
   if (Test-Path -LiteralPath $ModelsJson) {
@@ -186,7 +155,6 @@ function Invoke-AiStatus {
     }
   }
 
-  # Get installed models via ollama list
   $installedCount = 0
   if ($ollamaAvailable) {
     $listOutput = @(& $ollamaCmd.Source list 2>&1 | Select-Object -Skip 1 | ForEach-Object { ($_ -split '\s+')[0] } | Where-Object { $_ -ne '' })
@@ -212,7 +180,6 @@ function Invoke-AiStatus {
     return ($result | ConvertTo-Json -Compress)
   }
 
-  # Human-readable output
   Write-Output "Ollama binary: $(if ($ollamaAvailable) { 'found' } else { 'not found' })"
   if ($ollamaService) {
     Write-Output "Ollama service: $($ollamaService.Status)"
@@ -228,10 +195,6 @@ function Invoke-AiStatus {
   Write-Output "Desired models: $desiredCount"
   Write-Output "Installed models: $installedCount"
 }
-
-# ---------------------------------------------------------------------------
-# Endpoint subcommand
-# ---------------------------------------------------------------------------
 
 function Invoke-AiEndpoint {
   if (-not (Test-Path -LiteralPath $ServicesJson)) {
@@ -253,7 +216,6 @@ function Invoke-AiEndpoint {
     return ($result | ConvertTo-Json -Compress)
   }
 
-  # Tabular output: service/endpoint<tab>protocol://host:port
   foreach ($svcName in $result.Keys) {
     $network = $result[$svcName]
     foreach ($epName in ($network.PSObject.Properties.Name | Sort-Object)) {
@@ -263,19 +225,13 @@ function Invoke-AiEndpoint {
   }
 }
 
-# ---------------------------------------------------------------------------
-# Config subcommand
-# ---------------------------------------------------------------------------
-
 function Invoke-AiConfig {
-  # Read models.json
   $profiles = [ordered]@{}
   if (Test-Path -LiteralPath $ModelsJson) {
     $manifest = Get-Content -Raw -Path $ModelsJson | ConvertFrom-Json
     $profiles = $manifest.models
   }
 
-  # Read services.json for endpoints
   $ollamaEndpoint = $null
   $litellmEndpoint = $null
   if (Test-Path -LiteralPath $ServicesJson) {
@@ -292,16 +248,13 @@ function Invoke-AiConfig {
     }
   }
 
-  # Get active profile
   $activeProfile = if ($env:NUCLEUS_AI_SYNC_PROFILE) { $env:NUCLEUS_AI_SYNC_PROFILE } else { Get-NucleusHostKey }
 
-  # Model counts per profile
   $modelCounts = [ordered]@{}
   foreach ($_profile in ($profiles.PSObject.Properties.Name | Sort-Object)) {
     $modelCounts[$_profile] = @($profiles.$_profile).Count
   }
 
-  # Environment variables
   $envVars = [ordered]@{
     OLLAMA_HOST              = $env:OLLAMA_HOST
     NUCLEUS_AI_SYNC_PROFILE  = $env:NUCLEUS_AI_SYNC_PROFILE
@@ -322,7 +275,6 @@ function Invoke-AiConfig {
     return ($result | ConvertTo-Json -Depth 3 -Compress)
   }
 
-  # Human-readable output
   Write-Output "Active profile: $activeProfile"
   Write-Output ""
   Write-Output "Model counts:"
@@ -344,10 +296,6 @@ function Invoke-AiConfig {
     }
   }
 }
-
-# ---------------------------------------------------------------------------
-# Dispatch
-# ---------------------------------------------------------------------------
 
 switch ($Action) {
   'sync'     { Invoke-AiSync }

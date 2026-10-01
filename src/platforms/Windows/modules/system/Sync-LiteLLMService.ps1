@@ -15,9 +15,6 @@
 .NOTES
   Environment variables:
     (none)    No environment variables used.
-
-  Exit codes:
-    0 on success; 1 on error.
 #>
 
 function Sync-LiteLLMService {
@@ -50,9 +47,6 @@ function Sync-LiteLLMService {
 
   .EXAMPLE
     Sync-LiteLLMService -RepoRoot 'C:\Users\admin\nucleus' -Enabled:$true -GpgExe 'C:\...\gpg.exe' -HostKeyPath 'C:\...\ssh_host_ed25519_key' -SopsExe 'C:\...\sops.exe' -SecretsDir 'C:\...\secrets'
-
-  .EXAMPLE
-    Sync-LiteLLMService -RepoRoot 'C:\Users\admin\nucleus' -Enabled:$false -GpgExe 'C:\...\gpg.exe' -HostKeyPath 'C:\...\ssh_host_ed25519_key' -SopsExe 'C:\...\sops.exe' -SecretsDir 'C:\...\secrets'
   #>
   [CmdletBinding()]
   param(
@@ -97,9 +91,9 @@ function Sync-LiteLLMService {
     return
   }
 
-  # Materialise system-level secrets (AI API keys) from src/secrets/system.yml
-  # into %ProgramData%\nucleus\secrets\ so the SYSTEM-native litellm SCM service
-  # can read them at startup.
+  # Materialise the AI API keys from src/secrets/system.yml into
+  # %ProgramData%\nucleus\secrets\ so the SYSTEM-native service can read them
+  # at startup.
   $systemSecretsDir = Join-Path -Path $env:ProgramData -ChildPath "nucleus\secrets"
   # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
   $null = New-Item -Path $systemSecretsDir -ItemType Directory -Force
@@ -127,8 +121,7 @@ function Sync-LiteLLMService {
     }
   }
 
-  # Find the litellm binary installed by uv.
-  # uv tool install places binaries in ~\.local\bin by default.
+  # uv tool install places litellm in ~\.local\bin by default.
   $litellmBin = Join-Path -Path $HOME -ChildPath ".local\bin\litellm.exe"
   if (-not (Test-Path -Path $litellmBin -PathType Leaf)) {
     # check-suppress:suppression_doc: probe whether the binary is on PATH; Get-Command throws when absent.
@@ -140,7 +133,6 @@ function Sync-LiteLLMService {
     $litellmBin = $litellmCmd.Source
   }
 
-  # Prepare ProgramData directories.
   $programDataDir = Join-Path -Path $env:ProgramData -ChildPath "nucleus\litellm"
   $logDir = Get-NucleusSystemLogDir
   $serviceLogDir = Join-Path -Path $logDir -ChildPath "litellm"
@@ -149,8 +141,7 @@ function Sync-LiteLLMService {
 
   . (Join-Path -Path $PSScriptRoot -ChildPath "..\Set-ManagedSymlinkDeleteProtection.ps1")
 
-  # Symlink the config so source edits take effect on service restart without
-  # re-running apply.
+  # Symlink the config so source edits take effect on service restart.
   $configLink = Join-Path -Path $programDataDir -ChildPath "litellm-config.yml"
   $configSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\litellm\config.yml"
   if (-not (Test-Path -Path $configSource -PathType Leaf)) {
@@ -160,8 +151,8 @@ function Sync-LiteLLMService {
   New-Item -Path $configLink -ItemType SymbolicLink -Target $configSource -Force > $null
   Set-ManagedSymlinkDeleteProtection -Context "Sync-LiteLLMService" -Path $configLink
 
-  # Symlink the Cline custom handler alongside the config.  litellm's
-  # get_instance_fn resolves the handler relative to the config file directory.
+  # litellm's get_instance_fn resolves the handler relative to the config
+  # directory, so the link has to sit next to the config.
   $handlerLink = Join-Path -Path $programDataDir -ChildPath "cline_handler.py"
   $handlerSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\litellm\cline_handler.py"
   if (-not (Test-Path -Path $handlerSource -PathType Leaf)) {
@@ -176,20 +167,14 @@ function Sync-LiteLLMService {
   $stdoutLogFile = Join-Path -Path $serviceLogDir -ChildPath "stdout.log"
   $stderrLogFile = Join-Path -Path $serviceLogDir -ChildPath "stderr.log"
 
-  # Data-driven: select the keys this consumer needs from the env-secrets
-  # catalog.  This is the same filter, over the same file, that
-  # envLib.mkSecretArgsForConsumer applies on POSIX -- parity is the point, so
-  # the catalog is read from the repo rather than copied to a runtime location
-  # that nothing populated.
+  # Read the catalog from the repo rather than a runtime copy, which is the same
+  # filter envLib.mkSecretArgsForConsumer applies on POSIX.
   $envSecretsCatalog = Join-Path -Path $RepoRoot -ChildPath 'src\modules\env\env-secrets.json'
   $liteLLMKeys = Get-LiteLLMKeySpec -CatalogPath $envSecretsCatalog
 
-  # Build JSON key-spec array for the wrapper script: [{file, env}, ...]
   # WHY: a bare name, not a path. LiteLLM-run.ps1 joins $spec.file onto its own
-  # $secretsDir, and Join-Path does not treat an absolute child as absolute, so
-  # a full key-file path here would resolve to <secretsDir>\<full path> and match
-  # nothing. The secrets were written to $systemSecretsDir by name above, which
-  # is the same directory the wrapper reconstructs.
+  # $secretsDir, and Join-Path does not treat an absolute child as absolute, so a
+  # full key-file path here would match nothing.
   $keySpecs = @()
   foreach ($entry in $liteLLMKeys) {
     $keySpecs += [PSCustomObject]@{ file = $entry.name; env = $entry.envVar }
@@ -201,13 +186,11 @@ function Sync-LiteLLMService {
     if ($svc.litellm.network.default) { $svc.litellm.network.default } else { @{ host = '127.0.0.1'; port = 4000 } }
   }
 
-  # Write a PowerShell wrapper script that sets environment variables then
-  # launches litellm.  Using a wrapper file avoids the nested-quoting problem
-  # that would arise from embedding this logic inline in sc.exe binPath.
+  # A wrapper file avoids the nested quoting that embedding this logic in the
+  # sc.exe binPath would create.
   $wrapperScript = Join-Path -Path $programDataDir -ChildPath "run-litellm.ps1"
   $wrapperContent = Get-Content -Raw (Join-Path -Path $PSScriptRoot -ChildPath "..\scripts\LiteLLM-run.ps1")
   $keySpecsJson = $keySpecs | ConvertTo-Json -Compress
-  # Redis env vars for LiteLLM coordination + response cache.
   $redisConfig = & {
     # check-suppress:suppression_doc: probe -- services.json may not exist yet; $null check handles absence.
     $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json

@@ -5,14 +5,9 @@ function Invoke-UvSetup {
 
   .DESCRIPTION
     Maintains a managed set of Python CLI tools installed via `uv tool install`.
-    On each apply it queries `uv tool list` for the actually installed set,
-    removes anything installed but absent from the desired list (zap-style),
-    and installs any desired tools that are missing.
-
-    Mirrors the install-uv-tools POSIX activation in agents.nix.
 
     The desired set and the per-tool rationale live in the shared registry
-    src/modules/packages/desired.json (uv -> <host>).  An entry may pin its
+    src/modules/packages/desired.json (uv -> <host>). An entry may pin its
     version to a flake.lock node ("pin": "flake:<node>") when the declarative
     POSIX provisioning, not a PyPI release, is the authoritative version.
 
@@ -22,38 +17,27 @@ function Invoke-UvSetup {
 
   .EXAMPLE
     Invoke-UvSetup
-
-  .NOTES
-    Environment variables: (none)
-    Exit codes: 0 on success; non-zero on failure.
   #>
   [CmdletBinding()]
   param()
 
-  # Derive repo root from script location (src/platforms/Windows/modules/setup/ -> repo root is 5 levels up).
   $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
   $lockfilePath = Join-Path $repoRoot "src\lockfiles\lockfile.json"
   $flakeLockPath = Join-Path $repoRoot "src\flake.lock"
 
-  # Get-NucleusHostKey resolves the canonical host key used to slice the shared
-  # desired-package registry.
   . (Join-Path -Path $repoRoot -ChildPath "src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1")
 
-  # Resolve-NucleusFlakePin turns a "flake:<node>" pin into a GitHub source and
-  # revision; the enforcement lib uses the same helper for its rev probe.
+  # The enforcement lib uses the same helper for its rev probe.
   . (Join-Path -Path $repoRoot -ChildPath "src\platforms\Windows\modules\lib\Resolve-NucleusFlakePin.ps1")
 
-  # Read version-pinning data from the consolidated lockfile.
   $lockfile = @{}
   if (Test-Path $lockfilePath) {
     $lockfile = Get-Content $lockfilePath -Raw | ConvertFrom-Json
   }
   $uvVersions = if ($lockfile -and $lockfile.uv) { $lockfile.uv } else { @{} }
 
-  # Declarative desired-state list from the shared registry (single source of
-  # truth: src/modules/packages/desired.json).  Entries are objects with named
-  # fields; python/extras are read into per-tool lookup tables so one tool's
-  # version can never land in another tool's slot.
+  # python/extras go into per-tool lookup tables so one tool's version can
+  # never land in another tool's slot.
   $desiredPath = Join-Path $repoRoot "src\modules\packages\desired.json"
   if (-not (Test-Path -LiteralPath $desiredPath)) {
     Write-NucleusError -CommandName 'Invoke-UvSetup' "desired package registry not found at '$desiredPath'"
@@ -117,32 +101,28 @@ function Invoke-UvSetup {
   }
 
   # uv tool install places binaries in ~\.local\bin by default (UV_TOOL_BIN_DIR).
-  # Canonical source: ManagedPaths.ps1 -> managed-paths.nix (pathComponents).
   $uvBinDir = Get-NucleusManagedBinDir "local"
 
-  # Guard: uv must be accessible after WinGet DSC has installed astral-sh.uv.
+  # WinGet DSC installs astral-sh.uv before this runs.
   # check-suppress:suppression_doc: probe -- uv may not be installed; if-guard checks absence below.
   if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
     Write-NucleusError -CommandName 'Invoke-UvSetup' "uv not found on PATH; ensure astral-sh.uv was installed by WinGet DSC before calling this function"
     return
   }
 
-  # Ensure required Python versions are available before installing tools.
   $pythonVersions = $toolPythonVersion.Values | Where-Object { $_ } | Sort-Object -Unique
   foreach ($ver in $pythonVersions) {
     uv python install $ver
   }
 
-  # Prepend ~/.local/bin so binaries installed during this apply run are
-  # accessible in subsequent steps without opening a new terminal session.
+  # Prepend ~/.local/bin so binaries installed during this apply run resolve in
+  # later steps without a new terminal session.
   if ($env:PATH -notlike "*$uvBinDir*") {
     $env:PATH = "$env:PATH;$uvBinDir"
   }
 
-  # Get actually installed uv tools from `uv tool list` (zap-style: remove
-  # any installed tool absent from the desired list, regardless of prior
-  # managed state). Parse only "name vX.Y.Z" lines so separators/headers
-  # cannot become uninstall candidates.
+  # Parse only "name vX.Y.Z" lines so headers and separators cannot become
+  # uninstall candidates.
   $uvListOutput = @(uv tool list 2>&1 | Where-Object { $_ -match '^[A-Za-z0-9][A-Za-z0-9._-]*\s+v\d' })
   $installedVersions = @{}
   $installedTools = @($uvListOutput | ForEach-Object {
@@ -152,13 +132,10 @@ function Invoke-UvSetup {
     $parts[0]
   })
 
-  # Tools installed but not desired: zap-style removal.
-  # Mirrors homebrew cleanup = "zap": removes anything installed but absent
-  # from the declared desired set, regardless of how it was installed.
+  # Removing an installed tool absent from the declared set, however it got installed.
   $toRemove = @($installedTools | Where-Object { $desiredPackages -notcontains $_ })
 
-  # Desired tools not yet installed OR installed at a version different from
-  # the lockfile pin (version-aware reconciliation).
+  # Missing, or installed at a version other than the pin.
   $toInstall = @($desiredPackages | Where-Object {
     $pkg = $_
     $isInstalled = $installedTools -contains $pkg
@@ -174,7 +151,6 @@ function Invoke-UvSetup {
     return $false
   })
 
-  # Prune packages removed from the desired list.
   foreach ($pkg in $toRemove) {
     if ($pkg -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') {
       Write-NucleusInfo -CommandName 'uv' "skipping invalid uninstall token '$pkg'"
@@ -189,11 +165,9 @@ function Invoke-UvSetup {
     Write-NucleusInfo -CommandName 'uv' "'$pkg' uninstalled"
   }
 
-  # Install additions (fresh installs and version-mismatch reinstalls).
   foreach ($pkg in $toInstall) {
     $entry = if ($uvPins.ContainsKey($pkg)) { $uvPins[$pkg] } else { $uvVersions.$pkg }
     if ($entry -is [string]) {
-      # Version-pinned entry: install from PyPI.
       $version = $entry
       $pkgWithVersion = if ($version) { "${pkg}==${version}" } else { $pkg }
       $installSpec = if ($packageExtras.ContainsKey($pkg)) { "$pkgWithVersion$($packageExtras[$pkg])" } else { $pkgWithVersion }
@@ -212,7 +186,6 @@ function Invoke-UvSetup {
       }
       Write-NucleusInfo -CommandName 'uv' "'$installSpec' installed successfully"
     } else {
-      # Hash-pinned entry: install from VCS.
       $source = $entry.source
       $rev = $entry.rev
       $installSpec = "${pkg} @ git+$source@$rev"

@@ -1,6 +1,5 @@
-# Test-ScoopShim lives in lib/ because it is a generic Scoop predicate, not part
-# of this step's convergence flow. It resolves shim paths through
-# Get-NucleusScoopShimsDir, which apply.ps1 has already loaded.
+# Test-ScoopShim is a shared predicate in lib/; apply.ps1 already loaded its
+# dependency Get-NucleusScoopShimsDir.
 . (Join-Path -Path $PSScriptRoot -ChildPath '..\lib\Test-ScoopShim.ps1')
 
 function Invoke-ScoopSetup {
@@ -9,70 +8,35 @@ function Invoke-ScoopSetup {
     Idempotently converges the declarative Scoop app set (install + prune).
 
   .DESCRIPTION
-    Register the 'extras' and 'main' Scoop buckets, then
-    reads the Scoop apps directory for the actually installed set and removes
-    anything not in the desired list (zap-style), then installs any desired
-    apps that are missing at versions pinned in the repository lockfile.
+    Register the 'extras' and 'main' buckets, then reconcile the apps directory
+    against the desired list, removing what is not declared and installing what
+    is missing at the lockfile version.
 
-    Mirrors the declarative install+prune approach used by Invoke-BunSetup and
-    the install-bun-packages POSIX activation.
+    Runs after the WinGet DSC step that installs Scoop.Scoop, because the shims
+    directory is not on PATH in the parent session until prepended.
 
-    This function must run after the WinGet DSC step that installs Scoop.Scoop,
-    because Scoop shims are written to %USERPROFILE%\scoop\shims which is not
-    on PATH in the parent PowerShell session until explicitly prepended.
-
-    Currently managed:
-      - cargo-binstall — Rust CLI install vehicle; absent from WinGet; Scoop
-                         main bucket is the correct tier
-                         (winget > scoop > cargo binstall > cargo > bun > uv).
-      - gopass         — cross-platform pass reimplementation; Windows parity
-                         for pkgs.pass on POSIX hosts.
-      - iwck           — temporary keyboard locker for cleaning; blocks all
-                         input until Ctrl+Break.
-      - qemu           — QCOW2 tooling and guest VM runner for Invoke-VMSetup;
-                         absent from WinGet; Scoop extras bucket.
-      - sigrok-cli     — logic analyzer CLI; absent from WinGet; provisioned
-                         via nucleus custom Scoop bucket (NSIS installer).
-      - whisper-cpp    — local speech-to-text runtime (whisper-cli for files,
-                         whisper-stream for live microphone input); absent
-                         from WinGet; Scoop main bucket.
-      - zig            — Zig compiler toolchain; build-time dependency for
-                         source-built packages (Invoke-SourceBuild).
-
-    The desired set and the per-app rationale live in the shared registry
-    src/modules/packages/desired.json (scoop -> <host>).
-
-    Custom bucket manifests live in src/modules/scoop-manifests/ and are
-    copied into ~/.scoop/buckets/nucleus/ at apply time.
+    The desired set and per-app rationale live in
+    src/modules/packages/desired.json (scoop -> <host>). Custom bucket
+    manifests live in src/modules/scoop-manifests/.
 
   .EXAMPLE
     Invoke-ScoopSetup
-
-  .NOTES
-    Environment variables: (none)
-    Exit codes: 0 on success; non-zero on failure.
   #>
   [CmdletBinding()]
   param()
 
-  # Derive repo root from script location (src/platforms/Windows/modules/setup/ -> repo root is 5 levels up).
   $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
   $lockfilePath = Join-Path $repoRoot "src\lockfiles\lockfile.json"
 
-  # Get-NucleusHostKey resolves the canonical host key used to slice the shared
-  # desired-package registry.
   . (Join-Path -Path $repoRoot -ChildPath "src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1")
 
-  # Read version-pinning data from the consolidated lockfile.
   $lockfile = @{}
   if (Test-Path $lockfilePath) {
     $lockfile = Get-Content $lockfilePath -Raw | ConvertFrom-Json
   }
   $scoopVersions = if ($lockfile -and $lockfile.scoop) { $lockfile.scoop } else { @{} }
 
-  # Declarative desired-state list from the shared registry (single source of
-  # truth: src/modules/packages/desired.json).  Only packages absent from
-  # WinGet are managed here.
+  # Only packages absent from WinGet are managed here.
   $desiredPath = Join-Path $repoRoot "src\modules\packages\desired.json"
   if (-not (Test-Path -LiteralPath $desiredPath)) {
     Write-NucleusError -CommandName 'Invoke-ScoopSetup' "desired package registry not found at '$desiredPath'"
@@ -89,10 +53,8 @@ function Invoke-ScoopSetup {
   })
   $desiredNames = @($desiredPackages | ForEach-Object { $_.name })
 
-  # Prepend the Scoop shims directory so 'scoop' is resolvable in this session.
-  # DSC runs in a child process; PATH additions from that process do not
-  # propagate back to the parent shell, so the shims path must be added
-  # explicitly here after the DSC step completes.
+  # DSC runs in a child process, so its PATH additions never reach this
+  # session; the shims path has to be added here.
   Add-NucleusPathEntry -Path (Get-NucleusScoopShimsDir)
 
   if (-not (Test-Path (Join-Path (Get-NucleusScoopShimsDir) "scoop.cmd"))) {
@@ -100,15 +62,11 @@ function Invoke-ScoopSetup {
     return
   }
 
-  # Ensure required buckets are registered.  'main' is the default bucket but
-  # may be absent on a fresh Scoop install depending on the version.  'extras'
-  # hosts qemu and is registered as a standard supplement bucket.
-  # 'nucleus' is a local custom bucket for repo-owned manifests (e.g. NSIS
-  # installers for tools absent from public buckets like sigrok-cli).
+  # 'main' is the default bucket but can be absent on a fresh install;
+  # 'extras' hosts qemu.
   foreach ($bucket in @('extras', 'main')) {
-    # -ErrorAction SilentlyContinue is intentional: 'scoop bucket list' may
-    # exit non-zero when no buckets are registered yet (fresh install).
-    # The result string is checked immediately by the -notmatch guard.
+    # 'scoop bucket list' exits non-zero when nothing is registered yet, and
+    # the -notmatch guard below is the real check.
     $existing = scoop bucket list 2>&1
     if ($existing -notmatch "(?m)^$bucket\b") {
       Write-NucleusInfo -CommandName 'scoop' "adding bucket '$bucket'"
@@ -120,8 +78,8 @@ function Invoke-ScoopSetup {
     }
   }
 
-  # Provision the nucleus custom bucket: copy repo-owned manifests into
-  # ~/.scoop/buckets/nucleus/ so Scoop can resolve nucleus/<package> installs.
+  # Copy repo-owned manifests into ~/.scoop/buckets/nucleus/ so Scoop can
+  # resolve nucleus/<package> installs.
   $manifestsSource = Join-Path $repoRoot "src\modules\scoop-manifests"
   if (Test-Path -LiteralPath $manifestsSource) {
     $manifestFiles = @(Get-ChildItem -Path $manifestsSource -Filter '*.json' -File)
@@ -138,10 +96,7 @@ function Invoke-ScoopSetup {
     }
   }
 
-  # Get actually installed Scoop apps by reading the apps directory (zap-style:
-  # remove any installed app absent from the desired list, regardless of prior
-  # managed state).  Scoop installs each app to ~\scoop\apps\<name>\, so
-  # directory names are the authoritative installed set.
+  # ~\scoop\apps\<name>\ directory names are the authoritative installed set.
   $scoopAppsDir = Join-Path $env:USERPROFILE "scoop\apps"
   $installedApps = @()
   if (Test-Path $scoopAppsDir) {
@@ -151,22 +106,16 @@ function Invoke-ScoopSetup {
     )
   }
 
-  # Parse installed versions from `scoop list` for version reconciliation.
   $installedVersions = @{}
   $scoopListOutput = @(scoop list 2>&1)
   $scoopListOutput | Select-String "^'(.+)' \((\S+)\)" | ForEach-Object {
     $installedVersions[$_.Matches.Groups[1].Value] = $_.Matches.Groups[2].Value
   }
 
-  # Apps installed but not desired: zap-style removal.
-  # Mirrors homebrew cleanup = "zap": removes anything installed but absent
-  # from the declared desired set, regardless of how it was installed.
+  # Removing an app absent from the declared set, however it got installed.
   $toRemove = @($installedApps | Where-Object { $desiredNames -notcontains $_ })
 
-  # Desired apps not yet installed OR installed at a version different from
-  # the lockfile pin (version-aware reconciliation).  Scoop writes a
-  # <name>.cmd shim for most apps; fall back to <name>.exe for apps (like
-  # gopass) that ship a native binary shim.
+  # Missing, or installed at a version other than the lockfile pin.
   $toInstall = @($desiredPackages | Where-Object {
     $pkgName = $_.name
     $isInstalled = $installedApps -contains $pkgName
@@ -177,7 +126,6 @@ function Invoke-ScoopSetup {
     $installedVersion -ne $expectedVersion
   })
 
-  # Prune packages removed from the desired list.
   foreach ($pkg in $toRemove) {
     Write-NucleusInfo -CommandName 'scoop' "uninstalling removed package '$pkg'"
     scoop uninstall $pkg
@@ -188,7 +136,6 @@ function Invoke-ScoopSetup {
     Write-NucleusInfo -CommandName 'scoop' "'$pkg' uninstalled"
   }
 
-  # Install additions with version pinning from lockfile.
   foreach ($entry in $toInstall) {
     $pkgName = $entry.name
     $pkgBucket = $entry.bucket
@@ -211,7 +158,7 @@ function Invoke-ScoopSetup {
     Write-NucleusInfo -CommandName 'scoop' "'$pkgName' installed successfully"
   }
 
-  # Hold all managed packages at their locked versions (prevents accidental upgrades).
+  # Hold every managed package at its locked version.
   foreach ($pkgName in $desiredNames) {
     scoop hold $pkgName 2>&1 > $null
   }
