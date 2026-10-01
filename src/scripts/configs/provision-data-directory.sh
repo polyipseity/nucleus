@@ -1,24 +1,10 @@
+#!/usr/bin/env bash
 # shellcheck shell=bash
-# src/scripts/configs/provision-data-directory.sh — Centralized ~/data provisioning.
-#
-# Ensures ~/data exists and creates folders, files, and symlinks as specified
-# in a JSON manifest. Must NEVER delete anything. If a target already exists
-# (file, dir, or symlink), it is left untouched.
+# provision-data-directory.sh - create ~/data entries from a JSON manifest.
+# Never deletes: an existing file, dir, or symlink is left alone.
 #
 # Usage: provision-data-directory.sh <homedir> <manifest-json> <jq-bin>
-#   homedir:       user's home directory (e.g. /Users/alice)
-#   manifest-json: JSON array of operations (see below)
-#   jq-bin:        path to jq binary
-#
-# Manifest format:
-#   [{"op": "dir", "path": "hermes-agent"},
-#    {"op": "file", "path": "hermes-agent/SOUL.md", "content": "..."},
-#    {"op": "symlink", "path": "/Users/alice/.hermes/SOUL.md", "target": "/Users/alice/data/hermes-agent/SOUL.md"}]
-#
-# Operations:
-#   dir     — mkdir -p <homedir>/data/<path> (no-op if exists)
-#   file    — create <homedir>/data/<path> with content (no-op if exists)
-#   symlink — create symlink at <path> pointing to <target> (no-op if exists)
+# Ops: dir, file, symlink.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -30,10 +16,8 @@ _manifest="$2"
 _jq_bin="${3:-jq}"
 _data_dir="${_homedir}/data"
 
-# Ensure ~/data exists.
 mkdir -p "$_data_dir"
 
-# Process each manifest entry.
 _count=$(echo "$_manifest" | "$_jq_bin" 'length')
 _i=0
 while [ "$_i" -lt "$_count" ]; do
