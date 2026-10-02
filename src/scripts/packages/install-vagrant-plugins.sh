@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Register the store-provided Vagrant provider plugins in VAGRANT_HOME and verify
-# they load. Args: <vagrant-binary> <jq-binary> <vagrant-home> <registry-json>,
-# where registry-json is Vagrant's own plugins.json shape:
-# {"version": "1", "installed": {"<plugin>": {...}}}.
+# Write the managed Vagrant provider registry into VAGRANT_HOME and verify that
+# Vagrant reports every provider at its pinned version.
 #
-# The gems live in the Nix store and reach Vagrant through GEM_PATH, so the only
-# thing to converge is the registry Vagrant reads at startup. A plugin missing
-# from `vagrant plugin list` means its gem did not resolve, which fails here
-# rather than surfacing as a missing provider during the first `vagrant up`.
+# Args: <vagrant-binary> <jq-binary> <vagrant-home> <registry-json>, where the
+# registry is Vagrant's own plugins.json shape:
+#   {"version": "1", "installed": {"<plugin>": {ruby_version, gem_version, ...}}}
+#
+# The gems themselves come from the Nix store through the wrapper's GEM_PATH, so
+# nothing is fetched here. A provider Vagrant cannot resolve is reported here
+# instead of surfacing later as an unusable provider during `vagrant up`.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -23,42 +24,42 @@ _ivp_registry_json="$4"
 
 _ivp_registry="$(mktemp)"
 # shellcheck disable=SC2016 # reason: jq program body must not be expanded by shell
-printf '%s\n' "$_ivp_registry_json" | "$_ivp_jq_bin" -S -c '.installed' >"$_ivp_registry" ||
-  die -l vagrant "could not parse the managed Vagrant plugin registry"
+printf '%s\n' "$_ivp_registry_json" |
+  "$_ivp_jq_bin" -S -c 'if (.installed // {} | length) == 0 then error("no providers declared") else .installed end' \
+    >"$_ivp_registry" || die -l vagrant "the managed Vagrant provider registry declares no providers"
 
-_ivp_wanted="$(
-  "$_ivp_jq_bin" -r 'keys[]' <"$_ivp_registry" | sort | tr '\n' ' '
-)"
+_ivp_wanted="$("$_ivp_jq_bin" -r 'to_entries[] | "\(.key) \(.value.gem_version)"' <"$_ivp_registry")"
 
 mkdir -p "$_ivp_home"
 _ivp_state_file="$_ivp_home/plugins.json"
 
-# WHY compare key sets rather than bytes: Vagrant rewrites this file whenever a
-# plugin command runs, so formatting is not ours to assert. A plugin that is not
-# managed here must not be silently dropped from the registry.
+# WHY compare key sets and not bytes: Vagrant rewrites this file whenever a
+# plugin command runs, so its formatting is not ours to assert. A provider that
+# is not managed here must not be dropped from the registry.
 if [ -f "$_ivp_state_file" ]; then
   _ivp_present="$(
-    "$_ivp_jq_bin" -S -r '.installed // {} | keys[]' <"$_ivp_state_file" 2>/dev/null |
-      sort | tr '\n' ' '
+    "$_ivp_jq_bin" -S -r '.installed // {} | keys | join(" ")' <"$_ivp_state_file" 2>/dev/null
   )"
-  [ "$_ivp_present" = "$_ivp_wanted" ] ||
-    die -l vagrant "$_ivp_state_file registers unmanaged plugins [$_ivp_present]; remove them with 'vagrant plugin uninstall' before applying"
+  _ivp_managed="$("$_ivp_jq_bin" -r 'keys | join(" ")' <"$_ivp_registry")"
+  [ "$_ivp_present" = "$_ivp_managed" ] ||
+    die -l vagrant "$_ivp_state_file registers providers this repo does not manage [$_ivp_present]; remove them with 'vagrant plugin uninstall' before applying"
 fi
 
 # shellcheck disable=SC2016 # reason: jq program body must not be expanded by shell
 printf '%s\n' "$_ivp_registry_json" |
-  "$_ivp_jq_bin" -S -c '{version: "1", installed: .installed}' >"$_ivp_state_file"
+  "$_ivp_jq_bin" -S -c '.' >"$_ivp_state_file"
 
-_ivp_loaded="$(
+_ivp_installed="$(
   VAGRANT_HOME="$_ivp_home" "$_ivp_vagrant_bin" plugin list 2>/dev/null |
-    awk 'NR > 1 { print $1 }' | sort | tr '\n' ' '
+    awk '$1 ~ /^[A-Za-z][A-Za-z0-9_-]*$/ && $2 ~ /^\(/ { gsub(/[(),]/, "", $2); print $1, $2 }' |
+    tr '\n' ' '
 )"
 
-while IFS= read -r _ivp_name; do
-  case " $_ivp_loaded " in
-  *" $_ivp_name "*) ;;
-  *) die -l vagrant "the $_ivp_name provider did not load; vagrant reports: $_ivp_loaded" ;;
+while IFS=' ' read -r _ivp_name _ivp_version; do
+  case " $_ivp_installed " in
+  *" $_ivp_name $_ivp_version "*) ;;
+  *) die -l vagrant "provider $_ivp_name $_ivp_version did not load; vagrant reports: ${_ivp_installed:-none}" ;;
   esac
-done < <("$_ivp_jq_bin" -r 'keys[]' <"$_ivp_registry")
+done <<<"$_ivp_wanted"
 
-nuc_done "Vagrant providers: $_ivp_wanted"
+nuc_done "Vagrant providers: $("$_ivp_jq_bin" -r 'keys | join(", ")' <"$_ivp_registry")"

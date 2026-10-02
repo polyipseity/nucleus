@@ -32,6 +32,8 @@ let
         ruby_version = ruby_3_4.version;
         vagrant_version = vagrant.version;
         gem_version = plugin.version;
+        # Bundler resolves this exact version from GEM_PATH during init.
+        installed_gem_version = plugin.version;
         require = "";
         sources = [ ];
       })
@@ -71,6 +73,11 @@ let
       installPhase = ''
         runHook preInstall
         gem build ${name}.gemspec -o ${name}.gem
+        # The built gem is kept so `vagrant plugin install` can consume it from
+        # the store: Vagrant writes its own Bundler solution file only when it
+        # performs the install, so a hand-written plugins.json is not enough.
+        mkdir -p "$out/gem"
+        cp ${name}.gem "$out/gem/${name}-${version}.gem"
         gem install --local --install-dir "$out/gems" --ignore-dependencies --no-document ${name}.gem
         runHook postInstall
       '';
@@ -115,7 +122,13 @@ let
     else
       [ qemuPlugin ];
 
-  gemPaths = map (p: "${p}/gems") plugins;
+  pluginGemPaths = map (p: "${p}/gems") plugins;
+
+  # Vagrant's own gems come last so a plugin can never shadow the runtime.
+  fullGemPaths = pluginGemPaths ++ [
+    "${vagrant}/lib/ruby/gems/${ruby_3_4.version.libDir}"
+    "${vagrant.passthru.deps}/lib/ruby/gems/${ruby_3_4.version.libDir}"
+  ];
 
   # bsdtar extracts downloaded boxes; qemu-img and virt-sysprep back
   # `vagrant package`, matching the path additions nixpkgs bakes into its wrapper.
@@ -125,28 +138,45 @@ let
       qemu
     ]
   );
+  # A plain script, not writeShellScriptBin, because Vagrant shells out to curl
+  # and ssh from the ambient PATH that writeShellScriptBin would replace.
+  #
+  # WHY Ruby is invoked directly: the nixpkgs wrapper exports GEM_PATH itself, so
+  # a GEM_PATH set outside it is discarded. Owning GEM_PATH is what puts the
+  # store gems in front of Vagrant's Bundler.
+  wrapperBody = ''
+    export GEM_PATH=${lib.escapeShellArg (builtins.concatStringsSep ":" fullGemPaths)}
+    export PATH=${lib.escapeShellArg "${runtimeInputs}:"}$PATH
+    exec ${vagrant.passthru.ruby}/bin/ruby \
+      ${vagrant}/lib/ruby/gems/${ruby_3_4.version.libDir}/gems/vagrant-${vagrant.version}/bin/vagrant "$@"
+  '';
+
+  wrapperScript = pkgs.writeShellScript "vagrant-wrapper" wrapperBody;
+
+  # The deployed binary. One package, because a second `vagrant` on PATH would
+  # collide in the managed package environment.
+  package = pkgs.runCommand "vagrant-with-plugins" { } ''
+    mkdir -p "$out/bin"
+    cp ${wrapperScript} "$out/bin/vagrant"
+    chmod +x "$out/bin/vagrant"
+  '';
+
 in
 {
-  inherit plugins;
+  inherit plugins package wrapperBody;
 
-  gemPaths = gemPaths ++ [ "${vagrant.passthru.deps}/lib/ruby/gems/${ruby_3_4.version.libDir}" ];
+  gemPaths = fullGemPaths;
 
   registry = {
     version = "1";
     installed = registryEntries;
   };
 
+  # Store paths of the installed plugin gem directories, in registry order.
+  gemFiles = pluginGemPaths;
+
   desired = map (p: {
     inherit (p.passthru) pluginName;
     inherit (p) version;
   }) plugins;
-
-  # One `vagrant` binary. Prepending the plugin gem dirs to GEM_PATH is what
-  # makes Vagrant's Bundler see them, and QEMU has to be on PATH for the QEMU
-  # provider to find its binaries.
-  package = pkgs.writeShellScriptBin "vagrant" ''
-    export GEM_PATH=${lib.escapeShellArg (builtins.concatStringsSep ":" gemPaths)}
-    export PATH=${lib.escapeShellArg runtimeInputs}":$PATH"
-    exec ${vagrant}/bin/vagrant "$@"
-  '';
 }
