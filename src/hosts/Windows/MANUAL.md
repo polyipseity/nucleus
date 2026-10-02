@@ -11,6 +11,10 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 5. Picard: sign in and add the AcoustID API key under Options.
 6. Starship is active in every shell and needs a Nerd Font. Apply installs `DEVCOM.JetBrainsMonoNerdFont`, so select it as the terminal font.
 
+## virtualization
+
+1. Apply enables the Hyper-V optional feature, then reboot before running `vagrant up --provider hyperv`, because apply cannot restart the machine itself. Hyper-V is unavailable on Windows Home, so a Home host fails that step with a DISM "feature name is unknown" error and needs an upgrade to Pro.
+
 ## secrets and remotes
 
 1. Generate `rclone_config_pass`: `openssl rand -hex 64` into `rclone_config_pass` in `src/secrets/users/<username>.yml`, commit, re-run `nucleus-apply`. Delete `%USERPROFILE%\.config\rclone\rclone.conf` first when unencrypted remotes exist.

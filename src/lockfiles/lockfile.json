@@ -299,6 +299,7 @@
     "Google.ChromeRemoteDesktopHost": "149.0.7827.18",
     "Gyan.FFmpeg": "8.1.1",
     "Hashicorp.Packer": "1.16.0",
+    "Hashicorp.Vagrant": "2.4.9",
     "IJHack.QtPass": "1.7.0",
     "ImageMagick.ImageMagick": "7.1.2.25",
     "j178.Prek": "0.4.13",

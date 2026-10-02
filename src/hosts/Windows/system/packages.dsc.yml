@@ -59,6 +59,15 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: >-
+          Ensure HashiCorp Vagrant is installed for VM development environments,
+          cross-host parity with pkgs.vagrant on MacBook and NixOS.
+      settings:
+        id: Hashicorp.Vagrant
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure uv is installed for cross-host Python workflow parity with macOS and NixOS
       settings:
         id: astral-sh.uv

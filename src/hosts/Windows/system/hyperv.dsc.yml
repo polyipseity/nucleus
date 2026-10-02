@@ -1,0 +1,15 @@
+---
+# WinGet DSC v3 - Hyper-V optional feature
+$schema: https://aka.ms/configuration-dsc-schema/0.2
+properties:
+  configurationVersion: 0.2.0
+  resources:
+    - resource: OpenDsc.Windows/OptionalFeature
+      directives:
+        description: >-
+          Enable the Hyper-V optional feature so Vagrant's built-in Hyper-V
+          provider has a hypervisor; apply cannot reboot, so the restart is
+          recorded in MANUAL.md.
+      settings:
+        name: Microsoft-Hyper-V-All
+        _exist: true
