@@ -29,6 +29,7 @@
     "Google.PlatformTools",
     "Gyan.FFmpeg",
     "Hashicorp.Packer",
+    "Hashicorp.Vagrant",
     "IJHack.QtPass",
     "ImageMagick.ImageMagick",
     "Inter.Inter",

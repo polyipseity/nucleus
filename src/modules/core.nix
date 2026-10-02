@@ -930,6 +930,16 @@ let
       nixpkgs = "uv";
       winget = "astral-sh.uv";
     };
+    # WHY no Homebrew key: the cask installs a signed pkg under /opt/vagrant,
+    # which collides with the nixpkgs build mkPkgs already allows as unfree.
+    vagrant = {
+      category = "cli";
+      nixpkgs = "vagrant";
+      # The provider plugins are store gems, so the deployed binary is the
+      # wrapper from lib/vagrant-plugins.nix instead of pkgs.vagrant itself.
+      nixpkgsPackage = vagrantPlugins.package;
+      winget = "Hashicorp.Vagrant";
+    };
     vlc = {
       category = "gui";
       homebrew = {
@@ -1032,6 +1042,9 @@ let
 
   packageConfig = config.nucleus.packages.selection;
   managedPackageNames = builtins.attrNames managedPackages;
+
+  # Provider plugins for Vagrant, pinned by hash and resolved per platform.
+  vagrantPlugins = import ./lib/vagrant-plugins.nix { inherit lib pkgs; };
 
   # WHY: `enable` takes hostName explicitly, so the Windows set resolves anywhere Nix runs.
   managedPackageEnabledForHost =

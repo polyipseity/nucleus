@@ -217,6 +217,7 @@ in
     ./shell
     ./shell
     ./terminal-activations.nix
+    ./vagrant.nix
     ./voice-transcription.nix
     ./wallpapers.nix
   ];

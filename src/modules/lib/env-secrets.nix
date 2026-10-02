@@ -316,6 +316,16 @@ let
       why = "gpg-agent SSH socket (macOS). Default gpgconf location, serving the SSH protocol because src/modules/posix/gnupg.nix sets enableSSHSupport.";
     };
 
+    VAGRANT_HOME = {
+      values = {
+        MacBook = "${resolvedHomeDirectory}/Library/Application Support/nucleus/state/vagrant";
+        NixOS = "${resolvedHomeDirectory}/.local/share/nucleus/state/vagrant";
+        Windows = "%LOCALAPPDATA%\\nucleus\\state\\vagrant";
+      };
+      userSpecific = true;
+      why = "Vagrant keeps downloaded boxes, data directories, and its plugin registry under this directory. Managed so those files land in a nucleus root instead of the home directory.";
+    };
+
     HOME = {
       values = {
         Windows = "%USERPROFILE%";
