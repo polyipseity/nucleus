@@ -36,6 +36,8 @@ in
     "${activationBundle}/src/scripts/packages/install-vagrant-plugins.sh" \
       "${plugins.package}/bin/vagrant" \
       "${pkgs.jq}/bin/jq" \
+      "${pkgs.gawk}/bin/awk" \
+      "${pkgs.coreutils}/bin/tr" \
       "${vagrantHome}" \
       '${builtins.toJSON plugins.registry}'
   '';
