@@ -75,7 +75,7 @@ jobs:
       NUCLEUS_VERBOSE: false
     steps:
       - name: Checkout repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
 
@@ -88,7 +88,7 @@ jobs:
       # Source: https://github.com/DeterminateSystems/nix-installer-action/pull/236
       - name: Install Nix (POSIX)
         if: runner.os != 'Windows'
-        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25  # v22
+        uses: DeterminateSystems/nix-installer-action@3138316df39ed29be04236d7ffc686fa525866aa  # v23
         with:
           determinate: false
 
@@ -98,11 +98,11 @@ jobs:
       # not a broken cache.
       - name: Cache Nix store (POSIX)
         if: runner.os != 'Windows'
-        uses: DeterminateSystems/magic-nix-cache-action@908b263ff629f4cc17666315b7fd3ec127c6244d  # v14 # zizmor: ignore[cache-poisoning] intentional Nix store cache on trusted CI runners
+        uses: DeterminateSystems/magic-nix-cache-action@84c0677f58dcedf3b91f8223ce36a9ea5b3c84b7  # v14 # zizmor: ignore[cache-poisoning] intentional Nix store cache on trusted CI runners
 
       - name: Check Nix flake inputs freshness (POSIX)
         if: runner.os != 'Windows'
-        uses: DeterminateSystems/flake-checker-action@a0f068d37b542f3150564fbf1164fec2d958ee11  # v12.0.0
+        uses: DeterminateSystems/flake-checker-action@786422608c7bded2bbc9741ad9f91356842bf520  # v12.0.0
 
       - name: Provision bootstrap dependencies (POSIX)
         if: runner.os != 'Windows'
