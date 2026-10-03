@@ -2,8 +2,8 @@
 # Write the managed Vagrant provider registry into VAGRANT_HOME and verify that
 # Vagrant reports every provider at its pinned version.
 #
-# Args: <vagrant-binary> <jq-binary> <vagrant-home> <registry-json>, where the
-# registry is Vagrant's own plugins.json shape:
+# Args: <vagrant-binary> <jq-binary> <gawk-binary> <tr-binary> <vagrant-home>
+#       <registry-json>, where the registry is Vagrant's own plugins.json shape:
 #   {"version": "1", "installed": {"<plugin>": {ruby_version, gem_version, ...}}}
 #
 # The gems themselves come from the Nix store through the wrapper's GEM_PATH, so
@@ -17,8 +17,12 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _ivp_vagrant_bin="$1"
 _ivp_jq_bin="$2"
-_ivp_home="$3"
-_ivp_registry_json="$4"
+# WHY store paths: activation runs with no awk or tr on PATH, and the sibling
+# scripts in this directory take their tools the same way.
+_ivp_gawk_bin="$3"
+_ivp_tr_bin="$4"
+_ivp_home="$5"
+_ivp_registry_json="$6"
 
 [ -x "$_ivp_vagrant_bin" ] || die -l vagrant "vagrant is not executable at $_ivp_vagrant_bin"
 
@@ -49,10 +53,13 @@ fi
 printf '%s\n' "$_ivp_registry_json" |
   "$_ivp_jq_bin" -S -c '.' >"$_ivp_state_file"
 
+_ivp_listing="$(VAGRANT_HOME="$_ivp_home" "$_ivp_vagrant_bin" plugin list 2>/dev/null)"
+
+# shellcheck disable=SC2016 # reason: awk program body must not be expanded by shell
 _ivp_installed="$(
-  VAGRANT_HOME="$_ivp_home" "$_ivp_vagrant_bin" plugin list 2>/dev/null |
-    awk '$1 ~ /^[A-Za-z][A-Za-z0-9_-]*$/ && $2 ~ /^\(/ { gsub(/[(),]/, "", $2); print $1, $2 }' |
-    tr '\n' ' '
+  printf '%s\n' "$_ivp_listing" |
+    "$_ivp_gawk_bin" '$1 ~ /^[A-Za-z][A-Za-z0-9_-]*$/ && $2 ~ /^\(/ { gsub(/[(),]/, "", $2); print $1, $2 }' |
+    "$_ivp_tr_bin" '\n' ' '
 )"
 
 while IFS=' ' read -r _ivp_name _ivp_version; do
