@@ -92,18 +92,27 @@ fskit_daemon_state() {
 }
 
 # WHY: killall, not launchctl kickstart, SIP refuses to kickstart this system
-# daemon (exit 150). Non-zero when no new PID appears within the bound, so the
-# caller reports the remedy instead of retrying the mount blindly.
+# daemon (exit 150). fskitd(8) is demand-start: launchd runs it for a volume
+# request and it exits when idle, so an idle daemon needs no restart and an
+# empty PID after the kill is the normal outcome. Non-zero only when the daemon
+# survives the kill and keeps its PID past the bound, so the caller reports the
+# remedy instead of retrying the mount blindly.
 fskit_restart_daemon() {
   local wait_seconds="${1:-30}"
   local pid_before pid_after ticks max_ticks kill_status=0
+
+  pid_before="$(fskit_daemon_pid)"
+  # WHY: nothing to restart: the next volume request starts the daemon, and
+  # killall on an absent process only fails (it exits 1 when nothing matches).
+  if [ -z "$pid_before" ]; then
+    return 0
+  fi
 
   if ! command -v killall >/dev/null 2>&1; then
     error "fskit: killall not found; cannot restart $FSKIT_DAEMON_LABEL"
     return 1
   fi
 
-  pid_before="$(fskit_daemon_pid)"
   if [ "$(id -u)" -eq 0 ]; then
     killall fskitd || kill_status=$?
   else
@@ -124,12 +133,15 @@ fskit_restart_daemon() {
     sleep 0.5
     ticks=$((ticks + 1))
     pid_after="$(fskit_daemon_pid)"
-    if [ -n "$pid_after" ] && [ "$pid_after" != "$pid_before" ]; then
+    # WHY: an empty PID means the daemon exited and launchd runs it again on the
+    # next volume request, a different PID means it already respawned. Only the
+    # killed PID still being there is the failure.
+    if [ -z "$pid_after" ] || [ "$pid_after" != "$pid_before" ]; then
       return 0
     fi
   done
 
-  error "fskit: $FSKIT_DAEMON_LABEL did not restart within ${wait_seconds}s; retry, or reboot"
+  error "fskit: $FSKIT_DAEMON_LABEL ignored SIGTERM and is still running after ${wait_seconds}s; run 'sudo killall -9 fskitd' as an operator, then reboot if the daemon survives"
   return 1
 }
 

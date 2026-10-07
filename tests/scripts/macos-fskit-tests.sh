@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Tests for src/scripts/lib/macos-fskit.sh, the FSKit module-state probe and the
-# kill-and-respawn repair path.
+# daemon restart path.
 #
 # The probe decides whether a mount attempt is skipped, so its contract matters
 # in both directions: a readable list must answer enabled/disabled precisely, and
 # an unreadable one must answer "unknown" rather than "disabled" (a probe failure
 # that reads as a missing module would skip a mount that could have succeeded).
-# The repair must report failure when the daemon does not come back, because the
-# caller then stops the mount instead of retrying into the same wedge.
+# The repair reports failure only when the daemon survives the kill and keeps
+# its pid past the bound, because fskitd(8) is demand-start: an idle daemon
+# needs no restart, and one that exits comes back on the next volume request.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -42,7 +43,8 @@ exit 1
 FAKE_PLUTIL
 
 # FAKE_FSKIT_PIDS: PIDs answered by successive `launchctl print` calls, the last
-# one repeating. A daemon that never respawns answers the same PID every time.
+# one repeating. A daemon that survives the kill answers the same PID every
+# time, and a "-" entry answers with no pid (the daemon exited).
 cat >"$_tmp/bin/launchctl" <<'FAKE_LAUNCHCTL'
 #!/usr/bin/env bash
 case "${1:-}" in
@@ -58,7 +60,7 @@ print)
     _pid="$_candidate"
     if [ "$_i" -ge "$_n" ]; then break; fi
   done
-  if [ -n "$_pid" ]; then printf 'pid = %s\n' "$_pid"; fi
+  if [ -n "$_pid" ] && [ "$_pid" != "-" ]; then printf 'pid = %s\n' "$_pid"; fi
   ;;
 esac
 exit 0
@@ -167,6 +169,29 @@ FAKE_FSKIT_PIDS=''
 assert_eq "an absent daemon has no pid" "" "$(fskit_daemon_pid)"
 assert_eq "an absent daemon reads as stopped" "stopped" "$(fskit_daemon_state)"
 
+# WHY: fskitd(8) is demand-start, so an idle daemon needs no restart and one
+# that exits after the kill comes back on the next volume request. Only a daemon
+# that keeps its pid past the bound survives the kill and needs the operator.
+: >"$FAKE_KILLALL_LOG"
+: >"$FAKE_FSKIT_COUNTER"
+FAKE_FSKIT_PIDS=''
+if fskit_restart_daemon 5; then
+  assert_pass "an idle daemon at entry reports success"
+else
+  assert_fail "fskit-restart-idle" "an idle daemon was reported as a failed restart"
+fi
+assert_eq "the idle restart never calls killall" "" "$(cat "$FAKE_KILLALL_LOG")"
+
+: >"$FAKE_KILLALL_LOG"
+: >"$FAKE_FSKIT_COUNTER"
+FAKE_FSKIT_PIDS='100 -'
+if fskit_restart_daemon 5; then
+  assert_pass "a daemon that exits after the kill reports success"
+else
+  assert_fail "fskit-restart-exit" "an exited daemon was reported as a failed restart"
+fi
+assert_mentions "the exit restart" "$(cat "$FAKE_KILLALL_LOG")" "fskitd"
+
 : >"$FAKE_KILLALL_LOG"
 : >"$FAKE_FSKIT_COUNTER"
 FAKE_FSKIT_PIDS='100 200'
@@ -183,9 +208,9 @@ FAKE_FSKIT_PIDS='100 100'
 if fskit_restart_daemon 1 2>"$_tmp/restart.err"; then
   assert_fail "fskit-restart-stale" "a daemon that kept its pid was reported as restarted"
 else
-  assert_pass "a daemon that never respawns reports failure"
+  assert_pass "a daemon that keeps its pid past the bound reports failure"
 fi
-assert_mentions "the failed restart" "$(cat "$_tmp/restart.err")" "did not restart"
+assert_mentions "the failed restart" "$(cat "$_tmp/restart.err")" "killall -9"
 
 : >"$FAKE_FSKIT_COUNTER"
 FAKE_FSKIT_PIDS='300 400'
@@ -226,9 +251,9 @@ assert_mentions "the disabled-module report" "$(cat "$_tmp/repair-disabled.err")
 : >"$FAKE_FSKIT_COUNTER"
 FAKE_FSKIT_PIDS='100 100'
 if fskit_repair_provider 1 2>"$_tmp/repair-fail.err"; then
-  assert_fail "fskit-repair-daemon" "a daemon that never respawned was reported as repaired"
+  assert_fail "fskit-repair-daemon" "a daemon that survived the kill was reported as repaired"
 else
-  assert_pass "a daemon that never respawns fails the repair"
+  assert_pass "a daemon that survives the kill fails the repair"
 fi
 
 finish_tests
