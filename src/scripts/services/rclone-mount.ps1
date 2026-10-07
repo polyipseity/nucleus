@@ -56,7 +56,12 @@ if ($prepareRc -eq 20) {
     #   whose stdout is captured to stdout.log, while the verbose and information streams
     #   are hidden under the default preference variables, so those would silently drop
     #   the operator's mount diagnostics.  Every Write-Host below follows this same rule.
-    Write-Output "$instance`: backend requires user action; see health record"
+    # WHY: the notice carries the class and remedy itself. Clear-HealthRecordAll at
+    #   apply deletes every health record, so a line pointing at the record names
+    #   evidence that is gone by the time the log is read.
+    $class = Get-HealthField -Instance $instance -Field 'class'
+    $remedy = Get-HealthField -Instance $instance -Field 'remedy'
+    Write-Output "$instance`: backend requires user action (class=$class): $remedy"
     exit 0
 }
 

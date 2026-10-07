@@ -270,6 +270,25 @@ Describe 'rclone-mount.ps1 retry loop' {
     Remove-Item -LiteralPath $script:CaseRoot -Recurse -Force -ErrorAction Ignore
   }
 
+  Context 'prepare returns 20' {
+
+    It 'carries the class and remedy in the notice' {
+      # Clear-HealthRecordAll at apply deletes every record, so a notice that only
+      # points at the record names evidence the operator cannot reach. The line
+      # has to carry the diagnosis itself.
+      $script:StandIn = Save-StandInRclone -Stderr 'not reached'
+      $result = Invoke-MountAttempt -Extra @{
+        NUCLEUS_MOUNT_ATTEMPTS       = '1'
+        NUCLEUS_TEST_PREPARE_BLOCKED = '1'
+      }
+
+      $result.ExitCode | Should -Be 0
+      $result.Record.state | Should -Be 'blocked'
+      $result.Output | Should -Match 'class=provider-refusal'
+      $result.Output | Should -Match ([regex]::Escape('install WinFsp via winget install WinFsp.WinFsp'))
+    }
+  }
+
   Context 'attempts exhausted' {
 
     It 'blocks with the last attempt own class rather than a fixed mount-failed' {

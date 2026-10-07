@@ -85,7 +85,13 @@ _cm_main() {
   local prepare_rc=0
   backend_prepare "$instance" || prepare_rc=$?
   if [ "$prepare_rc" -eq 20 ]; then
-    notice -l cloud-drives "$instance: backend requires user action; see health record"
+    # WHY: the notice carries the class and remedy itself. The apply-time re-arm
+    #   (reset-service-health) deletes every health record, so a line pointing at
+    #   the record names evidence that is gone by the time the log is read.
+    local prepare_class prepare_remedy
+    prepare_class="$(svc_health_get "$instance" "class")"
+    prepare_remedy="$(svc_health_get "$instance" "remedy")"
+    notice -l cloud-drives "$instance: backend requires user action (class=$prepare_class): $prepare_remedy"
     exit 0
   fi
 

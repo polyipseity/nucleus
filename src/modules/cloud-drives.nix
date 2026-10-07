@@ -400,12 +400,19 @@ in
 
       # WHY: nucleus-apply provisions the system.  A blocked marker from a
       #   previous failed mount attempt is stale after apply re-registers the
-      #   extension and restarts agents.  Clearing it is normal provisioning
+      #   extension and restarts agents.  Clearing it is normal provisioning.
+      #   entryBetween lists the runs-before names first: the wipe runs before
+      #   setupLaunchAgents, so the records the agent runs started there write
+      #   survive it, and after cloud-drives-pre-stop, where a stopping runner can
+      #   write the last-exit record the wipe then clears.  A named entry that
+      #   does not exist forms no edge, so the macOS-only names are safe on NixOS.
 
       {
-        home.activation.reset-service-health = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-          "${activationBundle}/src/scripts/services/reset-service-health.sh"
-        '';
+        home.activation.reset-service-health =
+          lib.hm.dag.entryBetween [ "setupLaunchAgents" ] [ "linkGeneration" "cloud-drives-pre-stop" ]
+            ''
+              "${activationBundle}/src/scripts/services/reset-service-health.sh"
+            '';
       }
 
       # This module is imported into the Home Manager config, so use HM-native

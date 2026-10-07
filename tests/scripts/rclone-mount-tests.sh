@@ -370,7 +370,6 @@ test_prepare_blocks_returns_20() {
   FAKE_REMOTES="OneDrive:"
   export FAKE_CALLS FAKE_REMOTES
   install_mocks
-  # Override MOCK_BACKEND_PREPARE to simulate provider-version failure.
   MOCK_BACKEND_PREPARE() {
     mkdir -p "$NUCLEUS_USER_ROOT/state/service-stats"
     printf '{"state":"blocked","class":"provider-refusal","remedy":"re-enable macFUSE","boot":"test","reported":false,"attempts":0,"lastSuccess":0,"restarts":[],"generation":null,"lastExit":0}' \
@@ -380,12 +379,25 @@ test_prepare_blocks_returns_20() {
   export -f MOCK_BACKEND_PREPARE
 
   local rc=0
-  run_main 2>/dev/null || rc=$?
+  # stdout is captured so the notice can be asserted: the apply-time re-arm
+  # deletes the health record, so the log line is the only place the class and
+  # remedy survive.
+  run_main >"$home/out" 2>/dev/null || rc=$?
 
   if [ "$rc" -eq 0 ] && [ "$(health_field state)" = "blocked" ]; then
     assert_pass "backend_prepare returning 20 exits 0 with blocked record"
   else
     assert_fail "startup-prepare-block" "rc=$rc state=$(health_field state)"
+  fi
+  if grep -qF 'class=provider-refusal' "$home/out"; then
+    assert_pass "the prepare-block notice names the class the record carries"
+  else
+    assert_fail "prepare-block-notice-class" "out='$(cat "$home/out")'"
+  fi
+  if grep -qF 're-enable macFUSE' "$home/out"; then
+    assert_pass "the prepare-block notice carries the remedy text"
+  else
+    assert_fail "prepare-block-notice-remedy" "out='$(cat "$home/out")'"
   fi
   rm -rf "$home" "$bin"
 
