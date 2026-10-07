@@ -6,10 +6,10 @@
 # system extension not found"/"not enabled" (macFUSE status 3/4) or "mount(8)
 # returned 69" while the drive is simply missing, and the only repair is the
 # FSKit daemon restart. The regressions this guards: repairing a host with no
-# FSKit provider, starting mounts after a failed provider repair, unmounting a
-# mount that is already healthy (the remount is what wedges FSKit), reporting
-# success for a mount that never came back, and leaving the blocked marker
-# behind after a successful repair.
+# FSKit provider, leaving the mounts untouched after a failed provider repair,
+# unmounting a mount that is already healthy (the remount is what wedges FSKit),
+# reporting success for a mount that never came back, and leaving the blocked
+# marker behind after a successful repair.
 # ref: https://github.com/macfuse/macfuse/issues/1132
 set -euo pipefail
 
@@ -359,7 +359,7 @@ mark_blocked() {
   svc_health_set_blocked "$1" "fskit-provider" "run sudo killall fskitd"
 }
 
-section "1" "host and provider gates"
+section "1" "host gate"
 
 reset_world local.cloud-mount.OneDrive
 FAKE_UNAME_S=Linux
@@ -368,13 +368,6 @@ assert_eq "a non-macOS host is rejected" "1" "$(run_repair)"
 assert_mentions "the rejection" "$(cat "$_out")" "FSKit provider"
 assert_mentions "the rejection names the host" "$(cat "$_out")" "NixOS"
 assert_untouched "a rejected host" local.cloud-mount.OneDrive
-
-reset_world local.cloud-mount.OneDrive
-FAKE_KILLALL_STATUS=1
-export FAKE_KILLALL_STATUS
-assert_eq "a failed provider repair fails the command" "1" "$(run_repair)"
-assert_mentions "the failed provider repair" "$(cat "$_out")" "killall fskitd"
-assert_untouched "a failed provider repair" local.cloud-mount.OneDrive
 
 section "2" "repair brings the mounts back"
 
@@ -572,5 +565,43 @@ if svc_health_is_blocked local.cloud-mount.OneDrive; then
 else
   assert_pass "a confirmable mount clears its blocked record"
 fi
+
+section "10" "a failed provider repair still reaches the mounts"
+
+# WHY: the provider step is a repair attempt, not a precondition. It failed on a
+#   healthy machine while its wait loop misread a demand-start daemon, and the
+#   mounts were never given their restarts. The warning names the failure, and
+#   from here the mount loop decides the exit like any other run.
+reset_world local.cloud-mount.OneDrive
+FAKE_KILLALL_STATUS=1
+FAKE_ATTACH_AFTER_KICKS=2
+export FAKE_KILLALL_STATUS FAKE_ATTACH_AFTER_KICKS
+assert_eq "a mount that comes up after the relaunch still exits 0" "0" "$(run_repair OneDrive --timeout 40)"
+assert_mentions "the provider failure is warned about" "$(cat "$_out")" "warning: the FSKit provider could not be repaired"
+assert_mentions "the warning names the mount context" "$(cat "$_out")" "cloud mount(s)"
+assert_mentions "the mount comes back after the relaunch" "$(cat "$_out")" "mounted: OneDrive"
+assert_eq "the repair relaunched the agent" "2" "$(grep -c '^kickstart local.cloud-mount.OneDrive$' "$FAKE_ACTIONS")"
+FAKE_ATTACH_AFTER_KICKS=""
+export FAKE_ATTACH_AFTER_KICKS
+
+reset_world local.cloud-mount.OneDrive
+FAKE_KILLALL_STATUS=1
+FAKE_NO_MOUNT_ON_KICKSTART=1
+export FAKE_KILLALL_STATUS FAKE_NO_MOUNT_ON_KICKSTART
+assert_eq "a mount that stays down still fails the command" "1" "$(run_repair OneDrive --timeout 2)"
+assert_mentions "the provider failure is warned about" "$(cat "$_out")" "warning: the FSKit provider could not be repaired"
+assert_mentions "an unrecovered mount is still reported" "$(cat "$_out")" "not mounted: OneDrive"
+assert_mentions "the failure summary is kept" "$(cat "$_out")" "repair finished with 1 failure(s)"
+assert_mentions "the failure summary keeps the remedy" "$(cat "$_out")" "run 'sudo killall fskitd'"
+unset FAKE_NO_MOUNT_ON_KICKSTART
+
+# WHY: the control. A provider repair that succeeds must not warn, or the
+#   warning becomes routine noise and stops naming the failure.
+reset_world local.cloud-mount.OneDrive
+assert_eq "a successful provider repair exits 0 without the warning" "0" "$(run_repair OneDrive)"
+assert_mentions "a successful provider repair mounts the drive" "$(cat "$_out")" "mounted: OneDrive"
+# check-suppress:suppression_doc: grep exits 1 on a zero match count, which is the passing case here
+assert_eq "a successful provider repair carries no provider warning" "0" \
+  "$(grep -c 'the FSKit provider could not be repaired' "$_out" || true)"
 
 finish_tests

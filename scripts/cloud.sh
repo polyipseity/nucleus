@@ -1287,8 +1287,10 @@ do_repair() {
 
   say "restarting the macOS FSKit provider (macFUSE file-system extension)..."
   if ! fskit_repair_provider "$timeout"; then
-    error "the FSKit provider could not be repaired; no mount was restarted"
-    exit 1
+    # WHY: a failed provider repair does not prove the mounts are unrecoverable,
+    #   so they still get their restarts and the exit reports their outcome
+    #   instead of the command stopping before any of them was tried.
+    warn "the FSKit provider could not be repaired; repair continues with the ${#rows[@]} cloud mount(s), restarting and verifying each"
   fi
 
   # WHY: FSKit needs a few seconds to re-register the macFUSE module after
