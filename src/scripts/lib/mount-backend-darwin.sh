@@ -111,24 +111,57 @@ _macfuse_version_gte() {
   return 0
 }
 
+# WHY a helper: the two candidates are fixed macOS install locations, and the
+# gate tests override this to exercise the probe on a machine with no macFUSE
+# on disk.
+macfuse_cli_bin() {
+  local candidate
+  for candidate in \
+    "/Library/Filesystems/macfuse.fs/Contents/Resources/macfuse.app/Contents/MacOS/macfuse" \
+    "/opt/homebrew/bin/macfuse"; do
+    if [ -x "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# WHY this plist and not the sibling Resources/macfuse.app one: only here does
+# CFBundleShortVersionString carry the installed macFUSE package version. The
+# inner plist reports 1.0, the CLI wrapper's own bundle version, and a gate
+# reading it would block every install as too old.
+macfuse_info_plist() {
+  printf '%s\n' "/Library/Filesystems/macfuse.fs/Contents/Info.plist"
+}
+
 # The only place that registers/re-registers the filesystem extension.
 # Args: $1 instance key. Returns 20 for user action required.
 backend_prepare() {
   local instance="$1"
+  local not_installed="macFUSE not installed; install via 'brew install --cask macfuse@dev'"
 
-  local macfuse_bin="/Library/Filesystems/macfuse.fs/Contents/Resources/macfuse.app/Contents/MacOS/macfuse"
-  if [ ! -x "$macfuse_bin" ]; then
-    macfuse_bin="/opt/homebrew/bin/macfuse"
-    if [ ! -x "$macfuse_bin" ]; then
-      svc_health_set_blocked "$instance" "provider-version" "macFUSE not installed; install via 'brew install --cask macfuse@dev'"
-      return 20
-    fi
+  if ! macfuse_cli_bin >/dev/null; then
+    svc_health_set_blocked "$instance" "provider-version" "$not_installed"
+    return 20
   fi
 
   # WHY: FSKit volume operations need macFUSE 5.4.0+ on macOS 27. Earlier versions lack
   # the FSKit daemon interface, and this check stops a stale install failing silently.
-  local installed_version
-  installed_version=$("$macfuse_bin" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "0.0.0")
+  # WHY no fallback version for an unreadable plist: _macfuse_version_gte treats a
+  # missing component as 0, so a made-up version would report a broken install as
+  # merely old instead of pointing at the installation.
+  local plist installed_version version_pattern='^[0-9]+\.[0-9]+\.[0-9]+$'
+  plist="$(macfuse_info_plist)"
+  if [ ! -f "$plist" ]; then
+    svc_health_set_blocked "$instance" "provider-version" "$not_installed"
+    return 20
+  fi
+  if ! installed_version="$(plutil -extract CFBundleShortVersionString raw "$plist" 2>/dev/null)" ||
+    ! [[ "$installed_version" =~ $version_pattern ]]; then
+    svc_health_set_blocked "$instance" "provider-version" "macFUSE version could not be read from $plist; check the macFUSE installation"
+    return 20
+  fi
   if ! _macfuse_version_gte "$installed_version" "5.4.0"; then
     svc_health_set_blocked "$instance" "provider-version" "macFUSE $installed_version is too old for FSKit; upgrade to 5.4.0+"
     return 20

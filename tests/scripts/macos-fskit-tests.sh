@@ -123,6 +123,34 @@ rm -f "$_plist"
 assert_eq "a missing module list reads as unknown" "unknown" "$(fskit_macfuse_module_state)"
 : >"$_plist"
 
+section "macos-fskit" "extension gate"
+
+extension_gate_status() {
+  if fskit_extension_is_enabled; then
+    printf '0'
+  else
+    printf '%s' "$?"
+  fi
+}
+
+FAKE_FSKIT_LISTING='[
+  0 => "io.macfuse.app.fsmodule.macfuse"
+]'
+assert_eq "a listed module opens the extension gate" "0" "$(extension_gate_status)"
+
+FAKE_FSKIT_LISTING='[
+  0 => "com.apple.fskit.exfat"
+]'
+assert_eq "an unlisted module leaves the extension gate closed" "1" "$(extension_gate_status)"
+
+# WHY a failed probe leaves the gate closed: the probe cannot prove the
+# extension is on, so backend_prepare attempts the re-registration and its own
+# case on the module state decides the outcome.
+FAKE_FSKIT_LISTING=""
+FAKE_PLUTIL_STATUS=1
+assert_eq "a failed probe leaves the extension gate closed" "1" "$(extension_gate_status)"
+FAKE_PLUTIL_STATUS=0
+
 section "macos-fskit" "daemon state and repair"
 
 export FAKE_FSKIT_COUNTER="$_tmp/launchctl.count"

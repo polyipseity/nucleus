@@ -70,6 +70,13 @@ fskit_macfuse_module_state() {
   printf 'disabled\n'
 }
 
+# WHY `unknown` counts as not enabled: a failed probe cannot prove the
+# extension is on, so the caller re-registers and its own case on the module
+# state decides the outcome.
+fskit_extension_is_enabled() {
+  [ "$(fskit_macfuse_module_state)" = "enabled" ]
+}
+
 fskit_daemon_pid() {
   if ! command -v launchctl >/dev/null 2>&1; then return 0; fi
   # check-suppress:suppression_doc: the daemon may be absent or SIGPIPE the probe; an empty PID is the answer this reports.
