@@ -359,6 +359,14 @@ mark_blocked() {
   svc_health_set_blocked "$1" "fskit-provider" "run sudo killall fskitd"
 }
 
+# WHY: the relaunch budget default is user-facing contract text in --help. The
+#   suite always passes --timeout explicitly, so nothing else notices a silent
+#   drift back to the old value, and a drifted default re-inflates every real
+#   repair run.
+section "0" "repair help text"
+assert_mentions "the repair help names the relaunch default" \
+  "$("$CLOUD_SH" --help repair)" "(default: 15)"
+
 section "1" "host gate"
 
 reset_world local.cloud-mount.OneDrive

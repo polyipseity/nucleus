@@ -52,7 +52,7 @@ usage() {
 
   repair options:
     --timeout SECS      Seconds to keep relaunching each mount agent until its
-                        volume appears (default: 60).
+                        volume appears (default: 15).
     --repo-root PATH    Repo checkout used to find src/users/.
 
   Common options:
@@ -1144,7 +1144,7 @@ do_sync() {
 # so the one repair is the daemon restart the macFUSE maintainers prescribe.
 # ref: https://github.com/macfuse/macfuse/issues/1132
 do_repair() {
-  timeout=60
+  timeout=15
   repo_root=""
   local -a requested=() rows=()
   local tab
