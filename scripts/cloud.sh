@@ -1285,12 +1285,13 @@ do_repair() {
     exit 0
   fi
 
-  say "restarting the macOS FSKit provider (macFUSE file-system extension)..."
+  say "checking the macOS FSKit provider (macFUSE file-system extension)..."
   if ! fskit_repair_provider "$timeout"; then
     # WHY: a failed provider repair does not prove the mounts are unrecoverable,
     #   so they still get their restarts and the exit reports their outcome
     #   instead of the command stopping before any of them was tried.
-    warn "the FSKit provider could not be repaired; repair continues with the ${#rows[@]} cloud mount(s), restarting and verifying each"
+    # check-suppress:suppression_doc: warn-and-continue is the sanctioned degradation; the provider failure is reported and the mount outcomes still decide the exit
+    warn "the FSKit provider could not be repaired; repair continues with the ${#rows[@]} cloud mount(s), verifying each and restarting the ones that are down"
   fi
 
   # WHY: FSKit needs a few seconds to re-register the macFUSE module after

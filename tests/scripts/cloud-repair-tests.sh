@@ -113,8 +113,8 @@ case "${1:-}" in
 print)
   case "${2:-}" in
   system/*)
-    # The FSKit daemon: it reports a pid, and a pid different from the one before
-    # only once it was killed, which is what fskit_restart_daemon waits for.
+    # The FSKit daemon: an empty pid after the kill or a pid different from the
+    # one before counts as success; an unchanged pid at the deadline is the failure.
     if [ -f "$FAKE_DAEMON_KILLED" ]; then
       printf 'pid = %s\n' "$((2000 + $(wc -l <"$FAKE_LAUNCHCTL_LOG")))"
     else
@@ -577,8 +577,10 @@ FAKE_KILLALL_STATUS=1
 FAKE_ATTACH_AFTER_KICKS=2
 export FAKE_KILLALL_STATUS FAKE_ATTACH_AFTER_KICKS
 assert_eq "a mount that comes up after the relaunch still exits 0" "0" "$(run_repair OneDrive --timeout 40)"
+assert_mentions "the provider step is described as a check" "$(cat "$_out")" "checking the macOS FSKit provider"
 assert_mentions "the provider failure is warned about" "$(cat "$_out")" "warning: the FSKit provider could not be repaired"
 assert_mentions "the warning names the mount context" "$(cat "$_out")" "cloud mount(s)"
+assert_mentions "the warning states what repair actually does" "$(cat "$_out")" "verifying each and restarting the ones that are down"
 assert_mentions "the mount comes back after the relaunch" "$(cat "$_out")" "mounted: OneDrive"
 assert_eq "the repair relaunched the agent" "2" "$(grep -c '^kickstart local.cloud-mount.OneDrive$' "$FAKE_ACTIONS")"
 FAKE_ATTACH_AFTER_KICKS=""
@@ -592,7 +594,7 @@ assert_eq "a mount that stays down still fails the command" "1" "$(run_repair On
 assert_mentions "the provider failure is warned about" "$(cat "$_out")" "warning: the FSKit provider could not be repaired"
 assert_mentions "an unrecovered mount is still reported" "$(cat "$_out")" "not mounted: OneDrive"
 assert_mentions "the failure summary is kept" "$(cat "$_out")" "repair finished with 1 failure(s)"
-assert_mentions "the failure summary keeps the remedy" "$(cat "$_out")" "run 'sudo killall fskitd'"
+assert_mentions "the failure summary keeps the remedy" "$(sed -n '/repair finished with/,$p' "$_out")" "run 'sudo killall fskitd'"
 unset FAKE_NO_MOUNT_ON_KICKSTART
 
 # WHY: the control. A provider repair that succeeds must not warn, or the
