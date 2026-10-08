@@ -77,14 +77,36 @@ fskit_extension_is_enabled() {
   [ "$(fskit_macfuse_module_state)" = "enabled" ]
 }
 
+# WHY `unknown` and empty stay apart: a probe that cannot run (launchctl missing
+# or exiting non-zero) answers `unknown`, while a readable probe that reports no
+# daemon answers empty. fskit_restart_daemon treats the first as a repair it
+# cannot verify and the second as an idle daemon that needs no restart, so a
+# probe error must not collapse into the idle answer.
 fskit_daemon_pid() {
-  if ! command -v launchctl >/dev/null 2>&1; then return 0; fi
-  # check-suppress:suppression_doc: the daemon may be absent or SIGPIPE the probe; an empty PID is the answer this reports.
-  launchctl print "system/$FSKIT_DAEMON_LABEL" 2>/dev/null | awk '/pid =/{print $3; exit}' || true
+  local output status=0
+  if ! command -v launchctl >/dev/null 2>&1; then
+    printf 'unknown\n'
+    return 0
+  fi
+  # check-suppress:suppression_doc: the capture keeps a failing probe from killing a set -e caller and the
+  #   status is classified below rather than propagated. The empty capture now feeds fskit_restart_daemon's
+  #   idle-skip, so collapsing a probe error into empty would turn unreadable state into false success.
+  output="$(launchctl print "system/$FSKIT_DAEMON_LABEL" 2>/dev/null)" || status=$?
+  if [ "$status" -ne 0 ]; then
+    printf 'unknown\n'
+    return 0
+  fi
+  printf '%s\n' "$output" | awk '/pid =/{print $3; exit}'
 }
 
+# WHY unknown is its own state: a failed probe proves neither a running nor a
+# stopped daemon, and a caller that acts on the answer must see the difference.
 fskit_daemon_state() {
-  if [ -n "$(fskit_daemon_pid)" ]; then
+  local pid
+  pid="$(fskit_daemon_pid)"
+  if [ "$pid" = "unknown" ]; then
+    printf 'unknown\n'
+  elif [ -n "$pid" ]; then
     printf 'running\n'
   else
     printf 'stopped\n'
@@ -94,14 +116,20 @@ fskit_daemon_state() {
 # WHY: killall, not launchctl kickstart, SIP refuses to kickstart this system
 # daemon (exit 150). fskitd(8) is demand-start: launchd runs it for a volume
 # request and it exits when idle, so an idle daemon needs no restart and an
-# empty PID after the kill is the normal outcome. Non-zero only when the daemon
-# survives the kill and keeps its PID past the bound, so the caller reports the
-# remedy instead of retrying the mount blindly.
+# empty PID after the kill is the normal outcome. Non-zero when the state
+# cannot be read, when killall is unavailable or fails, and when the daemon
+# survives the kill and keeps its PID past the bound, so each path reports its
+# own message and the caller can hand the operator the remedy instead of
+# retrying the mount blindly.
 fskit_restart_daemon() {
   local wait_seconds="${1:-30}"
   local pid_before pid_after ticks max_ticks kill_status=0
 
   pid_before="$(fskit_daemon_pid)"
+  if [ "$pid_before" = "unknown" ]; then
+    error "fskitd state could not be read (launchctl probe failed); repair cannot verify the daemon"
+    return 1
+  fi
   # WHY: nothing to restart: the next volume request starts the daemon, and
   # killall on an absent process only fails (it exits 1 when nothing matches).
   if [ -z "$pid_before" ]; then
@@ -156,17 +184,13 @@ fskit_repair_provider() {
   fi
   state="$(fskit_macfuse_module_state)"
   case "$state" in
-  enabled)
-    printf 'ok\n'
-    ;;
+  enabled) ;;
   disabled)
     error "fskit: macFUSE is missing from FSKit's module list; enable it in System Settings > General > Login Items & Extensions > By category > File System Extensions, then retry"
-    printf 'module-disabled\n'
     return 1
     ;;
   *)
     error "fskit: could not read FSKit's module list; check that the macFUSE file-system extension is enabled"
-    printf 'unknown\n'
     return 1
     ;;
   esac
