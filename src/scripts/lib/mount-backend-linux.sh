@@ -145,16 +145,6 @@ backend_unmount() {
   fusermount3 -u "$mount_point" 2>/dev/null || true
 }
 
-backend_repair() {
-  local mount_point="${1:-}"
-  if [ -n "$mount_point" ]; then
-    printf 'Unmounting %s...\n' "$mount_point"
-    # check-suppress:suppression_doc: best-effort unmount during repair
-    fusermount3 -u "$mount_point" 2>/dev/null || true
-  fi
-  printf 'Mount will be retried on next watchdog tick.\n'
-}
-
 # backend_provider_refusal: always false on Linux (no FSKit/extension concept).
 backend_provider_refusal() {
   return 1

@@ -297,31 +297,6 @@ backend_unmount() {
   fi
 }
 
-# Args: $1 instance key (optional, for health record).
-backend_repair() {
-  local instance="${1:-}"
-  printf 'Restarting fskitd...\n'
-  if fskit_restart_daemon 30; then
-    printf 'fskitd restarted successfully.\n'
-    local state
-    state="$(fskit_macfuse_module_state)"
-    case "$state" in
-    enabled)
-      printf 'macFUSE module is enabled in FSKit.\n'
-      ;;
-    disabled)
-      printf 'macFUSE is missing from FSKit module list.\n'
-      printf 'Enable it in: System Settings > General > Login Items & Extensions > By category > File System Extensions\n'
-      ;;
-    *)
-      printf 'Could not read FSKit module list.\n'
-      ;;
-    esac
-  else
-    printf 'Failed to restart fskitd. Run '\''sudo killall fskitd'\'' manually.\n'
-  fi
-}
-
 # Args: $1 stderr capture file.
 backend_provider_refusal() {
   local capture="$1"
