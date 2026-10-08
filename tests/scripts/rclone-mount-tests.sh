@@ -961,6 +961,60 @@ test_terminal_failure_writes_blocked_record() {
   restore_default_mocks
 }
 
+# WHY a capture tail in the record: the runner deletes rclone's stderr after
+#   classifying it, so a blocked record carried only the class and a generic
+#   remedy. The mount that failed with `invalidConnection` (macFUSE's helper
+#   tool missing) read as "check remote configuration and credentials", and
+#   nothing on the machine still held the error that would have named the real
+#   cause. The record keeps the tail so the first place a reader looks is the
+#   one that can answer.
+test_blocked_record_carries_failure_output() {
+  local home bin
+  home="$(create_home)"
+  bin="$(setup_fake_rclone)"
+  setup_env "$home" "$bin"
+  FAKE_MARKER="$home/clouds/OneDrive/.marker"
+  FAKE_CALLS="$home/calls"
+  FAKE_REMOTES="OneDrive:"
+  FAKE_SLEEP=1
+  # Three lines so the tail logic has something to trim against, with a middle
+  # line distinctive enough that its presence proves the record holds rclone's
+  # own words rather than a class-derived summary.
+  FAKE_ERRFILE="$home/rclone.err"
+  printf '%s\n' \
+    '2026/10/08 12:58:41.400 NOTICE : Mounting remote' \
+    'Unexpected error: invalidConnection' \
+    '2026/10/08 12:58:41.402 Failed to mount the mount point' \
+    >"$FAKE_ERRFILE"
+  FAKE_PROBE_STATE="absent:not-listed"
+  export FAKE_MARKER FAKE_CALLS FAKE_REMOTES FAKE_SLEEP FAKE_ERRFILE FAKE_PROBE_STATE
+  install_mocks
+  MOCK_BACKEND_CLASSIFY() { printf 'mount-failed'; }
+  MOCK_BACKEND_IS_TRANSIENT() { return 1; } # mount-failed is terminal
+  export -f MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT
+  backend_probe() { MOCK_BACKEND_PROBE "$@"; }
+  backend_class() { MOCK_BACKEND_CLASSIFY "$@"; }
+  backend_is_transient() { MOCK_BACKEND_IS_TRANSIENT "$@"; }
+  export -f backend_probe backend_class backend_is_transient
+
+  local rc=0
+  run_main 2>/dev/null || rc=$?
+
+  local state output
+  state="$(health_field state)"
+  output="$(health_field failureOutput)"
+  if [ "$state" = "blocked" ] &&
+    printf '%s' "$output" | grep -q 'Unexpected error: invalidConnection'; then
+    assert_pass "a blocked record carries rclone's failing output"
+  else
+    assert_fail "blocked-output-tail" \
+      "state=$state failureOutput='$output' (expected the capture's error line in the record)"
+  fi
+  rm -rf "$home" "$bin"
+
+  restore_default_mocks
+}
+
 test_unconfigured_remote_exits_0() {
   local home bin
   home="$(create_home)"
@@ -1504,6 +1558,7 @@ test_successful_mount_clears_a_stale_evidence_pointer
 test_removing_this_attempts_file_keeps_an_earlier_pointer
 test_exhaustion_keeps_the_last_attempt_class
 test_terminal_failure_writes_blocked_record
+test_blocked_record_carries_failure_output
 test_unconfigured_remote_exits_0
 test_health_record_created_on_startup
 test_health_record_class_and_remedy_on_blocked

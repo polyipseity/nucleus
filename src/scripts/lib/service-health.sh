@@ -5,9 +5,9 @@
 # Two writers: the runner classifies a MOUNT (mounted, provider-refused, attempts
 # exhausted), the watchdog the SUPERVISOR (crash-looping, not-loaded). They meet on
 # the fields both observe: state, class, remedy, lastSuccess, lastExit. generation,
-# restarts and reportedState are watchdog-only, evidence is runner-only. lastExit
-# has two writers without interfering because both report the same exit the
-# supervisor observed, and Rule 5 dispatches on 78 (EX_CONFIG).
+# restarts and reportedState are watchdog-only, evidence and failureOutput are
+# runner-only. lastExit has two writers without interfering because both report the
+# same exit the supervisor observed, and Rule 5 dispatches on 78 (EX_CONFIG).
 #
 # `generation` is the supervisor run token as of the last observation and the single
 # input to loop detection. It is null until the first observation, and null is the
@@ -144,8 +144,14 @@ svc_health_set_state() {
   svc_health_set "$1" "state" "\"$2\""
 }
 
+# Args: $1 instance, $2 class, $3 remedy, $4 optional tail of rclone's stderr.
+# WHY the tail: without it a blocked record named only a class and a generic
+#   remedy, and the capture file it came from was deleted, so the exact error
+#   (the missing macFUSE helper read as a credentials problem) survived nowhere.
+#   Empty means no tail was captured; the field is nulled rather than left
+#   carrying an earlier attempt's words.
 svc_health_set_blocked() {
-  local instance="$1" class="$2" remedy="$3"
+  local instance="$1" class="$2" remedy="$3" failure_output="${4:-}"
   svc_health_init "$instance"
   local file tmp
   file="$(svc_health_state_file "$instance")"
@@ -153,8 +159,9 @@ svc_health_set_blocked() {
   if ! jq -c \
     --arg class "$class" \
     --arg remedy "$remedy" \
+    --arg failureOutput "$failure_output" \
     --arg boot "$(svc_health_boot_id)" \
-    '.state = "blocked" | .class = $class | .remedy = $remedy | .boot = $boot | .reportedState = null' \
+    '.state = "blocked" | .class = $class | .remedy = $remedy | .failureOutput = (if $failureOutput == "" then null else $failureOutput end) | .boot = $boot | .reportedState = null' \
     "$file" >"$tmp" 2>/dev/null; then
     rm -f "$tmp"
     return 1
@@ -194,12 +201,13 @@ svc_health_mark_reported() {
 }
 
 # WHY drop .restarts: svc_health_is_looping reads it, so a clear that kept the history would be re-blocked by Rule 3 on the very next tick.
+# WHY drop failureOutput with class/remedy: a cleared block is a healthy mount, and a record still carrying the last failure's output sends the next reader after a problem that is gone.
 svc_health_clear() {
   local instance="$1" file tmp
   file="$(svc_health_state_file "$instance")"
   [ -f "$file" ] || return 0
   tmp="${file}.tmp.$$"
-  if ! jq -c '.state = "stopped" | .class = null | .remedy = null | .reportedState = null | .restarts = []' "$file" >"$tmp" 2>/dev/null; then
+  if ! jq -c '.state = "stopped" | .class = null | .remedy = null | .failureOutput = null | .reportedState = null | .restarts = []' "$file" >"$tmp" 2>/dev/null; then
     rm -f "$tmp"
     return 1
   fi

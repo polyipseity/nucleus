@@ -41,7 +41,11 @@ backend_class() {
     return
   fi
 
-  if grep -qE 'Unauthorized|Invalid credentials|unauthorized_request|auth.*failed|401' "$capture"; then
+  # WHY anchored to an HTTP status: a bare `401` also matched the millisecond
+  #   field of an rclone timestamp (12:58:41.401), so an ordinary mount failure
+  #   was recorded as bad credentials. Genuine auth errors carry either the
+  #   word Unauthorized (already matched above) or the status phrase itself.
+  if grep -qE 'Unauthorized|Invalid credentials|unauthorized_request|auth.*failed|HTTP status 401' "$capture"; then
     printf 'auth\n'
     return
   fi
@@ -84,7 +88,7 @@ backend_remedy() {
     printf 'retry in progress'
     ;;
   *)
-    printf 'check remote configuration and credentials'
+    printf "%s" "check remote configuration and credentials; the health record for this mount carries rclone's failing output"
     ;;
   esac
 }

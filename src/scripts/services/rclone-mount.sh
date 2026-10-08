@@ -99,6 +99,9 @@ _cm_main() {
   # Set when the attach wait ended on a table that could not be read, so the
   # record can say the read failed rather than the mount failed.
   local probe_unknown=false
+  # Set from the last attempt's capture before the file is removed, so a
+  # blocked record can carry rclone's own failing output.
+  local failure_output=""
   while [ "$attempt" -le "$attempts" ]; do
     if svc_health_is_blocked "$instance"; then
       notice -l cloud-drives "$instance: blocked (class=$(svc_health_get "$instance" "class")); not attempting"
@@ -171,6 +174,9 @@ _cm_main() {
       #   record still naming a retained capture file would point whoever reads it
       #   at evidence for a mount that is now healthy.
       svc_health_set "$instance" evidence null
+      # WHY: same reason as the evidence field, applied to the output tail: a
+      #   record that recovered must not keep the last failure's words.
+      svc_health_set "$instance" failureOutput null
       rm -f "$capture_file" "$mount_args_file"
 
       local watch_status=0
@@ -220,6 +226,12 @@ _cm_main() {
 
     notice -l cloud-drives "$instance: attempt $attempt failed (class=$class, $remedy)"
 
+    # WHY: the tail is taken while the capture file still exists. Every later
+    #   branch may delete it, and the blocked record written below is the only
+    #   place the exact error survives; twenty lines hold the failure and its
+    #   immediate context without turning the record into a log.
+    failure_output="$(tail -n 20 "$capture_file")"
+
     # WHY: the capture file is kept only on the unreadable-table path, where the
     #   class in the health record is one this runner chose rather than one
     #   rclone's output supports, so the file is the only remaining record of what
@@ -242,7 +254,7 @@ _cm_main() {
     rm -f "$mount_args_file"
 
     if ! backend_is_transient "$class"; then
-      svc_health_set_blocked "$instance" "$class" "$remedy"
+      svc_health_set_blocked "$instance" "$class" "$remedy" "$failure_output"
       exit 0
     fi
 
@@ -270,7 +282,7 @@ _cm_main() {
   fi
   local final_remedy
   final_remedy="$(backend_remedy "$final_class")"
-  svc_health_set_blocked "$instance" "$final_class" "$final_remedy"
+  svc_health_set_blocked "$instance" "$final_class" "$final_remedy" "$failure_output"
   notice -l cloud-drives "$instance: all $attempts attempts exhausted; blocked"
   exit 0
 }

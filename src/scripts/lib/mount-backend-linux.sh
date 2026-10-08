@@ -24,7 +24,11 @@ backend_class() {
     return
   fi
 
-  if grep -qE 'Unauthorized|Invalid credentials|unauthorized_request|auth.*failed|401' "$capture"; then
+  # WHY anchored to an HTTP status: same as darwin, a bare `401` matched the
+  #   millisecond field of an rclone timestamp and recorded a healthy remote as
+  #   bad credentials. Cross-host parity: both classifiers decide the same class
+  #   from the same wording.
+  if grep -qE 'Unauthorized|Invalid credentials|unauthorized_request|auth.*failed|HTTP status 401' "$capture"; then
     printf 'auth\n'
     return
   fi
@@ -54,7 +58,7 @@ backend_remedy() {
   auth) printf 'verify remote credentials' ;;
   remote-not-found) printf 'check remote name and configuration' ;;
   path-permission) printf 'check mount point permissions' ;;
-  *) printf 'check remote configuration and credentials' ;;
+  *) printf "%s" "check remote configuration and credentials; the health record for this mount carries rclone's failing output" ;;
   esac
 }
 

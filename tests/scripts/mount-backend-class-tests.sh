@@ -142,4 +142,37 @@ else
   assert_fail "io-transient is transient on Linux" "a Linux io error would never be retried"
 fi
 
+section "3" "the auth class matches an HTTP status, not a millisecond"
+
+# WHY this case: an rclone timestamp carries a millisecond field, and a bare
+#   `401` in the auth pattern matched it, so an ordinary mount failure was
+#   recorded as bad credentials and the operator was sent to re-authenticate
+#   a mount whose remote was fine.
+assert_class "a timestamp-only capture does not classify as auth" \
+  "mount-failed" "enabled" \
+  '2026/10/08 12:58:41.401 NOTICE : mounting remote'
+
+# The anchored pattern must still reach a real HTTP status, or the fix would
+#   trade one misclassification for silently ignoring every genuine auth error.
+assert_class "an explicit HTTP status still classifies as auth" \
+  "auth" "enabled" \
+  'Failed to list files: HTTP status 401'
+
+# The Linux classifier carries the same anchored pattern, asserted in its own
+#   subshell for the same reason as the transient verdicts above: both backends
+#   define backend_class, and the last source would shadow the first.
+_linux_class="$(
+  unset _NUCLEUS_MOUNT_BACKEND_LINUX_SOURCED
+  # shellcheck source=../../src/scripts/lib/mount-backend-linux.sh
+  . "$REPO_ROOT/src/scripts/lib/mount-backend-linux.sh"
+  printf '%s\n' '2026/10/08 12:58:41.401 NOTICE : mounting remote' >"$CAPTURE"
+  backend_class "$CAPTURE"
+)"
+if [ "$_linux_class" = "mount-failed" ]; then
+  assert_pass "linux: a timestamp-only capture does not classify as auth"
+else
+  assert_fail "linux-timestamp-auth" \
+    "expected 'mount-failed', got '$_linux_class'; the Linux pattern still reads the millisecond field as auth"
+fi
+
 finish_tests
