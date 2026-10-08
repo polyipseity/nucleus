@@ -74,9 +74,28 @@
     },
     "autostartRuntimeEntry": {
       "description": "Auto-start runtime configuration for one host",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "macos-launchagent"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "bundleId"
+            ]
+          }
+        }
+      ],
       "properties": {
         "bundleId": {
-          "description": "macOS bundle identifier (e.g. com.if.Amphetamine). Used to locate the app for macos-launchagent manipulation.",
+          "description": "macOS bundle identifier (e.g. com.if.Amphetamine). Used to locate the app for macos-launchagent manipulation. Required for macos-launchagent because the generated LaunchAgent launches through open -b.",
           "type": "string"
         },
         "autostartEnabled": {

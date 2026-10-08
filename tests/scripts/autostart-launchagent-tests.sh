@@ -168,6 +168,29 @@ make_fixture() {
         "justification": "test fixture"
       }
     }
+  },
+  "OpenB": {
+    "displayName": "OpenB",
+    "description": "fixture app whose generated LaunchAgent must launch through open -b",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "autostartEnabled": true,
+        "kind": "macos-launchagent",
+        "path": "/Applications/OpenB.app",
+        "bundleId": "com.example.openb"
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "type": "omitted",
+        "justification": "test fixture"
+      },
+      "Windows": {
+        "platform": "Windows",
+        "type": "omitted",
+        "justification": "test fixture"
+      }
+    }
   }
 }
 APPSJSON
@@ -315,6 +338,46 @@ test_foreign_plist_is_kept() {
   rm -rf "$FIXTURE_ROOT"
 }
 
+# The regression this guards: generating ProgramArguments with the raw bundle
+# binary bypasses LaunchServices single-instance registration, so an app that
+# auto-updates and relaunches through runningboardd ends up running twice when
+# the agent re-fires. The generated plist must launch through /usr/bin/open -b
+# so a re-fire activates the existing instance instead of spawning a second.
+test_generated_plist_launches_via_open_b() {
+  local rc=0
+  make_fixture
+  rc="$(run_autostart enable OpenB "$FIXTURE_ROOT/out.txt" true MacBook)"
+  local plist="$FIXTURE_AGENTS/local.com.example.openb.plist"
+  if [ "$rc" -eq 0 ] && [ -f "$plist" ] &&
+    grep -A2 '<string>/usr/bin/open</string>' "$plist" | grep -q '<string>-b</string>' &&
+    grep -A2 '<string>/usr/bin/open</string>' "$plist" | grep -q '<string>com.example.openb</string>' &&
+    ! grep -q 'Contents/MacOS' "$plist"; then
+    assert_pass "a generated LaunchAgent plist launches through open -b with the bundle id"
+  else
+    assert_fail "a generated LaunchAgent plist launches through open -b with the bundle id" "rc=$rc plist: $([ -f "$plist" ] && echo present || echo absent) content=[$([ -f "$plist" ] && cat "$plist")] output=[$(cat "$FIXTURE_ROOT/out.txt")]"
+  fi
+  rm -rf "$FIXTURE_ROOT"
+}
+
+# The disable path must converge the generated plist away: an entry that stops
+# declaring autostartEnabled but keeps its LaunchAgent would keep launching the
+# app through the leftover agent. Enable first so the absence assertion cannot
+# pass vacuously on a plist that was never created.
+test_generated_plist_is_absent_when_disabled() {
+  local rc=0 created=no plist
+  make_fixture
+  plist="$FIXTURE_AGENTS/local.com.example.openb.plist"
+  rc="$(run_autostart enable OpenB "$FIXTURE_ROOT/out-enable.txt" true MacBook)"
+  [ "$rc" -eq 0 ] && [ -f "$plist" ] && created=yes
+  rc="$(run_autostart disable OpenB "$FIXTURE_ROOT/out.txt" true MacBook)"
+  if [ "$created" = "yes" ] && [ "$rc" -eq 0 ] && [ ! -f "$plist" ]; then
+    assert_pass "a generated LaunchAgent plist is removed on disable"
+  else
+    assert_fail "a generated LaunchAgent plist is removed on disable" "created=$created rc=$rc plist present: $([ -f "$plist" ] && echo yes || echo no) output=[$(cat "$FIXTURE_ROOT/out.txt")]"
+  fi
+  rm -rf "$FIXTURE_ROOT"
+}
+
 test_fskit_module_is_reported_present() {
   local rc=0
   make_fixture
@@ -428,6 +491,69 @@ test_macos_only_kind_is_rejected_off_macos() {
   rm -rf "$FIXTURE_ROOT"
 }
 
+# The generated plist launches through open -b, so a macos-launchagent entry
+# without a bundleId cannot be converged: the schema must reject it at the
+# registry boundary instead of letting autostart.sh warn-and-skip at apply time.
+write_schema_fixture_registry() {
+  local out_file="$1" bundle_clause="$2"
+  cat >"$out_file" <<SCHEMAFIXTURE
+{
+  "\$schema": "src/modules/apps.schema.json",
+  "OpenB": {
+    "displayName": "OpenB",
+    "description": "fixture registry entry exercising the bundleId requirement for macos-launchagent",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "autostartEnabled": true,
+        "kind": "macos-launchagent",
+        "path": "/Applications/OpenB.app"${bundle_clause}
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "type": "omitted",
+        "justification": "test fixture"
+      },
+      "Windows": {
+        "platform": "Windows",
+        "type": "omitted",
+        "justification": "test fixture"
+      }
+    }
+  }
+}
+SCHEMAFIXTURE
+}
+
+test_schema_launchagent_requires_bundle_id() {
+  local rc=0
+  local dir
+  dir="$(mktemp -d)"
+  write_schema_fixture_registry "$dir/registry.json" ''
+  check-jsonschema --schemafile "$REPO_ROOT/src/modules/apps.schema.json" "$dir/registry.json" >"$dir/out.txt" 2>&1 || rc=$?
+  if [ "$rc" -ne 0 ] && grep -q 'bundleId' "$dir/out.txt"; then
+    assert_pass "schema rejects a macos-launchagent entry without bundleId"
+  else
+    assert_fail "schema rejects a macos-launchagent entry without bundleId" "rc=$rc output=[$(cat "$dir/out.txt")]"
+  fi
+  rm -rf "$dir"
+}
+
+test_schema_launchagent_accepts_bundle_id() {
+  local rc=0
+  local dir
+  dir="$(mktemp -d)"
+  write_schema_fixture_registry "$dir/registry.json" ',
+        "bundleId": "com.example.openb"'
+  check-jsonschema --schemafile "$REPO_ROOT/src/modules/apps.schema.json" "$dir/registry.json" >"$dir/out.txt" 2>&1 || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    assert_pass "schema accepts a macos-launchagent entry with bundleId"
+  else
+    assert_fail "schema accepts a macos-launchagent entry with bundleId" "rc=$rc output=[$(cat "$dir/out.txt")]"
+  fi
+  rm -rf "$dir"
+}
+
 # The macOS login-item branch is exercised on every host: NUCLEUS_HOST pins the
 # host, and run_autostart mocks plutil, stat, dscl, and systemextensionsctl, so the
 # branch's own tool use is what the mocks answer. The product never calls
@@ -437,6 +563,8 @@ test_macos_only_kind_is_rejected_off_macos() {
 test_scalar_program_plist_is_removed
 test_program_arguments_plist_is_removed
 test_foreign_plist_is_kept
+test_generated_plist_launches_via_open_b
+test_generated_plist_is_absent_when_disabled
 test_fskit_module_is_reported_present
 test_fskit_module_converge_skips_approval_instructions
 test_unregistered_fskit_module_keeps_approval_instructions
@@ -446,5 +574,7 @@ test_manual_app_reports_approval_instructions
 test_manual_app_status_shows_manual
 test_manual_app_verify_reports_no_drift
 test_macos_only_kind_is_rejected_off_macos
+test_schema_launchagent_requires_bundle_id
+test_schema_launchagent_accepts_bundle_id
 
 finish_tests

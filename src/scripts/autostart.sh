@@ -98,28 +98,19 @@ macos_launchagent_exists() {
   [ -f "$(macos_launchagent_path "$bundle_id")" ] && printf 'true' || printf 'false'
 }
 
-# Reads CFBundleExecutable from the bundle's Info.plist. Returns the .app path
-# as fallback when resolution fails (e.g. missing Info.plist, non-Mach-O bundle).
-macos_app_binary_path() {
-  local app_path="$1"
-  local info_plist="$app_path/Contents/Info.plist"
-  if [ -f "$info_plist" ]; then
-    local binary_name
-    # shellcheck disable=SC2086 # reason: PlistBuddy output is a single token (binary name)
-    binary_name=$(/usr/libexec/PlistBuddy -c "Print CFBundleExecutable" "$info_plist" 2>/dev/null || true) # check-suppress:suppression_doc: PlistBuddy fails when Info.plist lacks CFBundleExecutable; fallback to .app path is intentional
-    if [ -n "$binary_name" ] && [ -x "$app_path/Contents/MacOS/$binary_name" ]; then
-      printf '%s' "$app_path/Contents/MacOS/$binary_name"
-      return
-    fi
-  fi
-  printf '%s' "$app_path"
-}
-
 macos_launchagent_ensure() {
   local bundle_id="$1" app_path="$2"
-  # WHY the binary inside the bundle: launchd cannot execute a .app directory.
-  local binary_path
-  binary_path="$(macos_app_binary_path "$app_path")"
+  # WHY open -b instead of exec'ing the bundle binary: launchd's direct exec
+  # bypasses LaunchServices single-instance registration, so an app auto-updater
+  # that SIGTERMs the running instance and relaunches it (via runningboardd),
+  # followed by a later re-fire of this agent, leaves two app instances running
+  # that LaunchServices cannot deduplicate (observed with Raycast on MacBook,
+  # 2026-10-01, pids 10178 and 26431). `open -b` asks LaunchServices to activate
+  # the already-running instance instead of spawning a second one. Known edge: a
+  # freshly installed app LaunchServices has not registered yet fails `open -b`
+  # once, and the next login or agent re-fire succeeds.
+  # WHY the retained app_path parameter: the converge dispatcher passes bundle
+  # id and app path together; only the plist body changed here.
   local label plist_path
   label="$(macos_launchagent_label "$bundle_id")"
   plist_path="$(macos_launchagent_path "$bundle_id")"
@@ -134,7 +125,9 @@ macos_launchagent_ensure() {
     <string>${label}</string>
     <key>ProgramArguments</key>
     <array>
-        <string>${binary_path}</string>
+        <string>/usr/bin/open</string>
+        <string>-b</string>
+        <string>${bundle_id}</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
