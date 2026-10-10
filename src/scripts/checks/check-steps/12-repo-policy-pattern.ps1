@@ -524,7 +524,7 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
     @($PositionalArgs | Where-Object { (Split-Path -Leaf $_) -eq '.envrc' })
   } else {
     @(Get-ChildItem -Path $r -Recurse -Force -File -Filter '.envrc' |
-        Where-Object { $_.FullName -notmatch '[\\/]\\.git[\\/]' -and $_.FullName -notmatch '[\\/]vendor[\\/]' } |
+        Where-Object { $_.FullName -notmatch '[\/]\.git[\/]' -and $_.FullName -notmatch '[\/]vendor[\/]' } |
         ForEach-Object { [IO.Path]::GetRelativePath($r, $_.FullName) })
   })
 
