@@ -508,20 +508,32 @@ test_step14_envrc_ban_pruned_decoys_ignored() {
   touch "$_tmp/real/.envrc"
   run_envrc_ban_policy false "$_tmp" >"$_out" 2>&1
   _ret=$?
-  if [ "$_ret" -eq 0 ] || ! grep -q "envrc ban: 'real/.envrc' exists; delete it" "$_out"; then
-    echo "FAIL: a real .envrc outside the pruned dirs must still fail the envrc ban policy"
+  if [ "$_ret" -eq 0 ]; then
+    echo "FAIL: a real .envrc outside the pruned dirs must still fail the envrc ban policy (run exited 0)"
     cat "$_out"
     rm -rf "$_tmp"
     rm -f "$_out"
     return 1
   fi
-  if grep -q "envrc ban: '" "$_out" && [ "$(grep -c "envrc ban: '" "$_out")" -ne 1 ]; then
-    echo "FAIL: only the real .envrc must be reported; .git and vendor decoys must be pruned"
+  if ! grep -qF "envrc ban: 'real/.envrc' exists; delete it" "$_out"; then
+    echo "FAIL: the report must name the real offender by its path 'real/.envrc'"
     cat "$_out"
     rm -rf "$_tmp"
     rm -f "$_out"
     return 1
   fi
+  # Fixed-string matching so a decoy literal cannot false-positive on the real
+  # path, whose reported string carries the same .envrc suffix.
+  local _decoy
+  for _decoy in ".git/.envrc" "vendor/.envrc" "nested/.git/.envrc"; do
+    if grep -qF "envrc ban: '$_decoy' exists" "$_out"; then
+      echo "FAIL: the decoy '$_decoy' sits in a pruned dir and must not be reported"
+      cat "$_out"
+      rm -rf "$_tmp"
+      rm -f "$_out"
+      return 1
+    fi
+  done
   rm -rf "$_tmp"
   rm -f "$_out"
   return 0
