@@ -402,7 +402,6 @@ if (-not $NoToolCacheGc) {
   $cargoBinstallCacheDir = Join-Path $env:LOCALAPPDATA "cargo-binstall\cache"
   $rustupTmpDir = Join-Path $HOME ".rustup\tmp"
   $uvCacheDir = Join-Path $env:LOCALAPPDATA "uv\cache"
-  $repoDirenvDir = Join-Path $resolvedRepoRoot ".direnv"
 
   Clear-DirectoryContentsIfPresent -Path $bunCacheDir -Label "bun install cache"
   Clear-DirectoryContentsIfPresent -Path $cargoBinstallCacheDir -Label "cargo-binstall cache"
@@ -419,19 +418,6 @@ if (-not $NoToolCacheGc) {
   }
 
   Clear-DirectoryContentsIfPresent -Path $uvCacheDir -Label "uv cache"
-
-  if (Test-Path -LiteralPath $repoDirenvDir -PathType Container) {
-    try {
-      if ($DryRun) {
-        Write-NucleusDryRun "would remove repo-local direnv cache '$repoDirenvDir'"
-      } else {
-        Remove-Item -LiteralPath $repoDirenvDir -Recurse -Force -ErrorAction Stop
-      }
-    }
-    catch {
-      Write-NucleusWarning "failed to remove repo-local direnv cache '$repoDirenvDir' — $($_.Exception.Message)"
-    }
-  }
 }
 
 # ---- Step 3: remove stale .git cache/state files from ~/dev -----------------

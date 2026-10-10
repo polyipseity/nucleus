@@ -426,7 +426,6 @@ gc_tool_caches_if_available() {
   uv_cache_dir="$platform_cache_root/uv"
   cargo_binstall_cache_dir="$platform_cache_root/cargo-binstall"
   rustup_tmp_dir="$rustup_home_dir/tmp"
-  repo_direnv_dir="$REPO_ROOT/.direnv"
 
   gc_dir_contents_if_present "$bun_cache_dir" "bun install cache"
   gc_dir_contents_if_present "$cargo_binstall_cache_dir" "cargo-binstall cache"
@@ -441,12 +440,6 @@ gc_tool_caches_if_available() {
   fi
 
   gc_dir_contents_if_present "$uv_cache_dir" "uv cache"
-
-  if [ -d "$repo_direnv_dir" ]; then
-    if ! rm -rf -- "$repo_direnv_dir"; then
-      warn "failed to remove repo-local direnv cache '$repo_direnv_dir'"
-    fi
-  fi
 }
 
 gc_git_cache_if_present() {
