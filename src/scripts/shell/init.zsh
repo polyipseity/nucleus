@@ -1,15 +1,15 @@
 # Zsh initialization for nucleus-managed hosts. History exclusion, stale
 # nix-env guard, completion directory, agent-session detection, dev tool
 # interception, srt agent wrapping.
-# Embedded by src/modules/shell.nix into initContent.
+# Embedded by src/modules/shell/default.nix into initContent.
 
 # Warn once when the nix store paths this shell inherited have been
 # garbage-collected: a devShell env outlives its closure in long-lived shells,
 # and every link in them then dies with "library not found for -lSystem".
-# WHY warn-only, and why no Windows twin: unsetting the variables mid-session
-# would half-fix the shell and hide the problem; recovery needs a fresh process
-# tree (quit and reopen the terminal). Windows has no nix devShell env to go
-# stale, so there is no twin to write.
+# WHY: warn-only because unsetting the variables mid-session would half-fix
+# the shell and hide the problem; recovery needs a fresh process tree (quit and
+# reopen the terminal). No Windows twin because Windows has no nix devShell env
+# to go stale.
 if [[ -z "${__nucleus_stale_nix_warned:-}" ]]; then
   __nucleus_stale_nix_path=""
   if [[ -n "${NIX_CC:-}" && "${NIX_CC:-}" == /nix/store/* && ! -e "${NIX_CC:-}" ]]; then
