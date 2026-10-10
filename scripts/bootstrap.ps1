@@ -363,43 +363,6 @@ function Install-GnuPGDirect {
   Write-NucleusInfo "GnuPG $Version installed successfully at $installDir"
 }
 
-function Invoke-RepositoryDirenvAllowIfAvailable {
-  <#
-  .SYNOPSIS
-    Best-effort direnv allow for the canonical nucleus repository root.
-
-  .DESCRIPTION
-    Runs `direnv allow` only when direnv is available, `.envrc` exists, and the
-    bootstrap repository root basename is exactly `nucleus`, which keeps
-    auto-allow narrow and avoids trusting non-nucleus checkouts.
-
-    Failures are warnings because direnv allow is convenience-only and must not
-    block bootstrap or apply.
-  #>
-  [CmdletBinding()]
-  param()
-
-  # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
-  if (-not (Get-Command -Name direnv -ErrorAction SilentlyContinue)) {
-    return
-  }
-
-  $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..")).Path
-  if ((Split-Path -Path $repoRoot -Leaf) -ne "nucleus") {
-    return
-  }
-
-  $envrcPath = Join-Path -Path $repoRoot -ChildPath ".envrc"
-  if (-not (Test-Path -Path $envrcPath -PathType Leaf)) {
-    return
-  }
-
-  & direnv allow $repoRoot
-  if ($LASTEXITCODE -ne 0) {
-    Write-NucleusWarning "failed to run 'direnv allow' for $repoRoot"
-  }
-}
-
 function Install-Uv {
   <#
   .SYNOPSIS
@@ -541,8 +504,6 @@ if (Get-Command -Name uv -ErrorAction SilentlyContinue) {
 } else {
     Write-NucleusWarning "uv not found — check-jsonschema will not be installed"
 }
-
-Invoke-RepositoryDirenvAllowIfAvailable
 
 if ($Apply) {
   $applyScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "..\src\hosts\Windows\apply.ps1"

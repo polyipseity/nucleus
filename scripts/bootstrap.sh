@@ -165,27 +165,6 @@ bootstrap_nix_if_missing() {
   require_command nix
 }
 
-allow_repo_direnv_if_available() {
-  # Auto-allow the canonical repo .envrc so the first `cd` loads the devShell.
-  # Only the nucleus checkout is allowed, and every failure is non-fatal: direnv
-  # may be absent and .envrc may be missing in partial checkouts.
-  if ! command -v direnv >/dev/null 2>&1; then
-    return
-  fi
-
-  if [ ! -f "$REPO_ROOT/.envrc" ]; then
-    return
-  fi
-
-  if [ "$(basename -- "$REPO_ROOT")" != "nucleus" ]; then
-    return
-  fi
-
-  if ! direnv allow "$REPO_ROOT"; then
-    warn "failed to run 'direnv allow' for $REPO_ROOT"
-  fi
-}
-
 ensure_macos_nix_mount() {
   # macOS seals the root volume, so a top-level /nix cannot be created. It has
   # to be declared in /etc/synthetic.conf and materialised by apfs.util at boot,
@@ -271,8 +250,6 @@ _nix_pwsh=$(command -v pwsh 2>/dev/null || true) # check-suppress:suppression_do
 if [ -n "$_nix_pwsh" ]; then
   provision_pwsh_modules "$_nix_pwsh"
 fi
-
-allow_repo_direnv_if_available
 
 if [ "$apply" = true ]; then
   say "Running apply flow via src#apply..."
