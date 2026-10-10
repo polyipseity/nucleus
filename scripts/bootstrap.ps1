@@ -492,7 +492,7 @@ if (Get-Command -Name uv -ErrorAction SilentlyContinue) {
         Write-NucleusWarning "failed to install yamllint via uv tool install"
     }
 } else {
-    Write-NucleusWarning "uv not found — yamllint will not be installed"
+    Write-NucleusWarning "uv not found: yamllint will not be installed"
 }
 # check-jsonschema: Python package, no WinGet ID. Requires uv on PATH.
 # check-suppress:suppression_doc: probe whether uv is installed; warns when absent
@@ -502,7 +502,7 @@ if (Get-Command -Name uv -ErrorAction SilentlyContinue) {
         Write-NucleusWarning "failed to install check-jsonschema via uv tool install"
     }
 } else {
-    Write-NucleusWarning "uv not found — check-jsonschema will not be installed"
+    Write-NucleusWarning "uv not found: check-jsonschema will not be installed"
 }
 
 if ($Apply) {
