@@ -25,6 +25,33 @@
   Collect orphaned VM data (default: $false). Runs vm.sh gc --gc-data, which is
   what gc.sh does when asked to.
 
+.PARAMETER Expiry
+  POSIX-only master expiry override, accepted and ignored on Windows.
+
+.PARAMETER HmExpiry
+  POSIX-only Home Manager generation expiry, accepted and ignored on Windows.
+
+.PARAMETER NixExpiry
+  POSIX-only nix store GC expiry, accepted and ignored on Windows.
+
+.PARAMETER NoDuperemoveGc
+  POSIX-only skip switch, accepted and ignored on Windows.
+
+.PARAMETER NoHmGc
+  POSIX-only skip switch, accepted and ignored on Windows.
+
+.PARAMETER NoJournaldGc
+  POSIX-only skip switch, accepted and ignored on Windows.
+
+.PARAMETER NoNixArtifactsGc
+  POSIX-only skip switch, accepted and ignored on Windows.
+
+.PARAMETER NoNixGc
+  POSIX-only skip switch, accepted and ignored on Windows.
+
+.PARAMETER NoSystemGc
+  POSIX-only skip switch, accepted and ignored on Windows.
+
 .NOTES
   Environment variables: NUCLEUS_GC_HM_EXPIRY, NUCLEUS_GC_LOG_COMPRESS, NUCLEUS_GC_LOG_MAX_FILES, NUCLEUS_GC_LOG_MAX_SIZE, NUCLEUS_GC_MODULE_DIR, NUCLEUS_GC_NIX_EXPIRY, NUCLEUS_LOG_EXPIRY, NUCLEUS_REPO_ROOT.
 #>
