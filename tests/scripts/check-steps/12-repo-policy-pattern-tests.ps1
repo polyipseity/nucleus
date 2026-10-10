@@ -124,6 +124,39 @@ try {
     if (Test-Path -LiteralPath $skipLink) { Remove-Item -LiteralPath $skipLink -Force }
     if (Test-Path -LiteralPath $skipFixture) { Remove-Item -LiteralPath $skipFixture -Force }
   }
+
+  # 4. envrc ban policy: a root-level .envrc fails with its path reported.
+  $envrcPath = Join-Path -Path $fixtureDir -ChildPath '.envrc'
+  Set-Content -Path $envrcPath -Value 'use flake'
+  $envrcRoot = Invoke-LoggingFormatPolicy -Paths @($envrcPath)
+  if ($envrcRoot.Status -eq 0 -or $envrcRoot.Output -notmatch "envrc ban: '[^']*\.envrc' exists; delete it") {
+    Assert-Fail 'step 12: a root-level .envrc' "exit $($envrcRoot.Status); $($envrcRoot.Output.Trim())"
+  } else {
+    Assert-Pass 'step 12: a root-level .envrc is reported'
+  }
+
+  # 5. envrc ban policy: a nested .envrc also fails.
+  $envrcNestedDir = Join-Path -Path $fixtureDir -ChildPath 'sub'
+  New-Item -ItemType Directory -Path $envrcNestedDir -Force > $null
+  $envrcNestedPath = Join-Path -Path $envrcNestedDir -ChildPath '.envrc'
+  Set-Content -Path $envrcNestedPath -Value 'use flake'
+  $envrcNested = Invoke-LoggingFormatPolicy -Paths @($envrcNestedPath)
+  if ($envrcNested.Status -eq 0 -or $envrcNested.Output -notmatch "envrc ban: '[^']*\.envrc' exists; delete it") {
+    Assert-Fail 'step 12: a nested .envrc' "exit $($envrcNested.Status); $($envrcNested.Output.Trim())"
+  } else {
+    Assert-Pass 'step 12: a nested .envrc is reported'
+  }
+
+  # 6. envrc ban policy: an ordinary file passes with no envrc finding.
+  $envrcClean = Invoke-LoggingFormatPolicy -Paths @($cleanPath)
+  if ($envrcClean.Status -ne 0 -or $envrcClean.Output -match 'envrc ban:') {
+    Assert-Fail 'step 12: a tree without .envrc' "exit $($envrcClean.Status); $($envrcClean.Output.Trim())"
+  } elseif ($envrcClean.Output -notmatch 'envrc ban policy passed\.') {
+    # WHY: without this the case could pass on a step that never ran.
+    Assert-Fail 'step 12: a tree without .envrc' 'envrc ban policy did not run'
+  } else {
+    Assert-Pass 'step 12: a file without .envrc passes the envrc ban policy'
+  }
 } finally {
   if (Test-Path -LiteralPath $fixtureDir) {
     Remove-Item -Path $fixtureDir -Recurse -Force

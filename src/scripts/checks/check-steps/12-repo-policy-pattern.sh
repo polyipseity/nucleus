@@ -21,6 +21,7 @@ _POLICY_PATTERN_CHECKS=(
   "removed skip mechanism|run_removed_skip_mechanism|files"
   "nix file structure|run_nix_file_structure|files"
   "log capture pair policy|run_log_capture_pair_policy|files"
+  "envrc ban policy|run_envrc_ban_policy|files"
 )
 
 run_repo_policy_pattern() {
@@ -487,5 +488,49 @@ run_log_capture_pair_policy() {
     return 1
   fi
   say "log capture pair policy passed."
+  return 0
+}
+
+# A repo-local .envrc is banned outright: direnv would inject a devShell env
+# into every shell entering the tree, and once the store closure is garbage
+# collected that env points at dead paths (builds and links fail). The scan
+# walks the working tree because .envrc is gitignored, so a git-tracked-file
+# list can never see it.
+# ref: allow-and-deny-lists.instructions.md#A14 -- .envrc ban
+run_envrc_ban_policy() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
+  local _files=("$@")
+  cd "$_repo_root" || return 1
+
+  local _envrc_errors=0
+  local _offenders=()
+  local _f
+
+  if $_has_args; then
+    for _f in "${_files[@]}"; do
+      case "$(basename "$_f")" in
+      .envrc) _offenders+=("$_f") ;;
+      esac
+    done
+  else
+    while IFS= read -r -d '' _f; do
+      _offenders+=("${_f#./}")
+    done < <(find . \( -path ./.git -o -path '*/vendor' \) -prune -o -name '.envrc' -type f -print0)
+  fi
+
+  if [ "${#_offenders[@]}" -gt 0 ]; then
+    local _offender
+    for _offender in "${_offenders[@]}"; do
+      _envrc_errors=$((_envrc_errors + 1))
+      error "envrc ban: '$_offender' exists; delete it (a repo-local .envrc would inject a devShell env at cd; see allow-and-deny-lists.instructions.md)"
+    done
+  fi
+
+  if [ "$_envrc_errors" -gt 0 ]; then
+    error "envrc ban policy check failed with $_envrc_errors error(s)"
+    return 1
+  fi
+  say "envrc ban policy passed."
   return 0
 }

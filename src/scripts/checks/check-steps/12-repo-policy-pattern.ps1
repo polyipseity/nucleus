@@ -511,6 +511,35 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
     Write-Message "log capture pair policy passed."
   }
 
+  # A repo-local .envrc is banned outright: direnv would inject a devShell env
+  # into every shell entering the tree, and once the store closure is garbage
+  # collected that env points at dead paths (builds and links fail). The scan
+  # walks the working tree because .envrc is gitignored, so a git-tracked-file
+  # list can never see it.
+  # ref: allow-and-deny-lists.instructions.md#A14 -- .envrc ban
+  Write-Message "--- envrc ban policy ---"
+  $envrcErrors = 0
+
+  $envrcOffenders = @(if ($HasArgs) {
+    @($PositionalArgs | Where-Object { (Split-Path -Leaf $_) -eq '.envrc' })
+  } else {
+    @(Get-ChildItem -Path $r -Recurse -Force -File -Filter '.envrc' |
+        Where-Object { $_.FullName -notmatch '[\\/]\\.git[\\/]' -and $_.FullName -notmatch '[\\/]vendor[\\/]' } |
+        ForEach-Object { [IO.Path]::GetRelativePath($r, $_.FullName) })
+  })
+
+  foreach ($envrcOffender in $envrcOffenders) {
+    $envrcErrors++
+    Write-ErrorMessage "envrc ban: '$envrcOffender' exists; delete it (a repo-local .envrc would inject a devShell env at cd; see allow-and-deny-lists.instructions.md)"
+  }
+
+  if ($envrcErrors -gt 0) {
+    Write-ErrorMessage "envrc ban policy check failed with $envrcErrors error(s)"
+    $failed = $true
+  } else {
+    Write-Message "envrc ban policy passed."
+  }
+
   if ($failed) {
     Write-ErrorMessage "repository policy (pattern-based) check failed"
     return $false

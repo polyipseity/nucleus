@@ -412,6 +412,86 @@ test_step14_text_hygiene_placeholder_cell_allowed() {
   [ "$_ret" -eq 0 ]
 }
 
+# --- envrc ban policy behavioral tests ---
+
+test_step14_envrc_ban_root_fails() {
+  local _tmp _out _ret
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  touch "$_tmp/.envrc"
+  run_envrc_ban_policy false "$_tmp" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -eq 0 ] || ! grep -q "envrc ban: '.envrc' exists; delete it" "$_out"; then
+    echo "FAIL: a root-level .envrc must fail the envrc ban policy and name the path"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+test_step14_envrc_ban_nested_fails() {
+  local _tmp _out _ret
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  mkdir -p "$_tmp/sub/dir"
+  touch "$_tmp/sub/dir/.envrc"
+  run_envrc_ban_policy false "$_tmp" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -eq 0 ] || ! grep -q "envrc ban: 'sub/dir/.envrc' exists; delete it" "$_out"; then
+    echo "FAIL: a nested .envrc must fail the envrc ban policy and name the relative path"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+test_step14_envrc_ban_clean_tree_passes() {
+  local _tmp _out _ret
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  mkdir -p "$_tmp/sub"
+  touch "$_tmp/sub/script.sh"
+  run_envrc_ban_policy false "$_tmp" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -ne 0 ] || ! grep -q 'envrc ban policy passed' "$_out"; then
+    echo "FAIL: a tree without .envrc must pass the envrc ban policy"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+test_step14_envrc_ban_scoped_mode_fails() {
+  local _tmp _out _ret
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  touch "$_tmp/.envrc"
+  run_envrc_ban_policy true "$_tmp" "$_tmp/.envrc" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -eq 0 ] || ! grep -q "envrc ban: '$_tmp/.envrc' exists; delete it" "$_out"; then
+    echo "FAIL: scoped mode must fail when the given path is an .envrc"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
 failures=0
 for test in \
   test_step14_removed_skip_constructs_detection \
@@ -431,7 +511,11 @@ for test in \
   test_step14_nix_file_structure_pattern2_detection \
   test_step14_nix_file_structure_valid_passes \
   test_step14_capture_pair_behavioral_positive \
-  test_step14_capture_pair_behavioral_negative; do
+  test_step14_capture_pair_behavioral_negative \
+  test_step14_envrc_ban_root_fails \
+  test_step14_envrc_ban_nested_fails \
+  test_step14_envrc_ban_clean_tree_passes \
+  test_step14_envrc_ban_scoped_mode_fails; do
   if ! $test; then
     failures=$((failures + 1))
   fi
