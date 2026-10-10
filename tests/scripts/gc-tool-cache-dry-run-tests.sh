@@ -22,16 +22,24 @@ GC_SH="$SCRIPT_DIR/../../scripts/gc.sh"
 # marker sits inside a subdir so the step's own find -maxdepth 1 -exec rm -rf
 # must remove the subdir before the marker file is reachable.
 #
-# The uv and cargo-binstall markers use $HOME/Library/Caches because the step
-# hardwires platform_cache_root to that path on Darwin and never reads
-# XDG_CACHE_HOME there (scripts/gc.sh:419-422).
+# The uv and cargo-binstall markers sit under the same platform_cache_root the
+# step computes (scripts/gc.sh:419-422): Library/Caches on Darwin, and the
+# XDG_CACHE_HOME that run_gc_with_env pins to <home>/caches elsewhere. Seeding
+# only the macOS path would leave the real-run assertion failing on Linux,
+# where the step clears <home>/caches instead.
 seed_tool_cache_tree() { # <home>
   local _h="$1"
+  local _platform_cache_root
+  if [ "$(uname -s)" = "Darwin" ]; then
+    _platform_cache_root="$_h/Library/Caches"
+  else
+    _platform_cache_root="$_h/caches"
+  fi
   printf '%s\n' \
     "$_h/.bun/install/cache/marker" \
-    "$_h/Library/Caches/cargo-binstall/marker" \
+    "$_platform_cache_root/cargo-binstall/marker" \
     "$_h/.rustup/tmp/marker" \
-    "$_h/Library/Caches/uv/marker"
+    "$_platform_cache_root/uv/marker"
 }
 
 # gc_flags: every --no-*-gc flag, so the run touches only the tool-cache step.
@@ -104,7 +112,7 @@ test_real_run_clears_entries() {
     fi
   done < <(seed_tool_cache_tree "$home")
 
-  # The uv cache on macOS sits at platform_cache_root, which the uv marker
+  # The uv cache sits at platform_cache_root, which the uv marker
   # above seeds. Every marker must be gone: if any survives, the step did not
   # clear that directory and the dry-run assertion above would be passing only
   # because the step is inert.
