@@ -35,22 +35,22 @@
   POSIX-only nix store GC expiry, accepted and ignored on Windows.
 
 .PARAMETER NoDuperemoveGc
-  POSIX-only skip switch, accepted and ignored on Windows.
+  POSIX-only btrfs duperemove on /nix/store skip, accepted and ignored on Windows.
 
 .PARAMETER NoHmGc
-  POSIX-only skip switch, accepted and ignored on Windows.
+  POSIX-only home-manager generation expiration skip, accepted and ignored on Windows.
 
 .PARAMETER NoJournaldGc
-  POSIX-only skip switch, accepted and ignored on Windows.
+  POSIX-only journald log vacuum skip, accepted and ignored on Windows.
 
 .PARAMETER NoNixArtifactsGc
-  POSIX-only skip switch, accepted and ignored on Windows.
+  POSIX-only stale result symlink cleanup skip, accepted and ignored on Windows.
 
 .PARAMETER NoNixGc
-  POSIX-only skip switch, accepted and ignored on Windows.
+  POSIX-only nix-collect-garbage skip, accepted and ignored on Windows.
 
 .PARAMETER NoSystemGc
-  POSIX-only skip switch, accepted and ignored on Windows.
+  POSIX-only system profile generation expiration skip, accepted and ignored on Windows.
 
 .NOTES
   Environment variables: NUCLEUS_GC_HM_EXPIRY, NUCLEUS_GC_LOG_COMPRESS, NUCLEUS_GC_LOG_MAX_FILES, NUCLEUS_GC_LOG_MAX_SIZE, NUCLEUS_GC_MODULE_DIR, NUCLEUS_GC_NIX_EXPIRY, NUCLEUS_LOG_EXPIRY, NUCLEUS_REPO_ROOT.
