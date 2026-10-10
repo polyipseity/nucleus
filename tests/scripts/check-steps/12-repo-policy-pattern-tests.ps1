@@ -165,9 +165,8 @@ try {
     Assert-Pass 'step 12: a file without .envrc passes the envrc ban policy'
   }
 
-  # 7. envrc ban policy: whole-repo mode reaches the real prune through a direct action invocation.
-  #    The fixture lives in its OWN subtree, not at the shared $fixtureDir root: the root-level,
-  #    nested, and tree-without cases above leave .envrc files behind, which a whole-repo scan
+  # Fixture for case 7 below: an isolated whole-repo subtree, NOT the shared $fixtureDir root.
+  #    The root-level, nested, and tree-without cases above leave .envrc files behind, which a whole-repo scan
   #    would also report and make the expected result depend on case ordering.
   #    WHY the src/modules/configs and tests skeleton: the action's preceding scans walk those
   #    paths and the cfg scan dereferences src/modules/configs without an existence guard, so the
@@ -206,6 +205,7 @@ try {
     # empty scans) that are expected for a fixture tree, so they must not abort the run and
     # hide the envrc policy under test; the assertions still gate on its reported output.
     '$ErrorActionPreference = "Continue"',
+    # reason: NUCLEUS_REPO_ROOT is expected to be absent, and the whole-repo scan must target the fixture root
     'Remove-Item -Path Env:NUCLEUS_REPO_ROOT -ErrorAction Ignore',
     ('$RepoRoot = ''{0}''' -f $repoRoot),
     '$FrameworkDir = Join-Path $RepoRoot "src/scripts/lib"',
@@ -250,6 +250,7 @@ try {
     # fixture tree, so they must not abort the run before the scoped envrc path is checked; the
     # assertion still gates on that reported path.
     '$ErrorActionPreference = "Continue"',
+    # reason: NUCLEUS_REPO_ROOT is expected to be absent, and the scoped path check must read the fixture root
     'Remove-Item -Path Env:NUCLEUS_REPO_ROOT -ErrorAction Ignore',
     ('$RepoRoot = ''{0}''' -f $repoRoot),
     '$FrameworkDir = Join-Path $RepoRoot "src/scripts/lib"',
@@ -267,7 +268,7 @@ try {
   # WHY: this gates on the action's own failure banner, not on $Status. The runner turns the
   # action's $false return value into exit 1 (step-runner.ps1:603-604), but this child script
   # discards that return value, so $LASTEXITCODE reads a native child's code and drifts to 0.
-  if ($envrcNestedTight.Output -notmatch 'envrc ban: ' -or $envrcNestedTight.Output -notmatch 'sub/' -or $envrcNestedTight.Output -notlike '*repository policy (pattern-based) check failed*') {
+  if ($envrcNestedTight.Output -notmatch "envrc ban: '[^']*[/\\]sub[/\\]\.envrc' exists" -or $envrcNestedTight.Output -notlike '*repository policy (pattern-based) check failed*') {
     Assert-Fail 'step 12: a nested .envrc is reported with its nested path' $envrcNestedTight.Output.Trim()
   } else {
     Assert-Pass 'step 12: a nested .envrc is reported with its nested path'
