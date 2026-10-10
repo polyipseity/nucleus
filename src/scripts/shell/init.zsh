@@ -1,6 +1,31 @@
-# Zsh initialization for nucleus-managed hosts. History exclusion, completion
-# directory, agent-session detection, dev tool interception, srt agent wrapping.
+# Zsh initialization for nucleus-managed hosts. History exclusion, stale
+# nix-env guard, completion directory, agent-session detection, dev tool
+# interception, srt agent wrapping.
 # Embedded by src/modules/shell.nix into initContent.
+
+# Warn once when the nix store paths this shell inherited have been
+# garbage-collected: a devShell env outlives its closure in long-lived shells,
+# and every link in them then dies with "library not found for -lSystem".
+# WHY warn-only, and why no Windows twin: unsetting the variables mid-session
+# would half-fix the shell and hide the problem; recovery needs a fresh process
+# tree (quit and reopen the terminal). Windows has no nix devShell env to go
+# stale, so there is no twin to write.
+if [[ -z "${__nucleus_stale_nix_warned:-}" ]]; then
+  __nucleus_stale_nix_path=""
+  if [[ -n "${NIX_CC:-}" && "${NIX_CC:-}" == /nix/store/* && ! -e "${NIX_CC:-}" ]]; then
+    __nucleus_stale_nix_path="$NIX_CC"
+  elif [[ -n "${SDKROOT:-}" && "${SDKROOT:-}" == /nix/store/* && ! -e "${SDKROOT:-}" ]]; then
+    __nucleus_stale_nix_path="$SDKROOT"
+  elif [[ -n "${DEVELOPER_DIR:-}" && "${DEVELOPER_DIR:-}" == /nix/store/* && ! -e "${DEVELOPER_DIR:-}" ]]; then
+    __nucleus_stale_nix_path="$DEVELOPER_DIR"
+  fi
+  if [[ -n "$__nucleus_stale_nix_path" ]]; then
+    print -u2 -- "this shell inherited nix store paths that no longer exist, e.g. $__nucleus_stale_nix_path."
+    print -u2 -- "builds and links will fail in it. quit and reopen this terminal, or log out and back in."
+    typeset -g __nucleus_stale_nix_warned=1
+  fi
+  unset __nucleus_stale_nix_path
+fi
 
 # History: exclude commands starting with a space and duplicates
 setopt HIST_IGNORE_SPACE
