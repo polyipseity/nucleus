@@ -492,6 +492,41 @@ test_step14_envrc_ban_scoped_mode_fails() {
   return 0
 }
 
+test_step14_envrc_ban_pruned_decoys_ignored() {
+  local _tmp _out _ret
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  # The find prune must skip .git and vendor at any depth and report only the real
+  # offender. A top-level .git and a nested .git both appear so the test fails if
+  # the prune ever drops back to excluding only the top-level .git. The real
+  # offender sits outside the pruned dirs so the run still fails, which is what
+  # proves the decoys were skipped rather than the whole scan being inert.
+  mkdir -p "$_tmp/.git" "$_tmp/vendor" "$_tmp/nested/.git" "$_tmp/real"
+  touch "$_tmp/.git/.envrc"
+  touch "$_tmp/vendor/.envrc"
+  touch "$_tmp/nested/.git/.envrc"
+  touch "$_tmp/real/.envrc"
+  run_envrc_ban_policy false "$_tmp" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -eq 0 ] || ! grep -q "envrc ban: 'real/.envrc' exists; delete it" "$_out"; then
+    echo "FAIL: a real .envrc outside the pruned dirs must still fail the envrc ban policy"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  if grep -q "envrc ban: '" "$_out" && [ "$(grep -c "envrc ban: '" "$_out")" -ne 1 ]; then
+    echo "FAIL: only the real .envrc must be reported; .git and vendor decoys must be pruned"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
 failures=0
 for test in \
   test_step14_removed_skip_constructs_detection \
@@ -515,7 +550,8 @@ for test in \
   test_step14_envrc_ban_root_fails \
   test_step14_envrc_ban_nested_fails \
   test_step14_envrc_ban_clean_tree_passes \
-  test_step14_envrc_ban_scoped_mode_fails; do
+  test_step14_envrc_ban_scoped_mode_fails \
+  test_step14_envrc_ban_pruned_decoys_ignored; do
   if ! $test; then
     failures=$((failures + 1))
   fi

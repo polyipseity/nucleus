@@ -516,7 +516,7 @@ run_envrc_ban_policy() {
   else
     while IFS= read -r -d '' _f; do
       _offenders+=("${_f#./}")
-    done < <(find . \( -path ./.git -o -path '*/vendor' \) -prune -o -name '.envrc' -type f -print0)
+    done < <(find . \( -path ./.git -o -path '*/.git' -o -path '*/vendor' \) -prune -o -name '.envrc' -type f -print0)
   fi
 
   if [ "${#_offenders[@]}" -gt 0 ]; then
