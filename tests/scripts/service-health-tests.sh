@@ -361,6 +361,23 @@ else
   assert_fail "recording a success advances lastSuccess" "expected > $_success_before, got $_success_after"
 fi
 
+# svc_health_record_live is the sibling writer the watchdog calls when a live
+# job's own record reads running. It is a dumb stamper: the running-vs-idle gate
+# lives in the watchdog (see service-watchdog-tests.sh section 25), so here it
+# only proves the field is written and its siblings are left alone.
+_live_before="$(rec "$_rst" '.lastSuccess')"
+_live_state_before="$(rec "$_rst" '.state')"
+_live_t0="$(date +%s)"
+svc_health_record_live "$_rst" >/dev/null 2>&1
+_live_after="$(rec "$_rst" '.lastLive')"
+if [ "$_live_after" -ge "$_live_t0" ] && [ "$_live_after" -le "$(date +%s)" ]; then
+  assert_pass "recording a live observation writes a fresh lastLive"
+else
+  assert_fail "recording a live observation writes a fresh lastLive" "expected a fresh epoch, got $_live_after"
+fi
+assert_eq "recording live leaves lastSuccess alone" "$_live_before" "$(rec "$_rst" '.lastSuccess')"
+assert_eq "recording live leaves the state alone" "$_live_state_before" "$(rec "$_rst" '.state')"
+
 # lastSuccess is the divider between the two loop rules: restarts newer than it
 # are failures, older ones belong to a healthy life.  A reader that evaluated
 # `.lastSuccess` inside the per-restart select would fail on a number and report

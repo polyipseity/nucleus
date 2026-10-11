@@ -248,6 +248,27 @@ svc_health_record_success() {
   mv "$tmp" "$file"
 }
 
+# WHY a sibling field, not a lastSuccess change: lastSuccess is consumed by
+#   svc_health_restart_count and svc_health_consecutive_failures for crash-loop
+#   detection, so changing its meaning would silently change that policy. lastLive
+#   is stamped only when the record reads running, so a lastSuccess that advances
+#   while lastLive does not is the visible signature of a job that was alive and
+#   not working (a cloud mount in its attach wait). The watchdog owns that gate;
+#   this writer is unconditional, mirroring svc_health_record_success.
+svc_health_record_live() {
+  local instance="$1"
+  svc_health_init "$instance"
+  local file now tmp
+  file="$(svc_health_state_file "$instance")"
+  now=$(date +%s)
+  tmp="${file}.tmp.$$"
+  if ! jq -c --argjson now "$now" '.lastLive = $now' "$file" >"$tmp" 2>/dev/null; then
+    rm -f "$tmp"
+    return 1
+  fi
+  mv "$tmp" "$file"
+}
+
 svc_health_restart_count() {
   local instance="$1" file
   file="$(svc_health_state_file "$instance")"

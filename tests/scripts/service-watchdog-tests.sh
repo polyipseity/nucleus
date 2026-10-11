@@ -1455,4 +1455,82 @@ assert_eq "an unknown supervisor type exits 0" 0 "$captured_status"
 assert_eq "an unknown supervisor type does not raise an unbound variable" 0 "$_f2a_unbound"
 rm -f "$F2A_DRIVER"
 
+# ── Section 25: lastLive diverges from lastSuccess for a live idle job ────
+section 25 "A live-but-idle job advances lastSuccess but not lastLive"
+
+# D3/lastLive: during a cloud-mount attach wait the rclone PROCESS is live, so
+# the watchdog stamps lastSuccess while nothing is mounted (the runner is what
+# stamps state=running once the volume attaches). lastLive is a sibling field the
+# watchdog stamps ONLY when the record itself reads running, so a lastSuccess that
+# advances while lastLive does not is the visible signature of a live-but-not-
+# working job. svc_health_record_success keeps its crash-loop contract untouched.
+cat >"$_tmp/repo/src/modules/services.json" <<'JSON'
+{
+  "lastlive": {
+    "displayName": "LastLive probe",
+    "hosts": {
+      "MacBook": {
+        "type": "macos-launchctl",
+        "scope": "system",
+        "service": "local.lastlive",
+        "unitPath": "/Library/LaunchDaemons/local.lastlive.plist"
+      }
+    }
+  }
+}
+JSON
+
+_ll_instance="lastlive"
+_ll_record="$state_dir/${_ll_instance}.json"
+_ll_succ() { jq -r '.lastSuccess // 0' "$_ll_record" 2>/dev/null || printf '0'; }
+_ll_live() { jq -r '.lastLive // 0' "$_ll_record" 2>/dev/null || printf '0'; }
+_ll_haslive() { jq -r 'has("lastLive")' "$_ll_record" 2>/dev/null || printf 'false'; }
+
+_scope_filter=""
+FAKE_LIST=""
+FAKE_LIVE="local.lastlive"
+FAKE_STATE="running"
+FAKE_EXIT_CODE=0
+FAKE_RUNS=0
+export FAKE_LIST FAKE_LIVE FAKE_STATE FAKE_EXIT_CODE FAKE_RUNS
+
+# (a) A live process whose record reads running: the tick must advance lastLive
+# alongside lastSuccess, and the field must exist at all. The existence check is
+# the RED: it fails while the field does not yet exist.
+jq -n --arg boot "$(svc_health_boot_id)" \
+  '{state:"running","class":null,"remedy":null,"attempts":0,"reportedState":null,"boot":$boot,"lastSuccess":0,"restarts":[],"generation":0,"lastExit":0}' \
+  >"$_ll_record"
+: >"$_tmp/launchctl.log"
+run_tick
+assert_eq "a live running job gains a lastLive field" "true" "$(_ll_haslive)"
+if [ "$(_ll_live)" -gt 0 ]; then
+  assert_pass "a live running job stamps lastLive"
+else
+  assert_fail "a live running job stamps lastLive" "lastLive=$(_ll_live)"
+fi
+if [ "$(_ll_succ)" -gt 0 ]; then
+  assert_pass "a live running job still stamps lastSuccess"
+else
+  assert_fail "a live running job still stamps lastSuccess" "lastSuccess=$(_ll_succ)"
+fi
+
+# (b) A live process whose record is NOT running (the attach-wait signature): the
+# tick keeps stamping lastSuccess but must NOT advance lastLive.
+jq -n --arg boot "$(svc_health_boot_id)" \
+  '{state:"stopped","class":null,"remedy":null,"attempts":0,"reportedState":null,"boot":$boot,"lastSuccess":0,"restarts":[],"generation":0,"lastExit":0}' \
+  >"$_ll_record"
+: >"$_tmp/launchctl.log"
+run_tick
+run_tick
+if [ "$(_ll_succ)" -gt 0 ]; then
+  assert_pass "a live idle job still advances lastSuccess"
+else
+  assert_fail "a live idle job still advances lastSuccess" "lastSuccess=$(_ll_succ)"
+fi
+assert_eq "a live idle job does not stamp lastLive" "0" "$(_ll_live)"
+rm -f "$_ll_record"
+unset FAKE_LIST FAKE_STATE FAKE_EXIT_CODE FAKE_RUNS
+FAKE_LIVE=""
+export FAKE_LIVE
+
 finish_tests

@@ -378,6 +378,17 @@ _watchdog_check_instance() {
         if ! svc_health_record_success "$instance"; then
           warn "watchdog: could not record success for $instance"
         fi
+        # WHY gate lastLive on the record's own state, not on process liveness:
+        #   a live rclone process during a mount's attach wait is alive and not
+        #   working, and only the runner stamps state=running once the volume
+        #   actually attaches. So lastLive advances only when the record reads
+        #   running; a lastSuccess that advances while lastLive does not is that
+        #   gap, made visible. lastSuccess keeps its crash-loop contract unchanged.
+        if [ "$_state" = "running" ]; then
+          if ! svc_health_record_live "$instance"; then
+            warn "watchdog: could not record live for $instance"
+          fi
+        fi
       fi
     fi
 
