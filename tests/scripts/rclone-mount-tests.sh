@@ -16,7 +16,7 @@
 #       rclone-mount.sh:33 explains this). Verify failure by reading the health
 #       record's state/class/remedy, NEVER by the exit code.
 #   <watch_status>: the only non-zero exit: the mount attached, then the rclone
-#       process died; its status is propagated verbatim (rclone-mount.sh:179).
+#       process died; its status is propagated verbatim (rclone-mount.sh:207-213).
 #   NOT returned: 1 / 2 / 3 / 20. Those were the contract of an earlier runner.
 # shellcheck shell=bash
 # SC1090: MOUNT_SH is a runtime variable; SC1091: test-lib.sh resolves via SCRIPT_DIR;
@@ -585,6 +585,85 @@ test_dead_mount_stops_attach_wait_early() {
     assert_pass "a dead mount is classified in ${elapsed}s, not after the 20s budget"
   else
     assert_fail "dead-mount-fast-classify" "elapsed=${elapsed}s budget=20s"
+  fi
+  rm -rf "$home" "$bin"
+
+  restore_default_mocks
+}
+
+section "3bb" "a mount that dies in the first poll is still classified from its status"
+
+# The regression the reorder caused, and the one no other case reaches. The loop
+# polls the probe between liveness checks, so a child that died during the first
+# poll used to leave probe_state unset, and the wait then polled the probe until
+# the budget expired. The classification below reads probe_state to separate a
+# table nobody could read from one that read absent, and an unset probe_state
+# answered neither.
+#
+# FAKE_PROBE_STATE is deliberately absent here, so the probe answers from the
+# marker the way a readable table reports one: absent on the first poll, before
+# the marker exists, and present on the second. That is the shape the reorder
+# broke. An exit-0 child against a probe that would answer present is a mount
+# the host tore down, and the class has to come from the capture rather than
+# from the budget arm.
+test_instant_death_is_classified_from_its_own_status() {
+  local home bin class
+  home="$(create_home)"
+  bin="$(setup_fake_rclone)"
+  # A 20s budget, so an early break is distinguishable from polling it out.
+  setup_env "$home" "$bin" 20
+  # The default 2s budget is too tight for this case: the fixed loop does one
+  # extra poll before it can break, so an instant death lands on the boundary
+  # and the neighbouring 2s-budget case flakes when this one runs first. The
+  # budget is not the defect, so it is this test's own input that is raised.
+  NUCLEUS_MOUNT_ATTEMPTS="1"
+  NUCLEUS_MOUNT_BACKOFF="0,0"
+  export NUCLEUS_MOUNT_ATTEMPTS NUCLEUS_MOUNT_BACKOFF
+  # Stubbed the way every other case in this suite stubs the classifier. The
+  # real backend_class answers provider-version on a host with macFUSE
+  # disabled, so it cannot pin the arm that classified.
+  MOCK_BACKEND_CLASSIFY() { printf 'path-permission\n'; }
+  # Terminal, so one attempt ends the run and the elapsed time is attributable
+  # to the attach wait alone rather than to retry backoff.
+  MOCK_BACKEND_IS_TRANSIENT() { return 1; }
+  MOCK_BACKEND_MOUNT() {
+    # check-suppress:suppression_doc: _backend_capture is set in the runner's scope before this mock is called
+    # Exit 0, the status rclone reports for a mount the host tore down. A
+    # subshell, so the pid the runner holds is a real child that dies at once.
+    (exit 0) 2>"$_backend_capture" &
+    _backend_rclone_pid=$!
+  }
+  # The probe is pinned rather than derived. run_main runs _cm_main in a
+  # subshell, so a poll counter here would not survive the next poll, and a
+  # marker written before the first poll is what made an earlier version of
+  # this test take the live arm instead. Absent is also the honest answer for a
+  # mount point on a host with no diskutil: the darwin fallback's directory
+  # test reads a dead mount point as empty and answers absent:not-listed, so
+  # this is the input the reorder regressed, and it is why the class can only
+  # have come from the child-exited arm.
+  MOCK_BACKEND_PROBE_STATE() { printf 'absent:not-listed\n'; }
+  export -f MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT MOCK_BACKEND_MOUNT MOCK_BACKEND_PROBE_STATE
+  install_mocks
+
+  local start elapsed
+  start=$SECONDS
+  run_main >"$home/out" 2>/dev/null
+  elapsed=$((SECONDS - start))
+  class="$(health_field class)"
+
+  # The class is whatever the stub answered, so path-permission can only have
+  # come through the child-exited arm: the budget arm forces io-transient for
+  # any ending it cannot place, and the live arm would have taken the mount.
+  if [ "$class" = "path-permission" ]; then
+    assert_pass "a mount that dies in the first poll is classified from its own status"
+  else
+    assert_fail "instant-death-class" \
+      "class=$class (expected path-permission: the budget arm answers io-transient, so only the child-exited arm can reach this class)"
+  fi
+  if [ "$elapsed" -lt 5 ]; then
+    assert_pass "a mount that dies in the first poll ends the wait in ${elapsed}s, not after the 20s budget"
+  else
+    assert_fail "instant-death-early" "elapsed=${elapsed}s budget=20s (the wait polled past the child's death)"
   fi
   rm -rf "$home" "$bin"
 
@@ -1553,6 +1632,7 @@ test_mount_succeeds_and_records_success
 test_mount_passes_remote_and_point_to_rclone
 test_transient_error_retries_and_succeeds
 test_dead_mount_stops_attach_wait_early
+test_instant_death_is_classified_from_its_own_status
 test_unreadable_mount_table_does_not_record_running
 test_successful_mount_clears_a_stale_evidence_pointer
 test_removing_this_attempts_file_keeps_an_earlier_pointer

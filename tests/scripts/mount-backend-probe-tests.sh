@@ -149,28 +149,65 @@ mkdir -p "$_darwin_empty" "$_darwin_full" "$_darwin_unreadable"
 : >"$_darwin_full/an-entry"
 chmod 000 "$_darwin_unreadable"
 
-# ── a diskutil that names a volume answers, whatever the directory holds ─────
+# ── only a reported mount point equal to ours proves the volume is HERE ─────
 # The empty directory is the discriminating input: the content test alone would
-# call it absent, so `present` here can only have come from diskutil.
+# call it absent, so `present` here can only have come from diskutil, and only
+# from its reported mount point matching the path we passed.
+cat >"$_shim_dir/diskutil" <<'SHIM'
+#!/bin/sh
+echo "   Volume Name: test-volume"
+echo "   Mount Point: $2"
+SHIM
+chmod +x "$_shim_dir/diskutil"
+_darwin_named_state="$(backend_probe_state "$_darwin_empty")"
+case "$_darwin_named_state" in
+present) assert_pass "on darwin a volume mounted at our path answers present for an empty mount point" ;;
+*) assert_fail "darwin-probe-named-volume" \
+  "a volume reported at our own path left the mount point reading as [$_darwin_named_state]" ;;
+esac
+
+# ── a volume name with no mount point is not evidence of a mount ────────────
+# A diskutil that names a volume but reports no mount point cannot say the volume
+# is attached HERE, so the answer is absent rather than present.
 cat >"$_shim_dir/diskutil" <<'SHIM'
 #!/bin/sh
 echo "   Volume Name: test-volume"
 SHIM
 chmod +x "$_shim_dir/diskutil"
-_darwin_named_state="$(backend_probe_state "$_darwin_empty")"
-case "$_darwin_named_state" in
-present) assert_pass "on darwin a diskutil that names a volume answers for an empty mount point" ;;
-*) assert_fail "darwin-probe-named-volume" \
-  "a diskutil that named a volume left an empty mount point reading as [$_darwin_named_state]" ;;
+_darwin_novolmount_state="$(backend_probe_state "$_darwin_empty")"
+case "$_darwin_novolmount_state" in
+absent:not-listed) assert_pass "a volume name with no reported mount point is not read as a mount" ;;
+*) assert_fail "darwin-probe-volume-no-mountpoint" \
+  "a volume name with no mount point left the mount point reading as [$_darwin_novolmount_state]" ;;
 esac
 
-# ── a diskutil on PATH that names no volume: not mounted ───────────────────
-# The shim is on PATH and names nothing, which is what `diskutil info` does for
-# a path holding no volume: it exits non-zero with its message on stderr, and the
-# probe discards both. The directory is non-empty on purpose. Reading it as
-# present tells the attach loop a mount is live, and the loop acts on that by
-# recording the service running, clearing the evidence pointer and deleting the
-# capture file for a mount that never attached.
+# ── P0 regression: a poisoned mount point resolves to its parent volume ─────
+# This is the state proven live on macOS 27.0.1: a mount point whose mount was
+# torn down uncleanly has diskutil resolve the path to the CONTAINING APFS
+# volume, so it prints a real `Volume Name: Data` and a mount point that is not
+# ours. The old grep matched the volume name and answered present, so the attach
+# loop recorded a dead mount healthy and deleted the capture file that held the
+# reason. The directory is non-empty on purpose: leftover files in a mount point
+# must not read as an attached volume either.
+cat >"$_shim_dir/diskutil" <<'SHIM'
+#!/bin/sh
+echo "   Device Identifier:         disk3s5"
+echo "   Volume Name:               Data"
+echo "   Mount Point:               /System/Volumes/Data"
+SHIM
+chmod +x "$_shim_dir/diskutil"
+_darwin_parent_state="$(backend_probe_state "$_darwin_full")"
+case "$_darwin_parent_state" in
+absent:not-listed) assert_pass "a poisoned mount point that resolves to its parent volume reads as not mounted" ;;
+*) assert_fail "darwin-probe-poisoned-parent" \
+  "a poisoned mount point read as [$_darwin_parent_state]: a volume resolved to its parent would be recorded as a healthy mount" ;;
+esac
+
+# ── the no-mount-point case stays absent for a NON-empty directory too ──────
+# A diskutil that names no mount point must not fall through to the directory
+# test, which would read leftover files in a mount point as an attached volume.
+# The attach loop acts on `present` by recording the service running and
+# deleting the capture file, so that mistake records a dead mount as healthy.
 cat >"$_shim_dir/diskutil" <<'SHIM'
 #!/bin/sh
 exit 7
@@ -181,6 +218,26 @@ case "$_darwin_full_state" in
 absent:not-listed) assert_pass "a diskutil that names no volume reports a non-empty mount point as not mounted" ;;
 *) assert_fail "darwin-probe-nonempty-unmounted" \
   "a non-empty mount point read as [$_darwin_full_state] although diskutil named no volume — leftover files would be recorded as a healthy mount" ;;
+esac
+
+# ── a clean, never-mounted directory still reads as not mounted ─────────────
+# On a real host this shape is `Could not find disk: <path>`, which prints no
+# mount point at all and exits non-zero. Asserted with a non-empty directory as
+# the input so the answer can only have come from diskutil's silence, not from
+# the directory test finding nothing. This is the false-negative check that
+# keeps the poisoned-parent fix above from being solved by always answering
+# absent when diskutil is present.
+cat >"$_shim_dir/diskutil" <<'SHIM'
+#!/bin/sh
+echo "Could not find disk: $2" >&2
+exit 1
+SHIM
+chmod +x "$_shim_dir/diskutil"
+_darwin_clean_state="$(backend_probe_state "$_darwin_full")"
+case "$_darwin_clean_state" in
+absent:not-listed) assert_pass "a clean directory with no volume reads as not mounted on darwin" ;;
+*) assert_fail "darwin-probe-clean-unmounted" \
+  "a clean unmounted directory read as [$_darwin_clean_state]: a volume resolved elsewhere would be recorded as a healthy mount" ;;
 esac
 
 # ── with no diskutil on PATH the directory test is the only evidence ─────────

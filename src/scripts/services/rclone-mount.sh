@@ -139,6 +139,24 @@ _cm_main() {
     # disagree when the loop breaks on a dead child after a readable absent answer.
     local exit_reason=""
     while [ $((SECONDS - attach_start)) -lt "$attach_seconds" ]; do
+      # WHY liveness is read from the process: a probe is not proof of life. The
+      #   probe is itself a forked child, so its exit status cannot be bound to a
+      #   variable, and it can answer about a mount that has already gone.
+      # WHY this is a check and not a break, the regression the reorder caused:
+      #   the loop's only other break is the present check, so a child that died
+      #   during the first poll left probe_state unset, probe_unknown unset, and
+      #   the wait polled the probe until the budget expired. On a host with no
+      #   diskutil the directory fallback answers absent:not-listed for a dead
+      #   mount point, so the run could not tell that from a live one. Taking the
+      #   status here and classifying it once the wait has ended keeps the
+      #   decision single and lets the classification below read both signals.
+      #   kill -0 on a zombie succeeds, but the probe and the sleep are
+      #   foreground children, so bash reaps between polls and the worst case is
+      #   one extra poll.
+      local child_exited=false
+      if ! kill -0 "${_backend_rclone_pid:-}" 2>/dev/null; then
+        child_exited=true
+      fi
       # WHY: backend_probe_state keeps the third value. A two-valued answer is 0
       #   both for a live mount and for a table that could not be read, and this
       #   loop acts on that 0 by recording the service running and deleting the
@@ -150,13 +168,19 @@ _cm_main() {
         exit_reason="attached"
         break
       fi
-      # WHY: a mount that dies during startup would otherwise be polled for the whole
-      #   budget before anything classified it, even though the capture file
-      #   already held the reason. An unreaped child is a zombie and kill -0
-      #   succeeds on a zombie, but the probe and sleep are foreground children, so
-      #   bash reaps between polls and the worst case is one extra poll.
-      if ! kill -0 "${_backend_rclone_pid:-}" 2>/dev/null; then
+      # WHY a check rather than a break, and after the probe: the probe must run
+      #   at least once so that the classification below can separate a mount
+      #   nobody could read from one that read absent, and a mount that died is
+      #   not allowed to skip that read. A child that died now also ends the wait
+      #   on the first poll, so a mount that dies during startup is not polled for
+      #   the whole budget before anything classifies it.
+      if [ "$child_exited" = true ]; then
         exit_reason="child-exited"
+        break
+      fi
+      # WHY bounded by the budget: SECONDS is wall-clock, so a sleep that could
+      #   outlast the remaining budget would keep polling after the wait ended.
+      if [ $((SECONDS - attach_start)) -ge "$attach_seconds" ]; then
         break
       fi
       sleep 1
@@ -179,14 +203,14 @@ _cm_main() {
       svc_health_set "$instance" failureOutput null
       rm -f "$capture_file" "$mount_args_file"
 
-      local watch_status=0
-      wait "$_backend_rclone_pid" || watch_status=$?
+      local wait_status=0
+      wait "$_backend_rclone_pid" || wait_status=$?
 
-      svc_health_set_last_exit "$instance" "$watch_status"
+      svc_health_set_last_exit "$instance" "$wait_status"
       # check-suppress:suppression_doc: best-effort unmount after mount failure
       backend_unmount "$mount_point" 2>/dev/null || true
-      notice -l cloud-drives "$instance: mount exited with status $watch_status"
-      exit "$watch_status"
+      notice -l cloud-drives "$instance: mount exited with status $wait_status"
+      exit "$wait_status"
     fi
 
     local class
@@ -195,18 +219,17 @@ _cm_main() {
     #   rclone's output and answers mount-failed when it finds no cause there,
     #   blaming the mount for a read nobody could make and sending the operator to
     #   check the remote. io-transient is the class whose remedy is to try again.
-    # WHY: there is no `attached` arm, because the wait can only end attached when
-    #   live is true, and the success path exits before reaching this case. The
-    #   `*)` arm covers an ending this code cannot place and reads it as
-    #   io-transient, the class that costs a retry, over the terminal classes that
-    #   stop the run on the strength of a read that never completed.
+    # WHY there is no `attached` arm: the wait can only end attached when live is
+    #   true, and the success path exits before reaching this case. The `*)` arm
+    #   covers an ending this code cannot place and reads it as io-transient, the
+    #   class that costs a retry, over the terminal classes that stop the run on
+    #   the strength of a read that never completed.
+    probe_unknown=false
     case "$exit_reason" in
     child-exited | budget)
       if [ "${probe_state#unknown:}" != "$probe_state" ]; then
         probe_unknown=true
         class="io-transient"
-      else
-        probe_unknown=false
       fi
       ;;
     *)
@@ -214,6 +237,7 @@ _cm_main() {
       class="io-transient"
       ;;
     esac
+
     local remedy
     remedy="$(backend_remedy "$class")"
 

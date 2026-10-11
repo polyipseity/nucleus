@@ -26,9 +26,11 @@ backend_class() {
 
   # WHY anchored to an HTTP status: same as darwin, a bare `401` matched the
   #   millisecond field of an rclone timestamp and recorded a healthy remote as
-  #   bad credentials. Cross-host parity: both classifiers decide the same class
-  #   from the same wording.
-  if grep -qE 'Unauthorized|Invalid credentials|unauthorized_request|auth.*failed|HTTP status 401' "$capture"; then
+  #   bad credentials. 421 is anchored for the same reason: an expired session
+  #   surfaces as HTTP 421, and a bare number would match that millisecond
+  #   field too. Cross-host parity: both classifiers decide the same class from
+  #   the same wording.
+  if grep -qE 'Unauthorized|Invalid credentials|unauthorized_request|auth.*failed|HTTP status 401|HTTP status 421|Invalid global session' "$capture"; then
     printf 'auth\n'
     return
   fi

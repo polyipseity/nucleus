@@ -175,4 +175,55 @@ else
     "expected 'mount-failed', got '$_linux_class'; the Linux pattern still reads the millisecond field as auth"
 fi
 
+# ── an expired session is auth, and its status is anchored too ──────────────
+# 421 is what an expired Apple session surfaced as on a live MacBook. It fell
+# through every arm to mount-failed, whose remedy points the operator at remote
+# configuration when the real action is a re-authentication.
+assert_class "an HTTP 421 status classifies as auth" \
+  "auth" "enabled" \
+  'Failed to list files: HTTP status 421'
+
+assert_class "an invalid global session classifies as auth" \
+  "auth" "enabled" \
+  'ERROR: iCloud root not found: Invalid global session'
+
+# The same trap the 401 anchor guards, one digit over: 421 lands in the
+#   millisecond field of an rclone timestamp (12:58:41.421) dozens of times a
+#   second, so an unanchored 421 records an ordinary mount failure as bad
+#   credentials. A timestamp carrying no status and no session phrase must
+#   stay mount-failed.
+assert_class "a timestamp-only capture with .421 does not classify as auth" \
+  "mount-failed" "enabled" \
+  '2026/10/08 12:58:41.421 NOTICE : mounting remote'
+
+# The Linux classifier carries the same anchored pattern, asserted in its own
+#   subshell for the same shadowing reason as the verdicts above.
+_linux_421_class="$(
+  unset _NUCLEUS_MOUNT_BACKEND_LINUX_SOURCED
+  # shellcheck source=../../src/scripts/lib/mount-backend-linux.sh
+  . "$REPO_ROOT/src/scripts/lib/mount-backend-linux.sh"
+  printf '%s\n' 'Failed to list files: HTTP status 421' >"$CAPTURE"
+  backend_class "$CAPTURE"
+)"
+if [ "$_linux_421_class" = "auth" ]; then
+  assert_pass "linux: an HTTP 421 status classifies as auth"
+else
+  assert_fail "linux-421-auth" \
+    "expected 'auth', got '$_linux_421_class'; the Linux pattern misses an expired session"
+fi
+
+_linux_421_ts_class="$(
+  unset _NUCLEUS_MOUNT_BACKEND_LINUX_SOURCED
+  # shellcheck source=../../src/scripts/lib/mount-backend-linux.sh
+  . "$REPO_ROOT/src/scripts/lib/mount-backend-linux.sh"
+  printf '%s\n' '2026/10/08 12:58:41.421 NOTICE : mounting remote' >"$CAPTURE"
+  backend_class "$CAPTURE"
+)"
+if [ "$_linux_421_ts_class" = "mount-failed" ]; then
+  assert_pass "linux: a timestamp-only capture with .421 does not classify as auth"
+else
+  assert_fail "linux-421-timestamp-auth" \
+    "expected 'mount-failed', got '$_linux_421_ts_class'; the Linux pattern reads the millisecond field as auth"
+fi
+
 finish_tests

@@ -45,7 +45,12 @@ backend_class() {
   #   field of an rclone timestamp (12:58:41.401), so an ordinary mount failure
   #   was recorded as bad credentials. Genuine auth errors carry either the
   #   word Unauthorized (already matched above) or the status phrase itself.
-  if grep -qE 'Unauthorized|Invalid credentials|unauthorized_request|auth.*failed|HTTP status 401' "$capture"; then
+  # WHY 421 is anchored the same way: an expired session surfaces as HTTP 421,
+  #   and 421 lands in the millisecond field of that same timestamp dozens of
+  #   times a second, so a bare number would recreate the 401 bug one digit
+  #   over. The session wording is a phrase, not a number, so it needs no
+  #   anchor, and it is what an expired Apple iCloud session reports.
+  if grep -qE 'Unauthorized|Invalid credentials|unauthorized_request|auth.*failed|HTTP status 401|HTTP status 421|Invalid global session' "$capture"; then
     printf 'auth\n'
     return
   fi
@@ -254,14 +259,26 @@ _backend_rclone_pid=""
 backend_probe_state() {
   local mount_point="$1"
 
-  # WHY: a diskutil that names no volume answers not mounted. Falling through to the
-  # directory test would read leftover files in a mount point as an attached volume, and
-  # the attach loop acts on `present` by recording the service running and deleting the
-  # capture file. A diskutil that cannot answer reads the same, so it too answers absent,
-  # and unknown:dir-unreadable stays reserved for a caller-unreadable directory on a host
-  # with no diskutil.
+  # WHY the reported mount point is the only evidence, and a volume name is none: a
+  # poisoned mount point, meaning a directory whose mount was torn down uncleanly, has
+  # diskutil resolve the path to the CONTAINING APFS volume, so it prints a real
+  # `Volume Name: Data` and a `Mount Point:` of /System/Volumes/Data. Grepping for the
+  # volume name alone answered `present` for exactly that state, and the attach loop in
+  # rclone-mount.sh acts on `present` by recording the service running and deleting the
+  # capture file, so a dead mount was recorded healthy and its evidence destroyed in the
+  # same step. A poisoned mount point also stays poisoned across a reboot with nothing
+  # mounted, so the wrong answer recurred and spread to other drives. Only a reported
+  # mount point equal to the path we passed proves the volume is attached HERE.
+  # WHY absent when no line matches, and unknown is not used: a diskutil that names no
+  # volume and one that fails to answer both print no `Mount Point:` line, and neither is
+  # evidence of a mount. unknown:dir-unreadable stays reserved for a caller-unreadable
+  # directory on a host with no diskutil, so the token keeps one meaning.
   if command -v diskutil >/dev/null 2>&1; then
-    if diskutil info "$mount_point" 2>/dev/null | grep -q "Volume Name"; then
+    local reported
+    reported="$(diskutil info "$mount_point" 2>/dev/null |
+      sed -n 's/^[[:space:]]*Mount Point:[[:space:]]*//p' |
+      head -n 1)"
+    if [ "$reported" = "$mount_point" ]; then
       printf 'present\n'
     else
       printf 'absent:not-listed\n'
