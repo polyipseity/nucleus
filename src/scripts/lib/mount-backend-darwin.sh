@@ -15,14 +15,18 @@ _MOUNT_BACKEND_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd
 [ -n "${_NUCLEUS_SERVICE_HEALTH_SOURCED-}" ] || . "$_MOUNT_BACKEND_DIR/service-health.sh"
 
 # Args: $1 stderr capture file path.
-# Outputs: class token string. One of: provider-refusal, provider-version,
-#   io-transient, auth, remote-not-found, path-permission, mount-failed.
+# Outputs: class token string, in decision order. One of: no-output,
+#   provider-refusal, provider-version, io-transient, auth, remote-not-found,
+#   path-permission, torn-down, mount-failed.
 backend_class() {
   local capture="$1"
-  [ -f "$capture" ] || {
-    printf 'mount-failed\n'
+  # A missing file and a file rclone wrote nothing into are the same silence:
+  # the runner reaches classification with no rclone words to justify any
+  # class, and the old mount-failed fall-through blamed the remote anyway.
+  if [ ! -f "$capture" ] || [ ! -s "$capture" ]; then
+    printf 'no-output\n'
     return
-  }
+  fi
 
   # fskit_macfuse_module_state answers enabled|disabled|unknown. `disabled` means the
   # extension is present but switched off, which a re-enable can clear, so it is the one
@@ -70,6 +74,18 @@ backend_class() {
     return
   fi
 
+  # WHY after every error grep: a capture holding a real error plus the
+  #   clean-unmount NOTICE is the error case, and each grep above returns
+  #   before this one is reached. rclone logs `Unmounted rclone mount` when a
+  #   mounted volume is torn down cleanly and writes nothing else on that
+  #   path, so reaching here with the NOTICE is the signature of a teardown:
+  #   the volume attached and something removed it, and no remote,
+  #   credential, or path is at fault.
+  if grep -q 'Unmounted rclone mount' "$capture"; then
+    printf 'torn-down\n'
+    return
+  fi
+
   printf 'mount-failed\n'
 }
 
@@ -92,8 +108,14 @@ backend_remedy() {
   io-transient)
     printf 'retry in progress'
     ;;
+  torn-down)
+    printf "%s" "the mount attached and was torn down; check the runner log and system logs for the teardown cause"
+    ;;
+  no-output)
+    printf "%s" "rclone wrote nothing to its output; check the runner log for this mount"
+    ;;
   *)
-    printf "%s" "check remote configuration and credentials; the health record for this mount carries rclone's failing output"
+    printf "%s" "check remote configuration and credentials; when present, the health record for this mount carries rclone's failing output"
     ;;
   esac
 }

@@ -226,4 +226,168 @@ else
     "expected 'mount-failed', got '$_linux_421_ts_class'; the Linux pattern reads the millisecond field as auth"
 fi
 
+section "4" "a clean unmount with no error is torn-down, and silence is no-output"
+
+# rclone logs this NOTICE when a mounted volume is torn down cleanly. The live
+# evidence behind the torn-down class: three drives attached, held under a
+# second, and exited 0 with this line and no error at all, yet the fall-through
+# recorded each as mount-failed, whose remedy sent the operator to check
+# credentials for remotes that were fine.
+UNMOUNT_NOTICE='2026/10/11 22:53:01 NOTICE : /Users/admin/clouds/iCloud: Unmounted rclone mount'
+
+assert_class "an unmount-only capture classifies as torn-down" \
+  "torn-down" "enabled" "$UNMOUNT_NOTICE"
+
+# The discriminating case: the ordering is what enforces "no error". A capture
+# holding a real error AND the unmount NOTICE must stay the error class, because
+# every error grep returns before the teardown predicate is reached. A single
+# `grep -q Unmounted` placed ahead of the other tests breaks exactly here.
+assert_class "an auth error followed by an unmount NOTICE still classifies as auth" \
+  "auth" "enabled" "$(printf 'Failed to list files: HTTP status 401\n%s' "$UNMOUNT_NOTICE")"
+
+# A capture file nobody created arrives with no rclone words to justify any
+# class, and its old mount-failed remedy told the operator to check remote
+# configuration. no-output says the runner captured nothing and points at the
+# runner log instead.
+_missing_class="$(backend_class "$CAPTURE.absent")"
+if [ "$_missing_class" = "no-output" ]; then
+  assert_pass "a missing capture classifies as no-output"
+else
+  assert_fail "missing-capture-class" "expected 'no-output', got '$_missing_class'"
+fi
+
+_missing_remedy="$(backend_remedy no-output)"
+case "$_missing_remedy" in
+*"check remote configuration"*)
+  assert_fail "no-output-remedy-not-credentials" \
+    "remedy '$_missing_remedy' still sends the operator to remote configuration"
+  ;;
+*)
+  assert_pass "no-output-remedy-not-credentials"
+  ;;
+esac
+case "$_missing_remedy" in
+*"runner log"*)
+  assert_pass "no-output-remedy-points-at-the-runner-log"
+  ;;
+*)
+  assert_fail "no-output-remedy-points-at-the-runner-log" \
+    "remedy '$_missing_remedy' does not name the runner log"
+  ;;
+esac
+
+# An existing-but-empty capture is the same silence: rclone wrote nothing to
+# stderr, so every error grep misses and the old fall-through answered
+# mount-failed with the credentials remedy.
+: >"$CAPTURE"
+_empty_class="$(backend_class "$CAPTURE")"
+if [ "$_empty_class" = "no-output" ]; then
+  assert_pass "an empty capture classifies as no-output"
+else
+  assert_fail "empty-capture-class" "expected 'no-output', got '$_empty_class'"
+fi
+
+# The torn-down remedy names the teardown itself. Sending the operator to
+# credentials for a volume that mounted and was then unmounted cleanly is the
+# misdiagnosis this class exists to end.
+_torn_remedy="$(backend_remedy torn-down)"
+case "$_torn_remedy" in
+*credentials* | *"check remote configuration"*)
+  assert_fail "torn-down-remedy-names-teardown" \
+    "remedy '$_torn_remedy' points at credentials or configuration"
+  ;;
+*)
+  assert_pass "torn-down-remedy-names-teardown"
+  ;;
+esac
+
+# Both new classes are terminal: a teardown nothing explains and a silent
+# rclone are not cleared by retrying, and retrying them is the restart storm
+# the blocked-marker contract exists to prevent.
+if backend_is_transient "torn-down"; then
+  assert_fail "torn-down-is-terminal" "backend_is_transient returned 0 — a teardown would be retried forever"
+else
+  assert_pass "torn-down-is-terminal"
+fi
+
+if backend_is_transient "no-output"; then
+  assert_fail "no-output-is-terminal" "backend_is_transient returned 0 — silence would be retried forever"
+else
+  assert_pass "no-output-is-terminal"
+fi
+
+# The default remedy's claim about the health record is only true when the
+# record kept a capture file, which happens on the unreadable-table path alone.
+# An unconditional claim pointed readers at evidence that was routinely absent.
+_default_remedy="$(backend_remedy mount-failed)"
+case "$_default_remedy" in
+*"when present, the health record for this mount carries rclone's failing output"*)
+  assert_pass "default remedy qualifies the health-record claim"
+  ;;
+*)
+  assert_fail "default-remedy-qualifies-record-claim" \
+    "remedy '$_default_remedy' asserts the record carries rclone's output unconditionally"
+  ;;
+esac
+
+# The Linux classifier carries the same predicate and the same ordering,
+# asserted in its own subshell for the same shadowing reason as above: both
+# backends define backend_class, and the last source would shadow the first.
+_linux_torn="$(
+  unset _NUCLEUS_MOUNT_BACKEND_LINUX_SOURCED
+  # shellcheck source=../../src/scripts/lib/mount-backend-linux.sh
+  . "$REPO_ROOT/src/scripts/lib/mount-backend-linux.sh"
+  printf '%s\n' "$UNMOUNT_NOTICE" >"$CAPTURE"
+  backend_class "$CAPTURE"
+)"
+if [ "$_linux_torn" = "torn-down" ]; then
+  assert_pass "linux: an unmount-only capture classifies as torn-down"
+else
+  assert_fail "linux-torn-down-class" \
+    "expected 'torn-down', got '$_linux_torn'; the Linux predicate misses the clean unmount"
+fi
+
+_linux_torn_auth="$(
+  unset _NUCLEUS_MOUNT_BACKEND_LINUX_SOURCED
+  # shellcheck source=../../src/scripts/lib/mount-backend-linux.sh
+  . "$REPO_ROOT/src/scripts/lib/mount-backend-linux.sh"
+  printf 'Failed to list files: HTTP status 401\n%s\n' "$UNMOUNT_NOTICE" >"$CAPTURE"
+  backend_class "$CAPTURE"
+)"
+if [ "$_linux_torn_auth" = "auth" ]; then
+  assert_pass "linux: an auth error followed by an unmount NOTICE still classifies as auth"
+else
+  assert_fail "linux-torn-auth" \
+    "expected 'auth', got '$_linux_torn_auth'; the Linux ordering lets the unmount swallow a real error"
+fi
+
+_linux_silent="$(
+  unset _NUCLEUS_MOUNT_BACKEND_LINUX_SOURCED
+  # shellcheck source=../../src/scripts/lib/mount-backend-linux.sh
+  . "$REPO_ROOT/src/scripts/lib/mount-backend-linux.sh"
+  backend_class "$CAPTURE.absent"
+)"
+if [ "$_linux_silent" = "no-output" ]; then
+  assert_pass "linux: a missing capture classifies as no-output"
+else
+  assert_fail "linux-missing-capture-class" \
+    "expected 'no-output', got '$_linux_silent'; the Linux fall-through still blames the remote"
+fi
+
+_linux_default_remedy="$(
+  unset _NUCLEUS_MOUNT_BACKEND_LINUX_SOURCED
+  # shellcheck source=../../src/scripts/lib/mount-backend-linux.sh
+  . "$REPO_ROOT/src/scripts/lib/mount-backend-linux.sh"
+  backend_remedy mount-failed
+)"
+case "$_linux_default_remedy" in
+*"when present, the health record for this mount carries rclone's failing output"*)
+  assert_pass "linux: default remedy qualifies the health-record claim"
+  ;;
+*)
+  assert_fail "linux-default-remedy-qualifies-record-claim" \
+    "remedy '$_linux_default_remedy' asserts the record carries rclone's output unconditionally"
+  ;;
+esac
+
 finish_tests
