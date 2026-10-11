@@ -13,3 +13,25 @@
 #>
 
 . (Resolve-Path (Join-Path $PSScriptRoot '../../../../../../../../src/platforms/Windows/modules/ServiceHealth.ps1')).Path
+
+# WHY a substituted boot id: Get-HealthBootId reaches for Get-CimInstance, which
+#   does not exist on a POSIX test host, so production answers 'unknown' there
+#   and Test-HealthBlocked fails closed for every record, including one whose
+#   boot stamp is deliberately stale. The retry-loop case that pins the
+#   previous-boot gate (a blocked record stops gating after a reboot) needs the
+#   child process to see a stable, real-shaped boot id the way a Windows host
+#   provides one. Same category as the Mount-Backend-Prepare stub beside it: a
+#   lookup Windows owns that a POSIX host cannot answer.
+function Get-HealthBootId {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param()
+    if (-not $IsWindows) { return 'fixture-boot-id' }
+    try {
+        $boot = (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime
+        if ($null -eq $boot) { return $script:HealthBootUnknown }
+        return $boot.ToString('o')
+    } catch {
+        return $script:HealthBootUnknown
+    }
+}

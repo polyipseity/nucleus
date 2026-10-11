@@ -399,3 +399,35 @@ Describe 'Get-HealthBootId boot identity' {
     $script:StubBootTime = [datetime]'2026-09-19T16:17:08'
   }
 }
+
+Describe 'Set-HealthBlocked failure tail' {
+  # Mirrors svc_health_set_blocked in src/scripts/lib/service-health.sh, which
+  # takes rclone's failing output and stores it under the same field name. A
+  # class with no evidence behind it sends the operator hunting through runner
+  # logs that macOS clears at reboot, so the tail is what survives.
+
+  It 'stores the tail on the blocked record' {
+    Set-HealthBlocked -Instance 'tail-store' -Class 'auth' -Remedy 'verify remote credentials' `
+      -FailureOutput "ERROR: listing failed`nHTTP status 401"
+
+    (Get-HealthField -Instance 'tail-store' -Field 'failureOutput') `
+      | Should -Be "ERROR: listing failed`nHTTP status 401"
+  }
+
+  It 'leaves the tail null when the write carries none' {
+    Set-HealthBlocked -Instance 'tail-absent' -Class 'auth' -Remedy 'verify remote credentials'
+
+    (Get-HealthField -Instance 'tail-absent' -Field 'failureOutput') | Should -BeNullOrEmpty
+  }
+
+  It 'drops the tail on clear' {
+    # A cleared block is a healthy mount, and a record still carrying the last
+    # failure's output sends the next reader after a problem that is gone.
+    Set-HealthBlocked -Instance 'tail-clear' -Class 'auth' -Remedy 'verify remote credentials' `
+      -FailureOutput 'rclone said no'
+
+    Clear-HealthRecord -Instance 'tail-clear'
+
+    (Get-HealthField -Instance 'tail-clear' -Field 'failureOutput') | Should -BeNullOrEmpty
+  }
+}

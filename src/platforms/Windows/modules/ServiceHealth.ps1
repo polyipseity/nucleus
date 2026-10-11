@@ -9,9 +9,12 @@
     The block setters assign to the record's fixed key set directly, which is
     safe only because every key they touch is one Initialize-HealthRecord
     writes. A key outside that set goes through Set-HealthField, which can add
-    one. The evidence field stays absent from every record whose instance is not
-    a mount runner, and the runner creates it the first time it keeps a capture
-    file.
+    one. The evidence and failureOutput fields are never written by
+    Initialize-HealthRecord: the runner creates evidence the first time it keeps
+    a capture file, and failureOutput is created by whichever writer touches it
+    first (the blocked write with rclone's tail, the clear, or the recovery
+    path), so the field stays absent from records whose instance never blocked
+    and never recovered.
 
     ShouldProcess gating covers the New/Set/Remove verbs that PSScriptAnalyzer's
     PSUseShouldProcessForStateChangingFunctions inspects. The Initialize-, Add-
@@ -155,7 +158,12 @@ function Set-HealthBlocked {
     param(
         [Parameter(Mandatory)][string]$Instance,
         [Parameter(Mandatory)][string]$Class,
-        [Parameter(Mandatory)][string]$Remedy
+        [Parameter(Mandatory)][string]$Remedy,
+        # Mirror of svc_health_set_blocked's fourth argument: rclone's own failing
+        # output, taken while the capture file still exists. An empty value stores
+        # null, never an empty string, so a blocked record with no captured output
+        # reads as "no output" rather than as a string every test matches.
+        [string]$FailureOutput = ''
     )
     # Gate before Initialize-HealthRecord, which creates the record, so -WhatIf
     # cannot leave a new file behind.
@@ -171,6 +179,11 @@ function Set-HealthBlocked {
     $json.remedy = $Remedy
     $json.boot = (Get-HealthBootId)
     $json.reportedState = $null
+    # WHY Add-Member rather than an assignment: failureOutput is not a key
+    #   Initialize-HealthRecord writes, and assigning to a missing property on a
+    #   PSCustomObject throws. jq on POSIX creates the key the same way.
+    $tail = if ([string]::IsNullOrEmpty($FailureOutput)) { $null } else { $FailureOutput }
+    $json | Add-Member -NotePropertyName failureOutput -NotePropertyValue $tail -Force
     $json | ConvertTo-Json -Depth 4 | Set-Content -Path $tmp -NoNewline
     Move-Item -Path $tmp -Destination $file -Force
 }
@@ -236,6 +249,9 @@ function Set-HealthReported {
 # be re-blocked by the watchdog's Rule 3 on the very next tick. Dropping
 # .restarts is what makes this a re-arm rather than a status reset. The evidence
 # field is left alone because it still names a capture file the runner kept.
+# WHY drop the failure tail with class/remedy: a cleared block is a healthy
+# mount, and a record still carrying the last failure's output sends the next
+# reader after a problem that is gone.
 # Mirrors svc_health_clear in src/scripts/lib/service-health.sh.
 function Clear-HealthRecord {
     [CmdletBinding()]
@@ -249,6 +265,9 @@ function Clear-HealthRecord {
     $json.remedy = $null
     $json.reportedState = $null
     $json.restarts = @()
+    # WHY Add-Member here too: the key may not exist yet (Initialize-HealthRecord
+    #   never writes it), and assigning to a missing property throws.
+    $json | Add-Member -NotePropertyName failureOutput -NotePropertyValue $null -Force
     $json | ConvertTo-Json -Depth 4 | Set-Content -Path $tmp -NoNewline
     Move-Item -Path $tmp -Destination $file -Force
 }

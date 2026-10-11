@@ -88,29 +88,31 @@ BeforeAll {
   #
   # WHY two implementations: Start-Process runs a file, not a command line, so the
   #   stand-in has to be something the host can execute: a shebang script on POSIX, a
-  #   .cmd on Windows. Both write one line to stderr, which is what the classifier
-  #   reads, and both exit 1, which is what a mount that never attaches does.
+  #   .cmd on Windows. Both write each chosen line to stderr, which is what the
+  #   classifier reads, and both exit 1, which is what a mount that never attaches does.
   # WHY MarkerName: the stand-in writes the marker into the mount point it is handed
   #   on the command line, so the name is all it needs to know. The runner prepends the
   #   'mount' subcommand, so the mount point is the third argument after the program
   #   name: $0 is this file, $1 is 'mount', $2 is the remote, $3 is the mount point.
   function Save-StandInRclone {
     param(
-      [Parameter(Mandatory)][string]$Stderr,
+      [Parameter(Mandatory)][string[]]$Stderr,
       [string]$MarkerName = ''
     )
 
     $path = Join-Path -Path $script:CaseRoot -ChildPath 'stand-in-rclone'
     if ($IsWindows) {
       $path = "$path.cmd"
-      $lines = @('@echo off', ('echo {0} 1>&2' -f $Stderr))
+      $lines = @('@echo off')
+      foreach ($line in $Stderr) { $lines += ('echo {0} 1>&2' -f $line) }
       if ($MarkerName) { $lines += ('type nul > "%~3\{0}"' -f $MarkerName) }
       $lines += 'exit /b 1'
       Set-Content -Path $path -Value $lines
       return $path
     }
 
-    $lines = @('#!/bin/sh', ('echo {0} >&2' -f "'$Stderr'"))
+    $lines = @('#!/bin/sh')
+    foreach ($line in $Stderr) { $lines += ('echo {0} >&2' -f "'$line'") }
     if ($MarkerName) { $lines += ('touch "{0}/{1}"' -f '$3', $MarkerName) }
     $lines += 'exit 1'
     Set-Content -Path $path -Value $lines
@@ -388,6 +390,56 @@ Describe 'rclone-mount.ps1 retry loop' {
       $result.Record.state | Should -Be 'running'
       $result.Record.PSObject.Properties.Name | Should -Contain 'evidence'
       $result.Record.evidence | Should -BeNullOrEmpty
+    }
+  }
+
+  Context 'failure tail on the blocked record' {
+
+    It 'carries the tail of a multi-line capture' {
+      # POSIX binds tail -n 20 while the capture file still exists, because every
+      # later branch may delete it and the blocked record is the only place the exact
+      # error survives. The Windows record must carry the same words: a class with no
+      # evidence behind it sends the operator after runner logs that clear at reboot.
+      $script:StandIn = Save-StandInRclone -Stderr @(
+        '2026-10-11T22:53:01.401Z NOTICE: iCloud:/ mount starting'
+        'ERROR: iCloud:/: listing files failed'
+        'HTTP status 401: Unauthorized'
+      )
+      $result = Invoke-MountAttempt -Extra @{ NUCLEUS_MOUNT_ATTEMPTS = '1' }
+
+      $result.Record.state | Should -Be 'blocked'
+      $result.Record.'class' | Should -Be 'auth'
+      $result.Record.failureOutput | Should -Match 'mount starting'
+      $result.Record.failureOutput | Should -Match 'listing files failed'
+      $result.Record.failureOutput | Should -Match 'HTTP status 401'
+    }
+
+    It 'clears a previous boot failure tail when the mount attaches' {
+      # After a reboot the boot stamp no longer matches, so a blocked record stops
+      # gating and the runner proceeds and may attach. A tail the previous run left
+      # behind would then point the next reader at a failure that is over, which is
+      # the same reason the success path nulls the evidence pointer.
+      $recordDir = Split-Path -Parent $script:RecordPath
+      $null = New-Item -ItemType Directory -Path $recordDir -Force
+      @{
+        state        = 'blocked'
+        'class'      = 'auth'
+        remedy       = 'verify remote credentials'
+        failureOutput = 'stale words from a previous boot'
+        boot         = 'stale-boot-id'
+        attempts     = 0
+        reportedState = $null
+        lastSuccess  = 0
+        restarts     = @()
+        generation   = $null
+        lastExit     = 0
+      } | ConvertTo-Json -Depth 4 | Set-Content -Path $script:RecordPath -NoNewline
+
+      $script:StandIn = Save-StandInRclone -Stderr 'mounted' -MarkerName 'attached.txt'
+      $result = Invoke-MountAttempt -Extra @{ NUCLEUS_MOUNT_ATTEMPTS = '1' }
+
+      $result.Record.state | Should -Be 'running'
+      $result.Record.failureOutput | Should -BeNullOrEmpty
     }
   }
 }

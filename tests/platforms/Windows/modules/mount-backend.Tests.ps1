@@ -238,3 +238,64 @@ Describe 'Mount-Backend-Prepare failure contract' {
     Should -Invoke Start-Service -Exactly 0
   }
 }
+
+Describe 'Mount-Backend-Class auth anchoring' {
+
+  BeforeAll {
+    # One capture file per case, holding the lines around the token under test. The
+    # classifier reads the whole file, and the collision this Describe pins happens
+    # only when a real rclone timestamp is present, so a single bare token would not
+    # model the failure.
+    function New-CaptureFile {
+      # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- Pester helper that writes one temp fixture file
+      [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+      param([Parameter(Mandatory)][string[]]$Lines)
+      $capture = Join-Path $script:Root "$([guid]::NewGuid().ToString('N')).txt"
+      Set-Content -Path $capture -Value $Lines
+      $capture
+    }
+  }
+
+  It 'does not read a timestamp millisecond field as bad credentials' {
+    # A bare 401 matched the millisecond field of an rclone timestamp
+    # (12:58:41.401), so an ordinary mount failure was recorded as bad
+    # credentials and sent the operator to re-key a healthy remote. This is the
+    # same RED the POSIX twins had, and the same anchoring fixes it on both.
+    $capture = New-CaptureFile -Lines @(
+      '2026-10-11T22:53:01.401Z NOTICE: iCloud:/ mount finished'
+    )
+
+    Mount-Backend-Class -CaptureFile $capture | Should -Be 'mount-failed'
+  }
+
+  It 'does not read a 421 millisecond field as an expired session' {
+    # 421 is anchored for the same reason as 401: an expired session surfaces as
+    # HTTP 421, and a bare number would recreate the 401 bug one digit over by
+    # matching that same millisecond field dozens of times a second.
+    $capture = New-CaptureFile -Lines @(
+      '2026-10-11T22:53:01.421Z NOTICE: iCloud:/ mount finished'
+    )
+
+    Mount-Backend-Class -CaptureFile $capture | Should -Be 'mount-failed'
+  }
+
+  It 'classifies an anchored HTTP status 401 as auth' {
+    # Genuine auth failures carry the status phrase itself, which no timestamp
+    # can produce.
+    $capture = New-CaptureFile -Lines @(
+      'ERROR: iCloud:/: listing failed: HTTP status 401'
+    )
+
+    Mount-Backend-Class -CaptureFile $capture | Should -Be 'auth'
+  }
+
+  It 'classifies an anchored HTTP status 421 as an expired session' {
+    # An expired Apple iCloud session reports HTTP 421, so the phrase has to
+    # classify as auth while the bare number stays inert.
+    $capture = New-CaptureFile -Lines @(
+      'ERROR: iCloud:/: listing failed: HTTP status 421'
+    )
+
+    Mount-Backend-Class -CaptureFile $capture | Should -Be 'auth'
+  }
+}

@@ -22,7 +22,18 @@ function Mount-Backend-Class {
     $content = Get-Content -Raw $CaptureFile -ErrorAction SilentlyContinue
     if (-not $content) { return 'mount-failed' }
 
-    if ($content -match 'Unauthorized|Invalid credentials|unauthorized_request|auth.*failed|401') {
+    # WHY anchored to an HTTP status, byte for byte with the POSIX twins: a bare
+    #   `401` also matched the millisecond field of an rclone timestamp
+    #   (12:58:41.401), so an ordinary mount failure was recorded as bad
+    #   credentials and the operator was sent to re-key a healthy remote. Genuine
+    #   auth errors carry either the word Unauthorized or the status phrase
+    #   itself.
+    # WHY 421 is anchored the same way: an expired session surfaces as HTTP 421,
+    #   and 421 lands in the millisecond field of that same timestamp dozens of
+    #   times a second, so a bare number would recreate the 401 bug one digit
+    #   over. The session wording is a phrase, not a number, so it needs no
+    #   anchor.
+    if ($content -match 'Unauthorized|Invalid credentials|unauthorized_request|auth.*failed|HTTP status 401|HTTP status 421|Invalid global session') {
         return 'auth'
     }
     if ($content -match 'not found|does not exist|Unknown remote|Couldn.*list files|directory not found') {

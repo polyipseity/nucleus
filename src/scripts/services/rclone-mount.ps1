@@ -50,6 +50,11 @@ $backoffSchedule = $backoffCsv -split ',' | ForEach-Object { [int]$_.Trim() }
 
 Initialize-HealthRecord -Instance $instance
 
+# Last attempt's capture tail, bound while the file still exists so the blocked
+# records written below can carry rclone's own words. Empty means the run
+# captured nothing worth keeping.
+$failureOutput = ''
+
 $prepareRc = Mount-Backend-Prepare -Instance $instance
 if ($prepareRc -eq 20) {
     # WHY: Write-Output, not Write-Host: this script is the body of a scheduled task
@@ -121,6 +126,9 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
         #   record still naming a retained capture file would point whoever reads it at
         #   evidence for a mount that is now healthy.
         Set-HealthField -Instance $instance -Field 'evidence' -Value $null
+        # WHY: same reason as the evidence field, applied to the output tail: a
+        #   record that recovered must not keep the last failure's words.
+        Set-HealthField -Instance $instance -Field 'failureOutput' -Value $null
         # check-suppress:suppression_doc: best-effort capture cleanup; the file is this attempt's own and the record no longer names it
         Remove-Item -Path $captureFile -ErrorAction SilentlyContinue
 
@@ -169,6 +177,16 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
 
     Write-Output "$instance`: attempt $attempt failed (class=$class, $remedy)"
 
+    # WHY: the tail is taken while the capture file still exists. Every later
+    #   branch may delete it, and the blocked records written below are the only
+    #   place the exact error survives; twenty lines hold the failure and its
+    #   immediate context without turning the record into a log. The POSIX runner
+    #   binds the same tail with `tail -n 20`.
+    $tailLines = if (Test-Path -LiteralPath $captureFile) {
+        @(Get-Content -LiteralPath $captureFile -Tail 20)
+    } else { @() }
+    $failureOutput = $tailLines -join "`n"
+
     # WHY keep the capture file only on the unreadable-mount-point path: there the
     #   class is one this runner chose, not one rclone's output supports, so the file
     #   is the only record of what the mount was doing. The record names the path
@@ -186,7 +204,7 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
 
     # Terminal class: stop immediately.
     if (-not (Mount-Backend-IsTransient -Class $class)) {
-        Set-HealthBlocked -Instance $instance -Class $class -Remedy $remedy
+        Set-HealthBlocked -Instance $instance -Class $class -Remedy $remedy -FailureOutput $failureOutput
         exit 0
     }
 
@@ -219,6 +237,6 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
 #   services.schema.json pins mountAttempts to a minimum of 1 and the schema-validation
 #   check step validates the file, so nothing valid reaches it.
 $finalClass = if ($probeUnknown) { 'io-transient' } else { $class }
-Set-HealthBlocked -Instance $instance -Class $finalClass -Remedy (Mount-Backend-Remedy -Class $finalClass)
+Set-HealthBlocked -Instance $instance -Class $finalClass -Remedy (Mount-Backend-Remedy -Class $finalClass) -FailureOutput $failureOutput
 Write-Output "$instance`: all $attempts attempts exhausted; blocked"
 exit 0
