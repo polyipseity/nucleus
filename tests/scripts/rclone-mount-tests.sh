@@ -461,6 +461,33 @@ test_mount_passes_remote_and_point_to_rclone() {
   rm -rf "$home" "$bin"
 }
 
+test_missing_mount_point_is_recreated() {
+  local home bin marker
+  home="$(create_home)"
+  bin="$(setup_fake_rclone)"
+  setup_env "$home" "$bin" 10
+  # A teardown can delete the mount point directory; nothing at apply time runs
+  # again until the next apply, so the runner itself must recreate it.
+  rm -rf "$NUCLEUS_RCLONE_MOUNT_POINT"
+  marker="$home/clouds/OneDrive/.marker"
+  FAKE_MARKER="$marker"
+  FAKE_CALLS="$home/calls"
+  FAKE_REMOTES="OneDrive:"
+  FAKE_EXIT_WHEN_RUNNING=8
+  export FAKE_MARKER FAKE_CALLS FAKE_REMOTES FAKE_EXIT_WHEN_RUNNING
+  install_mocks
+
+  local rc=0
+  run_main 2>/dev/null || rc=$?
+
+  if [ -d "$NUCLEUS_RCLONE_MOUNT_POINT" ]; then
+    assert_pass "the runner recreates a missing mount point directory"
+  else
+    assert_fail "mount-point-recreated" "directory missing after run (rc=$rc)"
+  fi
+  rm -rf "$home" "$bin"
+}
+
 section "3" "retry on transient error"
 
 test_transient_error_retries_and_succeeds() {
@@ -1630,6 +1657,7 @@ test_prepare_success_proceeds_to_mount
 test_prepare_blocks_returns_20
 test_mount_succeeds_and_records_success
 test_mount_passes_remote_and_point_to_rclone
+test_missing_mount_point_is_recreated
 test_transient_error_retries_and_succeeds
 test_dead_mount_stops_attach_wait_early
 test_instant_death_is_classified_from_its_own_status

@@ -81,6 +81,12 @@ _cm_main() {
   _cm_parse_backoff
   svc_health_init "$instance"
 
+  # WHY: macOS launchd has no ExecStartPre, so a teardown that deletes the mount
+  #   point directory leaves nothing to recreate it until the next apply; the
+  #   Linux unit creates it via ExecStartPre, and mkdir -p is idempotent, so the
+  #   shared runner covers both.
+  mkdir -p "$mount_point"
+
   # Backend prepare is idempotent and may write a blocked record, returning 20.
   local prepare_rc=0
   backend_prepare "$instance" || prepare_rc=$?
