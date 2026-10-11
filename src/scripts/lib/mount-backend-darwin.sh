@@ -16,8 +16,8 @@ _MOUNT_BACKEND_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd
 
 # Args: $1 stderr capture file path.
 # Outputs: class token string, in decision order. One of: no-output,
-#   provider-refusal, provider-version, io-transient, auth, remote-not-found,
-#   path-permission, torn-down, mount-failed.
+#   provider-refusal, provider-version, auth, remote-not-found,
+#   path-permission, io-transient, torn-down, mount-failed.
 backend_class() {
   local capture="$1"
   # A missing file and a file rclone wrote nothing into are the same silence:
