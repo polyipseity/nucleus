@@ -147,7 +147,7 @@ svc_health_set_state() {
 # Args: $1 instance, $2 class, $3 remedy, $4 optional tail of rclone's stderr.
 # WHY the tail: without it a blocked record named only a class and a generic
 #   remedy, and the capture file it came from was deleted, so the exact error
-#   (the missing macFUSE helper read as a credentials problem) survived nowhere.
+#   (a missing mount helper read as a credentials problem) survived nowhere.
 #   Empty means no tail was captured; the field is nulled rather than left
 #   carrying an earlier attempt's words.
 svc_health_set_blocked() {

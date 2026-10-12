@@ -167,10 +167,9 @@ let
     let
 
       # WHY: rclone stats the mount point before mounting and refuses to mount
-      #   when it is missing, while macFUSE creates a /Volumes mount point only
-      #   as part of the mount itself, and /Volumes is root-owned, so a
-      #   user-scope activation could not create it either.  Mounts therefore
-      #   live directly under the user's home directory, as on every other host.
+      #   when it is missing, so mounts live directly under the user's home
+      #   directory with the directory created ahead of the mount, as on every
+      #   other host.
       mountPoint = "${currentUserHome}/${mount.localPath}";
       rcloneRemote = "${mount.remoteName}:${mount.remotePath}";
       # Always pass the configured iCloud service explicitly so mount behavior
@@ -180,16 +179,8 @@ let
         "--iclouddrive-service"
         mount.iCloudService
       ];
-      # WHY: macFUSE defaults to its kernel-extension backend, which needs a kext
-      #   approval this host must never grant; FSKit runs the file system in user
-      #   space, so every macOS mount selects it explicitly.
-      # ref: https://github.com/macfuse/macfuse -- FSKit backend via -o backend=fskit
-      macFuseFsKitArgs = lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
-        "--option"
-        "backend=fskit"
-      ];
       mountVolumeLabel = if mount.name != null then mount.name else mount.id;
-      # FSKit volumes carry a display name; --volname needs macFUSE 5.1 or newer.
+      # nfsmount accepts --volname; the label it shows is best-effort on macOS.
       volumeNameArgs = lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
         "--volname"
         mountVolumeLabel
@@ -202,11 +193,10 @@ let
         "--password-command"
         "cat ${lib.escapeShellArg config.nucleus.rclone.configPassSecretPath}"
       ];
-      extraArgsList =
-        iCloudServiceArgs ++ macFuseFsKitArgs ++ volumeNameArgs ++ rclonePasswordArgs ++ mount.extraArgs;
-      # WHY: FSKit has no FUSE notification API, so remote changes reach the mount
-      #   only through rclone's own cache and poll timers, and --read-only is
-      #   enforced by rclone's VFS because FSKit always opens files read/write.
+      extraArgsList = iCloudServiceArgs ++ volumeNameArgs ++ rclonePasswordArgs ++ mount.extraArgs;
+      # WHY: NFS carries no change-notification API, so remote changes reach the
+      #   mount only through rclone's own cache and poll timers, and --read-only
+      #   is enforced by rclone's VFS alone.
     in
     pkgs.writeNucleusShellApplication {
       name = "cloud-mount-${mount.id}";
@@ -343,12 +333,10 @@ in
     in
     lib.mkMerge [
 
-      # WHY: during setupLaunchAgents bootout+bootstrap, the old mount's FSKit
-      #   volume may still be attached when the new mount starts.  The new mount
-      #   script detects the stale volume and runs diskutil unmount force, which
-      #   can trigger lsd to re-register the FSKit extension with a new UUID
-      #   (Apple bug on macOS 26).  The subsequent mount then fails with a stale
-      #   UUID reference.  Pre-stopping agents and waiting for volumes to release
+      # WHY: during setupLaunchAgents bootout+bootstrap, the old mount may still
+      #   be attached when the new mount starts, and a second mount at the same
+      #   path fails while it drains.  Pre-stopping the agents and waiting for
+      #   the volumes to release gives the new mount a clear path.
 
       (lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && declaredMountAgents != [ ]) {
         home.activation.cloud-drives-pre-stop = lib.hm.dag.entryBefore [ "setupLaunchAgents" ] ''
@@ -436,11 +424,11 @@ in
                 #   was blocked or stopped intentionally.  KeepAlive created a
                 #   parallel retry mechanism that contradicted the blocked-marker
                 #   contract and caused infinite restart loops.
-                # WHY: the teardown budget must cover a real macFUSE/FSKit unmount.
+                # WHY: the teardown budget must cover a real NFS unmount.
                 #   launchd SIGKILLs the job after this budget (default 20 s covers
                 #   only a fast teardown), and a mount killed mid-unmount leaves the
-                #   rclone process wedged and the volume registration stale, so every
-                #   later mount at this path is destroyed seconds after it attaches.
+                #   rclone process wedged and the mount point held, so every later
+                #   mount at this path fails until the state clears.
                 # NOTE: the runner installs no signal handler, so it does not itself
                 #   forward the stop to rclone; teardown of the backgrounded rclone
                 #   relies on launchd's own signal delivery to the job.  This budget is

@@ -372,7 +372,7 @@ test_prepare_blocks_returns_20() {
   install_mocks
   MOCK_BACKEND_PREPARE() {
     mkdir -p "$NUCLEUS_USER_ROOT/state/service-stats"
-    printf '{"state":"blocked","class":"provider-refusal","remedy":"re-enable macFUSE","boot":"test","reported":false,"attempts":0,"lastSuccess":0,"restarts":[],"generation":null,"lastExit":0}' \
+    printf '{"state":"blocked","class":"mount-backend-unsupported","remedy":"rclone lacks nfsmount; rebuild the profile","boot":"test","reported":false,"attempts":0,"lastSuccess":0,"restarts":[],"generation":null,"lastExit":0}' \
       >"$NUCLEUS_USER_ROOT/state/service-stats/$NUCLEUS_CLOUD_MOUNT_INSTANCE.json"
     return 20
   }
@@ -389,12 +389,12 @@ test_prepare_blocks_returns_20() {
   else
     assert_fail "startup-prepare-block" "rc=$rc state=$(health_field state)"
   fi
-  if grep -qF 'class=provider-refusal' "$home/out"; then
+  if grep -qF 'class=mount-backend-unsupported' "$home/out"; then
     assert_pass "the prepare-block notice names the class the record carries"
   else
     assert_fail "prepare-block-notice-class" "out='$(cat "$home/out")'"
   fi
-  if grep -qF 're-enable macFUSE' "$home/out"; then
+  if grep -qF 'rclone lacks nfsmount' "$home/out"; then
     assert_pass "the prepare-block notice carries the remedy text"
   else
     assert_fail "prepare-block-notice-remedy" "out='$(cat "$home/out")'"
@@ -647,8 +647,8 @@ test_instant_death_is_classified_from_its_own_status() {
   NUCLEUS_MOUNT_BACKOFF="0,0"
   export NUCLEUS_MOUNT_ATTEMPTS NUCLEUS_MOUNT_BACKOFF
   # Stubbed the way every other case in this suite stubs the classifier. The
-  # real backend_class answers provider-version on a host with macFUSE
-  # disabled, so it cannot pin the arm that classified.
+  # real backend_class's own arms must not decide this case: what is under test
+  # is which arm classified, so the arm's answer is pinned by the stub.
   MOCK_BACKEND_CLASSIFY() { printf 'path-permission\n'; }
   # Terminal, so one attempt ends the run and the elapsed time is attributable
   # to the attach wait alone rather than to retry backoff.
@@ -1069,11 +1069,10 @@ test_terminal_failure_writes_blocked_record() {
 
 # WHY a capture tail in the record: the runner deletes rclone's stderr after
 #   classifying it, so a blocked record carried only the class and a generic
-#   remedy. The mount that failed with `invalidConnection` (macFUSE's helper
-#   tool missing) read as "check remote configuration and credentials", and
-#   nothing on the machine still held the error that would have named the real
-#   cause. The record keeps the tail so the first place a reader looks is the
-#   one that can answer.
+#   remedy. A mount that failed with an error nothing on the machine still held
+#   read as "check remote configuration and credentials", and the exact error
+#   was gone. The record keeps the tail so the first place a reader looks is
+#   the one that can answer.
 test_blocked_record_carries_failure_output() {
   local home bin
   home="$(create_home)"
@@ -1334,7 +1333,7 @@ test_prepare_failure_writes_blocked() {
   install_mocks
   MOCK_BACKEND_PREPARE() {
     mkdir -p "$NUCLEUS_USER_ROOT/state/service-stats"
-    printf '{"state":"blocked","class":"provider-version","remedy":"upgrade macFUSE","boot":"test","reported":false,"attempts":0,"lastSuccess":0,"restarts":[],"generation":null,"lastExit":0}' \
+    printf '{"state":"blocked","class":"mount-backend-unsupported","remedy":"rclone lacks nfsmount; rebuild the profile","boot":"test","reported":false,"attempts":0,"lastSuccess":0,"restarts":[],"generation":null,"lastExit":0}' \
       >"$NUCLEUS_USER_ROOT/state/service-stats/$NUCLEUS_CLOUD_MOUNT_INSTANCE.json"
     return 20
   }
@@ -1342,8 +1341,8 @@ test_prepare_failure_writes_blocked() {
   local rc=0
   run_main 2>/dev/null || rc=$?
 
-  if [ "$(health_field state)" = "blocked" ] && [ "$(health_field class)" = "provider-version" ]; then
-    assert_pass "backend_prepare writes blocked record with provider-version class"
+  if [ "$(health_field state)" = "blocked" ] && [ "$(health_field class)" = "mount-backend-unsupported" ]; then
+    assert_pass "backend_prepare writes blocked record with mount-backend-unsupported class"
   else
     assert_fail "prepare-blocked" "state=$(health_field state) class=$(health_field class)"
   fi
@@ -1455,9 +1454,10 @@ argv_field() {
 }
 
 # assert_real_backend_argv: assert the argument vector reaching the recorder.
-# Args: $1 = label, $2 = expected remote, $3 = expected mount point.
+# Args: $1 = label, $2 = expected remote, $3 = expected mount point,
+# $4 = expected mount subcommand (nfsmount on darwin, mount on linux).
 assert_real_backend_argv() {
-  local label="$1" want_remote="$2" want_point="$3"
+  local label="$1" want_remote="$2" want_point="$3" want_subcmd="$4"
   local argc
   argc="$(argv_field argc)"
 
@@ -1472,8 +1472,8 @@ assert_real_backend_argv() {
     assert_fail "$label-blob" "a recorded argument contains embedded newlines (collapsed vector)"
     return
   fi
-  if ! grep -qxF 'arg=<mount>' "$ARGV_FILE"; then
-    assert_fail "$label-subcommand" "'mount' is not its own argument"
+  if ! grep -qxF "arg=<$want_subcmd>" "$ARGV_FILE"; then
+    assert_fail "$label-subcommand" "'$want_subcmd' is not its own argument"
     return
   fi
   if ! grep -qxF "arg=<$want_remote>" "$ARGV_FILE"; then
@@ -1508,7 +1508,13 @@ real_backend_case() {
   local rc=0
   run_main_real_backend "$REPO_ROOT/src/scripts/lib/mount-backend-$backend_name.sh" 2>/dev/null || rc=$?
 
-  assert_real_backend_argv "$label" "OneDrive:Backups" "$point"
+  # The subcommand is backend policy: darwin mounts through nfsmount, linux
+  # through the FUSE mount. Both must reach rclone as one discrete argv entry.
+  local want_subcmd="mount"
+  if [ "$backend_name" = "darwin" ]; then
+    want_subcmd="nfsmount"
+  fi
+  assert_real_backend_argv "$label" "OneDrive:Backups" "$point" "$want_subcmd"
   rm -rf "$home" "$bin"
 }
 
@@ -1652,6 +1658,248 @@ test_backoff_schedule_covers_every_retry() {
   fi
 }
 
+# ── Section 24: teardown bounds, mount-point heal, serve-exit evidence ────────
+# The four defects live diagnostics attributed: a teardown wait that blocked
+# three production runners in wait4 forever, a forced unmount that blocked >10s
+# on a live volume, an empty mount point left dirty by an earlier teardown that
+# refuses new mounts until it is recreated, and a capture file deleted before
+# the serve status was known, destroying the only words a post-attach death
+# leaves.
+
+# WHY ls -di: the inode number is ls's own output; find prints no inode
+# portably, and the heal is only observable as the directory's identity
+# changing.
+# shellcheck disable=SC2012 # reason: reading an inode number, not listing paths
+inode_of() {
+  ls -di "$1" | awk '{print $1}'
+}
+
+# (a) heal: an existing EMPTY mount point is recreated before the mount, so the
+# directory carries a fresh inode and a new mount can attach. rmdir succeeds
+# only for an empty unmounted directory, so this is the one shape the heal can
+# replace; the inode is what proves the recreation happened.
+test_heal_recreates_existing_empty_mount_point() {
+  local home bin marker inode_before inode_after rc=0
+  home="$(create_home)"
+  bin="$(setup_fake_rclone)"
+  setup_env "$home" "$bin" 10
+  mkdir -p "$NUCLEUS_RCLONE_MOUNT_POINT"
+  inode_before="$(inode_of "$NUCLEUS_RCLONE_MOUNT_POINT")"
+  marker="$home/clouds/OneDrive/.marker"
+  FAKE_MARKER="$marker"
+  FAKE_CALLS="$home/calls"
+  FAKE_REMOTES="OneDrive:"
+  FAKE_EXIT_WHEN_RUNNING=8
+  export FAKE_MARKER FAKE_CALLS FAKE_REMOTES FAKE_EXIT_WHEN_RUNNING
+  install_mocks
+
+  run_main >/dev/null 2>&1 || rc=$?
+
+  inode_after="$(inode_of "$NUCLEUS_RCLONE_MOUNT_POINT")"
+  if [ -n "$inode_before" ] && [ "$inode_after" != "$inode_before" ]; then
+    assert_pass "an existing empty mount point is recreated before mounting (inode changed)"
+  else
+    assert_fail "mount-point-healed" \
+      "inode $inode_before -> $inode_after (expected a new inode; a dirty directory refuses new mounts)"
+  fi
+  rm -rf "$home" "$bin"
+}
+
+# (b) bounded stop: a child that ignores TERM is KILLed, and the runner ends
+# instead of waiting on it forever. The poll is the bound: the KILL path is
+# exercised because the stub outlives the TERM-poll, and the elapsed time is
+# what distinguishes the bound from the unbounded wait it replaced.
+test_bounded_stop_ends_against_a_term_ignoring_child() {
+  local home bin start elapsed rc=0
+  home="$(create_home)"
+  bin="$(setup_fake_rclone)"
+  setup_env "$home" "$bin"
+  FAKE_PROBE_STATE="absent:not-listed"
+  MOCK_BACKEND_CLASSIFY() { printf 'mount-failed'; }
+  # Terminal, so the failure path runs exactly once and the teardown is the
+  # only thing between the test and its verdict.
+  MOCK_BACKEND_IS_TRANSIENT() { return 1; }
+  MOCK_BACKEND_MOUNT() {
+    (
+      trap '' TERM
+      printf 'stuck in teardown\n' >&2
+      sleep 30
+    ) 2>"$_backend_capture" &
+    _backend_rclone_pid=$!
+  }
+  export FAKE_PROBE_STATE
+  export -f MOCK_BACKEND_CLASSIFY MOCK_BACKEND_IS_TRANSIENT MOCK_BACKEND_MOUNT
+  install_mocks
+
+  start=$SECONDS
+  run_main >/dev/null 2>&1 || rc=$?
+  elapsed=$((SECONDS - start))
+
+  if [ "$elapsed" -lt 15 ]; then
+    assert_pass "a teardown against a TERM-ignoring child ends in ${elapsed}s, not 30s"
+  else
+    assert_fail "bounded-stop" \
+      "elapsed=${elapsed}s (the runner still blocks on a child that will not exit)"
+  fi
+  if [ "$(health_field state)" = "blocked" ]; then
+    assert_pass "the run still writes its blocked record after the bounded stop"
+  else
+    assert_fail "bounded-stop-record" "state=$(health_field state)"
+  fi
+  rm -rf "$home" "$bin"
+
+  restore_default_mocks
+}
+
+# (c) serve-exit evidence: a mount that dies AFTER attaching leaves its words
+# only in the capture file, and the runner used to delete that file before the
+# serve status was known. The record keeps the tail and the capture still goes
+# away, so evidence survives without a file leak.
+test_serve_exit_failure_keeps_rclone_words_in_the_record() {
+  local home bin marker capture_path rc=0
+  home="$(create_home)"
+  bin="$(setup_fake_rclone)"
+  setup_env "$home" "$bin" 5
+  marker="$home/clouds/OneDrive/.marker"
+  FAKE_MARKER="$marker"
+  FAKE_CALLS="$home/calls"
+  FAKE_REMOTES="OneDrive:"
+  export FAKE_MARKER FAKE_CALLS FAKE_REMOTES
+  install_mocks
+  MOCK_BACKEND_PROBE_STATE() { printf 'present\n'; }
+  MOCK_BACKEND_MOUNT() {
+    # The capture path is the runner's own mktemp; only the mock can record it,
+    # and the removal assertion below needs the exact name.
+    printf '%s' "$_backend_capture" >"$home/capture-path"
+    (
+      printf 'post-attach explosion\n' >&2
+      exit 1
+    ) 2>"$_backend_capture" &
+    _backend_rclone_pid=$!
+  }
+  export -f MOCK_BACKEND_PROBE_STATE MOCK_BACKEND_MOUNT
+
+  run_main >/dev/null 2>&1 || rc=$?
+
+  if [ "$rc" -eq 1 ]; then
+    assert_pass "a mount that dies after attach propagates its status"
+  else
+    assert_fail "serve-exit-status" "rc=$rc (expected 1)"
+  fi
+  case "$(health_field failureOutput)" in
+  *"post-attach explosion"*)
+    assert_pass "the record keeps the capture tail of a post-attach death"
+    ;;
+  *)
+    assert_fail "serve-exit-evidence" \
+      "failureOutput='$(health_field failureOutput)' (expected the tail of rclone's stderr)"
+    ;;
+  esac
+  if [ "$(health_field lastExit)" = "1" ]; then
+    assert_pass "the record carries the serve exit status"
+  else
+    assert_fail "serve-exit-last-exit" "lastExit=$(health_field lastExit)"
+  fi
+  capture_path="$(cat "$home/capture-path" 2>/dev/null || true)"
+  if [ -n "$capture_path" ] && [ ! -f "$capture_path" ]; then
+    assert_pass "the capture file is still removed (no file leak)"
+  else
+    assert_fail "serve-exit-capture-removed" \
+      "capture '$capture_path' still exists after the record took its tail"
+  fi
+  rm -rf "$home" "$bin"
+
+  restore_default_mocks
+}
+
+# A clean serve exit stays clean: no failure output is written for a mount that
+# ended the way a stop ends, and the capture still goes away. Without this the
+# case above would also pass against a runner that wrote the tail on every exit.
+test_serve_exit_zero_leaves_failure_output_null() {
+  local home bin marker rc=0 capture_path
+  home="$(create_home)"
+  bin="$(setup_fake_rclone)"
+  setup_env "$home" "$bin" 5
+  marker="$home/clouds/OneDrive/.marker"
+  FAKE_MARKER="$marker"
+  FAKE_CALLS="$home/calls"
+  FAKE_REMOTES="OneDrive:"
+  export FAKE_MARKER FAKE_CALLS FAKE_REMOTES
+  install_mocks
+  MOCK_BACKEND_PROBE_STATE() { printf 'present\n'; }
+  MOCK_BACKEND_MOUNT() {
+    printf '%s' "$_backend_capture" >"$home/capture-path"
+    (exit 0) 2>"$_backend_capture" &
+    _backend_rclone_pid=$!
+  }
+  export -f MOCK_BACKEND_PROBE_STATE MOCK_BACKEND_MOUNT
+
+  run_main >/dev/null 2>&1 || rc=$?
+
+  if [ "$rc" -eq 0 ] && [ "$(health_field state)" = "running" ]; then
+    assert_pass "a clean serve exit stays a running mount"
+  else
+    assert_fail "serve-exit-zero" "rc=$rc state=$(health_field state)"
+  fi
+  if [ -z "$(health_field failureOutput)" ]; then
+    assert_pass "a clean serve exit writes no failure output"
+  else
+    assert_fail "serve-exit-zero-evidence" \
+      "failureOutput='$(health_field failureOutput)' (a normal stop is not a failure)"
+  fi
+  capture_path="$(cat "$home/capture-path" 2>/dev/null || true)"
+  if [ -n "$capture_path" ] && [ ! -f "$capture_path" ]; then
+    assert_pass "a clean serve exit still removes the capture file"
+  else
+    assert_fail "serve-exit-zero-capture" "capture '$capture_path' still exists"
+  fi
+  rm -rf "$home" "$bin"
+
+  restore_default_mocks
+}
+
+# (d) bounded unmount: the best-effort unmount helper hanging must not wedge
+# the success path. The mount is already gone when rclone's exit tore the
+# server down, so abandoning the helper is a cleanup miss, not a lost mount.
+test_bounded_unmount_when_the_helper_hangs() {
+  local home bin marker start elapsed rc=0
+  home="$(create_home)"
+  bin="$(setup_fake_rclone)"
+  setup_env "$home" "$bin" 5
+  marker="$home/clouds/OneDrive/.marker"
+  FAKE_MARKER="$marker"
+  FAKE_CALLS="$home/calls"
+  FAKE_REMOTES="OneDrive:"
+  export FAKE_MARKER FAKE_CALLS FAKE_REMOTES
+  install_mocks
+  MOCK_BACKEND_PROBE_STATE() { printf 'present\n'; }
+  MOCK_BACKEND_MOUNT() {
+    (exit 0) 2>"$_backend_capture" &
+    _backend_rclone_pid=$!
+  }
+  MOCK_BACKEND_UNMOUNT() { sleep 30; }
+  export -f MOCK_BACKEND_PROBE_STATE MOCK_BACKEND_MOUNT MOCK_BACKEND_UNMOUNT
+
+  start=$SECONDS
+  run_main >/dev/null 2>&1 || rc=$?
+  elapsed=$((SECONDS - start))
+
+  if [ "$elapsed" -lt 15 ]; then
+    assert_pass "a hanging unmount helper is abandoned in ${elapsed}s, not 30s"
+  else
+    assert_fail "bounded-unmount" \
+      "elapsed=${elapsed}s (the success path still blocks on the unmount helper)"
+  fi
+  if [ "$rc" -eq 0 ] && [ "$(health_field state)" = "running" ]; then
+    assert_pass "the mount stays recorded as running after an abandoned unmount"
+  else
+    assert_fail "bounded-unmount-record" "rc=$rc state=$(health_field state)"
+  fi
+  rm -rf "$home" "$bin"
+
+  restore_default_mocks
+}
+
 # ── Run all tests ────────────────────────────────────────────────────────────
 test_prepare_success_proceeds_to_mount
 test_prepare_blocks_returns_20
@@ -1677,6 +1925,11 @@ test_prepare_failure_writes_blocked
 test_prepare_default_restored_after_failure_tests
 test_real_backend_argv_darwin
 test_real_backend_argv_linux
+test_heal_recreates_existing_empty_mount_point
+test_bounded_stop_ends_against_a_term_ignoring_child
+test_serve_exit_failure_keeps_rclone_words_in_the_record
+test_serve_exit_zero_leaves_failure_output_null
+test_bounded_unmount_when_the_helper_hangs
 test_backoff_values_within_declared_schedule
 test_backoff_clamps_to_declared_sequence
 test_backoff_schedule_is_nonempty

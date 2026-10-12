@@ -148,7 +148,7 @@ svc_wait_mount_released() {
   return 0
 }
 
-# WHY: FSKit can refuse the first attempts right after its daemon restarts (macFUSE status 3/4) while a later one serves the volume, and the mount agent no longer retries a provider refusal on its own, so the bounded retry belongs to the command that wants the mount up. A launch still in flight is never interrupted: an attach may take its own bound, and kicking it again would destroy an attempt that could still succeed.
+# WHY: a mount provider can refuse the first attempts right after its own restart while a later one serves the volume, and the mount agent does not retry such a refusal on its own, so the bounded retry belongs to the command that wants the mount up. A launch still in flight is never interrupted: an attach may take its own bound, and kicking it again would destroy an attempt that could still succeed.
 # An unknown:* answer for the whole budget returns 1 too: it polls without spending a launch, so no launch cap can end such a run.
 svc_remount_until() {
   local mount_point="$1" target="$2" sudo_prefix="$3" budget="$4" interval="${5:-5}" max_launches="${6:-4}"
@@ -241,7 +241,7 @@ svc_mount_table_contains() {
   esac
 }
 
-# WHY: a hung macFUSE/FSKit volume blocks the mount table and any stat of the volume inside the kernel, and these scripts have no 'timeout' binary on PATH, so a probe that can touch a mount carries its own bound. One dead volume would hang the watchdog and the whole nucleus-svc CLI.
+# WHY: a hung mount blocks the mount table and any stat of the mount point inside the kernel, and these scripts have no 'timeout' binary on PATH, so a probe that can touch a mount carries its own bound. One dead mount would hang the watchdog and the whole nucleus-svc CLI.
 svc_run_bounded() {
   local bound="$1"
   shift

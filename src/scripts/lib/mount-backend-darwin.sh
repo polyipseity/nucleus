@@ -1,7 +1,13 @@
 # shellcheck shell=bash
-# Mount backend for macOS: macFUSE/FSKit. Every FSKit/macFUSE specific lives here,
-# so the core runner never mentions them.
-# ref: https://github.com/macfuse/macfuse/issues/1132
+# Mount backend for macOS: rclone nfsmount over rclone's own local NFS server.
+# Every macOS-mount-specific decision lives here, so the core runner never
+# mentions them.
+# WHY nfsmount and not the FUSE mount: live diagnostics on macOS 27 showed
+#   fskitd's mount preflight rejecting these mount points with
+#   NSCocoaErrorDomain 516 milliseconds after the FUSE handshake, and rclone
+#   reporting the rejected volume as a clean unmount and exit 0, which hid the
+#   cause from every log-based diagnosis. nfsmount needs no file system
+#   extension at all and is the backend rclone documents for macOS.
 
 [ -n "${_NUCLEUS_MOUNT_BACKEND_DARWIN_SOURCED-}" ] && return
 _NUCLEUS_MOUNT_BACKEND_DARWIN_SOURCED=1
@@ -9,15 +15,12 @@ _NUCLEUS_MOUNT_BACKEND_DARWIN_SOURCED=1
 _MOUNT_BACKEND_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 # shellcheck source=lib.sh
 [ -n "${_NUCLEUS_LIB_SOURCED-}" ] || . "$_MOUNT_BACKEND_DIR/lib.sh"
-# shellcheck source=macos-fskit.sh
-[ -n "${_NUCLEUS_MACOS_FSKIT_SOURCED-}" ] || . "$_MOUNT_BACKEND_DIR/macos-fskit.sh"
 # shellcheck source=service-health.sh
 [ -n "${_NUCLEUS_SERVICE_HEALTH_SOURCED-}" ] || . "$_MOUNT_BACKEND_DIR/service-health.sh"
 
 # Args: $1 stderr capture file path.
-# Outputs: class token string, in decision order. One of: no-output,
-#   provider-refusal, provider-version, auth, remote-not-found,
-#   path-permission, io-transient, torn-down, mount-failed.
+# Outputs: class token string, in decision order. One of: no-output, auth,
+#   remote-not-found, path-permission, io-transient, torn-down, mount-failed.
 backend_class() {
   local capture="$1"
   # A missing file and a file rclone wrote nothing into are the same silence:
@@ -25,23 +28,6 @@ backend_class() {
   # class, and the old mount-failed fall-through blamed the remote anyway.
   if [ ! -f "$capture" ] || [ ! -s "$capture" ]; then
     printf 'no-output\n'
-    return
-  fi
-
-  # fskit_macfuse_module_state answers enabled|disabled|unknown. `disabled` means the
-  # extension is present but switched off, which a re-enable can clear, so it is the one
-  # provider state worth retrying. Anything else is a module that was listed and failed
-  # anyway, or a state nobody could read, and a retry clears neither. Retrying provider
-  # failures is what produced the restart storm.
-  # WHY no macFUSE version check here: backend_prepare blocks provider-version up front
-  # when the installed macFUSE predates the FSKit volume-operation APIs, so reaching here
-  # with `enabled` means a listed module whose mount still failed.
-  if grep -qE 'File system extension not (found|enabled)|fuse: mount failed with error|mount\(8\) returned 69|MFMount.*not enabled' "$capture"; then
-    if [ "$(fskit_macfuse_module_state)" = "disabled" ]; then
-      printf 'provider-refusal\n'
-    else
-      printf 'provider-version\n'
-    fi
     return
   fi
 
@@ -69,7 +55,10 @@ backend_class() {
     return
   fi
 
-  if grep -qE 'connection refused|connection reset|timeout|resource temporarily unavailable|device or resource busy' "$capture"; then
+  # WHY failed to mount NFS volume: nfsmount reports a mount the kernel refused
+  #   (the path still owned by an earlier attempt) with that line, and only a
+  #   retry re-grants it; the terminal mount-failed would block instead.
+  if grep -qE 'connection refused|connection reset|timeout|resource temporarily unavailable|device or resource busy|failed to mount NFS volume' "$capture"; then
     printf 'io-transient\n'
     return
   fi
@@ -93,9 +82,6 @@ backend_class() {
 backend_remedy() {
   local class="$1"
   case "$class" in
-  provider-refusal | provider-version)
-    printf "%s" "run sudo killall fskitd (nucleus-cloud repair), then re-enable macFUSE in System Settings > General > Login Items & Extensions > By category > File System Extensions"
-    ;;
   auth)
     printf 'verify remote credentials'
     ;;
@@ -124,108 +110,31 @@ backend_remedy() {
 backend_is_transient() {
   local class="$1"
   case "$class" in
-  provider-refusal | io-transient) return 0 ;;
+  io-transient) return 0 ;;
   esac
   return 1
 }
 
-# Return 0 if $1 >= $2 (dot-separated semver).
-_macfuse_version_gte() {
-  local IFS='.'
-  read -ra v1 <<<"$1"
-  read -ra v2 <<<"$2"
-  for i in 0 1 2; do
-    local a="${v1[$i]:-0}" b="${v2[$i]:-0}"
-    if [ "$a" -gt "$b" ] 2>/dev/null; then return 0; fi
-    if [ "$a" -lt "$b" ] 2>/dev/null; then return 1; fi
-  done
-  return 0
-}
-
-# WHY a helper: the two candidates are fixed macOS install locations, and the
-# gate tests override this to exercise the probe on a machine with no macFUSE
-# on disk.
-macfuse_cli_bin() {
-  local candidate
-  for candidate in \
-    "/Library/Filesystems/macfuse.fs/Contents/Resources/macfuse.app/Contents/MacOS/macfuse" \
-    "/opt/homebrew/bin/macfuse"; do
-    if [ -x "$candidate" ]; then
-      printf '%s\n' "$candidate"
-      return 0
-    fi
-  done
-  return 1
-}
-
-# WHY this plist and not the sibling Resources/macfuse.app one: only here does
-# CFBundleShortVersionString carry the installed macFUSE package version. The
-# inner plist reports 1.0, the CLI wrapper's own bundle version, and a gate
-# reading it would block every install as too old.
-macfuse_info_plist() {
-  printf '%s\n' "/Library/Filesystems/macfuse.fs/Contents/Info.plist"
-}
-
-# The only place that registers/re-registers the filesystem extension.
-# Args: $1 instance key. Returns 20 for user action required.
+# Args: $1 instance key. Returns 20 for user action required, writing the
+# blocked record itself; 0 when this host can run the backend.
 backend_prepare() {
   local instance="$1"
-  local not_installed="macFUSE not installed; install via 'brew install --cask macfuse@dev'"
+  local rclone_bin="${NUCLEUS_RCLONE_BIN:-rclone}"
 
-  if ! macfuse_cli_bin >/dev/null; then
-    svc_health_set_blocked "$instance" "provider-version" "$not_installed"
+  if ! rclone_bin="$(command -v "$rclone_bin")"; then
+    svc_health_set_blocked "$instance" "mount-backend-unsupported" "rclone is not on PATH; the managed profile provides it, so rebuild the profile and log in again"
     return 20
   fi
 
-  # WHY: FSKit volume operations need macFUSE 5.4.0+ on macOS 27. Earlier versions lack
-  # the FSKit daemon interface, and this check stops a stale install failing silently.
-  # WHY no fallback version for an unreadable plist: _macfuse_version_gte treats a
-  # missing component as 0, so a made-up version would report a broken install as
-  # merely old instead of pointing at the installation.
-  local plist installed_version version_pattern='^[0-9]+\.[0-9]+\.[0-9]+$'
-  plist="$(macfuse_info_plist)"
-  if [ ! -f "$plist" ]; then
-    svc_health_set_blocked "$instance" "provider-version" "$not_installed"
-    return 20
-  fi
-  if ! installed_version="$(plutil -extract CFBundleShortVersionString raw "$plist" 2>/dev/null)" ||
-    ! [[ "$installed_version" =~ $version_pattern ]]; then
-    svc_health_set_blocked "$instance" "provider-version" "macFUSE version could not be read from $plist; check the macFUSE installation"
-    return 20
-  fi
-  if ! _macfuse_version_gte "$installed_version" "5.4.0"; then
-    svc_health_set_blocked "$instance" "provider-version" "macFUSE $installed_version is too old for FSKit; upgrade to 5.4.0+"
+  # WHY `nfsmount --help` and not `help nfsmount`: rclone's help command exits
+  #   0 for any topic, including ones that do not exist, so it cannot separate
+  #   a build with nfsmount from one without it. The subcommand's own --help
+  #   fails when the subcommand is missing.
+  if ! "$rclone_bin" nfsmount --help >/dev/null 2>&1; then
+    svc_health_set_blocked "$instance" "mount-backend-unsupported" "the rclone on PATH has no nfsmount command; the managed profile pins a version that has it, so rebuild the profile and log in again"
     return 20
   fi
 
-  # WHY: never --force per attempt. This only runs when the extension is off.
-  if ! fskit_extension_is_enabled; then
-    # check-suppress:suppression_doc: best-effort re-registration; failure blocks the mount
-    /opt/homebrew/bin/brew install --cask --no-quarantine macfuse@dev 2>/dev/null || true
-  fi
-
-  local module_state
-  module_state="$(fskit_macfuse_module_state)"
-  case "$module_state" in
-  enabled)
-    return 0
-    ;;
-  disabled)
-    svc_health_set_blocked "$instance" "provider-refusal" "$(backend_remedy provider-refusal)"
-    return 20
-    ;;
-  unknown)
-    # WHY this fails OPEN while backend_class fails CLOSED for the same `unknown`: they
-    # answer different questions. prepare asks "may I proceed?", so refusing would block a
-    # mount that may work, under a class that misdescribes it. class asks "what kind of
-    # failure is this?", and a provider failure nobody can explain is not something a retry
-    # clears. Composed, they attempt once, then block. Do not make either match the other.
-    return 0
-    ;;
-  esac
-
-  # An unexpected value fails OPEN like `unknown`: the mount is attempted and rclone
-  # plus backend_class report the real failure.
   return 0
 }
 
@@ -251,19 +160,18 @@ backend_args() {
     printf '%s\n' "--read-only"
   fi
 
-  # FSKit backend args, macOS 27+.
-  printf '%s\n' "-obackend=fskit"
-
   if [ -n "$extra_args" ]; then
     printf '%s\n' "$extra_args"
   fi
 }
 
 # Args: $1 rclone binary path, remaining args mount flags (from backend_args).
+# WHY nfsmount: chosen here so the runner stays free of macOS-mount specifics;
+#   the diagnostics behind the choice are in the file header.
 backend_mount() {
   local rclone_bin="$1"
   shift
-  "$rclone_bin" mount "$@" 2>"$_backend_capture" &
+  "$rclone_bin" nfsmount "$@" 2>"$_backend_capture" &
   _backend_rclone_pid=$!
 }
 
@@ -338,11 +246,4 @@ backend_unmount() {
     # check-suppress:suppression_doc: best-effort unmount; fusermount may fail if nothing is mounted
     fusermount3 -u "$mount_point" 2>/dev/null || true
   fi
-}
-
-# Args: $1 stderr capture file.
-backend_provider_refusal() {
-  local capture="$1"
-  [ -f "$capture" ] || return 1
-  grep -qE 'File system extension not (found|enabled)|fuse: mount failed with error|mount\(8\) returned 69|MFMount.*not enabled' "$capture"
 }

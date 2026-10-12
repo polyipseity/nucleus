@@ -224,7 +224,7 @@
     }
   },
   "cloud-drive": {
-    "description": "rclone FUSE cloud drive mounts",
+    "description": "rclone cloud drive mounts",
     "displayName": "Cloud Drive Mounts",
     "lifecycle": {
       "mountAttempts": 3,
@@ -243,7 +243,7 @@
       "MacBook": {
         "scope": "user",
         "launchdDomain": "gui",
-        "justification": "Per-user FUSE mount namespace bound to login session",
+        "justification": "Per-user mount namespace bound to login session",
         "prefixMatch": true,
         "service": "local.cloud-mount.",
         "type": "macos-launchctl",
@@ -258,7 +258,7 @@
         "unitPath": "~/Library/LaunchAgents/local.cloud-mount.__INSTANCE__.plist"
       },
       "NixOS": {
-        "justification": "Per-user FUSE mount namespace bound to login session",
+        "justification": "Per-user mount namespace bound to login session",
         "prefixMatch": true,
         "scope": "user",
         "service": "cloud-mount-",
@@ -267,7 +267,7 @@
         "unitPath": "~/.config/systemd/user/cloud-mount-__INSTANCE__.service"
       },
       "Windows": {
-        "justification": "Per-user FUSE mount via scheduled task at logon; replaced Servy for user-context isolation.",
+        "justification": "Per-user mount via scheduled task at logon; replaced Servy for user-context isolation.",
         "prefixMatch": true,
         "service": "NucleusCloudMount-",
         "taskPath": "\\NucleusCloudMount",

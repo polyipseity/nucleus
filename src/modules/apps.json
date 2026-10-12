@@ -562,7 +562,7 @@
   },
   "macFUSE": {
     "displayName": "macFUSE",
-    "description": "FSKit-capable FUSE userspace driver for rclone and ntfs-3g mounts",
+    "description": "FSKit-capable FUSE userspace driver for ntfs-3g mounts",
     "hosts": {
       "MacBook": {
         "platform": "macOS",
@@ -570,7 +570,7 @@
         "kind": "macos-system-extension",
         "bundleId": "io.macfuse.app.fsmodule.macfuse",
         "approvalInstructions": "System Settings → General → Login Items & Extensions → by category → File System Extensions → enable macFUSE.",
-        "justification": "FSKit file-system extension; io.macfuse.app.fsmodule.macfuse serves distributed volumes (cloud mounts) and io.macfuse.app.fsmodule.macfuse-local serves local volumes (NTFS). Approve in Login Items & Extensions → File System Extensions (not Privacy & Security). The macFUSE kernel extension stays unapproved."
+        "justification": "FSKit file-system extension needed by ntfs-3g: io.macfuse.app.fsmodule.macfuse-local attaches the local NTFS volumes that have no native driver. Approve in Login Items & Extensions → File System Extensions (not Privacy & Security). The macFUSE kernel extension stays unapproved."
       },
       "NixOS": {
         "platform": "NixOS",

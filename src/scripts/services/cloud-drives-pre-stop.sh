@@ -2,10 +2,10 @@
 # Cloud drive pre-stop: stop all cloud mount LaunchAgents and wait for their
 # volumes to release before setupLaunchAgents runs its bootout+bootstrap cycle.
 #
-# WHY: if the old mount's FSKit volume has not released when the new agent
-# starts, the mount script force-unmounts the stale volume, and that can make
-# lsd re-register the FSKit extension with a new UUID (Apple bug on macOS 26)
-# so the mount fails on a stale UUID.
+# WHY: booting out the old agent while its mount is still live leaves the new
+# agent mounting onto a volume that is still attached, so the drain waits for
+# each volume to release first. The stop TERMs rclone, its NFS server dies, and
+# the kernel client unmounts the volume.
 #
 # Called from the cloud-drives.nix activation entry, entryBefore
 # setupLaunchAgents. No-op off Darwin: NixOS uses systemd and has no FSKit.
@@ -32,7 +32,7 @@ esac
 # ── Stop each cloud mount LaunchAgent and wait for its volume ────────────────
 # Iterate the mounts JSON array.  For each enabled mount with a configured
 # remote (i.e. one that has a running LaunchAgent), send bootout to stop the
-# agent and wait for the FSKit volume to release from the mount table.
+# agent and wait for its volume to release from the mount table.
 while IFS= read -r _psd_entry; do
   [ -z "$_psd_entry" ] && continue
 
@@ -53,7 +53,7 @@ while IFS= read -r _psd_entry; do
   # check-suppress:suppression_doc: bootout of a job that is not loaded is an expected no-op.
   launchctl bootout "$_psd_target" 2>/dev/null || true
 
-  # WHY: 15s covers FSKit cleanup after the old agent's SIGTERM without
+  # WHY: 15s covers the client unmount after the old agent's SIGTERM without
   # meaningfully delaying apply.
   if svc_wait_mount_released "$_psd_mount_point" 15; then
     notice -l cloud-drives "pre-stop: volume at $_psd_mount_point released"

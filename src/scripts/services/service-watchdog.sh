@@ -416,7 +416,7 @@ _watchdog_check_instance() {
     78)
       notice "watchdog: $instance exited with EX_CONFIG (78); repairing"
       # WHY the bound: a repair that hangs, such as one blocked inside the kernel by a
-      #   dead macFUSE volume, would stall the tick and leave every instance after
+      #   dead mount, would stall the tick and leave every instance after
       #   this one unchecked. 124 is svc_run_bounded's timeout status.
       repair_timeout="$(_watchdog_repair_timeout_seconds)"
       svc_run_bounded "$repair_timeout" supervisor_repair "$target" "$declared_unit_path" "$scope" || repair_rc=$?

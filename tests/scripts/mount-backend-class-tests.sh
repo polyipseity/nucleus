@@ -40,22 +40,18 @@ unset _NUCLEUS_MOUNT_BACKEND_DARWIN_SOURCED
 CAPTURE="$(mktemp "${TMPDIR:-/tmp}/mbc-capture.XXXXXX")"
 trap 'rm -f "$CAPTURE"' EXIT
 
-# An FSKit/provider-refusal line that backend_class's own regex matches.
-FSKIT_PATTERN='File system extension not enabled'
-
-# classify_with STATE PATTERN: stub the module state, write PATTERN into the capture,
-# and print the REAL backend_class verdict.
+# classify_with PATTERN: write PATTERN into the capture and print the REAL
+# backend_class verdict.
 classify_with() {
-  local state="$1" pattern="$2"
-  fskit_macfuse_module_state() { printf '%s\n' "$state"; }
+  local pattern="$1"
   printf '%s\n' "$pattern" >"$CAPTURE"
   backend_class "$CAPTURE"
 }
 
-# assert_class LABEL EXPECTED STATE PATTERN
+# assert_class LABEL EXPECTED PATTERN
 assert_class() {
-  local label="$1" expected="$2" state="$3" pattern="$4" got
-  got="$(classify_with "$state" "$pattern")"
+  local label="$1" expected="$2" pattern="$3" got
+  got="$(classify_with "$pattern")"
   if [ "$got" = "$expected" ]; then
     assert_pass "$label"
   else
@@ -63,51 +59,33 @@ assert_class() {
   fi
 }
 
-section "1" "provider classification separates refusal from version"
+section "1" "nfs mount-grab failures are transient"
 
-assert_class "disabled extension classifies as provider-refusal" \
-  "provider-refusal" "disabled" "$FSKIT_PATTERN"
+# The live diagnosis behind the arm: rclone nfsmount reports a mount the kernel
+# would not grant as `failed to mount NFS volume: exit status 16` (EBUSY), and
+# that line fell through every arm to mount-failed, whose terminal remedy
+# blocked the mount instead of letting the retry re-grant it.
+assert_class "an nfs mount-grab failure classifies as io-transient" \
+  "io-transient" \
+  'mount: /Users/admin/clouds/GoogleDrive failed with 16: failed to mount NFS volume: exit status 16'
 
-assert_class "enabled extension with a failed mount classifies as provider-version" \
-  "provider-version" "enabled" "$FSKIT_PATTERN"
-
-# The other two inputs the branch must cover: an unreadable module list (`unknown`) and
-# an unexpected/empty value.  Both are terminal, because the module state cannot explain
-# the failure and a retry therefore cannot clear it.
-assert_class "unknown module state classifies as provider-version" \
-  "provider-version" "unknown" "$FSKIT_PATTERN"
-
-assert_class "empty module state classifies as provider-version" \
-  "provider-version" "" "$FSKIT_PATTERN"
-
-# Control: the provider branch must not swallow other classes.  A non-provider pattern
-# still has to reach its own verdict, proving the new branch is a split and not a
-# catch-all.
-assert_class "non-provider patterns still reach their own class (auth)" \
-  "auth" "enabled" "Unauthorized (401)"
+# Control: the new pattern must not become a catch-all. A failure nothing
+# recognises still answers mount-failed, the class whose remedy points at the
+# record's own output.
+assert_class "an unrecognised failure still classifies as mount-failed" \
+  "mount-failed" '2026/10/12 ERROR : something this classifier does not know'
 
 section "2" "the class decides retry policy, and the verdict is per-host"
 
-if backend_is_transient "provider-refusal"; then
-  assert_pass "provider-refusal is transient (retried)"
-else
-  assert_fail "provider-refusal is transient (retried)" "backend_is_transient returned non-zero"
-fi
-
-if backend_is_transient "provider-version"; then
-  assert_fail "provider-version is terminal (not retried)" \
-    "backend_is_transient returned 0 — a version mismatch would be retried forever"
-else
-  assert_pass "provider-version is terminal (not retried)"
-fi
-
 # WHY the verdict is asserted per-host instead of against a declared list: it genuinely
-# DIFFERS between hosts.  darwin (and Windows) retry `provider-refusal`, because the user
-# can switch the extension back on and the retry then succeeds; Linux must not, because
-# nothing there can re-enable anything.  A cross-host declaration therefore could only be
-# wrong on some host, which is why `transientClasses` was removed from services.json, and
-# this suite's former cross-check against it was deleted with it rather than left asserting
-# agreement with an absent field.  The real per-host classification is pinned below.
+# DIFFERS between hosts.  No backend emits a provider class any more: Linux never
+# defined one, and macOS mounts moved to nfsmount, which never touches an extension.
+# The Linux assertion below passes because an unknown token falls through to the
+# terminal default by design, which is the contract that matters here.  A cross-host
+# declaration could only be wrong on some host, which is why `transientClasses` was
+# removed from services.json, and this suite's former cross-check against it was
+# deleted with it rather than left asserting agreement with an absent field.  The
+# real per-host classification is pinned below.
 if backend_is_transient "io-transient"; then
   assert_pass "io-transient is transient on darwin"
 else
@@ -149,13 +127,13 @@ section "3" "the auth class matches an HTTP status, not a millisecond"
 #   recorded as bad credentials and the operator was sent to re-authenticate
 #   a mount whose remote was fine.
 assert_class "a timestamp-only capture does not classify as auth" \
-  "mount-failed" "enabled" \
+  "mount-failed" \
   '2026/10/08 12:58:41.401 NOTICE : mounting remote'
 
 # The anchored pattern must still reach a real HTTP status, or the fix would
 #   trade one misclassification for silently ignoring every genuine auth error.
 assert_class "an explicit HTTP status still classifies as auth" \
-  "auth" "enabled" \
+  "auth" \
   'Failed to list files: HTTP status 401'
 
 # The Linux classifier carries the same anchored pattern, asserted in its own
@@ -180,11 +158,11 @@ fi
 # through every arm to mount-failed, whose remedy points the operator at remote
 # configuration when the real action is a re-authentication.
 assert_class "an HTTP 421 status classifies as auth" \
-  "auth" "enabled" \
+  "auth" \
   'Failed to list files: HTTP status 421'
 
 assert_class "an invalid global session classifies as auth" \
-  "auth" "enabled" \
+  "auth" \
   'ERROR: iCloud root not found: Invalid global session'
 
 # The same trap the 401 anchor guards, one digit over: 421 lands in the
@@ -193,7 +171,7 @@ assert_class "an invalid global session classifies as auth" \
 #   credentials. A timestamp carrying no status and no session phrase must
 #   stay mount-failed.
 assert_class "a timestamp-only capture with .421 does not classify as auth" \
-  "mount-failed" "enabled" \
+  "mount-failed" \
   '2026/10/08 12:58:41.421 NOTICE : mounting remote'
 
 # The Linux classifier carries the same anchored pattern, asserted in its own
@@ -236,14 +214,14 @@ section "4" "a clean unmount with no error is torn-down, and silence is no-outpu
 UNMOUNT_NOTICE='2026/10/11 22:53:01 NOTICE : /Users/admin/clouds/iCloud: Unmounted rclone mount'
 
 assert_class "an unmount-only capture classifies as torn-down" \
-  "torn-down" "enabled" "$UNMOUNT_NOTICE"
+  "torn-down" "$UNMOUNT_NOTICE"
 
 # The discriminating case: the ordering is what enforces "no error". A capture
 # holding a real error AND the unmount NOTICE must stay the error class, because
 # every error grep returns before the teardown predicate is reached. A single
 # `grep -q Unmounted` placed ahead of the other tests breaks exactly here.
 assert_class "an auth error followed by an unmount NOTICE still classifies as auth" \
-  "auth" "enabled" "$(printf 'Failed to list files: HTTP status 401\n%s' "$UNMOUNT_NOTICE")"
+  "auth" "$(printf 'Failed to list files: HTTP status 401\n%s' "$UNMOUNT_NOTICE")"
 
 # A capture file nobody created arrives with no rclone words to justify any
 # class, and its old mount-failed remedy told the operator to check remote

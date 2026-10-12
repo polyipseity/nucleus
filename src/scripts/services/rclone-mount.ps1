@@ -129,13 +129,51 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
         # WHY: same reason as the evidence field, applied to the output tail: a
         #   record that recovered must not keep the last failure's words.
         Set-HealthField -Instance $instance -Field 'failureOutput' -Value $null
-        # check-suppress:suppression_doc: best-effort capture cleanup; the file is this attempt's own and the record no longer names it
-        Remove-Item -Path $captureFile -ErrorAction SilentlyContinue
 
-        $proc.WaitForExit()
+        # WHY the poll rather than one blocking WaitForExit(): a still-running
+        #   rclone is the mount serving, so the loop keeps waiting on the live
+        #   process and only the 10s timeout wakes it. Once the child is gone the
+        #   reap gets its own bound, because WaitForExit also completes redirected-
+        #   output draining, which can outlive the process; a reap that does not
+        #   finish within 10s is reported and abandoned so a wedged child cannot
+        #   hold the scheduled task open forever. The capture file survives the
+        #   wait because the record may need its tail below.
+        while (-not $proc.HasExited) {
+            # check-suppress:suppression_doc: the completion flag is re-read through HasExited on the next pass
+            $null = $proc.WaitForExit(10000)
+        }
+        if (-not $proc.WaitForExit(10000)) {
+            Write-Output "$instance`: warning: exited rclone did not finish shutting down within 10s; abandoning the wait"
+        }
         $exitCode = $proc.ExitCode
 
         Set-HealthLastExitCode -Instance $instance $exitCode
+
+        # WHY the post-attach death tail: the capture holds the only words a death
+        #   after attaching leaves, and deleting it before the wait, the old order,
+        #   destroyed them. The normal set is 0, a clean exit after a clean
+        #   unmount, and 1, the exit a terminated child reports on Windows, the
+        #   counterpart of POSIX's 143; the runner's own Pester suite pins that
+        #   pair, so a stand-in exiting 1 after attaching must leave the record
+        #   reading healthy. Any other status gets the tail POSIX writes.
+        if ($exitCode -notin @(0, 1)) {
+            $deathTail = if (Test-Path -LiteralPath $captureFile) {
+                @(Get-Content -LiteralPath $captureFile -Tail 20)
+            } else { @() }
+            # WHY the guard: an absent or empty tail joins to an empty string, while
+            #   the field's convention (service-health.sh) is to null an absent tail,
+            #   so failureOutput is never written as an empty string.
+            $deathOutput = $deathTail -join "`n"
+            if ($deathOutput) {
+                Set-HealthField -Instance $instance -Field 'failureOutput' -Value $deathOutput
+            } else {
+                Set-HealthField -Instance $instance -Field 'failureOutput' -Value $null
+            }
+            Write-Output "$instance`: mount died after attaching with status $exitCode"
+        }
+        # check-suppress:suppression_doc: best-effort capture cleanup; the record carries the tail when the death was abnormal
+        Remove-Item -Path $captureFile -ErrorAction SilentlyContinue
+
         Mount-Backend-Unmount -MountPoint $mountPoint
         Write-Output "$instance`: mount exited with status $exitCode"
         exit $exitCode
@@ -169,10 +207,20 @@ for ($attempt = 1; $attempt -le $attempts; $attempt++) {
     }
     $remedy = Mount-Backend-Remedy -Class $class
 
-    # Kill rclone if still running.
+    # Stop rclone if still running: grace first, then Kill, each bounded.
     if (-not $proc.HasExited) {
-        $proc.Kill()
-        $proc.WaitForExit()
+        # WHY the two bounded waits: the POSIX runner TERMs and polls for up to
+        #   10s, then KILLs and polls again before abandoning a child that
+        #   survives both. Kill() is this platform's only stop, so the first
+        #   wait is the grace a dying child gets to exit on its own, and the
+        #   second bounds the reap after Kill. A child still alive after both
+        #   is reported and left alone rather than blocking the task forever.
+        if (-not $proc.WaitForExit(10000)) {
+            $proc.Kill()
+            if (-not $proc.WaitForExit(5000)) {
+                Write-Output "$instance`: warning: rclone did not exit within 5s of Kill(); abandoning the wait"
+            }
+        }
     }
 
     Write-Output "$instance`: attempt $attempt failed (class=$class, $remedy)"

@@ -792,11 +792,13 @@ run_cloud_mount_invariants() {
     fi
   done
 
-  # Exactly one macfuse install call site, in the darwin backend.
+  # No macfuse install call site in the mount path: the cloud mounts run on
+  # rclone nfsmount and install nothing, and the NTFS macFUSE install is
+  # Nix-managed (src/hosts/MacBook/homebrew.nix).
   local _install_count
-  _install_count=$(grep -rl 'macfuse install\|brew install.*macfuse' src/scripts/lib/ src/scripts/services/ 2>/dev/null | wc -l || true) # check-suppress:suppression_doc: grep exits 1 when no install site matches; || echo 0 appended a second 0 under pipefail so the exactly-one assertion below never fired
-  if [ "$_install_count" -ne 1 ]; then
-    error "$_ctx_name: found $_install_count macfuse install call sites; must be exactly one (mount-backend-darwin.sh)"
+  _install_count=$(grep -rl 'macfuse install\|brew install.*macfuse' src/scripts/lib/ src/scripts/services/ 2>/dev/null | wc -l || true) # check-suppress:suppression_doc: grep exits 1 when no install site matches; the count must read zero either way
+  if [ "$_install_count" -ne 0 ]; then
+    error "$_ctx_name: found $_install_count macfuse install call sites; the mount path must install none (the NTFS install is Nix-managed)"
     _failed=1
   fi
 

@@ -42,9 +42,10 @@ trap 'rm -rf "$_shim_dir" "$_table" "$_work"' EXIT
 
 _mounted_empty="$_work/mounted-empty"
 _mounted_full="$_work/mounted-full"
+_nfs_mounted="$_work/nfs-mounted"
 _plain_dir="$_work/plain-dir"
 _prefix_sibling="$_work/prefix"
-mkdir -p "$_mounted_empty" "$_mounted_full" "$_plain_dir" "$_prefix_sibling"
+mkdir -p "$_mounted_empty" "$_mounted_full" "$_nfs_mounted" "$_plain_dir" "$_prefix_sibling"
 : >"$_mounted_full/an-entry"
 : >"$_plain_dir/an-entry"
 mkdir -p "$_prefix_sibling-sibling"
@@ -56,6 +57,7 @@ cat >"$_table" <<TABLE
 fakefs on $_mounted_empty (fuse.rclone, rw)
 fakefs on $_mounted_full (fuse.rclone, rw)
 fakefs on $_prefix_sibling-sibling (fuse.rclone, rw)
+localhost:/ on $_nfs_mounted (nfs, rw, addr=127.0.0.1)
 TABLE
 
 probe_state() { # <path>
@@ -73,6 +75,18 @@ esac
 case "$(probe_state "$_mounted_full")" in
 present) assert_pass "a mounted-and-non-empty mount point reads as mounted" ;;
 *) assert_fail "mount-probe-nonempty-mounted" "[$(probe_state "$_mounted_full")]" ;;
+esac
+
+# ── an NFS-spelled table entry is mounted too ────────────────────────────────
+# rclone nfsmount mounts over a local NFS server, so on macOS the table spells
+# the source `localhost:/` and the filesystem NFS rather than any fuse.rclone
+# spelling. The shared matcher keys on ` on <path> (` (macOS mount(8) format,
+# fstype inside the parens); this pins that an NFS entry in that shape reads as
+# mounted, or every mount would report absent after the backend switch.
+case "$(probe_state "$_nfs_mounted")" in
+present) assert_pass "an NFS-spelled mount table entry reads as mounted" ;;
+*) assert_fail "mount-probe-nfs-entry" \
+  "an NFS mount table entry read as not mounted ([$(probe_state "$_nfs_mounted")])" ;;
 esac
 
 # ── inverse error: a NON-empty directory that is not mounted is NOT mounted ──
@@ -134,8 +148,8 @@ esac
 
 # ── darwin: diskutil on PATH decides alone ───────────────────────────────────
 # The macOS backend is sourced last, after every assertion above, because it
-# redefines the backend_* names they read. macos-fskit.sh is sourced with it and
-# only defines functions, so this runs on a Linux host unchanged. diskutil is
+# redefines the backend_* names they read. The darwin backend defines only
+# functions, so this runs on a Linux host unchanged. diskutil is
 # shimmed for the same reason the mount table is: a real host's diskutil cannot
 # be relied on to name a volume on demand, and the situations below differ only
 # in what the shim does.
@@ -148,6 +162,24 @@ _darwin_unreadable="$_work/darwin-unreadable"
 mkdir -p "$_darwin_empty" "$_darwin_full" "$_darwin_unreadable"
 : >"$_darwin_full/an-entry"
 chmod 000 "$_darwin_unreadable"
+
+# ── an NFS volume as diskutil reports it is present ──────────────────────────
+# The backend macOS actually runs: nfsmount volumes are ordinary diskutil
+# answers, and this pins that an NFS-flavored reply carrying our mount point
+# still reads as attached.
+cat >"$_shim_dir/diskutil" <<'SHIM'
+#!/bin/sh
+echo "   Volume Name: iCloud"
+echo "   File System Personality: NFS"
+echo "   Mount Point: $2"
+SHIM
+chmod +x "$_shim_dir/diskutil"
+_darwin_nfs_state="$(backend_probe_state "$_darwin_empty")"
+case "$_darwin_nfs_state" in
+present) assert_pass "an NFS volume diskutil reports at our path reads as mounted on darwin" ;;
+*) assert_fail "darwin-probe-nfs-volume" \
+  "an NFS volume at our path read as [$_darwin_nfs_state]" ;;
+esac
 
 # ── only a reported mount point equal to ours proves the volume is HERE ─────
 # The empty directory is the discriminating input: the content test alone would

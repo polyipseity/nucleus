@@ -44,7 +44,8 @@ _vsd_replicas_json="$3"
 mkdir -p "$HOME/clouds"
 
 # WHY a real directory on macOS too: rclone stats the mount point before
-# mounting, so macFUSE never creates one under /Volumes.
+# mounting, so the mount never creates one for us; the point lives in the
+# user's home directory on every host.
 while IFS= read -r _vsd_entry; do
   [ -z "$_vsd_entry" ] && continue
   _vsd_local_path="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.localPath')"

@@ -85,6 +85,14 @@ _cm_main() {
   #   point directory leaves nothing to recreate it until the next apply; the
   #   Linux unit creates it via ExecStartPre, and mkdir -p is idempotent, so the
   #   shared runner covers both.
+  # WHY rmdir first: an earlier mount teardown can leave this empty directory in
+  #   a state that fails listing and refuses any new mount at the path. rmdir
+  #   succeeds only for an empty, unmounted directory: an active mount or a
+  #   populated directory fails it, and that failure is the expected case, so it
+  #   is suppressed rather than surfaced. The mkdir -p below is the existence
+  #   check that matters either way.
+  # check-suppress:suppression_doc: rmdir fails by design on an active mount or a populated directory; the mkdir -p below checks existence either way
+  rmdir "$mount_point" 2>/dev/null || true
   mkdir -p "$mount_point"
 
   # Backend prepare is idempotent and may write a blocked record, returning 20.
@@ -205,16 +213,64 @@ _cm_main() {
       #   at evidence for a mount that is now healthy.
       svc_health_set "$instance" evidence null
       # WHY: same reason as the evidence field, applied to the output tail: a
-      #   record that recovered must not keep the last failure's words.
+      #   record that recovered must not keep the last failure's words. A tail
+      #   from a NEW death after this point is written again once the serve wait
+      #   below has the status that justifies it.
       svc_health_set "$instance" failureOutput null
-      rm -f "$capture_file" "$mount_args_file"
+      # WHY the capture is NOT removed here: the serve wait has not run, and a
+      #   death after attach leaves its words only in this file. Every branch
+      #   after the wait removes it, once the status is known.
+      rm -f "$mount_args_file"
 
       local wait_status=0
       wait "$_backend_rclone_pid" || wait_status=$?
 
       svc_health_set_last_exit "$instance" "$wait_status"
-      # check-suppress:suppression_doc: best-effort unmount after mount failure
-      backend_unmount "$mount_point" 2>/dev/null || true
+
+      # WHY bounded: a forced unmount of a live volume blocked for more than ten
+      #   seconds in diagnostics, and this teardown must never wedge the runner.
+      #   The mount is already gone when rclone's own exit tore its server down,
+      #   so an abandoned helper is a cleanup miss, not a lost mount.
+      (backend_unmount "$mount_point") &
+      local _cm_unmount_pid=$!
+      local _cm_unmount_i=0
+      while [ "$_cm_unmount_i" -lt 10 ] && kill -0 "$_cm_unmount_pid" 2>/dev/null; do
+        sleep 1
+        _cm_unmount_i=$((_cm_unmount_i + 1))
+      done
+      if kill -0 "$_cm_unmount_pid" 2>/dev/null; then
+        warn -l cloud-drives "$instance: unmount helper still running after 10s; abandoning it"
+        # check-suppress:suppression_doc: best-effort cleanup of the helper's own child; the helper itself is abandoned below
+        pkill -P "$_cm_unmount_pid" 2>/dev/null || true
+        # check-suppress:suppression_doc: kill may fail if the helper already exited
+        kill -KILL "$_cm_unmount_pid" 2>/dev/null || true
+      fi
+      # check-suppress:suppression_doc: wait may fail if the helper already exited
+      wait "$_cm_unmount_pid" 2>/dev/null || true
+
+      # WHY after the wait and before the removal: a death after attach leaves
+      #   its words only in this file, and the old order deleted them before the
+      #   status was known. 0 is a clean exit and 143 is the TERM of a normal
+      #   stop; anything else is the mount dying unexpectedly, and the record
+      #   keeps the tail once the file goes away.
+      if [ "$wait_status" -ne 0 ] && [ "$wait_status" -ne 143 ]; then
+        local _cm_tail _cm_tail_json
+        _cm_tail="$(tail -n 20 "$capture_file")"
+        # WHY null instead of "": an empty capture leaves nothing to read, and an
+        #   empty string would read as recorded evidence where there is none. The
+        #   field spells absence as null everywhere else.
+        if [ -n "$_cm_tail" ]; then
+          _cm_tail_json="$(printf '%s' "$_cm_tail" | jq -Rs .)"
+        else
+          _cm_tail_json="null"
+        fi
+        if ! svc_health_set "$instance" failureOutput "$_cm_tail_json"; then
+          warn -l cloud-drives "$instance: could not record the post-attach failure output"
+        fi
+        notice -l cloud-drives "$instance: mount died after attaching with status $wait_status"
+      fi
+      rm -f "$capture_file"
+
       notice -l cloud-drives "$instance: mount exited with status $wait_status"
       exit "$wait_status"
     fi
@@ -250,8 +306,33 @@ _cm_main() {
     if [ -n "${_backend_rclone_pid:-}" ] && kill -0 "$_backend_rclone_pid" 2>/dev/null; then
       # check-suppress:suppression_doc: kill may fail if rclone already exited
       kill -TERM "$_backend_rclone_pid" 2>/dev/null || true
-      # check-suppress:suppression_doc: wait may fail if rclone already exited
-      wait "$_backend_rclone_pid" 2>/dev/null || true
+      # WHY a bounded poll instead of a bare `wait`: a child wedged in the
+      #   kernel during teardown blocked production runners in wait4 forever,
+      #   and a builtin `wait` has no bound to give up with. The poll observes
+      #   the same liveness and can stop; `wait` runs only once the child is
+      #   gone, where reaping is instant; a child still alive after KILL cannot
+      #   be forced by this process, so it is abandoned with a warning instead
+      #   of held.
+      local _cm_stop_i=0
+      while [ "$_cm_stop_i" -lt 10 ] && kill -0 "$_backend_rclone_pid" 2>/dev/null; do
+        sleep 1
+        _cm_stop_i=$((_cm_stop_i + 1))
+      done
+      if kill -0 "$_backend_rclone_pid" 2>/dev/null; then
+        # check-suppress:suppression_doc: kill may fail if rclone already exited
+        kill -KILL "$_backend_rclone_pid" 2>/dev/null || true
+        _cm_stop_i=0
+        while [ "$_cm_stop_i" -lt 10 ] && kill -0 "$_backend_rclone_pid" 2>/dev/null; do
+          sleep 1
+          _cm_stop_i=$((_cm_stop_i + 1))
+        done
+      fi
+      if kill -0 "$_backend_rclone_pid" 2>/dev/null; then
+        warn -l cloud-drives "$instance: rclone pid $_backend_rclone_pid is stuck in the kernel; abandoning it"
+      else
+        # check-suppress:suppression_doc: wait may fail if rclone already exited
+        wait "$_backend_rclone_pid" 2>/dev/null || true
+      fi
     fi
 
     notice -l cloud-drives "$instance: attempt $attempt failed (class=$class, $remedy)"

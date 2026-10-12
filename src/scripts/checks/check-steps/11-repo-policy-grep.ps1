@@ -161,7 +161,7 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
 
   # --- Cloud-mount invariants ---
   # The shared runner is backend-agnostic: FUSE and supervisor names live behind
-  # the mount and supervisor interfaces, and the macOS installer has one site.
+  # the mount and supervisor interfaces, and the mount path installs nothing.
   Write-Message "--- cloud-mount invariants ---"
   $cmViolations = 0
   $cmOsPattern = 'macfuse|fskit|WinFsp|fuse3|nucleus-cloud-repair'
@@ -189,8 +189,8 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
         Sort-Object -Unique
     )
   }
-  if ($cmInstallSites.Count -ne 1) {
-    Write-ErrorMessage "found $($cmInstallSites.Count) macfuse install call sites; must be exactly one (mount-backend-darwin.sh)"
+  if ($cmInstallSites.Count -ne 0) {
+    Write-ErrorMessage "found $($cmInstallSites.Count) macfuse install call sites; the mount path must install none (the NTFS install is Nix-managed)"
     $cmViolations++
   }
 
