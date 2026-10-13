@@ -36,7 +36,7 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 
 1. Generate `rclone_config_pass`: `openssl rand -hex 64` into `rclone_config_pass` in `src/secrets/users/<username>.yml`, commit, re-run `nucleus-apply`. Delete `~/.config/rclone/rclone.conf` first when unencrypted remotes exist.
 2. Run `nucleus-cloud setup` and complete `rclone config` for GoogleDrive, iCloud, and OneDrive.
-3. Cloud mounts supervise themselves on every host: launchd `KeepAlive`, systemd `Restart=always`, and the Windows task loop each remount a dead mount within 30 seconds, with no manual step in between. `nucleus-cloud status` prints each mount's state with the last 20 lines of its retained mount log under the host's log root; `nucleus-cloud restart` stops the mounts and lets the platform manager bring them back, as a convenience only. The same wrapper, the same verbs, and the same cadence run on MacBook, NixOS, and Windows (`scripts/cloud.ps1`).
+3. Cloud mounts supervise themselves on every host: launchd `KeepAlive`, systemd `Restart=always`, and the Windows task loop each remount a dead mount within 30 seconds, with no manual step in between. `nucleus-cloud status` prints each mount's state with the last 20 lines of its retained mount log under the host's log root; `nucleus-cloud restart` stops the mounts and lets the platform manager bring them back, as a convenience only. The same wrapper contract, the same verbs, and the same cadence run on MacBook, NixOS, and Windows (`scripts/cloud.ps1`).
 
 ## recovery
 
