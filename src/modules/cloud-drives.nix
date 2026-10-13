@@ -220,7 +220,7 @@ let
     in
     [
       (mountServiceId mount)
-      "${config.nucleus.logging.logDir}/cloud-mount-${mount.id}/mount.log"
+      "${config.nucleus.logging.logDir}/cloud-drive-mount-${mount.id}/mount.log"
       mountPoint
       rcloneRemote
     ]
@@ -348,19 +348,6 @@ in
     in
     lib.mkMerge [
 
-      # WHY: during setupLaunchAgents bootout+bootstrap, the old mount may still
-      #   be attached when the new mount starts, and a second mount at the same
-      #   path fails while it drains.  Pre-stopping the agents and waiting for
-      #   the volumes to release gives the new mount a clear path.
-
-      (lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && declaredMountAgents != [ ]) {
-        home.activation.cloud-drives-pre-stop = lib.hm.dag.entryBefore [ "setupLaunchAgents" ] ''
-          "${activationBundle}/src/scripts/services/cloud-drives-pre-stop.sh" \
-            "${pkgs.jq}/bin/jq" \
-            '${builtins.toJSON (map (m: { inherit (m) id localPath; }) declaredMountAgents)}'
-        '';
-      })
-
       # Registration must land before the agents start, or the first mount of a
       # fresh system fails on an unregistered extension and launchd spends the
       # first ThrottleInterval cycles discovering that.
@@ -417,13 +404,12 @@ in
       #   extension and restarts agents.  Clearing it is normal provisioning.
       #   entryBetween lists the runs-before names first: the wipe runs before
       #   setupLaunchAgents, so the records the agent runs started there write
-      #   survive it, and after cloud-drives-pre-stop, where a stopping runner can
-      #   write the last-exit record the wipe then clears.  A named entry that
-      #   does not exist forms no edge, so the macOS-only names are safe on NixOS.
+      #   survive it.  A named entry that does not exist forms no edge, so
+      #   macOS-only names are safe on NixOS.
 
       {
         home.activation.reset-service-health =
-          lib.hm.dag.entryBetween [ "setupLaunchAgents" ] [ "linkGeneration" "cloud-drives-pre-stop" ]
+          lib.hm.dag.entryBetween [ "setupLaunchAgents" ] [ "linkGeneration" ]
             ''
               "${activationBundle}/src/scripts/services/reset-service-health.sh"
             '';
@@ -460,8 +446,8 @@ in
                 # Both streams go to ~/Library/Logs for easier debugging; the
                 # wrapper itself appends rclone's full output to mount.log in
                 # the same per-instance directory.
-                StandardOutPath = "${config.nucleus.logging.logDir}/cloud-mount-${mount.id}/stdout.log";
-                StandardErrorPath = "${config.nucleus.logging.logDir}/cloud-mount-${mount.id}/stderr.log";
+                StandardOutPath = "${config.nucleus.logging.logDir}/cloud-drive-mount-${mount.id}/stdout.log";
+                StandardErrorPath = "${config.nucleus.logging.logDir}/cloud-drive-mount-${mount.id}/stderr.log";
               };
             };
           }) declaredMountAgents

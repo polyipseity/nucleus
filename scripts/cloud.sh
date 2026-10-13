@@ -1140,7 +1140,7 @@ _cloud_mount_targets() {
       warn "cloud mount '$_cmt_id' declares no local path; it is skipped"
       continue
     fi
-    printf '%s\t%s\t%s\n' "$_cmt_id" "$_cmt_mount_point" "$_cmt_log_root/cloud-mount-${_cmt_id}/mount.log"
+    printf '%s\t%s\t%s\n' "$_cmt_id" "$_cmt_mount_point" "$_cmt_log_root/cloud-drive-mount-${_cmt_id}/mount.log"
   done <<<"$(_cloud_mount_rows "$_cmt_mounts_json")"
 }
 
