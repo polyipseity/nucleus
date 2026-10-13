@@ -7,7 +7,7 @@
 #                                 local-only, never touches remote)
 #   sync  -> Invoke-ReplicaSync  (pull-only replica sync, remote -> local)
 #
-# Usage: .\scripts\cloud.ps1 <setup|reset|sync> [options]
+# Usage: .\scripts\cloud.ps1 <setup|reset|sync|status|restart> [options]
 #
 # Exit conditions: 0 on success; non-zero on any failure.
 
@@ -16,7 +16,7 @@
 [CmdletBinding(DefaultParameterSetName = 'Action')]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('setup', 'reset', 'sync')]
+  [ValidateSet('setup', 'reset', 'sync', 'status', 'restart')]
   [string]$Action = 'setup',
 
   # setup options
@@ -45,6 +45,10 @@ Usage: .\scripts\cloud.ps1 <setup|reset|sync> [options]
            names, and optionally run nucleus apply.
   reset    Remove local replica data and rclone cache (local-only).
   sync     Pull-only replica sync (remote -> local).
+  status   Show up/down per mount from the platform mount state, with the
+           last 20 lines of each mount's log.
+  restart  Stop the rclone process for each mount; the scheduled task's loop
+           remounts it within 30 seconds.
 
   setup options:
     -Apply|-NoApply   Run nucleus apply to converge cloud mount services
@@ -74,6 +78,151 @@ if ($RepoRoot) {
   $env:NUCLEUS_REPO_ROOT = $RepoRoot
 }
 
+function Invoke-CloudStatus {
+  <#
+  .SYNOPSIS
+    Reports up/down for every enabled cloud mount with its recent log tail.
+  .DESCRIPTION
+    The platform mount state is decided by whether the WinFsp mount point
+    lists: rclone leaves the mount point as an empty real directory when the
+    mount is down, so an empty listing is the down signal. The retained mount
+    log is the runner's entire failure surface, mirroring the POSIX twin.
+  .EXAMPLE
+    .\scripts\cloud.ps1 status
+  #>
+  [CmdletBinding()]
+  param()
+
+  $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
+  Import-Module $modulePath -Force -DisableNameChecking
+  . (Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Invoke-LogManagement.ps1')
+
+  function Resolve-CloudStatusRepoRoot {
+    $repoRoot = $env:NUCLEUS_REPO_ROOT
+    if (-not $repoRoot) {
+      # check-suppress:suppression_doc: probe -- may be invoked outside repo checkouts; resolution handled below.
+      $candidate = Resolve-Path "$PSScriptRoot\.." -ErrorAction SilentlyContinue
+      if ($candidate) { return $candidate }
+      throw "NUCLEUS_REPO_ROOT is not set. Run via apply.ps1 or run from the repo checkout."
+    }
+    if (-not (Test-Path -Path $repoRoot -PathType Container)) {
+      throw "NUCLEUS_REPO_ROOT path '$repoRoot' does not exist or is not a directory."
+    }
+    return $repoRoot
+  }
+
+  $repoRoot = Resolve-CloudStatusRepoRoot
+  $registry = & (Join-Path $repoRoot 'src\platforms\Windows\modules\Load-UserRegistry.ps1') -RepoRoot $repoRoot
+  $primaryUser = $registry['primaryUser']
+  if ($null -eq $primaryUser) {
+    Write-NucleusError 'no primary user is declared in the user registry; cloud status cannot resolve mounts.'
+    exit 1
+  }
+
+  $cloudDrives = $primaryUser['cloudDrives']
+  $homeDirectory = [string]$primaryUser['homeDirectory']
+  if ($null -eq $cloudDrives) {
+    Write-NucleusInfo 'no cloudDrives configuration is declared for the primary user.'
+    return
+  }
+
+  foreach ($mount in @($cloudDrives['mounts'] | Where-Object { $_ })) {
+    $enabled = if ($null -ne $mount['enable']) { [bool]$mount['enable'] } else { $true }
+    if (-not $enabled) { continue }
+
+    $mountPoint = Join-Path $homeDirectory ([string]$mount['localPath'])
+    $listing = @()
+    if (Test-Path -LiteralPath $mountPoint -PathType Container) {
+      # check-suppress:suppression_doc: an unreadable mount point counts as down rather than failing the whole report
+      $listing = @(Get-ChildItem -LiteralPath $mountPoint -Force -ErrorAction SilentlyContinue)
+    }
+    $stateWord = if ($listing.Count -gt 0) { 'up' } else { 'down' }
+    Write-NucleusInfo "$($mount['id']) $stateWord $mountPoint"
+
+    $logFile = Join-Path (Get-NucleusLogDir) "cloud-drive-mount-$($mount['id'])\mount.log"
+    Write-NucleusInfo "--- $($mount['id']) log (last 20 lines) ---"
+    if (Test-Path -LiteralPath $logFile -PathType Leaf) {
+      Get-Content -LiteralPath $logFile -Tail 20
+    }
+    else {
+      Write-NucleusInfo "(no log yet at $logFile)"
+    }
+  }
+}
+
+function Invoke-CloudRestart {
+  <#
+  .SYNOPSIS
+    Stops the rclone process for every enabled cloud mount.
+  .DESCRIPTION
+    Each mount's rclone process is matched by its mount point, the one
+    command-line argument unique to the instance; the platform manager (task
+    loop) remounts it within 30 seconds, so no start step is needed here.
+  .EXAMPLE
+    .\scripts\cloud.ps1 restart
+  #>
+  [CmdletBinding()]
+  param()
+
+  $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
+  Import-Module $modulePath -Force -DisableNameChecking
+
+  function Resolve-CloudRestartRepoRoot {
+    $repoRoot = $env:NUCLEUS_REPO_ROOT
+    if (-not $repoRoot) {
+      # check-suppress:suppression_doc: probe -- may be invoked outside repo checkouts; resolution handled below.
+      $candidate = Resolve-Path "$PSScriptRoot\.." -ErrorAction SilentlyContinue
+      if ($candidate) { return $candidate }
+      throw "NUCLEUS_REPO_ROOT is not set. Run via apply.ps1 or run from the repo checkout."
+    }
+    if (-not (Test-Path -Path $repoRoot -PathType Container)) {
+      throw "NUCLEUS_REPO_ROOT path '$repoRoot' does not exist or is not a directory."
+    }
+    return $repoRoot
+  }
+
+  $repoRoot = Resolve-CloudRestartRepoRoot
+  $registry = & (Join-Path $repoRoot 'src\platforms\Windows\modules\Load-UserRegistry.ps1') -RepoRoot $repoRoot
+  $primaryUser = $registry['primaryUser']
+  if ($null -eq $primaryUser) {
+    Write-NucleusError 'no primary user is declared in the user registry; cloud restart cannot resolve mounts.'
+    exit 1
+  }
+
+  $cloudDrives = $primaryUser['cloudDrives']
+  $homeDirectory = [string]$primaryUser['homeDirectory']
+  if ($null -eq $cloudDrives) {
+    Write-NucleusInfo 'no cloudDrives configuration is declared for the primary user.'
+    return
+  }
+
+  foreach ($mount in @($cloudDrives['mounts'] | Where-Object { $_ })) {
+    $enabled = if ($null -ne $mount['enable']) { [bool]$mount['enable'] } else { $true }
+    if (-not $enabled) { continue }
+
+    $mountPoint = Join-Path $homeDirectory ([string]$mount['localPath'])
+    # WHY .Contains and not -like: a mount point is a literal path; the wildcard
+    #   interpretation in -like would need escaping for no benefit.
+    # WHY both qualifiers: the POSIX twin matches the mount subcommand and the
+    #   mount point, so an unrelated rclone job whose path merely extends the
+    #   mount point (a replica sync) is never stopped.
+    $processes = @(
+      Get-CimInstance -ClassName Win32_Process -Filter "Name = 'rclone.exe'" |
+        Where-Object {
+          $_.CommandLine -and $_.CommandLine.Contains('rclone mount') -and $_.CommandLine.Contains($mountPoint)
+        }
+    )
+    if ($processes.Count -eq 0) {
+      Write-NucleusInfo "$($mount['id']) has no running rclone; the platform manager (task loop) starts it on its next beat"
+      continue
+    }
+    foreach ($process in $processes) {
+      Stop-Process -Id $process.ProcessId
+      Write-NucleusInfo "$($mount['id']) rclone stopped (pid $($process.ProcessId)); the platform manager (task loop) remounts it within 30s"
+    }
+  }
+}
+
 switch ($Action) {
   'setup' {
     Invoke-CloudSetup -Apply $apply
@@ -83,6 +232,12 @@ switch ($Action) {
   }
   'sync' {
     Invoke-ReplicaSync -DryRun $DryRun -ReplicaId $ReplicaId
+  }
+  'status' {
+    Invoke-CloudStatus
+  }
+  'restart' {
+    Invoke-CloudRestart
   }
 }
 

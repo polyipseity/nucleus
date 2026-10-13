@@ -782,7 +782,7 @@ run_cloud_mount_invariants() {
   local _failed=0
   local _core_files
   _core_files="src/scripts/services/rclone-mount.sh src/scripts/services/rclone-mount.ps1"
-  local _os_pattern='macfuse|fskit|WinFsp|fuse3|nucleus-cloud-repair'
+  local _os_pattern='macfuse|fskit|WinFsp|fuse3'
 
   for _f in $_core_files; do
     [ -f "$_f" ] || continue
@@ -892,16 +892,17 @@ run_service_supervision_invariants() {
     _failed=1
   fi
 
-  # Retry and backoff belong to the shared runner alone; a sleeping mount
-  # backend or setup step is a second retry owner.
-  local _mount_path_file
-  for _mount_path_file in src/scripts/lib/mount-backend-darwin.sh src/scripts/lib/mount-backend-linux.sh src/scripts/services/cloud-drives-setup.sh; do
-    [ -f "$_mount_path_file" ] || continue
-    if grep -qE '(^|[^[:alnum:]_])sleep([^[:alnum:]_]|$)' "$_mount_path_file"; then
-      error "$_ctx_name: $_mount_path_file sleeps; retry/backoff is owned by the shared runner (src/scripts/services/rclone-mount.sh)"
-      _failed=1
-    fi
-  done
+  # Retry and backoff belong to the platform manager (launchd KeepAlive,
+  # systemd Restart=always, the Windows task loop); a setup step that sleeps
+  # is a second retry owner.
+  # WHY one path and no loop: the sleep ban covered the mount runners until
+  #   they became platform-managed, leaving the setup script as the only
+  #   cloud-mount script where a sleep would reintroduce a second retry owner.
+  local _mount_path_file=src/scripts/services/cloud-drives-setup.sh
+  if [ -f "$_mount_path_file" ] && grep -qE '(^|[^[:alnum:]_])sleep([^[:alnum:]_]|$)' "$_mount_path_file"; then
+    error "$_ctx_name: $_mount_path_file sleeps; retry/backoff is owned by the platform manager (launchd KeepAlive, systemd Restart=always, the Windows task loop)"
+    _failed=1
+  fi
 
   # Only the watchdog may act on the loop predicate; a service script calling it
   # enforces a private throttle instead of reporting health.

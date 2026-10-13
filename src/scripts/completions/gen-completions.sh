@@ -45,7 +45,7 @@ known_subcommands() {
   check) printf '%s\n' "packer|sh|pwsh" ;;
   gc) printf '%s\n' "cleanup-nix|preferences" ;;
   apply) printf '%s\n' "health-check|audit-store" ;;
-  cloud) printf '%s\n' "setup|reset|sync|repair" ;;
+  cloud) printf '%s\n' "setup|reset|sync|status|restart" ;;
   update) printf '%s\n' "lockfile" ;;
   utils) printf '%s\n' "optimize-pdf|strip-metadata" ;;
   esac

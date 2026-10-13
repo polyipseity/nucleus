@@ -138,13 +138,13 @@ test_mount_path_symlink_error_without_a_label_stays_generic() {
   rm -rf "$home"
 }
 
-# mark_blocked <home> <service label>: a fresh blocked record, as the mount
-# wrapper leaves it when the FSKit provider refuses the volume. Written into the
-# test's own root so it cannot leak into a later test.
+# mark_blocked <home> <service label>: a stale blocked record from the
+# pre-rewrite era, which the setup script's generic reader still reports.
+# Written into the test's own root so it cannot leak into a later test.
 mark_blocked() { # <home> <label>
   (
     NUCLEUS_USER_ROOT="$(user_root_for_home "$1")"
-    svc_health_set_blocked "$2" "fskit-provider" "$(fskit_remedy)"
+    svc_health_set_blocked "$2" "fskit-provider" "stale marker from the pre-rewrite era"
   )
 }
 
@@ -154,7 +154,7 @@ test_blocked_mount_warns_with_its_remedy() {
   mark_blocked "$home" local.cloud-mount.GoogleDrive
   err="$(run_setup_stderr "$home" "$_mounts_labeled" "$_replicas_none" 2>&1)" || rc=$?
   case "$err" in *'cloud-drives (clouds/GoogleDrive): warning'*) reported=true ;; esac
-  case "$err" in *'nucleus-cloud repair'*) remedy_ok=true ;; esac
+  case "$err" in *'stale marker from the pre-rewrite era'*) remedy_ok=true ;; esac
   if [ "$rc" -eq 0 ] && [ "$reported" = true ] && [ "$remedy_ok" = true ]; then
     assert_pass "a blocked mount is reported with the remedy, and the apply still succeeds"
   else

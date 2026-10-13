@@ -315,8 +315,6 @@ cat >"$_cli/repo/src/modules/services.json" <<JSON
       }
     },
     "lifecycle": {
-      "mountAttempts": 3,
-      "mountRetryBackoffSeconds": [20, 40],
       "mountAttachTimeoutSeconds": 77
     }
   },
@@ -546,27 +544,27 @@ reset_cli running "$_cli_mount" "" stop plain-service
 assert_count "stopping an ordinary service exits 0" 0 "$captured_status"
 assert_count "an ordinary service never probes the mount table" 0 "$(grep -c '^mount:' "$FAKE_TIMELINE")"
 
-section 8 "A blocked cloud mount repairs the FSKit provider before the reload"
+section 8 "A blocked cloud mount restarts like any other"
 
-# WHY: the blocked marker is what says the provider, not the mount, is the
-# problem, so the repair is gated on it: a stale marker is ignored, and an
-# unblocked restart must leave the FSKit daemon alone.
+# WHY: the rewrite deleted the provider-repair path with the repair command, so
+# a blocked record no longer gates anything. The restart proceeds exactly like
+# an unblocked one, the FSKit daemon is never touched, and the record stays
+# visible as generic health state only.
 _cli_state_dir="$(user_root_for_home "$_cli/home")/state/service-stats"
 block_mount() { # <key>
-  svc_health_set_blocked "$1" "fskit-provider" "$(fskit_remedy)"
+  svc_health_set_blocked "$1" "fskit-provider" "stale marker from the pre-rewrite era"
 }
 
 block_mount local.cloud-mount.iCloud
 reset_cli stopped "$_cli_mount" 2 restart local.cloud-mount.iCloud
 assert_count "restarting a blocked cloud mount exits 0" 0 "$captured_status"
-assert_mentions "the blocked provider is repaired, not retried" "$captured_output" "repairing the macFUSE/FSKit provider"
-assert_count "the blocked provider's daemon is restarted" 1 "$(_fskit_killcount)"
-if [ "$(_fskit_killcount)" -eq 1 ] && [ "$(timeline_index 'sudo killall fskitd')" -lt "$(timeline_index 'bootstrap')" ]; then
-  assert_pass "the provider is repaired before the agent is reloaded"
+if contains "$captured_output" "repairing the macFUSE/FSKit provider"; then
+  assert_fail "svc-blocked-no-repair" "a deleted repair path ran for a blocked record"
 else
-  assert_fail "svc-blocked-repair-first" "timeline=[$(tr '\n' ';' <"$FAKE_TIMELINE")]"
+  assert_pass "a blocked record does not trigger the deleted repair path"
 fi
-assert_mentions "the repaired mount's volume is verified" "$captured_output" "is mounted"
+assert_count "a blocked record never restarts the FSKit daemon" 0 "$(_fskit_killcount)"
+assert_mentions "the blocked restart's volume is verified" "$captured_output" "is mounted"
 
 svc_health_clear local.cloud-mount.iCloud
 reset_cli stopped "$_cli_mount" 2 restart local.cloud-mount.iCloud
@@ -581,7 +579,7 @@ FAKE_MOUNT_APPEAR_AFTER=""
 reset_cli stopped "$_cli_mount" 2 restart local.cloud-mount.iCloud
 assert_count "a volume that never attaches fails the restart" 1 "$captured_status"
 assert_mentions "the failed attach" "$captured_output" "did not attach"
-assert_mentions "the failed attach names the repair command" "$captured_output" "nucleus-cloud repair"
+assert_mentions "the failed attach names the status command" "$captured_output" "nucleus-cloud status"
 # WHY control first: the CLI must quote the budget declared by THIS fixture, so
 # the assertion below cannot pass by coincidence with a hardcoded 45.
 assert_count "control: the stub registry declares the attach budget" "77" \
@@ -603,12 +601,12 @@ assert_count "the blocked class is in the JSON status" "fskit-provider" \
   "$(printf '%s' "$captured_output" | tail -1 | jq -r '.services["local.cloud-mount.iCloud"].blocked')"
 assert_mentions "the JSON status carries the remedy" \
   "$(printf '%s' "$captured_output" | tail -1 | jq -r '.services["local.cloud-mount.iCloud"].blockedRemedy')" \
-  "nucleus-cloud repair"
+  "stale marker from the pre-rewrite era"
 
 reset_cli running "$_cli_mount" "" list
 assert_count "list exits 0 for a blocked instance" 0 "$captured_status"
 assert_mentions "list reports the blocked class" "$captured_output" "blocked (fskit-provider)"
-assert_mentions "list reports the blocked remedy" "$captured_output" "nucleus-cloud repair"
+assert_mentions "list reports the blocked remedy" "$captured_output" "stale marker from the pre-rewrite era"
 
 reset_cli running "$_cli_mount" "" status local.cloud-mount.iCloud
 assert_mentions "status reports the blocked class" "$captured_output" "blocked (fskit-provider)"

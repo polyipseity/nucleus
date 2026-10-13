@@ -21,20 +21,20 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib/macos-launch-services.sh"
 # shellcheck source=../src/scripts/lib/svc-instances.sh
 . "$SCRIPT_DIR/../src/scripts/lib/svc-instances.sh"
-# shellcheck source=../src/scripts/lib/macos-fskit.sh
-. "$SCRIPT_DIR/../src/scripts/lib/macos-fskit.sh"
 # shellcheck source=../src/scripts/lib/service-health.sh
 . "$SCRIPT_DIR/../src/scripts/lib/service-health.sh"
 
 usage() {
-  usage_std "$(basename "$0")" "setup|reset|sync|repair [options]"
+  usage_std "$(basename "$0")" "setup|reset|sync|status|restart [options]"
   cat <<'EOF'
   setup    Verify/create rclone remotes, validate credentials, sync display
            names, and optionally run nucleus apply.
   reset    Remove local replica data and rclone cache (local-only).
   sync     Pull-only replica sync (remote -> local).
-  repair   Restart the macOS FSKit provider (macFUSE file-system extension).
-           Then restart and verify the declared cloud mounts (macOS only).
+  status   Show up/down per mount from the platform mount table, with the
+           last 20 lines of each mount's log.
+  restart  Stop the rclone process for each mount; the platform manager
+           remounts it within 30 seconds.
 
   setup options:
     --apply|--no-apply  Run nucleus apply to converge cloud mount services
@@ -48,11 +48,6 @@ usage() {
   sync options:
     --dry-run           Print planned sync commands instead of executing them.
     --replica-id ID     Sync only the replica with the given id.
-    --repo-root PATH    Repo checkout used to find src/users/.
-
-  repair options:
-    --timeout SECS      Seconds to keep relaunching each mount agent until its
-                        volume appears (default: 15).
     --repo-root PATH    Repo checkout used to find src/users/.
 
   Common options:
@@ -234,24 +229,16 @@ EOF
   esac
 }
 
-# WHY: the mount points come from the same user-registry loader that nucleus-svc
-#   and the watchdog read, so the repair targets the mounts the runtime side
-#   actually declares (disabled entries included in the registry are skipped).
-_repair_mount_rows() {
+# WHY: the rows come from the same user-registry loader that nucleus-svc and the
+#   watchdog read, so status and restart act on the mounts the runtime side
+#   actually declares (disabled entries are skipped).
+_cloud_mount_rows() {
   jq -r '
     .[]?
     | select(.enable == null or .enable == true)
-    | select(.id != null)
-    | [(.id | tostring), (.localPath // "")] | @tsv
+    | select(.id != null and .localPath != null)
+    | [(.id | tostring), (.localPath | tostring)] | @tsv
   ' <<<"$1"
-}
-
-# WHY: both the restart and the bounded relaunch below act on the same target, and
-#   resolving it once keeps the two from disagreeing about the domain.
-_repair_mount_target() {
-  local label="$1" uid="$2"
-
-  launchctl_target "$(_detect_launchd_domain "$label" "$uid")" "$uid" "$label"
 }
 
 remote_provider_type() {
@@ -1136,255 +1123,116 @@ do_sync() {
   say "completed successfully"
 }
 
-# WHY: macOS serves macFUSE volumes through the FSKit file-system extension, and
-# macFUSE 5.x can leave that subsystem wedged after an unmount: every later mount
-# then fails with "File system extension not found"/"not enabled" (macFUSE status
-# 3/4) or "mount(8) returned 69" while FSKit's own module list still names the
-# module. Re-registering the extension or mounting again only deepens the wedge,
-# so the one repair is the daemon restart the macFUSE maintainers prescribe.
-# ref: https://github.com/macfuse/macfuse/issues/1132
-do_repair() {
-  timeout=15
-  repo_root=""
-  local -a requested=() rows=()
-  local tab
-  tab="$(printf '\t')"
+# Shared plumbing for status and restart: one tab-separated row per enabled
+# mount with its id, resolved mount point, and retained mount log path. The log
+# path mirrors what cloud-drives.nix passes the wrapper as its -LogFile value.
+_cloud_mount_targets() {
+  local _cmt_host="$1" _cmt_username="$2" _cmt_cloud_entry="$3"
+  local _cmt_mounts_json _cmt_log_root _cmt_label _cmt_mount_point
 
-  while [ "$#" -gt 0 ]; do
-    case "$1" in
-    --timeout)
-      shift
-      if [ "$#" -eq 0 ] || [ -z "$1" ]; then
-        error "--timeout requires a value"
-        exit 1
-      fi
-      timeout="$1"
-      ;;
-    --timeout=*)
-      timeout="${1#--timeout=}"
-      if [ -z "$timeout" ]; then
-        error "--timeout requires a non-empty value"
-        exit 1
-      fi
-      ;;
-    --repo-root)
-      shift
-      if [ "$#" -eq 0 ] || [ -z "$1" ]; then
-        error "--repo-root requires a value"
-        exit 1
-      fi
-      repo_root="$1"
-      ;;
-    --repo-root=*)
-      repo_root="${1#--repo-root=}"
-      if [ -z "$repo_root" ]; then
-        error "--repo-root requires a non-empty value"
-        exit 1
-      fi
-      ;;
-    -h | --help)
-      usage
-      exit 0
-      ;;
-    -*)
-      error "unsupported argument '$1'"
-      usage >&2
-      exit 1
-      ;;
-    *)
-      requested+=("$1")
-      ;;
-    esac
-    shift
-  done
+  _cmt_mounts_json="$(svc_configured_mounts "$REPO_ROOT" "$_cmt_host" "$_cmt_username")"
+  _cmt_log_root="$(nucleus_log_dir)"
+  while IFS="$(printf '\t')" read -r _cmt_id _cmt_local_path; do
+    [ -n "$_cmt_id" ] || continue
+    _cmt_label="$(jq -r '.service // empty' <<<"$_cmt_cloud_entry")${_cmt_id}"
+    _cmt_mount_point="$(svc_cloud_mount_point "$_cmt_cloud_entry" "$_cmt_mounts_json" "$_cmt_label" "$HOME")"
+    if [ -z "$_cmt_mount_point" ]; then
+      warn "cloud mount '$_cmt_id' declares no local path; it is skipped"
+      continue
+    fi
+    printf '%s\t%s\t%s\n' "$_cmt_id" "$_cmt_mount_point" "$_cmt_log_root/cloud-mount-${_cmt_id}/mount.log"
+  done <<<"$(_cloud_mount_rows "$_cmt_mounts_json")"
+}
 
-  case "$timeout" in
-  '' | *[!0-9]* | 0)
-    error "--timeout expects a positive whole number of seconds, got '$timeout'"
-    exit 1
-    ;;
-  esac
-
-  if [ -z "$repo_root" ]; then
-    REPO_ROOT="$(derive_repo_root)"
-  else
-    REPO_ROOT="$repo_root"
-  fi
-
-  host="$(resolve_nucleus_host)"
-  if [ "$host" != "MacBook" ]; then
-    error "repair repairs the macOS FSKit provider, which host '$host' does not have"
-    exit 1
-  fi
-
+# Resolve the cloud-drive host entry once for status and restart; both need the
+# same registry plumbing, shared here.
+_cloud_mount_context() {
   require_command jq
-  require_command launchctl
-
-  services_json="$REPO_ROOT/src/modules/services.json"
-  if [ ! -f "$services_json" ]; then
-    error "services registry not found at $services_json"
+  REPO_ROOT="$(derive_repo_root)"
+  _cmc_host="$(resolve_nucleus_host)"
+  _cmc_username="$(id -un)"
+  _cmc_services_json="$REPO_ROOT/src/modules/services.json"
+  if [ ! -f "$_cmc_services_json" ]; then
+    error "services registry not found at $_cmc_services_json"
     exit 1
   fi
-  cloud_entry="$(jq -c --arg host "$host" '.["cloud-drive"].hosts[$host] // empty' "$services_json")"
-  if [ -z "$cloud_entry" ]; then
-    error "no cloud-drive service entry for host '$host' in $services_json"
+  _cmc_cloud_entry="$(jq -c --arg host "$_cmc_host" '.["cloud-drive"].hosts[$host] // empty' "$_cmc_services_json")"
+  if [ -z "$_cmc_cloud_entry" ]; then
+    error "no cloud-drive service entry for host '$_cmc_host' in $_cmc_services_json"
     exit 1
   fi
-  label_prefix="$(jq -r '.service // empty' <<<"$cloud_entry")"
-  if [ -z "$label_prefix" ]; then
-    error "the cloud-drive service entry for host '$host' declares no service label"
-    exit 1
+}
+
+# status: one line per enabled mount with the platform mount table as the
+# authority, then the last 20 lines of that mount's retained log.
+do_status() {
+  local rows tab id mount_point log_file state
+  _cloud_mount_context
+  rows="$(_cloud_mount_targets "$_cmc_host" "$_cmc_username" "$_cmc_cloud_entry")"
+  if [ -z "$rows" ]; then
+    say "no enabled cloud mounts are declared for user '$_cmc_username'"
+    return 0
   fi
 
-  # Cloud mounts are gui agents of the invoking user, so launchctl needs no
-  # privilege; a registry that moves them into the system domain still gets the
-  # escalation the other svc-side operations use.
-  sudo_prefix=""
-  [ "$(jq -r '.scope // "user"' <<<"$cloud_entry")" = "system" ] && sudo_prefix="sudo"
-
-  username="$(id -un)"
-  uid="$(id -u)"
-  mounts_json="$(svc_configured_mounts "$REPO_ROOT" "$host" "$username")"
-
-  while IFS="$tab" read -r mount_id local_path; do
-    [ -n "$mount_id" ] || continue
-    label="${label_prefix}${mount_id}"
-    mount_point="$(svc_cloud_mount_point "$cloud_entry" "$mounts_json" "$label" "$HOME")"
-    if [ -z "$mount_point" ]; then
-      warn "cloud mount '$mount_id' declares no local path; it cannot be verified and is skipped"
-      continue
-    fi
-    rows+=("$mount_id$tab$label$tab$mount_point")
-  done <<<"$(_repair_mount_rows "$mounts_json")"
-
-  if [ "${#requested[@]}" -gt 0 ]; then
-    local -a filtered=()
-    local request row found
-    for request in "${requested[@]}"; do
-      found=false
-      for row in "${rows[@]}"; do
-        if [ "${row%%"$tab"*}" = "$request" ]; then
-          filtered+=("$row")
-          found=true
-        fi
-      done
-      if [ "$found" != true ]; then
-        error "cloud mount '$request' is not declared for user '$username'"
-        exit 1
-      fi
-    done
-    if [ "${#filtered[@]}" -gt 0 ]; then
-      rows=("${filtered[@]}")
-    else
-      rows=()
-    fi
-  fi
-
-  if [ "${#rows[@]}" -eq 0 ]; then
-    say "no enabled cloud mounts are declared for user '$username'; nothing to repair"
-    exit 0
-  fi
-
-  say "checking the macOS FSKit provider (macFUSE file-system extension)..."
-  if ! fskit_repair_provider "$timeout"; then
-    # WHY: a failed provider repair does not prove the mounts are unrecoverable,
-    #   so they still get their restarts and the exit reports their outcome
-    #   instead of the command stopping before any of them was tried.
-    # check-suppress:suppression_doc: warn-and-continue is the sanctioned degradation; the provider failure is reported and the mount outcomes still decide the exit
-    warn "the FSKit provider could not be repaired; repair continues with the ${#rows[@]} cloud mount(s), verifying each and restarting the ones that are down"
-  fi
-
-  # WHY: FSKit needs a few seconds to re-register the macFUSE module after
-  #   fskitd respawns; agents that start before it is ready get "File system
-  #   extension not found" and must be kicked again.
-  sleep 5
-
-  failures=0
-  undetermined=0
-  for row in "${rows[@]}"; do
-    IFS="$tab" read -r mount_id label mount_point <<<"$row"
-
-    _cm_state="$(svc_mount_table_state "$mount_point")"
-    case "$_cm_state" in
+  tab="$(printf '\t')"
+  while IFS="$tab" read -r id mount_point log_file; do
+    [ -n "$id" ] || continue
+    state="$(svc_mount_table_state "$mount_point")"
+    case "$state" in
     present)
-      say "mount '$mount_id' is already mounted"
-      continue
+      say "$id up $mount_point"
       ;;
     unknown:*)
-      # WHY: the table could not be read, so nothing is known about this mount.
-      #   Starting one anyway is what the "unknown answers present" rule exists to
-      #   prevent, and skipping it silently made repair report a success it did not
-      #   perform, so it counts as undetermined and the command fails.
-      warn "could not determine whether mount '$mount_id' ($mount_point) is mounted (${_cm_state#unknown:}); leaving it alone"
-      undetermined=$((undetermined + 1))
-      continue
-      ;;
-    esac
-
-    say "starting mount '$mount_id'..."
-    target="$(_repair_mount_target "$label" "$uid")"
-    plist="$HOME/Library/LaunchAgents/$label.plist"
-
-    # WHY: an unloaded agent cannot be kickstarted, so one with an installed plist is
-    #   loaded first. A loaded-but-wedged agent still reports a running state while
-    #   its volume never attached, so it is restarted instead of waited on.
-    if [ -f "$plist" ] && ! launchctl_job_loaded "$target" "$sudo_prefix"; then
-      domain="$(launchctl_bootstrap_domain "$(_detect_launchd_domain "$label" "$uid")" "$uid")"
-      # check-suppress:suppression_doc: the bounded relaunch below is the check; a bootstrap that fails leaves the job unloaded and the relaunch reports the outcome.
-      launchctl_bootstrap_plist "$domain" "$plist" "$target" "$sudo_prefix" >/dev/null || true
-    else
-      # check-suppress:suppression_doc: a kickstart that fails is retried by the bounded relaunch below, which is the check.
-      $sudo_prefix launchctl kickstart -k "$target" >/dev/null 2>&1 || true
-    fi
-
-    # WHY the bounded relaunch: FSKit can refuse the first attempts right after its
-    #   daemon restarts while a later one serves the volume, and the mount runner
-    #   stops on a provider refusal instead of retrying it, so the bounded retry
-    #   belongs to the command that wants the mount up.
-    # check-suppress:suppression_doc: the report pass below names every mount that did not come back, so a failed relaunch is not an error here.
-    svc_remount_until "$mount_point" "$target" "$sudo_prefix" "$timeout" || true
-
-    _cm_state="$(svc_mount_table_state "$mount_point")"
-    case "$_cm_state" in
-    present)
-      say "mounted: $mount_id ($mount_point)"
-      # WHY: a mount that came back is no longer blocked, so its record is re-armed here
-      #   rather than letting every later apply re-report a fixed problem.
-      svc_health_clear "$label"
-      ;;
-    unknown:*)
-      # WHY: the table could not be read a second time, so whether this mount came back
-      #   is unknown. Calling it mounted and clearing its record would claim a
-      #   success the repair did not perform and erase the evidence a later apply
-      #   needs, so it counts as undetermined instead.
-      warn "could not determine whether mount '$mount_id' ($mount_point) came back after the relaunch (${_cm_state#unknown:}); its health record was left in place"
-      undetermined=$((undetermined + 1))
+      warn "$id state unknown (${state#unknown:}) at $mount_point"
       ;;
     *)
-      # check-suppress:suppression_doc: every unrecovered mount is reported before the command fails, so one missing drive cannot hide the others.
-      error "not mounted: $mount_id ($mount_point)" || true
-      failures=$((failures + 1))
+      say "$id down $mount_point"
       ;;
     esac
-  done
+    say "--- $id log (last 20 lines) ---"
+    if [ -f "$log_file" ]; then
+      tail -n 20 "$log_file"
+    else
+      say "(no log yet at $log_file)"
+    fi
+  done <<<"$rows"
+}
 
-  if [ "$failures" -gt 0 ]; then
-    # WHY: this block exits before the undetermined one below, so a run with both
-    #   would drop the count of the mounts whose state is unknown.
-    undetermined_note=""
-    [ "$undetermined" -gt 0 ] && undetermined_note=" and could not determine the state of $undetermined mount(s); the warning for each names the mount and the reason"
-    error "repair finished with $failures failure(s)$undetermined_note; $(fskit_remedy)"
-    exit 1
+# restart: TERMs the rclone process whose command line carries this mount's
+# path; the platform manager (launchd KeepAlive, systemd Restart=always) starts
+# the replacement within its 30 second throttle. The mount point is the match
+# key because it is the one argument unique to this instance and the wrapper
+# keeps no pid file by design.
+do_restart() {
+  local rows tab id mount_point log_file pids pid
+  _cloud_mount_context
+  rows="$(_cloud_mount_targets "$_cmc_host" "$_cmc_username" "$_cmc_cloud_entry")"
+  if [ -z "$rows" ]; then
+    say "no enabled cloud mounts are declared for user '$_cmc_username'"
+    return 0
   fi
 
-  if [ "$undetermined" -gt 0 ]; then
-    # WHY: an undetermined mount is not a repaired mount, so the command fails rather
-    #   than reporting a success it did not perform.
-    error "repair could not determine the state of $undetermined mount(s); the warning for each names the mount and the reason. $(fskit_remedy)"
-    exit 1
-  fi
-
-  say "cloud mounts repaired"
+  tab="$(printf '\t')"
+  while IFS="$tab" read -r id mount_point log_file; do
+    [ -n "$id" ] || continue
+    pids="$(ps -eo pid=,args= | awk -v mp="$mount_point" '{
+      pid = $1
+      if (index($0, "rclone mount ") > 0 && index($0, " " mp) > 0) print pid
+    }')" || {
+      warn "$id could not scan processes for the mount point; restart skipped"
+      continue
+    }
+    if [ -n "$pids" ]; then
+      while IFS= read -r pid; do
+        [ -n "$pid" ] || continue
+        # check-suppress:suppression_doc: a process that exits between the scan and the signal is expected; status re-reads the real state
+        kill -TERM "$pid" 2>/dev/null || true
+      done <<<"$pids"
+      say "$id rclone stopped; the platform manager remounts it within 30s"
+    else
+      say "$id has no running rclone; the platform manager starts it on its next beat"
+    fi
+  done <<<"$rows"
 }
 
 action="${1:-help}"
@@ -1400,7 +1248,8 @@ case "$action" in
 setup) do_setup "$@" ;;
 reset) do_reset "$@" ;;
 sync) do_sync "$@" ;;
-repair) do_repair "$@" ;;
+status) do_status "$@" ;;
+restart) do_restart "$@" ;;
 *)
   error "unsupported subcommand '$action'"
   usage >&2

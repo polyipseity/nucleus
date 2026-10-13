@@ -166,7 +166,7 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   # surface; the mount path itself installs nothing (the cask is Nix-managed).
   Write-Message "--- cloud-mount invariants ---"
   $cmViolations = 0
-  $cmOsPattern = 'macfuse|fskit|WinFsp|fuse3|nucleus-cloud-repair'
+  $cmOsPattern = 'macfuse|fskit|WinFsp|fuse3'
 
   foreach ($cmRelative in @('src/scripts/services/rclone-mount.sh', 'src/scripts/services/rclone-mount.ps1')) {
     $cmPath = Join-Path -Path $r -ChildPath $cmRelative
@@ -299,19 +299,18 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
     $ssViolations++
   }
 
-  # Retry and backoff belong to the shared runner alone; a mount backend or
-  # setup step that sleeps is a second retry owner, which is how the original
-  # restart storm ran without backoff.
+  # Retry and backoff belong to the platform manager (launchd KeepAlive,
+  # systemd Restart=always, the Windows task loop); a setup step that sleeps
+  # is a second retry owner, which is how the original restart storm ran
+  # without backoff.
   $ssMountFiles = @(
-    'src/scripts/lib/mount-backend-darwin.sh',
-    'src/scripts/lib/mount-backend-linux.sh',
     'src/scripts/services/cloud-drives-setup.sh'
   )
   foreach ($ssMountFile in $ssMountFiles) {
     $ssMountPath = Join-Path -Path $r -ChildPath $ssMountFile
     if (-not (Test-Path -LiteralPath $ssMountPath)) { continue }
     if (Select-String -LiteralPath $ssMountPath -Pattern '(^|[^a-zA-Z0-9_])sleep([^a-zA-Z0-9_]|$)' -CaseSensitive -Quiet) {
-      Write-ErrorMessage "$ssMountFile sleeps; retry/backoff is owned by the shared runner (src/scripts/services/rclone-mount.sh)"
+      Write-ErrorMessage "$ssMountFile sleeps; retry/backoff is owned by the platform manager (launchd KeepAlive, systemd Restart=always, the Windows task loop)"
       $ssViolations++
     }
   }

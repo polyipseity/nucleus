@@ -23,15 +23,9 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 . "$SCRIPT_DIR/test-lib.sh"
 
 # HOME and NUCLEUS_USER_ROOT must resolve to a temp dir before any wrapper
-# runs: during the RED run the pre-rewrite wrapper still writes health
-# records, and those must never land in the real user state directory.
+# runs, so files the wrapper creates never land in the real user state
+# directory.
 init_test_state
-
-# Bound the pre-rewrite runner's retry budget so the RED run finishes in
-# seconds instead of minutes. The new wrapper never reads these variables.
-export NUCLEUS_MOUNT_ATTEMPTS=1
-export NUCLEUS_MOUNT_BACKOFF=0
-export NUCLEUS_MOUNT_ATTACH_SECONDS=1
 
 WRAPPER="$REPO_ROOT/src/scripts/services/rclone-mount.sh"
 

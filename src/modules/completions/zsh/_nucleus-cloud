@@ -4,10 +4,9 @@
 
 _arguments \
   '(-h --help)'{--help,-h}'[Show usage]' \
-  '1:subcommand:((setup "Verify/create rclone remotes, validate credentials, sync display" reset "Remove local replica data and rclone cache (local-only)" sync "Pull-only replica sync (remote -> local)" repair "Restart the macOS FSKit provider (macFUSE file-system extension)"))' \
+  '1:subcommand:((setup "Verify/create rclone remotes, validate credentials, sync display" reset "Remove local replica data and rclone cache (local-only)" sync "Pull-only replica sync (remote -> local)" status "Show up/down per mount from the platform mount table, with the" restart "Stop the rclone process for each mount; the platform manager"))' \
   '--apply[apply]' \
   '--dry-run[dry run]' \
   '--no-apply[no apply]' \
   '--replica-id[replica id]' \
-  '--repo-root[repo root]' \
-  '--timeout[timeout]'
+  '--repo-root[repo root]'

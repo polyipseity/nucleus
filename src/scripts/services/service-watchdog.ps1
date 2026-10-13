@@ -31,8 +31,8 @@
   entries per instance. An instance the user registry declares but Windows does
   not run is reported once per transition through the health record's reported
   state instead of being started.
-  Runs indefinitely, sleeping cloud-drive.lifecycle.watchdogTickSeconds between
-  iterations. Use -Oneshot to run a single iteration.
+  Runs indefinitely, sleeping $WatchdogTickSeconds (300) between iterations.
+  Use -Oneshot to run a single iteration.
 
 .PARAMETER Oneshot
   Run one iteration and exit instead of sleeping forever.
@@ -43,6 +43,12 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# WHY fixed constants: the POSIX twin hardcodes the same two values, and
+#   services.json no longer carries watchdog timings; one owner per policy,
+#   and a runtime restart loop belongs to the platform manager.
+$WatchdogTickSeconds = 300
+$WatchdogRepairTimeoutSeconds = 30
 
 $modulePath = Join-Path $PSScriptRoot '..\..\..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
@@ -275,7 +281,7 @@ function Test-ServiceInstance {
     # Rule 5: live but broken: repair in place so it is not counted as a restart.
     if ($lastExit -eq 78) {
       Write-NucleusNotice -CommandName 'service-watchdog' -Message "$Instance exited 78 (EX_CONFIG); repairing it"
-      $repairTimeout = Get-WatchdogLifecycleDuration -Name 'watchdogRepairTimeoutSeconds' -Default 30
+      $repairTimeout = $WatchdogRepairTimeoutSeconds
       $repairStatus = Invoke-BoundedRepair -Target $Target -TimeoutSeconds $repairTimeout
       if ($repairStatus -eq 124) {
         Write-NucleusWarning -CommandName 'service-watchdog' -Message "repair of $Instance timed out after ${repairTimeout}s"
@@ -291,39 +297,6 @@ function Test-ServiceInstance {
   # Rule 4: not live and not blocked: the only revival path.
   Write-NucleusNotice -CommandName 'service-watchdog' -Message "$Instance is not running; starting it"
   Supervisor-Start -Target $Target
-}
-
-function Get-WatchdogLifecycleDuration {
-  <#
-  .SYNOPSIS
-    Reads one cloud-drive lifecycle timing from the service registry.
-  .DESCRIPTION
-    Both watchdog timings are declared once in services.json and read here, so
-    this watchdog cannot drift from the policy its POSIX twin reads out of the
-    same file. watchdogTickSeconds bounds the gap BETWEEN ticks,
-    watchdogRepairTimeoutSeconds bounds ONE repair call.
-  #>
-  [CmdletBinding()]
-  [OutputType([int])]
-  param(
-    [Parameter(Mandatory)][string]$Name,
-    [Parameter(Mandatory)][int]$Default
-  )
-
-  # WHY stepwise instead of one chained index: `$RegistryRaw['cloud-drive'].lifecycle[$Name]`
-  #   evaluates left to right and indexing $null throws, so the guard could never
-  #   run on the path it exists for, and the declared default stayed unreachable
-  #   while the POSIX twin's `${value:-<default>}` always honoured it.
-  $value = $null
-  if ($null -ne $RegistryRaw) {
-    $drive = $RegistryRaw['cloud-drive']
-    if ($null -ne $drive) {
-      $lifecycle = $drive['lifecycle']
-      if ($null -ne $lifecycle) { $value = $lifecycle[$Name] }
-    }
-  }
-  if (-not $value) { return $Default }
-  return [int]$value
 }
 
 function Invoke-BoundedRepair {
@@ -409,6 +382,6 @@ if ($Oneshot) {
 } else {
   while ($true) {
     Invoke-WatchdogIteration
-    Start-Sleep -Seconds (Get-WatchdogLifecycleDuration -Name 'watchdogTickSeconds' -Default 300)
+    Start-Sleep -Seconds $WatchdogTickSeconds
   }
 }

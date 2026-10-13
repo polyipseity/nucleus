@@ -1,17 +1,11 @@
 #!/usr/bin/env bash
-# Tests for src/scripts/lib/macos-fskit.sh, the FSKit module-state probe and the
-# daemon restart path.
+# Tests for src/scripts/lib/macos-fskit.sh, the FSKit module-state probe.
 #
-# The probe decides whether a mount attempt is skipped, so its contract matters
-# in both directions: a readable list must answer enabled/disabled precisely, and
-# an unreadable one must answer "unknown" rather than "disabled" (a probe failure
-# that reads as a missing module would skip a mount that could have succeeded).
-# The daemon probe keeps the same split: a launchctl that is missing or exits
-# non-zero answers "unknown", and only a readable probe that reports no daemon
-# answers empty. The repair fails when it cannot read the daemon state, and also
-# when the daemon survives the kill and keeps its pid past the bound, because
-# fskitd(8) is demand-start: an idle daemon needs no restart, and one that exits
-# comes back on the next volume request.
+# The probe decides whether a macFUSE-dependent entry counts as present, so its
+# contract matters in both directions: a readable list must answer
+# enabled/disabled precisely, and an unreadable one must answer "unknown" rather
+# than "disabled" (a probe failure that reads as a missing module would drop an
+# entry that is actually fine).
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -32,7 +26,7 @@ readonly _tmp
 _plist="$(fskit_settings_plist)"
 export PATH="$_tmp/bin:$PATH"
 
-export FAKE_PLUTIL_STATUS FAKE_FSKIT_LISTING FAKE_FSKIT_PIDS FAKE_FSKIT_COUNTER FAKE_KILLALL_LOG FAKE_KILLALL_STATUS FAKE_LAUNCHCTL_FAIL
+export FAKE_PLUTIL_STATUS FAKE_FSKIT_LISTING
 
 cat >"$_tmp/bin/plutil" <<'FAKE_PLUTIL'
 #!/usr/bin/env bash
@@ -44,48 +38,7 @@ case "${1:-}" in
 esac
 exit 1
 FAKE_PLUTIL
-
-# FAKE_FSKIT_PIDS: PIDs answered by successive `launchctl print` calls, the last
-# one repeating. A daemon that survives the kill answers the same PID every
-# time, and a "-" entry answers with no pid (the daemon exited).
-cat >"$_tmp/bin/launchctl" <<'FAKE_LAUNCHCTL'
-#!/usr/bin/env bash
-case "${1:-}" in
-print)
-  # FAKE_LAUNCHCTL_FAIL models a probe that cannot run, distinct from an idle
-  # daemon that answers exit 0 with no pid.
-  if [ "${FAKE_LAUNCHCTL_FAIL:-0}" = "1" ]; then
-    printf 'Could not find service\n' >&2
-    exit 113
-  fi
-  _n=0
-  if [ -f "$FAKE_FSKIT_COUNTER" ]; then _n="$(cat "$FAKE_FSKIT_COUNTER")"; fi
-  _n=$((_n + 1))
-  printf '%s' "$_n" >"$FAKE_FSKIT_COUNTER"
-  _pid=""
-  _i=0
-  for _candidate in ${FAKE_FSKIT_PIDS:-}; do
-    _i=$((_i + 1))
-    _pid="$_candidate"
-    if [ "$_i" -ge "$_n" ]; then break; fi
-  done
-  if [ -n "$_pid" ] && [ "$_pid" != "-" ]; then printf 'pid = %s\n' "$_pid"; fi
-  ;;
-esac
-exit 0
-FAKE_LAUNCHCTL
-
-cat >"$_tmp/bin/killall" <<'FAKE_KILLALL'
-#!/usr/bin/env bash
-printf '%s\n' "$*" >>"$FAKE_KILLALL_LOG"
-exit "${FAKE_KILLALL_STATUS:-0}"
-FAKE_KILLALL
-
-cat >"$_tmp/bin/sudo" <<'FAKE_SUDO'
-#!/usr/bin/env bash
-exec "$@"
-FAKE_SUDO
-chmod +x "$_tmp/bin/plutil" "$_tmp/bin/launchctl" "$_tmp/bin/killall" "$_tmp/bin/sudo"
+chmod +x "$_tmp/bin/plutil"
 
 assert_eq() { # <test name> <expected> <actual>
   if [ "$2" = "$3" ]; then
@@ -93,13 +46,6 @@ assert_eq() { # <test name> <expected> <actual>
   else
     assert_fail "$1" "expected '$2', got '$3'"
   fi
-}
-
-assert_mentions() { # <slug> <haystack> <needle>
-  case "$2" in
-  *"$3"*) assert_pass "$1 mentions '$3'" ;;
-  *) assert_fail "$1" "output did not mention '$3': $2" ;;
-  esac
 }
 
 section "macos-fskit" "module state probe"
@@ -114,211 +60,18 @@ assert_eq "an unlisted module reads as disabled" "disabled" "$(fskit_module_stat
 
 FAKE_FSKIT_LISTING='[
   0 => "com.apple.fskit.exfat"
-  1 => "io.macfuse.app.fsmodule.macfuse-local"
 ]'
-assert_eq "the -local variant keeps macFUSE enabled" "enabled" "$(fskit_macfuse_module_state)"
+assert_eq "a list without the module reads as disabled" "disabled" "$(fskit_module_state io.macfuse.app.fsmodule.macfuse)"
 
-FAKE_FSKIT_LISTING='[
-  0 => "com.apple.fskit.exfat"
-]'
-assert_eq "a list without macFUSE reads as disabled" "disabled" "$(fskit_macfuse_module_state)"
-
-# WHY: the probe gates a mount attempt, so a failed probe must not read as a
-# missing module, that would skip a mount that could have succeeded.
+# WHY: the probe gates a presence decision, so a failed probe must not read as a
+# missing module; that would drop an entry that is actually fine.
 FAKE_FSKIT_LISTING=""
 FAKE_PLUTIL_STATUS=1
 assert_eq "a failed probe reads as unknown" "unknown" "$(fskit_module_state io.macfuse.app.fsmodule.macfuse)"
 FAKE_PLUTIL_STATUS=0
 
 rm -f "$_plist"
-assert_eq "a missing module list reads as unknown" "unknown" "$(fskit_macfuse_module_state)"
+assert_eq "a missing module list reads as unknown" "unknown" "$(fskit_module_state io.macfuse.app.fsmodule.macfuse)"
 : >"$_plist"
-
-section "macos-fskit" "extension gate"
-
-extension_gate_status() {
-  if fskit_extension_is_enabled; then
-    printf '0'
-  else
-    printf '%s' "$?"
-  fi
-}
-
-FAKE_FSKIT_LISTING='[
-  0 => "io.macfuse.app.fsmodule.macfuse"
-]'
-assert_eq "a listed module opens the extension gate" "0" "$(extension_gate_status)"
-
-FAKE_FSKIT_LISTING='[
-  0 => "com.apple.fskit.exfat"
-]'
-assert_eq "an unlisted module leaves the extension gate closed" "1" "$(extension_gate_status)"
-
-# WHY a failed probe leaves the gate closed: the probe cannot prove the
-# extension is on, so backend_prepare attempts the re-registration and its own
-# case on the module state decides the outcome.
-FAKE_FSKIT_LISTING=""
-FAKE_PLUTIL_STATUS=1
-assert_eq "a failed probe leaves the extension gate closed" "1" "$(extension_gate_status)"
-FAKE_PLUTIL_STATUS=0
-
-section "macos-fskit" "daemon state and repair"
-
-export FAKE_FSKIT_COUNTER="$_tmp/launchctl.count"
-export FAKE_KILLALL_LOG="$_tmp/killall.log"
-: >"$FAKE_KILLALL_LOG"
-: >"$FAKE_FSKIT_COUNTER"
-
-FAKE_FSKIT_PIDS='4242'
-assert_eq "a running daemon reports its pid" "4242" "$(fskit_daemon_pid)"
-assert_eq "a running daemon reads as running" "running" "$(fskit_daemon_state)"
-
-FAKE_FSKIT_PIDS=''
-: >"$FAKE_FSKIT_COUNTER"
-assert_eq "an absent daemon has no pid" "" "$(fskit_daemon_pid)"
-assert_eq "an absent daemon reads as stopped" "stopped" "$(fskit_daemon_state)"
-
-# WHY: a probe that cannot run proves neither a running nor a stopped daemon,
-# so it answers "unknown" and a repair that reads it fails instead of claiming
-# a daemon it never saw.
-: >"$FAKE_KILLALL_LOG"
-: >"$FAKE_FSKIT_COUNTER"
-FAKE_LAUNCHCTL_FAIL=1
-assert_eq "a failed probe answers unknown for the pid" "unknown" "$(fskit_daemon_pid)"
-assert_eq "a failed probe reads as unknown" "unknown" "$(fskit_daemon_state)"
-if fskit_restart_daemon 5 2>"$_tmp/restart-probefail.err"; then
-  assert_fail "fskit-restart-probefail" "a failed probe was reported as a successful restart"
-else
-  assert_pass "a failed probe fails the restart"
-fi
-assert_mentions "the failed-probe report" "$(cat "$_tmp/restart-probefail.err")" "state could not be read"
-assert_eq "the failed-probe restart never calls killall" "" "$(cat "$FAKE_KILLALL_LOG")"
-FAKE_LAUNCHCTL_FAIL=0
-
-# WHY a restricted PATH: the real launchctl at /usr/bin would make the answer
-# depend on the machine, and the two commands below are all the error path runs.
-mkdir -p "$_tmp/nolaunchctl-bin"
-ln -sf "$(command -v sed)" "$_tmp/nolaunchctl-bin/sed"
-ln -sf "$(command -v cat)" "$_tmp/nolaunchctl-bin/cat"
-: >"$FAKE_KILLALL_LOG"
-: >"$FAKE_FSKIT_COUNTER"
-if (PATH="$_tmp/nolaunchctl-bin" fskit_restart_daemon 5) 2>"$_tmp/restart-nobin.err"; then
-  assert_fail "fskit-restart-nobin" "a missing launchctl was reported as a successful restart"
-else
-  assert_pass "a missing launchctl fails the restart"
-fi
-assert_mentions "the missing-probe report" "$(cat "$_tmp/restart-nobin.err")" "state could not be read"
-assert_eq "the missing-probe restart never calls killall" "" "$(cat "$FAKE_KILLALL_LOG")"
-assert_eq "a missing launchctl reads as unknown" "unknown" "$(PATH="$_tmp/nolaunchctl-bin" fskit_daemon_state)"
-
-# WHY: fskitd(8) is demand-start, so an idle daemon needs no restart and one
-# that exits after the kill comes back on the next volume request. Only a daemon
-# that keeps its pid past the bound survives the kill and needs the operator.
-: >"$FAKE_KILLALL_LOG"
-: >"$FAKE_FSKIT_COUNTER"
-FAKE_FSKIT_PIDS=''
-if fskit_restart_daemon 5; then
-  assert_pass "an idle daemon at entry reports success"
-else
-  assert_fail "fskit-restart-idle" "an idle daemon was reported as a failed restart"
-fi
-assert_eq "the idle restart never calls killall" "" "$(cat "$FAKE_KILLALL_LOG")"
-
-: >"$FAKE_KILLALL_LOG"
-: >"$FAKE_FSKIT_COUNTER"
-FAKE_FSKIT_PIDS='100 -'
-if fskit_restart_daemon 5; then
-  assert_pass "a daemon that exits after the kill reports success"
-else
-  assert_fail "fskit-restart-exit" "an exited daemon was reported as a failed restart"
-fi
-assert_mentions "the exit restart" "$(cat "$FAKE_KILLALL_LOG")" "fskitd"
-
-: >"$FAKE_KILLALL_LOG"
-: >"$FAKE_FSKIT_COUNTER"
-FAKE_FSKIT_PIDS='100 200'
-if fskit_restart_daemon 5; then
-  assert_pass "a daemon that respawns reports success"
-else
-  assert_fail "fskit-restart" "the restart failed although the daemon respawned with a new pid"
-fi
-assert_mentions "the restart" "$(cat "$FAKE_KILLALL_LOG")" "fskitd"
-
-: >"$FAKE_KILLALL_LOG"
-: >"$FAKE_FSKIT_COUNTER"
-FAKE_FSKIT_PIDS='100 100'
-if fskit_restart_daemon 1 2>"$_tmp/restart.err"; then
-  assert_fail "fskit-restart-stale" "a daemon that kept its pid was reported as restarted"
-else
-  assert_pass "a daemon that keeps its pid past the bound reports failure"
-fi
-assert_mentions "the failed restart" "$(cat "$_tmp/restart.err")" "killall -9"
-
-: >"$FAKE_FSKIT_COUNTER"
-FAKE_FSKIT_PIDS='300 400'
-FAKE_KILLALL_STATUS=1
-if fskit_restart_daemon 1 2>"$_tmp/killfail.err"; then
-  assert_fail "fskit-restart-killfail" "a failed killall was reported as a successful restart"
-else
-  assert_pass "a failed killall reports failure"
-fi
-assert_mentions "the failed killall" "$(cat "$_tmp/killfail.err")" "killall fskitd"
-FAKE_KILLALL_STATUS=0
-
-assert_mentions "the remedy" "$(fskit_remedy)" "killall fskitd"
-
-section "macos-fskit" "provider repair"
-
-# WHY: the repair has to distinguish "the subsystem needed a restart" from "the
-# module is gone", the second needs the operator, and only an error says so. A
-# successful repair prints nothing: callers report success in their own words.
-: >"$FAKE_KILLALL_LOG"
-: >"$FAKE_FSKIT_COUNTER"
-FAKE_FSKIT_PIDS='100 200'
-FAKE_FSKIT_LISTING='[
-  0 => "io.macfuse.app.fsmodule.macfuse"
-]'
-if fskit_repair_provider 5 >"$_tmp/repair-ok.out" 2>"$_tmp/repair-ok.err"; then
-  assert_pass "a repaired provider reports success"
-else
-  assert_fail "fskit-repair-ok" "a repaired provider was reported as failed"
-fi
-assert_eq "the successful repair prints no status token" "" "$(cat "$_tmp/repair-ok.out")"
-
-: >"$FAKE_KILLALL_LOG"
-: >"$FAKE_FSKIT_COUNTER"
-FAKE_FSKIT_PIDS='100 200'
-FAKE_FSKIT_LISTING='[
-  0 => "com.apple.fskit.exfat"
-]'
-if fskit_repair_provider 5 >"$_tmp/repair-disabled.out" 2>"$_tmp/repair-disabled.err"; then
-  assert_fail "fskit-repair-disabled" "a missing module was reported as a successful repair"
-else
-  assert_pass "a restart without the module fails the repair"
-fi
-assert_mentions "the disabled-module report" "$(cat "$_tmp/repair-disabled.err")" "Login Items & Extensions"
-assert_eq "the disabled-module failure prints no status token" "" "$(cat "$_tmp/repair-disabled.out")"
-
-: >"$FAKE_KILLALL_LOG"
-: >"$FAKE_FSKIT_COUNTER"
-FAKE_FSKIT_PIDS='100 200'
-FAKE_PLUTIL_STATUS=1
-if fskit_repair_provider 5 >"$_tmp/repair-unknown.out" 2>"$_tmp/repair-unknown.err"; then
-  assert_fail "fskit-repair-unknown" "an unreadable module list was reported as a successful repair"
-else
-  assert_pass "an unreadable module list fails the repair"
-fi
-assert_mentions "the unknown-module report" "$(cat "$_tmp/repair-unknown.err")" "could not read FSKit's module list"
-assert_eq "the unknown-module failure prints no status token" "" "$(cat "$_tmp/repair-unknown.out")"
-FAKE_PLUTIL_STATUS=0
-
-: >"$FAKE_KILLALL_LOG"
-: >"$FAKE_FSKIT_COUNTER"
-FAKE_FSKIT_PIDS='100 100'
-if fskit_repair_provider 1 2>"$_tmp/repair-fail.err"; then
-  assert_fail "fskit-repair-daemon" "a daemon that survived the kill was reported as repaired"
-else
-  assert_pass "a daemon that survives the kill fails the repair"
-fi
 
 finish_tests

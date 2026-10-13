@@ -22,8 +22,6 @@ if [ -h "$_self" ]; then
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
-# shellcheck source=../src/scripts/lib/macos-fskit.sh
-. "$SCRIPT_DIR/../src/scripts/lib/macos-fskit.sh"
 . "$SCRIPT_DIR/../src/scripts/lib/service-health.sh"
 . "$SCRIPT_DIR/../src/scripts/lib/macos-launch-services.sh"
 . "$SCRIPT_DIR/../src/scripts/lib/svc-instances.sh"
@@ -499,14 +497,11 @@ EOF
 # reboot.
 CLOUD_MOUNT_RELEASE_TIMEOUT=30
 
-# WHY: FSKit can refuse the first attempts right after its daemon restarts, so
-# the launch is retried within a budget instead of failing on the first refusal.
 # WHY: the attach budget is deliberately not declared here.
 # wait_cloud_mount_attached reads services.json
-# cloud-drive.lifecycle.mountAttachTimeoutSeconds, the same field the runner
-# receives as NUCLEUS_MOUNT_ATTACH_SECONDS, so this CLI can never quote a budget
-# its host's policy no longer declares.
-CLOUD_MOUNT_REPAIR_TIMEOUT=30
+# cloud-drive.lifecycle.mountAttachTimeoutSeconds, so this CLI can never quote a
+# budget its host's policy no longer declares. Restart backoff belongs to the
+# platform manager, not to the runner or to this CLI.
 
 cloud_mount_point() {
   local prefix_entry="$1" instance="$2"
@@ -529,33 +524,14 @@ wait_cloud_mount_released() {
   return 1
 }
 
-# WHY: an agent reloaded into a wedged provider refuses the volume again and
-# writes another blocked marker, so the provider is repaired first, and only when
-# a fresh marker says the provider was the reason.
-repair_cloud_mount_provider() {
-  local name="$1" instance="$2"
-
-  if ! svc_health_is_blocked "$instance"; then
-    return 0
-  fi
-  local class
-  class=$(svc_health_get "$instance" "class" 2>/dev/null || echo "unknown")
-  notice "$name — blocked ($class); repairing the macFUSE/FSKit provider before reloading the agent"
-  if ! fskit_repair_provider "$CLOUD_MOUNT_REPAIR_TIMEOUT"; then
-    error "$name — the macFUSE/FSKit provider could not be repaired; run 'nucleus-cloud repair'"
-    return 1
-  fi
-  return 0
-}
-
 # WHY: an agent whose provider refused the volume exits 0 by design, so the job's
 # state is not the mount's state; the volume is the success criterion.
 wait_cloud_mount_attached() {
   local name="$1" mount_point="$2" target="$3" sudo_prefix="$4"
 
   [ -n "$mount_point" ] || return 0
-  # WHY single-sourced: the runner's NUCLEUS_MOUNT_ATTACH_SECONDS is this same
-  # registry field, so raising it must reach this message too.
+  # WHY single-sourced: this services.json field is the only attach budget, so
+  # a policy change reaches both the wait and its messages.
   local attach_budget
   if ! attach_budget=$(jq -er '."cloud-drive".lifecycle.mountAttachTimeoutSeconds' "$SERVICES_JSON"); then
     error "$name — services.json cloud-drive.lifecycle.mountAttachTimeoutSeconds is missing or invalid"
@@ -565,7 +541,7 @@ wait_cloud_mount_attached() {
     say "$name — $mount_point is mounted"
     return 0
   fi
-  error "$name — $mount_point did not attach within ${attach_budget}s; run 'nucleus-cloud repair' and check 'nucleus-svc logs $name'"
+  error "$name: $mount_point did not attach within ${attach_budget}s; check 'nucleus-cloud status' and 'nucleus-svc logs $name'"
   return 1
 }
 
@@ -610,9 +586,6 @@ svc_action() {
     status) svc_status "$name" "$entry_json" ;;
     start)
       cleanup_service_ports "$entry_json"
-      if [ -n "$cloud_mount" ]; then
-        repair_cloud_mount_provider "$name" "$svc_id" || return 1
-      fi
       recover_launchctl_service "$launchd_domain" "$svc_id" "$sudo_prefix" "$uid" || {
         # WHY: a loaded job only needs starting and an unloaded one loading again;
         # either failure is reported with launchctl's own output.
@@ -650,9 +623,6 @@ svc_action() {
       ;;
     restart)
       cleanup_service_ports "$entry_json"
-      if [ -n "$cloud_mount" ]; then
-        repair_cloud_mount_provider "$name" "$svc_id" || return 1
-      fi
       # WHY: release the volume before anything reloads the agent, or the reload
       # destroys the new mount as a duplicate.
       if [ -n "$cloud_mount" ]; then

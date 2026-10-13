@@ -227,11 +227,6 @@
     "description": "rclone cloud drive mounts",
     "displayName": "Cloud Drive Mounts",
     "lifecycle": {
-      "mountAttempts": 3,
-      "mountRetryBackoffSeconds": [
-        20,
-        40
-      ],
       "mountAttachTimeoutSeconds": 45
     },
     "logging": {

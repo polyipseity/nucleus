@@ -11,9 +11,10 @@
   Rclone.Rclone, plus `rclone config` per provider.
 #>
 
-# WHY: the mount instance id is the health-record key, and the watchdog resolves
-#   it through the same scheduled-task mapping, so writer and reader share one
-#   construction site.
+# WHY: the mount instance id is the key the watchdog uses to discover an
+#   instance the registry declares but the supervisor does not run, and the
+#   watchdog resolves it through the same scheduled-task mapping, so writer and
+#   reader share one construction site.
 . (Join-Path -Path $PSScriptRoot -ChildPath '..\Get-NucleusServiceInstance.ps1')
 
 function Sync-CloudDriveCatalog {
@@ -101,13 +102,11 @@ function Sync-CloudDriveCatalog {
         }
         $readWrite = if ($null -ne $mount.readWrite) { [bool]$mount.readWrite } else { $true }
 
-        # WHY the base flag set: pre-rewrite both platforms' backends injected
-        #   exactly these five flags (MountBackend.ps1 and
-        #   mount-backend-{darwin,linux}.sh), and the wrapper contract now
+        # WHY the base flag set: the pre-rewrite mount backends on both platforms
+        #   injected exactly these five flags, and the wrapper contract now
         #   receives every flag from here, so keeping the set verbatim keeps
         #   Windows mount behavior unchanged by this rewrite.
-        # WHY read-only as a flag: the backend that resolved NUCLEUS_RCLONE_
-        #   READ_ONLY is gone, and the value must be decided here while $mount
+        # WHY read-only as a flag: the value must be decided here while $mount
         #   is in scope, because the generated script runs in a fresh scope.
         $mountExtraArgs = @(
             '--vfs-cache-mode', 'full',

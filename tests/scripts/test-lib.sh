@@ -20,12 +20,8 @@ init_test_state() {
 
 # Nothing initialises on source, every suite must call init_test_state
 # itself BEFORE the first lib.sh / service-health.sh source, or it gets no
-# isolation at all.  Two suites do more: cloud-repair additionally unsets
-# NUCLEUS_USER_ROOT around its own STATE_DIR derivation (deriving it against an
-# already-set root pointed the suite at the real user's service-health records)
-# and launches its repair subprocess with the variable removed, while
-# svc-restart has no NUCLEUS_USER_ROOT handling of its own and relies on this
-# initialiser alone.
+# isolation at all. svc-restart has no NUCLEUS_USER_ROOT handling of its own
+# and relies on this initialiser alone.
 
 # Console color detection (mirrors lib.sh _nuc_color_init): NO_COLOR set
 # non-empty -> plain; FORCE_COLOR set and != "0" or CLICOLOR_FORCE set

@@ -18,31 +18,10 @@
         "type": "string"
       },
       "lifecycle": {
-        "description": "Shared policy data for the service (mount attempt counts, timings, watchdog cadence). Consumed by runners and watchers on every host from a single definition. Contains no failure-classification tokens and no user-facing text: classification is per host (see each host's mount backend) and remedies live in the code that emits them.",
+        "description": "Shared policy data for the service, consumed by the CLI tooling from a single definition. Contains no failure-classification tokens and no user-facing text: restart cadence and revival belong to the platform manager on every host.",
         "properties": {
-          "mountAttempts": {
-            "description": "Maximum mount attempts in ONE runner invocation before the runner gives up. Governs the mount runner only; it is not a retry count for the service watchdog.",
-            "type": "integer",
-            "minimum": 1
-          },
-          "mountRetryBackoffSeconds": {
-            "description": "Seconds to sleep before the NEXT mount attempt, indexed by attempt number (1-based): attempt N sleeps element N-1. CLAMPED, never extrapolated - when `mountAttempts` exceeds the schedule length the LAST declared value is reused, so every delay a runner sleeps is a declared value and no runner may invent one beyond the list. Hosts must not diverge on this rule.",
-            "items": { "type": "integer", "minimum": 1 },
-            "minItems": 1,
-            "type": "array"
-          },
           "mountAttachTimeoutSeconds": {
-            "description": "Seconds to wait for the mount to become live after rclone starts. A TIMEOUT, not an interval and not a retry count: when it elapses the attempt is recorded as a failure.",
-            "type": "integer",
-            "minimum": 1
-          },
-          "watchdogTickSeconds": {
-            "description": "Seconds the service watchdog sleeps between ticks, on every host. Bounds how long a service can stay down before revival is even attempted. Distinct from watchdogRepairTimeoutSeconds, which bounds ONE repair call rather than the gap between ticks.",
-            "type": "integer",
-            "minimum": 1
-          },
-          "watchdogRepairTimeoutSeconds": {
-            "description": "Seconds allowed for ONE supervisor repair call before the watchdog abandons it as timed out. Bounds a single call, not the gap between ticks; distinct from watchdogTickSeconds.",
+            "description": "Seconds nucleus-svc waits for a cloud mount volume to attach after an agent start or restart. A timeout, not an interval and not a retry count.",
             "type": "integer",
             "minimum": 1
           }
