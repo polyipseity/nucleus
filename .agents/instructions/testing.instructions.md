@@ -75,7 +75,7 @@ Contract-breaking change: add Nix logic or Pester tests. Bug fix: a reproducing 
 
 ## Assertions must discriminate
 
-An assertion on a value that cannot distinguish the outcomes it claims to test proves nothing. The rclone mount runner exits 0 on a running mount, a blocked one, a terminal failure, and an exhausted retry alike, so every `rc -eq 0` assertion over it passed regardless. The same shape hides in expectations derived from the host under test and in gates comparing two lists that are both empty.
+An assertion on a value that cannot distinguish the outcomes it claims to test proves nothing. The same shape hides in expectations derived from the host under test and in gates comparing two lists that are both empty.
 
 Before writing an assertion, name the result that would make it fail. Assert that discriminating fact (attempt count, recorded state, resolved path), not the summary every path shares, then break the behavior and confirm the assertion fires.
 
