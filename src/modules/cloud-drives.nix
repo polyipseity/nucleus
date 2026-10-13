@@ -200,6 +200,21 @@ let
         "-o"
         "backend=fskit"
       ];
+      # WHY the base five flags on every host: the pre-rewrite POSIX backends
+      #   and the Windows catalog all inject them; dropping them here was a
+      #   regression the Task 5 worker caught (VFS cache off, INFO logs).
+      baseMountArgs = [
+        "--vfs-cache-mode"
+        "full"
+        "--vfs-cache-max-age"
+        "1h"
+        "--dir-cache-time"
+        "5m"
+        "--poll-interval"
+        "1m"
+        "--log-level"
+        "NOTICE"
+      ];
       # Locks rclone's VFS to reads for replica-style mounts.
       readOnlyArgs = lib.optionals (!mount.readWrite) [ "--read-only" ];
     in
@@ -209,6 +224,7 @@ let
       mountPoint
       rcloneRemote
     ]
+    ++ baseMountArgs
     ++ iCloudServiceArgs
     ++ volumeNameArgs
     ++ rclonePasswordArgs

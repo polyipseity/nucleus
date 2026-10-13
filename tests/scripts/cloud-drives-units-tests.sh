@@ -62,6 +62,21 @@ else
   assert_fail "ExecStart carries the shared positional CLI with escaped words" "ExecStart does not use escapeShellArgs over mkMountCliArgs"
 fi
 
+# Regression pin (Task 5 caught the POSIX rewrite silently dropping these):
+# the base five rclone flags the pre-rewrite backends and the Windows catalog
+# all inject must reach every mount on this host too.
+if grep -q '++ baseMountArgs' "$NIX_FILE"; then
+  assert_pass "mkMountCliArgs includes the base flag set"
+else
+  assert_fail "mkMountCliArgs includes the base flag set" "no ++ baseMountArgs in cloud-drives.nix"
+fi
+
+if grep -q -- '--vfs-cache-mode' "$NIX_FILE" && grep -q -- '--poll-interval' "$NIX_FILE" && grep -q -- '"NOTICE"' "$NIX_FILE"; then
+  assert_pass "base flag set carries cache mode, poll interval, and NOTICE log level"
+else
+  assert_fail "base flag set carries cache mode, poll interval, and NOTICE log level" "one of the base five flags is missing from cloud-drives.nix"
+fi
+
 section "2" "deleted machinery stays deleted"
 
 offenders="$(grep -n 'ExecStop' "$NIX_FILE" || true)"
