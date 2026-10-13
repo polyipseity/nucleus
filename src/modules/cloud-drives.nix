@@ -244,32 +244,6 @@ let
     done
   '';
 
-  # Build a systemd ExecStop unmount script (NixOS only).
-  #
-  # WHY a generated script rather than a `/bin/sh -c '…'` unit line: lib.escapeShellArg
-  #   emits its own single quotes, which collide with the surrounding ones.  For a mount
-  #   point containing a space the quoted argument closed early, so `sh -c` ran
-  #   `fusermount3 -u "/Users/a"`: the path split at the first space and the remainder
-  #   became separate words, leaving the volume mounted and the stale mount blocking the
-  #   next start.  Escaped exactly once, inside the script where bash parses it, the path
-  #   always arrives as ONE argument; the unit line is then a bare store path with no
-  #   quoting left to get wrong.
-  mkFusermountUnmount =
-    mountPoint:
-    pkgs.writeShellScript "cloud-mount-unmount" ''
-      # check-suppress:suppression_doc: unmounting a mount that may not exist; cleanup-only operation that must not fail (e.g. on retry after partial mount failure).
-      fusermount3 -u ${lib.escapeShellArg mountPoint} || true
-    '';
-
-  # Build a systemd ExecStartPre script that ensures the mount point directory exists.
-  # Same quoting rationale as mkFusermountUnmount above: the path is escaped once, inside
-  # the script, instead of nested inside a `sh -c '…'` argument.
-  mkEnsureMountPoint =
-    mountPoint:
-    pkgs.writeShellScript "cloud-mount-mkdir" ''
-      mkdir -p ${lib.escapeShellArg mountPoint}
-    '';
-
   # Build a scheduled replica-sync runner that invokes
   # scripts/cloud.sh sync for one replica id. replica_id and user_home are
   # passed as environment variables via extraEnv.
@@ -485,9 +459,7 @@ in
             value =
               let
                 mountPoint = "${currentUserHome}/${mount.localPath}";
-                # Same password-command logic as the macOS LaunchAgent script.
-                # WHY: --password-command not env var: systemd user services do not
-                # inherit session environment variables set in shell profiles.
+                mountScript = "${mkRcloneMountScript mount}/bin/nucleus-cloud-mount-${mount.id}";
               in
               {
                 Unit = {
@@ -497,13 +469,26 @@ in
                 };
                 Service = {
                   Type = "simple";
-                  ExecStartPre = "${mkEnsureMountPoint mountPoint}";
-                  ExecStart = "${mkRcloneMountScript mount}/bin/nucleus-cloud-mount-${mount.id}";
-                  ExecStop = mkFusermountUnmount mountPoint;
-                  # WHY: no Restart policy: the watchdog owns revival on every host.
-                  # A non-zero exit means a transient failure; the runner retries
-                  # internally with bounded backoff.  A zero exit means the mount
-                  # was blocked or stopped intentionally.
+                  # The clean pass force-unmounts a stale entry and recreates the
+                  # directory before every start, and a FUSE mount disappears when
+                  # its process does, so the unit needs neither a pre-create step
+                  # nor a stop-time unmount.
+                  ExecStartPre = "${mountScript} clean ${lib.escapeShellArg mountPoint}";
+                  # WHY escapeShellArgs into one string: systemd splits the unit
+                  #   command line itself, honouring single quotes and backslash
+                  #   escapes, so each escaped word parses back to the exact argv
+                  #   that the macOS ProgramArguments array carries natively.
+                  ExecStart = "${mountScript} " + lib.escapeShellArgs (mkMountCliArgs mount);
+                  # WHY Restart=always with a throttle instead of in-script retries:
+                  #   systemd owns the revival loop here exactly as launchd
+                  #   KeepAlive owns it on macOS and the scheduled task owns it on
+                  #   Windows, so the wrapper stays a single clean-and-exec pass.
+                  #   30s bounds a permanent failure (expired token, remote outage)
+                  #   to one attempt per interval, and rclone stays alive while a
+                  #   remote rate-limits rather than exiting, so a healthy mount
+                  #   never re-loops.
+                  Restart = "always";
+                  RestartSec = 30;
                 };
                 Install = {
                   WantedBy = [ "default.target" ];
