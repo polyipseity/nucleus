@@ -792,10 +792,18 @@ run_cloud_mount_invariants() {
     fi
   done
 
-  # No macfuse install call site in the mount path: the cloud mounts run on
-  # rclone nfsmount and install nothing, and the NTFS macFUSE install is
-  # Nix-managed (src/hosts/MacBook/homebrew.nix).
-  local _install_count
+  # macOS cloud mounts run through macFUSE, so the dependency must be declared
+  # in the machine package surface; a missing declaration leaves every macOS
+  # mount failing at the extension step. The mount path itself installs
+  # nothing: the cask is Nix-managed (src/hosts/MacBook/homebrew.nix).
+  local _decl_count _install_count
+  # check-suppress:suppression_doc: grep exits 1 when no declaration matches; the count check below reports that as a violation
+  _decl_count=$(grep -ci 'macfuse' src/hosts/MacBook/homebrew.nix 2>/dev/null || true)
+  if [ "${_decl_count:-0}" -lt 1 ]; then
+    error "$_ctx_name: no macFUSE declaration in src/hosts/MacBook/homebrew.nix; macOS cloud mounts and ntfs-3g need the cask"
+    _failed=1
+  fi
+
   _install_count=$(grep -rl 'macfuse install\|brew install.*macfuse' src/scripts/lib/ src/scripts/services/ 2>/dev/null | wc -l || true) # check-suppress:suppression_doc: grep exits 1 when no install site matches; the count must read zero either way
   if [ "$_install_count" -ne 0 ]; then
     error "$_ctx_name: found $_install_count macfuse install call sites; the mount path must install none (the NTFS install is Nix-managed)"

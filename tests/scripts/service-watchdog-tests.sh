@@ -59,7 +59,9 @@ export NUCLEUS_USER_ROOT
 # (they inherit the exported _nuc_prefix which lib.sh preserves).
 . "$REPO_ROOT/src/scripts/lib/lib.sh"
 
-# Stub services.json for prefix expansion tests.
+# Stub services.json for prefix expansion tests. cloud-drive stays listed so
+# the tick's KeepAlive exclusion is observable; worker-pool carries the D5
+# iteration guard on a service the watchdog still manages.
 cat >"$_tmp/repo/src/modules/services.json" <<'JSON'
 {
   "cloud-drive": {
@@ -77,6 +79,18 @@ cat >"$_tmp/repo/src/modules/services.json" <<'JSON'
         "prefixMatch": true,
         "service": "cloud-mount-",
         "scope": "user"
+      }
+    }
+  },
+  "worker-pool": {
+    "displayName": "Worker Pool",
+    "hosts": {
+      "MacBook": {
+        "type": "macos-launchctl",
+        "prefixMatch": true,
+        "service": "local.worker.",
+        "scope": "user",
+        "launchdDomain": "gui"
       }
     }
   }
@@ -312,8 +326,11 @@ NUCLEUS_HOST=MacBook
 # ── Extract watchdog function definitions (avoid executing _watchdog_main) ──
 # The script ends with `_watchdog_main "$@"` which would enter an infinite
 # loop.  We extract only the function definitions via awk, then re-source
-# service-health.sh to restore any functions clobbered by the eval.
-eval "$(awk '/^_watchdog_[a-z_]+\(\)/ || /^supervisor_/ { p = 1 } p { print } p && /^}/ { p = 0; next } /^[^_]/ && !/^#/ && !/^$/ && p == 0 { next }' "$WATCHDOG")"
+# service-health.sh to restore any functions clobbered by the eval. The
+# watchdog's readonly constants come along with `readonly` stripped: the
+# values are policy, the enforcement path is what these sections exercise,
+# and a section that needs a short bound can then assign one.
+eval "$(awk '/^readonly _WATCHDOG_/ { sub(/^readonly /, ""); print; next } /^_watchdog_[a-z_]+\(\)/ || /^supervisor_/ { p = 1 } p { print } p && /^}/ { p = 0; next } /^[^_]/ && !/^#/ && !/^$/ && p == 0 { next }' "$WATCHDOG")"
 # shellcheck source=../src/scripts/lib/service-health.sh
 # shellcheck disable=SC1091 # reason: relative source path resolves at runtime
 # shellcheck source=../src/scripts/lib/service-health.sh
@@ -630,6 +647,8 @@ section 12 "The tick iterates every service on this host"
 
 # D5: svc_keys was assigned inside its own for-loop, so the tick body ran zero
 # times and no rule ever executed for any service. This drives the real tick.
+# A cloud-mount instance is listed and deliberately left untouched: launchd
+# KeepAlive owns mount restarts, so the tick must skip cloud-drive entirely.
 count_occurrences() { # <haystack> <needle>
   printf '%s' "$1" | grep -c -F "$2" || true
 }
@@ -642,7 +661,7 @@ run_tick() {
   )" || captured_status=$?
 }
 
-FAKE_LIST="local.cloud-mount.iCloud local.cloud-mount.OneDrive"
+FAKE_LIST="local.worker.alpha local.worker.beta local.cloud-mount.iCloud"
 FAKE_LIVE=""
 export FAKE_LIST FAKE_LIVE
 : >"$_tmp/launchctl.log"
@@ -650,6 +669,7 @@ run_tick
 assert_eq "tick exits 0" 0 "$captured_status"
 assert_eq "tick visits every listed instance" 2 "$(count_occurrences "$captured_output" 'is not running; starting')"
 assert_eq "tick revives each instance" 2 "$(calls_made "$_tmp/launchctl.log")"
+assert_not_contains "tick skips cloud-drive entirely" "$captured_output" "cloud-mount"
 
 # ── Section 13: Scope selects the domain, .service names the unit ─────────
 section 13 "Scope selects the launchd domain and .service names the unit"
@@ -831,21 +851,21 @@ cat >"$_tmp/repo/src/modules/services.json" <<'JSON'
       }
     }
   },
-  "cloud-drive": {
+  "worker-pool": {
     "hosts": {
       "MacBook": {
         "type": "macos-launchctl",
         "prefixMatch": true,
         "scope": "user",
         "launchdDomain": "gui",
-        "service": "local.cloud-mount."
+        "service": "local.worker."
       }
     }
   }
 }
 JSON
 
-FAKE_LIST="local.cloud-mount.iCloud"
+FAKE_LIST="local.worker.alpha"
 FAKE_LIVE=""
 FAKE_STATE="spawn scheduled"
 export FAKE_LIST FAKE_LIVE FAKE_STATE
@@ -1057,21 +1077,21 @@ run_tick_errexit() {
 # survive it and still check the one behind it.  Before the fix the tick died at
 # the corrupt record, so every service later in the list was silently unchecked.
 mkdir -p "$state_dir"
-FAKE_LIST="local.cloud-mount.aaa-broken local.cloud-mount.bbb-healthy"
+FAKE_LIST="local.worker.aaa-broken local.worker.bbb-healthy"
 FAKE_LIVE=""
 FAKE_DISABLED=""
 FAKE_ABSENT=""
 export FAKE_LIST FAKE_LIVE FAKE_DISABLED FAKE_ABSENT FAKE_STATE
-rm -f "$state_dir/local.cloud-mount.aaa-broken.json" "$state_dir/local.cloud-mount.bbb-healthy.json"
+rm -f "$state_dir/local.worker.aaa-broken.json" "$state_dir/local.worker.bbb-healthy.json"
 # A record that exists but is not JSON: the shape an interrupted write, a foreign
 # writer, or a one-off migration can leave behind.
-printf '{ this is not json' >"$state_dir/local.cloud-mount.aaa-broken.json"
+printf '{ this is not json' >"$state_dir/local.worker.aaa-broken.json"
 : >"$_tmp/launchctl.log"
 run_tick_errexit
 assert_eq "the tick survives a corrupt record" 0 "$captured_status"
 assert_contains "the corruption is reported on read" "$captured_output" "unreadable health record"
 assert_contains "the service behind the corrupt record is still checked" "$captured_output" \
-  "local.cloud-mount.bbb-healthy is not running"
+  "local.worker.bbb-healthy is not running"
 
 # Direct guard assertion: the accessor is what makes a corrupt record survivable
 # under errexit, so call it plainly, exactly as the tick does, and require it to
@@ -1079,23 +1099,23 @@ assert_contains "the service behind the corrupt record is still checked" "$captu
 _direct_status=0
 _direct_out="$(
   set -euo pipefail
-  _watchdog_health_field "local.cloud-mount.aaa-broken" "state" 2>&1
+  _watchdog_health_field "local.worker.aaa-broken" "state" 2>&1
 )" || _direct_status=$?
 assert_eq "the record accessor survives a corrupt record" 0 "$_direct_status"
 assert_contains "the accessor reports the corruption" "$_direct_out" "unreadable health record"
-rm -f "$state_dir/local.cloud-mount.aaa-broken.json"
+rm -f "$state_dir/local.worker.aaa-broken.json"
 
 # Control: with a valid record the same tick still exits 0 and checks both, so
 # the abort above is caused by the corruption and not by the fixture.
-rm -f "$state_dir/local.cloud-mount.aaa-broken.json"
-svc_health_init "local.cloud-mount.aaa-broken"
+rm -f "$state_dir/local.worker.aaa-broken.json"
+svc_health_init "local.worker.aaa-broken"
 run_tick_errexit
 assert_eq "a valid record still exits 0" 0 "$captured_status"
 assert_not_contains "a valid record reports no corruption" "$captured_output" "unreadable health record"
 assert_contains "every service is checked when records are valid" "$captured_output" \
-  "local.cloud-mount.aaa-broken is not running"
+  "local.worker.aaa-broken is not running"
 
-rm -f "$state_dir/local.cloud-mount.aaa-broken.json" "$state_dir/local.cloud-mount.bbb-healthy.json"
+rm -f "$state_dir/local.worker.aaa-broken.json" "$state_dir/local.worker.bbb-healthy.json"
 
 # ── Section 21: A configured-but-absent instance is reported (F2) ─────────
 section 21 "Configured but absent instances are reported"
@@ -1182,8 +1202,9 @@ unset _NUCLEUS_LIB_SOURCED _NUCLEUS_SERVICE_HEALTH_SOURCED
 . "$F1_LIB_ROOT/src/scripts/lib/macos-launch-services.sh"
 . "$F1_LIB_ROOT/src/scripts/lib/svc-instances.sh"
 # The watchdog ends with `_watchdog_main "$@"`, which would loop forever, so
-# extract function definitions only, the same extraction the suite performs.
-eval "$(awk '/^_watchdog_[a-z_]+\(\)/ || /^supervisor_/ { p = 1 } p { print } p && /^}/ { p = 0; next } /^[^_]/ && !/^#/ && !/^$/ && p == 0 { next }' "$F1_WATCHDOG")"
+# extract function definitions only, the same extraction the suite performs
+# (constants included, readonly stripped, for the same reason).
+eval "$(awk '/^readonly _WATCHDOG_/ { sub(/^readonly /, ""); print; next } /^_watchdog_[a-z_]+\(\)/ || /^supervisor_/ { p = 1 } p { print } p && /^}/ { p = 0; next } /^[^_]/ && !/^#/ && !/^$/ && p == 0 { next }' "$F1_WATCHDOG")"
 # The CLI parser is part of the skipped top level, so its two globals must be
 # initialised here: _watchdog_scope_selected reads $_scope_filter under `set -u`.
 _scope_filter=""
@@ -1212,14 +1233,14 @@ run_subprocess_tick() {
 
 # Same two records as §20, corrupt first, healthy second, so the only
 # variable changed is the process boundary.
-FAKE_LIST="local.cloud-mount.aaa-broken local.cloud-mount.bbb-healthy"
+FAKE_LIST="local.worker.aaa-broken local.worker.bbb-healthy"
 FAKE_LIVE=""
 FAKE_DISABLED=""
 FAKE_ABSENT=""
 FAKE_STATE=""
 export FAKE_LIST FAKE_LIVE FAKE_DISABLED FAKE_ABSENT FAKE_STATE
-rm -f "$state_dir/local.cloud-mount.aaa-broken.json" "$state_dir/local.cloud-mount.bbb-healthy.json"
-printf '{ this is not json' >"$state_dir/local.cloud-mount.aaa-broken.json"
+rm -f "$state_dir/local.worker.aaa-broken.json" "$state_dir/local.worker.bbb-healthy.json"
+printf '{ this is not json' >"$state_dir/local.worker.aaa-broken.json"
 : >"$_tmp/launchctl.log"
 
 run_subprocess_tick
@@ -1230,53 +1251,41 @@ assert_contains "the real subprocess reports the corrupt record" "$captured_outp
 # every instance AFTER it was left unchecked for as long as the record stayed
 # corrupt.
 assert_contains "the instance after the corrupt record is still checked" "$captured_output" \
-  "local.cloud-mount.bbb-healthy is not running"
+  "local.worker.bbb-healthy is not running"
 
 # Control: with no corruption the same subprocess reaches both instances, so a
 # silent child cannot make the assertions above pass for the wrong reason.
-rm -f "$state_dir/local.cloud-mount.aaa-broken.json"
-svc_health_init "local.cloud-mount.aaa-broken"
+rm -f "$state_dir/local.worker.aaa-broken.json"
+svc_health_init "local.worker.aaa-broken"
 run_subprocess_tick
 assert_eq "the real subprocess tick exits 0 without corruption" 0 "$captured_status"
 assert_contains "both instances are checked when records are valid" "$captured_output" \
-  "local.cloud-mount.aaa-broken is not running"
+  "local.worker.aaa-broken is not running"
 assert_contains "the second instance is reached without corruption" "$captured_output" \
-  "local.cloud-mount.bbb-healthy is not running"
+  "local.worker.bbb-healthy is not running"
 
-rm -f "$state_dir/local.cloud-mount.aaa-broken.json" "$state_dir/local.cloud-mount.bbb-healthy.json" "$F1_DRIVER"
+rm -f "$state_dir/local.worker.aaa-broken.json" "$state_dir/local.worker.bbb-healthy.json" "$F1_DRIVER"
 
-# ── Section 23: the repair call is bounded by the declared policy ────────
-section 23 "A repair call is bounded by the declared watchdogRepairTimeoutSeconds"
+# ── Section 23: the repair call is bounded by the watchdog constant ────────
+section 23 "A repair call is bounded by the watchdog repair constant"
 
-# A repair (live + last exit 78) is a bootout+bootstrap, and a dead macFUSE/FSKit
-# volume blocks inside the kernel.  Unbounded, ONE hung repair stalls the whole
-# tick and every instance after it goes unchecked, which is why the value
-# bounding a single repair call is declared in services.json and read per tick.
-# These checks pin that the value is ENFORCED, and that neither an absent nor a
-# malformed value can make the call unbounded.  All three are behavioural: the
-# watchdog ends with `_watchdog_main "$@"`, so it cannot be sourced in-process
-# and there is no unit-level way to call the reader without re-stating it.
+# A repair (live + last exit 78) is a bootout+bootstrap, and a dead volume can
+# block inside the kernel. Unbounded, ONE hung repair stalls the whole tick and
+# every instance after it goes unchecked. The bound is a watchdog constant
+# (the services.json lookup is gone with the cloud-drive lifecycle block);
+# these checks pin that the constant is ENFORCED and that the production value
+# stays positive and single-sourced.
 _repair_marker="$_tmp/repair-invoked.txt"
 _orig_repair="$(declare -f supervisor_repair)"
 # shellcheck disable=SC2329 # reason: invoked by eval'd watchdog code through svc_run_bounded in a subshell
 supervisor_repair() {
   printf 'started\n' >>"$_repair_marker"
-  # WHY the redirect: this sleep is deliberately longer than the declared bound,
-  #   and a background process still holding the captured stdout pipe would keep
-  #   the command substitution open until it exited, making the elapsed-time
-  #   check below measure the sleep instead of the bound.
+  # WHY the redirect: this sleep is deliberately longer than the bound set
+  #   below, and a background process still holding the captured stdout pipe
+  #   would keep the command substitution open until it exited, making the
+  #   elapsed-time check below measure the sleep instead of the bound.
   sleep 5 >/dev/null 2>&1
   printf 'completed\n' >>"$_repair_marker"
-}
-
-# repair_policy: write a one-key registry carrying $1, or none when ABSENT.
-repair_policy() {
-  mkdir -p "$_tmp/repair-policy"
-  if [ "$1" = "ABSENT" ]; then
-    printf '{"cloud-drive":{"lifecycle":{"watchdogTickSeconds":300}}}\n' >"$_tmp/repair-policy/services.json"
-  else
-    printf '{"cloud-drive":{"lifecycle":{"watchdogRepairTimeoutSeconds":%s}}}\n' "$1" >"$_tmp/repair-policy/services.json"
-  fi
 }
 
 seed_repair_record() {
@@ -1302,10 +1311,8 @@ FAKE_STATE="running"
 FAKE_EXIT_CODE=78
 export FAKE_LIVE FAKE_STATE FAKE_EXIT_CODE
 
-# (1) The declared bound is enforced.
-repair_policy 1
-NUCLEUS_SERVICES_JSON="$_tmp/repair-policy/services.json"
-export NUCLEUS_SERVICES_JSON
+# (1) The constant is enforced: a repair sleeping past it is abandoned.
+_WATCHDOG_REPAIR_TIMEOUT_SECONDS=1
 rm -f "$_repair_marker"
 seed_repair_record
 : >"$_tmp/launchctl.log"
@@ -1319,12 +1326,12 @@ if repair_started; then
 else
   assert_fail "the hanging repair is the code under the bound" "the repair was never invoked"
 fi
-assert_contains "a repair outliving the declared bound is abandoned" "$captured_output" "timed out after 1s"
+assert_contains "a repair outliving the bound is abandoned" "$captured_output" "timed out after 1s"
 if repair_completed; then
-  assert_fail "a repair outliving the declared bound never completes" \
-    "the repair ran to completion, so the declared 1s did not bound it"
+  assert_fail "a repair outliving the bound never completes" \
+    "the repair ran to completion, so the 1s bound did not bound it"
 else
-  assert_pass "a repair outliving the declared bound never completes"
+  assert_pass "a repair outliving the bound never completes"
 fi
 if [ "$_elapsed" -lt 5 ]; then
   assert_pass "the bound returns before the repair would have finished"
@@ -1333,66 +1340,28 @@ else
     "took ${_elapsed}s; the repair sleeps 5s, so the call was not bounded"
 fi
 
-# (2) An ABSENT value still yields a positive bound: the same repair is allowed to
-# finish instead of being abandoned instantly (a zero/empty bound would report a
-# timeout here, and an unbounded call would hang the tick for good).
-repair_policy ABSENT
-rm -f "$_repair_marker"
-seed_repair_record
-run_check_instance "cloud-drive" "macos-launchctl" "$macos_entry" "local.cloud-mount.iCloud"
-assert_eq "an absent bound still exits 0" 0 "$captured_status"
-if repair_started; then
-  assert_pass "the hanging repair ran under the absent-key default"
-else
-  assert_fail "the hanging repair ran under the absent-key default" "the repair was never invoked"
-fi
-# The repair sleeps 5s: that it RAN TO COMPLETION is what proves the absent-key
-# fallback is a positive bound.  A zero/empty fallback would abandon the call at
-# once, and no fallback at all would leave it unbounded.
-if repair_completed; then
-  assert_pass "an absent value yields a positive bound, not zero"
-else
-  assert_fail "an absent value yields a positive bound, not zero" \
-    "the repair was abandoned, so the fallback is not a usable bound"
-fi
-assert_not_contains "an absent bound is not reported as a timeout" "$captured_output" "timed out"
+# (2) The production constant stays positive and declared exactly once: a zero
+# or second definition would either abandon every repair instantly or let the
+# two copies drift apart.
+_defs="$(grep -cE '^[[:space:]]*readonly _WATCHDOG_REPAIR_TIMEOUT_SECONDS=[1-9][0-9]*$' "$WATCHDOG" || true)"
+assert_eq "the production bound is a positive integer declared once" "1" "$_defs"
 
-# (3) A MALFORMED value must not hang: svc_run_bounded cannot evaluate the bound
-# (`$((bound * 5))` on a non-numeric string is an unbound-variable error under
-# set -u), so the call is refused BEFORE it is backgrounded and the tick reports
-# it instead of dying.
-repair_policy '"abc"'
+# (3) A repaired service resumes: with a generous bound the same repair runs to
+# completion instead of being abandoned.
+_WATCHDOG_REPAIR_TIMEOUT_SECONDS=30
 rm -f "$_repair_marker"
 seed_repair_record
-_started="$(date +%s)"
 run_check_instance "cloud-drive" "macos-launchctl" "$macos_entry" "local.cloud-mount.iCloud"
-_elapsed=$(($(date +%s) - _started))
-assert_eq "a malformed bound does not abort the tick" 0 "$captured_status"
+assert_eq "a bounded repair still exits 0" 0 "$captured_status"
 if repair_completed; then
-  assert_fail "a malformed bound never lets the repair run to completion" \
-    "the repair completed, so a non-numeric bound did not bound it"
+  assert_pass "a repair inside the bound runs to completion"
 else
-  assert_pass "a malformed bound never lets the repair run to completion"
+  assert_fail "a repair inside the bound runs to completion" "the repair was abandoned or never invoked"
 fi
-# The warning differs by CONTEXT, and both are correct: run_check_instance runs the
-# tick under `set +euo pipefail` (nounset OFF), so `$((abc * 5))` evaluates the stray
-# name to 0 and the call is abandoned immediately; with nounset ON, the daemon's own
-# environment, the evaluation itself fails and svc_run_bounded refuses the call
-# before backgrounding it.  Either way the tick survives and the failure is reported;
-# the regression this pins is the SILENT one.
-if printf '%s' "$captured_output" | grep -qE 'timed out after|could not repair'; then
-  assert_pass "a malformed bound is reported, not swallowed"
-else
-  assert_fail "a malformed bound is reported, not swallowed" "no repair warning in: $captured_output"
-fi
-if [ "$_elapsed" -lt 5 ]; then
-  assert_pass "a malformed bound does not hang the tick"
-else
-  assert_fail "a malformed bound does not hang the tick" "took ${_elapsed}s"
-fi
+assert_not_contains "a completed repair is not reported as a timeout" "$captured_output" "timed out"
 
 eval "$_orig_repair"
-unset NUCLEUS_SERVICES_JSON FAKE_EXIT_CODE
+unset FAKE_EXIT_CODE
 FAKE_LIVE=""
 FAKE_STATE=""
 export FAKE_LIVE FAKE_STATE

@@ -11,11 +11,6 @@ let
   currentUsername = config.home.username;
   currentUserHome = config.home.homeDirectory;
 
-  # cloud-drive.lifecycle in services.json is the single definition of the mount
-  # retry policy. Deriving the mount env vars from it keeps this module from
-  # carrying a second copy of the same numbers.
-  cloudDriveLifecycle = (builtins.fromJSON (builtins.readFile ./services.json)).cloud-drive.lifecycle;
-
   userConfig =
     users.${currentUsername}.cloudDrives or {
       mounts = [ ];
@@ -161,11 +156,12 @@ let
   mountUnitName = mount: mountIdentity.unitName isDarwin mount.id;
   mountServiceId = mount: mountIdentity.serviceId isDarwin mount.id;
 
-  # The full store path to rclone, so the agent does not depend on PATH.
-  mkRcloneMountScript =
+  # Positional CLI arguments for the wrapper: <instance> <log-file>
+  # <mount-point> <remote-spec> [flags...]. Shared by the macOS ProgramArguments
+  # and the NixOS ExecStart so both hosts mount with identical semantics.
+  mkMountCliArgs =
     mount:
     let
-
       # WHY: rclone stats the mount point before mounting and refuses to mount
       #   when it is missing, so mounts live directly under the user's home
       #   directory with the directory created ahead of the mount, as on every
@@ -180,44 +176,73 @@ let
         mount.iCloudService
       ];
       mountVolumeLabel = if mount.name != null then mount.name else mount.id;
-      # nfsmount accepts --volname; the label it shows is best-effort on macOS.
-      volumeNameArgs = lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
+      # rclone translates --volname into the FUSE volume label macOS shows in
+      # Finder; the flag is rclone-level and the macOS agent is the only caller
+      # that adds it.
+      volumeNameArgs = lib.optionals isDarwin [
         "--volname"
         mountVolumeLabel
       ];
       # Pass the managed config passphrase command when the feature is enabled
       # so the LaunchAgent can decrypt an encrypted rclone.conf on every start.
       # WHY: --password-command not env var: LaunchAgents run outside user shell
-      # sessions and do not inherit RCLONE_CONFIG_PASS from the login environment.
+      #   sessions and do not inherit RCLONE_CONFIG_PASS from the login environment.
       rclonePasswordArgs = lib.optionals config.nucleus.rclone.configPassEnabled [
         "--password-command"
         "cat ${lib.escapeShellArg config.nucleus.rclone.configPassSecretPath}"
       ];
-      extraArgsList = iCloudServiceArgs ++ volumeNameArgs ++ rclonePasswordArgs ++ mount.extraArgs;
-      # WHY: NFS carries no change-notification API, so remote changes reach the
-      #   mount only through rclone's own cache and poll timers, and --read-only
-      #   is enforced by rclone's VFS alone.
+      # WHY backend=fskit: the spike that chose this backend (macFUSE user-space
+      #   proof, 2026-10-13) showed the macFUSE kernel path cannot mount on
+      #   macOS 27 while the user-space FSKit backend mounts cleanly; without
+      #   this option macFUSE defaults to the kext path and every mount fails
+      #   with a preflight rejection. macOS only: fuse3 has no such option.
+      fskitBackendArgs = lib.optionals isDarwin [
+        "-o"
+        "backend=fskit"
+      ];
+      # Locks rclone's VFS to reads for replica-style mounts.
+      readOnlyArgs = lib.optionals (!mount.readWrite) [ "--read-only" ];
     in
+    [
+      (mountServiceId mount)
+      "${config.nucleus.logging.logDir}/cloud-mount-${mount.id}/mount.log"
+      mountPoint
+      rcloneRemote
+    ]
+    ++ iCloudServiceArgs
+    ++ volumeNameArgs
+    ++ rclonePasswordArgs
+    ++ fskitBackendArgs
+    ++ readOnlyArgs
+    ++ mount.extraArgs;
+
+  # Thin store wrapper around the shared rclone-mount.sh. Every per-mount value
+  # arrives as a positional argument from ProgramArguments (macOS) or ExecStart
+  # (NixOS), so the derivation carries no environment contract of its own.
+  mkRcloneMountScript =
+    mount:
     pkgs.writeNucleusShellApplication {
       name = "cloud-mount-${mount.id}";
       scriptName = "src/scripts/services/rclone-mount";
       runtimeInputs = [ pkgs.rclone ];
-      extraEnv = {
-        NUCLEUS_RCLONE_REMOTE = rcloneRemote;
-        NUCLEUS_RCLONE_MOUNT_POINT = mountPoint;
-        NUCLEUS_RCLONE_ARGS = lib.concatStringsSep "\n" extraArgsList;
-        NUCLEUS_RCLONE_READ_ONLY = if mount.readWrite then "false" else "true";
-        # WHY: the wrapper records a provider failure against the supervisor unit
-        #   identity, which is the key every service command and the watchdog use.
-        NUCLEUS_CLOUD_MOUNT_INSTANCE = mountServiceId mount;
-        # Lifecycle policy: derived from services.json cloud-drive.lifecycle.
-        NUCLEUS_MOUNT_ATTEMPTS = toString cloudDriveLifecycle.mountAttempts;
-        NUCLEUS_MOUNT_BACKOFF = lib.concatStringsSep "," (
-          map toString cloudDriveLifecycle.mountRetryBackoffSeconds
-        );
-        NUCLEUS_MOUNT_ATTACH_SECONDS = toString cloudDriveLifecycle.mountAttachTimeoutSeconds;
-      };
     };
+
+  # Registers the macFUSE FSKit extension so fskitd can discover it. The spike
+  # behind the macFUSE backend decision showed mounts fail until the appex
+  # bundles are registered; System Settings approval is the one-time manual
+  # step, and this re-registration is idempotent on every apply.
+  registerFskitExtension = pkgs.writeShellScript "register-macfuse-fskit" ''
+    for _appex in "$@"; do
+      if [ ! -d "$_appex" ]; then
+        echo "macFUSE FSKit extension missing: $_appex; reinstall macFUSE" >&2
+        exit 1
+      fi
+    done
+    for _appex in "$@"; do
+      # check-suppress:suppression_doc: re-registering an already-registered extension exits nonzero; the mount itself verifies registration state
+      /usr/bin/pluginkit -a "$_appex" || true
+    done
+  '';
 
   # Build a systemd ExecStop unmount script (NixOS only).
   #
@@ -346,6 +371,17 @@ in
         '';
       })
 
+      # Registration must land before the agents start, or the first mount of a
+      # fresh system fails on an unregistered extension and launchd spends the
+      # first ThrottleInterval cycles discovering that.
+      (lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && declaredMountAgents != [ ]) {
+        home.activation.macos-register-macfuse-extension = lib.hm.dag.entryBefore [ "setupLaunchAgents" ] ''
+          "${registerFskitExtension}" \
+            /Library/Filesystems/macfuse.fs/Contents/Resources/macfuse.app/Contents/Extensions/io.macfuse.app.fsmodule.macfuse.appex \
+            /Library/Filesystems/macfuse.fs/Contents/Resources/macfuse.app/Contents/Extensions/io.macfuse.app.fsmodule.macfuse-local.appex
+        '';
+      })
+
       # WHY: anchor this after both writeBoundary and setupLaunchAgents.  HM
       #   requires side-effecting entries to run after writeBoundary, and on
       #   macOS setupLaunchAgents is the entry whose plist compare followed by
@@ -416,25 +452,24 @@ in
               enable = true;
               config = {
                 Label = mountUnitName mount;
-                ProgramArguments = [ "${mkRcloneMountScript mount}/bin/nucleus-cloud-mount-${mount.id}" ];
+                ProgramArguments = [
+                  "${mkRcloneMountScript mount}/bin/nucleus-cloud-mount-${mount.id}"
+                ]
+                ++ mkMountCliArgs mount;
                 RunAtLoad = true;
-                # WHY: no KeepAlive: the watchdog owns revival on every host.
-                #   A non-zero exit means a transient failure; the runner retries
-                #   internally with bounded backoff.  A zero exit means the mount
-                #   was blocked or stopped intentionally.  KeepAlive created a
-                #   parallel retry mechanism that contradicted the blocked-marker
-                #   contract and caused infinite restart loops.
-                # WHY: the teardown budget must cover a real NFS unmount.
-                #   launchd SIGKILLs the job after this budget (default 20 s covers
-                #   only a fast teardown), and a mount killed mid-unmount leaves the
-                #   rclone process wedged and the mount point held, so every later
-                #   mount at this path fails until the state clears.
-                # NOTE: the runner installs no signal handler, so it does not itself
-                #   forward the stop to rclone; teardown of the backgrounded rclone
-                #   relies on launchd's own signal delivery to the job.  This budget is
-                #   what gives that delivery room to complete before SIGKILL.
-                ExitTimeOut = 60;
-                # Both streams go to ~/Library/Logs for easier debugging.
+                # WHY KeepAlive with a throttle instead of in-script retries:
+                #   launchd owns the restart loop here exactly as systemd
+                #   Restart=always owns it on NixOS and the scheduled task owns
+                #   it on Windows, so the wrapper stays a single clean-and-exec
+                #   pass. 30s bounds a permanent failure (expired token, remote
+                #   outage) to one attempt per interval, and rclone stays alive
+                #   while a remote rate-limits rather than exiting, so a healthy
+                #   mount never re-loops.
+                KeepAlive = true;
+                ThrottleInterval = 30;
+                # Both streams go to ~/Library/Logs for easier debugging; the
+                # wrapper itself appends rclone's full output to mount.log in
+                # the same per-instance directory.
                 StandardOutPath = "${config.nucleus.logging.logDir}/cloud-mount-${mount.id}/stdout.log";
                 StandardErrorPath = "${config.nucleus.logging.logDir}/cloud-mount-${mount.id}/stderr.log";
               };

@@ -232,9 +232,7 @@
         20,
         40
       ],
-      "mountAttachTimeoutSeconds": 45,
-      "watchdogTickSeconds": 300,
-      "watchdogRepairTimeoutSeconds": 30
+      "mountAttachTimeoutSeconds": 45
     },
     "logging": {
       "capture": "all"

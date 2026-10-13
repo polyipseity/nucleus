@@ -35,6 +35,16 @@ export NUCLEUS_MOUNT_ATTACH_SECONDS=1
 
 WRAPPER="$REPO_ROOT/src/scripts/services/rclone-mount.sh"
 
+# Every temp dir created by setup_fakes lands here so the suite leaves nothing
+# behind in TMPDIR.
+_TEMP_DIRS=()
+# shellcheck disable=SC2329 # reason: invoked through the EXIT trap below, which the analyzer does not follow
+cleanup_temp() {
+  # check-suppress:suppression_doc: best-effort temp removal at suite exit; a failure leaves temp files, not bad assertions
+  rm -rf ${_TEMP_DIRS[@]+"${_TEMP_DIRS[@]}"} 2>/dev/null || true
+}
+trap cleanup_temp EXIT
+
 # assert_eq: compare actual against expected, report through the shared
 # assertion counters. Argument order matches this suite's call sites.
 assert_eq() { # <actual> <expected> <test name>
@@ -47,8 +57,10 @@ assert_eq() { # <actual> <expected> <test name>
 
 setup_fakes() {
   FAKEBIN="$(mktemp -d)"
-  MNT="$(mktemp -d)/cloudtest"
+  MNT_PARENT="$(mktemp -d)"
+  MNT="$MNT_PARENT/cloudtest"
   LOG="$(mktemp -u).log"
+  _TEMP_DIRS+=("$FAKEBIN" "$MNT_PARENT" "$LOG")
   cat >"$FAKEBIN/mount" <<'EOF'
 #!/bin/bash
 [ -n "${FAKE_MOUNTED:-}" ] && echo "localhost:/ on $FAKE_MOUNTED (nfs, nodev)"
@@ -135,6 +147,22 @@ if [ "$rc" -eq 2 ]; then
   assert_pass "missing arguments exit 2"
 else
   assert_fail "missing arguments exit 2" "status $rc"
+fi
+
+section "5" "clean skips umount when the mount table has no entry for the path"
+setup_fakes
+: >"$FAKEBIN/umount.calls"
+unset FAKE_MOUNTED
+bash "$WRAPPER" clean "$MNT"
+if [ -s "$FAKEBIN/umount.calls" ]; then
+  assert_fail "umount is not called for an unmounted path" "called: $(cat "$FAKEBIN/umount.calls")"
+else
+  assert_pass "umount is not called for an unmounted path"
+fi
+if [ -d "$MNT" ]; then
+  assert_pass "mount point is still created"
+else
+  assert_fail "mount point is still created" "missing"
 fi
 
 finish_tests

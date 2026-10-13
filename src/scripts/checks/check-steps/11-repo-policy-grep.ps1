@@ -161,7 +161,9 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
 
   # --- Cloud-mount invariants ---
   # The shared runner is backend-agnostic: FUSE and supervisor names live behind
-  # the mount and supervisor interfaces, and the mount path installs nothing.
+  # the mount and supervisor interfaces. macOS cloud mounts run through
+  # macFUSE, so the dependency must be declared in the machine package
+  # surface; the mount path itself installs nothing (the cask is Nix-managed).
   Write-Message "--- cloud-mount invariants ---"
   $cmViolations = 0
   $cmOsPattern = 'macfuse|fskit|WinFsp|fuse3|nucleus-cloud-repair'
@@ -173,6 +175,16 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
       Write-ErrorMessage "$cmRelative contains OS-specific FUSE/backend names (invariant violation: $cmOsPattern)"
       $cmViolations++
     }
+  }
+
+  $cmDeclCount = 0
+  $cmHomebrew = Join-Path -Path $r -ChildPath 'src/hosts/MacBook/homebrew.nix'
+  if (Test-Path -LiteralPath $cmHomebrew) {
+    $cmDeclCount = (Select-String -LiteralPath $cmHomebrew -Pattern 'macfuse' -CaseSensitive:$false | Measure-Object).Count
+  }
+  if ($cmDeclCount -lt 1) {
+    Write-ErrorMessage 'no macFUSE declaration in src/hosts/MacBook/homebrew.nix; macOS cloud mounts and ntfs-3g need the cask'
+    $cmViolations++
   }
 
   $cmInstallDirs = @(

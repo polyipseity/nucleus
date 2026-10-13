@@ -18,6 +18,15 @@ _WATCHDOG_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 #   re-sourcing it is a no-op redefinition.
 . "$_WATCHDOG_DIR/../lib/svc-instances.sh"
 
+# WHY constants: the tick cadence and repair bound are properties of the
+#   watchdog itself. They were read from services.json's cloud-drive.lifecycle
+#   because cloud mounts were the first supervised services; launchd KeepAlive
+#   now owns mount restarts, the watchdog skips cloud-drive entirely, and that
+#   block no longer describes this daemon. 300s bounds discovery lag for a dead
+#   service; 30s bounds one repair so a hung repair cannot stall the tick.
+readonly _WATCHDOG_TICK_SECONDS=300
+readonly _WATCHDOG_REPAIR_TIMEOUT_SECONDS=30
+
 _watchdog_dispatch_supervisor() {
   case "$(uname -s)" in
   Darwin)
@@ -50,7 +59,7 @@ _watchdog_main() {
   _watchdog_dispatch_supervisor
 
   local interval
-  interval="$(_watchdog_interval_seconds)"
+  interval="$_WATCHDOG_TICK_SECONDS"
   while :; do
     _watchdog_tick
     if [ "$_oneshot" = true ]; then
@@ -69,31 +78,6 @@ _watchdog_services_json() {
     return 0
   fi
   printf '%s/src/modules/services.json' "$(derive_repo_root)"
-}
-
-_watchdog_interval_seconds() {
-  local services_json="" value=""
-  services_json="$(_watchdog_services_json)"
-  if [ -f "$services_json" ]; then
-    # WHY the quoted key: `cloud-drive` contains a hyphen, which jq parses as
-    #   subtraction, so the unquoted form is a compile error that silently fell
-    #   through to the default while the Windows twin honoured the same key.
-    # check-suppress:suppression_doc: best-effort policy read; an absent lifecycle block falls back to the declared default
-    value="$(jq -r '."cloud-drive".lifecycle.watchdogTickSeconds // empty' "$services_json" 2>/dev/null || true)"
-  fi
-  printf '%s' "${value:-300}"
-}
-
-# Distinct from the tick interval, which bounds the gap between ticks.
-_watchdog_repair_timeout_seconds() {
-  local services_json="" value=""
-  services_json="$(_watchdog_services_json)"
-  if [ -f "$services_json" ]; then
-    # WHY the quoted key: see _watchdog_interval_seconds.
-    # check-suppress:suppression_doc: best-effort policy read; an absent lifecycle block falls back to the declared default
-    value="$(jq -r '."cloud-drive".lifecycle.watchdogRepairTimeoutSeconds // empty' "$services_json" 2>/dev/null || true)"
-  fi
-  printf '%s' "${value:-30}"
 }
 
 _watchdog_entry_field() {
@@ -163,6 +147,10 @@ _watchdog_tick() {
 
   local svc_key
   for svc_key in $svc_keys; do
+    # WHY: launchd KeepAlive owns cloud-mount restarts; counting generations,
+    #   blocking loops, or starting mounts here would fight the supervisor that
+    #   owns them.
+    [ "$svc_key" = "cloud-drive" ] && continue
     local host_entry
     # Service keys contain hyphens, which jq reads as subtraction in '.$key', so
     # both lookup parts bind with --arg and every service resolves.
@@ -418,7 +406,7 @@ _watchdog_check_instance() {
       # WHY the bound: a repair that hangs, such as one blocked inside the kernel by a
       #   dead mount, would stall the tick and leave every instance after
       #   this one unchecked. 124 is svc_run_bounded's timeout status.
-      repair_timeout="$(_watchdog_repair_timeout_seconds)"
+      repair_timeout="$_WATCHDOG_REPAIR_TIMEOUT_SECONDS"
       svc_run_bounded "$repair_timeout" supervisor_repair "$target" "$declared_unit_path" "$scope" || repair_rc=$?
       if [ "$repair_rc" -eq 124 ]; then
         warn "watchdog: repair of $instance timed out after ${repair_timeout}s"
