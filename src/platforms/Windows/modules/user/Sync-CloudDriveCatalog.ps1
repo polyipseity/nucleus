@@ -40,18 +40,6 @@ function Sync-CloudDriveCatalog {
     #   the watchdog still expects. Replicas default to false.
     $enabledMounts = $mounts | Where-Object { Test-NucleusMountEnabled -Mount $_ }
 
-    # WHY: cloud-drive.lifecycle in services.json is the single definition of the
-    #   retry policy; POSIX derives the same numbers in cloud-drives.nix.
-    $servicesJsonPath = Join-Path $env:NUCLEUS_REPO_ROOT 'src\modules\services.json'
-    $servicesRegistry = Get-Content -Path $servicesJsonPath -Raw | ConvertFrom-Json -AsHashtable
-    $mountLifecycle = $servicesRegistry['cloud-drive'].lifecycle
-    $mountAttempts = [string]$mountLifecycle.mountAttempts
-    $mountBackoff = (@($mountLifecycle.mountRetryBackoffSeconds) | ForEach-Object { [string]$_ }) -join ','
-    $mountAttachSeconds = [string]$mountLifecycle.mountAttachTimeoutSeconds
-    if (-not $mountAttempts -or -not $mountBackoff -or -not $mountAttachSeconds) {
-        throw "cloud-drives: cloud-drive.lifecycle is incomplete (mountAttempts/mountRetryBackoffSeconds/mountAttachTimeoutSeconds) in $servicesJsonPath"
-    }
-
     foreach ($mount in $enabledMounts) {
         $localPath = Join-Path $HomeDirectory $mount.localPath
         if (Test-Path -LiteralPath $localPath) {
@@ -113,19 +101,27 @@ function Sync-CloudDriveCatalog {
         }
         $readWrite = if ($null -ne $mount.readWrite) { [bool]$mount.readWrite } else { $true }
 
-        # WHY extras only: the backend owns `mount`, the remote spec, the mount point,
-        #   the VFS flags, --log-level and --read-only. Sending the whole list made the
-        #   backend append it verbatim and rclone saw a stray `mount`. POSIX draws the
-        #   same line (cloud-drives.nix extraArgsList -> NUCLEUS_RCLONE_ARGS).
-        $mountExtraArgs = @()
+        # WHY the base flag set: pre-rewrite both platforms' backends injected
+        #   exactly these five flags (MountBackend.ps1 and
+        #   mount-backend-{darwin,linux}.sh), and the wrapper contract now
+        #   receives every flag from here, so keeping the set verbatim keeps
+        #   Windows mount behavior unchanged by this rewrite.
+        # WHY read-only as a flag: the backend that resolved NUCLEUS_RCLONE_
+        #   READ_ONLY is gone, and the value must be decided here while $mount
+        #   is in scope, because the generated script runs in a fresh scope.
+        $mountExtraArgs = @(
+            '--vfs-cache-mode', 'full',
+            '--vfs-cache-max-age', '1h',
+            '--dir-cache-time', '5m',
+            '--poll-interval', '1m',
+            '--log-level', 'NOTICE'
+        )
+        if (-not $readWrite) {
+            $mountExtraArgs += '--read-only'
+        }
         if ($mount.provider -eq 'iCloud') {
             $mountExtraArgs += '--iclouddrive-service', $iCloudService
         }
-
-        # WHY resolve now: the generated script runs in a fresh scope where $mount has no
-        #   value, so a deferred `if ($mount.readOnly)` made every mount writable.
-        #   Mapping mirrors POSIX (cloud-drives.nix: readWrite -> READ_ONLY).
-        $readOnlyLiteral = if ($readWrite) { 'false' } else { 'true' }
 
         if ($mount.extraArgs) {
             $mountExtraArgs += @($mount.extraArgs | Where-Object { $_ })
@@ -161,25 +157,39 @@ function Sync-CloudDriveCatalog {
         #   wrapper, so an apostrophe (a path like C:\Users\O'Brien, a remote name, an
         #   extra arg) would end the literal early and fail the task silently in a hidden
         #   window. Code-derived values cannot contain one and are emitted as-is.
-        # WHY the remote spec: POSIX sets NUCLEUS_RCLONE_REMOTE to
-        #   "${remoteName}:${remotePath}" (cloud-drives.nix). Inert today because every
-        #   entry uses remotePath "/", but a non-root path would otherwise be dropped.
         $escapedRemoteName = ([string]$remoteSpec).Replace("'", "''")
         $escapedMountPoint = ([string]$localPath).Replace("'", "''")
         $escapedInstanceId = ([string]$instanceId).Replace("'", "''")
-        $escapedArgs = ([string]($mountExtraArgs -join "`r`n")).Replace("'", "''")
-        $escapedRcloneExe = ([string]$rcloneExe).Replace("'", "''")
+        $escapedMountLog = ([string](Join-Path $mountLogDir 'mount.log')).Replace("'", "''")
+        $escapedRcloneDir = ([string][IO.Path]::GetDirectoryName($rcloneExe)).Replace("'", "''")
         $escapedRunnerPath = ([string]$runnerPath).Replace("'", "''")
         $escapedStdoutLogFile = ([string]$stdoutLogFile).Replace("'", "''")
         $escapedStderrLogFile = ([string]$stderrLogFile).Replace("'", "''")
 
-        # WHY the resolved path: the task runs `pwsh.exe -NoProfile`, so a bare `rclone`
-        #   resolves only when the registry PATH happens to carry it. POSIX is safe
-        #   through the wrapper's runtimeInputs; Windows has no equivalent.
-        # WHY the redirects: without them the mount's output is discarded entirely.
-        $wrapperContent = "# Auto-generated by Sync-CloudDriveCatalog.ps1`r`n`$env:NUCLEUS_RCLONE_REMOTE = '$escapedRemoteName'`r`n`$env:NUCLEUS_RCLONE_MOUNT_POINT = '$escapedMountPoint'`r`n`$env:NUCLEUS_CLOUD_MOUNT_INSTANCE = '$escapedInstanceId'`r`n`$env:NUCLEUS_RCLONE_READ_ONLY = '$readOnlyLiteral'`r`n`$env:NUCLEUS_RCLONE_ARGS = '$escapedArgs'`r`n`$env:NUCLEUS_RCLONE_BIN = '$escapedRcloneExe'`r`n`$env:NUCLEUS_MOUNT_ATTEMPTS = '$mountAttempts'`r`n`$env:NUCLEUS_MOUNT_BACKOFF = '$mountBackoff'`r`n`$env:NUCLEUS_MOUNT_ATTACH_SECONDS = '$mountAttachSeconds'`r`n" +
+        # WHY an array literal: the runner takes -RcloneArgs as a real string[]
+        #   and forwards each element verbatim to rclone, so a value containing
+        #   spaces (a --volname label) must travel as one element rather than a
+        #   joined string the runner would have to re-split.
+        $rcloneArgsLiteral = if ($mountExtraArgs.Count -gt 0) {
+            '@(' + (($mountExtraArgs | ForEach-Object {
+                    "'" + ([string]$_).Replace("'", "''") + "'"
+                }) -join ', ') + ')'
+        }
+        else {
+            '@()'
+        }
+
+        # WHY the PATH line: the task runs `pwsh.exe -NoProfile`, so a bare `rclone`
+        #   resolves only when the registry PATH happens to carry it. The directory
+        #   resolved at apply time is prepended at run time; POSIX is safe through
+        #   the wrapper's runtimeInputs and Windows has no equivalent.
+        # WHY the redirects: without them the wrapper's own notices are discarded
+        #   entirely; rclone's output reaches its retained mount.log through the
+        #   runner and the captured pair through these two streams.
+        $wrapperContent = "# Auto-generated by Sync-CloudDriveCatalog.ps1`r`n" +
+            "`$env:PATH = '$escapedRcloneDir;' + `$env:PATH`r`n" +
             $passLine +
-            "& '$escapedRunnerPath' 1>> '$escapedStdoutLogFile' 2>> '$escapedStderrLogFile'`r`n"
+            "& '$escapedRunnerPath' -Instance '$escapedInstanceId' -LogFile '$escapedMountLog' -MountPoint '$escapedMountPoint' -RemoteSpec '$escapedRemoteName' -RcloneArgs $rcloneArgsLiteral 1>> '$escapedStdoutLogFile' 2>> '$escapedStderrLogFile'`r`n"
         Set-Content -Path $wrapperPath -Value $wrapperContent -Force -Encoding UTF8
 
         $userId = if ([string]::IsNullOrWhiteSpace($env:USERDOMAIN)) {
@@ -191,7 +201,17 @@ function Sync-CloudDriveCatalog {
 
         $action = New-ScheduledTaskAction -Execute 'pwsh.exe' -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -File `"$wrapperPath`""
         $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
-        $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+        # WHY restart-on-failure as defense in depth: the wrapper's own loop
+        #   owns the 30-second retry cadence, so these settings only revive a
+        #   task whose pwsh process itself died; the count is bounded because a
+        #   permanently broken install must not restart forever.
+        # WHY ExecutionTimeLimit zero: the default execution limit would kill
+        #   the supervisor loop on any host it survives past that limit, and
+        #   Task Scheduler does not count a time-limit stop as a failure the
+        #   restart policy could recover.
+        # WHY a one-minute interval: Task Scheduler rejects anything shorter,
+        #   and the wrapper's loop keeps the fast cadence on its own.
+        $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -RestartCount 10 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
         $principal = New-ScheduledTaskPrincipal -UserId $userId -RunLevel Limited
 
         # check-suppress:suppression_doc: probe -- task may not be registered yet; $null check handles absence.

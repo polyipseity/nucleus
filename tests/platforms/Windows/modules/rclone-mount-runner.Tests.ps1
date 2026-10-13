@@ -1,30 +1,17 @@
 <#
 .SYNOPSIS
-  Pester tests for the cloud-mount runner's required lifecycle inputs (D50).
+  Contract tests for the minimal Windows cloud-mount supervisor.
 
 .DESCRIPTION
-  The retry policy (mountAttempts, mountRetryBackoffSeconds, mountAttachTimeoutSeconds) is
-  single-sourced from
-  cloud-drive.lifecycle in services.json, and the Windows generator injects it as
-  NUCLEUS_MOUNT_ATTEMPTS / NUCLEUS_MOUNT_BACKOFF / NUCLEUS_MOUNT_ATTACH_SECONDS.
-  The POSIX runner consumes the same three with `:?`, required, no fallback.
+  Pins the wrapper contract shared with rclone-mount.sh: launch rclone with
+  the instance's arguments verbatim, stream its output into the retained
+  mount log, and start again after any exit on the configured cadence. There
+  are no health records and no classification by design; the loop and the
+  log file are the whole supervision surface.
 
-  A default in the runner is therefore a SECOND policy definition that can drift
-  from the registry, which is what this file pins: a missing value must fail
-  loudly and name the variable, and a present value must actually be consumed.
-
-  Every case throws before the runner reaches the health record or the mount
-  backend, so these tests perform no mount and write no state. LOCALAPPDATA
-  still points at a temp tree, because the health root resolves from it.
-
-  The retry-loop cases below do reach the backend, and they need one: the runner
-  resolves its modules from $NUCLEUS_REPO_ROOT, so the suite points that at a
-  fixture repo root whose MountBackend.ps1 loads the real backend and stubs only
-  Mount-Backend-Prepare, whose WinFsp registry and service lookups do not exist
-  off Windows and would otherwise end every run at "backend requires user action"
-  before the attach loop. The probe and the failure classifier under test are the
-  production implementations, and the mount itself is a stand-in rclone that writes
-  a chosen message to stderr and exits.
+  The loop runs forever, so every loop case runs the wrapper in a child
+  process, polls for the observable it needs, and kills the child. Exit-code
+  and looping behavior are never tested through in-process invocation.
 
   Run with: pwsh -NoProfile -Command "Invoke-Pester tests/platforms/Windows/modules/rclone-mount-runner.Tests.ps1 -Output Detailed"
 #>
@@ -32,414 +19,323 @@
 BeforeAll {
   $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '../../../..')
   $script:Runner = Join-Path $repoRoot 'src/scripts/services/rclone-mount.ps1'
-  $script:Root = Join-Path ([IO.Path]::GetTempPath()) ("rclone-runner-$([guid]::NewGuid())")
-  $null = New-Item -ItemType Directory -Path (Join-Path $script:Root 'la') -Force
+  $script:Root = Join-Path ([IO.Path]::GetTempPath()) ("rclone-mount-$([guid]::NewGuid())")
+  $null = New-Item -ItemType Directory -Path $script:Root -Force
 
-  # Inputs every case shares, so the failure under test is the one reported.
-  $script:BaseEnv = @{
-    NUCLEUS_REPO_ROOT                  = $repoRoot.Path
-    LOCALAPPDATA                       = (Join-Path $script:Root 'la')
-    NUCLEUS_CLOUD_MOUNT_INSTANCE       = 'local.cloud-mount.iCloud'
-    NUCLEUS_RCLONE_REMOTE              = 'iCloud:/'
-    NUCLEUS_RCLONE_MOUNT_POINT         = (Join-Path $script:Root 'mnt')
-  }
-  $script:LifecycleNames = @(
-    'NUCLEUS_MOUNT_ATTEMPTS'
-    'NUCLEUS_MOUNT_ATTACH_SECONDS'
-    'NUCLEUS_MOUNT_BACKOFF'
-  )
-
-  # Invoke-Runner: run the real runner in a CHILD process with a controlled
-  # environment. A child is required: the runner is a script, not a function
-  # module, and the throw must be observed as the process outcome.
-  function Invoke-Runner {
-    param([hashtable]$Env = @{})
-
-    $saved = @{}
-    foreach ($name in $script:LifecycleNames) {
-      $saved[$name] = [Environment]::GetEnvironmentVariable($name)
-      [Environment]::SetEnvironmentVariable($name, $null)
-    }
-    try {
-      foreach ($name in $Env.Keys) { [Environment]::SetEnvironmentVariable($name, [string]$Env[$name]) }
-      $output = & pwsh -NoProfile -File $script:Runner 2>&1
-      return @{ Output = ($output | Out-String); ExitCode = $LASTEXITCODE }
-    } finally {
-      foreach ($name in $script:LifecycleNames) {
-        [Environment]::SetEnvironmentVariable($name, $saved[$name])
-      }
-    }
-  }
-
-  function New-CaseEnv {
-    # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- Pester helper that merges two hashtables; it mutates no system state and the New- verb reads as "make a case env"
-    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
-    param([hashtable]$Extra = @{})
-    $env = @{}
-    foreach ($k in $script:BaseEnv.Keys) { $env[$k] = $script:BaseEnv[$k] }
-    foreach ($k in $Extra.Keys) { $env[$k] = $Extra[$k] }
-    return $env
-  }
-
-  # MountFixtureRoot: the repo root whose modules dir the runner loads.
-  $script:FixtureRoot = Join-Path -Path $repoRoot.Path -ChildPath 'tests/fixtures/windows-mount-runner/repo'
-
-  # Save-StandInRclone: an executable that stands in for rclone.
+  # Save-StandInRclone: an executable that stands in for rclone. Each
+  # invocation appends one block to the shared invocation log (a marker
+  # line, then what the process received), writes the chosen stderr lines,
+  # and exits with the chosen code.
   #
-  # WHY two implementations: Start-Process runs a file, not a command line, so the
-  #   stand-in has to be something the host can execute: a shebang script on POSIX, a
-  #   .cmd on Windows. Both write each chosen line to stderr, which is what the
-  #   classifier reads, and both exit 1, which is what a mount that never attaches does.
-  # WHY MarkerName: the stand-in writes the marker into the mount point it is handed
-  #   on the command line, so the name is all it needs to know. The runner prepends the
-  #   'mount' subcommand, so the mount point is the third argument after the program
-  #   name: $0 is this file, $1 is 'mount', $2 is the remote, $3 is the mount point.
+  # WHY two implementations: Start-Process runs a file, not a command line,
+  #   so the stand-in must be executable on the host: a shebang script on
+  #   POSIX and a .cmd on Windows.
+  # WHY the argv shapes differ: on POSIX the recorded block is one line per
+  #   argv element, which proves element-level verbatim forwarding. cmd has
+  #   no verbatim argv loop, so the Windows block is the raw %* remainder
+  #   with PowerShell's own quoting, which is exactly the command line rclone
+  #   would receive.
   function Save-StandInRclone {
     param(
-      [Parameter(Mandatory)][string[]]$Stderr,
-      [string]$MarkerName = ''
+      [Parameter(Mandatory)][string]$BinDir,
+      [Parameter(Mandatory)][string]$InvocationLog,
+      [int]$ExitCode = 1,
+      [string[]]$Stderr = @('stand-in rclone failure')
     )
 
-    $path = Join-Path -Path $script:CaseRoot -ChildPath 'stand-in-rclone'
+    $null = New-Item -ItemType Directory -Path $BinDir -Force
     if ($IsWindows) {
-      $path = "$path.cmd"
-      $lines = @('@echo off')
-      foreach ($line in $Stderr) { $lines += ('echo {0} 1>&2' -f $line) }
-      if ($MarkerName) { $lines += ('type nul > "%~3\{0}"' -f $MarkerName) }
-      $lines += 'exit /b 1'
+      $path = Join-Path $BinDir 'rclone.cmd'
+      $lines = @('@echo off', 'echo === invocation>>"{0}"' -f $InvocationLog)
+      foreach ($line in $Stderr) { $lines += 'echo {0} 1>&2' -f $line }
+      $lines += 'echo %* >>"{0}"' -f $InvocationLog
+      $lines += 'exit /b {0}' -f $ExitCode
       Set-Content -Path $path -Value $lines
       return $path
     }
 
-    $lines = @('#!/bin/sh')
-    foreach ($line in $Stderr) { $lines += ('echo {0} >&2' -f "'$line'") }
-    if ($MarkerName) { $lines += ('touch "{0}/{1}"' -f '$3', $MarkerName) }
-    $lines += 'exit 1'
-    Set-Content -Path $path -Value $lines
+    $path = Join-Path $BinDir 'rclone'
+    # WHY the log path travels through a sibling file read at run time
+    #   ($0.LOG): a baked-in absolute path would have to be shell-quoted twice
+    #   (generator and script), while the sibling keeps quoting to one place.
+    Set-Content -Path "$path.LOG" -Value $InvocationLog
+    $body = @(
+      '#!/bin/sh'
+      'LOG="$(cat "$0.LOG")"'
+      'printf "%s\\n" "=== invocation" >>"$LOG"'
+      'for _a in "$@"; do printf "arg:%s\\n" "$_a" >>"$LOG"; done'
+    )
+    foreach ($line in $Stderr) {
+      $escaped = $line.Replace("'", "'\''")
+      $body += "printf '%s\n' '$escaped' >&2"
+    }
+    $body += 'exit {0}' -f $ExitCode
+    Set-Content -Path $path -Value ($body -join "`n")
     $null = & chmod 755 $path
     return $path
   }
 
-  # Block-DirectoryReadAccess: make a directory this process cannot list.
-  #
-  # WHY an ACL rather than a mode: NTFS has no POSIX mode bits, so `chmod 000`
-  #   leaves the directory fully readable on Windows and the probe answers
-  #   absent, which is the case these tests are not about. mount-backend.Tests.ps1
-  #   carries the same helper and asserts unknown:dir-unreadable from it on this
-  #   runner.
-  # WHY read without execute: a directory needs EXECUTE to be traversed and READ
-  #   to be listed, and only the listing is what the probe depends on. Denying
-  #   execute would stop the probe reaching the directory at all.
-  function Block-DirectoryReadAccess {
-    param([Parameter(Mandatory)][string]$Path)
-
-    if ($IsWindows) {
-      $null = & icacls $Path /deny "$($env:USERNAME):(R)" 2>&1
-      return 'icacls'
+  # Get-InvocationBlockList: split the invocation log into per-attempt blocks.
+  function Get-InvocationBlockList {
+    param([Parameter(Mandatory)][string]$InvocationLog)
+    if (-not (Test-Path -LiteralPath $InvocationLog)) { return @() }
+    $raw = Get-Content -Raw -LiteralPath $InvocationLog
+    $blocks = @()
+    foreach ($chunk in ($raw -split '=== invocation')) {
+      if ([string]::IsNullOrWhiteSpace($chunk)) { continue }
+      # WHY the prefix strip: the POSIX stand-in records one arg: line per
+      # argv element, while the Windows stand-in records the raw %* line
+      # (unchanged here); stripping keeps blocks argv-shaped on both hosts.
+      $lines = @($chunk -split "`n" | ForEach-Object { $_.TrimEnd("`r") } |
+        Where-Object { $_ -ne '' } |
+        ForEach-Object { $_ -replace '^arg:', '' })
+      $blocks += ,$lines
     }
-    $null = & chmod 000 $Path
-    return 'chmod'
+    # WHY the extra comma wrap: a bare `return $blocks` writes an array to the
+    # pipeline, which enumerates it, and a single-block result then collapses
+    # to that block's line items; the caller would read three lines as three
+    # attempts and kill the wrapper before the log flushed. The wrap emits the
+    # block array itself as one object for zero, one, or many blocks.
+    return ,$blocks
   }
 
-  # Unblock-DirectoryReadAccess: put the permissions back so the sweep can
-  # delete the tree.
-  function Unblock-DirectoryReadAccess {
+  # Save-LaunchDriver: generate the per-case launcher script.
+  #
+  # WHY a driver instead of pwsh -File directly on the wrapper: -File mode
+  # binds exactly one command-line element to a string[] parameter and rejects
+  # repeats, so multi-flag arguments cannot travel that way on any platform.
+  # Production calls the wrapper in-process from the generated mount-<id>.ps1
+  # with a real array, so the driver is also the production call shape.
+  function Save-LaunchDriver {
     param(
       [Parameter(Mandatory)][string]$Path,
-      [Parameter(Mandatory)][string]$Method
+      [Parameter(Mandatory)][string]$Runner,
+      [Parameter(Mandatory)][string]$LogFile,
+      [Parameter(Mandatory)][string]$MountPoint,
+      [Parameter(Mandatory)][string]$RemoteSpec,
+      [string[]]$FlagArgs = @(),
+      [int]$RetrySeconds = 30
     )
 
-    if ($Method -eq 'icacls') {
-      $null = & icacls $Path /remove:d "$($env:USERNAME)" 2>&1
-      return
+    $quote = { param($value) "'" + ([string]$value).Replace("'", "''") + "'" }
+    $flags = if ($FlagArgs.Count -gt 0) {
+      '@(' + (($FlagArgs | ForEach-Object { & $quote $_ }) -join ', ') + ')'
+    } else {
+      '@()'
     }
-    $null = & chmod 700 $Path
+    $text = @(
+      '$ErrorActionPreference = ''Stop'''
+      ('& {0} -Instance ''local.cloud-mount.test'' -LogFile {1} -MountPoint {2} -RemoteSpec {3} -RcloneArgs {4} -RetrySeconds {5}' -f `
+          (& $quote $Runner), (& $quote $LogFile), (& $quote $MountPoint), `
+          (& $quote $RemoteSpec), $flags, $RetrySeconds)
+    )
+    Set-Content -Path $Path -Value ($text -join "`n")
+    return $Path
   }
 
-  # Invoke-MountAttempt: run the real runner against the fixture backend.
-  function Invoke-MountAttempt {
-    param([hashtable]$Extra = @{})
-
-    $env = New-CaseEnv @{
-      NUCLEUS_REPO_ROOT            = $script:FixtureRoot
-      LOCALAPPDATA                 = (Join-Path -Path $script:CaseRoot -ChildPath 'la')
-      NUCLEUS_RCLONE_MOUNT_POINT   = $script:MountPoint
-      NUCLEUS_RCLONE_BIN           = $script:StandIn
-      NUCLEUS_MOUNT_ATTACH_SECONDS = '5'
-      NUCLEUS_MOUNT_BACKOFF        = '1'
-      # WHY TEMP is supplied: the runner writes its stderr capture to $env:TEMP, which
-      #   Windows always defines and PowerShell on a POSIX host does not. Pointing it
-      #   into the case root also puts the capture file where the case can clean it up.
-      TEMP                         = $script:CaseRoot
+  # Wait-Until: poll a condition for a bounded time; false on timeout.
+  function Wait-Until {
+    param(
+      [Parameter(Mandatory)][scriptblock]$Condition,
+      [int]$TimeoutSeconds = 12
+    )
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    while ([DateTime]::UtcNow -lt $deadline) {
+      if (& $Condition) { return $true }
+      Start-Sleep -Milliseconds 250
     }
-    foreach ($k in $Extra.Keys) { $env[$k] = $Extra[$k] }
-
-    # WHY save, set, restore: the runner is a script rather than a function, so its
-    # inputs have to arrive through the environment the child process inherits. A
-    # lifecycle name the case did not supply is cleared first, for the same reason
-    # Invoke-Runner clears them above, so a value another case left in this process
-    # cannot reach the run.
-    $saved = @{}
-    foreach ($k in $env.Keys) {
-      $saved[$k] = [Environment]::GetEnvironmentVariable($k)
-      [Environment]::SetEnvironmentVariable($k, [string]$env[$k])
-    }
-    foreach ($name in $script:LifecycleNames) {
-      if (-not $env.ContainsKey($name)) { [Environment]::SetEnvironmentVariable($name, $null) }
-    }
-    try {
-      $output = & pwsh -NoProfile -File $script:Runner 2>&1
-      $exitCode = $LASTEXITCODE
-    } finally {
-      foreach ($k in $saved.Keys) { [Environment]::SetEnvironmentVariable($k, $saved[$k]) }
-    }
-
-    return @{
-      Output   = ($output | Out-String)
-      ExitCode = $exitCode
-      Record   = if (Test-Path -LiteralPath $script:RecordPath) {
-        Get-Content -Raw -LiteralPath $script:RecordPath | ConvertFrom-Json
-      } else { $null }
-    }
+    return (& $Condition)
   }
+
+  # Start-Supervisor: launch the wrapper in a child process and track it for
+  # the suite-wide kill sweep.
+  function Start-Supervisor {
+    # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test helper that spawns a child under the suite temp tree; -WhatIf would break every case that needs a live process
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    param([Parameter(Mandatory)][string[]]$ArgumentList)
+
+    # WHY the quoting pass: Start-Process joins -ArgumentList into a single
+    # command string without quoting on every platform, so a value with
+    # spaces (the repo path itself, the spaced mount point) would split into
+    # stray argv elements; the child's parser reassembles each
+    # double-quoted value into one argument.
+    $quoted = @($ArgumentList | ForEach-Object {
+        if ($_ -match '[ \t]') { '"{0}"' -f $_ } else { $_ }
+      })
+    $stdoutPath = Join-Path $script:Root 'supervisor-stdout.log'
+    $stderrPath = Join-Path $script:Root 'supervisor-stderr.log'
+    $proc = Start-Process -FilePath (Get-Process -Id $PID).Path `
+      -ArgumentList $quoted `
+      -PassThru `
+      -RedirectStandardOutput $stdoutPath `
+      -RedirectStandardError $stderrPath
+    $script:StartedProcs += $proc
+    return $proc
+  }
+
+  # Stop-Supervisor: kill a tracked child so no loop outlives its case.
+  function Stop-Supervisor {
+    # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test helper that kills only the child the suite spawned; a WhatIf guard would leave loops running past the case
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    param([Parameter(Mandatory)][System.Diagnostics.Process]$Process)
+    if ($Process.HasExited) { return }
+    $Process.Kill()
+    $null = $Process.WaitForExit(5000)
+  }
+
+  # Invoke-MissingParameter: run the wrapper without the given parameters and
+  # return the child's outcome. -NonInteractive is required: mandatory
+  # parameters would otherwise prompt, and a prompt would hang the suite.
+  # WHY no Mandatory on -ArgumentList: the no-argument case under test IS an
+  # empty list, which a Mandatory parameter rejects before pwsh ever runs.
+  function Invoke-MissingParameter {
+    param([string[]]$ArgumentList = @())
+
+    $output = & pwsh -NoProfile -NonInteractive -File $script:Runner @ArgumentList 2>&1
+    return @{ Output = ($output | Out-String); ExitCode = $LASTEXITCODE }
+  }
+
+  $script:StartedProcs = @()
 }
 
 AfterAll {
+  foreach ($proc in $script:StartedProcs) {
+    try {
+      if (-not $proc.HasExited) { $proc.Kill() }
+    } catch {
+      # A process that exits between the check and the kill needs no sweep;
+      # the remaining processes are still cleaned up below.
+      Write-Verbose "supervisor process already gone: $($_.Exception.Message)"
+    }
+  }
   Remove-Item -LiteralPath $script:Root -Recurse -Force -ErrorAction Ignore
 }
 
-Describe 'rclone-mount.ps1 requires the injected lifecycle policy' {
+Describe 'rclone-mount.ps1 minimal supervisor contract' {
 
-  It 'fails loudly when NUCLEUS_MOUNT_ATTEMPTS is unset' {
-    $result = Invoke-Runner -Env (New-CaseEnv)
-    $result.ExitCode | Should -Not -Be 0
-    $result.Output | Should -Match 'NUCLEUS_MOUNT_ATTEMPTS not set'
+  It 'fails loudly when mandatory parameters are missing' {
+    $none = Invoke-MissingParameter -ArgumentList @()
+    $none.ExitCode | Should -Not -Be 0
+    $none.Output | Should -Match 'missing mandatory parameters'
+    $none.Output | Should -Match 'Instance'
+    $none.Output | Should -Match 'LogFile'
+
+    $partial = Invoke-MissingParameter -ArgumentList @('-Instance', 'local.cloud-mount.test')
+    $partial.ExitCode | Should -Not -Be 0
+    $partial.Output | Should -Match 'missing mandatory parameters'
+    $partial.Output | Should -Match 'LogFile'
+    $partial.Output | Should -Not -Match 'Instance'
   }
 
-  It 'fails loudly when NUCLEUS_MOUNT_ATTACH_SECONDS is unset' {
-    $result = Invoke-Runner -Env (New-CaseEnv @{ NUCLEUS_MOUNT_ATTEMPTS = '1' })
-    $result.ExitCode | Should -Not -Be 0
-    $result.Output | Should -Match 'NUCLEUS_MOUNT_ATTACH_SECONDS not set'
+  It 'invokes rclone again after a failed exit and keeps its stderr in the mount log' {
+    $caseRoot = Join-Path $script:Root ([guid]::NewGuid().ToString('N'))
+    $invLog = Join-Path $caseRoot 'invocations.log'
+    $binDir = Join-Path $caseRoot 'bin'
+    $mountLog = Join-Path -Path $caseRoot -ChildPath 'logs' -AdditionalChildPath 'mount.log'
+    $null = New-Item -ItemType Directory -Path $caseRoot -Force
+    $null = Save-StandInRclone -BinDir $binDir -InvocationLog $invLog `
+      -ExitCode 1 -Stderr @('probe-error-line')
+    $driver = Save-LaunchDriver -Path (Join-Path $caseRoot 'launch.ps1') `
+      -Runner $script:Runner -LogFile $mountLog `
+      -MountPoint (Join-Path $caseRoot 'mnt') -RemoteSpec 'testremote:' `
+      -RetrySeconds 1
+    $launchArgs = @('-NoProfile', '-NonInteractive', '-File', $driver)
+    $envPath = $binDir + [IO.Path]::PathSeparator + $env:PATH
+    $prevPath = $env:PATH
+    $env:PATH = $envPath
+    try {
+      $proc = Start-Supervisor -ArgumentList $launchArgs
+      $secondAttempt = Wait-Until -Condition {
+        (Get-InvocationBlockList -InvocationLog $invLog).Count -ge 2
+      } -TimeoutSeconds 15
+      Stop-Supervisor -Process $proc
+    } finally {
+      $env:PATH = $prevPath
+    }
+
+    $secondAttempt | Should -BeTrue
+    (Get-InvocationBlockList -InvocationLog $invLog).Count | Should -BeGreaterOrEqual 2
+    Test-Path -LiteralPath $mountLog | Should -BeTrue
+    (Get-Content -Raw -LiteralPath $mountLog) | Should -Match 'probe-error-line'
+    $stdout = Get-Content -Raw -LiteralPath (Join-Path $script:Root 'supervisor-stdout.log')
+    $stdout | Should -Match 'retrying in 1s'
   }
 
-  It 'fails loudly when NUCLEUS_MOUNT_BACKOFF is unset' {
-    $result = Invoke-Runner -Env (New-CaseEnv @{
-        NUCLEUS_MOUNT_ATTEMPTS        = '1'
-        NUCLEUS_MOUNT_ATTACH_SECONDS  = '0'
-      })
-    $result.ExitCode | Should -Not -Be 0
-    $result.Output | Should -Match 'NUCLEUS_MOUNT_BACKOFF not set'
-  }
+  It 'forwards the remote spec, a mount point with spaces, and every flag verbatim' {
+    $caseRoot = Join-Path $script:Root ([guid]::NewGuid().ToString('N'))
+    $invLog = Join-Path $caseRoot 'invocations.log'
+    $binDir = Join-Path $caseRoot 'bin'
+    $mountLog = Join-Path $caseRoot 'mount.log'
+    $spacedMount = Join-Path $caseRoot 'cloud dir with spaces'
+    $null = New-Item -ItemType Directory -Path $caseRoot -Force
+    $null = New-Item -ItemType Directory -Path $spacedMount -Force
+    $null = Save-StandInRclone -BinDir $binDir -InvocationLog $invLog -ExitCode 1
+    $flagArgs = @('--volname', 'Cloud Drive', '--read-only')
+    $driver = Save-LaunchDriver -Path (Join-Path $caseRoot 'launch.ps1') `
+      -Runner $script:Runner -LogFile $mountLog `
+      -MountPoint $spacedMount -RemoteSpec 'testremote:' `
+      -FlagArgs $flagArgs -RetrySeconds 600
+    $launchArgs = @('-NoProfile', '-NonInteractive', '-File', $driver)
 
-  It 'consumes the injected attempts value instead of defaulting it' {
-    # A non-numeric value must fail at the conversion: reaching an Int32 cast
-    # proves the injected value is what the runner parses, and that no default
-    # silently replaced it.
-    $result = Invoke-Runner -Env (New-CaseEnv @{
-        NUCLEUS_MOUNT_ATTEMPTS        = 'notanumber'
-        NUCLEUS_MOUNT_ATTACH_SECONDS  = '0'
-        NUCLEUS_MOUNT_BACKOFF         = '1'
-      })
-    $result.ExitCode | Should -Not -Be 0
-    $result.Output | Should -Match 'System.Int32'
-    $result.Output | Should -Not -Match 'NUCLEUS_MOUNT_ATTEMPTS not set'
-  }
+    $envPath = $binDir + [IO.Path]::PathSeparator + $env:PATH
+    $prevPath = $env:PATH
+    $env:PATH = $envPath
+    try {
+      $proc = Start-Supervisor -ArgumentList $launchArgs
+      $firstAttempt = Wait-Until -Condition {
+        (Get-InvocationBlockList -InvocationLog $invLog).Count -ge 1
+      } -TimeoutSeconds 12
+      Stop-Supervisor -Process $proc
+    } finally {
+      $env:PATH = $prevPath
+    }
 
-  It 'consumes the injected backoff value instead of defaulting it' {
-    $result = Invoke-Runner -Env (New-CaseEnv @{
-        NUCLEUS_MOUNT_ATTEMPTS        = '1'
-        NUCLEUS_MOUNT_ATTACH_SECONDS  = '0'
-        NUCLEUS_MOUNT_BACKOFF         = 'notanumber'
-      })
-    $result.ExitCode | Should -Not -Be 0
-    $result.Output | Should -Match 'System.Int32'
-    $result.Output | Should -Not -Match 'NUCLEUS_MOUNT_BACKOFF not set'
-  }
-}
-
-Describe 'rclone-mount.ps1 retry loop' {
-
-  BeforeEach {
-    $script:CaseRoot = Join-Path $script:Root ([guid]::NewGuid().ToString('N'))
-    $null = New-Item -ItemType Directory -Path (Join-Path $script:CaseRoot 'la') -Force
-    $script:MountPoint = Join-Path $script:CaseRoot 'mnt'
-    $null = New-Item -ItemType Directory -Path $script:MountPoint -Force
-    $script:RecordPath = Join-Path (Join-Path (Join-Path (Join-Path (Join-Path $script:CaseRoot 'la') 'nucleus') 'state') 'service-stats') 'local.cloud-mount.iCloud.json'
-  }
-
-  AfterEach {
-    if (Test-Path -LiteralPath $script:MountPoint) { $null = & chmod 700 $script:MountPoint }
-    Remove-Item -LiteralPath $script:CaseRoot -Recurse -Force -ErrorAction Ignore
-  }
-
-  Context 'prepare returns 20' {
-
-    It 'carries the class and remedy in the notice' {
-      # Clear-HealthRecordAll at apply deletes every record, so a notice that only
-      # points at the record names evidence the operator cannot reach. The line
-      # has to carry the diagnosis itself.
-      $script:StandIn = Save-StandInRclone -Stderr 'not reached'
-      $result = Invoke-MountAttempt -Extra @{
-        NUCLEUS_MOUNT_ATTEMPTS       = '1'
-        NUCLEUS_TEST_PREPARE_BLOCKED = '1'
-      }
-
-      $result.ExitCode | Should -Be 0
-      $result.Record.state | Should -Be 'blocked'
-      $result.Output | Should -Match 'class=provider-refusal'
-      $result.Output | Should -Match ([regex]::Escape('install WinFsp via winget install WinFsp.WinFsp'))
+    $firstAttempt | Should -BeTrue
+    $block = (Get-InvocationBlockList -InvocationLog $invLog)[0]
+    if ($IsWindows) {
+      # cmd records the raw %* command line: tokens with spaces carry the
+      # quotes PowerShell emitted, which is the command line rclone receives.
+      $block.Count | Should -Be 1
+      $block[0] | Should -Match ([regex]::Escape('testremote:'))
+      $block[0] | Should -Match ([regex]::Escape('"{0}"' -f $spacedMount))
+      $block[0] | Should -Match ([regex]::Escape('"Cloud Drive"'))
+      $block[0] | Should -Match ([regex]::Escape('--read-only'))
+    } else {
+      # The first argv element of the stand-in is the subcommand 'mount',
+      # because the wrapper invokes `rclone mount <remote> <point> [flags]`.
+      # Joined before comparing: the Pester pipeline unrolls an array on the
+      # left of -Be, which would compare each element against the whole array.
+      $expected = @('mount', 'testremote:', $spacedMount) + @('--volname', 'Cloud Drive', '--read-only')
+      ($block -join "`n") | Should -Be ($expected -join "`n")
     }
   }
 
-  Context 'attempts exhausted' {
-
-    It 'blocks with the last attempt own class rather than a fixed mount-failed' {
-      # The last attempt's rclone output classifies as io-transient, so the exhausted
-      # record must say io-transient. A hardcoded mount-failed discards the only
-      # classification the run produced and sends the operator to the remote when what
-      # stopped the run was a transient network failure.
-      $script:StandIn = Save-StandInRclone -Stderr 'connection refused'
-      $result = Invoke-MountAttempt -Extra @{ NUCLEUS_MOUNT_ATTEMPTS = '2' }
-
-      $result.ExitCode | Should -Be 0
-      $result.Record.state | Should -Be 'blocked'
-      $result.Record.'class' | Should -Be 'io-transient'
-      $result.Record.remedy | Should -Be 'retry in progress'
+  It 'creates the log directory before the first attempt' {
+    $caseRoot = Join-Path $script:Root ([guid]::NewGuid().ToString('N'))
+    $invLog = Join-Path $caseRoot 'invocations.log'
+    $binDir = Join-Path $caseRoot 'bin'
+    $mountLog = Join-Path -Path $caseRoot -ChildPath 'deep' -AdditionalChildPath 'nested', 'mount.log'
+    $null = New-Item -ItemType Directory -Path $caseRoot -Force
+    $null = Save-StandInRclone -BinDir $binDir -InvocationLog $invLog -ExitCode 1
+    $driver = Save-LaunchDriver -Path (Join-Path $caseRoot 'launch.ps1') `
+      -Runner $script:Runner -LogFile $mountLog `
+      -MountPoint (Join-Path $caseRoot 'mnt') -RemoteSpec 'testremote:' `
+      -RetrySeconds 600
+    $launchArgs = @('-NoProfile', '-NonInteractive', '-File', $driver)
+    $envPath = $binDir + [IO.Path]::PathSeparator + $env:PATH
+    $prevPath = $env:PATH
+    $env:PATH = $envPath
+    try {
+      $proc = Start-Supervisor -ArgumentList $launchArgs
+      $oneAttempt = Wait-Until -Condition {
+        (Get-InvocationBlockList -InvocationLog $invLog).Count -ge 1
+      } -TimeoutSeconds 12
+      Stop-Supervisor -Process $proc
+    } finally {
+      $env:PATH = $prevPath
     }
 
-    It 'reports the attempt that failed on its own classification' {
-      $script:StandIn = Save-StandInRclone -Stderr 'connection refused'
-      $result = Invoke-MountAttempt -Extra @{ NUCLEUS_MOUNT_ATTEMPTS = '2' }
-
-      $result.Output | Should -Match 'attempt 1 failed \(class=io-transient'
-      $result.Output | Should -Match 'attempt 2 failed \(class=io-transient'
-    }
-  }
-
-  Context 'mount point this process may not read' {
-
-    BeforeEach {
-      $script:DenyMethod = Block-DirectoryReadAccess -Path $script:MountPoint
-    }
-
-    # WHY here rather than AfterAll: each case gets a fresh mount point under its
-    #   own case root, and AfterAll's recursive delete cannot list a denied
-    #   directory, so a deny left in place would leak the whole tree.
-    AfterEach {
-      Unblock-DirectoryReadAccess -Path $script:MountPoint -Method $script:DenyMethod
-    }
-
-    It 'blocks as io-transient rather than reporting the classifier diagnosis' {
-      # The mount point cannot be listed, so the probe cannot say whether the mount
-      # is there. The classifier's answer comes from rclone's output, which is about
-      # a different question; a terminal class from it would stop the run and point
-      # the operator at the remote on the strength of a read that never completed.
-      $script:StandIn = Save-StandInRclone -Stderr 'rclone: VFS cache unusable'
-      $result = Invoke-MountAttempt -Extra @{ NUCLEUS_MOUNT_ATTEMPTS = '1' }
-
-      $result.Record.state | Should -Be 'blocked'
-      $result.Record.'class' | Should -Be 'io-transient'
-    }
-
-    It 'keeps the capture file and records where it is' {
-      # The class here is one the runner chose, not one rclone's output supports, so
-      # the file is the only remaining record of what the mount was doing. The path
-      # goes in the record because log lines rotate.
-      $script:StandIn = Save-StandInRclone -Stderr 'rclone: VFS cache unusable'
-      $result = Invoke-MountAttempt -Extra @{ NUCLEUS_MOUNT_ATTEMPTS = '1' }
-
-      $result.Record.evidence | Should -Not -BeNullOrEmpty
-      Test-Path -LiteralPath $result.Record.evidence | Should -BeTrue
-      Get-Content -Raw -LiteralPath $result.Record.evidence | Should -Match 'VFS cache unusable'
-      $result.Output | Should -Match ([regex]::Escape('rclone output kept at'))
-    }
-  }
-
-  Context 'a known diagnosis' {
-
-    It 'drops the capture file and leaves no evidence pointer' {
-      # The guard for the case above: retention belongs to the unreadable mount point
-      # alone, and a class rclone's output supports is the whole diagnosis, so the
-      # file has nothing left to say.
-      $script:StandIn = Save-StandInRclone -Stderr 'Unauthorized'
-      $result = Invoke-MountAttempt -Extra @{ NUCLEUS_MOUNT_ATTEMPTS = '3' }
-
-      $result.Record.'class' | Should -Be 'auth'
-      $result.Record.PSObject.Properties.Name | Should -Not -Contain 'evidence'
-      $result.Output | Should -Not -Match 'rclone output kept at'
-    }
-
-    It 'stops on the first attempt for a terminal class' {
-      $script:StandIn = Save-StandInRclone -Stderr 'Unauthorized'
-      $result = Invoke-MountAttempt -Extra @{ NUCLEUS_MOUNT_ATTEMPTS = '3' }
-
-      $result.Output | Should -Match 'attempt 1 failed \(class=auth'
-      $result.Output | Should -Not -Match 'attempt 2 failed'
-    }
-  }
-
-  Context 'a mount that attaches' {
-
-    It 'leaves the evidence key present and null so a healthy mount reads as healthy' {
-      # Reaching running ends the failure the pointer was written for. The key is
-      # cleared to null rather than dropped, so a healthy mount reads as a key with no
-      # value, not as a key that was never there.
-      $script:StandIn = Save-StandInRclone -Stderr 'mounted' -MarkerName 'attached.txt'
-      $result = Invoke-MountAttempt -Extra @{ NUCLEUS_MOUNT_ATTEMPTS = '1' }
-
-      $result.Record.state | Should -Be 'running'
-      $result.Record.PSObject.Properties.Name | Should -Contain 'evidence'
-      $result.Record.evidence | Should -BeNullOrEmpty
-    }
-  }
-
-  Context 'failure tail on the blocked record' {
-
-    It 'carries the tail of a multi-line capture' {
-      # POSIX binds tail -n 20 while the capture file still exists, because every
-      # later branch may delete it and the blocked record is the only place the exact
-      # error survives. The Windows record must carry the same words: a class with no
-      # evidence behind it sends the operator after runner logs that clear at reboot.
-      $script:StandIn = Save-StandInRclone -Stderr @(
-        '2026-10-11T22:53:01.401Z NOTICE: iCloud:/ mount starting'
-        'ERROR: iCloud:/: listing files failed'
-        'HTTP status 401: Unauthorized'
-      )
-      $result = Invoke-MountAttempt -Extra @{ NUCLEUS_MOUNT_ATTEMPTS = '1' }
-
-      $result.Record.state | Should -Be 'blocked'
-      $result.Record.'class' | Should -Be 'auth'
-      $result.Record.failureOutput | Should -Match 'mount starting'
-      $result.Record.failureOutput | Should -Match 'listing files failed'
-      $result.Record.failureOutput | Should -Match 'HTTP status 401'
-    }
-
-    It 'clears a previous boot failure tail when the mount attaches' {
-      # After a reboot the boot stamp no longer matches, so a blocked record stops
-      # gating and the runner proceeds and may attach. A tail the previous run left
-      # behind would then point the next reader at a failure that is over, which is
-      # the same reason the success path nulls the evidence pointer.
-      $recordDir = Split-Path -Parent $script:RecordPath
-      $null = New-Item -ItemType Directory -Path $recordDir -Force
-      @{
-        state        = 'blocked'
-        'class'      = 'auth'
-        remedy       = 'verify remote credentials'
-        failureOutput = 'stale words from a previous boot'
-        boot         = 'stale-boot-id'
-        attempts     = 0
-        reportedState = $null
-        lastSuccess  = 0
-        restarts     = @()
-        generation   = $null
-        lastExit     = 0
-      } | ConvertTo-Json -Depth 4 | Set-Content -Path $script:RecordPath -NoNewline
-
-      $script:StandIn = Save-StandInRclone -Stderr 'mounted' -MarkerName 'attached.txt'
-      $result = Invoke-MountAttempt -Extra @{ NUCLEUS_MOUNT_ATTEMPTS = '1' }
-
-      $result.Record.state | Should -Be 'running'
-      $result.Record.failureOutput | Should -BeNullOrEmpty
-    }
+    $oneAttempt | Should -BeTrue
+    Test-Path -LiteralPath $mountLog | Should -BeTrue
   }
 }
