@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Hide default macOS menu bar items (Spotlight, Control Centre battery, Wi-Fi,
-# the pinned Control Centre shortcut controls) and set status-item spacing to
-# the minimum floor of 0.
+# Hide default macOS menu bar items (Spotlight, Control Centre battery) and
+# set status-item spacing to the minimum floor of 0.
 #
 # macOS 27 caveat: Apple rewrote the menu bar, so its own system icons (Wi-Fi,
 # Control Centre, clock) ignore NSStatusItemSpacing and only third-party status
@@ -41,26 +40,6 @@ if _nucleus_resolve_console_user; then
   if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
     /usr/bin/defaults write com.apple.controlcenter "NSStatusItem Visible Battery" -bool false; then
     error -l menu-bar "failed to hide Control Centre battery status item."
-    exit 1
-  fi
-
-  # WHY hide Wi-Fi and the shortcut controls: macOS 27 ignores the spacing
-  # keys for Apple's own system icons (see header), so hiding is the only way
-  # to reclaim that width. BentoBox-0/1 are the pinned Control Centre gallery
-  # controls; the Control Centre icon itself has no hide key.
-  if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
-    /usr/bin/defaults write com.apple.controlcenter "NSStatusItem VisibleCC WiFi" -bool false; then
-    error -l menu-bar "failed to hide Wi-Fi status item."
-    exit 1
-  fi
-  if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
-    /usr/bin/defaults write com.apple.controlcenter "NSStatusItem VisibleCC BentoBox-0" -bool false; then
-    error -l menu-bar "failed to hide shortcut control BentoBox-0."
-    exit 1
-  fi
-  if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
-    /usr/bin/defaults write com.apple.controlcenter "NSStatusItem VisibleCC BentoBox-1" -bool false; then
-    error -l menu-bar "failed to hide shortcut control BentoBox-1."
     exit 1
   fi
 
