@@ -3,7 +3,11 @@
     {
       "Name": "Default",
       "Guid": "9B6E253F-0528-4F8A-A025-4FD279C73DB1",
-      "Minimum Contrast": 0.30
+      "Minimum Contrast": 0.30,
+      "Non Ascii Font": "JetBrainsMonoNFM-Regular 13",
+      "Normal Font": "JetBrainsMonoNFM-Regular 13",
+      "Option Key Sends": 2,
+      "Unlimited Scrollback": true
     }
   ]
 }
