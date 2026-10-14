@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Hide default macOS menu bar items (Spotlight, Control Centre battery) and
-# clamp status-item spacing to the minimum floor.
+# set status-item spacing to the minimum floor of 0.
+#
+# macOS 27 caveat: Apple rewrote the menu bar, so its own system icons (Wi-Fi,
+# Control Centre, clock) ignore NSStatusItemSpacing and only third-party status
+# items tighten. A full logout may be required for the spacing writes to take
+# effect; killing ControlCentre is not always enough.
 #
 # WHY an activation script and not CustomUserPreferences: ByHost
 # (-currentHost) domains cannot be written that way, and the per-user domains
@@ -39,7 +44,8 @@ if _nucleus_resolve_console_user; then
   fi
 
   # Spacing at the documented floor of 0; 4 is the manual fallback if icons
-  # overlap after this takes effect.
+  # overlap after this takes effect. These values only tighten third-party
+  # items on macOS 27 (see header).
   if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
     /usr/bin/defaults -currentHost write -globalDomain NSStatusItemSpacing -int 0; then
     error -l menu-bar "failed to set NSStatusItemSpacing."
@@ -52,7 +58,9 @@ if _nucleus_resolve_console_user; then
   fi
 
   # Restart Control Centre so the writes apply immediately. killall exits 1 when
-  # it is not running, and the defaults still apply at next launch.
+  # it is not running, and the defaults still apply at next launch. On macOS 27
+  # this may not move the spacing at all; a full logout is the fallback (see
+  # header).
   /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
     /usr/bin/killall ControlCenter 2>/dev/null || true # check-suppress:suppression_doc: Control Centre may not be running; killall exits 1, defaults persist and apply at next launch
 else

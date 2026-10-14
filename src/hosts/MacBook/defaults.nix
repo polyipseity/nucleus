@@ -203,9 +203,11 @@ in
         AutoUpdate = true;
       };
 
-      # Control Centre: hide the battery percentage (the allow-listed Stats app
-      # shows it) and set status-item spacing to the 0 floor, with 4 as the
-      # fallback when icons overlap.
+      # Status-item spacing at the 0 floor; 4 is the manual fallback if icons
+      # overlap. macOS 27 caveat: Apple rewrote the menu bar, so its own system
+      # icons ignore these keys and only third-party status items tighten. A
+      # full logout may be required for the writes to take effect, since a
+      # Control Centre restart is not always enough.
       "com.apple.controlcenter" = {
         NSStatusItemSelectionPadding = 0; # pixels of padding around selected item
         NSStatusItemSpacing = 0; # pixels between status items
