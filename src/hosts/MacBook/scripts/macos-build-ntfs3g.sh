@@ -68,6 +68,18 @@ ntfs3g_rebuild_reason() {
   fi
 }
 
+# WHY the absence gate: macFUSE presence is the feature toggle for this fork
+#   since the 2026-10-14 fuse-t pivot removed the cask. fuse-t ships no
+#   fuse.pc (it provides fuse-t.pc and fuse3.pc), so a missing pkg-config file
+#   means the provider is intentionally gone rather than damaged; the retarget
+#   at fuse-t is tracked in the MacBook MANUAL. Absent skips with a notice and
+#   exit 0 so apply converges; present but unfingerprintable below still
+#   hard-errors, because that is a broken install rather than a deliberate one.
+if ! [ -f "$PROVIDER_ROOT/lib/pkgconfig/fuse.pc" ]; then
+  notice -l ntfs-3g "build skipped: macFUSE absent (fuse-t pivot; NTFS retarget pending, see MacBook MANUAL)"
+  exit 0
+fi
+
 # WHY: macFUSE is an impure build input. Homebrew's cask macfuse@dev declares auto_updates and installs into /usr/local, so the library and headers can be replaced with no repository change and no change to the Nix fingerprint. The digest of the consumed provider files is therefore observed on every activation: without it a macFUSE upgrade leaves the installed ntfs-3g holding an absolute /usr/local/lib/libfuse.<abi>.dylib load path that no longer resolves. The helper is part of buildFingerprint (providerFingerprintScript in ntfs-3g.nix), so an edit that changes what the digest covers without changing its value would leave the field-2 comparison below unchanged.
 if ! PROVIDER_DIGEST="$(fuse_provider_digest "$PROVIDER_ROOT")"; then
   error -l ntfs-3g "macFUSE under $PROVIDER_ROOT is not fingerprinted — install or repair it (Homebrew cask macfuse@dev)"

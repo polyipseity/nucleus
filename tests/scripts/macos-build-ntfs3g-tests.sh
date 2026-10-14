@@ -32,6 +32,15 @@ if [ -z "$GATE_FUNC" ]; then
   finish_tests
 fi
 
+# Fail closed: without the macFUSE absence gate the script hard-errors on a
+# host that intentionally runs without macFUSE after the fuse-t pivot, and
+# every apply aborts at the ntfs-3g build step.
+if grep -q 'build skipped: macFUSE absent' "$BUILD_SCRIPT" && grep -q 'pkgconfig/fuse.pc" ]; then' "$BUILD_SCRIPT"; then
+  assert_pass "macFUSE absence gate skips with a notice"
+else
+  assert_fail "macFUSE absence gate skips with a notice" "the fuse.pc absence check or its notice line is missing from $BUILD_SCRIPT"
+fi
+
 # gate_call <binary> <record> <fingerprint> <digest>: run the extracted gate in a
 # fresh shell that also sources the provider library the gate delegates to.
 # Prints the rebuild reason (empty when the installed binary is current).
