@@ -56,6 +56,19 @@ else
   assert_fail "ExecStartPre runs the wrapper clean pass on the escaped mount point" "no clean-mode ExecStartPre found"
 fi
 
+# Regression pin (Task 8 caught the wrapper being invoked without its mode
+# word, which exits 2 on every launch): the shared argument list must start
+# with the mount mode token before the instance id.
+CLI_LIST="$(
+  awk '/mkMountCliArgs =/ { in_fn = 1 } in_fn && /^    in$/ { in_list = 1; next } in_list { print; if (/mount.extraArgs;/) exit }' "$NIX_FILE"
+)"
+first_token="$(printf '%s\n' "$CLI_LIST" | sed -n '/^    \[$/{n;p;}' | head -n 1 | tr -d '[:space:]')"
+if [ "$first_token" = '"mount"' ]; then
+  assert_pass "argument list starts with the mount mode word"
+else
+  assert_fail "argument list starts with the mount mode word" "first token was ${first_token:-<none>}"
+fi
+
 if printf '%s' "$SERVICE_BLOCK" | grep -q 'ExecStart = .*escapeShellArgs (mkMountCliArgs mount)'; then
   assert_pass "ExecStart carries the shared positional CLI with escaped words"
 else

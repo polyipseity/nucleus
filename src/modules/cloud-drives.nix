@@ -217,8 +217,14 @@ let
       ];
       # Locks rclone's VFS to reads for replica-style mounts.
       readOnlyArgs = lib.optionals (!mount.readWrite) [ "--read-only" ];
+      # WHY the mode word first: the wrapper CLI is mode-ordered
+      #   (mount <instance> <log-file> <mount-point> <remote-spec> [flags]),
+      #   and both consumers (launchd ProgramArguments, systemd ExecStart)
+      #   build from this list, so one prepend covers both hosts. Omitting it
+      #   made every launch hit the usage guard and exit 2 (found in Task 8).
     in
     [
+      "mount"
       (mountServiceId mount)
       "${config.nucleus.logging.logDir}/cloud-drive-mount-${mount.id}/mount.log"
       mountPoint
