@@ -191,15 +191,15 @@ let
         "--password-command"
         "cat ${lib.escapeShellArg config.nucleus.rclone.configPassSecretPath}"
       ];
-      # WHY backend=fskit: the spike that chose this backend (macFUSE user-space
-      #   proof, 2026-10-13) showed the macFUSE kernel path cannot mount on
-      #   macOS 27 while the user-space FSKit backend mounts cleanly; without
-      #   this option macFUSE defaults to the kext path and every mount fails
-      #   with a preflight rejection. macOS only: fuse3 has no such option.
-      fskitBackendArgs = lib.optionals isDarwin [
-        "-o"
-        "backend=fskit"
-      ];
+      # WHY no backend option on macOS: the 2026-10-14 pivot dropped macFUSE
+      #   for fuse-t, whose library rclone loads and whose local NFSv4 server
+      #   mounts with no file system extension at all (NFS is already fuse-t's
+      #   default mode). The old macFUSE FSKit extension had to be registered
+      #   and kept enabled in System Settings, and its enablement reverted
+      #   after every failed start, so the whole option was the failure class.
+      #   fuse-t's own FSKit mode shares that toggle bug and fails under
+      #   launchd TCC attribution, so NFS stays the mode. macOS only: NixOS
+      #   mounts through its native FUSE support and Windows through WinFsp.
       # WHY the base five flags on every host: the pre-rewrite POSIX backends
       #   and the Windows catalog all inject them; dropping them here was a
       #   regression the Task 5 worker caught (VFS cache off, INFO logs).
@@ -234,7 +234,6 @@ let
     ++ iCloudServiceArgs
     ++ volumeNameArgs
     ++ rclonePasswordArgs
-    ++ fskitBackendArgs
     ++ readOnlyArgs
     ++ mount.extraArgs;
 
@@ -248,23 +247,6 @@ let
       scriptName = "src/scripts/services/rclone-mount";
       runtimeInputs = [ pkgs.rclone ];
     };
-
-  # Registers the macFUSE FSKit extension so fskitd can discover it. The spike
-  # behind the macFUSE backend decision showed mounts fail until the appex
-  # bundles are registered; System Settings approval is the one-time manual
-  # step, and this re-registration is idempotent on every apply.
-  registerFskitExtension = pkgs.writeShellScript "register-macfuse-fskit" ''
-    for _appex in "$@"; do
-      if [ ! -d "$_appex" ]; then
-        echo "macFUSE FSKit extension missing: $_appex; reinstall macFUSE" >&2
-        exit 1
-      fi
-    done
-    for _appex in "$@"; do
-      # check-suppress:suppression_doc: re-registering an already-registered extension exits nonzero; the mount itself verifies registration state
-      /usr/bin/pluginkit -a "$_appex" || true
-    done
-  '';
 
   # Build a scheduled replica-sync runner that invokes
   # scripts/cloud.sh sync for one replica id. replica_id and user_home are
@@ -353,17 +335,6 @@ in
       ) config.nucleus.cloudDrives.mounts;
     in
     lib.mkMerge [
-
-      # Registration must land before the agents start, or the first mount of a
-      # fresh system fails on an unregistered extension and launchd spends the
-      # first ThrottleInterval cycles discovering that.
-      (lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && declaredMountAgents != [ ]) {
-        home.activation.macos-register-macfuse-extension = lib.hm.dag.entryBefore [ "setupLaunchAgents" ] ''
-          "${registerFskitExtension}" \
-            /Library/Filesystems/macfuse.fs/Contents/Resources/macfuse.app/Contents/Extensions/io.macfuse.app.fsmodule.macfuse.appex \
-            /Library/Filesystems/macfuse.fs/Contents/Resources/macfuse.app/Contents/Extensions/io.macfuse.app.fsmodule.macfuse-local.appex
-        '';
-      })
 
       # WHY: anchor this after both writeBoundary and setupLaunchAgents.  HM
       #   requires side-effecting entries to run after writeBoundary, and on

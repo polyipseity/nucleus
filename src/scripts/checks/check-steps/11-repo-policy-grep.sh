@@ -782,7 +782,7 @@ run_cloud_mount_invariants() {
   local _failed=0
   local _core_files
   _core_files="src/scripts/services/rclone-mount.sh src/scripts/services/rclone-mount.ps1"
-  local _os_pattern='macfuse|fskit|WinFsp|fuse3'
+  local _os_pattern='macfuse|fskit|WinFsp|fuse3|fuse-t'
 
   for _f in $_core_files; do
     [ -f "$_f" ] || continue
@@ -792,21 +792,21 @@ run_cloud_mount_invariants() {
     fi
   done
 
-  # macOS cloud mounts run through macFUSE, so the dependency must be declared
+  # macOS cloud mounts run through fuse-t, so the dependency must be declared
   # in the machine package surface; a missing declaration leaves every macOS
-  # mount failing at the extension step. The mount path itself installs
+  # mount failing at the FUSE library step. The mount path itself installs
   # nothing: the cask is Nix-managed (src/hosts/MacBook/homebrew.nix).
   local _decl_count _install_count
   # check-suppress:suppression_doc: grep exits 1 when no declaration matches; the count check below reports that as a violation
-  _decl_count=$(grep -ci 'macfuse' src/hosts/MacBook/homebrew.nix 2>/dev/null || true)
+  _decl_count=$(grep -ci 'fuse-t' src/hosts/MacBook/homebrew.nix 2>/dev/null || true)
   if [ "${_decl_count:-0}" -lt 1 ]; then
-    error "$_ctx_name: no macFUSE declaration in src/hosts/MacBook/homebrew.nix; macOS cloud mounts and ntfs-3g need the cask"
+    error "$_ctx_name: no fuse-t declaration in src/hosts/MacBook/homebrew.nix; macOS cloud mounts need the cask"
     _failed=1
   fi
 
-  _install_count=$(grep -rl 'macfuse install\|brew install.*macfuse' src/scripts/lib/ src/scripts/services/ 2>/dev/null | wc -l || true) # check-suppress:suppression_doc: grep exits 1 when no install site matches; the count must read zero either way
+  _install_count=$(grep -rl 'macfuse install\|brew install.*macfuse\|fuse-t install\|brew install.*fuse-t' src/scripts/lib/ src/scripts/services/ 2>/dev/null | wc -l || true) # check-suppress:suppression_doc: grep exits 1 when no install site matches; the count must read zero either way
   if [ "$_install_count" -ne 0 ]; then
-    error "$_ctx_name: found $_install_count macfuse install call sites; the mount path must install none (the NTFS install is Nix-managed)"
+    error "$_ctx_name: found $_install_count FUSE-library install call sites; the mount path must install none (the cask is Nix-managed)"
     _failed=1
   fi
 

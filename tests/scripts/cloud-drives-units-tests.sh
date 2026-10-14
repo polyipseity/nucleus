@@ -125,12 +125,14 @@ else
   assert_fail "no sh -c quoting in generated unit commands" "$offenders"
 fi
 
-# The user-space backend option must stay behind the darwin guard: fuse3 has
-# no backend=fskit, so the binding has to remain an isDarwin optional.
-if grep -q 'fskitBackendArgs = lib.optionals isDarwin' "$NIX_FILE"; then
-  assert_pass "the fskit backend option stays darwin-guarded"
+# Task 8 pivot: fuse-t's local NFSv4 server is its default mode, so the
+# module passes no backend option, and the macFUSE FSKit extension machinery
+# (registration, pluginkit) must never come back: its System Settings
+# enablement reverted after every failed start.
+if grep -qE 'backend=(fskit|nfs|smb)|registerFskitExtension|pluginkit' "$NIX_FILE"; then
+  assert_fail "no backend flag or extension registration in the module" "found: $(grep -oE 'backend=[a-z]+|registerFskitExtension|pluginkit' "$NIX_FILE" | sort -u | tr '\n' ' ')"
 else
-  assert_fail "the fskit backend option stays darwin-guarded" "fskitBackendArgs is no longer an isDarwin optional"
+  assert_pass "no backend flag or extension registration in the module"
 fi
 
 section "3" "the wrapper clean pass keeps a space-containing mount point whole"

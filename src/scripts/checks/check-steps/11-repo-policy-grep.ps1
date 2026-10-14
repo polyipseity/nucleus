@@ -162,11 +162,11 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   # --- Cloud-mount invariants ---
   # The shared runner is backend-agnostic: FUSE and supervisor names live behind
   # the mount and supervisor interfaces. macOS cloud mounts run through
-  # macFUSE, so the dependency must be declared in the machine package
+  # fuse-t, so the dependency must be declared in the machine package
   # surface; the mount path itself installs nothing (the cask is Nix-managed).
   Write-Message "--- cloud-mount invariants ---"
   $cmViolations = 0
-  $cmOsPattern = 'macfuse|fskit|WinFsp|fuse3'
+  $cmOsPattern = 'macfuse|fskit|WinFsp|fuse3|fuse-t'
 
   foreach ($cmRelative in @('src/scripts/services/rclone-mount.sh', 'src/scripts/services/rclone-mount.ps1')) {
     $cmPath = Join-Path -Path $r -ChildPath $cmRelative
@@ -180,10 +180,10 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   $cmDeclCount = 0
   $cmHomebrew = Join-Path -Path $r -ChildPath 'src/hosts/MacBook/homebrew.nix'
   if (Test-Path -LiteralPath $cmHomebrew) {
-    $cmDeclCount = (Select-String -LiteralPath $cmHomebrew -Pattern 'macfuse' -CaseSensitive:$false | Measure-Object).Count
+    $cmDeclCount = (Select-String -LiteralPath $cmHomebrew -Pattern 'fuse-t' -CaseSensitive:$false | Measure-Object).Count
   }
   if ($cmDeclCount -lt 1) {
-    Write-ErrorMessage 'no macFUSE declaration in src/hosts/MacBook/homebrew.nix; macOS cloud mounts and ntfs-3g need the cask'
+    Write-ErrorMessage 'no fuse-t declaration in src/hosts/MacBook/homebrew.nix; macOS cloud mounts need the cask'
     $cmViolations++
   }
 
@@ -196,13 +196,13 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   if ($cmInstallDirs.Count -gt 0) {
     $cmInstallSites = @(
       Get-ChildItem -LiteralPath $cmInstallDirs -Recurse -File |
-        Select-String -Pattern 'macfuse install|brew install.*macfuse' -CaseSensitive |
+        Select-String -Pattern 'macfuse install|brew install.*macfuse|fuse-t install|brew install.*fuse-t' -CaseSensitive |
         ForEach-Object { $_.Path } |
         Sort-Object -Unique
     )
   }
   if ($cmInstallSites.Count -ne 0) {
-    Write-ErrorMessage "found $($cmInstallSites.Count) macfuse install call sites; the mount path must install none (the NTFS install is Nix-managed)"
+    Write-ErrorMessage "found $($cmInstallSites.Count) FUSE-library install call sites; the mount path must install none (the cask is Nix-managed)"
     $cmViolations++
   }
 

@@ -560,30 +560,6 @@
       }
     }
   },
-  "macFUSE": {
-    "displayName": "macFUSE",
-    "description": "FSKit-capable FUSE userspace driver for rclone cloud mounts and ntfs-3g",
-    "hosts": {
-      "MacBook": {
-        "platform": "macOS",
-        "autostartEnabled": true,
-        "kind": "macos-system-extension",
-        "bundleId": "io.macfuse.app.fsmodule.macfuse",
-        "approvalInstructions": "System Settings → General → Login Items & Extensions → by category → File System Extensions → enable macFUSE.",
-        "justification": "FSKit file-system extension behind both macOS FUSE consumers: rclone cloud mounts run as `rclone mount -o backend=fskit`, and io.macfuse.app.fsmodule.macfuse-local attaches the local NTFS volumes that have no native driver for ntfs-3g. Approve in Login Items & Extensions → File System Extensions (not Privacy & Security). The macFUSE kernel extension stays unapproved."
-      },
-      "NixOS": {
-        "platform": "NixOS",
-        "type": "omitted",
-        "justification": "macOS-only system extension; no Linux build exists."
-      },
-      "Windows": {
-        "platform": "Windows",
-        "type": "omitted",
-        "justification": "macOS-only system extension; no Windows build exists."
-      }
-    }
-  },
   "Chrome Remote Desktop Host": {
     "displayName": "Chrome Remote Desktop Host",
     "description": "Headless remote-desktop receiver",
