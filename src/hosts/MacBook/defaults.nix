@@ -414,6 +414,15 @@ in
         # straight to showing tips.
         "NoSyncPermissionToShowTip" = true;
         "NoSyncTipOfTheDay" = true;
+        # Silences the "Allow Terminal-Initiated Display/Download?" prompt
+        # whenever a program shows an inline image (imgcat, chafa) or starts a
+        # terminal-initiated transfer, so images always render without
+        # confirmation. iTermWarning stores the permanent-silence flag under
+        # the identifier itself and the remembered answer under
+        # "<identifier>_selection" (0 = Yes); the answer is written explicitly
+        # instead of relying on the missing-key integer default of 0.
+        "NoSyncSuppressDownloadConfirmation" = true;
+        "NoSyncSuppressDownloadConfirmation_selection" = 0;
         # Blocks other processes from reading keystrokes.
         "Secure Input" = true;
         # Disable in-app update checks; updates are managed declaratively.
