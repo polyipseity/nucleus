@@ -88,6 +88,7 @@
       "*.gstatic.com",
       "*.huggingface.co",
       "*.mediawiki.org",
+      "*.mirror.jellyfin.org",
       "*.npmjs.org",
       "*.pypi.org",
       "*.typst.app",
