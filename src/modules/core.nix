@@ -968,6 +968,15 @@ let
       };
       winget = "Microsoft.VisualStudioCode.Insiders";
     };
+    wechat = {
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "wechat";
+      };
+      nixpkgs = "wechat-uos";
+      winget = "Tencent.WeChat.Universal";
+    };
     "whatsapp-beta" = {
       # Allow-list is source-agnostic: the converter matches `settings.id`
       # regardless of `source: msstore`.
