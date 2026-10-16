@@ -425,6 +425,17 @@ in
         # instead of relying on the missing-key integer default of 0.
         "NoSyncSuppressDownloadConfirmation" = true;
         "NoSyncSuppressDownloadConfirmation_selection" = 0;
+        # Pre-answer the "Permission Required" control-sequence prompts with
+        # Allow so iTerm2 stops asking. Same iTermWarning mechanism as
+        # NoSyncSuppressDownloadConfirmation above; the optional-bool advanced
+        # settings ask when absent, allow when false, prevent when true.
+        # "A control sequence attempted to activate a session. Allow it?"
+        "NoSyncAllowDenyStealFocus" = true;
+        "NoSyncAllowDenyStealFocus_selection" = 0; # 0 = Allow (first action)
+        # "A control sequence attempted to clear scrollback history..."
+        "PreventEscapeSequenceFromClearingHistory" = false;
+        # "A control sequence attempted to change the current profile..."
+        "PreventEscapeSequenceFromChangingProfile" = false;
         # Blocks other processes from reading keystrokes.
         "Secure Input" = true;
         # Disable in-app update checks; updates are managed declaratively.
