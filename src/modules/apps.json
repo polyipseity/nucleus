@@ -427,6 +427,43 @@
       }
     }
   },
+  "WeChat": {
+    "displayName": "WeChat",
+    "description": "Messaging client",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "autostartEnabled": false,
+        "kind": "macos-launchagent",
+        "path": "/Applications/WeChat.app",
+        "bundleId": "com.tencent.xinWeChat",
+        "statusIcon": {
+          "kind": "manual",
+          "iconVisible": false
+        }
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "autostartEnabled": false,
+        "kind": "nixos-xdg-desktop",
+        "path": "/run/current-system/sw/bin/wechat-uos",
+        "statusIcon": {
+          "kind": "manual",
+          "iconVisible": false
+        }
+      },
+      "Windows": {
+        "platform": "Windows",
+        "autostartEnabled": false,
+        "kind": "windows-run-key",
+        "path": "%ProgramFiles%\\Tencent\\Weixin\\Weixin.exe",
+        "statusIcon": {
+          "kind": "manual",
+          "iconVisible": false
+        }
+      }
+    }
+  },
   "Steam": {
     "displayName": "Steam",
     "description": "Game distribution and launcher platform",

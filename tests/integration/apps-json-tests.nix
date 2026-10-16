@@ -32,6 +32,7 @@ let
     "MiddleClick"
     "Parsec"
     "Telegram"
+    "WeChat"
     "WhatsApp"
     "Steam"
     "Discord"
