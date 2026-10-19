@@ -1,30 +1,123 @@
 # Zsh initialization for nucleus-managed hosts. History exclusion, stale
-# nix-env guard, completion directory, agent-session detection, dev tool
+# nix-env scrubber, completion directory, agent-session detection, dev tool
 # interception, srt agent wrapping.
 # Embedded by src/modules/shell/default.nix into initContent.
 
-# Warn once when the nix store paths this shell inherited have been
-# garbage-collected: a devShell env outlives its closure in long-lived shells,
-# and every link in them then dies with "library not found for -lSystem".
-# WHY: warn-only because unsetting the variables mid-session would half-fix
-# the shell and hide the problem; recovery needs a fresh process tree (quit and
-# reopen the terminal). No Windows twin because Windows has no nix devShell env
-# to go stale.
+# Scrub once per shell start when the env this shell inherited carries nix
+# store paths that were garbage-collected: a devShell env outlives its
+# closure in long-lived shells, tmux panes, and IDE terminals, and every
+# reference then dies with "library not found for -lSystem". Repo-managed
+# values route through stable toolchains/ symlinks (converged at activation)
+# and cannot go stale; the residue is devShell stdenv exports like NIX_CC and
+# flag vars, which only re-entering the devShell can restore.
+# WHY repair instead of the previous warn-only guard: dropping a dead value
+# turns a broken build into a working one on the system toolchain, and the
+# report still names everything dropped so the devShell case is never silent.
+# No Windows twin because Windows has no nix devShell env to go stale.
 if [[ -z "${__nucleus_stale_nix_warned:-}" ]]; then
-  __nucleus_stale_nix_path=""
-  if [[ -n "${NIX_CC:-}" && "${NIX_CC:-}" == /nix/store/* && ! -e "${NIX_CC:-}" ]]; then
-    __nucleus_stale_nix_path="$NIX_CC"
-  elif [[ -n "${SDKROOT:-}" && "${SDKROOT:-}" == /nix/store/* && ! -e "${SDKROOT:-}" ]]; then
-    __nucleus_stale_nix_path="$SDKROOT"
-  elif [[ -n "${DEVELOPER_DIR:-}" && "${DEVELOPER_DIR:-}" == /nix/store/* && ! -e "${DEVELOPER_DIR:-}" ]]; then
-    __nucleus_stale_nix_path="$DEVELOPER_DIR"
-  fi
-  if [[ -n "$__nucleus_stale_nix_path" ]]; then
-    print -u2 -- "this shell inherited nix store paths that no longer exist, e.g. $__nucleus_stale_nix_path."
-    print -u2 -- "builds and links will fail in it. quit and reopen this terminal, or log out and back in."
-    typeset -g __nucleus_stale_nix_warned=1
-  fi
-  unset __nucleus_stale_nix_path
+  typeset -g __nucleus_stale_nix_warned=1
+  () {
+    # _nucleus_dead_component PATH: 0 when PATH is a /nix/store component
+    # whose store-hash segment names an entry that no longer exists.
+    _nucleus_dead_component() {
+      local _ndc_comp="$1"
+      [[ "$_ndc_comp" == /nix/store/* ]] || return 1
+      local _ndc_head="${_ndc_comp#/nix/store/}"
+      _ndc_head="${_ndc_head%%/*}"
+      local _ndc_hash_re='^[0-9a-z]{32}([-.].*)?$'
+      [[ "$_ndc_head" =~ $_ndc_hash_re ]] || return 1
+      [[ ! -e "$_ndc_comp" ]]
+    }
+
+    local -a __nuc_report
+    __nuc_report=()
+    local __nuc_nixdropped=false
+
+    # Colon-list vars: drop dead components, keep the rest in order, dedupe
+    # entries that repeat, and leave the variable untouched when nothing was
+    # dead.
+    local __nuc_var __nuc_raw __nuc_comp __nuc_dropped __nuc_total
+    local -a __nuc_kept
+    typeset -A __nuc_seen
+    for __nuc_var in PATH MANPATH LD_LIBRARY_PATH CPATH C_INCLUDE_PATH \
+      CPLUS_INCLUDE_PATH OBJC_INCLUDE_PATH LIBRARY_PATH PKG_CONFIG_PATH \
+      PYTHONPATH PERL5LIB TERMINFO_DIRS; do
+      __nuc_raw="${(P)__nuc_var}"
+      [[ -n "$__nuc_raw" ]] || continue
+      __nuc_kept=()
+      __nuc_seen=()
+      __nuc_dropped=0
+      __nuc_total=0
+      for __nuc_comp in "${(@s/:/)__nuc_raw}"; do
+        (( __nuc_total++ ))
+        if _nucleus_dead_component "$__nuc_comp"; then
+          (( __nuc_dropped++ ))
+          continue
+        fi
+        if [[ -z "$__nuc_comp" ]]; then
+          __nuc_kept+=( "" )
+        elif [[ -z "${__nuc_seen[$__nuc_comp]+x}" ]]; then
+          __nuc_seen[$__nuc_comp]=1
+          __nuc_kept+=( "$__nuc_comp" )
+        fi
+      done
+      if (( __nuc_dropped > 0 )); then
+        export "${__nuc_var}=${(j/:/)__nuc_kept}"
+        __nuc_report+=( "$__nuc_var ($__nuc_dropped of $__nuc_total entries)" )
+        [[ "$__nuc_var" == NIX_* ]] && __nuc_nixdropped=true
+      fi
+    done
+
+    # Other exported ordinary scalars: a dead store path anywhere in the
+    # value means the value is broken as a whole, so unset it and report.
+    # The bare /nix/store/<hash>-<name> directory is re-checked before
+    # unsetting: an over-long extraction whose store entry still exists is
+    # ambiguous, and unsetting a live value would break more than it heals.
+    local -a __nuc_names
+    local __nuc_name __nuc_type __nuc_value __nuc_rest __nuc_cand __nuc_bare
+    # The [@] subscript is load-bearing: ${(k)parameters} without it joins
+    # every key into one word, and the loop then matches nothing.
+    __nuc_names=("${(k)parameters[@]}")
+    for __nuc_name in "${(@o)__nuc_names}"; do
+      case "$__nuc_name" in
+      __nucleus_* | __nuc_* | _ | parameters | PATH | MANPATH | \
+        LD_LIBRARY_PATH | CPATH | C_INCLUDE_PATH | CPLUS_INCLUDE_PATH | \
+        OBJC_INCLUDE_PATH | LIBRARY_PATH | PKG_CONFIG_PATH | PYTHONPATH | \
+        PERL5LIB | TERMINFO_DIRS) continue ;;
+      esac
+      __nuc_type="${parameters[$__nuc_name]}"
+      # zsh spells the export flag "export" inside type strings like
+      # "scalar-export"; "exported" never matches.
+      [[ "$__nuc_type" == *export* ]] || continue
+      if [[ "$__nuc_type" == *readonly* || "$__nuc_type" == *association* ||
+        "$__nuc_type" == *array* || "$__nuc_type" == *function* ]]; then
+        continue
+      fi
+      __nuc_value="${(P)__nuc_name}"
+      [[ "$__nuc_value" == *'/nix/store/'* ]] || continue
+      __nuc_rest="$__nuc_value"
+      while [[ "$__nuc_rest" == *'/nix/store/'* ]]; do
+        __nuc_rest="${__nuc_rest#*/nix/store/}"
+        __nuc_cand="/nix/store/${__nuc_rest%%[[:space:]:\"\(\)]*}"
+        __nuc_bare="${__nuc_cand#/nix/store/}"
+        __nuc_bare="/nix/store/${__nuc_bare%%/*}"
+        if [[ ! -e "$__nuc_bare" ]]; then
+          unset "$__nuc_name"
+          __nuc_report+=( "$__nuc_name=$__nuc_cand" )
+          [[ "$__nuc_name" == NIX_* ]] && __nuc_nixdropped=true
+          break
+        fi
+      done
+    done
+
+    if (( ${#__nuc_report} > 0 )); then
+      print -u2 -- "this shell inherited nix store paths that no longer exist; dropped: ${(j/, /)__nuc_report}"
+      if [[ "$__nuc_nixdropped" == true ]]; then
+        print -u2 -- "those devShell tools are gone; re-enter the devShell (direnv reload, or exit and re-enter) to restore them."
+      fi
+    fi
+    unfunction _nucleus_dead_component
+  }
 fi
 
 # History: exclude commands starting with a space and duplicates

@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# Test: the init.zsh stale nix-env guard warns once when a shell inherited
-# garbage-collected nix store paths, and stays silent otherwise.
+# Test: the init.zsh stale nix-env scrubber drops garbage-collected store
+# paths from inherited env, reports exactly what it dropped, and stays silent
+# when nothing is dead.
 #
-# The guard protects long-lived shells whose devShell closure was freed by
-# nix-store --gc: they still export NIX_CC/SDKROOT/DEVELOPER_DIR pointing into
-# /nix/store, and every link dies with "library not found for -lSystem". The
-# suite substitutes init.zsh's build-time tokens the way shell.nix does, then
-# sources the result under zsh -f with a controlled environment: the warning
-# is the observable behavior, so the assertions target stderr.
+# The scrubber protects long-lived shells whose devShell closure was freed by
+# nix-store --gc: they still export NIX_CC/SDKROOT and friends pointing into
+# /nix/store, and every link then dies with "library not found for -lSystem".
+# The suite substitutes init.zsh's build-time tokens the way shell.nix does,
+# then sources the result under zsh -f with a controlled environment: the
+# report on stderr and the post-source variable state on stdout are the
+# observable behavior, so the assertions target both.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -19,12 +21,20 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 require_command zsh "zsh sources src/scripts/shell/init.zsh"
 require_command sed "token substitution mirrors shell.nix replaceStrings"
 
-_sls_phrase="inherited nix store paths that no longer exist"
+_sls_prefix="this shell inherited nix store paths that no longer exist; dropped: "
+_sls_remedy="those devShell tools are gone; re-enter the devShell (direnv reload, or exit and re-enter) to restore them."
+# 32-char store hash of all zeros cannot name a real store entry, so the path
+# is dead by construction without depending on GC state.
 _sls_dead="/nix/store/00000000000000000000000000000000-dead"
+_sls_dead_sub="$_sls_dead/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
 # /nix/store itself is a real store-prefixed path that always exists on a
-# nix host, so it exercises the live-path branch without depending on a
-# specific store entry.
+# nix host, and its first segment is not a store hash, so it exercises the
+# live/non-hash branch without depending on a specific store entry.
 _sls_live="/nix/store"
+# Every case runs under this live PATH: the test process may itself inherit
+# GC'd store entries from its parent shell, and ambient staleness would
+# pollute every case's report.
+_sls_controlled_path="/usr/bin:/bin:/usr/sbin:/sbin"
 
 _sls_tmp="$(mktemp -d)"
 trap 'rm -rf "$_sls_tmp"' EXIT
@@ -35,7 +45,7 @@ mkdir -p "$_sls_home"
 # does, with benign values: a no-op statement for the injected check lines,
 # never-present paths for the devin probe and the default tools root. Tokens
 # reach the test source un-substituted otherwise, and a bare token line would
-# abort sourcing before the guard ever runs.
+# abort sourcing before the scrubber ever runs.
 _sls_init="$_sls_tmp/init.zsh"
 sed \
   -e 's/__AGENT_ENV_VAR_CHECKS__/:/' \
@@ -55,81 +65,152 @@ assert_pass "token substitution leaves no __TOKEN__ behind"
 
 # The driver autoloads compinit the way an interactive zsh does: zsh -f skips
 # the rc files that normally register the autoload, so sourcing init.zsh bare
-# would die with "command not found: compinit" before reaching the guard.
+# would die with "command not found: compinit" before reaching the scrubber.
+# After sourcing it prints the state of the variables under test so the cases
+# assert observed repair, not just the report.
 _sls_driver="$_sls_tmp/driver.zsh"
-printf 'autoload -Uz compinit\n. "%s"\n' "$_sls_init" >"$_sls_driver"
+cat >"$_sls_driver" <<EOF
+autoload -Uz compinit
+. "$_sls_init"
+print -- "NIX_CC=\${NIX_CC-<unset>}"
+print -- "SDKROOT=\${SDKROOT-<unset>}"
+print -- "PATH=\${PATH-<unset>}"
+EOF
 
-# run_init_case ERRFILE [VAR=VALUE ...]: source the substituted init under
-# zsh -f from inside the temp dir (keeping the prek hook away from a real
-# repo) with NIX_CC/SDKROOT/DEVELOPER_DIR cleared first, then whatever the
-# case assigns. HOME points at the temp dir so compinit writes nothing real.
-run_init_case() { # <err-file> [VAR=VALUE ...]
+# run_init_case ERRFILE OUTFILE [VAR=VALUE ...]: source the substituted init
+# under zsh -f from inside the temp dir (keeping the prek hook away from a
+# real repo) with an empty inherited environment: the test process may itself
+# sit inside a stale devShell (dead builder, stdenv, NIX_* vars), and ambient
+# staleness would pollute every case's report. HOME points at the temp dir so
+# compinit writes nothing real; case assignments come last so they win.
+run_init_case() { # <err-file> <out-file> [VAR=VALUE ...]
   local _err="$1"
-  shift
+  local _out="$2"
+  shift 2
   (
     cd "$_sls_tmp" || exit 1
-    env -u NIX_CC -u SDKROOT -u DEVELOPER_DIR "$@" HOME="$_sls_home" \
-      zsh -f "$_sls_driver" </dev/null >/dev/null 2>"$_err"
+    env -i PATH="$_sls_controlled_path" HOME="$_sls_home" \
+      "$@" zsh -f "$_sls_driver" </dev/null >"$_out" 2>"$_err"
   )
 }
 
-assert_warns() { # <label> <err-file>
-  if grep -qF "$_sls_phrase" "$2"; then
+assert_dropped() { # <label> <err-file>
+  if grep -qF "$_sls_prefix" "$2"; then
     assert_pass "$1"
   else
-    assert_fail "$1" "warning missing; stderr: $(tr '\n' ' ' <"$2")"
+    assert_fail "$1" "drop report missing; stderr: $(tr '\n' ' ' <"$2")"
   fi
 }
 
-assert_no_warn() { # <label> <err-file>
-  if grep -qF "$_sls_phrase" "$2"; then
-    assert_fail "$1" "unexpected warning; stderr: $(tr '\n' ' ' <"$2")"
+assert_no_report() { # <label> <err-file>
+  if grep -qF "$_sls_prefix" "$2"; then
+    assert_fail "$1" "unexpected drop report; stderr: $(tr '\n' ' ' <"$2")"
+  else
+    assert_pass "$1"
+  fi
+}
+
+assert_no_remedy() { # <label> <err-file>
+  if grep -qF "$_sls_remedy" "$2"; then
+    assert_fail "$1" "unexpected devShell remedy; stderr: $(tr '\n' ' ' <"$2")"
   else
     assert_pass "$1"
   fi
 }
 
 _err="$_sls_tmp/err.txt"
+_out="$_sls_tmp/out.txt"
 
-# A dead NIX_CC is the failing-cargo case: warn, and name the dead path.
-run_init_case "$_err" "NIX_CC=$_sls_dead"
-assert_warns "dead NIX_CC warns" "$_err"
-if grep -qF "$_sls_dead" "$_err"; then
-  assert_pass "dead NIX_CC warning names the dead path"
+# A dead NIX_CC is the failing-cargo case: report it, point at the devShell
+# remedy, and observe the variable actually gone.
+run_init_case "$_err" "$_out" "NIX_CC=$_sls_dead"
+assert_dropped "dead NIX_CC is reported" "$_err"
+if grep -qF "NIX_CC=$_sls_dead" "$_err"; then
+  assert_pass "dead NIX_CC report names the dead value"
 else
-  assert_fail "dead NIX_CC warning names the dead path" \
+  assert_fail "dead NIX_CC report names the dead value" \
     "stderr: $(tr '\n' ' ' <"$_err")"
 fi
-
-# The guard must survive re-sourcing without repeating itself.
-_sls_twice="$_sls_tmp/twice.zsh"
-printf 'autoload -Uz compinit\n. "%s"\n. "%s"\n' "$_sls_init" "$_sls_init" >"$_sls_twice"
-(
-  cd "$_sls_tmp" || exit 1
-  env -u SDKROOT -u DEVELOPER_DIR "NIX_CC=$_sls_dead" HOME="$_sls_home" \
-    zsh -f "$_sls_twice" </dev/null >/dev/null 2>"$_err"
-)
-_warn_count="$(grep -cF "$_sls_phrase" "$_err" || true)"
-if [ "$_warn_count" -eq 1 ]; then
-  assert_pass "re-sourcing the init warns exactly once"
+if grep -qF "$_sls_remedy" "$_err"; then
+  assert_pass "dead NIX_CC prints the devShell remedy"
 else
-  assert_fail "re-sourcing the init warns exactly once" "warned $_warn_count times"
+  assert_fail "dead NIX_CC prints the devShell remedy" \
+    "stderr: $(tr '\n' ' ' <"$_err")"
+fi
+if grep -qx 'NIX_CC=<unset>' "$_out"; then
+  assert_pass "dead NIX_CC is unset after sourcing"
+else
+  assert_fail "dead NIX_CC is unset after sourcing" \
+    "stdout: $(tr '\n' ' ' <"$_out")"
 fi
 
-# No inherited nix vars: silence.
-run_init_case "$_err"
-assert_no_warn "all nix vars unset: no warning" "$_err"
+# A dead entry inside PATH: drop it, keep the live entries in order, collapse
+# a repeated live entry, and skip the devShell remedy (no NIX_ var dropped).
+_sls_live_path="/usr/bin:/bin:/usr/sbin"
+run_init_case "$_err" "$_out" \
+  "PATH=$_sls_live_path:$_sls_dead/bin:$_sls_live_path"
+assert_dropped "dead PATH entry is reported" "$_err"
+assert_no_remedy "dead PATH entry alone prints no devShell remedy" "$_err"
+if grep -qx "PATH=$_sls_live_path" "$_out"; then
+  assert_pass "dead PATH entry dropped, live entries kept in order, duplicates collapsed"
+else
+  assert_fail "dead PATH entry dropped, live entries kept in order, duplicates collapsed" \
+    "stdout: $(tr '\n' ' ' <"$_out")"
+fi
 
-# A live store path: silence. Proves the guard checks existence, not the prefix.
-run_init_case "$_err" "NIX_CC=$_sls_live"
-assert_no_warn "live NIX_CC: no warning" "$_err"
+# A dead SDKROOT, spelled as a subpath of a dead store entry: the store entry
+# itself is gone, so report and unset. SDKROOT carries no NIX_ prefix, so the
+# devShell remedy must stay silent.
+run_init_case "$_err" "$_out" "SDKROOT=$_sls_dead_sub"
+assert_dropped "dead SDKROOT is reported" "$_err"
+assert_no_remedy "dead SDKROOT prints no devShell remedy" "$_err"
+if grep -qx 'SDKROOT=<unset>' "$_out"; then
+  assert_pass "dead SDKROOT is unset after sourcing"
+else
+  assert_fail "dead SDKROOT is unset after sourcing" \
+    "stdout: $(tr '\n' ' ' <"$_out")"
+fi
 
-# Dead DEVELOPER_DIR: warns, so the guard is not NIX_CC-only.
-run_init_case "$_err" "DEVELOPER_DIR=$_sls_dead"
-assert_warns "dead DEVELOPER_DIR warns" "$_err"
+# A store-prefixed value that is not hash-shaped: untouched and silent.
+# Proves the scrubber checks the store-hash shape and existence, not the
+# prefix alone.
+run_init_case "$_err" "$_out" "NIX_CC=$_sls_live"
+assert_no_report "live, non-hash-shaped store prefix: no report" "$_err"
+if grep -qx "NIX_CC=$_sls_live" "$_out"; then
+  assert_pass "live, non-hash-shaped store prefix is untouched"
+else
+  assert_fail "live, non-hash-shaped store prefix is untouched" \
+    "stdout: $(tr '\n' ' ' <"$_out")"
+fi
 
-# Dead SDKROOT: the third variable, same expectation.
-run_init_case "$_err" "SDKROOT=$_sls_dead"
-assert_warns "dead SDKROOT warns" "$_err"
+# No inherited stale values: complete silence on stderr.
+run_init_case "$_err" "$_out"
+if [ -s "$_err" ]; then
+  assert_fail "clean environment: no stderr output" \
+    "stderr: $(tr '\n' ' ' <"$_err")"
+else
+  assert_pass "clean environment: no stderr output"
+fi
+
+# The scrubber must survive re-sourcing without repeating itself.
+_sls_twice="$_sls_tmp/twice.zsh"
+cat >"$_sls_twice" <<EOF
+autoload -Uz compinit
+. "$_sls_init"
+. "$_sls_init"
+EOF
+(
+  cd "$_sls_tmp" || exit 1
+  env -i PATH="$_sls_controlled_path" HOME="$_sls_home" \
+    "NIX_CC=$_sls_dead" \
+    zsh -f "$_sls_twice" </dev/null >/dev/null 2>"$_err"
+)
+_report_count="$(grep -cF "$_sls_prefix" "$_err" || true)"
+if [ "$_report_count" -eq 1 ]; then
+  assert_pass "re-sourcing the init reports exactly once"
+else
+  assert_fail "re-sourcing the init reports exactly once" \
+    "reported $_report_count times"
+fi
 
 finish_tests
