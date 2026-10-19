@@ -22,7 +22,6 @@
 }:
 let
   managedPaths = import ./managed-paths.nix { inherit pkgs; };
-  appleSdkEnhanced = import ./apple-sdk-enhanced.nix { inherit pkgs lib; };
   toolchainLinks = import ./toolchain-links.nix { inherit lib pkgs; };
   # Stable SYSTEM-root toolchain directories. The POSIX toolchain values below
   # point into these instead of raw store paths; see toolchain-links.nix for why.
@@ -482,7 +481,6 @@ let
 in
 {
   inherit
-    appleSdkEnhanced
     catalog
     allVars
     systemVars
