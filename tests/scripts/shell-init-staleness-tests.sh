@@ -75,6 +75,7 @@ autoload -Uz compinit
 print -- "NIX_CC=\${NIX_CC-<unset>}"
 print -- "SDKROOT=\${SDKROOT-<unset>}"
 print -- "PATH=\${PATH-<unset>}"
+print -- "HOME=\${HOME-<unset>}"
 EOF
 
 # run_init_case ERRFILE OUTFILE [VAR=VALUE ...]: source the substituted init
@@ -171,15 +172,53 @@ else
     "stdout: $(tr '\n' ' ' <"$_out")"
 fi
 
-# A store-prefixed value that is not hash-shaped: untouched and silent.
-# Proves the scrubber checks the store-hash shape and existence, not the
-# prefix alone.
+# A dead HOME is special runtime state, not a devShell export: the
+# special/tied exclusion keeps the scalar pass from unsetting it, so the
+# completion-dir mkdir fails loudly on its own instead of losing the home
+# path for every later consumer.
+run_init_case "$_err" "$_out" "HOME=$_sls_dead"
+assert_no_report "dead HOME: no report" "$_err"
+if grep -qx "HOME=$_sls_dead" "$_out"; then
+  assert_pass "dead HOME is not unset"
+else
+  assert_fail "dead HOME is not unset" \
+    "stdout: $(tr '\n' ' ' <"$_out")"
+fi
+
+# A value that is only the bare /nix/store prefix: the scalar pass'
+# substring guard does not match it (no trailing slash), so nothing runs and
+# the value is untouched and silent.
 run_init_case "$_err" "$_out" "NIX_CC=$_sls_live"
 assert_no_report "live, non-hash-shaped store prefix: no report" "$_err"
 if grep -qx "NIX_CC=$_sls_live" "$_out"; then
   assert_pass "live, non-hash-shaped store prefix is untouched"
 else
   assert_fail "live, non-hash-shaped store prefix is untouched" \
+    "stdout: $(tr '\n' ' ' <"$_out")"
+fi
+
+# A nonexistent /nix/store component that carries no store hash: the colon
+# pass rejects it by shape, so it survives in PATH untouched while the same
+# component hash-shaped and dead would be dropped (case 2 pins that side).
+_sls_nonhash="/nix/store/not-a-store-hash"
+run_init_case "$_err" "$_out" "PATH=$_sls_controlled_path:$_sls_nonhash"
+assert_no_report "nonexistent non-hash colon component: no report" "$_err"
+if grep -qx "PATH=$_sls_controlled_path:$_sls_nonhash" "$_out"; then
+  assert_pass "nonexistent non-hash colon component is not dropped"
+else
+  assert_fail "nonexistent non-hash colon component is not dropped" \
+    "stdout: $(tr '\n' ' ' <"$_out")"
+fi
+
+# Same shape gate in the scalar pass: a nonexistent but non-hash store path
+# is not enough to unset an exported scalar.
+_sls_nonhash_scalar="/nix/store/not-a-store-hash/SDKs/X.sdk"
+run_init_case "$_err" "$_out" "SDKROOT=$_sls_nonhash_scalar"
+assert_no_report "nonexistent non-hash scalar: no report" "$_err"
+if grep -qx "SDKROOT=$_sls_nonhash_scalar" "$_out"; then
+  assert_pass "nonexistent non-hash scalar is untouched"
+else
+  assert_fail "nonexistent non-hash scalar is untouched" \
     "stdout: $(tr '\n' ' ' <"$_out")"
 fi
 

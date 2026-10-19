@@ -24,24 +24,38 @@ if [[ -z "${__nucleus_stale_nix_warned:-}" ]]; then
       [[ "$_ndc_comp" == /nix/store/* ]] || return 1
       local _ndc_head="${_ndc_comp#/nix/store/}"
       _ndc_head="${_ndc_head%%/*}"
-      local _ndc_hash_re='^[0-9a-z]{32}([-.].*)?$'
-      [[ "$_ndc_head" =~ $_ndc_hash_re ]] || return 1
+      # Hash shape comes from the enclosing scope's single __nuc_hash_re.
+      [[ "$_ndc_head" =~ $__nuc_hash_re ]] || return 1
       [[ ! -e "$_ndc_comp" ]]
     }
 
     local -a __nuc_report
     __nuc_report=()
     local __nuc_nixdropped=false
+    # One hash-shape gate for both passes: a /nix/store segment that is not a
+    # store hash is never ours to touch.
+    local __nuc_hash_re='^[0-9a-z]{32}([-.].*)?$'
 
     # Colon-list vars: drop dead components, keep the rest in order, dedupe
     # entries that repeat, and leave the variable untouched when nothing was
-    # dead.
+    # dead. The list is declared once and shared with the scalar pass below.
+    local -a __nuc_colon_vars
+    __nuc_colon_vars=(
+      PATH MANPATH LD_LIBRARY_PATH CPATH C_INCLUDE_PATH CPLUS_INCLUDE_PATH
+      OBJC_INCLUDE_PATH LIBRARY_PATH PKG_CONFIG_PATH PYTHONPATH PERL5LIB
+      TERMINFO_DIRS
+    )
+    typeset -A __nuc_colon_set
+    __nuc_colon_set=()
+    local __nuc_cv
+    for __nuc_cv in "${__nuc_colon_vars[@]}"; do
+      __nuc_colon_set[$__nuc_cv]=1
+    done
+
     local __nuc_var __nuc_raw __nuc_comp __nuc_dropped __nuc_total
     local -a __nuc_kept
     typeset -A __nuc_seen
-    for __nuc_var in PATH MANPATH LD_LIBRARY_PATH CPATH C_INCLUDE_PATH \
-      CPLUS_INCLUDE_PATH OBJC_INCLUDE_PATH LIBRARY_PATH PKG_CONFIG_PATH \
-      PYTHONPATH PERL5LIB TERMINFO_DIRS; do
+    for __nuc_var in "${__nuc_colon_vars[@]}"; do
       __nuc_raw="${(P)__nuc_var}"
       [[ -n "$__nuc_raw" ]] || continue
       __nuc_kept=()
@@ -74,23 +88,26 @@ if [[ -z "${__nucleus_stale_nix_warned:-}" ]]; then
     # unsetting: an over-long extraction whose store entry still exists is
     # ambiguous, and unsetting a live value would break more than it heals.
     local -a __nuc_names
-    local __nuc_name __nuc_type __nuc_value __nuc_rest __nuc_cand __nuc_bare
+    local __nuc_name __nuc_type __nuc_value __nuc_rest __nuc_cand __nuc_head
+    local __nuc_bare
     # The [@] subscript is load-bearing: ${(k)parameters} without it joins
     # every key into one word, and the loop then matches nothing.
     __nuc_names=("${(k)parameters[@]}")
     for __nuc_name in "${(@o)__nuc_names}"; do
       case "$__nuc_name" in
-      __nucleus_* | __nuc_* | _ | parameters | PATH | MANPATH | \
-        LD_LIBRARY_PATH | CPATH | C_INCLUDE_PATH | CPLUS_INCLUDE_PATH | \
-        OBJC_INCLUDE_PATH | LIBRARY_PATH | PKG_CONFIG_PATH | PYTHONPATH | \
-        PERL5LIB | TERMINFO_DIRS) continue ;;
+      __nucleus_* | __nuc_* | _ | parameters) continue ;;
       esac
+      [[ -n "${__nuc_colon_set[$__nuc_name]+x}" ]] && continue
       __nuc_type="${parameters[$__nuc_name]}"
       # zsh spells the export flag "export" inside type strings like
-      # "scalar-export"; "exported" never matches.
+      # "scalar-export"; "exported" never matches. Special and tied params
+      # (HOME is "scalar-export-special", PATH "scalar-tied-export-special")
+      # are runtime state the shell manages: unsetting a dead HOME would
+      # break the completion-dir mkdir below at every shell start.
       [[ "$__nuc_type" == *export* ]] || continue
       if [[ "$__nuc_type" == *readonly* || "$__nuc_type" == *association* ||
-        "$__nuc_type" == *array* || "$__nuc_type" == *function* ]]; then
+        "$__nuc_type" == *array* || "$__nuc_type" == *function* ||
+        "$__nuc_type" == *special* || "$__nuc_type" == *tied* ]]; then
         continue
       fi
       __nuc_value="${(P)__nuc_name}"
@@ -99,8 +116,12 @@ if [[ -z "${__nucleus_stale_nix_warned:-}" ]]; then
       while [[ "$__nuc_rest" == *'/nix/store/'* ]]; do
         __nuc_rest="${__nuc_rest#*/nix/store/}"
         __nuc_cand="/nix/store/${__nuc_rest%%[[:space:]:\"\(\)]*}"
-        __nuc_bare="${__nuc_cand#/nix/store/}"
-        __nuc_bare="/nix/store/${__nuc_bare%%/*}"
+        __nuc_head="${__nuc_cand#/nix/store/}"
+        __nuc_head="${__nuc_head%%/*}"
+        # Same hash-shape gate as the colon pass, so a nonexistent but
+        # non-hash /nix/store segment is not enough to unset a scalar.
+        [[ "$__nuc_head" =~ $__nuc_hash_re ]] || continue
+        __nuc_bare="/nix/store/$__nuc_head"
         if [[ ! -e "$__nuc_bare" ]]; then
           unset "$__nuc_name"
           __nuc_report+=( "$__nuc_name=$__nuc_cand" )
@@ -111,9 +132,11 @@ if [[ -z "${__nucleus_stale_nix_warned:-}" ]]; then
     done
 
     if (( ${#__nuc_report} > 0 )); then
-      print -u2 -- "this shell inherited nix store paths that no longer exist; dropped: ${(j/, /)__nuc_report}"
+      # -r keeps inherited values from being interpreted as print escapes
+      # (a \c in a report value would truncate the line).
+      print -ru2 -- "this shell inherited nix store paths that no longer exist; dropped: ${(j/, /)__nuc_report}"
       if [[ "$__nuc_nixdropped" == true ]]; then
-        print -u2 -- "those devShell tools are gone; re-enter the devShell (direnv reload, or exit and re-enter) to restore them."
+        print -ru2 -- "those devShell tools are gone; re-enter the devShell (direnv reload, or exit and re-enter) to restore them."
       fi
     fi
     unfunction _nucleus_dead_component
