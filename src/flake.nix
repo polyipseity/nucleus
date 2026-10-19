@@ -472,6 +472,19 @@
                 gnupg24 = gnupg25_pinned;
               }
             )
+            # WHY: upstream Seatbelt profiles allow only POSIX IPC, so PyInstaller
+            # bootloaders die at startup on denied semctl(SETVAL). Remove once the
+            # emitted profile carries the System V semaphore allow.
+            (_final: prev: {
+              sandbox-runtime = prev.sandbox-runtime.overrideAttrs (old: {
+                postInstall = (old.postInstall or "") + ''
+                  substituteInPlace \
+                    $out/lib/node_modules/@anthropic-ai/sandbox-runtime/dist/sandbox/macos-sandbox-utils.js \
+                    --replace-fail "'(allow ipc-posix-sem)'" \
+                    "'(allow ipc-posix-sem)','(allow ipc-sysv-sem)'"
+                '';
+              });
+            })
             # WHY: the upstream Nix module's default package resolves through pkgs.
             hermes-agent.overlays.default
             # Exposed via pkgs so modules use it without importing from flake.nix.
