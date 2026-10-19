@@ -23,6 +23,11 @@
 let
   managedPaths = import ./managed-paths.nix { inherit pkgs; };
   appleSdkEnhanced = import ./apple-sdk-enhanced.nix { inherit pkgs lib; };
+  toolchainLinks = import ./toolchain-links.nix { inherit lib pkgs; };
+  # Stable SYSTEM-root toolchain directories. The POSIX toolchain values below
+  # point into these instead of raw store paths; see toolchain-links.nix for why.
+  macLinkDir = toolchainLinks.linkDirFor "MacBook";
+  nixosLinkDir = toolchainLinks.linkDirFor "NixOS";
 
   allUsers = import ./users-registry.nix {
     lib = pkgs.lib;
@@ -67,21 +72,24 @@ let
   catalog = {
     CC = {
       values = {
-        default = "${pkgs.llvmPackages.clang}/bin/clang";
+        MacBook = "${macLinkDir}/clang/bin/clang";
+        NixOS = "${nixosLinkDir}/clang/bin/clang";
         Windows = "clang";
       };
       why = "Nix CC for native builds \u2014 all-process on all hosts. On Windows, resolved from PATH by Machine-scope DSC.";
     };
     CXX = {
       values = {
-        default = "${pkgs.llvmPackages.clang}/bin/clang++";
+        MacBook = "${macLinkDir}/clang/bin/clang++";
+        NixOS = "${nixosLinkDir}/clang/bin/clang++";
         Windows = "clang++";
       };
       why = "Nix CXX for native builds \u2014 all-process on all hosts. On Windows, resolved from PATH by Machine-scope DSC.";
     };
     LD = {
       values = {
-        default = "${pkgs.llvmPackages.lld}/bin/ld.lld";
+        MacBook = "${macLinkDir}/lld/bin/ld.lld";
+        NixOS = "${nixosLinkDir}/lld/bin/ld.lld";
         Windows = "ld.lld";
       };
       why = "Nix LD for native builds \u2014 all-process on all hosts. On Windows, resolved from PATH by Machine-scope DSC.";
@@ -89,14 +97,16 @@ let
 
     CMAKE_C_COMPILER_LAUNCHER = {
       values = {
-        default = "${pkgs.sccache}/bin/sccache";
+        MacBook = "${macLinkDir}/sccache/bin/sccache";
+        NixOS = "${nixosLinkDir}/sccache/bin/sccache";
         Windows = "sccache";
       };
       why = "Wrap CMake C compilation through sccache for cross-host C/C++ compiler caching. On Windows, resolved from PATH via Machine-scope DSC.";
     };
     CMAKE_CXX_COMPILER_LAUNCHER = {
       values = {
-        default = "${pkgs.sccache}/bin/sccache";
+        MacBook = "${macLinkDir}/sccache/bin/sccache";
+        NixOS = "${nixosLinkDir}/sccache/bin/sccache";
         Windows = "sccache";
       };
       why = "Wrap CMake C++ compilation through sccache for cross-host C/C++ compiler caching. On Windows, resolved from PATH via Machine-scope DSC.";
@@ -142,25 +152,26 @@ let
 
     DEVELOPER_DIR = {
       values = {
-        MacBook = "${appleSdkEnhanced}";
+        MacBook = "${macLinkDir}/apple-sdk";
       };
       why = "Enhanced apple-sdk with real tool symlinks, so xcrun resolves python3, git, make, etc. without Xcode CLT.";
     };
     SDKROOT = {
       values = {
-        MacBook = "${appleSdkEnhanced}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk";
+        MacBook = "${macLinkDir}/apple-sdk/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk";
       };
       why = "Explicit SDKROOT avoids second xcrun invocation when DEVELOPER_DIR is set.";
     };
     LIBRARY_PATH = {
       values = {
-        MacBook = "${pkgs.libiconv}/lib";
+        MacBook = "${macLinkDir}/libiconv/lib";
       };
       why = "Rustup-managed cargo on macOS needs libiconv in LIBRARY_PATH for crates with C deps.";
     };
     NIX_SSL_CERT_FILE = {
       values = {
-        default = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+        MacBook = "${macLinkDir}/cacert/etc/ssl/certs/ca-bundle.crt";
+        NixOS = "${nixosLinkDir}/cacert/etc/ssl/certs/ca-bundle.crt";
         Windows = null;
       };
       why = "Nix-managed SSL cert bundle for all processes outside nix-daemon build environments. On NixOS, nix-daemon sets this for its own builds but GUI/CLI tools outside systemd also need it. Not applicable on Windows (no Nix store).";
@@ -342,9 +353,10 @@ let
 
     PLAYWRIGHT_BROWSERS_PATH = {
       values = {
-        default = "${pkgs.playwright-driver.browsers}";
+        MacBook = "${macLinkDir}/playwright-browsers";
+        NixOS = "${nixosLinkDir}/playwright-browsers";
       };
-      why = "Playwright browser binaries location. Points to the Nix store path with pre-built Chromium/Firefox/WebKit. System-wide so all tools (hermes-agent, agent-browser, opencode) can find browsers. On Windows, set by Sync-HermesConfig.ps1.";
+      why = "Playwright browser binaries location. Resolves through the managed toolchain symlink to the Nix store path holding pre-built Chromium/Firefox/WebKit. System-wide so all tools (hermes-agent, agent-browser, opencode) can find browsers. On Windows, set by Sync-HermesConfig.ps1.";
     };
   };
 

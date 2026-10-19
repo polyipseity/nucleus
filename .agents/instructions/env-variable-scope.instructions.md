@@ -22,6 +22,8 @@ The catalog is the single source of truth for anything that must reach more than
 
 A framework export that reaches one shell family is not enough. nix-darwin, for example, exports the GPG agent environment for zsh, bash, and fish from the snippet it sources in `/etc/zshenv`, so a PowerShell started outside a zsh parent has no `SSH_AUTH_SOCK` and falls back to an `IdentityFile` it cannot read. A value a provisioned shell or GUI process needs belongs in the catalog, or the uncovered surface carries a `# WHY:`.
 
+POSIX toolchain values (`CC`, `DEVELOPER_DIR`, and friends) never name a raw `/nix/store` path: they route through stable symlinks under the host SYSTEM root (`<root>/toolchains/<name>`) that activation repoints each apply (`src/modules/lib/toolchain-links.nix`), so `nix-collect-garbage` cannot leave an inherited value dangling.
+
 ## Cross-host exceptions
 
 | Var | macOS | NixOS | Windows | Rationale |

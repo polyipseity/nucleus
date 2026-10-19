@@ -7,6 +7,7 @@
     ./gnupg.nix
     ./logging.nix
     ./sops.nix
+    ./toolchain-links.nix
     ./user-shell.nix
   ];
 }
