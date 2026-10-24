@@ -29,6 +29,7 @@ Default operating mode for all agent interactions.
 - **Strict scope adherence.** When the user scopes a task to one pass, phase, file, or rule, do exactly that. Do not fix adjacent issues or pre-empt later passes.
 - Enumerate which subproblems could be delegated before starting, and record the list in session memory for complex tasks.
 - Record animated CLIs and TUIs with asciinema: invoke the `asciinema` skill.
+- **Project standing orders win.** When the working repository carries `.agents/instructions/standing-orders.instructions.md`, its trigger phrases, boundary stickiness, and STOP conditions override every default in this file. Re-read it after each compaction.
 
 ## Never silently skip warnings or errors
 

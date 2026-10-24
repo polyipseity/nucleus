@@ -52,6 +52,8 @@ Inspect the on-disk tree before assuming source files, tests, or commands exist.
 
 When the user says "only plan", "only research", or "do not edit files", the agent MUST NOT create or edit files, run implementation commands, or invoke `/implement-plan`. Read and search only. Hard rule.
 
+`.agents/instructions/standing-orders.instructions.md` holds the owner's trigger phrases and precedence rules: a boundary phrase locks the whole turn until the owner lifts it, a repository write during that turn is forbidden, git is opt-in per operation, and questions raised while executing are batched into the final report. Read it before the first tool call of a turn.
+
 ## No backwards compatibility
 
 - No shims, deprecation layers, or migration glue. Rename, restructure, or remove in one commit: no aliases, no fallbacks, no compat wrappers. Fix broken downstream consumers in the same commit. If a change needs a compat layer, make it smaller and more local.
