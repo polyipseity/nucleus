@@ -38,10 +38,10 @@ _fail() {
 # Prints the fixture root.
 _make_case() {
   local _root="$_tmp/$1"
-  mkdir -p "$_root/.agents/prompts" "$_root/src/users/default/agents/prompts" "$_root/.agents/instructions"
+  mkdir -p "$_root/.agents/prompts" "$_root/src/users/default/agents/prompts" "$_root/src/users/default/agents/instructions"
   printf '%s\n' 'Read standing-orders.instructions.md first.' "Task: \$@" >"$_root/.agents/prompts/t.prompt.md"
   printf '%s\n' '<!-- child-prompt-block:begin -->' 'block' '<!-- child-prompt-block:end -->' \
-    >"$_root/.agents/instructions/standing-orders.instructions.md"
+    >"$_root/src/users/default/agents/instructions/standing-orders.instructions.md"
   printf '%s' "$_root"
 }
 
@@ -112,31 +112,66 @@ _expect_message "harness-specific name" "/memories/ path"
 # 7. An unbalanced child-prompt-block marker pair is rejected and names the policy file.
 _root=$(_make_case unbalanced)
 printf '%s\n' '<!-- child-prompt-block:begin -->' 'block' \
-  >"$_root/.agents/instructions/standing-orders.instructions.md"
+  >"$_root/src/users/default/agents/instructions/standing-orders.instructions.md"
 _run_case "$_root"
 _expect_rc 1 "unbalanced markers"
 _expect_message "child-prompt-block markers are unbalanced" "unbalanced markers"
-_expect_message "$_root/.agents/instructions/standing-orders.instructions.md" "unbalanced markers name the policy file"
+_expect_message "$_root/src/users/default/agents/instructions/standing-orders.instructions.md" "unbalanced markers name the policy file"
 
 # 8. A tree without the policy file passes that rule with no stderr.
 _root=$(_make_case nopolicy)
-rm -f "$_root/.agents/instructions/standing-orders.instructions.md"
+rm -f "$_root/src/users/default/agents/instructions/standing-orders.instructions.md"
 _run_case "$_root"
 _expect_rc 0 "missing policy file"
 _expect_silent_stderr "missing policy file"
 
 # 9. A tree with neither prompts directory fails loudly instead of passing green.
 _empty="$_tmp/empty"
-mkdir -p "$_empty/.agents/instructions"
+mkdir -p "$_empty/src/users/default/agents/instructions"
 printf '%s\n' '<!-- child-prompt-block:begin -->' 'block' '<!-- child-prompt-block:end -->' \
-  >"$_empty/.agents/instructions/standing-orders.instructions.md"
+  >"$_empty/src/users/default/agents/instructions/standing-orders.instructions.md"
 _run_case "$_empty"
 _expect_rc 1 "no prompts directory"
 _expect_message "no prompt templates found" "no prompts directory"
 
-# 10. The real tree satisfies the contract.
+# 10. A harness-specific name in a user-scope instruction file is rejected.
+_root=$(_make_case uscope-instr)
+printf '%s\n' 'Read the diagnostics with get_errors.' >"$_root/src/users/default/agents/instructions/extra.instructions.md"
+_run_case "$_root"
+_expect_rc 1 "instruction file harness name"
+_expect_message "harness-specific name" "instruction file harness name"
+_expect_message "$_root/src/users/default/agents/instructions/extra.instructions.md" "instruction file harness name names the file"
+
+# 11. A harness-specific name in a user-scope agent definition is rejected.
+_root=$(_make_case uscope-agent)
+mkdir -p "$_root/src/users/default/agents/agents"
+printf '%s\n' 'Delegate with runSubagent.' >"$_root/src/users/default/agents/agents/helper.agent.md"
+_run_case "$_root"
+_expect_rc 1 "agent definition harness name"
+_expect_message "harness-specific name" "agent definition harness name"
+_expect_message "$_root/src/users/default/agents/agents/helper.agent.md" "agent definition names the file"
+
+# 12. A harness-specific name in a user-scope skill body is rejected.
+_root=$(_make_case uscope-skill)
+mkdir -p "$_root/src/users/default/agents/skills/helper"
+printf '%s\n' 'Write to /memories/session/x.md.' >"$_root/src/users/default/agents/skills/helper/SKILL.md"
+_run_case "$_root"
+_expect_rc 1 "skill body harness name"
+_expect_message "harness-specific name" "skill body harness name"
+_expect_message "$_root/src/users/default/agents/skills/helper/SKILL.md" "skill body names the file"
+
+# 13. The adapter mapping table is exempt, because it is where harness names belong.
+_root=$(_make_case adapter)
+printf '%s\n' '| Diagnostics | none | get_errors |' '| Child | subagent | runSubagent |' \
+  >"$_root/src/users/default/agents/instructions/harness-adapters.reference.md"
+_run_case "$_root"
+_expect_rc 0 "adapter table exemption"
+_expect_silent_stderr "adapter table exemption"
+
+# 14. The real tree satisfies the contract.
 _run_case "$REPO_ROOT"
 _expect_rc 0 "real repository tree"
+_expect_silent_stderr "real repository tree"
 
 if [ "$failures" -ne 0 ]; then
   echo "prompt template contract tests: $failures failed"

@@ -17,7 +17,7 @@ Default operating mode for all agent interactions.
 - Break non-trivial work into ordered steps and finish them end to end.
 - Parallelize independent reads, searches, and validations.
 - After each burst, report progress and the next action.
-- Verify before finishing: run the syntax, lint, test, or runtime checks relevant to the task. Use `get_errors` after each editing round when VS Code interaction is available.
+- Verify before finishing: run the syntax, lint, test, or runtime checks relevant to the task. Read the diagnostics the harness exposes after each editing round, and when it exposes none, run the compiler, linter, or test command instead.
 - Read the project architecture docs (`AGENTS.md`, `.agents/instructions/`) before placing new code.
 - **Immutable by default.** Every variable, field, return type, and collection reaches for the immutable variant first: `const` over `let`, `readonly` properties, `readonly T[]`, frozen records, read-only borrows. Mutability needs a stated reason. See `programming-principles.instructions.md` and `typing-conventions.instructions.md`.
 - **No fallbacks.** When a primary path fails or a dependency is missing, report the failure. Never add a fallback branch or mask a missing value with a default (`or ""`, `?? ""`, `|| ""`, `dict.get(k, "")`, `unwrap_or("")`, a swallowing `except`, `-ErrorAction SilentlyContinue` without a stated reason, `2>$null` without an annotation). Fix the primary path instead.
@@ -29,7 +29,7 @@ Default operating mode for all agent interactions.
 - **Strict scope adherence.** When the user scopes a task to one pass, phase, file, or rule, do exactly that. Do not fix adjacent issues or pre-empt later passes.
 - Enumerate which subproblems could be delegated before starting, and record the list in session memory for complex tasks.
 - Record animated CLIs and TUIs with asciinema: invoke the `asciinema` skill.
-- **Project standing orders win.** When the working repository carries `.agents/instructions/standing-orders.instructions.md`, its trigger phrases, boundary stickiness, and STOP conditions override every default in this file. Re-read it after each compaction.
+- **Standing orders win.** `~/.agents/instructions/standing-orders.instructions.md` is user scope, so it governs every repository, and it overrides every default in this file: its trigger phrases, boundary stickiness, and STOP conditions. A repository may add project-scope rules of its own. Re-read it after each compaction.
 
 ## Never silently skip warnings or errors
 
@@ -44,8 +44,8 @@ Every warning and error gets accounted for. Calling one "benign" without proof h
 
 Use a subagent for every delegatable subproblem; each gets its own context window.
 
-- `Explore` for research over 3 or more file reads or any broad exploratory question. Read files directly only for narrow 1-2 file questions.
-- `General Purpose` for focused implementations and for tasks phrased as "do X in file Y".
+- A read-only research child for research over 3 or more file reads or any broad exploratory question. Read files directly only for narrow 1-2 file questions.
+- An implementation child for focused implementations and for tasks phrased as "do X in file Y".
 - 2 or more independently modifiable files means parallel subagents; 2 or more separable questions means one subagent each. Max 2 concurrent.
 
 Prompt shape is in `delegate.prompt.md`: 2-3 sentences of context, one-sentence task, hard constraints, expected return.
@@ -85,8 +85,8 @@ Run `find`, `rg`, `ls -R`, `tree`, or `git ls-files` only inside the current wor
 - Markdown paragraphs are one line each, no hard wrapping (`authoring.instructions.md`).
 - Never `cd` into `.agents/skills/` or any skill subfolder. Run from the repo root; a skill folder collects `.venv/` and `uv.lock` trash and fails.
 - Never run or suggest `uv run -m init generate` or `uv run -m init generate -C`. Content generation is automatic in this repo.
-- Use the `memory` tool for all memory operations. It takes `/memories/...` paths and supports `view`, `create`, `str_replace`, `insert`, `delete`, and `rename`. `memory view /memories/session/` lists session files, so `resolve_memory_file_uri` is only for paths a non-memory tool needs.
-- The `memory` tool and other VS Code interaction tools (`get_errors`, `run_vscode_command`, `vscode_askQuestions`) unlock by calling `activate_vs_code_interaction` with no arguments. Do it before concluding a tool is missing. Do not fall back to `resolve_memory_file_uri` plus `read_file`, `create_file`, or `run_in_terminal`: that writes URL-encoded garbage files and bypasses the memory API.
+- Use the session-memory capability for all memory operations. Its directory and its operation names differ per harness, so resolve them in `harness-adapters.reference.md` before the first write. List the directory to find existing entries rather than guessing a filename.
+- When the harness exposes no memory capability, report that and stop. Never write a memory entry through a lower-level file tool that assembles its own path, because a path the memory API cannot read is lost state, not a fallback.
 
 ## Premise integrity
 
@@ -103,4 +103,4 @@ Before finishing a multi-phase plan, re-read the plan and verify every phase. Re
 
 Check whether separable subproblems went to subagents. If not, record why delegation would or would not have helped.
 
-Plan files live in session memory as `/memories/session/plan-<datetime>.md`, never `active-plan.md`. Create with `memory create`, `date -u +%Y-%m-%dT%H%M%S` for the name, then read it back to confirm it has content. When the user asks to check the plan, find the newest `plan-*.md`, read its frontmatter (`status: completed`, `in-progress`; `current-step`; `committed: no|partial|yes`), and report or act on it.
+Plan files live in session memory as `plan-<datetime>.md`, never `active-plan.md`. Create the file through the session-memory capability, using `date -u +%Y-%m-%dT%H%M%S` for the name, then read it back to confirm it has content. When the user asks to check the plan, find the newest `plan-*.md`, read its frontmatter (`status: completed`, `in-progress`; `current-step`; `committed: no|partial|yes`), and report or act on it.

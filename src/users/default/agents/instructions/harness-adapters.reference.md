@@ -7,15 +7,20 @@ name: "Harness Adapters"
 
 Prompt bodies name capabilities, never one harness's surface. Resolve each capability here for the harness that is running. When a capability is unmapped for the current harness, say so and stop; do not guess a tool name and do not quietly map one scope onto another.
 
+This file is user scope, deployed to `~/.agents/instructions/`, so it applies in every repository; rules that belong to one repository stay in that repository's `.agents/instructions/`.
+
 | Capability | Pi | VS Code Copilot |
 | --- | --- | --- |
-| Session memory | directory `~/.pi/agent/memory/session`, read and written with `read`, `write`, and `bash`; no dedicated tool | `memory` tool `view`, `create`, `str_replace`, `delete`; `/memories/session/` |
+| Session memory | directory `~/.pi/agent/memory/session`; one file per entry, named by the workflow | `/memories/session/` |
+| Memory operations | `memory_write`, `memory_read`, and `memory_search` on that directory, or plain file tools | `memory` tool `view`, `create`, `str_replace`, `delete`, `rename` on `/memories/` paths |
 | Repo memory | none | `/memories/repo/` |
 | Durable memory | `memory_write`, `memory_read`, `memory_search`, `scratchpad` (`MEMORY.md`, `daily/`, `SCRATCHPAD.md`) | `memory` tool on the `/memories/` root |
 | Child agent | `subagent` tool | `runSubagent` |
-| Research agent (read-only recon) | `scout`, or `reviewer` when the child must not write at all | `Explore` |
-| Implementation agent | `worker` | `General Purpose` |
-| Review agent | `reviewer` (no edit or write tools) | `code-review` |
+| Research child (read-only recon) | `scout`, or `reviewer` when the child must not write at all | `Explore` |
+| Implementation child | `worker` | `General Purpose` |
+| Review child | `reviewer` (no edit or write tools) | `code-review` |
+| Diagnostics after an edit | none built in, so rely on the compiler, linter, or test command | `get_errors` after each editing round |
+| Batch edit | `edit` with several replacements in one call | `multi_replace_string_in_file` |
 | File edit | `edit`, `write` | `replace_string_in_file`, `multi_replace_string_in_file`, `create_file` |
 | Shell | `bash` | `run_in_terminal` |
 | Skill | `/skill:<name>`, or read the `SKILL.md` | `skill:` invocation, or read the `SKILL.md` |
@@ -23,6 +28,8 @@ Prompt bodies name capabilities, never one harness's surface. Resolve each capab
 | Model pin | `subagents.modelScope` in settings, allow `inherit` only | model picker; the owner's choice is the only authority |
 
 `scout` ships `write` for its `context.md` artifact, so it is not a read-only child. Use `reviewer` when the boundary forbids any write.
+
+A session-memory entry is one file whose name the workflow chooses, so `plan-<datetime>.md` and `checkpoint-<datetime>.md` are the same filename on every harness and only the directory above differs.
 
 opencode, Cursor, and CLI agents have no verified mapping in this repository. State the gap and use repository files instead of an unverified tool name.
 

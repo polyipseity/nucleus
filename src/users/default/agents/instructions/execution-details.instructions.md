@@ -9,7 +9,7 @@ alwaysApply: true
 
 ## Tool-retry discipline
 
-A malformed tool error repeats identically, so never retry the same pattern. Switch tools (`multi_replace_string_in_file` to `replace_string_in_file`), simplify the request, or restructure the approach. A failed batch edit recovers through sequential single-edit calls, with a smaller batch or simpler diffs rather than the same call again.
+A malformed tool error repeats identically, so never retry the same pattern. Switch tools (a batch edit to a single edit), simplify the request, or restructure the approach. A failed batch edit recovers through sequential single-edit calls, with a smaller batch or simpler diffs rather than the same call again.
 
 ## Investigation protocol
 

@@ -5,7 +5,7 @@ disable-model-invocation: true
 argument-hint: "[interrupted task summary]"
 ---
 
-Read `.agents/instructions/standing-orders.instructions.md` and follow it; it overrides this workflow's defaults. Resolve capability names through `.agents/instructions/harness-adapters.reference.md`.
+Read `~/.agents/instructions/standing-orders.instructions.md` and follow it; it overrides this workflow's defaults. Resolve capability names through `~/.agents/instructions/harness-adapters.reference.md`.
 
 You are resuming after an interruption. Continue from the exact next incomplete step. Do not re-read conversation history or workspace files beyond what the task needs.
 

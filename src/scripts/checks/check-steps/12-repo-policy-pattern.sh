@@ -547,6 +547,9 @@ run_prompt_template_contract() {
   local _files=("$@")
   local _prompt_files=()
   local _errors=0 _f _prompt_count=0
+  # One harness's tool and agent names belong in the adapter mapping table, never
+  # in a body an agent follows in an unknown harness.
+  local _harness_names='activate_vs_code_interaction|multi_replace_string_in_file|runSubagent|resolve_memory_file_uri|__LANE_SCOPE__|/memories/|get_errors|run_in_terminal|run_vscode_command|vscode_askQuestions|replace_string_in_file|create_file'
   if $_has_args; then
     filter_scoped_files _prompt_files .agents/prompts '*.md' "${_files[@]}"
     filter_scoped_files _prompt_files src/users/default/agents/prompts '*.md' "${_files[@]}"
@@ -579,13 +582,37 @@ run_prompt_template_contract() {
       _errors=$((_errors + 1))
       error "$_f: missing standing-orders anchor line"
     fi
-    if grep -qE 'activate_vs_code_interaction|multi_replace_string_in_file|runSubagent|resolve_memory_file_uri|__LANE_SCOPE__|/memories/' "$_f"; then
+    if grep -qE "$_harness_names" "$_f"; then
       _errors=$((_errors + 1))
-      error "$_f: harness-specific name; use a capability from harness-adapters.reference.md"
+      error "$_f: harness-specific name; use a capability from ~/.agents/instructions/harness-adapters.reference.md"
     fi
   done
 
-  local _policy="$_repo_root/.agents/instructions/standing-orders.instructions.md"
+  # The same vocabulary rule covers every user-scope file an agent follows in an
+  # unknown harness: instruction bodies, agent definitions, and skill bodies. The
+  # adapter reference is exempt because its table is the sanctioned place for a
+  # harness's own tool names.
+  local _uscope_files=()
+  local _uscope_dir _uf
+  for _uscope_dir in src/users/default/agents/instructions src/users/default/agents/agents src/users/default/agents/skills; do
+    if $_has_args; then
+      filter_scoped_files _uscope_files "$_uscope_dir" '*.md' "${_files[@]}"
+    elif [ -d "$_repo_root/$_uscope_dir" ]; then
+      discover_files _uscope_files "$_repo_root" "$_uscope_dir" '*.md'
+    fi
+  done
+  for _uf in "${_uscope_files[@]}"; do
+    [ -n "$_uf" ] || continue
+    case "${_uf##*/}" in
+    harness-adapters.reference.md) continue ;;
+    esac
+    if grep -qE "$_harness_names" "$_uf"; then
+      _errors=$((_errors + 1))
+      error "$_uf: harness-specific name; use a capability from ~/.agents/instructions/harness-adapters.reference.md"
+    fi
+  done
+
+  local _policy="$_repo_root/src/users/default/agents/instructions/standing-orders.instructions.md"
   if [ -f "$_policy" ] &&
     grep -qF 'child-prompt-block:begin' "$_policy" &&
     ! grep -qF 'child-prompt-block:end' "$_policy"; then

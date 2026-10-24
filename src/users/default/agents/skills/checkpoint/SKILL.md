@@ -17,10 +17,10 @@ description: |
 
 ## What to save
 
-Write a checkpoint file to session memory at `/memories/session/checkpoint-<datetime>.md`.
+Write a checkpoint file to session memory as `checkpoint-<datetime>.md`. The directory and the operation names come from the session-memory capability, which `harness-adapters.reference.md` maps for the running harness.
 
 Each checkpoint captures:
-- **Standing orders:** the boundary in force, quoted from `.agents/instructions/standing-orders.instructions.md`, or `none` when no boundary is active
+- **Standing orders:** the boundary in force, quoted from `~/.agents/instructions/standing-orders.instructions.md`, or `none` when no boundary is active
 - **Step context:** current plan step/phase, plan file path, frontmatter state
 - **Work done:** 2-3 sentence summary of what was accomplished this session
 - **Next steps:** what remains (list items from plan)
@@ -28,17 +28,17 @@ Each checkpoint captures:
 
 ## How to save
 
-> **Memory tool availability:** If the `memory` tool is not in the available tool list, call `activate_vs_code_interaction` with no arguments first. It is a one-shot call that permanently unlocks VS Code interaction tools.
-
 1. Run `date -u +%Y-%m-%dT%H%M%S` for ISO timestamp.
-2. Construct path `/memories/session/checkpoint-<datetime>.md`.
-3. Call `memory create` with path `/memories/session/checkpoint-<datetime>.md` and `file_text` containing the checkpoint content.
+2. Create the file through the session-memory capability, named `checkpoint-<datetime>.md`, with the checkpoint content.
+3. Read it back to confirm it has content.
+
+If the harness exposes no session-memory capability, report that and stop instead of writing the checkpoint as an ordinary project file.
 
 ## How to restore
 
 The `continue.prompt.md`, `verify-plan.prompt.md`, and `verify-implementation.prompt.md` workflows each find and load the latest checkpoint when resuming after interruption or context compaction. A checkpoint provides enough context to continue without replaying full history.
 
-On restore, read `.agents/instructions/standing-orders.instructions.md` before the first action and restate the checkpoint's boundary line. A checkpoint that records `none` does not lift a boundary the owner set in the current session.
+On restore, read `~/.agents/instructions/standing-orders.instructions.md` before the first action and restate the checkpoint's boundary line. A checkpoint that records `none` does not lift a boundary the owner set in the current session.
 
 ## Integration
 

@@ -7,7 +7,7 @@ argument-hint: "[atomicCommits=yes|no] [backwardsCompat=yes|no] [maxConcurrency=
 
 # Implement plan
 
-Read `.agents/instructions/standing-orders.instructions.md` and follow it; it overrides this workflow's defaults. Resolve capability names through `.agents/instructions/harness-adapters.reference.md`.
+Read `~/.agents/instructions/standing-orders.instructions.md` and follow it; it overrides this workflow's defaults. Resolve capability names through `~/.agents/instructions/harness-adapters.reference.md`.
 
 ## Arguments
 

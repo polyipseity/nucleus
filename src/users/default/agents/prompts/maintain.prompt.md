@@ -7,7 +7,7 @@ argument-hint: "[target glob]"
 
 # Maintainability improvement loop
 
-Read `.agents/instructions/standing-orders.instructions.md` and follow it; it overrides this workflow's defaults. Resolve capability names through `.agents/instructions/harness-adapters.reference.md`.
+Read `~/.agents/instructions/standing-orders.instructions.md` and follow it; it overrides this workflow's defaults. Resolve capability names through `~/.agents/instructions/harness-adapters.reference.md`.
 
 Remove unnecessary complexity across code, docs, and AI customizations while preserving behavior.
 

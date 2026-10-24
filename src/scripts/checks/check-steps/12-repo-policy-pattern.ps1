@@ -549,13 +549,22 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   $ptFiles = @(if ($HasArgs) {
       @($PositionalArgs | Where-Object {
           $ptNorm = $_ -replace '\\', '/'
-          ($ptDirs -contains (Split-Path -Parent $ptNorm)) -and ((Split-Path -Leaf $ptNorm) -like '*.md')
+          # Prefix match, mirroring filter_scoped_files in check-lib.sh: a scoped run
+          # accepts any file nested under a scanned directory.
+          $ptInScope = $false
+          foreach ($ptDir in $ptDirs) {
+            if ($ptNorm.StartsWith("$ptDir/", [StringComparison]::Ordinal)) { $ptInScope = $true; break }
+          }
+          $ptInScope -and ((Split-Path -Leaf $ptNorm) -like '*.md')
         } | Where-Object { Test-Path -LiteralPath (Join-Path $r $_) } |
         ForEach-Object { Get-Item -LiteralPath (Join-Path $r $_) })
     } else {
       @($ptDirs | ForEach-Object { Get-ChildItem -LiteralPath (Join-Path $r $_) -Filter '*.md' -File -Recurse })
     })
   $ptErrors = 0
+  # One harness's tool and agent names belong in the adapter mapping table, never
+  # in a body an agent follows in an unknown harness.
+  $ptHarnessNames = 'activate_vs_code_interaction|multi_replace_string_in_file|runSubagent|resolve_memory_file_uri|__LANE_SCOPE__|/memories/|get_errors|run_in_terminal|run_vscode_command|vscode_askQuestions|replace_string_in_file|create_file'
   if (-not $HasArgs -and $ptFiles.Count -eq 0) {
     $ptErrors++
     Write-ErrorMessage "no prompt templates found under .agents/prompts or src/users/default/agents/prompts"
@@ -574,12 +583,43 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
       $ptErrors++
       Write-ErrorMessage "$($pt.FullName): missing standing-orders anchor line"
     }
-    if ($ptText -match 'activate_vs_code_interaction|multi_replace_string_in_file|runSubagent|resolve_memory_file_uri|__LANE_SCOPE__|/memories/') {
+    if ($ptText -match $ptHarnessNames) {
       $ptErrors++
-      Write-ErrorMessage "$($pt.FullName): harness-specific name; use a capability from harness-adapters.reference.md"
+      Write-ErrorMessage "$($pt.FullName): harness-specific name; use a capability from ~/.agents/instructions/harness-adapters.reference.md"
     }
   }
-  $ptPolicy = Join-Path $r '.agents/instructions/standing-orders.instructions.md'
+
+  # The same vocabulary rule covers every user-scope file an agent follows in an
+  # unknown harness: instruction bodies, agent definitions, and skill bodies. The
+  # adapter reference is exempt because its table is the sanctioned place for a
+  # harness's own tool names.
+  $ucDirs = @('src/users/default/agents/instructions', 'src/users/default/agents/agents', 'src/users/default/agents/skills')
+  $ucFiles = @(if ($HasArgs) {
+      @($PositionalArgs | Where-Object {
+          $ucNorm = $_ -replace '\\', '/'
+          # Prefix match, mirroring filter_scoped_files in check-lib.sh: a scoped run
+          # accepts any file nested under a scanned directory, which the skills tree
+          # needs. Exact parent equality would pass a nested file on Windows only.
+          $ucInScope = $false
+          foreach ($ucDir in $ucDirs) {
+            if ($ucNorm.StartsWith("$ucDir/", [StringComparison]::Ordinal)) { $ucInScope = $true; break }
+          }
+          $ucInScope -and ((Split-Path -Leaf $ucNorm) -like '*.md')
+        } | Where-Object { Test-Path -LiteralPath (Join-Path $r $_) } |
+        ForEach-Object { Get-Item -LiteralPath (Join-Path $r $_) })
+    } else {
+      @($ucDirs | Where-Object { Test-Path -LiteralPath (Join-Path $r $_) } |
+        ForEach-Object { Get-ChildItem -LiteralPath (Join-Path $r $_) -Filter '*.md' -File -Recurse })
+    })
+  foreach ($uc in $ucFiles) {
+    if ($uc.Name -eq 'harness-adapters.reference.md') { continue }
+    $ucText = Get-Content -Raw -LiteralPath $uc.FullName
+    if ($ucText -match $ptHarnessNames) {
+      $ptErrors++
+      Write-ErrorMessage "$($uc.FullName): harness-specific name; use a capability from ~/.agents/instructions/harness-adapters.reference.md"
+    }
+  }
+  $ptPolicy = Join-Path $r 'src/users/default/agents/instructions/standing-orders.instructions.md'
   if ((Test-Path -LiteralPath $ptPolicy) -and
     (Select-String -LiteralPath $ptPolicy -Pattern 'child-prompt-block:begin' -SimpleMatch -Quiet) -and
     -not (Select-String -LiteralPath $ptPolicy -Pattern 'child-prompt-block:end' -SimpleMatch -Quiet)) {

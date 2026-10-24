@@ -7,7 +7,7 @@ argument-hint: "<instruction file path>"
 
 # Edit instructions
 
-Read `.agents/instructions/standing-orders.instructions.md` and follow it; it overrides this workflow's defaults. Resolve capability names through `.agents/instructions/harness-adapters.reference.md`.
+Read `~/.agents/instructions/standing-orders.instructions.md` and follow it; it overrides this workflow's defaults. Resolve capability names through `~/.agents/instructions/harness-adapters.reference.md`.
 
 Place new guidance correctly inside `.instructions.md` files, following `authoring.instructions.md`.
 

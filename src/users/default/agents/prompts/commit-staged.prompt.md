@@ -7,7 +7,7 @@ argument-hint: "[footer text] [commitNow=no]"
 
 # Commit staged changes
 
-Read `.agents/instructions/standing-orders.instructions.md` and follow it; it overrides this workflow's defaults. Resolve capability names through `.agents/instructions/harness-adapters.reference.md`.
+Read `~/.agents/instructions/standing-orders.instructions.md` and follow it; it overrides this workflow's defaults. Resolve capability names through `~/.agents/instructions/harness-adapters.reference.md`.
 
 Proceed automatically with best-effort defaults and context.
 

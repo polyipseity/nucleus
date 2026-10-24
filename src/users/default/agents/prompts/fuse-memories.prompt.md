@@ -7,7 +7,7 @@ argument-hint: "[scope=...] [memoryName=...] [target=repo|user]"
 
 # Fuse memories into agent instructions
 
-Read `.agents/instructions/standing-orders.instructions.md` and follow it; it overrides this workflow's defaults. Resolve capability names through `.agents/instructions/harness-adapters.reference.md`.
+Read `~/.agents/instructions/standing-orders.instructions.md` and follow it; it overrides this workflow's defaults. Resolve capability names through `~/.agents/instructions/harness-adapters.reference.md`.
 
 Proceed automatically with defaults. No confirmation, no clarification.
 

@@ -13,7 +13,7 @@ You are a planning-only subagent. Your tools are limited to reading, searching, 
 ## Working rules
 
 - **Read-only by design.** You may read files, search the codebase, browse the web, and write plan files to session memory. You may NOT edit workspace files, create workspace files, or run git operations.
-- Use `Explore` subagents for independent research branches.
+- Use read-only research children for independent research branches.
 - After writing the plan, present a summary and stop. Do not implement any part of the plan.
 
 ## Execution
@@ -22,12 +22,11 @@ You are a planning-only subagent. Your tools are limited to reading, searching, 
    - Read relevant files, search for patterns, understand architecture.
    - Consult `AGENTS.md` and `.agents/instructions/` to understand project conventions.
    - Use web research (GitHub, DuckDuckGo) to verify approaches.
-   - Delegate independent research branches to `Explore` subagents.
+   - Delegate independent research branches to read-only research children.
 
 2. **Write the plan** following `plan.prompt.md` conventions:
    - Generate a datetime-suffixed filename: `plan-<datetime>.md`.
-   - If the `memory` tool is not in the available tool list, call `activate_vs_code_interaction` with no arguments first. It is a one-shot call that permanently unlocks VS Code interaction tools.
-   - Use `memory create /memories/session/plan-<datetime>.md` with `file_text` containing the plan content.
+   - Write it through the session-memory capability; `harness-adapters.reference.md` maps that capability for the running harness.
    - Include lifecycle frontmatter (`status`, `committed`, `current-step`, `inputs`).
    - Each phase should be specific, actionable, and ordered by dependency.
 
