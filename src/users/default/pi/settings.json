@@ -40,6 +40,13 @@
   "showCacheMissNotices": true,
   "showHardwareCursor": true,
   "steeringMode": "all",
+  "subagents": {
+    "modelScope": {
+      "allow": ["inherit"],
+      "enforce": true,
+      "strict": true
+    }
+  },
   "terminal": {
     "showTerminalProgress": true
   },

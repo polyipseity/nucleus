@@ -7,6 +7,20 @@
       "type": "array",
       "items": { "type": "string" },
       "description": "Paths to prompt template directories or files"
+    },
+    "subagents": {
+      "type": "object",
+      "description": "Model policy for child agents. modelScope with enforce and strict rejects any resolved model outside allow; allow: [\"inherit\"] pins children to the parent session model and aborts explicit model arguments.",
+      "properties": {
+        "modelScope": {
+          "type": "object",
+          "properties": {
+            "allow": { "type": "array", "items": { "type": "string" } },
+            "enforce": { "type": "boolean" },
+            "strict": { "type": "boolean" }
+          }
+        }
+      }
     }
   },
   "additionalProperties": true
