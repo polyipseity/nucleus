@@ -1,5 +1,5 @@
 {
-  "$schema": "./settings.schema.json",
+  "$schema": "https://pi.dev/schemas/settings.schema.json",
   "compaction": {
     "enabled": true,
     "keepRecentTokens": 32768,
