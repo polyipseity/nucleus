@@ -553,10 +553,13 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
         } | Where-Object { Test-Path -LiteralPath (Join-Path $r $_) } |
         ForEach-Object { Get-Item -LiteralPath (Join-Path $r $_) })
     } else {
-      @($ptDirs | Where-Object { Test-Path -LiteralPath (Join-Path $r $_) } |
-        ForEach-Object { Get-ChildItem -LiteralPath (Join-Path $r $_) -Filter '*.md' -File })
+      @($ptDirs | ForEach-Object { Get-ChildItem -LiteralPath (Join-Path $r $_) -Filter '*.md' -File -Recurse })
     })
   $ptErrors = 0
+  if (-not $HasArgs -and $ptFiles.Count -eq 0) {
+    $ptErrors++
+    Write-ErrorMessage "no prompt templates found under .agents/prompts or src/users/default/agents/prompts"
+  }
   foreach ($pt in $ptFiles) {
     $ptText = Get-Content -Raw -LiteralPath $pt.FullName
     if ($ptText -match '\$\{input:') {

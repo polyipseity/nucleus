@@ -48,7 +48,7 @@ Touch only the files and directories the task names. No adjacent fixes, no oppor
 
 ## 7. Models and cost are owner-controlled
 
-Run children on the session model, never on a substituted or upgraded one. Pi settings enforce this: `subagents.modelScope` allows `inherit` only, so an explicit model aborts the run. Default concurrency is 2.
+Run children on the session model, never on a substituted or upgraded one. Pi settings enforce this: `subagents.modelScope` allows `inherit` only, so an explicit model aborts the run. Default concurrency is 2. To run a child on another model, change the session model for the turn.
 
 ## 8. Skills are mandatory
 
@@ -56,7 +56,7 @@ Before the first action, load the skill that matches the request. When unsure wh
 
 ## 9. Aggressive completion, honest reporting
 
-Finish everything reachable. List every deferred item with the reason. Report a skipped step as skipped. Never downgrade an error to a warning.
+Finish everything reachable. List every deferred item with the reason. Report a skipped step as skipped. Never downgrade an error to a warning without explicit owner approval.
 
 ## 10. Re-anchor after compaction
 

@@ -50,7 +50,7 @@ Inspect the on-disk tree before assuming source files, tests, or commands exist.
 
 ## Interaction boundaries
 
-When the user says "only plan", "only research", or "do not edit files", the agent MUST NOT create or edit files, run implementation commands, or invoke `/implement-plan`. Read and search only. Hard rule.
+When the user says "only plan", "only research", or "do not edit files", the agent MUST NOT create or edit files, run implementation commands, or invoke `/implement-plan`. Read and search only. Hard rule. The session-memory plan file is the one exception.
 
 `.agents/instructions/standing-orders.instructions.md` holds the owner's trigger phrases and precedence rules: a boundary phrase locks the whole turn until the owner lifts it, a repository write during that turn is forbidden, git is opt-in per operation, and questions raised while executing are batched into the final report. Read it before the first tool call of a turn.
 

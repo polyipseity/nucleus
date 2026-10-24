@@ -7,7 +7,7 @@ argument-hint: "[phase or file]"
 
 # Verify plan implementation
 
-Read `.agents/instructions/standing-orders.instructions.md` and follow it; it overrides this workflow's defaults. Resolve capability names through `.agents/instructions/harness-adapters.reference.md`.
+Read `.agents/instructions/standing-orders.instructions.md` and follow it; it overrides this workflow's defaults. Resolve capability names through `.agents/instructions/harness-adapters.reference.md`. Do not edit any file, do not create any file, and do not run any git command.
 
 ## Focus
 

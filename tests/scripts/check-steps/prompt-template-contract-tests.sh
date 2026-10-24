@@ -38,7 +38,7 @@ _fail() {
 # Prints the fixture root.
 _make_case() {
   local _root="$_tmp/$1"
-  mkdir -p "$_root/.agents/prompts" "$_root/.agents/instructions"
+  mkdir -p "$_root/.agents/prompts" "$_root/src/users/default/agents/prompts" "$_root/.agents/instructions"
   printf '%s\n' 'Read standing-orders.instructions.md first.' "Task: \$@" >"$_root/.agents/prompts/t.prompt.md"
   printf '%s\n' '<!-- child-prompt-block:begin -->' 'block' '<!-- child-prompt-block:end -->' \
     >"$_root/.agents/instructions/standing-orders.instructions.md"
@@ -125,7 +125,16 @@ _run_case "$_root"
 _expect_rc 0 "missing policy file"
 _expect_silent_stderr "missing policy file"
 
-# 9. The real tree satisfies the contract.
+# 9. A tree with neither prompts directory fails loudly instead of passing green.
+_empty="$_tmp/empty"
+mkdir -p "$_empty/.agents/instructions"
+printf '%s\n' '<!-- child-prompt-block:begin -->' 'block' '<!-- child-prompt-block:end -->' \
+  >"$_empty/.agents/instructions/standing-orders.instructions.md"
+_run_case "$_empty"
+_expect_rc 1 "no prompts directory"
+_expect_message "no prompt templates found" "no prompts directory"
+
+# 10. The real tree satisfies the contract.
 _run_case "$REPO_ROOT"
 _expect_rc 0 "real repository tree"
 

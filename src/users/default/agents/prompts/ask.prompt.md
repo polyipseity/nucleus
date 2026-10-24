@@ -15,6 +15,8 @@ $@
 
 Empty means: answer the question in the immediately preceding user message.
 
+- Read-only: edit no file, create no file, run no git command.
+
 ## Workflow
 
 1. Identify the exact question. Do not infer adjacent questions or propose improvements.

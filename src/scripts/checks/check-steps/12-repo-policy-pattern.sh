@@ -546,15 +546,25 @@ run_prompt_template_contract() {
   shift 2
   local _files=("$@")
   local _prompt_files=()
+  local _errors=0 _f _prompt_count=0
   if $_has_args; then
     filter_scoped_files _prompt_files .agents/prompts '*.md' "${_files[@]}"
     filter_scoped_files _prompt_files src/users/default/agents/prompts '*.md' "${_files[@]}"
   else
-    [ -d "$_repo_root/.agents/prompts" ] && discover_files _prompt_files "$_repo_root" .agents/prompts '*.md'
-    [ -d "$_repo_root/src/users/default/agents/prompts" ] && discover_files _prompt_files "$_repo_root" src/users/default/agents/prompts '*.md'
+    discover_files _prompt_files "$_repo_root" .agents/prompts '*.md'
+    discover_files _prompt_files "$_repo_root" src/users/default/agents/prompts '*.md'
   fi
 
-  local _errors=0 _f
+  for _f in "${_prompt_files[@]}"; do
+    if [ -n "$_f" ]; then
+      _prompt_count=$((_prompt_count + 1))
+    fi
+  done
+  if ! $_has_args && [ "$_prompt_count" -eq 0 ]; then
+    _errors=$((_errors + 1))
+    error "no prompt templates found under .agents/prompts or src/users/default/agents/prompts"
+  fi
+
   for _f in "${_prompt_files[@]}"; do
     [ -n "$_f" ] || continue
     if grep -qF "\${input:" "$_f"; then
