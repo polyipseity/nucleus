@@ -687,6 +687,9 @@ let
         name = "python";
       };
       nixpkgs = "python3";
+      # WHY: the test preflight imports yaml, and the managed python3 is what a bare
+      # scripts/test.sh resolves; the plain attr cannot satisfy it.
+      nixpkgsPackage = pkgs.python3.withPackages (p: [ p.pyyaml ]);
       winget = "Python.Python.3.13";
     };
     qtpass = {
