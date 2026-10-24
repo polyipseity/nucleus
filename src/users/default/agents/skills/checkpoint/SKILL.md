@@ -2,9 +2,7 @@
 name: checkpoint
 version: 1.0.0
 description: |
-  Save session state for context compaction survival. Called automatically
-  during plan and implement-plan workflows at natural break points, after
-  each phase, before subagent calls, and at context pressure.
+  Save session state for context compaction survival and re-anchor the standing orders after a resume. Called automatically during plan and implement-plan workflows at natural break points, after each phase, before subagent calls, and at context pressure.
 ---
 
 # Checkpoint: save session state
@@ -22,6 +20,7 @@ description: |
 Write a checkpoint file to session memory at `/memories/session/checkpoint-<datetime>.md`.
 
 Each checkpoint captures:
+- **Standing orders:** the boundary in force, quoted from `.agents/instructions/standing-orders.instructions.md`, or `none` when no boundary is active
 - **Step context:** current plan step/phase, plan file path, frontmatter state
 - **Work done:** 2-3 sentence summary of what was accomplished this session
 - **Next steps:** what remains (list items from plan)
@@ -38,6 +37,8 @@ Each checkpoint captures:
 ## How to restore
 
 The `continue.prompt.md`, `verify-plan.prompt.md`, and `verify-implementation.prompt.md` workflows each find and load the latest checkpoint when resuming after interruption or context compaction. A checkpoint provides enough context to continue without replaying full history.
+
+On restore, read `.agents/instructions/standing-orders.instructions.md` before the first action and restate the checkpoint's boundary line. A checkpoint that records `none` does not lift a boundary the owner set in the current session.
 
 ## Integration
 
