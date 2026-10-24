@@ -2,22 +2,24 @@
 name: maintain
 description: Aggressively improve maintainability via repeated parallel waves of maintainer subagents, with strict atomic commit discipline and rollback safety.
 disable-model-invocation: true
-argument-hint: Optional scope (e.g., `target=src/modules/` or `target=scripts/`). Default: entire codebase.
+argument-hint: "[target glob]"
 ---
 
 # Maintainability improvement loop
+
+Read `.agents/instructions/standing-orders.instructions.md` and follow it; it overrides this workflow's defaults. Resolve capability names through `.agents/instructions/harness-adapters.reference.md`.
 
 Remove unnecessary complexity across code, docs, and AI customizations while preserving behavior.
 
 ## Workflow
 
 1. Capture the baseline hash with `git rev-parse HEAD`; never roll back earlier.
-2. Resolve `${input:target}`, default `**/*`.
+2. Resolve the target: `${1:-**/*}`. Lane hints: `${@:2}`.
 3. Partition the scope into independent lanes.
 4. Run parallel `maintainer` subagents, one per lane:
 
    ```text
-   Improve maintainability across __LANE_SCOPE__.
+   Improve maintainability across the resolved target.
    Be aggressive: remove unnecessary indirection, duplicated policy,
    stale guidance, and avoidable abstractions.
    Preserve behavior.

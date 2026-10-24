@@ -2,23 +2,23 @@
 description: "Research the active plan (plan-*.md in session memory) using online searches to verify feasibility, accuracy, and risks before implementation."
 disable-model-invocation: true
 name: "verify-plan"
-argument-hint: "optional: specific phase, file, or question to focus research on"
+argument-hint: "[phase or file]"
 ---
 
 # Verify plan with online research
 
-Research the active plan against online sources to check feasibility, accuracy, dependencies, and risks. Do NOT execute, implement, or edit any files: research, compare, report.
+Read `.agents/instructions/standing-orders.instructions.md` and follow it; it overrides this workflow's defaults. Resolve capability names through `.agents/instructions/harness-adapters.reference.md`.
 
-## Guard clause
+## Focus
 
-If the triggering message contains "implement", "do it", "go ahead", "execute", "make the changes", or any equivalent, refuse and redirect: "I'm in verify mode: I can only research and plan. To execute, use the implement-plan prompt."
+$@
 
-If the `memory` tool is missing from the tool list, call `activate_vs_code_interaction` with no arguments first: it is a one-shot call that unlocks the VS Code interaction tools.
+Empty means: verify the whole plan. Research online, compare against the plan, and report.
 
 ## 1. Retrieve the plan
 
-1. `memory view /memories/session/` and pick the newest `plan-*.md` by name (descending datetime). None: report "No active plan found, nothing to verify." and stop.
-2. Read it with `memory view /memories/session/<filename>`.
+1. List session memory and pick the newest `plan-<datetime>.md` by name (descending datetime). None: report "No active plan found, nothing to verify." and stop.
+2. Read that plan file.
 3. Parse the frontmatter (`status`, `current-step`, `committed`, `inputs`) for context.
 4. Load the newest `checkpoint-*.md` from the same listing for supplementary context. None is fine.
 

@@ -2,32 +2,24 @@
 name: implement-plan
 description: Execute an implementation plan with subagent parallelism and atomic commits.
 disable-model-invocation: true
-argument-hint: "backwardsCompat=no atomicCommits=yes maxConcurrency=2"
+argument-hint: "[atomicCommits=yes|no] [backwardsCompat=yes|no] [maxConcurrency=N]"
 ---
 
 # Implement plan
 
-Proceed automatically with best-effort defaults. Do not ask for confirmation.
+Read `.agents/instructions/standing-orders.instructions.md` and follow it; it overrides this workflow's defaults. Resolve capability names through `.agents/instructions/harness-adapters.reference.md`.
 
-## Guard clause
+## Arguments
 
-If the triggering message contains "only plan", "only research", "do not start implement", "do not edit files", or any equivalent boundary marker, this prompt must not auto-execute. Confirm the boundary briefly and stop: no plan files, no commands, no edits.
+$@
 
-## Inputs
-
-Resolution order: explicit user arguments, then plan frontmatter `inputs`, then the defaults below.
-
-- `atomicCommits: yes` (commit each meaningful sub-step atomically)
-- `backwardsCompat: no` (no compatibility shims)
-- `maxConcurrency: 2` (at most 2 concurrent subagents)
-
-State `Inputs loaded: atomicCommits=<value>, backwardsCompat=<value>, maxConcurrency=<value>` before any implementation begins.
+Resolution order: explicit arguments, then the plan frontmatter `inputs`, then these defaults: `atomicCommits=yes`, `backwardsCompat=no`, `maxConcurrency=2`. Flags may appear in any order. State `Arguments loaded: atomicCommits=<value>, backwardsCompat=<value>, maxConcurrency=<value>` before any implementation begins.
 
 ## 1. Create the plan file
 
-The plan lives in session memory under `/memories/session/plan-<datetime>.md` so it survives context compaction. Generate the name with `date -u +%Y-%m-%dT%H%M%S`, create the file with `memory create`, then read it back to confirm it is nonempty and substantive rather than whitespace or a bare title. From then on, always retrieve it through the find-latest-plan pattern below instead of relying on ephemeral variables.
+The plan lives in session memory as `plan-<datetime>.md` so it survives context compaction. Generate the name with `date -u +%Y-%m-%dT%H%M%S`, create it with the session memory write capability, then read it back to confirm it is nonempty and substantive rather than whitespace or a bare title. From then on, always retrieve it through the find-latest-plan pattern below instead of relying on ephemeral variables.
 
-If the `memory` tool is missing or `memory create` fails, call `activate_vs_code_interaction` with no arguments and retry. If activation is unavailable and it still fails, write the plan to a temp file (`mktemp`, or `$env:TEMP` plus a random name), verify it with `[[ -s "$planfile" ]]` or `(Get-Item "$planfile").Length -gt 0`, and record `planfile=/path/to/temp/file` in a session-memory plan file for partial survivability.
+If the session memory capability is unavailable, stop and report it. Do not write the plan anywhere else.
 
 Frontmatter:
 
@@ -55,7 +47,7 @@ With `atomicCommits: yes`, commit after every meaningful sub-step: adding a func
 
 Re-read the plan regularly, especially after interruptions, subagent returns, and context switches, so no phase is skipped or misread.
 
-Before any context switch, subagent call, or natural break, update the frontmatter: retrieve the plan, bump `current-step` to the current workflow number, update `committed`, and write it back with `memory str_replace` (never `memory create`, which would overwrite). Invoke the checkpoint skill (`skill: "checkpoint"`) alongside each update. `committed` goes `no` to `partial` on the first commit and stays `partial` after that; it becomes `yes` only in step 5, so "some commits" stays distinguishable from "all commits". With `atomicCommits: no`, leave it at `no`.
+Before any context switch, subagent call, or natural break, update the frontmatter: retrieve the plan, bump `current-step` to the current workflow number, update `committed`, and write it back with the session memory update capability. Invoke the checkpoint skill (`skill: "checkpoint"`) alongside each update. `committed` goes `no` to `partial` on the first commit and stays `partial` after that; it becomes `yes` only in step 5, so "some commits" stays distinguishable from "all commits". With `atomicCommits: no`, leave it at `no`.
 
 **Pre-subagent commit gate:** before spawning any subagent, commit the current phase's work. Never delegate with a dirty working tree, and update `committed` afterwards.
 
@@ -81,6 +73,6 @@ Close with what was implemented, which files changed, and any deferred items.
 
 ## Find the latest plan file
 
-1. `memory view /memories/session/` and pick the newest `plan-*.md` by name (descending datetime).
+1. List session memory and pick the newest `plan-<datetime>.md` by name (descending datetime).
 2. No match: report "no active plan found" and stop.
-3. Read it with `memory view /memories/session/<filename>`.
+3. Read that plan file.

@@ -2,16 +2,22 @@
 name: plan
 description: "Use when creating or updating an implementation plan with thorough research. Counterpart to implement-plan."
 disable-model-invocation: true
-argument-hint: "task description, or Update: <changes> to modify existing plan"
+argument-hint: "<task description or Update: changes>"
 ---
 
 # Plan mode
 
-Produce, refine, or update an implementation plan. Do NOT execute, implement, or edit any files: research, reason, write the plan.
+Read `.agents/instructions/standing-orders.instructions.md` and follow it; it overrides this workflow's defaults. Resolve capability names through `.agents/instructions/harness-adapters.reference.md`.
 
-## Guard clause
+## Task
 
-If the triggering message contains "implement", "do it", "go ahead", "execute", "make the changes", "edit files", or any equivalent execution indicator, refuse and redirect: "I'm in plan mode: I can only research and write a plan. To execute, use the implement-plan prompt." Create no plan files, run no commands, edit nothing.
+$@
+
+Empty means: infer the task from the conversation. If none is inferable, stop and say "no task given" rather than inventing one. An `Update:` prefix means revise the existing plan.
+
+## Which planner
+
+This template authors and revises plan files. `/plan` (the plan-mode extension) is a read-only planning mode that can capture and save a plan; use it when the owner asks for read-only planning.
 
 ## Inputs
 
@@ -25,7 +31,7 @@ State `Defaults acknowledged: atomicCommits=yes, backwardsCompat=no, maxConcurre
 
 ## Input
 
-A task description creates a new plan. An update request (`Update: ...`) modifies the existing one; assume it was sound and apply the requested changes.
+A task description creates a new plan.
 
 ## 1. Research
 
@@ -34,7 +40,7 @@ Research only. No implementation, no implementation code: the purpose is to gath
 - Read the relevant files, search for patterns, and understand the architecture. Consult `AGENTS.md` and `.agents/instructions/`.
 - Search GitHub for existing implementations, libraries, and patterns; DuckDuckGo or other engines for APIs, docs, alternatives.
 - Ask about ambiguous requirements.
-- Enumerate the delegatable subproblems (separate research branches, independent file reads, architecture exploration), write the list into session memory under `/memories/session/`, and delegate each to an `Explore` or `General Purpose` subagent. Do not skip this step.
+- Enumerate the delegatable subproblems (separate research branches, independent file reads, architecture exploration), write the list into session memory, and delegate each to a research agent. Do not skip this step.
 
 ## 2. Create the plan
 
@@ -87,18 +93,14 @@ Present the plan and stop. Summarize the key design decisions, the phases and wh
 The name must be `plan-<datetime>.md`. Never `active-plan.md`.
 
 1. `date -u +%Y-%m-%dT%H%M%S` for the name.
-2. `memory create` at `/memories/session/plan-<datetime>.md` with the plan content.
+2. Create `plan-<datetime>.md` in session memory with the plan content.
 3. Read it back and confirm it is substantive, not whitespace, "TODO", or a bare title.
-
-If the `memory` tool is not in the tool list, call `activate_vs_code_interaction` with no arguments first: it is a one-shot call that unlocks the VS Code interaction tools for the session.
 
 ## Find the latest plan file
 
-Same activation caveat as above.
-
-1. `memory view /memories/session/` and pick the newest `plan-*.md` by name (descending datetime).
+1. List session memory and pick the newest `plan-<datetime>.md` by name (descending datetime).
 2. No match: report "no active plan found" and stop.
-3. Read it with `memory view /memories/session/<filename>`.
+3. Read that plan file.
 
 ## Rules
 

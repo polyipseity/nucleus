@@ -2,23 +2,23 @@
 description: "Verify that the active plan (plan-*.md in session memory) is fully implemented. If gaps exist, produce a remediation plan without implementing."
 disable-model-invocation: true
 name: "verify-implementation"
-argument-hint: "optional: specific phase or file to focus verification on"
+argument-hint: "[phase or file]"
 ---
 
 # Verify plan implementation
 
-Check whether an active plan is fully implemented. Do NOT execute, implement, or edit any files: research, compare, report.
+Read `.agents/instructions/standing-orders.instructions.md` and follow it; it overrides this workflow's defaults. Resolve capability names through `.agents/instructions/harness-adapters.reference.md`.
 
-## Guard clause
+## Focus
 
-If the triggering message contains "implement", "do it", "go ahead", "execute", "make the changes", or any equivalent, refuse and redirect: "I'm in verify mode: I can only check and plan. To execute, use the implement-plan prompt."
+$@
 
-If the `memory` tool is missing from the tool list, call `activate_vs_code_interaction` with no arguments first: it is a one-shot call that unlocks the VS Code interaction tools.
+Empty means: verify the whole implementation. Compare the plan against the code and report gaps without implementing.
 
 ## 1. Retrieve the plan
 
-1. `memory view /memories/session/` and pick the newest `plan-*.md` by name (descending datetime). None: report "No active plan found, nothing to verify." and stop.
-2. Read it with `memory view /memories/session/<filename>`.
+1. List session memory and pick the newest `plan-<datetime>.md` by name (descending datetime). None: report "No active plan found, nothing to verify." and stop.
+2. Read that plan file.
 3. Parse the frontmatter (`status`, `current-step`, `committed`, `inputs`) for context. Never short-circuit on `status: completed`: verify regardless.
 4. Load the newest `checkpoint-*.md` from the same listing for supplementary context (work done, files touched, pending decisions). None is fine.
 
@@ -26,7 +26,7 @@ If the `memory` tool is missing from the tool list, call `activate_vs_code_inter
 
 Collect the full list of expected outcomes from every phase and step, then check each against the workspace: read modified files for the intended change, confirm new files exist at the expected path, confirm removed files are gone, and search for behavioral outcomes by their patterns, imports, or references.
 
-Delegate separate phases or large file sets to `Explore` subagents so the main context stays focused. Log every step as passed or failed with its evidence.
+Delegate separate phases or large file sets to research agents so the main context stays focused. Log every step as passed or failed with its evidence.
 
 With `inputs.atomicCommits: yes`, compare `git log --oneline` against the plan phases and flag any phase with no matching commit: "Phase N has no commit: changes may be uncommitted or lost."
 

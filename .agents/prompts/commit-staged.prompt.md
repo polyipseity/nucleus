@@ -1,10 +1,12 @@
 ---
 name: commit-staged
 description: Produce a commit message for the currently staged changes and commit by default.
-argument-hint: Optional extras (e.g., ticket=ABC-123). To skip committing, pass `commitNow=no`.
+argument-hint: "[footer text] [commitNow=no]"
 ---
 
 # Commit staged changes
+
+Read `.agents/instructions/standing-orders.instructions.md` and follow it; it overrides this workflow's defaults. Resolve capability names through `.agents/instructions/harness-adapters.reference.md`.
 
 Proceed automatically with best-effort defaults and context.
 
@@ -18,7 +20,7 @@ Proceed automatically with best-effort defaults and context.
 
    If it has not run, write a best-effort message from context and stop.
 
-2. **Compose the message** from that output and the repository's own conventions (`.agents/`, `CONTRIBUTING.md`, `package.json`, commitlint config, `prek.toml`): a short subject around 50 chars, an optional body with each line 72 chars or fewer, and a footer (`BREAKING CHANGE`, `Refs`, `Ticket`) that includes `${input:extra}` when given. Prefer whatever tooling enforces; fall back to Conventional Commits. If commitlint rejects the message, rewrap it and retry with a fresh `git commit`.
+2. **Compose the message** from that output and the repository's own conventions (`.agents/`, `CONTRIBUTING.md`, `package.json`, commitlint config, `prek.toml`): a short subject around 50 chars, an optional body with each line 72 chars or fewer, and a footer (`BREAKING CHANGE`, `Refs`, `Ticket`) that includes any footer text from the arguments when given. Prefer whatever tooling enforces; fall back to Conventional Commits. If commitlint rejects the message, rewrap it and retry with a fresh `git commit`.
 
    Never use `git commit --amend`. A rejected commit was never created, so `--amend` would rewrite whatever HEAD points at and destroy a pre-existing commit.
 
@@ -37,7 +39,7 @@ Proceed automatically with best-effort defaults and context.
 
    A structural check of the `type(scope): subject` shape is the last resort, for when bun is unavailable or the temp install cannot complete. On a lint failure, fix the message and re-run, and do not commit until it passes; on a tool error, report it and stop.
 
-4. **Create the commit.** If `${input:commitNow}` is `no`, present the message and stop. Otherwise:
+4. **Create the commit.** If the arguments contain `commitNow=no`, present the message and stop. Otherwise:
 
    PowerShell (Windows), with a single-quoted here-string so nothing expands:
 
@@ -67,7 +69,8 @@ Proceed automatically with best-effort defaults and context.
 - Run only the two approved shell commands. Do not touch the index: no `git add`, no `git reset`.
 - Never run `bun install` or any install to enable commitlint inside the project repo. Use a temp dir (`mktemp -d`) and clean it up. If artifacts such as `node_modules/`, `package.json`, or a lockfile were created in a repo that must not have them, delete them before finishing and never commit them.
 
-## Inputs
+## Arguments
 
-- `${input:extra}`: optional footer text
-- `${input:commitNow}`: `no` to skip committing; defaults to commit
+$@
+
+`commitNow=no` anywhere in the arguments skips the commit and presents the message only. Every other argument is footer text for the commit message.
