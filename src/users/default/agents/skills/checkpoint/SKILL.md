@@ -17,7 +17,7 @@ description: |
 
 ## What to save
 
-Write a checkpoint file to session memory as `checkpoint-<datetime>.md`. The directory and the operation names come from the session-memory capability, which `harness-adapters.reference.md` maps for the running harness.
+Write a checkpoint file to session memory as `checkpoint-<datetime>.md`. The directory and the operation names come from the session-memory capability, which `~/.agents/instructions/harness-adapters.reference.md` maps for the running harness.
 
 Each checkpoint captures:
 - **Standing orders:** the boundary in force, quoted from `~/.agents/instructions/standing-orders.instructions.md`, or `none` when no boundary is active

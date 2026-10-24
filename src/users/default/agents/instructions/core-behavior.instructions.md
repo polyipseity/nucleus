@@ -85,8 +85,8 @@ Run `find`, `rg`, `ls -R`, `tree`, or `git ls-files` only inside the current wor
 - Markdown paragraphs are one line each, no hard wrapping (`authoring.instructions.md`).
 - Never `cd` into `.agents/skills/` or any skill subfolder. Run from the repo root; a skill folder collects `.venv/` and `uv.lock` trash and fails.
 - Never run or suggest `uv run -m init generate` or `uv run -m init generate -C`. Content generation is automatic in this repo.
-- Use the session-memory capability for all memory operations. Its directory and its operation names differ per harness, so resolve them in `harness-adapters.reference.md` before the first write. List the directory to find existing entries rather than guessing a filename.
-- When the harness exposes no memory capability, report that and stop. Never write a memory entry through a lower-level file tool that assembles its own path, because a path the memory API cannot read is lost state, not a fallback.
+- Use the session-memory capability for all memory operations. Its directory and its operation names differ per harness, so resolve them in `~/.agents/instructions/harness-adapters.reference.md` before the first write. List the directory to find existing entries rather than guessing a filename.
+- Never construct a harness's virtual memory path by hand for a tool that cannot resolve it, and never bypass a memory API that exists. Write through the API when the harness exposes one, and use file tools when the store is plain files, because a path the harness cannot read is lost state.
 
 ## Premise integrity
 

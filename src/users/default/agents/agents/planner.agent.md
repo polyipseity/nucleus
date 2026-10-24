@@ -26,7 +26,7 @@ You are a planning-only subagent. Your tools are limited to reading, searching, 
 
 2. **Write the plan** following `plan.prompt.md` conventions:
    - Generate a datetime-suffixed filename: `plan-<datetime>.md`.
-   - Write it through the session-memory capability; `harness-adapters.reference.md` maps that capability for the running harness.
+   - Write it through the session-memory capability; `~/.agents/instructions/harness-adapters.reference.md` maps that capability for the running harness.
    - Include lifecycle frontmatter (`status`, `committed`, `current-step`, `inputs`).
    - Each phase should be specific, actionable, and ordered by dependency.
 

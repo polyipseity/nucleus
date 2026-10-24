@@ -12,7 +12,7 @@ This file is user scope, deployed to `~/.agents/instructions/`, so it applies in
 | Capability | Pi | VS Code Copilot |
 | --- | --- | --- |
 | Session memory | directory `~/.pi/agent/memory/session`; one file per entry, named by the workflow | `/memories/session/` |
-| Memory operations | `memory_write`, `memory_read`, and `memory_search` on that directory, or plain file tools | `memory` tool `view`, `create`, `str_replace`, `delete`, `rename` on `/memories/` paths |
+| Memory operations | `memory_write`, `memory_read`, and `memory_search` when the extension is installed; its entries are plain files under the directory above, so file tools read and write the same store | the memory API (`view`, `create`, `str_replace`, `delete`, `rename`) with `/memories/` paths; file tools must not drive it |
 | Repo memory | none | `/memories/repo/` |
 | Durable memory | `memory_write`, `memory_read`, `memory_search`, `scratchpad` (`MEMORY.md`, `daily/`, `SCRATCHPAD.md`) | `memory` tool on the `/memories/` root |
 | Child agent | `subagent` tool | `runSubagent` |
