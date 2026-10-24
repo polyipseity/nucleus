@@ -540,6 +540,56 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
     Write-Message "envrc ban policy passed."
   }
 
+  # A prompt template is expanded by a substituter that understands only $1, $2,
+  # $@, $ARGUMENTS, ${N:-default}, and ${@:N}. A template without a slot silently
+  # discards everything typed after the command name.
+  # ref: allow-and-deny-lists.instructions.md#C5 -- pattern literals live in this file
+  Write-Message "--- prompt template contract ---"
+  $ptDirs = @('.agents/prompts', 'src/users/default/agents/prompts')
+  $ptFiles = @(if ($HasArgs) {
+      @($PositionalArgs | Where-Object {
+          $ptNorm = $_ -replace '\\', '/'
+          ($ptDirs -contains (Split-Path -Parent $ptNorm)) -and ((Split-Path -Leaf $ptNorm) -like '*.md')
+        } | Where-Object { Test-Path -LiteralPath (Join-Path $r $_) } |
+        ForEach-Object { Get-Item -LiteralPath (Join-Path $r $_) })
+    } else {
+      @($ptDirs | Where-Object { Test-Path -LiteralPath (Join-Path $r $_) } |
+        ForEach-Object { Get-ChildItem -LiteralPath (Join-Path $r $_) -Filter '*.md' -File })
+    })
+  $ptErrors = 0
+  foreach ($pt in $ptFiles) {
+    $ptText = Get-Content -Raw -LiteralPath $pt.FullName
+    if ($ptText -match '\$\{input:') {
+      $ptErrors++
+      Write-ErrorMessage "$($pt.FullName): VS Code input variable cannot expand; use a positional slot"
+    }
+    if ($ptText -notmatch '\$(ARGUMENTS|@|\d)|\$\{\d+:-') {
+      $ptErrors++
+      Write-ErrorMessage "$($pt.FullName): no argument slot; text typed after the command is discarded"
+    }
+    if ($ptText -notmatch 'standing-orders\.instructions\.md') {
+      $ptErrors++
+      Write-ErrorMessage "$($pt.FullName): missing standing-orders anchor line"
+    }
+    if ($ptText -match 'activate_vs_code_interaction|multi_replace_string_in_file|runSubagent|resolve_memory_file_uri|__LANE_SCOPE__|/memories/') {
+      $ptErrors++
+      Write-ErrorMessage "$($pt.FullName): harness-specific name; use a capability from harness-adapters.reference.md"
+    }
+  }
+  $ptPolicy = Join-Path $r '.agents/instructions/standing-orders.instructions.md'
+  if ((Test-Path -LiteralPath $ptPolicy) -and
+    (Select-String -LiteralPath $ptPolicy -Pattern 'child-prompt-block:begin' -SimpleMatch -Quiet) -and
+    -not (Select-String -LiteralPath $ptPolicy -Pattern 'child-prompt-block:end' -SimpleMatch -Quiet)) {
+    $ptErrors++
+    Write-ErrorMessage "standing-orders.instructions.md: child-prompt-block markers are unbalanced"
+  }
+  if ($ptErrors -gt 0) {
+    Write-ErrorMessage "prompt template contract failed with $ptErrors error(s)"
+    $failed = $true
+  } else {
+    Write-Message "prompt template contract passed."
+  }
+
   if ($failed) {
     Write-ErrorMessage "repository policy (pattern-based) check failed"
     return $false

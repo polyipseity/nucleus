@@ -22,6 +22,7 @@ _POLICY_PATTERN_CHECKS=(
   "nix file structure|run_nix_file_structure|files"
   "log capture pair policy|run_log_capture_pair_policy|files"
   "envrc ban policy|run_envrc_ban_policy|files"
+  "prompt template contract|run_prompt_template_contract|files"
 )
 
 run_repo_policy_pattern() {
@@ -532,5 +533,60 @@ run_envrc_ban_policy() {
     return 1
   fi
   say "envrc ban policy passed."
+  return 0
+}
+
+# A prompt template is expanded by a substituter that understands only $1, $2,
+# $@, $ARGUMENTS, ${N:-default}, and ${@:N}. A template without a slot silently
+# discards everything typed after the command name, and a VS Code ${input:...}
+# variable never expands outside VS Code.
+# ref: allow-and-deny-lists.instructions.md#C5 -- pattern literals live in this file
+run_prompt_template_contract() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
+  local _files=("$@")
+  local _prompt_files=()
+  if $_has_args; then
+    filter_scoped_files _prompt_files .agents/prompts '*.md' "${_files[@]}"
+    filter_scoped_files _prompt_files src/users/default/agents/prompts '*.md' "${_files[@]}"
+  else
+    [ -d "$_repo_root/.agents/prompts" ] && discover_files _prompt_files "$_repo_root" .agents/prompts '*.md'
+    [ -d "$_repo_root/src/users/default/agents/prompts" ] && discover_files _prompt_files "$_repo_root" src/users/default/agents/prompts '*.md'
+  fi
+
+  local _errors=0 _f
+  for _f in "${_prompt_files[@]}"; do
+    [ -n "$_f" ] || continue
+    if grep -qF "\${input:" "$_f"; then
+      _errors=$((_errors + 1))
+      error "$_f: VS Code \${input:...} cannot expand; use \$1, \$@, or \${N:-default}"
+    fi
+    if ! grep -qE '[$](ARGUMENTS|@|[0-9])|[$][{][0-9]+:-' "$_f"; then
+      _errors=$((_errors + 1))
+      error "$_f: no argument slot; text typed after the command is discarded"
+    fi
+    if ! grep -qF 'standing-orders.instructions.md' "$_f"; then
+      _errors=$((_errors + 1))
+      error "$_f: missing standing-orders anchor line"
+    fi
+    if grep -qE 'activate_vs_code_interaction|multi_replace_string_in_file|runSubagent|resolve_memory_file_uri|__LANE_SCOPE__|/memories/' "$_f"; then
+      _errors=$((_errors + 1))
+      error "$_f: harness-specific name; use a capability from harness-adapters.reference.md"
+    fi
+  done
+
+  local _policy="$_repo_root/.agents/instructions/standing-orders.instructions.md"
+  if [ -f "$_policy" ] &&
+    grep -qF 'child-prompt-block:begin' "$_policy" &&
+    ! grep -qF 'child-prompt-block:end' "$_policy"; then
+    _errors=$((_errors + 1))
+    error "$_policy: child-prompt-block markers are unbalanced"
+  fi
+
+  if [ "$_errors" -gt 0 ]; then
+    error "prompt template contract failed with $_errors error(s)"
+    return 1
+  fi
+  say "prompt template contract passed."
   return 0
 }
