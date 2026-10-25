@@ -5,6 +5,9 @@
 # runtimeInputs: the daemon wrapper → create-builder → NixOS VM → linux-builder
 # → daemon chain would otherwise cycle. The glob takes whatever
 # *-create-builder exists; the previous output stays alive via its own GC roots.
+# Note: create-builder is kept alive by the system closure (nix.buildMachines
+# references pkg = pkgs.darwin.linux-builder). If GC ever removes it, this
+# script fails fatally and the builder must be re-provisioned via nucleus-apply.
 set -euo pipefail
 
 export TMPDIR=/run/org.nixos.linux-builder USE_TMPDIR=1
