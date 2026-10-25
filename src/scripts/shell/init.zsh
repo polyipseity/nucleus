@@ -32,6 +32,14 @@ if [[ -z "${__nucleus_stale_nix_warned:-}" ]]; then
     local -a __nuc_report
     __nuc_report=()
     local __nuc_nixdropped=false
+    local __nuc_toolchain_dropped=false
+    # Toolchain vars that were (pre-fix) raw /nix/store paths; a dead one means
+    # the stable symlinks were never converged -> run nucleus-apply.
+    local -A __nuc_toolchain_vars
+    __nuc_toolchain_vars=(
+      CC 1 CXX 1 LD 1 DEVELOPER_DIR 1 SDKROOT 1 LIBRARY_PATH 1
+      NIX_SSL_CERT_FILE 1 CMAKE_C_COMPILER_LAUNCHER 1 CMAKE_CXX_COMPILER_LAUNCHER 1
+    )
     # One hash-shape gate for both passes: a /nix/store segment that is not a
     # store hash is never ours to touch.
     local __nuc_hash_re='^[0-9a-z]{32}([-.].*)?$'
@@ -79,6 +87,7 @@ if [[ -z "${__nucleus_stale_nix_warned:-}" ]]; then
         export "${__nuc_var}=${(j/:/)__nuc_kept}"
         __nuc_report+=( "$__nuc_var ($__nuc_dropped of $__nuc_total entries)" )
         [[ "$__nuc_var" == NIX_* ]] && __nuc_nixdropped=true
+        [[ -n "${__nuc_toolchain_vars[$__nuc_var]+x}" ]] && __nuc_toolchain_dropped=true
       fi
     done
 
@@ -126,6 +135,7 @@ if [[ -z "${__nucleus_stale_nix_warned:-}" ]]; then
           unset "$__nuc_name"
           __nuc_report+=( "$__nuc_name=$__nuc_cand" )
           [[ "$__nuc_name" == NIX_* ]] && __nuc_nixdropped=true
+          [[ -n "${__nuc_toolchain_vars[$__nuc_name]+x}" ]] && __nuc_toolchain_dropped=true
           break
         fi
       done
@@ -137,6 +147,9 @@ if [[ -z "${__nucleus_stale_nix_warned:-}" ]]; then
       print -ru2 -- "this shell inherited nix store paths that no longer exist; dropped: ${(j/, /)__nuc_report}"
       if [[ "$__nuc_nixdropped" == true ]]; then
         print -ru2 -- "those devShell tools are gone; re-enter the devShell (direnv reload, or exit and re-enter) to restore them."
+      fi
+      if [[ "$__nuc_toolchain_dropped" == true ]]; then
+        print -ru2 -- "toolchain paths are stale; run nucleus-apply to converge stable symlinks."
       fi
     fi
     unfunction _nucleus_dead_component

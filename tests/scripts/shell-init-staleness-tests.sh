@@ -119,6 +119,14 @@ assert_no_remedy() { # <label> <err-file>
   fi
 }
 
+assert_toolchain_remedy() { # <label> <err-file>
+  if grep -qF "toolchain paths are stale; run nucleus-apply to converge stable symlinks." "$2"; then
+    assert_pass "$1"
+  else
+    assert_fail "$1" "missing toolchain remedy; stderr: $(tr '\n' ' ' <"$2")"
+  fi
+}
+
 _err="$_sls_tmp/err.txt"
 _out="$_sls_tmp/out.txt"
 
@@ -165,6 +173,7 @@ fi
 run_init_case "$_err" "$_out" "SDKROOT=$_sls_dead_sub"
 assert_dropped "dead SDKROOT is reported" "$_err"
 assert_no_remedy "dead SDKROOT prints no devShell remedy" "$_err"
+assert_toolchain_remedy "dead SDKROOT prints the toolchain remedy" "$_err"
 if grep -qx 'SDKROOT=<unset>' "$_out"; then
   assert_pass "dead SDKROOT is unset after sourcing"
 else
