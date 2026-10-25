@@ -431,6 +431,28 @@ run_pin_flake_inputs() {
   fi
 }
 
+run_pin_devshell() {
+  # Pin the devShell closure into a profile so daily GC keeps the stdenv/bash/
+  # toolchain closure alive. Otherwise `nix develop` (used directly, since
+  # .envrc is banned in this repo) leaves no persistent GC root and the
+  # closure is freed under store pressure, leaving inherited NIX_CC/builder/
+  # stdenv pointing at dead paths (the init.zsh scrubber reports them).
+  case "$(uname -s)-$(uname -m)" in
+  Darwin-arm64) _rpds_system="aarch64-darwin" ;;
+  Linux-x86_64) _rpds_system="x86_64-linux" ;;
+  *)
+    warn -l devshell "unsupported host '$(uname -s)-$(uname -m)'; skipping devShell pin"
+    return 0
+    ;;
+  esac
+  _rpds_profile="/nix/var/nix/profiles/nucleus-devshell"
+  say -l devshell "pinning devShell closure to $_rpds_profile..."
+  if ! run_nix_as_root build --profile "$_rpds_profile" "$REPO_ROOT/src#devShells.$_rpds_system.default"; then
+    # WHY: devShell pinning is a GC optimization; the devShell re-evaluates next apply if unpinned.
+    warn -l devshell "devShell build failed (devShell may re-evaluate next apply)"
+  fi
+}
+
 run_post_apply() {
   # Each step is best-effort: failures warn but do not abort apply.
   local _target="${1:-}"
@@ -513,6 +535,7 @@ Darwin)
   _post_rebuild_repo_root="$(derive_repo_root)"
   printf '%s\n' "$_post_rebuild_repo_root" | sudo -H tee "/Library/Application Support/nucleus/repo-root" >/dev/null
   run_pin_flake_inputs
+  run_pin_devshell
   run_terminal_activations
   "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
   run_caddy_local_ca_trust sudo
@@ -544,6 +567,7 @@ Linux)
     _post_rebuild_repo_root="$(derive_repo_root)"
     printf '%s\n' "$_post_rebuild_repo_root" | sudo -H tee "/var/lib/nucleus/repo-root" >/dev/null
     run_pin_flake_inputs
+    run_pin_devshell
     run_terminal_activations
     "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
     run_caddy_local_ca_trust sudo
@@ -556,6 +580,7 @@ Linux)
     run_pre_build
     run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
     run_pin_flake_inputs
+    run_pin_devshell
     run_terminal_activations
     "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
     run_caddy_local_ca_trust user
