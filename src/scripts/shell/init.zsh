@@ -418,7 +418,14 @@ pi() {
   # WHY: srt parses its own options (-h, -V, -d, -s, -c, --control-fd) wherever
   #      they appear, so without "--" a plain `pi --help` prints srt's help and
   #      `pi -c <arg>` loses the argument without an error.
-  srt command pi -- "$@"
+  # WHY: nodejs-24 spends only 250 ms per address family before starting the
+  #      next. Where an IPv6 attempt answers EHOSTUNREACH at once, the IPv4
+  #      attempt is still dialling when that window closes, so node cancels it
+  #      and reports ETIMEDOUT, and srt's CONNECT proxy answers 502 for an
+  #      allowlisted host. The wider window keeps address racing on, so an
+  #      IPv6-only network still works. Process-scoped on purpose: the flag
+  #      belongs to the sandbox proxy, not to every node command in the shell.
+  NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--network-family-autoselection-attempt-timeout=10000" srt command pi -- "$@"
 }
 
 pi-unrestricted() {

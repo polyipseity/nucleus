@@ -541,7 +541,28 @@ function pi {
   # WHY: srt parses its own options (-h, -V, -d, -s, -c, --control-fd) wherever
   #      they appear, so without "--" a plain `pi --help` prints srt's help and
   #      `pi -c <arg>` loses the argument without an error.
-  srt command pi -- @args
+  # WHY: nodejs-24 spends only 250 ms per address family before starting the
+  #      next. Where an IPv6 attempt answers EHOSTUNREACH at once, the IPv4
+  #      attempt is still dialling when that window closes, so node cancels it
+  #      and reports ETIMEDOUT, and srt's CONNECT proxy answers 502 for an
+  #      allowlisted host. The wider window keeps address racing on, so an
+  #      IPv6-only network still works.
+  $nodeOptionsFlag = '--network-family-autoselection-attempt-timeout=10000'
+  $previousNodeOptions = $env:NODE_OPTIONS
+  if ($previousNodeOptions) {
+    $env:NODE_OPTIONS = "$previousNodeOptions $nodeOptionsFlag"
+  } else {
+    $env:NODE_OPTIONS = $nodeOptionsFlag
+  }
+  try {
+    srt command pi -- @args
+    $exitCode = $LASTEXITCODE
+  } finally {
+    # WHY: $env: is process-wide, so the caller's own node children must not
+    #      inherit a sandbox-only flag.
+    $env:NODE_OPTIONS = $previousNodeOptions
+  }
+  $global:LASTEXITCODE = $exitCode
 }
 
 function pi-unrestricted {

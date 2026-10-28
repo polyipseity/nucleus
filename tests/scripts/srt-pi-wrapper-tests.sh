@@ -27,8 +27,14 @@ trap 'rm -rf "$_spw_tmp"' EXIT
 
 _spw_srt_log="$_spw_tmp/srt.log"
 _spw_pi_log="$_spw_tmp/pi.log"
+_spw_srt_env_log="$_spw_tmp/srt.env.log"
+_spw_pi_env_log="$_spw_tmp/pi.env.log"
 export SRT_LOG="$_spw_srt_log"
 export PI_LOG="$_spw_pi_log"
+
+# WHY: the NODE_OPTIONS assertions below are exact, so the harness environment
+# must not decide them. A case that needs a value sets it for that one call.
+unset NODE_OPTIONS
 
 # WHY the wrappers are extracted instead of sourced whole: init.zsh is an
 # interactive profile (compinit, mkdir, starship), so it cannot be sourced by a
@@ -72,11 +78,13 @@ assert_extraction_complete() { # <label> <file> <first line> <last line>
   fi
   assert_pass "$_label"
 }
-# Recording stubs. Each writes one record per invocation: the stub tag, then the
-# arguments joined with US (0x1f), which cannot occur in the arguments under
-# test. Nothing here executes the wrapped command, so an argument the wrapper
-# dropped shows up as a missing field rather than as a side effect.
-_spw_write_stub() { # <path> <tag>
+# Recording stubs. Each writes two records per invocation, both opening with the
+# stub tag: the arguments joined with US (0x1f), which cannot occur in the
+# arguments under test, and the NODE_OPTIONS the wrapper ran with. The records go
+# to separate logs, so an argv assertion keeps its exact expectation whatever the
+# environment holds. Nothing here executes the wrapped command, so an argument
+# the wrapper dropped shows up as a missing field rather than as a side effect.
+_spw_write_stub() { # <path> <tag> <argv log> <env log>
   cat >"$1" <<STUB
 #!/bin/sh
 {
@@ -84,6 +92,11 @@ _spw_write_stub() { # <path> <tag>
   for _spw_arg in "\$@"; do printf '\037%s' "\$_spw_arg"; done
   printf '\n'
 } >>"$3"
+{
+  printf '%s' '$2'
+  printf '\037%s' "\${NODE_OPTIONS-}"
+  printf '\n'
+} >>"$4"
 STUB
   chmod +x "$1"
 }
@@ -91,13 +104,21 @@ STUB
 _spw_stub_bin="$_spw_tmp/bin"
 _spw_stub_bin2="$_spw_tmp/bin2"
 mkdir -p "$_spw_stub_bin" "$_spw_stub_bin2"
-_spw_write_stub "$_spw_stub_bin/srt" srt "$_spw_srt_log"
-_spw_write_stub "$_spw_stub_bin/pi" pi-bin "$_spw_pi_log"
-_spw_write_stub "$_spw_stub_bin2/pi" pi-bin2 "$_spw_pi_log"
+_spw_write_stub "$_spw_stub_bin/srt" srt "$_spw_srt_log" "$_spw_srt_env_log"
+_spw_write_stub "$_spw_stub_bin/pi" pi-bin "$_spw_pi_log" "$_spw_pi_env_log"
+_spw_write_stub "$_spw_stub_bin2/pi" pi-bin2 "$_spw_pi_log" "$_spw_pi_env_log"
+
+# A failing srt proves the wrapper hands its exit status back to the caller.
+_spw_fail_bin="$_spw_tmp/bin-fail"
+mkdir -p "$_spw_fail_bin"
+_spw_write_stub "$_spw_fail_bin/srt" srt-fail "$_spw_srt_log" "$_spw_srt_env_log"
+printf 'exit 7\n' >>"$_spw_fail_bin/srt"
 
 reset_logs() {
   : >"$_spw_srt_log"
   : >"$_spw_pi_log"
+  : >"$_spw_srt_env_log"
+  : >"$_spw_pi_env_log"
 }
 
 _spw_status=0
@@ -110,6 +131,14 @@ run_zsh_case() { # <path prefix> <invocation>
   {
     cat "$_spw_zsh_wrappers"
     printf '\n%s\n' "$_invocation"
+    # The probe runs after the invocation and the driver exits with the
+    # invocation's status, so neither the caller environment nor the exit
+    # status is masked.
+    cat <<'PROBE'
+_spw_probe_status=$?
+printf 'node-options-after:%s\n' "${NODE_OPTIONS-}"
+(exit "$_spw_probe_status")
+PROBE
   } >"$_driver"
   PATH="$_prefix:$PATH" zsh "$_driver" >"$_spw_output" 2>&1 || _spw_status=$?
 }
@@ -121,6 +150,13 @@ run_pwsh_case() { # <path prefix> <invocation>
   {
     cat "$_spw_ps1_wrappers"
     printf '\n%s\n' "$_invocation"
+    # Same contract as the zsh driver: observe the restored environment, then
+    # exit with the invocation's status.
+    cat <<'PROBE'
+$spwStatus = $LASTEXITCODE
+Write-Output "node-options-after:$env:NODE_OPTIONS"
+exit $spwStatus
+PROBE
   } >"$_driver"
   PATH="$_prefix:$PATH" pwsh -NoProfile -File "$_driver" >"$_spw_output" 2>&1 || _spw_status=$?
 }
@@ -168,6 +204,22 @@ assert_single_record() { # <label> <log>
     return
   fi
   assert_pass "$1"
+}
+
+assert_output_line() { # <label> <expected line>
+  if grep -Fxq -- "$2" "$_spw_output"; then
+    assert_pass "$1"
+    return
+  fi
+  assert_fail "$1" "output was [$(tr '\n' ' ' <"$_spw_output")], expected line [$2]"
+}
+
+assert_exit_status() { # <label> <expected status>
+  if [ "$_spw_status" -eq "$2" ]; then
+    assert_pass "$1"
+    return
+  fi
+  assert_fail "$1" "wrapper exited $_spw_status, expected $2: $(tr '\n' ' ' <"$_spw_output")"
 }
 
 assert_extraction_complete "zsh: init.zsh pi() extracted whole" \
@@ -218,6 +270,39 @@ assert_interpreter_ran "zsh: pi-unrestricted runs" &&
   assert_log_equals "zsh: pi-unrestricted calls pi directly" \
     "$_spw_pi_log" pi-bin --version &&
   assert_log_empty "zsh: pi-unrestricted never enters srt" "$_spw_srt_log"
+
+# srt's node gives each address family 250 ms, and an instant IPv6
+# EHOSTUNREACH then cancels a healthy IPv4 dial, which the proxy reports as a
+# 502. The flag has to reach srt's node without touching the caller.
+reset_logs
+run_zsh_case "$_spw_stub_bin" 'pi --help'
+assert_interpreter_ran "zsh: pi runs with a clean NODE_OPTIONS" &&
+  assert_log_equals "zsh: pi hands srt the autoselect window flag" \
+    "$_spw_srt_env_log" srt --network-family-autoselection-attempt-timeout=10000 &&
+  assert_log_equals "zsh: the flag leaves the forwarded argv unchanged" \
+    "$_spw_srt_log" srt command pi -- --help
+
+reset_logs
+NODE_OPTIONS='--max-old-space-size=4096' run_zsh_case "$_spw_stub_bin" 'pi --help'
+assert_interpreter_ran "zsh: pi runs with an inherited NODE_OPTIONS" &&
+  assert_log_equals "zsh: an inherited NODE_OPTIONS is prepended to, never replaced" \
+    "$_spw_srt_env_log" srt '--max-old-space-size=4096 --network-family-autoselection-attempt-timeout=10000' &&
+  assert_output_line "zsh: a per-command assignment leaves the caller's value alone" \
+    'node-options-after:--max-old-space-size=4096'
+
+reset_logs
+NODE_OPTIONS='--max-old-space-size=4096' run_zsh_case "$_spw_stub_bin" 'pi-unrestricted --version'
+assert_interpreter_ran "zsh: pi-unrestricted runs with an inherited NODE_OPTIONS" &&
+  assert_log_equals "zsh: pi-unrestricted does not gain the sandbox flag" \
+    "$_spw_pi_env_log" pi-bin '--max-old-space-size=4096' &&
+  assert_log_equals "zsh: pi-unrestricted still calls pi directly" \
+    "$_spw_pi_log" pi-bin --version &&
+  assert_log_empty "zsh: pi-unrestricted never enters srt with the flag present" "$_spw_srt_log"
+
+reset_logs
+run_zsh_case "$_spw_fail_bin" 'pi --help'
+assert_exit_status "zsh: pi propagates srt's exit status" 7
+unset NODE_OPTIONS
 
 section 2 "PowerShell wrapper (src/scripts/shell/profile.ps1)"
 
@@ -275,5 +360,37 @@ assert_interpreter_ran "pwsh: pi-unrestricted runs with pi on two PATH entries" 
   assert_log_equals "pwsh: pi-unrestricted picks the first pi on PATH" \
     "$_spw_pi_log" pi-bin --help &&
   assert_log_empty "pwsh: pi-unrestricted never enters srt with two PATH entries" "$_spw_srt_log"
+
+# The same window flag as the zsh section: it has to reach srt's node without
+# touching the caller's own NODE_OPTIONS.
+reset_logs
+run_pwsh_case "$_spw_stub_bin" 'pi --help'
+assert_interpreter_ran "pwsh: pi runs with a clean NODE_OPTIONS" &&
+  assert_log_equals "pwsh: pi hands srt the autoselect window flag" \
+    "$_spw_srt_env_log" srt --network-family-autoselection-attempt-timeout=10000 &&
+  assert_log_equals "pwsh: the flag leaves the forwarded argv unchanged" \
+    "$_spw_srt_log" srt command pi -- --help
+
+reset_logs
+NODE_OPTIONS='--max-old-space-size=4096' run_pwsh_case "$_spw_stub_bin" 'pi --help'
+assert_interpreter_ran "pwsh: pi runs with an inherited NODE_OPTIONS" &&
+  assert_log_equals "pwsh: an inherited NODE_OPTIONS is prepended to, never replaced" \
+    "$_spw_srt_env_log" srt '--max-old-space-size=4096 --network-family-autoselection-attempt-timeout=10000' &&
+  assert_output_line "pwsh: the process-wide assignment is restored afterwards" \
+    'node-options-after:--max-old-space-size=4096'
+
+reset_logs
+NODE_OPTIONS='--max-old-space-size=4096' run_pwsh_case "$_spw_stub_bin" 'pi-unrestricted --version'
+assert_interpreter_ran "pwsh: pi-unrestricted runs with an inherited NODE_OPTIONS" &&
+  assert_log_equals "pwsh: pi-unrestricted does not gain the sandbox flag" \
+    "$_spw_pi_env_log" pi-bin '--max-old-space-size=4096' &&
+  assert_log_equals "pwsh: pi-unrestricted still calls pi directly" \
+    "$_spw_pi_log" pi-bin --version &&
+  assert_log_empty "pwsh: pi-unrestricted never enters srt with the flag present" "$_spw_srt_log"
+
+reset_logs
+run_pwsh_case "$_spw_fail_bin" 'pi --help'
+assert_exit_status "pwsh: pi preserves srt's exit status for the caller" 7
+unset NODE_OPTIONS
 
 finish_tests
