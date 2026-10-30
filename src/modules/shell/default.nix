@@ -220,6 +220,14 @@ in
     executable = true;
   };
 
+  # Claude Code settings: deploy via writable symlink (method 1).
+  home.activation.seed-claude-settings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    mkdir -p "${config.home.homeDirectory}/.claude"
+    "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+      "${config.home.homeDirectory}/.claude/settings.json" \
+      "${overlay.toRepoRelPath (overlay.selectFile "claude" "settings.json")}"
+  '';
+
   # Non-interactive zsh: rm function delegates to safe-rm. .zshenv is sourced
   # by all zsh instances (interactive and non-interactive).
   programs.zsh.envExtra = ''

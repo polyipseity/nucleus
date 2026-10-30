@@ -302,6 +302,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-HermesConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-HarnessBridge.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-SafeDelete.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-ClaudeConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-UserPath.ps1")
 # editors/: VS Code configuration and workspace management.
 . (Join-Path -Path $editorsModuleDir -ChildPath "Set-VSCodeWorkspaceTrust.ps1")
@@ -686,6 +687,7 @@ Sync-HermesConfig -Enabled:$true -User $sessionUser -RepoRoot $repoRoot
 # so they are deployed to the USER root with .cmd shims on the managed PATH.
 Sync-HarnessBridge -Enabled:$EnableHarnessBridgeParity -RepoRoot $repoRoot -UserRoot (Get-NucleusUserRoot) -UserProfile $HOME
 Sync-SafeDelete -Enabled:$true -RepoRoot $repoRoot -UserRoot (Get-NucleusUserRoot) -UserProfile $HOME
+Sync-ClaudeConfig -Enabled:$true -RepoRoot $repoRoot -UserProfile $HOME
 if ($EnableCloudDrivesParity) {
   foreach ($userRecord in $selectedUserRecords) {
     Sync-CloudDriveCatalog -UserConfig $userRecord -HomeDirectory $userRecord.homeDirectory
