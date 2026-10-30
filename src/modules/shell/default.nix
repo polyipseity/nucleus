@@ -206,11 +206,29 @@ in
     source = "${managedPaths.nodeShim}/bin/node";
   };
 
-  # Non-interactive rm defense: wrapper in ~/.local/bin (on append PATH, before
-  # system paths) delegates to safe-rm (kaelzhang) which moves to OS Trash.
+  # Non-interactive deletion defense: wrappers in ~/.local/bin (on append PATH, before
+  # system paths) delegate to safe-rm (kaelzhang) which moves to OS Trash.
   # Interactive shells override with a blocking function in init.zsh.
   home.file.".local/bin/rm" = {
     source = "${activationBundle}/src/scripts/safe-delete-rm.sh";
+    executable = true;
+  };
+  # Shims for the full union of deletion commands across all hosts (Windows-origin
+  # commands included) so they are safe on POSIX too.
+  home.file.".local/bin/del" = {
+    source = "${activationBundle}/src/scripts/safe-delete-shim.sh";
+    executable = true;
+  };
+  home.file.".local/bin/rd" = {
+    source = "${activationBundle}/src/scripts/safe-delete-shim.sh";
+    executable = true;
+  };
+  home.file.".local/bin/erase" = {
+    source = "${activationBundle}/src/scripts/safe-delete-shim.sh";
+    executable = true;
+  };
+  home.file.".local/bin/ri" = {
+    source = "${activationBundle}/src/scripts/safe-delete-shim.sh";
     executable = true;
   };
 

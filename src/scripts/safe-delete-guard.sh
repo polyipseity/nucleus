@@ -9,10 +9,18 @@ input=$(cat)
 # Extract command from JSON (simple grep-based, no jq dependency)
 cmd=$(printf '%s' "$input" | grep -o '"command"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*: *"//;s/"$//')
 
-# Block /bin/rm direct invocation
+# Block direct native rm invocation (absolute/relative path to rm)
 case "$cmd" in
-*/bin/rm*)
-  printf '%s\n' "BLOCKED: /bin/rm bypasses safe-delete protection. Use shell-safe-rm or rip2 instead." >&2
+*/bin/rm* | */usr/bin/rm* | */usr/local/bin/rm* | ./*rm*)
+  printf '%s\n' "BLOCKED: native rm bypasses safe-delete protection. Use shell-safe-rm or rip2 instead." >&2
+  exit 2
+  ;;
+esac
+
+# Block backslash-escaped deletion commands (alias bypass)
+case "$cmd" in
+*'\rm'* | *'\del'* | *'\rd'* | *'\rmdir'* | *'\erase'* | *'\ri'* | *'\unlink'* | *'\shred'*)
+  printf '%s\n' "BLOCKED: backslash-escaped deletion command bypasses safe-delete protection. Use shell-safe-rm or rip2 instead." >&2
   exit 2
   ;;
 esac
