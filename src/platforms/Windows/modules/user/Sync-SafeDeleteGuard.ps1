@@ -12,9 +12,17 @@ if ($inputText -match 'cmd\.exe|(?<!\w)cmd(?!\w)') {
   exit 2
 }
 
-# Block /bin/rm (shouldn't appear on Windows but guard anyway)
-if ($inputText -match '/bin/rm') {
-  Write-Host "BLOCKED: /bin/rm bypasses safe-delete protection. Use rip instead." -ForegroundColor Red
+# Block native rm invocation (absolute/relative path to rm)
+if ($inputText -match '/bin/rm|/usr/bin/rm|/usr/local/bin/rm') {
+  Write-Host "BLOCKED: native rm bypasses safe-delete protection. Use rip instead." -ForegroundColor Red
+  exit 2
+}
+
+# Block backslash-escaped deletion commands (alias bypass)
+$escaped = @('rm','del','rd','rmdir','erase','ri','unlink','shred') | ForEach-Object { [regex]::Escape("\$_") }
+$pattern = ($escaped -join '|')
+if ($inputText -match $pattern) {
+  Write-Host "BLOCKED: backslash-escaped deletion command bypasses safe-delete protection. Use rip instead." -ForegroundColor Red
   exit 2
 }
 
