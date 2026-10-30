@@ -141,7 +141,7 @@ function Sync-SafeDelete {
 
   # Git Bash: rm alias to rip
   $bashrc = Join-Path -Path $UserProfile -ChildPath ".bashrc"
-  $bashrcSnippet = "# Nucleus safe-delete: rm -> rip (graveyard)`nif [[ `$- == *i* ]]; then alias rm='rip'; echo '[SafeDelete] rm -> rip. Use rip -u to undo.'; fi`n"
+  $bashrcSnippet = "# Nucleus safe-delete: deletion union -> rip (graveyard)`nif [[ `$- == *i* ]]; then alias rm='rip'; alias del='rip'; alias rd='rip'; alias rmdir='rip'; alias erase='rip'; alias ri='rip'; alias unlink='rip'; alias shred='rip'; echo '[SafeDelete] deletion commands -> rip. Use rip -u to undo.'; fi`n"
   if (Test-Path -LiteralPath $bashrc) {
     $content = Get-Content -LiteralPath $bashrc -Raw
     if ($content -notlike "*Nucleus safe-delete*") {
