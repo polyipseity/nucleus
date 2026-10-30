@@ -170,6 +170,12 @@
               xevd = prev.xevd.overrideAttrs (_: {
                 doCheck = !prev.stdenv.hostPlatform.isDarwin;
               });
+              # WHY: nixpkgs marked fastmcp-slim broken because mcp >= 2
+              # (PR #575004). Override it to use mcp_1 so fastmcp/oterm build,
+              # mirroring the (unmerged) upstream PR #577109.
+              python314Packages = prev.python314Packages.overrideScope (pyfinal: pyprev: {
+                fastmcp-slim = pyprev.fastmcp-slim.override { mcp = pyfinal.mcp_1; };
+              });
               # WHY: nixpkgs frei0r 3.2.1 unconditionally depends on gavl → libdrm,
               # which breaks ffmpeg-full eval on Darwin. Gate gavl to Linux and disable
               # it via CMake until nixpkgs merges https://github.com/NixOS/nixpkgs/pull/549747.

@@ -14,6 +14,15 @@ let
           inherit (pkgs.stdenv.hostPlatform) system;
           config.allowUnfree = true;
           config.allowUnsupportedSystem = true;
+          overlays = [
+            (_final: prev: {
+              # WHY: mirror the mkPkgs override so fastmcp/oterm build against
+              # mcp_1 instead of the broken mcp >= 2 path (see flake.nix).
+              python314Packages = prev.python314Packages.overrideScope (pyfinal: pyprev: {
+                fastmcp-slim = pyprev.fastmcp-slim.override { mcp = pyfinal.mcp_1; };
+              });
+            })
+          ];
         };
       in
       permissivePkgs.oterm
