@@ -231,6 +231,18 @@ in
     source = "${activationBundle}/src/scripts/safe-delete-shim.sh";
     executable = true;
   };
+  home.file.".local/bin/rmdir" = {
+    source = "${activationBundle}/src/scripts/safe-delete-shim.sh";
+    executable = true;
+  };
+  home.file.".local/bin/unlink" = {
+    source = "${activationBundle}/src/scripts/safe-delete-shim.sh";
+    executable = true;
+  };
+  home.file.".local/bin/shred" = {
+    source = "${activationBundle}/src/scripts/safe-delete-shim.sh";
+    executable = true;
+  };
 
   # Agent guard: blocks dangerous deletion commands in coding agent hooks.
   home.file.".local/bin/safe-delete-guard" = {
