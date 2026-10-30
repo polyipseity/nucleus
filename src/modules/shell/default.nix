@@ -214,6 +214,12 @@ in
     executable = true;
   };
 
+  # Agent guard: blocks dangerous deletion commands in coding agent hooks.
+  home.file.".local/bin/safe-delete-guard" = {
+    source = "${activationBundle}/src/scripts/safe-delete-guard.sh";
+    executable = true;
+  };
+
   # Non-interactive zsh: rm function delegates to safe-rm. .zshenv is sourced
   # by all zsh instances (interactive and non-interactive).
   programs.zsh.envExtra = ''

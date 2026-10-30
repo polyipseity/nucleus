@@ -103,4 +103,51 @@ function Sync-SafeDelete {
   if (Test-Path -LiteralPath $clinkLuaSource) {
     Copy-Item -LiteralPath $clinkLuaSource -Destination $clinkLua -Force
   }
+
+  # Clink auto-run: register clink inject in cmd.exe AutoRun
+  $clinkExe = Join-Path -Path (Get-NucleusScoopShimsDir) -ChildPath "clink.cmd"
+  if (Test-Path -LiteralPath $clinkExe) {
+    $autoRunKey = "HKCU:\Software\Microsoft\Command Processor"
+    $clinkInject = "& `"$clinkExe`" inject"
+    # check-suppress:suppression_doc: AutoRun value may not exist yet.
+    $current = (Get-ItemProperty -Path $autoRunKey -Name AutoRun -ErrorAction SilentlyContinue).AutoRun
+    if ($current -notlike "*clink*inject*") {
+      $newVal = if ($current) { "$current & $clinkInject" } else { $clinkInject }
+      Set-ItemProperty -Path $autoRunKey -Name AutoRun -Value $newVal -Type String
+    }
+  }
+
+  # Doskey fallback for vanilla cmd.exe (no clink)
+  $doskeyCmd = Join-Path -Path $binDir -ChildPath "cmd_aliases.cmd"
+  $doskeyContent = "@echo off`r`ndoskey del=rip.exe `$*`r`ndoskey erase=rip.exe `$*`r`ndoskey rd=rip.exe `$*`r`ndoskey rmdir=rip.exe `$*`r`ndoskey rm=rip.exe `$*`r`n"
+  Set-Content -Path $doskeyCmd -Value $doskeyContent -Force
+
+  # Register doskey fallback in AutoRun (if clink inject not already there)
+  $autoRunKey = "HKCU:\Software\Microsoft\Command Processor"
+  # check-suppress:suppression_doc: AutoRun value may not exist yet.
+  $current = (Get-ItemProperty -Path $autoRunKey -Name AutoRun -ErrorAction SilentlyContinue).AutoRun
+  if ($current -notlike "*cmd_aliases*") {
+    $newVal = if ($current) { "$current & `"$doskeyCmd`"" } else { "`"$doskeyCmd`"" }
+    Set-ItemProperty -Path $autoRunKey -Name AutoRun -Value $newVal -Type String
+  }
+
+  # Agent guard: deploy as PATH shim
+  $guardSource = Join-Path -Path $RepoRoot -ChildPath "src\platforms\Windows\modules\user\Sync-SafeDeleteGuard.ps1"
+  $guardDest = Join-Path -Path $shimDir -ChildPath "safe-delete-guard.cmd"
+  if (Test-Path -LiteralPath $guardSource) {
+    $guardContent = "@echo off`r`npwsh -NoProfile -File `"$guardSource`" %*`r`n"
+    Set-Content -Path $guardDest -Value $guardContent -Force
+  }
+
+  # Git Bash: rm alias to rip
+  $bashrc = Join-Path -Path $UserProfile -ChildPath ".bashrc"
+  $bashrcSnippet = "# Nucleus safe-delete: rm -> rip (graveyard)`nif [[ `$- == *i* ]]; then alias rm='rip'; echo '[SafeDelete] rm -> rip. Use rip -u to undo.'; fi`n"
+  if (Test-Path -LiteralPath $bashrc) {
+    $content = Get-Content -LiteralPath $bashrc -Raw
+    if ($content -notlike "*Nucleus safe-delete*") {
+      Add-Content -Path $bashrc -Value $bashrcSnippet
+    }
+  } else {
+    Set-Content -Path $bashrc -Value $bashrcSnippet
+  }
 }

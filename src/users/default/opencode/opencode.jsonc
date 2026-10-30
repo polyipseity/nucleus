@@ -19,5 +19,14 @@
   "plugin": [
     // Superpowers is provisioned via method-1 symlink to Nix store.
     // See symlink-superpowers-for-opencode.sh and agents.nix.
-  ]
+  ],
+  "permission": {
+    "bash": {
+      "*": "allow",
+      "rm *": "deny",
+      "/bin/rm*": "deny",
+      "cmd *": "deny",
+      "cmd.exe*": "deny"
+    }
+  }
 }
