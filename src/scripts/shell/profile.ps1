@@ -8,118 +8,155 @@
 __NUCLEUS_PREPEND_PATH__
 __NUCLEUS_APPEND_PATH__
 
-if ($IsWindows) {
-  # File deletion safety: recycle to Recycle Bin (filesystem only)
-  if (-not (Test-Path Variable:Script:OriginalRemoveItem)) {
-    # check-suppress:suppression_doc: cmdlet may not exist in constrained environments.
-    $script:OriginalRemoveItem = Get-Command Remove-Item -CommandType Cmdlet -ErrorAction SilentlyContinue
-  }
+# File deletion safety: recycle on Windows, delegate to rip/shell-safe-rm on POSIX.
+# Applies on every host because pwsh is installable on all three (macOS, NixOS, Windows).
+if (-not (Test-Path Variable:Script:OriginalRemoveItem)) {
+  # check-suppress:suppression_doc: cmdlet may not exist in constrained environments.
+  $script:OriginalRemoveItem = Get-Command Remove-Item -CommandType Cmdlet -ErrorAction SilentlyContinue
+}
 
-  function Invoke-SafeDelete {
-    [CmdletBinding(DefaultParameterSetName='Path', SupportsShouldProcess=$true)]
-    param(
-      [Parameter(Position=0, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
-      [string[]]$Path,
-      [Parameter(Position=0, ParameterSetName='LiteralPath', ValueFromPipelineByPropertyName=$true)]
-      [string[]]$LiteralPath,
-      [Switch]$Recurse,
-      [Switch]$Force,
-      [string]$Filter,
-      [string[]]$Include,
-      [string[]]$Exclude,
-      [Switch]$WhatIf,
-      [Switch]$Confirm
-    )
-    begin {
+function Invoke-SafeDelete {
+  [CmdletBinding(DefaultParameterSetName='Path', SupportsShouldProcess=$true)]
+  param(
+    [Parameter(Position=0, ValueFromPipeline=$true, ValueFromPipelineByPropertyName=$true)]
+    [string[]]$Path,
+    [Parameter(Position=0, ParameterSetName='LiteralPath', ValueFromPipelineByPropertyName=$true)]
+    [string[]]$LiteralPath,
+    [Switch]$Recurse,
+    [Switch]$Force,
+    [string]$Filter,
+    [string[]]$Include,
+    [string[]]$Exclude,
+    [Switch]$WhatIf,
+    [Switch]$Confirm
+  )
+  begin {
+    if ($IsWindows) {
       # check-suppress:suppression_doc: assembly may already be loaded.
       Add-Type -AssemblyName Microsoft.VisualBasic -ErrorAction SilentlyContinue
-      $isInteractive = $false
-      try { $isInteractive = [Environment]::UserInteractive -and ($null -ne $Host.UI.RawUI) } catch { $isInteractive = $false }
-      $passedThrough = $false
     }
-    process {
-      $targetPaths = if ($LiteralPath) { $LiteralPath } else { $Path }
-      if (-not $targetPaths) { return }
+    $isInteractive = $false
+    try { $isInteractive = [Environment]::UserInteractive -and ($null -ne $Host.UI.RawUI) } catch { $isInteractive = $false }
+  }
+  process {
+    $targetPaths = if ($LiteralPath) { $LiteralPath } else { $Path }
+    if (-not $targetPaths) { return }
 
-      $allFilesystem = $true
-      $resolvedItems = @()
-      foreach ($p in $targetPaths) {
-        try {
-          if ($LiteralPath) {
-            # check-suppress:suppression_doc: item may not exist; handled by null check below.
-            $items = Get-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue
-          } else {
-            # check-suppress:suppression_doc: item may not exist; handled by null check below.
-            $items = Get-Item -Path $p -Force -ErrorAction SilentlyContinue
-          }
-          if (-not $items) {
-            $allFilesystem = $false
-            break
-          }
-          foreach ($item in $items) {
-            if ($item.PSProvider.Name -ne 'FileSystem') {
-              $allFilesystem = $false
-              break
-            }
-            $resolvedItems += $item
-          }
-          if (-not $allFilesystem) { break }
-        } catch {
+    if (-not $IsWindows) {
+      # POSIX backend: delegate to the platform safe alternative.
+      $safeBin = $null
+      foreach ($candidate in @('shell-safe-rm', 'rip', 'rip2')) {
+        $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
+        if ($cmd) { $safeBin = $cmd.Source; break }
+      }
+      if ($safeBin) {
+        & $safeBin @targetPaths
+        return
+      }
+      # Fallback: pass through to the original Remove-Item (no recycling available).
+      $orig = $script:OriginalRemoveItem
+      if ($orig) {
+        $params = @{}
+        if ($LiteralPath) { $params['LiteralPath'] = $LiteralPath } else { $params['Path'] = $Path }
+        if ($Recurse) { $params['Recurse'] = $true }
+        if ($Force) { $params['Force'] = $true }
+        if ($Filter) { $params['Filter'] = $Filter }
+        if ($Include) { $params['Include'] = $Include }
+        if ($Exclude) { $params['Exclude'] = $Exclude }
+        if ($WhatIf) { $params['WhatIf'] = $true }
+        if ($Confirm) { $params['Confirm'] = $true }
+        & $orig @params
+      }
+      return
+    }
+
+    $allFilesystem = $true
+    $resolvedItems = @()
+    foreach ($p in $targetPaths) {
+      try {
+        if ($LiteralPath) {
+          # check-suppress:suppression_doc: item may not exist; handled by null check below.
+          $items = Get-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue
+        } else {
+          # check-suppress:suppression_doc: item may not exist; handled by null check below.
+          $items = Get-Item -Path $p -Force -ErrorAction SilentlyContinue
+        }
+        if (-not $items) {
           $allFilesystem = $false
           break
         }
-      }
-
-      if (-not $allFilesystem) {
-        $orig = $script:OriginalRemoveItem
-        if ($orig) {
-          $params = @{}
-          if ($LiteralPath) { $params['LiteralPath'] = $LiteralPath } else { $params['Path'] = $Path }
-          if ($Recurse) { $params['Recurse'] = $true }
-          if ($Force) { $params['Force'] = $true }
-          if ($Filter) { $params['Filter'] = $Filter }
-          if ($Include) { $params['Include'] = $Include }
-          if ($Exclude) { $params['Exclude'] = $Exclude }
-          if ($WhatIf) { $params['WhatIf'] = $true }
-          if ($Confirm) { $params['Confirm'] = $true }
-          & $orig @params
-          return
-        }
-      }
-
-      if ($isInteractive -and $allFilesystem) {
-        Write-Host '[SafeDelete] Routed to Recycle Bin. Tip: use rip for instant undo.' -ForegroundColor Cyan
-      }
-
-      foreach ($item in $resolvedItems) {
-        $itemPath = $item.ProviderPath
-        if ($PSCmdlet.ShouldProcess($itemPath, 'Recycle')) {
-          if ($item.PSIsContainer) {
-            try { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($itemPath, 'OnlyErrorDialogs', 'SendToRecycleBin') } catch { throw }
-          } else {
-            try { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($itemPath, 'OnlyErrorDialogs', 'SendToRecycleBin') } catch { throw }
+        foreach ($item in $items) {
+          if ($item.PSProvider.Name -ne 'FileSystem') {
+            $allFilesystem = $false
+            break
           }
+          $resolvedItems += $item
+        }
+        if (-not $allFilesystem) { break }
+      } catch {
+        $allFilesystem = $false
+        break
+      }
+    }
+
+    if (-not $allFilesystem) {
+      $orig = $script:OriginalRemoveItem
+      if ($orig) {
+        $params = @{}
+        if ($LiteralPath) { $params['LiteralPath'] = $LiteralPath } else { $params['Path'] = $Path }
+        if ($Recurse) { $params['Recurse'] = $true }
+        if ($Force) { $params['Force'] = $true }
+        if ($Filter) { $params['Filter'] = $Filter }
+        if ($Include) { $params['Include'] = $Include }
+        if ($Exclude) { $params['Exclude'] = $Exclude }
+        if ($WhatIf) { $params['WhatIf'] = $true }
+        if ($Confirm) { $params['Confirm'] = $true }
+        & $orig @params
+        return
+      }
+    }
+
+    if ($isInteractive -and $allFilesystem) {
+      Write-Host '[SafeDelete] Routed to Recycle Bin. Tip: use rip for instant undo.' -ForegroundColor Cyan
+    }
+
+    foreach ($item in $resolvedItems) {
+      $itemPath = $item.ProviderPath
+      if ($PSCmdlet.ShouldProcess($itemPath, 'Recycle')) {
+        if ($item.PSIsContainer) {
+          try { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory($itemPath, 'OnlyErrorDialogs', 'SendToRecycleBin') } catch { throw }
+        } else {
+          try { [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($itemPath, 'OnlyErrorDialogs', 'SendToRecycleBin') } catch { throw }
         }
       }
     }
   }
-  # check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
-  Remove-Item alias:rm -ErrorAction SilentlyContinue
-  # check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
-  Remove-Item alias:del -ErrorAction SilentlyContinue
-  # check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
-  Remove-Item alias:rd -ErrorAction SilentlyContinue
-  # check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
-  Remove-Item alias:erase -ErrorAction SilentlyContinue
-  # check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
-  Remove-Item alias:ri -ErrorAction SilentlyContinue
-  Set-Alias rm Invoke-SafeDelete
-  Set-Alias del Invoke-SafeDelete
-  Set-Alias rd Invoke-SafeDelete
-  Set-Alias erase Invoke-SafeDelete
-  Set-Alias ri Invoke-SafeDelete
-  Set-Alias Remove-Item Invoke-SafeDelete
+}
 
+# check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
+Remove-Item alias:rm -ErrorAction SilentlyContinue
+# check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
+Remove-Item alias:del -ErrorAction SilentlyContinue
+# check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
+Remove-Item alias:rd -ErrorAction SilentlyContinue
+# check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
+Remove-Item alias:erase -ErrorAction SilentlyContinue
+# check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
+Remove-Item alias:ri -ErrorAction SilentlyContinue
+# check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
+Remove-Item alias:rmdir -ErrorAction SilentlyContinue
+# check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
+Remove-Item alias:unlink -ErrorAction SilentlyContinue
+Set-Alias rm Invoke-SafeDelete
+Set-Alias del Invoke-SafeDelete
+Set-Alias rd Invoke-SafeDelete
+Set-Alias erase Invoke-SafeDelete
+Set-Alias ri Invoke-SafeDelete
+Set-Alias rmdir Invoke-SafeDelete
+Set-Alias Remove-Item Invoke-SafeDelete
+
+
+if ($IsWindows) {
   # WHY: conditional: secret file may be absent before apply has materialized it.
   $_rclonePassFile = Join-Path $HOME "AppData\Local\nucleus\secrets\rclone-config-pass"
   if (Test-Path -Path $_rclonePassFile -PathType Leaf) {

@@ -58,7 +58,8 @@ let
 
   profileContent =
     # check-suppress:config-method: method 4 (runtime embedded) -- init.ps1 and profile.ps1 are read at eval time and embedded into the activation block as a literal string. No deployment step needed.
-    # __NUCLEUS_*__ tokens are Windows-only (substituted by Sync-ShellProfile.ps1); they become empty strings on POSIX, leaving the `if ($IsWindows)` blocks inert.
+    # __NUCLEUS_*__ tokens are Windows-only (substituted by Sync-ShellProfile.ps1); they become empty strings on POSIX.
+    # The file-deletion safety block is no longer gated on $IsWindows (it runs on every host); only the rclone/LLVM block stays gated.
     builtins.replaceStrings
       [
         "__MANAGED_PREPEND_PATH__"
