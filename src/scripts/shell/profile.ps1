@@ -11,6 +11,7 @@ __NUCLEUS_APPEND_PATH__
 if ($IsWindows) {
   # File deletion safety: recycle to Recycle Bin (filesystem only)
   if (-not (Test-Path Variable:Script:OriginalRemoveItem)) {
+    # check-suppress:suppression_doc: cmdlet may not exist in constrained environments.
     $script:OriginalRemoveItem = Get-Command Remove-Item -CommandType Cmdlet -ErrorAction SilentlyContinue
   }
 
@@ -30,6 +31,7 @@ if ($IsWindows) {
       [Switch]$Confirm
     )
     begin {
+      # check-suppress:suppression_doc: assembly may already be loaded.
       Add-Type -AssemblyName Microsoft.VisualBasic -ErrorAction SilentlyContinue
       $isInteractive = $false
       try { $isInteractive = [Environment]::UserInteractive -and ($null -ne $Host.UI.RawUI) } catch { $isInteractive = $false }
@@ -44,8 +46,10 @@ if ($IsWindows) {
       foreach ($p in $targetPaths) {
         try {
           if ($LiteralPath) {
+            # check-suppress:suppression_doc: item may not exist; handled by null check below.
             $items = Get-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue
           } else {
+            # check-suppress:suppression_doc: item may not exist; handled by null check below.
             $items = Get-Item -Path $p -Force -ErrorAction SilentlyContinue
           }
           if (-not $items) {
@@ -99,10 +103,15 @@ if ($IsWindows) {
       }
     }
   }
+  # check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
   Remove-Item alias:rm -ErrorAction SilentlyContinue
+  # check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
   Remove-Item alias:del -ErrorAction SilentlyContinue
+  # check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
   Remove-Item alias:rd -ErrorAction SilentlyContinue
+  # check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
   Remove-Item alias:erase -ErrorAction SilentlyContinue
+  # check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
   Remove-Item alias:ri -ErrorAction SilentlyContinue
   Set-Alias rm Invoke-SafeDelete
   Set-Alias del Invoke-SafeDelete

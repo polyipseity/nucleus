@@ -1,19 +1,29 @@
 ---
-description: "Use always: safe file deletion policy covering all platforms and agents. Never use rm/del/rd/erase/Remove-Item/cmd directly; use recoverable alternatives."
+description: "Use always: file deletion safety rules. Never use rm or its equivalents directly; use recoverable alternatives. Covers POSIX and Windows."
 name: "File Deletion Safety"
 applyTo: "**"
 alwaysApply: true
 ---
 
-# File Deletion Safety
+# File deletion safety
+
+Never use `rm`, `del`, `rd`, `rmdir`, `erase`, `ri`, or `Remove-Item` directly. These permanently delete files with no recovery.
+
+## Alternatives
+
+**POSIX (macOS, Linux):**
+- `shell-safe-rm` (moves to OS Trash, supports rm flags, recoverable via OS GUI)
+- `rip2` / `rip` (moves to graveyard, recoverable via `rip -u`)
+
+**Windows PowerShell:**
+- The built-in `rm`, `del`, `rd`, `erase`, `ri`, `Remove-Item` aliases are safe: they recycle to the Recycle Bin. Use them.
+
+**Windows cmd.exe / Git Bash:**
+- `rip` (available on PATH, moves to graveyard)
 
 ## Rules
-- Never use `rm`, `del`, `rd`, `rmdir`, `erase`, `ri`, or `Remove-Item` directly.
-- **POSIX**: use `shell-safe-rm` (moves to OS Trash, recoverable) or `rip`/`rip2` (moves to graveyard, recoverable; undo with `rip -u`).
-- **Windows PowerShell**: the built-in `rm`/`del`/`rd`/`erase`/`ri`/`Remove-Item` aliases are safe (recycle to Recycle Bin).
-- **Windows cmd/Git Bash**: use `rip` (available on PATH).
-- Motivation: direct deletion is not recoverable. Safe alternatives are recoverable.
 
-## Agent constraints
-- On Windows, never invoke `cmd.exe` or `cmd`; always use `pwsh`.
-- On non-Windows, never invoke `/bin/rm` directly (bypasses protection).
+- Never invoke `/bin/rm` directly on POSIX. It bypasses the safe-delete protection.
+- Never invoke `cmd.exe` or `cmd` on Windows. Always use `pwsh`.
+- When a script needs to delete files, use the platform's safe alternative, not raw `rm`.
+- If a tool or library calls `rm` internally, that is acceptable; the rule applies to direct agent invocations.

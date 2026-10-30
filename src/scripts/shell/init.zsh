@@ -474,4 +474,13 @@ EOF
   return 1
 }
 
+# rm is disabled in interactive shells: permanent deletion is unrecoverable.
+# Use shell-safe-rm (moves to OS Trash) or rip2/rip (graveyard with undo).
+rm() {
+  cat >&2 << 'EOF'
+shell: error: rm is disabled. Use shell-safe-rm or rip2 instead.
+EOF
+  return 1
+}
+
 __MACOS_ICLOUD_HOOKS__

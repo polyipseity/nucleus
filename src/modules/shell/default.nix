@@ -206,6 +206,20 @@ in
     source = "${managedPaths.nodeShim}/bin/node";
   };
 
+  # Non-interactive rm defense: wrapper in ~/.local/bin (on append PATH, before
+  # system paths) delegates to safe-rm (kaelzhang) which moves to OS Trash.
+  # Interactive shells override with a blocking function in init.zsh.
+  home.file.".local/bin/rm" = {
+    source = "${activationBundle}/src/scripts/safe-delete-rm.sh";
+    executable = true;
+  };
+
+  # Non-interactive zsh: rm function delegates to safe-rm. .zshenv is sourced
+  # by all zsh instances (interactive and non-interactive).
+  programs.zsh.envExtra = ''
+    rm() { safe-rm "$@"; }
+  '';
+
   # Probes each tool's Nix store binary, skips regeneration when the completion
   # file is newer than the binary, and soft-fails on a non-zero subcommand exit.
   home.activation = {

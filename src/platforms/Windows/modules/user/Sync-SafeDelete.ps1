@@ -1,101 +1,106 @@
-#Requires -Version 5.1
 <#
 .SYNOPSIS
-  Deploys safe-delete PATH shims for Windows (rip.exe copies for all aliases).
+  Deploys Windows safe-delete shims (rip.exe copies) and converges the
+  PowerShell recycling function.
 
 .DESCRIPTION
-  Copies rip.exe to <USER root>\bin with names rm.exe, del.exe, rd.exe, rmdir.exe, erase.exe, ri.exe.
-  These are also copied to %USERPROFILE%\.local\bin for PATH coverage. Follows HarnessBridge pattern.
+  Safe-delete defense for Windows: PowerShell overrides rm/del/rd/erase/ri/
+  Remove-Item with a .NET Recycle Bin function (in profile.ps1). For non-PowerShell
+  contexts (cmd.exe, Git Bash, scripts, agents), rip.exe shims in
+  %USERPROFILE%\.local\bin intercept all deletion commands.
+
+  Layout this function converges:
+
+    <USER root>\bin\rm.exe, del.exe, rd.exe, rmdir.exe, erase.exe, ri.exe
+      deployed copies of rip.exe (from Scoop shims dir)
+    %USERPROFILE%\.local\bin\rm.exe, del.exe, ...  PATH shims (copies)
 
 .PARAMETER Enabled
-  Mandatory. Deploy or remove.
+  Whether safe-delete shims should be enforced.
 
 .PARAMETER RepoRoot
-  Absolute path to live repository root.
+  Absolute path to the live repository root.
 
 .PARAMETER UserRoot
-  Absolute path to nucleus Windows USER root (%LOCALAPPDATA%\nucleus).
+  Absolute path to the nucleus Windows USER root (%LOCALAPPDATA%\nucleus).
 
 .PARAMETER UserProfile
-  Absolute path to user profile (%USERPROFILE%).
-
-.EXAMPLE
-  Sync-SafeDelete -Enabled:$true -RepoRoot $repoRoot -UserRoot (Get-NucleusUserRoot) -UserProfile $HOME
+  Absolute path to the user profile (%USERPROFILE%).
 #>
+
 function Sync-SafeDelete {
   [CmdletBinding()]
   param(
-    [Parameter(Mandatory = $true)] [bool]$Enabled,
-    [Parameter(Mandatory = $true)] [string]$RepoRoot,
-    [Parameter(Mandatory = $true)] [string]$UserRoot,
-    [Parameter(Mandatory = $true)] [string]$UserProfile
+    [Parameter(Mandatory)]
+    [bool]$Enabled,
+
+    [Parameter(Mandatory)]
+    [string]$RepoRoot,
+
+    [Parameter(Mandatory)]
+    [string]$UserRoot,
+
+    [Parameter(Mandatory)]
+    [string]$UserProfile
   )
 
-  $binDir = Join-Path -Path $UserRoot -ChildPath 'bin'
-  $shimDir = Join-Path -Path $UserProfile -ChildPath '.local\bin'
-  $names = @('rm.exe', 'del.exe', 'rd.exe', 'rmdir.exe', 'erase.exe', 'ri.exe')
+  $binDir = Join-Path -Path $UserRoot -ChildPath "bin"
+  $shimDir = Join-Path -Path $UserProfile -ChildPath ".local\bin"
+  $ripExe = Join-Path -Path (Get-NucleusScoopShimsDir) -ChildPath "rip.exe"
+
+  $shimNames = @("rm.exe", "del.exe", "rd.exe", "rmdir.exe", "erase.exe", "ri.exe")
+
+  # Clink Lua filter for cmd.exe interception
+  $clinkDir = Join-Path -Path $env:LOCALAPPDATA -ChildPath "clink"
+  $clinkLua = Join-Path -Path $clinkDir -ChildPath "safedel.lua"
+  $clinkLuaSource = Join-Path -Path $RepoRoot -ChildPath "src\platforms\Windows\modules\user\clink\safedel.lua"
 
   if (-not $Enabled) {
-    foreach ($n in $names) {
-      Remove-Item -LiteralPath (Join-Path $binDir $n) -Force -ErrorAction SilentlyContinue
-      Remove-Item -LiteralPath (Join-Path $shimDir $n) -Force -ErrorAction SilentlyContinue
+    foreach ($name in $shimNames) {
+      $target = Join-Path -Path $shimDir -ChildPath $name
+      if (Test-Path -LiteralPath $target) {
+        # check-suppress:suppression_doc: shim may already be absent; idempotent cleanup.
+        Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
+      }
+    }
+    if (Test-Path -LiteralPath $clinkLua) {
+      # check-suppress:suppression_doc: lua file may already be absent; idempotent cleanup.
+      Remove-Item -LiteralPath $clinkLua -Force -ErrorAction SilentlyContinue
     }
     return
   }
 
-  New-Item -ItemType Directory -Force -Path $binDir | Out-Null
-  New-Item -ItemType Directory -Force -Path $shimDir | Out-Null
-
-  # Find rip.exe from scoop or system
-  $rip = $null
-  $candidates = @(
-    (Join-Path $UserProfile 'scoop\apps\rip\current\rip.exe'),
-    (Join-Path $UserProfile 'scoop\shims\rip.exe'),
-    (Get-Command rip.exe -ErrorAction SilentlyContinue | ForEach-Object Source)
-  )
-  foreach ($c in $candidates) {
-    if ($c -and (Test-Path -LiteralPath $c)) { $rip = $c; break }
-  }
-
-  if (-not $rip) {
-    Write-NucleusWarning -CommandName 'Sync-SafeDelete' 'rip.exe not found; PATH shims not deployed (ensure rip2/scoop installed)'
+  if (-not (Test-Path -LiteralPath $ripExe)) {
+    Write-NucleusWarning -CommandName 'Sync-SafeDelete' "rip.exe not found at '$ripExe'; run Invoke-ScoopSetup first"
     return
   }
 
-  foreach ($n in $names) {
-    try {
-      Copy-Item -LiteralPath $rip -Destination (Join-Path $binDir $n) -Force
-    } catch {
-      Write-NucleusWarning -CommandName 'Sync-SafeDelete' "failed to deploy $n to bin: $_"
-    }
-    try {
-      Copy-Item -LiteralPath $rip -Destination (Join-Path $shimDir $n) -Force
-    } catch {
-      Write-NucleusWarning -CommandName 'Sync-SafeDelete' "failed to deploy $n to .local\bin: $_"
-    }
+  # Ensure directories exist
+  if (-not (Test-Path -LiteralPath $binDir)) {
+    # check-suppress:suppression_doc: directory creation output not needed.
+    New-Item -ItemType Directory -Path $binDir -Force > $null
+  }
+  if (-not (Test-Path -LiteralPath $shimDir)) {
+    # check-suppress:suppression_doc: directory creation output not needed.
+    New-Item -ItemType Directory -Path $shimDir -Force > $null
   }
 
-  # Clink Lua filter
-  $clinkDir = Join-Path $env:LOCALAPPDATA 'clink'
-  New-Item -ItemType Directory -Force -Path $clinkDir | Out-Null
-  $lua = @'
--- SafeDelete: intercept rm/del/rd/rmdir/erase and route to rip
-local function is_interactive() return true end
-clink.onfilterinput(function(text)
-    local cmd, rest = text:match("^%s*(%a+)%s*(.*)")
-    if cmd then
-        local lcmd = cmd:lower()
-        if lcmd == "del" or lcmd == "erase" or lcmd == "rd" or lcmd == "rmdir" or lcmd == "rm" then
-            if is_interactive() then
-                io.write("[SafeDelete Notice] Redirecting to rip.\n")
-            end
-            local clean_args = rest:gsub("/[fFsSqQpP]", "")
-            return "rip.exe " .. clean_args
-        end
-    end
-    return text
-end)
-'@
-  $luaPath = Join-Path $clinkDir 'safedel.lua'
-  Set-Content -LiteralPath $luaPath -Value $lua -Encoding UTF8
+  foreach ($name in $shimNames) {
+    # Deployed copy in USER root bin
+    $deployedPath = Join-Path -Path $binDir -ChildPath $name
+    Copy-Item -LiteralPath $ripExe -Destination $deployedPath -Force
+
+    # PATH shim in .local\bin
+    $shimPath = Join-Path -Path $shimDir -ChildPath $name
+    Copy-Item -LiteralPath $ripExe -Destination $shimPath -Force
+  }
+
+  # Deploy clink Lua filter
+  if (-not (Test-Path -LiteralPath $clinkDir)) {
+    # check-suppress:suppression_doc: directory creation output not needed.
+    New-Item -ItemType Directory -Path $clinkDir -Force > $null
+  }
+  if (Test-Path -LiteralPath $clinkLuaSource) {
+    Copy-Item -LiteralPath $clinkLuaSource -Destination $clinkLua -Force
+  }
 }

@@ -1,1 +1,1 @@
-{"hooks":{"beforeMCPExecution":[{"command":"harness-approval hook cursor","timeout":130}],"beforeShellExecution":[{"command":"harness-approval hook cursor","timeout":130}],"stop":[{"command":"harness-drive cursor","timeout":130}]},"version":1}
+{"hooks":{"beforeMCPExecution":[{"command":"harness-approval hook cursor","timeout":130}],"beforeShellExecution":[{"command":"safe-delete-guard","timeout":10},{"command":"harness-approval hook cursor","timeout":130}],"stop":[{"command":"harness-drive cursor","timeout":130}]},"version":1}
