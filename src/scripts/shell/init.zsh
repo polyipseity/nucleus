@@ -483,4 +483,54 @@ EOF
   return 1
 }
 
+
+del() {
+  cat >&2 << 'EOF'
+shell: error: del is disabled. Use shell-safe-rm or rip2 instead.
+EOF
+  return 1
+}
+
+rd() {
+  cat >&2 << 'EOF'
+shell: error: rd is disabled. Use shell-safe-rm or rip2 instead.
+EOF
+  return 1
+}
+
+rmdir() {
+  cat >&2 << 'EOF'
+shell: error: rmdir is disabled. Use shell-safe-rm or rip2 instead.
+EOF
+  return 1
+}
+
+erase() {
+  cat >&2 << 'EOF'
+shell: error: erase is disabled. Use shell-safe-rm or rip2 instead.
+EOF
+  return 1
+}
+
+ri() {
+  cat >&2 << 'EOF'
+shell: error: ri is disabled. Use shell-safe-rm or rip2 instead.
+EOF
+  return 1
+}
+
+unlink() {
+  cat >&2 << 'EOF'
+shell: error: unlink is disabled. Use shell-safe-rm or rip2 instead.
+EOF
+  return 1
+}
+
+shred() {
+  cat >&2 << 'EOF'
+shell: error: shred is disabled. Use shell-safe-rm or rip2 instead.
+EOF
+  return 1
+}
+
 __MACOS_ICLOUD_HOOKS__
