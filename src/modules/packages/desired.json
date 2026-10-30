@@ -9,6 +9,10 @@
       {
         "name": "clawhub",
         "why": "Fetched-skill install vehicle; absent from nixpkgs and cargo-binstall; bun is the only viable install tier."
+      },
+      {
+        "name": "safe-rm",
+        "why": "POSIX file deletion safety (OS Trash): replaces rm with recoverable deletion via kaelzhang/shell-safe-rm npm package."
       }
     ],
     "NixOS": [
@@ -19,6 +23,10 @@
       {
         "name": "clawhub",
         "why": "Fetched-skill install vehicle; absent from nixpkgs and cargo-binstall; bun is the only viable install tier."
+      },
+      {
+        "name": "safe-rm",
+        "why": "POSIX file deletion safety (OS Trash): replaces rm with recoverable deletion via kaelzhang/shell-safe-rm npm package."
       }
     ],
     "Windows": [
@@ -267,6 +275,11 @@
       {
         "name": "zig",
         "why": "Zig compiler toolchain; build-time dependency for source-built packages (Invoke-SourceBuild)."
+      },
+      {
+        "name": "rip2",
+        "bucket": "nucleus",
+        "why": "POSIX-style recoverable deletion for Windows (graveyard): rip2 from custom manifest."
       }
     ]
   },

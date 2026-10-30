@@ -734,6 +734,14 @@ let
       nixpkgs = "rimsort";
       winget = "RimSort.RimSort";
     };
+    rip2 = {
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "rip2";
+      };
+      nixpkgs = "rip2";
+    };
     ripgrep = {
       category = "cli";
       homebrew = {

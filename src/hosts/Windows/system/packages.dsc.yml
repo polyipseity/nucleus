@@ -29,6 +29,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure Clink is installed for cmd.exe command-line editing and to support safe-delete Lua interception hooks
+      settings:
+        id: chrisant996.Clink
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure zoxide is installed for cross-host shell navigation parity with macOS and NixOS
       settings:
         id: ajeetdsouza.zoxide
