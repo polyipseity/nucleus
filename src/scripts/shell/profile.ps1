@@ -45,7 +45,7 @@ function Invoke-SafeDelete {
     if (-not $IsWindows) {
       # POSIX backend: delegate to the platform safe alternative.
       $safeBin = $null
-      foreach ($candidate in @('shell-safe-rm', 'rip', 'rip2')) {
+      foreach ($candidate in @('shell-safe-rm')) {
         $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
         if ($cmd) { $safeBin = $cmd.Source; break }
       }
@@ -153,6 +153,8 @@ Set-Alias rd Invoke-SafeDelete
 Set-Alias erase Invoke-SafeDelete
 Set-Alias ri Invoke-SafeDelete
 Set-Alias rmdir Invoke-SafeDelete
+Set-Alias unlink Invoke-SafeDelete
+Set-Alias shred Invoke-SafeDelete
 Set-Alias Remove-Item Invoke-SafeDelete
 
 
