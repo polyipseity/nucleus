@@ -40,3 +40,4 @@ alwaysApply: false
 - pwsh safe-delete (`Invoke-SafeDelete`) currently Windows-only in `profile.ps1` (`if ($IsWindows)`); pwsh is installable on all hosts, so it must apply equally. Un-gate and add a POSIX backend.
 - Interactive blocking message is identical in intent across platforms.
 - PATH-based defense works on all platforms.
+- Deletion-command union across all hosts: `rm, del, rd, rmdir, erase, ri, unlink, shred, Remove-Item`. Interactive blocking, PATH shims, and agent guards cover the union on every host (not just Windows). POSIX pwsh delegates to `shell-safe-rm` (not rip). Windows git bash aliases the union to `rip`. cmd intercepts the Windows subset via clink/doskey/PATH shims.
