@@ -12,6 +12,7 @@ _POLICY_DATA_CHECKS=(
   "embedded content enforcement|run_embedded_content_enforcement|files"
   "method-1 symlink resolution|run_method1_symlink_resolution|ctx"
   "release age uniformity|run_release_age_uniformity|files"
+  "upstream workaround staleness|run_upstream_workaround_staleness|ctx"
 )
 
 run_repo_policy_data() {
@@ -411,6 +412,35 @@ run_release_age_uniformity() {
     fi
   fi
 
+  if [ "$_errors" -ne 0 ]; then
+    return 1
+  fi
+  return 0
+}
+
+run_upstream_workaround_staleness() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
+  cd "$_repo_root" || return 1
+  local _reg=".agents/instructions/upstream-workarounds.instructions.md"
+  if [ ! -f "$_reg" ]; then
+    error "upstream workarounds registry not found: $_reg"
+    return 1
+  fi
+  # Every file path referenced in the registry's location column must exist.
+  local _errors=0
+  local _paths
+  _paths=$(grep -oE '(src|scripts|\.agents)/[A-Za-z0-9_./-]+' "$_reg" | sort -u)
+  local _p
+  while IFS= read -r _p; do
+    [ -z "$_p" ] && continue
+    # strip trailing punctuation
+    _p="${_p%.}"
+    if [ ! -e "$_p" ]; then
+      error "upstream workarounds registry references missing path: $_p"
+      _errors=1
+    fi
+  done <<< "$_paths"
   if [ "$_errors" -ne 0 ]; then
     return 1
   fi

@@ -274,6 +274,24 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
   }
   if ($raErrors -gt 0) { $failed = $true }
 
+  Write-Message "--- upstream workaround staleness ---"
+  $uwReg = Join-Path $r '.agents\instructions\upstream-workarounds.instructions.md'
+  if (-not (Test-Path -LiteralPath $uwReg)) {
+    Write-ErrorMessage "upstream workarounds registry not found at $uwReg"
+    $failed = $true
+  } else {
+    $uwContent = Get-Content -LiteralPath $uwReg -Raw
+    $uwPaths = [regex]::Matches($uwContent, '(src|scripts|\.agents)/[A-Za-z0-9_./-]+') | ForEach-Object { $_.Value } | Sort-Object -Unique
+    foreach ($uwP in $uwPaths) {
+      $uwP = $uwP.TrimEnd('.')
+      $full = Join-Path $r ($uwP -replace '/','\')
+      if (-not (Test-Path -LiteralPath $full)) {
+        Write-ErrorMessage "upstream workarounds registry references missing path: $uwP"
+        $failed = $true
+      }
+    }
+  }
+
   if ($failed) {
     Write-ErrorMessage "repository policy (data-driven) check failed"
     return $false
