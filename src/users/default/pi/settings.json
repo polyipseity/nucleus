@@ -11,7 +11,7 @@
   "defaultThinkingLevel": "high",
   "followUpMode": "all",
   "httpIdleTimeoutMs": 300000,
-  "lastChangelogVersion": "0.86.1",
+  "lastChangelogVersion": "0.99.2",
   "markdown": {
     "mermaid": "final"
   },
@@ -19,19 +19,19 @@
     "bun"
   ],
   "packages": [
-    "npm:@juicesharp/rpiv-ask-user-question@2.10.1",
-    "npm:@narumitw/pi-plan-mode@0.58.0",
-    "npm:pi-background-tasks@2.5.0",
-    "npm:pi-extmgr@0.3.0",
-    "npm:pi-goal-x@0.31.6",
+    "npm:@juicesharp/rpiv-ask-user-question@2.15.0",
+    "npm:@narumitw/pi-plan-mode@0.59.4",
+    "npm:pi-background-tasks@2.6.10",
+    "npm:pi-extmgr@0.4.2",
+    "npm:pi-goal-x@0.34.0",
     "npm:pi-memory@0.4.2",
-    "npm:pi-powerline-footer@0.17.1",
+    "npm:pi-powerline-footer@0.21.0",
     "npm:pi-simplify@0.2.3",
-    "npm:pi-subagents@0.68.0",
-    "npm:pi-web-access@0.29.0",
-    "npm:@narumitw/pi-usage@0.60.8",
+    "npm:pi-subagents@0.82.1",
+    "npm:pi-web-access@0.44.0",
+    "npm:@narumitw/pi-usage@0.68.1",
     "npm:better-custom@0.4.2",
-    "npm:pi-provider-litellm@3.1.0",
+    "npm:pi-provider-litellm@4.5.0",
     "npm:@getpipher/vision@0.5.3"
   ],
   "prompts": [
@@ -42,7 +42,9 @@
   "steeringMode": "all",
   "subagents": {
     "modelScope": {
-      "allow": ["inherit"],
+      "allow": [
+        "inherit"
+      ],
       "enforce": true,
       "strict": true
     }
