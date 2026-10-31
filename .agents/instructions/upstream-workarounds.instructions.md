@@ -26,7 +26,7 @@ A workaround compensates for an upstream limitation. Two categories:
 | W06 | src/hosts/MacBook/linux-builder.nix:105 | /etc/nix/builder_ed25519 ownership | nix-darwin builder | upstream changes ownership |
 | W07 | src/platforms/Windows/modules/user/Sync-HermesConfig.ps1:190 | HERMES_HOME env var | hermes-agent installer | installer sets HERMES_HOME |
 | W08 | src/scripts/editors/neovim-init.lua:6,10,33 | enable_shift_number_symbols_workaround | neovim/terminal | regression fixed |
-| W09 | src/vms/VMs.json (Android) | sound=none | UTM #2221/#2364/#4781 | UTM fixes deadlock |
+| W09 | src/modules/vms/VMs.json (Android) | sound=none | UTM #2221/#2364/#4781 | UTM fixes deadlock |
 | W10 | src/hosts/MacBook/activation.nix (Spotlight) | six-step Spotlight disable | macOS SIP/launchd | SIP allows declarative disable |
 | W11 | src/flake.nix:467 | gnupg pinned to 2.5.19, patches=[], postPatch="" | nixpkgs gnupg patch stack (2.4-only) | patch stack targets 2.5 |
 | W12 | src/flake.nix:145-180 | davs2/kvazaar/etc doCheck=false on Darwin | nixpkgs test incompatibility | nixpkgs fixes Darwin tests |
