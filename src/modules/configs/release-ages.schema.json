@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Release ages",
+  "type": "object",
+  "required": ["$schema", "bun", "uv", "cargo", "psgallery"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "bun": {
+      "type": "object",
+      "required": ["minimumReleaseAge", "unit", "installTimeEnforced"],
+      "properties": {
+        "minimumReleaseAge": { "type": ["integer", "null"] },
+        "unit": { "type": ["string", "null"], "enum": ["seconds", null] },
+        "installTimeEnforced": { "type": "boolean" }
+      }
+    },
+    "uv": {
+      "type": "object",
+      "required": ["excludeNewer", "unit", "installTimeEnforced"],
+      "properties": {
+        "excludeNewer": { "type": ["string", "null"] },
+        "unit": { "type": ["string", "null"], "enum": ["iso8601-duration", null] },
+        "installTimeEnforced": { "type": "boolean" }
+      }
+    },
+    "cargo": {
+      "type": "object",
+      "required": ["minimumReleaseAge", "unit", "installTimeEnforced", "reason"],
+      "properties": {
+        "minimumReleaseAge": { "type": ["integer", "null"] },
+        "unit": { "type": ["string", "null"] },
+        "installTimeEnforced": { "type": "boolean" },
+        "reason": { "type": "string" }
+      }
+    },
+    "psgallery": {
+      "type": "object",
+      "required": ["minimumReleaseAge", "unit", "installTimeEnforced", "reason"],
+      "properties": {
+        "minimumReleaseAge": { "type": ["integer", "null"] },
+        "unit": { "type": ["string", "null"] },
+        "installTimeEnforced": { "type": "boolean" },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}
