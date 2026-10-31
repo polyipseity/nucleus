@@ -414,7 +414,7 @@ run_caddy_local_ca_trust() {
     return
   fi
 
-  if ! sh "$_rclct_script" "$1"; then
+  if ! bash "$_rclct_script" "$1"; then
     # WHY: caddy-trust is a convenience feature; apply succeeds without local CA trust.
     warn -l caddy-trust 'delegated trust script exited with an error (continuing without failing apply)'
   fi
@@ -462,7 +462,7 @@ run_post_apply() {
   if [ "$vm_setup" = true ]; then _flags+=(--vm-setup); fi
   if [ "$vm_sync" = false ]; then _flags+=(--no-vm-sync); fi
   _flags+=(--target "$_target")
-  sh "$REPO_ROOT/src/scripts/post-apply.sh" "${_flags[@]}"
+  bash "$REPO_ROOT/src/scripts/post-apply.sh" "${_flags[@]}"
 }
 
 run_terminal_activations() {
