@@ -7,7 +7,8 @@
 # (read-only Nix store paths) and unnecessary (tap versions are bumped by
 # the flake stage; installed packages are reconciled by nix-darwin activation).
 #
-# Commands: [--flake|--no-flake] [--sops|--no-sops].
+# Commands: [--flake|--no-flake] [--sops|--no-sops] [--force].
+# nixpkgs updates are gated to once per 30 days (see release-ages.json).
 # Each stage is independently skippable, so partial updates are possible
 # (e.g. rewrap secrets without touching flake.lock).
 #
@@ -44,6 +45,7 @@ usage() {
   update options:
     --flake|--no-flake    Control nix flake update (default: --flake).
     --sops|--no-sops      Control sops updatekeys (default: --sops).
+    --force               Bypass the 30-day nixpkgs age guard.
 
   lockfile options:
     --sections <list>     Comma-separated section names to update (default: all).
@@ -63,6 +65,7 @@ do_update() {
 
   flake=true
   sops=true
+  force=false
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -84,6 +87,10 @@ do_update() {
       sops=false
       ;;
 
+    --force)
+      force=true
+      ;;
+
     *)
       error "unsupported argument '$1'"
       usage >&2
@@ -101,13 +108,63 @@ do_update() {
     NIX_CONFIG="$(merge_nix_config)" NIX_PATH="nixpkgs=flake:nixpkgs" nix --option warn-dirty false "$@"
   }
 
+  # guard_nixpkgs_age
+  #   Refuses to update nixpkgs if the currently pinned commit is younger than
+  #   the threshold declared in release-ages.json (nixpkgs.minimumReleaseAge,
+  #   seconds). Applies to nixpkgs only. Bypass with --force.
+  guard_nixpkgs_age() {
+    local _ra_json="${NUCLEUS_RELEASE_AGES_FILE:-$REPO_ROOT/src/modules/configs/release-ages.json}"
+    local _threshold
+    _threshold=$(jq -r '.nixpkgs.minimumReleaseAge // 2592000' "$_ra_json" 2>/dev/null || echo 2592000)
+    local _lock="$REPO_ROOT/src/flake.lock"
+    local _last_modified
+    _last_modified=$(jq -r '.nodes.nixpkgs_4.locked.lastModified // .nodes.nixpkgs.locked.lastModified // 0' "$_lock" 2>/dev/null || echo 0)
+    local _now
+    _now=$(date +%s)
+    local _age=$(( _now - _last_modified ))
+    if [ "$_age" -lt "$_threshold" ]; then
+      local _days=$(( _age / 86400 ))
+      local _min_days=$(( _threshold / 86400 ))
+      error "nixpkgs guard: pinned commit is ${_days}d old, minimum is ${_min_days}d. Use --force to bypass."
+      return 1
+    fi
+    return 0
+  }
+
+  # latest_eligible_nixpkgs_commit
+  #   Queries GitHub for the most recent nixos-unstable channel commit whose
+  #   date is at least minimumReleaseAge seconds ago. Returns the SHA.
+  latest_eligible_nixpkgs_commit() {
+    local _ra_json="${NUCLEUS_RELEASE_AGES_FILE:-$REPO_ROOT/src/modules/configs/release-ages.json}"
+    local _threshold
+    _threshold=$(jq -r '.nixpkgs.minimumReleaseAge // 2592000' "$_ra_json" 2>/dev/null || echo 2592000)
+    local _cutoff
+    _cutoff=$(date -u -d "@$(( $(date +%s) - _threshold ))" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+      || date -u -v-${_threshold}S +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
+    local _sha
+    _sha=$(curl -s "https://api.github.com/repos/NixOS/nixpkgs/commits?sha=nixos-unstable&until=${_cutoff}&per_page=1" 2>/dev/null | jq -r '.[0].sha // empty')
+    if [ -z "$_sha" ]; then
+      error "could not determine eligible nixpkgs commit (network/GitHub API failure)"
+      return 1
+    fi
+    printf '%s' "$_sha"
+  }
+
   # update_flake_inputs
-  #   Runs `nix flake update` against the flake at src/. WHY: the flake lock
-  #   must live next to flake.nix (Nix requirement), so the update explicitly
-  #   targets src/ rather than the repo root.
+  #   Updates the nixpkgs input (guarded, >=30 days) and rewraps SOPS files.
+  #   WHY: nixpkgs is pinned to a specific channel commit via --override-input
+  #   so that only nixpkgs moves, not every other input.
   update_flake_inputs() {
-    # Updates pinned upstream revisions in src/flake.lock.
-    if flake_output="$(run_nix flake update --flake "$REPO_ROOT/src" 2>&1)"; then
+    if [ "$force" != true ]; then
+      guard_nixpkgs_age || return 1
+    fi
+
+    local _target_commit
+    _target_commit=$(latest_eligible_nixpkgs_commit) || return 1
+    notice "pinning nixpkgs to $_target_commit"
+
+    local flake_output
+    if flake_output="$(run_nix flake lock --override-input nixpkgs "github:NixOS/nixpkgs/$_target_commit" --flake "$REPO_ROOT/src" 2>&1)"; then
       if [ -n "$flake_output" ]; then
         printf '%s\n' "$flake_output"
       fi
@@ -116,10 +173,6 @@ do_update() {
 
     printf '%s\n' "$flake_output" >&2
 
-    # Transient network / GitHub API-rate-limit failures should propagate as
-    # errors so callers can handle the failure upstream.
-    # WHY: these specific signatures are called out so an operator can retry
-    # later instead of suspecting the lockfile itself broke.
     if printf '%s' "$flake_output" | grep -Eq 'API rate limit exceeded|unable to download|HTTP error 403'; then
       error "flake update failed due to transient fetch/rate-limit error"
     fi
