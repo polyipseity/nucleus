@@ -19,7 +19,9 @@ let
               # WHY: mirror the mkPkgs override so fastmcp/oterm build against
               # mcp_1 instead of the broken mcp >= 2 path (see flake.nix).
               python314Packages = prev.python314Packages.overrideScope (pyfinal: pyprev: {
-                fastmcp-slim = pyprev.fastmcp-slim.override { mcp = pyfinal.mcp_1; };
+                # WHY: oterm (and fastmcp-slim) must agree on one mcp version;
+                # alias mcp to mcp_1 so no duplicate mcp appears in the closure.
+                mcp = pyfinal.mcp_1;
               });
             })
           ];

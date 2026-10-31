@@ -186,7 +186,9 @@
               # (PR #575004). Override it to use mcp_1 so fastmcp/oterm build,
               # mirroring the (unmerged) upstream PR #577109.
               python314Packages = prev.python314Packages.overrideScope (pyfinal: pyprev: {
-                fastmcp-slim = pyprev.fastmcp-slim.override { mcp = pyfinal.mcp_1; };
+                # WHY: oterm (and fastmcp-slim) must agree on one mcp version;
+                # alias mcp to mcp_1 so no duplicate mcp appears in the closure.
+                mcp = pyfinal.mcp_1;
               });
               # WHY: nixpkgs frei0r 3.2.1 unconditionally depends on gavl → libdrm,
               # which breaks ffmpeg-full eval on Darwin. Gate gavl to Linux and disable
