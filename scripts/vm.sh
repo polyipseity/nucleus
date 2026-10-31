@@ -331,7 +331,7 @@ done
 # WHY: folding post-subcommand flags into the same option set makes flag order
 # irrelevant; unknown flags only warn so subcommand flags can pass.
 filtered_vm_args=()
-for arg in "${vm_args[@]}"; do
+for arg in ${vm_args[@]+"${vm_args[@]}"}; do
   case "$arg" in
   --json) json_output=true ;;
   --dry-run) dry_run=true ;;
