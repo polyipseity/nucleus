@@ -1,47 +1,163 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Release ages",
-  "type": "object",
-  "required": ["$schema", "bun", "uv", "cargo", "psgallery"],
   "properties": {
-    "$schema": { "type": "string" },
-    "bun": {
-      "type": "object",
-      "required": ["minimumReleaseAge", "unit", "installTimeEnforced"],
-      "properties": {
-        "minimumReleaseAge": { "type": ["integer", "null"] },
-        "unit": { "type": ["string", "null"], "enum": ["seconds", null] },
-        "installTimeEnforced": { "type": "boolean" }
-      }
+    "$schema": {
+      "type": "string"
     },
-    "uv": {
-      "type": "object",
-      "required": ["excludeNewer", "unit", "installTimeEnforced"],
+    "bun": {
       "properties": {
-        "excludeNewer": { "type": ["string", "null"] },
-        "unit": { "type": ["string", "null"], "enum": ["iso8601-duration", null] },
-        "installTimeEnforced": { "type": "boolean" }
-      }
+        "installTimeEnforced": {
+          "type": "boolean"
+        },
+        "minimumReleaseAge": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "unit": {
+          "enum": [
+            "seconds",
+            null
+          ],
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "minimumReleaseAge",
+        "unit",
+        "installTimeEnforced"
+      ],
+      "type": "object"
     },
     "cargo": {
-      "type": "object",
-      "required": ["minimumReleaseAge", "unit", "installTimeEnforced", "reason"],
       "properties": {
-        "minimumReleaseAge": { "type": ["integer", "null"] },
-        "unit": { "type": ["string", "null"] },
-        "installTimeEnforced": { "type": "boolean" },
-        "reason": { "type": "string" }
-      }
+        "installTimeEnforced": {
+          "type": "boolean"
+        },
+        "minimumReleaseAge": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "unit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "minimumReleaseAge",
+        "unit",
+        "installTimeEnforced",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "nixpkgs": {
+      "properties": {
+        "installTimeEnforced": {
+          "type": "boolean"
+        },
+        "minimumReleaseAge": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "unit": {
+          "enum": [
+            "seconds",
+            null
+          ],
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "minimumReleaseAge",
+        "unit",
+        "installTimeEnforced"
+      ],
+      "type": "object"
     },
     "psgallery": {
-      "type": "object",
-      "required": ["minimumReleaseAge", "unit", "installTimeEnforced", "reason"],
       "properties": {
-        "minimumReleaseAge": { "type": ["integer", "null"] },
-        "unit": { "type": ["string", "null"] },
-        "installTimeEnforced": { "type": "boolean" },
-        "reason": { "type": "string" }
-      }
+        "installTimeEnforced": {
+          "type": "boolean"
+        },
+        "minimumReleaseAge": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "unit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "minimumReleaseAge",
+        "unit",
+        "installTimeEnforced",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "uv": {
+      "properties": {
+        "installTimeEnforced": {
+          "type": "boolean"
+        },
+        "minimumReleaseAge": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "unit": {
+          "enum": [
+            "seconds",
+            null
+          ],
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "minimumReleaseAge",
+        "unit",
+        "installTimeEnforced"
+      ],
+      "type": "object"
     }
-  }
+  },
+  "required": [
+    "$schema",
+    "bun",
+    "uv",
+    "cargo",
+    "psgallery",
+    "nixpkgs"
+  ],
+  "title": "Release ages",
+  "type": "object"
 }

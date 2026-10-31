@@ -1,7 +1,30 @@
 {
   "$schema": "./release-ages.schema.json",
-  "bun": { "minimumReleaseAge": 432000, "unit": "seconds", "installTimeEnforced": true },
-  "uv": { "excludeNewer": "P5D", "unit": "iso8601-duration", "installTimeEnforced": true },
-  "cargo": { "minimumReleaseAge": 432000, "unit": "seconds", "installTimeEnforced": false, "reason": "no upstream delay feature; install relies on lockfile pins, updater filters by age" },
-  "psgallery": { "minimumReleaseAge": null, "unit": null, "installTimeEnforced": false, "reason": "no upstream delay feature; relies on pin + nupkg hash" }
+  "bun": {
+    "installTimeEnforced": true,
+    "minimumReleaseAge": 432000,
+    "unit": "seconds"
+  },
+  "cargo": {
+    "installTimeEnforced": false,
+    "minimumReleaseAge": 432000,
+    "reason": "no upstream delay feature; install relies on lockfile pins, updater filters by age",
+    "unit": "seconds"
+  },
+  "nixpkgs": {
+    "installTimeEnforced": true,
+    "minimumReleaseAge": 2592000,
+    "unit": "seconds"
+  },
+  "psgallery": {
+    "installTimeEnforced": false,
+    "minimumReleaseAge": null,
+    "reason": "no upstream delay feature; relies on pin + nupkg hash",
+    "unit": null
+  },
+  "uv": {
+    "installTimeEnforced": true,
+    "minimumReleaseAge": 432000,
+    "unit": "seconds"
+  }
 }
