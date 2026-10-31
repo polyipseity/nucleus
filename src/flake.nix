@@ -170,26 +170,6 @@
               xevd = prev.xevd.overrideAttrs (_: {
                 doCheck = !prev.stdenv.hostPlatform.isDarwin;
               });
-              # WHY: nixpkgs redis 8.10.3 Darwin postPatch does substituteInPlace
-              # --replace-fail on the hardcoded CommandLineTools SDK path, but
-              # redis >= 8.10.3 computes MACOS_SDK via xcrun, so the literal is
-              # gone and the build aborts. Clear the dead postPatch and point
-              # MACOS_SDK at apple-sdk via makeFlags instead.
-              redis = prev.redis.overrideAttrs (oldAttrs: {
-                postPatch = prev.lib.optionalString prev.stdenv.hostPlatform.isDarwin "";
-                makeFlags = (oldAttrs.makeFlags or [ ])
-                  ++ prev.lib.optionals prev.stdenv.hostPlatform.isDarwin [
-                    "MACOS_SDK=${prev.apple-sdk.sdkroot}"
-                  ];
-              });
-              # WHY: nixpkgs marked fastmcp-slim broken because mcp >= 2
-              # (PR #575004). Override it to use mcp_1 so fastmcp/oterm build,
-              # mirroring the (unmerged) upstream PR #577109.
-              python314Packages = prev.python314Packages.overrideScope (pyfinal: pyprev: {
-                # WHY: oterm (and fastmcp-slim) must agree on one mcp version;
-                # alias mcp to mcp_1 so no duplicate mcp appears in the closure.
-                mcp = pyfinal.mcp_1;
-              });
               # WHY: nixpkgs frei0r 3.2.1 unconditionally depends on gavl → libdrm,
               # which breaks ffmpeg-full eval on Darwin. Gate gavl to Linux and disable
               # it via CMake until nixpkgs merges https://github.com/NixOS/nixpkgs/pull/549747.

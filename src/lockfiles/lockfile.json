@@ -1,15 +1,15 @@
 {
   "$schema": "./lockfile.schema.json",
   "bun": {
-    "@anthropic-ai/sandbox-runtime": "0.0.81",
-    "@earendil-works/pi-coding-agent": "1.4.0",
+    "@anthropic-ai/sandbox-runtime": "0.0.77",
+    "@earendil-works/pi-coding-agent": "0.87.1",
     "@tobilu/qmd": "2.8.3",
-    "clawhub": "0.24.1",
-    "playwright": "1.64.1"
+    "clawhub": "0.23.3",
+    "playwright": "1.63.0"
   },
   "cargo-binstall": {
     "cargo-cache": "0.8.3",
-    "cargo-nextest": "0.9.150",
+    "cargo-nextest": "0.9.146",
     "nickel-lang-lsp": "1.18.0",
     "pay-respects": "0.8.8"
   },
@@ -21,24 +21,24 @@
   },
   "pi": {
     "@getpipher/vision": "0.5.3",
-    "@juicesharp/rpiv-ask-user-question": "2.15.0",
-    "@narumitw/pi-plan-mode": "0.59.4",
-    "@narumitw/pi-usage": "0.68.1",
+    "@juicesharp/rpiv-ask-user-question": "2.10.1",
+    "@narumitw/pi-plan-mode": "0.58.0",
+    "@narumitw/pi-usage": "0.60.8",
     "better-custom": "0.4.2",
-    "pi-background-tasks": "2.6.10",
-    "pi-extmgr": "0.4.2",
-    "pi-goal-x": "0.34.0",
+    "pi-background-tasks": "2.5.0",
+    "pi-extmgr": "0.3.0",
+    "pi-goal-x": "0.31.6",
     "pi-memory": "0.4.2",
-    "pi-powerline-footer": "0.21.0",
-    "pi-provider-litellm": "4.5.0",
+    "pi-powerline-footer": "0.17.1",
+    "pi-provider-litellm": "3.1.0",
     "pi-simplify": "0.2.3",
-    "pi-subagents": "0.82.1",
-    "pi-web-access": "0.44.0"
+    "pi-subagents": "0.68.0",
+    "pi-web-access": "0.29.0"
   },
   "psgallery": {
-    "PSScriptAnalyzer": "1.25.0",
     "Pester": "6.2.0",
-    "powershell-yaml": "0.4.12"
+    "powershell-yaml": "0.4.12",
+    "PSScriptAnalyzer": "1.25.0"
   },
   "rustup": {
     "stable": "1.95.0"
@@ -176,8 +176,8 @@
     "vscode": {
       "arrterian.nix-env-selector": "1.3.2",
       "astral-sh.ty": "2026.69.12452253",
-      "asvetliakov.vscode-neovim": "1.20.0",
-      "charliermarsh.ruff": "2026.82.0",
+      "asvetliakov.vscode-neovim": "1.19.0",
+      "charliermarsh.ruff": "2026.74.0",
       "christian-kohler.npm-intellisense": "1.4.5",
       "christian-kohler.path-intellisense": "2.10.0",
       "cl.eide": "3.26.14",
@@ -187,7 +187,7 @@
       "docker.docker": "0.18.0",
       "editorconfig.editorconfig": "0.18.2",
       "esbenp.prettier-vscode": "12.4.0",
-      "github.codespaces": "1.18.16",
+      "github.codespaces": "1.18.15",
       "github.remotehub": "0.65.2026080601",
       "github.vscode-github-actions": "0.32.3",
       "heaths.vscode-guid": "1.9.0",
@@ -198,24 +198,24 @@
       "keroc.hex-fmt": "1.0.0",
       "mark-hansen.hledger-vscode": "0.0.12",
       "mkhl.direnv": "0.17.0",
-      "ms-azuretools.vscode-containers": "2.5.1",
-      "ms-ceintl.vscode-language-pack-zh-hant": "1.131.2026090407",
+      "ms-azuretools.vscode-containers": "2.5.0",
+      "ms-ceintl.vscode-language-pack-zh-hant": "1.129.2026071717",
       "ms-python.debugpy": "2026.6.0",
       "ms-python.python": "2026.4.0",
-      "ms-python.vscode-python-envs": "1.37.2026092101",
+      "ms-python.vscode-python-envs": "1.37.2026090401",
       "ms-toolsai.datawrangler": "1.24.2",
       "ms-toolsai.jupyter": "2025.9.1",
       "ms-toolsai.jupyter-keymap": "1.1.2",
       "ms-toolsai.jupyter-renderers": "1.3.0",
       "ms-toolsai.vscode-jupyter-cell-tags": "0.1.9",
       "ms-toolsai.vscode-jupyter-slideshow": "0.1.6",
-      "ms-vscode-remote.remote-containers": "0.469.0",
-      "ms-vscode-remote.remote-ssh": "0.128.0",
+      "ms-vscode-remote.remote-containers": "0.466.0",
+      "ms-vscode-remote.remote-ssh": "0.124.0",
       "ms-vscode-remote.remote-ssh-edit": "0.87.0",
       "ms-vscode-remote.remote-wsl": "0.104.3",
       "ms-vscode.cmake-tools": "1.23.52",
       "ms-vscode.cpp-devtools": "0.7.0",
-      "ms-vscode.cpptools": "1.34.4",
+      "ms-vscode.cpptools": "1.32.2",
       "ms-vscode.cpptools-extension-pack": "1.5.1",
       "ms-vscode.cpptools-themes": "2.0.0",
       "ms-vscode.hexeditor": "1.11.1",
@@ -223,17 +223,17 @@
       "ms-vscode.powershell": "2025.4.0",
       "ms-vscode.remote-explorer": "0.5.0",
       "ms-vscode.remote-repositories": "0.43.2026080601",
-      "ms-vscode.remote-server": "1.6.2026092109",
-      "ms-vscode.vscode-chat-customizations-evaluations": "1.1.2026091515",
+      "ms-vscode.remote-server": "1.6.2026072909",
+      "ms-vscode.vscode-chat-customizations-evaluations": "1.1.2026090319",
       "ms-vscode.vscode-serial-monitor": "0.13.251128001",
       "ms-vsliveshare.vsliveshare": "1.1.122",
-      "myriad-dreamin.tinymist": "0.15.8",
+      "myriad-dreamin.tinymist": "0.15.2",
       "redhat.vscode-yaml": "1.24.0",
       "rust-lang.rust-analyzer": "0.3.2803",
       "s-nlf-fh.glassit": "0.2.6",
       "sjhuangx.vscode-scheme": "0.4.0",
       "sst-dev.opencode-v2": "0.1.1",
-      "streetsidesoftware.code-spell-checker": "4.9.3",
+      "streetsidesoftware.code-spell-checker": "4.7.3",
       "svelte.svelte-vscode": "110.3.1",
       "takumii.markdowntable": "0.10.3",
       "tamasfe.even-better-toml": "0.21.2",
@@ -241,7 +241,7 @@
       "vadimcn.vscode-lldb": "1.12.2"
     }
   },
-  "updated": "2026-10-30T13:17:50Z",
+  "updated": "2026-09-23T08:08:15Z",
   "uv": {
     "discord-music-rpc": {
       "rev": "bba71027a684db53f3fcde5adbd3d42627241a83",
@@ -255,43 +255,42 @@
   "vm-setup": {
     "nixos-iso": {
       "aarch64-linux": {
-        "digest": "sha256:2917713bf4ce6359627c7f3b6c09700d5523539297aa7d8bf43c517510c919cc",
-        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1103272.31ecbaca1bde/nixos-minimal-26.11pre1103272.31ecbaca1bde-aarch64-linux.iso"
+        "digest": "sha256:347769d17cf475238860ff3651481e3a6781552c3eff6405487fe2c126d21ef1",
+        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1077996.6774f7bc2537/nixos-minimal-26.11pre1077996.6774f7bc2537-aarch64-linux.iso"
       },
       "x86_64-linux": {
-        "digest": "sha256:a565bc505ef89b8e437c973fd5f1b4e04faeec1aa8ba092b32eb86f9bf1deff7",
-        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1103272.31ecbaca1bde/nixos-minimal-26.11pre1103272.31ecbaca1bde-x86_64-linux.iso"
+        "digest": "sha256:ff526276f3258bb80b70df4794b724937ba3713fb734406162207c1a76132700",
+        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1077996.6774f7bc2537/nixos-minimal-26.11pre1077996.6774f7bc2537-x86_64-linux.iso"
       }
     },
     "tart-images": {
       "sequoia": {
-        "digest": "sha256:eee659985b01e4df2a6c0754bd8d25e54969933c43fdcd4edef8bea337b3d354",
+        "digest": "sha256:4947ac5ab1b2fdc46ab856132d2ba958f8e45b5f85192c66370dafc028c514dd",
         "image": "ghcr.io/cirruslabs/macos-sequoia-base"
       },
       "tahoe": {
-        "digest": "sha256:4aaa751fa7538902d73c767f27a066fc87e83f183069da4e4b5022863abd4c77",
+        "digest": "sha256:1b093499716409d29e8b5336844528e1cae375db97d2ad8e5aeff78cf0da201e",
         "image": "ghcr.io/cirruslabs/macos-tahoe-base"
       }
     }
   },
-  "whisper": {
-    "ggml-base.en.bin": {
-      "hash": "sha256-oDd5yG3zMjB19eeWyyzlAp8A7Ihp7uP9+4l6/jbG0AI=",
-      "revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
-      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base.en.bin"
-    }
-  },
   "winget": {
     "7zip.7zip": "26.01",
+    "ajeetdsouza.zoxide": "0.9.9",
     "Anysphere.Cursor": "3.14.7",
+    "astral-sh.ruff": "0.15.16",
+    "astral-sh.ty": "0.0.44",
+    "astral-sh.uv": "0.11.19",
     "BlenderFoundation.Blender": "5.1.2",
     "BurntSushi.ripgrep": "15.1.0",
     "CaddyServer.Caddy": "2.11.4",
     "Clement.bottom": "0.12.3",
     "DEVCOM.JetBrainsMonoNerdFont": "3.3.0",
+    "direnv.direnv": "2.37.1",
     "Discord.Discord.Canary": "1.0.982",
     "EclipseAdoptium.Temurin.25.JDK": "25.0.1",
     "EqualizerAPO.EqualizerAPO": "1.4.2",
+    "eza-community.eza": "0.23.4",
     "GIMP.GIMP": "3.2.4",
     "Git.Git": "2.54.0",
     "GitHub.cli": "2.93.0",
@@ -303,7 +302,10 @@
     "Hashicorp.Vagrant": "2.4.9",
     "IJHack.QtPass": "1.7.0",
     "ImageMagick.ImageMagick": "7.1.2.25",
+    "j178.Prek": "0.4.13",
     "Jellyfin.Server": "10.11.11",
+    "jqlang.jq": "1.8.1",
+    "junegunn.fzf": "0.73.1",
     "KDE.Krita": "5.3.2.1",
     "LLVM.LLVM": "22.1.6",
     "Microsoft.DotNet.Runtime.6": "6.0.36",
@@ -315,8 +317,8 @@
     "MikeFarah.yq": "4.53.4",
     "MusicBrainz.Picard": "2.13.3",
     "Neovim.Neovim": "0.12.2",
-    "OBSProject.OBSStudio": "31.1.2",
     "Obsidian.Obsidian": "1.12.7",
+    "OBSProject.OBSStudio": "31.1.2",
     "Ollama.Ollama": "0.30.6",
     "Oven-sh.Bun": "1.3.14",
     "Parsec.Parsec": "150.101.0.0",
@@ -325,27 +327,25 @@
     "Redis.Redis": "3.0.504",
     "RimSort.RimSort": "1.12.0",
     "Rustlang.Rustup": "1.29.0",
-    "SST.opencode": "1.16.2",
     "SecretsOPerationS.SOPS": "3.12.2",
+    "sharkdp.bat": "0.26.1",
+    "sharkdp.fd": "10.4.2",
+    "SST.opencode": "1.16.2",
     "Telegram.TelegramDesktop.Beta": "4.6.4",
     "Tencent.WeChat.Universal": "4.1.15.53",
     "TheDocumentFoundation.LibreOffice": "26.2.3.2",
     "Typst.Typst": "0.14.2",
     "Valve.Steam": "2.10.91.91",
     "VideoLAN.VLC": "3.0.23",
+    "waterlan.dos2unix": "7.5.6",
     "WinFsp.WinFsp": "2.1.25156",
-    "Zoom.Zoom": "7.0.38856",
-    "ajeetdsouza.zoxide": "0.9.9",
-    "astral-sh.ruff": "0.15.16",
-    "astral-sh.ty": "0.0.44",
-    "astral-sh.uv": "0.11.19",
-    "direnv.direnv": "2.37.1",
-    "eza-community.eza": "0.23.4",
-    "j178.Prek": "0.4.13",
-    "jqlang.jq": "1.8.1",
-    "junegunn.fzf": "0.73.1",
-    "sharkdp.bat": "0.26.1",
-    "sharkdp.fd": "10.4.2",
-    "waterlan.dos2unix": "7.5.6"
+    "Zoom.Zoom": "7.0.38856"
+  },
+  "whisper": {
+    "ggml-base.en.bin": {
+      "hash": "sha256-oDd5yG3zMjB19eeWyyzlAp8A7Ihp7uP9+4l6/jbG0AI=",
+      "revision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base.en.bin"
+    }
   }
 }
