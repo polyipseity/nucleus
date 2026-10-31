@@ -510,6 +510,10 @@ Darwin)
   "$_ash_script_dir/secrets/register-host-age-key.sh" --repo-root "$REPO_ROOT"
   run_health_check
   run_pre_build
+  # Front-load the devShell/flake-inputs closures so the rust toolchain and inputs
+  # are built during pre-build rather than late in activation.
+  run_pin_flake_inputs
+  run_pin_devshell
   # linux-builder saves ~500 MiB RAM when idle; the trap stops it on any exit.
   _lb_started=false
   if command -v nucleus-svc >/dev/null 2>&1; then
@@ -534,8 +538,6 @@ Darwin)
   # refresh the recorded live repo root in case the checkout moved during activation
   _post_rebuild_repo_root="$(derive_repo_root)"
   printf '%s\n' "$_post_rebuild_repo_root" | sudo -H tee "/Library/Application Support/nucleus/repo-root" >/dev/null
-  run_pin_flake_inputs
-  run_pin_devshell
   run_terminal_activations
   "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
   run_caddy_local_ca_trust sudo
@@ -557,6 +559,9 @@ Linux)
     "$_ash_script_dir/secrets/register-host-age-key.sh" --repo-root "$REPO_ROOT"
     run_health_check
     run_pre_build
+    # Front-load the devShell/flake-inputs closures (see Darwin branch).
+    run_pin_flake_inputs
+    run_pin_devshell
     # Activation scripts run under `env -i`, so record the live root at the
     # SYSTEM root where derive_repo_root finds it.
     sudo -H install -d -m 0755 "/var/lib/nucleus"
@@ -566,8 +571,6 @@ Linux)
     # refresh in case the checkout moved during activation
     _post_rebuild_repo_root="$(derive_repo_root)"
     printf '%s\n' "$_post_rebuild_repo_root" | sudo -H tee "/var/lib/nucleus/repo-root" >/dev/null
-    run_pin_flake_inputs
-    run_pin_devshell
     run_terminal_activations
     "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
     run_caddy_local_ca_trust sudo
@@ -578,9 +581,10 @@ Linux)
     target_username="${target_user:-${NUCLEUS_USERNAME:-$(id -un)}}"
     run_health_check
     run_pre_build
-    run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
+    # Front-load the devShell/flake-inputs closures (see Darwin branch).
     run_pin_flake_inputs
     run_pin_devshell
+    run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
     run_terminal_activations
     "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
     run_caddy_local_ca_trust user
