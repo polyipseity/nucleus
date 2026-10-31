@@ -400,15 +400,19 @@ run_release_age_uniformity() {
     fi
   done
 
-  # uv exclude-newer vs uv.toml
-  local _uv_val
-  _uv_val=$(jq -r '.uv.excludeNewer' "$_ra_json" 2>/dev/null)
-  if [ -f "src/users/default/uv/uv.toml" ]; then
-    local _uv_file_val
-    _uv_file_val=$(grep -E '^[[:space:]]*exclude-newer[[:space:]]*=' "src/users/default/uv/uv.toml" | head -1 | sed -E 's/.*=[[:space:]]*"([^"]*)".*/\1/')
-    if [ "$_uv_file_val" != "$_uv_val" ]; then
-      error "release age mismatch: uv.toml has exclude-newer=$_uv_file_val, declaration has $_uv_val"
-      _errors=1
+  # uv minimumReleaseAge (seconds) vs uv.toml exclude-newer (ISO 8601 days)
+  local _uv_seconds
+  _uv_seconds=$(jq -r '.uv.minimumReleaseAge' "$_ra_json" 2>/dev/null)
+  if [ -n "$_uv_seconds" ] && [ "$_uv_seconds" != "null" ]; then
+    local _uv_days=$(( _uv_seconds / 86400 ))
+    local _uv_expected="P${_uv_days}D"
+    if [ -f "src/users/default/uv/uv.toml" ]; then
+      local _uv_file_val
+      _uv_file_val=$(grep -E '^[[:space:]]*exclude-newer[[:space:]]*=' "src/users/default/uv/uv.toml" | head -1 | sed -E 's/.*=[[:space:]]*"([^"]*)".*/\1/')
+      if [ "$_uv_file_val" != "$_uv_expected" ]; then
+        error "release age mismatch: uv.toml has exclude-newer=$_uv_file_val, declaration converts to $_uv_expected"
+        _errors=1
+      fi
     fi
   fi
 

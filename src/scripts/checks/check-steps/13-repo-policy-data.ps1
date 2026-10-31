@@ -259,14 +259,16 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
         }
       }
     }
-    $uvAge = [string]$ra.uv.excludeNewer
+    $uvSeconds = [int]$ra.uv.minimumReleaseAge
+    $uvDays = [int]($uvSeconds / 86400)
+    $uvAge = "P${uvDays}D"
     $uvFile = Join-Path $r 'src/users/default/uv/uv.toml'
     if (Test-Path -LiteralPath $uvFile) {
       $m = Select-String -LiteralPath $uvFile -Pattern '^[\s]*exclude-newer[\s]*=' | Select-Object -First 1
       if ($m) {
         $val = [string]($m.Line -replace '.*=\s*','' -replace '^"','' -replace '"$','')
         if ($val -ne $uvAge) {
-          Write-ErrorMessage "release age mismatch: uv.toml has exclude-newer=$val, declaration has $uvAge"
+          Write-ErrorMessage "release age mismatch: uv.toml has exclude-newer=$val, declaration converts to $uvAge"
           $raErrors++
         }
       }
