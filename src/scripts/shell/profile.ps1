@@ -26,7 +26,7 @@ function Invoke-SafeDelete {
     [Switch]$Force,
     [string]$Filter,
     [string[]]$Include,
-    [string[]]$Exclude,
+    [string[]]$Exclude
   )
   begin {
     if ($IsWindows) {
