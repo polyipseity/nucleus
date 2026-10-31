@@ -13,7 +13,7 @@
   },
   "nixpkgs": {
     "installTimeEnforced": true,
-    "minimumReleaseAge": 2592000,
+    "minimumReleaseAge": 1209600,
     "unit": "seconds"
   },
   "psgallery": {

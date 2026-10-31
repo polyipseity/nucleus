@@ -8,7 +8,7 @@
 # the flake stage; installed packages are reconciled by nix-darwin activation).
 #
 # Commands: [--flake|--no-flake] [--sops|--no-sops] [--force].
-# nixpkgs updates are gated to once per 30 days (see release-ages.json).
+# nixpkgs updates are gated to once per 14 days (see release-ages.json).
 # Each stage is independently skippable, so partial updates are possible
 # (e.g. rewrap secrets without touching flake.lock).
 #
@@ -45,7 +45,7 @@ usage() {
   update options:
     --flake|--no-flake    Control nix flake update (default: --flake).
     --sops|--no-sops      Control sops updatekeys (default: --sops).
-    --force               Bypass the 30-day nixpkgs age guard.
+    --force               Bypass the 14-day nixpkgs age guard.
 
   lockfile options:
     --sections <list>     Comma-separated section names to update (default: all).
@@ -115,7 +115,7 @@ do_update() {
   guard_nixpkgs_age() {
     local _ra_json="${NUCLEUS_RELEASE_AGES_FILE:-$REPO_ROOT/src/modules/configs/release-ages.json}"
     local _threshold
-    _threshold=$(jq -r '.nixpkgs.minimumReleaseAge // 2592000' "$_ra_json" 2>/dev/null || echo 2592000)
+    _threshold=$(jq -r '.nixpkgs.minimumReleaseAge // 1209600' "$_ra_json" 2>/dev/null || echo 1209600)
     local _lock="$REPO_ROOT/src/flake.lock"
     local _last_modified
     _last_modified=$(jq -r '.nodes.nixpkgs_4.locked.lastModified // .nodes.nixpkgs.locked.lastModified // 0' "$_lock" 2>/dev/null || echo 0)
@@ -137,7 +137,7 @@ do_update() {
   latest_eligible_nixpkgs_commit() {
     local _ra_json="${NUCLEUS_RELEASE_AGES_FILE:-$REPO_ROOT/src/modules/configs/release-ages.json}"
     local _threshold
-    _threshold=$(jq -r '.nixpkgs.minimumReleaseAge // 2592000' "$_ra_json" 2>/dev/null || echo 2592000)
+    _threshold=$(jq -r '.nixpkgs.minimumReleaseAge // 1209600' "$_ra_json" 2>/dev/null || echo 1209600)
     local _cutoff
     _cutoff=$(date -u -d "@$(( $(date +%s) - _threshold ))" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
       || date -u -v-${_threshold}S +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
@@ -151,7 +151,7 @@ do_update() {
   }
 
   # update_flake_inputs
-  #   Updates the nixpkgs input (guarded, >=30 days) and rewraps SOPS files.
+  #   Updates the nixpkgs input (guarded, >=14 days) and rewraps SOPS files.
   #   WHY: nixpkgs is pinned to a specific channel commit via --override-input
   #   so that only nixpkgs moves, not every other input.
   update_flake_inputs() {
