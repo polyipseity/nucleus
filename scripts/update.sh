@@ -369,6 +369,7 @@ EOF
   fi
 
   if section_enabled cargo-binstall; then
+    _cargo_age_threshold=$(($(date +%s) - ${MINIMUM_RELEASE_AGE:-432000}))
     while IFS= read -r key; do
       [ -z "$key" ] && continue
       if printf '%s\n' "$data" | jq -e --arg k "$key" '(.["cargo-binstall"][$k] | type) == "object"' >/dev/null; then
@@ -379,13 +380,18 @@ EOF
 
       # crates.io returns 403 without a User-Agent, so fall back to cargo search.
       # check-suppress:suppression_doc: crates.io API may be unreachable or return a non-JSON error page; the cargo search fallback handles failure.
-      new=$(curl -fsSL -A "nucleus-update-lockfile" "https://crates.io/api/v1/crates/$key" 2>/dev/null | jq -r '.crate.max_stable_version // .versions[0].num // empty' 2>/dev/null) || new=""
+      new=$(curl -fsSL -A "nucleus-update-lockfile" "https://crates.io/api/v1/crates/$key" 2>/dev/null | jq -r --arg thresh "$_cargo_age_threshold" '
+        [ .versions[] | select(.yanked == false) |
+          {num, ts: (.created_at | fromdateiso8601)} ] |
+        map(select(.ts < ($thresh | tonumber))) |
+        sort_by(-.ts) | .[0].num // empty
+      ' 2>/dev/null) || new=""
       if [ -z "$new" ]; then
         # check-suppress:suppression_doc: cargo may be unavailable or the crate unpublished; the warn path reports the failure.
         new=$(cargo search --limit 1 "$key" 2>/dev/null | awk -v k="$key" -F' = ' '$1 == k {gsub(/"/, "", $2); sub(/[[:space:]].*/, "", $2); print $2; exit}') || new=""
       fi
       if [ -z "$new" ]; then
-        warn "cargo-binstall.$key: no version source (crates.io API and cargo search both failed)"
+        warn "cargo-binstall.$key: no version source (crates.io API and cargo search both failed, or none older than the minimum release age)"
         continue
       fi
       if [ "$new" != "$old" ]; then
@@ -397,12 +403,21 @@ EOF
 
   if section_enabled bun; then
     if command -v curl >/dev/null 2>&1; then
+      _bun_age_threshold=$(($(date +%s) - ${MINIMUM_RELEASE_AGE:-432000}))
       while IFS= read -r key; do
         [ -z "$key" ] && continue
         old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.bun // {})[$k] // empty')
         [ -z "$old" ] && continue
-        new=$(curl -fsSL "https://registry.npmjs.org/$key/latest" 2>/dev/null | jq -r '.version // empty' 2>/dev/null)
-        if [ -n "$new" ] && [ "$new" != "$old" ]; then
+        case "$old" in \{*) continue ;; esac
+        new=$(curl -fsSL "https://registry.npmjs.org/$key" 2>/dev/null | jq -r --arg thresh "$_bun_age_threshold" '
+          [ .time | to_entries[] | select(.key | test("^[0-9]")) |
+            {version: .key, ts: (.value | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601)} ] |
+          map(select(.ts < ($thresh | tonumber))) |
+          sort_by(-.ts) | .[0] // empty | .version
+        ' 2>/dev/null)
+        if [ -z "$new" ]; then
+          warn "bun.$key: no version older than the minimum release age — keeping $old"
+        elif [ "$new" != "$old" ]; then
           log_update "bun" "$key" "$old" "$new"
           data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.bun[$k] = $v')
         fi

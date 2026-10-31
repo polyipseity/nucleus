@@ -317,10 +317,15 @@ function Invoke-LockfileBump {
         try {
           # check-suppress:suppression_doc: probe -- crate may not exist or network unavailable; cargo search is the fallback below
           $resp = Invoke-RestMethod -Uri "https://crates.io/api/v1/crates/$key" -Headers @{ 'User-Agent' = 'nucleus-update-lockfile' }
-          if ($resp.crate.max_stable_version) {
-            $new = $resp.crate.max_stable_version
-          } elseif ($resp.versions -and $resp.versions.Count -gt 0) {
-            $new = $resp.versions[0].num
+          if ($resp.versions -and $resp.versions.Count -gt 0) {
+            $ageSeconds = if ($env:MINIMUM_RELEASE_AGE) { [int]$env:MINIMUM_RELEASE_AGE } else { 432000 }
+            $nowEpoch = [int][double]::Parse((Get-Date -UFormat '%s'))
+            $candidates = @($resp.versions | Where-Object { -not $_.yanked } | ForEach-Object {
+              $pubEpoch = [int][double]::Parse((Get-Date ([datetime]::Parse($_.created_at).ToUniversalTime()) -UFormat '%s'))
+              $age = $nowEpoch - $pubEpoch
+              if ($age -ge $ageSeconds) { [pscustomobject]@{ Version = $_.num; Age = $age; CreatedAt = $_.created_at } }
+            })
+            $new = ($candidates | Sort-Object { [version]$_.Version } -Descending | Select-Object -First 1).Version
           }
         } catch {
           $new = $null  # check-suppress:suppression_doc: API failure; cargo search below is the only other version source
@@ -353,14 +358,25 @@ function Invoke-LockfileBump {
   if (Test-SectionEnabled 'bun') {
     if (Get-Command -Name 'curl' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
       if ($ht.ContainsKey('bun') -and $ht['bun'] -is [hashtable]) {
+        $ageSeconds = if ($env:MINIMUM_RELEASE_AGE) { [int]$env:MINIMUM_RELEASE_AGE } else { 432000 }
         foreach ($key in @($ht['bun'].Keys)) {
           $old = $ht['bun'][$key]
+          if ($old -isnot [string]) { continue }
           # check-suppress:suppression_doc: probe -- package may not exist; stderr suppressed for clean output.
-          $result = & curl -fsSL "https://registry.npmjs.org/$key/latest" 2>$null
+          $result = & curl -fsSL "https://registry.npmjs.org/$key" 2>$null
           if ($result) {
             $parsed = $result | ConvertFrom-Json
-            $new = $parsed.version.Trim()
-            if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
+            $versions = @($parsed.PSObject.Properties |
+              Where-Object { $_.Name -match '^[0-9]' -and $parsed.time.$($_.Name) } |
+              ForEach-Object {
+                $pubEpoch = [int][double]::Parse((Get-Date ([datetime]::Parse($parsed.time.$($_.Name)).ToUniversalTime()) -UFormat '%s'))
+                $age = [int][double]::Parse((Get-Date -UFormat '%s')) - $pubEpoch
+                if ($age -ge $ageSeconds) { [pscustomobject]@{ Version = $_.Name; Age = $age } }
+              })
+            $new = ($versions | Sort-Object { [version]$_.Version } -Descending | Select-Object -First 1).Version
+            if ([string]::IsNullOrEmpty($new)) {
+              Write-NucleusWarning "bun.${key}: no version older than the minimum release age -- keeping $old"
+            } elseif ($new -ne $old) {
               Write-Update -Section 'bun' -Key $key -OldValue $old -NewValue $new
               $ht['bun'][$key] = $new
             }
