@@ -11,6 +11,7 @@ _POLICY_DATA_CHECKS=(
   "agents policy|run_agents_policy|files"
   "embedded content enforcement|run_embedded_content_enforcement|files"
   "method-1 symlink resolution|run_method1_symlink_resolution|ctx"
+  "release age uniformity|run_release_age_uniformity|files"
 )
 
 run_repo_policy_data() {
@@ -369,5 +370,49 @@ run_method1_symlink_resolution() {
   fi
 
   say "verified $_checked method-1 symlink(s) resolve to live repo root ($_repo_root)"
+  return 0
+}
+
+run_release_age_uniformity() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
+  local _files=("$@")
+  cd "$_repo_root" || return 1
+  local _ra_json="src/modules/configs/release-ages.json"
+  local _errors=0
+  if [ ! -f "$_ra_json" ]; then
+    error "release-ages.json not found"
+    return 1
+  fi
+
+  # bun minimumReleaseAge vs bunfig.toml files
+  local _bun_age
+  _bun_age=$(jq -r '.bun.minimumReleaseAge' "$_ra_json" 2>/dev/null)
+  for _bf in src/users/default/bun/bunfig.toml src/users/default/pi/bunfig.toml; do
+    if [ -f "$_bf" ]; then
+      local _bf_val
+      _bf_val=$(grep -E '^[[:space:]]*minimumReleaseAge[[:space:]]*=' "$_bf" | head -1 | sed -E 's/.*=[[:space:]]*([0-9]+).*/\1/')
+      if [ "$_bf_val" != "$_bun_age" ]; then
+        error "release age mismatch: $_bf has minimumReleaseAge=$_bf_val, declaration has $_bun_age"
+        _errors=1
+      fi
+    fi
+  done
+
+  # uv exclude-newer vs uv.toml
+  local _uv_val
+  _uv_val=$(jq -r '.uv.excludeNewer' "$_ra_json" 2>/dev/null)
+  if [ -f "src/users/default/uv/uv.toml" ]; then
+    local _uv_file_val
+    _uv_file_val=$(grep -E '^[[:space:]]*exclude-newer[[:space:]]*=' "src/users/default/uv/uv.toml" | head -1 | sed -E 's/.*=[[:space:]]*"([^"]*)".*/\1/')
+    if [ "$_uv_file_val" != "$_uv_val" ]; then
+      error "release age mismatch: uv.toml has exclude-newer=$_uv_file_val, declaration has $_uv_val"
+      _errors=1
+    fi
+  fi
+
+  if [ "$_errors" -ne 0 ]; then
+    return 1
+  fi
   return 0
 }

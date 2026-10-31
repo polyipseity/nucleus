@@ -236,6 +236,44 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
     Write-Message 'AGENTS.md instruction links resolve.'
   }
 
+
+  Write-Message "--- release age uniformity ---"
+  $raPath = Join-Path $r 'src\modules\configs\release-ages.json'
+  $raErrors = 0
+  if (-not (Test-Path -LiteralPath $raPath)) {
+    Write-ErrorMessage "release-ages.json not found at $raPath"
+    $raErrors++
+  } else {
+    $ra = Get-Content -LiteralPath $raPath -Raw | ConvertFrom-Json
+    $bunAge = [int]$ra.bun.minimumReleaseAge
+    foreach ($bf in @('src/users/default/bun/bunfig.toml','src/users/default/pi/bunfig.toml')) {
+      $full = Join-Path $r $bf
+      if (Test-Path -LiteralPath $full) {
+        $m = Select-String -LiteralPath $full -Pattern '^[\s]*minimumReleaseAge[\s]*=' | Select-Object -First 1
+        if ($m) {
+          $val = [int]($m.Line -replace '.*=\s*','' -replace '\D.*','')
+          if ($val -ne $bunAge) {
+            Write-ErrorMessage "release age mismatch: $bf has minimumReleaseAge=$val, declaration has $bunAge"
+            $raErrors++
+          }
+        }
+      }
+    }
+    $uvAge = [string]$ra.uv.excludeNewer
+    $uvFile = Join-Path $r 'src/users/default/uv/uv.toml'
+    if (Test-Path -LiteralPath $uvFile) {
+      $m = Select-String -LiteralPath $uvFile -Pattern '^[\s]*exclude-newer[\s]*=' | Select-Object -First 1
+      if ($m) {
+        $val = [string]($m.Line -replace '.*=\s*','' -replace '^"','' -replace '"$','')
+        if ($val -ne $uvAge) {
+          Write-ErrorMessage "release age mismatch: uv.toml has exclude-newer=$val, declaration has $uvAge"
+          $raErrors++
+        }
+      }
+    }
+  }
+  if ($raErrors -gt 0) { $failed = $true }
+
   if ($failed) {
     Write-ErrorMessage "repository policy (data-driven) check failed"
     return $false
