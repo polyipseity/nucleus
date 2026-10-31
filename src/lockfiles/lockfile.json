@@ -4,7 +4,7 @@
     "@anthropic-ai/sandbox-runtime": "0.0.81",
     "@earendil-works/pi-coding-agent": "1.4.0",
     "@tobilu/qmd": "2.8.3",
-    "clawhub": "0.24.1",
+    "clawhub": "0.23.3",
     "playwright": "1.64.1"
   },
   "cargo-binstall": {
