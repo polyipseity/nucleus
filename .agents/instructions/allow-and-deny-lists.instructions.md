@@ -74,7 +74,14 @@ A new exclusion needs a category id, tier, and `# ref:`.
 | D5 | `tests/platforms/Windows/modules/gc-parity.Tests.ps1` | `$DestructiveCommands` | T2 | A command absent from the list is silently skipped by the dry-run guard walk, so renaming a helper in `scripts/gc.ps1` disarms the coverage check instead of failing it | Error if stale (`has no stale entry in the destructive-command list`) |
 | D6 | `tests/platforms/Windows/modules/gc-parity.Tests.ps1` | `$PosixOnlyCapabilities` | T2 | The list must name exactly the switches `gc.ps1` documents as POSIX-only | Error if stale (`documents exactly the POSIX-only capabilities as accepted and ignored`) |
 
+### Category E: upstream workarounds
+
+| ID | Files | Entry | Tier | Reason | Verify |
+| --- | --- | --- | --- | --- | --- |
+| E1 | `.agents/instructions/upstream-workarounds.instructions.md` | All entries (W01-W24) | T3 | Workarounds for upstream limitations; temporary entries re-checked quarterly, permanent entries listed only | Error if a referenced path is missing (`run_upstream_workaround_staleness`, step 13) |
+
 ## Dummy keys
+
 
 `src/modules/dummy-keys.json`, validated against `src/modules/dummy-keys.schema.json`. A `sk-` placeholder of 4 or more alphanumerics must resolve to `dummyKeys.<name>.value`, consumers use that value verbatim, and every entry carries `value`, `consumers`, and `note`. Step 13 (`run_dummy_key_uniformity`) enforces it.
 
