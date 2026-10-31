@@ -132,28 +132,32 @@ function Invoke-SafeDelete {
 }
 
 # check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
-Remove-Item alias:rm -ErrorAction SilentlyContinue
+Remove-Item alias:rm -Force -ErrorAction SilentlyContinue
 # check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
-Remove-Item alias:del -ErrorAction SilentlyContinue
+Remove-Item alias:del -Force -ErrorAction SilentlyContinue
 # check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
-Remove-Item alias:rd -ErrorAction SilentlyContinue
+Remove-Item alias:rd -Force -ErrorAction SilentlyContinue
 # check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
-Remove-Item alias:erase -ErrorAction SilentlyContinue
+Remove-Item alias:erase -Force -ErrorAction SilentlyContinue
 # check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
-Remove-Item alias:ri -ErrorAction SilentlyContinue
+Remove-Item alias:ri -Force -ErrorAction SilentlyContinue
 # check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
-Remove-Item alias:rmdir -ErrorAction SilentlyContinue
+Remove-Item alias:rmdir -Force -ErrorAction SilentlyContinue
 # check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
-Remove-Item alias:unlink -ErrorAction SilentlyContinue
-Set-Alias rm Invoke-SafeDelete
-Set-Alias del Invoke-SafeDelete
-Set-Alias rd Invoke-SafeDelete
-Set-Alias erase Invoke-SafeDelete
-Set-Alias ri Invoke-SafeDelete
-Set-Alias rmdir Invoke-SafeDelete
-Set-Alias unlink Invoke-SafeDelete
-Set-Alias shred Invoke-SafeDelete
-Set-Alias Remove-Item Invoke-SafeDelete
+Remove-Item alias:unlink -Force -ErrorAction SilentlyContinue
+# check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
+Remove-Item alias:shred -Force -ErrorAction SilentlyContinue
+# check-suppress:suppression_doc: alias may not exist; idempotent cleanup.
+Remove-Item alias:Remove-Item -Force -ErrorAction SilentlyContinue
+Set-Alias rm Invoke-SafeDelete -Force
+Set-Alias del Invoke-SafeDelete -Force
+Set-Alias rd Invoke-SafeDelete -Force
+Set-Alias erase Invoke-SafeDelete -Force
+Set-Alias ri Invoke-SafeDelete -Force
+Set-Alias rmdir Invoke-SafeDelete -Force
+Set-Alias unlink Invoke-SafeDelete -Force
+Set-Alias shred Invoke-SafeDelete -Force
+Set-Alias Remove-Item Invoke-SafeDelete -Force
 
 
 if ($IsWindows) {
