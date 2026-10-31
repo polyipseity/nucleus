@@ -318,7 +318,13 @@ function Invoke-LockfileBump {
           # check-suppress:suppression_doc: probe -- crate may not exist or network unavailable; cargo search is the fallback below
           $resp = Invoke-RestMethod -Uri "https://crates.io/api/v1/crates/$key" -Headers @{ 'User-Agent' = 'nucleus-update-lockfile' }
           if ($resp.versions -and $resp.versions.Count -gt 0) {
-            $ageSeconds = if ($env:MINIMUM_RELEASE_AGE) { [int]$env:MINIMUM_RELEASE_AGE } else { 432000 }
+            $ageSeconds = if ($env:MINIMUM_RELEASE_AGE) { [int]$env:MINIMUM_RELEASE_AGE } else { 
+              $raFile = if ($env:NUCLEUS_RELEASE_AGES_FILE) { $env:NUCLEUS_RELEASE_AGES_FILE } else { Join-Path $repoRoot 'src/modules/configs/release-ages.json' }
+              $raVal = 432000
+              if (Test-Path -LiteralPath $raFile) { try { $raVal = [int]((Get-Content -Raw -LiteralPath $raFile | ConvertFrom-Json).cargo.minimumReleaseAge) } catch { $raVal = 432000 } }
+              if ($raVal -le 0) { $raVal = 432000 }
+              $raVal
+            }
             $nowEpoch = [int][double]::Parse((Get-Date -UFormat '%s'))
             $candidates = @($resp.versions | Where-Object { -not $_.yanked } | ForEach-Object {
               $pubEpoch = [int][double]::Parse((Get-Date ([datetime]::Parse($_.created_at).ToUniversalTime()) -UFormat '%s'))
@@ -358,7 +364,13 @@ function Invoke-LockfileBump {
   if (Test-SectionEnabled 'bun') {
     if (Get-Command -Name 'curl' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
       if ($ht.ContainsKey('bun') -and $ht['bun'] -is [hashtable]) {
-        $ageSeconds = if ($env:MINIMUM_RELEASE_AGE) { [int]$env:MINIMUM_RELEASE_AGE } else { 432000 }
+        $ageSeconds = if ($env:MINIMUM_RELEASE_AGE) { [int]$env:MINIMUM_RELEASE_AGE } else { 
+          $raFile = if ($env:NUCLEUS_RELEASE_AGES_FILE) { $env:NUCLEUS_RELEASE_AGES_FILE } else { Join-Path $repoRoot 'src/modules/configs/release-ages.json' }
+          $raVal = 432000
+          if (Test-Path -LiteralPath $raFile) { try { $raVal = [int]((Get-Content -Raw -LiteralPath $raFile | ConvertFrom-Json).bun.minimumReleaseAge) } catch { $raVal = 432000 } }
+          if ($raVal -le 0) { $raVal = 432000 }
+          $raVal
+        }
         foreach ($key in @($ht['bun'].Keys)) {
           $old = $ht['bun'][$key]
           if ($old -isnot [string]) { continue }
@@ -394,7 +406,13 @@ function Invoke-LockfileBump {
   if (Test-SectionEnabled 'pi') {
     if (Get-Command -Name 'curl' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
       if ($ht.ContainsKey('pi') -and $ht['pi'] -is [hashtable]) {
-        $ageSeconds = if ($env:MINIMUM_RELEASE_AGE) { [int]$env:MINIMUM_RELEASE_AGE } else { 432000 }
+        $ageSeconds = if ($env:MINIMUM_RELEASE_AGE) { [int]$env:MINIMUM_RELEASE_AGE } else { 
+          $raFile = if ($env:NUCLEUS_RELEASE_AGES_FILE) { $env:NUCLEUS_RELEASE_AGES_FILE } else { Join-Path $repoRoot 'src/modules/configs/release-ages.json' }
+          $raVal = 432000
+          if (Test-Path -LiteralPath $raFile) { try { $raVal = [int]((Get-Content -Raw -LiteralPath $raFile | ConvertFrom-Json).bun.minimumReleaseAge) } catch { $raVal = 432000 } }
+          if ($raVal -le 0) { $raVal = 432000 }
+          $raVal
+        }
         foreach ($key in @($ht['pi'].Keys)) {
           $old = $ht['pi'][$key]
           if ($old -isnot [string]) { continue }
