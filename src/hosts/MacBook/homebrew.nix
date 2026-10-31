@@ -6,6 +6,7 @@
   homebrew-core,
   homebrew-cask,
   openai-tools,
+  cirruslabs-cli,
   smudge-smudge,
   ...
 }:
@@ -70,11 +71,12 @@ in
       "homebrew/homebrew-core" = homebrew-core;
       "homebrew/homebrew-cask" = homebrew-cask;
       "openai/homebrew-tools" = openai-tools;
+      "cirruslabs/homebrew-cli" = cirruslabs-cli;
       "smudge/homebrew-smudge" = smudge-smudge;
     };
     trust = {
       # softnet is a transitive tart dependency that cannot be enumerated statically.
-      taps = [ "openai/tools" ];
+      taps = [ "openai/tools" "cirruslabs/cli" ];
       formulae = [
         "smudge/smudge/nightlight"
       ];

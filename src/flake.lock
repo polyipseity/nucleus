@@ -17,6 +17,22 @@
         "type": "github"
       }
     },
+    "cirruslabs-cli": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1780337541,
+        "narHash": "sha256-7KVWRKl+Wxn3sAqAKE8lnhOeElH+J01CITvjxHtDp5o=",
+        "owner": "cirruslabs",
+        "repo": "homebrew-cli",
+        "rev": "4fef6a32df31b4c51bf745ae2d86b53a037a1a6c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "cirruslabs",
+        "repo": "homebrew-cli",
+        "type": "github"
+      }
+    },
     "cl-nix-lite": {
       "inputs": {
         "flake-parts": "flake-parts_2",
@@ -504,6 +520,7 @@
     "root": {
       "inputs": {
         "brew-src": "brew-src",
+        "cirruslabs-cli": "cirruslabs-cli",
         "darwin": "darwin",
         "hermes-agent": "hermes-agent",
         "home-manager": "home-manager_2",
