@@ -369,7 +369,7 @@ EOF
   fi
 
   if section_enabled cargo-binstall; then
-    _cargo_age_threshold=$(($(date +%s) - ${MINIMUM_RELEASE_AGE:-$(jq -r '.cargo.minimumReleaseAge // 432000' "$REPO_ROOT/src/modules/configs/release-ages.json" 2>/dev/null || echo 432000)}))
+    _cargo_age_threshold=$(($(date +%s) - ${MINIMUM_RELEASE_AGE:-$(jq -r '.cargo.minimumReleaseAge // 432000' "${NUCLEUS_RELEASE_AGES_FILE:-$REPO_ROOT/src/modules/configs/release-ages.json}" 2>/dev/null || echo 432000)}))
     while IFS= read -r key; do
       [ -z "$key" ] && continue
       if printf '%s\n' "$data" | jq -e --arg k "$key" '(.["cargo-binstall"][$k] | type) == "object"' >/dev/null; then
@@ -403,7 +403,7 @@ EOF
 
   if section_enabled bun; then
     if command -v curl >/dev/null 2>&1; then
-      _bun_age_threshold=$(($(date +%s) - ${MINIMUM_RELEASE_AGE:-$(jq -r '.bun.minimumReleaseAge // 432000' "$REPO_ROOT/src/modules/configs/release-ages.json" 2>/dev/null || echo 432000)}))
+      _bun_age_threshold=$(($(date +%s) - ${MINIMUM_RELEASE_AGE:-$(jq -r '.bun.minimumReleaseAge // 432000' "${NUCLEUS_RELEASE_AGES_FILE:-$REPO_ROOT/src/modules/configs/release-ages.json}" 2>/dev/null || echo 432000)}))
       while IFS= read -r key; do
         [ -z "$key" ] && continue
         old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.bun // {})[$k] // empty')
@@ -432,7 +432,7 @@ EOF
   # install would reject the pin (supply-chain hardening).
   if section_enabled pi; then
     if command -v curl >/dev/null 2>&1; then
-      _pi_age_threshold=$(($(date +%s) - ${MINIMUM_RELEASE_AGE:-$(jq -r '.pi.minimumReleaseAge // .bun.minimumReleaseAge // 432000' "$REPO_ROOT/src/modules/configs/release-ages.json" 2>/dev/null || echo 432000)}))
+      _pi_age_threshold=$(($(date +%s) - ${MINIMUM_RELEASE_AGE:-$(jq -r '.pi.minimumReleaseAge // .bun.minimumReleaseAge // 432000' "${NUCLEUS_RELEASE_AGES_FILE:-$REPO_ROOT/src/modules/configs/release-ages.json}" 2>/dev/null || echo 432000)}))
       while IFS= read -r key; do
         [ -z "$key" ] && continue
         old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.pi // {})[$k] // empty')
