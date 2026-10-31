@@ -27,8 +27,6 @@ function Invoke-SafeDelete {
     [string]$Filter,
     [string[]]$Include,
     [string[]]$Exclude,
-    [Switch]$WhatIf,
-    [Switch]$Confirm
   )
   begin {
     if ($IsWindows) {
@@ -63,8 +61,8 @@ function Invoke-SafeDelete {
         if ($Filter) { $params['Filter'] = $Filter }
         if ($Include) { $params['Include'] = $Include }
         if ($Exclude) { $params['Exclude'] = $Exclude }
-        if ($WhatIf) { $params['WhatIf'] = $true }
-        if ($Confirm) { $params['Confirm'] = $true }
+        if ($PSBoundParameters.ContainsKey('WhatIf')) { $params['WhatIf'] = [bool]$PSBoundParameters['WhatIf'] }
+        if ($PSBoundParameters.ContainsKey('Confirm')) { $params['Confirm'] = [bool]$PSBoundParameters['Confirm'] }
         & $orig @params
       }
       return
@@ -109,8 +107,8 @@ function Invoke-SafeDelete {
         if ($Filter) { $params['Filter'] = $Filter }
         if ($Include) { $params['Include'] = $Include }
         if ($Exclude) { $params['Exclude'] = $Exclude }
-        if ($WhatIf) { $params['WhatIf'] = $true }
-        if ($Confirm) { $params['Confirm'] = $true }
+        if ($PSBoundParameters.ContainsKey('WhatIf')) { $params['WhatIf'] = [bool]$PSBoundParameters['WhatIf'] }
+        if ($PSBoundParameters.ContainsKey('Confirm')) { $params['Confirm'] = [bool]$PSBoundParameters['Confirm'] }
         & $orig @params
         return
       }
