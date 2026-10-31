@@ -6,6 +6,8 @@ applyTo: "src/modules/**/*.json, src/modules/**/*.nix, src/hosts/**/*.nix, src/h
 
 # Cross-host feature parity
 
+# Upstream workarounds registry: .agents/instructions/upstream-workarounds.instructions.md
+
 Same capability on every host. Reusable behavior goes in a shared module rather than a per-host special case: POSIX is bash under `src/scripts/`, Windows is PowerShell under `src/platforms/Windows/modules/`, and no Windows runtime code may name a `.sh` path. A platform difference needs a `# WHY:`.
 
 ## Scope

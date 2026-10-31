@@ -6,6 +6,8 @@ applyTo: "src/**/*.nix, src/modules/**/*.nix, src/hosts/**/*.nix"
 
 # Nix authoring
 
+# Upstream workarounds registry: .agents/instructions/upstream-workarounds.instructions.md
+
 ## Flake conventions
 
 - Every input follows nixpkgs: `inputs.<name>.follows = "nixpkgs"`. Duplicate evaluations are a bug.
