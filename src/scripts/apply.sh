@@ -373,11 +373,11 @@ start_sudo_keepalive() {
 }
 
 run_health_check() {
-  _rhc_args=()
   if [ "$store_audit" = true ]; then
-    _rhc_args+=(--store-audit)
+    run_nix run "$REPO_ROOT/src#apply" health-check --store-audit
+  else
+    run_nix run "$REPO_ROOT/src#apply" health-check
   fi
-  run_nix run "$REPO_ROOT/src#apply" health-check "${_rhc_args[@]}"
 }
 
 run_pre_build() {

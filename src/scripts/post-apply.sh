@@ -77,7 +77,7 @@ run_jellyfin_sync() {
   if [ ! -f "$_rjs_script" ]; then
     return
   fi
-  NUCLEUS_REPO_ROOT="$_repo_root" sh "$_rjs_script"
+  NUCLEUS_REPO_ROOT="$_repo_root" bash "$_rjs_script"
 }
 
 run_ai_sync() {
@@ -99,7 +99,7 @@ run_ai_sync() {
 
   say -l ai "running post-apply AI model sync..."
   apply_log_init
-  if ! sh "$_ras_script" sync 2>&1 | tee -a "$_apply_log"; then
+  if ! bash "$_ras_script" sync 2>&1 | tee -a "$_apply_log"; then
     warn -l ai "ai.sh sync exited with an error; model sync incomplete (system apply succeeded)"
   fi
 }
@@ -123,7 +123,7 @@ run_replica_sync() {
 
   say -l replica-sync "running post-apply replica sync..."
   apply_log_init
-  if ! sh "$_rrb_script" sync 2>&1 | tee -a "$_apply_log"; then
+  if ! bash "$_rrb_script" sync 2>&1 | tee -a "$_apply_log"; then
     warn -l replica-sync "cloud.sh sync exited with an error; replica sync incomplete (system apply succeeded)"
   fi
 }
@@ -138,7 +138,7 @@ run_vm_post_apply() {
   if [ "$_vm_setup" = true ]; then
     say -l nucleus-vm "running post-apply VM provisioning (setup)..."
     apply_log_init
-    if ! sh "$_rvp_script" setup --accept-gsi-license 2>&1 | tee -a "$_apply_log"; then
+    if ! bash "$_rvp_script" setup --accept-gsi-license 2>&1 | tee -a "$_apply_log"; then
       warn -l nucleus-vm "vm.sh setup exited with an error; VM setup incomplete (system apply succeeded)"
     fi
     return
@@ -151,7 +151,7 @@ run_vm_post_apply() {
 
   say -l nucleus-vm "running post-apply VM config refresh (sync)..."
   apply_log_init
-  if ! sh "$_rvp_script" sync 2>&1 | tee -a "$_apply_log"; then
+  if ! bash "$_rvp_script" sync 2>&1 | tee -a "$_apply_log"; then
     warn -l nucleus-vm "vm.sh sync exited with an error; VM sync incomplete (system apply succeeded)"
   fi
 }
@@ -165,7 +165,7 @@ run_gc() {
 
   say -l gc "running post-apply garbage collection..."
   apply_log_init
-  if ! sh "$_rgc_script" 2>&1 | tee -a "$_apply_log"; then
+  if ! bash "$_rgc_script" 2>&1 | tee -a "$_apply_log"; then
     warn -l gc "gc.sh exited with an error; GC incomplete (system apply succeeded)"
   fi
 }
