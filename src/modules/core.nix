@@ -782,6 +782,15 @@ let
       nixpkgs = "sccache";
       winget = "Mozilla.sccache";
     };
+    scoop = {
+      category = "cli";
+      platforms = [ "linux" ];
+      homebrew = {
+        kind = "formula";
+        name = "scoop";
+      };
+      winget = "Scoop.Scoop";
+    };
     shellcheck = {
       category = "cli";
       homebrew = {
@@ -868,15 +877,6 @@ let
       category = "cli";
       nixpkgs = "steamcmd";
       winget = "Valve.SteamCMD";
-    };
-    scoop = {
-      category = "cli";
-      platforms = [ "linux" ];
-      homebrew = {
-        kind = "formula";
-        name = "scoop";
-      };
-      winget = "Scoop.Scoop";
     };
     taplo = {
       category = "cli";
