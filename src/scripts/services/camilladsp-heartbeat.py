@@ -254,25 +254,54 @@ def _run(command: list[str]) -> str | None:
     return result.stdout
 
 
+# wpctl status draws a tree: " │  " before every node line, " ├─ " and " └─ "
+# before section headers. Source: wireplumber src/tools/wpctl.c
+_TREE_GLYPHS = "│├└─"
+
+
+def _wpctl_section(output: str, header: str) -> list[str]:
+    """Lines of one wpctl status section, stopping at the next header."""
+    lines = output.splitlines()
+    for index, line in enumerate(lines):
+        if header not in line:
+            continue
+        collected: list[str] = []
+        for candidate in lines[index + 1 :]:
+            if re.search(r"[├└]─", candidate):
+                break
+            collected.append(candidate)
+        return collected
+    return []
+
+
+def _wpctl_node(line: str) -> tuple[bool, int, str] | None:
+    """(is_default, id, description) for one wpctl node line, else None.
+
+    The description is padded to 35 columns and may be followed by a volume
+    suffix, so both the padding and the suffix come off before it is returned.
+    """
+    text = line.strip(" \t" + _TREE_GLYPHS)
+    match = re.match(r"(?P<marker>[* ])?\s*(?P<id>\d+)\.\s+(?P<rest>.*)$", text)
+    if match is None:
+        return None
+    name = re.sub(r"\s*\[vol:.*$", "", match.group("rest")).rstrip()
+    if not name:
+        return None
+    return (match.group("marker") == "*", int(match.group("id")), name)
+
+
 def _linux_default_output() -> str | None:
     """System default sink, trying WirePlumber, PulseAudio, then ALSA.
 
-    The string handling mirrors the sed pipeline this replaced, so a host that
-    resolved a device yesterday resolves the same one today.
+    wpctl is read from the tree its `status` command prints, falling back to
+    pactl then aplay for a host running neither WirePlumber nor the default.
     """
     output = _run(["wpctl", "status"])
     if output:
-        lines = output.splitlines()
-        for index, line in enumerate(lines):
-            if "Sinks:" not in line:
-                continue
-            for candidate_line in lines[index : index + 2]:
-                if "*" not in candidate_line:
-                    continue
-                value = re.sub(r".*\*\s*", "", candidate_line)
-                value = re.sub(r"\s+[0-9]+.*", "", value)
-                if value:
-                    return value
+        for line in _wpctl_section(output, "Sinks:"):
+            node = _wpctl_node(line)
+            if node is not None and node[0]:
+                return node[2]
 
     output = _run(["pactl", "info"])
     if output:
@@ -296,18 +325,10 @@ def _linux_list_available(capture_device: str) -> list[str] | None:
 
     output = _run(["wpctl", "status"])
     if output:
-        lines = output.splitlines()
-        for index, line in enumerate(lines):
-            if "Sinks:" not in line:
-                continue
-            for candidate_line in lines[index : index + 21]:
-                if not re.match(r"^\s+[0-9]+\.", candidate_line):
-                    continue
-                value = re.sub(r"^\s*[0-9]*\.\s*", "", candidate_line)
-                value = re.sub(r"\s+[0-9]+.*", "", value)
-                if value and value != capture_device:
-                    candidates.append(value)
-            break
+        for line in _wpctl_section(output, "Sinks:"):
+            node = _wpctl_node(line)
+            if node is not None and node[2] != capture_device:
+                candidates.append(node[2])
 
     output = _run(["pactl", "list", "sinks", "short"])
     if output:

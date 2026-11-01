@@ -234,21 +234,36 @@ def case_fingerprint_covers_device():
 
 
 def case_linux_backends():
+    status = (
+        "PipeWire 'pipewire-0' [1.2.7, admin@host, cookie:1234]\n"
+        " └─ Clients:\n"
+        "       32. WirePlumber                         [1.2.7, admin@host, pid:1234]\n"
+        "\n"
+        "Audio\n"
+        " ├─ Devices:\n"
+        " │      51. Built-in Audio Analog Stereo        [alsa]\n"
+        " │\n"
+        " ├─ Sinks:\n"
+        " │      53. HDMI Output                         [vol: 0.40]\n"
+        " │  *   52. Built-in Audio Analog Stereo        [vol: 1.00]\n"
+        " │      54. USB Speakers                        [vol: 0.80 MUTED]\n"
+        " │\n"
+        " ├─ Sources:\n"
+        " │  *   55. Built-in Audio Analog Stereo        [vol: 1.00]\n"
+        " │\n"
+        " └─ Streams:\n"
+        "\n"
+        "Video\n"
+    )
     outputs = {
-        ("wpctl", "status"): (
-            "Audio\n"
-            " ├─ Sinks:\n"
-            " │  *   52. Built-in Audio Analog Stereo        [vol: 1.00]\n"
-            " │      53. HDMI Output                         [vol: 0.40]\n"
-            " ├─ Sources:\n"
-        ),
+        ("wpctl", "status"): status,
         ("pactl", "info"): "Server Name: pulseaudio\nDefault Sink: alsa_output.pci.analog-stereo\n",
         ("aplay", "-l"): "card 0: PCH [HDA Intel PCH], device 0: ALC295 Analog [ALC295 Analog]\n",
     }
-    # WHY: the daemon keeps the substitutions the shell pipeline used, so the
-    # default sink here is the id and description the GNU sed expression left.
     m._run = lambda command: outputs.get(tuple(command))
-    assert m._linux_default_output() == "52. Built-in Audio Analog Stereo        [vol:"
+    # The marker is a position, not a preference: the default is the second
+    # sink, so a parser that only looks at the first line gets HDMI.
+    assert m._linux_default_output() == "Built-in Audio Analog Stereo"
 
     def only_pactl(command):
         return outputs.get(tuple(command)) if command[0] == "pactl" else None
@@ -257,6 +272,20 @@ def case_linux_backends():
     assert m._linux_default_output() == "alsa_output.pci.analog-stereo"
     m._run = lambda command: outputs.get(tuple(command)) if command[0] == "aplay" else None
     assert m._linux_default_output() == "hw:CARD=0,DEV=0"
+
+    # wpctl names, capture excluded, never the source list. The order is
+    # alphabetical because the list is sorted below the backends, not because
+    # the tree is walked in that order.
+    m._run = lambda command: outputs.get(tuple(command)) if command[0] == "wpctl" else None
+    assert m._linux_list_available("USB Speakers") == [
+        "Built-in Audio Analog Stereo",
+        "HDMI Output",
+    ]
+    assert m._linux_list_available("nonsense") == [
+        "Built-in Audio Analog Stereo",
+        "HDMI Output",
+        "USB Speakers",
+    ]
 
     m._run = lambda command: (
         "1\talsa_output.hdmi\tPipeWire\ts32le\tIDLE\n"
