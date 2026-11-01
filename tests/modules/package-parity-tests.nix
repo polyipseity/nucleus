@@ -5,6 +5,7 @@
 #   • dotted nixpkgs attribute paths resolve via lib.hasAttrByPath
 #   • darwin-only packages have platforms = ["darwin"]
 #   • darwin-only packages are not buildable on Linux
+#   • linux-only packages have platforms = ["linux"]
 #   • homebrew.kind is the documented formula|cask and carries a name
 #
 # Run with: nix-instantiate --eval tests/modules/package-parity-tests.nix
@@ -130,6 +131,60 @@ let
     "equaliser"
   ];
 
+  # --- Linux-only packages, derived from nixpkgs ---
+  # An entry is Linux-only when its nixpkgs attribute declares support for Linux
+  # and not for Darwin: then the registry has to say so, and a darwin package
+  # set must never try to build it. The declared platforms decide it, since
+  # `lib.meta.availableOn` folds in `meta.platforms` and `meta.badPlatforms`,
+  # and both are read from the Linux package set: a darwin evaluation of an
+  # unfree or broken attribute answers a different question than "is this app
+  # Linux-only".
+  # WHY not attribute presence: nixpkgs defines the attribute on every system,
+  # so presence distinguishes nothing. `alsa-utils` resolves in an
+  # aarch64-darwin package set and is still Linux-only.
+  darwinSystem = lib.systems.elaborate "aarch64-darwin";
+  linuxSystem = lib.systems.elaborate "x86_64-linux";
+  linuxPkgs' = import <nixpkgs> { system = "x86_64-linux"; };
+  # One entry's own `nixpkgs = "…"`, read from its block text: `nixpkgsAttrs`
+  # above is a flat list of every attribute in the file and cannot be keyed by
+  # entry. Split rather than regex, because a POSIX ERE over multi-line text is
+  # implementation-defined about `.` crossing newlines.
+  nixpkgsAttrOf =
+    name:
+    let
+      block = entryBlocks.${name} or "";
+      parts = lib.strings.splitString "nixpkgs = \"" block;
+    in
+    if builtins.length parts < 2 then
+      null
+    else
+      builtins.head (lib.strings.splitString "\"" (builtins.elemAt parts 1));
+  linuxPackageOf =
+    name:
+    let
+      attr = nixpkgsAttrOf name;
+    in
+    if attr == null then null else lib.attrByPath (lib.strings.splitString "." attr) null linuxPkgs';
+  # Presence stays the entry filter: an entry with no `nixpkgs` attribute is not
+  # a nix package at all.
+  nixpkgsEntryNames = builtins.filter (name: nixpkgsAttrOf name != null) extractedNames;
+  linuxOnlyPackageNames = builtins.filter (
+    name:
+    let
+      pkg = linuxPackageOf name;
+    in
+    pkg != null && lib.meta.availableOn linuxSystem pkg && !(lib.meta.availableOn darwinSystem pkg)
+  ) nixpkgsEntryNames;
+
+  # macOS keeps an app that nixpkgs packages only for Linux: Homebrew carries
+  # it, or the flake overlay replaces the attribute with a darwin build.
+  # `platforms = [ "linux" ]` removes an entry from every darwin list, the
+  # Homebrew ones included, because `managedPackagePlatformCompatible` gates
+  # them all, so the marker is owed only where nothing else carries darwin.
+  flakeText = builtins.readFile ../../src/flake.nix;
+  darwinCarriedElsewhere =
+    name: homebrewBlockOf name != "" || lib.hasInfix "${name} = prev.stdenv.mkDerivation" flakeText;
+
   # --- Packages without nixpkgs attr (WinGet-only / macOS-cask-only) ---
 
   # --- Tests ---
@@ -185,6 +240,24 @@ let
     assert' (unmarked == [ ])
       "Darwin-only packages must set platforms = [ \"darwin\" ] in core.nix; unmarked: ${lib.strings.concatStringsSep ", " unmarked}";
 
+  # Linux-only packages must set platforms = [ "linux" ] in core.nix, unless
+  # macOS gets them some other way (Homebrew, or a flake overlay darwin build).
+  # It constrains only what the derivation finds, so an app that nixpkgs
+  # packages for both systems is never required to carry the marker.
+  test_linux_only_packages_platform_marked =
+    let
+      unmarked = builtins.filter (
+        name:
+        let
+          entryBlock = entryBlocks.${name} or null;
+        in
+        !(darwinCarriedElsewhere name)
+        && (entryBlock == null || !lib.hasInfix "platforms = [ \"linux\" ]" entryBlock)
+      ) linuxOnlyPackageNames;
+    in
+    assert' (unmarked == [ ])
+      "Linux-only packages must set platforms = [ \"linux\" ] in core.nix; unmarked: ${lib.strings.concatStringsSep ", " unmarked}";
+
   # Darwin-only packages must not be buildable on Linux.
   test_darwin_only_absent_on_linux =
     let
@@ -237,6 +310,7 @@ let
     test_managed_nixpkgs_attrs_resolve
     test_dotted_nixpkgs_paths_resolve
     test_darwin_only_packages_platform_marked
+    test_linux_only_packages_platform_marked
     test_darwin_only_absent_on_linux
     test_homebrew_kind_documented
     test_homebrew_kind_has_name

@@ -1177,6 +1177,7 @@ let
         && managedPackageBackends.${name} == "nixpkgs"
         && managedPackagePlatformCompatible name
         && nixPackageAttrPresent name
+        && nixPackageAttrAvailable name
         && !(builtins.elem name posixProgramsProvidedPackages)
       ) enabledManagedPackageNames
     else
