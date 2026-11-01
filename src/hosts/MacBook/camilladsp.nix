@@ -24,16 +24,12 @@ let
     ];
   };
 
+  camilladspPython = import ../../modules/lib/camilladsp-python.nix { inherit pkgs; };
+
   camilladspHeartbeat = pkgs.writeNucleusShellApplication {
     name = "camilladsp-heartbeat";
     scriptName = "src/scripts/services/camilladsp-heartbeat";
-    runtimeInputs = [
-      pkgs.websocat
-      pkgs.jq
-      (pkgs.python3.withPackages (p: [ p.pyyaml ]))
-      # Without this the probe depends on the ambient PATH.
-      pkgs.switchaudio-osx
-    ];
+    runtimeInputs = [ camilladspPython ];
   };
 
   envVars = import ../../modules/lib/env-secrets.nix {

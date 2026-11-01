@@ -20,14 +20,12 @@ let
     ];
   };
 
+  camilladspPython = import ../../modules/lib/camilladsp-python.nix { inherit pkgs; };
+
   camilladspHeartbeat = pkgs.writeNucleusShellApplication {
     name = "camilladsp-heartbeat";
     scriptName = "src/scripts/services/camilladsp-heartbeat";
-    runtimeInputs = [
-      pkgs.websocat
-      pkgs.jq
-      (pkgs.python3.withPackages (p: [ p.pyyaml ]))
-    ];
+    runtimeInputs = [ camilladspPython ];
   };
 in
 {
