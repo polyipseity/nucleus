@@ -261,15 +261,25 @@ def _run(command: list[str]) -> str | None:
 _APLAY_DEVICE_LINE = re.compile(
     r"^card (?P<card>\d+): (?P<card_id>\S+) \[[^\]]*\], device (?P<device>\d+):"
 )
+# aplay capitalizes the id: `card 0: Loopback [Loopback]`.
+_ALSA_LOOPBACK_CARD_ID = "loopback"
 
 
 def _alsa_devices(output: str) -> list[tuple[str, int]]:
-    """(card id, device index) for every playback device `aplay -l` reports."""
+    """(card id, device index) for every playback device `aplay -l` reports.
+
+    A loopback card is the capture side of a DSP chain and never a playback
+    target, so it is not a candidate.
+    """
     devices: list[tuple[str, int]] = []
     for line in output.splitlines():
         match = _APLAY_DEVICE_LINE.match(line)
-        if match is not None:
-            devices.append((match.group("card_id"), int(match.group("device"))))
+        if match is None:
+            continue
+        card_id = match.group("card_id")
+        if card_id.lower() == _ALSA_LOOPBACK_CARD_ID:
+            continue
+        devices.append((card_id, int(match.group("device"))))
     return devices
 
 

@@ -236,9 +236,11 @@ def case_fingerprint_covers_device():
 def case_linux_backends():
     aplay = (
         "**** List of PLAYBACK Hardware Devices ****\n"
-        "card 0: PCH [HDA Intel PCH], device 0: ALC295 Analog [ALC295 Analog]\n"
-        "card 0: PCH [HDA Intel PCH], device 3: HDMI 0 [HDMI 0]\n"
-        "card 1: HDMI [HDA Intel HDMI], device 7: HDMI 1 [HDMI 1]\n"
+        "card 0: Loopback [Loopback], device 0: Loopback PCM [Loopback PCM]\n"
+        "card 0: Loopback [Loopback], device 1: Loopback PCM [Loopback PCM]\n"
+        "card 1: PCH [HDA Intel PCH], device 0: ALC295 Analog [ALC295 Analog]\n"
+        "card 1: PCH [HDA Intel PCH], device 3: HDMI 0 [HDMI 0]\n"
+        "card 2: HDMI [HDA Intel HDMI], device 7: HDMI 1 [HDMI 1]\n"
     )
     # Wrong-namespace output: a WirePlumber description and a PulseAudio sink
     # name are not ALSA identifiers, so neither is a device source.
@@ -259,10 +261,13 @@ def case_linux_backends():
     # hw:CARD=0,DEV=0, which ALSA cannot resolve.
     default = m._linux_default_output()
     assert default == "hw:CARD=PCH,DEV=0", default
+    # A loopback is the capture side of the chain, so the card is skipped and the
+    # default is a real card rather than hw:CARD=Loopback,DEV=0.
+    assert "CARD=Loopback" not in default, default
 
-    # Every device of every card minus the capture device. aplay reports card 0
-    # first and HDMI sorts before PCH, so this is the sorted order, not the
-    # reported one.
+    # Every device of every card minus the capture device. aplay reports the PCH
+    # card before the HDMI card, so this is the sorted order, not the reported
+    # one.
     assert m._linux_list_available("hw:CARD=PCH,DEV=0") == [
         "hw:CARD=HDMI,DEV=7",
         "hw:CARD=PCH,DEV=3",
