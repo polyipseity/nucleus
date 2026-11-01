@@ -22,9 +22,15 @@
     has to be caught by a test rather than by a compiler.
 
     Sources are read through the PowerShell parser and the YAML reader rather
-    than through regular expressions over raw text, so reformatting or renaming
-    a local does not break the guard. No scheduled-task, registry, or COM API is
-    touched, so the suite runs on macOS and Linux as well as Windows.
+    than through regular expressions over raw text. Reformatting, renaming a
+    local, spelling both Join-Path arguments positionally, and writing the
+    Windows test as `$IsWindows -eq $true` all leave the guard green. It does
+    pin the leaves it exists to protect (nucleus/camilladsp and statefile.yml)
+    and it requires the action string to pass the Join-Path result itself to
+    -StateFile, so a refactor that copies -Argument into a variable before
+    New-ScheduledTaskAction is reported here until the suite is updated. No
+    scheduled-task, registry, or COM API is touched, so the suite runs on macOS
+    and Linux as well as Windows.
 
 .NOTES
     Environment variables: (none)
@@ -58,17 +64,38 @@ Describe 'Windows CamillaDSP statefile wiring' {
             return $ast
         }
 
-        # Value of one named parameter of a parsed command. A string literal or
-        # an expandable string yields its text with any $var references kept
-        # verbatim, which is what a parameter-name match needs; anything else
-        # yields its source text so a caller can still see what was passed.
+        # Text of one parsed argument. A string literal keeps its value and an
+        # expandable string keeps its $var references verbatim, which is what a
+        # caller matching on a variable name needs; anything else yields its
+        # source text so the caller can still see what was passed.
+        function Get-ArgumentText {
+            param(
+                [Parameter(Mandatory)]
+                [System.Management.Automation.Language.Ast]$Argument
+            )
+
+            if ($Argument -is [System.Management.Automation.Language.StringConstantExpressionAst] -or
+                $Argument -is [System.Management.Automation.Language.ExpandableStringExpressionAst]) {
+                return $Argument.Value
+            }
+
+            return $Argument.Extent.Text
+        }
+
+        # Value of one parameter of a parsed command, named or positional.
+        # Element 0 is the command name, so -Position 1 is the first argument.
+        # The positional form is the fallback because Join-Path binds the same
+        # two parameters either way, and refactoring a call between the named
+        # and the positional spelling is not a behavior change.
         function Get-CommandParameterValue {
             param(
                 [Parameter(Mandatory)]
                 [System.Management.Automation.Language.CommandAst]$Command,
 
                 [Parameter(Mandatory)]
-                [string]$Name
+                [string]$Name,
+
+                [int]$Position = 0
             )
 
             $elements = $Command.CommandElements
@@ -76,17 +103,56 @@ Describe 'Windows CamillaDSP statefile wiring' {
                 $element = $elements[$index]
                 if ($element -is [System.Management.Automation.Language.CommandParameterAst] -and
                     $element.ParameterName -eq $Name) {
-                    $value = $elements[$index + 1]
-                    if ($value -is [System.Management.Automation.Language.StringConstantExpressionAst] -or
-                        $value -is [System.Management.Automation.Language.ExpandableStringExpressionAst]) {
-                        return $value.Value
+                    return Get-ArgumentText -Argument $elements[$index + 1]
+                }
+            }
+
+            if ($Position -gt 0) {
+                $positional = 0
+                for ($index = 1; $index -lt $elements.Count; $index++) {
+                    $element = $elements[$index]
+                    # A named parameter consumes the element after it, so its
+                    # value is never a positional argument.
+                    if ($element -is [System.Management.Automation.Language.CommandParameterAst]) {
+                        $index++
+                        continue
                     }
 
-                    return $value.Extent.Text
+                    $positional++
+                    if ($positional -eq $Position) {
+                        return Get-ArgumentText -Argument $element
+                    }
                 }
             }
 
             return $null
+        }
+
+        # Name of the variable an expression is assigned to, with any scope or
+        # drive qualifier dropped: the action string references $name, never
+        # $script:name. Null when the expression is not an assignment target.
+        function Get-AssignedVariableName {
+            param(
+                [Parameter(Mandatory)]
+                [System.Management.Automation.Language.Ast]$Ast
+            )
+
+            $current = $Ast.Parent
+            while ($null -ne $current -and $current -isnot [System.Management.Automation.Language.AssignmentStatementAst]) {
+                $current = $current.Parent
+            }
+
+            if ($null -eq $current -or $current.Left -isnot [System.Management.Automation.Language.VariableExpressionAst]) {
+                return $null
+            }
+
+            $variablePath = $current.Left.VariablePath.UserPath
+            $qualifier = $variablePath.IndexOf(':')
+            if ($qualifier -ge 0) {
+                $variablePath = $variablePath.Substring($qualifier + 1)
+            }
+
+            return $variablePath
         }
 
         # Site 1: the supervisor's param() block, which is the whole set of
@@ -121,10 +187,20 @@ Describe 'Windows CamillaDSP statefile wiring' {
                     $args[0].GetCommandName() -eq 'Join-Path'
                 },
                 $true
-            ) | Where-Object { (Get-CommandParameterValue -Command $_ -Name 'Path') -match 'Get-CamillaDSPStateDir' }
+            ) | Where-Object { (Get-CommandParameterValue -Command $_ -Name 'Path' -Position 1) -match 'Get-CamillaDSPStateDir' }
         )
         $script:stateFileLeaf = if ($script:stateFileJoins.Count -eq 1) {
-            Get-CommandParameterValue -Command $script:stateFileJoins[0] -Name 'ChildPath'
+            Get-CommandParameterValue -Command $script:stateFileJoins[0] -Name 'ChildPath' -Position 2
+        }
+        else {
+            $null
+        }
+
+        # Site 2b again: the variable that Join-Path result is assigned to. The
+        # action has to pass this variable, whatever the source calls it, so the
+        # guard below never pins a local name of its own.
+        $script:stateFileVariable = if ($script:stateFileJoins.Count -eq 1) {
+            Get-AssignedVariableName -Ast $script:stateFileJoins[0]
         }
         else {
             $null
@@ -150,7 +226,12 @@ Describe 'Windows CamillaDSP statefile wiring' {
                     $true
                 ))) {
                     foreach ($clause in $ifStatement.Clauses) {
-                        if ($clause.Item1.Extent.Text.Trim() -ne '$IsWindows') { continue }
+                        # Any positive test of $IsWindows selects the branch, so
+                        # -eq $true or a spare set of parentheses still finds it;
+                        # a negated or false-comparing test does not.
+                        $condition = $clause.Item1.Extent.Text
+                        if ($condition -notmatch '\$IsWindows\b') { continue }
+                        if ($condition -match '(?i)(-not\s+|!)\s*\$IsWindows\b|\$IsWindows\s*-(eq\s*\$false|ne\s*\$true)\b|\$false\s*-eq\s*\$IsWindows\b') { continue }
 
                         $clause.Item2.FindAll(
                             {
@@ -163,7 +244,7 @@ Describe 'Windows CamillaDSP statefile wiring' {
                 }
             )
             if ($windowsBranchJoins.Count -eq 1) {
-                $script:windowsStateDirLeaf = Get-CommandParameterValue -Command $windowsBranchJoins[0] -Name 'ChildPath'
+                $script:windowsStateDirLeaf = Get-CommandParameterValue -Command $windowsBranchJoins[0] -Name 'ChildPath' -Position 2
             }
         }
 
@@ -211,8 +292,14 @@ Describe 'Windows CamillaDSP statefile wiring' {
     It 'passes the statefile as the value the sync module computes' {
         $script:stateFileJoins.Count | Should -Be 1 -Because 'the -StateFile value has to come from Get-CamillaDSPStateDir'
         $script:stateFileLeaf | Should -Be 'statefile.yml'
+        $script:stateFileVariable | Should -Not -BeNullOrEmpty -Because 'the Join-Path result has to be assigned to a variable the action can name'
         $script:taskArgument | Should -Not -BeNullOrEmpty
-        $script:taskArgument | Should -Match '(?i)-StateFile\s+"?\$stateFile\b'
+
+        # Anchored to the end of the token, because the guard names whichever
+        # variable the source uses: a value with anything appended to it is a
+        # different expression, not this variable.
+        $stateFilePattern = '(?i)-StateFile\s+"?\$' + [regex]::Escape($script:stateFileVariable) + '(?=["''\s]|$)'
+        $script:taskArgument | Should -Match $stateFilePattern
     }
 
     It 'names the Windows state directory under nucleus/camilladsp' {
