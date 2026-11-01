@@ -709,7 +709,7 @@
               pkgs.zsh
               # WHY: android-config-tests needs zip, which Ubuntu does not ship.
               pkgs.zip
-              # WHY: camilladsp-deviceselect parses YAML fixtures, and PATH is exported once.
+              # WHY: the heartbeat suite parses YAML fixtures, and PATH is exported once.
               (pkgs.python3.withPackages (p: [ p.pyyaml ]))
               treefmtWrapper
             ];
