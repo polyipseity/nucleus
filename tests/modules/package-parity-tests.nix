@@ -29,6 +29,15 @@ let
   listElements = builtins.filter isListElement parts;
   extractedNames = map builtins.head listElements;
 
+  # Entries are matched by source order, so this asserts the file's declared
+  # order. Nix compares strings with strcmp, which is byte order, so the rule
+  # needs no locale and no collation data.
+  namePairs = lib.lists.genList (i: [
+    (builtins.elemAt extractedNames i)
+    (builtins.elemAt extractedNames (i + 1))
+  ]) (builtins.length extractedNames - 1);
+  outOfOrder = builtins.filter (p: builtins.elemAt p 0 >= builtins.elemAt p 1) namePairs;
+
   # --- Entry blocks keyed by name (structural parse) ---
   # WHY: the assertion needs each entry's real text, and forcing managedPackages
   # through the module system would drag in every host's config args (pkgs,
@@ -130,6 +139,15 @@ let
     builtins.length extractedNames > 0
   ) "managedPackages must have at least one entry";
 
+  # managedPackages must be sorted by entry name in byte order.
+  test_registry_names_sorted =
+    assert' (outOfOrder == [ ])
+      "managedPackages entries must be sorted by name, byte order; out of order: ${
+        lib.strings.concatStringsSep ", " (
+          map (p: "${builtins.elemAt p 0} before ${builtins.elemAt p 1}") outOfOrder
+        )
+      }";
+
   # No duplicate entry names.
   test_no_duplicate_names = assert' (
     builtins.length extractedNames == builtins.length (lib.unique extractedNames)
@@ -214,6 +232,7 @@ let
 
   allTests = [
     test_entry_names_valid
+    test_registry_names_sorted
     test_no_duplicate_names
     test_managed_nixpkgs_attrs_resolve
     test_dotted_nixpkgs_paths_resolve

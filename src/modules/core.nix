@@ -130,28 +130,6 @@ let
       };
       winget = "Google.ChromeRemoteDesktopHost";
     };
-    czkawka = {
-      category = "gui";
-      homebrew = {
-        kind = "formula";
-        name = "czkawka";
-      };
-      nixpkgs = "czkawka";
-      winget = "qarmin.czkawka.cli";
-    };
-    exiftool = {
-      category = "cli";
-      homebrew = {
-        kind = "formula";
-        name = "exiftool";
-      };
-      nixpkgs = "perlPackages.ImageExifTool";
-      winget = "ExifTool.ExifTool";
-    };
-    mat2 = {
-      category = "cli";
-      nixpkgs = "mat2";
-    };
     cursor = {
       # Single source of truth for Cursor enable/disable. Every host is listed
       # and disabled, since an omitted host would default to enabled.
@@ -169,6 +147,15 @@ let
       nixpkgs = "code-cursor";
       winget = "Anysphere.Cursor";
     };
+    czkawka = {
+      category = "gui";
+      homebrew = {
+        kind = "formula";
+        name = "czkawka";
+      };
+      nixpkgs = "czkawka";
+      winget = "qarmin.czkawka.cli";
+    };
     deadnix = {
       category = "cli";
       nixpkgs = "deadnix";
@@ -178,15 +165,6 @@ let
       platforms = [ "darwin" ];
       nixpkgs = "desktoppr";
     };
-    "discord@canary" = {
-      category = "gui";
-      homebrew = {
-        kind = "cask";
-        name = "discord@canary";
-      };
-      nixpkgs = "discord-canary";
-      winget = "Discord.Discord.Canary";
-    };
     direnv = {
       category = "cli";
       homebrew = {
@@ -195,6 +173,15 @@ let
       };
       nixpkgs = "direnv";
       winget = "direnv.direnv";
+    };
+    "discord@canary" = {
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "discord@canary";
+      };
+      nixpkgs = "discord-canary";
+      winget = "Discord.Discord.Canary";
     };
     dos2unix = {
       category = "cli";
@@ -219,15 +206,6 @@ let
       platforms = [ "darwin" ];
       nixpkgs = "duti";
     };
-    eza = {
-      category = "cli";
-      homebrew = {
-        kind = "formula";
-        name = "eza";
-      };
-      nixpkgs = "eza";
-      winget = "eza-community.eza";
-    };
     "equaliser" = {
       category = "cli";
       platforms = [ "darwin" ];
@@ -237,14 +215,23 @@ let
       category = "gui";
       winget = "EqualizerAPO.EqualizerAPO";
     };
-    ffmpeg = {
+    exiftool = {
       category = "cli";
       homebrew = {
         kind = "formula";
-        name = "ffmpeg";
+        name = "exiftool";
       };
-      nixpkgs = "ffmpeg-full";
-      winget = "Gyan.FFmpeg";
+      nixpkgs = "perlPackages.ImageExifTool";
+      winget = "ExifTool.ExifTool";
+    };
+    eza = {
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "eza";
+      };
+      nixpkgs = "eza";
+      winget = "eza-community.eza";
     };
     fd = {
       category = "cli";
@@ -255,14 +242,14 @@ let
       nixpkgs = "fd";
       winget = "sharkdp.fd";
     };
-    fzf = {
+    ffmpeg = {
       category = "cli";
       homebrew = {
         kind = "formula";
-        name = "fzf";
+        name = "ffmpeg";
       };
-      nixpkgs = "fzf";
-      winget = "junegunn.fzf";
+      nixpkgs = "ffmpeg-full";
+      winget = "Gyan.FFmpeg";
     };
     "font-awesome" = {
       category = "cli";
@@ -272,6 +259,15 @@ let
       };
       nixpkgs = "font-awesome";
     };
+    fzf = {
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "fzf";
+      };
+      nixpkgs = "fzf";
+      winget = "junegunn.fzf";
+    };
     gh = {
       category = "cli";
       homebrew = {
@@ -280,6 +276,15 @@ let
       };
       nixpkgs = "gh";
       winget = "GitHub.cli";
+    };
+    ghostscript = {
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "ghostscript";
+      };
+      nixpkgs = "ghostscript";
+      winget = "ArtifexSoftware.GhostScript";
     };
     gimp = {
       category = "gui";
@@ -327,15 +332,6 @@ let
       };
       nixpkgs = "google-chrome";
       winget = "Google.Chrome.Canary";
-    };
-    ghostscript = {
-      category = "cli";
-      homebrew = {
-        kind = "formula";
-        name = "ghostscript";
-      };
-      nixpkgs = "ghostscript";
-      winget = "ArtifexSoftware.GhostScript";
     };
     imagemagick = {
       category = "cli";
@@ -457,6 +453,10 @@ let
       };
       platforms = [ "darwin" ];
     };
+    mat2 = {
+      category = "cli";
+      nixpkgs = "mat2";
+    };
     mold = {
       category = "cli";
       nixpkgs = "mold";
@@ -487,6 +487,10 @@ let
       category = "cli";
       nixpkgs = "nickel";
     };
+    "nix-index" = {
+      category = "cli";
+      nixpkgs = "nix-index";
+    };
     nixd = {
       category = "cli";
       nixpkgs = "nixd";
@@ -498,10 +502,6 @@ let
     nixfmt = {
       category = "cli";
       nixpkgs = "nixfmt";
-    };
-    "nix-index" = {
-      category = "cli";
-      nixpkgs = "nix-index";
     };
     nls = {
       category = "cli";
@@ -598,6 +598,19 @@ let
       };
       winget = "Parsec.Parsec";
     };
+    pass = {
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "pass";
+      };
+      nixpkgs = "pass";
+      # WHY: pass-otp is not a top-level attr and pass loads it from
+      # SYSTEM_EXTENSION_DIR. Contributing both would collide on bin/pass, so
+      # the wrapper replaces the plain attr. `nixpkgs` stays the probe.
+      nixpkgsPackage = pkgs.pass.withExtensions (extensions: [ extensions.pass-otp ]);
+      winget = "GnuPG.pass";
+    };
     "pay-respects" = {
       category = "cli";
       nixpkgs = "pay-respects";
@@ -625,24 +638,19 @@ let
       platforms = [ "darwin" ];
       nixpkgs = "pinentry_mac";
     };
-    pass = {
+    powersession = {
+      # WHY: absent from nixpkgs, so disable nix routing on the other hosts.
+      enable = {
+        MacBook = false;
+        NixOS = false;
+        Windows = true;
+      };
       category = "cli";
       homebrew = {
         kind = "formula";
-        name = "pass";
+        name = "powersession";
       };
-      nixpkgs = "pass";
-      # WHY: pass-otp is not a top-level attr and pass loads it from
-      # SYSTEM_EXTENSION_DIR. Contributing both would collide on bin/pass, so
-      # the wrapper replaces the plain attr. `nixpkgs` stays the probe.
-      nixpkgsPackage = pkgs.pass.withExtensions (extensions: [ extensions.pass-otp ]);
-      winget = "GnuPG.pass";
-    };
-    pulseview = {
-      # WHY: not in homebrew-core; nixpkgs builds cleanly on macOS/Linux. Windows provisioned via WinGet Sigrok.PulseView.
-      category = "gui";
-      nixpkgs = "pulseview";
-      winget = "Sigrok.PulseView";
+      winget = "Watfaq.PowerSession";
     };
     powershell = {
       category = "cli";
@@ -662,20 +670,6 @@ let
       };
       winget = "Microsoft.PowerToys";
     };
-    powersession = {
-      # WHY: absent from nixpkgs, so disable nix routing on the other hosts.
-      enable = {
-        MacBook = false;
-        NixOS = false;
-        Windows = true;
-      };
-      category = "cli";
-      homebrew = {
-        kind = "formula";
-        name = "powersession";
-      };
-      winget = "Watfaq.PowerSession";
-    };
     prek = {
       category = "cli";
       homebrew = {
@@ -684,6 +678,12 @@ let
       };
       nixpkgs = "prek";
       winget = "j178.Prek";
+    };
+    pulseview = {
+      # WHY: not in homebrew-core; nixpkgs builds cleanly on macOS/Linux. Windows provisioned via WinGet Sigrok.PulseView.
+      category = "gui";
+      nixpkgs = "pulseview";
+      winget = "Sigrok.PulseView";
     };
     python = {
       category = "cli";
@@ -697,12 +697,6 @@ let
       nixpkgsPackage = pkgs.python3.withPackages (p: [ p.pyyaml ]);
       winget = "Python.Python.3.13";
     };
-    qtpass = {
-      # WHY: the cask is broken on macOS, so route it to nixpkgs there.
-      category = "gui";
-      nixpkgs = "qtpass";
-      winget = "IJHack.QtPass";
-    };
     qemu = {
       category = "cli";
       homebrew = {
@@ -711,14 +705,11 @@ let
       };
       nixpkgs = "qemu";
     };
-    rectangle = {
+    qtpass = {
+      # WHY: the cask is broken on macOS, so route it to nixpkgs there.
       category = "gui";
-      platforms = [ "darwin" ];
-      homebrew = {
-        kind = "cask";
-        name = "rectangle";
-      };
-      nixpkgs = "rectangle";
+      nixpkgs = "qtpass";
+      winget = "IJHack.QtPass";
     };
     rclone = {
       category = "cli";
@@ -728,6 +719,15 @@ let
       };
       nixpkgs = "rclone";
       winget = "Rclone.Rclone";
+    };
+    rectangle = {
+      category = "gui";
+      platforms = [ "darwin" ];
+      homebrew = {
+        kind = "cask";
+        name = "rectangle";
+      };
+      nixpkgs = "rectangle";
     };
     redis = {
       category = "cli";
@@ -842,6 +842,11 @@ let
       nixpkgs = "source-serif";
       winget = "Adobe.SourceSerif4";
     };
+    sqlite = {
+      category = "cli";
+      nixpkgs = "sqlite";
+      winget = "SQLite.SQLite";
+    };
     "ssh-to-age" = {
       category = "cli";
       nixpkgs = "ssh-to-age";
@@ -863,11 +868,6 @@ let
         name = "stats";
       };
       nixpkgs = "stats";
-    };
-    sqlite = {
-      category = "cli";
-      nixpkgs = "sqlite";
-      winget = "SQLite.SQLite";
     };
     steam = {
       category = "gui";
@@ -947,15 +947,6 @@ let
       nixpkgsPackage = vagrantPlugins.package;
       winget = "Hashicorp.Vagrant";
     };
-    vlc = {
-      category = "gui";
-      homebrew = {
-        kind = "cask";
-        name = "vlc";
-      };
-      nixpkgs = "vlc";
-      winget = "VideoLAN.VLC";
-    };
     "visual-studio-code" = {
       category = "gui";
       homebrew = {
@@ -974,6 +965,15 @@ let
         name = "visual-studio-code@insiders";
       };
       winget = "Microsoft.VisualStudioCode.Insiders";
+    };
+    vlc = {
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "vlc";
+      };
+      nixpkgs = "vlc";
+      winget = "VideoLAN.VLC";
     };
     wechat = {
       category = "gui";
@@ -1000,15 +1000,6 @@ let
       category = "cli";
       nixpkgs = "whisper-cpp";
     };
-    winfsp = {
-      category = "cli";
-      platforms = [ "linux" ];
-      homebrew = {
-        kind = "formula";
-        name = "winfsp";
-      };
-      winget = "WinFsp.WinFsp";
-    };
     "windows-terminal-preview" = {
       category = "gui";
       platforms = [ "linux" ];
@@ -1017,6 +1008,15 @@ let
         name = "windows-terminal-preview";
       };
       winget = "Microsoft.WindowsTerminal.Preview";
+    };
+    winfsp = {
+      category = "cli";
+      platforms = [ "linux" ];
+      homebrew = {
+        kind = "formula";
+        name = "winfsp";
+      };
+      winget = "WinFsp.WinFsp";
     };
     yamllint = {
       category = "cli";
