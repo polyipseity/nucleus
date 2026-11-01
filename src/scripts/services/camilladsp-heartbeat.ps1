@@ -298,14 +298,19 @@ function Test-CamillaDSPNeedsPush {
 function Get-CamillaDSPConfigFingerprint {
   <#
   .SYNOPSIS
-    SHA256 over the config bytes and the resolved playback device.
+    SHA256 over the config bytes, the resolved playback device, and the resolved
+    capture device.
   .DESCRIPTION
-    The device is part of the hash because the config stores a null playback
-    device, so a device change would otherwise look like no change.
+    The device names are part of the hash because the config stores them as null,
+    so a device change would otherwise look like no change. A loopback capture
+    follows the default playback endpoint, which can change with the config bytes
+    untouched, so the capture name needs its own separator.
   .PARAMETER ConfigPath
     Config file whose bytes are hashed.
   .PARAMETER TargetDevice
     Device resolution selects right now.
+  .PARAMETER CaptureDevice
+    Capture endpoint resolution selects right now.
   #>
   [CmdletBinding()]
   [OutputType([string])]
@@ -315,17 +320,31 @@ function Get-CamillaDSPConfigFingerprint {
 
     [Parameter(Mandatory)]
     [AllowEmptyString()]
-    [string]$TargetDevice
+    [string]$TargetDevice,
+
+    [Parameter(Mandatory = $false)]
+    [AllowEmptyString()]
+    [string]$CaptureDevice = ''
   )
 
-  $config = [System.IO.File]::ReadAllBytes($ConfigPath)
-  $separator = [System.Text.Encoding]::UTF8.GetBytes("`n--playback-device--`n")
-  $device = [System.Text.Encoding]::UTF8.GetBytes($TargetDevice)
+  $segments = @(
+    [System.IO.File]::ReadAllBytes($ConfigPath),
+    [System.Text.Encoding]::UTF8.GetBytes("`n--playback-device--`n"),
+    [System.Text.Encoding]::UTF8.GetBytes($TargetDevice),
+    [System.Text.Encoding]::UTF8.GetBytes("`n--capture-device--`n"),
+    [System.Text.Encoding]::UTF8.GetBytes($CaptureDevice)
+  )
 
-  $combined = [byte[]]::new($config.Length + $separator.Length + $device.Length)
-  [System.Array]::Copy($config, 0, $combined, 0, $config.Length)
-  [System.Array]::Copy($separator, 0, $combined, $config.Length, $separator.Length)
-  [System.Array]::Copy($device, 0, $combined, $config.Length + $separator.Length, $device.Length)
+  $length = 0
+  foreach ($segment in $segments) {
+    $length += $segment.Length
+  }
+  $combined = [byte[]]::new($length)
+  $offset = 0
+  foreach ($segment in $segments) {
+    [System.Array]::Copy($segment, 0, $combined, $offset, $segment.Length)
+    $offset += $segment.Length
+  }
 
   $sha = [System.Security.Cryptography.SHA256]::Create()
   try {
@@ -347,6 +366,8 @@ function Test-CamillaDSPConfigChanged {
     Config file to fingerprint.
   .PARAMETER TargetDevice
     Device resolution selects right now.
+  .PARAMETER CaptureDevice
+    Capture endpoint resolution selects right now.
   #>
   [CmdletBinding()]
   [OutputType([bool])]
@@ -356,14 +377,18 @@ function Test-CamillaDSPConfigChanged {
 
     [Parameter(Mandatory)]
     [AllowEmptyString()]
-    [string]$TargetDevice
+    [string]$TargetDevice,
+
+    [Parameter(Mandatory = $false)]
+    [AllowEmptyString()]
+    [string]$CaptureDevice = ''
   )
 
   $lastPushFile = Join-Path -Path (Get-CamillaDSPStateDir) -ChildPath 'last-push.txt'
   if (-not (Test-Path -Path $lastPushFile -PathType Leaf)) { return $true }
 
   $recorded = (Get-Content -Raw -Path $lastPushFile).Trim()
-  return $recorded -ne (Get-CamillaDSPConfigFingerprint -ConfigPath $ConfigPath -TargetDevice $TargetDevice)
+  return $recorded -ne (Get-CamillaDSPConfigFingerprint -ConfigPath $ConfigPath -TargetDevice $TargetDevice -CaptureDevice $CaptureDevice)
 }
 
 function Save-CamillaDSPLastPush {
@@ -394,13 +419,18 @@ function Send-CamillaDSPConfig {
     A target device is patched into the config directly, so the device that was
     measured is the device that gets pushed. State is recorded only after
     CamillaDSP answers "Ok"; a rejection drops the device cache, because the
-    resolved device is probably gone even though the cache still lists it.
+    resolved device is probably gone even though the cache still lists it. A
+    config that resolves to no playback device is not pushed at all: a null
+    playback device makes CamillaDSP play to the system default output, which on
+    a loopback capture is the endpoint it captures from.
   .PARAMETER EndpointPort
     CamillaDSP websocket API port.
   .PARAMETER ConfigPath
     Config file to push.
   .PARAMETER TargetDevice
     Device to push, or an empty value to resolve the config first.
+  .PARAMETER CaptureDevice
+    Capture endpoint to write alongside the target device.
   #>
   [CmdletBinding()]
   [OutputType([bool])]
@@ -413,13 +443,26 @@ function Send-CamillaDSPConfig {
 
     [Parameter(Mandatory)]
     [AllowEmptyString()]
-    [string]$TargetDevice
+    [string]$TargetDevice,
+
+    [Parameter(Mandatory = $false)]
+    [AllowEmptyString()]
+    [string]$CaptureDevice = ''
   )
 
   $yaml = if ([string]::IsNullOrEmpty($TargetDevice)) {
     Resolve-CamillaDSPPlaybackDevice -ConfigPath $ConfigPath
   } else {
-    ConvertTo-CamillaDSPPlaybackDeviceYaml -ConfigPath $ConfigPath -Device $TargetDevice
+    ConvertTo-CamillaDSPPlaybackDeviceYaml -ConfigPath $ConfigPath -Device $TargetDevice -CaptureDevice $CaptureDevice
+  }
+
+  $pushedDevice = [string]($yaml | ConvertFrom-Yaml).devices.playback.device
+  # WHY: without a playback device CamillaDSP binds the system default output,
+  # which is the loopback capture endpoint here, so a push would feed the output
+  # back as input. The resolver has already warned about the missing second
+  # endpoint, and the tick retries with backoff until one appears.
+  if ([string]::IsNullOrEmpty($pushedDevice)) {
+    return $false
   }
 
   $payload = @{ SetConfig = $yaml } | ConvertTo-Json -Compress
@@ -429,9 +472,8 @@ function Send-CamillaDSPConfig {
     return $false
   }
 
-  $pushedDevice = [string]($yaml | ConvertFrom-Yaml).devices.playback.device
   Save-CamillaDSPLastDevice -Device $pushedDevice
-  Save-CamillaDSPLastPush -Fingerprint (Get-CamillaDSPConfigFingerprint -ConfigPath $ConfigPath -TargetDevice $pushedDevice)
+  Save-CamillaDSPLastPush -Fingerprint (Get-CamillaDSPConfigFingerprint -ConfigPath $ConfigPath -TargetDevice $pushedDevice -CaptureDevice $CaptureDevice)
   return $true
 }
 
@@ -495,14 +537,16 @@ while ($true) {
     }
 
     $targetDevice = ''
+    $captureDevice = ''
     $configChanged = $true
     if (Test-Path -Path $ConfigFile -PathType Leaf) {
       $targetDevice = [string](Get-CamillaDSPResolvedPlaybackDeviceName -ConfigPath $ConfigFile)
-      $configChanged = Test-CamillaDSPConfigChanged -ConfigPath $ConfigFile -TargetDevice $targetDevice
+      $captureDevice = [string](Get-CamillaDSPLoopbackCaptureDevice -ConfigPath $ConfigFile)
+      $configChanged = Test-CamillaDSPConfigChanged -ConfigPath $ConfigFile -TargetDevice $targetDevice -CaptureDevice $captureDevice
     }
 
     if (Test-CamillaDSPNeedsPush -RunState $runState -LiveDevice $liveDevice -TargetDevice $targetDevice -ConfigChanged $configChanged) {
-      $success = Send-CamillaDSPConfig -EndpointPort $Port -ConfigPath $ConfigFile -TargetDevice $targetDevice
+      $success = Send-CamillaDSPConfig -EndpointPort $Port -ConfigPath $ConfigFile -TargetDevice $targetDevice -CaptureDevice $captureDevice
     } else {
       $success = $true
     }

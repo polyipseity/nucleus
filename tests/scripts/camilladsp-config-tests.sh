@@ -5,6 +5,8 @@
 # chain that cannot start on that host. The ALSA default device that feeds the
 # loopback must also be the capture side's pair, so the two ends cannot drift apart
 # in a one-sided edit, and no playback device may resolve back into that loopback.
+# A captured name also belongs to one backend only, and a Wasapi capture with a null
+# device reads system audio only when it says it is loopback.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -45,8 +47,8 @@ CARD_PREFIXES = ("hw:", "plughw:", "sysdefault:", "default:", "dsnoop:")
 HW_DEVICE = re.compile(r"^hw:([^,\s]+),(\d+),(\d+)$")
 
 
-def alsa_endpoints(config_dir):
-    """Yield (path, key, device) for every Alsa devices.<key> block, deduped by file."""
+def all_endpoints(config_dir):
+    """Yield (path, key, endpoint) for every devices.<key> block, deduped by file."""
     seen = set()
     for path in sorted(config_dir.glob("**/*.yml")):
         resolved = path.resolve()
@@ -56,8 +58,15 @@ def alsa_endpoints(config_dir):
         config = yaml.safe_load(path.read_text()) or {}
         devices = config.get("devices") or {}
         for key, endpoint in devices.items():
-            if not isinstance(endpoint, dict) or endpoint.get("type") != "Alsa":
+            if not isinstance(endpoint, dict):
                 continue
+            yield path, key, endpoint
+
+
+def alsa_endpoints(config_dir):
+    """Yield (path, key, device) for every Alsa devices.<key> block, deduped by file."""
+    for path, key, endpoint in all_endpoints(config_dir):
+        if endpoint.get("type") == "Alsa":
             yield path, key, endpoint.get("device")
 
 
@@ -163,8 +172,38 @@ def case_default_device_pairs_with_capture():
     )
 
 
+def case_backend_device_names():
+    config_dir = pathlib.Path(os.environ["CONFIG_DIR"])
+    wrong_backend = []
+    missing_loopback = []
+    wasapi_capture = 0
+    # A device name belongs to one backend. BlackHole is a macOS driver, so a
+    # Wasapi or Alsa endpoint naming it cannot open on that host, and a Wasapi
+    # capture with a null device needs loopback: true or it captures the
+    # microphone instead of system audio.
+    for path, key, endpoint in all_endpoints(config_dir):
+        device = endpoint.get("device")
+        kind = endpoint.get("type")
+        if isinstance(device, str) and "BlackHole" in device and kind != "CoreAudio":
+            wrong_backend.append(
+                f"{path}: devices.{key}.device = {device!r} is a CoreAudio name under {kind}"
+            )
+        if key == "capture" and kind == "Wasapi":
+            wasapi_capture += 1
+            if device is None and endpoint.get("loopback") is not True:
+                missing_loopback.append(
+                    f"{path}: Wasapi capture with no device needs loopback: true"
+                )
+    assert wasapi_capture > 0, (
+        f"no Wasapi capture endpoint under {config_dir}, so the loopback property passed vacuously"
+    )
+    assert not wrong_backend, "a device name belongs to one backend: " + "; ".join(wrong_backend)
+    assert not missing_loopback, "; ".join(missing_loopback)
+
+
 CASES = {
     "alsa_devices_name_alsa_devices": case_alsa_devices_name_alsa_devices,
+    "backend_device_names": case_backend_device_names,
     "default_device_pairs_with_capture": case_default_device_pairs_with_capture,
 }
 
@@ -201,5 +240,8 @@ run_case alsa_devices_name_alsa_devices
 
 section 2 "default device pairing"
 run_case default_device_pairs_with_capture
+
+section 3 "backend device names"
+run_case backend_device_names
 
 finish_tests

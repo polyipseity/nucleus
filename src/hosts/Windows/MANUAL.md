@@ -11,6 +11,10 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 5. Picard: sign in and add the AcoustID API key under Options.
 6. Starship is active in every shell and needs a Nerd Font. Apply installs `DEVCOM.JetBrainsMonoNerdFont`, so select it as the terminal font.
 
+## audio processing
+
+1. CamillaDSP captures the default playback device in WASAPI loopback, so this host needs two playback endpoints: applications play into the default one, which CamillaDSP captures, and the processed audio goes to the other. With a single output there is nowhere for the unprocessed stream to go, and `camilladsp-heartbeat` logs a warning instead of feeding the output back into the capture. Set the spare endpoint (HDMI or an unused output) as the default playback device; the shipped configs leave both devices `null` so the heartbeat picks them.
+
 ## virtualization
 
 1. Apply enables the Hyper-V optional feature, then reboot before running `vagrant up --provider hyperv`, because apply cannot restart the machine itself. Hyper-V is unavailable on Windows Home, so a Home host fails that step with a DISM "feature name is unknown" error and needs an upgrade to Pro.

@@ -8,9 +8,19 @@ param()
 $ErrorActionPreference = 'Stop'
 $script:passCount = 0
 $script:failCount = 0
+$script:warnings = @()
+
+# WHY: the resolver reports an unusable topology through the shared formatter,
+# which the heartbeat imports. The stub records the message so the suite can
+# assert what the daemon would log, without the formatter's command-name lookup.
+function Write-NucleusWarning {
+  param([string]$Message, [string]$CommandName = '')
+  $script:warnings += @("$CommandName`: $Message")
+}
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $deviceSelect = Join-Path $repoRoot 'src/scripts/services/camilladsp-deviceselect.ps1'
+$heartbeat = Join-Path $repoRoot 'src/scripts/services/camilladsp-heartbeat.ps1'
 
 # WHY: off Windows the library keeps its state under the XDG state directory, so
 # a run without this wrote last-device.txt into the live daemon's directory and
@@ -37,24 +47,30 @@ function Get-PlaybackDevice {
   return $cfg.devices.playback.device
 }
 
-# Build a minimal CamillaDSP config YAML with the given devices.
+# Build a minimal CamillaDSP config YAML with the given devices. A loopback
+# capture is a Wasapi render endpoint with a null device, as the shipped Windows
+# configs declare it.
 function ConvertTo-ConfigYaml {
   param(
     [string]$PlaybackDevice,
-    [string]$CaptureDevice = 'Loopback Audio'
+    [string]$CaptureDevice = 'Loopback Audio',
+    [switch]$Loopback
   )
-  $device = if ($PlaybackDevice -eq '') { 'null' } else { """$PlaybackDevice""" }
+  $playback = if ($PlaybackDevice -eq '') { 'null' } else { """$PlaybackDevice""" }
+  $capture = if ($CaptureDevice -eq '') { 'null' } else { """$CaptureDevice""" }
+  $backend = if ($Loopback) { 'Wasapi' } else { 'CoreAudio' }
+  $loopbackLine = if ($Loopback) { "`n    loopback: true" } else { '' }
   return @"
 ---
 devices:
   playback:
     channels: 2
-    device: $device
-    type: CoreAudio
+    device: $playback
+    type: $backend
   capture:
     channels: 2
-    device: "$CaptureDevice"
-    type: CoreAudio
+    device: ${capture}${loopbackLine}
+    type: $backend
 "@
 }
 
@@ -69,6 +85,7 @@ function Invoke-WithMockedDetection {
     [hashtable]$Mocks,
     [string]$EntryPoint
   )
+  $script:warnings = @()
   $cfgFile = New-TemporaryFile | Rename-Item -NewName { $_ -replace '\.tmp$', '.yml' } -PassThru
   Set-Content -Path $cfgFile.FullName -Value $ConfigYaml -NoNewline
   try {
@@ -117,6 +134,30 @@ function Invoke-Resolve {
     Available = $Available
   }
 }
+
+# Read one function of the heartbeat without running the script: the heartbeat is
+# a resident loop, so dot-sourcing it would never return. The fingerprint is pure,
+# so the test defines the shipped implementation instead of copying the hash
+# logic, the same seam camilladsp-wiring.Tests.ps1 uses for scripts it must not run.
+function Get-HeartbeatFunctionScript {
+  param([string]$Name)
+  $tokens = $null
+  $parseErrors = $null
+  $ast = [System.Management.Automation.Language.Parser]::ParseFile($heartbeat, [ref]$tokens, [ref]$parseErrors)
+  if ($parseErrors) { throw "camilladsp-heartbeat.ps1 does not parse: $($parseErrors[0].Message)" }
+  $definition = $ast.Find(
+    {
+      $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+      $args[0].Name -eq $Name
+    },
+    $true
+  )
+  if ($null -eq $definition) { throw "camilladsp-heartbeat.ps1 has no function $Name" }
+  return [scriptblock]::Create($definition.Extent.Text)
+}
+# Dot-sourced at script scope, because a function defined inside a helper would
+# disappear with the helper's scope.
+. (Get-HeartbeatFunctionScript -Name 'Get-CamillaDSPConfigFingerprint')
 
 # Test 1: Non-null playback device → pass through unchanged.
 $resolved = Invoke-Resolve -ConfigYaml (ConvertTo-ConfigYaml -PlaybackDevice 'MacBook Pro Speakers')
@@ -313,6 +354,100 @@ if ($device -eq 'USB Speaker') {
   Assert-Pass 'last saved missing → falls through to first available'
 } else {
   Assert-Fail 'last saved missing fallback' "expected 'USB Speaker', got '$device'"
+}
+
+# Test 15: a loopback capture reads a render endpoint, so the capture device is
+# the default playback device and the daemon has to play to a different one.
+$loopbackYaml = ConvertTo-ConfigYaml -PlaybackDevice '' -CaptureDevice '' -Loopback
+$resolved = Invoke-Resolve -ConfigYaml $loopbackYaml -Default 'Speakers (Realtek)' -First 'Spare Output' -Available @('Speakers (Realtek)', 'Spare Output')
+$loopbackConfig = $resolved | ConvertFrom-Yaml
+if ($loopbackConfig.devices.capture.device -eq 'Speakers (Realtek)') {
+  Assert-Pass 'loopback capture resolves to the default render endpoint'
+} else {
+  Assert-Fail 'loopback capture resolution' "expected 'Speakers (Realtek)', got '$($loopbackConfig.devices.capture.device)'"
+}
+if ($loopbackConfig.devices.capture.loopback -eq $true) {
+  Assert-Pass 'loopback capture keeps loopback: true'
+} else {
+  Assert-Fail 'loopback flag preservation' "expected True, got '$($loopbackConfig.devices.capture.loopback)'"
+}
+$device = Get-PlaybackDevice -Yaml $resolved
+if ($device -eq 'Spare Output') {
+  Assert-Pass 'playback never selects the loopback capture endpoint'
+} else {
+  Assert-Fail 'loopback playback exclusion' "expected 'Spare Output', got '$device'"
+}
+
+# Test 16: a single render endpoint leaves no output to play to, so the config is
+# pushed unpatched and the daemon reports the missing second endpoint.
+$resolved = Invoke-Resolve -ConfigYaml $loopbackYaml -Default 'Speakers (Realtek)' -First '' -Last '' -Available @('Speakers (Realtek)')
+if ($resolved -eq $loopbackYaml) {
+  Assert-Pass 'single render endpoint leaves the config unpatched'
+} else {
+  Assert-Fail 'single endpoint passthrough' 'expected the config text unchanged'
+}
+$endpointWarnings = @($script:warnings | Where-Object { $_ -match 'second playback endpoint' })
+if ($endpointWarnings.Count -eq 1) {
+  Assert-Pass 'single render endpoint warns about the second playback endpoint'
+} else {
+  Assert-Fail 'single endpoint warning' "expected one two-endpoint warning, got $($script:warnings.Count): $($script:warnings -join ' | ')"
+}
+
+# Test 17: the fingerprint covers the resolved capture device as well, because a
+# loopback capture follows the default playback device while the config bytes stay
+# the same. Either endpoint changing has to look like a change.
+$fingerprintFile = New-TemporaryFile | Rename-Item -NewName { $_ -replace '\.tmp$', '.yml' } -PassThru
+Set-Content -Path $fingerprintFile.FullName -Value $loopbackYaml -NoNewline
+try {
+  $baseline = Get-CamillaDSPConfigFingerprint -ConfigPath $fingerprintFile.FullName -TargetDevice 'Spare Output' -CaptureDevice 'Speakers (Realtek)'
+  $otherCapture = Get-CamillaDSPConfigFingerprint -ConfigPath $fingerprintFile.FullName -TargetDevice 'Spare Output' -CaptureDevice 'Speakers (Realtek) 2'
+  $otherPlayback = Get-CamillaDSPConfigFingerprint -ConfigPath $fingerprintFile.FullName -TargetDevice 'Spare Output 2' -CaptureDevice 'Speakers (Realtek)'
+  if ($baseline -ne $otherCapture) {
+    Assert-Pass 'fingerprint changes with the resolved capture device'
+  } else {
+    Assert-Fail 'fingerprint capture separator' "both capture devices hashed to $baseline"
+  }
+  if ($baseline -ne $otherPlayback) {
+    Assert-Pass 'fingerprint changes with the resolved playback device'
+  } else {
+    Assert-Fail 'fingerprint playback separator' "both playback devices hashed to $baseline"
+  }
+} finally {
+  Remove-Item -Path $fingerprintFile.FullName -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: best-effort cleanup -- temp config may already be gone
+}
+
+# Test 18: a config with no playback device must never reach CamillaDSP, because
+# a null playback device binds the system default output, which is the loopback
+# capture endpoint here. The request stub records any push attempt.
+$script:pushedPayload = $null
+$script:lastPushFingerprint = $null
+function Invoke-CamillaDSPRequest {
+  param([int]$EndpointPort, [string]$Payload)
+  $script:pushedPayload = "$EndpointPort $Payload"
+  return @{ SetConfig = @{ result = 'Ok' } }
+}
+function Save-CamillaDSPLastPush {
+  param([string]$Fingerprint)
+  $script:lastPushFingerprint = $Fingerprint
+}
+. $deviceSelect
+function Get-CamillaDSPDefaultPlaybackDevice { return 'Speakers (Realtek)' }
+function Get-CamillaDSPAvailablePlaybackDeviceList { return @() }
+function Get-CamillaDSPFirstAvailablePlaybackDevice { return '' }
+function Get-CamillaDSPLastDevice { return '' }
+. (Get-HeartbeatFunctionScript -Name 'Send-CamillaDSPConfig')
+
+$sendConfigFile = New-TemporaryFile | Rename-Item -NewName { $_ -replace '\.tmp$', '.yml' } -PassThru
+Set-Content -Path $sendConfigFile.FullName -Value $loopbackYaml -NoNewline
+try {
+  $pushed = Send-CamillaDSPConfig -EndpointPort 1 -ConfigPath $sendConfigFile.FullName -TargetDevice '' -CaptureDevice 'Speakers (Realtek)'
+} finally {
+  Remove-Item -Path $sendConfigFile.FullName -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: best-effort cleanup -- temp config may already be gone
+}
+if ($pushed -eq $false -and $null -eq $script:pushedPayload) {
+  Assert-Pass 'single render endpoint never pushes a self-feeding config'
+} else {
+  Assert-Fail 'single endpoint push guard' "returned '$pushed' with payload '$($script:pushedPayload)'"
 }
 
 Write-Output ''

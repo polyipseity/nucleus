@@ -21,6 +21,16 @@
     lives. Both stay silent until someone reads a log, which is why this drift
     has to be caught by a test rather than by a compiler.
 
+    A fourth coupling lives in the heartbeat itself:
+        src/scripts/services/camilladsp-heartbeat.ps1
+            hashes the resolved playback and capture endpoints with the config.
+    The fingerprint only covers the capture endpoint while every call that hashes
+    or records a config passes -CaptureDevice, and a parameter added to one call
+    site and not the other is silent: the daemon then stops re-pushing when the
+    capture source changes. The parameter names and the call sites are read from
+    the parsed source, so a rename or a reflow stays green while a missing
+    argument does not.
+
     Sources are read through the PowerShell parser and the YAML reader rather
     than through regular expressions over raw text. Reformatting, renaming a
     local, spelling both Join-Path arguments positionally, and writing the
@@ -261,6 +271,43 @@ Describe 'Windows CamillaDSP statefile wiring' {
         # Site 3: the GUI backend's own answer.
         $script:guiConfig = ConvertFrom-Yaml -Yaml (Get-Content -Raw -LiteralPath $script:guiConfigPath)
         $script:guiStatefilePath = $script:guiConfig.statefile_path
+
+        # Site 4: every heartbeat call that hashes or records a config, and the
+        # parameters of the functions it calls, so a capture endpoint that reaches
+        # one call site and not the other is reported.
+        $script:heartbeatPath = Join-Path -Path $script:repoRoot -ChildPath 'src/scripts/services/camilladsp-heartbeat.ps1'
+        $heartbeatAst = Get-ScriptAst -Path $script:heartbeatPath
+        $fingerprintFunctionName = @(
+            'Get-CamillaDSPConfigFingerprint'
+            'Send-CamillaDSPConfig'
+            'Test-CamillaDSPConfigChanged'
+        )
+        $script:fingerprintCalls = @($heartbeatAst.FindAll(
+            {
+                $args[0] -is [System.Management.Automation.Language.CommandAst] -and
+                $fingerprintFunctionName -contains $args[0].GetCommandName()
+            },
+            $true
+        ))
+        $script:fingerprintCallsWithoutCapture = @(
+            foreach ($call in $script:fingerprintCalls) {
+                if (-not (Get-CommandParameterValue -Command $call -Name 'CaptureDevice')) {
+                    $call.Extent.Text
+                }
+            }
+        )
+        $script:fingerprintFunctionParameters = @{}
+        foreach ($definition in @($heartbeatAst.FindAll(
+                    {
+                        $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+                        $fingerprintFunctionName -contains $args[0].Name
+                    },
+                    $true
+                ))) {
+            $script:fingerprintFunctionParameters[$definition.Name] = @(
+                $definition.Body.ParamBlock.Parameters | ForEach-Object { $_.Name.VariablePath.UserPath }
+            )
+        }
     }
 
     It 'declares the supervisor parameters the task action has to bind' {
@@ -317,5 +364,17 @@ Describe 'Windows CamillaDSP statefile wiring' {
 
         $guiStatefilePathSlash = $script:guiStatefilePath -replace '\\', '/'
         $guiStatefilePathSlash.EndsWith('/' + $script:daemonStatefileTail) | Should -BeTrue -Because "statefile_path '$script:guiStatefilePath' must end with '$script:daemonStatefileTail'"
+    }
+
+    It 'declares the capture endpoint on the heartbeat functions that hash a config' {
+        $script:fingerprintFunctionParameters.Keys.Count | Should -Be 3
+        foreach ($name in @('Get-CamillaDSPConfigFingerprint', 'Send-CamillaDSPConfig', 'Test-CamillaDSPConfigChanged')) {
+            $script:fingerprintFunctionParameters[$name] | Should -Contain 'CaptureDevice' -Because "$name has to accept the capture endpoint the fingerprint covers"
+        }
+    }
+
+    It 'passes the capture endpoint to every heartbeat call that hashes a config' {
+        $script:fingerprintCalls.Count | Should -BeGreaterThan 0
+        $script:fingerprintCallsWithoutCapture | Should -BeNullOrEmpty -Because "a call without -CaptureDevice stops the re-push when the capture source changes: $($script:fingerprintCallsWithoutCapture -join '; ')"
     }
 }
