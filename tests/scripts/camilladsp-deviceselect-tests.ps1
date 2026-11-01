@@ -12,6 +12,12 @@ $script:failCount = 0
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $deviceSelect = Join-Path $repoRoot 'src/scripts/services/camilladsp-deviceselect.ps1'
 
+# WHY: off Windows the library keeps its state under the XDG state directory, so
+# a run without this wrote last-device.txt into the live daemon's directory and
+# could delete the device the daemon had saved. Temp dir, one per run, matching
+# what init_test_state does for the POSIX suites.
+$env:XDG_STATE_HOME = Join-Path ([System.IO.Path]::GetTempPath()) ("camilladsp-tests-" + [guid]::NewGuid().ToString('N'))
+
 function Assert-Pass {
   param([string]$Name)
   Write-Output "PASS $Name"
