@@ -98,10 +98,17 @@ function Invoke-WithMockedDetection {
       $mockFirst = [string]$Mocks.First
       $mockLast = [string]$Mocks.Last
       $mockAvailable = [string[]]$Mocks.Available
+      $mockFailure = [bool]$Mocks.EnumerationFails
       # Override COM-backed helpers with mocks so no audio stack is required.
       function Get-CamillaDSPDefaultPlaybackDevice { return $mockDefault }
       function Get-CamillaDSPAvailablePlaybackDeviceList { return $mockAvailable }
-      function Get-CamillaDSPFirstAvailablePlaybackDevice { return $mockFirst }
+      if ($mockFailure) {
+        # Fail the enumeration underneath the shipped first-available helper, so
+        # the test exercises the null-versus-empty distinction that helper makes.
+        function Get-CamillaDSPAvailablePlaybackDeviceCache { return $null }
+      } else {
+        function Get-CamillaDSPFirstAvailablePlaybackDevice { return $mockFirst }
+      }
       function Get-CamillaDSPLastDevice { return $mockLast }
       if ($EntryPoint -eq 'resolved') {
         Get-CamillaDSPResolvedPlaybackDeviceName -ConfigPath $ConfigPath
@@ -119,19 +126,22 @@ function Invoke-WithMockedDetection {
 # $Default: value returned by Get-CamillaDSPDefaultPlaybackDevice (or $null)
 # $First: value returned by Get-CamillaDSPFirstAvailablePlaybackDevice (or $null)
 # $Last: value returned by Get-CamillaDSPLastDevice (or $null)
+# $EnumerationFails: report a failed enumeration from the first-available step
 function Invoke-Resolve {
   param(
     [string]$ConfigYaml,
     [string]$Default = $null,
     [string]$First = $null,
     [string]$Last = $null,
-    [string[]]$Available = @()
+    [string[]]$Available = @(),
+    [switch]$EnumerationFails
   )
   return Invoke-WithMockedDetection -ConfigYaml $ConfigYaml -EntryPoint 'resolve' -Mocks @{
-    Default   = $Default
-    First     = $First
-    Last      = $Last
-    Available = $Available
+    Default          = $Default
+    First            = $First
+    Last             = $Last
+    Available        = $Available
+    EnumerationFails = [bool]$EnumerationFails
   }
 }
 
@@ -416,9 +426,11 @@ try {
   Remove-Item -Path $fingerprintFile.FullName -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: best-effort cleanup -- temp config may already be gone
 }
 
-# Test 18: a config with no playback device must never reach CamillaDSP, because
-# a null playback device binds the system default output, which is the loopback
-# capture endpoint here. The request stub records any push attempt.
+# Tests 18-22: the push boundary never hands CamillaDSP a config that feeds its
+# own output back in. Send-CamillaDSPConfig has to compare the device it is about
+# to push against the capture endpoint the tick resolved, so these cases pass that
+# endpoint instead of letting the boundary resolve it again. The request stub
+# records every push attempt.
 $script:pushedPayload = $null
 $script:lastPushFingerprint = $null
 function Invoke-CamillaDSPRequest {
@@ -435,19 +447,142 @@ function Get-CamillaDSPDefaultPlaybackDevice { return 'Speakers (Realtek)' }
 function Get-CamillaDSPAvailablePlaybackDeviceList { return @() }
 function Get-CamillaDSPFirstAvailablePlaybackDevice { return '' }
 function Get-CamillaDSPLastDevice { return '' }
+. (Get-HeartbeatFunctionScript -Name 'Write-CamillaDSPPushRefusalWarning')
 . (Get-HeartbeatFunctionScript -Name 'Send-CamillaDSPConfig')
 
-$sendConfigFile = New-TemporaryFile | Rename-Item -NewName { $_ -replace '\.tmp$', '.yml' } -PassThru
-Set-Content -Path $sendConfigFile.FullName -Value $loopbackYaml -NoNewline
-try {
-  $pushed = Send-CamillaDSPConfig -EndpointPort 1 -ConfigPath $sendConfigFile.FullName -TargetDevice '' -CaptureDevice 'Speakers (Realtek)'
-} finally {
-  Remove-Item -Path $sendConfigFile.FullName -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: best-effort cleanup -- temp config may already be gone
+# Push one config through the shipped Send-CamillaDSPConfig and report what it
+# did. Without -KeepRefusalState the once-per-reason record is cleared first, so
+# each case starts from a state where the refusal is new.
+function Invoke-Send {
+  param(
+    [string]$ConfigYaml,
+    [string]$TargetDevice,
+    [string]$CaptureDevice,
+    [switch]$KeepRefusalState
+  )
+  $script:pushedPayload = $null
+  $script:warnings = @()
+  if (-not $KeepRefusalState) { $script:CamillaDSPLastPushRefusal = '' }
+  $file = New-TemporaryFile | Rename-Item -NewName { $_ -replace '\.tmp$', '.yml' } -PassThru
+  Set-Content -Path $file.FullName -Value $ConfigYaml -NoNewline
+  try {
+    $pushed = Send-CamillaDSPConfig -EndpointPort 1 -ConfigPath $file.FullName -TargetDevice $TargetDevice -CaptureDevice $CaptureDevice
+  } finally {
+    Remove-Item -Path $file.FullName -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: best-effort cleanup -- temp config may already be gone
+  }
+  return [pscustomobject]@{
+    Pushed   = $pushed
+    Payload  = $script:pushedPayload
+    Warnings = @($script:warnings)
+  }
 }
-if ($pushed -eq $false -and $null -eq $script:pushedPayload) {
+
+# Test 18: a config that resolves to no playback device.
+$result = Invoke-Send -ConfigYaml $loopbackYaml -TargetDevice '' -CaptureDevice 'Speakers (Realtek)'
+if ($result.Pushed -eq $false -and $null -eq $result.Payload) {
   Assert-Pass 'single render endpoint never pushes a self-feeding config'
 } else {
-  Assert-Fail 'single endpoint push guard' "returned '$pushed' with payload '$($script:pushedPayload)'"
+  Assert-Fail 'single endpoint push guard' "returned '$($result.Pushed)' with payload '$($result.Payload)'"
+}
+
+# Test 19: the tick resolves the capture endpoint and the playback candidate in
+# two probes, so a default change between them can make the playback device equal
+# the capture endpoint. The push boundary has to catch that instead of trusting
+# the resolutions to agree.
+$result = Invoke-Send -ConfigYaml $loopbackYaml -TargetDevice 'Spare Output' -CaptureDevice 'Spare Output'
+$namedBoth = @($result.Warnings | Where-Object { $_ -match 'is also the capture endpoint' -and $_ -match 'Spare Output' })
+if ($result.Pushed -eq $false -and $null -eq $result.Payload -and $namedBoth.Count -eq 1) {
+  Assert-Pass 'push refuses a playback device equal to the capture endpoint'
+} else {
+  Assert-Fail 'capture-equals-playback guard' "returned '$($result.Pushed)', payload '$($result.Payload)', warnings '$($result.Warnings -join ' | ')'"
+}
+
+# Test 20: a config that names its playback device is returned unchanged by the
+# resolver, so only the push boundary can notice that the name is the capture
+# endpoint the default probe just reported.
+$explicitYaml = ConvertTo-ConfigYaml -PlaybackDevice 'Speakers (Realtek)' -CaptureDevice '' -Loopback
+$result = Invoke-Send -ConfigYaml $explicitYaml -TargetDevice 'Speakers (Realtek)' -CaptureDevice 'Speakers (Realtek)'
+$namedBoth = @($result.Warnings | Where-Object { $_ -match 'is also the capture endpoint' -and $_ -match "'Speakers \(Realtek\)'" })
+if ($result.Pushed -eq $false -and $null -eq $result.Payload -and $namedBoth.Count -eq 1) {
+  Assert-Pass 'push refuses an explicit playback device equal to the capture endpoint'
+} else {
+  Assert-Fail 'explicit capture-equals-playback guard' "returned '$($result.Pushed)', payload '$($result.Payload)', warnings '$($result.Warnings -join ' | ')'"
+}
+
+# Test 21: when the default playback probe returns nothing, the loopback capture
+# endpoint is unknown, so nothing proves playback differs from it. An unknown
+# endpoint is refused instead of being treated as an absent one.
+$result = Invoke-Send -ConfigYaml $loopbackYaml -TargetDevice 'Speakers (Realtek)' -CaptureDevice ''
+$unknown = @($result.Warnings | Where-Object { $_ -match 'capture endpoint is unresolved' })
+if ($result.Pushed -eq $false -and $null -eq $result.Payload -and $unknown.Count -eq 1) {
+  Assert-Pass 'push refuses a loopback config whose capture endpoint is unknown'
+} else {
+  Assert-Fail 'unknown-capture guard' "returned '$($result.Pushed)', payload '$($result.Payload)', warnings '$($result.Warnings -join ' | ')'"
+}
+
+# Test 22: the refusal repeats on every tick while the topology stays broken, so
+# the same reason is logged once.
+$first = Invoke-Send -ConfigYaml $loopbackYaml -TargetDevice 'Spare Output' -CaptureDevice 'Spare Output'
+$second = Invoke-Send -ConfigYaml $loopbackYaml -TargetDevice 'Spare Output' -CaptureDevice 'Spare Output' -KeepRefusalState
+if ($first.Warnings.Count -eq 1 -and $second.Warnings.Count -eq 0) {
+  Assert-Pass 'repeated push refusal warns once for the same reason'
+} else {
+  Assert-Fail 'push refusal quieting' "first $($first.Warnings.Count) warning(s), second $($second.Warnings.Count)"
+}
+
+# Test 23: an enumeration failure is not the topology defect. Two healthy
+# endpoints with one failed read must not send the operator to the Sound panel.
+$resolved = Invoke-Resolve -ConfigYaml $loopbackYaml -Default '' -First '' -Last '' -EnumerationFails
+$failureWarnings = @($script:warnings)
+if ($resolved -eq $loopbackYaml -and $failureWarnings.Count -eq 1 -and $failureWarnings[0] -match 'cannot enumerate playback devices' -and $failureWarnings[0] -notmatch 'second playback endpoint') {
+  Assert-Pass 'enumeration failure warns about the failed read, not the topology'
+} else {
+  Assert-Fail 'enumeration failure message' "warnings '$($failureWarnings -join ' | ')'"
+}
+
+# Test 24: one warning per distinct cause. The resident heartbeat resolves on
+# every tick, so an unchanged cause stays quiet, a different cause speaks up, and
+# a successful resolution clears the record so the next failure is reported.
+$dedupeFile = New-TemporaryFile | Rename-Item -NewName { $_ -replace '\.tmp$', '.yml' } -PassThru
+Set-Content -Path $dedupeFile.FullName -Value $loopbackYaml -NoNewline
+try {
+  $dedupe = & {
+    param([string]$DeviceSelectPath, [string]$ConfigPath)
+    . $DeviceSelectPath
+    $script:seen = @()
+    function Write-NucleusWarning {
+      param([string]$Message, [string]$CommandName = '')
+      $script:seen += @("$CommandName`: $Message")
+    }
+    function Get-CamillaDSPDefaultPlaybackDevice { return '' }
+    function Get-CamillaDSPLastDevice { return $null }
+    function Get-CamillaDSPAvailablePlaybackDeviceList { return $null }
+    function Get-CamillaDSPFirstAvailablePlaybackDevice { return $null }
+    Resolve-CamillaDSPPlaybackDevice -ConfigPath $ConfigPath > $null
+    Resolve-CamillaDSPPlaybackDevice -ConfigPath $ConfigPath > $null
+    $afterSameCause = @($script:seen).Count
+    function Get-CamillaDSPAvailablePlaybackDeviceList { return @() }
+    function Get-CamillaDSPFirstAvailablePlaybackDevice { return '' }
+    Resolve-CamillaDSPPlaybackDevice -ConfigPath $ConfigPath > $null
+    $afterOtherCause = @($script:seen).Count
+    function Get-CamillaDSPFirstAvailablePlaybackDevice { return 'Spare Output' }
+    Resolve-CamillaDSPPlaybackDevice -ConfigPath $ConfigPath > $null
+    function Get-CamillaDSPFirstAvailablePlaybackDevice { return '' }
+    Resolve-CamillaDSPPlaybackDevice -ConfigPath $ConfigPath > $null
+    $afterRecovery = @($script:seen).Count
+    return [pscustomobject]@{
+      AfterSameCause = $afterSameCause
+      AfterOtherCause = $afterOtherCause
+      AfterRecovery = $afterRecovery
+    }
+  } $deviceSelect $dedupeFile.FullName
+  if ($dedupe.AfterSameCause -eq 1 -and $dedupe.AfterOtherCause -eq 2 -and $dedupe.AfterRecovery -eq 3) {
+    Assert-Pass 'repeated resolution warnings stay quiet per cause and resume after recovery'
+  } else {
+    Assert-Fail 'resolution warning quieting' "same $($dedupe.AfterSameCause), other $($dedupe.AfterOtherCause), recovery $($dedupe.AfterRecovery)"
+  }
+} finally {
+  Remove-Item -Path $dedupeFile.FullName -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: best-effort cleanup -- temp config may already be gone
 }
 
 Write-Output ''

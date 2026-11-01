@@ -251,10 +251,12 @@ function Test-CamillaDSPNeedsPush {
   .SYNOPSIS
     Whether CamillaDSP needs the config pushed this tick.
   .DESCRIPTION
-    A null target is skipped while CamillaDSP is Running: the resolver falls
-    back to the first available device, so a null device is never actually
-    pushed. A stopped instance is pushed even with a null target, because that
-    is what delivers the initial config.
+    A null target is skipped while CamillaDSP is Running: there is no device to
+    compare, and a push would only repeat the running config. While it is not
+    Running the decision is a push whatever the target, so the initial config is
+    delivered; Send-CamillaDSPConfig then refuses a config whose playback device
+    is empty or is the loopback capture endpoint, so an unusable topology never
+    binds.
   .PARAMETER RunState
     Value of GetState.
   .PARAMETER LiveDevice
@@ -411,6 +413,37 @@ function Save-CamillaDSPLastPush {
   Set-Content -Path (Join-Path -Path $stateDir -ChildPath 'last-push.txt') -Value $Fingerprint -NoNewline
 }
 
+# WHY: a refused push is retried on every tick while the topology stays broken,
+# so the refusal is logged once per distinct reason instead of once per tick.
+# This is the heartbeat's own scope, which outlives the loop's iterations.
+$script:CamillaDSPLastPushRefusal = ''
+
+function Write-CamillaDSPPushRefusalWarning {
+  <#
+  .SYNOPSIS
+    Warns about a refused push, once per distinct reason.
+  .DESCRIPTION
+    A different reason warns again, and an accepted push clears the record, so
+    the next refusal is reported.
+  .PARAMETER Cause
+    Reason key; the same key is not warned twice in a row.
+  .PARAMETER Message
+    Text to log when the reason is new.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [string]$Cause,
+
+    [Parameter(Mandatory)]
+    [string]$Message
+  )
+
+  if ($script:CamillaDSPLastPushRefusal -eq $Cause) { return }
+  $script:CamillaDSPLastPushRefusal = $Cause
+  Write-NucleusWarning -CommandName 'camilladsp-heartbeat' -Message $Message
+}
+
 function Send-CamillaDSPConfig {
   <#
   .SYNOPSIS
@@ -420,9 +453,11 @@ function Send-CamillaDSPConfig {
     measured is the device that gets pushed. State is recorded only after
     CamillaDSP answers "Ok"; a rejection drops the device cache, because the
     resolved device is probably gone even though the cache still lists it. A
-    config that resolves to no playback device is not pushed at all: a null
-    playback device makes CamillaDSP play to the system default output, which on
-    a loopback capture is the endpoint it captures from.
+    config is never pushed onto a device it would feed from: an empty playback
+    device binds the system default output, an unresolved capture endpoint
+    cannot be proven different from that output, and a playback device equal to
+    the capture endpoint makes CamillaDSP capture its own output. Each refusal
+    warns once per reason.
   .PARAMETER EndpointPort
     CamillaDSP websocket API port.
   .PARAMETER ConfigPath
@@ -430,7 +465,8 @@ function Send-CamillaDSPConfig {
   .PARAMETER TargetDevice
     Device to push, or an empty value to resolve the config first.
   .PARAMETER CaptureDevice
-    Capture endpoint to write alongside the target device.
+    Capture endpoint the tick resolved: written alongside the target device, and
+    the endpoint the push must not be pointed back into. Empty means unresolved.
   #>
   [CmdletBinding()]
   [OutputType([bool])]
@@ -456,13 +492,27 @@ function Send-CamillaDSPConfig {
     ConvertTo-CamillaDSPPlaybackDeviceYaml -ConfigPath $ConfigPath -Device $TargetDevice -CaptureDevice $CaptureDevice
   }
 
-  $pushedDevice = [string]($yaml | ConvertFrom-Yaml).devices.playback.device
+  $pushedConfig = $yaml | ConvertFrom-Yaml
+  $pushedDevice = [string]$pushedConfig.devices.playback.device
   # WHY: without a playback device CamillaDSP binds the system default output,
   # which is the loopback capture endpoint here, so a push would feed the output
-  # back as input. The resolver has already warned about the missing second
-  # endpoint, and the tick retries with backoff until one appears.
+  # back as input. The resolver has already warned about the cause.
   if ([string]::IsNullOrEmpty($pushedDevice)) {
     return $false
+  }
+
+  # WHY: the capture endpoint is the one device playback has to avoid, and the
+  # comparison uses the endpoint the tick resolved. Resolving it again here could
+  # observe a different default and prove nothing.
+  if ($pushedConfig.devices.capture.loopback -eq $true) {
+    if ([string]::IsNullOrEmpty($CaptureDevice)) {
+      Write-CamillaDSPPushRefusalWarning -Cause 'unknown-capture' -Message 'not pushing: the loopback capture endpoint is unresolved because no default playback endpoint was found, so playback cannot be proven different from it'
+      return $false
+    }
+    if ($pushedDevice -eq $CaptureDevice) {
+      Write-CamillaDSPPushRefusalWarning -Cause 'capture-equals-playback' -Message "not pushing: playback device '$pushedDevice' is also the capture endpoint '$CaptureDevice', so CamillaDSP would capture its own output"
+      return $false
+    }
   }
 
   $payload = @{ SetConfig = $yaml } | ConvertTo-Json -Compress
@@ -472,6 +522,7 @@ function Send-CamillaDSPConfig {
     return $false
   }
 
+  $script:CamillaDSPLastPushRefusal = ''
   Save-CamillaDSPLastDevice -Device $pushedDevice
   Save-CamillaDSPLastPush -Fingerprint (Get-CamillaDSPConfigFingerprint -ConfigPath $ConfigPath -TargetDevice $pushedDevice -CaptureDevice $CaptureDevice)
   return $true

@@ -42,6 +42,13 @@
     scheduled-task, registry, or COM API is touched, so the suite runs on macOS
     and Linux as well as Windows.
 
+    The push boundary is guarded the same way: the capture endpoint the tick
+    resolved is what a pushed playback device has to differ from, so the boundary
+    must compare against its -CaptureDevice argument, refuse the three ways a
+    push can feed the output back in, and never resolve the endpoint itself. A
+    second resolution could observe a different system default than the one the
+    tick used, which would make the comparison prove nothing.
+
 .NOTES
     Environment variables: (none)
     Exit codes: 0 on success; 1 on failure
@@ -308,6 +315,71 @@ Describe 'Windows CamillaDSP statefile wiring' {
                 $definition.Body.ParamBlock.Parameters | ForEach-Object { $_.Name.VariablePath.UserPath }
             )
         }
+
+        # Site 4 again: the push boundary. Its guard conditions are read as
+        # source text, and the capture resolver call is searched for inside Send
+        # so a boundary that observes the endpoint a second time is reported.
+        $script:sendDefinitions = @($heartbeatAst.FindAll(
+            {
+                $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+                $args[0].Name -eq 'Send-CamillaDSPConfig'
+            },
+            $true
+        ))
+        $script:sendGuardConditions = @()
+        $script:sendCaptureResolutions = @()
+        if ($script:sendDefinitions.Count -eq 1) {
+            $script:sendGuardConditions = @(
+                foreach ($guard in @($script:sendDefinitions[0].Body.FindAll(
+                    { $args[0] -is [System.Management.Automation.Language.IfStatementAst] },
+                    $true
+                ))) {
+                    foreach ($clause in $guard.Clauses) { $clause.Item1.Extent.Text }
+                }
+            )
+            $script:sendCaptureResolutions = @($script:sendDefinitions[0].Body.FindAll(
+                {
+                    $args[0] -is [System.Management.Automation.Language.CommandAst] -and
+                    $args[0].GetCommandName() -eq 'Get-CamillaDSPLoopbackCaptureDevice'
+                },
+                $true
+            ))
+        }
+
+        # Site 4 again: the tick's single capture observation and the arguments
+        # that carry it. A call outside a function body is a tick call, and every
+        # one of those has to pass the variable the one resolution is assigned to.
+        $script:captureResolutions = @($heartbeatAst.FindAll(
+            {
+                $args[0] -is [System.Management.Automation.Language.CommandAst] -and
+                $args[0].GetCommandName() -eq 'Get-CamillaDSPLoopbackCaptureDevice'
+            },
+            $true
+        ))
+        $script:captureObservationVariable = if ($script:captureResolutions.Count -eq 1) {
+            Get-AssignedVariableName -Ast $script:captureResolutions[0]
+        }
+        else {
+            $null
+        }
+        $script:tickCaptureArgumentValues = @(
+            @(
+                foreach ($call in $script:fingerprintCalls) {
+                    $current = $call.Parent
+                    $insideFunction = $false
+                    while ($null -ne $current) {
+                        if ($current -is [System.Management.Automation.Language.FunctionDefinitionAst]) {
+                            $insideFunction = $true
+                            break
+                        }
+                        $current = $current.Parent
+                    }
+                    if (-not $insideFunction) {
+                        Get-CommandParameterValue -Command $call -Name 'CaptureDevice'
+                    }
+                }
+            ) | Select-Object -Unique
+        )
     }
 
     It 'declares the supervisor parameters the task action has to bind' {
@@ -376,5 +448,28 @@ Describe 'Windows CamillaDSP statefile wiring' {
     It 'passes the capture endpoint to every heartbeat call that hashes a config' {
         $script:fingerprintCalls.Count | Should -BeGreaterThan 0
         $script:fingerprintCallsWithoutCapture | Should -BeNullOrEmpty -Because "a call without -CaptureDevice stops the re-push when the capture source changes: $($script:fingerprintCallsWithoutCapture -join '; ')"
+    }
+
+    It 'refuses a push that would feed the output back in' {
+        $script:sendDefinitions.Count | Should -Be 1
+
+        $loopbackGuards = @($script:sendGuardConditions | Where-Object { $_ -match 'capture\.loopback' })
+        $loopbackGuards.Count | Should -BeGreaterThan 0 -Because 'a capture that is not loopback has a capture-side device, so playback cannot equal it'
+
+        $unknownGuards = @($script:sendGuardConditions | Where-Object { $_ -match '(?i)IsNullOrEmpty\(\$CaptureDevice\)' })
+        $unknownGuards.Count | Should -BeGreaterThan 0 -Because 'an unresolved capture endpoint cannot be proven different from the device about to be pushed'
+
+        $equalityGuards = @($script:sendGuardConditions | Where-Object { $_ -match '(?i)\$pushedDevice\s+-eq\s+\$CaptureDevice' })
+        $equalityGuards.Count | Should -BeGreaterThan 0 -Because 'a playback device equal to the capture endpoint makes CamillaDSP capture its own output'
+    }
+
+    It 'compares the capture endpoint the tick resolved instead of resolving it again' {
+        $script:sendCaptureResolutions.Count | Should -Be 0 -Because 'resolving the endpoint inside the push boundary could observe a different default than the tick did'
+        $script:captureResolutions.Count | Should -Be 1 -Because 'the tick has to resolve the endpoint once and pass that value to every comparison'
+        $script:captureObservationVariable | Should -Not -BeNullOrEmpty -Because 'the single resolution has to be assigned to a variable the calls can pass'
+
+        $expected = '$' + $script:captureObservationVariable
+        $script:tickCaptureArgumentValues.Count | Should -Be 1 -Because "every capture-taking call in the tick has to pass one observation, got: $($script:tickCaptureArgumentValues -join ', ')"
+        $script:tickCaptureArgumentValues[0] | Should -Be $expected
     }
 }

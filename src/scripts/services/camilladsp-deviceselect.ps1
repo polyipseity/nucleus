@@ -15,14 +15,19 @@
 # the Render direction in loopback mode) and backend_wasapi.md.
 #
 # When no playback candidate remains, the config is returned unchanged and one
-# warning names the second endpoint the topology needs.
+# warning names the cause: a failed endpoint enumeration, or the second endpoint
+# the loopback topology needs. The warning repeats only when the cause changes,
+# because a broken topology would otherwise log on every tick.
 #
 # State files live in Get-CamillaDSPStateDir:
 #   last-device.txt          last device pushed to CamillaDSP
 #   available-devices.txt    enumerated device names, one per line
 #   available-devices.meta   capture device, then the enumeration epoch
 #
-# Dependencies: PowerShell 7+, powershell-yaml module
+# Dependencies: PowerShell 7+, the powershell-yaml module, and Write-NucleusWarning
+# from Format-NucleusOutput.psm1. That function is resolved in the caller's scope,
+# because the heartbeat imports the formatter for its own messages; a caller that
+# dot-sources this library without it has to stub it (the suite does).
 #
 # Usage (dot-source):
 #   . "$PSScriptRoot/camilladsp-deviceselect.ps1"
@@ -217,7 +222,11 @@ function Clear-CamillaDSPDeviceCache {
 function Get-CamillaDSPFirstAvailablePlaybackDevice {
   <#
   .SYNOPSIS
-    First cached playback device in sorted-name order, or $null.
+    First cached playback device in sorted-name order.
+  .DESCRIPTION
+    Returns $null when enumeration failed and an empty string when enumeration
+    succeeded with nothing left, so the caller can name the real cause of a
+    resolution that found no device.
   .PARAMETER CaptureDevice
     Device excluded from playback selection.
   #>
@@ -228,9 +237,11 @@ function Get-CamillaDSPFirstAvailablePlaybackDevice {
     [string]$CaptureDevice = ''
   )
 
-  $names = @(Get-CamillaDSPAvailablePlaybackDeviceCache -CaptureDevice $CaptureDevice)
-  if ($names.Count -eq 0) { return $null }
-  return $names[0]
+  $names = Get-CamillaDSPAvailablePlaybackDeviceCache -CaptureDevice $CaptureDevice
+  if ($null -eq $names) { return $null }
+  $names = @($names)
+  if ($names.Count -eq 0) { return '' }
+  return [string]$names[0]
 }
 
 # --- Last saved default and push state ---
@@ -290,6 +301,38 @@ function Clear-CamillaDSPLastDevice {
 }
 
 # --- Config resolution ---
+
+# WHY: one broken topology would otherwise log the same line on every 5 s tick.
+# Dot-sourcing puts this in the caller's script scope, so it survives a resident
+# heartbeat and stays fresh in each test block; it is not a state file, because a
+# restart should report the cause again.
+$script:CamillaDSPLastWarnedCause = ''
+
+function Write-CamillaDSPTopologyWarning {
+  <#
+  .SYNOPSIS
+    Warns about a resolution failure, once per distinct cause.
+  .DESCRIPTION
+    A different cause warns again, and a successful resolution clears the record,
+    so the next failure is reported.
+  .PARAMETER Cause
+    Cause key; the same key is not warned twice in a row.
+  .PARAMETER Message
+    Text to log when the cause is new.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [string]$Cause,
+
+    [Parameter(Mandatory)]
+    [string]$Message
+  )
+
+  if ($script:CamillaDSPLastWarnedCause -eq $Cause) { return }
+  $script:CamillaDSPLastWarnedCause = $Cause
+  Write-NucleusWarning -CommandName 'camilladsp-deviceselect' -Message $Message
+}
 
 function Get-CamillaDSPLoopbackCaptureDevice {
   <#
@@ -381,7 +424,8 @@ function Resolve-CamillaDSPPlaybackDevice {
     sets a device is returned with its original text, so nothing is reserialized
     needlessly. A loopback capture holds the default playback endpoint, so that
     endpoint is excluded from every step, and a config whose only render
-    endpoint is the capture source is returned unchanged with a warning.
+    endpoint is the capture source is returned unchanged with a warning naming
+    the cause: a failed enumeration or the missing second endpoint.
   .PARAMETER ConfigPath
     Config file to resolve.
   #>
@@ -430,16 +474,27 @@ function Resolve-CamillaDSPPlaybackDevice {
   }
 
   # Fallback 2: first available device in sorted-name order.
+  $enumerationFailed = $false
   if ([string]::IsNullOrEmpty($detected)) {
-    $detected = Get-CamillaDSPFirstAvailablePlaybackDevice -CaptureDevice $captureDevice
+    $firstAvailable = Get-CamillaDSPFirstAvailablePlaybackDevice -CaptureDevice $captureDevice
+    if ($null -eq $firstAvailable) {
+      $enumerationFailed = $true
+    } else {
+      $detected = [string]$firstAvailable
+    }
   }
 
   # Nothing available: pass through with the null device and say why.
   if ([string]::IsNullOrEmpty($detected)) {
-    Write-NucleusWarning -CommandName 'camilladsp-deviceselect' -Message 'no playback device available: the loopback capture takes the default playback endpoint, so this host needs a second playback endpoint'
+    if ($enumerationFailed) {
+      Write-CamillaDSPTopologyWarning -Cause 'enumeration-failed' -Message 'cannot enumerate playback devices: the Windows audio endpoint list is unavailable, so no playback device was selected'
+    } else {
+      Write-CamillaDSPTopologyWarning -Cause 'no-candidate' -Message 'no playback device available: the loopback capture takes the default playback endpoint, so this host needs a second playback endpoint'
+    }
     return $yaml
   }
 
+  $script:CamillaDSPLastWarnedCause = ''
   Save-CamillaDSPLastDevice -Device $detected
   return (ConvertTo-CamillaDSPPlaybackDeviceYaml -ConfigPath $ConfigPath -Device $detected -CaptureDevice $loopbackCaptureDevice)
 }
