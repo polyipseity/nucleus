@@ -408,10 +408,18 @@ def invalidate_device_cache() -> None:
 
 
 def detect_first_available(capture_device: str) -> str | None:
+    """First available playback device, never the capture device.
+
+    The backend already excludes capture, and this repeats the check because a
+    backend that regressed would otherwise open an audio loop.
+    """
     devices = list_available_devices_cached(capture_device)
     if not devices:
         return None
-    return devices[0]
+    for name in devices:
+        if name != capture_device:
+            return name
+    return None
 
 
 def save_last_device(device: str) -> None:
