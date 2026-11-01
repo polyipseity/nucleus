@@ -16,10 +16,10 @@
     path), so the field stays absent from records whose instance never blocked
     and never recovered.
 
-    ShouldProcess gating covers the New/Set/Remove verbs that PSScriptAnalyzer's
-    PSUseShouldProcessForStateChangingFunctions inspects. The Initialize-, Add-
-    and Clear- mutators write the same file ungated, so a -WhatIf pass reports
-    the Set- calls only. No caller passes -WhatIf today.
+    ShouldProcess gating follows PSUseShouldProcessForStateChangingFunctions,
+    whose verb set and fix are defined in .agents/instructions/pwsh-lint-policy.instructions.md.
+    The Initialize-, Add- and Clear- mutators write the same file ungated, so a
+    -WhatIf pass reports the Set- calls only. No caller passes -WhatIf today.
 #>
 [CmdletBinding()]
 param()

@@ -67,6 +67,12 @@ function Sync-CamillaDSPService {
     "$($env:USERDOMAIN)\$($env:USERNAME)"
   }
 
+  # The statefile belongs beside the heartbeat's device state, so the path comes
+  # from the same helper the heartbeat uses. Literal $PSScriptRoot form keeps it
+  # visible to DotSourceTargets.Tests.ps1, which skips variable-built paths.
+  . "$PSScriptRoot\..\..\..\..\..\src\scripts\services\camilladsp-deviceselect.ps1"
+  $stateFile = Join-Path -Path (Get-CamillaDSPStateDir) -ChildPath 'statefile.yml'
+
   # Write the wrapper script that starts camilladsp with --no_config. Pushing the
   # config is the heartbeat's job, so this wrapper never needs the config path.
   $wrapperDir = Join-Path -Path $HOME -ChildPath ".config\camilladsp\bin"
@@ -75,12 +81,6 @@ function Sync-CamillaDSPService {
   $wrapperScriptPathSource = Join-Path -Path $PSScriptRoot -ChildPath "..\scripts\CamillaDSP-autoconfig.ps1"
   $wrapperContent = Get-Content -Raw $wrapperScriptPathSource
   Set-Content -Path $wrapperScriptPath -Value $wrapperContent -NoNewline
-
-  # The statefile belongs beside the heartbeat's device state, so the path comes
-  # from the same helper the heartbeat uses. Literal $PSScriptRoot form keeps it
-  # visible to DotSourceTargets.Tests.ps1, which skips variable-built paths.
-  . "$PSScriptRoot\..\..\..\..\..\src\scripts\services\camilladsp-deviceselect.ps1"
-  $stateFile = Join-Path -Path (Get-CamillaDSPStateDir) -ChildPath 'statefile.yml'
 
   $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -File `"$wrapperScriptPath`" -CamillaDSPBin `"$camilladspBin`" -Port $wsPort -LogFile `"$logFile`" -StateFile `"$stateFile`""
   $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
