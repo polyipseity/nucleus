@@ -266,6 +266,109 @@ def case_linux_backends():
     assert m._linux_list_available("capture") == ["alsa_output.analog", "alsa_output.hdmi"]
 
 
+def case_loop_states():
+    """The three stopped states drive the loop, not just the skip predicate."""
+
+    class StopLoop(Exception):
+        pass
+
+    settings = {"up": False, "state": "Stopped", "live_config": "", "result": "Ok"}
+
+    class FakeClient:
+        last = None
+
+        def __init__(self, port):
+            self.port = port
+            self.calls = []
+            self.pushed = []
+            self.up = settings["up"]
+            self.state = settings["state"]
+            self.live_config = settings["live_config"]
+            FakeClient.last = self
+
+        def endpoint_up(self):
+            return self.up
+
+        def reset(self):
+            self.calls.append("reset")
+
+        def request(self, payload):
+            key = next(iter(payload))
+            self.calls.append(key)
+            if key == "GetState":
+                return {"GetState": {"value": self.state}}
+            if key == "GetConfig":
+                return {"GetConfig": {"value": self.live_config}}
+            if key == "SetConfig":
+                self.pushed.append(payload["SetConfig"])
+                return {"SetConfig": {"result": settings["result"]}}
+            raise AssertionError(f"unexpected request {key}")
+
+    sleeps = []
+    remaining = {"ticks": 0}
+
+    def fake_sleep(seconds):
+        sleeps.append(seconds)
+        remaining["ticks"] -= 1
+        if remaining["ticks"] <= 0:
+            raise StopLoop
+
+    def drive(config, ticks, **overrides):
+        settings.update({"up": False, "state": "Stopped", "live_config": "", "result": "Ok"})
+        settings.update(overrides)
+        sleeps.clear()
+        remaining["ticks"] = ticks
+        try:
+            m.run(1234, config)
+        except StopLoop:
+            pass
+        return FakeClient.last, list(sleeps)
+
+    m.CamillaClient = FakeClient
+    m.read_toggles = lambda: (True, True)
+    m.time.sleep = fake_sleep
+
+    # An absent endpoint costs a reset and a ten second wait, never a probe.
+    c = Case()
+    client, waits = drive(c.config(), 3)
+    assert client.calls == ["reset", "reset", "reset"], client.calls
+    assert waits == [m.ABSENT_SLEEP] * 3, waits
+
+    # A connected but stopped camilladsp receives the resolved config.
+    c = Case()
+    config = c.config()
+    client, waits = drive(config, 2, up=True)
+    assert client.pushed, "a stopped camilladsp must receive the config"
+    assert "Speakers" in client.pushed[0], client.pushed[0]
+    assert waits == [m.BASE_SLEEP, m.BASE_SLEEP], waits
+
+    # Running, target device live, push already recorded: nothing is pushed.
+    c = Case()
+    config = c.config()
+    target = m.target_playback_device(config)
+    m.record_push(m.config_fingerprint(config, target))
+    live = (
+        "devices:\n"
+        "  capture:\n    device: BlackHole 2ch\n"
+        f"  playback:\n    device: {target}\n"
+    )
+    client, waits = drive(config, 2, up=True, state="Running", live_config=live)
+    assert client.calls == ["GetState", "GetConfig"] * 2, client.calls
+    assert client.pushed == [], client.pushed
+    assert waits == [m.BASE_SLEEP, m.BASE_SLEEP], waits
+
+    # Running with a drifted device pushes the target back.
+    drifted = live.replace(target, "Unplugged")
+    client, waits = drive(config, 1, up=True, state="Running", live_config=drifted)
+    assert client.pushed and "Unplugged" not in client.pushed[0], client.pushed
+
+    # A refused push keeps the backoff doubling.
+    c = Case()
+    client, waits = drive(c.config(), 3, up=True, result="Error")
+    assert client.pushed, "a refused push still records the attempt"
+    assert waits == [10, 20, 40], waits
+
+
 CASES = {
     "passthrough_nonempty_device": case_passthrough,
     "patches_with_default_output": case_patches_default_output,
@@ -286,6 +389,7 @@ CASES = {
     "config_change_detection": case_config_change,
     "fingerprint_covers_device": case_fingerprint_covers_device,
     "linux_backend_parsing": case_linux_backends,
+    "loop_three_states": case_loop_states,
 }
 
 
@@ -341,5 +445,8 @@ run_case fingerprint_covers_device
 
 section 4 "Linux backends"
 run_case linux_backend_parsing
+
+section 5 "loop states"
+run_case loop_three_states
 
 finish_tests
