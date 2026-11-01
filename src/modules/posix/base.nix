@@ -49,6 +49,13 @@ in
     }
 
     (lib.optionalAttrs (!hasLaunchdDaemonsOption) {
+      # WHY: nice/ionice the nix daemon so local builds (e.g. ffmpeg-full) do
+      # not saturate interactive work. max-jobs/cores stay at defaults (auto);
+      # lower them (e.g. max-jobs = 2; cores = 2;) if the machine is still
+      # saturated during large builds.
+      nix.daemonNiceLevel = 19;
+      nix.daemonIONiceLevel = 7;
+
       # Writable symlink into the repo tree, with a same-folder .bak for any
       # system-owned original replaced the first time.
       # check-suppress:config-method: method 1 (writable symlink) -- symlink; runs as root via nucleus-apply.
