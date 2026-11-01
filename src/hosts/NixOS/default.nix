@@ -33,16 +33,17 @@
   # (CamillaDSP uses hw:Loopback,1 as capture source).
   boot.kernelModules = [ "snd-aloop" ];
 
-  # WHY: this closes the chain an application sees. The application opens the ALSA
-  # default, which is the loopback playback side; CamillaDSP captures the loopback
-  # capture side and plays to the real card. `type plug` resamples, so an
-  # application may open the default at any rate while the configs capture at
-  # 44100. Consequence: with camilladsp stopped nothing drains the loopback, so
+  # WHY: the other half of that loopback now carries the ALSA default, so an
+  # application that opens `default` feeds the daemon instead of the card. `type
+  # plug` resamples, so an application may open it at any rate while the configs
+  # capture at their own. The loopback is one raw PCM with no mixing layer, so a
+  # single client holds it at a time; mixing would take `dmix` on top, which is a
+  # separate change. Consequence: with camilladsp stopped nothing drains it, so
   # output is silent.
-  # check-suppress:config-method: method 2 (read-only) -- environment.etc is the
-  # declarative /etc deployment and takes build-time content only, so a writable
-  # symlink cannot be expressed there; ALSA clients open this as root, outside the
-  # user tree the repo is provisioned into.
+  # check-suppress:config-method: method 2 (read-only) -- a writable link here
+  # would be repoRoot-derived, which lands as a store copy that cannot be
+  # re-pointed, and every ALSA client on the system has to read this path, which a
+  # per-user link cannot guarantee.
   environment.etc."asound.conf".source = ../../modules/configs/asound/asound.conf;
 
   # Journald retention: cap total journal size so disk-bound systemd services

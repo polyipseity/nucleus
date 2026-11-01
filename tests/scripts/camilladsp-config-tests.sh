@@ -90,28 +90,40 @@ def case_default_device_pairs_with_capture():
         f"{asound}: no pcm.!default slave.pcm of the hw:<card>,<device>,<subdevice> shape"
     )
     raw, (card, playback_device, subdevice) = slave
-    # snd-aloop pairs playback device N with capture device N+1 on one card, so the
-    # capture side is derived from the playback side the default device names.
+    # ref: Documentation/sound/cards/aloop.rst -- a loopback card's playback device 0
+    # pairs with its capture device 1, so the capture side sits one above the
+    # playback side the default device names.
     capture_device = str(int(playback_device) + 1)
 
-    problems = []
+    # Every host's config directory is scanned on purpose: the Alsa configs are the
+    # NixOS ones, and an Alsa hw: capture anywhere else would be a host that needs
+    # this file too, so a failure there is correct rather than a false positive.
+    unpaired = []
+    mismatched = []
     paired = 0
+    capture_count = 0
     for path, key, device in alsa_endpoints(pathlib.Path(os.environ["CONFIG_DIR"])):
-        if key != "capture" or not isinstance(device, str):
+        if key != "capture":
             continue
-        capture = HW_DEVICE.match(device)
+        capture_count += 1
+        capture = HW_DEVICE.match(device) if isinstance(device, str) else None
         if capture is None:
+            unpaired.append(f"{path}: capture device {device!r}")
             continue
         paired += 1
         if capture.groups() != (card, capture_device, subdevice):
-            problems.append(
+            mismatched.append(
                 f"{path}: capture device {device!r} is not the other side of {asound} slave.pcm {raw!r}"
             )
+    assert paired == capture_count, (
+        f"{paired} of {capture_count} Alsa capture endpoints under {os.environ['CONFIG_DIR']} "
+        f"cannot be paired with {asound}: " + "; ".join(unpaired)
+    )
     assert paired > 0, (
-        f"no config under {os.environ['CONFIG_DIR']} captures from a hw: device, "
+        f"no Alsa capture endpoint under {os.environ['CONFIG_DIR']}, "
         f"so the pairing of {asound} was never exercised"
     )
-    assert not problems, "; ".join(problems)
+    assert not mismatched, "; ".join(mismatched)
 
 
 CASES = {
