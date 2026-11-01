@@ -22,10 +22,16 @@ let
 
   camilladspPython = import ../../modules/lib/camilladsp-python.nix { inherit pkgs; };
 
+  # WHY alsa-utils: `aplay -l` is the heartbeat's only device source on Linux, and
+  # the wrapper prepends runtimeInputs to an inherited PATH, so the ambient systemd
+  # user PATH must not be what makes the probe work.
   camilladspHeartbeat = pkgs.writeNucleusShellApplication {
     name = "camilladsp-heartbeat";
     scriptName = "src/scripts/services/camilladsp-heartbeat";
-    runtimeInputs = [ camilladspPython ];
+    runtimeInputs = [
+      camilladspPython
+      pkgs.alsa-utils
+    ];
   };
 in
 {
