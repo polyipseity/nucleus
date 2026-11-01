@@ -5,6 +5,7 @@
 #   • dotted nixpkgs attribute paths resolve via lib.hasAttrByPath
 #   • darwin-only packages have platforms = ["darwin"]
 #   • darwin-only packages are not buildable on Linux
+#   • homebrew.kind is the documented formula|cask and carries a name
 #
 # Run with: nix-instantiate --eval tests/modules/package-parity-tests.nix
 
@@ -51,6 +52,45 @@ let
       ) parts
     )
   );
+
+  # --- Homebrew kind contract ---
+  # The registry comment documents `homebrew = { kind = "formula"|"cask"; name }`
+  # and the brew/cask filters in core.nix key off that kind, so a third value
+  # drops the package from both lists without an error.  Each assertion below
+  # works inside one entry's `homebrew = { ... }` text rather than over the file.
+  homebrewBlockOf =
+    name:
+    let
+      split = lib.strings.splitString "homebrew = {" (entryBlocks.${name} or "");
+    in
+    if builtins.length split < 2 then
+      ""
+    else
+      builtins.head (lib.strings.splitString "}" (builtins.head (builtins.tail split)));
+
+  declaredHomebrewKind =
+    name:
+    let
+      pieces = lib.strings.splitString "kind = \"" (homebrewBlockOf name);
+    in
+    if builtins.length pieces == 2 then
+      builtins.head (lib.strings.splitString "\"" (builtins.head (builtins.tail pieces)))
+    else
+      null;
+
+  homebrewDeclaresName =
+    name:
+    let
+      pieces = lib.strings.splitString "name = \"" (homebrewBlockOf name);
+    in
+    builtins.length pieces == 2 && !lib.hasPrefix "\"" (builtins.head (builtins.tail pieces));
+
+  homebrewEntryNames = builtins.filter (name: homebrewBlockOf name != "") (
+    builtins.attrNames entryBlocks
+  );
+
+  homebrewKindCarriesName =
+    name: declaredHomebrewKind name == "formula" || declaredHomebrewKind name == "cask";
 
   # --- Extract nixpkgs attrs from core.nix text ---
   matches = builtins.split "nixpkgs = \"([^\"]+)\";" coreModuleText;
@@ -149,6 +189,29 @@ let
     in
     assert' (builtins.all notBuildableOnLinux darwinNixpkgsAttrs) "Darwin-only packages must not be buildable on Linux";
 
+  # Every entry with homebrew metadata declares the documented kind.
+  test_homebrew_kind_documented =
+    let
+      validKind = kind: kind == "formula" || kind == "cask";
+      invalid = builtins.filter (name: !validKind (declaredHomebrewKind name)) homebrewEntryNames;
+    in
+    assert' (builtins.length homebrewEntryNames > 0 && invalid == [ ])
+      "homebrew.kind must be \"formula\" or \"cask\" in core.nix; invalid: ${lib.strings.concatStringsSep ", " invalid}";
+
+  # A declared kind ships the name Homebrew installs.
+  test_homebrew_kind_has_name =
+    let
+      named = builtins.filter homebrewKindCarriesName homebrewEntryNames;
+      missing = builtins.filter (name: !homebrewDeclaresName name) named;
+    in
+    assert' (builtins.length named > 0 && missing == [ ])
+      "homebrew entries declaring kind = formula|cask must set homebrew.name in core.nix; missing: ${lib.strings.concatStringsSep ", " missing}";
+
+  # No entry reintroduces a kind the registry comment does not document.
+  test_no_undocumented_homebrew_kind = assert' (
+    !(lib.hasInfix "kind = \"brew\"" coreModuleText)
+  ) "core.nix must not declare homebrew kind \"brew\" (documented values: formula, cask)";
+
   allTests = [
     test_entry_names_valid
     test_no_duplicate_names
@@ -156,6 +219,9 @@ let
     test_dotted_nixpkgs_paths_resolve
     test_darwin_only_packages_platform_marked
     test_darwin_only_absent_on_linux
+    test_homebrew_kind_documented
+    test_homebrew_kind_has_name
+    test_no_undocumented_homebrew_kind
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {

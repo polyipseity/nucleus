@@ -128,7 +128,7 @@ let
     czkawka = {
       category = "gui";
       homebrew = {
-        kind = "brew";
+        kind = "formula";
         name = "czkawka";
       };
       nixpkgs = "czkawka";
@@ -1208,7 +1208,7 @@ let
           managedPackageBackends.${packageName} == "homebrew"
           && managedPackagePlatformCompatible packageName
           && (meta.homebrew or null) != null
-          && meta.homebrew.kind == "brew"
+          && meta.homebrew.kind == "formula"
         then
           meta.homebrew.name
         else
