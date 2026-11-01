@@ -77,7 +77,7 @@ Never suppress; rename. Words ending in `s` that are inherently singular (Status
 
 ### `PSUseShouldProcessForStateChangingFunctions`
 
-**Trigger:** a function whose verb is `New`, `Set`, or `Remove`. Those three are the only verbs checked; `Initialize-`, `Add-`, and `Enable-` are not flagged (verified with a probe file).
+**Trigger:** a function whose verb is one of `New`, `Set`, `Remove`, `Reset`, `Stop`, `Restart`, `Start`, `Update`. Nothing else is flagged: `Add-`, `Clear-`, `Close-`, `Disable-`, `Enable-`, `Initialize-`, `Move-`, `Register-`, and `Unregister-` all pass. Verified with `Invoke-ScriptAnalyzer -ScriptDefinition` against PSScriptAnalyzer 1.25.0, the version pinned under `psgallery` in `src/lockfiles/lockfile.json`.
 
 **Fix:** add `[CmdletBinding(SupportsShouldProcess)]` and gate the mutation on `$PSCmdlet.ShouldProcess(<target>, <action>)`, following `Set-ManagedSymlinkDeleteProtection.ps1`, `Remove-ManagedSecret.ps1`, `Set-VSCodeWorkspaceTrust.ps1`, `Set-PiProjectTrust.ps1`. Callers that pass no `-WhatIf` keep current behavior, and `PSUseSupportsShouldProcess`/`PSShouldProcess` stay satisfied because the gate is actually called. Test fixtures that create files take the same treatment.
 
