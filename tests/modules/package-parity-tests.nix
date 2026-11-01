@@ -79,7 +79,6 @@ let
     "desktoppr"
     "pinentry_mac"
     "equaliser"
-    "switchaudio-osx"
   ];
 
   # --- Packages without nixpkgs attr (WinGet-only / macOS-cask-only) ---
@@ -142,7 +141,6 @@ let
         "desktoppr"
         "pinentry_mac"
         "equaliser"
-        "switchaudio-osx"
       ];
       notBuildableOnLinux =
         attr:

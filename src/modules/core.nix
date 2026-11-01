@@ -869,15 +869,6 @@ let
       nixpkgs = "steamcmd";
       winget = "Valve.SteamCMD";
     };
-    switchaudio-osx = {
-      category = "cli";
-      platforms = [ "darwin" ];
-      homebrew = {
-        kind = "formula";
-        name = "switchaudio-osx";
-      };
-      nixpkgs = "switchaudio-osx";
-    };
     scoop = {
       category = "cli";
       platforms = [ "linux" ];
