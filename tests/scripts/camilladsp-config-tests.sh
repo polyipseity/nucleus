@@ -31,9 +31,13 @@ import yaml
 # bare PCM name or one of the standard ALSA prefixes. Anything else is a name
 # from a platform backend that happens to share the devices block. The tuple is
 # the set this repo uses today, not ALSA's whole PCM namespace, so a new name such
-# as `dmix:` fails here by design; widening it is the change the snd-aloop note in
-# src/hosts/NixOS/default.nix already anticipates.
+# as `dmix:` fails here by design; widening it is the change the default-device
+# WHY in src/hosts/NixOS/default.nix already anticipates.
 ALSA_PREFIXES = ("hw:", "plughw:", "sysdefault:", "default", "dsnoop:")
+
+# Prefixes whose remainder addresses a card, so the same loopback can be spelled
+# `hw:Loopback,0,0`, `plughw:Loopback`, or `sysdefault:CARD=Loopback`.
+CARD_PREFIXES = ("hw:", "plughw:", "sysdefault:", "default:", "dsnoop:")
 
 # The hw:<card>,<device>,<subdevice> form is the only one that names a card and a
 # device number separately, which is what makes the playback/capture pairing
@@ -85,6 +89,20 @@ def default_slave(asound):
     return slave.group(1), parsed.groups()
 
 
+def names_card(raw, card):
+    """True when an ALSA PCM name addresses `card`, however the spelling is prefixed."""
+    name = raw
+    for prefix in CARD_PREFIXES:
+        if name.startswith(prefix):
+            name = name[len(prefix) :]
+            break
+    # `sysdefault:CARD=<card>` and `default:CARD=<card>` name the card as a keyed
+    # value; the hw-style spellings put it first and may omit device and subdevice.
+    keyed = re.match(r"CARD=(?P<card>[^,]+)", name, re.IGNORECASE)
+    head = keyed if keyed is not None else re.match(r"(?P<card>[^,=]+)", name)
+    return head is not None and head.group("card").lower() == card.lower()
+
+
 def case_default_device_pairs_with_capture():
     asound = pathlib.Path(os.environ["ASOUND_CONF"])
     assert asound.is_file(), f"{asound} does not exist"
@@ -109,13 +127,14 @@ def case_default_device_pairs_with_capture():
     for path, key, device in alsa_endpoints(pathlib.Path(os.environ["CONFIG_DIR"])):
         if key == "playback":
             # `default` now resolves through this file into the loopback, and every
-            # hw: name on that card is the loopback too, so playback has to stay
-            # away from both or the daemon plays back what it just captured.
+            # name on that card does too, however it is prefixed, so playback has to
+            # stay away from both or the daemon plays back what it just captured.
             if not isinstance(device, str):
                 continue
-            loopback = HW_DEVICE.match(device)
-            if device == "default" or (loopback is not None and loopback.group(1) == card):
-                self_feeding.append(f"{path}: playback device {device!r}")
+            if device == "default":
+                self_feeding.append(f"{path}: playback device {device!r} resolves through the ALSA default")
+            elif names_card(device, card):
+                self_feeding.append(f"{path}: playback device {device!r} names the loopback card {card!r}")
             continue
         if key != "capture":
             continue

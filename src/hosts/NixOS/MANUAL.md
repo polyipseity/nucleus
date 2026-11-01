@@ -14,7 +14,8 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 3. Picard: sign in and add the AcoustID API key under Options.
 4. EasyEffects: add a Limiter or Compressor under Effects > Output to cap volume. Presets come from <https://github.com/Digitalone1/EasyEffects-Presets>, cloned into `~/.local/share/easyeffects/output/`.
 5. CamillaDSP loopback: `arecord -l | grep Loopback`. Missing after apply means a reboot is needed.
-6. The ALSA default routes into the loopback, so audio is silent while `camilladsp` is stopped: start `camilladsp`, or point the app at a `hw:` card. The same node serves capture, so a recorder that opens `default` reads the loopback instead: give `arecord` the card (`arecord -D hw:CARD=<card>`) and `whisper-stream` a capture id that is not the default (`whisper-stream --capture <id>`); `arecord -l` lists the cards. One client at a time, no mixing. Do not set a config's playback device to `default`, which resolves into the loopback that config captures from, so its own output returns as input.
+6. The ALSA default routes into the loopback, so audio is silent while `camilladsp` is stopped: start `camilladsp`, or point the app at a `hw:` card. The loopback takes one client at a time and does not mix. The same node serves capture, so a recorder that opens `default` reads the loopback instead: give `arecord` the card (`arecord -D hw:CARD=<card>`) and `whisper-stream` a capture id that is not the default (`whisper-stream --capture <id>`); `arecord -l` lists the cards.
+7. Do not set a config's playback device to `default` or to the loopback card: both resolve back into the card the config captures from, so its own output returns as input. The shipped configs leave playback `null` on purpose, which is what lets the heartbeat choose the card.
 
 ## secrets and remotes
 
@@ -30,7 +31,7 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 
 1. Transcribe a file: `whisper-cli -m ~/.local/share/nucleus/models/ggml-base.en.bin -f <audio-file>`.
 2. Transcribe live: `whisper-stream -m ~/.local/share/nucleus/models/ggml-base.en.bin`. Add `--step 0` for discrete segments instead of a rolling window.
-3. `whisper-stream` opens an SDL2 window; close it to stop. PipeWire captures the microphone, so a missing source in `pw-cli list-sources` is a PipeWire problem, not a whisper.cpp one.
+3. `whisper-stream` opens an SDL2 window; close it to stop. It opens a capture device of its own through ALSA, since this host runs no PipeWire, so a missing or wrong source is an ALSA device question: `arecord -l` lists what is available.
 
 ## harness bridge
 
