@@ -100,12 +100,11 @@ _camilladsp_list_available_macos() {
   local output
   output=$(system_profiler SPAudioDataType -json 2>/dev/null) || return 1
 
-  local _tmpfile
-  _tmpfile=$(mktemp) || return 1
-  cat <<PYEOF >"$_tmpfile"
-import json, sys
+  local _py_out _rc
+  _py_out=$(_CAMILLADSP_JSON="$output" python3 - "$capture_device" <<'PYEOF' 2>/dev/null
+import json, os, sys
 capture = sys.argv[1]
-for dev in json.loads(sys.stdin.read()).get('SPAudioDataType', []):
+for dev in json.loads(os.environ["_CAMILLADSP_JSON"]).get('SPAudioDataType', []):
     for item in dev.get('_items', []):
         if 'coreaudio_device_output' not in item:
             continue  # input-only device (e.g. built-in mic)
@@ -113,10 +112,12 @@ for dev in json.loads(sys.stdin.read()).get('SPAudioDataType', []):
         if name and name != capture:
             print(name)
 PYEOF
-  local -a names
-  mapfile -t names < <(python3 "$_tmpfile" "$capture_device" <<<"$output" 2>/dev/null)
-  local _rc=$?
-  rm -f "$_tmpfile"
+  )
+  _rc=$?
+  local -a names=()
+  if [ -n "$_py_out" ]; then
+    mapfile -t names <<<"$_py_out"
+  fi
   [ "${#names[@]}" -eq 0 ] && return $_rc
   # WHY: pin collation so the ordering does not depend on the caller's locale.
   printf '%s\n' "${names[@]}" | LC_ALL=C sort
@@ -248,12 +249,7 @@ camilladsp_resolve_playback_device() {
   local config_file="$1"
 
   local _devices
-  local _tmpfile
-  _tmpfile=$(mktemp) || {
-    cat "$config_file"
-    return 0
-  }
-  cat <<PYEOF >"$_tmpfile"
+  _devices=$(python3 - "$config_file" <<'PYEOF'
 import yaml, sys
 with open(sys.argv[1]) as f:
     cfg = yaml.safe_load(f)
@@ -263,8 +259,10 @@ capture = cfg.get('devices', {}).get('capture', {}).get('device', '') or ''
 print(playback if playback is not None else '')
 print(capture)
 PYEOF
-  _devices=$(python3 "$_tmpfile" "$config_file")
-  rm -f "$_tmpfile"
+  ) || {
+    cat "$config_file"
+    return 0
+  }
 
   local playback_device capture_device
   playback_device=$(printf '%s' "$_devices" | head -1)
@@ -317,20 +315,13 @@ PYEOF
     return 0
   fi
 
-  local _patchfile
-  _patchfile=$(mktemp) || {
-    cat "$config_file"
-    return 0
-  }
-  cat <<PYEOF >"$_patchfile"
+  python3 - "$config_file" "$detected_device" <<'PYEOF'
 import yaml, sys
 with open(sys.argv[1]) as f:
     cfg = yaml.safe_load(f)
 cfg['devices']['playback']['device'] = sys.argv[2]
 yaml.dump(cfg, sys.stdout, default_flow_style=False, allow_unicode=True, sort_keys=False)
 PYEOF
-  python3 "$_patchfile" "$config_file" "$detected_device"
-  rm -f "$_patchfile"
 }
 
 # The device detection would currently select, or empty when it yields nothing.
@@ -441,20 +432,14 @@ camilladsp_push_config() {
 
   local _resolved_config
   if [ -n "$device" ]; then
-    local _patchfile
-    _patchfile=$(mktemp) || return 1
-    cat <<PYEOF >"$_patchfile"
+    _resolved_config=$(python3 - "$config_file" "$device" <<'PYEOF'
 import yaml, sys
 with open(sys.argv[1]) as f:
     cfg = yaml.safe_load(f)
 cfg['devices']['playback']['device'] = sys.argv[2]
 yaml.dump(cfg, sys.stdout, default_flow_style=False, allow_unicode=True, sort_keys=False)
 PYEOF
-    _resolved_config=$(python3 "$_patchfile" "$config_file" "$device") || {
-      rm -f "$_patchfile"
-      return 1
-    }
-    rm -f "$_patchfile"
+    ) || return 1
   else
     _resolved_config=$(camilladsp_resolve_playback_device "$config_file") || return 1
   fi
