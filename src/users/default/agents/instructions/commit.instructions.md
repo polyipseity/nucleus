@@ -17,6 +17,17 @@ Run it from the project root. Commitlint picks up `.commitlintrc.*` or `commitli
 
 If validation fails, fix the message and re-validate. Do not commit until it passes. If commitlint is present and configured but errors unexpectedly (a tool error, not a lint error), report the failure rather than committing.
 
+## Message content
+
+Commitlint validates structure only; content quality is governed here plus the `humanizer` skill.
+
+- Invoke the `humanizer` skill on every drafted message and apply its filler, AI-vocabulary, rule-of-three, and generic-conclusion checks (skip promotional-language checks, which do not apply to commits).
+- Subject line is the default: around 50 chars, a concrete verb plus object, no filler words.
+- A body is allowed only when the change is non-obvious (rationale not evident from the diff) and/or very large (touches many files or subsystems). Body lines stay at 72 chars or fewer and explain why; never enumerate files or changes.
+- Footer (`BREAKING CHANGE`, `Refs`, ticket) only when relevant.
+
+Bad: `feat: add new feature for handling user authentication and improve error messages and update tests`. Good: `feat(auth): add session expiry handling`.
+
 ## Temp-dir install
 
 `bun x commitlint` writes nothing to the repo, but its cache-based resolution cannot reach packages the config's `extends` reaches from the transpiled `noop.js`, which surfaces as `Cannot find package 'conventional-changelog-conventionalcommits'`. `--default-config` is not a workaround; the global cache fails the same way. Install into a temp dir instead:

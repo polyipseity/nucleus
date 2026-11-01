@@ -21,7 +21,9 @@ Proceed automatically with best-effort defaults and context.
 
    If it has not run, write a best-effort message from context and stop.
 
-2. **Compose the message** from that output and the repository's own conventions (`.agents/`, `CONTRIBUTING.md`, `package.json`, commitlint config, `prek.toml`): a short subject around 50 chars, an optional body with each line 72 chars or fewer, and a footer (`BREAKING CHANGE`, `Refs`, `Ticket`) that includes any footer text from the arguments when given. Prefer whatever tooling enforces; fall back to Conventional Commits. If commitlint rejects the message, rewrap it and retry with a fresh `git commit`.
+2. **Compose the message** from that output and the repository's own conventions (`.agents/`, `CONTRIBUTING.md`, `package.json`, commitlint config, `prek.toml`): a subject around 50 chars (concrete verb plus object, no filler) and an optional body only when the change is non-obvious and/or very large; body lines stay at 72 chars or fewer and explain why, never enumerating files or changes. Footer (`BREAKING CHANGE`, `Refs`, `Ticket`) only when relevant, plus any footer text from the arguments. Prefer whatever tooling enforces; fall back to Conventional Commits. If commitlint rejects the message, rewrap it and retry with a fresh `git commit`.
+
+   - Before committing, invoke the `humanizer` skill on the drafted message and apply its filler, AI-vocabulary, rule-of-three, and generic-conclusion checks (skip promotional-language checks, which do not apply to commits). The result should read like a person wrote it: short, specific, no enumerated change lists.
 
    Never use `git commit --amend`. A rejected commit was never created, so `--amend` would rewrite whatever HEAD points at and destroy a pre-existing commit.
 

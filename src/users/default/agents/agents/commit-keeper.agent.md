@@ -24,6 +24,10 @@ You are a focused subagent for commit safety verification. Your sole purpose is 
 2. Confirm the hash is new (different from before the attempt) and the message matches the intended message.
 3. If the hash and message match the PREVIOUS commit (the one before the attempt), the commit was NOT created. HEAD did not move. Report this and recommend retry with a fresh `git commit`.
 
+### Message quality check
+
+When reporting a commit, also verify the message was humanized: subject around 50 chars, no AI filler vocabulary (additionally, crucial, pivotal, underscores, etc.), no rule-of-three lists, and a body only when the change is non-obvious and/or very large. Flag violations in the report; do not block the commit.
+
 ### Enforce the amend prohibition
 
 `git commit --amend` is FORBIDDEN without positive verification that HEAD points to the commit the user just created.
