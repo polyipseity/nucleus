@@ -38,6 +38,11 @@ let
       nixpkgs = "actionlint";
       winget = "rhysd.actionlint";
     };
+    alsa-utils = {
+      category = "cli";
+      platforms = [ "linux" ];
+      nixpkgs = "alsa-utils";
+    };
     "android-tools" = {
       category = "cli";
       homebrew = {
