@@ -134,7 +134,8 @@ let
   # --- Linux-only packages, derived from nixpkgs ---
   # An entry is Linux-only when its nixpkgs attribute declares support for Linux
   # and not for Darwin: then the registry says so, which keeps the entry out of
-  # every darwin list, Homebrew and WinGet included, and records the intent.
+  # the darwin nixpkgs list and out of the Homebrew formula and cask lists, and
+  # records the intent.
   # The declared platforms decide it, since `lib.meta.availableOn` folds in
   # `meta.platforms` and `meta.badPlatforms`, read from the Linux package set: a
   # darwin evaluation of an unfree or broken attribute answers a different
