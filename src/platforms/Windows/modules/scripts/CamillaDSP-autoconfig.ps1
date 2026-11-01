@@ -11,20 +11,25 @@
     camilladsp.enable toggle gate binding in exactly one place. Pushing here as
     well meant two writers racing at boot, each tearing down and rebuilding the
     audio graph. Mirrors camilladsp-run.sh on POSIX.
+
+    The statefile path arrives as -StateFile instead of being derived here. The
+    task action computes it from Get-CamillaDSPStateDir, so camilladsp's own
+    state sits beside the heartbeat's device state in one directory rather than
+    in a second, XDG-shaped one.
 #>
 param(
   [Parameter(Mandatory)] [string] $CamillaDSPBin,
   [Parameter(Mandatory)] [int] $Port,
-  [Parameter(Mandatory)] [string] $LogFile
+  [Parameter(Mandatory)] [string] $LogFile,
+  [Parameter(Mandatory)] [string] $StateFile
 )
 
 $ErrorActionPreference = "Stop"
 
-$stateFile = Join-Path -Path $HOME -ChildPath ".local\state\camilladsp\statefile.yml"
-$null = New-Item -Path (Split-Path $stateFile -Parent) -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+$null = New-Item -Path (Split-Path $StateFile -Parent) -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
 
 # Start camilladsp with --no_config (WS server only, no device).
-$process = [System.Diagnostics.Process]::Start($CamillaDSPBin, "-p $Port --statefile `"$stateFile`" -w --no_config -o `"$LogFile`"")
+$process = [System.Diagnostics.Process]::Start($CamillaDSPBin, "-p $Port --statefile `"$StateFile`" -w --no_config -o `"$LogFile`"")
 if ($null -eq $process) { exit 1 }
 
 # Assign camilladsp to a Windows Job Object with KILL_ON_JOB_CLOSE.

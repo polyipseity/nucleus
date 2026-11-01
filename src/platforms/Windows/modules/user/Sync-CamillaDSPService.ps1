@@ -76,13 +76,13 @@ function Sync-CamillaDSPService {
   $wrapperContent = Get-Content -Raw $wrapperScriptPathSource
   Set-Content -Path $wrapperScriptPath -Value $wrapperContent -NoNewline
 
-  # Copy the shared device-detection library alongside the wrapper script.
-  $deviceSelectSource = Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\..\..\src\scripts\services\camilladsp-deviceselect.ps1"
-  $deviceSelectDest = Join-Path -Path $wrapperDir -ChildPath "deviceselect.ps1"
-  $deviceSelectContent = Get-Content -Raw $deviceSelectSource
-  Set-Content -Path $deviceSelectDest -Value $deviceSelectContent -NoNewline
+  # The statefile belongs beside the heartbeat's device state, so the path comes
+  # from the same helper the heartbeat uses. Literal $PSScriptRoot form keeps it
+  # visible to DotSourceTargets.Tests.ps1, which skips variable-built paths.
+  . "$PSScriptRoot\..\..\..\..\..\src\scripts\services\camilladsp-deviceselect.ps1"
+  $stateFile = Join-Path -Path (Get-CamillaDSPStateDir) -ChildPath 'statefile.yml'
 
-  $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -File `"$wrapperScriptPath`" -CamillaDSPBin `"$camilladspBin`" -Port $wsPort -LogFile `"$logFile`""
+  $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -File `"$wrapperScriptPath`" -CamillaDSPBin `"$camilladspBin`" -Port $wsPort -LogFile `"$logFile`" -StateFile `"$stateFile`""
   $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
   $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
   $principal = New-ScheduledTaskPrincipal -UserId $userId -RunLevel Limited
