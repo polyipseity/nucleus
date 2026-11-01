@@ -4,7 +4,7 @@ devices:
   adjust_period: null
   capture:
     channels: 2
-    device: BlackHole 2ch
+    device: hw:Loopback,1,0
     format: null
     labels: null
     type: Alsa
