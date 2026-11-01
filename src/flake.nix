@@ -141,7 +141,7 @@
 
           overlays = [
             (_final: prev: {
-              # Nix sandbox; ffmpeg-full's tests cover them.
+              # Nix sandbox; these deps are tested upstream.
               davs2 = prev.davs2.overrideAttrs (_: {
                 doCheck = !prev.stdenv.hostPlatform.isDarwin;
               });
@@ -179,6 +179,14 @@
               });
               xevd = prev.xevd.overrideAttrs (_: {
                 doCheck = !prev.stdenv.hostPlatform.isDarwin;
+              });
+              # WHY: ffmpeg-full has no aarch64-darwin binary cache entry, so it
+              # builds locally and its checkPhase dominates runtime (multi-hour,
+              # machine-saturating). Disable checks; codecs are retained. Linux
+              # cached builds are unaffected (substituted before override runs).
+              ffmpeg-full = prev.ffmpeg-full.overrideAttrs (_: {
+                doCheck = false;
+                doInstallCheck = false;
               });
             })
             (_final: prev: {
