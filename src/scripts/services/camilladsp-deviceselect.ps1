@@ -116,7 +116,9 @@ function Get-CamillaDSPAvailablePlaybackDeviceList {
     return $null
   }
 
-  return ($names | Sort-Object)
+  # WHY: a bare return unrolls the array, so an empty successful enumeration
+  # would reach the caller as no output and read as a failed enumeration.
+  Write-Output -InputObject ([string[]]@($names | Sort-Object)) -NoEnumerate
 }
 
 function Get-CamillaDSPDeviceCacheTtl {
@@ -184,7 +186,7 @@ function Get-CamillaDSPAvailablePlaybackDeviceCache {
       if (-not [string]::IsNullOrEmpty($RequiredDevice) -and $cached -notcontains $RequiredDevice) {
         $reusable = $false
       }
-      if ($reusable) { return [string[]]$cached }
+      if ($reusable) { Write-Output -InputObject ([string[]]$cached) -NoEnumerate; return }
     }
   }
 
@@ -194,7 +196,9 @@ function Get-CamillaDSPAvailablePlaybackDeviceCache {
   New-Item -ItemType Directory -Path $stateDir -Force > $null
   Set-Content -Path $metaFile -Value @($CaptureDevice, [DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
   Set-Content -Path $cacheFile -Value $devices
-  return [string[]]$devices
+  # WHY: an empty list has to stay an empty array here too, or the caller reads
+  # it as a failed enumeration.
+  Write-Output -InputObject ([string[]]$devices) -NoEnumerate
 }
 
 function Clear-CamillaDSPDeviceCache {

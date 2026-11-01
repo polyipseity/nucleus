@@ -585,6 +585,64 @@ try {
   Remove-Item -Path $dedupeFile.FullName -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: best-effort cleanup -- temp config may already be gone
 }
 
+# Test 25: an empty successful enumeration is the single-endpoint host, not a
+# failed read. Test 16 mocks Get-CamillaDSPFirstAvailablePlaybackDevice, so it
+# never exercises this chain; this one drives the shipped list, cache, and
+# first-available functions with a fake audio enumerator that reports only the
+# capture endpoint. The second resolution reads the cache the first one wrote.
+$singleEndpointFile = New-TemporaryFile
+Set-Content -Path $singleEndpointFile.FullName -Value $loopbackYaml -NoNewline
+$savedStateHome = $env:XDG_STATE_HOME
+$env:XDG_STATE_HOME = New-Item -ItemType Directory -Path (Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "camilladsp-state-$([guid]::NewGuid().ToString('N'))") -Force | Select-Object -ExpandProperty FullName
+try {
+  # WHY: a one-element return unwraps to a string, so the block's output is
+  # re-wrapped before indexing it.
+  $singleEndpointWarnings = @(& {
+    param([string]$DeviceSelectPath, [string]$ConfigPath)
+    . $DeviceSelectPath
+    $script:seen = @()
+    function Write-NucleusWarning {
+      param([string]$Message, [string]$CommandName = '')
+      $script:seen += @("$CommandName`: $Message")
+    }
+    function Get-CamillaDSPDefaultPlaybackDevice { return 'Speakers (Realtek)' }
+    function Get-CamillaDSPLastDevice { return $null }
+    # One render endpoint, and it is the loopback capture source, so the
+    # enumeration succeeds with nothing left to play to.
+    $fakeDevices = [System.Collections.Generic.List[object]]::new()
+    $fakeDevices.Add([pscustomobject]@{ FriendlyName = 'Speakers (Realtek)' }) > $null
+    $fakeEnumerator = [pscustomobject]@{}
+    $fakeEnumerator | Add-Member -MemberType ScriptMethod -Name EnumAudioEndpoints -Value {
+      param([int]$flow, [int]$state)
+      if ($flow -ne 0 -or $state -ne 1) { throw "unexpected enumeration scope: flow=$flow state=$state" }
+      return ,$fakeDevices
+    }
+    # WHY: the shipped enumeration asks PowerShell for the MMDeviceEnumerator COM
+    # class, so stubbing New-Object is the seam that drives the real enumeration
+    # off Windows. The stub asserts the call it stands in for.
+    function New-Object {
+      # check-suppress:SuppressMessageAttribute: PSAvoidOverwritingBuiltInCmdlets -- the stub shadows the cmdlet on purpose
+      [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidOverwritingBuiltInCmdlets', '', Justification = 'stands in for the COM enumerator the shipped enumeration requests')]
+      # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- the stub mutates nothing
+      [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'returns a stub object and changes nothing')]
+      param([string]$ComObject)
+      if ($ComObject -ne 'MMDeviceEnumerator') { throw "unexpected COM class request: $ComObject" }
+      return $fakeEnumerator
+    }
+    Resolve-CamillaDSPPlaybackDevice -ConfigPath $ConfigPath > $null
+    Resolve-CamillaDSPPlaybackDevice -ConfigPath $ConfigPath > $null
+    return @($script:seen)
+  } $deviceSelect $singleEndpointFile.FullName)
+  if ($singleEndpointWarnings.Count -eq 1 -and $singleEndpointWarnings[0] -match 'second playback endpoint' -and $singleEndpointWarnings[0] -notmatch 'cannot enumerate') {
+    Assert-Pass 'empty successful enumeration names the two-endpoint topology'
+  } else {
+    Assert-Fail 'empty enumeration message' "expected one two-endpoint warning, got $($singleEndpointWarnings.Count): $($singleEndpointWarnings -join ' | ')"
+  }
+} finally {
+  $env:XDG_STATE_HOME = $savedStateHome
+  Remove-Item -Path $singleEndpointFile.FullName -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: best-effort cleanup -- temp config may already be gone
+}
+
 Write-Output ''
 Write-Output "--- camilladsp-deviceselect tests: $script:passCount passed, $script:failCount failed ---"
 Write-Output ''
