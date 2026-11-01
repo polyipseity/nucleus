@@ -234,65 +234,59 @@ def case_fingerprint_covers_device():
 
 
 def case_linux_backends():
+    aplay = (
+        "**** List of PLAYBACK Hardware Devices ****\n"
+        "card 0: PCH [HDA Intel PCH], device 0: ALC295 Analog [ALC295 Analog]\n"
+        "card 0: PCH [HDA Intel PCH], device 3: HDMI 0 [HDMI 0]\n"
+        "card 1: HDMI [HDA Intel HDMI], device 7: HDMI 1 [HDMI 1]\n"
+    )
+    # Wrong-namespace output: a WirePlumber description and a PulseAudio sink
+    # name are not ALSA identifiers, so neither is a device source.
     status = (
-        "PipeWire 'pipewire-0' [1.2.7, admin@host, cookie:1234]\n"
-        " └─ Clients:\n"
-        "       32. WirePlumber                         [1.2.7, admin@host, pid:1234]\n"
-        "\n"
         "Audio\n"
-        " ├─ Devices:\n"
-        " │      51. Built-in Audio Analog Stereo        [alsa]\n"
-        " │\n"
         " ├─ Sinks:\n"
-        " │      53. HDMI Output                         [vol: 0.40]\n"
         " │  *   52. Built-in Audio Analog Stereo        [vol: 1.00]\n"
-        " │      54. USB Speakers                        [vol: 0.80 MUTED]\n"
-        " │\n"
-        " ├─ Sources:\n"
-        " │  *   55. Built-in Audio Analog Stereo        [vol: 1.00]\n"
-        " │\n"
-        " └─ Streams:\n"
-        "\n"
-        "Video\n"
     )
     outputs = {
+        ("aplay", "-l"): aplay,
         ("wpctl", "status"): status,
         ("pactl", "info"): "Server Name: pulseaudio\nDefault Sink: alsa_output.pci.analog-stereo\n",
-        ("aplay", "-l"): "card 0: PCH [HDA Intel PCH], device 0: ALC295 Analog [ALC295 Analog]\n",
+        ("pactl", "list", "sinks", "short"): "1\talsa_output.analog\tPipeWire\ts32le\tRUNNING\n",
     }
+    run = m._run
     m._run = lambda command: outputs.get(tuple(command))
-    # The marker is a position, not a preference: the default is the second
-    # sink, so a parser that only looks at the first line gets HDMI.
-    assert m._linux_default_output() == "Built-in Audio Analog Stereo"
+    # The card field is the id, not the index: an index would read
+    # hw:CARD=0,DEV=0, which ALSA cannot resolve.
+    default = m._linux_default_output()
+    assert default == "hw:CARD=PCH,DEV=0", default
 
-    def only_pactl(command):
-        return outputs.get(tuple(command)) if command[0] == "pactl" else None
-
-    m._run = only_pactl
-    assert m._linux_default_output() == "alsa_output.pci.analog-stereo"
-    m._run = lambda command: outputs.get(tuple(command)) if command[0] == "aplay" else None
-    assert m._linux_default_output() == "hw:CARD=0,DEV=0"
-
-    # wpctl names, capture excluded, never the source list. The order is
-    # alphabetical because the list is sorted below the backends, not because
-    # the tree is walked in that order.
-    m._run = lambda command: outputs.get(tuple(command)) if command[0] == "wpctl" else None
-    assert m._linux_list_available("USB Speakers") == [
-        "Built-in Audio Analog Stereo",
-        "HDMI Output",
+    # Every device of every card minus the capture device. aplay reports card 0
+    # first and HDMI sorts before PCH, so this is the sorted order, not the
+    # reported one.
+    assert m._linux_list_available("hw:CARD=PCH,DEV=0") == [
+        "hw:CARD=HDMI,DEV=7",
+        "hw:CARD=PCH,DEV=3",
     ]
-    assert m._linux_list_available("nonsense") == [
-        "Built-in Audio Analog Stereo",
-        "HDMI Output",
-        "USB Speakers",
+    assert m._linux_list_available("hw:CARD=none,DEV=0") == [
+        "hw:CARD=HDMI,DEV=7",
+        "hw:CARD=PCH,DEV=0",
+        "hw:CARD=PCH,DEV=3",
     ]
 
-    m._run = lambda command: (
-        "1\talsa_output.hdmi\tPipeWire\ts32le\tIDLE\n"
-        "2\talsa_output.analog\tPipeWire\ts32le\tRUNNING\n"
-    ) if command[0] == "pactl" else None
-    assert m._linux_list_available("alsa_output.analog") == ["alsa_output.hdmi"]
-    assert m._linux_list_available("capture") == ["alsa_output.analog", "alsa_output.hdmi"]
+    def only(namespace):
+        return lambda command: outputs.get(tuple(command)) if command[0] == namespace else None
+
+    for namespace in ("wpctl", "pactl"):
+        m._run = only(namespace)
+        assert m._linux_default_output() is None, f"{namespace} is not a device source"
+        assert m._linux_list_available("hw:CARD=PCH,DEV=0") is None, namespace
+
+    # A host without aplay is an absent backend: the real _run answers None
+    # rather than raising.
+    m._run = run
+    m.shutil.which = lambda name: None
+    assert m._linux_default_output() is None
+    assert m._linux_list_available("hw:CARD=PCH,DEV=0") is None
 
 
 def case_loop_states():

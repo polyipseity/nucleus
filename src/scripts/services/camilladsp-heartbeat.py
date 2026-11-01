@@ -11,8 +11,10 @@ Per host behaviour:
 
 - macOS reads CoreAudio through ctypes, so `SwitchAudioSource` and
   `system_profiler` leave the closure entirely.
-- Linux keeps `wpctl`, `pactl` or `aplay`, because there is no in-process
-  equivalent without a new dependency, and those hosts have no TCC cost.
+- Linux reads `aplay -l`, because there is no in-process equivalent without a
+  new dependency, and those hosts have no TCC cost. The NixOS config is
+  `type: Alsa`, so an ALSA identifier is the only candidate CamillaDSP can
+  open: a WirePlumber description or a PulseAudio sink name is not.
 
 The daemon has three stopped states, so a dead endpoint costs nothing:
 
@@ -254,98 +256,54 @@ def _run(command: list[str]) -> str | None:
     return result.stdout
 
 
-# wpctl status draws a tree: " │  " before every node line, " ├─ " and " └─ "
-# before section headers. Source: wireplumber src/tools/wpctl.c
-_TREE_GLYPHS = "│├└─"
+# `aplay -l` prints one line per playback device:
+#   card 0: PCH [HDA Intel PCH], device 0: ALC295 Analog [ALC295 Analog]
+_APLAY_DEVICE_LINE = re.compile(
+    r"^card (?P<card>\d+): (?P<card_id>\S+) \[[^\]]*\], device (?P<device>\d+):"
+)
 
 
-def _wpctl_section(output: str, header: str) -> list[str]:
-    """Lines of one wpctl status section, stopping at the next header."""
-    lines = output.splitlines()
-    for index, line in enumerate(lines):
-        if header not in line:
-            continue
-        collected: list[str] = []
-        for candidate in lines[index + 1 :]:
-            if re.search(r"[├└]─", candidate):
-                break
-            collected.append(candidate)
-        return collected
-    return []
+def _alsa_devices(output: str) -> list[tuple[str, int]]:
+    """(card id, device index) for every playback device `aplay -l` reports."""
+    devices: list[tuple[str, int]] = []
+    for line in output.splitlines():
+        match = _APLAY_DEVICE_LINE.match(line)
+        if match is not None:
+            devices.append((match.group("card_id"), int(match.group("device"))))
+    return devices
 
 
-def _wpctl_node(line: str) -> tuple[bool, int, str] | None:
-    """(is_default, id, description) for one wpctl node line, else None.
-
-    The description is padded to 35 columns and may be followed by a volume
-    suffix, so both the padding and the suffix come off before it is returned.
-    """
-    text = line.strip(" \t" + _TREE_GLYPHS)
-    match = re.match(r"(?P<marker>[* ])?\s*(?P<id>\d+)\.\s+(?P<rest>.*)$", text)
-    if match is None:
-        return None
-    name = re.sub(r"\s*\[vol:.*$", "", match.group("rest")).rstrip()
-    if not name:
-        return None
-    return (match.group("marker") == "*", int(match.group("id")), name)
+def _alsa_name(card_id: str, device: int) -> str:
+    """CamillaDSP device string. `CARD=` matches the id, never the index."""
+    return f"hw:CARD={card_id},DEV={device}"
 
 
 def _linux_default_output() -> str | None:
-    """System default sink, trying WirePlumber, PulseAudio, then ALSA.
+    """First device of the first card, or None when `aplay -l` yields nothing.
 
-    wpctl is read from the tree its `status` command prints, falling back to
-    pactl then aplay for a host running neither WirePlumber nor the default.
+    ALSA exposes no notion of a default output, so the first card wins. A host
+    with several cards pins the intended device in the config, which the
+    resolver leaves untouched.
     """
-    output = _run(["wpctl", "status"])
-    if output:
-        for line in _wpctl_section(output, "Sinks:"):
-            node = _wpctl_node(line)
-            if node is not None and node[0]:
-                return node[2]
-
-    output = _run(["pactl", "info"])
-    if output:
-        for line in output.splitlines():
-            if "Default Sink:" in line:
-                value = line.replace("Default Sink: ", "", 1)
-                if value:
-                    return value
-
     output = _run(["aplay", "-l"])
-    if output:
-        for line in output.splitlines():
-            match = re.match(r"^card ([0-9]+)", line)
-            if match:
-                return f"hw:CARD={match.group(1)},DEV=0"
-    return None
+    if not output:
+        return None
+    devices = _alsa_devices(output)
+    if not devices:
+        return None
+    card_id, device = devices[0]
+    return _alsa_name(card_id, device)
 
 
 def _linux_list_available(capture_device: str) -> list[str] | None:
-    candidates: list[str] = []
-
-    output = _run(["wpctl", "status"])
-    if output:
-        for line in _wpctl_section(output, "Sinks:"):
-            node = _wpctl_node(line)
-            if node is not None and node[2] != capture_device:
-                candidates.append(node[2])
-
-    output = _run(["pactl", "list", "sinks", "short"])
-    if output:
-        for line in output.splitlines():
-            fields = line.split()
-            if len(fields) >= 2 and fields[1] != capture_device:
-                candidates.append(fields[1])
-
+    """Every ALSA playback device except the capture device, byte-sorted."""
     output = _run(["aplay", "-l"])
-    if output:
-        for line in output.splitlines():
-            match = re.match(r"^card ([0-9]+)", line)
-            if match:
-                candidate = f"hw:CARD={match.group(1)},DEV=0"
-                if candidate != capture_device:
-                    candidates.append(candidate)
-
+    if not output:
+        return None
+    candidates = [
+        _alsa_name(card_id, device) for card_id, device in _alsa_devices(output)
+    ]
+    candidates = [name for name in candidates if name != capture_device]
     if not candidates:
         return None
     # Locale-independent ordering, matching the previous bash implementation.
