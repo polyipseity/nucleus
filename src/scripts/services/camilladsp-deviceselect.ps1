@@ -1,16 +1,20 @@
 #
-# Smart playback device detection for CamillaDSP (Windows).
+# Playback device detection, config resolution, and device cache for
+# CamillaDSP on Windows.
 #
 # Resolve-CamillaDSPPlaybackDevice reads a config YAML file and, when
-# devices.playback.device is null, detects one in this order: system default output
-# (WASAPI COM), last saved default (state file), first available device (sorted-name
-# fallback). A config that already sets playback.device is returned unchanged.
+# devices.playback.device is null, detects one in this order: system default
+# output (WASAPI COM), last saved default validated against the available
+# devices, first available device in sorted-name order. A config that already
+# sets playback.device is returned unchanged.
 #
-# The capture device is always excluded, to prevent an audio loop
-# (output -> capture -> processed -> output again).
+# The capture device is never selected, since playback and capture on one
+# device is an audio loop.
 #
-# State file: %LOCALAPPDATA%\nucleus\camilladsp\last-device.txt holds the last device
-# pushed to CamillaDSP, used as fallback when no system default is detected.
+# State files live in Get-CamillaDSPStateDir:
+#   last-device.txt          last device pushed to CamillaDSP
+#   available-devices.txt    enumerated device names, one per line
+#   available-devices.meta   capture device, then the enumeration epoch
 #
 # Dependencies: PowerShell 7+, powershell-yaml module
 #
@@ -19,11 +23,43 @@
 #   $resolved = Resolve-CamillaDSPPlaybackDevice -ConfigPath $configPath
 #
 
-function Get-CamillaDSPDefaultPlaybackDevice {
+function Get-CamillaDSPStateDir {
+  <#
+  .SYNOPSIS
+    Directory holding the CamillaDSP state files.
+  .DESCRIPTION
+    Windows keeps state under %LOCALAPPDATA%\nucleus\camilladsp. Off Windows
+    the directory follows the XDG state location, so a test run can point
+    XDG_STATE_HOME at a temporary directory instead of a live daemon's state.
+  #>
   [CmdletBinding()]
+  [OutputType([string])]
   param()
 
-  # Detect system default playback device via WASAPI COM.
+  if ($IsWindows) {
+    return (Join-Path -Path $env:LOCALAPPDATA -ChildPath 'nucleus\camilladsp')
+  }
+  if (-not [string]::IsNullOrEmpty($env:XDG_STATE_HOME)) {
+    return (Join-Path -Path $env:XDG_STATE_HOME -ChildPath 'camilladsp')
+  }
+  return (Join-Path -Path $HOME -ChildPath '.local/state/camilladsp')
+}
+
+function Get-CamillaDSPDefaultPlaybackDevice {
+  <#
+  .SYNOPSIS
+    Name of the current system default playback device, or $null.
+  .DESCRIPTION
+    Reads the WASAPI default render endpoint through COM, which exists only on
+    Windows. Off Windows the probe returns $null so this library and its suite
+    can be sourced on macOS and Linux.
+  #>
+  [CmdletBinding()]
+  [OutputType([string])]
+  param()
+
+  if (-not $IsWindows) { return $null }
+
   try {
     # 0 = eRender (playback), 0 = DMT_DEFAULT (user default)
     $enumerator = New-Object -ComObject MMDeviceEnumerator
@@ -31,19 +67,29 @@ function Get-CamillaDSPDefaultPlaybackDevice {
     return $endpoint.FriendlyName
   } catch {
     # Audio service not running or no devices.
-    $null = $_  # check-suppress:suppression_doc: $_ discarded; detection failure is non-fatal
     return $null
   }
 }
 
 function Get-CamillaDSPAvailablePlaybackDeviceList {
+  <#
+  .SYNOPSIS
+    Active render endpoints, capture device excluded and sorted by name.
+  .DESCRIPTION
+    Returns $null when enumeration fails, so a caller can tell a failed read
+    from an empty list. Names are sorted with Sort-Object, so selection is
+    deterministic on a given machine instead of following the undocumented
+    EnumAudioEndpoints order.
+  .PARAMETER CaptureDevice
+    Device to exclude; playback and capture on one device is an audio loop.
+  #>
   [CmdletBinding()]
+  [OutputType([string[]])]
   param(
     [Parameter(Mandatory = $false)]
-    [string]$CaptureDevice = $null
+    [string]$CaptureDevice = ''
   )
 
-  # Enumerate active render endpoints and collect names, excluding capture.
   try {
     $enumerator = New-Object -ComObject MMDeviceEnumerator
     # 0 = eRender, 0x1 = DEVICE_STATE_ACTIVE
@@ -56,135 +102,229 @@ function Get-CamillaDSPAvailablePlaybackDeviceList {
       }
     }
   } catch {
-    # Enumeration failed.
-    $null = $_  # check-suppress:suppression_doc: $_ discarded; enumeration failure is non-fatal
     return $null
   }
 
-  # Sort by name (case-sensitive, ascending) so selection stays stable across reboots
-  # and Windows updates and matches the macOS/Linux ordering, instead of relying on
-  # undocumented EnumAudioEndpoints enumeration order.
   return ($names | Sort-Object)
 }
 
-function Get-CamillaDSPFirstAvailablePlaybackDevice {
+function Get-CamillaDSPDeviceCacheTtl {
+  <#
+  .SYNOPSIS
+    Device cache lifetime in seconds.
+  .DESCRIPTION
+    CAMILLADSP_DEVICE_CACHE_TTL overrides the 300 second default. A value that
+    is not an integer leaves the default in place, as the Python daemon does.
+  #>
   [CmdletBinding()]
+  [OutputType([int])]
+  param()
+
+  $parsed = 0
+  if ([int]::TryParse($env:CAMILLADSP_DEVICE_CACHE_TTL, [ref]$parsed)) {
+    return $parsed
+  }
+  return 300
+}
+
+function Get-CamillaDSPAvailablePlaybackDeviceCache {
+  <#
+  .SYNOPSIS
+    Enumerated playback devices, reusing the cache while it can still answer.
+  .DESCRIPTION
+    The cache is reusable only when the capture device matches, the age is
+    inside the TTL, and, when a required device is given, that device is in the
+    cached list. The raw probe name is deliberately not part of the key,
+    because it flips between ticks and every flip would cost a full
+    enumeration. Returns $null when enumeration fails.
+  .PARAMETER CaptureDevice
+    Device excluded from playback selection; part of the cache key.
+  .PARAMETER RequiredDevice
+    Device the caller needs listed, otherwise the cache is bypassed.
+  #>
+  [CmdletBinding()]
+  [OutputType([string[]])]
   param(
     [Parameter(Mandatory = $false)]
-    [string]$CaptureDevice = $null
+    [string]$CaptureDevice = '',
+
+    [Parameter(Mandatory = $false)]
+    [string]$RequiredDevice = ''
   )
 
-  $names = Get-CamillaDSPAvailablePlaybackDeviceList -CaptureDevice $CaptureDevice
-  if ($null -eq $names -or $names.Count -eq 0) {
-    return $null
+  $stateDir = Get-CamillaDSPStateDir
+  $cacheFile = Join-Path -Path $stateDir -ChildPath 'available-devices.txt'
+  $metaFile = Join-Path -Path $stateDir -ChildPath 'available-devices.meta'
+  $ttl = Get-CamillaDSPDeviceCacheTtl
+
+  if ((Test-Path -Path $cacheFile -PathType Leaf) -and (Test-Path -Path $metaFile -PathType Leaf)) {
+    $meta = @(Get-Content -Path $metaFile)
+    if ($meta.Count -ge 2) {
+      $cachedAt = [long]0
+      $age = [long]-1
+      if ([long]::TryParse($meta[1], [ref]$cachedAt)) {
+        $age = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - $cachedAt
+      }
+      $cached = @(Get-Content -Path $cacheFile | Where-Object { -not [string]::IsNullOrEmpty($_) })
+      $reusable = $meta[0] -eq $CaptureDevice
+      # A non-negative age is required so TTL=0 means "never reuse" instead of
+      # letting a clock skew pin a stale list indefinitely.
+      if ($age -lt 0 -or $age -ge $ttl) { $reusable = $false }
+      if (-not [string]::IsNullOrEmpty($RequiredDevice) -and $cached -notcontains $RequiredDevice) {
+        $reusable = $false
+      }
+      if ($reusable) { return [string[]]$cached }
+    }
   }
+
+  $devices = Get-CamillaDSPAvailablePlaybackDeviceList -CaptureDevice $CaptureDevice
+  if ($null -eq $devices) { return $null }
+
+  New-Item -ItemType Directory -Path $stateDir -Force > $null
+  Set-Content -Path $metaFile -Value @($CaptureDevice, [DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+  Set-Content -Path $cacheFile -Value $devices
+  return [string[]]$devices
+}
+
+function Clear-CamillaDSPDeviceCache {
+  <#
+  .SYNOPSIS
+    Drops the device enumeration cache.
+  .DESCRIPTION
+    Called when CamillaDSP rejects a pushed config: the resolved device is
+    probably gone even though the cache still lists it. Not called on transport
+    failures, because an unreachable websocket must not force a full
+    enumeration on every tick.
+  #>
+  [CmdletBinding()]
+  param()
+
+  $stateDir = Get-CamillaDSPStateDir
+  foreach ($name in @('available-devices.txt', 'available-devices.meta')) {
+    $path = Join-Path -Path $stateDir -ChildPath $name
+    if (Test-Path -Path $path -PathType Leaf) {
+      Remove-Item -Path $path -Force
+    }
+  }
+}
+
+function Get-CamillaDSPFirstAvailablePlaybackDevice {
+  <#
+  .SYNOPSIS
+    First cached playback device in sorted-name order, or $null.
+  .PARAMETER CaptureDevice
+    Device excluded from playback selection.
+  #>
+  [CmdletBinding()]
+  [OutputType([string])]
+  param(
+    [Parameter(Mandatory = $false)]
+    [string]$CaptureDevice = ''
+  )
+
+  $names = @(Get-CamillaDSPAvailablePlaybackDeviceCache -CaptureDevice $CaptureDevice)
+  if ($names.Count -eq 0) { return $null }
   return $names[0]
 }
 
-# --- Last saved default state file ---
-
-# WHY: $env:LOCALAPPDATA is null off Windows, so resolving the state dir
-# unconditionally made this library impossible to source on macOS/Linux and
-# blocked its test suite there. Mirrors the POSIX library's XDG state location on
-# those platforms; Windows is unchanged.
-$script:CamillaDSPStateDir = if ($IsWindows) {
-  Join-Path $env:LOCALAPPDATA 'nucleus\camilladsp'
-} else {
-  Join-Path $HOME '.local/state/camilladsp'
-}
-$script:CamillaDSPLastDeviceFile = Join-Path $script:CamillaDSPStateDir 'last-device.txt'
+# --- Last saved default and push state ---
 
 function Save-CamillaDSPLastDevice {
+  <#
+  .SYNOPSIS
+    Records the device CamillaDSP accepted.
+  .PARAMETER Device
+    Device name; an empty value records nothing.
+  #>
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)]
+    [AllowEmptyString()]
     [string]$Device
   )
 
   if ([string]::IsNullOrEmpty($Device)) { return }
-  if (-not (Test-Path $script:CamillaDSPStateDir)) {
-    # check-suppress:suppression_doc: return value discarded; directory creation is side-effect only
-    $null = New-Item -ItemType Directory -Path $script:CamillaDSPStateDir -Force
-  }
-  Set-Content -Path $script:CamillaDSPLastDeviceFile -Value $Device -NoNewline
+  $stateDir = Get-CamillaDSPStateDir
+  New-Item -ItemType Directory -Path $stateDir -Force > $null
+  Set-Content -Path (Join-Path -Path $stateDir -ChildPath 'last-device.txt') -Value $Device -NoNewline
 }
 
 function Get-CamillaDSPLastDevice {
+  <#
+  .SYNOPSIS
+    Last recorded device, or $null when none was recorded.
+  #>
+  [CmdletBinding()]
+  [OutputType([string])]
+  param()
+
+  $path = Join-Path -Path (Get-CamillaDSPStateDir) -ChildPath 'last-device.txt'
+  if (-not (Test-Path -Path $path -PathType Leaf)) { return $null }
+  $content = Get-Content -Raw -Path $path
+  if ([string]::IsNullOrWhiteSpace($content)) { return $null }
+  return $content.Trim()
+}
+
+function Clear-CamillaDSPLastDevice {
+  <#
+  .SYNOPSIS
+    Drops the recorded device.
+  .DESCRIPTION
+    Runs when enumeration succeeded and the saved device is genuinely gone, for
+    example after state was copied from another machine. Without it every later
+    tick retries the same doomed lookup.
+  #>
   [CmdletBinding()]
   param()
 
-  if (Test-Path $script:CamillaDSPLastDeviceFile) {
-    $content = Get-Content -Raw $script:CamillaDSPLastDeviceFile
-    if (-not [string]::IsNullOrWhiteSpace($content)) {
-      return $content.Trim()
-    }
+  $path = Join-Path -Path (Get-CamillaDSPStateDir) -ChildPath 'last-device.txt'
+  if (Test-Path -Path $path -PathType Leaf) {
+    Remove-Item -Path $path -Force
   }
-  return $null
+}
+
+# --- Config resolution ---
+
+function ConvertTo-CamillaDSPPlaybackDeviceYaml {
+  <#
+  .SYNOPSIS
+    Re-serializes a config with the playback device set.
+  .DESCRIPTION
+    The heartbeat pushes this instead of re-running detection, so the device it
+    measured and the device it pushes are the same one.
+  .PARAMETER ConfigPath
+    Config file to patch.
+  .PARAMETER Device
+    Device to write into devices.playback.device.
+  #>
+  [CmdletBinding()]
+  [OutputType([string])]
+  param(
+    [Parameter(Mandatory)]
+    [string]$ConfigPath,
+
+    [Parameter(Mandatory)]
+    [AllowEmptyString()]
+    [string]$Device
+  )
+
+  $config = (Get-Content -Raw -Path $ConfigPath) | ConvertFrom-Yaml
+  $config.devices.playback.device = $Device
+  return ($config | ConvertTo-Yaml)
 }
 
 function Resolve-CamillaDSPPlaybackDevice {
-  [CmdletBinding()]
-  param(
-    [Parameter(Mandatory)]
-    [string]$ConfigPath
-  )
-
-  $yaml = Get-Content -Raw $ConfigPath
-  $cfg = $yaml | ConvertFrom-Yaml
-
-  $playbackDevice = $cfg.devices.playback.device
-  $captureDevice = $cfg.devices.capture.device
-
-  # Non-null playback device passes through unchanged.
-  if ($null -ne $playbackDevice) {
-    return $yaml
-  }
-
-  # Detect system default playback device via WASAPI COM.
-  $detected = Get-CamillaDSPDefaultPlaybackDevice
-
-  # Hard invariant: the capture device must never be used as playback, which would
-  # create an audio loop (output -> capture -> processed -> output again).
-  if ($detected -eq $captureDevice) {
-    $detected = $null
-  }
-
-  # Fallback 1: last saved default. Rejected when the device is gone from the
-  # system, since pushing a nonexistent name would fail; the run falls through to
-  # first-available instead.
-  if (-not $detected) {
-    $savedDevice = Get-CamillaDSPLastDevice
-    if ($savedDevice -and $savedDevice -ne $captureDevice) {
-      $allDevices = Get-CamillaDSPAvailablePlaybackDeviceList -CaptureDevice $captureDevice
-      if ($null -ne $allDevices -and ($allDevices -contains $savedDevice)) {
-        $detected = $savedDevice
-      }
-      # Enumeration failure ($null) or a missing device leaves $detected null, so
-      # this falls through to fallback 2.
-    }
-  }
-
-  # Fallback 2: first available playback device by deterministic sorted name.
-  if (-not $detected) {
-    $detected = Get-CamillaDSPFirstAvailablePlaybackDevice -CaptureDevice $captureDevice
-  }
-
-  # Nothing available: pass through with an empty device.
-  if (-not $detected) {
-    return $yaml
-  }
-
-  # Patch YAML: set the detected device and re-serialize.
-  $cfg.devices.playback.device = $detected
-  $patched = $cfg | ConvertTo-Yaml
-
-  # Save the resolved device to state file for future fallback.
-  Save-CamillaDSPLastDevice -Device $detected
-
-  return $patched
-}
-
-function Get-CamillaDSPResolvedPlaybackDeviceName {
+  <#
+  .SYNOPSIS
+    Config text with the playback device resolved when it is null.
+  .DESCRIPTION
+    Resolution order: system default output, last saved device validated
+    against the available list, first available device. A config that already
+    sets a device is returned with its original text, so nothing is reserialized
+    needlessly.
+  .PARAMETER ConfigPath
+    Config file to resolve.
+  #>
   [CmdletBinding()]
   [OutputType([string])]
   param(
@@ -192,14 +332,73 @@ function Get-CamillaDSPResolvedPlaybackDeviceName {
     [string]$ConfigPath
   )
 
-  # The device the heartbeat compares the live device against, or $null when
-  # detection yields nothing, so it can detect a drift away from the desired device.
-  if (-not (Test-Path $ConfigPath)) {
+  $yaml = Get-Content -Raw -Path $ConfigPath
+  $config = $yaml | ConvertFrom-Yaml
+
+  $playbackDevice = $config.devices.playback.device
+  $captureDevice = $config.devices.capture.device
+
+  if ($null -ne $playbackDevice) {
+    return $yaml
+  }
+
+  $detected = Get-CamillaDSPDefaultPlaybackDevice
+  if ($detected -eq $captureDevice) {
+    $detected = $null
+  }
+
+  # Fallback 1: last saved default, validated against the available devices.
+  if ([string]::IsNullOrEmpty($detected)) {
+    $savedDevice = Get-CamillaDSPLastDevice
+    if (-not [string]::IsNullOrEmpty($savedDevice) -and $savedDevice -ne $captureDevice) {
+      $available = Get-CamillaDSPAvailablePlaybackDeviceCache -CaptureDevice $captureDevice -RequiredDevice $savedDevice
+      if ($null -eq $available) {
+        # Enumeration failed, so accept the saved device as best effort.
+        $detected = $savedDevice
+      } elseif (@($available) -contains $savedDevice) {
+        $detected = $savedDevice
+      } else {
+        Clear-CamillaDSPLastDevice
+      }
+    }
+  }
+
+  # Fallback 2: first available device in sorted-name order.
+  if ([string]::IsNullOrEmpty($detected)) {
+    $detected = Get-CamillaDSPFirstAvailablePlaybackDevice -CaptureDevice $captureDevice
+  }
+
+  # Nothing available: pass through with the null device.
+  if ([string]::IsNullOrEmpty($detected)) {
+    return $yaml
+  }
+
+  Save-CamillaDSPLastDevice -Device $detected
+  return (ConvertTo-CamillaDSPPlaybackDeviceYaml -ConfigPath $ConfigPath -Device $detected)
+}
+
+function Get-CamillaDSPResolvedPlaybackDeviceName {
+  <#
+  .SYNOPSIS
+    The device detection would select right now, or $null.
+  .DESCRIPTION
+    The heartbeat compares the live device against this value, so it re-pushes
+    when the system default output changed.
+  .PARAMETER ConfigPath
+    Config file to resolve.
+  #>
+  [CmdletBinding()]
+  [OutputType([string])]
+  param(
+    [Parameter(Mandatory)]
+    [string]$ConfigPath
+  )
+
+  if (-not (Test-Path -Path $ConfigPath -PathType Leaf)) {
     return $null
   }
   $resolved = Resolve-CamillaDSPPlaybackDevice -ConfigPath $ConfigPath
-  $cfg = $resolved | ConvertFrom-Yaml
-  $device = $cfg.devices.playback.device
+  $device = ($resolved | ConvertFrom-Yaml).devices.playback.device
   if ($null -eq $device) { return $null }
   return [string]$device
 }
