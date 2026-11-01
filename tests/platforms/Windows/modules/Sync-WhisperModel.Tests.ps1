@@ -92,6 +92,23 @@ Describe 'Sync-WhisperModel' {
             param([string]$RepoRoot, [bool]$Enabled = $true)
             return @(Sync-WhisperModel -RepoRoot $RepoRoot -Enabled:$Enabled)
         }
+
+        # Run the module and keep both the narration and the terminating error.
+        # The call pipes into ForEach-Object instead of being wrapped in @(...):
+        # a direct assignment discards everything the call already wrote once
+        # the terminating error arrives, which is exactly the narration the
+        # failure assertions need. The module reports its reason through
+        # Write-NucleusError and then rethrows bare, so the exception message is
+        # always 'ScriptHalted' and the reason can only be read from the text.
+        function Invoke-WhisperRun {
+            param([string]$RepoRoot, [bool]$Enabled = $true)
+            $lines = [System.Collections.Generic.List[string]]::new()
+            $threw = $null
+            $ErrorActionPreference = 'Continue'
+            try { Sync-WhisperModel -RepoRoot $RepoRoot -Enabled:$Enabled 2>&1 | ForEach-Object { $lines.Add("$_") } }
+            catch { $threw = $_.Exception }
+            return @{ Text = ($lines -join "`n"); Threw = $threw }
+        }
     }
 
     AfterAll {
@@ -147,9 +164,8 @@ Describe 'Sync-WhisperModel' {
             Write-FixtureModel -Name 'ggml-fixture.bin' -Bytes ([byte[]](0x74, 0x61, 0x6d))
             $repo = Get-WhisperFixtureRepo -WhisperSection @{ 'ggml-fixture.bin' = Get-WhisperPin }
 
-            $ErrorActionPreference = 'Continue'
-            $messages = @(Sync-WhisperModel -RepoRoot $repo -Enabled:$true 2>&1)
-            $text = $messages -join "`n"
+            $run = Invoke-WhisperRun -RepoRoot $repo
+            $text = $run.Text
 
             $text | Should -Match 'does not match the pin' -Because "the drift must be announced; output was: $text"
             $text | Should -Match ([regex]::Escape($script:SriTampered)) -Because "the deployed digest must be reported; output was: $text"
@@ -165,6 +181,7 @@ Describe 'Sync-WhisperModel' {
             # so no escaping is needed around the placeholders.
             $bothDigests = 'expected {0}.*found {1}' -f [regex]::Escape($script:SriAbc), [regex]::Escape($script:SriTampered)
             $text | Should -Match $bothDigests -Because "the pinned digest must precede the deployed one; output was: $text"
+            $run.Threw | Should -Not -BeNullOrEmpty -Because 'the fixture url refuses the connection on port 1, so the re-download cannot succeed'
         }
 
         It 'does not overwrite the drifted file with an unverified download' {
@@ -197,9 +214,10 @@ Describe 'Sync-WhisperModel' {
         It 'announces the download it is about to attempt' {
             $repo = Get-WhisperFixtureRepo -WhisperSection @{ 'ggml-absent.bin' = Get-WhisperPin }
 
-            $ErrorActionPreference = 'Continue'
-            $messages = @(Sync-WhisperModel -RepoRoot $repo -Enabled:$true 2>&1)
-            ($messages -join "`n") | Should -Match 'downloading'
+            $run = Invoke-WhisperRun -RepoRoot $repo
+
+            $run.Text | Should -Match 'downloading' -Because "the fetch must be announced before it runs; output was: $($run.Text)"
+            $run.Threw | Should -Not -BeNullOrEmpty -Because 'the fixture url refuses the connection on port 1'
         }
     }
 
@@ -238,42 +256,47 @@ Describe 'Sync-WhisperModel' {
         It 'throws when there is no whisper section' {
             $repo = Get-WhisperFixtureRepo -WhisperSection $null
 
-            $ErrorActionPreference = 'Stop'
-            { Sync-WhisperModel -RepoRoot $repo -Enabled:$true } |
-                Should -Throw -ExpectedMessage '*no whisper section*'
+            $run = Invoke-WhisperRun -RepoRoot $repo
+
+            $run.Threw | Should -Not -BeNullOrEmpty -Because 'an unusable lockfile must abort the convergence'
+            $run.Text | Should -Match 'no whisper section' -Because "the reason must reach the operator; output was: $($run.Text)"
         }
 
         It 'throws when the lockfile file is missing' {
             $missing = Join-Path $script:tempRoot ('absent-' + [guid]::NewGuid().ToString('N'))
 
-            $ErrorActionPreference = 'Stop'
-            { Sync-WhisperModel -RepoRoot $missing -Enabled:$true } |
-                Should -Throw -ExpectedMessage '*lockfile not found*'
+            $run = Invoke-WhisperRun -RepoRoot $missing
+
+            $run.Threw | Should -Not -BeNullOrEmpty -Because 'a missing lockfile must abort the convergence'
+            $run.Text | Should -Match 'lockfile not found' -Because "the reason must reach the operator; output was: $($run.Text)"
         }
 
         It 'throws when an entry is missing its hash' {
             $repo = Get-WhisperFixtureRepo -WhisperSection @{ 'ggml-fixture.bin' = @{ url = $script:UnreachableUrl; revision = $script:Rev } }
 
-            $ErrorActionPreference = 'Stop'
-            { Sync-WhisperModel -RepoRoot $repo -Enabled:$true } |
-                Should -Throw -ExpectedMessage '*must declare both url and hash*'
+            $run = Invoke-WhisperRun -RepoRoot $repo
+
+            $run.Threw | Should -Not -BeNullOrEmpty -Because 'a pin without a hash must abort the convergence'
+            $run.Text | Should -Match 'must declare both url and hash' -Because "the reason must name both fields; output was: $($run.Text)"
         }
 
         It 'throws when an entry is missing its url' {
             $repo = Get-WhisperFixtureRepo -WhisperSection @{ 'ggml-fixture.bin' = @{ hash = $script:SriAbc; revision = $script:Rev } }
 
-            $ErrorActionPreference = 'Stop'
-            { Sync-WhisperModel -RepoRoot $repo -Enabled:$true } |
-                Should -Throw -ExpectedMessage '*must declare both url and hash*'
+            $run = Invoke-WhisperRun -RepoRoot $repo
+
+            $run.Threw | Should -Not -BeNullOrEmpty -Because 'a pin without a url must abort the convergence'
+            $run.Text | Should -Match 'must declare both url and hash' -Because "the reason must name both fields; output was: $($run.Text)"
         }
 
         It 'validates the pin before fetching anything' {
             $repo = Get-WhisperFixtureRepo -WhisperSection @{ 'ggml-fixture.bin' = @{ url = $script:UnreachableUrl; revision = $script:Rev } }
 
-            $ErrorActionPreference = 'Continue'
-            $messages = @(Sync-WhisperModel -RepoRoot $repo -Enabled:$true 2>&1)
-            @($messages | Where-Object { $_ -Match 'downloading' }).Count |
+            $run = Invoke-WhisperRun -RepoRoot $repo
+
+            @($run.Text -split "`n" | Where-Object { $_ -Match 'downloading' }).Count |
                 Should -Be 0 -Because 'a malformed pin must be rejected before any network call'
+            $run.Threw | Should -Not -BeNullOrEmpty -Because 'the malformed pin must abort the convergence rather than be skipped'
         }
     }
 }
