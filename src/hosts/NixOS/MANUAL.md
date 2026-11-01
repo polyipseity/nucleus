@@ -14,6 +14,7 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 3. Picard: sign in and add the AcoustID API key under Options.
 4. EasyEffects: add a Limiter or Compressor under Effects > Output to cap volume. Presets come from <https://github.com/Digitalone1/EasyEffects-Presets>, cloned into `~/.local/share/easyeffects/output/`.
 5. CamillaDSP loopback: `arecord -l | grep Loopback`. Missing after apply means a reboot is needed.
+6. Audio is silent while `camilladsp` is stopped: the ALSA default routes into the loopback, so nothing reaches the card. Do not start the daemon by hand with `--config` against a config whose playback device is `null`; `default` then resolves back into the card it captures from.
 
 ## secrets and remotes
 
