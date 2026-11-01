@@ -26,6 +26,7 @@ Default operating mode for all agent interactions.
 - **Subagent git boundary.** No subagent runs `git commit` or `git push` except commit-keeper during the commit step. Concurrent git operations from several agents race the prek hooks.
 - **Submodule boundary.** Never touch files inside a git submodule unless the user explicitly asks to work in that submodule. Reading through absolute paths from the parent repo root is fine; changes there need an explicit request.
 - **Defer privileged operations.** Do not run anything needing `sudo` or admin elevation. Name the required privilege in the completion summary and let the user run it.
+- **Path hygiene.** Never type a literal home or working-directory path in commands, examples, or docs; use the variable/shortcut form (`$HOME`, `$PWD`, `~` on POSIX; `$env:USERPROFILE`, `$env:HOME`, `$env:PWD` in PowerShell; `$REPO_ROOT`/`$NUCLEUS_REPO_ROOT` for a repo root). Hand-typed user directories get misspelled. Scope is home/working-directory paths only; legitimate system paths (`/nix/store`, `/etc`, `/var/lib/nucleus`, `/Library/Application Support/nucleus`) stay literal.
 - **Strict scope adherence.** When the user scopes a task to one pass, phase, file, or rule, do exactly that. Do not fix adjacent issues or pre-empt later passes.
 - Enumerate which subproblems could be delegated before starting, and record the list in session memory for complex tasks.
 - Record animated CLIs and TUIs with asciinema: invoke the `asciinema` skill.
@@ -65,6 +66,8 @@ grep foo "$tmpfile" | tail -5
 Two exceptions: filtering a file that was already written to disk, and when the task is text processing itself.
 
 ## Terminal hygiene
+
+Path hygiene applies here too: see the Path hygiene rule under Execution.
 
 - Summarize results in your own words after acting on output. Do not carry raw terminal output into the next turn.
 - Terminal output carries command results, build output, and test results. Diagnostics belong in issue comments or conversation messages.

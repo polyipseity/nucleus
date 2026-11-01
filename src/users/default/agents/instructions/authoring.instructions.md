@@ -22,6 +22,8 @@ These files load as agent context, so they stay concise.
 
 ## Document conventions
 
+- Paths in examples and docs use `$HOME`, `$PWD`, `~` (and their PowerShell equivalents `$env:USERPROFILE`, `$env:HOME`, `$env:PWD`), never a literal user or working directory. Hand-typed home paths get misspelled.
+
 - Sentence case headings: capitalize the first word and proper nouns only.
 - Wrap file paths, command names, and inline code in backticks.
 - Keep bullet items grammatically parallel: all nouns, all imperatives, or all full sentences.
