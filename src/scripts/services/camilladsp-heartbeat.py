@@ -35,6 +35,8 @@ import ctypes
 import hashlib
 import json
 import os
+import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -238,6 +240,10 @@ def _macos_list_available(capture_device: str) -> list[str] | None:
 
 
 def _run(command: list[str]) -> str | None:
+    # The shell version guarded on `command -v`, so a missing tool is an absent
+    # backend rather than a per-tick warning.
+    if shutil.which(command[0]) is None:
+        return None
     try:
         result = subprocess.run(
             command, capture_output=True, text=True, timeout=10, check=False
@@ -249,25 +255,39 @@ def _run(command: list[str]) -> str | None:
 
 
 def _linux_default_output() -> str | None:
+    """System default sink, trying WirePlumber, PulseAudio, then ALSA.
+
+    The string handling mirrors the sed pipeline this replaced, so a host that
+    resolved a device yesterday resolves the same one today.
+    """
     output = _run(["wpctl", "status"])
     if output:
-        in_sinks = False
-        for line in output.splitlines():
-            if "Sinks:" in line:
-                in_sinks = True
+        lines = output.splitlines()
+        for index, line in enumerate(lines):
+            if "Sinks:" not in line:
                 continue
-            if in_sinks and line.strip().startswith("*"):
-                name = line.split("*", 1)[1].strip()
-                candidate = name.rsplit(None, 1)[0] if " " in name else name
-                if candidate:
-                    return candidate
+            for candidate_line in lines[index : index + 2]:
+                if "*" not in candidate_line:
+                    continue
+                value = re.sub(r".*\*\s*", "", candidate_line)
+                value = re.sub(r"\s+[0-9]+.*", "", value)
+                if value:
+                    return value
+
     output = _run(["pactl", "info"])
     if output:
         for line in output.splitlines():
-            if line.startswith("Default Sink:"):
-                value = line.split(":", 1)[1].strip()
+            if "Default Sink:" in line:
+                value = line.replace("Default Sink: ", "", 1)
                 if value:
                     return value
+
+    output = _run(["aplay", "-l"])
+    if output:
+        for line in output.splitlines():
+            match = re.match(r"^card ([0-9]+)", line)
+            if match:
+                return f"hw:CARD={match.group(1)},DEV=0"
     return None
 
 
@@ -276,40 +296,39 @@ def _linux_list_available(capture_device: str) -> list[str] | None:
 
     output = _run(["wpctl", "status"])
     if output:
-        in_sinks = False
-        for line in output.splitlines():
-            if "Sinks:" in line:
-                in_sinks = True
+        lines = output.splitlines()
+        for index, line in enumerate(lines):
+            if "Sinks:" not in line:
                 continue
-            if not in_sinks:
-                continue
-            stripped = line.strip()
-            if not stripped or not stripped[0].isdigit():
-                continue
-            name = stripped.split(".", 1)[1].strip() if "." in stripped else stripped
-            candidate = name.rsplit(None, 1)[0] if " " in name else name
-            if candidate and candidate != capture_device:
-                candidates.append(candidate)
+            for candidate_line in lines[index : index + 21]:
+                if not re.match(r"^\s+[0-9]+\.", candidate_line):
+                    continue
+                value = re.sub(r"^\s*[0-9]*\.\s*", "", candidate_line)
+                value = re.sub(r"\s+[0-9]+.*", "", value)
+                if value and value != capture_device:
+                    candidates.append(value)
+            break
 
     output = _run(["pactl", "list", "sinks", "short"])
     if output:
         for line in output.splitlines():
-            fields = line.split("\t")
-            if len(fields) >= 2 and fields[1] and fields[1] != capture_device:
+            fields = line.split()
+            if len(fields) >= 2 and fields[1] != capture_device:
                 candidates.append(fields[1])
 
     output = _run(["aplay", "-l"])
     if output:
         for line in output.splitlines():
-            if line.startswith("card "):
-                card = line.split(":", 1)[0].split()[1]
-                candidate = f"hw:CARD={card},DEV=0"
+            match = re.match(r"^card ([0-9]+)", line)
+            if match:
+                candidate = f"hw:CARD={match.group(1)},DEV=0"
                 if candidate != capture_device:
                     candidates.append(candidate)
 
     if not candidates:
         return None
-    return sorted(set(candidates), key=lambda value: value.encode("utf-8"))
+    # Locale-independent ordering, matching the previous bash implementation.
+    return sorted(candidates, key=lambda value: value.encode("utf-8"))
 
 
 # --- Device detection --------------------------------------------------------
