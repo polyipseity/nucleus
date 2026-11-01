@@ -14,6 +14,7 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 8. Grant Automation to the terminal that runs `nucleus-vm setup`, so UTM imports can be approved.
 9. Allow full disk access for remote users: System Settings > General > Sharing > Remote Login > (i) > Allow full disk access for remote users.
 10. LuLu's icon is hidden through `noIconMode`, so reopening LuLu restores its preferences window.
+11. Nix daemon is niced (nice 19, ionice 7) and capped by `daemon-nice-level`/`daemon-ionice-level` in `nix.custom.conf` so local builds (e.g. ffmpeg-full) do not saturate the machine. To tune further, edit `max-jobs`/`cores` in that file (default `auto`); lower them (e.g. `max-jobs = 2`, `cores = 2`) if builds still dominate interactive work.
 
 ## macOS settings with no API
 
