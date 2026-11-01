@@ -133,15 +133,15 @@ let
 
   # --- Linux-only packages, derived from nixpkgs ---
   # An entry is Linux-only when its nixpkgs attribute declares support for Linux
-  # and not for Darwin: then the registry has to say so, and a darwin package
-  # set must never try to build it. The declared platforms decide it, since
-  # `lib.meta.availableOn` folds in `meta.platforms` and `meta.badPlatforms`,
-  # and both are read from the Linux package set: a darwin evaluation of an
-  # unfree or broken attribute answers a different question than "is this app
-  # Linux-only".
-  # WHY not attribute presence: nixpkgs defines the attribute on every system,
-  # so presence distinguishes nothing. `alsa-utils` resolves in an
-  # aarch64-darwin package set and is still Linux-only.
+  # and not for Darwin: then the registry says so, which keeps the entry out of
+  # every darwin list, Homebrew and WinGet included, and records the intent.
+  # The declared platforms decide it, since `lib.meta.availableOn` folds in
+  # `meta.platforms` and `meta.badPlatforms`, read from the Linux package set: a
+  # darwin evaluation of an unfree or broken attribute answers a different
+  # question than "is this app Linux-only".
+  # WHY: attribute presence cannot stand in, because nixpkgs defines the
+  # attribute on every system; `alsa-utils` resolves in an aarch64-darwin package
+  # set and is still Linux-only.
   darwinSystem = lib.systems.elaborate "aarch64-darwin";
   linuxSystem = lib.systems.elaborate "x86_64-linux";
   linuxPkgs' = import <nixpkgs> { system = "x86_64-linux"; };
@@ -321,5 +321,6 @@ builtins.seq (builtins.deepSeq allTests null) {
   success = true;
   testCount = builtins.length allTests;
   packageCount = builtins.length extractedNames;
+  linuxOnlyCount = builtins.length linuxOnlyPackageNames;
   message = "All ${builtins.toString (builtins.length allTests)} cross-platform package parity tests passed (${builtins.toString (builtins.length extractedNames)} packages verified)";
 }
