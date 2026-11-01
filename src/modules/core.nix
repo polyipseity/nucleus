@@ -19,6 +19,9 @@ let
   # nixpkgs on NixOS; any GUI component makes an entry gui.
   # pkgs.cargo must not be added: it conflicts with pkgs.rustup over bin/cargo.
   # install-cargo-binstall-packages takes cargo as a store-path argument.
+  # Entries are byte-ordered by name, so `@canary` suffixes sort after their
+  # neighbours instead of grouping with them; test_registry_names_sorted in
+  # tests/modules/package-parity-tests.nix enforces it.
   managedPackages = {
     "7zip" = {
       category = "cli";

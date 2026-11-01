@@ -13,7 +13,7 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 
 ## audio processing
 
-1. CamillaDSP captures the default playback device in WASAPI loopback, so this host needs two playback endpoints: applications play into the default one, which CamillaDSP captures, and the processed audio goes to the other. With a single output there is nowhere for the unprocessed stream to go, and `camilladsp-heartbeat` logs a warning instead of feeding the output back into the capture. Set the spare endpoint (HDMI or an unused output) as the default playback device; the shipped configs leave both devices `null` so the heartbeat picks them.
+1. CamillaDSP captures the default playback device in WASAPI loopback, so this host needs two playback endpoints: applications play into the default one, which CamillaDSP captures, and the processed audio goes to the other. With a single output there is nowhere for the unprocessed stream to go, and `camilladsp-heartbeat` logs a warning instead of feeding the output back into the capture. Set the spare endpoint (HDMI or an unused output) as the default playback device; the shipped configs leave both devices `null` so the heartbeat picks them. The heartbeat is the only writer of those configs: editing them in camillagui binds playback and capture to the same endpoint, which the heartbeat refuses to push, so the daemon keeps the last config it accepted.
 
 ## virtualization
 
