@@ -4,7 +4,7 @@
 # ALSA backend cannot open a CoreAudio or WASAPI name. A copied loopback name is a
 # chain that cannot start on that host. The ALSA default device that feeds the
 # loopback must also be the capture side's pair, so the two ends cannot drift apart
-# in a one-sided edit.
+# in a one-sided edit, and no playback device may resolve back into that loopback.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -29,7 +29,10 @@ import yaml
 
 # An Alsa device is opened through libasound, so only ALSA resolves the name: a
 # bare PCM name or one of the standard ALSA prefixes. Anything else is a name
-# from a platform backend that happens to share the devices block.
+# from a platform backend that happens to share the devices block. The tuple is
+# the set this repo uses today, not ALSA's whole PCM namespace, so a new name such
+# as `dmix:` fails here by design; widening it is the change the snd-aloop note in
+# src/hosts/NixOS/default.nix already anticipates.
 ALSA_PREFIXES = ("hw:", "plughw:", "sysdefault:", "default", "dsnoop:")
 
 # The hw:<card>,<device>,<subdevice> form is the only one that names a card and a
@@ -100,9 +103,20 @@ def case_default_device_pairs_with_capture():
     # this file too, so a failure there is correct rather than a false positive.
     unpaired = []
     mismatched = []
+    self_feeding = []
     paired = 0
     capture_count = 0
     for path, key, device in alsa_endpoints(pathlib.Path(os.environ["CONFIG_DIR"])):
+        if key == "playback":
+            # `default` now resolves through this file into the loopback, and every
+            # hw: name on that card is the loopback too, so playback has to stay
+            # away from both or the daemon plays back what it just captured.
+            if not isinstance(device, str):
+                continue
+            loopback = HW_DEVICE.match(device)
+            if device == "default" or (loopback is not None and loopback.group(1) == card):
+                self_feeding.append(f"{path}: playback device {device!r}")
+            continue
         if key != "capture":
             continue
         capture_count += 1
@@ -124,6 +138,10 @@ def case_default_device_pairs_with_capture():
         f"so the pairing of {asound} was never exercised"
     )
     assert not mismatched, "; ".join(mismatched)
+    assert not self_feeding, (
+        f"an Alsa playback device resolves through {asound} back into the loopback it captures from: "
+        + "; ".join(self_feeding)
+    )
 
 
 CASES = {
