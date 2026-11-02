@@ -5,7 +5,7 @@
   "homepage": "https://sigrok.org/wiki/Sigrok-cli",
   "license": "GPL-3.0-or-later",
   "url": "https://sigrok.org/download/binary/sigrok-cli/sigrok-cli-0.7.2-x86_64-installer.exe",
-  "hash": "TODO: compute sha256 on Windows before first apply",
+  "hash": "27ddf838c992381f3d9c52ad9d5a7ec7db382d9aea1905d44538a7c7bd368446",
   "installer": {
     "script": [
       "Start-Process -FilePath \"$dir\\sigrok-cli-0.7.2-x86_64-installer.exe\" -ArgumentList '/S' -Wait",
