@@ -14,7 +14,7 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 8. Grant Automation to the terminal that runs `nucleus-vm setup`, so UTM imports can be approved.
 9. Allow full disk access for remote users: System Settings > General > Sharing > Remote Login > (i) > Allow full disk access for remote users.
 10. LuLu's icon is hidden through `noIconMode`, so reopening LuLu restores its preferences window.
-11. Nix daemon scheduling is set on NixOS through `nix.daemonCPUSchedPolicy` and `nix.daemonIOSchedPriority` in `posix/base.nix`, which replaced the removed nice/ionice options. Determinate Nix on this host no longer reads those keys from `nix.custom.conf`, so the remaining lever for local builds (e.g. ffmpeg-full) is parallelism: edit `max-jobs`/`cores` in that file (default `auto`) and lower them (e.g. `max-jobs = 2`, `cores = 2`) if builds still dominate interactive work.
+11. The nix daemon's priority cannot be tuned from `nix.custom.conf`: `daemon-nice-level` and `daemon-ionice-level` are not settings this nix reads (the client warns `unknown setting` for both), so they never applied. The lever that does work for local builds (e.g. ffmpeg-full) is parallelism: edit `max-jobs`/`cores` in that file (default `auto`) and lower them (e.g. `max-jobs = 2`, `cores = 2`) if builds still dominate interactive work.
 
 ## macOS settings with no API
 

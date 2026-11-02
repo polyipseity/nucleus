@@ -30,7 +30,7 @@ alwaysApply: false
 
 ## Agent command blocking
 
-- Guard script `safe-delete-guard` (POSIX sh + PowerShell twin) blocks `/bin/rm`, `cmd`/`cmd.exe` (Windows), and direct `rm` invocations.
+- Guard script `safe-delete-guard` (POSIX sh + PowerShell twin) blocks a deletion reached through a `/bin/rm` path or a `./` relative path, the backslash-escaped spellings, and `cmd`/`cmd.exe` (Windows). A bare `rm` is not in its pattern set, because the interactive alias covers that case and the guard exists to stop the bypasses the alias cannot see. The suite `tests/scripts/safe-delete-guard-tests.sh` pins that split.
 - Deployed as PreToolUse hooks for Claude Code, Copilot, Cursor, OpenCode. Pi uses instructions only.
 
 ## Cross-host parity

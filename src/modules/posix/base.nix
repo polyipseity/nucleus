@@ -50,11 +50,14 @@ in
 
     (lib.optionalAttrs (!hasLaunchdDaemonsOption) {
       # WHY: keep local builds (e.g. ffmpeg-full) from saturating interactive
-      # work. `batch` is the documented scheduling policy for non-interactive
-      # tasks, and I/O priority 7 is the lowest best-effort level. Both replaced
-      # `daemonNiceLevel`/`daemonIONiceLevel`, which nixpkgs removed. max-jobs and
-      # cores stay at defaults (auto); lower them (e.g. max-jobs = 2; cores = 2;)
-      # if the machine is still saturated during large builds.
+      # work. Both names and both value domains come from the option descriptions
+      # in nixpkgs nixos/modules/services/system/nix-daemon.nix: `batch` is the CPU
+      # policy documented for non-interactive tasks, and 7 is the lowest
+      # best-effort I/O priority. They replace daemonNiceLevel/daemonIONiceLevel,
+      # which nixpkgs now declares as a removed-option module. That module is NixOS
+      # only, which is the case this branch runs in. max-jobs and cores stay at
+      # defaults (auto); lower them (e.g. max-jobs = 2; cores = 2;) if the machine
+      # is still saturated during large builds.
       nix.daemonCPUSchedPolicy = "batch";
       nix.daemonIOSchedPriority = 7;
 
