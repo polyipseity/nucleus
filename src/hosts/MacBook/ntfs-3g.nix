@@ -1,14 +1,8 @@
-# MacBook/ntfs-3g.nix - build polyipseity/ext.ntfs-3g from source.
+# MacBook/ntfs-3g.nix - build polyipseity/ext.ntfs-3g from source against fuse-t.
 #
-# WHY from source and not nixpkgs: the nixpkgs package builds against macFUSE
-# stub headers rather than the installed macFUSE, so it does not track the
-# provider this host runs. This fork builds against the installed macFUSE and
-# mounts with -o backend=fskit, the kext-free path on macOS 27; the macFUSE
-# kernel extension is never approved here.
-#
-# WHY an activation script and not a derivation: the fork links against
-# /usr/local/lib/libfuse.dylib, an impure dependency a Nix sandbox build cannot
-# resolve. Activation runs after Homebrew, so macFUSE exists by then.
+# WHY from source in activation and not from nixpkgs: the fork links
+# /usr/local/lib/libfuse-t.dylib, an impure dependency a sandbox build cannot
+# resolve, so the build runs in activation after Homebrew has installed fuse-t.
 { lib, pkgs, ... }:
 let
   activationBundle = pkgs.callPackage ../../modules/lib/script-tree.nix { };
@@ -51,17 +45,19 @@ let
   installHookPatchPath = ./patches/ntfs-3g-install-hook.patch;
   fuseProviderPatchPath = ./patches/ntfs-3g-fuse-provider.patch;
 
-  # macFUSE's fuse.pc declares these Cflags, but the fork's configure.ac has no
-  # fuse pkg-config check, so they are passed explicitly instead.
+  # fuse-t's fuse-t.pc declares "Cflags: -I/usr/local/include/fuse" (a symlink into
+  # the fuse-t application support tree), but the fork's configure.ac has no fuse
+  # cflags check, so the include directory and the offset-bits define are passed
+  # explicitly here.
   cppFlags = "-I/usr/local/include/fuse -D_FILE_OFFSET_BITS=64";
-  # WHY absolute dylib and not -lfuse: the patched src/Makefile.am links macFUSE
-  # by path. macFUSE's /usr/local/lib/libfuse.la names -liconv -licucore as
-  # dependency_libs, which libtool would push onto every ntfsprogs link, and the
-  # nixpkgs apple-sdk ships no stubs for those, so the links fail.
+  # WHY the rpath: /usr/local/lib/libfuse-t.dylib carries the install name
+  # @rpath/libfuse-t.dylib (otool -D), so linking it, by absolute path or not,
+  # records @rpath/libfuse-t.dylib in the binary and dyld aborts with "no LC_RPATH's
+  # found" unless the binary also carries /usr/local/lib as an rpath.
   # WHY CoreFoundation: ENABLE_NFCONV defaults on darwin, so unistr.c calls
   # CoreFoundation APIs that upstream's Makefile.am never links. linkFlags flows
   # only into make LDFLAGS, so autoconf probes are unaffected.
-  linkFlags = "-framework CoreFoundation";
+  linkFlags = "-framework CoreFoundation -Wl,-rpath,/usr/local/lib";
   configureFlags = "--with-fuse=external --prefix=/usr/local --disable-crypto --disable-plugins";
   clangBin = "${pkgs.llvmPackages.clang}/bin/clang";
   clangxxBin = "${pkgs.llvmPackages.clang}/bin/clang++";
@@ -74,9 +70,9 @@ let
   # store, so a script-only edit would otherwise leave the previous /usr/local
   # install in place.
   buildScriptPath = ./scripts/macos-build-ntfs3g.sh;
-  # WHY fingerprint the provider helper: an edit that is a no-op over the current
-  # tree (say, a find narrowed to the top level) leaves the digest unchanged, so
-  # the recorded provider field could not notice it.
+  # WHY fingerprint the provider helper: the build's provider digest and identity
+  # come from it, so an edit that changes what the digest covers would otherwise
+  # leave field 2 of the build record unchanged.
   providerFingerprintScript = ../../scripts/lib/macos-fuse-provider.sh;
   buildFingerprint = builtins.hashString "sha256" (
     builtins.concatStringsSep "\n" [

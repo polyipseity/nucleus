@@ -1,5 +1,5 @@
 /*
- * Fixture macFUSE header for tests/scripts/macos-fuse-provider-tests.sh.
+ * Fixture fuse-t header for tests/scripts/macos-fuse-provider-tests.sh.
  * Non-primary headers under include/fuse/ are hashed too: the digest case that
  * mutates this file is what proves the whole directory is covered.
  */

@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
-# Builds polyipseity/ext.ntfs-3g from source.
+# Builds polyipseity/ext.ntfs-3g from source against fuse-t.
 #
 # Rebuilds when the installed binary or the build record is missing, when the Nix
-# fingerprint (argument 1) changed, or when the observed macFUSE provider digest
+# fingerprint (argument 1) changed, or when the observed fuse-t provider digest
 # changed. CC/CXX/CPPFLAGS/CFLAGS/CXXFLAGS/LDFLAGS are exported so ./configure and
 # make resolve them from the environment.
 #
 # WHY build from source in activation rather than from nixpkgs: the polyipseity fork
-# (commit f0e5cb0) links against the macFUSE install under /usr/local/lib, an impure
+# (commit f0e5cb0) links the fuse-t install under /usr/local/lib, an impure
 # dependency no sandbox build can resolve, and activation runs after Homebrew so
-# macFUSE is installed first. The nixpkgs package instead builds against macFUSE stub
-# headers and selects the kernel-extension backend, a kext this host must never
-# approve; this fork is built against the installed macFUSE so mounts can select the
-# FSKit backend (-o backend=fskit), the kext-free path on macOS 27.
+# fuse-t is installed first. The fork's own Makefile already names -lfuse-t, and one
+# local patch turns that into an absolute path. No mount backend is passed: fuse-t
+# mounts through its own NFSv4 server unless an -o backend option asks for another.
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../../../scripts/lib/lib.sh
@@ -52,8 +51,13 @@ unset DEVELOPER_DIR
 FINGERPRINT_FILE="/usr/local/share/ntfs-3g/.build-fingerprint"
 LOG_FILE="/Library/Application Support/nucleus/logs/ntfs-3g-build.log"
 PROVIDER_ROOT=/usr/local
+# WHY the absolute dylib path and not the fork's -lfuse-t: fuse-t installs
+# libfuse-t.dylib beside a static libfuse-t.a under /usr/local/lib, which is on no
+# default link search path, so patches/ntfs-3g-fuse-provider.patch rewrites the
+# Makefile's FUSE_LIBS to this absolute path, naming the dynamic library without a
+# -L flag and without the static archive in reach. The same path gates the build.
+PROVIDER_LIB="$PROVIDER_ROOT/lib/libfuse-t.dylib"
 NTFS3G_BIN=/usr/local/bin/ntfs-3g
-PKGUTIL_BIN=/usr/sbin/pkgutil
 
 # Reason the installed ntfs-3g must be rebuilt; prints nothing while current. The observed state is passed in rather than read from the constants above, so the gate can be exercised against fixtures (tests/scripts/macos-build-ntfs3g-tests.sh).
 ntfs3g_rebuild_reason() {
@@ -61,36 +65,41 @@ ntfs3g_rebuild_reason() {
     printf '%s\n' "binary missing"
   elif ! [ -f "$2" ]; then
     printf '%s\n' "build record missing"
-  elif [ "$(fuse_provider_record_field 1 "$2")" != "$3" ]; then
+  elif [ "$(sed -n 1p "$2")" != "$3" ]; then
     printf '%s\n' "build configuration changed"
-  elif [ "$(fuse_provider_record_field 2 "$2")" != "$4" ]; then
-    printf '%s\n' "macFUSE provider changed"
+  elif [ "$(sed -n 2p "$2")" != "$4" ]; then
+    printf '%s\n' "fuse-t provider changed"
   fi
 }
 
-# WHY the absence gate: macFUSE presence is the feature toggle for this fork
-#   since the 2026-10-14 fuse-t pivot removed the cask. fuse-t ships no
-#   fuse.pc (it provides fuse-t.pc and fuse3.pc), so a missing pkg-config file
-#   means the provider is intentionally gone rather than damaged; the retarget
-#   at fuse-t is tracked in the MacBook MANUAL. Absent skips with a notice and
-#   exit 0 so apply converges; present but unfingerprintable below still
-#   hard-errors, because that is a broken install rather than a deliberate one.
-if ! [ -f "$PROVIDER_ROOT/lib/pkgconfig/fuse.pc" ]; then
-  notice -l ntfs-3g "build skipped: macFUSE absent (fuse-t pivot; NTFS retarget pending, see MacBook MANUAL)"
+# WHY the absence gate: fuse-t is the feature toggle for this fork, since it is the
+#   only provider the fork links (homebrew.nix installs the cask). Absent skips with
+#   a notice and exit 0 so apply converges on a host that intentionally runs without
+#   it; present but unfingerprintable below still hard-errors, because that is a
+#   broken install rather than a deliberate one.
+if ! [ -f "$PROVIDER_LIB" ]; then
+  notice -l ntfs-3g "build skipped: fuse-t absent (install the Homebrew cask fuse-t)"
   exit 0
 fi
 
-# WHY: macFUSE is an impure build input. Homebrew's cask macfuse@dev declares auto_updates and installs into /usr/local, so the library and headers can be replaced with no repository change and no change to the Nix fingerprint. The digest of the consumed provider files is therefore observed on every activation: without it a macFUSE upgrade leaves the installed ntfs-3g holding an absolute /usr/local/lib/libfuse.<abi>.dylib load path that no longer resolves. The helper is part of buildFingerprint (providerFingerprintScript in ntfs-3g.nix), so an edit that changes what the digest covers without changing its value would leave the field-2 comparison below unchanged.
+# WHY: fuse-t is an impure build input living outside the Nix store, so the library
+# and headers can be replaced with no repository change and no change to the Nix
+# fingerprint. The digest of the consumed provider files is therefore observed on
+# every activation: without it a fuse-t upgrade leaves the installed ntfs-3g built
+# against the previous library. The helper lives in src/scripts/lib/macos-fuse-provider.sh
+# and is part of buildFingerprint through providerFingerprintScript (ntfs-3g.nix), so
+# an edit that changes what the digest covers would otherwise leave the field-2
+# comparison below unchanged.
 if ! PROVIDER_DIGEST="$(fuse_provider_digest "$PROVIDER_ROOT")"; then
-  error -l ntfs-3g "macFUSE under $PROVIDER_ROOT is not fingerprinted — install or repair it (Homebrew cask macfuse@dev)"
+  error -l ntfs-3g "fuse-t under $PROVIDER_ROOT is not fingerprinted: reinstall the Homebrew cask fuse-t"
   exit 1
 fi
 
 REBUILD_REASON="$(ntfs3g_rebuild_reason "$NTFS3G_BIN" "$FINGERPRINT_FILE" "$CURRENT_FINGERPRINT" "$PROVIDER_DIGEST")"
 
 if [ -n "$REBUILD_REASON" ]; then
-  MACFUSE_VERSION="$(macfuse_pkg_version "$PKGUTIL_BIN")" || exit 1
-  PROVIDER_IDENTITY="$(fuse_provider_identity "$PROVIDER_ROOT" "$MACFUSE_VERSION")" || exit 1
+  PROVIDER_VERSION="$(fuse_provider_version "$PROVIDER_ROOT")" || exit 1
+  PROVIDER_IDENTITY="$(fuse_provider_identity "$PROVIDER_ROOT" "$PROVIDER_VERSION")" || exit 1
   say -l ntfs-3g "building from source: $REBUILD_REASON (log: $LOG_FILE)"
   # WHY: prepend (not append) so nix gnumake shadows BSD /usr/bin/make, which cannot parse the GNU Makefiles ./configure generates.
   export PATH="$BUILD_TOOLS_PATH:$PATH"
@@ -107,7 +116,7 @@ if [ -n "$REBUILD_REASON" ]; then
       "$(date '+%Y-%m-%d %H:%M:%S')" "$PROVIDER_IDENTITY" "$PROVIDER_DIGEST"
 
     # WHY: chain every step with && so the group's exit status is the first failure. A rejected patch or a failed autotools/configure step leaves a tree that can still build, so the build would otherwise install sources the fingerprint does not describe and record them as the current install. Chaining rather than exiting, because the group output goes to the log file and an early exit would suppress the console BUILD FAILED report below.
-    # WHY: keep macFUSE out of LDFLAGS during configure, since autoconf link probes fail when every test binary must link macFUSE under nix clang wrappers.
+    # WHY: configure runs with LDFLAGS empty so its link probes do not have to load fuse-t under the nix clang wrappers.
     # WHY: pass LDFLAGS on the make command line as well as the export. ./configure writes "LDFLAGS =" (empty) into every Makefile and a Makefile-defined LDFLAGS overrides the environment variable, so without the command-line form the libntfs-3g link loses -framework CoreFoundation and fails on the nfconv calls.
     printf '[%s] ntfs-3g: patching...\n' "$(date '+%Y-%m-%d %H:%M:%S')" &&
       patch -p1 <"$CRYPTO_PATCH_PATH" &&

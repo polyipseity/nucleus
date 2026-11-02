@@ -7,5 +7,5 @@
  else
  FUSE_CFLAGS = -I/usr/local/include/fuse -D_FILE_OFFSET_BITS=64
 -FUSE_LIBS   = -lfuse-t
-+FUSE_LIBS   = /usr/local/lib/libfuse.dylib
++FUSE_LIBS   = /usr/local/lib/libfuse-t.dylib
  endif
