@@ -423,8 +423,11 @@ run_release_age_uniformity() {
 }
 
 run_upstream_workaround_staleness() {
-  local _has_args="$1" _repo_root="$2"
-  shift 2
+  # The spec array registers this sub-check as `ctx`, so the first argument is the
+  # caller's context, not the files-style has-args flag.
+  local -n ctx="$1"
+  local _repo_root="${ctx[REPO_ROOT]}"
+  shift
   cd "$_repo_root" || return 1
   local _reg=".agents/instructions/upstream-workarounds.instructions.md"
   if [ ! -f "$_reg" ]; then
