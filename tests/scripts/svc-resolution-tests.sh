@@ -65,18 +65,22 @@ cat >"$_tmp/repo/src/modules/services.json" <<JSON
 JSON
 
 # --- Fake launchctl ----------------------------------------------------------
-# FAKE_LIVE lists the labels the fake reports as loaded; every mutating
-# subcommand is appended to FAKE_LAUNCHCTL_LOG so tests can assert exactly which
-# targets an action touched.
+# FAKE_LIVE lists the labels the fake starts out reporting as loaded, and every
+# mutating subcommand is appended to FAKE_LAUNCHCTL_LOG so tests can assert
+# exactly which targets an action touched. The reported set lives in a file
+# because a `bootout` clears a label for the rest of the CLI run, which a single
+# process cannot see in its own environment. The disabled gate lives in a second
+# file for the same reason: `disable` and `enable` are separate processes.
 cat >"$_tmp/bin/launchctl" <<'FAKE'
 #!/usr/bin/env bash
+_gate() { cat "${FAKE_GATE_FILE:?}" 2>/dev/null || printf 'enabled\n'; }
 case "${1:-}" in
 list)
   printf 'PID\tStatus\tLabel\n'
-  for _label in ${FAKE_LIVE:-}; do printf '4242\t0\t%s\n' "$_label"; done
+  for _label in $(cat "${FAKE_LOADED:?}" 2>/dev/null); do printf '4242\t0\t%s\n' "$_label"; done
   ;;
 print)
-  for _label in ${FAKE_LIVE:-}; do
+  for _label in $(cat "${FAKE_LOADED:?}" 2>/dev/null); do
     case "${2:-}" in
     *"$_label")
       printf 'state = running\n\tpid = 4242\n'
@@ -87,7 +91,34 @@ print)
   printf 'state = not running\n\tlast exit code = 0\n'
   exit 1
   ;;
-kill | enable | disable | bootout | bootstrap | start | kickstart)
+print-disabled)
+  printf '\n\tdisabled services = {\n'
+  for _label in $(cat "${FAKE_LOADED:?}" 2>/dev/null); do
+    printf '\t\t"%s" => %s\n' "$_label" "$(_gate)"
+  done
+  printf '\t}\n'
+  ;;
+disable | enable)
+  printf '%s\n' "$*" >>"${FAKE_LAUNCHCTL_LOG:?}"
+  if [ "$1" = "disable" ]; then printf 'disabled' >"${FAKE_GATE_FILE:?}"; else printf 'enabled' >"${FAKE_GATE_FILE:?}"; fi
+  ;;
+bootout)
+  printf '%s\n' "$*" >>"${FAKE_LAUNCHCTL_LOG:?}"
+  _target="${*: -1}"
+  _kept=""
+  for _label in $(cat "${FAKE_LOADED:?}" 2>/dev/null); do
+    # A KeepAlive job respawns unless the gate is already closed, so an unload
+    # that arrives before the gate leaves the label loaded.
+    if [ "$(_gate)" = "disabled" ]; then
+      case "$_target" in
+      *"$_label") continue ;;
+      esac
+    fi
+    _kept="${_kept:+$_kept }$_label"
+  done
+  printf '%s\n' "$_kept" >"${FAKE_LOADED:?}"
+  ;;
+kill | bootstrap | start | kickstart)
   printf '%s\n' "$*" >>"${FAKE_LAUNCHCTL_LOG:?}"
   ;;
 *)
@@ -96,6 +127,13 @@ kill | enable | disable | bootout | bootstrap | start | kickstart)
 esac
 FAKE
 chmod +x "$_tmp/bin/launchctl"
+
+# The unload poll sleeps between probes; a no-op keeps the bounded poll free.
+cat >"$_tmp/bin/sleep" <<'FAKE'
+#!/usr/bin/env bash
+exit 0
+FAKE
+chmod +x "$_tmp/bin/sleep"
 
 # --- Fake systemctl/journalctl (NixOS rows) -------------------------------
 # FAKE_UNITS lists the units the fake reports as loaded; journalctl records each
@@ -131,6 +169,12 @@ printf 'journald line for %s\n' "$*"
 FAKE
 chmod +x "$_tmp/bin/systemctl" "$_tmp/bin/journalctl"
 
+# The launchd state a CLI run observes: the labels the fake reports as loaded
+# and the disabled gate. Both are files because the verbs are separate processes,
+# and both are re-seeded per CLI run so each case starts from its own FAKE_LIVE.
+_FAKE_LOADED_FILE="$_tmp/launchd.loaded"
+_FAKE_GATE_FILE="$_tmp/launchd.gate"
+
 # run_svc: Run the CLI against the stub registry with fake managers on PATH.
 run_svc() { # <svc.sh args...>
   env NUCLEUS_HOST="${SVC_TEST_HOST:-MacBook}" \
@@ -141,6 +185,8 @@ run_svc() { # <svc.sh args...>
     PATH="$_tmp/bin:$PATH" \
     FAKE_LIVE="${FAKE_LIVE:-}" \
     FAKE_UNITS="${FAKE_UNITS:-}" \
+    FAKE_LOADED="$_FAKE_LOADED_FILE" \
+    FAKE_GATE_FILE="$_FAKE_GATE_FILE" \
     FAKE_LAUNCHCTL_LOG="$_tmp/launchctl.log" \
     FAKE_JOURNALCTL_LOG="$_tmp/journalctl.log" \
     bash "$SVC_SH" "$@"
@@ -174,10 +220,30 @@ assert_not_contains() { # <test name> <haystack> <needle>
 # captured_output / captured_status: Results of the last run_cli call.
 captured_output=""
 captured_status=0
-# run_cli: Run the CLI, capturing combined output and exit status.
+# run_cli: Run the CLI, capturing combined output and exit status. The launchd
+# state is re-seeded here so one case's unload cannot leak into the next.
 run_cli() { # <svc.sh args...>
+  printf '%s\n' "${FAKE_LIVE:-}" >"$_FAKE_LOADED_FILE"
+  printf 'enabled\n' >"$_FAKE_GATE_FILE"
   captured_status=0
   captured_output="$(run_svc "$@" 2>&1)" || captured_status=$?
+}
+
+# count_log <verb>: how many recorded invocations of that launchctl verb.
+count_log() { # <verb>
+  awk -v v="$1" '$1 == v { n++ } END { print n + 0 }' "$_tmp/launchctl.log"
+}
+
+# disable_before_bootout <label>: true when the gate write for that target
+# precedes its unload, which is the order a KeepAlive job needs. The logged
+# target carries its domain prefix, so the label is compared as a suffix.
+disable_before_bootout() { # <label>
+  awk -v t="$1" '
+    function is_target(field) { return substr(field, length(field) - length(t) + 1) == t }
+    $1 == "disable" && is_target($NF) && !d { d = NR }
+    $1 == "bootout" && is_target($NF) && !b { b = NR }
+    END { exit ((d && b && d < b) ? 0 : 1) }
+  ' "$_tmp/launchctl.log"
 }
 
 section 1 "Live instances"
@@ -202,9 +268,18 @@ assert_contains "the touched target is that instance" "$(cat "$_tmp/launchctl.lo
 : >"$_tmp/launchctl.log"
 run_cli disable cloud-drive
 assert_eq "aggregate action exits 0" 0 "$captured_status"
-assert_eq "aggregate action touches every live instance" 2 "$(wc -l <"$_tmp/launchctl.log" | tr -d ' ')"
+assert_eq "aggregate action writes the gate for every live instance" 2 "$(count_log disable)"
+assert_eq "aggregate action unloads every live instance" 2 "$(count_log bootout)"
 assert_contains "aggregate action covers the first instance" "$(cat "$_tmp/launchctl.log")" "local.cloud-mount.iCloud"
 assert_contains "aggregate action covers the second instance" "$(cat "$_tmp/launchctl.log")" "local.cloud-mount.OneDrive"
+for _instance in local.cloud-mount.iCloud local.cloud-mount.OneDrive; do
+  if disable_before_bootout "$_instance"; then
+    assert_pass "the gate for $_instance is written before its unload"
+  else
+    assert_fail "the gate for $_instance is written before its unload" \
+      "log=[$(tr '\n' ';' <"$_tmp/launchctl.log")]"
+  fi
+done
 
 section 3 "Zero instances"
 FAKE_LIVE=""

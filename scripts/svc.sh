@@ -687,8 +687,22 @@ svc_action() {
         }
       fi
       ;;
-    enable) $sudo_prefix launchctl enable "$target" >/dev/null 2>&1 ;;
-    disable) $sudo_prefix launchctl disable "$target" >/dev/null 2>&1 ;;
+    enable)
+      local _out=""
+      if ! _out=$(launchctl_service_enable "$target" "$sudo_prefix"); then
+        error "$name — launchctl enable failed: $_out"
+        return 1
+      fi
+      say "$name — enabled (not started; run 'nucleus-svc start $name' to start it)"
+      ;;
+    disable)
+      local _out=""
+      if ! _out=$(launchctl_service_disable "$target" "$sudo_prefix"); then
+        error "$name — launchctl disable failed: $_out"
+        return 1
+      fi
+      say "$name — disabled and unloaded"
+      ;;
     esac
     ;;
   nixos-systemctl)

@@ -102,6 +102,45 @@ launchctl_service_enabled() {
   printf 'unknown'
 }
 
+# Sets the disabled gate, then unloads the job and waits for it to be absent.
+# Prints launchctl's own output and returns 1 when either step fails.
+# WHY: `launchctl disable` writes a load-time gate and nothing else, so a running
+# KeepAlive job keeps running and the verb looks inert. The gate is set BEFORE the
+# bootout: a KeepAlive job respawns in the gap between an unload and the gate, and
+# the job is then left running under a gate that claims it is disabled. For the
+# same reason the unload is the bootout and never a SIGTERM, because launchd
+# restarts a job it killed.
+launchctl_service_disable() {
+  local target="$1" sudo_prefix="$2"
+  local out=""
+  if ! out=$($sudo_prefix launchctl disable "$target" 2>&1); then
+    printf '%s\n' "$out"
+    return 1
+  fi
+  # WHY: the unload helper owns the bootout and its version-specific flags, so it
+  # reports that step's outcome; the gate command above is the one that prints
+  # launchctl's own reason.
+  if ! launchctl_bootout_wait "$target" "$sudo_prefix"; then
+    printf '%s\n' "launchctl bootout did not unload $target"
+    return 1
+  fi
+  return 0
+}
+
+# Clears the disabled gate. Prints launchctl's own output and returns 1 on
+# failure. Never bootstraps and never starts.
+# WHY: `systemctl enable` and `Set-Service -StartupType Automatic` only set the
+# startup type, so enable means the same here and leaves loading to `start`.
+launchctl_service_enable() {
+  local target="$1" sudo_prefix="$2"
+  local out=""
+  if ! out=$($sudo_prefix launchctl enable "$target" 2>&1); then
+    printf '%s\n' "$out"
+    return 1
+  fi
+  return 0
+}
+
 # WHY: macOS 26+ unloads asynchronously, so a `bootstrap` issued right after `bootout` can fail with "Bootstrap failed: 5: Input/output error" while the job is still loaded, and the bootout that completes afterwards leaves the service unloaded and silent. Home Manager uses `launchctl bootout --wait` for the same reason; the poll covers older macOS, where --wait does not exist.
 launchctl_bootout_wait() {
   local target="$1" sudo_prefix="$2"
