@@ -10,7 +10,7 @@ alwaysApply: false
 ## POSIX (macOS + NixOS)
 
 - **Packages**: `rip2` via managedPackages (nixpkgs + Homebrew). `safe-rm` via bun global (`safe-rm` npm package, kaelzhang's shell-safe-rm).
-- **Interactive shells**: `rm()` function in `src/scripts/shell/init.zsh` prints an error and blocks. Aliases `del`, `rmdir` are not overridden (only `rm` is blocked interactively).
+- **Interactive shells**: `src/scripts/shell/init.zsh` defines blocking functions for `rm`, `del`, `rd`, `rmdir`, `erase`, `ri`, `unlink`, and `shred`; each prints an error and returns 1.
 - **Non-interactive shells**: Two defenses:
   1. `rm()` function in `.zshenv` (via `programs.zsh.envExtra`) delegates to `safe-rm`.
   2. `~/.local/bin/rm` wrapper script (via `home.file`) delegates to `safe-rm`. This is the reliable defense for `sh -c "rm ..."` and agent subshells because `~/.local/bin` is on the managed append PATH before system paths.
@@ -19,9 +19,8 @@ alwaysApply: false
 ## Windows
 
 - **Packages**: `rip2` via Scoop (`src/modules/scoop-manifests/rip2.json`). `clink` via WinGet DSC (`chrisant996.Clink`).
-- **PowerShell (pwsh)**: `Invoke-SafeDelete` function in `src/scripts/shell/profile.ps1` overrides `rm`, `del`, `rd`, `erase`, `ri`, `rmdir`, `unlink`, `shred`, `Remove-Item` on every host: on Windows it recycles through `[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile`/`DeleteDirectory` with `SendToRecycleBin`, on POSIX it delegates to `shell-safe-rm` and falls back to the original `Remove-Item` when `shell-safe-rm` is absent. Interactive sessions print a tip.
-- **cmd.exe**: Clink arrives from the WinGet DSC entry `chrisant996.Clink`, which puts command aliases in `%LOCALAPPDATA%\Microsoft\WinGet\Links`. `Sync-SafeDelete.ps1` writes the Lua filter (`src/platforms/Windows/modules/user/clink/safedel.lua`) to `%LOCALAPPDATA%\clink\safedel.lua`, rewriting `del`, `erase`, `rd`, `rmdir`, `rm` to `rip.exe`. The AutoRun injection runs only when `clink` resolves from the WinGet links directory, the Scoop shims directory, or PATH.
-- **cmd.exe without Clink**: the doskey AutoRun maps `del`, `erase`, `rd`, `rmdir`, `rm` to `rip.exe`.
+- **PowerShell (pwsh)**: `Invoke-SafeDelete` function in `src/scripts/shell/profile.ps1` overrides `rm`, `del`, `rd`, `erase`, `ri`, `rmdir`, `unlink`, `shred`, `Remove-Item` on every host: on Windows it recycles through `[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile`/`DeleteDirectory` with `SendToRecycleBin`, and targets that do not resolve to a filesystem item fall back to the original `Remove-Item`; on POSIX it delegates to `shell-safe-rm`, falling back to the original `Remove-Item` when `shell-safe-rm` is absent. Interactive Windows sessions print a tip.
+- **cmd.exe**: `Sync-SafeDelete.ps1` writes the Lua filter (`src/platforms/Windows/modules/user/clink/safedel.lua`) to `%LOCALAPPDATA%\clink\safedel.lua`, rewriting `del`, `erase`, `rd`, `rmdir`, `rm` to `rip.exe`. The AutoRun injection runs when `clink` resolves on PATH, and the doskey AutoRun maps `del`, `erase`, `rd`, `rmdir`, `rm` to `rip.exe` when it does not.
 - **Git Bash**: Alias `rm` to `rip` in `~/.bashrc` with interactive detection.
 - **PATH shims**: `Sync-SafeDelete.ps1` deploys copies of `rip.exe` as `rm.exe`, `del.exe`, `rd.exe`, `rmdir.exe`, `erase.exe`, `ri.exe` to `%USERPROFILE%\.local\bin` (on managed PATH). Also deploys to `<USER root>\bin`.
 

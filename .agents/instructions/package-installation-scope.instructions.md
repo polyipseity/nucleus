@@ -49,7 +49,9 @@ To change the blocked set: edit `initContent` in `src/modules/shell/default.nix`
 
 Declared once in `managedPackages` in `src/modules/core.nix`, alphabetically by name. `category: "cli"` installs from nixpkgs; `"gui"` means a Homebrew cask on macOS and nixpkgs on NixOS, so an app shipping a GUI component is `"gui"`.
 
-`platforms` gates a **carrier**, not a host: it filters only entries that carry a `nixpkgs` or `homebrew` block, so a Windows-only package is a WinGet id alone, with no `platforms` field and a one-line `# WinGet-only:` comment. An entry Homebrew installs still carries `nixpkgs` as its availability probe — `rectangle` has both `homebrew` and `nixpkgs` — and `core.nix` derives `missingNixPackageAttrs` from those probes, so an attribute missing for the current platform fails the registry assertion instead of disappearing from the build.
+`platforms` gates the `nixpkgs` and `homebrew` carriers and never filters a WinGet id: it applies only to entries that carry one of those blocks, so a Windows-only package carries `category` plus `winget`, with no carrier block, no `platforms` field, and a one-line `# WinGet-only:` comment. `core.nix` derives `missingNixPackageAttrs` from the `nixpkgs` attribute of the entries that carry one, so an attribute missing for the current platform fails the registry assertion instead of disappearing from the build.
+
+No entry may repeat a package that `managedPackages` already provides: `src/hosts/NixOS/desktop.nix` still installs `p7zip`, `gimp`, `pass`, and `qtpass` alongside their registry entries.
 
 An entry whose bare `nixpkgs` attr is not the derivation to deploy carries `nixpkgsPackage`, with `nixpkgs` still required as the availability probe. Never contribute a second derivation for the same binary: `buildEnv` collides on it, nix-darwin's `system-path` keeps the first, and Home Manager's `home-manager-path` refuses to build, so replace the entry instead (`pass` deploys `pkgs.pass.withExtensions (extensions: [ extensions.pass-otp ])`).
 
