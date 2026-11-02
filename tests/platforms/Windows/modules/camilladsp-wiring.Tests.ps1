@@ -51,8 +51,8 @@
     refusals gate on a loopback capture, so the boundary is also driven rather
     than only read: its function definitions are sourced from the parsed file and
     called with the state directory, the resolver's answer, and the request log
-    stubbed, which is the only way to see that a config that is not loopback
-    reaches a request at all.
+    stubbed, which is the only way this suite can see that a config that is not
+    loopback reaches a request at all.
 
 .NOTES
     Environment variables: (none)
@@ -546,7 +546,7 @@ devices:
         $script:requests.Count | Should -Be 1 -Because 'a capture that is not loopback cannot be the output a null playback device binds, so the config has to reach CamillaDSP'
         $pushedConfig = ($script:requests[0] | ConvertFrom-Json).SetConfig | ConvertFrom-Yaml
         $pushedConfig.devices.playback.device | Should -BeNullOrEmpty -Because 'the config keeps its null device so CamillaDSP binds its own default output'
-        @($script:refusals | Where-Object { $_.Cause -eq 'unknown-capture' }).Count | Should -Be 0
+        @($script:refusals | Where-Object { $_.Cause -eq 'unknown-capture' }).Count | Should -Be 0 -Because 'a refusal would have recorded a cause instead of reaching CamillaDSP'
     }
 
     It 'refuses a null-device loopback config that would bind the capture endpoint' {
@@ -565,8 +565,7 @@ devices:
         Send-CamillaDSPConfig -ConfigPath $configPath -TargetDevice '' -CaptureDevice 'Some Speakers' -EndpointPort 1 | Should -BeFalse
 
         $script:requests.Count | Should -Be 0 -Because 'a null playback device on a loopback config binds the system default output, which is the endpoint the loopback capture reads'
-        # The refusal keeps the resolver's own warning, so it records no cause here.
-        $script:refusals.Count | Should -Be 0
+        $script:refusals.Count | Should -Be 0 -Because 'the empty-device refusal keeps the resolver warning and records no cause of its own'
     }
 
     It 'refuses a loopback config whose capture endpoint is unresolved' {
@@ -585,6 +584,28 @@ devices:
         Send-CamillaDSPConfig -ConfigPath $configPath -TargetDevice '' -CaptureDevice '' -EndpointPort 1 | Should -BeFalse
 
         $script:requests.Count | Should -Be 0 -Because 'an unresolved loopback capture endpoint cannot be proven different from the device about to be pushed'
-        @($script:refusals | Where-Object { $_.Cause -eq 'unknown-capture' }).Count | Should -Be 1
+        @($script:refusals | Where-Object { $_.Cause -eq 'unknown-capture' }).Count | Should -Be 1 -Because 'the unresolved-endpoint refusal has to name its own reason'
+    }
+
+    # Both guards refuse this config, so only the recorded cause shows which one
+    # ran: swapping them, or lifting the unresolved-endpoint guard out of the
+    # loopback branch, records a cause the empty-device refusal does not.
+    It 'refuses an empty loopback playback device before the unresolved capture endpoint' {
+        $configPath = Join-Path -Path $TestDrive -ChildPath 'loopback-null-unresolved.yml'
+        Set-Content -LiteralPath $configPath -Value @'
+devices:
+  capture:
+    type: Wasapi
+    device: null
+    loopback: true
+  playback:
+    type: Wasapi
+    device: null
+'@
+
+        Send-CamillaDSPConfig -ConfigPath $configPath -TargetDevice '' -CaptureDevice '' -EndpointPort 1 | Should -BeFalse -Because 'the loopback capture endpoint is the output a null playback device would bind'
+
+        $script:requests.Count | Should -Be 0 -Because 'a self-feeding config reaches no request whichever guard refuses it'
+        $script:refusals.Count | Should -Be 0 -Because 'the empty-device guard runs first and keeps the resolver warning instead of recording a cause'
     }
 }

@@ -255,8 +255,9 @@ function Test-CamillaDSPNeedsPush {
     compare, and a push would only repeat the running config. While it is not
     Running the decision is a push whatever the target, so the initial config is
     delivered; Send-CamillaDSPConfig then refuses a loopback config whose
-    playback device is empty or is the capture endpoint, so a config that would
-    capture its own output never binds.
+    playback device is empty or is the capture endpoint, or whose capture
+    endpoint is unresolved, so a config that would capture its own output never
+    binds.
   .PARAMETER RunState
     Value of GetState.
   .PARAMETER LiveDevice
@@ -459,8 +460,10 @@ function Send-CamillaDSPConfig {
     from that output, and a playback device equal to the capture endpoint makes
     CamillaDSP capture its own output. A capture that is not loopback is pushed
     even with an empty playback device, because CamillaDSP then binds its own
-    default output and nothing feeds it back. A refusal that names a reason warns
-    once per reason; the empty-device refusal keeps the resolver's own warning.
+    default output and nothing feeds it back. The unresolved-endpoint and
+    capture-equals-playback refusals each name a reason and warn once per
+    reason; the empty-device refusal names none and keeps the resolver's own
+    warning.
   .PARAMETER EndpointPort
     CamillaDSP websocket API port.
   .PARAMETER ConfigPath
