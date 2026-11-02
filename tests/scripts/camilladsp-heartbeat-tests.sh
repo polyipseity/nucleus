@@ -424,8 +424,7 @@ CASES = {
 def main():
     name = sys.argv[1]
     if name not in CASES:
-        print(f"unknown case: {name}", file=sys.stderr)
-        return 2
+        sys.exit(f"unknown case: {name}")
     try:
         CASES[name]()
     except AssertionError as error:
