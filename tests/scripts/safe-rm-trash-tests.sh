@@ -288,6 +288,9 @@ verify_list_names_seed() { # <root>
   local _block
   _block="$(activation_block "$1" "verify-managed-symlink-paths")"
   [ -n "$_block" ] || return 1
+  # The ordering is half the claim: a membership-only check stays green when the
+  # entry is moved to entryBefore and the verify runs on the pre-seed state.
+  contains "$_block" 'entryAfter' || return 1
   contains "$_block" '"seed-safe-rm-config"'
 }
 

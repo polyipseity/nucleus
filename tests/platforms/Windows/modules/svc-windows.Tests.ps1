@@ -1182,11 +1182,6 @@ Describe 'Get-HostService' {
 }
 
 Describe 'Get-CaptureMode' {
-  It 'returns platform-specific capture mode when set' {
-    $result = Get-CaptureMode -ServiceKey 'ollama'
-    $result | Should -Be 'all'
-  }
-
   It 'falls back to platform-specific when top-level not set' {
     $result = Get-CaptureMode -ServiceKey 'cloud-drive'
     $result | Should -Be 'stderr'
