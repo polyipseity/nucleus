@@ -423,8 +423,6 @@ run_release_age_uniformity() {
 }
 
 run_upstream_workaround_staleness() {
-  # The spec array registers this sub-check as `ctx`, so the first argument is the
-  # caller's context, not the files-style has-args flag.
   local -n ctx="$1"
   local _repo_root="${ctx[REPO_ROOT]}"
   shift
