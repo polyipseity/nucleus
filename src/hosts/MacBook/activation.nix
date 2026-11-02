@@ -108,9 +108,10 @@ in
   # power.restartAfterPowerFailure = true;  # Keep the comment and keep it disabled.
 
   system.activationScripts.extraActivation.text = ''
-    # ---- ensure-macfuse-install-dirs -----------------------------------------------
-    # WHY: the macFUSE cask postflight sets ownership on both directories, so
-    # they must exist before the cask installs.
+    # ---- ensure-local-install-dirs -----------------------------------------------
+    # WHY: the source-built ntfs-3g consumes its fuse-t provider under /usr/local
+    # (lib/libfuse-t.dylib, include/fuse), so both parent directories are created
+    # here instead of relying on whatever installed the provider.
     /bin/mkdir -p /usr/local/include /usr/local/lib
 
     # ---- ensure-nucleus-roots ------------------------------------------------------

@@ -16,7 +16,7 @@ Top-level `properties` key with `configurationVersion: 0.2.0` and a `resources:`
 
 ## Resource groups and ordering
 
-Within a file: (1) packages (`Microsoft.WinGet.Client/Package`), (2) system settings (`Microsoft.Windows.Settings/*`), (3) registry (`Microsoft.Windows.Registry/*`), (4) environment variables (`Microsoft.Windows.Environment/*`), (5) script (`PSDscResources/Script`). Sort alphabetically inside each group by `settings.id` (packages) or `settings.valueName`/`settings.name` (others). Group integrity beats cross-type alphabetical ordering.
+Within a file: (1) packages (`Microsoft.WinGet.Client/Package`), (2) system settings (`Microsoft.Windows.Settings/*`), (3) registry (`Microsoft.Windows.Registry/*`), (4) environment variables (`Microsoft.Windows.Environment/*`), (5) script (`PSDscResources/Script`). Sort alphabetically, case-folded, inside each group by `settings.id` (packages) or `settings.valueName`/`settings.name` (others). Group integrity beats cross-type alphabetical ordering.
 
 ## Authoring rules
 
