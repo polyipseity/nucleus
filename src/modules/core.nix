@@ -134,12 +134,8 @@ let
       winget = "Google.ChromeRemoteDesktopHost";
     };
     clink = {
-      # WHY: Windows-only, and nixpkgs carries no `clink` attribute, so this entry
-      # has no nix carrier and no Homebrew formula. `platforms` keeps it out of
-      # the darwin nix list, matching how the other Windows-only entries declare
-      # themselves, and the WinGet id is the only provisioning surface.
+      # WinGet-only: no Homebrew cask exists and no nixpkgs attr; Windows installs via WinGet.
       category = "cli";
-      platforms = [ "linux" ];
       winget = "chrisant996.Clink";
     };
     cursor = {
