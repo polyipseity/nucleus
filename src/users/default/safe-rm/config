@@ -1,16 +1,15 @@
 # safe-rm configuration. Seeded to ~/.safe-rm/config as a writable symlink by
-# the seed-safe-rm-config activation entry in src/modules/home.nix.
+# the seed-safe-rm-config activation entry in src/modules/home.nix, and sourced
+# by safe-rm's bin/rm.sh, so it is read by every rm on this host.
 #
-# safe-rm sources $SAFE_RM_CONFIG when that file exists, and its default is
-# $HOME/.safe-rm/config (or $XDG_CONFIG_HOME/safe-rm/config when that directory
-# exists), so this file is read by every rm on this host.
+# WHY the opt-out is gated: under srt the sandbox denies appleevent-send, so the
+# osascript route aborts, while "~/.Trash" is write-allowed. safe-rm's mv path
+# is the one that works there, at the cost of naming the entry
+# "<name> HH.MM.SS.<ext>" with no undo metadata for Finder. Outside srt the
+# Finder route stays, so Finder "Put Back" survives.
 #
-# WHY AppleScript is off: under srt the sandbox denies appleevent-send, so the
-# osascript route fails and the delete aborts. With "no" here, safe-rm takes its
-# mv path into $HOME/.Trash, which needs only the write grant that
-# src/users/default/srt/settings.json already gives "~/.Trash".
-#
-# Cost: the mv path names the entry "<name> HH.MM.SS.<ext>" and writes no undo
-# metadata for Finder, so Finder "Put Back" is not guaranteed. The entry is
-# still in the Trash and still recoverable by dragging it out.
-export SAFE_RM_USE_APPLESCRIPT=no
+# The marker is SANDBOX_RUNTIME, which srt exports into every sandboxed child.
+# ref: sandbox-runtime dist/sandbox/sandbox-utils.js:619
+if [ -n "${SANDBOX_RUNTIME:-}" ]; then
+  export SAFE_RM_USE_APPLESCRIPT=no
+fi

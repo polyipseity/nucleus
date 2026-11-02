@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
 # Tests for the sandboxed Trash. Two facts have to hold together: the srt policy
-# write-allows ~/.Trash, and ~/.safe-rm/config sets SAFE_RM_USE_APPLESCRIPT=no
-# so safe-rm renames into that Trash with mv instead of scripting Finder. Either
-# fact alone leaves a sandboxed rm broken: the policy without the config keeps
-# the AppleScript route, which the sandbox blocks, and the config without the
-# policy makes the mv fallback fail on a Trash the sandbox cannot write. The
-# suite also checks the home.nix wiring, because a correct file at a path the
-# activation never seeds fixes nothing.
+# write-allows ~/.Trash, and ~/.safe-rm/config turns safe-rm's AppleScript route
+# off, so under the sandbox it renames into that Trash with mv instead of
+# scripting Finder. Either fact alone leaves a sandboxed rm broken: the policy
+# without the config keeps the AppleScript route, which the sandbox blocks, and
+# the config without the policy makes the mv fallback fail on a Trash the sandbox
+# cannot write. The suite also checks the home.nix wiring, because a correct file
+# at a path the activation never seeds fixes nothing.
+#
+# The opt-out is gated on SANDBOX_RUNTIME, the marker srt exports into every
+# sandboxed child, so it applies only where the Finder route is blocked and
+# Finder "Put Back" survives everywhere else. The suite therefore sources the
+# file twice, with the marker unset and set, and never inspects the file text: an
+# unconditional export passes the marked run and fails the unmarked one.
 #
 # home.nix is read as text, not evaluated. The wiring is three attribute-level
 # facts (the seed entry, the writable marking, the verify list), and those names
@@ -21,13 +27,16 @@
 # that cannot fail cannot vouch for anything, so the second run is what proves
 # the first one is not vacuous.
 #
-# The ordering family asserts case-sensitive byte order over the whole allowWrite
-# array, which is the only collation that is identical on every host: a
-# locale-dependent sort produces a different array on a different machine. That
-# assertion also covers a defect older than this suite: "~/dev" sat before
-# "~/Library/Application Support/nucleus", which byte order puts first because
-# "L" (0x4C) sorts before "d" (0x64). The same assertion would have caught that
-# edit when it landed, and it catches an entry appended at the end.
+# The ordering family asserts case-sensitive byte order over three arrays:
+# filesystem.allowWrite, filesystem.denyWrite, and ignoreViolations."*". Byte
+# order is the only collation that is identical on every host, since a
+# locale-dependent sort produces a different array on a different machine. An
+# array that lost its entries would sort cleanly, so each ordering assertion is
+# paired with a presence check for an entry the array has to hold. Three
+# misorderings existed when this family landed: "~/dev" before
+# "~/Library/Application Support/nucleus" ("L" is 0x4C, "d" is 0x64),
+# "~/.zprofile" after "~/.zshenv", and "/System" after "/private/var" ("S" is
+# 0x53, below every lowercase initial).
 # shellcheck disable=SC2329 # reason: the fact predicates below are dispatched indirectly through expect and expect_failure, which shellcheck cannot follow.
 set -euo pipefail
 
@@ -45,6 +54,12 @@ HOME_NIX_REL="src/modules/home.nix"
 # The Trash path srt matches. Escaped so the shell keeps the literal tilde: an
 # unescaped one would expand to this shell's HOME and match nothing.
 TRASH_ENTRY=\~/.Trash
+# The entry the denyWrite fix moved. Escaped for the same reason as TRASH_ENTRY.
+ZPROFILE_ENTRY=\~/.zprofile
+# jq paths to the three srt arrays whose order this suite holds to byte order.
+ALLOW_WRITE='.filesystem.allowWrite'
+DENY_WRITE='.filesystem.denyWrite'
+IGNORE_VIOLATIONS='.ignoreViolations."*"'
 # Home Manager expressions matched against the Nix source text. The dollar signs
 # are escaped for the same reason: expanding them here would compare this
 # shell's HOME against text that holds the expression.
@@ -196,35 +211,47 @@ symlink_entry() { # <root>
   awk -v want="$SAFE_RM_ENTRY_PATH" -v drop="" "$_ENTRY_AWK" "$_home"
 }
 
-trash_is_write_allowed() { # <root>
+# entry_listed_once <root> <jq-path> <entry>: the array holds that entry exactly
+# once. An array that never held it would sort fine and say nothing about where
+# the entry belongs.
+entry_listed_once() { # <root> <jq-path> <entry>
   local _settings _count
   _settings="$(overlay_resolve "$1" "srt" "settings.json")" || return 1
-  _count="$(jq -r --arg trash "$TRASH_ENTRY" '[.filesystem.allowWrite[] | select(. == $trash)] | length' "$_settings")" || return 1
+  _count="$(jq -r --arg entry "$3" "[$2[] | select(. == \$entry)] | length" "$_settings")" || return 1
   [ "$_count" = "1" ]
 }
 
-allow_write_is_sorted() { # <root>
+array_is_byte_sorted() { # <root> <jq-path>
   local _settings _listed _sorted
-  # The entry has to be present as well: an array that never held it would sort
-  # fine and say nothing about where it belongs.
-  trash_is_write_allowed "$1" || return 1
   _settings="$(overlay_resolve "$1" "srt" "settings.json")" || return 1
-  _listed="$(jq -r '.filesystem.allowWrite[]' "$_settings")" || return 1
+  _listed="$(jq -r "$2[]" "$_settings")" || return 1
   [ -n "$_listed" ] || return 1
   _sorted="$(printf '%s\n' "$_listed" | LC_ALL=C sort)" || return 1
   [ "$_listed" = "$_sorted" ]
 }
 
-# The directive text is asserted as well as the sourced value: safe-rm sources
-# the file, so the value is what matters, and a second non-comment line would be
-# a second directive nobody reviewed. The file carries comments only otherwise.
-config_disables_applescript() { # <root>
-  local _config _effective _value
+# sourced_applescript_value <config> <sandbox-marker>: print the value safe-rm
+# would read from the config, sourcing it in a bash with SANDBOX_RUNTIME cleared
+# and then set to the marker when one is given. Clearing first is what makes the
+# unmarked case the real host case: this suite itself runs inside srt, where the
+# marker is already exported.
+sourced_applescript_value() { # <config> <sandbox-marker>
+  bash -c 'unset SAFE_RM_USE_APPLESCRIPT SANDBOX_RUNTIME; if [ -n "$2" ]; then export SANDBOX_RUNTIME="$2"; fi; . "$1"; printf "%s" "${SAFE_RM_USE_APPLESCRIPT-}"' _ "$1" "$2"
+}
+
+config_leaves_applescript_unset() { # <root>
+  local _config _value
   _config="$(overlay_resolve "$1" "safe-rm" "config")" || return 1
   [ -f "$_config" ] || return 1
-  _effective="$(grep -vE '^[[:space:]]*(#|$)' "$_config")" || return 1
-  [ "$_effective" = "export SAFE_RM_USE_APPLESCRIPT=no" ] || return 1
-  _value="$(bash -c 'unset SAFE_RM_USE_APPLESCRIPT; . "$1"; printf "%s" "${SAFE_RM_USE_APPLESCRIPT-}"' _ "$_config")" || return 1
+  _value="$(sourced_applescript_value "$_config" "")" || return 1
+  [ -z "$_value" ]
+}
+
+config_sets_applescript_no_in_sandbox() { # <root>
+  local _config _value
+  _config="$(overlay_resolve "$1" "safe-rm" "config")" || return 1
+  [ -f "$_config" ] || return 1
+  _value="$(sourced_applescript_value "$_config" 1)" || return 1
   [ "$_value" = "no" ]
 }
 
@@ -285,15 +312,27 @@ settings_without_trash() { # <src-root> <dest-root>
   fi
 }
 
-settings_with_trash_appended() { # <src-root> <dest-root>
+# settings_with_entry_appended <src-root> <dest-root> <jq-path> <entry>: move
+# that entry to the end of its array. The entry stays listed once, so only the
+# order changes and the twin proves the order check rather than the presence
+# check. For denyWrite this is also the exact shape the fix corrected.
+settings_with_entry_appended() { # <src-root> <dest-root> <jq-path> <entry>
   if [ -f "$1/$SETTINGS_REL" ]; then
-    jq --arg trash "$TRASH_ENTRY" '.filesystem.allowWrite |= (map(select(. != $trash)) + [$trash])' "$1/$SETTINGS_REL" >"$2/$SETTINGS_REL"
+    jq --arg entry "$4" "$3 |= (map(select(. != \$entry)) + [\$entry])" "$1/$SETTINGS_REL" >"$2/$SETTINGS_REL"
   fi
 }
 
-config_without_directive() { # <src-root> <dest-root>
+# config_without_gate <src-root> <dest-root>: drop the gate and its closing `fi`,
+# leaving the bare export. The `fi` goes too because a lone one is a syntax error,
+# and a copy that cannot be sourced would fail both source checks for the wrong
+# reason.
+config_without_gate() { # <src-root> <dest-root>
   if [ -f "$1/$CONFIG_REL" ]; then
-    grep -v '^export SAFE_RM_USE_APPLESCRIPT=no$' "$1/$CONFIG_REL" >"$2/$CONFIG_REL"
+    awk '
+      $0 == "if [ -n \"${SANDBOX_RUNTIME:-}\" ]; then" { next }
+      $0 == "fi" { next }
+      { print }
+    ' "$1/$CONFIG_REL" >"$2/$CONFIG_REL"
   fi
 }
 
@@ -339,29 +378,46 @@ expect_removal() { # <name> <fixture-root> <relative-path> <removed-lines>
 
 section 1 "the srt policy write-allows the Trash"
 
-expect "$TRASH_ENTRY is listed once in filesystem.allowWrite" trash_is_write_allowed "$REPO_ROOT"
+expect "$TRASH_ENTRY is listed once in filesystem.allowWrite" entry_listed_once "$REPO_ROOT" "$ALLOW_WRITE" "$TRASH_ENTRY"
 copy_fixture "$_tmp/no-trash"
 settings_without_trash "$REPO_ROOT" "$_tmp/no-trash"
-assert_eq "0" "$(jq -r --arg trash "$TRASH_ENTRY" '[.filesystem.allowWrite[] | select(. == $trash)] | length' "$_tmp/no-trash/$SETTINGS_REL")" \
+assert_eq "0" "$(jq -r --arg entry "$TRASH_ENTRY" "[${ALLOW_WRITE}[] | select(. == \$entry)] | length" "$_tmp/no-trash/$SETTINGS_REL")" \
   "the no-trash copy really lost the entry"
-expect_failure "anti-vacuity: without the ~/.Trash entry the write check fails" trash_is_write_allowed "$_tmp/no-trash"
+expect_failure "anti-vacuity: without the ~/.Trash entry the write check fails" entry_listed_once "$_tmp/no-trash" "$ALLOW_WRITE" "$TRASH_ENTRY"
 
-section 2 "allowWrite keeps case-sensitive byte order"
+section 2 "the srt arrays keep case-sensitive byte order"
 
-expect "filesystem.allowWrite is sorted case-sensitively" allow_write_is_sorted "$REPO_ROOT"
+expect "filesystem.allowWrite is sorted case-sensitively" array_is_byte_sorted "$REPO_ROOT" "$ALLOW_WRITE"
 copy_fixture "$_tmp/trash-appended"
-settings_with_trash_appended "$REPO_ROOT" "$_tmp/trash-appended"
-assert_eq "$TRASH_ENTRY" "$(jq -r '.filesystem.allowWrite[-1]' "$_tmp/trash-appended/$SETTINGS_REL")" \
+settings_with_entry_appended "$REPO_ROOT" "$_tmp/trash-appended" "$ALLOW_WRITE" "$TRASH_ENTRY"
+assert_eq "$TRASH_ENTRY" "$(jq -r "${ALLOW_WRITE}[-1]" "$_tmp/trash-appended/$SETTINGS_REL")" \
   "the appended copy really ends with ~/.Trash"
-expect_failure "anti-vacuity: an appended ~/.Trash breaks the order check" allow_write_is_sorted "$_tmp/trash-appended"
+expect_failure "anti-vacuity: an appended ~/.Trash breaks the allowWrite order check" array_is_byte_sorted "$_tmp/trash-appended" "$ALLOW_WRITE"
 
-section 3 "safe-rm is told to skip AppleScript"
+expect "$ZPROFILE_ENTRY is listed once in filesystem.denyWrite" entry_listed_once "$REPO_ROOT" "$DENY_WRITE" "$ZPROFILE_ENTRY"
+expect "filesystem.denyWrite is sorted case-sensitively" array_is_byte_sorted "$REPO_ROOT" "$DENY_WRITE"
+copy_fixture "$_tmp/zprofile-appended"
+settings_with_entry_appended "$REPO_ROOT" "$_tmp/zprofile-appended" "$DENY_WRITE" "$ZPROFILE_ENTRY"
+assert_eq "$ZPROFILE_ENTRY" "$(jq -r "${DENY_WRITE}[-1]" "$_tmp/zprofile-appended/$SETTINGS_REL")" \
+  "the appended copy really ends with $ZPROFILE_ENTRY"
+expect_failure "anti-vacuity: an appended ~/.zprofile breaks the denyWrite order check" array_is_byte_sorted "$_tmp/zprofile-appended" "$DENY_WRITE"
 
-expect "sourcing the config yields SAFE_RM_USE_APPLESCRIPT=no" config_disables_applescript "$REPO_ROOT"
-copy_fixture "$_tmp/no-directive"
-config_without_directive "$REPO_ROOT" "$_tmp/no-directive"
-expect_removal "the no-directive copy lost exactly the export line" "$_tmp/no-directive" "$CONFIG_REL" 1
-expect_failure "anti-vacuity: without the directive the sourced value check fails" config_disables_applescript "$_tmp/no-directive"
+expect "/System is listed once in ignoreViolations.\"*\"" entry_listed_once "$REPO_ROOT" "$IGNORE_VIOLATIONS" '/System'
+expect "ignoreViolations.\"*\" is sorted case-sensitively" array_is_byte_sorted "$REPO_ROOT" "$IGNORE_VIOLATIONS"
+copy_fixture "$_tmp/system-appended"
+settings_with_entry_appended "$REPO_ROOT" "$_tmp/system-appended" "$IGNORE_VIOLATIONS" '/System'
+assert_eq '/System' "$(jq -r "${IGNORE_VIOLATIONS}[-1]" "$_tmp/system-appended/$SETTINGS_REL")" \
+  "the appended copy really ends with /System"
+expect_failure "anti-vacuity: an appended /System breaks the ignoreViolations order check" array_is_byte_sorted "$_tmp/system-appended" "$IGNORE_VIOLATIONS"
+
+section 3 "safe-rm is told to skip AppleScript only inside the sandbox"
+
+expect "sourcing the config without SANDBOX_RUNTIME leaves SAFE_RM_USE_APPLESCRIPT unset" config_leaves_applescript_unset "$REPO_ROOT"
+expect "sourcing the config with SANDBOX_RUNTIME=1 sets SAFE_RM_USE_APPLESCRIPT=no" config_sets_applescript_no_in_sandbox "$REPO_ROOT"
+copy_fixture "$_tmp/no-gate"
+config_without_gate "$REPO_ROOT" "$_tmp/no-gate"
+expect_removal "the no-gate copy lost exactly the gate and its fi" "$_tmp/no-gate" "$CONFIG_REL" 2
+expect_failure "anti-vacuity: without the gate the unmarked source sets the variable" config_leaves_applescript_unset "$_tmp/no-gate"
 
 section 4 "the activation selector resolves to a real file"
 

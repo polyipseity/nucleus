@@ -59,19 +59,19 @@
       "~/.gnupg/pubring.gpg",
       "~/.gnupg/pubring.kbx",
       "~/.gnupg/trustdb.gpg",
-      "~/.zshenv",
       "~/.zprofile",
+      "~/.zshenv",
       "~/.zshrc"
     ]
   },
   "ignoreViolations": {
     "*": [
+      "/System",
       "/etc/hosts",
       "/etc/ssl",
       "/nix/store",
       "/private/tmp",
       "/private/var",
-      "/System",
       "/tmp",
       "/usr/bin",
       "/usr/lib",
