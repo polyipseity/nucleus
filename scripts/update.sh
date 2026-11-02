@@ -121,10 +121,10 @@ do_update() {
     _last_modified=$(jq -r '.nodes.nixpkgs_4.locked.lastModified // .nodes.nixpkgs.locked.lastModified // 0' "$_lock" 2>/dev/null || echo 0)
     local _now
     _now=$(date +%s)
-    local _age=$(( _now - _last_modified ))
+    local _age=$((_now - _last_modified))
     if [ "$_age" -lt "$_threshold" ]; then
-      local _days=$(( _age / 86400 ))
-      local _min_days=$(( _threshold / 86400 ))
+      local _days=$((_age / 86400))
+      local _min_days=$((_threshold / 86400))
       error "nixpkgs guard: pinned commit is ${_days}d old, minimum is ${_min_days}d. Use --force to bypass."
       return 1
     fi
@@ -139,8 +139,8 @@ do_update() {
     local _threshold
     _threshold=$(jq -r '.nixpkgs.minimumReleaseAge // 1209600' "$_ra_json" 2>/dev/null || echo 1209600)
     local _cutoff
-    _cutoff=$(date -u -d "@$(( $(date +%s) - _threshold ))" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
-      || date -u -v-${_threshold}S +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
+    _cutoff=$(date -u -d "@$(($(date +%s) - _threshold))" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null ||
+      date -u -v-${_threshold}S +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
     local _sha
     _sha=$(curl -s "https://api.github.com/repos/NixOS/nixpkgs/commits?sha=nixos-unstable&until=${_cutoff}&per_page=1" 2>/dev/null | jq -r '.[0].sha // empty')
     if [ -z "$_sha" ]; then

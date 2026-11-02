@@ -404,7 +404,7 @@ run_release_age_uniformity() {
   local _uv_seconds
   _uv_seconds=$(jq -r '.uv.minimumReleaseAge' "$_ra_json" 2>/dev/null)
   if [ -n "$_uv_seconds" ] && [ "$_uv_seconds" != "null" ]; then
-    local _uv_days=$(( _uv_seconds / 86400 ))
+    local _uv_days=$((_uv_seconds / 86400))
     local _uv_expected="P${_uv_days}D"
     if [ -f "src/users/default/uv/uv.toml" ]; then
       local _uv_file_val
@@ -444,7 +444,7 @@ run_upstream_workaround_staleness() {
       error "upstream workarounds registry references missing path: $_p"
       _errors=1
     fi
-  done <<< "$_paths"
+  done <<<"$_paths"
   if [ "$_errors" -ne 0 ]; then
     return 1
   fi

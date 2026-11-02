@@ -42,7 +42,7 @@ find "$REPO_ROOT" \
   -path "$REPO_ROOT/.direnv" -prune -o \
   -path "$REPO_ROOT/vendor" -prune -o \
   \( -name result -o -name 'result-*' \) \
-  -print0 2>/dev/null > "$_cnba_list" || true # check-suppress:suppression_doc: find returns non-zero when -prune skips dirs; || true prevents set -e abort
+  -print0 2>/dev/null >"$_cnba_list" || true # check-suppress:suppression_doc: find returns non-zero when -prune skips dirs; || true prevents set -e abort
 
 # find without -L, so the scan never traverses into the store.
 while IFS= read -r -d '' _cnba_path; do
@@ -59,7 +59,7 @@ while IFS= read -r -d '' _cnba_path; do
   else
     warn "found non-symlink at $_cnba_path — skipping (not a Nix build artifact)"
   fi
-done < "$_cnba_list"
+done <"$_cnba_list"
 
 rm -f "$_cnba_list"
 

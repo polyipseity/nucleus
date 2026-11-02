@@ -189,8 +189,7 @@ let
   # entry from every darwin list, the Homebrew ones included, because
   # `managedPackagePlatformCompatible` gates them all, so the marker is owed
   # only where nothing else carries darwin.
-  homebrewRoutedOnDarwin =
-    name: lib.hasInfix "category = \"gui\"" (entryBlocks.${name} or "");
+  homebrewRoutedOnDarwin = name: lib.hasInfix "category = \"gui\"" (entryBlocks.${name} or "");
   flakeText = builtins.readFile ../../src/flake.nix;
   darwinCarriedElsewhere =
     name:
