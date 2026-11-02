@@ -254,9 +254,9 @@ function Test-CamillaDSPNeedsPush {
     A null target is skipped while CamillaDSP is Running: there is no device to
     compare, and a push would only repeat the running config. While it is not
     Running the decision is a push whatever the target, so the initial config is
-    delivered; Send-CamillaDSPConfig then refuses a config whose playback device
-    is empty or is the loopback capture endpoint, so an unusable topology never
-    binds.
+    delivered; Send-CamillaDSPConfig then refuses a loopback config whose
+    playback device is empty or is the capture endpoint, so a config that would
+    capture its own output never binds.
   .PARAMETER RunState
     Value of GetState.
   .PARAMETER LiveDevice
@@ -453,11 +453,14 @@ function Send-CamillaDSPConfig {
     measured is the device that gets pushed. State is recorded only after
     CamillaDSP answers "Ok"; a rejection drops the device cache, because the
     resolved device is probably gone even though the cache still lists it. A
-    config is never pushed onto a device it would feed from: an empty playback
-    device binds the system default output, an unresolved capture endpoint
-    cannot be proven different from that output, and a playback device equal to
-    the capture endpoint makes CamillaDSP capture its own output. Each refusal
-    warns once per reason.
+    loopback capture is never pushed onto a device it would feed from: an empty
+    playback device binds the system default output, which is the loopback
+    capture endpoint, an unresolved capture endpoint cannot be proven different
+    from that output, and a playback device equal to the capture endpoint makes
+    CamillaDSP capture its own output. A capture that is not loopback is pushed
+    even with an empty playback device, because CamillaDSP then binds its own
+    default output and nothing feeds it back. A refusal that names a reason warns
+    once per reason; the empty-device refusal keeps the resolver's own warning.
   .PARAMETER EndpointPort
     CamillaDSP websocket API port.
   .PARAMETER ConfigPath
@@ -494,17 +497,21 @@ function Send-CamillaDSPConfig {
 
   $pushedConfig = $yaml | ConvertFrom-Yaml
   $pushedDevice = [string]$pushedConfig.devices.playback.device
-  # WHY: without a playback device CamillaDSP binds the system default output,
-  # which is the loopback capture endpoint here, so a push would feed the output
-  # back as input. The resolver has already warned about the cause.
-  if ([string]::IsNullOrEmpty($pushedDevice)) {
-    return $false
-  }
 
   # WHY: the capture endpoint is the one device playback has to avoid, and the
   # comparison uses the endpoint the tick resolved. Resolving it again here could
-  # observe a different default and prove nothing.
+  # observe a different default and prove nothing. Only a loopback capture reads
+  # a render endpoint, so only then can playback be pointed back into it; a
+  # capture with a capture-side device of its own cannot be what a null playback
+  # device binds, and CamillaDSP resolves that null to its own default output.
   if ($pushedConfig.devices.capture.loopback -eq $true) {
+    # WHY: an empty playback device makes CamillaDSP bind the system default
+    # output, which is the loopback capture endpoint whenever capture is that
+    # loopback, so only then would the config feed its own output back as input.
+    # The resolver has already warned about the cause.
+    if ([string]::IsNullOrEmpty($pushedDevice)) {
+      return $false
+    }
     if ([string]::IsNullOrEmpty($CaptureDevice)) {
       Write-CamillaDSPPushRefusalWarning -Cause 'unknown-capture' -Message 'not pushing: the loopback capture endpoint is unresolved because no default playback endpoint was found, so playback cannot be proven different from it'
       return $false

@@ -47,7 +47,12 @@
     must compare against its -CaptureDevice argument, refuse the three ways a
     push can feed the output back in, and never resolve the endpoint itself. A
     second resolution could observe a different system default than the one the
-    tick used, which would make the comparison prove nothing.
+    tick used, which would make the comparison prove nothing. Those three
+    refusals gate on a loopback capture, so the boundary is also driven rather
+    than only read: its function definitions are sourced from the parsed file and
+    called with the state directory, the resolver's answer, and the request log
+    stubbed, which is the only way to see that a config that is not loopback
+    reaches a request at all.
 
 .NOTES
     Environment variables: (none)
@@ -471,5 +476,115 @@ Describe 'Windows CamillaDSP statefile wiring' {
         $expected = '$' + $script:captureObservationVariable
         $script:tickCaptureArgumentValues.Count | Should -Be 1 -Because "every capture-taking call in the tick has to pass one observation, got: $($script:tickCaptureArgumentValues -join ', ')"
         $script:tickCaptureArgumentValues[0] | Should -Be $expected
+    }
+}
+
+Describe 'Windows CamillaDSP push gate' {
+    BeforeAll {
+        $script:deviceSelectPath = Join-Path -Path $PSScriptRoot -ChildPath '../../../../src/scripts/services/camilladsp-deviceselect.ps1'
+        $script:heartbeatPath = Join-Path -Path $PSScriptRoot -ChildPath '../../../../src/scripts/services/camilladsp-heartbeat.ps1'
+
+        # The push boundary is driven rather than only read, because the fix is
+        # about which configs reach a request. Only the function definitions are
+        # sourced: the heartbeat's tick loop lives at top level, so dot-sourcing
+        # the file would never return.
+        $tokens = $null
+        $parseErrors = $null
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($script:heartbeatPath, [ref]$tokens, [ref]$parseErrors)
+        if ($parseErrors) {
+            throw "camilladsp-heartbeat.ps1 does not parse: $($parseErrors[0].Message)"
+        }
+
+        $definitions = @($ast.FindAll(
+            { $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] },
+            $true
+        ))
+        . ([scriptblock]::Create(($definitions | ForEach-Object { $_.Extent.Text }) -join "`n"))
+
+        # The state helpers the boundary records through, so the record is real
+        # and lands in the temporary state directory the tests mock.
+        . $script:deviceSelectPath
+    }
+
+    BeforeEach {
+        $script:requests = @()
+        $script:refusals = @()
+        $script:stateDir = Join-Path -Path $TestDrive -ChildPath 'camilladsp-state'
+        New-Item -ItemType Directory -Path $script:stateDir -Force > $null
+
+        # The three things outside the boundary: the state directory, the
+        # resolver's answer, and the request log. Everything else runs shipped.
+        Mock Get-CamillaDSPStateDir { $script:stateDir }
+        # An empty -TargetDevice is what the tick passes when the resolver found
+        # no device, so the mock returns the config unchanged, as the resolver
+        # does in that case.
+        Mock Resolve-CamillaDSPPlaybackDevice { Get-Content -Raw -LiteralPath $ConfigPath }
+        Mock Invoke-CamillaDSPRequest {
+            $script:requests += $Payload
+            return @{ SetConfig = @{ result = 'Ok' } }
+        }
+        Mock Write-CamillaDSPPushRefusalWarning {
+            $script:refusals += [pscustomobject]@{ Cause = $Cause; Message = $Message }
+        }
+    }
+
+    It 'pushes a null-device config when capture is not loopback' {
+        $configPath = Join-Path -Path $TestDrive -ChildPath 'nonloopback.yml'
+        Set-Content -LiteralPath $configPath -Value @'
+devices:
+  capture:
+    type: Wasapi
+    device: "Some Microphone"
+    loopback: false
+  playback:
+    type: Wasapi
+    device: null
+'@
+
+        Send-CamillaDSPConfig -ConfigPath $configPath -TargetDevice '' -CaptureDevice 'Some Microphone' -EndpointPort 1 | Should -BeTrue
+
+        $script:requests.Count | Should -Be 1 -Because 'a capture that is not loopback cannot be the output a null playback device binds, so the config has to reach CamillaDSP'
+        $pushedConfig = ($script:requests[0] | ConvertFrom-Json).SetConfig | ConvertFrom-Yaml
+        $pushedConfig.devices.playback.device | Should -BeNullOrEmpty -Because 'the config keeps its null device so CamillaDSP binds its own default output'
+        @($script:refusals | Where-Object { $_.Cause -eq 'unknown-capture' }).Count | Should -Be 0
+    }
+
+    It 'refuses a null-device loopback config that would bind the capture endpoint' {
+        $configPath = Join-Path -Path $TestDrive -ChildPath 'loopback-null.yml'
+        Set-Content -LiteralPath $configPath -Value @'
+devices:
+  capture:
+    type: Wasapi
+    device: null
+    loopback: true
+  playback:
+    type: Wasapi
+    device: null
+'@
+
+        Send-CamillaDSPConfig -ConfigPath $configPath -TargetDevice '' -CaptureDevice 'Some Speakers' -EndpointPort 1 | Should -BeFalse
+
+        $script:requests.Count | Should -Be 0 -Because 'a null playback device on a loopback config binds the system default output, which is the endpoint the loopback capture reads'
+        # The refusal keeps the resolver's own warning, so it records no cause here.
+        $script:refusals.Count | Should -Be 0
+    }
+
+    It 'refuses a loopback config whose capture endpoint is unresolved' {
+        $configPath = Join-Path -Path $TestDrive -ChildPath 'loopback-unresolved.yml'
+        Set-Content -LiteralPath $configPath -Value @'
+devices:
+  capture:
+    type: Wasapi
+    device: null
+    loopback: true
+  playback:
+    type: Wasapi
+    device: "Some Speakers"
+'@
+
+        Send-CamillaDSPConfig -ConfigPath $configPath -TargetDevice '' -CaptureDevice '' -EndpointPort 1 | Should -BeFalse
+
+        $script:requests.Count | Should -Be 0 -Because 'an unresolved loopback capture endpoint cannot be proven different from the device about to be pushed'
+        @($script:refusals | Where-Object { $_.Cause -eq 'unknown-capture' }).Count | Should -Be 1
     }
 }
