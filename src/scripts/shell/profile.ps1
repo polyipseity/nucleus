@@ -116,9 +116,12 @@ function Invoke-SafeDelete {
 
     if ($isInteractive -and $allFilesystem) {
       # WHY: Write-Information needs no host object and stays suppressible; $PSStyle
-      # is an automatic variable in pwsh 7.2+, so the colour costs no import.
+      # is an automatic variable in pwsh 7.2+, so the colour costs no import. The
+      # gate mirrors the shared helpers: non-empty NO_COLOR wins, and colour also
+      # needs a VT-capable terminal with stdout not redirected.
       $tip = '[SafeDelete] Routed to Recycle Bin. Tip: use rip for instant undo.'
-      if (Test-Path Variable:PSStyle) {
+      if ((Test-Path Variable:PSStyle) -and (-not $env:NO_COLOR) -and
+        $Host.UI.SupportsVirtualTerminal -and (-not [Console]::IsOutputRedirected)) {
         $tip = "$($PSStyle.Foreground.Cyan)$tip$($PSStyle.Reset)"
       }
       Write-Information -MessageData $tip -InformationAction Continue

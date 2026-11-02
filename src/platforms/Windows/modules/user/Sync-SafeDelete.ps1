@@ -34,10 +34,15 @@ function Resolve-ClinkCommand {
     Resolve the Clink executable from PATH, or return $null when it is absent.
 
   .DESCRIPTION
-    Clink comes from the WinGet DSC entry chrisant996.Clink, whose nullsoft
-    installer declares no Commands, so WinGet creates no link shim and PATH is
-    the whole search. That installer registers both clink and clink_x64, so
-    clink is tried first, clink_x64 second, and the first match wins.
+    Clink comes from the WinGet DSC entry chrisant996.Clink in
+    src\hosts\Windows\system\packages.dsc.yml. Nothing in this repo adds a PATH
+    entry for Clink, so whatever Clink's own installer put on PATH is the whole
+    search: the probe is a best-effort presence check, not a guarantee, and a
+    miss only costs the clink inject AutoRun and the Lua filter hook.
+
+    Binary names, from the v1.9.35 release archive: clink.bat, clink_x64.exe,
+    clink_x86.exe, clink_arm64.exe, and no clink.exe. So clink (which resolves
+    to clink.bat) is tried first, clink_x64 second, and the first match wins.
 
   .OUTPUTS
     System.String. The resolved path, or $null when Clink is absent.
@@ -154,7 +159,9 @@ function Sync-SafeDelete {
   $doskeyContent = "@echo off`r`ndoskey del=rip.exe `$*`r`ndoskey erase=rip.exe `$*`r`ndoskey rd=rip.exe `$*`r`ndoskey rmdir=rip.exe `$*`r`ndoskey rm=rip.exe `$*`r`n"
   Set-Content -Path $doskeyCmd -Value $doskeyContent -Force
 
-  # Register doskey fallback in AutoRun (if clink inject not already there)
+  # Register the doskey AutoRun unconditionally: clink may be absent, and a
+  # clink that is present may still not load the Lua filter, so cmd.exe needs
+  # this mapping either way. The cmd_aliases guard keeps re-runs idempotent.
   $autoRunKey = "HKCU:\Software\Microsoft\Command Processor"
   # check-suppress:suppression_doc: AutoRun value may not exist yet.
   $current = (Get-ItemProperty -Path $autoRunKey -Name AutoRun -ErrorAction SilentlyContinue).AutoRun
