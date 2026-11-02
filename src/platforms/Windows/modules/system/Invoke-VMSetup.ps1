@@ -11,6 +11,7 @@
   PROCESSOR_ARCHITECTURE (WHPX auto-detection).
 #>
 . (Join-Path $PSScriptRoot 'Get-VMGuestSshPublicKey.ps1')
+
 function Wait-GuestReady {
   <#
   .SYNOPSIS
@@ -32,6 +33,7 @@ function Wait-GuestReady {
     )
 
     $pipe = "\\.\pipe\qga-$VmId"
+    # Its own loop rather than a shared waiter: a 5s guest-agent cadence, as in vm_wait_for_guest (src/scripts/lib/vm.sh), which keeps its body too.
     $timer = [System.Diagnostics.Stopwatch]::StartNew()
     while ($timer.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
         try {
@@ -1566,6 +1568,7 @@ function Invoke-FidoWindowsIso {
     try {
         $maxAttempts = $Retries + 1
         $attempt = 1
+        # Its own loop rather than a shared waiter: attempt-bounded retry with exponential backoff, like run_with_backoff (src/scripts/lib/vm.sh).
         while ($attempt -le $maxAttempts) {
             Push-Location $tmpDir
             try {
@@ -1693,6 +1696,7 @@ function Invoke-BuildWindowsImage {
             $maxAttempts = $WindowsIsoRetries + 1
             $attempt = 1
             $downloadOk = $false
+            # Its own loop rather than a shared waiter: attempt-bounded retry with exponential backoff, like run_with_backoff (src/scripts/lib/vm.sh).
             while ($attempt -le $maxAttempts) {
                 & curl.exe -fL -o $cachedIso $WindowsIsoUrl
                 if ($LASTEXITCODE -eq 0) {
