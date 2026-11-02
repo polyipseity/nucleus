@@ -2,7 +2,7 @@
 # shellcheck source=../check-lib.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "nix-flake-eval" "Nix flake evaluation" run_nix_flake_eval posix any none
+register_step "nix-flake-eval" "Nix flake evaluation and managed config keys" run_nix_flake_eval posix any none
 
 run_nix_flake_eval() {
   local -n ctx="$1"
@@ -79,7 +79,88 @@ run_nix_flake_eval() {
     say "0 Nix files in scope — nothing to evaluate."
   fi
 
+  # WHY: the keys are validated in every mode, because this reads a config file
+  # rather than the flake and a scoped run must not be able to skip it (the same
+  # always-run rule step 05 follows). The file is consumed only where it is
+  # deployed, so its keys are judged by the nix that reads it, not by whatever nix
+  # happens to run here.
+  if managed_nix_conf_check_applies; then
+    run_nix_conf_key_check "$_ctx_name" || _ne_exit=1
+  fi
+
   return $_ne_exit
+}
+
+# managed_nix_conf_check_applies: the managed nix.conf is consumed only where it is
+# deployed, so a host whose nix never reads it must not judge its keys.
+managed_nix_conf_check_applies() {
+  if [ -e /etc/nix/nix.custom.conf ]; then
+    return 0
+  fi
+  say "/etc/nix/nix.custom.conf is not deployed on this host: managed nix config keys not checked."
+  return 1
+}
+
+# run_nix_conf_key_check: every setting the managed nix.conf declares must be a
+# setting this nix reads. Nix only warns about an unknown name in a config file,
+# so a key that is not a setting never applies and nothing else reports it.
+run_nix_conf_key_check() {
+  local -n ctx="$1"
+  local _nc_repo_root="${ctx[REPO_ROOT]}"
+  shift
+  local _nc_rel="src/modules/configs/nix/nix.custom.conf"
+  local _nc_file="$_nc_repo_root/$_nc_rel"
+  local _nc_key_count=0
+  local _nc_line _nc_trim _nc_key _nc_err
+
+  # WHY: a missing managed config is a defect in the tree, never a reason to
+  # pass quietly; the file is the only statement of the daemon's settings.
+  if [ ! -f "$_nc_file" ]; then
+    error "$_nc_rel: managed nix config not found"
+    return 1
+  fi
+
+  while IFS= read -r _nc_line || [ -n "$_nc_line" ]; do
+    # Strip leading whitespace, then ignore comments (prose and commented-out
+    # settings alike) and anything that is not a setting-name line.
+    _nc_trim="${_nc_line#"${_nc_line%%[![:space:]]*}"}"
+    case "$_nc_trim" in
+    '' | '#'*) continue ;;
+    *=*) ;;
+    *) continue ;;
+    esac
+    _nc_key="${_nc_trim%%=*}"
+    _nc_key="${_nc_key%"${_nc_key##*[![:space:]]}"}"
+    case "$_nc_key" in
+    '' | *[!A-Za-z0-9_-]*) continue ;;
+    esac
+    _nc_key_count=$((_nc_key_count + 1))
+  done <"$_nc_file"
+
+  # WHY: one parse of the whole file, so nix judges exactly what the daemon
+  # reads: the setting names, the `extra-` append aliases it resolves itself, and
+  # the values. An unknown name warns on stderr and still exits 0, so stderr is
+  # the only signal for it; a bad value or a syntax error exits non-zero.
+  # WHY: no nix lock here. The lock serializes the flake evals' shared SQLite eval
+  # cache, and a config parse touches none of it, so taking it only adds a way
+  # to block behind an unrelated nix process.
+  if ! _nc_err="$(NIX_CONFIG="$(cat "$_nc_file")" nix config show max-jobs 2>&1 >/dev/null)"; then
+    error "$_nc_rel: nix rejected the managed config: $_nc_err"
+    return 1
+  fi
+  case "$_nc_err" in
+  *"unknown setting"*)
+    while IFS= read -r _nc_line; do
+      case "$_nc_line" in
+      *"unknown setting"*) error "$_nc_rel: $_nc_line" ;;
+      esac
+    done <<<"$_nc_err"
+    return 1
+    ;;
+  esac
+
+  say "managed nix config keys passed ($_nc_key_count keys)."
+  return 0
 }
 
 # run_hermetic_eval: prove the Nix layer evaluates with no forwarded
