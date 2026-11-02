@@ -44,7 +44,7 @@ _ALLOWED_LINES=$(
 scripts/update.ps1|12|bump-lockfile.ps1 (the nucleus command surface merged
 scripts/update.ps1|13|bump-lockfile` into
 scripts/update.ps1|139|# deleted scripts/bump-lockfile.ps1
-scripts/update.sh|173|# scripts/bump-lockfile.sh.
+scripts/update.sh|226|# scripts/bump-lockfile.sh.
 src/scripts/checks/check-steps/10-completions-fresh.ps1|8|in the bump-lockfile completer still has its --list-sections
 src/scripts/checks/lockfile-enforcement-lib.ps1|3|bump-lockfile.ps1 -VerifyInstalled.
 src/scripts/checks/lockfile-enforcement-lib.ps1|4|safe to source from bump-lockfile.
