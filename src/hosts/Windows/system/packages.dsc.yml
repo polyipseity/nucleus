@@ -29,13 +29,6 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure Clink is installed for cmd.exe command-line editing and to support safe-delete Lua interception hooks
-      settings:
-        id: chrisant996.Clink
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
         description: Ensure zoxide is installed for cross-host shell navigation parity with macOS and NixOS
       settings:
         id: ajeetdsouza.zoxide
@@ -43,41 +36,16 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure Cursor is installed for cross-host editor parity with macOS (Homebrew cask cursor) and NixOS (nixpkgs code-cursor)
+      settings:
+        id: Anysphere.Cursor
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure Ghostscript is installed to provide the `gs` PostScript/PDF CLI for cross-host parity with macOS and NixOS
       settings:
         id: ArtifexSoftware.GhostScript
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: Ensure ExifTool is installed to provide metadata read/write CLI for cross-host parity with macOS and NixOS
-      settings:
-        id: ExifTool.ExifTool
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: >-
-          Ensure HashiCorp Packer is installed for automated VM image building
-          (scripts\VM-build.ps1; cross-host parity with pkgs.packer on macOS/NixOS).
-      settings:
-        id: Hashicorp.Packer
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: >-
-          Ensure HashiCorp Vagrant is installed for VM development environments,
-          cross-host parity with pkgs.vagrant on MacBook and NixOS.
-      settings:
-        id: Hashicorp.Vagrant
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: Ensure uv is installed for cross-host Python workflow parity with macOS and NixOS
-      settings:
-        id: astral-sh.uv
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -92,6 +60,13 @@ properties:
         description: Ensure ty is installed for cross-host Python type-check/LSP CLI parity with macOS and NixOS
       settings:
         id: astral-sh.ty
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure uv is installed for cross-host Python workflow parity with macOS and NixOS
+      settings:
+        id: astral-sh.uv
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -119,6 +94,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure Clink is installed for cmd.exe command-line editing and to support safe-delete Lua interception hooks
+      settings:
+        id: chrisant996.Clink
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure bottom is installed for cross-host terminal monitoring parity with macOS and NixOS
       settings:
         id: Clement.bottom
@@ -140,23 +122,19 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure Redis is installed as the local loopback in-memory data store for cross-service coordination and caching, matching the NixOS nucleus-redis server
-      settings:
-        id: Redis.Redis
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: Ensure Starship is installed for cross-shell prompt parity with macOS and NixOS
-      settings:
-        id: Starship.Starship
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
         description: Ensure Discord Canary is installed to match the macOS canary-channel declaration
       settings:
         id: Discord.Discord.Canary
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Eclipse Temurin JDK 25 (latest LTS) — cross-platform parity with macOS
+          (Homebrew cask openjdk@25) and NixOS (nixpkgs jdk floating LTS alias).
+          Enabled by default via the single-source overlap enable flag.
+      settings:
+        id: EclipseAdoptium.Temurin.25.JDK
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -168,6 +146,13 @@ properties:
           Cross-platform parity: EasyEffects (NixOS), Equaliser (macOS).
       settings:
         id: EqualizerAPO.EqualizerAPO
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure ExifTool is installed to provide metadata read/write CLI for cross-host parity with macOS and NixOS
+      settings:
+        id: ExifTool.ExifTool
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -207,13 +192,6 @@ properties:
         description: Ensure standalone GnuPG is installed (lightweight, no GUI)
       settings:
         id: GnuPG.GnuPG
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: Ensure Google Platform Tools (adb, fastboot) is installed for Android VM configuration
-      settings:
-        id: Google.PlatformTools
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -267,9 +245,34 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure Google Platform Tools (adb, fastboot) is installed for Android VM configuration
+      settings:
+        id: Google.PlatformTools
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure FFmpeg is installed for cross-host multimedia processing and transcoding parity with macOS and NixOS; GPL build from gyan.dev includes comprehensive open-source codec support (x264, x265, AAC, Opus, and others)
       settings:
         id: Gyan.FFmpeg
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Ensure HashiCorp Packer is installed for automated VM image building
+          (scripts\VM-build.ps1; cross-host parity with pkgs.packer on macOS/NixOS).
+      settings:
+        id: Hashicorp.Packer
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Ensure HashiCorp Vagrant is installed for VM development environments,
+          cross-host parity with pkgs.vagrant on MacBook and NixOS.
+      settings:
+        id: Hashicorp.Vagrant
         source: winget
 
     - resource: PSDscResources/Script
@@ -331,13 +334,6 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure jq is installed for cross-host JSON tooling parity with macOS and NixOS
-      settings:
-        id: jqlang.jq
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
         description: >-
           Ensure Jellyfin Server is installed for cross-host media-server parity
           with the macOS launchd agent and Linux systemd user service. WinGet
@@ -345,6 +341,13 @@ properties:
           https://github.com/microsoft/winget-pkgs/tree/master/manifests/j/Jellyfin/Server
       settings:
         id: Jellyfin.Server
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure jq is installed for cross-host JSON tooling parity with macOS and NixOS
+      settings:
+        id: jqlang.jq
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -368,13 +371,6 @@ properties:
         description: Ensure LLVM/Clang is installed so clang and lld are available for cross-host native build parity with macOS and NixOS
       settings:
         id: LLVM.LLVM
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: Ensure shfmt is installed for cross-host shell formatting parity with macOS and NixOS
-      settings:
-        id: mvdan.shfmt
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -414,13 +410,6 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure Cursor is installed for cross-host editor parity with macOS (Homebrew cask cursor) and NixOS (nixpkgs code-cursor)
-      settings:
-        id: Anysphere.Cursor
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
         description: >-
           Windows Terminal Preview — preferred over stable per repository policy
           (preview/beta channels are favoured when available).  Provides "Open in
@@ -439,9 +428,9 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure Neovim is installed to mirror the default-editor baseline declared on macOS and NixOS
+        description: Ensure sccache is installed for Rust/C/C++ compiler caching (cross-host parity with pkgs.sccache on macOS and NixOS)
       settings:
-        id: Neovim.Neovim
+        id: Mozilla.sccache
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -457,9 +446,34 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure shfmt is installed for cross-host shell formatting parity with macOS and NixOS
+      settings:
+        id: mvdan.shfmt
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure Neovim is installed to mirror the default-editor baseline declared on macOS and NixOS
+      settings:
+        id: Neovim.Neovim
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure Obsidian is installed to mirror the macOS GUI package declaration
       settings:
         id: Obsidian.Obsidian
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          OBS Studio (stable) — cross-platform parity with macOS (Homebrew cask obs)
+          and NixOS (nixpkgs obs-studio). Gated by the single-source overlap enable
+          flag; excluded at apply time unless managedPackages."obs-studio".enable
+          is true for Windows.
+      settings:
+        id: OBSProject.OBSStudio
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -489,26 +503,6 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: >-
-          Czkawka CLI — duplicate file finder CLI. Cross-platform parity with
-          nixpkgs pkgs.czkawka (provides czkawka_cli, czkawka_gui, krokiet)
-          on POSIX hosts. Paired with qarmin.krokiet for GUI parity.
-      settings:
-        id: qarmin.czkawka.cli
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: >-
-          Krokiet — Slint GUI frontend of Czkawka. Provides duplicate file
-          finding with a modern Rust UI. Cross-platform parity with the
-          krokiet binary bundled inside nixpkgs pkgs.czkawka on POSIX hosts.
-      settings:
-        id: qarmin.krokiet
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
         description: Ensure Parsec is installed to mirror the macOS low-latency remote-desktop package declaration
       settings:
         id: Parsec.Parsec
@@ -534,6 +528,26 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: >-
+          Czkawka CLI — duplicate file finder CLI. Cross-platform parity with
+          nixpkgs pkgs.czkawka (provides czkawka_cli, czkawka_gui, krokiet)
+          on POSIX hosts. Paired with qarmin.krokiet for GUI parity.
+      settings:
+        id: qarmin.czkawka.cli
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Krokiet — Slint GUI frontend of Czkawka. Provides duplicate file
+          finding with a modern Rust UI. Cross-platform parity with the
+          krokiet binary bundled inside nixpkgs pkgs.czkawka on POSIX hosts.
+      settings:
+        id: qarmin.krokiet
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure rclone is installed as the cross-platform cloud storage sync and mount tool for cloud drive parity with macOS and NixOS
       settings:
         id: Rclone.Rclone
@@ -541,9 +555,9 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure RimSort is installed as the RimWorld mod manager for mod management parity with macOS and NixOS
+        description: Ensure Redis is installed as the local loopback in-memory data store for cross-service coordination and caching, matching the NixOS nucleus-redis server
       settings:
-        id: RimSort.RimSort
+        id: Redis.Redis
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -551,6 +565,13 @@ properties:
         description: Ensure actionlint is installed for cross-host GitHub Actions workflow lint parity with macOS and NixOS
       settings:
         id: rhysd.actionlint
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure RimSort is installed as the RimWorld mod manager for mod management parity with macOS and NixOS
+      settings:
+        id: RimSort.RimSort
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -604,6 +625,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure SQLite is installed for command-line database access
+      settings:
+        id: SQLite.SQLite
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure opencode is installed for cross-host agent tooling parity with macOS and NixOS
       settings:
         id: SST.opencode
@@ -611,9 +639,9 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure SQLite is installed for command-line database access
+        description: Ensure Starship is installed for cross-shell prompt parity with macOS and NixOS
       settings:
-        id: SQLite.SQLite
+        id: Starship.Starship
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -625,13 +653,9 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: >-
-          Steam — game distribution and launcher platform. Cross-platform parity with
-          macOS (Homebrew steam cask) and NixOS (programs.steam.enable). No Steam
-          beta/preview channel is available via WinGet; stable release only per
-          repository channel policy exception.
+        description: Ensure taplo is installed for cross-host TOML formatting parity with macOS and NixOS
       settings:
-        id: Valve.Steam
+        id: tamasfe.taplo
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -663,9 +687,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure taplo is installed for cross-host TOML formatting parity with macOS and NixOS
+        description: >-
+          Steam — game distribution and launcher platform. Cross-platform parity with
+          macOS (Homebrew steam cask) and NixOS (programs.steam.enable). No Steam
+          beta/preview channel is available via WinGet; stable release only per
+          repository channel policy exception.
       settings:
-        id: tamasfe.taplo
+        id: Valve.Steam
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -696,16 +724,16 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure zizmor is installed for cross-host GitHub Actions security auditing parity with macOS and NixOS
+        description: Ensure WinFsp (FUSE for Windows) is installed as a prerequisite for rclone mount on Windows; required for any cloud drive mount operation
       settings:
-        id: zizmor.zizmor
+        id: WinFsp.WinFsp
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure WinFsp (FUSE for Windows) is installed as a prerequisite for rclone mount on Windows; required for any cloud drive mount operation
+        description: Ensure zizmor is installed for cross-host GitHub Actions security auditing parity with macOS and NixOS
       settings:
-        id: WinFsp.WinFsp
+        id: zizmor.zizmor
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -715,34 +743,6 @@ properties:
           cask) and NixOS (nixpkgs zoom-us).
       settings:
         id: Zoom.Zoom
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: Ensure sccache is installed for Rust/C/C++ compiler caching (cross-host parity with pkgs.sccache on macOS and NixOS)
-      settings:
-        id: Mozilla.sccache
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: >-
-          OBS Studio (stable) — cross-platform parity with macOS (Homebrew cask obs)
-          and NixOS (nixpkgs obs-studio). Gated by the single-source overlap enable
-          flag; excluded at apply time unless managedPackages."obs-studio".enable
-          is true for Windows.
-      settings:
-        id: OBSProject.OBSStudio
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: >-
-          Eclipse Temurin JDK 25 (latest LTS) — cross-platform parity with macOS
-          (Homebrew cask openjdk@25) and NixOS (nixpkgs jdk floating LTS alias).
-          Enabled by default via the single-source overlap enable flag.
-      settings:
-        id: EclipseAdoptium.Temurin.25.JDK
         source: winget
 
     - resource: PSDscResources/Script

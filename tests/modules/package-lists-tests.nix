@@ -9,6 +9,7 @@
 #   • every desired package resolves to a lockfile version pin (or a flake pin)
 #   • cursor.superpowers lockfile entry is valid
 #   • the managed `pass` resolves to the OTP-wrapped derivation, never alongside it
+#   • Windows DSC package ids are sorted alphabetically (case-folded)
 #
 # Run with: nix-instantiate --eval --strict tests/modules/package-lists-tests.nix
 
@@ -204,6 +205,23 @@ let
     id: builtins.elem id resolvedWindowsPackages || id == "Anysphere.Cursor"
   ) dscIds;
 
+  # The package group is sorted alphabetically by `settings.id`
+  # (`.agents/instructions/winget-dsc.instructions.md`, "Resource groups and
+  # ordering"). WHY case-folded: WinGet ids keep their own casing, so ids such as
+  # `astral-sh.uv`, `ajeetdsouza.zoxide`, and `chrisant996.Clink` sit among
+  # `ArtifexSoftware.GhostScript` and `BlenderFoundation.Blender`; a byte
+  # comparison would instead move every lowercase-leading id past every
+  # uppercase-leading one.
+  dscSortKey = id: lib.toLower id;
+  dscSortedIds = builtins.sort (a: b: dscSortKey a < dscSortKey b) dscIds;
+  dscSorted = dscIds == dscSortedIds;
+  # WHY report adjacent inversions: each names one misplaced block, while a
+  # position-by-position diff would also list every id that a single insert
+  # displaces.
+  dscInversions = lib.filter (pair: dscSortKey pair.fst > dscSortKey pair.snd) (
+    if dscIds == [ ] then [ ] else lib.zipLists dscIds (builtins.tail dscIds)
+  );
+
   # Committed JSON must be multi-line with sorted keys and single trailing newline.
   committedRaw = readRepo "src/hosts/Windows/system/winget-packages.json";
   committedBody = lib.removeSuffix "\n" committedRaw;
@@ -259,6 +277,9 @@ in
   test_wp_obs_enabled = assert' wpObsEnabled "OBS Studio must be enabled on Windows";
   test_wp_jdk_enabled = assert' wpJdkEnabled "Temurin JDK 25 must be enabled on Windows";
   test_wp_dsc_covered = assert' wpDscCovered "Every DSC WinGet id must be in the generated allow-list";
+  test_wp_dsc_sorted = assert' dscSorted "DSC package ids must be sorted alphabetically (case-folded): ${
+    builtins.concatStringsSep ", " (builtins.map (pair: "${pair.fst} before ${pair.snd}") dscInversions)
+  }";
   test_wp_json_sorted = assert' (
     wpJsonTerminated && wpJsonMultiline && wpJsonHasKeys
   ) "winget-packages.json must be multi-line with sorted keys and exactly one trailing newline";
