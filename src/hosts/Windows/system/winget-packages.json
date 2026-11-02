@@ -78,6 +78,7 @@
     "astral-sh.ruff",
     "astral-sh.ty",
     "astral-sh.uv",
+    "chrisant996.Clink",
     "direnv.direnv",
     "eza-community.eza",
     "j178.Prek",
