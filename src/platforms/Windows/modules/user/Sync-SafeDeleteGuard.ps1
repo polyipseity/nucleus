@@ -8,13 +8,13 @@ $inputText = [Console]::In.ReadToEnd()
 
 # Block cmd.exe / cmd
 if ($inputText -match 'cmd\.exe|(?<!\w)cmd(?!\w)') {
-  Write-Host "BLOCKED: cmd.exe is not allowed. Use pwsh instead." -ForegroundColor Red
+  [Console]::Error.WriteLine('BLOCKED: cmd.exe is not allowed. Use pwsh instead.')
   exit 2
 }
 
 # Block native rm invocation (absolute/relative path to rm)
 if ($inputText -match '/bin/rm|/usr/bin/rm|/usr/local/bin/rm') {
-  Write-Host "BLOCKED: native rm bypasses safe-delete protection. Use rip instead." -ForegroundColor Red
+  [Console]::Error.WriteLine('BLOCKED: native rm bypasses safe-delete protection. Use rip instead.')
   exit 2
 }
 
@@ -22,7 +22,7 @@ if ($inputText -match '/bin/rm|/usr/bin/rm|/usr/local/bin/rm') {
 $escaped = @('rm','del','rd','rmdir','erase','ri','unlink','shred') | ForEach-Object { [regex]::Escape("\$_") }
 $pattern = ($escaped -join '|')
 if ($inputText -match $pattern) {
-  Write-Host "BLOCKED: backslash-escaped deletion command bypasses safe-delete protection. Use rip instead." -ForegroundColor Red
+  [Console]::Error.WriteLine('BLOCKED: backslash-escaped deletion command bypasses safe-delete protection. Use rip instead.')
   exit 2
 }
 

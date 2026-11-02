@@ -115,7 +115,13 @@ function Invoke-SafeDelete {
     }
 
     if ($isInteractive -and $allFilesystem) {
-      Write-Host '[SafeDelete] Routed to Recycle Bin. Tip: use rip for instant undo.' -ForegroundColor Cyan
+      # WHY: Write-Information needs no host object and stays suppressible; $PSStyle
+      # is an automatic variable in pwsh 7.2+, so the colour costs no import.
+      $tip = '[SafeDelete] Routed to Recycle Bin. Tip: use rip for instant undo.'
+      if (Test-Path Variable:PSStyle) {
+        $tip = "$($PSStyle.Foreground.Cyan)$tip$($PSStyle.Reset)"
+      }
+      Write-Information -MessageData $tip -InformationAction Continue
     }
 
     foreach ($item in $resolvedItems) {
