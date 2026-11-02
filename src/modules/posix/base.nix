@@ -49,12 +49,14 @@ in
     }
 
     (lib.optionalAttrs (!hasLaunchdDaemonsOption) {
-      # WHY: nice/ionice the nix daemon so local builds (e.g. ffmpeg-full) do
-      # not saturate interactive work. max-jobs/cores stay at defaults (auto);
-      # lower them (e.g. max-jobs = 2; cores = 2;) if the machine is still
-      # saturated during large builds.
-      nix.daemonNiceLevel = 19;
-      nix.daemonIONiceLevel = 7;
+      # WHY: keep local builds (e.g. ffmpeg-full) from saturating interactive
+      # work. `batch` is the documented scheduling policy for non-interactive
+      # tasks, and I/O priority 7 is the lowest best-effort level. Both replaced
+      # `daemonNiceLevel`/`daemonIONiceLevel`, which nixpkgs removed. max-jobs and
+      # cores stay at defaults (auto); lower them (e.g. max-jobs = 2; cores = 2;)
+      # if the machine is still saturated during large builds.
+      nix.daemonCPUSchedPolicy = "batch";
+      nix.daemonIOSchedPriority = 7;
 
       # Writable symlink into the repo tree, with a same-folder .bak for any
       # system-owned original replaced the first time.
