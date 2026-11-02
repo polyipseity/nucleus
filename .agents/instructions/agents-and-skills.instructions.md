@@ -50,13 +50,15 @@ Rules: hooks always exit 0 and fail open, so an unanswered approval becomes a lo
 
 Transport is the Hermes plugin `src/users/default/hermes/plugins/harness-bridge/` (`/harness status|approve|deny|send|sessions`), enabled by `services.hermes-agent.settings.plugins.enabled` and, on Windows, by `Sync-HermesConfig`. Requests and queued prompts live under `<USER root>/state/harness-bridge/`, decisions in `<USER root>/logs/harness-bridge.log` (`log` on Windows).
 
-## Sandbox unix sockets
+## Sandbox sockets and filesystem grants
 
 `srt` is `@anthropic-ai/sandbox-runtime`, and pi runs inside it. On macOS it builds a Seatbelt profile and emits each `network.allowUnixSockets` entry literally, with no `realpath`. Seatbelt matches the kernel's canonical path, so an entry spelled through a symlink matches nothing and the failure is silent.
 
 `/private/var/run/nix-daemon.socket` is the spelling that must be present, because `/var/run` is a symlink to `/private/var/run`. Keep the other spellings (`/nix/var/nix/daemon-socket/socket`, `/var/run/nix-daemon.socket`): they cost nothing and cover a socket that is not behind a symlink. Do not prune them as duplicates.
 
 Symptom when the resolved spelling is missing: `EPERM` on the daemon socket from any nix command, which blocks `nix run ./src#check` and `./src#test`. `EPERM` is the tell, since a socket with no listener gives `ECONNREFUSED`. `nix eval` is not a usable probe, because it passes without touching the store.
+
+`filesystem.allowWrite` renders `(allow file-write*)` over the entry's whole subtree and re-allows `file-write-unlink` and `file-write-create` there, which is why `~/.Trash` is granted: safe-rm runs with `SAFE_RM_USE_APPLESCRIPT=no` and renames into the Trash, and the AppleScript route needs `appleevent-send`, which the sandbox denies. The grant is broader than the delete it serves, because a nested `denyWrite` is a specific deny that beats the allow and would also block the rename, so a drop-only Trash is not expressible. `allowAppleEvents` stays off: it would grant `appleevent-send` and `lsopen` to every sandboxed command, and srt's README says launched applications then run outside the sandbox entirely.
 
 ## Authoring rules
 
