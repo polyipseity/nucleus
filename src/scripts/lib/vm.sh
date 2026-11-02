@@ -438,21 +438,35 @@ vm_get_running_ids() {
   esac
 }
 
-# Polls utmctl list until VM NAME appears or timeout is reached.
-wait_for_utm_registration() {
-  _wfur_name="$1"
-  _wfur_attempt=1
-  _wfur_max_attempts=15
-
-  while [ "$_wfur_attempt" -le "$_wfur_max_attempts" ]; do
-    if vm_get_utm_registered_names | grep -qxF "$_wfur_name"; then
+# vm_wait_until DESCRIPTION TIMEOUT_SECONDS COMMAND... polls COMMAND once a
+# second until it exits 0 or TIMEOUT_SECONDS elapse. The interval is fixed and
+# the timeout has no default, so a loop needing another cadence, a shared
+# elapsed budget, or per-state progress output keeps its own body.
+vm_wait_until() {
+  _wu_desc="$1"
+  _wu_timeout="$2"
+  shift 2
+  _wu_deadline=$(($(date +%s) + _wu_timeout))
+  while [ "$(date +%s)" -lt "$_wu_deadline" ]; do
+    if "$@"; then
       return 0
     fi
     sleep 1
-    _wfur_attempt=$((_wfur_attempt + 1))
   done
-
+  warn "timed out after ${_wu_timeout}s waiting for $_wu_desc"
   return 1
+}
+
+# Returns 0 when utmctl lists NAME among the registered VMs.
+vm_utm_registered_name_present() {
+  vm_get_utm_registered_names | grep -qxF "$1"
+}
+
+# Polls utmctl list until VM NAME appears or TIMEOUT_SECONDS (default 15) elapse.
+wait_for_utm_registration() {
+  _wfur_name="$1"
+  _wfur_timeout="${2:-15}"
+  vm_wait_until "UTM to register '$_wfur_name'" "$_wfur_timeout" vm_utm_registered_name_present "$_wfur_name"
 }
 
 # Exponential backoff, capped at 30s, with windows_iso_retries extra attempts.
@@ -1678,11 +1692,7 @@ vm_inject_nixos() {
     return 1
   fi
 
-  for _vix_i in 1 2 3 4 5 6 7 8 9 10; do
-    [ -e "$_vix_part" ] && break
-    sleep 1
-  done
-  if [ ! -e "$_vix_part" ]; then
+  if ! vm_wait_until "NBD partition node $_vix_part to appear" 10 test -e "$_vix_part"; then
     _vix_cleanup
     error "NBD partition node did not appear: $_vix_part"
     return 1
