@@ -59,6 +59,19 @@ make_fixtures() {
 Write-Host "`e[31m"
 FIXTURE
 
+  # logging-format mode: prose whose inline code starts with e. The narrowed
+  # pattern must leave `enable` alone while still catching a real escape.
+  cat >"$WORK_DIR/logging-inline-fixture.ps1" <<'FIXTURE'
+# the `enable` flag
+Write-Host 'the `enable` flag'
+FIXTURE
+
+  # logging-format mode: a backtick-e that ends the token, an escape form with
+  # no bracket after it.
+  cat >"$WORK_DIR/logging-tail-fixture.ps1" <<'FIXTURE'
+$escape = "`e"
+FIXTURE
+
   # skip-constructs mode: the removed skip signal.
   # shellcheck disable=SC2016 # reason: $condition is a literal PowerShell variable in the emitted fixture, not a shell expansion
   printf 'if ($condition) { %s 2 }\n' "$SKIP_SIGNAL" >"$WORK_DIR/skip-fixture.ps1"
@@ -88,6 +101,18 @@ assert_mode_reports() {
   fi
 }
 
+# assert_mode_silent NAME MODE FILE EXPECTED: the rule must not print a line
+# carrying EXPECTED for a file that only resembles a violation.
+assert_mode_silent() {
+  local _name="$1" _mode="$2" _file="$3" _expected="$4" _out
+  _out="$(scan "$_mode" "$_file")"
+  if printf '%s\n' "$_out" | grep -qF -- "$_expected"; then
+    assert_fail "$_name" "rule reported $_expected; output: $_out"
+  else
+    assert_pass "$_name"
+  fi
+}
+
 test_default_mode_reports_oversized_heredoc() {
   assert_mode_reports "default mode reports an oversized heredoc" default \
     "$WORK_DIR/heredoc-fixture.sh" "heredoc INNER has 31 content lines"
@@ -96,6 +121,16 @@ test_default_mode_reports_oversized_heredoc() {
 test_logging_format_mode_reports_backtick_e() {
   assert_mode_reports "logging-format mode reports a backtick-e escape literal" logging-format \
     "$WORK_DIR/logging-fixture.ps1" "backtick-e escape literal"
+}
+
+test_logging_format_mode_allows_inline_code_starting_with_e() {
+  assert_mode_silent "logging-format mode allows inline code starting with e" logging-format \
+    "$WORK_DIR/logging-inline-fixture.ps1" "backtick-e escape literal"
+}
+
+test_logging_format_mode_reports_backtick_e_at_token_end() {
+  assert_mode_reports "logging-format mode reports a backtick-e that ends the token" logging-format \
+    "$WORK_DIR/logging-tail-fixture.ps1" "backtick-e escape literal"
 }
 
 test_skip_constructs_mode_reports_removed_skip_signal() {
@@ -107,5 +142,7 @@ make_fixtures
 test_awk_program_compiles
 test_default_mode_reports_oversized_heredoc
 test_logging_format_mode_reports_backtick_e
+test_logging_format_mode_allows_inline_code_starting_with_e
+test_logging_format_mode_reports_backtick_e_at_token_end
 test_skip_constructs_mode_reports_removed_skip_signal
 finish_tests

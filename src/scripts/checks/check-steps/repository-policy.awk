@@ -57,7 +57,9 @@ mode == "logging-format" && !allowlisted {
   if (FILENAME ~ /\.ps1$/ || FILENAME ~ /\.psm1$/) {
     if ($0 ~ /\[char\]27/)
       print FILENAME ":" FNR ": char-27 escape literal (use PSStyle helpers)"
-    if ($0 ~ /`e/)
+    # An ESC escape is a backtick-e that ends the token; inline code such as
+    # `enable` continues with an identifier character.
+    if ($0 ~ /`e([^A-Za-z0-9_]|$)/)
       print FILENAME ":" FNR ": backtick-e escape literal (use PSStyle helpers)"
   }
 }

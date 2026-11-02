@@ -267,11 +267,12 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
         Write-ErrorMessage "$($m.Path):$($m.LineNumber): char-27 escape literal (use PSStyle helpers)"
         $lfErrors++
       }
-      # WHY: -CaseSensitive matches the awk twin (repository-policy.awk), whose
-      # regex is case-sensitive by construction. Select-String's case-insensitive
-      # default would flag any lowercase-e example, including a comment naming the
-      # automatic Event variable.
-      foreach ($m in (Select-String -Path $lfPsFiles -Pattern '`e' -CaseSensitive)) {
+      # WHY the token-end group: an ESC escape is a backtick-e that ends the
+      # token; inline code such as `enable` continues with an identifier
+      # character. -CaseSensitive matches the awk twin (repository-policy.awk),
+      # whose regex is case-sensitive by construction, and Select-String's
+      # case-insensitive default would flag any lowercase-e example.
+      foreach ($m in (Select-String -Path $lfPsFiles -Pattern '`e([^A-Za-z0-9_]|$)' -CaseSensitive)) {
         Write-ErrorMessage "$($m.Path):$($m.LineNumber): backtick-e escape literal (use PSStyle helpers)"
         $lfErrors++
       }
