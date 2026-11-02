@@ -44,6 +44,7 @@ function Invoke-SafeDelete {
       # POSIX backend: delegate to the platform safe alternative.
       $safeBin = $null
       foreach ($candidate in @('shell-safe-rm')) {
+        # check-suppress:suppression_doc: shell-safe-rm is optional; an absent candidate falls through to the original cmdlet
         $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
         if ($cmd) { $safeBin = $cmd.Source; break }
       }
