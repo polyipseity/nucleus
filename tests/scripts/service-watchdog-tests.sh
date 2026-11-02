@@ -387,6 +387,45 @@ assert_eq() { # <name> <expected> <actual>
   fi
 }
 
+# wait_for_line FILE PATTERN [TIMEOUT_TENTHS]: poll FILE until it contains
+# PATTERN.  WHY a poll and not a read: a stub write is not an assignment, and
+# svc_run_bounded runs a repair in a BACKGROUND process, so a marker or log read
+# taken right after such a call can legitimately find the write missing.  That
+# assumption, not the write, is what flakes.  The poll is bounded: a line that
+# never arrives fails the calling case inside the timeout, it never hangs the
+# suite.
+wait_for_line() { # <file> <pattern> [timeout_tenths]
+  _wl_file="$1"
+  _wl_pattern="$2"
+  _wl_timeout="${3:-50}"
+  _wl_elapsed=0
+  while [ "$_wl_elapsed" -lt "$_wl_timeout" ]; do
+    if grep -q "$_wl_pattern" "$_wl_file" 2>/dev/null; then
+      return 0
+    fi
+    sleep 0.1
+    _wl_elapsed=$((_wl_elapsed + 1))
+  done
+  return 1
+}
+
+# assert_log_line NAME FILE PATTERN [TIMEOUT_TENTHS]: fetch a stub's output
+# through the waiter and assert the discriminating line, not the whole file.
+# Only for output a background process writes: the repair marker in section 23 is
+# written by the repair CHILD that svc_run_bounded started, so a read can arrive
+# before the child wrote, and a repair abandoned at its bound is signalled before
+# it may have written anything.  A foreground stub call has already returned when
+# its assertion runs, and those reads stay synchronous, so a genuinely missing
+# write still fails immediately instead of spending the timeout.
+assert_log_line() { # <name> <file> <pattern> [timeout_tenths]
+  local timeout="${4:-50}"
+  if wait_for_line "$2" "$3" "$timeout"; then
+    assert_pass "$1"
+  else
+    assert_fail "$1" "no '$3' line in $(basename "$2") within $((timeout / 10))s; file has: $(cat "$2" 2>/dev/null || printf '<absent>')"
+  fi
+}
+
 calls_made() {
   local file="$1"
   if [ -f "$file" ]; then wc -l <"$file" | tr -d ' '; else printf '0'; fi
@@ -1294,14 +1333,18 @@ seed_repair_record() {
     >"$state_dir/local.cloud-mount.iCloud.json"
 }
 
-# repair_started / repair_completed: grep -q, so a missing marker reads as absent
-# WITHOUT the `grep -c` trap: grep -c prints 0 AND returns 1 on no match, so it would
-# have to be guarded with `|| printf 0`, emitting `0\n0` and silently defeating the
-# comparison.  Distinct markers, because "the repair started" and "the repair ran to
-# completion" are exactly what a bound changes.
-repair_started() {
-  [ -f "$_repair_marker" ] && grep -q '^started$' "$_repair_marker"
-}
+# repair_completed: grep -q, so a missing marker reads as absent WITHOUT the
+# `grep -c` trap: grep -c prints 0 AND returns 1 on no match, so it would have to
+# be guarded with `|| printf 0`, emitting `0\n0` and silently defeating the
+# comparison.
+# WHY this predicate is NOT a wait while the two POSITIVE marker assertions are:
+#   the marker is written by the repair CHILD, which svc_run_bounded runs in a
+#   background process.  "It started" and "it ran to completion" are therefore
+#   waits (assert_log_line) because a read can arrive before the child wrote.
+#   This predicate only backs a NEGATIVE assertion, and by the time it runs
+#   svc_run_bounded has signalled AND reaped the abandoned child at the bound, so
+#   that child can no longer write: waiting would only spend the timeout to learn
+#   what the reap already settled.
 repair_completed() {
   [ -f "$_repair_marker" ] && grep -q '^completed$' "$_repair_marker"
 }
@@ -1321,11 +1364,7 @@ run_check_instance "cloud-drive" "macos-launchctl" "$macos_entry" "local.cloud-m
 _elapsed=$(($(date +%s) - _started))
 assert_eq "the repair path exits 0" 0 "$captured_status"
 # CONTROL: the hanging repair must be the code that ran, or the timing measures nothing.
-if repair_started; then
-  assert_pass "the hanging repair is the code under the bound"
-else
-  assert_fail "the hanging repair is the code under the bound" "the repair was never invoked"
-fi
+assert_log_line "the hanging repair is the code under the bound" "$_repair_marker" '^started$'
 assert_contains "a repair outliving the bound is abandoned" "$captured_output" "timed out after 1s"
 if repair_completed; then
   assert_fail "a repair outliving the bound never completes" \
@@ -1353,11 +1392,7 @@ rm -f "$_repair_marker"
 seed_repair_record
 run_check_instance "cloud-drive" "macos-launchctl" "$macos_entry" "local.cloud-mount.iCloud"
 assert_eq "a bounded repair still exits 0" 0 "$captured_status"
-if repair_completed; then
-  assert_pass "a repair inside the bound runs to completion"
-else
-  assert_fail "a repair inside the bound runs to completion" "the repair was abandoned or never invoked"
-fi
+assert_log_line "a repair inside the bound runs to completion" "$_repair_marker" '^completed$'
 assert_not_contains "a completed repair is not reported as a timeout" "$captured_output" "timed out"
 
 eval "$_orig_repair"
