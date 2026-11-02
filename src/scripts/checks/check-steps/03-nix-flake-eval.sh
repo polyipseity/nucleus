@@ -51,7 +51,7 @@ run_nix_flake_eval() {
     # WHY: src/hosts/Windows/system/winget-packages.json cannot be generated on
     # Windows, so it is committed, and this is the only byte-exact (format
     # inclusive) check of it; the always-run nix-tests step compares the parsed
-    # entry set on every POSIX host instead.
+    # entry set and pins the root-key order on every POSIX host instead.
     # WHY: ./src#winget-packages builds the macOS package set, so it is an
     # aarch64-darwin derivation no other host can build. Check it only where the
     # host system matches, and say it was not checked elsewhere.

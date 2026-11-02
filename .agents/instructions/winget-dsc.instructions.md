@@ -22,7 +22,7 @@ Within a file: (1) packages (`Microsoft.WinGet.Client/Package`), (2) system sett
 
 - `.yml` extension only; `source: winget` on every package.
 - Use canonical WinGet identifiers, verified with `winget search`. Prefer named IDs over opaque Store-generated IDs; document the rationale when only a generated ID exists.
-- `src/hosts/Windows/system/winget-packages.json` is generated from the managed package registry in `src/modules/core.nix`. Never hand-edit it; regenerate with `install -m 644 "$(nix build --no-link --print-out-paths ./src#winget-packages)" src/hosts/Windows/system/winget-packages.json`. That derivation is an aarch64-darwin build, so the macOS-only check step 3 is the only byte-exact comparison; the nix-tests step compares the parsed entry set on every POSIX host.
+- `src/hosts/Windows/system/winget-packages.json` is generated from the managed package registry in `src/modules/core.nix`. Never hand-edit it; regenerate with `install -m 644 "$(nix build --no-link --print-out-paths ./src#winget-packages)" src/hosts/Windows/system/winget-packages.json`. That derivation is an aarch64-darwin build, so the macOS-only check step 3 is the only byte-exact comparison; the nix-tests step compares the parsed entry set and pins the root-key order on every POSIX host.
 - Prefer preview/canary channel per `AGENTS.md` channel policy; document exceptions in `directives.description:`.
 - Registry values need `valueType` (`DWord`, `String`, ...). Environment variables: scope as `User` or `Machine`, prefer `User`.
 - Use `%USERPROFILE%` for user home in `value` strings.
