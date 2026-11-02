@@ -1166,10 +1166,14 @@ let
   ) enabledManagedPackageNames;
 
   # Cross-platform nixpkgs packages. macOS respects backend selection; NixOS
-  # takes every platform-compatible package.
-  # WHY meta.available: platforms is a coarse darwin/linux filter, while some
-  # packages build for one Linux arch only. meta.available reads lazily and does
-  # NOT trip check-meta's refusal assertion.
+  # takes every platform-compatible package. `platforms` is the platform rule for
+  # both lists.
+  # WHY the Linux list still probes meta.available: platforms is a coarse
+  # darwin/linux filter, while some packages build for one Linux arch only.
+  # meta.available reads lazily and does NOT trip check-meta's refusal assertion.
+  # The darwin list does not probe it: an entry nixpkgs cannot provide on darwin
+  # must carry platforms = [ "linux" ] instead, and the
+  # `darwinUnavailableNixPackages` assertion below enforces exactly that.
 
   # Excluded: a programs.* module already contributes these, and a second
   # derivation would collide in buildEnv's paths. Windows still uses WinGet.
@@ -1185,7 +1189,6 @@ let
         && managedPackageBackends.${name} == "nixpkgs"
         && managedPackagePlatformCompatible name
         && nixPackageAttrPresent name
-        && nixPackageAttrAvailable name
         && !(builtins.elem name posixProgramsProvidedPackages)
       ) enabledManagedPackageNames
     else
@@ -1208,6 +1211,24 @@ let
       attr = managedPackages.${packageName}.nixpkgs;
     in
     ((lib.attrByPath (lib.strings.splitString "." attr) null pkgs).meta.available or true);
+
+  # Packages the darwin nixpkgs list carries but cannot install: enabled here,
+  # routed to nixpkgs, platform-compatible, attribute present, and unavailable in
+  # the darwin package set. The darwin list no longer drops these on the
+  # availability probe, so the registry must say so with platforms =
+  # [ "linux" ] instead; the assertion in `config` names every entry that does
+  # not. Empty off darwin, where `pkgs` does not hold the darwin package set.
+  darwinUnavailableNixPackages = lib.optionals pkgs.stdenv.hostPlatform.isDarwin (
+    builtins.filter (
+      packageName:
+      (managedPackages.${packageName}.nixpkgs or null) != null
+      && managedPackageBackends.${packageName} == "nixpkgs"
+      && managedPackagePlatformCompatible packageName
+      && nixPackageAttrPresent packageName
+      && !(nixPackageAttrAvailable packageName)
+      && !(builtins.elem packageName posixProgramsProvidedPackages)
+    ) enabledManagedPackageNames
+  );
 
   managedHomebrewBrews = lib.optionals pkgs.stdenv.hostPlatform.isDarwin (
     builtins.filter (name: name != null) (
@@ -1354,12 +1375,19 @@ in
     (lib.optionalAttrs (options ? home && options.home ? packages) { home.packages = sharedPackages; })
 
     {
-      assertions = map (packageName: {
-        assertion = missingNixPackageAttrs == [ ];
-        message = "core.nix: package '${packageName}' routes to nixpkgs but pkgs.${
-          managedPackages.${packageName}.nixpkgs
-        } is unavailable on this platform.";
-      }) missingNixPackageAttrs;
+      assertions =
+        map (packageName: {
+          assertion = missingNixPackageAttrs == [ ];
+          message = "core.nix: package '${packageName}' routes to nixpkgs but pkgs.${
+            managedPackages.${packageName}.nixpkgs
+          } is unavailable on this platform.";
+        }) missingNixPackageAttrs
+        ++ [
+          {
+            assertion = darwinUnavailableNixPackages == [ ];
+            message = "core.nix: packages unavailable on darwin must set platforms = [ \"linux\" ] rather than being dropped silently: ${lib.strings.concatStringsSep ", " darwinUnavailableNixPackages}";
+          }
+        ];
     }
 
     (lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {

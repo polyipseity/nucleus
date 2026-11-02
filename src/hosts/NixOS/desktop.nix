@@ -42,7 +42,6 @@ in
     (with pkgs; [
       file-roller
       kdePackages.ark
-      p7zip
 
       # Terminal emulators for the "Open in Terminal" context menu action.
       gnome-terminal # default terminal for GNOME "Open in Terminal"
@@ -58,9 +57,6 @@ in
       parsec-bin
 
       easyeffects # graphical PipeWire audio processing GUI
-      gimp
-      pass
-      qtpass
 
       # WHY: zenity draws the modal dialog the "strip metadata" Nautilus entry
       # uses to report inputs it could not process.

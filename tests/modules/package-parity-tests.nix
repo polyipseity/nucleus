@@ -6,6 +6,8 @@
 #   • darwin-only packages have platforms = ["darwin"]
 #   • darwin-only packages are not buildable on Linux
 #   • linux-only packages have platforms = ["linux"]
+#   • packages nixpkgs cannot provide on darwin have platforms = ["linux"]
+#   • src/hosts/NixOS/desktop.nix installs nothing managedPackages provides
 #   • homebrew.kind is the documented formula|cask and carries a name
 #
 # Run with: nix-instantiate --eval tests/modules/package-parity-tests.nix
@@ -177,6 +179,18 @@ let
     pkg != null && lib.meta.availableOn linuxSystem pkg && !(lib.meta.availableOn darwinSystem pkg)
   ) nixpkgsEntryNames;
 
+  # Entries nixpkgs cannot provide on darwin at all, read the same way as
+  # `linuxOnlyPackageNames`: `lib.meta.availableOn` over the Linux package set, so
+  # an unfree or broken attribute does not answer a different question.  A null
+  # package (attribute absent from the Linux set) is not a platform answer.
+  darwinUnavailablePackageNames = builtins.filter (
+    name:
+    let
+      pkg = linuxPackageOf name;
+    in
+    pkg != null && !(lib.meta.availableOn darwinSystem pkg)
+  ) nixpkgsEntryNames;
+
   # macOS keeps an app that nixpkgs packages only for Linux: Homebrew carries
   # it, or the flake overlay replaces the attribute with a darwin build.
   # `platforms = [ "linux" ]` removes an entry from every darwin list, the
@@ -185,6 +199,31 @@ let
   flakeText = builtins.readFile ../../src/flake.nix;
   darwinCarriedElsewhere =
     name: homebrewBlockOf name != "" || lib.hasInfix "${name} = prev.stdenv.mkDerivation" flakeText;
+
+  # --- NixOS host package list ---
+  # A host may not install by hand what managedPackages already provides: both
+  # paths reach environment.systemPackages, so the duplicate survives only until
+  # one of the two changes.  Compared against each entry's `nixpkgs` attribute,
+  # because that is the name a host file writes for a managed package (`p7zip`
+  # for the "7zip" entry).  Only the `environment.systemPackages` block is read,
+  # so option paths and service settings elsewhere in the file cannot match.
+  nixosDesktopText = builtins.readFile ../../src/hosts/NixOS/desktop.nix;
+  nixosDesktopPackageList = builtins.head (
+    lib.strings.splitString "\n    ];" (
+      builtins.head (
+        builtins.tail (lib.strings.splitString "environment.systemPackages =" nixosDesktopText)
+      )
+    )
+  );
+  desktopPackageTokenOf =
+    line:
+    lib.removePrefix "pkgs." (lib.strings.trim (builtins.head (lib.strings.splitString "#" line)));
+  # List entries are one bare token per line; the `(with pkgs; [` opener, the
+  # `])` close and the `++ lib.optionals …` scaffolding carry punctuation and
+  # drop out.
+  nixosDesktopPackageNames = builtins.filter (t: builtins.match "[a-zA-Z0-9._-]+" t != null) (
+    map desktopPackageTokenOf (lib.strings.splitString "\n" nixosDesktopPackageList)
+  );
 
   # --- Packages without nixpkgs attr (WinGet-only / macOS-cask-only) ---
 
@@ -259,6 +298,23 @@ let
     assert' (unmarked == [ ])
       "Linux-only packages must set platforms = [ \"linux\" ] in core.nix; unmarked: ${lib.strings.concatStringsSep ", " unmarked}";
 
+  # Entries nixpkgs cannot provide on darwin must say so with
+  # `platforms = [ "linux" ]`: core.nix carries every platform-compatible entry
+  # in the darwin nixpkgs list without probing availability, so the marker is the
+  # only thing that keeps such an entry out of it.  The exemption above applies
+  # for the same reason it does there, since the marker also removes an entry
+  # from the Homebrew lists.
+  test_darwin_unavailable_packages_declared =
+    let
+      unmarked = builtins.filter (
+        name:
+        !(darwinCarriedElsewhere name)
+        && !lib.hasInfix "platforms = [ \"linux\" ]" (entryBlocks.${name} or "")
+      ) darwinUnavailablePackageNames;
+    in
+    assert' (unmarked == [ ])
+      "packages nixpkgs cannot provide on darwin must set platforms = [ \"linux\" ] in core.nix; unmarked: ${lib.strings.concatStringsSep ", " unmarked}";
+
   # Darwin-only packages must not be buildable on Linux.
   test_darwin_only_absent_on_linux =
     let
@@ -304,6 +360,19 @@ let
     !(lib.hasInfix "kind = \"brew\"" coreModuleText)
   ) "core.nix must not declare homebrew kind \"brew\" (documented values: formula, cask)";
 
+  # src/hosts/NixOS/desktop.nix must not reinstall a managedPackages entry.
+  # An entry is matched by its `nixpkgs` attribute (through `nixpkgsAttrOf`
+  # rather than the flat `nixpkgsAttrs`, which is empty because it filters the
+  # between-match strings instead of the capture groups), and the message names
+  # the host-file token, which is the line to drop.
+  test_nixos_desktop_has_no_registry_duplicates =
+    let
+      providedByRegistry = token: builtins.any (name: nixpkgsAttrOf name == token) extractedNames;
+      duplicates = lib.unique (builtins.filter providedByRegistry nixosDesktopPackageNames);
+    in
+    assert' (builtins.length nixosDesktopPackageNames > 0 && duplicates == [ ])
+      "src/hosts/NixOS/desktop.nix must not install what managedPackages already provides; drop the line for: ${lib.strings.concatStringsSep ", " duplicates}";
+
   allTests = [
     test_entry_names_valid
     test_registry_names_sorted
@@ -312,10 +381,12 @@ let
     test_dotted_nixpkgs_paths_resolve
     test_darwin_only_packages_platform_marked
     test_linux_only_packages_platform_marked
+    test_darwin_unavailable_packages_declared
     test_darwin_only_absent_on_linux
     test_homebrew_kind_documented
     test_homebrew_kind_has_name
     test_no_undocumented_homebrew_kind
+    test_nixos_desktop_has_no_registry_duplicates
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {
