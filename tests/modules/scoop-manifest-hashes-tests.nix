@@ -2,8 +2,9 @@
 #
 # The published Scoop schema constrains `hash` to a digest, but that check needs
 # network, so a POSIX run without it never notices a placeholder. This test
-# applies the same pattern offline, and additionally requires every architecture
-# block to carry a hash, so a new architecture cannot inherit an empty field.
+# applies the same pattern offline, additionally requires every architecture
+# block to carry a hash, so a new architecture cannot inherit an empty field,
+# and rejects a digest repeated inside one hash array.
 #
 # Run with: nix-instantiate --eval --strict tests/modules/scoop-manifest-hashes-tests.nix
 
@@ -13,7 +14,9 @@ let
   repoRoot = ../..;
   manifestDir = repoRoot + "/src/modules/scoop-manifests";
 
-  # Mirrors definitions.hashPattern in the Scoop schema.
+  # Mirrors definitions.hash in the Scoop schema: one digest, or a non-empty
+  # array of digests. The array branch there carries `uniqueItems: true`, so a
+  # repeated digest is malformed and not merely redundant.
   # ref: https://raw.githubusercontent.com/ScoopInstaller/Scoop/master/schema.json
   hashPattern = "^([a-fA-F0-9]{64}|(sha1|sha256|sha512|md5):([a-fA-F0-9]{32}|[a-fA-F0-9]{40}|[a-fA-F0-9]{64}|[a-fA-F0-9]{128}))$";
 
@@ -81,8 +84,40 @@ let
     else
       "<${builtins.typeOf value}>";
 
+  # WHY: a repeated digest is the one malformed shape whose printed array looks
+  # well formed, so it is named as a repeat instead of leaving the reader to
+  # compare the elements of a value that is already printed.
+  repeatedValues =
+    values:
+    builtins.foldl' (
+      acc: value:
+      if builtins.elem value acc then
+        acc
+      else if builtins.length (builtins.filter (other: other == value) values) > 1 then
+        acc ++ [ value ]
+      else
+        acc
+    ) [ ] values;
+
+  describeBadSite =
+    site:
+    let
+      repeats = if builtins.isList site.value then repeatedValues site.value else [ ];
+    in
+    "${site.label} = ${describeValue site.value}"
+    + (if repeats == [ ] then "" else " (repeated digest: ${builtins.concatStringsSep ", " repeats})");
+
+  # WHY: the count of distinct elements must equal the element count, because a
+  # digest copied twice inside one array gives no second integrity check and
+  # arrives from a copy-paste edit.
+  distinctCount =
+    values:
+    builtins.length (
+      builtins.foldl' (acc: v: if builtins.elem v acc then acc else acc ++ [ v ]) [ ] values
+    );
+
   # Mirrors definitions.hash in the Scoop schema: one digest, or a non-empty
-  # array of digests.
+  # array of distinct digests.
   hashWellFormed =
     value:
     if builtins.isString value then
@@ -90,6 +125,7 @@ let
     else if builtins.isList value then
       value != [ ]
       && builtins.all (item: builtins.isString item && builtins.match hashPattern item != null) value
+      && distinctCount value == builtins.length value
     else
       false;
 
@@ -173,11 +209,7 @@ let
 
   test_hashes_well_formed =
     assert' (badHashSites == [ ])
-      "every Scoop manifest hash must be a digest, not a placeholder: ${
-        builtins.concatStringsSep ", " (
-          builtins.map (s: "${s.label} = ${describeValue s.value}") badHashSites
-        )
-      }";
+      "every Scoop manifest hash must be a digest, not a placeholder: ${builtins.concatStringsSep ", " (builtins.map describeBadSite badHashSites)}";
 
   allTests = [
     test_hash_site_counts

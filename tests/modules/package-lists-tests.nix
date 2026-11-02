@@ -211,6 +211,18 @@ let
     builtins.match ".*\n" committedRaw != null && builtins.match ".*\n\n" committedRaw == null;
   wpJsonMultiline = builtins.match ".*\n.*" committedBody != null;
   wpJsonHasKeys = builtins.hasAttr "$schema" committedDoc && builtins.hasAttr "packages" committedDoc;
+  # WHY: check step 03 compares this file byte for byte against its derivation
+  # and key order is part of that comparison, so a reshaped document that still
+  # parses must fail here too, on every host, not only where step 03 can build
+  # the artifact. Root keys sit at a two-space indent and nested keys sit
+  # deeper, so the pattern below selects the root level only.
+  wpJsonKeyOrder =
+    let
+      keyLines = builtins.filter (l: builtins.match "  \"[^\"]+\":.*" l != null) (
+        lib.splitString "\n" committedRaw
+      );
+    in
+    keyLines != [ ] && builtins.match "  \"\\$schema\":.*" (builtins.head keyLines) != null;
 
   # --- Aggregate ---
   allTestsPass =
@@ -250,6 +262,7 @@ in
   test_wp_json_sorted = assert' (
     wpJsonTerminated && wpJsonMultiline && wpJsonHasKeys
   ) "winget-packages.json must be multi-line with sorted keys and exactly one trailing newline";
+  test_wp_json_key_order = assert' wpJsonKeyOrder "$schema must be the first root key in winget-packages.json";
 
   all_tests_pass = assert' allTestsPass "all package-lists invariants must hold";
   success = allTestsPass;
