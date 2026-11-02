@@ -61,6 +61,47 @@ launchctl_job_loaded() {
   $sudo_prefix launchctl print "$target" >/dev/null 2>&1
 }
 
+# Prints enabled | disabled | unknown and always returns 0.
+# WHY: `launchctl list` answers loaded-ness, so a status built on it cannot see the
+# disabled gate that `launchctl enable`/`disable` writes, which leaves both verbs
+# looking inert. `launchctl print-disabled <domain-target>` prints that gate as
+# `"<label>" => enabled|disabled` lines (man launchctl, print-disabled, whose reply
+# shape on this host lists both directions). The parse is deliberately narrow,
+# because the man page states that the newer subcommands' output "does not
+# constitute an API and no promises of forward compatibility are offered to
+# programs that attempt to parse it" (CAVEATS) and that `print`'s output is "NOT API
+# in any sense at all". Anything outside those two exact lines, a missing overrides
+# map and a failed command included, is unknown, so no caller claims a state it did
+# not read. A label absent from the map is unknown and not enabled, because nothing
+# in the reply names its state.
+launchctl_service_enabled() {
+  local domain_target="$1" label="$2" sudo_prefix="$3"
+  local overrides=""
+  # check-suppress:suppression_doc: an unreadable overrides database is the unknown verdict, not an error this probe reports
+  if ! overrides=$($sudo_prefix launchctl print-disabled "$domain_target" 2>/dev/null); then
+    printf 'unknown'
+    return 0
+  fi
+  case "$overrides" in
+  *"disabled services"*) ;;
+  *)
+    printf 'unknown'
+    return 0
+    ;;
+  esac
+  # The quotes anchor the label: without them a shorter label would also match a
+  # longer one that starts the same way.
+  if printf '%s\n' "$overrides" | grep -Fq -- "\"$label\" => disabled"; then
+    printf 'disabled'
+    return 0
+  fi
+  if printf '%s\n' "$overrides" | grep -Fq -- "\"$label\" => enabled"; then
+    printf 'enabled'
+    return 0
+  fi
+  printf 'unknown'
+}
+
 # WHY: macOS 26+ unloads asynchronously, so a `bootstrap` issued right after `bootout` can fail with "Bootstrap failed: 5: Input/output error" while the job is still loaded, and the bootout that completes afterwards leaves the service unloaded and silent. Home Manager uses `launchctl bootout --wait` for the same reason; the poll covers older macOS, where --wait does not exist.
 launchctl_bootout_wait() {
   local target="$1" sudo_prefix="$2"

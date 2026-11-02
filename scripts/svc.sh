@@ -258,7 +258,7 @@ svc_status() {
     launchd_domain=$(echo "$entry_json" | jq -r '.launchdDomain // "gui"')
     [ "$scope" = "system" ] && domain_flag="sudo"
 
-    local list_line running=true enabled=true pid=""
+    local list_line running=true pid=""
     # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
     if [ "$scope" = "user" ] && [ "$EUID" -eq 0 ]; then
       list_line=$(launchctl asuser "$REAL_USER_UID" launchctl list 2>/dev/null | awk -v label="$svc_id" 'NR>1 && $3==label { print $1, $2 }' || true) # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
@@ -269,7 +269,6 @@ svc_status() {
     socket_activated=$(echo "$entry_json" | jq -r '.socketActivated // false')
     if [ -z "$list_line" ]; then
       running=false
-      enabled=false
     else
       pid=$(echo "$list_line" | awk '{ print $1 }')
       if [ "$pid" = "-" ] || [ -z "$pid" ]; then pid=""; fi
@@ -286,12 +285,24 @@ svc_status() {
       case "$print_out" in
       *"state = running"*)
         running=true
-        enabled=true
         pid=$(echo "$print_out" | sed -n 's/.*pid = \([0-9]*\).*/\1/p')
         [ -z "$pid" ] && pid=""
         ;;
       esac
     fi
+    # The disabled gate is a separate question from loaded-ness, so it is read on
+    # its own and stays tri-state: only a read that names the state can claim one.
+    local domain_target
+    if [ "$scope" = "system" ]; then
+      domain_target=$(launchctl_bootstrap_domain system "")
+    else
+      domain_target=$(launchctl_bootstrap_domain "${launchd_domain:-gui}" "$(launchctl_session_uid)")
+    fi
+    local enabled_json="null"
+    case "$(launchctl_service_enabled "$domain_target" "$svc_id" "$domain_flag")" in
+    enabled) enabled_json=true ;;
+    disabled) enabled_json=false ;;
+    esac
     local status_text state_text exit_code=""
     if [ "$running" = true ]; then
       status_text="active"
@@ -304,7 +315,7 @@ svc_status() {
     fi
     platform_json=$(printf '{"status":"%s","running":%s,"enabled":%s,"pid":%s,"state":%s,"exitCode":%s}' \
       "$status_text" \
-      "$running" "$enabled" "${pid:-null}" \
+      "$running" "$enabled_json" "${pid:-null}" \
       "$(printf '%s' "${state_text:-null}" | jq -R . 2>/dev/null || echo null)" \
       "${exit_code:-null}")
     ;;
