@@ -804,7 +804,7 @@ run_cloud_mount_invariants() {
     _failed=1
   fi
 
-  _install_count=$(grep -rl 'macfuse install\|brew install.*macfuse\|fuse-t install\|brew install.*fuse-t' src/scripts/lib/ src/scripts/services/ 2>/dev/null | wc -l || true) # check-suppress:suppression_doc: grep exits 1 when no install site matches; the count must read zero either way
+  _install_count=$(grep -rl 'macfuse install\b\|brew install.*macfuse\|fuse-t install\b\|brew install.*fuse-t' src/scripts/lib/ src/scripts/services/ 2>/dev/null | wc -l || true) # check-suppress:suppression_doc: grep exits 1 when no install site matches; the count must read zero either way
   if [ "$_install_count" -ne 0 ]; then
     error "$_ctx_name: found $_install_count FUSE-library install call sites; the mount path must install none (the cask is Nix-managed)"
     _failed=1

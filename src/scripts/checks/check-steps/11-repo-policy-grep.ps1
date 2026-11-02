@@ -196,7 +196,7 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   if ($cmInstallDirs.Count -gt 0) {
     $cmInstallSites = @(
       Get-ChildItem -LiteralPath $cmInstallDirs -Recurse -File |
-        Select-String -Pattern 'macfuse install|brew install.*macfuse|fuse-t install|brew install.*fuse-t' -CaseSensitive |
+        Select-String -Pattern 'macfuse install\b|brew install.*macfuse|fuse-t install\b|brew install.*fuse-t' -CaseSensitive |
         ForEach-Object { $_.Path } |
         Sort-Object -Unique
     )
