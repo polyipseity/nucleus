@@ -33,7 +33,7 @@
 # locale-dependent sort produces a different array on a different machine. An
 # array that lost its entries would sort cleanly, so each ordering assertion is
 # paired with a presence check for an entry the array has to hold. Three
-# misorderings existed when this family landed: "~/dev" before
+# misorderings this suite has had to catch: "~/dev" before
 # "~/Library/Application Support/nucleus" ("L" is 0x4C, "d" is 0x64),
 # "~/.zprofile" after "~/.zshenv", and "/System" after "/private/var" ("S" is
 # 0x53, below every lowercase initial).
