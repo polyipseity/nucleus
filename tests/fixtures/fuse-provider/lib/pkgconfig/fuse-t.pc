@@ -1,0 +1,10 @@
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include/fuse
+
+Name: fuse-t
+Description: Fixture fuse-t pkg-config file for the provider-digest tests
+Version: 1.2.7
+Libs: -L${libdir} -lfuse-t
+Cflags: -I${includedir} -D_FILE_OFFSET_BITS=64
