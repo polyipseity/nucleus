@@ -20,8 +20,9 @@ case "$cmd" in
 esac
 
 # Block backslash-escaped deletion commands (alias bypass).
-# WHY: no `*'\rmdir'*` alternative: `*'\rm'*` is a prefix match, so it already
-# covers every escaped rmdir spelling.
+# WHY: no `*'\rmdir'*` alternative: the glob only asks that the literal `\rm`
+# appear somewhere in the command, so every escaped rmdir spelling already
+# matches.
 case "$cmd" in
 *'\rm'* | *'\del'* | *'\rd'* | *'\erase'* | *'\ri'* | *'\unlink'* | *'\shred'*)
   printf '%s\n' "BLOCKED: backslash-escaped deletion command bypasses safe-delete protection. Use shell-safe-rm or rip2 instead." >&2

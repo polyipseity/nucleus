@@ -78,7 +78,7 @@ CORPUS=(
   "bare unlink|$N_UNLINK foo"
   "bare shred|$N_SHRED foo"
   "cmd interpreter running del|$N_CMDEXE /c $N_DEL foo"
-  "pwsh with a quoted cmd call|pwsh -c \"x cmd y\""
+  "pwsh with a quoted cmd call|pwsh -c \"x cmd y\"" # records 0 on both sides: the guard's extraction stops at the first quote, so this row pins the known bypass rather than coverage
   "pwsh with an unquoted cmd call|pwsh -c x cmd y"
   "directory listing|ls -la"
   "rip a path|rip foo"
@@ -139,9 +139,11 @@ _original_verdict() { # <command>
   printf '%s' 0
 }
 
-# The pre-collapse path branch without its one load-bearing alternative. Every
-# absolute-path row must lose its verdict here, or the corpus never reached the
-# alternative that subsumed the two removed spellings.
+# The pre-collapse path branch without its one load-bearing alternative. At
+# least one row must lose its verdict here, or the corpus never reached the
+# alternative that subsumed the two removed spellings. The /usr/bin,
+# /usr/local/bin and ./ rows keep theirs by construction, because this mutant is
+# the earlier spelling of the same branch.
 _verdict_without_bin_pattern() { # <command>
   case "$1" in
   */usr/bin/rm* | */usr/local/bin/rm* | ./*rm*)
@@ -152,9 +154,10 @@ _verdict_without_bin_pattern() { # <command>
   printf '%s' 0
 }
 
-# The pre-collapse escape branch without its delete alternative. The escaped
-# directory row must lose its verdict here, or nothing proves that the removed
-# alternative was in fact covered by this one.
+# The pre-collapse escape branch without its delete alternative. At least one
+# row must lose its verdict here, or nothing proves that the removed alternative
+# was in fact covered by this one. The escaped directory row keeps its verdict,
+# because this mutant still lists that spelling.
 _verdict_without_escape_delete() { # <command>
   case "$1" in
   *'\del'* | *'\rd'* | *'\rmdir'* | *'\erase'* | *'\ri'* | *'\unlink'* | *'\shred'*)
