@@ -359,6 +359,20 @@ block_without_line() { # <activation-name> <literal> <src-root> <dest-root>
   fi
 }
 
+# block_with_word_change <activation-name> <from> <to> <src-root> <dest-root>:
+# rewrite one literal inside that activation block only, so the same word in a
+# look-alike block elsewhere cannot satisfy the predicate.
+block_with_word_change() { # <activation-name> <from> <to> <src-root> <dest-root>
+  if [ -f "$4/$HOME_NIX_REL" ]; then
+    awk -v name="$1" -v from="$2" -v to="$3" -v end="'';" '
+      !in_block && index($0, "home.activation." name " =") > 0 { in_block = 1 }
+      in_block && index($0, from) > 0 { sub(from, to); print; next }
+      { print }
+      in_block && index($0, end) > 0 { in_block = 0 }
+    ' "$4/$HOME_NIX_REL" >"$5/$HOME_NIX_REL"
+  fi
+}
+
 # symlink_entry_without_line <literal> <src-root> <dest-root>: drop one line from
 # the ~/.safe-rm/config managedSymlinkPaths entry only.
 symlink_entry_without_line() { # <literal> <src-root> <dest-root>
@@ -457,5 +471,11 @@ copy_fixture "$_tmp/verify-missing"
 block_without_line "verify-managed-symlink-paths" '"seed-safe-rm-config"' "$REPO_ROOT" "$_tmp/verify-missing"
 expect_removal "the verify copy lost exactly the list entry" "$_tmp/verify-missing" "$HOME_NIX_REL" 1
 expect_failure "anti-vacuity: without the list entry the verify check fails" verify_list_names_seed "$_tmp/verify-missing"
+# The ordering check needs a twin of its own: dropping the entry proves nothing
+# about it, because the predicate would fail for the missing entry alone.
+copy_fixture "$_tmp/verify-before"
+block_with_word_change "verify-managed-symlink-paths" 'entryAfter' 'entryBefore' "$REPO_ROOT" "$_tmp/verify-before"
+expect_removal "the ordering copy changed exactly one line" "$_tmp/verify-before" "$HOME_NIX_REL" 1
+expect_failure "anti-vacuity: entryBefore fails the ordering check" verify_list_names_seed "$_tmp/verify-before"
 
 finish_tests
