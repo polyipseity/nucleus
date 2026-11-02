@@ -140,7 +140,7 @@ do_update() {
     _threshold=$(jq -r '.nixpkgs.minimumReleaseAge // 1209600' "$_ra_json" 2>/dev/null || echo 1209600)
     local _cutoff
     _cutoff=$(date -u -d "@$(($(date +%s) - _threshold))" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null ||
-      date -u -v-${_threshold}S +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
+      date -u -v-"${_threshold}"S +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
     local _sha
     _sha=$(curl -s "https://api.github.com/repos/NixOS/nixpkgs/commits?sha=nixos-unstable&until=${_cutoff}&per_page=1" 2>/dev/null | jq -r '.[0].sha // empty')
     if [ -z "$_sha" ]; then
