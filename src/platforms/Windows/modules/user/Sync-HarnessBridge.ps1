@@ -14,9 +14,13 @@
     <USER root>\bin\harness-notify.ps1    deployed copy of the entry point
     <USER root>\bin\harness-approval.ps1  deployed copy of the entry point
     <USER root>\bin\harness-drive.ps1     deployed copy of the entry point
+    <USER root>\bin\harness-bridge-common.ps1  helper the entry points dot-source
     %USERPROFILE%\.local\bin\harness-notify.cmd    shim -> <USER root>\bin copy
     %USERPROFILE%\.local\bin\harness-approval.cmd  shim -> <USER root>\bin copy
     %USERPROFILE%\.local\bin\harness-drive.cmd     shim -> <USER root>\bin copy
+
+  harness-bridge-common.ps1 is dot-sourced by the three entry points, never
+  invoked as a command, so it gets no shim.
 
   Copies (rather than links into the repository) keep a hook working when the
   checkout moves; they are refreshed whenever the repository copy changes, so the
@@ -73,6 +77,9 @@ function Sync-HarnessBridge {
 
   $label = 'harness-bridge'
   $scriptNames = @('harness-approval', 'harness-drive', 'harness-notify')
+  # Dot-sourced by the entry points, so it is deployed beside them with no shim.
+  $sharedScriptNames = @('harness-bridge-common')
+  $deployNames = @($scriptNames) + @($sharedScriptNames)
   $binDir = Join-Path -Path $UserRoot -ChildPath 'bin'
   $shimDir = Join-Path -Path $UserProfile -ChildPath '.local\bin'
 
@@ -87,6 +94,13 @@ function Sync-HarnessBridge {
             Remove-Item -LiteralPath $managedPath -Force
             Write-NucleusNotice -Message "[$label] removed $managedPath"
           }
+        }
+      }
+      foreach ($scriptName in $sharedScriptNames) {
+        $managedPath = Join-Path -Path $binDir -ChildPath "$scriptName.ps1"
+        if (Test-Path -LiteralPath $managedPath) {
+          Remove-Item -LiteralPath $managedPath -Force
+          Write-NucleusNotice -Message "[$label] removed $managedPath"
         }
       }
       Write-NucleusNotice -Message "[$label] disabled — harness hooks answer locally"
@@ -108,10 +122,10 @@ function Sync-HarnessBridge {
     }
     $shimTemplate = Get-Content -LiteralPath $shimTemplatePath -Raw -Encoding UTF8
 
-    foreach ($scriptName in $scriptNames) {
+    foreach ($scriptName in $deployNames) {
       $sourcePath = Join-Path -Path $RepoRoot -ChildPath "src\scripts\notify\$scriptName.ps1"
       if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
-        Write-NucleusWarning -Message "[$label] entry point not found: $sourcePath"
+        Write-NucleusWarning -Message "[$label] script not found: $sourcePath"
         continue
       }
 
@@ -124,6 +138,8 @@ function Sync-HarnessBridge {
         Copy-Item -LiteralPath $sourcePath -Destination $targetPath -Force
         Write-NucleusNotice -Message "[$label] deployed $targetPath"
       }
+
+      if ($scriptName -in $sharedScriptNames) { continue }
 
       # WHY: .gitattributes marks *.bat and *.ps1 but not *.cmd, so the template
       # arrives with LF endings while cmd.exe expects CRLF.

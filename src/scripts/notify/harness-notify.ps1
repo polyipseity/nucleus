@@ -14,10 +14,11 @@
   running for bot-token platforms.
 
   Deployed verbatim to <USER root>\bin and reached from harness hooks through the
-  %USERPROFILE%\.local\bin\harness-notify.cmd shim, so it stays self-contained:
-  importing the shared Format-NucleusOutput module would bake a repository path
-  into the deployed copy. The warning helper below still emits the F1 shape
-  (`<cmd>: warning: <msg>`) to stderr.
+  %USERPROFILE%\.local\bin\harness-notify.cmd shim, together with the sibling
+  harness-bridge-common.ps1 it dot-sources for the shared helpers: importing the
+  shared Format-NucleusOutput module would bake a repository path into the
+  deployed copy. That helper emits the F1 shape (`<cmd>: warning: <msg>`) to
+  stderr.
 
 .PARAMETER EventName
   Lifecycle event: done, needs-input, approval, or error. Named EventName because
@@ -61,44 +62,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Write-HarnessBridgeWarning {
-  <#
-  .SYNOPSIS
-    Writes one F1 warning line to stderr without importing the shared module.
-  .DESCRIPTION
-    See the file header: this script is deployed outside the repository, so it
-    cannot import Format-NucleusOutput.psm1.  The line keeps the F1 shape minus
-    console color, which a hook never sees anyway.
-  .PARAMETER CommandName
-    F1 command prefix.
-  .PARAMETER Message
-    Warning text.
-  #>
-  [CmdletBinding()]
-  param(
-    [Parameter(Mandatory)]
-    [string]$CommandName,
-
-    [Parameter(Mandatory)]
-    [string]$Message
-  )
-
-  [Console]::Error.WriteLine("${CommandName}: warning: $Message")
-}
-
-function Get-HarnessBridgeConfigPath {
-  <#
-  .SYNOPSIS
-    Resolves the nucleus runtime config path.
-  .DESCRIPTION
-    Same location `scripts/config.ps1` (nucleus-config) reads and writes.
-  #>
-  [CmdletBinding()]
-  [OutputType([string])]
-  param()
-
-  return (Join-Path -Path $HOME -ChildPath '.local/state/nucleus/config.json')
-}
+# WHY $PSScriptRoot: Windows deploys a copy of this script outside the repository,
+# so the shared helpers are resolved beside the copy, never by a repo-relative path.
+. (Join-Path -Path $PSScriptRoot -ChildPath 'harness-bridge-common.ps1')
 
 function Get-HarnessBridgeNotifyConfig {
   <#

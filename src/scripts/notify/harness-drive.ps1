@@ -25,10 +25,11 @@
   would have to fake user input into the harness.
 
   Deployed verbatim to <USER root>\bin and reached from harness hooks through the
-  %USERPROFILE%\.local\bin\harness-drive.cmd shim, so it stays self-contained:
-  importing the shared Format-NucleusOutput module would bake a repository path
-  into the deployed copy. The warning helper below still emits the F1 shape
-  (`<cmd>: warning: <msg>`) to stderr.
+  %USERPROFILE%\.local\bin\harness-drive.cmd shim, together with the sibling
+  harness-bridge-common.ps1 it dot-sources for the shared helpers: importing the
+  shared Format-NucleusOutput module would bake a repository path into the
+  deployed copy. That helper emits the F1 shape (`<cmd>: warning: <msg>`) to
+  stderr.
 
 .PARAMETER Harness
   Harness name: pi, opencode, cursor, or copilot.
@@ -59,56 +60,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Write-HarnessBridgeWarning {
-  <#
-  .SYNOPSIS
-    Writes one F1 warning line to stderr without importing the shared module.
-  .PARAMETER CommandName
-    F1 command prefix.
-  .PARAMETER Message
-    Warning text.
-  #>
-  [CmdletBinding()]
-  param(
-    [Parameter(Mandatory)]
-    [string]$CommandName,
-
-    [Parameter(Mandatory)]
-    [string]$Message
-  )
-
-  [Console]::Error.WriteLine("${CommandName}: warning: $Message")
-}
-
-function Get-HarnessBridgeUserRoot {
-  <#
-  .SYNOPSIS
-    Resolves the Windows nucleus USER root.
-  .DESCRIPTION
-    Mirrors Get-NucleusUserRoot in ManagedPaths.ps1, inlined because this script
-    is deployed outside the repository.
-  #>
-  [CmdletBinding()]
-  [OutputType([string])]
-  param()
-
-  if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
-    throw 'harness-drive: %LOCALAPPDATA% is unset; the nucleus USER root is undefined'
-  }
-  return (Join-Path -Path $env:LOCALAPPDATA -ChildPath 'nucleus')
-}
-
-function Get-HarnessBridgeConfigPath {
-  <#
-  .SYNOPSIS
-    Resolves the nucleus runtime config path.
-  #>
-  [CmdletBinding()]
-  [OutputType([string])]
-  param()
-
-  return (Join-Path -Path $HOME -ChildPath '.local/state/nucleus/config.json')
-}
+# WHY $PSScriptRoot: Windows deploys a copy of this script outside the repository,
+# so the shared helpers are resolved beside the copy, never by a repo-relative path.
+. (Join-Path -Path $PSScriptRoot -ChildPath 'harness-bridge-common.ps1')
 
 function Get-HarnessBridgeDriveConfig {
   <#

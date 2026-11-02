@@ -31,9 +31,9 @@ BeforeAll {
     .SYNOPSIS
       Creates an isolated repository/user-root sandbox for one test.
     .DESCRIPTION
-      The "repository" holds copies of the two real entry points so the deployment
-      logic exercises real content, while HOME/LOCALAPPDATA/PATH point at empty
-      directories the test owns.
+      The "repository" holds copies of the real entry points and the helper they
+      dot-source, so the deployment logic exercises real content, while
+      HOME/LOCALAPPDATA/PATH point at empty directories the test owns.
     #>
     [CmdletBinding(SupportsShouldProcess = $true)]
     [OutputType([hashtable])]
@@ -55,7 +55,7 @@ BeforeAll {
 
     $sourceDir = Join-Path -Path $sandbox.Repo -ChildPath 'src\scripts\notify'
     $null = New-Item -ItemType Directory -Path $sourceDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
-    foreach ($name in @('harness-approval', 'harness-drive', 'harness-notify')) {
+    foreach ($name in @('harness-approval', 'harness-bridge-common', 'harness-drive', 'harness-notify')) {
       Copy-Item -LiteralPath (Join-Path -Path $script:NotifyDir -ChildPath "$name.ps1") -Destination (Join-Path -Path $sourceDir -ChildPath "$name.ps1")
     }
 
@@ -333,7 +333,7 @@ Describe 'Sync-HarnessBridge shim convergence' {
     Remove-HarnessBridgeSandbox -Root $script:syncSandbox.Root
   }
 
-  It 'deploys both entry points and both PATH shims on an enabled run' {
+  It 'deploys every entry point with its shim and the shared helper on an enabled run' {
     Sync-HarnessBridge -Enabled:$true -RepoRoot $script:syncSandbox.Repo -UserRoot $script:syncUserRoot -UserProfile $script:syncSandbox.Home > $null
 
     foreach ($name in @('harness-approval', 'harness-drive', 'harness-notify')) {
@@ -349,6 +349,13 @@ Describe 'Sync-HarnessBridge shim convergence' {
       $shimText | Should -Match 'pwsh -NoProfile -ExecutionPolicy Bypass'
       $shimText | Should -Match "`r`n"
     }
+
+    # The helper is dot-sourced, never invoked, so it has no shim.
+    $deployedCommon = Join-Path -Path $script:syncBinDir -ChildPath 'harness-bridge-common.ps1'
+    $sourceCommon = Join-Path -Path $script:syncSandbox.Repo -ChildPath 'src\scripts\notify\harness-bridge-common.ps1'
+    Test-Path -LiteralPath $deployedCommon | Should -Be $true
+    (Get-Content -LiteralPath $deployedCommon -Raw -Encoding UTF8) | Should -Be (Get-Content -LiteralPath $sourceCommon -Raw -Encoding UTF8)
+    Test-Path -LiteralPath (Join-Path -Path $script:syncShimDir -ChildPath 'harness-bridge-common.cmd') | Should -Be $false
   }
 
   It 'is idempotent — a second enabled run rewrites nothing' {
@@ -356,6 +363,7 @@ Describe 'Sync-HarnessBridge shim convergence' {
       (Join-Path -Path $script:syncBinDir -ChildPath 'harness-notify.ps1')
       (Join-Path -Path $script:syncBinDir -ChildPath 'harness-approval.ps1')
       (Join-Path -Path $script:syncBinDir -ChildPath 'harness-drive.ps1')
+      (Join-Path -Path $script:syncBinDir -ChildPath 'harness-bridge-common.ps1')
       (Join-Path -Path $script:syncShimDir -ChildPath 'harness-notify.cmd')
       (Join-Path -Path $script:syncShimDir -ChildPath 'harness-approval.cmd')
       (Join-Path -Path $script:syncShimDir -ChildPath 'harness-drive.cmd')
@@ -377,7 +385,7 @@ Describe 'Sync-HarnessBridge shim convergence' {
 
     Sync-HarnessBridge -Enabled:$false -RepoRoot $script:syncSandbox.Repo -UserRoot $script:syncUserRoot -UserProfile $script:syncSandbox.Home > $null
 
-    foreach ($name in @('harness-approval', 'harness-drive', 'harness-notify')) {
+    foreach ($name in @('harness-approval', 'harness-bridge-common', 'harness-drive', 'harness-notify')) {
       Test-Path -LiteralPath (Join-Path -Path $script:syncBinDir -ChildPath "$name.ps1") | Should -Be $false
       Test-Path -LiteralPath (Join-Path -Path $script:syncShimDir -ChildPath "$name.cmd") | Should -Be $false
     }
