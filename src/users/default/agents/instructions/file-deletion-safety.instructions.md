@@ -15,7 +15,7 @@ Never use `rm`, `del`, `rd`, `rmdir`, `erase`, `ri`, `unlink`, `shred`, or `Remo
 - `shell-safe-rm` (moves to OS Trash, supports rm flags, recoverable via OS GUI)
 - `rip2` / `rip` (moves to graveyard, recoverable via `rip -u`)
 
-On macOS, safe-rm runs with `SAFE_RM_USE_APPLESCRIPT=no` from the managed `~/.safe-rm/config`, and `~/.Trash` is a write-allowed path in the srt policy, so a delete renames the item into the Trash instead of scripting Finder. Apple Events stay denied, and the cost is that Finder "Put Back" is not guaranteed; the item is in the Trash and can be dragged out.
+Inside the srt sandbox, safe-rm takes its `mv` path because the managed config sets `SAFE_RM_USE_APPLESCRIPT=no` when srt's `SANDBOX_RUNTIME` marker is present, and `~/.Trash` is a write-allowed path in the srt policy. Apple Events stay denied there, and the cost is that Finder "Put Back" is not guaranteed; the item is in the Trash and can be dragged out. Outside the sandbox the Finder route stays available, so a delete there still gets Put Back.
 
 **PowerShell (all hosts):**
 - pwsh safe-delete applies on every host (pwsh is installable on macOS, NixOS, Windows). On Windows it recycles to the Recycle Bin; on POSIX it delegates to `shell-safe-rm`. The aliases `rm`, `del`, `rd`, `erase`, `ri`, `rmdir`, `unlink`, `shred`, `Remove-Item` all route through `Invoke-SafeDelete`.
