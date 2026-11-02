@@ -7,6 +7,8 @@
   successful unit action and lastLive on a successful liveness probe.  A
   lastSuccess that advances while lastLive does not is the visible signature of a
   job that was alive and not working, so the pair has to exist on Windows too.
+  On Windows Set-HealthSuccess writes both from one clock read, so the pair
+  cannot diverge here and that signature is POSIX-only.
 
   The module's other contracts stay in the neighbouring service-health.Tests.ps1
   suite; this file covers the liveness stamp, the writes that must leave it

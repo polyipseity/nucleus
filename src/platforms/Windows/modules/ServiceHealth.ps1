@@ -18,7 +18,9 @@
 
     Windows supervises replicas through Sync-CloudDriveCatalog and
     Invoke-ReplicaSync, so it has no mount class to classify and no torn-down
-    state to report.
+    state to report. Set-HealthSuccess stamps lastSuccess and lastLive from one
+    clock read, so the pair cannot diverge on Windows and a job that is alive and
+    not working does not show up as that signature here.
 
     ShouldProcess gating follows PSUseShouldProcessForStateChangingFunctions,
     whose verb set and fix are defined in .agents/instructions/pwsh-lint-policy.instructions.md.

@@ -79,7 +79,9 @@ function Sync-HarnessBridge {
   $scriptNames = @('harness-approval', 'harness-drive', 'harness-notify')
   # Dot-sourced by the entry points, so it is deployed beside them with no shim.
   $sharedScriptNames = @('harness-bridge-common')
-  $deployNames = @($scriptNames) + @($sharedScriptNames)
+  # Shared file first: an interrupted apply must never leave entry points behind
+  # that dot-source a file which never arrived.
+  $deployNames = @($sharedScriptNames) + @($scriptNames)
   $binDir = Join-Path -Path $UserRoot -ChildPath 'bin'
   $shimDir = Join-Path -Path $UserProfile -ChildPath '.local\bin'
 

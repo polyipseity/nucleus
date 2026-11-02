@@ -5,7 +5,7 @@
 #   • dotted nixpkgs attribute paths resolve via lib.hasAttrByPath
 #   • darwin-only packages have platforms = ["darwin"]
 #   • darwin-only packages are not buildable on Linux
-#   • packages nixpkgs cannot provide on darwin have platforms = ["linux"] or a Homebrew/overlay carrier
+#   • packages nixpkgs cannot provide on darwin have platforms = ["linux"] or a Homebrew-on-darwin/overlay carrier
 #   • src/hosts/NixOS/desktop.nix installs nothing managedPackages provides
 #   • homebrew.kind is the documented formula|cask and carries a name
 #
@@ -178,14 +178,24 @@ let
     pkg != null && !(lib.meta.availableOn darwinSystem pkg)
   ) nixpkgsEntryNames;
 
-  # macOS keeps an app that nixpkgs packages only for Linux: Homebrew carries
-  # it, or the flake overlay replaces the attribute with a darwin build.
-  # `platforms = [ "linux" ]` removes an entry from every darwin list, the
-  # Homebrew ones included, because `managedPackagePlatformCompatible` gates
-  # them all, so the marker is owed only where nothing else carries darwin.
+  # macOS keeps an app that nixpkgs packages only for Linux when the registry
+  # routes it to Homebrew on darwin: `resolvePackageBackend` sends the gui
+  # category to Homebrew under the policy default, and core.nix's
+  # `darwinUnavailableNixPackages` filters on that same backend, so its
+  # assertion never examines such an entry. A CLI entry stays on nixpkgs
+  # whatever Homebrew metadata it carries, which is why a Homebrew block alone
+  # cannot carry it. The flake overlay replaces the attribute with a darwin
+  # build, so it carries either route. `platforms = [ "linux" ]` removes an
+  # entry from every darwin list, the Homebrew ones included, because
+  # `managedPackagePlatformCompatible` gates them all, so the marker is owed
+  # only where nothing else carries darwin.
+  homebrewRoutedOnDarwin =
+    name: lib.hasInfix "category = \"gui\"" (entryBlocks.${name} or "");
   flakeText = builtins.readFile ../../src/flake.nix;
   darwinCarriedElsewhere =
-    name: homebrewBlockOf name != "" || lib.hasInfix "${name} = prev.stdenv.mkDerivation" flakeText;
+    name:
+    (homebrewRoutedOnDarwin name && homebrewBlockOf name != "")
+    || lib.hasInfix "${name} = prev.stdenv.mkDerivation" flakeText;
 
   # --- NixOS host package list ---
   # A host may not install by hand what managedPackages already provides: both
@@ -276,12 +286,13 @@ let
       "Darwin-only packages must set platforms = [ \"darwin\" ] in core.nix; unmarked: ${lib.strings.concatStringsSep ", " unmarked}";
 
   # Entries nixpkgs cannot provide on darwin need a darwin carrier:
-  # `platforms = [ "linux" ]` for a package that is genuinely Linux-only, or a
-  # Homebrew block / flake overlay build for one macOS installs another way.
-  # core.nix carries every platform-compatible entry in the darwin nixpkgs list
-  # without probing availability, so without one of the two the entry drops out
-  # of it silently.  The marker also gates the Homebrew lists, so it is only
-  # correct where nothing else carries darwin.
+  # `platforms = [ "linux" ]` for a package that is genuinely Linux-only, a
+  # Homebrew block on an entry the registry routes to Homebrew on darwin, or a
+  # flake overlay build for one macOS installs another way. core.nix carries
+  # every platform-compatible entry in the darwin nixpkgs list without probing
+  # availability, so without one of the three the entry drops out of it
+  # silently. The marker also gates the Homebrew lists, so it is only correct
+  # where nothing else carries darwin.
   test_darwin_unavailable_packages_declared =
     let
       unmarked = builtins.filter (
@@ -291,7 +302,7 @@ let
       ) darwinUnavailablePackageNames;
     in
     assert' (builtins.length darwinUnavailablePackageNames > 0 && unmarked == [ ])
-      "packages nixpkgs cannot provide on darwin need a darwin carrier: platforms = [ \"linux\" ] for a genuinely Linux-only package, or a Homebrew block or flake overlay build for the entry; parsed ${builtins.toString (builtins.length darwinUnavailablePackageNames)}, unmarked: ${lib.strings.concatStringsSep ", " unmarked}";
+      "packages nixpkgs cannot provide on darwin need a darwin carrier: platforms = [ \"linux\" ] for a genuinely Linux-only package, a Homebrew block on an entry routed to Homebrew on darwin, or a flake overlay build; parsed ${builtins.toString (builtins.length darwinUnavailablePackageNames)}, unmarked: ${lib.strings.concatStringsSep ", " unmarked}";
 
   # Darwin-only packages must not be buildable on Linux.
   test_darwin_only_absent_on_linux =

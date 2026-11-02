@@ -65,9 +65,9 @@ ntfs3g_rebuild_reason() {
     printf '%s\n' "binary missing"
   elif ! [ -f "$2" ]; then
     printf '%s\n' "build record missing"
-  elif [ "$(sed -n 1p "$2")" != "$3" ]; then
+  elif [ "$(fuse_provider_record_field 1 "$2")" != "$3" ]; then
     printf '%s\n' "build configuration changed"
-  elif [ "$(sed -n 2p "$2")" != "$4" ]; then
+  elif [ "$(fuse_provider_record_field 2 "$2")" != "$4" ]; then
     printf '%s\n' "fuse-t provider changed"
   fi
 }

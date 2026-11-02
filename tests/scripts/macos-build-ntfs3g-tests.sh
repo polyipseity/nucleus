@@ -18,6 +18,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/test-lib.sh"
 
 LIB_SH="$SCRIPT_DIR/../../src/scripts/lib/lib.sh"
+FUSE_PROVIDER_LIB="$SCRIPT_DIR/../../src/scripts/lib/macos-fuse-provider.sh"
 BUILD_SCRIPT="$SCRIPT_DIR/../../src/hosts/MacBook/scripts/macos-build-ntfs3g.sh"
 
 FINGERPRINT="3f1a9c1d0b7e4a5f8c2d6e9b0a1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f70819"
@@ -71,6 +72,8 @@ assert_contains "build script sources the fuse-t provider helper" "$BUILD_SCRIPT
 assert_contains "build script computes the provider digest from the helper" "$BUILD_SCRIPT_TEXT" "fuse_provider_digest \"\$PROVIDER_ROOT\""
 assert_contains "build script reads the provider version from the helper" "$BUILD_SCRIPT_TEXT" "fuse_provider_version \"\$PROVIDER_ROOT\""
 assert_contains "build script names the provider from the helper" "$BUILD_SCRIPT_TEXT" "fuse_provider_identity \"\$PROVIDER_ROOT\""
+assert_contains "build script reads the build record through the provider helper" "$BUILD_SCRIPT_TEXT" "fuse_provider_record_field 1 \"\$2\""
+assert_not_contains "build script carries no private record reader" "$BUILD_SCRIPT_TEXT" "sed -n 1p"
 assert_not_contains "build script carries no private provider digest" "$BUILD_SCRIPT_TEXT" "ntfs3g_provider_digest"
 assert_not_contains "build script carries no private provider identity" "$BUILD_SCRIPT_TEXT" "ntfs3g_provider_identity"
 
@@ -87,17 +90,19 @@ fi
 # ---- Rebuild gate ----
 
 # gate_call <function_text> <binary> <record> <fingerprint> <digest>: run the
-# extracted gate in a fresh shell that also sources lib.sh.
+# extracted gate in a fresh shell that also sources lib.sh and the provider
+# library the gate delegates to.
 # Prints the rebuild reason (empty when the installed binary is current).
 gate_call() {
   local function_text="$1"
   shift
   bash -c '
     . "$1"
-    eval "$2"
-    shift 2
+    . "$2"
+    eval "$3"
+    shift 3
     ntfs3g_rebuild_reason "$@"
-  ' macos-build-ntfs3g-tests "$LIB_SH" "$function_text" "$@"
+  ' macos-build-ntfs3g-tests "$LIB_SH" "$FUSE_PROVIDER_LIB" "$function_text" "$@"
 }
 
 # assert_reason <test_name> <expected_reason> <binary> <record> <fingerprint> <digest>

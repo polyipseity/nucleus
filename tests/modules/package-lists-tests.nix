@@ -10,6 +10,7 @@
 #   • cursor.superpowers lockfile entry is valid
 #   • the managed `pass` resolves to the OTP-wrapped derivation, never alongside it
 #   • Windows DSC package ids are sorted alphabetically (case-folded)
+#   • winget-packages.json is $schema-first at the root key level
 #
 # Run with: nix-instantiate --eval --strict tests/modules/package-lists-tests.nix
 
@@ -214,7 +215,7 @@ let
   # uppercase-leading one.
   dscSortKey = id: lib.toLower id;
   dscSortedIds = builtins.sort (a: b: dscSortKey a < dscSortKey b) dscIds;
-  dscSorted = dscIds == dscSortedIds;
+  dscSorted = dscIds != [ ] && dscIds == dscSortedIds;
   # WHY report adjacent inversions: each names one misplaced block, while a
   # position-by-position diff would also list every id that a single insert
   # displaces.
