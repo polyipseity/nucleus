@@ -66,10 +66,10 @@ FIXTURE
 Write-Host 'the `enable` flag'
 FIXTURE
 
-  # logging-format mode: a backtick-e that ends the token, an escape form with
-  # no bracket after it.
+  # logging-format mode: a backtick-e that ends the line, the form the pattern's
+  # `$` alternative covers. No quote follows, so no character after the e.
   cat >"$WORK_DIR/logging-tail-fixture.ps1" <<'FIXTURE'
-$escape = "`e"
+$escape = `e
 FIXTURE
 
   # skip-constructs mode: the removed skip signal.
@@ -102,9 +102,15 @@ assert_mode_reports() {
 }
 
 # assert_mode_silent NAME MODE FILE EXPECTED: the rule must not print a line
-# carrying EXPECTED for a file that only resembles a violation.
+# carrying EXPECTED for a file that only resembles a violation.  `scan` discards
+# awk's status and stderr, so a missing fixture prints nothing and the case would
+# pass for the wrong reason; the fixture is therefore required to exist.
 assert_mode_silent() {
   local _name="$1" _mode="$2" _file="$3" _expected="$4" _out
+  if [ ! -f "$_file" ]; then
+    assert_fail "$_name" "fixture not found: $_file"
+    return
+  fi
   _out="$(scan "$_mode" "$_file")"
   if printf '%s\n' "$_out" | grep -qF -- "$_expected"; then
     assert_fail "$_name" "rule reported $_expected; output: $_out"
@@ -128,8 +134,8 @@ test_logging_format_mode_allows_inline_code_starting_with_e() {
     "$WORK_DIR/logging-inline-fixture.ps1" "backtick-e escape literal"
 }
 
-test_logging_format_mode_reports_backtick_e_at_token_end() {
-  assert_mode_reports "logging-format mode reports a backtick-e that ends the token" logging-format \
+test_logging_format_mode_reports_backtick_e_at_line_end() {
+  assert_mode_reports "logging-format mode reports a backtick-e at end of line" logging-format \
     "$WORK_DIR/logging-tail-fixture.ps1" "backtick-e escape literal"
 }
 
@@ -143,6 +149,6 @@ test_awk_program_compiles
 test_default_mode_reports_oversized_heredoc
 test_logging_format_mode_reports_backtick_e
 test_logging_format_mode_allows_inline_code_starting_with_e
-test_logging_format_mode_reports_backtick_e_at_token_end
+test_logging_format_mode_reports_backtick_e_at_line_end
 test_skip_constructs_mode_reports_removed_skip_signal
 finish_tests

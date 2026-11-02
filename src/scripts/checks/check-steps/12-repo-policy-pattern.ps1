@@ -269,9 +269,9 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
       }
       # WHY the token-end group: an ESC escape is a backtick-e that ends the
       # token; inline code such as `enable` continues with an identifier
-      # character. -CaseSensitive matches the awk twin (repository-policy.awk),
-      # whose regex is case-sensitive by construction, and Select-String's
-      # case-insensitive default would flag any lowercase-e example.
+      # character. -CaseSensitive is parity with the awk twin
+      # (repository-policy.awk), whose regex is case-sensitive, so both twins
+      # report the same lines.
       foreach ($m in (Select-String -Path $lfPsFiles -Pattern '`e([^A-Za-z0-9_]|$)' -CaseSensitive)) {
         Write-ErrorMessage "$($m.Path):$($m.LineNumber): backtick-e escape literal (use PSStyle helpers)"
         $lfErrors++

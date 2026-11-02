@@ -14,9 +14,7 @@ let
   repoRoot = ../..;
   manifestDir = repoRoot + "/src/modules/scoop-manifests";
 
-  # Mirrors definitions.hash in the Scoop schema: one digest, or a non-empty
-  # array of digests. The array branch there carries `uniqueItems: true`, so a
-  # repeated digest is malformed and not merely redundant.
+  # Mirrors definitions.hashPattern in the Scoop schema.
   # ref: https://raw.githubusercontent.com/ScoopInstaller/Scoop/master/schema.json
   hashPattern = "^([a-fA-F0-9]{64}|(sha1|sha256|sha512|md5):([a-fA-F0-9]{32}|[a-fA-F0-9]{40}|[a-fA-F0-9]{64}|[a-fA-F0-9]{128}))$";
 
@@ -84,20 +82,20 @@ let
     else
       "<${builtins.typeOf value}>";
 
+  # WHY: the rejection and the failure message both read this one list, so the
+  # rule cannot reject a value that its own message calls well formed.
+  unique =
+    values:
+    builtins.foldl' (acc: value: if builtins.elem value acc then acc else acc ++ [ value ]) [ ] values;
+
   # WHY: a repeated digest is the one malformed shape whose printed array looks
   # well formed, so it is named as a repeat instead of leaving the reader to
   # compare the elements of a value that is already printed.
   repeatedValues =
     values:
-    builtins.foldl' (
-      acc: value:
-      if builtins.elem value acc then
-        acc
-      else if builtins.length (builtins.filter (other: other == value) values) > 1 then
-        acc ++ [ value ]
-      else
-        acc
-    ) [ ] values;
+    builtins.filter (value: builtins.length (builtins.filter (other: other == value) values) > 1) (
+      unique values
+    );
 
   describeBadSite =
     site:
@@ -110,14 +108,11 @@ let
   # WHY: the count of distinct elements must equal the element count, because a
   # digest copied twice inside one array gives no second integrity check and
   # arrives from a copy-paste edit.
-  distinctCount =
-    values:
-    builtins.length (
-      builtins.foldl' (acc: v: if builtins.elem v acc then acc else acc ++ [ v ]) [ ] values
-    );
+  distinctCount = values: builtins.length (unique values);
 
   # Mirrors definitions.hash in the Scoop schema: one digest, or a non-empty
-  # array of distinct digests.
+  # array of distinct digests. The array branch there carries `uniqueItems:
+  # true`, so a repeated digest is malformed and not merely redundant.
   hashWellFormed =
     value:
     if builtins.isString value then
@@ -211,12 +206,39 @@ let
     assert' (badHashSites == [ ])
       "every Scoop manifest hash must be a digest, not a placeholder: ${builtins.concatStringsSep ", " (builtins.map describeBadSite badHashSites)}";
 
+  # WHY: no manifest carries an array hash, so the array branch of
+  # `hashWellFormed` is unreachable from manifest data and its uniqueness rule
+  # would otherwise pass vacuously. A literal digest pair pins both directions:
+  # one digest is well formed, and the same digest twice is not. The message
+  # names the repeated digest through the same helper a manifest failure uses.
+  sampleDigest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+  sampleHashArray = [
+    sampleDigest
+    sampleDigest
+  ];
+  singleDigestArrayAccepted = hashWellFormed [ sampleDigest ];
+  repeatedDigestArrayRejected = !hashWellFormed sampleHashArray;
+
+  test_array_hash_uniqueness =
+    assert' (singleDigestArrayAccepted && repeatedDigestArrayRejected)
+      "an array hash must accept one digest (that digest is ${
+        if singleDigestArrayAccepted then "accepted" else "rejected"
+      }) and reject a repeat (the repeat is ${
+        if repeatedDigestArrayRejected then "rejected" else "accepted"
+      }): ${
+        describeBadSite {
+          label = "self-test";
+          value = sampleHashArray;
+        }
+      }";
+
   allTests = [
     test_hash_site_counts
     test_every_manifest_has_hash_site
     test_architecture_blocks_are_attrsets
     test_architectures_carry_hash
     test_hashes_well_formed
+    test_array_hash_uniqueness
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {

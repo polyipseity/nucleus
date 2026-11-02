@@ -9,7 +9,7 @@
 # check host instead, with every other step skipped, and assert on what it
 # reports.
 #
-# WHY: both fixture bodies are assembled from [char]96; a literal backtick-e in
+# WHY: every fixture body is assembled from [char]96; a literal backtick-e in
 # this file would itself trip the policy under test, since the step scans tracked
 # .ps1 files and only the shared color helpers are allowlisted.
 
@@ -66,6 +66,36 @@ function Invoke-LoggingFormatPolicy {
   }
 }
 
+# Invoke-LoggingFormatAction: invoke the captured step 12 action directly over one
+# fixture path, the same single-$Context call the runner makes. WHY a direct call
+# and not the harness above: step 12 registers -Platform windows, so the check
+# host reports it "not applicable (platform: windows)" on macOS and a scoped run
+# there never reaches the logging-format scan. Cases 7 and 8 use the same direct
+# invocation for the same reason.
+function Invoke-LoggingFormatAction {
+  param([string]$FixturePath)
+  $actionPath = Join-Path -Path $fixtureDir -ChildPath "action-$([guid]::NewGuid().ToString('N')).ps1"
+  Set-Content -Path $actionPath -Value @(
+    # WHY: the action's preceding scans surface non-terminating errors that are expected for a
+    # fixture tree, so they must not abort the run and hide the scan under test.
+    '$ErrorActionPreference = "Continue"',
+    # reason: NUCLEUS_REPO_ROOT is expected to be absent, and the scoped path check must read the real repo
+    'Remove-Item -Path Env:NUCLEUS_REPO_ROOT -ErrorAction Ignore',
+    ('$RepoRoot = ''{0}''' -f $repoRoot),
+    '$FrameworkDir = Join-Path $RepoRoot "src/scripts/lib"',
+    '$CheckDir = Join-Path $RepoRoot "src/scripts/checks"',
+    '. (Join-Path $CheckDir "check-lib.ps1")',
+    '. (Join-Path $FrameworkDir "deny-list.ps1")',
+    '$script:Captured = $null',
+    'function Register-Step { param($Id,$Name,$Platform,$Mode,$Requires,[scriptblock]$Action); $script:Captured = $Action }',
+    '. (Join-Path $CheckDir "check-steps/12-repo-policy-pattern.ps1")',
+    ('$Context = [pscustomobject]@{{ HasArgs = $true; RepoRoot = ''{0}''; PositionalArgs = @(''{1}''); NixFiles = @() }}' -f $repoRoot, $FixturePath),
+    '$out = @(& $script:Captured $Context 2>&1) | ForEach-Object { $_.ToString() }',
+    'foreach ($line in $out) { Write-Output $line }'
+  )
+  return Invoke-LoggingFormatPolicy -ScriptPath $actionPath
+}
+
 try {
   # WHY: -File keeps the host's own flag parsing intact; `& $checkScript` would
   # bind --scoped positionally to the host's first parameter and fail validation.
@@ -99,6 +129,34 @@ try {
   } else {
     Assert-Pass 'step 12: a backtick-e escape sequence is reported'
   }
+  # 2b. Inline code starting with a lowercase e is not an escape.
+  $inlinePath = Join-Path $fixtureDir 'inline.ps1'
+  Set-Content -Path $inlinePath -Value @(
+    ('# the ' + $backtick + 'enable flag'),
+    ('Write-Output ''the ' + $backtick + 'enable flag''')
+  )
+  $inline = Invoke-LoggingFormatAction -FixturePath $inlinePath
+  if ($inline.Output -match 'backtick-e escape literal') {
+    Assert-Fail 'step 12: inline code starting with e' $inline.Output.Trim()
+  } elseif ($inline.Output -notmatch 'logging format policy passed\.') {
+    # WHY: without this the case could pass on a step that never ran instead of a clean scan.
+    Assert-Fail 'step 12: inline code starting with e' 'logging format policy did not run'
+  } else {
+    Assert-Pass 'step 12: inline code starting with e is not an escape'
+  }
+
+  # 2c. A backtick-e that ends the line is an escape with no trailing character.
+  $tailPath = Join-Path $fixtureDir 'tail.ps1'
+  Set-Content -Path $tailPath -Value ('$esc = ' + $backtick + 'e')
+  $tail = Invoke-LoggingFormatAction -FixturePath $tailPath
+  if ($tail.Output -notmatch 'backtick-e escape literal') {
+    Assert-Fail 'step 12: a backtick-e at end of line' $tail.Output.Trim()
+  } elseif ($tail.Output -notmatch 'logging format policy check failed') {
+    Assert-Fail 'step 12: a backtick-e at end of line' 'the logging format policy must report the fixture as a failure'
+  } else {
+    Assert-Pass 'step 12: a backtick-e at end of line is reported'
+  }
+
   # 3. The removed skip mechanism list covers the test-harness counter.
   #    The tokens are composed at runtime: step 12 scans tracked .ps1/.sh files,
   #    this test file included, so a literal token here would be a finding
