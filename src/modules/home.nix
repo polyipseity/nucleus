@@ -126,6 +126,11 @@ let
       path = "${resolvedHomeDirectory}/.srt-settings.json";
       writable = true;
     }
+    {
+      # check-suppress:config-method: method 1 (writable symlink) -- safe-rm config is user-overridable via the standard overlay pattern.
+      path = "${resolvedHomeDirectory}/.safe-rm/config";
+      writable = true;
+    }
     # LiteLLM config and handler symlinks, editable in the repo and picked up on service restart.
     {
       path = "${nucleusUserRoot}/litellm-config.yml";
@@ -361,6 +366,13 @@ in
         "${overlay.toRepoRelPath (overlay.selectFile "srt" "settings.json")}"
     '';
 
+    # check-suppress:config-method: method 1 (writable symlink) -- safe-rm config is user-overridable via the standard overlay pattern.
+    home.activation.seed-safe-rm-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+        "${config.home.homeDirectory}/.safe-rm/config" \
+        "${overlay.toRepoRelPath (overlay.selectFile "safe-rm" "config")}"
+    '';
+
     # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
     home.activation.seed-litellm-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
@@ -390,6 +402,7 @@ in
           "seed-discord-music-rpc-config"
           "seed-iterm2-dynamic-profiles"
           "seed-litellm-config"
+          "seed-safe-rm-config"
           "seed-srt-settings"
         ]
         ''

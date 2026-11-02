@@ -13,6 +13,7 @@
       "/private/var/folders",
       "/tmp",
       "/var/folders",
+      "~/.Trash",
       "~/.bun",
       "~/.cache",
       "~/.cargo",
@@ -24,9 +25,9 @@
       "~/.npm",
       "~/.pi",
       "~/.rustup",
-      "~/dev",
       "~/Library/Application Support/nucleus",
-      "~/Library/Caches"
+      "~/Library/Caches",
+      "~/dev"
     ],
     "denyRead": [
       "~/.aws",
