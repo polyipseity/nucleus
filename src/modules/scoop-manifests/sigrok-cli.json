@@ -21,8 +21,5 @@
   "checkver": {
     "url": "https://sigrok.org/wiki/Downloads",
     "regex": "sigrok-cli[._-]v?([\\d.]+)\\.tar"
-  },
-  "autoupdate": {
-    "url": "https://sigrok.org/download/binary/sigrok-cli/sigrok-cli-$version-x86_64-installer.exe"
   }
 }

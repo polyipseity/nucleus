@@ -4,7 +4,9 @@
 # network, so a POSIX run without it never notices a placeholder. This test
 # applies the same pattern offline, additionally requires every architecture
 # block to carry a hash, so a new architecture cannot inherit an empty field,
-# and rejects a digest repeated inside one hash array.
+# rejects a digest repeated inside one hash array, and refuses an `autoupdate`
+# block, so a version bump cannot rewrite a URL and leave the previous digest in
+# place.
 #
 # Run with: nix-instantiate --eval --strict tests/modules/scoop-manifest-hashes-tests.nix
 
@@ -232,6 +234,23 @@ let
         }
       }";
 
+  # WHY: `autoupdate` rewrites `url` on a version bump and leaves every `hash`
+  # untouched, so a bumped manifest ships a URL whose digest describes the
+  # previous archive. Neither project publishes an extractable checksum, so the
+  # bump has to run `nix store prefetch-file` for each digest. Refusing the block
+  # keeps that step from being skipped, and for a manifest whose installer file
+  # name carries the version it is the only in-repo reminder to edit that name.
+  manifestsWithAutoupdate = builtins.filter (manifest: manifest.doc ? autoupdate) manifests;
+
+  test_no_autoupdate =
+    assert' (manifestsWithAutoupdate == [ ])
+      "${builtins.concatStringsSep "; " (
+        builtins.map (
+          manifest:
+          "scoop manifest ${manifest.name} must not carry autoupdate: a bump must recompute the digests with nix store prefetch-file and update the installer file name when it carries the version"
+        ) manifestsWithAutoupdate
+      )}";
+
   allTests = [
     test_hash_site_counts
     test_every_manifest_has_hash_site
@@ -239,6 +258,7 @@ let
     test_architectures_carry_hash
     test_hashes_well_formed
     test_array_hash_uniqueness
+    test_no_autoupdate
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {
