@@ -5,8 +5,7 @@
 #   • dotted nixpkgs attribute paths resolve via lib.hasAttrByPath
 #   • darwin-only packages have platforms = ["darwin"]
 #   • darwin-only packages are not buildable on Linux
-#   • linux-only packages have platforms = ["linux"]
-#   • packages nixpkgs cannot provide on darwin have platforms = ["linux"]
+#   • packages nixpkgs cannot provide on darwin have platforms = ["linux"] or a Homebrew/overlay carrier
 #   • src/hosts/NixOS/desktop.nix installs nothing managedPackages provides
 #   • homebrew.kind is the documented formula|cask and carries a name
 #
@@ -133,20 +132,15 @@ let
     "equaliser"
   ];
 
-  # --- Linux-only packages, derived from nixpkgs ---
-  # An entry is Linux-only when its nixpkgs attribute declares support for Linux
-  # and not for Darwin: then the registry says so, which keeps the entry out of
-  # the darwin nixpkgs list and out of the Homebrew formula and cask lists, and
-  # records the intent.
+  # --- Packages nixpkgs cannot provide on darwin, derived from nixpkgs ---
   # The declared platforms decide it, since `lib.meta.availableOn` folds in
   # `meta.platforms` and `meta.badPlatforms`, read from the Linux package set: a
   # darwin evaluation of an unfree or broken attribute answers a different
-  # question than "is this app Linux-only".
+  # question than "can nixpkgs build this for darwin".
   # WHY: attribute presence cannot stand in, because nixpkgs defines the
   # attribute on every system; `alsa-utils` resolves in an aarch64-darwin package
-  # set and is still Linux-only.
+  # set and is still unavailable there.
   darwinSystem = lib.systems.elaborate "aarch64-darwin";
-  linuxSystem = lib.systems.elaborate "x86_64-linux";
   linuxPkgs' = import <nixpkgs> { system = "x86_64-linux"; };
   # One entry's own `nixpkgs = "…"`, read from its block text: `nixpkgsAttrs`
   # above is a flat list of every attribute in the file and cannot be keyed by
@@ -171,18 +165,11 @@ let
   # Presence stays the entry filter: an entry with no `nixpkgs` attribute is not
   # a nix package at all.
   nixpkgsEntryNames = builtins.filter (name: nixpkgsAttrOf name != null) extractedNames;
-  linuxOnlyPackageNames = builtins.filter (
-    name:
-    let
-      pkg = linuxPackageOf name;
-    in
-    pkg != null && lib.meta.availableOn linuxSystem pkg && !(lib.meta.availableOn darwinSystem pkg)
-  ) nixpkgsEntryNames;
 
-  # Entries nixpkgs cannot provide on darwin at all, read the same way as
-  # `linuxOnlyPackageNames`: `lib.meta.availableOn` over the Linux package set, so
-  # an unfree or broken attribute does not answer a different question.  A null
-  # package (attribute absent from the Linux set) is not a platform answer.
+  # Entries nixpkgs cannot provide on darwin at all, read with
+  # `lib.meta.availableOn` over the Linux package set, so an unfree or broken
+  # attribute does not answer a different question.  A null package (attribute
+  # absent from the Linux set) is not a platform answer.
   darwinUnavailablePackageNames = builtins.filter (
     name:
     let
@@ -208,13 +195,21 @@ let
   # for the "7zip" entry).  Only the `environment.systemPackages` block is read,
   # so option paths and service settings elsewhere in the file cannot match.
   nixosDesktopText = builtins.readFile ../../src/hosts/NixOS/desktop.nix;
-  nixosDesktopPackageList = builtins.head (
-    lib.strings.splitString "\n    ];" (
-      builtins.head (
-        builtins.tail (lib.strings.splitString "environment.systemPackages =" nixosDesktopText)
-      )
-    )
-  );
+  # The split is the parse, so each half checks that it found its delimiter
+  # before taking a head: one occurrence of the opener and one `\n    ];` close.
+  # Without the guard a reformat would hand back an empty interior and the
+  # duplicate check would scan nothing.
+  nixosDesktopBlocks = lib.strings.splitString "environment.systemPackages =" nixosDesktopText;
+  nixosDesktopPackageList =
+    assert lib.assertMsg (
+      builtins.length nixosDesktopBlocks > 1
+    ) "src/hosts/NixOS/desktop.nix must declare an environment.systemPackages = block";
+    let
+      listParts = lib.strings.splitString "\n    ];" (builtins.head (builtins.tail nixosDesktopBlocks));
+    in
+    assert lib.assertMsg (builtins.length listParts > 1)
+      "src/hosts/NixOS/desktop.nix environment.systemPackages block must close with `];` on a line indented four spaces";
+    builtins.head listParts;
   desktopPackageTokenOf =
     line:
     lib.removePrefix "pkgs." (lib.strings.trim (builtins.head (lib.strings.splitString "#" line)));
@@ -280,30 +275,13 @@ let
     assert' (unmarked == [ ])
       "Darwin-only packages must set platforms = [ \"darwin\" ] in core.nix; unmarked: ${lib.strings.concatStringsSep ", " unmarked}";
 
-  # Linux-only packages must set platforms = [ "linux" ] in core.nix, unless
-  # macOS gets them some other way (Homebrew, or a flake overlay darwin build).
-  # It constrains only what the derivation finds, so an app that nixpkgs
-  # packages for both systems is never required to carry the marker.
-  test_linux_only_packages_platform_marked =
-    let
-      unmarked = builtins.filter (
-        name:
-        let
-          entryBlock = entryBlocks.${name} or null;
-        in
-        !(darwinCarriedElsewhere name)
-        && (entryBlock == null || !lib.hasInfix "platforms = [ \"linux\" ]" entryBlock)
-      ) linuxOnlyPackageNames;
-    in
-    assert' (unmarked == [ ])
-      "Linux-only packages must set platforms = [ \"linux\" ] in core.nix; unmarked: ${lib.strings.concatStringsSep ", " unmarked}";
-
-  # Entries nixpkgs cannot provide on darwin must say so with
-  # `platforms = [ "linux" ]`: core.nix carries every platform-compatible entry
-  # in the darwin nixpkgs list without probing availability, so the marker is the
-  # only thing that keeps such an entry out of it.  The exemption above applies
-  # for the same reason it does there, since the marker also removes an entry
-  # from the Homebrew lists.
+  # Entries nixpkgs cannot provide on darwin need a darwin carrier:
+  # `platforms = [ "linux" ]` for a package that is genuinely Linux-only, or a
+  # Homebrew block / flake overlay build for one macOS installs another way.
+  # core.nix carries every platform-compatible entry in the darwin nixpkgs list
+  # without probing availability, so without one of the two the entry drops out
+  # of it silently.  The marker also gates the Homebrew lists, so it is only
+  # correct where nothing else carries darwin.
   test_darwin_unavailable_packages_declared =
     let
       unmarked = builtins.filter (
@@ -312,8 +290,8 @@ let
         && !lib.hasInfix "platforms = [ \"linux\" ]" (entryBlocks.${name} or "")
       ) darwinUnavailablePackageNames;
     in
-    assert' (unmarked == [ ])
-      "packages nixpkgs cannot provide on darwin must set platforms = [ \"linux\" ] in core.nix; unmarked: ${lib.strings.concatStringsSep ", " unmarked}";
+    assert' (builtins.length darwinUnavailablePackageNames > 0 && unmarked == [ ])
+      "packages nixpkgs cannot provide on darwin need a darwin carrier: platforms = [ \"linux\" ] for a genuinely Linux-only package, or a Homebrew block or flake overlay build for the entry; parsed ${builtins.toString (builtins.length darwinUnavailablePackageNames)}, unmarked: ${lib.strings.concatStringsSep ", " unmarked}";
 
   # Darwin-only packages must not be buildable on Linux.
   test_darwin_only_absent_on_linux =
@@ -380,7 +358,6 @@ let
     test_managed_nixpkgs_attrs_resolve
     test_dotted_nixpkgs_paths_resolve
     test_darwin_only_packages_platform_marked
-    test_linux_only_packages_platform_marked
     test_darwin_unavailable_packages_declared
     test_darwin_only_absent_on_linux
     test_homebrew_kind_documented
@@ -393,6 +370,5 @@ builtins.seq (builtins.deepSeq allTests null) {
   success = true;
   testCount = builtins.length allTests;
   packageCount = builtins.length extractedNames;
-  linuxOnlyCount = builtins.length linuxOnlyPackageNames;
   message = "All ${builtins.toString (builtins.length allTests)} cross-platform package parity tests passed (${builtins.toString (builtins.length extractedNames)} packages verified)";
 }

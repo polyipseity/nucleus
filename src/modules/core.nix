@@ -878,6 +878,13 @@ let
       nixpkgs = "stats";
     };
     steam = {
+      # WHY: NixOS installs Steam through programs.steam.enable, which puts
+      # pkgs.steam and its steam-run wrapper in environment.systemPackages and
+      # turns on hardware.steam-hardware, so the registry must not add pkgs.steam
+      # there as well.
+      enable = {
+        NixOS = false;
+      };
       category = "gui";
       homebrew = {
         kind = "cask";
@@ -1385,7 +1392,7 @@ in
         ++ [
           {
             assertion = darwinUnavailableNixPackages == [ ];
-            message = "core.nix: packages unavailable on darwin must set platforms = [ \"linux\" ] rather than being dropped silently: ${lib.strings.concatStringsSep ", " darwinUnavailableNixPackages}";
+            message = "core.nix: packages nixpkgs cannot provide on darwin need a darwin carrier: set platforms = [ \"linux\" ] if the package is genuinely Linux-only, otherwise give the entry a Homebrew block or a flake overlay build; unresolved: ${lib.strings.concatStringsSep ", " darwinUnavailableNixPackages}";
           }
         ];
     }
