@@ -566,6 +566,48 @@ function Test-FailFastReport-ReplaysFailedStep {
     }
 }
 
+# The pipeline appends a failure as its runspace completes, so two failures can
+# land in completion order: a later-launched step that fails first must still be
+# reported after an earlier-launched step that fails later. The contract is
+# launch order (step-runner.instructions.md, Dispatch). Driving
+# Invoke-StepPipeline in-process cannot assert this, because a fail-fast abort
+# exits the host process; the child process carries the exit code and output.
+function Test-PipelineFailFastReportsLaunchOrder {
+    $driver = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-order-$([System.IO.Path]::GetRandomFileName()).ps1"
+    $driverText = @'
+param([string]$RepoRoot)
+Set-Location $RepoRoot
+$FrameworkDir = Join-Path $RepoRoot 'src/scripts/lib'
+. (Join-Path $FrameworkDir 'step-runner.ps1')
+function Write-Message { Write-Output "msg: $args" }
+function Write-ErrorMessage { Write-Output "err: $args" }
+Read-Argument -Arguments @()
+$script:FAIL_FAST = $true
+$env:PARALLEL_JOBS = '2'
+Register-Step -Id 'slow-fail' -Number 1 -Name 'Slow-fail step' -Action { param($Context) Start-Sleep -Milliseconds 3000; 'SLOW-FAIL-REASON'; $false }
+Register-Step -Id 'fast-fail' -Number 2 -Name 'Fast-fail step' -Action { param($Context) Start-Sleep -Milliseconds 300; 'FAST-FAIL-REASON'; $false }
+Invoke-StepPipeline
+'@
+    Set-Content -LiteralPath $driver -Value $driverText -Encoding utf8
+    try {
+        $pwshExe = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
+        $out = & $pwshExe -NoLogo -NoProfile -NonInteractive -File $driver -RepoRoot $repoRoot 2>&1 | Out-String
+        $code = $LASTEXITCODE
+        # Launch order is 1 then 2; step 2 fails first (300 ms) while step 1 is
+        # still failing at 3000 ms, so a completion-ordered report prints 2 1.
+        $rightOrder = $out -match 'some checks failed: steps 1 2 '
+        $wrongOrder = $out -match 'some checks failed: steps 2 1'
+        $bothReplayed = $out -match 'SLOW-FAIL-REASON' -and $out -match 'FAST-FAIL-REASON'
+        if ($code -eq 1 -and $rightOrder -and -not $wrongOrder -and $bothReplayed) {
+            Assert-Pass "fail-fast report lists staggered failures in launch order"
+        } else {
+            Assert-Fail "pipeline fail-fast launch order" "exit=$code rightOrder=$rightOrder wrongOrder=$wrongOrder bothReplayed=$bothReplayed output=[$out]"
+        }
+    } finally {
+        Remove-Item -LiteralPath $driver -Force
+    }
+}
+
 # ---- Run tests ----
 Write-Output "`n=== Step-runner framework unit tests (PS1) ==="
 Write-Output "Registration arity, token validation, applicability matrix, --only-steps."
@@ -598,6 +640,7 @@ Test-OnlySteps-Dedup
 Test-OnlySteps-LastValueWin
 Test-OnlySteps-UnknownIdError
 Test-FailFastReport-ReplaysFailedStep
+Test-PipelineFailFastReportsLaunchOrder
 
 function Test-SaveFileListCache-NoPathBeyondSymlink {
     . $stepRunner

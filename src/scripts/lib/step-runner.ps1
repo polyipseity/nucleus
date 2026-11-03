@@ -509,7 +509,7 @@ function Invoke-StepPipeline {
   $pos = 0
   $stopLaunching = $false
   $infrastructureFailed = $false
-  $failFastNumbers = @()
+  $failFastNumbers = [System.Collections.Generic.HashSet[int]]::new()
   $active = [System.Collections.Generic.List[hashtable]]::new()
 
   while ($true) {
@@ -664,7 +664,7 @@ function Invoke-StepPipeline {
       if ($script:FAIL_FAST) {
         $exitFile = Join-Path $script:WaveTmpDir "step-$($rs.Number).exit"
         if ((Test-Path -LiteralPath $exitFile) -and (Get-Content -LiteralPath $exitFile -Raw) -ne '0') {
-          $failFastNumbers += $rs.Number
+          $null = $failFastNumbers.Add($rs.Number)  # check-suppress:suppression_doc: HashSet.Add returns bool; membership is the only effect needed
           $stopLaunching = $true
         }
       }
@@ -679,7 +679,15 @@ function Invoke-StepPipeline {
   }
 
   if ($script:FAIL_FAST -and $failFastNumbers.Count -gt 0) {
-    Format-FailFastReport -Number $failFastNumbers
+    # WHY ordered here: failures are recorded as runspaces complete, so the set
+    # carries no order. $spawnedNumbers holds every launched number in launch
+    # order and the failed set is a subset of it, so scanning it reports the
+    # failures in launch order whichever runspace failed first.
+    $orderedFailed = @()
+    foreach ($n in $spawnedNumbers) {
+      if ($failFastNumbers.Contains($n)) { $orderedFailed += $n }
+    }
+    Format-FailFastReport -Number $orderedFailed
     exit 1
   }
 
