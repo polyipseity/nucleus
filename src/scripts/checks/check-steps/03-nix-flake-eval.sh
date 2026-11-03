@@ -26,14 +26,21 @@ run_nix_flake_eval() {
   fi
 
   if $_ne_eval; then
+    # Each remaining nix invocation keeps its own call because three lanes are
+    # in play and a merge would drop the contract of the lane that gave up its
+    # environment or its real output. Real build: the pin exports NIX_PATH for
+    # the whole step, and the winget check needs the store path it prints for
+    # cmp. Env-present eval: `nix config show system` and the package eval must
+    # read the environment this host's nix runs with. Env-clean hermetic: the
+    # dry-run below strips NUCLEUS_REPO_ROOT and forces its own NIX_CONFIG.
     # WHY: <nixpkgs> comes from the flake-locked input, never from this
     # machine's channel; the evals below must not depend on the ambient one.
     if ! nucleus_pin_nixpkgs "$_repo_root"; then
       _ne_exit=1
     fi
 
-    # WHY: both evals write the shared SQLite eval cache; serialize them with
-    # the test steps' nix invocations (pre-push check and test may overlap).
+    # WHY: these nix calls write the shared SQLite eval cache; serialize them
+    # with the test steps' nix invocations (pre-push check and test may overlap).
     # WHY: builtins.currentSystem is unavailable under pure eval, so a probe
     # that suppressed stderr and fell back to a hardcoded aarch64-darwin
     # reported the darwin system on every host and made the eval below target
@@ -55,6 +62,8 @@ run_nix_flake_eval() {
     # WHY: ./src#winget-packages builds the macOS package set, so it is an
     # aarch64-darwin derivation no other host can build. Check it only where the
     # host system matches, and say it was not checked elsewhere.
+    # It stays its own real build: cmp compares the store path this command
+    # prints, and a dry-run prints no path.
     local _ne_ga_out
     if [ "$sys" != "aarch64-darwin" ]; then
       say "winget allow-list freshness not checked: ./src#winget-packages is an aarch64-darwin derivation (host system: $sys)."
@@ -71,6 +80,10 @@ run_nix_flake_eval() {
     fi
 
     # Hermetic eval: prove Nix layer evaluates without forwarded env vars.
+    # The env-clean lane is one dry-run over both system targets: nix build
+    # takes the whole installable list in a single run (help synopsis
+    # `nix build [option...] installables...`, description "nix build builds the
+    # specified installables"), so the targets share one process instead of two.
     run_hermetic_eval "$_ctx_name" || _ne_exit=1
 
     # Nix lint (nixf-tidy)
@@ -143,7 +156,9 @@ run_nix_conf_key_check() {
   # the only signal for it; a bad value or a syntax error exits non-zero.
   # WHY: no nix lock here. The lock serializes the flake evals' shared SQLite eval
   # cache, and a config parse touches none of it, so taking it only adds a way
-  # to block behind an unrelated nix process.
+  # to block behind an unrelated nix process. It joins no other invocation
+  # either: it parses the managed file as NIX_CONFIG, a config contract no
+  # other nix call in this step shares.
   if ! _nc_err="$(NIX_CONFIG="$(cat "$_nc_file")" nix config show max-jobs 2>&1 >/dev/null)"; then
     error "$_nc_rel: nix rejected the managed config: $_nc_err"
     return 1
@@ -182,36 +197,31 @@ run_hermetic_eval() {
   local _nix_cfg
   _nix_cfg="$(merge_nix_config)"
 
-  # Darwin must build hermetically (exit 0)
-  if ! nucleus_nix_locked env -u NUCLEUS_REPO_ROOT \
-    NIX_CONFIG="$_nix_cfg" \
-    nix build "./src#darwinConfigurations.MacBook.config.system.build.toplevel" --dry-run >/dev/null; then
-    error "darwin hermetic eval failed (expected exit 0 with no env vars and no --impure)"
-    _exit=1
-  else
-    say "darwin hermetic eval passed (no env vars, no --impure)."
-  fi
-
-  # NixOS must reach the assertion stage, not fail on impurity
-  local _nixos_out
-  _nixos_out="$(mktemp)"
+  # One env-clean dry-run carries both system targets, so exit 0 is the
+  # contract for each of them: the darwin target must build hermetically, and
+  # the nixos target must reach a clean evaluation rather than an impurity
+  # failure. When the single call is non-zero, the captured output is what
+  # still separates the failure modes: the repoRoot/getEnv pattern is the
+  # env-dependency signature, and any other text is an unexpected failure.
+  local _hermetic_out
+  _hermetic_out="$(mktemp)"
   if nucleus_nix_locked env -u NUCLEUS_REPO_ROOT \
     NIX_CONFIG="$_nix_cfg" \
-    nix build "./src#nixosConfigurations.NixOS.config.system.build.toplevel" --dry-run \
-    >"$_nixos_out" 2>&1; then
-    say "nixos hermetic eval passed (no env vars, no --impure)."
+    nix build --dry-run \
+    "./src#darwinConfigurations.MacBook.config.system.build.toplevel" \
+    "./src#nixosConfigurations.NixOS.config.system.build.toplevel" \
+    >"$_hermetic_out" 2>&1; then
+    say "darwin and nixos hermetic evals passed (no env vars, no --impure)."
   else
-    if grep -Eq "required argument 'repoRoot'|getEnv" "$_nixos_out"; then
-      error "nixos hermetic eval regressed to env-var dependency:"
-      cat "$_nixos_out" >&2
-      _exit=1
+    if grep -Eq "required argument 'repoRoot'|getEnv" "$_hermetic_out"; then
+      error "hermetic eval regressed to env-var dependency (darwin or nixos):"
     else
-      error "nixos hermetic eval failed for an unexpected reason:"
-      cat "$_nixos_out" >&2
-      _exit=1
+      error "hermetic eval failed for an unexpected reason (expected exit 0 with no env vars and no --impure):"
     fi
+    cat "$_hermetic_out" >&2
+    _exit=1
   fi
-  rm -f "$_nixos_out"
+  rm -f "$_hermetic_out"
 
   return $_exit
 }
