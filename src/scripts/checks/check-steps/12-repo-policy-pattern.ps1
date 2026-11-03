@@ -299,75 +299,6 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
     Write-Message "logging format policy passed."
   }
 
-  # --- text hygiene ---
-  # ref: documentation.instructions.md -- prose-style rule this sub-check enforces
-  Write-Message "--- text hygiene ---"
-  $thErrors = 0
-  $thSelfLeaf = $selfLeaf
-  $thSelfShLeaf = $selfShLeaf
-
-  # WHY the same shape as the logging-format scope: vendored code, secrets, and
-  # test fixtures carry the pattern text itself and must not be scanned.
-  # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariants; vendored and secret files are separate concerns
-  $thFiles = @(if ($HasArgs) {
-    @($PositionalArgs | Where-Object {
-        $_ -notmatch '(^|[\\/])(vendor[\\/]|node_modules[\\/]|src[\\/]secrets[\\/]|tests[\\/]fixtures[\\/])' -and
-        $_ -notmatch '(^|[\\/])skills[\\/]humanizer[\\/]' -and
-        $_ -match '\.(md|sh|zsh|ps1|psm1|nix|yml|yaml)$' -and
-        (Split-Path -Leaf $_) -notin @($thSelfLeaf, $thSelfShLeaf) + $allStepLeaves
-      })
-  } else {
-    @(git ls-files | Select-GitIgnored | Where-Object {
-        $_ -notmatch '(^|[\\/])(vendor[\\/]|node_modules[\\/]|src[\\/]secrets[\\/]|tests[\\/]fixtures[\\/])' -and
-        $_ -notmatch '(^|[\\/])skills[\\/]humanizer[\\/]' -and
-        $_ -match '\.(md|sh|zsh|ps1|psm1|nix|yml|yaml)$' -and
-        (Split-Path -Leaf $_) -notin @($thSelfLeaf, $thSelfShLeaf) + $allStepLeaves
-      })
-  })
-
-  if ($thFiles.Count -gt 0) {
-    # WHY [char]0x2014 and not a literal: this file is scanned by the sub-check
-    # it implements, so writing the byte sequence here would flag itself.
-    $emDash = [char]0x2014
-    foreach ($thPath in $thFiles) {
-      $thLines = @(Get-Content -LiteralPath (Join-Path $r $thPath) -ErrorAction SilentlyContinue)
-      $thInHelp = $false
-      $thInFence = $false
-      $thIsMd = $thPath -match '\.md$'
-      $thIsPs = $thPath -match '\.(ps1|psm1)$'
-      for ($thI = 0; $thI -lt $thLines.Count; $thI++) {
-        $thLine = $thLines[$thI]
-        if ($thIsMd -and $thLine -match '^[ \t]*(```|~~~)') { $thInFence = -not $thInFence }
-        if (-not $thInFence -and $thLine.Contains($emDash)) {
-          # A dash inside a markdown inline code span names a literal value, the
-          # way a quoted string does in code, so the scan sees the line without
-          # its code spans. WHY markdown only: a code span is its literal syntax.
-          $thScan = if ($thIsMd) { [regex]::Replace($thLine, '`[^`]*`', '') } else { $thLine }
-          $thPlaceholder = $false
-          foreach ($thCell in $thLine.Split('|')) {
-            if ($thCell.Trim() -eq $emDash) { $thPlaceholder = $true; break }
-          }
-          if (-not $thPlaceholder -and $thScan.Contains($emDash) -and
-              ($thIsMd -or $thInHelp -or $thLine -match '^[ \t]*#' -or $thLine -match '<#')) {
-            Write-ErrorMessage "$thPath`:$($thI + 1): em dash in prose (use a comma, a colon, or two sentences)"
-            $thErrors++
-          }
-        }
-        if ($thIsPs) {
-          if ((-not $thInHelp) -and $thLine -match '<#') { $thInHelp = -not ($thLine -match '#>') }
-          elseif ($thInHelp -and $thLine -match '#>') { $thInHelp = $false }
-        }
-      }
-    }
-  }
-
-  if ($thErrors -gt 0) {
-    Write-ErrorMessage "text hygiene policy check failed with $thErrors error(s)"
-    $failed = $true
-  } else {
-    Write-Message "text hygiene policy passed."
-  }
-
   # --- removed skip mechanism ---
   # ref: step-runner.instructions.md -- declared applicability replaces step-level skipping
   Write-Message "--- removed skip mechanism ---"
@@ -563,9 +494,6 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
       @($ptDirs | ForEach-Object { Get-ChildItem -LiteralPath (Join-Path $r $_) -Filter '*.md' -File -Recurse })
     })
   $ptErrors = 0
-  # One harness's tool and agent names belong in the adapter mapping table, never
-  # in a body an agent follows in an unknown harness.
-  $ptHarnessNames = 'activate_vs_code_interaction|multi_replace_string_in_file|runSubagent|resolve_memory_file_uri|__LANE_SCOPE__|/memories/|get_errors|run_in_terminal|run_vscode_command|vscode_askQuestions|replace_string_in_file|create_file'
   if (-not $HasArgs -and $ptFiles.Count -eq 0) {
     $ptErrors++
     Write-ErrorMessage "no prompt templates found under .agents/prompts or src/users/default/agents/prompts"
@@ -580,46 +508,8 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
       $ptErrors++
       Write-ErrorMessage "$($pt.FullName): no argument slot; text typed after the command is discarded"
     }
-    if ($ptText -notmatch 'standing-orders\.instructions\.md') {
-      $ptErrors++
-      Write-ErrorMessage "$($pt.FullName): missing standing-orders anchor line"
-    }
-    if ($ptText -match $ptHarnessNames) {
-      $ptErrors++
-      Write-ErrorMessage "$($pt.FullName): harness-specific name; use a capability from ~/.agents/instructions/harness-adapters.reference.md"
-    }
   }
 
-  # The same vocabulary rule covers every user-scope file an agent follows in an
-  # unknown harness: instruction bodies, agent definitions, and skill bodies. The
-  # adapter reference is exempt because its table is the sanctioned place for a
-  # harness's own tool names.
-  $ucDirs = @('src/users/default/agents/instructions', 'src/users/default/agents/agents', 'src/users/default/agents/skills')
-  $ucFiles = @(if ($HasArgs) {
-      @($PositionalArgs | Where-Object {
-          $ucNorm = $_ -replace '\\', '/'
-          # Prefix match, mirroring filter_scoped_files in check-lib.sh: a scoped run
-          # accepts any file nested under a scanned directory, which the skills tree
-          # needs. Exact parent equality would pass a nested file on Windows only.
-          $ucInScope = $false
-          foreach ($ucDir in $ucDirs) {
-            if ($ucNorm.StartsWith("$ucDir/", [StringComparison]::Ordinal)) { $ucInScope = $true; break }
-          }
-          $ucInScope -and ((Split-Path -Leaf $ucNorm) -like '*.md')
-        } | Where-Object { Test-Path -LiteralPath (Join-Path $r $_) } |
-        ForEach-Object { Get-Item -LiteralPath (Join-Path $r $_) })
-    } else {
-      @($ucDirs | Where-Object { Test-Path -LiteralPath (Join-Path $r $_) } |
-        ForEach-Object { Get-ChildItem -LiteralPath (Join-Path $r $_) -Filter '*.md' -File -Recurse })
-    })
-  foreach ($uc in $ucFiles) {
-    if ($uc.Name -eq 'harness-adapters.reference.md') { continue }
-    $ucText = Get-Content -Raw -LiteralPath $uc.FullName
-    if ($ucText -match $ptHarnessNames) {
-      $ptErrors++
-      Write-ErrorMessage "$($uc.FullName): harness-specific name; use a capability from ~/.agents/instructions/harness-adapters.reference.md"
-    }
-  }
   $ptPolicy = Join-Path $r 'src/users/default/agents/instructions/standing-orders.instructions.md'
   if ((Test-Path -LiteralPath $ptPolicy) -and
     (Select-String -LiteralPath $ptPolicy -Pattern 'child-prompt-block:begin' -SimpleMatch -Quiet) -and

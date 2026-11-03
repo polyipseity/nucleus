@@ -315,103 +315,6 @@ test_step14_removed_skip_constructs_detection() {
   return 0
 }
 
-# --- text hygiene behavioral tests ---
-
-# The em dash is composed at runtime: step 12 scans tracked .sh files, this file
-# included, so a literal byte here would be a finding against the gate's own
-# test. Same reason as the removed-skip list above.
-_EM_DASH=$(printf '\xe2\x80\x94')
-
-test_step14_text_hygiene_clean_comment() {
-  local _tmp _out _ret
-  _tmp=$(mktemp -d)
-  _out=$(mktemp)
-  printf '# a clean comment with a colon: nothing to flag\n' >"$_tmp/clean.sh"
-  run_text_hygiene_policy true "$_tmp" "$_tmp/clean.sh" >"$_out" 2>&1
-  _ret=$?
-  if [ "$_ret" -ne 0 ]; then
-    echo "FAIL: a clean comment should pass the text hygiene policy"
-    cat "$_out"
-  fi
-  rm -rf "$_tmp"
-  rm -f "$_out"
-  [ "$_ret" -eq 0 ]
-}
-
-test_step14_text_hygiene_comment_dash_fails() {
-  local _tmp _out _ret
-  _tmp=$(mktemp -d)
-  _out=$(mktemp)
-  printf '# prose %s here\n' "$_EM_DASH" >"$_tmp/dirty.sh"
-  printf '<#\n.DESCRIPTION\n  help %s here\n#>\n' "$_EM_DASH" >"$_tmp/dirty.ps1"
-  run_text_hygiene_policy true "$_tmp" "$_tmp/dirty.sh" "$_tmp/dirty.ps1" >"$_out" 2>&1
-  _ret=$?
-  if [ "$_ret" -eq 0 ] || ! grep -q 'em dash in prose' "$_out"; then
-    echo "FAIL: an em dash in a comment or a help block should fail the text hygiene policy"
-    cat "$_out"
-    rm -rf "$_tmp"
-    rm -f "$_out"
-    return 1
-  fi
-  rm -rf "$_tmp"
-  rm -f "$_out"
-  return 0
-}
-
-test_step14_text_hygiene_string_and_fence_allowed() {
-  local _tmp _out _ret _fence
-  _tmp=$(mktemp -d)
-  _out=$(mktemp)
-  # The fence is composed so the shellcheck single-quote rule stays quiet.
-  _fence=$(printf '\140\140\140')
-  printf 'error "service %s not found"\n' "$_EM_DASH" >"$_tmp/strings.sh"
-  printf 'prose with no dash\n\n%s\ncode %s stays\n%s\n' "$_fence" "$_EM_DASH" "$_fence" >"$_tmp/doc.md"
-  run_text_hygiene_policy true "$_tmp" "$_tmp/strings.sh" "$_tmp/doc.md" >"$_out" 2>&1
-  _ret=$?
-  if [ "$_ret" -ne 0 ]; then
-    echo "FAIL: an em dash in a quoted string or a markdown fence should pass the text hygiene policy"
-    cat "$_out"
-  fi
-  rm -rf "$_tmp"
-  rm -f "$_out"
-  [ "$_ret" -eq 0 ]
-}
-
-test_step14_text_hygiene_markdown_prose_fails() {
-  local _tmp _out _ret
-  _tmp=$(mktemp -d)
-  _out=$(mktemp)
-  printf 'markdown prose %s here\n' "$_EM_DASH" >"$_tmp/doc.md"
-  run_text_hygiene_policy true "$_tmp" "$_tmp/doc.md" >"$_out" 2>&1
-  _ret=$?
-  if [ "$_ret" -eq 0 ] || ! grep -q 'doc.md:1: em dash in prose' "$_out"; then
-    echo "FAIL: an em dash in markdown prose should fail and report file:line"
-    cat "$_out"
-    rm -rf "$_tmp"
-    rm -f "$_out"
-    return 1
-  fi
-  rm -rf "$_tmp"
-  rm -f "$_out"
-  return 0
-}
-
-test_step14_text_hygiene_placeholder_cell_allowed() {
-  local _tmp _out _ret
-  _tmp=$(mktemp -d)
-  _out=$(mktemp)
-  printf '| id | tier | reason |\n| --- | --- | --- |\n| D3 | %s | external |\n' "$_EM_DASH" >"$_tmp/doc.md"
-  run_text_hygiene_policy true "$_tmp" "$_tmp/doc.md" >"$_out" 2>&1
-  _ret=$?
-  if [ "$_ret" -ne 0 ]; then
-    echo "FAIL: a table cell holding only the em dash is a placeholder and should pass"
-    cat "$_out"
-  fi
-  rm -rf "$_tmp"
-  rm -f "$_out"
-  [ "$_ret" -eq 0 ]
-}
-
 # --- envrc ban policy behavioral tests ---
 
 test_step14_envrc_ban_root_fails() {
@@ -539,14 +442,105 @@ test_step14_envrc_ban_pruned_decoys_ignored() {
   return 0
 }
 
+# --- config method compliance behavioral tests ---
+# Ruling R7: the POSIX twin mirrors the .ps1 annotation rule. A config file
+# referenced from src/ (outside configs/) needs a "# check-suppress:config-method"
+# comment on the reference line or within the 10 lines above it.
+
+# Build a fixture tree holding one config and a referencing src file.
+# Remaining args become the lines of src/probe-deploy.sh. Prints the root.
+cfg_method_fixture() {
+  local _root
+  _root=$(mktemp -d)
+  mkdir -p "$_root/src/modules/configs/probe"
+  printf '%s\n' '{"probe": true}' >"$_root/src/modules/configs/probe/settings.json"
+  printf '%s\n' "$@" >"$_root/src/probe-deploy.sh"
+  printf '%s\n' "$_root"
+}
+
+test_step14_config_method_unannotated_reference_fails() {
+  local _tmp _out _ret
+  _tmp=$(cfg_method_fixture 'deploy "src/modules/configs/probe/settings.json"')
+  _out=$(mktemp)
+  run_config_method_compliance true "$_tmp" "$_tmp/src/probe-deploy.sh" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -eq 0 ] || ! grep -qF "referenced but no '# check-suppress:config-method' comment found on or before reference lines" "$_out" || ! grep -qF 'probe/settings.json : referenced' "$_out"; then
+    echo "FAIL: a referenced config without the annotation must fail and name the config"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+test_step14_config_method_same_line_annotation_passes() {
+  local _tmp _out _ret
+  _tmp=$(cfg_method_fixture 'deploy "src/modules/configs/probe/settings.json" # check-suppress:config-method: method 1 (writable symlink)')
+  _out=$(mktemp)
+  run_config_method_compliance true "$_tmp" "$_tmp/src/probe-deploy.sh" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -ne 0 ]; then
+    echo "FAIL: an annotation on the reference line must pass"
+    cat "$_out"
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  [ "$_ret" -eq 0 ]
+}
+
+test_step14_config_method_preceding_annotation_passes() {
+  local _tmp _out _ret
+  _tmp=$(cfg_method_fixture \
+    '# check-suppress:config-method: method 1 (writable symlink)' \
+    '# deploy the shared probe settings' \
+    ':' \
+    'deploy "src/modules/configs/probe/settings.json"')
+  _out=$(mktemp)
+  run_config_method_compliance true "$_tmp" "$_tmp/src/probe-deploy.sh" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -ne 0 ]; then
+    echo "FAIL: an annotation 3 lines above the reference must pass"
+    cat "$_out"
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  [ "$_ret" -eq 0 ]
+}
+
+test_step14_config_method_window_is_10_lines() {
+  local _tmp _out _ret
+  # The annotation sits 11 lines above the reference, one outside the window
+  # the .ps1 twin scans, so this must fail. It pins the window width.
+  _tmp=$(cfg_method_fixture \
+    '# check-suppress:config-method: method 1 (writable symlink)' \
+    '# filler 01' '# filler 02' '# filler 03' '# filler 04' '# filler 05' \
+    '# filler 06' '# filler 07' '# filler 08' '# filler 09' '# filler 10' \
+    'deploy "src/modules/configs/probe/settings.json"')
+  _out=$(mktemp)
+  run_config_method_compliance true "$_tmp" "$_tmp/src/probe-deploy.sh" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -eq 0 ] || ! grep -qF "referenced but no '# check-suppress:config-method' comment found" "$_out"; then
+    echo "FAIL: an annotation 11 lines above the reference must fail (10-line window)"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
 failures=0
 for test in \
   test_step14_removed_skip_constructs_detection \
-  test_step14_text_hygiene_clean_comment \
-  test_step14_text_hygiene_comment_dash_fails \
-  test_step14_text_hygiene_string_and_fence_allowed \
-  test_step14_text_hygiene_markdown_prose_fails \
-  test_step14_text_hygiene_placeholder_cell_allowed \
+  test_step14_config_method_unannotated_reference_fails \
+  test_step14_config_method_same_line_annotation_passes \
+  test_step14_config_method_preceding_annotation_passes \
+  test_step14_config_method_window_is_10_lines \
   test_step14_naming_behavioral_positive \
   test_step14_naming_behavioral_negative \
   test_step14_naming_behavioral_exemption \

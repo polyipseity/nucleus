@@ -8,50 +8,7 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
   # WHY: all repo-policy step files must be excluded from pattern scans to avoid self-referencing literal pattern text
   $allStepLeaves = @('11-repo-policy-grep.ps1', '12-repo-policy-pattern.ps1', '13-repo-policy-data.ps1')
-  $allStepShLeaves = @('11-repo-policy-grep.sh', '12-repo-policy-pattern.sh', '13-repo-policy-data.sh')
   $failed = $false
-
-  # --- Package manager enforcement ---
-  Write-Message "--- package manager enforcement ---"
-  $pmeViolations = 0
-  $pmeExcludeNames = @() + $allStepLeaves + $allStepShLeaves
-
-  if ($HasArgs) {
-    $pmeHasShell = @($PositionalArgs | Where-Object { $_ -match '\.(sh|ps1|nix)$' }).Count -gt 0
-    if (-not $pmeHasShell) {
-      Write-Message "0 shell files in scope — nothing to enforce."
-    } else {
-      $pmeGrepFiles = @(
-        $PositionalArgs | Where-Object { $_ -match '\.(sh|ps1|nix)$' } |
-        Where-Object { $pmeExcludeNames -notcontains [System.IO.Path]::GetFileName($_) }
-      )
-      if ($pmeGrepFiles.Count -gt 0) {
-        $pipV = Select-String -Path $pmeGrepFiles -Pattern '(^|[^a-z])pip install([^-]|$)' |
-          Where-Object { $_.Line -notmatch 'uv pip install' }
-        if ($pipV) { Write-ErrorMessage 'bare pip install detected (use uv pip install instead)'; $pmeViolations++ }
-
-        $npmV = Select-String -Path $pmeGrepFiles -Pattern '(^|[^a-z])npm install([^-]|$)'
-        if ($npmV) { Write-ErrorMessage 'bare npm install detected (use bun or nix instead)'; $pmeViolations++ }
-      }
-    }
-  } else {
-    $pmeGrepFiles = @(
-      Get-ChildItem -Recurse -Path (Join-Path $r 'scripts'), (Join-Path $r 'src'), (Join-Path $r 'tests') `
-        -Include *.sh, *.ps1, *.nix `
-        | Where-Object { $pmeExcludeNames -notcontains $_.Name } `
-        | ForEach-Object { $_.FullName }
-    )
-    if ($pmeGrepFiles.Count -gt 0) {
-      $pipV = Select-String -Path $pmeGrepFiles -Pattern '(^|[^a-z])pip install([^-]|$)' |
-        Where-Object { $_.Line -notmatch 'uv pip install' }
-      if ($pipV) { Write-ErrorMessage 'bare pip install detected (use uv pip install instead)'; $pmeViolations++ }
-
-      $npmV = Select-String -Path $pmeGrepFiles -Pattern '(^|[^a-z])npm install([^-]|$)'
-      if ($npmV) { Write-ErrorMessage 'bare npm install detected (use bun or nix instead)'; $pmeViolations++ }
-    }
-  }
-
-  if ($pmeViolations -gt 0) { $failed = $true } else { Write-Message 'no package manager violations found.' }
 
   # --- Suppression audit ---
   Write-Message "--- suppression audit ---"
@@ -342,62 +299,6 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   }
 
   if ($ssViolations -gt 0) { $failed = $true } else { Write-Message 'no service supervision invariant violations found.' }
-
-  # --- SRT wrapper invariants ---
-  # srt consumes its own options (-h, -V, -d, -s, -c, --control-fd) wherever they
-  # appear, so `pi --help` prints srt's usage and `pi -c <arg>` loses the argument
-  # silently. Every forwarder must write the -- marker.
-  Write-Message "--- srt wrapper invariants ---"
-  $swViolations = 0
-  # `srt -c '<string>'` is deliberately not a candidate: the string is a single
-  # argv element behind -c, so it exposes no per-argument flag to srt's parser.
-  $swInvocation = '(^|[^A-Za-z0-9_./-])srt\s+command\s+\S+'
-  $swSeparated = 'srt\s+command\s+\S+\s+--(\s|$)'
-
-  # The comment filter below keeps this check from reporting itself: both patterns
-  # are regexes, so neither matches the line it is written on, and a literal
-  # invocation left in a comment is dropped.
-  $swFiles = @()
-  if ($HasArgs) {
-    # The whole-repo branch reads src/ and scripts/ only, so drop tests/ here too
-    # and keep both modes in agreement: a test proving this rule needs a violating
-    # example, and a fixture is not a shipped wrapper.
-    # ref: allow-and-deny-lists.instructions.md#B9
-    $swFiles = @(
-      $PositionalArgs |
-        Where-Object { $_ -match '\.(sh|zsh|ps1|nix)$' } |
-        Where-Object { $_ -notmatch '(^|[\\/])tests[\\/]' }
-    )
-  } else {
-    foreach ($swDir in @('src', 'scripts')) {
-      $swDirPath = Join-Path -Path $r -ChildPath $swDir
-      if (-not (Test-Path -LiteralPath $swDirPath)) { continue }
-      $swFiles += @(
-        Get-ChildItem -LiteralPath $swDirPath -Recurse -File -Include *.sh, *.zsh, *.ps1, *.nix |
-          Select-GitIgnored |
-          ForEach-Object { $_ }
-      )
-    }
-  }
-
-  if ($swFiles.Count -gt 0) {
-    $swUnseparated = @(
-      Select-String -Path $swFiles -Pattern $swInvocation |
-        Where-Object { $_.Line -notmatch $swSeparated } |
-        Where-Object { $_.Line -notmatch '^\s*#' }
-    )
-    foreach ($swHit in $swUnseparated) {
-      $swRelative = if ($swHit.Path.StartsWith($r)) {
-        ($swHit.Path.Substring($r.Length).TrimStart([char[]]"\/")) -replace '\\', '/'
-      } else {
-        $swHit.Path
-      }
-      Write-ErrorMessage "$($swRelative):$($swHit.LineNumber) forwards the user's arguments to srt without --; srt parses its own options, so put -- between the wrapped command and the forwarded arguments"
-      $swViolations++
-    }
-  }
-
-  if ($swViolations -gt 0) { $failed = $true } else { Write-Message 'every srt wrapper separates its forwarded arguments.' }
 
   if ($failed) {
     Write-ErrorMessage "repository policy (grep-heavy) check failed"

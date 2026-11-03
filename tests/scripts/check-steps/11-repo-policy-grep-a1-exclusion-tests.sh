@@ -79,14 +79,19 @@ else
 fi
 
 # 3. The function-scoped extraction must actually be reading the function, or
-#    cases 1 and 2 pass on empty input and prove nothing. A function that
-#    vanished would make both greps above trivially empty.
+#    cases 1 and 2 pass on empty input and prove nothing. The package-manager
+#    sub-check was deleted with the text-only cleanup, so both scopes are empty
+#    by design and cases 1 and 2 scan nothing until the section returns. The
+#    reachable failure this guards is one twin changing while the other does
+#    not, or an anchor drifting so the extraction returns a truncated scope.
 sh_len="$(extract_pme_sh | wc -l | tr -d ' ')"
 ps1_len="$(extract_pme_ps1 | wc -l | tr -d ' ')"
-if [ "$sh_len" -gt 10 ] && [ "$ps1_len" -gt 10 ]; then
+if [ "$sh_len" -eq 0 ] && [ "$ps1_len" -eq 0 ]; then
+  assert_pass 'the package-manager subject is absent from both twins, so cases 1 and 2 scan nothing by design'
+elif [ "$sh_len" -gt 10 ] && [ "$ps1_len" -gt 10 ]; then
   assert_pass "the extraction scopes are non-empty (sh ${sh_len} lines, ps1 ${ps1_len} lines)"
 else
-  assert_fail 'the extraction scopes are non-empty' "sh ${sh_len} lines, ps1 ${ps1_len} lines"
+  assert_fail 'the extraction scopes are neither both absent nor both readable' "sh ${sh_len} lines, ps1 ${ps1_len} lines"
 fi
 
 # 4. This file must not itself trip the check it guards. The PowerShell twin

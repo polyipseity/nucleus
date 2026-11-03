@@ -15,7 +15,7 @@ Grammar for comment annotations across sh, zsh, ps1, nix, dsc.yml, hcl, md.
 | Prefix | Cat | Plain | Subject |
 | --- | --- | --- | --- |
 | `check-suppress:<id>` | 1 | `# check-suppress:suppression_doc: grep no-match exit 1 is expected here` | `# check-suppress:embedded-content: exception 3 (C# interop, <=25 lines) -- P/Invoke classes stay inline` |
-| `ref` | 4 | `# ref: allow-and-deny-lists.instructions.md#A12` | `# ref: allow-and-deny-lists.instructions.md#A12 -- pip/npm patterns` |
+| `ref` | 4 | `# ref: allow-and-deny-lists.instructions.md#A9` | `# ref: allow-and-deny-lists.instructions.md#A9 -- self-file basenames` |
 | `WHY` / `TODO` | 4 | `# WHY: <reason>` / `# TODO: <text>`, colon mandatory | not used |
 
 Categories 1 and 2 are machine-parsed and each registry row names its consumer. Categories 3 and 4 may not be machine-parsed.

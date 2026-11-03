@@ -382,6 +382,7 @@ run_release_age_uniformity() {
   local _ra_json="src/modules/configs/release-ages.json"
   local _errors=0
   if [ ! -f "$_ra_json" ]; then
+    # check-suppress:config-method: missing-file error text naming the release-age registry, not a config consumption
     error "release-ages.json not found"
     return 1
   fi

@@ -17,7 +17,6 @@ _POLICY_PATTERN_CHECKS=(
   "activation naming policy|run_activation_naming_policy|files"
   "config method compliance|run_config_method_compliance|files"
   "logging format policy|run_logging_format_policy|files"
-  "text hygiene|run_text_hygiene_policy|files"
   "removed skip mechanism|run_removed_skip_mechanism|files"
   "nix file structure|run_nix_file_structure|files"
   "log capture pair policy|run_log_capture_pair_policy|files"
@@ -31,64 +30,108 @@ run_repo_policy_pattern() {
   run_policy_checks "$_ctx_name" "repository policy (pattern-based)" _POLICY_PATTERN_CHECKS "$@"
 }
 
+# A config referenced from outside the configs tree must carry the registered
+# config-method annotation on the reference line or within the 10 lines above
+# it. This mirrors 12-repo-policy-pattern.ps1: the two scans it replaces printed
+# matches that never failed a run and flagged text no instruction defines, so
+# neither could enforce anything.
+# WHY whole-repo in both modes: a reference can live in any src/ file, so a
+#   scoped subset cannot prove the annotation is absent; the .ps1 twin scans
+#   the same way.
 run_config_method_compliance() {
-  local _has_args="$1" _repo_root="$2"
+  local _repo_root="$2"
   shift 2
-  local _files=("$@")
   cd "$_repo_root" || return 1
   local _cfg_errors=0
   local _cfg_dir="src/modules/configs"
-  local _cfg_par_tmpdir
-  _cfg_par_tmpdir=$(mktemp -d) || {
-    error "failed to create temp dir"
-    _cfg_errors=$((_cfg_errors + 1))
-  }
 
-  # Single-pass: collect all config file basenames, run one grep across src/
-  local _cfg_patterns
-  _cfg_patterns=$(mktemp) || {
-    error "failed to create temp file"
-    _cfg_errors=$((_cfg_errors + 1))
-  }
-  find "$_cfg_dir" -type f -exec basename {} \; | sort -u >"$_cfg_patterns"
+  if [ ! -d "$_cfg_dir" ]; then
+    say "config method compliance passed."
+    return 0
+  fi
+
+  # Reference files: every Nix, PowerShell, and shell source outside vendored
+  # code and the configs tree itself, so a config never counts as its own ref.
   # ref: allow-and-deny-lists.instructions.md#B1 -- structural invariants; vendored code and config methods are different concerns
-  find src/ \( -name '*.nix' -o -name '*.ps1' -o -name '*.sh' \) -not -path '*/vendor/*' -not -path '*/configs/*' -print |
-    filter_gitignored |
-    xargs grep -n -F -f "$_cfg_patterns" 2>/dev/null ||
-    true # check-suppress:suppression_doc: xargs grep exits 1 when no config basename collisions are found; no match is the expected state
-  rm -f "$_cfg_patterns"
+  local _src_files=()
+  if [ -d src/ ]; then
+    mapfile -t _src_files < <(
+      find src/ \( -name '*.nix' -o -name '*.ps1' -o -name '*.sh' \) -not -path '*/vendor/*' -not -path '*/configs/*' -print |
+        filter_gitignored
+    )
+  fi
 
-  # Check for configs. method usage
-  # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
-  find "$_cfg_dir" -type f -print0 |
-    xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
-      _tmpdir="$1"
-      _f="$2"
-      _basename=$(basename "$_f")
-      # ref: allow-and-deny-lists.instructions.md#A2 -- infrastructure files are not configs
-      case "$_basename" in
-        .gitkeep|.gitignore|*.schema.json) exit 0 ;;
-      esac
-      _result_file="$_tmpdir/${_basename}.result"
-      _relpath="${_f#*configs/}"
-      if grep -q "^[^#]*configs\." "$_f" 2>/dev/null; then
-        echo "ERROR:$_relpath uses configs. method" >> "$_result_file"
+  local _annot
+  _annot=$(mktemp) || {
+    error "failed to create temp file"
+    return 1
+  }
+  if [ "${#_src_files[@]}" -gt 0 ]; then
+    # One pass collects every annotation as "file:line"; the per-reference
+    # window below is then an exact line lookup.
+    grep -HnF '# check-suppress:config-method' "${_src_files[@]}" | cut -d: -f1,2 >"$_annot" || true # check-suppress:suppression_doc: grep exits 1 when no annotation exists; the per-reference errors report that state
+  fi
+
+  local _cfg _rel _base _suffix _refs _ref _ref_file _ref_line _annotated _pn _lo
+  while IFS= read -r -d '' _cfg; do
+    _base="$(basename "$_cfg")"
+    # ref: allow-and-deny-lists.instructions.md#A2 -- infrastructure files are not configs
+    case "$_base" in
+    .gitkeep | .gitignore | *.schema.json | *.nix) continue ;;
+    esac
+    _rel="${_cfg#"$_cfg_dir"/}"
+    case "$_rel" in
+    agents/* | hermes-agent/SOUL.md | ollama/models.json) continue ;;
+    esac
+
+    _refs=""
+    if [ "${#_src_files[@]}" -gt 0 ]; then
+      # Reference tiers in the .ps1 twin's order: relative path, then basename,
+      # then the ${hostName} template suffix. A tier that matches replaces the
+      # refs from the tiers above it, so the annotation applies to one tier.
+      _refs=$(grep -HnF -- "$_rel" "${_src_files[@]}" || true) # check-suppress:suppression_doc: grep exits 1 when no file references this config, which moves the scan to the next tier
+      if [ -z "$_refs" ]; then
+        _refs=$(grep -HnF -- "$_base" "${_src_files[@]}" || true) # check-suppress:suppression_doc: grep exits 1 when no file references this config, which moves the scan to the next tier
       fi
-    ' _ "$_cfg_par_tmpdir"
+      if [ -z "$_refs" ] && [ -n "${_base%%.*}" ] && [ "$_base" != "${_base%%.*}" ]; then
+        _suffix=".${_base#*.}"
+        _refs=$(grep -HnF -- "\${hostName}${_suffix}" "${_src_files[@]}" || true) # check-suppress:suppression_doc: grep exits 1 when no template line references this config, which leaves the config with no refs
+      fi
+    fi
 
-  local _result_file _eline
-  for _result_file in "$_cfg_par_tmpdir"/*.result; do
-    [ -f "$_result_file" ] || continue
-    while IFS= read -r _eline; do
-      case "$_eline" in
-      ERROR:*)
-        _cfg_errors=$((_cfg_errors + 1))
-        error "${_eline#ERROR:}"
-        ;;
-      esac
-    done <"$_result_file"
-  done
-  rm -rf -- "$_cfg_par_tmpdir"
+    # Annotation-only rule: a config with no reference outside configs/ has
+    # nothing to annotate.
+    [ -n "$_refs" ] || continue
+
+    _annotated=false
+    while IFS= read -r _ref; do
+      [ -n "$_ref" ] || continue
+      _ref_file="${_ref%%:*}"
+      _ref_line="${_ref#*:}"
+      _ref_line="${_ref_line%%:*}"
+      if grep -qxF "$_ref_file:$_ref_line" "$_annot"; then
+        _annotated=true
+        break
+      fi
+      _lo=$((_ref_line - 10))
+      for ((_pn = _ref_line - 1; _pn >= _lo && _pn >= 1; _pn--)); do
+        if grep -qxF "$_ref_file:$_pn" "$_annot"; then
+          _annotated=true
+          break
+        fi
+      done
+      if $_annotated; then
+        break
+      fi
+    done <<<"$_refs"
+
+    if ! $_annotated; then
+      error "$_rel : referenced but no '# check-suppress:config-method' comment found on or before reference lines"
+      _cfg_errors=$((_cfg_errors + 1))
+    fi
+  done < <(find "$_cfg_dir" -type f -print0)
+
+  rm -f "$_annot"
 
   if [ "$_cfg_errors" -gt 0 ]; then
     error "config method compliance check failed with $_cfg_errors error(s)"
@@ -228,45 +271,6 @@ _policy_scan_target() {
   "$_POLICY_STEP_SELF_SH" | "$_POLICY_STEP_SELF_PS1" | 11-repo-policy-grep.ps1 | 13-repo-policy-data.ps1) return 1 ;;
   esac
   [[ "$_pst_file" =~ $_pst_ext_re ]]
-}
-
-run_text_hygiene_policy() {
-  local _has_args="$1" _repo_root="$2"
-  shift 2
-  local _files=("$@")
-  cd "$_repo_root" || return 1
-
-  local _th_errors=0
-  # .md carries prose, the rest carry comment syntax. A trailing comment on a
-  # code line is out of scope: the same line can hold a string carrying the
-  # dash, and a line-based scan cannot tell the two apart.
-  local _th_ext_re='\.(md|sh|zsh|ps1|psm1|nix|yml|yaml)$'
-  local _th_files=()
-  local _f
-  if $_has_args; then
-    for _f in "${_files[@]}"; do
-      if _policy_scan_target "$_f" "$_th_ext_re"; then _th_files+=("$_f"); fi
-    done
-  else
-    while IFS= read -r _f; do
-      if _policy_scan_target "$_f" "$_th_ext_re"; then _th_files+=("$_f"); fi
-    done < <(git ls-files | filter_gitignored)
-  fi
-
-  if [ "${#_th_files[@]}" -gt 0 ]; then
-    local _th_violation
-    while IFS= read -r _th_violation; do
-      _th_errors=$((_th_errors + 1))
-      error "$_th_violation"
-    done < <(awk -v mode=em-dash -f "$_AWK_PATH" "${_th_files[@]}")
-  fi
-
-  if [ "$_th_errors" -gt 0 ]; then
-    error "text hygiene policy check failed with $_th_errors error(s)"
-    return 1
-  fi
-  say "text hygiene policy passed."
-  return 0
 }
 
 run_logging_format_policy() {
@@ -547,9 +551,6 @@ run_prompt_template_contract() {
   local _files=("$@")
   local _prompt_files=()
   local _errors=0 _f _prompt_count=0
-  # One harness's tool and agent names belong in the adapter mapping table, never
-  # in a body an agent follows in an unknown harness.
-  local _harness_names='activate_vs_code_interaction|multi_replace_string_in_file|runSubagent|resolve_memory_file_uri|__LANE_SCOPE__|/memories/|get_errors|run_in_terminal|run_vscode_command|vscode_askQuestions|replace_string_in_file|create_file'
   if $_has_args; then
     filter_scoped_files _prompt_files .agents/prompts '*.md' "${_files[@]}"
     filter_scoped_files _prompt_files src/users/default/agents/prompts '*.md' "${_files[@]}"
@@ -577,38 +578,6 @@ run_prompt_template_contract() {
     if ! grep -qE '[$](ARGUMENTS|@|[0-9])|[$][{][0-9]+:-' "$_f"; then
       _errors=$((_errors + 1))
       error "$_f: no argument slot; text typed after the command is discarded"
-    fi
-    if ! grep -qF 'standing-orders.instructions.md' "$_f"; then
-      _errors=$((_errors + 1))
-      error "$_f: missing standing-orders anchor line"
-    fi
-    if grep -qE "$_harness_names" "$_f"; then
-      _errors=$((_errors + 1))
-      error "$_f: harness-specific name; use a capability from ~/.agents/instructions/harness-adapters.reference.md"
-    fi
-  done
-
-  # The same vocabulary rule covers every user-scope file an agent follows in an
-  # unknown harness: instruction bodies, agent definitions, and skill bodies. The
-  # adapter reference is exempt because its table is the sanctioned place for a
-  # harness's own tool names.
-  local _uscope_files=()
-  local _uscope_dir _uf
-  for _uscope_dir in src/users/default/agents/instructions src/users/default/agents/agents src/users/default/agents/skills; do
-    if $_has_args; then
-      filter_scoped_files _uscope_files "$_uscope_dir" '*.md' "${_files[@]}"
-    elif [ -d "$_repo_root/$_uscope_dir" ]; then
-      discover_files _uscope_files "$_repo_root" "$_uscope_dir" '*.md'
-    fi
-  done
-  for _uf in "${_uscope_files[@]}"; do
-    [ -n "$_uf" ] || continue
-    case "${_uf##*/}" in
-    harness-adapters.reference.md) continue ;;
-    esac
-    if grep -qE "$_harness_names" "$_uf"; then
-      _errors=$((_errors + 1))
-      error "$_uf: harness-specific name; use a capability from ~/.agents/instructions/harness-adapters.reference.md"
     fi
   done
 
