@@ -82,10 +82,10 @@ _run_script_test() {
 }
 
 _run_parallel_script_tests() {
-  local _repo_root="$1"
-  shift
+  local _repo_root="$1" _timing_list="$2"
+  shift 2
   local -a _scripts=("$@")
-  local _capture_dir _failed_list _script _capture_file _status _reason _exit_code=0
+  local _capture_dir _failed_list _script _capture_file _status _reason _ms_pair _exit_code=0
 
   if [ "${#_scripts[@]}" -eq 0 ]; then
     return 0
@@ -113,6 +113,9 @@ _run_parallel_script_tests() {
     quiet_mode="$4"
     base=$(basename "$script")
     capture_file="$capture_dir/$base.out"
+    # Sourced once for the shared millisecond clock; the run_one source below
+    # is a no-op under the runner re-source guard.
+    . "$repo_root/src/scripts/lib/step-runner.sh"
     run_one() {
       if [ "$base" = "nucleus-apps-smoke-tests.sh" ]; then
         . "$repo_root/src/scripts/lib/step-runner.sh"
@@ -128,8 +131,11 @@ _run_parallel_script_tests() {
       fi
     }
     _rc=0
+    _start_ms=$(_step_now_ms)
     run_one >"$capture_file" 2>&1 || _rc=$?
+    _end_ms=$(_step_now_ms)
     printf '%s' "$_rc" >"$capture_dir/$base.rc"
+    printf "%s %s\n" "$_start_ms" "$_end_ms" >"$capture_dir/$base.ms"
   ' _ {} "$_capture_dir" "$_repo_root" "$quiet_mode"
 
   for _script in "${_scripts[@]}"; do
@@ -147,10 +153,20 @@ _run_parallel_script_tests() {
     elif [ "$_status" -ne 0 ]; then
       printf '%s (exit %s)\n' "$_script" "$_status" >>"$_failed_list"
     fi
+    if [ -f "$_capture_dir/$(basename "$_script").ms" ]; then
+      _ms_pair=$(cat "$_capture_dir/$(basename "$_script").ms")
+      printf '%s %s\n' "$_ms_pair" "$(basename "$_script")" >>"$_timing_list"
+    fi
     if [ -f "$_capture_file" ]; then
       cat "$_capture_file"
     fi
   done
+
+  # Informational only: the table never feeds the exit code or the failure list.
+  if [ -s "$_timing_list" ]; then
+    say "suite wall times (slowest first):"
+    LC_ALL=C awk '{ printf "%6.1f s  %s\n", ($2 - $1) / 1000, $3 }' "$_timing_list" | LC_ALL=C sort -rn
+  fi
 
   if [ -s "$_failed_list" ]; then
     error "FAILED script tests:"
@@ -170,7 +186,7 @@ run_script_and_framework_tests() {
   local _exit_code=0
   local _test_dir="$_repo_root/tests/scripts"
   local -a _all_scripts=() _priority_scripts=() _parallel_scripts=()
-  local _test_script
+  local _test_script _timing_list _start_ms _end_ms
 
   while IFS= read -r -d '' _test_script; do
     [ -n "$_test_script" ] || continue
@@ -187,16 +203,25 @@ run_script_and_framework_tests() {
 
   say "--- discovered script tests ---"
 
+  _timing_list=$(mktemp) || {
+    error "failed to create timing list"
+    return 1
+  }
+
   for _test_script in "${_priority_scripts[@]}"; do
     say "running $(basename "$_test_script")"
+    _start_ms=$(_step_now_ms)
     if ! _run_script_test "$_test_script"; then
       _exit_code=1
     fi
+    _end_ms=$(_step_now_ms)
+    printf '%s %s %s\n' "$_start_ms" "$_end_ms" "$(basename "$_test_script")" >>"$_timing_list"
   done
 
-  if ! _run_parallel_script_tests "$_repo_root" "${_parallel_scripts[@]}"; then
+  if ! _run_parallel_script_tests "$_repo_root" "$_timing_list" "${_parallel_scripts[@]}"; then
     _exit_code=1
   fi
 
+  rm -f "$_timing_list"
   return "$_exit_code"
 }
