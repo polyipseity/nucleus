@@ -504,12 +504,16 @@ function Invoke-StepPipeline {
   # Only applicable, selected steps count toward the run progress.
   $totalSteps = $pendingIndices.Count
 
+  # Work queue: keep up to $maxJobs runspaces running and launch the next
+  # pending step the moment a slot frees, instead of waiting out a batch.
   $pos = 0
-  while ($pos -lt $pendingIndices.Count) {
-    $batchEnd = [Math]::Min($pos + $maxJobs, $pendingIndices.Count)
-    $runspaces = [System.Collections.Generic.List[hashtable]]::new()
+  $stopLaunching = $false
+  $infrastructureFailed = $false
+  $failFastNumbers = @()
+  $active = [System.Collections.Generic.List[hashtable]]::new()
 
-    while ($pos -lt $batchEnd) {
+  while ($true) {
+    while (-not $stopLaunching -and $active.Count -lt $maxJobs -and $pos -lt $pendingIndices.Count) {
       $i = $pendingIndices[$pos]
       $pos++
       $n = $script:StepNumbers[$i]
@@ -624,43 +628,59 @@ function Invoke-StepPipeline {
         Reset      = $script:NucStyleReset
       })
       $handle = $ps.BeginInvoke()
-      $null = $runspaces.Add(@{ PowerShell = $ps; AsyncResult = $handle; Number = $n })  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
+      $null = $active.Add(@{ PowerShell = $ps; AsyncResult = $handle; Number = $n })  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
       $startedSteps++
       $null = $spawnedNumbers.Add($n)  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
       Write-Output ("$($script:NucStyleDim)[{0}/{1}] step {2} {3} started$($script:NucStyleReset)" -f $startedSteps, $totalSteps, $n, $name)
     }
 
-    $batchFailed = $false
-    foreach ($rs in $runspaces) {
+    if ($active.Count -eq 0) { break }
+
+    # Block until the next step finishes, then drain every finished one in
+    # launch order so the fail-fast report keeps that order.
+    $waitHandles = [System.Threading.WaitHandle[]]::new($active.Count)
+    for ($k = 0; $k -lt $active.Count; $k++) {
+      $waitHandles[$k] = $active[$k].AsyncResult.AsyncWaitHandle
+    }
+    # check-suppress:suppression_doc: WaitAny's return is the index of the signaled handle; the drain below re-scans IsCompleted
+    $null = [System.Threading.WaitHandle]::WaitAny($waitHandles)
+
+    for ($k = 0; $k -lt $active.Count;) {
+      $rs = $active[$k]
+      if (-not $rs.AsyncResult.IsCompleted) {
+        $k++
+        continue
+      }
       try {
         $null = $rs.PowerShell.EndInvoke($rs.AsyncResult)  # check-suppress:suppression_doc: EndInvoke returns runspace output; already redirected to step out-file
       } catch {
-        $batchFailed = $true
+        $infrastructureFailed = $true
+        if ($script:FAIL_FAST) { $stopLaunching = $true }
       } finally {
         $rs.PowerShell.Dispose()
       }
-    }
-
-    if ($batchFailed -and $script:FAIL_FAST) {
-      # A runspace that threw has no per-step exit file to replay; report the
-      # infrastructure failure rather than exiting silently.
-      Write-ErrorMessage "step runspace failed (fail-fast)"
-      exit 1
-    }
-
-    if ($script:FAIL_FAST) {
-      $failFastNumbers = @()
-      foreach ($rs in $runspaces) {
+      # Removing at $k without advancing keeps the launch order intact.
+      $active.RemoveAt($k)
+      if ($script:FAIL_FAST) {
         $exitFile = Join-Path $script:WaveTmpDir "step-$($rs.Number).exit"
         if ((Test-Path -LiteralPath $exitFile) -and (Get-Content -LiteralPath $exitFile -Raw) -ne '0') {
           $failFastNumbers += $rs.Number
+          $stopLaunching = $true
         }
       }
-      if ($failFastNumbers.Count -gt 0) {
-        Format-FailFastReport -Number $failFastNumbers
-        exit 1
-      }
     }
+  }
+
+  if ($script:FAIL_FAST -and $infrastructureFailed) {
+    # A runspace that threw has no per-step exit file to replay; report the
+    # infrastructure failure rather than exiting silently.
+    Write-ErrorMessage "step runspace failed (fail-fast)"
+    exit 1
+  }
+
+  if ($script:FAIL_FAST -and $failFastNumbers.Count -gt 0) {
+    Format-FailFastReport -Number $failFastNumbers
+    exit 1
   }
 
   $pipelineStart.Stop()

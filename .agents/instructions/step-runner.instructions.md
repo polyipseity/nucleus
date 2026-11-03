@@ -1,5 +1,5 @@
 ---
-description: "Use when implementing or modifying the step-runner framework used by the check and test pipelines. Covers step registration, declared applicability (platform, mode, requires), the --only-steps selector, run-state rendering, PS1 parallelism, and step 7 $schema enforcement."
+description: "Use when implementing or modifying the step-runner framework used by the check and test pipelines. Covers step registration, declared applicability (platform, mode, requires), the --only-steps selector, run-state rendering, work-queue dispatch, and step 7 $schema enforcement."
 name: "Step-Runner Framework"
 applyTo: "src/scripts/lib/step-runner.sh, src/scripts/lib/step-runner.ps1, scripts/check.sh, scripts/check.ps1, scripts/test.sh, scripts/test.ps1, tests/scripts/**, src/scripts/checks/check-steps/**, src/scripts/tests/test-steps/**"
 ---
@@ -27,9 +27,13 @@ A step that does not run never affects the exit code (0 pass, 1 fail) and never 
 
 Step 01 runs `treefmt` in place, so a pipeline can reformat files silently: run `git status --short` afterwards and commit the result as a `style(...)` change. Test step 04 declares `requires sops-machine-key` and Windows has no counterpart for it.
 
-## PowerShell dispatch
+## Dispatch
 
-`Invoke-StepPipeline` runs steps in waves capped at `PARALLEL_JOBS` (CPU count by default), one `[PowerShell]::Create()` runspace per step driven with `BeginInvoke`, and replays results in step-number order. Not `RunspacePool` or `Start-Job`, because those are the constructs that make runspace state unpredictable for the steps below.
+Both runners schedule steps through a work queue capped at `PARALLEL_JOBS` (CPU count by default): a free slot launches the next pending step immediately, and a slot releases the moment its step finishes, so a slow step never holds back a later step that could start. The `[k/N] step ... started` lines are numbered by launch order.
+
+POSIX blocks on `wait -n -p` over the running wrapper pids. PowerShell keeps one `[PowerShell]::Create()` runspace per step driven with `BeginInvoke` and blocks on `WaitAny` over the runspace async handles. Not `RunspacePool` or `Start-Job`, because those are the constructs that make runspace state unpredictable for the steps.
+
+Under `--fail-fast` the first failure stops new launches; the queue drains the steps already in flight, then reports the failed set in launch order and exits 1. The queue changes only when steps launch: per-step output and timing files, the `=== [NN] name ===` headers, the `sum of steps` and `wall clock` lines, and the not-run states are unaffected.
 
 ## Step 7 `$schema` enforcement
 
