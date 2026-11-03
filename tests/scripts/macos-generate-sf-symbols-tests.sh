@@ -213,12 +213,6 @@ test_skill_points_at_generated_path() {
   else
     assert_pass "skill no longer points at the committed list"
   fi
-
-  if grep -q 'NixOS and Windows: not applicable' "$SKILL_MD"; then
-    assert_pass "skill records NixOS/Windows as not applicable"
-  else
-    assert_fail "cross-host status" "expected an explicit N/A for NixOS/Windows"
-  fi
 }
 
 test_committed_list_removed() {

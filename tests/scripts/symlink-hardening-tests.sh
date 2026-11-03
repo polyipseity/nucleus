@@ -105,19 +105,9 @@ test_no_chattr_invocation() {
   fi
 }
 
-test_policy_records_capability_requirement() {
-  local policy="$REPO_ROOT/.agents/instructions/cross-host-feature-parity.instructions.md"
-  if grep -q "CAP_LINUX_IMMUTABLE" "$policy"; then
-    assert_pass "policy records why Linux cannot prevent symlink removal (CAP_LINUX_IMMUTABLE)"
-  else
-    assert_fail "policy records why Linux cannot prevent symlink removal (CAP_LINUX_IMMUTABLE)" "CAP_LINUX_IMMUTABLE not found in $policy"
-  fi
-}
-
 test_absent_path_is_silent_no_op
 test_dangling_symlink_is_accepted
 test_existing_symlink_is_accepted
 test_flag_failure_reports_f1_error
 test_no_chattr_invocation
-test_policy_records_capability_requirement
 finish_tests

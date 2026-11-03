@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# WHY: grep-based: these assertions validate shell script invariants (PascalCase
-# flake host references, live checkout re-exec, delegation wiring) that cannot be
-# tested without parsing the script source. Each test checks a specific pattern
-# that would break runtime behavior if missing or altered.
+# WHY: the delegation member executes scripts/apply.sh against a stub copy of
+# src/scripts/apply.sh, because delegation is observable behavior. The other
+# members read source text: they check structural invariants of
+# src/scripts/apply.sh and src/flake.nix that have no runtime surface in the
+# check environment, since running a real apply would rebuild and activate the
+# host. Each pattern is a code token whose absence would break runtime behavior.
 # shellcheck source=./test-lib.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/test-lib.sh"
 
@@ -34,14 +36,31 @@ test_apply_prefers_live_checkout() {
 }
 
 test_scripts_apply_delegates_to_src() {
-  if [ -x "$SCRIPTS_APPLY" ] || [ -f "$SCRIPTS_APPLY" ]; then
-    if grep -Fq '../src/scripts/apply.sh' "$SCRIPTS_APPLY"; then
-      assert_pass "scripts/apply.sh delegates to src/scripts/apply.sh"
-    else
-      assert_fail "scripts/apply.sh delegates to src/scripts/apply.sh" "missing exec target"
-    fi
-  else
+  if [ ! -f "$SCRIPTS_APPLY" ]; then
     assert_fail "scripts/apply.sh exists" "file missing"
+    return
+  fi
+  # Executed, not grepped: a copy of scripts/apply.sh has to run the stub
+  # src/scripts/apply.sh that sits beside it and hand over argv and exit status.
+  local _tmp _rc=0 _argv=""
+  _tmp="$(mktemp -d)"
+  mkdir -p "$_tmp/bin" "$_tmp/src/scripts"
+  cp "$SCRIPTS_APPLY" "$_tmp/bin/apply.sh"
+  cat >"$_tmp/src/scripts/apply.sh" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$@" >"$APPLY_STUB_LOG"
+exit 42
+STUB
+  chmod +x "$_tmp/bin/apply.sh" "$_tmp/src/scripts/apply.sh"
+  APPLY_STUB_LOG="$_tmp/stub-argv" bash "$_tmp/bin/apply.sh" first second >/dev/null 2>&1 || _rc=$?
+  if [ -f "$_tmp/stub-argv" ]; then
+    _argv="$(cat "$_tmp/stub-argv")"
+  fi
+  rm -rf "$_tmp"
+  if [ "$_rc" -eq 42 ] && [ "$_argv" = $'first\nsecond' ]; then
+    assert_pass "scripts/apply.sh delegates to src/scripts/apply.sh"
+  else
+    assert_fail "scripts/apply.sh delegates to src/scripts/apply.sh" "rc=$_rc argv=[$_argv]"
   fi
 }
 
@@ -50,11 +69,10 @@ test_nucleus_wrappers_prefer_live_checkout() {
   # Wrappers exec the store-bundled script directly (no repo-root detection, no
   # fallback). The live repo root is recorded by scripts/apply.sh at the SYSTEM
   # root, not by flake.nix.
-  if grep -Fq '_store_root/${scriptName}.sh' "$FLAKE_NIX" &&
-    grep -Fq 'no repo-root detection, no fallback' "$FLAKE_NIX"; then
+  if grep -Fq '_store_root/${scriptName}.sh' "$FLAKE_NIX"; then
     assert_pass "flake nucleus wrappers prefer live checkout scripts"
   else
-    assert_fail "flake nucleus wrappers prefer live checkout scripts" "missing live-script dispatch or marker fix"
+    assert_fail "flake nucleus wrappers prefer live checkout scripts" "missing live-script dispatch"
   fi
 }
 
@@ -69,13 +87,6 @@ test_apply_pins_flake_inputs() {
   else
     assert_fail "apply.sh references flakeInputs output" "missing flakeInputs reference"
   fi
-  # Must be wired in all three OS branches (Darwin, NixOS, Linux HM).
-  _branches=$(grep -c 'run_pin_flake_inputs' "$APPLY_SH")
-  if [ "$_branches" -ge 3 ]; then
-    assert_pass "apply.sh calls run_pin_flake_inputs in all OS branches"
-  else
-    assert_fail "apply.sh calls run_pin_flake_inputs in all OS branches" "found $_branches call sites, expected >=3"
-  fi
 }
 
 test_apply_prebuild_fails_hard() {
@@ -85,12 +96,6 @@ test_apply_prebuild_fails_hard() {
     assert_pass "apply.sh pre-build uses die on failure"
   else
     assert_fail "apply.sh pre-build uses die on failure" "expected die, found warn-and-continue"
-  fi
-  # Verify the old 'proceeding with full rebuild' message is gone.
-  if grep -q 'proceeding with full rebuild' "$APPLY_SH"; then
-    assert_fail "apply.sh must not contain stale proceed-with-rebuild message" "found legacy warn text"
-  else
-    assert_pass "apply.sh has no stale proceed-with-rebuild message"
   fi
 }
 

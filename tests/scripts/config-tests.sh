@@ -19,8 +19,11 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 CONFIG_SH="$SCRIPT_DIR/../../scripts/config.sh"
 readonly CONFIG_SH
+CONFIG_PS1="$SCRIPT_DIR/../../scripts/config.ps1"
+readonly CONFIG_PS1
 
 require_command jq "the config CLI parses JSON with jq"
+require_command pwsh "the PowerShell config twin's default channels are asserted by running it"
 
 # _cfg HOME ARGS...: run the CLI against an isolated config file. The script
 # resolves the config path from HOME at startup, so a per-test HOME is the whole
@@ -149,6 +152,34 @@ _t_get_list_and_section_outputs_are_unchanged() {
   fi
 }
 
+# _t_get_prints_default_channels: the channel list a fresh host gets, which is
+# also the list harness-notify falls back to when no config file exists.
+_t_get_prints_default_channels() {
+  local home out rc=0
+  home="$(_new_home)"
+  trap 'rm -rf "$home"' RETURN
+  out="$(_cfg "$home" get harness-notify.channels | tr -d '\n ')" || rc=$?
+  if [ "$rc" -eq 0 ] && [ "$out" = '["telegram","ntfy","discord"]' ]; then
+    assert_pass "get prints the default channels"
+  else
+    assert_fail "default channels" "rc=$rc output=[$out]"
+  fi
+}
+
+# _t_ps1_get_prints_default_channels: scripts/config.ps1 ships the same list,
+# asserted by running it instead of comparing the two declarations as text.
+_t_ps1_get_prints_default_channels() {
+  local home out rc=0
+  home="$(_new_home)"
+  trap 'rm -rf "$home"' RETURN
+  out="$(HOME="$home" pwsh -NoProfile -File "$CONFIG_PS1" get harness-notify.channels | tr -d '\r\n ')" || rc=$?
+  if [ "$rc" -eq 0 ] && [ "$out" = '["telegram","ntfy","discord"]' ]; then
+    assert_pass "the PowerShell config prints the same default channels"
+  else
+    assert_fail "ps1 default channels" "rc=$rc output=[$out]"
+  fi
+}
+
 section 1 "get and set handle a false boolean"
 _t_get_prints_default_false
 _t_get_prints_user_false
@@ -161,5 +192,9 @@ _t_get_prints_a_present_null
 
 section 3 "the other value shapes are untouched"
 _t_get_list_and_section_outputs_are_unchanged
+
+section 4 "default channels match the shipped list"
+_t_get_prints_default_channels
+_t_ps1_get_prints_default_channels
 
 finish_tests
