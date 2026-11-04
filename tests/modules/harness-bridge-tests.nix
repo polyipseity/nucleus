@@ -78,6 +78,10 @@ let
   # name the exact entry instead of assuming its position.
   entriesRunning =
     entries: command: builtins.filter (entry: entryPointOf entry.command == command) entries;
+  # Exact command match: a harness wired to another harness's decision document, or
+  # to an argument-less approval call, still starts with the entry point name, so
+  # the first-word match above cannot catch it.
+  entriesWithCommand = entries: command: builtins.filter (entry: entry.command == command) entries;
   underBudget = builtins.filter (entry: entry.timeout < approvalWindow) allEntries;
   claudeUnderBudget = builtins.filter (entry: entry.timeout < approvalWindow) claudeEntries;
 in
@@ -112,6 +116,12 @@ in
     )
 
     # --- Claude carries the same budget ---
+    (assert' (builtins.length claudeEntries > 0)
+      "the Claude hook config must declare at least one hook entry; an emptied hook set would make the timeout asserts below vacuous"
+    )
+    (assert' (
+      builtins.length (entriesRunning claudeEntries guardCommand) == 1
+    ) "Claude must gate tool calls with exactly one safe-delete-guard hook")
     (assert' (all (entry: entry ? timeout) claudeEntries)
       "every Claude hook entry must declare a timeout, or the harness applies a budget of its own and the guard can be killed before the approval window"
     )
@@ -124,7 +134,7 @@ in
       (
         builtins.length copilotHooks.PreToolUse == 2
         && builtins.length (entriesRunning copilotHooks.PreToolUse guardCommand) == 1
-        && builtins.length (entriesRunning copilotHooks.PreToolUse "harness-approval") == 1
+        && builtins.length (entriesWithCommand copilotHooks.PreToolUse "harness-approval hook copilot") == 1
       )
       "VS Code Copilot PreToolUse must hold exactly two hooks: safe-delete-guard and the Copilot harness-approval document"
     )
@@ -144,7 +154,9 @@ in
       (
         builtins.length cursorHooks.beforeShellExecution == 2
         && builtins.length (entriesRunning cursorHooks.beforeShellExecution guardCommand) == 1
-        && builtins.length (entriesRunning cursorHooks.beforeShellExecution "harness-approval") == 1
+        &&
+          builtins.length (entriesWithCommand cursorHooks.beforeShellExecution "harness-approval hook cursor")
+          == 1
       )
       "Cursor shell executions must hold exactly two hooks: safe-delete-guard and the Cursor harness-approval document"
     )
