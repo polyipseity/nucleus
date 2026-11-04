@@ -25,11 +25,32 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
     Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#B1 -- structural invariants; vendored code and config methods are different concerns; gitignore filter applied on top
   # WHY: raw basenames with -SimpleMatch mirror the .sh twin's grep -F -f semantics; [regex]::Escape here would make dotted basenames (e.g. system.gitconfig) match literally and never be found
   $cfgPatterns = @($cfgFiles | ForEach-Object { $_.Name } | Sort-Object -Unique)
-  # WHY: Select-GitIgnored returns path strings; piping strings to Select-String searches them as content, so -Path is required to read the actual files
-  $cfgSelectOutput = Select-String -Path $srcFiles -Pattern $cfgPatterns -SimpleMatch
-  # WHY: refs may use a ${hostName} template that no raw basename matches.
-  $cfgMethodOutput = Select-String -Path $srcFiles -Pattern '# check-suppress:config-method'
-  $cfgTemplateOutput = Select-String -Path $srcFiles -Pattern '${hostName}' -SimpleMatch
+  # One read pass builds the three lists the per-config loop below reads:
+  # every config basename as one escaped alternation (raw basenames stay
+  # literal substrings, mirroring the .sh twin's grep -F), the annotation
+  # marker, and the ${hostName} template form. Entries keep Select-String's
+  # Path/LineNumber/Line shape and its file-then-line order, so the loop is
+  # unchanged; this replaces three sweeps that each re-read every source file.
+  $cfgCombinedPattern = ($cfgPatterns | ForEach-Object { [regex]::Escape($_) }) -join '|'
+  $cfgTemplatePattern = [regex]::Escape('${hostName}')
+  $cfgSelectOutput = [System.Collections.Generic.List[pscustomobject]]::new()
+  $cfgMethodOutput = [System.Collections.Generic.List[pscustomobject]]::new()
+  $cfgTemplateOutput = [System.Collections.Generic.List[pscustomobject]]::new()
+  foreach ($cfgSrc in $srcFiles) {
+    $cfgLines = @(Get-Content -Path $cfgSrc)
+    for ($cfgI = 0; $cfgI -lt $cfgLines.Count; $cfgI++) {
+      $cfgLine = $cfgLines[$cfgI]
+      $cfgHitSelect = $cfgLine -match $cfgCombinedPattern
+      $cfgHitMethod = $cfgLine -match '# check-suppress:config-method'
+      $cfgHitTemplate = $cfgLine -match $cfgTemplatePattern
+      if ($cfgHitSelect -or $cfgHitMethod -or $cfgHitTemplate) {
+        $cfgEntry = [pscustomobject]@{ Path = $cfgSrc; LineNumber = $cfgI + 1; Line = $cfgLine }
+        if ($cfgHitSelect) { $cfgSelectOutput.Add($cfgEntry) }
+        if ($cfgHitMethod) { $cfgMethodOutput.Add($cfgEntry) }
+        if ($cfgHitTemplate) { $cfgTemplateOutput.Add($cfgEntry) }
+      }
+    }
+  }
 
   $parallelJobs = [Environment]::ProcessorCount
 
@@ -124,7 +145,8 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   $kebabRegex = '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'
   $macosDirRegex = '^(src[\\/]platforms[\\/]macOS[\\/]|src[\\/]hosts[\\/]MacBook[\\/])'
   $namingErrors = 0
-  $definitions = @()
+  # WHY: List rather than += on an array: += copies the whole array per append, and a repo this size defines thousands of entries
+  $definitions = [System.Collections.Generic.List[string]]::new()
 
   # WHY: if-expression output is pipeline-enumerated: an empty branch yields $null, crashing the .Count check below under StrictMode; the @() wrapper forces an array
   # WHY: paths are made repo-relative (mirroring the .sh twin's `find src` output) so the ^src/... anchor in $macosDirRegex matches; full paths would never match and silently disable the macos- prefix rule
@@ -147,7 +169,7 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
         if ($line -match '^\s*#') { continue }
 
         if ($line -match $dottedRegex) {
-          $definitions += "$file`:$($i + 1):$(($Matches[0] -split '\.')[-1])"
+          $definitions.Add("$file`:$($i + 1):$(($Matches[0] -split '\.')[-1])")
         }
 
         if (-not $inBlock -and $line -match ($nsRegex + '\s*=[^;]*\{')) {
@@ -155,7 +177,7 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
           $depth = 0
         }
         if ($inBlock -and $line -match $entryRegex) {
-          $definitions += "$file`:$($i + 1):$($Matches[1])"
+          $definitions.Add("$file`:$($i + 1):$($Matches[1])")
         }
         if ($inBlock) {
           $depth += ([regex]::Matches($line, '\{')).Count - ([regex]::Matches($line, '\}')).Count
@@ -234,46 +256,50 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
       'Format-NucleusOutput.psm1', 'Format-NucleusOutput.Tests.ps1', 'Invoke-LogManagement.ps1', 'log-management.Tests.ps1')
     $lfScanned = @($lfFiles | Where-Object { (Split-Path -Leaf $_) -notin $lfAllowlisted })
 
-    $lfShFiles = @($lfScanned | Where-Object { $_ -match '\.(sh|zsh)$' })
-    $lfEchoFiles = @($lfScanned | Where-Object { $_ -match '\.sh$' })
-    $lfPsFiles = @($lfScanned | Where-Object { $_ -match '\.(ps1|psm1)$' })
+    # WHY seven buckets: the old code ran one Select-String sweep per rule over
+    # its file list, so every sweep re-read every file; this reads each file
+    # once and flushes the buckets in the same sweep order below, keeping the
+    # report byte-identical.
+    $lfAnsiSh = [System.Collections.Generic.List[string]]::new()
+    $lfTputSh = [System.Collections.Generic.List[string]]::new()
+    $lfEcho = [System.Collections.Generic.List[string]]::new()
+    $lfAnsiPs = [System.Collections.Generic.List[string]]::new()
+    $lfTputPs = [System.Collections.Generic.List[string]]::new()
+    $lfChar27 = [System.Collections.Generic.List[string]]::new()
+    $lfBacktick = [System.Collections.Generic.List[string]]::new()
 
-    if ($lfShFiles.Count -gt 0) {
-      foreach ($m in (Select-String -Path $lfShFiles -Pattern '\\033\[', '\\e\[', '\\x1b\[')) {
-        Write-ErrorMessage "$($m.Path):$($m.LineNumber): raw ANSI escape literal (use shared color helpers)"
-        $lfErrors++
-      }
-      foreach ($m in (Select-String -Path $lfShFiles -Pattern '\btput\b')) {
-        Write-ErrorMessage "$($m.Path):$($m.LineNumber): terminal capability query (use shared color helpers)"
-        $lfErrors++
+    foreach ($lfFile in $lfScanned) {
+      $lfIsPs = $lfFile -match '\.(ps1|psm1)$'
+      $lfLines = @(Get-Content -Path $lfFile)
+      for ($lfI = 0; $lfI -lt $lfLines.Count; $lfI++) {
+        $lfLine = $lfLines[$lfI]
+        $lfLoc = "$($lfFile):$($lfI + 1)"
+        if ($lfLine -match '\\033\[' -or $lfLine -match '\\e\[' -or $lfLine -match '\\x1b\[') {
+          if ($lfIsPs) { $lfAnsiPs.Add("$lfLoc`: raw ANSI escape literal (use shared color helpers)") } else { $lfAnsiSh.Add("$lfLoc`: raw ANSI escape literal (use shared color helpers)") }
+        }
+        if ($lfLine -match '\btput\b') {
+          if ($lfIsPs) { $lfTputPs.Add("$lfLoc`: terminal capability query (use shared color helpers)") } else { $lfTputSh.Add("$lfLoc`: terminal capability query (use shared color helpers)") }
+        }
+        if (-not $lfIsPs -and $lfFile -match '\.sh$' -and $lfLine -match '(^|[^A-Za-z0-9_])echo\s+-e([^A-Za-z0-9_]|$)') {
+          $lfEcho.Add("$lfLoc`: echo dash-e flag (use printf with %b)")
+        }
+        if ($lfIsPs) {
+          if ($lfLine -match '\[char\]27') { $lfChar27.Add("$lfLoc`: char-27 escape literal (use PSStyle helpers)") }
+          # WHY the token-end group: an ESC escape is a backtick-e that ends the
+          # token; inline code such as `enable` continues with an identifier
+          # character. -cmatch is parity with the awk twin
+          # (repository-policy.awk), whose regex is case-sensitive, so both twins
+          # report the same lines.
+          if ($lfLine -cmatch '`e([^A-Za-z0-9_]|$)') { $lfBacktick.Add("$lfLoc`: backtick-e escape literal (use PSStyle helpers)") }
+        }
       }
     }
-    if ($lfEchoFiles.Count -gt 0) {
-      foreach ($m in (Select-String -Path $lfEchoFiles -Pattern '(^|[^A-Za-z0-9_])echo\s+-e([^A-Za-z0-9_]|$)')) {
-        Write-ErrorMessage "$($m.Path):$($m.LineNumber): echo dash-e flag (use printf with %b)"
-        $lfErrors++
-      }
-    }
-    if ($lfPsFiles.Count -gt 0) {
-      foreach ($m in (Select-String -Path $lfPsFiles -Pattern '\\033\[', '\\e\[', '\\x1b\[')) {
-        Write-ErrorMessage "$($m.Path):$($m.LineNumber): raw ANSI escape literal (use shared color helpers)"
-        $lfErrors++
-      }
-      foreach ($m in (Select-String -Path $lfPsFiles -Pattern '\btput\b')) {
-        Write-ErrorMessage "$($m.Path):$($m.LineNumber): terminal capability query (use shared color helpers)"
-        $lfErrors++
-      }
-      foreach ($m in (Select-String -Path $lfPsFiles -Pattern '\[char\]27')) {
-        Write-ErrorMessage "$($m.Path):$($m.LineNumber): char-27 escape literal (use PSStyle helpers)"
-        $lfErrors++
-      }
-      # WHY the token-end group: an ESC escape is a backtick-e that ends the
-      # token; inline code such as `enable` continues with an identifier
-      # character. -CaseSensitive is parity with the awk twin
-      # (repository-policy.awk), whose regex is case-sensitive, so both twins
-      # report the same lines.
-      foreach ($m in (Select-String -Path $lfPsFiles -Pattern '`e([^A-Za-z0-9_]|$)' -CaseSensitive)) {
-        Write-ErrorMessage "$($m.Path):$($m.LineNumber): backtick-e escape literal (use PSStyle helpers)"
+
+    # Flush in the sweep order the Select-String version used: sh ANSI, sh
+    # tput, echo, ps ANSI, ps tput, char-27, backtick-e.
+    foreach ($lfGroup in @($lfAnsiSh, $lfTputSh, $lfEcho, $lfAnsiPs, $lfTputPs, $lfChar27, $lfBacktick)) {
+      foreach ($lfMsg in $lfGroup) {
+        Write-ErrorMessage $lfMsg
         $lfErrors++
       }
     }
@@ -404,32 +430,42 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   }
 
   $lcpDiscardPattern = '(StandardOutPath|StandardErrorPath|StandardOutput|StandardError)\s*=\s*"/dev/null"'
-  # WHY per-file select/read instead of one batched pass, as the .sh twin does
-  # with a single awk program: the batching was not ported to this twin, so this
-  # rule pays two Select-String calls and one Get-Content per file and the step
-  # runs slower here than on POSIX. A known asymmetry, not an oversight.
+  # WHY one read per file instead of two Select-String calls plus a -Raw read:
+  # the .sh twin batches this family into a single awk pass, and one Get-Content
+  # matches that cost while preserving per-file, per-rule report order.
   foreach ($f in $lcpFiles) {
     # Exclude this check's own twins: their source contains the literal pattern text.
     if ((Split-Path -Leaf $f) -in ($allStepLeaves + $allStepShLeaves)) { continue }  # WHY: $f is a string from Select-GitIgnored, not a FileInfo object
     $lcpRel = $f.Substring($r.Length + 1) -replace '\\', '/'
 
-    # Rule 1: no capture directive may discard a stream.
-    Select-String -Path $f -Pattern $lcpDiscardPattern | ForEach-Object {
-      Write-ErrorMessage "log capture pair: '$lcpRel`:$($_.LineNumber)' discards a stream to /dev/null; capture stdout.log and stderr.log instead (output-handling.instructions.md)"
-      $lcpErrors++
+    $lcpLines = @(Get-Content -LiteralPath $f)
+
+    # Rule 1: no capture directive may discard a stream. One finding per matching
+    # line, matching Select-String's one-MatchInfo-per-line emission.
+    for ($lcpI = 0; $lcpI -lt $lcpLines.Count; $lcpI++) {
+      if ($lcpLines[$lcpI] -match $lcpDiscardPattern) {
+        Write-ErrorMessage "log capture pair: '$lcpRel`:$($lcpI + 1)' discards a stream to /dev/null; capture stdout.log and stderr.log instead (output-handling.instructions.md)"
+        $lcpErrors++
+      }
     }
 
-    # Rule 2: no merged-stream redirection.
-    Select-String -Path $f -Pattern '*>>' -SimpleMatch | ForEach-Object {
-      Write-ErrorMessage "log capture pair: '$lcpRel`:$($_.LineNumber)' merges stdout and stderr; use 1>> and 2>> into stdout.log and stderr.log"
-      $lcpErrors++
+    # Rule 2: no merged-stream redirection. Literal '*>>' substring, the same
+    # search Select-String -SimpleMatch and the POSIX twin's index($0, "*>>") do,
+    # one finding per line.
+    for ($lcpI = 0; $lcpI -lt $lcpLines.Count; $lcpI++) {
+      if ($lcpLines[$lcpI].Contains('*>>')) {
+        Write-ErrorMessage "log capture pair: '$lcpRel`:$($lcpI + 1)' merges stdout and stderr; use 1>> and 2>> into stdout.log and stderr.log"
+        $lcpErrors++
+      }
     }
 
     # Rule 3: capture is both-or-neither per file, per directive family.
     # WHY boolean presence: a file may own several services, so only the lone-stream case
     # is a violation -- with one stream captured and the other discarded, the discarded
     # stream lands in whatever the platform default is.
-    $lcpRaw = Get-Content -LiteralPath $f -Raw
+    # Presence over the whole file, derived from the same read; joining with LF
+    # keeps every -match pattern equivalent to the old -Raw read.
+    $lcpRaw = $lcpLines -join "`n"
     if (($lcpRaw -match 'StandardOutPath') -ne ($lcpRaw -match 'StandardErrorPath')) {
       Write-ErrorMessage "log capture pair: '$lcpRel' declares only one of StandardOutPath/StandardErrorPath; declare both or neither"
       $lcpErrors++
