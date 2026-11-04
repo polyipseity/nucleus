@@ -22,6 +22,12 @@
   With no paths given, skip Git discovery and report nothing to check. Used by
   check.sh/check.ps1 in scoped mode to skip whole-repo discovery.
 
+.PARAMETER PssaWorker
+  Internal: run only the lint phase over the given paths and print the
+  diagnostics as one JSON array on stdout. The parent process fans the lint
+  out over child processes of itself, one slice of files each; not meant to
+  be invoked by hand.
+
 .PARAMETER Paths
   Paths to check. Omitted, every tracked *.ps1 file is checked.
 
@@ -46,6 +52,9 @@ param(
   [string]$Settings = '',
   [string[]]$OnlyStep = @(),
   [switch]$Scoped,
+  # Internal fan-out worker: the parent spawns children of this script with
+  # this switch so the lint phase runs one file slice per process.
+  [switch]$PssaWorker,
   # ValueFromRemainingArguments is required: without it a [string[]] at
   # Position 0 binds the first path and rejects the second, so
   # `check.ps1 pwsh a.ps1 b.ps1` fails on b.ps1. Callers pass whole sets.
@@ -160,10 +169,138 @@ if ($runPssa) {
       throw "No PSSA rules enabled after filtering (severities: $($enabledSeverities -join ', '); excluded: $($excludedRules -join ', '))."
     }
 
-    $diags = $files | Invoke-ScriptAnalyzer -Settings @{
-      IncludeRules = [string[]]$enabledRuleNames
-      Rules = @{}
+    # WHY child processes rather than threads: the phase's cost is
+    # PSScriptAnalyzer resolving each distinct command name through
+    # Get-Command once per process (907 names, 109 s measured here on the
+    # positional-parameter rule alone), and threads inside one process share
+    # its unlocked static rule state while reaching only 1.8x on that
+    # workload. WHY four workers at most: the resolution is syscall-bound,
+    # so on the full 240-file list the wall bottoms out at four workers
+    # (79 s, against 91 s at six and ten, 119 s with no fan-out), because
+    # each extra worker re-resolves the shared command names against the same
+    # module paths. The 8-file floor keeps small scoped runs on the
+    # single-process path they already use.
+    $maxWorkers = [int][Math]::Min(
+      [Math]::Min([System.Environment]::ProcessorCount, 4),
+      [Math]::Ceiling($files.Count / 8.0)
+    )
+
+    if ($PssaWorker -or $maxWorkers -le 1) {
+      $diags = $files | Invoke-ScriptAnalyzer -Settings @{
+        IncludeRules = [string[]]$enabledRuleNames
+        Rules = @{}
+      }
+    } else {
+      # Contiguous slices of the sorted file list, one child per slice, so the
+      # merged diagnostics keep the sorted file order of a single-process run.
+      # Within a file the diagnostic set is identical; only PSSA's first-file
+      # ordering quirk can differ, since each slice starts a fresh analyzer.
+      $sliceSize = [int][Math]::Ceiling($files.Count / $maxWorkers)
+      $slices = [System.Collections.Generic.List[string[]]]::new()
+      for ($i = 0; $i -lt $files.Count; $i += $sliceSize) {
+        $last = [Math]::Min($i + $sliceSize - 1, $files.Count - 1)
+        $slices.Add([string[]]@($files[$i..$last]))
+      }
+
+      $childPwsh = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
+      $scriptPath = (Resolve-Path -Path $PSCommandPath).Path
+      $settingsPath = (Resolve-Path -Path $settingsFile).Path
+
+      # WHY a parameterized scriptblock instead of a function: Start-ThreadJob
+      # runs this body in a fresh runspace that does not inherit the script
+      # scope, so every value it needs arrives as an argument.
+      $invokePssaWorker = {
+        param(
+          [Parameter(Mandatory)][string]$PwshPath,
+          [Parameter(Mandatory)][string]$ScriptPathValue,
+          [Parameter(Mandatory)][string]$SettingsPathValue,
+          [Parameter(Mandatory)][string[]]$SlicePaths
+        )
+
+        $psi = [System.Diagnostics.ProcessStartInfo]::new()
+        $psi.FileName = $PwshPath
+        $psi.UseShellExecute = $false
+        # Both streams redirect together: capturing one while dropping the
+        # other is prohibited (log capture pair policy), and the parent
+        # forwards the captured stderr verbatim so a failing worker's own
+        # message is never buffered away.
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        foreach ($argument in @('-NoLogo', '-NoProfile', '-NonInteractive', '-File', $ScriptPathValue, '-OnlyStep', 'PSSA', '-Settings', $SettingsPathValue, '-PssaWorker')) {
+          $psi.ArgumentList.Add($argument)
+        }
+        foreach ($path in $SlicePaths) {
+          $psi.ArgumentList.Add($path)
+        }
+
+        $process = [System.Diagnostics.Process]::Start($psi)
+        # WHY async: the pipes have bounded buffers, so waiting for exit
+        # before draining them would deadlock a child that fills a pipe.
+        $stdout = $process.StandardOutput.ReadToEndAsync()
+        $stderr = $process.StandardError.ReadToEndAsync()
+        $process.WaitForExit()
+
+        return [pscustomobject]@{
+          ExitCode = $process.ExitCode
+          Output   = $stdout.Result
+          Errors   = $stderr.Result
+        }
+      }
+
+      $jobs = @(
+        foreach ($slice in $slices) {
+          Start-ThreadJob -ScriptBlock $invokePssaWorker -ArgumentList $childPwsh, $scriptPath, $settingsPath, $slice -ThrottleLimit $maxWorkers
+        }
+      )
+
+      # Collect in job order: job N carries slice N, so the diagnostics keep
+      # the sorted file order of a single-process run.
+      $workerDiags = [System.Collections.Generic.List[object]]::new()
+      foreach ($job in $jobs) {
+        $outcome = $job | Wait-Job | Receive-Job
+        if (-not $outcome) {
+          throw 'PowerShell lint worker produced no result.'
+        }
+        if (-not [string]::IsNullOrEmpty($outcome.Errors)) {
+          # Passthrough: the worker's own text, unformatted and unfiltered.
+          [Console]::Error.Write($outcome.Errors)
+        }
+        if ($outcome.ExitCode -ne 0) {
+          throw "PowerShell lint worker process failed with exit code $($outcome.ExitCode)."
+        }
+        if ([string]::IsNullOrWhiteSpace($outcome.Output)) {
+          throw 'PowerShell lint worker returned no diagnostics payload.'
+        }
+        $parsed = ConvertFrom-Json -InputObject $outcome.Output
+        if ($null -ne $parsed) {
+          foreach ($entry in @($parsed)) {
+            $workerDiags.Add($entry)
+          }
+        }
+      }
+      $diags = @($workerDiags)
     }
+
+    if ($PssaWorker) {
+      # stdout is the protocol channel back to the parent: one JSON array of
+      # diagnostics and nothing else.
+      $payload = if ($diags) {
+        @($diags | ForEach-Object {
+            [pscustomobject]@{
+              ScriptPath = $_.ScriptPath
+              Line       = $_.Line
+              Column     = $_.Column
+              Severity   = $_.Severity.ToString()
+              Message    = $_.Message
+            }
+          })
+      } else {
+        @()
+      }
+      Write-Output (ConvertTo-Json -InputObject $payload -Compress)
+      exit 0
+    }
+
     if ($diags) {
       $ErrorActionPreference = 'Continue'
       $diags | ForEach-Object {
