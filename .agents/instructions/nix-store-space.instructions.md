@@ -8,7 +8,7 @@ applyTo: "src/modules/posix/base.nix, src/modules/configs/nix/**, src/flake.nix,
 
 ## Store settings
 
-Settings live in [`posix/base.nix`](../../src/modules/posix/base.nix) (NixOS `nix.settings`) and [`nix.custom.conf`](../../src/modules/configs/nix/nix.custom.conf) on MacBook (`nix.enable = false` under Determinate Nix). Read them there instead of trusting a copy. Under Determinate the macOS daemon's CPU and I/O priority are not configurable at all, so `max-jobs`/`cores` are the lever there, which is why the scheduling options exist only in the NixOS branch. `min-free`/`max-free` are GC pressure thresholds; the `apply.sh` `health-check` `--min-free-bytes` (16 GB) is a separate system-wide check and not the same number.
+Settings live in [`posix/base.nix`](../../src/modules/posix/base.nix) (NixOS `nix.settings`) and [`MacBook.conf`](../../src/modules/configs/nix/MacBook.conf) on MacBook (`nix.enable = false` under Determinate Nix, deployed as `/etc/nix/nix.custom.conf`). Read them there instead of trusting a copy. Under Determinate the macOS daemon's CPU and I/O priority are not configurable at all, so `max-jobs`/`cores` are the lever there, which is why the scheduling options exist only in the NixOS branch. `min-free`/`max-free` are GC pressure thresholds; the `apply.sh` `health-check` `--min-free-bytes` (16 GB) is a separate system-wide check and not the same number.
 
 Two invariants are invisible in those files. `keep-derivations`/`keep-outputs` stay `true` because `nix-shell` and rollback need them. GC is age-based (`nix-collect-garbage --delete-older-than` in `posix/base.nix`, [`nix-store-gc.sh`](../../src/scripts/services/nix-store-gc.sh), [`gc.sh`](../../scripts/gc.sh)), never `-d`.
 

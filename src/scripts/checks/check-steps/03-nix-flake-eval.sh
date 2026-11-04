@@ -94,37 +94,40 @@ run_nix_flake_eval() {
 
   # WHY: the keys are validated in every mode, because this reads a config file
   # rather than the flake and a scoped run must not be able to skip it (the same
-  # always-run rule step 05 follows). The file is consumed only where it is
-  # deployed, so its keys are judged by the nix that reads it, not by whatever nix
-  # happens to run here.
-  if managed_nix_conf_check_applies; then
-    run_nix_conf_key_check "$_ctx_name" || _ne_exit=1
-  fi
+  # always-run rule step 05 follows). The check decides its own applicability from
+  # two facts: the config is declared only on the host that deploys it, and it is
+  # judged only by the nix flavor that consumes it.
+  run_nix_conf_key_check "$_ctx_name" || _ne_exit=1
 
   return $_ne_exit
 }
 
-# managed_nix_conf_check_applies: the managed nix.conf is consumed only where it is
-# deployed, so a host whose nix never reads it must not judge its keys.
-managed_nix_conf_check_applies() {
-  if [ -e /etc/nix/nix.custom.conf ]; then
-    return 0
-  fi
-  say "/etc/nix/nix.custom.conf is not deployed on this host: managed nix config keys not checked."
-  return 1
-}
-
 # run_nix_conf_key_check: every setting the managed nix.conf declares must be a
 # setting this nix reads. Nix only warns about an unknown name in a config file,
-# so a key that is not a setting never applies and nothing else reports it.
+# so a key that is not a setting never applies and nothing else reports it. The
+# check applies where both hold: the host's platform deploys the file (nix.enable
+# = false, which is macOS under Determinate Nix) and the running nix is the
+# Determinate flavor that consumes it. A host missing either is skipped rather
+# than judged.
 run_nix_conf_key_check() {
   local -n ctx="$1"
   local _nc_repo_root="${ctx[REPO_ROOT]}"
-  shift
-  local _nc_rel="src/modules/configs/nix/nix.custom.conf"
-  local _nc_file="$_nc_repo_root/$_nc_rel"
-  local _nc_key_count=0
-  local _nc_line _nc_trim _nc_key _nc_err
+  local _nc_host _nc_rel _nc_file
+  _nc_host="$(resolve_nucleus_host)"
+  # WHY: both conditions are required. The file is deployed only where nix.enable =
+  # false, and only Determinate Nix consumes it: upstream Nix does not know settings
+  # the file declares (eval-cores, lazy-trees), so judging the keys under it would
+  # report a working file as broken. Asking for one of those settings tells the two
+  # flavors apart without parsing a version string.
+  if ! nucleus_flag_for_host "$_nc_host" darwin || ! nix config show lazy-trees >/dev/null 2>&1; then
+    say "no managed nix config judged on $_nc_host: keys are judged only under the Determinate Nix that consumes the file"
+    return 0
+  fi
+  _nc_rel="src/modules/configs/nix/$_nc_host.conf"
+  _nc_file="$_nc_repo_root/$_nc_rel"
+  local -a _nc_keys=()
+  local _nc_line _nc_trim _nc_key _nc_err _nc_name _nc_declared _nc_setting
+  local _nc_unknown=0
 
   # WHY: a missing managed config is a defect in the tree, never a reason to
   # pass quietly; the file is the only statement of the daemon's settings.
@@ -147,7 +150,7 @@ run_nix_conf_key_check() {
     case "$_nc_key" in
     '' | *[!A-Za-z0-9_-]*) continue ;;
     esac
-    _nc_key_count=$((_nc_key_count + 1))
+    _nc_keys+=("$_nc_key")
   done <"$_nc_file"
 
   # WHY: one parse of the whole file, so nix judges exactly what the daemon
@@ -163,18 +166,37 @@ run_nix_conf_key_check() {
     error "$_nc_rel: nix rejected the managed config: $_nc_err"
     return 1
   fi
-  case "$_nc_err" in
-  *"unknown setting"*)
-    while IFS= read -r _nc_line; do
-      case "$_nc_line" in
-      *"unknown setting"*) error "$_nc_rel: $_nc_line" ;;
-      esac
-    done <<<"$_nc_err"
+  # WHY: nix warns about an unknown name in every config source it reads, not only
+  # the NIX_CONFIG this file is parsed as. CI's installer writes its own settings
+  # into the runner's nix.conf, so a name this file never declares reaches this
+  # stderr without the file being at fault; only a declared name is a defect here.
+  while IFS= read -r _nc_line; do
+    case "$_nc_line" in
+    *"unknown setting"*) ;;
+    *) continue ;;
+    esac
+    _nc_name="${_nc_line##*unknown setting }"
+    _nc_name="${_nc_name#\'}"
+    _nc_name="${_nc_name%%\'*}"
+    _nc_declared=false
+    for _nc_setting in "${_nc_keys[@]}"; do
+      if [ "$_nc_setting" = "$_nc_name" ]; then
+        _nc_declared=true
+        break
+      fi
+    done
+    if $_nc_declared; then
+      _nc_unknown=1
+      error "$_nc_rel: $_nc_line"
+    else
+      say "unattributed warning from outside the managed config: $_nc_line"
+    fi
+  done <<<"$_nc_err"
+  if [ "$_nc_unknown" -ne 0 ]; then
     return 1
-    ;;
-  esac
+  fi
 
-  say "managed nix config keys passed ($_nc_key_count keys)."
+  say "managed nix config keys passed (${#_nc_keys[@]} keys)."
   return 0
 }
 

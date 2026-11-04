@@ -12,7 +12,7 @@
   # check-suppress:config-method: method 2 (read-only) -- Nix daemon overwrites nix.custom.conf on restart -- a writable symlink would lose managed settings.
   environment.etc."nix/nix.custom.conf".text =
     builtins.replaceStrings [ "__USERNAME__" ] [ username ]
-      (builtins.readFile ../../modules/configs/nix/nix.custom.conf);
+      (builtins.readFile ../../modules/configs/nix/MacBook.conf);
 
   # nix-darwin v5+ needs an explicit primary user for single-user tooling.
   system.primaryUser = username;
