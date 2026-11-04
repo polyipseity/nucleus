@@ -118,7 +118,7 @@ EOF
 # --- activation naming policy: attrset regions (one awk pass) ---
 # A `<namespace> = { ... };` block yields entries through the shared awk program
 # now. These cases pin the record set the sed|paste|sed loop produced: which
-# lines the region covers, that the region ends at the closing brace, and that no
+# lines the region covers, that the region closes on brace depth, and that no
 # block state carries from one file to the next. A record only reaches the output
 # as a violation report, so each fixture names its entries so that every captured
 # record has to be reported and every uncaptured one has to stay silent.
@@ -232,11 +232,11 @@ EOF
   return 0
 }
 
-# The region ends at the first `};` line, so a nested attrset closes it: its
-# lib-wrapped field is reported as an entry and nothing after the nested close is
-# scanned. That is the record set the sed range produced. Changing it would be a
-# policy change, so the case pins it rather than asserting the twin's brace depth.
-test_step14_naming_nested_attrset_closes_region() {
+# The region closes on brace depth, so a nested attrset does not end it and the
+# entries after the nested close are still scanned. The shape is the one at
+# src/platforms/macOS/modules/default.nix:330-346: a namespace, an entry, a nested
+# attrset with `command` and `order`, then more entries.
+test_step14_naming_nested_attrset_keeps_scanning() {
   local _tmp _out _ret _count
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -245,32 +245,41 @@ test_step14_naming_nested_attrset_closes_region() {
 { lib, ... }:
 {
   home.activation = {
+    badEntry = lib.mkAfter "";
     badWrapper = {
-      badNestedField = lib.mkAfter "";
+      command = "x";
+      order = 50;
     };
-    badTail = lib.mkAfter "";
+    badAfterClose = lib.mkAfter "";
   };
 }
 EOF
   run_activation_naming_policy false "$_tmp" >"$_out" 2>&1
   _ret=$?
   _count=$(grep -cF 'is not kebab-case' "$_out")
-  if [ "$_ret" -eq 0 ] || [ "$_count" -ne 1 ]; then
-    echo "FAIL: expected only the nested field reported, got $_count (exit $_ret)"
+  if [ "$_ret" -eq 0 ] || [ "$_count" -ne 2 ]; then
+    echo "FAIL: expected the entries before and after the nested attrset reported, got $_count (exit $_ret)"
     cat "$_out"
     rm -rf "$_tmp"
     rm -f "$_out"
     return 1
   fi
-  if ! grep -Fq "'badNestedField' at src/modules/nested.nix:5 is not kebab-case" "$_out"; then
-    echo "FAIL: the nested field was not reported"
+  if ! grep -Fq "'badEntry' at src/modules/nested.nix:4 is not kebab-case" "$_out"; then
+    echo "FAIL: the entry before the nested attrset was not reported"
     cat "$_out"
     rm -rf "$_tmp"
     rm -f "$_out"
     return 1
   fi
-  if grep -Fq 'badWrapper' "$_out" || grep -Fq 'badTail' "$_out"; then
-    echo "FAIL: an attrset-valued entry or a post-nested entry was reported"
+  if ! grep -Fq "'badAfterClose' at src/modules/nested.nix:9 is not kebab-case" "$_out"; then
+    echo "FAIL: the entry after the nested close was not reported"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  if grep -Fq 'badWrapper' "$_out"; then
+    echo "FAIL: the attrset-valued wrapper was reported as an entry"
     cat "$_out"
     rm -rf "$_tmp"
     rm -f "$_out"
@@ -317,6 +326,8 @@ EOF
   rm -f "$_out"
   return 0
 }
+
+# --- logging format policy behavioral tests ---
 
 FIXTURE_DIR="$REPO_ROOT/tests/fixtures/logging-format"
 CAPTURE_FIXTURE_DIR="$REPO_ROOT/tests/fixtures/log-capture-pair"
@@ -1025,7 +1036,7 @@ for test in \
   test_step14_naming_behavioral_prefix \
   test_step14_naming_region_scopes_attrset_block \
   test_step14_naming_region_ends_at_closing_brace \
-  test_step14_naming_nested_attrset_closes_region \
+  test_step14_naming_nested_attrset_keeps_scanning \
   test_step14_naming_region_state_does_not_cross_files \
   test_step14_logging_behavioral_positive \
   test_step14_logging_behavioral_negative \

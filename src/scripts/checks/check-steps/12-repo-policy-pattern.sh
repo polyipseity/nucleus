@@ -192,7 +192,9 @@ run_activation_naming_policy() {
     # per file and took 0.30 s of this rule's 0.45 s here; the region and entry
     # rules now live in the shared program.
     local _awk_path="$_AWK_PATH"
-    awk -v mode=activation-naming -f "$_awk_path" "${_nix_files[@]}" >>"$_names_file"
+    # Nothing in this call chain enables errexit, so an unguarded failure would
+    # fall through to the pass message.
+    awk -v mode=activation-naming -f "$_awk_path" "${_nix_files[@]}" >>"$_names_file" || return 1
   fi
 
   sort -u -o "$_names_file" "$_names_file"

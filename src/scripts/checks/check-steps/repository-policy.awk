@@ -79,16 +79,32 @@ BEGIN {
     # line. That excludes the region's other lines that look like assignments,
     # such as `config = {` inside a value.
     _an_entry = "^[[:space:]]*[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)?[[:space:]]*=[[:space:]]*(lib\\.(mkIf|mkAfter|mkBefore|mkForce|mkOverride|mkOrder|hm\\.dag\\.entry(A|Before|Order|After))|[[:space:]]*$)"
-    _an_end = "^[[:space:]]*[}];"
   }
 }
 
-# The region opens on a namespace attrset line and closes on the next `};` line,
-# which is the range the sed pipeline used. A nested attrset therefore closes the
-# region early, so the entries after it stay unreported.
-mode == "activation-naming" && FNR == 1 { _an_block = 0 }
+# Count one character in a line. Braces inside strings count, because the .ps1
+# twin tallies them per line rather than parsing: both twins have to read one
+# tree into one record set.
+function count_char(text, ch,   i, count) {
+  count = 0
+  for (i = 1; i <= length(text); i++)
+    if (substr(text, i, 1) == ch) count++
+  return count
+}
+
+# The region opens on a namespace attrset line and closes when its brace depth
+# returns to zero, which is how 12-repo-policy-pattern.ps1:161-164 tracks it. A
+# nested attrset therefore keeps the region open, and the entries after its close
+# are still scanned.
+mode == "activation-naming" && FNR == 1 {
+  _an_block = 0
+  _an_depth = 0
+}
 mode == "activation-naming" {
-  if (!_an_block && $0 ~ _an_ns_start) _an_block = 1
+  if (!_an_block && $0 ~ _an_ns_start) {
+    _an_block = 1
+    _an_depth = 0
+  }
   if (_an_block) {
     if ($0 ~ _an_entry) {
       _an_name = $0
@@ -96,7 +112,11 @@ mode == "activation-naming" {
       sub(/[^A-Za-z0-9_-].*$/, "", _an_name)
       print FILENAME ":" FNR ":" _an_name
     }
-    if ($0 ~ _an_end) _an_block = 0
+    _an_depth += count_char($0, "{") - count_char($0, "}")
+    if (_an_depth <= 0) {
+      _an_block = 0
+      _an_depth = 0
+    }
   }
 }
 
