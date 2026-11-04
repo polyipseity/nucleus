@@ -368,12 +368,6 @@ run_suppression_audit() {
   shift
   cd "${ctx[REPO_ROOT]}" || return 1
   local _errors=0
-  local _tmpdir
-  _tmpdir=$(mktemp -d) || {
-    error "failed to create temp dir"
-    _errors=$((_errors + 1))
-  }
-
   local _files=()
   # shellcheck disable=SC2178 # reason: nameref to context array
   local -n _sh_files="${ctx[SH_FILES]}"
@@ -390,10 +384,13 @@ run_suppression_audit() {
     _files=("${_cached_nix_files[@]}" "${_cached_shell_files[@]}")
   fi
 
-  # Drop this step's own file: its scan definitions contain the literal suppression patterns.
+  # Drop this step's own file: its scan definitions contain the literal
+  # suppression patterns. ${x##*/} rather than basename, because a fork per file
+  # cost more than the rest of this function together.
   local _filtered=() _f_iter
+  local _self_name="${BASH_SOURCE[0]##*/}"
   for _f_iter in "${_files[@]}"; do
-    [ "$(basename "$_f_iter")" = "$(basename "${BASH_SOURCE[0]}")" ] || _filtered+=("$_f_iter")
+    [ "${_f_iter##*/}" = "$_self_name" ] || _filtered+=("$_f_iter")
   done
   _files=("${_filtered[@]}")
 
@@ -417,67 +414,28 @@ run_suppression_audit() {
   fi
   local _ps1_files=() _ps1_iter
   for _ps1_iter in "${_ps1_candidates[@]}"; do
-    case "$(basename "$_ps1_iter")" in
+    case "${_ps1_iter##*/}" in
     11-repo-policy-grep.ps1 | 12-repo-policy-pattern.ps1 | 13-repo-policy-data.ps1) continue ;;
     esac
     _ps1_files+=("$_ps1_iter")
   done
 
-  if [ "${#_files[@]}" -gt 0 ]; then
-    # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
-    printf '%s\0' "${_files[@]}" |
-      xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
-        _safe="$(echo "$2" | tr "/" "_")"
-        _out="$1/${_safe}.out"
-        _grep_pattern="shellcheck disable=|check-suppress:"  # reason: self-reference: grep pattern literal, not a suppression
-        grep -Hn -E "$_grep_pattern" "$2" \
-          | grep -v -E "reason:|suppression_doc:|config-method|embedded-content|packer_validate|SuppressMessageAttribute" \
-          | sed "s/^/undoc_supp:/" >> "$_out" 2>/dev/null || true  # check-suppress:suppression_doc: grep exits 1 on no matches; an empty .out file is the clean signal
-        # Bare "|| true" suppressions: documented by "# check-suppress:suppression_doc:" on
-        # the same or preceding line; test fixtures (tests/) are exempt.
-        case "$2" in
-          *"/tests/"* | "tests/"*) ;;
-          *)
-            awk "
-              /^[[:space:]]*#/ { prev = \$0; next }
-              /\|\| true/ {
-                if (\$0 !~ /check-suppress:suppression_doc:/ && prev !~ /# check-suppress:suppression_doc:/) {
-                  print FILENAME \":\" FNR \":|| true: \" \$0
-                }
-              }
-              { prev = \$0 }
-            " "$2" | sed "s/^/undoc_supp:/" >> "$_out" 2>/dev/null || true  # check-suppress:suppression_doc: awk exits 1 on no || true matches; an empty .out file is the clean signal
-            ;;
-        esac
-      ' _ "$_tmpdir"
-  fi
-
-  local _f _err
-  for _f in "$_tmpdir"/*.out "$_tmpdir"/.*.out; do
-    [ -f "$_f" ] || continue
-    while IFS= read -r _err; do
-      _errors=$((_errors + 1))
-      error "$_err"
-    done <"$_f"
-  done
-
-  if [ "${#_ps1_files[@]}" -gt 0 ]; then
-    # Mirrors Get-UndocSuppViolation in 11-repo-policy-grep.ps1. A comment-line
-    # match is dropped; otherwise the check id must sit on the line or the line
-    # above, which is looser on purpose so a WHY above the probe it explains counts.
-    # WHY case-insensitive: PowerShell -match is, and the two implementations
-    #   must not disagree over a file that spells a parameter differently.
-    # WHY repo-relative: the whole-repo branch enumerates paths from the repo
-    #   root, so matching the raw path would exempt every file in a checkout
-    #   that merely lives under a directory named tests, disarming the policy.
-    # check-suppress:embedded-content: exception 1 (data-driven/generated) -- awk program for the PowerShell suppression audit
-    read -r -d '' _awk_ps1_supp <<'AWKEOF'
-function add_pattern(p, l, c, e) {
+  # One awk process over every file. The previous shape spawned bash, grep, sed
+  # and awk once per file, which dominated this step's runtime; a single program
+  # now applies the pattern table and the annotation audit line by line. Each
+  # half keeps the message it printed before, so CI output does not shift.
+  local _scan_files=("${_files[@]}" "${_ps1_files[@]}")
+  if [ "${#_scan_files[@]}" -gt 0 ]; then
+    local _awk_program
+    # check-suppress:embedded-content: exception 1 (data-driven/generated) -- awk program for the suppression audit
+    read -r -d '' _awk_program <<'AWKEOF'
+function add_pattern(p, l, c, e, f) {
   _count++
   pat[_count] = p
   label[_count] = l
   id[_count] = c
   exempt[_count] = e
+  ps1[_count] = f
 }
 
 # Repo-relative, so a checkout that merely lives under a directory named tests
@@ -495,22 +453,31 @@ function is_tests(path,   rel, root_lc) {
 
 BEGIN {
   # One entry per pattern: ERE, report label, documenting check id (empty when
-  # no annotation documents it), and whether the tests/ exemption applies.
-  add_pattern("2>[$]null", "2>$null", "suppression_doc", 1)
-  add_pattern("-erroraction silentlycontinue", "-ErrorAction SilentlyContinue", "suppression_doc", 1)
-  add_pattern("catch[[:space:]]*\\{[[:space:]]*\\}", "empty catch {}", "suppression_doc", 0)
-  add_pattern("[|] out-null", "| Out-Null", "", 0)
-  add_pattern("[$]null[[:space:]]*=[[:space:]]*[^[:space:]]", "$null =", "suppression_doc", 1)
-  add_pattern("\\[void\\]", "[void]", "suppression_doc", 1)
-  add_pattern("suppressmessageattribute\\(", "SuppressMessageAttribute", "SuppressMessageAttribute", 0)
+  # no annotation documents it), whether the tests/ exemption applies, and
+  # whether it belongs to the PowerShell half. The PowerShell entries mirror
+  # Get-UndocSuppViolation in 11-repo-policy-grep.ps1; a .ps1 file is the only
+  # thing that half reads, and everything else is shell or Nix.
+  add_pattern("[|][|] true", "|| true", "suppression_doc", 1, 0)
+  add_pattern("2>[$]null", "2>$null", "suppression_doc", 1, 1)
+  add_pattern("-erroraction silentlycontinue", "-ErrorAction SilentlyContinue", "suppression_doc", 1, 1)
+  add_pattern("catch[[:space:]]*\\{[[:space:]]*\\}", "empty catch {}", "suppression_doc", 0, 1)
+  add_pattern("[|] out-null", "| Out-Null", "", 0, 1)
+  add_pattern("[$]null[[:space:]]*=[[:space:]]*[^[:space:]]", "$null =", "suppression_doc", 1, 1)
+  add_pattern("\\[void\\]", "[void]", "suppression_doc", 1, 1)
+  add_pattern("suppressmessageattribute\\(", "SuppressMessageAttribute", "SuppressMessageAttribute", 0, 1)
 }
 
-FNR == 1 { prev = ""; _under_tests = is_tests(FILENAME) }
+FNR == 1 {
+  prev = ""
+  _under_tests = is_tests(FILENAME)
+  _is_ps1 = (FILENAME ~ "[.]ps1$")
+}
 
 {
   line = tolower($0)
   if (line !~ "^[ \t]*#") {
     for (_i = 1; _i <= _count; _i++) {
+      if (ps1[_i] != _is_ps1) continue
       if (exempt[_i] && _under_tests) continue
       if (line !~ pat[_i]) continue
       if (id[_i] != "") {
@@ -519,29 +486,42 @@ FNR == 1 { prev = ""; _under_tests = is_tests(FILENAME) }
         if (line ~ ("# check-suppress:" _id "[ \t:]")) continue
         if (FNR > 1 && prev ~ ("# check-suppress:" _id)) continue
       }
-      printf "%s:%d (%s)\n", FILENAME, FNR, label[_i]
+      # The shell half repeats the line, because the annotation on it is what a
+      # reader has to see to fix it; the PowerShell half names the pattern.
+      if (ps1[_i]) {
+        printf "%s:%d (%s)\n", FILENAME, FNR, label[_i]
+      } else {
+        printf "undoc_supp:%s:%d:%s: %s\n", FILENAME, FNR, label[_i], $0
+      }
     }
+  }
+  # A `shellcheck disable=` or `check-suppress:` line is documented by a
+  # registered check id, or by `reason:` for a shellcheck directive. The
+  # PowerShell half reads PowerShell annotations only, so this rule skips a
+  # .ps1 file. Comment lines are scanned on purpose: a comment carrying an
+  # unregistered id is exactly what this rule is for.
+  if (!_is_ps1 && $0 ~ /shellcheck disable=|check-suppress:/ &&
+      $0 !~ /reason:|suppression_doc:|config-method|embedded-content|packer_validate|SuppressMessageAttribute/) {
+    printf "undoc_supp:%s:%d:%s\n", FILENAME, FNR, $0
   }
   prev = line
 }
 AWKEOF
 
-    local _ps1_violations
-    _ps1_violations=$(
-      printf '%s\0' "${_ps1_files[@]}" |
-        xargs -0 awk -v ROOT="${ctx[REPO_ROOT]}" "$_awk_ps1_supp"
+    local _violations
+    _violations=$(
+      printf '%s\0' "${_scan_files[@]}" |
+        xargs -0 awk -v ROOT="${ctx[REPO_ROOT]}" "$_awk_program" |
+        LC_ALL=C sort -u
     )
     while IFS= read -r _err; do
       [ -z "$_err" ] && continue
       _errors=$((_errors + 1))
       error "$_err"
-    done < <(printf '%s\n' "$_ps1_violations" | LC_ALL=C sort -u)
-  fi
+    done <<<"$_violations"
 
-  if [ "${#_files[@]}" -gt 0 ] || [ "${#_ps1_files[@]}" -gt 0 ]; then
     if [ "$_errors" -gt 0 ]; then
       say "  add '# check-suppress:suppression_doc: reason' comment to explain intentional suppressions."
-      rm -rf -- "$_tmpdir"
       return 1
     fi
     say "no undocumented error suppressions found."
@@ -549,7 +529,6 @@ AWKEOF
     say "0 script files in scope — nothing to audit."
   fi
 
-  rm -rf -- "$_tmpdir"
   return 0
 }
 
