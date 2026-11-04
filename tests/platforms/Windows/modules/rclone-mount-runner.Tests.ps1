@@ -35,6 +35,37 @@ BeforeAll {
   #   no verbatim argv loop, so the Windows block is the raw %* remainder
   #   with PowerShell's own quoting, which is exactly the command line rclone
   #   would receive.
+
+  # Write-StandInRcloneCmd: write the Windows stand-in batch file, one command
+  # per line.
+  #
+  # WHY the parenthesized -f: inside an array literal, -f applies to the whole
+  #   array expression, so @('@echo off', 'echo ...' -f $x) yields ONE element
+  #   '@echo off echo ...'. cmd then runs 'echo' with the arguments 'off echo
+  #   ...', echo is never turned off, and the command echo repeats the marker
+  #   text into the invocation log before any attempt has finished. The block
+  #   splitter finds a second block inside the first attempt, the suite stops
+  #   the supervisor before it retries, and both the retry notice and the
+  #   recorded argv assertions fail on artifacts instead of on the supervisor.
+  # WHY the bytes are written here, not by Set-Content: the suite asserts the
+  #   generated command boundaries on every host, so the fixture must produce the
+  #   same bytes everywhere instead of inheriting a platform newline default.
+  function Write-StandInRcloneCmd {
+    param(
+      [Parameter(Mandatory)][string]$Path,
+      [Parameter(Mandatory)][string]$InvocationLog,
+      [int]$ExitCode = 1,
+      [string[]]$Stderr = @('stand-in rclone failure')
+    )
+
+    $lines = @('@echo off', ('echo === invocation>>"{0}"' -f $InvocationLog))
+    foreach ($line in $Stderr) { $lines += 'echo {0} 1>&2' -f $line }
+    $lines += 'echo %* >>"{0}"' -f $InvocationLog
+    $lines += 'exit /b {0}' -f $ExitCode
+    [System.IO.File]::WriteAllText($Path, (($lines -join "`r`n") + "`r`n"), [System.Text.UTF8Encoding]::new($false))
+    return $Path
+  }
+
   function Save-StandInRclone {
     param(
       [Parameter(Mandatory)][string]$BinDir,
@@ -45,13 +76,8 @@ BeforeAll {
 
     $null = New-Item -ItemType Directory -Path $BinDir -Force
     if ($IsWindows) {
-      $path = Join-Path $BinDir 'rclone.cmd'
-      $lines = @('@echo off', 'echo === invocation>>"{0}"' -f $InvocationLog)
-      foreach ($line in $Stderr) { $lines += 'echo {0} 1>&2' -f $line }
-      $lines += 'echo %* >>"{0}"' -f $InvocationLog
-      $lines += 'exit /b {0}' -f $ExitCode
-      Set-Content -Path $path -Value $lines
-      return $path
+      return Write-StandInRcloneCmd -Path (Join-Path $BinDir 'rclone.cmd') `
+        -InvocationLog $InvocationLog -ExitCode $ExitCode -Stderr $Stderr
     }
 
     $path = Join-Path $BinDir 'rclone'
@@ -162,7 +188,10 @@ BeforeAll {
     $quoted = @($ArgumentList | ForEach-Object {
         if ($_ -match '[ \t]') { '"{0}"' -f $_ } else { $_ }
       })
-    $stdoutPath = Join-Path $script:Root 'supervisor-stdout.log'
+    # WHY script scope: a case reads the captured stdout while the child is
+    #   still running, so the path has to outlive this helper.
+    $script:SupervisorStdoutPath = Join-Path $script:Root 'supervisor-stdout.log'
+    $stdoutPath = $script:SupervisorStdoutPath
     $stderrPath = Join-Path $script:Root 'supervisor-stderr.log'
     $proc = Start-Process -FilePath (Get-Process -Id $PID).Path `
       -ArgumentList $quoted `
@@ -227,6 +256,22 @@ Describe 'rclone-mount.ps1 minimal supervisor contract' {
     $partial.Output | Should -Not -Match 'Instance'
   }
 
+  It 'writes the Windows stand-in with one command per line' {
+    $path = Write-StandInRcloneCmd -Path (Join-Path $script:Root 'stand-in.cmd') `
+      -InvocationLog (Join-Path $script:Root 'invocations.log') -ExitCode 1 -Stderr @('probe-error-line')
+    $bytes = [System.IO.File]::ReadAllBytes($path)
+    $loneLf = 0
+    for ($i = 0; $i -lt $bytes.Count; $i++) {
+      if ($bytes[$i] -ne 0x0a) { continue }
+      if ($i -eq 0 -or $bytes[$i - 1] -ne 0x0d) { $loneLf++ }
+    }
+    $loneLf | Should -Be 0
+    $text = [System.Text.Encoding]::UTF8.GetString($bytes)
+    $commandLines = @($text -split "`r`n")
+    $commandLines[0] | Should -Be '@echo off'
+    $commandLines[1] | Should -Match '^echo === invocation>>"'
+  }
+
   It 'invokes rclone again after a failed exit and keeps its stderr in the mount log' {
     $caseRoot = Join-Path $script:Root ([guid]::NewGuid().ToString('N'))
     $invLog = Join-Path $caseRoot 'invocations.log'
@@ -248,17 +293,58 @@ Describe 'rclone-mount.ps1 minimal supervisor contract' {
       $secondAttempt = Wait-Until -Condition {
         (Get-InvocationBlockList -InvocationLog $invLog).Count -ge 2
       } -TimeoutSeconds 15
+      # WHY before the kill: the notice exists only after an attempt has exited,
+      #   so waiting for it observes the retry itself; a notice written after the
+      #   delay would still appear, which the separate pre-sleep case rules out.
+      $retryNotice = Wait-Until -Condition {
+        (Test-Path -LiteralPath $script:SupervisorStdoutPath) -and
+        ((Get-Content -Raw -LiteralPath $script:SupervisorStdoutPath) -match 'retrying in 1s')
+      } -TimeoutSeconds 15
       Stop-Supervisor -Process $proc
     } finally {
       $env:PATH = $prevPath
     }
 
     $secondAttempt | Should -BeTrue
+    $retryNotice | Should -BeTrue
     (Get-InvocationBlockList -InvocationLog $invLog).Count | Should -BeGreaterOrEqual 2
     Test-Path -LiteralPath $mountLog | Should -BeTrue
     (Get-Content -Raw -LiteralPath $mountLog) | Should -Match 'probe-error-line'
-    $stdout = Get-Content -Raw -LiteralPath (Join-Path $script:Root 'supervisor-stdout.log')
+    $stdout = Get-Content -Raw -LiteralPath $script:SupervisorStdoutPath
     $stdout | Should -Match 'retrying in 1s'
+  }
+
+  It 'writes the retry notice before the retry delay elapses' {
+    $caseRoot = Join-Path $script:Root ([guid]::NewGuid().ToString('N'))
+    $invLog = Join-Path $caseRoot 'invocations.log'
+    $binDir = Join-Path $caseRoot 'bin'
+    $mountLog = Join-Path $caseRoot 'mount.log'
+    $null = New-Item -ItemType Directory -Path $caseRoot -Force
+    $null = Save-StandInRclone -BinDir $binDir -InvocationLog $invLog -ExitCode 1
+    # WHY 30 s against a 10 s wait: the notice has to appear while the delay is
+    #   still running, so a write after Start-Sleep cannot satisfy this case.
+    $driver = Save-LaunchDriver -Path (Join-Path $caseRoot 'launch.ps1') `
+      -Runner $script:Runner -LogFile $mountLog `
+      -MountPoint (Join-Path $caseRoot 'mnt') -RemoteSpec 'testremote:' `
+      -RetrySeconds 30
+    $launchArgs = @('-NoProfile', '-NonInteractive', '-File', $driver)
+    $envPath = $binDir + [IO.Path]::PathSeparator + $env:PATH
+    $prevPath = $env:PATH
+    $env:PATH = $envPath
+    try {
+      $proc = Start-Supervisor -ArgumentList $launchArgs
+      $notice = Wait-Until -Condition {
+        (Test-Path -LiteralPath $script:SupervisorStdoutPath) -and
+        ((Get-Content -Raw -LiteralPath $script:SupervisorStdoutPath) -match 'retrying in 30s')
+      } -TimeoutSeconds 10
+      $attempts = (Get-InvocationBlockList -InvocationLog $invLog).Count
+      Stop-Supervisor -Process $proc
+    } finally {
+      $env:PATH = $prevPath
+    }
+
+    $notice | Should -BeTrue
+    $attempts | Should -Be 1
   }
 
   It 'forwards the remote spec, a mount point with spaces, and every flag verbatim' {
