@@ -61,20 +61,13 @@ run_config_method_compliance() {
     )
   fi
 
-  local _annot
-  _annot=$(mktemp) || {
-    error "failed to create temp file"
-    return 1
-  }
-  if [ "${#_src_files[@]}" -gt 0 ]; then
-    # One pass collects every annotation as "file:line"; the per-reference
-    # window below is then an exact line lookup.
-    grep -HnF '# check-suppress:config-method' "${_src_files[@]}" | cut -d: -f1,2 >"$_annot" || true # check-suppress:suppression_doc: grep exits 1 when no annotation exists; the per-reference errors report that state
-  fi
-
-  local _cfg _rel _base _suffix _refs _ref _ref_file _ref_line _annotated _pn _lo
+  # Checkable configs in find order, with the patterns each one is looked up
+  # by: its relative path, its basename, and, when the basename has an
+  # extension, the ${hostName} template form.
+  local _cfgs=() _bases=() _tmpls=()
+  local _cfg _rel _base
   while IFS= read -r -d '' _cfg; do
-    _base="$(basename "$_cfg")"
+    _base="${_cfg##*/}"
     # ref: allow-and-deny-lists.instructions.md#A2 -- infrastructure files are not configs
     case "$_base" in
     .gitkeep | .gitignore | *.schema.json | *.nix) continue ;;
@@ -83,20 +76,73 @@ run_config_method_compliance() {
     case "$_rel" in
     agents/* | hermes-agent/SOUL.md | ollama/models.json) continue ;;
     esac
+    _cfgs+=("$_rel")
+    _bases+=("$_base")
+    if [ "$_base" = "${_base%%.*}" ]; then
+      _tmpls+=("")
+    else
+      _tmpls+=("\${hostName}.${_base#*.}")
+    fi
+  done < <(find "$_cfg_dir" -type f -print0)
 
+  if [ "${#_cfgs[@]}" -eq 0 ]; then
+    say "config method compliance passed."
+    return 0
+  fi
+
+  # Reference index: one grep for every config basename, which also serves the
+  # relative-path tier because a relative path contains its basename, and one
+  # grep for the template forms. The tiers below read this index, so the tree is
+  # never scanned again per config.
+  local _ref_index="" _tmpl_index=""
+  local _pat_args=() _tmpl_args=() _pat
+  for _pat in "${_bases[@]}"; do
+    _pat_args+=(-e "$_pat")
+  done
+  for _pat in "${_tmpls[@]}"; do
+    [ -n "$_pat" ] && _tmpl_args+=(-e "$_pat")
+  done
+  if [ "${#_src_files[@]}" -gt 0 ]; then
+    _ref_index=$(grep -HnF "${_pat_args[@]}" "${_src_files[@]}" || true) # check-suppress:suppression_doc: grep exits 1 when no source file references a config; every config then reports no references
+    if [ "${#_tmpl_args[@]}" -gt 0 ]; then
+      _tmpl_index=$(grep -HnF "${_tmpl_args[@]}" "${_src_files[@]}" || true) # check-suppress:suppression_doc: grep exits 1 when no template line references a config; the template tier then stays empty
+    fi
+  fi
+
+  # Annotation index as "file:line" keys, so the 10-line window below is a
+  # lookup and needs no subprocess.
+  local -A _annot=()
+  local _key
+  if [ "${#_src_files[@]}" -gt 0 ]; then
+    while IFS= read -r _key; do
+      [ -n "$_key" ] && _annot["$_key"]=1
+    done < <(grep -HnF '# check-suppress:config-method' "${_src_files[@]}" | cut -d: -f1,2)
+  fi
+
+  local _i _line _refs _ref _ref_file _ref_line _annotated _tmpl _pn _lo
+  for ((_i = 0; _i < ${#_cfgs[@]}; _i++)); do
+    _rel="${_cfgs[_i]}"
+    _base="${_bases[_i]}"
+    _tmpl="${_tmpls[_i]}"
+
+    # Reference tiers in the .ps1 twin's order: relative path, then basename,
+    # then the ${hostName} template suffix. A tier that matches replaces the
+    # refs from the tiers above it, so the annotation applies to one tier.
     _refs=""
-    if [ "${#_src_files[@]}" -gt 0 ]; then
-      # Reference tiers in the .ps1 twin's order: relative path, then basename,
-      # then the ${hostName} template suffix. A tier that matches replaces the
-      # refs from the tiers above it, so the annotation applies to one tier.
-      _refs=$(grep -HnF -- "$_rel" "${_src_files[@]}" || true) # check-suppress:suppression_doc: grep exits 1 when no file references this config, which moves the scan to the next tier
+    if [ -n "$_ref_index" ]; then
+      while IFS= read -r _line; do
+        [[ $_line == *"$_rel"* ]] && _refs+="$_line"$'\n'
+      done <<<"$_ref_index"
       if [ -z "$_refs" ]; then
-        _refs=$(grep -HnF -- "$_base" "${_src_files[@]}" || true) # check-suppress:suppression_doc: grep exits 1 when no file references this config, which moves the scan to the next tier
+        while IFS= read -r _line; do
+          [[ $_line == *"$_base"* ]] && _refs+="$_line"$'\n'
+        done <<<"$_ref_index"
       fi
-      if [ -z "$_refs" ] && [ -n "${_base%%.*}" ] && [ "$_base" != "${_base%%.*}" ]; then
-        _suffix=".${_base#*.}"
-        _refs=$(grep -HnF -- "\${hostName}${_suffix}" "${_src_files[@]}" || true) # check-suppress:suppression_doc: grep exits 1 when no template line references this config, which leaves the config with no refs
-      fi
+    fi
+    if [ -z "$_refs" ] && [ -n "$_tmpl" ] && [ -n "$_tmpl_index" ]; then
+      while IFS= read -r _line; do
+        [[ $_line == *"$_tmpl"* ]] && _refs+="$_line"$'\n'
+      done <<<"$_tmpl_index"
     fi
 
     # Annotation-only rule: a config with no reference outside configs/ has
@@ -109,13 +155,13 @@ run_config_method_compliance() {
       _ref_file="${_ref%%:*}"
       _ref_line="${_ref#*:}"
       _ref_line="${_ref_line%%:*}"
-      if grep -qxF "$_ref_file:$_ref_line" "$_annot"; then
+      if [ -n "${_annot["$_ref_file:$_ref_line"]-}" ]; then
         _annotated=true
         break
       fi
       _lo=$((_ref_line - 10))
       for ((_pn = _ref_line - 1; _pn >= _lo && _pn >= 1; _pn--)); do
-        if grep -qxF "$_ref_file:$_pn" "$_annot"; then
+        if [ -n "${_annot["$_ref_file:$_pn"]-}" ]; then
           _annotated=true
           break
         fi
@@ -129,9 +175,7 @@ run_config_method_compliance() {
       error "$_rel : referenced but no '# check-suppress:config-method' comment found on or before reference lines"
       _cfg_errors=$((_cfg_errors + 1))
     fi
-  done < <(find "$_cfg_dir" -type f -print0)
-
-  rm -f "$_annot"
+  done
 
   if [ "$_cfg_errors" -gt 0 ]; then
     error "config method compliance check failed with $_cfg_errors error(s)"
@@ -261,7 +305,9 @@ _policy_scan_target() {
   case "$_pst_file" in
   vendor/* | src/secrets/* | tests/fixtures/*) return 1 ;;
   esac
-  case "$(basename "$_pst_file")" in
+  # ${x##*/} rather than basename: this runs once per tracked file, where the
+  # forks cost more than the scan itself.
+  case "${_pst_file##*/}" in
   "$_POLICY_STEP_SELF_SH" | "$_POLICY_STEP_SELF_PS1" | 11-repo-policy-grep.ps1 | 13-repo-policy-data.ps1) return 1 ;;
   esac
   [[ "$_pst_file" =~ $_pst_ext_re ]]

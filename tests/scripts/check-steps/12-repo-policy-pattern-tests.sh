@@ -747,6 +747,182 @@ test_step14_config_method_window_is_10_lines() {
 }
 
 # ---------------------------------------------------------------------------
+# Config method compliance: one reference index
+#
+# The rule now answers every config from a single bulk scan of the reference
+# files instead of running three whole-tree greps per config. These cases pin
+# the two things that rewrite could silently break: the number of scans, and the
+# tier reading (the relative-path tier replaces the basename tier, and the
+# ${hostName} template tier answers a config no raw basename matches).
+# ---------------------------------------------------------------------------
+
+# A grep that counts itself before forwarding to the real one. $1 is the shim
+# directory; the real grep arrives as $NUCLEUS_REAL_GREP, captured before the
+# shim directory joins PATH.
+grep_counting_shim() {
+  local _gcs_dir="$1"
+  cat >"$_gcs_dir/grep" <<'EOF'
+#!/bin/sh
+printf '%s\n' "$*" >>"$NUCLEUS_GREP_LOG"
+exec "$NUCLEUS_REAL_GREP" "$@"
+EOF
+  chmod +x "$_gcs_dir/grep"
+}
+
+# Five dotted configs, each referenced by basename only, so a per-config scan
+# shape spends a relative-path grep and a basename grep on every config. The
+# violations that still surface prove the shim did not disarm the rule.
+test_step14_config_method_reference_index_scan_count() {
+  local _tmp _out _log _shim _ret _count _real_grep _name
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  _log=$(mktemp)
+  _shim=$(mktemp -d)
+  for _name in alpha bravo charlie delta echo; do
+    mkdir -p "$_tmp/src/modules/configs/$_name"
+    printf '%s\n' '{"probe": true}' >"$_tmp/src/modules/configs/$_name/$_name.json"
+    printf 'deploy "%s.json"\n' "$_name" >>"$_tmp/src/probe-deploy.sh"
+  done
+  _real_grep=$(command -v grep)
+  grep_counting_shim "$_shim" "$_real_grep"
+  _ret=0
+  NUCLEUS_GREP_LOG="$_log" NUCLEUS_REAL_GREP="$_real_grep" PATH="$_shim:$PATH" \
+    run_config_method_compliance true "$_tmp" >"$_out" 2>&1 || _ret=$?
+  _count=$(wc -l <"$_log")
+  _count="${_count// /}"
+  if [ "$_ret" -eq 0 ] || ! grep -qF "referenced but no '# check-suppress:config-method' comment found" "$_out"; then
+    echo "FAIL: the unannotated configs must still be reported through the counting shim"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out" "$_log"
+    return 1
+  fi
+  if [ "$_count" -gt 3 ]; then
+    echo "FAIL: expected at most three grep scans (annotation, basename, template index), got $_count"
+    cat "$_log"
+    rm -rf "$_tmp"
+    rm -f "$_out" "$_log"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out" "$_log"
+  return 0
+}
+
+# A config referenced twice: the basename reference carries an annotation, the
+# relative-path reference 19 lines below does not. A tier that widens instead of
+# replacing (union of both tiers) passes on the annotated basename line; the
+# relative-path tier replaces it, so this must fail.
+test_step14_config_method_relative_tier_beats_basename() {
+  local _tmp _out _ret _i
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  mkdir -p "$_tmp/src/modules/configs/probe"
+  printf '%s\n' '{"probe": true}' >"$_tmp/src/modules/configs/probe/settings.json"
+  {
+    printf '%s\n' '# check-suppress:config-method: method 1 (writable symlink)'
+    printf 'echo %s\n' 'settings.json'
+    for _i in $(seq 1 18); do printf '# filler %02d\n' "$_i"; done
+    printf '%s\n' 'deploy "src/modules/configs/probe/settings.json"'
+  } >"$_tmp/src/probe-deploy.sh"
+  run_config_method_compliance true "$_tmp" "$_tmp/src/probe-deploy.sh" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -eq 0 ] || ! grep -qF 'probe/settings.json : referenced but no' "$_out"; then
+    echo "FAIL: the relative-path tier must replace the annotated basename tier and fail"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+# A host-config file is referenced only through the ${hostName} template, so the
+# answer depends on the template tier built from the basename's extension
+# suffix. Unannotated fails, annotated on the same line passes.
+test_step14_config_method_template_tier_reference() {
+  local _tmp _out _ret
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  mkdir -p "$_tmp/src/modules/configs/git"
+  printf '%s\n' '[user]' >"$_tmp/src/modules/configs/git/MacBook.gitconfig"
+  # shellcheck disable=SC2016 # reason: the fixture writes the literal template token, not a shell expansion
+  printf '%s\n' 'write "${hostName}.gitconfig"' >"$_tmp/src/probe-deploy.sh"
+  run_config_method_compliance true "$_tmp" "$_tmp/src/probe-deploy.sh" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -eq 0 ] || ! grep -qF 'git/MacBook.gitconfig : referenced but no' "$_out"; then
+    echo "FAIL: a template-only reference must be found by the template tier and fail unannotated"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  # shellcheck disable=SC2016 # reason: the fixture writes the literal template token, not a shell expansion
+  printf '%s\n' 'write "${hostName}.gitconfig" # check-suppress:config-method: method 1 (writable symlink)' >"$_tmp/src/probe-deploy.sh"
+  run_config_method_compliance true "$_tmp" "$_tmp/src/probe-deploy.sh" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -ne 0 ]; then
+    echo "FAIL: the annotated template reference must pass"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+# The rule is whole-repo in both modes by design: a config's verdict depends on
+# references that can live in any src/ file, so a scoped subset cannot prove an
+# annotation absent. A scoped run that listed an unrelated file must still catch
+# a violation in a file it was not given; a scoped implementation would drop the
+# config and pass.
+test_step14_config_method_scoped_run_checks_whole_repo() {
+  local _tmp _out _ret
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  mkdir -p "$_tmp/src/modules/configs/probe"
+  printf '%s\n' '{"probe": true}' >"$_tmp/src/modules/configs/probe/settings.json"
+  printf '%s\n' 'deploy "src/modules/configs/probe/settings.json"' >"$_tmp/src/probe-deploy.sh"
+  printf '%s\n' ':' >"$_tmp/src/unrelated.sh"
+  run_config_method_compliance true "$_tmp" "$_tmp/src/unrelated.sh" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -eq 0 ] || ! grep -qF 'probe/settings.json : referenced but no' "$_out"; then
+    echo "FAIL: a scoped run must still check every config against every reference file"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+# The step-file exclusion is by basename, so a step file at any depth is out of
+# every policy scan while an ordinary file at the same depth stays in. This pins
+# the parameter-expansion basename read that replaced a fork per file.
+test_step14_policy_scan_target_nested_basename() {
+  local _ret=0
+  if _policy_scan_target "src/scripts/deep/dir/12-repo-policy-pattern.sh" '\.(sh|zsh)$'; then
+    echo "FAIL: a step file at depth must be excluded by basename"
+    _ret=1
+  fi
+  if ! _policy_scan_target "src/scripts/deep/dir/deploy.sh" '\.(sh|zsh)$'; then
+    echo "FAIL: an ordinary shell file at depth must stay a scan target"
+    _ret=1
+  fi
+  if _policy_scan_target "vendor/deep/deploy.sh" '\.(sh|zsh)$'; then
+    echo "FAIL: a vendored path must stay out of scans"
+    _ret=1
+  fi
+  [ "$_ret" -eq 0 ]
+}
+
+# ---------------------------------------------------------------------------
 # Log capture pair policy: one pass, exact messages
 #
 # The rule reads four stream positions per file (launchd out/err, systemd
@@ -1030,6 +1206,11 @@ for test in \
   test_step14_config_method_same_line_annotation_passes \
   test_step14_config_method_preceding_annotation_passes \
   test_step14_config_method_window_is_10_lines \
+  test_step14_config_method_reference_index_scan_count \
+  test_step14_config_method_relative_tier_beats_basename \
+  test_step14_config_method_template_tier_reference \
+  test_step14_config_method_scoped_run_checks_whole_repo \
+  test_step14_policy_scan_target_nested_basename \
   test_step14_naming_behavioral_positive \
   test_step14_naming_behavioral_negative \
   test_step14_naming_behavioral_exemption \
