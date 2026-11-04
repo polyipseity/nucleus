@@ -8,6 +8,9 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
   # WHY: all repo-policy step files must be excluded from pattern scans to avoid self-referencing literal pattern text
   $allStepLeaves = @('11-repo-policy-grep.ps1', '12-repo-policy-pattern.ps1', '13-repo-policy-data.ps1')
+  # WHY: the shell twins carry the same literal pattern text, and the `|| true` rule
+  #   scans shell and Nix files, so the .sh leaves need the same exclusion
+  $allStepShLeaves = @('11-repo-policy-grep.sh', '12-repo-policy-pattern.sh', '13-repo-policy-data.sh')
   $failed = $false
 
   # --- Suppression audit ---
@@ -72,9 +75,10 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
     $saNixFiles = @(if ($Context.NixFiles) { $Context.NixFiles } else { $PositionalArgs | Where-Object { $_ -like '*.nix' } })
     $saPs1Files = @((@(if ($Context.Ps1Files) { $Context.Ps1Files } else { $PositionalArgs | Where-Object { $_ -like '*.ps1' } })) |
       Where-Object { (Split-Path -Leaf $_) -notin $allStepLeaves })
+    $saShNixFiles = @((@($saShFiles + $saNixFiles)) | Where-Object { (Split-Path -Leaf $_) -notin $allStepShLeaves })
     $saHasFiles = ($saShFiles.Count -gt 0) -or ($saNixFiles.Count -gt 0) -or ($saPs1Files.Count -gt 0)
 
-    $saUndocViolations += Get-UndocSuppViolation -Pattern '|| true' -Label '|| true' -Files @((@($saShFiles + $saNixFiles)) | Where-Object $saNotTests) -Cache ([ref]$saFileCache)
+    $saUndocViolations += Get-UndocSuppViolation -Pattern '|| true' -Label '|| true' -Files @($saShNixFiles | Where-Object $saNotTests) -Cache ([ref]$saFileCache)
     $saUndocViolations += Get-UndocSuppViolation -Pattern '2>$null' -Label '2>$null' -Files @($saPs1Files | Where-Object $saNotTests) -Cache ([ref]$saFileCache)
     $saUndocViolations += Get-UndocSuppViolation -Pattern '-ErrorAction SilentlyContinue' -Label '-ErrorAction SilentlyContinue' -Files @($saPs1Files | Where-Object $saNotTests) -Cache ([ref]$saFileCache)
     $saUndocViolations += Get-UndocSuppViolation -Pattern 'catch\s*\{\s*\}' -Label 'empty catch {}' -IsRegex -Files $saPs1Files -Cache ([ref]$saFileCache)
@@ -85,7 +89,7 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   } else {
     $saAllShNix = @(
       Get-ChildItem -Path $r -Recurse -File |
-        Where-Object { $_.Extension -in '.sh', '.nix' -and $_.FullName -notmatch '[\/]vendor[\/]' } |
+        Where-Object { $_.Extension -in '.sh', '.nix' -and $_.FullName -notmatch '[\/]vendor[\/]' -and $_.Name -notin $allStepShLeaves } |
         ForEach-Object { $_.FullName }
     )
     $saAllPs1 = @(
