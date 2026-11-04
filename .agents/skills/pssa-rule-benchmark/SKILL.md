@@ -37,9 +37,14 @@ pwsh .agents/skills/pssa-rule-benchmark/pssa-rule-benchmark.ps1 -Runs 5
 # Write results elsewhere
 pwsh .agents/skills/pssa-rule-benchmark/pssa-rule-benchmark.ps1 -ResultsFile /tmp/my-results.json
 
-# Skip existing rules (resume after partial run)
+# Skip existing rules (resume after partial run; skipped rules keep their rows)
 pwsh .agents/skills/pssa-rule-benchmark/pssa-rule-benchmark.ps1 -SkipExisting
+
+# Check the aggregation itself, no benchmarking
+pwsh .agents/skills/pssa-rule-benchmark/pssa-rule-benchmark.ps1 -SelfTest
 ```
+
+`-Runs 1` is supported: every summary row counts exactly the rows recorded for it, so a single run reports `Runs: 1` with mean, min, max, and median equal and a standard deviation of 0. `-SkipExisting` merges: rules skipped because the file already has enough runs keep the rows already recorded there, so the written file still describes every rule it holds. When every enabled rule is skipped, the run reports that and leaves the file untouched.
 
 The benchmark launches a **separate `pwsh` subprocess per task**, each running `invoke-pssa-rule.ps1` with `-RuleName` set. This ensures complete isolation: no cross-rule state leaks, no cached AST or module state. Each subprocess imports `PSScriptAnalyzer` fresh and runs `Invoke-ScriptAnalyzer` against all repository `.ps1` files using the given rule in isolation (via `IncludeRules` + empty `Rules` hashtable). Subprocess output (JSON) is parsed; if parsing fails or the subprocess exits non-zero, the error is recorded and the run continues.
 
@@ -70,7 +75,9 @@ The three slow rules (`PSAvoidUsingCmdletAliases`, `PSUseCmdletCorrectly`, `PSSh
 - **Task matrix**: all enabled rules × `$Runs` (default 3) = $N$ tasks, then **shuffled** with `Sort-Object { Get-Random }` and a printed seed for reproducibility
 - **Subprocess runner** (`invoke-pssa-rule.psl`): imports `PSScriptAnalyzer`, calls `Invoke-ScriptAnalyzer` with `-IncludeRules @($ruleName) -ExcludeRules @()`, measures with `[System.Diagnostics.Stopwatch]`, outputs JSON to stdout via `ConvertTo-Json -Compress`. Exit 0 on success, 1 on failure.
 - **Subprocess spawning** (`pssa-rule-benchmark.ps1`): `System.Diagnostics.Process` with `RedirectStandardOutput=true`, `RedirectStandardError=true`, 600s timeout per task. Stdout parsed from JSON; stderr captured to `ErrorMessage` on parse failure.
-- **Aggregation**: per rule across $R$ runs: `MeanMs`, `MinMs`, `MaxMs`, `StdDevMs` (population stddev), `MedianMs`, `MeanDiagCount`. Raw per-run data included in `RawData` array.
+- **Aggregation**: per rule across the rows recorded for it: `Runs` (the row count), `MeanMs`, `MinMs`, `MaxMs`, `StdDevMs` (population stddev), `MedianMs`, `MeanDiagCount`. Raw per-run data is always a `RawData` array, even for one run, and the results file is always a JSON array. Failed runs are excluded from every statistic.
+- **Resume**: with `-SkipExisting`, rules that already have `-Runs` rows are not re-run and their entries are carried into the written file unchanged; rules that are re-run replace their own entry.
+- **Self-test**: `-SelfTest` exercises the aggregation and the resume merge against synthetic rows (one, two, and three samples, a failed row, an overlapping re-run) and throws when a summary disagrees with its recorded rows. It needs neither `git` nor PSScriptAnalyzer.
 - **Incremental output**: raw results saved to `$ResultsFile.raw` every 10 tasks; deleted on success. Final aggregated JSON written to `$ResultsFile`.
 
 ## File layout
