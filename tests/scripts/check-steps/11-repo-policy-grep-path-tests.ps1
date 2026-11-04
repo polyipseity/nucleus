@@ -194,6 +194,49 @@ if ($stepOutput -match 'svc_health_is_looping') {
 }
 
 Write-Output ''
+# 6. The `|| true` rule scans shell and Nix files, and the step shell leaves
+#    carry the same literal pattern text in their own scan definitions, so the
+#    leaves have to be excluded from that scan. The fixture is a shell step
+#    leaf with an unannotated `|| true` in code: without $allStepShLeaves the
+#    audit reports it, which is the Windows-job regression this guard pins.
+$fixtureRoot = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "nucleus-step11-sh-leaf-$([guid]::NewGuid().ToString('N'))"
+New-Item -ItemType Directory -Path $fixtureRoot -Force > $null
+$fixtureShLeaf = Join-Path $fixtureRoot '11-repo-policy-grep.sh'
+Set-Content -LiteralPath $fixtureShLeaf -Value @(
+  'set -euo pipefail',
+  'command --flag || true'
+)
+$fixtureContext = [pscustomobject]@{
+  HasArgs        = $true
+  RepoRoot       = $fixtureRoot
+  PositionalArgs = @()
+  ShFiles        = @($fixtureShLeaf)
+  NixFiles       = @()
+  Ps1Files       = @()
+}
+$fixtureOutput = ''
+$fixtureCrash = ''
+try {
+  $fixtureOutput = & $script:StepActions[$stepIndex] $fixtureContext 2>&1 | Out-String
+} catch {
+  # WHY: with the exclusion variable dropped outright the step throws a
+  # strict-mode error; recording it keeps this case's failure visible instead
+  # of aborting the run before the assertion can report.
+  $fixtureCrash = $_.Exception.Message
+}
+if ($fixtureCrash) {
+  Assert-Fail 'step 11: a shell step leaf with || true is excluded from the suppression audit' $fixtureCrash
+} elseif ($fixtureOutput -match '\(\|\| true\)') {
+  Assert-Fail 'step 11: a shell step leaf with || true is excluded from the suppression audit' $fixtureOutput.Trim()
+} elseif ($fixtureOutput -notmatch 'no suppression audit violations found') {
+  # WHY: without this the case could pass on an audit that never saw the
+  # fixture instead of one that saw it and excluded it.
+  Assert-Fail 'step 11: a shell step leaf with || true is excluded from the suppression audit' 'suppression audit did not run'
+} else {
+  Assert-Pass 'step 11: a shell step leaf with || true is excluded from the suppression audit'
+}
+
+Write-Output ''
 Write-Output "TOTAL $script:passCount passed, $script:failCount failed"
 if ($script:failCount -gt 0) { exit 1 }
 exit 0
