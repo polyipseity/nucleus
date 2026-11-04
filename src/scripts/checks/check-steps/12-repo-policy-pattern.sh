@@ -170,11 +170,9 @@ run_activation_naming_policy() {
     return 1
   }
 
-  # Activation entry definitions as "file:line:name" across the three namespaces.
+  # Dotted definitions as "file:line:name", anywhere in a file: the three
+  # namespaces written out as `home.activation.<name>`.
   local _ns_re='(home\.activation|system\.activationScripts|nucleus\.terminalActivations)'
-  # Matches an attrset entry line and no nested-content line (`config = {`,
-  # `Unit = {`, `bundle_id = "..."`). The trailing $ anchors the pattern value.
-  local _entry_re="^[[:space:]]*[a-zA-Z0-9_-]+(\\.[a-zA-Z0-9_-]+)?[[:space:]]*=[[:space:]]*(lib\\.(mkIf|mkAfter|mkBefore|mkForce|mkOverride|mkOrder|hm\\.dag\\.entry(A|Before|Order|After))|[[:space:]]*$)"
 
   local _nix_files=()
   if $_has_args; then
@@ -189,18 +187,12 @@ run_activation_naming_policy() {
       sed -E 's/^([^:]+:[0-9]+:).*\.([a-zA-Z0-9_-]+)$/\1\2/' >>"$_names_file" ||
       true # check-suppress:suppression_doc: grep exits 1 when no dotted definitions are found; an empty result file is the clean state
 
-    # Attrset definitions: <ns> = { <name> = ...; } regions. The entry-value
-    # filter avoids capturing nested-attrset content lines, `=` emits the line
-    # number, and `paste` pairs it with the extracted name.
-    for _f in "${_nix_files[@]}"; do
-      sed -nE "/${_ns_re}[[:space:]]*=[^;]*\\{/,/^[[:space:]]*\\};/ {
-        /${_entry_re}/ {
-          s/^[[:space:]]*([a-zA-Z0-9_-]+).*/\\1/
-          =
-          p
-        }
-      }" "$_f" | paste -d: - - | sed "s|^|$_f:|" >>"$_names_file"
-    done
+    # Attrset definitions: `<ns> = { <name> = ...; }` regions, in one pass for
+    # the whole list. The sed|paste|sed loop this replaces forked three children
+    # per file and took 0.30 s of this rule's 0.45 s here; the region and entry
+    # rules now live in the shared program.
+    local _awk_path="$_AWK_PATH"
+    awk -v mode=activation-naming -f "$_awk_path" "${_nix_files[@]}" >>"$_names_file"
   fi
 
   sort -u -o "$_names_file" "$_names_file"

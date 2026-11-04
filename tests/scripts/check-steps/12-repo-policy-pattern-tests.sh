@@ -115,7 +115,208 @@ EOF
   return 0
 }
 
-# --- logging format policy behavioral tests ---
+# --- activation naming policy: attrset regions (one awk pass) ---
+# A `<namespace> = { ... };` block yields entries through the shared awk program
+# now. These cases pin the record set the sed|paste|sed loop produced: which
+# lines the region covers, that the region ends at the closing brace, and that no
+# block state carries from one file to the next. A record only reaches the output
+# as a violation report, so each fixture names its entries so that every captured
+# record has to be reported and every uncaptured one has to stay silent.
+
+test_step14_naming_region_scopes_attrset_block() {
+  local _tmp _out _ret _count
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  mkdir -p "$_tmp/src/modules"
+  cat >"$_tmp/src/modules/region.nix" <<'EOF'
+{ lib, ... }:
+{
+  badBefore = lib.mkAfter "";
+
+  home.activation = {
+    badInside = lib.mkAfter "";
+    badDotted.text = lib.mkAfter "";
+    valid-inside = lib.mkAfter "";
+  };
+
+  badAfter = lib.mkAfter "";
+}
+EOF
+  run_activation_naming_policy false "$_tmp" >"$_out" 2>&1
+  _ret=$?
+  _count=$(grep -cF 'is not kebab-case' "$_out")
+  if [ "$_ret" -eq 0 ] || [ "$_count" -ne 2 ]; then
+    echo "FAIL: expected the two in-block entries reported, got $_count (exit $_ret)"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  if ! grep -Fq "activation name 'badInside' at src/modules/region.nix:6 is not kebab-case" "$_out"; then
+    echo "FAIL: the entry inside the block is not reported at its own line"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  # A dotted key inside the block is the entry named by its first segment, not by
+  # the trailing attribute.
+  if ! grep -Fq "activation name 'badDotted' at src/modules/region.nix:7 is not kebab-case" "$_out"; then
+    echo "FAIL: a dotted key inside the block is not reported by its first segment"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  if grep -Fq 'badBefore' "$_out" || grep -Fq 'badAfter' "$_out"; then
+    echo "FAIL: an entry line outside the block was reported"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+# The closing `};` ends the region, and the scan looks for the next block after it.
+# A region that never closes keeps the file in scope, so the between-blocks line
+# and the second block would both be reported.
+test_step14_naming_region_ends_at_closing_brace() {
+  local _tmp _out _ret _count
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  mkdir -p "$_tmp/src/modules"
+  cat >"$_tmp/src/modules/blocks.nix" <<'EOF'
+{ lib, ... }:
+{
+  home.activation = {
+    badFirst = lib.mkAfter "";
+  };
+
+  badBetween = lib.mkAfter "";
+
+  system.activationScripts = {
+    badSecond = lib.mkAfter "";
+  };
+}
+EOF
+  run_activation_naming_policy false "$_tmp" >"$_out" 2>&1
+  _ret=$?
+  _count=$(grep -cF 'is not kebab-case' "$_out")
+  if [ "$_ret" -eq 0 ] || [ "$_count" -ne 2 ]; then
+    echo "FAIL: expected one entry reported per block, got $_count (exit $_ret)"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  if ! grep -Fq "'badFirst' at src/modules/blocks.nix:4 is not kebab-case" "$_out" ||
+    ! grep -Fq "'badSecond' at src/modules/blocks.nix:10 is not kebab-case" "$_out"; then
+    echo "FAIL: a block entry is not reported at its own line"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  if grep -Fq 'badBetween' "$_out"; then
+    echo "FAIL: a line between two blocks was reported as an entry"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+# The region ends at the first `};` line, so a nested attrset closes it: its
+# lib-wrapped field is reported as an entry and nothing after the nested close is
+# scanned. That is the record set the sed range produced. Changing it would be a
+# policy change, so the case pins it rather than asserting the twin's brace depth.
+test_step14_naming_nested_attrset_closes_region() {
+  local _tmp _out _ret _count
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  mkdir -p "$_tmp/src/modules"
+  cat >"$_tmp/src/modules/nested.nix" <<'EOF'
+{ lib, ... }:
+{
+  home.activation = {
+    badWrapper = {
+      badNestedField = lib.mkAfter "";
+    };
+    badTail = lib.mkAfter "";
+  };
+}
+EOF
+  run_activation_naming_policy false "$_tmp" >"$_out" 2>&1
+  _ret=$?
+  _count=$(grep -cF 'is not kebab-case' "$_out")
+  if [ "$_ret" -eq 0 ] || [ "$_count" -ne 1 ]; then
+    echo "FAIL: expected only the nested field reported, got $_count (exit $_ret)"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  if ! grep -Fq "'badNestedField' at src/modules/nested.nix:5 is not kebab-case" "$_out"; then
+    echo "FAIL: the nested field was not reported"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  if grep -Fq 'badWrapper' "$_out" || grep -Fq 'badTail' "$_out"; then
+    echo "FAIL: an attrset-valued entry or a post-nested entry was reported"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+# Both files open a block and never close it, and both place a violating entry
+# line before their block. A scan that carries the open block into the next file
+# reports the second file's leading line, whichever file the discovery yields
+# first; a scan that resets per file reports nothing.
+test_step14_naming_region_state_does_not_cross_files() {
+  local _tmp _out _ret
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  mkdir -p "$_tmp/src/modules"
+  cat >"$_tmp/src/modules/a-open.nix" <<'EOF'
+{ lib, ... }:
+{
+  badLeadingA = lib.mkAfter "";
+  home.activation = {
+    valid-a = lib.mkAfter "";
+EOF
+  cat >"$_tmp/src/modules/b-open.nix" <<'EOF'
+{ lib, ... }:
+{
+  badLeadingB = lib.mkAfter "";
+  home.activation = {
+    valid-b = lib.mkAfter "";
+EOF
+  run_activation_naming_policy false "$_tmp" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -ne 0 ] || grep -Fq 'is not kebab-case' "$_out"; then
+    echo "FAIL: an unclosed block leaked into the next file (exit $_ret)"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
 
 FIXTURE_DIR="$REPO_ROOT/tests/fixtures/logging-format"
 CAPTURE_FIXTURE_DIR="$REPO_ROOT/tests/fixtures/log-capture-pair"
@@ -822,6 +1023,10 @@ for test in \
   test_step14_naming_behavioral_negative \
   test_step14_naming_behavioral_exemption \
   test_step14_naming_behavioral_prefix \
+  test_step14_naming_region_scopes_attrset_block \
+  test_step14_naming_region_ends_at_closing_brace \
+  test_step14_naming_nested_attrset_closes_region \
+  test_step14_naming_region_state_does_not_cross_files \
   test_step14_logging_behavioral_positive \
   test_step14_logging_behavioral_negative \
   test_step14_logging_behavioral_allowlist \

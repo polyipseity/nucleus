@@ -23,6 +23,12 @@
 # (output-handling.instructions.md): a capture directive that sends a stream to
 # /dev/null, a merged-stream redirection, and a file that captures one stream of
 # a directive family but not the other, for launchd and systemd separately.
+#
+# Activation-naming mode (-v mode=activation-naming): extracts the entry
+# definitions inside `<namespace> = { ... };` blocks as "file:line:name"
+# records, one record per line. The step owns the policy (kebab-case, the
+# forbidden prefix, the macos- requirement); this mode only reports what the
+# blocks define, so the step can sort and de-duplicate the records.
 
 # Report one file's log-capture findings, in the order the per-rule greps
 # produced them: discards, then merges, then the two presence checks. Order is
@@ -64,6 +70,34 @@ mode == "log-capture" {
 }
 END {
   if (mode == "log-capture" && _cap_file != "") report_capture_pair()
+}
+
+BEGIN {
+  if (mode == "activation-naming") {
+    _an_ns_start = "(home\\.activation|system\\.activationScripts|nucleus\\.terminalActivations)[[:space:]]*=[^;]*[{]"
+    # An activation entry carries a lib wrapper, or leaves its value on the next
+    # line. That excludes the region's other lines that look like assignments,
+    # such as `config = {` inside a value.
+    _an_entry = "^[[:space:]]*[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)?[[:space:]]*=[[:space:]]*(lib\\.(mkIf|mkAfter|mkBefore|mkForce|mkOverride|mkOrder|hm\\.dag\\.entry(A|Before|Order|After))|[[:space:]]*$)"
+    _an_end = "^[[:space:]]*[}];"
+  }
+}
+
+# The region opens on a namespace attrset line and closes on the next `};` line,
+# which is the range the sed pipeline used. A nested attrset therefore closes the
+# region early, so the entries after it stay unreported.
+mode == "activation-naming" && FNR == 1 { _an_block = 0 }
+mode == "activation-naming" {
+  if (!_an_block && $0 ~ _an_ns_start) _an_block = 1
+  if (_an_block) {
+    if ($0 ~ _an_entry) {
+      _an_name = $0
+      sub(/^[[:space:]]*/, "", _an_name)
+      sub(/[^A-Za-z0-9_-].*$/, "", _an_name)
+      print FILENAME ":" FNR ":" _an_name
+    }
+    if ($0 ~ _an_end) _an_block = 0
+  }
 }
 
 mode == "" && FNR == 1 { in_heredoc = 0 }
