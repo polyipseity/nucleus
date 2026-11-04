@@ -206,19 +206,51 @@ test_no_consumer_exits_outside_a_heredoc() {
 
 # ---- safe-rm fixture environment ----
 
+# The cases must not depend on a provisioned host: safe-rm is installed by the
+# install-bun-packages activation, it is absent from the test app's
+# runtimeInputs, and CI runs bootstrap --no-apply before the test pipeline, so a
+# case that needs the real binary would be red on every CI runner. A fake with
+# the tool's contract (read SAFE_RM_CONFIG, move each target into SAFE_RM_TRASH)
+# exercises the helper identically on any host, and a PATH without it at all
+# exercises the absent branch even here.
+
 # Derived from this file rather than reused from SCRIPT_DIR: sourcing
 # src/scripts/tests/test-lib.sh in the probes below reassigns SCRIPT_DIR, which
 # makes shellcheck read every later use as possibly lost (SC2031).
 _SAFE_RM_TEST_LIB="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/test-lib.sh"
 
+_make_fake_safe_rm() { # <dir>
+  # shellcheck disable=SC2016 # reason: the quoted body is a script for the shim, not text this shell expands
+  cat >"$1/safe-rm" <<'FAKE'
+#!/usr/bin/env bash
+# Stand-in for safe-rm: fails unless the helper configured a config file, then
+# moves every operand into the configured trash, which is the part of safe-rm's
+# behaviour the helper is responsible for.
+set -eu
+[ -f "$SAFE_RM_CONFIG" ]
+mkdir -p "$SAFE_RM_TRASH"
+for _target in "$@"; do
+  case "$_target" in -*) continue ;; esac
+  mv -- "$_target" "$SAFE_RM_TRASH/"
+done
+FAKE
+  chmod +x "$1/safe-rm"
+}
+
+_SAFE_RM_FAKE_BIN="$(mktemp -d)"
+_make_fake_safe_rm "$_SAFE_RM_FAKE_BIN"
+# One trash for the whole run, which is what a suite gets: it calls the helper in
+# its own shell first, so every child process inherits the cached directory.
+_SAFE_RM_PROBE_TRASH="$(mktemp -d)"
+
 # Each case below runs in a fresh shell so the helper's exports cannot leak into
-# the suite's own environment, and so a restricted PATH applies to the helper's
-# own `command -v` check rather than to this process.
+# the suite's own environment, and so its PATH is the one the case names.
 _lib_probe() { # <path> [assignment...]
   local _path="$1"
   shift
   # shellcheck disable=SC2016 # reason: the quoted body is a script for bash -c, not text this shell expands
-  env -u SAFE_RM_CONFIG -u SAFE_RM_TRASH "$@" PATH="$_path" bash -c '
+  env -u SAFE_RM_CONFIG -u SAFE_RM_TRASH "$@" PATH="$_path" \
+    _NUCLEUS_TEST_SAFE_RM_TRASH="$_SAFE_RM_PROBE_TRASH" bash -c '
     . "$1"
     ensure_safe_rm_env && _rc=0 || _rc=$?
     printf "%s|%s|%s" "$_rc" "${SAFE_RM_CONFIG-}" "${SAFE_RM_TRASH-}"
@@ -230,7 +262,7 @@ _lib_probe() { # <path> [assignment...]
 # makes safe-rm prompt on stdout and corrupt every exact-output assertion.
 test_ensure_safe_rm_env_sets_both_when_unset() {
   local _result _rc _config _trash
-  _result="$(_lib_probe "$PATH")"
+  _result="$(_lib_probe "$_SAFE_RM_FAKE_BIN:$PATH")"
   _rc="${_result%%|*}"
   _result="${_result#*|}"
   _config="${_result%%|*}"
@@ -247,10 +279,12 @@ test_ensure_safe_rm_env_sets_both_when_unset() {
 
 # A caller that sets both keeps its own pair: the check gate supplies the
 # operator's real config this way, and silently replacing it would hide a broken
-# operator config from the gate.
+# operator config from the gate. The fake is on PATH so the honored-pair branch
+# is actually reached rather than skipped by an absent binary.
 test_ensure_safe_rm_env_keeps_a_complete_pair() {
   local _result
-  _result="$(_lib_probe "$PATH" SAFE_RM_CONFIG=/sentinel/config SAFE_RM_TRASH=/sentinel/trash)"
+  _result="$(_lib_probe "$_SAFE_RM_FAKE_BIN:$PATH" \
+    SAFE_RM_CONFIG=/sentinel/config SAFE_RM_TRASH=/sentinel/trash)"
   if [ "$_result" = "0|/sentinel/config|/sentinel/trash" ]; then
     assert_pass "ensure_safe_rm_env keeps a caller's complete pair"
   else
@@ -258,20 +292,61 @@ test_ensure_safe_rm_env_keeps_a_complete_pair() {
   fi
 }
 
-# Half a pair is worse than none: a preset config without a preset trash leaves
-# SAFE_RM_TRASH at its $HOME/.Trash default, which is absent in a test home.
-# Setting both is the only coherent outcome.
+# A half pair is completed and the supplied half survives, in both directions.
+# The supplied config without a trash is the case that prompted on this host;
+# the supplied trash without a config is the mirror, and neither half may be
+# replaced by the helper.
 test_ensure_safe_rm_env_completes_a_half_pair() {
   local _result _config _trash
-  _result="$(_lib_probe "$PATH" SAFE_RM_CONFIG=/sentinel/config)"
+  _result="$(_lib_probe "$_SAFE_RM_FAKE_BIN:$PATH" SAFE_RM_CONFIG=/sentinel/config)"
   _result="${_result#0|}"
   _config="${_result%%|*}"
   _trash="${_result#*|}"
-  if [ -f "$_config" ] && [ -d "$_trash" ]; then
-    assert_pass "ensure_safe_rm_env completes a half-set pair instead of honoring it"
+  if [ "$_config" = /sentinel/config ] && [ -d "$_trash" ]; then
+    assert_pass "ensure_safe_rm_env keeps a supplied config and adds a trash"
   else
-    assert_fail "ensure_safe_rm_env completes a half-set pair instead of honoring it" \
+    assert_fail "ensure_safe_rm_env keeps a supplied config and adds a trash" \
       "config=[$_config] trash=[$_trash]"
+  fi
+
+  _result="$(_lib_probe "$_SAFE_RM_FAKE_BIN:$PATH" SAFE_RM_TRASH=/sentinel/trash)"
+  _result="${_result#0|}"
+  _config="${_result%%|*}"
+  _trash="${_result#*|}"
+  if [ -f "$_config" ] && [ "$_trash" = /sentinel/trash ]; then
+    assert_pass "ensure_safe_rm_env keeps a supplied trash and adds a config"
+  else
+    assert_fail "ensure_safe_rm_env keeps a supplied trash and adds a config" \
+      "config=[$_config] trash=[$_trash]"
+  fi
+}
+
+# Two calls in one shell hand back the same directory. Without the cache every
+# call and every child process added another trash directory, which is the leak
+# the unit suite showed three times over.
+test_ensure_safe_rm_env_reuses_one_trash_per_run() {
+  local _result
+  # The second call clears the pair first, or the complete-pair branch would
+  # return before the cache is consulted and this would pass for the wrong
+  # reason.
+  # shellcheck disable=SC2016 # reason: the quoted body is a script for bash -c, not text this shell expands
+  _result="$(env -u SAFE_RM_CONFIG -u SAFE_RM_TRASH -u _NUCLEUS_TEST_SAFE_RM_TRASH \
+    PATH="$_SAFE_RM_FAKE_BIN:$PATH" bash -c '
+    . "$1"
+    ensure_safe_rm_env
+    _first="$SAFE_RM_TRASH"
+    unset SAFE_RM_CONFIG SAFE_RM_TRASH
+    ensure_safe_rm_env
+    printf "%s|%s|%s" "$_first" "$SAFE_RM_TRASH" "$SAFE_RM_CONFIG"
+  ' _ "$_SAFE_RM_TEST_LIB")"
+  local _first _rest _second
+  _first="${_result%%|*}"
+  _rest="${_result#*|}"
+  _second="${_rest%%|*}"
+  if [ -n "$_first" ] && [ "$_first" = "$_second" ] && [ -d "$_first" ]; then
+    assert_pass "ensure_safe_rm_env reuses one trash directory per run"
+  else
+    assert_fail "ensure_safe_rm_env reuses one trash directory per run" "got [$_result]"
   fi
 }
 
@@ -280,14 +355,18 @@ test_ensure_safe_rm_env_completes_a_half_pair() {
 # says so in one line instead of failing, because CI provisions safe-rm nowhere
 # (bootstrap installs Nix and base deps, the test app adds no PATH) and a hard
 # failure here would be six suite reds for a host that needs no configuration.
-# The normal-PATH case above is the control that keeps this from passing against
-# a helper that never exports anything.
+# The cases above are the control that keeps this from passing against a helper
+# that never exports anything.
 test_ensure_safe_rm_env_leaves_a_plain_rm_alone() {
   local _result
+  # The interpreter is named by absolute path and PATH holds nothing resolvable:
+  # /usr/bin:/bin does not exist on NixOS, where looking bash up in that PATH
+  # exits 127 and set -e aborts the suite before its tally.
   # The notice is captured in the same string as the exports, so the assertion
   # matches the full shape it claims: no exports, status 0, then the notice.
   # shellcheck disable=SC2016 # reason: the quoted body is a script for bash -c, not text this shell expands
-  _result="$(env -u SAFE_RM_CONFIG -u SAFE_RM_TRASH PATH=/usr/bin:/bin bash -c '
+  _result="$(env -u SAFE_RM_CONFIG -u SAFE_RM_TRASH -u _NUCLEUS_TEST_SAFE_RM_TRASH \
+    PATH=/nonexistent "$BASH" -c '
     . "$1"
     _notice="$(ensure_safe_rm_env)" && _rc=0 || _rc=$?
     printf "|%s|%s|%s|%s" "${SAFE_RM_CONFIG-}" "${SAFE_RM_TRASH-}" "$_rc" "$_notice"
@@ -302,9 +381,9 @@ test_ensure_safe_rm_env_leaves_a_plain_rm_alone() {
   esac
 }
 
-# The point of the helper is the deletion route, so exercise it: a delete under
-# the helper's environment must succeed silently and leave the entry in the
-# scratch trash rather than in the operator's Trash.
+# The point of the helper is the deletion route, so exercise it: the tool must
+# receive a config it can read and a trash it can use, the deletion must be
+# silent, and the entry must end up in the helper's trash.
 test_ensure_safe_rm_env_routes_a_delete_to_the_scratch_trash() {
   local _work _out _rc=0
   _work="$(mktemp -d)"
@@ -312,12 +391,13 @@ test_ensure_safe_rm_env_routes_a_delete_to_the_scratch_trash() {
   # Exit statuses name the failed step, so a red run reports which one broke
   # instead of only that the probe printed nothing.
   # shellcheck disable=SC2016 # reason: the quoted body is a script for bash -c, not text this shell expands
-  _out="$(env -u SAFE_RM_CONFIG -u SAFE_RM_TRASH bash -c '
+  _out="$(env -u SAFE_RM_CONFIG -u SAFE_RM_TRASH \
+    PATH="$_SAFE_RM_FAKE_BIN:$PATH" _NUCLEUS_TEST_SAFE_RM_TRASH="$_SAFE_RM_PROBE_TRASH" bash -c '
     . "$1"
     ensure_safe_rm_env || exit 9
     safe-rm -f "$2" || exit 8
     [ -e "$2" ] && exit 7
-    [ -n "$(ls -A "$SAFE_RM_TRASH")" ] || exit 6
+    [ -e "$SAFE_RM_TRASH/victim" ] || exit 6
     printf "%s" "$SAFE_RM_TRASH"
   ' _ "$_SAFE_RM_TEST_LIB" "$_work/victim")" || _rc=$?
   if [ "$_rc" -ne 0 ]; then
@@ -325,7 +405,7 @@ test_ensure_safe_rm_env_routes_a_delete_to_the_scratch_trash() {
   elif [ -z "$_out" ]; then
     assert_fail "ensure_safe_rm_env routes a delete to the scratch trash" \
       "the trash path is empty"
-  elif [ -d "$_out" ] && [ ! -e "$_work/victim" ]; then
+  elif [ -d "$_out" ] && [ ! -e "$_work/victim" ] && [ "$_out" != "$HOME/.Trash" ]; then
     assert_pass "ensure_safe_rm_env routes a delete to the scratch trash"
   else
     assert_fail "ensure_safe_rm_env routes a delete to the scratch trash" "trash=[$_out]"
@@ -346,6 +426,7 @@ test_no_consumer_exits_outside_a_heredoc
 test_ensure_safe_rm_env_sets_both_when_unset
 test_ensure_safe_rm_env_keeps_a_complete_pair
 test_ensure_safe_rm_env_completes_a_half_pair
+test_ensure_safe_rm_env_reuses_one_trash_per_run
 test_ensure_safe_rm_env_leaves_a_plain_rm_alone
 test_ensure_safe_rm_env_routes_a_delete_to_the_scratch_trash
 
