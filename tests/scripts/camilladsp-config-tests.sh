@@ -20,7 +20,9 @@ ASOUND_CONF="$REPO_ROOT/src/modules/configs/asound/asound.conf"
 require_command python3 "the CamillaDSP configs are YAML and PyYAML is the parser the suite uses"
 require_command mktemp "the case runs from a private helper file"
 
-helper="$(mktemp -t camilladsp-config-tests)"
+# Plain mktemp: -t takes a template without X's on BSD but demands them on GNU,
+# where the suite then died before printing a tally.
+helper="$(mktemp)"
 cat >"$helper" <<'PY'
 import os
 import pathlib

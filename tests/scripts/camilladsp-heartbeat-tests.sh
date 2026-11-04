@@ -20,7 +20,9 @@ require_command mktemp "each test case needs a private state directory"
 
 init_test_state
 
-helper="$(mktemp -t camilladsp-heartbeat-tests)"
+# Plain mktemp: -t takes a template without X's on BSD but demands them on GNU,
+# where the suite then died before printing a tally.
+helper="$(mktemp)"
 cat >"$helper" <<'PY'
 import importlib.util
 import os
