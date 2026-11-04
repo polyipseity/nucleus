@@ -385,12 +385,14 @@ run_suppression_audit() {
   fi
 
   # Drop this step's own file: its scan definitions contain the literal
-  # suppression patterns. ${x##*/} rather than basename, because a fork per file
-  # cost more than the rest of this function together.
-  local _filtered=() _f_iter
-  local _self_name="${BASH_SOURCE[0]##*/}"
+  # suppression patterns. path_basename rather than basename keeps the per-file
+  # cost at zero forks, and it also matches a Windows-shaped path.
+  local _filtered=() _f_iter _self_name
+  path_basename "${BASH_SOURCE[0]}"
+  _self_name="$REPLY"
   for _f_iter in "${_files[@]}"; do
-    [ "${_f_iter##*/}" = "$_self_name" ] || _filtered+=("$_f_iter")
+    path_basename "$_f_iter"
+    [ "$REPLY" = "$_self_name" ] || _filtered+=("$_f_iter")
   done
   _files=("${_filtered[@]}")
 
@@ -414,7 +416,8 @@ run_suppression_audit() {
   fi
   local _ps1_files=() _ps1_iter
   for _ps1_iter in "${_ps1_candidates[@]}"; do
-    case "${_ps1_iter##*/}" in
+    path_basename "$_ps1_iter"
+    case "$REPLY" in
     11-repo-policy-grep.ps1 | 12-repo-policy-pattern.ps1 | 13-repo-policy-data.ps1) continue ;;
     esac
     _ps1_files+=("$_ps1_iter")

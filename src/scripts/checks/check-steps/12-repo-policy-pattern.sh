@@ -8,7 +8,8 @@ _AWK_PATH="$_REPO_POLICY_STEP_DIR/repository-policy.awk"
 # Every repo-policy step file carries the literal pattern text the scans search
 # for, so each scan skips the whole set, itself included.
 # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
-_POLICY_STEP_SELF_SH="$(basename "${BASH_SOURCE[0]}")"
+path_basename "${BASH_SOURCE[0]}"
+_POLICY_STEP_SELF_SH="$REPLY"
 _POLICY_STEP_SELF_PS1="${_POLICY_STEP_SELF_SH%.sh}.ps1"
 
 register_step "repo-policy-pattern" "Repository policy (pattern-based)" run_repo_policy_pattern posix any none
@@ -67,7 +68,8 @@ run_config_method_compliance() {
   local _cfgs=() _bases=() _tmpls=()
   local _cfg _rel _base
   while IFS= read -r -d '' _cfg; do
-    _base="${_cfg##*/}"
+    path_basename "$_cfg"
+    _base="$REPLY"
     # ref: allow-and-deny-lists.instructions.md#A2 -- infrastructure files are not configs
     case "$_base" in
     .gitkeep | .gitignore | *.schema.json | *.nix) continue ;;
@@ -306,9 +308,10 @@ _policy_scan_target() {
   case "$_pst_file" in
   vendor/* | src/secrets/* | tests/fixtures/*) return 1 ;;
   esac
-  # ${x##*/} rather than basename: this runs once per tracked file, where the
-  # forks cost more than the scan itself.
-  case "${_pst_file##*/}" in
+  # path_basename rather than basename: this runs once per tracked file, where
+  # the forks cost more than the scan itself.
+  path_basename "$_pst_file"
+  case "$REPLY" in
   "$_POLICY_STEP_SELF_SH" | "$_POLICY_STEP_SELF_PS1" | 11-repo-policy-grep.ps1 | 13-repo-policy-data.ps1) return 1 ;;
   esac
   [[ "$_pst_file" =~ $_pst_ext_re ]]

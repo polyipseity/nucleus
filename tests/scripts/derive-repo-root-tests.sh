@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Test: derive_repo_root() rejects Nix store paths as NUCLEUS_REPO_ROOT values.
 # Defense-in-depth against the 2026-09 gui-env LaunchAgent store-path poisoning.
+# Case F covers path_basename(), the separator-agnostic leaf its sibling path
+# helpers rely on.
 
 set -euo pipefail
 
@@ -115,10 +117,50 @@ test_registry_helper_rejects_store_path() {
   fi
 }
 
+# Case F: path_basename takes the leaf of a backslash-separated path as well as a
+# slash-separated one. A Windows-shaped path reaches the bash check steps
+# verbatim, and the plain parameter expansion then returns the whole string, so a
+# self-exclusion comparison against a file list stops matching and the step
+# reports its own scan patterns as violations.
+test_path_basename_both_separators() {
+  local _impl _got
+  _impl="$(extract_func path_basename "$LIB_SH")"
+  if [ -z "$_impl" ]; then
+    assert_fail "path_basename is defined in lib.sh" "extract_func found nothing in $LIB_SH"
+    return 0
+  fi
+  eval "$_impl"
+
+  path_basename 'D:\a\repo\src\x.sh'
+  _got="$REPLY"
+  if [ "$_got" = 'x.sh' ]; then
+    assert_pass "path_basename takes the leaf of a Windows-shaped path"
+  else
+    assert_fail "path_basename takes the leaf of a Windows-shaped path" "got: $_got"
+  fi
+
+  path_basename 'src/scripts/checks/check-steps/11-repo-policy-grep.sh'
+  _got="$REPLY"
+  if [ "$_got" = '11-repo-policy-grep.sh' ]; then
+    assert_pass "path_basename keeps the slash-separated leaf unchanged"
+  else
+    assert_fail "path_basename keeps the slash-separated leaf unchanged" "got: $_got"
+  fi
+
+  path_basename '11-repo-policy-grep.sh'
+  _got="$REPLY"
+  if [ "$_got" = '11-repo-policy-grep.sh' ]; then
+    assert_pass "path_basename returns a bare name unchanged"
+  else
+    assert_fail "path_basename returns a bare name unchanged" "got: $_got"
+  fi
+}
+
 test_store_path_falls_through
 test_store_path_falls_through_to_script_dir
 test_normal_env_var_accepted
 test_system_file_store_path_rejected
 test_registry_helper_rejects_store_path
+test_path_basename_both_separators
 
 finish_tests

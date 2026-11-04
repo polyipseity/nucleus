@@ -275,6 +275,17 @@ derive_repo_root() {
   return 1
 }
 
+# path_basename PATH: set REPLY to PATH's last component, treating `/` and `\`
+# as separators alike. A Windows-shaped path (`D:\a\repo\src\x.sh`) reaches
+# these step files verbatim, and `${p##*/}` then returns the whole string, so a
+# basename comparison against a file list silently stops matching.
+# REPLY rather than stdout: the repo-policy scans call this once per tracked
+# file, where a fork per call costs more than the scan itself.
+path_basename() {
+  REPLY="${1##*/}"
+  REPLY="${REPLY##*\\}"
+}
+
 resolve_nucleus_host() {
   if [ -n "${NUCLEUS_HOST:-}" ]; then
     printf '%s\n' "$NUCLEUS_HOST"
