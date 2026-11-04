@@ -20,6 +20,8 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
 
+ensure_safe_rm_env
+
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 
 PKG_DIR="$REPO_ROOT/src/scripts/packages"

@@ -25,6 +25,8 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
 
+ensure_safe_rm_env
+
 DEPLOY_SCRIPT="$SCRIPT_DIR/../../src/hosts/MacBook/scripts/macos-deploy-automator-workflows.sh"
 
 # Fail closed: without the extracted function every case below would call an

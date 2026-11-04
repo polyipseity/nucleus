@@ -10,6 +10,8 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
+
+ensure_safe_rm_env
 # shellcheck source=./user-registry-fixture.sh
 . "$SCRIPT_DIR/user-registry-fixture.sh"
 

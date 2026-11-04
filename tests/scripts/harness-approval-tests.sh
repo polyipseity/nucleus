@@ -18,6 +18,8 @@ APPROVAL="$SCRIPT_DIR/../../src/scripts/notify/harness-approval.sh"
 require_command mktemp "temporary directories for the recording stub"
 require_command find "locating the harness-bridge state directory"
 
+ensure_safe_rm_env
+
 TMPDIR_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_ROOT"' EXIT
 

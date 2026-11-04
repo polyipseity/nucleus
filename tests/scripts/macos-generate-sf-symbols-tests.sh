@@ -17,6 +17,8 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 init_test_state
 
+ensure_safe_rm_env
+
 REPO_ROOT="$SCRIPT_DIR/../.."
 GENERATOR="$REPO_ROOT/src/platforms/macOS/scripts/macos-generate-sf-symbols.sh"
 SKILL_MD="$REPO_ROOT/.agents/skills/sf-symbols/SKILL.md"

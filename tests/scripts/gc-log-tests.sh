@@ -11,6 +11,8 @@ LIB_SH="$SCRIPT_DIR/../../src/scripts/lib/lib.sh"
 EXPIRE_SH="$SCRIPT_DIR/../../src/scripts/lib/expire-profile-generations.sh"
 GC_SH="$SCRIPT_DIR/../../scripts/gc.sh"
 
+ensure_safe_rm_env
+
 # ---- Test A: sudo -H is passed for profile expiry ----
 
 test_sudo_h_passed_when_sudo_true() {
@@ -117,6 +119,11 @@ EOF
   else
     assert_fail "gc-escalate" "unexpected record: $(cat "$MOCK_RECORD")"
   fi
+  # Restore the mode before the cleanup removes the directory: safe-rm moves a
+  # deletion into the trash, and macOS refuses to rename a 0555 directory into
+  # any trash directory at all, so the cleanup would abort the suite before its
+  # tally. The suite made the directory unreadable, so undoing that is its job.
+  chmod u+w "$sys_dir"
   rm -rf "$mock_dir" "$work" "$user_dir" "$sys_dir"
 }
 

@@ -15,6 +15,8 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 readonly SCRIPT_DIR REPO_ROOT
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
+
+ensure_safe_rm_env
 init_test_state
 # shellcheck source=../../src/scripts/lib/macos-launch-services.sh
 . "$SCRIPT_DIR/../../src/scripts/lib/macos-launch-services.sh"

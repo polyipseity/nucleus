@@ -17,6 +17,8 @@ DRIVE="$SCRIPT_DIR/../../src/scripts/notify/harness-drive.sh"
 require_command mktemp "temporary directories for the harness home"
 require_command jq "queue payloads and expected documents"
 
+ensure_safe_rm_env
+
 TMPDIR_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_ROOT"' EXIT
 

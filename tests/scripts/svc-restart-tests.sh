@@ -11,6 +11,8 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
+
+ensure_safe_rm_env
 init_test_state
 # shellcheck source=../../src/scripts/lib/service-health.sh
 . "$SCRIPT_DIR/../../src/scripts/lib/service-health.sh"
