@@ -7,7 +7,7 @@
 #      someone else's tool, where the user only notices the missing notification;
 #   2. the entry points, the declared defaults, and the hook timeout budget
 #      drifting apart; the approval wait is exactly why the hook timeout has to
-#      stay larger than it.
+#      cover it.
 #
 # Run with: nix-instantiate --eval --strict tests/modules/harness-bridge-tests.nix
 
@@ -25,10 +25,27 @@ let
     "harness-notify"
   ];
 
+  # The deletion guard ships beside the bridge in the same hook files. It is a
+  # deployed PATH command in its own right rather than a bridge entry point: a
+  # POSIX script in src/scripts, and on Windows a shim Sync-SafeDelete.ps1 writes
+  # around its PowerShell implementation.
+  guardCommand = "safe-delete-guard";
+  hookCommands = entryPoints ++ [ guardCommand ];
+  guardScript = "/src/scripts/safe-delete-guard.sh";
+  guardWindowsImplementation = "/src/platforms/Windows/modules/user/Sync-SafeDeleteGuard.ps1";
+
   copilotHooks =
     (builtins.fromJSON (read "/src/users/default/agents/hooks/harness-notify.json")).hooks;
   cursorHooks = (builtins.fromJSON (read "/src/users/default/cursor/hooks.json")).hooks;
   cursorVersion = (builtins.fromJSON (read "/src/users/default/cursor/hooks.json")).version;
+
+  # Claude nests command entries one level deeper than the other two files: each
+  # event holds matcher groups, and each group holds the commands, so its
+  # commands are collected separately instead of joining allEntries.
+  claudeHooks = (builtins.fromJSON (read "/src/users/default/claude/settings.json")).hooks;
+  claudeEntries = builtins.concatMap (groups: builtins.concatMap (group: group.hooks) groups) (
+    builtins.attrValues claudeHooks
+  );
 
   # Attr values of both files are lists of hook entries; flatten one level.
   allEntries = builtins.concatLists (
@@ -55,8 +72,14 @@ let
     )
   );
 
-  # First word of a hook command: the entry point the harness resolves on PATH.
+  # First word of a hook command: the command the harness resolves on PATH.
   entryPointOf = command: builtins.head (builtins.split " " command);
+  # Entries of one event list that run a given command, so a per-file check can
+  # name the exact entry instead of assuming its position.
+  entriesRunning =
+    entries: command: builtins.filter (entry: entryPointOf entry.command == command) entries;
+  underBudget = builtins.filter (entry: entry.timeout < approvalWindow) allEntries;
+  claudeUnderBudget = builtins.filter (entry: entry.timeout < approvalWindow) claudeEntries;
 in
 {
   tests = builtins.filter (x: x != null) [
@@ -69,29 +92,45 @@ in
     )
 
     # --- Hooks resolve by bare name, never by machine-specific path ---
-    (assert' (all (
-      entry: builtins.elem (entryPointOf entry.command) entryPoints
-    ) allEntries) "every hook command must start with a deployed harness-bridge entry point")
+    (assert' (all (entry: builtins.elem (entryPointOf entry.command) hookCommands) allEntries)
+      "every hook command must start with a deployed command: a harness-bridge entry point or the deletion guard"
+    )
     (assert' (all (entry: builtins.match "[a-z0-9_-]+( [a-z0-9_-]+)*" entry.command != null) allEntries)
       "hook commands must be bare PATH-resolved names; an absolute path, home expansion, or environment reference cannot work on all three hosts"
     )
+    (assert' (builtins.pathExists (root + guardScript))
+      "the deletion guard hook needs its POSIX implementation, or a POSIX harness runs a hook it cannot find"
+    )
+    (assert' (builtins.pathExists (root + guardWindowsImplementation))
+      "the deletion guard hook needs its Windows implementation, which Sync-SafeDelete.ps1 exposes as the safe-delete-guard shim; without it the guard is silent on Windows"
+    )
 
-    # --- Timeout budget exceeds the approval wait ---
+    # --- Timeout budget covers the approval wait ---
     (assert' (all (entry: entry ? timeout) allEntries) "every hook entry must declare a timeout")
-    (assert' (all (entry: entry.timeout > approvalWindow) allEntries)
-      "hook timeout (${toString (builtins.head allEntries).timeout}) must exceed the approval window (${toString approvalWindow}), or the harness kills the hook before a decision can arrive"
+    (assert' (underBudget == [ ])
+      "hook timeout (${toString (builtins.head underBudget).timeout}) on ${(builtins.head underBudget).command} must be at least the approval window (${toString approvalWindow}), or the harness kills the hook before a decision can arrive"
+    )
+
+    # --- Claude carries the same budget ---
+    (assert' (all (entry: entry ? timeout) claudeEntries)
+      "every Claude hook entry must declare a timeout, or the harness applies a budget of its own and the guard can be killed before the approval window"
+    )
+    (assert' (claudeUnderBudget == [ ])
+      "hook timeout (${toString (builtins.head claudeUnderBudget).timeout}) on ${(builtins.head claudeUnderBudget).command} must be at least the approval window (${toString approvalWindow}), or the harness kills the hook before a decision can arrive"
     )
 
     # --- Copilot wiring ---
-    (assert' (
-      builtins.length copilotHooks.PreToolUse == 1
-    ) "VS Code Copilot must gate tool calls with exactly one PreToolUse hook")
-    (assert' (
-      (builtins.head copilotHooks.PreToolUse).command == "harness-approval hook copilot"
-    ) "VS Code Copilot PreToolUse must ask harness-approval for the Copilot decision document")
-    (assert' (
-      (builtins.head copilotHooks.PreToolUse).type == "command"
-    ) "VS Code Copilot PreToolUse must be a command hook")
+    (assert'
+      (
+        builtins.length copilotHooks.PreToolUse == 2
+        && builtins.length (entriesRunning copilotHooks.PreToolUse guardCommand) == 1
+        && builtins.length (entriesRunning copilotHooks.PreToolUse "harness-approval") == 1
+      )
+      "VS Code Copilot PreToolUse must hold exactly two hooks: safe-delete-guard and the Copilot harness-approval document"
+    )
+    (assert' (all (
+      entry: entry.type == "command"
+    ) copilotHooks.PreToolUse) "VS Code Copilot PreToolUse hooks must all be command hooks")
     (assert' (
       builtins.length copilotHooks.Stop == 1
     ) "VS Code Copilot must drive turn ends with exactly one Stop hook")
@@ -101,9 +140,14 @@ in
 
     # --- Cursor wiring ---
     (assert' (cursorVersion == 1) "Cursor hook definitions must use config version 1")
-    (assert' (
-      (builtins.head cursorHooks.beforeShellExecution).command == "harness-approval hook cursor"
-    ) "Cursor shell executions must ask harness-approval for the Cursor permission document")
+    (assert'
+      (
+        builtins.length cursorHooks.beforeShellExecution == 2
+        && builtins.length (entriesRunning cursorHooks.beforeShellExecution guardCommand) == 1
+        && builtins.length (entriesRunning cursorHooks.beforeShellExecution "harness-approval") == 1
+      )
+      "Cursor shell executions must hold exactly two hooks: safe-delete-guard and the Cursor harness-approval document"
+    )
     (assert' (
       (builtins.head cursorHooks.beforeMCPExecution).command == "harness-approval hook cursor"
     ) "Cursor MCP calls must ask harness-approval for the Cursor permission document")
