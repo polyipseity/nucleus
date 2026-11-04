@@ -160,7 +160,7 @@ if ($runPssa) {
     $excludedRules = [System.Collections.Generic.HashSet[string]]@($settingsTable.ExcludeRules)
     $allRules = @(Get-ScriptAnalyzerRule)
     if ($allRules.Count -eq 0) {
-      throw 'Get-ScriptAnalyzerRule returned no rules — PSScriptAnalyzer may not be installed correctly.'
+      throw 'Get-ScriptAnalyzerRule returned no rules: PSScriptAnalyzer may not be installed correctly.'
     }
     $enabledRuleNames = @($allRules | Where-Object {
         $_.RuleName -notin $excludedRules -and $_.Severity -in $enabledSeverities

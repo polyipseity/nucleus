@@ -20,7 +20,7 @@ Register-Step -Id "windows-pester" -Name "Windows Pester tests" -Platform window
   )
 
   if ($testFiles.Count -eq 0) {
-    Write-Message '0 Pester test files found — nothing to run.'
+    Write-Message '0 Pester test files found: nothing to run.'
     return $true
   }
 

@@ -268,6 +268,10 @@ Describe 'rclone-mount.ps1 minimal supervisor contract' {
     $loneLf | Should -Be 0
     $text = [System.Text.Encoding]::UTF8.GetString($bytes)
     $commandLines = @($text -split "`r`n")
+    # A merge of the stderr, argv or exit elements would leave the first two lines
+    # intact, so pin the length too: header, invocation echo, one echo per stderr
+    # line, the argv log and the exit code, plus the empty tail after the final CRLF.
+    $commandLines.Count | Should -Be 6
     $commandLines[0] | Should -Be '@echo off'
     $commandLines[1] | Should -Match '^echo === invocation>>"'
   }

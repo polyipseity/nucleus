@@ -115,6 +115,6 @@ Push, PR, and manual runs. POSIX: `nix run ./src#test`. Windows: `bootstrap.ps1`
 - [ ] `find tests/modules tests/integration tests/hosts -name '*.nix' -exec nix-instantiate --eval {} +`
 - [ ] `cd src && nix flake check`
 - [ ] `nix run ./src#check`
-- [ ] `pwsh -File scripts/check-pwsh.ps1 -OnlyStep PSSA`
-- [ ] `pwsh -File scripts/check-pwsh.ps1 -OnlyStep Syntax -Settings scripts/test-PSScriptAnalyzerSettings.psd1`
+- [ ] `pwsh -File src/scripts/checks/check-pwsh.ps1 -OnlyStep PSSA`
+- [ ] `pwsh -File src/scripts/checks/check-pwsh.ps1 -OnlyStep Syntax -Settings scripts/test-PSScriptAnalyzerSettings.psd1`
 - [ ] `pwsh -File scripts/test.ps1 --only-steps=nix-tests`

@@ -116,12 +116,12 @@ EOF
 }
 
 # --- activation naming policy: attrset regions (one awk pass) ---
-# A `<namespace> = { ... };` block yields entries through the shared awk program
-# now. These cases pin the record set the sed|paste|sed loop produced: which
-# lines the region covers, that the region closes on brace depth, and that no
-# block state carries from one file to the next. A record only reaches the output
-# as a violation report, so each fixture names its entries so that every captured
-# record has to be reported and every uncaptured one has to stay silent.
+# A `<namespace> = { ... };` block yields entries through the shared awk program.
+# These cases pin the record set it produces: which lines the region covers, that
+# the region closes on brace depth, and that no block state carries from one file
+# to the next. A record only reaches the output as a violation report, so each
+# fixture names its entries so that every captured record has to be reported and
+# every uncaptured one has to stay silent.
 
 test_step14_naming_region_scopes_attrset_block() {
   local _tmp _out _ret _count
@@ -180,9 +180,9 @@ EOF
   return 0
 }
 
-# The closing `};` ends the region, and the scan looks for the next block after it.
-# A region that never closes keeps the file in scope, so the between-blocks line
-# and the second block would both be reported.
+# The region ends when its brace depth returns to zero, so a nested attrset keeps
+# it open. A region that never closes keeps the file in scope, and the
+# between-blocks line and the second block would both be reported.
 test_step14_naming_region_ends_at_closing_brace() {
   local _tmp _out _ret _count
   _tmp=$(mktemp -d)
@@ -793,18 +793,18 @@ test_step14_config_method_reference_index_scan_count() {
   if [ "$_ret" -eq 0 ] || ! grep -qF "referenced but no '# check-suppress:config-method' comment found" "$_out"; then
     echo "FAIL: the unannotated configs must still be reported through the counting shim"
     cat "$_out"
-    rm -rf "$_tmp"
+    rm -rf "$_tmp" "$_shim"
     rm -f "$_out" "$_log"
     return 1
   fi
   if [ "$_count" -gt 3 ]; then
     echo "FAIL: expected at most three grep scans (annotation, basename, template index), got $_count"
     cat "$_log"
-    rm -rf "$_tmp"
+    rm -rf "$_tmp" "$_shim"
     rm -f "$_out" "$_log"
     return 1
   fi
-  rm -rf "$_tmp"
+  rm -rf "$_tmp" "$_shim"
   rm -f "$_out" "$_log"
   return 0
 }

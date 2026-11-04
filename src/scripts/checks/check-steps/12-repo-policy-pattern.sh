@@ -78,7 +78,9 @@ run_config_method_compliance() {
     esac
     _cfgs+=("$_rel")
     _bases+=("$_base")
-    if [ "$_base" = "${_base%%.*}" ]; then
+    # A templated form needs a dot past the first character, matching the twin's
+    # $dotIndex -gt 0: a dot-prefixed basename has an empty stem and none.
+    if [ -z "${_base%%.*}" ] || [ "$_base" = "${_base%%.*}" ]; then
       _tmpls+=("")
     else
       _tmpls+=("\${hostName}.${_base#*.}")

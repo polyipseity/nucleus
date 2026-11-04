@@ -105,8 +105,11 @@ _run_parallel_script_tests() {
     say "running $(basename "$_script")"
   done
 
-  # shellcheck disable=SC2016 # reason: $1-$4 are sh -c positional params, not shell expansion
-  printf '%s\0' "${_scripts[@]}" | xargs -0 -P "$PARALLEL_JOBS" -I{} sh -c '
+  # shellcheck disable=SC2016 # reason: $1-$4 are bash -c positional params, not shell expansion
+  # WHY bash rather than sh: the job sources step-runner.sh, a bash library
+  # (BASH_SOURCE, declare, local -n); where sh is dash the source dies with
+  # "Bad substitution" and the shared millisecond clock never loads.
+  printf '%s\0' "${_scripts[@]}" | xargs -0 -P "$PARALLEL_JOBS" -I{} bash -c '
     script="$1"
     capture_dir="$2"
     repo_root="$3"

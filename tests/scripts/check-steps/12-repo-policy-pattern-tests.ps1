@@ -252,7 +252,7 @@ try {
   #    reports it "not applicable (platform: windows)" on macOS and the whole-repo branch never runs.
   #    The child sets the variables check-lib.ps1 needs at dot-source time ($RepoRoot, $FrameworkDir,
   #    $CheckDir), stubs Register-Step to capture the action, dot-sources the step file, and invokes
-  #    the action itself: the same single-$Context call the runner makes at step-runner.ps1:593. It
+  #    the action itself: the same single-$Context call the runner makes. It
   #    clears NUCLEUS_REPO_ROOT so the step scans the fixture, not the live repo.
   #
   #    The fixture carries one clean offender plus a .git decoy and a vendor decoy under decoy/. Both
@@ -324,7 +324,7 @@ try {
   )
   $envrcNestedTight = Invoke-LoggingFormatPolicy -ScriptPath $envrcTightScript
   # WHY: this gates on the action's own failure banner, not on $Status. The runner turns the
-  # action's $false return value into exit 1 (step-runner.ps1:603-604), but this child script
+  # action's $false return value into exit 1, but this child script
   # discards that return value, so $LASTEXITCODE reads a native child's code and drifts to 0.
   if ($envrcNestedTight.Output -notmatch "envrc ban: '[^']*[/\\]sub[/\\]\.envrc' exists" -or $envrcNestedTight.Output -notlike '*repository policy (pattern-based) check failed*') {
     Assert-Fail 'step 12: a nested .envrc is reported with its nested path' $envrcNestedTight.Output.Trim()

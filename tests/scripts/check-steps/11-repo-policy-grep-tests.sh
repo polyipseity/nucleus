@@ -692,10 +692,11 @@ test_posix_mixed_family_scan_reports_each_shape() {
     '& cmd /c ver 2>$null')
   _sh=$(supp_fixture src/probe.sh "probe_cmd || true")
   _root=$(fixture_root "$_ps1")
+  _sh_root=$(fixture_root "$_sh")
   run_supp_scan "$_ps1" "$_sh"
   _ps1_lines=$(printf '%s\n' "$_out" | grep -c "$_ps1:[0-9][0-9]* (")
   _sh_lines=$(printf '%s\n' "$_out" | grep -c 'undoc_supp:')
-  rm -rf "$_root"
+  rm -rf "$_root" "$_sh_root"
   if [ "$_ps1_lines" -ne 4 ] || [ "$_sh_lines" -ne 1 ]; then
     fail "expected 4 PowerShell and 1 shell violation, got $_ps1_lines and $_sh_lines" "$_out"
     return 1
