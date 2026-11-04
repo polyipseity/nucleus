@@ -55,8 +55,9 @@ run_activation_tool_resolution() {
   # The android guest scripts run in a guest with no Nix store, so their `ip` can
   # take neither a store-path arg nor a PATH prepend.
   # ref: allow-and-deny-lists.instructions.md#A10 -- guest scripts have no Nix store to resolve against
-  # shellcheck disable=SC2155 # reason: basename's exit status is irrelevant; self-derived for exclusion
-  local _self_sh="$(basename "${BASH_SOURCE[0]}")"
+  # path_basename rather than basename: separator-agnostic and fork-free, matching the sibling sub-checks.
+  path_basename "${BASH_SOURCE[0]}"
+  local _self_sh="$REPLY"
   local _candidate_files=()
   local _f
 
@@ -70,8 +71,8 @@ run_activation_tool_resolution() {
       for _dir in "${_activation_dirs[@]}"; do
         case "$_f" in
         "$_dir"/*)
-          # shellcheck disable=SC2155 # reason: basename's exit status is irrelevant; exclusion check
-          case "$(basename "$_f")" in
+          path_basename "$_f"
+          case "$REPLY" in
           "$_self_sh" | android-fake-wifi-guest-*.sh) continue 2 ;;
           esac
           _candidate_files+=("$_f")
