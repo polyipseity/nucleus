@@ -31,7 +31,7 @@ Step 01 runs `treefmt` in place, so a pipeline can reformat files silently: run 
 
 Both runners schedule steps through a work queue capped at `PARALLEL_JOBS` (CPU count by default): a free slot launches the next pending step immediately, and a slot releases the moment its step finishes, so a slow step never holds back a later step that could start. The `[k/N] step ... started` lines are numbered by launch order.
 
-POSIX blocks on `wait -n -p` over the running wrapper pids. PowerShell keeps one `[PowerShell]::Create()` runspace per step driven with `BeginInvoke` and blocks on `WaitAny` over the runspace async handles. Not `RunspacePool` or `Start-Job`, because those are the constructs that make runspace state unpredictable for the steps.
+POSIX blocks on `wait -n -p` over the running wrapper pids. That `-p` flag needs bash 5.1, so bash 5.1 is the runner's floor. PowerShell keeps one `[PowerShell]::Create()` runspace per step driven with `BeginInvoke` and blocks on `WaitAny` over the runspace async handles. Not `RunspacePool` or `Start-Job`, because those are the constructs that make runspace state unpredictable for the steps.
 
 Under `--fail-fast` the first failure stops new launches; the queue drains the steps already in flight, then reports the failed set in launch order and exits 1. The queue changes only when steps launch: per-step output and timing files, the `=== [NN] name ===` headers, the `sum of steps` and `wall clock` lines, and the not-run states are unaffected.
 

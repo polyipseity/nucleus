@@ -679,10 +679,10 @@ function Invoke-StepPipeline {
   }
 
   if ($script:FAIL_FAST -and $failFastNumbers.Count -gt 0) {
-    # WHY ordered here: failures are recorded as runspaces complete, so the set
-    # carries no order. $spawnedNumbers holds every launched number in launch
-    # order and the failed set is a subset of it, so scanning it reports the
-    # failures in launch order whichever runspace failed first.
+    # WHY: failures are recorded as runspaces complete, so the set carries no
+    # order. $spawnedNumbers holds every launched number in launch order and the
+    # failed set is a subset of it, so scanning it reports the failures in launch
+    # order whichever runspace failed first.
     $orderedFailed = @()
     foreach ($n in $spawnedNumbers) {
       if ($failFastNumbers.Contains($n)) { $orderedFailed += $n }
