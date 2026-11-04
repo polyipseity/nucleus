@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Tests for src/scripts/completions/gen-completions.sh: --help contract, --check determinism,
-# idempotent regeneration, 13-command coverage, generated headers + zsh syntax,
+# idempotent regeneration, the suite not touching the tracked completions tree, 13-command
+# coverage, generated headers + zsh syntax,
 # update lockfile --list-* dynamic wiring, flag-extraction correctness pins, and
 # spec-word escaping of shell metacharacters in subcommand descriptions.
 #
@@ -35,6 +36,13 @@ _profile_ps1="src/scripts/shell/profile.ps1"
 # lockfile.
 _NUCLEUS_COMMANDS=(ai apply bootstrap check cloud config gc utils svc test update vm)
 
+# Marker for the no-touch assertion (case 15): plain mktemp, outside the tracked
+# tree, timestamped before anything in the suite can generate. The one-second
+# buffer keeps a same-second write from sharing the marker's timestamp and
+# escaping find -newer on a one-second-granularity filesystem.
+_tree_marker="$(mktemp)"
+sleep 1
+
 # 1. --help exits 0 and prints a usage: line.
 if _help_out="$(bash "$_gen_script" --help 2>&1)" && printf '%s\n' "$_help_out" | grep -q '^usage: '; then
   assert_pass "gen-completions: --help exits 0 and prints usage line"
@@ -42,22 +50,15 @@ else
   assert_fail "gen-completions: --help contract" "exit code or usage line missing"
 fi
 
-# 2. Regenerate the tree, then --check must exit 0.
-if bash "$_gen_script" >/dev/null 2>&1 && bash "$_gen_script" --check >/dev/null 2>&1; then
-  assert_pass "gen-completions: generate then --check exits 0"
-else
-  assert_fail "gen-completions: generate + --check" "non-zero exit"
-fi
-
-# 3. Idempotency: a second generate is byte-identical (git-free comparison).
-_tmp_snapshot="$(mktemp -d)"
+# 2. Idempotency via --check: it regenerates into a temp dir and exits 0 only
+#    when every generated file matches the tracked tree byte-for-byte, which is
+#    the same invocation check step 10 runs, and it never writes the real tree.
 _tmp_stub_repo="$(mktemp -d)"
-trap 'rm -rf "$_tmp_snapshot" "$_tmp_stub_repo"' EXIT
-cp -R "$_COMPLETIONS_DIR/." "$_tmp_snapshot/"
-if bash "$_gen_script" >/dev/null 2>&1 && diff -rq "$_tmp_snapshot" "$_COMPLETIONS_DIR" >/dev/null 2>&1; then
-  assert_pass "gen-completions: regeneration is idempotent"
+trap 'rm -rf "$_tree_marker" "$_tmp_stub_repo"' EXIT
+if bash "$_gen_script" --check >/dev/null 2>&1; then
+  assert_pass "gen-completions: regeneration via --check is byte-identical"
 else
-  assert_fail "gen-completions: idempotency" "files changed after regenerate"
+  assert_fail "gen-completions: idempotency via --check" "regenerated output differs from the tracked tree"
 fi
 
 # 4. Coverage: every command has a zsh completion file.
@@ -305,6 +306,16 @@ if [ -n "$_ps_utils_flags" ] && [ "$_ps_utils_flags" = "$_zsh_utils_flags" ]; th
   assert_pass "gen-completions: nucleus-utils flag set agrees across pwsh and zsh"
 else
   assert_fail "gen-completions: nucleus-utils pwsh/zsh flag parity" "pwsh-only: $(comm -23 <(printf '%s\n' "$_ps_utils_flags") <(printf '%s\n' "$_zsh_utils_flags") | tr '\n' ' ')|zsh-only: $(comm -13 <(printf '%s\n' "$_ps_utils_flags") <(printf '%s\n' "$_zsh_utils_flags") | tr '\n' ' ')"
+fi
+
+# 15. A test run must not touch the tracked completions tree at all. Content
+#     equality cannot see this: rewriting a file with identical bytes replaces
+#     its inode and mtime, so only metadata shows that the suite wrote there.
+_moved_files="$(find src/modules/completions -newer "$_tree_marker" -type f)"
+if [ -z "$_moved_files" ]; then
+  assert_pass "gen-completions: suite left the tracked completions tree untouched"
+else
+  assert_fail "gen-completions: tracked tree untouched" "files rewritten during the run: $_moved_files"
 fi
 
 finish_tests
