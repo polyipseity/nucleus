@@ -108,23 +108,40 @@ run_nix_flake_eval() {
 # check applies where both hold: the host's platform deploys the file (nix.enable
 # = false, which is macOS under Determinate Nix) and the running nix is the
 # Determinate flavor that consumes it. A host missing either is skipped rather
-# than judged.
+# than judged. A probe that fails for any other reason fails the check instead,
+# because a nix too broken to answer says nothing about applicability.
 run_nix_conf_key_check() {
   local -n ctx="$1"
   local _nc_repo_root="${ctx[REPO_ROOT]}"
   local _nc_host _nc_rel _nc_file
   _nc_host="$(resolve_nucleus_host)"
-  # WHY: both conditions are required. The file is deployed only where nix.enable =
-  # false, and only Determinate Nix consumes it: upstream Nix does not know settings
-  # the file declares (eval-cores, lazy-trees), so judging the keys under it would
-  # report a working file as broken. Asking for one of those settings tells the two
-  # flavors apart without parsing a version string.
-  if ! nucleus_flag_for_host "$_nc_host" darwin || ! nix config show lazy-trees >/dev/null 2>&1; then
+  _nc_rel="src/modules/configs/nix/$_nc_host.conf"
+  _nc_file="$_nc_repo_root/$_nc_rel"
+  # WHY: only macOS deploys the file, and the deployed path does not tell the
+  # flavors apart because the CI installer writes that path too. Upstream Nix does
+  # not know settings the file declares (eval-cores, lazy-trees), so judging the
+  # keys under it would report a working file as broken; asking for one of those
+  # settings tells the two flavors apart without parsing a version string.
+  if ! nucleus_flag_for_host "$_nc_host" darwin; then
     say "no managed nix config judged on $_nc_host: keys are judged only under the Determinate Nix that consumes the file"
     return 0
   fi
-  _nc_rel="src/modules/configs/nix/$_nc_host.conf"
-  _nc_file="$_nc_repo_root/$_nc_rel"
+  local _nc_probe_err _nc_upstream=false
+  if ! _nc_probe_err="$(nix config show lazy-trees 2>&1 >/dev/null)"; then
+    case "$_nc_probe_err" in
+    *"could not find setting"*lazy-trees* | *"unknown setting"*lazy-trees*) _nc_upstream=true ;;
+    esac
+    # WHY: an upstream nix answers with a complaint naming the probe, which is the
+    # flavor this file was not written for. Any other failure means nix could not
+    # answer at all, so skipping here would switch the check off exactly where the
+    # daemon's settings are in doubt.
+    if ! $_nc_upstream; then
+      error "$_nc_rel: nix could not report whether it knows the managed settings: [$_nc_probe_err]"
+      return 1
+    fi
+    say "no managed nix config judged on $_nc_host: keys are judged only under the Determinate Nix that consumes the file, and this nix reports: $_nc_probe_err"
+    return 0
+  fi
   local -a _nc_keys=()
   local _nc_line _nc_trim _nc_key _nc_err _nc_name _nc_declared _nc_setting
   local _nc_unknown=0

@@ -40,13 +40,18 @@ SHIM_DIR="$(mktemp -d)"
 readonly HOST REAL_NIX SHIM_DIR
 
 # The shim is the `nix` a flavor-pinned case runs. It answers the Determinate probe
-# from SHIM_PROBE_RC, records every call, and delegates everything else to the real
+# from SHIM_FLAVOR, records every call, and delegates everything else to the real
 # nix, so a parse still runs the real parser and a case can prove whether one ran.
 cat >"$SHIM_DIR/nix" <<'SHIM'
 #!/bin/sh
 printf '%s\n' "$*" >>"${SHIM_LOG:?}"
 if [ "$*" = "config show lazy-trees" ]; then
-  exit "${SHIM_PROBE_RC:?}"
+  case "${SHIM_FLAVOR:?}" in
+  0) exit 0 ;;
+  1) printf "error: could not find setting 'lazy-trees'\n" >&2; exit 1 ;;
+  2) printf "error: opening lock file '/nix/var/nix/db/big-lock': Permission denied\n" >&2; exit 1 ;;
+  *) printf 'shim: unknown flavor %s\n' "$SHIM_FLAVOR" >&2; exit 99 ;;
+  esac
 fi
 exec "${REAL_NIX:?}" "$@"
 SHIM
@@ -54,11 +59,12 @@ chmod +x "$SHIM_DIR/nix"
 
 # run_subcheck <host> <fixture-repo> <out-file> <flavor> [nix-user-conf]: invoke the
 # sub-check the way the runner does and print the exit status. The host is pinned
-# through NUCLEUS_HOST. The flavor pins what the nix on PATH reports for the
-# Determinate probe: 0 for the flavor that consumes the file, a non-zero status for
-# upstream Nix, and an empty value for the real nix. The optional user config
-# supplies a setting warning that comes from a config source other than the managed
-# file, which is how the CI runner's own nix.conf behaves.
+# through NUCLEUS_HOST. The flavor pins what the nix on PATH answers for the
+# Determinate probe: 0 for the flavor that consumes the file, 1 for upstream Nix
+# (the not-a-setting answer), 2 for a nix that cannot answer, and an empty value for
+# the real nix. The optional user config supplies a setting warning that comes from
+# a config source other than the managed file, which is how the CI runner's own
+# nix.conf behaves.
 run_subcheck() { # <host> <fixture-repo> <out-file> <flavor> [user-conf]
   local host="$1" fixture="$2" out_file="$3" flavor="$4" user_conf="${5:-}" rc=0
   (
@@ -66,7 +72,7 @@ run_subcheck() { # <host> <fixture-repo> <out-file> <flavor> [user-conf]
       export NIX_USER_CONF_FILES="$user_conf"
     fi
     if [ -n "$flavor" ]; then
-      export PATH="$SHIM_DIR:$PATH" SHIM_PROBE_RC="$flavor" SHIM_LOG="$fixture/nix-calls.log" REAL_NIX
+      export PATH="$SHIM_DIR:$PATH" SHIM_FLAVOR="$flavor" SHIM_LOG="$fixture/nix-calls.log" REAL_NIX
     fi
     NO_COLOR=1 NUCLEUS_HOST="$host" NUCLEUS_REPO_ROOT="$REPO_ROOT" bash -c '
       set -euo pipefail
@@ -132,18 +138,23 @@ test_live_config_matches_the_host_that_deploys_it() {
 }
 
 test_host_that_deploys_no_config_skips_without_reading_one() {
-  local out rc=0
+  local out rc=0 calls=""
   make_fixture
-  # The real nix, whatever its flavor: the host guard alone must skip, and the
+  # The consuming flavor is pinned, so the host clause alone must skip; without the
+  # pin an upstream runner would skip in the flavor clause and leave the host clause
+  # untested. An empty call log proves the check returned before probing, and the
   # fixture holds no config, so a read would fail with "managed nix config not
-  # found". rc=0 with the skip message is what proves the check returned before
-  # touching a file.
-  rc="$(run_subcheck NixOS "$FIXTURE_REPO" "$FIXTURE_REPO/out.txt" "")"
+  # found" as well.
+  rc="$(run_subcheck NixOS "$FIXTURE_REPO" "$FIXTURE_REPO/out.txt" 0)"
   out="$(cat "$FIXTURE_REPO/out.txt")"
-  if [ "$rc" -eq 0 ] && contains "$out" "no managed nix config judged on NixOS" && ! contains "$out" "not found"; then
-    assert_pass "a host that deploys no managed config skips without reading one"
+  if [ -f "$FIXTURE_REPO/nix-calls.log" ]; then
+    calls="$(cat "$FIXTURE_REPO/nix-calls.log")"
+  fi
+  if [ "$rc" -eq 0 ] && contains "$out" "no managed nix config judged on NixOS" &&
+    [ -z "$calls" ] && ! contains "$out" "not found"; then
+    assert_pass "a host that deploys no managed config skips without probing or reading"
   else
-    assert_fail "a host that deploys no managed config skips without reading one" "rc=$rc output=[$out]"
+    assert_fail "a host that deploys no managed config skips without probing or reading" "rc=$rc calls=[$calls] output=[$out]"
   fi
   rm -rf "$FIXTURE_REPO"
 }
@@ -164,10 +175,32 @@ test_darwin_host_under_upstream_nix_skips() {
     calls="$(cat "$FIXTURE_REPO/nix-calls.log")"
   fi
   if [ "$rc" -eq 0 ] && contains "$out" "no managed nix config judged on MacBook" &&
-    ! contains "$out" "passed (" && [ "$calls" = "config show lazy-trees" ]; then
-    assert_pass "a darwin host under upstream nix skips without parsing the file"
+    contains "$out" "could not find setting" && ! contains "$out" "passed (" &&
+    [ "$calls" = "config show lazy-trees" ]; then
+    assert_pass "a darwin host under upstream nix skips, naming the probe answer"
   else
-    assert_fail "a darwin host under upstream nix skips without parsing the file" "rc=$rc calls=[$calls] output=[$out]"
+    assert_fail "a darwin host under upstream nix skips, naming the probe answer" "rc=$rc calls=[$calls] output=[$out]"
+  fi
+  rm -rf "$FIXTURE_REPO"
+}
+
+test_probe_that_cannot_answer_fails_the_check() {
+  local out calls="" rc=0
+  make_fixture
+  # A nix that fails the probe for a reason other than not knowing the setting is
+  # broken, not inapplicable: the check must fail with that stderr rather than switch
+  # itself off. The fixture holds no config, so a parse would fail too, and the call
+  # log proves none ran.
+  rc="$(run_subcheck MacBook "$FIXTURE_REPO" "$FIXTURE_REPO/out.txt" 2)"
+  out="$(cat "$FIXTURE_REPO/out.txt")"
+  if [ -f "$FIXTURE_REPO/nix-calls.log" ]; then
+    calls="$(cat "$FIXTURE_REPO/nix-calls.log")"
+  fi
+  if [ "$rc" -eq 1 ] && contains "$out" "$CONF_REL" && contains "$out" "Permission denied" &&
+    [ "$calls" = "config show lazy-trees" ]; then
+    assert_pass "a probe that cannot answer fails the check with its stderr"
+  else
+    assert_fail "a probe that cannot answer fails the check with its stderr" "rc=$rc calls=[$calls] output=[$out]"
   fi
   rm -rf "$FIXTURE_REPO"
 }
@@ -300,10 +333,11 @@ test_warning_from_another_config_source_is_not_a_file_defect() {
   rm -rf "$FIXTURE_REPO"
 }
 
-section 1 "the managed config is judged only under the nix flavor that consumes it"
+section 1 "the managed config is judged only under a consuming nix that can answer"
 test_live_config_matches_the_host_that_deploys_it
 test_host_that_deploys_no_config_skips_without_reading_one
 test_darwin_host_under_upstream_nix_skips
+test_probe_that_cannot_answer_fails_the_check
 
 section 2 "an unknown setting the file declares fails and is named"
 test_unknown_key_fails_and_is_named
