@@ -115,7 +115,7 @@ run_nix_conf_key_check() {
   local _nc_repo_root="${ctx[REPO_ROOT]}"
   local _nc_host _nc_rel _nc_file
   _nc_host="$(resolve_nucleus_host)"
-  _nc_rel="src/modules/configs/nix/$_nc_host.conf"
+  _nc_rel="src/modules/configs/nix/nix.custom.$_nc_host.conf"
   _nc_file="$_nc_repo_root/$_nc_rel"
   # WHY: only macOS deploys the file, and the deployed path does not tell the
   # flavors apart because the CI installer writes that path too. Upstream Nix does

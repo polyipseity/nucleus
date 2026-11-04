@@ -19,7 +19,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../test-lib.sh"
 
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../../.." && pwd)"
-CONF_REL="src/modules/configs/nix/MacBook.conf"
+CONF_REL="src/modules/configs/nix/nix.custom.MacBook.conf"
 readonly REPO_ROOT CONF_REL
 
 require_command nix "the managed config key check needs the real nix as its oracle"
