@@ -234,9 +234,8 @@ run_activation_naming_policy() {
       true # check-suppress:suppression_doc: grep exits 1 when no dotted definitions are found; an empty result file is the clean state
 
     # Attrset definitions: `<ns> = { <name> = ...; }` regions, in one pass for
-    # the whole list. The sed|paste|sed loop this replaces forked three children
-    # per file and took 0.30 s of this rule's 0.45 s here; the region and entry
-    # rules now live in the shared program.
+    # the whole list rather than a child chain per file; the region and entry
+    # rules live in the shared program.
     local _awk_path="$_AWK_PATH"
     # Nothing in this call chain enables errexit, so an unguarded failure would
     # fall through to the pass message.
@@ -493,16 +492,20 @@ run_log_capture_pair_policy() {
     if [ -f "$_f" ]; then _lcp_scan+=("$_f"); fi
   done
 
-  # One pass for the whole list. The grep version spawned up to nine children
-  # per file, which was 9.1 s of the 12.6 s step here; the mode carries both the
-  # messages and their per-file report order, so the output is unchanged.
+  # One awk pass for the whole list rather than a child chain per file; the mode
+  # carries both the messages and their per-file report order, so the output is
+  # unchanged.
   if [ "${#_lcp_scan[@]}" -gt 0 ]; then
     local _awk_path="$_AWK_PATH"
-    local _violation
+    local _violations _violation
+    # Nothing in this call chain enables errexit, and a process-substitution
+    # reader never sees the scanner's status, so the scan is captured first.
+    _violations=$(awk -v mode=log-capture -f "$_awk_path" "${_lcp_scan[@]}") || return 1
     while IFS= read -r _violation; do
+      [ -z "$_violation" ] && continue
       _lcp_errors=$((_lcp_errors + 1))
       error "$_violation"
-    done < <(awk -v mode=log-capture -f "$_awk_path" "${_lcp_scan[@]}")
+    done <<<"$_violations"
   fi
 
   if [ "$_lcp_errors" -gt 0 ]; then

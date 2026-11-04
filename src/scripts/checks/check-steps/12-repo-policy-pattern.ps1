@@ -404,6 +404,10 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   }
 
   $lcpDiscardPattern = '(StandardOutPath|StandardErrorPath|StandardOutput|StandardError)\s*=\s*"/dev/null"'
+  # WHY per-file select/read instead of one batched pass, as the .sh twin does
+  # with a single awk program: the batching was not ported to this twin, so this
+  # rule pays two Select-String calls and one Get-Content per file and the step
+  # runs slower here than on POSIX. A known asymmetry, not an oversight.
   foreach ($f in $lcpFiles) {
     # Exclude this check's own twins: their source contains the literal pattern text.
     if ((Split-Path -Leaf $f) -in ($allStepLeaves + $allStepShLeaves)) { continue }  # WHY: $f is a string from Select-GitIgnored, not a FileInfo object

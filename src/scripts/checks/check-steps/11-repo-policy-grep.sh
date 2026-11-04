@@ -420,10 +420,11 @@ run_suppression_audit() {
     _ps1_files+=("$_ps1_iter")
   done
 
-  # One awk process over every file. The previous shape spawned bash, grep, sed
-  # and awk once per file, which dominated this step's runtime; a single program
-  # now applies the pattern table and the annotation audit line by line. Each
-  # half keeps the message it printed before, so CI output does not shift.
+  # One awk process over every file, applying the pattern table and the
+  # annotation audit line by line instead of spawning a child chain per file.
+  # Message text is unchanged, but the whole violation set is sorted and
+  # deduplicated as one list, so the shell and PowerShell halves can interleave
+  # differently and exact duplicate lines collapse.
   local _scan_files=("${_files[@]}" "${_ps1_files[@]}")
   if [ "${#_scan_files[@]}" -gt 0 ]; then
     local _awk_program
@@ -508,12 +509,17 @@ FNR == 1 {
 }
 AWKEOF
 
-    local _violations
-    _violations=$(
+    local _scan_output _violations
+    # Nothing in this call chain enables errexit, and a pipeline carries the
+    # status of its last command, so the scan is checked before the sort.
+    if ! _scan_output=$(
       printf '%s\0' "${_scan_files[@]}" |
-        xargs -0 awk -v ROOT="${ctx[REPO_ROOT]}" "$_awk_program" |
-        LC_ALL=C sort -u
-    )
+        xargs -0 awk -v ROOT="${ctx[REPO_ROOT]}" "$_awk_program"
+    ); then
+      error "suppression audit scan failed"
+      return 1
+    fi
+    _violations=$(printf '%s\n' "$_scan_output" | LC_ALL=C sort -u)
     while IFS= read -r _err; do
       [ -z "$_err" ] && continue
       _errors=$((_errors + 1))

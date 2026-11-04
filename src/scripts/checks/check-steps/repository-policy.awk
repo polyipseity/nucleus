@@ -83,8 +83,10 @@ BEGIN {
 }
 
 # Count one character in a line. Braces inside strings count, because the .ps1
-# twin tallies them per line rather than parsing: both twins have to read one
-# tree into one record set.
+# twin tallies them per line rather than parsing, so both twins read one tree
+# into one record set. The tally has one divergence: the twin skips comment
+# lines before tallying and this does not, so a brace inside a comment moves the
+# depth and the region can close on the wrong line.
 function count_char(text, ch,   i, count) {
   count = 0
   for (i = 1; i <= length(text); i++)
