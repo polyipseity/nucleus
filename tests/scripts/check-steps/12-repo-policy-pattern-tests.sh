@@ -534,8 +534,285 @@ test_step14_config_method_window_is_10_lines() {
   return 0
 }
 
+# ---------------------------------------------------------------------------
+# Log capture pair policy: one pass, exact messages
+#
+# The rule reads four stream positions per file (launchd out/err, systemd
+# out/err) and two discard shapes, then reports them in a fixed order. These
+# cases drive the real function over the fixture units and pin the whole
+# message, line content included, so a pass that changed the text, dropped a
+# stream position, or leaked flags across files fails them. Expected line
+# content is read back out of the fixture, because this suite is itself scanned
+# by the step and must not carry a literal capture directive.
+# ---------------------------------------------------------------------------
+
+# Copy a fixture set into a fresh directory and run the rule over the copies.
+# $1: output file to fill; $2: directory for the copies; rest: fixture names.
+capture_scan() {
+  local _cs_out="$1" _cs_dir="$2"
+  shift 2
+  local _cs_copies=()
+  local _cs_name
+  for _cs_name in "$@"; do
+    cp "$CAPTURE_FIXTURE_DIR/$_cs_name" "$_cs_dir/$_cs_name"
+    _cs_copies+=("$_cs_dir/$_cs_name")
+  done
+  run_log_capture_pair_policy true "$_cs_dir" "${_cs_copies[@]}" >"$_cs_out" 2>&1
+}
+
+# Exact text present in the captured output. The runner prefix is the only part
+# left out, because the runner owns it.
+capture_reports() {
+  grep -qF -- "$1" "$2"
+}
+
+# All four stream positions accepted in one call. A pass that reports a pair, or
+# that treats 1>>/2>> as a merged redirection, fails here.
+test_step14_capture_pair_all_stream_positions_pass() {
+  local _tmp _out _ret
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  capture_scan "$_out" "$_tmp" clean.nix clean.ps1 systemd-pair.nix
+  _ret=$?
+  if [ "$_ret" -ne 0 ] || capture_reports "log capture pair:" "$_out"; then
+    echo "FAIL: a launchd pair, a systemd pair and a 1>>/2>> wrapper must pass"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  if ! capture_reports "log capture pair policy passed." "$_out"; then
+    echo "FAIL: the passing run did not report the policy as passed"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+# Both /dev/null directives are reported, with their file, line and line text.
+# The count is what shows the second stream is not lost after the first hit.
+test_step14_capture_pair_discard_message_is_exact() {
+  local _tmp _out _ret _probe _line_out _line_err _count
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  capture_scan "$_out" "$_tmp" violations.nix
+  _ret=$?
+  _probe="$_tmp/violations.nix"
+  _line_out=$(sed -n '5p' "$CAPTURE_FIXTURE_DIR/violations.nix")
+  _line_err=$(sed -n '6p' "$CAPTURE_FIXTURE_DIR/violations.nix")
+  _count=$(grep -cF 'discards a stream to /dev/null' "$_out")
+  if [ "$_ret" -eq 0 ] || [ "$_count" -ne 2 ]; then
+    echo "FAIL: expected two discard reports, got $_count"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  if ! capture_reports "log capture pair: '$_probe:5:$_line_out' discards a stream to /dev/null; capture stdout.log and stderr.log instead (output-handling.instructions.md)" "$_out" ||
+    ! capture_reports "log capture pair: '$_probe:6:$_line_err' discards a stream to /dev/null; capture stdout.log and stderr.log instead (output-handling.instructions.md)" "$_out"; then
+    echo "FAIL: the discard report does not carry the file, line and line text"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+# The merged-stream report, exact, and exactly once.
+test_step14_capture_pair_merged_message_is_exact() {
+  local _tmp _out _ret _probe _line _count
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  capture_scan "$_out" "$_tmp" violations.ps1
+  _ret=$?
+  _probe="$_tmp/violations.ps1"
+  _line=$(sed -n '2p' "$CAPTURE_FIXTURE_DIR/violations.ps1")
+  _count=$(grep -cF 'merges stdout and stderr' "$_out")
+  if [ "$_ret" -eq 0 ] || [ "$_count" -ne 1 ]; then
+    echo "FAIL: expected one merged-stream report, got $_count"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  if ! capture_reports "log capture pair: '$_probe:2:$_line' merges stdout and stderr; use 1>> and 2>> into stdout.log and stderr.log" "$_out"; then
+    echo "FAIL: the merged-stream report does not carry the file, line and line text"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+# A launchd file capturing the error stream only. The message names the file and
+# the directive family, and it is emitted once.
+test_step14_capture_pair_lone_launchd_message_is_exact() {
+  local _tmp _out _ret _probe
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  capture_scan "$_out" "$_tmp" lone.nix
+  _ret=$?
+  _probe="$_tmp/lone.nix"
+  if [ "$_ret" -eq 0 ]; then
+    echo "FAIL: a launchd file capturing one stream must fail the policy"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  if ! capture_reports "log capture pair: '$_probe' declares only one of StandardOutPath/StandardErrorPath; declare both or neither" "$_out"; then
+    echo "FAIL: the launchd lone-stream report is not exact"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+# The systemd family has its own wording. A pass that reported the launchd text
+# for a systemd directive fails on the first assertion, one that dropped the
+# systemd presence flags fails on the return code.
+test_step14_capture_pair_lone_systemd_message_is_exact() {
+  local _tmp _out _ret _probe
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  capture_scan "$_out" "$_tmp" systemd-lone.nix
+  _ret=$?
+  _probe="$_tmp/systemd-lone.nix"
+  if [ "$_ret" -eq 0 ]; then
+    echo "FAIL: a systemd file capturing one stream must fail the policy"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  if ! capture_reports "log capture pair: '$_probe' declares only one of StandardOutput/StandardError; declare both or neither" "$_out"; then
+    echo "FAIL: the systemd lone-stream report is not exact"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  if capture_reports "StandardOutPath/StandardErrorPath" "$_out"; then
+    echo "FAIL: a systemd directive was reported with the launchd wording"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+# Flags are per file. One file captures the error stream only and the next
+# captures the stdout stream only; a pass that carries the first file's flags
+# into the second sees a pair and reports nothing for it.
+test_step14_capture_pair_state_does_not_cross_files() {
+  local _tmp _out _ret _first _second _count
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  capture_scan "$_out" "$_tmp" lone.nix violations-lone.nix
+  _ret=$?
+  _first="$_tmp/lone.nix"
+  _second="$_tmp/violations-lone.nix"
+  _count=$(grep -cF 'declares only one of StandardOutPath/StandardErrorPath' "$_out")
+  if [ "$_ret" -eq 0 ] || [ "$_count" -ne 2 ]; then
+    echo "FAIL: expected both lone-stream files reported, got $_count"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  if ! capture_reports "log capture pair: '$_first' declares only one" "$_out" ||
+    ! capture_reports "log capture pair: '$_second' declares only one" "$_out"; then
+    echo "FAIL: a lone-stream file was not reported under its own path"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+# Report order is per file and per rule, not line order: every discard report
+# comes before every merged report, so a merged redirection above a discard is
+# still reported second. This is the order the per-rule greps produced.
+test_step14_capture_pair_reports_discard_before_merged() {
+  local _tmp _out _ret _discard_at _merged_at
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  capture_scan "$_out" "$_tmp" merged-above-discard.nix
+  _ret=$?
+  _discard_at=$(grep -nF 'discards a stream to /dev/null' "$_out" | head -1 | cut -d: -f1)
+  _merged_at=$(grep -nF 'merges stdout and stderr' "$_out" | head -1 | cut -d: -f1)
+  if [ "$_ret" -eq 0 ] || [ -z "$_discard_at" ] || [ -z "$_merged_at" ]; then
+    echo "FAIL: the ordering fixture must report both a discard and a merge"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  if [ "$_discard_at" -ge "$_merged_at" ]; then
+    echo "FAIL: the merged report came before the discard report"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+# Per-file accumulation does not carry into the next file: two violating files in
+# one call report each hit once, not the first file's hits twice. A pass whose
+# hit arrays are never cleared fails the first count.
+test_step14_capture_pair_counts_reset_per_file() {
+  local _tmp _out _ret _discards _merges
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  capture_scan "$_out" "$_tmp" violations.nix violations.ps1
+  _ret=$?
+  _discards=$(grep -cF 'discards a stream to /dev/null' "$_out")
+  _merges=$(grep -cF 'merges stdout and stderr' "$_out")
+  if [ "$_ret" -eq 0 ] || [ "$_discards" -ne 2 ] || [ "$_merges" -ne 1 ]; then
+    echo "FAIL: expected 2 discards and 1 merge, got $_discards and $_merges"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
 failures=0
 for test in \
+  test_step14_capture_pair_all_stream_positions_pass \
+  test_step14_capture_pair_discard_message_is_exact \
+  test_step14_capture_pair_merged_message_is_exact \
+  test_step14_capture_pair_lone_launchd_message_is_exact \
+  test_step14_capture_pair_lone_systemd_message_is_exact \
+  test_step14_capture_pair_state_does_not_cross_files \
+  test_step14_capture_pair_reports_discard_before_merged \
+  test_step14_capture_pair_counts_reset_per_file \
   test_step14_removed_skip_constructs_detection \
   test_step14_config_method_unannotated_reference_fails \
   test_step14_config_method_same_line_annotation_passes \

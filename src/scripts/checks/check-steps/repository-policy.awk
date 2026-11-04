@@ -17,6 +17,54 @@
 # contract, and this file plus the two gate steps carry the pattern list, so all
 # of them are excluded here.
 # The word "skip" in prose stays legal; only the named constructs match.
+#
+# Log-capture mode (-v mode=log-capture): one pass over the service definition
+# files, enforcing the stdout.log/stderr.log pair
+# (output-handling.instructions.md): a capture directive that sends a stream to
+# /dev/null, a merged-stream redirection, and a file that captures one stream of
+# a directive family but not the other, for launchd and systemd separately.
+
+# Report one file's log-capture findings, in the order the per-rule greps
+# produced them: discards, then merges, then the two presence checks. Order is
+# part of the contract, so a merged redirection on an earlier line than a
+# discard is still reported second.
+function report_capture_pair(   i) {
+  for (i = 1; i <= _cap_discards; i++)
+    printf "log capture pair: '%s' discards a stream to /dev/null; capture stdout.log and stderr.log instead (output-handling.instructions.md)\n", _cap_discard[i]
+  for (i = 1; i <= _cap_merges; i++)
+    printf "log capture pair: '%s' merges stdout and stderr; use 1>> and 2>> into stdout.log and stderr.log\n", _cap_merge[i]
+  if (_cap_launchd_out != _cap_launchd_err)
+    printf "log capture pair: '%s' declares only one of StandardOutPath/StandardErrorPath; declare both or neither\n", _cap_file
+  if (_cap_systemd_out != _cap_systemd_err)
+    printf "log capture pair: '%s' declares only one of StandardOutput/StandardError; declare both or neither\n", _cap_file
+}
+
+# Per-file state, reset at every file: a path with several services is normal,
+# so only the lone-stream case is a violation. The two families are tracked
+# apart because launchd and systemd spell the same intent differently.
+mode == "log-capture" && FNR == 1 {
+  if (_cap_file != "") report_capture_pair()
+  _cap_file = FILENAME
+  _cap_discards = 0
+  _cap_merges = 0
+  _cap_launchd_out = 0
+  _cap_launchd_err = 0
+  _cap_systemd_out = 0
+  _cap_systemd_err = 0
+}
+mode == "log-capture" {
+  if ($0 ~ /(StandardOutPath|StandardErrorPath|StandardOutput|StandardError)[[:space:]]*=[[:space:]]*"\/dev\/null"/)
+    _cap_discard[++_cap_discards] = FILENAME ":" FNR ":" $0
+  if (index($0, "*>>"))
+    _cap_merge[++_cap_merges] = FILENAME ":" FNR ":" $0
+  if (index($0, "StandardOutPath")) _cap_launchd_out = 1
+  if (index($0, "StandardErrorPath")) _cap_launchd_err = 1
+  if ($0 ~ /StandardOutput[[:space:]]*=/) _cap_systemd_out = 1
+  if ($0 ~ /StandardError[[:space:]]*=/) _cap_systemd_err = 1
+}
+END {
+  if (mode == "log-capture" && _cap_file != "") report_capture_pair()
+}
 
 mode == "" && FNR == 1 { in_heredoc = 0 }
 mode == "" && !in_heredoc && match($0, /<<-?[ \t]*["\047\\]?[A-Za-z_][A-Za-z0-9_]*/) {
