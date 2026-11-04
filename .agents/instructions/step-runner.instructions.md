@@ -35,6 +35,8 @@ POSIX blocks on `wait -n -p` over the running wrapper pids. That `-p` flag needs
 
 Under `--fail-fast` the first failure stops new launches; the queue drains the steps already in flight, then reports the failed set in launch order and exits 1. The queue changes only when steps launch: per-step output and timing files, the `=== [NN] name ===` headers, the `sum of steps` and `wall clock` lines, and the not-run states are unaffected.
 
+A PowerShell runspace that throws is recorded against its step: the runner writes exit code 1 and the exception into that step's replay file, so the summary reports the step as failed with the reason and the pipeline never reports it as finished. On the `--fail-fast` abort the same failure prints one message before the exit, since that path leaves no summary.
+
 ## Step 7 `$schema` enforcement
 
 Nucleus-owned JSON and YAML requires an inline `$schema` pointing at a co-located schema file. External formats use their published `$schema` when one exists and never a hand-rolled one. The exception list is the A8 row in `allow-and-deny-lists.instructions.md`; a missing, non-string, or dangling `$schema` is a per-file error, and the step fails if any file errored. POSIX and Windows behave identically.

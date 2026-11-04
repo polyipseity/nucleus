@@ -608,6 +608,62 @@ Invoke-StepPipeline
     }
 }
 
+# A runspace that throws cannot be provoked from step content: the step block runs
+# inside the runspace's own try/catch, so only a failure outside it (a broken
+# runspace, a full temp filesystem) escapes to EndInvoke. This test builds that
+# escape with the same API the pipeline uses, feeds the error EndInvoke raises to
+# the runner's recording function, and checks the summary reports a failure with
+# the reason instead of a green run. Format-StepSummary exits, so the child
+# process carries the exit code and output.
+function Test-RunspaceFailureReportsStepAsFailed {
+    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-runspace-failure-$([System.IO.Path]::GetRandomFileName())"
+    $null = New-Item -ItemType Directory -Path $tempDir -Force
+    $driver = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-runspace-$([System.IO.Path]::GetRandomFileName()).ps1"
+    $driverText = @'
+param([string]$RepoRoot, [string]$TempDir)
+Set-Location $RepoRoot
+$FrameworkDir = Join-Path $RepoRoot 'src/scripts/lib'
+. (Join-Path $FrameworkDir 'step-runner.ps1')
+function Write-Message { Write-Output "msg: $args" }
+function Write-ErrorMessage { Write-Output "err: $args" }
+Read-Argument -Arguments @()
+$script:FAIL_FAST = $false
+$script:WaveTmpDir = $TempDir
+Register-Step -Id 'broken' -Number 1 -Name 'Broken step' -Action { $true }
+$iss = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
+$ps = [System.Management.Automation.PowerShell]::Create($iss)
+$null = $ps.AddScript({ throw 'RUNSPACE-BOOM' })
+$handle = $ps.BeginInvoke()
+try {
+  $null = $ps.EndInvoke($handle)
+  $reason = 'EndInvoke did not throw; the test premise is broken'
+} catch {
+  $reason = "$_"
+} finally {
+  $ps.Dispose()
+}
+Write-StepRunspaceFailure -Number 1 -Reason $reason
+Format-StepSummary
+'@
+    Set-Content -LiteralPath $driver -Value $driverText -Encoding utf8
+    try {
+        $pwshExe = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
+        $out = & $pwshExe -NoLogo -NoProfile -NonInteractive -File $driver -RepoRoot $repoRoot -TempDir $tempDir 2>&1 | Out-String
+        $code = $LASTEXITCODE
+        $reported = $out -match 'step runspace failed: ' -and $out -match 'RUNSPACE-BOOM'
+        $failed = $out -match 'some checks failed: steps 1'
+        $green = $out -match 'all checks passed'
+        if ($code -eq 1 -and $reported -and $failed -and -not $green) {
+            Assert-Pass "a runspace that throws is reported as a failed step with its reason"
+        } else {
+            Assert-Fail "runspace failure report" "exit=$code reported=$reported failed=$failed green=$green output=[$out]"
+        }
+    } finally {
+        Remove-Item -LiteralPath $driver -Force
+        Remove-Item -LiteralPath $tempDir -Recurse -Force
+    }
+}
+
 # ---- Run tests ----
 Write-Output "`n=== Step-runner framework unit tests (PS1) ==="
 Write-Output "Registration arity, token validation, applicability matrix, --only-steps."
@@ -641,6 +697,7 @@ Test-OnlySteps-LastValueWin
 Test-OnlySteps-UnknownIdError
 Test-FailFastReport-ReplaysFailedStep
 Test-PipelineFailFastReportsLaunchOrder
+Test-RunspaceFailureReportsStepAsFailed
 
 function Test-SaveFileListCache-NoPathBeyondSymlink {
     . $stepRunner

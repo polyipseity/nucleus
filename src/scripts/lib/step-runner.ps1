@@ -510,6 +510,7 @@ function Invoke-StepPipeline {
   $stopLaunching = $false
   $infrastructureFailed = $false
   $failFastNumbers = [System.Collections.Generic.HashSet[int]]::new()
+  $runspaceFailedNumbers = [System.Collections.Generic.HashSet[int]]::new()
   $active = [System.Collections.Generic.List[hashtable]]::new()
 
   while ($true) {
@@ -655,6 +656,8 @@ function Invoke-StepPipeline {
         $null = $rs.PowerShell.EndInvoke($rs.AsyncResult)  # check-suppress:suppression_doc: EndInvoke returns runspace output; already redirected to step out-file
       } catch {
         $infrastructureFailed = $true
+        $null = $runspaceFailedNumbers.Add($rs.Number)  # check-suppress:suppression_doc: HashSet.Add returns bool; membership is the only effect needed
+        Write-StepRunspaceFailure -Number $rs.Number -Reason "$_"
         if ($script:FAIL_FAST) { $stopLaunching = $true }
       } finally {
         $rs.PowerShell.Dispose()
@@ -672,8 +675,8 @@ function Invoke-StepPipeline {
   }
 
   if ($script:FAIL_FAST -and $infrastructureFailed) {
-    # A runspace that threw has no per-step exit file to replay; report the
-    # infrastructure failure rather than exiting silently.
+    # Report the runspace failure on the abort path, which exits before
+    # Format-StepSummary renders the step it was recorded against.
     Write-ErrorMessage "step runspace failed (fail-fast)"
     exit 1
   }
@@ -695,6 +698,9 @@ function Invoke-StepPipeline {
   "$($pipelineStart.ElapsedMilliseconds)" | Out-File -FilePath (Join-Path $script:WaveTmpDir 'pipeline.wall_ms') -Encoding utf8 -NoNewline
 
   foreach ($n in $spawnedNumbers) {
+    # A step whose runspace threw never finished; the summary reports it as failed
+    # with the recorded reason, so claiming it finished here would contradict it.
+    if ($runspaceFailedNumbers.Contains($n)) { continue }
     $timeFile = Join-Path $script:WaveTmpDir "step-$n.time"
     $elapsedMs = 0
     if (Test-Path -LiteralPath $timeFile) { $elapsedMs = [int](Get-Content -LiteralPath $timeFile -Raw) }
@@ -730,6 +736,20 @@ function Write-StepReplay {
       else { $_ }
     } | Write-Output
   }
+}
+
+# Records a runspace that threw against its step. The throw happens outside the
+# runspace's own try/catch, so no exit file was written: Format-StepSummary reads
+# a missing exit file as a failure with no output, and the pipeline would report
+# the step as finished. Writing the exit code and the reason puts the step on the
+# same report path as any other failure.
+function Write-StepRunspaceFailure {
+  param(
+    [Parameter(Mandatory)][int]$Number,
+    [Parameter(Mandatory)][string]$Reason
+  )
+  "step runspace failed: $Reason" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.out") -Encoding utf8 -Append
+  "1" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.exit") -Encoding utf8 -NoNewline
 }
 
 # True when a step's captured output carries the no-scope convention. A
