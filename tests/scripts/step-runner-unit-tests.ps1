@@ -609,18 +609,32 @@ Invoke-StepPipeline
 }
 
 # A runspace that throws cannot be provoked from step content: the step block runs
-# inside the runspace's own try/catch, so only a failure outside it (a broken
-# runspace, a full temp filesystem) escapes to EndInvoke. This test builds that
-# escape with the same API the pipeline uses, feeds the error EndInvoke raises to
-# the runner's recording function, and checks the summary reports a failure with
-# the reason instead of a green run. Format-StepSummary exits, so the child
-# process carries the exit code and output.
-function Test-RunspaceFailureReportsStepAsFailed {
+# inside the runspace's own try/catch, so a throw from an action becomes an
+# ordinary failed step. What the drain's catch handles is the whole pipeline
+# failing, and the seam a test can reach is StepLibPath: Invoke-StepPipeline
+# dot-sources it synchronously and then again at the head of the async pipeline, so
+# a lib that throws on its second load kills the runspace before the step body
+# runs. Both cases below drive Invoke-StepPipeline, so each half of the fix is
+# guarded on its own: deleting the recording reddens the report case, deleting the
+# tail skip reddens the finished-line case.
+function Invoke-RunspaceFailureRun {
+    param([Parameter(Mandatory)][string]$RepoRoot)
+
+    # The derived FrameworkDir is <LibPath>/../../lib, so the skeleton mirrors the
+    # repo layout without touching the checkout.
     $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-runspace-failure-$([System.IO.Path]::GetRandomFileName())"
-    $null = New-Item -ItemType Directory -Path $tempDir -Force
+    $null = New-Item -ItemType Directory -Path (Join-Path $tempDir 'src/scripts/lib') -Force
+    $null = New-Item -ItemType Directory -Path (Join-Path $tempDir 'src/scripts/checks') -Force
+    Set-Content -LiteralPath (Join-Path $tempDir 'src/scripts/lib/deny-list.ps1') -Value '# stub: the setup dot-sources the lib from the derived FrameworkDir'
+    $marker = Join-Path $tempDir 'second-load.marker'
+    Set-Content -LiteralPath (Join-Path $tempDir 'src/scripts/checks/failing-lib.ps1') -Value @(
+        "if (Test-Path -LiteralPath '$marker') { throw 'RUNSPACE-BOOM' }",
+        "New-Item -ItemType File -Path '$marker' -Force > `$null"
+    )
+
     $driver = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-runspace-$([System.IO.Path]::GetRandomFileName()).ps1"
     $driverText = @'
-param([string]$RepoRoot, [string]$TempDir)
+param([string]$RepoRoot, [string]$LibPath)
 Set-Location $RepoRoot
 $FrameworkDir = Join-Path $RepoRoot 'src/scripts/lib'
 . (Join-Path $FrameworkDir 'step-runner.ps1')
@@ -628,39 +642,47 @@ function Write-Message { Write-Output "msg: $args" }
 function Write-ErrorMessage { Write-Output "err: $args" }
 Read-Argument -Arguments @()
 $script:FAIL_FAST = $false
-$script:WaveTmpDir = $TempDir
+$script:StepLibPath = $LibPath
+$env:PARALLEL_JOBS = '1'
 Register-Step -Id 'broken' -Number 1 -Name 'Broken step' -Action { $true }
-$iss = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
-$ps = [System.Management.Automation.PowerShell]::Create($iss)
-$null = $ps.AddScript({ throw 'RUNSPACE-BOOM' })
-$handle = $ps.BeginInvoke()
-try {
-  $null = $ps.EndInvoke($handle)
-  $reason = 'EndInvoke did not throw; the test premise is broken'
-} catch {
-  $reason = "$_"
-} finally {
-  $ps.Dispose()
-}
-Write-StepRunspaceFailure -Number 1 -Reason $reason
+Invoke-StepPipeline
 Format-StepSummary
 '@
     Set-Content -LiteralPath $driver -Value $driverText -Encoding utf8
     try {
         $pwshExe = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
-        $out = & $pwshExe -NoLogo -NoProfile -NonInteractive -File $driver -RepoRoot $repoRoot -TempDir $tempDir 2>&1 | Out-String
-        $code = $LASTEXITCODE
-        $reported = $out -match 'step runspace failed: ' -and $out -match 'RUNSPACE-BOOM'
-        $failed = $out -match 'some checks failed: steps 1'
-        $green = $out -match 'all checks passed'
-        if ($code -eq 1 -and $reported -and $failed -and -not $green) {
-            Assert-Pass "a runspace that throws is reported as a failed step with its reason"
-        } else {
-            Assert-Fail "runspace failure report" "exit=$code reported=$reported failed=$failed green=$green output=[$out]"
-        }
+        $out = & $pwshExe -NoLogo -NoProfile -NonInteractive -File $driver -RepoRoot $RepoRoot -LibPath (Join-Path $tempDir 'src/scripts/checks/failing-lib.ps1') 2>&1 | Out-String
+        return @{ Out = $out; Code = $LASTEXITCODE }
     } finally {
         Remove-Item -LiteralPath $driver -Force
         Remove-Item -LiteralPath $tempDir -Recurse -Force
+    }
+}
+
+# The recording half: without it the step still renders as failed (a missing exit
+# file defaults to 1) but with no reason, so the run never says what broke.
+function Test-PipelineRecordsRunspaceFailure {
+    $run = Invoke-RunspaceFailureRun -RepoRoot $repoRoot
+    $reported = $run.Out -match 'step runspace failed: ' -and $run.Out -match 'RUNSPACE-BOOM'
+    $failed = $run.Out -match 'some checks failed: steps 1'
+    $green = $run.Out -match 'all checks passed'
+    if ($run.Code -eq 1 -and $reported -and $failed -and -not $green) {
+        Assert-Pass "a runspace that throws is reported as a failed step with its reason"
+    } else {
+        Assert-Fail "runspace failure report" "exit=$($run.Code) reported=$reported failed=$failed green=$green output=[$($run.Out)]"
+    }
+}
+
+# The tail half: the pipeline prints "step N finished" for every spawned number, and
+# a runspace that died before writing its exit file never finished.
+function Test-PipelineDoesNotReportRunspaceFailureAsFinished {
+    $run = Invoke-RunspaceFailureRun -RepoRoot $repoRoot
+    $failed = $run.Out -match 'some checks failed: steps 1'
+    $finished = $run.Out -match 'step\s+1 finished'
+    if ($run.Code -eq 1 -and $failed -and -not $finished) {
+        Assert-Pass "a runspace that throws is not reported as finished"
+    } else {
+        Assert-Fail "runspace failure finished line" "exit=$($run.Code) failed=$failed finished=$finished output=[$($run.Out)]"
     }
 }
 
@@ -697,7 +719,8 @@ Test-OnlySteps-LastValueWin
 Test-OnlySteps-UnknownIdError
 Test-FailFastReport-ReplaysFailedStep
 Test-PipelineFailFastReportsLaunchOrder
-Test-RunspaceFailureReportsStepAsFailed
+Test-PipelineRecordsRunspaceFailure
+Test-PipelineDoesNotReportRunspaceFailureAsFinished
 
 function Test-SaveFileListCache-NoPathBeyondSymlink {
     . $stepRunner

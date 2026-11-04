@@ -683,7 +683,7 @@ test_posix_annotation_does_not_cross_files() {
 # pattern list, so a program that applied one list to every file loses four of
 # these five lines.
 test_posix_mixed_family_scan_reports_each_shape() {
-  local _ps1 _sh _root _ps1_lines _sh_lines
+  local _ps1 _sh _root _sh_root _ps1_lines _sh_lines
   # shellcheck disable=SC2016 # reason: fixture body must reach the file unexpanded
   _ps1=$(supp_fixture src/probe.ps1 \
     '$a = Get-Item "p" -ErrorAction SilentlyContinue' \

@@ -93,9 +93,9 @@ function count_char(text, ch,   i, count) {
 }
 
 # The region opens on a namespace attrset line and closes when its brace depth
-# returns to zero, which is how 12-repo-policy-pattern.ps1:161-164 tracks it. A
-# nested attrset therefore keeps the region open, and the entries after its close
-# are still scanned.
+# returns to zero, which is how 12-repo-policy-pattern.ps1 tracks it. A nested
+# attrset therefore keeps the region open, and the entries after its close are
+# still scanned.
 mode == "activation-naming" && FNR == 1 {
   _an_block = 0
   _an_depth = 0

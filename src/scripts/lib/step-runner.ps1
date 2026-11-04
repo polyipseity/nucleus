@@ -742,7 +742,9 @@ function Write-StepReplay {
 # runspace's own try/catch, so no exit file was written: Format-StepSummary reads
 # a missing exit file as a failure with no output, and the pipeline would report
 # the step as finished. Writing the exit code and the reason puts the step on the
-# same report path as any other failure.
+# same report path as any other failure. It runs inside the drain's catch, so a
+# throw from the writes here escapes as a terminating error in place of the
+# runspace's own exception.
 function Write-StepRunspaceFailure {
   param(
     [Parameter(Mandatory)][int]$Number,
