@@ -55,7 +55,7 @@ run_activation_tool_resolution() {
   # The android guest scripts run in a guest with no Nix store, so their `ip` can
   # take neither a store-path arg nor a PATH prepend.
   # ref: allow-and-deny-lists.instructions.md#A10 -- guest scripts have no Nix store to resolve against
-  # path_basename rather than basename: separator-agnostic and fork-free, matching the sibling sub-checks.
+  # path_basename rather than basename: separator-agnostic and fork-free.
   path_basename "${BASH_SOURCE[0]}"
   local _self_sh="$REPLY"
   local _candidate_files=()
@@ -449,7 +449,9 @@ function is_tests(path,   rel, root_lc) {
   root_lc = tolower(ROOT)
   rel = path
   if (root_lc != "" && index(tolower(rel), root_lc) == 1) {
-    rel = substr(rel, length(ROOT) + 2)
+    # Strip any run of separators after the root, matching the PowerShell twin's TrimStart.
+    rel = substr(rel, length(ROOT) + 1)
+    sub(/^[\/\\]+/, "", rel)
   } else {
     sub(/^\.[\/]/, "", rel)
   }
@@ -617,7 +619,8 @@ run_service_supervision_invariants() {
 
     # Drop this step's own file: it names the constants in the loop below.
     local _self_name
-    _self_name="$(basename "${BASH_SOURCE[0]}")"
+    path_basename "${BASH_SOURCE[0]}"
+    _self_name="$REPLY"
     local _elsewhere
     _elsewhere=$(grep -rnE '_SVC_HEALTH_(LOOP|WARN)_[A-Z_]+' --include='*.sh' src/ scripts/ |
       grep -vE "^${_health_lib}:" |

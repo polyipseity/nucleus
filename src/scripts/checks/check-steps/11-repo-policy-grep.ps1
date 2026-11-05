@@ -8,9 +8,12 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
   # WHY: all repo-policy step files must be excluded from pattern scans to avoid self-referencing literal pattern text
   $allStepLeaves = @('11-repo-policy-grep.ps1', '12-repo-policy-pattern.ps1', '13-repo-policy-data.ps1')
-  # WHY: the shell twins carry the same literal pattern text, and the `|| true` rule
-  #   scans shell and Nix files, so the .sh leaves need the same exclusion
-  $allStepShLeaves = @('11-repo-policy-grep.sh', '12-repo-policy-pattern.sh', '13-repo-policy-data.sh')
+  # WHY: only this step's own shell leaf is excluded. It carries `|| true`
+  #   unannotated in its own scan table; the sibling leaves carry the literal
+  #   only behind `# check-suppress:suppression_doc:` annotations, which the
+  #   audit accepts, so excluding them would silently exempt a real violation
+  #   there and diverge from the POSIX twin, which drops its own file alone.
+  $allStepShLeaves = @('11-repo-policy-grep.sh')
   $failed = $false
 
   # --- Suppression audit ---

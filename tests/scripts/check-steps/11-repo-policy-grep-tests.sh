@@ -570,11 +570,19 @@ test_posix_unannotated_shellcheck_disable_is_reported() {
 
 # The documented form: `reason:` on the same line. The undocumented directive in
 # the same call is the control: it proves the annotation audit ran, and a dropped
-# negative filter reports the accepted fixture alongside it.
+# negative filter reports the accepted fixture alongside it. The accepted fixture
+# is also scanned alone, so a clean scan must still exit 0.
 test_posix_documented_shellcheck_disable_is_accepted() {
-  local _probe _control
+  local _probe _control _rc
   _probe=$(supp_fixture src/probe.sh "#!/usr/bin/env bash" "# shellcheck disable=SC2086 # reason: probe")
   _control=$(supp_fixture src/control.sh "#!/usr/bin/env bash" "# shellcheck disable=SC2086") # check-suppress:suppression_doc: fixture text -- the control's pattern
+  run_supp_scan "$_probe"
+  _rc=$?
+  if [ "$_rc" -ne 0 ]; then
+    fail "a clean scan of the accepted fixture exited $_rc" "$_out"
+    rm -rf "$(fixture_root "$_probe")" "$(fixture_root "$_control")"
+    return 1
+  fi
   run_supp_scan "$_probe" "$_control"
   rm -rf "$(fixture_root "$_probe")" "$(fixture_root "$_control")"
   if ! supp_only_control_reported "$_probe" "undoc_supp:$_control:2:# shellcheck disable=SC2086"; then # check-suppress:suppression_doc: expected report -- the audit echoes the line
@@ -605,14 +613,22 @@ test_posix_bare_or_true_is_reported() {
 
 # The annotation above the line documents it, the same acceptance the
 # PowerShell half applies and the form the shipped scripts use. The undocumented
-# `|| true` in the same call is the control.
+# `|| true` in the same call is the control. The accepted fixture is also
+# scanned alone, so a clean scan must still exit 0.
 test_posix_documented_or_true_is_accepted() {
-  local _probe _control
+  local _probe _control _rc
   _probe=$(supp_fixture src/probe.sh \
     "#!/usr/bin/env bash" \
     "# check-suppress:suppression_doc: probe; the caller inspects the status" \
     "  probe_cmd || true")
   _control=$(supp_fixture src/control.sh "#!/usr/bin/env bash" "  other_cmd || true")
+  run_supp_scan "$_probe"
+  _rc=$?
+  if [ "$_rc" -ne 0 ]; then
+    fail "a clean scan of the accepted fixture exited $_rc" "$_out"
+    rm -rf "$(fixture_root "$_probe")" "$(fixture_root "$_control")"
+    return 1
+  fi
   run_supp_scan "$_probe" "$_control"
   rm -rf "$(fixture_root "$_probe")" "$(fixture_root "$_control")"
   if ! supp_only_control_reported "$_probe" "undoc_supp:$_control:2:|| true:   other_cmd || true"; then
@@ -643,6 +659,38 @@ test_posix_or_true_tests_directory_exemption() {
   case "$_out" in
   *"probe.sh"*)
     fail "the tests/ fixture was reported" "$_out"
+    return 1
+    ;;
+  esac
+  return 0
+}
+
+# The repo-relative rule strips any run of separators after the root, the way
+# the PowerShell twin's TrimStart does, so a doubled separator still lands the
+# file under tests/ and takes the exemption. REPO_ROOT is shadowed to the
+# fixture tree because run_supp_scan pins it to the real checkout, and only the
+# root-prefix branch is what the twin's rule changed.
+test_posix_tests_exemption_survives_doubled_separator() {
+  local _exempt _control _root _reported
+  local REPO_ROOT
+  _exempt=$(supp_fixture tests/probe.sh "#!/usr/bin/env bash" "  probe_cmd || true")
+  _control=$(supp_fixture src/probe.nix "  bad = probe || true;")
+  _root=$(fixture_root "$_exempt")
+  REPO_ROOT="$_root"
+  run_supp_scan "$_root//tests/probe.sh" "$_control"
+  _reported=$(printf '%s\n' "$_out" | grep -c 'undoc_supp:')
+  rm -rf "$_root" "$(fixture_root "$_control")"
+  if [ "$_reported" -ne 1 ]; then
+    fail "expected exactly the control to be reported, got $_reported" "$_out"
+    return 1
+  fi
+  if ! supp_reports "undoc_supp:$_control:1:|| true:   bad = probe || true;"; then
+    fail "the control was not reported" "$_out"
+    return 1
+  fi
+  case "$_out" in
+  *"probe.sh"*)
+    fail "the doubled-separator tests/ fixture was reported" "$_out"
     return 1
     ;;
   esac
@@ -720,11 +768,19 @@ test_posix_mixed_family_scan_reports_each_shape() {
 # .ps1 file must not be reported for it. Without this, a program that applied
 # every pattern to every file still passes the mixed-family test above. The shell
 # file in the same call is the control, so the case cannot pass against a scan
-# that read nothing.
+# that read nothing. The .ps1 alone is also scanned, so a clean scan must still
+# exit 0.
 test_posix_or_true_is_shell_only() {
-  local _ps1 _control
+  local _ps1 _control _rc
   _ps1=$(supp_fixture src/probe.ps1 'Get-Item "p" || true')
   _control=$(supp_fixture src/control.sh "probe_cmd || true")
+  run_supp_scan "$_ps1"
+  _rc=$?
+  if [ "$_rc" -ne 0 ]; then
+    fail "a clean scan of the accepted fixture exited $_rc" "$_out"
+    rm -rf "$(fixture_root "$_ps1")" "$(fixture_root "$_control")"
+    return 1
+  fi
   run_supp_scan "$_ps1" "$_control"
   rm -rf "$(fixture_root "$_ps1")" "$(fixture_root "$_control")"
   if ! supp_only_control_reported "$_ps1" "undoc_supp:$_control:1:|| true: probe_cmd || true"; then
@@ -742,6 +798,7 @@ for test in \
   test_posix_annotation_does_not_cross_files \
   test_posix_or_true_is_shell_only \
   test_posix_or_true_tests_directory_exemption \
+  test_posix_tests_exemption_survives_doubled_separator \
   test_posix_mixed_family_scan_reports_each_shape; do
   if ! "$test"; then
     echo "FAIL: $test"
