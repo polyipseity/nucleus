@@ -102,6 +102,46 @@ run_nix_flake_eval() {
   return $_ne_exit
 }
 
+# nix_conf_flavor_state <host> <state-var> <probe-stderr-var>: classify the
+# applicability guard of run_nix_conf_key_check. The check and its test suite
+# call this one expression, so the suite cannot hold a second copy of the
+# decision and disagree with it. <state-var> receives one of:
+#   consumes - the host deploys the managed config and the running nix reads it
+#   skip     - the check does not apply here: the host clause, or the probe's
+#              upstream not-a-setting answer, carried in <probe-stderr-var>
+#   broken   - the probe failed for any other reason, carried in
+#              <probe-stderr-var>; the caller must report an error, never skip
+# <probe-stderr-var> is empty on the consumes and host-clause paths.
+# WHY: only macOS deploys the file, and the deployed path does not tell the
+# flavors apart because the CI installer writes that path too. Upstream Nix does
+# not know settings the file declares (eval-cores, lazy-trees), so judging the
+# keys under it would report a working file as broken; asking for one of those
+# settings tells the two flavors apart without parsing a version string.
+# WHY: both accepted upstream answers put the quoted probe name directly after
+# the phrase, so the match pins that adjacency. The runner's nix.conf carries
+# settings this nix does not know and warns about them on every run
+# (`.github/workflows/ci.yml:82`), so unrelated warning text must not classify a
+# broken probe as upstream and switch the check off.
+nix_conf_flavor_state() { # <host> <state-var> <probe-stderr-var>
+  local _ncfs_host="$1"
+  local -n _ncfs_state="$2" _ncfs_err="$3"
+  _ncfs_err=""
+  if ! nucleus_flag_for_host "$_ncfs_host" darwin; then
+    _ncfs_state=skip
+    return 0
+  fi
+  if _ncfs_err="$(nucleus_nix_locked nix config show lazy-trees 2>&1 >/dev/null)"; then
+    _ncfs_state=consumes
+    _ncfs_err=""
+    return 0
+  fi
+  case "$_ncfs_err" in
+  *"could not find setting 'lazy-trees'"* | *"unknown setting 'lazy-trees'") _ncfs_state=skip ;;
+  *) _ncfs_state=broken ;;
+  esac
+  return 0
+}
+
 # run_nix_conf_key_check: every setting the managed nix.conf declares must be a
 # setting this nix reads. Nix only warns about an unknown name in a config file,
 # so a key that is not a setting never applies and nothing else reports it. The
@@ -117,31 +157,25 @@ run_nix_conf_key_check() {
   _nc_host="$(resolve_nucleus_host)"
   _nc_rel="src/modules/configs/nix/nix.custom.$_nc_host.conf"
   _nc_file="$_nc_repo_root/$_nc_rel"
-  # WHY: only macOS deploys the file, and the deployed path does not tell the
-  # flavors apart because the CI installer writes that path too. Upstream Nix does
-  # not know settings the file declares (eval-cores, lazy-trees), so judging the
-  # keys under it would report a working file as broken; asking for one of those
-  # settings tells the two flavors apart without parsing a version string.
-  if ! nucleus_flag_for_host "$_nc_host" darwin; then
-    say "no managed nix config judged on $_nc_host: keys are judged only under the Determinate Nix that consumes the file"
-    return 0
-  fi
-  local _nc_probe_err _nc_upstream=false
-  if ! _nc_probe_err="$(nix config show lazy-trees 2>&1 >/dev/null)"; then
-    case "$_nc_probe_err" in
-    *"could not find setting"*lazy-trees* | *"unknown setting"*lazy-trees*) _nc_upstream=true ;;
-    esac
-    # WHY: an upstream nix answers with a complaint naming the probe, which is the
-    # flavor this file was not written for. Any other failure means nix could not
-    # answer at all, so skipping here would switch the check off exactly where the
-    # daemon's settings are in doubt.
-    if ! $_nc_upstream; then
-      error "$_nc_rel: nix could not report whether it knows the managed settings: [$_nc_probe_err]"
-      return 1
+  local _nc_state _nc_probe_err _nc_reports=""
+  nix_conf_flavor_state "$_nc_host" _nc_state _nc_probe_err
+  case "$_nc_state" in
+  consumes) ;;
+  skip)
+    if [ -n "$_nc_probe_err" ]; then
+      _nc_reports=", and this nix reports: $_nc_probe_err"
     fi
-    say "no managed nix config judged on $_nc_host: keys are judged only under the Determinate Nix that consumes the file, and this nix reports: $_nc_probe_err"
+    say "no managed nix config judged on $_nc_host: keys are judged only under the Determinate Nix that consumes the file$_nc_reports"
     return 0
-  fi
+    ;;
+  broken)
+    # WHY: only the upstream not-a-setting answer may skip; any other failure
+    # means nix could not answer at all, so skipping would switch the check off
+    # exactly where the daemon's settings are in doubt.
+    error "$_nc_rel: nix could not report whether it knows the managed settings: [$_nc_probe_err]"
+    return 1
+    ;;
+  esac
   local -a _nc_keys=()
   local _nc_line _nc_trim _nc_key _nc_err _nc_name _nc_declared _nc_setting
   local _nc_unknown=0
@@ -174,12 +208,11 @@ run_nix_conf_key_check() {
   # reads: the setting names, the `extra-` append aliases it resolves itself, and
   # the values. An unknown name warns on stderr and still exits 0, so stderr is
   # the only signal for it; a bad value or a syntax error exits non-zero.
-  # WHY: no nix lock here. The lock serializes the flake evals' shared SQLite eval
-  # cache, and a config parse touches none of it, so taking it only adds a way
-  # to block behind an unrelated nix process. It joins no other invocation
-  # either: it parses the managed file as NIX_CONFIG, a config contract no
-  # other nix call in this step shares.
-  if ! _nc_err="$(NIX_CONFIG="$(cat "$_nc_file")" nix config show max-jobs 2>&1 >/dev/null)"; then
+  # WHY: every nix call in this step takes the lock, so one serialization rule
+  # governs them all. The lock guards the shared SQLite eval cache, which this
+  # parse never reads; waiting behind an unrelated flake eval is the accepted
+  # cost of that uniformity.
+  if ! _nc_err="$(NIX_CONFIG="$(cat "$_nc_file")" nucleus_nix_locked nix config show max-jobs 2>&1 >/dev/null)"; then
     error "$_nc_rel: nix rejected the managed config: $_nc_err"
     return 1
   fi

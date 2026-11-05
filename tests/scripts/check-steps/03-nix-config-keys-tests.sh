@@ -20,7 +20,6 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../../.." && pwd)"
 CONF_REL="src/modules/configs/nix/nix.custom.MacBook.conf"
-readonly REPO_ROOT CONF_REL
 
 require_command nix "the managed config key check needs the real nix as its oracle"
 require_command jq "resolving the host platform reads the host registry"
@@ -31,6 +30,11 @@ require_command jq "resolving the host platform reads the host registry"
 export NUCLEUS_REPO_ROOT="$REPO_ROOT"
 # shellcheck source=../../../src/scripts/lib/lib.sh
 . "$REPO_ROOT/src/scripts/lib/lib.sh"
+# The flavor guard lives in the check itself: the live expectations call the
+# check's own classifier, so the suite cannot hold a second copy of the decision.
+# shellcheck source=../../../src/scripts/checks/check-steps/03-nix-flake-eval.sh
+. "$REPO_ROOT/src/scripts/checks/check-steps/03-nix-flake-eval.sh"
+readonly REPO_ROOT CONF_REL
 HOST="$(resolve_nucleus_host)"
 # The real nix, resolved before the shim can shadow it, and the directory the shim
 # lives in. A case that must not depend on the installed flavor puts the shim first
@@ -50,6 +54,7 @@ if [ "$*" = "config show lazy-trees" ]; then
   0) exit 0 ;;
   1) printf "error: could not find setting 'lazy-trees'\n" >&2; exit 1 ;;
   2) printf "error: opening lock file '/nix/var/nix/db/big-lock': Permission denied\n" >&2; exit 1 ;;
+  3) printf "warning: unknown setting 'build-provenance-tags'\nerror: lazy-trees unavailable: Permission denied\n" >&2; exit 1 ;;
   *) printf 'shim: unknown flavor %s\n' "$SHIM_FLAVOR" >&2; exit 99 ;;
   esac
 fi
@@ -61,10 +66,11 @@ chmod +x "$SHIM_DIR/nix"
 # sub-check the way the runner does and print the exit status. The host is pinned
 # through NUCLEUS_HOST. The flavor pins what the nix on PATH answers for the
 # Determinate probe: 0 for the flavor that consumes the file, 1 for upstream Nix
-# (the not-a-setting answer), 2 for a nix that cannot answer, and an empty value for
-# the real nix. The optional user config supplies a setting warning that comes from
-# a config source other than the managed file, which is how the CI runner's own
-# nix.conf behaves.
+# (the not-a-setting answer), 2 for a nix that cannot answer, 3 for a broken probe
+# that also carries the runner's unrelated unknown-setting warning, and an empty
+# value for the real nix. The optional user config supplies a setting warning that
+# comes from a config source other than the managed file, which is how the CI
+# runner's own nix.conf behaves.
 run_subcheck() { # <host> <fixture-repo> <out-file> <flavor> [user-conf]
   local host="$1" fixture="$2" out_file="$3" flavor="$4" user_conf="${5:-}" rc=0
   (
@@ -110,12 +116,19 @@ contains() { # <text> <needle>
 }
 
 test_live_config_matches_the_host_that_deploys_it() {
-  local out_file rc=0 out count
+  local out_file rc=0 out count live_state live_probe_err
+  # One run-scoped TMPDIR artifact, read once below and never again: no cleanup
+  # line for it.
   out_file="$(mktemp)"
+  # The check's own classifier, called here first so this case maps the live
+  # environment onto the same three-way expectation the check will act on: the
+  # parse, the not-applicable skip, or the hard error for a probe that cannot
+  # answer. The subshell below then runs the check against that environment.
+  nix_conf_flavor_state "$HOST" live_state live_probe_err
   rc="$(run_subcheck "$HOST" "$REPO_ROOT" "$out_file" "")"
   out="$(cat "$out_file")"
-  # The check's own two questions, asked here to pick this host's expectation.
-  if nucleus_flag_for_host "$HOST" darwin && nix config show lazy-trees >/dev/null 2>&1; then
+  case "$live_state" in
+  consumes)
     # The nix that consumes the deployed file must know every key it declares. A
     # parse that found nothing would also report rc=0, so the count carries the
     # assertion that the live file was actually read and checked.
@@ -125,7 +138,8 @@ test_live_config_matches_the_host_that_deploys_it() {
     else
       assert_fail "the live config on $HOST passes and parses $count keys" "rc=$rc count=[$count] output=[$out]"
     fi
-  else
+    ;;
+  skip)
     # Nothing here consumes the file, so the host-correct expectation is the
     # not-applicable message, never a verdict from a nix that does not know it.
     if [ "$rc" -eq 0 ] && contains "$out" "no managed nix config judged on $HOST"; then
@@ -133,8 +147,24 @@ test_live_config_matches_the_host_that_deploys_it() {
     else
       assert_fail "$HOST has no nix that consumes the managed config, so it judges none" "rc=$rc output=[$out]"
     fi
-  fi
-  rm -f "$out_file"
+    ;;
+  broken)
+    # A probe that cannot answer is a hard error, not a skip: the check must fail
+    # with its stderr, and this case must expect exactly that failure instead of
+    # reporting a misleading skip mismatch beside the real one. The stderr match
+    # pins that the classifier and the check saw the same failure.
+    if [ "$rc" -eq 1 ] && contains "$out" "$CONF_REL" &&
+      contains "$out" "could not report whether it knows the managed settings" &&
+      { [ -z "$live_probe_err" ] || contains "$out" "$live_probe_err"; }; then
+      assert_pass "a live probe that cannot answer fails the check and the case expects it"
+    else
+      assert_fail "a live probe that cannot answer fails the check and the case expects it" "rc=$rc probe=[$live_probe_err] output=[$out]"
+    fi
+    ;;
+  *)
+    assert_fail "the flavor classifier returned a recognised state" "state=[$live_state]"
+    ;;
+  esac
 }
 
 test_host_that_deploys_no_config_skips_without_reading_one() {
@@ -201,6 +231,31 @@ test_probe_that_cannot_answer_fails_the_check() {
     assert_pass "a probe that cannot answer fails the check with its stderr"
   else
     assert_fail "a probe that cannot answer fails the check with its stderr" "rc=$rc calls=[$calls] output=[$out]"
+  fi
+  rm -rf "$FIXTURE_REPO"
+}
+
+test_unrelated_unknown_setting_warning_does_not_classify_the_probe() {
+  local out rc=0 calls=""
+  make_fixture
+  # The runner's own nix.conf carries a setting this nix does not know and warns
+  # about it on every run (`.github/workflows/ci.yml:82`), so the probe's stderr
+  # can hold an `unknown setting` warning about another name before its real
+  # failure. Only the classified phrase with the quoted probe name inline counts
+  # as the upstream answer; anything else is a broken probe that must fail loudly
+  # instead of switching the check off as not-applicable.
+  rc="$(run_subcheck MacBook "$FIXTURE_REPO" "$FIXTURE_REPO/out.txt" 3)"
+  out="$(cat "$FIXTURE_REPO/out.txt")"
+  if [ -f "$FIXTURE_REPO/nix-calls.log" ]; then
+    calls="$(cat "$FIXTURE_REPO/nix-calls.log")"
+  fi
+  if [ "$rc" -eq 1 ] && contains "$out" "$CONF_REL" &&
+    contains "$out" "could not report whether it knows the managed settings" &&
+    contains "$out" "build-provenance-tags" && ! contains "$out" "no managed nix config judged" &&
+    [ "$calls" = "config show lazy-trees" ]; then
+    assert_pass "an unrelated unknown-setting warning does not classify a broken probe as upstream"
+  else
+    assert_fail "an unrelated unknown-setting warning does not classify a broken probe as upstream" "rc=$rc calls=[$calls] output=[$out]"
   fi
   rm -rf "$FIXTURE_REPO"
 }
@@ -338,6 +393,7 @@ test_live_config_matches_the_host_that_deploys_it
 test_host_that_deploys_no_config_skips_without_reading_one
 test_darwin_host_under_upstream_nix_skips
 test_probe_that_cannot_answer_fails_the_check
+test_unrelated_unknown_setting_warning_does_not_classify_the_probe
 
 section 2 "an unknown setting the file declares fails and is named"
 test_unknown_key_fails_and_is_named

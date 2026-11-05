@@ -379,6 +379,7 @@ run_release_age_uniformity() {
   shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
+  # check-suppress:config-method: path lookup feeding the release-age validation below, not a config consumption
   local _ra_json="src/modules/configs/release-ages.json"
   local _errors=0
   if [ ! -f "$_ra_json" ]; then
