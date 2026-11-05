@@ -73,6 +73,14 @@ END {
 }
 
 BEGIN {
+  # An operand shaped like name=value is an awk variable assignment, so a repo
+  # file literally named x=y would never be opened. Every call site here passes
+  # files as operands and variables via -v, so prefix the bare assignment-shaped
+  # operand with ./ to keep the filename distinguishable; a path already
+  # carrying a slash is unambiguous and stays untouched.
+  for (_argv_i = 1; _argv_i < ARGC; _argv_i++)
+    if (ARGV[_argv_i] ~ /^[A-Za-z_][A-Za-z0-9_]*=/)
+      ARGV[_argv_i] = "./" ARGV[_argv_i]
   if (mode == "activation-naming") {
     _an_ns_start = "(home\\.activation|system\\.activationScripts|nucleus\\.terminalActivations)[[:space:]]*=[^;]*[{]"
     # An activation entry carries a lib wrapper, or leaves its value on the next
@@ -84,9 +92,9 @@ BEGIN {
 
 # Count one character in a line. Braces inside strings count, because the .ps1
 # twin tallies them per line rather than parsing, so both twins read one tree
-# into one record set. The tally has one divergence: the twin skips comment
-# lines before tallying and this does not, so a brace inside a comment moves the
-# depth and the region can close on the wrong line.
+# into one record set. Comment lines never reach the tally: the twin skips
+# them before the region rules (12-repo-policy-pattern.ps1:180) and the mode
+# rule below skips them the same way, so a brace in a comment cannot move depth.
 function count_char(text, ch,   i, count) {
   count = 0
   for (i = 1; i <= length(text); i++)
@@ -103,6 +111,10 @@ mode == "activation-naming" && FNR == 1 {
   _an_depth = 0
 }
 mode == "activation-naming" {
+  # Mirror the twin's comment-line skip (12-repo-policy-pattern.ps1:180): a
+  # comment is not a region open, an entry, nor brace-bearing text, so prose
+  # carrying a brace cannot move the depth or close the region early.
+  if ($0 ~ /^[[:space:]]*#/) next
   if (!_an_block && $0 ~ _an_ns_start) {
     _an_block = 1
     _an_depth = 0

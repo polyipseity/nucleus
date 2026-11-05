@@ -19,25 +19,34 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   $cfgDir = Join-Path -Path $r -ChildPath "src\modules\configs"
   $cfgErrors = 0
 
-  $cfgFiles = Get-ChildItem -Path $cfgDir -Recurse -File
-  $srcFiles = Get-ChildItem -Path (Join-Path $r "src") -Recurse -Include '*.nix', '*.ps1', '*.sh' |
+  $cfgFiles = Get-ChildItem -LiteralPath $cfgDir -Recurse -File
+  $srcFiles = Get-ChildItem -LiteralPath (Join-Path $r "src") -Recurse -Include '*.nix', '*.ps1', '*.sh' |
     Where-Object { $_.FullName -notmatch '[\/]vendor[\/]' -and $_.FullName -notmatch '[\/]configs[\/]' } |
     Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#B1 -- structural invariants; vendored code and config methods are different concerns; gitignore filter applied on top
-  # WHY: raw basenames with -SimpleMatch mirror the .sh twin's grep -F -f semantics; [regex]::Escape here would make dotted basenames (e.g. system.gitconfig) match literally and never be found
+  # WHY: basenames stay raw in this list and each is [regex]::Escape'd when it enters the alternation below, so dotted basenames (e.g. system.gitconfig) match literally, mirroring the .sh twin's grep -Fi -f fixed-string semantics
   $cfgPatterns = @($cfgFiles | ForEach-Object { $_.Name } | Sort-Object -Unique)
+  if ($cfgPatterns.Count -eq 0) {
+    # WHY: -match '' matches every line, so an empty list must not run the scan
+    # or the per-config loop; mirrors the .sh empty-list early return.
+    Write-Message "config method compliance passed (0 configs)."
+  } else {
   # One read pass builds the three lists the per-config loop below reads:
   # every config basename as one escaped alternation (raw basenames stay
   # literal substrings, mirroring the .sh twin's grep -F), the annotation
   # marker, and the ${hostName} template form. Entries keep Select-String's
   # Path/LineNumber/Line shape and its file-then-line order, so the loop is
   # unchanged; this replaces three sweeps that each re-read every source file.
+  # Case-insensitive -match is the stricter reading, agreed with the .sh twin
+  # (grep -Fi): a case-variant reference to a config basename is still a real
+  # reference, so this flags deployments a case-sensitive read skips; annotation
+  # ids are machine-parsed in exact form, so nothing hides on that side.
   $cfgCombinedPattern = ($cfgPatterns | ForEach-Object { [regex]::Escape($_) }) -join '|'
   $cfgTemplatePattern = [regex]::Escape('${hostName}')
   $cfgSelectOutput = [System.Collections.Generic.List[pscustomobject]]::new()
   $cfgMethodOutput = [System.Collections.Generic.List[pscustomobject]]::new()
   $cfgTemplateOutput = [System.Collections.Generic.List[pscustomobject]]::new()
   foreach ($cfgSrc in $srcFiles) {
-    $cfgLines = @(Get-Content -Path $cfgSrc)
+    $cfgLines = @(Get-Content -LiteralPath $cfgSrc)
     for ($cfgI = 0; $cfgI -lt $cfgLines.Count; $cfgI++) {
       $cfgLine = $cfgLines[$cfgI]
       $cfgHitSelect = $cfgLine -match $cfgCombinedPattern
@@ -57,8 +66,15 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   # WHY: $using: is only valid inside the -Parallel scriptblock; -ThrottleLimit is
   # evaluated in the caller scope, so it takes the plain variable (canonical order:
   # scriptblock first, then -ThrottleLimit)
-  $cfgFileErrors = $cfgFiles | ForEach-Object -Parallel {
-    $basename = $_.Name
+  # WHY the index wrapper: -Parallel emits results in completion order (a slow
+  # first input prints last), so each result carries its input index and the
+  # report below sorts by it, restoring $cfgFiles order deterministically.
+  $cfgIndexed = @(for ($cfgIdx = 0; $cfgIdx -lt $cfgFiles.Count; $cfgIdx++) {
+      [pscustomobject]@{ Index = $cfgIdx; File = $cfgFiles[$cfgIdx] }
+    })
+  $cfgFileErrors = $cfgIndexed | ForEach-Object -Parallel {
+    $cfgEntry = $_
+    $basename = $cfgEntry.File.Name
 
     # Skip infrastructure files and Nix modules inside configs/  # ref: allow-and-deny-lists.instructions.md#A2 -- infrastructure files are not configs
     if ($basename -in '.gitkeep', '.gitignore') { return $null }
@@ -68,7 +84,7 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
     if ($basename -like '*.nix') { return $null }
 
     # Skip agent customization files (consumed as a directory via Method 4)  # ref: allow-and-deny-lists.instructions.md#A2 -- agents/* consumed as directory
-    $relPath = $_.FullName.Substring($using:cfgDir.Length + 1) -replace '\\', '/'
+    $relPath = $cfgEntry.File.FullName.Substring($using:cfgDir.Length + 1) -replace '\\', '/'
     if ($relPath -like 'agents/*') { return $null }
 
     # Skip configs deployed via provision-data-directory or flake inputs (not direct src/ references)
@@ -92,7 +108,7 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
     }
 
     if ($refs.Count -eq 0) {
-      return "$relPath : no references found in src/ (excluding configs/) -- orphaned config?"
+      return [pscustomobject]@{ Index = $cfgEntry.Index; Message = "$relPath : no references found in src/ (excluding configs/) -- orphaned config?" }
     }
 
     $hasMethod = $false
@@ -114,17 +130,15 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
       }
     }
     if (-not $hasMethod) {
-      return "$relPath : referenced but no '# check-suppress:config-method' comment found on or before reference lines"
+      return [pscustomobject]@{ Index = $cfgEntry.Index; Message = "$relPath : referenced but no '# check-suppress:config-method' comment found on or before reference lines" }
     }
 
     return $null
   } -ThrottleLimit $parallelJobs
 
-  foreach ($cfe in $cfgFileErrors) {
-    if ($cfe) {
-      Write-ErrorMessage $cfe
-      $cfgErrors++
-    }
+  foreach ($cfe in ($cfgFileErrors | Where-Object { $null -ne $_ } | Sort-Object Index)) {
+    Write-ErrorMessage $cfe.Message
+    $cfgErrors++
   }
 
   if ($cfgErrors -gt 0) {
@@ -132,6 +146,8 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
     $failed = $true
   } else {
     Write-Message "config method compliance passed."
+  }
+
   }
 
   Write-Message "--- activation naming policy ---"
@@ -270,7 +286,7 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
 
     foreach ($lfFile in $lfScanned) {
       $lfIsPs = $lfFile -match '\.(ps1|psm1)$'
-      $lfLines = @(Get-Content -Path $lfFile)
+      $lfLines = @(Get-Content -LiteralPath $lfFile)
       for ($lfI = 0; $lfI -lt $lfLines.Count; $lfI++) {
         $lfLine = $lfLines[$lfI]
         $lfLoc = "$($lfFile):$($lfI + 1)"
@@ -308,12 +324,12 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   # The spec requires NO_COLOR handling in both helpers; the probe is guarded on
   # existence so fixture trees skip it.
   $libShPath = Join-Path $r 'src\scripts\lib\lib.sh'
-  if ((Test-Path -LiteralPath $libShPath) -and -not (Select-String -Path $libShPath -Pattern 'NO_COLOR' -Quiet)) {
+  if ((Test-Path -LiteralPath $libShPath) -and -not (Select-String -LiteralPath $libShPath -Pattern 'NO_COLOR' -Quiet)) {
     Write-ErrorMessage "src/scripts/lib/lib.sh does not reference NO_COLOR (logging-format self-check)"
     $lfErrors++
   }
   $psm1Path = Join-Path $r 'src\platforms\Windows\modules\Format-NucleusOutput.psm1'
-  if ((Test-Path -LiteralPath $psm1Path) -and -not (Select-String -Path $psm1Path -Pattern 'NO_COLOR' -Quiet)) {
+  if ((Test-Path -LiteralPath $psm1Path) -and -not (Select-String -LiteralPath $psm1Path -Pattern 'NO_COLOR' -Quiet)) {
     Write-ErrorMessage "src/platforms/Windows/modules/Format-NucleusOutput.psm1 does not reference NO_COLOR (logging-format self-check)"
     $lfErrors++
   }
@@ -414,16 +430,19 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   # `2>$null`/`2>/dev/null` on a single command is the suppression-audit concern (step 11).
   Write-Message "--- log capture pair policy ---"
   $lcpErrors = 0
-  $lcpSearchDirs = @(
-    (Join-Path -Path $r -ChildPath 'src'),
-    (Join-Path -Path $r -ChildPath 'tests')
-  )
+  # POSIX roots: the whole tracked repo (git ls-files | filter_gitignored,
+  # 12-repo-policy-pattern.sh:494), extension-narrowed by _lcp_ext_re (.sh:484)
+  # and filtered by _policy_scan_target (.sh:310-324: vendor, src/secrets,
+  # tests/fixtures, self twins). Scanning $r gives the same roots, so a capture
+  # point under scripts/ is caught like one under src/; Select-GitIgnored
+  # applies the gitignore filter on top.
+  $lcpSearchDirs = @($r)
   $lcpFiles = @()
   foreach ($dir in $lcpSearchDirs) {
     if (Test-Path -LiteralPath $dir) {
       # Scope excludes test fixtures, which deliberately hold violation samples.
       # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariants; vendored and secret files are separate concerns
-      $lcpFiles += Get-ChildItem -Path $dir -Recurse -Include '*.nix', '*.sh', '*.ps1', '*.psm1', '*.yml' |
+      $lcpFiles += Get-ChildItem -LiteralPath $dir -Recurse -Include '*.nix', '*.sh', '*.ps1', '*.psm1', '*.yml' |
         Where-Object { $_.FullName -notmatch '(^|[\\\/])(vendor|secrets|tests[\\\/]fixtures)([\\\/]|$)' } |
         Select-GitIgnored
     }

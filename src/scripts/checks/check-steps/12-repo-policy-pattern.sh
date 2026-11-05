@@ -40,6 +40,10 @@ run_repo_policy_pattern() {
 #   scoped subset cannot prove the annotation is absent; the .ps1 twin scans
 #   the same way.
 run_config_method_compliance() {
+  # $1 is HAS_ARGS from run_policy_checks' "files" style (check-lib.sh passes
+  # "${_rpc_context[HAS_ARGS]}" before REPO_ROOT), and the suite mirrors it
+  # with a leading true/false. Unread here: the scan is whole-repo in both
+  # modes (see the WHY above), so it cannot narrow anything.
   local _repo_root="$2"
   shift 2
   cd "$_repo_root" || return 1
@@ -90,7 +94,7 @@ run_config_method_compliance() {
   done < <(find "$_cfg_dir" -type f -print0)
 
   if [ "${#_cfgs[@]}" -eq 0 ]; then
-    say "config method compliance passed."
+    say "config method compliance passed (0 configs)."
     return 0
   fi
 
@@ -98,6 +102,10 @@ run_config_method_compliance() {
   # relative-path tier because a relative path contains its basename, and one
   # grep for the template forms. The tiers below read this index, so the tree is
   # never scanned again per config.
+  # Case-insensitive is the stricter reading and both twins agree on it: a
+  # case-variant reference is still a real config reference, so -i flags
+  # deployments a case-sensitive read skips, while annotation ids are
+  # machine-parsed in exact form, so nothing hides on that side.
   local _ref_index="" _tmpl_index=""
   local _pat_args=() _tmpl_args=() _pat
   for _pat in "${_bases[@]}"; do
@@ -107,9 +115,9 @@ run_config_method_compliance() {
     [ -n "$_pat" ] && _tmpl_args+=(-e "$_pat")
   done
   if [ "${#_src_files[@]}" -gt 0 ]; then
-    _ref_index=$(grep -HnF "${_pat_args[@]}" "${_src_files[@]}" || true) # check-suppress:suppression_doc: grep exits 1 when no source file references a config; every config then reports no references
+    _ref_index=$(grep -HnFi "${_pat_args[@]}" "${_src_files[@]}" || true) # check-suppress:suppression_doc: grep exits 1 when no source line carries a config basename; the empty index is this tier's no-match result, which the tiers below resolve per config
     if [ "${#_tmpl_args[@]}" -gt 0 ]; then
-      _tmpl_index=$(grep -HnF "${_tmpl_args[@]}" "${_src_files[@]}" || true) # check-suppress:suppression_doc: grep exits 1 when no template line references a config; the template tier then stays empty
+      _tmpl_index=$(grep -HnFi "${_tmpl_args[@]}" "${_src_files[@]}" || true) # check-suppress:suppression_doc: grep exits 1 when no template line references a config; the template tier then stays empty
     fi
   fi
 
@@ -120,7 +128,7 @@ run_config_method_compliance() {
   if [ "${#_src_files[@]}" -gt 0 ]; then
     while IFS= read -r _key; do
       [ -n "$_key" ] && _annot["$_key"]=1
-    done < <(grep -HnF '# check-suppress:config-method' "${_src_files[@]}" | cut -d: -f1,2)
+    done < <(grep -HnFi '# check-suppress:config-method' "${_src_files[@]}" | cut -d: -f1,2)
   fi
 
   local _i _line _refs _ref _ref_file _ref_line _annotated _tmpl _pn _lo
@@ -135,17 +143,17 @@ run_config_method_compliance() {
     _refs=""
     if [ -n "$_ref_index" ]; then
       while IFS= read -r _line; do
-        [[ $_line == *"$_rel"* ]] && _refs+="$_line"$'\n'
+        [[ ${_line,,} == *"${_rel,,}"* ]] && _refs+="$_line"$'\n'
       done <<<"$_ref_index"
       if [ -z "$_refs" ]; then
         while IFS= read -r _line; do
-          [[ $_line == *"$_base"* ]] && _refs+="$_line"$'\n'
+          [[ ${_line,,} == *"${_base,,}"* ]] && _refs+="$_line"$'\n'
         done <<<"$_ref_index"
       fi
     fi
     if [ -z "$_refs" ] && [ -n "$_tmpl" ] && [ -n "$_tmpl_index" ]; then
       while IFS= read -r _line; do
-        [[ $_line == *"$_tmpl"* ]] && _refs+="$_line"$'\n'
+        [[ ${_line,,} == *"${_tmpl,,}"* ]] && _refs+="$_line"$'\n'
       done <<<"$_tmpl_index"
     fi
 

@@ -688,6 +688,152 @@ test_step14_config_method_unannotated_reference_fails() {
   return 0
 }
 
+# Case-fold divergence pin: both twins read config-method references
+# case-insensitively, so a case-variant basename reference still needs the
+# annotation (comments at the grep -Fi site and the .ps1 pattern build).
+test_step14_config_method_case_variant_reference_fails() {
+  local _tmp _out _ret
+  _tmp=$(cfg_method_fixture 'deploy "src/modules/configs/probe/SETTINGS.JSON"')
+  _out=$(mktemp)
+  run_config_method_compliance true "$_tmp" "$_tmp/src/probe-deploy.sh" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -eq 0 ] || ! grep -qF "probe/settings.json : referenced" "$_out"; then
+    echo "FAIL: a case-variant config reference must be flagged (case-insensitive reading on both twins)"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+# Empty config list pin: both twins report the shared counted pass message
+# (`config method compliance passed (0 configs).`); the .ps1 early-returns
+# before its scan, where an empty pattern list would `-match` every line.
+test_step14_config_method_empty_config_list_reports_counted_pass() {
+  local _tmp _out _ret
+  _tmp=$(mktemp -d)
+  mkdir -p "$_tmp/src/modules/configs"
+  printf '%s\n' 'echo hi' >"$_tmp/src/probe-deploy.sh"
+  _out=$(mktemp)
+  run_config_method_compliance true "$_tmp" "$_tmp/src/probe-deploy.sh" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -ne 0 ] || ! grep -qF "config method compliance passed (0 configs)." "$_out"; then
+    echo "FAIL: an empty config list must pass with the counted message both twins share"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+# Bracketed filename pin: a source file named with [ must still resolve and
+# flag its unannotated reference; the .ps1 twin needs -LiteralPath for the
+# same path, because Get-Content -Path wildcard-matches [ and reads nothing.
+test_step14_config_method_bracket_filename_resolves() {
+  local _tmp _out _ret
+  _tmp=$(mktemp -d)
+  mkdir -p "$_tmp/src/modules/configs/probe"
+  printf '%s\n' '{"probe": true}' >"$_tmp/src/modules/configs/probe/settings.json"
+  printf '%s\n' 'deploy "src/modules/configs/probe/settings.json"' >"$_tmp/src/probe[1].sh"
+  _out=$(mktemp)
+  run_config_method_compliance true "$_tmp" "$_tmp/src/probe[1].sh" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -eq 0 ] || ! grep -qF "probe/settings.json : referenced" "$_out"; then
+    echo "FAIL: a bracketed source filename must resolve and flag the unannotated reference"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
+# Dot-prefixed template-tier guard pin (.sh guard at the config loop): a
+# basename whose stem is empty gets no ${hostName} template pattern, and the
+# reference still resolves through the basename tier, so the annotated fixture
+# under tests/fixtures/ passes.
+test_step14_config_method_dot_prefixed_config_guard_fires() {
+  local _ret _out
+  _out=$(mktemp)
+  run_config_method_compliance true "$REPO_ROOT/tests/fixtures/config-method-dot-prefixed" >"$_out" 2>&1
+  _ret=$?
+  if [ "$_ret" -ne 0 ] || ! grep -qF "config method compliance passed." "$_out"; then
+    echo "FAIL: a dot-prefixed config must resolve through the basename tier with no template pattern"
+    cat "$_out"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -f "$_out"
+  return 0
+}
+
+test_step14_config_method_parallel_reports_input_order() {
+  local _tmp _out _driver _aaa_line _zzz_line
+  if ! command -v pwsh >/dev/null 2>&1; then
+    echo "FAIL: pwsh is required to run the PowerShell twin's config-method corpus"
+    return 1
+  fi
+  _tmp=$(mktemp -d)
+  _out=$(mktemp)
+  _driver="$_tmp/twin-driver.ps1"
+  mkdir -p "$_tmp/src/modules/configs"
+  printf '%s\n' '{}' >"$_tmp/src/modules/configs/aaa.conf"
+  printf '%s\n' '{}' >"$_tmp/src/modules/configs/zzz.conf"
+  awk 'BEGIN { for (i = 1; i <= 600; i++) print "deploy \"src/modules/configs/aaa.conf\"" }' >"$_tmp/src/probe-deploy.sh"
+  cat >"$_driver" <<'DRIVER'
+# Test driver: runs the real 12-repo-policy-pattern.ps1 action against a
+# fixture root, stubbing only the four functions the check pipeline provides.
+$ErrorActionPreference = 'Continue'
+function Register-Step {
+  param(
+    [Parameter(Mandatory)][string]$Id,
+    [Parameter(Mandatory)][string]$Name,
+    [string]$Platform,
+    [string]$Mode,
+    [string]$Requires,
+    [Parameter(Mandatory)][scriptblock]$Action
+  )
+  $script:stepAction = $Action
+}
+function Write-Message { param([Parameter(Mandatory, Position = 0)][string]$Message) Write-Output $Message }
+function Write-ErrorMessage { param([Parameter(Mandatory, Position = 0)][string]$Message) Write-Output "ERROR: $Message" }
+function Select-GitIgnored { process { "$_" } }
+
+$repoRoot = $args[0]
+$fixtureRoot = $args[1]
+. (Join-Path $repoRoot 'src/scripts/checks/check-steps/12-repo-policy-pattern.ps1')
+Set-Location $fixtureRoot
+$ctx = [pscustomobject]@{
+  HasArgs        = $false
+  RepoRoot       = $fixtureRoot
+  PositionalArgs = @()
+  NixFiles       = $null
+}
+& $script:stepAction $ctx
+DRIVER
+  pwsh -NoLogo -NoProfile -NonInteractive -File "$_driver" "$REPO_ROOT" "$_tmp" >"$_out" 2>&1
+  _aaa_line=$(grep -nF 'aaa.conf : referenced but no' "$_out" | head -n 1 | cut -d: -f1)
+  _zzz_line=$(grep -nF 'zzz.conf : no references found' "$_out" | head -n 1 | cut -d: -f1)
+  if [ -z "$_aaa_line" ] || [ -z "$_zzz_line" ] || [ "$_aaa_line" -ge "$_zzz_line" ]; then
+    echo "FAIL: two config errors must report in input index order (aaa.conf before zzz.conf)"
+    cat "$_out"
+    rm -rf "$_tmp"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_tmp"
+  rm -f "$_out"
+  return 0
+}
+
 test_step14_config_method_same_line_annotation_passes() {
   local _tmp _out _ret
   _tmp=$(cfg_method_fixture 'deploy "src/modules/configs/probe/settings.json" # check-suppress:config-method: method 1 (writable symlink)')
@@ -1203,6 +1349,11 @@ for test in \
   test_step14_capture_pair_counts_reset_per_file \
   test_step14_removed_skip_constructs_detection \
   test_step14_config_method_unannotated_reference_fails \
+  test_step14_config_method_case_variant_reference_fails \
+  test_step14_config_method_empty_config_list_reports_counted_pass \
+  test_step14_config_method_bracket_filename_resolves \
+  test_step14_config_method_dot_prefixed_config_guard_fires \
+  test_step14_config_method_parallel_reports_input_order \
   test_step14_config_method_same_line_annotation_passes \
   test_step14_config_method_preceding_annotation_passes \
   test_step14_config_method_window_is_10_lines \
