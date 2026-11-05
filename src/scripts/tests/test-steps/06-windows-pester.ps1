@@ -47,6 +47,12 @@ foreach ($failed in $result.Failed) {
   Write-Output "nucleus-pester failed: $name : $message"
 }
 
+foreach ($block in $result.FailedBlocks) {
+  if ($block.ErrorRecord) {
+    Write-Output "nucleus-pester blockfailed: $($block.Path -join '.') : $($block.ErrorRecord[-1].Exception.Message)"
+  }
+}
+
 if ($result.FailedCount -gt 0) { exit 1 }
 exit 0
 '@
@@ -126,11 +132,20 @@ exit 0
     # WHY throttled jobs: each suite already runs in its own child pwsh, so the
     # parent only has to fan out and wait. One job per suite, bounded at one child
     # per processor, is what keeps the fan-out from starting 46 processes at once.
-    $suiteJobs = @(
-      foreach ($testFile in $testFiles) {
-        Start-ThreadJob -ScriptBlock $invokePesterSuite -ArgumentList $testFile, $childPwsh, $RepoRoot, $runnerPath -ThrottleLimit ([Environment]::ProcessorCount)
+    # WHY incremental collection instead of one pipeline assignment: on a throw
+    # mid-fan-out the old assignment left $suiteJobs empty, so the finally's
+    # Remove-Job cleaned nothing and the started jobs leaked with their child
+    # pwsh processes.
+    $suiteJobs = [System.Collections.Generic.List[object]]::new()
+    foreach ($testFile in $testFiles) {
+      try {
+        $suiteJobs.Add((Start-ThreadJob -ScriptBlock $invokePesterSuite -ArgumentList $testFile, $childPwsh, $RepoRoot, $runnerPath -ThrottleLimit ([Environment]::ProcessorCount)))
+      } catch {
+        $suiteJobs | Stop-Job
+        $suiteJobs | Remove-Job -Force
+        throw
       }
-    )
+    }
 
     # Collection is serial and indexed in the original $testFiles order, so a suite
     # finishing early cannot move a line or the counts relative to a serial run.
@@ -179,6 +194,7 @@ exit 0
     return $true
   } finally {
     if ($suiteJobs.Count -gt 0) {
+      # WHY: Remove-Job -Force waits for in-flight children instead of killing them (recorded probes: 10 ms vs 7503 ms vs over 45 s).
       Remove-Job -Job $suiteJobs -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: cleanup also runs when the step fails early and must not replace the step verdict
     }
     Remove-Item -LiteralPath $runnerPath -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: the temp runner is removed on every path; a leftover file after a transient lock must not replace the step's real verdict.
