@@ -112,7 +112,7 @@ try {
   Set-Content -Path $violatingPath -Value ('$e = "' + $backtick + 'e[31m"')
 
   # 1. An escape-looking word in a comment is not an escape.
-  $clean = Invoke-LoggingFormatPolicy -Paths @($cleanPath)
+  $clean = Invoke-LoggingFormatAction -FixturePath $cleanPath
   if ($clean.Status -ne 0 -or $clean.Output -match 'backtick-e escape literal') {
     Assert-Fail 'step 12: a comment naming the automatic Event variable' "exit $($clean.Status); $($clean.Output.Trim())"
   } elseif ($clean.Output -notmatch 'logging format policy passed\.') {
@@ -123,8 +123,8 @@ try {
   }
 
   # 2. The policy still catches a real escape sequence.
-  $violating = Invoke-LoggingFormatPolicy -Paths @($violatingPath)
-  if ($violating.Status -eq 0 -or $violating.Output -notmatch 'backtick-e escape literal') {
+  $violating = Invoke-LoggingFormatAction -FixturePath $violatingPath
+  if ($violating.Output -notmatch ([regex]::Escape($violatingPath) + ':\d+: backtick-e escape literal') -or $violating.Output -notlike '*repository policy (pattern-based) check failed*') {
     Assert-Fail 'step 12: a backtick-e escape sequence' "exit $($violating.Status); $($violating.Output.Trim())"
   } else {
     Assert-Pass 'step 12: a backtick-e escape sequence is reported'
@@ -176,11 +176,11 @@ try {
     $skipScan = $null
     Push-Location -LiteralPath $repoRoot
     try {
-      $skipScan = Invoke-LoggingFormatPolicy -Paths @('tests/scripts/removed-skip-construct-fixture.sh')
+      $skipScan = Invoke-LoggingFormatAction -FixturePath 'tests/scripts/removed-skip-construct-fixture.sh'
     } finally {
       Pop-Location
     }
-    if ($skipScan.Status -eq 0 -or $skipScan.Output -notmatch $skipToken -or $skipScan.Output -notmatch $counterToken) {
+    if ($skipScan.Output -notmatch ("removed-skip-construct-fixture\.sh:\d+: removed skip mechanism '" + $skipToken + "'") -or $skipScan.Output -notmatch ("removed-skip-construct-fixture\.sh:\d+: removed skip mechanism '" + $counterToken + "'") -or $skipScan.Output -notlike '*repository policy (pattern-based) check failed*') {
       Assert-Fail 'step 12: a removed skip construct' "exit $($skipScan.Status); $($skipScan.Output.Trim())"
     } else {
       Assert-Pass 'step 12: the test-harness skip counter is reported as a removed skip construct'
@@ -193,8 +193,8 @@ try {
   # 4. envrc ban policy: a root-level .envrc fails with its path reported.
   $envrcPath = Join-Path -Path $fixtureDir -ChildPath '.envrc'
   Set-Content -Path $envrcPath -Value 'use flake'
-  $envrcRoot = Invoke-LoggingFormatPolicy -Paths @($envrcPath)
-  if ($envrcRoot.Status -eq 0 -or $envrcRoot.Output -notmatch "envrc ban: '[^']*\.envrc' exists; delete it") {
+  $envrcRoot = Invoke-LoggingFormatAction -FixturePath $envrcPath
+  if ($envrcRoot.Output -notmatch ("envrc ban: '" + [regex]::Escape($envrcPath) + "' exists; delete it") -or $envrcRoot.Output -notlike '*repository policy (pattern-based) check failed*') {
     Assert-Fail 'step 12: a root-level .envrc' "exit $($envrcRoot.Status); $($envrcRoot.Output.Trim())"
   } else {
     Assert-Pass 'step 12: a root-level .envrc is reported'
@@ -205,15 +205,15 @@ try {
   New-Item -ItemType Directory -Path $envrcNestedDir -Force > $null
   $envrcNestedPath = Join-Path -Path $envrcNestedDir -ChildPath '.envrc'
   Set-Content -Path $envrcNestedPath -Value 'use flake'
-  $envrcNested = Invoke-LoggingFormatPolicy -Paths @($envrcNestedPath)
-  if ($envrcNested.Status -eq 0 -or $envrcNested.Output -notmatch "envrc ban: '[^']*\.envrc' exists; delete it") {
+  $envrcNested = Invoke-LoggingFormatAction -FixturePath $envrcNestedPath
+  if ($envrcNested.Output -notmatch ("envrc ban: '" + [regex]::Escape($envrcNestedPath) + "' exists; delete it") -or $envrcNested.Output -notlike '*repository policy (pattern-based) check failed*') {
     Assert-Fail 'step 12: a nested .envrc' "exit $($envrcNested.Status); $($envrcNested.Output.Trim())"
   } else {
     Assert-Pass 'step 12: a nested .envrc is reported'
   }
 
   # 6. envrc ban policy: an ordinary file passes with no envrc finding.
-  $envrcClean = Invoke-LoggingFormatPolicy -Paths @($cleanPath)
+  $envrcClean = Invoke-LoggingFormatAction -FixturePath $cleanPath
   if ($envrcClean.Status -ne 0 -or $envrcClean.Output -match 'envrc ban:') {
     Assert-Fail 'step 12: a tree without .envrc' "exit $($envrcClean.Status); $($envrcClean.Output.Trim())"
   } elseif ($envrcClean.Output -notmatch 'envrc ban policy passed\.') {
@@ -330,6 +330,154 @@ try {
     Assert-Fail 'step 12: a nested .envrc is reported with its nested path' $envrcNestedTight.Output.Trim()
   } else {
     Assert-Pass 'step 12: a nested .envrc is reported with its nested path'
+  }
+
+  # 9. log capture pair policy: a capture directive discarding a stream is reported.
+  #    The log-capture scan walks its RepoRoot, never PositionalArgs, so this child
+  #    points RepoRoot at an isolated fixture root. The src/modules/configs and tests
+  #    skeleton mirrors case 7: the config-method scan dereferences its root before
+  #    the log-capture section runs. The violating body is assembled from split
+  #    string pieces so this tracked test file never carries a literal the gate's
+  #    own log-capture scan would flag against itself.
+  $lcpRoot = Join-Path -Path $fixtureDir -ChildPath 'lcp-root'
+  New-Item -ItemType Directory -Path @(
+    (Join-Path -Path $lcpRoot -ChildPath 'src/modules/configs')
+    (Join-Path -Path $lcpRoot -ChildPath 'tests')
+    (Join-Path -Path $lcpRoot -ChildPath 'launchd')
+  ) -Force > $null
+  $lcpCapturePath = Join-Path -Path $lcpRoot -ChildPath 'launchd/capture-point.nix'
+  Set-Content -Path $lcpCapturePath -Value @(
+    '{',
+    ('  Standard' + 'Output = "/dev' + '/null";'),
+    ('  Standard' + 'Error = "/dev' + '/null";'),
+    '}'
+  )
+  $lcpActionScript = Join-Path -Path $fixtureDir -ChildPath 'lcp-action.ps1'
+  Set-Content -Path $lcpActionScript -Value @(
+    # WHY: the action's preceding scans surface non-terminating errors that are expected
+    # for a fixture tree, so they must not abort the run and hide the scan under test.
+    '$ErrorActionPreference = "Continue"',
+    ('$RepoRoot = ''{0}''' -f $repoRoot),
+    '$FrameworkDir = Join-Path $RepoRoot "src/scripts/lib"',
+    '$CheckDir = Join-Path $RepoRoot "src/scripts/checks"',
+    '. (Join-Path $CheckDir "check-lib.ps1")',
+    '. (Join-Path $FrameworkDir "deny-list.ps1")',
+    '$script:Captured = $null',
+    'function Register-Step { param($Id,$Name,$Platform,$Mode,$Requires,[scriptblock]$Action); $script:Captured = $Action }',
+    '. (Join-Path $CheckDir "check-steps/12-repo-policy-pattern.ps1")',
+    ('$Context = [pscustomobject]@{{ HasArgs = $true; RepoRoot = ''{0}''; PositionalArgs = @(); NixFiles = @() }}' -f $lcpRoot),
+    '$out = @(& $script:Captured $Context 2>&1) | ForEach-Object { $_.ToString() }',
+    'foreach ($line in $out) { Write-Output $line }'
+  )
+  # WHY the push: Select-GitIgnored passes every path through only outside a git
+  # worktree (deny-list.ps1), and the spawned child inherits this location, so the
+  # fixture-root scan never queries git about temp paths.
+  Push-Location -LiteralPath $lcpRoot
+  try {
+    $lcpViolation = Invoke-LoggingFormatPolicy -ScriptPath $lcpActionScript
+  } finally {
+    Pop-Location
+  }
+  $lcpFinding = "log capture pair: 'launchd/capture-point.nix:2' discards a stream to /dev/null; capture stdout.log and stderr.log instead (output-handling.instructions.md)"
+  if ($lcpViolation.Output -notmatch [regex]::Escape($lcpFinding) -or $lcpViolation.Output -notlike '*log capture pair policy check failed*') {
+    Assert-Fail 'step 12: a capture directive discarding a stream to /dev/null' "exit $($lcpViolation.Status); $($lcpViolation.Output.Trim())"
+  } else {
+    Assert-Pass 'step 12: a capture directive discarding a stream to /dev/null is reported'
+  }
+
+  # 10. activation naming policy: a violating activation entry name is reported.
+  #    The nix scan reads its files through the scoped positional list, so this
+  #    child points RepoRoot at an isolated fixture root and feeds the entry file
+  #    as the one scoped path. The src/modules/configs skeleton mirrors case 9:
+  #    the config-method scan dereferences its root before the activation naming
+  #    section runs.
+  $anRoot = Join-Path -Path $fixtureDir -ChildPath 'an-root'
+  New-Item -ItemType Directory -Path (Join-Path -Path $anRoot -ChildPath 'src/modules/configs') -Force > $null
+  $anEntryPath = Join-Path -Path $anRoot -ChildPath 'src/modules/an-case.nix'
+  Set-Content -Path $anEntryPath -Value 'home.activation.badName = lib.mkIf true { }'
+  $anActionScript = Join-Path -Path $fixtureDir -ChildPath 'an-action.ps1'
+  Set-Content -Path $anActionScript -Value @(
+    # WHY: the action's preceding scans surface non-terminating errors that are expected
+    # for a fixture tree, so they must not abort the run and hide the scan under test.
+    '$ErrorActionPreference = "Continue"',
+    ('$RepoRoot = ''{0}''' -f $repoRoot),
+    '$FrameworkDir = Join-Path $RepoRoot "src/scripts/lib"',
+    '$CheckDir = Join-Path $RepoRoot "src/scripts/checks"',
+    '. (Join-Path $CheckDir "check-lib.ps1")',
+    '. (Join-Path $FrameworkDir "deny-list.ps1")',
+    '$script:Captured = $null',
+    'function Register-Step { param($Id,$Name,$Platform,$Mode,$Requires,[scriptblock]$Action); $script:Captured = $Action }',
+    '. (Join-Path $CheckDir "check-steps/12-repo-policy-pattern.ps1")',
+    ('$Context = [pscustomobject]@{{ HasArgs = $true; RepoRoot = ''{0}''; PositionalArgs = @(''src/modules/an-case.nix''); NixFiles = @() }}' -f $anRoot),
+    '$out = @(& $script:Captured $Context 2>&1) | ForEach-Object { $_.ToString() }',
+    'foreach ($line in $out) { Write-Output $line }'
+  )
+  # WHY the push: Select-GitIgnored passes every path through only outside a git
+  # worktree (deny-list.ps1), and the spawned child inherits this location, so the
+  # fixture-root scan never queries git about temp paths.
+  Push-Location -LiteralPath $anRoot
+  try {
+    $anViolation = Invoke-LoggingFormatPolicy -ScriptPath $anActionScript
+  } finally {
+    Pop-Location
+  }
+  $anFinding = "activation name 'badName' at src/modules/an-case.nix:1 is not kebab-case (see .agents/instructions/activation-scripts.instructions.md)"
+  if ($anViolation.Output -notmatch [regex]::Escape($anFinding) -or $anViolation.Output -notlike '*activation naming policy check failed*') {
+    Assert-Fail 'step 12: an activation entry name that is not kebab-case' "exit $($anViolation.Status); $($anViolation.Output.Trim())"
+  } else {
+    Assert-Pass 'step 12: an activation entry name that is not kebab-case is reported'
+  }
+
+  # 11. config method compliance: a config missing its method annotation is reported.
+  #    The config-method scan reads RepoRoot, not the positional list, so this child
+  #    points RepoRoot at an isolated fixture root whose src/modules/configs holds
+  #    one config and whose src/ file references its basename with no annotation in
+  #    the ten-line window. Script-level $RepoRoot and the Push-Location mirror case
+  #    10: real repo root for the dot-sourced libs, fixture root for the scans.
+  $cmRoot = Join-Path -Path $fixtureDir -ChildPath 'cm-root'
+  New-Item -ItemType Directory -Path (Join-Path -Path $cmRoot -ChildPath 'src/modules/configs/demo') -Force > $null
+  # WHY two configs: the step reads $cfgFiles.Count off the raw Get-ChildItem result, which is a scalar under StrictMode when the tree holds one file, so a single-config fixture errors before the scan and the case would assert on nothing.
+  Set-Content -Path (Join-Path -Path $cmRoot -ChildPath 'src/modules/configs/demo/settings.conf') -Value 'managed = true'
+  Set-Content -Path (Join-Path -Path $cmRoot -ChildPath 'src/modules/configs/demo/extra.conf') -Value 'managed = true'
+  Set-Content -Path (Join-Path -Path $cmRoot -ChildPath 'src/modules/deploy-demo.nix') -Value @(
+    '{'
+    '  # the reference below deploys the config and carries no method annotation'
+    '  deployPath = "settings.conf";'
+    '  # check-suppress:config-method: fixture deployment declares the method inline'
+    '  extraPath = "extra.conf";'
+    '}'
+  )
+  $cmActionScript = Join-Path -Path $fixtureDir -ChildPath 'cm-action.ps1'
+  Set-Content -Path $cmActionScript -Value @(
+    # WHY: the action's preceding scans surface non-terminating errors that are expected
+    # for a fixture tree, so they must not abort the run and hide the scan under test.
+    '$ErrorActionPreference = "Continue"',
+    ('$RepoRoot = ''{0}''' -f $repoRoot),
+    '$FrameworkDir = Join-Path $RepoRoot "src/scripts/lib"',
+    '$CheckDir = Join-Path $RepoRoot "src/scripts/checks"',
+    '. (Join-Path $CheckDir "check-lib.ps1")',
+    '. (Join-Path $FrameworkDir "deny-list.ps1")',
+    '$script:Captured = $null',
+    'function Register-Step { param($Id,$Name,$Platform,$Mode,$Requires,[scriptblock]$Action); $script:Captured = $Action }',
+    '. (Join-Path $CheckDir "check-steps/12-repo-policy-pattern.ps1")',
+    ('$Context = [pscustomobject]@{{ HasArgs = $true; RepoRoot = ''{0}''; PositionalArgs = @(); NixFiles = @() }}' -f $cmRoot),
+    '$out = @(& $script:Captured $Context 2>&1) | ForEach-Object { $_.ToString() }',
+    'foreach ($line in $out) { Write-Output $line }'
+  )
+  # WHY the push: Select-GitIgnored passes every path through only outside a git
+  # worktree (deny-list.ps1), and the spawned child inherits this location, so the
+  # fixture-root scan never queries git about temp paths.
+  Push-Location -LiteralPath $cmRoot
+  try {
+    $cmViolation = Invoke-LoggingFormatPolicy -ScriptPath $cmActionScript
+  } finally {
+    Pop-Location
+  }
+  $cmFinding = "demo/settings.conf : referenced but no '# check-suppress:config-method' comment found on or before reference lines"
+  if ($cmViolation.Output -notmatch [regex]::Escape($cmFinding) -or $cmViolation.Output -notlike '*config method compliance check failed*') {
+    Assert-Fail 'step 12: a config missing its method annotation' "exit $($cmViolation.Status); $($cmViolation.Output.Trim())"
+  } else {
+    Assert-Pass 'step 12: a config missing its method annotation is reported'
   }
 } finally {
   if (Test-Path -LiteralPath $fixtureDir) {

@@ -15,7 +15,7 @@ TEST_FILE="$REPO_ROOT/src/scripts/checks/check-steps/12-repo-policy-pattern.sh"
 
 # --- activation naming policy behavioral tests ---
 
-test_step14_naming_behavioral_positive() {
+test_step12_naming_behavioral_positive() {
   local _tmp _out _ret
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -45,7 +45,7 @@ EOF
   [ "$_ret" -eq 0 ]
 }
 
-test_step14_naming_behavioral_negative() {
+test_step12_naming_behavioral_negative() {
   local _tmp _out _ret
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -67,7 +67,7 @@ EOF
   return 0
 }
 
-test_step14_naming_behavioral_exemption() {
+test_step12_naming_behavioral_exemption() {
   local _tmp _out _ret
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -93,7 +93,7 @@ EOF
   [ "$_ret" -eq 0 ]
 }
 
-test_step14_naming_behavioral_prefix() {
+test_step12_naming_behavioral_prefix() {
   local _tmp _out _ret
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -123,7 +123,7 @@ EOF
 # fixture names its entries so that every captured record has to be reported and
 # every uncaptured one has to stay silent.
 
-test_step14_naming_region_scopes_attrset_block() {
+test_step12_naming_region_scopes_attrset_block() {
   local _tmp _out _ret _count
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -183,7 +183,7 @@ EOF
 # The region ends when its brace depth returns to zero, so a nested attrset keeps
 # it open. A region that never closes keeps the file in scope, and the
 # between-blocks line and the second block would both be reported.
-test_step14_naming_region_ends_at_closing_brace() {
+test_step12_naming_region_ends_at_closing_brace() {
   local _tmp _out _ret _count
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -236,7 +236,7 @@ EOF
 # entries after the nested close are still scanned. The shape is the one at
 # src/platforms/macOS/modules/default.nix:330-346: a namespace, an entry, a nested
 # attrset with `command` and `order`, then more entries.
-test_step14_naming_nested_attrset_keeps_scanning() {
+test_step12_naming_nested_attrset_keeps_scanning() {
   local _tmp _out _ret _count
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -294,7 +294,7 @@ EOF
 # line before their block. A scan that carries the open block into the next file
 # reports the second file's leading line, whichever file the discovery yields
 # first; a scan that resets per file reports nothing.
-test_step14_naming_region_state_does_not_cross_files() {
+test_step12_naming_region_state_does_not_cross_files() {
   local _tmp _out _ret
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -332,7 +332,7 @@ EOF
 FIXTURE_DIR="$REPO_ROOT/tests/fixtures/logging-format"
 CAPTURE_FIXTURE_DIR="$REPO_ROOT/tests/fixtures/log-capture-pair"
 
-test_step14_logging_behavioral_positive() {
+test_step12_logging_behavioral_positive() {
   local _tmp _out _ret
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -349,7 +349,7 @@ test_step14_logging_behavioral_positive() {
   [ "$_ret" -eq 0 ]
 }
 
-test_step14_logging_behavioral_negative() {
+test_step12_logging_behavioral_negative() {
   local _tmp _out _ret
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -369,7 +369,7 @@ test_step14_logging_behavioral_negative() {
   return 0
 }
 
-test_step14_logging_behavioral_allowlist() {
+test_step12_logging_behavioral_allowlist() {
   local _tmp _out _ret
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -388,7 +388,7 @@ test_step14_logging_behavioral_allowlist() {
 
 # --- nix file structure behavioral tests ---
 
-test_step14_nix_file_structure_pattern1_detection() {
+test_step12_nix_file_structure_pattern1_detection() {
   local _tmp
   _tmp=$(mktemp -d)
   mkdir -p "$_tmp/src/testmod"
@@ -412,7 +412,7 @@ test_step14_nix_file_structure_pattern1_detection() {
   [ "$_ret" -eq 0 ]
 }
 
-test_step14_nix_file_structure_pattern2_detection() {
+test_step12_nix_file_structure_pattern2_detection() {
   local _tmp
   _tmp=$(mktemp -d)
   mkdir -p "$_tmp/src/mymod"
@@ -435,7 +435,7 @@ test_step14_nix_file_structure_pattern2_detection() {
   [ "$_ret" -eq 0 ]
 }
 
-test_step14_nix_file_structure_valid_passes() {
+test_step12_nix_file_structure_valid_passes() {
   local _tmp
   _tmp=$(mktemp -d)
   mkdir -p "$_tmp/src/mymod"
@@ -456,7 +456,7 @@ test_step14_nix_file_structure_valid_passes() {
 
 # --- log capture pair policy behavioral tests ---
 
-test_step14_capture_pair_behavioral_positive() {
+test_step12_capture_pair_behavioral_positive() {
   local _tmp _out _ret
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -473,7 +473,7 @@ test_step14_capture_pair_behavioral_positive() {
   [ "$_ret" -eq 0 ]
 }
 
-test_step14_capture_pair_behavioral_negative() {
+test_step12_capture_pair_behavioral_negative() {
   local _tmp _out _ret
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -497,7 +497,7 @@ test_step14_capture_pair_behavioral_negative() {
 # The removed-skip list must cover the test-harness skip counter. The tokens are
 # composed at runtime: step 12 scans tracked .sh files, this file included, so a
 # literal token here would be a finding against the gate's own test.
-test_step14_removed_skip_constructs_detection() {
+test_step12_removed_skip_constructs_detection() {
   local _tmp _out _assert_token _counter_token
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -529,7 +529,7 @@ test_step14_removed_skip_constructs_detection() {
 
 # --- envrc ban policy behavioral tests ---
 
-test_step14_envrc_ban_root_fails() {
+test_step12_envrc_ban_root_fails() {
   local _tmp _out _ret
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -548,7 +548,7 @@ test_step14_envrc_ban_root_fails() {
   return 0
 }
 
-test_step14_envrc_ban_nested_fails() {
+test_step12_envrc_ban_nested_fails() {
   local _tmp _out _ret
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -568,7 +568,7 @@ test_step14_envrc_ban_nested_fails() {
   return 0
 }
 
-test_step14_envrc_ban_clean_tree_passes() {
+test_step12_envrc_ban_clean_tree_passes() {
   local _tmp _out _ret
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -588,7 +588,7 @@ test_step14_envrc_ban_clean_tree_passes() {
   return 0
 }
 
-test_step14_envrc_ban_scoped_mode_fails() {
+test_step12_envrc_ban_scoped_mode_fails() {
   local _tmp _out _ret
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -607,7 +607,7 @@ test_step14_envrc_ban_scoped_mode_fails() {
   return 0
 }
 
-test_step14_envrc_ban_pruned_decoys_ignored() {
+test_step12_envrc_ban_pruned_decoys_ignored() {
   local _tmp _out _ret
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -670,7 +670,7 @@ cfg_method_fixture() {
   printf '%s\n' "$_root"
 }
 
-test_step14_config_method_unannotated_reference_fails() {
+test_step12_config_method_unannotated_reference_fails() {
   local _tmp _out _ret
   _tmp=$(cfg_method_fixture 'deploy "src/modules/configs/probe/settings.json"')
   _out=$(mktemp)
@@ -691,7 +691,7 @@ test_step14_config_method_unannotated_reference_fails() {
 # Case-fold divergence pin: both twins read config-method references
 # case-insensitively, so a case-variant basename reference still needs the
 # annotation (comments at the grep -Fi site and the .ps1 pattern build).
-test_step14_config_method_case_variant_reference_fails() {
+test_step12_config_method_case_variant_reference_fails() {
   local _tmp _out _ret
   _tmp=$(cfg_method_fixture 'deploy "src/modules/configs/probe/SETTINGS.JSON"')
   _out=$(mktemp)
@@ -712,7 +712,7 @@ test_step14_config_method_case_variant_reference_fails() {
 # Empty config list pin: both twins report the shared counted pass message
 # (`config method compliance passed (0 configs).`); the .ps1 early-returns
 # before its scan, where an empty pattern list would `-match` every line.
-test_step14_config_method_empty_config_list_reports_counted_pass() {
+test_step12_config_method_empty_config_list_reports_counted_pass() {
   local _tmp _out _ret
   _tmp=$(mktemp -d)
   mkdir -p "$_tmp/src/modules/configs"
@@ -735,7 +735,7 @@ test_step14_config_method_empty_config_list_reports_counted_pass() {
 # Bracketed filename pin: a source file named with [ must still resolve and
 # flag its unannotated reference; the .ps1 twin needs -LiteralPath for the
 # same path, because Get-Content -Path wildcard-matches [ and reads nothing.
-test_step14_config_method_bracket_filename_resolves() {
+test_step12_config_method_bracket_filename_resolves() {
   local _tmp _out _ret
   _tmp=$(mktemp -d)
   mkdir -p "$_tmp/src/modules/configs/probe"
@@ -760,7 +760,7 @@ test_step14_config_method_bracket_filename_resolves() {
 # basename whose stem is empty gets no ${hostName} template pattern, and the
 # reference still resolves through the basename tier, so the annotated fixture
 # under tests/fixtures/ passes.
-test_step14_config_method_dot_prefixed_config_guard_fires() {
+test_step12_config_method_dot_prefixed_config_guard_fires() {
   local _ret _out
   _out=$(mktemp)
   run_config_method_compliance true "$REPO_ROOT/tests/fixtures/config-method-dot-prefixed" >"$_out" 2>&1
@@ -775,7 +775,31 @@ test_step14_config_method_dot_prefixed_config_guard_fires() {
   return 0
 }
 
-test_step14_config_method_parallel_reports_input_order() {
+# A config basename carrying regex metacharacters must still resolve through
+# every tier: the index greps are fixed-string and the tier compares quote the
+# pattern, so probe[1].json cannot be read as a bracket expression.
+test_step12_config_method_regex_metachar_basename_flagged() {
+  local _root _out _ret
+  _root=$(mktemp -d)
+  _out=$(mktemp)
+  mkdir -p "$_root/src/modules/configs/probe"
+  printf '%s\n' '{"probe": true}' >"$_root/src/modules/configs/probe/probe[1].json"
+  printf '%s\n' 'deploy "src/modules/configs/probe/probe[1].json"' >"$_root/src/probe-deploy.sh"
+  _ret=0
+  run_config_method_compliance true "$_root" >"$_out" 2>&1 || _ret=$?
+  if [ "$_ret" -eq 0 ] || ! grep -qF "referenced but no '# check-suppress:config-method' comment found" "$_out" || ! grep -qF 'probe[1].json' "$_out"; then
+    echo "FAIL: a config basename with regex metacharacters must still be matched literally"
+    cat "$_out"
+    rm -rf "$_root"
+    rm -f "$_out"
+    return 1
+  fi
+  rm -rf "$_root"
+  rm -f "$_out"
+  return 0
+}
+
+test_step12_config_method_parallel_reports_input_order() {
   local _tmp _out _driver _aaa_line _zzz_line
   if ! command -v pwsh >/dev/null 2>&1; then
     echo "FAIL: pwsh is required to run the PowerShell twin's config-method corpus"
@@ -834,7 +858,7 @@ DRIVER
   return 0
 }
 
-test_step14_config_method_same_line_annotation_passes() {
+test_step12_config_method_same_line_annotation_passes() {
   local _tmp _out _ret
   _tmp=$(cfg_method_fixture 'deploy "src/modules/configs/probe/settings.json" # check-suppress:config-method: method 1 (writable symlink)')
   _out=$(mktemp)
@@ -849,7 +873,7 @@ test_step14_config_method_same_line_annotation_passes() {
   [ "$_ret" -eq 0 ]
 }
 
-test_step14_config_method_preceding_annotation_passes() {
+test_step12_config_method_preceding_annotation_passes() {
   local _tmp _out _ret
   _tmp=$(cfg_method_fixture \
     '# check-suppress:config-method: method 1 (writable symlink)' \
@@ -868,7 +892,7 @@ test_step14_config_method_preceding_annotation_passes() {
   [ "$_ret" -eq 0 ]
 }
 
-test_step14_config_method_window_is_10_lines() {
+test_step12_config_method_window_is_10_lines() {
   local _tmp _out _ret
   # The annotation sits 11 lines above the reference, one outside the window
   # the .ps1 twin scans, so this must fail. It pins the window width.
@@ -918,7 +942,7 @@ EOF
 # Five dotted configs, each referenced by basename only, so a per-config scan
 # shape spends a relative-path grep and a basename grep on every config. The
 # violations that still surface prove the shim did not disarm the rule.
-test_step14_config_method_reference_index_scan_count() {
+test_step12_config_method_reference_index_scan_count() {
   local _tmp _out _log _shim _ret _count _real_grep _name
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -930,7 +954,7 @@ test_step14_config_method_reference_index_scan_count() {
     printf 'deploy "%s.json"\n' "$_name" >>"$_tmp/src/probe-deploy.sh"
   done
   _real_grep=$(command -v grep)
-  grep_counting_shim "$_shim" "$_real_grep"
+  grep_counting_shim "$_shim"
   _ret=0
   NUCLEUS_GREP_LOG="$_log" NUCLEUS_REAL_GREP="$_real_grep" PATH="$_shim:$PATH" \
     run_config_method_compliance true "$_tmp" >"$_out" 2>&1 || _ret=$?
@@ -943,8 +967,8 @@ test_step14_config_method_reference_index_scan_count() {
     rm -f "$_out" "$_log"
     return 1
   fi
-  if [ "$_count" -gt 3 ]; then
-    echo "FAIL: expected at most three grep scans (annotation, basename, template index), got $_count"
+  if [ "$_count" -ne 3 ]; then
+    echo "FAIL: expected exactly three grep scans (annotation, basename, template index), got $_count"
     cat "$_log"
     rm -rf "$_tmp" "$_shim"
     rm -f "$_out" "$_log"
@@ -959,7 +983,7 @@ test_step14_config_method_reference_index_scan_count() {
 # relative-path reference 19 lines below does not. A tier that widens instead of
 # replacing (union of both tiers) passes on the annotated basename line; the
 # relative-path tier replaces it, so this must fail.
-test_step14_config_method_relative_tier_beats_basename() {
+test_step12_config_method_relative_tier_beats_basename() {
   local _tmp _out _ret _i
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -988,7 +1012,7 @@ test_step14_config_method_relative_tier_beats_basename() {
 # A host-config file is referenced only through the ${hostName} template, so the
 # answer depends on the template tier built from the basename's extension
 # suffix. Unannotated fails, annotated on the same line passes.
-test_step14_config_method_template_tier_reference() {
+test_step12_config_method_template_tier_reference() {
   local _tmp _out _ret
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -1026,7 +1050,7 @@ test_step14_config_method_template_tier_reference() {
 # annotation absent. A scoped run that listed an unrelated file must still catch
 # a violation in a file it was not given; a scoped implementation would drop the
 # config and pass.
-test_step14_config_method_scoped_run_checks_whole_repo() {
+test_step12_config_method_scoped_run_checks_whole_repo() {
   local _tmp _out _ret
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -1051,7 +1075,7 @@ test_step14_config_method_scoped_run_checks_whole_repo() {
 # The step-file exclusion is by basename, so a step file at any depth is out of
 # every policy scan while an ordinary file at the same depth stays in. This pins
 # the parameter-expansion basename read that replaced a fork per file.
-test_step14_policy_scan_target_nested_basename() {
+test_step12_policy_scan_target_nested_basename() {
   local _ret=0
   if _policy_scan_target "src/scripts/deep/dir/12-repo-policy-pattern.sh" '\.(sh|zsh)$'; then
     echo "FAIL: a step file at depth must be excluded by basename"
@@ -1091,7 +1115,10 @@ capture_scan() {
     cp "$CAPTURE_FIXTURE_DIR/$_cs_name" "$_cs_dir/$_cs_name"
     _cs_copies+=("$_cs_dir/$_cs_name")
   done
-  run_log_capture_pair_policy true "$_cs_dir" "${_cs_copies[@]}" >"$_cs_out" 2>&1
+  # The policy cds into its root and never returns to the caller's directory;
+  # the subshell keeps that cd from leaving this suite parked in a temp dir
+  # the case is about to delete.
+  (run_log_capture_pair_policy true "$_cs_dir" "${_cs_copies[@]}" >"$_cs_out" 2>&1)
 }
 
 # Exact text present in the captured output. The runner prefix is the only part
@@ -1102,7 +1129,7 @@ capture_reports() {
 
 # All four stream positions accepted in one call. A pass that reports a pair, or
 # that treats 1>>/2>> as a merged redirection, fails here.
-test_step14_capture_pair_all_stream_positions_pass() {
+test_step12_capture_pair_all_stream_positions_pass() {
   local _tmp _out _ret
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -1129,7 +1156,7 @@ test_step14_capture_pair_all_stream_positions_pass() {
 
 # Both /dev/null directives are reported, with their file, line and line text.
 # The count is what shows the second stream is not lost after the first hit.
-test_step14_capture_pair_discard_message_is_exact() {
+test_step12_capture_pair_discard_message_is_exact() {
   local _tmp _out _ret _probe _line_out _line_err _count
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -1160,7 +1187,7 @@ test_step14_capture_pair_discard_message_is_exact() {
 }
 
 # The merged-stream report, exact, and exactly once.
-test_step14_capture_pair_merged_message_is_exact() {
+test_step12_capture_pair_merged_message_is_exact() {
   local _tmp _out _ret _probe _line _count
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -1190,7 +1217,7 @@ test_step14_capture_pair_merged_message_is_exact() {
 
 # A launchd file capturing the error stream only. The message names the file and
 # the directive family, and it is emitted once.
-test_step14_capture_pair_lone_launchd_message_is_exact() {
+test_step12_capture_pair_lone_launchd_message_is_exact() {
   local _tmp _out _ret _probe
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -1219,7 +1246,7 @@ test_step14_capture_pair_lone_launchd_message_is_exact() {
 # The systemd family has its own wording. A pass that reported the launchd text
 # for a systemd directive fails on the first assertion, one that dropped the
 # systemd presence flags fails on the return code.
-test_step14_capture_pair_lone_systemd_message_is_exact() {
+test_step12_capture_pair_lone_systemd_message_is_exact() {
   local _tmp _out _ret _probe
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -1255,7 +1282,7 @@ test_step14_capture_pair_lone_systemd_message_is_exact() {
 # Flags are per file. One file captures the error stream only and the next
 # captures the stdout stream only; a pass that carries the first file's flags
 # into the second sees a pair and reports nothing for it.
-test_step14_capture_pair_state_does_not_cross_files() {
+test_step12_capture_pair_state_does_not_cross_files() {
   local _tmp _out _ret _first _second _count
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -1287,7 +1314,7 @@ test_step14_capture_pair_state_does_not_cross_files() {
 # Report order is per file and per rule, not line order: every discard report
 # comes before every merged report, so a merged redirection above a discard is
 # still reported second. This is the order the per-rule greps produced.
-test_step14_capture_pair_reports_discard_before_merged() {
+test_step12_capture_pair_reports_discard_before_merged() {
   local _tmp _out _ret _discard_at _merged_at
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -1317,7 +1344,7 @@ test_step14_capture_pair_reports_discard_before_merged() {
 # Per-file accumulation does not carry into the next file: two violating files in
 # one call report each hit once, not the first file's hits twice. A pass whose
 # hit arrays are never cleared fails the first count.
-test_step14_capture_pair_counts_reset_per_file() {
+test_step12_capture_pair_counts_reset_per_file() {
   local _tmp _out _ret _discards _merges
   _tmp=$(mktemp -d)
   _out=$(mktemp)
@@ -1339,50 +1366,51 @@ test_step14_capture_pair_counts_reset_per_file() {
 
 failures=0
 for test in \
-  test_step14_capture_pair_all_stream_positions_pass \
-  test_step14_capture_pair_discard_message_is_exact \
-  test_step14_capture_pair_merged_message_is_exact \
-  test_step14_capture_pair_lone_launchd_message_is_exact \
-  test_step14_capture_pair_lone_systemd_message_is_exact \
-  test_step14_capture_pair_state_does_not_cross_files \
-  test_step14_capture_pair_reports_discard_before_merged \
-  test_step14_capture_pair_counts_reset_per_file \
-  test_step14_removed_skip_constructs_detection \
-  test_step14_config_method_unannotated_reference_fails \
-  test_step14_config_method_case_variant_reference_fails \
-  test_step14_config_method_empty_config_list_reports_counted_pass \
-  test_step14_config_method_bracket_filename_resolves \
-  test_step14_config_method_dot_prefixed_config_guard_fires \
-  test_step14_config_method_parallel_reports_input_order \
-  test_step14_config_method_same_line_annotation_passes \
-  test_step14_config_method_preceding_annotation_passes \
-  test_step14_config_method_window_is_10_lines \
-  test_step14_config_method_reference_index_scan_count \
-  test_step14_config_method_relative_tier_beats_basename \
-  test_step14_config_method_template_tier_reference \
-  test_step14_config_method_scoped_run_checks_whole_repo \
-  test_step14_policy_scan_target_nested_basename \
-  test_step14_naming_behavioral_positive \
-  test_step14_naming_behavioral_negative \
-  test_step14_naming_behavioral_exemption \
-  test_step14_naming_behavioral_prefix \
-  test_step14_naming_region_scopes_attrset_block \
-  test_step14_naming_region_ends_at_closing_brace \
-  test_step14_naming_nested_attrset_keeps_scanning \
-  test_step14_naming_region_state_does_not_cross_files \
-  test_step14_logging_behavioral_positive \
-  test_step14_logging_behavioral_negative \
-  test_step14_logging_behavioral_allowlist \
-  test_step14_nix_file_structure_pattern1_detection \
-  test_step14_nix_file_structure_pattern2_detection \
-  test_step14_nix_file_structure_valid_passes \
-  test_step14_capture_pair_behavioral_positive \
-  test_step14_capture_pair_behavioral_negative \
-  test_step14_envrc_ban_root_fails \
-  test_step14_envrc_ban_nested_fails \
-  test_step14_envrc_ban_clean_tree_passes \
-  test_step14_envrc_ban_scoped_mode_fails \
-  test_step14_envrc_ban_pruned_decoys_ignored; do
+  test_step12_capture_pair_all_stream_positions_pass \
+  test_step12_capture_pair_discard_message_is_exact \
+  test_step12_capture_pair_merged_message_is_exact \
+  test_step12_capture_pair_lone_launchd_message_is_exact \
+  test_step12_capture_pair_lone_systemd_message_is_exact \
+  test_step12_capture_pair_state_does_not_cross_files \
+  test_step12_capture_pair_reports_discard_before_merged \
+  test_step12_capture_pair_counts_reset_per_file \
+  test_step12_removed_skip_constructs_detection \
+  test_step12_config_method_unannotated_reference_fails \
+  test_step12_config_method_case_variant_reference_fails \
+  test_step12_config_method_empty_config_list_reports_counted_pass \
+  test_step12_config_method_bracket_filename_resolves \
+  test_step12_config_method_dot_prefixed_config_guard_fires \
+  test_step12_config_method_regex_metachar_basename_flagged \
+  test_step12_config_method_parallel_reports_input_order \
+  test_step12_config_method_same_line_annotation_passes \
+  test_step12_config_method_preceding_annotation_passes \
+  test_step12_config_method_window_is_10_lines \
+  test_step12_config_method_reference_index_scan_count \
+  test_step12_config_method_relative_tier_beats_basename \
+  test_step12_config_method_template_tier_reference \
+  test_step12_config_method_scoped_run_checks_whole_repo \
+  test_step12_policy_scan_target_nested_basename \
+  test_step12_naming_behavioral_positive \
+  test_step12_naming_behavioral_negative \
+  test_step12_naming_behavioral_exemption \
+  test_step12_naming_behavioral_prefix \
+  test_step12_naming_region_scopes_attrset_block \
+  test_step12_naming_region_ends_at_closing_brace \
+  test_step12_naming_nested_attrset_keeps_scanning \
+  test_step12_naming_region_state_does_not_cross_files \
+  test_step12_logging_behavioral_positive \
+  test_step12_logging_behavioral_negative \
+  test_step12_logging_behavioral_allowlist \
+  test_step12_nix_file_structure_pattern1_detection \
+  test_step12_nix_file_structure_pattern2_detection \
+  test_step12_nix_file_structure_valid_passes \
+  test_step12_capture_pair_behavioral_positive \
+  test_step12_capture_pair_behavioral_negative \
+  test_step12_envrc_ban_root_fails \
+  test_step12_envrc_ban_nested_fails \
+  test_step12_envrc_ban_clean_tree_passes \
+  test_step12_envrc_ban_scoped_mode_fails \
+  test_step12_envrc_ban_pruned_decoys_ignored; do
   if ! $test; then
     failures=$((failures + 1))
   fi
