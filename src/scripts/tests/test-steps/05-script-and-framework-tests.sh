@@ -4,8 +4,11 @@
 
 register_step "script-and-framework-tests" "Script and framework tests" run_script_and_framework_tests
 
-# Discover tests/scripts/**/*-tests.sh in stable order: priority framework suites first,
-# then everything else lexicographically. Excludes suites wired to other test steps.
+# Discover tests/scripts/**/*-tests.{sh,ps1} in stable order: priority framework
+# suites first (both twins), then everything else lexicographically. Excludes
+# suites wired to other test steps; the excluded names strip per extension, so
+# the one list below covers both globs and mirrors the Windows twin's
+# $excludeNames.
 _discover_script_tests() {
   local _test_dir="$1"
   local -a _all=() _ordered=() _seen=()
@@ -13,12 +16,12 @@ _discover_script_tests() {
 
   while IFS= read -r -d '' _f; do
     _all+=("$_f")
-  done < <(find "$_test_dir" -type f -name '*-tests.sh' -print0 | LC_ALL=C sort -z)
+  done < <(find "$_test_dir" -type f \( -name '*-tests.sh' -o -name '*-tests.ps1' \) -print0 | LC_ALL=C sort -z)
 
   for _priority in step-runner-unit-tests test-lib-unit-tests deny-list-tests; do
     for _f in "${_all[@]}"; do
       _base="$(basename "$_f")"
-      if [ "$_base" = "${_priority}.sh" ]; then
+      if [ "$_base" = "${_priority}.sh" ] || [ "$_base" = "${_priority}.ps1" ]; then
         _ordered+=("$_f")
         _seen+=("$_f")
       fi
@@ -26,7 +29,10 @@ _discover_script_tests() {
   done
 
   for _f in "${_all[@]}"; do
-    _base="$(basename "$_f" .sh)"
+    case "$_f" in
+    *.ps1) _base="$(basename "$_f" .ps1)" ;;
+    *) _base="$(basename "$_f" .sh)" ;;
+    esac
     case "$_base" in
     nix-test-eval-tests | check-pwsh-tests) continue ;;
     esac
@@ -46,8 +52,14 @@ _discover_script_tests() {
 }
 
 _is_priority_script_test() {
-  case "$(basename "$1")" in
-  step-runner-unit-tests.sh | test-lib-unit-tests.sh | deny-list-tests.sh) return 0 ;;
+  local _base
+  _base="$(basename "$1")"
+  case "$_base" in
+  *.ps1) _base="${_base%.ps1}" ;;
+  *) _base="${_base%.sh}" ;;
+  esac
+  case "$_base" in
+  step-runner-unit-tests | test-lib-unit-tests | deny-list-tests) return 0 ;;
   *) return 1 ;;
   esac
 }
@@ -64,6 +76,8 @@ _run_script_test() {
   # suite is not run a second time just to show the output quiet mode suppressed.
   if [ "$(basename "$_script")" = "nucleus-apps-smoke-tests.sh" ]; then
     nucleus_nix_locked bash "$_script" >"$_capture" 2>&1 || _status=$?
+  elif [ "${_script##*.}" = "ps1" ]; then
+    pwsh -NoProfile -File "$_script" >"$_capture" 2>&1 || _status=$?
   else
     bash "$_script" >"$_capture" 2>&1 || _status=$?
   fi
@@ -127,6 +141,8 @@ _run_parallel_script_tests() {
         else
           nucleus_nix_locked bash "$script"
         fi
+      elif [ "${base##*.}" = "ps1" ]; then
+        pwsh -NoProfile -File "$script"
       elif [ "$quiet_mode" = true ]; then
         bash "$script"
       else
