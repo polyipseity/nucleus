@@ -92,12 +92,12 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   } else {
     $saAllShNix = @(
       Get-ChildItem -Path $r -Recurse -File |
-        Where-Object { $_.Extension -in '.sh', '.nix' -and $_.FullName -notmatch '[\/]vendor[\/]' -and $_.Name -notin $allStepShLeaves } |
+        Where-Object { $_.Extension -in '.sh', '.nix' -and $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.Name -notin $allStepShLeaves } |
         ForEach-Object { $_.FullName }
     )
     $saAllPs1 = @(
       Get-ChildItem -Path $r -Recurse -File |
-        Where-Object { $_.Extension -eq '.ps1' -and $_.FullName -notmatch '[\/]vendor[\/]' -and $_.Name -notin $allStepLeaves } |
+        Where-Object { $_.Extension -eq '.ps1' -and $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.Name -notin $allStepLeaves } |
         ForEach-Object { $_.FullName }
     )
     $saHasFiles = ($saAllShNix.Count -gt 0) -or ($saAllPs1.Count -gt 0)
@@ -141,14 +141,16 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
     }
   }
 
-  $cmDeclCount = 0
   $cmHomebrew = Join-Path -Path $r -ChildPath 'src/hosts/MacBook/homebrew.nix'
+  # WHY the guard wraps the failure too: a fixture root with no homebrew.nix
+  #   has nothing to declare, and a bare `continue` at this level would abort
+  #   the whole step action (no enclosing loop), not skip this check.
   if (Test-Path -LiteralPath $cmHomebrew) {
     $cmDeclCount = (Select-String -LiteralPath $cmHomebrew -Pattern 'fuse-t' -CaseSensitive:$false | Measure-Object).Count
-  }
-  if ($cmDeclCount -lt 1) {
-    Write-ErrorMessage 'no fuse-t declaration in src/hosts/MacBook/homebrew.nix; macOS cloud mounts need the cask'
-    $cmViolations++
+    if ($cmDeclCount -lt 1) {
+      Write-ErrorMessage 'no fuse-t declaration in src/hosts/MacBook/homebrew.nix; macOS cloud mounts need the cask'
+      $cmViolations++
+    }
   }
 
   $cmInstallDirs = @(
