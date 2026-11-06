@@ -14,7 +14,7 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 8. Grant Automation to the terminal that runs `nucleus-vm setup`, so UTM imports can be approved.
 9. Allow full disk access for remote users: System Settings > General > Sharing > Remote Login > (i) > Allow full disk access for remote users.
 10. LuLu's icon is hidden through `noIconMode`, so reopening LuLu restores its preferences window.
-11. The nix daemon's priority cannot be tuned from `nix.custom.conf`: `daemon-nice-level` and `daemon-ionice-level` are NixOS systemd options rather than settings this nix reads, so they never applied and nix could only warn `unknown setting`; a wrong name there now fails the check pipeline. Parallelism is the lever: uncomment `max-jobs` and `cores` in that file (e.g. 2 and 2) if builds still dominate interactive work.
+11. The nix daemon's priority cannot be tuned from `nix.custom.conf`: `daemon-nice-level` and `daemon-ionice-level` are NixOS systemd options rather than settings this nix reads, so they never applied and nix could only warn `unknown setting`; a wrong name there now fails the check pipeline.
 
 ## macOS settings with no API
 

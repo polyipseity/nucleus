@@ -271,16 +271,17 @@ derive_repo_root() {
       return 0
     fi
   fi
-  printf '%s\n' "derive_repo_root: cannot determine nucleus repository root — set NUCLEUS_REPO_ROOT or run from within the nucleus repo" >&2
+  printf '%s\n' "derive_repo_root: cannot determine nucleus repository root. Set NUCLEUS_REPO_ROOT or run from within the nucleus repo" >&2
   return 1
 }
 
-# path_basename PATH: set REPLY to PATH's last component, treating `/` and `\`
-# as separators alike. A Windows-shaped path (`D:\a\repo\src\x.sh`) reaches
-# these step files verbatim, and `${p##*/}` then returns the whole string, so a
-# basename comparison against a file list silently stops matching.
-# REPLY rather than stdout: the repo-policy scans call this once per tracked
-# file, where a fork per call costs more than the scan itself.
+# path_basename PATH: contract: PATH is a forward-slash path, REPLY is set to
+# its last component with no trailing separator. The extra backslash strip
+# covers a Windows-shaped path (`D:\a\repo\src\x.sh`): it reaches these step
+# files verbatim, `${p##*/}` then returns the whole string, and a basename
+# comparison against a file list silently stops matching. REPLY rather than
+# stdout: the repo-policy scans call this once per tracked file, where a fork
+# per call costs more than the scan itself.
 path_basename() {
   REPLY="${1##*/}"
   REPLY="${REPLY##*\\}"

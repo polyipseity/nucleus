@@ -40,5 +40,3 @@ SSOT: `src/modules/host-platform-registry.json` for host to platform and platfor
 One step, four spellings: `write-terminal-activations`, `Sync-TerminalActivation`, `terminal-activations:`, `run_terminal_activations`. The singular/plural asymmetry is deliberate (PowerShell singular, activation and stage plural), so do not "fix" it.
 
 Kept as is: `Disable-SteamAutoStartup` keeps the approved `Disable` verb, and the `config-utils.nix` generated names (`unprotectSymlink_${name}` and friends) stay exempt from kebab-case, mirrored on Windows by the `Deploy-*` names in `ConfigHelpers.ps1`.
-
-Known stage-label gaps, not fixed: POSIX `apply.sh` lacks the `svc:`, `vm-setup:`, and `vm-sync:` labels Windows emits, and Windows `apply.ps1` lacks the `health-check:` and `caddy-local-ca-trust:` labels POSIX emits.
