@@ -44,17 +44,17 @@ pwsh .agents/skills/pssa-rule-benchmark/pssa-rule-benchmark.ps1 -SkipExisting
 pwsh .agents/skills/pssa-rule-benchmark/pssa-rule-benchmark.ps1 -SelfTest
 ```
 
-`-Runs 1` is supported: every summary row counts exactly the rows recorded for it, so a single run reports `Runs: 1` with mean, min, max, and median equal and a standard deviation of 0. `-SkipExisting` merges: rules skipped because the file already has enough runs keep the rows already recorded there, so the written file still describes every rule it holds. When every enabled rule is skipped, the run reports that and leaves the file untouched.
+`-Runs 1` is supported: every summary row counts exactly the rows recorded for it, so a single run reports `Runs: 1` with mean, min, max, and median equal and a standard deviation of 0. `-SkipExisting` merges: rules skipped because the file already has enough runs keep the rows already recorded there, so the written file still describes every rule it holds. On load, duplicate entries and entries for rules the settings no longer enable are dropped and reported. When every enabled rule is skipped, the run reports that and leaves the file untouched.
 
 The benchmark launches a **separate `pwsh` subprocess per task**, each running `invoke-pssa-rule.ps1` with `-RuleName` set. This ensures complete isolation: no cross-rule state leaks, no cached AST or module state. Each subprocess imports `PSScriptAnalyzer` fresh and runs `Invoke-ScriptAnalyzer` against all repository `.ps1` files using the given rule in isolation (via `IncludeRules` + empty `Rules` hashtable). Subprocess output (JSON) is parsed; if parsing fails or the subprocess exits non-zero, the error is recorded and the run continues.
 
-The task execution order is **globally randomized** using a printed seed (for reproducibility). Each task outputs progress: `[N/189 (P%)] RuleName (run R/R)` with elapsed time and diagnostic count. Results are checkpoint-incremented every 10 tasks, so partial output survives interruption.
+The task execution order is **globally randomized** using a printed seed (for reproducibility). Each task outputs progress: `[N/222 (P%)] RuleName (run R/R)` with elapsed time and diagnostic count. Results are checkpoint-incremented every 10 tasks, so partial output survives interruption.
 
-### Known performance (macOS Apple Silicon, pwsh 7.6.3, PSScriptAnalyzer 1.25.0, 128 files × 63 rules × 3 runs)
+### Known performance (recorded run: macOS Apple Silicon, pwsh 7.6.3, PSScriptAnalyzer 1.25.0, 128 files × 63 rules × 3 runs; reproduction 2026-11-04 on pwsh 7.6.6 counted 240 files; 2026-11-06 settings enable 74 rules, 222 tasks at -Runs 3)
 
 | Metric | Mean | Max | StdDev | Notes |
 | ------------------------------ | ----- | ----- | ------ | -------------------------------------- |
-| **Total wall-clock** | — | ~681s | — | 189 tasks randomized |
+| **Total wall-clock** | — | ~681s | — | 189 tasks randomized (recorded run) |
 | `PSAvoidUsingCmdletAliases` | 67.2s | 98.3s | 22.6s | High variance: `Get-Command` per file |
 | `PSUseCmdletCorrectly` | 43.3s | 62.4s | 13.9s | `Get-Command` per file |
 | `PSShouldProcess` | 42.8s | 54.0s | 8.4s | `Get-Command` per file |

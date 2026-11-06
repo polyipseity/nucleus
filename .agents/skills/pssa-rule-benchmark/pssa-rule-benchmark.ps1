@@ -12,7 +12,7 @@
   has a single row.
 
 .PARAMETER Runs
-  Number of benchmark runs per rule. Default: 3.
+  Number of benchmark runs per rule. Minimum: 1. Default: 3.
 
 .PARAMETER ResultsFile
   Path to write aggregated results JSON. Default: pssa-rule-benchmark-results.json
@@ -27,7 +27,8 @@
 .PARAMETER SelfTest
   Run the aggregation self-test instead of benchmarking: synthetic rows of one,
   two, and three samples, failed rows, and a resume merge. Exits 0 when every
-  summary matches its recorded rows, 1 otherwise.
+  summary matches its recorded rows, 1 otherwise. Cannot be combined with
+  -SkipExisting or -ResultsFile.
 
 .EXAMPLE
   pwsh .agents/skills/pssa-rule-benchmark/pssa-rule-benchmark.ps1
@@ -137,6 +138,13 @@ function Merge-AggregatedResultSet {
 function Invoke-AggregationSelfTest {
   $failures = [System.Collections.Generic.List[string]]::new()
 
+  # An assertion's condition can throw (StrictMode dereference after a failed
+  # count), and the final throw unwinds here too; both must print FAIL first.
+  trap {
+    if ($failures.Count -gt 0) { foreach ($failure in $failures) { Write-Output "FAIL: $failure" } }
+    break
+  }
+
   $makeRow = {
     param([string]$RuleName, [double]$ElapsedMs, [int]$Run, [bool]$IsError)
     [PSCustomObject]@{
@@ -225,13 +233,15 @@ function Invoke-AggregationSelfTest {
   $assert.Invoke('one row: JSON stays an array', ($json.TrimStart()[0] -eq '['), $json.Substring(0, [math]::Min(20, $json.Length)))
 
   if ($failures.Count -gt 0) {
-    foreach ($failure in $failures) { Write-Output "FAIL: $failure" }
     throw "Aggregation self-test failed: $($failures.Count) assertion(s)."
   }
   Write-Output 'Aggregation self-test passed.'
 }
 
 if ($SelfTest) {
+  if ($SkipExisting -or $PSBoundParameters.ContainsKey('ResultsFile')) {
+    throw "-SelfTest cannot be combined with -SkipExisting or -ResultsFile."
+  }
   Invoke-AggregationSelfTest
   exit 0
 }
@@ -277,7 +287,7 @@ Write-Output "Enabled rules: $totalRules"
 # ---------------------------------------------------------------------------
 # Discover files for count display (subprocess discovers independently)
 # ---------------------------------------------------------------------------
-$paths = @(@(git ls-files '*.ps1') | Where-Object { Test-Path $_ })
+$paths = @(git ls-files '*.ps1' | Where-Object { Test-Path $_ })
 $fileCount = $paths.Count
 Write-Output "Files to analyze: $fileCount"
 
@@ -296,6 +306,26 @@ $existingResults = @()
 if ($SkipExisting -and (Test-Path $ResultsFile)) {
   try {
     $existingResults = @(Get-Content $ResultsFile -Raw | ConvertFrom-Json)
+    $missingRuns = @($existingResults | Where-Object { $null -eq $_.PSObject.Properties['Runs'] })
+    if ($missingRuns.Count -gt 0) {
+      throw "results file has no Runs field for rule '$($missingRuns[0].RuleName)'"
+    }
+    # The writer emits neither duplicates nor retired rules; only a hand-edited file can, and both must be dropped before the merge.
+    $enabledRuleNames = @($allRules | ForEach-Object { $_.RuleName })
+    $seenRuleNames = [System.Collections.Generic.HashSet[string]]::new()
+    $keptResults = @()
+    foreach ($entry in $existingResults) {
+      if (-not $seenRuleNames.Add($entry.RuleName)) {
+        Write-Output "Dropping duplicate results entry for $($entry.RuleName)"
+        continue
+      }
+      if ($entry.RuleName -notin $enabledRuleNames) {
+        Write-Output "Dropping results for $($entry.RuleName) (no longer enabled)"
+        continue
+      }
+      $keptResults += $entry
+    }
+    $existingResults = $keptResults
     foreach ($entry in $existingResults) {
       if ($entry.Runs -ge $Runs) {
         $null = $skipRules.Add($entry.RuleName)  # check-suppress:suppression_doc: HashSet.Add returns bool; set membership is the side effect
@@ -305,7 +335,7 @@ if ($SkipExisting -and (Test-Path $ResultsFile)) {
     Write-Output ""
   } catch {
     $existingResults = @()
-    Write-Output "Warning: could not parse existing results file, will re-benchmark all rules"
+    Write-Output "Warning: could not parse existing results file ($($_.Exception.Message)), will re-benchmark all rules"
     Write-Output ""
   }
 }
@@ -334,7 +364,11 @@ Write-Output ""
 # Nothing to run leaves a summary that already matches its rows, so the file is
 # left untouched rather than rewritten.
 if ($totalTasks -eq 0) {
-  Write-Output "Nothing to benchmark: every enabled rule already meets -Runs $Runs in $ResultsFile"
+  if ($totalRules -eq 0) {
+    Write-Output "Nothing to benchmark: no enabled rules in $settingsPath"
+  } else {
+    Write-Output "Nothing to benchmark: every enabled rule already meets -Runs $Runs in $ResultsFile"
+  }
   exit 0
 }
 
