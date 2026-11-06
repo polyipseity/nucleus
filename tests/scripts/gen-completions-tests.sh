@@ -36,11 +36,14 @@ _profile_ps1="src/scripts/shell/profile.ps1"
 # lockfile.
 _NUCLEUS_COMMANDS=(ai apply bootstrap check cloud config gc utils svc test update vm)
 
-# Marker for the no-touch assertion (case 15): plain mktemp, outside the tracked
+# Marker for the no-touch assertion (case 14): plain mktemp, outside the tracked
 # tree, timestamped before anything in the suite can generate. The one-second
 # buffer keeps a same-second write from sharing the marker's timestamp and
-# escaping find -newer on a one-second-granularity filesystem.
+# escaping find -newer on a one-second-granularity filesystem. The manifest
+# beside it is the deletion half of that assertion: a removed file has no mtime
+# left to compare, so it can only be caught by its absence from the file list.
 _tree_marker="$(mktemp)"
+_tree_files_before="$(find src/modules/completions -type f | LC_ALL=C sort)"
 sleep 1
 
 # 1. --help exits 0 and prints a usage: line.
@@ -61,7 +64,7 @@ else
   assert_fail "gen-completions: idempotency via --check" "regenerated output differs from the tracked tree"
 fi
 
-# 4. Coverage: every command has a zsh completion file.
+# 3. Coverage: every command has a zsh completion file.
 _coverage_ok=1
 for _cmd in "${_NUCLEUS_COMMANDS[@]}"; do
   if [ ! -f "$_COMPLETIONS_DIR/_nucleus-$_cmd" ]; then
@@ -73,7 +76,7 @@ if [ "$_coverage_ok" -eq 1 ]; then
   assert_pass "gen-completions: all ${#_NUCLEUS_COMMANDS[@]} commands have zsh completion files"
 fi
 
-# 5. Generated headers and zsh syntax on every host.
+# 4. Generated headers and zsh syntax on every host.
 _gen_ok=1
 for _zsh_f in "$_COMPLETIONS_DIR"/_nucleus "$_COMPLETIONS_DIR"/_nucleus-*; do
   [ -f "$_zsh_f" ] || continue
@@ -92,7 +95,7 @@ if [ "$_gen_ok" -eq 1 ]; then
   assert_pass "gen-completions: all generated files have headers and pass zsh -n"
 fi
 
-# 6. update lockfile dynamic value completion via --list-sections.
+# 5. update lockfile dynamic value completion via --list-sections.
 if grep -q "_call_program 'sections' nucleus-update --list-sections" "$_COMPLETIONS_DIR/_nucleus-update" &&
   grep -q -- '--sections:section name:->sections' "$_COMPLETIONS_DIR/_nucleus-update"; then
   assert_pass "gen-completions: update lockfile --sections dynamic wiring"
@@ -100,7 +103,7 @@ else
   assert_fail "gen-completions: update lockfile --sections wiring" "missing _call_program/->sections"
 fi
 
-# 8. Flag extraction correctness: usage-line + body flags land in the spec,
+# 6. Flag extraction correctness: usage-line + body flags land in the spec,
 #    corrected sets are pinned (apply's 12 flags + health-check/audit-store
 #    subcommands, test's -q group, optimize-pdf --rm-bak), and no jq/rclone/curl
 #    tool flags leak into any file.
@@ -121,7 +124,7 @@ else
   assert_fail "gen-completions: flag extraction" "flag set deviates from the authoritative table"
 fi
 
-# 9. Merged subcommand coverage: parent completion files enumerate their
+# 7. Merged subcommand coverage: parent completion files enumerate their
 #    subcommands after the command-surface merge (check packer/sh/pwsh,
 #    gc cleanup-nix/preferences, apply health-check/audit-store, cloud
 #    setup/reset/sync/status/restart, update lockfile).
@@ -164,7 +167,7 @@ if [ "$_sub_ok" -eq 1 ]; then
   assert_pass "gen-completions: merged subcommands covered by parent completions"
 fi
 
-# 7. _nucleus dispatcher completes `nucleus-<TAB>` with every command name.
+# 8. _nucleus dispatcher completes `nucleus-<TAB>` with every command name.
 _disp_file="$_COMPLETIONS_DIR/_nucleus"
 if grep -q '^#compdef nucleus-$' "$_disp_file" &&
   grep -qw 'apply' "$_disp_file" &&
@@ -178,7 +181,7 @@ else
   assert_fail "gen-completions: _nucleus dispatcher" "missing #compdef nucleus- or command names"
 fi
 
-# 10. Description text with shell metacharacters must survive BOTH quoting
+# 9. Description text with shell metacharacters must survive BOTH quoting
 #     layers of a generated file: the single-quoted spec word parsed by the
 #     shell, and the double-quoted description that _arguments evals out of the
 #     ((...)) action. Regression: an unescaped ' ended the spec word early, so
@@ -251,7 +254,7 @@ else
   fi
 fi
 
-# 11. The PowerShell twin's command list must be the canonical set. It is the
+# 10. The PowerShell twin's command list must be the canonical set. It is the
 #     list that decides which $nucleus<Cmd>Flags inventories exist, so a command
 #     missing here loses its flag completion silently.
 _ps_commands="$(pwsh -NoLogo -NoProfile -NonInteractive -File "$_ps_gen_script" -ListCommands | tr -d '\r' | LC_ALL=C sort)"
@@ -262,7 +265,7 @@ else
   assert_fail "gen-completions.ps1: command list" "ps-only: $(comm -13 <(printf '%s\n' "$_expected_commands") <(printf '%s\n' "$_ps_commands") | tr '\n' ' ')|missing: $(comm -23 <(printf '%s\n' "$_expected_commands") <(printf '%s\n' "$_ps_commands") | tr '\n' ' ')"
 fi
 
-# 12. Every flag inventory profile.ps1 REFERENCES must be DEFINED in it. The
+# 11. Every flag inventory profile.ps1 REFERENCES must be DEFINED in it. The
 #     generated region is the only definition site, so a completer naming a
 #     variable the generator no longer emits completes nothing at all. This is
 #     the exact shipped regression: the utils completer existed while the
@@ -284,7 +287,7 @@ else
   assert_fail "profile.ps1: referenced flag inventories" "nothing defines: ${_undefined_vars:-<no $nucleus*Flags references found>}"
 fi
 
-# 13. Every completer entry targets a canonical command: a registration for a
+# 12. Every completer entry targets a canonical command: a registration for a
 #     command that is not part of the nucleus surface is dead code that can also
 #     reference an inventory nothing defines.
 _targets="$(grep -oE '^Register-ArgumentCompleter -CommandName nucleus-[a-z0-9-]+' "$_profile_ps1" | awk '{print $3}' | sed 's/^nucleus-//' | LC_ALL=C sort -u || true)"
@@ -294,7 +297,7 @@ else
   assert_fail "profile.ps1: completer targets" "extra: $(comm -23 <(printf '%s\n' "$_targets") <(printf '%s\n' "$_expected_commands") | tr '\n' ' ')|missing: $(comm -13 <(printf '%s\n' "$_targets") <(printf '%s\n' "$_expected_commands") | tr '\n' ' ')"
 fi
 
-# 14. PowerShell/zsh flag parity for nucleus-utils: the two generators must
+# 13. PowerShell/zsh flag parity for nucleus-utils: the two generators must
 #     describe the same flag set, or a flag completes on one platform and not the
 #     other. Only utils is pinned -- the other commands' zsh files carry flags the
 #     pwsh inventory does not derive, so they are not parity-comparable here.
@@ -308,14 +311,18 @@ else
   assert_fail "gen-completions: nucleus-utils pwsh/zsh flag parity" "pwsh-only: $(comm -23 <(printf '%s\n' "$_ps_utils_flags") <(printf '%s\n' "$_zsh_utils_flags") | tr '\n' ' ')|zsh-only: $(comm -13 <(printf '%s\n' "$_ps_utils_flags") <(printf '%s\n' "$_zsh_utils_flags") | tr '\n' ' ')"
 fi
 
-# 15. A test run must not touch the tracked completions tree at all. Content
+# 14. A test run must not touch the tracked completions tree at all. Content
 #     equality cannot see this: rewriting a file with identical bytes replaces
-#     its inode and mtime, so only metadata shows that the suite wrote there.
+#     its inode and mtime, so only metadata shows that the suite wrote there,
+#     and a deletion leaves no file for -newer to see, so the manifest captured
+#     before the run is diffed as the second half.
 _moved_files="$(find src/modules/completions -newer "$_tree_marker" -type f)"
-if [ -z "$_moved_files" ]; then
+_tree_files_after="$(find src/modules/completions -type f | LC_ALL=C sort)"
+_deleted_files="$(comm -23 <(printf '%s\n' "$_tree_files_before") <(printf '%s\n' "$_tree_files_after") | tr '\n' ' ')"
+if [ -z "$_moved_files" ] && [ -z "$_deleted_files" ]; then
   assert_pass "gen-completions: suite left the tracked completions tree untouched"
 else
-  assert_fail "gen-completions: tracked tree untouched" "files rewritten during the run: $_moved_files"
+  assert_fail "gen-completions: tracked tree untouched" "files rewritten during the run: ${_moved_files:-none}|files deleted during the run: ${_deleted_files:-none}"
 fi
 
 finish_tests

@@ -9,7 +9,7 @@
 # heartbeat recreates the screen with its own copy, so a stale value there
 # silently undoes the create path on the next poll.
 #
-# WHY parsing instead of execution: none of the three scripts can prove these
+# WHY: parsing instead of execution: none of the three scripts can prove these
 # values in the check environment. The create path soft-fails every BetterDisplay
 # CLI call and no-ops without the app, the heartbeat is a 60 s daemon loop that
 # never exits, and macos-display-resolutions.sh needs a WindowServer context a
