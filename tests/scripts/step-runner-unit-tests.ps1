@@ -574,9 +574,15 @@ function Test-FailFastReport-ReplaysFailedStep {
 # exits the host process; the child process carries the exit code and output.
 function Test-PipelineFailFastReportsLaunchOrder {
     $driver = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-order-$([System.IO.Path]::GetRandomFileName()).ps1"
+    # WHY a fixture working dir: the child's Invoke-StepPipeline walks the file
+    #   list from the current directory and these steps never read it, so a
+    #   skeleton with src/ keeps the walk off the real checkout.
+    $walkDir = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-walk-$([System.IO.Path]::GetRandomFileName())"
+    $null = New-Item -ItemType Directory -Path (Join-Path $walkDir 'src/scripts') -Force
     $driverText = @'
-param([string]$RepoRoot)
-Set-Location $RepoRoot
+param([string]$RepoRoot, [string]$WalkDir)
+$ErrorActionPreference = 'Stop'
+Set-Location $WalkDir
 $FrameworkDir = Join-Path $RepoRoot 'src/scripts/lib'
 . (Join-Path $FrameworkDir 'step-runner.ps1')
 function Write-Message { Write-Output "msg: $args" }
@@ -591,7 +597,7 @@ Invoke-StepPipeline
     Set-Content -LiteralPath $driver -Value $driverText -Encoding utf8
     try {
         $pwshExe = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
-        $out = & $pwshExe -NoLogo -NoProfile -NonInteractive -File $driver -RepoRoot $repoRoot 2>&1 | Out-String
+        $out = & $pwshExe -NoLogo -NoProfile -NonInteractive -File $driver -RepoRoot $repoRoot -WalkDir $walkDir 2>&1 | Out-String
         $code = $LASTEXITCODE
         # Launch order is 1 then 2; step 2 fails first (300 ms) while step 1 is
         # still failing at 3000 ms, so a completion-ordered report prints 2 1.
@@ -605,6 +611,7 @@ Invoke-StepPipeline
         }
     } finally {
         Remove-Item -LiteralPath $driver -Force
+        Remove-Item -LiteralPath $walkDir -Recurse -Force
     }
 }
 
@@ -621,7 +628,9 @@ function Invoke-RunspaceFailureRun {
     param([Parameter(Mandatory)][string]$RepoRoot)
 
     # The derived FrameworkDir is <LibPath>/../../lib, so the skeleton mirrors the
-    # repo layout without touching the checkout.
+    # repo layout without touching the checkout. It is also the child's working
+    # dir: Invoke-StepPipeline walks the file list from the current directory,
+    # and these steps never read it, so the walk stays inside the fixture.
     $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-runspace-failure-$([System.IO.Path]::GetRandomFileName())"
     $null = New-Item -ItemType Directory -Path (Join-Path $tempDir 'src/scripts/lib') -Force
     $null = New-Item -ItemType Directory -Path (Join-Path $tempDir 'src/scripts/checks') -Force
@@ -634,8 +643,9 @@ function Invoke-RunspaceFailureRun {
 
     $driver = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-runspace-$([System.IO.Path]::GetRandomFileName()).ps1"
     $driverText = @'
-param([string]$RepoRoot, [string]$LibPath)
-Set-Location $RepoRoot
+param([string]$RepoRoot, [string]$LibPath, [string]$WalkDir)
+$ErrorActionPreference = 'Stop'
+Set-Location $WalkDir
 $FrameworkDir = Join-Path $RepoRoot 'src/scripts/lib'
 . (Join-Path $FrameworkDir 'step-runner.ps1')
 function Write-Message { Write-Output "msg: $args" }
@@ -651,7 +661,7 @@ Format-StepSummary
     Set-Content -LiteralPath $driver -Value $driverText -Encoding utf8
     try {
         $pwshExe = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
-        $out = & $pwshExe -NoLogo -NoProfile -NonInteractive -File $driver -RepoRoot $RepoRoot -LibPath (Join-Path $tempDir 'src/scripts/checks/failing-lib.ps1') 2>&1 | Out-String
+        $out = & $pwshExe -NoLogo -NoProfile -NonInteractive -File $driver -RepoRoot $RepoRoot -LibPath (Join-Path $tempDir 'src/scripts/checks/failing-lib.ps1') -WalkDir $tempDir 2>&1 | Out-String
         return @{ Out = $out; Code = $LASTEXITCODE }
     } finally {
         Remove-Item -LiteralPath $driver -Force

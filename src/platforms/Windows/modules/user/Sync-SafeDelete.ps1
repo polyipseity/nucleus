@@ -176,6 +176,9 @@ function Sync-SafeDelete {
   if (Test-Path -LiteralPath $guardSource) {
     $guardContent = "@echo off`r`npwsh -NoProfile -File `"$guardSource`" %*`r`n"
     Set-Content -Path $guardDest -Value $guardContent -Force
+  } else {
+    # The skip is a real branch: without it the agent guard silently never deploys.
+    Write-NucleusWarning -CommandName 'Sync-SafeDelete' "guard source not found at '$guardSource'; safe-delete-guard.cmd not deployed"
   }
 
   # Git Bash: rm alias to rip

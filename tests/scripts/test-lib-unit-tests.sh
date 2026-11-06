@@ -210,9 +210,9 @@ test_no_consumer_exits_outside_a_heredoc() {
 # install-bun-packages activation, it is absent from the test app's
 # runtimeInputs, and CI runs bootstrap --no-apply before the test pipeline, so a
 # case that needs the real binary would be red on every CI runner. A fake with
-# the tool's contract (read SAFE_RM_CONFIG, move each target into SAFE_RM_TRASH)
-# exercises the helper identically on any host, and a PATH without it at all
-# exercises the absent branch even here.
+# the tool's contract (read SAFE_RM_CONFIG, move each target into SAFE_RM_TRASH,
+# prompt when the trash is absent) exercises the helper identically on any host,
+# and a PATH without it at all exercises the absent branch even here.
 
 # Derived from this file rather than reused from SCRIPT_DIR: sourcing
 # src/scripts/tests/test-lib.sh in the probes below reassigns SCRIPT_DIR, which
@@ -225,9 +225,15 @@ _make_fake_safe_rm() { # <dir>
 #!/usr/bin/env bash
 # Stand-in for safe-rm: fails unless the helper configured a config file, then
 # moves every operand into the configured trash, which is the part of safe-rm's
-# behaviour the helper is responsible for.
+# behaviour the helper is responsible for. An absent trash takes the tool's own
+# route (safe-rm bin/rm.sh:389-398): print the prompt, read stdin, then create
+# and proceed, so at EOF the prompt has already reached stdout.
 set -eu
 [ -f "$SAFE_RM_CONFIG" ]
+if [ ! -d "$SAFE_RM_TRASH" ]; then
+  printf 'Directory "%s" does not exist, do you want create it? ' "$SAFE_RM_TRASH"
+  IFS= read -r _answer || :
+fi
 mkdir -p "$SAFE_RM_TRASH"
 for _target in "$@"; do
   case "$_target" in -*) continue ;; esac
@@ -381,25 +387,31 @@ test_ensure_safe_rm_env_leaves_a_plain_rm_alone() {
   esac
 }
 
-# The point of the helper is the deletion route, so exercise it: the tool must
-# receive a config it can read and a trash it can use, the deletion must be
-# silent, and the entry must end up in the helper's trash.
+# The point of the helper is the deletion route, so exercise it on the helper's
+# own path: no injected trash, so the creation and export branch runs, the tool
+# receives a config it can read and the trash the helper made, the output is
+# exactly the trash path (a prompt would corrupt it), and the delete lands in the
+# exported directory a child process inherits.
 test_ensure_safe_rm_env_routes_a_delete_to_the_scratch_trash() {
   local _work _out _rc=0
   _work="$(mktemp -d)"
   printf 'victim\n' >"$_work/victim"
   # Exit statuses name the failed step, so a red run reports which one broke
-  # instead of only that the probe printed nothing.
+  # instead of only that the probe printed nothing; 5 is the export never
+  # reaching the child environment. stdin sits at /dev/null so a prompt hits EOF
+  # at once instead of waiting on the suite's own stdin.
   # shellcheck disable=SC2016 # reason: the quoted body is a script for bash -c, not text this shell expands
-  _out="$(env -u SAFE_RM_CONFIG -u SAFE_RM_TRASH \
-    PATH="$_SAFE_RM_FAKE_BIN:$PATH" _NUCLEUS_TEST_SAFE_RM_TRASH="$_SAFE_RM_PROBE_TRASH" bash -c '
+  _out="$(env -u SAFE_RM_CONFIG -u SAFE_RM_TRASH -u _NUCLEUS_TEST_SAFE_RM_TRASH \
+    PATH="$_SAFE_RM_FAKE_BIN:$PATH" bash -c '
     . "$1"
     ensure_safe_rm_env || exit 9
+    _exported="$(env | sed -n "s/^_NUCLEUS_TEST_SAFE_RM_TRASH=//p")"
+    [ -n "$_exported" ] && [ "$_exported" = "$SAFE_RM_TRASH" ] || exit 5
     safe-rm -f "$2" || exit 8
     [ -e "$2" ] && exit 7
-    [ -e "$SAFE_RM_TRASH/victim" ] || exit 6
+    [ -e "$_exported/victim" ] || exit 6
     printf "%s" "$SAFE_RM_TRASH"
-  ' _ "$_SAFE_RM_TEST_LIB" "$_work/victim")" || _rc=$?
+  ' _ "$_SAFE_RM_TEST_LIB" "$_work/victim" </dev/null)" || _rc=$?
   if [ "$_rc" -ne 0 ]; then
     assert_fail "ensure_safe_rm_env routes a delete to the scratch trash" "probe exited $_rc"
   elif [ -z "$_out" ]; then
@@ -409,6 +421,42 @@ test_ensure_safe_rm_env_routes_a_delete_to_the_scratch_trash() {
     assert_pass "ensure_safe_rm_env routes a delete to the scratch trash"
   else
     assert_fail "ensure_safe_rm_env routes a delete to the scratch trash" "trash=[$_out]"
+  fi
+  rm -rf "$_work"
+}
+
+# The absent-trash prompt is the failure class the helper exists to prevent:
+# safe-rm's bin/rm.sh:389-398 prints the prompt on stdout, reads stdin, then
+# creates the trash and proceeds, and the prompt on stdout is what corrupts a
+# suite's exact-output assertions. CI carries no real binary (fixture note
+# above), so the fake carries the same route, and this case pins it: a supplied
+# trash path that does not exist must produce the prompt and still lose the file
+# to the trash.
+test_safe_rm_route_prompts_on_an_absent_trash() {
+  local _work _trash _out _rc=0
+  _work="$(mktemp -d)"
+  printf 'victim\n' >"$_work/victim"
+  _trash="$_work/absent-trash"
+  # shellcheck disable=SC2016 # reason: the quoted body is a script for bash -c, not text this shell expands
+  _out="$(env -u SAFE_RM_CONFIG -u SAFE_RM_TRASH \
+    PATH="$_SAFE_RM_FAKE_BIN:$PATH" _NUCLEUS_TEST_SAFE_RM_TRASH="$_trash" bash -c '
+    . "$1"
+    ensure_safe_rm_env || exit 9
+    safe-rm -f "$2" || exit 8
+    [ -e "$2" ] && exit 7
+    [ -e "$3/victim" ] || exit 6
+  ' _ "$_SAFE_RM_TEST_LIB" "$_work/victim" "$_trash" </dev/null)" || _rc=$?
+  if [ "$_rc" -ne 0 ]; then
+    assert_fail "safe-rm route prompts on an absent trash" "probe exited $_rc"
+  else
+    case "$_out" in
+    *"do you want create it"*)
+      assert_pass "safe-rm route prompts on an absent trash"
+      ;;
+    *)
+      assert_fail "safe-rm route prompts on an absent trash" "no prompt in [$_out]"
+      ;;
+    esac
   fi
   rm -rf "$_work"
 }
@@ -429,5 +477,6 @@ test_ensure_safe_rm_env_completes_a_half_pair
 test_ensure_safe_rm_env_reuses_one_trash_per_run
 test_ensure_safe_rm_env_leaves_a_plain_rm_alone
 test_ensure_safe_rm_env_routes_a_delete_to_the_scratch_trash
+test_safe_rm_route_prompts_on_an_absent_trash
 
 finish_tests

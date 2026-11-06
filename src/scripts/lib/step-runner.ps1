@@ -446,7 +446,10 @@ function Save-FileListCache {
   # into src/users/default and yields every file there a second time under a
   # pathspec git check-ignore rejects as beyond a symbolic link. The bash twin
   # reaches the same result through find, which does not follow symlinks.
-  $script:CachedYamlFiles = @((Get-ChildItem -Recurse -Filter '*.yml') + (Get-ChildItem -Recurse -Filter '*.yaml')) | Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object Name | Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#B7 -- structural invariant; gitignore filter applied on top
+  # WHY one enumeration: the shell twin's cache_file_lists takes yml and yaml in
+  #   one find, and concatenating two Get-ChildItem results makes an empty side
+  #   a $null that Where-Object trips over under StrictMode.
+  $script:CachedYamlFiles = Get-ChildItem -Recurse | Where-Object { $_.Extension -in '.yml', '.yaml' } | Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object Name | Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#B7 -- structural invariant; gitignore filter applied on top
   $script:CachedJsonFiles = Get-ChildItem -Path 'src' -Recurse -Filter '*.json' | Where-Object { $_.Name -notmatch '\.schema\.json$' -and $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object Name | Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#A7,#B7 -- schema files are meta; vendor is structural invariant; gitignore filter applied on top
   $script:CachedShellFiles = Get-ChildItem -Path 'src/scripts' -Recurse -Filter '*.sh' | Sort-Object Name | Select-GitIgnored
 }
@@ -508,7 +511,6 @@ function Invoke-StepPipeline {
   # pending step the moment a slot frees, instead of waiting out a batch.
   $pos = 0
   $stopLaunching = $false
-  $infrastructureFailed = $false
   $failFastNumbers = [System.Collections.Generic.HashSet[int]]::new()
   $runspaceFailedNumbers = [System.Collections.Generic.HashSet[int]]::new()
   $active = [System.Collections.Generic.List[hashtable]]::new()
@@ -655,7 +657,6 @@ function Invoke-StepPipeline {
       try {
         $null = $rs.PowerShell.EndInvoke($rs.AsyncResult)  # check-suppress:suppression_doc: EndInvoke returns runspace output; already redirected to step out-file
       } catch {
-        $infrastructureFailed = $true
         $null = $runspaceFailedNumbers.Add($rs.Number)  # check-suppress:suppression_doc: HashSet.Add returns bool; membership is the only effect needed
         Write-StepRunspaceFailure -Number $rs.Number -Reason "$_"
         if ($script:FAIL_FAST) { $stopLaunching = $true }
@@ -674,9 +675,11 @@ function Invoke-StepPipeline {
     }
   }
 
-  if ($script:FAIL_FAST -and $infrastructureFailed) {
+  if ($script:FAIL_FAST -and $runspaceFailedNumbers.Count -gt 0) {
     # Report the runspace failure on the abort path, which exits before
-    # Format-StepSummary renders the step it was recorded against.
+    # Format-StepSummary renders the step it was recorded against. The drain's
+    # catch records every one there, so the set is the single source for this
+    # branch.
     Write-ErrorMessage "step runspace failed (fail-fast)"
     exit 1
   }

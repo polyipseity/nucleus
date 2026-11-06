@@ -341,6 +341,12 @@ Describe 'rclone-mount.ps1 minimal supervisor contract' {
         (Test-Path -LiteralPath $script:SupervisorStdoutPath) -and
         ((Get-Content -Raw -LiteralPath $script:SupervisorStdoutPath) -match 'retrying in 30s')
       } -TimeoutSeconds 10
+      # WHY its own wait: $attempts is only 1 because the notice follows the
+      #   attempt's log write; a future reordering must fail here as a timeout,
+      #   not as a bare count mismatch after the child is gone.
+      $attemptLogged = Wait-Until -Condition {
+        (Get-InvocationBlockList -InvocationLog $invLog).Count -ge 1
+      } -TimeoutSeconds 15
       $attempts = (Get-InvocationBlockList -InvocationLog $invLog).Count
       Stop-Supervisor -Process $proc
     } finally {
@@ -348,7 +354,10 @@ Describe 'rclone-mount.ps1 minimal supervisor contract' {
     }
 
     $notice | Should -BeTrue
+    $attemptLogged | Should -BeTrue
     $attempts | Should -Be 1
+    Test-Path -LiteralPath $mountLog | Should -BeTrue
+    (Get-Content -Raw -LiteralPath $mountLog) | Should -Match 'stand-in rclone failure'
   }
 
   It 'forwards the remote spec, a mount point with spaces, and every flag verbatim' {
