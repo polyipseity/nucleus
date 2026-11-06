@@ -46,6 +46,10 @@ let
   claudeEntries = builtins.concatMap (groups: builtins.concatMap (group: group.hooks) groups) (
     builtins.attrValues claudeHooks
   );
+  # The gate assert reads only PreToolUse: an all-events count would let a guard
+  # on any other event satisfy the "gate tool calls" claim while never blocking
+  # a tool call.
+  claudePreToolUseEntries = builtins.concatMap (group: group.hooks) claudeHooks.PreToolUse;
 
   # Attr values of both files are lists of hook entries; flatten one level.
   allEntries = builtins.concatLists (
@@ -96,10 +100,14 @@ in
     )
 
     # --- Hooks resolve by bare name, never by machine-specific path ---
-    (assert' (all (entry: builtins.elem (entryPointOf entry.command) hookCommands) allEntries)
+    (assert'
+      (all (entry: builtins.elem (entryPointOf entry.command) hookCommands) (allEntries ++ claudeEntries))
       "every hook command must start with a deployed command: a harness-bridge entry point or the deletion guard"
     )
-    (assert' (all (entry: builtins.match "[a-z0-9_-]+( [a-z0-9_-]+)*" entry.command != null) allEntries)
+    (assert'
+      (all (entry: builtins.match "[a-z0-9_-]+( [a-z0-9_-]+)*" entry.command != null) (
+        allEntries ++ claudeEntries
+      ))
       "hook commands must be bare PATH-resolved names; an absolute path, home expansion, or environment reference cannot work on all three hosts"
     )
     (assert' (builtins.pathExists (root + guardScript))
@@ -120,7 +128,7 @@ in
       "the Claude hook config must declare at least one hook entry; an emptied hook set would make the timeout asserts below vacuous"
     )
     (assert' (
-      builtins.length (entriesRunning claudeEntries guardCommand) == 1
+      builtins.length (entriesRunning claudePreToolUseEntries guardCommand) == 1
     ) "Claude must gate tool calls with exactly one safe-delete-guard hook")
     (assert' (all (entry: entry ? timeout) claudeEntries)
       "every Claude hook entry must declare a timeout, or the harness applies a budget of its own and the guard can be killed before the approval window"

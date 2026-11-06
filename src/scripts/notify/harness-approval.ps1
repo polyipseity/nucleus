@@ -272,7 +272,7 @@ function Request-HarnessApproval {
       "$Tool`: $Summary (reply /harness approve $requestId)"
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'approval notification failed — the request is still visible via /harness status'
+    Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'approval notification failed: the request is still visible via /harness status'
   }
 
   $decision = ''
@@ -432,7 +432,7 @@ try {
 
   try { $config = Get-HarnessBridgeApprovalConfig -ConfigPath $configPath }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'could not parse nucleus config — asking locally'
+    Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'could not parse nucleus config: asking locally'
     Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -LogDir $logDir
   }
 

@@ -45,7 +45,7 @@ fi
 case "$_hn_event" in
 done | needs-input | approval | error) ;;
 *)
-  warn "unknown event '$_hn_event' — not notifying"
+  warn "unknown event '$_hn_event': not notifying"
   exit 0
   ;;
 esac
@@ -60,7 +60,7 @@ if [ -f "$HOME/.local/state/nucleus/config.json" ]; then
   #   both platforms report one string per action and `set -e` cannot kill a
   #   hook before it writes anything.
   if ! _hn_user_config="$(cat "$HOME/.local/state/nucleus/config.json")"; then
-    warn "could not parse nucleus config — not notifying"
+    warn "could not parse nucleus config: not notifying"
     exit 0
   fi
 fi
@@ -68,7 +68,7 @@ _hn_config="$(
   jq -c --argjson defaults "$_hn_defaults" --argjson user "$_hn_user_config" \
     '$defaults * ($user["harness-notify"] // {})' <<<'{}'
 )" || {
-  warn "could not parse nucleus config — not notifying"
+  warn "could not parse nucleus config: not notifying"
   exit 0
 }
 
@@ -112,7 +112,7 @@ if command -v hermes >/dev/null; then
 fi
 
 if [ -z "$_hn_hermes" ]; then
-  warn "hermes is not on PATH — notification dropped"
+  warn "hermes is not on PATH: notification dropped"
   exit 0
 fi
 

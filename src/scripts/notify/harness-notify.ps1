@@ -129,7 +129,7 @@ function Send-HarnessNotification {
     $config = Get-HarnessBridgeNotifyConfig -ConfigPath $ConfigPath
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message 'could not parse nucleus config — not notifying'
+    Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message 'could not parse nucleus config: not notifying'
     return
   }
 
@@ -150,7 +150,7 @@ function Send-HarnessNotification {
   # more than one hermes on PATH otherwise yields a list, which cannot be invoked.
   $hermes = Get-Command -Name 'hermes' -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1  # check-suppress:suppression_doc: absence is the expected case and is reported right below
   if ($null -eq $hermes) {
-    Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message 'hermes is not on PATH — notification dropped'
+    Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message 'hermes is not on PATH: notification dropped'
     return
   }
 
@@ -176,7 +176,7 @@ try {
   }
 
   if ($EventName -notin @('done', 'needs-input', 'approval', 'error')) {
-    Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message "unknown event '$EventName' — not notifying"
+    Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message "unknown event '$EventName': not notifying"
     exit 0
   }
 

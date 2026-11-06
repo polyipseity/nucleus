@@ -130,7 +130,7 @@ if [ -f "$HOME/.local/state/nucleus/config.json" ]; then
   # a hook dying under `set -e` prints no decision and Copilot reads that as a
   # denial.
   if ! _ha_user_config="$(cat "$HOME/.local/state/nucleus/config.json")"; then
-    warn "could not parse nucleus config — asking locally"
+    warn "could not parse nucleus config: asking locally"
     _ha_finish ask
   fi
 fi
@@ -138,7 +138,7 @@ if ! _ha_config="$(
   jq -c --argjson defaults "$_ha_defaults" --argjson user "$_ha_user_config" \
     '$defaults * { "harness-notify": ($user["harness-notify"] // {}), "harness-approval": ($user["harness-approval"] // {}) }' <<<'{}'
 )"; then
-  warn "could not parse nucleus config — asking locally"
+  warn "could not parse nucleus config: asking locally"
   _ha_finish ask
 fi
 
@@ -205,7 +205,7 @@ fi
 # notification only means the user reads /harness status instead of being pinged.
 if ! "$SCRIPT_DIR/harness-notify.sh" "$_ha_harness" approval \
   "$_ha_tool: $_ha_summary (reply /harness approve $_ha_id)"; then
-  warn "approval notification failed — the request is still visible via /harness status"
+  warn "approval notification failed: the request is still visible via /harness status"
 fi
 
 _ha_response="$_ha_responses/$_ha_id.json"

@@ -201,7 +201,7 @@ function Get-QueuedHarnessPrompt {
     }
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message "could not read the queued prompt '$($newest.FullName)' — treating it as empty"
+    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message "could not read the queued prompt '$($newest.FullName)': treating it as empty"
     $text = ''
   }
 
@@ -244,7 +244,7 @@ function Clear-QueuedHarnessPrompt {
   if ($dropped -eq 0) { return }
 
   Write-HarnessDriveAuditEntry -Harness $Harness -Detail "dropped $dropped queued prompt(s)"
-  Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message "harness-drive is disabled — dropped $dropped queued prompt(s)"
+  Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message "harness-drive is disabled: dropped $dropped queued prompt(s)"
 }
 
 function Write-HarnessDriveAuditEntry {
@@ -307,7 +307,7 @@ function Send-HarnessDriveNotification {
   # check-suppress:suppression_doc: several pwsh wrappers can sit on PATH and absence is handled right below
   $pwshCli = Get-Command -Name 'pwsh' -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
   if ($null -eq $pwshCli) {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'pwsh is not on PATH — notification dropped'
+    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'pwsh is not on PATH: notification dropped'
     return
   }
 
@@ -315,11 +315,11 @@ function Send-HarnessDriveNotification {
     $Payload | & $pwshCli.Source -NoProfile -ExecutionPolicy Bypass -File $notifyPath $Harness 'done'
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'notification failed — continuing to the queued prompt'
+    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'notification failed: continuing to the queued prompt'
     return
   }
   if ($LASTEXITCODE -ne 0) {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'notification failed — continuing to the queued prompt'
+    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'notification failed: continuing to the queued prompt'
   }
 }
 
@@ -337,7 +337,7 @@ try {
     $config = Get-HarnessBridgeDriveConfig -ConfigPath (Get-HarnessBridgeConfigPath)
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'could not parse nucleus config — not driving'
+    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'could not parse nucleus config: not driving'
     $empty = Get-HarnessDriveEmptyDocument -Harness $Harness
     if (-not [string]::IsNullOrWhiteSpace($empty)) { Write-Output $empty }
     exit 0
@@ -375,7 +375,7 @@ try {
   }
 
   if ([string]::IsNullOrWhiteSpace($queued.Text)) {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'queued prompt is empty — nothing to inject'
+    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'queued prompt is empty: nothing to inject'
     try {
       Remove-Item -LiteralPath $queued.Path -Force
     }
@@ -393,7 +393,7 @@ try {
     Remove-Item -LiteralPath $queued.Path -Force
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'could not consume the queued prompt — dropping it to avoid double delivery'
+    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'could not consume the queued prompt: dropping it to avoid double delivery'
     $empty = Get-HarnessDriveEmptyDocument -Harness $Harness
     if (-not [string]::IsNullOrWhiteSpace($empty)) { Write-Output $empty }
     exit 0
