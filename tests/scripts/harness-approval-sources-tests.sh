@@ -201,6 +201,12 @@ answer_request() { # <request-file> <decision>
     >"$_state/responses/$(basename "$_request")"
 }
 
+# The audit line names the source that answered, which is the only record of who
+# decided a prompt after the harness has moved on.
+approval_source() {
+  jq -rs 'map(select(.kind == "approval")) | last | .source // ""' "$NUCLEUS_LOG_DIR/harness.log" 2>/dev/null || true
+}
+
 section 1 "the sources matrix"
 
 # An absent section takes the shipped default, and only a `prompt` default can turn
@@ -251,8 +257,8 @@ fi
 clear_state
 write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":30}}}'
 if tty_run y "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
-  if [ "$(decision_of "$WORK/out")" = "allow" ]; then
-    assert_pass "the prompt source reads a typed y as allow"
+  if [ "$(decision_of "$WORK/out")" = "allow" ] && [ "$(approval_source)" = "prompt" ]; then
+    assert_pass "the prompt source reads a typed y as allow and is audited as its source"
   else
     assert_fail "prompt allow" "transcript=$(tr -d '\r' <"$WORK/out")"
   fi
@@ -263,8 +269,8 @@ fi
 clear_state
 write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":30}}}'
 if tty_run n "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
-  if [ "$(decision_of "$WORK/out")" = "deny" ]; then
-    assert_pass "the prompt source reads a typed n as deny"
+  if [ "$(decision_of "$WORK/out")" = "deny" ] && [ "$(approval_source)" = "prompt" ]; then
+    assert_pass "the prompt source reads a typed n as deny and is audited as its source"
   else
     assert_fail "prompt deny" "transcript=$(tr -d '\r' <"$WORK/out")"
   fi

@@ -43,7 +43,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../lib/harness-audit.sh
 . "$SCRIPT_DIR/../lib/harness-audit.sh"
 
-_ha_start="$(harness_audit_now_ms)"
+_hf_start="$(harness_audit_now_ms)"
 
 _hf_harness="${1-}"
 _hf_payload=""
@@ -83,7 +83,13 @@ _hf_render() { # <decision> <reason>
 }
 
 # Every path ends here.
-_hf_finish() { # <decision> <reason>
+_hf_finish() { # <decision> <reason> [runner-rule]
+  # WHY a third argument: a runner-level outcome has no filter to name, and the
+  # rule token is what tells a registry failure apart from a clean `no-filter`.
+  _hf_finish_rule="${3-}"
+  if [ -z "$_hf_finish_rule" ]; then
+    _hf_finish_rule="${_hf_best_rule-}"
+  fi
   # WHY best-effort and first: the verdict decides whether a command runs, so a
   # failed append is reported and then ignored. The filter that spoke (if any)
   # and its rule are what makes filter accuracy auditable later.
@@ -95,8 +101,8 @@ _hf_finish() { # <decision> <reason>
       _hf_audit_source="filter"
     fi
     harness_audit_log filter "$_hf_harness" "${1-}" "$_hf_audit_source" \
-      "${_hf_best_filter-}" "${_hf_best_rule-}" \
-      "$(($(harness_audit_now_ms) - _ha_start))" \
+      "${_hf_best_filter-}" "$_hf_finish_rule" \
+      "$(($(harness_audit_now_ms) - _hf_start))" \
       "$_hf_audit_summary" "$_hf_audit_digest" ''
   ); then
     warn "could not write the harness audit log"
@@ -134,7 +140,7 @@ _hf_rank() { # <decision>
 _hf_repo_root=""
 if ! _hf_repo_root="$(derive_repo_root)"; then
   warn "could not resolve the repository root: asking locally"
-  _hf_finish ask "harness-filter (registry-error): the repository root is unknown, so the filter registry cannot be read"
+  _hf_finish ask "harness-filter (registry-error): the repository root is unknown, so the filter registry cannot be read" registry-error
 fi
 # check-suppress:config-method: method 4 (runtime direct read) -- the registry is data the runner reads from the live checkout, so a writable symlink into the store or the home directory would freeze the filter list until the next apply
 _hf_registry="$_hf_repo_root/src/modules/configs/harness-filters.json"
@@ -142,11 +148,11 @@ _hf_registry="$_hf_repo_root/src/modules/configs/harness-filters.json"
 _hf_entries=""
 if [ ! -f "$_hf_registry" ]; then
   warn "filter registry not found at $_hf_registry: asking locally"
-  _hf_finish ask "harness-filter (registry-error): no filter registry at $_hf_registry"
+  _hf_finish ask "harness-filter (registry-error): no filter registry at $_hf_registry" registry-error
 fi
 if ! _hf_entries="$(jq -c '.filters[] | select(.enabled == true) | {id: .id, settings: .settings}' "$_hf_registry")"; then
   warn "could not parse the filter registry at $_hf_registry: asking locally"
-  _hf_finish ask "harness-filter (registry-error): the filter registry at $_hf_registry is unreadable"
+  _hf_finish ask "harness-filter (registry-error): the filter registry at $_hf_registry is unreadable" registry-error
 fi
 
 # WHY the leading whitespace is stripped first: a payload that is JSON behind a
@@ -170,7 +176,7 @@ case "$_hf_payload" in
 *) _hf_command="$_hf_payload" ;;
 esac
 if [ -z "$_hf_command" ]; then
-  _hf_finish ask "harness-filter (not-a-command): the payload carries no shell command"
+  _hf_finish ask "harness-filter (not-a-command): the payload carries no shell command" not-a-command
 fi
 # The command is what the gate asks about, so it replaces the raw payload, and it
 # is collapsed to the one line the terminal prompt and the audit line carry: a
@@ -224,6 +230,6 @@ while IFS= read -r _hf_entry; do
 done <<<"$_hf_entries"
 
 if [ -z "$_hf_best_decision" ]; then
-  _hf_finish ask "harness-filter (no-filter): no enabled filter produced a verdict"
+  _hf_finish ask "harness-filter (no-filter): no enabled filter produced a verdict" no-filter
 fi
 _hf_finish "$_hf_best_decision" "$_hf_best_reason"

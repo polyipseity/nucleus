@@ -222,11 +222,15 @@ function Get-HarnessFilterRegistryEntry {
   <#
   .SYNOPSIS
     Reads the enabled registry entries in registry order.
+  .DESCRIPTION
+    Returns one object per enabled entry, carrying the id and its settings as JSON.
   .PARAMETER RegistryPath
     Absolute path to harness-filters.json.
   #>
   [CmdletBinding()]
-  [OutputType([array])]
+  # WHY object[]: the entries are [pscustomobject] values collected from a
+  # pipeline, so the emitted array is System.Object[] and the declaration says so.
+  [OutputType([object[]])]
   param(
     [Parameter(Mandatory)]
     [string]$RegistryPath
@@ -329,6 +333,51 @@ function Invoke-HarnessFilterList {
   return $best
 }
 
+function Write-HarnessFilterAudit {
+  <#
+  .SYNOPSIS
+    Records one filter verdict in the shared audit log.
+  .DESCRIPTION
+    Best-effort and first: the verdict decides whether a command runs, so a failed
+    append is reported and then ignored. The filter that spoke (if any) and its
+    rule are what makes filter accuracy auditable later.
+  .PARAMETER Harness
+    Calling harness name.
+  .PARAMETER Decision
+    allow, deny, or ask.
+  .PARAMETER Rule
+    Runner-level rule name; empty means the deciding filter's own rule applies.
+  .PARAMETER Summary
+    One-line description of the call.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [AllowEmptyString()]
+    [string]$Harness,
+
+    [Parameter(Mandatory)]
+    [string]$Decision,
+
+    [AllowEmptyString()]
+    [string]$Rule = '',
+
+    [AllowEmptyString()]
+    [string]$Summary = ''
+  )
+
+  $effectiveRule = if ([string]::IsNullOrEmpty($Rule)) { $script:filterRule } else { $Rule }
+  $auditSource = if ([string]::IsNullOrEmpty($script:filterId)) { 'none' } else { 'filter' }
+  try {
+    Write-HarnessBridgeAuditEvent -Kind 'filter' -Harness $Harness -Decision $Decision `
+      -Source $auditSource -Filter $script:filterId -Rule $effectiveRule `
+      -Summary $Summary -Digest $script:auditDigest -StartTime $script:auditStart
+  }
+  catch {
+    Write-HarnessBridgeWarning -CommandName 'harness-filter' -Message "could not write the harness audit log: $($_.Exception.Message)"
+  }
+}
+
 function Complete-HarnessFilter {
   <#
   .SYNOPSIS
@@ -348,6 +397,8 @@ function Complete-HarnessFilter {
     Tool name, for the approval gate.
   .PARAMETER Summary
     One-line description of the call, for the approval gate.
+  .PARAMETER Rule
+    Runner-level rule name, so an audited ask names what stopped it deciding.
   #>
   [CmdletBinding()]
   param(
@@ -368,20 +419,13 @@ function Complete-HarnessFilter {
 
     [Parameter(Mandatory)]
     [AllowEmptyString()]
-    [string]$Summary
+    [string]$Summary,
+
+    [AllowEmptyString()]
+    [string]$Rule = ''
   )
 
-  # WHY best-effort and first: the verdict decides whether a command runs, so a
-  # failed append is reported and then ignored.
-  try {
-    $auditSource = if ([string]::IsNullOrEmpty($script:filterId)) { 'none' } else { 'filter' }
-    Write-HarnessBridgeAuditEvent -Kind 'filter' -Harness $Harness -Decision $Decision `
-      -Source $auditSource -Filter $script:filterId -Rule $script:filterRule `
-      -Summary $Summary -Digest $script:auditDigest -StartTime $script:auditStart
-  }
-  catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-filter' -Message "could not write the harness audit log: $($_.Exception.Message)"
-  }
+  Write-HarnessFilterAudit -Harness $Harness -Decision $Decision -Rule $Rule -Summary $Summary
 
   if ($Decision -cin @('allow', 'deny')) {
     Write-Output (ConvertTo-HarnessFilterDocument -Harness $Harness -Decision $Decision -Reason $Reason)
@@ -422,24 +466,24 @@ try {
 
   if ([string]::IsNullOrWhiteSpace($env:NUCLEUS_REPO_ROOT)) {
     Write-HarnessBridgeWarning -CommandName 'harness-filter' -Message 'NUCLEUS_REPO_ROOT is unset: asking locally'
-    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason 'harness-filter (registry-error): NUCLEUS_REPO_ROOT is unset, so the filter registry cannot be read'
+    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason 'harness-filter (registry-error): NUCLEUS_REPO_ROOT is unset, so the filter registry cannot be read' -Rule registry-error
   }
   # check-suppress:config-method: method 4 (runtime direct read) -- the registry is data the runner reads from the live checkout, so a writable symlink into the store or the home directory would freeze the filter list until the next apply
   $registryPath = Join-Path -Path (Join-Path -Path (Join-Path -Path $env:NUCLEUS_REPO_ROOT -ChildPath 'src') -ChildPath 'modules') -ChildPath 'configs/harness-filters.json'
   if (-not (Test-Path -LiteralPath $registryPath -PathType Leaf)) {
     Write-HarnessBridgeWarning -CommandName 'harness-filter' -Message "filter registry not found at ${registryPath}: asking locally"
-    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason "harness-filter (registry-error): no filter registry at $registryPath"
+    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason "harness-filter (registry-error): no filter registry at $registryPath" -Rule registry-error
   }
 
   try { $entries = Get-HarnessFilterRegistryEntry -RegistryPath $registryPath }
   catch {
     Write-HarnessBridgeWarning -CommandName 'harness-filter' -Message "could not parse the filter registry at ${registryPath}: asking locally"
-    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason "harness-filter (registry-error): the filter registry at $registryPath is unreadable"
+    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason "harness-filter (registry-error): the filter registry at $registryPath is unreadable" -Rule registry-error
   }
 
   $command = Read-HarnessFilterPayloadCommand -Payload $payload
   if ([string]::IsNullOrWhiteSpace($command)) {
-    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason 'harness-filter (not-a-command): the payload carries no shell command'
+    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason 'harness-filter (not-a-command): the payload carries no shell command' -Rule not-a-command
   }
   # The command is what the gate asks about, so it replaces the raw payload, and it
   # is collapsed to the one line the terminal prompt and the audit line carry: a
@@ -453,7 +497,7 @@ try {
   # WHY ask and never allow: an undecided call is not an authorisation, so the
   # runner allows only when a filter says so.
   if ([string]::IsNullOrEmpty($result.Decision)) {
-    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason 'harness-filter (no-filter): no enabled filter produced a verdict'
+    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason 'harness-filter (no-filter): no enabled filter produced a verdict' -Rule no-filter
   }
   Complete-HarnessFilter -Harness $Harness -Decision $result.Decision -Tool $toolName -Summary $summaryText -Reason $result.Reason
 }
@@ -461,6 +505,9 @@ catch {
   # Fail open to the harness's own prompt: a broken runner must not authorise a
   # call, and must not block one either.
   Write-HarnessBridgeWarning -CommandName 'harness-filter' -Message $_.Exception.Message
+  # WHY its own call: a crash is exactly the outcome a review looks for, so the
+  # fail-open document is audited rather than only printed.
+  Write-HarnessFilterAudit -Harness $Harness -Decision 'ask' -Rule 'runner-error'
   Write-Output (ConvertTo-HarnessFilterDocument -Harness $Harness -Decision 'ask' -Reason 'harness-filter (runner-error): the runner failed, so the harness prompts')
 }
 

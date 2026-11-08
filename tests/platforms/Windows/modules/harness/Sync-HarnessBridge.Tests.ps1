@@ -576,6 +576,9 @@ Describe 'harness-approval.ps1 Windows twin' {
     $approvals[0].decision | Should -Be 'allow'
     $approvals[0].source | Should -Be 'hermes'
     $approvals[0].summary | Should -Be 'bash: git push --force'
+    # The id is the request id, which is what /harness approve answered and what a
+    # review label attaches to.
+    $approvals[0].id | Should -Be (Split-Path -Path $requestPath -LeafBase)
   }
 
   It 'publishes a request for an empty summary instead of failing open' {

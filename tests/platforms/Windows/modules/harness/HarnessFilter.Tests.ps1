@@ -196,6 +196,10 @@ Describe 'harness-filter render table' {
     $filters[0].source | Should -Be 'filter'
     $filters[0].filter | Should -Be 'safe-delete'
     $filters[0].rule | Should -Be 'native-path'
+    $filters[0].latency_ms | Should -BeGreaterOrEqual 0
+    $filters[0].digest | Should -Not -BeNullOrEmpty
+    $filters[0].ts | Should -Not -BeNullOrEmpty
+    $filters[0].id | Should -Match '^[0-9a-f]{8}$'
   }
 
   It 'denies a native rm path with a Copilot PreToolUse document' {

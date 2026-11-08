@@ -98,6 +98,7 @@ $ErrorActionPreference = 'Stop'
 $script:auditStart = [datetime]::UtcNow
 $script:auditDigest = ''
 $script:decidedBy = ''
+$script:requestId = ''
 
 function Get-HarnessBridgeApprovalConfig {
   <#
@@ -622,7 +623,7 @@ function Complete-HarnessApproval {
   try {
     Write-HarnessBridgeAuditEvent -Kind 'approval' -Harness $Harness -Decision $final `
       -Source $script:decidedBy -Summary $summaryText -Digest $script:auditDigest `
-      -StartTime $script:auditStart
+      -StartTime $script:auditStart -Id $script:requestId
   }
   catch {
     Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message "could not write the harness audit log: $($_.Exception.Message)"
@@ -711,6 +712,7 @@ try {
     }
     $requestPath = $request.RequestPath
     $responsePath = $request.ResponsePath
+    $script:requestId = [string]$request.Id
   }
 
   $wait = Wait-HarnessApproval -Source $sourceName -PromptTimeout $promptTimeout `
@@ -732,6 +734,16 @@ catch {
   # wedge the harness, and must not silently authorise anything either.
   Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message $_.Exception.Message
   $fallbackHarness = if ([string]::IsNullOrWhiteSpace($harnessName)) { 'other' } else { $harnessName }
+  # WHY its own try: this is the crash path a review looks for, so it is audited
+  # rather than only printed, and logging here must not break the document either.
+  try {
+    Write-HarnessBridgeAuditEvent -Kind 'approval' -Harness $fallbackHarness -Decision 'ask' `
+      -Source 'none' -Summary 'harness-approval (fail-open)' -Digest $script:auditDigest `
+      -StartTime $script:auditStart
+  }
+  catch {
+    Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message "could not write the harness audit log: $($_.Exception.Message)"
+  }
   Write-Output (ConvertTo-HarnessApprovalDocument -Harness $fallbackHarness -Decision 'ask' -Plain:$Plain)
 }
 

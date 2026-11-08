@@ -174,6 +174,14 @@ function Write-HarnessBridgeAuditEvent {
     [string]$Id = ''
   )
 
+  # WHY here: the schema caps a summary at 200 collapsed characters, and one place
+  # per platform owns the rule, so no caller can widen it by passing a raw body.
+  $Summary = ($Summary -replace '\s+', ' ').Trim()
+  if ($Summary.Length -gt 200) { $Summary = $Summary.Substring(0, 200) }
+  # WHY mint: the review workflow labels an event by id, so every event needs one
+  # even when no caller has a natural id to hand.
+  if ([string]::IsNullOrEmpty($Id)) { $Id = [guid]::NewGuid().ToString('N').Substring(0, 8) }
+
   $auditEvent = @{ kind = $Kind }
   # WHY none: a bridge event always names what decided, and no decision names itself.
   $auditEvent['source'] = if ([string]::IsNullOrEmpty($Source)) { 'none' } else { $Source }

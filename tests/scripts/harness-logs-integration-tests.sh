@@ -24,6 +24,7 @@ readonly APPROVAL NOTIFY RUNNER LOGS
 
 require_command mktemp "temporary directories for the home, the stub, and the log root"
 require_command jq "the events are asserted as JSON"
+require_command find "locating the request file the gate publishes"
 
 ensure_safe_rm_env
 
@@ -150,7 +151,13 @@ _allow="$(jq -c 'map(select(.decision == "allow")) | .[0] // {}' <<<"$(events_of
 if [ "$(jq -r '.filter' <<<"$_deny")" = "safe-delete" ] &&
   [ "$(jq -r '.rule' <<<"$_deny")" = "native-path" ] &&
   [ "$(jq -r '.source' <<<"$_deny")" = "filter" ] &&
-  [ "$(jq -r '.decision' <<<"$_allow")" = "allow" ]; then
+  [ "$(jq -r '.decision' <<<"$_allow")" = "allow" ] &&
+  [ "$(jq -r '.latency_ms | type' <<<"$_deny")" = "number" ] &&
+  [ -n "$(jq -r '.digest' <<<"$_deny")" ] &&
+  [ -n "$(jq -r '.ts' <<<"$_deny")" ] &&
+  [ "$(jq -r '.latency_ms | type' <<<"$_allow")" = "number" ] &&
+  [ -n "$(jq -r '.digest' <<<"$_allow")" ] &&
+  [ -n "$(jq -r '.ts' <<<"$_allow")" ]; then
   assert_pass "a filter verdict writes kind=filter with its id and rule, allow included"
 else
   assert_fail "filter events" "$(cat "$AUDIT" 2>/dev/null)"
@@ -184,7 +191,6 @@ fi
 # A regular file where the log root belongs makes every append fail, which is the
 # only way to prove the hook still answers.
 printf 'not a directory\n' >"$TMPDIR_ROOT/blocked"
-NUCLEUS_LOG_DIR="$TMPDIR_ROOT/blocked/logs"
 reset_audit
 _rc=0
 _out="$(printf '%s' '{"command":"/bin/rm -rf x"}' |
