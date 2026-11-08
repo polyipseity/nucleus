@@ -693,6 +693,15 @@
               MANAGED_PREF_DOMAINS = builtins.concatStringsSep " " managedPrefDomains.resetUserPreferenceDomains;
             };
           };
+          nucleus-logs = nucleusApp {
+            name = "logs";
+            # Windows twin: scripts/logs.ps1.
+            runtimeInputs = [
+              pkgs.coreutils
+              pkgs.gzip
+              pkgs.jq
+            ];
+          };
           nucleus-svc = nucleusApp {
             name = "svc";
             runtimeInputs = [ pkgs.jq ];

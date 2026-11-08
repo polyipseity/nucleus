@@ -13,6 +13,33 @@ GC_SH="$SCRIPT_DIR/../../scripts/gc.sh"
 
 ensure_safe_rm_env
 
+# new_logs_stub <dir>: create the NUCLEUS_LOGS_BIN stand-in. gc_logs delegates
+# rotation and expiry to nucleus-logs, so the suite stubs that entry point and
+# records the operation and the resolved directory; the library functions it
+# drives are never reached here.
+new_logs_stub() {
+  cat >"$1/logs-stub.sh" <<'EOF'
+#!/usr/bin/env bash
+_action="$1"
+_scope=user
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+  --scope)
+    _scope="$2"
+    shift
+    ;;
+  esac
+  shift
+done
+case "$_scope" in
+system) _dir="$STUB_SYSTEM_DIR" ;;
+*) _dir="$STUB_USER_DIR" ;;
+esac
+printf '%s %s\n' "$(printf '%s' "$_action" | tr '[:lower:]' '[:upper:]')" "$_dir" >>"$MOCK_RECORD"
+EOF
+  chmod +x "$1/logs-stub.sh"
+}
+
 # ---- Test A: sudo -H is passed for profile expiry ----
 
 test_sudo_h_passed_when_sudo_true() {
@@ -93,17 +120,18 @@ echo "SUDO_CALLED" >> "$MOCK_RECORD"
 printf '%s\n' "$@" >> "$MOCK_RECORD"
 EOF
   chmod +x "$mock_dir/sudo"
+  new_logs_stub "$mock_dir"
   export MOCK_RECORD="$work/record.txt"
   : >"$MOCK_RECORD"
 
   gc_func="$(extract_func gc_logs "$GC_SH")"
 
-  PATH="$mock_dir:$PATH" REPO_ROOT="$SCRIPT_DIR/../.." bash -c '
+  PATH="$mock_dir:$PATH" REPO_ROOT="$SCRIPT_DIR/../.." \
+    NUCLEUS_LOGS_BIN="$mock_dir/logs-stub.sh" \
+    STUB_USER_DIR="$user_dir" STUB_SYSTEM_DIR="$sys_dir" bash -c '
     . "$1"
     nucleus_log_dir() { printf "%s\n" "'"$user_dir"'"; }
     nucleus_system_log_dir() { printf "%s\n" "'"$sys_dir"'"; }
-    rotate_logs_in_directory() { echo "ROTATE $1" >> "$MOCK_RECORD"; }
-    expire_logs_in_directory() { echo "EXPIRE $1" >> "$MOCK_RECORD"; }
     '"$gc_func"'
     gc_logs
   ' nucleus-gc-test "$LIB_SH" >/dev/null 2>&1
@@ -141,17 +169,18 @@ test_gc_logs_inline_when_system_dir_writable() {
 echo "SUDO_CALLED" >> "$MOCK_RECORD"
 EOF
   chmod +x "$mock_dir/sudo"
+  new_logs_stub "$mock_dir"
   export MOCK_RECORD="$work/record.txt"
   : >"$MOCK_RECORD"
 
   gc_func="$(extract_func gc_logs "$GC_SH")"
 
-  PATH="$mock_dir:$PATH" REPO_ROOT="$SCRIPT_DIR/../.." bash -c '
+  PATH="$mock_dir:$PATH" REPO_ROOT="$SCRIPT_DIR/../.." \
+    NUCLEUS_LOGS_BIN="$mock_dir/logs-stub.sh" \
+    STUB_USER_DIR="$user_dir" STUB_SYSTEM_DIR="$sys_dir" bash -c '
     . "$1"
     nucleus_log_dir() { printf "%s\n" "'"$user_dir"'"; }
     nucleus_system_log_dir() { printf "%s\n" "'"$sys_dir"'"; }
-    rotate_logs_in_directory() { echo "ROTATE $1" >> "$MOCK_RECORD"; }
-    expire_logs_in_directory() { echo "EXPIRE $1" >> "$MOCK_RECORD"; }
     '"$gc_func"'
     gc_logs
   ' nucleus-gc-test "$LIB_SH" >/dev/null 2>&1

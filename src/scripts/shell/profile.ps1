@@ -845,6 +845,23 @@ $nucleusGcFlags = @(
   '--wallpaper-gc'
 )
 
+$nucleusLogsFlags = @(
+  '--compress',
+  '--dry-run',
+  '--expiry',
+  '--harness',
+  '--help',
+  '--json',
+  '--kind',
+  '--lines',
+  '--log',
+  '--max-files',
+  '--max-size',
+  '--note',
+  '--scope',
+  '--since'
+)
+
 $nucleusSvcFlags = @(
   '--help',
   '--json',
@@ -976,6 +993,12 @@ if ($IsWindows) {
     param()
     Invoke-NucleusRepoScript 'scripts\gc.ps1' @Args
   }
+  function nucleus-logs {
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    param()
+    Invoke-NucleusRepoScript 'scripts\logs.ps1' @Args
+  }
   function nucleus-update {
     # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
@@ -1011,6 +1034,7 @@ if ($IsWindows) {
 $nucleusSvcCommands = @('list', 'status', 'start', 'stop', 'restart', 'enable', 'disable', 'verify', 'endpoint', 'logs', 'log-paths', 'log-config')
 $nucleusConfigCommands = @('get', 'set', 'list')
 $nucleusGcCommands = @('cleanup-nix', 'preferences')
+$nucleusLogsCommands = @('append', 'expire', 'gc', 'label', 'rotate', 'show', 'stats', 'tail')
 $nucleusUtilsCommands = @('optimize-pdf', 'strip-metadata')
 
 Register-ArgumentCompleter -CommandName nucleus-svc -ScriptBlock {
@@ -1046,6 +1070,13 @@ Register-ArgumentCompleter -CommandName nucleus-gc -ScriptBlock {
   $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: parameter metadata variables, declared for introspection
   $nucleusGcCommands | Where-Object { $_ -like "$wordToComplete*" }
   $nucleusGcFlags | Where-Object { $_ -like "$wordToComplete*" }
+}
+
+Register-ArgumentCompleter -CommandName nucleus-logs -ScriptBlock {
+  param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: parameter metadata variables, declared for introspection
+  $nucleusLogsCommands | Where-Object { $_ -like "$wordToComplete*" }
+  $nucleusLogsFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-cloud -ScriptBlock {

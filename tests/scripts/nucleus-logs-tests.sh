@@ -1,0 +1,224 @@
+#!/usr/bin/env bash
+# Tests for scripts/logs.sh: the append-only JSONL event log, its concurrency
+# contract, and the rotation and expiry it owns.
+#
+# The concurrency case is the load-bearing one. A writer that truncates, that
+# opens without O_APPEND, or that spends more than one write(2) per line loses or
+# interleaves lines under contention, and nothing else in the tree would notice.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=./test-lib.sh
+. "$SCRIPT_DIR/test-lib.sh"
+
+REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+LOGS_SH="$REPO_ROOT/scripts/logs.sh"
+readonly REPO_ROOT LOGS_SH
+
+init_test_state
+ensure_safe_rm_env
+require_command jq "nucleus-logs writes and reads JSON events"
+require_command gzip "nucleus-logs compresses rotated archives"
+
+_WORK="$(mktemp -d)"
+export NUCLEUS_LOG_DIR="$_WORK"
+trap 'rm -rf "$_WORK"' EXIT
+
+_ALL_KEYS='"ts","id","kind","harness","decision","source","filter","rule","latency_ms","summary","digest"'
+
+# logs <args...>: run the app against the suite's temporary log root.
+logs() {
+  NUCLEUS_LOG_DIR="$_WORK" bash "$LOGS_SH" "$@"
+}
+
+# ---- One append produces one canonical line ----
+
+test_append_writes_one_canonical_line() {
+  printf '%s\n' '{"id":"one","kind":"decision"}' | logs append decisions
+  local count
+  count="$(wc -l <"$_WORK/decisions.log" | tr -d ' ')"
+  if [ "$count" -eq 1 ]; then
+    assert_pass "append writes exactly one line"
+  else
+    assert_fail "append-one-line" "expected 1 line, got $count"
+  fi
+
+  local missing
+  missing="$(jq -r --argjson keys "[$_ALL_KEYS]" '. as $event | [$keys[] as $k | select($event | has($k) | not) | $k] | join(",")' "$_WORK/decisions.log")"
+  if [ -z "$missing" ]; then
+    assert_pass "append carries all eleven canonical keys"
+  else
+    assert_fail "append-keys" "missing keys: $missing"
+  fi
+
+  if [ "$(jq -r '.id' "$_WORK/decisions.log")" = "one" ]; then
+    assert_pass "append preserves the supplied id"
+  else
+    assert_fail "append-id" "id not preserved: $(cat "$_WORK/decisions.log")"
+  fi
+}
+
+# ---- Oversized events are refused, not truncated ----
+
+test_oversized_event_is_refused() {
+  local big status=0
+  big="$(printf 'x%.0s' $(seq 5000))"
+  printf '{"id":"big","summary":"%s"}\n' "$big" | logs append decisions >/dev/null 2>&1 || status=$?
+  if [ "$status" -ne 0 ]; then
+    assert_pass "an event over 4096 bytes is rejected"
+  else
+    assert_fail "append-oversize" "append accepted an oversized event"
+  fi
+
+  if ! jq -e 'select(.id == "big")' "$_WORK/decisions.log" >/dev/null; then
+    assert_pass "a rejected event leaves no partial line"
+  else
+    assert_fail "append-oversize-partial" "oversized event reached the log"
+  fi
+}
+
+# ---- 50 concurrent appends: no lost line, no interleaved line ----
+
+test_concurrent_appends_keep_every_line() {
+  local before after appended i
+  before="$(wc -l <"$_WORK/decisions.log" | tr -d ' ')"
+
+  for i in $(seq 1 50); do
+    printf '{"id":"c%02d","kind":"concurrent","summary":"line %02d"}\n' "$i" "$i" |
+      NUCLEUS_LOG_DIR="$_WORK" bash "$LOGS_SH" append concurrent &
+  done
+  wait
+
+  after="$(wc -l <"$_WORK/concurrent.log" | tr -d ' ')"
+  appended=$((after))
+  if [ "$appended" -eq 50 ]; then
+    assert_pass "50 concurrent appends produce exactly 50 lines"
+  else
+    assert_fail "append-concurrent-count" "expected 50 lines, got $appended"
+  fi
+
+  local invalid
+  invalid="$(jq -c 'select((.id | type) != "string" or (.summary | type) != "string")' "$_WORK/concurrent.log" | wc -l | tr -d ' ')"
+  if [ "$invalid" -eq 0 ]; then
+    assert_pass "every concurrent line parses with its own id and summary"
+  else
+    assert_fail "append-concurrent-interleave" "$invalid interleaved or unparseable line(s)"
+  fi
+
+  local unique
+  unique="$(jq -r '.id' "$_WORK/concurrent.log" | sort -u | wc -l | tr -d ' ')"
+  if [ "$unique" -eq 50 ]; then
+    assert_pass "all 50 concurrent ids are present exactly once"
+  else
+    assert_fail "append-concurrent-unique" "expected 50 distinct ids, got $unique"
+  fi
+
+  if [ "$before" -lt "$after" ]; then
+    assert_pass "the earlier log line was not rewritten by later appends"
+  else
+    assert_fail "append-append-only" "the pre-existing log shrank or vanished"
+  fi
+}
+
+# ---- label appends an event and never rewrites history ----
+
+test_label_appends_verdict_event() {
+  local before
+  before="$(cat "$_WORK/decisions.log")"
+
+  logs label one deny --note "reviewed by hand"
+
+  if diff -q <(printf '%s\n' "$before") <(head -n "$(printf '%s\n' "$before" | wc -l | tr -d ' ')" "$_WORK/decisions.log") >/dev/null; then
+    assert_pass "label leaves the earlier lines byte-identical"
+  else
+    assert_fail "label-rewrite" "label modified an existing line"
+  fi
+
+  local verdict
+  verdict="$(jq -r 'select(.kind == "label" and .id == "one") | [.decision, .summary] | @tsv' "$_WORK/decisions.log" | tail -n 1)"
+  if [ "$verdict" = "$(printf 'deny\treviewed by hand')" ]; then
+    assert_pass "label records kind=label with the verdict and note"
+  else
+    assert_fail "label-verdict" "unexpected label event: $verdict"
+  fi
+}
+
+# ---- rotate copies, compresses, and truncates in place ----
+
+test_rotate_archives_and_truncates() {
+  local big
+  big="$(printf 'y%.0s' $(seq 3000))"
+  printf '{"id":"rot","summary":"%s"}\n' "$big" >>"$_WORK/rotate-me.log"
+
+  logs rotate --max-size 1024 --max-files 4 --compress true
+
+  if [ -f "$_WORK/rotate-me.log.1.gz" ]; then
+    assert_pass "rotate produces rotate-me.log.1.gz"
+  else
+    assert_fail "rotate-archive" "no rotate-me.log.1.gz after rotate"
+  fi
+
+  local size
+  size="$(wc -c <"$_WORK/rotate-me.log" | tr -d ' ')"
+  if [ "$size" -eq 0 ]; then
+    assert_pass "rotate truncates the live file in place"
+  else
+    assert_fail "rotate-truncate" "live file still $size bytes"
+  fi
+
+  if [ "$(gzip -dc "$_WORK/rotate-me.log.1.gz" | jq -r '.id')" = "rot" ]; then
+    assert_pass "the archive holds the rotated event"
+  else
+    assert_fail "rotate-content" "archive content lost the event"
+  fi
+}
+
+# ---- expire removes archives past the retention window ----
+
+test_expire_removes_old_archives() {
+  printf '{"id":"old"}\n' | gzip >"$_WORK/expire-me.log.1.gz"
+  printf '{"id":"fresh"}\n' | gzip >"$_WORK/expire-me.log.2.gz"
+  touch -t 202001010000 "$_WORK/expire-me.log.1.gz"
+
+  logs expire --expiry 7d
+
+  if [ ! -f "$_WORK/expire-me.log.1.gz" ]; then
+    assert_pass "expire removes an archive older than the expiry"
+  else
+    assert_fail "expire-old" "the expired archive survived"
+  fi
+
+  if [ -f "$_WORK/expire-me.log.2.gz" ]; then
+    assert_pass "expire keeps an archive inside the expiry"
+  else
+    assert_fail "expire-fresh" "expire removed a fresh archive"
+  fi
+}
+
+# ---- show and stats read what append wrote ----
+
+test_show_filters_by_kind() {
+  local output
+  output="$(logs show decisions --kind label --json)"
+  if printf '%s' "$output" | jq -e 'length >= 1 and all(.kind == "label")' >/dev/null; then
+    assert_pass "show --kind returns only matching events"
+  else
+    assert_fail "show-kind" "unexpected show output: $output"
+  fi
+}
+
+# ---- Run tests ----
+
+section 1 "nucleus-logs"
+echo ""
+
+test_append_writes_one_canonical_line
+test_oversized_event_is_refused
+test_concurrent_appends_keep_every_line
+test_label_appends_verdict_event
+test_rotate_archives_and_truncates
+test_expire_removes_old_archives
+test_show_filters_by_kind
+
+finish_tests

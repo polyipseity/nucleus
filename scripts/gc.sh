@@ -22,10 +22,19 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 # default GC below runs.
 action="${1:-}"
 case "$action" in
-cleanup-nix | preferences)
+cleanup-nix | logs | preferences)
   shift
   case "$action" in
   cleanup-nix) do_cleanup_nix "$@" ;;
+  # WHY the NUCLEUS_LOGS_BIN seam: the logging operations belong to nucleus-logs,
+  # and the seam lets a caller (and a test) substitute the entry point instead of
+  # reaching into the library the app itself drives.
+  logs)
+    case "${1:-}" in
+    '' | -*) set -- gc "$@" ;;
+    esac
+    exec "${NUCLEUS_LOGS_BIN:-"$SCRIPT_DIR/logs.sh"}" "$@"
+    ;;
   preferences) do_macos_preferences "$@" ;;
   esac
   exit $?
@@ -48,6 +57,7 @@ usage() {
   --vm-gc|--no-vm-gc                  Control stale VM artifact removal (default: --vm-gc).
   --vm-data-gc|--no-vm-data-gc        Also GC data/ writable disks during VM gc (default: --no-vm-data-gc).
   --log-gc|--no-log-gc                Control log rotation (default: --log-gc).
+  logs [<subcommand>] [options]       Rotate and expire managed logs via nucleus-logs; defaults to 'gc'.
   --journald-gc|--no-journald-gc        Control journald log vacuum (default: --journald-gc).
   --scoop-gc|--no-scoop-gc            Control Scoop cache clearing (default: --scoop-gc; ignored on POSIX, Scoop is Windows-only).
   --log-max-size <bytes>              Log rotation max file size before rotation (default: 10000000).
@@ -749,14 +759,15 @@ gc_logs() {
   _gl_log_dir="$(nucleus_log_dir)"
   _gl_system_log_dir="$(nucleus_system_log_dir)"
   _gl_expiry="$(resolve_log_expiry)"
+  _gl_logs="${NUCLEUS_LOGS_BIN:-"$SCRIPT_DIR/logs.sh"}"
 
-  rotate_logs_in_directory "$_gl_log_dir" "$_gl_maxsize" "$_gl_maxfiles" "$_gl_compress"
-  expire_logs_in_directory "$_gl_log_dir" "$_gl_expiry"
+  "$_gl_logs" rotate --scope user --max-size "$_gl_maxsize" --max-files "$_gl_maxfiles" --compress "$_gl_compress"
+  "$_gl_logs" expire --scope user --expiry "$_gl_expiry"
 
   if [ -n "$_gl_system_log_dir" ] && [ "$_gl_system_log_dir" != "$_gl_log_dir" ]; then
     if [ -w "$_gl_system_log_dir" ]; then
-      rotate_logs_in_directory "$_gl_system_log_dir" "$_gl_maxsize" "$_gl_maxfiles" "$_gl_compress"
-      expire_logs_in_directory "$_gl_system_log_dir" "$_gl_expiry"
+      "$_gl_logs" rotate --scope system --max-size "$_gl_maxsize" --max-files "$_gl_maxfiles" --compress "$_gl_compress"
+      "$_gl_logs" expire --scope system --expiry "$_gl_expiry"
     elif command -v sudo >/dev/null 2>&1 && [ "$(id -u)" -ne 0 ]; then
       say "system log dir '$_gl_system_log_dir' not writable by current user; escalating to root"
       sudo env NUCLEUS_REPO_ROOT="$REPO_ROOT" NUCLEUS_LOG_EXPIRY="$_gl_expiry" \

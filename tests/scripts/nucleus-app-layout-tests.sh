@@ -35,6 +35,7 @@ declare -a LAYOUT_PACKAGES=(
   nucleus-config
   nucleus-utils
   nucleus-gc
+  nucleus-logs
   nucleus-svc
   nucleus-test
   nucleus-update
@@ -50,6 +51,7 @@ declare -A ENTRY_SCRIPT=(
   ["nucleus-config"]=scripts/config.sh
   ["nucleus-utils"]=scripts/utils.sh
   ["nucleus-gc"]=scripts/gc.sh
+  ["nucleus-logs"]=scripts/logs.sh
   ["nucleus-svc"]=scripts/svc.sh
   ["nucleus-test"]=scripts/test.sh
   ["nucleus-update"]=scripts/update.sh

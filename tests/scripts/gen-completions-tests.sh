@@ -34,7 +34,7 @@ _profile_ps1="src/scripts/shell/profile.ps1"
 # commands: check packer/sh/pwsh, gc cleanup-nix/preferences, apply
 # health-check/audit-store, cloud setup/reset/sync/status/restart, update
 # lockfile.
-_NUCLEUS_COMMANDS=(ai apply bootstrap check cloud config gc utils svc test update vm)
+_NUCLEUS_COMMANDS=(ai apply bootstrap check cloud config gc logs utils svc test update vm)
 
 # Marker for the no-touch assertion (case 14): plain mktemp, outside the tracked
 # tree, timestamped before anything in the suite can generate. The one-second
