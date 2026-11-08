@@ -5,11 +5,17 @@
 
 register_step "repo-policy-data" "Repository policy (data-driven)" run_repo_policy_data posix any none
 
+# WHY: this step resolves the shared awk scan program by absolute path, and a
+#   suite sources this file on its own, so the directory is derived here rather
+#   than borrowed from step 12's top-level assignment.
+_REPO_POLICY_STEP_DIR="$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 _POLICY_DATA_CHECKS=(
   "dummy key uniformity|run_dummy_key_uniformity|files"
   "preflight install command policy|run_preflight_install_command_policy|ctx"
   "agents policy|run_agents_policy|files"
   "embedded content enforcement|run_embedded_content_enforcement|files"
+  "PowerShell here-string enforcement|run_here_string_policy|ctx"
   "method-1 symlink resolution|run_method1_symlink_resolution|ctx"
   "release age uniformity|run_release_age_uniformity|files"
   "upstream workaround staleness|run_upstream_workaround_staleness|ctx"
@@ -288,6 +294,70 @@ run_embedded_content_enforcement() {
   fi
 
   say "no embedded-content heredoc violations found."
+  return 0
+}
+
+# run_here_string_policy: the .ps1 side of the embedded-content policy. The
+# PowerShell twin (13-repo-policy-data.ps1) reads the parse tree to measure each
+# here-string; the here-string mode of repository-policy.awk reproduces the same
+# gate from text over the same file set, so both hosts run one rule.
+run_here_string_policy() {
+  local -n ctx="$1"
+  shift
+  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
+  cd "$_repo_root" || return 1
+
+  local _errors=0 _f
+  local -a _ps1_files=()
+  if $_has_args; then
+    local -n _ps1_ctx="${ctx[PS1_FILES]}"
+    _ps1_files=("${_ps1_ctx[@]}")
+  else
+    while IFS= read -r -d '' _f; do
+      _ps1_files+=("$_f")
+    done < <(find . -name '*.ps1' -not -path './vendor/*' -not -path './.git/*' -print0)
+    # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariant; gitignore filter applied on top
+    if [ "${#_ps1_files[@]}" -gt 0 ]; then
+      mapfile -t _ps1_files < <(printf '%s\n' "${_ps1_files[@]}" | filter_gitignored)
+    fi
+  fi
+
+  # The repo-policy step files carry here-string-shaped pattern text of their
+  # own; the twin excludes the same three leaves from its own scan.
+  # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
+  local -a _scan=()
+  for _f in "${_ps1_files[@]}"; do
+    case "$(basename "$_f")" in
+    11-repo-policy-grep.ps1 | 12-repo-policy-pattern.ps1 | 13-repo-policy-data.ps1) continue ;;
+    esac
+    _scan+=("$_f")
+  done
+
+  if [ "${#_scan[@]}" -gt 0 ]; then
+    local _awk_path="$_REPO_POLICY_STEP_DIR/repository-policy.awk"
+    local _violation
+    local _out
+    _out=$(mktemp) || {
+      error "failed to create temp file"
+      return 1
+    }
+    awk -v mode=here-string -f "$_awk_path" "${_scan[@]}" >"$_out" || {
+      error "here-string scan failed to run"
+      rm -f "$_out"
+      return 1
+    }
+    while IFS= read -r _violation; do
+      _errors=$((_errors + 1))
+      error "$_violation"
+    done <"$_out"
+    rm -f "$_out"
+  fi
+
+  if [ "$_errors" -gt 0 ]; then
+    say "  Extract here-strings above 10 content lines to shared files — see .agents/instructions/embedded-content.instructions.md."
+    return 1
+  fi
+  say "no PowerShell here-string violations found."
   return 0
 }
 

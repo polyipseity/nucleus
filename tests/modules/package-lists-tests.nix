@@ -269,6 +269,19 @@ let
     lib.hasInfix "\n      id: ScoopInstall\n" dscText
     && lib.hasInfix "\n        - GitInstall\n" dscText;
 
+  # The enable list and the DSC file are two halves of one deployment: the list
+  # decides which ids the updater pins, the DSC file decides which of them an
+  # apply installs. An id in the first without a resource in the second is
+  # pinned and never installed. WHY one exception: the WinGet SteamCMD package
+  # installs outside the steamcmd_install_path RimSort reads, so
+  # Invoke-SteamCMDSetup.ps1 provisions the binary from Valve's CDN instead of a
+  # DSC resource (POSIX twin: src/scripts/configs/provision-steamcmd.sh).
+  wingetDscExceptions = [ "Valve.SteamCMD" ];
+  wingetMissingDscResources = builtins.filter (
+    id: !(builtins.elem id dscIds) && !(builtins.elem id wingetDscExceptions)
+  ) resolvedWindowsPackages;
+  wpDscCoversEnableList = wingetMissingDscResources == [ ];
+
   # The package group is sorted alphabetically by `settings.id`
   # (`.agents/instructions/winget-dsc.instructions.md`, "Resource groups and
   # ordering"). WHY case-folded: WinGet ids keep their own casing, so ids such as
@@ -325,6 +338,7 @@ let
     && stirlingDisabledHosts == [ ]
     && stirlingDesktopResolved
     && spIsValid
+    && wpDscCoversEnableList
     && wpScoopInstallPresent;
 in
 {
@@ -364,6 +378,7 @@ in
     builtins.concatStringsSep ", " (builtins.map (pair: "${pair.fst} before ${pair.snd}") dscInversions)
   }";
   test_wp_scoop_install_present = assert' wpScoopInstallPresent "the DSC file must keep the six-space id: ScoopInstall block with its GitInstall dependency";
+  test_wp_dsc_covers_enable_list = assert' wpDscCoversEnableList "enabled WinGet ids with no DSC resource: ${builtins.concatStringsSep ", " wingetMissingDscResources}";
   test_wp_json_sorted = assert' (
     wpJsonTerminated && wpJsonMultiline && wpJsonHasKeys
   ) "winget-packages.json must be multi-line with sorted keys and exactly one trailing newline";

@@ -584,6 +584,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure PulseView (sigrok logic-analyzer GUI) is installed for cross-host logic-analyzer parity with nixpkgs pulseview on macOS and NixOS; no Homebrew cask carries it
+      settings:
+        id: Sigrok.PulseView
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure SQLite is installed for command-line database access
       settings:
         id: SQLite.SQLite
@@ -629,6 +636,13 @@ properties:
         description: Ensure Telegram Desktop Beta is installed to mirror the macOS beta-channel messaging baseline
       settings:
         id: Telegram.TelegramDesktop.Beta
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure WeChat is installed for cross-host messaging parity with macOS (Homebrew cask wechat) and NixOS (nixpkgs wechat-uos)
+      settings:
+        id: Tencent.WeChat.Universal
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package

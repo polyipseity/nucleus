@@ -3,6 +3,13 @@
 # Default mode (no -v mode): heredoc size detector for the embedded-content
 # policy; flags heredocs with more than 30 content lines.
 #
+# Here-string mode (-v mode=here-string): the PowerShell side of the same
+# policy, over .ps1 files. The twin (13-repo-policy-data.ps1) reads the parse
+# tree; this mode reads text and reproduces the twin's gate: a here-string is
+# file content only when it is a C# interop block (Add-Type, exempt up to 25
+# content lines) or is written to disk (limit 10). Anything else, such as script
+# text handed to a subprocess, the twin skips, so this mode skips it too.
+#
 # Logging-format mode (-v mode=logging-format): enforces the unified logging
 # format standard (see .agents/instructions/logging.instructions.md):
 #   - raw ANSI escapes (\033[, \e[, \x1b[) and tput outside the shared
@@ -81,6 +88,7 @@ BEGIN {
   for (_argv_i = 1; _argv_i < ARGC; _argv_i++)
     if (ARGV[_argv_i] ~ /^[A-Za-z_][A-Za-z0-9_]*=/)
       ARGV[_argv_i] = "./" ARGV[_argv_i]
+  if (mode == "here-string") _hs_write_re = "Set-Content|Add-Content|Out-File|Tee-Object"
   if (mode == "activation-naming") {
     _an_ns_start = "(home\\.activation|system\\.activationScripts|nucleus\\.terminalActivations)[[:space:]]*=[^;]*[{]"
     # An activation entry carries a lib wrapper, or leaves its value on the next
@@ -150,6 +158,59 @@ mode == "" && in_heredoc {
   else if (!dash && $0 ~ "^" tag "[ \t]*$") { in_heredoc = 0 }
   else { body++; next }
   if (body > 30) print FILENAME ":" start_line ": heredoc " tag " has " body " content lines (limit 30)"
+}
+
+# One violation line, byte for byte the message the .ps1 twin prints, so a
+# finding reads the same whichever twin catches it.
+function report_here_string() {
+  printf "%s:%d: here-string with %d content lines (limit 10) \342\200\224 extract to a shared file per the embedded-content policy\n", FILENAME, _hs_start, _hs_body
+}
+
+mode == "here-string" && FNR == 1 {
+  _hs_open = 0
+  _hs_prev = ""
+  _hs_cited = 0
+}
+mode == "here-string" {
+  _hs_line = $0
+  # .ps1 files are CRLF; the closing mark starts the line either way.
+  sub(/\r$/, "", _hs_line)
+  if (_hs_open) {
+    if (substr(_hs_line, 1, 2) == _hs_closer) {
+      _hs_open = 0
+      # The pipeline form `@"..."@ | Set-Content` names the write command on the
+      # closing line, which is where the twin's PipelineAst check finds it.
+      if (_hs_line ~ _hs_write_re) _hs_write = 1
+      if (_hs_addtype) {
+        if (_hs_body > 25 && !_hs_marked) report_here_string()
+      } else if (_hs_write && _hs_body > 10 && !_hs_marked) report_here_string()
+    } else {
+      _hs_body++
+    }
+    next
+  }
+  # An opener is `@"` or `@'` as the last characters on the line; the quote
+  # character picks the closing mark.
+  if (match(_hs_line, /@["\047][ \t]*$/)) {
+    _hs_start = FNR
+    _hs_body = 0
+    _hs_closer = substr(_hs_line, RSTART + 1, 1) "@"
+    # C# interop (embedded-content exception 3) passes the type source straight
+    # to Add-Type, on the opener line or through a continuation naming the
+    # parameter on the line above it.
+    _hs_addtype = (_hs_line ~ /Add-Type|-TypeDefinition|-MemberDefinition/ || _hs_prev ~ /Add-Type|-TypeDefinition|-MemberDefinition/)
+    _hs_write = (_hs_line ~ _hs_write_re)
+    # A citation on one of the 10 lines above exempts the site, the window the
+    # twin reads for check-suppress:embedded-content.
+    _hs_marked = (_hs_cited > 0)
+    _hs_cited = 0
+    _hs_open = 1
+    _hs_prev = _hs_line
+    next
+  }
+  if (_hs_line ~ /check-suppress:embedded-content/) _hs_cited = 10
+  else if (_hs_cited > 0) _hs_cited--
+  _hs_prev = _hs_line
 }
 
 mode == "logging-format" && FNR == 1 {
