@@ -49,7 +49,7 @@ function Invoke-ScoopSetup {
     return
   }
   $desiredPackages = @($hostDesired | ForEach-Object {
-    @{ name = $_.name; bucket = $_.bucket }
+    @{ name = $_.name; bucket = $_.bucket; noShim = $_.noShim }
   })
   $desiredNames = @($desiredPackages | ForEach-Object { $_.name })
 
@@ -66,9 +66,11 @@ function Invoke-ScoopSetup {
   # 'extras' hosts qemu.
   foreach ($bucket in @('extras', 'main')) {
     # 'scoop bucket list' exits non-zero when nothing is registered yet, and
-    # the -notmatch guard below is the real check.
+    # the -match guard below is the real check. WHY the positive form: on an
+    # array, -notmatch returns the lines that do not match, so it is true for
+    # almost any output.
     $existing = scoop bucket list 2>&1
-    if ($existing -notmatch "(?m)^$bucket\b") {
+    if (-not ($existing -match "(?m)^$bucket\b")) {
       Write-NucleusInfo -CommandName 'scoop' "adding bucket '$bucket'"
       scoop bucket add $bucket
       if ($LASTEXITCODE -ne 0) {
@@ -82,7 +84,7 @@ function Invoke-ScoopSetup {
   # explicit; Scoop still verifies each manifest's own file hashes at install.
   $fontsBucketUrl = 'https://github.com/KnotUntied/scoop-fonts.git'
   $existing = scoop bucket list 2>&1
-  if ($existing -notmatch '(?m)^fonts\b') {
+  if (-not ($existing -match '(?m)^fonts\b')) {
     Write-NucleusInfo -CommandName 'scoop' "adding bucket 'fonts'"
     scoop bucket add fonts $fontsBucketUrl
     if ($LASTEXITCODE -ne 0) {
@@ -164,7 +166,7 @@ function Invoke-ScoopSetup {
       Write-NucleusError -CommandName 'scoop' "'scoop install $installSpec' failed (exit $LASTEXITCODE)"
       return
     }
-    if (-not (Test-ScoopShim -PackageName $pkgName)) {
+    if (-not $entry.noShim -and -not (Test-ScoopShim -PackageName $pkgName)) {
       Write-NucleusError -CommandName 'scoop' "'$pkgName' installed but no shim found under '$(Get-NucleusScoopShimsDir)'"
       return
     }

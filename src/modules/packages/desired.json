@@ -262,11 +262,13 @@
       {
         "bucket": "fonts",
         "name": "notosanscjk",
+        "noShim": true,
         "why": "Noto Sans CJK covers Windows CJK text rendering; parity with pkgs.noto-fonts-cjk-sans on POSIX hosts."
       },
       {
         "bucket": "fonts",
         "name": "notoserifcjk",
+        "noShim": true,
         "why": "Noto Serif CJK completes the Windows font parity with pkgs.noto-fonts-cjk-serif on POSIX hosts."
       },
       {

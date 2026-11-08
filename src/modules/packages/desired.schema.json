@@ -187,6 +187,10 @@
           "$ref": "#/definitions/packageName",
           "description": "Scoop app name."
         },
+        "noShim": {
+          "description": "True for a package that installs no executable shim, such as a font. The post-install shim assertion in Invoke-ScoopSetup is skipped for it.",
+          "type": "boolean"
+        },
         "why": {
           "$ref": "#/definitions/why"
         }

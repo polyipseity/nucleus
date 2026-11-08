@@ -592,7 +592,10 @@ properties:
             Remove-Item $tmp -Force
             throw "scoop installer hash mismatch: expected $sha, got $actual"
           }
-          & powershell -NoProfile -ExecutionPolicy Bypass -File $tmp
+          # WHY -RunAsAdmin: the pinned installer denies an elevated session without it, and apply.ps1 always elevates.
+          # WHY -ScoopDir: it pins the directory the TestScript asserts; the installer otherwise resolves it from -ScoopDir, then $env:SCOOP, then $env:USERPROFILE\scoop.
+          $scoopDir = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $env:USERPROFILE 'scoop' }
+          & powershell -NoProfile -ExecutionPolicy Bypass -File $tmp -RunAsAdmin -ScoopDir $scoopDir
           if ($LASTEXITCODE -ne 0) {
             Remove-Item $tmp -Force
             throw "scoop installer exited with code $LASTEXITCODE"
