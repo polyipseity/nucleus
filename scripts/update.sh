@@ -232,7 +232,7 @@ do_lockfile() {
 
   usage_lockfile() {
     usage_std "$(basename "$0") lockfile" "[--sections <comma-separated>] [--verify] [--verify-installed] [--list-sections]" \
-      "Query each available tool for the current version of each pinned item and write an updated lockfile atomically."
+      "Query each available tool for the current version of each pinned item (the WinGet section derives versions from microsoft/winget-pkgs and adds missing keys) and write an updated lockfile atomically."
     cat <<'EOF'
 
 Options:
@@ -388,20 +388,89 @@ EOF
   fi
 
   if section_enabled winget; then
-    if command -v winget >/dev/null 2>&1; then
-      while IFS= read -r key; do
-        [ -z "$key" ] && continue
-        old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.winget // {})[$k] // empty')
-        [ -z "$old" ] && continue
-        new=$(winget show --id "$key" 2>/dev/null | awk -F': ' '/^Version / {print $2}' | head -1 | tr -d '[:space:]')
-        if [ -n "$new" ] && [ "$new" != "$old" ]; then
-          log_update "winget" "$key" "$old" "$new"
-          data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.winget[$k] = $v')
-        fi
-      done < <(printf '%s\n' "$data" | jq -r '(.winget // {}) | keys[]')
-    else
-      warn "winget: command not found — skipping section"
+    require_command gh
+
+    _wu_enable="$REPO_ROOT/src/hosts/Windows/system/winget-packages.json"
+    if [ ! -f "$_wu_enable" ]; then
+      error "winget: enable list not found at $_wu_enable"
+      exit 1
     fi
+
+    # Canary: one package that must exist, so a per-id miss below is a data
+    # miss in microsoft/winget-pkgs, not a broken gh or network.
+    if ! _wu_canary="$(gh api 'repos/microsoft/winget-pkgs/contents/manifests/7/7zip' --jq '.[].name')" || [ -z "$_wu_canary" ]; then
+      error "winget: cannot read microsoft/winget-pkgs through gh"
+      exit 1
+    fi
+
+    # Entry names of one package directory. An absent path yields no names,
+    # which every caller treats as the per-id miss it reports.
+    _wu_list() {
+      gh api "repos/microsoft/winget-pkgs/contents/$1" --jq '.[].name' 2>/dev/null || true # check-suppress:suppression_doc: gh exits non-zero for an absent contents path, which is the per-id miss the caller reports
+    }
+
+    # Prints the path of the newest manifest for one id, relative to the id's
+    # canonical package directory. That directory holds the version directories,
+    # but a package may keep a variant or an architecture level above them (LTS,
+    # MSVC, Canary/x86), so each level is listed and the newest entry descended
+    # into until a manifest file named for the id appears.
+    _wu_manifest_path() {
+      local dir="$1" id="$2" depth=0 names newest name rel="" esc
+      esc="$(printf '%s' "$id" | sed -e 's/[.]/\\./g')"
+      while [ "$depth" -lt 4 ]; do
+        # WHY the leading slash: the contents API 404s a directory path with a
+        # trailing slash, so the descent keeps its segments unslashed.
+        names="$(_wu_list "$dir${rel:+/$rel}")"
+        [ -n "$names" ] || return 1
+        for name in "$id.yaml" "$id.version.yaml" "$id.installer.yaml"; do
+          if printf '%s\n' "$names" | grep -Fxq -- "$name"; then
+            printf '%s\n' "${rel:+$rel/}$name"
+            return 0
+          fi
+        done
+        # A package that ships only variant-named manifests (ripgrep) carries the
+        # variant in the file name rather than in the directory path.
+        name="$(printf '%s\n' "$names" | grep -E "^${esc}[.].*[.]yaml$" | head -n 1 || true)" # check-suppress:suppression_doc: grep exit 1 is the miss path for a package without a variant-named manifest
+        if [ -n "$name" ]; then
+          printf '%s\n' "${rel:+$rel/}$name"
+          return 0
+        fi
+        newest="$(printf '%s\n' "$names" | grep -E '^[0-9]' | sort -u -V | tail -n 1 || true)" # check-suppress:suppression_doc: grep exit 1 is the miss path for a level that holds no version directory
+        if [ -z "$newest" ]; then
+          newest="$(printf '%s\n' "$names" | grep -Ev '^[.]' | sort -u -V | tail -n 1 || true)" # check-suppress:suppression_doc: grep exit 1 is the miss path for a level whose entries are all dot-directories
+        fi
+        [ -n "$newest" ] || return 1
+        rel="${rel:+$rel/}$newest"
+        depth=$((depth + 1))
+      done
+      return 1
+    }
+
+    while IFS= read -r id; do
+      [ -z "$id" ] && continue
+      _ns="${id%%.*}"
+      _letter="$(printf '%s' "$_ns" | cut -c1 | tr '[:upper:]' '[:lower:]')"
+      _pkg="${id//./\/}"
+      _dir="manifests/$_letter/$_pkg"
+      _mpath="$(_wu_manifest_path "$_dir" "$id" || true)" # check-suppress:suppression_doc: the descent returns 1 when the id has no manifest at any level, which the caller turns into a warning
+      if [ -z "$_mpath" ]; then
+        warn "winget: $id: no manifest in microsoft/winget-pkgs; left unpinned"
+        continue
+      fi
+      # check-suppress:suppression_doc: a 404 here leaves the body empty, which the -z test below turns into a warning
+      _raw="$(gh api -H 'Accept: application/vnd.github.raw+json' "repos/microsoft/winget-pkgs/contents/$_dir/$_mpath" 2>/dev/null)" || _raw=""
+      _new="$(printf '%s\n' "$_raw" | awk -F': *' '/^PackageVersion:/ { print $2; exit }' | tr -d "[:space:]'\"")"
+      if [ -z "$_new" ]; then
+        warn "winget: $id: no PackageVersion in $_dir/$_mpath; left unpinned"
+        continue
+      fi
+      _old="$(printf '%s\n' "$data" | jq -r --arg k "$id" '(.winget // {})[$k] // empty')"
+      if [ "$_old" = "$_new" ]; then
+        continue
+      fi
+      log_update "winget" "$id" "${_old:-<absent>}" "$_new"
+      data="$(printf '%s\n' "$data" | jq --arg k "$id" --arg v "$_new" '.winget[$k] = $v')"
+    done < <(jq -r '.packages[]' "$_wu_enable")
   fi
 
   if section_enabled scoop; then

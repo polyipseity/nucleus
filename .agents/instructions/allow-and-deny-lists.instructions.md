@@ -71,6 +71,7 @@ A new exclusion needs a category id, tier, and `# ref:`.
 | D4 | `tests/modules/posix-module-imports-tests.nix` | `hostScopedModules`: `security.nix` | T2 | `security.sudo` is NixOS-only, so the macOS-shared `posix/` aggregator cannot carry `security.nix`; the NixOS host imports it directly | Error if stale (`nix-tests`) |
 | D5 | `tests/platforms/Windows/modules/gc-parity.Tests.ps1` | `$DestructiveCommands` | T2 | A command absent from the list is silently skipped by the dry-run guard walk, so renaming a helper in `scripts/gc.ps1` disarms the coverage check instead of failing it | Error if stale (`has no stale entry in the destructive-command list`) |
 | D6 | `tests/platforms/Windows/modules/gc-parity.Tests.ps1` | `$PosixOnlyCapabilities` | T2 | The list must name exactly the switches `gc.ps1` documents as POSIX-only | Error if stale (`documents exactly the POSIX-only capabilities as accepted and ignored`) |
+| D7 | `tests/modules/package-lists-tests.nix` | `wingetPinExceptions` | T3 | Ids the microsoft/winget-pkgs repository does not carry: msstore ids by design, plus any registry id with no manifest, each warned by the updater every run; verify msstore ids on Windows with `winget show <id> --source msstore` | Quarterly |
 
 ### Category E: upstream workarounds
 

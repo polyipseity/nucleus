@@ -263,25 +263,109 @@ function Invoke-LockfileBump {
   $changed = $false
 
   if (Test-SectionEnabled 'winget') {
-    if (Get-Command -Name 'winget' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
-      if ($ht.ContainsKey('winget') -and $ht['winget'] -is [hashtable]) {
-        # Snapshot the keys: assigning a value below invalidates the live
-        # KeyCollection enumerator on .NET Core ('Collection was modified').
-        foreach ($key in @($ht['winget'].Keys)) {
-          $old = $ht['winget'][$key]
-          # check-suppress:suppression_doc: probe -- package may not exist; stderr suppressed for clean output.
-          $result = & winget show --id $key 2>$null | Select-String -Pattern '^Version '
-          if ($result) {
-            $new = ($result -split ':\s*', 2)[-1].Trim()
-            if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
-              Write-Update -Section 'winget' -Key $key -OldValue $old -NewValue $new
-              $ht['winget'][$key] = $new
-            }
-          }
-        }
+    if (-not (Get-Command -Name 'gh' -ErrorAction SilentlyContinue)) {  # check-suppress:suppression_doc: probe -- gh absence is the condition under test; the branch hard-errors
+      Write-NucleusError 'winget: gh is required to read microsoft/winget-pkgs'
+      throw 'winget: gh is required to read microsoft/winget-pkgs'
+    }
+    $enablePath = Join-Path $repoRoot 'src\hosts\Windows\system\winget-packages.json'
+    if (-not (Test-Path -Path $enablePath)) {
+      Write-NucleusError "winget: enable list not found at $enablePath"
+      throw "winget: enable list not found at $enablePath"
+    }
+    $enableIds = @((Get-Content -Path $enablePath -Raw -Encoding UTF8 | ConvertFrom-Json).packages)
+
+    # Canary: one package that must exist, so a per-id miss below is a data miss
+    # in microsoft/winget-pkgs, not a broken gh or network.
+    $canary = & gh api 'repos/microsoft/winget-pkgs/contents/manifests/7/7zip' --jq '.[].name'
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace(($canary -join ''))) {
+      Write-NucleusError 'winget: cannot read microsoft/winget-pkgs through gh'
+      throw 'winget: cannot read microsoft/winget-pkgs through gh'
+    }
+
+    # Numeric segment compare with an ordinal tie-break, matching the bash twin's
+    # sort -V.
+    function Compare-ManifestVersion {
+      param([string] $Left, [string] $Right)
+      $lp = @([regex]::Matches($Left, '\d+') | ForEach-Object { [int64]$_.Value })
+      $rp = @([regex]::Matches($Right, '\d+') | ForEach-Object { [int64]$_.Value })
+      $n = [Math]::Max($lp.Count, $rp.Count)
+      for ($i = 0; $i -lt $n; $i++) {
+        $lv = if ($i -lt $lp.Count) { $lp[$i] } else { 0 }
+        $rv = if ($i -lt $rp.Count) { $rp[$i] } else { 0 }
+        # WHY the casts: the 0 filler branches are Int32 while the array
+        # elements are Int64, and Int32.CompareTo(Int64) throws.
+        if ($lv -ne $rv) { return ([int64]$lv).CompareTo([int64]$rv) }
       }
-    } else {
-      Write-NucleusWarning 'winget not found — skipping winget section'
+      return [string]::CompareOrdinal($Left, $Right)
+    }
+
+    # Entry names of one package directory; an absent path yields no names,
+    # which the caller treats as the per-id miss it reports.
+    function Get-WingetEntryName {
+      param([string] $Path)
+      $names = & gh api "repos/microsoft/winget-pkgs/contents/$Path" --jq '.[].name' 2>$null  # check-suppress:suppression_doc: probe -- an absent path exits non-zero and is reported through the empty result
+      if ($LASTEXITCODE -ne 0) { return @() }
+      return @($names)
+    }
+
+    # Newest manifest for one id, relative to the id's canonical package
+    # directory. That directory holds the version directories, but a package may
+    # keep a variant or an architecture level above them (LTS, MSVC,
+    # Canary/x86), so each level is listed and the newest entry descended into
+    # until a manifest file named for the id appears.
+    function Get-WingetManifestPath {
+      param([string] $Dir, [string] $Id)
+      $esc = [regex]::Escape($Id)
+      $rel = ''
+      for ($depth = 0; $depth -lt 4; $depth++) {
+        $prefix = if ($rel) { "$rel/" } else { '' }
+        $nameList = @(Get-WingetEntryName -Path $(if ($rel) { "$Dir/$rel" } else { $Dir }))
+        if ($nameList.Count -eq 0) { return $null }
+        foreach ($candidate in @("$Id.yaml", "$Id.version.yaml", "$Id.installer.yaml")) {
+          if ($nameList -contains $candidate) { return "$prefix$candidate" }
+        }
+        $variant = @($nameList | Where-Object { $_ -match "^$esc\..*\.yaml$" } | Select-Object -First 1)
+        if ($variant.Count -gt 0) { return "$prefix$($variant[0])" }
+        $numeric = @($nameList | Where-Object { $_ -match '^[0-9]' })
+        $pool = if ($numeric.Count -gt 0) { $numeric } else { @($nameList | Where-Object { $_ -notmatch '^\.' }) }
+        $newest = $null
+        foreach ($entry in $pool) { if ($null -eq $newest -or (Compare-ManifestVersion $entry $newest) -gt 0) { $newest = $entry } }
+        if ($null -eq $newest) { return $null }
+        $rel = "$prefix$newest"
+      }
+      return $null
+    }
+
+    # WHY: the bash twin reads `(.winget // {})`, so an absent section must not
+    # be indexed here either.
+    if (-not ($ht.ContainsKey('winget') -and $ht['winget'] -is [hashtable])) { $ht['winget'] = @{} }
+
+    foreach ($id in $enableIds) {
+      $ns = ($id -split '\.', 2)[0]
+      $letter = $ns.Substring(0, 1).ToLowerInvariant()
+      $dir = "manifests/$letter/" + ($id -replace '\.', '/')
+      $mpath = Get-WingetManifestPath -Dir $dir -Id $id
+      if ($null -eq $mpath) {
+        Write-NucleusWarning "winget: $id : no manifest in microsoft/winget-pkgs; left unpinned"
+        continue
+      }
+      $raw = & gh api -H 'Accept: application/vnd.github.raw+json' "repos/microsoft/winget-pkgs/contents/$dir/$mpath"
+      if ($LASTEXITCODE -ne 0) {
+        Write-NucleusWarning "winget: $id : cannot read $dir/$mpath; left unpinned"
+        continue
+      }
+      $new = ''
+      $versionLine = @($raw | Where-Object { $_ -like 'PackageVersion:*' } | Select-Object -First 1)
+      if ($versionLine.Count -gt 0) { $new = (($versionLine[0] -split ':\s*', 2)[-1]).Trim().Trim("'", '"') }
+      if ([string]::IsNullOrEmpty($new)) {
+        Write-NucleusWarning "winget: $id : no PackageVersion in $dir/$mpath; left unpinned"
+        continue
+      }
+      $old = $ht['winget'][$id]
+      if ($old -eq $new) { continue }
+      $oldLabel = if ([string]::IsNullOrEmpty([string]$old)) { '<absent>' } else { [string]$old }
+      Write-Update -Section 'winget' -Key $id -OldValue $oldLabel -NewValue $new
+      $ht['winget'][$id] = $new
     }
   }
 

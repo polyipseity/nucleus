@@ -197,6 +197,27 @@ let
   wpObsEnabled = builtins.elem "OBSProject.OBSStudio" resolvedWindowsPackages;
   wpJdkEnabled = builtins.elem "EclipseAdoptium.Temurin.25.JDK" resolvedWindowsPackages;
 
+  # Enabled WinGet ids must each carry a lockfile version pin. The exception
+  # list holds the ids whose canonical manifest path 404s in
+  # microsoft/winget-pkgs, plus the msstore id: the msstore source lives outside
+  # that repository, so that id is checked on Windows with
+  # winget show <id> --source msstore instead. Step 7 reconciles this list
+  # against the updater output.
+  wingetPinExceptions = [
+    "9NBDXK71NK08"
+    "Adobe.SourceSerif4"
+    "ArtifexSoftware.GhostScript"
+    "EqualizerAPO.EqualizerAPO"
+    "ExifTool.ExifTool"
+    "GnuPG.pass"
+    "Inter.Inter"
+    "PeterVerbeek.PeaceEqualizerAPO"
+  ];
+  wingetMissingPins = builtins.filter (
+    id: !(builtins.elem id wingetPinExceptions || lockfile.winget ? ${id})
+  ) resolvedWindowsPackages;
+  wingetPinsResolve = wingetMissingPins == [ ];
+
   # Every DSC WinGet id must be in the generated allow-list.
   dscText = readRepo "src/hosts/Windows/system/packages.dsc.yml";
   dscLines = lib.splitString "\n" dscText;
@@ -254,6 +275,7 @@ let
     && flakePinsAreGithub
     && noFlakePinDuplication
     && allLockfilePinsResolve
+    && wingetPinsResolve
     && posixInstallersFreeOfLists
     && passOtpResolved
     && spIsValid;
@@ -268,6 +290,7 @@ in
   test_flake_pins_are_github = assert' flakePinsAreGithub "every 'flake:<node>' pin must name a github input with owner, repo, and rev";
   test_flake_pins_not_duplicated = assert' noFlakePinDuplication "a 'flake:<node>'-pinned package must not also carry a lockfile version pin";
   test_lockfile_pins_resolve = assert' allLockfilePinsResolve "every desired package must have a lockfile version pin (or declare a flake pin)";
+  test_winget_lockfile_pins_resolve = assert' wingetPinsResolve "enabled WinGet ids missing a lockfile pin: ${builtins.concatStringsSep ", " wingetMissingPins}";
   test_no_hardcoded_posix_lists = assert' posixInstallersFreeOfLists "POSIX installers must not hardcode desired-package literals";
   test_pass_otp_resolved = assert' passOtpResolved "sharedPackages must contribute the pass-otp wrapper and not the plain pass attr";
   test_cursor_superpowers_lockfile = assert' spIsValid "cursor.superpowers must have https source and 40-char hex rev";
