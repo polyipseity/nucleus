@@ -248,7 +248,7 @@
       "vadimcn.vscode-lldb": "1.12.2"
     }
   },
-  "updated": "2026-11-08T06:34:04Z",
+  "updated": "2026-11-08T12:57:47Z",
   "uv": {
     "discord-music-rpc": {
       "rev": "bba71027a684db53f3fcde5adbd3d42627241a83",
@@ -303,7 +303,7 @@
     "GitHub.cli": "2.103.3",
     "GnuPG.GnuPG": "2.5.24",
     "Google.Chrome": "157.0.8103.39",
-    "Google.Chrome.Canary": "159.0.8149.0",
+    "Google.Chrome.Canary": "159.0.8150.0",
     "Google.ChromeRemoteDesktopHost": "157.0.8103.41",
     "Google.PlatformTools": "37.0.2",
     "Gyan.FFmpeg": "9.0.2",
@@ -341,6 +341,7 @@
     "SecretsOPerationS.SOPS": "3.13.3",
     "Sigrok.PulseView": "0.4.2",
     "Starship.Starship": "1.27.0",
+    "StirlingTools.StirlingPDF": "3.3.0",
     "Telegram.TelegramDesktop.Beta": "4.6.4",
     "Tencent.WeChat.Universal": "4.2.0.13",
     "TheDocumentFoundation.LibreOffice": "26.8.2.2",

@@ -9,6 +9,7 @@
 #   • every desired package resolves to a lockfile version pin (or a flake pin)
 #   • cursor.superpowers lockfile entry is valid
 #   • the managed `pass` resolves to the OTP-wrapped derivation, never alongside it
+#   • the Stirling-PDF entry resolves enabled on every host and deploys the desktop build
 #   • Windows DSC package ids are sorted alphabetically (case-folded)
 #   • winget-packages.json is $schema-first at the root key level
 #
@@ -189,6 +190,29 @@ let
   passOtpResolved =
     lib.any (p: p.drvPath == passOtpWrapper.drvPath) passCandidates
     && !(lib.any (p: p.drvPath == pkgsLinux.pass.drvPath) passCandidates);
+  # --- Stirling-PDF desktop resolution ---
+  # The registry must resolve the entry enabled on every host and deploy the
+  # Tauri desktop build. WHY pname: `nixpkgsPackage` is what lands in the
+  # package set, so the derivation name is the only observable that separates
+  # the desktop build from the headless server attr the entry probes.
+  stirlingHostNames = [
+    "MacBook"
+    "NixOS"
+    "Windows"
+  ];
+  stirlingEvaluations = builtins.map (host: {
+    inherit host;
+    enabled = (evalCoreForHost host).config.nucleus.packages.enabled;
+  }) stirlingHostNames;
+  stirlingMissingHosts = builtins.filter (e: !(e.enabled ? "stirling-pdf")) stirlingEvaluations;
+  stirlingDisabledHosts = builtins.filter (
+    e: (e.enabled ? "stirling-pdf") && !e.enabled."stirling-pdf"
+  ) stirlingEvaluations;
+  stirlingNixPnames = builtins.map (p: p.pname or "") (
+    builtins.filter (p: lib.hasPrefix "stirling-pdf" (p.pname or "")) sharedPackages
+  );
+  stirlingDesktopResolved = stirlingNixPnames == [ "stirling-pdf-desktop" ];
+
   committedDoc = builtins.fromJSON (readRepo "src/hosts/Windows/system/winget-packages.json");
   committedPackages = committedDoc.packages or [ ];
 
@@ -292,6 +316,9 @@ let
     && nucleusScoopManifestsPresent
     && posixInstallersFreeOfLists
     && passOtpResolved
+    && stirlingMissingHosts == [ ]
+    && stirlingDisabledHosts == [ ]
+    && stirlingDesktopResolved
     && spIsValid
     && wpScoopInstallPresent;
 in
@@ -309,6 +336,21 @@ in
   test_nucleus_scoop_manifests_present = assert' nucleusScoopManifestsPresent "bucket 'nucleus' entries missing a src/modules/scoop-manifests manifest: ${builtins.concatStringsSep ", " missingNucleusScoopManifests}";
   test_no_hardcoded_posix_lists = assert' posixInstallersFreeOfLists "POSIX installers must not hardcode desired-package literals";
   test_pass_otp_resolved = assert' passOtpResolved "sharedPackages must contribute the pass-otp wrapper and not the plain pass attr";
+  test_stirling_pdf_registry_present =
+    assert' (stirlingMissingHosts == [ ])
+      "the stirling-pdf registry entry must resolve on every host; missing on: ${
+        builtins.concatStringsSep ", " (builtins.map (e: e.host) stirlingMissingHosts)
+      }";
+  test_stirling_pdf_enabled_everywhere =
+    assert' (stirlingDisabledHosts == [ ])
+      "the stirling-pdf registry entry must be enabled on every host; disabled on: ${
+        builtins.concatStringsSep ", " (builtins.map (e: e.host) stirlingDisabledHosts)
+      }";
+  test_stirling_pdf_desktop_resolved = assert' stirlingDesktopResolved "the registry must contribute exactly the stirling-pdf-desktop derivation; resolved: ${
+    builtins.concatStringsSep ", " (
+      if stirlingNixPnames == [ ] then [ "<none>" ] else stirlingNixPnames
+    )
+  }";
   test_cursor_superpowers_lockfile = assert' spIsValid "cursor.superpowers must have https source and 40-char hex rev";
 
   # Windows DSC overlap parity tests.

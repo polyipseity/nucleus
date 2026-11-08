@@ -889,6 +889,21 @@ let
       nixpkgs = "steamcmd";
       winget = "Valve.SteamCMD";
     };
+    stirling-pdf = {
+      # WHY the desktop variant: Stirling-PDF's GUI build is the Tauri app
+      # (`stirling-pdf-desktop`), and it starts its own local server only while
+      # the app runs. The headless server attr (`stirling-pdf`) is deliberately
+      # not deployed, because a host-wide daemon would need its own service
+      # entry, a reserved port, and an authentication layer the product lacks.
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "stirling-pdf";
+      };
+      nixpkgs = "stirling-pdf";
+      nixpkgsPackage = pkgs.stirling-pdf-desktop;
+      winget = "StirlingTools.StirlingPDF";
+    };
     taplo = {
       category = "cli";
       homebrew = {
