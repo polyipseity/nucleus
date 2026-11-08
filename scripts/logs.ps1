@@ -109,22 +109,20 @@ $ErrorActionPreference = 'Stop'
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
-if ($Help -or [string]::IsNullOrWhiteSpace($Action)) {
-  Get-Help -Full $PSCommandPath
-  if ($Help) { exit 0 }
-  Write-NucleusError -CommandName logs 'missing action (append, expire, gc, label, rotate, show, stats, tail)'
-  exit 1
-}
-
 # WHY 4096: one bounded write of at most a page reaches the file as a single
-# operation, so concurrent appenders never interleave inside a line. A larger
-# event is refused rather than truncated, because a truncated event is
+# operation, so concurrent appenders never interleave inside a line. The limit
+# budgets the trailing newline, so an event is refused once line plus newline
+# reaches the size; it is never truncated, because a truncated event is
 # unparseable history.
 $script:MaxEventBytes = 4096
 
-# Labels are ordinary events in the audit log, so a verdict never rewrites the
-# line it annotates.
-$script:LabelLog = 'decisions'
+# Labels are ordinary events appended to the harness log, so a verdict never
+# rewrites the line it annotates. Gate decisions live in that log, which is why
+# it is the default.
+$script:LabelLog = 'harness'
+
+# The verdict vocabulary the gate review reads back.
+$script:LabelVerdicts = @('correct', 'false-allow', 'false-deny')
 
 $script:EventKeys = @(
   'ts', 'id', 'kind', 'harness', 'decision',
@@ -199,12 +197,12 @@ function Add-NucleusLogEvent {
   .SYNOPSIS
     Appends one canonical event line to a log.
   .DESCRIPTION
-    The single writer every caller shares. The handle is opened in append mode
-    and other writers are excluded through a bounded retry on the sharing
-    violation, so a concurrent append waits for the line in flight instead of
-    interleaving with it.
+    The single writer every caller shares. An exclusive <log>.lock sidecar is
+    held for the duration of one append, which serializes app writers, while the
+    log itself is opened shared so a native writer redirecting into it is never
+    blocked.
   .PARAMETER LogName
-    Log name, written to <log root>\<LogName>.log.
+    Log name, written to <log root>\<LogName>.log. Alias: -Log.
   .PARAMETER Event
     Event fields as a hashtable; missing canonical keys become null.
   .PARAMETER Directory
@@ -213,6 +211,7 @@ function Add-NucleusLogEvent {
   [CmdletBinding(SupportsShouldProcess)]
   param(
     [Parameter(Mandatory)]
+    [Alias('Log')]
     [string]$LogName,
     [Parameter(Mandatory)]
     [hashtable]$Event,
@@ -226,8 +225,8 @@ function Add-NucleusLogEvent {
 
   $line = ConvertTo-LogEventLine -Event $Event
   $bytes = [System.Text.Encoding]::UTF8.GetByteCount($line)
-  if ($bytes -gt $script:MaxEventBytes) {
-    throw "event is $bytes bytes; the limit is $($script:MaxEventBytes)"
+  if ($bytes + 1 -ge $script:MaxEventBytes) {
+    throw "event is $bytes bytes; a line plus its newline must stay under $($script:MaxEventBytes)"
   }
 
   $path = Join-Path -Path $Directory -ChildPath "$LogName.log"
@@ -241,32 +240,72 @@ function Add-NucleusLogEvent {
   }
 
   $payload = [System.Text.Encoding]::UTF8.GetBytes($line + [Environment]::NewLine)
-  # WHY FileShare.None: FileMode.Append seeks to the end and writes, it does not
-  # use FILE_APPEND_DATA, so a second writer sharing the file would overwrite the
-  # line in flight. Excluding every other opener turns a concurrent append into a
-  # sharing violation the retry loop below waits out, which is what makes the
-  # append atomic.
-  $attempts = 0
+  # WHY a lock sidecar: FileMode.Append seeks to the end and writes, so two app
+  # writers sharing the log would overwrite the line in flight. An exclusive
+  # .lock file serializes them, while the log itself stays shared so a service
+  # redirecting stdout into it keeps working.
+  $lockPath = "$path.lock"
+  $lockAttempts = 0
   while ($true) {
     try {
-      $stream = [System.IO.FileStream]::new(
-        $path,
-        [System.IO.FileMode]::Append,
-        [System.IO.FileAccess]::Write,
+      $lock = [System.IO.FileStream]::new(
+        $lockPath,
+        [System.IO.FileMode]::OpenOrCreate,
+        [System.IO.FileAccess]::ReadWrite,
         [System.IO.FileShare]::None)
-      try {
-        $stream.Write($payload, 0, $payload.Length)
-        $stream.Flush()
-      } finally {
-        $stream.Dispose()
-      }
-      return
+      break
     } catch [System.IO.IOException] {
-      $attempts++
-      if ($attempts -ge 25) { throw }
-      Start-Sleep -Milliseconds (10 * $attempts)
+      $lockAttempts++
+      if ($lockAttempts -ge 500) {
+        throw "timed out after $lockAttempts attempts waiting for '$lockPath'"
+      }
+      Start-Sleep -Milliseconds 10
     }
   }
+
+  try {
+    $stream = [System.IO.FileStream]::new(
+      $path,
+      [System.IO.FileMode]::Append,
+      [System.IO.FileAccess]::Write,
+      [System.IO.FileShare]::ReadWrite)
+    try {
+      $stream.Write($payload, 0, $payload.Length)
+      $stream.Flush()
+    } finally {
+      $stream.Dispose()
+    }
+  } finally {
+    $lock.Dispose()
+  }
+}
+
+function Get-LogArchiveIndex {
+  <#
+  .SYNOPSIS
+    Returns the rotation index of an archive name, or $null when it is not one.
+  .DESCRIPTION
+    Windows rotation names archives <base>.<N>.log.gz, the POSIX rotation names
+    them <log>.log.<N>.gz, and a reader has to see both so rotated history stays
+    visible whichever writer produced it.
+  .PARAMETER Name
+    File name to test.
+  .PARAMETER LogName
+    Log the archive must belong to.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [string]$Name,
+    [Parameter(Mandatory)]
+    [string]$LogName
+  )
+
+  $escaped = [regex]::Escape($LogName)
+  foreach ($pattern in @("^$escaped\.(\d+)\.log(\.gz)?$", "^$escaped\.log\.(\d+)(\.gz)?$")) {
+    if ($Name -match $pattern) { return [int]$Matches[1] }
+  }
+  return $null
 }
 
 function Get-LogEventStream {
@@ -287,17 +326,16 @@ function Get-LogEventStream {
     [string]$LogName
   )
 
-  $archivePattern = "$LogName.log.*.gz"
   $archives = @()
   if (Test-Path -LiteralPath $Directory -PathType Container) {
     # check-suppress:suppression_doc: probe -- no archives may exist yet; the empty result is handled below.
     $archives = @(Get-ChildItem -LiteralPath $Directory -File -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -like $archivePattern })
+        Where-Object { $null -ne (Get-LogArchiveIndex -Name $_.Name -LogName $LogName) })
   }
   $ordered = $archives | Sort-Object -Property {
     # WHY: the numeric suffix is the archive age, and a plain name sort would
     # order .10 before .9 once ten archives exist.
-    [int]($_.Name -replace "^$([regex]::Escape($LogName))\.log\.(\d+)(\.gz)?$", '$1')
+    Get-LogArchiveIndex -Name $_.Name -LogName $LogName
   } -Descending
 
   foreach ($archive in $ordered) {
@@ -430,7 +468,7 @@ function Get-LogsStats {
     } else { $null }
     # check-suppress:suppression_doc: probe -- a log with no archives reports zero.
     $archives = @(Get-ChildItem -LiteralPath $Directory -File -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -like "$name.log.*" }).Count
+        Where-Object { $null -ne (Get-LogArchiveIndex -Name $_.Name -LogName $name) }).Count
     [pscustomobject]@{
       log      = $name
       events   = $lines.Count
@@ -458,14 +496,34 @@ function Get-LogsSchemaDefault {
     [string]$Fallback
   )
 
-  if (-not $repoRoot) { return $Fallback }
+  if (-not $repoRoot) {
+    Write-NucleusWarning -CommandName logs 'repo root unresolvable; using the built-in default'
+    return $Fallback
+  }
   $schemaPath = Join-Path -Path $repoRoot -ChildPath 'src\modules\services.schema.json'
-  if (-not (Test-Path -LiteralPath $schemaPath -PathType Leaf)) { return $Fallback }
+  if (-not (Test-Path -LiteralPath $schemaPath -PathType Leaf)) {
+    Write-NucleusWarning -CommandName logs "services.schema.json not found; using the built-in $Field default $Fallback"
+    return $Fallback
+  }
   $schema = Get-Content -LiteralPath $schemaPath -Raw | ConvertFrom-Json
   $properties = $schema.definitions.loggingEntry.properties
   $property = $properties.PSObject.Properties[$Field]
-  if ($null -eq $property -or $null -eq $property.Value.default) { return $Fallback }
+  if ($null -eq $property -or $null -eq $property.Value.default) {
+    Write-NucleusWarning -CommandName logs "services.schema.json has no $Field default; using the built-in default $Fallback"
+    return $Fallback
+  }
   return [string]$property.Value.default
+}
+
+# WHY: only the entry script dispatches. A caller that dot-sources this file
+# imports Add-NucleusLogEvent without printing help and exiting 1.
+if ($MyInvocation.InvocationName -eq '.') { return }
+
+if ($Help -or [string]::IsNullOrWhiteSpace($Action)) {
+  Get-Help -Full $PSCommandPath
+  if ($Help) { exit 0 }
+  Write-NucleusError -CommandName logs 'missing action (append, expire, gc, label, rotate, show, stats, tail)'
+  exit 1
 }
 
 $logDir = Get-LogsDir -ScopeName $Scope
@@ -498,15 +556,20 @@ switch ($Action) {
       Write-NucleusError -CommandName logs 'label requires -Id and -Verdict'
       exit 1
     }
-    $event = @{ kind = 'label'; id = $Id; decision = $Verdict; source = 'nucleus-logs'; summary = $Note }
-    Add-NucleusLogEvent -LogName $script:LabelLog -Event $event -Directory $userLogDir -WhatIf:$DryRun
+    if ($script:LabelVerdicts -notcontains $Verdict) {
+      Write-NucleusError -CommandName logs "invalid verdict '$Verdict' (expected: $($script:LabelVerdicts -join ', '))"
+      exit 1
+    }
+    $labelLog = if ($Log) { $Log } else { $script:LabelLog }
+    $event = @{ kind = 'label'; id = $Id; verdict = $Verdict; note = $Note; source = 'none' }
+    Add-NucleusLogEvent -LogName $labelLog -Event $event -Directory $userLogDir -WhatIf:$DryRun
   }
   'show' {
     if (-not $Log) {
       Write-NucleusError -CommandName logs 'show requires -Log'
       exit 1
     }
-    $events = @(Select-LogEvent -Directory $userLogDir -LogName $Log -SinceFilter $Since -KindFilter $Kind -HarnessFilter $Harness)
+    $events = @(Select-LogEvent -Directory $logDir -LogName $Log -SinceFilter $Since -KindFilter $Kind -HarnessFilter $Harness)
     if ($Json) {
       ConvertTo-Json -InputObject $events -Depth 5
     } else {
@@ -518,9 +581,9 @@ switch ($Action) {
       Write-NucleusError -CommandName logs 'tail requires -Log'
       exit 1
     }
-    $path = Join-Path -Path $userLogDir -ChildPath "$Log.log"
+    $path = Join-Path -Path $logDir -ChildPath "$Log.log"
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
-      Write-NucleusInfo -CommandName logs "no log '$Log' under '$userLogDir'"
+      Write-NucleusInfo -CommandName logs "no log '$Log' under '$logDir'"
       exit 0
     }
     foreach ($line in (Get-Content -LiteralPath $path -Tail $Lines)) {

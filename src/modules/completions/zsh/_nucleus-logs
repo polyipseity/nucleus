@@ -4,7 +4,7 @@
 
 _arguments \
   '(-h --help)'{--help,-h}'[Show usage]' \
-  '1:subcommand:((append "Append one JSON event object read from stdin" expire "Delete archives older than the expiry" gc "Rotate, then expire" label "Append a kind=label event to the decisions log" rotate "Rotate logs larger than the size limit" show "Print matching events, oldest first" stats "Count events, bytes, and archives per log" tail "Print the last events (default: 10)"))' \
+  '1:subcommand:((append "Append one JSON event object read from stdin" expire "Delete archives older than the expiry" gc "Rotate, then expire" label "Append a kind=label event (verdict: correct, false-allow, false-deny)" rotate "Rotate logs larger than the size limit" show "Print matching events, oldest first" stats "Count events, bytes, and archives per log" tail "Print the last events (default: 10)"))' \
   '--compress[compress]' \
   '--dry-run[dry run]' \
   '--expiry[expiry]' \
@@ -12,6 +12,7 @@ _arguments \
   '--json[json]' \
   '--kind[kind]' \
   '--lines[lines]' \
+  '--log[log]' \
   '--max-files[max files]' \
   '--max-size[max size]' \
   '--note[note]' \

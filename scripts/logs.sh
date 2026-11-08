@@ -8,10 +8,9 @@
 # harness, decision, source, filter, rule, latency_ms, summary, digest; absent
 # keys are written as null and keys are sorted, so a line is canonical.
 
-set -euo pipefail
-
-# Resolve symlinks so SCRIPT_DIR works from Nix wrapper symlinks. BASH_SOURCE is
-# used rather than $0 so a sourcing caller still resolves this file.
+# Resolve symlinks so the script directory works from Nix wrapper symlinks.
+# BASH_SOURCE is used rather than $0 so a sourcing caller still resolves this
+# file.
 _logs_self="${BASH_SOURCE[0]}"
 if [ -h "$_logs_self" ]; then
   _target="$(readlink "$_logs_self")"
@@ -20,21 +19,35 @@ if [ -h "$_logs_self" ]; then
   *) _logs_self="$(dirname "$_logs_self")/$_target" ;;
   esac
 fi
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_logs_self")" && pwd)"
-# shellcheck source=../src/scripts/lib/lib.sh
-. "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
+_logs_script_dir="$(CDPATH='' cd -- "$(dirname -- "$_logs_self")" && pwd)"
+
+# WHY the guard: a sourcing caller keeps its own shell options, its SCRIPT_DIR,
+# and the libraries it already loaded. Only the executed script turns on strict
+# mode and sources lib.sh.
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  set -euo pipefail
+fi
+if ! declare -F nucleus_log_dir >/dev/null; then
+  # shellcheck source=../src/scripts/lib/lib.sh
+  . "$_logs_script_dir/../src/scripts/lib/lib.sh"
+fi
 # shellcheck source=../src/scripts/lib/log-expiry.sh
-. "$SCRIPT_DIR/../src/scripts/lib/log-expiry.sh"
+. "$_logs_script_dir/../src/scripts/lib/log-expiry.sh"
 
 # WHY 4096: a single O_APPEND write(2) of at most one page cannot interleave
 # with a concurrent appender, and the kernel never splits a write that fits in a
-# page. A larger event is refused instead of truncated, because a truncated
-# event is unparseable history.
+# page. The limit budgets the trailing newline, so an event is refused once its
+# line plus newline reaches this size; it is never truncated, because a
+# truncated event is unparseable history.
 LOGS_MAX_EVENT_BYTES=4096
 
-# Labels are ordinary events in the audit log, so a verdict never rewrites the
-# line it annotates.
-LOGS_LABEL_LOG="decisions"
+# Labels are ordinary events appended to the harness log, so a verdict never
+# rewrites the line it annotates. Gate decisions live in that log, which is why
+# it is the default.
+LOGS_LABEL_LOG="harness"
+
+# The verdict vocabulary the gate review reads back.
+LOGS_LABEL_VERDICTS="correct false-allow false-deny"
 
 usage() {
   usage_std "$(basename "$0")" "<subcommand> [options]" "Append, inspect, rotate, and expire nucleus JSONL event logs."
@@ -42,11 +55,11 @@ usage() {
   append <log-name>                      Append one JSON event object read from stdin.
   expire [--scope <user|system>]         Delete archives older than the expiry.
   gc [--scope <user|system>]             Rotate, then expire.
-  label <id> <verdict> [--note <text>]   Append a kind=label event to the decisions log.
+  label <id> <verdict> [options]         Append a kind=label event (verdict: correct, false-allow, false-deny).
   rotate [--scope <user|system>]         Rotate logs larger than the size limit.
   show <log-name> [options]              Print matching events, oldest first.
-  stats [--log <name>]                   Count events, bytes, and archives per log.
-  tail <log-name> [--lines <count>]      Print the last events (default: 10).
+  stats [--scope <user|system>]          Count events, bytes, and archives per log.
+  tail <log-name> [--scope <user|system>]  Print the last events (default: 10).
 
   --compress <true|false>  Compress rotated archives (default: services schema).
   --expiry <duration>      Archive retention, e.g. 7d (default: NUCLEUS_LOG_EXPIRY or 7d).
@@ -54,11 +67,12 @@ usage() {
   --json                   Emit one JSON document instead of text.
   --kind <kind>            show: keep events whose kind matches.
   --lines <count>          tail: number of events to print (default: 10).
+  --log <name>             label/stats: log name (label default: harness).
   --max-files <count>      Rotated archives to keep (default: services schema).
   --max-size <bytes>       Rotation threshold in bytes (default: services schema).
   --scope <user|system>    Log root to operate on (default: user).
   --since <iso>            show: keep events at or after an ISO-8601 timestamp.
-  --note <text>            label: free-text justification stored as the summary.
+  --note <text>            label: free-text justification stored as the note.
   --dry-run                Report what would change without writing.
 EOF
 }
@@ -105,11 +119,20 @@ logs_event_bytes() {
   printf '%s' "$1" | wc -c | tr -d ' '
 }
 
+# logs_check_event_size <bytes>: refuse a line whose write would reach the limit
+# once its trailing newline is appended.
+logs_check_event_size() {
+  if [ "$(($1 + 1))" -ge "$LOGS_MAX_EVENT_BYTES" ]; then
+    die "event is $1 bytes; a line plus its newline must stay under $LOGS_MAX_EVENT_BYTES"
+  fi
+}
+
 # logs_append_event <log-name> <json-line>: append one canonical line. This is
 # the writer every caller shares; keep it to a single printf so the whole line
 # reaches one write(2) on a file opened O_APPEND.
 logs_append_event() {
   logs_validate_name "$1"
+  logs_check_event_size "$(logs_event_bytes "$2")"
   _lae_dir="$(nucleus_log_dir)" || die "cannot resolve the nucleus log directory"
   mkdir -p "$_lae_dir"
   _lae_file="$(logs_file_path "$_lae_dir" "$1")"
@@ -131,9 +154,7 @@ logs_append_stdin() {
     die "event is not a JSON object"
   fi
   _las_bytes="$(logs_event_bytes "$_las_line")"
-  if [ "$_las_bytes" -gt "$LOGS_MAX_EVENT_BYTES" ]; then
-    die "event is $_las_bytes bytes; the limit is $LOGS_MAX_EVENT_BYTES"
-  fi
+  logs_check_event_size "$_las_bytes"
 
   logs_validate_name "$1"
 
@@ -151,17 +172,20 @@ logs_append_stdin() {
 # rotation knob, so the app and nucleus-gc cannot disagree about it.
 logs_schema_default() {
   if ! _lsd_root="$(derive_repo_root)"; then
+    warn "repo root unresolvable; using the built-in $1 default $2"
     printf '%s\n' "$2"
     return 0
   fi
   _lsd_schema="$_lsd_root/src/modules/services.schema.json"
   if [ ! -f "$_lsd_schema" ]; then
+    warn "services.schema.json not found; using the built-in $1 default $2"
     printf '%s\n' "$2"
     return 0
   fi
   require_command jq
   _lsd_value="$(jq -r --arg f "$1" '.definitions.loggingEntry.properties | getpath([$f, "default"]) // empty' "$_lsd_schema")"
   if [ -z "$_lsd_value" ]; then
+    warn "services.schema.json has no $1 default; using the built-in default $2"
     printf '%s\n' "$2"
   else
     printf '%s\n' "$_lsd_value"
@@ -317,8 +341,8 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     ;;
   esac
 
-  # Value options are parsed per subcommand, so an option a subcommand does not
-  # act on is an error instead of being silently accepted.
+  # Options are parsed per command group, so an option the group does not act on
+  # is an error instead of being silently accepted.
   _logs_name=""
   _logs_scope="user"
   _logs_json=false
@@ -334,6 +358,7 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   _logs_label_id=""
   _logs_label_verdict=""
   _logs_label_note=""
+  _logs_label_log=""
 
   case "$_logs_action" in
   append | show | tail)
@@ -360,6 +385,11 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
       --harness)
         logs_require_value --harness "$#"
         _logs_harness="$2"
+        shift
+        ;;
+      --scope)
+        logs_require_value --scope "$#"
+        _logs_scope="$2"
         shift
         ;;
       --dry-run)
@@ -391,6 +421,11 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
       --note)
         logs_require_value --note "$#"
         _logs_label_note="$2"
+        shift
+        ;;
+      --log)
+        logs_require_value --log "$#"
+        _logs_label_log="$2"
         shift
         ;;
       --dry-run)
@@ -486,29 +521,35 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     logs_append_stdin "$_logs_name" "$_logs_dry"
     ;;
   label)
+    case " $LOGS_LABEL_VERDICTS " in
+    *" $_logs_label_verdict "*) ;;
+    *) die "invalid verdict '$_logs_label_verdict' (expected: $LOGS_LABEL_VERDICTS)" ;;
+    esac
+    _logs_label_log="${_logs_label_log:-$LOGS_LABEL_LOG}"
+    logs_validate_name "$_logs_label_log"
     _logs_event="$(jq -cn --arg id "$_logs_label_id" --arg verdict "$_logs_label_verdict" \
       --arg note "$_logs_label_note" '{
-        kind: "label", id: $id, decision: $verdict, source: "nucleus-logs",
-        summary: (if $note == "" then null else $note end)
+        kind: "label", id: $id, verdict: $verdict, source: "none",
+        note: (if $note == "" then null else $note end)
       }')"
     _logs_line="$(printf '%s' "$_logs_event" | logs_normalize_event)" || die "label: event normalization failed"
     _logs_dir="$(nucleus_log_dir)" || die "cannot resolve the nucleus log directory"
-    _logs_file="$(logs_file_path "$_logs_dir" "$LOGS_LABEL_LOG")"
+    _logs_file="$(logs_file_path "$_logs_dir" "$_logs_label_log")"
     if [ "$_logs_dry" = true ]; then
       dry_run "would append a label event for '$_logs_label_id' to '$_logs_file'"
       printf '%s\n' "$_logs_line"
       exit 0
     fi
-    logs_append_event "$LOGS_LABEL_LOG" "$_logs_line"
+    logs_append_event "$_logs_label_log" "$_logs_line"
     ;;
   show)
     logs_validate_name "$_logs_name"
-    _logs_dir="$(logs_dir_for_scope user)" || die "cannot resolve the nucleus log directory"
+    _logs_dir="$(logs_dir_for_scope "$_logs_scope")" || die "cannot resolve the nucleus log directory"
     logs_show "$_logs_dir" "$_logs_name" "$_logs_since" "$_logs_kind" "$_logs_harness" "$_logs_json"
     ;;
   tail)
     logs_validate_name "$_logs_name"
-    _logs_dir="$(logs_dir_for_scope user)" || die "cannot resolve the nucleus log directory"
+    _logs_dir="$(logs_dir_for_scope "$_logs_scope")" || die "cannot resolve the nucleus log directory"
     logs_tail "$_logs_dir" "$_logs_name" "$_logs_lines"
     ;;
   stats)

@@ -416,16 +416,17 @@ function Invoke-CleanupNix {
 function Invoke-NucleusLogs {
   <#
   .SYNOPSIS
-    Runs a nucleus-logs subcommand and returns its exit code.
+    Runs a nucleus-logs subcommand, streaming its output and setting $LASTEXITCODE.
   .DESCRIPTION
     The logging operations belong to nucleus-logs, so every caller runs the app
     rather than its internals. WHY the NUCLEUS_LOGS_BIN seam: one indirection
-    lets a caller (and a test) substitute the entry point.
+    lets a caller (and a test) substitute the entry point. WHY the exit code is
+    not returned: the app's own messages stream to the host, and a returned code
+    would ride the same pipeline as that output, so callers read $LASTEXITCODE.
   .PARAMETER Arguments
     Arguments passed to the app, starting with -Action.
   #>
   [CmdletBinding()]
-  [OutputType([int])]
   param(
     [Parameter(Mandatory)]
     [string[]]$Arguments
@@ -455,7 +456,8 @@ switch ($Action) {
     if ($LogMaxSize) { $logsArguments += @('-MaxSize', $LogMaxSize) }
     if ($LogMaxFiles) { $logsArguments += @('-MaxFiles', $LogMaxFiles) }
     if ($LogCompress) { $logsArguments += @('-Compress', $LogCompress) }
-    exit (Invoke-NucleusLogs -Arguments $logsArguments)
+    Invoke-NucleusLogs -Arguments $logsArguments
+    exit $LASTEXITCODE
   }
   'preferences' {
     Write-NucleusInfo "preferences gc is macOS-only; no Windows action performed"
@@ -629,8 +631,10 @@ if (-not $NoLogGc) {
     if ($DryRun) {
       Write-NucleusDryRun "would rotate managed logs in '$logDir' and expire archives older than $logExpiry"
     } else {
-      $null = Invoke-NucleusLogs -Arguments @('-Action', 'rotate', '-Scope', 'user', '-MaxSize', $logMaxSize, '-MaxFiles', $logMaxFiles, '-Compress', $logCompress)  # check-suppress:suppression_doc: the app streams its own progress and errors; the pipeline value (its exit code plus any app output) is not branched on, so rotation failures surface through the app's stderr instead of a second report here
-      $null = Invoke-NucleusLogs -Arguments @('-Action', 'expire', '-Scope', 'user', '-Expiry', $logExpiry)  # check-suppress:suppression_doc: same best-effort expiry call; the app reports its own failures on stderr and the GC step does not act on the code
+      Invoke-NucleusLogs -Arguments @('-Action', 'rotate', '-Scope', 'user', '-MaxSize', $logMaxSize, '-MaxFiles', $logMaxFiles, '-Compress', $logCompress)
+      if ($LASTEXITCODE -ne 0) { throw "nucleus-logs rotate -Scope user failed (exit $LASTEXITCODE)" }
+      Invoke-NucleusLogs -Arguments @('-Action', 'expire', '-Scope', 'user', '-Expiry', $logExpiry)
+      if ($LASTEXITCODE -ne 0) { throw "nucleus-logs expire -Scope user failed (exit $LASTEXITCODE)" }
     }
 
     if ($systemLogDir -and ($systemLogDir -ne $logDir)) {
@@ -638,8 +642,10 @@ if (-not $NoLogGc) {
         if ($DryRun) {
           Write-NucleusDryRun "would rotate managed logs in '$systemLogDir' and expire archives older than $logExpiry"
         } else {
-          $null = Invoke-NucleusLogs -Arguments @('-Action', 'rotate', '-Scope', 'system', '-MaxSize', $logMaxSize, '-MaxFiles', $logMaxFiles, '-Compress', $logCompress)  # check-suppress:suppression_doc: the app streams its own progress and errors; the pipeline value is not branched on, so a system-tree rotation failure surfaces through the app's stderr
-          $null = Invoke-NucleusLogs -Arguments @('-Action', 'expire', '-Scope', 'system', '-Expiry', $logExpiry)  # check-suppress:suppression_doc: same best-effort expiry call on the writable system tree; the app reports failures on stderr
+          Invoke-NucleusLogs -Arguments @('-Action', 'rotate', '-Scope', 'system', '-MaxSize', $logMaxSize, '-MaxFiles', $logMaxFiles, '-Compress', $logCompress)
+          if ($LASTEXITCODE -ne 0) { throw "nucleus-logs rotate -Scope system failed (exit $LASTEXITCODE)" }
+          Invoke-NucleusLogs -Arguments @('-Action', 'expire', '-Scope', 'system', '-Expiry', $logExpiry)
+          if ($LASTEXITCODE -ne 0) { throw "nucleus-logs expire -Scope system failed (exit $LASTEXITCODE)" }
         }
       } elseif ($DryRun) {
         Write-NucleusDryRun "would escalate system log rotation in '$systemLogDir' to the 'log-gc-system' scheduled task"

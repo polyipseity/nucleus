@@ -95,13 +95,15 @@ Describe 'nucleus-logs append' {
 }
 
 Describe 'nucleus-logs label' {
-  It 'appends a kind=label event and leaves earlier lines untouched' {
-    $before = @(Get-LogLine -LogName 'decisions')
+  It 'appends a kind=label event to the harness log and leaves earlier lines untouched' {
+    $null = Invoke-Logs -Arguments @('label', '-Id', 'seed', '-Verdict', 'correct', '-Note', 'seed event')
+    $before = @(Get-LogLine -LogName 'harness')
+    $before.Count | Should -Be 1
 
-    $result = Invoke-Logs -Arguments @('label', '-Id', 'one', '-Verdict', 'deny', '-Note', 'reviewed by hand')
+    $result = Invoke-Logs -Arguments @('label', '-Id', 'one', '-Verdict', 'false-deny', '-Note', 'reviewed by hand')
     $result.ExitCode | Should -Be 0
 
-    $after = @(Get-LogLine -LogName "decisions")
+    $after = @(Get-LogLine -LogName 'harness')
     $after.Count | Should -Be ($before.Count + 1)
     for ($index = 0; $index -lt $before.Count; $index++) {
       $after[$index] | Should -Be $before[$index]
@@ -110,8 +112,9 @@ Describe 'nucleus-logs label' {
     $label = $after[-1] | ConvertFrom-Json
     $label.kind | Should -Be 'label'
     $label.id | Should -Be 'one'
-    $label.decision | Should -Be 'deny'
-    $label.summary | Should -Be 'reviewed by hand'
+    $label.verdict | Should -Be 'false-deny'
+    $label.note | Should -Be 'reviewed by hand'
+    $label.source | Should -Be 'none'
   }
 }
 
@@ -149,6 +152,31 @@ Describe 'nucleus-logs concurrency' {
       $ids += $event.id
     }
     ($ids | Sort-Object -Unique).Count | Should -Be 12
+  }
+}
+
+Describe 'nucleus-logs tolerates a native writer' {
+  It 'appends while another handle holds the log open for writing' {
+    $path = Join-Path $script:Work 'native.log'
+    # WHY this holder: a service redirecting stdout into the log holds the file
+    # open for writing. The append must wait on the lock sidecar, never on the
+    # log itself, or every event would time out behind the native writer.
+    $holder = [System.IO.FileStream]::new(
+      $path,
+      [System.IO.FileMode]::Append,
+      [System.IO.FileAccess]::Write,
+      [System.IO.FileShare]::ReadWrite)
+    try {
+      $nativeBytes = [System.Text.Encoding]::UTF8.GetBytes("native line`n")
+      $holder.Write($nativeBytes, 0, $nativeBytes.Length)
+      $holder.Flush()
+
+      $result = Invoke-Logs -Arguments @('append', '-Log', 'native') -InputLine '{"id":"n1","kind":"decision"}'
+      $result.ExitCode | Should -Be 0
+      (Get-Content -LiteralPath $path).Count | Should -Be 2
+    } finally {
+      $holder.Dispose()
+    }
   }
 }
 

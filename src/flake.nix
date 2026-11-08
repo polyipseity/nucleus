@@ -698,6 +698,8 @@
             # Windows twin: scripts/logs.ps1.
             runtimeInputs = [
               pkgs.coreutils
+              pkgs.findutils
+              pkgs.gawk
               pkgs.gzip
               pkgs.jq
             ];
