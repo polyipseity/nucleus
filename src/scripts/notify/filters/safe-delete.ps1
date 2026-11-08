@@ -84,8 +84,12 @@ if ($Command -like '*cmd.exe*' -or $Command -like '* cmd *') {
 # A deletion command as the invoked word, optionally behind sudo. The pattern
 # anchors on a command separator, so the same verb in an argument position or
 # inside quotes does not match.
+# WHY -imatch: PowerShell folds case for these words, so DEL, Del, and del are one
+# deletion; a case-sensitive test would let an uppercase spelling fall through to
+# no-match, which reads as allow. The bypass families above stay case-sensitive
+# because they match a path or a spelling, not a PowerShell word.
 $deletion = '(^|[;&|(]|&&|\|\|)\s*(sudo\s+)?(rm|del|rd|rmdir|erase|ri|unlink|shred|Remove-Item)(\s|$)'
-if ($Command -cmatch $deletion) {
+if ($Command -imatch $deletion) {
   $verb = $Matches[3]
 
   # WHY no proven redirect on Windows: the six shim names are exactly the words

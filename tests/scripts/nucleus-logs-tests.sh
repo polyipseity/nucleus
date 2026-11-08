@@ -267,12 +267,17 @@ test_expire_removes_old_archives() {
 # ---- show and stats read what append wrote ----
 
 test_show_filters_by_kind() {
-  local output
+  # WHY a second kind: with label events alone, `--kind label` returns the same set
+  # whether or not the flag filters, so the case could not fail.
+  printf '%s\n' '{"id":"kind-seed","kind":"decision"}' | logs append harness
+  local output all
   output="$(logs show harness --kind label --json)"
-  if printf '%s' "$output" | jq -e 'length >= 1 and all(.kind == "label")' >/dev/null; then
+  all="$(logs show harness --json)"
+  if printf '%s' "$all" | jq -e 'any(.id == "kind-seed")' >/dev/null &&
+    printf '%s' "$output" | jq -e 'length >= 1 and all(.kind == "label")' >/dev/null; then
     assert_pass "show --kind returns only matching events"
   else
-    assert_fail "show-kind" "unexpected show output: $output"
+    assert_fail "show-kind" "unexpected show output: $output (all: $all)"
   fi
 }
 

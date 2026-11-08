@@ -40,6 +40,11 @@ BeforeAll {
     param()
 
     $root = Join-Path -Path ([System.IO.Path]::GetTempPath()) ("nucleus-hfilter-" + [guid]::NewGuid().ToString('N'))
+    # WHY ShouldProcess: New- is a should-process verb, so the analyzer requires the
+    # gate; the body only ever writes inside the temp path it just computed.
+    if (-not $PSCmdlet.ShouldProcess($root, 'create the filter fixture tree')) {
+      return $root
+    }
     $notifyCopy = Join-Path -Path $root 'src\scripts\notify'
     $configCopy = Join-Path -Path $root 'src\modules\configs'
     foreach ($dir in @($notifyCopy, (Join-Path -Path $notifyCopy 'filters'), $configCopy)) {
@@ -83,6 +88,9 @@ BeforeAll {
     )
 
     if (Test-Path -LiteralPath $Root) {
+      # WHY ShouldProcess: Remove- is a should-process verb, so the analyzer requires
+      # the gate; a test helper must still call it rather than only declare it.
+      if (-not $PSCmdlet.ShouldProcess($Root, 'remove the filter fixture tree')) { return }
       Remove-Item -LiteralPath $Root -Recurse -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: cleanup in test teardown, a failure is acceptable
     }
   }
@@ -106,6 +114,9 @@ BeforeAll {
     )
 
     $path = Join-Path -Path (Join-Path -Path $Root 'src\modules\configs') -ChildPath 'harness-filters.json'
+    # WHY ShouldProcess: Set- is a should-process verb, so the analyzer requires the
+    # gate; a test helper must still call it rather than only declare it.
+    if (-not $PSCmdlet.ShouldProcess($path, 'replace the fixture filter registry')) { return }
     [System.IO.File]::WriteAllText($path, $Document, [System.Text.UTF8Encoding]::new($false))
   }
 
@@ -149,8 +160,6 @@ BeforeAll {
     .PARAMETER UserProfile
       Overrides USERPROFILE for the child, so a case decides which shim directory the filter
       compares against.
-    .PARAMETER PathPrefix
-      Prepends a directory to the child's PATH, so a case decides what the filter resolves.
     #>
     [CmdletBinding()]
     [OutputType([hashtable])]
@@ -164,19 +173,15 @@ BeforeAll {
       [Parameter(Mandatory)]
       [string]$Payload,
 
-      [string]$UserProfile = '',
-
-      [string]$PathPrefix = ''
+      [string]$UserProfile = ''
     )
 
     $previous = $env:NUCLEUS_REPO_ROOT
     $previousLogDir = $env:NUCLEUS_LOG_DIR
     $previousUserProfile = $env:USERPROFILE
-    $previousPath = $env:PATH
     $env:NUCLEUS_REPO_ROOT = $Root
     $env:NUCLEUS_LOG_DIR = Join-Path -Path $Root 'logs'
     if (-not [string]::IsNullOrEmpty($UserProfile)) { $env:USERPROFILE = $UserProfile }
-    if (-not [string]::IsNullOrEmpty($PathPrefix)) { $env:PATH = "$PathPrefix$([System.IO.Path]::PathSeparator)$env:PATH" }
     try {
       $runner = Join-Path -Path (Join-Path -Path $Root 'src\scripts\notify') -ChildPath 'harness-filter.ps1'
       $stdout = @($Payload | & $script:PwshPath -NoProfile -File $runner $Harness 2>$null) -join "`n"
@@ -186,7 +191,6 @@ BeforeAll {
       $env:NUCLEUS_REPO_ROOT = $previous
       $env:NUCLEUS_LOG_DIR = $previousLogDir
       $env:USERPROFILE = $previousUserProfile
-      $env:PATH = $previousPath
     }
   }
 
@@ -309,12 +313,20 @@ Describe 'safe-delete filter settings' {
 }
 
 Describe 'safe-delete redirect proof' {
-  It 'denies a plain delete when a plain binary comes first on PATH' {
-    $plainDir = Join-Path -Path $script:Sandbox 'plain-bin'
-    $null = New-Item -ItemType Directory -Path $plainDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
-    Copy-Item -LiteralPath $script:PwshPath -Destination (Join-Path -Path $plainDir -ChildPath 'rm.exe') -Force
-    $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"rm x"}' `
-      -UserProfile $script:UnprovenProfile -PathPrefix $plainDir
+  # WHY uppercase: PowerShell folds case for every deletion word, so `DEL` is the
+  # same deletion as `del`; a case-sensitive verb test would let it through as
+  # no-match with no unproven ruling. The case fails if the verb test stops folding
+  # case, which is exactly the regression it exists for.
+  It 'denies an uppercase deletion word whose redirect is unproven' {
+    $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"DEL /S x"}' -UserProfile $script:UnprovenProfile
+
+    $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
+    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'deny'
+    $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'unproven-redirect'
+  }
+
+  It 'denies Remove-Item spelled in lower case' {
+    $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"remove-item -Recurse -Force C:\\data"}' -UserProfile $script:UnprovenProfile
 
     $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
     $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'deny'

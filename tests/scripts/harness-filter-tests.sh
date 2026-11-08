@@ -156,6 +156,7 @@ FILTER_CASES=(
   '{"unproven":"deny"}|cmd.exe /c del x|deny|cmd-shell'
   '{"unproven":"deny"}|pwsh -c x cmd y|deny|cmd-shell'
   '{"unproven":"deny"}|rm x|deny|unproven-redirect'
+  '{"unproven":"deny"}|DEL /S x|deny|unproven-redirect'
   '{"unproven":"deny"}|rm -rf build|deny|unproven-redirect'
   '{"unproven":"route"}|rm x|ask|unproven-redirect'
   '{}|rm x|deny|unproven-redirect'
@@ -236,6 +237,8 @@ assert_decision "a sudo-prefixed deletion is unproven even with the wrapper firs
   "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"deny"}' 'sudo rm -rf x')" deny unproven-redirect
 assert_decision "a sudo-prefixed deletion routes when configured" \
   "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"route"}' 'sudo rm -rf x')" ask unproven-redirect
+assert_decision "an uppercase word is detected but not proven by a lowercase wrapper" \
+  "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"deny"}' 'RM -rf build')" deny unproven-redirect
 
 # The three bypass families are the spellings no redirect can cover, so the
 # setting that governs an unproven redirect must not reach them.

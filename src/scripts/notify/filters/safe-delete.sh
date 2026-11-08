@@ -73,9 +73,19 @@ esac
 # anchors on a command separator, so the same verb in an argument position or
 # inside quotes does not match.
 _sd_verb_re='(^|[;&|(]|&&|\|\|)[[:space:]]*(sudo[[:space:]]+)?(rm|del|rd|rmdir|erase|ri|unlink|shred|Remove-Item)([[:space:]]|$)'
+# WHY nocasematch: PowerShell folds case for every one of these words, so `DEL` and
+# `Remove-Item` are deletions on the other twin, and a lowercase-only test would let
+# the same bytes answer no-match, which reads as allow. The proof still resolves the
+# word as typed, because a POSIX PATH lookup is case-sensitive.
+_sd_is_deletion=false
+shopt -s nocasematch
 if [[ $_sd_command =~ $_sd_verb_re ]]; then
+  _sd_is_deletion=true
   _sd_verb="${BASH_REMATCH[3]}"
   _sd_sudo="${BASH_REMATCH[2]}"
+fi
+shopt -u nocasematch
+if [ "$_sd_is_deletion" = true ]; then
 
   # The wrapper home.file deploys for this verb (src/modules/shell/default.nix):
   # ~/.local/bin/<verb> linked into home-manager's file tree. The link and its
