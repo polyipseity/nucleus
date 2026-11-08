@@ -139,7 +139,8 @@ function Write-HarnessBridgeAuditEvent {
   .PARAMETER StartTime
     When the entry point started, so the event carries its latency.
   .PARAMETER Id
-    Event id; empty lets nucleus-logs carry no id of its own.
+    Event id; empty makes this writer mint an 8-character hex id, which is what a
+    review label attaches a verdict to.
   #>
   [CmdletBinding()]
   param(
@@ -174,8 +175,9 @@ function Write-HarnessBridgeAuditEvent {
     [string]$Id = ''
   )
 
-  # WHY here: the schema caps a summary at 200 collapsed characters, and one place
-  # per platform owns the rule, so no caller can widen it by passing a raw body.
+  # WHY here: this writer and harness-audit.sh are what cap a summary at 200
+  # collapsed characters; the schema documents the field but enforces neither.
+  # One owner per platform, so no caller can widen it with a raw body.
   $Summary = ($Summary -replace '\s+', ' ').Trim()
   if ($Summary.Length -gt 200) { $Summary = $Summary.Substring(0, 200) }
   # WHY mint: the review workflow labels an event by id, so every event needs one
