@@ -567,6 +567,40 @@ properties:
         id: Rustlang.Rustup
         source: winget
 
+    - resource: PSDscResources/Script
+      id: ScoopInstall
+      directives:
+        description: >-
+          Bootstrap the Scoop user-space package manager from a commit-pinned,
+          SHA256-checked installer, because winget-pkgs carries no Scoop
+          manifest; Git is required for bucket management, hence dependsOn.
+      settings:
+        GetScript: |
+          $scoopDir = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $env:USERPROFILE 'scoop' }
+          return @{ Result = if (Test-Path (Join-Path $scoopDir 'shims\scoop.cmd')) { 'Present' } else { 'Absent' } }
+        TestScript: |
+          $scoopDir = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $env:USERPROFILE 'scoop' }
+          return Test-Path (Join-Path $scoopDir 'shims\scoop.cmd')
+        SetScript: |
+          $url = 'https://raw.githubusercontent.com/ScoopInstaller/Install/1e2f334083d609986d8c8bc9e31ae8e87c39fab4/install.ps1'
+          # WHY: commit-pinned URL already fixes the bytes; the hash catches a tampered download path. Bump both together.
+          $sha = '94f983b190438311e006b957db7c8422709e0ba62a6c2ac04e278164108f2512'
+          $tmp = Join-Path $env:TEMP 'nucleus-scoop-install.ps1'
+          Invoke-WebRequest -Uri $url -OutFile $tmp
+          $actual = (Get-FileHash -Path $tmp -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $sha) {
+            Remove-Item $tmp -Force
+            throw "scoop installer hash mismatch: expected $sha, got $actual"
+          }
+          & powershell -NoProfile -ExecutionPolicy Bypass -File $tmp
+          if ($LASTEXITCODE -ne 0) {
+            Remove-Item $tmp -Force
+            throw "scoop installer exited with code $LASTEXITCODE"
+          }
+          Remove-Item $tmp -Force
+      dependsOn:
+        - GitInstall
+
     - resource: Microsoft.WinGet.Client/Package
       directives:
         description: Ensure SOPS is installed

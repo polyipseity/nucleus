@@ -260,6 +260,16 @@
         "why": "Temporary keyboard locker for cleaning; blocks all input until Ctrl+Break."
       },
       {
+        "bucket": "fonts",
+        "name": "notosanscjk",
+        "why": "Noto Sans CJK covers Windows CJK text rendering; parity with pkgs.noto-fonts-cjk-sans on POSIX hosts."
+      },
+      {
+        "bucket": "fonts",
+        "name": "notoserifcjk",
+        "why": "Noto Serif CJK completes the Windows font parity with pkgs.noto-fonts-cjk-serif on POSIX hosts."
+      },
+      {
         "name": "qemu",
         "why": "QCOW2 tooling and guest VM runner for Invoke-VMSetup; Scoop extras bucket."
       },

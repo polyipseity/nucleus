@@ -48,6 +48,8 @@
     "cargo-binstall": "1.10.0",
     "gopass": "1.15.0",
     "iwck": "3.10",
+    "notosanscjk": "2.004",
+    "notoserifcjk": "2.001",
     "qemu": "9.0.0",
     "rip2": "0.9.7",
     "sigrok-cli": "0.7.2",

@@ -569,7 +569,7 @@ foreach ($configFile in $effectiveConfigFiles) {
 
 wevtutil sl Application /ms:209715200 2>$null  # check-suppress:suppression_doc: may already be at desired size; wevtutil exits non-zero but this is harmless
 
-# After WinGet DSC installs Scoop.Scoop, since the shims directory is not on
+# After the ScoopInstall DSC bootstrap, since the shims directory is not on
 # PATH until Invoke-ScoopSetup prepends it.
 # rustup runs after WinGet DSC installs Rustlang.Rustup, and before
 # Invoke-CargoBinstallSetup so the stable toolchain and its cargo binary exist
