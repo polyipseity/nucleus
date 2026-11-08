@@ -57,25 +57,17 @@ let
     builtins.attrValues copilotHooks ++ builtins.attrValues cursorHooks
   );
 
-  # WHY: text reads, not behavior. The approval window has no runtime surface to
-  # test against: the hook either answers inside its timeout or the harness kills
-  # it, so the budget is parsed from both declarations and compared at the end of
-  # the test list. The gate defaults pinned below are declared independently in
-  # the two nucleus-config implementations.
+  # WHY: text reads, not behavior. The hook budget has no runtime surface to test
+  # against: the hook either answers inside its timeout or the harness kills it, so
+  # the ceiling is a declared number here and compared against every filter entry.
+  # The gate defaults pinned below are declared independently in the two
+  # nucleus-config implementations and in the resolver, which is why they are read
+  # as text and compared instead of imported.
+  hookCeiling = 3600;
   configSh = read "/scripts/config.sh";
   flatConfigSh = flatten configSh;
   flatConfigPs1 = flatten (read "/scripts/config.ps1");
-  approvalScript = read "/src/scripts/notify/harness-approval.sh";
-  approvalWindow = builtins.fromJSON (
-    builtins.head (builtins.match ".*harness-approval[^0-9]*([0-9]+).*" (flatten configSh))
-  );
-  approvalScriptDefault = builtins.fromJSON (
-    builtins.head (
-      builtins.match ".*\"harness-approval\":[{]\"enable\":false,\"timeout-seconds\":([0-9]+)[}].*" (
-        flatten approvalScript
-      )
-    )
-  );
+  flatApprovalScript = flatten (read "/src/scripts/notify/harness-approval.sh");
 
   # First word of a hook command: the command the harness resolves on PATH.
   entryPointOf = command: builtins.head (builtins.split " " command);
@@ -87,8 +79,9 @@ let
   # to an argument-less approval call, still starts with the entry point name, so
   # the first-word match above cannot catch it.
   entriesWithCommand = entries: command: builtins.filter (entry: entry.command == command) entries;
-  underBudget = builtins.filter (entry: entry.timeout < approvalWindow) allEntries;
-  claudeUnderBudget = builtins.filter (entry: entry.timeout < approvalWindow) claudeEntries;
+  filterEntries = builtins.filter (entry: entryPointOf entry.command == "harness-filter") (
+    allEntries ++ claudeEntries
+  );
 in
 {
   tests = builtins.filter (x: x != null) [
@@ -120,8 +113,11 @@ in
 
     # --- Timeout budget covers the approval wait ---
     (assert' (all (entry: entry ? timeout) allEntries) "every hook entry must declare a timeout")
-    (assert' (underBudget == [ ])
-      "hook timeout (${toString (builtins.head underBudget).timeout}) on ${(builtins.head underBudget).command} must be at least the approval window (${toString approvalWindow}), or the harness kills the hook before a decision can arrive"
+    (assert' (filterEntries != [ ])
+      "the hook files must run the filter runner at least once, or the approval budget below is vacuous"
+    )
+    (assert' (all (entry: entry.timeout == hookCeiling) filterEntries)
+      "a filter entry's timeout must be the hook ceiling (${toString hookCeiling} s); the approval sources wait until answered by default, so a shorter hook timeout turns a human's answer into a harness denial"
     )
 
     # --- Claude carries the same budget ---
@@ -133,9 +129,6 @@ in
     ) "Claude must gate tool calls with exactly one safe-delete-guard hook")
     (assert' (all (entry: entry ? timeout) claudeEntries)
       "every Claude hook entry must declare a timeout, or the harness applies a budget of its own and the guard can be killed before the approval window"
-    )
-    (assert' (claudeUnderBudget == [ ])
-      "hook timeout (${toString (builtins.head claudeUnderBudget).timeout}) on ${(builtins.head claudeUnderBudget).command} must be at least the approval window (${toString approvalWindow}), or the harness kills the hook before a decision can arrive"
     )
 
     # --- Copilot wiring ---
@@ -177,30 +170,36 @@ in
       (builtins.head cursorHooks.stop).command == "harness-drive cursor"
     ) "Cursor stop must run harness-drive, which notifies and injects a queued prompt")
 
-    # --- Per-action gates: master on, approval off, drive on ---
-    # WHY: the shipped state is deliberately "notify, do not broker": a host
-    # opts into remote approvals, and never the other way round. Each flag is
-    # declared in both nucleus-config implementations with nothing shared
-    # between them, so this file pins the declarations; the scripts' own
-    # fallback gates are asserted by the harness-notify, harness-approval, and
-    # harness-drive suites.
+    # --- Per-action gates: master on, prompt approval, drive on ---
+    # WHY: the shipped state asks in the terminal and brokers nothing remotely: a
+    # host adds the hermes source, and never the other way round. Each default is
+    # declared in both nucleus-config implementations and in the resolver with
+    # nothing shared between them, so this file pins the declarations; the
+    # scripts' own fallback gates are asserted by the harness-notify,
+    # harness-approval, and harness-drive suites.
     (assert'
-      (builtins.match ".*\"harness-approval\": [{][^}]*\"enable\": false,.*" flatConfigSh != null)
-      "nucleus-config DEFAULTS must ship harness-approval.enable=false, so no host brokers a tool call until it opts in"
+      (
+        builtins.match ".*\"harness-approval\": [{][ ]*\"sources\": [[]\"prompt\"],.*" flatConfigSh != null
+      )
+      "nucleus-config DEFAULTS must ship harness-approval.sources=[\"prompt\"], so no host brokers a tool call until it opts in"
     )
     (assert' (builtins.match ".*\"harness-drive\": [{][^}]*\"enable\": true.*" flatConfigSh != null)
       "nucleus-config DEFAULTS must ship harness-drive.enable=true, so a finished turn is announced and remote driving keeps working"
     )
     (assert' (
-      builtins.match ".*'harness-approval' = @[{][^}]*enable = \\$false.*" flatConfigPs1 != null
-    ) "the PowerShell nucleus-config DEFAULTS must ship the same harness-approval.enable=false")
+      builtins.match ".*'harness-approval' = @[{][ ]*sources = @[(]'prompt'[)].*" flatConfigPs1 != null
+    ) "the PowerShell nucleus-config DEFAULTS must ship the same harness-approval.sources=['prompt']")
     (assert' (
       builtins.match ".*'harness-drive' += @[{][^}]*enable = \\$true.*" flatConfigPs1 != null
     ) "the PowerShell nucleus-config DEFAULTS must ship the same harness-drive.enable=true")
 
-    # --- Approval window parity ---
-    (assert' (approvalWindow == approvalScriptDefault)
-      "harness-approval must declare the same timeout the nucleus-config default ships (${toString approvalWindow} vs ${toString approvalScriptDefault})"
+    # --- Source default parity ---
+    (assert'
+      (
+        builtins.match ".*\"harness-approval\":[{]\"sources\":[[]\"prompt\"],\"timeout-seconds\":[{]\"hermes\":0,\"prompt\":0[}][}].*" flatApprovalScript
+        != null
+      )
+      "harness-approval must ship the same source list and per-source timeouts as nucleus-config, since a hook that runs without a config file falls back to these"
     )
   ];
 

@@ -30,9 +30,12 @@
 
   The decisions aggregate as deny > ask > allow regardless of registry order, so
   registry order stays readable instead of load-bearing.  `ask` means "no
-  decision here" and the harness falls back to its own local prompt, which is
-  also what a call no filter decides answers: the runner never allows by
+  decision here" and is then put to the configured approval sources, which
+  answer allow or deny for a call no filter decides: the runner never allows by
   omission, because that would remove prompting the harness would otherwise do.
+  The sources are consulted through the sibling harness-approval.ps1 with
+  -Plain, so this runner renders the document and the resolver only states the
+  decision.
 
   Every path prints a document and exits 0, because several harnesses read a
   failed hook as a denial, which would turn a broken registry into a blocked
@@ -171,6 +174,42 @@ function Read-HarnessFilterPayloadCommand {
   return ''
 }
 
+function Read-HarnessFilterPayloadTool {
+  <#
+  .SYNOPSIS
+    Extracts the tool name a hook payload reports.
+  .DESCRIPTION
+    Used when the filters leave a call undecided, so the approval gate shows the
+    tool the harness named. A payload this cannot read names no tool, and the
+    gate still has to be asked.
+  .PARAMETER Payload
+    Raw hook payload read from stdin.
+  #>
+  [CmdletBinding()]
+  [OutputType([string])]
+  param(
+    [Parameter(Mandatory)]
+    [AllowEmptyString()]
+    [string]$Payload
+  )
+
+  $fallback = 'hook'
+  if ([string]::IsNullOrWhiteSpace($Payload)) { return $fallback }
+  if (-not $Payload.TrimStart().StartsWith('{')) { return $fallback }
+
+  $parsed = $null
+  try { $parsed = ConvertFrom-Json -InputObject $Payload -AsHashtable }
+  catch { return $fallback }
+  if ($parsed -isnot [hashtable]) { return $fallback }
+
+  foreach ($field in @('tool_name', 'tool', 'hook_event_name')) {
+    if ($parsed.ContainsKey($field) -and -not [string]::IsNullOrWhiteSpace([string]$parsed[$field])) {
+      return [string]$parsed[$field]
+    }
+  }
+  return $fallback
+}
+
 function Get-HarnessFilterRegistryEntry {
   <#
   .SYNOPSIS
@@ -281,12 +320,21 @@ function Complete-HarnessFilter {
   <#
   .SYNOPSIS
     Prints the aggregated decision in the caller's vocabulary and exits 0.
+  .DESCRIPTION
+    An undecided call is put to the configured approval sources, asked for the
+    decision word alone because this runner renders the document. A source that
+    answers allow or deny becomes the runner's answer; anything else keeps the
+    runner's own reason so the harness's prompt explains what happened.
   .PARAMETER Harness
     Calling harness name.
   .PARAMETER Decision
     allow, ask, or deny.
   .PARAMETER Reason
     Human-readable reason.
+  .PARAMETER Tool
+    Tool name, for the approval gate.
+  .PARAMETER Summary
+    One-line description of the call, for the approval gate.
   #>
   [CmdletBinding()]
   param(
@@ -299,11 +347,40 @@ function Complete-HarnessFilter {
 
     [Parameter(Mandatory)]
     [AllowEmptyString()]
-    [string]$Reason
+    [string]$Reason,
+
+    [Parameter(Mandatory)]
+    [AllowEmptyString()]
+    [string]$Tool,
+
+    [Parameter(Mandatory)]
+    [AllowEmptyString()]
+    [string]$Summary
   )
 
-  $final = if ($Decision -cin @('allow', 'deny')) { $Decision } else { 'ask' }
-  Write-Output (ConvertTo-HarnessFilterDocument -Harness $Harness -Decision $final -Reason $Reason)
+  if ($Decision -cin @('allow', 'deny')) {
+    Write-Output (ConvertTo-HarnessFilterDocument -Harness $Harness -Decision $Decision -Reason $Reason)
+    exit 0
+  }
+
+  $resolverPath = Join-Path -Path $PSScriptRoot -ChildPath 'harness-approval.ps1'
+  if (-not (Test-Path -LiteralPath $resolverPath -PathType Leaf)) {
+    Write-HarnessBridgeWarning -CommandName 'harness-filter' -Message "no approval resolver at ${resolverPath}: asking locally"
+  }
+  else {
+    $pwshPath = [Environment]::ProcessPath
+    $lines = @(& $pwshPath -NoProfile -File $resolverPath -Plain -Harness $Harness -Tool $Tool -Summary $Summary |
+        ForEach-Object { [string]$_ } | Where-Object { $_ -ne '' })
+    if ($LASTEXITCODE -ne 0) {
+      Write-HarnessBridgeWarning -CommandName 'harness-filter' -Message 'the approval resolver failed: asking locally'
+    }
+    elseif ($lines.Count -ge 1 -and $lines[$lines.Count - 1] -cin @('allow', 'deny')) {
+      Write-Output (ConvertTo-HarnessFilterDocument -Harness $Harness -Decision $lines[$lines.Count - 1] -Reason 'harness-approval (source)')
+      exit 0
+    }
+  }
+
+  Write-Output (ConvertTo-HarnessFilterDocument -Harness $Harness -Decision 'ask' -Reason $Reason)
   exit 0
 }
 
@@ -311,35 +388,43 @@ try {
   $payload = ''
   if ([Console]::IsInputRedirected) { $payload = [Console]::In.ReadToEnd() }
 
+  # What the approval gate shows the user when no filter decides, so a call no
+  # filter claims still reaches the gate with the tool and the command it saw.
+  $toolName = Read-HarnessFilterPayloadTool -Payload $payload
+  $summaryText = (($payload -replace '\s+', ' ').Trim())
+  if ($summaryText.Length -gt 200) { $summaryText = $summaryText.Substring(0, 200) }
+
   if ([string]::IsNullOrWhiteSpace($env:NUCLEUS_REPO_ROOT)) {
     Write-HarnessBridgeWarning -CommandName 'harness-filter' -Message 'NUCLEUS_REPO_ROOT is unset: asking locally'
-    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Reason 'harness-filter (registry-error): NUCLEUS_REPO_ROOT is unset, so the filter registry cannot be read'
+    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason 'harness-filter (registry-error): NUCLEUS_REPO_ROOT is unset, so the filter registry cannot be read'
   }
   # check-suppress:config-method: method 4 (runtime direct read) -- the registry is data the runner reads from the live checkout, so a writable symlink into the store or the home directory would freeze the filter list until the next apply
   $registryPath = Join-Path -Path (Join-Path -Path (Join-Path -Path $env:NUCLEUS_REPO_ROOT -ChildPath 'src') -ChildPath 'modules') -ChildPath 'configs/harness-filters.json'
   if (-not (Test-Path -LiteralPath $registryPath -PathType Leaf)) {
     Write-HarnessBridgeWarning -CommandName 'harness-filter' -Message "filter registry not found at ${registryPath}: asking locally"
-    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Reason "harness-filter (registry-error): no filter registry at $registryPath"
+    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason "harness-filter (registry-error): no filter registry at $registryPath"
   }
 
   try { $entries = Get-HarnessFilterRegistryEntry -RegistryPath $registryPath }
   catch {
     Write-HarnessBridgeWarning -CommandName 'harness-filter' -Message "could not parse the filter registry at ${registryPath}: asking locally"
-    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Reason "harness-filter (registry-error): the filter registry at $registryPath is unreadable"
+    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason "harness-filter (registry-error): the filter registry at $registryPath is unreadable"
   }
 
   $command = Read-HarnessFilterPayloadCommand -Payload $payload
   if ([string]::IsNullOrWhiteSpace($command)) {
-    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Reason 'harness-filter (not-a-command): the payload carries no shell command'
+    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason 'harness-filter (not-a-command): the payload carries no shell command'
   }
+  # The command is what the gate asks about, so it replaces the raw payload.
+  $summaryText = $command
 
   $result = Invoke-HarnessFilterList -Entry $entries -Command $command -Payload $payload
   # WHY ask and never allow: an undecided call is not an authorisation, so the
   # runner allows only when a filter says so.
   if ([string]::IsNullOrEmpty($result.Decision)) {
-    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Reason 'harness-filter (no-filter): no enabled filter produced a verdict'
+    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason 'harness-filter (no-filter): no enabled filter produced a verdict'
   }
-  Complete-HarnessFilter -Harness $Harness -Decision $result.Decision -Reason $result.Reason
+  Complete-HarnessFilter -Harness $Harness -Decision $result.Decision -Tool $toolName -Summary $summaryText -Reason $result.Reason
 }
 catch {
   # Fail open to the harness's own prompt: a broken runner must not authorise a

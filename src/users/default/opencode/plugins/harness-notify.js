@@ -32,9 +32,12 @@ const runFile = promisify(execFile);
 
 const NOTIFY_COMMAND = "harness-notify";
 const APPROVAL_COMMAND = "harness-approval";
-// Must exceed harness-approval's own wait (harness-approval.timeout-seconds,
-// default 120) so the broker's timeout — not this one — produces `ask`.
-const APPROVAL_TIMEOUT_MS = 240_000;
+// The approval sources wait until answered by default
+// (harness-approval.timeout-seconds is 0), so this is the ceiling for the whole
+// wait rather than a limit under the gate: 3600 s matches the hook budget the
+// shared hook files declare, and the harness falls back to its own prompt when
+// it expires.
+const APPROVAL_TIMEOUT_MS = 3_600_000;
 
 /**
  * Nucleus USER root, mirroring derive_nucleus_user_root in

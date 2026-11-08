@@ -511,7 +511,7 @@ Describe 'harness-approval.ps1 Windows twin' {
   }
 
   It 'honours a remote allow decision, clears the request, and audits it' {
-    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ enable = $true } }
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ sources = @('hermes'); 'timeout-seconds' = @{ 'hermes' = 30 } } }
     $stateDir = Get-BridgeStateDir -Sandbox $script:approvalSandbox
     $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('pi', 'bash', 'git push --force', '30')
 
@@ -553,23 +553,28 @@ Describe 'harness-approval.ps1 Windows twin' {
     (Get-Content -LiteralPath $auditLog -Raw -Encoding UTF8) | Should -Match "pi`tbash`tallow"
   }
 
-  It 'answers Cursor hook mode with a Cursor permission document when nobody answers' {
-    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ enable = $true; 'timeout-seconds' = 2 } }
-    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'cursor') -Stdin '{"command":"rm -rf build"}'
+  It 'stops the hermes source at its per-source timeout and answers ask' {
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ sources = @('hermes'); 'timeout-seconds' = @{ 'hermes' = 2 } } }
+    $stubLogBefore = @(Get-HermesStubLog -Sandbox $script:approvalSandbox).Count
+
+    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('cursor', 'beforeShellExecution', 'rm -rf build')
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
     $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
     $document['permission'] | Should -Be 'ask'
 
-    $log = Get-HermesStubLog -Sandbox $script:approvalSandbox
+    $stateDir = Get-BridgeStateDir -Sandbox $script:approvalSandbox
+    @(Get-ChildItem -LiteralPath $stateDir -Recurse -Filter '*.json' -File).Count | Should -Be 0
+
+    $log = @(Get-HermesStubLog -Sandbox $script:approvalSandbox) | Select-Object -Skip $stubLogBefore
     @($log | Where-Object { $_.Contains('--subject [cursor] approval needed') }).Count | Should -BeGreaterThan 0
-    @($log | Where-Object { $_.Contains('hook: rm -rf build') }).Count | Should -BeGreaterThan 0
+    @($log | Where-Object { $_.Contains('beforeShellExecution: rm -rf build') }).Count | Should -BeGreaterThan 0
   }
 
-  It 'answers Copilot hook mode with a PreToolUse decision document' {
-    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ enable = $true; 'timeout-seconds' = 2 } }
-    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'copilot') -Stdin '{"tool_name":"runInTerminal","tool_input":{"command":"rm -rf /"}}'
+  It 'renders the Copilot PreToolUse decision document' {
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ sources = @('hermes'); 'timeout-seconds' = @{ 'hermes' = 2 } } }
+    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('copilot', 'runInTerminal', 'rm -rf /')
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
@@ -579,50 +584,53 @@ Describe 'harness-approval.ps1 Windows twin' {
     $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Be 'nucleus harness-approval'
   }
 
-  It 'renders the plain decision for harnesses without a document shape' {
-    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ enable = $true; 'timeout-seconds' = 2 } }
-    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'opencode') -Stdin '{"title":"run bash"}'
+  It 'prints the decision word alone for a caller that renders its own document' {
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ sources = @('hermes'); 'timeout-seconds' = @{ 'hermes' = 2 } } }
+    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('-Plain', 'copilot', 'runInTerminal', 'rm -rf /')
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
     $result.Stdout | Should -Be 'ask'
   }
 
-  It 'answers ask at once when the remote gate is disabled' {
-    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ enable = $false } }
+  It 'answers ask at once when the source list is empty' {
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ sources = @(); 'timeout-seconds' = @{ 'hermes' = 30 } } }
     $stubLogBefore = @(Get-HermesStubLog -Sandbox $script:approvalSandbox).Count
-
-    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'copilot') -Stdin '{"tool_name":"runInTerminal","tool_input":{"command":"rm -rf /"}}'
-    $result = Wait-TwinProcess -Started $started
-
-    $result.ExitCode | Should -Be 0
-    $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
-    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'ask'
-    @(Get-HermesStubLog -Sandbox $script:approvalSandbox).Count | Should -Be $stubLogBefore
-
     $stateDir = Get-BridgeStateDir -Sandbox $script:approvalSandbox
-    if (Test-Path -LiteralPath $stateDir) {
-      @(Get-ChildItem -LiteralPath $stateDir -Recurse -Filter '*.json' -File).Count | Should -Be 0
-    }
-  }
+    $requestsBefore = 0
+    if (Test-Path -LiteralPath $stateDir) { $requestsBefore = @(Get-ChildItem -LiteralPath $stateDir -Recurse -Filter '*.json' -File).Count }
 
-  It 'leaves the gate off when the config names no approval section' {
-    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') } }
     $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('pi', 'bash', 'git push --force', '30')
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
     $result.Stdout | Should -Be 'ask'
+    @(Get-HermesStubLog -Sandbox $script:approvalSandbox).Count | Should -Be $stubLogBefore
+    if (Test-Path -LiteralPath $stateDir) {
+      @(Get-ChildItem -LiteralPath $stateDir -Recurse -Filter '*.json' -File).Count | Should -Be $requestsBefore
+    }
   }
 
-  It 'still exits 0 with a decision when the payload is malformed' {
-    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ enable = $true; 'timeout-seconds' = 2 } }
-    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'cursor') -Stdin 'not json at all'
+  It 'asks when the source list is not a list' {
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ sources = 'prompt' } }
+    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('pi', 'bash', 'git push --force', '30')
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
-    $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
-    $document['permission'] | Should -Be 'ask'
+    $result.Stdout | Should -Be 'ask'
+    $result.Stderr | Should -Match 'must be a list of source names'
+  }
+
+  It 'defaults to the prompt source and asks when no console can answer' {
+    # A section without a source list takes the shipped default, and a host whose
+    # hook has no console must answer ask instead of reading its own silence as a
+    # denial. The one-second wait keeps the case bounded on a host that has one.
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') } }
+    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('pi', 'bash', 'git push --force', '1')
+    $result = Wait-TwinProcess -Started $started
+
+    $result.ExitCode | Should -Be 0
+    $result.Stdout | Should -Be 'ask'
   }
 }
 

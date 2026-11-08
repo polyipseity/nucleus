@@ -26,9 +26,11 @@ import { join } from "node:path";
 
 const APPROVAL_COMMAND = "harness-approval";
 const CONFIG_PATH = join(homedir(), ".local", "state", "nucleus", "config.json");
-// Must exceed harness-approval's own wait (harness-approval.timeout-seconds,
-// default 120) so the broker's timeout — not this one — produces `ask`.
-const EXEC_TIMEOUT_MS = 240_000;
+// The sources wait until answered by default (harness-approval.timeout-seconds
+// is 0), so this is the ceiling for the whole wait rather than a limit under the
+// gate: 3600 s matches the hook budget the shared hook files declare, and pi
+// falls back to its own confirm when it expires.
+const EXEC_TIMEOUT_MS = 3_600_000;
 const SUMMARY_LIMIT = 200;
 
 const RISKY_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
@@ -43,9 +45,10 @@ const RISKY_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
 
 /**
  * `harness-notify.enable` is the master kill switch: with it off, this gate must
- * not add prompts pi would not otherwise show. The remote gate itself
- * (`harness-approval.enable`, off by default) is read by the `harness-approval`
- * command this extension calls, so turning it off leaves pi's own confirm.
+ * not add prompts pi would not otherwise show. The gate itself
+ * (`harness-approval.sources`, `["prompt"]` by default) is read by the
+ * `harness-approval` command this extension calls, so an empty list leaves pi's
+ * own confirm.
  */
 function approvalEnabled(): boolean {
   try {

@@ -42,8 +42,8 @@
     harness-notify.max-chars integer body cap, default 1200
 
     The other two gates belong to their own entry points and do not change what
-    this script sends: harness-approval.enable (default false) answers tool calls
-    locally, and harness-drive.enable (default true) decides whether a queued
+    this script sends: harness-approval.sources (default ["prompt"]) answers
+    tool calls, and harness-drive.enable (default true) decides whether a queued
     prompt is injected after a finished turn.
 #>
 

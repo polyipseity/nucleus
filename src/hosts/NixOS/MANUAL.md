@@ -37,6 +37,6 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 
 Set `services.hermes-agent.gateway.enable = true` for this host, otherwise nothing can arrive remotely; apply enables the `harness-bridge` plugin and runs the gateway as a user service. To provision a channel once: seal `TELEGRAM_BOT_TOKEN`, or `NTFY_TOPIC` with `NTFY_TOKEN`, or `DISCORD_BOT_TOKEN` in your SOPS file, list it in `src/users/<user>/env-secrets.json` with `consumers: ["hermes-agent"]`, set `platforms.<name>.enabled` in the gateway config, then re-run `nucleus-apply`. Check the gateway with `systemctl --user status hermes-agent`.
 
-Remote approvals are off by default: `nucleus-config set harness-approval.enable true` to enable them. `nucleus-config get harness-notify.channels` lists the notification channels; `nucleus-config set harness-notify.enable false` stops the bridge on this machine.
+Approvals are asked in the terminal by default (`harness-approval.sources` is `["prompt"]`); `nucleus-config set harness-approval.sources '["prompt","hermes"]'` adds the remote channel, and `harness-approval.timeout-seconds.<source>` bounds each wait, `0` meaning until answered. `nucleus-config get harness-notify.channels` lists the notification channels; `nucleus-config set harness-notify.enable false` stops the bridge on this machine.
 
 The rules behind those switches and the `/harness` commands are in `.agents/instructions/agents-and-skills.instructions.md`.

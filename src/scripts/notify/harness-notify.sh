@@ -24,8 +24,8 @@
 #                            has not set up fails delivery and warns
 #   harness-notify.max-chars integer body cap, default 1200
 #
-# The other two gates live in their own entry points: `harness-approval.enable`
-# (default false) answers tool calls, `harness-drive.enable` (default true)
+# The other two gates live in their own entry points: `harness-approval.sources`
+# (default ["prompt"]) answers tool calls, `harness-drive.enable` (default true)
 # decides whether a queued prompt is injected after a finished turn.
 set -euo pipefail
 

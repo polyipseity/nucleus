@@ -24,9 +24,9 @@
 #
 # The decisions aggregate as deny > ask > allow regardless of registry order, so
 # registry order stays readable instead of load-bearing. `ask` means "no decision
-# here" and the harness falls back to its own local prompt, which is also the
-# answer for a call no filter decides: the runner never allows by omission,
-# because that would remove prompting the harness would otherwise do.
+# here" and is then put to the configured approval sources, which answer allow or
+# deny for a call no filter decides: the runner never allows by omission, because
+# that would remove prompting the harness would otherwise do.
 #
 # Every path prints a document and exits 0, because several harnesses read a
 # failed hook as a denial, which would turn a broken registry into a blocked
@@ -42,6 +42,21 @@ _hf_payload=""
 if [ ! -t 0 ]; then
   _hf_payload="$(cat)"
 fi
+
+# What the approval gate shows the user when no filter decides: the tool the
+# harness named and the command it asked about.
+# WHY best-effort: a payload this cannot parse still has to reach the gate,
+# because the gate, not the runner, decides whether the call runs.
+_hf_tool="hook"
+_hf_description="${_hf_payload:0:200}"
+_hf_description="${_hf_description//$'\n'/ }"
+case "$_hf_payload" in
+\{*)
+  if ! _hf_tool="$(jq -r '.tool_name // .tool // .hook_event_name // "hook"' <<<"$_hf_payload" 2>/dev/null)"; then
+    _hf_tool="hook"
+  fi
+  ;;
+esac
 
 # Renders the decision in the calling harness's own vocabulary. `ask` is a valid
 # value in every shape, so the neutral answer is always expressible. The two
@@ -62,10 +77,24 @@ _hf_render() { # <decision> <reason>
 # Every path ends here.
 _hf_finish() { # <decision> <reason>
   case "${1-}" in
-  allow | deny) _hf_decision="$1" ;;
-  *) _hf_decision="ask" ;;
+  allow | deny)
+    _hf_render "$1" "${2-}"
+    exit 0
+    ;;
   esac
-  _hf_render "$_hf_decision" "${2-}"
+  # No filter decided, so the configured approval sources answer instead: the
+  # same gate every harness hook passes through, asked for the decision word
+  # alone because the reason below is this runner's to render.
+  _hf_resolver="$SCRIPT_DIR/harness-approval.sh"
+  if [ ! -f "$_hf_resolver" ]; then
+    warn "no approval resolver at $_hf_resolver: asking locally"
+  elif ! _hf_option="$("$_hf_resolver" --plain "$_hf_harness" "$_hf_tool" "$_hf_description")"; then
+    warn "the approval resolver failed: asking locally"
+  elif [ "$_hf_option" = "allow" ] || [ "$_hf_option" = "deny" ]; then
+    _hf_render "$_hf_option" "harness-approval (source)"
+    exit 0
+  fi
+  _hf_render ask "${2-}"
   exit 0
 }
 
@@ -118,6 +147,9 @@ esac
 if [ -z "$_hf_command" ]; then
   _hf_finish ask "harness-filter (not-a-command): the payload carries no shell command"
 fi
+# The command is what the gate asks about; the raw payload only stands in when
+# the payload names no command at all.
+_hf_description="$_hf_command"
 
 # WHY empty: "no filter spoke" is not a verdict, so it must not win the
 # comparison below. The fallback is ask, and a filter that allows still outranks

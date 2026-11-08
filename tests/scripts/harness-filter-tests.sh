@@ -29,7 +29,15 @@ readonly SCRIPT_DIR REPO_ROOT
 init_test_state
 ensure_safe_rm_env
 
+# The runner puts a call no filter decides to the approval sources. This suite is
+# about aggregation, so the sources are switched off: an empty list answers `ask`
+# at once, which is the value every assertion below compares against. The gate
+# itself, including its terminal, is covered by harness-approval-sources-tests.sh.
+mkdir -p "$HOME/.local/state/nucleus"
+printf '%s\n' '{"harness-approval":{"sources":[]}}' >"$HOME/.local/state/nucleus/config.json"
+
 RUNNER="$REPO_ROOT/src/scripts/notify/harness-filter.sh"
+APPROVAL="$REPO_ROOT/src/scripts/notify/harness-approval.sh"
 FILTER_DIR="$REPO_ROOT/src/scripts/notify/filters"
 LIB_DIR="$REPO_ROOT/src/scripts/lib/lib.sh"
 REGISTRY="$REPO_ROOT/src/modules/configs/harness-filters.json"
@@ -38,7 +46,7 @@ readonly RUNNER FILTER_DIR LIB_DIR REGISTRY
 require_command jq "the runner and the filter registry both need jq"
 require_command python3 "the schema file is parsed with python3"
 
-for _required in "$RUNNER" "$FILTER_DIR/safe-delete.sh" "$LIB_DIR" "$REGISTRY"; do
+for _required in "$RUNNER" "$APPROVAL" "$FILTER_DIR/safe-delete.sh" "$LIB_DIR" "$REGISTRY"; do
   if [ ! -e "$_required" ]; then
     assert_fail "runner assets present" "$_required does not exist"
     finish_tests
@@ -57,6 +65,7 @@ make_tree() { # <name>
   local _root="$WORK/$1"
   mkdir -p "$_root/src/scripts/lib" "$_root/src/scripts/notify/filters" "$_root/src/modules/configs"
   cp "$RUNNER" "$_root/src/scripts/notify/harness-filter.sh"
+  cp "$APPROVAL" "$_root/src/scripts/notify/harness-approval.sh"
   cp "$LIB_DIR" "$_root/src/scripts/lib/lib.sh"
   cp "$FILTER_DIR"/*.sh "$_root/src/scripts/notify/filters/"
   cp "$REGISTRY" "$_root/src/modules/configs/harness-filters.json"
