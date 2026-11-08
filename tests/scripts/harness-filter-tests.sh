@@ -50,6 +50,9 @@ readonly RUNNER FILTER_DIR LIB_DIR LIB_DIR_DIR LOGS_APP REGISTRY
 
 require_command jq "the runner and the filter registry both need jq"
 require_command python3 "the schema file is parsed with python3"
+require_command bash "the filter runs under bash and this suite resolves its interpreter"
+require_command sh "the filter resolves a deletion word through sh -c"
+require_command readlink "the filter reads the wrapper's link target with readlink"
 
 for _required in "$RUNNER" "$APPROVAL" "$FILTER_DIR/safe-delete.sh" "$LIB_DIR" "$LIB_DIR_DIR/harness-audit.sh" "$LOGS_APP" "$REGISTRY"; do
   if [ ! -e "$_required" ]; then
@@ -169,26 +172,36 @@ done
 
 section 2 "redirect proof (safe-delete)"
 
-# The managed wrapper the proof looks for is ~/.local/bin/<verb>, and the filter
-# treats anything else as not redirected. These fixtures are the four shapes that
-# answer: the deployed symlink, a plain file at the same path, an absent command,
-# and a plain rm ahead of everything on PATH.
+# The managed wrapper the proof looks for is ~/.local/bin/<verb> linked into
+# home-manager's file tree, and the filter treats anything else as not redirected.
+# These fixtures are the five shapes that answer: that link, a plain file at the
+# same path, a link the user pointed elsewhere, an absent command, and a plain rm
+# ahead of everything on PATH.
 BASH_PATH="$(command -v bash)"
 PROVEN_HOME="$WORK/proven-home"
 PLAIN_WRAPPER_HOME="$WORK/plain-wrapper-home"
+WRONG_TARGET_HOME="$WORK/wrong-target-home"
 EMPTY_HOME="$WORK/empty-home"
 PLAIN_BIN="$WORK/plain-bin"
 MIN_BIN="$WORK/min-bin"
-readonly BASH_PATH PROVEN_HOME PLAIN_WRAPPER_HOME EMPTY_HOME PLAIN_BIN MIN_BIN
-mkdir -p "$PROVEN_HOME/.local/bin" "$PLAIN_WRAPPER_HOME/.local/bin" "$EMPTY_HOME" "$PLAIN_BIN" "$MIN_BIN"
-# WHY a symlink to a real executable: `command -v` skips a target it cannot run,
-# so a dangling link would read as a missing command and prove the wrong case.
-ln -s /bin/sh "$PROVEN_HOME/.local/bin/rm"
+# The home-manager file tree the real deployment links into. A fixture cannot
+# write a Nix store path, so the tree only carries the shape the proof reads.
+HM_TREE="$WORK/store/0123456789ab-home-manager-files"
+readonly BASH_PATH PROVEN_HOME PLAIN_WRAPPER_HOME WRONG_TARGET_HOME EMPTY_HOME PLAIN_BIN MIN_BIN HM_TREE
+mkdir -p "$PROVEN_HOME/.local/bin" "$PLAIN_WRAPPER_HOME/.local/bin" "$WRONG_TARGET_HOME/.local/bin" \
+  "$EMPTY_HOME" "$PLAIN_BIN" "$MIN_BIN" "$HM_TREE/.local/bin"
+# WHY a symlink to an executable: `command -v` skips a link it cannot run, so a
+# dangling one would read as a missing command and prove the wrong case.
+printf '#!/bin/sh\nexit 0\n' >"$HM_TREE/.local/bin/rm"
+chmod +x "$HM_TREE/.local/bin/rm"
+ln -s "$HM_TREE/.local/bin/rm" "$PROVEN_HOME/.local/bin/rm"
+ln -s /bin/rm "$WRONG_TARGET_HOME/.local/bin/rm"
 printf '#!/bin/sh\nexit 0\n' >"$PLAIN_WRAPPER_HOME/.local/bin/rm"
 printf '#!/bin/sh\nexit 0\n' >"$PLAIN_BIN/rm"
 chmod +x "$PLAIN_WRAPPER_HOME/.local/bin/rm" "$PLAIN_BIN/rm"
-# The filter needs jq for its settings and sh for the lookup, and nothing else.
-for _tool in jq sh; do
+# The filter needs jq for its settings, sh for the lookup, and readlink for the
+# wrapper's target, and nothing else.
+for _tool in jq sh readlink; do
   ln -s "$(command -v "$_tool")" "$MIN_BIN/$_tool"
 done
 
@@ -217,6 +230,12 @@ assert_decision "a plain rm ahead of the wrapper on PATH is unproven and denies"
   "$(run_filter_env "$EMPTY_HOME" "$PLAIN_PATH" '{"unproven":"deny"}' 'rm x')" deny unproven-redirect
 assert_decision "a plain file at the wrapper path is unproven and denies" \
   "$(run_filter_env "$PLAIN_WRAPPER_HOME" "$PLAIN_WRAPPER_HOME/.local/bin:$MIN_BIN" '{"unproven":"deny"}' 'rm x')" deny unproven-redirect
+assert_decision "a wrapper symlinked to a plain binary is unproven and denies" \
+  "$(run_filter_env "$WRONG_TARGET_HOME" "$WRONG_TARGET_HOME/.local/bin:$MIN_BIN" '{"unproven":"deny"}' 'rm x')" deny unproven-redirect
+assert_decision "a sudo-prefixed deletion is unproven even with the wrapper first" \
+  "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"deny"}' 'sudo rm -rf x')" deny unproven-redirect
+assert_decision "a sudo-prefixed deletion routes when configured" \
+  "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"route"}' 'sudo rm -rf x')" ask unproven-redirect
 
 # The three bypass families are the spellings no redirect can cover, so the
 # setting that governs an unproven redirect must not reach them.

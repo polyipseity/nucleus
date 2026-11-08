@@ -15,16 +15,16 @@
     native-path        an absolute or relative path to the delete binary
     escaped-spelling   a backslash-escaped deletion command, which skips the alias
     cmd-shell          cmd.exe, which is never allowed on any host
-    proven-redirect    a deletion command whose word resolves to the managed shim
     unproven-redirect  a deletion command whose redirect is unproven, which is
                        treated as not redirected
     no-match           nothing to gate
 
   An unproven redirect is treated as not redirected: settings.unproven says what
   that gets, so deny (the registry default) blocks the command, route puts it to
-  the approval sources, and allow lets it through. A redirect is proven only when
-  the deletion word resolves to the shim Sync-SafeDelete.ps1 deploys, so a PATH
-  that reaches a plain binary and a shim that is absent both read as unproven.
+  the approval sources, and allow lets it through. PowerShell has no proven
+  redirect: the deletion words resolve through the alias table, which the profile
+  rewrites and a hook cannot see, so every deletion word falls to
+  settings.unproven.
 
 .PARAMETER Settings
   Filter settings as a JSON object.
@@ -88,47 +88,29 @@ $deletion = '(^|[;&|(]|&&|\|\|)\s*(sudo\s+)?(rm|del|rd|rmdir|erase|ri|unlink|shr
 if ($Command -cmatch $deletion) {
   $verb = $Matches[3]
 
-  # The managed shim for this verb: Sync-SafeDelete.ps1 copies rip.exe into
-  # %USERPROFILE%\.local\bin as rm.exe and the rest of the deletion union, so that
-  # copy is what PATH reaches.
-  $wrapper = $null
-  if (-not [string]::IsNullOrEmpty($env:USERPROFILE)) {
-    $wrapper = Join-Path -Path (Join-Path -Path $env:USERPROFILE -ChildPath '.local\bin') -ChildPath "$verb.exe"
-  }
-
-  # WHY -CommandType Application: a PATH lookup only, the visibility the POSIX twin
-  # gets from `sh -c 'command -v'`, so the built-in rm alias and a profile function
-  # are not mistaken for a redirect.
-  # check-suppress:suppression_doc: the verb may resolve to nothing, which is the unproven case and is reported as such
-  $resolvedCommand = Get-Command -Name $verb -CommandType Application -ErrorAction SilentlyContinue |
-    Select-Object -First 1
-  $resolved = $null
-  if ($null -ne $resolvedCommand) { $resolved = [string]$resolvedCommand.Source }
-
-  if ($null -ne $wrapper -and -not [string]::IsNullOrEmpty($resolved)) {
-    # WHY OrdinalIgnoreCase: Windows resolves and reports a path case-insensitively.
-    $resolvedFull = [System.IO.Path]::GetFullPath($resolved)
-    $wrapperFull = [System.IO.Path]::GetFullPath($wrapper)
-    if ([string]::Equals($resolvedFull, $wrapperFull, [System.StringComparison]::OrdinalIgnoreCase)) {
-      Write-Output ("allow`tproven-redirect`tdeletion command: $verb resolves to the managed safe-delete shim at $resolved")
-      exit 0
-    }
-  }
-
-  if ($null -eq $wrapper) {
-    $why = "$verb has no managed shim to compare against because USERPROFILE is unset"
-  }
-  elseif ([string]::IsNullOrEmpty($resolved)) {
-    $why = "$verb does not resolve on PATH"
+  # WHY no proven redirect on Windows: the six shim names are exactly the words
+  # PowerShell resolves through its alias table, and the profile replaces that
+  # table (Set-Alias rm Invoke-SafeDelete in src/scripts/shell/profile.ps1). A
+  # session without the profile runs the word on the real delete path, while the
+  # rip.exe shims serve the non-PowerShell contexts (cmd.exe, Git Bash, scripts),
+  # so alias precedence rather than PATH decides what the word means and no PATH
+  # comparison can prove the redirect. Every deletion word falls to
+  # settings.unproven.
+  if (-not [string]::IsNullOrEmpty($Matches[2])) {
+    # WHY nothing is proven behind sudo: sudo runs the word in an environment this
+    # repository does not manage (the tree carries no sudoers PATH policy).
+    $why = "$verb runs behind sudo, whose PATH this repository does not manage"
   }
   else {
-    $why = "$verb resolves to $resolved, not the managed safe-delete shim at $wrapper"
+    $why = "$verb has no provable redirect in PowerShell: the deletion shims serve the non-PowerShell contexts, and the profile aliases that redirect the word are invisible to this filter"
   }
 
+  # WHY the knob is named: settings.unproven is per-filter rather than per-verb, so
+  # a verb that can never be proven (Remove-Item) needs a discoverable escape.
   # WHY -ceq: the POSIX twin matches the setting with a case-sensitive case, so a
   # value spelled 'Allow' must not enable the redirect exemption on one host only.
   if ($unproven -ceq 'deny') {
-    Write-Output ("deny`tunproven-redirect`tdeletion command: $why, so it is treated as not redirected. Use rip instead (rip -u to undo).")
+    Write-Output ("deny`tunproven-redirect`tdeletion command: $why, so it is treated as not redirected. Use rip instead (rip -u to undo), or set harness-filters.json safe-delete.settings.unproven to route or allow.")
     exit 0
   }
   if ($unproven -ceq 'route') {

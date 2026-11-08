@@ -120,7 +120,7 @@ BeforeAll {
     .PARAMETER Body
       Script body, which prints the protocol line.
     #>
-    [CmdletBinding(SupportsShouldProcess = $true)]
+    [CmdletBinding()]
     param(
       [Parameter(Mandatory)]
       [string]$Root,
@@ -176,7 +176,7 @@ BeforeAll {
     $env:NUCLEUS_REPO_ROOT = $Root
     $env:NUCLEUS_LOG_DIR = Join-Path -Path $Root 'logs'
     if (-not [string]::IsNullOrEmpty($UserProfile)) { $env:USERPROFILE = $UserProfile }
-    if (-not [string]::IsNullOrEmpty($PathPrefix)) { $env:PATH = "$PathPrefix;$env:PATH" }
+    if (-not [string]::IsNullOrEmpty($PathPrefix)) { $env:PATH = "$PathPrefix$([System.IO.Path]::PathSeparator)$env:PATH" }
     try {
       $runner = Join-Path -Path (Join-Path -Path $Root 'src\scripts\notify') -ChildPath 'harness-filter.ps1'
       $stdout = @($Payload | & $script:PwshPath -NoProfile -File $runner $Harness 2>$null) -join "`n"
@@ -309,22 +309,6 @@ Describe 'safe-delete filter settings' {
 }
 
 Describe 'safe-delete redirect proof' {
-  # WHY -Skip off Windows: Get-Command appends PATHEXT only on Windows, so `rm`
-  # never resolves to rm.exe elsewhere and the case cannot prove the branch there.
-  It 'allows a plain delete whose word resolves to the deployed shim' -Skip:(-not $IsWindows) {
-    $shimDir = Join-Path -Path (Join-Path -Path $script:Sandbox 'proven-profile') -ChildPath '.local\bin'
-    $null = New-Item -ItemType Directory -Path $shimDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
-    # WHY the test's own pwsh binary: the case needs an executable to copy as
-    # rm.exe, and this one exists on every host that can run this suite.
-    Copy-Item -LiteralPath $script:PwshPath -Destination (Join-Path -Path $shimDir -ChildPath 'rm.exe') -Force
-    $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"rm x"}' `
-      -UserProfile (Split-Path -Parent (Split-Path -Parent $shimDir)) -PathPrefix $shimDir
-
-    $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
-    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'allow'
-    $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'proven-redirect'
-  }
-
   It 'denies a plain delete when a plain binary comes first on PATH' {
     $plainDir = Join-Path -Path $script:Sandbox 'plain-bin'
     $null = New-Item -ItemType Directory -Path $plainDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup

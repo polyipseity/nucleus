@@ -18,9 +18,9 @@
 # An unproven redirect is treated as not redirected: settings.unproven says what
 # that gets, so deny (the registry default) blocks the command, route puts it to
 # the approval sources, and allow lets it through. A redirect is proven only when
-# the deletion word resolves to the managed wrapper this host deploys, so a PATH
-# that reaches a plain binary, a wrapper that is absent, and a wrapper that is not
-# the managed deployment all read as unproven.
+# the deletion word resolves to the wrapper home.file deploys, so a PATH that
+# reaches a plain binary, a wrapper that is absent, a wrapper linked anywhere else,
+# and a word behind sudo all read as unproven.
 set -euo pipefail
 
 _sd_settings='{}'
@@ -75,41 +75,63 @@ esac
 _sd_verb_re='(^|[;&|(]|&&|\|\|)[[:space:]]*(sudo[[:space:]]+)?(rm|del|rd|rmdir|erase|ri|unlink|shred|Remove-Item)([[:space:]]|$)'
 if [[ $_sd_command =~ $_sd_verb_re ]]; then
   _sd_verb="${BASH_REMATCH[3]}"
+  _sd_sudo="${BASH_REMATCH[2]}"
 
-  # The managed wrapper for this verb: the home.file entry src/modules/shell/default.nix
-  # deploys at ~/.local/bin/<verb>. It is a symlink into the Nix store, and that
-  # shape is what separates it from a plain binary left at the same path.
+  # The wrapper home.file deploys for this verb (src/modules/shell/default.nix):
+  # ~/.local/bin/<verb> linked into home-manager's file tree. The link and its
+  # target are both checked, so a link the user pointed elsewhere is no proof.
   _sd_wrapper=""
   if [ -n "${HOME-}" ]; then
     _sd_wrapper="$HOME/.local/bin/$_sd_verb"
   fi
 
-  # WHY sh -c: `command -v` is a shell's own PATH lookup, so the answer is the one
-  # the calling shell gets from the PATH this process inherited. An alias or a
-  # function is invisible to a child shell, which is why only a PATH answer can be
-  # proven from here.
   _sd_resolved=""
-  if ! _sd_resolved="$(sh -c 'command -v "$1"' sh "$_sd_verb")"; then
-    _sd_resolved=""
-  fi
-
-  if [ -n "$_sd_wrapper" ] && [ "$_sd_resolved" = "$_sd_wrapper" ] && [ -L "$_sd_wrapper" ]; then
-    printf 'allow\tproven-redirect\t%s\n' "deletion command: $_sd_verb resolves to the managed safe-delete wrapper at $_sd_wrapper"
-    exit 0
-  fi
-
-  if [ -z "$_sd_wrapper" ]; then
+  _sd_target=""
+  _sd_why=""
+  if [ -n "$_sd_sudo" ]; then
+    # WHY no proof behind sudo: sudo runs the word in an environment this
+    # repository does not manage (the tree carries no sudoers PATH policy), so the
+    # caller's PATH says nothing about what `sudo $_sd_verb` reaches.
+    _sd_why="$_sd_verb runs behind sudo, whose PATH this repository does not manage"
+  elif [ -z "$_sd_wrapper" ]; then
     _sd_why="$_sd_verb has no managed wrapper to compare against because HOME is unset"
-  elif [ -z "$_sd_resolved" ]; then
-    _sd_why="$_sd_verb does not resolve on PATH"
-  elif [ "$_sd_resolved" = "$_sd_wrapper" ]; then
-    _sd_why="$_sd_verb resolves to $_sd_wrapper, which is a plain file rather than the managed symlink"
   else
-    _sd_why="$_sd_verb resolves to $_sd_resolved, not the managed safe-delete wrapper at $_sd_wrapper"
+    # WHY sh -c: `command -v` is a shell's own PATH lookup, so the answer is the
+    # one the calling shell gets from the PATH this process inherited. An alias or
+    # a function is invisible to a child shell, which is why only a PATH answer can
+    # be proven from here.
+    if ! _sd_resolved="$(sh -c 'command -v "$1"' sh "$_sd_verb")"; then
+      _sd_resolved=""
+    fi
+    if [ "$_sd_resolved" = "$_sd_wrapper" ] && [ -L "$_sd_wrapper" ]; then
+      # WHY the target, not just the link: home-manager links the wrapper into its
+      # `home-manager-files` derivation, so a link to any other executable (a plain
+      # /bin/rm, for one) is a wrapper swapped out, not the deployment.
+      if ! _sd_target="$(readlink "$_sd_wrapper")"; then
+        _sd_target=""
+      fi
+      case "$_sd_target" in
+      *home-manager-files/.local/bin/"$_sd_verb")
+        printf 'allow\tproven-redirect\t%s\n' "deletion command: $_sd_verb resolves to the home-manager safe-delete wrapper at $_sd_wrapper"
+        exit 0
+        ;;
+      esac
+    fi
+    if [ -z "$_sd_resolved" ]; then
+      _sd_why="$_sd_verb does not resolve on PATH"
+    elif [ "$_sd_resolved" != "$_sd_wrapper" ]; then
+      _sd_why="$_sd_verb resolves to $_sd_resolved, not the managed safe-delete wrapper at $_sd_wrapper"
+    elif [ ! -L "$_sd_wrapper" ]; then
+      _sd_why="$_sd_verb resolves to $_sd_wrapper, which is a plain file rather than the managed symlink"
+    elif [ -z "$_sd_target" ]; then
+      _sd_why="$_sd_wrapper is a symlink that does not resolve"
+    else
+      _sd_why="$_sd_wrapper is a symlink to $_sd_target, not the home-manager wrapper for $_sd_verb"
+    fi
   fi
   case "$_sd_unproven" in
   deny)
-    printf 'deny\tunproven-redirect\t%s\n' "deletion command: $_sd_why, so it is treated as not redirected. Use shell-safe-rm or rip2 instead."
+    printf 'deny\tunproven-redirect\t%s\n' "deletion command: $_sd_why, so it is treated as not redirected. Use shell-safe-rm or rip2 instead, or set harness-filters.json safe-delete.settings.unproven to route or allow."
     exit 0
     ;;
   route)
