@@ -217,34 +217,6 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure Noto Sans CJK SC is installed for Simplified Chinese sans-serif coverage on Windows, matching pkgs.noto-fonts-cjk-sans on POSIX hosts
-      settings:
-        id: Google.NotoSans.CJK.SC
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: Ensure Noto Sans CJK TC is installed for Traditional Chinese sans-serif coverage on Windows, completing the Simplified+Traditional parity required by repository policy
-      settings:
-        id: Google.NotoSans.CJK.TC
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: Ensure Noto Serif CJK SC is installed for Simplified Chinese serif coverage on Windows, matching pkgs.noto-fonts-cjk-serif on POSIX hosts
-      settings:
-        id: Google.NotoSerif.CJK.SC
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: Ensure Noto Serif CJK TC is installed for Traditional Chinese serif coverage on Windows, completing the Simplified+Traditional parity required by repository policy
-      settings:
-        id: Google.NotoSerif.CJK.TC
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
         description: Ensure Google Platform Tools (adb, fastboot) is installed for Android VM configuration
       settings:
         id: Google.PlatformTools
@@ -364,6 +336,13 @@ properties:
           macOS (Homebrew cask) and NixOS (nixpkgs).
       settings:
         id: KDE.Krita
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure ShellCheck is installed for cross-host shell script linting parity with macOS and NixOS
+      settings:
+        id: koalaman.shellcheck
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -589,20 +568,6 @@ properties:
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
-      id: ScoopInstall
-      directives:
-        description: >-
-          Scoop user-space package manager for portable CLI utilities not
-          available in WinGet (e.g. cargo-binstall).  Git is required by Scoop
-          for bucket management and updates; declared via dependsOn to ensure
-          Git is present before Scoop initialises.
-      settings:
-        id: Scoop.Scoop
-        source: winget
-      dependsOn:
-        - GitInstall
-
-    - resource: Microsoft.WinGet.Client/Package
       directives:
         description: Ensure SOPS is installed
       settings:
@@ -621,13 +586,6 @@ properties:
         description: Ensure fd is installed for cross-host file search parity with macOS and NixOS
       settings:
         id: sharkdp.fd
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: Ensure ShellCheck is installed for cross-host shell script linting parity with macOS and NixOS
-      settings:
-        id: ShellCheck.ShellCheck
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package

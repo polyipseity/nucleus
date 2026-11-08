@@ -522,7 +522,6 @@ let
         name = "font-noto-sans-cjk-sc";
       };
       nixpkgs = "noto-fonts-cjk-sans";
-      winget = "Google.NotoSans.CJK.SC";
     };
     "noto-sans-cjk-tc" = {
       category = "cli";
@@ -531,7 +530,6 @@ let
         name = "font-noto-sans-cjk-tc";
       };
       nixpkgs = "noto-fonts-cjk-sans";
-      winget = "Google.NotoSans.CJK.TC";
     };
     "noto-serif-cjk-sc" = {
       category = "cli";
@@ -540,7 +538,6 @@ let
         name = "font-noto-serif-cjk-sc";
       };
       nixpkgs = "noto-fonts-cjk-serif";
-      winget = "Google.NotoSerif.CJK.SC";
     };
     "noto-serif-cjk-tc" = {
       category = "cli";
@@ -549,7 +546,6 @@ let
         name = "font-noto-serif-cjk-tc";
       };
       nixpkgs = "noto-fonts-cjk-serif";
-      winget = "Google.NotoSerif.CJK.TC";
     };
     "obs-studio" = {
       # Stable OBS Studio: nixpkgs has no beta channel, so stable is uniform.
@@ -802,7 +798,6 @@ let
         kind = "formula";
         name = "scoop";
       };
-      winget = "Scoop.Scoop";
     };
     shellcheck = {
       category = "cli";
@@ -811,7 +806,7 @@ let
         name = "shellcheck";
       };
       nixpkgs = "shellcheck";
-      winget = "ShellCheck.ShellCheck";
+      winget = "koalaman.shellcheck";
     };
     shfmt = {
       category = "cli";
