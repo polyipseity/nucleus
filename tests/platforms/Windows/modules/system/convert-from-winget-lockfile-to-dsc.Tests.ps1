@@ -1,59 +1,31 @@
-# convert-from-winget-lockfile-to-dsc.Tests.ps1
-# Pester regression tests for the ConvertFrom-WingetLockfileToDsc -EnabledPackages filter.
+<#
+.SYNOPSIS
+    Pester coverage for the ConvertFrom-WingetLockfileToDsc -EnabledPackages filter.
+.DESCRIPTION
+    The converter must drop a WinGet package that the enable set excludes while
+    keeping every resource it does not own. A Script resource carries its id at
+    the resource level, not under settings, so the filter must not treat it as a
+    WinGet package and drop it: that regression would silently remove the Scoop
+    bootstrap and the font installs from every Windows apply.
+
+    The fixture under tests/fixtures/windows-dsc/ holds four resource shapes: an
+    enabled WinGet package with a lockfile pin, a disabled WinGet package, a
+    Script resource carrying a document id, and one carrying none.
+.NOTES
+    Exit codes: 0 on success; 1 on failure
+#>
 
 BeforeAll {
+    $ErrorActionPreference = 'Stop'
+
     Import-Module (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\..\src\platforms\Windows\modules\Format-NucleusOutput.psm1') -Force
     . (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\..\src\platforms\Windows\modules\system\ConvertFrom-WingetLockfileToDsc.ps1')
 
-    $script:configPath = Join-Path -Path $TestDrive -ChildPath 'fixture.dsc.yml'
+    # The converter only reads -ConfigPath and writes -OutputPath, so the
+    # read-only fixture is used directly and only the outputs live in TestDrive.
+    $script:configPath = Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\..\tests\fixtures\windows-dsc\convert-from-winget-lockfile-to-dsc.dsc.yml'
     $script:lockfilePath = Join-Path -Path $TestDrive -ChildPath 'lockfile.json'
     $script:outputPath = Join-Path -Path $TestDrive -ChildPath 'fixture.locked.dsc.yml'
-
-    # Four resource shapes: an enabled WinGet package with a lockfile pin, a
-    # disabled WinGet package, a Script resource carrying a document-level id
-    # (ScoopInstall), and one carrying none (the Font Awesome block). Only the
-    # WinGet packages may be filtered.
-    Set-Content -LiteralPath $script:configPath -Value @'
-$schema: https://aka.ms/configuration-dsc-schema/0.2
-properties:
-  configurationVersion: 0.2.0
-  resources:
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: enabled package
-      settings:
-        id: Example.Enabled
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: disabled package
-      settings:
-        id: Example.Disabled
-        source: winget
-
-    - resource: PSDscResources/Script
-      id: ScoopInstall
-      directives:
-        description: script resource with a document id
-      settings:
-        TestScript: |
-          return $true
-        SetScript: |
-          'scoop-install-marker'
-      dependsOn:
-        - GitInstall
-
-    - resource: PSDscResources/Script
-      id: FontAwesomeInstall
-      directives:
-        description: script resource without a settings id
-      settings:
-        TestScript: |
-          return $true
-        SetScript: |
-          'font-awesome-marker'
-'@
 
     Set-Content -LiteralPath $script:lockfilePath -Value @'
 {

@@ -1,0 +1,39 @@
+$schema: https://aka.ms/configuration-dsc-schema/0.2
+properties:
+  configurationVersion: 0.2.0
+  resources:
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: enabled package
+      settings:
+        id: Example.Enabled
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: disabled package
+      settings:
+        id: Example.Disabled
+        source: winget
+
+    - resource: PSDscResources/Script
+      id: ScoopInstall
+      directives:
+        description: script resource with a document id
+      settings:
+        TestScript: |
+          return $true
+        SetScript: |
+          'scoop-install-marker'
+      dependsOn:
+        - GitInstall
+
+    - resource: PSDscResources/Script
+      id: FontAwesomeInstall
+      directives:
+        description: script resource without a settings id
+      settings:
+        TestScript: |
+          return $true
+        SetScript: |
+          'font-awesome-marker'
