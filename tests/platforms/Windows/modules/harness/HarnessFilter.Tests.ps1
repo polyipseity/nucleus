@@ -53,6 +53,19 @@ BeforeAll {
       Copy-Item -LiteralPath $filter.FullName -Destination (Join-Path -Path (Join-Path -Path $notifyCopy 'filters') -ChildPath $filter.Name)
     }
     Copy-Item -LiteralPath $script:RegistryPath -Destination (Join-Path -Path $configCopy -ChildPath 'harness-filters.json')
+
+    # The runner audits through the nucleus-logs entry script, which imports the
+    # output and log-management modules from the repository it lives in, so the
+    # fixture carries all three beside a sandbox log root.
+    $scriptsCopy = Join-Path -Path $root 'scripts'
+    $modulesCopy = Join-Path -Path (Join-Path -Path $root 'src\platforms\Windows') -ChildPath 'modules'
+    foreach ($dir in @($scriptsCopy, $modulesCopy)) {
+      $null = New-Item -ItemType Directory -Path $dir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+    }
+    Copy-Item -LiteralPath (Join-Path -Path $script:RepoRootPath -ChildPath 'scripts\logs.ps1') -Destination (Join-Path -Path $scriptsCopy -ChildPath 'logs.ps1')
+    foreach ($name in @('Format-NucleusOutput.psm1', 'Get-NucleusHostPlatform.ps1', 'Invoke-LogManagement.ps1')) {
+      Copy-Item -LiteralPath (Join-Path -Path $script:RepoRootPath -ChildPath "src\platforms\Windows\modules\$name") -Destination (Join-Path -Path $modulesCopy -ChildPath $name)
+    }
     return $root
   }
 
@@ -148,13 +161,18 @@ BeforeAll {
     )
 
     $previous = $env:NUCLEUS_REPO_ROOT
+    $previousLogDir = $env:NUCLEUS_LOG_DIR
     $env:NUCLEUS_REPO_ROOT = $Root
+    $env:NUCLEUS_LOG_DIR = Join-Path -Path $Root 'logs'
     try {
       $runner = Join-Path -Path (Join-Path -Path $Root 'src\scripts\notify') -ChildPath 'harness-filter.ps1'
       $stdout = @($Payload | & $script:PwshPath -NoProfile -File $runner $Harness 2>$null) -join "`n"
       return @{ ExitCode = $LASTEXITCODE; Stdout = $stdout }
     }
-    finally { $env:NUCLEUS_REPO_ROOT = $previous }
+    finally {
+      $env:NUCLEUS_REPO_ROOT = $previous
+      $env:NUCLEUS_LOG_DIR = $previousLogDir
+    }
   }
 
   $script:Sandbox = New-FilterSandbox
@@ -165,6 +183,21 @@ AfterAll {
 }
 
 Describe 'harness-filter render table' {
+  It 'records its verdict as one filter event in the shared audit log' {
+    $auditLog = Join-Path -Path (Join-Path -Path $script:Sandbox -ChildPath 'logs') -ChildPath 'harness.log'
+    if (Test-Path -LiteralPath $auditLog) { Remove-Item -LiteralPath $auditLog -Force }
+
+    $null = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"tool_name":"runInTerminal","tool_input":{"command":"/bin/rm -rf x"}}'
+
+    $events = @(Get-Content -LiteralPath $auditLog -Encoding UTF8 | ForEach-Object { $_ | ConvertFrom-Json })
+    $filters = @($events | Where-Object { $_.kind -eq 'filter' })
+    $filters.Count | Should -Be 1
+    $filters[0].decision | Should -Be 'deny'
+    $filters[0].source | Should -Be 'filter'
+    $filters[0].filter | Should -Be 'safe-delete'
+    $filters[0].rule | Should -Be 'native-path'
+  }
+
   It 'denies a native rm path with a Copilot PreToolUse document' {
     $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"tool_name":"runInTerminal","tool_input":{"command":"/bin/rm -rf x"}}'
 

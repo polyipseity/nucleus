@@ -32,6 +32,29 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
+# WHY the app, not a log path: nucleus-logs owns the log root, the line format,
+# and the append, so a dropped prompt is recorded beside every gate decision.
+# shellcheck source=../../../scripts/logs.sh
+. "$SCRIPT_DIR/../../../scripts/logs.sh"
+# shellcheck source=../lib/harness-audit.sh
+. "$SCRIPT_DIR/../lib/harness-audit.sh"
+
+_hd_start="$(harness_audit_now_ms)"
+
+# _hd_audit <summary>: record one drive-side event.
+# WHY best-effort: driving is advisory at both ends, so a failed append warns and
+# the turn's document is still printed.
+_hd_audit() {
+  if ! (
+    _hd_audit_digest="$(printf '%s' "${_hd_payload-}" | harness_audit_digest)" || exit 1
+    _hd_audit_summary="$(printf '%s\n' "$1" | harness_audit_summary)"
+    harness_audit_log notify "$_hd_harness" '' none '' '' \
+      "$(($(harness_audit_now_ms) - _hd_start))" \
+      "$_hd_audit_summary" "$_hd_audit_digest" ''
+  ); then
+    warn "could not write the harness audit log"
+  fi
+}
 
 _hd_harness="${1-}"
 
@@ -125,12 +148,7 @@ if [ "$(jq -r '."harness-drive".enable' <<<"$_hd_config")" != "true" ]; then
     done
   fi
   if [ "$_hd_dropped" -gt 0 ]; then
-    _hd_log_dir="$(derive_nucleus_user_root)/logs"
-    mkdir -p "$_hd_log_dir"
-    printf '%s\t%s\t%s\t%s\t%s\n' \
-      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$_hd_harness" "drive" "disabled" \
-      "dropped $_hd_dropped queued prompt(s)" \
-      >>"$_hd_log_dir/harness-bridge.log"
+    _hd_audit "dropped $_hd_dropped queued prompt(s)"
     warn "harness-drive is disabled: dropped $_hd_dropped queued prompt(s)"
   fi
   _hd_empty "$_hd_harness"

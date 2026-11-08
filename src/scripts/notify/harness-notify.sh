@@ -32,6 +32,29 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
+# WHY the app, not a log path: nucleus-logs owns the log root, the line format,
+# and the append, so every notification lands where the gate's own decisions do.
+# shellcheck source=../../../scripts/logs.sh
+. "$SCRIPT_DIR/../../../scripts/logs.sh"
+# shellcheck source=../lib/harness-audit.sh
+. "$SCRIPT_DIR/../lib/harness-audit.sh"
+
+_hn_start="$(harness_audit_now_ms)"
+
+# _hn_audit <summary>: record this notification attempt.
+# WHY best-effort: a notification is advisory, so a failed append warns and the
+# delivery result stands.
+_hn_audit() {
+  if ! (
+    _hn_audit_digest="$(printf '%s' "${_hn_stdin-}" | harness_audit_digest)" || exit 1
+    _hn_audit_summary="$(printf '%s\n' "$1" | harness_audit_summary)"
+    harness_audit_log notify "$_hn_harness" '' none '' '' \
+      "$(($(harness_audit_now_ms) - _hn_start))" \
+      "$_hn_audit_summary" "$_hn_audit_digest" ''
+  ); then
+    warn "could not write the harness audit log"
+  fi
+}
 
 _hn_harness="${1-}"
 _hn_event="${2-}"
@@ -113,6 +136,7 @@ fi
 
 if [ -z "$_hn_hermes" ]; then
   warn "hermes is not on PATH: notification dropped"
+  _hn_audit "$_hn_label: notification dropped (hermes is not on PATH)"
   exit 0
 fi
 
@@ -124,5 +148,7 @@ while IFS= read -r _hn_target; do
     warn "delivery to '$_hn_target' failed"
   fi
 done < <(jq -r '.channels[]' <<<"$_hn_config")
+
+_hn_audit "$_hn_label: $_hn_text"
 
 exit 0

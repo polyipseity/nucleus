@@ -48,7 +48,7 @@ Rules: hooks always exit 0 and fail open, so an unanswered approval becomes a lo
 
 `harness-notify.enable` is the master switch. `harness-approval.enable` (off by default) gates only the remote approval wait. `harness-drive.enable` (on by default) gates only prompt injection: with it off a finished turn is still announced and a queued prompt is dropped. Cursor ignores `followup_message` on Windows, so Cursor is driveable from macOS and NixOS only.
 
-Transport is the Hermes plugin `src/users/default/hermes/plugins/harness-bridge/` (`/harness status|approve|deny|send|sessions`), enabled by `services.hermes-agent.settings.plugins.enabled` and, on Windows, by `Sync-HermesConfig`. Requests and queued prompts live under `<USER root>/state/harness-bridge/`, decisions in `<USER root>/logs/harness-bridge.log` (`log` on Windows).
+Transport is the Hermes plugin `src/users/default/hermes/plugins/harness-bridge/` (`/harness status|approve|deny|send|sessions`), enabled by `services.hermes-agent.settings.plugins.enabled` and, on Windows, by `Sync-HermesConfig`. Requests and queued prompts live under `<USER root>/state/harness-bridge/`; every bridge decision is an event in the shared `harness` log, appended through `nucleus-logs` and read back with `nucleus-logs show harness --json`.
 
 ## Sandbox sockets and filesystem grants
 

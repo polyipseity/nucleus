@@ -64,6 +64,11 @@ $ErrorActionPreference = 'Stop'
 # so the shared helpers are resolved beside the copy, never by a repo-relative path.
 . (Join-Path -Path $PSScriptRoot -ChildPath 'harness-bridge-common.ps1')
 
+# WHY script scope: the drop record is written from the queue helper, so the
+# start time and the payload fingerprint are collected here as the run takes them.
+$script:auditStart = [datetime]::UtcNow
+$script:auditDigest = ''
+
 function Get-HarnessBridgeDriveConfig {
   <#
   .SYNOPSIS
@@ -250,7 +255,7 @@ function Clear-QueuedHarnessPrompt {
 function Write-HarnessDriveAuditEntry {
   <#
   .SYNOPSIS
-    Appends one line to the harness-bridge audit log.
+    Appends one drive event to the shared audit log.
   .PARAMETER Harness
     Harness the entry is about.
   .PARAMETER Detail
@@ -266,19 +271,11 @@ function Write-HarnessDriveAuditEntry {
   )
 
   try {
-    $logDir = Join-Path -Path (Get-HarnessBridgeUserRoot) -ChildPath 'log'
-    $null = New-Item -ItemType Directory -Path $logDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
-    $line = @(
-      [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ', [System.Globalization.CultureInfo]::InvariantCulture)
-      $Harness
-      'drive'
-      'disabled'
-      $Detail
-    ) -join "`t"
-    Add-Content -LiteralPath (Join-Path -Path $logDir -ChildPath 'harness-bridge.log') -Value $line -Encoding utf8
+    Write-HarnessBridgeAuditEvent -Kind 'notify' -Harness $Harness -Summary $Detail `
+      -Digest $script:auditDigest -StartTime $script:auditStart
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'could not write the harness-bridge audit log'
+    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message "could not write the harness audit log: $($_.Exception.Message)"
   }
 }
 
@@ -351,6 +348,7 @@ try {
 
   $payload = ''
   if ([Console]::IsInputRedirected) { $payload = [Console]::In.ReadToEnd() }
+  $script:auditDigest = Get-HarnessBridgeDigest -Text $payload
 
   # The notification half shares one implementation; an empty payload still means
   # "the turn finished", which is what harness-notify turns into its default body.

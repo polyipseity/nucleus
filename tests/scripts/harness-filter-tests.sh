@@ -40,13 +40,15 @@ RUNNER="$REPO_ROOT/src/scripts/notify/harness-filter.sh"
 APPROVAL="$REPO_ROOT/src/scripts/notify/harness-approval.sh"
 FILTER_DIR="$REPO_ROOT/src/scripts/notify/filters"
 LIB_DIR="$REPO_ROOT/src/scripts/lib/lib.sh"
+LIB_DIR_DIR="$REPO_ROOT/src/scripts/lib"
+LOGS_APP="$REPO_ROOT/scripts/logs.sh"
 REGISTRY="$REPO_ROOT/src/modules/configs/harness-filters.json"
-readonly RUNNER FILTER_DIR LIB_DIR REGISTRY
+readonly RUNNER FILTER_DIR LIB_DIR LIB_DIR_DIR LOGS_APP REGISTRY
 
 require_command jq "the runner and the filter registry both need jq"
 require_command python3 "the schema file is parsed with python3"
 
-for _required in "$RUNNER" "$APPROVAL" "$FILTER_DIR/safe-delete.sh" "$LIB_DIR" "$REGISTRY"; do
+for _required in "$RUNNER" "$APPROVAL" "$FILTER_DIR/safe-delete.sh" "$LIB_DIR" "$LIB_DIR_DIR/harness-audit.sh" "$LOGS_APP" "$REGISTRY"; do
   if [ ! -e "$_required" ]; then
     assert_fail "runner assets present" "$_required does not exist"
     finish_tests
@@ -58,15 +60,24 @@ readonly WORK
 # shellcheck disable=SC2064 # reason: WORK is readonly and already resolved, so expanding now is the same value and survives the exit path
 trap "rm -rf '$WORK'" EXIT
 
+# The log root is a suite-owned temp tree, so a case never writes into the real
+# one and never depends on repo-root detection to find it.
+NUCLEUS_LOG_DIR="$WORK/logs"
+export NUCLEUS_LOG_DIR
+
 # A fixture repository tree that holds the shipped runner, library, and filters
 # plus the registry, so a case can replace the registry or add a filter without
 # touching the checkout.
 make_tree() { # <name>
   local _root="$WORK/$1"
-  mkdir -p "$_root/src/scripts/lib" "$_root/src/scripts/notify/filters" "$_root/src/modules/configs"
+  mkdir -p "$_root/scripts" "$_root/src/scripts/lib" "$_root/src/scripts/notify/filters" "$_root/src/modules/configs"
   cp "$RUNNER" "$_root/src/scripts/notify/harness-filter.sh"
   cp "$APPROVAL" "$_root/src/scripts/notify/harness-approval.sh"
   cp "$LIB_DIR" "$_root/src/scripts/lib/lib.sh"
+  cp "$LIB_DIR_DIR/harness-audit.sh" "$LIB_DIR_DIR/log-expiry.sh" "$_root/src/scripts/lib/"
+  # The bridge entry points source nucleus-logs' writer library from three levels
+  # up, so the fixture keeps the same layout the bundle has.
+  cp "$LOGS_APP" "$_root/scripts/logs.sh"
   cp "$FILTER_DIR"/*.sh "$_root/src/scripts/notify/filters/"
   cp "$REGISTRY" "$_root/src/modules/configs/harness-filters.json"
   printf '%s\n' "$_root"

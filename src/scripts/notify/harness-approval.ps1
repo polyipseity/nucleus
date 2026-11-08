@@ -92,6 +92,13 @@ $ErrorActionPreference = 'Stop'
 # so the shared helpers are resolved beside the copy, never by a repo-relative path.
 . (Join-Path -Path $PSScriptRoot -ChildPath 'harness-bridge-common.ps1')
 
+# WHY script scope: the audit line is written once, at the single exit every
+# path funnels through, so the start time, the answering source, and the input
+# fingerprint are collected here as the run produces them.
+$script:auditStart = [datetime]::UtcNow
+$script:auditDigest = ''
+$script:decidedBy = ''
+
 function Get-HarnessBridgeApprovalConfig {
   <#
   .SYNOPSIS
@@ -311,6 +318,10 @@ function Request-HarnessApproval {
   .SYNOPSIS
     Publishes a pending tool call for the Hermes source.
   .DESCRIPTION
+    An empty summary is valid: the runner passes whatever text the hook payload
+    carried, and a request that cannot describe itself must still be published
+    rather than fail the gate open.
+  .DESCRIPTION
     Writes the request under a temporary name and renames it, because the bridge
     plugin lists requests with a glob: a request must appear complete or not at
     all. Requests and responses older than four times the longest finite wait,
@@ -337,6 +348,7 @@ function Request-HarnessApproval {
     [string]$Tool,
 
     [Parameter(Mandatory)]
+    [AllowEmptyString()]
     [string]$Summary,
 
     [Parameter(Mandatory)]
@@ -404,7 +416,7 @@ function Request-HarnessApproval {
 function Wait-HarnessApproval {
   <#
   .SYNOPSIS
-    Races the enabled sources and returns the first answer.
+    Races the enabled sources and returns the first answer and its source.
   .DESCRIPTION
     One loop, so neither source needs a process to kill: the response file is
     checked every pass, and a live prompt keeps a pending console read whose
@@ -425,7 +437,7 @@ function Wait-HarnessApproval {
     source is not enabled.
   #>
   [CmdletBinding()]
-  [OutputType([string])]
+  [OutputType([hashtable])]
   param(
     [Parameter(Mandatory)]
     [AllowEmptyCollection()]
@@ -480,6 +492,7 @@ function Wait-HarnessApproval {
   $promptDeadline = if ($PromptTimeout -gt 0) { $start.AddSeconds($PromptTimeout) } else { [DateTime]::MaxValue }
   $hermesDeadline = if ($HermesTimeout -gt 0) { $start.AddSeconds($HermesTimeout) } else { [DateTime]::MaxValue }
   $decision = ''
+  $answeredBy = ''
 
   while ([string]::IsNullOrEmpty($decision)) {
     $now = [DateTime]::UtcNow
@@ -488,7 +501,10 @@ function Wait-HarnessApproval {
       $hermesLive = $false
       try {
         $answer = ConvertFrom-Json -InputObject (Get-Content -LiteralPath $ResponsePath -Raw -Encoding UTF8) -AsHashtable
-        if ($answer -is [hashtable] -and $answer.ContainsKey('decision')) { $decision = [string]$answer['decision'] }
+        if ($answer -is [hashtable] -and $answer.ContainsKey('decision')) {
+          $decision = [string]$answer['decision']
+          $answeredBy = 'hermes'
+        }
       }
       catch {
         Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'unreadable approval response: asking locally'
@@ -525,7 +541,10 @@ function Wait-HarnessApproval {
       elseif ($answered) {
         $decision = Get-HarnessApprovalConsoleAnswer -Byte $buffer[0]
         $pending = $null
-        if (-not [string]::IsNullOrEmpty($decision)) { break }
+        if (-not [string]::IsNullOrEmpty($decision)) {
+          $answeredBy = 'prompt'
+          break
+        }
         # Any other key is not an answer: ask again rather than read it as one.
         try { $pending = $console.In.ReadAsync($buffer, 0, 1) }
         catch {
@@ -556,63 +575,10 @@ function Wait-HarnessApproval {
     $console.Out.Dispose()
   }
 
-  if ($decision -in @('allow', 'deny')) { return $decision }
-  return 'ask'
-}
-
-function Write-HarnessBridgeAuditEntry {
-  <#
-  .SYNOPSIS
-    Appends one decision to the harness-bridge audit log.
-  .DESCRIPTION
-    Hooks run invisibly, so what was asked and how it was answered has to be
-    recoverable.  Best-effort: an unwritable log must not change the decision.
-  .PARAMETER LogDir
-    Absolute path to the nucleus log directory.
-  .PARAMETER Harness
-    Harness that asked.
-  .PARAMETER Tool
-    Tool name.
-  .PARAMETER Decision
-    Final decision.
-  .PARAMETER Summary
-    One-line description of the call.
-  #>
-  [CmdletBinding()]
-  param(
-    [Parameter(Mandatory)]
-    [string]$LogDir,
-
-    [Parameter(Mandatory)]
-    [string]$Harness,
-
-    [Parameter(Mandatory)]
-    [AllowEmptyString()]
-    [string]$Tool,
-
-    [Parameter(Mandatory)]
-    [AllowEmptyString()]
-    [string]$Decision,
-
-    [Parameter(Mandatory)]
-    [AllowEmptyString()]
-    [string]$Summary
-  )
-
-  try {
-    $null = New-Item -ItemType Directory -Path $LogDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
-    $line = @(
-      [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ', [System.Globalization.CultureInfo]::InvariantCulture)
-      $Harness
-      $Tool
-      $Decision
-      $Summary
-    ) -join "`t"
-    Add-Content -LiteralPath (Join-Path -Path $LogDir -ChildPath 'harness-bridge.log') -Value $line -Encoding utf8
-  }
-  catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'could not write the harness-bridge audit log'
-  }
+  if ($decision -in @('allow', 'deny')) { return @{ Decision = $decision; Source = $answeredBy } }
+  # WHY keep the source: a source that answered with something unusable still
+  # answered, and the audit line has to say which one it was.
+  return @{ Decision = 'ask'; Source = $answeredBy }
 }
 
 function Complete-HarnessApproval {
@@ -627,8 +593,6 @@ function Complete-HarnessApproval {
     One-line description of the call.
   .PARAMETER Decision
     allow, deny, or ask.
-  .PARAMETER LogDir
-    Absolute path to the nucleus log directory.
   .PARAMETER Plain
     Print the decision word alone.
   #>
@@ -648,14 +612,21 @@ function Complete-HarnessApproval {
     [Parameter(Mandatory)]
     [string]$Decision,
 
-    [Parameter(Mandatory)]
-    [string]$LogDir,
-
     [switch]$Plain
   )
 
   $final = if ($Decision -in @('allow', 'deny')) { $Decision } else { 'ask' }
-  Write-HarnessBridgeAuditEntry -LogDir $LogDir -Harness $Harness -Tool $Tool -Decision $final -Summary $Summary
+  # WHY the tool and the summary: the gate never sees the harness payload, so the
+  # request text is the raw input it can vouch for.
+  $summaryText = if ([string]::IsNullOrEmpty($Tool)) { $Summary } else { "${Tool}: ${Summary}" }
+  try {
+    Write-HarnessBridgeAuditEvent -Kind 'approval' -Harness $Harness -Decision $final `
+      -Source $script:decidedBy -Summary $summaryText -Digest $script:auditDigest `
+      -StartTime $script:auditStart
+  }
+  catch {
+    Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message "could not write the harness audit log: $($_.Exception.Message)"
+  }
   Write-Output (ConvertTo-HarnessApprovalDocument -Harness $Harness -Decision $final -Plain:$Plain)
   exit 0
 }
@@ -668,6 +639,7 @@ try {
   $harnessName = $Harness
   $toolName = $Tool
   $summaryText = $Summary
+  $script:auditDigest = Get-HarnessBridgeDigest -Text "$toolName`t$summaryText"
 
   if ([string]::IsNullOrWhiteSpace($harnessName)) {
     Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'usage: harness-approval <harness> <tool> <summary> [timeout-seconds]'
@@ -675,26 +647,25 @@ try {
     exit 0
   }
 
-  $logDir = Join-Path -Path (Get-HarnessBridgeUserRoot) -ChildPath 'log'
   $configPath = Get-HarnessBridgeConfigPath
 
   if ([string]::IsNullOrWhiteSpace($toolName)) {
     Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'usage: harness-approval <harness> <tool> <summary> [timeout-seconds]'
-    Complete-HarnessApproval -Harness $harnessName -Tool '' -Summary '' -Decision 'ask' -LogDir $logDir -Plain:$Plain
+    Complete-HarnessApproval -Harness $harnessName -Tool '' -Summary '' -Decision 'ask' -Plain:$Plain
   }
   if ($TimeoutSeconds -lt -1) {
     Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'the timeout argument must be a whole number of seconds'
-    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -LogDir $logDir -Plain:$Plain
+    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -Plain:$Plain
   }
 
   try { $config = Get-HarnessBridgeApprovalConfig -ConfigPath $configPath }
   catch {
     Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'could not parse nucleus config: asking locally'
-    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -LogDir $logDir -Plain:$Plain
+    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -Plain:$Plain
   }
 
   if (-not $config['harness-notify'].enable) {
-    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -LogDir $logDir -Plain:$Plain
+    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -Plain:$Plain
   }
 
   # The sources are the gate: none enabled keeps the hooks wired while every tool
@@ -702,7 +673,7 @@ try {
   try { $sourceName = Resolve-HarnessApprovalSource -Config $config['harness-approval'] }
   catch {
     Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message "$($_.Exception.Message): asking locally"
-    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -LogDir $logDir -Plain:$Plain
+    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -Plain:$Plain
   }
   try {
     $promptTimeout = Get-HarnessApprovalSourceTimeout -Config $config['harness-approval'] -Source 'prompt'
@@ -710,14 +681,14 @@ try {
   }
   catch {
     Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message "$($_.Exception.Message): asking locally"
-    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -LogDir $logDir -Plain:$Plain
+    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -Plain:$Plain
   }
   if ($TimeoutSeconds -ge 0) {
     $promptTimeout = $TimeoutSeconds
     $hermesTimeout = $TimeoutSeconds
   }
   if (@($sourceName).Count -eq 0) {
-    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -LogDir $logDir -Plain:$Plain
+    Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -Plain:$Plain
   }
 
   # A zero wait would sweep the very request this run is waiting on, so the
@@ -736,14 +707,16 @@ try {
     }
     catch {
       Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message "could not publish the approval request: asking locally ($($_.Exception.Message))"
-      Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -LogDir $logDir -Plain:$Plain
+      Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision 'ask' -Plain:$Plain
     }
     $requestPath = $request.RequestPath
     $responsePath = $request.ResponsePath
   }
 
-  $decision = Wait-HarnessApproval -Source $sourceName -PromptTimeout $promptTimeout `
+  $wait = Wait-HarnessApproval -Source $sourceName -PromptTimeout $promptTimeout `
     -HermesTimeout $hermesTimeout -Tool $toolName -Summary $summaryText -ResponsePath $responsePath
+  $script:decidedBy = $wait.Source
+  $decision = $wait.Decision
 
   # The request is consumed either way: an answered request would otherwise stay
   # in `/harness status`, and an unanswered one must not linger as pending.
@@ -752,7 +725,7 @@ try {
     Remove-Item -LiteralPath $responsePath -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: absent unless answered; a missing file is the expected steady state
   }
 
-  Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision $decision -LogDir $logDir -Plain:$Plain
+  Complete-HarnessApproval -Harness $harnessName -Tool $toolName -Summary $summaryText -Decision $decision -Plain:$Plain
 }
 catch {
   # Fail open: an unreachable broker or an unwritable state directory must not

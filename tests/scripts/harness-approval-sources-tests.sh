@@ -38,6 +38,12 @@ readonly WORK
 # shellcheck disable=SC2064 # reason: WORK is resolved and readonly, so expanding now is the same value and survives the exit path
 trap "rm -rf '$WORK'" EXIT
 
+# The audit log root is suite-owned: init_test_state points NUCLEUS_REPO_ROOT at a
+# tree with no services.json, so leaving this unset would make every case read the
+# missing file and warn on the stderr stream the pty helper merges into stdout.
+NUCLEUS_LOG_DIR="$WORK/logs"
+export NUCLEUS_LOG_DIR
+
 # The faked terminal. `notty` is a new session with no controlling terminal, so
 # /dev/tty cannot be opened; `tty` is a pty whose master the helper answers with
 # one key once the prompt appears. Both write what the child printed to a file,

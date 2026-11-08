@@ -67,6 +67,20 @@ BeforeAll {
       Copy-Item -LiteralPath $filter.FullName -Destination (Join-Path -Path $fixtureFilterDir -ChildPath $filter.Name)
     }
 
+    # The audit writer is the nucleus-logs entry script, and it imports the output
+    # module and the log-management module from the repository it lives in, so the
+    # fixture carries all three. NUCLEUS_LOG_DIR below pins the log root itself.
+    $fixtureScriptsDir = Join-Path -Path $sandbox.Repo -ChildPath 'scripts'
+    $fixtureModulesDir = Join-Path -Path (Join-Path -Path $sandbox.Repo -ChildPath 'src\platforms\Windows') -ChildPath 'modules'
+    foreach ($dir in @($fixtureScriptsDir, $fixtureModulesDir)) {
+      $null = New-Item -ItemType Directory -Path $dir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+    }
+    Copy-Item -LiteralPath (Join-Path -Path $script:RepoRootPath -ChildPath 'scripts\logs.ps1') -Destination (Join-Path -Path $fixtureScriptsDir -ChildPath 'logs.ps1')
+    foreach ($name in @('Format-NucleusOutput.psm1', 'Get-NucleusHostPlatform.ps1', 'Invoke-LogManagement.ps1')) {
+      Copy-Item -LiteralPath (Join-Path -Path $script:RepoRootPath -ChildPath "src\platforms\Windows\modules\$name") -Destination (Join-Path -Path $fixtureModulesDir -ChildPath $name)
+    }
+    $sandbox['Logs'] = Join-Path -Path $root 'logs'
+
     $null = Set-Content -Path $sandbox.HermesLog -Value '' -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
     return $sandbox
   }
@@ -201,6 +215,11 @@ BeforeAll {
     $psi.Environment['HOME'] = $Sandbox.Home
     $psi.Environment['USERPROFILE'] = $Sandbox.Home
     $psi.Environment['LOCALAPPDATA'] = $Sandbox.LocalApp
+    # WHY: the audit writer resolves nucleus-logs through the repository and the
+    # log root through the override, so neither case can reach the real checkout
+    # or the developer's log directory.
+    $psi.Environment['NUCLEUS_REPO_ROOT'] = $Sandbox.Repo
+    $psi.Environment['NUCLEUS_LOG_DIR'] = $Sandbox.Logs
     $psi.Environment['HERMES_STUB_LOG'] = $Sandbox.HermesLog
     $psi.Environment['PATH'] = $Sandbox.StubDir + [System.IO.Path]::PathSeparator + $env:PATH
 
@@ -548,9 +567,41 @@ Describe 'harness-approval.ps1 Windows twin' {
     @(Get-ChildItem -LiteralPath $stateDir -Recurse -Filter '*.json' -File).Count | Should -Be 0
     @(Get-ChildItem -LiteralPath $stateDir -Recurse -Filter '*.tmp' -File).Count | Should -Be 0
 
-    $auditLog = Join-Path -Path (Join-Path -Path $script:approvalSandbox.LocalApp -ChildPath 'nucleus\log') -ChildPath 'harness-bridge.log'
+    $auditLog = Join-Path -Path $script:approvalSandbox.Logs -ChildPath 'harness.log'
     Test-Path -LiteralPath $auditLog | Should -Be $true
-    (Get-Content -LiteralPath $auditLog -Raw -Encoding UTF8) | Should -Match "pi`tbash`tallow"
+    $events = @(Get-Content -LiteralPath $auditLog -Encoding UTF8 | ForEach-Object { $_ | ConvertFrom-Json })
+    $approvals = @($events | Where-Object { $_.kind -eq 'approval' })
+    $approvals.Count | Should -Be 1
+    $approvals[0].harness | Should -Be 'pi'
+    $approvals[0].decision | Should -Be 'allow'
+    $approvals[0].source | Should -Be 'hermes'
+    $approvals[0].summary | Should -Be 'bash: git push --force'
+  }
+
+  It 'publishes a request for an empty summary instead of failing open' {
+    # The runner passes whatever text the hook payload carried, which can be
+    # empty; binding used to throw on that, so the gate fell open without ever
+    # publishing a request anyone could answer.
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ sources = @('hermes'); 'timeout-seconds' = @{ 'hermes' = 30 } } }
+    $stateDir = Get-BridgeStateDir -Sandbox $script:approvalSandbox
+    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('-Harness', 'pi', '-Tool', 'hook', '-Summary', '', '-TimeoutSeconds', '30')
+
+    $requestPath = $null
+    $deadline = [DateTime]::UtcNow.AddSeconds(20)
+    while ($null -eq $requestPath -and [DateTime]::UtcNow -lt $deadline) {
+      $candidate = Get-ChildItem -LiteralPath (Join-Path -Path $stateDir -ChildPath 'requests') -Filter '*.json' -File -ErrorAction SilentlyContinue | Select-Object -First 1  # check-suppress:suppression_doc: absence means the request is not written yet; polling continues
+      if ($null -ne $candidate) { $requestPath = $candidate.FullName }
+      elseif (-not $started.Process.HasExited) { Start-Sleep -Milliseconds 200 }
+      else { break }
+    }
+
+    $requestPath | Should -Not -BeNullOrEmpty
+    $responsePath = Join-Path -Path (Join-Path -Path $stateDir -ChildPath 'responses') -ChildPath (Split-Path -Path $requestPath -Leaf)
+    [System.IO.File]::WriteAllText($responsePath, '{"decision":"allow","decided_by":"test"}', [System.Text.UTF8Encoding]::new($false))
+
+    $result = Wait-TwinProcess -Started $started
+    $result.ExitCode | Should -Be 0
+    $result.Stdout | Should -Be 'allow'
   }
 
   It 'stops the hermes source at its per-source timeout and answers ask' {
@@ -722,7 +773,7 @@ Describe 'harness-drive.ps1 Windows twin' {
     if (Test-Path -LiteralPath $queueDir) { Remove-Item -LiteralPath $queueDir -Recurse -Force }
     $null = Set-SandboxQueuedPrompt -Sandbox $script:driveSandbox -Harness 'copilot' -Name '7000-aaaa.json' -Text 'first'  # check-suppress:suppression_doc: the helper returns the queue path; this test does not need it
     $null = Set-SandboxQueuedPrompt -Sandbox $script:driveSandbox -Harness 'copilot' -Name '8000-bbbb.json' -Text 'second'  # check-suppress:suppression_doc: the helper returns the queue path; this test does not need it
-    $auditLog = Join-Path -Path (Join-Path -Path $script:driveSandbox.LocalApp -ChildPath 'nucleus\log') -ChildPath 'harness-bridge.log'
+    $auditLog = Join-Path -Path $script:driveSandbox.Logs -ChildPath 'harness.log'
     if (Test-Path -LiteralPath $auditLog) { Remove-Item -LiteralPath $auditLog -Force }
 
     $started = Invoke-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @('copilot')
@@ -732,7 +783,9 @@ Describe 'harness-drive.ps1 Windows twin' {
     $result.Stdout | Should -Be '{}'
     @(Get-ChildItem -LiteralPath $queueDir -Filter '*.json' -File).Count | Should -Be 0
     @(Get-HermesStubLog -Sandbox $script:driveSandbox | Where-Object { $_.Contains('--subject [copilot] finished') }).Count | Should -BeGreaterThan 0
-    (Get-Content -LiteralPath $auditLog -Raw -Encoding UTF8) | Should -Match 'dropped 2 queued prompt\(s\)'
+    $dropEvents = @(Get-Content -LiteralPath $auditLog -Encoding UTF8 | ForEach-Object { $_ | ConvertFrom-Json } |
+        Where-Object { $_.kind -eq 'notify' -and $_.summary -like '*dropped 2 queued prompt(s)*' })
+    $dropEvents.Count | Should -BeGreaterThan 0
   }
 
   It 'leaves the queue untouched when the bridge is disabled' {

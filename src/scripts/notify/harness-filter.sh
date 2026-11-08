@@ -36,6 +36,14 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
+# WHY the app, not a log path: nucleus-logs owns the log root, the line format,
+# and the append, so the runner cannot drift from the log it writes into.
+# shellcheck source=../../../scripts/logs.sh
+. "$SCRIPT_DIR/../../../scripts/logs.sh"
+# shellcheck source=../lib/harness-audit.sh
+. "$SCRIPT_DIR/../lib/harness-audit.sh"
+
+_ha_start="$(harness_audit_now_ms)"
 
 _hf_harness="${1-}"
 _hf_payload=""
@@ -76,6 +84,23 @@ _hf_render() { # <decision> <reason>
 
 # Every path ends here.
 _hf_finish() { # <decision> <reason>
+  # WHY best-effort and first: the verdict decides whether a command runs, so a
+  # failed append is reported and then ignored. The filter that spoke (if any)
+  # and its rule are what makes filter accuracy auditable later.
+  if ! (
+    _hf_audit_digest="$(printf '%s' "$_hf_payload" | harness_audit_digest)" || exit 1
+    _hf_audit_summary="$(printf '%s\n' "$_hf_description" | harness_audit_summary)"
+    _hf_audit_source="none"
+    if [ -n "${_hf_best_filter-}" ]; then
+      _hf_audit_source="filter"
+    fi
+    harness_audit_log filter "$_hf_harness" "${1-}" "$_hf_audit_source" \
+      "${_hf_best_filter-}" "${_hf_best_rule-}" \
+      "$(($(harness_audit_now_ms) - _ha_start))" \
+      "$_hf_audit_summary" "$_hf_audit_digest" ''
+  ); then
+    warn "could not write the harness audit log"
+  fi
   case "${1-}" in
   allow | deny)
     _hf_render "$1" "${2-}"
@@ -158,6 +183,8 @@ _hf_description="${_hf_description:0:200}"
 # that fallback.
 _hf_best_decision=""
 _hf_best_reason=""
+_hf_best_filter=""
+_hf_best_rule=""
 
 while IFS= read -r _hf_entry; do
   if [ -z "$_hf_entry" ]; then
@@ -191,6 +218,8 @@ while IFS= read -r _hf_entry; do
   if [ -z "$_hf_best_decision" ] || [ "$(_hf_rank "$_hf_decision")" -gt "$(_hf_rank "$_hf_best_decision")" ]; then
     _hf_best_decision="$_hf_decision"
     _hf_best_reason="$_hf_id ($_hf_rule): $_hf_reason"
+    _hf_best_filter="$_hf_id"
+    _hf_best_rule="$_hf_rule"
   fi
 done <<<"$_hf_entries"
 

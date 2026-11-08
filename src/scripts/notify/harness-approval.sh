@@ -42,6 +42,20 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
+# WHY the app, not a log path: nucleus-logs owns the log root, the line format,
+# and the append, so the gate cannot drift from the log it writes into.
+# shellcheck source=../../../scripts/logs.sh
+. "$SCRIPT_DIR/../../../scripts/logs.sh"
+# shellcheck source=../lib/harness-audit.sh
+. "$SCRIPT_DIR/../lib/harness-audit.sh"
+
+_ha_start_ms="$(harness_audit_now_ms)"
+# Which source answered: the audit line records it, and `none` means no source
+# decided and the harness fell back to its own prompt.
+_ha_decided_by=""
+# Set once the Hermes request is published, so the audit line can be annotated by
+# id; an early exit has no request and the writer mints an id instead.
+_ha_id=""
 
 _ha_usage() {
   warn "usage: harness-approval [--plain] <harness> <tool> <summary> [timeout-seconds]"
@@ -86,15 +100,24 @@ _ha_finish() {
   allow | deny) _ha_decision="$1" ;;
   *) _ha_decision="ask" ;;
   esac
-  _ha_log_dir="$_ha_root/logs"
-  # WHY best-effort: the decision is already made, and a hook that prints
-  # nothing reads as a denial in Copilot, so an unwritable log dir must not
-  # swallow the answer.
-  if ! { mkdir -p "$_ha_log_dir" &&
-    printf '%s\t%s\t%s\t%s\t%s\n' \
-      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$_ha_harness" "$_ha_tool" "$_ha_decision" "$_ha_summary" \
-      >>"$_ha_log_dir/harness-bridge.log"; }; then
-    warn "could not write the harness-bridge audit log"
+  # WHY a subshell: nucleus-logs refuses an unusable event by exiting, and a
+  # hook that prints nothing reads as a denial in Copilot, so a failed append
+  # must not swallow the answer. Best-effort in both directions.
+  if ! (
+    _ha_audit_summary="$_ha_summary"
+    if [ -n "$_ha_tool" ]; then
+      _ha_audit_summary="$_ha_tool: $_ha_summary"
+    fi
+    _ha_audit_summary="$(printf '%s\n' "$_ha_audit_summary" | harness_audit_summary)"
+    # WHY the request text: the gate never sees the harness payload, so the tool
+    # and the summary it was asked about are the raw input it can vouch for.
+    _ha_audit_digest="$(printf '%s\t%s' "$_ha_tool" "$_ha_summary" | harness_audit_digest)" || exit 1
+    harness_audit_log approval "$_ha_harness" "$_ha_decision" \
+      "${_ha_decided_by:-none}" '' '' \
+      "$(($(harness_audit_now_ms) - _ha_start_ms))" \
+      "$_ha_audit_summary" "$_ha_audit_digest" "$_ha_id"
+  ); then
+    warn "could not write the harness audit log"
   fi
   _ha_render "$_ha_decision"
   exit 0
@@ -319,6 +342,7 @@ while [ -z "$_ha_answer" ]; do
       _ha_answer=""
     fi
     if [ -n "$_ha_answer" ]; then
+      _ha_decided_by="hermes"
       break
     fi
   fi
@@ -339,8 +363,14 @@ while [ -z "$_ha_answer" ]; do
     _ha_key=""
     if IFS= read -r -n 1 -s -t 1 _ha_key <&3; then
       case "$_ha_key" in
-      a | A | y | Y) _ha_answer="allow" ;;
-      d | D | n | N) _ha_answer="deny" ;;
+      a | A | y | Y)
+        _ha_answer="allow"
+        _ha_decided_by="prompt"
+        ;;
+      d | D | n | N)
+        _ha_answer="deny"
+        _ha_decided_by="prompt"
+        ;;
       # Any other key is not an answer: the prompt stays live and the next pass
       # reads again, which is what an arrow key or a stray modifier should do.
       *) ;;

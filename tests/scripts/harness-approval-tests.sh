@@ -25,6 +25,10 @@ ensure_safe_rm_env
 TMPDIR_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_ROOT"' EXIT
 
+# The audit log root is suite-owned, so the cases never write into the real one.
+NUCLEUS_LOG_DIR="$TMPDIR_ROOT/logs"
+export NUCLEUS_LOG_DIR
+
 # Recording stub, mirroring harness-notify-tests.sh: proves the request was
 # announced on the configured channel without talking to Hermes.
 mkdir -p "$TMPDIR_ROOT/bin"
@@ -131,12 +135,15 @@ test_audit_log_records_the_decision() {
   write_config '{"harness-notify":{"enable":false}}'
   HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" \
     bash "$APPROVAL" copilot runInTerminal "rm -rf build" 5 >/dev/null
-  local _log
-  _log="$(find "$TMPDIR_ROOT/home" -name harness-bridge.log -print -quit 2>/dev/null)"
-  if [ -n "$_log" ] && grep -qF 'copilot' "$_log" && grep -qF 'ask' "$_log"; then
-    assert_pass "every approval decision is recorded in the audit log"
+  local _log="$NUCLEUS_LOG_DIR/harness.log"
+  local _event=""
+  _event="$(jq -c 'select(.kind == "approval")' "$_log" 2>/dev/null | tail -n 1)" || _event=""
+  if [ -n "$_event" ] && [ "$(jq -r '.decision' <<<"$_event")" = "ask" ] &&
+    [ "$(jq -r '.harness' <<<"$_event")" = "copilot" ] &&
+    [ "$(jq -r '.source' <<<"$_event")" = "none" ]; then
+    assert_pass "every approval decision is recorded as one kind=approval event"
   else
-    assert_fail "audit" "log=$_log"
+    assert_fail "audit" "event=$_event log=$(cat "$_log" 2>/dev/null)"
   fi
 }
 

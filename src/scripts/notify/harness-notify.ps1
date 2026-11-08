@@ -66,6 +66,43 @@ $ErrorActionPreference = 'Stop'
 # so the shared helpers are resolved beside the copy, never by a repo-relative path.
 . (Join-Path -Path $PSScriptRoot -ChildPath 'harness-bridge-common.ps1')
 
+# WHY script scope: the audit line is written from the delivery helper, which
+# runs before the process ends, so the start time and the input fingerprint are
+# collected here as the run produces them.
+$script:auditStart = [datetime]::UtcNow
+$script:auditDigest = ''
+
+function Write-HarnessNotifyAudit {
+  <#
+  .SYNOPSIS
+    Records one notification attempt in the shared audit log.
+  .DESCRIPTION
+    Best-effort: a notification is advisory, so a failed append warns and the
+    delivery result stands.
+  .PARAMETER HarnessName
+    Harness the notification was about.
+  .PARAMETER Summary
+    One-line description of the attempt.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [string]$HarnessName,
+
+    [Parameter(Mandatory)]
+    [AllowEmptyString()]
+    [string]$Summary
+  )
+
+  try {
+    Write-HarnessBridgeAuditEvent -Kind 'notify' -Harness $HarnessName -Summary $Summary `
+      -Digest $script:auditDigest -StartTime $script:auditStart
+  }
+  catch {
+    Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message "could not write the harness audit log: $($_.Exception.Message)"
+  }
+}
+
 function Get-HarnessBridgeNotifyConfig {
   <#
   .SYNOPSIS
@@ -151,6 +188,7 @@ function Send-HarnessNotification {
   $hermes = Get-Command -Name 'hermes' -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1  # check-suppress:suppression_doc: absence is the expected case and is reported right below
   if ($null -eq $hermes) {
     Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message 'hermes is not on PATH: notification dropped'
+    Write-HarnessNotifyAudit -HarnessName $Harness -Summary "${label}: notification dropped (hermes is not on PATH)"
     return
   }
 
@@ -163,6 +201,7 @@ function Send-HarnessNotification {
       Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message "delivery to '$targetText' failed"
     }
   }
+  Write-HarnessNotifyAudit -HarnessName $Harness -Summary "${label}: ${Text}"
 }
 
 # WHY: strict mode errors on reading an uninitialized variable, and
@@ -182,6 +221,7 @@ try {
 
   if ([string]::IsNullOrWhiteSpace($Text) -and [Console]::IsInputRedirected) {
     $stdin = [Console]::In.ReadToEnd()
+    $script:auditDigest = Get-HarnessBridgeDigest -Text $stdin
     if (-not [string]::IsNullOrWhiteSpace($stdin)) {
       if ($stdin.TrimStart().StartsWith('{')) {
         $payload = $null

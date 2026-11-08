@@ -66,6 +66,14 @@ $ErrorActionPreference = 'Stop'
 # so the shared helpers are resolved beside the copy, never by a repo-relative path.
 . (Join-Path -Path $PSScriptRoot -ChildPath 'harness-bridge-common.ps1')
 
+# WHY script scope: the runner records its verdict at the single exit it funnels
+# through, so the start time, the input fingerprint, and the filter that spoke
+# are collected here as the run produces them.
+$script:auditStart = [datetime]::UtcNow
+$script:auditDigest = ''
+$script:filterId = ''
+$script:filterRule = ''
+
 function ConvertTo-HarnessFilterDocument {
   <#
   .SYNOPSIS
@@ -278,7 +286,7 @@ function Invoke-HarnessFilterList {
   $filterDir = Join-Path -Path $PSScriptRoot -ChildPath 'filters'
   # WHY an empty Decision: "no filter spoke" is not a verdict. The caller answers
   # ask for it, while a filter that allows deliberately still outranks it.
-  $best = @{ Decision = ''; Reason = '' }
+  $best = @{ Decision = ''; Reason = ''; Filter = ''; Rule = '' }
 
   foreach ($item in $Entry) {
     $filterPath = Join-Path -Path $filterDir -ChildPath "$($item.Id).ps1"
@@ -310,7 +318,12 @@ function Invoke-HarnessFilterList {
     if ($decision -cnotin @('allow', 'ask', 'deny')) { $decision = 'ask' }
     if ([string]::IsNullOrEmpty($best.Decision) -or
       (Get-HarnessFilterRank -Decision $decision) -gt (Get-HarnessFilterRank -Decision $best.Decision)) {
-      $best = @{ Decision = $decision; Reason = "$($item.Id) ($($fields[1])): $($fields[2])" }
+      $best = @{
+        Decision = $decision
+        Reason   = "$($item.Id) ($($fields[1])): $($fields[2])"
+        Filter   = [string]$item.Id
+        Rule     = [string]$fields[1]
+      }
     }
   }
   return $best
@@ -358,6 +371,18 @@ function Complete-HarnessFilter {
     [string]$Summary
   )
 
+  # WHY best-effort and first: the verdict decides whether a command runs, so a
+  # failed append is reported and then ignored.
+  try {
+    $auditSource = if ([string]::IsNullOrEmpty($script:filterId)) { 'none' } else { 'filter' }
+    Write-HarnessBridgeAuditEvent -Kind 'filter' -Harness $Harness -Decision $Decision `
+      -Source $auditSource -Filter $script:filterId -Rule $script:filterRule `
+      -Summary $Summary -Digest $script:auditDigest -StartTime $script:auditStart
+  }
+  catch {
+    Write-HarnessBridgeWarning -CommandName 'harness-filter' -Message "could not write the harness audit log: $($_.Exception.Message)"
+  }
+
   if ($Decision -cin @('allow', 'deny')) {
     Write-Output (ConvertTo-HarnessFilterDocument -Harness $Harness -Decision $Decision -Reason $Reason)
     exit 0
@@ -387,6 +412,7 @@ function Complete-HarnessFilter {
 try {
   $payload = ''
   if ([Console]::IsInputRedirected) { $payload = [Console]::In.ReadToEnd() }
+  $script:auditDigest = Get-HarnessBridgeDigest -Text $payload
 
   # What the approval gate shows the user when no filter decides, so a call no
   # filter claims still reaches the gate with the tool and the command it saw.
@@ -422,6 +448,8 @@ try {
   if ($summaryText.Length -gt 200) { $summaryText = $summaryText.Substring(0, 200) }
 
   $result = Invoke-HarnessFilterList -Entry $entries -Command $command -Payload $payload
+  $script:filterId = [string]$result.Filter
+  $script:filterRule = [string]$result.Rule
   # WHY ask and never allow: an undecided call is not an authorisation, so the
   # runner allows only when a filter says so.
   if ([string]::IsNullOrEmpty($result.Decision)) {
