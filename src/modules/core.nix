@@ -351,7 +351,6 @@ let
         name = "font-inter";
       };
       nixpkgs = "inter";
-      winget = "Inter.Inter";
     };
     iterm2 = {
       category = "gui";
@@ -841,7 +840,6 @@ let
         name = "font-source-serif";
       };
       nixpkgs = "source-serif";
-      winget = "Adobe.SourceSerif4";
     };
     sqlite = {
       category = "cli";

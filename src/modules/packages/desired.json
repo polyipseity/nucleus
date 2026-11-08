@@ -260,6 +260,12 @@
         "why": "Cross-platform pass reimplementation; Windows parity for pkgs.pass on POSIX."
       },
       {
+        "bucket": "nucleus",
+        "name": "inter",
+        "noShim": true,
+        "why": "Inter UI font, per-user install; parity with the macOS font-inter cask and pkgs.inter on NixOS; no WinGet manifest serves Inter.Inter."
+      },
+      {
         "name": "iwck",
         "why": "Temporary keyboard locker for cleaning; blocks all input until Ctrl+Break."
       },
@@ -283,6 +289,12 @@
         "bucket": "nucleus",
         "name": "sigrok-cli",
         "why": "Logic analyzer CLI; absent from WinGet; provisioned via nucleus custom Scoop bucket."
+      },
+      {
+        "bucket": "nucleus",
+        "name": "source-serif",
+        "noShim": true,
+        "why": "Source Serif 4 serif font, per-user install; parity with the macOS font-source-serif cask and pkgs.source-serif on NixOS; no WinGet manifest serves Adobe.SourceSerif4."
       },
       {
         "name": "whisper-cpp",

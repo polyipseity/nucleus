@@ -3,7 +3,6 @@
   "packages": [
     "7zip.7zip",
     "9NBDXK71NK08",
-    "Adobe.SourceSerif4",
     "BlenderFoundation.Blender",
     "BurntSushi.ripgrep",
     "CaddyServer.Caddy",
@@ -24,7 +23,6 @@
     "Hashicorp.Vagrant",
     "IJHack.QtPass",
     "ImageMagick.ImageMagick",
-    "Inter.Inter",
     "Jellyfin.Server",
     "KDE.Krita",
     "LLVM.LLVM",

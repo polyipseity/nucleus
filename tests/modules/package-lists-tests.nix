@@ -200,11 +200,9 @@ let
   # Enabled WinGet ids must each carry a lockfile version pin. The exception
   # list holds the ids microsoft/winget-pkgs does not serve, so the updater
   # cannot pin them: the msstore id, verified on Windows with
-  # `winget show <id> --source msstore`, plus the two font ids.
+  # `winget show <id> --source msstore`.
   wingetPinExceptions = [
     "9NBDXK71NK08"
-    "Adobe.SourceSerif4"
-    "Inter.Inter"
   ];
   wingetMissingPins = builtins.filter (
     id: !(builtins.elem id wingetPinExceptions || lockfile.winget ? ${id})
