@@ -24,7 +24,9 @@
 #
 # The decisions aggregate as deny > ask > allow regardless of registry order, so
 # registry order stays readable instead of load-bearing. `ask` means "no decision
-# here" and the harness falls back to its own local prompt.
+# here" and the harness falls back to its own local prompt, which is also the
+# answer for a call no filter decides: the runner never allows by omission,
+# because that would remove prompting the harness would otherwise do.
 #
 # Every path prints a document and exits 0, because several harnesses read a
 # failed hook as a denial, which would turn a broken registry into a blocked
@@ -93,9 +95,14 @@ if ! _hf_entries="$(jq -c '.filters[] | select(.enabled == true) | {id: .id, set
   _hf_finish ask "harness-filter (registry-error): the filter registry at $_hf_registry is unreadable"
 fi
 
-# WHY the empty command is answered allow: a PreToolUse hook fires for every
-# tool, and only a shell call carries a command, so a payload without one is not
-# a deletion candidate. Gating it would prompt on every file read.
+# WHY the leading whitespace is stripped first: a payload that is JSON behind a
+# space or a newline is still JSON, and reading it as a raw command string would
+# hand the deletion patterns a text they cannot match, which reads as allow.
+_hf_leading="${_hf_payload%%[![:space:]]*}"
+_hf_payload="${_hf_payload#"$_hf_leading"}"
+
+# An empty command answers ask: the runner never allows by omission, so a payload
+# it cannot inspect keeps the harness's own prompt.
 _hf_command=""
 case "$_hf_payload" in
 "") ;;
@@ -109,11 +116,14 @@ case "$_hf_payload" in
 *) _hf_command="$_hf_payload" ;;
 esac
 if [ -z "$_hf_command" ]; then
-  _hf_finish allow "harness-filter (not-a-command): the payload carries no shell command"
+  _hf_finish ask "harness-filter (not-a-command): the payload carries no shell command"
 fi
 
-_hf_best_decision="allow"
-_hf_best_reason="harness-filter (no-filter): no enabled filter made a decision"
+# WHY empty: "no filter spoke" is not a verdict, so it must not win the
+# comparison below. The fallback is ask, and a filter that allows still outranks
+# that fallback.
+_hf_best_decision=""
+_hf_best_reason=""
 
 while IFS= read -r _hf_entry; do
   if [ -z "$_hf_entry" ]; then
@@ -144,10 +154,13 @@ while IFS= read -r _hf_entry; do
   *) _hf_decision="ask" ;;
   esac
 
-  if [ "$(_hf_rank "$_hf_decision")" -gt "$(_hf_rank "$_hf_best_decision")" ]; then
+  if [ -z "$_hf_best_decision" ] || [ "$(_hf_rank "$_hf_decision")" -gt "$(_hf_rank "$_hf_best_decision")" ]; then
     _hf_best_decision="$_hf_decision"
     _hf_best_reason="$_hf_id ($_hf_rule): $_hf_reason"
   fi
 done <<<"$_hf_entries"
 
+if [ -z "$_hf_best_decision" ]; then
+  _hf_finish ask "harness-filter (no-filter): no enabled filter produced a verdict"
+fi
 _hf_finish "$_hf_best_decision" "$_hf_best_reason"

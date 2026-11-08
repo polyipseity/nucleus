@@ -189,6 +189,17 @@ function Sync-HarnessBridge {
         Write-NucleusNotice -Message "[$label] deployed $targetFilter"
       }
     }
+
+    # WHY a prune: the runner resolves a filter by the id the registry names, so a
+    # copy left behind by a rename or a deletion would keep answering a filter the
+    # registry no longer declares. The source set is the only authority.
+    $sourceFilterNames = @(Get-ChildItem -LiteralPath $sourceFilterDir -File -Filter '*.ps1' | ForEach-Object { $_.Name })
+    foreach ($deployedFilter in @(Get-ChildItem -LiteralPath $deployedFilterDir -File -Filter '*.ps1')) {
+      if ($deployedFilter.Name -notin $sourceFilterNames) {
+        Remove-Item -LiteralPath $deployedFilter.FullName -Force
+        Write-NucleusNotice -Message "[$label] removed stale filter $($deployedFilter.FullName)"
+      }
+    }
   }
   catch {
     Write-NucleusWarning -Message "[$label] $($_.Exception.Message)"

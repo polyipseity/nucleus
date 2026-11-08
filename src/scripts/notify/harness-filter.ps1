@@ -30,7 +30,9 @@
 
   The decisions aggregate as deny > ask > allow regardless of registry order, so
   registry order stays readable instead of load-bearing.  `ask` means "no
-  decision here" and the harness falls back to its own local prompt.
+  decision here" and the harness falls back to its own local prompt, which is
+  also what a call no filter decides answers: the runner never allows by
+  omission, because that would remove prompting the harness would otherwise do.
 
   Every path prints a document and exits 0, because several harnesses read a
   failed hook as a denial, which would turn a broken registry into a blocked
@@ -140,7 +142,7 @@ function Read-HarnessFilterPayloadCommand {
   .DESCRIPTION
     A PreToolUse hook fires for every tool and only a shell call carries a
     command, so a payload without one returns an empty string and the caller
-    answers allow.
+    answers ask.
   .PARAMETER Payload
     Raw hook payload read from stdin.
   #>
@@ -220,6 +222,9 @@ function Invoke-HarnessFilterList {
   [OutputType([hashtable])]
   param(
     [Parameter(Mandatory)]
+    # WHY AllowEmptyCollection: a registry that enables no filter is a valid
+    # registry, and it must answer ask rather than fail parameter binding.
+    [AllowEmptyCollection()]
     [array]$Entry,
 
     [Parameter(Mandatory)]
@@ -232,7 +237,9 @@ function Invoke-HarnessFilterList {
 
   $pwshPath = [Environment]::ProcessPath
   $filterDir = Join-Path -Path $PSScriptRoot -ChildPath 'filters'
-  $best = @{ Decision = 'allow'; Reason = 'harness-filter (no-filter): no enabled filter made a decision' }
+  # WHY an empty Decision: "no filter spoke" is not a verdict. The caller answers
+  # ask for it, while a filter that allows deliberately still outranks it.
+  $best = @{ Decision = ''; Reason = '' }
 
   foreach ($item in $Entry) {
     $filterPath = Join-Path -Path $filterDir -ChildPath "$($item.Id).ps1"
@@ -241,24 +248,29 @@ function Invoke-HarnessFilterList {
       $line = "ask`tfilter-error`tno filter script at $filterPath"
     }
     else {
-      $output = $Payload | & $pwshPath -NoProfile -File $filterPath --settings $item.Settings --command $Command 2>&1
+      # WHY no 2>&1: stderr stays off the verdict path, matching the POSIX twin.
+      # A child's diagnostic carries whatever text it likes, and merging it would
+      # let that text read as the filter's answer.
+      $output = @($Payload | & $pwshPath -NoProfile -File $filterPath --settings $item.Settings --command $Command)
       $exitCode = $LASTEXITCODE
+      $candidate = @($output | ForEach-Object { [string]$_ } | Where-Object { $_ -ne '' })
       if ($exitCode -ne 0) {
         $line = 'ask' + "`t" + 'filter-error' + "`t" + 'the filter exited non-zero'
       }
-      else {
-        $candidate = @($output | ForEach-Object { [string]$_ } | Where-Object { ($_ -split "`t").Count -eq 3 } | Select-Object -Last 1)
-        if ($candidate.Count -eq 0) {
-          $line = 'ask' + "`t" + 'filter-error' + "`t" + 'the filter printed no decision line'
-        }
-        else { $line = $candidate[0] }
+      elseif ($candidate.Count -ne 1 -or ($candidate[0] -split "`t").Count -ne 3) {
+        $line = 'ask' + "`t" + 'filter-error' + "`t" + 'the filter printed no decision line'
       }
+      else { $line = $candidate[0] }
     }
 
     $fields = $line -split "`t"
     $decision = $fields[0]
-    if ($decision -notin @('allow', 'ask', 'deny')) { $decision = 'ask' }
-    if ((Get-HarnessFilterRank -Decision $decision) -gt (Get-HarnessFilterRank -Decision $best.Decision)) {
+    # WHY -cnotin: PowerShell's -in folds case, so an uppercase decision would
+    # survive normalization, then lose the case-sensitive rank lookup, and read as
+    # allow. The POSIX twin answers ask for the same bytes.
+    if ($decision -cnotin @('allow', 'ask', 'deny')) { $decision = 'ask' }
+    if ([string]::IsNullOrEmpty($best.Decision) -or
+      (Get-HarnessFilterRank -Decision $decision) -gt (Get-HarnessFilterRank -Decision $best.Decision)) {
       $best = @{ Decision = $decision; Reason = "$($item.Id) ($($fields[1])): $($fields[2])" }
     }
   }
@@ -290,7 +302,7 @@ function Complete-HarnessFilter {
     [string]$Reason
   )
 
-  $final = if ($Decision -in @('allow', 'deny')) { $Decision } else { 'ask' }
+  $final = if ($Decision -cin @('allow', 'deny')) { $Decision } else { 'ask' }
   Write-Output (ConvertTo-HarnessFilterDocument -Harness $Harness -Decision $final -Reason $Reason)
   exit 0
 }
@@ -318,10 +330,15 @@ try {
 
   $command = Read-HarnessFilterPayloadCommand -Payload $payload
   if ([string]::IsNullOrWhiteSpace($command)) {
-    Complete-HarnessFilter -Harness $Harness -Decision 'allow' -Reason 'harness-filter (not-a-command): the payload carries no shell command'
+    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Reason 'harness-filter (not-a-command): the payload carries no shell command'
   }
 
   $result = Invoke-HarnessFilterList -Entry $entries -Command $command -Payload $payload
+  # WHY ask and never allow: an undecided call is not an authorisation, so the
+  # runner allows only when a filter says so.
+  if ([string]::IsNullOrEmpty($result.Decision)) {
+    Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Reason 'harness-filter (no-filter): no enabled filter produced a verdict'
+  }
   Complete-HarnessFilter -Harness $Harness -Decision $result.Decision -Reason $result.Reason
 }
 catch {

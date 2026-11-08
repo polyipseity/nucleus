@@ -203,11 +203,11 @@ Describe 'harness-filter render table' {
     $result.Stdout | Should -Be 'allow'
   }
 
-  It 'allows a payload that carries no shell command' {
+  It 'asks for a payload that carries no shell command' {
     $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"tool_name":"readFile","tool_input":{"path":"x"}}'
 
     $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
-    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'allow'
+    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'ask'
     $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'not-a-command'
   }
 }
@@ -283,5 +283,38 @@ Describe 'aggregation and filter failure' {
     $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
     $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'ask'
     $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'filter-error'
+  }
+
+  It 'answers ask when no filter decides' {
+    Set-FilterRegistry -Root $script:Sandbox -Document '{"filters":[{"enabled":false,"id":"safe-delete","settings":{}}]}'
+    try {
+      $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"ls -la"}'
+
+      $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
+      $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'ask'
+      $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'no-filter'
+    }
+    finally { Copy-Item -LiteralPath $script:RegistryPath -Destination (Join-Path -Path (Join-Path -Path $script:Sandbox 'src\modules\configs') -ChildPath 'harness-filters.json') -Force }
+  }
+
+  It 'reads an uppercase decision as ask, not allow' {
+    # WHY: -in folds case, so without -cnotin the uppercase decision would survive
+    # normalization and then lose the case-sensitive rank lookup, which reads as
+    # allow. The POSIX twin answers ask for the same bytes.
+    Add-FilterScript -Root $script:Sandbox -Id 'upper' -Body 'Write-Output ("DENY`tsome-rule`tuppercase")'
+    Set-FilterRegistry -Root $script:Sandbox -Document '{"filters":[{"enabled":true,"id":"upper","settings":{}}]}'
+    $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"anything"}'
+
+    (ConvertFrom-Json -InputObject $result.Stdout -AsHashtable)['hookSpecificOutput']['permissionDecision'] | Should -Be 'ask'
+  }
+
+  It 'keeps a filter diagnostic off the verdict path' {
+    # WHY: the verdict is the single stdout line. A stderr diagnostic that happens
+    # to look like a protocol line must not become the answer.
+    Add-FilterScript -Root $script:Sandbox -Id 'noisy' -Body 'Write-Output ("allow`tno-match`tquiet"); [Console]::Error.WriteLine("ask`tunproven-redirect`tstderr")'
+    Set-FilterRegistry -Root $script:Sandbox -Document '{"filters":[{"enabled":true,"id":"noisy","settings":{}}]}'
+    $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"anything"}'
+
+    (ConvertFrom-Json -InputObject $result.Stdout -AsHashtable)['hookSpecificOutput']['permissionDecision'] | Should -Be 'allow'
   }
 }

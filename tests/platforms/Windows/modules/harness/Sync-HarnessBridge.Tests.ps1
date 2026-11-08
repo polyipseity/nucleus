@@ -398,6 +398,21 @@ Describe 'Sync-HarnessBridge shim convergence' {
     $after | Should -Be $before
   }
 
+  It 'prunes a deployed filter the source set no longer carries' {
+    # WHY: the runner resolves a filter by the id the registry names, so a copy
+    # left behind by a rename or a deletion would keep answering a filter the
+    # registry no longer declares.
+    $deployedFilterDir = Join-Path -Path $script:syncBinDir -ChildPath 'filters'
+    $staleFilter = Join-Path -Path $deployedFilterDir -ChildPath 'stale-filter.ps1'
+    $null = New-Item -ItemType Directory -Path $deployedFilterDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+    $null = Set-Content -Path $staleFilter -Value '# stale filter' -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
+
+    Sync-HarnessBridge -Enabled:$true -RepoRoot $script:syncSandbox.Repo -UserRoot $script:syncUserRoot -UserProfile $script:syncSandbox.Home > $null
+
+    Test-Path -LiteralPath $staleFilter | Should -Be $false
+    Test-Path -LiteralPath (Join-Path -Path $deployedFilterDir -ChildPath 'safe-delete.ps1') | Should -Be $true
+  }
+
   It 'removes the shims and deployed copies on a disabled run, keeping unmanaged files' {
     $unmanagedShim = Join-Path -Path $script:syncShimDir -ChildPath 'other-tool.cmd'
     $unmanagedBin = Join-Path -Path $script:syncBinDir -ChildPath 'other-tool.ps1'

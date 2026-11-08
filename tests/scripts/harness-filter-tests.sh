@@ -36,6 +36,7 @@ REGISTRY="$REPO_ROOT/src/modules/configs/harness-filters.json"
 readonly RUNNER FILTER_DIR LIB_DIR REGISTRY
 
 require_command jq "the runner and the filter registry both need jq"
+require_command python3 "the schema file is parsed with python3"
 
 for _required in "$RUNNER" "$FILTER_DIR/safe-delete.sh" "$LIB_DIR" "$REGISTRY"; do
   if [ ! -e "$_required" ]; then
@@ -182,9 +183,34 @@ else
   assert_fail "fallback: an unknown harness gets the plain word" "the fallback render is the plain decision"
 fi
 
+# One document per call: a second line would be a second decision for a harness
+# that reads either the whole stdout or its last line.
+for _doc_harness in claude copilot cursor opencode pi; do
+  _count="$(run_runner "$TREE" "$_doc_harness" '{"command":"/bin/rm -rf x"}' | wc -l | tr -d ' ')"
+  if [ "$_count" = "1" ]; then
+    assert_pass "exactly one document for $_doc_harness"
+  else
+    assert_fail "exactly one document for $_doc_harness" "the runner printed $_count line(s)"
+  fi
+done
+
 _no_command="$(run_runner "$TREE" copilot '{"tool_name":"readFile","tool_input":{"path":"x"}}')"
-assert_document "a payload without a command is allowed, not prompted" "$_no_command" \
-  '.hookSpecificOutput.permissionDecision == "allow" and (.hookSpecificOutput.permissionDecisionReason | contains("not-a-command"))'
+assert_document "a payload without a command asks, never allows by omission" "$_no_command" \
+  '.hookSpecificOutput.permissionDecision == "ask" and (.hookSpecificOutput.permissionDecisionReason | contains("not-a-command"))'
+
+# An undecided call is not an authorisation: a registry that disables every
+# filter must prompt, not silently allow.
+_undecided_tree="$(make_tree undecided)"
+set_registry "$_undecided_tree" '{"filters":[{"enabled":false,"id":"safe-delete","settings":{}}]}'
+_undecided="$(run_runner "$_undecided_tree" copilot '{"command":"ls -la"}')"
+assert_document "a call no filter decides asks with no-filter" "$_undecided" \
+  '.hookSpecificOutput.permissionDecision == "ask" and (.hookSpecificOutput.permissionDecisionReason | contains("no-filter"))'
+
+# A JSON payload behind leading whitespace is still JSON; reading it as a raw
+# command string would hand the deletion patterns a text they cannot match.
+_leading="$(run_runner "$TREE" copilot '  {"command":"/bin/rm -rf x"}')"
+assert_document "a payload with leading whitespace is still parsed as JSON" "$_leading" \
+  '.hookSpecificOutput.permissionDecision == "deny"'
 
 NO_REGISTRY_TREE="$(make_tree no-registry)"
 rm -f "$NO_REGISTRY_TREE/src/modules/configs/harness-filters.json"
@@ -270,12 +296,10 @@ else
   assert_fail "the registry carries its inline schema pointer" "$REGISTRY has no co-located \$schema"
 fi
 
-if command -v python3 >/dev/null 2>&1; then
-  if python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$REPO_ROOT/src/modules/configs/harness-filters.schema.json" 2>/dev/null; then
-    assert_pass "the schema file parses as JSON"
-  else
-    assert_fail "the schema file parses as JSON" "harness-filters.schema.json is not valid JSON"
-  fi
+if python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$REPO_ROOT/src/modules/configs/harness-filters.schema.json"; then
+  assert_pass "the schema file parses as JSON"
+else
+  assert_fail "the schema file parses as JSON" "harness-filters.schema.json is not valid JSON"
 fi
 
 finish_tests

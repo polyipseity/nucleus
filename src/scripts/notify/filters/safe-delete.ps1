@@ -85,7 +85,9 @@ if ($Command -cmatch $deletion) {
   # TODO: Task 3 -- the redirect proof decides here. Until it exists only `allow`
   # is honoured, so the registry default `deny` cannot block a command whose
   # redirect was never checked; `deny` and `route` therefore ask for now.
-  if ($unproven -eq 'allow') {
+  # WHY -ceq: the POSIX twin matches the setting with a case-sensitive case, so a
+  # value spelled 'Allow' must not enable the redirect exemption on one host only.
+  if ($unproven -ceq 'allow') {
     Write-Output ("allow`tunproven-redirect`tdeletion command: the safe redirect is unproven and settings.unproven allows it")
     exit 0
   }
