@@ -894,7 +894,7 @@ let
       # (`stirling-pdf-desktop`), and it starts its own local server only while
       # the app runs. The headless server attr (`stirling-pdf`) is deliberately
       # not deployed, because a host-wide daemon would need its own service
-      # entry, a reserved port, and an authentication layer the product lacks.
+      # entry and a reserved port.
       category = "gui";
       homebrew = {
         kind = "cask";

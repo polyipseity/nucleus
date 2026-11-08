@@ -605,7 +605,7 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure Stirling PDF desktop is installed for cross-host PDF editing parity with macOS (Homebrew cask) and NixOS (nixpkgs); this is the desktop build, which starts its own local server only while the app runs, so nothing listens at boot
+        description: Ensure Stirling PDF desktop is installed for PDF editing; the three carriers are not version-aligned (Homebrew cask, nixpkgs and WinGet ship different releases). This is the desktop build, which starts its own local server only while the app runs, so nothing listens at boot
       settings:
         id: StirlingTools.StirlingPDF
         source: winget

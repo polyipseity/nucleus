@@ -191,10 +191,15 @@ let
     lib.any (p: p.drvPath == passOtpWrapper.drvPath) passCandidates
     && !(lib.any (p: p.drvPath == pkgsLinux.pass.drvPath) passCandidates);
   # --- Stirling-PDF desktop resolution ---
-  # The registry must resolve the entry enabled on every host and deploy the
-  # Tauri desktop build. WHY pname: `nixpkgsPackage` is what lands in the
-  # package set, so the derivation name is the only observable that separates
-  # the desktop build from the headless server attr the entry probes.
+  # The registry must carry the entry and deploy the Tauri desktop build.
+  # WHY pname: `nixpkgsPackage` is what lands in the package set, so the
+  # derivation name is the only observable that separates the desktop build from
+  # the headless server attr the entry probes.
+  # WHY no per-host presence claim: `nucleus.packages.enabled` carries a key for
+  # every managedPackages entry on every host, so presence is all-or-nothing.
+  # This suite asserts existence and the Linux derivation only; which carrier
+  # (Homebrew cask, nixpkgs attr, WinGet id) resolves on which host is not
+  # asserted here, so a green run does not prove per-host availability.
   stirlingHostNames = [
     "MacBook"
     "NixOS"
@@ -204,7 +209,7 @@ let
     inherit host;
     enabled = (evalCoreForHost host).config.nucleus.packages.enabled;
   }) stirlingHostNames;
-  stirlingMissingHosts = builtins.filter (e: !(e.enabled ? "stirling-pdf")) stirlingEvaluations;
+  stirlingRegistryPresent = builtins.all (e: e.enabled ? "stirling-pdf") stirlingEvaluations;
   stirlingDisabledHosts = builtins.filter (
     e: (e.enabled ? "stirling-pdf") && !e.enabled."stirling-pdf"
   ) stirlingEvaluations;
@@ -316,7 +321,7 @@ let
     && nucleusScoopManifestsPresent
     && posixInstallersFreeOfLists
     && passOtpResolved
-    && stirlingMissingHosts == [ ]
+    && stirlingRegistryPresent
     && stirlingDisabledHosts == [ ]
     && stirlingDesktopResolved
     && spIsValid
@@ -336,11 +341,7 @@ in
   test_nucleus_scoop_manifests_present = assert' nucleusScoopManifestsPresent "bucket 'nucleus' entries missing a src/modules/scoop-manifests manifest: ${builtins.concatStringsSep ", " missingNucleusScoopManifests}";
   test_no_hardcoded_posix_lists = assert' posixInstallersFreeOfLists "POSIX installers must not hardcode desired-package literals";
   test_pass_otp_resolved = assert' passOtpResolved "sharedPackages must contribute the pass-otp wrapper and not the plain pass attr";
-  test_stirling_pdf_registry_present =
-    assert' (stirlingMissingHosts == [ ])
-      "the stirling-pdf registry entry must resolve on every host; missing on: ${
-        builtins.concatStringsSep ", " (builtins.map (e: e.host) stirlingMissingHosts)
-      }";
+  test_stirling_pdf_registry_present = assert' stirlingRegistryPresent "the stirling-pdf entry must exist in managedPackages";
   test_stirling_pdf_enabled_everywhere =
     assert' (stirlingDisabledHosts == [ ])
       "the stirling-pdf registry entry must be enabled on every host; disabled on: ${
