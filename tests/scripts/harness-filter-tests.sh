@@ -206,11 +206,14 @@ _undecided="$(run_runner "$_undecided_tree" copilot '{"command":"ls -la"}')"
 assert_document "a call no filter decides asks with no-filter" "$_undecided" \
   '.hookSpecificOutput.permissionDecision == "ask" and (.hookSpecificOutput.permissionDecisionReason | contains("no-filter"))'
 
-# A JSON payload behind leading whitespace is still JSON; reading it as a raw
-# command string would hand the deletion patterns a text they cannot match.
-_leading="$(run_runner "$TREE" copilot '  {"command":"/bin/rm -rf x"}')"
+# A JSON payload behind leading whitespace is still JSON. The command is a plain
+# delete on purpose: behind the prefix the deletion pattern cannot match, so
+# without the strip this payload takes the raw-command path and answers allow with
+# no rule, while with the strip it parses and the deletion filter answers ask with
+# unproven-redirect.
+_leading="$(run_runner "$TREE" copilot '  {"command":"rm x"}')"
 assert_document "a payload with leading whitespace is still parsed as JSON" "$_leading" \
-  '.hookSpecificOutput.permissionDecision == "deny"'
+  '.hookSpecificOutput.permissionDecision == "ask" and (.hookSpecificOutput.permissionDecisionReason | contains("unproven-redirect"))'
 
 NO_REGISTRY_TREE="$(make_tree no-registry)"
 rm -f "$NO_REGISTRY_TREE/src/modules/configs/harness-filters.json"
