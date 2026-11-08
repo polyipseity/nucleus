@@ -227,6 +227,13 @@ let
     id: builtins.elem id resolvedWindowsPackages || id == "Anysphere.Cursor"
   ) dscIds;
 
+  # The Scoop bootstrap is a Script resource, so its id sits at the resource
+  # level and the settings.id scan above cannot see it. WHY hasInfix with the
+  # surrounding newlines: it pins the exact six-space line without a regex.
+  wpScoopInstallPresent =
+    lib.hasInfix "\n      id: ScoopInstall\n" dscText
+    && lib.hasInfix "\n        - GitInstall\n" dscText;
+
   # The package group is sorted alphabetically by `settings.id`
   # (`.agents/instructions/winget-dsc.instructions.md`, "Resource groups and
   # ordering"). WHY case-folded: WinGet ids keep their own casing, so ids such as
@@ -278,7 +285,8 @@ let
     && wingetPinsResolve
     && posixInstallersFreeOfLists
     && passOtpResolved
-    && spIsValid;
+    && spIsValid
+    && wpScoopInstallPresent;
 in
 {
   test_managers_declared = assert' allManagersDeclared "desired.json must declare every manager (${builtins.concatStringsSep ", " managers})";
@@ -304,6 +312,7 @@ in
   test_wp_dsc_sorted = assert' dscSorted "DSC package ids must be sorted alphabetically (case-folded): ${
     builtins.concatStringsSep ", " (builtins.map (pair: "${pair.fst} before ${pair.snd}") dscInversions)
   }";
+  test_wp_scoop_install_present = assert' wpScoopInstallPresent "the DSC file must keep the six-space id: ScoopInstall block with its GitInstall dependency";
   test_wp_json_sorted = assert' (
     wpJsonTerminated && wpJsonMultiline && wpJsonHasKeys
   ) "winget-packages.json must be multi-line with sorted keys and exactly one trailing newline";

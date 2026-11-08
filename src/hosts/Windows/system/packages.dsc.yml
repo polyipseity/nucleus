@@ -576,10 +576,10 @@ properties:
           manifest; Git is required for bucket management, hence dependsOn.
       settings:
         GetScript: |
-          $scoopDir = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $env:USERPROFILE 'scoop' }
+          $scoopDir = Join-Path $env:USERPROFILE 'scoop'
           return @{ Result = if (Test-Path (Join-Path $scoopDir 'shims\scoop.cmd')) { 'Present' } else { 'Absent' } }
         TestScript: |
-          $scoopDir = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $env:USERPROFILE 'scoop' }
+          $scoopDir = Join-Path $env:USERPROFILE 'scoop'
           return Test-Path (Join-Path $scoopDir 'shims\scoop.cmd')
         SetScript: |
           $url = 'https://raw.githubusercontent.com/ScoopInstaller/Install/1e2f334083d609986d8c8bc9e31ae8e87c39fab4/install.ps1'
@@ -593,8 +593,8 @@ properties:
             throw "scoop installer hash mismatch: expected $sha, got $actual"
           }
           # WHY -RunAsAdmin: the pinned installer denies an elevated session without it, and apply.ps1 always elevates.
-          # WHY -ScoopDir: it pins the directory the TestScript asserts; the installer otherwise resolves it from -ScoopDir, then $env:SCOOP, then $env:USERPROFILE\scoop.
-          $scoopDir = if ($env:SCOOP) { $env:SCOOP } else { Join-Path $env:USERPROFILE 'scoop' }
+          # WHY -ScoopDir: it pins the directory the TestScript asserts, which is the path Get-NucleusScoopShimsDir owns; the installer would otherwise use its own default.
+          $scoopDir = Join-Path $env:USERPROFILE 'scoop'
           & powershell -NoProfile -ExecutionPolicy Bypass -File $tmp -RunAsAdmin -ScoopDir $scoopDir
           if ($LASTEXITCODE -ne 0) {
             Remove-Item $tmp -Force
@@ -746,18 +746,3 @@ properties:
       settings:
         id: Zoom.Zoom
         source: winget
-
-    - resource: PSDscResources/Script
-      id: YamlLintInstall
-      directives:
-        description: >-
-          Install yamllint for cross-host YAML formatting parity with macOS and
-          NixOS. No WinGet ID exists; installed via uv tool install (user-scope
-          Python tool).
-      settings:
-        GetScript: |
-          return @{ Result = if (Get-Command yamllint -ErrorAction SilentlyContinue) { "Present" } else { "Absent" } }
-        TestScript: |
-          return [bool](Get-Command yamllint -ErrorAction SilentlyContinue)
-        SetScript: |
-          uv tool install yamllint
