@@ -415,8 +415,11 @@ try {
   if ([string]::IsNullOrWhiteSpace($command)) {
     Complete-HarnessFilter -Harness $Harness -Decision 'ask' -Tool $toolName -Summary $summaryText -Reason 'harness-filter (not-a-command): the payload carries no shell command'
   }
-  # The command is what the gate asks about, so it replaces the raw payload.
-  $summaryText = $command
+  # The command is what the gate asks about, so it replaces the raw payload, and it
+  # is collapsed to the one line the terminal prompt and the audit line carry: a
+  # multi-line command would otherwise reach both verbatim.
+  $summaryText = (($command -replace '\s+', ' ').Trim())
+  if ($summaryText.Length -gt 200) { $summaryText = $summaryText.Substring(0, 200) }
 
   $result = Invoke-HarnessFilterList -Entry $entries -Command $command -Payload $payload
   # WHY ask and never allow: an undecided call is not an authorisation, so the

@@ -68,6 +68,7 @@ let
   flatConfigSh = flatten configSh;
   flatConfigPs1 = flatten (read "/scripts/config.ps1");
   flatApprovalScript = flatten (read "/src/scripts/notify/harness-approval.sh");
+  flatApprovalScriptPs1 = flatten (read "/src/scripts/notify/harness-approval.ps1");
 
   # First word of a hook command: the command the harness resolves on PATH.
   entryPointOf = command: builtins.head (builtins.split " " command);
@@ -189,6 +190,13 @@ in
     (assert' (
       builtins.match ".*'harness-approval' = @[{][ ]*sources = @[(]'prompt'[)].*" flatConfigPs1 != null
     ) "the PowerShell nucleus-config DEFAULTS must ship the same harness-approval.sources=['prompt']")
+    (assert'
+      (
+        builtins.match ".*'harness-approval' = @[{][ ]*sources[ ]*= @[(]'prompt'[)][ ]*'timeout-seconds' = @[{][ ]*hermes = 0; prompt = 0.*" flatApprovalScriptPs1
+        != null
+      )
+      "harness-approval.ps1 carries its own copy of the defaults, and a hook that runs without a config file falls back to it, so it must ship the same source list and per-source timeouts"
+    )
     (assert' (
       builtins.match ".*'harness-drive' += @[{][^}]*enable = \\$true.*" flatConfigPs1 != null
     ) "the PowerShell nucleus-config DEFAULTS must ship the same harness-drive.enable=true")

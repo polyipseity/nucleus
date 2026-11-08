@@ -147,9 +147,11 @@ esac
 if [ -z "$_hf_command" ]; then
   _hf_finish ask "harness-filter (not-a-command): the payload carries no shell command"
 fi
-# The command is what the gate asks about; the raw payload only stands in when
-# the payload names no command at all.
-_hf_description="$_hf_command"
+# The command is what the gate asks about, so it replaces the raw payload, and it
+# is collapsed to the one line the terminal prompt and the audit line carry: a
+# multi-line command would otherwise reach both verbatim.
+_hf_description="$(printf '%s' "$_hf_command" | tr -s '[:space:]' ' ')"
+_hf_description="${_hf_description:0:200}"
 
 # WHY empty: "no filter spoke" is not a verdict, so it must not win the
 # comparison below. The fallback is ask, and a filter that allows still outranks

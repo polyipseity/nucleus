@@ -441,6 +441,7 @@ function Wait-HarnessApproval {
     [string]$Tool,
 
     [Parameter(Mandatory)]
+    [AllowEmptyString()]
     [string]$Summary,
 
     [Parameter(Mandatory)]
@@ -501,7 +502,14 @@ function Wait-HarnessApproval {
 
     if ($promptLive -and $null -ne $pending) {
       $answered = $false
-      try { $answered = $pending.Wait(1000) }
+      $bytesRead = 0
+      try {
+        $answered = $pending.Wait(1000)
+        # WHY the byte count: a console that went away completes the read with
+        # nothing, and treating that as a rejected key would re-read forever. The
+        # POSIX twin reads the same signal from `read`'s status.
+        if ($answered) { $bytesRead = $pending.Result }
+      }
       catch {
         # A closed console faults the pending read, which is the same situation as
         # a console that was never there.
@@ -509,7 +517,12 @@ function Wait-HarnessApproval {
         $promptLive = $false
         $pending = $null
       }
-      if ($answered) {
+      if ($answered -and $bytesRead -le 0) {
+        Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'the console closed before an answer: asking locally'
+        $promptLive = $false
+        $pending = $null
+      }
+      elseif ($answered) {
         $decision = Get-HarnessApprovalConsoleAnswer -Byte $buffer[0]
         $pending = $null
         if (-not [string]::IsNullOrEmpty($decision)) { break }

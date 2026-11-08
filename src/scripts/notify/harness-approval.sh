@@ -106,8 +106,8 @@ if [ -z "$_ha_harness" ]; then
   exit 0
 fi
 
-# Only the hook form may omit the action description; every caller passes all
-# three, and an empty tool means the caller got its own arguments wrong.
+# Every caller passes all three arguments, and an empty tool means the caller
+# got its own arguments wrong.
 if [ -z "$_ha_tool" ]; then
   _ha_usage
   _ha_finish ask
@@ -282,8 +282,15 @@ if [ "$_ha_prompt" -eq 1 ]; then
 fi
 
 if [ "$_ha_tty" -eq 1 ]; then
-  printf 'nucleus approval: %s: %s\n  run it? [y]es / [n]o / [a]lways / [d]on'"'"'t: ' \
-    "$_ha_tool" "$_ha_summary" >&3
+  # WHY guarded like every other terminal write: a terminal that is opened and
+  # then lost would otherwise end the run under `set -e` with no document at all,
+  # which some harnesses read as a denial.
+  if ! printf 'nucleus approval: %s: %s\n  run it? [y]es / [n]o / [a]lways / [d]on'"'"'t: ' \
+    "$_ha_tool" "$_ha_summary" >&3; then
+    warn "could not write to the terminal: asking locally"
+    _ha_prompt_live=0
+    _ha_tty=0
+  fi
 fi
 
 _ha_answer=""

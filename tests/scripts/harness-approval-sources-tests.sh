@@ -197,16 +197,35 @@ answer_request() { # <request-file> <decision>
 
 section 1 "the sources matrix"
 
+# An absent section takes the shipped default, and only a `prompt` default can turn
+# a typed key into an answer: an accidental `[]` default answers ask here exactly as
+# it does without a terminal, so running this under the fake tty is what makes the
+# case discriminate.
 clear_state
 write_config '{"harness-notify":{"channels":["telegram"]}}'
-if notty_run "$WORK/out" pi bash "rm -rf build" 10 >/dev/null 2>"$WORK/err"; then
-  if [ "$(decision_of "$WORK/out")" = "ask" ] && [ -z "$(pending_requests)" ]; then
-    assert_pass "an absent harness-approval section defaults to the prompt source and answers ask without a terminal"
+if tty_run y "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
+  if [ "$(decision_of "$WORK/out")" = "allow" ]; then
+    assert_pass "an absent harness-approval section defaults to the prompt source and takes a typed allow"
   else
-    assert_fail "absent section" "out=$(cat "$WORK/out") requests=$(pending_requests)"
+    assert_fail "absent section default" "transcript=$(tr -d '\r' <"$WORK/out")"
   fi
 else
-  assert_fail "absent section" "the gate exited non-zero: $(cat "$WORK/err")"
+  assert_fail "absent section default" "the gate exited non-zero: $(cat "$WORK/err")"
+fi
+
+# The same source with no terminal: a hook started by a GUI harness must answer ask
+# at once instead of reading its own EOF as a refusal.
+clear_state
+write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":30}}}'
+_start=$SECONDS
+if notty_run "$WORK/out" pi bash "rm -rf build" 30 >/dev/null 2>"$WORK/err"; then
+  if [ "$(decision_of "$WORK/out")" = "ask" ] && [ "$(elapsed_since "$_start")" -lt 5 ]; then
+    assert_pass "the prompt source answers ask at once when the hook has no terminal"
+  else
+    assert_fail "prompt without a terminal" "out=$(cat "$WORK/out") elapsed=$(elapsed_since "$_start")s"
+  fi
+else
+  assert_fail "prompt without a terminal" "the gate exited non-zero: $(cat "$WORK/err")"
 fi
 
 clear_state
