@@ -413,7 +413,7 @@ function Invoke-CleanupNix {
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-SccacheManagement.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "ManagedPaths.ps1")
 
-function Invoke-NucleusLogs {
+function Invoke-NucleusLogCommand {
   <#
   .SYNOPSIS
     Runs a nucleus-logs subcommand, streaming its output and setting $LASTEXITCODE.
@@ -455,7 +455,7 @@ switch ($Action) {
     if ($LogMaxSize) { $logsArguments += @('-MaxSize', $LogMaxSize) }
     if ($LogMaxFiles) { $logsArguments += @('-MaxFiles', $LogMaxFiles) }
     if ($LogCompress) { $logsArguments += @('-Compress', $LogCompress) }
-    Invoke-NucleusLogs -Arguments $logsArguments
+    Invoke-NucleusLogCommand -Arguments $logsArguments
     exit $LASTEXITCODE
   }
   'preferences' {
@@ -630,12 +630,12 @@ if (-not $NoLogGc) {
     if ($DryRun) {
       Write-NucleusDryRun "would rotate managed logs in '$logDir' and expire archives older than $logExpiry"
     } else {
-      Invoke-NucleusLogs -Arguments @('-Action', 'rotate', '-Scope', 'user', '-MaxSize', $logMaxSize, '-MaxFiles', $logMaxFiles, '-Compress', $logCompress)
+      Invoke-NucleusLogCommand -Arguments @('-Action', 'rotate', '-Scope', 'user', '-MaxSize', $logMaxSize, '-MaxFiles', $logMaxFiles, '-Compress', $logCompress)
       if ($LASTEXITCODE -ne 0) {
         Write-NucleusError -CommandName gc "nucleus-logs rotate -Scope user failed (exit $LASTEXITCODE)"
         throw "nucleus-logs rotate -Scope user failed (exit $LASTEXITCODE)"
       }
-      Invoke-NucleusLogs -Arguments @('-Action', 'expire', '-Scope', 'user', '-Expiry', $logExpiry)
+      Invoke-NucleusLogCommand -Arguments @('-Action', 'expire', '-Scope', 'user', '-Expiry', $logExpiry)
       if ($LASTEXITCODE -ne 0) {
         Write-NucleusError -CommandName gc "nucleus-logs expire -Scope user failed (exit $LASTEXITCODE)"
         throw "nucleus-logs expire -Scope user failed (exit $LASTEXITCODE)"
@@ -647,12 +647,12 @@ if (-not $NoLogGc) {
         if ($DryRun) {
           Write-NucleusDryRun "would rotate managed logs in '$systemLogDir' and expire archives older than $logExpiry"
         } else {
-          Invoke-NucleusLogs -Arguments @('-Action', 'rotate', '-Scope', 'system', '-MaxSize', $logMaxSize, '-MaxFiles', $logMaxFiles, '-Compress', $logCompress)
+          Invoke-NucleusLogCommand -Arguments @('-Action', 'rotate', '-Scope', 'system', '-MaxSize', $logMaxSize, '-MaxFiles', $logMaxFiles, '-Compress', $logCompress)
           if ($LASTEXITCODE -ne 0) {
             Write-NucleusError -CommandName gc "nucleus-logs rotate -Scope system failed (exit $LASTEXITCODE)"
             throw "nucleus-logs rotate -Scope system failed (exit $LASTEXITCODE)"
           }
-          Invoke-NucleusLogs -Arguments @('-Action', 'expire', '-Scope', 'system', '-Expiry', $logExpiry)
+          Invoke-NucleusLogCommand -Arguments @('-Action', 'expire', '-Scope', 'system', '-Expiry', $logExpiry)
           if ($LASTEXITCODE -ne 0) {
             Write-NucleusError -CommandName gc "nucleus-logs expire -Scope system failed (exit $LASTEXITCODE)"
             throw "nucleus-logs expire -Scope system failed (exit $LASTEXITCODE)"

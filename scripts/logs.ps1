@@ -175,14 +175,14 @@ function ConvertTo-LogEventLine {
     Stamps ts when absent and fills every missing canonical key with null, so
     every line carries the same key set. Extra keys are kept and sorted with the
     rest.
-  .PARAMETER Event
+  .PARAMETER LogEvent
     Event fields as a hashtable.
   #>
   [CmdletBinding()]
   [OutputType([string])]
   param(
     [Parameter(Mandatory)]
-    [hashtable]$Event
+    [hashtable]$LogEvent
   )
 
   $normalized = @{}
@@ -190,7 +190,7 @@ function ConvertTo-LogEventLine {
     $normalized[$key] = $null
   }
   $normalized['ts'] = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
-  foreach ($entry in $Event.GetEnumerator()) {
+  foreach ($entry in $LogEvent.GetEnumerator()) {
     $normalized[$entry.Key] = $entry.Value
   }
 
@@ -214,8 +214,8 @@ function Add-NucleusLogEvent {
     blocked.
   .PARAMETER LogName
     Log name, written to <log root>\<LogName>.log. Alias: -Log.
-  .PARAMETER Event
-    Event fields as a hashtable; missing canonical keys become null.
+  .PARAMETER LogEvent
+    Event fields as a hashtable; missing canonical keys become null. Alias: -Event.
   .PARAMETER Directory
     Log root; defaults to the user log root.
   #>
@@ -225,7 +225,8 @@ function Add-NucleusLogEvent {
     [Alias('Log')]
     [string]$LogName,
     [Parameter(Mandatory)]
-    [hashtable]$Event,
+    [Alias('Event')]
+    [hashtable]$LogEvent,
     [string]$Directory
   )
 
@@ -243,7 +244,7 @@ function Add-NucleusLogEvent {
     throw 'no log directory resolved; set NUCLEUS_LOG_DIR or NUCLEUS_REPO_ROOT before appending'
   }
 
-  $line = ConvertTo-LogEventLine -Event $Event
+  $line = ConvertTo-LogEventLine -LogEvent $LogEvent
   $bytes = [System.Text.Encoding]::UTF8.GetByteCount($line)
   if ($bytes + 1 -ge $script:MaxEventBytes) {
     throw "event is $bytes bytes; a line plus its newline must stay under $($script:MaxEventBytes)"
@@ -316,6 +317,7 @@ function Get-LogArchiveIndex {
   .PARAMETER LogName
     Log the archive must belong to.
   #>
+  [OutputType([int])]
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)]
@@ -396,14 +398,14 @@ function Format-LogEventLine {
   <#
   .SYNOPSIS
     Renders one event object as a text line.
-  .PARAMETER Event
+  .PARAMETER LogEvent
     Parsed event object.
   #>
-  param([Parameter(Mandatory)] [pscustomobject]$Event)
+  param([Parameter(Mandatory)] [pscustomobject]$LogEvent)
 
   $fields = @()
   foreach ($name in @('ts', 'kind', 'id', 'decision', 'summary')) {
-    $property = $Event.PSObject.Properties[$name]
+    $property = $LogEvent.PSObject.Properties[$name]
     if ($null -eq $property -or $null -eq $property.Value) {
       $fields += '-'
     } elseif ($property.Value -is [datetime]) {
@@ -444,31 +446,31 @@ function Select-LogEvent {
   )
 
   foreach ($line in (Get-LogEventStream -Directory $Directory -LogName $LogName)) {
-    $event = $null
+    $logEvent = $null
     try {
-      $event = $line | ConvertFrom-Json -ErrorAction Stop
+      $logEvent = $line | ConvertFrom-Json -ErrorAction Stop
     } catch {
       continue
     }
-    if ($event -isnot [pscustomobject]) { continue }
+    if ($logEvent -isnot [pscustomobject]) { continue }
     if ($SinceFilter) {
-      $tsProperty = $event.PSObject.Properties['ts']
+      $tsProperty = $logEvent.PSObject.Properties['ts']
       $ts = if ($null -ne $tsProperty) { $tsProperty.Value } else { '' }
       if (-not $ts -or $ts -lt $SinceFilter) { continue }
     }
     if ($KindFilter) {
-      $kindProperty = $event.PSObject.Properties['kind']
+      $kindProperty = $logEvent.PSObject.Properties['kind']
       if ($null -eq $kindProperty -or $kindProperty.Value -ne $KindFilter) { continue }
     }
     if ($HarnessFilter) {
-      $harnessProperty = $event.PSObject.Properties['harness']
+      $harnessProperty = $logEvent.PSObject.Properties['harness']
       if ($null -eq $harnessProperty -or $harnessProperty.Value -ne $HarnessFilter) { continue }
     }
-    $event
+    $logEvent
   }
 }
 
-function Get-LogsStats {
+function Get-LogStatReport {
   <#
   .SYNOPSIS
     Returns per-log counters for one log root.
@@ -520,6 +522,7 @@ function Get-LogsSchemaDefault {
   .PARAMETER Fallback
     Value used when the schema cannot be read.
   #>
+  [OutputType([string])]
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)]
@@ -577,11 +580,11 @@ switch ($Action) {
       Write-NucleusError -CommandName logs 'event is not a JSON object'
       exit 1
     }
-    $event = @{}
+    $logEvent = @{}
     foreach ($property in $parsed.PSObject.Properties) {
-      $event[$property.Name] = $property.Value
+      $logEvent[$property.Name] = $property.Value
     }
-    Add-NucleusLogEvent -LogName $Log -Event $event -Directory $logDir -WhatIf:$DryRun
+    Add-NucleusLogEvent -LogName $Log -LogEvent $logEvent -Directory $logDir -WhatIf:$DryRun
   }
   'label' {
     if (-not $Id -or -not $Verdict) {
@@ -595,8 +598,8 @@ switch ($Action) {
     $labelLog = if ($Log) { $Log } else { $script:LabelLog }
     # WHY null: POSIX writes null when --note is absent, and "" would be a
     # different JSON value for the same absence.
-    $event = @{ kind = 'label'; id = $Id; verdict = $Verdict; note = $(if ($Note) { $Note } else { $null }); source = 'none' }
-    Add-NucleusLogEvent -LogName $labelLog -Event $event -Directory $userLogDir -WhatIf:$DryRun
+    $logEvent = @{ kind = 'label'; id = $Id; verdict = $Verdict; note = $(if ($Note) { $Note } else { $null }); source = 'none' }
+    Add-NucleusLogEvent -LogName $labelLog -LogEvent $logEvent -Directory $userLogDir -WhatIf:$DryRun
   }
   'show' {
     if (-not $Log) {
@@ -607,7 +610,7 @@ switch ($Action) {
     if ($Json) {
       ConvertTo-Json -InputObject $events -Depth 5
     } else {
-      foreach ($event in $events) { Format-LogEventLine -Event $event }
+      foreach ($logEvent in $events) { Format-LogEventLine -LogEvent $logEvent }
     }
   }
   'tail' {
@@ -621,15 +624,15 @@ switch ($Action) {
       exit 0
     }
     foreach ($line in (Get-Content -LiteralPath $path -Tail $Lines)) {
-      try {
-        Format-LogEventLine -Event ($line | ConvertFrom-Json -ErrorAction Stop)
-      } catch {
-        continue
-      }
+      $logEvent = try { $line | ConvertFrom-Json -ErrorAction Stop } catch { continue }
+      # WHY the format call sits outside the try: a malformed line is skippable, a
+      # binding error in the formatter is not, and swallowing it made tail print
+      # nothing and exit 0.
+      Format-LogEventLine -LogEvent $logEvent
     }
   }
   'stats' {
-    $rows = @(Get-LogsStats -Directory $logDir -LogFilter $Log)
+    $rows = @(Get-LogStatReport -Directory $logDir -LogFilter $Log)
     if ($Json) {
       ConvertTo-Json -InputObject $rows -Depth 5
     } elseif ($rows.Count -eq 0) {

@@ -28,7 +28,7 @@ BeforeAll {
   $env:NUCLEUS_REPO_ROOT = $script:RepoRoot
   $env:NUCLEUS_LOG_DIR = $script:Work
 
-  function Invoke-Logs {
+  function Invoke-LogCommand {
     param(
       [Parameter(Mandatory)][string[]]$Arguments,
       [string]$InputLine
@@ -73,22 +73,22 @@ AfterAll {
 
 Describe 'nucleus-logs append' {
   It 'writes one line carrying every canonical key' {
-    $result = Invoke-Logs -Arguments @('append', '-Log', 'decisions') -InputLine '{"id":"one","kind":"decision"}'
+    $result = Invoke-LogCommand -Arguments @('append', '-Log', 'decisions') -InputLine '{"id":"one","kind":"decision"}'
     $result.ExitCode | Should -Be 0
 
     $lines = @(Get-LogLine -LogName "decisions")
     $lines.Count | Should -Be 1
 
-    $event = $lines[0] | ConvertFrom-Json
+    $logEvent = $lines[0] | ConvertFrom-Json
     foreach ($key in @('ts', 'id', 'kind', 'harness', 'decision', 'source', 'filter', 'rule', 'latency_ms', 'summary', 'digest')) {
-      $event.PSObject.Properties.Name | Should -Contain $key
+      $logEvent.PSObject.Properties.Name | Should -Contain $key
     }
-    $event.id | Should -Be 'one'
+    $logEvent.id | Should -Be 'one'
   }
 
   It 'refuses an event over the 4096-byte limit' {
     $big = 'x' * 5000
-    $result = Invoke-Logs -Arguments @('append', '-Log', 'decisions') -InputLine ('{"id":"big","summary":"' + $big + '"}')
+    $result = Invoke-LogCommand -Arguments @('append', '-Log', 'decisions') -InputLine ('{"id":"big","summary":"' + $big + '"}')
     $result.ExitCode | Should -Not -Be 0
     ($result.Stderr -join '') | Should -BeLike '*4096*'
   }
@@ -96,11 +96,11 @@ Describe 'nucleus-logs append' {
 
 Describe 'nucleus-logs label' {
   It 'appends a kind=label event to the harness log and leaves earlier lines untouched' {
-    $null = Invoke-Logs -Arguments @('label', '-Id', 'seed', '-Verdict', 'correct', '-Note', 'seed event')
+    $null = Invoke-LogCommand -Arguments @('label', '-Id', 'seed', '-Verdict', 'correct', '-Note', 'seed event')
     $before = @(Get-LogLine -LogName 'harness')
     $before.Count | Should -Be 1
 
-    $result = Invoke-Logs -Arguments @('label', '-Id', 'one', '-Verdict', 'false-deny', '-Note', 'reviewed by hand')
+    $result = Invoke-LogCommand -Arguments @('label', '-Id', 'one', '-Verdict', 'false-deny', '-Note', 'reviewed by hand')
     $result.ExitCode | Should -Be 0
 
     $after = @(Get-LogLine -LogName 'harness')
@@ -162,9 +162,9 @@ Describe 'nucleus-logs concurrency' {
     $lines.Count | Should -Be 12
     $ids = @()
     foreach ($line in $lines) {
-      $event = $line | ConvertFrom-Json
-      $event.kind | Should -Be 'concurrent'
-      $ids += $event.id
+      $logEvent = $line | ConvertFrom-Json
+      $logEvent.kind | Should -Be 'concurrent'
+      $ids += $logEvent.id
     }
     ($ids | Sort-Object -Unique).Count | Should -Be 12
   }
@@ -186,12 +186,29 @@ Describe 'nucleus-logs tolerates a native writer' {
       $holder.Write($nativeBytes, 0, $nativeBytes.Length)
       $holder.Flush()
 
-      $result = Invoke-Logs -Arguments @('append', '-Log', 'native') -InputLine '{"id":"n1","kind":"decision"}'
+      $result = Invoke-LogCommand -Arguments @('append', '-Log', 'native') -InputLine '{"id":"n1","kind":"decision"}'
       $result.ExitCode | Should -Be 0
       (Get-Content -LiteralPath $path).Count | Should -Be 2
     } finally {
       $holder.Dispose()
     }
+  }
+}
+
+Describe 'nucleus-logs tail' {
+  It 'returns the newest event line rather than an empty success' {
+    $null = Invoke-LogCommand -Arguments @('append', '-Log', 'tail-check') -InputLine '{"id":"t1","kind":"decision","summary":"first"}'
+    $null = Invoke-LogCommand -Arguments @('append', '-Log', 'tail-check') -InputLine '{"id":"t2","kind":"decision","summary":"second"}'
+
+    $result = Invoke-LogCommand -Arguments @('tail', '-Log', 'tail-check', '-Lines', '1')
+    $result.ExitCode | Should -Be 0
+    # WHY the content assertion: a swallowed binding error exits 0 with no output,
+    # so the exit code alone cannot cover this path.
+    $result.Stdout | Should -Not -BeNullOrEmpty
+    # WHY the summary words: -BeLike is case-insensitive, so an id assertion on
+    # "t1"/"t2" matches the ISO timestamp's "T1".
+    ($result.Stdout -join "`n") | Should -BeLike '*second*'
+    ($result.Stdout -join "`n") | Should -Not -BeLike '*first*'
   }
 }
 
@@ -202,7 +219,7 @@ Describe 'nucleus-logs rotate and expire' {
     Set-Content -LiteralPath $path -Value $payload -NoNewline
     $null = Add-Content -LiteralPath $path -Value ([Environment]::NewLine)
 
-    $result = Invoke-Logs -Arguments @('rotate', '-MaxSize', '1024', '-MaxFiles', '4', '-Compress', 'true')
+    $result = Invoke-LogCommand -Arguments @('rotate', '-MaxSize', '1024', '-MaxFiles', '4', '-Compress', 'true')
     $result.ExitCode | Should -Be 0
 
     # WHY the .1.log naming: Invoke-LogRotation, the shared Windows rotation, names
@@ -228,18 +245,18 @@ Describe 'nucleus-logs rotate and expire' {
     $path = Join-Path -Path $script:Work -ChildPath 'plain.log'
     Set-Content -LiteralPath $path -Value ('{"id":"rot","summary":"' + ('y' * 3000) + '"}')
 
-    $result = Invoke-Logs -Arguments @('rotate', '-MaxSize', '1024', '-Compress', 'false')
+    $result = Invoke-LogCommand -Arguments @('rotate', '-MaxSize', '1024', '-Compress', 'false')
     $result.ExitCode | Should -Be 0
     (Test-Path -LiteralPath (Join-Path -Path $script:Work -ChildPath 'plain.1.log')) | Should -BeTrue
 
-    $show = Invoke-Logs -Arguments @('show', '-Log', 'plain', '-Json')
+    $show = Invoke-LogCommand -Arguments @('show', '-Log', 'plain', '-Json')
     $show.ExitCode | Should -Be 0
     $ids = @(($show.Stdout -join "`n") | ConvertFrom-Json).id
     $ids | Should -Contain 'rot'
   }
 
   It 'does not list an uncompressed archive as its own log' {
-    $stats = Invoke-Logs -Arguments @('stats', '-Json')
+    $stats = Invoke-LogCommand -Arguments @('stats', '-Json')
     $stats.ExitCode | Should -Be 0
     $names = @(($stats.Stdout -join "`n") | ConvertFrom-Json).log
     $names | Should -Not -Contain 'plain.1'
@@ -258,7 +275,7 @@ Describe 'nucleus-logs rotate and expire' {
     }
     (Get-Item -LiteralPath $old).LastWriteTime = (Get-Date).AddDays(-30)
 
-    $result = Invoke-Logs -Arguments @('expire', '-Expiry', '7d')
+    $result = Invoke-LogCommand -Arguments @('expire', '-Expiry', '7d')
     $result.ExitCode | Should -Be 0
 
     (Test-Path -LiteralPath $old) | Should -BeFalse
@@ -268,7 +285,7 @@ Describe 'nucleus-logs rotate and expire' {
 
 Describe 'nucleus-logs help' {
   It 'prints help and exits 0' {
-    $result = Invoke-Logs -Arguments @('-Help')
+    $result = Invoke-LogCommand -Arguments @('-Help')
     $result.ExitCode | Should -Be 0
     ($result.Stdout -join '') | Should -BeLike '*nucleus-logs*'
   }
