@@ -823,6 +823,16 @@ let
       # WHY: shfmt is a single static binary; no separate macOS cask exists.
       winget = "mvdan.shfmt";
     };
+    shotcut = {
+      # WHY: all three carriers publish stable releases only, so there is no channel to prefer.
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "shotcut";
+      };
+      nixpkgs = "shotcut";
+      winget = "Meltytech.Shotcut";
+    };
     sigrok-cli = {
       # WHY: absent from WinGet; provisioned via Scoop custom bucket on Windows.
       category = "cli";

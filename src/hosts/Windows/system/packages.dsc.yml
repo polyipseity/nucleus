@@ -375,6 +375,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure the Shotcut video editor is installed to match the macOS Homebrew cask and NixOS nixpkgs declarations
+      settings:
+        id: Meltytech.Shotcut
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure .NET 6 runtime is installed for EIDE/runtime parity with macOS and NixOS
       settings:
         id: Microsoft.DotNet.Runtime.6
