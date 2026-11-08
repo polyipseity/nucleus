@@ -55,8 +55,16 @@ BeforeAll {
 
     $sourceDir = Join-Path -Path $sandbox.Repo -ChildPath 'src\scripts\notify'
     $null = New-Item -ItemType Directory -Path $sourceDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
-    foreach ($name in @('harness-approval', 'harness-bridge-common', 'harness-drive', 'harness-notify')) {
+    foreach ($name in @('harness-approval', 'harness-bridge-common', 'harness-drive', 'harness-filter', 'harness-notify')) {
       Copy-Item -LiteralPath (Join-Path -Path $script:NotifyDir -ChildPath "$name.ps1") -Destination (Join-Path -Path $sourceDir -ChildPath "$name.ps1")
+    }
+    # The runner resolves its filters beside itself, so the fixture carries the
+    # filter directory too: without it the deploy path only warns, and nothing
+    # proves the filters ever reach their destination.
+    $fixtureFilterDir = Join-Path -Path $sourceDir -ChildPath 'filters'
+    $null = New-Item -ItemType Directory -Path $fixtureFilterDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+    foreach ($filter in @(Get-ChildItem -LiteralPath (Join-Path -Path $script:NotifyDir -ChildPath 'filters') -File -Filter '*.ps1')) {
+      Copy-Item -LiteralPath $filter.FullName -Destination (Join-Path -Path $fixtureFilterDir -ChildPath $filter.Name)
     }
 
     $null = Set-Content -Path $sandbox.HermesLog -Value '' -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
@@ -336,7 +344,7 @@ Describe 'Sync-HarnessBridge shim convergence' {
   It 'deploys every entry point with its shim and the shared helper on an enabled run' {
     Sync-HarnessBridge -Enabled:$true -RepoRoot $script:syncSandbox.Repo -UserRoot $script:syncUserRoot -UserProfile $script:syncSandbox.Home > $null
 
-    foreach ($name in @('harness-approval', 'harness-drive', 'harness-notify')) {
+    foreach ($name in @('harness-approval', 'harness-drive', 'harness-filter', 'harness-notify')) {
       $deployed = Join-Path -Path $script:syncBinDir -ChildPath "$name.ps1"
       $source = Join-Path -Path $script:syncSandbox.Repo -ChildPath "src\scripts\notify\$name.ps1"
       Test-Path -LiteralPath $deployed | Should -Be $true
@@ -356,6 +364,16 @@ Describe 'Sync-HarnessBridge shim convergence' {
     Test-Path -LiteralPath $deployedCommon | Should -Be $true
     (Get-Content -LiteralPath $deployedCommon -Raw -Encoding UTF8) | Should -Be (Get-Content -LiteralPath $sourceCommon -Raw -Encoding UTF8)
     Test-Path -LiteralPath (Join-Path -Path $script:syncShimDir -ChildPath 'harness-bridge-common.cmd') | Should -Be $false
+
+    # The filters are child processes the runner resolves beside itself: they have
+    # to reach their directory, and they get no shim because nothing invokes them
+    # by PATH.
+    foreach ($filter in @(Get-ChildItem -LiteralPath (Join-Path -Path $script:syncSandbox.Repo -ChildPath 'src\scripts\notify\filters') -File -Filter '*.ps1')) {
+      $deployedFilter = Join-Path -Path (Join-Path -Path $script:syncBinDir -ChildPath 'filters') -ChildPath $filter.Name
+      Test-Path -LiteralPath $deployedFilter | Should -Be $true
+      (Get-Content -LiteralPath $deployedFilter -Raw -Encoding UTF8) | Should -Be (Get-Content -LiteralPath $filter.FullName -Raw -Encoding UTF8)
+      Test-Path -LiteralPath (Join-Path -Path $script:syncShimDir -ChildPath ($filter.BaseName + '.cmd')) | Should -Be $false
+    }
   }
 
   It 'is idempotent — a second enabled run rewrites nothing' {
@@ -364,9 +382,12 @@ Describe 'Sync-HarnessBridge shim convergence' {
       (Join-Path -Path $script:syncBinDir -ChildPath 'harness-approval.ps1')
       (Join-Path -Path $script:syncBinDir -ChildPath 'harness-drive.ps1')
       (Join-Path -Path $script:syncBinDir -ChildPath 'harness-bridge-common.ps1')
+      (Join-Path -Path $script:syncBinDir -ChildPath 'harness-filter.ps1')
+      (Join-Path -Path $script:syncBinDir -ChildPath 'filters\safe-delete.ps1')
       (Join-Path -Path $script:syncShimDir -ChildPath 'harness-notify.cmd')
       (Join-Path -Path $script:syncShimDir -ChildPath 'harness-approval.cmd')
       (Join-Path -Path $script:syncShimDir -ChildPath 'harness-drive.cmd')
+      (Join-Path -Path $script:syncShimDir -ChildPath 'harness-filter.cmd')
     )
     $before = $artifacts | ForEach-Object { (Get-Item -LiteralPath $_).LastWriteTimeUtc.Ticks }
 
@@ -385,10 +406,11 @@ Describe 'Sync-HarnessBridge shim convergence' {
 
     Sync-HarnessBridge -Enabled:$false -RepoRoot $script:syncSandbox.Repo -UserRoot $script:syncUserRoot -UserProfile $script:syncSandbox.Home > $null
 
-    foreach ($name in @('harness-approval', 'harness-bridge-common', 'harness-drive', 'harness-notify')) {
+    foreach ($name in @('harness-approval', 'harness-bridge-common', 'harness-drive', 'harness-filter', 'harness-notify')) {
       Test-Path -LiteralPath (Join-Path -Path $script:syncBinDir -ChildPath "$name.ps1") | Should -Be $false
       Test-Path -LiteralPath (Join-Path -Path $script:syncShimDir -ChildPath "$name.cmd") | Should -Be $false
     }
+    Test-Path -LiteralPath (Join-Path -Path $script:syncBinDir -ChildPath 'filters') | Should -Be $false
     Test-Path -LiteralPath $unmanagedShim | Should -Be $true
     Test-Path -LiteralPath $unmanagedBin | Should -Be $true
 

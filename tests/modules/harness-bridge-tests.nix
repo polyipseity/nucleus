@@ -22,6 +22,7 @@ let
   entryPoints = [
     "harness-approval"
     "harness-drive"
+    "harness-filter"
     "harness-notify"
   ];
 
@@ -140,11 +141,10 @@ in
     # --- Copilot wiring ---
     (assert'
       (
-        builtins.length copilotHooks.PreToolUse == 2
-        && builtins.length (entriesRunning copilotHooks.PreToolUse guardCommand) == 1
-        && builtins.length (entriesWithCommand copilotHooks.PreToolUse "harness-approval hook copilot") == 1
+        builtins.length copilotHooks.PreToolUse == 1
+        && builtins.length (entriesWithCommand copilotHooks.PreToolUse "harness-filter copilot") == 1
       )
-      "VS Code Copilot PreToolUse must hold exactly two hooks: safe-delete-guard and the Copilot harness-approval document"
+      "VS Code Copilot PreToolUse must run exactly the filter runner: one entry point makes the decision, so no second document can disagree with it"
     )
     (assert' (all (
       entry: entry.type == "command"
@@ -160,17 +160,19 @@ in
     (assert' (cursorVersion == 1) "Cursor hook definitions must use config version 1")
     (assert'
       (
-        builtins.length cursorHooks.beforeShellExecution == 2
-        && builtins.length (entriesRunning cursorHooks.beforeShellExecution guardCommand) == 1
+        builtins.length cursorHooks.beforeShellExecution == 1
         &&
-          builtins.length (entriesWithCommand cursorHooks.beforeShellExecution "harness-approval hook cursor")
-          == 1
+          builtins.length (entriesWithCommand cursorHooks.beforeShellExecution "harness-filter cursor") == 1
       )
-      "Cursor shell executions must hold exactly two hooks: safe-delete-guard and the Cursor harness-approval document"
+      "Cursor shell executions must run exactly the filter runner: one entry point makes the decision, so no second document can disagree with it"
     )
-    (assert' (
-      (builtins.head cursorHooks.beforeMCPExecution).command == "harness-approval hook cursor"
-    ) "Cursor MCP calls must ask harness-approval for the Cursor permission document")
+    (assert'
+      (
+        builtins.length cursorHooks.beforeMCPExecution == 1
+        && (builtins.head cursorHooks.beforeMCPExecution).command == "harness-filter cursor"
+      )
+      "Cursor MCP calls must run the filter runner too, because an MCP call can delete data just as a shell command can"
+    )
     (assert' (
       (builtins.head cursorHooks.stop).command == "harness-drive cursor"
     ) "Cursor stop must run harness-drive, which notifies and injects a queued prompt")

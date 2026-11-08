@@ -4,23 +4,28 @@
 
 .DESCRIPTION
   The harness bridge answers harness hooks through bare command names
-  (`harness-notify`, `harness-approval`, `harness-drive`) so one shared hook
-  definition works on every platform.  Windows reaches them through .cmd shims,
-  because %USERPROFILE%\.local\bin is a managed PATH component and a bare name
-  resolves through PATHEXT.
+  (`harness-notify`, `harness-approval`, `harness-drive`, `harness-filter`) so one
+  shared hook definition works on every platform.  Windows reaches them through
+  .cmd shims, because %USERPROFILE%\.local\bin is a managed PATH component and a
+  bare name resolves through PATHEXT.
 
   Layout this function converges:
 
     <USER root>\bin\harness-notify.ps1    deployed copy of the entry point
     <USER root>\bin\harness-approval.ps1  deployed copy of the entry point
     <USER root>\bin\harness-drive.ps1     deployed copy of the entry point
+    <USER root>\bin\harness-filter.ps1    deployed copy of the entry point
     <USER root>\bin\harness-bridge-common.ps1  helper the entry points dot-source
+    <USER root>\bin\filters\*.ps1          the copies harness-filter runs
     %USERPROFILE%\.local\bin\harness-notify.cmd    shim -> <USER root>\bin copy
     %USERPROFILE%\.local\bin\harness-approval.cmd  shim -> <USER root>\bin copy
     %USERPROFILE%\.local\bin\harness-drive.cmd     shim -> <USER root>\bin copy
+    %USERPROFILE%\.local\bin\harness-filter.cmd    shim -> <USER root>\bin copy
 
-  harness-bridge-common.ps1 is dot-sourced by the three entry points, never
-  invoked as a command, so it gets no shim.
+  harness-bridge-common.ps1 is dot-sourced by the entry points, never
+  invoked as a command, so it gets no shim.  The filters are child processes the
+  runner starts, so they get neither a shim nor a PATH entry: the runner resolves
+  them beside itself.
 
   Copies (rather than links into the repository) keep a hook working when the
   checkout moves; they are refreshed whenever the repository copy changes, so the
@@ -76,9 +81,12 @@ function Sync-HarnessBridge {
   )
 
   $label = 'harness-bridge'
-  $scriptNames = @('harness-approval', 'harness-drive', 'harness-notify')
+  $scriptNames = @('harness-approval', 'harness-drive', 'harness-filter', 'harness-notify')
   # Dot-sourced by the entry points, so it is deployed beside them with no shim.
   $sharedScriptNames = @('harness-bridge-common')
+  # Child processes of the runner, resolved beside the deployed copy, so the whole
+  # directory has to arrive with it.
+  $filterDirName = 'filters'
   # Shared file first: an interrupted apply must never leave entry points behind
   # that dot-source a file which never arrived.
   $deployNames = @($sharedScriptNames) + @($scriptNames)
@@ -104,6 +112,11 @@ function Sync-HarnessBridge {
           Remove-Item -LiteralPath $managedPath -Force
           Write-NucleusNotice -Message "[$label] removed $managedPath"
         }
+      }
+      $deployedFilterDir = Join-Path -Path $binDir -ChildPath $filterDirName
+      if (Test-Path -LiteralPath $deployedFilterDir) {
+        Remove-Item -LiteralPath $deployedFilterDir -Recurse -Force
+        Write-NucleusNotice -Message "[$label] removed $deployedFilterDir"
       }
       Write-NucleusNotice -Message "[$label] disabled — harness hooks answer locally"
       return
@@ -154,6 +167,26 @@ function Sync-HarnessBridge {
       if ($shimNeedsWrite) {
         [System.IO.File]::WriteAllText($shimPath, $shim, [System.Text.UTF8Encoding]::new($false))
         Write-NucleusNotice -Message "[$label] wrote $shimPath"
+      }
+    }
+
+    $sourceFilterDir = Join-Path -Path (Join-Path -Path $RepoRoot -ChildPath 'src\scripts\notify') -ChildPath $filterDirName
+    if (-not (Test-Path -LiteralPath $sourceFilterDir -PathType Container)) {
+      Write-NucleusWarning -Message "[$label] filter directory not found: $sourceFilterDir"
+      return
+    }
+
+    $deployedFilterDir = Join-Path -Path $binDir -ChildPath $filterDirName
+    $null = New-Item -ItemType Directory -Path $deployedFilterDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+    foreach ($sourceFilter in @(Get-ChildItem -LiteralPath $sourceFilterDir -File -Filter '*.ps1')) {
+      $targetFilter = Join-Path -Path $deployedFilterDir -ChildPath $sourceFilter.Name
+      $filterNeedsCopy = $true
+      if (Test-Path -LiteralPath $targetFilter -PathType Leaf) {
+        $filterNeedsCopy = (Get-Content -LiteralPath $sourceFilter.FullName -Raw -Encoding UTF8) -ne (Get-Content -LiteralPath $targetFilter -Raw -Encoding UTF8)
+      }
+      if ($filterNeedsCopy) {
+        Copy-Item -LiteralPath $sourceFilter.FullName -Destination $targetFilter -Force
+        Write-NucleusNotice -Message "[$label] deployed $targetFilter"
       }
     }
   }
