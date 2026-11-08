@@ -172,6 +172,24 @@ test_label_target_and_verdict_vocabulary() {
   fi
 }
 
+# ---- a blank log name never resolves to a path ----
+
+test_blank_name_is_rejected() {
+  local status=0
+  printf '{"id":"x"}\n' | logs append '   ' >/dev/null 2>&1 || status=$?
+  if [ "$status" -ne 0 ]; then
+    assert_pass "a whitespace-only log name is rejected"
+  else
+    assert_fail "append-blank-name" "append accepted a whitespace-only name"
+  fi
+
+  if [ ! -e "$_WORK/.log" ] && [ ! -e "$_WORK/.lock" ]; then
+    assert_pass "a rejected name leaves no path behind"
+  else
+    assert_fail "append-blank-path" "a rejected name created a path"
+  fi
+}
+
 # ---- rotate copies, compresses, and truncates in place ----
 
 test_rotate_archives_and_truncates() {
@@ -199,6 +217,28 @@ test_rotate_archives_and_truncates() {
     assert_pass "the archive holds the rotated event"
   else
     assert_fail "rotate-content" "archive content lost the event"
+  fi
+}
+
+# ---- rotate without compression leaves a plain archive that show still reads ----
+
+test_rotate_without_compression_is_readable() {
+  local big
+  big="$(printf 'w%.0s' $(seq 3000))"
+  printf '{"id":"plain","summary":"%s"}\n' "$big" >>"$_WORK/plain.log"
+
+  logs rotate --max-size 1024 --max-files 4 --compress false
+
+  if [ -f "$_WORK/plain.log.1" ]; then
+    assert_pass "rotate without compression leaves a plain archive"
+  else
+    assert_fail "rotate-plain" "no plain archive after rotate --compress false"
+  fi
+
+  if [ "$(logs show plain --json | jq -r '.[].id' | head -n 1)" = "plain" ]; then
+    assert_pass "show reads an uncompressed archive"
+  else
+    assert_fail "rotate-plain-show" "show did not return the archived event"
   fi
 }
 
@@ -246,7 +286,9 @@ test_oversized_event_is_refused
 test_concurrent_appends_keep_every_line
 test_label_appends_verdict_event
 test_label_target_and_verdict_vocabulary
+test_blank_name_is_rejected
 test_rotate_archives_and_truncates
+test_rotate_without_compression_is_readable
 test_expire_removes_old_archives
 test_show_filters_by_kind
 

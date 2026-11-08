@@ -440,7 +440,6 @@ function Invoke-NucleusLogs {
   # WHY a child process: the app exits on a usage error, and an in-process exit
   # would end this script's remaining garbage-collection steps with it.
   & (Get-Process -Id $PID).Path -NoProfile -NoLogo -File $logsBin @Arguments
-  return $LASTEXITCODE
 }
 
 switch ($Action) {
@@ -632,9 +631,15 @@ if (-not $NoLogGc) {
       Write-NucleusDryRun "would rotate managed logs in '$logDir' and expire archives older than $logExpiry"
     } else {
       Invoke-NucleusLogs -Arguments @('-Action', 'rotate', '-Scope', 'user', '-MaxSize', $logMaxSize, '-MaxFiles', $logMaxFiles, '-Compress', $logCompress)
-      if ($LASTEXITCODE -ne 0) { throw "nucleus-logs rotate -Scope user failed (exit $LASTEXITCODE)" }
+      if ($LASTEXITCODE -ne 0) {
+        Write-NucleusError -CommandName gc "nucleus-logs rotate -Scope user failed (exit $LASTEXITCODE)"
+        throw "nucleus-logs rotate -Scope user failed (exit $LASTEXITCODE)"
+      }
       Invoke-NucleusLogs -Arguments @('-Action', 'expire', '-Scope', 'user', '-Expiry', $logExpiry)
-      if ($LASTEXITCODE -ne 0) { throw "nucleus-logs expire -Scope user failed (exit $LASTEXITCODE)" }
+      if ($LASTEXITCODE -ne 0) {
+        Write-NucleusError -CommandName gc "nucleus-logs expire -Scope user failed (exit $LASTEXITCODE)"
+        throw "nucleus-logs expire -Scope user failed (exit $LASTEXITCODE)"
+      }
     }
 
     if ($systemLogDir -and ($systemLogDir -ne $logDir)) {
@@ -643,9 +648,15 @@ if (-not $NoLogGc) {
           Write-NucleusDryRun "would rotate managed logs in '$systemLogDir' and expire archives older than $logExpiry"
         } else {
           Invoke-NucleusLogs -Arguments @('-Action', 'rotate', '-Scope', 'system', '-MaxSize', $logMaxSize, '-MaxFiles', $logMaxFiles, '-Compress', $logCompress)
-          if ($LASTEXITCODE -ne 0) { throw "nucleus-logs rotate -Scope system failed (exit $LASTEXITCODE)" }
+          if ($LASTEXITCODE -ne 0) {
+            Write-NucleusError -CommandName gc "nucleus-logs rotate -Scope system failed (exit $LASTEXITCODE)"
+            throw "nucleus-logs rotate -Scope system failed (exit $LASTEXITCODE)"
+          }
           Invoke-NucleusLogs -Arguments @('-Action', 'expire', '-Scope', 'system', '-Expiry', $logExpiry)
-          if ($LASTEXITCODE -ne 0) { throw "nucleus-logs expire -Scope system failed (exit $LASTEXITCODE)" }
+          if ($LASTEXITCODE -ne 0) {
+            Write-NucleusError -CommandName gc "nucleus-logs expire -Scope system failed (exit $LASTEXITCODE)"
+            throw "nucleus-logs expire -Scope system failed (exit $LASTEXITCODE)"
+          }
         }
       } elseif ($DryRun) {
         Write-NucleusDryRun "would escalate system log rotation in '$systemLogDir' to the 'log-gc-system' scheduled task"

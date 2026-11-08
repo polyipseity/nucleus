@@ -127,20 +127,22 @@ logs_check_event_size() {
   fi
 }
 
-# logs_append_event <log-name> <json-line>: append one canonical line. This is
-# the writer every caller shares; keep it to a single printf so the whole line
-# reaches one write(2) on a file opened O_APPEND.
+# logs_append_event <log-name> <json-line> <log-dir>: append one canonical line.
+# This is the writer every caller shares; keep it to a single printf so the whole
+# line reaches one write(2) on a file opened O_APPEND.
 logs_append_event() {
   logs_validate_name "$1"
   logs_check_event_size "$(logs_event_bytes "$2")"
-  _lae_dir="$(nucleus_log_dir)" || die "cannot resolve the nucleus log directory"
-  mkdir -p "$_lae_dir"
-  _lae_file="$(logs_file_path "$_lae_dir" "$1")"
+  # WHY: an empty root would build a path at the filesystem root, so a log name
+  # without a directory is an error rather than a silent relocation.
+  [ -n "$3" ] || die "no log directory resolved; cannot append to '$1'"
+  mkdir -p "$3"
+  _lae_file="$(logs_file_path "$3" "$1")"
   printf '%s\n' "$2" >>"$_lae_file"
 }
 
-# logs_append_stdin <log-name> <dry-run true|false>: read exactly one event from
-# stdin, reject an oversized one, and append it.
+# logs_append_stdin <log-name> <dry-run true|false> <log-dir>: read exactly one
+# event from stdin, reject an oversized one, and append it.
 logs_append_stdin() {
   _las_raw=""
   if ! IFS= read -r _las_raw; then
@@ -158,14 +160,13 @@ logs_append_stdin() {
 
   logs_validate_name "$1"
 
-  _las_dir="$(nucleus_log_dir)" || die "cannot resolve the nucleus log directory"
-  _las_file="$(logs_file_path "$_las_dir" "$1")"
+  _las_file="$(logs_file_path "$3" "$1")"
   if [ "$2" = true ]; then
     dry_run "would append $_las_bytes bytes to '$_las_file'"
     printf '%s\n' "$_las_line"
     return 0
   fi
-  logs_append_event "$1" "$_las_line"
+  logs_append_event "$1" "$_las_line" "$3"
 }
 
 # logs_schema_default <field> <fallback>: the services.schema.json default for a
@@ -218,9 +219,11 @@ logs_expire() {
 }
 
 # logs_event_stream <dir> <log-name>: archives oldest first, then the live file.
+# Both archive spellings are matched, gzipped and plain, because rotation leaves
+# plain text when compression is off.
 logs_event_stream() {
   if [ -d "$1" ]; then
-    find "$1" -maxdepth 1 -name "$2.log.*.gz" -type f |
+    find "$1" -maxdepth 1 -type f -name "$2.log.[0-9]*" |
       awk -F'.log.' '{ print $2 "\t" $0 }' | sort -rn | cut -f2-
   fi
   if [ -f "$1/$2.log" ]; then
@@ -504,10 +507,6 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
       esac
       shift
     done
-    case "$_logs_scope" in
-    user | system) ;;
-    *) die "unknown scope '$_logs_scope' (expected user or system)" ;;
-    esac
     ;;
   *)
     error "unknown subcommand '$_logs_action' (append, expire, gc, label, rotate, show, stats, tail)"
@@ -516,9 +515,17 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     ;;
   esac
 
+  # WHY once, before dispatch: every arm reads the scope, so a typo must fail
+  # here instead of silently reading the user tree.
+  case "$_logs_scope" in
+  user | system) ;;
+  *) die "unknown scope '$_logs_scope' (expected user or system)" ;;
+  esac
+
   case "$_logs_action" in
   append)
-    logs_append_stdin "$_logs_name" "$_logs_dry"
+    _logs_dir="$(logs_dir_for_scope "$_logs_scope")" || die "cannot resolve the nucleus log directory"
+    logs_append_stdin "$_logs_name" "$_logs_dry" "$_logs_dir"
     ;;
   label)
     case " $LOGS_LABEL_VERDICTS " in
@@ -533,14 +540,14 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
         note: (if $note == "" then null else $note end)
       }')"
     _logs_line="$(printf '%s' "$_logs_event" | logs_normalize_event)" || die "label: event normalization failed"
-    _logs_dir="$(nucleus_log_dir)" || die "cannot resolve the nucleus log directory"
+    _logs_dir="$(logs_dir_for_scope user)" || die "cannot resolve the nucleus log directory"
     _logs_file="$(logs_file_path "$_logs_dir" "$_logs_label_log")"
     if [ "$_logs_dry" = true ]; then
       dry_run "would append a label event for '$_logs_label_id' to '$_logs_file'"
       printf '%s\n' "$_logs_line"
       exit 0
     fi
-    logs_append_event "$_logs_label_log" "$_logs_line"
+    logs_append_event "$_logs_label_log" "$_logs_line" "$_logs_dir"
     ;;
   show)
     logs_validate_name "$_logs_name"

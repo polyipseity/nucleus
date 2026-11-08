@@ -118,6 +118,21 @@ Describe 'nucleus-logs label' {
   }
 }
 
+Describe 'nucleus-logs name validation' {
+  It 'rejects an empty log name without creating a lock in the current directory' {
+    Push-Location -Path $script:RepoRoot
+    try {
+      $command = ". '$($script:LogsPs1)'; Add-NucleusLogEvent -LogName '' -Event @{ id = 'x' }"
+      & $script:PwshExe -NoProfile -NonInteractive -Command $command > $null 2>&1
+      $LASTEXITCODE | Should -Not -Be 0
+      (Test-Path -LiteralPath (Join-Path -Path $script:RepoRoot -ChildPath '.lock')) | Should -BeFalse
+      (Test-Path -LiteralPath (Join-Path -Path $script:RepoRoot -ChildPath '.log')) | Should -BeFalse
+    } finally {
+      Pop-Location
+    }
+  }
+}
+
 Describe 'nucleus-logs concurrency' {
   It 'keeps every line of 12 concurrent appends parseable' {
     $processes = @()
@@ -205,6 +220,29 @@ Describe 'nucleus-logs rotate and expire' {
         } finally { $reader.Dispose() }
       } finally { $gzip.Dispose() }
     } finally { $inputStream.Dispose() }
+  }
+
+  It 'shows events from an uncompressed archive' {
+    # WHY: with compression off, rotation leaves <base>.1.log as plain text, and a
+    # reader that always inflates would fail on every show.
+    $path = Join-Path -Path $script:Work -ChildPath 'plain.log'
+    Set-Content -LiteralPath $path -Value ('{"id":"rot","summary":"' + ('y' * 3000) + '"}')
+
+    $result = Invoke-Logs -Arguments @('rotate', '-MaxSize', '1024', '-Compress', 'false')
+    $result.ExitCode | Should -Be 0
+    (Test-Path -LiteralPath (Join-Path -Path $script:Work -ChildPath 'plain.1.log')) | Should -BeTrue
+
+    $show = Invoke-Logs -Arguments @('show', '-Log', 'plain', '-Json')
+    $show.ExitCode | Should -Be 0
+    $ids = @(($show.Stdout -join "`n") | ConvertFrom-Json).id
+    $ids | Should -Contain 'rot'
+  }
+
+  It 'does not list an uncompressed archive as its own log' {
+    $stats = Invoke-Logs -Arguments @('stats', '-Json')
+    $stats.ExitCode | Should -Be 0
+    $names = @(($stats.Stdout -join "`n") | ConvertFrom-Json).log
+    $names | Should -Not -Contain 'plain.1'
   }
 
   It 'removes an archive older than the expiry and keeps a fresh one' {

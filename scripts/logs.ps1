@@ -18,16 +18,16 @@
   Subcommand: append, expire, gc, label, rotate, show, stats, or tail.
 
 .PARAMETER Log
-  Log name for append, show, stats, and tail.
+  Log name for append, show, stats, and tail; label uses it as the target log instead of the harness default.
 
 .PARAMETER Id
   label: event id the verdict applies to.
 
 .PARAMETER Verdict
-  label: the verdict, e.g. allow or deny.
+  label: the verdict, one of correct, false-allow, or false-deny.
 
 .PARAMETER Note
-  label: free-text justification stored as the summary.
+  label: free-text justification stored as the event's note field.
 
 .PARAMETER Since
   show: keep events at or after an ISO-8601 timestamp.
@@ -84,6 +84,7 @@ param(
   [ValidateSet('append', 'expire', 'gc', 'label', 'rotate', 'show', 'stats', 'tail')]
   [string]$Action,
   [Parameter(Position = 1)]
+  [Alias('LogName')]
   [string]$Log,
   [string]$Id,
   [string]$Verdict,
@@ -103,9 +104,19 @@ param(
   [switch]$Help
 )
 
-Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
+# WHY: only the entry script changes its own session. A dot-sourcing caller
+# loads the functions and keeps its strict mode, its error preference, and its
+# own environment validity; the CLI dispatch and the environment checks below
+# are entry-script work.
+$script:IsEntryScript = $MyInvocation.InvocationName -ne '.'
+if ($script:IsEntryScript) {
+  Set-StrictMode -Version Latest
+  $ErrorActionPreference = 'Stop'
+}
 
+# WHY the import stays unconditional: the writer's helpers come from this module
+# and the log-management module below, so the dot-source contract depends on
+# them being present.
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
@@ -130,7 +141,7 @@ $script:EventKeys = @(
 )
 
 $repoRoot = $env:NUCLEUS_REPO_ROOT
-if ([string]::IsNullOrWhiteSpace($repoRoot) -and [string]::IsNullOrWhiteSpace($env:NUCLEUS_LOG_DIR)) {
+if ($script:IsEntryScript -and [string]::IsNullOrWhiteSpace($repoRoot) -and [string]::IsNullOrWhiteSpace($env:NUCLEUS_LOG_DIR)) {
   Write-NucleusError -CommandName logs 'NUCLEUS_REPO_ROOT not set'
   exit 1
 }
@@ -138,7 +149,7 @@ if ([string]::IsNullOrWhiteSpace($repoRoot) -and [string]::IsNullOrWhiteSpace($e
 $moduleDir = if ($repoRoot) { Join-Path -Path $repoRoot -ChildPath 'src\platforms\Windows\modules' } else { $null }
 if ($moduleDir -and (Test-Path -LiteralPath (Join-Path -Path $moduleDir -ChildPath 'Invoke-LogManagement.ps1'))) {
   . (Join-Path -Path $moduleDir -ChildPath 'Invoke-LogManagement.ps1')
-} else {
+} elseif ($script:IsEntryScript) {
   Write-NucleusError -CommandName logs "Invoke-LogManagement.ps1 not found under '$moduleDir'"
   exit 1
 }
@@ -218,9 +229,18 @@ function Add-NucleusLogEvent {
     [string]$Directory
   )
 
-  if (-not $Directory) { $Directory = Get-LogsDir -ScopeName 'user' }
+  # WHY the name is checked first: no path may be derived from an empty or
+  # whitespace-only name, so the directory lookup and every FileStream below are
+  # reached only with a usable name.
+  if ([string]::IsNullOrWhiteSpace($LogName)) {
+    throw 'log name must not be empty'
+  }
   if ($LogName -notmatch '^[A-Za-z0-9._-]+$') {
     throw "invalid log name '$LogName' (allowed: A-Z a-z 0-9 . _ -)"
+  }
+  if (-not $Directory) { $Directory = Get-LogsDir -ScopeName 'user' }
+  if ([string]::IsNullOrWhiteSpace($Directory)) {
+    throw 'no log directory resolved; set NUCLEUS_LOG_DIR or NUCLEUS_REPO_ROOT before appending'
   }
 
   $line = ConvertTo-LogEventLine -Event $Event
@@ -230,6 +250,9 @@ function Add-NucleusLogEvent {
   }
 
   $path = Join-Path -Path $Directory -ChildPath "$LogName.log"
+  if ([string]::IsNullOrWhiteSpace($path)) {
+    throw "no log path resolved for '$LogName' under '$Directory'"
+  }
   if (-not (Test-Path -LiteralPath $Directory -PathType Container)) {
     $null = New-Item -Path $Directory -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns the created directory item, which the caller already knows from $Directory, so the object is discarded
   }
@@ -339,21 +362,27 @@ function Get-LogEventStream {
   } -Descending
 
   foreach ($archive in $ordered) {
-    $inputStream = [System.IO.File]::OpenRead($archive.FullName)
-    try {
-      $gzip = [System.IO.Compression.GZipStream]::new($inputStream, [System.IO.Compression.CompressionMode]::Decompress)
+    # WHY the branch: rotation leaves <base>.N.log as plain text when compression
+    # is off, and feeding that to GZipStream throws InvalidDataException.
+    if ($archive.Name -like '*.gz') {
+      $inputStream = [System.IO.File]::OpenRead($archive.FullName)
       try {
-        $reader = [System.IO.StreamReader]::new($gzip)
+        $gzip = [System.IO.Compression.GZipStream]::new($inputStream, [System.IO.Compression.CompressionMode]::Decompress)
         try {
-          $reader.ReadToEnd() -split "`n" | Where-Object { $_ }
+          $reader = [System.IO.StreamReader]::new($gzip)
+          try {
+            $reader.ReadToEnd() -split "`n" | Where-Object { $_ }
+          } finally {
+            $reader.Dispose()
+          }
         } finally {
-          $reader.Dispose()
+          $gzip.Dispose()
         }
       } finally {
-        $gzip.Dispose()
+        $inputStream.Dispose()
       }
-    } finally {
-      $inputStream.Dispose()
+    } else {
+      Get-Content -LiteralPath $archive.FullName
     }
   }
 
@@ -457,8 +486,11 @@ function Get-LogsStats {
 
   if (-not (Test-Path -LiteralPath $Directory -PathType Container)) { return }
 
+  # WHY the exclusion: an uncompressed archive is named <base>.N.log and matches
+  # *.log, but it is rotated history rather than a log of its own.
   # check-suppress:suppression_doc: probe -- an empty log root is reported as no rows, not as an error.
-  $files = @(Get-ChildItem -LiteralPath $Directory -Filter '*.log' -File -ErrorAction SilentlyContinue)
+  $files = @(Get-ChildItem -LiteralPath $Directory -Filter '*.log' -File -ErrorAction SilentlyContinue |
+      Where-Object { $_.Name -notmatch '\.\d+\.log(\.gz)?$' -and $_.Name -notmatch '\.log\.\d+(\.gz)?$' })
   foreach ($file in $files) {
     $name = $file.BaseName
     if ($LogFilter -and $name -ne $LogFilter) { continue }
@@ -517,7 +549,7 @@ function Get-LogsSchemaDefault {
 
 # WHY: only the entry script dispatches. A caller that dot-sources this file
 # imports Add-NucleusLogEvent without printing help and exiting 1.
-if ($MyInvocation.InvocationName -eq '.') { return }
+if (-not $script:IsEntryScript) { return }
 
 if ($Help -or [string]::IsNullOrWhiteSpace($Action)) {
   Get-Help -Full $PSCommandPath
@@ -549,7 +581,7 @@ switch ($Action) {
     foreach ($property in $parsed.PSObject.Properties) {
       $event[$property.Name] = $property.Value
     }
-    Add-NucleusLogEvent -LogName $Log -Event $event -Directory $userLogDir -WhatIf:$DryRun
+    Add-NucleusLogEvent -LogName $Log -Event $event -Directory $logDir -WhatIf:$DryRun
   }
   'label' {
     if (-not $Id -or -not $Verdict) {
@@ -561,7 +593,9 @@ switch ($Action) {
       exit 1
     }
     $labelLog = if ($Log) { $Log } else { $script:LabelLog }
-    $event = @{ kind = 'label'; id = $Id; verdict = $Verdict; note = $Note; source = 'none' }
+    # WHY null: POSIX writes null when --note is absent, and "" would be a
+    # different JSON value for the same absence.
+    $event = @{ kind = 'label'; id = $Id; verdict = $Verdict; note = $(if ($Note) { $Note } else { $null }); source = 'none' }
     Add-NucleusLogEvent -LogName $labelLog -Event $event -Directory $userLogDir -WhatIf:$DryRun
   }
   'show' {
