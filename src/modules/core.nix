@@ -218,11 +218,6 @@ let
       category = "cli";
       platforms = [ "darwin" ];
     };
-    "equalizer-apo" = {
-      # WinGet-only: no Homebrew cask exists and no nixpkgs attr; Windows installs via WinGet.
-      category = "gui";
-      winget = "EqualizerAPO.EqualizerAPO";
-    };
     exiftool = {
       category = "cli";
       homebrew = {
@@ -230,7 +225,7 @@ let
         name = "exiftool";
       };
       nixpkgs = "perlPackages.ImageExifTool";
-      winget = "ExifTool.ExifTool";
+      winget = "OliverBetz.ExifTool";
     };
     eza = {
       category = "cli";
@@ -292,7 +287,6 @@ let
         name = "ghostscript";
       };
       nixpkgs = "ghostscript";
-      winget = "ArtifexSoftware.GhostScript";
     };
     gimp = {
       category = "gui";
@@ -613,16 +607,10 @@ let
       # SYSTEM_EXTENSION_DIR. Contributing both would collide on bin/pass, so
       # the wrapper replaces the plain attr. `nixpkgs` stays the probe.
       nixpkgsPackage = pkgs.pass.withExtensions (extensions: [ extensions.pass-otp ]);
-      winget = "GnuPG.pass";
     };
     "pay-respects" = {
       category = "cli";
       nixpkgs = "pay-respects";
-    };
-    "peace-equalizer-apo" = {
-      # WinGet-only: no Homebrew cask exists and no nixpkgs attr; Windows installs via WinGet.
-      category = "gui";
-      winget = "PeterVerbeek.PeaceEqualizerAPO";
     };
     "pi-coding-agent" = {
       category = "cli";

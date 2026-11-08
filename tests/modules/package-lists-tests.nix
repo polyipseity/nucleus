@@ -198,20 +198,13 @@ let
   wpJdkEnabled = builtins.elem "EclipseAdoptium.Temurin.25.JDK" resolvedWindowsPackages;
 
   # Enabled WinGet ids must each carry a lockfile version pin. The exception
-  # list holds the ids whose canonical manifest path 404s in
-  # microsoft/winget-pkgs, plus the msstore id: the msstore source lives outside
-  # that repository, so that id is checked on Windows with
-  # winget show <id> --source msstore instead. Step 7 reconciles this list
-  # against the updater output.
+  # list holds the ids microsoft/winget-pkgs does not serve, so the updater
+  # cannot pin them: the msstore id, verified on Windows with
+  # `winget show <id> --source msstore`, plus the two font ids.
   wingetPinExceptions = [
     "9NBDXK71NK08"
     "Adobe.SourceSerif4"
-    "ArtifexSoftware.GhostScript"
-    "EqualizerAPO.EqualizerAPO"
-    "ExifTool.ExifTool"
-    "GnuPG.pass"
     "Inter.Inter"
-    "PeterVerbeek.PeaceEqualizerAPO"
   ];
   wingetMissingPins = builtins.filter (
     id: !(builtins.elem id wingetPinExceptions || lockfile.winget ? ${id})

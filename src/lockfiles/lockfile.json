@@ -46,6 +46,7 @@
   },
   "scoop": {
     "cargo-binstall": "1.10.0",
+    "ghostscript": "10.08.0",
     "gopass": "1.15.0",
     "iwck": "3.10",
     "notosanscjk": "2.004",
@@ -245,7 +246,7 @@
       "vadimcn.vscode-lldb": "1.12.2"
     }
   },
-  "updated": "2026-11-08T05:06:10Z",
+  "updated": "2026-11-08T06:34:04Z",
   "uv": {
     "discord-music-rpc": {
       "rev": "bba71027a684db53f3fcde5adbd3d42627241a83",
@@ -295,7 +296,6 @@
     "DEVCOM.JetBrainsMonoNerdFont": "3.3.0",
     "Discord.Discord.Canary": "1.0.1318",
     "EclipseAdoptium.Temurin.25.JDK": "25.0.5.8",
-    "EqualizerAPO.EqualizerAPO": "1.4.2",
     "GIMP.GIMP": "3.2.6",
     "Git.Git": "2.56.0.4",
     "GitHub.cli": "2.103.3",
@@ -325,10 +325,10 @@
     "Neovim.Neovim": "0.12.6",
     "OBSProject.OBSStudio": "33.0.0",
     "Obsidian.Obsidian": "1.15.0",
+    "OliverBetz.ExifTool": "13.61",
     "Ollama.Ollama": "0.40.15",
     "Oven-sh.Bun": "1.4.4",
     "Parsec.Parsec": "150.104.1.0",
-    "PeterVerbeek.PeaceEqualizerAPO": "1.6.10",
     "Python.Python.3.13": "3.13.17",
     "Rclone.Rclone": "1.75.2",
     "Redis.Redis": "3.0.504",

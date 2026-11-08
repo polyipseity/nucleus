@@ -252,6 +252,10 @@
         "why": "Rust CLI install vehicle; absent from WinGet; Scoop main bucket is the correct tier."
       },
       {
+        "name": "ghostscript",
+        "why": "Ghostscript CLI parity with pkgs.ghostscript on POSIX; absent from WinGet, Scoop main is the correct tier."
+      },
+      {
         "name": "gopass",
         "why": "Cross-platform pass reimplementation; Windows parity for pkgs.pass on POSIX."
       },

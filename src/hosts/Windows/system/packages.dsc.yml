@@ -43,13 +43,6 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure Ghostscript is installed to provide the `gs` PostScript/PDF CLI for cross-host parity with macOS and NixOS
-      settings:
-        id: ArtifexSoftware.GhostScript
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
         description: Ensure Ruff is installed for cross-host Python lint/format CLI parity with macOS and NixOS
       settings:
         id: astral-sh.ruff
@@ -135,24 +128,6 @@ properties:
           Enabled by default via the single-source overlap enable flag.
       settings:
         id: EclipseAdoptium.Temurin.25.JDK
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: >-
-          Equalizer APO — system-wide parametric equalizer for Windows.
-          Provides the driver-level audio processing backend; paired with the
-          Peace GUI for visual slider-based control.
-          Cross-platform parity: EasyEffects (NixOS), Equaliser (macOS).
-      settings:
-        id: EqualizerAPO.EqualizerAPO
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: Ensure ExifTool is installed to provide metadata read/write CLI for cross-host parity with macOS and NixOS
-      settings:
-        id: ExifTool.ExifTool
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
@@ -464,6 +439,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure ExifTool is installed to provide metadata read/write CLI for cross-host parity with macOS and NixOS
+      settings:
+        id: OliverBetz.ExifTool
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: >-
           Ensure Ollama is installed as the local LLM inference backend for
           cross-host AI parity with macOS (launchd user agent) and NixOS
@@ -492,17 +474,6 @@ properties:
         description: Ensure Parsec is installed to mirror the macOS low-latency remote-desktop package declaration
       settings:
         id: Parsec.Parsec
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: >-
-          Peace Equalizer APO — graphical user interface for Equalizer APO.
-          Provides point-and-click sliders, effect toggles, and preset management
-          so volume limits can be configured without editing config files.
-          Cross-platform parity: EasyEffects (NixOS), Equaliser (macOS).
-      settings:
-        id: PeterVerbeek.PeaceEqualizerAPO
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
