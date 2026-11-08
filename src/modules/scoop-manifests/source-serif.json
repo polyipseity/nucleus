@@ -18,10 +18,13 @@
       "$fontAcl.SetAccessRule($allRestrictedApplicationPackagesAccessRule)",
       "Set-Acl -AclObject $fontAcl $fontDir",
       "$fontKey = 'HKCU:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts'",
+      "$fontCount = 0",
       "Get-ChildItem -Path $dir -Filter '*.ttf' -Recurse | ForEach-Object {",
+      "    $fontCount++",
       "    Copy-Item -Path $_.FullName -Destination $fontDir -Force",
       "    New-ItemProperty -Path $fontKey -Name $_.Name.Replace($_.Extension, ' (TrueType)') -Value (Join-Path $fontDir $_.Name) -Force | Out-Null",
-      "}"
+      "}",
+      "if ($fontCount -eq 0) { throw 'source serif 4.005: no *.ttf found under the extracted archive; the release layout changed' }"
     ]
   },
   "uninstaller": {

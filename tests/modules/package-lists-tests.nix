@@ -209,6 +209,21 @@ let
   ) resolvedWindowsPackages;
   wingetPinsResolve = wingetMissingPins == [ ];
 
+  # WHY: a desired package with `bucket: "nucleus"` installs from
+  # src/modules/scoop-manifests/<name>.json, so an entry without that manifest
+  # fails the Windows apply with a manifest-not-found error instead of
+  # converging. The check is existence only; scoop-manifest-hashes-tests owns
+  # the content of the manifests that do exist.
+  nucleusScoopNames = builtins.map (entry: entry.name) (
+    builtins.filter (entry: (entry.bucket or null) == "nucleus") (entriesFor "scoop" "Windows")
+  );
+  hasNucleusScoopManifest =
+    name: builtins.pathExists (repoRoot + "/src/modules/scoop-manifests/${name}.json");
+  missingNucleusScoopManifests = builtins.filter (
+    name: !(hasNucleusScoopManifest name)
+  ) nucleusScoopNames;
+  nucleusScoopManifestsPresent = missingNucleusScoopManifests == [ ];
+
   # Every DSC WinGet id must be in the generated allow-list.
   dscText = readRepo "src/hosts/Windows/system/packages.dsc.yml";
   dscLines = lib.splitString "\n" dscText;
@@ -229,7 +244,7 @@ let
   # (`.agents/instructions/winget-dsc.instructions.md`, "Resource groups and
   # ordering"). WHY case-folded: WinGet ids keep their own casing, so ids such as
   # `astral-sh.uv`, `ajeetdsouza.zoxide`, and `chrisant996.Clink` sit among
-  # `ArtifexSoftware.GhostScript` and `BlenderFoundation.Blender`; a byte
+  # `BlenderFoundation.Blender` and `CaddyServer.Caddy`; a byte
   # comparison would instead move every lowercase-leading id past every
   # uppercase-leading one.
   dscSortKey = id: lib.toLower id;
@@ -274,6 +289,7 @@ let
     && noFlakePinDuplication
     && allLockfilePinsResolve
     && wingetPinsResolve
+    && nucleusScoopManifestsPresent
     && posixInstallersFreeOfLists
     && passOtpResolved
     && spIsValid
@@ -290,6 +306,7 @@ in
   test_flake_pins_not_duplicated = assert' noFlakePinDuplication "a 'flake:<node>'-pinned package must not also carry a lockfile version pin";
   test_lockfile_pins_resolve = assert' allLockfilePinsResolve "every desired package must have a lockfile version pin (or declare a flake pin)";
   test_winget_lockfile_pins_resolve = assert' wingetPinsResolve "enabled WinGet ids missing a lockfile pin: ${builtins.concatStringsSep ", " wingetMissingPins}";
+  test_nucleus_scoop_manifests_present = assert' nucleusScoopManifestsPresent "bucket 'nucleus' entries missing a src/modules/scoop-manifests manifest: ${builtins.concatStringsSep ", " missingNucleusScoopManifests}";
   test_no_hardcoded_posix_lists = assert' posixInstallersFreeOfLists "POSIX installers must not hardcode desired-package literals";
   test_pass_otp_resolved = assert' passOtpResolved "sharedPackages must contribute the pass-otp wrapper and not the plain pass attr";
   test_cursor_superpowers_lockfile = assert' spIsValid "cursor.superpowers must have https source and 40-char hex rev";

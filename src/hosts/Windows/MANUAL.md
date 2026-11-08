@@ -4,12 +4,10 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 
 ## apps
 
-1. Equalizer APO: run the configurator to pick the playback device, then reboot.
-2. Peace Equalizer APO: cap output with the Effects > Limiter sliders or with pre-amplification.
-3. OBS virtual camera: start the virtual camera from OBS and it appears as a DirectShow device in other apps. `obs-virtualcam` ships inside the `OBSProject.OBSStudio` install, so there is nothing to install separately.
-4. Chrome Remote Desktop Host is installed declaratively as `Google.ChromeRemoteDesktopHost` (WinGet). To accept connections, finish "Set up remote access" at <https://remotedesktop.google.com/access>. The installer owns the service; apply neither starts nor stops it.
-5. Picard: sign in and add the AcoustID API key under Options.
-6. Starship is active in every shell and needs a Nerd Font. Apply installs `DEVCOM.JetBrainsMonoNerdFont`, so select it as the terminal font.
+1. OBS virtual camera: start the virtual camera from OBS and it appears as a DirectShow device in other apps. `obs-virtualcam` ships inside the `OBSProject.OBSStudio` install, so there is nothing to install separately.
+2. Chrome Remote Desktop Host is installed declaratively as `Google.ChromeRemoteDesktopHost` (WinGet). To accept connections, finish "Set up remote access" at <https://remotedesktop.google.com/access>. The installer owns the service; apply neither starts nor stops it.
+3. Picard: sign in and add the AcoustID API key under Options.
+4. Starship is active in every shell and needs a Nerd Font. Apply installs `DEVCOM.JetBrainsMonoNerdFont`, so select it as the terminal font.
 
 ## audio processing
 
