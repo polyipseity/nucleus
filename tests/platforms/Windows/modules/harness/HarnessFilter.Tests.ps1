@@ -146,6 +146,11 @@ BeforeAll {
       Harness name.
     .PARAMETER Payload
       Hook payload written to the child's stdin.
+    .PARAMETER UserProfile
+      Overrides USERPROFILE for the child, so a case decides which shim directory the filter
+      compares against.
+    .PARAMETER PathPrefix
+      Prepends a directory to the child's PATH, so a case decides what the filter resolves.
     #>
     [CmdletBinding()]
     [OutputType([hashtable])]
@@ -157,13 +162,21 @@ BeforeAll {
       [string]$Harness,
 
       [Parameter(Mandatory)]
-      [string]$Payload
+      [string]$Payload,
+
+      [string]$UserProfile = '',
+
+      [string]$PathPrefix = ''
     )
 
     $previous = $env:NUCLEUS_REPO_ROOT
     $previousLogDir = $env:NUCLEUS_LOG_DIR
+    $previousUserProfile = $env:USERPROFILE
+    $previousPath = $env:PATH
     $env:NUCLEUS_REPO_ROOT = $Root
     $env:NUCLEUS_LOG_DIR = Join-Path -Path $Root 'logs'
+    if (-not [string]::IsNullOrEmpty($UserProfile)) { $env:USERPROFILE = $UserProfile }
+    if (-not [string]::IsNullOrEmpty($PathPrefix)) { $env:PATH = "$PathPrefix;$env:PATH" }
     try {
       $runner = Join-Path -Path (Join-Path -Path $Root 'src\scripts\notify') -ChildPath 'harness-filter.ps1'
       $stdout = @($Payload | & $script:PwshPath -NoProfile -File $runner $Harness 2>$null) -join "`n"
@@ -172,10 +185,17 @@ BeforeAll {
     finally {
       $env:NUCLEUS_REPO_ROOT = $previous
       $env:NUCLEUS_LOG_DIR = $previousLogDir
+      $env:USERPROFILE = $previousUserProfile
+      $env:PATH = $previousPath
     }
   }
 
   $script:Sandbox = New-FilterSandbox
+
+  # A profile with no shims, so a plain delete reads as unproven whatever the
+  # developer's own USERPROFILE carries.
+  $script:UnprovenProfile = Join-Path -Path $script:Sandbox 'unproven-profile'
+  $null = New-Item -ItemType Directory -Path (Join-Path -Path $script:UnprovenProfile -ChildPath '.local\bin') -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
 }
 
 AfterAll {
@@ -219,11 +239,11 @@ Describe 'harness-filter render table' {
     $result.Stdout | Should -Be '{"permission":"deny"}'
   }
 
-  It 'asks about a plain delete with the unproven-redirect rule' {
-    $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"rm x"}'
+  It 'denies a plain delete whose redirect is unproven' {
+    $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"rm x"}' -UserProfile $script:UnprovenProfile
 
     $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
-    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'ask'
+    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'deny'
     $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'unproven-redirect'
   }
 
@@ -253,9 +273,21 @@ Describe 'safe-delete filter settings' {
   It 'allows a plain delete when settings.unproven is allow' {
     Set-FilterRegistry -Root $script:Sandbox -Document '{"filters":[{"enabled":true,"id":"safe-delete","settings":{"unproven":"allow"}}]}'
     try {
-      $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"rm x"}'
+      $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"rm x"}' -UserProfile $script:UnprovenProfile
       $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
       $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'allow'
+      $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'unproven-redirect'
+    }
+    finally { Copy-Item -LiteralPath $script:RegistryPath -Destination (Join-Path -Path (Join-Path -Path $script:Sandbox 'src\modules\configs') -ChildPath 'harness-filters.json') -Force }
+  }
+
+  It 'routes a plain delete to the approval sources when settings.unproven is route' {
+    Set-FilterRegistry -Root $script:Sandbox -Document '{"filters":[{"enabled":true,"id":"safe-delete","settings":{"unproven":"route"}}]}'
+    try {
+      $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"rm x"}' -UserProfile $script:UnprovenProfile
+      $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
+      $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'ask'
+      $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'unproven-redirect'
     }
     finally { Copy-Item -LiteralPath $script:RegistryPath -Destination (Join-Path -Path (Join-Path -Path $script:Sandbox 'src\modules\configs') -ChildPath 'harness-filters.json') -Force }
   }
@@ -273,6 +305,36 @@ Describe 'safe-delete filter settings' {
       $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'deny'
       $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match ([regex]::Escape("($($case.Rule))"))
     }
+  }
+}
+
+Describe 'safe-delete redirect proof' {
+  # WHY -Skip off Windows: Get-Command appends PATHEXT only on Windows, so `rm`
+  # never resolves to rm.exe elsewhere and the case cannot prove the branch there.
+  It 'allows a plain delete whose word resolves to the deployed shim' -Skip:(-not $IsWindows) {
+    $shimDir = Join-Path -Path (Join-Path -Path $script:Sandbox 'proven-profile') -ChildPath '.local\bin'
+    $null = New-Item -ItemType Directory -Path $shimDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+    # WHY the test's own pwsh binary: the case needs an executable to copy as
+    # rm.exe, and this one exists on every host that can run this suite.
+    Copy-Item -LiteralPath $script:PwshPath -Destination (Join-Path -Path $shimDir -ChildPath 'rm.exe') -Force
+    $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"rm x"}' `
+      -UserProfile (Split-Path -Parent (Split-Path -Parent $shimDir)) -PathPrefix $shimDir
+
+    $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
+    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'allow'
+    $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'proven-redirect'
+  }
+
+  It 'denies a plain delete when a plain binary comes first on PATH' {
+    $plainDir = Join-Path -Path $script:Sandbox 'plain-bin'
+    $null = New-Item -ItemType Directory -Path $plainDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+    Copy-Item -LiteralPath $script:PwshPath -Destination (Join-Path -Path $plainDir -ChildPath 'rm.exe') -Force
+    $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"rm x"}' `
+      -UserProfile $script:UnprovenProfile -PathPrefix $plainDir
+
+    $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
+    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'deny'
+    $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'unproven-redirect'
   }
 }
 

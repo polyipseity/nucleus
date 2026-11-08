@@ -458,13 +458,20 @@ fi
 
 section 4 "the runner consults the same sources"
 
-# A payload the filters leave undecided (a plain `rm`, whose redirect is unproven)
-# is answered by the sources, and the runner renders the harness's own document.
+# A payload the filters leave undecided is answered by the sources, and the
+# runner renders the harness's own document. The shipped registry denies an
+# unproven redirect, so only a registry that routes it reaches the gate at all:
+# the fixture carries that one file, and the runner still resolves its filters
+# beside itself.
+GATE_TREE="$WORK/gate-tree"
+mkdir -p "$GATE_TREE/src/modules/configs"
+printf '%s\n' '{"filters":[{"enabled":true,"id":"safe-delete","settings":{"unproven":"route"}}]}' \
+  >"$GATE_TREE/src/modules/configs/harness-filters.json"
 clear_state
 write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["hermes"],"timeout-seconds":{"hermes":30}}}'
 printf '%s' '{"tool_name":"runInTerminal","tool_input":{"command":"rm x"}}' >"$WORK/payload"
 python3 "$TERMINAL_HELPER" notty - "$WORK/out" bash -c \
-  "NUCLEUS_REPO_ROOT='$REPO_ROOT' bash '$RUNNER' copilot <'$WORK/payload'" >/dev/null 2>"$WORK/err" &
+  "NUCLEUS_REPO_ROOT='$GATE_TREE' bash '$RUNNER' copilot <'$WORK/payload'" >/dev/null 2>"$WORK/err" &
 _runner_pid=$!
 if _request="$(wait_for_request)"; then
   answer_request "$_request" deny

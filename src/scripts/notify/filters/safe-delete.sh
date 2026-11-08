@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # safe-delete filter: denies the spellings that bypass the safe-delete layer and
-# asks about a deletion command whose safe redirect is not proven.
+# applies settings.unproven to a deletion command whose redirect it cannot prove.
 #
 #   filters/safe-delete.sh --settings <json> --command <text>
 #   stdout: decision<TAB>rule<TAB>reason
@@ -10,12 +10,17 @@
 #   native-path       an absolute or relative path to the delete binary
 #   escaped-spelling  a backslash-escaped deletion command, which skips the alias
 #   cmd-shell         cmd.exe, which is never allowed on any host
-#   unproven-redirect a deletion command with no proof yet that it reaches the
-#                     safe alternative
+#   proven-redirect   a deletion command whose word resolves to the managed wrapper
+#   unproven-redirect a deletion command whose redirect is unproven, which is
+#                     treated as not redirected
 #   no-match          nothing to gate
 #
-# settings.unproven (deny | route | allow) says what to do with a command whose
-# redirect is unproven.
+# An unproven redirect is treated as not redirected: settings.unproven says what
+# that gets, so deny (the registry default) blocks the command, route puts it to
+# the approval sources, and allow lets it through. A redirect is proven only when
+# the deletion word resolves to the managed wrapper this host deploys, so a PATH
+# that reaches a plain binary, a wrapper that is absent, and a wrapper that is not
+# the managed deployment all read as unproven.
 set -euo pipefail
 
 _sd_settings='{}'
@@ -64,21 +69,59 @@ case "$_sd_command" in
   ;;
 esac
 
-# A deletion command as the invoked word, optionally behind sudo. Quoted
-# occurrences match too, which is safe here because the outcome is a prompt, not
-# a denial.
-if printf '%s' "$_sd_command" |
-  grep -Eq '(^|[;&|(]|&&|\|\|)[[:space:]]*(sudo[[:space:]]+)?(rm|del|rd|rmdir|erase|ri|unlink|shred|Remove-Item)([[:space:]]|$)'; then
-  # TODO: Task 3 -- the redirect proof decides here. Until it exists only `allow`
-  # is honoured, so the registry default `deny` cannot block a command whose
-  # redirect was never checked; `deny` and `route` therefore ask for now.
+# A deletion command as the invoked word, optionally behind sudo. The pattern
+# anchors on a command separator, so the same verb in an argument position or
+# inside quotes does not match.
+_sd_verb_re='(^|[;&|(]|&&|\|\|)[[:space:]]*(sudo[[:space:]]+)?(rm|del|rd|rmdir|erase|ri|unlink|shred|Remove-Item)([[:space:]]|$)'
+if [[ $_sd_command =~ $_sd_verb_re ]]; then
+  _sd_verb="${BASH_REMATCH[3]}"
+
+  # The managed wrapper for this verb: the home.file entry src/modules/shell/default.nix
+  # deploys at ~/.local/bin/<verb>. It is a symlink into the Nix store, and that
+  # shape is what separates it from a plain binary left at the same path.
+  _sd_wrapper=""
+  if [ -n "${HOME-}" ]; then
+    _sd_wrapper="$HOME/.local/bin/$_sd_verb"
+  fi
+
+  # WHY sh -c: `command -v` is a shell's own PATH lookup, so the answer is the one
+  # the calling shell gets from the PATH this process inherited. An alias or a
+  # function is invisible to a child shell, which is why only a PATH answer can be
+  # proven from here.
+  _sd_resolved=""
+  if ! _sd_resolved="$(sh -c 'command -v "$1"' sh "$_sd_verb")"; then
+    _sd_resolved=""
+  fi
+
+  if [ -n "$_sd_wrapper" ] && [ "$_sd_resolved" = "$_sd_wrapper" ] && [ -L "$_sd_wrapper" ]; then
+    printf 'allow\tproven-redirect\t%s\n' "deletion command: $_sd_verb resolves to the managed safe-delete wrapper at $_sd_wrapper"
+    exit 0
+  fi
+
+  if [ -z "$_sd_wrapper" ]; then
+    _sd_why="$_sd_verb has no managed wrapper to compare against because HOME is unset"
+  elif [ -z "$_sd_resolved" ]; then
+    _sd_why="$_sd_verb does not resolve on PATH"
+  elif [ "$_sd_resolved" = "$_sd_wrapper" ]; then
+    _sd_why="$_sd_verb resolves to $_sd_wrapper, which is a plain file rather than the managed symlink"
+  else
+    _sd_why="$_sd_verb resolves to $_sd_resolved, not the managed safe-delete wrapper at $_sd_wrapper"
+  fi
   case "$_sd_unproven" in
+  deny)
+    printf 'deny\tunproven-redirect\t%s\n' "deletion command: $_sd_why, so it is treated as not redirected. Use shell-safe-rm or rip2 instead."
+    exit 0
+    ;;
+  route)
+    printf 'ask\tunproven-redirect\t%s\n' "deletion command: $_sd_why, so it is treated as not redirected and the harness prompts"
+    exit 0
+    ;;
   allow)
-    printf 'allow\tunproven-redirect\t%s\n' "deletion command: the safe redirect is unproven and settings.unproven allows it"
+    printf 'allow\tunproven-redirect\t%s\n' "deletion command: $_sd_why, and settings.unproven allows an unproven redirect"
     exit 0
     ;;
   esac
-  printf 'ask\tunproven-redirect\t%s\n' "deletion command: the safe redirect is unproven, so the harness prompts"
+  printf 'deny\tunproven-redirect\t%s\n' "deletion command: $_sd_why, and settings.unproven is '$_sd_unproven' rather than deny, route, or allow, so the unproven redirect is denied. Use shell-safe-rm or rip2 instead."
   exit 0
 fi
 
