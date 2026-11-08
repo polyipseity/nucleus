@@ -20,6 +20,10 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../../.." && pwd)"
 readonly REPO_ROOT
 
+require_command awk "the here-string scan is an awk program"
+require_command grep "every case matches the scan output with grep"
+require_command mktemp "every case builds a throwaway fixture tree"
+
 # The shared message prefix: both twins report a violation as "here-string with
 # <n> content lines (limit 10)", so a case asserts a whole line built from it
 # rather than a loose fragment.
@@ -207,16 +211,105 @@ test_crlf_here_string_is_counted() {
     "${file%/*}" "$RULE_TEXT 11 content lines"
 }
 
+test_single_quote_closer_is_counted() {
+  local file
+  file="$(new_fixture single-quote)"
+  {
+    emit_here_string "Set-Content -Path out.txt -Value @'" 11 "'@" ""
+  } >"$file"
+  assert_reports "a single-quoted here-string of 11 content lines fails" \
+    "${file%/*}" "$RULE_TEXT 11 content lines"
+}
+
+test_interop_marker_on_the_line_above_is_recognized() {
+  local file
+  file="$(new_fixture interop-above)"
+  {
+    printf 'Add-Type -TypeDefinition `\n'
+    emit_here_string '@"' 26 '"@' ""
+  } >"$file"
+  assert_reports "an Add-Type on the line above the opener raises the cap to 25" \
+    "${file%/*}" "$RULE_TEXT 26 content lines"
+}
+
+test_interop_member_write_counts_as_file_content() {
+  local file
+  file="$(new_fixture member-write)"
+  {
+    # shellcheck disable=SC2016 # reason: the PowerShell expression is fixture text, not a shell expansion
+    emit_here_string '[IO.File]::WriteAllText($outPath, @"' 11 '"@)' ""
+  } >"$file"
+  assert_reports "a [IO.File]::WriteAllText target of 11 content lines fails" \
+    "${file%/*}" "$RULE_TEXT 11 content lines"
+}
+
+test_interop_member_write_within_limit_passes() {
+  local file
+  file="$(new_fixture member-write-under)"
+  {
+    # shellcheck disable=SC2016 # reason: the PowerShell expression is fixture text, not a shell expansion
+    emit_here_string '[IO.File]::WriteAllText($outPath, @"' 9 '"@)' ""
+  } >"$file"
+  assert_silent "a [IO.File]::WriteAllText target of 9 content lines passes" "${file%/*}"
+}
+
+test_citation_covers_a_later_here_string_in_the_window() {
+  local file
+  file="$(new_fixture cited-window)"
+  {
+    printf '# check-suppress:embedded-content: fixture justification\n'
+    emit_here_string 'Set-Content -Path short.txt -Value @"' 2 '"@' ""
+    emit_here_string 'Set-Content -Path big.txt -Value @"' 11 '"@' ""
+  } >"$file"
+  # The window is line distance: the citation still covers the second opener,
+  # which sits five lines below it with another here-string in between.
+  assert_silent "a citation still covers a second here-string inside its window" "${file%/*}"
+}
+
+# citation_window <gap>: a file whose citation sits GAP lines above an 11-line
+# here-string, so a case can pin the twin's 10-line window at both ends.
+citation_window() { # <gap>
+  local _gap="$1" _i=0
+  printf '# check-suppress:embedded-content: fixture justification\n'
+  while [ "$_i" -lt $((_gap - 1)) ]; do
+    printf '# filler %d\n' "$_i"
+    _i=$((_i + 1))
+  done
+  emit_here_string 'Set-Content -Path out.txt -Value @"' 11 '"@' ""
+}
+
+test_citation_window_includes_ten_lines_above() {
+  local file
+  file="$(new_fixture window-ten)"
+  citation_window 10 >"$file"
+  assert_silent "a citation 10 lines above the opener exempts it" "${file%/*}"
+}
+
+test_citation_window_excludes_eleven_lines_above() {
+  local file
+  file="$(new_fixture window-eleven)"
+  citation_window 11 >"$file"
+  assert_reports "a citation 11 lines above the opener does not exempt it" \
+    "${file%/*}" "$RULE_TEXT 11 content lines"
+}
+
 section 1 "the twin's thresholds"
 test_oversized_written_here_string_fails
 test_here_string_within_limit_passes
+test_single_quote_closer_is_counted
 test_oversized_interop_block_fails
 test_interop_block_within_cap_passes
+test_interop_marker_on_the_line_above_is_recognized
 
 section 2 "the twin's gate"
 test_here_string_not_written_to_disk_is_ignored
 test_pipeline_write_to_disk_counts_as_file_content
+test_interop_member_write_counts_as_file_content
+test_interop_member_write_within_limit_passes
 test_policy_citation_exempts_the_site
+test_citation_covers_a_later_here_string_in_the_window
+test_citation_window_includes_ten_lines_above
+test_citation_window_excludes_eleven_lines_above
 
 section 3 "per-file state"
 test_two_here_strings_in_one_file_are_both_reported

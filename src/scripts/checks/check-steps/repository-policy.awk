@@ -7,8 +7,14 @@
 # policy, over .ps1 files. The twin (13-repo-policy-data.ps1) reads the parse
 # tree; this mode reads text and reproduces the twin's gate: a here-string is
 # file content only when it is a C# interop block (Add-Type, exempt up to 25
-# content lines) or is written to disk (limit 10). Anything else, such as script
-# text handed to a subprocess, the twin skips, so this mode skips it too.
+# content lines) or is written to disk (limit 10) through Set-Content,
+# Add-Content, Out-File, Tee-Object, or a [IO.File]::WriteAll*/[IO.File]::
+# AppendAll* member call. Anything else, such as script text handed to a
+# subprocess, the twin skips, so this mode skips it too. The text heuristics
+# are looser than the AST in the over-exempting direction: an Add-Type marker
+# on the adjacent line exempts a block the twin's ancestor walk might not, and
+# a line ending in a quote inside a comment or a single-quoted string opens a
+# phantom here-string. Neither has a live instance in the repository.
 #
 # Logging-format mode (-v mode=logging-format): enforces the unified logging
 # format standard (see .agents/instructions/logging.instructions.md):
@@ -88,7 +94,7 @@ BEGIN {
   for (_argv_i = 1; _argv_i < ARGC; _argv_i++)
     if (ARGV[_argv_i] ~ /^[A-Za-z_][A-Za-z0-9_]*=/)
       ARGV[_argv_i] = "./" ARGV[_argv_i]
-  if (mode == "here-string") _hs_write_re = "Set-Content|Add-Content|Out-File|Tee-Object"
+  if (mode == "here-string") _hs_write_re = "Set-Content|Add-Content|Out-File|Tee-Object|WriteAll|AppendAll"
   if (mode == "activation-naming") {
     _an_ns_start = "(home\\.activation|system\\.activationScripts|nucleus\\.terminalActivations)[[:space:]]*=[^;]*[{]"
     # An activation entry carries a lib wrapper, or leaves its value on the next
@@ -169,15 +175,20 @@ function report_here_string() {
 mode == "here-string" && FNR == 1 {
   _hs_open = 0
   _hs_prev = ""
-  _hs_cited = 0
+  _hs_cited_line = 0
 }
 mode == "here-string" {
   _hs_line = $0
   # .ps1 files are CRLF; the closing mark starts the line either way.
   sub(/\r$/, "", _hs_line)
+  # The twin's citation window is line distance, not a countdown: a citation on
+  # any of the 10 physical lines above an opener exempts it, body lines
+  # included, so the recorded line number is what carries the window.
+  if (_hs_line ~ /check-suppress:embedded-content/) _hs_cited_line = FNR
   if (_hs_open) {
     if (substr(_hs_line, 1, 2) == _hs_closer) {
       _hs_open = 0
+      _hs_prev = _hs_line
       # The pipeline form `@"..."@ | Set-Content` names the write command on the
       # closing line, which is where the twin's PipelineAst check finds it.
       if (_hs_line ~ _hs_write_re) _hs_write = 1
@@ -200,16 +211,14 @@ mode == "here-string" {
     # parameter on the line above it.
     _hs_addtype = (_hs_line ~ /Add-Type|-TypeDefinition|-MemberDefinition/ || _hs_prev ~ /Add-Type|-TypeDefinition|-MemberDefinition/)
     _hs_write = (_hs_line ~ _hs_write_re)
-    # A citation on one of the 10 lines above exempts the site, the window the
-    # twin reads for check-suppress:embedded-content.
-    _hs_marked = (_hs_cited > 0)
-    _hs_cited = 0
+    # A citation on one of the 10 lines above exempts the site, the twin's
+    # window; a citation on the opener line itself does not, as in the twin.
+    _hs_gap = FNR - _hs_cited_line
+    _hs_marked = (_hs_cited_line > 0 && _hs_gap >= 1 && _hs_gap <= 10)
     _hs_open = 1
     _hs_prev = _hs_line
     next
   }
-  if (_hs_line ~ /check-suppress:embedded-content/) _hs_cited = 10
-  else if (_hs_cited > 0) _hs_cited--
   _hs_prev = _hs_line
 }
 

@@ -276,11 +276,20 @@ let
   # installs outside the steamcmd_install_path RimSort reads, so
   # Invoke-SteamCMDSetup.ps1 provisions the binary from Valve's CDN instead of a
   # DSC resource (POSIX twin: src/scripts/configs/provision-steamcmd.sh).
+  # ref: allow-and-deny-lists.instructions.md#D8 -- tier 2, so the staleness
+  #   guard below fails an exception that no longer holds.
   wingetDscExceptions = [ "Valve.SteamCMD" ];
   wingetMissingDscResources = builtins.filter (
     id: !(builtins.elem id dscIds) && !(builtins.elem id wingetDscExceptions)
   ) resolvedWindowsPackages;
   wpDscCoversEnableList = wingetMissingDscResources == [ ];
+  # An exception is stale when the id stopped being enabled (the exception now
+  # protects nothing) or when the id gained a DSC resource (the exception now
+  # hides a real gap). Both must fail rather than linger.
+  wingetStaleDscExceptions = builtins.filter (
+    id: !(builtins.elem id resolvedWindowsPackages) || builtins.elem id dscIds
+  ) wingetDscExceptions;
+  wpDscExceptionsFresh = wingetStaleDscExceptions == [ ];
 
   # The package group is sorted alphabetically by `settings.id`
   # (`.agents/instructions/winget-dsc.instructions.md`, "Resource groups and
@@ -339,6 +348,7 @@ let
     && stirlingDesktopResolved
     && spIsValid
     && wpDscCoversEnableList
+    && wpDscExceptionsFresh
     && wpScoopInstallPresent;
 in
 {
@@ -379,6 +389,7 @@ in
   }";
   test_wp_scoop_install_present = assert' wpScoopInstallPresent "the DSC file must keep the six-space id: ScoopInstall block with its GitInstall dependency";
   test_wp_dsc_covers_enable_list = assert' wpDscCoversEnableList "enabled WinGet ids with no DSC resource: ${builtins.concatStringsSep ", " wingetMissingDscResources}";
+  test_wp_dsc_exceptions_fresh = assert' wpDscExceptionsFresh "stale WinGet DSC exceptions (no longer enabled, or now carrying a DSC resource): ${builtins.concatStringsSep ", " wingetStaleDscExceptions}";
   test_wp_json_sorted = assert' (
     wpJsonTerminated && wpJsonMultiline && wpJsonHasKeys
   ) "winget-packages.json must be multi-line with sorted keys and exactly one trailing newline";

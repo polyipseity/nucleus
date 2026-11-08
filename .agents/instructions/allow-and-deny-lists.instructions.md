@@ -72,6 +72,7 @@ A new exclusion needs a category id, tier, and `# ref:`.
 | D5 | `tests/platforms/Windows/modules/gc-parity.Tests.ps1` | `$DestructiveCommands` | T2 | A command absent from the list is silently skipped by the dry-run guard walk, so renaming a helper in `scripts/gc.ps1` disarms the coverage check instead of failing it | Error if stale (`has no stale entry in the destructive-command list`) |
 | D6 | `tests/platforms/Windows/modules/gc-parity.Tests.ps1` | `$PosixOnlyCapabilities` | T2 | The list must name exactly the switches `gc.ps1` documents as POSIX-only | Error if stale (`documents exactly the POSIX-only capabilities as accepted and ignored`) |
 | D7 | `tests/modules/package-lists-tests.nix` | `wingetPinExceptions` | T3 | Ids the microsoft/winget-pkgs repository does not carry: msstore ids by design, plus any registry id with no manifest, each warned by the updater every run; verify msstore ids on Windows with `winget show <id> --source msstore` | Quarterly |
+| D8 | `tests/modules/package-lists-tests.nix` | `wingetDscExceptions`: `Valve.SteamCMD` | T2 | The WinGet SteamCMD package installs outside the `steamcmd_install_path` RimSort reads, so `Invoke-SteamCMDSetup.ps1` provisions the binary from Valve's CDN instead of a DSC resource (POSIX twin: `src/scripts/configs/provision-steamcmd.sh`) | Error if stale (`stale WinGet DSC exceptions`) |
 
 ### Category E: upstream workarounds
 
