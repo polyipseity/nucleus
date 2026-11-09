@@ -22,11 +22,11 @@
 
     filters\<id>.ps1 --settings <json> --command <text>
     stdin   the raw hook payload, for a filter that needs more than the command
-    stdout  exactly one line: decision<TAB>rule<TAB>reason
+    stdout  exactly one non-empty line: decision<TAB>rule<TAB>reason
 
-  A non-zero exit, a missing script, or an output that is not exactly one line
-  carrying three tab-separated fields is recorded as ask with rule `filter-error`,
-  because the filter could not state a verdict.
+  A non-zero exit, a missing script, or an output that is not exactly one
+  non-empty line carrying three tab-separated fields is recorded as ask with rule
+  `filter-error`, because the filter could not state a verdict.
 
   The decisions aggregate as deny > ask > allow regardless of registry order, so
   registry order stays readable instead of load-bearing.  `ask` means "no
@@ -304,6 +304,9 @@ function Invoke-HarnessFilterList {
       # let that text read as the filter's answer.
       $output = @($Payload | & $pwshPath -NoProfile -File $filterPath --settings $item.Settings --command $Command)
       $exitCode = $LASTEXITCODE
+      # WHY empty strings dropped: a blank line ahead of the verdict is not
+      # content, so the count is of verdict lines. The POSIX twin drops the same
+      # lines with sed before it counts.
       $candidate = @($output | ForEach-Object { [string]$_ } | Where-Object { $_ -ne '' })
       if ($exitCode -ne 0) {
         $line = 'ask' + "`t" + 'filter-error' + "`t" + 'the filter exited non-zero'

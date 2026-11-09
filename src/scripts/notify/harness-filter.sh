@@ -17,11 +17,11 @@
 # Filter protocol (one process per enabled registry entry, in registry order):
 #   filters/<id>.sh --settings <json> --command <text>
 #   stdin  the raw hook payload, for a filter that needs more than the command
-#   stdout exactly one line: decision<TAB>rule<TAB>reason
+#   stdout exactly one non-empty line: decision<TAB>rule<TAB>reason
 #   decision is allow, ask, or deny; a non-zero exit, a missing script, or an
-#   output that is not exactly one line carrying three tab-separated fields is
-#   recorded as ask with rule `filter-error`, because the filter could not state
-#   a verdict.
+#   output that is not exactly one non-empty line carrying three tab-separated
+#   fields is recorded as ask with rule `filter-error`, because the filter could
+#   not state a verdict.
 #
 # The decisions aggregate as deny > ask > allow regardless of registry order, so
 # registry order stays readable instead of load-bearing. `ask` means "no decision
@@ -214,7 +214,10 @@ while IFS= read -r _hf_entry; do
   # second line is an answer a harness reading the whole stdout or its last line
   # could act on, and cut reads the newline into the first field, so a multi-line
   # answer used to arrive as a decision that is neither allow nor deny and a rule
-  # that is not a rule name. The Windows twin requires the same two things.
+  # that is not a rule name. Empty lines are dropped first, because the Windows
+  # twin drops empty strings before it counts, and a blank line ahead of a verdict
+  # is not a second answer. The Windows twin requires the same two things.
+  _hf_line="$(printf '%s\n' "$_hf_line" | sed '/^$/d')"
   _hf_lines="$(printf '%s\n' "$_hf_line" | wc -l | tr -d ' ')"
   _hf_tabs="$(printf '%s' "$_hf_line" | tr -cd '\t' | wc -c | tr -d ' ')"
   if [ "$_hf_lines" -ne 1 ] || [ "$_hf_tabs" -ne 2 ]; then

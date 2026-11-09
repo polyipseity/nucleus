@@ -434,4 +434,17 @@ Describe 'aggregation and filter failure' {
     $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'ask'
     $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'filter-error'
   }
+
+  It 'reads a blank line ahead of the verdict as one verdict' {
+    # WHY: the POSIX twin drops empty lines before it counts, so a blank line
+    # ahead of the verdict is not content on either platform. Counting raw lines
+    # here would answer filter-error for bytes the POSIX twin accepts.
+    Add-FilterScript -Root $script:Sandbox -Id 'blankfirst' -Body 'Write-Output ""; Write-Output ("allow`tno-match`tquiet")'
+    Set-FilterRegistry -Root $script:Sandbox -Document '{"filters":[{"enabled":true,"id":"blankfirst","settings":{}}]}'
+    $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"anything"}'
+
+    $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
+    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'allow'
+    $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'no-match'
+  }
 }

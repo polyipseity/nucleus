@@ -30,8 +30,7 @@ let
   # bridge entry point: a POSIX script in src/scripts, and on Windows a shim
   # Sync-SafeDelete.ps1 writes around its PowerShell implementation. No hook file
   # registers it: every harness that carries a hook file runs the filter runner.
-  guardCommand = "safe-delete-guard";
-  hookCommands = entryPoints ++ [ guardCommand ];
+  hookCommands = entryPoints;
   guardScript = "/src/scripts/safe-delete-guard.sh";
   guardWindowsImplementation = "/src/platforms/Windows/modules/user/Sync-SafeDeleteGuard.ps1";
 
@@ -92,10 +91,9 @@ in
     )
 
     # --- Hooks resolve by bare name, never by machine-specific path ---
-    (assert'
-      (all (entry: builtins.elem (entryPointOf entry.command) hookCommands) (allEntries ++ claudeEntries))
-      "every hook command must start with a deployed command: a harness-bridge entry point or the deletion guard"
-    )
+    (assert' (all (entry: builtins.elem (entryPointOf entry.command) hookCommands) (
+      allEntries ++ claudeEntries
+    )) "every hook command must start with a deployed harness-bridge entry point")
     (assert'
       (all (entry: builtins.match "[a-z0-9_-]+( [a-z0-9_-]+)*" entry.command != null) (
         allEntries ++ claudeEntries

@@ -2,8 +2,9 @@
 # Tests for src/scripts/completions/gen-completions.sh: --help contract, --check determinism,
 # idempotent regeneration, the suite not touching the tracked completions tree, 13-command
 # coverage, generated headers + zsh syntax,
-# update lockfile --list-* dynamic wiring, flag-extraction correctness pins, and
-# spec-word escaping of shell metacharacters in subcommand descriptions.
+# update lockfile --list-* dynamic wiring, flag-extraction correctness pins,
+# spec-word escaping of shell metacharacters in subcommand descriptions, and the
+# gc completion's subcommand list against the dispatch in scripts/gc.sh.
 #
 # Also guards the PowerShell twin (src/scripts/completions/gen-completions.ps1):
 # its command list matches the canonical set, every Register-ArgumentCompleter
@@ -323,6 +324,41 @@ if [ -z "$_moved_files" ] && [ -z "$_deleted_files" ]; then
   assert_pass "gen-completions: suite left the tracked completions tree untouched"
 else
   assert_fail "gen-completions: tracked tree untouched" "files rewritten during the run: ${_moved_files:-none}|files deleted during the run: ${_deleted_files:-none}"
+fi
+
+# 15. gc's subcommand inventory is the dispatch in scripts/gc.sh, and --check
+#     cannot prove it: it compares the tracked file with the generator, so a label
+#     that vanished from both would stay green. The dispatch arm is the labels a
+#     user can actually type, so it is compared with the subcommand spec word the
+#     generated file carries. The extractor anchors on the outer `case "$action"`
+#     line and the first arm closing parenthesis, so the nested `logs` arm and any
+#     help-body text stay out of the list.
+_gc_dispatch_labels="$(
+  awk '
+    /^case "\$action" in$/ { in_dispatch = 1; next }
+    in_dispatch {
+      if ($0 !~ /\)/) { next }
+      sub(/\).*/, "")
+      gsub(/[[:space:]|]/, "\n")
+      print
+      exit
+    }
+  ' scripts/gc.sh | sed '/^$/d' | LC_ALL=C sort
+)"
+_gc_completion_labels="$(
+  sed -n "s/^  '1:subcommand:((\(.*\)))'.*/\1/p" "$_COMPLETIONS_DIR/_nucleus-gc" |
+    sed -E 's/"[^"]*"//g' |
+    tr -s ' ' '\n' |
+    sed -E '/^[a-z][a-z0-9-]*$/!d' |
+    LC_ALL=C sort
+)"
+# WHY the non-empty clause: a broken extractor would otherwise compare two empty
+# lists, and an empty dispatch is itself a failure worth reporting.
+if [ -n "$_gc_dispatch_labels" ] && [ "$_gc_completion_labels" = "$_gc_dispatch_labels" ]; then
+  assert_pass "gen-completions: gc completion subcommands match the scripts/gc.sh dispatch"
+else
+  assert_fail "gen-completions: gc completion subcommands" \
+    "dispatch: ${_gc_dispatch_labels//$'\n'/ }|completion: ${_gc_completion_labels//$'\n'/ }"
 fi
 
 finish_tests

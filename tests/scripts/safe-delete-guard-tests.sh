@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Corpus parity suite for src/scripts/safe-delete-guard.sh.
 #
-# The guard is the PreToolUse hook that denies a native delete to every coding
-# agent, so its pattern set is a security control. Three alternatives were
-# removed as subsumed (shellcheck SC2221/SC2222): the `/usr/bin` and
-# `/usr/local/bin` spellings of the delete tool, and the backslash-escaped
-# directory variant. This suite proves the removal preserved the union of
-# matched strings rather than assuming it.
+# The guard is the deployed `safe-delete-guard` PATH command on POSIX and the
+# `safe-delete-guard.cmd` shim on Windows, so its pattern set is a security
+# control. Three alternatives were removed as subsumed (shellcheck
+# SC2221/SC2222): the `/usr/bin` and `/usr/local/bin` spellings of the delete
+# tool, and the backslash-escaped directory variant. This suite proves the
+# removal preserved the union of matched strings rather than assuming it.
 #
 # For every command in the corpus below the suite records two verdicts: the
 # shipped guard's exit status, and the status the pre-collapse pattern set gives
@@ -19,8 +19,8 @@
 # each drops one load-bearing alternative from the pre-collapse set, and each has
 # to disagree with the shipped guard somewhere.
 #
-# The guard is driven through the hook JSON protocol on stdin, which is the only
-# interface the agent hooks call, so argv is never exercised. The payload is
+# The guard is driven through the hook JSON payload on stdin, the same format the
+# filter runner passes on to a filter, so argv is never exercised. The payload is
 # JSON-escaped the way a real hook payload is, and both tables are computed from
 # the command the guard's own extraction yields, so escaping never stands
 # between the two sides of the comparison.

@@ -76,6 +76,10 @@ case "$_sd_command" in
   exit 0
   ;;
 esac
+# WHY a fold close here as well as in the verb block: this one closes the fold the
+# three families opened, so the settings.unproven comparison stays case-sensitive
+# no matter where that block sits relative to it. The verb block opens and closes
+# its own fold, because the proof below resolves the word as typed.
 shopt -u nocasematch
 
 # A deletion command as the invoked word, optionally behind sudo. The pattern

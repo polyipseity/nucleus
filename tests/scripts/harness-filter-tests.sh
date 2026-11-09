@@ -174,10 +174,12 @@ for _case in "${FILTER_CASES[@]}"; do
   assert_decision "$_rule: $_command" "$(run_filter "$_settings" "$_command")" "$_decision" "$_rule"
 done
 
-# Guard, not a red-before case: the case fold is scoped above this comparison, so
-# a value spelled 'Allow' must stay unmatched and deny. Moving the `shopt -u`
-# above the settings.unproven block would silently allow it with every other case
-# still green, and the PowerShell twin compares with -ceq for the same reason.
+# Guard, not a red-before case: the case fold is closed above this comparison, so
+# a value spelled 'Allow' must stay unmatched and deny. The mutation that flips it
+# is a fold left in force across `case "$_sd_unproven"`: the verb block opens its
+# own fold, and without the `shopt -u` that closes it `Allow` would match and
+# allow with every other case still green. The PowerShell twin compares with -ceq
+# for the same reason.
 assert_decision "an uppercase settings.unproven value denies (guard: the fold stops above the setting)" \
   "$(run_filter '{"unproven":"Allow"}' 'rm x')" deny unproven-redirect
 
@@ -360,6 +362,9 @@ add_filter "$AGG" garbage 'printf "not a decision line\n"'
 # A decision line plus a second line: the protocol is one verdict per filter, and
 # a harness reading the whole stdout or its last line could act on the extra one.
 add_filter "$AGG" twoline 'printf "allow\tno-match\tquiet\ngarbage\n"'
+# A blank line ahead of the verdict is not content: the Windows twin drops empty
+# strings before it counts, so both runners have to read this as one verdict.
+add_filter "$AGG" blankfirst 'printf "\nallow\tno-match\tquiet\n"'
 
 set_registry "$AGG" '{"filters":[{"enabled":true,"id":"allow-first","settings":{}},{"enabled":true,"id":"ask-second","settings":{}},{"enabled":true,"id":"deny-third","settings":{}}]}'
 if [ "$(run_runner "$AGG" copilot '{"command":"anything"}')" = "$(printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"deny-third (native-path): third"}}')" ]; then
@@ -409,6 +414,13 @@ set_registry "$AGG" '{"filters":[{"enabled":true,"id":"twoline","settings":{}}]}
 _twoline="$(run_runner "$AGG" copilot '{"command":"anything"}')"
 assert_document "a filter printing a second line is recorded as filter-error" "$_twoline" \
   '.hookSpecificOutput.permissionDecision == "ask" and (.hookSpecificOutput.permissionDecisionReason | contains("filter-error")) and (.hookSpecificOutput.permissionDecisionReason | contains("no decision line"))'
+
+set_registry "$AGG" '{"filters":[{"enabled":true,"id":"blankfirst","settings":{}}]}'
+_blankfirst="$(run_runner "$AGG" copilot '{"command":"anything"}')"
+# The verdict, not filter-error: the blank line the filter wrote first is not an
+# answer, and the Windows twin accepts the same bytes.
+assert_document "a blank line ahead of the verdict is not a decision line" "$_blankfirst" \
+  '.hookSpecificOutput.permissionDecision == "allow" and (.hookSpecificOutput.permissionDecisionReason | contains("no-match"))'
 
 set_registry "$AGG" '{"filters":[{"enabled":true,"id":"absent","settings":{}}]}'
 _absent="$(run_runner "$AGG" copilot '{"command":"anything"}')"
