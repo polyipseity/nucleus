@@ -233,4 +233,35 @@ else
   assert_fail "dropping the escape-delete pattern changes a verdict" "no row changed, so the escaped-directory row proves nothing"
 fi
 
+section 3 "case fold"
+
+# The filter twins fold case for these families, so a guard that matched only
+# lowercase spellings would deny a form one platform folds and allow its
+# uppercase twin. These rows sit outside the corpus because the corpus compares
+# two case-sensitive pattern sets, which cannot tell a folded guard from an
+# unfolded one. Guard rows: they pass today and must keep passing.
+U_RM="$(_two R M)"
+U_CMDEXE="$(_two CM D).$(_two E XE)"
+readonly U_RM U_CMDEXE
+
+FOLD_CASES=(
+  "uppercase absolute bin path|/usr/BIN/$U_RM foo|2"
+  "uppercase escaped spelling|\\$U_RM foo|2"
+  "uppercase cmd interpreter|$U_CMDEXE /c $N_DEL foo|2"
+)
+readonly FOLD_CASES
+
+for _entry in "${FOLD_CASES[@]}"; do
+  _label="${_entry%%|*}"
+  _rest="${_entry#*|}"
+  _command="${_rest%|*}"
+  _want="${_rest##*|}"
+  _seen="$(_guard_status "$(_payload "$_command")")"
+  if [ "$_seen" = "$_want" ]; then
+    assert_pass "case fold: $_label"
+  else
+    assert_fail "case fold: $_label" "guard exited $_seen for '$_command', want $_want"
+  fi
+done
+
 finish_tests

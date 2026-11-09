@@ -5,8 +5,10 @@
 #   filters/safe-delete.sh --settings <json> --command <text>
 #   stdout: decision<TAB>rule<TAB>reason
 #
-# Rule families, name for name with the three branches of the retired guard, plus
-# the redirect question:
+# Rule families, name for name with the three branches of safe-delete-guard, plus
+# the redirect question. No hook file registers that guard any more: what remains is
+# the PATH command safe-delete-guard on POSIX and the safe-delete-guard.cmd shim on
+# Windows, which a caller can still name directly.
 #   native-path       an absolute or relative path to the delete binary
 #   escaped-spelling  a backslash-escaped deletion command, which skips the alias
 #   cmd-shell         cmd.exe, which is never allowed on any host
@@ -50,6 +52,12 @@ fi
 # WHY the guard's three branches verbatim: they are the spellings that reach a
 # delete without passing the interactive alias or the PATH shim, so a filter that
 # gated fewer of them would silently reopen a documented bypass.
+# WHY nocasematch across the three families: the verb test below folds case, so an
+# uppercase word is a deletion, and a fold that stopped at the verb would let `\RM`,
+# `./RM`, and `/usr/BIN/rm` slip the families and answer no-match, which reads as
+# allow. The fold is scoped to these cases, so the settings.unproven comparison
+# below stays case-sensitive.
+shopt -s nocasematch
 case "$_sd_command" in
 */bin/rm* | ./*rm*)
   printf 'deny\tnative-path\t%s\n' "native rm bypasses safe-delete protection. Use shell-safe-rm or rip2 instead."
@@ -68,6 +76,7 @@ case "$_sd_command" in
   exit 0
   ;;
 esac
+shopt -u nocasematch
 
 # A deletion command as the invoked word, optionally behind sudo. The pattern
 # anchors on a command separator, so the same verb in an argument position or

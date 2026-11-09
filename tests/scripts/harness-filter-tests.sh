@@ -150,8 +150,11 @@ section 1 "filter protocol (safe-delete)"
 FILTER_CASES=(
   '{"unproven":"deny"}|/bin/rm -rf x|deny|native-path'
   '{"unproven":"deny"}|/usr/local/bin/rm x|deny|native-path'
+  '{"unproven":"deny"}|/usr/BIN/rm -rf x|deny|native-path'
   '{"unproven":"deny"}|./rm x|deny|native-path'
+  '{"unproven":"deny"}|./RM -rf build|deny|native-path'
   '{"unproven":"deny"}|\rm x|deny|escaped-spelling'
+  '{"unproven":"deny"}|\RM -rf /tmp/x|deny|escaped-spelling'
   '{"unproven":"deny"}|\unlink x|deny|escaped-spelling'
   '{"unproven":"deny"}|cmd.exe /c del x|deny|cmd-shell'
   '{"unproven":"deny"}|pwsh -c x cmd y|deny|cmd-shell'
@@ -170,6 +173,13 @@ for _case in "${FILTER_CASES[@]}"; do
   IFS='|' read -r _settings _command _decision _rule <<<"$_case"
   assert_decision "$_rule: $_command" "$(run_filter "$_settings" "$_command")" "$_decision" "$_rule"
 done
+
+# Guard, not a red-before case: the case fold is scoped above this comparison, so
+# a value spelled 'Allow' must stay unmatched and deny. Moving the `shopt -u`
+# above the settings.unproven block would silently allow it with every other case
+# still green, and the PowerShell twin compares with -ceq for the same reason.
+assert_decision "an uppercase settings.unproven value denies (guard: the fold stops above the setting)" \
+  "$(run_filter '{"unproven":"Allow"}' 'rm x')" deny unproven-redirect
 
 section 2 "redirect proof (safe-delete)"
 

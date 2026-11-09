@@ -296,11 +296,31 @@ Describe 'safe-delete filter settings' {
     finally { Copy-Item -LiteralPath $script:RegistryPath -Destination (Join-Path -Path (Join-Path -Path $script:Sandbox 'src\modules\configs') -ChildPath 'harness-filters.json') -Force }
   }
 
+  It 'denies an uppercase settings.unproven value (guard: the fold stops above the setting)' {
+    Set-FilterRegistry -Root $script:Sandbox -Document '{"filters":[{"enabled":true,"id":"safe-delete","settings":{"unproven":"Allow"}}]}'
+    try {
+      $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"rm x"}'
+      $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
+      $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'deny'
+      $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'unproven-redirect'
+    }
+    finally { Copy-Item -LiteralPath $script:RegistryPath -Destination (Join-Path -Path (Join-Path -Path $script:Sandbox 'src\modules\configs') -ChildPath 'harness-filters.json') -Force }
+  }
+
   It 'denies every bypass family' {
     $cases = @(
       @{ Payload = '{"command":"/bin/rm -rf x"}'; Rule = 'native-path' }
       @{ Payload = '{"command":"./rm x"}'; Rule = 'native-path' }
       @{ Payload = '{"command":"\\rm x"}'; Rule = 'escaped-spelling' }
+      # WHY these three: the verb test folds case, so an uppercase word is a
+      # deletion, and a fold that stops at the verb lets the uppercase spelling
+      # slip the families and answer no-match, which reads as allow. The first two
+      # fail that way before the families fold. The third is a guard rather than a
+      # red-before case: `-like` already folded case here, and a Windows backslash
+      # path is caught by the escaped family, which is why it names that rule.
+      @{ Payload = '{"command":"\\RM -Recurse x"}'; Rule = 'escaped-spelling' }
+      @{ Payload = '{"command":"C:\\BIN\\RM.exe -r x"}'; Rule = 'escaped-spelling' }
+      @{ Payload = '{"command":"C:/BIN/RM.exe -r x"}'; Rule = 'native-path' }
       @{ Payload = '{"command":"cmd.exe /c del x"}'; Rule = 'cmd-shell' }
     )
     foreach ($case in $cases) {

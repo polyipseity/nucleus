@@ -9,8 +9,10 @@
     filters\safe-delete.ps1 --settings <json> --command <text>
     stdout: decision<TAB>rule<TAB>reason
 
-  Rule families, name for name with the three branches of the retired guard, plus
-  the redirect question:
+  Rule families, name for name with the three branches of safe-delete-guard, plus
+  the redirect question. No hook file registers that guard any more: what remains
+  is the PATH command safe-delete-guard on POSIX and the safe-delete-guard.cmd shim
+  on Windows, which a caller can still name directly.
 
     native-path        an absolute or relative path to the delete binary
     escaped-spelling   a backslash-escaped deletion command, which skips the alias
@@ -65,18 +67,24 @@ catch {
 # WHY the guard's three branches verbatim: they are the spellings that reach a
 # delete without passing the interactive alias or the PATH shim, so a filter that
 # gated fewer of them would silently reopen a documented bypass.
-if ($Command -like '*/bin/rm*' -or $Command -like './*rm*') {
+# WHY -ilike rather than -like: PowerShell folds case for -like already, so this
+# changes no verdict. Naming the operator says so, where -like invites a reader to
+# assume the family is case-sensitive and add a -clike that would reopen the bypass.
+if ($Command -ilike '*/bin/rm*' -or $Command -ilike './*rm*') {
   Write-Output ("deny`tnative-path`tnative rm bypasses safe-delete protection. Use shell-safe-rm or rip2 instead.")
   exit 0
 }
 $escaped = @('\rm', '\del', '\rd', '\erase', '\ri', '\unlink', '\shred')
 foreach ($spelling in $escaped) {
-  if ($Command.Contains($spelling)) {
+  # WHY IndexOf with OrdinalIgnoreCase: String.Contains is ordinal, so an uppercase
+  # spelling such as `\RM` slipped a family whose whole job is to catch it and
+  # answered no-match, which reads as allow.
+  if ($Command.IndexOf($spelling, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
     Write-Output ("deny`tescaped-spelling`ta backslash-escaped deletion command bypasses safe-delete protection. Use shell-safe-rm or rip2 instead.")
     exit 0
   }
 }
-if ($Command -like '*cmd.exe*' -or $Command -like '* cmd *') {
+if ($Command -ilike '*cmd.exe*' -or $Command -ilike '* cmd *') {
   Write-Output ("deny`tcmd-shell`tcmd.exe is not allowed. Use pwsh instead.")
   exit 0
 }
@@ -86,8 +94,8 @@ if ($Command -like '*cmd.exe*' -or $Command -like '* cmd *') {
 # inside quotes does not match.
 # WHY -imatch: PowerShell folds case for these words, so DEL, Del, and del are one
 # deletion; a case-sensitive test would let an uppercase spelling fall through to
-# no-match, which reads as allow. The bypass families above stay case-sensitive
-# because they match a path or a spelling, not a PowerShell word.
+# no-match, which reads as allow. Every family above folds case for that same
+# reason; the setting compared below does not.
 $deletion = '(^|[;&|(]|&&|\|\|)\s*(sudo\s+)?(rm|del|rd|rmdir|erase|ri|unlink|shred|Remove-Item)(\s|$)'
 if ($Command -imatch $deletion) {
   $verb = $Matches[3]

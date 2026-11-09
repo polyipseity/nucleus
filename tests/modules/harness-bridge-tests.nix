@@ -26,10 +26,10 @@ let
     "harness-notify"
   ];
 
-  # The deletion guard ships beside the bridge in the same hook files. It is a
-  # deployed PATH command in its own right rather than a bridge entry point: a
-  # POSIX script in src/scripts, and on Windows a shim Sync-SafeDelete.ps1 writes
-  # around its PowerShell implementation.
+  # The deletion guard is a deployed PATH command in its own right rather than a
+  # bridge entry point: a POSIX script in src/scripts, and on Windows a shim
+  # Sync-SafeDelete.ps1 writes around its PowerShell implementation. No hook file
+  # registers it: every harness that carries a hook file runs the filter runner.
   guardCommand = "safe-delete-guard";
   hookCommands = entryPoints ++ [ guardCommand ];
   guardScript = "/src/scripts/safe-delete-guard.sh";
@@ -47,10 +47,11 @@ let
   claudeEntries = builtins.concatMap (groups: builtins.concatMap (group: group.hooks) groups) (
     builtins.attrValues claudeHooks
   );
-  # The gate assert reads only PreToolUse: an all-events count would let a guard
-  # on any other event satisfy the "gate tool calls" claim while never blocking
-  # a tool call.
-  claudePreToolUseEntries = builtins.concatMap (group: group.hooks) claudeHooks.PreToolUse;
+  # Only a Bash matcher reaches a shell command, so only its hooks can gate a
+  # deletion; a hook filed under another matcher would pass a whole-event count.
+  claudeBashPreToolUseEntries = builtins.concatMap (group: group.hooks) (
+    builtins.filter (group: group.matcher == "Bash") claudeHooks.PreToolUse
+  );
 
   # Attr values of both files are lists of hook entries; flatten one level.
   allEntries = builtins.concatLists (
@@ -72,10 +73,6 @@ let
 
   # First word of a hook command: the command the harness resolves on PATH.
   entryPointOf = command: builtins.head (builtins.split " " command);
-  # Entries of one event list that run a given command, so a per-file check can
-  # name the exact entry instead of assuming its position.
-  entriesRunning =
-    entries: command: builtins.filter (entry: entryPointOf entry.command == command) entries;
   # Exact command match: a harness wired to another harness's decision document, or
   # to an argument-less approval call, still starts with the entry point name, so
   # the first-word match above cannot catch it.
@@ -106,10 +103,10 @@ in
       "hook commands must be bare PATH-resolved names; an absolute path, home expansion, or environment reference cannot work on all three hosts"
     )
     (assert' (builtins.pathExists (root + guardScript))
-      "the deletion guard hook needs its POSIX implementation, or a POSIX harness runs a hook it cannot find"
+      "the deletion guard needs its POSIX implementation, or the deployed safe-delete-guard command does not exist"
     )
     (assert' (builtins.pathExists (root + guardWindowsImplementation))
-      "the deletion guard hook needs its Windows implementation, which Sync-SafeDelete.ps1 exposes as the safe-delete-guard shim; without it the guard is silent on Windows"
+      "the deletion guard needs its Windows implementation, which Sync-SafeDelete.ps1 exposes as the safe-delete-guard.cmd shim; without it the shim has nothing to run"
     )
 
     # --- Timeout budget covers the approval wait ---
@@ -125,11 +122,12 @@ in
     (assert' (builtins.length claudeEntries > 0)
       "the Claude hook config must declare at least one hook entry; an emptied hook set would make the timeout asserts below vacuous"
     )
-    (assert' (
-      builtins.length (entriesRunning claudePreToolUseEntries guardCommand) == 1
-    ) "Claude must gate tool calls with exactly one safe-delete-guard hook")
+    (assert'
+      (builtins.length (entriesWithCommand claudeBashPreToolUseEntries "harness-filter claude") == 1)
+      "Claude's Bash PreToolUse must run exactly the filter runner: one entry point makes the decision, so no second hook can answer a deletion differently"
+    )
     (assert' (all (entry: entry ? timeout) claudeEntries)
-      "every Claude hook entry must declare a timeout, or the harness applies a budget of its own and the guard can be killed before the approval window"
+      "every Claude hook entry must declare a timeout, or the harness applies a budget of its own and the filter can be killed before the approval window"
     )
 
     # --- Copilot wiring ---
