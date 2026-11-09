@@ -357,6 +357,9 @@ add_filter "$AGG" ask-second 'printf "ask\tunproven-redirect\tsecond\n"'
 add_filter "$AGG" deny-third 'printf "deny\tnative-path\tthird\n"'
 add_filter "$AGG" crash "printf 'boom\n' >&2\nexit 3"
 add_filter "$AGG" garbage 'printf "not a decision line\n"'
+# A decision line plus a second line: the protocol is one verdict per filter, and
+# a harness reading the whole stdout or its last line could act on the extra one.
+add_filter "$AGG" twoline 'printf "allow\tno-match\tquiet\ngarbage\n"'
 
 set_registry "$AGG" '{"filters":[{"enabled":true,"id":"allow-first","settings":{}},{"enabled":true,"id":"ask-second","settings":{}},{"enabled":true,"id":"deny-third","settings":{}}]}'
 if [ "$(run_runner "$AGG" copilot '{"command":"anything"}')" = "$(printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"deny-third (native-path): third"}}')" ]; then
@@ -400,6 +403,11 @@ assert_document "a crashing filter is recorded as filter-error" "$_crash" \
 set_registry "$AGG" '{"filters":[{"enabled":true,"id":"garbage","settings":{}}]}'
 _garbage="$(run_runner "$AGG" copilot '{"command":"anything"}')"
 assert_document "a filter printing no protocol line is recorded as filter-error" "$_garbage" \
+  '.hookSpecificOutput.permissionDecision == "ask" and (.hookSpecificOutput.permissionDecisionReason | contains("filter-error")) and (.hookSpecificOutput.permissionDecisionReason | contains("no decision line"))'
+
+set_registry "$AGG" '{"filters":[{"enabled":true,"id":"twoline","settings":{}}]}'
+_twoline="$(run_runner "$AGG" copilot '{"command":"anything"}')"
+assert_document "a filter printing a second line is recorded as filter-error" "$_twoline" \
   '.hookSpecificOutput.permissionDecision == "ask" and (.hookSpecificOutput.permissionDecisionReason | contains("filter-error")) and (.hookSpecificOutput.permissionDecisionReason | contains("no decision line"))'
 
 set_registry "$AGG" '{"filters":[{"enabled":true,"id":"absent","settings":{}}]}'

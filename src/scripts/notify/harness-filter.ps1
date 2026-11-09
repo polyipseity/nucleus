@@ -24,9 +24,9 @@
     stdin   the raw hook payload, for a filter that needs more than the command
     stdout  exactly one line: decision<TAB>rule<TAB>reason
 
-  A non-zero exit, a missing script, or a line without three tab-separated
-  fields is recorded as ask with rule `filter-error`, because the filter could
-  not state a verdict.
+  A non-zero exit, a missing script, or an output that is not exactly one line
+  carrying three tab-separated fields is recorded as ask with rule `filter-error`,
+  because the filter could not state a verdict.
 
   The decisions aggregate as deny > ask > allow regardless of registry order, so
   registry order stays readable instead of load-bearing.  `ask` means "no

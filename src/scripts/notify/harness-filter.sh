@@ -18,9 +18,10 @@
 #   filters/<id>.sh --settings <json> --command <text>
 #   stdin  the raw hook payload, for a filter that needs more than the command
 #   stdout exactly one line: decision<TAB>rule<TAB>reason
-#   decision is allow, ask, or deny; a non-zero exit, a missing script, or a line
-#   that does not carry three tab-separated fields is recorded as ask with rule
-#   `filter-error`, because the filter could not state a verdict.
+#   decision is allow, ask, or deny; a non-zero exit, a missing script, or an
+#   output that is not exactly one line carrying three tab-separated fields is
+#   recorded as ask with rule `filter-error`, because the filter could not state
+#   a verdict.
 #
 # The decisions aggregate as deny > ask > allow regardless of registry order, so
 # registry order stays readable instead of load-bearing. `ask` means "no decision
@@ -209,8 +210,14 @@ while IFS= read -r _hf_entry; do
     _hf_line="$(printf 'ask\tfilter-error\tthe filter exited non-zero')"
   fi
 
+  # WHY one line and three fields: the protocol is one verdict per filter. A
+  # second line is an answer a harness reading the whole stdout or its last line
+  # could act on, and cut reads the newline into the first field, so a multi-line
+  # answer used to arrive as a decision that is neither allow nor deny and a rule
+  # that is not a rule name. The Windows twin requires the same two things.
+  _hf_lines="$(printf '%s\n' "$_hf_line" | wc -l | tr -d ' ')"
   _hf_tabs="$(printf '%s' "$_hf_line" | tr -cd '\t' | wc -c | tr -d ' ')"
-  if [ "$_hf_tabs" -ne 2 ]; then
+  if [ "$_hf_lines" -ne 1 ] || [ "$_hf_tabs" -ne 2 ]; then
     _hf_line="$(printf 'ask\tfilter-error\tthe filter printed no decision line')"
   fi
   _hf_decision="$(printf '%s' "$_hf_line" | cut -f1)"

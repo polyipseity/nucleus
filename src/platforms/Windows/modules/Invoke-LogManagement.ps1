@@ -3,8 +3,9 @@
   Log directory helpers and management functions for nucleus services.
 
 .DESCRIPTION
-  Log directory helpers, sanitization, rotation (copy-truncate), and time-based
-  expiry. Paths come from services.json $logging.
+  Log directory helpers, sanitization, and time-based expiry. Paths come from
+  services.json $logging. Rotation is nucleus-logs' own, so this module holds
+  none.
 
 .NOTES
   Environment variables:
@@ -204,7 +205,7 @@ function Invoke-LogExpiry {
   if ($days -le 0) { return }
 
   $cutoff = (Get-Date).AddDays(-$days)
-  # WHY: the pattern must match both the name.N.log written by Invoke-LogRotation
+  # WHY: the pattern must match both the name.N.log nucleus-logs rotation writes
   # and the legacy .log.N and dated log_* naming.
   $pattern = '(\.log\.\d+(\.gz)?$|\.\d+\.log(\.gz)?$|^log_.*\.log$|\.log\.gz$)'
 
@@ -213,102 +214,5 @@ function Invoke-LogExpiry {
     $_.Name -match $pattern -and $_.LastWriteTime -lt $cutoff
   } | ForEach-Object {
     Remove-Item -LiteralPath $_.FullName -Force
-  }
-}
-
-function Invoke-LogRotation {
-  <#
-  .SYNOPSIS
-    Rotates log files in a directory tree based on size.
-  .DESCRIPTION
-    Recursively scans for *.log files. A file over MaxSize is rotated with
-    copy-truncate, which preserves the inode for POSIX parity, and archives shift
-    .1 through MaxFiles.
-  .PARAMETER Path
-    Root directory containing log files to rotate.
-  .PARAMETER MaxSize
-    Maximum file size in bytes before rotation (default: 10 MB).
-  .PARAMETER MaxFiles
-    Number of rotated archives to keep (default: 4).
-  .PARAMETER Compress
-    Whether to compress rotated archives with gzip (default: $true).
-  #>
-  [CmdletBinding()]
-  param(
-    [Parameter(Mandatory)]
-    [string]$Path,
-    [int]$MaxSize = 10000000, # bytes
-    [int]$MaxFiles = 4,
-    [bool]$Compress = $true
-  )
-
-  if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return }
-
-  # check-suppress:suppression_doc: probe -- no log files may exist; empty result handled.
-  $logFiles = Get-ChildItem -LiteralPath $Path -Recurse -Filter '*.log' -File -ErrorAction SilentlyContinue
-  foreach ($file in $logFiles) {
-    if ($file.Length -le $MaxSize) { continue }
-
-    $isWritable = $false
-    try {
-      $writeStream = [System.IO.File]::OpenWrite($file.FullName)
-      $writeStream.Close()
-      $isWritable = $true
-    } catch {
-      $isWritable = $false
-    }
-    if (-not $isWritable) {
-      throw "log rotation requires write access to '$($file.FullName)'; run as administrator"
-    }
-
-    $baseName = $file.BaseName
-    $dir = $file.DirectoryName
-
-    # drop the oldest archive when at max
-    $oldest = $MaxFiles
-    $oldestPath = Join-Path -Path $dir -ChildPath "$baseName.$oldest.log"
-    if (Test-Path -LiteralPath $oldestPath -PathType Leaf) {
-      Remove-Item -LiteralPath $oldestPath -Force
-    }
-    if ($Compress) {
-      $oldestGz = "$oldestPath.gz"
-      if (Test-Path -LiteralPath $oldestGz -PathType Leaf) {
-        Remove-Item -LiteralPath $oldestGz -Force
-      }
-    }
-
-    # shift N -> N+1
-    for ($i = $MaxFiles - 1; $i -ge 1; $i--) {
-      $src = Join-Path -Path $dir -ChildPath "$baseName.$i.log"
-      $dst = Join-Path -Path $dir -ChildPath "$baseName.$($i + 1).log"
-      if (Test-Path -LiteralPath $src -PathType Leaf) {
-        Move-Item -LiteralPath $src -Destination $dst -Force
-      }
-      if ($Compress) {
-        $srcGz = "$src.gz"
-        $dstGz = "$dst.gz"
-        if (Test-Path -LiteralPath $srcGz -PathType Leaf) {
-          Move-Item -LiteralPath $srcGz -Destination $dstGz -Force
-        }
-      }
-    }
-
-    # copy-truncate keeps the inode
-    $archivePath = Join-Path -Path $dir -ChildPath "$baseName.1.log"
-    Copy-Item -LiteralPath $file.FullName -Destination $archivePath -Force
-    $truncateStream = [System.IO.File]::Open(
-      $file.FullName,
-      [System.IO.FileMode]::Open,
-      [System.IO.FileAccess]::Write
-    )
-    $truncateStream.SetLength(0)
-    $truncateStream.Close()
-
-    if ($Compress) {
-      $null = & gzip @($archivePath) 2>$null  # check-suppress:suppression_doc: archive may fail to compress if already corrupted or missing; $? checked below
-      if (-not $?) {
-        Write-NucleusWarning -CommandName log-rotation "gzip failed for $archivePath; keeping uncompressed."
-      }
-    }
   }
 }

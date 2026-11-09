@@ -115,8 +115,13 @@ exit 0
   # WHY this entry is legitimate: Sync-AgentsSkillManifest resolves the managed skill
   # symlink by its Windows target, which is meaningless on a POSIX filesystem, so the
   # case is platform-conditional rather than missing.
+  #
+  # WHY this entry is legitimate: the unwritable-log case makes a file read-only
+  # with a mode bit, which only POSIX enforces, and a Windows host would need an
+  # ACL deny the suite does not set.
   $expectedSkips = @{
     'Sync-AgentsSkillManifest.Tests.ps1' = if ($IsWindows) { 0 } else { 1 }
+    'logs.Tests.ps1'                     = if ($IsWindows) { 1 } else { 0 }
   }
 
   $suiteJobs = @()

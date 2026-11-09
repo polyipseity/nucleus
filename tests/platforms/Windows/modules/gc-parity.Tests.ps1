@@ -94,6 +94,10 @@ BeforeAll {
     # Every command in gc.ps1 that removes or rewrites state.  git is absent on
     # purpose: gc.ps1 shells out to it for both reads and removals, and only the
     # removals live inside the dry-run-aware helpers.
+    # Invoke-NucleusLogCommand is absent for a third reason: the logs action forwards
+    # -DryRun into the child process as an argument, which the walk cannot see, so
+    # listing it fails the guard walk on that call; its four step-7 calls are
+    # guarded by an if the walk does see.
     # ref: allow-and-deny-lists.instructions.md#D5 -- a command missing from
     # this list is silently skipped by the guard walk, so a renamed helper would
     # disarm the dry-run coverage check instead of failing it. T2 (self-prune):
@@ -104,8 +108,6 @@ BeforeAll {
         'Clear-SccacheCache'
         'Invoke-AISync'
         'Invoke-CleanupNix'
-        'Invoke-LogExpiry'
-        'Invoke-LogRotation'
         'Remove-Item'
         'Remove-StaleWallpaper'
         'Remove-VMGcItem'

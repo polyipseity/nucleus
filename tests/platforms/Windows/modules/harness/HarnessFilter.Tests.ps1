@@ -432,4 +432,19 @@ Describe 'aggregation and filter failure' {
 
     (ConvertFrom-Json -InputObject $result.Stdout -AsHashtable)['hookSpecificOutput']['permissionDecision'] | Should -Be 'allow'
   }
+
+  It 'answers ask with filter-error when a filter prints a second line' {
+    # WHY: exactly one stdout line is the verdict. A filter that prints a
+    # decision and a second line, which a harness reading the whole stdout or
+    # its last line could take as another answer, has stated no verdict, so the
+    # runner falls back to ask and names filter-error, the document the POSIX
+    # twin prints for the same bytes.
+    Add-FilterScript -Root $script:Sandbox -Id 'twoline' -Body 'Write-Output ("allow`tno-match`tquiet"); Write-Output "garbage"'
+    Set-FilterRegistry -Root $script:Sandbox -Document '{"filters":[{"enabled":true,"id":"twoline","settings":{}}]}'
+    $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"anything"}'
+
+    $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
+    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'ask'
+    $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'filter-error'
+  }
 }

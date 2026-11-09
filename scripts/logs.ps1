@@ -6,9 +6,9 @@
 .DESCRIPTION
   The Windows half of nucleus-logs. It owns the same operations as
   scripts/logs.sh: append one canonical event line per invocation, show, tail,
-  label, stats, rotate, expire, and gc. Rotation and expiry delegate to the
-  shared Invoke-LogManagement.ps1 implementation, so nothing is reimplemented
-  here.
+  label, stats, rotate, expire, and gc. Rotation is implemented here, because
+  nucleus-logs is the one owner of rotation on either platform; expiry delegates
+  to the shared Invoke-LogManagement.ps1 implementation.
 
   One event per line. Each line is a JSON object with the keys ts, id, kind,
   harness, decision, source, filter, rule, latency_ms, summary, digest; absent
@@ -42,7 +42,8 @@
   tail: number of events to print (default: 10).
 
 .PARAMETER Scope
-  Log root to operate on: user or system (default: user).
+  Log root to operate on: user or system (default: user). Every subcommand but
+  label takes it; label always appends to the user root.
 
 .PARAMETER MaxSize
   rotate: size in bytes that triggers rotation (default: services schema).
@@ -211,7 +212,8 @@ function Add-NucleusLogEvent {
     The single writer every caller shares. An exclusive <log>.lock sidecar is
     held for the duration of one append, which serializes app writers, while the
     log itself is opened shared so a native writer redirecting into it is never
-    blocked.
+    blocked. The sidecar is removed before the append returns, so it never
+    outlives the write it guarded.
   .PARAMETER LogName
     Log name, written to <log root>\<LogName>.log. Alias: -Log.
   .PARAMETER LogEvent
@@ -268,6 +270,17 @@ function Add-NucleusLogEvent {
   # writers sharing the log would overwrite the line in flight. An exclusive
   # .lock file serializes them, while the log itself stays shared so a service
   # redirecting stdout into it keeps working.
+  # WHY the sidecar is removed while it is still held: it must not outlive the
+  # append, and a delete after the close lets a waiting appender take the old file
+  # while another creates a new one, so two appenders write at once and lose an
+  # event. Holding it through the delete keeps every waiter out until its next
+  # attempt creates the single new file.
+  # WHY the share mode differs per platform: on Unix only FileShare.None takes the
+  # exclusive lock the sidecar depends on, and unlink ignores the share mode, so
+  # None both excludes and allows the removal. On Windows that same value forbids
+  # the delete, while FileShare.Delete still refuses another appender's read/write
+  # open and holds the removal pending until the handle closes.
+  $lockShare = if ($IsWindows) { [System.IO.FileShare]::Delete } else { [System.IO.FileShare]::None }
   $lockPath = "$path.lock"
   $lockAttempts = 0
   while ($true) {
@@ -276,7 +289,7 @@ function Add-NucleusLogEvent {
         $lockPath,
         [System.IO.FileMode]::OpenOrCreate,
         [System.IO.FileAccess]::ReadWrite,
-        [System.IO.FileShare]::None)
+        $lockShare)
       break
     } catch [System.IO.IOException] {
       $lockAttempts++
@@ -300,7 +313,15 @@ function Add-NucleusLogEvent {
       $stream.Dispose()
     }
   } finally {
-    $lock.Dispose()
+    # WHY the delete comes before the close, and why it runs on the failed-write
+    # path too: see the share-mode comment at the acquisition. A throw here
+    # still closes the handle, so an unwritable sidecar fails the append instead of
+    # leaking it.
+    try {
+      [System.IO.File]::Delete($lockPath)
+    } finally {
+      $lock.Dispose()
+    }
   }
 }
 
@@ -550,6 +571,108 @@ function Get-LogsSchemaDefault {
   return [string]$property.Value.default
 }
 
+function Invoke-LogRotation {
+  <#
+  .SYNOPSIS
+    Rotates the log files under a root by size, with copy-truncate.
+  .DESCRIPTION
+    Recursively scans for *.log files and rotates each one over MaxSize with
+    copy-truncate, so a service holding its log open keeps writing into the same
+    file. Archives shift .1 through MaxFiles and the oldest is dropped.
+    An archive is skipped: rotation names its own output <base>.N.log, which
+    matches *.log, and rotating that again files history under a name no reader
+    looks for. That exclusion is name-shaped, so a live log whose own name ends in
+    .<digits>.log is skipped as well.
+  .PARAMETER Path
+    Root directory containing log files to rotate.
+  .PARAMETER MaxSize
+    Maximum file size in bytes before rotation (default: 10 MB).
+  .PARAMETER MaxFiles
+    Number of rotated archives to keep (default: 4).
+  .PARAMETER Compress
+    Whether to compress rotated archives with gzip (default: $true).
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [string]$Path,
+    [int]$MaxSize = 10000000, # bytes
+    [int]$MaxFiles = 4,
+    [bool]$Compress = $true
+  )
+
+  if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return }
+
+  # check-suppress:suppression_doc: probe -- no log files may exist; empty result handled.
+  $logFiles = Get-ChildItem -LiteralPath $Path -Recurse -Filter '*.log' -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -notmatch '\.\d+\.log(\.gz)?$' }
+  foreach ($file in $logFiles) {
+    if ($file.Length -le $MaxSize) { continue }
+
+    $isWritable = $false
+    try {
+      $writeStream = [System.IO.File]::OpenWrite($file.FullName)
+      $writeStream.Close()
+      $isWritable = $true
+    } catch {
+      $isWritable = $false
+    }
+    if (-not $isWritable) {
+      throw "log rotation requires write access to '$($file.FullName)'; run as administrator"
+    }
+
+    $baseName = $file.BaseName
+    $dir = $file.DirectoryName
+
+    # drop the oldest archive when at max
+    $oldest = $MaxFiles
+    $oldestPath = Join-Path -Path $dir -ChildPath "$baseName.$oldest.log"
+    if (Test-Path -LiteralPath $oldestPath -PathType Leaf) {
+      Remove-Item -LiteralPath $oldestPath -Force
+    }
+    if ($Compress) {
+      $oldestGz = "$oldestPath.gz"
+      if (Test-Path -LiteralPath $oldestGz -PathType Leaf) {
+        Remove-Item -LiteralPath $oldestGz -Force
+      }
+    }
+
+    # shift N -> N+1
+    for ($i = $MaxFiles - 1; $i -ge 1; $i--) {
+      $src = Join-Path -Path $dir -ChildPath "$baseName.$i.log"
+      $dst = Join-Path -Path $dir -ChildPath "$baseName.$($i + 1).log"
+      if (Test-Path -LiteralPath $src -PathType Leaf) {
+        Move-Item -LiteralPath $src -Destination $dst -Force
+      }
+      if ($Compress) {
+        $srcGz = "$src.gz"
+        $dstGz = "$dst.gz"
+        if (Test-Path -LiteralPath $srcGz -PathType Leaf) {
+          Move-Item -LiteralPath $srcGz -Destination $dstGz -Force
+        }
+      }
+    }
+
+    # copy-truncate keeps the inode
+    $archivePath = Join-Path -Path $dir -ChildPath "$baseName.1.log"
+    Copy-Item -LiteralPath $file.FullName -Destination $archivePath -Force
+    $truncateStream = [System.IO.File]::Open(
+      $file.FullName,
+      [System.IO.FileMode]::Open,
+      [System.IO.FileAccess]::Write
+    )
+    $truncateStream.SetLength(0)
+    $truncateStream.Close()
+
+    if ($Compress) {
+      $null = & gzip @($archivePath) 2>$null  # check-suppress:suppression_doc: archive may fail to compress if already corrupted or missing; $? checked below
+      if (-not $?) {
+        Write-NucleusWarning -CommandName log-rotation "gzip failed for $archivePath; keeping uncompressed."
+      }
+    }
+  }
+}
+
 # WHY: only the entry script dispatches. A caller that dot-sources this file
 # imports Add-NucleusLogEvent without printing help and exiting 1.
 if (-not $script:IsEntryScript) { return }
@@ -575,6 +698,13 @@ switch ($Action) {
       Write-NucleusError -CommandName logs 'expected one JSON event object on stdin'
       exit 1
     }
+    # WHY refuse a second line: scripts/logs.sh dies on the same input, because a
+    # caller that piped two events would otherwise see one appended and the other
+    # dropped without a word.
+    if ($null -ne [Console]::In.ReadLine()) {
+      Write-NucleusError -CommandName logs 'expected exactly one event line on stdin'
+      exit 1
+    }
     $parsed = $raw | ConvertFrom-Json
     if ($parsed -isnot [pscustomobject]) {
       Write-NucleusError -CommandName logs 'event is not a JSON object'
@@ -587,6 +717,13 @@ switch ($Action) {
     Add-NucleusLogEvent -LogName $Log -LogEvent $logEvent -Directory $logDir -WhatIf:$DryRun
   }
   'label' {
+    # WHY reject the bound parameter: label always appends to the user root, so a
+    # -Scope here names a destination the event never reaches and reads as
+    # consent it never had. scripts/logs.sh has no --scope on label either.
+    if ($PSBoundParameters.ContainsKey('Scope')) {
+      Write-NucleusError -CommandName logs "unsupported option '-Scope' for label"
+      exit 1
+    }
     if (-not $Id -or -not $Verdict) {
       Write-NucleusError -CommandName logs 'label requires -Id and -Verdict'
       exit 1
