@@ -92,16 +92,12 @@ logs_validate_name() {
   case "$1" in
   '' | *[!A-Za-z0-9._-]*) die "invalid log name '$1' (allowed: A-Z a-z 0-9 . _ -)" ;;
   esac
-  # WHY: a name whose last dot-separated segment is all digits would write
-  # <name>.log, which is the rotated archive name of the base before that
-  # segment, so a live file and an archive collide outright.
+  # WHY: the archive glob is *.[0-9]*.log, so a dot followed by a digit anywhere
+  # makes the live file archive-shaped. Such a name writes <name>.log, the
+  # rotated archive of the base before that dot, so the two collide outright.
+  # That is why the rule is not limited to the last segment.
   case "$1" in
-  *.*)
-    case "${1##*.}" in
-    '' | *[!0-9]*) ;;
-    *) die "invalid log name '$1': a trailing .<digits> collides with the archive name <base>.<N>.log" ;;
-    esac
-    ;;
+  *.[0-9]*) die "invalid log name '$1': a dot followed by a digit collides with the archive name <base>.<N>.log" ;;
   esac
 }
 

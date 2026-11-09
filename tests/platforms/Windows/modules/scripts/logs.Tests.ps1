@@ -171,18 +171,23 @@ Describe 'nucleus-logs name validation' {
     }
   }
 
-  It 'rejects a name whose last segment is all digits' {
-    # WHY: a live <base>.<digits>.log is the rotated archive name of <base>, so
-    # the live file and the archive collide outright.
-    $command = ". '$($script:LogsPs1)'; Add-NucleusLogEvent -LogName 'app.1' -Event @{ id = 'x' }"
-    & $script:PwshExe -NoProfile -NonInteractive -Command $command > $null 2>&1
-    $LASTEXITCODE | Should -Not -Be 0
+  It 'rejects a name with a dot followed by a digit' {
+    # WHY: the archive glob is *.[0-9]*.log, so a dot followed by a digit
+    # anywhere in the name makes the live file archive-shaped, which is why the
+    # rule is not limited to the last segment.
+    foreach ($name in @('app.1', 'app.1x', 'app.1.x')) {
+      $command = ". '$($script:LogsPs1)'; Add-NucleusLogEvent -LogName '$name' -Event @{ id = 'x' }"
+      & $script:PwshExe -NoProfile -NonInteractive -Command $command > $null 2>&1
+      $LASTEXITCODE | Should -Not -Be 0
+    }
   }
 
-  It 'still accepts a digit-led segment that is not all digits' {
-    $command = ". '$($script:LogsPs1)'; Add-NucleusLogEvent -LogName 'app.1x' -Event @{ id = 'x' } -Directory '$($script:Work)'"
-    & $script:PwshExe -NoProfile -NonInteractive -Command $command > $null 2>&1
-    $LASTEXITCODE | Should -Be 0
+  It 'still accepts a name with no dot followed by a digit' {
+    foreach ($name in @('app.x1', 'v2')) {
+      $command = ". '$($script:LogsPs1)'; Add-NucleusLogEvent -LogName '$name' -Event @{ id = 'x' } -Directory '$($script:Work)'"
+      & $script:PwshExe -NoProfile -NonInteractive -Command $command > $null 2>&1
+      $LASTEXITCODE | Should -Be 0
+    }
   }
 }
 

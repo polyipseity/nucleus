@@ -241,11 +241,12 @@ function Add-NucleusLogEvent {
   if ($LogName -notmatch '^[A-Za-z0-9._-]+$') {
     throw "invalid log name '$LogName' (allowed: A-Z a-z 0-9 . _ -)"
   }
-  # WHY the trailing-digits rejection: a live log named <base>.<digits> would
-  # write <base>.<digits>.log, which is the rotated archive name of <base>, so
-  # the live file and the archive collide outright.
-  if ($LogName -match '\.\d+$') {
-    throw "invalid log name '$LogName': a trailing .<digits> collides with the archive name <base>.<N>.log"
+  # WHY: the archive glob is *.[0-9]*.log, so a dot followed by a digit
+  # anywhere makes the live file archive-shaped. Such a name writes
+  # <name>.log, the rotated archive of the base before that dot, so the two
+  # collide outright. That is why the rule is not limited to the last segment.
+  if ($LogName -match '\.[0-9]') {
+    throw "invalid log name '$LogName': a dot followed by a digit collides with the archive name <base>.<N>.log"
   }
   if (-not $Directory) { $Directory = Get-LogsDir -ScopeName 'user' }
   if ([string]::IsNullOrWhiteSpace($Directory)) {

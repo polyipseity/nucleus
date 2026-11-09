@@ -209,10 +209,46 @@ test_archive_shaped_name_is_rejected() {
 
   status=0
   printf '{"id":"x"}\n' | logs append app.1x >/dev/null 2>&1 || status=$?
-  if [ "$status" -eq 0 ] && [ -f "$_WORK/app.1x.log" ]; then
-    assert_pass "append accepts a digit-led segment that is not all digits"
+  if [ "$status" -ne 0 ]; then
+    assert_pass "append rejects a final segment starting with a digit"
   else
-    assert_fail "append-1x" "append refused app.1x"
+    assert_fail "append-1x" "append accepted app.1x"
+  fi
+
+  if [ ! -e "$_WORK/app.1x.log" ]; then
+    assert_pass "a rejected digit-led segment leaves no file"
+  else
+    assert_fail "append-1x-path" "append created app.1x.log"
+  fi
+
+  status=0
+  printf '{"id":"x"}\n' | logs append app.1.x >/dev/null 2>&1 || status=$?
+  if [ "$status" -ne 0 ]; then
+    assert_pass "append rejects a dot followed by a digit anywhere"
+  else
+    assert_fail "append-1x-dot" "append accepted app.1.x"
+  fi
+
+  if [ ! -e "$_WORK/app.1.x.log" ]; then
+    assert_pass "a rejected mid-name digit segment leaves no file"
+  else
+    assert_fail "append-1x-dot-path" "append created app.1.x.log"
+  fi
+
+  status=0
+  printf '{"id":"x"}\n' | logs append app.x1 >/dev/null 2>&1 || status=$?
+  if [ "$status" -eq 0 ] && [ -f "$_WORK/app.x1.log" ]; then
+    assert_pass "append accepts a final segment that starts with a letter"
+  else
+    assert_fail "append-x1" "append refused app.x1"
+  fi
+
+  status=0
+  printf '{"id":"x"}\n' | logs append v2 >/dev/null 2>&1 || status=$?
+  if [ "$status" -eq 0 ] && [ -f "$_WORK/v2.log" ]; then
+    assert_pass "append accepts a dotless name with digits"
+  else
+    assert_fail "append-v2" "append refused v2"
   fi
 
   status=0
