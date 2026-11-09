@@ -32,7 +32,7 @@ alwaysApply: false
 
 - Guard script `safe-delete-guard` (POSIX sh + PowerShell twin) blocks a deletion reached through a `/bin/rm` path or a `./` relative path, the backslash-escaped spellings, and `cmd`/`cmd.exe` (Windows). A bare `rm` is not in its pattern set, because the interactive alias covers that case and the guard exists to stop the bypasses the alias cannot see. The suite `tests/scripts/safe-delete-guard-tests.sh` pins that split.
 - The guard is not a hook: no hook file registers it. Its remaining roles are the PATH command `safe-delete-guard` on POSIX and the `safe-delete-guard.cmd` shim on Windows.
-- Every harness that carries a hook file (Claude Code, Copilot, Cursor) gates tool calls through `harness-filter <harness>`, whose `safe-delete` filter applies the same three families plus `settings.unproven`, so the unproven-redirect question and the audit event reach all of them. Pi and opencode use instructions and extensions only.
+- Every harness that carries a hook file (Claude Code, Copilot, Cursor) gates tool calls through `harness-filter <harness>`, whose `safe-delete` filter applies the same three families plus `settings.unproven` (`deny`, `ask`, or `allow`), so the unproven-redirect question and the audit event reach all of them. Pi and opencode use instructions and extensions only.
 
 ## Cross-host parity
 

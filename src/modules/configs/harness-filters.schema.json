@@ -8,6 +8,36 @@
     "filters": {
       "items": {
         "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "id": {
+                  "const": "safe-delete"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "then": {
+              "properties": {
+                "settings": {
+                  "properties": {
+                    "unproven": {
+                      "enum": [
+                        "allow",
+                        "ask",
+                        "deny"
+                      ],
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
         "properties": {
           "enabled": {
             "type": "boolean"

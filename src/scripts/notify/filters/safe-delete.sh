@@ -18,8 +18,8 @@
 #   no-match          nothing to gate
 #
 # An unproven redirect is treated as not redirected: settings.unproven says what
-# that gets, so deny (the registry default) blocks the command, route puts it to
-# the approval sources, and allow lets it through. A redirect is proven only when
+# that gets, so ask (the registry default) puts it to the approval sources, deny
+# blocks the command, and allow lets it through. A redirect is proven only when
 # the deletion word resolves to the wrapper home.file deploys, so a PATH that
 # reaches a plain binary, a wrapper that is absent, a wrapper linked anywhere else,
 # and a word behind sudo all read as unproven.
@@ -44,7 +44,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-if ! _sd_unproven="$(jq -r '.unproven // "deny"' <<<"$_sd_settings")"; then
+if ! _sd_unproven="$(jq -r '.unproven // "ask"' <<<"$_sd_settings")"; then
   printf 'ask\tfilter-error\tsettings are not valid JSON\n'
   exit 0
 fi
@@ -154,10 +154,10 @@ if [ "$_sd_is_deletion" = true ]; then
   fi
   case "$_sd_unproven" in
   deny)
-    printf 'deny\tunproven-redirect\t%s\n' "deletion command: $_sd_why, so it is treated as not redirected. Use shell-safe-rm or rip2 instead, or set harness-filters.json safe-delete.settings.unproven to route or allow."
+    printf 'deny\tunproven-redirect\t%s\n' "deletion command: $_sd_why, so it is treated as not redirected. Use shell-safe-rm or rip2 instead, or set harness-filters.json safe-delete.settings.unproven to ask or allow."
     exit 0
     ;;
-  route)
+  ask)
     printf 'ask\tunproven-redirect\t%s\n' "deletion command: $_sd_why, so it is treated as not redirected and the harness prompts"
     exit 0
     ;;
@@ -166,7 +166,7 @@ if [ "$_sd_is_deletion" = true ]; then
     exit 0
     ;;
   esac
-  printf 'deny\tunproven-redirect\t%s\n' "deletion command: $_sd_why, and settings.unproven is '$_sd_unproven' rather than deny, route, or allow, so the unproven redirect is denied. Use shell-safe-rm or rip2 instead."
+  printf 'deny\tunproven-redirect\t%s\n' "deletion command: $_sd_why, and settings.unproven is '$_sd_unproven' rather than deny, ask, or allow, so the unproven redirect is denied. Use shell-safe-rm or rip2 instead."
   exit 0
 fi
 

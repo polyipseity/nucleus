@@ -22,8 +22,8 @@
     no-match           nothing to gate
 
   An unproven redirect is treated as not redirected: settings.unproven says what
-  that gets, so deny (the registry default) blocks the command, route puts it to
-  the approval sources, and allow lets it through. PowerShell has no proven
+  that gets, so ask (the registry default) puts it to the approval sources, deny
+  blocks the command, and allow lets it through. PowerShell has no proven
   redirect: the deletion words resolve through the alias table, which the profile
   rewrites and a hook cannot see, so every deletion word falls to
   settings.unproven.
@@ -54,7 +54,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$unproven = 'deny'
+$unproven = 'ask'
 try {
   $parsed = ConvertFrom-Json -InputObject $Settings -AsHashtable
   if ($parsed -is [hashtable] -and $parsed.ContainsKey('unproven')) { $unproven = [string]$parsed['unproven'] }
@@ -122,10 +122,10 @@ if ($Command -imatch $deletion) {
   # WHY -ceq: the POSIX twin matches the setting with a case-sensitive case, so a
   # value spelled 'Allow' must not enable the redirect exemption on one host only.
   if ($unproven -ceq 'deny') {
-    Write-Output ("deny`tunproven-redirect`tdeletion command: $why, so it is treated as not redirected. Use rip instead (rip -u to undo), or set harness-filters.json safe-delete.settings.unproven to route or allow.")
+    Write-Output ("deny`tunproven-redirect`tdeletion command: $why, so it is treated as not redirected. Use rip instead (rip -u to undo), or set harness-filters.json safe-delete.settings.unproven to ask or allow.")
     exit 0
   }
-  if ($unproven -ceq 'route') {
+  if ($unproven -ceq 'ask') {
     Write-Output ("ask`tunproven-redirect`tdeletion command: $why, so it is treated as not redirected and the harness prompts")
     exit 0
   }
@@ -133,7 +133,7 @@ if ($Command -imatch $deletion) {
     Write-Output ("allow`tunproven-redirect`tdeletion command: $why, and settings.unproven allows an unproven redirect")
     exit 0
   }
-  Write-Output ("deny`tunproven-redirect`tdeletion command: $why, and settings.unproven is '$unproven' rather than deny, route, or allow, so the unproven redirect is denied. Use rip instead (rip -u to undo).")
+  Write-Output ("deny`tunproven-redirect`tdeletion command: $why, and settings.unproven is '$unproven' rather than deny, ask, or allow, so the unproven redirect is denied. Use rip instead (rip -u to undo).")
   exit 0
 }
 

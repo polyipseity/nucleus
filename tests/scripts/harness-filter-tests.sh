@@ -46,9 +46,11 @@ LIB_DIR="$REPO_ROOT/src/scripts/lib/lib.sh"
 LIB_DIR_DIR="$REPO_ROOT/src/scripts/lib"
 LOGS_APP="$REPO_ROOT/scripts/logs.sh"
 REGISTRY="$REPO_ROOT/src/modules/configs/harness-filters.json"
-readonly RUNNER FILTER_DIR LIB_DIR LIB_DIR_DIR LOGS_APP REGISTRY
+SCHEMA="$REPO_ROOT/src/modules/configs/harness-filters.schema.json"
+readonly RUNNER FILTER_DIR LIB_DIR LIB_DIR_DIR LOGS_APP REGISTRY SCHEMA
 
 require_command jq "the runner and the filter registry both need jq"
+require_command check-jsonschema "the shipped registry is validated against its schema"
 require_command python3 "the schema file is parsed with python3"
 require_command bash "the filter runs under bash and this suite resolves its interpreter"
 require_command sh "the filter resolves a deletion word through sh -c"
@@ -161,8 +163,8 @@ FILTER_CASES=(
   '{"unproven":"deny"}|rm x|deny|unproven-redirect'
   '{"unproven":"deny"}|DEL /S x|deny|unproven-redirect'
   '{"unproven":"deny"}|rm -rf build|deny|unproven-redirect'
-  '{"unproven":"route"}|rm x|ask|unproven-redirect'
-  '{}|rm x|deny|unproven-redirect'
+  '{"unproven":"ask"}|rm x|ask|unproven-redirect'
+  '{}|rm x|ask|unproven-redirect'
   '{"unproven":"allow"}|rm x|allow|unproven-redirect'
   '{"unproven":"deny"}|ls -la|allow|no-match'
   '{"unproven":"deny"}|git status|allow|no-match'
@@ -225,20 +227,42 @@ readonly PROVEN_PATH NO_RM_PATH PLAIN_PATH
 
 assert_decision "a proven redirect allows under deny" \
   "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"deny"}' 'rm x')" allow proven-redirect
-assert_decision "a proven redirect allows under route" \
-  "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"route"}' 'rm x')" allow proven-redirect
+assert_decision "a proven redirect allows under ask" \
+  "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"ask"}' 'rm x')" allow proven-redirect
 assert_decision "a proven redirect allows under allow" \
   "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"allow"}' 'rm x')" allow proven-redirect
-assert_decision "a missing rm is unproven and denies by default" \
+assert_decision "a missing rm is unproven and denies when set to deny" \
   "$(run_filter_env "$EMPTY_HOME" "$NO_RM_PATH" '{"unproven":"deny"}' 'rm x')" deny unproven-redirect
-assert_decision "an absent settings.unproven denies" \
-  "$(run_filter_env "$EMPTY_HOME" "$NO_RM_PATH" '{}' 'rm x')" deny unproven-redirect
-assert_decision "an unproven redirect routes when configured" \
-  "$(run_filter_env "$EMPTY_HOME" "$NO_RM_PATH" '{"unproven":"route"}' 'rm x')" ask unproven-redirect
+assert_decision "an absent settings.unproven asks" \
+  "$(run_filter_env "$EMPTY_HOME" "$NO_RM_PATH" '{}' 'rm x')" ask unproven-redirect
+assert_decision "an unproven redirect asks when configured" \
+  "$(run_filter_env "$EMPTY_HOME" "$NO_RM_PATH" '{"unproven":"ask"}' 'rm x')" ask unproven-redirect
 assert_decision "an unproven redirect allows when configured" \
   "$(run_filter_env "$EMPTY_HOME" "$NO_RM_PATH" '{"unproven":"allow"}' 'rm x')" allow unproven-redirect
-assert_decision "an unknown settings.unproven denies instead of allowing" \
-  "$(run_filter_env "$EMPTY_HOME" "$NO_RM_PATH" '{"unproven":"maybe"}' 'rm x')" deny unproven-redirect
+# An unknown value denies rather than allowing, and the fallthrough message is the
+# only place an operator is told the accepted words. Those words are read from the
+# schema here, so a value added to the enum alone fails this case instead of
+# shipping unannounced.
+_unknown_line="$(run_filter_env "$EMPTY_HOME" "$NO_RM_PATH" '{"unproven":"maybe"}' 'rm x')"
+assert_decision "an unknown settings.unproven denies instead of allowing" "$_unknown_line" deny unproven-redirect
+_schema_words=()
+mapfile -t _schema_words < <(jq -r '.properties.filters.items.allOf[0].then.properties.settings.properties.unproven.enum[]' "$SCHEMA")
+if [ "${#_schema_words[@]}" -eq 0 ]; then
+  assert_fail "the unknown settings.unproven message names every schema-accepted word" "no enum words read from $SCHEMA"
+else
+  _unnamed=()
+  for _word in "${_schema_words[@]}"; do
+    case "$(printf '%s' "$_unknown_line" | cut -f3)" in
+    *"$_word"*) ;;
+    *) _unnamed+=("$_word") ;;
+    esac
+  done
+  if [ "${#_unnamed[@]}" -eq 0 ]; then
+    assert_pass "the unknown settings.unproven message names every schema-accepted word"
+  else
+    assert_fail "the unknown settings.unproven message names every schema-accepted word" "not named: ${_unnamed[*]}"
+  fi
+fi
 assert_decision "a plain rm ahead of the wrapper on PATH is unproven and denies" \
   "$(run_filter_env "$EMPTY_HOME" "$PLAIN_PATH" '{"unproven":"deny"}' 'rm x')" deny unproven-redirect
 assert_decision "a plain file at the wrapper path is unproven and denies" \
@@ -247,14 +271,14 @@ assert_decision "a wrapper symlinked to a plain binary is unproven and denies" \
   "$(run_filter_env "$WRONG_TARGET_HOME" "$WRONG_TARGET_HOME/.local/bin:$MIN_BIN" '{"unproven":"deny"}' 'rm x')" deny unproven-redirect
 assert_decision "a sudo-prefixed deletion is unproven even with the wrapper first" \
   "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"deny"}' 'sudo rm -rf x')" deny unproven-redirect
-assert_decision "a sudo-prefixed deletion routes when configured" \
-  "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"route"}' 'sudo rm -rf x')" ask unproven-redirect
+assert_decision "a sudo-prefixed deletion asks when configured" \
+  "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"ask"}' 'sudo rm -rf x')" ask unproven-redirect
 assert_decision "an uppercase word is detected but not proven by a lowercase wrapper" \
   "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"deny"}' 'RM -rf build')" deny unproven-redirect
 
 # The three bypass families are the spellings no redirect can cover, so the
 # setting that governs an unproven redirect must not reach them.
-for _setting in deny route allow; do
+for _setting in deny ask allow; do
   for _case in '/bin/rm -rf x|deny|native-path' './rm x|deny|native-path' '\rm x|deny|escaped-spelling' 'cmd.exe /c del x|deny|cmd-shell'; do
     IFS='|' read -r _command _decision _rule <<<"$_case"
     assert_decision "$_rule stays denied under unproven=$_setting: $_command" \
@@ -279,11 +303,11 @@ fi
 assert_document "cursor: document parses as JSON" "$_cursor_deny" '.permission == "deny"'
 
 _copilot_unproven="$(run_runner "$TREE" copilot '{"command":"rm x"}')"
-assert_document "copilot: a plain delete with an unproven redirect is denied" "$_copilot_unproven" \
-  '.hookSpecificOutput.permissionDecision == "deny" and (.hookSpecificOutput.permissionDecisionReason | contains("unproven-redirect"))'
+assert_document "copilot: a plain delete with an unproven redirect asks under the shipped registry" "$_copilot_unproven" \
+  '.hookSpecificOutput.permissionDecision == "ask" and (.hookSpecificOutput.permissionDecisionReason | contains("unproven-redirect"))'
 
 _cursor_unproven="$(run_runner "$TREE" cursor '{"command":"rm x"}')"
-assert_document "cursor: a plain delete with an unproven redirect is denied" "$_cursor_unproven" '.permission == "deny"'
+assert_document "cursor: a plain delete with an unproven redirect asks under the shipped registry" "$_cursor_unproven" '.permission == "ask"'
 
 _claude_deny="$(run_runner "$TREE" claude '{"command":"/bin/rm -rf x"}')"
 assert_document "claude: native path is denied" "$_claude_deny" \
@@ -339,11 +363,11 @@ assert_document "a call no filter decides asks with no-filter" "$_undecided" \
 # A JSON payload behind leading whitespace is still JSON. The command is a plain
 # delete on purpose: behind the prefix the deletion pattern cannot match, so
 # without the strip this payload takes the raw-command path and answers allow with
-# no rule, while with the strip it parses and the deletion filter denies it with
+# no rule, while with the strip it parses and the deletion filter answers ask with
 # unproven-redirect.
 _leading="$(run_runner "$TREE" copilot '  {"command":"rm x"}')"
 assert_document "a payload with leading whitespace is still parsed as JSON" "$_leading" \
-  '.hookSpecificOutput.permissionDecision == "deny" and (.hookSpecificOutput.permissionDecisionReason | contains("unproven-redirect"))'
+  '.hookSpecificOutput.permissionDecision == "ask" and (.hookSpecificOutput.permissionDecisionReason | contains("unproven-redirect"))'
 
 NO_REGISTRY_TREE="$(make_tree no-registry)"
 rm -f "$NO_REGISTRY_TREE/src/modules/configs/harness-filters.json"
@@ -435,10 +459,10 @@ else
   assert_fail "the registry declares at least one filter" "$REGISTRY has an empty filters array"
 fi
 
-if jq -e '.filters[] | select(.id == "safe-delete" and .enabled == true and .settings.unproven == "deny")' "$REGISTRY" >/dev/null 2>&1; then
-  assert_pass "safe-delete is enabled with settings.unproven at its deny default"
+if jq -e '.filters[] | select(.id == "safe-delete" and .enabled == true and .settings.unproven == "ask")' "$REGISTRY" >/dev/null 2>&1; then
+  assert_pass "safe-delete is enabled with settings.unproven at its ask default"
 else
-  assert_fail "safe-delete is enabled with settings.unproven at its deny default" "$REGISTRY does not enable it with the documented default"
+  assert_fail "safe-delete is enabled with settings.unproven at its ask default" "$REGISTRY does not enable it with the documented default"
 fi
 
 if jq -e '.["$schema"] == "./harness-filters.schema.json"' "$REGISTRY" >/dev/null 2>&1; then
@@ -447,10 +471,28 @@ else
   assert_fail "the registry carries its inline schema pointer" "$REGISTRY has no co-located \$schema"
 fi
 
-if python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$REPO_ROOT/src/modules/configs/harness-filters.schema.json"; then
+if python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$SCHEMA"; then
   assert_pass "the schema file parses as JSON"
 else
   assert_fail "the schema file parses as JSON" "harness-filters.schema.json is not valid JSON"
+fi
+
+# The schema pins the settings vocabulary a filter reads, so a registry naming a
+# value the filter no longer accepts is rejected before a hook ever runs it.
+if _schema_out="$(check-jsonschema --schemafile "$SCHEMA" "$REGISTRY" 2>&1)"; then
+  assert_pass "the shipped registry validates against its schema"
+else
+  assert_fail "the shipped registry validates against its schema" "$_schema_out"
+fi
+
+_retired_registry="$WORK/retired-registry.json"
+# Keyed on the filter id rather than array position, so a registry that lists
+# another filter first cannot make the case fail for the wrong reason.
+jq '(.filters[] | select(.id == "safe-delete") | .settings.unproven) = "route"' "$REGISTRY" >"$_retired_registry"
+if _retired_out="$(check-jsonschema --schemafile "$SCHEMA" "$_retired_registry" 2>&1)"; then
+  assert_fail "the schema rejects a settings.unproven value the filter no longer reads" "a registry naming route validated: $_retired_out"
+else
+  assert_pass "the schema rejects a settings.unproven value the filter no longer reads"
 fi
 
 finish_tests

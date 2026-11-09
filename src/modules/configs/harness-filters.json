@@ -5,7 +5,7 @@
       "enabled": true,
       "id": "safe-delete",
       "settings": {
-        "unproven": "deny"
+        "unproven": "ask"
       }
     }
   ]

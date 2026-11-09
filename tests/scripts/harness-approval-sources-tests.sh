@@ -459,13 +459,13 @@ fi
 section 4 "the runner consults the same sources"
 
 # A payload the filters leave undecided is answered by the sources, and the
-# runner renders the harness's own document. The shipped registry denies an
-# unproven redirect, so only a registry that routes it reaches the gate at all:
-# the fixture carries that one file, and the runner still resolves its filters
-# beside itself.
+# runner renders the harness's own document. The shipped registry asks for an
+# unproven redirect, and the fixture pins that value in its own copy so the case
+# states the setting it depends on: the fixture carries that one file, and the
+# runner still resolves its filters beside itself.
 GATE_TREE="$WORK/gate-tree"
 mkdir -p "$GATE_TREE/src/modules/configs"
-printf '%s\n' '{"filters":[{"enabled":true,"id":"safe-delete","settings":{"unproven":"route"}}]}' \
+printf '%s\n' '{"filters":[{"enabled":true,"id":"safe-delete","settings":{"unproven":"ask"}}]}' \
   >"$GATE_TREE/src/modules/configs/harness-filters.json"
 clear_state
 write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["hermes"],"timeout-seconds":{"hermes":30}}}'

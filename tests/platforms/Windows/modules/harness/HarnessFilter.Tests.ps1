@@ -24,6 +24,7 @@ BeforeAll {
   $script:NotifyDir = Join-Path -Path $script:RepoRootPath -ChildPath 'src\scripts\notify'
   $script:FiltersDir = Join-Path -Path $script:NotifyDir -ChildPath 'filters'
   $script:RegistryPath = Join-Path -Path (Join-Path -Path $script:RepoRootPath -ChildPath 'src\modules\configs') -ChildPath 'harness-filters.json'
+  $script:SchemaPath = Join-Path -Path (Join-Path -Path $script:RepoRootPath -ChildPath 'src\modules\configs') -ChildPath 'harness-filters.schema.json'
   $script:PwshPath = [Environment]::ProcessPath
 
   function New-FilterSandbox {
@@ -230,11 +231,11 @@ Describe 'harness-filter render table' {
     $result.Stdout | Should -Be '{"permission":"deny"}'
   }
 
-  It 'denies a plain delete whose redirect is unproven' {
+  It 'asks for a plain delete whose redirect is unproven' {
     $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"rm x"}'
 
     $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
-    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'deny'
+    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'ask'
     $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'unproven-redirect'
   }
 
@@ -272,12 +273,12 @@ Describe 'safe-delete filter settings' {
     finally { Copy-Item -LiteralPath $script:RegistryPath -Destination (Join-Path -Path (Join-Path -Path $script:Sandbox 'src\modules\configs') -ChildPath 'harness-filters.json') -Force }
   }
 
-  It 'routes a plain delete to the approval sources when settings.unproven is route' {
-    Set-FilterRegistry -Root $script:Sandbox -Document '{"filters":[{"enabled":true,"id":"safe-delete","settings":{"unproven":"route"}}]}'
+  It 'denies a plain delete when settings.unproven is deny' {
+    Set-FilterRegistry -Root $script:Sandbox -Document '{"filters":[{"enabled":true,"id":"safe-delete","settings":{"unproven":"deny"}}]}'
     try {
       $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"rm x"}'
       $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
-      $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'ask'
+      $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'deny'
       $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'unproven-redirect'
     }
     finally { Copy-Item -LiteralPath $script:RegistryPath -Destination (Join-Path -Path (Join-Path -Path $script:Sandbox 'src\modules\configs') -ChildPath 'harness-filters.json') -Force }
@@ -290,6 +291,27 @@ Describe 'safe-delete filter settings' {
       $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
       $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'deny'
       $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'unproven-redirect'
+    }
+    finally { Copy-Item -LiteralPath $script:RegistryPath -Destination (Join-Path -Path (Join-Path -Path $script:Sandbox 'src\modules\configs') -ChildPath 'harness-filters.json') -Force }
+  }
+
+  It 'denies an unknown settings.unproven value and names every schema-accepted word' {
+    # WHY the words come from the schema: the fallthrough message is the only place
+    # an operator is told them, so a value added to the enum alone fails here rather
+    # than shipping unannounced. The POSIX twin reads the same enum.
+    Set-FilterRegistry -Root $script:Sandbox -Document '{"filters":[{"enabled":true,"id":"safe-delete","settings":{"unproven":"maybe"}}]}'
+    try {
+      $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"rm x"}'
+      $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
+      $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'deny'
+      $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'unproven-redirect'
+      # An empty enum would make the loop below vacuous, so the count is asserted.
+      $schema = Get-Content -Raw -LiteralPath $script:SchemaPath | ConvertFrom-Json
+      $words = @($schema.properties.filters.items.allOf[0].then.properties.settings.properties.unproven.enum)
+      $words.Count | Should -BeGreaterOrEqual 1
+      foreach ($word in $words) {
+        $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match ([regex]::Escape($word))
+      }
     }
     finally { Copy-Item -LiteralPath $script:RegistryPath -Destination (Join-Path -Path (Join-Path -Path $script:Sandbox 'src\modules\configs') -ChildPath 'harness-filters.json') -Force }
   }
@@ -324,19 +346,19 @@ Describe 'safe-delete deletion-verb case matching' {
   # same deletion as `del`; a case-sensitive verb test would let it through as
   # no-match with no unproven ruling. The case fails if the verb test stops folding
   # case, which is exactly the regression it exists for.
-  It 'denies an uppercase deletion word whose redirect is unproven' {
+  It 'asks for an uppercase deletion word whose redirect is unproven' {
     $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"DEL /S x"}'
 
     $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
-    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'deny'
+    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'ask'
     $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'unproven-redirect'
   }
 
-  It 'denies Remove-Item spelled in lower case' {
+  It 'asks for Remove-Item spelled in lower case' {
     $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"remove-item -Recurse -Force C:\\data"}'
 
     $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
-    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'deny'
+    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'ask'
     $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'unproven-redirect'
   }
 }
