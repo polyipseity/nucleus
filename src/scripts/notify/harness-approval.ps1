@@ -15,7 +15,9 @@
   answer wins and the other is dropped:
     prompt  asks in the console the hook runs under, over CONIN$. A hook started
             without a console answers `ask` instead of reading a denial into its
-            own silence.
+            own silence. The console is shared with the harness, so the answer is
+            a line: only Enter decides, and a keystroke meant for the harness TUI
+            is never read as one.
     hermes  publishes a request under <USER root>\state\harness-bridge and waits
             for `/harness approve <id>` or `/harness deny <id>` on a channel.
 
@@ -290,27 +292,30 @@ function Open-HarnessApprovalConsole {
   return @{ In = $consoleIn; Out = $consoleOut }
 }
 
-function Get-HarnessApprovalConsoleAnswer {
+function Get-HarnessApprovalConsoleLineAnswer {
   <#
   .SYNOPSIS
-    Maps one console byte to a decision.
+    Maps one typed line to a decision.
   .DESCRIPTION
-    The console is line-buffered, so a read completes after Enter and the first
-    character carries the answer. y and a approve, n and d deny, and anything
-    else is not an answer.
-  .PARAMETER Byte
-    First byte of the line the user typed.
+    The console is shared with the harness, so the answer is a line rather than a
+    keystroke: only Enter completes it, and a key aimed at the harness TUI is
+    never read as one. The prompt reads `[y]es`, so the spelled-out word answers
+    too, and the comparison ignores case and spaces. An empty line or any other
+    word is not an answer.
+  .PARAMETER Line
+    Text the console delivered before the first line break.
   #>
   [CmdletBinding()]
   [OutputType([string])]
   param(
     [Parameter(Mandatory)]
-    [byte]$Byte
+    [AllowEmptyString()]
+    [string]$Line
   )
 
-  $key = [string][char]$Byte
-  if ($key -in @('a', 'A', 'y', 'Y')) { return 'allow' }
-  if ($key -in @('d', 'D', 'n', 'N')) { return 'deny' }
+  $word = ($Line -replace '\s', '').ToLowerInvariant()
+  if ($word -in @('a', 'allow', 'y', 'yes')) { return 'allow' }
+  if ($word -in @('d', "don't", 'dont', 'n', 'no')) { return 'deny' }
   return ''
 }
 
@@ -467,7 +472,11 @@ function Wait-HarnessApproval {
 
   $console = $null
   $pending = $null
-  $buffer = [byte[]]::new(1)
+  # WHY a line-sized buffer: the console delivers the whole line when line input
+  # is on, and one keystroke per read when a harness turned it off, so one read
+  # can carry either and the accumulator below decides which arrived.
+  $buffer = [byte[]]::new(256)
+  $typedLine = [System.Text.StringBuilder]::new()
   if ($promptLive) {
     try { $console = Open-HarnessApprovalConsole }
     catch {
@@ -478,9 +487,9 @@ function Wait-HarnessApproval {
   if ($promptLive) {
     try {
       $writer = [System.IO.StreamWriter]::new($console.Out, [System.Text.UTF8Encoding]::new($false))
-      $writer.Write("nucleus approval: ${Tool}: ${Summary}`r`n  run it? [y]es / [n]o / [a]lways / [d]on't: ")
+      $writer.Write("nucleus approval: ${Tool}: ${Summary}`r`n  run it? [y]es / [n]o / [a]llow once / [d]on't: ")
       $writer.Flush()
-      $pending = $console.In.ReadAsync($buffer, 0, 1)
+      $pending = $console.In.ReadAsync($buffer, 0, $buffer.Length)
     }
     catch {
       Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'could not write to the console: asking locally'
@@ -540,14 +549,30 @@ function Wait-HarnessApproval {
         $pending = $null
       }
       elseif ($answered) {
-        $decision = Get-HarnessApprovalConsoleAnswer -Byte $buffer[0]
+        # WHY a stateless decode per read: a multi-byte character split across two
+        # reads decodes to U+FFFD, and every accepted word is ASCII, so the worst
+        # case is an unknown word and a re-prompt. A stateful decoder would buy
+        # nothing the vocabulary can use.
+        $typedLine.Append([System.Text.Encoding]::UTF8.GetString($buffer, 0, $bytesRead)) > $null
+        $typed = $typedLine.ToString()
         $pending = $null
-        if (-not [string]::IsNullOrEmpty($decision)) {
-          $answeredBy = 'prompt'
-          break
+        $breakAt = $typed.IndexOfAny([char[]]@("`r", "`n"))
+        if ($breakAt -ge 0) {
+          # WHY the first control character rather than the break: a raw-mode Enter
+          # is a bare CR and a stray ESC is another control byte, and the POSIX twin
+          # cuts there, so `yes` followed by ESC and Enter decides on both hosts
+          # instead of re-prompting on one.
+          $cutAt = [regex]::Match($typed, '[\x00-\x1F\x7F]').Index
+          $decision = Get-HarnessApprovalConsoleLineAnswer -Line $typed.Substring(0, $cutAt)
+          $typedLine.Clear() > $null
+          if (-not [string]::IsNullOrEmpty($decision)) {
+            $answeredBy = 'prompt'
+            break
+          }
         }
-        # Any other key is not an answer: ask again rather than read it as one.
-        try { $pending = $console.In.ReadAsync($buffer, 0, 1) }
+        # A partial line, an empty line, and an unknown word are not answers: read
+        # again rather than decide on either.
+        try { $pending = $console.In.ReadAsync($buffer, 0, $buffer.Length) }
         catch {
           Write-HarnessBridgeWarning -CommandName 'harness-approval' -Message 'the console closed before an answer: asking locally'
           $promptLive = $false

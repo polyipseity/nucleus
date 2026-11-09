@@ -30,7 +30,9 @@
 # answer wins and the other is dropped.
 #   prompt  asks in the terminal the hook runs under, over /dev/tty. A hook
 #           started without a terminal (a GUI editor, a service) answers `ask`
-#           instead of reading a denial into its own silence.
+#           instead of reading a denial into its own silence. The terminal is
+#           shared with the harness, so the answer is a line: only Enter decides,
+#           and a keystroke meant for the harness TUI is never read as one.
 #   hermes  publishes a request under <USER root>/state/harness-bridge and waits
 #           for `/harness approve <id>` or `/harness deny <id>` on a channel.
 #
@@ -308,7 +310,7 @@ if [ "$_ha_tty" -eq 1 ]; then
   # WHY guarded like every other terminal write: a terminal that is opened and
   # then lost would otherwise end the run under `set -e` with no document at all,
   # which some harnesses read as a denial.
-  if ! printf 'nucleus approval: %s: %s\n  run it? [y]es / [n]o / [a]lways / [d]on'"'"'t: ' \
+  if ! printf 'nucleus approval: %s: %s\n  run it? [y]es / [n]o / [a]llow once / [d]on'"'"'t: ' \
     "$_ha_tool" "$_ha_summary" >&3; then
     warn "could not write to the terminal: asking locally"
     _ha_prompt_live=0
@@ -317,6 +319,10 @@ if [ "$_ha_tty" -eq 1 ]; then
 fi
 
 _ha_answer=""
+# Bytes already read but not yet a line: `read` saves partial input when it times
+# out, and a terminal a TUI put in raw mode delivers a keystroke at a time, so an
+# answer waits here for its line break instead of being thrown away.
+_ha_line_buffer=""
 _ha_hermes_live="$_ha_hermes"
 _ha_now="$(date +%s)"
 _ha_prompt_deadline=0
@@ -360,29 +366,59 @@ while [ -z "$_ha_answer" ]; do
   fi
 
   if [ "$_ha_prompt_live" -eq 1 ]; then
-    _ha_key=""
-    if IFS= read -r -n 1 -s -t 1 _ha_key <&3; then
-      case "$_ha_key" in
-      a | A | y | Y)
+    _ha_chunk=""
+    if IFS= read -r -s -t 1 _ha_chunk <&3; then
+      _ha_rc=0
+    else
+      _ha_rc=$?
+    fi
+    # WHY the chunk is kept either way: a timeout above 128 still carries what was
+    # typed, and dropping it is invisible in canonical mode, where the kernel holds
+    # the bytes, but loses the answer outright in raw mode, where every read takes
+    # them. The prompt shares the terminal with the harness, so a keystroke meant
+    # for its TUI must not answer for the operator: a decision still needs a line.
+    _ha_line_buffer="$_ha_line_buffer$_ha_chunk"
+    # WHY two ways to complete: a read that succeeds stopped at the LF and did not
+    # keep it, while a raw-mode Enter is a bare CR that `read` does not treat as
+    # end of line and leaves inside the partial input a timeout saves.
+    _ha_complete=0
+    if [ "$_ha_rc" -eq 0 ]; then
+      _ha_complete=1
+    else
+      case "$_ha_line_buffer" in
+      *$'\r'* | *$'\n'*) _ha_complete=1 ;;
+      esac
+    fi
+    if [ "$_ha_complete" -eq 1 ]; then
+      _ha_line="${_ha_line_buffer%%[[:cntrl:]]*}"
+      _ha_line_buffer=""
+      # The prompt reads `[y]es`, so the spelled-out word is an answer as well,
+      # and the comparison ignores case and spaces because the line is what the
+      # operator typed rather than what any terminal normalized.
+      _ha_word="${_ha_line,,}"
+      _ha_word="${_ha_word//[[:space:]]/}"
+      case "$_ha_word" in
+      a | allow | y | yes)
         _ha_answer="allow"
         _ha_decided_by="prompt"
         ;;
-      d | D | n | N)
+      d | "don't" | dont | n | no)
         _ha_answer="deny"
         _ha_decided_by="prompt"
         ;;
-      # Any other key is not an answer: the prompt stays live and the next pass
-      # reads again, which is what an arrow key or a stray modifier should do.
+      # An empty line, or any other word, is not an answer: the prompt stays live
+      # and the next pass reads again, which is what a stray Enter or a correction
+      # should do.
       *) ;;
       esac
-    else
-      _ha_rc=$?
-      # WHY: `read` reports a timeout above 128 and a closed terminal at or below
-      # it, and only the second means nobody can answer any more.
-      if [ "$_ha_rc" -le 128 ]; then
-        warn "the terminal closed before an answer: asking locally"
-        _ha_prompt_live=0
-      fi
+    fi
+    # WHY end of input stops the source: `read` reports a timeout above 128 and
+    # end of input or a closed terminal at or below it, and the status cannot
+    # separate an EOF from a read error, so nobody can answer from that terminal
+    # any more and waiting out the timeout would only delay the harness's prompt.
+    if [ "$_ha_rc" -ne 0 ] && [ "$_ha_rc" -le 128 ]; then
+      warn "the terminal is at end of input or closed before an answer: asking locally"
+      _ha_prompt_live=0
     fi
   else
     sleep 1

@@ -686,6 +686,38 @@ Describe 'harness-approval.ps1 Windows twin' {
     $result.ExitCode | Should -Be 0
     $result.Stdout | Should -Be 'ask'
   }
+
+  It 'maps every accepted console word without executing the script body' {
+    # The vocabulary sits on the shipped default path, so a typo in either list
+    # would silently turn an operator's answer into a re-prompt. The entry point
+    # exits on every path, so the function comes out of the parsed AST rather than
+    # a dot-source: this case finishing is what proves the body never ran, since
+    # running it would print a decision and end the runspace.
+    $parseErrors = $null
+    $tokens = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($script:approvalScript, [ref]$tokens, [ref]$parseErrors)
+    @($parseErrors).Count | Should -Be 0
+    @($tokens).Count | Should -BeGreaterThan 0
+    $found = @($ast.FindAll({
+          param($node)
+          $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+          $node.Name -eq 'Get-HarnessApprovalConsoleLineAnswer'
+        }, $true))
+    $found.Count | Should -Be 1
+    . ([scriptblock]::Create($found[0].Extent.Text))
+
+    foreach ($word in @('y', 'yes', 'Y', ' a ', 'allow', 'ALLOW')) {
+      Get-HarnessApprovalConsoleLineAnswer -Line $word | Should -Be 'allow'
+    }
+    foreach ($word in @('n', 'no', 'd', 'dont', "don't", ' NO ')) {
+      Get-HarnessApprovalConsoleLineAnswer -Line $word | Should -Be 'deny'
+    }
+    # `always` promised persistence that does not exist, so it is neither accepted
+    # nor aliased.
+    foreach ($word in @('', 'maybe', 'always')) {
+      Get-HarnessApprovalConsoleLineAnswer -Line $word | Should -Be ''
+    }
+  }
 }
 
 Describe 'harness-drive.ps1 Windows twin' {

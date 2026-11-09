@@ -9,8 +9,9 @@
 #   * `notty` forks a session with no controlling terminal, which is what a hook
 #     started from a GUI harness sees, and proves the prompt source answers `ask`
 #     instead of reading its own silence as a denial;
-#   * `tty` allocates a pty and types one key once the prompt is on screen, which
-#     is the only way to drive /dev/tty from a suite.
+#   * `tty` allocates a pty and types the given text once the prompt is on screen,
+#     which is the only way to drive /dev/tty from a suite. The text carries its
+#     own newline, because a decision is a line and not a keystroke.
 #
 # The Hermes side is driven the way the bridge plugin drives it: the suite reads
 # the published request and writes the response file the plugin writes.
@@ -84,7 +85,11 @@ while time.time() < deadline:
             break
         out += chunk
     if not sent and b'run it?' in out:
-        os.write(master, key.encode())
+        first, sep, rest = key.partition('|')
+        os.write(master, first.encode())
+        if sep:
+            time.sleep(1.6)
+            os.write(master, rest.encode())
         sent = True
     waited, state = os.waitpid(pid, os.WNOHANG)
     if waited == pid:
@@ -114,6 +119,10 @@ HELPER
 readonly TERMINAL_HELPER="$WORK/terminal.py"
 
 CONFIG_PATH="$HOME/.local/state/nucleus/config.json"
+# What Enter sends through the pty: a decision is a line, so the cases that answer
+# type the word and this newline.
+NEWLINE=$'\n'
+readonly NEWLINE
 
 write_config() { # <json>
   mkdir -p "$(dirname "$CONFIG_PATH")"
@@ -160,12 +169,15 @@ notty_run() { # <outfile> <args...>
   python3 "$TERMINAL_HELPER" notty - "$_out" bash "$APPROVAL" "$@"
 }
 
-# tty_run <key> <outfile> <args...>: run the gate on a pty and type <key>; `-`
-# types nothing, which is what a source nobody answers looks like.
-tty_run() { # <key> <outfile> <args...>
-  local _key="$1" _out="$2"
+# `tty_run <typed> <outfile> <args...>`: run the gate on a pty and type <typed>,
+# which is the bytes to send, so an answer is a word plus $NEWLINE and a bare key
+# is not an answer at all; `-` types nothing, which is what a source nobody
+# answers looks like. A `|` pauses 1.6 s between the two halves, which is how a
+# slow typist who stops between the letter and Enter is simulated.
+tty_run() { # <typed> <outfile> <args...>
+  local _typed="$1" _out="$2"
   shift 2
-  python3 "$TERMINAL_HELPER" tty "$_key" "$_out" bash "$APPROVAL" "$@"
+  python3 "$TERMINAL_HELPER" tty "$_typed" "$_out" bash "$APPROVAL" "$@"
 }
 
 # The decision is the last line of a transcript that is exactly a decision, which
@@ -210,12 +222,12 @@ approval_source() {
 section 1 "the sources matrix"
 
 # An absent section takes the shipped default, and only a `prompt` default can turn
-# a typed key into an answer: an accidental `[]` default answers ask here exactly as
-# it does without a terminal, so running this under the fake tty is what makes the
-# case discriminate.
+# a typed answer into a decision: an accidental `[]` default answers ask here exactly
+# as it does without a terminal, so running this under the fake tty is what makes
+# the case discriminate.
 clear_state
 write_config '{"harness-notify":{"channels":["telegram"]}}'
-if tty_run y "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
+if tty_run "y$NEWLINE" "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
   if [ "$(decision_of "$WORK/out")" = "allow" ]; then
     assert_pass "an absent harness-approval section defaults to the prompt source and takes a typed allow"
   else
@@ -256,7 +268,7 @@ fi
 
 clear_state
 write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":30}}}'
-if tty_run y "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
+if tty_run "y$NEWLINE" "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
   if [ "$(decision_of "$WORK/out")" = "allow" ] && [ "$(approval_source)" = "prompt" ]; then
     assert_pass "the prompt source reads a typed y as allow and is audited as its source"
   else
@@ -268,7 +280,7 @@ fi
 
 clear_state
 write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":30}}}'
-if tty_run n "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
+if tty_run "n$NEWLINE" "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
   if [ "$(decision_of "$WORK/out")" = "deny" ] && [ "$(approval_source)" = "prompt" ]; then
     assert_pass "the prompt source reads a typed n as deny and is audited as its source"
   else
@@ -276,6 +288,148 @@ if tty_run n "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
   fi
 else
   assert_fail "prompt deny" "the gate exited non-zero: $(cat "$WORK/err")"
+fi
+
+# The prompt shares the terminal with the harness, so a keystroke aimed at its TUI
+# must not answer for the operator: the answer is a line, which needs Enter. A bare
+# key therefore leaves the prompt unanswered until its own timeout runs out.
+clear_state
+write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":2}}}'
+_start=$SECONDS
+if tty_run y "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
+  if [ "$(decision_of "$WORK/out")" = "ask" ] && [ "$(elapsed_since "$_start")" -ge 2 ]; then
+    assert_pass "a bare y without Enter is not an answer and the prompt answers ask at its timeout"
+  else
+    assert_fail "bare y is not an answer" "transcript=$(tr -d '\r' <"$WORK/out") elapsed=$(elapsed_since "$_start")s"
+  fi
+else
+  assert_fail "bare y is not an answer" "the gate exited non-zero: $(cat "$WORK/err")"
+fi
+
+# The other half of the same rule: the key does decide once Enter arrives, so the
+# case above proves Enter is required rather than proving the prompt is deaf.
+clear_state
+write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":30}}}'
+if tty_run "y$NEWLINE" "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
+  if [ "$(decision_of "$WORK/out")" = "allow" ]; then
+    assert_pass "the same y decides allow once Enter arrives"
+  else
+    assert_fail "y with Enter" "transcript=$(tr -d '\r' <"$WORK/out")"
+  fi
+else
+  assert_fail "y with Enter" "the gate exited non-zero: $(cat "$WORK/err")"
+fi
+
+# A partial line has to reach the decision: an operator who pauses longer than the
+# one-second read timeout between the letter and Enter must still be answered. The
+# pty here stays canonical, so the kernel holds the `y` and this case proves only
+# that the later Enter picks it up; the raw cases below are what see a read throw
+# partial input away.
+clear_state
+write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":30}}}'
+if tty_run "y|$NEWLINE" "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
+  if [ "$(decision_of "$WORK/out")" = "allow" ]; then
+    assert_pass "a y held by the line discipline arrives with the later Enter"
+  else
+    assert_fail "paused y before Enter" "transcript=$(tr -d '\r' <"$WORK/out")"
+  fi
+else
+  assert_fail "paused y before Enter" "the gate exited non-zero: $(cat "$WORK/err")"
+fi
+
+# The terminal this rule exists for: a TUI harness puts the shared tty into raw
+# mode, where every read timeout consumes what was typed and Enter arrives as a
+# bare CR rather than the LF bash treats as end of line. The gate is reached with
+# `exec` only after `stty` applied the mode, so a host without a usable stty fails
+# here with 97 instead of quietly running the canonical case a second time.
+clear_state
+write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":4}}}'
+if python3 "$TERMINAL_HELPER" tty "y"$'\r' "$WORK/out" bash -c "stty raw -echo || exit 97; exec bash '$APPROVAL' pi bash 'rm -rf build'" >/dev/null 2>"$WORK/err"; then
+  if [ "$(decision_of "$WORK/out")" = "allow" ]; then
+    assert_pass "a raw-mode terminal answers allow on y and a bare CR"
+  else
+    assert_fail "raw-mode answer" "transcript=$(tr -d '\r' <"$WORK/out")"
+  fi
+else
+  _child_rc=$?
+  assert_fail "raw-mode answer" "the raw-mode child exited $_child_rc: $(cat "$WORK/err")"
+fi
+
+# The pause and raw mode together: the letter is typed, the read times out, and the
+# CR arrives a second later. Nothing holds the `y` in raw mode, so this is the case
+# that fails when a timed-out read drops what it was handed.
+clear_state
+write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":4}}}'
+_start=$SECONDS
+if python3 "$TERMINAL_HELPER" tty "y|"$'\r' "$WORK/out" bash -c "stty raw -echo || exit 97; exec bash '$APPROVAL' pi bash 'rm -rf build'" >/dev/null 2>"$WORK/err"; then
+  if [ "$(decision_of "$WORK/out")" = "allow" ]; then
+    assert_pass "a raw-mode y typed before the timeout still answers allow with the later CR"
+  else
+    assert_fail "paused raw-mode y" "transcript=$(tr -d '\r' <"$WORK/out") elapsed=$(elapsed_since "$_start")s"
+  fi
+else
+  _child_rc=$?
+  assert_fail "paused raw-mode y" "the raw-mode child exited $_child_rc: $(cat "$WORK/err")"
+fi
+
+# One control byte inside the line ends it rather than becoming part of the word:
+# `yes` followed by ESC and Enter still decides, so a stray key meant for the
+# harness TUI cannot turn an answer into a re-prompt.
+clear_state
+write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":4}}}'
+_start=$SECONDS
+if tty_run "yes"$'\x1b'"$NEWLINE" "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
+  if [ "$(decision_of "$WORK/out")" = "allow" ]; then
+    assert_pass "a control byte inside the line ends it, so yes with ESC still answers allow"
+  else
+    assert_fail "control byte in the line" "transcript=$(tr -d '\r' <"$WORK/out") elapsed=$(elapsed_since "$_start")s"
+  fi
+else
+  assert_fail "control byte in the line" "the gate exited non-zero: $(cat "$WORK/err")"
+fi
+
+# An empty line is Enter and nothing else, which is still not an answer.
+clear_state
+write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":2}}}'
+_start=$SECONDS
+if tty_run "$NEWLINE" "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
+  if [ "$(decision_of "$WORK/out")" = "ask" ] && [ "$(elapsed_since "$_start")" -ge 2 ]; then
+    assert_pass "an empty line is not an answer and the prompt answers ask at its timeout"
+  else
+    assert_fail "empty line" "transcript=$(tr -d '\r' <"$WORK/out") elapsed=$(elapsed_since "$_start")s"
+  fi
+else
+  assert_fail "empty line" "the gate exited non-zero: $(cat "$WORK/err")"
+fi
+
+# A word the prompt does not know is not an answer either, and neither is a letter
+# inside one: reading a keystroke at a time answered allow on the y in `maybe`.
+clear_state
+write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":2}}}'
+_start=$SECONDS
+if tty_run "maybe$NEWLINE" "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
+  if [ "$(decision_of "$WORK/out")" = "ask" ] && [ "$(elapsed_since "$_start")" -ge 2 ]; then
+    assert_pass "an unknown word is not an answer and the prompt answers ask at its timeout"
+  else
+    assert_fail "unknown word" "transcript=$(tr -d '\r' <"$WORK/out") elapsed=$(elapsed_since "$_start")s"
+  fi
+else
+  assert_fail "unknown word" "the gate exited non-zero: $(cat "$WORK/err")"
+fi
+
+# End of input is the one thing that cannot become an answer: the terminal closing
+# ends the source at once instead of waiting out a timeout nobody can beat.
+clear_state
+write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":30}}}'
+_start=$SECONDS
+if tty_run $'\x04' "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
+  if [ "$(decision_of "$WORK/out")" = "ask" ] && [ "$(elapsed_since "$_start")" -lt 5 ]; then
+    assert_pass "end of input on the terminal ends the prompt source and answers ask at once"
+  else
+    assert_fail "end of input" "transcript=$(tr -d '\r' <"$WORK/out") elapsed=$(elapsed_since "$_start")s"
+  fi
+else
+  assert_fail "end of input" "the gate exited non-zero: $(cat "$WORK/err")"
 fi
 
 # The prompt's own finite timeout: nobody types anything, so the source gives up
@@ -386,13 +540,13 @@ fi
 
 section 2 "the race"
 
-# Prompt first: the typed key wins while the request is still pending, so the run
-# ends at once. The announce log is what proves the other source was live: the
+# Prompt first: the typed answer wins while the request is still pending, so the
+# run ends at once. The announce log is what proves the other source was live: the
 # request file itself is published and consumed inside the same second.
 clear_state
 write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt","hermes"],"timeout-seconds":{"prompt":30,"hermes":60}}}'
 _start=$SECONDS
-if tty_run y "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
+if tty_run "y$NEWLINE" "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
   _elapsed="$(elapsed_since "$_start")"
   if [ "$(decision_of "$WORK/out")" = "allow" ] && [ -s "$HARNESS_APPROVAL_LOG" ] &&
     [ -z "$(pending_requests)" ] && [ "$_elapsed" -lt 20 ]; then
