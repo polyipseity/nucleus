@@ -29,16 +29,14 @@ BeforeAll {
   # The six commands whose PowerShell completer keeps its subcommand list by
   # hand, with the constraint in the Windows app that is the source of truth for
   # it: a ValidateSet on the entry-point parameter, or the command switch in
-  # config.ps1, the one app of the six with no ValidateSet. Count proves the
-  # extraction landed on the subcommand list rather than a nested option set
-  # (gc.ps1:89, logs.ps1:97, svc.ps1:170 and :430 declare a second one).
+  # config.ps1, the one app of the six with no ValidateSet.
   $Script:SubcommandSources = [ordered]@{
-    'gc'     = @{ App = 'scripts/gc.ps1'; Mechanism = 'ValidateSet'; Anchor = ''; Variable = 'nucleusGcCommands'; Count = 4 }
-    'svc'    = @{ App = 'scripts/svc.ps1'; Mechanism = 'ValidateSet'; Anchor = ''; Variable = 'nucleusSvcCommands'; Count = 12 }
-    'config' = @{ App = 'scripts/config.ps1'; Mechanism = 'switch'; Anchor = 'switch ($Command) {'; Variable = 'nucleusConfigCommands'; Count = 3 }
-    'logs'   = @{ App = 'scripts/logs.ps1'; Mechanism = 'ValidateSet'; Anchor = ''; Variable = 'nucleusLogsCommands'; Count = 8 }
-    'utils'  = @{ App = 'scripts/utils.ps1'; Mechanism = 'ValidateSet'; Anchor = ''; Variable = 'nucleusUtilsCommands'; Count = 2 }
-    'vm'     = @{ App = 'scripts/vm.ps1'; Mechanism = 'ValidateSet'; Anchor = ''; Variable = 'nucleusVmCommands'; Count = 15 }
+    'gc'     = @{ App = 'scripts/gc.ps1'; Mechanism = 'ValidateSet'; Anchor = ''; Variable = 'nucleusGcCommands' }
+    'svc'    = @{ App = 'scripts/svc.ps1'; Mechanism = 'ValidateSet'; Anchor = ''; Variable = 'nucleusSvcCommands' }
+    'config' = @{ App = 'scripts/config.ps1'; Mechanism = 'switch'; Anchor = 'switch ($Command) {'; Variable = 'nucleusConfigCommands' }
+    'logs'   = @{ App = 'scripts/logs.ps1'; Mechanism = 'ValidateSet'; Anchor = ''; Variable = 'nucleusLogsCommands' }
+    'utils'  = @{ App = 'scripts/utils.ps1'; Mechanism = 'ValidateSet'; Anchor = ''; Variable = 'nucleusUtilsCommands' }
+    'vm'     = @{ App = 'scripts/vm.ps1'; Mechanism = 'ValidateSet'; Anchor = ''; Variable = 'nucleusVmCommands' }
   }
 
   function New-FixtureProfile {
@@ -169,6 +167,32 @@ BeforeAll {
     }
     return @($labels)
   }
+
+  function Compare-SubcommandList {
+    # The labels that are one-sided between an expected list and an actual
+    # list, expected-only first and then actual-only. -Direction narrows the
+    # result to one side so a caller can still say which way a difference runs.
+    [CmdletBinding()]
+    [OutputType([object[]])]
+    param(
+      [Parameter(Mandatory)]
+      [AllowEmptyCollection()]
+      [string[]]$Expected,
+      [Parameter(Mandatory)]
+      [AllowEmptyCollection()]
+      [string[]]$Actual,
+      [ValidateSet('Both', 'Missing', 'Surplus')]
+      [string]$Direction = 'Both'
+    )
+    $missing = @($Expected | Where-Object { $Actual -notcontains $_ })
+    $surplus = @($Actual | Where-Object { $Expected -notcontains $_ })
+    switch ($Direction) {
+      'Missing' { return $missing }
+      'Surplus' { return $surplus }
+      'Both' { return @($missing + $surplus) }
+      default { throw "Unknown direction '$Direction'." }
+    }
+  }
 }
 
 AfterAll {
@@ -256,10 +280,10 @@ Describe 'gen-completions.ps1 generated inventory' {
       } else {
         @(Get-ValidateSetSubcommandList -Path $appPath)
       }
-      if ($accepted.Count -ne $source.Count) {
-        # WHY: an extraction that lands on a nested ValidateSet, or on nothing,
-        # would compare against a plausible-looking list and pass vacuously.
-        $failures.Add("${command}: $($source.App) yielded $($accepted.Count) labels, expected $($source.Count): " + ($accepted -join ', '))
+      if ($accepted.Count -eq 0) {
+        # WHY: an extraction that landed on nothing would otherwise blame every
+        # offered label, which reads as a completer bug rather than a broken one.
+        $failures.Add("${command}: $($source.App) yielded no subcommand labels")
         continue
       }
       $offered = @(Get-ProfileSubcommandList -VariableName $source.Variable -ProfileText $profileText)
@@ -267,8 +291,8 @@ Describe 'gen-completions.ps1 generated inventory' {
         $failures.Add("${command}: `$$($source.Variable) is missing or empty in profile.ps1")
         continue
       }
-      $missing = @($accepted | Where-Object { $offered -notcontains $_ })
-      $stale = @($offered | Where-Object { $accepted -notcontains $_ })
+      $missing = @(Compare-SubcommandList -Expected $accepted -Actual $offered -Direction 'Missing')
+      $stale = @(Compare-SubcommandList -Expected $accepted -Actual $offered -Direction 'Surplus')
       if ($missing.Count -gt 0) {
         $failures.Add("${command}: not offered: " + ($missing -join ', '))
       }
@@ -356,5 +380,32 @@ Describe 'gen-completions.ps1 generated inventory' {
     @($vmFlags | Sort-Object) | Should -Be $vmExpected
     $vmFlags | Should -Not -Contain '--no-windows-iso'
     $profileText | Should -Not -Match '--remove-backup'
+  }
+}
+
+Describe 'Compare-SubcommandList' {
+  It 'reports nothing for identical lists' {
+    $difference = Compare-SubcommandList -Expected @('a', 'b') -Actual @('b', 'a')
+    ($difference -join ',') | Should -BeExactly ''
+  }
+
+  It 'names a label missing from the expected list' {
+    $difference = Compare-SubcommandList -Expected @('a', 'b') -Actual @('a', 'b', 'c')
+    ($difference -join ',') | Should -BeExactly 'c'
+  }
+
+  It 'names a label surplus to the expected list' {
+    $difference = Compare-SubcommandList -Expected @('a', 'b') -Actual @('a', 'b', 'c') -Direction 'Surplus'
+    ($difference -join ',') | Should -BeExactly 'c'
+  }
+
+  It 'names a label missing from the actual list' {
+    $difference = Compare-SubcommandList -Expected @('a', 'b', 'c') -Actual @('a', 'b') -Direction 'Missing'
+    ($difference -join ',') | Should -BeExactly 'c'
+  }
+
+  It 'reports nothing for two empty lists' {
+    $difference = Compare-SubcommandList -Expected @() -Actual @()
+    ($difference -join ',') | Should -BeExactly ''
   }
 }

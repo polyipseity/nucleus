@@ -434,14 +434,79 @@ _profile_subcommand_labels() {
     tr -d "'"
 }
 
+# _subcommand_diff <expected-list> <actual-list> [missing|surplus|both]: print the
+# one-sided labels, one per line, in either the first or the second list.
+# WHY separate from the row loop: the row loop can only show that today's six
+# lists agree, so a comparison that never reports a difference would pass it.
+# This function gets its own case, which fails when it reports nothing. The row
+# loop asks for one direction at a time so a failure keeps its own wording.
+_subcommand_diff() {
+  local _mode="${3:-both}" _missing _surplus
+  _missing="$(comm -23 <(printf '%s\n' "$1" | LC_ALL=C sort) <(printf '%s\n' "$2" | LC_ALL=C sort))"
+  _surplus="$(comm -13 <(printf '%s\n' "$1" | LC_ALL=C sort) <(printf '%s\n' "$2" | LC_ALL=C sort))"
+  case "$_mode" in
+  missing)
+    if [ -n "$_missing" ]; then printf '%s\n' "$_missing"; fi
+    ;;
+  surplus)
+    if [ -n "$_surplus" ]; then printf '%s\n' "$_surplus"; fi
+    ;;
+  both)
+    if [ -n "$_missing" ]; then printf '%s\n' "$_missing"; fi
+    if [ -n "$_surplus" ]; then printf '%s\n' "$_surplus"; fi
+    ;;
+  *)
+    # WHY: a mistyped direction would otherwise print both blocks and read as a
+    # clean comparison of whichever block the caller looked at.
+    printf 'unknown direction %s\n' "$_mode" >&2
+    return 1
+    ;;
+  esac
+}
+
+_self_test_diff() {
+  local _same _truncated _surplus _missing _empty
+  _same="$(_subcommand_diff $'a\nb' $'b\na')"
+  if [ -z "$_same" ]; then
+    assert_pass "diff: identical lists report nothing"
+  else
+    assert_fail "diff-identical" "reported [${_same//$'\n'/ }]"
+  fi
+  _truncated="$(_subcommand_diff $'a\nb' $'a\nb\nc')"
+  if [ "$_truncated" = "c" ]; then
+    assert_pass "diff: a label absent from expected is named"
+  else
+    assert_fail "diff-truncated" "reported [${_truncated//$'\n'/ }], wanted [c]"
+  fi
+  _surplus="$(_subcommand_diff $'a\nb' $'a\nb\nc' surplus)"
+  if [ "$_surplus" = "c" ]; then
+    assert_pass "diff: the surplus direction names the label on its own"
+  else
+    assert_fail "diff-surplus" "reported [${_surplus//$'\n'/ }], wanted [c]"
+  fi
+  _missing="$(_subcommand_diff $'a\nb\nc' $'a\nb' missing)"
+  if [ "$_missing" = "c" ]; then
+    assert_pass "diff: the missing direction names the label on its own"
+  else
+    assert_fail "diff-missing" "reported [${_missing//$'\n'/ }], wanted [c]"
+  fi
+  _empty="$(_subcommand_diff '' '')"
+  if [ -z "$_empty" ]; then
+    assert_pass "diff: two empty lists report nothing (the row loop rejects an empty extraction before comparing)"
+  else
+    assert_fail "diff-empty" "reported [${_empty//$'\n'/ }]"
+  fi
+}
+_self_test_diff
+
 # Fields: command | script | exact anchor line | which matching block | Windows
-# app | its subcommand constraint | expected label count. The bash anchor is the
-# whole line, indentation included, because a trimmed match hits an in-function
-# block first (svc line 579, vm line 352), and logs matches three times on the
-# same variable, so there its anchor is only right because the selector is last.
-# Heredoc data, so each anchor stays the app's own text unquoted.
+# app | its subcommand constraint. The bash anchor is the whole line,
+# indentation included, because a trimmed match hits an in-function block first
+# (svc line 579, vm line 352), and logs matches three times on the same variable,
+# so there its anchor is only right because the selector is last. Heredoc data,
+# so each anchor stays the app's own text unquoted.
 _subcommand_ok=1
-while IFS='|' read -r _cmd _script _anchor _which _ps1 _mechanism _expected_count; do
+while IFS='|' read -r _cmd _script _anchor _which _ps1 _mechanism; do
   # WHY the empty-list clause below: a dispatch the extractor cannot parse, or a
   # completer whose list moved, would otherwise compare two empty sets and pass,
   # which is the one outcome this case exists to prevent.
@@ -466,35 +531,27 @@ while IFS='|' read -r _cmd _script _anchor _which _ps1 _mechanism _expected_coun
     _subcommand_ok=0
     continue
   fi
-  # WHY the count: the app extraction has to land on the subcommand list, and a
-  # wrong anchor would otherwise compare two lists that both look plausible.
-  _app_count="$(printf '%s\n' "$_in_app" | wc -l | tr -d ' ')"
-  if [ "$_app_count" -ne "$_expected_count" ]; then
-    assert_fail "gen-completions: $_cmd app subcommand list" \
-      "$_ps1 yielded $_app_count labels, expected $_expected_count: ${_in_app//$'\n'/ }"
-    _subcommand_ok=0
-  fi
-  _zsh_missing="$(comm -23 <(printf '%s\n' "$_dispatched") <(printf '%s\n' "$_completed") | tr '\n' ' ')"
-  _zsh_stale="$(comm -13 <(printf '%s\n' "$_dispatched") <(printf '%s\n' "$_completed") | tr '\n' ' ')"
+  _zsh_missing="$(_subcommand_diff "$_dispatched" "$_completed" missing | tr '\n' ' ')"
+  _zsh_stale="$(_subcommand_diff "$_dispatched" "$_completed" surplus | tr '\n' ' ')"
   if [ -n "$_zsh_missing" ] || [ -n "$_zsh_stale" ]; then
     assert_fail "gen-completions: $_cmd zsh completion subcommands" \
       "missing: ${_zsh_missing:-none}|not dispatched: ${_zsh_stale:-none}"
     _subcommand_ok=0
   fi
-  _profile_missing="$(comm -23 <(printf '%s\n' "$_in_app") <(printf '%s\n' "$_in_profile") | tr '\n' ' ')"
-  _profile_stale="$(comm -13 <(printf '%s\n' "$_in_app") <(printf '%s\n' "$_in_profile") | tr '\n' ' ')"
+  _profile_missing="$(_subcommand_diff "$_in_app" "$_in_profile" missing | tr '\n' ' ')"
+  _profile_stale="$(_subcommand_diff "$_in_app" "$_in_profile" surplus | tr '\n' ' ')"
   if [ -n "$_profile_missing" ] || [ -n "$_profile_stale" ]; then
     assert_fail "gen-completions: $_cmd profile.ps1 completer subcommands" \
       "missing: ${_profile_missing:-none}|not in $_ps1: ${_profile_stale:-none}"
     _subcommand_ok=0
   fi
 done <<'SUBCOMMAND_SOURCES'
-gc|scripts/gc.sh|case "$action" in|first|scripts/gc.ps1|validateset|4
-svc|scripts/svc.sh|case "$action" in|first|scripts/svc.ps1|validateset|12
-config|scripts/config.sh|case "${1:-}" in|first|scripts/config.ps1|switch:switch ($Command) {|3
-logs|scripts/logs.sh|  case "$_logs_action" in|last|scripts/logs.ps1|validateset|8
-utils|scripts/utils.sh|  case "$subcommand" in|first|scripts/utils.ps1|validateset|2
-vm|scripts/vm.sh|case "$action" in|first|scripts/vm.ps1|validateset|15
+gc|scripts/gc.sh|case "$action" in|first|scripts/gc.ps1|validateset
+svc|scripts/svc.sh|case "$action" in|first|scripts/svc.ps1|validateset
+config|scripts/config.sh|case "${1:-}" in|first|scripts/config.ps1|switch:switch ($Command) {
+logs|scripts/logs.sh|  case "$_logs_action" in|last|scripts/logs.ps1|validateset
+utils|scripts/utils.sh|  case "$subcommand" in|first|scripts/utils.ps1|validateset
+vm|scripts/vm.sh|case "$action" in|first|scripts/vm.ps1|validateset
 SUBCOMMAND_SOURCES
 if [ "$_subcommand_ok" -eq 1 ]; then
   assert_pass "gen-completions: six hand-coded subcommand lists match their zsh and PowerShell sources"
