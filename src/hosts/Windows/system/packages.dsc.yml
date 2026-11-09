@@ -58,6 +58,15 @@ properties:
     - resource: Microsoft.WinGet.Client/Package
       directives:
         description: >-
+          Ensure Audacity is installed for cross-host audio editing parity with
+          macOS (Homebrew cask) and NixOS (nixpkgs).
+      settings:
+        id: Audacity.Audacity
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
           Blender — 3D creation suite for modelling, animation, rendering, and video
           editing. Cross-platform parity with macOS (Homebrew cask) and NixOS (nixpkgs).
       settings:

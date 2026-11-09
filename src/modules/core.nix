@@ -59,6 +59,16 @@ let
       category = "cli";
       nixpkgs = "asciinema";
     };
+    audacity = {
+      # WHY: audacity is 4.x; audacity_3 legacy, unused; no preview pkg.
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "audacity";
+      };
+      nixpkgs = "audacity";
+      winget = "Audacity.Audacity";
+    };
     bat = {
       category = "cli";
       homebrew = {

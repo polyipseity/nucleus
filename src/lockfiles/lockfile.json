@@ -291,6 +291,7 @@
   "winget": {
     "7zip.7zip": "26.06",
     "Anysphere.Cursor": "3.14.7",
+    "Audacity.Audacity": "4.0.2",
     "BlenderFoundation.Blender": "5.2.3",
     "BurntSushi.ripgrep": "15.2.0",
     "CaddyServer.Caddy": "2.11.9",
