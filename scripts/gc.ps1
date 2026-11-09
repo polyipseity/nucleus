@@ -407,8 +407,8 @@ function Invoke-CleanupNix {
 
 # Load only the modules required by this script.
 . (Join-Path -Path $resolvedModuleDir -ChildPath "ConfigHelpers.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "remove-stalewallpaper.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-AISync.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers\Remove-StaleWallpaper.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "system\Invoke-AISync.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-LogManagement.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-SccacheManagement.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "ManagedPaths.ps1")

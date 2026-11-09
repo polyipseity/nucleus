@@ -157,9 +157,6 @@ BeforeAll {
       Harness name.
     .PARAMETER Payload
       Hook payload written to the child's stdin.
-    .PARAMETER UserProfile
-      Overrides USERPROFILE for the child, so a case decides which shim directory the filter
-      compares against.
     #>
     [CmdletBinding()]
     [OutputType([hashtable])]
@@ -171,17 +168,13 @@ BeforeAll {
       [string]$Harness,
 
       [Parameter(Mandatory)]
-      [string]$Payload,
-
-      [string]$UserProfile = ''
+      [string]$Payload
     )
 
     $previous = $env:NUCLEUS_REPO_ROOT
     $previousLogDir = $env:NUCLEUS_LOG_DIR
-    $previousUserProfile = $env:USERPROFILE
     $env:NUCLEUS_REPO_ROOT = $Root
     $env:NUCLEUS_LOG_DIR = Join-Path -Path $Root 'logs'
-    if (-not [string]::IsNullOrEmpty($UserProfile)) { $env:USERPROFILE = $UserProfile }
     try {
       $runner = Join-Path -Path (Join-Path -Path $Root 'src\scripts\notify') -ChildPath 'harness-filter.ps1'
       $stdout = @($Payload | & $script:PwshPath -NoProfile -File $runner $Harness 2>$null) -join "`n"
@@ -190,16 +183,10 @@ BeforeAll {
     finally {
       $env:NUCLEUS_REPO_ROOT = $previous
       $env:NUCLEUS_LOG_DIR = $previousLogDir
-      $env:USERPROFILE = $previousUserProfile
     }
   }
 
   $script:Sandbox = New-FilterSandbox
-
-  # A profile with no shims, so a plain delete reads as unproven whatever the
-  # developer's own USERPROFILE carries.
-  $script:UnprovenProfile = Join-Path -Path $script:Sandbox 'unproven-profile'
-  $null = New-Item -ItemType Directory -Path (Join-Path -Path $script:UnprovenProfile -ChildPath '.local\bin') -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
 }
 
 AfterAll {
@@ -244,7 +231,7 @@ Describe 'harness-filter render table' {
   }
 
   It 'denies a plain delete whose redirect is unproven' {
-    $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"rm x"}' -UserProfile $script:UnprovenProfile
+    $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"rm x"}'
 
     $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
     $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'deny'
@@ -277,7 +264,7 @@ Describe 'safe-delete filter settings' {
   It 'allows a plain delete when settings.unproven is allow' {
     Set-FilterRegistry -Root $script:Sandbox -Document '{"filters":[{"enabled":true,"id":"safe-delete","settings":{"unproven":"allow"}}]}'
     try {
-      $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"rm x"}' -UserProfile $script:UnprovenProfile
+      $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"rm x"}'
       $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
       $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'allow'
       $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'unproven-redirect'
@@ -288,7 +275,7 @@ Describe 'safe-delete filter settings' {
   It 'routes a plain delete to the approval sources when settings.unproven is route' {
     Set-FilterRegistry -Root $script:Sandbox -Document '{"filters":[{"enabled":true,"id":"safe-delete","settings":{"unproven":"route"}}]}'
     try {
-      $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"rm x"}' -UserProfile $script:UnprovenProfile
+      $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"rm x"}'
       $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
       $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'ask'
       $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'unproven-redirect'
@@ -332,13 +319,13 @@ Describe 'safe-delete filter settings' {
   }
 }
 
-Describe 'safe-delete redirect proof' {
+Describe 'safe-delete deletion-verb case matching' {
   # WHY uppercase: PowerShell folds case for every deletion word, so `DEL` is the
   # same deletion as `del`; a case-sensitive verb test would let it through as
   # no-match with no unproven ruling. The case fails if the verb test stops folding
   # case, which is exactly the regression it exists for.
   It 'denies an uppercase deletion word whose redirect is unproven' {
-    $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"DEL /S x"}' -UserProfile $script:UnprovenProfile
+    $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"DEL /S x"}'
 
     $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
     $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'deny'
@@ -346,7 +333,7 @@ Describe 'safe-delete redirect proof' {
   }
 
   It 'denies Remove-Item spelled in lower case' {
-    $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"remove-item -Recurse -Force C:\\data"}' -UserProfile $script:UnprovenProfile
+    $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"remove-item -Recurse -Force C:\\data"}'
 
     $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
     $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'deny'
