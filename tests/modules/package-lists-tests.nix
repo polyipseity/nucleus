@@ -253,6 +253,35 @@ let
   ) nucleusScoopNames;
   nucleusScoopManifestsPresent = missingNucleusScoopManifests == [ ];
 
+  # WHY: `nucleus/<name>@<pin>` names the exact version Scoop installs, while a
+  # manifest serves exactly one version, so a one-sided bump installs nothing.
+  # An entry with no manifest is skipped here because the existence test owns it.
+  scoopVersionText = value: if value == null then "<missing>" else toString value;
+  nucleusScoopPins =
+    builtins.map
+      (
+        entry:
+        let
+          name = entry.name;
+        in
+        {
+          inherit name;
+          pinned = lockfile.scoop.${name} or null;
+          manifestVersion =
+            (builtins.fromJSON (readRepo "src/modules/scoop-manifests/${name}.json")).version or null;
+        }
+      )
+      (
+        builtins.filter (entry: (entry.bucket or null) == "nucleus" && hasNucleusScoopManifest entry.name) (
+          entriesFor "scoop" "Windows"
+        )
+      );
+  nucleusScoopVersionMismatches = builtins.map (
+    entry:
+    "${entry.name}: lockfile scoop pin ${scoopVersionText entry.pinned}, manifest version ${scoopVersionText entry.manifestVersion}"
+  ) (builtins.filter (entry: entry.pinned != entry.manifestVersion) nucleusScoopPins);
+  nucleusScoopVersionPinsMatch = nucleusScoopVersionMismatches == [ ];
+
   # Every DSC WinGet id must be in the generated allow-list.
   dscText = readRepo "src/hosts/Windows/system/packages.dsc.yml";
   dscLines = lib.splitString "\n" dscText;
@@ -341,6 +370,7 @@ let
     && allLockfilePinsResolve
     && wingetPinsResolve
     && nucleusScoopManifestsPresent
+    && nucleusScoopVersionPinsMatch
     && posixInstallersFreeOfLists
     && passOtpResolved
     && stirlingRegistryPresent
@@ -363,6 +393,7 @@ in
   test_lockfile_pins_resolve = assert' allLockfilePinsResolve "every desired package must have a lockfile version pin (or declare a flake pin)";
   test_winget_lockfile_pins_resolve = assert' wingetPinsResolve "enabled WinGet ids missing a lockfile pin: ${builtins.concatStringsSep ", " wingetMissingPins}";
   test_nucleus_scoop_manifests_present = assert' nucleusScoopManifestsPresent "bucket 'nucleus' entries missing a src/modules/scoop-manifests manifest: ${builtins.concatStringsSep ", " missingNucleusScoopManifests}";
+  test_nucleus_scoop_version_pins_match = assert' nucleusScoopVersionPinsMatch "nucleus Scoop lockfile pins must match their manifest versions: ${builtins.concatStringsSep ", " nucleusScoopVersionMismatches}";
   test_no_hardcoded_posix_lists = assert' posixInstallersFreeOfLists "POSIX installers must not hardcode desired-package literals";
   test_pass_otp_resolved = assert' passOtpResolved "sharedPackages must contribute the pass-otp wrapper and not the plain pass attr";
   test_stirling_pdf_registry_present = assert' stirlingRegistryPresent "the stirling-pdf entry must exist in managedPackages";

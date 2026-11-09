@@ -316,6 +316,14 @@ let
       nixpkgs = "gitFull";
       winget = "Git.Git";
     };
+    glaxnimate = {
+      # WHY: three hosts, three carriers, none of them shared. nixpkgs carries
+      # 0.6.0 for Linux only and no cask or WinGet package exists, so macOS
+      # builds the upstream dmg and Windows installs the upstream zip through a
+      # nucleus Scoop manifest. The 0.5.x binaries are what upstream publishes.
+      category = "gui";
+      nixpkgs = "glaxnimate";
+    };
     gnupg = {
       category = "cli";
       homebrew = {
@@ -1331,6 +1339,10 @@ in
       # nixpkgs (pkgs.qtpass) there instead. Windows still uses WinGet; NixOS is
       # nixpkgs anyway, so this only changes macOS.
       default = {
+        # WHY: no glaxnimate cask exists at all, so the gui category's Homebrew
+        # route contributes nothing on macOS with no error. The macOS carrier is
+        # the flake's darwin derivation of the upstream dmg.
+        glaxnimate = "nixpkgs";
         pulseview = "nixpkgs";
         qtpass = "nixpkgs";
       };

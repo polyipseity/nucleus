@@ -256,6 +256,11 @@
         "why": "Ghostscript CLI parity with pkgs.ghostscript on POSIX; absent from WinGet, Scoop main is the correct tier."
       },
       {
+        "bucket": "nucleus",
+        "name": "glaxnimate",
+        "why": "Animated vector graphics editor; no WinGet manifest and no public Scoop bucket entry, and upstream published no Windows asset for 0.5.4."
+      },
+      {
         "name": "gopass",
         "why": "Cross-platform pass reimplementation; Windows parity for pkgs.pass on POSIX."
       },

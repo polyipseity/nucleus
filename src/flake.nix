@@ -216,6 +216,53 @@
                 };
               };
             })
+            (
+              _final: prev:
+              prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
+                # WHY: nixpkgs' glaxnimate is Linux-only, so macOS takes the
+                # upstream dmg. That bundle's executable is Mach-O x86_64, so the
+                # app runs translated under Rosetta and both darwin systems are
+                # declared rather than a native arm64 build.
+                glaxnimate = prev.stdenv.mkDerivation rec {
+                  pname = "glaxnimate";
+                  version = "0.5.4";
+
+                  sourceRoot = ".";
+
+                  nativeBuildInputs = [ prev.undmg ];
+
+                  src = prev.fetchurl {
+                    url = "https://github.com/mbasaglia/glaxnimate/releases/download/${version}/glaxnimate.dmg";
+                    hash = "sha256-f9r5g+F2ZU2Ehhuz0HiWOC68YsZ68jRH1lK5SefQZAg=";
+                  };
+
+                  # WHY: the dmg wraps the bundle in a directory named after the
+                  # build, so the app sits one level down and *.app matches
+                  # nothing.
+                  installPhase = ''
+                    mkdir -p $out/Applications
+                    cp -r ./*/*.app $out/Applications/
+                  '';
+
+                  meta = {
+                    description = "Animated vector graphics editor";
+                    homepage = "https://glaxnimate.org/";
+                    license = with prev.lib.licenses; [
+                      bsd2
+                      cc-by-sa-40
+                      cc0
+                      gpl2Plus
+                      gpl3Plus
+                      unicodeTOU
+                    ];
+                    platforms = [
+                      "aarch64-darwin"
+                      "x86_64-darwin"
+                    ];
+                  };
+                };
+              }
+            )
             (_final: prev: {
               # WHY no strip: a PyInstaller bundle carries its Python data past the
               # Mach-O section boundaries, so stripping drops the appended PKG.
