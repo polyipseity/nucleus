@@ -237,11 +237,20 @@
                   };
 
                   # WHY: the dmg wraps the bundle in a directory named after the
-                  # build, so the app sits one level down and *.app matches
-                  # nothing.
+                  # build, so the app sits one level down, and its payload also
+                  # carries an `Applications` symlink to the host's /Applications,
+                  # which a shell glob would follow and copy the whole installed
+                  # set. `find` does not follow symlinks and `-type d` excludes
+                  # the link itself, so only the real bundle is collected. The
+                  # guard below exists because `find` matches nothing
+                  # successfully, where the old glob failed loudly.
                   installPhase = ''
                     mkdir -p $out/Applications
-                    cp -r ./*/*.app $out/Applications/
+                    find . -maxdepth 2 -name '*.app' -type d -exec cp -r {} $out/Applications/ \;
+                    test -n "$(ls -A $out/Applications)" || {
+                      echo "glaxnimate: no .app bundle collected" >&2
+                      exit 1
+                    }
                   '';
 
                   meta = {
