@@ -23,6 +23,7 @@ readonly REPO_ROOT
 require_command awk "the here-string scan is an awk program"
 require_command grep "every case matches the scan output with grep"
 require_command mktemp "every case builds a throwaway fixture tree"
+require_command tr "every case renders multi-line output on one line"
 
 # The shared message prefix: both twins report a violation as "here-string with
 # <n> content lines (limit 10)", so a case asserts a whole line built from it

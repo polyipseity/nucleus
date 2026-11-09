@@ -16,7 +16,7 @@ Every managed package manager gets a minimum release age delay, limiting exposur
 Authoritative values: `src/modules/configs/release-ages.json` (with `release-ages.schema.json`). All consumers must match it; see `run_release_age_uniformity` check.
 | `PSGallery` | none upstream | version pin, plus the nupkg SHA256 (`hash`) for hash-pinned entries | `src/lockfiles/lockfile.json` (`psgallery`) |
 
-WinGet, Scoop, cargo-binstall, rustup, and Homebrew have no delay feature, so they rely on the version pins in `src/lockfiles/lockfile.json`; Homebrew also disables `autoUpdate` globally. PSGallery cannot be proxied through a delayed source at all: it has no release-age feature and nixpkgs packages none of the modules pinned under `psgallery`, which is why that section carries the pin plus the nupkg SHA256.
+WinGet, Scoop, cargo-binstall, and rustup have no delay feature, so they rely on the version pins in `src/lockfiles/lockfile.json`; Homebrew has none either and disables `autoUpdate` globally, with the pinning reason in `lockfile-enforcement.instructions.md`. PSGallery cannot be proxied through a delayed source at all: it has no release-age feature and nixpkgs packages none of the modules pinned under `psgallery`, which is why that section carries the pin plus the nupkg SHA256.
 
 ## Lifecycle scripts
 

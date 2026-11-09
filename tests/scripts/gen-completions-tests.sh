@@ -31,7 +31,7 @@ _profile_ps1="src/scripts/shell/profile.ps1"
 
 # The canonical nucleus-* command set (alphabetical), must match the generator.
 # Subcommands are covered by their parent completion files, not as standalone
-# commands: check packer/sh/pwsh, gc cleanup-nix/preferences, apply
+# commands: check packer/sh/pwsh, gc cleanup-nix/logs/preferences, apply
 # health-check/audit-store, cloud setup/reset/sync/status/restart, update
 # lockfile.
 _NUCLEUS_COMMANDS=(ai apply bootstrap check cloud config gc logs utils svc test update vm)
@@ -126,7 +126,7 @@ fi
 
 # 7. Merged subcommand coverage: parent completion files enumerate their
 #    subcommands after the command-surface merge (check packer/sh/pwsh,
-#    gc cleanup-nix/preferences, apply health-check/audit-store, cloud
+#    gc cleanup-nix/logs/preferences, apply health-check/audit-store, cloud
 #    setup/reset/sync/status/restart, update lockfile).
 _sub_ok=1
 for _s in packer sh pwsh; do
@@ -135,7 +135,7 @@ for _s in packer sh pwsh; do
     _sub_ok=0
   }
 done
-for _s in cleanup-nix preferences; do
+for _s in cleanup-nix logs preferences; do
   grep -qw -- "$_s" "$_COMPLETIONS_DIR/_nucleus-gc" || {
     assert_fail "gen-completions: subcommand" "gc missing $_s"
     _sub_ok=0

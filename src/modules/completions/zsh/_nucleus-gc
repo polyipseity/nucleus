@@ -4,7 +4,7 @@
 
 _arguments \
   '(-h --help)'{--help,-h}'[Show usage]' \
-  '1:subcommand:((cleanup-nix "" preferences ""))' \
+  '1:subcommand:((cleanup-nix "" logs "Rotate and expire managed logs via nucleus-logs; defaults to '\''gc'\''" preferences ""))' \
   '--dry-run[dry run]' \
   '--duperemove-gc[duperemove gc]' \
   '--expiry[expiry]' \

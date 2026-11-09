@@ -44,7 +44,7 @@ known_subcommands() {
   ai) printf '%s\n' "sync|list|status|endpoint|config" ;;
   config) printf '%s\n' "get|set|list" ;;
   check) printf '%s\n' "packer|sh|pwsh" ;;
-  gc) printf '%s\n' "cleanup-nix|preferences" ;;
+  gc) printf '%s\n' "cleanup-nix|logs|preferences" ;;
   apply) printf '%s\n' "health-check|audit-store" ;;
   cloud) printf '%s\n' "setup|reset|sync|status|restart" ;;
   update) printf '%s\n' "lockfile" ;;

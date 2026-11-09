@@ -44,6 +44,10 @@ BeforeAll {
     $Script:GcSh = Get-Content -LiteralPath $Script:GcShPath -Raw
     $Script:GcPs1 = Get-Content -LiteralPath $Script:GcPs1Path -Raw
 
+    # The modules tree gc.ps1 dot-sources from: the same default the script
+    # applies when -ModuleDir is not passed.
+    $Script:ModuleDir = Join-Path -Path (Join-Path -Path $Script:RepoRoot -ChildPath 'src') -ChildPath 'platforms\Windows\modules'
+
     # The param block text, taken from the parse tree so the assertion is about
     # what PowerShell binds rather than about how the line happens to be spaced.
     $Script:GcPs1Tokens = $null
@@ -325,5 +329,47 @@ Describe 'nucleus-gc dry-run coverage' {
             $call.Extent.Text | Should -Match '-WhatIf:\$DryRun' -Because (
                 'gc.ps1 line {0} calls Invoke-CleanupNix and must pass -WhatIf:$DryRun' -f $call.Extent.StartLineNumber)
         }
+    }
+}
+
+Describe 'nucleus-gc module imports' {
+    It 'dot-sources every module from the directory that holds it' {
+        # WHY: the dot-sources are the only wiring between gc.ps1 and the modules
+        # tree, and nothing else here or in the analyzers notices when a module
+        # moves: the import line keeps naming the old directory, the function it
+        # defined never appears, and gc.ps1 aborts under its own
+        # $ErrorActionPreference = 'Stop' before it reaches any action.
+        # Both spellings the script could use are read: Join-Path with the
+        # parameter names dropped, and a plain interpolation. A pattern anchored
+        # on the -Path/-ChildPath spelling skipped a rewritten line while the
+        # other imports kept the case green, which is the leak it exists to close.
+        $imports = @(
+            [regex]::Matches($Script:GcPs1, 'Join-Path\b[^\r\n"]*\$resolvedModuleDir[^\r\n"]*"(?<child>[^"]+)"') |
+                ForEach-Object { $_.Groups['child'].Value }
+            [regex]::Matches($Script:GcPs1, '"\$resolvedModuleDir(?<child>[^"]+)"') |
+                ForEach-Object { $_.Groups['child'].Value }
+        )
+        $imports.Count | Should -BeGreaterThan 0 -Because (
+            'an extractor that matched nothing would pass this case no matter which module moved')
+
+        $unresolved = @(
+            foreach ($child in $imports) {
+                $segments = @($child -split '[\\/]' | Where-Object { $_ })
+                $leaf = $segments[-1]
+                $candidate = Join-Path -Path $Script:ModuleDir -ChildPath ($segments -join '\')
+                if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+                    "$child (not found under $Script:ModuleDir)"
+                }
+                # WHY the directory listing rather than the item's .Name: on a
+                # case-insensitive filesystem Get-Item echoes the requested case,
+                # so its .Name cannot tell a case-only regression from a correct
+                # import. The listing carries the stored names.
+                elseif (@(Get-ChildItem -LiteralPath (Split-Path -Parent $candidate) -Force -File |
+                        Where-Object { $_.Name -ceq $leaf }).Count -eq 0) {
+                    "$child (only a differently cased name exists under $(Split-Path -Parent $candidate))"
+                }
+            }
+        )
+        $unresolved | Should -BeNullOrEmpty
     }
 }

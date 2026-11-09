@@ -17,6 +17,8 @@ BeforeAll {
   $Script:FixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'nucleus-gen-completions-tests'
   $Script:ScriptPath = Join-Path $PSScriptRoot '../../../../src/scripts/completions/gen-completions.ps1'
   $Script:RealProfilePath = Join-Path $PSScriptRoot '../../../../src/scripts/shell/profile.ps1'
+  $Script:GcShPath = Join-Path $PSScriptRoot '../../../../scripts/gc.sh'
+  $Script:GcSh = Get-Content -LiteralPath $Script:GcShPath -Raw
   $Script:PwshExe = (Get-Command pwsh).Source
 
   function New-FixtureProfile {
@@ -156,6 +158,38 @@ Describe 'gen-completions.ps1 generated inventory' {
     $profileText = Get-FixtureProfile
     $profileText | Should -Match 'Register-ArgumentCompleter -CommandName nucleus-gc '
     $profileText | Should -Match "'verify'"
+  }
+
+  It 'offers every gc subcommand gc.sh dispatches' {
+    $null = Invoke-GenCompletion  # check-suppress:suppression_doc: Invoke-GenCompletion returns the generated profile text; output discarded because the test reads the fixture file instead
+    $profileText = Get-FixtureProfile
+
+    # WHY: the subcommands come from gc.sh's own dispatch block, so this case
+    # pins the completer to the CLI instead of to a second list that can drift.
+    # nucleus-gc logs was undiscoverable for exactly that reason.
+    $caseMatch = [regex]::Match($Script:GcSh, '(?m)^case "\$action" in\r?\n(?<labels>[^)\r\n]*)\)')
+    $caseMatch.Success | Should -BeTrue -Because (
+      'the gc.sh action dispatch block must be parsed, or this case proves nothing')
+    $dispatched = @(
+      $caseMatch.Groups['labels'].Value -split '\|' |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { $_ }
+    )
+
+    $glueMatch = [regex]::Match($profileText, '\$nucleusGcCommands = @\((?<list>[^)]*)\)')
+    $glueMatch.Success | Should -BeTrue -Because (
+      'the hand-coded gc subcommand array must survive regeneration')
+    $offered = @(
+      [regex]::Matches($glueMatch.Groups['list'].Value, "'([^']+)'") |
+        ForEach-Object { $_.Groups[1].Value }
+    )
+
+    $missing = @($dispatched | Where-Object { $offered -notcontains $_ })
+    $missing | Should -BeNullOrEmpty -Because (
+      'nucleus-gc must complete every subcommand gc.sh dispatches, missing: ' + ($missing -join ', '))
+    $stale = @($offered | Where-Object { $dispatched -notcontains $_ })
+    $stale | Should -BeNullOrEmpty -Because (
+      'a completer entry gc.sh never dispatches offers a subcommand that does nothing: ' + ($stale -join ', '))
   }
 
   It 'gc flags include the full generated set' {
