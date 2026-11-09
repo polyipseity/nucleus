@@ -190,6 +190,40 @@ test_blank_name_is_rejected() {
   fi
 }
 
+# ---- a live name never lands in the archive namespace ----
+
+test_archive_shaped_name_is_rejected() {
+  local status=0
+  printf '{"id":"x"}\n' | logs append app.1 >/dev/null 2>&1 || status=$?
+  if [ "$status" -ne 0 ]; then
+    assert_pass "append rejects a name ending in .<digits>"
+  else
+    assert_fail "append-archive-name" "append accepted app.1"
+  fi
+
+  if [ ! -e "$_WORK/app.1.log" ]; then
+    assert_pass "a rejected archive-shaped name leaves no file"
+  else
+    assert_fail "append-archive-name-path" "append created app.1.log"
+  fi
+
+  status=0
+  printf '{"id":"x"}\n' | logs append app.1x >/dev/null 2>&1 || status=$?
+  if [ "$status" -eq 0 ] && [ -f "$_WORK/app.1x.log" ]; then
+    assert_pass "append accepts a digit-led segment that is not all digits"
+  else
+    assert_fail "append-1x" "append refused app.1x"
+  fi
+
+  status=0
+  printf '{"id":"x"}\n' | logs append app >/dev/null 2>&1 || status=$?
+  if [ "$status" -eq 0 ] && [ -f "$_WORK/app.log" ]; then
+    assert_pass "append still accepts a plain name"
+  else
+    assert_fail "append-plain" "append refused app"
+  fi
+}
+
 # ---- rotate copies, compresses, and truncates in place ----
 
 test_rotate_archives_and_truncates() {
@@ -199,10 +233,10 @@ test_rotate_archives_and_truncates() {
 
   logs rotate --max-size 1024 --max-files 4 --compress true
 
-  if [ -f "$_WORK/rotate-me.log.1.gz" ]; then
-    assert_pass "rotate produces rotate-me.log.1.gz"
+  if [ -f "$_WORK/rotate-me.1.log.gz" ]; then
+    assert_pass "rotate produces rotate-me.1.log.gz"
   else
-    assert_fail "rotate-archive" "no rotate-me.log.1.gz after rotate"
+    assert_fail "rotate-archive" "no rotate-me.1.log.gz after rotate"
   fi
 
   local size
@@ -213,7 +247,7 @@ test_rotate_archives_and_truncates() {
     assert_fail "rotate-truncate" "live file still $size bytes"
   fi
 
-  if [ "$(gzip -dc "$_WORK/rotate-me.log.1.gz" | jq -r '.id')" = "rot" ]; then
+  if [ "$(gzip -dc "$_WORK/rotate-me.1.log.gz" | jq -r '.id')" = "rot" ]; then
     assert_pass "the archive holds the rotated event"
   else
     assert_fail "rotate-content" "archive content lost the event"
@@ -229,35 +263,89 @@ test_rotate_without_compression_is_readable() {
 
   logs rotate --max-size 1024 --max-files 4 --compress false
 
-  if [ -f "$_WORK/plain.log.1" ]; then
+  if [ -f "$_WORK/plain.1.log" ]; then
     assert_pass "rotate without compression leaves a plain archive"
   else
     assert_fail "rotate-plain" "no plain archive after rotate --compress false"
   fi
 
-  if [ "$(logs show plain --json | jq -r '.[].id' | head -n 1)" = "plain" ]; then
-    assert_pass "show reads an uncompressed archive"
+  # WHY the seeded ids: rotation leaves the live file empty, so a single archive
+  # makes every ordering pass. Two archives plus a live line prove the stream is
+  # oldest archive first and the live file last.
+  printf '{"id":"older"}\n' >"$_WORK/plain.2.log"
+  printf '{"id":"newest"}\n' >>"$_WORK/plain.log"
+  local order
+  order="$(logs show plain --json | jq -r '.[].id' | paste -sd, -)"
+  if [ "$order" = "older,plain,newest" ]; then
+    assert_pass "show reads archives oldest first and the live file last"
   else
-    assert_fail "rotate-plain-show" "show did not return the archived event"
+    assert_fail "rotate-plain-show" "show order was '$order'"
+  fi
+}
+
+# ---- a second rotation must not rotate the archives it wrote ----
+
+test_rotate_twice_does_not_nest_archives() {
+  local big
+  big="$(printf 'z%.0s' $(seq 3000))"
+  printf '{"id":"nested","summary":"%s"}\n' "$big" >>"$_WORK/nest-me.log"
+
+  logs rotate --max-size 1024 --max-files 4 --compress false
+  logs rotate --max-size 1024 --max-files 4 --compress false
+
+  if [ ! -e "$_WORK/nest-me.1.1.log" ]; then
+    assert_pass "a second rotation does not nest an archive"
+  else
+    assert_fail "rotate-nested" "a second rotation produced nest-me.1.1.log"
+  fi
+
+  local size
+  size="$(wc -c <"$_WORK/nest-me.1.log" | tr -d ' ')"
+  if [ "$size" -gt 0 ]; then
+    assert_pass "a second rotation leaves the first archive non-empty"
+  else
+    assert_fail "rotate-nested-empty" "the second rotation truncated nest-me.1.log"
+  fi
+}
+
+# ---- stats reports live logs, never plain archives ----
+
+test_stats_skips_plain_archives() {
+  printf '{"id":"live"}\n' >>"$_WORK/stat-me.log"
+  printf '{"id":"archived"}\n' >"$_WORK/stat-me.1.log"
+
+  local rows
+  rows="$(logs stats --json | jq -r '.[].log | select(startswith("stat-me"))' | paste -sd, -)"
+  if [ "$rows" = "stat-me" ]; then
+    assert_pass "stats reports one row named after the live log"
+  else
+    assert_fail "stats-archive-row" "stats reported '$rows'"
   fi
 }
 
 # ---- expire removes archives past the retention window ----
 
 test_expire_removes_old_archives() {
-  printf '{"id":"old"}\n' | gzip >"$_WORK/expire-me.log.1.gz"
-  printf '{"id":"fresh"}\n' | gzip >"$_WORK/expire-me.log.2.gz"
-  touch -t 202001010000 "$_WORK/expire-me.log.1.gz"
+  printf '{"id":"old"}\n' | gzip >"$_WORK/expire-me.1.log.gz"
+  printf '{"id":"fresh"}\n' | gzip >"$_WORK/expire-me.2.log.gz"
+  printf '{"id":"plain-old"}\n' >"$_WORK/expire-me.3.log"
+  touch -t 202001010000 "$_WORK/expire-me.1.log.gz" "$_WORK/expire-me.3.log"
 
   logs expire --expiry 7d
 
-  if [ ! -f "$_WORK/expire-me.log.1.gz" ]; then
+  if [ ! -f "$_WORK/expire-me.1.log.gz" ]; then
     assert_pass "expire removes an archive older than the expiry"
   else
     assert_fail "expire-old" "the expired archive survived"
   fi
 
-  if [ -f "$_WORK/expire-me.log.2.gz" ]; then
+  if [ ! -f "$_WORK/expire-me.3.log" ]; then
+    assert_pass "expire removes an uncompressed archive older than the expiry"
+  else
+    assert_fail "expire-plain-old" "the expired plain archive survived"
+  fi
+
+  if [ -f "$_WORK/expire-me.2.log.gz" ]; then
     assert_pass "expire keeps an archive inside the expiry"
   else
     assert_fail "expire-fresh" "expire removed a fresh archive"
@@ -292,8 +380,11 @@ test_concurrent_appends_keep_every_line
 test_label_appends_verdict_event
 test_label_target_and_verdict_vocabulary
 test_blank_name_is_rejected
+test_archive_shaped_name_is_rejected
 test_rotate_archives_and_truncates
 test_rotate_without_compression_is_readable
+test_rotate_twice_does_not_nest_archives
+test_stats_skips_plain_archives
 test_expire_removes_old_archives
 test_show_filters_by_kind
 

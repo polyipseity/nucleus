@@ -533,7 +533,8 @@ log_sanitize() {
 }
 
 # Copy-truncate keeps the inode, so open launchd/systemd descriptors stay valid.
-# Archives shift .1 (newest) through .$maxfiles, and .1.gz when compress is true.
+# Archives are <base>.<N>.log, gzipped as <base>.<N>.log.gz when compress is true,
+# with .1 newest and .$maxfiles oldest.
 rotate_log_file() {
   _rlf_logfile="$1"
   _rlf_maxsize="${2:-10000000}" # bytes
@@ -552,16 +553,17 @@ rotate_log_file() {
   fi
 
   if [ "$_rlf_maxfiles" -gt 0 ]; then
-    rm -f "$_rlf_logfile.$_rlf_maxfiles" "$_rlf_logfile.$_rlf_maxfiles.gz"
+    _rlf_archive="${_rlf_logfile%.log}"
+    rm -f "$_rlf_archive.$_rlf_maxfiles.log" "$_rlf_archive.$_rlf_maxfiles.log.gz"
 
     _rlf_i=$((_rlf_maxfiles - 1))
     while [ "$_rlf_i" -ge 1 ]; do
-      [ -f "$_rlf_logfile.$_rlf_i" ] && mv "$_rlf_logfile.$_rlf_i" "$_rlf_logfile.$((_rlf_i + 1))"
-      [ -f "$_rlf_logfile.$_rlf_i.gz" ] && mv "$_rlf_logfile.$_rlf_i.gz" "$_rlf_logfile.$((_rlf_i + 1)).gz"
+      [ -f "$_rlf_archive.$_rlf_i.log" ] && mv "$_rlf_archive.$_rlf_i.log" "$_rlf_archive.$((_rlf_i + 1)).log"
+      [ -f "$_rlf_archive.$_rlf_i.log.gz" ] && mv "$_rlf_archive.$_rlf_i.log.gz" "$_rlf_archive.$((_rlf_i + 1)).log.gz"
       _rlf_i=$((_rlf_i - 1))
     done
 
-    if ! cp "$_rlf_logfile" "$_rlf_logfile.1"; then
+    if ! cp "$_rlf_logfile" "$_rlf_archive.1.log"; then
       warn "failed to rotate '$_rlf_logfile': archive copy failed"
       return 0
     fi
@@ -572,7 +574,7 @@ rotate_log_file() {
 
     if [ "$_rlf_compress" = "true" ]; then
       # check-suppress:suppression_doc: archived log may not exist yet on first rotation; gzip -f exits 1 for missing files.
-      gzip -f "$_rlf_logfile.1" 2>/dev/null || true
+      gzip -f "$_rlf_archive.1.log" 2>/dev/null || true
     fi
   else
     : >"$_rlf_logfile"
@@ -587,7 +589,11 @@ rotate_logs_in_directory() {
 
   [ -d "$_rld_dir" ] || return 0
 
-  find "$_rld_dir" -name '*.log' -type f | while IFS= read -r _rld_logfile; do
+  # WHY the exclusion: rotation names its output <base>.<N>.log, which matches
+  # *.log, so a second pass would nest that history as <base>.<N>.1.log and
+  # truncate the archive. A live log whose own name carries a digit-led segment
+  # before .log is skipped too, the trade-off the Windows rotator already makes.
+  find "$_rld_dir" -name '*.log' -type f ! -name '*.[0-9]*.log' | while IFS= read -r _rld_logfile; do
     rotate_log_file "$_rld_logfile" "$_rld_maxsize" "$_rld_maxfiles" "$_rld_compress"
   done
 }
@@ -610,7 +616,7 @@ expire_logs_in_directory() {
   [ "$_eld_days" -gt 0 ] || return 0
 
   find "$_eld_dir" -type f \
-    \( -name '*.log.[0-9]*' -o -name '*.log.gz' -o -name '*.log.[0-9]*.gz' -o -name 'log_*.log' \) \
+    \( -name '*.[0-9]*.log' -o -name '*.log.gz' \) \
     -mtime +"${_eld_days}" -delete
 }
 

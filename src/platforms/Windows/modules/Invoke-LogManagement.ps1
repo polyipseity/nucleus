@@ -205,9 +205,9 @@ function Invoke-LogExpiry {
   if ($days -le 0) { return }
 
   $cutoff = (Get-Date).AddDays(-$days)
-  # WHY: the pattern must match both the name.N.log nucleus-logs rotation writes
-  # and the legacy .log.N and dated log_* naming.
-  $pattern = '(\.log\.\d+(\.gz)?$|\.\d+\.log(\.gz)?$|^log_.*\.log$|\.log\.gz$)'
+  # WHY: the pattern must match the name.N.log archives nucleus-logs rotation
+  # writes, gzipped or plain, plus a bare compressed <base>.log.gz.
+  $pattern = '(\.\d+\.log(\.gz)?$|\.log\.gz$)'
 
   # check-suppress:suppression_doc: probe -- no expired log files may exist; pipeline handles empty result.
   Get-ChildItem -LiteralPath $Path -Recurse -File -ErrorAction SilentlyContinue | Where-Object {

@@ -170,6 +170,20 @@ Describe 'nucleus-logs name validation' {
       Pop-Location
     }
   }
+
+  It 'rejects a name whose last segment is all digits' {
+    # WHY: a live <base>.<digits>.log is the rotated archive name of <base>, so
+    # the live file and the archive collide outright.
+    $command = ". '$($script:LogsPs1)'; Add-NucleusLogEvent -LogName 'app.1' -Event @{ id = 'x' }"
+    & $script:PwshExe -NoProfile -NonInteractive -Command $command > $null 2>&1
+    $LASTEXITCODE | Should -Not -Be 0
+  }
+
+  It 'still accepts a digit-led segment that is not all digits' {
+    $command = ". '$($script:LogsPs1)'; Add-NucleusLogEvent -LogName 'app.1x' -Event @{ id = 'x' } -Directory '$($script:Work)'"
+    & $script:PwshExe -NoProfile -NonInteractive -Command $command > $null 2>&1
+    $LASTEXITCODE | Should -Be 0
+  }
 }
 
 Describe 'nucleus-logs concurrency' {
@@ -261,8 +275,8 @@ Describe 'nucleus-logs rotate and expire' {
     $result = Invoke-LogCommand -Arguments @('rotate', '-MaxSize', '1024', '-MaxFiles', '4', '-Compress', 'true')
     $result.ExitCode | Should -Be 0
 
-    # WHY the .1.log naming: nucleus-logs names Windows archives
-    # <base>.<N>.log.gz, unlike the POSIX <log>.log.<N>.gz form.
+    # WHY the .1.log naming: every host names archives <base>.<N>.log.gz, so the
+    # POSIX and Windows writers agree and one reader pattern covers both.
     (Test-Path -LiteralPath (Join-Path -Path $script:Work -ChildPath 'rotate-me.1.log.gz')) | Should -BeTrue
     (Get-Item -LiteralPath $path).Length | Should -Be 0
 
@@ -323,8 +337,8 @@ Describe 'nucleus-logs rotate and expire' {
   }
 
   It 'removes an archive older than the expiry and keeps a fresh one' {
-    $old = Join-Path -Path $script:Work -ChildPath 'expire-me.log.1.gz'
-    $fresh = Join-Path -Path $script:Work -ChildPath 'expire-me.log.2.gz'
+    $old = Join-Path -Path $script:Work -ChildPath 'expire-me.1.log.gz'
+    $fresh = Join-Path -Path $script:Work -ChildPath 'expire-me.2.log.gz'
     foreach ($target in @($old, $fresh)) {
       $bytes = [System.Text.Encoding]::UTF8.GetBytes('{"id":"x"}')
       $fileStream = [System.IO.File]::Create($target)

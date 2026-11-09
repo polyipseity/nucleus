@@ -92,6 +92,17 @@ logs_validate_name() {
   case "$1" in
   '' | *[!A-Za-z0-9._-]*) die "invalid log name '$1' (allowed: A-Z a-z 0-9 . _ -)" ;;
   esac
+  # WHY: a name whose last dot-separated segment is all digits would write
+  # <name>.log, which is the rotated archive name of the base before that
+  # segment, so a live file and an archive collide outright.
+  case "$1" in
+  *.*)
+    case "${1##*.}" in
+    '' | *[!0-9]*) ;;
+    *) die "invalid log name '$1': a trailing .<digits> collides with the archive name <base>.<N>.log" ;;
+    esac
+    ;;
+  esac
 }
 
 # logs_file_path <dir> <log-name>: print the live file for an already validated
@@ -219,12 +230,12 @@ logs_expire() {
 }
 
 # logs_event_stream <dir> <log-name>: archives oldest first, then the live file.
-# Both archive spellings are matched, gzipped and plain, because rotation leaves
-# plain text when compression is off.
+# Archives are <base>.<N>.log, gzipped as <base>.<N>.log.gz when compression is on.
 logs_event_stream() {
   if [ -d "$1" ]; then
-    find "$1" -maxdepth 1 -type f -name "$2.log.[0-9]*" |
-      awk -F'.log.' '{ print $2 "\t" $0 }' | sort -rn | cut -f2-
+    find "$1" -maxdepth 1 -type f \( -name "$2.[0-9]*.log" -o -name "$2.[0-9]*.log.gz" \) |
+      awk -v name="$2" '{ b = $0; sub(/.*\//, "", b); sub(/\.log(\.gz)?$/, "", b); print substr(b, length(name) + 2) "\t" $0 }' |
+      sort -rn | cut -f2-
   fi
   if [ -f "$1/$2.log" ]; then
     printf '%s\n' "$1/$2.log"
@@ -292,13 +303,18 @@ logs_stats() {
   _lst_rows=""
   for _lst_file in "$1"/*.log; do
     [ -f "$_lst_file" ] || continue
+    # WHY the skip: an uncompressed archive is named <base>.<N>.log and matches
+    # *.log, but it is rotated history rather than a log of its own.
+    case "${_lst_file##*/}" in
+    *.[0-9]*.log) continue ;;
+    esac
     _lst_name="$(basename -- "$_lst_file" .log)"
     if [ -n "$2" ] && [ "$_lst_name" != "$2" ]; then
       continue
     fi
     _lst_events="$(wc -l <"$_lst_file" | tr -d ' ')"
     _lst_bytes="$(wc -c <"$_lst_file" | tr -d ' ')"
-    _lst_archives="$(find "$1" -maxdepth 1 -name "$_lst_name.log.*" -type f | wc -l | tr -d ' ')"
+    _lst_archives="$(find "$1" -maxdepth 1 -type f \( -name "$_lst_name.[0-9]*.log" -o -name "$_lst_name.[0-9]*.log.gz" \) | wc -l | tr -d ' ')"
     _lst_last="$(tail -n 1 "$_lst_file" | jq -Rr 'fromjson? | .ts // empty')"
     _lst_rows="${_lst_rows}${_lst_name}	${_lst_events}	${_lst_bytes}	${_lst_archives}	${_lst_last}
 "

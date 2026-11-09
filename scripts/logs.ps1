@@ -241,6 +241,12 @@ function Add-NucleusLogEvent {
   if ($LogName -notmatch '^[A-Za-z0-9._-]+$') {
     throw "invalid log name '$LogName' (allowed: A-Z a-z 0-9 . _ -)"
   }
+  # WHY the trailing-digits rejection: a live log named <base>.<digits> would
+  # write <base>.<digits>.log, which is the rotated archive name of <base>, so
+  # the live file and the archive collide outright.
+  if ($LogName -match '\.\d+$') {
+    throw "invalid log name '$LogName': a trailing .<digits> collides with the archive name <base>.<N>.log"
+  }
   if (-not $Directory) { $Directory = Get-LogsDir -ScopeName 'user' }
   if ([string]::IsNullOrWhiteSpace($Directory)) {
     throw 'no log directory resolved; set NUCLEUS_LOG_DIR or NUCLEUS_REPO_ROOT before appending'
@@ -330,9 +336,8 @@ function Get-LogArchiveIndex {
   .SYNOPSIS
     Returns the rotation index of an archive name, or $null when it is not one.
   .DESCRIPTION
-    Windows rotation names archives <base>.<N>.log.gz, the POSIX rotation names
-    them <log>.log.<N>.gz, and a reader has to see both so rotated history stays
-    visible whichever writer produced it.
+    Windows rotation names archives <base>.<N>.log.gz, and every host names
+    them that way, so rotated history stays visible whichever host wrote it.
   .PARAMETER Name
     File name to test.
   .PARAMETER LogName
@@ -348,9 +353,7 @@ function Get-LogArchiveIndex {
   )
 
   $escaped = [regex]::Escape($LogName)
-  foreach ($pattern in @("^$escaped\.(\d+)\.log(\.gz)?$", "^$escaped\.log\.(\d+)(\.gz)?$")) {
-    if ($Name -match $pattern) { return [int]$Matches[1] }
-  }
+  if ($Name -match "^$escaped\.(\d+)\.log(\.gz)?$") { return [int]$Matches[1] }
   return $null
 }
 
@@ -513,7 +516,7 @@ function Get-LogStatReport {
   # *.log, but it is rotated history rather than a log of its own.
   # check-suppress:suppression_doc: probe -- an empty log root is reported as no rows, not as an error.
   $files = @(Get-ChildItem -LiteralPath $Directory -Filter '*.log' -File -ErrorAction SilentlyContinue |
-      Where-Object { $_.Name -notmatch '\.\d+\.log(\.gz)?$' -and $_.Name -notmatch '\.log\.\d+(\.gz)?$' })
+      Where-Object { $_.Name -notmatch '\.\d+\.log(\.gz)?$' })
   foreach ($file in $files) {
     $name = $file.BaseName
     if ($LogFilter -and $name -ne $LogFilter) { continue }
