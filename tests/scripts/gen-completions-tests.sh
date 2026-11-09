@@ -4,7 +4,9 @@
 # coverage, generated headers + zsh syntax,
 # update lockfile --list-* dynamic wiring, flag-extraction correctness pins,
 # spec-word escaping of shell metacharacters in subcommand descriptions, and the
-# gc completion's subcommand list against the dispatch in scripts/gc.sh.
+# six hand-coded subcommand lists (gc, svc, config, logs, utils, vm): the zsh
+# table against the app's scripts/<cmd>.sh dispatch, the PowerShell array against
+# the app's scripts/<cmd>.ps1 subcommand constraint.
 #
 # Also guards the PowerShell twin (src/scripts/completions/gen-completions.ps1):
 # its command list matches the canonical set, every Register-ArgumentCompleter
@@ -326,39 +328,176 @@ else
   assert_fail "gen-completions: tracked tree untouched" "files rewritten during the run: ${_moved_files:-none}|files deleted during the run: ${_deleted_files:-none}"
 fi
 
-# 15. gc's subcommand inventory is the dispatch in scripts/gc.sh, and --check
-#     cannot prove it: it compares the tracked file with the generator, so a label
-#     that vanished from both would stay green. The dispatch arm is the labels a
-#     user can actually type, so it is compared with the subcommand spec word the
-#     generated file carries. The extractor anchors on the outer `case "$action"`
-#     line and the first arm closing parenthesis, so the nested `logs` arm and any
-#     help-body text stay out of the list.
-_gc_dispatch_labels="$(
-  awk '
-    /^case "\$action" in$/ { in_dispatch = 1; next }
-    in_dispatch {
-      if ($0 !~ /\)/) { next }
-      sub(/\).*/, "")
-      gsub(/[[:space:]|]/, "\n")
-      print
-      exit
+# 15. Each hand-coded subcommand list answers to one surface, and --check cannot
+#     prove either: it compares the tracked file with the generator, so a label
+#     that vanished from both would stay green.
+#
+#     The zsh table answers to the dispatch in scripts/<cmd>.sh, the set of labels
+#     a POSIX user can actually type: a dispatched label the table omits ships
+#     silently (nucleus-gc logs shipped that way), and a table entry the dispatch
+#     cannot run is dead.
+#
+#     The PowerShell array answers to the Windows app, not to the POSIX dispatch:
+#     a ValidateSet on the entry-point parameter of scripts/<cmd>.ps1, or the
+#     command switch in config.ps1, the one app of the six with no ValidateSet.
+#     That is why nucleus-gc all completes on Windows and is correctly absent from
+#     the zsh table.
+
+# _dispatch_subcommand_labels <script> <anchor> <first|last>: the arm labels of
+# the case block that starts on the anchor line. Only depth-one arm headers count,
+# so a case nested in an arm body contributes nothing, and non-word labels (-h,
+# --help, *) drop out: a subcommand is a bare word.
+_dispatch_subcommand_labels() {
+  awk -v anchor="$2" -v which="$3" '
+    { lines[NR] = $0; if ($0 == anchor) hits[++total] = NR }
+    END {
+      if (total == 0) exit 1
+      start = (which == "last") ? hits[total] : hits[1]
+      depth = 1
+      expecting = 1
+      for (i = start + 1; i <= NR; i++) {
+        line = lines[i]
+        if (line ~ /^[[:space:]]*esac([[:space:]]|;|$)/) {
+          depth--
+          if (depth == 0) exit 0
+          continue
+        }
+        if (line ~ /^[[:space:]]*case[[:space:]].*[[:space:]]in[[:space:]]*$/) {
+          depth++
+          continue
+        }
+        if (depth != 1) continue
+        if (expecting == 0) {
+          if (line ~ /;;[[:space:]]*$/) expecting = 1
+          continue
+        }
+        # A comment or blank line between arms is not an arm header.
+        if (line !~ /\)/) continue
+        labels = line
+        sub(/\).*/, "", labels)
+        rest = line
+        sub(/^[^)]*\)/, "", rest)
+        count = split(labels, alternates, "|")
+        for (j = 1; j <= count; j++) {
+          gsub(/[[:space:]]/, "", alternates[j])
+          if (alternates[j] ~ /^[a-z][a-z0-9-]*$/) print alternates[j]
+        }
+        # An arm that closes on its own line leaves the next line an arm header.
+        expecting = (rest ~ /;;/) ? 1 : 0
+      }
     }
-  ' scripts/gc.sh | sed '/^$/d' | LC_ALL=C sort
-)"
-_gc_completion_labels="$(
-  sed -n "s/^  '1:subcommand:((\(.*\)))'.*/\1/p" "$_COMPLETIONS_DIR/_nucleus-gc" |
+  ' "$1"
+}
+
+# _completion_subcommand_labels <file>: the labels of the subcommand spec word,
+# with each label's quoted description removed.
+_completion_subcommand_labels() {
+  sed -n "s/^  '1:subcommand:((\(.*\)))'.*/\1/p" "$1" |
     sed -E 's/"[^"]*"//g' |
     tr -s ' ' '\n' |
-    sed -E '/^[a-z][a-z0-9-]*$/!d' |
-    LC_ALL=C sort
-)"
-# WHY the non-empty clause: a broken extractor would otherwise compare two empty
-# lists, and an empty dispatch is itself a failure worth reporting.
-if [ -n "$_gc_dispatch_labels" ] && [ "$_gc_completion_labels" = "$_gc_dispatch_labels" ]; then
-  assert_pass "gen-completions: gc completion subcommands match the scripts/gc.sh dispatch"
-else
-  assert_fail "gen-completions: gc completion subcommands" \
-    "dispatch: ${_gc_dispatch_labels//$'\n'/ }|completion: ${_gc_completion_labels//$'\n'/ }"
+    sed -E '/^[a-z][a-z0-9-]*$/!d'
+}
+
+# _validate_set_labels <ps1>: the labels of the ValidateSet on the entry-point
+# parameter, meaning the first one inside the script's top-level param block. Six
+# of the apps declare more than one ValidateSet (gc.ps1:67 and :89, logs.ps1:85
+# and :97, svc.ps1:40, :170, :430), so anchoring on the block keeps a nested
+# option list from answering for the subcommands.
+_validate_set_labels() {
+  awk '
+    { sub(/\r$/, "") }
+    !in_block && $0 == "param(" { in_block = 1; next }
+    in_block && $0 == ")" { exit }
+    in_block && /ValidateSet\(/ { print; exit }
+  ' "$1" | grep -oE "'[^']+'" | tr -d "'"
+}
+
+# _switch_labels <ps1> <switch line>: the arm labels of a switch statement, for
+# the one app that constrains its subcommands with a switch instead.
+_switch_labels() {
+  awk -v anchor="$2" '
+    { sub(/\r$/, "") }
+    $0 == anchor { in_switch = 1; next }
+    in_switch && /^[[:space:]]*default/ { exit }
+    in_switch && /^[[:space:]]*\047[a-z]/ { print; next }
+  ' "$1" | grep -oE "'[^']+'" | tr -d "'"
+}
+
+# _profile_subcommand_labels <command>: the hand-coded $nucleus<Cmd>Commands
+# array profile.ps1 keeps for the PowerShell completer.
+_profile_subcommand_labels() {
+  local _pascal _variable
+  _pascal="$(printf '%s\n' "$1" | awk '{ print toupper(substr($0, 1, 1)) substr($0, 2) }')"
+  _variable="nucleus${_pascal}Commands"
+  grep -F "\$$_variable = @(" "$_profile_ps1" |
+    grep -oE "'[^']+'" |
+    tr -d "'"
+}
+
+# Fields: command | script | exact anchor line | which matching block | Windows
+# app | its subcommand constraint | expected label count. The bash anchor is the
+# whole line, indentation included, because a trimmed match hits an in-function
+# block first (svc line 579, vm line 352), and logs matches three times on the
+# same variable, so there its anchor is only right because the selector is last.
+# Heredoc data, so each anchor stays the app's own text unquoted.
+_subcommand_ok=1
+while IFS='|' read -r _cmd _script _anchor _which _ps1 _mechanism _expected_count; do
+  # WHY the empty-list clause below: a dispatch the extractor cannot parse, or a
+  # completer whose list moved, would otherwise compare two empty sets and pass,
+  # which is the one outcome this case exists to prevent.
+  _dispatched="$(_dispatch_subcommand_labels "$_script" "$_anchor" "$_which" | LC_ALL=C sort || true)"
+  _completed="$(_completion_subcommand_labels "$_COMPLETIONS_DIR/_nucleus-$_cmd" | LC_ALL=C sort || true)"
+  case "$_mechanism" in
+  validateset) _in_app="$(_validate_set_labels "$_ps1" | LC_ALL=C sort || true)" ;;
+  switch:*) _in_app="$(_switch_labels "$_ps1" "${_mechanism#switch:}" | LC_ALL=C sort || true)" ;;
+  *)
+    # WHY: the loop body runs in the main shell, so without this arm a mistyped
+    # mechanism would silently reuse the previous row's list.
+    assert_fail "gen-completions: $_cmd app subcommand list" \
+      "unknown mechanism '$_mechanism' for $_ps1"
+    _subcommand_ok=0
+    continue
+    ;;
+  esac
+  _in_profile="$(_profile_subcommand_labels "$_cmd" | LC_ALL=C sort || true)"
+  if [ -z "$_dispatched" ] || [ -z "$_completed" ] || [ -z "$_in_app" ] || [ -z "$_in_profile" ]; then
+    assert_fail "gen-completions: $_cmd subcommand lists" \
+      "empty extraction -- dispatch: [${_dispatched//$'\n'/ }]|zsh: [${_completed//$'\n'/ }]|app: [${_in_app//$'\n'/ }]|profile.ps1: [${_in_profile//$'\n'/ }]"
+    _subcommand_ok=0
+    continue
+  fi
+  # WHY the count: the app extraction has to land on the subcommand list, and a
+  # wrong anchor would otherwise compare two lists that both look plausible.
+  _app_count="$(printf '%s\n' "$_in_app" | wc -l | tr -d ' ')"
+  if [ "$_app_count" -ne "$_expected_count" ]; then
+    assert_fail "gen-completions: $_cmd app subcommand list" \
+      "$_ps1 yielded $_app_count labels, expected $_expected_count: ${_in_app//$'\n'/ }"
+    _subcommand_ok=0
+  fi
+  _zsh_missing="$(comm -23 <(printf '%s\n' "$_dispatched") <(printf '%s\n' "$_completed") | tr '\n' ' ')"
+  _zsh_stale="$(comm -13 <(printf '%s\n' "$_dispatched") <(printf '%s\n' "$_completed") | tr '\n' ' ')"
+  if [ -n "$_zsh_missing" ] || [ -n "$_zsh_stale" ]; then
+    assert_fail "gen-completions: $_cmd zsh completion subcommands" \
+      "missing: ${_zsh_missing:-none}|not dispatched: ${_zsh_stale:-none}"
+    _subcommand_ok=0
+  fi
+  _profile_missing="$(comm -23 <(printf '%s\n' "$_in_app") <(printf '%s\n' "$_in_profile") | tr '\n' ' ')"
+  _profile_stale="$(comm -13 <(printf '%s\n' "$_in_app") <(printf '%s\n' "$_in_profile") | tr '\n' ' ')"
+  if [ -n "$_profile_missing" ] || [ -n "$_profile_stale" ]; then
+    assert_fail "gen-completions: $_cmd profile.ps1 completer subcommands" \
+      "missing: ${_profile_missing:-none}|not in $_ps1: ${_profile_stale:-none}"
+    _subcommand_ok=0
+  fi
+done <<'SUBCOMMAND_SOURCES'
+gc|scripts/gc.sh|case "$action" in|first|scripts/gc.ps1|validateset|4
+svc|scripts/svc.sh|case "$action" in|first|scripts/svc.ps1|validateset|12
+config|scripts/config.sh|case "${1:-}" in|first|scripts/config.ps1|switch:switch ($Command) {|3
+logs|scripts/logs.sh|  case "$_logs_action" in|last|scripts/logs.ps1|validateset|8
+utils|scripts/utils.sh|  case "$subcommand" in|first|scripts/utils.ps1|validateset|2
+vm|scripts/vm.sh|case "$action" in|first|scripts/vm.ps1|validateset|15
+SUBCOMMAND_SOURCES
+if [ "$_subcommand_ok" -eq 1 ]; then
+  assert_pass "gen-completions: six hand-coded subcommand lists match their zsh and PowerShell sources"
 fi
 
 finish_tests

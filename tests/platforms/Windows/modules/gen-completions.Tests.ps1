@@ -10,6 +10,12 @@
   blocks survive regeneration, and single-flag commands get a full '--help'
   entry (regression: if-expression unrolling once emitted a corrupt '-' line).
 
+  Every hand-coded PowerShell subcommand array (gc, svc, config, logs, utils,
+  vm) is also pinned to the subcommand constraint of its Windows app: a
+  subcommand an app accepts but a completer never offers ships silently, which is
+  how nucleus-gc logs stayed undiscoverable, and how nucleus-gc all stayed
+  unofferable.
+
   Run with: pwsh -NoProfile -Command "Invoke-Pester tests/platforms/Windows/modules/gen-completions.Tests.ps1 -Passthru"
 #>
 
@@ -17,9 +23,23 @@ BeforeAll {
   $Script:FixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'nucleus-gen-completions-tests'
   $Script:ScriptPath = Join-Path $PSScriptRoot '../../../../src/scripts/completions/gen-completions.ps1'
   $Script:RealProfilePath = Join-Path $PSScriptRoot '../../../../src/scripts/shell/profile.ps1'
-  $Script:GcShPath = Join-Path $PSScriptRoot '../../../../scripts/gc.sh'
-  $Script:GcSh = Get-Content -LiteralPath $Script:GcShPath -Raw
+  $Script:RepoRoot = Join-Path $PSScriptRoot '../../../..'
   $Script:PwshExe = (Get-Command pwsh).Source
+
+  # The six commands whose PowerShell completer keeps its subcommand list by
+  # hand, with the constraint in the Windows app that is the source of truth for
+  # it: a ValidateSet on the entry-point parameter, or the command switch in
+  # config.ps1, the one app of the six with no ValidateSet. Count proves the
+  # extraction landed on the subcommand list rather than a nested option set
+  # (gc.ps1:89, logs.ps1:97, svc.ps1:170 and :430 declare a second one).
+  $Script:SubcommandSources = [ordered]@{
+    'gc'     = @{ App = 'scripts/gc.ps1'; Mechanism = 'ValidateSet'; Anchor = ''; Variable = 'nucleusGcCommands'; Count = 4 }
+    'svc'    = @{ App = 'scripts/svc.ps1'; Mechanism = 'ValidateSet'; Anchor = ''; Variable = 'nucleusSvcCommands'; Count = 12 }
+    'config' = @{ App = 'scripts/config.ps1'; Mechanism = 'switch'; Anchor = 'switch ($Command) {'; Variable = 'nucleusConfigCommands'; Count = 3 }
+    'logs'   = @{ App = 'scripts/logs.ps1'; Mechanism = 'ValidateSet'; Anchor = ''; Variable = 'nucleusLogsCommands'; Count = 8 }
+    'utils'  = @{ App = 'scripts/utils.ps1'; Mechanism = 'ValidateSet'; Anchor = ''; Variable = 'nucleusUtilsCommands'; Count = 2 }
+    'vm'     = @{ App = 'scripts/vm.ps1'; Mechanism = 'ValidateSet'; Anchor = ''; Variable = 'nucleusVmCommands'; Count = 15 }
+  }
 
   function New-FixtureProfile {
     # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test fixture mutates a temp dir; no ShouldProcess in tests
@@ -89,6 +109,65 @@ BeforeAll {
       return @()
     }
     return @([regex]::Matches($match.Groups['flags'].Value, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+  }
+
+  function Get-ProfileSubcommandList {
+    param(
+      [Parameter(Mandatory)]
+      [string]$VariableName,
+      [Parameter(Mandatory)]
+      [string]$ProfileText
+    )
+    $match = [regex]::Match($ProfileText, [regex]::Escape("`$$VariableName = @(") + "(?<list>[^)]*)\)")
+    if (-not $match.Success) {
+      return @()
+    }
+    return @([regex]::Matches($match.Groups['list'].Value, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+  }
+
+  function Get-ValidateSetSubcommandList {
+    # The labels of the ValidateSet on the entry-point parameter, meaning the
+    # first one inside the script's top-level param block: a nested option list
+    # (logs' scope, svc's live/pseudo list) must not answer for the subcommands.
+    param(
+      [Parameter(Mandatory)]
+      [string]$Path
+    )
+    $inBlock = $false
+    foreach ($line in (Get-Content -LiteralPath $Path)) {
+      if (-not $inBlock) {
+        if ($line -ceq 'param(') { $inBlock = $true }
+        continue
+      }
+      if ($line -ceq ')') { break }
+      if ($line -match 'ValidateSet\(') {
+        return @([regex]::Matches($line, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+      }
+    }
+    return @()
+  }
+
+  function Get-SwitchSubcommandList {
+    # The arm labels of a switch statement, for the one app that constrains its
+    # subcommands with a switch instead of a ValidateSet.
+    param(
+      [Parameter(Mandatory)]
+      [string]$Path,
+      [Parameter(Mandatory)]
+      [string]$Anchor
+    )
+    $inSwitch = $false
+    $labels = [System.Collections.Generic.List[string]]::new()
+    foreach ($line in (Get-Content -LiteralPath $Path)) {
+      if (-not $inSwitch) {
+        if ($line -ceq $Anchor) { $inSwitch = $true }
+        continue
+      }
+      if ($line -match '^\s*default') { break }
+      $match = [regex]::Match($line, "^\s*'([^']+)'")
+      if ($match.Success) { $labels.Add($match.Groups[1].Value) }
+    }
+    return @($labels)
   }
 }
 
@@ -160,36 +239,45 @@ Describe 'gen-completions.ps1 generated inventory' {
     $profileText | Should -Match "'verify'"
   }
 
-  It 'offers every gc subcommand gc.sh dispatches' {
+  It 'offers every subcommand each Windows app accepts' {
     $null = Invoke-GenCompletion  # check-suppress:suppression_doc: Invoke-GenCompletion returns the generated profile text; output discarded because the test reads the fixture file instead
     $profileText = Get-FixtureProfile
 
-    # WHY: the subcommands come from gc.sh's own dispatch block, so this case
-    # pins the completer to the CLI instead of to a second list that can drift.
-    # nucleus-gc logs was undiscoverable for exactly that reason.
-    $caseMatch = [regex]::Match($Script:GcSh, '(?m)^case "\$action" in\r?\n(?<labels>[^)\r\n]*)\)')
-    $caseMatch.Success | Should -BeTrue -Because (
-      'the gc.sh action dispatch block must be parsed, or this case proves nothing')
-    $dispatched = @(
-      $caseMatch.Groups['labels'].Value -split '\|' |
-        ForEach-Object { $_.Trim() } |
-        Where-Object { $_ }
-    )
-
-    $glueMatch = [regex]::Match($profileText, '\$nucleusGcCommands = @\((?<list>[^)]*)\)')
-    $glueMatch.Success | Should -BeTrue -Because (
-      'the hand-coded gc subcommand array must survive regeneration')
-    $offered = @(
-      [regex]::Matches($glueMatch.Groups['list'].Value, "'([^']+)'") |
-        ForEach-Object { $_.Groups[1].Value }
-    )
-
-    $missing = @($dispatched | Where-Object { $offered -notcontains $_ })
-    $missing | Should -BeNullOrEmpty -Because (
-      'nucleus-gc must complete every subcommand gc.sh dispatches, missing: ' + ($missing -join ', '))
-    $stale = @($offered | Where-Object { $dispatched -notcontains $_ })
-    $stale | Should -BeNullOrEmpty -Because (
-      'a completer entry gc.sh never dispatches offers a subcommand that does nothing: ' + ($stale -join ', '))
+    # WHY: the subcommands come from each Windows app's own parameter constraint,
+    # so this case pins the arrays to the CLI instead of to a second list that can
+    # drift. nucleus-gc logs was undiscoverable, and nucleus-gc all is the reverse
+    # case: a Windows-only action the array must offer and the zsh table must not.
+    $failures = [System.Collections.Generic.List[string]]::new()
+    foreach ($command in $Script:SubcommandSources.Keys) {
+      $source = $Script:SubcommandSources[$command]
+      $appPath = Join-Path $Script:RepoRoot $source.App
+      $accepted = if ($source.Mechanism -eq 'switch') {
+        @(Get-SwitchSubcommandList -Path $appPath -Anchor $source.Anchor)
+      } else {
+        @(Get-ValidateSetSubcommandList -Path $appPath)
+      }
+      if ($accepted.Count -ne $source.Count) {
+        # WHY: an extraction that lands on a nested ValidateSet, or on nothing,
+        # would compare against a plausible-looking list and pass vacuously.
+        $failures.Add("${command}: $($source.App) yielded $($accepted.Count) labels, expected $($source.Count): " + ($accepted -join ', '))
+        continue
+      }
+      $offered = @(Get-ProfileSubcommandList -VariableName $source.Variable -ProfileText $profileText)
+      if ($offered.Count -eq 0) {
+        $failures.Add("${command}: `$$($source.Variable) is missing or empty in profile.ps1")
+        continue
+      }
+      $missing = @($accepted | Where-Object { $offered -notcontains $_ })
+      $stale = @($offered | Where-Object { $accepted -notcontains $_ })
+      if ($missing.Count -gt 0) {
+        $failures.Add("${command}: not offered: " + ($missing -join ', '))
+      }
+      if ($stale.Count -gt 0) {
+        $failures.Add("${command}: offered but never accepted: " + ($stale -join ', '))
+      }
+    }
+    ($failures -join '; ') | Should -BeNullOrEmpty -Because (
+      'nucleus-<command> must complete every subcommand its Windows app accepts, and nothing the app rejects')
   }
 
   It 'gc flags include the full generated set' {
