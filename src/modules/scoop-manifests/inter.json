@@ -1,8 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/ScoopInstaller/Scoop/master/schema.json",
   "checkver": {
-    "url": "https://api.github.com/repos/rsms/inter/releases/latest",
-    "regex": "\"tag_name\":\\s*\"v?([\\d.]+)\""
+    "regex": "\"tag_name\":\\s*\"v?([\\d.]+)\"",
+    "url": "https://api.github.com/repos/rsms/inter/releases/latest"
   },
   "description": "Typeface specially designed for user interfaces",
   "hash": "9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e",

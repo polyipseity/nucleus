@@ -1,8 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/ScoopInstaller/Scoop/master/schema.json",
   "checkver": {
-    "url": "https://api.github.com/repos/adobe-fonts/source-serif/releases/latest",
-    "regex": "\"tag_name\":\\s*\"v?([\\d.]+R?)\""
+    "regex": "\"tag_name\":\\s*\"v?([\\d.]+R?)\"",
+    "url": "https://api.github.com/repos/adobe-fonts/source-serif/releases/latest"
   },
   "description": "Typeface for setting text in many sizes, weights, and languages, designed to complement Source Sans",
   "hash": "549fdb8f9a682bd06944298621404969f6de77c2e422ff3b8244a1dcd6a0c425",

@@ -258,7 +258,7 @@
       {
         "bucket": "nucleus",
         "name": "glaxnimate",
-        "why": "Animated vector graphics editor; no WinGet manifest and no public Scoop bucket entry, and upstream published no Windows asset for 0.5.4."
+        "why": "Animated vector graphics editor; no WinGet manifest and no public Scoop bucket entry, so the pinned KDE Windows asset is installed directly."
       },
       {
         "name": "gopass",
