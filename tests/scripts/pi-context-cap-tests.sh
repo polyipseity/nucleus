@@ -23,7 +23,7 @@ else
     "$(tail -n 20 "$_pcc_out" | tr '\n' ' ')"
 fi
 
-if grep -qE '(^|[^0-9])[0-9]+ pass' "$_pcc_out"; then
+if grep -qE '(^|[^0-9])[1-9][0-9]* pass' "$_pcc_out"; then
   assert_pass "bun reported a non-zero passing test count"
 else
   assert_fail "bun reported a non-zero passing test count" \
