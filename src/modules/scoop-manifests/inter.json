@@ -1,11 +1,12 @@
 {
   "$schema": "https://raw.githubusercontent.com/ScoopInstaller/Scoop/master/schema.json",
-  "version": "4.1",
+  "checkver": {
+    "url": "https://api.github.com/repos/rsms/inter/releases/latest",
+    "regex": "\"tag_name\":\\s*\"v?([\\d.]+)\""
+  },
   "description": "Typeface specially designed for user interfaces",
-  "homepage": "https://rsms.me/inter/",
-  "license": "OFL-1.1",
-  "url": "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip",
   "hash": "9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e",
+  "homepage": "https://rsms.me/inter/",
   "installer": {
     "script": [
       "$fontDir = \"$env:LOCALAPPDATA\\Microsoft\\Windows\\Fonts\"",
@@ -27,6 +28,7 @@
       "if ($fontCount -eq 0) { throw 'inter 4.1: no *.ttf found under the extracted archive; the release layout changed' }"
     ]
   },
+  "license": "OFL-1.1",
   "uninstaller": {
     "script": [
       "$fontDir = \"$env:LOCALAPPDATA\\Microsoft\\Windows\\Fonts\"",
@@ -37,8 +39,6 @@
       "}"
     ]
   },
-  "checkver": {
-    "url": "https://api.github.com/repos/rsms/inter/releases/latest",
-    "regex": "\"tag_name\":\\s*\"v?([\\d.]+)\""
-  }
+  "url": "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip",
+  "version": "4.1"
 }

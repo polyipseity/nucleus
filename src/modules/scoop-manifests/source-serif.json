@@ -1,11 +1,12 @@
 {
   "$schema": "https://raw.githubusercontent.com/ScoopInstaller/Scoop/master/schema.json",
-  "version": "4.005R",
+  "checkver": {
+    "url": "https://api.github.com/repos/adobe-fonts/source-serif/releases/latest",
+    "regex": "\"tag_name\":\\s*\"v?([\\d.]+R?)\""
+  },
   "description": "Typeface for setting text in many sizes, weights, and languages, designed to complement Source Sans",
-  "homepage": "https://adobe-fonts.github.io/source-serif/",
-  "license": "OFL-1.1",
-  "url": "https://github.com/adobe-fonts/source-serif/releases/download/4.005R/source-serif-4.005_Desktop.zip",
   "hash": "549fdb8f9a682bd06944298621404969f6de77c2e422ff3b8244a1dcd6a0c425",
+  "homepage": "https://adobe-fonts.github.io/source-serif/",
   "installer": {
     "script": [
       "$fontDir = \"$env:LOCALAPPDATA\\Microsoft\\Windows\\Fonts\"",
@@ -27,6 +28,7 @@
       "if ($fontCount -eq 0) { throw 'source serif 4.005: no *.ttf found under the extracted archive; the release layout changed' }"
     ]
   },
+  "license": "OFL-1.1",
   "uninstaller": {
     "script": [
       "$fontDir = \"$env:LOCALAPPDATA\\Microsoft\\Windows\\Fonts\"",
@@ -37,8 +39,6 @@
       "}"
     ]
   },
-  "checkver": {
-    "url": "https://api.github.com/repos/adobe-fonts/source-serif/releases/latest",
-    "regex": "\"tag_name\":\\s*\"v?([\\d.]+R?)\""
-  }
+  "url": "https://github.com/adobe-fonts/source-serif/releases/download/4.005R/source-serif-4.005_Desktop.zip",
+  "version": "4.005R"
 }

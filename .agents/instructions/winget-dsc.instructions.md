@@ -57,11 +57,11 @@ Skip `PSDscResources/Script` when PATH is unreliable or the state is complex. De
 
 Scoop installs user-space CLI tools with no WinGet ID into `%USERPROFILE%\scoop\`, no admin required. Scoop itself installs through the `ScoopInstall` Script resource, which downloads the commit-pinned `ScoopInstaller/Install` script and checks its SHA256; `Git.Git` stays its `dependsOn` because Scoop needs Git for bucket management. `Invoke-ScoopSetup` then registers the `fonts` bucket and reconciles the desired apps.
 
-Never reconcile the Scoop app set with `PSDscResources/Script`: `scoop` is not on PATH in a DSC child process. Use `src/platforms/Windows/modules/Invoke-ScoopSetup.ps1`, which `apply.ps1` calls after DSC completes.
+Never reconcile the Scoop app set with `PSDscResources/Script`: `scoop` is not on PATH in a DSC child process. Use `src/platforms/Windows/modules/setup/Invoke-ScoopSetup.ps1`, which `apply.ps1` calls after DSC completes.
 
 For a tool absent from WinGet and the public buckets (`main`, `extras`), write a manifest in `src/modules/scoop-manifests/<name>.json` and add `bucket: "nucleus"` to its `desired.json` entry. `Invoke-ScoopSetup` copies the manifests into `~\scoop\buckets\nucleus\` and installs with `scoop install nucleus/<name>`. Manifest format follows [Scoop's app manifest spec](https://github.com/ScoopInstaller/Scoop/wiki/App-Manifests); for NSIS installers use the `installer.script` block with the `/S` silent flag, and set `$schema` to Scoop's published schema for step 7 validation. Guard installs with `Test-Path` on the shim, never `Get-Command`.
 
-`src/platforms/Windows/modules/Invoke-CargoBinstallSetup.ps1` handles Rust CLI tools with no WinGet or Scoop equivalent (`cargo-cache`, `pay-respects`). It keeps a desired-state list at `~\.config\nucleus\cargo-binstall-packages.json` and runs `cargo binstall --no-confirm` for additions, `cargo uninstall` for removals.
+`src/platforms/Windows/modules/setup/Invoke-CargoBinstallSetup.ps1` handles Rust CLI tools with no WinGet or Scoop equivalent (`cargo-cache`, `pay-respects`). It keeps a desired-state list at `~\.config\nucleus\cargo-binstall-packages.json` and runs `cargo binstall --no-confirm` for additions, `cargo uninstall` for removals.
 
 ## Imperative recovery safety (Windows modules)
 

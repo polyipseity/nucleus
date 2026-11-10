@@ -18,7 +18,7 @@ Guest OSes match host hostnames, and the value comes from `hostname` in `VMs.jso
 
 ## Guest credentials
 
-From per-user SOPS secrets, never the host login: `vm_guest_username` and `vm_guest_password` via `vmGuest` in the user registry, with SSH keys in `src/modules/vm-guest-ssh-public-key-paths.json`. Setup scripts decrypt and inject, so drift must invalidate stale artifacts. Update `tests/modules/vm-setup-manifest-tests.nix` when any of this changes.
+From per-user SOPS secrets, never the host login: `vm_guest_username` and `vm_guest_password` via `vmGuest` in the user registry, with SSH keys in `src/modules/vms/vm-guest-ssh-public-key-paths.json`. Setup scripts decrypt and inject, so drift must invalidate stale artifacts. Update `tests/modules/vm-setup-manifest-tests.nix` when any of this changes.
 
 ## android-config
 
@@ -31,7 +31,7 @@ Flags: `--gapps`, `--adb-keys`, `--magisk`, `--root`, `--fake-wifi`, `--fake-wif
 
 Privileged access goes through Magisk `su` only, never `adb root`. `--root` sets `persist.sys.root_access=3` and leaves `ro.debuggable` at `0`.
 
-A change touches `VMs.json` + `VMs.schema.json`, `vm.sh`, `vm.ps1`, the Windows modules, `tests/scripts/android-config-tests.{sh,ps1}`, `tests/integration/android-config-parity-tests.nix`, `tests/modules/vm-setup-manifest-tests.nix`, and every `MANUAL.md`.
+A change touches `VMs.json` + `VMs.schema.json`, `vm.sh`, `vm.ps1`, the Windows modules, `tests/scripts/android-config-tests.{sh,ps1}`, `tests/platforms/Windows/modules/embedded-content/android-config-parity.Tests.ps1`, `tests/modules/vm-setup-manifest-tests.nix`, and every `MANUAL.md`.
 
 ## Android UTM freeze
 

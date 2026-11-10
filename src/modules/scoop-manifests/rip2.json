@@ -1,9 +1,5 @@
 {
   "$schema": "https://raw.githubusercontent.com/ScoopInstaller/Scoop/master/schema.json",
-  "version": "0.9.7",
-  "description": "A safe and ergonomic alternative to rm",
-  "homepage": "https://github.com/MilesCranmer/rip2",
-  "license": "GPL-3.0-or-later",
   "architecture": {
     "64bit": {
       "url": "https://github.com/MilesCranmer/rip2/releases/download/v0.9.7/rip-Windows-x86_64.zip",
@@ -17,5 +13,9 @@
   "bin": "rip.exe",
   "checkver": {
     "github": "https://github.com/MilesCranmer/rip2"
-  }
+  },
+  "description": "A safe and ergonomic alternative to rm",
+  "homepage": "https://github.com/MilesCranmer/rip2",
+  "license": "GPL-3.0-or-later",
+  "version": "0.9.7"
 }
