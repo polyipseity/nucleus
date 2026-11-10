@@ -267,7 +267,7 @@ function Invoke-LockfileBump {
       Write-NucleusError 'winget: gh is required to read microsoft/winget-pkgs'
       throw 'winget: gh is required to read microsoft/winget-pkgs'
     }
-    $enablePath = Join-Path $repoRoot 'src\hosts\Windows\system\winget-packages.json'
+    $enablePath = Join-Path $repoRoot 'src/hosts/Windows/system/winget-packages.json'
     if (-not (Test-Path -Path $enablePath)) {
       Write-NucleusError "winget: enable list not found at $enablePath"
       throw "winget: enable list not found at $enablePath"

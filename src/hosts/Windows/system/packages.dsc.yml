@@ -324,7 +324,7 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure the Shotcut video editor is installed to match the macOS Homebrew cask and NixOS nixpkgs declarations
+        description: Ensure the Shotcut video editor is installed to match the macOS Homebrew cask and NixOS nixpkgs declarations, so the editor is available on Windows
       settings:
         id: Meltytech.Shotcut
         source: winget
@@ -555,7 +555,7 @@ properties:
           Invoke-WebRequest -Uri $url -OutFile $tmp
           $actual = (Get-FileHash -Path $tmp -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($actual -ne $sha) {
-            Remove-Item $tmp -Force
+            Remove-Item $tmp -Force -ErrorAction SilentlyContinue
             throw "scoop installer hash mismatch: expected $sha, got $actual"
           }
           # WHY -RunAsAdmin: the pinned installer denies an elevated session without it, and apply.ps1 always elevates.
@@ -563,10 +563,10 @@ properties:
           $scoopDir = Join-Path $env:USERPROFILE 'scoop'
           & powershell -NoProfile -ExecutionPolicy Bypass -File $tmp -RunAsAdmin -ScoopDir $scoopDir
           if ($LASTEXITCODE -ne 0) {
-            Remove-Item $tmp -Force
+            Remove-Item $tmp -Force -ErrorAction SilentlyContinue
             throw "scoop installer exited with code $LASTEXITCODE"
           }
-          Remove-Item $tmp -Force
+          Remove-Item $tmp -Force -ErrorAction SilentlyContinue
       dependsOn:
         - GitInstall
 

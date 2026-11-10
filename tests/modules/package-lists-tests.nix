@@ -12,6 +12,7 @@
 #   • the Stirling-PDF entry resolves enabled on every host and deploys the desktop build
 #   • Windows DSC package ids are sorted alphabetically (case-folded)
 #   • winget-packages.json is $schema-first at the root key level
+#   • the ScoopInstall DSC bootstrap guard: block-anchored id and dependsOn pairing, enable-list coverage, and the eight wp* aggregate members.
 #
 # Run with: nix-instantiate --eval --strict tests/modules/package-lists-tests.nix
 
@@ -292,11 +293,17 @@ let
   ) dscIds;
 
   # The Scoop bootstrap is a Script resource, so its id sits at the resource
-  # level and the settings.id scan above cannot see it. WHY hasInfix with the
-  # surrounding newlines: it pins the exact six-space line without a regex.
+  # level and the settings.id scan above cannot see it. WHY split on the Script
+  # resource marker: the id and its dependsOn must appear in the same block, so
+  # a dependency moved under any other block fails instead of passing on a
+  # whole-file scan.
+  scoopScriptBlock =
+    let
+      entries = lib.splitString "\n    - resource: PSDscResources/Script" dscText;
+    in
+    lib.findFirst (entry: lib.hasInfix "\n      id: ScoopInstall\n" entry) null entries;
   wpScoopInstallPresent =
-    lib.hasInfix "\n      id: ScoopInstall\n" dscText
-    && lib.hasInfix "\n        - GitInstall\n" dscText;
+    scoopScriptBlock != null && lib.hasInfix "\n        - GitInstall\n" scoopScriptBlock;
 
   # The enable list and the DSC file are two halves of one deployment: the list
   # decides which ids the updater pins, the DSC file decides which of them an
@@ -379,7 +386,17 @@ let
     && spIsValid
     && wpDscCoversEnableList
     && wpDscExceptionsFresh
-    && wpScoopInstallPresent;
+    && wpScoopInstallPresent
+    && wpResolvedMatchesCommitted
+    && wpCursorDisabled
+    && wpObsEnabled
+    && wpJdkEnabled
+    && wpDscCovered
+    && dscSorted
+    && wpJsonTerminated
+    && wpJsonMultiline
+    && wpJsonHasKeys
+    && wpJsonKeyOrder;
 in
 {
   test_managers_declared = assert' allManagersDeclared "desired.json must declare every manager (${builtins.concatStringsSep ", " managers})";

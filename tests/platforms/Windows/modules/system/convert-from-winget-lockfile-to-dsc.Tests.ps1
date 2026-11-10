@@ -68,4 +68,18 @@ Describe 'ConvertFrom-WingetLockfileToDsc -EnabledPackages filter' {
     It 'injects the lockfile version into an enabled package' {
         $script:locked | Should -Match '(?m)^        version: 1\.2\.3$'
     }
+
+    It 'emits every fixture resource when -EnabledPackages is omitted' {
+        $unfilteredPath = Join-Path -Path $TestDrive -ChildPath 'unfiltered.dsc.yml'
+        ConvertFrom-WingetLockfileToDsc `
+            -ConfigPath $script:configPath `
+            -LockfilePath $script:lockfilePath `
+            -OutputPath $unfilteredPath
+        $raw = Get-Content -LiteralPath $unfilteredPath -Raw
+        $raw | Should -Match '(?m)^        id: Example\.Enabled$'
+        $raw | Should -Match '(?m)^        id: Example\.Disabled$'
+        $raw | Should -Match '(?m)^      id: ScoopInstall$'
+        $raw | Should -Match '(?m)^      id: FontAwesomeInstall$'
+        $raw | Should -Match '(?m)^        version: 1\.2\.3$'
+    }
 }

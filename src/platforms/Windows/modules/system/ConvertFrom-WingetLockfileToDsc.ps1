@@ -26,6 +26,10 @@
   is dropped from the output. This enforces the single-source overlap enable
   flag (managedPackages in core.nix) on Windows, which does not run Nix.
   When omitted, all resources are emitted (no filtering).
+  A kept Script block can outlive a filtered-away dependency: when this
+  filter removes a resource another block names in dependsOn, the
+  surviving reference points at nothing, so verify dependsOn targets
+  after filtering.
 
 .EXAMPLE
   ConvertFrom-WingetLockfileToDsc -ConfigPath .\system\scheduler.dsc.yml -LockfilePath ..\..\lockfiles\lockfile.json -OutputPath .\system\scheduler.locked.dsc.yml
