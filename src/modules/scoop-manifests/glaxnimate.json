@@ -1,16 +1,16 @@
 {
   "$schema": "https://raw.githubusercontent.com/ScoopInstaller/Scoop/master/schema.json",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "description": "Animated vector graphics editor",
   "homepage": "https://glaxnimate.org/",
   "license": "GPL-3.0-or-later",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/mbasaglia/glaxnimate/releases/download/0.5.3/glaxnimate-x86_64.zip",
-      "hash": "ba75aa86eff8fb6ca91410b67f80ed43d163d65e90c9e3627b8b56f020cc5205"
+      "url": "https://sakura-osaka.mirrors.kde.org/kde/ftp/stable/glaxnimate/0.6.0/windows/glaxnimate-0.6.0-x86_64-standalone.7z",
+      "hash": "b27742f8c6ccc8942689e6150973c5286d68ce31c777f7fefbe7738e0bfc488d"
     }
   },
-  "bin": "glaxnimate/bin/glaxnimate.exe",
+  "bin": "bin/glaxnimate.exe",
   "checkver": {
     "github": "https://github.com/mbasaglia/glaxnimate"
   }

@@ -319,8 +319,9 @@ let
     glaxnimate = {
       # WHY: three hosts, three carriers, none of them shared. nixpkgs carries
       # 0.6.0 for Linux only and no cask or WinGet package exists, so macOS
-      # builds the upstream dmg and Windows installs the upstream zip through a
-      # nucleus Scoop manifest. The 0.5.x binaries are what upstream publishes.
+      # builds the app from KDE's arm64 dmg and Windows installs KDE's portable
+      # 7z through a nucleus Scoop manifest. The 0.6.0 binaries come from KDE's
+      # release server.
       category = "gui";
       nixpkgs = "glaxnimate";
     };
@@ -1341,7 +1342,7 @@ in
       default = {
         # WHY: no glaxnimate cask exists at all, so the gui category's Homebrew
         # route contributes nothing on macOS with no error. The macOS carrier is
-        # the flake's darwin derivation of the upstream dmg.
+        # the flake's darwin derivation of the KDE arm64 dmg.
         glaxnimate = "nixpkgs";
         pulseview = "nixpkgs";
         qtpass = "nixpkgs";

@@ -220,30 +220,33 @@
               _final: prev:
               prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
                 # WHY: nixpkgs' glaxnimate is Linux-only, so macOS takes the
-                # upstream dmg. That bundle's executable is Mach-O x86_64, so the
-                # app runs translated under Rosetta and both darwin systems are
-                # declared rather than a native arm64 build.
+                # KDE dmg. Its bundle is a native arm64 build, so the
+                # derivation declares aarch64-darwin only; an x86_64-darwin
+                # eval could not run the bundle it would fetch.
                 glaxnimate = prev.stdenv.mkDerivation rec {
                   pname = "glaxnimate";
-                  version = "0.5.4";
+                  version = "0.6.0";
 
                   sourceRoot = ".";
 
                   nativeBuildInputs = [ prev.undmg ];
 
+                  # WHY: download.kde.org answers with a Mirrorbits redirect to
+                  # geo mirrors outside *.kde.org, which the srt proxy allowlist
+                  # refuses (403 X-Proxy-Error: blocked-by-allowlist), so the
+                  # URL pins a *.kde.org mirror that serves the file directly.
                   src = prev.fetchurl {
-                    url = "https://github.com/mbasaglia/glaxnimate/releases/download/${version}/glaxnimate.dmg";
-                    hash = "sha256-f9r5g+F2ZU2Ehhuz0HiWOC68YsZ68jRH1lK5SefQZAg=";
+                    url = "https://sakura-osaka.mirrors.kde.org/kde/ftp/stable/glaxnimate/${version}/macOS/glaxnimate-${version}-arm64.dmg";
+                    hash = "sha256-X3aNoON6y5Sl84QaGXFfmeEhZG/Zg/+gCktnW/6pvXU=";
                   };
 
-                  # WHY: the dmg wraps the bundle in a directory named after the
-                  # build, so the app sits one level down, and its payload also
-                  # carries an `Applications` symlink to the host's /Applications,
-                  # which a shell glob would follow and copy the whole installed
-                  # set. `find` does not follow symlinks and `-type d` excludes
-                  # the link itself, so only the real bundle is collected. The
-                  # guard below exists because `find` matches nothing
-                  # successfully, where the old glob failed loudly.
+                  # WHY: the dmg payload puts the real bundle beside an
+                  # `Applications` symlink to the host's /Applications, and a
+                  # `cp -r *` over the payload root follows it and drags that
+                  # tree in. `find` does not follow symlinks and `-type d`
+                  # excludes the link itself, so only the real bundle is
+                  # collected. The guard below exists because `find` matches
+                  # nothing successfully, where a glob would fail loudly.
                   installPhase = ''
                     mkdir -p $out/Applications
                     find . -maxdepth 2 -name '*.app' -type d -exec cp -r {} $out/Applications/ \;
@@ -264,10 +267,7 @@
                       gpl3Plus
                       unicodeTOU
                     ];
-                    platforms = [
-                      "aarch64-darwin"
-                      "x86_64-darwin"
-                    ];
+                    platforms = [ "aarch64-darwin" ];
                   };
                 };
               }

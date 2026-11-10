@@ -47,7 +47,7 @@
   "scoop": {
     "cargo-binstall": "1.10.0",
     "ghostscript": "10.08.0",
-    "glaxnimate": "0.5.3",
+    "glaxnimate": "0.6.0",
     "gopass": "1.15.0",
     "inter": "4.1",
     "iwck": "3.10",
