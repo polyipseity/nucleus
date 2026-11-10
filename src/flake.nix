@@ -768,6 +768,8 @@
             name = "test";
             runtimeInputs = [
               pkgs.bash
+              # WHY: pi-context-cap-tests runs bun test over the extension source.
+              pkgs.bun
               pkgs.check-jsonschema
               pkgs.findutils
               pkgs.git
