@@ -97,6 +97,7 @@
       "*.googlevideo.com",
       "*.gstatic.com",
       "*.huggingface.co",
+      "*.kde.org",
       "*.mediawiki.org",
       "*.mirror.jellyfin.org",
       "*.npmjs.org",
