@@ -31,6 +31,7 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 1. Transcribe a file: `whisper-cli -m "$env:LOCALAPPDATA\nucleus\models\ggml-base.en.bin" -f <audio-file>`.
 2. Transcribe live: `whisper-stream -m "$env:LOCALAPPDATA\nucleus\models\ggml-base.en.bin"`. Add `--step 0` for discrete segments instead of a rolling window.
 3. `whisper-stream` opens an SDL2 window; close it to stop. Run it from a terminal on the desktop: a PowerShell session outside the interactive desktop session has no microphone and captures nothing.
+4. Clean a recording: `deep-filter -m "$env:LOCALAPPDATA\nucleus\models\DeepFilterNet3_onnx.tar.gz" -o out.wav in.wav`.
 
 ## harness bridge
 

@@ -32,6 +32,7 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 1. Transcribe a file: `whisper-cli -m ~/.local/share/nucleus/models/ggml-base.en.bin -f <audio-file>`.
 2. Transcribe live: `whisper-stream -m ~/.local/share/nucleus/models/ggml-base.en.bin`. Add `--step 0` for discrete segments instead of a rolling window.
 3. `whisper-stream` opens an SDL2 window; close it to stop. It opens a capture device of its own through ALSA, since this host runs no PipeWire, so a missing or wrong source is an ALSA device question: `arecord -l` lists what is available.
+4. Clean a recording: `deep-filter -m ~/.local/share/nucleus/models/DeepFilterNet3_onnx.tar.gz -o out.wav in.wav`.
 
 ## harness bridge
 
