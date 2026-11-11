@@ -481,6 +481,64 @@
                   ];
                 };
               };
+
+              # WHY: pinned upstream release binary; not in nixpkgs as CLI. The v0.5.6
+              # assets are single executables (no archive) and x86_64-linux ships only a
+              # musl binary.
+              deep-filter = prev.stdenv.mkDerivation rec {
+                pname = "deep-filter";
+                version = "0.5.6";
+
+                src =
+                  if prev.stdenv.hostPlatform.isDarwin then
+                    if prev.stdenv.hostPlatform.isAarch64 then
+                      prev.fetchurl {
+                        url = "https://github.com/Rikorose/DeepFilterNet/releases/download/v${version}/deep-filter-${version}-aarch64-apple-darwin";
+                        hash = "sha256-RgHn9OTAPlmkxbUAAhbvOt0+gIeZz8zZXhToPqRhEIE=";
+                      }
+                    else
+                      prev.fetchurl {
+                        url = "https://github.com/Rikorose/DeepFilterNet/releases/download/v${version}/deep-filter-${version}-x86_64-apple-darwin";
+                        hash = "sha256-076EADrLfCPnOK1/cKFY7HeajSM6guf6PnF9ES61tQ8=";
+                      }
+                  else if prev.stdenv.hostPlatform.isAarch64 then
+                    prev.fetchurl {
+                      url = "https://github.com/Rikorose/DeepFilterNet/releases/download/v${version}/deep-filter-${version}-aarch64-unknown-linux-gnu";
+                      hash = "sha256-FOAqHAAo88oL34O2KzM25WugVWiU7ylalehXPwZVcWY=";
+                    }
+                  else
+                    prev.fetchurl {
+                      url = "https://github.com/Rikorose/DeepFilterNet/releases/download/v${version}/deep-filter-${version}-x86_64-unknown-linux-musl";
+                      hash = "sha256-cHdeJR7uRMDyRRoegzMmz4vLvjBNPnzRKFHm/Ocu99o=";
+                    };
+
+                dontUnpack = true;
+                dontBuild = true;
+                dontStrip = true;
+                dontPatchELF = true;
+
+                installPhase = ''
+                  runHook preInstall
+                  install -Dm755 "$src" "$out/bin/deep-filter"
+                  runHook postInstall
+                '';
+
+                meta = {
+                  description = "DeepFilterNet noise suppression CLI";
+                  homepage = "https://github.com/Rikorose/DeepFilterNet";
+                  license = with prev.lib.licenses; [
+                    asl20
+                    mit
+                  ];
+                  platforms = [
+                    "x86_64-linux"
+                    "aarch64-linux"
+                    "x86_64-darwin"
+                    "aarch64-darwin"
+                  ];
+                  mainProgram = "deep-filter";
+                };
+              };
             })
             (
               _final: prev:

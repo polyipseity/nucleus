@@ -178,6 +178,12 @@ let
       category = "cli";
       nixpkgs = "deadnix";
     };
+    deep-filter = {
+      category = "cli";
+      # WHY: pinned upstream release binary; not in nixpkgs as CLI.
+      nixpkgs = "deep-filter";
+      nixpkgsPackage = pkgs.deep-filter;
+    };
     desktoppr = {
       category = "cli";
       platforms = [ "darwin" ];

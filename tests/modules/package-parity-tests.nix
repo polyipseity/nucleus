@@ -252,12 +252,17 @@ let
     builtins.length extractedNames == builtins.length (lib.unique extractedNames)
   ) "No duplicate package names in managedPackages";
 
-  # All nixpkgs attrs extracted from core.nix must resolve.
+  # deep-filter must be registered as a managed POSIX package.
+  test_deep_filter_registered = assert' (builtins.elem "deep-filter" extractedNames) "managedPackages must include deep-filter";
+
+  # All nixpkgs attrs extracted from core.nix must resolve, or be provided by
+  # the flake overlay when absent from upstream nixpkgs.
   test_managed_nixpkgs_attrs_resolve =
     let
       pkgs' = import <nixpkgs> { };
       pathOf = s: lib.strings.splitString "." s;
-      resolves = s: lib.hasAttrByPath (pathOf s) pkgs';
+      overlayProvides = s: lib.hasInfix "\n              ${s} = prev.stdenv.mkDerivation" flakeText;
+      resolves = s: lib.hasAttrByPath (pathOf s) pkgs' || overlayProvides s;
     in
     assert' (builtins.all resolves nixpkgsAttrs) "All managedPackages nixpkgs attrs must resolve in nixpkgs";
 
@@ -365,6 +370,7 @@ let
     test_entry_names_valid
     test_registry_names_sorted
     test_no_duplicate_names
+    test_deep_filter_registered
     test_managed_nixpkgs_attrs_resolve
     test_dotted_nixpkgs_paths_resolve
     test_darwin_only_packages_platform_marked
