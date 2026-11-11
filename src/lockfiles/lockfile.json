@@ -20,6 +20,13 @@
       "source": "https://github.com/obra/superpowers.git"
     }
   },
+  "deepfilternet": {
+    "DeepFilterNet3_onnx.tar.gz": {
+      "hash": "sha256-yU2R9wkRAByUbg+rtKqa3DcEX0WgO1YAjLDIJEy2NhY=",
+      "revision": "978576aa8400552a4ce9730838c635aa30db5e61",
+      "url": "https://raw.githubusercontent.com/Rikorose/DeepFilterNet/978576aa8400552a4ce9730838c635aa30db5e61/models/DeepFilterNet3_onnx.tar.gz"
+    }
+  },
   "pi": {
     "@getpipher/vision": "0.5.3",
     "@juicesharp/rpiv-ask-user-question": "2.15.0",

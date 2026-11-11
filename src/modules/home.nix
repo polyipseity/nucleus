@@ -223,6 +223,7 @@ in
     ./shell
     ./terminal-activations.nix
     ./vagrant.nix
+    ./deepfilternet.nix
     ./voice-transcription.nix
     ./wallpapers.nix
   ];
