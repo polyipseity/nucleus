@@ -21,6 +21,16 @@ export interface ActiveModel {
   id: string;
 }
 
+export interface RuntimeModel {
+  provider: string;
+  id: string;
+  contextWindow: number;
+}
+
+export interface StatusUi {
+  setStatus(key: string, value: string | undefined): void;
+}
+
 export type Command =
   | { kind: "status"; scope: "all" | "session" | "global" }
   | { kind: "status"; scope: "model"; provider: string; model: string }
@@ -358,6 +368,27 @@ export function effectiveWindow(model: ActiveModel, input: WindowInput): { windo
   });
 }
 
+export function syncModelWindow(
+  model: RuntimeModel,
+  baseline: number,
+  session: number | null,
+  models: Json | null,
+  settings: unknown,
+  ui?: StatusUi,
+): { changed: boolean; window: number; source: Source } {
+  const result = effectiveWindow(model, { baseline, session, models, settings });
+  const changed = model.contextWindow !== result.window;
+  if (changed) model.contextWindow = result.window;
+  // modelsAreEqual compares type, id, and provider only, so ctx.setModel on the
+  // same model does not emit model_select. Mutate model.contextWindow and nudge
+  // the UI so usage/compaction math and the model indicator refresh immediately.
+  if (changed && ui) {
+    ui.setStatus("context-window", "");
+    ui.setStatus("context-window", undefined);
+  }
+  return { changed, window: result.window, source: result.source };
+}
+
 // Cap a write just produced, for the re-apply that follows it.
 export function writtenCap(outcome: ApplyOutcome): number | null | undefined {
   return outcome.kind === "written" && outcome.target === "settings" ? outcome.cap : undefined;
@@ -473,17 +504,14 @@ export default function (pi: ExtensionAPI) {
   const modelsPath = join(agentDir(), "models.json");
   const paths: FilePaths = { settings: settingsPath, models: modelsPath };
 
-  const applyCap = (model: { provider: string; id: string; contextWindow: number }): void => {
+  const applyCap = (
+    model: { provider: string; id: string; contextWindow: number },
+    ui?: StatusUi,
+  ): void => {
     const cached = nativeCache.get(model);
     const baseline = cached ?? model.contextWindow;
     if (cached === undefined) nativeCache.set(model, baseline);
-    const result = effectiveWindow(model, {
-      baseline,
-      session: sessionOverride,
-      models: readJson(modelsPath),
-      settings: pi.getSettings(),
-    });
-    if (model.contextWindow !== result.window) model.contextWindow = result.window;
+    syncModelWindow(model, baseline, sessionOverride, readJson(modelsPath), pi.getSettings(), ui);
   };
 
   pi.on("model_select", ({ model }) => applyCap(model));
@@ -491,7 +519,7 @@ export default function (pi: ExtensionAPI) {
     // A reload is the one point where pi re-reads settings.json, so its cache is
     // authoritative again and the mirror would only hold a stale copy.
     if (event.reason === "reload") resetWrittenCap();
-    if (ctx.model) applyCap(ctx.model);
+    if (ctx.model) applyCap(ctx.model, ctx.ui);
   });
 
   pi.registerCommand("context-window", {
@@ -523,7 +551,7 @@ export default function (pi: ExtensionAPI) {
         // write only reaches pi.getSettings() when pi reloads; without the mirror the
         // next model switch would apply the pre-write cap.
         noteWrittenCap(outcome);
-        applyCap(model);
+        applyCap(model, ctx.ui);
       }
 
       const settings = readJson(settingsPath);

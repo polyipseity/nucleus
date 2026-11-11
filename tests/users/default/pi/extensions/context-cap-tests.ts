@@ -20,6 +20,7 @@ import {
   serialize,
   setGlobalCap,
   setModelWindow,
+  syncModelWindow,
   type ActiveModel,
   type FilePaths,
   type Json,
@@ -400,6 +401,107 @@ describe("effectiveWindow and the written-cap mirror", () => {
       window: 900000,
       source: "model",
     });
+  });
+});
+
+describe("syncModelWindow", () => {
+  afterEach(() => resetWrittenCap());
+
+  test("mutates the active model window and nudges ui when the effective value changes", () => {
+    const model = { provider: active.provider, id: active.id, contextWindow: 1000000 };
+    const calls: Array<[string, string | undefined]> = [];
+    const ui = { setStatus: (key: string, value: string | undefined) => calls.push([key, value]) };
+
+    const result = syncModelWindow(model, 1000000, null, null, { contextWindowCap: 256000 }, ui);
+
+    expect(result).toEqual({ changed: true, window: 256000, source: "global" });
+    expect(model.contextWindow).toBe(256000);
+    expect(calls).toEqual([["context-window", ""], ["context-window", undefined]]);
+  });
+
+  test("does not nudge ui when the effective window is unchanged", () => {
+    const model = { provider: active.provider, id: active.id, contextWindow: 256000 };
+    const calls: Array<[string, string | undefined]> = [];
+    const ui = { setStatus: (key: string, value: string | undefined) => calls.push([key, value]) };
+
+    const result = syncModelWindow(model, 1000000, null, null, { contextWindowCap: 256000 }, ui);
+
+    expect(result).toEqual({ changed: false, window: 256000, source: "global" });
+    expect(model.contextWindow).toBe(256000);
+    expect(calls).toEqual([]);
+  });
+
+  test("session override takes precedence immediately", () => {
+    const model = { provider: active.provider, id: active.id, contextWindow: 1000000 };
+    const models: Json = {
+      providers: { "opencode-go": { modelOverrides: { "glm-5.1": { contextWindow: 900000 } } } },
+    };
+
+    const result = syncModelWindow(model, 1000000, 300000, models, { contextWindowCap: 256000 });
+
+    expect(result).toEqual({ changed: true, window: 300000, source: "session" });
+    expect(model.contextWindow).toBe(300000);
+  });
+
+  test("global set and clear affect the active model through the written-cap mirror", () => {
+    const model = { provider: active.provider, id: active.id, contextWindow: 1000000 };
+    const staleSettings = { contextWindowCap: 256000 };
+    const paths = tempPaths({ settings: '{"contextWindowCap":256000}\n' });
+
+    noteWrittenCap(applyToFiles(parseCommand("100000 global", active), paths, catalog));
+    const capped = syncModelWindow(model, 1000000, null, null, staleSettings);
+    expect(capped).toEqual({ changed: true, window: 100000, source: "global" });
+    expect(model.contextWindow).toBe(100000);
+
+    noteWrittenCap(applyToFiles(parseCommand("default global", active), paths, catalog));
+    const cleared = syncModelWindow(model, 1000000, null, null, staleSettings);
+    expect(cleared).toEqual({ changed: true, window: 1000000, source: "native" });
+    expect(model.contextWindow).toBe(1000000);
+  });
+
+  test("negative clear affects the active model the same way as default", () => {
+    const model = { provider: active.provider, id: active.id, contextWindow: 256000 };
+    const staleSettings = { contextWindowCap: 256000 };
+    const paths = tempPaths({ settings: '{"contextWindowCap":256000}\n' });
+
+    noteWrittenCap(applyToFiles(parseCommand("-1 global", active), paths, catalog));
+    const cleared = syncModelWindow(model, 1000000, null, null, staleSettings);
+    expect(cleared).toEqual({ changed: true, window: 1000000, source: "native" });
+    expect(model.contextWindow).toBe(1000000);
+  });
+
+  test("model write affects the active model immediately and clearing restores the correct layer", () => {
+    const model = { provider: active.provider, id: active.id, contextWindow: 1000000 };
+    const paths = tempPaths({ models: "{}\n" });
+
+    applyToFiles(parseCommand("500000 model", active), paths, catalog);
+    const models = JSON.parse(readFileSync(paths.models, "utf8")) as Json;
+    const explicit = syncModelWindow(model, 1000000, null, models, { contextWindowCap: 256000 });
+    expect(explicit).toEqual({ changed: true, window: 500000, source: "model" });
+    expect(model.contextWindow).toBe(500000);
+
+    applyToFiles(parseCommand("default model", active), paths, catalog);
+    const clearedModels = JSON.parse(readFileSync(paths.models, "utf8")) as Json;
+    const cleared = syncModelWindow(model, 1000000, null, clearedModels, { contextWindowCap: 256000 });
+    expect(cleared).toEqual({ changed: true, window: 256000, source: "global" });
+    expect(model.contextWindow).toBe(256000);
+  });
+
+  test("provider write affects the active model immediately and clearing restores native when no other layer applies", () => {
+    const model = { provider: active.provider, id: active.id, contextWindow: 1000000 };
+    const paths = tempPaths({ models: "{}\n" });
+
+    applyToFiles(parseCommand("200000 provider opencode-go", active), paths, catalog);
+    const models = JSON.parse(readFileSync(paths.models, "utf8")) as Json;
+    const explicit = syncModelWindow(model, 1000000, null, models, {});
+    expect(explicit).toEqual({ changed: true, window: 200000, source: "model" });
+    expect(model.contextWindow).toBe(200000);
+
+    applyToFiles(parseCommand("-1 provider opencode-go", active), paths, catalog);
+    const clearedModels = JSON.parse(readFileSync(paths.models, "utf8")) as Json;
+    const cleared = syncModelWindow(model, 1000000, null, clearedModels, {});
+    expect(cleared).toEqual({ changed: true, window: 1000000, source: "native" });
+    expect(model.contextWindow).toBe(1000000);
   });
 });
 
