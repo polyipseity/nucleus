@@ -2,17 +2,17 @@
 // model is selected, and serve /context-window for status plus set and clear
 // at four scopes. Model and provider windows are models.json entries that pi
 // applies itself, so this file reads them only to report and writes them only
-// on request. Precedence: session > model > provider > global > native. Each
-// `as` below narrows a value this file already checked with asObject or a
-// string guard.
+// on request. Precedence: session > explicit model window > global ceiling >
+// native, so an explicit window always wins over the ceiling. Each `as` below
+// narrows a value this file already checked with asObject or a string guard.
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { readFileSync, renameSync, writeFileSync } from "node:fs";
+import { readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 export type Scope = "session" | "model" | "provider" | "global";
-export type Source = "session" | "global" | "native";
+export type Source = "session" | "model" | "global" | "native";
 export type Json = Record<string, unknown>;
 
 export interface ActiveModel {
@@ -22,13 +22,18 @@ export interface ActiveModel {
 
 export type Command =
   | { kind: "status" }
-  | { kind: "set"; scope: Scope; value: number; provider?: string; model?: string }
-  | { kind: "clear"; scope: Scope; provider?: string; model?: string }
+  | { kind: "set"; scope: "session" | "global"; value: number }
+  | { kind: "clear"; scope: "session" | "global" }
+  | { kind: "set"; scope: "model"; value: number; provider: string; model: string }
+  | { kind: "clear"; scope: "model"; provider: string; model: string }
+  | { kind: "set"; scope: "provider"; value: number; provider: string }
+  | { kind: "clear"; scope: "provider"; provider: string }
   | { kind: "error"; message: string };
 
 export interface Layers {
   baseline: number;
   session: number | null;
+  explicit: number | null;
   cap: number | null;
 }
 
@@ -44,9 +49,19 @@ export interface StatusInput {
 
 // The extension API exposes no model catalog: modelRegistry lives on the
 // extension context that pi hands to handlers, so callers pass that.
-interface ModelCatalog {
+export interface ModelCatalog {
   getAll(): readonly { provider: string; id: string }[];
 }
+
+export interface FilePaths {
+  settings: string;
+  models: string;
+}
+
+export type ApplyOutcome =
+  | { kind: "none" }
+  | { kind: "written"; target: "settings" | "models"; message: string }
+  | { kind: "refused"; message: string };
 
 const SCOPES: readonly string[] = ["session", "model", "provider", "global"];
 const POSITIVE_INT = /^[1-9][0-9]*$/;
@@ -57,13 +72,14 @@ function asObject(value: unknown): Json | null {
   return value as Json;
 }
 
-function parsePositive(token: string): number | null {
-  if (!POSITIVE_INT.test(token)) return null;
+function parsePositive(token: string | undefined): number | null {
+  if (token === undefined || !POSITIVE_INT.test(token)) return null;
   const value = Number(token);
   return Number.isSafeInteger(value) ? value : null;
 }
 
-function parseTarget(token: string, active: ActiveModel): { provider: string; model: string } {
+function parseTarget(token: string | undefined, active: ActiveModel): { provider: string; model: string } {
+  if (token === undefined) return { provider: active.provider, model: active.id };
   const slash = token.indexOf("/");
   if (slash > 0 && slash < token.length - 1) {
     return { provider: token.slice(0, slash), model: token.slice(slash + 1) };
@@ -73,9 +89,9 @@ function parseTarget(token: string, active: ActiveModel): { provider: string; mo
 
 export function parseCommand(input: string, active: ActiveModel): Command {
   const tokens = input.trim().split(/\s+/).filter((token) => token.length > 0);
-  if (tokens.length === 0) return { kind: "status" };
+  const [head, ...rest] = tokens;
+  if (head === undefined) return { kind: "status" };
 
-  const head = tokens[0];
   if (!SCOPES.includes(head)) {
     const bare = parsePositive(head);
     if (bare !== null) return { kind: "set", scope: "session", value: bare };
@@ -84,7 +100,6 @@ export function parseCommand(input: string, active: ActiveModel): Command {
   }
 
   const scope = head as Scope;
-  const rest = tokens.slice(1);
 
   if (scope === "session" || scope === "global") {
     if (rest.length !== 1) return { kind: "error", message: `${scope} takes one value. ${GRAMMAR}` };
@@ -95,19 +110,27 @@ export function parseCommand(input: string, active: ActiveModel): Command {
   }
 
   if (scope === "provider") {
-    const value = rest.length > 0 ? parsePositive(rest[rest.length - 1]) : null;
-    const isClear = rest.length > 0 && rest[rest.length - 1] === "default";
-    if ((value === null && !isClear) || rest.length > 2) {
+    if (rest.length > 2) {
       return { kind: "error", message: `provider takes [<provider>] and a value or default. ${GRAMMAR}` };
     }
-    const provider = rest.length === 2 ? rest[0] : active.provider;
-    return isClear
-      ? { kind: "clear", scope, provider }
-      : { kind: "set", scope, value: value as number, provider };
+    const named = rest.length === 2 ? rest[0] : undefined;
+    const provider = named === undefined ? active.provider : named;
+    const last = rest.at(-1);
+    if (last === "default") return { kind: "clear", scope, provider };
+    const value = parsePositive(last);
+    if (value === null) {
+      return { kind: "error", message: `provider needs a positive integer or default. ${GRAMMAR}` };
+    }
+    return { kind: "set", scope, value, provider };
   }
 
+  // A bare number in the id slot is not a model id, so `model 900000 500000`
+  // is a malformed request rather than a model named after the number.
+  if (rest.length === 2 && parsePositive(rest[0]) !== null) {
+    return { kind: "error", message: `model takes a model id before the value. ${GRAMMAR}` };
+  }
   const target = rest.length === 2 ? parseTarget(rest[0], active) : { provider: active.provider, model: active.id };
-  const last = rest.length > 0 ? rest[rest.length - 1] : "";
+  const last = rest.at(-1);
   const value = parsePositive(last);
   if (value !== null && rest.length <= 2) return { kind: "set", scope, value, ...target };
   if (last === "default" && rest.length <= 2) return { kind: "clear", scope, ...target };
@@ -116,6 +139,7 @@ export function parseCommand(input: string, active: ActiveModel): Command {
 
 export function resolveWindow(layers: Layers): { window: number; source: Source } {
   if (layers.session !== null) return { window: layers.session, source: "session" };
+  if (layers.explicit !== null) return { window: layers.explicit, source: "model" };
   if (layers.cap !== null && layers.baseline > layers.cap) return { window: layers.cap, source: "global" };
   return { window: layers.baseline, source: "native" };
 }
@@ -195,6 +219,11 @@ function sortKeysDeep(value: unknown): unknown {
   return sorted;
 }
 
+// Byte-stable output: sorted keys, 2-space indent, exactly one trailing newline.
+export function serialize(value: unknown): string {
+  return `${JSON.stringify(sortKeysDeep(value), null, 2)}\n`;
+}
+
 function agentDir(): string {
   return join(homedir(), ".pi", "agent");
 }
@@ -207,11 +236,113 @@ function readJson(path: string): Json | null {
   }
 }
 
-function writeJson(path: string, value: Json): void {
-  const body = `${JSON.stringify(sortKeysDeep(value), null, 2)}\n`;
-  const temporary = join(dirname(path), `.${process.pid}.tmp`);
-  writeFileSync(temporary, body, "utf8");
-  renameSync(temporary, path);
+// A managed config file is a symlink into the repo, so the write has to land on
+// the resolved target: renaming over the symlink path would delete the link.
+function writableTarget(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    return path;
+  }
+}
+
+function describe(value: number | null): string {
+  return value === null ? "cleared" : `set to ${value}`;
+}
+
+function writeJson(
+  path: string,
+  value: Json,
+  target: "settings" | "models",
+  message: string,
+): ApplyOutcome {
+  const body = serialize(value);
+  const resolved = writableTarget(path);
+  const temporary = join(dirname(resolved), `.${basename(resolved)}.${process.pid}.tmp`);
+  try {
+    writeFileSync(temporary, body, "utf8");
+    renameSync(temporary, resolved);
+  } catch (cause) {
+    const failure = cause instanceof Error ? cause.message : String(cause);
+    try {
+      rmSync(temporary, { force: true });
+    } catch (cleanup) {
+      const leftover = cleanup instanceof Error ? cleanup.message : String(cleanup);
+      return {
+        kind: "refused",
+        message: `cannot write ${resolved}: ${failure}; could not remove ${temporary}: ${leftover}`,
+      };
+    }
+    return { kind: "refused", message: `cannot write ${resolved}: ${failure}` };
+  }
+  return { kind: "written", target, message };
+}
+
+function modelWindow(models: Json | null, provider: string, modelId: string): number | null {
+  const override = asObject(asObject(asObject(asObject(models?.providers)?.[provider])?.modelOverrides)?.[modelId]);
+  const value = override?.contextWindow;
+  return typeof value === "number" ? value : null;
+}
+
+// ids pi knows for a provider, plus the ids models.json lists or overrides, so
+// a provider-scope write or clear also reaches a model pi has since dropped.
+function providerModelIds(catalog: ModelCatalog, provider: string, models: Json | null): string[] {
+  const ids = new Set<string>();
+  for (const model of catalog.getAll()) {
+    if (model.provider === provider) ids.add(model.id);
+  }
+  const section = asObject(asObject(models?.providers)?.[provider]);
+  const listed = section?.models;
+  if (Array.isArray(listed)) {
+    for (const entry of listed) {
+      const id = asObject(entry)?.id;
+      if (typeof id === "string") ids.add(id);
+    }
+  }
+  const overrides = asObject(section?.modelOverrides);
+  if (overrides) {
+    for (const id of Object.keys(overrides)) ids.add(id);
+  }
+  return [...ids].sort();
+}
+
+export function applyToFiles(command: Command, paths: FilePaths, catalog: ModelCatalog): ApplyOutcome {
+  if (command.kind !== "set" && command.kind !== "clear") return { kind: "none" };
+  const value = command.kind === "set" ? command.value : null;
+
+  switch (command.scope) {
+    case "session":
+      return { kind: "none" };
+    case "global": {
+      const settings = readJson(paths.settings);
+      if (!settings) {
+        return { kind: "refused", message: `${basename(paths.settings)} is missing or unreadable, nothing written` };
+      }
+      setGlobalCap(settings, value);
+      return writeJson(paths.settings, settings, "settings", `global window ${describe(value)}`);
+    }
+    case "model":
+    case "provider":
+      break;
+  }
+
+  const models = readJson(paths.models);
+  if (!models) {
+    return { kind: "refused", message: `${basename(paths.models)} is missing or unreadable, nothing written` };
+  }
+  const provider = command.provider;
+  const ids = command.scope === "model" ? [command.model] : providerModelIds(catalog, provider, models);
+  if (ids.length === 0) {
+    return { kind: "refused", message: `no models found for provider ${provider}, nothing written` };
+  }
+  for (const id of ids) setModelWindow(models, provider, id, value);
+  const plural = ids.length === 1 ? "" : "s";
+  return writeJson(
+    paths.models,
+    models,
+    "models",
+    `${command.scope} window ${describe(value)} for ${ids.length} model${plural} in ${provider}; run /model to reload models.json`,
+  );
 }
 
 // Window a model carries on first sight, before any cap this file applied.
@@ -219,11 +350,20 @@ const nativeCache = new WeakMap<object, number>();
 let sessionOverride: number | null = null;
 
 export default function (pi: ExtensionAPI) {
-  const applyCap = (model: { id: string; contextWindow: number }): void => {
+  const settingsPath = join(agentDir(), "settings.json");
+  const modelsPath = join(agentDir(), "models.json");
+  const paths: FilePaths = { settings: settingsPath, models: modelsPath };
+
+  const applyCap = (model: { provider: string; id: string; contextWindow: number }): void => {
     const cached = nativeCache.get(model);
     const baseline = cached ?? model.contextWindow;
     if (cached === undefined) nativeCache.set(model, baseline);
-    const result = resolveWindow({ baseline, session: sessionOverride, cap: readCap(pi.getSettings()) });
+    const result = resolveWindow({
+      baseline,
+      session: sessionOverride,
+      explicit: modelWindow(readJson(modelsPath), model.provider, model.id),
+      cap: readCap(pi.getSettings()),
+    });
     if (model.contextWindow !== result.window) model.contextWindow = result.window;
   };
 
@@ -247,42 +387,15 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      const settingsPath = join(agentDir(), "settings.json");
-      const modelsPath = join(agentDir(), "models.json");
-
       if (command.kind === "set" || command.kind === "clear") {
-        const value = command.kind === "set" ? command.value : null;
-        if (command.scope === "session") {
-          sessionOverride = value;
-          applyCap(model);
-        } else if (command.scope === "global") {
-          const settings = readJson(settingsPath);
-          if (!settings) {
-            ctx.ui.notify("settings.json is missing or unreadable, nothing written", "error");
-            return;
-          }
-          setGlobalCap(settings, value);
-          writeJson(settingsPath, settings);
-          applyCap(model);
-        } else {
-          const models = readJson(modelsPath);
-          if (!models) {
-            ctx.ui.notify("models.json is missing or unreadable, nothing written", "error");
-            return;
-          }
-          const provider = command.provider as string;
-          const ids =
-            command.scope === "model"
-              ? [command.model as string]
-              : providerModelIds(ctx.modelRegistry, provider, models);
-          if (ids.length === 0) {
-            ctx.ui.notify(`no models found for provider ${provider}, nothing written`, "error");
-            return;
-          }
-          for (const id of ids) setModelWindow(models, provider, id, value);
-          writeJson(modelsPath, models);
-          ctx.ui.notify(`${command.scope} window ${value === null ? "cleared" : `set to ${value}`}; run /model or restart to load it`, "info");
+        const outcome = applyToFiles(command, paths, ctx.modelRegistry);
+        if (outcome.kind === "refused") {
+          ctx.ui.notify(outcome.message, "error");
+          return;
         }
+        if (outcome.kind === "written") ctx.ui.notify(outcome.message, "info");
+        if (command.scope === "session") sessionOverride = command.kind === "set" ? command.value : null;
+        applyCap(model);
       }
 
       const settings = readJson(settingsPath);
@@ -290,10 +403,15 @@ export default function (pi: ExtensionAPI) {
       const baseline = nativeCache.get(model) ?? model.contextWindow;
       const sessions = sessionOverride;
       const caps = readCap(settings);
-      const result = resolveWindow({ baseline, session: sessions, cap: caps });
+      const result = resolveWindow({
+        baseline,
+        session: sessions,
+        explicit: modelWindow(models, active.provider, active.id),
+        cap: caps,
+      });
       const providerStatus = providerWindow(ctx.modelRegistry, active.provider, models);
       const activeOverride = modelWindow(models, active.provider, active.id);
-      for (const line of formatStatus({
+      const lines = formatStatus({
         session: sessions,
         model: activeOverride,
         provider: providerStatus,
@@ -301,33 +419,10 @@ export default function (pi: ExtensionAPI) {
         baseline,
         effective: result.window,
         source: result.source,
-      })) {
-        ctx.ui.notify(line, "info");
-      }
+      });
+      ctx.ui.notify(lines.join("\n"), "info");
     },
   });
-}
-
-function providerModelIds(catalog: ModelCatalog, provider: string, models: Json | null): string[] {
-  const ids = new Set<string>();
-  for (const model of catalog.getAll()) {
-    if (model.provider === provider) ids.add(model.id);
-  }
-  const section = asObject(asObject(models?.providers)?.[provider]);
-  const listed = section?.models;
-  if (Array.isArray(listed)) {
-    for (const entry of listed) {
-      const id = asObject(entry)?.id;
-      if (typeof id === "string") ids.add(id);
-    }
-  }
-  return [...ids].sort();
-}
-
-function modelWindow(models: Json | null, provider: string, modelId: string): number | null {
-  const override = asObject(asObject(asObject(asObject(models?.providers)?.[provider])?.modelOverrides)?.[modelId]);
-  const value = override?.contextWindow;
-  return typeof value === "number" ? value : null;
 }
 
 function providerWindow(
@@ -338,9 +433,10 @@ function providerWindow(
   const ids = providerModelIds(catalog, provider, models);
   if (ids.length === 0) return null;
   const values = ids.map((id) => modelWindow(models, provider, id));
-  if (values.every((value) => value === null)) return null;
   const set = values.filter((value): value is number => value !== null);
-  return set.length === ids.length && set.every((value) => value === set[0])
-    ? { value: set[0], count: ids.length }
+  const [first] = set;
+  if (first === undefined) return null;
+  return set.length === ids.length && set.every((value) => value === first)
+    ? { value: first, count: ids.length }
     : "mixed";
 }

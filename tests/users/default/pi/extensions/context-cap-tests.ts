@@ -1,19 +1,43 @@
-// Pure-function cases for the context-window extension. File IO and the pi
-// API stay out of the tests; the extension keeps those in thin wrappers.
+// Cases for the context-window extension: pure parsing and precedence, the
+// deterministic serializer, and file round-trips against a temp directory so
+// the session command's writes are exercised without touching ~/.pi.
 
 import { describe, expect, test } from "bun:test";
+import { existsSync, lstatSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import {
+  applyToFiles,
   formatStatus,
   parseCommand,
   readCap,
   resolveWindow,
+  serialize,
   setGlobalCap,
   setModelWindow,
   type ActiveModel,
+  type FilePaths,
   type Json,
+  type ModelCatalog,
 } from "../../../../../src/users/default/pi/extensions/context-cap.ts";
 
 const active: ActiveModel = { provider: "opencode-go", id: "glm-5.1" };
+
+const catalog: ModelCatalog = {
+  getAll: () => [
+    { provider: "anthropic", id: "claude-sonnet-5" },
+    { provider: "opencode-go", id: "glm-5.1" },
+    { provider: "opencode-go", id: "mimo-v2.6-flash" },
+  ],
+};
+
+function tempPaths(seed: { settings?: string; models?: string } = {}): FilePaths {
+  const dir = mkdtempSync(join(tmpdir(), "context-cap-"));
+  const paths: FilePaths = { settings: join(dir, "settings.json"), models: join(dir, "models.json") };
+  if (seed.settings !== undefined) writeFileSync(paths.settings, seed.settings, "utf8");
+  if (seed.models !== undefined) writeFileSync(paths.models, seed.models, "utf8");
+  return paths;
+}
 
 describe("parseCommand", () => {
   test("empty input asks for status", () => {
@@ -67,29 +91,42 @@ describe("parseCommand", () => {
       expect(parseCommand(input, active).kind).toBe("error");
     }
   });
+
+  test("rejects a number in the model id slot", () => {
+    for (const input of ["model 900000 500000", "model 900000 default"]) {
+      expect(parseCommand(input, active).kind).toBe("error");
+    }
+  });
 });
 
 describe("resolveWindow", () => {
   test("session wins over everything", () => {
-    expect(resolveWindow({ baseline: 1000000, session: 300000, cap: 256000 })).toEqual({
+    expect(resolveWindow({ baseline: 1000000, session: 300000, explicit: 900000, cap: 256000 })).toEqual({
       window: 300000,
       source: "session",
     });
   });
 
+  test("an explicit model window wins over the ceiling", () => {
+    expect(resolveWindow({ baseline: 1000000, session: null, explicit: 900000, cap: 256000 })).toEqual({
+      window: 900000,
+      source: "model",
+    });
+  });
+
   test("the ceiling applies only when the baseline is bigger", () => {
-    expect(resolveWindow({ baseline: 1000000, session: null, cap: 256000 })).toEqual({
+    expect(resolveWindow({ baseline: 1000000, session: null, explicit: null, cap: 256000 })).toEqual({
       window: 256000,
       source: "global",
     });
-    expect(resolveWindow({ baseline: 100000, session: null, cap: 256000 })).toEqual({
+    expect(resolveWindow({ baseline: 100000, session: null, explicit: null, cap: 256000 })).toEqual({
       window: 100000,
       source: "native",
     });
   });
 
   test("no ceiling means the baseline", () => {
-    expect(resolveWindow({ baseline: 200000, session: null, cap: null })).toEqual({
+    expect(resolveWindow({ baseline: 200000, session: null, explicit: null, cap: null })).toEqual({
       window: 200000,
       source: "native",
     });
@@ -166,6 +203,14 @@ describe("setModelWindow", () => {
   });
 });
 
+describe("serialize", () => {
+  test("sorts keys, indents two spaces, and ends with one newline", () => {
+    expect(serialize({ zeta: 1, alpha: { beta: true }, list: [{ b: 2, a: 1 }] })).toBe(
+      '{\n  "alpha": {\n    "beta": true\n  },\n  "list": [\n    {\n      "a": 1,\n      "b": 2\n    }\n  ],\n  "zeta": 1\n}\n',
+    );
+  });
+});
+
 describe("formatStatus", () => {
   test("prints one line per scope and the effective window", () => {
     expect(
@@ -185,5 +230,139 @@ describe("formatStatus", () => {
       "global    256000",
       "effective 256000 (global) of 1000000 native",
     ]);
+  });
+});
+
+describe("applyToFiles", () => {
+  test("global set writes a sorted cap with one trailing newline", () => {
+    const paths = tempPaths({
+      settings: '{"compact":true,"$schema":"https://example.invalid/settings.json"}\n',
+    });
+    const outcome = applyToFiles(parseCommand("global 256000", active), paths, catalog);
+    expect(outcome.kind).toBe("written");
+    expect(readFileSync(paths.settings, "utf8")).toBe(
+      '{\n  "$schema": "https://example.invalid/settings.json",\n  "compact": true,\n  "contextWindowCap": 256000\n}\n',
+    );
+  });
+
+  test("global clear removes only the cap", () => {
+    const paths = tempPaths({
+      settings: '{"$schema":"https://example.invalid/settings.json","contextWindowCap":256000,"defaultProvider":"opencode-go"}\n',
+    });
+    expect(applyToFiles(parseCommand("global default", active), paths, catalog).kind).toBe("written");
+    expect(JSON.parse(readFileSync(paths.settings, "utf8"))).toEqual({
+      $schema: "https://example.invalid/settings.json",
+      defaultProvider: "opencode-go",
+    });
+  });
+
+  test("model set creates the provider section", () => {
+    const paths = tempPaths({ models: "{}\n" });
+    expect(
+      applyToFiles(parseCommand("model anthropic/claude-sonnet-5 500000", active), paths, catalog).kind,
+    ).toBe("written");
+    expect(JSON.parse(readFileSync(paths.models, "utf8"))).toEqual({
+      providers: { anthropic: { modelOverrides: { "claude-sonnet-5": { contextWindow: 500000 } } } },
+    });
+  });
+
+  test("provider set covers catalog ids, listed models, and existing overrides", () => {
+    const paths = tempPaths({
+      models: JSON.stringify({
+        providers: {
+          anthropic: {
+            apiKey: "env:ANTHROPIC_API_KEY",
+            models: [{ id: "claude-haiku-5" }],
+            modelOverrides: { "retired-model": { contextWindow: 1 } },
+          },
+          other: { modelOverrides: { x: { contextWindow: 1 } } },
+        },
+      }),
+    });
+    expect(applyToFiles(parseCommand("provider anthropic 200000", active), paths, catalog).kind).toBe("written");
+    expect(JSON.parse(readFileSync(paths.models, "utf8"))).toEqual({
+      providers: {
+        anthropic: {
+          apiKey: "env:ANTHROPIC_API_KEY",
+          models: [{ id: "claude-haiku-5" }],
+          modelOverrides: {
+            "claude-haiku-5": { contextWindow: 200000 },
+            "claude-sonnet-5": { contextWindow: 200000 },
+            "retired-model": { contextWindow: 200000 },
+          },
+        },
+        other: { modelOverrides: { x: { contextWindow: 1 } } },
+      },
+    });
+  });
+
+  test("clear removes only what it emptied", () => {
+    const paths = tempPaths({
+      models: JSON.stringify({
+        providers: {
+          anthropic: {
+            apiKey: "env:ANTHROPIC_API_KEY",
+            modelOverrides: {
+              "claude-sonnet-5": { contextWindow: 500000 },
+              "claude-opus-4": { contextWindow: 900000, maxTokens: 64000 },
+            },
+          },
+        },
+      }),
+    });
+    expect(applyToFiles(parseCommand("model anthropic/claude-sonnet-5 default", active), paths, catalog).kind).toBe(
+      "written",
+    );
+    expect(JSON.parse(readFileSync(paths.models, "utf8"))).toEqual({
+      providers: {
+        anthropic: {
+          apiKey: "env:ANTHROPIC_API_KEY",
+          modelOverrides: { "claude-opus-4": { contextWindow: 900000, maxTokens: 64000 } },
+        },
+      },
+    });
+  });
+
+  test("a missing file writes nothing", () => {
+    const paths = tempPaths();
+    for (const input of ["global 256000", "model 500000", "provider 200000"]) {
+      const outcome = applyToFiles(parseCommand(input, active), paths, catalog);
+      expect(outcome.kind).toBe("refused");
+      expect(existsSync(paths.settings)).toBe(false);
+      expect(existsSync(paths.models)).toBe(false);
+    }
+  });
+
+  test("an unparsable file is left untouched", () => {
+    const paths = tempPaths({ settings: "{not json", models: "{not json" });
+    for (const input of ["global 256000", "model 500000"]) {
+      expect(applyToFiles(parseCommand(input, active), paths, catalog).kind).toBe("refused");
+    }
+    expect(readFileSync(paths.settings, "utf8")).toBe("{not json");
+    expect(readFileSync(paths.models, "utf8")).toBe("{not json");
+  });
+
+  test("a provider with no known models writes nothing", () => {
+    const paths = tempPaths({ models: "{}\n" });
+    const outcome = applyToFiles(parseCommand("provider nobody 200000", active), paths, catalog);
+    expect(outcome.kind).toBe("refused");
+    expect(readFileSync(paths.models, "utf8")).toBe("{}\n");
+  });
+
+  test("a session command touches no file", () => {
+    const paths = tempPaths();
+    expect(applyToFiles(parseCommand("200000", active), paths, catalog)).toEqual({ kind: "none" });
+    expect(existsSync(paths.settings)).toBe(false);
+    expect(existsSync(paths.models)).toBe(false);
+  });
+
+  test("writing through a symlink keeps the link and updates the target", () => {
+    const paths = tempPaths();
+    const target = join(dirname(paths.settings), "settings.real.json");
+    writeFileSync(target, "{}\n", "utf8");
+    symlinkSync(target, paths.settings);
+    expect(applyToFiles(parseCommand("global 256000", active), paths, catalog).kind).toBe("written");
+    expect(lstatSync(paths.settings).isSymbolicLink()).toBe(true);
+    expect(readFileSync(target, "utf8")).toBe('{\n  "contextWindowCap": 256000\n}\n');
   });
 });
