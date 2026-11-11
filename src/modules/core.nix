@@ -319,7 +319,7 @@ let
     git-filter-repo = {
       category = "cli";
       nixpkgs = "git-filter-repo";
-      # WinGet carries no manifest; Windows installs it from the uv tool list.
+      # WHY: WinGet carries no manifest; Windows installs it from the uv tool list.
     };
     git-lfs = {
       category = "cli";
