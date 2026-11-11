@@ -252,6 +252,11 @@
         "why": "Rust CLI install vehicle; absent from WinGet; Scoop main bucket is the correct tier."
       },
       {
+        "bucket": "nucleus",
+        "name": "deep-filter",
+        "why": "DeepFilterNet speech enhancement CLI pinned to v0.5.6 via the nucleus Scoop bucket; absent from WinGet and public Scoop buckets."
+      },
+      {
         "name": "ghostscript",
         "why": "Ghostscript CLI parity with pkgs.ghostscript on POSIX; absent from WinGet, Scoop main is the correct tier."
       },

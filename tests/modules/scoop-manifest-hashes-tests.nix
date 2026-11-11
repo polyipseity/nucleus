@@ -154,6 +154,7 @@ let
   # above, so each manifest's hash-site count is pinned by name. A reshape is a
   # one-line edit here, and a mismatch names the manifest.
   expectedHashSites = {
+    "deep-filter.json" = 1;
     "glaxnimate.json" = 1;
     "inter.json" = 1;
     "rip2.json" = 2;

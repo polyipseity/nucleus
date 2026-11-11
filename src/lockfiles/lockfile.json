@@ -46,6 +46,7 @@
   },
   "scoop": {
     "cargo-binstall": "1.10.0",
+    "deep-filter": "0.5.6",
     "ghostscript": "10.08.0",
     "glaxnimate": "0.6.0",
     "gopass": "1.15.0",

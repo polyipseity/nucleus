@@ -283,6 +283,10 @@ let
   ) (builtins.filter (entry: entry.pinned != entry.manifestVersion) nucleusScoopPins);
   nucleusScoopVersionPinsMatch = nucleusScoopVersionMismatches == [ ];
 
+  deepFilterDesiredPresent = lib.any (
+    entry: entry.name == "deep-filter" && (entry.bucket or null) == "nucleus"
+  ) (entriesFor "scoop" "Windows");
+
   # Every DSC WinGet id must be in the generated allow-list.
   dscText = readRepo "src/hosts/Windows/system/packages.dsc.yml";
   dscLines = lib.splitString "\n" dscText;
@@ -378,6 +382,7 @@ let
     && wingetPinsResolve
     && nucleusScoopManifestsPresent
     && nucleusScoopVersionPinsMatch
+    && deepFilterDesiredPresent
     && posixInstallersFreeOfLists
     && passOtpResolved
     && stirlingRegistryPresent
@@ -411,6 +416,7 @@ in
   test_winget_lockfile_pins_resolve = assert' wingetPinsResolve "enabled WinGet ids missing a lockfile pin: ${builtins.concatStringsSep ", " wingetMissingPins}";
   test_nucleus_scoop_manifests_present = assert' nucleusScoopManifestsPresent "bucket 'nucleus' entries missing a src/modules/scoop-manifests manifest: ${builtins.concatStringsSep ", " missingNucleusScoopManifests}";
   test_nucleus_scoop_version_pins_match = assert' nucleusScoopVersionPinsMatch "nucleus Scoop lockfile pins must match their manifest versions: ${builtins.concatStringsSep ", " nucleusScoopVersionMismatches}";
+  test_deep_filter_scoop_desired = assert' deepFilterDesiredPresent "deep-filter must be a nucleus-bucket Scoop entry in desired.json scoop.Windows";
   test_no_hardcoded_posix_lists = assert' posixInstallersFreeOfLists "POSIX installers must not hardcode desired-package literals";
   test_pass_otp_resolved = assert' passOtpResolved "sharedPackages must contribute the pass-otp wrapper and not the plain pass attr";
   test_stirling_pdf_registry_present = assert' stirlingRegistryPresent "the stirling-pdf entry must exist in managedPackages";
