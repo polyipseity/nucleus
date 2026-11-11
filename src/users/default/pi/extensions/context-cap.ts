@@ -12,6 +12,7 @@ import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
 export type Scope = "session" | "model" | "provider" | "global";
+export type StatusScope = "all" | Scope;
 export type Source = "session" | "model" | "global" | "native";
 export type Json = Record<string, unknown>;
 
@@ -21,7 +22,9 @@ export interface ActiveModel {
 }
 
 export type Command =
-  | { kind: "status" }
+  | { kind: "status"; scope: "all" | "session" | "global" }
+  | { kind: "status"; scope: "model"; provider: string; model: string }
+  | { kind: "status"; scope: "provider"; provider: string }
   | { kind: "set"; scope: "session" | "global"; value: number }
   | { kind: "clear"; scope: "session" | "global" }
   | { kind: "set"; scope: "model"; value: number; provider: string; model: string }
@@ -37,14 +40,16 @@ export interface Layers {
   cap: number | null;
 }
 
-export interface StatusInput {
+export type ProviderStatus = { value: number; count: number } | "mixed" | null;
+
+export interface FullStatusInput {
   session: number | null;
   model: number | null;
-  provider: { value: number; count: number } | "mixed" | null;
+  provider: ProviderStatus;
   global: number | null;
-  baseline: number;
   effective: number;
   source: Source;
+  native: number;
 }
 
 // The extension API exposes no model catalog: modelRegistry lives on the
@@ -71,9 +76,11 @@ export interface WindowInput {
   settings: unknown;
 }
 
-const SCOPES: readonly string[] = ["session", "model", "provider", "global"];
+const SCOPES = new Set<Scope>(["session", "model", "provider", "global"]);
 const POSITIVE_INT = /^[1-9][0-9]*$/;
-const GRAMMAR = "usage: /context-window [<n> | default | session|model|provider|global ...]";
+const NEGATIVE_INT = /^-\d+$/;
+const GRAMMAR =
+  "usage: /context-window [all|session|model [M]|provider [P]|global | N [scope]|N model [M]|N provider [P]|N global | default|<negative> [same scope/target]]";
 
 function asObject(value: unknown): Json | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
@@ -86,7 +93,11 @@ function parsePositive(token: string | undefined): number | null {
   return Number.isSafeInteger(value) ? value : null;
 }
 
-function parseTarget(token: string | undefined, active: ActiveModel): { provider: string; model: string } {
+function isClearValue(token: string | undefined): boolean {
+  return token === "default" || (token !== undefined && NEGATIVE_INT.test(token));
+}
+
+function parseModelTarget(token: string | undefined, active: ActiveModel): { provider: string; model: string } {
   if (token === undefined) return { provider: active.provider, model: active.id };
   const slash = token.indexOf("/");
   if (slash > 0 && slash < token.length - 1) {
@@ -95,54 +106,79 @@ function parseTarget(token: string | undefined, active: ActiveModel): { provider
   return { provider: active.provider, model: token };
 }
 
+function isScope(token: string): token is Scope {
+  return SCOPES.has(token as Scope);
+}
+
 export function parseCommand(input: string, active: ActiveModel): Command {
   const tokens = input.trim().split(/\s+/).filter((token) => token.length > 0);
   const [head, ...rest] = tokens;
-  if (head === undefined) return { kind: "status" };
-
-  if (!SCOPES.includes(head)) {
-    const bare = parsePositive(head);
-    if (bare !== null) return { kind: "set", scope: "session", value: bare };
-    if (head === "default") return { kind: "clear", scope: "session" };
-    return { kind: "error", message: `unknown scope "${head}". ${GRAMMAR}` };
+  if (head === undefined || head === "all") {
+    if (rest.length !== 0) return { kind: "error", message: `all takes no arguments. ${GRAMMAR}` };
+    return { kind: "status", scope: "all" };
   }
 
-  const scope = head as Scope;
-
-  if (scope === "session" || scope === "global") {
-    if (rest.length !== 1) return { kind: "error", message: `${scope} takes one value. ${GRAMMAR}` };
-    const value = parsePositive(rest[0]);
-    if (value !== null) return { kind: "set", scope, value };
-    if (rest[0] === "default") return { kind: "clear", scope };
-    return { kind: "error", message: `${scope} needs a positive integer or default. ${GRAMMAR}` };
-  }
-
-  if (scope === "provider") {
-    if (rest.length > 2) {
-      return { kind: "error", message: `provider takes [<provider>] and a value or default. ${GRAMMAR}` };
+  const value = parsePositive(head);
+  if (value !== null) {
+    const scopeToken = rest[0];
+    if (scopeToken === undefined || scopeToken === "session") {
+      if (rest.length > 1) return { kind: "error", message: `session takes no target. ${GRAMMAR}` };
+      return { kind: "set", scope: "session", value };
     }
-    const named = rest.length === 2 ? rest[0] : undefined;
-    const provider = named === undefined ? active.provider : named;
-    const last = rest.at(-1);
-    if (last === "default") return { kind: "clear", scope, provider };
-    const value = parsePositive(last);
-    if (value === null) {
-      return { kind: "error", message: `provider needs a positive integer or default. ${GRAMMAR}` };
+    if (scopeToken === "global") {
+      if (rest.length !== 1) return { kind: "error", message: `global takes no target. ${GRAMMAR}` };
+      return { kind: "set", scope: "global", value };
     }
-    return { kind: "set", scope, value, provider };
+    if (scopeToken === "model") {
+      if (rest.length > 2) return { kind: "error", message: `model takes at most one target. ${GRAMMAR}` };
+      return { kind: "set", scope: "model", value, ...parseModelTarget(rest[1], active) };
+    }
+    if (scopeToken === "provider") {
+      if (rest.length > 2) return { kind: "error", message: `provider takes at most one target. ${GRAMMAR}` };
+      const provider = rest[1] ?? active.provider;
+      return { kind: "set", scope: "provider", value, provider };
+    }
+    return { kind: "error", message: `unknown scope "${scopeToken}". ${GRAMMAR}` };
   }
 
-  // A bare number in the id slot is not a model id, so `model 900000 500000`
-  // is a malformed request rather than a model named after the number.
-  if (rest.length === 2 && parsePositive(rest[0]) !== null) {
-    return { kind: "error", message: `model takes a model id before the value. ${GRAMMAR}` };
+  if (isClearValue(head)) {
+    const scopeToken = rest[0];
+    if (scopeToken === undefined || scopeToken === "session") {
+      if (rest.length > 1) return { kind: "error", message: `session takes no target. ${GRAMMAR}` };
+      return { kind: "clear", scope: "session" };
+    }
+    if (scopeToken === "global") {
+      if (rest.length !== 1) return { kind: "error", message: `global takes no target. ${GRAMMAR}` };
+      return { kind: "clear", scope: "global" };
+    }
+    if (scopeToken === "model") {
+      if (rest.length > 2) return { kind: "error", message: `model takes at most one target. ${GRAMMAR}` };
+      return { kind: "clear", scope: "model", ...parseModelTarget(rest[1], active) };
+    }
+    if (scopeToken === "provider") {
+      if (rest.length > 2) return { kind: "error", message: `provider takes at most one target. ${GRAMMAR}` };
+      const provider = rest[1] ?? active.provider;
+      return { kind: "clear", scope: "provider", provider };
+    }
+    return { kind: "error", message: `unknown scope "${scopeToken}". ${GRAMMAR}` };
   }
-  const target = rest.length === 2 ? parseTarget(rest[0], active) : { provider: active.provider, model: active.id };
-  const last = rest.at(-1);
-  const value = parsePositive(last);
-  if (value !== null && rest.length <= 2) return { kind: "set", scope, value, ...target };
-  if (last === "default" && rest.length <= 2) return { kind: "clear", scope, ...target };
-  return { kind: "error", message: `model takes [<id> | <provider>/<id>] and a value or default. ${GRAMMAR}` };
+
+  if (!isScope(head)) {
+    return { kind: "error", message: `unknown command "${head}". ${GRAMMAR}` };
+  }
+
+  if (head === "session" || head === "global") {
+    if (rest.length !== 0) return { kind: "error", message: `${head} query takes no arguments. ${GRAMMAR}` };
+    return { kind: "status", scope: head };
+  }
+
+  if (head === "provider") {
+    if (rest.length > 1) return { kind: "error", message: `provider query takes at most one target. ${GRAMMAR}` };
+    return { kind: "status", scope: "provider", provider: rest[0] ?? active.provider };
+  }
+
+  if (rest.length > 1) return { kind: "error", message: `model query takes at most one target. ${GRAMMAR}` };
+  return { kind: "status", scope: "model", ...parseModelTarget(rest[0], active) };
 }
 
 export function resolveWindow(layers: Layers): { window: number; source: Source } {
@@ -201,21 +237,29 @@ export function setModelWindow(models: Json, provider: string, modelId: string, 
   overrides[modelId] = entry;
 }
 
-export function formatStatus(input: StatusInput): string[] {
-  const text = (value: number | null): string => (value === null ? "unset" : String(value));
-  const provider =
-    input.provider === null
-      ? "unset"
-      : input.provider === "mixed"
-        ? "mixed"
-        : `${input.provider.value} (${input.provider.count} models)`;
+function formatValue(value: number | null): string {
+  return value === null ? "unset" : String(value);
+}
+
+function formatProviderStatus(provider: ProviderStatus): string {
+  if (provider === null) return "unset";
+  if (provider === "mixed") return "mixed";
+  return `${provider.value} (${provider.count} models)`;
+}
+
+export function formatFullStatus(input: FullStatusInput): string[] {
   return [
-    `session   ${text(input.session)}`,
-    `model     ${text(input.model)}`,
-    `provider  ${provider}`,
-    `global    ${text(input.global)}`,
-    `effective ${input.effective} (${input.source}) of ${input.baseline} native`,
+    `session ${formatValue(input.session)}`,
+    `model ${formatValue(input.model)}`,
+    `provider ${formatProviderStatus(input.provider)}`,
+    `global ${formatValue(input.global)}`,
+    `effective ${input.effective} (${input.source}) of ${input.native} native`,
   ];
+}
+
+export function formatScopeStatus(scope: Exclude<StatusScope, "all">, value: number | ProviderStatus | null): string {
+  if (scope === "provider") return `provider ${formatProviderStatus(value as ProviderStatus)}`;
+  return `${scope} ${formatValue(value as number | null)}`;
 }
 
 function sortKeysDeep(value: unknown): unknown {
@@ -297,7 +341,7 @@ function writeJson(
   return written;
 }
 
-function modelWindow(models: Json | null, provider: string, modelId: string): number | null {
+export function modelWindow(models: Json | null, provider: string, modelId: string): number | null {
   const override = asObject(asObject(asObject(asObject(models?.providers)?.[provider])?.modelOverrides)?.[modelId]);
   const value = override?.contextWindow;
   return typeof value === "number" ? value : null;
@@ -359,6 +403,22 @@ function providerModelIds(catalog: ModelCatalog, provider: string, models: Json 
     for (const id of Object.keys(overrides)) ids.add(id);
   }
   return [...ids].sort();
+}
+
+export function providerWindow(
+  catalog: ModelCatalog,
+  provider: string,
+  models: Json | null,
+): ProviderStatus {
+  const ids = providerModelIds(catalog, provider, models);
+  if (ids.length === 0) return null;
+  const values = ids.map((id) => modelWindow(models, provider, id));
+  const set = values.filter((value): value is number => value !== null);
+  const [first] = set;
+  if (first === undefined) return null;
+  return set.length === ids.length && set.every((value) => value === first)
+    ? { value: first, count: ids.length }
+    : "mixed";
 }
 
 export function applyToFiles(command: Command, paths: FilePaths, catalog: ModelCatalog): ApplyOutcome {
@@ -469,42 +529,46 @@ export default function (pi: ExtensionAPI) {
       const settings = readJson(settingsPath);
       const models = readJson(modelsPath);
       const baseline = nativeCache.get(model) ?? model.contextWindow;
-      const sessions = sessionOverride;
-      const caps = readCap(settings);
       const result = resolveWindow({
         baseline,
-        session: sessions,
+        session: sessionOverride,
         explicit: modelWindow(models, active.provider, active.id),
-        cap: caps,
+        cap: readCap(settings),
       });
-      const providerStatus = providerWindow(ctx.modelRegistry, active.provider, models);
-      const activeOverride = modelWindow(models, active.provider, active.id);
-      const lines = formatStatus({
-        session: sessions,
-        model: activeOverride,
-        provider: providerStatus,
-        global: caps,
-        baseline,
+
+      if (command.kind === "status" && command.scope !== "all") {
+        if (command.scope === "session") {
+          ctx.ui.notify(formatScopeStatus("session", sessionOverride), "info");
+          return;
+        }
+        if (command.scope === "global") {
+          ctx.ui.notify(formatScopeStatus("global", readCap(settings)), "info");
+          return;
+        }
+        if (command.scope === "model") {
+          ctx.ui.notify(
+            formatScopeStatus("model", modelWindow(models, command.provider, command.model)),
+            "info",
+          );
+          return;
+        }
+        ctx.ui.notify(
+          formatScopeStatus("provider", providerWindow(ctx.modelRegistry, command.provider, models)),
+          "info",
+        );
+        return;
+      }
+
+      const lines = formatFullStatus({
+        session: sessionOverride,
+        model: modelWindow(models, active.provider, active.id),
+        provider: providerWindow(ctx.modelRegistry, active.provider, models),
+        global: readCap(settings),
         effective: result.window,
         source: result.source,
+        native: baseline,
       });
       ctx.ui.notify(lines.join("\n"), "info");
     },
   });
-}
-
-function providerWindow(
-  catalog: ModelCatalog,
-  provider: string,
-  models: Json | null,
-): { value: number; count: number } | "mixed" | null {
-  const ids = providerModelIds(catalog, provider, models);
-  if (ids.length === 0) return null;
-  const values = ids.map((id) => modelWindow(models, provider, id));
-  const set = values.filter((value): value is number => value !== null);
-  const [first] = set;
-  if (first === undefined) return null;
-  return set.length === ids.length && set.every((value) => value === first)
-    ? { value: first, count: ids.length }
-    : "mixed";
 }

@@ -9,9 +9,11 @@ import { dirname, join } from "node:path";
 import {
   applyToFiles,
   effectiveWindow,
-  formatStatus,
+  formatFullStatus,
+  formatScopeStatus,
   noteWrittenCap,
   parseCommand,
+  providerWindow,
   readCap,
   resetWrittenCap,
   resolveWindow,
@@ -43,45 +45,69 @@ function tempPaths(seed: { settings?: string; models?: string } = {}): FilePaths
 }
 
 describe("parseCommand", () => {
-  test("empty input asks for status", () => {
-    expect(parseCommand("", active)).toEqual({ kind: "status" });
+  test("bare and all query the full status block", () => {
+    expect(parseCommand("", active)).toEqual({ kind: "status", scope: "all" });
+    expect(parseCommand("all", active)).toEqual({ kind: "status", scope: "all" });
   });
 
-  test("a bare number sets the session window", () => {
-    expect(parseCommand("200000", active)).toEqual({ kind: "set", scope: "session", value: 200000 });
-  });
-
-  test("default clears the session window", () => {
-    expect(parseCommand("default", active)).toEqual({ kind: "clear", scope: "session" });
-  });
-
-  test("global takes a value or default", () => {
-    expect(parseCommand("global 256000", active)).toEqual({ kind: "set", scope: "global", value: 256000 });
-    expect(parseCommand("global default", active)).toEqual({ kind: "clear", scope: "global" });
-  });
-
-  test("model defaults to the active model", () => {
-    expect(parseCommand("model 900000", active)).toEqual({
-      kind: "set",
+  test("single-scope queries use the active target when omitted", () => {
+    expect(parseCommand("session", active)).toEqual({ kind: "status", scope: "session" });
+    expect(parseCommand("global", active)).toEqual({ kind: "status", scope: "global" });
+    expect(parseCommand("model", active)).toEqual({
+      kind: "status",
       scope: "model",
-      value: 900000,
       provider: "opencode-go",
       model: "glm-5.1",
     });
+    expect(parseCommand("provider", active)).toEqual({
+      kind: "status",
+      scope: "provider",
+      provider: "opencode-go",
+    });
   });
 
-  test("model accepts provider/id", () => {
-    expect(parseCommand("model anthropic/claude-sonnet-5 500000", active)).toEqual({
+  test("model and provider queries accept an explicit target", () => {
+    expect(parseCommand("model anthropic/claude-sonnet-5", active)).toEqual({
+      kind: "status",
+      scope: "model",
+      provider: "anthropic",
+      model: "claude-sonnet-5",
+    });
+    expect(parseCommand("provider opencode-go", active)).toEqual({
+      kind: "status",
+      scope: "provider",
+      provider: "opencode-go",
+    });
+  });
+
+  test("set uses scope-after-value with session as the default scope", () => {
+    expect(parseCommand("200000", active)).toEqual({ kind: "set", scope: "session", value: 200000 });
+    expect(parseCommand("200000 session", active)).toEqual({ kind: "set", scope: "session", value: 200000 });
+    expect(parseCommand("256000 global", active)).toEqual({ kind: "set", scope: "global", value: 256000 });
+  });
+
+  test("model and provider set accept an explicit target", () => {
+    expect(parseCommand("500000 model", active)).toEqual({
+      kind: "set",
+      scope: "model",
+      value: 500000,
+      provider: "opencode-go",
+      model: "glm-5.1",
+    });
+    expect(parseCommand("500000 model anthropic/claude-sonnet-5", active)).toEqual({
       kind: "set",
       scope: "model",
       value: 500000,
       provider: "anthropic",
       model: "claude-sonnet-5",
     });
-  });
-
-  test("provider defaults to the active provider", () => {
-    expect(parseCommand("provider 200000", active)).toEqual({
+    expect(parseCommand("200000 provider", active)).toEqual({
+      kind: "set",
+      scope: "provider",
+      value: 200000,
+      provider: "opencode-go",
+    });
+    expect(parseCommand("200000 provider opencode-go", active)).toEqual({
       kind: "set",
       scope: "provider",
       value: 200000,
@@ -89,14 +115,51 @@ describe("parseCommand", () => {
     });
   });
 
-  test("rejects zero, negatives, and junk", () => {
-    for (const input of ["0", "-5", "session 0", "nonsense", "model abc"]) {
-      expect(parseCommand(input, active).kind).toBe("error");
-    }
+  test("clear uses default or any negative value with the same scope and target forms", () => {
+    expect(parseCommand("default", active)).toEqual({ kind: "clear", scope: "session" });
+    expect(parseCommand("-1", active)).toEqual({ kind: "clear", scope: "session" });
+    expect(parseCommand("default session", active)).toEqual({ kind: "clear", scope: "session" });
+    expect(parseCommand("-1 global", active)).toEqual({ kind: "clear", scope: "global" });
+    expect(parseCommand("default model", active)).toEqual({
+      kind: "clear",
+      scope: "model",
+      provider: "opencode-go",
+      model: "glm-5.1",
+    });
+    expect(parseCommand("-5 model anthropic/claude-sonnet-5", active)).toEqual({
+      kind: "clear",
+      scope: "model",
+      provider: "anthropic",
+      model: "claude-sonnet-5",
+    });
+    expect(parseCommand("default provider opencode-go", active)).toEqual({
+      kind: "clear",
+      scope: "provider",
+      provider: "opencode-go",
+    });
+    expect(parseCommand("-2 provider", active)).toEqual({
+      kind: "clear",
+      scope: "provider",
+      provider: "opencode-go",
+    });
   });
 
-  test("rejects a number in the model id slot", () => {
-    for (const input of ["model 900000 500000", "model 900000 default"]) {
+  test("rejects malformed forms and the old scope-first set grammar", () => {
+    for (const input of [
+      "0",
+      "session 0",
+      "global 256000",
+      "global default",
+      "nonsense",
+      "effective",
+      "all extra",
+      "session extra",
+      "model 900000 500000",
+      "provider 200000 300000",
+      "200000 extra",
+      "default extra",
+      "-1 extra",
+    ]) {
       expect(parseCommand(input, active).kind).toBe("error");
     }
   });
@@ -214,6 +277,71 @@ describe("serialize", () => {
   });
 });
 
+describe("providerWindow", () => {
+  test("reports a uniform provider override and count", () => {
+    const models: Json = {
+      providers: {
+        "opencode-go": {
+          modelOverrides: {
+            "glm-5.1": { contextWindow: 200000 },
+            "mimo-v2.6-flash": { contextWindow: 200000 },
+          },
+        },
+      },
+    };
+    expect(providerWindow(catalog, "opencode-go", models)).toEqual({ value: 200000, count: 2 });
+  });
+
+  test("reports mixed when provider models differ or are partly unset", () => {
+    const models: Json = {
+      providers: {
+        "opencode-go": {
+          modelOverrides: {
+            "glm-5.1": { contextWindow: 200000 },
+          },
+        },
+      },
+    };
+    expect(providerWindow(catalog, "opencode-go", models)).toBe("mixed");
+  });
+
+  test("reports null when no provider override is set", () => {
+    expect(providerWindow(catalog, "opencode-go", {})).toBeNull();
+  });
+});
+
+describe("formatFullStatus", () => {
+  test("prints the full status block in owner order", () => {
+    expect(
+      formatFullStatus({
+        session: null,
+        model: 500000,
+        provider: "mixed",
+        global: 256000,
+        effective: 256000,
+        source: "global",
+        native: 1000000,
+      }),
+    ).toEqual([
+      "session unset",
+      "model 500000",
+      "provider mixed",
+      "global 256000",
+      "effective 256000 (global) of 1000000 native",
+    ]);
+  });
+});
+
+describe("formatScopeStatus", () => {
+  test("prints one labeled line for a single-scope query", () => {
+    expect(formatScopeStatus("session", null)).toBe("session unset");
+    expect(formatScopeStatus("global", 256000)).toBe("global 256000");
+    expect(formatScopeStatus("model", 500000)).toBe("model 500000");
+    expect(formatScopeStatus("provider", { value: 200000, count: 3 })).toBe("provider 200000 (3 models)");
+    expect(formatScopeStatus("provider", "mixed")).toBe("provider mixed");
+  });
+});
+
 describe("effectiveWindow and the written-cap mirror", () => {
   const staleSettings = { contextWindowCap: 256000 };
   const base = { baseline: 1000000, session: null, models: null as Json | null };
@@ -234,25 +362,22 @@ describe("effectiveWindow and the written-cap mirror", () => {
   test("the written cap survives a later selection while pi still reports the old one", () => {
     resetWrittenCap();
     const paths = tempPaths({ settings: '{"contextWindowCap":256000}\n' });
-    noteWrittenCap(applyToFiles(parseCommand("global 100000", active), paths, catalog));
+    noteWrittenCap(applyToFiles(parseCommand("100000 global", active), paths, catalog));
     expect(effectiveWindow(active, { ...base, settings: staleSettings })).toEqual({
       window: 100000,
       source: "global",
     });
-    // A second resolution stands in for the next model switch, where pi's cache
-    // still reports its construction-time cap.
     expect(effectiveWindow(active, { ...base, settings: { contextWindowCap: 999 } }).window).toBe(100000);
   });
 
   test("clearing keeps the cap gone, and a reload restores pi's value", () => {
     resetWrittenCap();
     const paths = tempPaths({ settings: '{"contextWindowCap":256000}\n' });
-    noteWrittenCap(applyToFiles(parseCommand("global default", active), paths, catalog));
+    noteWrittenCap(applyToFiles(parseCommand("default global", active), paths, catalog));
     expect(effectiveWindow(active, { ...base, settings: staleSettings })).toEqual({
       window: 1000000,
       source: "native",
     });
-    // A session_start for reason "reload" drops the mirror, so pi reports again.
     resetWrittenCap();
     expect(effectiveWindow(active, { ...base, settings: staleSettings })).toEqual({
       window: 256000,
@@ -263,7 +388,7 @@ describe("effectiveWindow and the written-cap mirror", () => {
   test("a models.json write leaves the cap mirror alone", () => {
     resetWrittenCap();
     const paths = tempPaths({ models: "{}\n" });
-    noteWrittenCap(applyToFiles(parseCommand("model 500000", active), paths, catalog));
+    noteWrittenCap(applyToFiles(parseCommand("500000 model", active), paths, catalog));
     expect(effectiveWindow(active, { ...base, settings: staleSettings })).toEqual({
       window: 256000,
       source: "global",
@@ -278,34 +403,12 @@ describe("effectiveWindow and the written-cap mirror", () => {
   });
 });
 
-describe("formatStatus", () => {
-  test("prints one line per scope and the effective window", () => {
-    expect(
-      formatStatus({
-        session: null,
-        model: 500000,
-        provider: "mixed",
-        global: 256000,
-        baseline: 1000000,
-        effective: 256000,
-        source: "global",
-      }),
-    ).toEqual([
-      "session   unset",
-      "model     500000",
-      "provider  mixed",
-      "global    256000",
-      "effective 256000 (global) of 1000000 native",
-    ]);
-  });
-});
-
 describe("applyToFiles", () => {
   test("global set writes a sorted cap with one trailing newline", () => {
     const paths = tempPaths({
       settings: '{"compact":true,"$schema":"https://example.invalid/settings.json"}\n',
     });
-    const outcome = applyToFiles(parseCommand("global 256000", active), paths, catalog);
+    const outcome = applyToFiles(parseCommand("256000 global", active), paths, catalog);
     expect(outcome.kind).toBe("written");
     expect(readFileSync(paths.settings, "utf8")).toBe(
       '{\n  "$schema": "https://example.invalid/settings.json",\n  "compact": true,\n  "contextWindowCap": 256000\n}\n',
@@ -316,17 +419,17 @@ describe("applyToFiles", () => {
     const paths = tempPaths({
       settings: '{"$schema":"https://example.invalid/settings.json","contextWindowCap":256000,"defaultProvider":"opencode-go"}\n',
     });
-    expect(applyToFiles(parseCommand("global default", active), paths, catalog).kind).toBe("written");
+    expect(applyToFiles(parseCommand("default global", active), paths, catalog).kind).toBe("written");
     expect(JSON.parse(readFileSync(paths.settings, "utf8"))).toEqual({
       $schema: "https://example.invalid/settings.json",
       defaultProvider: "opencode-go",
     });
   });
 
-  test("model set creates the provider section", () => {
+  test("model set creates the provider section for the explicit target", () => {
     const paths = tempPaths({ models: "{}\n" });
     expect(
-      applyToFiles(parseCommand("model anthropic/claude-sonnet-5 500000", active), paths, catalog).kind,
+      applyToFiles(parseCommand("500000 model anthropic/claude-sonnet-5", active), paths, catalog).kind,
     ).toBe("written");
     expect(JSON.parse(readFileSync(paths.models, "utf8"))).toEqual({
       providers: { anthropic: { modelOverrides: { "claude-sonnet-5": { contextWindow: 500000 } } } },
@@ -346,7 +449,7 @@ describe("applyToFiles", () => {
         },
       }),
     });
-    expect(applyToFiles(parseCommand("provider anthropic 200000", active), paths, catalog).kind).toBe("written");
+    expect(applyToFiles(parseCommand("200000 provider anthropic", active), paths, catalog).kind).toBe("written");
     expect(JSON.parse(readFileSync(paths.models, "utf8"))).toEqual({
       providers: {
         anthropic: {
@@ -377,7 +480,7 @@ describe("applyToFiles", () => {
         },
       }),
     });
-    expect(applyToFiles(parseCommand("model anthropic/claude-sonnet-5 default", active), paths, catalog).kind).toBe(
+    expect(applyToFiles(parseCommand("default model anthropic/claude-sonnet-5", active), paths, catalog).kind).toBe(
       "written",
     );
     expect(JSON.parse(readFileSync(paths.models, "utf8"))).toEqual({
@@ -392,7 +495,7 @@ describe("applyToFiles", () => {
 
   test("a missing file writes nothing", () => {
     const paths = tempPaths();
-    for (const input of ["global 256000", "model 500000", "provider 200000"]) {
+    for (const input of ["256000 global", "500000 model", "200000 provider"]) {
       const outcome = applyToFiles(parseCommand(input, active), paths, catalog);
       expect(outcome.kind).toBe("refused");
       expect(existsSync(paths.settings)).toBe(false);
@@ -402,7 +505,7 @@ describe("applyToFiles", () => {
 
   test("an unparsable file is left untouched", () => {
     const paths = tempPaths({ settings: "{not json", models: "{not json" });
-    for (const input of ["global 256000", "model 500000"]) {
+    for (const input of ["256000 global", "500000 model"]) {
       expect(applyToFiles(parseCommand(input, active), paths, catalog).kind).toBe("refused");
     }
     expect(readFileSync(paths.settings, "utf8")).toBe("{not json");
@@ -411,7 +514,7 @@ describe("applyToFiles", () => {
 
   test("a provider with no known models writes nothing", () => {
     const paths = tempPaths({ models: "{}\n" });
-    const outcome = applyToFiles(parseCommand("provider nobody 200000", active), paths, catalog);
+    const outcome = applyToFiles(parseCommand("200000 provider nobody", active), paths, catalog);
     expect(outcome.kind).toBe("refused");
     expect(readFileSync(paths.models, "utf8")).toBe("{}\n");
   });
@@ -428,7 +531,7 @@ describe("applyToFiles", () => {
     const target = join(dirname(paths.settings), "settings.real.json");
     writeFileSync(target, "{}\n", "utf8");
     symlinkSync(target, paths.settings);
-    expect(applyToFiles(parseCommand("global 256000", active), paths, catalog).kind).toBe("written");
+    expect(applyToFiles(parseCommand("256000 global", active), paths, catalog).kind).toBe("written");
     expect(lstatSync(paths.settings).isSymbolicLink()).toBe(true);
     expect(readFileSync(target, "utf8")).toBe('{\n  "contextWindowCap": 256000\n}\n');
   });
@@ -438,7 +541,7 @@ describe("applyToFiles", () => {
     const sibling = join(dirname(paths.settings), "settings.sibling.json");
     linkSync(paths.settings, sibling);
     expect(statSync(paths.settings).nlink).toBe(2);
-    expect(applyToFiles(parseCommand("global 256000", active), paths, catalog).kind).toBe("written");
+    expect(applyToFiles(parseCommand("256000 global", active), paths, catalog).kind).toBe("written");
     expect(readFileSync(sibling, "utf8")).toBe('{\n  "contextWindowCap": 256000\n}\n');
     expect(lstatSync(paths.settings).nlink).toBe(2);
     expect(statSync(paths.settings).ino).toBe(statSync(sibling).ino);
