@@ -337,6 +337,10 @@
         "why": "Tray Rich Presence app for Discord; pinned to a VCS rev via the uv section of lockfile.json."
       },
       {
+        "name": "git-filter-repo",
+        "why": "History rewriting CLI. WinGet has no manifest, and uv is the Windows install path (nixpkgs on POSIX)."
+      },
+      {
         "name": "hermes-agent",
         "pin": "flake:hermes-agent",
         "why": "NousResearch AI agent framework.  Provisioned from the flake.lock rev so the installed framework matches the Nix-provisioned version on POSIX hosts; the PyPI project has no release matching that rev."

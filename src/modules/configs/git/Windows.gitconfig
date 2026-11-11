@@ -1,9 +1,9 @@
 # Managed global (system) Git config for Windows (see
 # .agents/instructions/git-scope-terminology.instructions.md). Symlinked as
 # <Git install>\etc\gitconfig by Sync-GitAndSshConfig.ps1; the installer-owned
-# original is backed up to etc\gitconfig.bak. Only the Git for Windows
-# installer shipped defaults (credential.helper, http.sslBackend, core.fscache)
-# are folded in here so replacing the installer-owned file does not change
+# original is backed up to etc\gitconfig.bak. The Git for Windows installer
+# shipped defaults (credential.helper, http.sslBackend, core.fscache) are
+# folded in here so replacing the installer-owned file does not change
 # behavior; signing, newline and symlink defaults are user-scoped in
 # src/users/default/git/Windows.gitconfig.
 [core]
@@ -12,3 +12,12 @@
     helper = manager
 [http]
     sslBackend = schannel
+
+# Machine-wide LFS filters, the same four keys `git lfs install --system`
+# writes (git-lfs lfs/attribute.go, filterAttribute). Hooks stay per-repo:
+# git lfs install adds them only when run inside a repository.
+[filter "lfs"]
+    clean = git-lfs clean -- %f
+    smudge = git-lfs smudge -- %f
+    process = git-lfs filter-process
+    required = true

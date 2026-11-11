@@ -165,6 +165,14 @@ properties:
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
+      id: GitLfsInstall
+      directives:
+        description: Ensure Git LFS is installed so cloned LFS repositories materialize their large files on Windows as they do on macOS and NixOS
+      settings:
+        id: GitHub.GitLFS
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
       directives:
         description: Ensure standalone GnuPG is installed (lightweight, no GUI)
       settings:

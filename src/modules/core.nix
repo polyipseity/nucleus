@@ -316,6 +316,16 @@ let
       nixpkgs = "gitFull";
       winget = "Git.Git";
     };
+    git-filter-repo = {
+      category = "cli";
+      nixpkgs = "git-filter-repo";
+      # WinGet carries no manifest; Windows installs it from the uv tool list.
+    };
+    git-lfs = {
+      category = "cli";
+      nixpkgs = "git-lfs";
+      winget = "GitHub.GitLFS";
+    };
     glaxnimate = {
       # WHY: three hosts, three carriers, none of them shared. nixpkgs carries
       # 0.6.0 for Linux only and no cask or WinGet package exists, so macOS

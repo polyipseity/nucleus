@@ -255,6 +255,7 @@
       "rev": "bba71027a684db53f3fcde5adbd3d42627241a83",
       "source": "https://github.com/polyipseity/ext.discord-music-rpc"
     },
+    "git-filter-repo": "2.47.0",
     "litellm": "1.100.1",
     "paddleocr": "3.6.0",
     "yamllint": "1.35.1"
@@ -302,6 +303,7 @@
     "EclipseAdoptium.Temurin.25.JDK": "25.0.5.8",
     "GIMP.GIMP": "3.2.6",
     "Git.Git": "2.56.0.4",
+    "GitHub.GitLFS": "3.8.0",
     "GitHub.cli": "2.103.3",
     "GnuPG.GnuPG": "2.5.24",
     "Google.Chrome": "157.0.8103.39",
