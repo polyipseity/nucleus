@@ -60,8 +60,16 @@ export interface FilePaths {
 
 export type ApplyOutcome =
   | { kind: "none" }
-  | { kind: "written"; target: "settings" | "models"; message: string }
+  | { kind: "written"; target: "settings"; message: string; cap: number | null }
+  | { kind: "written"; target: "models"; message: string }
   | { kind: "refused"; message: string };
+
+export interface WindowInput {
+  baseline: number;
+  session: number | null;
+  models: Json | null;
+  settings: unknown;
+}
 
 const SCOPES: readonly string[] = ["session", "model", "provider", "global"];
 const POSITIVE_INT = /^[1-9][0-9]*$/;
@@ -253,8 +261,7 @@ function describe(value: number | null): string {
 function writeJson(
   path: string,
   value: Json,
-  target: "settings" | "models",
-  message: string,
+  written: Extract<ApplyOutcome, { kind: "written" }>,
 ): ApplyOutcome {
   const body = serialize(value);
   const resolved = writableTarget(path);
@@ -275,13 +282,49 @@ function writeJson(
     }
     return { kind: "refused", message: `cannot write ${resolved}: ${failure}` };
   }
-  return { kind: "written", target, message };
+  return written;
 }
 
 function modelWindow(models: Json | null, provider: string, modelId: string): number | null {
   const override = asObject(asObject(asObject(asObject(models?.providers)?.[provider])?.modelOverrides)?.[modelId]);
   const value = override?.contextWindow;
   return typeof value === "number" ? value : null;
+}
+
+// Effective window for one model, with the cap from the write mirror when a
+// global write happened, and from `settings` otherwise.
+export function effectiveWindow(model: ActiveModel, input: WindowInput): { window: number; source: Source } {
+  return resolveWindow({
+    baseline: input.baseline,
+    session: input.session,
+    explicit: modelWindow(input.models, model.provider, model.id),
+    cap: resolveCap(input.settings),
+  });
+}
+
+// Cap a write just produced, for the re-apply that follows it.
+export function writtenCap(outcome: ApplyOutcome): number | null | undefined {
+  return outcome.kind === "written" && outcome.target === "settings" ? outcome.cap : undefined;
+}
+
+// Cap the last global write produced, or undefined when none happened. pi builds
+// its merged settings once and getSettings() returns a clone of that cache
+// (settings-manager.js:305-307), so a later model switch would otherwise re-read
+// the pre-write cap. A session_start for reason "reload" drops the mirror, since
+// pi re-read the file then.
+let capFromWrite: number | null | undefined;
+
+export function noteWrittenCap(outcome: ApplyOutcome): void {
+  const cap = writtenCap(outcome);
+  if (cap !== undefined) capFromWrite = cap;
+}
+
+export function resetWrittenCap(): void {
+  capFromWrite = undefined;
+}
+
+function resolveCap(settings: unknown): number | null {
+  return capFromWrite === undefined ? readCap(settings) : capFromWrite;
 }
 
 // ids pi knows for a provider, plus the ids models.json lists or overrides, so
@@ -319,7 +362,12 @@ export function applyToFiles(command: Command, paths: FilePaths, catalog: ModelC
         return { kind: "refused", message: `${basename(paths.settings)} is missing or unreadable, nothing written` };
       }
       setGlobalCap(settings, value);
-      return writeJson(paths.settings, settings, "settings", `global window ${describe(value)}`);
+      return writeJson(paths.settings, settings, {
+        kind: "written",
+        target: "settings",
+        message: `global window ${describe(value)}`,
+        cap: value,
+      });
     }
     case "model":
     case "provider":
@@ -337,12 +385,11 @@ export function applyToFiles(command: Command, paths: FilePaths, catalog: ModelC
   }
   for (const id of ids) setModelWindow(models, provider, id, value);
   const plural = ids.length === 1 ? "" : "s";
-  return writeJson(
-    paths.models,
-    models,
-    "models",
-    `${command.scope} window ${describe(value)} for ${ids.length} model${plural} in ${provider}; run /model to reload models.json`,
-  );
+  return writeJson(paths.models, models, {
+    kind: "written",
+    target: "models",
+    message: `${command.scope} window ${describe(value)} for ${ids.length} model${plural} in ${provider}; run /model to reload models.json`,
+  });
 }
 
 // Window a model carries on first sight, before any cap this file applied.
@@ -358,17 +405,20 @@ export default function (pi: ExtensionAPI) {
     const cached = nativeCache.get(model);
     const baseline = cached ?? model.contextWindow;
     if (cached === undefined) nativeCache.set(model, baseline);
-    const result = resolveWindow({
+    const result = effectiveWindow(model, {
       baseline,
       session: sessionOverride,
-      explicit: modelWindow(readJson(modelsPath), model.provider, model.id),
-      cap: readCap(pi.getSettings()),
+      models: readJson(modelsPath),
+      settings: pi.getSettings(),
     });
     if (model.contextWindow !== result.window) model.contextWindow = result.window;
   };
 
   pi.on("model_select", ({ model }) => applyCap(model));
-  pi.on("session_start", (_event, ctx) => {
+  pi.on("session_start", (event, ctx) => {
+    // A reload is the one point where pi re-reads settings.json, so its cache is
+    // authoritative again and the mirror would only hold a stale copy.
+    if (event.reason === "reload") resetWrittenCap();
     if (ctx.model) applyCap(ctx.model);
   });
 
@@ -395,6 +445,12 @@ export default function (pi: ExtensionAPI) {
         }
         if (outcome.kind === "written") ctx.ui.notify(outcome.message, "info");
         if (command.scope === "session") sessionOverride = command.kind === "set" ? command.value : null;
+        // WHY: mirror the cap this command wrote instead of re-reading it. pi caches
+        // its merged settings when SettingsManager is built and getSettings() returns
+        // structuredClone of that cache (settings-manager.js:305-307), so the file
+        // write only reaches pi.getSettings() when pi reloads; without the mirror the
+        // next model switch would apply the pre-write cap.
+        noteWrittenCap(outcome);
         applyCap(model);
       }
 

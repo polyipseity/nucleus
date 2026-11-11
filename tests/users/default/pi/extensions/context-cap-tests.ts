@@ -2,15 +2,18 @@
 // deterministic serializer, and file round-trips against a temp directory so
 // the session command's writes are exercised without touching ~/.pi.
 
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, lstatSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import {
   applyToFiles,
+  effectiveWindow,
   formatStatus,
+  noteWrittenCap,
   parseCommand,
   readCap,
+  resetWrittenCap,
   resolveWindow,
   serialize,
   setGlobalCap,
@@ -208,6 +211,70 @@ describe("serialize", () => {
     expect(serialize({ zeta: 1, alpha: { beta: true }, list: [{ b: 2, a: 1 }] })).toBe(
       '{\n  "alpha": {\n    "beta": true\n  },\n  "list": [\n    {\n      "a": 1,\n      "b": 2\n    }\n  ],\n  "zeta": 1\n}\n',
     );
+  });
+});
+
+describe("effectiveWindow and the written-cap mirror", () => {
+  const staleSettings = { contextWindowCap: 256000 };
+  const base = { baseline: 1000000, session: null, models: null as Json | null };
+  const models: Json = {
+    providers: { "opencode-go": { modelOverrides: { "glm-5.1": { contextWindow: 900000 } } } },
+  };
+
+  afterEach(() => resetWrittenCap());
+
+  test("pi is authoritative before any write", () => {
+    resetWrittenCap();
+    expect(effectiveWindow(active, { ...base, settings: staleSettings })).toEqual({
+      window: 256000,
+      source: "global",
+    });
+  });
+
+  test("the written cap survives a later selection while pi still reports the old one", () => {
+    resetWrittenCap();
+    const paths = tempPaths({ settings: '{"contextWindowCap":256000}\n' });
+    noteWrittenCap(applyToFiles(parseCommand("global 100000", active), paths, catalog));
+    expect(effectiveWindow(active, { ...base, settings: staleSettings })).toEqual({
+      window: 100000,
+      source: "global",
+    });
+    // A second resolution stands in for the next model switch, where pi's cache
+    // still reports its construction-time cap.
+    expect(effectiveWindow(active, { ...base, settings: { contextWindowCap: 999 } }).window).toBe(100000);
+  });
+
+  test("clearing keeps the cap gone, and a reload restores pi's value", () => {
+    resetWrittenCap();
+    const paths = tempPaths({ settings: '{"contextWindowCap":256000}\n' });
+    noteWrittenCap(applyToFiles(parseCommand("global default", active), paths, catalog));
+    expect(effectiveWindow(active, { ...base, settings: staleSettings })).toEqual({
+      window: 1000000,
+      source: "native",
+    });
+    // A session_start for reason "reload" drops the mirror, so pi reports again.
+    resetWrittenCap();
+    expect(effectiveWindow(active, { ...base, settings: staleSettings })).toEqual({
+      window: 256000,
+      source: "global",
+    });
+  });
+
+  test("a models.json write leaves the cap mirror alone", () => {
+    resetWrittenCap();
+    const paths = tempPaths({ models: "{}\n" });
+    noteWrittenCap(applyToFiles(parseCommand("model 500000", active), paths, catalog));
+    expect(effectiveWindow(active, { ...base, settings: staleSettings })).toEqual({
+      window: 256000,
+      source: "global",
+    });
+  });
+
+  test("the models.json override wins over the cap", () => {
+    expect(effectiveWindow(active, { baseline: 1000000, session: null, models, settings: staleSettings })).toEqual({
+      window: 900000,
+      source: "model",
+    });
   });
 });
 
