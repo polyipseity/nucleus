@@ -3,7 +3,7 @@
 // the session command's writes are exercised without touching ~/.pi.
 
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, lstatSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, linkSync, mkdtempSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import {
@@ -431,5 +431,16 @@ describe("applyToFiles", () => {
     expect(applyToFiles(parseCommand("global 256000", active), paths, catalog).kind).toBe("written");
     expect(lstatSync(paths.settings).isSymbolicLink()).toBe(true);
     expect(readFileSync(target, "utf8")).toBe('{\n  "contextWindowCap": 256000\n}\n');
+  });
+
+  test("writing through a hardlink keeps both names on one inode", () => {
+    const paths = tempPaths({ settings: "{}\n" });
+    const sibling = join(dirname(paths.settings), "settings.sibling.json");
+    linkSync(paths.settings, sibling);
+    expect(statSync(paths.settings).nlink).toBe(2);
+    expect(applyToFiles(parseCommand("global 256000", active), paths, catalog).kind).toBe("written");
+    expect(readFileSync(sibling, "utf8")).toBe('{\n  "contextWindowCap": 256000\n}\n');
+    expect(lstatSync(paths.settings).nlink).toBe(2);
+    expect(statSync(paths.settings).ino).toBe(statSync(sibling).ino);
   });
 });

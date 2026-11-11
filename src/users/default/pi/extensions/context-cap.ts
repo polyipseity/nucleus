@@ -7,7 +7,7 @@
 // narrows a value this file already checked with asObject or a string guard.
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
@@ -244,8 +244,10 @@ function readJson(path: string): Json | null {
   }
 }
 
-// A managed config file is a symlink into the repo, so the write has to land on
-// the resolved target: renaming over the symlink path would delete the link.
+// A managed config file can be reached through a symlink or share its inode with
+// a hardlink, and a plain rename breaks either one: it deletes the symlink, and it
+// leaves a hardlink sibling on the old inode. Resolve the symlink first, then let
+// the write choose a mechanism from the resolved file's link count.
 function writableTarget(path: string): string {
   try {
     return realpathSync(path);
@@ -266,9 +268,18 @@ function writeJson(
   const body = serialize(value);
   const resolved = writableTarget(path);
   const temporary = join(dirname(resolved), `.${basename(resolved)}.${process.pid}.tmp`);
+  // throwIfNoEntry: a file that vanished between the read and the write has no
+  // links to preserve, so it is written as a new one.
+  const links = statSync(resolved, { throwIfNoEntry: false })?.nlink ?? 1;
   try {
-    writeFileSync(temporary, body, "utf8");
-    renameSync(temporary, resolved);
+    if (links > 1) {
+      // WHY: replacing the name would leave every other hardlink on the old inode,
+      // so a multiply linked file is written through its inode and is not atomic.
+      writeFileSync(resolved, body, "utf8");
+    } else {
+      writeFileSync(temporary, body, "utf8");
+      renameSync(temporary, resolved);
+    }
   } catch (cause) {
     const failure = cause instanceof Error ? cause.message : String(cause);
     try {
