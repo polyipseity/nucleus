@@ -268,10 +268,11 @@ function writeJson(
   const body = serialize(value);
   const resolved = writableTarget(path);
   const temporary = join(dirname(resolved), `.${basename(resolved)}.${process.pid}.tmp`);
-  // throwIfNoEntry: a file that vanished between the read and the write has no
-  // links to preserve, so it is written as a new one.
-  const links = statSync(resolved, { throwIfNoEntry: false })?.nlink ?? 1;
   try {
+    // WHY: the link count is read inside the try so a stat failure (EACCES, ELOOP,
+    // EIO) returns the refused outcome like every other filesystem error here;
+    // throwIfNoEntry keeps a vanished file on the rename path, which creates it.
+    const links = statSync(resolved, { throwIfNoEntry: false })?.nlink ?? 1;
     if (links > 1) {
       // WHY: replacing the name would leave every other hardlink on the old inode,
       // so a multiply linked file is written through its inode and is not atomic.
