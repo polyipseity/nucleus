@@ -2,6 +2,10 @@
 
 Steps `nucleus-apply` cannot do. Everything else is already converged.
 
+## system
+
+1. pi reports its sandbox state through the `sandbox` status indicator: `SANDBOX: srt` inside the srt sandbox and `SANDBOX: NONE (unsandboxed)` outside it. Run `/sandbox-status` for the evidence, mode, resolved `rm`, `shell-safe-rm`/`rip` presence, and the `safe-delete` filter's `unproven` setting. The unsandboxed warning is emitted once per process.
+
 ## apps
 
 1. OBS virtual camera: start the virtual camera from OBS and it appears as a DirectShow device in other apps. `obs-virtualcam` ships inside the `OBSProject.OBSStudio` install, so there is nothing to install separately.

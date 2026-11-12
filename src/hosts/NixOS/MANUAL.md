@@ -17,6 +17,10 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 6. The ALSA default routes into the loopback, so audio is silent while `camilladsp` is stopped: start `camilladsp`, or point the app at a `hw:` card. The loopback takes one client at a time and does not mix. The same node serves capture, so a recorder that opens `default` reads the loopback instead: give `arecord` the card (`arecord -D hw:CARD=<card>`) and `whisper-stream` a capture id that is not the default (`whisper-stream --capture <id>`); `arecord -l` lists the cards.
 7. Do not set a config's playback device to `default` or to the loopback card: both resolve back into the card the config captures from, so its own output returns as input. The shipped configs leave playback `null` on purpose, which is what lets the heartbeat choose the card.
 
+## system
+
+1. pi reports its sandbox state through the `sandbox` status indicator: `SANDBOX: srt` inside the srt sandbox and `SANDBOX: NONE (unsandboxed)` outside it. Run `/sandbox-status` for the evidence, mode, resolved `rm`, `shell-safe-rm`/`rip` presence, and the `safe-delete` filter's `unproven` setting. The unsandboxed warning is emitted once per process.
+
 ## secrets and remotes
 
 1. Generate `rclone_config_pass`: `openssl rand -hex 64` into `rclone_config_pass` in `src/secrets/users/<username>.yml`, commit, re-run `nucleus-apply`. Delete `~/.config/rclone/rclone.conf` first when unencrypted remotes exist.
