@@ -793,14 +793,21 @@ describe("syncRoutedWindow", () => {
 
 // applyCap is a closure inside the extension factory, so the re-selection cases
 // register the real extension with a fake pi and drive the handlers it registered.
-// The fake supplies the two calls applyCap makes; the extension still reads
-// ~/.pi/agent/models.json itself, read-only.
+// The fake supplies the two calls applyCap makes, the registry catalog the
+// command handler reports through, and the settings getSettings returns; the
+// extension still reads ~/.pi/agent/models.json itself, read-only.
 type HandlerContext = {
   model?: RuntimeModel;
   ui: CapUi;
 } & RoutedSource;
 type ModelSelectHandler = (event: { model: RuntimeModel }, ctx: HandlerContext) => Promise<void> | void;
 type SessionStartHandler = (event: { reason: string }, ctx: HandlerContext) => Promise<void> | void;
+type SessionShutdownHandler = () => Promise<void> | void;
+// The command handler also builds its status block from the registry catalog.
+type CommandContext = Omit<HandlerContext, "modelRegistry"> & {
+  modelRegistry: RoutedSource["modelRegistry"] & ModelCatalog;
+};
+type CommandHandler = (args: string, ctx: CommandContext) => Promise<void> | void;
 
 const silentUi: CapUi = { setStatus: () => {}, notify: () => {} };
 
@@ -812,26 +819,36 @@ const unrouted = {
   getContextUsage: () => undefined,
 };
 
-function loadContextCap(
-  settings: unknown,
-  setModel: ModelSelector["setModel"],
-): { model_select: ModelSelectHandler; session_start: SessionStartHandler } {
-  const handlers: { model_select?: ModelSelectHandler; session_start?: SessionStartHandler } = {};
+type RegisteredHandlers = {
+  model_select: ModelSelectHandler;
+  session_start: SessionStartHandler;
+  session_shutdown: SessionShutdownHandler;
+  command: CommandHandler;
+};
+
+function loadContextCap(settings: unknown, setModel: ModelSelector["setModel"]): RegisteredHandlers {
+  const handlers: Partial<RegisteredHandlers> = {};
   const fakePi = {
     on: (name: string, handler: unknown) => {
       if (name === "model_select") handlers.model_select = handler as ModelSelectHandler;
       if (name === "session_start") handlers.session_start = handler as SessionStartHandler;
+      if (name === "session_shutdown") handlers.session_shutdown = handler as SessionShutdownHandler;
       return () => {};
     },
-    registerCommand: () => {},
+    registerCommand: (name: string, options: { handler: CommandHandler }) => {
+      if (name === "context-window") handlers.command = options.handler;
+    },
     getSettings: () => settings,
     setModel,
   };
   contextCap(fakePi as unknown as Parameters<typeof contextCap>[0]);
-  const { model_select: onModelSelect, session_start: onSessionStart } = handlers;
+  const { model_select: onModelSelect, session_start: onSessionStart, session_shutdown: onSessionShutdown, command } =
+    handlers;
   // A missing handler would make every case below pass vacuously.
-  if (!onModelSelect || !onSessionStart) throw new Error("context-cap registered no handlers");
-  return { model_select: onModelSelect, session_start: onSessionStart };
+  if (!onModelSelect || !onSessionStart || !onSessionShutdown || !command) {
+    throw new Error("context-cap registered no handlers");
+  }
+  return { model_select: onModelSelect, session_start: onSessionStart, session_shutdown: onSessionShutdown, command };
 }
 
 describe("refreshActiveModel", () => {
@@ -974,5 +991,127 @@ describe("re-selecting the model", () => {
     expect(attempts).toBe(2);
     expect(model.contextWindow).toBe(100000);
     expect(notifications).toHaveLength(1);
+  });
+
+  test("a re-selection whose setModel re-emits model_select does not re-enter applyCap", async () => {
+    const selected: RuntimeModel[] = [];
+    const physical: RuntimeModel = { provider: "context-cap-test", id: "re-emit-physical", contextWindow: 1000000 };
+    // applyCap reads the routed source once per run, so the count is what shows
+    // whether the re-emitted handler re-entered it. The setModel count alone
+    // cannot: a second applyCap reads the window the first one already applied,
+    // so it returns before re-selecting whether or not the guard is there.
+    let applyCapRuns = 0;
+    const routed: HandlerContext = {
+      ui: silentUi,
+      sessionManager: {
+        getEntries: () => {
+          applyCapRuns += 1;
+          return [
+            { type: "message", message: { role: "assistant", provider: physical.provider, model: physical.id } },
+          ];
+        },
+      },
+      modelRegistry: { find: () => physical },
+      getContextUsage: () => ({ contextWindow: physical.contextWindow }),
+    };
+    const handlers = loadContextCap({ contextWindowCap: 256000 }, async (model) => {
+      selected.push(model);
+      // A pi that does not suppress the re-selection's own model_select, so the
+      // refreshing guard in the handler is what keeps applyCap from re-entering.
+      await handlers.model_select({ model }, routed);
+      return true;
+    });
+    await handlers.session_start({ reason: "start" }, { ui: silentUi, ...unrouted });
+    const model: RuntimeModel = { provider: "pi-route", id: "re-emit", contextWindow: 1000000 };
+
+    await handlers.model_select({ model }, routed);
+
+    expect(selected).toHaveLength(1);
+    expect(selected[0]!.contextWindow).toBe(256000);
+    expect(applyCapRuns).toBe(1);
+  });
+});
+
+// A routed selection displays the registry's physical model, which applyCap writes
+// before it re-selects. These cases cap at session scope through the command
+// handler so no case writes ~/.pi/agent/settings.json, and the session clear in the
+// last case is then the one layer it can take away.
+describe("routed selections through applyCap", () => {
+  afterEach(() => {
+    restoreRoutedWindows();
+    resetWrittenCap();
+  });
+
+  // A session-capped routed selection: the virtual model is selected while the
+  // assistant entry and the usage report both name the physical one. The session
+  // override lives in the extension module, so each case sets it here.
+  async function routedSessionCap() {
+    const physical: RuntimeModel = { provider: "context-cap-test", id: "routed-physical", contextWindow: 1000000 };
+    const virtual: RuntimeModel = { provider: "pi-route", id: "routed-virtual", contextWindow: 1000000 };
+    const selected: RuntimeModel[] = [];
+    // What the fake setModel saw at the moment it ran.
+    const atSelect: Array<{ physicalWindow: number; cloneWindow: number }> = [];
+    const handlers = loadContextCap({}, async (clone) => {
+      selected.push(clone);
+      atSelect.push({ physicalWindow: physical.contextWindow, cloneWindow: clone.contextWindow });
+      return true;
+    });
+    const routed: HandlerContext = {
+      ui: silentUi,
+      sessionManager: {
+        getEntries: () => [
+          { type: "message", message: { role: "assistant", provider: physical.provider, model: physical.id } },
+        ],
+      },
+      modelRegistry: {
+        find: (provider, modelId) => (provider === physical.provider && modelId === physical.id ? physical : undefined),
+      },
+      getContextUsage: () => ({ contextWindow: physical.contextWindow }),
+    };
+    await handlers.session_start({ reason: "start" }, { ui: silentUi, ...unrouted });
+    // The scratch model already sits at the cap, so this command sets the session
+    // override without re-selecting anything and atSelect stays the routed case's.
+    const scratch: RuntimeModel = { provider: "context-cap-test", id: "scratch", contextWindow: 256000 };
+    await handlers.command("256000 session", {
+      ui: silentUi,
+      model: scratch,
+      ...unrouted,
+      modelRegistry: { find: () => undefined, getAll: () => [] },
+    });
+    await handlers.model_select({ model: virtual }, routed);
+    return { handlers, physical, selected, atSelect, routed };
+  }
+
+  test("a routed selection applies the effective window to the physical model before re-selecting", async () => {
+    const { physical, selected, atSelect } = await routedSessionCap();
+
+    expect(atSelect).toEqual([{ physicalWindow: 256000, cloneWindow: 256000 }]);
+    expect(physical.contextWindow).toBe(256000);
+    expect(selected).toHaveLength(1);
+    expect(selected[0]!.contextWindow).toBe(256000);
+  });
+
+  test("session shutdown restores the routed physical window", async () => {
+    const { handlers, physical } = await routedSessionCap();
+    expect(physical.contextWindow).toBe(256000);
+
+    await handlers.session_shutdown();
+
+    expect(physical.contextWindow).toBe(1000000);
+  });
+
+  test("a session-scope clear through the command handler restores the routed physical window", async () => {
+    const { handlers, physical, selected, routed } = await routedSessionCap();
+    expect(physical.contextWindow).toBe(256000);
+
+    // pi holds the re-selected clone, and that clone is the model the command
+    // handler reports as active.
+    await handlers.command("default", {
+      ...routed,
+      model: selected[selected.length - 1]!,
+      modelRegistry: { find: routed.modelRegistry.find, getAll: () => [] },
+    });
+
+    expect(physical.contextWindow).toBe(1000000);
   });
 });
