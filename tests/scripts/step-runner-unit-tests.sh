@@ -810,9 +810,62 @@ test_run_all_steps_fail_fast_reports_failed_step() {
   fi
 }
 
+# The step FIFO is an internal detail, but a runner that leaves it outside its own
+# wave directory depends on the host's deletion transport: a transport that cannot
+# move a FIFO returns non-zero, and `set -e` then kills the step before it records
+# its exit status, so every step reports as failed while its own body prints a pass.
+# The shim reproduces that transport deterministically instead of observing the
+# host's own rm, which behaves differently inside and outside the srt sandbox.
+test_run_step_survives_fifo_hostile_rm() {
+  local _out _exit=0 _shim_dir _real_rm
+  _shim_dir="$(mktemp -d)"
+  _real_rm="$(command -v rm)"
+  cat >"$_shim_dir/rm" <<EOF
+#!/usr/bin/env bash
+for _shim_arg in "\$@"; do
+  if [ -p "\$_shim_arg" ]; then
+    printf 'shim rm: cannot move FIFO %s\\n' "\$_shim_arg" >&2
+    exit 1
+  fi
+done
+exec "$_real_rm" "\$@"
+EOF
+  chmod +x "$_shim_dir/rm"
+  # WHY a separate process with its own set -e: a command substitution that is
+  # the left operand of `||` runs with errexit suppressed, and that suppression
+  # reaches the background step subshells too. Reaching the runner from this
+  # file directly, as the other dispatch tests do, cannot reproduce the failure.
+  cat >"$_shim_dir/driver.sh" <<'EOF'
+set -euo pipefail
+REPO_ROOT="$1"
+. "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+step_ok() {
+  echo "body-ok"
+  return 0
+}
+register_step "one" 1 "One" step_ok
+register_step "two" 2 "Two" step_ok
+run_all_steps
+# WHY read here: the wave directory is removed by the EXIT trap when this script
+# exits, so the exit files are read before that trap fires.
+printf 'exits=%s,%s\n' "$(cat "$_wave_tmpdir/step-1.exit")" "$(cat "$_wave_tmpdir/step-2.exit")"
+aggregate_results
+EOF
+  _out=$(PATH="$_shim_dir:$PATH" PARALLEL_JOBS=1 bash "$_shim_dir/driver.sh" "$REPO_ROOT" 2>&1) || _exit=$?
+  rm -rf "$_shim_dir"
+  if [ "$_exit" -eq 0 ] &&
+    [[ "$_out" == *"exits=0,0"* ]] &&
+    [[ "$_out" == *"all checks passed."* ]]; then
+    assert_pass "a step records its exit status even when the deletion transport cannot move a FIFO"
+  else
+    assert_fail "run_step fifo-hostile rm" "exit=$_exit output=[$_out]"
+  fi
+}
+
 echo "--- Dispatch ---"
 test_run_all_steps_reports_not_applicable_and_passes
 test_run_all_steps_fail_fast_reports_failed_step
+test_run_step_survives_fifo_hostile_rm
 
 echo "--- Argument parsing and shared helpers ---"
 test_parse_args_help

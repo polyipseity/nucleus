@@ -257,7 +257,12 @@ _run_step() {
     done
   fi
 
-  _fifo=$(mktemp -u "${TMPDIR:-/tmp}/nucleus-step-${_n}-XXXXXX")
+  # WHY inside the wave directory: a step FIFO created outside it has to be
+  # removed on its own, and a deletion transport that cannot move a FIFO returns
+  # non-zero, which under `set -e` killed the step before it recorded its exit
+  # status. _wave_cleanup removes the wave directory wholesale, and removing a
+  # directory works on every transport.
+  _fifo="$_wave_tmpdir/step-$_n.fifo"
   mkfifo "$_fifo"
   (
     if "$_func" "STEP_CTX" "$@"; then
@@ -278,7 +283,6 @@ _run_step() {
 
   _exit_code=0
   wait "$_func_pid" || _exit_code=$?
-  rm -f "$_fifo"
 
   printf '%s' "$_exit_code" >"$_wave_tmpdir/step-$_n.exit"
   _elapsed_ms=$(($(_step_now_ms) - _step_start_ms))
