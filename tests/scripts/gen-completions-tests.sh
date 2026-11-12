@@ -32,12 +32,24 @@ _COMPLETIONS_DIR="src/modules/completions/zsh"
 _ps_gen_script="src/scripts/completions/gen-completions.ps1"
 _profile_ps1="src/scripts/shell/profile.ps1"
 
-# The canonical nucleus-* command set (alphabetical), must match the generator.
-# Subcommands are covered by their parent completion files, not as standalone
-# commands: check packer/sh/pwsh, gc cleanup-nix/logs/preferences, apply
-# health-check/audit-store, cloud setup/reset/sync/status/restart, update
-# lockfile.
-_NUCLEUS_COMMANDS=(ai apply bootstrap camilladsp-heartbeat check cloud config gc logs utils svc test update vm)
+# The canonical nucleus-* command set, derived from the flake packages output
+# so a new mkNucleusApps entry becomes a required completion without a second list.
+require_command nix "gen-completions: nix eval is required to derive the nucleus command list from the flake"
+_sys_t="$(nix config show system)"
+_NUCLEUS_COMMANDS=()
+while IFS= read -r _cmd_t; do
+  [ -n "$_cmd_t" ] || continue
+  case "$_cmd_t" in
+  nucleus-*) _NUCLEUS_COMMANDS+=("${_cmd_t#nucleus-}") ;;
+  esac
+done < <(
+  nix eval --raw "$REPO_ROOT/src#packages.$_sys_t" --apply 'ps: let names = builtins.attrNames ps; nucleus = builtins.filter (n: builtins.substring 0 8 n == "nucleus-") names; in builtins.concatStringsSep "\n" (builtins.sort builtins.lessThan nucleus)' 2>/dev/null
+  printf '\n'
+)
+if [ "${#_NUCLEUS_COMMANDS[@]}" -eq 0 ]; then
+  echo "gen-completions: could not derive nucleus command list from the flake" >&2
+  exit 1
+fi
 
 # Marker for the no-touch assertion (case 14): plain mktemp, outside the tracked
 # tree, timestamped before anything in the suite can generate. The one-second
@@ -268,9 +280,8 @@ fi
 #     list that decides which $nucleus<Cmd>Flags inventories exist, so a command
 #     missing here loses its flag completion silently.
 _ps_commands="$(pwsh -NoLogo -NoProfile -NonInteractive -File "$_ps_gen_script" -ListCommands | tr -d '\r' | LC_ALL=C sort)"
-# WHY: Windows has no nucleus-camilladsp-heartbeat app (the heartbeat there runs as a
-# scheduled task over src/scripts/services/camilladsp-heartbeat.ps1), so the PowerShell
-# twin's canonical set is the zsh set minus that daemon entry point.
+# The PowerShell twin derives the Windows command list from the flake via
+# gen-completions.ps1 -ListCommands (excluding POSIX-only daemon entry points).
 _expected_commands="$(printf '%s\n' "${_NUCLEUS_COMMANDS[@]}" | grep -vx -- 'camilladsp-heartbeat' | LC_ALL=C sort)"
 if [ "$_ps_commands" = "$_expected_commands" ]; then
   assert_pass "gen-completions.ps1: command list matches the canonical set"
@@ -566,5 +577,47 @@ SUBCOMMAND_SOURCES
 if [ "$_subcommand_ok" -eq 1 ]; then
   assert_pass "gen-completions: six hand-coded subcommand lists match their zsh and PowerShell sources"
 fi
+
+# 16. A temporary 15th mkNucleusApps-derived command must make freshness fail
+#     naming the missing completion, so new registry entries cannot ship without
+#     generated zsh coverage.
+_extra_repo="$(mktemp -d)"
+mkdir -p "$_extra_repo/src/modules/completions" "$_extra_repo/scripts" "$_extra_repo/src/scripts/services"
+cp -R "$REPO_ROOT/src/modules/completions/zsh" "$_extra_repo/src/modules/completions/zsh"
+for _cmd in "${_NUCLEUS_COMMANDS[@]}"; do
+  case "$_cmd" in
+  camilladsp-heartbeat)
+    cat >"$_extra_repo/src/scripts/services/camilladsp-heartbeat.sh" <<EOF
+#!/usr/bin/env bash
+case "\${1:-}" in --help) echo "usage: nucleus-${_cmd}";; esac
+EOF
+    chmod +x "$_extra_repo/src/scripts/services/camilladsp-heartbeat.sh"
+    ;;
+  *)
+    cat >"$_extra_repo/scripts/${_cmd}.sh" <<EOF
+#!/usr/bin/env bash
+case "\${1:-}" in --help) echo "usage: nucleus-${_cmd}";; esac
+EOF
+    chmod +x "$_extra_repo/scripts/${_cmd}.sh"
+    ;;
+  esac
+done
+cat >"$_extra_repo/scripts/zzz-extra-command.sh" <<'EOF'
+#!/usr/bin/env bash
+case "${1:-}" in --help) echo "usage: nucleus-zzz-extra-command";; esac
+EOF
+chmod +x "$_extra_repo/scripts/zzz-extra-command.sh"
+_extra_list=""
+for _cmd in "${_NUCLEUS_COMMANDS[@]}"; do _extra_list="${_extra_list}${_cmd}"$'\n'; done
+_extra_list="${_extra_list}zzz-extra-command"
+_extra_out=""
+_extra_rc=0
+_extra_out="$(NUCLEUS_REPO_ROOT="$_extra_repo" NUCLEUS_COMPLETIONS_COMMANDS="$_extra_list" bash "$_gen_script" --check 2>&1)" || _extra_rc=$?
+if [ "$_extra_rc" -ne 0 ] && printf '%s\n' "$_extra_out" | grep -q '_nucleus-zzz-extra-command'; then
+  assert_pass "gen-completions: a 15th derived command makes the suite fail naming it"
+else
+  assert_fail "gen-completions: 15th derived command detection" "rc=$_extra_rc output=${_extra_out//$'\n'/ | }"
+fi
+rm -rf "$_extra_repo"
 
 finish_tests

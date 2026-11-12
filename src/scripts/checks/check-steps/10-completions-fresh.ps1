@@ -23,12 +23,11 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
   }
 
   Write-Message "--- coverage: zsh + pwsh completions for every nucleus-* command ---"
-  # WHY no camilladsp-heartbeat: the POSIX daemon has no Windows twin command, so
-  # the zsh registry lists it and this profile.ps1 inventory cannot.
-  $commands = @(
-    'ai', 'apply', 'bootstrap', 'check', 'cloud', 'config', 'gc',
-    'utils', 'svc', 'test', 'update', 'vm'
-  )
+  $commands = @(pwsh -NoLogo -NoProfile -NonInteractive -File (Join-Path $r 'src\scripts\completions\gen-completions.ps1') -ListCommands | ForEach-Object { ($_ | Out-String).Trim() } | Where-Object { $_ -ne '' })
+  if ($commands.Count -eq 0) {
+    Write-ErrorMessage "could not derive nucleus command list from gen-completions.ps1 -ListCommands"
+    return $false
+  }
   $profilePath = Join-Path $r 'src/scripts/shell/profile.ps1'
   $zshDir = Join-Path $r 'src/modules/completions/zsh'
   $profileText = [System.IO.File]::ReadAllText($profilePath)

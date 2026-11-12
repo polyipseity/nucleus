@@ -3,12 +3,34 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-# The canonical nucleus-* command set (alphabetical): the coverage contract
-# shared with src/scripts/completions/gen-completions.sh and tests/scripts/gen-completions-tests.sh.
-# WHY no camilladsp-heartbeat: it is a POSIX-only daemon with no pwsh completer
-# entry in profile.ps1, so listing it here would fail this step's pwsh coverage
-# assertion. The zsh side still covers it through gen-completions.sh --check.
-_NUCLEUS_COMMANDS=(ai apply bootstrap check cloud config gc logs utils svc test update vm)
+# The canonical nucleus-* command set, derived from the flake packages output.
+# The zsh side asserts coverage over the derived list; the pwsh side asserts
+# completer and flag inventory parity for commands that have a Windows app
+# surface (profile.ps1).
+_derive_nucleus_commands() {
+  local _root="${1:-$_repo_root}"
+  require_command nix "nix eval is required to derive the nucleus command list from the flake"
+  local _sys_10 _n10
+  _sys_10="$(nix config show system)"
+  _NUCLEUS_COMMANDS=()
+  while IFS= read -r _n10; do
+    [ -n "$_n10" ] || continue
+    case "$_n10" in
+    nucleus-*) _NUCLEUS_COMMANDS+=("${_n10#nucleus-}") ;;
+    esac
+  done < <(
+    nix eval --raw "$_root/src#packages.$_sys_10" --apply 'ps: let names = builtins.attrNames ps; nucleus = builtins.filter (n: builtins.substring 0 8 n == "nucleus-") names; in builtins.concatStringsSep "\n" (builtins.sort builtins.lessThan nucleus)' 2>/dev/null
+    printf '\n'
+  )
+  [ "${#_NUCLEUS_COMMANDS[@]}" -gt 0 ] || return 1
+  _NUCLEUS_PWSH_COMMANDS=()
+  for _n10 in "${_NUCLEUS_COMMANDS[@]}"; do
+    case "$_n10" in
+    camilladsp-heartbeat) continue ;;
+    esac
+    _NUCLEUS_PWSH_COMMANDS+=("$_n10")
+  done
+}
 
 # pascal_case <cmd> yields the $nucleus<Cmd>Flags spelling gen-completions.ps1 emits.
 pascal_case() {
@@ -31,6 +53,11 @@ run_completions_fresh() {
   local _files=("$@")
   cd "$_repo_root" || return 1
 
+  _derive_nucleus_commands "$_repo_root" || {
+    error "could not derive nucleus command list from flake packages"
+    return 1
+  }
+
   # 1. Generated files must match generator output; drift is a hard failure.
   if ! bash "$_repo_root/src/scripts/completions/gen-completions.sh" --check; then
     error "generated completions are stale — run src/scripts/completions/gen-completions.sh to regenerate"
@@ -45,6 +72,8 @@ run_completions_fresh() {
       error "missing zsh completion file src/modules/completions/zsh/_nucleus-$_cmd"
       return 1
     fi
+  done
+  for _cmd in "${_NUCLEUS_PWSH_COMMANDS[@]}"; do
     # Anchored at the line start: the command name alone also matches a comment
     # or a longer command (nucleus-svc inside nucleus-service-watchdog).
     if ! grep -qE "^Register-ArgumentCompleter -CommandName nucleus-$_cmd([[:space:]]|$)" "$_profile"; then

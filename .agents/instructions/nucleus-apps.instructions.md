@@ -20,7 +20,7 @@ Stop at the first fit:
 2. A variant of an existing app: add a subcommand to `check`, `gc`, `apply`, `cloud`, or `update`.
 3. A new top-level concern: register it in `mkNucleusApps` with a matching `scripts/<name>.sh` and `scripts/<name>.ps1`. An entry with no Windows twin declares only the POSIX script and its zsh completion; an entry that must never be invoked by hand stays out of `mkNucleusApps` entirely and is wired from its store path.
 
-The command set is shared with the completion generators and check step `10-completions-fresh`, so change one and the other or freshness fails.
+The completion generators and check step `10-completions-fresh` derive the command set from flake `packages.<system>` entries whose names start with `nucleus-`, so registering or removing an entry in `mkNucleusApps` updates completion coverage and freshness checks without a second hand-maintained list. A `scripts/<name>.sh` (or the daemon mapping in `gen-completions.sh`) must still exist so `--help`-derived completions can be generated.
 
 ## Internal invocation
 
