@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Test: the deletion policy suite runs under bun and reports real passing cases.
+# The wrapper enforces the two failure modes a bare `bun test` call would hide in
+# a log: a non-zero exit and a vacuous zero-test run.
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=./test-lib.sh
+. "$SCRIPT_DIR/test-lib.sh"
+
+REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+
+require_command bun "bun test executes the deletion policy suite"
+
+_sdp_suite="$REPO_ROOT/tests/scripts/notify/safe-delete-policy-tests.ts"
+_sdp_out="$(mktemp)"
+trap 'rm -f "$_sdp_out"' EXIT
+
+if bun test "$_sdp_suite" >"$_sdp_out" 2>&1; then
+  assert_pass "deletion policy tests pass under bun test"
+else
+  assert_fail "deletion policy tests pass under bun test" \
+    "$(tail -n 20 "$_sdp_out" | tr '\n' ' ')"
+fi
+
+if grep -qE '(^|[^0-9])[1-9][0-9]* pass' "$_sdp_out"; then
+  assert_pass "bun reported a non-zero passing test count"
+else
+  assert_fail "bun reported a non-zero passing test count" \
+    "no pass count in: $(tail -n 5 "$_sdp_out" | tr '\n' ' ')"
+fi
+
+finish_tests
