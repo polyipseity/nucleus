@@ -20,16 +20,19 @@ import contextCap, {
   refreshActiveModel,
   resetWrittenCap,
   resolveWindow,
+  restoreRoutedWindows,
   serialize,
   setGlobalCap,
   setModelWindow,
   syncModelWindow,
+  syncRoutedWindow,
   type ActiveModel,
   type CapUi,
   type FilePaths,
   type Json,
   type ModelCatalog,
   type ModelSelector,
+  type RoutedSource,
   type RuntimeModel,
 } from "../../../../../src/users/default/pi/extensions/context-cap.ts";
 
@@ -688,17 +691,126 @@ describe("applyToFiles", () => {
   });
 });
 
+describe("syncRoutedWindow", () => {
+  afterEach(() => restoreRoutedWindows());
+
+  // A routed selection's usage reports the physical model window, which changes
+  // as the sync writes it, so each case supplies what pi would report at that
+  // moment instead of a value fixed at construction.
+  function routedSource(
+    models: readonly RuntimeModel[],
+    entries: () => readonly unknown[],
+    usage: () => { contextWindow: number } | undefined,
+  ): RoutedSource {
+    return {
+      sessionManager: { getEntries: entries },
+      modelRegistry: {
+        find: (provider, modelId) => models.find((model) => model.provider === provider && model.id === modelId),
+      },
+      getContextUsage: usage,
+    };
+  }
+
+  function assistantEntry(message: { provider: string; model: string; responseModel?: string }): unknown {
+    return { type: "message", message: { role: "assistant", ...message } };
+  }
+
+  test("writes the effective window onto the model the last assistant entry names", () => {
+    const physical: RuntimeModel = { provider: "opencode-go", id: "glm-5.1", contextWindow: 1000000 };
+    const earlier: RuntimeModel = { provider: "anthropic", id: "claude-sonnet-5", contextWindow: 200000 };
+    const entries = [
+      { type: "message", message: { role: "user", content: "hi" } },
+      assistantEntry({ provider: "anthropic", model: "claude-sonnet-5" }),
+      // responseModel is the id the provider actually answered with.
+      assistantEntry({ provider: "opencode-go", model: "glm-5.1-preview", responseModel: "glm-5.1" }),
+    ];
+    const source = routedSource([physical, earlier], () => entries, () => ({ contextWindow: 1000000 }));
+
+    const target = syncRoutedWindow(source, 256000);
+
+    expect(target).toBe(physical);
+    expect(physical.contextWindow).toBe(256000);
+    expect(earlier.contextWindow).toBe(200000);
+  });
+
+  test("a second sync updates the recorded model without recording a new original", () => {
+    const physical: RuntimeModel = { provider: "opencode-go", id: "glm-5.1", contextWindow: 1000000 };
+    const entries = [assistantEntry({ provider: "opencode-go", model: "glm-5.1" })];
+    let reported = 1000000;
+    const source = routedSource([physical], () => entries, () => ({ contextWindow: reported }));
+
+    expect(syncRoutedWindow(source, 256000)).toBe(physical);
+    reported = 256000;
+    expect(syncRoutedWindow(source, 200000)).toBe(physical);
+    expect(physical.contextWindow).toBe(200000);
+
+    // The first original, not the intermediate 256000, is what a restore returns.
+    restoreRoutedWindows();
+    expect(physical.contextWindow).toBe(1000000);
+  });
+
+  test("a different routed target restores the previous model and mutates the new one", () => {
+    const first: RuntimeModel = { provider: "opencode-go", id: "glm-5.1", contextWindow: 1000000 };
+    const second: RuntimeModel = { provider: "anthropic", id: "claude-sonnet-5", contextWindow: 200000 };
+    let entries: unknown[] = [assistantEntry({ provider: "opencode-go", model: "glm-5.1" })];
+    let reported = 1000000;
+    const source = routedSource([first, second], () => entries, () => ({ contextWindow: reported }));
+    expect(syncRoutedWindow(source, 256000)).toBe(first);
+
+    entries = [assistantEntry({ provider: "anthropic", model: "claude-sonnet-5" })];
+    reported = 200000;
+
+    expect(syncRoutedWindow(source, 300000)).toBe(second);
+    expect(first.contextWindow).toBe(1000000);
+    expect(second.contextWindow).toBe(300000);
+  });
+
+  test("restoreRoutedWindows puts the recorded original back and a second call does nothing", () => {
+    const physical: RuntimeModel = { provider: "opencode-go", id: "glm-5.1", contextWindow: 1000000 };
+    const entries = [assistantEntry({ provider: "opencode-go", model: "glm-5.1" })];
+    const source = routedSource([physical], () => entries, () => ({ contextWindow: 1000000 }));
+    syncRoutedWindow(source, 256000);
+
+    restoreRoutedWindows();
+    expect(physical.contextWindow).toBe(1000000);
+    restoreRoutedWindows();
+    expect(physical.contextWindow).toBe(1000000);
+  });
+
+  test("a source that already reports the effective window mutates nothing", () => {
+    const physical: RuntimeModel = { provider: "opencode-go", id: "glm-5.1", contextWindow: 256000 };
+    const entries = [assistantEntry({ provider: "opencode-go", model: "glm-5.1" })];
+    const agreeing = routedSource([physical], () => entries, () => ({ contextWindow: 256000 }));
+
+    expect(syncRoutedWindow(agreeing, 256000)).toBeNull();
+    expect(physical.contextWindow).toBe(256000);
+
+    const unknown = routedSource([physical], () => entries, () => undefined);
+    expect(syncRoutedWindow(unknown, 100000)).toBeNull();
+    expect(physical.contextWindow).toBe(256000);
+  });
+});
+
 // applyCap is a closure inside the extension factory, so the re-selection cases
 // register the real extension with a fake pi and drive the handlers it registered.
 // The fake supplies the two calls applyCap makes; the extension still reads
 // ~/.pi/agent/models.json itself, read-only.
-type ModelSelectHandler = (event: { model: RuntimeModel }, ctx: { ui: CapUi }) => Promise<void> | void;
-type SessionStartHandler = (
-  event: { reason: string },
-  ctx: { model?: RuntimeModel; ui: CapUi },
-) => Promise<void> | void;
+type HandlerContext = {
+  model?: RuntimeModel;
+  ui: CapUi;
+} & RoutedSource;
+type ModelSelectHandler = (event: { model: RuntimeModel }, ctx: HandlerContext) => Promise<void> | void;
+type SessionStartHandler = (event: { reason: string }, ctx: HandlerContext) => Promise<void> | void;
 
 const silentUi: CapUi = { setStatus: () => {}, notify: () => {} };
+
+// Every handler hands ctx to applyCap, which reads the routed window from it;
+// these cases are not routed, so the source reports no context usage at all.
+const unrouted = {
+  sessionManager: { getEntries: () => [] as readonly unknown[] },
+  modelRegistry: { find: () => undefined as RuntimeModel | undefined },
+  getContextUsage: () => undefined,
+};
 
 function loadContextCap(
   settings: unknown,
@@ -746,6 +858,11 @@ describe("refreshActiveModel", () => {
 });
 
 describe("re-selecting the model", () => {
+  afterEach(() => {
+    restoreRoutedWindows();
+    resetWrittenCap();
+  });
+
   test("the re-keyed native baseline restores the native window when the cap is cleared", async () => {
     const settings: { contextWindowCap?: number } = { contextWindowCap: 256000 };
     const selected: RuntimeModel[] = [];
@@ -753,10 +870,10 @@ describe("re-selecting the model", () => {
       selected.push(model);
       return true;
     });
-    await handlers.session_start({ reason: "start" }, { ui: silentUi });
+    await handlers.session_start({ reason: "start" }, { ui: silentUi, ...unrouted });
     const model: RuntimeModel = { provider: "context-cap-test", id: "rekey", contextWindow: 1000000 };
 
-    await handlers.model_select({ model }, { ui: silentUi });
+    await handlers.model_select({ model }, { ui: silentUi, ...unrouted });
     expect(selected).toHaveLength(1);
     const clone = selected[0]!;
     expect(clone.contextWindow).toBe(256000);
@@ -764,11 +881,48 @@ describe("re-selecting the model", () => {
     // The cap is gone, so the next window must come from the native baseline that
     // refreshActiveModel re-keyed onto the clone, not from the clone's capped value.
     delete settings.contextWindowCap;
-    await handlers.model_select({ model: clone }, { ui: silentUi });
+    await handlers.model_select({ model: clone }, { ui: silentUi, ...unrouted });
 
     expect(clone.contextWindow).toBe(1000000);
     expect(selected).toHaveLength(2);
     expect(selected[1]!.contextWindow).toBe(1000000);
+  });
+
+  test("a capped routed physical model selected directly keeps its native baseline", async () => {
+    const settings: { contextWindowCap?: number } = { contextWindowCap: 256000 };
+    const selected: RuntimeModel[] = [];
+    const handlers = loadContextCap(settings, async (model) => {
+      selected.push(model);
+      return true;
+    });
+    await handlers.session_start({ reason: "start" }, { ui: silentUi, ...unrouted });
+
+    // A routed selection shows the physical model's 1000000 window as the capped
+    // 256000, which leaves the physical registry object carrying 256000.
+    const physical: RuntimeModel = { provider: "context-cap-test", id: "routed-then-selected", contextWindow: 1000000 };
+    const routed = {
+      ui: silentUi,
+      sessionManager: {
+        getEntries: () => [
+          { type: "message", message: { role: "assistant", provider: physical.provider, model: physical.id } },
+        ],
+      },
+      modelRegistry: { find: () => physical },
+      getContextUsage: () => ({ contextWindow: physical.contextWindow }),
+    };
+    const virtual: RuntimeModel = { provider: "pi-route", id: "virtual", contextWindow: 1000000 };
+    await handlers.model_select({ model: virtual }, routed);
+    expect(physical.contextWindow).toBe(256000);
+
+    // With the cap still set, selecting that same physical object must read the
+    // restored native window as the baseline, not the capped window the route left.
+    await handlers.model_select({ model: physical }, routed);
+    expect(physical.contextWindow).toBe(256000);
+
+    // A later clear then has to restore the true native window.
+    delete settings.contextWindowCap;
+    await handlers.model_select({ model: selected[selected.length - 1]! }, routed);
+    expect(selected[selected.length - 1]!.contextWindow).toBe(1000000);
   });
 
   test("an effective change re-selects once and an identical selection does not re-select again", async () => {
@@ -777,16 +931,16 @@ describe("re-selecting the model", () => {
       selected.push(model);
       return true;
     });
-    await handlers.session_start({ reason: "start" }, { ui: silentUi });
+    await handlers.session_start({ reason: "start" }, { ui: silentUi, ...unrouted });
     const model: RuntimeModel = { provider: "context-cap-test", id: "once", contextWindow: 1000000 };
 
-    await handlers.model_select({ model }, { ui: silentUi });
+    await handlers.model_select({ model }, { ui: silentUi, ...unrouted });
     expect(selected).toHaveLength(1);
     expect(model.contextWindow).toBe(256000);
 
     // pi holds the clone now, so selecting the same provider and id again must not
     // append another model_change entry.
-    await handlers.model_select({ model: selected[0]! }, { ui: silentUi });
+    await handlers.model_select({ model: selected[0]! }, { ui: silentUi, ...unrouted });
     expect(selected).toHaveLength(1);
   });
 
@@ -803,10 +957,10 @@ describe("re-selecting the model", () => {
       attempts += 1;
       return false;
     });
-    await handlers.session_start({ reason: "start" }, { ui });
+    await handlers.session_start({ reason: "start" }, { ui, ...unrouted });
     const model: RuntimeModel = { provider: "context-cap-test", id: "no-auth", contextWindow: 1000000 };
 
-    await handlers.model_select({ model }, { ui });
+    await handlers.model_select({ model }, { ui, ...unrouted });
     expect(attempts).toBe(1);
     expect(model.contextWindow).toBe(256000);
     expect(statusCalls).toEqual([["context-window", ""], ["context-window", undefined]]);
@@ -816,7 +970,7 @@ describe("re-selecting the model", () => {
     expect(notifications[0]![0]).toContain("pi-powerline-footer");
 
     settings.contextWindowCap = 100000;
-    await handlers.model_select({ model }, { ui });
+    await handlers.model_select({ model }, { ui, ...unrouted });
     expect(attempts).toBe(2);
     expect(model.contextWindow).toBe(100000);
     expect(notifications).toHaveLength(1);

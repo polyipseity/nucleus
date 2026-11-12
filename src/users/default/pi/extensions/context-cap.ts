@@ -86,6 +86,14 @@ export interface FilePaths {
   models: string;
 }
 
+// A routed selection displays the registry's physical model window (agent-session.js:1020-1027,
+// model-runtime.js:753-756), so callers pass the parts of the extension context that reach it.
+export interface RoutedSource {
+  sessionManager: { getEntries(): readonly unknown[] };
+  modelRegistry: { find(provider: string, modelId: string): RuntimeModel | undefined };
+  getContextUsage(): { contextWindow: number } | undefined;
+}
+
 export type ApplyOutcome =
   | { kind: "none" }
   | { kind: "written"; target: "settings"; message: string; cap: number | null }
@@ -592,12 +600,65 @@ export async function refreshActiveModel(
   }
 }
 
+// Physical model whose window the footer would show, but only while that window
+// still disagrees with the effective one: a routed selection is the only case
+// where the two can differ.
+export function routedPhysicalModel(source: RoutedSource, effective: number): RuntimeModel | null {
+  const usage = source.getContextUsage();
+  if (usage === undefined || usage.contextWindow === effective) return null;
+  const entries = source.sessionManager.getEntries();
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const entry = asObject(entries[index]);
+    if (entry?.type !== "message") continue;
+    const message = asObject(entry.message);
+    if (message?.role !== "assistant") continue;
+    const provider = message.provider;
+    const id = message.responseModel ?? message.model;
+    if (typeof provider !== "string" || typeof id !== "string") return null;
+    return source.modelRegistry.find(provider, id) ?? null;
+  }
+  return null;
+}
+
+// Original window of every registry object this file wrote, so a restore can put
+// each one back.
+const routedOriginals = new Map<RuntimeModel, number>();
+
+// A routed selection reads routedModel.model, the registry's physical object
+// (agent-session.js:1020-1027), and ModelRegistry.find hands back that same
+// object (model-registry.js:24-26 -> model-runtime.js:287-289), so writing the
+// window there is what the footer reports. Risk: the registry object is
+// process-wide, so every other session in this process sees the mutated window
+// until it is restored. Recording the original once and restoring it is what
+// keeps a later direct selection of this physical model from inheriting the
+// virtual cap.
+export function syncRoutedWindow(source: RoutedSource, effective: number): RuntimeModel | null {
+  // Restore first: the target may be the object this file already capped, and
+  // the detection below has to compare its native window with the effective one
+  // rather than the capped window a previous sync left on it.
+  restoreRoutedWindows();
+  const target = routedPhysicalModel(source, effective);
+  if (target === null) return null;
+  routedOriginals.set(target, target.contextWindow);
+  target.contextWindow = effective;
+  return target;
+}
+
+export function restoreRoutedWindows(): void {
+  for (const [model, original] of routedOriginals) model.contextWindow = original;
+  routedOriginals.clear();
+}
+
 export default function (pi: ExtensionAPI) {
   const settingsPath = join(agentDir(), "settings.json");
   const modelsPath = join(agentDir(), "models.json");
   const paths: FilePaths = { settings: settingsPath, models: modelsPath };
 
-  const applyCap = async (model: RuntimeModel, ui?: CapUi): Promise<void> => {
+  const applyCap = async (model: RuntimeModel, ui?: CapUi, routed?: RoutedSource): Promise<void> => {
+    // Restore before reading the baseline: a routed physical model can be the
+    // very object selected here, and its capped window would otherwise become
+    // the native baseline that a later clear can never undo.
+    restoreRoutedWindows();
     const cached = nativeCache.get(model);
     const baseline = cached ?? model.contextWindow;
     if (cached === undefined) nativeCache.set(model, baseline);
@@ -617,6 +678,13 @@ export default function (pi: ExtensionAPI) {
     // thinking-level re-apply per effective change, and that is the price of
     // invalidating a leaf-keyed cache; an unchanged window and source re-selects
     // nothing.
+    // A routed selection displays the physical model's window, which the mutation
+    // above did not touch, so write it before the re-selection: the leaf move
+    // then repaints the footer from the routed window.
+    // WHY before the early return: the restore at the top of this function undid
+    // the routed window this file applied last time, so an unchanged window still
+    // has to be written back for the footer to keep showing it.
+    if (routed) syncRoutedWindow(routed, result.window);
     if (!result.changed && !sourceMoved) return;
     const selected = await refreshActiveModel(pi, model, result.window, baseline);
     // The mutation already repainted through nudgeStatus, and pi's own usage and
@@ -635,9 +703,13 @@ export default function (pi: ExtensionAPI) {
   // that render. The re-selection this triggers must not come back through here.
   pi.on("model_select", ({ model }, ctx) => {
     if (refreshing) return;
-    return applyCap(model, ctx.ui);
+    return applyCap(model, ctx.ui, ctx);
   });
+  pi.on("session_shutdown", () => restoreRoutedWindows());
   pi.on("session_start", (event, ctx) => {
+    // Restore first: a registry object left carrying the previous session's
+    // window would otherwise hide the routed selection this one makes.
+    restoreRoutedWindows();
     // A reload is the one point where pi re-reads settings.json, so its cache is
     // authoritative again and the mirror would only hold a stale copy.
     if (event.reason === "reload") resetWrittenCap();
@@ -646,7 +718,7 @@ export default function (pi: ExtensionAPI) {
     lastEffective = null;
     warnedNoAuth = false;
     if (!ctx.model) return;
-    return applyCap(ctx.model, ctx.ui);
+    return applyCap(ctx.model, ctx.ui, ctx);
   });
 
   pi.registerCommand("context-window", {
@@ -678,7 +750,7 @@ export default function (pi: ExtensionAPI) {
         // write only reaches pi.getSettings() when pi reloads; without the mirror the
         // next model switch would apply the pre-write cap.
         noteWrittenCap(outcome);
-        await applyCap(model, ctx.ui);
+        await applyCap(model, ctx.ui, ctx);
       }
 
       const settings = readJson(settingsPath);
