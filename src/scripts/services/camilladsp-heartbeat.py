@@ -59,11 +59,14 @@ NUCLEUS_CONFIG = Path.home() / ".local/state/nucleus/config.json"
 DEFAULT_CONFIG = Path.home() / ".config/camilladsp/configs/config.yml"
 
 # CoreAudio selectors and scopes, as four-character codes.
+# Source: CoreAudio.framework/Headers/AudioHardware.h:608-611 and
+# AudioHardwareBase.h:203-334. A wrong code returns kAudioHardwareUnknownPropertyError
+# ('who?'), which every caller here reads as "no device".
 _SYSTEM_OBJECT = 1
-_SEL_DEFAULT_OUTPUT = int.from_bytes(b"dout", "big")
+_SEL_DEFAULT_OUTPUT = int.from_bytes(b"dOut", "big")
 _SEL_DEVICES = int.from_bytes(b"dev#", "big")
 _SEL_NAME = int.from_bytes(b"lnam", "big")
-_SEL_STREAM_CONFIG = int.from_bytes(b"scon", "big")
+_SEL_STREAM_CONFIG = int.from_bytes(b"slay", "big")
 _SCOPE_GLOBAL = int.from_bytes(b"glob", "big")
 _SCOPE_OUTPUT = int.from_bytes(b"outp", "big")
 _ELEMENT_MAIN = 0

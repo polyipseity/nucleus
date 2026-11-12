@@ -88,6 +88,30 @@ def case_passthrough():
     assert c.probe_calls == 0, "a fixed device must not touch the audio backend"
 
 
+def case_selector_codes():
+    # Values copied from the SDK headers. A wrong code makes the property
+    # unknown ('who?'), and detection then silently returns nothing.
+    # AudioHardware.h:608 kAudioHardwarePropertyDevices = 'dev#'
+    # AudioHardware.h:610 kAudioHardwarePropertyDefaultOutputDevice = 'dOut'
+    # AudioHardware.h:1008 kAudioDevicePropertyStreamConfiguration = 'slay'
+    # AudioHardwareBase.h:203 kAudioObjectPropertyScopeGlobal = 'glob'
+    # AudioHardwareBase.h:205 kAudioObjectPropertyScopeOutput = 'outp'
+    # AudioHardwareBase.h:334 kAudioObjectPropertyName = 'lnam'
+    expected = {
+        "_SYSTEM_OBJECT": 1,
+        "_SEL_DEVICES": b"dev#",
+        "_SEL_DEFAULT_OUTPUT": b"dOut",
+        "_SEL_NAME": b"lnam",
+        "_SEL_STREAM_CONFIG": b"slay",
+        "_SCOPE_GLOBAL": b"glob",
+        "_SCOPE_OUTPUT": b"outp",
+    }
+    for name, value in expected.items():
+        want = value if isinstance(value, int) else int.from_bytes(value, "big")
+        actual = getattr(m, name)
+        assert actual == want, f"{name} is {actual:#x}, header says {want:#x}"
+
+
 def case_patches_default_output():
     c = Case()
     config = c.config()
@@ -420,6 +444,7 @@ CASES = {
     "fingerprint_covers_device": case_fingerprint_covers_device,
     "linux_backend_parsing": case_linux_backends,
     "loop_three_states": case_loop_states,
+    "selector_codes": case_selector_codes,
 }
 
 
@@ -477,5 +502,8 @@ run_case linux_backend_parsing
 
 section 5 "loop states"
 run_case loop_three_states
+
+section 6 "CoreAudio wire values and log format"
+run_case selector_codes
 
 finish_tests
