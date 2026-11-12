@@ -999,7 +999,10 @@ export default function (pi: ExtensionAPI) {
     });
   };
 
-  pi.on("model_select", ({ model }) => applyCap(model));
+  // The host repaints after a model switch, but the effective window can change
+  // here without changing the model, so nudge explicitly rather than relying on
+  // that render.
+  pi.on("model_select", ({ model }, ctx) => applyCap(model, ctx.ui));
   pi.on("session_start", (event, ctx) => {
     // A reload is the one point where pi re-reads settings.json, so its cache is
     // authoritative again and the mirror would only hold a stale copy.

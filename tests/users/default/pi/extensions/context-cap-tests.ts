@@ -1,13 +1,16 @@
 // Cases for the context-window extension: pure parsing and precedence, the
 // deterministic serializer, file round-trips against a temp directory so the
-// session command's writes are exercised without touching ~/.pi, and the footer
-// snapshot plus the lines it renders.
+// session command's writes are exercised without touching ~/.pi, the footer
+// snapshot plus the lines it renders, and the footer wiring the default export
+// installs when a fake host delivers session_start and model_select events.
 
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, lstatSync, linkSync, mkdtempSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import {
+// Type-only: bun erases it, so the suite keeps resolving with no runtime deps.
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import contextCap, {
   applyToFiles,
   buildFooterSnapshot,
   effectiveWindow,
@@ -896,5 +899,282 @@ describe("buildFooterSnapshot", () => {
     expect(snapshot.subscription).toBe(false);
     expect(renderFooterLines(snapshot, 80, stubTheme)[1]).toContain("no-model");
     expect(renderFooterLines(snapshot, 80, stubTheme)[1]).toContain("?/0");
+  });
+});
+
+// --- Fake extension host -----------------------------------------------------
+// The default export is the extension's only entry point, so the wiring cases
+// below drive it through a fake host instead of reaching into module state. The
+// fake carries only the members this extension touches, which no pi runtime type
+// describes, so it is cast at the ExtensionAPI and ExtensionContext seams.
+
+interface FakeModel {
+  provider: string;
+  id: string;
+  contextWindow: number;
+  reasoning: boolean;
+}
+
+interface FakeTui {
+  requestRender(): void;
+}
+
+interface FakeFooterData {
+  branchChangeCallbacks: Array<() => void>;
+  subscribed: boolean;
+  getGitBranch(): string | null;
+  getExtensionStatuses(): ReadonlyMap<string, string>;
+  getAvailableProviderCount(): number;
+  onBranchChange(callback: () => void): () => void;
+}
+
+interface FakeFooter {
+  render(width: number): string[];
+  dispose?(): void;
+}
+
+type FooterFactory = (tui: FakeTui, theme: FooterTheme, footerData: FakeFooterData) => FakeFooter;
+
+interface FakeUi {
+  footerFactories: FooterFactory[];
+  statusCalls: Array<[key: string, value: string | undefined]>;
+  notifications: Array<[message: string, level: string]>;
+  setFooter(factory: FooterFactory): void;
+  setStatus(key: string, value: string | undefined): void;
+  notify(message: string, level: string): void;
+}
+
+interface FakeContext {
+  mode: string;
+  ui: FakeUi;
+  model: FakeModel | undefined;
+  thinkingLevel: string;
+  getContextUsage(): { tokens: number | null; contextWindow: number; percent: number | null } | undefined;
+  sessionManager: { getEntries(): unknown[]; getCwd(): string; getSessionName(): string | null };
+  modelRegistry: { isUsingOAuth(model: FakeModel): boolean; getAll(): Array<{ provider: string; id: string }> };
+  cwd: string;
+  hasUI: boolean;
+  scopedModels: unknown[];
+}
+
+interface FakePi {
+  on(event: string, handler: (event: unknown, ctx: unknown) => unknown): void;
+  registerCommand(name: string, command: { handler: (args: string, ctx: unknown) => Promise<void> }): void;
+  getSettings(): Record<string, unknown>;
+  emit(event: string, payload: unknown, ctx: unknown): unknown;
+  command(name: string, args: string, ctx: unknown): Promise<void>;
+}
+
+// Test-only ids: the extension reads models.json under the process home, which
+// bun fixes at process start, so an id no real file carries keeps that read from
+// finding an override.
+const TEST_PROVIDER = "test-provider";
+const TEST_MODEL = "test-model";
+const TEST_TOKENS = 35200;
+
+function fakeModel(overrides: Partial<FakeModel> = {}): FakeModel {
+  return { provider: TEST_PROVIDER, id: TEST_MODEL, contextWindow: 100000, reasoning: false, ...overrides };
+}
+
+function fakeUi(): FakeUi {
+  const ui: FakeUi = {
+    footerFactories: [],
+    statusCalls: [],
+    notifications: [],
+    setFooter: (factory) => ui.footerFactories.push(factory),
+    setStatus: (key, value) => ui.statusCalls.push([key, value]),
+    notify: (message, level) => ui.notifications.push([message, level]),
+  };
+  return ui;
+}
+
+function fakeFooterData(): FakeFooterData {
+  const footerData: FakeFooterData = {
+    branchChangeCallbacks: [],
+    subscribed: false,
+    getGitBranch: () => null,
+    getExtensionStatuses: () => new Map<string, string>(),
+    getAvailableProviderCount: () => 1,
+    onBranchChange: (callback) => {
+      footerData.branchChangeCallbacks.push(callback);
+      footerData.subscribed = true;
+      return () => {
+        footerData.subscribed = false;
+      };
+    },
+  };
+  return footerData;
+}
+
+function fakeContext(ui: FakeUi, overrides: Partial<Omit<FakeContext, "ui">> = {}): FakeContext {
+  return {
+    mode: "tui",
+    ui,
+    model: fakeModel(),
+    thinkingLevel: "high",
+    getContextUsage: () => ({ tokens: TEST_TOKENS, contextWindow: 100000, percent: (TEST_TOKENS / 100000) * 100 }),
+    sessionManager: { getEntries: () => [], getCwd: () => "/home/user/project", getSessionName: () => null },
+    modelRegistry: { isUsingOAuth: () => false, getAll: () => [] },
+    cwd: "/home/user/project",
+    hasUI: true,
+    scopedModels: [],
+    ...overrides,
+  };
+}
+
+function fakePi(settings: Record<string, unknown> = {}): FakePi {
+  const handlers = new Map<string, Array<(event: unknown, ctx: unknown) => unknown>>();
+  const commands = new Map<string, { handler: (args: string, ctx: unknown) => Promise<void> }>();
+  const pi: FakePi = {
+    on: (event, handler) => {
+      handlers.set(event, [...(handlers.get(event) ?? []), handler]);
+    },
+    registerCommand: (name, command) => {
+      commands.set(name, command);
+    },
+    getSettings: () => settings,
+    emit: (event, payload, ctx) => {
+      let result: unknown;
+      for (const handler of handlers.get(event) ?? []) result = handler(payload, ctx);
+      return result;
+    },
+    command: async (name, args, ctx) => {
+      const command = commands.get(name);
+      if (command === undefined) throw new Error(`the extension registered no command named ${name}`);
+      await command.handler(args, ctx);
+    },
+  };
+  return pi;
+}
+
+function startExtension(settings: Record<string, unknown> = {}): FakePi {
+  const pi = fakePi(settings);
+  contextCap(pi as unknown as ExtensionAPI);
+  return pi;
+}
+
+function emitEvent(pi: FakePi, event: string, payload: unknown, ctx: FakeContext): void {
+  pi.emit(event, payload, ctx as unknown as ExtensionContext);
+}
+
+// Mounting the factory is what pi's interactive mode does on the next frame.
+function mountFooter(
+  ui: FakeUi,
+  footerData: FakeFooterData,
+  index = ui.footerFactories.length - 1,
+): FakeFooter {
+  const factory = ui.footerFactories[index];
+  if (factory === undefined) throw new Error(`no footer factory installed at index ${index}`);
+  return factory({ requestRender: () => {} }, stubTheme, footerData);
+}
+
+describe("footer wiring through a fake extension host", () => {
+  let pi: FakePi;
+
+  beforeEach(() => {
+    resetWrittenCap();
+    pi = startExtension({ contextWindowCap: 256000 });
+  });
+
+  test("a tui session_start installs exactly one footer that renders at least two lines", () => {
+    const ui = fakeUi();
+    emitEvent(pi, "session_start", { reason: "startup" }, fakeContext(ui));
+
+    expect(ui.footerFactories).toHaveLength(1);
+    const lines = mountFooter(ui, fakeFooterData()).render(80);
+    expect(lines.length).toBeGreaterThanOrEqual(2);
+    expect(lines[1]).toContain(`${((TEST_TOKENS / 100000) * 100).toFixed(1)}%/100k`);
+  });
+
+  test("a print or json session_start installs no footer", () => {
+    for (const mode of ["print", "json"]) {
+      const ui = fakeUi();
+      emitEvent(pi, "session_start", { reason: "startup" }, fakeContext(ui, { mode }));
+
+      expect(ui.footerFactories).toHaveLength(0);
+      expect(ui.statusCalls).toHaveLength(0);
+    }
+  });
+
+  test("a reload installs a fresh footer that serves the reloaded context", () => {
+    const ui = fakeUi();
+    emitEvent(
+      pi,
+      "session_start",
+      { reason: "startup" },
+      fakeContext(ui, { model: fakeModel({ id: "first-model" }) }),
+    );
+    emitEvent(
+      pi,
+      "session_start",
+      { reason: "reload" },
+      fakeContext(ui, { model: fakeModel({ id: "second-model" }) }),
+    );
+
+    expect(ui.footerFactories).toHaveLength(2);
+    const footerData = fakeFooterData();
+    expect(mountFooter(ui, footerData, 0).render(80)[1]).toContain("first-model");
+    expect(mountFooter(ui, footerData, 1).render(80)[1]).toContain("second-model");
+  });
+
+  test("the component reads the effective window per render, not per install", () => {
+    const ui = fakeUi();
+    const context = fakeContext(ui, { model: fakeModel({ contextWindow: 100000 }) });
+    emitEvent(pi, "session_start", { reason: "startup" }, context);
+    const component = mountFooter(ui, fakeFooterData());
+
+    const before = component.render(80);
+    expect(before[1]).toContain("/100k");
+
+    // getContextUsage().tokens is the fake's constant, so only the window moved:
+    // the 256000 cap replaces the 1,000,000 native window on this selection.
+    emitEvent(pi, "model_select", { model: fakeModel({ contextWindow: 1000000 }) }, context);
+
+    const after = component.render(80);
+    expect(after[1]).toContain("/256k (global)");
+    expect(after[1]).not.toBe(before[1]);
+  });
+
+  test("a model_select nudges the status so the footer repaints", () => {
+    const ui = fakeUi();
+    const context = fakeContext(ui);
+    emitEvent(pi, "session_start", { reason: "startup" }, context);
+    ui.statusCalls.length = 0;
+
+    emitEvent(pi, "model_select", { model: fakeModel({ contextWindow: 1000000 }) }, context);
+
+    expect(ui.statusCalls).toEqual([
+      ["context-window", ""],
+      ["context-window", undefined],
+    ]);
+  });
+
+  test("dispose unsubscribes the branch-change listener", () => {
+    const ui = fakeUi();
+    emitEvent(pi, "session_start", { reason: "startup" }, fakeContext(ui));
+    const footerData = fakeFooterData();
+    const component = mountFooter(ui, footerData);
+
+    expect(footerData.branchChangeCallbacks).toHaveLength(1);
+    expect(footerData.subscribed).toBe(true);
+
+    component.dispose?.();
+
+    expect(footerData.subscribed).toBe(false);
+  });
+
+  test("a model-less tui session_start still installs the footer and renders ?/0", () => {
+    const ui = fakeUi();
+    emitEvent(
+      pi,
+      "session_start",
+      { reason: "startup" },
+      fakeContext(ui, { model: undefined, getContextUsage: () => undefined }),
+    );
+
+    expect(ui.footerFactories).toHaveLength(1);
+    const lines = mountFooter(ui, fakeFooterData()).render(80);
+    expect(lines[1]).toContain("?/0");
+    expect(lines[1]).not.toContain("(native)");
   });
 });
