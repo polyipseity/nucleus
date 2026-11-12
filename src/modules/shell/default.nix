@@ -244,9 +244,10 @@ in
     executable = true;
   };
 
-  # Agent guard: blocks dangerous deletion commands in coding agent hooks.
+  # Agent guard: the same deletion policy the filter runner dispatches, in its
+  # --hook mode, so one program decides for agents and for every harness.
   home.file.".local/bin/safe-delete-guard" = {
-    source = "${activationBundle}/src/scripts/safe-delete-guard.sh";
+    source = "${activationBundle}/src/scripts/notify/filters/safe-delete.ts";
     executable = true;
   };
 

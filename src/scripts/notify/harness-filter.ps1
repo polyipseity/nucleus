@@ -20,13 +20,17 @@
   Filter protocol (one child process per enabled registry entry, in registry
   order):
 
-    filters\<id>.ps1 --settings <json> --command <text>
+    bun filters\<id>.ts --settings <json> --command <text>
     stdin   the raw hook payload, for a filter that needs more than the command
     stdout  exactly one non-empty line: decision<TAB>rule<TAB>reason
 
-  A non-zero exit, a missing script, or an output that is not exactly one
-  non-empty line carrying three tab-separated fields is recorded as ask with rule
-  `filter-error`, because the filter could not state a verdict.
+  A missing bun, a missing filter, a non-zero exit, or an output that is not
+  exactly one non-empty line carrying three tab-separated fields is recorded as
+  ask with rule `filter-error`, because the filter could not state a verdict.
+
+  WHY bun and one file per filter instead of a PowerShell twin: the POSIX twin
+  runs the same `filters/<id>.ts` through the same runtime, so one program decides
+  for every harness on every host and no pair of implementations can drift.
 
   The decisions aggregate as deny > ask > allow regardless of registry order, so
   registry order stays readable instead of load-bearing.  `ask` means "no
@@ -286,23 +290,34 @@ function Invoke-HarnessFilterList {
     [string]$Payload
   )
 
-  $pwshPath = [Environment]::ProcessPath
   $filterDir = Join-Path -Path $PSScriptRoot -ChildPath 'filters'
   # WHY an empty Decision: "no filter spoke" is not a verdict. The caller answers
   # ask for it, while a filter that allows deliberately still outranks it.
   $best = @{ Decision = ''; Reason = ''; Filter = ''; Rule = '' }
 
+  # check-suppress:suppression_doc: bun may be absent; that absence is the expected case, and the loop answers it as ask filter-error
+  $bunCommand = Get-Command -Name 'bun' -CommandType Application -ErrorAction SilentlyContinue |
+    Select-Object -First 1
+  if ($null -eq $bunCommand) {
+    # WHY a warning and not a throw: a missing runtime must not abort the hook,
+    # and this line is what reaches a human, matching the POSIX twin.
+    Write-HarnessBridgeWarning -CommandName 'harness-filter' -Message 'bun is not on PATH, so no filter can run: asking locally'
+  }
+
   foreach ($item in $Entry) {
-    $filterPath = Join-Path -Path $filterDir -ChildPath "$($item.Id).ps1"
+    $filterPath = Join-Path -Path $filterDir -ChildPath "$($item.Id).ts"
     $line = ''
-    if (-not (Test-Path -LiteralPath $filterPath -PathType Leaf)) {
+    if ($null -eq $bunCommand) {
+      $line = "ask`tfilter-error`tbun is not on PATH, so the filter runtime is missing"
+    }
+    elseif (-not (Test-Path -LiteralPath $filterPath -PathType Leaf)) {
       $line = "ask`tfilter-error`tno filter script at $filterPath"
     }
     else {
       # WHY no 2>&1: stderr stays off the verdict path, matching the POSIX twin.
       # A child's diagnostic carries whatever text it likes, and merging it would
       # let that text read as the filter's answer.
-      $output = @($Payload | & $pwshPath -NoProfile -File $filterPath --settings $item.Settings --command $Command)
+      $output = @($Payload | & $bunCommand.Source run $filterPath --settings $item.Settings --command $Command)
       $exitCode = $LASTEXITCODE
       # WHY empty strings dropped: a blank line ahead of the verdict is not
       # content, so the count is of verdict lines. The POSIX twin drops the same

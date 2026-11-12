@@ -63,7 +63,7 @@ BeforeAll {
     # proves the filters ever reach their destination.
     $fixtureFilterDir = Join-Path -Path $sourceDir -ChildPath 'filters'
     $null = New-Item -ItemType Directory -Path $fixtureFilterDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
-    foreach ($filter in @(Get-ChildItem -LiteralPath (Join-Path -Path $script:NotifyDir -ChildPath 'filters') -File -Filter '*.ps1')) {
+    foreach ($filter in @(Get-ChildItem -LiteralPath (Join-Path -Path $script:NotifyDir -ChildPath 'filters') -File -Filter '*.ts')) {
       Copy-Item -LiteralPath $filter.FullName -Destination (Join-Path -Path $fixtureFilterDir -ChildPath $filter.Name)
     }
 
@@ -387,7 +387,7 @@ Describe 'Sync-HarnessBridge shim convergence' {
     # The filters are child processes the runner resolves beside itself: they have
     # to reach their directory, and they get no shim because nothing invokes them
     # by PATH.
-    foreach ($filter in @(Get-ChildItem -LiteralPath (Join-Path -Path $script:syncSandbox.Repo -ChildPath 'src\scripts\notify\filters') -File -Filter '*.ps1')) {
+    foreach ($filter in @(Get-ChildItem -LiteralPath (Join-Path -Path $script:syncSandbox.Repo -ChildPath 'src\scripts\notify\filters') -File -Filter '*.ts')) {
       $deployedFilter = Join-Path -Path (Join-Path -Path $script:syncBinDir -ChildPath 'filters') -ChildPath $filter.Name
       Test-Path -LiteralPath $deployedFilter | Should -Be $true
       (Get-Content -LiteralPath $deployedFilter -Raw -Encoding UTF8) | Should -Be (Get-Content -LiteralPath $filter.FullName -Raw -Encoding UTF8)
@@ -402,7 +402,7 @@ Describe 'Sync-HarnessBridge shim convergence' {
       (Join-Path -Path $script:syncBinDir -ChildPath 'harness-drive.ps1')
       (Join-Path -Path $script:syncBinDir -ChildPath 'harness-bridge-common.ps1')
       (Join-Path -Path $script:syncBinDir -ChildPath 'harness-filter.ps1')
-      (Join-Path -Path $script:syncBinDir -ChildPath 'filters\safe-delete.ps1')
+      (Join-Path -Path $script:syncBinDir -ChildPath 'filters\safe-delete.ts')
       (Join-Path -Path $script:syncShimDir -ChildPath 'harness-notify.cmd')
       (Join-Path -Path $script:syncShimDir -ChildPath 'harness-approval.cmd')
       (Join-Path -Path $script:syncShimDir -ChildPath 'harness-drive.cmd')
@@ -422,14 +422,14 @@ Describe 'Sync-HarnessBridge shim convergence' {
     # left behind by a rename or a deletion would keep answering a filter the
     # registry no longer declares.
     $deployedFilterDir = Join-Path -Path $script:syncBinDir -ChildPath 'filters'
-    $staleFilter = Join-Path -Path $deployedFilterDir -ChildPath 'stale-filter.ps1'
+    $staleFilter = Join-Path -Path $deployedFilterDir -ChildPath 'stale-filter.ts'
     $null = New-Item -ItemType Directory -Path $deployedFilterDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
     $null = Set-Content -Path $staleFilter -Value '# stale filter' -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
 
     Sync-HarnessBridge -Enabled:$true -RepoRoot $script:syncSandbox.Repo -UserRoot $script:syncUserRoot -UserProfile $script:syncSandbox.Home > $null
 
     Test-Path -LiteralPath $staleFilter | Should -Be $false
-    Test-Path -LiteralPath (Join-Path -Path $deployedFilterDir -ChildPath 'safe-delete.ps1') | Should -Be $true
+    Test-Path -LiteralPath (Join-Path -Path $deployedFilterDir -ChildPath 'safe-delete.ts') | Should -Be $true
   }
 
   It 'removes the shims and deployed copies on a disabled run, keeping unmanaged files' {

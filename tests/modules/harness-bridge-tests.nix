@@ -27,12 +27,17 @@ let
   ];
 
   # The deletion guard is a deployed PATH command in its own right rather than a
-  # bridge entry point: a POSIX script in src/scripts, and on Windows a shim
-  # Sync-SafeDelete.ps1 writes around its PowerShell implementation. No hook file
-  # registers it: every harness that carries a hook file runs the filter runner.
+  # bridge entry point: on POSIX a home-manager file that runs the shared policy,
+  # and on Windows a .cmd shim Sync-SafeDelete.ps1 writes around it. The policy is
+  # one file both platforms run, so neither side carries a second implementation.
+  # No hook file registers the guard: every harness that carries a hook file runs
+  # the filter runner.
   hookCommands = entryPoints;
-  guardScript = "/src/scripts/safe-delete-guard.sh";
-  guardWindowsImplementation = "/src/platforms/Windows/modules/user/Sync-SafeDeleteGuard.ps1";
+  guardPolicy = "/src/scripts/notify/filters/safe-delete.ts";
+  guardPosixWiring = "/src/modules/shell/default.nix";
+  guardWindowsWiring = "/src/platforms/Windows/modules/user/Sync-SafeDelete.ps1";
+  flatGuardPosixWiring = flatten (read guardPosixWiring);
+  flatGuardWindowsWiring = flatten (read guardWindowsWiring);
 
   copilotHooks =
     (builtins.fromJSON (read "/src/users/default/agents/hooks/harness-notify.json")).hooks;
@@ -100,11 +105,15 @@ in
       ))
       "hook commands must be bare PATH-resolved names; an absolute path, home expansion, or environment reference cannot work on all three hosts"
     )
-    (assert' (builtins.pathExists (root + guardScript))
-      "the deletion guard needs its POSIX implementation, or the deployed safe-delete-guard command does not exist"
+    (assert' (builtins.pathExists (root + guardPolicy))
+      "the deletion guard and the filter runner must run one shared policy file, or the two agent-blocking paths drift apart"
     )
-    (assert' (builtins.pathExists (root + guardWindowsImplementation))
-      "the deletion guard needs its Windows implementation, which Sync-SafeDelete.ps1 exposes as the safe-delete-guard.cmd shim; without it the shim has nothing to run"
+    (assert'
+      (builtins.match ".*src/scripts/notify/filters/safe-delete[.]ts.*" flatGuardPosixWiring != null)
+      "the POSIX safe-delete-guard command must name the shared policy file, or the deployed command runs something else"
+    )
+    (assert' (builtins.match ".*filters\\\\safe-delete[.]ts.*--hook.*" flatGuardWindowsWiring != null)
+      "the Windows safe-delete-guard.cmd shim must run the shared policy file in its --hook mode, or the shim guards with a pattern set of its own"
     )
 
     # --- Timeout budget covers the approval wait ---

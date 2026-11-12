@@ -14,7 +14,8 @@
 #   4. aggregation and failure handling, against a fixture registry and fixture
 #      filters, because the shipped registry carries one filter and so cannot
 #      show that deny outranks ask outranks allow;
-#   5. the shipped registry itself.
+#   5. the shipped registry itself; and 6. the missing-runtime contract, since a
+#      filter is a bun program and a host without bun still has to answer.
 #
 # The runner resolves its filters beside itself and its registry through
 # derive_repo_root, so every case runs from a copy of the real runner, the real
@@ -52,11 +53,11 @@ readonly RUNNER FILTER_DIR LIB_DIR LIB_DIR_DIR LOGS_APP REGISTRY SCHEMA
 require_command jq "the runner and the filter registry both need jq"
 require_command check-jsonschema "the shipped registry is validated against its schema"
 require_command python3 "the schema file is parsed with python3"
-require_command bash "the filter runs under bash and this suite resolves its interpreter"
-require_command sh "the filter resolves a deletion word through sh -c"
-require_command readlink "the filter reads the wrapper's link target with readlink"
+require_command bun "a filter is a bun program, and this suite runs it the way the runner does"
+BUN="$(command -v bun)"
+readonly BUN
 
-for _required in "$RUNNER" "$APPROVAL" "$FILTER_DIR/safe-delete.sh" "$LIB_DIR" "$LIB_DIR_DIR/harness-audit.sh" "$LOGS_APP" "$REGISTRY"; do
+for _required in "$RUNNER" "$APPROVAL" "$FILTER_DIR/safe-delete.ts" "$LIB_DIR" "$LIB_DIR_DIR/harness-audit.sh" "$LOGS_APP" "$REGISTRY"; do
   if [ ! -e "$_required" ]; then
     assert_fail "runner assets present" "$_required does not exist"
     finish_tests
@@ -86,7 +87,7 @@ make_tree() { # <name>
   # The bridge entry points source nucleus-logs' writer library from three levels
   # up, so the fixture keeps the same layout the bundle has.
   cp "$LOGS_APP" "$_root/scripts/logs.sh"
-  cp "$FILTER_DIR"/*.sh "$_root/src/scripts/notify/filters/"
+  cp "$FILTER_DIR"/*.ts "$_root/src/scripts/notify/filters/"
   cp "$REGISTRY" "$_root/src/modules/configs/harness-filters.json"
   printf '%s\n' "$_root"
 }
@@ -95,13 +96,13 @@ set_registry() { # <tree> <json>
   printf '%s\n' "$2" >"$1/src/modules/configs/harness-filters.json"
 }
 
-# A fixture filter, named the way the registry names it. %b expands the body's
-# \n escapes: written literally, a body whose second line starts with a redirect
-# leaves ">&2\nexit 3" on one line, where bash reads it as a `>&2nexit` redirect
-# in the suite's working directory and no failing exit at all.
+# A fixture filter, named the way the registry names it. The body is JavaScript:
+# the runner starts it with bun, so a fixture is a .ts file like a shipped filter.
+# WHY no %b: a body's `\t` separators are JavaScript escapes inside a string
+# literal, and expanding them here would write a raw tab into the source and put
+# the three fields on one line with nothing separating them.
 add_filter() { # <tree> <id> <body>
-  printf '#!/usr/bin/env bash\n%b\n' "$3" >"$1/src/scripts/notify/filters/$2.sh"
-  chmod +x "$1/src/scripts/notify/filters/$2.sh"
+  printf '%s\n' "$3" >"$1/src/scripts/notify/filters/$2.ts"
 }
 
 run_runner() { # <tree> <harness> <payload>
@@ -112,15 +113,15 @@ run_runner() { # <tree> <harness> <payload>
 }
 
 run_filter() { # <settings> <command>
-  "$FILTER_DIR/safe-delete.sh" --settings "$1" --command "$2" </dev/null
+  "$BUN" run "$FILTER_DIR/safe-delete.ts" --settings "$1" --command "$2" </dev/null
 }
 
 # The redirect proof depends on the caller's PATH and HOME, so those cases set
-# both and run the filter through this shell's own bash. The interpreter is named
+# both and run the filter through this shell's own bun. The runtime is named
 # outright because a case that narrows PATH to the point of carrying no deletion
-# command would otherwise lose the shebang's `env bash` lookup too.
+# command would otherwise lose the runner's `bun` lookup too.
 run_filter_env() { # <home> <path> <settings> <command>
-  HOME="$1" PATH="$2" "$BASH_PATH" "$FILTER_DIR/safe-delete.sh" --settings "$3" --command "$4" </dev/null
+  HOME="$1" PATH="$2" "$BUN" run "$FILTER_DIR/safe-delete.ts" --settings "$3" --command "$4" </dev/null
 }
 
 assert_decision() { # <name> <line> <decision> <rule>
@@ -176,12 +177,11 @@ for _case in "${FILTER_CASES[@]}"; do
   assert_decision "$_rule: $_command" "$(run_filter "$_settings" "$_command")" "$_decision" "$_rule"
 done
 
-# Guard, not a red-before case: the case fold is closed above this comparison, so
-# a value spelled 'Allow' must stay unmatched and deny. The mutation that flips it
-# is a fold left in force across `case "$_sd_unproven"`: the verb block opens its
-# own fold, and without the `shopt -u` that closes it `Allow` would match and
-# allow with every other case still green. The PowerShell twin compares with -ceq
-# for the same reason.
+# Guard, not a red-before case: a value spelled 'Allow' must stay unmatched and
+# deny, because the policy compares settings.unproven against the three accepted
+# words without folding case. A fold applied to the setting would allow with every
+# other case still green, and the PowerShell twin compares with -ceq for the same
+# reason.
 assert_decision "an uppercase settings.unproven value denies (guard: the fold stops above the setting)" \
   "$(run_filter '{"unproven":"Allow"}' 'rm x')" deny unproven-redirect
 
@@ -192,7 +192,6 @@ section 2 "redirect proof (safe-delete)"
 # These fixtures are the five shapes that answer: that link, a plain file at the
 # same path, a link the user pointed elsewhere, an absent command, and a plain rm
 # ahead of everything on PATH.
-BASH_PATH="$(command -v bash)"
 PROVEN_HOME="$WORK/proven-home"
 PLAIN_WRAPPER_HOME="$WORK/plain-wrapper-home"
 WRONG_TARGET_HOME="$WORK/wrong-target-home"
@@ -202,7 +201,7 @@ MIN_BIN="$WORK/min-bin"
 # The home-manager file tree the real deployment links into. A fixture cannot
 # write a Nix store path, so the tree only carries the shape the proof reads.
 HM_TREE="$WORK/store/0123456789ab-home-manager-files"
-readonly BASH_PATH PROVEN_HOME PLAIN_WRAPPER_HOME WRONG_TARGET_HOME EMPTY_HOME PLAIN_BIN MIN_BIN HM_TREE
+readonly PROVEN_HOME PLAIN_WRAPPER_HOME WRONG_TARGET_HOME EMPTY_HOME PLAIN_BIN MIN_BIN HM_TREE
 mkdir -p "$PROVEN_HOME/.local/bin" "$PLAIN_WRAPPER_HOME/.local/bin" "$WRONG_TARGET_HOME/.local/bin" \
   "$EMPTY_HOME" "$PLAIN_BIN" "$MIN_BIN" "$HM_TREE/.local/bin"
 # WHY a symlink to an executable: `command -v` skips a link it cannot run, so a
@@ -214,11 +213,9 @@ ln -s /bin/rm "$WRONG_TARGET_HOME/.local/bin/rm"
 printf '#!/bin/sh\nexit 0\n' >"$PLAIN_WRAPPER_HOME/.local/bin/rm"
 printf '#!/bin/sh\nexit 0\n' >"$PLAIN_BIN/rm"
 chmod +x "$PLAIN_WRAPPER_HOME/.local/bin/rm" "$PLAIN_BIN/rm"
-# The filter needs jq for its settings, sh for the lookup, and readlink for the
-# wrapper's target, and nothing else.
-for _tool in jq sh readlink; do
-  ln -s "$(command -v "$_tool")" "$MIN_BIN/$_tool"
-done
+# The policy resolves the wrapper's link target with node builtins, so a narrowed
+# PATH needs no tool at all: the only property these cases need is the absence of
+# a deletion command ahead of the wrapper.
 
 PROVEN_PATH="$PROVEN_HOME/.local/bin:$MIN_BIN"
 NO_RM_PATH="$MIN_BIN"
@@ -378,17 +375,17 @@ assert_document "a missing registry asks instead of allowing silently" "$_missin
 section 4 "aggregation and filter failure"
 
 AGG="$(make_tree aggregation)"
-add_filter "$AGG" allow-first 'printf "allow\tno-match\tfirst\n"'
-add_filter "$AGG" ask-second 'printf "ask\tunproven-redirect\tsecond\n"'
-add_filter "$AGG" deny-third 'printf "deny\tnative-path\tthird\n"'
-add_filter "$AGG" crash "printf 'boom\n' >&2\nexit 3"
-add_filter "$AGG" garbage 'printf "not a decision line\n"'
+add_filter "$AGG" allow-first 'console.log("allow\tno-match\tfirst");'
+add_filter "$AGG" ask-second 'console.log("ask\tunproven-redirect\tsecond");'
+add_filter "$AGG" deny-third 'console.log("deny\tnative-path\tthird");'
+add_filter "$AGG" crash 'console.error("boom"); process.exit(3);'
+add_filter "$AGG" garbage 'console.log("not a decision line");'
 # A decision line plus a second line: the protocol is one verdict per filter, and
 # a harness reading the whole stdout or its last line could act on the extra one.
-add_filter "$AGG" twoline 'printf "allow\tno-match\tquiet\ngarbage\n"'
+add_filter "$AGG" twoline 'console.log("allow\tno-match\tquiet"); console.log("garbage");'
 # A blank line ahead of the verdict is not content: the Windows twin drops empty
 # strings before it counts, so both runners have to read this as one verdict.
-add_filter "$AGG" blankfirst 'printf "\nallow\tno-match\tquiet\n"'
+add_filter "$AGG" blankfirst 'console.log(""); console.log("allow\tno-match\tquiet");'
 
 set_registry "$AGG" '{"filters":[{"enabled":true,"id":"allow-first","settings":{}},{"enabled":true,"id":"ask-second","settings":{}},{"enabled":true,"id":"deny-third","settings":{}}]}'
 if [ "$(run_runner "$AGG" copilot '{"command":"anything"}')" = "$(printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"deny-third (native-path): third"}}')" ]; then
@@ -493,6 +490,57 @@ if _retired_out="$(check-jsonschema --schemafile "$SCHEMA" "$_retired_registry" 
   assert_fail "the schema rejects a settings.unproven value the filter no longer reads" "a registry naming route validated: $_retired_out"
 else
   assert_pass "the schema rejects a settings.unproven value the filter no longer reads"
+fi
+
+section 6 "missing runtime"
+
+# A filter is a bun program, so a host without bun cannot state a verdict. The
+# contract is ask with rule filter-error and exit 0, never a hard exit: several
+# harnesses read a failed hook as a denial, and the warning on stderr is what
+# reaches a human.
+#
+# WHY a shadow bin directory: one tool cannot be dropped from PATH without
+# re-rooting it, and bun shares its directory with the tools the runner needs. So
+# every regular file on PATH is linked back in except bun itself, and a case fails
+# on the missing runtime rather than on a missing sed.
+NO_BUN_BIN="$WORK/no-bun-bin"
+NO_BUN_STDERR="$WORK/no-bun.stderr"
+readonly NO_BUN_BIN NO_BUN_STDERR
+mkdir -p "$NO_BUN_BIN"
+while IFS= read -r _dir; do
+  [ -d "$_dir" ] || continue
+  for _entry in "$_dir"/*; do
+    [ -f "$_entry" ] || continue
+    _name="${_entry##*/}"
+    case "$_name" in
+    bun | bunx) continue ;;
+    esac
+    ln -sf "$_entry" "$NO_BUN_BIN/$_name"
+  done
+done < <(printf '%s' "$PATH" | tr ':' '\n')
+
+if [ ! -e "$NO_BUN_BIN/bun" ]; then
+  assert_pass "the shadow bin directory carries every tool except bun"
+else
+  assert_fail "the shadow bin directory carries every tool except bun" "$NO_BUN_BIN/bun exists, so the cases below would not test a missing runtime"
+fi
+
+_no_bun_status=0
+_no_bun_line="$(PATH="$NO_BUN_BIN" NUCLEUS_REPO_ROOT="$TREE" "$RUNNER" pi <<<'{"command":"/bin/rm x"}' 2>"$NO_BUN_STDERR")" || _no_bun_status=$?
+if [ "$_no_bun_line" = "ask" ] && [ "$_no_bun_status" -eq 0 ]; then
+  assert_pass "a missing bun answers ask and exits 0"
+else
+  assert_fail "a missing bun answers ask and exits 0" "got '$_no_bun_line' with exit $_no_bun_status"
+fi
+
+_no_bun_document="$(PATH="$NO_BUN_BIN" NUCLEUS_REPO_ROOT="$TREE" "$RUNNER" copilot <<<'{"command":"/bin/rm x"}' 2>/dev/null)"
+assert_document "a missing bun is recorded as filter-error" "$_no_bun_document" \
+  '.hookSpecificOutput.permissionDecision == "ask" and (.hookSpecificOutput.permissionDecisionReason | contains("filter-error"))'
+
+if grep -q 'bun is not on PATH' "$NO_BUN_STDERR"; then
+  assert_pass "a missing bun warns on stderr, where a human looks"
+else
+  assert_fail "a missing bun warns on stderr, where a human looks" "stderr carried no bun warning: $(cat "$NO_BUN_STDERR")"
 fi
 
 finish_tests

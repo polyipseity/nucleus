@@ -55,7 +55,7 @@ BeforeAll {
     foreach ($name in @('harness-bridge-common', 'harness-filter')) {
       Copy-Item -LiteralPath (Join-Path -Path $script:NotifyDir -ChildPath "$name.ps1") -Destination (Join-Path -Path $notifyCopy -ChildPath "$name.ps1")
     }
-    foreach ($filter in @(Get-ChildItem -LiteralPath $script:FiltersDir -File -Filter '*.ps1')) {
+    foreach ($filter in @(Get-ChildItem -LiteralPath $script:FiltersDir -File -Filter '*.ts')) {
       Copy-Item -LiteralPath $filter.FullName -Destination (Join-Path -Path (Join-Path -Path $notifyCopy 'filters') -ChildPath $filter.Name)
     }
     Copy-Item -LiteralPath $script:RegistryPath -Destination (Join-Path -Path $configCopy -ChildPath 'harness-filters.json')
@@ -130,7 +130,7 @@ BeforeAll {
     .PARAMETER Id
       Filter id the registry names.
     .PARAMETER Body
-      Script body, which prints the protocol line.
+      JavaScript body, which prints the protocol line.
     #>
     [CmdletBinding()]
     param(
@@ -144,7 +144,7 @@ BeforeAll {
       [string]$Body
     )
 
-    $path = Join-Path -Path (Join-Path -Path $Root 'src\scripts\notify\filters') -ChildPath "$Id.ps1"
+    $path = Join-Path -Path (Join-Path -Path $Root 'src\scripts\notify\filters') -ChildPath "$Id.ts"
     [System.IO.File]::WriteAllText($path, $Body, [System.Text.UTF8Encoding]::new($false))
   }
 
@@ -365,9 +365,9 @@ Describe 'safe-delete deletion-verb case matching' {
 
 Describe 'aggregation and filter failure' {
   It 'ranks deny above ask above allow in any registry order' {
-    Add-FilterScript -Root $script:Sandbox -Id 'allow-all' -Body 'Write-Output ("allow`tno-match`tfirst")'
-    Add-FilterScript -Root $script:Sandbox -Id 'ask-all' -Body 'Write-Output ("ask`tunproven-redirect`tsecond")'
-    Add-FilterScript -Root $script:Sandbox -Id 'deny-all' -Body 'Write-Output ("deny`tnative-path`tthird")'
+    Add-FilterScript -Root $script:Sandbox -Id 'allow-all' -Body 'console.log("allow\tno-match\tfirst");'
+    Add-FilterScript -Root $script:Sandbox -Id 'ask-all' -Body 'console.log("ask\tunproven-redirect\tsecond");'
+    Add-FilterScript -Root $script:Sandbox -Id 'deny-all' -Body 'console.log("deny\tnative-path\tthird");'
 
     foreach ($order in @(
         '{"filters":[{"enabled":true,"id":"allow-all","settings":{}},{"enabled":true,"id":"ask-all","settings":{}},{"enabled":true,"id":"deny-all","settings":{}}]}',
@@ -391,7 +391,7 @@ Describe 'aggregation and filter failure' {
   }
 
   It 'records a crashing filter as filter-error' {
-    Add-FilterScript -Root $script:Sandbox -Id 'crash' -Body 'Write-Error "boom"; exit 3'
+    Add-FilterScript -Root $script:Sandbox -Id 'crash' -Body 'console.error("boom"); process.exit(3);'
     Set-FilterRegistry -Root $script:Sandbox -Document '{"filters":[{"enabled":true,"id":"crash","settings":{}}]}'
     $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"anything"}'
 
@@ -425,7 +425,7 @@ Describe 'aggregation and filter failure' {
     # WHY: -in folds case, so without -cnotin the uppercase decision would survive
     # normalization and then lose the case-sensitive rank lookup, which reads as
     # allow. The POSIX twin answers ask for the same bytes.
-    Add-FilterScript -Root $script:Sandbox -Id 'upper' -Body 'Write-Output ("DENY`tsome-rule`tuppercase")'
+    Add-FilterScript -Root $script:Sandbox -Id 'upper' -Body 'console.log("DENY\tsome-rule\tuppercase");'
     Set-FilterRegistry -Root $script:Sandbox -Document '{"filters":[{"enabled":true,"id":"upper","settings":{}}]}'
     $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"anything"}'
 
@@ -435,7 +435,7 @@ Describe 'aggregation and filter failure' {
   It 'keeps a filter diagnostic off the verdict path' {
     # WHY: the verdict is the single stdout line. A stderr diagnostic that happens
     # to look like a protocol line must not become the answer.
-    Add-FilterScript -Root $script:Sandbox -Id 'noisy' -Body 'Write-Output ("allow`tno-match`tquiet"); [Console]::Error.WriteLine("ask`tunproven-redirect`tstderr")'
+    Add-FilterScript -Root $script:Sandbox -Id 'noisy' -Body 'console.log("allow\tno-match\tquiet"); console.error("ask\tunproven-redirect\tstderr");'
     Set-FilterRegistry -Root $script:Sandbox -Document '{"filters":[{"enabled":true,"id":"noisy","settings":{}}]}'
     $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"anything"}'
 
@@ -448,7 +448,7 @@ Describe 'aggregation and filter failure' {
     # its last line could take as another answer, has stated no verdict, so the
     # runner falls back to ask and names filter-error, the document the POSIX
     # twin prints for the same bytes.
-    Add-FilterScript -Root $script:Sandbox -Id 'twoline' -Body 'Write-Output ("allow`tno-match`tquiet"); Write-Output "garbage"'
+    Add-FilterScript -Root $script:Sandbox -Id 'twoline' -Body 'console.log("allow\tno-match\tquiet"); console.log("garbage");'
     Set-FilterRegistry -Root $script:Sandbox -Document '{"filters":[{"enabled":true,"id":"twoline","settings":{}}]}'
     $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"anything"}'
 
@@ -461,7 +461,7 @@ Describe 'aggregation and filter failure' {
     # WHY: the POSIX twin drops empty lines before it counts, so a blank line
     # ahead of the verdict is not content on either platform. Counting raw lines
     # here would answer filter-error for bytes the POSIX twin accepts.
-    Add-FilterScript -Root $script:Sandbox -Id 'blankfirst' -Body 'Write-Output ""; Write-Output ("allow`tno-match`tquiet")'
+    Add-FilterScript -Root $script:Sandbox -Id 'blankfirst' -Body 'console.log(""); console.log("allow\tno-match\tquiet");'
     Set-FilterRegistry -Root $script:Sandbox -Document '{"filters":[{"enabled":true,"id":"blankfirst","settings":{}}]}'
     $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"anything"}'
 

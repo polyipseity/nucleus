@@ -15,13 +15,17 @@
 # file is data, not a script, and so never reaches the script-tree bundle.
 #
 # Filter protocol (one process per enabled registry entry, in registry order):
-#   filters/<id>.sh --settings <json> --command <text>
+#   bun filters/<id>.ts --settings <json> --command <text>
 #   stdin  the raw hook payload, for a filter that needs more than the command
 #   stdout exactly one non-empty line: decision<TAB>rule<TAB>reason
-#   decision is allow, ask, or deny; a non-zero exit, a missing script, or an
-#   output that is not exactly one non-empty line carrying three tab-separated
-#   fields is recorded as ask with rule `filter-error`, because the filter could
-#   not state a verdict.
+#   decision is allow, ask, or deny; a missing bun, a missing filter, a non-zero
+#   exit, or an output that is not exactly one non-empty line carrying three
+#   tab-separated fields is recorded as ask with rule `filter-error`, because the
+#   filter could not state a verdict.
+#
+# WHY bun and one file per filter instead of a per-platform twin: the Windows twin
+# runs the same `filters/<id>.ts` through the same runtime, so one program decides
+# for every harness on every host and no pair of implementations can drift.
 #
 # The decisions aggregate as deny > ask > allow regardless of registry order, so
 # registry order stays readable instead of load-bearing. `ask` means "no decision
@@ -185,6 +189,16 @@ fi
 _hf_description="$(printf '%s' "$_hf_command" | tr -s '[:space:]' ' ')"
 _hf_description="${_hf_description:0:200}"
 
+# WHY ask rather than a hard error: a host without the runtime cannot state a
+# verdict, and several harnesses read a failed hook as a denial, so aborting would
+# block a session over a missing tool. The warning is what reaches a human; the
+# answer is the same filter-error the runner gives a filter that cannot run.
+_hf_bun=""
+if ! _hf_bun="$(command -v bun)"; then
+  warn "bun is not on PATH, so no filter can run: asking locally"
+  _hf_finish ask "harness-filter (filter-error): bun is not on PATH, so the filter runtime is missing" filter-error
+fi
+
 # WHY empty: "no filter spoke" is not a verdict, so it must not win the
 # comparison below. The fallback is ask, and a filter that allows still outranks
 # that fallback.
@@ -199,11 +213,11 @@ while IFS= read -r _hf_entry; do
   fi
   _hf_id="$(jq -r '.id' <<<"$_hf_entry")"
   _hf_settings="$(jq -c '.settings' <<<"$_hf_entry")"
-  _hf_filter="$SCRIPT_DIR/filters/$_hf_id.sh"
+  _hf_filter="$SCRIPT_DIR/filters/$_hf_id.ts"
   _hf_line=""
   if [ ! -f "$_hf_filter" ]; then
     _hf_line="$(printf 'ask\tfilter-error\tno filter script at %s' "$_hf_filter")"
-  elif ! _hf_line="$("$_hf_filter" --settings "$_hf_settings" --command "$_hf_command" <<<"$_hf_payload")"; then
+  elif ! _hf_line="$("$_hf_bun" run "$_hf_filter" --settings "$_hf_settings" --command "$_hf_command" <<<"$_hf_payload")"; then
     # WHY the filter's own stderr is left alone: it already reached this process's
     # stderr, and merging it into the line would make a plain diagnostic read as
     # the verdict.

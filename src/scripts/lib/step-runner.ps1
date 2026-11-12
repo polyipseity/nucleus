@@ -859,6 +859,8 @@ function Format-StepSummary {
 
 function Test-Prerequisite {
   Assert-ToolAvailable -Name 'actionlint' -Type 'Command'
+  # WHY: harness-filter runs every filters/<id>.ts through bun, so a host without bun cannot gate a tool call.
+  Assert-ToolAvailable -Name 'bun' -Type 'Command'
   Assert-ToolAvailable -Name 'check-jsonschema' -Type 'Command'
   Assert-ToolAvailable -Name 'git' -Type 'Command'
   Assert-ToolAvailable -Name 'jq' -Type 'Command'

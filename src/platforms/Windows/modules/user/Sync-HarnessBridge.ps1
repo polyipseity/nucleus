@@ -16,7 +16,7 @@
     <USER root>\bin\harness-drive.ps1     deployed copy of the entry point
     <USER root>\bin\harness-filter.ps1    deployed copy of the entry point
     <USER root>\bin\harness-bridge-common.ps1  helper the entry points dot-source
-    <USER root>\bin\filters\*.ps1          the copies harness-filter runs
+    <USER root>\bin\filters\*.ts          the copies harness-filter runs
     %USERPROFILE%\.local\bin\harness-notify.cmd    shim -> <USER root>\bin copy
     %USERPROFILE%\.local\bin\harness-approval.cmd  shim -> <USER root>\bin copy
     %USERPROFILE%\.local\bin\harness-drive.cmd     shim -> <USER root>\bin copy
@@ -178,7 +178,7 @@ function Sync-HarnessBridge {
 
     $deployedFilterDir = Join-Path -Path $binDir -ChildPath $filterDirName
     $null = New-Item -ItemType Directory -Path $deployedFilterDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
-    foreach ($sourceFilter in @(Get-ChildItem -LiteralPath $sourceFilterDir -File -Filter '*.ps1')) {
+    foreach ($sourceFilter in @(Get-ChildItem -LiteralPath $sourceFilterDir -File -Filter '*.ts')) {
       $targetFilter = Join-Path -Path $deployedFilterDir -ChildPath $sourceFilter.Name
       $filterNeedsCopy = $true
       if (Test-Path -LiteralPath $targetFilter -PathType Leaf) {
@@ -193,8 +193,8 @@ function Sync-HarnessBridge {
     # WHY a prune: the runner resolves a filter by the id the registry names, so a
     # copy left behind by a rename or a deletion would keep answering a filter the
     # registry no longer declares. The source set is the only authority.
-    $sourceFilterNames = @(Get-ChildItem -LiteralPath $sourceFilterDir -File -Filter '*.ps1' | ForEach-Object { $_.Name })
-    foreach ($deployedFilter in @(Get-ChildItem -LiteralPath $deployedFilterDir -File -Filter '*.ps1')) {
+    $sourceFilterNames = @(Get-ChildItem -LiteralPath $sourceFilterDir -File -Filter '*.ts' | ForEach-Object { $_.Name })
+    foreach ($deployedFilter in @(Get-ChildItem -LiteralPath $deployedFilterDir -File -Filter '*.ts')) {
       if ($deployedFilter.Name -notin $sourceFilterNames) {
         Remove-Item -LiteralPath $deployedFilter.FullName -Force
         Write-NucleusNotice -Message "[$label] removed stale filter $($deployedFilter.FullName)"

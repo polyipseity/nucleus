@@ -14,6 +14,9 @@
     <USER root>\bin\rm.exe, del.exe, rd.exe, rmdir.exe, erase.exe, ri.exe
       deployed copies of rip.exe (from Scoop shims dir)
     %USERPROFILE%\.local\bin\rm.exe, del.exe, ...  PATH shims (copies)
+    %USERPROFILE%\.local\bin\safe-delete-guard.cmd   launcher for the shared
+      deletion policy, which Sync-HarnessBridge deploys into
+      <USER root>\bin\filters
 
 .PARAMETER Enabled
   Whether safe-delete shims should be enforced.
@@ -170,16 +173,14 @@ function Sync-SafeDelete {
     Set-ItemProperty -Path $autoRunKey -Name AutoRun -Value $newVal -Type String
   }
 
-  # Agent guard: deploy as PATH shim
-  $guardSource = Join-Path -Path $RepoRoot -ChildPath "src\platforms\Windows\modules\user\Sync-SafeDeleteGuard.ps1"
+  # Agent guard: a PATH shim around the one deletion policy, run in its --hook
+  # mode. The policy file is the copy Sync-HarnessBridge deploys, so the shim, the
+  # harness filters, and the POSIX safe-delete-guard command all execute the same
+  # bytes instead of a per-platform pattern set that can drift.
+  $guardPolicy = Join-Path -Path $binDir -ChildPath "filters\safe-delete.ts"
   $guardDest = Join-Path -Path $shimDir -ChildPath "safe-delete-guard.cmd"
-  if (Test-Path -LiteralPath $guardSource) {
-    $guardContent = "@echo off`r`npwsh -NoProfile -File `"$guardSource`" %*`r`n"
-    Set-Content -Path $guardDest -Value $guardContent -Force
-  } else {
-    # The skip is a real branch: without it the agent guard silently never deploys.
-    Write-NucleusWarning -CommandName 'Sync-SafeDelete' "guard source not found at '$guardSource'; safe-delete-guard.cmd not deployed"
-  }
+  $guardContent = "@echo off`r`nbun run `"$guardPolicy`" --hook %*`r`n"
+  Set-Content -Path $guardDest -Value $guardContent -Force
 
   # Git Bash: rm alias to rip
   $bashrc = Join-Path -Path $UserProfile -ChildPath ".bashrc"

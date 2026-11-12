@@ -769,6 +769,8 @@ aggregate_results() {
 
 preflight_check() {
   require_command actionlint
+  # WHY: harness-filter runs every filters/<id>.ts through bun, so a host without bun cannot gate a tool call.
+  require_command bun
   require_command check-jsonschema
   require_command git # required by deny-list.sh for gitignore filtering; must hard-fail rather than silently pass through
   require_command jq
