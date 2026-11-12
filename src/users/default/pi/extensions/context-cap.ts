@@ -436,11 +436,10 @@ export function syncModelWindow(
   const result = effectiveWindow(model, { baseline, session, models, settings });
   const changed = model.contextWindow !== result.window;
   if (changed) model.contextWindow = result.window;
-  // The in-place mutation is deliberate: modelsAreEqual compares type, id, and
-  // provider only, so replacing the model with the same one emits no
-  // model_select, while pi's own usage and compaction math reads
-  // model.contextWindow. The status nudge is what repaints the footer and the
-  // model indicator so the new window shows immediately.
+  // The in-place mutation is deliberate: pi's own usage and compaction math
+  // reads model.contextWindow. The status nudge repaints the model indicator;
+  // a footer that caches on the transcript leaf still needs the re-selection
+  // applyCap performs.
   if (changed && ui) nudgeStatus(ui);
   return { changed, window: result.window, source: result.source };
 }
@@ -562,9 +561,6 @@ export function applyToFiles(command: Command, paths: FilePaths, catalog: ModelC
 const nativeCache = new WeakMap<object, number>();
 let sessionOverride: number | null = null;
 
-// Effective window this file last applied.
-let lastEffective: { window: number; source: Source } | null = null;
-
 // Set for the span of this file's own re-selection. pi suppresses the
 // model_select of a re-selection today, because modelsAreEqual compares type,
 // id, and provider only (agent-session.js:1868-1870), so this guard is what
@@ -662,22 +658,13 @@ export default function (pi: ExtensionAPI) {
     const cached = nativeCache.get(model);
     const baseline = cached ?? model.contextWindow;
     if (cached === undefined) nativeCache.set(model, baseline);
-    const previous = lastEffective;
     const result = syncModelWindow(model, baseline, sessionOverride, readJson(modelsPath), pi.getSettings(), ui);
-    lastEffective = { window: result.window, source: result.source };
-    // A repaint is driven by a window change, so a layer switch that keeps the
-    // same window (session 200000 over an identical model window, say) would
-    // leave the footer showing the previous source label until something else
-    // repaints.
-    const sourceMoved = previous !== null && (previous.window !== result.window || previous.source !== result.source);
-    if (!result.changed && sourceMoved && ui) nudgeStatus(ui);
     // The in-place mutation above is not enough for the footer:
     // pi-powerline-footer caches context usage per (sessionManager, leafId)
     // (context-usage.ts:66-84), so only a new transcript entry makes it
     // recompute. Re-selecting costs one model_change entry and one
     // thinking-level re-apply per effective change, and that is the price of
-    // invalidating a leaf-keyed cache; an unchanged window and source re-selects
-    // nothing.
+    // invalidating a leaf-keyed cache; an unchanged window re-selects nothing.
     // A routed selection displays the physical model's window, which the mutation
     // above did not touch, so write it before the re-selection: the leaf move
     // then repaints the footer from the routed window.
@@ -685,7 +672,7 @@ export default function (pi: ExtensionAPI) {
     // the routed window this file applied last time, so an unchanged window still
     // has to be written back for the footer to keep showing it.
     if (routed) syncRoutedWindow(routed, result.window);
-    if (!result.changed && !sourceMoved) return;
+    if (!result.changed) return;
     const selected = await refreshActiveModel(pi, model, result.window, baseline);
     // The mutation already repainted through nudgeStatus, and pi's own usage and
     // compaction math reads model.contextWindow, so a refused re-selection costs
@@ -713,9 +700,6 @@ export default function (pi: ExtensionAPI) {
     // A reload is the one point where pi re-reads settings.json, so its cache is
     // authoritative again and the mirror would only hold a stale copy.
     if (event.reason === "reload") resetWrittenCap();
-    // Reset before the model check: a model-less start must fall back to the
-    // native zero window instead of the previous session's applied value.
-    lastEffective = null;
     warnedNoAuth = false;
     if (!ctx.model) return;
     return applyCap(ctx.model, ctx.ui, ctx);
