@@ -1,12 +1,14 @@
 // Cases for the context-window extension: pure parsing and precedence, the
 // deterministic serializer, and file round-trips against a temp directory so the
-// session command's writes are exercised without touching ~/.pi.
+// session command's writes are exercised without touching ~/.pi. The re-selection
+// cases register the extension with a fake pi, so their only real filesystem
+// contact is the read-only models.json lookup applyCap makes under ~/.pi/agent.
 
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, lstatSync, linkSync, mkdtempSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import {
+import contextCap, {
   applyToFiles,
   effectiveWindow,
   formatFullStatus,
@@ -15,6 +17,7 @@ import {
   parseCommand,
   providerWindow,
   readCap,
+  refreshActiveModel,
   resetWrittenCap,
   resolveWindow,
   serialize,
@@ -22,9 +25,12 @@ import {
   setModelWindow,
   syncModelWindow,
   type ActiveModel,
+  type CapUi,
   type FilePaths,
   type Json,
   type ModelCatalog,
+  type ModelSelector,
+  type RuntimeModel,
 } from "../../../../../src/users/default/pi/extensions/context-cap.ts";
 
 const active: ActiveModel = { provider: "opencode-go", id: "glm-5.1" };
@@ -679,5 +685,140 @@ describe("applyToFiles", () => {
     expect(readFileSync(sibling, "utf8")).toBe('{\n  "contextWindowCap": 256000\n}\n');
     expect(lstatSync(paths.settings).nlink).toBe(2);
     expect(statSync(paths.settings).ino).toBe(statSync(sibling).ino);
+  });
+});
+
+// applyCap is a closure inside the extension factory, so the re-selection cases
+// register the real extension with a fake pi and drive the handlers it registered.
+// The fake supplies the two calls applyCap makes; the extension still reads
+// ~/.pi/agent/models.json itself, read-only.
+type ModelSelectHandler = (event: { model: RuntimeModel }, ctx: { ui: CapUi }) => Promise<void> | void;
+type SessionStartHandler = (
+  event: { reason: string },
+  ctx: { model?: RuntimeModel; ui: CapUi },
+) => Promise<void> | void;
+
+const silentUi: CapUi = { setStatus: () => {}, notify: () => {} };
+
+function loadContextCap(
+  settings: unknown,
+  setModel: ModelSelector["setModel"],
+): { model_select: ModelSelectHandler; session_start: SessionStartHandler } {
+  const handlers: { model_select?: ModelSelectHandler; session_start?: SessionStartHandler } = {};
+  const fakePi = {
+    on: (name: string, handler: unknown) => {
+      if (name === "model_select") handlers.model_select = handler as ModelSelectHandler;
+      if (name === "session_start") handlers.session_start = handler as SessionStartHandler;
+      return () => {};
+    },
+    registerCommand: () => {},
+    getSettings: () => settings,
+    setModel,
+  };
+  contextCap(fakePi as unknown as Parameters<typeof contextCap>[0]);
+  const { model_select: onModelSelect, session_start: onSessionStart } = handlers;
+  // A missing handler would make every case below pass vacuously.
+  if (!onModelSelect || !onSessionStart) throw new Error("context-cap registered no handlers");
+  return { model_select: onModelSelect, session_start: onSessionStart };
+}
+
+describe("refreshActiveModel", () => {
+  test("re-selects a clone with the same provider and id and the requested window", async () => {
+    const selected: RuntimeModel[] = [];
+    const pi: ModelSelector = {
+      setModel: async (model) => {
+        selected.push(model);
+        return true;
+      },
+    };
+    const model: RuntimeModel = { provider: "opencode-go", id: "glm-5.1", contextWindow: 1000000 };
+
+    await expect(refreshActiveModel(pi, model, 256000, 1000000)).resolves.toBe(true);
+
+    expect(selected).toHaveLength(1);
+    const clone = selected[0]!;
+    expect(clone).not.toBe(model);
+    expect(clone.provider).toBe(model.provider);
+    expect(clone.id).toBe(model.id);
+    expect(clone.contextWindow).toBe(256000);
+    expect(model.contextWindow).toBe(1000000);
+  });
+});
+
+describe("re-selecting the model", () => {
+  test("the re-keyed native baseline restores the native window when the cap is cleared", async () => {
+    const settings: { contextWindowCap?: number } = { contextWindowCap: 256000 };
+    const selected: RuntimeModel[] = [];
+    const handlers = loadContextCap(settings, async (model) => {
+      selected.push(model);
+      return true;
+    });
+    await handlers.session_start({ reason: "start" }, { ui: silentUi });
+    const model: RuntimeModel = { provider: "context-cap-test", id: "rekey", contextWindow: 1000000 };
+
+    await handlers.model_select({ model }, { ui: silentUi });
+    expect(selected).toHaveLength(1);
+    const clone = selected[0]!;
+    expect(clone.contextWindow).toBe(256000);
+
+    // The cap is gone, so the next window must come from the native baseline that
+    // refreshActiveModel re-keyed onto the clone, not from the clone's capped value.
+    delete settings.contextWindowCap;
+    await handlers.model_select({ model: clone }, { ui: silentUi });
+
+    expect(clone.contextWindow).toBe(1000000);
+    expect(selected).toHaveLength(2);
+    expect(selected[1]!.contextWindow).toBe(1000000);
+  });
+
+  test("an effective change re-selects once and an identical selection does not re-select again", async () => {
+    const selected: RuntimeModel[] = [];
+    const handlers = loadContextCap({ contextWindowCap: 256000 }, async (model) => {
+      selected.push(model);
+      return true;
+    });
+    await handlers.session_start({ reason: "start" }, { ui: silentUi });
+    const model: RuntimeModel = { provider: "context-cap-test", id: "once", contextWindow: 1000000 };
+
+    await handlers.model_select({ model }, { ui: silentUi });
+    expect(selected).toHaveLength(1);
+    expect(model.contextWindow).toBe(256000);
+
+    // pi holds the clone now, so selecting the same provider and id again must not
+    // append another model_change entry.
+    await handlers.model_select({ model: selected[0]! }, { ui: silentUi });
+    expect(selected).toHaveLength(1);
+  });
+
+  test("a refused re-selection keeps the mutation, repaints, and warns once per session", async () => {
+    const statusCalls: Array<[string, string | undefined]> = [];
+    const notifications: Array<[string, string | undefined]> = [];
+    const ui: CapUi = {
+      setStatus: (key, value) => statusCalls.push([key, value]),
+      notify: (message, type) => notifications.push([message, type]),
+    };
+    const settings: { contextWindowCap?: number } = { contextWindowCap: 256000 };
+    let attempts = 0;
+    const handlers = loadContextCap(settings, async () => {
+      attempts += 1;
+      return false;
+    });
+    await handlers.session_start({ reason: "start" }, { ui });
+    const model: RuntimeModel = { provider: "context-cap-test", id: "no-auth", contextWindow: 1000000 };
+
+    await handlers.model_select({ model }, { ui });
+    expect(attempts).toBe(1);
+    expect(model.contextWindow).toBe(256000);
+    expect(statusCalls).toEqual([["context-window", ""], ["context-window", undefined]]);
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]![1]).toBe("warning");
+    expect(notifications[0]![0]).toContain("context-cap-test/no-auth");
+    expect(notifications[0]![0]).toContain("pi-powerline-footer");
+
+    settings.contextWindowCap = 100000;
+    await handlers.model_select({ model }, { ui });
+    expect(attempts).toBe(2);
+    expect(model.contextWindow).toBe(100000);
+    expect(notifications).toHaveLength(1);
   });
 });

@@ -1,12 +1,13 @@
-// pi context-window control in two duties: enforce one global ceiling when a
-// model is selected, and serve /context-window for status plus set and clear at
-// four scopes. Model and provider windows are models.json entries that pi
-// applies itself, so this file reads them only to report and writes them only
-// on request. Precedence: session > explicit model window > global ceiling >
-// native, so an explicit window always wins over the ceiling. Each `as` below
-// narrows a value this file already checked with asObject or a string guard.
-// This extension installs no footer of its own: the footer belongs to the
-// user's pi-powerline-footer package, whose component is single-owner.
+// pi context-window control in three duties: enforce one global ceiling when a
+// model is selected, serve /context-window for status plus set and clear at
+// four scopes, and re-select the model when the effective window changes so the
+// user's footer recomputes it. Model and provider windows are models.json
+// entries that pi applies itself, so this file reads them only to report and
+// writes them only on request. Precedence: session > explicit model window >
+// global ceiling > native, so an explicit window always wins over the ceiling.
+// Each `as` below narrows a value this file already checked with asObject or a
+// string guard. This extension installs no footer of its own: the footer belongs
+// to the user's pi-powerline-footer package, whose component is single-owner.
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -31,6 +32,10 @@ export interface RuntimeModel {
 
 export interface StatusUi {
   setStatus(key: string, value: string | undefined): void;
+}
+
+export interface CapUi extends StatusUi {
+  notify(message: string, type?: "info" | "warning" | "error"): void;
 }
 
 export type Command =
@@ -68,6 +73,12 @@ export interface FullStatusInput {
 // extension context that pi hands to handlers, so callers pass that.
 export interface ModelCatalog {
   getAll(): readonly { provider: string; id: string }[];
+}
+
+// pi.setModel takes a whole model, while this file knows only the provider, id,
+// and window, so callers pass just the one method a re-selection needs.
+export interface ModelSelector {
+  setModel(model: RuntimeModel): Promise<boolean>;
 }
 
 export interface FilePaths {
@@ -546,15 +557,47 @@ let sessionOverride: number | null = null;
 // Effective window this file last applied.
 let lastEffective: { window: number; source: Source } | null = null;
 
+// Set for the span of this file's own re-selection. pi suppresses the
+// model_select of a re-selection today, because modelsAreEqual compares type,
+// id, and provider only (agent-session.js:1868-1870), so this guard is what
+// keeps a pi that stops suppressing it from looping through applyCap again.
+let refreshing = false;
+
+// One no-auth warning per session: the window stays correct while the provider
+// has no auth, but the footer keeps the old one, and repeating that on every
+// selection is noise.
+let warnedNoAuth = false;
+
+// Re-select the active model so pi appends a model_change entry. That entry is
+// what invalidates the pi-powerline-footer context-usage cache, which keys on
+// (sessionManager, leafId), so the footer recomputes the window on its next
+// render.
+export async function refreshActiveModel(
+  pi: ModelSelector,
+  model: RuntimeModel,
+  window: number,
+  baseline: number,
+): Promise<boolean> {
+  const clone: RuntimeModel = { ...model, contextWindow: window };
+  // WHY: nativeCache is keyed by object identity and pi holds the clone from here
+  // on, so the clone needs the native baseline under its own identity. Without the
+  // re-key the next applyCap would take the capped window as the native baseline,
+  // and a later clear would restore the cap instead of the native window.
+  nativeCache.set(clone, baseline);
+  refreshing = true;
+  try {
+    return await pi.setModel(clone);
+  } finally {
+    refreshing = false;
+  }
+}
+
 export default function (pi: ExtensionAPI) {
   const settingsPath = join(agentDir(), "settings.json");
   const modelsPath = join(agentDir(), "models.json");
   const paths: FilePaths = { settings: settingsPath, models: modelsPath };
 
-  const applyCap = (
-    model: { provider: string; id: string; contextWindow: number },
-    ui?: StatusUi,
-  ): void => {
+  const applyCap = async (model: RuntimeModel, ui?: CapUi): Promise<void> => {
     const cached = nativeCache.get(model);
     const baseline = cached ?? model.contextWindow;
     if (cached === undefined) nativeCache.set(model, baseline);
@@ -567,12 +610,33 @@ export default function (pi: ExtensionAPI) {
     // repaints.
     const sourceMoved = previous !== null && (previous.window !== result.window || previous.source !== result.source);
     if (!result.changed && sourceMoved && ui) nudgeStatus(ui);
+    // The in-place mutation above is not enough for the footer:
+    // pi-powerline-footer caches context usage per (sessionManager, leafId)
+    // (context-usage.ts:66-84), so only a new transcript entry makes it
+    // recompute. Re-selecting costs one model_change entry and one
+    // thinking-level re-apply per effective change, and that is the price of
+    // invalidating a leaf-keyed cache; an unchanged window and source re-selects
+    // nothing.
+    if (!result.changed && !sourceMoved) return;
+    const selected = await refreshActiveModel(pi, model, result.window, baseline);
+    // The mutation already repainted through nudgeStatus, and pi's own usage and
+    // compaction math reads model.contextWindow, so a refused re-selection costs
+    // only the footer refresh.
+    if (selected || !ui || warnedNoAuth) return;
+    warnedNoAuth = true;
+    ui.notify(
+      `cannot re-select ${model.provider}/${model.id}: no auth for that provider, so the pi-powerline-footer context window stays stale until the model is selected again`,
+      "warning",
+    );
   };
 
   // The host repaints after a model switch, but the effective window can change
   // here without changing the model, so nudge explicitly rather than relying on
-  // that render.
-  pi.on("model_select", ({ model }, ctx) => applyCap(model, ctx.ui));
+  // that render. The re-selection this triggers must not come back through here.
+  pi.on("model_select", ({ model }, ctx) => {
+    if (refreshing) return;
+    return applyCap(model, ctx.ui);
+  });
   pi.on("session_start", (event, ctx) => {
     // A reload is the one point where pi re-reads settings.json, so its cache is
     // authoritative again and the mirror would only hold a stale copy.
@@ -580,7 +644,9 @@ export default function (pi: ExtensionAPI) {
     // Reset before the model check: a model-less start must fall back to the
     // native zero window instead of the previous session's applied value.
     lastEffective = null;
-    if (ctx.model) applyCap(ctx.model, ctx.ui);
+    warnedNoAuth = false;
+    if (!ctx.model) return;
+    return applyCap(ctx.model, ctx.ui);
   });
 
   pi.registerCommand("context-window", {
@@ -612,7 +678,7 @@ export default function (pi: ExtensionAPI) {
         // write only reaches pi.getSettings() when pi reloads; without the mirror the
         // next model switch would apply the pre-write cap.
         noteWrittenCap(outcome);
-        applyCap(model, ctx.ui);
+        await applyCap(model, ctx.ui);
       }
 
       const settings = readJson(settingsPath);
