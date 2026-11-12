@@ -9,10 +9,12 @@ import { existsSync, lstatSync, linkSync, mkdtempSync, readFileSync, statSync, s
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import contextCap, {
+  agentPaths,
   applyToFiles,
   effectiveWindow,
   formatFullStatus,
   formatScopeStatus,
+  modelWindow,
   noteWrittenCap,
   parseCommand,
   providerWindow,
@@ -322,6 +324,65 @@ describe("serialize", () => {
     expect(serialize({ zeta: 1, alpha: { beta: true }, list: [{ b: 2, a: 1 }] })).toBe(
       '{\n  "alpha": {\n    "beta": true\n  },\n  "list": [\n    {\n      "a": 1,\n      "b": 2\n    }\n  ],\n  "zeta": 1\n}\n',
     );
+  });
+});
+
+describe("modelWindow", () => {
+  test("returns the explicit override for a matching model", () => {
+    const models: Json = {
+      providers: {
+        "opencode-go": {
+          modelOverrides: {
+            "glm-5.1": { contextWindow: 500000 },
+          },
+        },
+      },
+    };
+    expect(modelWindow(models, "opencode-go", "glm-5.1")).toBe(500000);
+  });
+
+  test("returns null for a mismatched model", () => {
+    const models: Json = {
+      providers: {
+        "opencode-go": {
+          modelOverrides: {
+            "glm-5.1": { contextWindow: 500000 },
+          },
+        },
+      },
+    };
+    expect(modelWindow(models, "opencode-go", "other-model")).toBeNull();
+  });
+
+  test("returns null when the model section is missing", () => {
+    const models: Json = {
+      providers: {
+        "opencode-go": {
+          modelOverrides: {},
+        },
+      },
+    };
+    expect(modelWindow(models, "opencode-go", "glm-5.1")).toBeNull();
+  });
+
+  test("returns null for a non-positive or non-finite window", () => {
+    const zero: Json = {
+      providers: { "opencode-go": { modelOverrides: { "glm-5.1": { contextWindow: 0 } } } },
+    };
+    const negative: Json = {
+      providers: { "opencode-go": { modelOverrides: { "glm-5.1": { contextWindow: -1 } } } },
+    };
+    const notFinite: Json = {
+      providers: { "opencode-go": { modelOverrides: { "glm-5.1": { contextWindow: Number.NaN } } } },
+    };
+    expect(modelWindow(zero, "opencode-go", "glm-5.1")).toBeNull();
+    expect(modelWindow(negative, "opencode-go", "glm-5.1")).toBeNull();
+    expect(modelWindow(notFinite, "opencode-go", "glm-5.1")).toBeNull();
+  });
+
+  test("returns null for an absent catalog", () => {
+    expect(modelWindow(null, "opencode-go", "glm-5.1")).toBeNull();
+    expect(modelWindow({}, "opencode-go", "glm-5.1")).toBeNull();
   });
 });
 
@@ -1342,5 +1403,71 @@ describe("watchdog", () => {
 
     expect(selected.length).toBeGreaterThanOrEqual(2);
     expect(selected[selected.length - 1]!.contextWindow).toBe(256000);
+  });
+});
+
+describe("agent config directory", () => {
+  const envKey = "PI_CODING_AGENT_DIR";
+  let previous: string | undefined;
+
+  beforeEach(() => {
+    previous = process.env[envKey];
+  });
+
+  afterEach(() => {
+    if (previous === undefined) {
+      delete process.env[envKey];
+    } else {
+      process.env[envKey] = previous;
+    }
+  });
+
+  test("agentPaths reads and applies writes in PI_CODING_AGENT_DIR", () => {
+    const dir = mkdtempSync(join(tmpdir(), "context-cap-agentdir-"));
+    process.env[envKey] = dir;
+    const paths = agentPaths();
+    expect(paths.settings).toBe(join(dir, "settings.json"));
+    expect(paths.models).toBe(join(dir, "models.json"));
+
+    writeFileSync(paths.settings, "{}\n", "utf8");
+    writeFileSync(paths.models, "{}\n", "utf8");
+
+    expect(applyToFiles(parseCommand("256000 global", active), paths, catalog).kind).toBe("written");
+    expect(JSON.parse(readFileSync(paths.settings, "utf8"))).toEqual({ contextWindowCap: 256000 });
+
+    expect(
+      applyToFiles(parseCommand("500000 model anthropic/claude-sonnet-5", active), paths, catalog).kind,
+    ).toBe("written");
+    expect(JSON.parse(readFileSync(paths.models, "utf8"))).toEqual({
+      providers: { anthropic: { modelOverrides: { "claude-sonnet-5": { contextWindow: 500000 } } } },
+    });
+  });
+
+  test("a /context-window global write lands in PI_CODING_AGENT_DIR", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "context-cap-agentdir-cmd-"));
+    process.env[envKey] = dir;
+    const settingsPath = join(dir, "settings.json");
+    const modelsPath = join(dir, "models.json");
+    writeFileSync(settingsPath, "{}\n", "utf8");
+    writeFileSync(modelsPath, "{}\n", "utf8");
+
+    const selected: RuntimeModel[] = [];
+    const handlers = loadContextCap({}, async (model) => {
+      selected.push(model);
+      return true;
+    });
+    const model: RuntimeModel = { provider: active.provider, id: active.id, contextWindow: 1000000 };
+    const ctx = {
+      ...unrouted,
+      ui: silentUi,
+      modelRegistry: { getAll: () => [{ provider: active.provider, id: active.id }] },
+      model,
+    };
+
+    await handlers.session_start({ reason: "start" }, ctx);
+    await handlers.command("256000 global", ctx);
+
+    expect(JSON.parse(readFileSync(settingsPath, "utf8"))).toEqual({ contextWindowCap: 256000 });
+    expect(selected.length).toBeGreaterThanOrEqual(1);
   });
 });

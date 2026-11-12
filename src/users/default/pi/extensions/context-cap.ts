@@ -14,6 +14,17 @@ import { readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
+let resolveAgentDir: () => string;
+try {
+  const mod = await import("@earendil-works/pi-coding-agent");
+  resolveAgentDir = mod.getAgentDir;
+} catch {
+  // WHY: tests run outside pi's extension loader and cannot resolve the package
+  // specifier; PI_CODING_AGENT_DIR is the documented override and homedir is the
+  // default, matching pi's config behavior for this path.
+  resolveAgentDir = () => process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
+}
+
 export type Scope = "session" | "model" | "provider" | "global";
 export type StatusScope = "all" | Scope;
 export type Source = "session" | "model" | "global" | "native";
@@ -360,12 +371,9 @@ export function serialize(value: unknown): string {
   return `${JSON.stringify(sortKeysDeep(value), null, 2)}\n`;
 }
 
-function agentDir(): string {
-  return join(homedir(), ".pi", "agent");
-}
-
-function agentPaths(): FilePaths {
-  return { settings: join(agentDir(), "settings.json"), models: join(agentDir(), "models.json") };
+export function agentPaths(): FilePaths {
+  const dir = resolveAgentDir();
+  return { settings: join(dir, "settings.json"), models: join(dir, "models.json") };
 }
 
 function readJson(path: string): Json | null {
@@ -432,7 +440,7 @@ function writeJson(
 export function modelWindow(models: Json | null, provider: string, modelId: string): number | null {
   const override = asObject(asObject(asObject(asObject(models?.providers)?.[provider])?.modelOverrides)?.[modelId]);
   const value = override?.contextWindow;
-  return typeof value === "number" ? value : null;
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
 }
 
 // Effective window for one model, with the cap from the write mirror when a
