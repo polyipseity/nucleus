@@ -4,7 +4,7 @@
 // cases register the extension with a fake pi, so their only real filesystem
 // contact is the read-only models.json lookup applyCap makes under ~/.pi/agent.
 
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, lstatSync, linkSync, mkdtempSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -24,9 +24,14 @@ import contextCap, {
   serialize,
   setGlobalCap,
   setModelWindow,
+  startWatchdog,
+  stopWatchdog,
   syncModelWindow,
   syncRoutedWindow,
+  WATCHDOG_INTERVAL_MS,
+  watchdogTick,
   type ActiveModel,
+  type CapHost,
   type CapUi,
   type FilePaths,
   type Json,
@@ -34,6 +39,7 @@ import contextCap, {
   type ModelSelector,
   type RoutedSource,
   type RuntimeModel,
+  type WatchdogSource,
 } from "../../../../../src/users/default/pi/extensions/context-cap.ts";
 
 const active: ActiveModel = { provider: "opencode-go", id: "glm-5.1" };
@@ -1113,5 +1119,228 @@ describe("routed selections through applyCap", () => {
     });
 
     expect(physical.contextWindow).toBe(1000000);
+  });
+});
+
+// pi can put a pristine registry model back on agent.state.model without firing
+// model_select (_refreshCurrentModelFromRegistry, agent-session.js:2607), which
+// discards the clone this file selected. The watchdog ticks until the window pi
+// holds matches the one this file applied. These cases drive watchdogTick
+// directly except the stop and wiring ones, which let a real interval run and
+// stop it in afterEach.
+describe("watchdog", () => {
+  beforeEach(() => stopWatchdog());
+
+  afterEach(() => {
+    stopWatchdog();
+    restoreRoutedWindows();
+    resetWrittenCap();
+  });
+
+  function capHost(settings: unknown, setModel: ModelSelector["setModel"]): CapHost {
+    return { setModel, getSettings: () => settings };
+  }
+
+  function pristineModel(id: string): RuntimeModel {
+    return { provider: "context-cap-test", id, contextWindow: 1000000 };
+  }
+
+  test("a tick whose model window differs from the last applied window re-applies", async () => {
+    const settings = { contextWindowCap: 256000 };
+    const selected: RuntimeModel[] = [];
+    const setModel = async (model: RuntimeModel) => {
+      selected.push(model);
+      return true;
+    };
+    const handlers = loadContextCap(settings, setModel);
+    const host = capHost(settings, setModel);
+    const model = pristineModel("watchdog-replaces");
+
+    await handlers.model_select({ model }, { ui: silentUi, ...unrouted });
+    expect(selected).toHaveLength(1);
+    expect(selected[0]!.contextWindow).toBe(256000);
+
+    // A provider registration inside pi swaps the clone for a pristine registry
+    // model, so the window pi holds no longer matches the applied one.
+    const replacement = pristineModel("watchdog-replaces");
+    await watchdogTick(host, { model: replacement, ui: silentUi, ...unrouted });
+
+    expect(selected).toHaveLength(2);
+    expect(selected[1]!.contextWindow).toBe(256000);
+    expect(replacement.contextWindow).toBe(256000);
+  });
+
+  test("a tick whose window already matches does nothing", async () => {
+    const settings = { contextWindowCap: 256000 };
+    const selected: RuntimeModel[] = [];
+    const setModel = async (model: RuntimeModel) => {
+      selected.push(model);
+      return true;
+    };
+    const handlers = loadContextCap(settings, setModel);
+    const host = capHost(settings, setModel);
+
+    await handlers.model_select({ model: pristineModel("watchdog-matches") }, { ui: silentUi, ...unrouted });
+    expect(selected).toHaveLength(1);
+
+    // pi still holds the clone this file selected, already at the capped window.
+    // The comparison has to short-circuit before the routed lookup, which walks the
+    // transcript, so a matching window costs one number per tick and nothing else.
+    let usageReads = 0;
+    const source: WatchdogSource = {
+      ...unrouted,
+      ui: silentUi,
+      model: selected[0]!,
+      getContextUsage: () => {
+        usageReads += 1;
+        return undefined;
+      },
+    };
+    await watchdogTick(host, source);
+
+    expect(selected).toHaveLength(1);
+    expect(usageReads).toBe(0);
+  });
+
+  test("a tick with no model, and a tick after stopWatchdog, each do nothing", async () => {
+    const settings = { contextWindowCap: 256000 };
+    const selected: RuntimeModel[] = [];
+    const setModel = async (model: RuntimeModel) => {
+      selected.push(model);
+      return true;
+    };
+    const handlers = loadContextCap(settings, setModel);
+    const host = capHost(settings, setModel);
+
+    await handlers.model_select({ model: pristineModel("watchdog-inert") }, { ui: silentUi, ...unrouted });
+    expect(selected).toHaveLength(1);
+
+    await watchdogTick(host, { ui: silentUi, ...unrouted });
+    expect(selected).toHaveLength(1);
+
+    stopWatchdog();
+    await watchdogTick(host, { model: pristineModel("watchdog-inert"), ui: silentUi, ...unrouted });
+    expect(selected).toHaveLength(1);
+  });
+
+  test("a tick while a re-selection is in flight does nothing", async () => {
+    const settings = { contextWindowCap: 256000 };
+    const selected: RuntimeModel[] = [];
+    const model = pristineModel("watchdog-in-flight");
+    let holding: RuntimeModel = model;
+    let inFlightTick: Promise<void> | undefined;
+    let replaced = false;
+    const source: WatchdogSource = {
+      ...unrouted,
+      ui: silentUi,
+      get model() {
+        return holding;
+      },
+    };
+    function setModel(selectedModel: RuntimeModel): Promise<boolean> {
+      selected.push(selectedModel);
+      // The re-selection is still awaiting this call, and pi can replace the model
+      // during it, so the tick below would see a window that does not match. The
+      // in-flight re-selection owns the model until it returns, so it must not.
+      if (!replaced) {
+        replaced = true;
+        holding = pristineModel("watchdog-in-flight");
+        inFlightTick = watchdogTick(host, source);
+      }
+      return Promise.resolve(true);
+    }
+    const host: CapHost = { setModel, getSettings: () => settings };
+    const handlers = loadContextCap(settings, setModel);
+
+    await handlers.model_select({ model }, { ui: silentUi, ...unrouted });
+
+    expect(selected).toHaveLength(1);
+    expect(inFlightTick).toBeUndefined();
+  });
+
+  test("startWatchdog followed by stopWatchdog leaves a tick inert, and a second stop does not throw", async () => {
+    const settings = { contextWindowCap: 256000 };
+    const selected: RuntimeModel[] = [];
+    const setModel = async (model: RuntimeModel) => {
+      selected.push(model);
+      return true;
+    };
+    const handlers = loadContextCap(settings, setModel);
+    const host = capHost(settings, setModel);
+
+    await handlers.model_select({ model: pristineModel("watchdog-stopped") }, { ui: silentUi, ...unrouted });
+    expect(selected).toHaveLength(1);
+
+    startWatchdog(host, { model: pristineModel("watchdog-stopped"), ui: silentUi, ...unrouted });
+    stopWatchdog();
+    expect(() => stopWatchdog()).not.toThrow();
+
+    await watchdogTick(host, { model: pristineModel("watchdog-stopped"), ui: silentUi, ...unrouted });
+    expect(selected).toHaveLength(1);
+  });
+
+  test("a tick re-reads the source model, so a live source sees pi's replacement", async () => {
+    const settings = { contextWindowCap: 256000 };
+    const selected: RuntimeModel[] = [];
+    const setModel = async (model: RuntimeModel) => {
+      selected.push(model);
+      return true;
+    };
+    const handlers = loadContextCap(settings, setModel);
+    const host = capHost(settings, setModel);
+
+    await handlers.model_select({ model: pristineModel("watchdog-live") }, { ui: silentUi, ...unrouted });
+    expect(selected).toHaveLength(1);
+
+    // The getter stands in for the extension context: pi holds the capped clone
+    // first, then replaces it with a pristine registry model. A source that
+    // snapshotted this value would keep returning the clone and stay inert.
+    let holding: RuntimeModel = selected[0]!;
+    const source: WatchdogSource = {
+      ...unrouted,
+      ui: silentUi,
+      get model() {
+        return holding;
+      },
+    };
+
+    await watchdogTick(host, source);
+    expect(selected).toHaveLength(1);
+
+    holding = pristineModel("watchdog-live");
+    await watchdogTick(host, source);
+    expect(selected).toHaveLength(2);
+    expect(selected[1]!.contextWindow).toBe(256000);
+  });
+
+  test("session_start hands the watchdog the live context, so a later replacement reaches a tick", async () => {
+    const settings = { contextWindowCap: 256000 };
+    const selected: RuntimeModel[] = [];
+    const handlers = loadContextCap(settings, async (model) => {
+      selected.push(model);
+      return true;
+    });
+    // The getter is what the extension context provides: pi resolves ctx.model at
+    // call time, so a source that copied it once would keep the old model.
+    let holding: RuntimeModel = pristineModel("watchdog-wiring");
+    const ctx = {
+      ...unrouted,
+      ui: silentUi,
+      get model() {
+        return holding;
+      },
+    };
+
+    await handlers.session_start({ reason: "start" }, ctx);
+    expect(selected).toHaveLength(1);
+    expect(holding.contextWindow).toBe(256000);
+
+    // pi swaps in a pristine registry model with no event, and the interval the
+    // handler started has to notice it on its next tick.
+    holding = pristineModel("watchdog-wiring");
+    await Bun.sleep(WATCHDOG_INTERVAL_MS + 200);
+
+    expect(selected.length).toBeGreaterThanOrEqual(2);
+    expect(selected[selected.length - 1]!.contextWindow).toBe(256000);
   });
 });

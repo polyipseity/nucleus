@@ -81,6 +81,13 @@ export interface ModelSelector {
   setModel(model: RuntimeModel): Promise<boolean>;
 }
 
+// A re-apply resolves the cap from pi's merged settings and re-selects through
+// the same handle, so it takes both methods from one object. The extension API
+// and this file's tests each supply them.
+export interface CapHost extends ModelSelector {
+  getSettings(): unknown;
+}
+
 export interface FilePaths {
   settings: string;
   models: string;
@@ -92,6 +99,16 @@ export interface RoutedSource {
   sessionManager: { getEntries(): readonly unknown[] };
   modelRegistry: { find(provider: string, modelId: string): RuntimeModel | undefined };
   getContextUsage(): { contextWindow: number } | undefined;
+}
+
+// What a watchdog tick reads: the routed parts of the extension context plus the
+// model pi is holding. Both properties are readonly because a tick has to read
+// agent.state.model again on every pass, so callers pass the live context and
+// never a copy of it: a spread would snapshot `model` once and the tick could
+// then never see the registry replacement it watches for.
+export interface WatchdogSource extends RoutedSource {
+  readonly model?: RuntimeModel;
+  readonly ui?: CapUi;
 }
 
 export type ApplyOutcome =
@@ -347,6 +364,10 @@ function agentDir(): string {
   return join(homedir(), ".pi", "agent");
 }
 
+function agentPaths(): FilePaths {
+  return { settings: join(agentDir(), "settings.json"), models: join(agentDir(), "models.json") };
+}
+
 function readJson(path: string): Json | null {
   try {
     return asObject(JSON.parse(readFileSync(path, "utf8")) as unknown);
@@ -567,6 +588,15 @@ let sessionOverride: number | null = null;
 // keeps a pi that stops suppressing it from looping through applyCap again.
 let refreshing = false;
 
+// Effective window pi is supposed to hold. A provider registration inside pi can
+// assign a pristine registry model to agent.state.model with no event
+// (_refreshCurrentModelFromRegistry, agent-session.js:2607, called from the register
+// handlers at :2726-2742), which discards the clone this file selected; the watchdog
+// compares against this value to notice and re-apply.
+let lastWindow: number | null = null;
+let watchdog: ReturnType<typeof setInterval> | null = null;
+export const WATCHDOG_INTERVAL_MS = 1000;
+
 // One no-auth warning per session: the window stays correct while the provider
 // has no auth, but the footer keeps the old one, and repeating that on every
 // selection is noise.
@@ -645,55 +675,109 @@ export function restoreRoutedWindows(): void {
   routedOriginals.clear();
 }
 
-export default function (pi: ExtensionAPI) {
-  const settingsPath = join(agentDir(), "settings.json");
-  const modelsPath = join(agentDir(), "models.json");
-  const paths: FilePaths = { settings: settingsPath, models: modelsPath };
+// One re-apply path for a selection, a status command, and a watchdog tick: a
+// tick has to do exactly what a selection does, so the body lives here and takes
+// the handle and the agent paths it needs instead of closing over them.
+async function applyCap(
+  pi: CapHost,
+  paths: FilePaths,
+  model: RuntimeModel,
+  ui?: CapUi,
+  routed?: RoutedSource,
+): Promise<void> {
+  // Restore before reading the baseline: a routed physical model can be the
+  // very object selected here, and its capped window would otherwise become
+  // the native baseline that a later clear can never undo.
+  restoreRoutedWindows();
+  const cached = nativeCache.get(model);
+  const baseline = cached ?? model.contextWindow;
+  if (cached === undefined) nativeCache.set(model, baseline);
+  const result = syncModelWindow(model, baseline, sessionOverride, readJson(paths.models), pi.getSettings(), ui);
+  // The window pi should hold from here on, set before the early return so the
+  // watchdog has a value to compare against when nothing was re-selected.
+  lastWindow = result.window;
+  // The in-place mutation above is not enough for the footer:
+  // pi-powerline-footer caches context usage per (sessionManager, leafId)
+  // (context-usage.ts:66-84), so only a new transcript entry makes it
+  // recompute. Re-selecting costs one model_change entry and one
+  // thinking-level re-apply per effective change, and that is the price of
+  // invalidating a leaf-keyed cache; an unchanged window re-selects nothing.
+  // A routed selection displays the physical model's window, which the mutation
+  // above did not touch, so write it before the re-selection: the leaf move
+  // then repaints the footer from the routed window.
+  // WHY before the early return: the restore at the top of this function undid
+  // the routed window this file applied last time, so an unchanged window still
+  // has to be written back for the footer to keep showing it.
+  if (routed) syncRoutedWindow(routed, result.window);
+  if (!result.changed) return;
+  const selected = await refreshActiveModel(pi, model, result.window, baseline);
+  // The mutation already repainted through nudgeStatus, and pi's own usage and
+  // compaction math reads model.contextWindow, so a refused re-selection costs
+  // only the footer refresh.
+  if (selected || !ui || warnedNoAuth) return;
+  warnedNoAuth = true;
+  ui.notify(
+    `cannot re-select ${model.provider}/${model.id}: no auth for that provider, so the pi-powerline-footer context window stays stale until the model is selected again`,
+    "warning",
+  );
+}
 
-  const applyCap = async (model: RuntimeModel, ui?: CapUi, routed?: RoutedSource): Promise<void> => {
-    // Restore before reading the baseline: a routed physical model can be the
-    // very object selected here, and its capped window would otherwise become
-    // the native baseline that a later clear can never undo.
-    restoreRoutedWindows();
-    const cached = nativeCache.get(model);
-    const baseline = cached ?? model.contextWindow;
-    if (cached === undefined) nativeCache.set(model, baseline);
-    const result = syncModelWindow(model, baseline, sessionOverride, readJson(modelsPath), pi.getSettings(), ui);
-    // The in-place mutation above is not enough for the footer:
-    // pi-powerline-footer caches context usage per (sessionManager, leafId)
-    // (context-usage.ts:66-84), so only a new transcript entry makes it
-    // recompute. Re-selecting costs one model_change entry and one
-    // thinking-level re-apply per effective change, and that is the price of
-    // invalidating a leaf-keyed cache; an unchanged window re-selects nothing.
-    // A routed selection displays the physical model's window, which the mutation
-    // above did not touch, so write it before the re-selection: the leaf move
-    // then repaints the footer from the routed window.
-    // WHY before the early return: the restore at the top of this function undid
-    // the routed window this file applied last time, so an unchanged window still
-    // has to be written back for the footer to keep showing it.
-    if (routed) syncRoutedWindow(routed, result.window);
-    if (!result.changed) return;
-    const selected = await refreshActiveModel(pi, model, result.window, baseline);
-    // The mutation already repainted through nudgeStatus, and pi's own usage and
-    // compaction math reads model.contextWindow, so a refused re-selection costs
-    // only the footer refresh.
-    if (selected || !ui || warnedNoAuth) return;
-    warnedNoAuth = true;
-    ui.notify(
-      `cannot re-select ${model.provider}/${model.id}: no auth for that provider, so the pi-powerline-footer context window stays stale until the model is selected again`,
-      "warning",
-    );
-  };
+// One tick of the re-apply watchdog: pi can replace the model this file selected
+// without firing an event, so a tick re-applies once the window pi holds no
+// longer matches the window this file last applied.
+export function watchdogTick(pi: CapHost, source: WatchdogSource): Promise<void> | undefined {
+  if (refreshing) return undefined;
+  if (lastWindow === null) return undefined;
+  const { model } = source;
+  if (model === undefined) return undefined;
+  if (model.contextWindow === lastWindow) return undefined;
+  return applyCap(pi, agentPaths(), model, source.ui, source);
+}
+
+// The cost of watching: one number comparison per second, plus one model_change
+// entry for each replacement pi performs, which is the only way to invalidate the
+// footer's leaf-keyed cache after a replacement that fires no event.
+export function startWatchdog(pi: CapHost, source: WatchdogSource): void {
+  // Clears a previous timer without going through stopWatchdog: that also forgets
+  // the window applyCap just recorded, which is the value every tick compares
+  // against, so restarting the timer has to keep it.
+  clearWatchdog();
+  watchdog = setInterval(() => {
+    void watchdogTick(pi, source);
+  }, WATCHDOG_INTERVAL_MS);
+  // WHY: an unref'd timer cannot keep the process alive once pi has exited.
+  watchdog.unref?.();
+}
+
+function clearWatchdog(): void {
+  if (watchdog !== null) {
+    clearInterval(watchdog);
+    watchdog = null;
+  }
+}
+
+export function stopWatchdog(): void {
+  clearWatchdog();
+  // A tick queued before the stop finds no window to restore and does nothing.
+  lastWindow = null;
+}
+
+export default function (pi: ExtensionAPI) {
+  const paths = agentPaths();
 
   // The host repaints after a model switch, but the effective window can change
   // here without changing the model, so nudge explicitly rather than relying on
   // that render. The re-selection this triggers must not come back through here.
   pi.on("model_select", ({ model }, ctx) => {
     if (refreshing) return;
-    return applyCap(model, ctx.ui, ctx);
+    return applyCap(pi, paths, model, ctx.ui, ctx);
   });
-  pi.on("session_shutdown", () => restoreRoutedWindows());
-  pi.on("session_start", (event, ctx) => {
+  pi.on("session_shutdown", () => {
+    stopWatchdog();
+    restoreRoutedWindows();
+  });
+  pi.on("session_start", async (event, ctx) => {
+    stopWatchdog();
     // Restore first: a registry object left carrying the previous session's
     // window would otherwise hide the routed selection this one makes.
     restoreRoutedWindows();
@@ -702,7 +786,10 @@ export default function (pi: ExtensionAPI) {
     if (event.reason === "reload") resetWrittenCap();
     warnedNoAuth = false;
     if (!ctx.model) return;
-    return applyCap(ctx.model, ctx.ui, ctx);
+    await applyCap(pi, paths, ctx.model, ctx.ui, ctx);
+    // The context itself is the source, not a copy of it: its model is a getter,
+    // so every tick reads whatever model pi is holding at that moment.
+    if (ctx.model) startWatchdog(pi, ctx);
   });
 
   pi.registerCommand("context-window", {
@@ -734,11 +821,11 @@ export default function (pi: ExtensionAPI) {
         // write only reaches pi.getSettings() when pi reloads; without the mirror the
         // next model switch would apply the pre-write cap.
         noteWrittenCap(outcome);
-        await applyCap(model, ctx.ui, ctx);
+        await applyCap(pi, paths, model, ctx.ui, ctx);
       }
 
-      const settings = readJson(settingsPath);
-      const models = readJson(modelsPath);
+      const settings = readJson(paths.settings);
+      const models = readJson(paths.models);
       const baseline = nativeCache.get(model) ?? model.contextWindow;
       const result = resolveWindow({
         baseline,
