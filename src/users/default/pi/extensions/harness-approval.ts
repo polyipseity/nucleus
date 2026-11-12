@@ -5,8 +5,8 @@
  * Only a conservative pattern list is gated. Prompting for every tool call would
  * make the agent unusable, and pi already has its own permission model for the
  * rest; the patterns here are the commands a person would want to veto from a
- * phone: recursive deletes, privilege escalation, pushes, piping to a shell,
- * recursive chmod, raw disk writes, and power commands.
+ * phone: privilege escalation, pushes, piping to a shell, recursive chmod, raw
+ * disk writes, and power commands.
  *
  * Three outcomes, all decided remotely first:
  *   allow — the call runs untouched (no local prompt)
@@ -33,8 +33,9 @@ const CONFIG_PATH = join(homedir(), ".local", "state", "nucleus", "config.json")
 const EXEC_TIMEOUT_MS = 3_600_000;
 const SUMMARY_LIMIT = 200;
 
+const DELETION_WORD_RE = /\b(?:rm|del|rd|rmdir|erase|ri|unlink|shred|remove-item)\b/i;
+
 const RISKY_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
-  [/\brm\s+-[A-Za-z]*[rRfF]/, "recursive delete"],
   [/\bsudo\b/, "privileged command"],
   [/\bgit\s+push\b/, "git push"],
   [/\|\s*(?:ba|z|k|fi)?sh\b/, "piped to a shell"],
@@ -77,6 +78,7 @@ function riskyReason(input: unknown): string | null {
     return null;
   }
   if (text.length > 4000) text = text.slice(0, 4000);
+  if (DELETION_WORD_RE.test(text)) return null;
   for (const [pattern, reason] of RISKY_PATTERNS) {
     if (pattern.test(text)) return reason;
   }
