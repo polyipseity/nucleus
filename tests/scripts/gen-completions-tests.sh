@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests for src/scripts/completions/gen-completions.sh: --help contract, --check determinism,
-# idempotent regeneration, the suite not touching the tracked completions tree, 13-command
+# idempotent regeneration, the suite not touching the tracked completions tree, 14-command
 # coverage, generated headers + zsh syntax,
 # update lockfile --list-* dynamic wiring, flag-extraction correctness pins,
 # spec-word escaping of shell metacharacters in subcommand descriptions, and the
@@ -37,7 +37,7 @@ _profile_ps1="src/scripts/shell/profile.ps1"
 # commands: check packer/sh/pwsh, gc cleanup-nix/logs/preferences, apply
 # health-check/audit-store, cloud setup/reset/sync/status/restart, update
 # lockfile.
-_NUCLEUS_COMMANDS=(ai apply bootstrap check cloud config gc logs utils svc test update vm)
+_NUCLEUS_COMMANDS=(ai apply bootstrap camilladsp-heartbeat check cloud config gc logs utils svc test update vm)
 
 # Marker for the no-touch assertion (case 14): plain mktemp, outside the tracked
 # tree, timestamped before anything in the suite can generate. The one-second
@@ -195,6 +195,13 @@ fi
 _fx_repo="$_tmp_stub_repo/repo"
 mkdir -p "$_fx_repo/scripts"
 for _cmd in "${_NUCLEUS_COMMANDS[@]}"; do
+  case "$_cmd" in
+  # WHY: the generator maps daemon entry points to src/scripts/services/, so the
+  # stub has to sit at that path or generation fails outright.
+  camilladsp-heartbeat) _stub_dir="$_fx_repo/src/scripts/services" ;;
+  *) _stub_dir="$_fx_repo/scripts" ;;
+  esac
+  mkdir -p "$_stub_dir"
   {
     printf '#!/usr/bin/env bash\n'
     # shellcheck disable=SC2016 # reason: the stub's own shell expands this literal text; the test must not.
@@ -205,7 +212,7 @@ for _cmd in "${_NUCLEUS_COMMANDS[@]}"; do
     printf -- "  echo '  --flag  Some flag'\n"
     printf -- '  ;;\n'
     printf 'esac\n'
-  } >"$_fx_repo/scripts/$_cmd.sh"
+  } >"$_stub_dir/$_cmd.sh"
 done
 _fx_desc="Strip a file's \"\$HOME\" metadata"
 {
@@ -261,7 +268,10 @@ fi
 #     list that decides which $nucleus<Cmd>Flags inventories exist, so a command
 #     missing here loses its flag completion silently.
 _ps_commands="$(pwsh -NoLogo -NoProfile -NonInteractive -File "$_ps_gen_script" -ListCommands | tr -d '\r' | LC_ALL=C sort)"
-_expected_commands="$(printf '%s\n' "${_NUCLEUS_COMMANDS[@]}" | LC_ALL=C sort)"
+# WHY: Windows has no nucleus-camilladsp-heartbeat app (the heartbeat there runs as a
+# scheduled task over src/scripts/services/camilladsp-heartbeat.ps1), so the PowerShell
+# twin's canonical set is the zsh set minus that daemon entry point.
+_expected_commands="$(printf '%s\n' "${_NUCLEUS_COMMANDS[@]}" | grep -vx -- 'camilladsp-heartbeat' | LC_ALL=C sort)"
 if [ "$_ps_commands" = "$_expected_commands" ]; then
   assert_pass "gen-completions.ps1: command list matches the canonical set"
 else

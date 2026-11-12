@@ -10,13 +10,15 @@ Every `nucleus-*` command is declared once in `mkNucleusApps` (`src/flake.nix`);
 
 `service-watchdog` is the exception: a daemon, not an app. It stays out of `mkNucleusApps`, never appears on PATH or `nix run`, and runs only from its store path under systemd or launchd. `nucleus-utils` groups user utilities such as `optimize-pdf`.
 
+`nucleus-camilladsp-heartbeat` is the opposite case: a daemon whose `--probe` mode operators run by hand after an apply, so it is registered normally and lands on PATH with the rest.
+
 ## Adding functionality
 
 Stop at the first fit:
 
 1. Not user-facing (library, daemon helper, activation step): keep it a plain script, with no PATH command.
 2. A variant of an existing app: add a subcommand to `check`, `gc`, `apply`, `cloud`, or `update`.
-3. A new top-level concern: register it in `mkNucleusApps` with a matching `scripts/<name>.sh` and `scripts/<name>.ps1`. A daemon-only entry skips `home.packages`.
+3. A new top-level concern: register it in `mkNucleusApps` with a matching `scripts/<name>.sh` and `scripts/<name>.ps1`. An entry with no Windows twin declares only the POSIX script and its zsh completion; an entry that must never be invoked by hand stays out of `mkNucleusApps` entirely and is wired from its store path.
 
 The command set is shared with the completion generators and check step `10-completions-fresh`, so change one and the other or freshness fails.
 

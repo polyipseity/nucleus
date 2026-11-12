@@ -23,12 +23,14 @@ COMPLETIONS_DIR="$REPO_ROOT/src/modules/completions/zsh"
 
 # The canonical nucleus-* command set (alphabetical), the coverage contract
 # shared with check step 10-completions-fresh and the generator tests.
-COMMANDS=(ai apply bootstrap check cloud config gc logs svc test update utils vm)
+COMMANDS=(ai apply bootstrap camilladsp-heartbeat check cloud config gc logs svc test update utils vm)
 
 # Subcommands whose usage line does not enumerate them cleanly (config embeds
 # argument syntax between names). Descriptions still come from the live --help body.
 sh_for_command() {
   case "$1" in
+  # Daemon entry points live under src/scripts/services/, not scripts/.
+  camilladsp-heartbeat) printf '%s\n' "src/scripts/services/camilladsp-heartbeat.sh" ;;
   *) printf '%s\n' "scripts/$1.sh" ;;
   esac
 }

@@ -5,6 +5,9 @@
 
 # The canonical nucleus-* command set (alphabetical): the coverage contract
 # shared with src/scripts/completions/gen-completions.sh and tests/scripts/gen-completions-tests.sh.
+# WHY no camilladsp-heartbeat: it is a POSIX-only daemon with no pwsh completer
+# entry in profile.ps1, so listing it here would fail this step's pwsh coverage
+# assertion. The zsh side still covers it through gen-completions.sh --check.
 _NUCLEUS_COMMANDS=(ai apply bootstrap check cloud config gc logs utils svc test update vm)
 
 # pascal_case <cmd> yields the $nucleus<Cmd>Flags spelling gen-completions.ps1 emits.

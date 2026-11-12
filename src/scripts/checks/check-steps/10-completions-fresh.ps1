@@ -23,6 +23,8 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
   }
 
   Write-Message "--- coverage: zsh + pwsh completions for every nucleus-* command ---"
+  # WHY no camilladsp-heartbeat: the POSIX daemon has no Windows twin command, so
+  # the zsh registry lists it and this profile.ps1 inventory cannot.
   $commands = @(
     'ai', 'apply', 'bootstrap', 'check', 'cloud', 'config', 'gc',
     'utils', 'svc', 'test', 'update', 'vm'
