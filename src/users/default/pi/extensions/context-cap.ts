@@ -1,15 +1,16 @@
-// pi context-window control in two duties: enforce one global ceiling when a
-// model is selected, and serve /context-window for status plus set and clear
-// at four scopes. Model and provider windows are models.json entries that pi
-// applies itself, so this file reads them only to report and writes them only
-// on request. Precedence: session > explicit model window > global ceiling >
-// native, so an explicit window always wins over the ceiling. Each `as` below
-// narrows a value this file already checked with asObject or a string guard.
+// pi context-window control in three duties: enforce one global ceiling when a
+// model is selected, serve /context-window for status plus set and clear at
+// four scopes, and render the footer that reports the effective window. Model
+// and provider windows are models.json entries that pi applies itself, so this
+// file reads them only to report and writes them only on request. Precedence:
+// session > explicit model window > global ceiling > native, so an explicit
+// window always wins over the ceiling. Each `as` below narrows a value this
+// file already checked with asObject or a string guard.
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export type Scope = "session" | "model" | "provider" | "global";
 export type StatusScope = "all" | Scope;
@@ -84,6 +85,88 @@ export interface WindowInput {
   session: number | null;
   models: Json | null;
   settings: unknown;
+}
+
+// Footer types stay structural: the component and the tests both build them, so
+// neither needs a pi runtime type. FooterEntry is the part of a session entry
+// the footer scans for usage, and FooterEntryUsage the part it sums.
+export interface FooterEntryUsage {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  cost: { total: number };
+}
+
+export interface FooterEntry {
+  type: string;
+  usage?: FooterEntryUsage;
+  message?: { role?: string; usage?: FooterEntryUsage };
+}
+
+export interface FooterSessionManager {
+  getEntries(): readonly FooterEntry[];
+  getCwd(): string;
+  getSessionName(): string | null | undefined;
+}
+
+export interface FooterData {
+  getGitBranch(): string | null;
+  getExtensionStatuses(): ReadonlyMap<string, string>;
+  getAvailableProviderCount(): number;
+}
+
+export interface FooterModel {
+  provider: string;
+  id: string;
+  reasoning: boolean;
+}
+
+export interface FooterSnapshotSource {
+  readonly model: FooterModel | undefined;
+  readonly thinkingLevel: string | null | undefined;
+  readonly sessionManager: FooterSessionManager;
+  readonly modelRegistry: { isUsingOAuth(model: FooterModel): boolean };
+  getContextUsage(): { tokens: number | null } | undefined;
+  readonly footerData: FooterData;
+}
+
+export interface FooterUsage {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  cost: number;
+}
+
+export interface FooterSnapshot {
+  cwd: string;
+  home: string;
+  branch: string | null;
+  sessionName: string | null;
+  modelId: string | null;
+  provider: string | null;
+  providerCount: number;
+  reasoning: boolean;
+  thinkingLevel: string | null;
+  tokens: number | null;
+  effectiveWindow: number;
+  source: Source;
+  usage: FooterUsage;
+  latestCacheHitRate: number | undefined;
+  subscription: boolean;
+  /** Extension statuses, ordered by key; renderFooterLines sanitizes them. */
+  statuses: readonly string[];
+}
+
+export interface FooterTheme {
+  fg(color: string, text: string): string;
+  bold(text: string): string;
+}
+
+export interface FooterFormatting {
+  visibleWidth(text: string): number;
+  truncateToWidth(text: string, width: number, ellipsis?: string): string;
 }
 
 const SCOPES = new Set<Scope>(["session", "model", "provider", "global"]);
@@ -415,14 +498,20 @@ export function syncModelWindow(
   const result = effectiveWindow(model, { baseline, session, models, settings });
   const changed = model.contextWindow !== result.window;
   if (changed) model.contextWindow = result.window;
-  // modelsAreEqual compares type, id, and provider only, so ctx.setModel on the
-  // same model does not emit model_select. Mutate model.contextWindow and nudge
-  // the UI so usage/compaction math and the model indicator refresh immediately.
-  if (changed && ui) {
-    ui.setStatus("context-window", "");
-    ui.setStatus("context-window", undefined);
-  }
+  // The in-place mutation is deliberate: modelsAreEqual compares type, id, and
+  // provider only, so replacing the model with the same one emits no
+  // model_select, while pi's own usage and compaction math reads
+  // model.contextWindow. The status nudge is what repaints the footer and the
+  // model indicator so the new window shows immediately.
+  if (changed && ui) nudgeStatus(ui);
   return { changed, window: result.window, source: result.source };
+}
+
+// A status set and cleared again: writing one is what makes pi repaint, and the
+// value itself is never meant to show.
+function nudgeStatus(ui: StatusUi): void {
+  ui.setStatus("context-window", "");
+  ui.setStatus("context-window", undefined);
 }
 
 // Cap a write just produced, for the re-apply that follows it.
@@ -531,9 +620,332 @@ export function applyToFiles(command: Command, paths: FilePaths, catalog: ModelC
   });
 }
 
+// The built-in footer caches its stats while (session, sessionId, leafId,
+// entryCount, limitsModel) is unchanged and renders the context window out of
+// that cached object (modes/interactive/components/footer.js:82-95, :134), so an
+// in-place model.contextWindow mutation never repaints the denominator. This
+// footer recomputes on every render and prints the window this file applied, so
+// a routed or virtual selection is reported without touching registry objects.
+// Fidelity gaps against the native footer: no "(auto)" compaction marker, no
+// experimental "xp" marker, no "→ routed" arrow, and no session.routedModel.
+
+// Same buckets the native footer prints: 999, 1.5k, 35k, 1.5M, 35M.
+export function formatTokens(count: number): string {
+  if (count < 1000) return count.toString();
+  if (count < 10000) return `${(count / 1000).toFixed(1)}k`;
+  if (count < 1000000) return `${Math.round(count / 1000)}k`;
+  if (count < 10000000) return `${(count / 1000000).toFixed(1)}M`;
+  return `${Math.round(count / 1000000)}M`;
+}
+
+// Native formatCwdForFooter: only a cwd inside home is shortened, and an exact
+// match becomes "~" rather than "~/.".
+export function footerCwd(cwd: string, home: string): string {
+  if (!home) return cwd;
+  const resolvedCwd = resolve(cwd);
+  const resolvedHome = resolve(home);
+  const relativeToHome = relative(resolvedHome, resolvedCwd);
+  const insideHome =
+    relativeToHome === "" ||
+    (relativeToHome !== ".." && !relativeToHome.startsWith(`..${sep}`) && !isAbsolute(relativeToHome));
+  if (!insideHome) return cwd;
+  return relativeToHome === "" ? "~" : `~${sep}${relativeToHome}`;
+}
+
+const ESCAPE = 0x1b;
+const RESET = "\x1b[0m";
+
+// Length of the ANSI sequence starting at `index`, or 0 when there is none. CSI
+// and OSC cover what pi's theme emits; other escapes are two bytes.
+function escapeLength(text: string, index: number): number {
+  if (text.charCodeAt(index) !== ESCAPE) return 0;
+  const introducer = text[index + 1];
+  if (introducer === "[") {
+    for (let cursor = index + 2; cursor < text.length; cursor += 1) {
+      const code = text.charCodeAt(cursor);
+      if (code >= 0x40 && code <= 0x7e) return cursor - index + 1;
+    }
+    return 0;
+  }
+  if (introducer === "]") {
+    for (let cursor = index + 2; cursor < text.length; cursor += 1) {
+      const code = text.charCodeAt(cursor);
+      if (code === 0x07) return cursor - index + 1;
+      if (code === ESCAPE && text[cursor + 1] === "\\") return cursor - index + 2;
+    }
+    return 0;
+  }
+  return introducer === undefined ? 0 : 2;
+}
+
+// Cells one code point occupies. Control characters and combining marks take
+// none, the East Asian wide blocks and emoji take two, everything else one, so
+// a combining sequence can measure narrower than the terminal draws it.
+function cellWidth(codePoint: number): number {
+  if (codePoint < 0x20 || (codePoint >= 0x7f && codePoint < 0xa0)) return 0;
+  if (
+    (codePoint >= 0x0300 && codePoint <= 0x036f) ||
+    (codePoint >= 0x1ab0 && codePoint <= 0x1aff) ||
+    (codePoint >= 0x1dc0 && codePoint <= 0x1dff) ||
+    (codePoint >= 0x200b && codePoint <= 0x200f) ||
+    (codePoint >= 0x20d0 && codePoint <= 0x20ff) ||
+    (codePoint >= 0xfe00 && codePoint <= 0xfe0f) ||
+    (codePoint >= 0xfe20 && codePoint <= 0xfe2f) ||
+    codePoint === 0xfeff
+  ) {
+    return 0;
+  }
+  if (
+    (codePoint >= 0x1100 && codePoint <= 0x115f) ||
+    (codePoint >= 0x2e80 && codePoint <= 0x303e) ||
+    (codePoint >= 0x3041 && codePoint <= 0x33ff) ||
+    (codePoint >= 0x3400 && codePoint <= 0x4dbf) ||
+    (codePoint >= 0x4e00 && codePoint <= 0x9fff) ||
+    (codePoint >= 0xa000 && codePoint <= 0xa4cf) ||
+    (codePoint >= 0xac00 && codePoint <= 0xd7a3) ||
+    (codePoint >= 0xf900 && codePoint <= 0xfaff) ||
+    (codePoint >= 0xfe30 && codePoint <= 0xfe6f) ||
+    (codePoint >= 0xff00 && codePoint <= 0xff60) ||
+    (codePoint >= 0xffe0 && codePoint <= 0xffe6) ||
+    (codePoint >= 0x1f300 && codePoint <= 0x1f64f) ||
+    (codePoint >= 0x1f900 && codePoint <= 0x1f9ff) ||
+    (codePoint >= 0x20000 && codePoint <= 0x3fffd)
+  ) {
+    return 2;
+  }
+  return 1;
+}
+
+// WHY local: the test suite imports this module with no runtime dependencies, so
+// @earendil-works/pi-tui cannot be loaded here.
+function visibleWidth(text: string): number {
+  let width = 0;
+  for (let index = 0; index < text.length; ) {
+    const escape = escapeLength(text, index);
+    if (escape > 0) {
+      index += escape;
+      continue;
+    }
+    const codePoint = text.codePointAt(index) ?? 0;
+    // Native visibleWidth renders a tab as three spaces.
+    width += codePoint === 0x09 ? 3 : cellWidth(codePoint);
+    index += codePoint > 0xffff ? 2 : 1;
+  }
+  return width;
+}
+
+interface WidthSlice {
+  text: string;
+  styled: boolean;
+}
+
+// Leading slice of `text` that fits in `limit` cells, keeping the escape
+// sequences it walked past so the slice stays styled.
+function takeWidth(text: string, limit: number): WidthSlice {
+  let taken = "";
+  let width = 0;
+  let styled = false;
+  for (let index = 0; index < text.length; ) {
+    const escape = escapeLength(text, index);
+    if (escape > 0) {
+      taken += text.slice(index, index + escape);
+      styled = true;
+      index += escape;
+      continue;
+    }
+    const codePoint = text.codePointAt(index) ?? 0;
+    const cells = codePoint === 0x09 ? 3 : cellWidth(codePoint);
+    if (width + cells > limit) break;
+    const size = codePoint > 0xffff ? 2 : 1;
+    taken += text.slice(index, index + size);
+    width += cells;
+    index += size;
+  }
+  return { text: taken, styled };
+}
+
+// Native truncation keeps styles open through the ellipsis and always resets;
+// this resets only when the slice carries an escape, so plain text stays plain.
+function truncateToWidth(text: string, width: number, ellipsis = "..."): string {
+  if (width <= 0) return "";
+  if (visibleWidth(text) <= width) return text;
+  const ellipsisWidth = visibleWidth(ellipsis);
+  if (ellipsisWidth >= width) return takeWidth(ellipsis, width).text;
+  const head = takeWidth(text, width - ellipsisWidth);
+  return `${head.text}${head.styled ? RESET : ""}${ellipsis}`;
+}
+
+export const footerFormatting: FooterFormatting = { visibleWidth, truncateToWidth };
+
+// Native footer sanitizing: one line, no tabs, collapsed spaces.
+function sanitizeStatus(text: string): string {
+  return text.replace(/[\r\n\t]/g, " ").replace(/ +/g, " ").trim();
+}
+
+export function renderFooterLines(
+  snapshot: FooterSnapshot,
+  width: number,
+  theme: FooterTheme,
+  fmt: FooterFormatting = footerFormatting,
+): string[] {
+  let pwd = footerCwd(snapshot.cwd, snapshot.home);
+  if (snapshot.branch) pwd = `${pwd} (${snapshot.branch})`;
+  if (snapshot.sessionName) pwd = `${pwd} • ${snapshot.sessionName}`;
+  const pwdLine = fmt.truncateToWidth(theme.fg("dim", pwd), width, theme.fg("dim", "..."));
+
+  const { usage } = snapshot;
+  const statsParts: string[] = [];
+  if (usage.input) statsParts.push(`↑${formatTokens(usage.input)}`);
+  if (usage.output) statsParts.push(`↓${formatTokens(usage.output)}`);
+  if (usage.cacheRead) statsParts.push(`R${formatTokens(usage.cacheRead)}`);
+  if (usage.cacheWrite) statsParts.push(`W${formatTokens(usage.cacheWrite)}`);
+  if ((usage.cacheRead > 0 || usage.cacheWrite > 0) && snapshot.latestCacheHitRate !== undefined) {
+    statsParts.push(`CH${snapshot.latestCacheHitRate.toFixed(1)}%`);
+  }
+  // Native prints the cost when either the cost or the subscription applies.
+  if (usage.cost || snapshot.subscription) {
+    statsParts.push(`$${usage.cost.toFixed(3)}${snapshot.subscription ? " (sub)" : ""}`);
+  }
+
+  const percent =
+    snapshot.tokens === null
+      ? null
+      : snapshot.effectiveWindow > 0
+        ? (snapshot.tokens / snapshot.effectiveWindow) * 100
+        : 0;
+  const windowText = formatTokens(snapshot.effectiveWindow);
+  const sourceNote = snapshot.source === "native" ? "" : ` (${snapshot.source})`;
+  const contextText = percent === null ? `?/${windowText}${sourceNote}` : `${percent.toFixed(1)}%/${windowText}${sourceNote}`;
+  statsParts.push(
+    percent !== null && percent > 90
+      ? theme.fg("error", contextText)
+      : percent !== null && percent > 70
+        ? theme.fg("warning", contextText)
+        : contextText,
+  );
+
+  // Native order (modes/interactive/components/footer.js): the stats side is
+  // truncated to the full width first (:196-201), the model side then gets only
+  // what is left past the two-space gap (:203), and with no budget left the line
+  // falls back to the stats alone (:210-213).
+  let statsLeft = statsParts.join(" ");
+  let statsLeftWidth = fmt.visibleWidth(statsLeft);
+  if (statsLeftWidth > width) {
+    statsLeft = fmt.truncateToWidth(statsLeft, width, "...");
+    statsLeftWidth = fmt.visibleWidth(statsLeft);
+  }
+
+  const modelName = snapshot.modelId ?? "no-model";
+  let rightSide = modelName;
+  if (snapshot.reasoning) {
+    const level = snapshot.thinkingLevel ?? "off";
+    rightSide = level === "off" ? `${modelName} • thinking off` : `${modelName} • ${level}`;
+  }
+
+  // Native keeps two spaces between the stats and the model and drops the
+  // provider prefix rather than truncating for it.
+  const minPadding = 2;
+  if (snapshot.providerCount > 1 && snapshot.modelId !== null && snapshot.provider !== null) {
+    const withProvider = `(${snapshot.provider}) ${rightSide}`;
+    if (statsLeftWidth + minPadding + fmt.visibleWidth(withProvider) <= width) rightSide = withProvider;
+  }
+
+  const rightSideWidth = fmt.visibleWidth(rightSide);
+  let statsLine: string;
+  if (statsLeftWidth + minPadding + rightSideWidth <= width) {
+    const padding = " ".repeat(width - statsLeftWidth - rightSideWidth);
+    statsLine = statsLeft + padding + rightSide;
+  } else {
+    const availableForRight = width - statsLeftWidth - minPadding;
+    if (availableForRight > 0) {
+      const truncatedRight = fmt.truncateToWidth(rightSide, availableForRight, "");
+      const padding = " ".repeat(Math.max(0, width - statsLeftWidth - fmt.visibleWidth(truncatedRight)));
+      statsLine = statsLeft + padding + truncatedRight;
+    } else {
+      statsLine = statsLeft;
+    }
+  }
+
+  // Dim the parts around any colored context segment separately, as the native
+  // footer does: the segment's own reset would clear an outer dim.
+  const lines = [pwdLine, theme.fg("dim", statsLeft) + theme.fg("dim", statsLine.slice(statsLeft.length))];
+
+  if (snapshot.statuses.length > 0) {
+    const statusLine = snapshot.statuses.map(sanitizeStatus).join(" ");
+    lines.push(fmt.truncateToWidth(statusLine, width, theme.fg("dim", "...")));
+  }
+  return lines;
+}
+
+// Native footer arithmetic (core/usage-totals.js): sum the usage of usage
+// entries, assistant and toolResult messages, and compaction or branch summaries.
+function addUsage(totals: FooterUsage, usage: FooterEntryUsage): void {
+  totals.input += usage.input;
+  totals.output += usage.output;
+  totals.cacheRead += usage.cacheRead;
+  totals.cacheWrite += usage.cacheWrite;
+  totals.cost += usage.cost.total;
+}
+
+// HOME first, then USERPROFILE, exactly as the native footer picks the home it
+// shortens against.
+function footerHome(): string {
+  return process.env.HOME || process.env.USERPROFILE || "";
+}
+
+export function buildFooterSnapshot(
+  source: FooterSnapshotSource,
+  effective: { window: number; source: Source },
+): FooterSnapshot {
+  const usage: FooterUsage = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 };
+  let latestCacheHitRate: number | undefined;
+  for (const entry of source.sessionManager.getEntries()) {
+    if (entry.type === "usage" && entry.usage) {
+      addUsage(usage, entry.usage);
+    } else if (entry.type === "message" && entry.message?.role === "assistant" && entry.message.usage) {
+      const messageUsage = entry.message.usage;
+      addUsage(usage, messageUsage);
+      const promptTokens = messageUsage.input + messageUsage.cacheRead + messageUsage.cacheWrite;
+      latestCacheHitRate = promptTokens > 0 ? (messageUsage.cacheRead / promptTokens) * 100 : undefined;
+    } else if (entry.type === "message" && entry.message?.role === "toolResult" && entry.message.usage) {
+      addUsage(usage, entry.message.usage);
+    } else if ((entry.type === "branch_summary" || entry.type === "compaction") && entry.usage) {
+      addUsage(usage, entry.usage);
+    }
+  }
+
+  const model = source.model;
+  const contextUsage = source.getContextUsage();
+  return {
+    cwd: source.sessionManager.getCwd(),
+    home: footerHome(),
+    branch: source.footerData.getGitBranch(),
+    sessionName: source.sessionManager.getSessionName() ?? null,
+    modelId: model?.id ?? null,
+    provider: model?.provider ?? null,
+    providerCount: source.footerData.getAvailableProviderCount(),
+    reasoning: model?.reasoning ?? false,
+    thinkingLevel: source.thinkingLevel ?? null,
+    tokens: contextUsage?.tokens ?? null,
+    effectiveWindow: effective.window,
+    source: effective.source,
+    usage,
+    latestCacheHitRate,
+    subscription: model ? source.modelRegistry.isUsingOAuth(model) : false,
+    statuses: [...source.footerData.getExtensionStatuses().entries()]
+      // Code-unit order, not locale collation, so the status line is identical
+      // in every locale.
+      .sort(([first], [second]) => (first < second ? -1 : first > second ? 1 : 0))
+      .map(([, text]) => text),
+  };
+}
+
 // Window a model carries on first sight, before any cap this file applied.
 const nativeCache = new WeakMap<object, number>();
 let sessionOverride: number | null = null;
+
+// Effective window this file last applied, read by the footer on every render.
+let lastEffective: { window: number; source: Source } | null = null;
 
 export default function (pi: ExtensionAPI) {
   const settingsPath = join(agentDir(), "settings.json");
@@ -547,7 +959,44 @@ export default function (pi: ExtensionAPI) {
     const cached = nativeCache.get(model);
     const baseline = cached ?? model.contextWindow;
     if (cached === undefined) nativeCache.set(model, baseline);
-    syncModelWindow(model, baseline, sessionOverride, readJson(modelsPath), pi.getSettings(), ui);
+    const previous = lastEffective;
+    const result = syncModelWindow(model, baseline, sessionOverride, readJson(modelsPath), pi.getSettings(), ui);
+    lastEffective = { window: result.window, source: result.source };
+    // A repaint is driven by a window change, so a layer switch that keeps the
+    // same window (session 200000 over an identical model window, say) would
+    // leave the footer showing the previous source label until something else
+    // repaints.
+    const sourceMoved = previous !== null && (previous.window !== result.window || previous.source !== result.source);
+    if (!result.changed && sourceMoved && ui) nudgeStatus(ui);
+  };
+
+  // Installed on every session_start on purpose. pi clears extension UI when it
+  // invalidates a session (modes/interactive/interactive-mode.js:343), which also
+  // replaces the context object this component reads, and setExtensionFooter
+  // disposes the previous custom footer before building the new one (:1885-1887).
+  const installFooter = (ctx: ExtensionContext): void => {
+    ctx.ui.setFooter((tui, theme, footerData) => {
+      const unsubscribe = footerData.onBranchChange(() => tui.requestRender());
+      return {
+        dispose: unsubscribe,
+        invalidate() {},
+        render(width: number): string[] {
+          const effective: { window: number; source: Source } = lastEffective ?? {
+            window: ctx.model?.contextWindow ?? 0,
+            source: "native",
+          };
+          const source: FooterSnapshotSource = {
+            model: ctx.model,
+            thinkingLevel: ctx.thinkingLevel ?? null,
+            sessionManager: ctx.sessionManager,
+            modelRegistry: ctx.modelRegistry,
+            getContextUsage: () => ctx.getContextUsage(),
+            footerData,
+          };
+          return renderFooterLines(buildFooterSnapshot(source, effective), width, theme);
+        },
+      };
+    });
   };
 
   pi.on("model_select", ({ model }) => applyCap(model));
@@ -555,7 +1004,16 @@ export default function (pi: ExtensionAPI) {
     // A reload is the one point where pi re-reads settings.json, so its cache is
     // authoritative again and the mirror would only hold a stale copy.
     if (event.reason === "reload") resetWrittenCap();
+    // Reset before the model check: a model-less start must fall back to the
+    // native zero window instead of the previous session's applied value.
+    lastEffective = null;
     if (ctx.model) applyCap(ctx.model, ctx.ui);
+    if (ctx.mode === "tui") {
+      installFooter(ctx);
+      // setFooter already repaints; the nudge repaints once more so the very
+      // first frame is the custom footer and not the cached built-in one.
+      nudgeStatus(ctx.ui);
+    }
   });
 
   pi.registerCommand("context-window", {

@@ -1,6 +1,7 @@
 // Cases for the context-window extension: pure parsing and precedence, the
-// deterministic serializer, and file round-trips against a temp directory so
-// the session command's writes are exercised without touching ~/.pi.
+// deterministic serializer, file round-trips against a temp directory so the
+// session command's writes are exercised without touching ~/.pi, and the footer
+// snapshot plus the lines it renders.
 
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, lstatSync, linkSync, mkdtempSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
@@ -8,13 +9,18 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import {
   applyToFiles,
+  buildFooterSnapshot,
   effectiveWindow,
+  footerCwd,
+  footerFormatting,
   formatFullStatus,
   formatScopeStatus,
+  formatTokens,
   noteWrittenCap,
   parseCommand,
   providerWindow,
   readCap,
+  renderFooterLines,
   resetWrittenCap,
   resolveWindow,
   serialize,
@@ -23,6 +29,9 @@ import {
   syncModelWindow,
   type ActiveModel,
   type FilePaths,
+  type FooterSnapshot,
+  type FooterSnapshotSource,
+  type FooterTheme,
   type Json,
   type ModelCatalog,
 } from "../../../../../src/users/default/pi/extensions/context-cap.ts";
@@ -679,5 +688,213 @@ describe("applyToFiles", () => {
     expect(readFileSync(sibling, "utf8")).toBe('{\n  "contextWindowCap": 256000\n}\n');
     expect(lstatSync(paths.settings).nlink).toBe(2);
     expect(statSync(paths.settings).ino).toBe(statSync(sibling).ino);
+  });
+});
+
+const stubTheme: FooterTheme = { fg: (_color, text) => text, bold: (text) => text };
+
+function recordingTheme(): { theme: FooterTheme; calls: Array<[string, string]> } {
+  const calls: Array<[string, string]> = [];
+  return {
+    calls,
+    theme: {
+      fg: (color, text) => {
+        calls.push([color, text]);
+        return text;
+      },
+      bold: (text) => text,
+    },
+  };
+}
+
+// Every field is set so a case only spells out what it probes.
+function footerSnapshot(overrides: Partial<FooterSnapshot> = {}): FooterSnapshot {
+  return {
+    cwd: "/home/user/project",
+    home: "/home/user",
+    branch: null,
+    sessionName: null,
+    modelId: "glm-5.1",
+    provider: "opencode-go",
+    providerCount: 1,
+    reasoning: false,
+    thinkingLevel: null,
+    tokens: 35200,
+    effectiveWindow: 100000,
+    source: "native",
+    usage: { input: 12000, output: 3000, cacheRead: 8000, cacheWrite: 0, cost: 0.123 },
+    latestCacheHitRate: 40,
+    subscription: false,
+    statuses: [],
+    ...overrides,
+  };
+}
+
+function entryUsage(input: number, output: number, cacheRead: number, cacheWrite: number, cost: number) {
+  return { input, output, cacheRead, cacheWrite, cost: { total: cost } };
+}
+
+// Costs are binary-exact so the summed total compares with toEqual.
+function footerSource(): FooterSnapshotSource {
+  return {
+    model: { provider: "opencode-go", id: "glm-5.1", reasoning: true },
+    thinkingLevel: "high",
+    sessionManager: {
+      getEntries: () => [
+        { type: "message", message: { role: "assistant", usage: entryUsage(1000, 500, 500, 0, 0.5) } },
+        { type: "message", message: { role: "toolResult", usage: entryUsage(100, 0, 0, 0, 0.25) } },
+        { type: "usage", usage: entryUsage(200, 0, 0, 0, 0.125) },
+        { type: "compaction", usage: entryUsage(50, 0, 0, 0, 0.125) },
+      ],
+      getCwd: () => "/home/user/project",
+      getSessionName: () => "refactor",
+    },
+    modelRegistry: { isUsingOAuth: () => true },
+    getContextUsage: () => ({ tokens: 35200 }),
+    footerData: {
+      getGitBranch: () => "main",
+      getExtensionStatuses: () => new Map([["zeta", "last"], ["alpha", "first"]]),
+      getAvailableProviderCount: () => 2,
+    },
+  };
+}
+
+describe("renderFooterLines", () => {
+  test("the effective window sets the denominator while token totals stay fixed", () => {
+    const narrow = renderFooterLines(footerSnapshot({ effectiveWindow: 100000, source: "session" }), 200, stubTheme);
+    const wide = renderFooterLines(footerSnapshot({ effectiveWindow: 200000, source: "session" }), 200, stubTheme);
+    expect(narrow[1]).toContain("35.2%/100k (session)");
+    expect(wide[1]).toContain("17.6%/200k (session)");
+    expect(narrow[1]).not.toBe(wide[1]);
+  });
+
+  test("unknown tokens render ?/<window>", () => {
+    const lines = renderFooterLines(
+      footerSnapshot({ tokens: null, effectiveWindow: 256000, source: "global" }),
+      200,
+      stubTheme,
+    );
+    expect(lines[1]).toContain("?/256k (global)");
+  });
+
+  test("the percent thresholds pick the warning and error colors", () => {
+    const half = recordingTheme();
+    renderFooterLines(footerSnapshot({ tokens: 50000 }), 200, half.theme);
+    expect(half.calls.some(([color]) => color === "warning" || color === "error")).toBe(false);
+
+    const seventyOne = recordingTheme();
+    renderFooterLines(footerSnapshot({ tokens: 71000 }), 200, seventyOne.theme);
+    expect(seventyOne.calls).toContainEqual(["warning", "71.0%/100k"]);
+
+    const ninetyOne = recordingTheme();
+    renderFooterLines(footerSnapshot({ tokens: 91000 }), 200, ninetyOne.theme);
+    expect(ninetyOne.calls).toContainEqual(["error", "91.0%/100k"]);
+  });
+
+  test("the provider prefix appears only when several providers are available", () => {
+    const single = renderFooterLines(footerSnapshot({ providerCount: 1 }), 200, stubTheme);
+    expect(single[1]).toContain("glm-5.1");
+    expect(single[1]).not.toContain("(opencode-go)");
+
+    const several = renderFooterLines(footerSnapshot({ providerCount: 2 }), 200, stubTheme);
+    expect(several[1]).toContain("(opencode-go) glm-5.1");
+  });
+
+  test("a narrow width truncates the model side to what the stats leave, then folds it away", () => {
+    // The stats take 42 of the 46 cells, so the model side is cut to the two
+    // cells left past the gap, and the provider prefix never survives: it is
+    // dropped before truncation because it is what fails the fit test.
+    const tight = renderFooterLines(footerSnapshot({ providerCount: 2 }), 46, stubTheme);
+    expect(tight[1]).toBe("↑12k ↓3.0k R8.0k CH40.0% $0.123 35.2%/100k  gl");
+    expect(tight[1]).not.toContain("(opencode-go)");
+
+    // Below the stats' own width the budget for the model side is gone, so the
+    // stats are truncated instead and the model segment drops out entirely.
+    const narrower = renderFooterLines(footerSnapshot({ providerCount: 2 }), 40, stubTheme);
+    expect(narrower[1]).toBe("↑12k ↓3.0k R8.0k CH40.0% $0.123 35.2%...");
+    expect(narrower[1]).not.toContain("glm-5.1");
+  });
+
+  test("statuses render on a third line in the given order and only when present", () => {
+    const withStatuses = renderFooterLines(
+      footerSnapshot({ statuses: ["build ok", "tests\n3/3\tgreen"] }),
+      200,
+      stubTheme,
+    );
+    expect(withStatuses).toHaveLength(3);
+    expect(withStatuses[2]).toBe("build ok tests 3/3 green");
+
+    expect(renderFooterLines(footerSnapshot(), 200, stubTheme)).toHaveLength(2);
+  });
+
+  test("line 1 shortens the cwd under home and appends the branch and session name", () => {
+    const lines = renderFooterLines(footerSnapshot({ branch: "main", sessionName: "refactor" }), 200, stubTheme);
+    expect(lines[0]).toBe("~/project (main) • refactor");
+  });
+
+  test("a model-less snapshot renders ?/0 with no source label", () => {
+    const lines = renderFooterLines(
+      footerSnapshot({ modelId: null, provider: null, reasoning: false, tokens: null, effectiveWindow: 0 }),
+      200,
+      stubTheme,
+    );
+    expect(lines[1]).toContain("?/0");
+    expect(lines[1]).toContain("no-model");
+    expect(lines[1]).not.toContain("(native)");
+  });
+});
+
+describe("footer formatting helpers", () => {
+  test("formatTokens matches the native buckets", () => {
+    expect([999, 1500, 35000, 1500000, 35000000].map(formatTokens)).toEqual(["999", "1.5k", "35k", "1.5M", "35M"]);
+  });
+
+  test("footerCwd shortens only a cwd inside home", () => {
+    expect(footerCwd("/home/user/project", "/home/user")).toBe("~/project");
+    expect(footerCwd("/home/user", "/home/user")).toBe("~");
+    expect(footerCwd("/tmp", "/home/user")).toBe("/tmp");
+    expect(footerCwd("/home/user2", "/home/user")).toBe("/home/user2");
+    expect(footerCwd("/home/user/project", "")).toBe("/home/user/project");
+  });
+
+  test("visibleWidth ignores ANSI sequences and truncation closes the style it cut", () => {
+    expect(footerFormatting.visibleWidth("\x1b[2mabc\x1b[0m")).toBe(3);
+    expect(footerFormatting.truncateToWidth("\x1b[2mabcdef\x1b[0m", 4, "...")).toBe("\x1b[2ma\x1b[0m...");
+  });
+});
+
+describe("buildFooterSnapshot", () => {
+  test("sums usage, keeps the latest cache hit rate, and orders statuses by key", () => {
+    const snapshot = buildFooterSnapshot(footerSource(), { window: 100000, source: "session" });
+    expect(snapshot.usage).toEqual({ input: 1350, output: 500, cacheRead: 500, cacheWrite: 0, cost: 1 });
+    expect(snapshot.latestCacheHitRate).toBeCloseTo(33.33, 2);
+    expect(snapshot.statuses).toEqual(["first", "last"]);
+    expect(snapshot.tokens).toBe(35200);
+    expect(snapshot.effectiveWindow).toBe(100000);
+    expect(snapshot.source).toBe("session");
+    expect(snapshot.modelId).toBe("glm-5.1");
+    expect(snapshot.provider).toBe("opencode-go");
+    expect(snapshot.providerCount).toBe(2);
+    expect(snapshot.reasoning).toBe(true);
+    expect(snapshot.thinkingLevel).toBe("high");
+    expect(snapshot.subscription).toBe(true);
+    expect(snapshot.branch).toBe("main");
+    expect(snapshot.sessionName).toBe("refactor");
+    expect(snapshot.cwd).toBe("/home/user/project");
+  });
+
+  test("a missing model and unknown context usage render as no-model and ?/0", () => {
+    const snapshot = buildFooterSnapshot(
+      { ...footerSource(), model: undefined, getContextUsage: () => undefined },
+      { window: 0, source: "native" },
+    );
+    expect(snapshot.modelId).toBeNull();
+    expect(snapshot.provider).toBeNull();
+    expect(snapshot.reasoning).toBe(false);
+    expect(snapshot.thinkingLevel).toBe("high");
+    expect(snapshot.tokens).toBeNull();
+    expect(snapshot.subscription).toBe(false);
+    expect(renderFooterLines(snapshot, 80, stubTheme)[1]).toContain("no-model");
+    expect(renderFooterLines(snapshot, 80, stubTheme)[1]).toContain("?/0");
   });
 });
