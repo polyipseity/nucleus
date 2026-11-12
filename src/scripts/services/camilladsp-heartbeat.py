@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import errno
 import hashlib
 import json
 import os
@@ -89,6 +90,55 @@ def _warn(message: str) -> None:
     # line carries its own local time.
     stamp = time.strftime("%Y-%m-%dT%H:%M:%S")
     print(f"{stamp} camilladsp-heartbeat: warning: {message}", file=sys.stderr, flush=True)
+
+
+def _list_xattrs(path: str) -> list[str]:
+    """Extended attribute names on path, read through libc.
+
+    os.listxattr is absent from this interpreter build on both hosts, and a tick
+    must not spawn a process, so libc is the only reader available. Any error is
+    an empty list: the caller is already reporting a failure.
+    """
+    libc = ctypes.CDLL(None)
+    libc.listxattr.restype = ctypes.c_ssize_t
+    encoded = path.encode()
+    if sys.platform == "darwin":
+        libc.listxattr.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_int]
+        size = libc.listxattr(encoded, None, 0, 0)
+    else:
+        libc.listxattr.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t]
+        size = libc.listxattr(encoded, None, 0)
+    if size <= 0:
+        return []
+    buffer = ctypes.create_string_buffer(size)
+    if sys.platform == "darwin":
+        written = libc.listxattr(encoded, buffer, size, 0)
+    else:
+        written = libc.listxattr(encoded, buffer, size)
+    if written <= 0:
+        return []
+    return [name.decode("utf-8", "replace") for name in buffer.raw[:written].split(b"\0") if name]
+
+
+def _provider_state(path: Path) -> str:
+    """Compact description of how iCloud provisioned path, for an EDEADLK.
+
+    A File Provider read that has to materialize content can return EDEADLK from
+    a launchd context. Nothing else in the log distinguishes that from a stale
+    file handle, so the failure carries the evidence needed to tell them apart.
+    """
+    resolved = os.path.realpath(path)
+    parts = [f"path={resolved}"]
+    names = _list_xattrs(resolved)
+    present = sorted(
+        name
+        for name in names
+        if name.startswith("com.apple.fileprovider") or name == "com.apple.macl"
+    )
+    parts.append(f"xattrs={','.join(present) or 'none'}")
+    placeholder = Path(resolved).parent / f".{Path(resolved).name}.icloud"
+    parts.append(f"placeholder={'yes' if placeholder.exists() else 'no'}")
+    return " ".join(parts)
 
 
 def state_dir() -> Path:
@@ -745,7 +795,11 @@ def run(port: int, config_file: Path) -> int:
                 success = push_config(client, config_file, target)
             else:
                 success = True
-        except (OSError, ValueError, json.JSONDecodeError) as error:
+        except OSError as error:
+            detail = f" [{_provider_state(config_file)}]" if error.errno == errno.EDEADLK else ""
+            _warn(f"tick failed: {error}{detail}")
+            client.reset()
+        except (ValueError, json.JSONDecodeError) as error:
             _warn(f"tick failed: {error}")
             client.reset()
         except Exception as error:  # noqa: BLE001 - websockets raises its own types

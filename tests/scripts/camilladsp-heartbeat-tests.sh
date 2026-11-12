@@ -461,6 +461,82 @@ def case_warn_timestamp():
     assert re.match(pattern, line), line
 
 
+def case_edeadlk_diagnostics():
+    import contextlib
+    import ctypes
+    import errno
+    import io
+
+    def set_xattr(path, name, value):
+        # macOS only: Linux resolves the namespace from the name prefix, and
+        # `com.` is not a known one, so this call answers EOPNOTSUPP there.
+        libc = ctypes.CDLL(None)
+        libc.setxattr.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_int]
+        rc = libc.setxattr(str(path).encode(), name.encode(), value, len(value), 0, 0)
+        assert rc == 0, rc
+
+    class StopLoop(Exception):
+        pass
+
+    class FakeClient:
+        def __init__(self, port):
+            self.port = port
+
+        def endpoint_up(self):
+            return True
+
+        def reset(self):
+            pass
+
+        def request(self, payload):
+            key = next(iter(payload))
+            if key == "GetState":
+                return {"GetState": {"value": "Running"}}
+            if key == "GetConfig":
+                return {"GetConfig": {"value": ""}}
+            raise AssertionError(f"unexpected request {key}")
+
+    c = Case()
+    config = c.config()
+    if sys.platform == "darwin":
+        set_xattr(config, "com.apple.fileprovider.test", b"1")
+
+    def deadlock(_path):
+        raise OSError(errno.EDEADLK, "Resource deadlock avoided")
+
+    m.CamillaClient = FakeClient
+    m.read_toggles = lambda: (True, True)
+    m._load_config = deadlock
+
+    ticks = {"left": 1}
+    stops = []
+
+    def fake_sleep(_seconds):
+        stops.append(1)
+        ticks["left"] -= 1
+        if ticks["left"] <= 0:
+            raise StopLoop
+
+    m.time.sleep = fake_sleep
+
+    buffer = io.StringIO()
+    with contextlib.redirect_stderr(buffer):
+        try:
+            m.run(1234, config)
+        except StopLoop:
+            pass
+    text = buffer.getvalue()
+    assert "Resource deadlock avoided" in text, text
+    assert f"path={os.path.realpath(config)}" in text, text
+    if sys.platform == "darwin":
+        assert "com.apple.fileprovider.test" in text, text
+    else:
+        # No File Provider attribute can be set off macOS, so the portable fact
+        # is the empty filtered list.
+        assert "xattrs=none" in text, text
+    assert "placeholder=no" in text, text
+
+
 CASES = {
     "passthrough_nonempty_device": case_passthrough,
     "patches_with_default_output": case_patches_default_output,
@@ -485,6 +561,7 @@ CASES = {
     "selector_codes": case_selector_codes,
     "probe_mode": case_probe_mode,
     "warn_timestamp": case_warn_timestamp,
+    "edeadlk_diagnostics": case_edeadlk_diagnostics,
 }
 
 
@@ -547,5 +624,6 @@ section 6 "CoreAudio wire values and log format"
 run_case selector_codes
 run_case probe_mode
 run_case warn_timestamp
+run_case edeadlk_diagnostics
 
 finish_tests
