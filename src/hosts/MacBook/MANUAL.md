@@ -15,7 +15,7 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 9. Allow full disk access for remote users: System Settings > General > Sharing > Remote Login > (i) > Allow full disk access for remote users.
 10. LuLu's icon is hidden through `noIconMode`, so reopening LuLu restores its preferences window.
 11. The nix daemon's priority cannot be tuned from `nix.custom.conf`: `daemon-nice-level` and `daemon-ionice-level` are NixOS systemd options rather than settings this nix reads, so they never applied and nix could only warn `unknown setting`; a wrong name there now fails the check pipeline.
-2. pi reports its sandbox state through the `sandbox` status indicator: `SANDBOX: srt` inside the srt sandbox and `SANDBOX: NONE (unsandboxed)` outside it. Run `/sandbox-status` for the evidence, mode, resolved `rm`, `shell-safe-rm`/`rip` presence, and the `safe-delete` filter's `unproven` setting. The unsandboxed warning is emitted once per process.
+12. pi reports its sandbox state through the `sandbox` status indicator: `SANDBOX: srt` inside the srt sandbox and `SANDBOX: NONE (unsandboxed)` outside it. Run `/sandbox-status` for the evidence, mode, resolved `rm`, `shell-safe-rm`/`rip` presence, and the `safe-delete` filter's `unproven` setting. The unsandboxed warning is emitted once per process.
 
 ## macOS settings with no API
 
