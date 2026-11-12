@@ -257,9 +257,10 @@ EOF
   fi
 
   # cargo aliases cargo-binstall; nixos-iso / tart-images normalize to
-  # vm-setup children. whisper has no updater: a (revision, hash) pair has to be
-  # chosen together, so nothing can recompute one from the other.
-  _VALID_SECTIONS_CSV="bun,cargo,cargo-binstall,cursor,pi,psgallery,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,whisper,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows"
+  # vm-setup children. whisper and deepfilternet have no updater: a (revision,
+  # hash) pair has to be chosen together, so nothing can recompute one from the
+  # other.
+  _VALID_SECTIONS_CSV="bun,cargo,cargo-binstall,cursor,deepfilternet,pi,psgallery,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,whisper,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows"
 
   SECTIONS=""
   VERIFY=false
@@ -330,7 +331,7 @@ EOF
   if [ -n "$SECTIONS" ]; then
     IFS=',' read -ra _tokens <<<"$SECTIONS"
     for _tok in "${_tokens[@]}"; do
-      if [[ ",source-builds,cursor,vscode,whisper,suggestions.homebrew.masApps,suggestions.opencode,suggestions.vm-setup.windows,version," == *",$_tok,"* ]]; then
+      if [[ ",source-builds,cursor,deepfilternet,vscode,whisper,suggestions.homebrew.masApps,suggestions.opencode,suggestions.vm-setup.windows,version," == *",$_tok,"* ]]; then
         warn "section '$_tok' has no updater — kept manual"
       fi
     done

@@ -150,9 +150,9 @@ function Invoke-LockfileBump {
   . (Join-Path $repoRoot 'src/platforms/Windows/modules/lib/PsGalleryPin.ps1')
 
   # Shared by --list-sections and token validation so the two cannot drift.
-  # whisper has no updater: a (revision, hash) pair has to be chosen together,
-  # so nothing can recompute one from the other.
-  $validSectionsCsv = 'bun,cargo,cargo-binstall,cursor,pi,psgallery,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,whisper,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows'
+  # whisper and deepfilternet have no updater: a (revision, hash) pair has to be
+  # chosen together, so nothing can recompute one from the other.
+  $validSectionsCsv = 'bun,cargo,cargo-binstall,cursor,deepfilternet,pi,psgallery,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,whisper,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows'
 
   # Exits before any lockfile read, matching the bash twin.
   if ($ListSections) {
@@ -192,7 +192,7 @@ function Invoke-LockfileBump {
 
   # Sections with no updater stay manual; warn instead of skipping silently.
   foreach ($tok in $sectionTokens) {
-    if (",source-builds,cursor,vscode,whisper,suggestions.homebrew.masApps,suggestions.opencode,suggestions.vm-setup.windows,version," -match ",$tok,") {
+    if (",source-builds,cursor,deepfilternet,vscode,whisper,suggestions.homebrew.masApps,suggestions.opencode,suggestions.vm-setup.windows,version," -match ",$tok,") {
       Write-NucleusWarning "section '$tok' has no updater — kept manual"
     }
   }
