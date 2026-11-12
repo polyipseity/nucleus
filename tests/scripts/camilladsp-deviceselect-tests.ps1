@@ -607,27 +607,15 @@ try {
     }
     function Get-CamillaDSPDefaultPlaybackDevice { return 'Speakers (Realtek)' }
     function Get-CamillaDSPLastDevice { return $null }
-    # One render endpoint, and it is the loopback capture source, so the
-    # enumeration succeeds with nothing left to play to.
-    $fakeDevices = [System.Collections.Generic.List[object]]::new()
-    $fakeDevices.Add([pscustomobject]@{ FriendlyName = 'Speakers (Realtek)' }) > $null
-    $fakeEnumerator = [pscustomobject]@{}
-    $fakeEnumerator | Add-Member -MemberType ScriptMethod -Name EnumAudioEndpoints -Value {
-      param([int]$flow, [int]$state)
-      if ($flow -ne 0 -or $state -ne 1) { throw "unexpected enumeration scope: flow=$flow state=$state" }
-      return ,$fakeDevices
-    }
-    # WHY: the shipped enumeration asks PowerShell for the MMDeviceEnumerator COM
-    # class, so stubbing New-Object is the seam that drives the real enumeration
-    # off Windows. The stub asserts the call it stands in for.
-    function New-Object {
-      # check-suppress:SuppressMessageAttribute: PSAvoidOverwritingBuiltInCmdlets -- the stub shadows the cmdlet on purpose
-      [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidOverwritingBuiltInCmdlets', '', Justification = 'stands in for the COM enumerator the shipped enumeration requests')]
-      # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- the stub mutates nothing
-      [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'returns a stub object and changes nothing')]
-      param([string]$ComObject)
-      if ($ComObject -ne 'MMDeviceEnumerator') { throw "unexpected COM class request: $ComObject" }
-      return $fakeEnumerator
+    # WHY: the shipped enumeration reads the managed interop seam, so replacing
+    # Get-CamillaDSPWasapi is what drives the real enumeration off Windows. The
+    # fake asserts nothing about COM; it stands in for one render endpoint that is
+    # also the loopback capture source, so nothing is left to play to.
+    $fakeWasapi = [pscustomobject]@{}
+    $fakeWasapi | Add-Member -MemberType ScriptMethod -Name GetActiveRenderFriendlyNames -Value { return @('Speakers (Realtek)') }
+    function Get-CamillaDSPWasapi {
+      param()
+      return $fakeWasapi
     }
     Resolve-CamillaDSPPlaybackDevice -ConfigPath $ConfigPath > $null
     Resolve-CamillaDSPPlaybackDevice -ConfigPath $ConfigPath > $null
@@ -641,6 +629,38 @@ try {
 } finally {
   $env:XDG_STATE_HOME = $savedStateHome
   Remove-Item -Path $singleEndpointFile.FullName -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: best-effort cleanup -- temp config may already be gone
+}
+
+Write-Output ''
+# The interop compiles on every host, and the seam keeps the getters empty off Windows.
+$interopType = 'CamillaDSPWasapi' -as [type]
+if ($null -ne $interopType) {
+  Assert-Pass 'WASAPI interop type loads from camilladsp-wasapi.cs'
+} else {
+  Assert-Fail 'WASAPI interop type loads from camilladsp-wasapi.cs' 'Add-Type did not define CamillaDSPWasapi'
+}
+if ($IsWindows) {
+  Write-Output 'skip: default playback device check is off-Windows only'
+} else {
+  # WHY: the push-boundary cases above replace Get-CamillaDSPDefaultPlaybackDevice
+  # in this scope, so the shipped getter is exercised in a child scope that
+  # dot-sources the library again.
+  # WHY: the seam is checked in the same scope, so a $null getter is
+  # attributable to the $IsWindows gate rather than to the getter's catch path.
+  & {
+    . $deviceSelect
+    if ($null -eq (Get-CamillaDSPWasapi)) {
+      Assert-Pass 'WASAPI seam is $null off Windows'
+    } else {
+      Assert-Fail 'WASAPI seam is $null off Windows' 'the seam returned a reader off Windows'
+    }
+    $offWindowsDevice = Get-CamillaDSPDefaultPlaybackDevice
+    if ($null -eq $offWindowsDevice) {
+      Assert-Pass 'default playback device is $null off Windows'
+    } else {
+      Assert-Fail 'default playback device is $null off Windows' "got '$offWindowsDevice'"
+    }
+  }
 }
 
 Write-Output ''

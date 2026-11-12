@@ -34,6 +34,14 @@
 #   $resolved = Resolve-CamillaDSPPlaybackDevice -ConfigPath $configPath
 #
 
+# WHY: the suite dot-sources this file once per case, and Add-Type rejects a
+# duplicate type name, so the compile is guarded instead of unconditional.
+# It runs on every host on purpose: an off-Windows run still proves the interop
+# builds, and Get-CamillaDSPWasapi is what gates the calls.
+if (-not ('CamillaDSPWasapi' -as [type])) {
+  Add-Type -Path (Join-Path -Path $PSScriptRoot -ChildPath '../../platforms/Windows/modules/scripts/camilladsp-wasapi.cs')
+}
+
 function Get-CamillaDSPStateDir {
   <#
   .SYNOPSIS
@@ -56,26 +64,40 @@ function Get-CamillaDSPStateDir {
   return (Join-Path -Path $HOME -ChildPath '.local/state/camilladsp')
 }
 
+function Get-CamillaDSPWasapi {
+  <#
+  .SYNOPSIS
+    WASAPI endpoint reader, or $null off Windows.
+  .DESCRIPTION
+    The single seam between this library and the managed interop in
+    camilladsp-wasapi.cs. The suite replaces this function, because a typed .NET
+    class cannot be stubbed the way the COM wrapper used to be.
+  #>
+  [CmdletBinding()]
+  param()
+
+  if (-not $IsWindows) { return $null }
+  return [CamillaDSPWasapi]::new()
+}
+
 function Get-CamillaDSPDefaultPlaybackDevice {
   <#
   .SYNOPSIS
     Name of the current system default playback device, or $null.
   .DESCRIPTION
-    Reads the WASAPI default render endpoint through COM, which exists only on
-    Windows. Off Windows the probe returns $null so this library and its suite
-    can be sourced on macOS and Linux.
+    Reads the WASAPI default render endpoint through the managed interop in
+    camilladsp-wasapi.cs, which exists only on Windows. Off Windows the seam
+    returns $null so this library and its suite can be sourced on macOS and Linux.
   #>
   [CmdletBinding()]
   [OutputType([string])]
   param()
 
-  if (-not $IsWindows) { return $null }
+  $wasapi = Get-CamillaDSPWasapi
+  if ($null -eq $wasapi) { return $null }
 
   try {
-    # 0 = eRender (playback), 0 = DMT_DEFAULT (user default)
-    $enumerator = New-Object -ComObject MMDeviceEnumerator
-    $endpoint = $enumerator.GetDefaultAudioEndpoint(0, 0)
-    return $endpoint.FriendlyName
+    return $wasapi.GetDefaultRenderFriendlyName()
   } catch {
     # Audio service not running or no devices.
     return $null
@@ -101,17 +123,11 @@ function Get-CamillaDSPAvailablePlaybackDeviceList {
     [string]$CaptureDevice = ''
   )
 
+  $wasapi = Get-CamillaDSPWasapi
+  if ($null -eq $wasapi) { return $null }
+
   try {
-    $enumerator = New-Object -ComObject MMDeviceEnumerator
-    # 0 = eRender, 0x1 = DEVICE_STATE_ACTIVE
-    $devices = $enumerator.EnumAudioEndpoints(0, 0x1)
-    $names = @()
-    for ($i = 0; $i -lt $devices.Count; $i++) {
-      $name = $devices.Item($i).FriendlyName
-      if ($name -ne $CaptureDevice) {
-        $names += $name
-      }
-    }
+    $names = @($wasapi.GetActiveRenderFriendlyNames() | Where-Object { $_ -ne $CaptureDevice })
   } catch {
     return $null
   }
