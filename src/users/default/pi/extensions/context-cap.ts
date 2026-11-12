@@ -89,8 +89,10 @@ export interface WindowInput {
 const SCOPES = new Set<Scope>(["session", "model", "provider", "global"]);
 const POSITIVE_INT = /^[1-9][0-9]*$/;
 const NEGATIVE_INT = /^-\d+$/;
+const DIGITS = /^\d+$/;
 const GRAMMAR =
   "usage: /context-window [all|session|model [M]|provider [P]|global | N [scope]|N model [M]|N provider [P]|N global | default|<negative> [same scope/target]]";
+const POSITIVE_WINDOW_ERROR = `context window must be a positive integer. ${GRAMMAR}`;
 
 function asObject(value: unknown): Json | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
@@ -103,17 +105,39 @@ function parsePositive(token: string | undefined): number | null {
   return Number.isSafeInteger(value) ? value : null;
 }
 
+// "-0" is the number zero and zero is not a valid window, so it errors like
+// "0" instead of clearing like the other negative values.
 function isClearValue(token: string | undefined): boolean {
-  return token === "default" || (token !== undefined && NEGATIVE_INT.test(token));
+  return token === "default" || (token !== undefined && NEGATIVE_INT.test(token) && Number(token) < 0);
 }
 
-function parseModelTarget(token: string | undefined, active: ActiveModel): { provider: string; model: string } {
+// A token written as a plain number that parsePositive rejected, such as "0",
+// "-0", or "007".
+function isWindowNumber(token: string): boolean {
+  return DIGITS.test(token) || NEGATIVE_INT.test(token);
+}
+
+// Split on the first slash only: providers publish multi-slash ids such as
+// meta-llama/Llama-3-70b, so a/b/c is provider a and model b/c. An empty
+// provider or model half is a malformed target, not a literal model id.
+function parseModelTarget(
+  token: string | undefined,
+  active: ActiveModel,
+): { provider: string; model: string } | null {
   if (token === undefined) return { provider: active.provider, model: active.id };
   const slash = token.indexOf("/");
-  if (slash > 0 && slash < token.length - 1) {
-    return { provider: token.slice(0, slash), model: token.slice(slash + 1) };
-  }
-  return { provider: active.provider, model: token };
+  if (slash === -1) return { provider: active.provider, model: token };
+  const provider = token.slice(0, slash);
+  const model = token.slice(slash + 1);
+  if (provider.length === 0 || model.length === 0) return null;
+  return { provider, model };
+}
+
+// A provider name has no slash, so a slash means the token named a
+// provider/model pair that only a model target accepts.
+function parseProviderTarget(token: string | undefined, active: ActiveModel): string | null {
+  if (token === undefined) return active.provider;
+  return token.includes("/") ? null : token;
 }
 
 function isScope(token: string): token is Scope {
@@ -141,11 +165,14 @@ export function parseCommand(input: string, active: ActiveModel): Command {
     }
     if (scopeToken === "model") {
       if (rest.length > 2) return { kind: "error", message: `model takes at most one target. ${GRAMMAR}` };
-      return { kind: "set", scope: "model", value, ...parseModelTarget(rest[1], active) };
+      const target = parseModelTarget(rest[1], active);
+      if (target === null) return { kind: "error", message: `invalid model target "${rest[1]}". ${GRAMMAR}` };
+      return { kind: "set", scope: "model", value, ...target };
     }
     if (scopeToken === "provider") {
       if (rest.length > 2) return { kind: "error", message: `provider takes at most one target. ${GRAMMAR}` };
-      const provider = rest[1] ?? active.provider;
+      const provider = parseProviderTarget(rest[1], active);
+      if (provider === null) return { kind: "error", message: `invalid provider target "${rest[1]}". ${GRAMMAR}` };
       return { kind: "set", scope: "provider", value, provider };
     }
     return { kind: "error", message: `unknown scope "${scopeToken}". ${GRAMMAR}` };
@@ -163,15 +190,20 @@ export function parseCommand(input: string, active: ActiveModel): Command {
     }
     if (scopeToken === "model") {
       if (rest.length > 2) return { kind: "error", message: `model takes at most one target. ${GRAMMAR}` };
-      return { kind: "clear", scope: "model", ...parseModelTarget(rest[1], active) };
+      const target = parseModelTarget(rest[1], active);
+      if (target === null) return { kind: "error", message: `invalid model target "${rest[1]}". ${GRAMMAR}` };
+      return { kind: "clear", scope: "model", ...target };
     }
     if (scopeToken === "provider") {
       if (rest.length > 2) return { kind: "error", message: `provider takes at most one target. ${GRAMMAR}` };
-      const provider = rest[1] ?? active.provider;
+      const provider = parseProviderTarget(rest[1], active);
+      if (provider === null) return { kind: "error", message: `invalid provider target "${rest[1]}". ${GRAMMAR}` };
       return { kind: "clear", scope: "provider", provider };
     }
     return { kind: "error", message: `unknown scope "${scopeToken}". ${GRAMMAR}` };
   }
+
+  if (isWindowNumber(head)) return { kind: "error", message: POSITIVE_WINDOW_ERROR };
 
   if (!isScope(head)) {
     return { kind: "error", message: `unknown command "${head}". ${GRAMMAR}` };
@@ -184,11 +216,15 @@ export function parseCommand(input: string, active: ActiveModel): Command {
 
   if (head === "provider") {
     if (rest.length > 1) return { kind: "error", message: `provider query takes at most one target. ${GRAMMAR}` };
-    return { kind: "status", scope: "provider", provider: rest[0] ?? active.provider };
+    const provider = parseProviderTarget(rest[0], active);
+    if (provider === null) return { kind: "error", message: `invalid provider target "${rest[0]}". ${GRAMMAR}` };
+    return { kind: "status", scope: "provider", provider };
   }
 
   if (rest.length > 1) return { kind: "error", message: `model query takes at most one target. ${GRAMMAR}` };
-  return { kind: "status", scope: "model", ...parseModelTarget(rest[0], active) };
+  const target = parseModelTarget(rest[0], active);
+  if (target === null) return { kind: "error", message: `invalid model target "${rest[0]}". ${GRAMMAR}` };
+  return { kind: "status", scope: "model", ...target };
 }
 
 export function resolveWindow(layers: Layers): { window: number; source: Source } {

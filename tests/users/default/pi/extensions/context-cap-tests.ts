@@ -160,9 +160,41 @@ describe("parseCommand", () => {
       "200000 extra",
       "default extra",
       "-1 extra",
+      "500000 model provider/",
+      "model /foo",
+      "default model /bar",
+      "500000 provider a/b",
+      "-0",
+      "-0 model provider/",
     ]) {
       expect(parseCommand(input, active).kind).toBe("error");
     }
+  });
+
+  test("splits a model target on the first slash only", () => {
+    expect(parseCommand("model a/b/c", active)).toEqual({
+      kind: "status",
+      scope: "model",
+      provider: "a",
+      model: "b/c",
+    });
+    expect(parseCommand("500000 model a/b/c", active)).toEqual({
+      kind: "set",
+      scope: "model",
+      value: 500000,
+      provider: "a",
+      model: "b/c",
+    });
+  });
+
+  test("non-positive windows error while negative values still clear", () => {
+    for (const input of ["0", "-0", "007"]) {
+      expect(parseCommand(input, active)).toEqual({
+        kind: "error",
+        message: expect.stringContaining("context window must be a positive integer"),
+      });
+    }
+    expect(parseCommand("-1", active)).toEqual({ kind: "clear", scope: "session" });
   });
 });
 
