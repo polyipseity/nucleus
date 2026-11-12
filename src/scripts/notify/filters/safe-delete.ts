@@ -61,6 +61,8 @@ export interface PolicyOptions {
 // no resolution of the word can prove the wrapper.
 type ForcedUnproven = "sudo" | "env-path" | "env-clean" | "command-p";
 
+type Prefix = "sudo" | "env" | "xargs";
+
 interface BareDeletion {
   readonly word: string;
   readonly forced: ForcedUnproven | null;
@@ -103,6 +105,20 @@ const SCRIPT_HOSTS = new Set(["sh", "bash", "zsh", "dash", "ksh", "ash", "fish",
 
 const SCRIPT_OPTION = /^-[A-Za-z]*c[A-Za-z]*$/;
 const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+
+// WHY: an option's separate argument hides the command word, so without this table `sudo -u root rm x` reads `root` and reports no-match.
+const PREFIX_OPTION_ARGUMENTS: Readonly<Record<Prefix, ReadonlySet<string>>> = {
+  sudo: new Set([
+    "-u", "--user", "-g", "--group", "-p", "--prompt", "-C", "--close-from",
+    "-T", "--command-timeout", "-h", "--host", "-U", "--other-user", "-r", "--role",
+    "-t", "--type",
+  ]),
+  env: new Set(["-u", "--unset", "-C", "--chdir", "-S", "--split-string"]),
+  xargs: new Set([
+    "-n", "--max-args", "-I", "--replace", "-P", "--max-procs", "-L", "--max-lines",
+    "-s", "--max-chars", "-E", "--eof", "-d", "--delimiter", "-a", "--arg-file",
+  ]),
+};
 
 // A command can nest a script through -c and a substitution, so the walk bounds
 // its own recursion rather than trusting input to stay shallow.
@@ -282,7 +298,7 @@ function commandSubstitutions(word: string): string[] {
 // the caller's PATH in charge of what runs.
 function locateCommand(segment: readonly Token[]): CommandPosition | null {
   let index = 0;
-  let prefix: "sudo" | "env" | "xargs" | null = null;
+  let prefix: Prefix | null = null;
   let forced: ForcedUnproven | null = null;
 
   while (index < segment.length) {
@@ -303,14 +319,18 @@ function locateCommand(segment: readonly Token[]): CommandPosition | null {
       return { index, forced };
     }
     if (folded === "sudo" || folded === "env" || folded === "xargs") return { index, forced };
+    if (PREFIX_OPTION_ARGUMENTS[prefix].has(word)) {
+      index += 2;
+      continue;
+    }
     if (word.startsWith("-")) {
       if (prefix === "sudo") forced = "sudo";
       if (prefix === "env" && (folded === "-i" || word === "-")) forced = "env-clean";
       index += 1;
       continue;
     }
-    if (prefix === "env" && ASSIGNMENT.test(word)) {
-      if (word.startsWith("PATH=")) forced = "env-path";
+    if (ASSIGNMENT.test(word)) {
+      if (prefix === "env" && word.startsWith("PATH=")) forced = "env-path";
       index += 1;
       continue;
     }
