@@ -1074,6 +1074,18 @@ let
       };
       winget = "WinFsp.WinFsp";
     };
+    xquartz = {
+      category = "gui";
+      # WHY: the macOS X11 server, cask-only upstream. NixOS already runs
+      # services.xserver and no Windows X server is managed, so darwin is the
+      # only carrier that installs anything.
+      platforms = [ "darwin" ];
+      homebrew = {
+        kind = "cask";
+        name = "xquartz";
+      };
+      nixpkgs = "xquartz";
+    };
     yamllint = {
       category = "cli";
       nixpkgs = "yamllint";

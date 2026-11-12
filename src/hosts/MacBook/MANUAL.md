@@ -31,6 +31,7 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 6. OBS virtual camera: start the virtual camera once, then approve the Driver Extension under Privacy & Security and grant Camera. OBS 28+ installs the CoreMediaIO plugin on first launch, so nothing needs installing by hand.
 7. Stats ships `eu.exelban.Stats.LaunchAtLogin`, an embedded SMAppService helper no script can unregister. If two Stats processes start at login, open Stats > Open application settings and turn Start at login off. Do not run `sfltool resetbtm`, which clears login items for every app.
 8. OrbStack's menu bar applet is toggled declaratively through the macOS 26 Control Center gate. To restore it after a manual toggle: System Settings > Menu Bar > OrbStack > Allow in the Menu Bar.
+9. `XQuartz` supplies the X11 server the sandbox allowlist expects. Launch it once after apply so `/private/tmp/.X11-unix/X0` exists, and approve its first-launch prompts; an X11 client started from pi then reaches it inside srt. Linux needs no equivalent because `services.xserver` provides one, and a second display needs its own `network.allowUnixSockets` entry.
 
 ## secrets and remotes
 
