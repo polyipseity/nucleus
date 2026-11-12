@@ -3,6 +3,7 @@
 # via modules/home.nix. The daemon is a system service, the heartbeat a systemd
 # USER service. Both log to journald like every other NixOS service.
 {
+  nucleusApps,
   pkgs,
   username,
   ...
@@ -20,19 +21,7 @@ let
     ];
   };
 
-  camilladspPython = import ../../modules/lib/camilladsp-python.nix { inherit pkgs; };
-
-  # WHY alsa-utils: `aplay -l` is the heartbeat's only device source on Linux, and
-  # the wrapper prepends runtimeInputs to an inherited PATH, so the ambient systemd
-  # user PATH must not be what makes the probe work.
-  camilladspHeartbeat = pkgs.writeNucleusShellApplication {
-    name = "camilladsp-heartbeat";
-    scriptName = "src/scripts/services/camilladsp-heartbeat";
-    runtimeInputs = [
-      camilladspPython
-      pkgs.alsa-utils
-    ];
-  };
+  camilladspHeartbeat = nucleusApps.nucleus-camilladsp-heartbeat;
 in
 {
   systemd.services.camilladsp = {

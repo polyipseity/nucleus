@@ -756,6 +756,17 @@
             name = "bootstrap";
             runtimeInputs = [ ];
           };
+          nucleus-camilladsp-heartbeat = nucleusApp {
+            name = "camilladsp-heartbeat";
+            scriptName = "src/scripts/services/camilladsp-heartbeat";
+            # WHY: `aplay -l` is the heartbeat's only device source on Linux, and the
+            # wrapper prepends runtimeInputs to an inherited PATH, so alsa-utils has to
+            # be carried here instead of resolving from the ambient systemd user PATH.
+            runtimeInputs = [
+              (import ./modules/lib/camilladsp-python.nix { inherit pkgs; })
+            ]
+            ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.alsa-utils ];
+          };
           nucleus-check = nucleusApp {
             name = "check";
             runtimeInputs = [

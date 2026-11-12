@@ -99,25 +99,28 @@ def _list_xattrs(path: str) -> list[str]:
     must not spawn a process, so libc is the only reader available. Any error is
     an empty list: the caller is already reporting a failure.
     """
-    libc = ctypes.CDLL(None)
-    libc.listxattr.restype = ctypes.c_ssize_t
-    encoded = path.encode()
-    if sys.platform == "darwin":
-        libc.listxattr.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_int]
-        size = libc.listxattr(encoded, None, 0, 0)
-    else:
-        libc.listxattr.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t]
-        size = libc.listxattr(encoded, None, 0)
-    if size <= 0:
+    try:
+        libc = ctypes.CDLL(None)
+        libc.listxattr.restype = ctypes.c_ssize_t
+        encoded = os.fsencode(path)
+        if sys.platform == "darwin":
+            libc.listxattr.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_int]
+            size = libc.listxattr(encoded, None, 0, 0)
+        else:
+            libc.listxattr.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t]
+            size = libc.listxattr(encoded, None, 0)
+        if size <= 0:
+            return []
+        buffer = ctypes.create_string_buffer(size)
+        if sys.platform == "darwin":
+            written = libc.listxattr(encoded, buffer, size, 0)
+        else:
+            written = libc.listxattr(encoded, buffer, size)
+        if written <= 0:
+            return []
+        return [name.decode("utf-8", "replace") for name in buffer.raw[:written].split(b"\0") if name]
+    except Exception:  # noqa: BLE001 - a diagnostic must never raise over the EDEADLK
         return []
-    buffer = ctypes.create_string_buffer(size)
-    if sys.platform == "darwin":
-        written = libc.listxattr(encoded, buffer, size, 0)
-    else:
-        written = libc.listxattr(encoded, buffer, size)
-    if written <= 0:
-        return []
-    return [name.decode("utf-8", "replace") for name in buffer.raw[:written].split(b"\0") if name]
 
 
 def _provider_state(path: Path) -> str:

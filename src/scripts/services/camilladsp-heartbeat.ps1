@@ -23,6 +23,8 @@
   Config file the heartbeat pushes.
 #>
 
+# WHY no -Probe twin and no stamped warnings: both are tracked follow-ups, and the
+# POSIX probe exists to diagnose the CoreAudio selectors Windows does not have.
 param(
   [Parameter(Mandatory = $false)]
   [int]$Port = 1234,

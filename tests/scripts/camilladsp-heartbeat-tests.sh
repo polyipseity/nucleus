@@ -444,7 +444,7 @@ def case_probe_mode():
         code = m.probe(c.dir / "config.yml")
     text = buffer.getvalue()
     assert code == 1, (code, text)
-    assert "target=" in text, text
+    assert "target=\n" in text, text
 
 
 def case_warn_timestamp():
@@ -509,10 +509,8 @@ def case_edeadlk_diagnostics():
     m._load_config = deadlock
 
     ticks = {"left": 1}
-    stops = []
 
     def fake_sleep(_seconds):
-        stops.append(1)
         ticks["left"] -= 1
         if ticks["left"] <= 0:
             raise StopLoop
