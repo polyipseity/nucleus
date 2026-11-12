@@ -447,6 +447,20 @@ def case_probe_mode():
     assert "target=" in text, text
 
 
+def case_warn_timestamp():
+    # An untimestamped line cannot be told apart from a months-old failure.
+    import contextlib
+    import io
+    import re
+
+    buffer = io.StringIO()
+    with contextlib.redirect_stderr(buffer):
+        m._warn("tick failed: boom")
+    line = buffer.getvalue().strip()
+    pattern = r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d camilladsp-heartbeat: warning: tick failed: boom$"
+    assert re.match(pattern, line), line
+
+
 CASES = {
     "passthrough_nonempty_device": case_passthrough,
     "patches_with_default_output": case_patches_default_output,
@@ -470,6 +484,7 @@ CASES = {
     "loop_three_states": case_loop_states,
     "selector_codes": case_selector_codes,
     "probe_mode": case_probe_mode,
+    "warn_timestamp": case_warn_timestamp,
 }
 
 
@@ -531,5 +546,6 @@ run_case loop_three_states
 section 6 "CoreAudio wire values and log format"
 run_case selector_codes
 run_case probe_mode
+run_case warn_timestamp
 
 finish_tests

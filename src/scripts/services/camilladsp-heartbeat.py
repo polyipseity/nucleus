@@ -85,7 +85,10 @@ class _PropertyAddress(ctypes.Structure):
 
 
 def _warn(message: str) -> None:
-    print(f"camilladsp-heartbeat: warning: {message}", file=sys.stderr, flush=True)
+    # The heartbeat log is append-only and read long after the fact, so every
+    # line carries its own local time.
+    stamp = time.strftime("%Y-%m-%dT%H:%M:%S")
+    print(f"{stamp} camilladsp-heartbeat: warning: {message}", file=sys.stderr, flush=True)
 
 
 def state_dir() -> Path:
