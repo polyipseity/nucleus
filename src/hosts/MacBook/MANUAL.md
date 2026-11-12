@@ -28,6 +28,7 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 3. Picard: sign in and add the AcoustID API key under Options.
 4. Equaliser: open it once, then approve its audio driver in System Settings > Privacy & Security > Extensions > Audio Extensions. It is menu-bar-only: never add a LaunchAgent.
 5. CamillaDSP: run `camilladsp --version`, then approve BlackHole in System Settings > Privacy & Security and grant Microphone.
+   - After an apply, confirm device detection: `nucleus-camilladsp-heartbeat --probe` prints `default_output`, `available`, and `target`, and exits 0 only when it can bind a device.
 6. OBS virtual camera: start the virtual camera once, then approve the Driver Extension under Privacy & Security and grant Camera. OBS 28+ installs the CoreMediaIO plugin on first launch, so nothing needs installing by hand.
 7. Stats ships `eu.exelban.Stats.LaunchAtLogin`, an embedded SMAppService helper no script can unregister. If two Stats processes start at login, open Stats > Open application settings and turn Start at login off. Do not run `sfltool resetbtm`, which clears login items for every app.
 8. OrbStack's menu bar applet is toggled declaratively through the macOS 26 Control Center gate. To restore it after a manual toggle: System Settings > Menu Bar > OrbStack > Allow in the Menu Bar.

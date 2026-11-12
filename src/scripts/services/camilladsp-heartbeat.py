@@ -519,6 +519,35 @@ def target_playback_device(config_file: Path) -> str:
     return _device_of(config, "playback")
 
 
+def probe(config_file: Path) -> int:
+    """Print what device detection sees, and exit non-zero when it binds nothing.
+
+    Detection failures are silent in the loop: a successful tick logs nothing and
+    a failed one logs a traceback, so this is the only way to see the values the
+    resolver works from.
+    """
+    capture = ""
+    if config_file.is_file():
+        try:
+            capture = _device_of(_load_config(config_file), "capture")
+        except (OSError, yaml.YAMLError) as error:
+            _warn(f"cannot read {config_file}: {error}")
+            return 1
+    default = probe_default_output() or ""
+    available = list_available_devices(capture) or []
+    target = target_playback_device(config_file) if config_file.is_file() else ""
+    print(f"platform={sys.platform}")
+    print(f"config={config_file}")
+    print(f"capture={capture}")
+    print(f"default_output={default}")
+    print(f"available={','.join(available)}")
+    print(f"target={target}")
+    if not target:
+        _warn("probe found no playback device to bind")
+        return 1
+    return 0
+
+
 def needs_push(state: str, live_device: str, target_device: str, config_changed: bool) -> bool:
     """Pure skip decision, mirroring the previous bash implementation.
 
@@ -728,7 +757,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="CamillaDSP device binding heartbeat")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
+    parser.add_argument(
+        "--probe",
+        action="store_true",
+        help="print what device detection sees and exit (0 bound, 1 nothing)",
+    )
     arguments = parser.parse_args()
+    if arguments.probe:
+        return probe(arguments.config)
     return run(arguments.port, arguments.config)
 
 

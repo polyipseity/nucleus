@@ -88,30 +88,6 @@ def case_passthrough():
     assert c.probe_calls == 0, "a fixed device must not touch the audio backend"
 
 
-def case_selector_codes():
-    # Values copied from the SDK headers. A wrong code makes the property
-    # unknown ('who?'), and detection then silently returns nothing.
-    # AudioHardware.h:608 kAudioHardwarePropertyDevices = 'dev#'
-    # AudioHardware.h:610 kAudioHardwarePropertyDefaultOutputDevice = 'dOut'
-    # AudioHardware.h:1008 kAudioDevicePropertyStreamConfiguration = 'slay'
-    # AudioHardwareBase.h:203 kAudioObjectPropertyScopeGlobal = 'glob'
-    # AudioHardwareBase.h:205 kAudioObjectPropertyScopeOutput = 'outp'
-    # AudioHardwareBase.h:334 kAudioObjectPropertyName = 'lnam'
-    expected = {
-        "_SYSTEM_OBJECT": 1,
-        "_SEL_DEVICES": b"dev#",
-        "_SEL_DEFAULT_OUTPUT": b"dOut",
-        "_SEL_NAME": b"lnam",
-        "_SEL_STREAM_CONFIG": b"slay",
-        "_SCOPE_GLOBAL": b"glob",
-        "_SCOPE_OUTPUT": b"outp",
-    }
-    for name, value in expected.items():
-        want = value if isinstance(value, int) else int.from_bytes(value, "big")
-        actual = getattr(m, name)
-        assert actual == want, f"{name} is {actual:#x}, header says {want:#x}"
-
-
 def case_patches_default_output():
     c = Case()
     config = c.config()
@@ -423,6 +399,54 @@ def case_loop_states():
     assert waits == [10, 20, 40], waits
 
 
+def case_selector_codes():
+    # Values copied from the SDK headers. A wrong code makes the property
+    # unknown ('who?'), and detection then silently returns nothing.
+    # AudioHardware.h:608 kAudioHardwarePropertyDevices = 'dev#'
+    # AudioHardware.h:610 kAudioHardwarePropertyDefaultOutputDevice = 'dOut'
+    # AudioHardware.h:1008 kAudioDevicePropertyStreamConfiguration = 'slay'
+    # AudioHardwareBase.h:203 kAudioObjectPropertyScopeGlobal = 'glob'
+    # AudioHardwareBase.h:205 kAudioObjectPropertyScopeOutput = 'outp'
+    # AudioHardwareBase.h:334 kAudioObjectPropertyName = 'lnam'
+    expected = {
+        "_SYSTEM_OBJECT": 1,
+        "_SEL_DEVICES": b"dev#",
+        "_SEL_DEFAULT_OUTPUT": b"dOut",
+        "_SEL_NAME": b"lnam",
+        "_SEL_STREAM_CONFIG": b"slay",
+        "_SCOPE_GLOBAL": b"glob",
+        "_SCOPE_OUTPUT": b"outp",
+    }
+    for name, value in expected.items():
+        want = value if isinstance(value, int) else int.from_bytes(value, "big")
+        actual = getattr(m, name)
+        assert actual == want, f"{name} is {actual:#x}, header says {want:#x}"
+
+
+def case_probe_mode():
+    import contextlib
+    import io
+
+    c = Case()
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        code = m.probe(c.config())
+    text = buffer.getvalue()
+    assert code == 0, (code, text)
+    assert "default_output=Speakers" in text, text
+    assert "available=Headphones,Speakers" in text, text
+    assert "target=Speakers" in text, text
+
+    c.probe = "BlackHole 2ch"
+    c.devices = []
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        code = m.probe(c.dir / "config.yml")
+    text = buffer.getvalue()
+    assert code == 1, (code, text)
+    assert "target=" in text, text
+
+
 CASES = {
     "passthrough_nonempty_device": case_passthrough,
     "patches_with_default_output": case_patches_default_output,
@@ -445,6 +469,7 @@ CASES = {
     "linux_backend_parsing": case_linux_backends,
     "loop_three_states": case_loop_states,
     "selector_codes": case_selector_codes,
+    "probe_mode": case_probe_mode,
 }
 
 
@@ -505,5 +530,6 @@ run_case loop_three_states
 
 section 6 "CoreAudio wire values and log format"
 run_case selector_codes
+run_case probe_mode
 
 finish_tests
