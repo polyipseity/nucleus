@@ -60,6 +60,12 @@ Transport is the Hermes plugin `src/users/default/hermes/plugins/harness-bridge/
 
 Symptom when the resolved spelling is missing: `EPERM` on the daemon socket from any nix command, which blocks `nix run ./src#check` and `./src#test`. `EPERM` is the tell, since a socket with no listener gives `ECONNREFUSED`. `nix eval` is not a usable probe, because it passes without touching the store.
 
+Linux ignores `network.allowUnixSockets` entirely: only `network.allowAllUnixSockets` has any effect there, because seccomp-bpf cannot read a socket path out of user memory (`@anthropic-ai/sandbox-runtime` 0.0.77, `dist/sandbox/linux-sandbox-utils.js:2370-2371`). With `allowAllUnixSockets: false` srt prefixes the sandboxed command with `apply-seccomp`, whose baked-in BPF filter rejects `socket(AF_UNIX, ...)` creation outright, so there is no path allowlist to extend (`:2421-2435`).
+
+The nixpkgs package ships no `apply-seccomp` helper: `vendor/seccomp/` holds only `build.ts` and the derivation builds nothing from it, so srt warns `seccomp not available - unix socket access not restricted` (`:819-822`) and Linux runs with Unix sockets unrestricted. The managed list therefore restricts nothing on Linux and carries weight only on macOS.
+
+`xvfb-run` does not restore the restricted case: the X client inside the sandbox is the process that must create the AF_UNIX socket, so where the server lives changes nothing. Where the helper does ship, run the GUI tool outside the sandbox (`pi-unrestricted` or a plain terminal) or set `allowAllUnixSockets: true`, which drops the filter.
+
 `filesystem.allowWrite` renders `(allow file-write*)` over the entry's whole subtree and re-allows `file-write-unlink` and `file-write-create` there, which is why `~/.Trash` is granted: safe-rm takes the `mv` route inside the sandbox because the managed config sets `SAFE_RM_USE_APPLESCRIPT=no` when `SANDBOX_RUNTIME` is present, and the AppleScript route needs `appleevent-send`, which the sandbox denies. That marker is srt's own export into every sandboxed child, so the config introduces no extra variable. The grant is broader than the delete it serves, because a nested `denyWrite` is a specific deny that beats the allow and would also block the rename, so a drop-only Trash is not expressible. `allowAppleEvents` stays off: it would grant `appleevent-send` and `lsopen` to every sandboxed command, and srt's README says launched applications then run outside the sandbox entirely.
 
 ## Authoring rules
