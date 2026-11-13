@@ -10,12 +10,16 @@ $script:passCount = 0
 $script:failCount = 0
 $script:warnings = @()
 
-# WHY: the resolver reports an unusable topology through the shared formatter,
-# which the heartbeat imports. The stub records the message so the suite can
-# assert what the daemon would log, without the formatter's command-name lookup.
+# WHY: the resolver and heartbeat report warnings through these helpers. The
+# stubs record messages so the suite can assert what the daemon would log.
 function Write-NucleusWarning {
   param([string]$Message, [string]$CommandName = '')
   $script:warnings += @("$CommandName`: $Message")
+}
+
+function Write-CamillaDSPWarning {
+  param([string]$Message)
+  $script:warnings += @("camilladsp-heartbeat: $Message")
 }
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path

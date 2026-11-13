@@ -21,16 +21,20 @@
 
 .PARAMETER ConfigFile
   Config file the heartbeat pushes.
+
+.PARAMETER Probe
+  Print the device selection state and exit. Exits 1 when no target device can be bound.
 #>
 
-# WHY no -Probe twin and no stamped warnings: both are tracked follow-ups, and the
-# POSIX probe exists to diagnose the CoreAudio selectors Windows does not have.
 param(
   [Parameter(Mandatory = $false)]
   [int]$Port = 1234,
 
   [Parameter(Mandatory = $false)]
-  [string]$ConfigFile = "$HOME\.config\camilladsp\configs\config.yml"
+  [string]$ConfigFile = "$HOME\.config\camilladsp\configs\config.yml",
+
+  [Parameter(Mandatory = $false)]
+  [switch]$Probe
 )
 
 $ErrorActionPreference = "Stop"
@@ -41,6 +45,89 @@ $ErrorActionPreference = "Stop"
 Import-Module (Join-Path -Path $PSScriptRoot -ChildPath '..\..\platforms\Windows\modules\Format-NucleusOutput.psm1') -Force
 
 . "$PSScriptRoot/camilladsp-deviceselect.ps1"
+
+# WHY: resolver warnings must be stamped and stay off stdout, matching heartbeat
+# probe/warning output on this host.
+function Write-NucleusWarning {
+  param(
+    [Parameter(Mandatory = $false)]
+    [string]$Message = '',
+    [Parameter(Mandatory = $false)]
+    [string]$CommandName = ''
+  )
+
+  Write-CamillaDSPWarning -Message $Message
+}
+
+function Write-CamillaDSPWarning {
+  <#
+  .SYNOPSIS
+    Writes a stamped heartbeat warning to stderr.
+  .PARAMETER Message
+    Warning text.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [string]$Message
+  )
+
+  $stamp = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ss')
+  [Console]::Error.WriteLine("$stamp camilladsp-heartbeat: warning: $Message")
+}
+
+function Invoke-CamillaDSPProbe {
+  <#
+  .SYNOPSIS
+    Prints the device selection state and returns an exit code.
+  .DESCRIPTION
+    Probe output mirrors the POSIX heartbeat: platform, config, capture,
+    default_output, available, and target. It exits 1 when no target device can
+    be bound.
+  .PARAMETER ProbeConfigFile
+    Config file to inspect.
+  #>
+  [CmdletBinding()]
+  [OutputType([int])]
+  param(
+    [Parameter(Mandatory)]
+    [string]$ProbeConfigFile
+  )
+
+  $capture = ''
+  if (Test-Path -Path $ProbeConfigFile -PathType Leaf) {
+    try {
+      $configObject = (Get-Content -Raw -Path $ProbeConfigFile) | ConvertFrom-Yaml
+      $captureDevice = $configObject.devices.capture.device
+      $capture = if ($null -eq $captureDevice) { '' } else { [string]$captureDevice }
+    } catch {
+      Write-CamillaDSPWarning -Message "cannot read ${ProbeConfigFile}: $($_.Exception.Message)"
+      return 1
+    }
+  }
+
+  $defaultOutput = [string](Get-CamillaDSPDefaultPlaybackDevice)
+  $availableDevices = @(Get-CamillaDSPAvailablePlaybackDeviceList -CaptureDevice $capture)
+  if ($null -eq $availableDevices) { $availableDevices = @() }
+  $target = ''
+  if (Test-Path -Path $ProbeConfigFile -PathType Leaf) {
+    $resolvedTarget = Get-CamillaDSPResolvedPlaybackDeviceName -ConfigPath $ProbeConfigFile
+    if ($null -ne $resolvedTarget) { $target = [string]$resolvedTarget }
+  }
+
+  [Console]::Out.WriteLine("platform=windows")
+  [Console]::Out.WriteLine("config=$ProbeConfigFile")
+  [Console]::Out.WriteLine("capture=$capture")
+  [Console]::Out.WriteLine("default_output=$defaultOutput")
+  [Console]::Out.WriteLine("available=$([string]::Join(',', $availableDevices))")
+  [Console]::Out.WriteLine("target=$target")
+
+  if ([string]::IsNullOrEmpty($target)) {
+    Write-CamillaDSPWarning -Message 'probe found no playback device to bind'
+    return 1
+  }
+  return 0
+}
 
 $baseSleep = 5
 $maxSleep = 300
@@ -123,7 +210,7 @@ function Close-CamillaDSPWebSocket {
   try {
     $script:CamillaDSPWebSocket.Dispose()
   } catch {
-    Write-NucleusWarning -CommandName 'camilladsp-heartbeat' -Message "closing the stale websocket failed: $($_.Exception.Message)"
+    Write-CamillaDSPWarning -Message "closing the stale websocket failed: $($_.Exception.Message)"
   }
   $script:CamillaDSPWebSocket = $null
 }
@@ -239,7 +326,7 @@ function Get-CamillaDSPLiveDevice {
   try {
     $config = $text | ConvertFrom-Yaml
   } catch {
-    Write-NucleusWarning -CommandName 'camilladsp-heartbeat' -Message "live config is not valid YAML: $($_.Exception.Message)"
+    Write-CamillaDSPWarning -Message "live config is not valid YAML: $($_.Exception.Message)"
     return ''
   }
 
@@ -444,7 +531,7 @@ function Write-CamillaDSPPushRefusalWarning {
 
   if ($script:CamillaDSPLastPushRefusal -eq $Cause) { return }
   $script:CamillaDSPLastPushRefusal = $Cause
-  Write-NucleusWarning -CommandName 'camilladsp-heartbeat' -Message $Message
+  Write-CamillaDSPWarning -Message $Message
 }
 
 function Send-CamillaDSPConfig {
@@ -560,7 +647,7 @@ function Get-CamillaDSPRuntimeToggle {
   try {
     $config = Get-Content -Raw -Path $configPath | ConvertFrom-Json -AsHashtable
   } catch {
-    Write-NucleusWarning -CommandName 'camilladsp-heartbeat' -Message "cannot read ${configPath}: $($_.Exception.Message)"
+    Write-CamillaDSPWarning -Message "cannot read ${configPath}: $($_.Exception.Message)"
     return $toggle
   }
 
@@ -572,6 +659,10 @@ function Get-CamillaDSPRuntimeToggle {
   if ($null -ne $section['heartbeat']) { $toggle.Heartbeat = [bool]$section['heartbeat'] }
   if ($null -ne $section['enable']) { $toggle.Binding = [bool]$section['enable'] }
   return $toggle
+}
+
+if ($Probe) {
+  exit (Invoke-CamillaDSPProbe -ProbeConfigFile $ConfigFile)
 }
 
 while ($true) {
@@ -614,7 +705,7 @@ while ($true) {
       $success = $true
     }
   } catch {
-    Write-NucleusWarning -CommandName 'camilladsp-heartbeat' -Message "tick failed: $($_.Exception.Message)"
+    Write-CamillaDSPWarning -Message "tick failed: $($_.Exception.Message)"
   }
 
   $sleepSeconds = if ($success) { $baseSleep } else { [Math]::Min($sleepSeconds * 2, $maxSleep) }

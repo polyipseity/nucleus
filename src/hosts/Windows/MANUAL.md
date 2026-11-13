@@ -16,6 +16,7 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 ## audio processing
 
 1. CamillaDSP captures the default playback device in WASAPI loopback, so this host needs two playback endpoints: applications play into the default one, which CamillaDSP captures, and the processed audio goes to the other. With a single output there is nowhere for the unprocessed stream to go, and `camilladsp-heartbeat` logs a warning instead of feeding the output back into the capture. Set the spare endpoint (HDMI or an unused output) as the default playback device; the shipped configs leave both devices `null` so the heartbeat picks them. The heartbeat is the only writer of those configs: editing them in camillagui binds playback and capture to the same endpoint, which the heartbeat refuses to push, so the daemon keeps the last config it accepted.
+   - After an apply on the Windows host, confirm device detection by running the heartbeat probe from the checkout (`pwsh -NoProfile -File src/scripts/services/camilladsp-heartbeat.ps1 -Probe`). It prints `platform`, `config`, `capture`, `default_output`, `available`, and `target`, and exits 0 only when it can bind a device. The Windows Pester step covers the probe contract on `windows-latest`; this host run confirms live WASAPI device selection.
 
 ## virtualization
 
