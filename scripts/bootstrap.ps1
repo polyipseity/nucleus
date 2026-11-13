@@ -426,6 +426,7 @@ Install-GnuPGDirect -Version $gnupgVersion -InstallerDate $gnupgDate -InstallerS
 
 $BootstrapPackageVersions = [ordered]@{
   "Hashicorp.Packer" = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_PACKER_VERSION"
+  "Oven-sh.Bun" = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_BUN_VERSION"
   "SecretsOPerationS.SOPS" = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_SOPS_VERSION"
 }
 

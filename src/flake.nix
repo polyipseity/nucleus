@@ -772,6 +772,7 @@
             runtimeInputs = [
               pkgs.actionlint
               pkgs.bash
+              pkgs.bun
               pkgs.git
               pkgs.jq
               pkgs.nixf
