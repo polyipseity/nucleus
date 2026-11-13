@@ -130,7 +130,10 @@ def _provider_state(path: Path) -> str:
     a launchd context. Nothing else in the log distinguishes that from a stale
     file handle, so the failure carries the evidence needed to tell them apart.
     """
-    resolved = os.path.realpath(path)
+    try:
+        resolved = os.path.realpath(path)
+    except Exception:  # noqa: BLE001 - a diagnostic must never raise over the EDEADLK
+        resolved = os.fspath(path)
     parts = [f"path={resolved}"]
     names = _list_xattrs(resolved)
     present = sorted(

@@ -535,6 +535,120 @@ def case_edeadlk_diagnostics():
     assert "placeholder=no" in text, text
 
 
+def _run_edeadlk_tick(config, path_fragment):
+    import contextlib
+    import errno
+    import io
+
+    class StopLoop(Exception):
+        pass
+
+    class FakeClient:
+        def __init__(self, port):
+            self.port = port
+
+        def endpoint_up(self):
+            return True
+
+        def reset(self):
+            pass
+
+        def request(self, payload):
+            key = next(iter(payload))
+            if key == "GetState":
+                return {"GetState": {"value": "Running"}}
+            if key == "GetConfig":
+                return {"GetConfig": {"value": ""}}
+            raise AssertionError(f"unexpected request {key}")
+
+    def deadlock(_path):
+        raise OSError(errno.EDEADLK, "Resource deadlock avoided")
+
+    m.CamillaClient = FakeClient
+    m.read_toggles = lambda: (True, True)
+    m._load_config = deadlock
+
+    ticks = {"left": 1}
+
+    def fake_sleep(_seconds):
+        ticks["left"] -= 1
+        if ticks["left"] <= 0:
+            raise StopLoop
+
+    m.time.sleep = fake_sleep
+
+    buffer = io.StringIO()
+    with contextlib.redirect_stderr(buffer):
+        try:
+            m.run(1234, config)
+        except StopLoop:
+            pass
+    text = buffer.getvalue()
+    assert "Resource deadlock avoided" in text, text
+    assert f"path={path_fragment}" in text, text
+    assert "xattrs=none" in text, text
+    assert "placeholder=no" in text, text
+    assert f"[path={path_fragment}" in text, text
+
+
+def case_provider_state_cdll_fault():
+    c = Case()
+    config = c.config()
+    original = m.ctypes.CDLL
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("ctypes.CDLL boom")
+
+    m.ctypes.CDLL = boom
+    try:
+        state = m._provider_state(config)
+        assert f"path={os.path.realpath(config)}" in state, state
+        assert " xattrs=none" in state, state
+        assert " placeholder=no" in state, state
+        _run_edeadlk_tick(config, os.path.realpath(config))
+    finally:
+        m.ctypes.CDLL = original
+
+
+def case_provider_state_fsencode_fault():
+    c = Case()
+    config = c.config()
+    original = m.os.fsencode
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("os.fsencode boom")
+
+    m.os.fsencode = boom
+    try:
+        state = m._provider_state(config)
+        assert f"path={os.path.realpath(config)}" in state, state
+        assert " xattrs=none" in state, state
+        assert " placeholder=no" in state, state
+        _run_edeadlk_tick(config, os.path.realpath(config))
+    finally:
+        m.os.fsencode = original
+
+
+def case_provider_state_realpath_fault():
+    c = Case()
+    config = c.config()
+    original = m.os.path.realpath
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("os.path.realpath boom")
+
+    m.os.path.realpath = boom
+    try:
+        expected = os.fspath(config)
+        state = m._provider_state(config)
+        assert f"path={expected}" in state, state
+        assert " xattrs=none" in state, state
+        assert " placeholder=no" in state, state
+        _run_edeadlk_tick(config, expected)
+    finally:
+        m.os.path.realpath = original
+
+
 CASES = {
     "passthrough_nonempty_device": case_passthrough,
     "patches_with_default_output": case_patches_default_output,
@@ -560,6 +674,9 @@ CASES = {
     "probe_mode": case_probe_mode,
     "warn_timestamp": case_warn_timestamp,
     "edeadlk_diagnostics": case_edeadlk_diagnostics,
+    "provider_state_cdll_fault": case_provider_state_cdll_fault,
+    "provider_state_fsencode_fault": case_provider_state_fsencode_fault,
+    "provider_state_realpath_fault": case_provider_state_realpath_fault,
 }
 
 
@@ -623,5 +740,8 @@ run_case selector_codes
 run_case probe_mode
 run_case warn_timestamp
 run_case edeadlk_diagnostics
+run_case provider_state_cdll_fault
+run_case provider_state_fsencode_fault
+run_case provider_state_realpath_fault
 
 finish_tests
