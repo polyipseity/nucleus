@@ -4,11 +4,11 @@
  * delivers prompts queued from a messaging channel (`/harness send pi <text>`).
  *
  * Two events matter for notification purposes:
- *   - `agent_settled`   — pi will not continue on its own, so the turn is done.
+ *   - `agent_settled`   - pi will not continue on its own, so the turn is done.
  *                         (`agent_end` is too early: auto-retry, auto-compact
  *                         and queued follow-ups still run afterwards.)  It is
  *                         also the moment a queued remote prompt is injected.
- *   - `ui_prompt_start` — pi is blocked on the user (select/confirm/input/…).
+ *   - `ui_prompt_start` - pi is blocked on the user (select/confirm/input/...).
  *
  * Only *when* to speak is decided here; channel selection and message
  * formatting belong to `harness-notify`.  Delivery is best-effort: a failing or
@@ -118,7 +118,7 @@ export default function (pi: ExtensionAPI) {
   // an empty queue.  (pi reports `source: "extension"` only on the `input`
   // event, not on the lifecycle events used here.)
   pi.on("agent_settled", async (_event, ctx) => {
-    await notify("done", `${basename(ctx.cwd)} — turn finished`);
+    await notify("done", `${basename(ctx.cwd)}: turn finished`);
 
     const prompt = takeQueuedPrompt();
     if (prompt === null) return;
@@ -131,7 +131,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("ui_prompt_start", async (event, ctx) => {
-    const suffix = event.title ? ` — ${event.title}` : "";
+    const suffix = event.title ? `: ${event.title}` : "";
     await notify("needs-input", `${basename(ctx.cwd)}${suffix}`);
   });
 }

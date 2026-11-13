@@ -12,7 +12,7 @@
 #   • the Stirling-PDF entry resolves enabled on every host and deploys the desktop build
 #   • Windows DSC package ids are sorted alphabetically (case-folded)
 #   • winget-packages.json is $schema-first at the root key level
-#   • the ScoopInstall DSC bootstrap guard: block-anchored id and dependsOn pairing, enable-list coverage, and the eight wp* aggregate members.
+#   • the ScoopInstall DSC bootstrap guard: block-anchored id and dependsOn pairing, enable-list coverage, and the DSC/WinGet parity aggregate members.
 #
 # Run with: nix-instantiate --eval --strict tests/modules/package-lists-tests.nix
 
@@ -297,13 +297,13 @@ let
   ) dscIds;
 
   # The Scoop bootstrap is a Script resource, so its id sits at the resource
-  # level and the settings.id scan above cannot see it. WHY split on the Script
-  # resource marker: the id and its dependsOn must appear in the same block, so
-  # a dependency moved under any other block fails instead of passing on a
-  # whole-file scan.
+  # level and the settings.id scan above cannot see it. WHY split on resource
+  # markers: the id and its dependsOn must appear in the same DSC resource
+  # block, so a dependency moved under any other block fails instead of passing
+  # on a wider scan.
   scoopScriptBlock =
     let
-      entries = lib.splitString "\n    - resource: PSDscResources/Script" dscText;
+      entries = lib.splitString "\n    - resource: " dscText;
     in
     lib.findFirst (entry: lib.hasInfix "\n      id: ScoopInstall\n" entry) null entries;
   wpScoopInstallPresent =

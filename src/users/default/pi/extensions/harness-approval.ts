@@ -9,9 +9,9 @@
  * disk writes, and power commands.
  *
  * Three outcomes, all decided remotely first:
- *   allow — the call runs untouched (no local prompt)
- *   deny  — the call is blocked without asking locally
- *   ask   — no remote decision arrived (broker disabled, unreachable, or nobody
+ *   allow: the call runs untouched (no local prompt)
+ *   deny:  the call is blocked without asking locally
+ *   ask:   no remote decision arrived (broker disabled, unreachable, or nobody
  *           answered in time), so the local confirm prompt decides
  *
  * The local prompt on `ask` is deliberate: it is pi's normal interactive

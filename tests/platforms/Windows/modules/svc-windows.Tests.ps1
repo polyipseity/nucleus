@@ -789,19 +789,19 @@ Describe 'Dispatch' {
     It 'logs with unknown service writes error' {
       Mock Write-Error { throw "Write-Error: $Message" }
 
-      { Invoke-Dispatch -Action logs -ServiceName @('nonexistent') } | Should -Throw 'Write-Error: svc: error: logs: nonexistent — service not found in registry*'
+      { Invoke-Dispatch -Action logs -ServiceName @('nonexistent') } | Should -Throw 'Write-Error: svc: error: logs: nonexistent  -  service not found in registry*'
     }
 
     It 'log-paths with unknown service writes error' {
       Mock Write-Error { throw "Write-Error: $Message" }
 
-      { Invoke-Dispatch -Action log-paths -ServiceName @('nonexistent') } | Should -Throw 'Write-Error: svc: error: log-paths: nonexistent — service not found in registry*'
+      { Invoke-Dispatch -Action log-paths -ServiceName @('nonexistent') } | Should -Throw 'Write-Error: svc: error: log-paths: nonexistent  -  service not found in registry*'
     }
 
     It 'log-config with unknown service writes error' {
       Mock Write-Error { throw "Write-Error: $Message" }
 
-      { Invoke-Dispatch -Action log-config -ServiceName @('nonexistent') } | Should -Throw 'Write-Error: svc: error: log-config: nonexistent — service not found in registry*'
+      { Invoke-Dispatch -Action log-config -ServiceName @('nonexistent') } | Should -Throw 'Write-Error: svc: error: log-config: nonexistent  -  service not found in registry*'
     }
   }
 
@@ -859,7 +859,7 @@ Describe 'Dispatch' {
       Mock Invoke-ServiceAction { return $true }
       Mock Write-Error { throw "Write-Error: $Message" }
 
-      { Invoke-Dispatch -Action restart -ServiceName @('cloud-drive') } | Should -Throw 'Write-Error: svc: error: cloud-drive — no instances found*'
+      { Invoke-Dispatch -Action restart -ServiceName @('cloud-drive') } | Should -Throw 'Write-Error: svc: error: cloud-drive  -  no instances found*'
       Should -Invoke Invoke-ServiceAction -Exactly 0
     }
 
@@ -915,7 +915,7 @@ Describe 'Dispatch' {
       Mock Write-Error { throw "Write-Error: $Message" }
 
       { Invoke-Dispatch -Action restart -ServiceName @('\NucleusCloudMount\NucleusCloudMount-work') } |
-        Should -Throw 'Write-Error: svc: error: \NucleusCloudMount\NucleusCloudMount-work — configured but not loaded*'
+        Should -Throw 'Write-Error: svc: error: \NucleusCloudMount\NucleusCloudMount-work  -  configured but not loaded*'
       Should -Invoke Invoke-ServiceAction -Exactly 0
     }
 

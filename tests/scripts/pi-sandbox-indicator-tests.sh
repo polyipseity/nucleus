@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Test: the pi sandbox-indicator extension suite runs under bun and reports real
 # passing cases. The wrapper enforces the two failure modes a bare `bun test`
-# call would hide in a log: a non-zero exit and a vacuous zero-test run.
+# call would hide in a log: a non-zero exit and a vacuous zero-pass run.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -27,7 +27,7 @@ if grep -qE '(^|[^0-9])[1-9][0-9]* pass' "$_psi_out"; then
   assert_pass "bun reported a non-zero passing test count"
 else
   assert_fail "bun reported a non-zero passing test count" \
-    "no pass count in: $(tail -n 5 "$_psi_out" | tr '\n' ' ')"
+    "no non-zero pass count in: $(tail -n 5 "$_psi_out" | tr '\n' ' ')"
 fi
 
 finish_tests

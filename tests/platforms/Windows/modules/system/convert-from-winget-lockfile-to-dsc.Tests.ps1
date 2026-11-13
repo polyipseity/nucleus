@@ -1,12 +1,13 @@
 <#
 .SYNOPSIS
-    Pester coverage for the ConvertFrom-WingetLockfileToDsc -EnabledPackages filter.
+    Pester coverage for the ConvertFrom-WingetLockfileToDsc -EnabledPackages filter and unfiltered default path.
 .DESCRIPTION
     The converter must drop a WinGet package that the enable set excludes while
     keeping every resource it does not own. A Script resource carries its id at
     the resource level, not under settings, so the filter must not treat it as a
     WinGet package and drop it: that regression would silently remove the Scoop
-    bootstrap and the font installs from every Windows apply.
+    bootstrap and the font installs from every Windows apply. When
+    -EnabledPackages is omitted, all resources are emitted without filtering.
 
     The fixture under tests/fixtures/windows-dsc/ holds four resource shapes: an
     enabled WinGet package with a lockfile pin, a disabled WinGet package, a
