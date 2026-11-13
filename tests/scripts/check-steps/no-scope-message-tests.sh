@@ -27,7 +27,7 @@ test_no_scope_step_replays_and_passes() {
       # renders exactly as a production step does. An earlier `echo` here left
       # the runner's line-start anchor satisfied by the test alone, and the
       # feature it was meant to prove stayed inert in production.
-      say "0 lockfile files in scope  -  nothing to validate."
+      say "0 lockfile files in scope - nothing to validate."
       return 0
     }
     register_step "empty" 1 "Empty scope" step_empty
@@ -89,7 +89,7 @@ test_predicate_is_live() {
       _STEP_NUMBERS=(1)
       # minimal conforming line, deliberately different from the production
       # fixture below so a live control is not the same fact twice
-      printf 'any-step: 0 thing in scope  -  nothing.\n' >"$_tmp/step-1.out"
+      printf 'any-step: 0 thing in scope - nothing.\n' >"$_tmp/step-1.out"
       if _step_reports_no_scope 0; then printf 'MATCH\n'; else printf 'NOMATCH\n'; fi
     fi
   ) >"$_tmp/result.txt" 2>&1
@@ -98,7 +98,7 @@ test_predicate_is_live() {
   if [ "$_result" = "MATCH" ]; then
     assert_pass "the no-scope predicate is reachable and answers a control line"
   else
-    assert_fail "the no-scope predicate is live" "result=[$_result]  -  the runner does not define a callable _step_reports_no_scope, or it rejects a conforming line"
+    assert_fail "the no-scope predicate is live" "result=[$_result] - the runner does not define a callable _step_reports_no_scope, or it rejects a conforming line"
   fi
 }
 
@@ -116,7 +116,7 @@ test_predicate_matches_a_labelled_production_line() {
     . "$STEP_RUNNER"
     _wave_tmpdir="$_tmp"
     _STEP_NUMBERS=(1)
-    printf '05-lockfile-validation: 0 lockfile files in scope  -  nothing to validate.\n' \
+    printf '05-lockfile-validation: 0 lockfile files in scope - nothing to validate.\n' \
       >"$_tmp/step-1.out"
     if _step_reports_no_scope 0; then printf 'MATCH\n'; else printf 'NOMATCH\n'; fi
   ) >"$_tmp/result.txt" 2>&1

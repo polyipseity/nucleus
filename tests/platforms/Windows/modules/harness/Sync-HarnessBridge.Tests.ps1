@@ -395,7 +395,7 @@ Describe 'Sync-HarnessBridge shim convergence' {
     }
   }
 
-  It 'is idempotent  -  a second enabled run rewrites nothing' {
+  It 'is idempotent - a second enabled run rewrites nothing' {
     $artifacts = @(
       (Join-Path -Path $script:syncBinDir -ChildPath 'harness-notify.ps1')
       (Join-Path -Path $script:syncBinDir -ChildPath 'harness-approval.ps1')

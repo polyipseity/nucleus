@@ -141,7 +141,7 @@ Describe 'Invoke-AppConverge manual kind' {
     Mock Write-NucleusWarning { param($Message) $Script:warning = $Message }
     $result = Invoke-AppConverge -Key 'ManualApp' -Entry $Script:Registry['ManualApp']
     $result | Should -Be 0
-    $Script:warning | Should -Be 'ManualApp  -  fixture manual instructions'
+    $Script:warning | Should -Be 'ManualApp — fixture manual instructions'
   }
 }
 

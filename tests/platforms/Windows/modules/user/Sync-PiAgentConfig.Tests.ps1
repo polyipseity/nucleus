@@ -71,7 +71,7 @@ Describe 'Sync-PiAgentConfig pi agent links' {
         $webSearchItem.Target | Should -Be (Join-Path $script:repoRoot 'src\users\default\pi\web-search.json')
     }
 
-    It 'is idempotent  -  re-running leaves the links intact' {
+    It 'is idempotent - re-running leaves the links intact' {
         $piDir = Join-Path $script:homeRoot '.pi\agent'
         $settingsLink = Join-Path $piDir 'settings.json'
 
