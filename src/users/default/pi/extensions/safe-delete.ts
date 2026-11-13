@@ -170,6 +170,25 @@ function setStatus(ui: SafeDeleteUi, value: string | undefined): void {
 	}
 }
 
+
+function verdictDetail(verdict: Verdict): string {
+	const parts = verdict.raw.split("\t");
+	if (parts.length >= 3) {
+		const detail = parts.slice(2).join("\t").trim();
+		if (detail.length > 0) {
+			return `${parts[1]}: ${detail}`;
+		}
+	}
+	const stderr = verdict.stderr.trim();
+	if (stderr.length > 0) {
+		return stderr;
+	}
+	if (parts.length >= 2 && parts[1]?.trim().length > 0) {
+		return parts[1]!.trim();
+	}
+	return "";
+}
+
 function block(reason: string): { block: true; reason: string } {
 	return { block: true, reason };
 }
@@ -196,7 +215,10 @@ export function createSafeDeleteExtension(options: RunnerOptions = {}): (pi: Ext
 			if (verdict.decision === "deny") {
 				setStatus(ui, "safe-delete: blocked");
 				try {
-					return block("Blocked by the safe-delete filter (deny). Use shell-safe-rm or rip2 instead.");
+					const detail = verdictDetail(verdict);
+					return block(detail.length > 0
+						? `Blocked by the safe-delete filter (deny). ${detail} Use shell-safe-rm or rip2 instead.`
+						: "Blocked by the safe-delete filter (deny). Use shell-safe-rm or rip2 instead.");
 				} finally {
 					setStatus(ui, undefined);
 				}
@@ -205,27 +227,34 @@ export function createSafeDeleteExtension(options: RunnerOptions = {}): (pi: Ext
 			setStatus(ui, "safe-delete: confirmation required");
 			try {
 				if (!ctx.hasUI) {
-					return block(
-						"Blocked by the safe-delete filter (ask) and no confirmation UI is available. Use shell-safe-rm or rip2 instead.",
-					);
+					const detail = verdictDetail(verdict);
+					return block(detail.length > 0
+						? `Blocked by the safe-delete filter (ask) and no confirmation UI is available. ${detail} Use shell-safe-rm or rip2 instead.`
+						: "Blocked by the safe-delete filter (ask) and no confirmation UI is available. Use shell-safe-rm or rip2 instead.");
 				}
 				if (typeof ui.confirm === "function") {
+					const detail = verdictDetail(verdict);
+					const message = detail.length > 0
+						? `Allow this command?\n\n${command}\n\nFilter: ${detail}`
+						: `Allow this command?\n\n${command}`;
 					const approved = await ui.confirm(
 						"Safe-delete filter requires confirmation",
-						`Allow this command?\n\n${command}`,
+						message,
 					);
 					return approved ? undefined : block("Blocked by safe-delete extension");
 				}
 				if (typeof ui.select === "function") {
-					const choice = await ui.select(
-						`Safe-delete filter requires confirmation:\n\n  ${command}\n\nAllow?`,
-						["Allow", "Block"],
-					);
+					const detail = verdictDetail(verdict);
+					const message = detail.length > 0
+						? `Safe-delete filter requires confirmation:\n\n  ${command}\n\nFilter: ${detail}\n\nAllow?`
+						: `Safe-delete filter requires confirmation:\n\n  ${command}\n\nAllow?`;
+					const choice = await ui.select(message, ["Allow", "Block"]);
 					return choice === "Allow" ? undefined : block("Blocked by safe-delete extension");
 				}
-				return block(
-					"Blocked by the safe-delete filter (ask) and no confirmation UI is available. Use shell-safe-rm or rip2 instead.",
-				);
+				const detail = verdictDetail(verdict);
+				return block(detail.length > 0
+					? `Blocked by the safe-delete filter (ask) and no confirmation UI is available. ${detail} Use shell-safe-rm or rip2 instead.`
+					: "Blocked by the safe-delete filter (ask) and no confirmation UI is available. Use shell-safe-rm or rip2 instead.");
 			} finally {
 				setStatus(ui, undefined);
 			}
