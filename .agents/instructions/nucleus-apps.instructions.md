@@ -20,7 +20,7 @@ Stop at the first fit:
 2. A variant of an existing app: add a subcommand to `check`, `gc`, `apply`, `cloud`, or `update`.
 3. A new top-level concern: register it in `mkNucleusApps` with a matching `scripts/<name>.sh` and `scripts/<name>.ps1`. An entry with no Windows twin declares only the POSIX script and its zsh completion; an entry that must never be invoked by hand stays out of `mkNucleusApps` entirely and is wired from its store path.
 
-The completion generators and check step `10-completions-fresh` derive the command set from flake `packages.<system>` entries whose names start with `nucleus-`, so registering or removing an entry in `mkNucleusApps` updates completion coverage and freshness checks without a second hand-maintained list. A `scripts/<name>.sh` (or the daemon mapping in `gen-completions.sh`) must still exist so `--help`-derived completions can be generated.
+`src/modules/completions/nucleus-apps.json` is the committed command manifest derived from flake `packages.<system>` / `mkNucleusApps`. `src/flake.nix` package output `nucleus-apps` builds it, and nix-capable checks compare the committed file to that derivation, so adding or removing an app in `mkNucleusApps` requires regenerating the manifest and committed completion artifacts in the same change. Completion generators and check step `10-completions-fresh` read the manifest, so Windows generation and checks do not evaluate nix at runtime and cannot pass from a stale static fallback. A `scripts/<name>.sh` (or the daemon mapping in `gen-completions.sh`) must still exist so `--help`-derived completions can be generated.
 
 ## Internal invocation
 
@@ -36,7 +36,7 @@ Every POSIX `scripts/<name>.sh` with subcommands needs a `scripts/<name>.ps1` tw
 
 ## Completions
 
-`src/scripts/completions/gen-completions.sh` and `gen-completions.ps1` derive completions from `--help` output. Regenerate and commit after a command-surface change; step `10-completions-fresh` re-runs them in check mode and fails on a diff. Never hand-edit generated files.
+`src/scripts/completions/gen-completions.sh` and `gen-completions.ps1` read the command list from `src/modules/completions/nucleus-apps.json` and derive flag/help content from command `--help` output. Regenerate the manifest and committed completion artifacts after a command-surface change; step `10-completions-fresh` and the nix-capable flake/generated-artifact checks fail on drift. Never hand-edit generated files.
 
 ## Agent host wrapper
 

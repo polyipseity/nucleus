@@ -3,26 +3,29 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-# The canonical nucleus-* command set, derived from the flake packages output.
-# The zsh side asserts coverage over the derived list; the pwsh side asserts
+# The canonical nucleus-* command set comes from the committed manifest.
+# The zsh side asserts coverage over the full manifest; the pwsh side asserts
 # completer and flag inventory parity for commands that have a Windows app
-# surface (profile.ps1).
-_derive_nucleus_commands() {
+# surface (profile.ps1). The nix-capable check path separately proves the
+# manifest matches mkNucleusApps.
+_load_nucleus_commands_from_manifest() {
   local _root="${1:-$_repo_root}"
-  require_command nix "nix eval is required to derive the nucleus command list from the flake"
-  local _sys_10 _n10
-  _sys_10="$(nix config show system)"
+  local _manifest="$_root/src/modules/completions/nucleus-apps.json"
+  require_command jq "jq is required to read the nucleus command manifest"
+  [ -f "$_manifest" ] || {
+    error "nucleus command manifest not found: $_manifest"
+    return 1
+  }
   _NUCLEUS_COMMANDS=()
+  local _n10
   while IFS= read -r _n10; do
     [ -n "$_n10" ] || continue
-    case "$_n10" in
-    nucleus-*) _NUCLEUS_COMMANDS+=("${_n10#nucleus-}") ;;
-    esac
-  done < <(
-    nix eval --raw "$_root/src#packages.$_sys_10" --apply 'ps: let names = builtins.attrNames ps; nucleus = builtins.filter (n: builtins.substring 0 8 n == "nucleus-") names; in builtins.concatStringsSep "\n" (builtins.sort builtins.lessThan nucleus)' 2>/dev/null
-    printf '\n'
-  )
-  [ "${#_NUCLEUS_COMMANDS[@]}" -gt 0 ] || return 1
+    _NUCLEUS_COMMANDS+=("$_n10")
+  done < <(jq -r '.commands[]' "$_manifest")
+  [ "${#_NUCLEUS_COMMANDS[@]}" -gt 0 ] || {
+    error "nucleus command manifest contains no commands: $_manifest"
+    return 1
+  }
   _NUCLEUS_PWSH_COMMANDS=()
   for _n10 in "${_NUCLEUS_COMMANDS[@]}"; do
     case "$_n10" in
@@ -30,6 +33,19 @@ _derive_nucleus_commands() {
     esac
     _NUCLEUS_PWSH_COMMANDS+=("$_n10")
   done
+}
+
+# On nix-capable hosts, the committed manifest must equal its flake derivation.
+_check_manifest_matches_flake() {
+  local _root="${1:-$_repo_root}"
+  local _manifest _out
+  _manifest="$_root/src/modules/completions/nucleus-apps.json"
+  _out="$(nucleus_nix_locked nix build --no-link --print-out-paths "$_root/src#nucleus-apps")" || return 1
+  if ! cmp -s "$_out" "$_manifest"; then
+    error "src/modules/completions/nucleus-apps.json is stale — regenerate it from ./src#nucleus-apps"
+    return 1
+  fi
+  say "nucleus app manifest matches its flake derivation."
 }
 
 # pascal_case <cmd> yields the $nucleus<Cmd>Flags spelling gen-completions.ps1 emits.
@@ -53,10 +69,8 @@ run_completions_fresh() {
   local _files=("$@")
   cd "$_repo_root" || return 1
 
-  _derive_nucleus_commands "$_repo_root" || {
-    error "could not derive nucleus command list from flake packages"
-    return 1
-  }
+  _load_nucleus_commands_from_manifest "$_repo_root" || return 1
+  _check_manifest_matches_flake "$_repo_root" || return 1
 
   # 1. Generated files must match generator output; drift is a hard failure.
   if ! bash "$_repo_root/src/scripts/completions/gen-completions.sh" --check; then

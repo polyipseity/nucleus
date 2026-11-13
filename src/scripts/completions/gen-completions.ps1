@@ -51,28 +51,20 @@ if (-not (Test-Path -Path $profilePath -PathType Leaf)) {
 # Command inventory and authoritative flag map
 
 function Get-NucleusCommandList {
-  $nix = Get-Command -Name 'nix' -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1 # check-suppress:suppression_doc: nix is optional on Windows hosts without Nix; fall through to the static command list.
-  if ($null -ne $nix) {
-    try {
-      $sys = (& $nix.Source config show system 2>$null) # check-suppress:suppression_doc: nix config may be unavailable; fall through to the static command list.
-      if ($sys) { $sys = ($sys | Out-String).Trim() }
-      if ($sys) {
-        $json = & $nix.Source eval --json "$repoRoot/src#packages.$sys" --apply 'ps: let names = builtins.attrNames ps; nucleus = builtins.filter (n: builtins.substring 0 8 n == "nucleus-") names; in builtins.sort builtins.lessThan nucleus' 2>$null # check-suppress:suppression_doc: flake eval may be unavailable or fail on Windows; fall through to the static command list.
-        if ($LASTEXITCODE -eq 0 -and $json) {
-          $names = @($json | ConvertFrom-Json | ForEach-Object { $_.Substring(8) } | Where-Object { $_ -ne 'camilladsp-heartbeat' })
-          if ($names.Count -gt 0) { return $names }
-        }
-      }
-    }
-    catch {
-      # Fall through to the static list when nix evaluation is unavailable.
-      $null = $_ # check-suppress:suppression_doc: preserve PSSA non-empty catch while discarding optional nix-eval error
-    }
+  $manifestPath = Join-Path $repoRoot 'src\modules\completions\nucleus-apps.json'
+  if (-not (Test-Path -Path $manifestPath -PathType Leaf)) {
+    Write-NucleusError "nucleus command manifest not found at $manifestPath"
+    exit 1
   }
-  return @(
-    'ai', 'apply', 'bootstrap', 'check', 'cloud', 'config', 'gc',
-    'logs', 'svc', 'test', 'update', 'utils', 'vm'
-  )
+  $manifest = Get-Content -Raw -Path $manifestPath | ConvertFrom-Json
+  # WHY: camilladsp-heartbeat has no Windows app surface, so PowerShell completers
+  # and flag inventories cover the remaining commands only.
+  $names = @($manifest.commands | Where-Object { $_ -and $_ -ne 'camilladsp-heartbeat' })
+  if ($names.Count -eq 0) {
+    Write-NucleusError "nucleus command manifest at $manifestPath contains no commands"
+    exit 1
+  }
+  return $names
 }
 
 function Get-NucleusFlagMap {

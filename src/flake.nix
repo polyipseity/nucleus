@@ -1042,38 +1042,70 @@
       };
 
       packages = {
-        "${systems.mac}" = {
-          treefmt = mkTreefmtWrapper systems.mac pkgsMac;
-          bootstrap-deps = pkgsMac.symlinkJoin {
-            name = "bootstrap-deps";
-            paths = [
-              pkgsMac.gnupg
-              pkgsMac.sops
-              pkgsMac.ssh-to-age
-              (mkTreefmtWrapper systems.mac pkgsMac)
-            ];
+        "${systems.mac}" =
+          let
+            nucleusAppsJson = pkgsMac.writeText "nucleus-apps.json" (
+              (import ./modules/lib/json.nix { lib = nixpkgs.lib; }).toSortedJSON {
+                "$schema" = "./nucleus-apps.schema.json";
+                commands =
+                  let
+                    names = builtins.attrNames nucleusAppsMac;
+                    nucleus = builtins.filter (n: builtins.substring 0 8 n == "nucleus-") names;
+                    short = builtins.map (n: builtins.substring 8 ((builtins.stringLength n) - 8) n) nucleus;
+                  in
+                  builtins.sort builtins.lessThan short;
+              }
+            );
+          in
+          {
+            treefmt = mkTreefmtWrapper systems.mac pkgsMac;
+            bootstrap-deps = pkgsMac.symlinkJoin {
+              name = "bootstrap-deps";
+              paths = [
+                pkgsMac.gnupg
+                pkgsMac.sops
+                pkgsMac.ssh-to-age
+                (mkTreefmtWrapper systems.mac pkgsMac)
+              ];
+            };
+            nucleus-apps = nucleusAppsJson;
+          }
+          // nucleusAppsMac
+          // {
+            flakeInputs = mkFlakeInputsPkg pkgsMac flakeInputsMac;
           };
-        }
-        // nucleusAppsMac
-        // {
-          flakeInputs = mkFlakeInputsPkg pkgsMac flakeInputsMac;
-        };
-        "${systems.linux}" = {
-          treefmt = mkTreefmtWrapper systems.linux pkgsLinux;
-          bootstrap-deps = pkgsLinux.symlinkJoin {
-            name = "bootstrap-deps";
-            paths = [
-              pkgsLinux.gnupg
-              pkgsLinux.sops
-              pkgsLinux.ssh-to-age
-              (mkTreefmtWrapper systems.linux pkgsLinux)
-            ];
+        "${systems.linux}" =
+          let
+            nucleusAppsJson = pkgsLinux.writeText "nucleus-apps.json" (
+              (import ./modules/lib/json.nix { lib = nixpkgs.lib; }).toSortedJSON {
+                "$schema" = "./nucleus-apps.schema.json";
+                commands =
+                  let
+                    names = builtins.attrNames nucleusAppsLinux;
+                    nucleus = builtins.filter (n: builtins.substring 0 8 n == "nucleus-") names;
+                    short = builtins.map (n: builtins.substring 8 ((builtins.stringLength n) - 8) n) nucleus;
+                  in
+                  builtins.sort builtins.lessThan short;
+              }
+            );
+          in
+          {
+            treefmt = mkTreefmtWrapper systems.linux pkgsLinux;
+            bootstrap-deps = pkgsLinux.symlinkJoin {
+              name = "bootstrap-deps";
+              paths = [
+                pkgsLinux.gnupg
+                pkgsLinux.sops
+                pkgsLinux.ssh-to-age
+                (mkTreefmtWrapper systems.linux pkgsLinux)
+              ];
+            };
+            nucleus-apps = nucleusAppsJson;
+          }
+          // nucleusAppsLinux
+          // {
+            flakeInputs = mkFlakeInputsPkg pkgsLinux flakeInputsLinux;
           };
-        }
-        // nucleusAppsLinux
-        // {
-          flakeInputs = mkFlakeInputsPkg pkgsLinux flakeInputsLinux;
-        };
       };
 
       # Committed as src/hosts/Windows/system/winget-packages.json and read by

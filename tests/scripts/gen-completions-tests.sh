@@ -32,23 +32,25 @@ _COMPLETIONS_DIR="src/modules/completions/zsh"
 _ps_gen_script="src/scripts/completions/gen-completions.ps1"
 _profile_ps1="src/scripts/shell/profile.ps1"
 
-# The canonical nucleus-* command set, derived from the flake packages output
-# so a new mkNucleusApps entry becomes a required completion without a second list.
-require_command nix "gen-completions: nix eval is required to derive the nucleus command list from the flake"
+# The canonical nucleus-* command set comes from the committed manifest.
+# A nix-capable host must keep that manifest identical to the flake-derived set.
+require_command jq "gen-completions: jq is required to read the nucleus command manifest"
+require_command nix "gen-completions: nix eval is required to verify the nucleus command manifest against the flake"
 _sys_t="$(nix config show system)"
 _NUCLEUS_COMMANDS=()
 while IFS= read -r _cmd_t; do
   [ -n "$_cmd_t" ] || continue
-  case "$_cmd_t" in
-  nucleus-*) _NUCLEUS_COMMANDS+=("${_cmd_t#nucleus-}") ;;
-  esac
-done < <(
-  nix eval --raw "$REPO_ROOT/src#packages.$_sys_t" --apply 'ps: let names = builtins.attrNames ps; nucleus = builtins.filter (n: builtins.substring 0 8 n == "nucleus-") names; in builtins.concatStringsSep "\n" (builtins.sort builtins.lessThan nucleus)' 2>/dev/null
-  printf '\n'
-)
+  _NUCLEUS_COMMANDS+=("$_cmd_t")
+done < <(jq -r '.commands[]' "$REPO_ROOT/src/modules/completions/nucleus-apps.json")
 if [ "${#_NUCLEUS_COMMANDS[@]}" -eq 0 ]; then
-  assert_fail "gen-completions: derive nucleus command list" "could not derive nucleus command list from the flake"
+  assert_fail "gen-completions: read nucleus command manifest" "could not read nucleus command list from src/modules/completions/nucleus-apps.json"
   finish_tests
+fi
+_manifest_out="$(nix build --no-link --print-out-paths "$REPO_ROOT/src#nucleus-apps" 2>/dev/null || true)"
+if [ -n "$_manifest_out" ] && cmp -s "$_manifest_out" "$REPO_ROOT/src/modules/completions/nucleus-apps.json"; then
+  assert_pass "gen-completions: nucleus command manifest matches flake derivation"
+else
+  assert_fail "gen-completions: nucleus command manifest matches flake derivation" "manifest differs from ./src#nucleus-apps"
 fi
 
 # Marker for the no-touch assertion (case 14): plain mktemp, outside the tracked
@@ -257,8 +259,17 @@ _fx_decode() {
   '
 }
 
+# WHY: the stub repo has no committed manifest, so provide the canonical list explicitly.
+_fx_cmds=""
+for _cmd in "${_NUCLEUS_COMMANDS[@]}"; do
+  if [ -n "$_fx_cmds" ]; then
+    _fx_cmds="$_fx_cmds"$'\n'"$_cmd"
+  else
+    _fx_cmds="$_cmd"
+  fi
+done
 _fx_gen_rc=0
-NUCLEUS_REPO_ROOT="$_fx_repo" bash "$_gen_script" >/dev/null 2>&1 || _fx_gen_rc=$?
+NUCLEUS_REPO_ROOT="$_fx_repo" NUCLEUS_COMPLETIONS_COMMANDS="$_fx_cmds" bash "$_gen_script" >/dev/null 2>&1 || _fx_gen_rc=$?
 _fx_file="$_fx_repo/src/modules/completions/zsh/_nucleus-utils"
 if [ "$_fx_gen_rc" -ne 0 ]; then
   assert_fail "gen-completions: metacharacters in a subcommand description" "generator exited $_fx_gen_rc against the stub repo root"

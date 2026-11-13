@@ -55,6 +55,23 @@ run_nix_flake_eval() {
     fi
 
     # Committed generated artifacts must equal their flake derivation.
+    # WHY: src/modules/completions/nucleus-apps.json is the cross-platform command
+    # manifest consumed on hosts without nix (Windows completion generation/checks).
+    # It is derived per system from mkNucleusApps, so freshness is checked by
+    # building this host's package and comparing it byte-for-byte.
+    local _ne_na_out
+    if _ne_na_out="$(nucleus_nix_locked nix build --no-link --print-out-paths ./src#nucleus-apps)"; then
+      if ! cmp -s "$_ne_na_out" src/modules/completions/nucleus-apps.json; then
+        error "src/modules/completions/nucleus-apps.json is stale — regenerate it from its derivation (see .agents/instructions/nucleus-apps.instructions.md)"
+        _ne_exit=1
+      else
+        say "generated nucleus app manifest matches its derivation."
+      fi
+    else
+      error "failed to build ./src#nucleus-apps for the generated-artifact check"
+      _ne_exit=1
+    fi
+
     # WHY: src/hosts/Windows/system/winget-packages.json cannot be generated on
     # Windows, so it is committed, and this is the only byte-exact (format
     # inclusive) check of it; the always-run nix-tests step compares the parsed

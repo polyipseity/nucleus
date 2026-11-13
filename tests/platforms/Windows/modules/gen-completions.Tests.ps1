@@ -47,9 +47,12 @@ BeforeAll {
       Remove-Item -LiteralPath $Script:FixtureRoot -Recurse -Force
     }
     $profileDir = Join-Path $Script:FixtureRoot 'src/scripts/shell'
+    $manifestDir = Join-Path $Script:FixtureRoot 'src/modules/completions'
     New-Item -Path $profileDir -ItemType Directory -Force > $null
+    New-Item -Path $manifestDir -ItemType Directory -Force > $null
     # Copy-Item preserves bytes, keeping the real file's CRLF + UTF-8 encoding.
     Copy-Item -LiteralPath $Script:RealProfilePath -Destination (Join-Path $profileDir 'profile.ps1')
+    Copy-Item -LiteralPath (Join-Path $Script:RepoRoot 'src/modules/completions/nucleus-apps.json') -Destination (Join-Path $manifestDir 'nucleus-apps.json')
   }
 
   function Get-FixtureProfile {

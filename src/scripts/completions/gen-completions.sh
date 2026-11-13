@@ -21,9 +21,10 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd -P)"
 REPO_ROOT="$(derive_repo_root)"
 COMPLETIONS_DIR="$REPO_ROOT/src/modules/completions/zsh"
 
-# The canonical nucleus-* command set, derived from the flake packages output
-# so a new mkNucleusApps entry becomes a completion without a second list.
-# NUCLEUS_COMPLETIONS_COMMANDS overrides derivation for tests (space or newline separated names).
+# The canonical nucleus-* command set, read from the committed manifest that
+# nix-capable checks keep in sync with mkNucleusApps. NUCLEUS_COMPLETIONS_COMMANDS
+# overrides the manifest for tests (space or newline separated names).
+NUCLEUS_APPS_MANIFEST="$REPO_ROOT/src/modules/completions/nucleus-apps.json"
 COMMANDS=()
 if [ -n "${NUCLEUS_COMPLETIONS_COMMANDS:-}" ]; then
   while IFS= read -r _cmd; do
@@ -33,43 +34,19 @@ if [ -n "${NUCLEUS_COMPLETIONS_COMMANDS:-}" ]; then
     *) COMMANDS+=("$_cmd") ;;
     esac
   done < <(printf '%s\n' "$NUCLEUS_COMPLETIONS_COMMANDS" | tr ' \t' '\n' | LC_ALL=C sort -u)
-elif command -v nix >/dev/null 2>&1 && [ -f "$REPO_ROOT/src/flake.nix" ]; then
-  _sys="$(nix config show system 2>/dev/null || true)" # check-suppress:suppression_doc: nix config may be unavailable in stub or restricted environments; fall through to script discovery.
-  if [ -n "$_sys" ]; then
-    while IFS= read -r _cmd; do
-      [ -n "$_cmd" ] || continue
-      case "$_cmd" in
-      nucleus-*) COMMANDS+=("${_cmd#nucleus-}") ;;
-      esac
-    done < <(
-      nix eval --raw "$REPO_ROOT/src#packages.$_sys" --apply 'ps: let names = builtins.attrNames ps; nucleus = builtins.filter (n: builtins.substring 0 8 n == "nucleus-") names; in builtins.concatStringsSep "\n" (builtins.sort builtins.lessThan nucleus)' 2>/dev/null
-      printf '\n'
-    )
+else
+  if [ ! -f "$NUCLEUS_APPS_MANIFEST" ]; then
+    error "nucleus command manifest not found: $NUCLEUS_APPS_MANIFEST"
+    exit 1
   fi
-fi
-if [ "${#COMMANDS[@]}" -eq 0 ]; then
-  # Fallback for environments without a buildable flake (e.g. stub repos in tests):
-  # discover commands from scripts/ and src/scripts/services/.
-  _found_cmds=""
-  if [ -d "$REPO_ROOT/scripts" ]; then
-    for _s in "$REPO_ROOT/scripts"/*.sh; do
-      [ -f "$_s" ] || continue
-      _found_cmds="${_found_cmds}$(basename "$_s" .sh)"$'\n'
-    done
-  fi
-  if [ -d "$REPO_ROOT/src/scripts/services" ]; then
-    for _s in "$REPO_ROOT/src/scripts/services"/*.sh; do
-      [ -f "$_s" ] || continue
-      _found_cmds="${_found_cmds}$(basename "$_s" .sh)"$'\n'
-    done
-  fi
+  require_command jq "jq is required to read the nucleus command manifest"
   while IFS= read -r _cmd; do
     [ -n "$_cmd" ] || continue
     COMMANDS+=("$_cmd")
-  done < <(printf '%s' "$_found_cmds" | LC_ALL=C sort -u)
+  done < <(jq -r '.commands[]' "$NUCLEUS_APPS_MANIFEST")
 fi
 if [ "${#COMMANDS[@]}" -eq 0 ]; then
-  error "could not derive nucleus command list"
+  error "could not read nucleus command list from $NUCLEUS_APPS_MANIFEST"
   exit 1
 fi
 
