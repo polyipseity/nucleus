@@ -66,6 +66,7 @@ function Get-NucleusCommandList {
     }
     catch {
       # Fall through to the static list when nix evaluation is unavailable.
+      $null = $_ # check-suppress:suppression_doc: preserve PSSA non-empty catch while discarding optional nix-eval error
     }
   }
   return @(

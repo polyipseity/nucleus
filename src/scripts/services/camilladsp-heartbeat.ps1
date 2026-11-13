@@ -56,6 +56,7 @@ function Write-NucleusWarning {
     [string]$CommandName = ''
   )
 
+  $null = $CommandName # check-suppress:suppression_doc: satisfy shared logging-module signature; heartbeat warning formatter ignores command name
   Write-CamillaDSPWarning -Message $Message
 }
 

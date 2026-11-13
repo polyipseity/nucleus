@@ -47,8 +47,8 @@ done < <(
   printf '\n'
 )
 if [ "${#_NUCLEUS_COMMANDS[@]}" -eq 0 ]; then
-  echo "gen-completions: could not derive nucleus command list from the flake" >&2
-  exit 1
+  assert_fail "gen-completions: derive nucleus command list" "could not derive nucleus command list from the flake"
+  finish_tests
 fi
 
 # Marker for the no-touch assertion (case 14): plain mktemp, outside the tracked

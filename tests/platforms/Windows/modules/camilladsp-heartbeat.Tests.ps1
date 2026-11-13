@@ -66,10 +66,9 @@ devices:
     $definitions = @($ast.FindAll({ $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true))
     . ([scriptblock]::Create(($definitions | Where-Object { $_.Name -eq 'Write-CamillaDSPWarning' } | ForEach-Object { $_.Extent.Text }) -join "`n"))
 
-    $errFile = Join-Path -Path $TestDrive -ChildPath 'warn.err'
     $scriptPath = Join-Path -Path $TestDrive -ChildPath 'warn.ps1'
     @'
-param([string]$HeartbeatPath, [string]$ErrFile)
+param([string]$HeartbeatPath)
 $ErrorActionPreference = "Stop"
 $tokens = $null
 $parseErrors = $null
