@@ -192,4 +192,12 @@ export const CORPUS_ROWS: readonly DeletionCorpusRow[] = [
     redirect: "managed",
     note: "a quoted -c script still executes command's deletion word",
   },
+  {
+    command: "command -p -- rm foo",
+    unproven: "ask",
+    decision: "ask",
+    rule: "unproven-redirect",
+    redirect: "managed",
+    note: "command -p -- still searches the default PATH before the executed word",
+  },
 ];

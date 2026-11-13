@@ -314,7 +314,11 @@ function locateCommand(segment: readonly Token[]): CommandPosition | null {
         // command -p runs on a default PATH, while -v and -V only probe, so a
         // probe keeps command as the word this walk stops on.
         const next = segment[index + 1]?.text;
-        if (next === "-p") return { index: index + 2, forced: "command-p" };
+        if (next === "-p") {
+          index += 2;
+          if (segment[index]?.text === "--") index += 1;
+          return { index, forced: "command-p" };
+        }
         if (next === "-v" || next === "-V") return { index, forced };
         index += 1;
         if (segment[index]?.text === "--") index += 1;
