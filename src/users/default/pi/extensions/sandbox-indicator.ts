@@ -5,7 +5,7 @@
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -65,7 +65,9 @@ export function detectSandbox(env: NodeJS.ProcessEnv = process.env): SandboxDete
 
 function defaultCommandPath(command: string): string {
 	try {
-		const result = execSync(`command -v ${command}`, { encoding: "utf8" });
+		const result = execFileSync("/bin/sh", ["-c", 'command -v -- "$1"', "sh", command], {
+			encoding: "utf8",
+		});
 		const line = result.trim().split("\n")[0];
 		return line.length > 0 ? line : "not found";
 	} catch {
