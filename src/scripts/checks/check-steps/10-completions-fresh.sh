@@ -44,7 +44,7 @@ sh_for_command() {
   esac
 }
 
-register_step "completions-fresh" "Completions freshness (generated files match)" run_completions_fresh posix full none
+register_step "completions-fresh" "Completions freshness (generated files match)" run_completions_fresh posix full nix
 
 run_completions_fresh() {
   local -n ctx="$1"

@@ -313,8 +313,12 @@ function locateCommand(segment: readonly Token[]): CommandPosition | null {
       if (folded === "command") {
         // command -p runs on a default PATH, while -v and -V only probe, so a
         // probe keeps command as the word this walk stops on.
-        if (segment[index + 1]?.text === "-p") return { index: index + 2, forced: "command-p" };
-        return { index, forced };
+        const next = segment[index + 1]?.text;
+        if (next === "-p") return { index: index + 2, forced: "command-p" };
+        if (next === "-v" || next === "-V") return { index, forced };
+        index += 1;
+        if (segment[index]?.text === "--") index += 1;
+        continue;
       }
       return { index, forced };
     }
