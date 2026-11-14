@@ -14,6 +14,7 @@ import {
   decideDeletion,
   hasNoProfile,
   managedRedirectResolver,
+  readPowershell,
   type RedirectProbe,
   type RedirectResolver,
   type Verdict,
@@ -457,6 +458,13 @@ describe("redirect proof", () => {
     if (!proof.proven) expect(proof.why).toContain("missing");
   });
 
+  test("a POSIX resolver ignores -NoProfile", () => {
+    const { home, wrapperDir } = managedHome("rm");
+    const proof = managedRedirectResolver({ home, path: wrapperDir, platform: "darwin", noProfile: true })("rm");
+    expect(proof.proven).toBe(true);
+    if (proof.proven) expect(proof.via).toBe("wrapper");
+  });
+
   test("the policy follows the proof it is handed", () => {
     const proven = decideDeletion("rm x", { settings: { unproven: "deny" }, redirect: managedResolver });
     expect(proven.rule).toBe("proven-redirect");
@@ -502,11 +510,13 @@ function win32Fixture(): Win32Fixture {
   };
 }
 
-function writeShimManifest(fixture: Win32Fixture, shims: readonly { name: string; path: string }[]): void {
-  writeFileSync(
-    fixture.manifest,
-    `${JSON.stringify({ version: 1, ripHash: fixture.ripHash, shims }, null, 0)}\n`,
-  );
+function writeShimManifest(
+  fixture: Win32Fixture,
+  shims: readonly { name: string; path: string }[],
+  options: { bom?: boolean } = {},
+): void {
+  const body = `${JSON.stringify({ version: 1, ripHash: fixture.ripHash, shims }, null, 0)}\n`;
+  writeFileSync(fixture.manifest, options.bom === true ? `\uFEFF${body}` : body);
 }
 
 function win32Verdict(command: string, fixture: Win32Fixture, overrides: Partial<RedirectProbe> = {}): Verdict {
@@ -537,7 +547,15 @@ describe("Windows proof", () => {
     expect(verdict.reason).toContain("rip shim");
   });
 
-  test("an extension-qualified word resolves like the bare word", () => {
+  test("a manifest written with a BOM still proves the shim", () => {
+    const fixture = win32Fixture();
+    writeShimManifest(fixture, [{ name: "rm.exe", path: join(fixture.bin, "rm.exe") }], { bom: true });
+    const verdict = win32Verdict("rm x", fixture);
+    expect(verdict.decision).toBe("allow");
+    expect(verdict.rule).toBe("proven-redirect");
+  });
+
+  test("the fold resolves an extension-qualified word like the bare word", () => {
     const fixture = win32Fixture();
     writeShimManifest(fixture, [{ name: "rm.exe", path: join(fixture.bin, "rm.exe") }]);
     const verdict = win32Verdict("rm.exe x", fixture);
@@ -593,16 +611,48 @@ describe("Windows proof", () => {
   });
 });
 
+// A win32 probe with no PATH entries and no manifest, so the profile cases never
+// touch the host's environment.
+function win32ProfileProbe(overrides: Partial<RedirectProbe> = {}): RedirectProbe {
+  const home = fixtureHome();
+  return {
+    home,
+    path: emptyPath(home),
+    platform: "win32",
+    pathext: ".exe",
+    manifest: join(home, "absent-shims.json"),
+    powershell: "profile",
+    ...overrides,
+  };
+}
+
 describe("PowerShell profile proof", () => {
   test("the managed profile proves a deletion word it overrides", () => {
-    const verdict = decideDeletion("Remove-Item x", { platform: "win32", settings: {} });
+    const verdict = decideDeletion("Remove-Item x", {
+      platform: "win32",
+      settings: {},
+      redirect: managedRedirectResolver(win32ProfileProbe()),
+    });
     expect(verdict.decision).toBe("allow");
     expect(verdict.rule).toBe("proven-redirect");
     expect(verdict.reason).toContain("managed PowerShell profile");
   });
 
+  test("every word the profile rewrites is proven through it", () => {
+    const resolve = managedRedirectResolver(win32ProfileProbe());
+    for (const word of ["remove-item", "del", "rd", "erase", "ri", "unlink", "shred"]) {
+      const proof = resolve(word);
+      expect(proof.proven).toBe(true);
+      if (proof.proven) expect(proof.via).toBe("profile");
+    }
+  });
+
   test("settings.powershell none leaves a word with no shim unproven", () => {
-    const verdict = decideDeletion("Remove-Item x", { platform: "win32", settings: { powershell: "none" } });
+    const verdict = decideDeletion("Remove-Item x", {
+      platform: "win32",
+      settings: {},
+      redirect: managedRedirectResolver(win32ProfileProbe({ powershell: "none" })),
+    });
     expect(verdict.decision).toBe("ask");
     expect(verdict.rule).toBe("unproven-redirect");
   });
@@ -624,10 +674,66 @@ describe("PowerShell profile proof", () => {
   });
 
   test("-NoProfile leaves that word unproven", () => {
-    const verdict = decideDeletion('pwsh -NoProfile -c "Remove-Item x"', { platform: "win32", settings: {} });
+    const command = 'pwsh -NoProfile -c "Remove-Item x"';
+    const verdict = decideDeletion(command, {
+      platform: "win32",
+      settings: {},
+      redirect: managedRedirectResolver(win32ProfileProbe({ noProfile: hasNoProfile(command) })),
+    });
     expect(verdict.decision).toBe("ask");
     expect(verdict.rule).toBe("unproven-redirect");
     expect(verdict.reason).toContain("NoProfile");
+  });
+
+  test("a parameter prefix PowerShell binds also discards the profile", () => {
+    const command = 'pwsh -nopro -c "Remove-Item x"';
+    const verdict = decideDeletion(command, {
+      platform: "win32",
+      settings: {},
+      redirect: managedRedirectResolver(win32ProfileProbe({ noProfile: hasNoProfile(command) })),
+    });
+    expect(verdict.decision).toBe("ask");
+    expect(verdict.rule).toBe("unproven-redirect");
+    expect(verdict.reason).toContain("NoProfile");
+  });
+});
+
+describe("hasNoProfile", () => {
+  test("every unambiguous prefix of NoProfile counts", () => {
+    for (const flag of ["-nop", "-nopr", "-nopro", "-noprof", "-noprofi", "-noprofil", "-noprofile", "-NoProfile"]) {
+      expect(hasNoProfile(`pwsh ${flag} -c x`)).toBe(true);
+    }
+    expect(hasNoProfile("pwsh -c x")).toBe(false);
+    expect(hasNoProfile("pwsh -no x")).toBe(false);
+  });
+});
+
+describe("settings.powershell", () => {
+  test("anything but exactly none keeps the profile assumption", () => {
+    expect(readPowershell(undefined)).toBe("profile");
+    expect(readPowershell({})).toBe("profile");
+    expect(readPowershell({ powershell: "PROFILE" })).toBe("profile");
+    expect(readPowershell({ powershell: "none" })).toBe("none");
+  });
+});
+
+describe("home discovery", () => {
+  test("a POSIX command resolves the wrapper from HOME, not USERPROFILE", () => {
+    const { home, wrapperDir } = managedHome("rm");
+    const saved = { HOME: process.env.HOME, PATH: process.env.PATH, USERPROFILE: process.env.USERPROFILE };
+    try {
+      process.env.HOME = home;
+      process.env.PATH = wrapperDir;
+      process.env.USERPROFILE = fixtureHome();
+      const verdict = decideDeletion("rm x", { platform: "darwin", settings: { unproven: "deny" } });
+      expect(verdict.decision).toBe("allow");
+      expect(verdict.rule).toBe("proven-redirect");
+    } finally {
+      for (const [name, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
   });
 });
 

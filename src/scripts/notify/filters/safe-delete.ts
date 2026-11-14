@@ -113,9 +113,10 @@ const DELETION_WORDS = new Set([
 ]);
 
 // The words the managed PowerShell profile rewrites into its recycle-bin function.
-// `rm` is not one of them on Windows: it is a deployed shim there, so it keeps the
-// manifest proof.
-const POWERSHELL_WORDS = new Set(["remove-item", "ri", "del", "rd", "erase"]);
+// `rm` and `rmdir` are not among them on Windows: they are deployed shims there, so
+// they keep the manifest proof. `unlink` and `shred` have no shim, so the profile
+// is their only redirect.
+const POWERSHELL_WORDS = new Set(["remove-item", "ri", "del", "rd", "erase", "unlink", "shred"]);
 
 const WIN32_EXECUTABLE_EXTENSIONS = [".exe", ".cmd", ".bat", ".com"];
 
@@ -803,16 +804,18 @@ function readUnproven(settings: unknown): string {
 
 // The managed profile is assumed loaded unless the setting says otherwise, so an
 // absent or invalid value keeps the redirect proof the profile provides.
-function readPowershell(settings: unknown): "profile" | "none" {
+export function readPowershell(settings: unknown): "profile" | "none" {
   if (typeof settings !== "object" || settings === null || Array.isArray(settings)) return "profile";
   return (settings as Record<string, unknown>).powershell === "none" ? "none" : "profile";
 }
 
 // A session started with -NoProfile discards the managed profile, so the redirect
-// it provides is absent from that command. The spelling is matched anywhere in
-// the command, because an outer interpreter may hand it to an inner one.
+// it provides is absent from that command. PowerShell binds any unambiguous prefix
+// of a parameter name, so -nop, -nopro, and every longer prefix up to -NoProfile all
+// mean the same thing here. The flag is matched anywhere in the command, because an
+// outer interpreter may hand it to an inner one.
 export function hasNoProfile(command: string): boolean {
-  return /-no(?:profile|p)\b/i.test(command);
+  return /(?:^|\s)-nop[a-z]*\b/i.test(command);
 }
 
 export function decideDeletion(command: string, options: PolicyOptions): Verdict {
@@ -821,7 +824,7 @@ export function decideDeletion(command: string, options: PolicyOptions): Verdict
   const redirect =
     options.redirect ??
     managedRedirectResolver({
-      ...defaultProbe(),
+      ...defaultProbe(platform),
       platform,
       powershell: readPowershell(options.settings),
       noProfile: hasNoProfile(command),
@@ -896,7 +899,9 @@ function readShimManifest(manifestPath: string | null): ShimManifest | string {
   if (manifestPath === null) return "the shim manifest path is unknown because LOCALAPPDATA is unset";
   let text: string;
   try {
-    text = readFileSync(manifestPath, "utf8");
+    // Windows PowerShell writes UTF-8 with a BOM by default, and the byte order
+    // mark is metadata rather than part of the document.
+    text = readFileSync(manifestPath, "utf8").replace(/^\uFEFF/, "");
   } catch {
     return `the shim manifest at ${manifestPath} is missing`;
   }
@@ -931,12 +936,10 @@ function normalizeWin32Path(path: string): string {
 }
 
 function win32CandidateNames(word: string, pathext: string): string[] {
-  const folded = word.toLowerCase();
   const extensions = pathext
     .split(";")
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0);
-  if (extensions.some((extension) => folded.endsWith(extension.toLowerCase()))) return [word];
   return extensions.map((extension) => `${word}${extension}`);
 }
 
@@ -1002,16 +1005,17 @@ function win32ShimProof(word: string, probe: RedirectProbe, manifest: ShimManife
 export function managedRedirectResolver(probe: RedirectProbe): RedirectResolver {
   let manifest: ShimManifest | string | null = null;
   return (word: string): RedirectProof => {
-    if (probe.noProfile === true) {
-      return {
-        proven: false,
-        why: `${word} runs in a session started with -NoProfile, which discards the managed profile`,
-      };
-    }
+    // The profile proof covers the words the profile rewrites. A word that also
+    // has a shim stays provable when the assumption is off, because it falls
+    // through to the manifest; a word with no shim, such as remove-item, ends up
+    // unproven.
     if (probe.platform === "win32") {
-      // The profile proof belongs to the words the profile rewrites, and those
-      // words keep their shims, so turning the assumption off falls through to
-      // the manifest rather than making the word unprovable.
+      if (probe.noProfile === true) {
+        return {
+          proven: false,
+          why: `${word} runs in a session started with -NoProfile, which discards the managed profile`,
+        };
+      }
       if (POWERSHELL_WORDS.has(word.toLowerCase()) && (probe.powershell ?? "profile") !== "none") {
         return { proven: true, via: "profile" };
       }
@@ -1042,17 +1046,19 @@ export function managedRedirectResolver(probe: RedirectProbe): RedirectResolver 
   };
 }
 
-function defaultProbe(): RedirectProbe {
+// The wrapper lives under the platform's own home variable: USERPROFILE on Windows
+// and HOME on POSIX, because a POSIX process can carry a decoy USERPROFILE.
+function defaultProbe(platform: string): RedirectProbe {
   const localAppData = process.env.LOCALAPPDATA;
   return {
-    home: process.env.USERPROFILE ?? process.env.HOME ?? null,
+    home: platform === "win32" ? (process.env.USERPROFILE ?? null) : (process.env.HOME ?? null),
     manifest:
       localAppData === undefined || localAppData.length === 0
         ? null
         : join(localAppData, "nucleus", "state", "safe-delete", "shims.json"),
     path: process.env.PATH ?? "",
     pathext: process.env.PATHEXT ?? DEFAULT_PATHEXT,
-    platform: process.platform,
+    platform,
   };
 }
 
