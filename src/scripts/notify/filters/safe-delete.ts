@@ -536,6 +536,9 @@ function locateCommand(segment: readonly Token[]): CommandPosition | null {
       // WHY: a statement word and a leading assignment take the command position
       // without being the executed word, and stopping on either hides a deletion.
       if (STATEMENT_WORDS.has(folded) || ASSIGNMENT.test(word)) {
+        // A PATH assignment replaces the PATH the wrapper lives on, so the word
+        // that follows cannot be proven by probing this process's PATH.
+        if (word.startsWith("PATH=")) forced = "env-path";
         index += 1;
         continue;
       }

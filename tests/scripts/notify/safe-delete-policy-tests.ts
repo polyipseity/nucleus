@@ -152,6 +152,16 @@ describe("command position", () => {
     expect(verdict.rule).toBe("unproven-redirect");
   });
 
+  // A PATH assignment replaces the PATH the wrapper lives on, so the word can no
+  // longer be proven by probing the filter's own PATH.
+  test("a PATH assignment forces an unproven redirect", () => {
+    for (const redirect of ["plain", "managed"] as const) {
+      const verdict = verdictOf("PATH=/usr/bin rm x", redirect);
+      expect(verdict.decision).toBe("ask");
+      expect(verdict.rule).toBe("unproven-redirect");
+    }
+  });
+
   test("an escaped cmd command word denies", () => {
     const verdict = verdictOf("\\cmd /c del x", "managed");
     expect(verdict.decision).toBe("deny");

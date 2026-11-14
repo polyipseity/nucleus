@@ -56,6 +56,14 @@ export const CORPUS_ROWS: readonly DeletionCorpusRow[] = [
     note: "a leading assignment does not change what the next word resolves through PATH",
   },
   {
+    command: "PATH=/usr/bin rm x",
+    unproven: "ask",
+    decision: "ask",
+    rule: "unproven-redirect",
+    redirect: "managed",
+    note: "a PATH assignment replaces the PATH the wrapper lives on, so the word cannot be proven",
+  },
+  {
     command: "echo cmd",
     unproven: "ask",
     decision: "allow",
