@@ -14,6 +14,7 @@ GC_SH="$SCRIPT_DIR/../../scripts/gc.sh"
 LOG_GC_SH="$SCRIPT_DIR/../../src/scripts/services/log-gc.sh"
 
 ensure_safe_rm_env
+init_test_state
 
 # new_logs_stub <dir>: create the NUCLEUS_LOGS_BIN stand-in. gc_logs delegates
 # rotation and expiry to nucleus-logs, so the suite stubs that entry point and
@@ -221,6 +222,7 @@ EOF
   else
     assert_fail "log-gc-root" "rc=$rc record: $record"
   fi
+  unset LOG_GC_RECORD
   rm -rf "$work"
 }
 
