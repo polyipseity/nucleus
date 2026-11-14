@@ -2,9 +2,10 @@
 # One audit event for the harness bridge, appended through nucleus-logs.
 #
 # Sourced by harness-approval, harness-drive, harness-filter, and harness-notify
-# after lib.sh and scripts/logs.sh: logs_append_event is the only writer, so no
-# caller assembles a line or opens a log file itself. The schema's field names
-# are the arguments, which is what keeps the four call sites from drifting apart.
+# after lib.sh and src/scripts/lib/logs.sh: logs_append_event is the only writer,
+# so no caller assembles a line or opens a log file itself. The schema's field
+# names are the arguments, which is what keeps the four call sites from drifting
+# apart.
 #
 # Every caller passes all ten arguments. An empty string means "absent" and
 # reaches the line as null; latency_ms is a whole number of milliseconds.

@@ -44,10 +44,11 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
-# WHY the app, not a log path: nucleus-logs owns the log root, the line format,
-# and the append, so the gate cannot drift from the log it writes into.
-# shellcheck source=../../../scripts/logs.sh
-. "$SCRIPT_DIR/../../../scripts/logs.sh"
+# WHY the shared library, not a log path: nucleus-logs owns the log root, the
+# line format, and the append, so the gate cannot drift from the log it writes
+# into.
+# shellcheck source=../lib/logs.sh
+. "$SCRIPT_DIR/../lib/logs.sh"
 # shellcheck source=../lib/harness-audit.sh
 . "$SCRIPT_DIR/../lib/harness-audit.sh"
 

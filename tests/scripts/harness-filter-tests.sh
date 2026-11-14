@@ -45,10 +45,9 @@ APPROVAL="$REPO_ROOT/src/scripts/notify/harness-approval.sh"
 FILTER_DIR="$REPO_ROOT/src/scripts/notify/filters"
 LIB_DIR="$REPO_ROOT/src/scripts/lib/lib.sh"
 LIB_DIR_DIR="$REPO_ROOT/src/scripts/lib"
-LOGS_APP="$REPO_ROOT/scripts/logs.sh"
 REGISTRY="$REPO_ROOT/src/modules/configs/harness-filters.json"
 SCHEMA="$REPO_ROOT/src/modules/configs/harness-filters.schema.json"
-readonly RUNNER FILTER_DIR LIB_DIR LIB_DIR_DIR LOGS_APP REGISTRY SCHEMA
+readonly RUNNER FILTER_DIR LIB_DIR LIB_DIR_DIR REGISTRY SCHEMA
 
 require_command jq "the runner and the filter registry both need jq"
 require_command check-jsonschema "the shipped registry is validated against its schema"
@@ -57,7 +56,7 @@ require_command bun "a filter is a bun program, and this suite runs it the way t
 BUN="$(command -v bun)"
 readonly BUN
 
-for _required in "$RUNNER" "$APPROVAL" "$FILTER_DIR/safe-delete.ts" "$LIB_DIR" "$LIB_DIR_DIR/harness-audit.sh" "$LOGS_APP" "$REGISTRY"; do
+for _required in "$RUNNER" "$APPROVAL" "$FILTER_DIR/safe-delete.ts" "$LIB_DIR" "$LIB_DIR_DIR/harness-audit.sh" "$LIB_DIR_DIR/logs.sh" "$REGISTRY"; do
   if [ ! -e "$_required" ]; then
     assert_fail "runner assets present" "$_required does not exist"
     finish_tests
@@ -79,14 +78,13 @@ export NUCLEUS_LOG_DIR
 # touching the checkout.
 make_tree() { # <name>
   local _root="$WORK/$1"
-  mkdir -p "$_root/scripts" "$_root/src/scripts/lib" "$_root/src/scripts/notify/filters" "$_root/src/modules/configs"
+  mkdir -p "$_root/src/scripts/lib" "$_root/src/scripts/notify/filters" "$_root/src/modules/configs"
   cp "$RUNNER" "$_root/src/scripts/notify/harness-filter.sh"
   cp "$APPROVAL" "$_root/src/scripts/notify/harness-approval.sh"
   cp "$LIB_DIR" "$_root/src/scripts/lib/lib.sh"
-  cp "$LIB_DIR_DIR/harness-audit.sh" "$LIB_DIR_DIR/log-expiry.sh" "$_root/src/scripts/lib/"
-  # The bridge entry points source nucleus-logs' writer library from three levels
-  # up, so the fixture keeps the same layout the bundle has.
-  cp "$LOGS_APP" "$_root/scripts/logs.sh"
+  cp "$LIB_DIR_DIR/harness-audit.sh" "$LIB_DIR_DIR/log-expiry.sh" "$LIB_DIR_DIR/logs.sh" "$_root/src/scripts/lib/"
+  # The bridge entry points source the log library beside them, so the fixture
+  # carries it where the script tree does.
   cp "$FILTER_DIR"/*.ts "$_root/src/scripts/notify/filters/"
   cp "$REGISTRY" "$_root/src/modules/configs/harness-filters.json"
   printf '%s\n' "$_root"

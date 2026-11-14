@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Tests for nucleus-gc profile-expiry sudo handling and system-log escalation.
+# Tests for nucleus-gc profile-expiry sudo handling, system-log escalation, and
+# how log-gc.sh resolves the nucleus-logs entry point.
 
 set -euo pipefail
 
@@ -10,6 +11,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 LIB_SH="$SCRIPT_DIR/../../src/scripts/lib/lib.sh"
 EXPIRE_SH="$SCRIPT_DIR/../../src/scripts/lib/expire-profile-generations.sh"
 GC_SH="$SCRIPT_DIR/../../scripts/gc.sh"
+LOG_GC_SH="$SCRIPT_DIR/../../src/scripts/services/log-gc.sh"
 
 ensure_safe_rm_env
 
@@ -195,6 +197,58 @@ EOF
   rm -rf "$mock_dir" "$work" "$user_dir" "$sys_dir"
 }
 
+# ---- Test D: log-gc.sh resolves the log app when the seam is unset ----
+
+test_log_gc_uses_root_scripts_when_bin_unset() {
+  local work fixture rc record
+  work="$(mktemp -d)"
+  fixture="$work/repo"
+  mkdir -p "$fixture/scripts"
+  cat >"$fixture/scripts/logs.sh" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"$LOG_GC_RECORD"
+EOF
+  chmod +x "$fixture/scripts/logs.sh"
+  export LOG_GC_RECORD="$work/record.txt"
+  : >"$LOG_GC_RECORD"
+
+  rc=0
+  (unset NUCLEUS_LOGS_BIN && NUCLEUS_REPO_ROOT="$fixture" bash "$LOG_GC_SH" user) || rc=$?
+  record="$(cat "$LOG_GC_RECORD")"
+
+  if [ "$rc" -eq 0 ] && [ "$record" = "gc --scope user" ]; then
+    assert_pass "log-gc.sh runs the checkout's logs app when NUCLEUS_LOGS_BIN is unset"
+  else
+    assert_fail "log-gc-root" "rc=$rc record: $record"
+  fi
+  rm -rf "$work"
+}
+
+# ---- Test E: log-gc.sh refuses to guess the log app ----
+
+test_log_gc_dies_without_root() {
+  local work tree err rc
+  work="$(mktemp -d)"
+  tree="$work/tree/src/scripts"
+  mkdir -p "$tree/services" "$tree/lib"
+  cp "$LOG_GC_SH" "$tree/services/log-gc.sh"
+  cp "$LIB_SH" "$tree/lib/lib.sh"
+
+  # The copy sits outside the checkout and git is kept below it, so every source
+  # derive_repo_root consults is absent or rejected.
+  rc=0
+  err="$(cd "$work" && unset NUCLEUS_REPO_ROOT && GIT_CEILING_DIRECTORIES="$work" \
+    NUCLEUS_REPO_ROOT_SYSTEM_FILE="$work/absent-repo-root" \
+    bash "$tree/services/log-gc.sh" user 2>&1 >/dev/null)" || rc=$?
+
+  if [ "$rc" -ne 0 ] && grep -q 'NUCLEUS_LOGS_BIN' <<<"$err" && grep -q 'repo-root' <<<"$err"; then
+    assert_pass "log-gc.sh fails and names NUCLEUS_LOGS_BIN when the root is unresolvable"
+  else
+    assert_fail "log-gc-unresolvable" "rc=$rc stderr: $err"
+  fi
+  rm -rf "$work"
+}
+
 # ---- Run tests ----
 
 section 1 "gc log tests"
@@ -204,5 +258,7 @@ test_sudo_h_passed_when_sudo_true
 test_nix_env_direct_when_sudo_false
 test_gc_logs_escalates_when_system_dir_not_writable
 test_gc_logs_inline_when_system_dir_writable
+test_log_gc_uses_root_scripts_when_bin_unset
+test_log_gc_dies_without_root
 
 finish_tests
