@@ -579,7 +579,18 @@ vm_wait_for_guest() {
 vm_write_if_changed() {
   _wwic_dst="$1"
   _wwic_mode="$2"
-  _wwic_dir="${_wwic_dst%/*}"
+  case "$_wwic_dst" in
+  */*) _wwic_dir="${_wwic_dst%/*}" ;;
+  *) _wwic_dir="." ;;
+  esac
+  # WHY: a root-level target leaves an empty prefix, which mktemp rejects.
+  [ -n "$_wwic_dir" ] || _wwic_dir="/"
+  # WHY: mv into a directory target would succeed by moving the temp file inside
+  # it, leaving no script and an orphan; refuse before any write happens.
+  if [ -d "$_wwic_dst" ]; then
+    error "guest script path is a directory: $_wwic_dst"
+    return 1
+  fi
   mkdir -p "$_wwic_dir"
   _wwic_tmp="$(mktemp "$_wwic_dir/.tmp.XXXXXX")" || return 1
   if ! cat >"$_wwic_tmp"; then
@@ -601,7 +612,11 @@ vm_write_if_changed() {
     error "failed to set mode $_wwic_mode on $_wwic_dst"
     return 1
   fi
-  mv -f "$_wwic_tmp" "$_wwic_dst"
+  if ! mv -f "$_wwic_tmp" "$_wwic_dst"; then
+    rm -f "$_wwic_tmp"
+    error "failed to replace $_wwic_dst"
+    return 1
+  fi
 }
 
 # Start helper rendering the manifest fields read from vm_vm_json: id, name,

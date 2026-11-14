@@ -80,14 +80,30 @@ file_inode() { # <file>
   esac
 }
 
-# Minimal manifest for the prune cases: the desired set names one VM, so every
-# other managed name in the scripts directory is stale.
+# Dot-prefixed buffers a write left behind in DIR, one per line. The writer keeps
+# its buffer invisible to the managed-pattern prune, so a leftover here would be
+# collected by nothing else.
+temp_files() { # <dir>
+  [ -d "$1" ] || return 0
+  find "$1" -maxdepth 1 -name '.tmp.*' -print
+}
+
+# Minimal manifest for the prune cases: the desired set names both VMs, enabled or
+# not, so every other managed name in the scripts directory is stale.
 write_prune_manifest() { # <path>
   cat >"$1" <<'VMJSON'
 {
   "VMs": [
     {
       "id": "keep",
+      "type": "NixOS"
+    },
+    {
+      "enabled": false,
+      "hosts": [
+        "NixOS"
+      ],
+      "id": "parked",
       "type": "NixOS"
     }
   ]
@@ -97,8 +113,13 @@ VMJSON
 
 # WHY: the prune cases target the desired-set diff, not template rendering, so the
 # writer renders the one desired file through the real vm_write_if_changed.
+# _writer_stub_status lets a case make the write fail, which must abort the prune.
+_writer_stub_status=0
 # shellcheck disable=SC2329 # reason: invoked by name from vm_prune_and_write_all_guest_scripts in vm.sh
 vm_write_all_guest_scripts() {
+  if [ "$_writer_stub_status" -ne 0 ]; then
+    return "$_writer_stub_status"
+  fi
   printf 'desired\n' | vm_write_if_changed "$VM_DIR/scripts/start-keep.sh" 755
 }
 
@@ -229,28 +250,54 @@ test_write_if_changed_leaves_unchanged_target() {
 # with another one, and it replaces the file by rename rather than by deleting it
 # first, so the recorder sees no managed deletion for our own output.
 test_write_if_changed_replaces_changed_target() {
-  local _target="$_tmp/start-changed.sh" _mode _content
+  local _target="$_tmp/start-changed.sh" _mode _content _temp_left
   printf 'old\n' | vm_write_if_changed "$_target" 755
   chmod 600 "$_target"
   : >"$_rm_record"
   printf 'new\n' | vm_write_if_changed "$_target" 755
   _mode="$(file_mode "$_target")"
   _content="$(cat "$_target")"
+  _temp_left="$(temp_files "$_tmp")"
   if [ "$_content" != "new" ]; then
     assert_fail "vm_write_if_changed replaces changed content" "content is [$_content]"
   elif [ "$_mode" != "755" ]; then
     assert_fail "vm_write_if_changed replaces changed content" "mode is $_mode, expected the writer's 755"
   elif [ -s "$_rm_record" ]; then
     assert_fail "vm_write_if_changed replaces changed content" "a managed deletion was recorded: $(cat "$_rm_record")"
+  elif [ -n "$_temp_left" ]; then
+    assert_fail "vm_write_if_changed replaces changed content" "temp files left behind: $_temp_left"
   else
     assert_pass "vm_write_if_changed replaces changed content and its mode"
+  fi
+}
+
+# A directory target has to fail before the buffer exists: mv into a directory
+# succeeds by moving the temp file inside it, which would leave no script at all
+# and a stray buffer nothing prunes.
+test_write_if_changed_rejects_directory_target() {
+  local _parent="$_tmp/target-dir" _target _status=0 _err _temp_left
+  mkdir -p "$_parent"
+  _target="$_parent/scripts"
+  mkdir -p "$_target"
+  _err="$(printf 'content\n' | vm_write_if_changed "$_target" 755 2>&1)" || _status=$?
+  _temp_left="$(temp_files "$_parent")"
+  if [ "$_status" -eq 0 ]; then
+    assert_fail "vm_write_if_changed rejects a directory target" "returned 0 for a directory target"
+  elif ! printf '%s' "$_err" | grep -q 'guest script path is a directory'; then
+    assert_fail "vm_write_if_changed rejects a directory target" "no error naming the directory target: $_err"
+  elif [ ! -d "$_target" ]; then
+    assert_fail "vm_write_if_changed rejects a directory target" "the target is no longer a directory"
+  elif [ -n "$_temp_left" ]; then
+    assert_fail "vm_write_if_changed rejects a directory target" "temp files left behind: $_temp_left"
+  else
+    assert_pass "vm_write_if_changed rejects a directory target before buffering"
   fi
 }
 
 # Write-then-prune: the desired script survives untouched, the stale managed one
 # goes, and a custom file in scripts/ is never the library's business.
 test_prune_removes_only_stale_managed_scripts() {
-  local _dir="$_tmp/prune" _keep _stale _custom _inode_before _inode_after _mode _content _record
+  local _dir="$_tmp/prune" _keep _stale _custom _inode_before _inode_after _mode _content _record _temp_left
   mkdir -p "$_dir/scripts"
   write_prune_manifest "$_dir/VMs.json"
   _keep="$_dir/scripts/start-keep.sh"
@@ -272,6 +319,7 @@ test_prune_removes_only_stale_managed_scripts() {
   _mode="$(file_mode "$_keep")"
   _content="$(cat "$_keep")"
   _record="$(cat "$_rm_record")"
+  _temp_left="$(temp_files "$_dir/scripts")"
   if [ -e "$_stale" ]; then
     assert_fail "prune removes a stale managed script" "start-old.sh still present"
   elif [ ! -f "$_custom" ] || [ "$(cat "$_custom")" != "notes" ]; then
@@ -280,15 +328,85 @@ test_prune_removes_only_stale_managed_scripts() {
     assert_fail "prune removes a stale managed script" "the desired script changed: inode $_inode_before -> $_inode_after, mode $_mode, content [$_content]"
   elif [ "$_record" != "start-old.sh" ]; then
     assert_fail "prune removes a stale managed script" "the recorded deletions are [$_record]"
+  elif [ -n "$_temp_left" ]; then
+    assert_fail "prune removes a stale managed script" "temp files left behind: $_temp_left"
   else
     assert_pass "prune removes only the stale managed script and writes the desired one in place"
+  fi
+}
+
+# A failed write must abort before the prune: the stale script survives, nothing
+# is recorded as deleted, and the caller sees a non-zero status.
+test_prune_skips_when_writer_fails() {
+  local _dir="$_tmp/prune-fail" _keep _stale _status=0 _record
+  mkdir -p "$_dir/scripts"
+  write_prune_manifest "$_dir/VMs.json"
+  _keep="$_dir/scripts/start-keep.sh"
+  _stale="$_dir/scripts/start-old.sh"
+  printf 'deployed\n' | vm_write_if_changed "$_keep" 755
+  printf 'stale\n' >"$_stale"
+  : >"$_rm_record"
+  VM_DIR="$_dir"
+  # shellcheck disable=SC2034 # reason: read at runtime by the sourced vm_prune_and_write_all_guest_scripts
+  MANIFEST="$_dir/VMs.json"
+  # shellcheck disable=SC2034 # reason: read at runtime by the sourced vm_prune_and_write_all_guest_scripts
+  dry_run=false
+  _writer_stub_status=1
+  vm_prune_and_write_all_guest_scripts >"$_dir/out.log" 2>&1 || _status=$?
+  _writer_stub_status=0
+  _record="$(cat "$_rm_record")"
+  if [ "$_status" -eq 0 ]; then
+    assert_fail "prune skips after a failed write" "returned 0 for a failed writer"
+  elif [ ! -f "$_stale" ]; then
+    assert_fail "prune skips after a failed write" "start-old.sh was pruned after the write failed"
+  elif [ "$(cat "$_keep")" != "deployed" ]; then
+    assert_fail "prune skips after a failed write" "the desired script changed: $(cat "$_keep")"
+  elif [ -n "$_record" ]; then
+    assert_fail "prune skips after a failed write" "a deletion was recorded: $_record"
+  else
+    assert_pass "prune leaves the tree alone and returns non-zero when a write fails"
+  fi
+}
+
+# The desired set covers every manifest VM, so a disabled one keeps its rendered
+# script instead of being pruned as stale.
+test_prune_keeps_disabled_vm_script() {
+  local _dir="$_tmp/prune-disabled" _parked _inode_before _inode_after _content _record
+  mkdir -p "$_dir/scripts"
+  write_prune_manifest "$_dir/VMs.json"
+  _parked="$_dir/scripts/start-parked.sh"
+  printf 'parked\n' >"$_parked"
+  chmod 755 "$_parked"
+  _inode_before="$(file_inode "$_parked")"
+  : >"$_rm_record"
+  VM_DIR="$_dir"
+  # shellcheck disable=SC2034 # reason: read at runtime by the sourced vm_prune_and_write_all_guest_scripts
+  MANIFEST="$_dir/VMs.json"
+  # shellcheck disable=SC2034 # reason: read at runtime by the sourced vm_prune_and_write_all_guest_scripts
+  dry_run=false
+  vm_prune_and_write_all_guest_scripts >"$_dir/out.log" 2>&1
+  # WHY: the pruned case must fail the assertion, not abort the suite under set -e,
+  # so a missing script is reported as 'missing' instead of being stat'ed.
+  _inode_after='missing'
+  _content=''
+  if [ -f "$_parked" ]; then
+    _inode_after="$(file_inode "$_parked")"
+    _content="$(cat "$_parked")"
+  fi
+  _record="$(cat "$_rm_record")"
+  if [ ! -f "$_parked" ] || [ "$_inode_before" != "$_inode_after" ] || [ "$_content" != "parked" ]; then
+    assert_fail "prune keeps a disabled VM's script" "start-parked.sh is gone or changed: inode $_inode_before -> $_inode_after, content [$_content], recorded [$_record]"
+  elif [ -n "$_record" ]; then
+    assert_fail "prune keeps a disabled VM's script" "a deletion was recorded: $_record"
+  else
+    assert_pass "prune keeps a disabled VM's desired script"
   fi
 }
 
 # A preview has to be read-only: the deployed script keeps its bytes even though
 # the render differs, the stale file stays, and nothing reaches the deleter.
 test_prune_dry_run_reports_without_writing_or_deleting() {
-  local _dir="$_tmp/prune-dry" _keep _stale _custom _inode_before _inode_after _mode _content _record
+  local _dir="$_tmp/prune-dry" _keep _stale _custom _inode_before _inode_after _mode _content _record _temp_left
   mkdir -p "$_dir/scripts"
   write_prune_manifest "$_dir/VMs.json"
   _keep="$_dir/scripts/start-keep.sh"
@@ -312,6 +430,7 @@ test_prune_dry_run_reports_without_writing_or_deleting() {
   _mode="$(file_mode "$_keep")"
   _content="$(cat "$_keep")"
   _record="$(cat "$_rm_record")"
+  _temp_left="$(temp_files "$_dir/scripts")"
   if [ "$_inode_before" != "$_inode_after" ] || [ "$_mode" != "640" ] || [ "$_content" != "deployed" ]; then
     assert_fail "prune dry-run writes nothing" "the deployed script changed: inode $_inode_before -> $_inode_after, mode $_mode, content [$_content]"
   elif [ ! -f "$_stale" ]; then
@@ -322,6 +441,8 @@ test_prune_dry_run_reports_without_writing_or_deleting() {
     assert_fail "prune dry-run writes nothing" "the preview does not name the would-be update: $(cat "$_dir/out.log")"
   elif ! grep -q 'remove stale guest script' "$_dir/out.log"; then
     assert_fail "prune dry-run writes nothing" "the preview does not name the stale script: $(cat "$_dir/out.log")"
+  elif [ -n "$_temp_left" ]; then
+    assert_fail "prune dry-run writes nothing" "temp files left behind: $_temp_left"
   else
     assert_pass "prune dry-run reports the pending update and prune without touching the tree"
   fi
@@ -330,7 +451,7 @@ test_prune_dry_run_reports_without_writing_or_deleting() {
 # The pack/unpack wrappers are written through the same helper, so a second sync
 # leaves them alone instead of replacing four files that already match.
 test_pack_unpack_writers_update_in_place() {
-  local _dir="$_tmp/wrappers" _inode_before _inode_after _mode _exec_line
+  local _dir="$_tmp/wrappers" _inode_before _inode_after _mode _exec_line _temp_left
   mkdir -p "$_dir"
   VM_DIR="$_dir"
   # shellcheck disable=SC2034 # reason: read at runtime by the sourced vm_write_pack_unpack_scripts
@@ -342,12 +463,15 @@ test_pack_unpack_writers_update_in_place() {
   : >"$_rm_record"
   vm_write_pack_unpack_scripts >>"$_dir/out.log" 2>&1
   _inode_after="$(file_inode "$_dir/scripts/pack.sh")"
+  _temp_left="$(temp_files "$_dir/scripts")"
   if [ "$_mode" != "755" ] || [ "$_exec_line" != 'exec nucleus-vm pack "$@"' ]; then
     assert_fail "pack/unpack writers render through vm_write_if_changed" "mode $_mode, last line [$_exec_line]"
   elif [ "$_inode_before" != "$_inode_after" ]; then
     assert_fail "pack/unpack writers render through vm_write_if_changed" "inode changed $_inode_before -> $_inode_after on an unchanged wrapper"
   elif [ -s "$_rm_record" ]; then
     assert_fail "pack/unpack writers render through vm_write_if_changed" "a managed deletion was recorded: $(cat "$_rm_record")"
+  elif [ -n "$_temp_left" ]; then
+    assert_fail "pack/unpack writers render through vm_write_if_changed" "temp files left behind: $_temp_left"
   else
     assert_pass "pack/unpack writers render through vm_write_if_changed and leave a matching wrapper alone"
   fi
@@ -360,7 +484,10 @@ test_wait_for_utm_registration_times_out
 test_wait_for_utm_registration_detects_registered_vm
 test_write_if_changed_leaves_unchanged_target
 test_write_if_changed_replaces_changed_target
+test_write_if_changed_rejects_directory_target
 test_prune_removes_only_stale_managed_scripts
+test_prune_skips_when_writer_fails
+test_prune_keeps_disabled_vm_script
 test_prune_dry_run_reports_without_writing_or_deleting
 test_pack_unpack_writers_update_in_place
 
