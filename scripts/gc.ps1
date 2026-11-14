@@ -9,6 +9,11 @@
   -DryRun reports each destructive step through Write-NucleusDryRun and removes
   nothing. The step guards make a preview impossible to turn into a real run.
 
+.PARAMETER Action
+  all runs the full GC (default). cleanup-nix, graveyard, logs, and preferences
+  run one targeted operation: graveyard reports the rip graveyard and deletes
+  nothing.
+
 .PARAMETER DryRun
   Report what would be collected and remove nothing (default: $false).
 
@@ -64,7 +69,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('all', 'cleanup-nix', 'logs', 'preferences')]
+  [ValidateSet('all', 'cleanup-nix', 'graveyard', 'logs', 'preferences')]
   [string]$Action = 'all',
   [string]$ModuleDir = $(if ($env:NUCLEUS_GC_MODULE_DIR) { $env:NUCLEUS_GC_MODULE_DIR } else { '' }),
   [switch]$DryRun,
@@ -442,9 +447,60 @@ function Invoke-NucleusLogCommand {
   & (Get-Process -Id $PID).Path -NoProfile -NoLogo -File $logsBin @Arguments
 }
 
+function Get-RipGraveyardReport {
+  <#
+  .SYNOPSIS
+    Reports the rip graveyard path, entry count, total bytes, and oldest entry.
+
+  .DESCRIPTION
+    Report-only: graveyard entries are the undo window for safe deletion, so
+    nothing here deletes. The path is $env:RIP_GRAVEYARD when it is set, else
+    <USER root>\state\rip\graveyard, because an elevated or scheduled session
+    does not inherit the User-scope variable.
+
+  .OUTPUTS
+    None.
+  #>
+  [CmdletBinding()]
+  param()
+
+  $graveyardPath = if ($env:RIP_GRAVEYARD) {
+    $env:RIP_GRAVEYARD
+  } else {
+    Join-Path -Path $env:LOCALAPPDATA -ChildPath 'nucleus\state\rip\graveyard'
+  }
+
+  Write-NucleusInfo "graveyard: $graveyardPath"
+
+  if (-not (Test-Path -LiteralPath $graveyardPath -PathType Container)) {
+    Write-NucleusInfo "entries: 0"
+    Write-NucleusInfo "bytes: 0"
+    Write-NucleusInfo "oldest: none"
+    return
+  }
+
+  # WHY @(...): an empty pipeline is $null, and $null.Count is $null in Windows
+  # PowerShell, so the count assertion below would read as absent.
+  $entries = @(Get-ChildItem -LiteralPath $graveyardPath -Force)
+  $files = @(Get-ChildItem -LiteralPath $graveyardPath -Recurse -Force -File)
+  $totalBytes = if ($files.Count -gt 0) { [long](($files | Measure-Object -Property Length -Sum).Sum) } else { 0 }
+  $oldest = $entries | Sort-Object -Property LastWriteTime | Select-Object -First 1
+
+  Write-NucleusInfo "entries: $($entries.Count)"
+  Write-NucleusInfo "bytes: $totalBytes"
+  if ($null -eq $oldest) {
+    Write-NucleusInfo "oldest: none"
+  } else {
+    Write-NucleusInfo "oldest: $($oldest.FullName)"
+  }
+}
+
 switch ($Action) {
   'cleanup-nix' {
     Invoke-CleanupNix -WhatIf:$DryRun
+  }
+  'graveyard' {
+    Get-RipGraveyardReport
   }
   'logs' {
     # WHY the passthrough: gc.sh logs takes a nucleus-logs subcommand, so the twin

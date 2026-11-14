@@ -326,6 +326,16 @@ let
       why = "gpg-agent SSH socket (macOS). Default gpgconf location, serving the SSH protocol because src/modules/posix/gnupg.nix sets enableSSHSupport.";
     };
 
+    RIP_GRAVEYARD = {
+      values = {
+        MacBook = "${resolvedHomeDirectory}/Library/Application Support/nucleus/state/rip/graveyard";
+        NixOS = "${resolvedHomeDirectory}/.local/share/nucleus/state/rip/graveyard";
+        Windows = "%LOCALAPPDATA%\\nucleus\\state\\rip\\graveyard";
+      };
+      userSpecific = true;
+      why = "rip moves deleted files here instead of removing them. Unset, rip keeps the graveyard under $TMPDIR (graveyard-<user>), so the undo window ends with the session. Managed so it lands in a nucleus root and survives.";
+    };
+
     VAGRANT_HOME = {
       values = {
         MacBook = "${resolvedHomeDirectory}/Library/Application Support/nucleus/state/vagrant";

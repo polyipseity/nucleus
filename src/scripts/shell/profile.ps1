@@ -1033,7 +1033,7 @@ if ($IsWindows) {
 
 $nucleusSvcCommands = @('list', 'status', 'start', 'stop', 'restart', 'enable', 'disable', 'verify', 'endpoint', 'logs', 'log-paths', 'log-config')
 $nucleusConfigCommands = @('get', 'set', 'list')
-$nucleusGcCommands = @('all', 'cleanup-nix', 'logs', 'preferences')
+$nucleusGcCommands = @('all', 'cleanup-nix', 'graveyard', 'logs', 'preferences')
 $nucleusLogsCommands = @('append', 'expire', 'gc', 'label', 'rotate', 'show', 'stats', 'tail')
 $nucleusUtilsCommands = @('optimize-pdf', 'strip-metadata')
 

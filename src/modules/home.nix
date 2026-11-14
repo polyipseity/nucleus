@@ -427,6 +427,10 @@ in
         "${pkgs.jq}/bin/jq"
     '';
 
+    home.activation.ensure-rip-graveyard = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      "${activationBundle}/src/scripts/configs/ensure-rip-graveyard.sh"
+    '';
+
     # The launchd path option types require an absolute path and do not expand ~.
     nucleus.logging.logDir = lib.mkDefault (
       builtins.replaceStrings [ "~" ] [ config.home.homeDirectory ] loggingPaths.logDirTemplate

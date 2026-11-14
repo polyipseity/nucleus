@@ -19,6 +19,8 @@
       <USER root>\bin\filters
     <USER root>\state\safe-delete\shims.json   every deployed shim path and
       the rip.exe hash the deletion filter proves it against
+    <USER root>\state\rip\graveyard   the rip graveyard, the path RIP_GRAVEYARD
+      names (src\modules\lib\env-secrets.nix)
 
 .PARAMETER Enabled
   Whether safe-delete shims should be enforced.
@@ -224,6 +226,15 @@ function Sync-SafeDelete {
     }
     Write-NucleusWarning -CommandName 'Sync-SafeDelete' "rip.exe not found at '$ripExe'; run Invoke-ScoopSetup first"
     return
+  }
+
+  # RIP_GRAVEYARD (src\modules\lib\env-secrets.nix) names this directory. An
+  # elevated or scheduled session does not inherit the User-scope variable, so
+  # the directory is created here instead of on the first deletion.
+  $graveyardDir = Join-Path -Path (Join-Path -Path (Join-Path -Path $UserRoot -ChildPath "state") -ChildPath "rip") -ChildPath "graveyard"
+  if (-not (Test-Path -LiteralPath $graveyardDir)) {
+    # check-suppress:suppression_doc: directory creation output not needed.
+    New-Item -ItemType Directory -Path $graveyardDir -Force > $null
   }
 
   # Ensure directories exist

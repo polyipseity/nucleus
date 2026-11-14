@@ -18,14 +18,48 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 # shellcheck source=../src/scripts/lib/log-expiry.sh
 . "$SCRIPT_DIR/../src/scripts/lib/log-expiry.sh"
 
+# WHY report-only: graveyard entries are the undo window for safe deletion, so
+# nucleus-gc reports them and never expires them.
+do_graveyard_report() {
+  # Root cron and sudo do not inherit the User-scope variable, so the managed
+  # root is the fallback rather than an error.
+  _gr_graveyard="${RIP_GRAVEYARD:-"$NUCLEUS_USER_ROOT/state/rip/graveyard"}"
+  _gr_entries=0
+  _gr_bytes=0
+  _gr_oldest="none"
+  _gr_oldest_mtime=""
+  _gr_stat=(-c '%Y')
+  if [ "$(uname -s)" = "Darwin" ]; then
+    _gr_stat=(-f '%m')
+  fi
+
+  if [ -d "$_gr_graveyard" ]; then
+    _gr_bytes=$(($(du -sk "$_gr_graveyard" | cut -f1) * 1024))
+    while IFS= read -r -d '' _gr_entry; do
+      _gr_entries=$((_gr_entries + 1))
+      _gr_mtime="$(stat "${_gr_stat[@]}" "$_gr_entry")"
+      if [ -z "$_gr_oldest_mtime" ] || [ "$_gr_mtime" -lt "$_gr_oldest_mtime" ]; then
+        _gr_oldest_mtime="$_gr_mtime"
+        _gr_oldest="$_gr_entry"
+      fi
+    done < <(find "$_gr_graveyard" -mindepth 1 -maxdepth 1 -print0)
+  fi
+
+  say "graveyard: $_gr_graveyard"
+  say "entries: $_gr_entries"
+  say "bytes: $_gr_bytes"
+  say "oldest: $_gr_oldest"
+}
+
 # A leading subcommand word runs one targeted operation and exits; with none, the full
 # default GC below runs.
 action="${1:-}"
 case "$action" in
-cleanup-nix | logs | preferences)
+cleanup-nix | graveyard | logs | preferences)
   shift
   case "$action" in
   cleanup-nix) do_cleanup_nix "$@" ;;
+  graveyard) do_graveyard_report ;;
   # WHY the NUCLEUS_LOGS_BIN seam: the logging operations belong to nucleus-logs,
   # and the seam lets a caller (and a test) substitute the entry point instead of
   # reaching into the library the app itself drives.
@@ -57,6 +91,7 @@ usage() {
   --vm-gc|--no-vm-gc                  Control stale VM artifact removal (default: --vm-gc).
   --vm-data-gc|--no-vm-data-gc        Also GC data/ writable disks during VM gc (default: --no-vm-data-gc).
   --log-gc|--no-log-gc                Control log rotation (default: --log-gc).
+  graveyard                           Report the rip2 graveyard path, entry count, total bytes, and oldest entry; deletes nothing.
   logs [<subcommand>] [options]       Rotate and expire managed logs via nucleus-logs; defaults to 'gc'.
   --journald-gc|--no-journald-gc        Control journald log vacuum (default: --journald-gc).
   --scoop-gc|--no-scoop-gc            Control Scoop cache clearing (default: --scoop-gc; ignored on POSIX, Scoop is Windows-only).
