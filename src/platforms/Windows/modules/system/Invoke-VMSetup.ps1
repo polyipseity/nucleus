@@ -122,8 +122,10 @@ function Write-VMScriptIfChanged {
   .DESCRIPTION
     Mirrors vm_write_if_changed in src/scripts/lib/vm.sh. An unchanged script
     keeps its content, timestamp, and file identity, so a sync stops recycling
-    it. The comparison is ordinal and exact, against exactly what this function
-    would write, so a second sync skips the write.
+    it. The comparison is over bytes, against exactly what this function writes
+    (UTF-8 without a byte-order mark), so a legacy BOM, a line-ending change, or
+    any other byte difference counts as a change, and an identical file is left
+    alone on every later sync.
   .PARAMETER Path
     Destination file. Its directory must already exist.
   .PARAMETER Content
@@ -145,16 +147,14 @@ function Write-VMScriptIfChanged {
         [string]$Content
     )
 
+    $expected = [System.Text.UTF8Encoding]::new($false).GetBytes($Content)
     if (Test-Path -LiteralPath $Path -PathType Leaf) {
-        $existing = Get-Content -LiteralPath $Path -Raw
-        # WHY: Get-Content -Raw returns $null for a zero-byte file; treat it as
-        # empty content so an empty script also skips on the second sync.
-        if ($null -eq $existing) { $existing = '' }
-        if ([string]::Equals($existing, $Content, [System.StringComparison]::Ordinal)) {
+        $existing = [System.IO.File]::ReadAllBytes($Path)
+        if ([System.Linq.Enumerable]::SequenceEqual($existing, $expected)) {
             return $false
         }
     }
-    [System.IO.File]::WriteAllText($Path, $Content, [System.Text.UTF8Encoding]::new($false))
+    [System.IO.File]::WriteAllBytes($Path, $expected)
     return $true
 }
 

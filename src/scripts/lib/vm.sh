@@ -774,7 +774,7 @@ vm_write_start_script() {
     ;;
   esac
 
-  say "wrote start helper scripts: $_wss_path_sh, $_wss_path_ps1"
+  say "start helper scripts ready: $_wss_path_sh, $_wss_path_ps1"
 }
 
 vm_write_stop_script() {
@@ -831,7 +831,7 @@ vm_write_stop_script() {
     ;;
   esac
 
-  say "wrote stop helper scripts: $_wst_path_sh, $_wst_path_ps1"
+  say "stop helper scripts ready: $_wst_path_sh, $_wst_path_ps1"
 }
 
 # Runtime kind (darwin-tart|darwin-utm|nixos-libvirt|windows-qemu) for this
@@ -904,7 +904,7 @@ EOF
 & nucleus-vm unpack @args
 exit $LASTEXITCODE
 EOF
-  say "wrote pack/unpack helper scripts: $VM_DIR/scripts"
+  say "pack/unpack helper scripts ready: $VM_DIR/scripts"
 }
 
 # VM iteration helper

@@ -24,6 +24,7 @@ export NO_COLOR=1
 
 require_command jq "the guest-script desired set is read from the VM manifest with jq"
 require_command cmp "vm_write_if_changed compares rendered bytes against the deployed script with cmp"
+require_command find "temp-file leftovers are checked with find"
 
 # WHY: these cases drive the writers directly, so only the globals they read are
 # set; vm_init() would need a live manifest and host profile.
@@ -32,6 +33,7 @@ dry_run=false
 _tmp="$(mktemp -d)"
 _real_utmctl="$UTMCTL"
 _real_rm="$(type -P rm)"
+_real_mv="$(type -P mv)"
 _rm_record="$_tmp/deletions.txt"
 
 # shellcheck disable=SC2329 # reason: dispatched by name from the EXIT trap
@@ -63,6 +65,28 @@ SHIM
   PATH="$_tmp/bin:$PATH"
 }
 _install_rm_recorder
+
+# mv shim in the same PATH directory. It fails only for the exact destination a
+# case names, because the host's deletion route moves files to its trash with mv
+# too: a shim that failed every rename would break the cleanup it is meant to
+# test the absence of.
+_install_mv_shim() {
+  _imv_real="$1"
+  cat >"$_tmp/bin/mv" <<SHIM
+#!/bin/sh
+_imv_last=''
+for _imv_arg in "\$@"; do
+  _imv_last="\$_imv_arg"
+done
+if [ -n "\${NUCLEUS_TEST_FAIL_MV_TARGET:-}" ] && [ "\$_imv_last" = "\$NUCLEUS_TEST_FAIL_MV_TARGET" ]; then
+  echo "mv: simulated failure" >&2
+  exit 1
+fi
+exec "$_imv_real" "\$@"
+SHIM
+  chmod 755 "$_tmp/bin/mv"
+}
+_install_mv_shim "$_real_mv"
 
 # Octal permission bits and inode of FILE, split on the stat spelling so the
 # assertions read the same on BSD and GNU hosts.
@@ -294,6 +318,32 @@ test_write_if_changed_rejects_directory_target() {
   fi
 }
 
+# A failed rename has to clean up the buffer and name the target: the buffer is
+# dot-prefixed, so the prune can never collect it, and the target must keep the
+# deployed bytes rather than end up half-replaced.
+test_write_if_changed_reports_failed_replace() {
+  local _dir="$_tmp/replace-fail" _target _status=0 _err _content _temp_left
+  mkdir -p "$_dir"
+  _target="$_dir/start-failed.sh"
+  printf 'old\n' | vm_write_if_changed "$_target" 755
+  export NUCLEUS_TEST_FAIL_MV_TARGET="$_target"
+  _err="$(printf 'new\n' | vm_write_if_changed "$_target" 755 2>&1)" || _status=$?
+  unset NUCLEUS_TEST_FAIL_MV_TARGET
+  _content="$(cat "$_target")"
+  _temp_left="$(temp_files "$_dir")"
+  if [ "$_status" -eq 0 ]; then
+    assert_fail "vm_write_if_changed reports a failed replace" "returned 0 when the rename failed"
+  elif ! printf '%s' "$_err" | grep -q 'failed to replace'; then
+    assert_fail "vm_write_if_changed reports a failed replace" "no error naming the failed replace: $_err"
+  elif [ "$_content" != "old" ]; then
+    assert_fail "vm_write_if_changed reports a failed replace" "the target content is [$_content]"
+  elif [ -n "$_temp_left" ]; then
+    assert_fail "vm_write_if_changed reports a failed replace" "temp files left behind: $_temp_left"
+  else
+    assert_pass "vm_write_if_changed reports a failed replace and leaves the target alone"
+  fi
+}
+
 # Write-then-prune: the desired script survives untouched, the stale managed one
 # goes, and a custom file in scripts/ is never the library's business.
 test_prune_removes_only_stale_managed_scripts() {
@@ -485,6 +535,7 @@ test_wait_for_utm_registration_detects_registered_vm
 test_write_if_changed_leaves_unchanged_target
 test_write_if_changed_replaces_changed_target
 test_write_if_changed_rejects_directory_target
+test_write_if_changed_reports_failed_replace
 test_prune_removes_only_stale_managed_scripts
 test_prune_skips_when_writer_fails
 test_prune_keeps_disabled_vm_script
