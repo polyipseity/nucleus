@@ -5,9 +5,9 @@
 # The guard is the deployed `safe-delete-guard` PATH command on POSIX and the
 # `safe-delete-guard.cmd` shim on Windows, so its verdicts are a security
 # control. It exists for the spellings the interactive alias and the PATH shims
-# cannot see: a deletion reached through a path, a backslash-escaped word, and
-# cmd.exe. This suite pins the union of matched strings the guard carried before
-# the policy replaced it, so a family that narrows flips a row here.
+# cannot see: a deletion reached through a path and cmd.exe. This suite pins the
+# union of matched strings the guard carried before the policy replaced it, so a
+# family that narrows flips a row here.
 #
 # The guard decides in two states, and the suite keeps them apart:
 #
@@ -21,7 +21,7 @@
 # The corpus alone cannot prove the comparison discriminates, since a corpus that
 # exercises nothing would agree with any table. Section 3 covers the case fold,
 # which every verdict above depends on: the policy folds case for the deletion
-# word, for the escape marker, and for cmd.exe.
+# word and for cmd.exe.
 #
 # The guard is driven through the hook JSON payload on stdin, the same format the
 # filter runner passes on to a filter, so argv is never exercised. The payload is
@@ -71,14 +71,18 @@ CORPUS=(
   "relative path to the delete tool|./$N_RM foo|2"
   "relative path to the directory tool|./$N_RMDIR foo|2"
   "absolute path to the directory tool|/usr/bin/$N_RMDIR foo|2"
-  "escaped directory delete|\\$N_RMDIR foo|2"
-  "escaped delete|\\$N_RM foo|2"
-  "escaped del|\\$N_DEL foo|2"
-  "escaped rd|\\$N_RD foo|2"
-  "escaped erase|\\$N_ERASE foo|2"
-  "escaped ri|\\$N_RI foo|2"
-  "escaped unlink|\\$N_UNLINK foo|2"
-  "escaped shred|\\$N_SHRED foo|2"
+  # These rows moved from denied to not denied: a leading backslash names the
+  # same word, so what the word resolves to decides, exactly as it does for the
+  # bare spelling above. The escape does not block on its own.
+  "escaped directory delete|\\$N_RMDIR foo|0"
+  "escaped delete|\\$N_RM foo|0"
+  "escaped del|\\$N_DEL foo|0"
+  "escaped rd|\\$N_RD foo|0"
+  "escaped erase|\\$N_ERASE foo|0"
+  "escaped ri|\\$N_RI foo|0"
+  "escaped unlink|\\$N_UNLINK foo|0"
+  "escaped shred|\\$N_SHRED foo|0"
+  "escaped absolute bin path|\\/bin/$N_RM foo|2"
   "bare del|$N_DEL foo|0"
   "bare rd|$N_RD foo|0"
   "bare rmdir|$N_RMDIR foo|0"
@@ -87,7 +91,9 @@ CORPUS=(
   "bare unlink|$N_UNLINK foo|0"
   "bare shred|$N_SHRED foo|0"
   "cmd interpreter running del|$N_CMDEXE /c $N_DEL foo|2"
-  "pwsh with an unquoted cmd call|pwsh -c x cmd y|2"
+  # This row moved from denied to not denied: cmd is an argument to an unquoted
+  # -c script here, and only a cmd command word names the shell.
+  "pwsh with an unquoted cmd call|pwsh -c x cmd y|0"
   "directory listing|ls -la|0"
   "rip a path|rip foo|0"
   "git status|git status|0"
@@ -146,13 +152,13 @@ done
 
 # A quoted argument used to hide the command from the guard: its JSON extraction
 # stopped at the first escaped quote, so this row allowed. The policy tokenizes
-# the payload, so the cmd.exe inside the quoted -c script is a cmd-shell deny, and
+# the payload and re-analyzes the quoted -c script, whose command word is cmd, so
 # the row is the one expectation that moved when the guard became the policy.
-_quoted='pwsh -c "x cmd y"'
+_quoted='pwsh -c "cmd /c del x"'
 if [ "$(_status_of "$_quoted")" = "2" ]; then
   assert_pass "pwsh with a quoted cmd call denies"
 else
-  assert_fail "pwsh with a quoted cmd call denies" "the quoted -c script hid the cmd shell from the guard"
+  assert_fail "pwsh with a quoted cmd call denies" "the quoted -c script hid the cmd command word from the guard"
 fi
 
 section 2 "family reach"
@@ -172,7 +178,7 @@ _contrast() { # <name> <blocked command> <twin command>
 }
 
 _contrast "path-spelled deletion" "/bin/$N_RM foo.txt" "$N_RM foo.txt"
-_contrast "backslash-escaped deletion" "\\$N_RM foo.txt" "$N_RM foo.txt"
+_contrast "escaped path-spelled deletion" "\\/bin/$N_RM foo.txt" "$N_RM foo.txt"
 _contrast "cmd.exe" "$N_CMDEXE /c $N_DEL foo" "$N_DEL foo"
 
 if [ "${#CORPUS[@]}" -ge 20 ]; then
@@ -189,8 +195,8 @@ fi
 
 section 3 "case fold"
 
-# The policy folds case for the deletion word, the escape marker, and cmd.exe,
-# so a lowercase-only pattern set would deny a form the fold accepts and allow its
+# The policy folds case for the deletion word and for cmd.exe, so a
+# lowercase-only pattern set would deny a form the fold accepts and allow its
 # uppercase twin. These rows sit outside the corpus because the corpus compares
 # verdicts, which cannot tell a folded pattern from an unfolded one.
 U_RM="$(_two R M)"
@@ -199,7 +205,7 @@ readonly U_RM U_CMDEXE
 
 FOLD_CASES=(
   "uppercase absolute bin path|/usr/BIN/$U_RM foo|2"
-  "uppercase escaped spelling|\\$U_RM foo|2"
+  "uppercase escaped bin path|\\/usr/BIN/$U_RM foo|2"
   "uppercase cmd interpreter|$U_CMDEXE /c $N_DEL foo|2"
 )
 readonly FOLD_CASES

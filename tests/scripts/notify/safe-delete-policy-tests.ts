@@ -13,6 +13,7 @@ import {
   decideDeletion,
   managedRedirectResolver,
   type RedirectResolver,
+  type Verdict,
 } from "../../../src/scripts/notify/filters/safe-delete.ts";
 import { CORPUS_ROWS } from "../../fixtures/safe-delete-corpus.ts";
 
@@ -80,6 +81,176 @@ describe("measured corpus", () => {
       expect(verdict.reason.length).toBeGreaterThan(0);
     });
   }
+});
+
+// One verdict per case with an injected resolver, so nothing here reads the host.
+function verdictOf(command: string, redirect: "managed" | "plain", unproven = "ask"): Verdict {
+  return decideDeletion(command, {
+    settings: { unproven },
+    redirect: redirect === "managed" ? managedResolver : plainResolver,
+  });
+}
+
+describe("command position", () => {
+  test("a cmd argument is not the command word", () => {
+    const verdict = verdictOf("echo cmd", "managed");
+    expect(verdict.decision).toBe("allow");
+    expect(verdict.rule).toBe("no-match");
+  });
+
+  test("a cmd command word denies", () => {
+    const verdict = verdictOf("cmd /c del x", "managed");
+    expect(verdict.decision).toBe("deny");
+    expect(verdict.rule).toBe("cmd-shell");
+  });
+
+  test("a cmd behind a prefix is still the command word", () => {
+    const verdict = verdictOf("xargs cmd /c del x", "managed");
+    expect(verdict.decision).toBe("deny");
+    expect(verdict.rule).toBe("cmd-shell");
+  });
+
+  test("a cmd argument inside an unquoted script stays an argument", () => {
+    const verdict = verdictOf("pwsh -c x cmd y", "managed");
+    expect(verdict.decision).toBe("allow");
+    expect(verdict.rule).toBe("no-match");
+  });
+
+  test("a quoted -c script still reaches the cmd shell", () => {
+    const verdict = verdictOf("pwsh -c 'cmd /c del x'", "managed");
+    expect(verdict.decision).toBe("deny");
+    expect(verdict.rule).toBe("cmd-shell");
+  });
+});
+
+describe("escaped spelling", () => {
+  test("an escaped word that resolves to the wrapper allows", () => {
+    const verdict = verdictOf("\\rm x", "managed");
+    expect(verdict.decision).toBe("allow");
+    expect(verdict.rule).toBe("proven-redirect");
+  });
+
+  test("an escaped word with an unproven redirect asks", () => {
+    const verdict = verdictOf("\\rm x", "plain");
+    expect(verdict.decision).toBe("ask");
+    expect(verdict.rule).toBe("unproven-redirect");
+  });
+
+  test("an escaped path is a native path", () => {
+    const verdict = verdictOf("\\/bin/rm x", "managed");
+    expect(verdict.decision).toBe("deny");
+    expect(verdict.rule).toBe("native-path");
+  });
+
+  test("an escaped uppercase word still folds to a deletion", () => {
+    const verdict = verdictOf("\\RM -rf x", "plain", "deny");
+    expect(verdict.decision).toBe("deny");
+    expect(verdict.rule).toBe("unproven-redirect");
+  });
+});
+
+describe("find primitives", () => {
+  test("-delete denies", () => {
+    const verdict = verdictOf("find . -delete", "managed");
+    expect(verdict.decision).toBe("deny");
+    expect(verdict.rule).toBe("find-primitive");
+  });
+
+  test("-exec rm resolves like a command word", () => {
+    const verdict = verdictOf("find . -exec rm {} \\;", "managed");
+    expect(verdict.decision).toBe("allow");
+    expect(verdict.rule).toBe("proven-redirect");
+  });
+
+  test("-exec rm with an unproven redirect asks", () => {
+    const verdict = verdictOf("find . -exec rm {} \\;", "plain");
+    expect(verdict.decision).toBe("ask");
+    expect(verdict.rule).toBe("unproven-redirect");
+  });
+
+  test("-exec with a native path denies", () => {
+    const verdict = verdictOf("find . -exec /bin/rm {} \\;", "managed");
+    expect(verdict.decision).toBe("deny");
+    expect(verdict.rule).toBe("native-path");
+  });
+
+  test("-exec with a quoted script recurses into it", () => {
+    const verdict = verdictOf("find . -exec sh -c 'rm x' {} \\;", "managed");
+    expect(verdict.decision).toBe("allow");
+    expect(verdict.rule).toBe("proven-redirect");
+  });
+
+  test("-exec without a terminator takes the rest of the segment", () => {
+    const verdict = verdictOf("find . -exec rm {}", "plain");
+    expect(verdict.decision).toBe("ask");
+    expect(verdict.rule).toBe("unproven-redirect");
+  });
+
+  test("-exec rip is not a deletion", () => {
+    const verdict = verdictOf("find . -exec rip {} \\;", "managed");
+    expect(verdict.decision).toBe("allow");
+    expect(verdict.rule).toBe("no-match");
+  });
+});
+
+describe("heredoc bodies", () => {
+  const bodies = [
+    "cat <<EOF\nrm -rf /\nEOF",
+    "cat <<'EOF'\nrm -rf /\nEOF",
+    'cat <<"EOF"\nrm -rf /\nEOF',
+    "cat <<-EOF\n\trm -rf /\n\tEOF",
+    "cat <<EOF\nrm -rf /",
+  ];
+
+  for (const command of bodies) {
+    test(`the body is data, not a command: ${JSON.stringify(command)}`, () => {
+      const verdict = verdictOf(command, "managed");
+      expect(verdict.decision).toBe("allow");
+      expect(verdict.rule).toBe("no-match");
+    });
+  }
+
+  test("a command after the delimiter is still analyzed", () => {
+    const verdict = verdictOf("cat <<EOF\nrm -rf /\nEOF\nrm -f /tmp/x", "managed");
+    expect(verdict.decision).toBe("allow");
+    expect(verdict.rule).toBe("proven-redirect");
+  });
+
+  test("a command after the delimiter follows settings.unproven", () => {
+    const verdict = verdictOf("cat <<EOF\nrm -rf /\nEOF\nrm -f /tmp/x", "plain");
+    expect(verdict.decision).toBe("ask");
+    expect(verdict.rule).toBe("unproven-redirect");
+  });
+
+  // A comment runs to the newline, so an operator inside it opens no body and the
+  // next line is still a command.
+  test("a heredoc operator in a comment opens no body", () => {
+    const managed = verdictOf("echo x # cat <<EOF\nrm -rf /\nEOF", "managed");
+    expect(managed.decision).toBe("allow");
+    expect(managed.rule).toBe("proven-redirect");
+    const plain = verdictOf("echo x # cat <<EOF\nrm -rf /\nEOF", "plain");
+    expect(plain.decision).toBe("ask");
+    expect(plain.rule).toBe("unproven-redirect");
+  });
+
+  // `<<` inside $(( )) is a shift, so the expression is copied instead of read as
+  // a redirection waiting for a body line.
+  test("a shift in arithmetic opens no body", () => {
+    const managed = verdictOf("echo $((1 << 2))\nrm -rf /", "managed");
+    expect(managed.decision).toBe("allow");
+    expect(managed.rule).toBe("proven-redirect");
+    const plain = verdictOf("echo $((1 << 2))\nrm -rf /", "plain");
+    expect(plain.decision).toBe("ask");
+    expect(plain.rule).toBe("unproven-redirect");
+  });
+});
+
+describe("rip", () => {
+  test("rip is not a deletion word", () => {
+    const verdict = verdictOf("rip -rf x", "managed");
+    expect(verdict.decision).toBe("allow");
+    expect(verdict.rule).toBe("no-match");
+  });
 });
 
 describe("settings.unproven", () => {
@@ -206,7 +377,6 @@ describe("filter mode", () => {
     expect(["allow", "ask", "deny"]).toContain(fields[0]!);
     expect([
       "native-path",
-      "escaped-spelling",
       "cmd-shell",
       "find-primitive",
       "proven-redirect",

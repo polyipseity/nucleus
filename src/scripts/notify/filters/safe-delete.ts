@@ -2,8 +2,8 @@
 // safe-delete: one deletion policy for the harness filter runner, the
 // safe-delete guard, and the pi extension. It prints exactly one verdict line,
 // decision<TAB>rule<TAB>reason, and it classifies the spellings that reach a
-// deletion without the interactive alias or the PATH shims: a native path, a
-// backslash-escaped word, cmd.exe, find's own primitives, and a bare deletion
+// deletion without the interactive alias or the PATH shims: a native path,
+// cmd.exe in command position, find's own -delete primitive, and a bare deletion
 // word. A bare word is proven only when it resolves to the home-manager wrapper,
 // because that wrapper is the redirect this policy trusts; every other bare word
 // is unproven and settings.unproven decides what that gets.
@@ -15,8 +15,8 @@
 // to stderr, and exits 2 on deny so the guard keeps its protocol. Every other
 // path exits 0, because a filter states its verdict on stdout.
 //
-// Rule names are the audit contract: native-path, escaped-spelling, cmd-shell,
-// find-primitive, proven-redirect, unproven-redirect, no-match.
+// Rule names are the audit contract: native-path, cmd-shell, find-primitive,
+// proven-redirect, unproven-redirect, no-match.
 
 import { accessSync, constants, readFileSync, readlinkSync, realpathSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
@@ -24,7 +24,6 @@ import { basename, join } from "node:path";
 export type Decision = "allow" | "ask" | "deny";
 export type Rule =
   | "native-path"
-  | "escaped-spelling"
   | "cmd-shell"
   | "find-primitive"
   | "proven-redirect"
@@ -70,7 +69,6 @@ interface BareDeletion {
 
 interface CommandFacts {
   readonly native: string[];
-  readonly escaped: string[];
   readonly bare: BareDeletion[];
   cmdShell: boolean;
   findPrimitive: boolean;
@@ -141,6 +139,176 @@ function isDeletionWord(word: string): boolean {
 function isCmdSpelling(word: string): boolean {
   const folded = basename(word).toLowerCase();
   return folded === "cmd" || folded === "cmd.exe";
+}
+
+interface HeredocSpec {
+  readonly delimiter: string;
+  readonly stripTabs: boolean;
+}
+
+// A `#` opens a comment only at the start of a word, so `x#y` stays a word.
+const COMMENT_START = new Set([" ", "\t", "\r", "\n", ";", "&", "|", "(", ")"]);
+
+function startsComment(command: string, index: number): boolean {
+  return index === 0 || COMMENT_START.has(command[index - 1]!);
+}
+
+// The heredoc operator has consumed everything up to `start`; this reads the
+// delimiter word and reports where it ends. The delimiter is quote-removed, so
+// `<<'EOF'`, `<<"EOF"`, and `<<EOF` all end the body at the same line.
+function readHeredocDelimiter(command: string, start: number): { spec: HeredocSpec; end: number } | null {
+  let index = start;
+  let stripTabs = false;
+  if (command[index] === "-") {
+    stripTabs = true;
+    index += 1;
+  }
+  while (command[index] === " " || command[index] === "\t") index += 1;
+  let delimiter = "";
+  let sawWord = false;
+  while (index < command.length) {
+    const char = command[index]!;
+    if (
+      char === " " ||
+      char === "\t" ||
+      char === "\r" ||
+      char === "\n" ||
+      char === ";" ||
+      char === "&" ||
+      char === "|" ||
+      char === "(" ||
+      char === ")"
+    ) {
+      break;
+    }
+    if (char === "'" || char === '"') {
+      const quote = char;
+      index += 1;
+      while (index < command.length && command[index] !== quote) {
+        delimiter += command[index];
+        index += 1;
+      }
+      if (index < command.length) index += 1;
+      sawWord = true;
+      continue;
+    }
+    if (char === "\\" && index + 1 < command.length) {
+      delimiter += command[index + 1];
+      index += 2;
+      sawWord = true;
+      continue;
+    }
+    delimiter += char;
+    index += 1;
+    sawWord = true;
+  }
+  if (!sawWord) return null;
+  return { spec: { delimiter, stripTabs }, end: index };
+}
+
+// Returns the index just past the delimiter line, or null when the body never
+// terminates. `<<-` strips leading tabs from each body line before comparing.
+function skipHeredocBody(command: string, start: number, spec: HeredocSpec): number | null {
+  let index = start;
+  while (index < command.length) {
+    const newline = command.indexOf("\n", index);
+    const lineEnd = newline === -1 ? command.length : newline;
+    const raw = command.slice(index, lineEnd);
+    const line = spec.stripTabs ? raw.replace(/^\t+/, "") : raw;
+    if (line === spec.delimiter) return newline === -1 ? command.length : newline + 1;
+    if (newline === -1) return null;
+    index = newline + 1;
+  }
+  return null;
+}
+
+// A heredoc body is data rather than commands, so it is dropped before the
+// tokenizer turns its lines into segments. Bodies are consumed in the order the
+// operators appear on their line, and an unterminated heredoc drops the rest.
+function stripHeredocBodies(command: string): string {
+  let result = "";
+  let index = 0;
+  let quote: string | null = null;
+  let pending: HeredocSpec[] = [];
+  while (index < command.length) {
+    const char = command[index]!;
+    if (quote !== null) {
+      result += char;
+      if (char === "\\" && quote === '"' && index + 1 < command.length) {
+        result += command[index + 1];
+        index += 2;
+        continue;
+      }
+      if (char === quote) quote = null;
+      index += 1;
+      continue;
+    }
+    if (char === "'" || char === '"') {
+      quote = char;
+      result += char;
+      index += 1;
+      continue;
+    }
+    if (char === "\\") {
+      result += command.slice(index, index + 2);
+      index += 2;
+      continue;
+    }
+    if (char === "$" && command[index + 1] === "(" && command[index + 2] === "(") {
+      // WHY: `<<` in $(( )) is a shift, so the expression is copied whole rather
+      // than read as a redirection that waits for a body line.
+      const start = index;
+      let depth = 2;
+      index += 3;
+      while (index < command.length && depth > 0) {
+        if (command[index] === "(") depth += 1;
+        if (command[index] === ")") depth -= 1;
+        index += 1;
+      }
+      result += command.slice(start, index);
+      continue;
+    }
+    if (char === "#" && startsComment(command, index)) {
+      // A comment runs to the newline, so an operator inside it opens nothing.
+      const newline = command.indexOf("\n", index);
+      const end = newline === -1 ? command.length : newline;
+      result += command.slice(index, end);
+      index = end;
+      continue;
+    }
+    if (char === "<" && command[index + 1] === "<") {
+      // `<<<` is a herestring with no body.
+      if (command[index + 2] === "<") {
+        result += "<<<";
+        index += 3;
+        continue;
+      }
+      const read = readHeredocDelimiter(command, index + 2);
+      if (read === null) {
+        result += "<<";
+        index += 2;
+        continue;
+      }
+      result += command.slice(index, read.end);
+      pending.push(read.spec);
+      index = read.end;
+      continue;
+    }
+    if (char === "\n") {
+      result += "\n";
+      index += 1;
+      for (const spec of pending) {
+        const next = skipHeredocBody(command, index, spec);
+        if (next === null) return result;
+        index = next;
+      }
+      pending = [];
+      continue;
+    }
+    result += char;
+    index += 1;
+  }
+  return result;
 }
 
 function tokenize(command: string): Token[] {
@@ -347,22 +515,34 @@ function locateCommand(segment: readonly Token[]): CommandPosition | null {
   return null;
 }
 
-function recordFindPrimitive(segment: readonly Token[], commandIndex: number, facts: CommandFacts): void {
+const EXEC_TERMINATORS = new Set([";", "\\;", "+"]);
+
+// find runs the words after -exec as a command, so they are classified the way a
+// top-level word is: a bare rm is proven or unproven through PATH, a native path
+// denies, and an interpreter -c script recurses. A missing terminator takes the
+// rest of the segment.
+function analyzeFind(
+  segment: readonly Token[],
+  commandIndex: number,
+  depth: number,
+  facts: CommandFacts,
+  inherited: ForcedUnproven | null,
+): void {
   for (let index = commandIndex + 1; index < segment.length; index += 1) {
     const word = segment[index]!.text;
     if (word === "-delete") facts.findPrimitive = true;
     if (word !== "-exec" && word !== "-execdir") continue;
-    const target = segment[index + 1];
-    if (target !== undefined && isDeletionWord(target.text)) facts.findPrimitive = true;
+    let end = index + 1;
+    while (end < segment.length && !EXEC_TERMINATORS.has(segment[end]!.text)) end += 1;
+    if (end > index + 1) analyzeSegment(segment.slice(index + 1, end), depth + 1, facts, inherited);
+    index = end;
   }
 }
 
 function classifyWord(token: Token, forced: ForcedUnproven | null, facts: CommandFacts): void {
-  const text = token.text;
-  if (text.startsWith("\\") && isDeletionWord(text.slice(1))) {
-    facts.escaped.push(text);
-    return;
-  }
+  // WHY: a leading backslash escapes the word name rather than spelling a path,
+  // so the word it forms is the one that runs, and it is classified as that word.
+  const text = token.text.startsWith("\\") ? token.text.slice(1) : token.text;
   if (!isDeletionWord(text)) return;
   if (text.includes("/")) {
     facts.native.push(text);
@@ -377,14 +557,16 @@ function analyzeSegment(
   facts: CommandFacts,
   inherited: ForcedUnproven | null,
 ): void {
+  // WHY: find -exec re-analysis reaches this walk without passing analyzeCommand,
+  // so the nesting cap belongs here as well as there.
+  if (depth > MAX_NESTING) return;
   const position = locateCommand(segment);
   const commandToken = position === null ? null : (segment[position.index] ?? null);
-  const scriptHost =
-    commandToken !== null && SCRIPT_HOSTS.has(basename(commandToken.text).toLowerCase());
+  const commandWord = commandToken === null ? null : basename(commandToken.text).toLowerCase();
+  const scriptHost = commandWord !== null && SCRIPT_HOSTS.has(commandWord);
 
   for (let index = 0; index < segment.length; index += 1) {
     const token = segment[index]!;
-    if (!token.quoted && isCmdSpelling(token.text)) facts.cmdShell = true;
     // A substitution runs in the caller's shell, so it inherits no prefix PATH.
     for (const nested of commandSubstitutions(token.text)) analyzeCommand(nested, depth + 1, facts, null);
     if (scriptHost && SCRIPT_OPTION.test(token.text) && index + 1 < segment.length) {
@@ -396,8 +578,10 @@ function analyzeSegment(
   }
 
   if (position === null || commandToken === null) return;
+  // Only the command word names the shell, so `echo cmd` keeps cmd as an argument.
+  if (isCmdSpelling(commandToken.text)) facts.cmdShell = true;
   classifyWord(commandToken, position.forced ?? inherited, facts);
-  if (basename(commandToken.text).toLowerCase() === "find") recordFindPrimitive(segment, position.index, facts);
+  if (commandWord === "find") analyzeFind(segment, position.index, depth, facts, position.forced ?? inherited);
 }
 
 function analyzeCommand(
@@ -408,7 +592,7 @@ function analyzeCommand(
 ): void {
   if (depth > MAX_NESTING) return;
   let segment: Token[] = [];
-  for (const token of tokenize(command)) {
+  for (const token of tokenize(stripHeredocBodies(command))) {
     if (token.kind === "separator") {
       if (segment.length > 0) analyzeSegment(segment, depth, facts, inherited);
       segment = [];
@@ -427,14 +611,6 @@ function nativeVerdict(): Verdict {
   };
 }
 
-function escapedVerdict(): Verdict {
-  return {
-    decision: "deny",
-    rule: "escaped-spelling",
-    reason: "a backslash-escaped deletion command bypasses safe-delete protection. Use shell-safe-rm or rip2 instead.",
-  };
-}
-
 function cmdShellVerdict(): Verdict {
   return { decision: "deny", rule: "cmd-shell", reason: "cmd.exe is not allowed. Use pwsh instead." };
 }
@@ -443,7 +619,7 @@ function findPrimitiveVerdict(): Verdict {
   return {
     decision: "deny",
     rule: "find-primitive",
-    reason: "find's -delete and -exec primitives run a deletion without the safe-delete wrapper. Use shell-safe-rm or rip2 instead.",
+    reason: "find -delete runs a deletion without the safe-delete wrapper. Use shell-safe-rm or rip2 instead.",
   };
 }
 
@@ -510,12 +686,11 @@ function readUnproven(settings: unknown): string {
 export function decideDeletion(command: string, options: PolicyOptions): Verdict {
   const unproven = readUnproven(options.settings);
   const redirect = options.redirect ?? managedRedirectResolver(defaultProbe());
-  const facts: CommandFacts = { native: [], escaped: [], bare: [], cmdShell: false, findPrimitive: false };
+  const facts: CommandFacts = { native: [], bare: [], cmdShell: false, findPrimitive: false };
   analyzeCommand(command, 0, facts, null);
 
   const verdicts: Verdict[] = [];
   if (facts.native.length > 0) verdicts.push(nativeVerdict());
-  if (facts.escaped.length > 0) verdicts.push(escapedVerdict());
   if (facts.cmdShell) verdicts.push(cmdShellVerdict());
   if (facts.findPrimitive) verdicts.push(findPrimitiveVerdict());
   for (const entry of facts.bare) verdicts.push(bareVerdict(entry, unproven, redirect));

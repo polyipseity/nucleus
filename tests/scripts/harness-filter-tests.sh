@@ -154,11 +154,9 @@ FILTER_CASES=(
   '{"unproven":"deny"}|/usr/BIN/rm -rf x|deny|native-path'
   '{"unproven":"deny"}|./rm x|deny|native-path'
   '{"unproven":"deny"}|./RM -rf build|deny|native-path'
-  '{"unproven":"deny"}|\rm x|deny|escaped-spelling'
-  '{"unproven":"deny"}|\RM -rf /tmp/x|deny|escaped-spelling'
-  '{"unproven":"deny"}|\unlink x|deny|escaped-spelling'
+  '{"unproven":"deny"}|\/bin/rm x|deny|native-path'
   '{"unproven":"deny"}|cmd.exe /c del x|deny|cmd-shell'
-  '{"unproven":"deny"}|pwsh -c x cmd y|deny|cmd-shell'
+  '{"unproven":"deny"}|pwsh -c x cmd y|allow|no-match'
   '{"unproven":"deny"}|rm x|deny|unproven-redirect'
   '{"unproven":"deny"}|DEL /S x|deny|unproven-redirect'
   '{"unproven":"deny"}|rm -rf build|deny|unproven-redirect'
@@ -167,6 +165,7 @@ FILTER_CASES=(
   '{"unproven":"allow"}|rm x|allow|unproven-redirect'
   '{"unproven":"deny"}|ls -la|allow|no-match'
   '{"unproven":"deny"}|git status|allow|no-match'
+  '{"unproven":"deny"}|echo cmd|allow|no-match'
 )
 readonly FILTER_CASES
 
@@ -270,11 +269,20 @@ assert_decision "a sudo-prefixed deletion asks when configured" \
   "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"ask"}' 'sudo rm -rf x')" ask unproven-redirect
 assert_decision "an uppercase word is detected but not proven by a lowercase wrapper" \
   "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"deny"}' 'RM -rf build')" deny unproven-redirect
+# An escaped word is a redirect question, not a bypass: the escape is removed and
+# what remains resolves through PATH like any other word.
+assert_decision "an escaped word that resolves to the wrapper allows" \
+  "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"deny"}' '\rm x')" allow proven-redirect
+assert_decision "an escaped word with no wrapper on PATH asks when configured" \
+  "$(run_filter_env "$EMPTY_HOME" "$NO_RM_PATH" '{"unproven":"ask"}' '\rm x')" ask unproven-redirect
+# Escape does not launder a path: the word it forms is still a native path.
+assert_decision "an escaped native path denies" \
+  "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"deny"}' '\/bin/rm x')" deny native-path
 
-# The three bypass families are the spellings no redirect can cover, so the
-# setting that governs an unproven redirect must not reach them.
+# The bypass families are the spellings no redirect can cover, so the setting
+# that governs an unproven redirect must not reach them.
 for _setting in deny ask allow; do
-  for _case in '/bin/rm -rf x|deny|native-path' './rm x|deny|native-path' '\rm x|deny|escaped-spelling' 'cmd.exe /c del x|deny|cmd-shell'; do
+  for _case in '/bin/rm -rf x|deny|native-path' './rm x|deny|native-path' '\/bin/rm x|deny|native-path' 'cmd.exe /c del x|deny|cmd-shell'; do
     IFS='|' read -r _command _decision _rule <<<"$_case"
     assert_decision "$_rule stays denied under unproven=$_setting: $_command" \
       "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" "{\"unproven\":\"$_setting\"}" "$_command")" "$_decision" "$_rule"
