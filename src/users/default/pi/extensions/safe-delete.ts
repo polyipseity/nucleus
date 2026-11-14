@@ -8,6 +8,7 @@
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { spawn } from "node:child_process";
+import { statusText } from "./shared/status-style.ts";
 
 // A cheap routing predicate: the command must mention a deletion word before the
 // runner is consulted. It never decides, so it stays permissive and leaves the
@@ -213,7 +214,7 @@ export function createSafeDeleteExtension(options: RunnerOptions = {}): (pi: Ext
 			}
 
 			if (verdict.decision === "deny") {
-				setStatus(ui, "safe-delete: blocked");
+				setStatus(ui, statusText("safe-delete: blocked", "error"));
 				try {
 					const detail = verdictDetail(verdict);
 					return block(detail.length > 0
@@ -224,7 +225,7 @@ export function createSafeDeleteExtension(options: RunnerOptions = {}): (pi: Ext
 				}
 			}
 
-			setStatus(ui, "safe-delete: confirmation required");
+			setStatus(ui, statusText("safe-delete: confirmation required", "warning"));
 			try {
 				if (!ctx.hasUI) {
 					const detail = verdictDetail(verdict);

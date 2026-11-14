@@ -8,10 +8,11 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { statusText } from "./shared/status-style.ts";
 
 export const STATUS_KEY = "sandbox";
-export const SANDBOX_LABEL = "SANDBOX: srt";
-export const UNSANDBOXED_LABEL = "SANDBOX: NONE (unsandboxed)";
+export const SANDBOX_LABEL = "sandbox: srt";
+export const UNSANDBOXED_LABEL = "sandbox: none";
 
 export interface SandboxDetection {
 	readonly sandboxed: boolean;
@@ -131,7 +132,10 @@ function getContext(value: unknown): SandboxStatusContext {
 function applySandboxState(ctx: SandboxStatusContext, env: NodeJS.ProcessEnv): void {
 	const detection = detectSandbox(env);
 	if (ctx.ui && typeof ctx.ui.setStatus === "function") {
-		ctx.ui.setStatus(STATUS_KEY, detection.label);
+		const status = detection.sandboxed
+			? detection.label
+			: statusText(detection.label, "warning", env);
+		ctx.ui.setStatus(STATUS_KEY, status);
 	}
 	if (!detection.sandboxed && ctx.hasUI === true && !warnedUnsandboxed) {
 		warnedUnsandboxed = true;
@@ -155,6 +159,8 @@ export function buildSandboxStatusReport(
 	const state = detection.sandboxed ? "sandboxed" : "unsandboxed";
 	const mode = typeof ctx.mode === "string" ? ctx.mode : "unknown";
 	const rmPath = commandPath("rm");
+	const filterPath = commandPath("harness-filter");
+	const filterDisplay = filterPath === "not found" ? "missing" : filterPath;
 	const safeRmPresent = commandExists("shell-safe-rm");
 	const ripPresent = commandExists("rip");
 	const unproven = readUnproven(env, cwd);
@@ -166,6 +172,7 @@ export function buildSandboxStatusReport(
 		`rm: ${rmPath}`,
 		`shell-safe-rm present: ${safeRmPresent}`,
 		`rip present: ${ripPresent}`,
+		`harness-filter: ${filterDisplay}`,
 		`safe-delete.settings.unproven: ${unproven}`,
 	].join("\n");
 }

@@ -14,6 +14,8 @@ import sandboxIndicator, {
 	type SandboxStatusContext,
 } from "../../../../../src/users/default/pi/extensions/sandbox-indicator.ts";
 
+const ESC = String.fromCharCode(27);
+
 type Handler = (event: unknown, ctx?: unknown) => void | Promise<void>;
 type CommandHandler = (args: string, ctx: unknown) => void | Promise<void>;
 
@@ -63,7 +65,7 @@ describe("detectSandbox", () => {
 		const result = detectSandbox({ SANDBOX_RUNTIME: "1" });
 		expect(result.sandboxed).toBe(true);
 		expect(result.label).toBe(SANDBOX_LABEL);
-		expect(result.label).toBe("SANDBOX: srt");
+		expect(result.label).toBe("sandbox: srt");
 		expect(result.evidence).toBe("SANDBOX_RUNTIME=1");
 	});
 
@@ -71,7 +73,7 @@ describe("detectSandbox", () => {
 		const result = detectSandbox({});
 		expect(result.sandboxed).toBe(false);
 		expect(result.label).toBe(UNSANDBOXED_LABEL);
-		expect(result.label).toBe("SANDBOX: NONE (unsandboxed)");
+		expect(result.label).toBe("sandbox: none");
 		expect(result.evidence).toBe("SANDBOX_RUNTIME unset");
 	});
 
@@ -132,7 +134,7 @@ describe("sandbox status lifecycle", () => {
 	});
 
 	test("session_start warns once per process when unsandboxed and hasUI", () => {
-		const { events } = registerExtension({});
+		const { events } = registerExtension({ NO_COLOR: "" });
 		const first = makeContext({ hasUI: true, mode: "interactive" });
 		const second = makeContext({ hasUI: true, mode: "interactive" });
 
@@ -146,7 +148,7 @@ describe("sandbox status lifecycle", () => {
 	});
 
 	test("session_compact does not warn again after session_start warned in same process", () => {
-		const { events } = registerExtension({});
+		const { events } = registerExtension({ NO_COLOR: "" });
 		const start = makeContext({ hasUI: true, mode: "interactive" });
 		const compact = makeContext({ hasUI: true, mode: "interactive" });
 
@@ -159,7 +161,7 @@ describe("sandbox status lifecycle", () => {
 	});
 
 	test("unsandboxed with no UI sets status but emits no warning", () => {
-		const { events } = registerExtension({});
+		const { events } = registerExtension({ NO_COLOR: "" });
 		const noUI = makeContext({ hasUI: false, mode: "print" });
 		const withUI = makeContext({ hasUI: true, mode: "interactive" });
 
@@ -192,6 +194,39 @@ describe("sandbox status lifecycle", () => {
 			[STATUS_KEY, SANDBOX_LABEL],
 			[STATUS_KEY, undefined],
 		]);
+	});
+});
+
+describe("sandbox status tone", () => {
+	beforeEach(() => {
+		resetSandboxWarningForTests();
+	});
+
+	test("unsandboxed label is warning yellow when color is allowed", () => {
+		const { events } = registerExtension({});
+		const { ctx, statuses } = makeContext({ hasUI: false, mode: "interactive" });
+
+		events.session_start?.({}, ctx);
+
+		expect(statuses).toEqual([[STATUS_KEY, `${ESC}[33msandbox: none${ESC}[0m`]]);
+	});
+
+	test("TERM=dumb keeps the unsandboxed label plain", () => {
+		const { events } = registerExtension({ TERM: "dumb" });
+		const { ctx, statuses } = makeContext({ hasUI: false, mode: "interactive" });
+
+		events.session_start?.({}, ctx);
+
+		expect(statuses).toEqual([[STATUS_KEY, "sandbox: none"]]);
+	});
+
+	test("sandboxed label stays plain when color is allowed", () => {
+		const { events } = registerExtension({ SANDBOX_RUNTIME: "1" });
+		const { ctx, statuses } = makeContext({ hasUI: false, mode: "interactive" });
+
+		events.session_start?.({}, ctx);
+
+		expect(statuses).toEqual([[STATUS_KEY, "sandbox: srt"]]);
 	});
 });
 
@@ -232,7 +267,12 @@ describe("buildSandboxStatusReport and /sandbox-status", () => {
 			{
 				env: { SANDBOX_RUNTIME: "1" },
 				cwd: "/tmp",
-				commandPath: (command) => (command === "rm" ? "/usr/bin/rm" : "not found"),
+				commandPath: (command) => {
+					if (command === "rm") {
+						return "/usr/bin/rm";
+					}
+					return command === "harness-filter" ? "/opt/nucleus/bin/harness-filter" : "not found";
+				},
 				commandExists: (command) => command === "shell-safe-rm",
 				readRegistryUnproven: () => "ask",
 			},
@@ -244,6 +284,7 @@ describe("buildSandboxStatusReport and /sandbox-status", () => {
 		expect(report).toContain("rm: /usr/bin/rm");
 		expect(report).toContain("shell-safe-rm present: true");
 		expect(report).toContain("rip present: false");
+		expect(report).toContain("harness-filter: /opt/nucleus/bin/harness-filter");
 		expect(report).toContain("safe-delete.settings.unproven: ask");
 	});
 
@@ -265,6 +306,7 @@ describe("buildSandboxStatusReport and /sandbox-status", () => {
 		expect(report).toContain("rm: not found");
 		expect(report).toContain("shell-safe-rm present: false");
 		expect(report).toContain("rip present: true");
+		expect(report).toContain("harness-filter: missing");
 		expect(report).toContain("safe-delete.settings.unproven: unavailable");
 	});
 
@@ -274,7 +316,8 @@ describe("buildSandboxStatusReport and /sandbox-status", () => {
 		const sandboxedExt = createSandboxIndicatorExtension({
 			env: { SANDBOX_RUNTIME: "1" },
 			cwd: "/tmp",
-			commandPath: () => "/bin/rm",
+			commandPath: (command) =>
+				command === "harness-filter" ? "/nucleus/bin/harness-filter" : "/bin/rm",
 			commandExists: (command) => command === "shell-safe-rm",
 			readRegistryUnproven: () => "ask",
 		});
@@ -299,6 +342,7 @@ describe("buildSandboxStatusReport and /sandbox-status", () => {
 		expect(sandboxedCtx.notifications[0][0]).toContain("rm: /bin/rm");
 		expect(sandboxedCtx.notifications[0][0]).toContain("shell-safe-rm present: true");
 		expect(sandboxedCtx.notifications[0][0]).toContain("rip present: false");
+		expect(sandboxedCtx.notifications[0][0]).toContain("harness-filter: /nucleus/bin/harness-filter");
 		expect(sandboxedCtx.notifications[0][0]).toContain("safe-delete.settings.unproven: ask");
 
 		resetSandboxWarningForTests();
@@ -327,6 +371,7 @@ describe("buildSandboxStatusReport and /sandbox-status", () => {
 		expect(unsandboxedCtx.notifications[0][0]).toContain("rm: not found");
 		expect(unsandboxedCtx.notifications[0][0]).toContain("shell-safe-rm present: false");
 		expect(unsandboxedCtx.notifications[0][0]).toContain("rip present: true");
+		expect(unsandboxedCtx.notifications[0][0]).toContain("harness-filter: missing");
 		expect(unsandboxedCtx.notifications[0][0]).toContain("safe-delete.settings.unproven: deny");
 		expect(sandboxed.command?.description).toBe("Show sandbox state and deletion-safety tooling status");
 	});

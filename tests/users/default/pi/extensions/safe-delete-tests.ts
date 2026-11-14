@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 import createSafeDeleteExtension, {
@@ -15,6 +15,48 @@ import createSafeDeleteExtension, {
 
 const REPO_ROOT = process.cwd();
 const RUNNER_PATH = join(REPO_ROOT, "src/scripts/notify/harness-filter.sh");
+const ESC = String.fromCharCode(27);
+
+const originalNoColor = process.env.NO_COLOR;
+const originalTerm = process.env.TERM;
+
+// The status expectations below pin the plain form, so each test starts with
+// NO_COLOR present; the tone tests opt out explicitly and restore afterwards.
+beforeEach(() => {
+	process.env.NO_COLOR = "";
+});
+
+afterEach(() => {
+	if (originalNoColor === undefined) {
+		delete process.env.NO_COLOR;
+	} else {
+		process.env.NO_COLOR = originalNoColor;
+	}
+	if (originalTerm === undefined) {
+		delete process.env.TERM;
+	} else {
+		process.env.TERM = originalTerm;
+	}
+});
+
+function allowColor(): () => void {
+	const savedNoColor = process.env.NO_COLOR;
+	const savedTerm = process.env.TERM;
+	delete process.env.NO_COLOR;
+	delete process.env.TERM;
+	return () => {
+		if (savedNoColor === undefined) {
+			delete process.env.NO_COLOR;
+		} else {
+			process.env.NO_COLOR = savedNoColor;
+		}
+		if (savedTerm === undefined) {
+			delete process.env.TERM;
+		} else {
+			process.env.TERM = savedTerm;
+		}
+	};
+}
 
 type ToolCallEvent = { toolName: string; input: { command?: unknown } };
 type ToolCallHandler = (
@@ -161,6 +203,54 @@ describe("safe-delete verdict mapping", () => {
 			["safe-delete", "safe-delete: blocked"],
 			["safe-delete", undefined],
 		]);
+	});
+
+	test("deny sets a red blocked status when color is allowed", async () => {
+		const restore = allowColor();
+		try {
+			const status: Array<[string, string | undefined]> = [];
+			const handler = loadExtension({ spawnFn: fakeSpawn("deny") });
+			const ui: SafeDeleteUi = {
+				hasUI: false,
+				setStatus: (key, value) => status.push([key, value]),
+			};
+
+			await handler(
+				{ toolName: "bash", input: { command: "rm file.txt" } },
+				{ hasUI: false, ui },
+			);
+
+			expect(status).toEqual([
+				["safe-delete", `${ESC}[31msafe-delete: blocked${ESC}[0m`],
+				["safe-delete", undefined],
+			]);
+		} finally {
+			restore();
+		}
+	});
+
+	test("ask sets a yellow confirmation status when color is allowed", async () => {
+		const restore = allowColor();
+		try {
+			const status: Array<[string, string | undefined]> = [];
+			const handler = loadExtension({ spawnFn: fakeSpawn("ask") });
+			const ui: SafeDeleteUi = {
+				hasUI: false,
+				setStatus: (key, value) => status.push([key, value]),
+			};
+
+			await handler(
+				{ toolName: "bash", input: { command: "rm file.txt" } },
+				{ hasUI: false, ui },
+			);
+
+			expect(status).toEqual([
+				["safe-delete", `${ESC}[33msafe-delete: confirmation required${ESC}[0m`],
+				["safe-delete", undefined],
+			]);
+		} finally {
+			restore();
+		}
 	});
 
 	test("ask blocks without UI, reports no confirmation was possible, and clears status", async () => {
