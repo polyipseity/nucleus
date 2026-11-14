@@ -121,6 +121,42 @@ describe("command position", () => {
     expect(verdict.decision).toBe("deny");
     expect(verdict.rule).toBe("cmd-shell");
   });
+
+  test("a statement word does not hide the command word", () => {
+    const verdict = verdictOf("then cmd /c del x", "managed");
+    expect(verdict.decision).toBe("deny");
+    expect(verdict.rule).toBe("cmd-shell");
+  });
+
+  test("a brace group does not hide the command word", () => {
+    const verdict = verdictOf("{ cmd /c del x; }", "managed");
+    expect(verdict.decision).toBe("deny");
+    expect(verdict.rule).toBe("cmd-shell");
+  });
+
+  test("a negation does not hide the command word", () => {
+    const verdict = verdictOf("! cmd /c del x", "managed");
+    expect(verdict.decision).toBe("deny");
+    expect(verdict.rule).toBe("cmd-shell");
+  });
+
+  test("a leading assignment does not hide the command word", () => {
+    const verdict = verdictOf("FOO=1 cmd /c del x", "managed");
+    expect(verdict.decision).toBe("deny");
+    expect(verdict.rule).toBe("cmd-shell");
+  });
+
+  test("a leading assignment leaves the deletion word unproven", () => {
+    const verdict = verdictOf("FOO=1 rm x", "plain");
+    expect(verdict.decision).toBe("ask");
+    expect(verdict.rule).toBe("unproven-redirect");
+  });
+
+  test("an escaped cmd command word denies", () => {
+    const verdict = verdictOf("\\cmd /c del x", "managed");
+    expect(verdict.decision).toBe("deny");
+    expect(verdict.rule).toBe("cmd-shell");
+  });
 });
 
 describe("escaped spelling", () => {
@@ -240,6 +276,58 @@ describe("heredoc bodies", () => {
     expect(managed.decision).toBe("allow");
     expect(managed.rule).toBe("proven-redirect");
     const plain = verdictOf("echo $((1 << 2))\nrm -rf /", "plain");
+    expect(plain.decision).toBe("ask");
+    expect(plain.rule).toBe("unproven-redirect");
+  });
+
+  // An arithmetic command is the same shift, at the start of a word.
+  test("a shift in an arithmetic command opens no body", () => {
+    const plain = verdictOf("(( x << 2 ))\nrm -rf /", "plain");
+    expect(plain.decision).toBe("ask");
+    expect(plain.rule).toBe("unproven-redirect");
+  });
+
+  // An unquoted delimiter leaves the body expandable, so a substitution in it
+  // still runs and its command is live.
+  test("a substitution in an unquoted body is still a command", () => {
+    const plain = verdictOf("cat <<EOF\n$(rm -rf /)\nEOF", "plain");
+    expect(plain.decision).toBe("ask");
+    expect(plain.rule).toBe("unproven-redirect");
+    const managed = verdictOf("cat <<EOF\n$(rm -rf /)\nEOF", "managed");
+    expect(managed.decision).toBe("allow");
+    expect(managed.rule).toBe("proven-redirect");
+  });
+
+  test("a quoted delimiter makes the body literal", () => {
+    const verdict = verdictOf("cat <<'EOF'\n$(rm -rf /)\nEOF", "plain");
+    expect(verdict.decision).toBe("allow");
+    expect(verdict.rule).toBe("no-match");
+  });
+
+  test("an escaped delimiter makes the body literal", () => {
+    const verdict = verdictOf("cat <<\\EOF\n$(rm -rf /)\nEOF", "plain");
+    expect(verdict.decision).toBe("allow");
+    expect(verdict.rule).toBe("no-match");
+  });
+
+  // A CRLF delimiter line still ends the body, so the next line is a command.
+  test("a carriage return on the delimiter line ends the body", () => {
+    const verdict = verdictOf("cat <<EOF\r\nrm -rf /\r\nEOF\r\nrm -f /tmp/x", "plain");
+    expect(verdict.decision).toBe("ask");
+    expect(verdict.rule).toBe("unproven-redirect");
+  });
+
+  test("two heredocs consume their bodies in order", () => {
+    const verdict = verdictOf("cat <<A <<B\nx\nA\ny\nB", "managed");
+    expect(verdict.decision).toBe("allow");
+    expect(verdict.rule).toBe("no-match");
+  });
+
+  test("a command after the second body is still analyzed", () => {
+    const managed = verdictOf("cat <<A <<B\nx\nA\ny\nB\nrm -f /tmp/x", "managed");
+    expect(managed.decision).toBe("allow");
+    expect(managed.rule).toBe("proven-redirect");
+    const plain = verdictOf("cat <<A <<B\nx\nA\ny\nB\nrm -f /tmp/x", "plain");
     expect(plain.decision).toBe("ask");
     expect(plain.rule).toBe("unproven-redirect");
   });

@@ -40,6 +40,22 @@ export const CORPUS_ROWS: readonly DeletionCorpusRow[] = [
   { command: "cmd /c del x", unproven: "ask", decision: "deny", rule: "cmd-shell", redirect: "plain" },
   { command: "xargs cmd /c del x", unproven: "ask", decision: "deny", rule: "cmd-shell", redirect: "plain" },
   {
+    command: "then cmd /c del x",
+    unproven: "ask",
+    decision: "deny",
+    rule: "cmd-shell",
+    redirect: "plain",
+    note: "a statement word is not the executed word, so cmd is still in command position",
+  },
+  {
+    command: "FOO=1 rm x",
+    unproven: "ask",
+    decision: "ask",
+    rule: "unproven-redirect",
+    redirect: "plain",
+    note: "a leading assignment does not change what the next word resolves through PATH",
+  },
+  {
     command: "echo cmd",
     unproven: "ask",
     decision: "allow",

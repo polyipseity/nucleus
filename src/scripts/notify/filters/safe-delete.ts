@@ -16,7 +16,7 @@
 // path exits 0, because a filter states its verdict on stdout.
 //
 // Rule names are the audit contract: native-path, cmd-shell, find-primitive,
-// proven-redirect, unproven-redirect, no-match.
+// proven-redirect, unproven-redirect, no-match, filter-error.
 
 import { accessSync, constants, readFileSync, readlinkSync, realpathSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
@@ -132,25 +132,40 @@ const DECISION_RANK: Record<Decision, number> = { allow: 1, ask: 2, deny: 3 };
 
 const WRAPPER_MARKER = "home-manager-files/.local/bin";
 
+// A word that takes the command position without being the executed word, so the
+// walk skips it instead of reporting no-match on a shell keyword.
+const STATEMENT_WORDS = new Set(["do", "done", "elif", "else", "esac", "fi", "if", "then", "time", "until", "while", "!", "{", "}"]);
+
+// A leading backslash escapes the word name rather than spelling a path, so the
+// word it forms is the one that runs.
+function stripEscape(word: string): string {
+  return word.startsWith("\\") ? word.slice(1) : word;
+}
+
 function isDeletionWord(word: string): boolean {
   return DELETION_WORDS.has(basename(word).toLowerCase());
 }
 
 function isCmdSpelling(word: string): boolean {
-  const folded = basename(word).toLowerCase();
+  const folded = basename(stripEscape(word)).toLowerCase();
   return folded === "cmd" || folded === "cmd.exe";
 }
 
 interface HeredocSpec {
   readonly delimiter: string;
   readonly stripTabs: boolean;
+  // An unquoted delimiter leaves the body expandable, so a command substitution
+  // in it still runs. A quote or backslash in the delimiter word turns expansion
+  // off for the whole body.
+  readonly expandable: boolean;
 }
 
-// A `#` opens a comment only at the start of a word, so `x#y` stays a word.
-const COMMENT_START = new Set([" ", "\t", "\r", "\n", ";", "&", "|", "(", ")"]);
+// A `#` comment and a `((` arithmetic group only open at the start of a word, so
+// `x#y` and `x((y))` stay part of a word.
+const WORD_BREAK = new Set([" ", "\t", "\r", "\n", ";", "&", "|", "(", ")"]);
 
-function startsComment(command: string, index: number): boolean {
-  return index === 0 || COMMENT_START.has(command[index - 1]!);
+function atWordStart(command: string, index: number): boolean {
+  return index === 0 || WORD_BREAK.has(command[index - 1]!);
 }
 
 // The heredoc operator has consumed everything up to `start`; this reads the
@@ -166,6 +181,7 @@ function readHeredocDelimiter(command: string, start: number): { spec: HeredocSp
   while (command[index] === " " || command[index] === "\t") index += 1;
   let delimiter = "";
   let sawWord = false;
+  let literal = false;
   while (index < command.length) {
     const char = command[index]!;
     if (
@@ -183,6 +199,7 @@ function readHeredocDelimiter(command: string, start: number): { spec: HeredocSp
     }
     if (char === "'" || char === '"') {
       const quote = char;
+      literal = true;
       index += 1;
       while (index < command.length && command[index] !== quote) {
         delimiter += command[index];
@@ -196,6 +213,7 @@ function readHeredocDelimiter(command: string, start: number): { spec: HeredocSp
       delimiter += command[index + 1];
       index += 2;
       sawWord = true;
+      literal = true;
       continue;
     }
     delimiter += char;
@@ -203,18 +221,20 @@ function readHeredocDelimiter(command: string, start: number): { spec: HeredocSp
     sawWord = true;
   }
   if (!sawWord) return null;
-  return { spec: { delimiter, stripTabs }, end: index };
+  return { spec: { delimiter, stripTabs, expandable: !literal }, end: index };
 }
 
 // Returns the index just past the delimiter line, or null when the body never
-// terminates. `<<-` strips leading tabs from each body line before comparing.
+// terminates. `<<-` strips leading tabs from each body line before comparing, and
+// a trailing carriage return is stripped so a CRLF file still ends the body.
 function skipHeredocBody(command: string, start: number, spec: HeredocSpec): number | null {
   let index = start;
   while (index < command.length) {
     const newline = command.indexOf("\n", index);
     const lineEnd = newline === -1 ? command.length : newline;
     const raw = command.slice(index, lineEnd);
-    const line = spec.stripTabs ? raw.replace(/^\t+/, "") : raw;
+    const tabStripped = spec.stripTabs ? raw.replace(/^\t+/, "") : raw;
+    const line = tabStripped.endsWith("\r") ? tabStripped.slice(0, -1) : tabStripped;
     if (line === spec.delimiter) return newline === -1 ? command.length : newline + 1;
     if (newline === -1) return null;
     index = newline + 1;
@@ -268,7 +288,21 @@ function stripHeredocBodies(command: string): string {
       result += command.slice(start, index);
       continue;
     }
-    if (char === "#" && startsComment(command, index)) {
+    if (char === "(" && command[index + 1] === "(" && atWordStart(command, index)) {
+      // WHY: `<<` in an arithmetic command is a shift, so the group is copied
+      // whole rather than read as a redirection that waits for a body line.
+      const start = index;
+      let depth = 2;
+      index += 2;
+      while (index < command.length && depth > 0) {
+        if (command[index] === "(") depth += 1;
+        if (command[index] === ")") depth -= 1;
+        index += 1;
+      }
+      result += command.slice(start, index);
+      continue;
+    }
+    if (char === "#" && atWordStart(command, index)) {
       // A comment runs to the newline, so an operator inside it opens nothing.
       const newline = command.indexOf("\n", index);
       const end = newline === -1 ? command.length : newline;
@@ -298,7 +332,14 @@ function stripHeredocBodies(command: string): string {
       result += "\n";
       index += 1;
       for (const spec of pending) {
+        const bodyStart = index;
         const next = skipHeredocBody(command, index, spec);
+        if (spec.expandable) {
+          // An unquoted delimiter expands command substitutions, so a deletion
+          // inside one is live even though the rest of the body is data.
+          const body = command.slice(bodyStart, next === null ? command.length : next);
+          for (const nested of commandSubstitutions(body)) result += `${nested}\n`;
+        }
         if (next === null) return result;
         index = next;
       }
@@ -492,6 +533,12 @@ function locateCommand(segment: readonly Token[]): CommandPosition | null {
         if (segment[index]?.text === "--") index += 1;
         continue;
       }
+      // WHY: a statement word and a leading assignment take the command position
+      // without being the executed word, and stopping on either hides a deletion.
+      if (STATEMENT_WORDS.has(folded) || ASSIGNMENT.test(word)) {
+        index += 1;
+        continue;
+      }
       return { index, forced };
     }
     if (folded === "sudo" || folded === "env" || folded === "xargs") return { index, forced };
@@ -540,9 +587,7 @@ function analyzeFind(
 }
 
 function classifyWord(token: Token, forced: ForcedUnproven | null, facts: CommandFacts): void {
-  // WHY: a leading backslash escapes the word name rather than spelling a path,
-  // so the word it forms is the one that runs, and it is classified as that word.
-  const text = token.text.startsWith("\\") ? token.text.slice(1) : token.text;
+  const text = stripEscape(token.text);
   if (!isDeletionWord(text)) return;
   if (text.includes("/")) {
     facts.native.push(text);
@@ -562,7 +607,7 @@ function analyzeSegment(
   if (depth > MAX_NESTING) return;
   const position = locateCommand(segment);
   const commandToken = position === null ? null : (segment[position.index] ?? null);
-  const commandWord = commandToken === null ? null : basename(commandToken.text).toLowerCase();
+  const commandWord = commandToken === null ? null : basename(stripEscape(commandToken.text)).toLowerCase();
   const scriptHost = commandWord !== null && SCRIPT_HOSTS.has(commandWord);
 
   for (let index = 0; index < segment.length; index += 1) {
