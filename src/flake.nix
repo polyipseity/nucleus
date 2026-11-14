@@ -7,7 +7,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     hermes-agent = {
-      url = "github:NousResearch/hermes-agent/v2026.8.31";
+      url = "github:NousResearch/hermes-agent/v2026.9.24";
       inputs.nixpkgs.follows = "nixpkgs";
       # WHY: v2026.8.31 is the first release exposing homeManagerModules.default
       # (PR #84178). The `voice` dependency group is excluded in src/modules/hermes-agent.nix.
@@ -36,7 +36,7 @@
     nix-homebrew.url = "github:zhaofengli/nix-homebrew";
     nix-homebrew.inputs.brew-src.follows = "brew-src";
     brew-src = {
-      url = "github:Homebrew/brew/7.0.11";
+      url = "github:Homebrew/brew/7.0.13";
       flake = false;
     };
     homebrew-core = {
