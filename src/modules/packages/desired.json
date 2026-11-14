@@ -252,12 +252,44 @@
         "why": "Rust CLI install vehicle; absent from WinGet; Scoop main bucket is the correct tier."
       },
       {
+        "bucket": "nucleus",
+        "name": "deep-filter",
+        "why": "DeepFilterNet speech enhancement CLI pinned to v0.5.6 via the nucleus Scoop bucket; absent from WinGet and public Scoop buckets."
+      },
+      {
+        "name": "ghostscript",
+        "why": "Ghostscript CLI parity with pkgs.ghostscript on POSIX; absent from WinGet, Scoop main is the correct tier."
+      },
+      {
+        "bucket": "nucleus",
+        "name": "glaxnimate",
+        "why": "Animated vector graphics editor; no WinGet manifest and no public Scoop bucket entry, so the pinned KDE Windows asset is installed directly."
+      },
+      {
         "name": "gopass",
         "why": "Cross-platform pass reimplementation; Windows parity for pkgs.pass on POSIX."
       },
       {
+        "bucket": "nucleus",
+        "name": "inter",
+        "noShim": true,
+        "why": "Inter UI font, per-user install; parity with the macOS font-inter cask and pkgs.inter on NixOS; no WinGet manifest serves Inter.Inter."
+      },
+      {
         "name": "iwck",
         "why": "Temporary keyboard locker for cleaning; blocks all input until Ctrl+Break."
+      },
+      {
+        "bucket": "fonts",
+        "name": "notosanscjk",
+        "noShim": true,
+        "why": "Noto Sans CJK covers Windows CJK text rendering; parity with pkgs.noto-fonts-cjk-sans on POSIX hosts."
+      },
+      {
+        "bucket": "fonts",
+        "name": "notoserifcjk",
+        "noShim": true,
+        "why": "Noto Serif CJK completes the Windows font parity with pkgs.noto-fonts-cjk-serif on POSIX hosts."
       },
       {
         "name": "qemu",
@@ -267,6 +299,12 @@
         "bucket": "nucleus",
         "name": "sigrok-cli",
         "why": "Logic analyzer CLI; absent from WinGet; provisioned via nucleus custom Scoop bucket."
+      },
+      {
+        "bucket": "nucleus",
+        "name": "source-serif",
+        "noShim": true,
+        "why": "Source Serif 4 serif font, per-user install; parity with the macOS font-source-serif cask and pkgs.source-serif on NixOS; no WinGet manifest serves Adobe.SourceSerif4."
       },
       {
         "name": "whisper-cpp",
@@ -302,6 +340,10 @@
       {
         "name": "discord-music-rpc",
         "why": "Tray Rich Presence app for Discord; pinned to a VCS rev via the uv section of lockfile.json."
+      },
+      {
+        "name": "git-filter-repo",
+        "why": "History rewriting CLI. WinGet has no manifest, and uv is the Windows install path (nixpkgs on POSIX)."
       },
       {
         "name": "hermes-agent",

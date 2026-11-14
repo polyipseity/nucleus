@@ -17,6 +17,8 @@ DRIVE="$SCRIPT_DIR/../../src/scripts/notify/harness-drive.sh"
 require_command mktemp "temporary directories for the harness home"
 require_command jq "queue payloads and expected documents"
 
+ensure_safe_rm_env
+
 TMPDIR_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_ROOT"' EXIT
 
@@ -43,6 +45,11 @@ Darwin) USER_ROOT="$TMPDIR_ROOT/home/Library/Application Support/nucleus" ;;
 *) USER_ROOT="$TMPDIR_ROOT/home/.local/share/nucleus" ;;
 esac
 COMMANDS="$USER_ROOT/state/harness-bridge/commands"
+
+# The audit log root is suite-owned, so a case never writes into the real one.
+AUDIT_LOG="$TMPDIR_ROOT/logs/harness.log"
+NUCLEUS_LOG_DIR="$TMPDIR_ROOT/logs"
+export NUCLEUS_LOG_DIR
 
 write_config() {
   mkdir -p "$TMPDIR_ROOT/home/.local/state/nucleus"
@@ -212,16 +219,16 @@ test_drive_disabled_notifies_but_drops_the_queue() {
   queue_prompt cursor 1000-aaaa.json "first"
   queue_prompt cursor 2000-bbbb.json "second"
   : >"$HARNESS_DRIVE_LOG"
-  rm -f "$USER_ROOT/logs/harness-bridge.log"
+  rm -f "$AUDIT_LOG"
   local _out=""
   _out="$(run_drive cursor '{"hook_event_name":"Stop"}')" || true
   local _left=""
   _left="$(find "$COMMANDS" -name '*.json' -print -quit 2>/dev/null)"
   local _audit=""
-  _audit="$(cat "$USER_ROOT/logs/harness-bridge.log" 2>/dev/null)" || _audit=""
+  _audit="$(jq -c 'select(.summary | tostring | contains("dropped 2 queued prompt(s)"))' "$AUDIT_LOG" 2>/dev/null)" || _audit=""
   if [ "$_out" = '{}' ] && [ -z "$_left" ] &&
     grep -qF 'finished' <<<"$(cat "$HARNESS_DRIVE_LOG")" &&
-    grep -qF 'dropped 2 queued prompt(s)' <<<"$_audit"; then
+    [ -n "$_audit" ] && [ "$(jq -r '.kind' <<<"$_audit")" = "notify" ]; then
     assert_pass "harness-drive.enable=false still notifies and drops the queued prompts"
   else
     assert_fail "drive-off" "out=$_out left=$_left audit=$_audit"
@@ -231,15 +238,16 @@ test_drive_disabled_notifies_but_drops_the_queue() {
 test_drive_disabled_with_empty_queue_is_quiet() {
   write_config '{"harness-drive":{"enable":false}}'
   rm -rf "$COMMANDS"
-  rm -f "$USER_ROOT/logs/harness-bridge.log"
+  rm -f "$AUDIT_LOG"
   local _rc=0
   local _out=""
   _out="$(run_drive copilot '{}')" || _rc=$?
-  if [ "$_rc" -eq 0 ] && [ "$_out" = '{}' ] &&
-    [ ! -f "$USER_ROOT/logs/harness-bridge.log" ]; then
-    assert_pass "with nothing queued the disabled drive path writes no audit entry"
+  local _dropped=""
+  _dropped="$(jq -c 'select(.summary | tostring | contains("dropped"))' "$AUDIT_LOG" 2>/dev/null)" || _dropped=""
+  if [ "$_rc" -eq 0 ] && [ "$_out" = '{}' ] && [ -z "$_dropped" ]; then
+    assert_pass "with nothing queued the disabled drive path records no drop"
   else
-    assert_fail "drive-off-empty" "rc=$_rc out=$_out"
+    assert_fail "drive-off-empty" "rc=$_rc out=$_out dropped=$_dropped"
   fi
 }
 

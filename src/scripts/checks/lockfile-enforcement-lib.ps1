@@ -274,6 +274,33 @@ function Invoke-LockfileEnforcement {
     }
   }
 
+  # No package manager ships the DeepFilterNet3 ONNX weights, so every version
+  # probe above is blind to a drifted model; the probe re-hashes the deployed
+  # file against the lockfile SRI instead.
+  if ($Lockfile.ContainsKey('deepfilternet')) {
+    $modelDir = Join-Path (Get-NucleusUserRoot) 'models'
+    foreach ($modelName in @($Lockfile.deepfilternet.Keys)) {
+      $pin = $Lockfile.deepfilternet.$modelName
+      $expectedSri = $pin.hash
+      if ([string]::IsNullOrWhiteSpace($expectedSri)) {
+        & $ErrorFn "deepfilternet.$modelName`: lockfile entry has no hash"; $errors++
+        continue
+      }
+      $modelPath = Join-Path -Path $modelDir -ChildPath $modelName
+      if (-not (Test-Path -LiteralPath $modelPath -PathType Leaf)) {
+        & $ErrorFn "deepfilternet.$modelName`: not deployed at $modelPath"; $errors++
+        continue
+      }
+      $actualSri = Get-NucleusSriHash -Path $modelPath
+      if ($actualSri -ne $expectedSri) {
+        & $ErrorFn "deepfilternet.$modelName`: expected $expectedSri, found $actualSri"; $errors++
+      }
+      else {
+        & $InfoFn "deepfilternet.$modelName`: present ($expectedSri)"
+      }
+    }
+  }
+
   # suggestions.opencode: git+URL pins have no installed-version query, so each
   # entry is reported at info level and never errors.
   if ($Lockfile.ContainsKey('suggestions') -and $Lockfile.suggestions.ContainsKey('opencode')) {

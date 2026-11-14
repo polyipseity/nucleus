@@ -446,7 +446,10 @@ function Save-FileListCache {
   # into src/users/default and yields every file there a second time under a
   # pathspec git check-ignore rejects as beyond a symbolic link. The bash twin
   # reaches the same result through find, which does not follow symlinks.
-  $script:CachedYamlFiles = @((Get-ChildItem -Recurse -Filter '*.yml') + (Get-ChildItem -Recurse -Filter '*.yaml')) | Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object Name | Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#B7 -- structural invariant; gitignore filter applied on top
+  # WHY one enumeration: the shell twin's cache_file_lists takes yml and yaml in
+  #   one find, and concatenating two Get-ChildItem results makes an empty side
+  #   a $null that Where-Object trips over under StrictMode.
+  $script:CachedYamlFiles = Get-ChildItem -Recurse | Where-Object { $_.Extension -in '.yml', '.yaml' } | Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object Name | Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#B7 -- structural invariant; gitignore filter applied on top
   $script:CachedJsonFiles = Get-ChildItem -Path 'src' -Recurse -Filter '*.json' | Where-Object { $_.Name -notmatch '\.schema\.json$' -and $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object Name | Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#A7,#B7 -- schema files are meta; vendor is structural invariant; gitignore filter applied on top
   $script:CachedShellFiles = Get-ChildItem -Path 'src/scripts' -Recurse -Filter '*.sh' | Sort-Object Name | Select-GitIgnored
 }
@@ -504,12 +507,16 @@ function Invoke-StepPipeline {
   # Only applicable, selected steps count toward the run progress.
   $totalSteps = $pendingIndices.Count
 
+  # Work queue: keep up to $maxJobs runspaces running and launch the next
+  # pending step the moment a slot frees, instead of waiting out a batch.
   $pos = 0
-  while ($pos -lt $pendingIndices.Count) {
-    $batchEnd = [Math]::Min($pos + $maxJobs, $pendingIndices.Count)
-    $runspaces = [System.Collections.Generic.List[hashtable]]::new()
+  $stopLaunching = $false
+  $failFastNumbers = [System.Collections.Generic.HashSet[int]]::new()
+  $runspaceFailedNumbers = [System.Collections.Generic.HashSet[int]]::new()
+  $active = [System.Collections.Generic.List[hashtable]]::new()
 
-    while ($pos -lt $batchEnd) {
+  while ($true) {
+    while (-not $stopLaunching -and $active.Count -lt $maxJobs -and $pos -lt $pendingIndices.Count) {
       $i = $pendingIndices[$pos]
       $pos++
       $n = $script:StepNumbers[$i]
@@ -624,49 +631,79 @@ function Invoke-StepPipeline {
         Reset      = $script:NucStyleReset
       })
       $handle = $ps.BeginInvoke()
-      $null = $runspaces.Add(@{ PowerShell = $ps; AsyncResult = $handle; Number = $n })  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
+      $null = $active.Add(@{ PowerShell = $ps; AsyncResult = $handle; Number = $n })  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
       $startedSteps++
       $null = $spawnedNumbers.Add($n)  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
       Write-Output ("$($script:NucStyleDim)[{0}/{1}] step {2} {3} started$($script:NucStyleReset)" -f $startedSteps, $totalSteps, $n, $name)
     }
 
-    $batchFailed = $false
-    foreach ($rs in $runspaces) {
+    if ($active.Count -eq 0) { break }
+
+    # Block until the next step finishes, then drain every finished one in
+    # launch order so the fail-fast report keeps that order.
+    $waitHandles = [System.Threading.WaitHandle[]]::new($active.Count)
+    for ($k = 0; $k -lt $active.Count; $k++) {
+      $waitHandles[$k] = $active[$k].AsyncResult.AsyncWaitHandle
+    }
+    # check-suppress:suppression_doc: WaitAny's return is the index of the signaled handle; the drain below re-scans IsCompleted
+    $null = [System.Threading.WaitHandle]::WaitAny($waitHandles)
+
+    for ($k = 0; $k -lt $active.Count;) {
+      $rs = $active[$k]
+      if (-not $rs.AsyncResult.IsCompleted) {
+        $k++
+        continue
+      }
       try {
         $null = $rs.PowerShell.EndInvoke($rs.AsyncResult)  # check-suppress:suppression_doc: EndInvoke returns runspace output; already redirected to step out-file
       } catch {
-        $batchFailed = $true
+        $null = $runspaceFailedNumbers.Add($rs.Number)  # check-suppress:suppression_doc: HashSet.Add returns bool; membership is the only effect needed
+        Write-StepRunspaceFailure -Number $rs.Number -Reason "$_"
+        if ($script:FAIL_FAST) { $stopLaunching = $true }
       } finally {
         $rs.PowerShell.Dispose()
       }
-    }
-
-    if ($batchFailed -and $script:FAIL_FAST) {
-      # A runspace that threw has no per-step exit file to replay; report the
-      # infrastructure failure rather than exiting silently.
-      Write-ErrorMessage "step runspace failed (fail-fast)"
-      exit 1
-    }
-
-    if ($script:FAIL_FAST) {
-      $failFastNumbers = @()
-      foreach ($rs in $runspaces) {
+      # Removing at $k without advancing keeps the launch order intact.
+      $active.RemoveAt($k)
+      if ($script:FAIL_FAST) {
         $exitFile = Join-Path $script:WaveTmpDir "step-$($rs.Number).exit"
         if ((Test-Path -LiteralPath $exitFile) -and (Get-Content -LiteralPath $exitFile -Raw) -ne '0') {
-          $failFastNumbers += $rs.Number
+          $null = $failFastNumbers.Add($rs.Number)  # check-suppress:suppression_doc: HashSet.Add returns bool; membership is the only effect needed
+          $stopLaunching = $true
         }
       }
-      if ($failFastNumbers.Count -gt 0) {
-        Format-FailFastReport -Number $failFastNumbers
-        exit 1
-      }
     }
+  }
+
+  if ($script:FAIL_FAST -and $runspaceFailedNumbers.Count -gt 0) {
+    # Report the runspace failure on the abort path, which exits before
+    # Format-StepSummary renders the step it was recorded against. The drain's
+    # catch records every one there, so the set is the single source for this
+    # branch.
+    Write-ErrorMessage "step runspace failed (fail-fast)"
+    exit 1
+  }
+
+  if ($script:FAIL_FAST -and $failFastNumbers.Count -gt 0) {
+    # WHY: failures are recorded as runspaces complete, so the set carries no
+    # order. $spawnedNumbers holds every launched number in launch order and the
+    # failed set is a subset of it, so scanning it reports the failures in launch
+    # order whichever runspace failed first.
+    $orderedFailed = @()
+    foreach ($n in $spawnedNumbers) {
+      if ($failFastNumbers.Contains($n)) { $orderedFailed += $n }
+    }
+    Format-FailFastReport -Number $orderedFailed
+    exit 1
   }
 
   $pipelineStart.Stop()
   "$($pipelineStart.ElapsedMilliseconds)" | Out-File -FilePath (Join-Path $script:WaveTmpDir 'pipeline.wall_ms') -Encoding utf8 -NoNewline
 
   foreach ($n in $spawnedNumbers) {
+    # A step whose runspace threw never finished; the summary reports it as failed
+    # with the recorded reason, so claiming it finished here would contradict it.
+    if ($runspaceFailedNumbers.Contains($n)) { continue }
     $timeFile = Join-Path $script:WaveTmpDir "step-$n.time"
     $elapsedMs = 0
     if (Test-Path -LiteralPath $timeFile) { $elapsedMs = [int](Get-Content -LiteralPath $timeFile -Raw) }
@@ -702,6 +739,22 @@ function Write-StepReplay {
       else { $_ }
     } | Write-Output
   }
+}
+
+# Records a runspace that threw against its step. The throw happens outside the
+# runspace's own try/catch, so no exit file was written: Format-StepSummary reads
+# a missing exit file as a failure with no output, and the pipeline would report
+# the step as finished. Writing the exit code and the reason puts the step on the
+# same report path as any other failure. It runs inside the drain's catch, so a
+# throw from the writes here escapes as a terminating error in place of the
+# runspace's own exception.
+function Write-StepRunspaceFailure {
+  param(
+    [Parameter(Mandatory)][int]$Number,
+    [Parameter(Mandatory)][string]$Reason
+  )
+  "step runspace failed: $Reason" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.out") -Encoding utf8 -Append
+  "1" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.exit") -Encoding utf8 -NoNewline
 }
 
 # True when a step's captured output carries the no-scope convention. A
@@ -806,6 +859,8 @@ function Format-StepSummary {
 
 function Test-Prerequisite {
   Assert-ToolAvailable -Name 'actionlint' -Type 'Command'
+  # WHY: harness-filter runs every filters/<id>.ts through bun, so a host without bun cannot gate a tool call.
+  Assert-ToolAvailable -Name 'bun' -Type 'Command'
   Assert-ToolAvailable -Name 'check-jsonschema' -Type 'Command'
   Assert-ToolAvailable -Name 'git' -Type 'Command'
   Assert-ToolAvailable -Name 'jq' -Type 'Command'

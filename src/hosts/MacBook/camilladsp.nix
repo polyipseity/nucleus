@@ -7,6 +7,7 @@
 {
   config,
   lib,
+  nucleusApps,
   pkgs,
   username,
   ...
@@ -24,13 +25,7 @@ let
     ];
   };
 
-  camilladspPython = import ../../modules/lib/camilladsp-python.nix { inherit pkgs; };
-
-  camilladspHeartbeat = pkgs.writeNucleusShellApplication {
-    name = "camilladsp-heartbeat";
-    scriptName = "src/scripts/services/camilladsp-heartbeat";
-    runtimeInputs = [ camilladspPython ];
-  };
+  camilladspHeartbeat = nucleusApps.nucleus-camilladsp-heartbeat;
 
   envVars = import ../../modules/lib/env-secrets.nix {
     inherit

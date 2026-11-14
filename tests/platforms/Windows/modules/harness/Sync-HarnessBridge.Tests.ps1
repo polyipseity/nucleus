@@ -31,9 +31,9 @@ BeforeAll {
     .SYNOPSIS
       Creates an isolated repository/user-root sandbox for one test.
     .DESCRIPTION
-      The "repository" holds copies of the two real entry points so the deployment
-      logic exercises real content, while HOME/LOCALAPPDATA/PATH point at empty
-      directories the test owns.
+      The "repository" holds copies of the real entry points and the helper they
+      dot-source, so the deployment logic exercises real content, while
+      HOME/LOCALAPPDATA/PATH point at empty directories the test owns.
     #>
     [CmdletBinding(SupportsShouldProcess = $true)]
     [OutputType([hashtable])]
@@ -55,9 +55,31 @@ BeforeAll {
 
     $sourceDir = Join-Path -Path $sandbox.Repo -ChildPath 'src\scripts\notify'
     $null = New-Item -ItemType Directory -Path $sourceDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
-    foreach ($name in @('harness-approval', 'harness-drive', 'harness-notify')) {
+    foreach ($name in @('harness-approval', 'harness-bridge-common', 'harness-drive', 'harness-filter', 'harness-notify')) {
       Copy-Item -LiteralPath (Join-Path -Path $script:NotifyDir -ChildPath "$name.ps1") -Destination (Join-Path -Path $sourceDir -ChildPath "$name.ps1")
     }
+    # The runner resolves its filters beside itself, so the fixture carries the
+    # filter directory too: without it the deploy path only warns, and nothing
+    # proves the filters ever reach their destination.
+    $fixtureFilterDir = Join-Path -Path $sourceDir -ChildPath 'filters'
+    $null = New-Item -ItemType Directory -Path $fixtureFilterDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+    foreach ($filter in @(Get-ChildItem -LiteralPath (Join-Path -Path $script:NotifyDir -ChildPath 'filters') -File -Filter '*.ts')) {
+      Copy-Item -LiteralPath $filter.FullName -Destination (Join-Path -Path $fixtureFilterDir -ChildPath $filter.Name)
+    }
+
+    # The audit writer is the nucleus-logs entry script, and it imports the output
+    # module and the log-management module from the repository it lives in, so the
+    # fixture carries all three. NUCLEUS_LOG_DIR below pins the log root itself.
+    $fixtureScriptsDir = Join-Path -Path $sandbox.Repo -ChildPath 'scripts'
+    $fixtureModulesDir = Join-Path -Path (Join-Path -Path $sandbox.Repo -ChildPath 'src\platforms\Windows') -ChildPath 'modules'
+    foreach ($dir in @($fixtureScriptsDir, $fixtureModulesDir)) {
+      $null = New-Item -ItemType Directory -Path $dir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+    }
+    Copy-Item -LiteralPath (Join-Path -Path $script:RepoRootPath -ChildPath 'scripts\logs.ps1') -Destination (Join-Path -Path $fixtureScriptsDir -ChildPath 'logs.ps1')
+    foreach ($name in @('Format-NucleusOutput.psm1', 'Get-NucleusHostPlatform.ps1', 'Invoke-LogManagement.ps1')) {
+      Copy-Item -LiteralPath (Join-Path -Path $script:RepoRootPath -ChildPath "src\platforms\Windows\modules\$name") -Destination (Join-Path -Path $fixtureModulesDir -ChildPath $name)
+    }
+    $sandbox['Logs'] = Join-Path -Path $root 'logs'
 
     $null = Set-Content -Path $sandbox.HermesLog -Value '' -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
     return $sandbox
@@ -193,6 +215,11 @@ BeforeAll {
     $psi.Environment['HOME'] = $Sandbox.Home
     $psi.Environment['USERPROFILE'] = $Sandbox.Home
     $psi.Environment['LOCALAPPDATA'] = $Sandbox.LocalApp
+    # WHY: the audit writer resolves nucleus-logs through the repository and the
+    # log root through the override, so neither case can reach the real checkout
+    # or the developer's log directory.
+    $psi.Environment['NUCLEUS_REPO_ROOT'] = $Sandbox.Repo
+    $psi.Environment['NUCLEUS_LOG_DIR'] = $Sandbox.Logs
     $psi.Environment['HERMES_STUB_LOG'] = $Sandbox.HermesLog
     $psi.Environment['PATH'] = $Sandbox.StubDir + [System.IO.Path]::PathSeparator + $env:PATH
 
@@ -333,10 +360,10 @@ Describe 'Sync-HarnessBridge shim convergence' {
     Remove-HarnessBridgeSandbox -Root $script:syncSandbox.Root
   }
 
-  It 'deploys both entry points and both PATH shims on an enabled run' {
+  It 'deploys every entry point with its shim and the shared helper on an enabled run' {
     Sync-HarnessBridge -Enabled:$true -RepoRoot $script:syncSandbox.Repo -UserRoot $script:syncUserRoot -UserProfile $script:syncSandbox.Home > $null
 
-    foreach ($name in @('harness-approval', 'harness-drive', 'harness-notify')) {
+    foreach ($name in @('harness-approval', 'harness-drive', 'harness-filter', 'harness-notify')) {
       $deployed = Join-Path -Path $script:syncBinDir -ChildPath "$name.ps1"
       $source = Join-Path -Path $script:syncSandbox.Repo -ChildPath "src\scripts\notify\$name.ps1"
       Test-Path -LiteralPath $deployed | Should -Be $true
@@ -349,16 +376,37 @@ Describe 'Sync-HarnessBridge shim convergence' {
       $shimText | Should -Match 'pwsh -NoProfile -ExecutionPolicy Bypass'
       $shimText | Should -Match "`r`n"
     }
+
+    # The helper is dot-sourced, never invoked, so it has no shim.
+    $deployedCommon = Join-Path -Path $script:syncBinDir -ChildPath 'harness-bridge-common.ps1'
+    $sourceCommon = Join-Path -Path $script:syncSandbox.Repo -ChildPath 'src\scripts\notify\harness-bridge-common.ps1'
+    Test-Path -LiteralPath $deployedCommon | Should -Be $true
+    (Get-Content -LiteralPath $deployedCommon -Raw -Encoding UTF8) | Should -Be (Get-Content -LiteralPath $sourceCommon -Raw -Encoding UTF8)
+    Test-Path -LiteralPath (Join-Path -Path $script:syncShimDir -ChildPath 'harness-bridge-common.cmd') | Should -Be $false
+
+    # The filters are child processes the runner resolves beside itself: they have
+    # to reach their directory, and they get no shim because nothing invokes them
+    # by PATH.
+    foreach ($filter in @(Get-ChildItem -LiteralPath (Join-Path -Path $script:syncSandbox.Repo -ChildPath 'src\scripts\notify\filters') -File -Filter '*.ts')) {
+      $deployedFilter = Join-Path -Path (Join-Path -Path $script:syncBinDir -ChildPath 'filters') -ChildPath $filter.Name
+      Test-Path -LiteralPath $deployedFilter | Should -Be $true
+      (Get-Content -LiteralPath $deployedFilter -Raw -Encoding UTF8) | Should -Be (Get-Content -LiteralPath $filter.FullName -Raw -Encoding UTF8)
+      Test-Path -LiteralPath (Join-Path -Path $script:syncShimDir -ChildPath ($filter.BaseName + '.cmd')) | Should -Be $false
+    }
   }
 
-  It 'is idempotent — a second enabled run rewrites nothing' {
+  It 'is idempotent - a second enabled run rewrites nothing' {
     $artifacts = @(
       (Join-Path -Path $script:syncBinDir -ChildPath 'harness-notify.ps1')
       (Join-Path -Path $script:syncBinDir -ChildPath 'harness-approval.ps1')
       (Join-Path -Path $script:syncBinDir -ChildPath 'harness-drive.ps1')
+      (Join-Path -Path $script:syncBinDir -ChildPath 'harness-bridge-common.ps1')
+      (Join-Path -Path $script:syncBinDir -ChildPath 'harness-filter.ps1')
+      (Join-Path -Path $script:syncBinDir -ChildPath 'filters\safe-delete.ts')
       (Join-Path -Path $script:syncShimDir -ChildPath 'harness-notify.cmd')
       (Join-Path -Path $script:syncShimDir -ChildPath 'harness-approval.cmd')
       (Join-Path -Path $script:syncShimDir -ChildPath 'harness-drive.cmd')
+      (Join-Path -Path $script:syncShimDir -ChildPath 'harness-filter.cmd')
     )
     $before = $artifacts | ForEach-Object { (Get-Item -LiteralPath $_).LastWriteTimeUtc.Ticks }
 
@@ -369,6 +417,21 @@ Describe 'Sync-HarnessBridge shim convergence' {
     $after | Should -Be $before
   }
 
+  It 'prunes a deployed filter the source set no longer carries' {
+    # WHY: the runner resolves a filter by the id the registry names, so a copy
+    # left behind by a rename or a deletion would keep answering a filter the
+    # registry no longer declares.
+    $deployedFilterDir = Join-Path -Path $script:syncBinDir -ChildPath 'filters'
+    $staleFilter = Join-Path -Path $deployedFilterDir -ChildPath 'stale-filter.ts'
+    $null = New-Item -ItemType Directory -Path $deployedFilterDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
+    $null = Set-Content -Path $staleFilter -Value '# stale filter' -NoNewline  # check-suppress:suppression_doc: Set-Content returns nothing useful, discarded in test setup
+
+    Sync-HarnessBridge -Enabled:$true -RepoRoot $script:syncSandbox.Repo -UserRoot $script:syncUserRoot -UserProfile $script:syncSandbox.Home > $null
+
+    Test-Path -LiteralPath $staleFilter | Should -Be $false
+    Test-Path -LiteralPath (Join-Path -Path $deployedFilterDir -ChildPath 'safe-delete.ts') | Should -Be $true
+  }
+
   It 'removes the shims and deployed copies on a disabled run, keeping unmanaged files' {
     $unmanagedShim = Join-Path -Path $script:syncShimDir -ChildPath 'other-tool.cmd'
     $unmanagedBin = Join-Path -Path $script:syncBinDir -ChildPath 'other-tool.ps1'
@@ -377,10 +440,11 @@ Describe 'Sync-HarnessBridge shim convergence' {
 
     Sync-HarnessBridge -Enabled:$false -RepoRoot $script:syncSandbox.Repo -UserRoot $script:syncUserRoot -UserProfile $script:syncSandbox.Home > $null
 
-    foreach ($name in @('harness-approval', 'harness-drive', 'harness-notify')) {
+    foreach ($name in @('harness-approval', 'harness-bridge-common', 'harness-drive', 'harness-filter', 'harness-notify')) {
       Test-Path -LiteralPath (Join-Path -Path $script:syncBinDir -ChildPath "$name.ps1") | Should -Be $false
       Test-Path -LiteralPath (Join-Path -Path $script:syncShimDir -ChildPath "$name.cmd") | Should -Be $false
     }
+    Test-Path -LiteralPath (Join-Path -Path $script:syncBinDir -ChildPath 'filters') | Should -Be $false
     Test-Path -LiteralPath $unmanagedShim | Should -Be $true
     Test-Path -LiteralPath $unmanagedBin | Should -Be $true
 
@@ -466,7 +530,7 @@ Describe 'harness-approval.ps1 Windows twin' {
   }
 
   It 'honours a remote allow decision, clears the request, and audits it' {
-    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ enable = $true } }
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ sources = @('hermes'); 'timeout-seconds' = @{ 'hermes' = 30 } } }
     $stateDir = Get-BridgeStateDir -Sandbox $script:approvalSandbox
     $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('pi', 'bash', 'git push --force', '30')
 
@@ -503,28 +567,68 @@ Describe 'harness-approval.ps1 Windows twin' {
     @(Get-ChildItem -LiteralPath $stateDir -Recurse -Filter '*.json' -File).Count | Should -Be 0
     @(Get-ChildItem -LiteralPath $stateDir -Recurse -Filter '*.tmp' -File).Count | Should -Be 0
 
-    $auditLog = Join-Path -Path (Join-Path -Path $script:approvalSandbox.LocalApp -ChildPath 'nucleus\log') -ChildPath 'harness-bridge.log'
+    $auditLog = Join-Path -Path $script:approvalSandbox.Logs -ChildPath 'harness.log'
     Test-Path -LiteralPath $auditLog | Should -Be $true
-    (Get-Content -LiteralPath $auditLog -Raw -Encoding UTF8) | Should -Match "pi`tbash`tallow"
+    $events = @(Get-Content -LiteralPath $auditLog -Encoding UTF8 | ForEach-Object { $_ | ConvertFrom-Json })
+    $approvals = @($events | Where-Object { $_.kind -eq 'approval' })
+    $approvals.Count | Should -Be 1
+    $approvals[0].harness | Should -Be 'pi'
+    $approvals[0].decision | Should -Be 'allow'
+    $approvals[0].source | Should -Be 'hermes'
+    $approvals[0].summary | Should -Be 'bash: git push --force'
+    # The id is the request id, which is what /harness approve answered and what a
+    # review label attaches to.
+    $approvals[0].id | Should -Be (Split-Path -Path $requestPath -LeafBase)
   }
 
-  It 'answers Cursor hook mode with a Cursor permission document when nobody answers' {
-    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ enable = $true; 'timeout-seconds' = 2 } }
-    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'cursor') -Stdin '{"command":"rm -rf build"}'
+  It 'publishes a request for an empty summary instead of failing open' {
+    # The runner passes whatever text the hook payload carried, which can be
+    # empty; binding used to throw on that, so the gate fell open without ever
+    # publishing a request anyone could answer.
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ sources = @('hermes'); 'timeout-seconds' = @{ 'hermes' = 30 } } }
+    $stateDir = Get-BridgeStateDir -Sandbox $script:approvalSandbox
+    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('-Harness', 'pi', '-Tool', 'hook', '-Summary', '', '-TimeoutSeconds', '30')
+
+    $requestPath = $null
+    $deadline = [DateTime]::UtcNow.AddSeconds(20)
+    while ($null -eq $requestPath -and [DateTime]::UtcNow -lt $deadline) {
+      $candidate = Get-ChildItem -LiteralPath (Join-Path -Path $stateDir -ChildPath 'requests') -Filter '*.json' -File -ErrorAction SilentlyContinue | Select-Object -First 1  # check-suppress:suppression_doc: absence means the request is not written yet; polling continues
+      if ($null -ne $candidate) { $requestPath = $candidate.FullName }
+      elseif (-not $started.Process.HasExited) { Start-Sleep -Milliseconds 200 }
+      else { break }
+    }
+
+    $requestPath | Should -Not -BeNullOrEmpty
+    $responsePath = Join-Path -Path (Join-Path -Path $stateDir -ChildPath 'responses') -ChildPath (Split-Path -Path $requestPath -Leaf)
+    [System.IO.File]::WriteAllText($responsePath, '{"decision":"allow","decided_by":"test"}', [System.Text.UTF8Encoding]::new($false))
+
+    $result = Wait-TwinProcess -Started $started
+    $result.ExitCode | Should -Be 0
+    $result.Stdout | Should -Be 'allow'
+  }
+
+  It 'stops the hermes source at its per-source timeout and answers ask' {
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ sources = @('hermes'); 'timeout-seconds' = @{ 'hermes' = 2 } } }
+    $stubLogBefore = @(Get-HermesStubLog -Sandbox $script:approvalSandbox).Count
+
+    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('cursor', 'beforeShellExecution', 'rm -rf build')
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
     $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
     $document['permission'] | Should -Be 'ask'
 
-    $log = Get-HermesStubLog -Sandbox $script:approvalSandbox
+    $stateDir = Get-BridgeStateDir -Sandbox $script:approvalSandbox
+    @(Get-ChildItem -LiteralPath $stateDir -Recurse -Filter '*.json' -File).Count | Should -Be 0
+
+    $log = @(Get-HermesStubLog -Sandbox $script:approvalSandbox) | Select-Object -Skip $stubLogBefore
     @($log | Where-Object { $_.Contains('--subject [cursor] approval needed') }).Count | Should -BeGreaterThan 0
-    @($log | Where-Object { $_.Contains('hook: rm -rf build') }).Count | Should -BeGreaterThan 0
+    @($log | Where-Object { $_.Contains('beforeShellExecution: rm -rf build') }).Count | Should -BeGreaterThan 0
   }
 
-  It 'answers Copilot hook mode with a PreToolUse decision document' {
-    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ enable = $true; 'timeout-seconds' = 2 } }
-    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'copilot') -Stdin '{"tool_name":"runInTerminal","tool_input":{"command":"rm -rf /"}}'
+  It 'renders the Copilot PreToolUse decision document' {
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ sources = @('hermes'); 'timeout-seconds' = @{ 'hermes' = 2 } } }
+    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('copilot', 'runInTerminal', 'rm -rf /')
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
@@ -534,50 +638,85 @@ Describe 'harness-approval.ps1 Windows twin' {
     $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Be 'nucleus harness-approval'
   }
 
-  It 'renders the plain decision for harnesses without a document shape' {
-    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ enable = $true; 'timeout-seconds' = 2 } }
-    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'opencode') -Stdin '{"title":"run bash"}'
+  It 'prints the decision word alone for a caller that renders its own document' {
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ sources = @('hermes'); 'timeout-seconds' = @{ 'hermes' = 2 } } }
+    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('-Plain', 'copilot', 'runInTerminal', 'rm -rf /')
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
     $result.Stdout | Should -Be 'ask'
   }
 
-  It 'answers ask at once when the remote gate is disabled' {
-    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ enable = $false } }
+  It 'answers ask at once when the source list is empty' {
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ sources = @(); 'timeout-seconds' = @{ 'hermes' = 30 } } }
     $stubLogBefore = @(Get-HermesStubLog -Sandbox $script:approvalSandbox).Count
-
-    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'copilot') -Stdin '{"tool_name":"runInTerminal","tool_input":{"command":"rm -rf /"}}'
-    $result = Wait-TwinProcess -Started $started
-
-    $result.ExitCode | Should -Be 0
-    $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
-    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'ask'
-    @(Get-HermesStubLog -Sandbox $script:approvalSandbox).Count | Should -Be $stubLogBefore
-
     $stateDir = Get-BridgeStateDir -Sandbox $script:approvalSandbox
-    if (Test-Path -LiteralPath $stateDir) {
-      @(Get-ChildItem -LiteralPath $stateDir -Recurse -Filter '*.json' -File).Count | Should -Be 0
-    }
-  }
+    $requestsBefore = 0
+    if (Test-Path -LiteralPath $stateDir) { $requestsBefore = @(Get-ChildItem -LiteralPath $stateDir -Recurse -Filter '*.json' -File).Count }
 
-  It 'leaves the gate off when the config names no approval section' {
-    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') } }
     $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('pi', 'bash', 'git push --force', '30')
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
     $result.Stdout | Should -Be 'ask'
+    @(Get-HermesStubLog -Sandbox $script:approvalSandbox).Count | Should -Be $stubLogBefore
+    if (Test-Path -LiteralPath $stateDir) {
+      @(Get-ChildItem -LiteralPath $stateDir -Recurse -Filter '*.json' -File).Count | Should -Be $requestsBefore
+    }
   }
 
-  It 'still exits 0 with a decision when the payload is malformed' {
-    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ enable = $true; 'timeout-seconds' = 2 } }
-    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('hook', 'cursor') -Stdin 'not json at all'
+  It 'asks when the source list is not a list' {
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') }; 'harness-approval' = @{ sources = 'prompt' } }
+    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('pi', 'bash', 'git push --force', '30')
     $result = Wait-TwinProcess -Started $started
 
     $result.ExitCode | Should -Be 0
-    $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
-    $document['permission'] | Should -Be 'ask'
+    $result.Stdout | Should -Be 'ask'
+    $result.Stderr | Should -Match 'must be a list of source names'
+  }
+
+  It 'defaults to the prompt source and asks when no console can answer' {
+    # A section without a source list takes the shipped default, and a host whose
+    # hook has no console must answer ask instead of reading its own silence as a
+    # denial. The one-second wait keeps the case bounded on a host that has one.
+    Set-SandboxConfig -Sandbox $script:approvalSandbox -Config @{ 'harness-notify' = @{ enable = $true; channels = @('telegram') } }
+    $started = Invoke-TwinProcess -Sandbox $script:approvalSandbox -ScriptPath $script:approvalScript -Arguments @('pi', 'bash', 'git push --force', '1')
+    $result = Wait-TwinProcess -Started $started
+
+    $result.ExitCode | Should -Be 0
+    $result.Stdout | Should -Be 'ask'
+  }
+
+  It 'maps every accepted console word without executing the script body' {
+    # The vocabulary sits on the shipped default path, so a typo in either list
+    # would silently turn an operator's answer into a re-prompt. The entry point
+    # exits on every path, so the function comes out of the parsed AST rather than
+    # a dot-source: this case finishing is what proves the body never ran, since
+    # running it would print a decision and end the runspace.
+    $parseErrors = $null
+    $tokens = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($script:approvalScript, [ref]$tokens, [ref]$parseErrors)
+    @($parseErrors).Count | Should -Be 0
+    @($tokens).Count | Should -BeGreaterThan 0
+    $found = @($ast.FindAll({
+          param($node)
+          $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+          $node.Name -eq 'Get-HarnessApprovalConsoleLineAnswer'
+        }, $true))
+    $found.Count | Should -Be 1
+    . ([scriptblock]::Create($found[0].Extent.Text))
+
+    foreach ($word in @('y', 'yes', 'Y', ' a ', 'allow', 'ALLOW')) {
+      Get-HarnessApprovalConsoleLineAnswer -Line $word | Should -Be 'allow'
+    }
+    foreach ($word in @('n', 'no', 'd', 'dont', "don't", ' NO ')) {
+      Get-HarnessApprovalConsoleLineAnswer -Line $word | Should -Be 'deny'
+    }
+    # `always` promised persistence that does not exist, so it is neither accepted
+    # nor aliased.
+    foreach ($word in @('', 'maybe', 'always')) {
+      Get-HarnessApprovalConsoleLineAnswer -Line $word | Should -Be ''
+    }
   }
 }
 
@@ -669,7 +808,7 @@ Describe 'harness-drive.ps1 Windows twin' {
     if (Test-Path -LiteralPath $queueDir) { Remove-Item -LiteralPath $queueDir -Recurse -Force }
     $null = Set-SandboxQueuedPrompt -Sandbox $script:driveSandbox -Harness 'copilot' -Name '7000-aaaa.json' -Text 'first'  # check-suppress:suppression_doc: the helper returns the queue path; this test does not need it
     $null = Set-SandboxQueuedPrompt -Sandbox $script:driveSandbox -Harness 'copilot' -Name '8000-bbbb.json' -Text 'second'  # check-suppress:suppression_doc: the helper returns the queue path; this test does not need it
-    $auditLog = Join-Path -Path (Join-Path -Path $script:driveSandbox.LocalApp -ChildPath 'nucleus\log') -ChildPath 'harness-bridge.log'
+    $auditLog = Join-Path -Path $script:driveSandbox.Logs -ChildPath 'harness.log'
     if (Test-Path -LiteralPath $auditLog) { Remove-Item -LiteralPath $auditLog -Force }
 
     $started = Invoke-TwinProcess -Sandbox $script:driveSandbox -ScriptPath $script:driveScript -Arguments @('copilot')
@@ -679,7 +818,9 @@ Describe 'harness-drive.ps1 Windows twin' {
     $result.Stdout | Should -Be '{}'
     @(Get-ChildItem -LiteralPath $queueDir -Filter '*.json' -File).Count | Should -Be 0
     @(Get-HermesStubLog -Sandbox $script:driveSandbox | Where-Object { $_.Contains('--subject [copilot] finished') }).Count | Should -BeGreaterThan 0
-    (Get-Content -LiteralPath $auditLog -Raw -Encoding UTF8) | Should -Match 'dropped 2 queued prompt\(s\)'
+    $dropEvents = @(Get-Content -LiteralPath $auditLog -Encoding UTF8 | ForEach-Object { $_ | ConvertFrom-Json } |
+        Where-Object { $_.kind -eq 'notify' -and $_.summary -like '*dropped 2 queued prompt(s)*' })
+    $dropEvents.Count | Should -BeGreaterThan 0
   }
 
   It 'leaves the queue untouched when the bridge is disabled' {

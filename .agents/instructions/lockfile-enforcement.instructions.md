@@ -8,7 +8,7 @@ applyTo: "src/lockfiles/lockfile.json, src/lockfiles/lockfile.schema.json, src/s
 
 ## Lockfile format
 
-`src/lockfiles/lockfile.json` pins tool and package versions. `src/lockfiles/lockfile.schema.json` is the authoritative field list, so read it instead of trusting any table of sections. Every section is required but may be empty (`{}`). Homebrew has no native lockfile, so its pins live here and activation runs `brew bundle --force` from the nix-darwin Brewfile.
+`src/lockfiles/lockfile.json` pins tool and package versions. `src/lockfiles/lockfile.schema.json` is the authoritative field list, so read it instead of trusting any table of sections. Every section is required but may be empty (`{}`). Homebrew has no native lockfile and is not pinned per cask; taps follow the `flake.lock` revisions because `mutableTaps = false`, an `auto_updates` cask moves on its own, and the only Homebrew data in the lockfile is `suggestions.homebrew.masApps`, since App Store ids are not versions.
 
 Update with `scripts/update.sh` / `scripts/update.ps1`. Nix packages are pinned by `nix flake lock` from `src/`, not here. The `uv` updater skips `.uv[<pkg>]` entries whose value is an object, and the `bun` and `pi` updaters skip object-shaped pins the same way. The `psgallery` updater recomputes the nupkg hash for object-form entries and leaves the entry unchanged with a warning when the hash cannot be fetched.
 

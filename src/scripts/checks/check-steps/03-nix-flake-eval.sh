@@ -2,7 +2,7 @@
 # shellcheck source=../check-lib.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "nix-flake-eval" "Nix flake evaluation" run_nix_flake_eval posix any none
+register_step "nix-flake-eval" "Nix flake evaluation and managed config keys" run_nix_flake_eval posix any none
 
 run_nix_flake_eval() {
   local -n ctx="$1"
@@ -26,14 +26,21 @@ run_nix_flake_eval() {
   fi
 
   if $_ne_eval; then
+    # Each remaining nix invocation keeps its own call because three lanes are
+    # in play and a merge would drop the contract of the lane that gave up its
+    # environment or its real output. Real build: the pin exports NIX_PATH for
+    # the whole step, and the winget check needs the store path it prints for
+    # cmp. Env-present eval: `nix config show system` and the package eval must
+    # read the environment this host's nix runs with. Env-clean hermetic: the
+    # dry-run below strips NUCLEUS_REPO_ROOT and forces its own NIX_CONFIG.
     # WHY: <nixpkgs> comes from the flake-locked input, never from this
     # machine's channel; the evals below must not depend on the ambient one.
     if ! nucleus_pin_nixpkgs "$_repo_root"; then
       _ne_exit=1
     fi
 
-    # WHY: both evals write the shared SQLite eval cache; serialize them with
-    # the test steps' nix invocations (pre-push check and test may overlap).
+    # WHY: these nix calls write the shared SQLite eval cache; serialize them
+    # with the test steps' nix invocations (pre-push check and test may overlap).
     # WHY: builtins.currentSystem is unavailable under pure eval, so a probe
     # that suppressed stderr and fell back to a hardcoded aarch64-darwin
     # reported the darwin system on every host and made the eval below target
@@ -48,13 +55,32 @@ run_nix_flake_eval() {
     fi
 
     # Committed generated artifacts must equal their flake derivation.
+    # WHY: src/modules/completions/nucleus-apps.json is the cross-platform command
+    # manifest consumed on hosts without nix (Windows completion generation/checks).
+    # It is derived per system from mkNucleusApps, so freshness is checked by
+    # building this host's package and comparing it byte-for-byte.
+    local _ne_na_out
+    if _ne_na_out="$(nucleus_nix_locked nix build --no-link --print-out-paths ./src#nucleus-apps)"; then
+      if ! cmp -s "$_ne_na_out" src/modules/completions/nucleus-apps.json; then
+        error "src/modules/completions/nucleus-apps.json is stale — regenerate it from its derivation (see .agents/instructions/nucleus-apps.instructions.md)"
+        _ne_exit=1
+      else
+        say "generated nucleus app manifest matches its derivation."
+      fi
+    else
+      error "failed to build ./src#nucleus-apps for the generated-artifact check"
+      _ne_exit=1
+    fi
+
     # WHY: src/hosts/Windows/system/winget-packages.json cannot be generated on
     # Windows, so it is committed, and this is the only byte-exact (format
     # inclusive) check of it; the always-run nix-tests step compares the parsed
-    # entry set on every POSIX host instead.
+    # entry set and pins the root-key order on every POSIX host instead.
     # WHY: ./src#winget-packages builds the macOS package set, so it is an
     # aarch64-darwin derivation no other host can build. Check it only where the
     # host system matches, and say it was not checked elsewhere.
+    # It stays its own real build: cmp compares the store path this command
+    # prints, and a dry-run prints no path.
     local _ne_ga_out
     if [ "$sys" != "aarch64-darwin" ]; then
       say "winget allow-list freshness not checked: ./src#winget-packages is an aarch64-darwin derivation (host system: $sys)."
@@ -71,6 +97,10 @@ run_nix_flake_eval() {
     fi
 
     # Hermetic eval: prove Nix layer evaluates without forwarded env vars.
+    # The env-clean lane is one dry-run over both system targets: nix build
+    # takes the whole installable list in a single run (help synopsis
+    # `nix build [option...] installables...`, description "nix build builds the
+    # specified installables"), so the targets share one process instead of two.
     run_hermetic_eval "$_ctx_name" || _ne_exit=1
 
     # Nix lint (nixf-tidy)
@@ -79,7 +109,162 @@ run_nix_flake_eval() {
     say "0 Nix files in scope — nothing to evaluate."
   fi
 
+  # WHY: the keys are validated in every mode, because this reads a config file
+  # rather than the flake and a scoped run must not be able to skip it (the same
+  # always-run rule step 05 follows). The check decides its own applicability from
+  # two facts: the config is declared only on the host that deploys it, and it is
+  # judged only by the nix flavor that consumes it.
+  run_nix_conf_key_check "$_ctx_name" || _ne_exit=1
+
   return $_ne_exit
+}
+
+# nix_conf_flavor_state <host> <state-var> <probe-stderr-var>: classify the
+# applicability guard of run_nix_conf_key_check. The check and its test suite
+# call this one expression, so the suite cannot hold a second copy of the
+# decision and disagree with it. <state-var> receives one of:
+#   consumes - the host deploys the managed config and the running nix reads it
+#   skip     - the check does not apply here: the host clause, or the probe's
+#              upstream not-a-setting answer, carried in <probe-stderr-var>
+#   broken   - the probe failed for any other reason, carried in
+#              <probe-stderr-var>; the caller must report an error, never skip
+# <probe-stderr-var> is empty on the consumes and host-clause paths.
+# WHY: only macOS deploys the file, and the deployed path does not tell the
+# flavors apart because the CI installer writes that path too. Upstream Nix does
+# not know settings the file declares (eval-cores, lazy-trees), so judging the
+# keys under it would report a working file as broken; asking for one of those
+# settings tells the two flavors apart without parsing a version string.
+# WHY: both accepted upstream answers put the quoted probe name directly after
+# the phrase, so the match pins that adjacency. The runner's nix.conf carries
+# settings this nix does not know and warns about them on every run
+# (`.github/workflows/ci.yml:82`), so unrelated warning text must not classify a
+# broken probe as upstream and switch the check off.
+nix_conf_flavor_state() { # <host> <state-var> <probe-stderr-var>
+  local _ncfs_host="$1"
+  local -n _ncfs_state="$2" _ncfs_err="$3"
+  _ncfs_err=""
+  if ! nucleus_flag_for_host "$_ncfs_host" darwin; then
+    _ncfs_state=skip
+    return 0
+  fi
+  if _ncfs_err="$(nucleus_nix_locked nix config show lazy-trees 2>&1 >/dev/null)"; then
+    _ncfs_state=consumes
+    _ncfs_err=""
+    return 0
+  fi
+  case "$_ncfs_err" in
+  *"could not find setting 'lazy-trees'"* | *"unknown setting 'lazy-trees'") _ncfs_state=skip ;;
+  *) _ncfs_state=broken ;;
+  esac
+  return 0
+}
+
+# run_nix_conf_key_check: every setting the managed nix.conf declares must be a
+# setting this nix reads. Nix only warns about an unknown name in a config file,
+# so a key that is not a setting never applies and nothing else reports it. The
+# check applies where both hold: the host's platform deploys the file (nix.enable
+# = false, which is macOS under Determinate Nix) and the running nix is the
+# Determinate flavor that consumes it. A host missing either is skipped rather
+# than judged. A probe that fails for any other reason fails the check instead,
+# because a nix too broken to answer says nothing about applicability.
+run_nix_conf_key_check() {
+  local -n ctx="$1"
+  local _nc_repo_root="${ctx[REPO_ROOT]}"
+  local _nc_host _nc_rel _nc_file
+  _nc_host="$(resolve_nucleus_host)"
+  _nc_rel="src/modules/configs/nix/nix.custom.$_nc_host.conf"
+  _nc_file="$_nc_repo_root/$_nc_rel"
+  local _nc_state _nc_probe_err _nc_reports=""
+  nix_conf_flavor_state "$_nc_host" _nc_state _nc_probe_err
+  case "$_nc_state" in
+  consumes) ;;
+  skip)
+    if [ -n "$_nc_probe_err" ]; then
+      _nc_reports=", and this nix reports: $_nc_probe_err"
+    fi
+    say "no managed nix config judged on $_nc_host: keys are judged only under the Determinate Nix that consumes the file$_nc_reports"
+    return 0
+    ;;
+  broken)
+    # WHY: only the upstream not-a-setting answer may skip; any other failure
+    # means nix could not answer at all, so skipping would switch the check off
+    # exactly where the daemon's settings are in doubt.
+    error "$_nc_rel: nix could not report whether it knows the managed settings: [$_nc_probe_err]"
+    return 1
+    ;;
+  esac
+  local -a _nc_keys=()
+  local _nc_line _nc_trim _nc_key _nc_err _nc_name _nc_declared _nc_setting
+  local _nc_unknown=0
+
+  # WHY: a missing managed config is a defect in the tree, never a reason to
+  # pass quietly; the file is the only statement of the daemon's settings.
+  if [ ! -f "$_nc_file" ]; then
+    error "$_nc_rel: managed nix config not found"
+    return 1
+  fi
+
+  while IFS= read -r _nc_line || [ -n "$_nc_line" ]; do
+    # Strip leading whitespace, then ignore comments (prose and commented-out
+    # settings alike) and anything that is not a setting-name line.
+    _nc_trim="${_nc_line#"${_nc_line%%[![:space:]]*}"}"
+    case "$_nc_trim" in
+    '' | '#'*) continue ;;
+    *=*) ;;
+    *) continue ;;
+    esac
+    _nc_key="${_nc_trim%%=*}"
+    _nc_key="${_nc_key%"${_nc_key##*[![:space:]]}"}"
+    case "$_nc_key" in
+    '' | *[!A-Za-z0-9_-]*) continue ;;
+    esac
+    _nc_keys+=("$_nc_key")
+  done <"$_nc_file"
+
+  # WHY: one parse of the whole file, so nix judges exactly what the daemon
+  # reads: the setting names, the `extra-` append aliases it resolves itself, and
+  # the values. An unknown name warns on stderr and still exits 0, so stderr is
+  # the only signal for it; a bad value or a syntax error exits non-zero.
+  # WHY: every nix call in this step takes the lock, so one serialization rule
+  # governs them all. The lock guards the shared SQLite eval cache, which this
+  # parse never reads; waiting behind an unrelated flake eval is the accepted
+  # cost of that uniformity.
+  if ! _nc_err="$(NIX_CONFIG="$(cat "$_nc_file")" nucleus_nix_locked nix config show max-jobs 2>&1 >/dev/null)"; then
+    error "$_nc_rel: nix rejected the managed config: $_nc_err"
+    return 1
+  fi
+  # WHY: nix warns about an unknown name in every config source it reads, not only
+  # the NIX_CONFIG this file is parsed as. CI's installer writes its own settings
+  # into the runner's nix.conf, so a name this file never declares reaches this
+  # stderr without the file being at fault; only a declared name is a defect here.
+  while IFS= read -r _nc_line; do
+    case "$_nc_line" in
+    *"unknown setting"*) ;;
+    *) continue ;;
+    esac
+    _nc_name="${_nc_line##*unknown setting }"
+    _nc_name="${_nc_name#\'}"
+    _nc_name="${_nc_name%%\'*}"
+    _nc_declared=false
+    for _nc_setting in "${_nc_keys[@]}"; do
+      if [ "$_nc_setting" = "$_nc_name" ]; then
+        _nc_declared=true
+        break
+      fi
+    done
+    if $_nc_declared; then
+      _nc_unknown=1
+      error "$_nc_rel: $_nc_line"
+    else
+      say "unattributed warning from outside the managed config: $_nc_line"
+    fi
+  done <<<"$_nc_err"
+  if [ "$_nc_unknown" -ne 0 ]; then
+    return 1
+  fi
+
+  say "managed nix config keys passed (${#_nc_keys[@]} keys)."
+  return 0
 }
 
 # run_hermetic_eval: prove the Nix layer evaluates with no forwarded
@@ -101,36 +286,31 @@ run_hermetic_eval() {
   local _nix_cfg
   _nix_cfg="$(merge_nix_config)"
 
-  # Darwin must build hermetically (exit 0)
-  if ! nucleus_nix_locked env -u NUCLEUS_REPO_ROOT \
-    NIX_CONFIG="$_nix_cfg" \
-    nix build "./src#darwinConfigurations.MacBook.config.system.build.toplevel" --dry-run >/dev/null; then
-    error "darwin hermetic eval failed (expected exit 0 with no env vars and no --impure)"
-    _exit=1
-  else
-    say "darwin hermetic eval passed (no env vars, no --impure)."
-  fi
-
-  # NixOS must reach the assertion stage, not fail on impurity
-  local _nixos_out
-  _nixos_out="$(mktemp)"
+  # One env-clean dry-run carries both system targets, so exit 0 is the
+  # contract for each of them: the darwin target must build hermetically, and
+  # the nixos target must reach a clean evaluation rather than an impurity
+  # failure. When the single call is non-zero, the captured output is what
+  # still separates the failure modes: the repoRoot/getEnv pattern is the
+  # env-dependency signature, and any other text is an unexpected failure.
+  local _hermetic_out
+  _hermetic_out="$(mktemp)"
   if nucleus_nix_locked env -u NUCLEUS_REPO_ROOT \
     NIX_CONFIG="$_nix_cfg" \
-    nix build "./src#nixosConfigurations.NixOS.config.system.build.toplevel" --dry-run \
-    >"$_nixos_out" 2>&1; then
-    say "nixos hermetic eval passed (no env vars, no --impure)."
+    nix build --dry-run \
+    "./src#darwinConfigurations.MacBook.config.system.build.toplevel" \
+    "./src#nixosConfigurations.NixOS.config.system.build.toplevel" \
+    >"$_hermetic_out" 2>&1; then
+    say "darwin and nixos hermetic evals passed (no env vars, no --impure)."
   else
-    if grep -Eq "required argument 'repoRoot'|getEnv" "$_nixos_out"; then
-      error "nixos hermetic eval regressed to env-var dependency:"
-      cat "$_nixos_out" >&2
-      _exit=1
+    if grep -Eq "required argument 'repoRoot'|getEnv" "$_hermetic_out"; then
+      error "hermetic eval regressed to env-var dependency (darwin or nixos):"
     else
-      error "nixos hermetic eval failed for an unexpected reason:"
-      cat "$_nixos_out" >&2
-      _exit=1
+      error "hermetic eval failed for an unexpected reason (expected exit 0 with no env vars and no --impure):"
     fi
+    cat "$_hermetic_out" >&2
+    _exit=1
   fi
-  rm -f "$_nixos_out"
+  rm -f "$_hermetic_out"
 
   return $_exit
 }

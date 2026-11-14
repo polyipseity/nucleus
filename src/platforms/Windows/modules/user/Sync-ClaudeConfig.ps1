@@ -5,6 +5,7 @@
 .DESCRIPTION
   Deploys ~/.claude/settings.json from src/users/<user>/claude/settings.json
   using method 1 (writable symlink) on Windows.
+  Requires ConfigHelpers.ps1 (Resolve-UserConfigFile) to be loaded by the caller.
 
 .PARAMETER Enabled
   Whether Claude config deployment should be enforced.
@@ -26,12 +27,14 @@ function Sync-ClaudeConfig {
     [string]$RepoRoot,
 
     [Parameter(Mandatory)]
-    [string]$UserProfile
+    [string]$UserProfile,
+
+    [Parameter()]
+    [string]$User = [System.Environment]::UserName
   )
 
   $claudeDir = Join-Path -Path $UserProfile -ChildPath ".claude"
   $settingsPath = Join-Path -Path $claudeDir -ChildPath "settings.json"
-  $sourcePath = Join-Path -Path $RepoRoot -ChildPath "src\users\default\claude\settings.json"
 
   if (-not $Enabled) {
     if (Test-Path -LiteralPath $settingsPath) {
@@ -46,12 +49,13 @@ function Sync-ClaudeConfig {
     New-Item -ItemType Directory -Path $claudeDir -Force > $null
   }
 
-  if (Test-Path -LiteralPath $sourcePath) {
-    # Method 1: writable symlink
-    if (Test-Path -LiteralPath $settingsPath) {
-      # check-suppress:suppression_doc: settings file may not exist; idempotent cleanup.
-      Remove-Item -LiteralPath $settingsPath -Force -ErrorAction SilentlyContinue
-    }
-    New-Item -ItemType SymbolicLink -Path $settingsPath -Target $sourcePath -Force > $null
+  # The overlay resolves the per-user override first; a missing source in both
+  # overlays is a hard error, never a silent skip.
+  $sourcePath = Resolve-UserConfigFile -User $User -ConfigName 'claude' -RelativePath 'settings.json' -RepoRoot $RepoRoot
+  # Method 1: writable symlink
+  if (Test-Path -LiteralPath $settingsPath) {
+    # check-suppress:suppression_doc: settings file may not exist; idempotent cleanup.
+    Remove-Item -LiteralPath $settingsPath -Force -ErrorAction SilentlyContinue
   }
+  New-Item -ItemType SymbolicLink -Path $settingsPath -Target $sourcePath -Force > $null
 }

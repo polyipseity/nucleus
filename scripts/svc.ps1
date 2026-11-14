@@ -14,9 +14,21 @@
   The operation to perform: list, status, start, stop, restart, enable, disable,
   endpoint, logs, log-paths, log-config.
 
+  stop warns when the platform will undo it: a scheduled task stays enabled and fires
+  again at its next trigger. start warns when the service is not enabled. Pass -Disable
+  with stop, or -Enable with start, to apply the remedy in the same run.
+
 .PARAMETER ServiceName
   Service names to target. For endpoint, first is the service name and the optional second
   is the endpoint name.
+
+.PARAMETER Disable
+  With stop: disable auto-start after stopping, so the task does not fire again. Rejected
+  on any other action.
+
+.PARAMETER Enable
+  With start: enable auto-start before starting, so the service also starts at the next
+  boot. Rejected on any other action.
 
 .NOTES
   Environment variables: NUCLEUS_REPO_ROOT.
@@ -32,6 +44,12 @@ param(
   [string[]]$ServiceName = @(),
 
   [switch]$Json,
+
+  # With stop: disable auto-start after stopping.
+  [switch]$Disable,
+
+  # With start: enable auto-start before starting.
+  [switch]$Enable,
 
   [Alias("h")]
   [switch]$Help,
@@ -56,6 +74,18 @@ if ($Help) {
 # nothing must not read as success.
 if (-not $Action) {
   Write-NucleusError "missing action (list, status, start, stop, restart, enable, disable, verify, endpoint, logs, log-paths, log-config)"
+  exit 1
+}
+
+# WHY: a remedy switch on the wrong action is a mistake rather than an extra flag to
+# ignore, and rejecting it here means no elevation prompt and no service-manager call
+# happens for a run that could not perform what was asked.
+if ($Disable -and $Action -ne 'stop') {
+  Write-NucleusError "-Disable is only valid with stop"
+  exit 1
+}
+if ($Enable -and $Action -ne 'start') {
+  Write-NucleusError "-Enable is only valid with start"
   exit 1
 }
 
@@ -384,6 +414,46 @@ function Get-ServiceStatus {
       return @{ status = 'unknown'; running = $false; enabled = $false; error = "unsupported type: $type" }
     }
   }
+}
+
+function Get-ServiceActionWarning {
+  <#
+  .SYNOPSIS
+    Returns the consequence a start or stop leaves behind, or $null when there is none.
+  .DESCRIPTION
+    The caller emits the message before the action, so the consequence is known in
+    advance. stop reads services.json's type only; start needs a runtime fact, so the
+    helper reuses the read-only status probe and warns only on an explicit not-enabled
+    verdict.
+  #>
+  param(
+    [ValidateSet('start', 'stop')]
+    [string]$Action,
+    [hashtable]$HostEntry
+  )
+
+  $type = $HostEntry.type
+  # WHY: an unknown type is not this table's to explain; the action itself reports it.
+  if ($type -notin @('windows-native', 'windows-schtask')) { return $null }
+
+  # WHY: Windows rows live here rather than in svc.sh, because this is the only CLI that
+  # serves windows-native and windows-schtask entries. Only a scheduled task is re-fired
+  # after a stop: its triggers outlive the stopped instance and stopping leaves the task
+  # enabled (service-firing-policy.reference.md: Windows tasks fire on triggers; this
+  # script's enable probe reads the task's own Disabled state). A native service starts
+  # from its StartType at boot or on request, so nothing revisits a stop.
+  if ($Action -eq 'stop') {
+    if ($type -eq 'windows-schtask') {
+      return 'the scheduled task stays enabled and fires again at its next trigger; use -Disable to stop it for good'
+    }
+    return $null
+  }
+
+  # WHY: a service that is not installed has no enable state to report, and its start
+  # fails with its own error, so warning here would only add noise.
+  $status = Get-ServiceStatus -HostEntry $HostEntry
+  if ($status.status -eq 'not-found' -or $status.enabled) { return $null }
+  return 'the service is not enabled, so it will not start on its own; use -Enable to enable it'
 }
 
 function Invoke-ServiceAction {
@@ -750,6 +820,30 @@ switch ($Action) {
         continue
       }
 
+      # WHY: -Enable runs before the start, because a disabled service fails to start and a
+      # failed enable would otherwise surface as a misleading start error. -Disable runs
+      # after the stop, because the disable is what makes the stop stick.
+      if ($Action -eq 'start' -and $Enable) {
+        try {
+          if ((Invoke-ServiceAction -Action 'enable' -HostEntry $entry.hostEntry) -ne $true) {
+            Write-NucleusError "$($entry.instanceId) — action 'enable' failed"
+            $overallExit = 1
+            continue
+          }
+        } catch {
+          Write-NucleusError "$($entry.instanceId) — $($_.Exception.Message)"
+          $overallExit = 1
+          continue
+        }
+      }
+
+      # WHY: the stop warning says the stop will be undone, which -Disable makes false, so
+      # a run that already applies the remedy stays quiet.
+      if ($Action -eq 'start' -or ($Action -eq 'stop' -and -not $Disable)) {
+        $warning = Get-ServiceActionWarning -Action $Action -HostEntry $entry.hostEntry
+        if ($warning) { Write-NucleusWarning "$($entry.instanceId) — $warning" }
+      }
+
       try {
         $result = Invoke-ServiceAction -Action $Action -HostEntry $entry.hostEntry
         if ($result -ne $true) {
@@ -763,6 +857,18 @@ switch ($Action) {
       } catch {
         Write-NucleusError "$($entry.instanceId) — $($_.Exception.Message)"
         $overallExit = 1
+      }
+
+      if ($Action -eq 'stop' -and $Disable) {
+        try {
+          if ((Invoke-ServiceAction -Action 'disable' -HostEntry $entry.hostEntry) -ne $true) {
+            Write-NucleusError "$($entry.instanceId) — action 'disable' failed"
+            $overallExit = 1
+          }
+        } catch {
+          Write-NucleusError "$($entry.instanceId) — $($_.Exception.Message)"
+          $overallExit = 1
+        }
       }
     }
     if ($overallExit -ne 0) { exit $overallExit }

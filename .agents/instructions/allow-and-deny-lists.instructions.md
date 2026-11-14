@@ -39,8 +39,7 @@ A new exclusion needs a category id, tier, and `# ref:`.
 | A9 | `11-repo-policy-grep.sh` | self-file (basename) | T3 | Self-ref contains literal patterns detected | Quarterly |
 | A10 | `11-repo-policy-grep.sh` | `android-fake-wifi-guest-setup.sh`, `android-fake-wifi-guest-revert.sh` | T3 | The guest has no Nix store, so its `ip`/`modprobe`/`rmmod` cannot resolve against one. The whole file is excluded, not the token. | Quarterly |
 | A11 | `scripts/gc.sh` | `command -v` tool lookups | T3 | `scripts/` is outside the scanned `_activation_dirs`, so a lookup here is a relocation, not a stored exclusion. `duperemove-store.sh` takes the binary as `$_duperemove_bin="$1"`, which is the `_X_bin="$1"` contract. A NixOS-only package cannot be added to the `gcWeekly` wrapper's `runtimeInputs` without splitting it. | Quarterly |
-| A12 | `11-repo-policy-grep.sh` | patterns `repo-policy-.*\.(sh\|ps1)`, `repository-policy.*\.(sh\|ps1)`, `1[123]-repo-policy-.*\.sh` (stored list, not filenames) | T3 | The package-manager scan bans bare `pip`/`npm` install and the step files carry that literal in their own patterns and error strings. The list is a superset of what exists: the first matches nothing, the second matches `repository-policy-awk-tests.sh`, the third the six step files plus their tests. Excluded by basename and glob in the whole-repo branch; `$pmeExcludeNames` in the twin | Quarterly |
-| A13 | `11-repo-policy-grep.sh` | `configure-gpg-agent.sh` | T3 | Part of the store-path-arg `_exclude_pattern` in `run_store_path_arg_usage`: its `_*_bin` variables are config parameters, not commands. The self-file basenames in the same pattern are A9; the android guest scripts are A10, excluded by a separate list in `run_activation_tool_resolution` | Quarterly |
+| A12 | `11-repo-policy-grep.sh`, `11-repo-policy-grep.ps1` | the repo-policy `.ps1` step leaves in both twins' PowerShell scans; this step's own `.sh` leaf in the shell and Nix scans | T3 | The suppression audit searches for literal suppression-pattern text the step files carry in their own scan definitions. The PowerShell twin keeps two lists: the three `.ps1` step leaves for its PowerShell scans, matching the POSIX twin's ps1 exclusion, and only this step's own `.sh` leaf for its shell and Nix scans, because the sibling leaves' `|| true` occurrences are all `suppression_doc`-annotated, which the audit accepts, and the POSIX twin already scans them | Quarterly |
 | A14 | `12-repo-policy-pattern.sh`, `.ps1` | `.envrc` | T3 | The scan walks the whole working tree for this filename because `.envrc` is gitignored and a tracked-file list cannot see it. A repo-local `.envrc` would inject a devShell env into shells at `cd`, the stale GC'd-env failure mode the direnv ban exists to prevent | Quarterly |
 
 ### Category B: directory-based
@@ -53,7 +52,6 @@ A new exclusion needs a category id, tier, and `# ref:`.
 | B6 | `12-repo-policy-pattern.sh`, `.ps1`, `13-repo-policy-data.sh`, `.ps1` | `vendor/` | T3 | Supplemented by Select-GitIgnored | Quarterly |
 | B7 | `step-runner.sh`, `.ps1` | `vendor/` | T3 | Supplemented by filter_gitignored/Select-GitIgnored | Quarterly |
 | B8 | `cleanup-nix-build-artifacts.sh` | `vendor/` | T3 | Structural | Quarterly |
-| B9 | `11-repo-policy-grep.sh`, `.ps1` | `tests/` in the srt wrapper scan only | T3 | Scoped mode receives whatever file the caller passes, so the hook would scan test files the whole-repo branch never reads. The suite proving the rule has to carry a violating example, and a fixture string is not a shipped wrapper | Quarterly |
 
 ### Category C: content pattern (grep -v)
 
@@ -73,6 +71,8 @@ A new exclusion needs a category id, tier, and `# ref:`.
 | D4 | `tests/modules/posix-module-imports-tests.nix` | `hostScopedModules`: `security.nix` | T2 | `security.sudo` is NixOS-only, so the macOS-shared `posix/` aggregator cannot carry `security.nix`; the NixOS host imports it directly | Error if stale (`nix-tests`) |
 | D5 | `tests/platforms/Windows/modules/gc-parity.Tests.ps1` | `$DestructiveCommands` | T2 | A command absent from the list is silently skipped by the dry-run guard walk, so renaming a helper in `scripts/gc.ps1` disarms the coverage check instead of failing it | Error if stale (`has no stale entry in the destructive-command list`) |
 | D6 | `tests/platforms/Windows/modules/gc-parity.Tests.ps1` | `$PosixOnlyCapabilities` | T2 | The list must name exactly the switches `gc.ps1` documents as POSIX-only | Error if stale (`documents exactly the POSIX-only capabilities as accepted and ignored`) |
+| D7 | `tests/modules/package-lists-tests.nix` | `wingetPinExceptions` | T3 | Ids the microsoft/winget-pkgs repository does not carry: msstore ids by design, plus any registry id with no manifest, each warned by the updater every run; verify msstore ids on Windows with `winget show <id> --source msstore` | Quarterly |
+| D8 | `tests/modules/package-lists-tests.nix` | `wingetDscExceptions`: `Valve.SteamCMD` | T2 | The WinGet SteamCMD package installs outside the `steamcmd_install_path` RimSort reads, so `Invoke-SteamCMDSetup.ps1` provisions the binary from Valve's CDN instead of a DSC resource (POSIX twin: `src/scripts/configs/provision-steamcmd.sh`) | Error if stale (`stale WinGet DSC exceptions`) |
 
 ### Category E: upstream workarounds
 

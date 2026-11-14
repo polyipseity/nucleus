@@ -566,6 +566,136 @@ function Test-FailFastReport-ReplaysFailedStep {
     }
 }
 
+# The pipeline appends a failure as its runspace completes, so two failures can
+# land in completion order: a later-launched step that fails first must still be
+# reported after an earlier-launched step that fails later. The contract is
+# launch order (step-runner.instructions.md, Dispatch). Driving
+# Invoke-StepPipeline in-process cannot assert this, because a fail-fast abort
+# exits the host process; the child process carries the exit code and output.
+function Test-PipelineFailFastReportsLaunchOrder {
+    $driver = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-order-$([System.IO.Path]::GetRandomFileName()).ps1"
+    # WHY a fixture working dir: the child's Invoke-StepPipeline walks the file
+    #   list from the current directory and these steps never read it, so a
+    #   skeleton with src/ keeps the walk off the real checkout.
+    $walkDir = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-walk-$([System.IO.Path]::GetRandomFileName())"
+    $null = New-Item -ItemType Directory -Path (Join-Path $walkDir 'src/scripts') -Force
+    $driverText = @'
+param([string]$RepoRoot, [string]$WalkDir)
+$ErrorActionPreference = 'Stop'
+Set-Location $WalkDir
+$FrameworkDir = Join-Path $RepoRoot 'src/scripts/lib'
+. (Join-Path $FrameworkDir 'step-runner.ps1')
+function Write-Message { Write-Output "msg: $args" }
+function Write-ErrorMessage { Write-Output "err: $args" }
+Read-Argument -Arguments @()
+$script:FAIL_FAST = $true
+$env:PARALLEL_JOBS = '2'
+Register-Step -Id 'slow-fail' -Number 1 -Name 'Slow-fail step' -Action { param($Context) Start-Sleep -Milliseconds 3000; 'SLOW-FAIL-REASON'; $false }
+Register-Step -Id 'fast-fail' -Number 2 -Name 'Fast-fail step' -Action { param($Context) Start-Sleep -Milliseconds 300; 'FAST-FAIL-REASON'; $false }
+Invoke-StepPipeline
+'@
+    Set-Content -LiteralPath $driver -Value $driverText -Encoding utf8
+    try {
+        $pwshExe = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
+        $out = & $pwshExe -NoLogo -NoProfile -NonInteractive -File $driver -RepoRoot $repoRoot -WalkDir $walkDir 2>&1 | Out-String
+        $code = $LASTEXITCODE
+        # Launch order is 1 then 2; step 2 fails first (300 ms) while step 1 is
+        # still failing at 3000 ms, so a completion-ordered report prints 2 1.
+        $rightOrder = $out -match 'some checks failed: steps 1 2 '
+        $wrongOrder = $out -match 'some checks failed: steps 2 1'
+        $bothReplayed = $out -match 'SLOW-FAIL-REASON' -and $out -match 'FAST-FAIL-REASON'
+        if ($code -eq 1 -and $rightOrder -and -not $wrongOrder -and $bothReplayed) {
+            Assert-Pass "fail-fast report lists staggered failures in launch order"
+        } else {
+            Assert-Fail "pipeline fail-fast launch order" "exit=$code rightOrder=$rightOrder wrongOrder=$wrongOrder bothReplayed=$bothReplayed output=[$out]"
+        }
+    } finally {
+        Remove-Item -LiteralPath $driver -Force
+        Remove-Item -LiteralPath $walkDir -Recurse -Force
+    }
+}
+
+# A runspace that throws cannot be provoked from step content: the step block runs
+# inside the runspace's own try/catch, so a throw from an action becomes an
+# ordinary failed step. What the drain's catch handles is the whole pipeline
+# failing, and the seam a test can reach is StepLibPath: Invoke-StepPipeline
+# dot-sources it synchronously and then again at the head of the async pipeline, so
+# a lib that throws on its second load kills the runspace before the step body
+# runs. Both cases below drive Invoke-StepPipeline, so each half of the fix is
+# guarded on its own: deleting the recording reddens the report case, deleting the
+# tail skip reddens the finished-line case.
+function Invoke-RunspaceFailureRun {
+    param([Parameter(Mandatory)][string]$RepoRoot)
+
+    # The derived FrameworkDir is <LibPath>/../../lib, so the skeleton mirrors the
+    # repo layout without touching the checkout. It is also the child's working
+    # dir: Invoke-StepPipeline walks the file list from the current directory,
+    # and these steps never read it, so the walk stays inside the fixture.
+    $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-runspace-failure-$([System.IO.Path]::GetRandomFileName())"
+    $null = New-Item -ItemType Directory -Path (Join-Path $tempDir 'src/scripts/lib') -Force
+    $null = New-Item -ItemType Directory -Path (Join-Path $tempDir 'src/scripts/checks') -Force
+    Set-Content -LiteralPath (Join-Path $tempDir 'src/scripts/lib/deny-list.ps1') -Value '# stub: the setup dot-sources the lib from the derived FrameworkDir'
+    $marker = Join-Path $tempDir 'second-load.marker'
+    Set-Content -LiteralPath (Join-Path $tempDir 'src/scripts/checks/failing-lib.ps1') -Value @(
+        "if (Test-Path -LiteralPath '$marker') { throw 'RUNSPACE-BOOM' }",
+        "New-Item -ItemType File -Path '$marker' -Force > `$null"
+    )
+
+    $driver = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-step-runner-runspace-$([System.IO.Path]::GetRandomFileName()).ps1"
+    $driverText = @'
+param([string]$RepoRoot, [string]$LibPath, [string]$WalkDir)
+$ErrorActionPreference = 'Stop'
+Set-Location $WalkDir
+$FrameworkDir = Join-Path $RepoRoot 'src/scripts/lib'
+. (Join-Path $FrameworkDir 'step-runner.ps1')
+function Write-Message { Write-Output "msg: $args" }
+function Write-ErrorMessage { Write-Output "err: $args" }
+Read-Argument -Arguments @()
+$script:FAIL_FAST = $false
+$script:StepLibPath = $LibPath
+$env:PARALLEL_JOBS = '1'
+Register-Step -Id 'broken' -Number 1 -Name 'Broken step' -Action { $true }
+Invoke-StepPipeline
+Format-StepSummary
+'@
+    Set-Content -LiteralPath $driver -Value $driverText -Encoding utf8
+    try {
+        $pwshExe = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
+        $out = & $pwshExe -NoLogo -NoProfile -NonInteractive -File $driver -RepoRoot $RepoRoot -LibPath (Join-Path $tempDir 'src/scripts/checks/failing-lib.ps1') -WalkDir $tempDir 2>&1 | Out-String
+        return @{ Out = $out; Code = $LASTEXITCODE }
+    } finally {
+        Remove-Item -LiteralPath $driver -Force
+        Remove-Item -LiteralPath $tempDir -Recurse -Force
+    }
+}
+
+# The recording half: without it the step still renders as failed (a missing exit
+# file defaults to 1) but with no reason, so the run never says what broke.
+function Test-PipelineRecordsRunspaceFailure {
+    $run = Invoke-RunspaceFailureRun -RepoRoot $repoRoot
+    $reported = $run.Out -match 'step runspace failed: ' -and $run.Out -match 'RUNSPACE-BOOM'
+    $failed = $run.Out -match 'some checks failed: steps 1'
+    $green = $run.Out -match 'all checks passed'
+    if ($run.Code -eq 1 -and $reported -and $failed -and -not $green) {
+        Assert-Pass "a runspace that throws is reported as a failed step with its reason"
+    } else {
+        Assert-Fail "runspace failure report" "exit=$($run.Code) reported=$reported failed=$failed green=$green output=[$($run.Out)]"
+    }
+}
+
+# The tail half: the pipeline prints "step N finished" for every spawned number, and
+# a runspace that died before writing its exit file never finished.
+function Test-PipelineDoesNotReportRunspaceFailureAsFinished {
+    $run = Invoke-RunspaceFailureRun -RepoRoot $repoRoot
+    $failed = $run.Out -match 'some checks failed: steps 1'
+    $finished = $run.Out -match 'step\s+1 finished'
+    if ($run.Code -eq 1 -and $failed -and -not $finished) {
+        Assert-Pass "a runspace that throws is not reported as finished"
+    } else {
+        Assert-Fail "runspace failure finished line" "exit=$($run.Code) failed=$failed finished=$finished output=[$($run.Out)]"
+    }
+}
+
 # ---- Run tests ----
 Write-Output "`n=== Step-runner framework unit tests (PS1) ==="
 Write-Output "Registration arity, token validation, applicability matrix, --only-steps."
@@ -598,6 +728,9 @@ Test-OnlySteps-Dedup
 Test-OnlySteps-LastValueWin
 Test-OnlySteps-UnknownIdError
 Test-FailFastReport-ReplaysFailedStep
+Test-PipelineFailFastReportsLaunchOrder
+Test-PipelineRecordsRunspaceFailure
+Test-PipelineDoesNotReportRunspaceFailureAsFinished
 
 function Test-SaveFileListCache-NoPathBeyondSymlink {
     . $stepRunner

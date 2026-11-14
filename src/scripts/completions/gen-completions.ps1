@@ -51,20 +51,20 @@ if (-not (Test-Path -Path $profilePath -PathType Leaf)) {
 # Command inventory and authoritative flag map
 
 function Get-NucleusCommandList {
-  return @(
-    'ai',
-    'apply',
-    'bootstrap',
-    'check',
-    'cloud',
-    'config',
-    'gc',
-    'svc',
-    'test',
-    'update',
-    'utils',
-    'vm'
-  )
+  $manifestPath = Join-Path $repoRoot 'src\modules\completions\nucleus-apps.json'
+  if (-not (Test-Path -Path $manifestPath -PathType Leaf)) {
+    Write-NucleusError "nucleus command manifest not found at $manifestPath"
+    exit 1
+  }
+  $manifest = Get-Content -Raw -Path $manifestPath | ConvertFrom-Json
+  # WHY: camilladsp-heartbeat has no Windows app surface, so PowerShell completers
+  # and flag inventories cover the remaining commands only.
+  $names = @($manifest.commands | Where-Object { $_ -and $_ -ne 'camilladsp-heartbeat' })
+  if ($names.Count -eq 0) {
+    Write-NucleusError "nucleus command manifest at $manifestPath contains no commands"
+    exit 1
+  }
+  return $names
 }
 
 function Get-NucleusFlagMap {
@@ -76,6 +76,7 @@ function Get-NucleusFlagMap {
     'cloud' = @('--apply', '--help', '--no-apply')
     'config' = @('--help')
     'gc' = @('--dry-run', '--duperemove-gc', '--expiry', '--generations-keep', '--git-cache-gc', '--help', '--hm-expiry', '--hm-gc', '--hm-generations-keep', '--journald-gc', '--log-compress', '--log-gc', '--log-max-files', '--log-max-size', '--nix-artifacts-gc', '--nix-expiry', '--nix-gc', '--no-dry-run', '--no-duperemove-gc', '--no-git-cache-gc', '--no-hm-gc', '--no-journald-gc', '--no-log-gc', '--no-nix-artifacts-gc', '--no-nix-gc', '--no-ollama-gc', '--no-sccache-gc', '--no-system-gc', '--no-tool-cache-gc', '--no-vm-data-gc', '--no-vm-gc', '--no-wallpaper-gc', '--ollama-gc', '--sccache-gc', '--system-gc', '--system-generations-keep', '--tool-cache-gc', '--vm-data-gc', '--vm-gc', '--wallpaper-gc')
+    'logs' = @('--compress', '--dry-run', '--expiry', '--harness', '--help', '--json', '--kind', '--lines', '--log', '--max-files', '--max-size', '--note', '--scope', '--since')
     'svc' = @('--help', '--json', '--system', '--user', '--verbose')
     'test' = @('-q', '--fail-fast', '--help', '--no-fail-fast', '--only-steps', '--quiet')
     'update' = @('--flake', '--help', '--list-sections', '--no-flake', '--no-sops', '--sections', '--sops', '--verify', '--verify-installed')

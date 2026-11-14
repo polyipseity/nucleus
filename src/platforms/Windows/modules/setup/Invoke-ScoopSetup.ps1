@@ -8,12 +8,12 @@ function Invoke-ScoopSetup {
     Idempotently converges the declarative Scoop app set (install + prune).
 
   .DESCRIPTION
-    Register the 'extras' and 'main' buckets, then reconcile the apps directory
-    against the desired list, removing what is not declared and installing what
-    is missing at the lockfile version.
+    Register the 'extras', 'main', and 'fonts' buckets, then reconcile the apps
+    directory against the desired list, removing what is not declared and
+    installing what is missing at the lockfile version.
 
-    Runs after the WinGet DSC step that installs Scoop.Scoop, because the shims
-    directory is not on PATH in the parent session until prepended.
+    Runs after the ScoopInstall DSC bootstrap, because the shims directory is
+    not on PATH in the parent session until prepended.
 
     The desired set and per-app rationale live in
     src/modules/packages/desired.json (scoop -> <host>). Custom bucket
@@ -49,7 +49,7 @@ function Invoke-ScoopSetup {
     return
   }
   $desiredPackages = @($hostDesired | ForEach-Object {
-    @{ name = $_.name; bucket = $_.bucket }
+    @{ name = $_.name; bucket = $_.bucket; noShim = $_.noShim }
   })
   $desiredNames = @($desiredPackages | ForEach-Object { $_.name })
 
@@ -58,7 +58,7 @@ function Invoke-ScoopSetup {
   Add-NucleusPathEntry -Path (Get-NucleusScoopShimsDir)
 
   if (-not (Test-Path (Join-Path (Get-NucleusScoopShimsDir) "scoop.cmd"))) {
-    Write-NucleusError -CommandName 'Invoke-ScoopSetup' "scoop not found at '$(Get-NucleusScoopShimsDir)\scoop.cmd'; ensure Scoop.Scoop was installed by WinGet DSC before calling this function"
+    Write-NucleusError -CommandName 'Invoke-ScoopSetup' "scoop not found at '$(Get-NucleusScoopShimsDir)\scoop.cmd'; ensure the ScoopInstall DSC bootstrap ran before calling this function"
     return
   }
 
@@ -66,15 +66,30 @@ function Invoke-ScoopSetup {
   # 'extras' hosts qemu.
   foreach ($bucket in @('extras', 'main')) {
     # 'scoop bucket list' exits non-zero when nothing is registered yet, and
-    # the -notmatch guard below is the real check.
+    # the -match guard below is the real check. WHY the positive form: on an
+    # array, -notmatch returns the lines that do not match, so it is true for
+    # almost any output.
     $existing = scoop bucket list 2>&1
-    if ($existing -notmatch "(?m)^$bucket\b") {
+    if (-not ($existing -match "(?m)^$bucket\b")) {
       Write-NucleusInfo -CommandName 'scoop' "adding bucket '$bucket'"
       scoop bucket add $bucket
       if ($LASTEXITCODE -ne 0) {
         Write-NucleusError -CommandName 'scoop' "failed to add bucket '$bucket' (exit $LASTEXITCODE)"
         return
       }
+    }
+  }
+
+  # The fonts bucket is a git bucket outside Scoop's known list, so the URL is
+  # explicit; Scoop still verifies each manifest's own file hashes at install.
+  $fontsBucketUrl = 'https://github.com/KnotUntied/scoop-fonts.git'
+  $existing = scoop bucket list 2>&1
+  if (-not ($existing -match '(?m)^fonts\b')) {
+    Write-NucleusInfo -CommandName 'scoop' "adding bucket 'fonts'"
+    scoop bucket add fonts $fontsBucketUrl
+    if ($LASTEXITCODE -ne 0) {
+      Write-NucleusError -CommandName 'scoop' "failed to add bucket 'fonts' (exit $LASTEXITCODE)"
+      return
     }
   }
 
@@ -151,7 +166,7 @@ function Invoke-ScoopSetup {
       Write-NucleusError -CommandName 'scoop' "'scoop install $installSpec' failed (exit $LASTEXITCODE)"
       return
     }
-    if (-not (Test-ScoopShim -PackageName $pkgName)) {
+    if (-not $entry.noShim -and -not (Test-ScoopShim -PackageName $pkgName)) {
       Write-NucleusError -CommandName 'scoop' "'$pkgName' installed but no shim found under '$(Get-NucleusScoopShimsDir)'"
       return
     }

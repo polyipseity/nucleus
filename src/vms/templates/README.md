@@ -39,8 +39,10 @@ __VM_DIR_DISPLAY__/
 │   └── <id>.qcow2.vm-provision-sha256 : provision fingerprint for runtime disk
 ├── <id>.vm.json                       : self-describing VM descriptor (all manifest guests)
 ├── scripts/                           : generated helper scripts
-│   ├── start-<id>.sh / .ps1           : start helper variants (all manifest guests, enabled or not)
-│   ├── stop-<id>.sh / .ps1            : stop helper variants
+│   ├── start-<id>.ps1                 : start helper, every manifest guest (enabled or not)
+│   ├── start-<id>.sh                  : POSIX hosts: every guest; Windows: non-Android guest only
+│   ├── stop-<id>.ps1                  : stop helper, every manifest guest
+│   ├── stop-<id>.sh                   : POSIX hosts only
 │   └── pack.sh / unpack.sh (+ .ps1)   : pack/unpack delegation wrappers
 ├── <name>.utm/                        : UTM bundle directory (macOS only)
 │   ├── config.plist                   : UTM VM configuration
@@ -60,7 +62,7 @@ __VM_DIR_DISPLAY__/
 | macOS | macOS | Tart | `scripts/start-<id>.sh` or `scripts/start-<id>.ps1` |
 | macOS | NixOS / Windows | UTM | `scripts/start-<id>.sh` or `scripts/start-<id>.ps1` |
 | NixOS | NixOS / Windows | libvirt | `scripts/start-<id>.sh` or `scripts/start-<id>.ps1` |
-| Windows | NixOS / Windows | QEMU | `scripts/start-<id>.ps1` (`scripts/start-<id>.sh` in Git Bash) |
+| Windows | NixOS / Windows | QEMU | `scripts/start-<id>.ps1` (`scripts/start-<id>.sh` for a non-Android guest) |
 
 Run from `__VM_DIR_DISPLAY__/scripts/`.
 

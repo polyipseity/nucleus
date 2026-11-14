@@ -16,13 +16,13 @@ Top-level `properties` key with `configurationVersion: 0.2.0` and a `resources:`
 
 ## Resource groups and ordering
 
-Within a file: (1) packages (`Microsoft.WinGet.Client/Package`), (2) system settings (`Microsoft.Windows.Settings/*`), (3) registry (`Microsoft.Windows.Registry/*`), (4) environment variables (`Microsoft.Windows.Environment/*`), (5) script (`PSDscResources/Script`). Sort alphabetically inside each group by `settings.id` (packages) or `settings.valueName`/`settings.name` (others). Group integrity beats cross-type alphabetical ordering.
+Within a file: (1) packages (`Microsoft.WinGet.Client/Package`), (2) system settings (`Microsoft.Windows.Settings/*`), (3) registry (`Microsoft.Windows.Registry/*`), (4) environment variables (`Microsoft.Windows.Environment/*`), (5) script (`PSDscResources/Script`). Sort alphabetically, case-folded, inside each group by `settings.id` (packages) or `settings.valueName`/`settings.name` (others). Group integrity beats cross-type alphabetical ordering.
 
 ## Authoring rules
 
 - `.yml` extension only; `source: winget` on every package.
 - Use canonical WinGet identifiers, verified with `winget search`. Prefer named IDs over opaque Store-generated IDs; document the rationale when only a generated ID exists.
-- `src/hosts/Windows/system/winget-packages.json` is generated from the managed package registry in `src/modules/core.nix`. Never hand-edit it; regenerate with `install -m 644 "$(nix build --no-link --print-out-paths ./src#winget-packages)" src/hosts/Windows/system/winget-packages.json`. That derivation is an aarch64-darwin build, so the macOS-only check step 3 is the only byte-exact comparison; the nix-tests step compares the parsed entry set on every POSIX host.
+- `src/hosts/Windows/system/winget-packages.json` is generated from the managed package registry in `src/modules/core.nix`. Never hand-edit it; regenerate with `install -m 644 "$(nix build --no-link --print-out-paths ./src#winget-packages)" src/hosts/Windows/system/winget-packages.json`. That derivation is an aarch64-darwin build, so the macOS-only check step 3 is the only byte-exact comparison; the nix-tests step compares the parsed entry set and pins the root-key order on every POSIX host.
 - Prefer preview/canary channel per `AGENTS.md` channel policy; document exceptions in `directives.description:`.
 - Registry values need `valueType` (`DWord`, `String`, ...). Environment variables: scope as `User` or `Machine`, prefer `User`.
 - Use `%USERPROFILE%` for user home in `value` strings.
@@ -55,13 +55,13 @@ Skip `PSDscResources/Script` when PATH is unreliable or the state is complex. De
 
 ## Scoop
 
-Scoop installs user-space CLI tools with no WinGet ID into `%USERPROFILE%\scoop\`, no admin required. Install Scoop itself via WinGet (`Scoop.Scoop`); it needs `Git.Git` for bucket management, so declare the dependency with `dependsOn`.
+Scoop installs user-space CLI tools with no WinGet ID into `%USERPROFILE%\scoop\`, no admin required. Scoop itself installs through the `ScoopInstall` Script resource, which downloads the commit-pinned `ScoopInstaller/Install` script and checks its SHA256; `Git.Git` stays its `dependsOn` because Scoop needs Git for bucket management. `Invoke-ScoopSetup` then registers the `fonts` bucket and reconciles the desired apps.
 
-Never manage Scoop with `PSDscResources/Script`: `scoop` is not on PATH right after WinGet installs it. Use `src/platforms/Windows/modules/Invoke-ScoopSetup.ps1`, which `apply.ps1` calls after DSC completes.
+Never reconcile the Scoop app set with `PSDscResources/Script`: `scoop` is not on PATH in a DSC child process. Use `src/platforms/Windows/modules/setup/Invoke-ScoopSetup.ps1`, which `apply.ps1` calls after DSC completes.
 
 For a tool absent from WinGet and the public buckets (`main`, `extras`), write a manifest in `src/modules/scoop-manifests/<name>.json` and add `bucket: "nucleus"` to its `desired.json` entry. `Invoke-ScoopSetup` copies the manifests into `~\scoop\buckets\nucleus\` and installs with `scoop install nucleus/<name>`. Manifest format follows [Scoop's app manifest spec](https://github.com/ScoopInstaller/Scoop/wiki/App-Manifests); for NSIS installers use the `installer.script` block with the `/S` silent flag, and set `$schema` to Scoop's published schema for step 7 validation. Guard installs with `Test-Path` on the shim, never `Get-Command`.
 
-`src/platforms/Windows/modules/Invoke-CargoBinstallSetup.ps1` handles Rust CLI tools with no WinGet or Scoop equivalent (`cargo-cache`, `pay-respects`). It keeps a desired-state list at `~\.config\nucleus\cargo-binstall-packages.json` and runs `cargo binstall --no-confirm` for additions, `cargo uninstall` for removals.
+`src/platforms/Windows/modules/setup/Invoke-CargoBinstallSetup.ps1` handles Rust CLI tools with no WinGet or Scoop equivalent (`cargo-cache`, `pay-respects`). It keeps a desired-state list at `~\.config\nucleus\cargo-binstall-packages.json` and runs `cargo binstall --no-confirm` for additions, `cargo uninstall` for removals.
 
 ## Imperative recovery safety (Windows modules)
 

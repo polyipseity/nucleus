@@ -438,21 +438,35 @@ vm_get_running_ids() {
   esac
 }
 
-# Polls utmctl list until VM NAME appears or timeout is reached.
-wait_for_utm_registration() {
-  _wfur_name="$1"
-  _wfur_attempt=1
-  _wfur_max_attempts=15
-
-  while [ "$_wfur_attempt" -le "$_wfur_max_attempts" ]; do
-    if vm_get_utm_registered_names | grep -qxF "$_wfur_name"; then
+# vm_wait_until DESCRIPTION TIMEOUT_SECONDS COMMAND... polls COMMAND once a
+# second until it exits 0 or TIMEOUT_SECONDS elapse. The interval is fixed and
+# the timeout has no default, so a loop needing another cadence, a shared
+# elapsed budget, or per-state progress output keeps its own body.
+vm_wait_until() {
+  _wu_desc="$1"
+  _wu_timeout="$2"
+  shift 2
+  _wu_deadline=$(($(date +%s) + _wu_timeout))
+  while [ "$(date +%s)" -lt "$_wu_deadline" ]; do
+    if "$@"; then
       return 0
     fi
     sleep 1
-    _wfur_attempt=$((_wfur_attempt + 1))
   done
-
+  warn "timed out after ${_wu_timeout}s waiting for $_wu_desc"
   return 1
+}
+
+# Returns 0 when utmctl lists NAME among the registered VMs.
+vm_utm_registered_name_present() {
+  vm_get_utm_registered_names | grep -qxF "$1"
+}
+
+# Polls utmctl list until VM NAME appears or TIMEOUT_SECONDS (default 15) elapse.
+wait_for_utm_registration() {
+  _wfur_name="$1"
+  _wfur_timeout="${2:-15}"
+  vm_wait_until "UTM to register '$_wfur_name'" "$_wfur_timeout" vm_utm_registered_name_present "$_wfur_name"
 }
 
 # Exponential backoff, capped at 30s, with windows_iso_retries extra attempts.
@@ -557,6 +571,54 @@ vm_wait_for_guest() {
   return 1
 }
 
+# Renders stdin into DST only when the bytes differ, so an unchanged generated
+# script keeps its inode, mode, and mtime across applies; a changed one is
+# replaced by rename, which a concurrent reader sees as one version or the other.
+# WHY: the temp file is dot-prefixed so the guest-script prune never treats it as
+# a managed script, and no deletion of the target is needed to replace it.
+vm_write_if_changed() {
+  _wwic_dst="$1"
+  _wwic_mode="$2"
+  case "$_wwic_dst" in
+  */*) _wwic_dir="${_wwic_dst%/*}" ;;
+  *) _wwic_dir="." ;;
+  esac
+  # WHY: a root-level target leaves an empty prefix, which mktemp rejects.
+  [ -n "$_wwic_dir" ] || _wwic_dir="/"
+  # WHY: mv into a directory target would succeed by moving the temp file inside
+  # it, leaving no script and an orphan; refuse before any write happens.
+  if [ -d "$_wwic_dst" ]; then
+    error "guest script path is a directory: $_wwic_dst"
+    return 1
+  fi
+  mkdir -p "$_wwic_dir"
+  _wwic_tmp="$(mktemp "$_wwic_dir/.tmp.XXXXXX")" || return 1
+  if ! cat >"$_wwic_tmp"; then
+    rm -f "$_wwic_tmp"
+    error "failed to buffer generated content for $_wwic_dst"
+    return 1
+  fi
+  if [ -f "$_wwic_dst" ] && cmp -s "$_wwic_tmp" "$_wwic_dst"; then
+    rm -f "$_wwic_tmp"
+    return 0
+  fi
+  if [ "$dry_run" = true ]; then
+    dry_run "update guest script: $_wwic_dst"
+    rm -f "$_wwic_tmp"
+    return 0
+  fi
+  if ! chmod "$_wwic_mode" "$_wwic_tmp"; then
+    rm -f "$_wwic_tmp"
+    error "failed to set mode $_wwic_mode on $_wwic_dst"
+    return 1
+  fi
+  if ! mv -f "$_wwic_tmp" "$_wwic_dst"; then
+    rm -f "$_wwic_tmp"
+    error "failed to replace $_wwic_dst"
+    return 1
+  fi
+}
+
 # Start helper rendering the manifest fields read from vm_vm_json: id, name,
 # type, cpus, ram, portForwards, plus the Android group.
 vm_write_start_script() {
@@ -579,25 +641,31 @@ vm_write_start_script() {
     _wss_tart_softnet_expose="$(printf '%s' "$_wss_doc" | jq -r '[.portForwards[] | "\(.hostPort):\(.guestPort)"] | join(",")')"
   fi
 
-  if [ -f "$TEMPLATES_DIR/start-posix.sh" ]; then
-    _wss_posix_sed=(
-      -e "s|__VM_ID__|$_wss_id|g"
-      -e "s|__VM_DISPLAY__|$_wss_display|g"
-      -e "s|__VM_TYPE__|$_wss_type|g"
-      -e "s|__HOST_KIND__|$_wss_host_kind|g"
-      -e "s|__VM_DIR__|$VM_DIR|g"
-    )
-    if [ "$_wss_host_kind" = "darwin-tart" ]; then
-      _wss_posix_sed+=(-e "s|__TART_SOFTNET_EXPOSE__|$_wss_tart_softnet_expose|g")
+  # WHY: windows-qemu renders its own start-<id>.sh from start-windows-host.sh
+  # below, and rendering both in one pass made the file differ from the target
+  # twice per sync, so it never kept its inode despite identical bytes.
+  if [ "$_wss_host_kind" != "windows-qemu" ]; then
+    if [ -f "$TEMPLATES_DIR/start-posix.sh" ]; then
+      _wss_posix_sed=(
+        -e "s|__VM_ID__|$_wss_id|g"
+        -e "s|__VM_DISPLAY__|$_wss_display|g"
+        -e "s|__VM_TYPE__|$_wss_type|g"
+        -e "s|__HOST_KIND__|$_wss_host_kind|g"
+        -e "s|__VM_DIR__|$VM_DIR|g"
+      )
+      if [ "$_wss_host_kind" = "darwin-tart" ]; then
+        _wss_posix_sed+=(-e "s|__TART_SOFTNET_EXPOSE__|$_wss_tart_softnet_expose|g")
+      else
+        _wss_posix_sed+=(-e "s|__TART_SOFTNET_EXPOSE__||g")
+      fi
+      sed "${_wss_posix_sed[@]}" "$TEMPLATES_DIR/start-posix.sh" |
+        vm_write_if_changed "$_wss_path_sh" 755
     else
-      _wss_posix_sed+=(-e "s|__TART_SOFTNET_EXPOSE__||g")
+      warn "start-posix.sh template not found at $TEMPLATES_DIR/start-posix.sh"
+      printf '#!/bin/sh\nset -eu\necho "VM start script for %s"\n' "$_wss_id" |
+        vm_write_if_changed "$_wss_path_sh" 755
     fi
-    sed "${_wss_posix_sed[@]}" "$TEMPLATES_DIR/start-posix.sh" >"$_wss_path_sh"
-  else
-    warn "start-posix.sh template not found at $TEMPLATES_DIR/start-posix.sh"
-    printf '#!/bin/sh\nset -eu\necho "VM start script for %s"\n' "$_wss_id" >"$_wss_path_sh"
   fi
-  chmod 755 "$_wss_path_sh"
 
   case "$_wss_host_kind" in
   darwin-tart | darwin-utm | nixos-libvirt)
@@ -613,10 +681,11 @@ vm_write_start_script() {
       else
         _wss_ps1_sed+=(-e "s|__TART_SOFTNET_EXPOSE__||g")
       fi
-      sed "${_wss_ps1_sed[@]}" "$TEMPLATES_DIR/start-host.ps1" >"$_wss_path_ps1"
+      sed "${_wss_ps1_sed[@]}" "$TEMPLATES_DIR/start-host.ps1" |
+        vm_write_if_changed "$_wss_path_ps1" 755
     else
       warn "start-host.ps1 template not found at $TEMPLATES_DIR/start-host.ps1"
-      printf '# start script for %s\n' "$_wss_id" >"$_wss_path_ps1"
+      printf '# start script for %s\n' "$_wss_id" | vm_write_if_changed "$_wss_path_ps1" 755
     fi
     ;;
   windows-qemu)
@@ -646,7 +715,7 @@ vm_write_start_script() {
         -e "s|__ANDROID_GSI_IMAGE__|$_wss_gsi_image|g" \
         -e "s|__ANDROID_NVRAM_IMAGE__|$_wss_nvram_image|g" \
         -e "s|__HOSTFWDS__|$_wss_hostfwds|g" \
-        "$_wss_android_start" >"$_wss_path_ps1"
+        "$_wss_android_start" | vm_write_if_changed "$_wss_path_ps1" 755
     else
       _wss_hostfwds="$(printf '%s' "$_wss_doc" | jq -r '[.portForwards[] | "hostfwd=tcp::\(.hostPort)-:\(.guestPort)"] | join(",")')"
       _wss_cpus="$(printf '%s' "$_wss_doc" | jq -r '.cpus')"
@@ -676,10 +745,10 @@ vm_write_start_script() {
           -e "s|__VGA__|std|g" \
           -e "s|__DISPLAY_BACKEND__|sdl|g" \
           -e "s|__VIRTIOFS_ARGS__||g" \
-          "$TEMPLATES_DIR/start-windows.ps1" >"$_wss_path_ps1"
+          "$TEMPLATES_DIR/start-windows.ps1" | vm_write_if_changed "$_wss_path_ps1" 755
       else
         warn "start-windows.ps1 template not found at $TEMPLATES_DIR/start-windows.ps1"
-        printf '# start script for %s\n' "$_wss_id" >"$_wss_path_ps1"
+        printf '# start script for %s\n' "$_wss_id" | vm_write_if_changed "$_wss_path_ps1" 755
       fi
       if [ -f "$TEMPLATES_DIR/start-windows-host.sh" ]; then
         sed -e "s|__QEMU_SYSTEM__|$_wss_qemu_system|g" \
@@ -693,8 +762,7 @@ vm_write_start_script() {
           -e "s|__HOSTFWDS__|$_wss_hostfwds|g" \
           -e "s|__VGA__|std|g" \
           -e "s|__DISPLAY_BACKEND__|sdl|g" \
-          "$TEMPLATES_DIR/start-windows-host.sh" >"$_wss_path_sh"
-        chmod 755 "$_wss_path_sh"
+          "$TEMPLATES_DIR/start-windows-host.sh" | vm_write_if_changed "$_wss_path_sh" 755
       else
         warn "start-windows-host.sh template not found at $TEMPLATES_DIR/start-windows-host.sh"
       fi
@@ -705,9 +773,8 @@ vm_write_start_script() {
     return 1
     ;;
   esac
-  chmod 755 "$_wss_path_ps1"
 
-  say "wrote start helper scripts: $_wss_path_sh, $_wss_path_ps1"
+  say "start helper scripts ready: $_wss_path_sh, $_wss_path_ps1"
 }
 
 vm_write_stop_script() {
@@ -730,10 +797,11 @@ vm_write_stop_script() {
       sed -e "s|__HOST_KIND__|$_wst_host_kind|g" \
         -e "s|__VM_ID__|$_wst_id|g" \
         -e "s|__VM_DISPLAY__|$_wst_display|g" \
-        "$TEMPLATES_DIR/stop-posix.sh" >"$_wst_path_sh"
+        "$TEMPLATES_DIR/stop-posix.sh" | vm_write_if_changed "$_wst_path_sh" 755
     else
       warn "stop-posix.sh template not found at $TEMPLATES_DIR/stop-posix.sh"
-      printf '#!/bin/sh\nset -eu\necho "stop script for %s"\n' "$_wst_id" >"$_wst_path_sh"
+      printf '#!/bin/sh\nset -eu\necho "stop script for %s"\n' "$_wst_id" |
+        vm_write_if_changed "$_wst_path_sh" 755
     fi
     ;;
   windows-qemu)
@@ -745,19 +813,16 @@ vm_write_stop_script() {
     return 1
     ;;
   esac
-  if [ -f "$_wst_path_sh" ]; then
-    chmod 755 "$_wst_path_sh"
-  fi
 
   case "$_wst_host_kind" in
   darwin-tart | darwin-utm | nixos-libvirt | windows-qemu)
     if [ -f "$TEMPLATES_DIR/stop-host.ps1" ]; then
       sed -e "s|__HOST_KIND__|$_wst_host_kind|g" \
         -e "s|__VM_ID__|$_wst_id|g" \
-        "$TEMPLATES_DIR/stop-host.ps1" >"$_wst_path_ps1"
+        "$TEMPLATES_DIR/stop-host.ps1" | vm_write_if_changed "$_wst_path_ps1" 755
     else
       warn "stop-host.ps1 template not found at $TEMPLATES_DIR/stop-host.ps1"
-      printf '# stop script for %s\n' "$_wst_id" >"$_wst_path_ps1"
+      printf '# stop script for %s\n' "$_wst_id" | vm_write_if_changed "$_wst_path_ps1" 755
     fi
     ;;
   *)
@@ -766,7 +831,7 @@ vm_write_stop_script() {
     ;;
   esac
 
-  say "wrote stop helper scripts: $_wst_path_sh, $_wst_path_ps1"
+  say "stop helper scripts ready: $_wst_path_sh, $_wst_path_ps1"
 }
 
 # Runtime kind (darwin-tart|darwin-utm|nixos-libvirt|windows-qemu) for this
@@ -819,29 +884,27 @@ vm_write_pack_unpack_scripts() {
     dry_run "write pack/unpack helper scripts: $VM_DIR/scripts/pack.*, unpack.*"
     return 0
   fi
-  cat >"$VM_DIR/scripts/pack.sh" <<'EOF'
+  vm_write_if_changed "$VM_DIR/scripts/pack.sh" 755 <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 exec nucleus-vm pack "$@"
 EOF
-  chmod 755 "$VM_DIR/scripts/pack.sh"
-  cat >"$VM_DIR/scripts/unpack.sh" <<'EOF'
+  vm_write_if_changed "$VM_DIR/scripts/unpack.sh" 755 <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 exec nucleus-vm unpack "$@"
 EOF
-  chmod 755 "$VM_DIR/scripts/unpack.sh"
-  cat >"$VM_DIR/scripts/pack.ps1" <<'EOF'
+  vm_write_if_changed "$VM_DIR/scripts/pack.ps1" 755 <<'EOF'
 # Generated by nucleus-vm setup: pack.ps1. Delegates to nucleus-vm pack.
 & nucleus-vm pack @args
 exit $LASTEXITCODE
 EOF
-  cat >"$VM_DIR/scripts/unpack.ps1" <<'EOF'
+  vm_write_if_changed "$VM_DIR/scripts/unpack.ps1" 755 <<'EOF'
 # Generated by nucleus-vm setup: unpack.ps1. Delegates to nucleus-vm unpack.
 & nucleus-vm unpack @args
 exit $LASTEXITCODE
 EOF
-  say "wrote pack/unpack helper scripts: $VM_DIR/scripts"
+  say "pack/unpack helper scripts ready: $VM_DIR/scripts"
 }
 
 # VM iteration helper
@@ -1678,11 +1741,7 @@ vm_inject_nixos() {
     return 1
   fi
 
-  for _vix_i in 1 2 3 4 5 6 7 8 9 10; do
-    [ -e "$_vix_part" ] && break
-    sleep 1
-  done
-  if [ ! -e "$_vix_part" ]; then
+  if ! vm_wait_until "NBD partition node $_vix_part to appear" 10 test -e "$_vix_part"; then
     _vix_cleanup
     error "NBD partition node did not appear: $_vix_part"
     return 1
@@ -2502,12 +2561,56 @@ vm_build_android_image() {
     say "Android image build skipped for '$_vai_id' (prerequisite missing or build failed; see above)"
 }
 
-vm_prune_and_write_all_guest_scripts() {
-  for _pwgas_f in "$VM_DIR/scripts"/*.sh "$VM_DIR/scripts"/*.ps1; do
-    [ -f "$_pwgas_f" ] || continue
-    rm -f "$_pwgas_f"
+# Names of every guest script the writers own: start/stop helpers for EVERY
+# manifest VM, enabled or not and host-matched or not, plus the pack/unpack
+# wrappers. One name per line, so the prune diff can compare by exact match.
+vm_desired_guest_script_names() {
+  _vdgsn_count="$(jq '.VMs | length' "$MANIFEST")" || return 1
+  _vdgsn_i=0
+  while [ "$_vdgsn_i" -lt "$_vdgsn_count" ]; do
+    _vdgsn_id="$(jq -r ".VMs[$_vdgsn_i].id" "$MANIFEST")" || return 1
+    printf 'start-%s.sh\nstart-%s.ps1\nstop-%s.sh\nstop-%s.ps1\n' \
+      "$_vdgsn_id" "$_vdgsn_id" "$_vdgsn_id" "$_vdgsn_id"
+    _vdgsn_i=$((_vdgsn_i + 1))
   done
-  vm_write_all_guest_scripts
+  printf 'pack.sh\npack.ps1\nunpack.sh\nunpack.ps1\n'
+}
+
+# Write the scripts the manifest asks for, then drop the managed ones it no
+# longer asks for. WHY this order: the old prune-first loop deleted every
+# generated script before rewriting it, so each apply replaced inodes that were
+# already correct and, on macOS, fed every script through the safe-delete route.
+# A failed write leaves the tree alone, since a prune after a partial render
+# would remove scripts the writers are about to need.
+vm_prune_and_write_all_guest_scripts() {
+  _pwgas_desired="$(mktemp)" || return 1
+  if ! vm_desired_guest_script_names >"$_pwgas_desired"; then
+    rm -f "$_pwgas_desired"
+    error "failed to read the VM ids from $MANIFEST; guest scripts left unchanged"
+    return 1
+  fi
+  if ! vm_write_all_guest_scripts; then
+    rm -f "$_pwgas_desired"
+    return 1
+  fi
+  if [ -d "$VM_DIR/scripts" ]; then
+    for _pwgas_path in "$VM_DIR/scripts"/*; do
+      [ -f "$_pwgas_path" ] || continue
+      _pwgas_name="${_pwgas_path##*/}"
+      case "$_pwgas_name" in
+      start-* | stop-* | pack.* | unpack.*) ;;
+      *) continue ;;
+      esac
+      grep -Fxq "$_pwgas_name" "$_pwgas_desired" && continue
+      if [ "$dry_run" = true ]; then
+        dry_run "remove stale guest script: $_pwgas_path"
+      else
+        rm -f "$_pwgas_path"
+        say "removed stale guest script: $_pwgas_path"
+      fi
+    done
+  fi
+  rm -f "$_pwgas_desired"
 }
 
 # On success sets _vupt_template to the Nix-rendered plist path.

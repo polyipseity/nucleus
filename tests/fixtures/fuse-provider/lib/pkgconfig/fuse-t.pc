@@ -3,8 +3,8 @@ exec_prefix=${prefix}
 libdir=${exec_prefix}/lib
 includedir=${prefix}/include/fuse
 
-Name: fuse
-Description: Fixture macFUSE pkg-config file for the provider-digest tests
-Version: 2.9.9
-Libs: -L${libdir} -lfuse
+Name: fuse-t
+Description: Fixture fuse-t pkg-config file for the provider-digest tests
+Version: 1.2.7
+Libs: -L${libdir} -lfuse-t
 Cflags: -I${includedir} -D_FILE_OFFSET_BITS=64

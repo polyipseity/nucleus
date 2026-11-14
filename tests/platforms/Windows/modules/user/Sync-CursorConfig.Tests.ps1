@@ -66,7 +66,7 @@ Describe 'Sync-CursorConfig IDE settings symlink (Class C)' {
         $mcpItem.LinkType | Should -Be 'SymbolicLink'
     }
 
-    It 'is idempotent — re-running leaves the link intact' {
+    It 'is idempotent - re-running leaves the link intact' {
         $ideSettingsLink = Join-Path $script:homeRoot 'AppData\Roaming\Cursor\User\settings.json'
         Test-Path -LiteralPath $ideSettingsLink | Should -Be $true
 

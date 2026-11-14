@@ -1,0 +1,1 @@
+fixture fuse-t library: libfuse-t-1.2.7.dylib and libfuse-t-1.3.0.dylib hold identical bytes on purpose

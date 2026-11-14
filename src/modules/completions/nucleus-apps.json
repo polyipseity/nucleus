@@ -1,0 +1,19 @@
+{
+  "$schema": "./nucleus-apps.schema.json",
+  "commands": [
+    "ai",
+    "apply",
+    "bootstrap",
+    "camilladsp-heartbeat",
+    "check",
+    "cloud",
+    "config",
+    "gc",
+    "logs",
+    "svc",
+    "test",
+    "update",
+    "utils",
+    "vm"
+  ]
+}

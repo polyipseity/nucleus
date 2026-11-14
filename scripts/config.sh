@@ -39,8 +39,11 @@ DEFAULTS='{
     "heartbeat": true
   },
   "harness-approval": {
-    "enable": false,
-    "timeout-seconds": 120
+    "sources": ["prompt"],
+    "timeout-seconds": {
+      "hermes": 0,
+      "prompt": 0
+    }
   },
   "harness-drive": {
     "enable": true
@@ -129,10 +132,12 @@ cmd_set() {
 cmd_list() {
   # WHY `type != ...` and not `scalars`: `paths(f)` keeps a leaf only when f is
   # truthy, so `paths(scalars)` dropped every `false` leaf and the default-off
-  # flags were missing from the listing.
+  # flags were missing from the listing. Arrays are leaves in their own right and
+  # their elements are not, which is also what the PowerShell twin prints.
   merge_config | jq -r '
-    paths(type != "object" and type != "array") as $p
-    | { key: ($p | join(".")), val: getpath($p) | tojson }
+    paths(type != "object") as $p
+    | select((getpath($p[0:-1]) | type) != "array")
+    | { key: ($p | map(tostring) | join(".")), val: getpath($p) | tojson }
     | "\(.key)=\(.val)"
   '
 }

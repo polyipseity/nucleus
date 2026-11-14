@@ -4,19 +4,28 @@
 
 .DESCRIPTION
   The harness bridge answers harness hooks through bare command names
-  (`harness-notify`, `harness-approval`, `harness-drive`) so one shared hook
-  definition works on every platform.  Windows reaches them through .cmd shims,
-  because %USERPROFILE%\.local\bin is a managed PATH component and a bare name
-  resolves through PATHEXT.
+  (`harness-notify`, `harness-approval`, `harness-drive`, `harness-filter`) so one
+  shared hook definition works on every platform.  Windows reaches them through
+  .cmd shims, because %USERPROFILE%\.local\bin is a managed PATH component and a
+  bare name resolves through PATHEXT.
 
   Layout this function converges:
 
     <USER root>\bin\harness-notify.ps1    deployed copy of the entry point
     <USER root>\bin\harness-approval.ps1  deployed copy of the entry point
     <USER root>\bin\harness-drive.ps1     deployed copy of the entry point
+    <USER root>\bin\harness-filter.ps1    deployed copy of the entry point
+    <USER root>\bin\harness-bridge-common.ps1  helper the entry points dot-source
+    <USER root>\bin\filters\*.ts          the copies harness-filter runs
     %USERPROFILE%\.local\bin\harness-notify.cmd    shim -> <USER root>\bin copy
     %USERPROFILE%\.local\bin\harness-approval.cmd  shim -> <USER root>\bin copy
     %USERPROFILE%\.local\bin\harness-drive.cmd     shim -> <USER root>\bin copy
+    %USERPROFILE%\.local\bin\harness-filter.cmd    shim -> <USER root>\bin copy
+
+  harness-bridge-common.ps1 is dot-sourced by the entry points, never
+  invoked as a command, so it gets no shim.  The filters are child processes the
+  runner starts, so they get neither a shim nor a PATH entry: the runner resolves
+  them beside itself.
 
   Copies (rather than links into the repository) keep a hook working when the
   checkout moves; they are refreshed whenever the repository copy changes, so the
@@ -72,7 +81,15 @@ function Sync-HarnessBridge {
   )
 
   $label = 'harness-bridge'
-  $scriptNames = @('harness-approval', 'harness-drive', 'harness-notify')
+  $scriptNames = @('harness-approval', 'harness-drive', 'harness-filter', 'harness-notify')
+  # Dot-sourced by the entry points, so it is deployed beside them with no shim.
+  $sharedScriptNames = @('harness-bridge-common')
+  # Child processes of the runner, resolved beside the deployed copy, so the whole
+  # directory has to arrive with it.
+  $filterDirName = 'filters'
+  # Shared file first: an interrupted apply must never leave entry points behind
+  # that dot-source a file which never arrived.
+  $deployNames = @($sharedScriptNames) + @($scriptNames)
   $binDir = Join-Path -Path $UserRoot -ChildPath 'bin'
   $shimDir = Join-Path -Path $UserProfile -ChildPath '.local\bin'
 
@@ -88,6 +105,18 @@ function Sync-HarnessBridge {
             Write-NucleusNotice -Message "[$label] removed $managedPath"
           }
         }
+      }
+      foreach ($scriptName in $sharedScriptNames) {
+        $managedPath = Join-Path -Path $binDir -ChildPath "$scriptName.ps1"
+        if (Test-Path -LiteralPath $managedPath) {
+          Remove-Item -LiteralPath $managedPath -Force
+          Write-NucleusNotice -Message "[$label] removed $managedPath"
+        }
+      }
+      $deployedFilterDir = Join-Path -Path $binDir -ChildPath $filterDirName
+      if (Test-Path -LiteralPath $deployedFilterDir) {
+        Remove-Item -LiteralPath $deployedFilterDir -Recurse -Force
+        Write-NucleusNotice -Message "[$label] removed $deployedFilterDir"
       }
       Write-NucleusNotice -Message "[$label] disabled — harness hooks answer locally"
       return
@@ -108,10 +137,10 @@ function Sync-HarnessBridge {
     }
     $shimTemplate = Get-Content -LiteralPath $shimTemplatePath -Raw -Encoding UTF8
 
-    foreach ($scriptName in $scriptNames) {
+    foreach ($scriptName in $deployNames) {
       $sourcePath = Join-Path -Path $RepoRoot -ChildPath "src\scripts\notify\$scriptName.ps1"
       if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) {
-        Write-NucleusWarning -Message "[$label] entry point not found: $sourcePath"
+        Write-NucleusWarning -Message "[$label] script not found: $sourcePath"
         continue
       }
 
@@ -125,6 +154,8 @@ function Sync-HarnessBridge {
         Write-NucleusNotice -Message "[$label] deployed $targetPath"
       }
 
+      if ($scriptName -in $sharedScriptNames) { continue }
+
       # WHY: .gitattributes marks *.bat and *.ps1 but not *.cmd, so the template
       # arrives with LF endings while cmd.exe expects CRLF.
       $shim = ($shimTemplate -replace '__HARNESS_BRIDGE_SCRIPT__', $targetPath) -replace "`r?`n", "`r`n"
@@ -136,6 +167,37 @@ function Sync-HarnessBridge {
       if ($shimNeedsWrite) {
         [System.IO.File]::WriteAllText($shimPath, $shim, [System.Text.UTF8Encoding]::new($false))
         Write-NucleusNotice -Message "[$label] wrote $shimPath"
+      }
+    }
+
+    $sourceFilterDir = Join-Path -Path (Join-Path -Path $RepoRoot -ChildPath 'src\scripts\notify') -ChildPath $filterDirName
+    if (-not (Test-Path -LiteralPath $sourceFilterDir -PathType Container)) {
+      Write-NucleusWarning -Message "[$label] filter directory not found: $sourceFilterDir"
+      return
+    }
+
+    $deployedFilterDir = Join-Path -Path $binDir -ChildPath $filterDirName
+    $null = New-Item -ItemType Directory -Path $deployedFilterDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+    foreach ($sourceFilter in @(Get-ChildItem -LiteralPath $sourceFilterDir -File -Filter '*.ts')) {
+      $targetFilter = Join-Path -Path $deployedFilterDir -ChildPath $sourceFilter.Name
+      $filterNeedsCopy = $true
+      if (Test-Path -LiteralPath $targetFilter -PathType Leaf) {
+        $filterNeedsCopy = (Get-Content -LiteralPath $sourceFilter.FullName -Raw -Encoding UTF8) -ne (Get-Content -LiteralPath $targetFilter -Raw -Encoding UTF8)
+      }
+      if ($filterNeedsCopy) {
+        Copy-Item -LiteralPath $sourceFilter.FullName -Destination $targetFilter -Force
+        Write-NucleusNotice -Message "[$label] deployed $targetFilter"
+      }
+    }
+
+    # WHY a prune: the runner resolves a filter by the id the registry names, so a
+    # copy left behind by a rename or a deletion would keep answering a filter the
+    # registry no longer declares. The source set is the only authority.
+    $sourceFilterNames = @(Get-ChildItem -LiteralPath $sourceFilterDir -File -Filter '*.ts' | ForEach-Object { $_.Name })
+    foreach ($deployedFilter in @(Get-ChildItem -LiteralPath $deployedFilterDir -File -Filter '*.ts')) {
+      if ($deployedFilter.Name -notin $sourceFilterNames) {
+        Remove-Item -LiteralPath $deployedFilter.FullName -Force
+        Write-NucleusNotice -Message "[$label] removed stale filter $($deployedFilter.FullName)"
       }
     }
   }

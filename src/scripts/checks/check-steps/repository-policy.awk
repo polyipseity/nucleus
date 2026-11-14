@@ -3,6 +3,19 @@
 # Default mode (no -v mode): heredoc size detector for the embedded-content
 # policy; flags heredocs with more than 30 content lines.
 #
+# Here-string mode (-v mode=here-string): the PowerShell side of the same
+# policy, over .ps1 files. The twin (13-repo-policy-data.ps1) reads the parse
+# tree; this mode reads text and reproduces the twin's gate: a here-string is
+# file content only when it is a C# interop block (Add-Type, exempt up to 25
+# content lines) or is written to disk (limit 10) through Set-Content,
+# Add-Content, Out-File, Tee-Object, or a [IO.File]::WriteAll*/[IO.File]::
+# AppendAll* member call. Anything else, such as script text handed to a
+# subprocess, the twin skips, so this mode skips it too. The text heuristics
+# are looser than the AST in the over-exempting direction: an Add-Type marker
+# on the adjacent line exempts a block the twin's ancestor walk might not, and
+# a line ending in a quote inside a comment or a single-quoted string opens a
+# phantom here-string. Neither has a live instance in the repository.
+#
 # Logging-format mode (-v mode=logging-format): enforces the unified logging
 # format standard (see .agents/instructions/logging.instructions.md):
 #   - raw ANSI escapes (\033[, \e[, \x1b[) and tput outside the shared
@@ -17,6 +30,123 @@
 # contract, and this file plus the two gate steps carry the pattern list, so all
 # of them are excluded here.
 # The word "skip" in prose stays legal; only the named constructs match.
+#
+# Log-capture mode (-v mode=log-capture): one pass over the service definition
+# files, enforcing the stdout.log/stderr.log pair
+# (output-handling.instructions.md): a capture directive that sends a stream to
+# /dev/null, a merged-stream redirection, and a file that captures one stream of
+# a directive family but not the other, for launchd and systemd separately.
+#
+# Activation-naming mode (-v mode=activation-naming): extracts the entry
+# definitions inside `<namespace> = { ... };` blocks as "file:line:name"
+# records, one record per line. The step owns the policy (kebab-case, the
+# forbidden prefix, the macos- requirement); this mode only reports what the
+# blocks define, so the step can sort and de-duplicate the records.
+
+# Report one file's log-capture findings, in the order the per-rule greps
+# produced them: discards, then merges, then the two presence checks. Order is
+# part of the contract, so a merged redirection on an earlier line than a
+# discard is still reported second.
+function report_capture_pair(   i) {
+  for (i = 1; i <= _cap_discards; i++)
+    printf "log capture pair: '%s' discards a stream to /dev/null; capture stdout.log and stderr.log instead (output-handling.instructions.md)\n", _cap_discard[i]
+  for (i = 1; i <= _cap_merges; i++)
+    printf "log capture pair: '%s' merges stdout and stderr; use 1>> and 2>> into stdout.log and stderr.log\n", _cap_merge[i]
+  if (_cap_launchd_out != _cap_launchd_err)
+    printf "log capture pair: '%s' declares only one of StandardOutPath/StandardErrorPath; declare both or neither\n", _cap_file
+  if (_cap_systemd_out != _cap_systemd_err)
+    printf "log capture pair: '%s' declares only one of StandardOutput/StandardError; declare both or neither\n", _cap_file
+}
+
+# Per-file state, reset at every file: a path with several services is normal,
+# so only the lone-stream case is a violation. The two families are tracked
+# apart because launchd and systemd spell the same intent differently.
+mode == "log-capture" && FNR == 1 {
+  if (_cap_file != "") report_capture_pair()
+  _cap_file = FILENAME
+  _cap_discards = 0
+  _cap_merges = 0
+  _cap_launchd_out = 0
+  _cap_launchd_err = 0
+  _cap_systemd_out = 0
+  _cap_systemd_err = 0
+}
+mode == "log-capture" {
+  if ($0 ~ /(StandardOutPath|StandardErrorPath|StandardOutput|StandardError)[[:space:]]*=[[:space:]]*"\/dev\/null"/)
+    _cap_discard[++_cap_discards] = FILENAME ":" FNR ":" $0
+  if (index($0, "*>>"))
+    _cap_merge[++_cap_merges] = FILENAME ":" FNR ":" $0
+  if (index($0, "StandardOutPath")) _cap_launchd_out = 1
+  if (index($0, "StandardErrorPath")) _cap_launchd_err = 1
+  if ($0 ~ /StandardOutput[[:space:]]*=/) _cap_systemd_out = 1
+  if ($0 ~ /StandardError[[:space:]]*=/) _cap_systemd_err = 1
+}
+END {
+  if (mode == "log-capture" && _cap_file != "") report_capture_pair()
+}
+
+BEGIN {
+  # An operand shaped like name=value is an awk variable assignment, so a repo
+  # file literally named x=y would never be opened. Every call site here passes
+  # files as operands and variables via -v, so prefix the bare assignment-shaped
+  # operand with ./ to keep the filename distinguishable; a path already
+  # carrying a slash is unambiguous and stays untouched.
+  for (_argv_i = 1; _argv_i < ARGC; _argv_i++)
+    if (ARGV[_argv_i] ~ /^[A-Za-z_][A-Za-z0-9_]*=/)
+      ARGV[_argv_i] = "./" ARGV[_argv_i]
+  if (mode == "here-string") _hs_write_re = "Set-Content|Add-Content|Out-File|Tee-Object|WriteAll|AppendAll"
+  if (mode == "activation-naming") {
+    _an_ns_start = "(home\\.activation|system\\.activationScripts|nucleus\\.terminalActivations)[[:space:]]*=[^;]*[{]"
+    # An activation entry carries a lib wrapper, or leaves its value on the next
+    # line. That excludes the region's other lines that look like assignments,
+    # such as `config = {` inside a value.
+    _an_entry = "^[[:space:]]*[A-Za-z0-9_-]+(\\.[A-Za-z0-9_-]+)?[[:space:]]*=[[:space:]]*(lib\\.(mkIf|mkAfter|mkBefore|mkForce|mkOverride|mkOrder|hm\\.dag\\.entry(A|Before|Order|After))|[[:space:]]*$)"
+  }
+}
+
+# Count one character in a line. Braces inside strings count, because the .ps1
+# twin tallies them per line rather than parsing, so both twins read one tree
+# into one record set. Comment lines never reach the tally: the twin skips
+# them before the region rules (12-repo-policy-pattern.ps1:180) and the mode
+# rule below skips them the same way, so a brace in a comment cannot move depth.
+function count_char(text, ch,   i, count) {
+  count = 0
+  for (i = 1; i <= length(text); i++)
+    if (substr(text, i, 1) == ch) count++
+  return count
+}
+
+# The region opens on a namespace attrset line and closes when its brace depth
+# returns to zero, which is how 12-repo-policy-pattern.ps1 tracks it. A nested
+# attrset therefore keeps the region open, and the entries after its close are
+# still scanned.
+mode == "activation-naming" && FNR == 1 {
+  _an_block = 0
+  _an_depth = 0
+}
+mode == "activation-naming" {
+  # Mirror the twin's comment-line skip (12-repo-policy-pattern.ps1:180): a
+  # comment is not a region open, an entry, nor brace-bearing text, so prose
+  # carrying a brace cannot move the depth or close the region early.
+  if ($0 ~ /^[[:space:]]*#/) next
+  if (!_an_block && $0 ~ _an_ns_start) {
+    _an_block = 1
+    _an_depth = 0
+  }
+  if (_an_block) {
+    if ($0 ~ _an_entry) {
+      _an_name = $0
+      sub(/^[[:space:]]*/, "", _an_name)
+      sub(/[^A-Za-z0-9_-].*$/, "", _an_name)
+      print FILENAME ":" FNR ":" _an_name
+    }
+    _an_depth += count_char($0, "{") - count_char($0, "}")
+    if (_an_depth <= 0) {
+      _an_block = 0
+      _an_depth = 0
+    }
+  }
+}
 
 mode == "" && FNR == 1 { in_heredoc = 0 }
 mode == "" && !in_heredoc && match($0, /<<-?[ \t]*["\047\\]?[A-Za-z_][A-Za-z0-9_]*/) {
@@ -34,6 +164,62 @@ mode == "" && in_heredoc {
   else if (!dash && $0 ~ "^" tag "[ \t]*$") { in_heredoc = 0 }
   else { body++; next }
   if (body > 30) print FILENAME ":" start_line ": heredoc " tag " has " body " content lines (limit 30)"
+}
+
+# One violation line, byte for byte the message the .ps1 twin prints, so a
+# finding reads the same whichever twin catches it.
+function report_here_string() {
+  printf "%s:%d: here-string with %d content lines (limit 10) \342\200\224 extract to a shared file per the embedded-content policy\n", FILENAME, _hs_start, _hs_body
+}
+
+mode == "here-string" && FNR == 1 {
+  _hs_open = 0
+  _hs_prev = ""
+  _hs_cited_line = 0
+}
+mode == "here-string" {
+  _hs_line = $0
+  # .ps1 files are CRLF; the closing mark starts the line either way.
+  sub(/\r$/, "", _hs_line)
+  # The twin's citation window is line distance, not a countdown: a citation on
+  # any of the 10 physical lines above an opener exempts it, body lines
+  # included, so the recorded line number is what carries the window.
+  if (_hs_line ~ /check-suppress:embedded-content/) _hs_cited_line = FNR
+  if (_hs_open) {
+    if (substr(_hs_line, 1, 2) == _hs_closer) {
+      _hs_open = 0
+      _hs_prev = _hs_line
+      # The pipeline form `@"..."@ | Set-Content` names the write command on the
+      # closing line, which is where the twin's PipelineAst check finds it.
+      if (_hs_line ~ _hs_write_re) _hs_write = 1
+      if (_hs_addtype) {
+        if (_hs_body > 25 && !_hs_marked) report_here_string()
+      } else if (_hs_write && _hs_body > 10 && !_hs_marked) report_here_string()
+    } else {
+      _hs_body++
+    }
+    next
+  }
+  # An opener is `@"` or `@'` as the last characters on the line; the quote
+  # character picks the closing mark.
+  if (match(_hs_line, /@["\047][ \t]*$/)) {
+    _hs_start = FNR
+    _hs_body = 0
+    _hs_closer = substr(_hs_line, RSTART + 1, 1) "@"
+    # C# interop (embedded-content exception 3) passes the type source straight
+    # to Add-Type, on the opener line or through a continuation naming the
+    # parameter on the line above it.
+    _hs_addtype = (_hs_line ~ /Add-Type|-TypeDefinition|-MemberDefinition/ || _hs_prev ~ /Add-Type|-TypeDefinition|-MemberDefinition/)
+    _hs_write = (_hs_line ~ _hs_write_re)
+    # A citation on one of the 10 lines above exempts the site, the twin's
+    # window; a citation on the opener line itself does not, as in the twin.
+    _hs_gap = FNR - _hs_cited_line
+    _hs_marked = (_hs_cited_line > 0 && _hs_gap >= 1 && _hs_gap <= 10)
+    _hs_open = 1
+    _hs_prev = _hs_line
+    next
+  }
+  _hs_prev = _hs_line
 }
 
 mode == "logging-format" && FNR == 1 {
@@ -57,80 +243,10 @@ mode == "logging-format" && !allowlisted {
   if (FILENAME ~ /\.ps1$/ || FILENAME ~ /\.psm1$/) {
     if ($0 ~ /\[char\]27/)
       print FILENAME ":" FNR ": char-27 escape literal (use PSStyle helpers)"
-    if ($0 ~ /`e/)
+    # An ESC escape is a backtick-e that ends the token; inline code such as
+    # `enable` continues with an identifier character.
+    if ($0 ~ /`e([^A-Za-z0-9_]|$)/)
       print FILENAME ":" FNR ": backtick-e escape literal (use PSStyle helpers)"
-  }
-}
-
-# Text-hygiene mode (-v mode=em-dash): fails on U+2014 in repo-owned prose,
-# which the prose-style rule in documentation.instructions.md bans. Only prose
-# is scanned: comment lines in code plus every line of a tracked .md file. An
-# em dash inside a quoted string, a here-string, a printf format or a regex is
-# program output or data, so it stays legal. The .awk file itself is not in the
-# scanned extension set, which is what keeps the literal below out of findings.
-#
-# WHY octal and not \x or \u: awk string escapes are octal in POSIX, \x is a gawk
-# extension, and \u expands to literal text under bash 3.2. The dash is compared
-# with index() and string equality so no regex has to carry the byte sequence,
-# which is where an escape would silently stop matching.
-
-BEGIN { em_dash = "\342\200\224" }
-
-function em_dash_path_excluded(path) {
-  # WHY humanizer: the skill documents the em dash by printing sentences that
-  # contain one, so its examples cannot be clean without losing their point.
-  return path ~ /(^|\/)(vendor|node_modules)\// || path ~ /(^|\/)skills\/humanizer\//
-}
-
-# A table cell holding only the em dash is a placeholder for "not applicable",
-# which reads as content rather than punctuation. Split on the pipe and compare
-# the trimmed cells, which is what the PowerShell twin does, so the two agree.
-# An em dash inside a markdown inline code span names a literal value, the way a
-# quoted string does in code. Raycast's "Auto-switch Input Source" menu really
-# does offer an item spelled with a dash, and the instruction has to say so.
-# WHY markdown only: a code span is markdown's literal-value syntax.
-function em_dash_strip_code_spans(line,   out, _i, _n, parts) {
-  _n = split(line, parts, /`/)
-  out = ""
-  for (_i = 1; _i <= _n; _i++) {
-    if (_i % 2 == 1) out = out parts[_i]
-  }
-  return out
-}
-
-function em_dash_placeholder_cell(line,   parts, _i, _n) {
-  _n = split(line, parts, /\|/)
-  for (_i = 1; _i <= _n; _i++) {
-    gsub(/^[ \t]+|[ \t]+$/, "", parts[_i])
-    if (parts[_i] == em_dash) return 1
-  }
-  return 0
-}
-
-mode == "em-dash" && FNR == 1 {
-  in_help = 0
-  in_fence = 0
-  em_dash_md = (FILENAME ~ /\.md$/)
-  em_dash_ps = (FILENAME ~ /\.(ps1|psm1)$/)
-}
-mode == "em-dash" {
-  if (em_dash_md && $0 ~ /^[ \t]*(```|~~~)/) in_fence = !in_fence
-  # A one-line help block opens and closes on the same line, so its text is
-  # prose on the opening line too.
-  if (em_dash_md) em_dash_scan_line = em_dash_strip_code_spans($0)
-  else em_dash_scan_line = $0
-  if (!em_dash_path_excluded(FILENAME) && !in_fence && !em_dash_placeholder_cell($0) &&
-      index(em_dash_scan_line, em_dash) > 0) {
-    if (em_dash_md || in_help || $0 ~ /^[ \t]*#/ || $0 ~ /<#/) {
-      print FILENAME ":" FNR ": em dash in prose (use a comma, a colon, or two sentences)"
-    }
-  }
-  if (em_dash_ps) {
-    if (!in_help && $0 ~ /<#/) {
-      in_help = ($0 ~ /#>/ ? 0 : 1)
-    } else if (in_help && $0 ~ /#>/) {
-      in_help = 0
-    }
   }
 }
 

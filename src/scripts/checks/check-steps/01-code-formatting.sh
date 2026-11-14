@@ -26,60 +26,6 @@ run_code_formatting() {
   fi
   say "treefmt OK."
 
-  if [ "$(uname)" = "Darwin" ]; then
-    local _workflow_files=()
-    if $_has_args; then
-      local _f
-      for _f in "${_files[@]}"; do
-        case "$_f" in
-        .github/workflows/* | */.github/workflows/*) _workflow_files+=("$_f") ;;
-        esac
-      done
-      if [ "${#_workflow_files[@]}" -eq 0 ]; then
-        say "0 workflow files in scope — actionlint and zizmor not run."
-      else
-        actionlint "${_workflow_files[@]}" || _exit=$?
-        if [ $_exit -eq 0 ]; then
-          say "actionlint OK."
-        else
-          error "actionlint failed with exit code $_exit"
-        fi
-        zizmor "${_workflow_files[@]}" || _exit=$?
-        if [ $_exit -eq 0 ]; then
-          say "zizmor OK."
-        else
-          error "zizmor failed with exit code $_exit"
-        fi
-      fi
-    else
-      if [ -d .github/workflows ]; then
-        while IFS= read -r -d '' _f; do
-          _workflow_files+=("$_f")
-        done < <(find .github/workflows -type f \( -name '*.yml' -o -name '*.yaml' \) -print0)
-      fi
-      if [ "${#_workflow_files[@]}" -eq 0 ]; then
-        say "0 workflow files — actionlint and zizmor not run."
-      else
-        actionlint "${_workflow_files[@]}" || _exit=$?
-        if [ $_exit -eq 0 ]; then
-          say "actionlint OK."
-        else
-          error "actionlint failed with exit code $_exit"
-        fi
-        zizmor "${_workflow_files[@]}" || _exit=$?
-        if [ $_exit -eq 0 ]; then
-          say "zizmor OK."
-        else
-          error "zizmor failed with exit code $_exit"
-        fi
-      fi
-    fi
-  fi
-
-  if [ $_exit -ne 0 ]; then
-    return $_exit
-  fi
-
   local _pkr_exit=0
   if [ "${#_pkr_files[@]}" -gt 0 ]; then
     bash scripts/check.sh packer --validate-only "${_pkr_files[@]}" || _pkr_exit=$?

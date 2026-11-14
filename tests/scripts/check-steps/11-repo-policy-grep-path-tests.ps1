@@ -194,6 +194,107 @@ if ($stepOutput -match 'svc_health_is_looping') {
 }
 
 Write-Output ''
+# 6. The `|| true` rule scans shell and Nix files, and the step shell leaves
+#    carry the same literal pattern text in their own scan definitions, so the
+#    leaves have to be excluded from that scan. The fixture is a shell step
+#    leaf with an unannotated `|| true` in code: without $allStepShLeaves the
+#    audit reports it, which is the Windows-job regression this guard pins.
+$fixtureRoot = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "nucleus-step11-sh-leaf-$([guid]::NewGuid().ToString('N'))"
+try {
+  New-Item -ItemType Directory -Path $fixtureRoot -Force > $null
+  $fixtureShLeaf = Join-Path $fixtureRoot '11-repo-policy-grep.sh'
+  Set-Content -LiteralPath $fixtureShLeaf -Value @(
+    'set -euo pipefail',
+    'command --flag || true'
+  )
+  $fixtureContext = [pscustomobject]@{
+    HasArgs        = $true
+    RepoRoot       = $fixtureRoot
+    PositionalArgs = @()
+    ShFiles        = @($fixtureShLeaf)
+    NixFiles       = @()
+    Ps1Files       = @()
+  }
+  $fixtureOutput = ''
+  $fixtureCrash = ''
+  try {
+    $fixtureOutput = & $script:StepActions[$stepIndex] $fixtureContext 2>&1 | Out-String
+  } catch {
+    # WHY: with the exclusion variable dropped outright the step throws a
+    # strict-mode error; recording it keeps this case's failure visible instead
+    # of aborting the run before the assertion can report.
+    $fixtureCrash = $_.Exception.Message
+  }
+  if ($fixtureCrash) {
+    Assert-Fail 'step 11: a shell step leaf with || true is excluded from the suppression audit' $fixtureCrash
+  } elseif ($fixtureOutput -match '\(\|\| true\)') {
+    Assert-Fail 'step 11: a shell step leaf with || true is excluded from the suppression audit' $fixtureOutput.Trim()
+  } elseif ($fixtureOutput -notmatch 'no suppression audit violations found') {
+    # WHY: without this the case could pass on an audit that never saw the
+    # fixture instead of one that saw it and excluded it.
+    Assert-Fail 'step 11: a shell step leaf with || true is excluded from the suppression audit' 'suppression audit did not run'
+  } else {
+    Assert-Pass 'step 11: a shell step leaf with || true is excluded from the suppression audit'
+  }
+} finally {
+  # WHY: a completed run must leave no temp fixture behind.
+  Remove-Item -LiteralPath $fixtureRoot -Recurse -Force
+}
+
+Write-Output ''
+# 7. Without positional args the audit walks RepoRoot itself (the branch at
+#    11-repo-policy-grep.ps1:89-100). The fixture pins each clause of that
+#    walk: the ordinary file is reported, the step leaf and vendor/ decoys are
+#    dropped, and tests/ is exempt. The live no-args case over the real checkout
+#    never asserts the audit's output, so a regression isolated to those
+#    clauses would pass every other case here.
+$wholeRepoRoot = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "nucleus-step11-whole-repo-$([guid]::NewGuid().ToString('N'))"
+try {
+  New-Item -ItemType Directory -Path (Join-Path $wholeRepoRoot 'src') -Force > $null
+  New-Item -ItemType Directory -Path (Join-Path $wholeRepoRoot 'tests') -Force > $null
+  New-Item -ItemType Directory -Path (Join-Path $wholeRepoRoot 'vendor') -Force > $null
+  Set-Content -LiteralPath (Join-Path $wholeRepoRoot 'src/probe.sh') -Value @('#!/usr/bin/env bash', 'command --flag || true')
+  Set-Content -LiteralPath (Join-Path $wholeRepoRoot 'src/probe.ps1') -Value @('$a = Get-Item "p" -ErrorAction SilentlyContinue')
+  Set-Content -LiteralPath (Join-Path $wholeRepoRoot '11-repo-policy-grep.sh') -Value @('set -euo pipefail', 'command --flag || true')
+  Set-Content -LiteralPath (Join-Path $wholeRepoRoot 'tests/t.sh') -Value @('command --flag || true')
+  Set-Content -LiteralPath (Join-Path $wholeRepoRoot 'vendor/v.sh') -Value @('command --flag || true')
+  $wholeRepoContext = [pscustomobject]@{
+    HasArgs        = $false
+    RepoRoot       = $wholeRepoRoot
+    PositionalArgs = @()
+  }
+  $wholeRepoOutput = ''
+  $wholeRepoCrash = ''
+  try {
+    $wholeRepoOutput = & $script:StepActions[$stepIndex] $wholeRepoContext 2>&1 | Out-String
+  } catch {
+    # WHY: recorded rather than rethrown so the assertions below still run and
+    # report the failure with the step's own message.
+    $wholeRepoCrash = $_.Exception.Message
+  }
+  $wholeRepoName = 'step 11: the no-args walk reports an ordinary file and drops the decoys'
+  if ($wholeRepoCrash) {
+    Assert-Fail $wholeRepoName $wholeRepoCrash
+  } elseif ($wholeRepoOutput -notmatch 'probe\.ps1:1 \(-ErrorAction SilentlyContinue\)') {
+    # WHY: the ps1 half of the walk is what proves the branch ran at all; a
+    # scan that read nothing would otherwise satisfy the count below.
+    Assert-Fail $wholeRepoName "ps1 violation missing: $($wholeRepoOutput.Trim())"
+  } else {
+    $wholeRepoReports = @([regex]::Matches($wholeRepoOutput, '\(\|\| true\)'))
+    if ($wholeRepoReports.Count -ne 1 -or $wholeRepoOutput -notmatch 'probe\.sh:2 \(\|\| true\)') {
+      # WHY: exactly one (|| true) line pins the leaf, vendor/ and tests/
+      # exclusions together: any of them leaking makes the count two or more.
+      Assert-Fail $wholeRepoName "expected only src/probe.sh, got $($wholeRepoReports.Count) report(s): $($wholeRepoOutput.Trim())"
+    } else {
+      Assert-Pass $wholeRepoName
+    }
+  }
+} finally {
+  # WHY: a completed run must leave no temp fixture behind.
+  Remove-Item -LiteralPath $wholeRepoRoot -Recurse -Force
+}
+
+Write-Output ''
 Write-Output "TOTAL $script:passCount passed, $script:failCount failed"
 if ($script:failCount -gt 0) { exit 1 }
 exit 0

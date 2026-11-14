@@ -1,0 +1,44 @@
+{
+  "$schema": "https://raw.githubusercontent.com/ScoopInstaller/Scoop/master/schema.json",
+  "checkver": {
+    "regex": "\"tag_name\":\\s*\"v?([\\d.]+R?)\"",
+    "url": "https://api.github.com/repos/adobe-fonts/source-serif/releases/latest"
+  },
+  "description": "Typeface for setting text in many sizes, weights, and languages, designed to complement Source Sans",
+  "hash": "549fdb8f9a682bd06944298621404969f6de77c2e422ff3b8244a1dcd6a0c425",
+  "homepage": "https://adobe-fonts.github.io/source-serif/",
+  "installer": {
+    "script": [
+      "$fontDir = \"$env:LOCALAPPDATA\\Microsoft\\Windows\\Fonts\"",
+      "New-Item -ItemType Directory -Path $fontDir -Force | Out-Null",
+      "# Packaged (MSIX/UWP) apps read per-user fonts only with this grant; the SIDs are locale-independent.",
+      "$fontAcl = Get-Acl $fontDir",
+      "$allApplicationPackagesAccessRule = New-Object System.Security.AccessControl.FileSystemAccessRule([System.Security.Principal.SecurityIdentifier]::new(\"S-1-15-2-1\"), \"ReadAndExecute\", \"ContainerInherit,ObjectInherit\", \"None\", \"Allow\")",
+      "$allRestrictedApplicationPackagesAccessRule = New-Object System.Security.AccessControl.FileSystemAccessRule([System.Security.Principal.SecurityIdentifier]::new(\"S-1-15-2-2\"), \"ReadAndExecute\", \"ContainerInherit,ObjectInherit\", \"None\", \"Allow\")",
+      "$fontAcl.SetAccessRule($allApplicationPackagesAccessRule)",
+      "$fontAcl.SetAccessRule($allRestrictedApplicationPackagesAccessRule)",
+      "Set-Acl -AclObject $fontAcl $fontDir",
+      "$fontKey = 'HKCU:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts'",
+      "$fontCount = 0",
+      "Get-ChildItem -Path $dir -Filter '*.ttf' -Recurse | ForEach-Object {",
+      "    $fontCount++",
+      "    Copy-Item -Path $_.FullName -Destination $fontDir -Force",
+      "    New-ItemProperty -Path $fontKey -Name $_.Name.Replace($_.Extension, ' (TrueType)') -Value (Join-Path $fontDir $_.Name) -Force | Out-Null",
+      "}",
+      "if ($fontCount -eq 0) { throw 'source serif 4.005: no *.ttf found under the extracted archive; the release layout changed' }"
+    ]
+  },
+  "license": "OFL-1.1",
+  "uninstaller": {
+    "script": [
+      "$fontDir = \"$env:LOCALAPPDATA\\Microsoft\\Windows\\Fonts\"",
+      "$fontKey = 'HKCU:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts'",
+      "Get-ChildItem -Path $dir -Filter '*.ttf' -Recurse | ForEach-Object {",
+      "    Remove-ItemProperty -Path $fontKey -Name $_.Name.Replace($_.Extension, ' (TrueType)') -Force -ErrorAction SilentlyContinue",
+      "    Remove-Item -Path (Join-Path $fontDir $_.Name) -Force -ErrorAction SilentlyContinue",
+      "}"
+    ]
+  },
+  "url": "https://github.com/adobe-fonts/source-serif/releases/download/4.005R/source-serif-4.005_Desktop.zip",
+  "version": "4.005R"
+}

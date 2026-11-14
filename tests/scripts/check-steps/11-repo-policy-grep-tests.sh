@@ -249,153 +249,6 @@ fi
 echo "PASS: activation tool resolution"
 
 # ---------------------------------------------------------------------------
-# srt wrapper invariants (run_srt_wrapper_invariants)
-#
-# srt parses its own options wherever they appear, so a wrapper that forwards
-# arguments without `--` loses them: `pi --help` prints srt's usage and
-# `pi -c <arg>` drops both arguments silently. The scan is driven with explicit
-# positional files (HAS_ARGS=true) so it never depends on the gitignore filter
-# being available inside a temporary fixture tree.
-# ---------------------------------------------------------------------------
-
-# Run the srt sub-check over one or more files and capture its combined output.
-# $@: file paths, relative to the repository root.
-run_srt_scan() {
-  local _file
-  for _file in "$@"; do
-    [ -f "$_file" ] || return 1
-  done
-  local -A _srt_ctx=([HAS_ARGS]=true [REPO_ROOT]="$REPO_ROOT")
-  _out=$(
-    cd "$REPO_ROOT" || return 1
-    run_srt_wrapper_invariants _srt_ctx "$@" 2>&1
-  )
-}
-
-# Does the report blame this file? Matched on the basename plus the trailing
-# "forwards the user's arguments" text, so a match can only come from the
-# violation line and not from the fixture path echoed elsewhere.
-srt_blames() {
-  case "$_out" in
-  *"$(basename -- "$1"):"*"forwards the user's arguments"*) return 0 ;;
-  *) return 1 ;;
-  esac
-}
-
-srt_fixture() {
-  local _root
-  _root=$(mktemp -d)
-  mkdir -p "$_root/src/scripts/shell"
-  printf '%s\n' "$@" >"$_root/src/scripts/shell/probe.sh"
-  printf '%s\n' "$_root/src/scripts/shell/probe.sh"
-}
-
-# The defect itself: a wrapper forwarding without the marker must be reported.
-# The positive control matters more than the negative half, because a scan that
-# reads nothing reports nothing and would pass a naive "no violation" assertion.
-test_srt_unseparated_wrapper_is_reported() {
-  local _probe _rc
-  _probe=$(srt_fixture 'srt command pi "$@"')
-  run_srt_scan "$_probe"
-  _rc=$?
-  rm -rf "$(dirname -- "$(dirname -- "$_probe")")"
-  if [ "$_rc" -eq 0 ]; then
-    fail "a wrapper without the separator was not reported" "$_out"
-    return 1
-  fi
-  if srt_blames "$_probe"; then
-    return 0
-  fi
-  fail "the report does not name the offending file" "$_out"
-  return 1
-}
-
-# An argument that merely starts with a dash is still forwarded verbatim, so
-# `pi -p x` has to be reported. Without the word-boundary tail on the exonerating
-# pattern this line would pass as if `--` were present.
-test_srt_leading_dash_argument_is_reported() {
-  local _probe _rc
-  _probe=$(srt_fixture 'srt command pi -p x')
-  run_srt_scan "$_probe"
-  _rc=$?
-  rm -rf "$(dirname -- "$(dirname -- "$_probe")")"
-  if [ "$_rc" -ne 0 ] && srt_blames "$_probe"; then
-    return 0
-  fi
-  fail "a wrapper whose first forwarded argument is a flag was not reported" "$_out"
-  return 1
-}
-
-# The fixed shape must pass, otherwise the rule would reject the repository's own
-# wrappers. Asserted on both real host wrappers, not on a copy of them.
-test_srt_separated_wrapper_is_accepted() {
-  local _rc
-  run_srt_scan src/scripts/shell/init.zsh src/scripts/shell/profile.ps1
-  _rc=$?
-  if [ "$_rc" -ne 0 ]; then
-    fail "the shipped wrappers were reported" "$_out"
-    return 1
-  fi
-  return 0
-}
-
-# Neither a comment quoting the invocation nor the `srt -c '<string>'` form is a
-# violation: the string sits behind -c as one argument and exposes no per-argument
-# flag for srt's parser to steal. The unseparated line alongside them is the
-# positive control, so an exclusion that suppressed everything would still fail.
-test_srt_comment_and_c_form_are_ignored() {
-  local _probe _rc
-  _probe=$(srt_fixture '# example: srt command pi "$@"' "srt -c 'pi --help'" 'srt command pi -- "$@"' 'srt command pi --help')
-  run_srt_scan "$_probe"
-  _rc=$?
-  rm -rf "$(dirname -- "$(dirname -- "$_probe")")"
-  if [ "$_rc" -eq 0 ]; then
-    fail "the scan reported nothing, so the exclusions were not exercised" "$_out"
-    return 1
-  fi
-  # Exactly the last line is the violation.
-  if [ "$(grep -c "forwards the user's arguments" <<<"$_out")" -ne 1 ]; then
-    fail "expected exactly one violation, got:" "$_out"
-    return 1
-  fi
-  return 0
-}
-
-# The step files carry the rule's own wording. Scanning them must find nothing:
-# that is what lets the scan cover its own source without an exclusion list.
-test_srt_step_files_are_not_self_reported() {
-  local _rc
-  run_srt_scan \
-    src/scripts/checks/check-steps/11-repo-policy-grep.sh \
-    src/scripts/checks/check-steps/11-repo-policy-grep.ps1
-  _rc=$?
-  if [ "$_rc" -ne 0 ]; then
-    fail "the check reported its own step files" "$_out"
-    return 1
-  fi
-  return 0
-}
-
-srt_failures=0
-for test in \
-  test_srt_unseparated_wrapper_is_reported \
-  test_srt_leading_dash_argument_is_reported \
-  test_srt_separated_wrapper_is_accepted \
-  test_srt_comment_and_c_form_are_ignored \
-  test_srt_step_files_are_not_self_reported; do
-  if ! "$test"; then
-    echo "FAIL: $test"
-    srt_failures=$((srt_failures + 1))
-  fi
-done
-
-if [ "$srt_failures" -ne 0 ]; then
-  echo "FAIL: $srt_failures srt wrapper invariant test(s) failed"
-  exit 1
-fi
-echo "PASS: srt wrapper invariants"
-
-# ---------------------------------------------------------------------------
 # PowerShell suppression audit (run_suppression_audit, the .ps1 half)
 #
 # The PowerShell twin audits .ps1 for unannotated suppressions. Without the
@@ -440,7 +293,7 @@ ps1_fixture() {
   printf '%s\n' "$_root/$1/probe.ps1"
 }
 
-ps1_fixture_root() {
+fixture_root() {
   printf '%s\n' "$(dirname -- "$(dirname -- "$1")")"
 }
 
@@ -459,7 +312,7 @@ ps1_blames() {
 test_ps1_undocumented_suppression_is_reported() {
   local _probe _root _rc
   _probe=$(ps1_fixture src "\$a = Get-Item 'p' -ErrorAction SilentlyContinue")
-  _root=$(ps1_fixture_root "$_probe")
+  _root=$(fixture_root "$_probe")
   run_ps1_supp_scan "$_probe"
   _rc=$?
   rm -rf "$_root"
@@ -478,7 +331,7 @@ test_ps1_undocumented_suppression_is_reported() {
 test_ps1_same_line_annotation_documents() {
   local _probe _root _rc
   _probe=$(ps1_fixture src "# check-suppress:suppression_doc: probe; the null check below handles it" "\$a = Get-Item 'p' -ErrorAction SilentlyContinue # check-suppress:suppression_doc: probe; the null check below handles it")
-  _root=$(ps1_fixture_root "$_probe")
+  _root=$(fixture_root "$_probe")
   run_ps1_supp_scan "$_probe"
   _rc=$?
   rm -rf "$_root"
@@ -494,7 +347,7 @@ test_ps1_same_line_annotation_documents() {
 test_ps1_preceding_line_annotation_documents() {
   local _probe _root _rc
   _probe=$(ps1_fixture src "# check-suppress:suppression_doc: probe; the null check below handles it" "\$a = Get-Item 'p' -ErrorAction SilentlyContinue")
-  _root=$(ps1_fixture_root "$_probe")
+  _root=$(fixture_root "$_probe")
   run_ps1_supp_scan "$_probe"
   _rc=$?
   rm -rf "$_root"
@@ -525,7 +378,7 @@ test_ps1_comment_line_is_not_a_violation() {
 test_ps1_annotated_out_null_is_still_reported() {
   local _probe _root _rc
   _probe=$(ps1_fixture src "Get-Item 'z' | Out-Null # check-suppress:suppression_doc: discarded")
-  _root=$(ps1_fixture_root "$_probe")
+  _root=$(fixture_root "$_probe")
   run_ps1_supp_scan "$_probe"
   _rc=$?
   rm -rf "$_root"
@@ -546,7 +399,7 @@ test_ps1_annotated_out_null_is_still_reported() {
 test_ps1_tests_directory_exemption() {
   local _probe _root _rc _reported
   _probe=$(ps1_fixture tests "\$a = Get-Item 'p' -ErrorAction SilentlyContinue" "\$b = & cmd /c ver 2>\$null" "\$null = Get-Item 'r'" "[void](Get-Item 'u')" "try { Get-Item 's' } catch {}" "Get-Item 'z' | Out-Null")
-  _root=$(ps1_fixture_root "$_probe")
+  _root=$(fixture_root "$_probe")
   run_ps1_supp_scan "$_probe"
   _rc=$?
   rm -rf "$_root"
@@ -572,7 +425,7 @@ test_ps1_tests_directory_exemption() {
 test_ps1_step_files_are_not_self_reported() {
   local _probe _root
   _probe=$(ps1_fixture src "\$a = Get-Item 'p' -ErrorAction SilentlyContinue")
-  _root=$(ps1_fixture_root "$_probe")
+  _root=$(fixture_root "$_probe")
   run_ps1_supp_scan \
     src/scripts/checks/check-steps/11-repo-policy-grep.ps1 \
     src/scripts/checks/check-steps/12-repo-policy-pattern.ps1 \
@@ -612,3 +465,349 @@ if [ "$ps1_failures" -ne 0 ]; then
   exit 1
 fi
 echo "PASS: PowerShell suppression audit"
+
+# ---------------------------------------------------------------------------
+# POSIX suppression audit (run_suppression_audit, the .sh/.nix half)
+#
+# The shell and Nix half is not the PowerShell half: a shellcheck directive with
+# no reason, or an annotation with an unregistered id, prints the offending line
+# so it can be read straight out of the CI log, and a bare `|| true` prints its
+# pattern label before the line. Both come out of one pass over the whole file
+# list, so these tests drive the real function through one call per fixture set
+# and pin the exact file:line text of every shape.
+# ---------------------------------------------------------------------------
+
+# Write a fixture file under a fresh temp root and print its path.
+# $1: path under that root (e.g. src/probe.sh), remaining args: the file's lines.
+supp_fixture() {
+  local _root
+  _root=$(mktemp -d)
+  mkdir -p "$_root/$(dirname -- "$1")"
+  printf '%s\n' "${@:2}" >"$_root/$1"
+  printf '%s\n' "$_root/$1"
+}
+
+# Run the audit over the given fixtures and capture its combined output.
+# The half a fixture belongs to follows from its extension, which is what the
+# audit dispatches on, so one call covers shell, Nix and PowerShell together.
+run_supp_scan() {
+  SH_FILES=()
+  NIX_FILES=()
+  PS1_FILES=()
+  CACHED_NIX_FILES=()
+  CACHED_SHELL_FILES=()
+  local _f
+  for _f in "$@"; do
+    case "$_f" in
+    *.sh) SH_FILES+=("$_f") ;;
+    *.nix) NIX_FILES+=("$_f") ;;
+    *.ps1) PS1_FILES+=("$_f") ;;
+    esac
+  done
+  local -A _supp_ctx=(
+    [HAS_ARGS]=true
+    [REPO_ROOT]="$REPO_ROOT"
+    [SH_FILES]="SH_FILES"
+    [PS1_FILES]="PS1_FILES"
+    [NIX_FILES]="NIX_FILES"
+    [CACHED_NIX_FILES]="CACHED_NIX_FILES"
+    [CACHED_SHELL_FILES]="CACHED_SHELL_FILES"
+  )
+  _out=$(
+    cd "$REPO_ROOT" || return 1
+    run_suppression_audit _supp_ctx 2>&1
+  )
+}
+
+# Does the report carry this complete message line?
+supp_reports() {
+  case "$_out" in
+  *"$1"*) return 0 ;;
+  *) return 1 ;;
+  esac
+}
+
+# An "accepted" case proves nothing on its own: a scan that reads no file also
+# reports nothing. Every accepted fixture therefore shares its call with a
+# control that must be reported, and nothing may be reported from the accepted
+# one.
+# $1: accepted fixture path, $2: the control's complete expected report line.
+supp_only_control_reported() {
+  local _accepted="$1" _expected="$2" _reported
+  _reported=$(printf '%s\n' "$_out" | grep -c 'undoc_supp:')
+  if [ "$_reported" -ne 1 ] || ! supp_reports "$_expected"; then
+    fail "expected only the control to be reported, got $_reported" "$_out"
+    return 1
+  fi
+  case "$_out" in
+  *"$_accepted:"*)
+    fail "the accepted fixture was reported" "$_out"
+    return 1
+    ;;
+  esac
+  return 0
+}
+
+# A shellcheck directive with no reason beside it is the shape the annotation
+# audit exists for. The message repeats the line, so this pins it whole.
+test_posix_unannotated_shellcheck_disable_is_reported() {
+  local _probe _root _rc
+  _probe=$(supp_fixture src/probe.sh "#!/usr/bin/env bash" "# shellcheck disable=SC2086") # check-suppress:suppression_doc: fixture text -- the pattern under test
+  _root=$(fixture_root "$_probe")
+  run_supp_scan "$_probe"
+  _rc=$?
+  rm -rf "$_root"
+  if [ "$_rc" -eq 0 ]; then
+    fail "an unannotated shellcheck disable was not reported" "$_out"
+    return 1
+  fi
+  if supp_reports "undoc_supp:$_probe:2:# shellcheck disable=SC2086"; then # check-suppress:suppression_doc: expected report -- the audit echoes the line
+    return 0
+  fi
+  fail "the report does not carry the offending line" "$_out"
+  return 1
+}
+
+# The documented form: `reason:` on the same line. The undocumented directive in
+# the same call is the control: it proves the annotation audit ran, and a dropped
+# negative filter reports the accepted fixture alongside it. The accepted fixture
+# is also scanned alone, so a clean scan must still exit 0.
+test_posix_documented_shellcheck_disable_is_accepted() {
+  local _probe _control _rc
+  _probe=$(supp_fixture src/probe.sh "#!/usr/bin/env bash" "# shellcheck disable=SC2086 # reason: probe")
+  _control=$(supp_fixture src/control.sh "#!/usr/bin/env bash" "# shellcheck disable=SC2086") # check-suppress:suppression_doc: fixture text -- the control's pattern
+  run_supp_scan "$_probe"
+  _rc=$?
+  if [ "$_rc" -ne 0 ]; then
+    fail "a clean scan of the accepted fixture exited $_rc" "$_out"
+    rm -rf "$(fixture_root "$_probe")" "$(fixture_root "$_control")"
+    return 1
+  fi
+  run_supp_scan "$_probe" "$_control"
+  rm -rf "$(fixture_root "$_probe")" "$(fixture_root "$_control")"
+  if ! supp_only_control_reported "$_probe" "undoc_supp:$_control:2:# shellcheck disable=SC2086"; then # check-suppress:suppression_doc: expected report -- the audit echoes the line
+    return 1
+  fi
+  return 0
+}
+
+# A bare `|| true` prints its label, then the line as written (leading
+# indentation included), which is why the expected string is exact.
+test_posix_bare_or_true_is_reported() {
+  local _probe _root _rc
+  _probe=$(supp_fixture src/probe.sh "#!/usr/bin/env bash" "  probe_cmd || true")
+  _root=$(fixture_root "$_probe")
+  run_supp_scan "$_probe"
+  _rc=$?
+  rm -rf "$_root"
+  if [ "$_rc" -eq 0 ]; then
+    fail "a bare '|| true' was not reported" "$_out"
+    return 1
+  fi
+  if supp_reports "undoc_supp:$_probe:2:|| true:   probe_cmd || true"; then
+    return 0
+  fi
+  fail "the report does not carry the label and the line" "$_out"
+  return 1
+}
+
+# The annotation above the line documents it, the same acceptance the
+# PowerShell half applies and the form the shipped scripts use. The undocumented
+# `|| true` in the same call is the control. The accepted fixture is also
+# scanned alone, so a clean scan must still exit 0.
+test_posix_documented_or_true_is_accepted() {
+  local _probe _control _rc
+  _probe=$(supp_fixture src/probe.sh \
+    "#!/usr/bin/env bash" \
+    "# check-suppress:suppression_doc: probe; the caller inspects the status" \
+    "  probe_cmd || true")
+  _control=$(supp_fixture src/control.sh "#!/usr/bin/env bash" "  other_cmd || true")
+  run_supp_scan "$_probe"
+  _rc=$?
+  if [ "$_rc" -ne 0 ]; then
+    fail "a clean scan of the accepted fixture exited $_rc" "$_out"
+    rm -rf "$(fixture_root "$_probe")" "$(fixture_root "$_control")"
+    return 1
+  fi
+  run_supp_scan "$_probe" "$_control"
+  rm -rf "$(fixture_root "$_probe")" "$(fixture_root "$_control")"
+  if ! supp_only_control_reported "$_probe" "undoc_supp:$_control:2:|| true:   other_cmd || true"; then
+    return 1
+  fi
+  return 0
+}
+
+# Only `|| true` carries the tests/ exemption; the annotation audit does not.
+# The .nix control outside tests/ is what keeps this from passing against a
+# scan that reported nothing, and it also proves a Nix file reaches the rule.
+test_posix_or_true_tests_directory_exemption() {
+  local _exempt _control _root _reported
+  _exempt=$(supp_fixture tests/probe.sh "#!/usr/bin/env bash" "  probe_cmd || true")
+  _control=$(supp_fixture src/probe.nix "  bad = probe || true;")
+  _root=$(fixture_root "$_control")
+  run_supp_scan "$_exempt" "$_control"
+  _reported=$(printf '%s\n' "$_out" | grep -c 'undoc_supp:')
+  rm -rf "$_root" "$(fixture_root "$_exempt")"
+  if [ "$_reported" -ne 1 ]; then
+    fail "expected exactly the control to be reported, got $_reported" "$_out"
+    return 1
+  fi
+  if ! supp_reports "undoc_supp:$_control:1:|| true:   bad = probe || true;"; then
+    fail "the control was not reported" "$_out"
+    return 1
+  fi
+  case "$_out" in
+  *"probe.sh"*)
+    fail "the tests/ fixture was reported" "$_out"
+    return 1
+    ;;
+  esac
+  return 0
+}
+
+# The repo-relative rule strips any run of separators after the root, the way
+# the PowerShell twin's TrimStart does, so a doubled separator still lands the
+# file under tests/ and takes the exemption. REPO_ROOT is shadowed to the
+# fixture tree because run_supp_scan pins it to the real checkout, and only the
+# root-prefix branch is what the twin's rule changed.
+test_posix_tests_exemption_survives_doubled_separator() {
+  local _exempt _control _root _reported
+  local REPO_ROOT
+  _exempt=$(supp_fixture tests/probe.sh "#!/usr/bin/env bash" "  probe_cmd || true")
+  _control=$(supp_fixture src/probe.nix "  bad = probe || true;")
+  _root=$(fixture_root "$_exempt")
+  REPO_ROOT="$_root"
+  run_supp_scan "$_root//tests/probe.sh" "$_control"
+  _reported=$(printf '%s\n' "$_out" | grep -c 'undoc_supp:')
+  rm -rf "$_root" "$(fixture_root "$_control")"
+  if [ "$_reported" -ne 1 ]; then
+    fail "expected exactly the control to be reported, got $_reported" "$_out"
+    return 1
+  fi
+  if ! supp_reports "undoc_supp:$_control:1:|| true:   bad = probe || true;"; then
+    fail "the control was not reported" "$_out"
+    return 1
+  fi
+  case "$_out" in
+  *"probe.sh"*)
+    fail "the doubled-separator tests/ fixture was reported" "$_out"
+    return 1
+    ;;
+  esac
+  return 0
+}
+
+# Per-file state must not leak. The first file ends on an annotation line, so a
+# program that carried `prev` into the next file would read the second file's
+# line 1 as documented and report nothing. Two mechanisms prevent that and each
+# is sufficient alone: the `FNR > 1` guard on the prev check, and the reset in
+# the FNR == 1 block. Removing either one leaves this case green, because the
+# other still holds; removing both turns it red.
+test_posix_annotation_does_not_cross_files() {
+  local _first _second _reported
+  _first=$(supp_fixture src/first.sh "#!/usr/bin/env bash" "# check-suppress:suppression_doc: probe; documents this file only")
+  _second=$(supp_fixture src/second.sh "  probe_cmd || true")
+  run_supp_scan "$_first" "$_second"
+  _reported=$(printf '%s\n' "$_out" | grep -c 'undoc_supp:')
+  rm -rf "$(fixture_root "$_first")" "$(fixture_root "$_second")"
+  if [ "$_reported" -ne 1 ]; then
+    fail "expected the second file's line 1 to be reported, got $_reported" "$_out"
+    return 1
+  fi
+  if ! supp_reports "undoc_supp:$_second:1:|| true:   probe_cmd || true"; then
+    fail "the line 1 violation was not reported" "$_out"
+    return 1
+  fi
+  case "$_out" in
+  *"$_first:"*)
+    fail "the annotation-only file was reported" "$_out"
+    return 1
+    ;;
+  esac
+  return 0
+}
+
+# One call, both halves. Each family keeps its own message shape and its own
+# pattern list, so a program that applied one list to every file loses four of
+# these five lines.
+test_posix_mixed_family_scan_reports_each_shape() {
+  local _ps1 _sh _root _sh_root _ps1_lines _sh_lines
+  # shellcheck disable=SC2016 # reason: fixture body must reach the file unexpanded
+  _ps1=$(supp_fixture src/probe.ps1 \
+    '$a = Get-Item "p" -ErrorAction SilentlyContinue' \
+    '$null = Get-Item "r"' \
+    '[void](Get-Item "u")' \
+    '& cmd /c ver 2>$null')
+  _sh=$(supp_fixture src/probe.sh "probe_cmd || true")
+  _root=$(fixture_root "$_ps1")
+  _sh_root=$(fixture_root "$_sh")
+  run_supp_scan "$_ps1" "$_sh"
+  _ps1_lines=$(printf '%s\n' "$_out" | grep -c "$_ps1:[0-9][0-9]* (")
+  _sh_lines=$(printf '%s\n' "$_out" | grep -c 'undoc_supp:')
+  rm -rf "$_root" "$_sh_root"
+  if [ "$_ps1_lines" -ne 4 ] || [ "$_sh_lines" -ne 1 ]; then
+    fail "expected 4 PowerShell and 1 shell violation, got $_ps1_lines and $_sh_lines" "$_out"
+    return 1
+  fi
+  for _expected in \
+    "$_ps1:1 (-ErrorAction SilentlyContinue)" \
+    "$_ps1:2 (\$null =)" \
+    "$_ps1:3 ([void])" \
+    "$_ps1:4 (2>\$null)" \
+    "undoc_supp:$_sh:1:|| true: probe_cmd || true"; do
+    if ! supp_reports "$_expected"; then
+      fail "missing report line: $_expected" "$_out"
+      return 1
+    fi
+  done
+  return 0
+}
+
+# The `|| true` rule covers shell and Nix only. The twin feeds its rule the same
+# two lists, so a PowerShell 7 chain operator is not a shell suppression and a
+# .ps1 file must not be reported for it. Without this, a program that applied
+# every pattern to every file still passes the mixed-family test above. The shell
+# file in the same call is the control, so the case cannot pass against a scan
+# that read nothing. The .ps1 alone is also scanned, so a clean scan must still
+# exit 0.
+test_posix_or_true_is_shell_only() {
+  local _ps1 _control _rc
+  _ps1=$(supp_fixture src/probe.ps1 'Get-Item "p" || true')
+  _control=$(supp_fixture src/control.sh "probe_cmd || true")
+  run_supp_scan "$_ps1"
+  _rc=$?
+  if [ "$_rc" -ne 0 ]; then
+    fail "a clean scan of the accepted fixture exited $_rc" "$_out"
+    rm -rf "$(fixture_root "$_ps1")" "$(fixture_root "$_control")"
+    return 1
+  fi
+  run_supp_scan "$_ps1" "$_control"
+  rm -rf "$(fixture_root "$_ps1")" "$(fixture_root "$_control")"
+  if ! supp_only_control_reported "$_ps1" "undoc_supp:$_control:1:|| true: probe_cmd || true"; then
+    return 1
+  fi
+  return 0
+}
+
+posix_failures=0
+for test in \
+  test_posix_unannotated_shellcheck_disable_is_reported \
+  test_posix_documented_shellcheck_disable_is_accepted \
+  test_posix_bare_or_true_is_reported \
+  test_posix_documented_or_true_is_accepted \
+  test_posix_annotation_does_not_cross_files \
+  test_posix_or_true_is_shell_only \
+  test_posix_or_true_tests_directory_exemption \
+  test_posix_tests_exemption_survives_doubled_separator \
+  test_posix_mixed_family_scan_reports_each_shape; do
+  if ! "$test"; then
+    echo "FAIL: $test"
+    posix_failures=$((posix_failures + 1))
+  fi
+done
+
+if [ "$posix_failures" -ne 0 ]; then
+  echo "FAIL: $posix_failures POSIX suppression audit test(s) failed"
+  exit 1
+fi
+echo "PASS: POSIX suppression audit"

@@ -1,0 +1,9 @@
+# safe-rm configuration for the test suites, reached through SAFE_RM_CONFIG from
+# ensure_safe_rm_env (tests/scripts/test-lib.sh).
+#
+# WHY a checked-in file rather than the operator's ~/.safe-rm/config: safe-rm
+# sources whatever SAFE_RM_CONFIG names, and a suite that runs with the real HOME
+# (gc-log-tests.sh does) would otherwise read configuration it does not control.
+# This file pins safe-rm to its built-in defaults, and it holds no overrides of
+# its own: the scratch trash the helper exports alongside it already forces the
+# `mv` route and keeps AppleScript out of a test run.

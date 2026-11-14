@@ -1,7 +1,7 @@
 ---
-description: "Use when implementing new features, modules, or changes that require test coverage. Mandates TDD practices for Nix and Windows DSC configurations. Covers test structure, CI integration, and validation patterns."
+description: "Use when implementing new features, modules, or changes that require test coverage, and when authoring a check or test that reads source text. Mandates TDD practices for Nix and Windows DSC configurations and the four-condition gate for text-only checks. Covers test structure, CI integration, and validation patterns."
 name: "Testing Guidelines"
-applyTo: "tests/**, src/hosts/Windows/**/*.yml, src/platforms/Windows/modules/**/*.ps1, tests/scripts/**, scripts/check.sh, scripts/check.ps1, scripts/test.sh, scripts/test.ps1, .github/workflows/**"
+applyTo: "tests/**, src/hosts/Windows/**/*.yml, src/platforms/Windows/modules/**/*.ps1, tests/scripts/**, src/scripts/checks/**, src/scripts/tests/**, scripts/check.sh, scripts/check.ps1, scripts/test.sh, scripts/test.ps1, .github/workflows/**"
 ---
 
 # Testing guidelines
@@ -79,13 +79,18 @@ An assertion on a value that cannot distinguish the outcomes it claims to test p
 
 Before writing an assertion, name the result that would make it fail. Assert that discriminating fact (attempt count, recorded state, resolved path), not the summary every path shares, then break the behavior and confirm the assertion fires.
 
-## Anti-pattern: grep-only Nix tests
+## Text-only checks and tests
 
-`builtins.readFile` plus `containsRegex` or `lib.hasInfix` is implementation-coupled: it breaks on reflow, renames, or comment edits and asserts no behavior.
+A check or test that reads source text instead of executing behavior is banned by default. A text scan does not test behavior, it breaks on reflow, renames, and comment edits, and it is what gets written when nobody wrote a real test.
 
-Acceptable: proving a banned pattern is absent (`!containsRegex "pip install"`), validating annotation presence, matching expected error text in a failure test, and parsing shell scripts when nothing else works (add a `# WHY:` comment).
+A text-only check may exist only when all four hold:
 
-Unacceptable: asserting a function name, an import path, or a string literal exists in a source file. Convert those to behavioral tests that evaluate the module with fixture data and check output attributes.
+1. No behavioral enforcement point exists. Style, annotation, and documentation rules have no runtime to test against.
+2. The match anchors to structure (syntax tokens, annotation markers, file layout), never to prose or formatting.
+3. A failure names a defect an implementer must fix, not a stylistic artifact.
+4. It duplicates nothing that already enforces the rule (shell function, schema validation, Nix assertion, executing test).
+
+When a text-only check fails on formatting, delete it. Converting it to an executing test is the second option and only when the behavior runs in the check environment. Before writing a new one, name which of the four conditions holds and put that reasoning in the change.
 
 ## Test script gotchas
 
@@ -110,6 +115,6 @@ Push, PR, and manual runs. POSIX: `nix run ./src#test`. Windows: `bootstrap.ps1`
 - [ ] `find tests/modules tests/integration tests/hosts -name '*.nix' -exec nix-instantiate --eval {} +`
 - [ ] `cd src && nix flake check`
 - [ ] `nix run ./src#check`
-- [ ] `pwsh -File scripts/check-pwsh.ps1 -OnlyStep PSSA`
-- [ ] `pwsh -File scripts/check-pwsh.ps1 -OnlyStep Syntax -Settings scripts/test-PSScriptAnalyzerSettings.psd1`
+- [ ] `pwsh -File src/scripts/checks/check-pwsh.ps1 -OnlyStep PSSA`
+- [ ] `pwsh -File src/scripts/checks/check-pwsh.ps1 -OnlyStep Syntax -Settings scripts/test-PSScriptAnalyzerSettings.psd1`
 - [ ] `pwsh -File scripts/test.ps1 --only-steps=nix-tests`

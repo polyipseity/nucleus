@@ -4,7 +4,7 @@
 
 _arguments \
   '(-h --help)'{--help,-h}'[Show usage]' \
-  '1:subcommand:((cleanup-nix "" preferences ""))' \
+  '1:subcommand:((cleanup-nix "" graveyard "Report the rip2 graveyard path, entry count, total bytes, and oldest entry; deletes nothing" logs "Rotate and expire managed logs via nucleus-logs; defaults to '\''gc'\''" preferences ""))' \
   '--dry-run[dry run]' \
   '--duperemove-gc[duperemove gc]' \
   '--expiry[expiry]' \

@@ -76,7 +76,10 @@ in
     };
     trust = {
       # softnet is a transitive tart dependency that cannot be enumerated statically.
-      taps = [ "openai/tools" "cirruslabs/cli" ];
+      taps = [
+        "openai/tools"
+        "cirruslabs/cli"
+      ];
       formulae = [
         "smudge/smudge/nightlight"
       ];

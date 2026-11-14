@@ -35,6 +35,13 @@ _sls_live="/nix/store"
 # GC'd store entries from its parent shell, and ambient staleness would
 # pollute every case's report.
 _sls_controlled_path="/usr/bin:/bin:/usr/sbin:/sbin"
+# zsh is resolved once and invoked by absolute path. It is not under the
+# controlled PATH on a host whose zsh comes from Nix, which is exactly what the
+# Linux CI runner provides, and a bare `zsh` there failed to exec.
+_sls_zsh="$(command -v zsh)"
+# Exit status of the last run_init_case, asserted by every case rather than
+# aborting the suite: the case runs as a top-level command under `set -e`.
+_sls_status=0
 
 _sls_tmp="$(mktemp -d)"
 trap 'rm -rf "$_sls_tmp"' EXIT
@@ -88,11 +95,24 @@ run_init_case() { # <err-file> <out-file> [VAR=VALUE ...]
   local _err="$1"
   local _out="$2"
   shift 2
+  _sls_status=0
   (
     cd "$_sls_tmp" || exit 1
     env -i PATH="$_sls_controlled_path" HOME="$_sls_home" \
-      "$@" zsh -f "$_sls_driver" </dev/null >"$_out" 2>"$_err"
-  )
+      "$@" "$_sls_zsh" -f "$_sls_driver" </dev/null >"$_out" 2>"$_err"
+  ) || _sls_status=$?
+}
+
+# A shell init that sources cleanly exits 0. A non-zero status means zsh aborted
+# before the driver printed the state the case asserts on, so the case reports
+# the status and zsh's stderr instead of leaving the runner a silent death.
+assert_sourced_cleanly() { # <label> <err-file>
+  if [ "$_sls_status" -eq 0 ]; then
+    assert_pass "$1: zsh sources the init cleanly"
+  else
+    assert_fail "$1: zsh sources the init cleanly" \
+      "zsh exited $_sls_status; stderr: $(tr '\n' ' ' <"$2")"
+  fi
 }
 
 assert_dropped() { # <label> <err-file>
@@ -133,6 +153,7 @@ _out="$_sls_tmp/out.txt"
 # A dead NIX_CC is the failing-cargo case: report it, point at the devShell
 # remedy, and observe the variable actually gone.
 run_init_case "$_err" "$_out" "NIX_CC=$_sls_dead"
+assert_sourced_cleanly "dead NIX_CC" "$_err"
 assert_dropped "dead NIX_CC is reported" "$_err"
 if grep -qF "NIX_CC=$_sls_dead" "$_err"; then
   assert_pass "dead NIX_CC report names the dead value"
@@ -158,6 +179,7 @@ fi
 _sls_live_path="/usr/bin:/bin:/usr/sbin"
 run_init_case "$_err" "$_out" \
   "PATH=$_sls_live_path:$_sls_dead/bin:$_sls_live_path"
+assert_sourced_cleanly "dead PATH entry" "$_err"
 assert_dropped "dead PATH entry is reported" "$_err"
 assert_no_remedy "dead PATH entry alone prints no devShell remedy" "$_err"
 if grep -qx "PATH=$_sls_live_path" "$_out"; then
@@ -171,6 +193,7 @@ fi
 # itself is gone, so report and unset. SDKROOT carries no NIX_ prefix, so the
 # devShell remedy must stay silent.
 run_init_case "$_err" "$_out" "SDKROOT=$_sls_dead_sub"
+assert_sourced_cleanly "dead SDKROOT" "$_err"
 assert_dropped "dead SDKROOT is reported" "$_err"
 assert_no_remedy "dead SDKROOT prints no devShell remedy" "$_err"
 assert_toolchain_remedy "dead SDKROOT prints the toolchain remedy" "$_err"
@@ -186,6 +209,7 @@ fi
 # completion-dir mkdir fails loudly on its own instead of losing the home
 # path for every later consumer.
 run_init_case "$_err" "$_out" "HOME=$_sls_dead"
+assert_sourced_cleanly "dead HOME" "$_err"
 assert_no_report "dead HOME: no report" "$_err"
 if grep -qx "HOME=$_sls_dead" "$_out"; then
   assert_pass "dead HOME is not unset"
@@ -198,6 +222,7 @@ fi
 # substring guard does not match it (no trailing slash), so nothing runs and
 # the value is untouched and silent.
 run_init_case "$_err" "$_out" "NIX_CC=$_sls_live"
+assert_sourced_cleanly "live store prefix" "$_err"
 assert_no_report "live, non-hash-shaped store prefix: no report" "$_err"
 if grep -qx "NIX_CC=$_sls_live" "$_out"; then
   assert_pass "live, non-hash-shaped store prefix is untouched"
@@ -211,6 +236,7 @@ fi
 # component hash-shaped and dead would be dropped (case 2 pins that side).
 _sls_nonhash="/nix/store/not-a-store-hash"
 run_init_case "$_err" "$_out" "PATH=$_sls_controlled_path:$_sls_nonhash"
+assert_sourced_cleanly "non-hash colon component" "$_err"
 assert_no_report "nonexistent non-hash colon component: no report" "$_err"
 if grep -qx "PATH=$_sls_controlled_path:$_sls_nonhash" "$_out"; then
   assert_pass "nonexistent non-hash colon component is not dropped"
@@ -223,6 +249,7 @@ fi
 # is not enough to unset an exported scalar.
 _sls_nonhash_scalar="/nix/store/not-a-store-hash/SDKs/X.sdk"
 run_init_case "$_err" "$_out" "SDKROOT=$_sls_nonhash_scalar"
+assert_sourced_cleanly "non-hash scalar" "$_err"
 assert_no_report "nonexistent non-hash scalar: no report" "$_err"
 if grep -qx "SDKROOT=$_sls_nonhash_scalar" "$_out"; then
   assert_pass "nonexistent non-hash scalar is untouched"
@@ -233,6 +260,7 @@ fi
 
 # No inherited stale values: complete silence on stderr.
 run_init_case "$_err" "$_out"
+assert_sourced_cleanly "clean environment" "$_err"
 if [ -s "$_err" ]; then
   assert_fail "clean environment: no stderr output" \
     "stderr: $(tr '\n' ' ' <"$_err")"
@@ -247,12 +275,14 @@ autoload -Uz compinit
 . "$_sls_init"
 . "$_sls_init"
 EOF
+_sls_status=0
 (
   cd "$_sls_tmp" || exit 1
   env -i PATH="$_sls_controlled_path" HOME="$_sls_home" \
     "NIX_CC=$_sls_dead" \
-    zsh -f "$_sls_twice" </dev/null >/dev/null 2>"$_err"
-)
+    "$_sls_zsh" -f "$_sls_twice" </dev/null >/dev/null 2>"$_err"
+) || _sls_status=$?
+assert_sourced_cleanly "re-sourcing" "$_err"
 _report_count="$(grep -cF "$_sls_prefix" "$_err" || true)"
 if [ "$_report_count" -eq 1 ]; then
   assert_pass "re-sourcing the init reports exactly once"

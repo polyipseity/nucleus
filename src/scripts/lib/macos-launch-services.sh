@@ -61,6 +61,86 @@ launchctl_job_loaded() {
   $sudo_prefix launchctl print "$target" >/dev/null 2>&1
 }
 
+# Prints enabled | disabled | unknown and always returns 0.
+# WHY: `launchctl list` answers loaded-ness, so a status built on it cannot see the
+# disabled gate that `launchctl enable`/`disable` writes, which leaves both verbs
+# looking inert. `launchctl print-disabled <domain-target>` prints that gate as
+# `"<label>" => enabled|disabled` lines (man launchctl, print-disabled, whose reply
+# shape on this host lists both directions). The parse is deliberately narrow,
+# because the man page states that the newer subcommands' output "does not
+# constitute an API and no promises of forward compatibility are offered to
+# programs that attempt to parse it" (CAVEATS) and that `print`'s output is "NOT API
+# in any sense at all". Anything outside those two exact lines, a missing overrides
+# map and a failed command included, is unknown, so no caller claims a state it did
+# not read. A label absent from the map is unknown and not enabled, because nothing
+# in the reply names its state.
+launchctl_service_enabled() {
+  local domain_target="$1" label="$2" sudo_prefix="$3"
+  local overrides=""
+  # check-suppress:suppression_doc: an unreadable overrides database is the unknown verdict, not an error this probe reports
+  if ! overrides=$($sudo_prefix launchctl print-disabled "$domain_target" 2>/dev/null); then
+    printf 'unknown'
+    return 0
+  fi
+  case "$overrides" in
+  *"disabled services"*) ;;
+  *)
+    printf 'unknown'
+    return 0
+    ;;
+  esac
+  # The quotes anchor the label: without them a shorter label would also match a
+  # longer one that starts the same way.
+  if printf '%s\n' "$overrides" | grep -Fq -- "\"$label\" => disabled"; then
+    printf 'disabled'
+    return 0
+  fi
+  if printf '%s\n' "$overrides" | grep -Fq -- "\"$label\" => enabled"; then
+    printf 'enabled'
+    return 0
+  fi
+  printf 'unknown'
+}
+
+# Sets the disabled gate, then unloads the job and waits for it to be absent.
+# Prints launchctl's own output and returns 1 when either step fails.
+# WHY: `launchctl disable` writes a load-time gate and nothing else, so a running
+# KeepAlive job keeps running and the verb looks inert. The gate is set BEFORE the
+# bootout: a KeepAlive job respawns in the gap between an unload and the gate, and
+# the job is then left running under a gate that claims it is disabled. For the
+# same reason the unload is the bootout and never a SIGTERM, because launchd
+# restarts a job it killed.
+launchctl_service_disable() {
+  local target="$1" sudo_prefix="$2"
+  local out=""
+  if ! out=$($sudo_prefix launchctl disable "$target" 2>&1); then
+    printf '%s\n' "$out"
+    return 1
+  fi
+  # WHY: the unload helper owns the bootout and its version-specific flags, so it
+  # reports that step's outcome; the gate command above is the one that prints
+  # launchctl's own reason.
+  if ! launchctl_bootout_wait "$target" "$sudo_prefix"; then
+    printf '%s\n' "launchctl bootout did not unload $target"
+    return 1
+  fi
+  return 0
+}
+
+# Clears the disabled gate. Prints launchctl's own output and returns 1 on
+# failure. Never bootstraps and never starts.
+# WHY: `systemctl enable` and `Set-Service -StartupType Automatic` only set the
+# startup type, so enable means the same here and leaves loading to `start`.
+launchctl_service_enable() {
+  local target="$1" sudo_prefix="$2"
+  local out=""
+  if ! out=$($sudo_prefix launchctl enable "$target" 2>&1); then
+    printf '%s\n' "$out"
+    return 1
+  fi
+  return 0
+}
+
 # WHY: macOS 26+ unloads asynchronously, so a `bootstrap` issued right after `bootout` can fail with "Bootstrap failed: 5: Input/output error" while the job is still loaded, and the bootout that completes afterwards leaves the service unloaded and silent. Home Manager uses `launchctl bootout --wait` for the same reason; the poll covers older macOS, where --wait does not exist.
 launchctl_bootout_wait() {
   local target="$1" sudo_prefix="$2"

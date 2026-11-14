@@ -3,9 +3,50 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-# The canonical nucleus-* command set (alphabetical): the coverage contract
-# shared with src/scripts/completions/gen-completions.sh and tests/scripts/gen-completions-tests.sh.
-_NUCLEUS_COMMANDS=(ai apply bootstrap check cloud config gc utils svc test update vm)
+# The canonical nucleus-* command set comes from the committed manifest.
+# The zsh side asserts coverage over the full manifest; the pwsh side asserts
+# completer and flag inventory parity for commands that have a Windows app
+# surface (profile.ps1). The nix-capable check path separately proves the
+# manifest matches mkNucleusApps.
+_load_nucleus_commands_from_manifest() {
+  local _root="${1:-$_repo_root}"
+  local _manifest="$_root/src/modules/completions/nucleus-apps.json"
+  require_command jq "jq is required to read the nucleus command manifest"
+  [ -f "$_manifest" ] || {
+    error "nucleus command manifest not found: $_manifest"
+    return 1
+  }
+  _NUCLEUS_COMMANDS=()
+  local _n10
+  while IFS= read -r _n10; do
+    [ -n "$_n10" ] || continue
+    _NUCLEUS_COMMANDS+=("$_n10")
+  done < <(jq -r '.commands[]' "$_manifest")
+  [ "${#_NUCLEUS_COMMANDS[@]}" -gt 0 ] || {
+    error "nucleus command manifest contains no commands: $_manifest"
+    return 1
+  }
+  _NUCLEUS_PWSH_COMMANDS=()
+  for _n10 in "${_NUCLEUS_COMMANDS[@]}"; do
+    case "$_n10" in
+    camilladsp-heartbeat) continue ;;
+    esac
+    _NUCLEUS_PWSH_COMMANDS+=("$_n10")
+  done
+}
+
+# On nix-capable hosts, the committed manifest must equal its flake derivation.
+_check_manifest_matches_flake() {
+  local _root="${1:-$_repo_root}"
+  local _manifest _out
+  _manifest="$_root/src/modules/completions/nucleus-apps.json"
+  _out="$(nucleus_nix_locked nix build --no-link --print-out-paths "$_root/src#nucleus-apps")" || return 1
+  if ! cmp -s "$_out" "$_manifest"; then
+    error "src/modules/completions/nucleus-apps.json is stale — regenerate it from ./src#nucleus-apps"
+    return 1
+  fi
+  say "nucleus app manifest matches its flake derivation."
+}
 
 # pascal_case <cmd> yields the $nucleus<Cmd>Flags spelling gen-completions.ps1 emits.
 pascal_case() {
@@ -19,7 +60,7 @@ sh_for_command() {
   esac
 }
 
-register_step "completions-fresh" "Completions freshness (generated files match)" run_completions_fresh posix full none
+register_step "completions-fresh" "Completions freshness (generated files match)" run_completions_fresh posix full nix
 
 run_completions_fresh() {
   local -n ctx="$1"
@@ -27,6 +68,9 @@ run_completions_fresh() {
   shift
   local _files=("$@")
   cd "$_repo_root" || return 1
+
+  _load_nucleus_commands_from_manifest "$_repo_root" || return 1
+  _check_manifest_matches_flake "$_repo_root" || return 1
 
   # 1. Generated files must match generator output; drift is a hard failure.
   if ! bash "$_repo_root/src/scripts/completions/gen-completions.sh" --check; then
@@ -42,6 +86,8 @@ run_completions_fresh() {
       error "missing zsh completion file src/modules/completions/zsh/_nucleus-$_cmd"
       return 1
     fi
+  done
+  for _cmd in "${_NUCLEUS_PWSH_COMMANDS[@]}"; do
     # Anchored at the line start: the command name alone also matches a comment
     # or a longer command (nucleus-svc inside nucleus-service-watchdog).
     if ! grep -qE "^Register-ArgumentCompleter -CommandName nucleus-$_cmd([[:space:]]|$)" "$_profile"; then

@@ -5,7 +5,9 @@
 #
 # The Hermes CLI is replaced by a recording stub so the suite never sends
 # anything; the /harness approve|deny side is simulated by writing the same
-# response file the plugin writes.
+# response file the plugin writes. The source matrix itself, including the prompt
+# source's terminal, is covered by harness-approval-sources-tests.sh; the cases
+# here drive the hermes source only, so no case can block on a real terminal.
 
 set -euo pipefail
 
@@ -18,8 +20,14 @@ APPROVAL="$SCRIPT_DIR/../../src/scripts/notify/harness-approval.sh"
 require_command mktemp "temporary directories for the recording stub"
 require_command find "locating the harness-bridge state directory"
 
+ensure_safe_rm_env
+
 TMPDIR_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_ROOT"' EXIT
+
+# The audit log root is suite-owned, so the cases never write into the real one.
+NUCLEUS_LOG_DIR="$TMPDIR_ROOT/logs"
+export NUCLEUS_LOG_DIR
 
 # Recording stub, mirroring harness-notify-tests.sh: proves the request was
 # announced on the configured channel without talking to Hermes.
@@ -43,10 +51,10 @@ write_config() {
   printf '%s\n' "$1" >"$TMPDIR_ROOT/home/.local/state/nucleus/config.json"
 }
 
-# Remote brokering is opt-in, so every test that expects a request to be
-# announced has to enable it explicitly.
+# Every test that expects a request announced names the hermes source explicitly,
+# so the prompt source and its terminal are out of the picture.
 write_config_brokering() {
-  write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"enable":true}}'
+  write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["hermes"],"timeout-seconds":{"hermes":30}}}'
 }
 
 # A request left behind by an earlier test would make a "nothing was brokered"
@@ -123,89 +131,19 @@ wait_for_decision() {
   approval_out="$(cat "$TMPDIR_ROOT/out")"
 }
 
-start_approval_hook() {
-  # Args: <timeout-seconds> <harness> <payload>
-  printf '%s' "$3" >"$TMPDIR_ROOT/hook-payload"
-  HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" \
-    bash "$APPROVAL" hook "$2" <"$TMPDIR_ROOT/hook-payload" \
-    >"$TMPDIR_ROOT/out" 2>"$TMPDIR_ROOT/err" &
-  approval_pid=$!
-}
-
-test_hook_mode_renders_cursor_json() {
-  write_config '{"harness-notify":{"enable":false}}'
-  local _rc=0
-  local _out=""
-  _out="$(printf '%s' '{"command":"git push --force"}' | HOME="$TMPDIR_ROOT/home" \
-    PATH="$TMPDIR_ROOT/bin:$PATH" bash "$APPROVAL" hook cursor)" || _rc=$?
-  if [ "$_rc" -eq 0 ] && [ "$_out" = '{"permission":"ask"}' ]; then
-    assert_pass "hook mode answers Cursor with Cursor's own document"
-  else
-    assert_fail "hook-cursor" "rc=$_rc out=$_out"
-  fi
-}
-
-test_hook_mode_renders_copilot_json() {
-  write_config '{"harness-notify":{"enable":false}}'
-  local _rc=0
-  local _out=""
-  _out="$(printf '%s' '{"tool_name":"runInTerminal","tool_input":{"command":"rm -rf /"}}' |
-    HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" bash "$APPROVAL" hook copilot)" || _rc=$?
-  if [ "$_rc" -eq 0 ] &&
-    grep -qF '"hookEventName":"PreToolUse"' <<<"$_out" &&
-    grep -qF '"permissionDecision":"ask"' <<<"$_out"; then
-    assert_pass "hook mode answers Copilot with a PreToolUse decision document"
-  else
-    assert_fail "hook-copilot" "rc=$_rc out=$_out"
-  fi
-}
-
-test_hook_mode_asks_plainly_for_unknown_harness() {
-  write_config '{"harness-notify":{"enable":false}}'
-  local _rc=0
-  local _out=""
-  _out="$(printf '%s' '{}' | HOME="$TMPDIR_ROOT/home" \
-    PATH="$TMPDIR_ROOT/bin:$PATH" bash "$APPROVAL" hook opencode)" || _rc=$?
-  if [ "$_rc" -eq 0 ] && [ "$_out" = 'ask' ]; then
-    assert_pass "hook mode falls back to the plain decision for other harnesses"
-  else
-    assert_fail "hook-plain" "rc=$_rc out=$_out"
-  fi
-}
-
-test_hook_mode_brokers_the_payload_command() {
-  write_config_brokering
-  : >"$HARNESS_APPROVAL_LOG"
-  start_approval_hook 30 cursor '{"command":"git push --force","cwd":"/tmp"}'
-  local _request
-  if ! _request="$(wait_for_request)"; then
-    kill "$approval_pid" 2>/dev/null
-    approval_pid=""
-    assert_fail "hook-broker" "no request file appeared"
-    return
-  fi
-  local _announced
-  _announced="$(wait_for_announcement || true)"
-  answer_request "$_request" allow
-  wait_for_decision
-  if [ "$approval_rc" -eq 0 ] && [ "$approval_out" = '{"permission":"allow"}' ] &&
-    grep -qF 'git push --force' <<<"$_announced"; then
-    assert_pass "hook mode brokers the payload command and renders a remote allow"
-  else
-    assert_fail "hook-broker" "rc=$approval_rc out=$approval_out log=$_announced"
-  fi
-}
-
 test_audit_log_records_the_decision() {
   write_config '{"harness-notify":{"enable":false}}'
-  printf '%s' '{"tool_name":"bash","tool_input":"rm -rf build"}' |
-    HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" bash "$APPROVAL" hook copilot >/dev/null
-  local _log
-  _log="$(find "$TMPDIR_ROOT/home" -name harness-bridge.log -print -quit 2>/dev/null)"
-  if [ -n "$_log" ] && grep -qF 'copilot' "$_log" && grep -qF 'ask' "$_log"; then
-    assert_pass "every hook decision is recorded in the audit log"
+  HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" \
+    bash "$APPROVAL" copilot runInTerminal "rm -rf build" 5 >/dev/null
+  local _log="$NUCLEUS_LOG_DIR/harness.log"
+  local _event=""
+  _event="$(jq -c 'select(.kind == "approval")' "$_log" 2>/dev/null | tail -n 1)" || _event=""
+  if [ -n "$_event" ] && [ "$(jq -r '.decision' <<<"$_event")" = "ask" ] &&
+    [ "$(jq -r '.harness' <<<"$_event")" = "copilot" ] &&
+    [ "$(jq -r '.source' <<<"$_event")" = "none" ]; then
+    assert_pass "every approval decision is recorded as one kind=approval event"
   else
-    assert_fail "audit" "log=$_log"
+    assert_fail "audit" "event=$_event log=$(cat "$_log" 2>/dev/null)"
   fi
 }
 
@@ -277,7 +215,7 @@ test_unwritable_state_answers_ask() {
   local _ro_parent
   _ro_parent="$(dirname "$(user_root_for_home "$_ro_home")")"
   mkdir -p "$_ro_home/.local/state/nucleus" "$_ro_parent"
-  printf '%s\n' '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"enable":true}}' \
+  printf '%s\n' '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["hermes"],"timeout-seconds":{"hermes":30}}}' \
     >"$_ro_home/.local/state/nucleus/config.json"
   chmod 500 "$_ro_home" "$_ro_parent"
   : >"$HARNESS_APPROVAL_LOG"
@@ -333,7 +271,7 @@ test_disabled_bridge_asks_without_request() {
 }
 
 test_approval_disabled_asks_without_request() {
-  write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"enable":false}}'
+  write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":[]}}'
   : >"$HARNESS_APPROVAL_LOG"
   local _rc=0
   local _out=""
@@ -343,40 +281,9 @@ test_approval_disabled_asks_without_request() {
   local _elapsed=$((SECONDS - _start))
   if [ "$_rc" -eq 0 ] && [ "$_out" = "ask" ] && [ "$_elapsed" -lt 5 ] &&
     [ ! -s "$HARNESS_APPROVAL_LOG" ] && [ -z "$(pending_requests)" ]; then
-    assert_pass "harness-approval.enable=false answers ask at once without notifying"
+    assert_pass "an empty source list answers ask at once without notifying"
   else
     assert_fail "approval-off" "rc=$_rc out=$_out elapsed=${_elapsed}s log=$(cat "$HARNESS_APPROVAL_LOG")"
-  fi
-}
-
-test_unset_approval_gate_defaults_to_off() {
-  write_config '{"harness-notify":{"channels":["telegram"]}}'
-  : >"$HARNESS_APPROVAL_LOG"
-  local _rc=0
-  local _out=""
-  _out="$(HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" \
-    bash "$APPROVAL" pi bash "rm -rf build" 30)" || _rc=$?
-  if [ "$_rc" -eq 0 ] && [ "$_out" = "ask" ] && [ ! -s "$HARNESS_APPROVAL_LOG" ] &&
-    [ -z "$(pending_requests)" ]; then
-    assert_pass "an unset harness-approval section leaves the gate off"
-  else
-    assert_fail "approval-default" "rc=$_rc out=$_out log=$(cat "$HARNESS_APPROVAL_LOG")"
-  fi
-}
-
-test_approval_disabled_hook_answers_neutrally() {
-  write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"enable":false}}'
-  : >"$HARNESS_APPROVAL_LOG"
-  local _rc=0
-  local _out=""
-  _out="$(printf '%s' '{"tool_name":"runInTerminal","tool_input":{"command":"rm -rf /"}}' |
-    HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" bash "$APPROVAL" hook copilot)" || _rc=$?
-  if [ "$_rc" -eq 0 ] &&
-    grep -qF '"permissionDecision":"ask"' <<<"$_out" &&
-    [ ! -s "$HARNESS_APPROVAL_LOG" ]; then
-    assert_pass "with approvals off the hook still answers the harness's own document"
-  else
-    assert_fail "approval-off-hook" "rc=$_rc out=$_out log=$(cat "$HARNESS_APPROVAL_LOG")"
   fi
 }
 
@@ -453,15 +360,9 @@ test_unwritable_state_answers_ask
 test_unreadable_config_answers_ask
 test_disabled_bridge_asks_without_request
 test_approval_disabled_asks_without_request
-test_unset_approval_gate_defaults_to_off
-test_approval_disabled_hook_answers_neutrally
 test_missing_arguments_asks
 test_request_is_announced
 test_request_file_carries_the_action
-test_hook_mode_renders_cursor_json
-test_hook_mode_renders_copilot_json
-test_hook_mode_asks_plainly_for_unknown_harness
-test_hook_mode_brokers_the_payload_command
 test_audit_log_records_the_decision
 
 finish_tests

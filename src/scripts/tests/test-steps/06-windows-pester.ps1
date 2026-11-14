@@ -20,7 +20,7 @@ Register-Step -Id "windows-pester" -Name "Windows Pester tests" -Platform window
   )
 
   if ($testFiles.Count -eq 0) {
-    Write-Message '0 Pester test files found — nothing to run.'
+    Write-Message '0 Pester test files found: nothing to run.'
     return $true
   }
 
@@ -47,16 +47,27 @@ foreach ($failed in $result.Failed) {
   Write-Output "nucleus-pester failed: $name : $message"
 }
 
+foreach ($block in $result.FailedBlocks) {
+  if ($block.ErrorRecord) {
+    Write-Output "nucleus-pester blockfailed: $($block.Path -join '.') : $($block.ErrorRecord[-1].Exception.Message)"
+  }
+}
+
 if ($result.FailedCount -gt 0) { exit 1 }
 exit 0
 '@
 
   Set-Content -Path $runnerPath -Value $runnerSource -Encoding utf8
 
-  function Invoke-PesterSuite {
+  # WHY a parameterized scriptblock instead of a function: Start-ThreadJob runs
+  # this body in a fresh runspace that does not inherit the step scope, so every
+  # value it needs arrives as an argument. The body itself is unchanged.
+  $invokePesterSuite = {
     param(
       [Parameter(Mandatory)][string]$SuitePath,
-      [Parameter(Mandatory)][string]$PwshPath
+      [Parameter(Mandatory)][string]$PwshPath,
+      [Parameter(Mandatory)][string]$RepoRootValue,
+      [Parameter(Mandatory)][string]$RunnerPath
     )
 
     $psi = [System.Diagnostics.ProcessStartInfo]::new()
@@ -64,8 +75,8 @@ exit 0
     $psi.UseShellExecute = $false
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
-    $psi.Environment['NUCLEUS_REPO_ROOT'] = $RepoRoot
-    foreach ($argument in @('-NoLogo', '-NoProfile', '-NonInteractive', '-File', $runnerPath, $SuitePath)) {
+    $psi.Environment['NUCLEUS_REPO_ROOT'] = $RepoRootValue
+    foreach ($argument in @('-NoLogo', '-NoProfile', '-NonInteractive', '-File', $RunnerPath, $SuitePath)) {
       $psi.ArgumentList.Add($argument)
     }
 
@@ -101,13 +112,19 @@ exit 0
   # An unlisted skip fails the step. Per-suite rather than one repo-wide total, so a
   # skip cannot move between suites to keep the count stable.
   #
-  # WHY this entry is legitimate: Sync-AgentsSkillManifest resolves the managed skill
-  # symlink by its Windows target, which is meaningless on a POSIX filesystem, so the
-  # case is platform-conditional rather than missing.
+  # WHY this Sync-AgentsSkillManifest.Tests.ps1 entry is legitimate: the suite
+  # resolves the managed skill symlink by its Windows target, which is meaningless on
+  # a POSIX filesystem, so the case is platform-conditional rather than missing.
+  #
+  # WHY this logs.Tests.ps1 entry is legitimate: the unwritable-log case makes a file
+  # read-only with a mode bit, which only POSIX enforces, and a Windows host would
+  # need an ACL deny the suite does not set.
   $expectedSkips = @{
     'Sync-AgentsSkillManifest.Tests.ps1' = if ($IsWindows) { 0 } else { 1 }
+    'logs.Tests.ps1'                     = if ($IsWindows) { 1 } else { 0 }
   }
 
+  $suiteJobs = @()
   try {
     $childPwsh = Join-Path -Path $PSHOME -ChildPath 'pwsh'
     if ($IsWindows) { $childPwsh = Join-Path -Path $PSHOME -ChildPath 'pwsh.exe' }
@@ -116,9 +133,36 @@ exit 0
     $totalFailed = 0
     $totalSkipped = 0
     $failedSuites = [System.Collections.Generic.List[string]]::new()
+
+    # WHY throttled jobs: each suite already runs in its own child pwsh, so the
+    # parent only has to fan out and wait. One job per suite, bounded at one child
+    # per processor, is what keeps the fan-out from starting 46 processes at once.
+    # WHY incremental collection instead of one pipeline assignment: on a throw
+    # mid-fan-out the old assignment left $suiteJobs empty, so the finally's
+    # Remove-Job cleaned nothing and the started jobs leaked with their child
+    # pwsh processes.
+    $suiteJobs = [System.Collections.Generic.List[object]]::new()
     foreach ($testFile in $testFiles) {
+      try {
+        $suiteJobs.Add((Start-ThreadJob -ScriptBlock $invokePesterSuite -ArgumentList $testFile, $childPwsh, $RepoRoot, $runnerPath -ThrottleLimit ([Environment]::ProcessorCount)))
+      } catch {
+        $suiteJobs | Stop-Job
+        $suiteJobs | Remove-Job -Force
+        throw
+      }
+    }
+
+    # Collection is serial and indexed in the original $testFiles order, so a suite
+    # finishing early cannot move a line or the counts relative to a serial run.
+    foreach ($index in 0..($testFiles.Count - 1)) {
+      $testFile = $testFiles[$index]
       $suiteName = [System.IO.Path]::GetFileName($testFile)
-      $outcome = Invoke-PesterSuite -SuitePath $testFile -PwshPath $childPwsh
+      $outcome = $suiteJobs[$index] | Wait-Job | Receive-Job
+      if (-not $outcome) {
+        Write-ErrorMessage "Pester: $suiteName reported no result (job $($suiteJobs[$index].State))."
+        $failedSuites.Add($suiteName)
+        continue
+      }
 
       foreach ($line in $outcome.Noise) { Write-Message $line }
       if ($outcome.Errors.Trim()) { Write-ErrorMessage $outcome.Errors.Trim() }
@@ -154,6 +198,10 @@ exit 0
     Write-Message "Pester: all $totalTests tests passed in $($testFiles.Count) suites ($totalSkipped declared skip(s))."
     return $true
   } finally {
+    if ($suiteJobs.Count -gt 0) {
+      # WHY: Remove-Job -Force waits for in-flight children instead of killing them (recorded probes: 10 ms vs 7503 ms vs over 45 s).
+      Remove-Job -Job $suiteJobs -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: cleanup also runs when the step fails early and must not replace the step verdict
+    }
     Remove-Item -LiteralPath $runnerPath -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: the temp runner is removed on every path; a leftover file after a transient lock must not replace the step's real verdict.
   }
 }

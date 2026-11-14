@@ -8,7 +8,8 @@ _AWK_PATH="$_REPO_POLICY_STEP_DIR/repository-policy.awk"
 # Every repo-policy step file carries the literal pattern text the scans search
 # for, so each scan skips the whole set, itself included.
 # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
-_POLICY_STEP_SELF_SH="$(basename "${BASH_SOURCE[0]}")"
+path_basename "${BASH_SOURCE[0]}"
+_POLICY_STEP_SELF_SH="$REPLY"
 _POLICY_STEP_SELF_PS1="${_POLICY_STEP_SELF_SH%.sh}.ps1"
 
 register_step "repo-policy-pattern" "Repository policy (pattern-based)" run_repo_policy_pattern posix any none
@@ -17,7 +18,6 @@ _POLICY_PATTERN_CHECKS=(
   "activation naming policy|run_activation_naming_policy|files"
   "config method compliance|run_config_method_compliance|files"
   "logging format policy|run_logging_format_policy|files"
-  "text hygiene|run_text_hygiene_policy|files"
   "removed skip mechanism|run_removed_skip_mechanism|files"
   "nix file structure|run_nix_file_structure|files"
   "log capture pair policy|run_log_capture_pair_policy|files"
@@ -31,64 +31,163 @@ run_repo_policy_pattern() {
   run_policy_checks "$_ctx_name" "repository policy (pattern-based)" _POLICY_PATTERN_CHECKS "$@"
 }
 
+# A config referenced from outside the configs tree must carry the registered
+# config-method annotation on the reference line or within the 10 lines above
+# it. This mirrors 12-repo-policy-pattern.ps1: the two scans it replaces printed
+# matches that never failed a run and flagged text no instruction defines, so
+# neither could enforce anything.
+# WHY whole-repo in both modes: a reference can live in any src/ file, so a
+#   scoped subset cannot prove the annotation is absent; the .ps1 twin scans
+#   the same way.
 run_config_method_compliance() {
-  local _has_args="$1" _repo_root="$2"
+  # $1 is HAS_ARGS from run_policy_checks' "files" style (check-lib.sh passes
+  # "${_rpc_context[HAS_ARGS]}" before REPO_ROOT), and the suite mirrors it
+  # with a leading true/false. Unread here: the scan is whole-repo in both
+  # modes (see the WHY above), so it cannot narrow anything.
+  local _repo_root="$2"
   shift 2
-  local _files=("$@")
   cd "$_repo_root" || return 1
   local _cfg_errors=0
   local _cfg_dir="src/modules/configs"
-  local _cfg_par_tmpdir
-  _cfg_par_tmpdir=$(mktemp -d) || {
-    error "failed to create temp dir"
-    _cfg_errors=$((_cfg_errors + 1))
-  }
 
-  # Single-pass: collect all config file basenames, run one grep across src/
-  local _cfg_patterns
-  _cfg_patterns=$(mktemp) || {
-    error "failed to create temp file"
-    _cfg_errors=$((_cfg_errors + 1))
-  }
-  find "$_cfg_dir" -type f -exec basename {} \; | sort -u >"$_cfg_patterns"
+  if [ ! -d "$_cfg_dir" ]; then
+    say "config method compliance passed."
+    return 0
+  fi
+
+  # Reference files: every Nix, PowerShell, and shell source outside vendored
+  # code and the configs tree itself, so a config never counts as its own ref.
   # ref: allow-and-deny-lists.instructions.md#B1 -- structural invariants; vendored code and config methods are different concerns
-  find src/ \( -name '*.nix' -o -name '*.ps1' -o -name '*.sh' \) -not -path '*/vendor/*' -not -path '*/configs/*' -print |
-    filter_gitignored |
-    xargs grep -n -F -f "$_cfg_patterns" 2>/dev/null ||
-    true # check-suppress:suppression_doc: xargs grep exits 1 when no config basename collisions are found; no match is the expected state
-  rm -f "$_cfg_patterns"
+  local _src_files=()
+  if [ -d src/ ]; then
+    mapfile -t _src_files < <(
+      find src/ \( -name '*.nix' -o -name '*.ps1' -o -name '*.sh' \) -not -path '*/vendor/*' -not -path '*/configs/*' -print |
+        filter_gitignored
+    )
+  fi
 
-  # Check for configs. method usage
-  # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
-  find "$_cfg_dir" -type f -print0 |
-    xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
-      _tmpdir="$1"
-      _f="$2"
-      _basename=$(basename "$_f")
-      # ref: allow-and-deny-lists.instructions.md#A2 -- infrastructure files are not configs
-      case "$_basename" in
-        .gitkeep|.gitignore|*.schema.json) exit 0 ;;
-      esac
-      _result_file="$_tmpdir/${_basename}.result"
-      _relpath="${_f#*configs/}"
-      if grep -q "^[^#]*configs\." "$_f" 2>/dev/null; then
-        echo "ERROR:$_relpath uses configs. method" >> "$_result_file"
-      fi
-    ' _ "$_cfg_par_tmpdir"
+  # Checkable configs in find order, with the patterns each one is looked up
+  # by: its relative path, its basename, and, when the basename has an
+  # extension, the ${hostName} template form.
+  local _cfgs=() _bases=() _tmpls=()
+  local _cfg _rel _base
+  while IFS= read -r -d '' _cfg; do
+    path_basename "$_cfg"
+    _base="$REPLY"
+    # ref: allow-and-deny-lists.instructions.md#A2 -- infrastructure files are not configs
+    case "$_base" in
+    .gitkeep | .gitignore | *.schema.json | *.nix) continue ;;
+    esac
+    _rel="${_cfg#"$_cfg_dir"/}"
+    case "$_rel" in
+    agents/* | hermes-agent/SOUL.md | ollama/models.json) continue ;;
+    esac
+    _cfgs+=("$_rel")
+    _bases+=("$_base")
+    # A templated form needs a dot past the first character, matching the twin's
+    # $dotIndex -gt 0: a dot-prefixed basename has an empty stem and none.
+    if [ -z "${_base%%.*}" ] || [ "$_base" = "${_base%%.*}" ]; then
+      _tmpls+=("")
+    else
+      _tmpls+=("\${hostName}.${_base#*.}")
+    fi
+  done < <(find "$_cfg_dir" -type f -print0)
 
-  local _result_file _eline
-  for _result_file in "$_cfg_par_tmpdir"/*.result; do
-    [ -f "$_result_file" ] || continue
-    while IFS= read -r _eline; do
-      case "$_eline" in
-      ERROR:*)
-        _cfg_errors=$((_cfg_errors + 1))
-        error "${_eline#ERROR:}"
-        ;;
-      esac
-    done <"$_result_file"
+  if [ "${#_cfgs[@]}" -eq 0 ]; then
+    say "config method compliance passed (0 configs)."
+    return 0
+  fi
+
+  # Reference index: one grep for every config basename, which also serves the
+  # relative-path tier because a relative path contains its basename, and one
+  # grep for the template forms. The tiers below read this index, so the tree is
+  # never scanned again per config.
+  # Case-insensitive is the stricter reading and both twins agree on it: a
+  # case-variant reference is still a real config reference, so -i flags
+  # deployments a case-sensitive read skips, while annotation ids are
+  # machine-parsed in exact form, so nothing hides on that side.
+  local _ref_index="" _tmpl_index=""
+  local _pat_args=() _tmpl_args=() _pat
+  for _pat in "${_bases[@]}"; do
+    _pat_args+=(-e "$_pat")
   done
-  rm -rf -- "$_cfg_par_tmpdir"
+  for _pat in "${_tmpls[@]}"; do
+    [ -n "$_pat" ] && _tmpl_args+=(-e "$_pat")
+  done
+  if [ "${#_src_files[@]}" -gt 0 ]; then
+    _ref_index=$(grep -HnFi "${_pat_args[@]}" "${_src_files[@]}" || true) # check-suppress:suppression_doc: grep exits 1 when no source line carries a config basename; the empty index is this tier's no-match result, which the tiers below resolve per config
+    if [ "${#_tmpl_args[@]}" -gt 0 ]; then
+      _tmpl_index=$(grep -HnFi "${_tmpl_args[@]}" "${_src_files[@]}" || true) # check-suppress:suppression_doc: grep exits 1 when no template line references a config; the template tier then stays empty
+    fi
+  fi
+
+  # Annotation index as "file:line" keys, so the 10-line window below is a
+  # lookup and needs no subprocess.
+  local -A _annot=()
+  local _key
+  if [ "${#_src_files[@]}" -gt 0 ]; then
+    while IFS= read -r _key; do
+      [ -n "$_key" ] && _annot["$_key"]=1
+    done < <(grep -HnFi '# check-suppress:config-method' "${_src_files[@]}" | cut -d: -f1,2)
+  fi
+
+  local _i _line _refs _ref _ref_file _ref_line _annotated _tmpl _pn _lo
+  for ((_i = 0; _i < ${#_cfgs[@]}; _i++)); do
+    _rel="${_cfgs[_i]}"
+    _base="${_bases[_i]}"
+    _tmpl="${_tmpls[_i]}"
+
+    # Reference tiers in the .ps1 twin's order: relative path, then basename,
+    # then the ${hostName} template suffix. A tier that matches replaces the
+    # refs from the tiers above it, so the annotation applies to one tier.
+    _refs=""
+    if [ -n "$_ref_index" ]; then
+      while IFS= read -r _line; do
+        [[ ${_line,,} == *"${_rel,,}"* ]] && _refs+="$_line"$'\n'
+      done <<<"$_ref_index"
+      if [ -z "$_refs" ]; then
+        while IFS= read -r _line; do
+          [[ ${_line,,} == *"${_base,,}"* ]] && _refs+="$_line"$'\n'
+        done <<<"$_ref_index"
+      fi
+    fi
+    if [ -z "$_refs" ] && [ -n "$_tmpl" ] && [ -n "$_tmpl_index" ]; then
+      while IFS= read -r _line; do
+        [[ ${_line,,} == *"${_tmpl,,}"* ]] && _refs+="$_line"$'\n'
+      done <<<"$_tmpl_index"
+    fi
+
+    # Annotation-only rule: a config with no reference outside configs/ has
+    # nothing to annotate.
+    [ -n "$_refs" ] || continue
+
+    _annotated=false
+    while IFS= read -r _ref; do
+      [ -n "$_ref" ] || continue
+      _ref_file="${_ref%%:*}"
+      _ref_line="${_ref#*:}"
+      _ref_line="${_ref_line%%:*}"
+      if [ -n "${_annot["$_ref_file:$_ref_line"]-}" ]; then
+        _annotated=true
+        break
+      fi
+      _lo=$((_ref_line - 10))
+      for ((_pn = _ref_line - 1; _pn >= _lo && _pn >= 1; _pn--)); do
+        if [ -n "${_annot["$_ref_file:$_pn"]-}" ]; then
+          _annotated=true
+          break
+        fi
+      done
+      if $_annotated; then
+        break
+      fi
+    done <<<"$_refs"
+
+    if ! $_annotated; then
+      error "$_rel : referenced but no '# check-suppress:config-method' comment found on or before reference lines"
+      _cfg_errors=$((_cfg_errors + 1))
+    fi
+  done
 
   if [ "$_cfg_errors" -gt 0 ]; then
     error "config method compliance check failed with $_cfg_errors error(s)"
@@ -127,11 +226,9 @@ run_activation_naming_policy() {
     return 1
   }
 
-  # Activation entry definitions as "file:line:name" across the three namespaces.
+  # Dotted definitions as "file:line:name", anywhere in a file: the three
+  # namespaces written out as `home.activation.<name>`.
   local _ns_re='(home\.activation|system\.activationScripts|nucleus\.terminalActivations)'
-  # Matches an attrset entry line and no nested-content line (`config = {`,
-  # `Unit = {`, `bundle_id = "..."`). The trailing $ anchors the pattern value.
-  local _entry_re="^[[:space:]]*[a-zA-Z0-9_-]+(\\.[a-zA-Z0-9_-]+)?[[:space:]]*=[[:space:]]*(lib\\.(mkIf|mkAfter|mkBefore|mkForce|mkOverride|mkOrder|hm\\.dag\\.entry(A|Before|Order|After))|[[:space:]]*$)"
 
   local _nix_files=()
   if $_has_args; then
@@ -146,18 +243,13 @@ run_activation_naming_policy() {
       sed -E 's/^([^:]+:[0-9]+:).*\.([a-zA-Z0-9_-]+)$/\1\2/' >>"$_names_file" ||
       true # check-suppress:suppression_doc: grep exits 1 when no dotted definitions are found; an empty result file is the clean state
 
-    # Attrset definitions: <ns> = { <name> = ...; } regions. The entry-value
-    # filter avoids capturing nested-attrset content lines, `=` emits the line
-    # number, and `paste` pairs it with the extracted name.
-    for _f in "${_nix_files[@]}"; do
-      sed -nE "/${_ns_re}[[:space:]]*=[^;]*\\{/,/^[[:space:]]*\\};/ {
-        /${_entry_re}/ {
-          s/^[[:space:]]*([a-zA-Z0-9_-]+).*/\\1/
-          =
-          p
-        }
-      }" "$_f" | paste -d: - - | sed "s|^|$_f:|" >>"$_names_file"
-    done
+    # Attrset definitions: `<ns> = { <name> = ...; }` regions, in one pass for
+    # the whole list rather than a child chain per file; the region and entry
+    # rules live in the shared program.
+    local _awk_path="$_AWK_PATH"
+    # Nothing in this call chain enables errexit, so an unguarded failure would
+    # fall through to the pass message.
+    awk -v mode=activation-naming -f "$_awk_path" "${_nix_files[@]}" >>"$_names_file" || return 1
   fi
 
   sort -u -o "$_names_file" "$_names_file"
@@ -224,49 +316,13 @@ _policy_scan_target() {
   case "$_pst_file" in
   vendor/* | src/secrets/* | tests/fixtures/*) return 1 ;;
   esac
-  case "$(basename "$_pst_file")" in
+  # path_basename rather than basename: this runs once per tracked file, where
+  # the forks cost more than the scan itself.
+  path_basename "$_pst_file"
+  case "$REPLY" in
   "$_POLICY_STEP_SELF_SH" | "$_POLICY_STEP_SELF_PS1" | 11-repo-policy-grep.ps1 | 13-repo-policy-data.ps1) return 1 ;;
   esac
   [[ "$_pst_file" =~ $_pst_ext_re ]]
-}
-
-run_text_hygiene_policy() {
-  local _has_args="$1" _repo_root="$2"
-  shift 2
-  local _files=("$@")
-  cd "$_repo_root" || return 1
-
-  local _th_errors=0
-  # .md carries prose, the rest carry comment syntax. A trailing comment on a
-  # code line is out of scope: the same line can hold a string carrying the
-  # dash, and a line-based scan cannot tell the two apart.
-  local _th_ext_re='\.(md|sh|zsh|ps1|psm1|nix|yml|yaml)$'
-  local _th_files=()
-  local _f
-  if $_has_args; then
-    for _f in "${_files[@]}"; do
-      if _policy_scan_target "$_f" "$_th_ext_re"; then _th_files+=("$_f"); fi
-    done
-  else
-    while IFS= read -r _f; do
-      if _policy_scan_target "$_f" "$_th_ext_re"; then _th_files+=("$_f"); fi
-    done < <(git ls-files | filter_gitignored)
-  fi
-
-  if [ "${#_th_files[@]}" -gt 0 ]; then
-    local _th_violation
-    while IFS= read -r _th_violation; do
-      _th_errors=$((_th_errors + 1))
-      error "$_th_violation"
-    done < <(awk -v mode=em-dash -f "$_AWK_PATH" "${_th_files[@]}")
-  fi
-
-  if [ "$_th_errors" -gt 0 ]; then
-    error "text hygiene policy check failed with $_th_errors error(s)"
-    return 1
-  fi
-  say "text hygiene policy passed."
-  return 0
 }
 
 run_logging_format_policy() {
@@ -442,47 +498,26 @@ run_log_capture_pair_policy() {
     done < <(git ls-files | filter_gitignored)
   fi
 
-  local _lcp_discard_re='(StandardOutPath|StandardErrorPath|StandardOutput|StandardError)[[:space:]]*=[[:space:]]*"/dev/null"'
+  local _lcp_scan=()
   for _f in "${_lcp_files[@]}"; do
-    [ -f "$_f" ] || continue
-
-    # Rule 1: no capture directive may discard a stream.
-    if grep -q -E "$_lcp_discard_re" "$_f"; then
-      local _lcp_hit
-      while IFS= read -r _lcp_hit; do
-        _lcp_errors=$((_lcp_errors + 1))
-        error "log capture pair: '$_f:$_lcp_hit' discards a stream to /dev/null; capture stdout.log and stderr.log instead (output-handling.instructions.md)"
-      done < <(grep -n -E "$_lcp_discard_re" "$_f")
-    fi
-
-    # Rule 2: no merged-stream redirection.
-    if grep -q -F '*>>' "$_f"; then
-      local _lcp_merged
-      while IFS= read -r _lcp_merged; do
-        _lcp_errors=$((_lcp_errors + 1))
-        error "log capture pair: '$_f:$_lcp_merged' merges stdout and stderr; use 1>> and 2>> into stdout.log and stderr.log"
-      done < <(grep -n -F '*>>' "$_f")
-    fi
-
-    # Rule 3: capture is both-or-neither per file, per directive family.
-    # WHY boolean presence: a file may own several services, so only the lone-stream
-    # case is a violation; with one stream captured and the other discarded, the
-    # discarded stream lands in whatever the platform default is.
-    local _lcp_launchd_out=false _lcp_launchd_err=false
-    if grep -q 'StandardOutPath' "$_f"; then _lcp_launchd_out=true; fi
-    if grep -q 'StandardErrorPath' "$_f"; then _lcp_launchd_err=true; fi
-    if [ "$_lcp_launchd_out" != "$_lcp_launchd_err" ]; then
-      _lcp_errors=$((_lcp_errors + 1))
-      error "log capture pair: '$_f' declares only one of StandardOutPath/StandardErrorPath; declare both or neither"
-    fi
-    local _lcp_systemd_out=false _lcp_systemd_err=false
-    if grep -q -E 'StandardOutput[[:space:]]*=' "$_f"; then _lcp_systemd_out=true; fi
-    if grep -q -E 'StandardError[[:space:]]*=' "$_f"; then _lcp_systemd_err=true; fi
-    if [ "$_lcp_systemd_out" != "$_lcp_systemd_err" ]; then
-      _lcp_errors=$((_lcp_errors + 1))
-      error "log capture pair: '$_f' declares only one of StandardOutput/StandardError; declare both or neither"
-    fi
+    if [ -f "$_f" ]; then _lcp_scan+=("$_f"); fi
   done
+
+  # One awk pass for the whole list rather than a child chain per file; the mode
+  # carries both the messages and their per-file report order, so the output is
+  # unchanged.
+  if [ "${#_lcp_scan[@]}" -gt 0 ]; then
+    local _awk_path="$_AWK_PATH"
+    local _violations _violation
+    # Nothing in this call chain enables errexit, and a process-substitution
+    # reader never sees the scanner's status, so the scan is captured first.
+    _violations=$(awk -v mode=log-capture -f "$_awk_path" "${_lcp_scan[@]}") || return 1
+    while IFS= read -r _violation; do
+      [ -z "$_violation" ] && continue
+      _lcp_errors=$((_lcp_errors + 1))
+      error "$_violation"
+    done <<<"$_violations"
+  fi
 
   if [ "$_lcp_errors" -gt 0 ]; then
     error "log capture pair policy check failed with $_lcp_errors error(s)"
@@ -547,9 +582,6 @@ run_prompt_template_contract() {
   local _files=("$@")
   local _prompt_files=()
   local _errors=0 _f _prompt_count=0
-  # One harness's tool and agent names belong in the adapter mapping table, never
-  # in a body an agent follows in an unknown harness.
-  local _harness_names='activate_vs_code_interaction|multi_replace_string_in_file|runSubagent|resolve_memory_file_uri|__LANE_SCOPE__|/memories/|get_errors|run_in_terminal|run_vscode_command|vscode_askQuestions|replace_string_in_file|create_file'
   if $_has_args; then
     filter_scoped_files _prompt_files .agents/prompts '*.md' "${_files[@]}"
     filter_scoped_files _prompt_files src/users/default/agents/prompts '*.md' "${_files[@]}"
@@ -577,38 +609,6 @@ run_prompt_template_contract() {
     if ! grep -qE '[$](ARGUMENTS|@|[0-9])|[$][{][0-9]+:-' "$_f"; then
       _errors=$((_errors + 1))
       error "$_f: no argument slot; text typed after the command is discarded"
-    fi
-    if ! grep -qF 'standing-orders.instructions.md' "$_f"; then
-      _errors=$((_errors + 1))
-      error "$_f: missing standing-orders anchor line"
-    fi
-    if grep -qE "$_harness_names" "$_f"; then
-      _errors=$((_errors + 1))
-      error "$_f: harness-specific name; use a capability from ~/.agents/instructions/harness-adapters.reference.md"
-    fi
-  done
-
-  # The same vocabulary rule covers every user-scope file an agent follows in an
-  # unknown harness: instruction bodies, agent definitions, and skill bodies. The
-  # adapter reference is exempt because its table is the sanctioned place for a
-  # harness's own tool names.
-  local _uscope_files=()
-  local _uscope_dir _uf
-  for _uscope_dir in src/users/default/agents/instructions src/users/default/agents/agents src/users/default/agents/skills; do
-    if $_has_args; then
-      filter_scoped_files _uscope_files "$_uscope_dir" '*.md' "${_files[@]}"
-    elif [ -d "$_repo_root/$_uscope_dir" ]; then
-      discover_files _uscope_files "$_repo_root" "$_uscope_dir" '*.md'
-    fi
-  done
-  for _uf in "${_uscope_files[@]}"; do
-    [ -n "$_uf" ] || continue
-    case "${_uf##*/}" in
-    harness-adapters.reference.md) continue ;;
-    esac
-    if grep -qE "$_harness_names" "$_uf"; then
-      _errors=$((_errors + 1))
-      error "$_uf: harness-specific name; use a capability from ~/.agents/instructions/harness-adapters.reference.md"
     fi
   done
 

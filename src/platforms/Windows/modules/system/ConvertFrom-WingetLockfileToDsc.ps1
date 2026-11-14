@@ -26,6 +26,10 @@
   is dropped from the output. This enforces the single-source overlap enable
   flag (managedPackages in core.nix) on Windows, which does not run Nix.
   When omitted, all resources are emitted (no filtering).
+  A kept Script block can outlive a filtered-away dependency: when this
+  filter removes a resource another block names in dependsOn, the
+  surviving reference points at nothing, so verify dependsOn targets
+  after filtering.
 
 .EXAMPLE
   ConvertFrom-WingetLockfileToDsc -ConfigPath .\system\scheduler.dsc.yml -LockfilePath ..\..\lockfiles\lockfile.json -OutputPath .\system\scheduler.locked.dsc.yml
@@ -80,17 +84,18 @@ function ConvertFrom-WingetLockfileToDsc {
   $filterEnabled = $PSBoundParameters.ContainsKey('EnabledPackages') -and $EnabledPackages
   $lines = Get-Content -Path $ConfigPath
   $outputLines = [System.Collections.ArrayList]::new()
-  # Buffer the current resource block so it can be dropped wholesale when disabled.
+  # Buffer the current resource block so a WinGet package block can be dropped wholesale when disabled.
   $resourceBuffer = [System.Collections.ArrayList]::new()
   $inResource = $false
   $currentWingetId = $null
+  $currentIsWingetPackage = $false
 
   foreach ($line in $lines) {
     # Resource boundary (4-space indent) starts a new block.
     if ($line -match '^    - resource:') {
       # Flush the previous buffered resource (if any) before starting a new one.
       if ($inResource) {
-        if (-not $filterEnabled -or ($currentWingetId -and $EnabledPackages.ContainsKey($currentWingetId))) {
+        if (-not $filterEnabled -or -not $currentIsWingetPackage -or ($currentWingetId -and $EnabledPackages.ContainsKey($currentWingetId))) {
           foreach ($buffered in $resourceBuffer) {
             [void]$outputLines.Add($buffered)  # check-suppress:suppression_doc: Add returns collection count, discarded
           }
@@ -99,6 +104,7 @@ function ConvertFrom-WingetLockfileToDsc {
       $resourceBuffer = [System.Collections.ArrayList]::new()
       $inResource = $true
       $currentWingetId = $null
+      $currentIsWingetPackage = $line -match '^    - resource:\s+Microsoft\.WinGet\.Client/Package'
       [void]$resourceBuffer.Add($line)  # check-suppress:suppression_doc: Add returns collection count, discarded
       continue
     }
@@ -127,7 +133,7 @@ function ConvertFrom-WingetLockfileToDsc {
 
   # Flush the final buffered resource.
   if ($inResource) {
-    if (-not $filterEnabled -or ($currentWingetId -and $EnabledPackages.ContainsKey($currentWingetId))) {
+    if (-not $filterEnabled -or -not $currentIsWingetPackage -or ($currentWingetId -and $EnabledPackages.ContainsKey($currentWingetId))) {
       foreach ($buffered in $resourceBuffer) {
         [void]$outputLines.Add($buffered)  # check-suppress:suppression_doc: Add returns collection count, discarded
       }

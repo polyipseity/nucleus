@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import errno
 import hashlib
 import json
 import os
@@ -59,11 +60,14 @@ NUCLEUS_CONFIG = Path.home() / ".local/state/nucleus/config.json"
 DEFAULT_CONFIG = Path.home() / ".config/camilladsp/configs/config.yml"
 
 # CoreAudio selectors and scopes, as four-character codes.
+# Source: CoreAudio.framework/Headers/AudioHardware.h:608-611 and
+# AudioHardwareBase.h:203-334. A wrong code returns kAudioHardwareUnknownPropertyError
+# ('who?'), which every caller here reads as "no device".
 _SYSTEM_OBJECT = 1
-_SEL_DEFAULT_OUTPUT = int.from_bytes(b"dout", "big")
+_SEL_DEFAULT_OUTPUT = int.from_bytes(b"dOut", "big")
 _SEL_DEVICES = int.from_bytes(b"dev#", "big")
 _SEL_NAME = int.from_bytes(b"lnam", "big")
-_SEL_STREAM_CONFIG = int.from_bytes(b"scon", "big")
+_SEL_STREAM_CONFIG = int.from_bytes(b"slay", "big")
 _SCOPE_GLOBAL = int.from_bytes(b"glob", "big")
 _SCOPE_OUTPUT = int.from_bytes(b"outp", "big")
 _ELEMENT_MAIN = 0
@@ -82,7 +86,65 @@ class _PropertyAddress(ctypes.Structure):
 
 
 def _warn(message: str) -> None:
-    print(f"camilladsp-heartbeat: warning: {message}", file=sys.stderr, flush=True)
+    # The heartbeat log is append-only and read long after the fact, so every
+    # line carries its own local time.
+    stamp = time.strftime("%Y-%m-%dT%H:%M:%S")
+    print(f"{stamp} camilladsp-heartbeat: warning: {message}", file=sys.stderr, flush=True)
+
+
+def _list_xattrs(path: str) -> list[str]:
+    """Extended attribute names on path, read through libc.
+
+    os.listxattr is absent from this interpreter build on both hosts, and a tick
+    must not spawn a process, so libc is the only reader available. Any error is
+    an empty list: the caller is already reporting a failure.
+    """
+    try:
+        libc = ctypes.CDLL(None)
+        libc.listxattr.restype = ctypes.c_ssize_t
+        encoded = os.fsencode(path)
+        if sys.platform == "darwin":
+            libc.listxattr.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_int]
+            size = libc.listxattr(encoded, None, 0, 0)
+        else:
+            libc.listxattr.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t]
+            size = libc.listxattr(encoded, None, 0)
+        if size <= 0:
+            return []
+        buffer = ctypes.create_string_buffer(size)
+        if sys.platform == "darwin":
+            written = libc.listxattr(encoded, buffer, size, 0)
+        else:
+            written = libc.listxattr(encoded, buffer, size)
+        if written <= 0:
+            return []
+        return [name.decode("utf-8", "replace") for name in buffer.raw[:written].split(b"\0") if name]
+    except Exception:  # noqa: BLE001 - a diagnostic must never raise over the EDEADLK
+        return []
+
+
+def _provider_state(path: Path) -> str:
+    """Compact description of how iCloud provisioned path, for an EDEADLK.
+
+    A File Provider read that has to materialize content can return EDEADLK from
+    a launchd context. Nothing else in the log distinguishes that from a stale
+    file handle, so the failure carries the evidence needed to tell them apart.
+    """
+    try:
+        resolved = os.path.realpath(path)
+    except Exception:  # noqa: BLE001 - a diagnostic must never raise over the EDEADLK
+        resolved = os.fspath(path)
+    parts = [f"path={resolved}"]
+    names = _list_xattrs(resolved)
+    present = sorted(
+        name
+        for name in names
+        if name.startswith("com.apple.fileprovider") or name == "com.apple.macl"
+    )
+    parts.append(f"xattrs={','.join(present) or 'none'}")
+    placeholder = Path(resolved).parent / f".{Path(resolved).name}.icloud"
+    parts.append(f"placeholder={'yes' if placeholder.exists() else 'no'}")
+    return " ".join(parts)
 
 
 def state_dir() -> Path:
@@ -516,6 +578,35 @@ def target_playback_device(config_file: Path) -> str:
     return _device_of(config, "playback")
 
 
+def probe(config_file: Path) -> int:
+    """Print what device detection sees, and exit non-zero when it binds nothing.
+
+    Detection failures are silent in the loop: a successful tick logs nothing and
+    a failed one logs a traceback, so this is the only way to see the values the
+    resolver works from.
+    """
+    capture = ""
+    if config_file.is_file():
+        try:
+            capture = _device_of(_load_config(config_file), "capture")
+        except (OSError, yaml.YAMLError) as error:
+            _warn(f"cannot read {config_file}: {error}")
+            return 1
+    default = probe_default_output() or ""
+    available = list_available_devices(capture) or []
+    target = target_playback_device(config_file) if config_file.is_file() else ""
+    print(f"platform={sys.platform}")
+    print(f"config={config_file}")
+    print(f"capture={capture}")
+    print(f"default_output={default}")
+    print(f"available={','.join(available)}")
+    print(f"target={target}")
+    if not target:
+        _warn("probe found no playback device to bind")
+        return 1
+    return 0
+
+
 def needs_push(state: str, live_device: str, target_device: str, config_changed: bool) -> bool:
     """Pure skip decision, mirroring the previous bash implementation.
 
@@ -710,7 +801,11 @@ def run(port: int, config_file: Path) -> int:
                 success = push_config(client, config_file, target)
             else:
                 success = True
-        except (OSError, ValueError, json.JSONDecodeError) as error:
+        except OSError as error:
+            detail = f" [{_provider_state(config_file)}]" if error.errno == errno.EDEADLK else ""
+            _warn(f"tick failed: {error}{detail}")
+            client.reset()
+        except (ValueError, json.JSONDecodeError) as error:
             _warn(f"tick failed: {error}")
             client.reset()
         except Exception as error:  # noqa: BLE001 - websockets raises its own types
@@ -725,7 +820,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="CamillaDSP device binding heartbeat")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
+    parser.add_argument(
+        "--probe",
+        action="store_true",
+        help="print what device detection sees and exit (0 bound, 1 nothing)",
+    )
     arguments = parser.parse_args()
+    if arguments.probe:
+        return probe(arguments.config)
     return run(arguments.port, arguments.config)
 
 

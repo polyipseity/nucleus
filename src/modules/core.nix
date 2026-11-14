@@ -19,6 +19,9 @@ let
   # nixpkgs on NixOS; any GUI component makes an entry gui.
   # pkgs.cargo must not be added: it conflicts with pkgs.rustup over bin/cargo.
   # install-cargo-binstall-packages takes cargo as a store-path argument.
+  # Entries are byte-ordered by name, so `@canary` suffixes sort after their
+  # neighbours instead of grouping with them; test_registry_names_sorted in
+  # tests/modules/package-parity-tests.nix enforces it.
   managedPackages = {
     "7zip" = {
       category = "cli";
@@ -55,6 +58,16 @@ let
     asciinema = {
       category = "cli";
       nixpkgs = "asciinema";
+    };
+    audacity = {
+      # WHY: audacity is 4.x; audacity_3 legacy, unused; no preview pkg.
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "audacity";
+      };
+      nixpkgs = "audacity";
+      winget = "Audacity.Audacity";
     };
     bat = {
       category = "cli";
@@ -130,27 +143,10 @@ let
       };
       winget = "Google.ChromeRemoteDesktopHost";
     };
-    czkawka = {
-      category = "gui";
-      homebrew = {
-        kind = "formula";
-        name = "czkawka";
-      };
-      nixpkgs = "czkawka";
-      winget = "qarmin.czkawka.cli";
-    };
-    exiftool = {
+    clink = {
+      # WinGet-only: no Homebrew cask exists and no nixpkgs attr; Windows installs via WinGet.
       category = "cli";
-      homebrew = {
-        kind = "formula";
-        name = "exiftool";
-      };
-      nixpkgs = "perlPackages.ImageExifTool";
-      winget = "ExifTool.ExifTool";
-    };
-    mat2 = {
-      category = "cli";
-      nixpkgs = "mat2";
+      winget = "chrisant996.Clink";
     };
     cursor = {
       # Single source of truth for Cursor enable/disable. Every host is listed
@@ -169,23 +165,29 @@ let
       nixpkgs = "code-cursor";
       winget = "Anysphere.Cursor";
     };
+    czkawka = {
+      category = "gui";
+      homebrew = {
+        kind = "formula";
+        name = "czkawka";
+      };
+      nixpkgs = "czkawka";
+      winget = "qarmin.czkawka.cli";
+    };
     deadnix = {
       category = "cli";
       nixpkgs = "deadnix";
+    };
+    deep-filter = {
+      category = "cli";
+      # WHY: pinned upstream release binary; not in nixpkgs as CLI.
+      nixpkgs = "deep-filter";
+      nixpkgsPackage = pkgs.deep-filter;
     };
     desktoppr = {
       category = "cli";
       platforms = [ "darwin" ];
       nixpkgs = "desktoppr";
-    };
-    "discord@canary" = {
-      category = "gui";
-      homebrew = {
-        kind = "cask";
-        name = "discord@canary";
-      };
-      nixpkgs = "discord-canary";
-      winget = "Discord.Discord.Canary";
     };
     direnv = {
       category = "cli";
@@ -195,6 +197,15 @@ let
       };
       nixpkgs = "direnv";
       winget = "direnv.direnv";
+    };
+    "discord@canary" = {
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "discord@canary";
+      };
+      nixpkgs = "discord-canary";
+      winget = "Discord.Discord.Canary";
     };
     dos2unix = {
       category = "cli";
@@ -219,6 +230,19 @@ let
       platforms = [ "darwin" ];
       nixpkgs = "duti";
     };
+    "equaliser" = {
+      category = "cli";
+      platforms = [ "darwin" ];
+    };
+    exiftool = {
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "exiftool";
+      };
+      nixpkgs = "perlPackages.ImageExifTool";
+      winget = "OliverBetz.ExifTool";
+    };
     eza = {
       category = "cli";
       homebrew = {
@@ -227,24 +251,6 @@ let
       };
       nixpkgs = "eza";
       winget = "eza-community.eza";
-    };
-    "equaliser" = {
-      category = "cli";
-      platforms = [ "darwin" ];
-    };
-    "equalizer-apo" = {
-      # WinGet-only: no Homebrew cask exists and no nixpkgs attr; Windows installs via WinGet.
-      category = "gui";
-      winget = "EqualizerAPO.EqualizerAPO";
-    };
-    ffmpeg = {
-      category = "cli";
-      homebrew = {
-        kind = "formula";
-        name = "ffmpeg";
-      };
-      nixpkgs = "ffmpeg-full";
-      winget = "Gyan.FFmpeg";
     };
     fd = {
       category = "cli";
@@ -255,14 +261,14 @@ let
       nixpkgs = "fd";
       winget = "sharkdp.fd";
     };
-    fzf = {
+    ffmpeg = {
       category = "cli";
       homebrew = {
         kind = "formula";
-        name = "fzf";
+        name = "ffmpeg";
       };
-      nixpkgs = "fzf";
-      winget = "junegunn.fzf";
+      nixpkgs = "ffmpeg-full";
+      winget = "Gyan.FFmpeg";
     };
     "font-awesome" = {
       category = "cli";
@@ -272,6 +278,15 @@ let
       };
       nixpkgs = "font-awesome";
     };
+    fzf = {
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "fzf";
+      };
+      nixpkgs = "fzf";
+      winget = "junegunn.fzf";
+    };
     gh = {
       category = "cli";
       homebrew = {
@@ -280,6 +295,14 @@ let
       };
       nixpkgs = "gh";
       winget = "GitHub.cli";
+    };
+    ghostscript = {
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "ghostscript";
+      };
+      nixpkgs = "ghostscript";
     };
     gimp = {
       category = "gui";
@@ -298,6 +321,25 @@ let
       };
       nixpkgs = "gitFull";
       winget = "Git.Git";
+    };
+    git-filter-repo = {
+      category = "cli";
+      nixpkgs = "git-filter-repo";
+      # WHY: WinGet carries no manifest; Windows installs it from the uv tool list.
+    };
+    git-lfs = {
+      category = "cli";
+      nixpkgs = "git-lfs";
+      winget = "GitHub.GitLFS";
+    };
+    glaxnimate = {
+      # WHY: three hosts, three carriers, none of them shared. nixpkgs carries
+      # 0.6.0 for Linux only and no cask or WinGet package exists, so macOS
+      # builds the app from KDE's arm64 dmg and Windows installs KDE's portable
+      # 7z through a nucleus Scoop manifest. The 0.6.0 binaries come from KDE's
+      # release server.
+      category = "gui";
+      nixpkgs = "glaxnimate";
     };
     gnupg = {
       category = "cli";
@@ -328,15 +370,6 @@ let
       nixpkgs = "google-chrome";
       winget = "Google.Chrome.Canary";
     };
-    ghostscript = {
-      category = "cli";
-      homebrew = {
-        kind = "formula";
-        name = "ghostscript";
-      };
-      nixpkgs = "ghostscript";
-      winget = "ArtifexSoftware.GhostScript";
-    };
     imagemagick = {
       category = "cli";
       homebrew = {
@@ -353,7 +386,6 @@ let
         name = "font-inter";
       };
       nixpkgs = "inter";
-      winget = "Inter.Inter";
     };
     iterm2 = {
       category = "gui";
@@ -457,6 +489,10 @@ let
       };
       platforms = [ "darwin" ];
     };
+    mat2 = {
+      category = "cli";
+      nixpkgs = "mat2";
+    };
     mold = {
       category = "cli";
       nixpkgs = "mold";
@@ -487,6 +523,10 @@ let
       category = "cli";
       nixpkgs = "nickel";
     };
+    "nix-index" = {
+      category = "cli";
+      nixpkgs = "nix-index";
+    };
     nixd = {
       category = "cli";
       nixpkgs = "nixd";
@@ -499,10 +539,6 @@ let
       category = "cli";
       nixpkgs = "nixfmt";
     };
-    "nix-index" = {
-      category = "cli";
-      nixpkgs = "nix-index";
-    };
     nls = {
       category = "cli";
       nixpkgs = "nls";
@@ -514,7 +550,6 @@ let
         name = "font-noto-sans-cjk-sc";
       };
       nixpkgs = "noto-fonts-cjk-sans";
-      winget = "Google.NotoSans.CJK.SC";
     };
     "noto-sans-cjk-tc" = {
       category = "cli";
@@ -523,7 +558,6 @@ let
         name = "font-noto-sans-cjk-tc";
       };
       nixpkgs = "noto-fonts-cjk-sans";
-      winget = "Google.NotoSans.CJK.TC";
     };
     "noto-serif-cjk-sc" = {
       category = "cli";
@@ -532,7 +566,6 @@ let
         name = "font-noto-serif-cjk-sc";
       };
       nixpkgs = "noto-fonts-cjk-serif";
-      winget = "Google.NotoSerif.CJK.SC";
     };
     "noto-serif-cjk-tc" = {
       category = "cli";
@@ -541,7 +574,6 @@ let
         name = "font-noto-serif-cjk-tc";
       };
       nixpkgs = "noto-fonts-cjk-serif";
-      winget = "Google.NotoSerif.CJK.TC";
     };
     "obs-studio" = {
       # Stable OBS Studio: nixpkgs has no beta channel, so stable is uniform.
@@ -598,14 +630,21 @@ let
       };
       winget = "Parsec.Parsec";
     };
+    pass = {
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "pass";
+      };
+      nixpkgs = "pass";
+      # WHY: pass-otp is not a top-level attr and pass loads it from
+      # SYSTEM_EXTENSION_DIR. Contributing both would collide on bin/pass, so
+      # the wrapper replaces the plain attr. `nixpkgs` stays the probe.
+      nixpkgsPackage = pkgs.pass.withExtensions (extensions: [ extensions.pass-otp ]);
+    };
     "pay-respects" = {
       category = "cli";
       nixpkgs = "pay-respects";
-    };
-    "peace-equalizer-apo" = {
-      # WinGet-only: no Homebrew cask exists and no nixpkgs attr; Windows installs via WinGet.
-      category = "gui";
-      winget = "PeterVerbeek.PeaceEqualizerAPO";
     };
     "pi-coding-agent" = {
       category = "cli";
@@ -625,24 +664,19 @@ let
       platforms = [ "darwin" ];
       nixpkgs = "pinentry_mac";
     };
-    pass = {
+    powersession = {
+      # WHY: absent from nixpkgs, so disable nix routing on the other hosts.
+      enable = {
+        MacBook = false;
+        NixOS = false;
+        Windows = true;
+      };
       category = "cli";
       homebrew = {
         kind = "formula";
-        name = "pass";
+        name = "powersession";
       };
-      nixpkgs = "pass";
-      # WHY: pass-otp is not a top-level attr and pass loads it from
-      # SYSTEM_EXTENSION_DIR. Contributing both would collide on bin/pass, so
-      # the wrapper replaces the plain attr. `nixpkgs` stays the probe.
-      nixpkgsPackage = pkgs.pass.withExtensions (extensions: [ extensions.pass-otp ]);
-      winget = "GnuPG.pass";
-    };
-    pulseview = {
-      # WHY: not in homebrew-core; nixpkgs builds cleanly on macOS/Linux. Windows provisioned via WinGet Sigrok.PulseView.
-      category = "gui";
-      nixpkgs = "pulseview";
-      winget = "Sigrok.PulseView";
+      winget = "Watfaq.PowerSession";
     };
     powershell = {
       category = "cli";
@@ -662,20 +696,6 @@ let
       };
       winget = "Microsoft.PowerToys";
     };
-    powersession = {
-      # WHY: absent from nixpkgs, so disable nix routing on the other hosts.
-      enable = {
-        MacBook = false;
-        NixOS = false;
-        Windows = true;
-      };
-      category = "cli";
-      homebrew = {
-        kind = "formula";
-        name = "powersession";
-      };
-      winget = "Watfaq.PowerSession";
-    };
     prek = {
       category = "cli";
       homebrew = {
@@ -684,6 +704,12 @@ let
       };
       nixpkgs = "prek";
       winget = "j178.Prek";
+    };
+    pulseview = {
+      # WHY: not in homebrew-core; nixpkgs builds cleanly on macOS/Linux. Windows provisioned via WinGet Sigrok.PulseView.
+      category = "gui";
+      nixpkgs = "pulseview";
+      winget = "Sigrok.PulseView";
     };
     python = {
       category = "cli";
@@ -697,12 +723,6 @@ let
       nixpkgsPackage = pkgs.python3.withPackages (p: [ p.pyyaml ]);
       winget = "Python.Python.3.13";
     };
-    qtpass = {
-      # WHY: the cask is broken on macOS, so route it to nixpkgs there.
-      category = "gui";
-      nixpkgs = "qtpass";
-      winget = "IJHack.QtPass";
-    };
     qemu = {
       category = "cli";
       homebrew = {
@@ -711,14 +731,11 @@ let
       };
       nixpkgs = "qemu";
     };
-    rectangle = {
+    qtpass = {
+      # WHY: the cask is broken on macOS, so route it to nixpkgs there.
       category = "gui";
-      platforms = [ "darwin" ];
-      homebrew = {
-        kind = "cask";
-        name = "rectangle";
-      };
-      nixpkgs = "rectangle";
+      nixpkgs = "qtpass";
+      winget = "IJHack.QtPass";
     };
     rclone = {
       category = "cli";
@@ -728,6 +745,15 @@ let
       };
       nixpkgs = "rclone";
       winget = "Rclone.Rclone";
+    };
+    rectangle = {
+      category = "gui";
+      platforms = [ "darwin" ];
+      homebrew = {
+        kind = "cask";
+        name = "rectangle";
+      };
+      nixpkgs = "rectangle";
     };
     redis = {
       category = "cli";
@@ -794,7 +820,6 @@ let
         kind = "formula";
         name = "scoop";
       };
-      winget = "Scoop.Scoop";
     };
     shellcheck = {
       category = "cli";
@@ -803,7 +828,7 @@ let
         name = "shellcheck";
       };
       nixpkgs = "shellcheck";
-      winget = "ShellCheck.ShellCheck";
+      winget = "koalaman.shellcheck";
     };
     shfmt = {
       category = "cli";
@@ -814,6 +839,16 @@ let
       nixpkgs = "shfmt";
       # WHY: shfmt is a single static binary; no separate macOS cask exists.
       winget = "mvdan.shfmt";
+    };
+    shotcut = {
+      # WHY: all three carriers publish stable releases only, so there is no channel to prefer.
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "shotcut";
+      };
+      nixpkgs = "shotcut";
+      winget = "Meltytech.Shotcut";
     };
     sigrok-cli = {
       # WHY: absent from WinGet; provisioned via Scoop custom bucket on Windows.
@@ -840,7 +875,11 @@ let
         name = "font-source-serif";
       };
       nixpkgs = "source-serif";
-      winget = "Adobe.SourceSerif4";
+    };
+    sqlite = {
+      category = "cli";
+      nixpkgs = "sqlite";
+      winget = "SQLite.SQLite";
     };
     "ssh-to-age" = {
       category = "cli";
@@ -864,12 +903,14 @@ let
       };
       nixpkgs = "stats";
     };
-    sqlite = {
-      category = "cli";
-      nixpkgs = "sqlite";
-      winget = "SQLite.SQLite";
-    };
     steam = {
+      # WHY: NixOS installs Steam through programs.steam.enable, which puts
+      # pkgs.steam and its steam-run wrapper in environment.systemPackages and
+      # turns on hardware.steam-hardware, so the registry must not add pkgs.steam
+      # there as well.
+      enable = {
+        NixOS = false;
+      };
       category = "gui";
       homebrew = {
         kind = "cask";
@@ -882,6 +923,21 @@ let
       category = "cli";
       nixpkgs = "steamcmd";
       winget = "Valve.SteamCMD";
+    };
+    stirling-pdf = {
+      # WHY the desktop variant: Stirling-PDF's GUI build is the Tauri app
+      # (`stirling-pdf-desktop`), and it starts its own local server only while
+      # the app runs. The headless server attr (`stirling-pdf`) is deliberately
+      # not deployed, because a host-wide daemon would need its own service
+      # entry and a reserved port.
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "stirling-pdf";
+      };
+      nixpkgs = "stirling-pdf";
+      nixpkgsPackage = pkgs.stirling-pdf-desktop;
+      winget = "StirlingTools.StirlingPDF";
     };
     taplo = {
       category = "cli";
@@ -947,15 +1003,6 @@ let
       nixpkgsPackage = vagrantPlugins.package;
       winget = "Hashicorp.Vagrant";
     };
-    vlc = {
-      category = "gui";
-      homebrew = {
-        kind = "cask";
-        name = "vlc";
-      };
-      nixpkgs = "vlc";
-      winget = "VideoLAN.VLC";
-    };
     "visual-studio-code" = {
       category = "gui";
       homebrew = {
@@ -974,6 +1021,15 @@ let
         name = "visual-studio-code@insiders";
       };
       winget = "Microsoft.VisualStudioCode.Insiders";
+    };
+    vlc = {
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "vlc";
+      };
+      nixpkgs = "vlc";
+      winget = "VideoLAN.VLC";
     };
     wechat = {
       category = "gui";
@@ -1000,6 +1056,15 @@ let
       category = "cli";
       nixpkgs = "whisper-cpp";
     };
+    "windows-terminal-preview" = {
+      category = "gui";
+      platforms = [ "linux" ];
+      homebrew = {
+        kind = "cask";
+        name = "windows-terminal-preview";
+      };
+      winget = "Microsoft.WindowsTerminal.Preview";
+    };
     winfsp = {
       category = "cli";
       platforms = [ "linux" ];
@@ -1009,14 +1074,17 @@ let
       };
       winget = "WinFsp.WinFsp";
     };
-    "windows-terminal-preview" = {
+    xquartz = {
       category = "gui";
-      platforms = [ "linux" ];
+      # WHY: the macOS X11 server, cask-only upstream. NixOS already runs
+      # services.xserver and no Windows X server is managed, so darwin is the
+      # only carrier that installs anything.
+      platforms = [ "darwin" ];
       homebrew = {
         kind = "cask";
-        name = "windows-terminal-preview";
+        name = "xquartz";
       };
-      winget = "Microsoft.WindowsTerminal.Preview";
+      nixpkgs = "xquartz";
     };
     yamllint = {
       category = "cli";
@@ -1158,10 +1226,14 @@ let
   ) enabledManagedPackageNames;
 
   # Cross-platform nixpkgs packages. macOS respects backend selection; NixOS
-  # takes every platform-compatible package.
-  # WHY meta.available: platforms is a coarse darwin/linux filter, while some
-  # packages build for one Linux arch only. meta.available reads lazily and does
-  # NOT trip check-meta's refusal assertion.
+  # takes every platform-compatible package. `platforms` is the platform rule for
+  # both lists.
+  # WHY the Linux list still probes meta.available: platforms is a coarse
+  # darwin/linux filter, while some packages build for one Linux arch only.
+  # meta.available reads lazily and does NOT trip check-meta's refusal assertion.
+  # The darwin list does not probe it: an entry nixpkgs cannot provide on darwin
+  # must carry platforms = [ "linux" ] instead, and the
+  # `darwinUnavailableNixPackages` assertion below enforces exactly that.
 
   # Excluded: a programs.* module already contributes these, and a second
   # derivation would collide in buildEnv's paths. Windows still uses WinGet.
@@ -1199,6 +1271,24 @@ let
       attr = managedPackages.${packageName}.nixpkgs;
     in
     ((lib.attrByPath (lib.strings.splitString "." attr) null pkgs).meta.available or true);
+
+  # Packages the darwin nixpkgs list carries but cannot install: enabled here,
+  # routed to nixpkgs, platform-compatible, attribute present, and unavailable in
+  # the darwin package set. The darwin list no longer drops these on the
+  # availability probe, so the registry must say so with platforms =
+  # [ "linux" ] instead; the assertion in `config` names every entry that does
+  # not. Empty off darwin, where `pkgs` does not hold the darwin package set.
+  darwinUnavailableNixPackages = lib.optionals pkgs.stdenv.hostPlatform.isDarwin (
+    builtins.filter (
+      packageName:
+      (managedPackages.${packageName}.nixpkgs or null) != null
+      && managedPackageBackends.${packageName} == "nixpkgs"
+      && managedPackagePlatformCompatible packageName
+      && nixPackageAttrPresent packageName
+      && !(nixPackageAttrAvailable packageName)
+      && !(builtins.elem packageName posixProgramsProvidedPackages)
+    ) enabledManagedPackageNames
+  );
 
   managedHomebrewBrews = lib.optionals pkgs.stdenv.hostPlatform.isDarwin (
     builtins.filter (name: name != null) (
@@ -1278,6 +1368,10 @@ in
       # nixpkgs (pkgs.qtpass) there instead. Windows still uses WinGet; NixOS is
       # nixpkgs anyway, so this only changes macOS.
       default = {
+        # WHY: no glaxnimate cask exists at all, so the gui category's Homebrew
+        # route contributes nothing on macOS with no error. The macOS carrier is
+        # the flake's darwin derivation of the KDE arm64 dmg.
+        glaxnimate = "nixpkgs";
         pulseview = "nixpkgs";
         qtpass = "nixpkgs";
       };
@@ -1345,12 +1439,19 @@ in
     (lib.optionalAttrs (options ? home && options.home ? packages) { home.packages = sharedPackages; })
 
     {
-      assertions = map (packageName: {
-        assertion = missingNixPackageAttrs == [ ];
-        message = "core.nix: package '${packageName}' routes to nixpkgs but pkgs.${
-          managedPackages.${packageName}.nixpkgs
-        } is unavailable on this platform.";
-      }) missingNixPackageAttrs;
+      assertions =
+        map (packageName: {
+          assertion = missingNixPackageAttrs == [ ];
+          message = "core.nix: package '${packageName}' routes to nixpkgs but pkgs.${
+            managedPackages.${packageName}.nixpkgs
+          } is unavailable on this platform.";
+        }) missingNixPackageAttrs
+        ++ [
+          {
+            assertion = darwinUnavailableNixPackages == [ ];
+            message = "core.nix: packages nixpkgs cannot provide on darwin need a darwin carrier: set platforms = [ \"linux\" ] if the package is genuinely Linux-only, otherwise give the entry a Homebrew block or a flake overlay build; unresolved: ${lib.strings.concatStringsSep ", " darwinUnavailableNixPackages}";
+          }
+        ];
     }
 
     (lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {

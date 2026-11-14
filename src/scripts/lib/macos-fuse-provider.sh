@@ -1,27 +1,27 @@
 # shellcheck shell=sh
-# macFUSE provider fingerprinting for the source-built ntfs-3g (macOS). Requires
+# fuse-t provider fingerprinting for the source-built ntfs-3g (macOS). Requires
 # sha256_of_file() and error() from src/scripts/lib/lib.sh.
 #
-# The build consumes the macFUSE installation under the provider root: include/fuse
-# headers, lib/libfuse.dylib and lib/pkgconfig/fuse.pc. Homebrew's cask declares
-# auto_updates, so those files can be replaced with no repository change, and they
+# The build consumes the fuse-t installation under the provider root: include/fuse
+# headers (a symlink into the fuse-t application support tree on a real host),
+# lib/libfuse-t.dylib and lib/pkgconfig/fuse-t.pc. fuse-t is installed outside the
+# Nix store, so those files can be replaced with no repository change, and they
 # themselves answer "has the provider changed since this binary was built?".
 #
-# WHY hash the consumed files instead of recording a version: the pinned cask carries
-# no version into the build fingerprint and a package receipt can disagree with what
-# is on disk, so hashing catches both an upgrade and an in-place replacement. The
-# provider root is a parameter so callers and tests can point at any installation
-# shape.
+# WHY hash the consumed files instead of recording a version: no version reaches the
+# build fingerprint and the installed tree can disagree with any recorded one, so
+# hashing catches both an upgrade and an in-place replacement. The provider root is a
+# parameter so callers and tests can point at any installation shape.
 
 # WHY: every message names the ntfs-3g activation build, its only consumer, because lib.sh derives the default label from $0 and would report one failure twice.
 _fp_error() {
   error -l ntfs-3g "$@"
 }
 
-# Resolved provider library path, following the symlink (libfuse.dylib -> libfuse.2.dylib). Returns 1 when absent or dangling.
+# Resolved provider library path, following the symlink (libfuse-t.dylib -> libfuse-t-1.2.7.dylib). Returns 1 when absent or dangling.
 _fp_resolved_lib() {
-  [ -e "$1/lib/libfuse.dylib" ] || return 1
-  /bin/realpath "$1/lib/libfuse.dylib"
+  [ -e "$1/lib/libfuse-t.dylib" ] || return 1
+  /bin/realpath "$1/lib/libfuse-t.dylib"
 }
 
 # WHY: sha256_of_file prints nothing and still succeeds for a file it cannot read, so an unchecked call would record an empty hash over a provider whose contents were never read.
@@ -36,77 +36,80 @@ fuse_provider_lib_name() {
   printf '%s\n' "${_fpln_lib##*/}"
 }
 
-# sha256 over the build's own provider inputs: every regular file under include/fuse/,
-# the resolved library the link step consumes, and the pkg-config file configure reads.
-# Nothing else under the root is hashed, and a symlink inside include/fuse/ is not
-# itself covered; lib/libfuse.dylib is, under the path it resolves to. The digest is
-# content-addressed over a sorted "path hash" manifest, so it is independent of
-# directory order, temp file name, and how the caller spells the root (canonicalized
-# first).
+# sha256 over the build's own provider inputs: every regular file under include/fuse/
+# (following the directory when it is a symlink into the fuse-t application support
+# tree), the resolved library the link step consumes, and the pkg-config file
+# configure reads. Nothing else under the root is hashed, and a symlink inside
+# include/fuse/ is not itself covered; lib/libfuse-t.dylib is, under the path it
+# resolves to. The digest is content-addressed over a sorted "path hash" manifest, so
+# it is independent of directory order, temp file name, and how the caller spells the
+# root (canonicalized first).
 #
-# WHY: record the library under its resolved relative path. A macFUSE ABI bump
-#   (libfuse.2 -> libfuse.3) changes the digest even when the bytes are identical,
-#   which is the case a content-only hash misses.
+# WHY: record the library under its resolved relative path. A fuse-t ABI bump
+#   (libfuse-t-1.2.7 -> libfuse-t-1.3.0) changes the digest even when the bytes are
+#   identical, which is the case a content-only hash misses.
 fuse_provider_digest() {
   _fpd_root="$1"
   if ! [ -f "$_fpd_root/include/fuse/fuse.h" ]; then
-    _fp_error "macFUSE headers not found under $_fpd_root/include/fuse"
+    _fp_error "fuse-t headers not found under $_fpd_root/include/fuse"
     return 1
   fi
-  if ! [ -f "$_fpd_root/lib/pkgconfig/fuse.pc" ]; then
-    _fp_error "macFUSE pkg-config file not found at $_fpd_root/lib/pkgconfig/fuse.pc"
+  if ! [ -f "$_fpd_root/lib/pkgconfig/fuse-t.pc" ]; then
+    _fp_error "fuse-t pkg-config file not found at $_fpd_root/lib/pkgconfig/fuse-t.pc"
     return 1
   fi
   # WHY: canonicalize the root before deriving relative manifest names. The library path comes from realpath, so a root reached through a symlinked component (/var -> /private/var, which is how $TMPDIR is spelled on macOS) would survive the prefix strip, leak an absolute path into the manifest, and rebuild on a spelling change.
   _fpd_root="$(/bin/realpath "$_fpd_root")" || {
-    _fp_error "macFUSE provider root is not resolvable: $1"
+    _fp_error "fuse-t provider root is not resolvable: $1"
     return 1
   }
   _fpd_lib="$(_fp_resolved_lib "$_fpd_root")" || {
-    _fp_error "macFUSE library not found at $_fpd_root/lib/libfuse.dylib"
+    _fp_error "fuse-t library not found at $_fpd_root/lib/libfuse-t.dylib"
     return 1
   }
 
   _fpd_manifest="$(mktemp)" || {
-    _fp_error "could not create a temporary file for the macFUSE provider manifest"
+    _fp_error "could not create a temporary file for the fuse-t provider manifest"
     return 1
   }
   # WHY: run find from inside the provider root so every manifest entry is relative to it and the digest depends only on relative names and contents; mktemp returns an absolute path, so the entry helper still works from there.
+  # WHY: -L, because fuse-t installs include/fuse as a symlink into its application support tree; without it the walk finds no headers at all.
   # WHY: every step fails the whole digest rather than recording a partial provider, since a truncated entry list would pass as a valid fingerprint, which is the drift the build record exists to detect.
   _fpd_lib_rel="${_fpd_lib#"$_fpd_root"/}"
   if ! (
     cd "$_fpd_root" || exit 1
-    _fpd_files="$(find include/fuse -type f -print)" || exit 1
+    _fpd_files="$(find -L include/fuse -type f -print)" || exit 1
     [ -n "$_fpd_files" ] || exit 1
     printf '%s\n' "$_fpd_files" | LC_ALL=C sort | while IFS= read -r _fpd_file; do
       _fp_manifest_entry "$_fpd_manifest" "$_fpd_file" || exit 1
     done || exit 1
-    _fp_manifest_entry "$_fpd_manifest" "lib/pkgconfig/fuse.pc" || exit 1
+    _fp_manifest_entry "$_fpd_manifest" "lib/pkgconfig/fuse-t.pc" || exit 1
     _fp_manifest_entry "$_fpd_manifest" "$_fpd_lib_rel" || exit 1
   ); then
     rm -f "$_fpd_manifest"
-    _fp_error "could not fingerprint the macFUSE provider under $_fpd_root"
+    _fp_error "could not fingerprint the fuse-t provider under $_fpd_root"
     return 1
   fi
   if ! LC_ALL=C sort -o "$_fpd_manifest" "$_fpd_manifest"; then
     rm -f "$_fpd_manifest"
-    _fp_error "could not sort the macFUSE provider manifest"
+    _fp_error "could not sort the fuse-t provider manifest"
     return 1
   fi
   if ! _fpd_digest="$(sha256_of_file "$_fpd_manifest")" || [ -z "$_fpd_digest" ]; then
     rm -f "$_fpd_manifest"
-    _fp_error "could not hash the macFUSE provider manifest"
+    _fp_error "could not hash the fuse-t provider manifest"
     return 1
   fi
   rm -f "$_fpd_manifest"
   printf '%s\n' "$_fpd_digest"
 }
 
-# Informational build-record line naming the provider the binary was built against.
-# Never gates a rebuild: a version string must not churn rebuilds.
-fuse_provider_identity() { # <provider_root> <macfuse_version>
+# Informational build-record line naming the provider the binary was built against,
+# e.g. "fuset 1.2.7 libfuse-t-1.2.7.dylib". Never gates a rebuild: a version string
+# must not churn rebuilds.
+fuse_provider_identity() { # <provider_root> <fuse_t_version>
   _fpi_lib="$(fuse_provider_lib_name "$1")" || return 1
-  printf 'macfuse %s %s\n' "$2" "$_fpi_lib"
+  printf 'fuset %s %s\n' "$2" "$_fpi_lib"
 }
 
 # One line of the ntfs-3g build record (1 = Nix fingerprint, 2 = provider digest,
@@ -117,21 +120,19 @@ fuse_provider_record_field() { # <line_number> <record_file>
   sed -n "${1}p" "$2"
 }
 
-# Installed macFUSE package version from the installer receipt, e.g. 5.3.3. The
-# pkgutil path is a parameter so the lookup can be driven against a stub. Fails loudly
-# when the receipt is absent: an unidentifiable provider is the state the build record
-# exists to expose.
-macfuse_pkg_version() { # <pkgutil_bin>
-  _mpv_pkgutil="${1:?macfuse_pkg_version: missing pkgutil path}"
-  if ! _mpv_info="$("$_mpv_pkgutil" --pkg-info io.macfuse.installer.components.core)"; then
-    _fp_error "macFUSE package receipt not found (io.macfuse.installer.components.core)"
+# Installed fuse-t version from the pkg-config file the build reads, e.g. 1.2.7. The
+# provider root is a parameter so the lookup can be driven against a fixture. Fails
+# loudly when the version is absent: an unidentifiable provider is the state the build
+# record exists to expose.
+fuse_provider_version() { # <provider_root>
+  _fpv_pc="${1:?fuse_provider_version: missing provider root}/lib/pkgconfig/fuse-t.pc"
+  if ! _fpv_version="$(sed -n 's/^Version: *//p' "$_fpv_pc")"; then
+    _fp_error "fuse-t pkg-config file cannot be read ($_fpv_pc)"
     return 1
   fi
-  # WHY: check pkgutil's own status before parsing, and keep the two failures distinct. A failing pkgutil must not be masked by output that happens to carry a version line.
-  _mpv_version="$(printf '%s\n' "$_mpv_info" | awk '/^version:/ { print $2 }')"
-  if [ -z "$_mpv_version" ]; then
-    _fp_error "macFUSE package receipt carries no version line (io.macfuse.installer.components.core)"
+  if [ -z "$_fpv_version" ]; then
+    _fp_error "fuse-t pkg-config file carries no Version line ($_fpv_pc)"
     return 1
   fi
-  printf '%s\n' "$_mpv_version"
+  printf '%s\n' "$_fpv_version"
 }

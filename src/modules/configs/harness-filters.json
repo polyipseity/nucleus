@@ -1,0 +1,13 @@
+{
+  "$schema": "./harness-filters.schema.json",
+  "filters": [
+    {
+      "enabled": true,
+      "id": "safe-delete",
+      "settings": {
+        "powershell": "profile",
+        "unproven": "ask"
+      }
+    }
+  ]
+}

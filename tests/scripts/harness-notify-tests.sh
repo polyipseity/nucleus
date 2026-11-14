@@ -12,8 +12,10 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/test-lib.sh"
 
 NOTIFY="$SCRIPT_DIR/../../src/scripts/notify/harness-notify.sh"
+NOTIFY_PS1="$SCRIPT_DIR/../../src/scripts/notify/harness-notify.ps1"
 
 require_command mktemp "temporary directories for the recording stub"
+require_command pwsh "the PowerShell twin's default channels are asserted by running it"
 
 TMPDIR_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_ROOT"' EXIT
@@ -98,10 +100,35 @@ test_missing_config_uses_defaults() {
   reset_log
   local rc=0
   run_notify "" cursor "done" "no config file" || rc=$?
-  if [ "$rc" -eq 0 ] && grep -q $'\037--to\037telegram' "$HARNESS_NOTIFY_LOG"; then
-    assert_pass "absent config file falls back to the declared defaults"
+  local count
+  count="$(grep -c '^ARGV' "$HARNESS_NOTIFY_LOG")"
+  if [ "$rc" -eq 0 ] && [ "$count" -eq 3 ] &&
+    grep -q $'\037--to\037telegram' "$HARNESS_NOTIFY_LOG" &&
+    grep -q $'\037--to\037ntfy' "$HARNESS_NOTIFY_LOG" &&
+    grep -q $'\037--to\037discord' "$HARNESS_NOTIFY_LOG"; then
+    assert_pass "absent config file falls back to all three default channels"
   else
-    assert_fail "defaults" "rc=$rc log: $(cat "$HARNESS_NOTIFY_LOG")"
+    assert_fail "defaults" "rc=$rc count=$count log: $(cat "$HARNESS_NOTIFY_LOG")"
+  fi
+}
+
+test_ps1_missing_config_uses_defaults() {
+  # The Windows twin resolves its config from $HOME the same way, so an
+  # isolated HOME with no config file exercises its declared default channels.
+  rm -rf "$TMPDIR_ROOT/home/.local/state"
+  reset_log
+  local rc=0
+  HOME="$TMPDIR_ROOT/home" PATH="$TMPDIR_ROOT/bin:$PATH" \
+    pwsh -NoProfile -File "$NOTIFY_PS1" pi "done" "no config file" >/dev/null || rc=$?
+  local count
+  count="$(grep -c '^ARGV' "$HARNESS_NOTIFY_LOG")"
+  if [ "$rc" -eq 0 ] && [ "$count" -eq 3 ] &&
+    grep -q $'\037--to\037telegram' "$HARNESS_NOTIFY_LOG" &&
+    grep -q $'\037--to\037ntfy' "$HARNESS_NOTIFY_LOG" &&
+    grep -q $'\037--to\037discord' "$HARNESS_NOTIFY_LOG"; then
+    assert_pass "the PowerShell twin falls back to the same three default channels"
+  else
+    assert_fail "ps1-defaults" "rc=$rc count=$count log: $(cat "$HARNESS_NOTIFY_LOG")"
   fi
 }
 
@@ -205,6 +232,7 @@ test_single_channel_delivery
 test_channel_fan_out
 test_disabled_config_sends_nothing
 test_missing_config_uses_defaults
+test_ps1_missing_config_uses_defaults
 test_unreadable_config_is_non_fatal
 test_missing_arguments_is_non_fatal
 test_unknown_event_is_ignored

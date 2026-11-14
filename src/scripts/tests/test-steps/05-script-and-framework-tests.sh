@@ -4,8 +4,11 @@
 
 register_step "script-and-framework-tests" "Script and framework tests" run_script_and_framework_tests
 
-# Discover tests/scripts/**/*-tests.sh in stable order: priority framework suites first,
-# then everything else lexicographically. Excludes suites wired to other test steps.
+# Discover tests/scripts/**/*-tests.{sh,ps1} in stable order: priority framework
+# suites first (both twins), then everything else lexicographically. Excludes
+# suites wired to other test steps; the excluded names strip per extension, so
+# the one list below covers both globs and mirrors the Windows twin's
+# $excludeNames.
 _discover_script_tests() {
   local _test_dir="$1"
   local -a _all=() _ordered=() _seen=()
@@ -13,12 +16,12 @@ _discover_script_tests() {
 
   while IFS= read -r -d '' _f; do
     _all+=("$_f")
-  done < <(find "$_test_dir" -type f -name '*-tests.sh' -print0 | LC_ALL=C sort -z)
+  done < <(find "$_test_dir" -type f \( -name '*-tests.sh' -o -name '*-tests.ps1' \) -print0 | LC_ALL=C sort -z)
 
   for _priority in step-runner-unit-tests test-lib-unit-tests deny-list-tests; do
     for _f in "${_all[@]}"; do
       _base="$(basename "$_f")"
-      if [ "$_base" = "${_priority}.sh" ]; then
+      if [ "$_base" = "${_priority}.sh" ] || [ "$_base" = "${_priority}.ps1" ]; then
         _ordered+=("$_f")
         _seen+=("$_f")
       fi
@@ -26,7 +29,10 @@ _discover_script_tests() {
   done
 
   for _f in "${_all[@]}"; do
-    _base="$(basename "$_f" .sh)"
+    case "$_f" in
+    *.ps1) _base="$(basename "$_f" .ps1)" ;;
+    *) _base="$(basename "$_f" .sh)" ;;
+    esac
     case "$_base" in
     nix-test-eval-tests | check-pwsh-tests) continue ;;
     esac
@@ -46,8 +52,14 @@ _discover_script_tests() {
 }
 
 _is_priority_script_test() {
-  case "$(basename "$1")" in
-  step-runner-unit-tests.sh | test-lib-unit-tests.sh | deny-list-tests.sh) return 0 ;;
+  local _base
+  _base="$(basename "$1")"
+  case "$_base" in
+  *.ps1) _base="${_base%.ps1}" ;;
+  *) _base="${_base%.sh}" ;;
+  esac
+  case "$_base" in
+  step-runner-unit-tests | test-lib-unit-tests | deny-list-tests) return 0 ;;
   *) return 1 ;;
   esac
 }
@@ -64,6 +76,8 @@ _run_script_test() {
   # suite is not run a second time just to show the output quiet mode suppressed.
   if [ "$(basename "$_script")" = "nucleus-apps-smoke-tests.sh" ]; then
     nucleus_nix_locked bash "$_script" >"$_capture" 2>&1 || _status=$?
+  elif [ "${_script##*.}" = "ps1" ]; then
+    pwsh -NoProfile -File "$_script" >"$_capture" 2>&1 || _status=$?
   else
     bash "$_script" >"$_capture" 2>&1 || _status=$?
   fi
@@ -82,10 +96,10 @@ _run_script_test() {
 }
 
 _run_parallel_script_tests() {
-  local _repo_root="$1"
-  shift
+  local _repo_root="$1" _timing_list="$2"
+  shift 2
   local -a _scripts=("$@")
-  local _capture_dir _failed_list _script _capture_file _status _reason _exit_code=0
+  local _capture_dir _failed_list _script _capture_file _status _reason _ms_pair _exit_code=0
 
   if [ "${#_scripts[@]}" -eq 0 ]; then
     return 0
@@ -105,14 +119,20 @@ _run_parallel_script_tests() {
     say "running $(basename "$_script")"
   done
 
-  # shellcheck disable=SC2016 # reason: $1-$4 are sh -c positional params, not shell expansion
-  printf '%s\0' "${_scripts[@]}" | xargs -0 -P "$PARALLEL_JOBS" -I{} sh -c '
+  # shellcheck disable=SC2016 # reason: $1-$4 are bash -c positional params, not shell expansion
+  # WHY bash rather than sh: the job sources step-runner.sh, a bash library
+  # (BASH_SOURCE, declare, local -n); where sh is dash the source dies with
+  # "Bad substitution" and the shared millisecond clock never loads.
+  printf '%s\0' "${_scripts[@]}" | xargs -0 -P "$PARALLEL_JOBS" -I{} bash -c '
     script="$1"
     capture_dir="$2"
     repo_root="$3"
     quiet_mode="$4"
     base=$(basename "$script")
     capture_file="$capture_dir/$base.out"
+    # Sourced once for the shared millisecond clock; the run_one source below
+    # is a no-op under the runner re-source guard.
+    . "$repo_root/src/scripts/lib/step-runner.sh"
     run_one() {
       if [ "$base" = "nucleus-apps-smoke-tests.sh" ]; then
         . "$repo_root/src/scripts/lib/step-runner.sh"
@@ -121,6 +141,8 @@ _run_parallel_script_tests() {
         else
           nucleus_nix_locked bash "$script"
         fi
+      elif [ "${base##*.}" = "ps1" ]; then
+        pwsh -NoProfile -File "$script"
       elif [ "$quiet_mode" = true ]; then
         bash "$script"
       else
@@ -128,8 +150,11 @@ _run_parallel_script_tests() {
       fi
     }
     _rc=0
+    _start_ms=$(_step_now_ms)
     run_one >"$capture_file" 2>&1 || _rc=$?
+    _end_ms=$(_step_now_ms)
     printf '%s' "$_rc" >"$capture_dir/$base.rc"
+    printf "%s %s\n" "$_start_ms" "$_end_ms" >"$capture_dir/$base.ms"
   ' _ {} "$_capture_dir" "$_repo_root" "$quiet_mode"
 
   for _script in "${_scripts[@]}"; do
@@ -147,10 +172,20 @@ _run_parallel_script_tests() {
     elif [ "$_status" -ne 0 ]; then
       printf '%s (exit %s)\n' "$_script" "$_status" >>"$_failed_list"
     fi
+    if [ -f "$_capture_dir/$(basename "$_script").ms" ]; then
+      _ms_pair=$(cat "$_capture_dir/$(basename "$_script").ms")
+      printf '%s %s\n' "$_ms_pair" "$(basename "$_script")" >>"$_timing_list"
+    fi
     if [ -f "$_capture_file" ]; then
       cat "$_capture_file"
     fi
   done
+
+  # Informational only: the table never feeds the exit code or the failure list.
+  if [ -s "$_timing_list" ]; then
+    say "suite wall times (slowest first):"
+    LC_ALL=C awk '{ printf "%6.1f s  %s\n", ($2 - $1) / 1000, $3 }' "$_timing_list" | LC_ALL=C sort -rn
+  fi
 
   if [ -s "$_failed_list" ]; then
     error "FAILED script tests:"
@@ -170,7 +205,7 @@ run_script_and_framework_tests() {
   local _exit_code=0
   local _test_dir="$_repo_root/tests/scripts"
   local -a _all_scripts=() _priority_scripts=() _parallel_scripts=()
-  local _test_script
+  local _test_script _timing_list _start_ms _end_ms
 
   while IFS= read -r -d '' _test_script; do
     [ -n "$_test_script" ] || continue
@@ -187,16 +222,25 @@ run_script_and_framework_tests() {
 
   say "--- discovered script tests ---"
 
+  _timing_list=$(mktemp) || {
+    error "failed to create timing list"
+    return 1
+  }
+
   for _test_script in "${_priority_scripts[@]}"; do
     say "running $(basename "$_test_script")"
+    _start_ms=$(_step_now_ms)
     if ! _run_script_test "$_test_script"; then
       _exit_code=1
     fi
+    _end_ms=$(_step_now_ms)
+    printf '%s %s %s\n' "$_start_ms" "$_end_ms" "$(basename "$_test_script")" >>"$_timing_list"
   done
 
-  if ! _run_parallel_script_tests "$_repo_root" "${_parallel_scripts[@]}"; then
+  if ! _run_parallel_script_tests "$_repo_root" "$_timing_list" "${_parallel_scripts[@]}"; then
     _exit_code=1
   fi
 
+  rm -f "$_timing_list"
   return "$_exit_code"
 }

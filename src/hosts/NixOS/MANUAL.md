@@ -17,6 +17,10 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 6. The ALSA default routes into the loopback, so audio is silent while `camilladsp` is stopped: start `camilladsp`, or point the app at a `hw:` card. The loopback takes one client at a time and does not mix. The same node serves capture, so a recorder that opens `default` reads the loopback instead: give `arecord` the card (`arecord -D hw:CARD=<card>`) and `whisper-stream` a capture id that is not the default (`whisper-stream --capture <id>`); `arecord -l` lists the cards.
 7. Do not set a config's playback device to `default` or to the loopback card: both resolve back into the card the config captures from, so its own output returns as input. The shipped configs leave playback `null` on purpose, which is what lets the heartbeat choose the card.
 
+## system
+
+1. pi reports its sandbox state through the `sandbox` status indicator: `SANDBOX: srt` inside the srt sandbox and `SANDBOX: NONE (unsandboxed)` outside it. Run `/sandbox-status` for the evidence, mode, resolved `rm`, `shell-safe-rm`/`rip` presence, and the `safe-delete` filter's `unproven` setting. The unsandboxed warning is emitted once per process.
+
 ## secrets and remotes
 
 1. Generate `rclone_config_pass`: `openssl rand -hex 64` into `rclone_config_pass` in `src/secrets/users/<username>.yml`, commit, re-run `nucleus-apply`. Delete `~/.config/rclone/rclone.conf` first when unencrypted remotes exist.
@@ -32,11 +36,12 @@ Steps `nucleus-apply` cannot do. Everything else is already converged.
 1. Transcribe a file: `whisper-cli -m ~/.local/share/nucleus/models/ggml-base.en.bin -f <audio-file>`.
 2. Transcribe live: `whisper-stream -m ~/.local/share/nucleus/models/ggml-base.en.bin`. Add `--step 0` for discrete segments instead of a rolling window.
 3. `whisper-stream` opens an SDL2 window; close it to stop. It opens a capture device of its own through ALSA, since this host runs no PipeWire, so a missing or wrong source is an ALSA device question: `arecord -l` lists what is available.
+4. Clean a recording: `deep-filter -m ~/.local/share/nucleus/models/DeepFilterNet3_onnx.tar.gz -o out.wav in.wav`.
 
 ## harness bridge
 
 Set `services.hermes-agent.gateway.enable = true` for this host, otherwise nothing can arrive remotely; apply enables the `harness-bridge` plugin and runs the gateway as a user service. To provision a channel once: seal `TELEGRAM_BOT_TOKEN`, or `NTFY_TOPIC` with `NTFY_TOKEN`, or `DISCORD_BOT_TOKEN` in your SOPS file, list it in `src/users/<user>/env-secrets.json` with `consumers: ["hermes-agent"]`, set `platforms.<name>.enabled` in the gateway config, then re-run `nucleus-apply`. Check the gateway with `systemctl --user status hermes-agent`.
 
-Remote approvals are off by default: `nucleus-config set harness-approval.enable true` to enable them. `nucleus-config get harness-notify.channels` lists the notification channels; `nucleus-config set harness-notify.enable false` stops the bridge on this machine.
+Approvals are asked in the terminal by default (`harness-approval.sources` is `["prompt"]`); `nucleus-config set harness-approval.sources '["prompt","hermes"]'` adds the remote channel, and `harness-approval.timeout-seconds.<source>` bounds each wait, `0` meaning until answered. `nucleus-config get harness-notify.channels` lists the notification channels; `nucleus-config set harness-notify.enable false` stops the bridge on this machine.
 
 The rules behind those switches and the `/harness` commands are in `.agents/instructions/agents-and-skills.instructions.md`.

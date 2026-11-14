@@ -21,14 +21,41 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd -P)"
 REPO_ROOT="$(derive_repo_root)"
 COMPLETIONS_DIR="$REPO_ROOT/src/modules/completions/zsh"
 
-# The canonical nucleus-* command set (alphabetical), the coverage contract
-# shared with check step 10-completions-fresh and the generator tests.
-COMMANDS=(ai apply bootstrap check cloud config gc svc test update utils vm)
+# The canonical nucleus-* command set, read from the committed manifest that
+# nix-capable checks keep in sync with mkNucleusApps. NUCLEUS_COMPLETIONS_COMMANDS
+# overrides the manifest for tests (space or newline separated names).
+NUCLEUS_APPS_MANIFEST="$REPO_ROOT/src/modules/completions/nucleus-apps.json"
+COMMANDS=()
+if [ -n "${NUCLEUS_COMPLETIONS_COMMANDS:-}" ]; then
+  while IFS= read -r _cmd; do
+    [ -n "$_cmd" ] || continue
+    case "$_cmd" in
+    nucleus-*) COMMANDS+=("${_cmd#nucleus-}") ;;
+    *) COMMANDS+=("$_cmd") ;;
+    esac
+  done < <(printf '%s\n' "$NUCLEUS_COMPLETIONS_COMMANDS" | tr ' \t' '\n' | LC_ALL=C sort -u)
+else
+  if [ ! -f "$NUCLEUS_APPS_MANIFEST" ]; then
+    error "nucleus command manifest not found: $NUCLEUS_APPS_MANIFEST"
+    exit 1
+  fi
+  require_command jq "jq is required to read the nucleus command manifest"
+  while IFS= read -r _cmd; do
+    [ -n "$_cmd" ] || continue
+    COMMANDS+=("$_cmd")
+  done < <(jq -r '.commands[]' "$NUCLEUS_APPS_MANIFEST")
+fi
+if [ "${#COMMANDS[@]}" -eq 0 ]; then
+  error "could not read nucleus command list from $NUCLEUS_APPS_MANIFEST"
+  exit 1
+fi
 
 # Subcommands whose usage line does not enumerate them cleanly (config embeds
 # argument syntax between names). Descriptions still come from the live --help body.
 sh_for_command() {
   case "$1" in
+  # Daemon entry points live under src/scripts/services/, not scripts/.
+  camilladsp-heartbeat) printf '%s\n' "src/scripts/services/camilladsp-heartbeat.sh" ;;
   *) printf '%s\n' "scripts/$1.sh" ;;
   esac
 }
@@ -39,11 +66,12 @@ sh_for_command() {
 known_subcommands() {
   case "$1" in
   svc) printf '%s\n' "list|status|start|stop|restart|enable|disable|verify|endpoint|logs|log-paths|log-config" ;;
+  logs) printf '%s\n' "append|expire|gc|label|rotate|show|stats|tail" ;;
   vm) printf '%s\n' "setup|sync|build-system|list|status|start|stop|upgrade|reset|android-config|inject|gc|resize|pack|unpack" ;;
   ai) printf '%s\n' "sync|list|status|endpoint|config" ;;
   config) printf '%s\n' "get|set|list" ;;
   check) printf '%s\n' "packer|sh|pwsh" ;;
-  gc) printf '%s\n' "cleanup-nix|preferences" ;;
+  gc) printf '%s\n' "cleanup-nix|graveyard|logs|preferences" ;;
   apply) printf '%s\n' "health-check|audit-store" ;;
   cloud) printf '%s\n' "setup|reset|sync|status|restart" ;;
   update) printf '%s\n' "lockfile" ;;

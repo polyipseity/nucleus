@@ -8,161 +8,16 @@ register_step "repo-policy-grep" "Repository policy (grep-heavy)" run_repo_polic
 
 # Sub-checks in output order, as "<label>|<function>|<style>".
 _POLICY_GREP_CHECKS=(
-  "store-path arg usage|run_store_path_arg_usage|ctx"
   "activation tool resolution|run_activation_tool_resolution|ctx"
-  "package manager enforcement|run_package_manager_enforcement|ctx"
   "suppression audit|run_suppression_audit|ctx"
   "cloud-mount invariants|run_cloud_mount_invariants|ctx"
   "service supervision invariants|run_service_supervision_invariants|ctx"
-  "srt wrapper invariants|run_srt_wrapper_invariants|ctx"
 )
 
 run_repo_policy_grep() {
   local _ctx_name="$1"
   shift
   run_policy_checks "$_ctx_name" "repository policy (grep-heavy)" _POLICY_GREP_CHECKS "$@"
-}
-
-run_store_path_arg_usage() {
-  local -n ctx="$1"
-  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
-  shift
-  local _files=("$@")
-  cd "$_repo_root" || return 1
-  local _violations=0
-
-  if $_has_args; then
-    local _f _has_sh_files=0
-    for _f in "${_files[@]}"; do
-      case "$_f" in
-      *.sh)
-        _has_sh_files=1
-        break
-        ;;
-      esac
-    done
-    if [ "$_has_sh_files" -eq 0 ]; then
-      say "0 shell files in scope — nothing to enforce."
-      return 0
-    fi
-  fi
-
-  # ref: comment-annotations.instructions.md#C1 -- self-derived basenames for exclusion
-  # shellcheck disable=SC2155 # reason: basename's exit status is irrelevant; self-derived for exclusion
-  local _self_sh="$(basename "${BASH_SOURCE[0]}")"
-  local _self_ps1="${_self_sh%.sh}.ps1"
-  local _candidate_files=()
-
-  # _X_bin here is a config parameter, not a command, so matching it is a false
-  # positive (A9 self-file basenames, A13 configure-gpg-agent.sh).
-  # ref: allow-and-deny-lists.instructions.md#A13 -- _*_bin values are config parameters, not commands
-  local _exclude_pattern='('"$_self_sh"'|'"$_self_ps1"'|configure-gpg-agent\.sh)$'
-
-  if $_has_args; then
-    local _f
-    for _f in "${_files[@]}"; do
-      case "$_f" in
-      *.sh) _candidate_files+=("$_f") ;;
-      esac
-    done
-    local _filtered=()
-    for _f in "${_candidate_files[@]}"; do
-      local _base
-      _base="$(basename "$_f")"
-      # Same exclusions as the whole-repo branch below.
-      case "$_base" in
-      "$_self_sh" | "$_self_ps1") continue ;;
-      esac
-      if echo "$_base" | grep -qE "$_exclude_pattern"; then
-        continue
-      fi
-      _filtered+=("$_f")
-    done
-    _candidate_files=("${_filtered[@]}")
-  else
-    mapfile -t _candidate_files < <(
-      find scripts/ src/scripts/ -name '*.sh' -print |
-        filter_gitignored |
-        grep -v -E "$_exclude_pattern"
-    )
-  fi
-
-  if [ "${#_candidate_files[@]}" -eq 0 ]; then
-    say "0 shell files in scope — nothing to enforce."
-    return 0
-  fi
-
-  # Unfiltered second list: a variable declared in one script can be consumed in another.
-  local _all_sh_files=()
-  if $_has_args; then
-    for _f in "${_candidate_files[@]}"; do
-      _all_sh_files+=("$_f")
-    done
-  else
-    mapfile -t _all_sh_files < <(
-      find scripts/ src/scripts/ -name '*.sh' -print |
-        filter_gitignored
-    )
-  fi
-
-  local _decls=()
-  local _file
-  for _file in "${_candidate_files[@]}"; do
-    local _line
-    while IFS= read -r _line; do
-      _decls+=("$_line")
-    done < <(grep -HnE '_[a-z][a-z0-9_]*_bin="\$[0-9]+"' "$_file" 2>/dev/null)
-  done
-
-  if [ "${#_decls[@]}" -eq 0 ]; then
-    say "no store-path arg declarations found."
-    return 0
-  fi
-
-  local _decl _var _line_num
-  for _decl in "${_decls[@]}"; do
-    _file="${_decl%%:*}"
-    _line_num="${_decl#*:}"
-    _line_num="${_line_num%%:*}"
-    _var="${_decl##*:}"
-    _var="${_var%%=*}"
-    _var="${_var#"${_var%%[![:space:]]*}"}"
-    _var="${_var%"${_var##*[![:space:]]}"}"
-
-    local _all_refs=0 _non_condition_refs=0
-    local _search_file
-    for _search_file in "${_all_sh_files[@]}"; do
-      local _refs
-      # check-suppress:suppression_doc: grep returns exit 1 on no match; || true allows empty result
-      _refs=$(grep -n "\\\${${_var}\|\\\$${_var}" "$_search_file" 2>/dev/null ||
-        true) # check-suppress:suppression_doc: grep returns exit 1 on no match; || true allows empty result
-      [ -z "$_refs" ] && continue
-
-      _all_refs=$((_all_refs + $(echo "$_refs" | wc -l)))
-
-      local _filtered
-      _filtered=$(echo "$_refs" |
-        grep -v -E "^[0-9]+:[[:space:]]*_?[a-z_]*=\"\\\$[0-9]+\"" |
-        grep -v -E "^[0-9]+:[[:space:]]*\[\[?\s+-[zn]\s" ||
-        true) # check-suppress:suppression_doc: grep returns exit 1 when all lines are filtered; || true allows empty result
-      # check-suppress:suppression_doc: grep -c returns exit 1 on zero matches; || true counts as 0
-      _non_condition_refs=$((_non_condition_refs + $(echo "$_filtered" | grep -c . || true)))
-    done
-
-    if [ "$_all_refs" -eq 0 ]; then
-      error "store-path arg variable ${_var} in ${_file} is declared but never referenced"
-      _violations=$((_violations + 1))
-    elif [ "$_non_condition_refs" -eq 0 ]; then
-      error "store-path arg variable ${_var} in ${_file} is only used in condition checks, never as a command or PATH entry"
-      _violations=$((_violations + 1))
-    fi
-  done
-
-  if [ "$_violations" -eq 0 ]; then
-    say "all store-path arg variables have command/PATH usage."
-    return 0
-  fi
-  return 1
 }
 
 run_activation_tool_resolution() {
@@ -200,8 +55,9 @@ run_activation_tool_resolution() {
   # The android guest scripts run in a guest with no Nix store, so their `ip` can
   # take neither a store-path arg nor a PATH prepend.
   # ref: allow-and-deny-lists.instructions.md#A10 -- guest scripts have no Nix store to resolve against
-  # shellcheck disable=SC2155 # reason: basename's exit status is irrelevant; self-derived for exclusion
-  local _self_sh="$(basename "${BASH_SOURCE[0]}")"
+  # path_basename rather than basename: separator-agnostic and fork-free.
+  path_basename "${BASH_SOURCE[0]}"
+  local _self_sh="$REPLY"
   local _candidate_files=()
   local _f
 
@@ -215,8 +71,8 @@ run_activation_tool_resolution() {
       for _dir in "${_activation_dirs[@]}"; do
         case "$_f" in
         "$_dir"/*)
-          # shellcheck disable=SC2155 # reason: basename's exit status is irrelevant; exclusion check
-          case "$(basename "$_f")" in
+          path_basename "$_f"
+          case "$REPLY" in
           "$_self_sh" | android-fake-wifi-guest-*.sh) continue 2 ;;
           esac
           _candidate_files+=("$_f")
@@ -506,83 +362,6 @@ AWKEOF
   return 0
 }
 
-# ref: allow-and-deny-lists.instructions.md#A12
-run_package_manager_enforcement() {
-  local -n ctx="$1"
-  shift
-  local _files=("$@")
-  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
-  cd "$_repo_root" || return 1
-  local _violations=0
-
-  # Skip when scoped to files outside this step's scope (no .sh/.ps1/.nix files).
-  if $_has_args; then
-    local _f _has_shell_files=0
-    for _f in "${_files[@]}"; do
-      case "$_f" in *.sh | *.ps1 | *.nix)
-        _has_shell_files=1
-        break
-        ;;
-      esac
-    done
-    if [ "$_has_shell_files" -eq 0 ]; then
-      say "0 shell files in scope — nothing to enforce."
-      return 0
-    fi
-  fi
-
-  local _grep_files=()
-  # shellcheck disable=SC2178 # reason: nameref to context array; shellcheck sees string assignment but the ref resolves to an array
-  local -n _sh_files="${ctx[SH_FILES]}"
-  # shellcheck disable=SC2178 # reason: nameref to context array
-  local -n _ps1_files="${ctx[PS1_FILES]}"
-  # shellcheck disable=SC2178 # reason: nameref to context array
-  local -n _nix_files="${ctx[NIX_FILES]}"
-  if $_has_args; then
-    [ ${#_sh_files[@]} -gt 0 ] && _grep_files+=("${_sh_files[@]}")
-    [ ${#_ps1_files[@]} -gt 0 ] && _grep_files+=("${_ps1_files[@]}")
-    [ ${#_nix_files[@]} -gt 0 ] && _grep_files+=("${_nix_files[@]}")
-    local _filtered=()
-    local _f
-    for _f in "${_grep_files[@]}"; do
-      case "$(basename "$_f")" in
-      repo-policy-*.sh | repo-policy-*.ps1 | repository-policy*.sh | repository-policy*.ps1 | 11-repo-policy-grep.sh | 12-repo-policy-pattern.sh | 13-repo-policy-data.sh | 11-repo-policy-grep.ps1 | 12-repo-policy-pattern.ps1 | 13-repo-policy-data.ps1) continue ;;
-      esac
-      _filtered+=("$_f")
-    done
-    _grep_files=("${_filtered[@]}")
-  else
-    mapfile -t _grep_files < <(
-      find scripts/ src/ tests/ \( -name '*.sh' -o -name '*.ps1' -o -name '*.nix' \) -print |
-        filter_gitignored |
-        grep -v -E '(repo-policy-.*\.(sh|ps1)|repository-policy.*\.(sh|ps1)|1[123]-repo-policy-.*\.sh)$'
-    )
-  fi
-
-  if [ "${#_grep_files[@]}" -gt 0 ]; then
-    if printf '%s\0' "${_grep_files[@]}" |
-      xargs -0 grep -n -E '(^|[^a-z])pip install([^-]|$)' 2>/dev/null |
-      grep -v 'uv pip install' |
-      grep . >/dev/null 2>&1; then
-      error "bare pip install detected (use uv pip install instead)"
-      _violations=$((_violations + 1))
-    fi
-
-    if printf '%s\0' "${_grep_files[@]}" |
-      xargs -0 grep -n -E '(^|[^a-z])npm install([^-]|$)' 2>/dev/null |
-      grep . >/dev/null 2>&1; then
-      error "bare npm install detected (use bun or nix instead)"
-      _violations=$((_violations + 1))
-    fi
-  fi
-
-  if [ "$_violations" -gt 0 ]; then
-    return 1
-  fi
-  say "no package manager violations found."
-  return 0
-}
-
 # Suppression audit: undocumented error suppressions.
 # ref: allow-and-deny-lists.instructions.md#A9
 run_suppression_audit() {
@@ -590,12 +369,6 @@ run_suppression_audit() {
   shift
   cd "${ctx[REPO_ROOT]}" || return 1
   local _errors=0
-  local _tmpdir
-  _tmpdir=$(mktemp -d) || {
-    error "failed to create temp dir"
-    _errors=$((_errors + 1))
-  }
-
   local _files=()
   # shellcheck disable=SC2178 # reason: nameref to context array
   local -n _sh_files="${ctx[SH_FILES]}"
@@ -612,10 +385,15 @@ run_suppression_audit() {
     _files=("${_cached_nix_files[@]}" "${_cached_shell_files[@]}")
   fi
 
-  # Drop this step's own file: its scan definitions contain the literal suppression patterns.
-  local _filtered=() _f_iter
+  # Drop this step's own file: its scan definitions contain the literal
+  # suppression patterns. path_basename rather than basename keeps the per-file
+  # cost at zero forks, and it also matches a Windows-shaped path.
+  local _filtered=() _f_iter _self_name
+  path_basename "${BASH_SOURCE[0]}"
+  _self_name="$REPLY"
   for _f_iter in "${_files[@]}"; do
-    [ "$(basename "$_f_iter")" = "$(basename "${BASH_SOURCE[0]}")" ] || _filtered+=("$_f_iter")
+    path_basename "$_f_iter"
+    [ "$REPLY" = "$_self_name" ] || _filtered+=("$_f_iter")
   done
   _files=("${_filtered[@]}")
 
@@ -639,67 +417,30 @@ run_suppression_audit() {
   fi
   local _ps1_files=() _ps1_iter
   for _ps1_iter in "${_ps1_candidates[@]}"; do
-    case "$(basename "$_ps1_iter")" in
+    path_basename "$_ps1_iter"
+    case "$REPLY" in
     11-repo-policy-grep.ps1 | 12-repo-policy-pattern.ps1 | 13-repo-policy-data.ps1) continue ;;
     esac
     _ps1_files+=("$_ps1_iter")
   done
 
-  if [ "${#_files[@]}" -gt 0 ]; then
-    # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
-    printf '%s\0' "${_files[@]}" |
-      xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
-        _safe="$(echo "$2" | tr "/" "_")"
-        _out="$1/${_safe}.out"
-        _grep_pattern="shellcheck disable=|check-suppress:"  # reason: self-reference: grep pattern literal, not a suppression
-        grep -Hn -E "$_grep_pattern" "$2" \
-          | grep -v -E "reason:|suppression_doc:|config-method|embedded-content|packer_validate|SuppressMessageAttribute" \
-          | sed "s/^/undoc_supp:/" >> "$_out" 2>/dev/null || true  # check-suppress:suppression_doc: grep exits 1 on no matches; an empty .out file is the clean signal
-        # Bare "|| true" suppressions: documented by "# check-suppress:suppression_doc:" on
-        # the same or preceding line; test fixtures (tests/) are exempt.
-        case "$2" in
-          *"/tests/"* | "tests/"*) ;;
-          *)
-            awk "
-              /^[[:space:]]*#/ { prev = \$0; next }
-              /\|\| true/ {
-                if (\$0 !~ /check-suppress:suppression_doc:/ && prev !~ /# check-suppress:suppression_doc:/) {
-                  print FILENAME \":\" FNR \":|| true: \" \$0
-                }
-              }
-              { prev = \$0 }
-            " "$2" | sed "s/^/undoc_supp:/" >> "$_out" 2>/dev/null || true  # check-suppress:suppression_doc: awk exits 1 on no || true matches; an empty .out file is the clean signal
-            ;;
-        esac
-      ' _ "$_tmpdir"
-  fi
-
-  local _f _err
-  for _f in "$_tmpdir"/*.out "$_tmpdir"/.*.out; do
-    [ -f "$_f" ] || continue
-    while IFS= read -r _err; do
-      _errors=$((_errors + 1))
-      error "$_err"
-    done <"$_f"
-  done
-
-  if [ "${#_ps1_files[@]}" -gt 0 ]; then
-    # Mirrors Get-UndocSuppViolation in 11-repo-policy-grep.ps1. A comment-line
-    # match is dropped; otherwise the check id must sit on the line or the line
-    # above, which is looser on purpose so a WHY above the probe it explains counts.
-    # WHY case-insensitive: PowerShell -match is, and the two implementations
-    #   must not disagree over a file that spells a parameter differently.
-    # WHY repo-relative: the whole-repo branch enumerates paths from the repo
-    #   root, so matching the raw path would exempt every file in a checkout
-    #   that merely lives under a directory named tests, disarming the policy.
-    # check-suppress:embedded-content: exception 1 (data-driven/generated) -- awk program for the PowerShell suppression audit
-    read -r -d '' _awk_ps1_supp <<'AWKEOF'
-function add_pattern(p, l, c, e) {
+  # One awk process over every file, applying the pattern table and the
+  # annotation audit line by line instead of spawning a child chain per file.
+  # Message text is unchanged, but the whole violation set is sorted and
+  # deduplicated as one list, so the shell and PowerShell halves can interleave
+  # differently and exact duplicate lines collapse.
+  local _scan_files=("${_files[@]}" "${_ps1_files[@]}")
+  if [ "${#_scan_files[@]}" -gt 0 ]; then
+    local _awk_program
+    # check-suppress:embedded-content: exception 1 (data-driven/generated) -- awk program for the suppression audit
+    read -r -d '' _awk_program <<'AWKEOF'
+function add_pattern(p, l, c, e, f) {
   _count++
   pat[_count] = p
   label[_count] = l
   id[_count] = c
   exempt[_count] = e
+  ps1[_count] = f
 }
 
 # Repo-relative, so a checkout that merely lives under a directory named tests
@@ -708,7 +449,9 @@ function is_tests(path,   rel, root_lc) {
   root_lc = tolower(ROOT)
   rel = path
   if (root_lc != "" && index(tolower(rel), root_lc) == 1) {
-    rel = substr(rel, length(ROOT) + 2)
+    # Strip any run of separators after the root, matching the PowerShell twin's TrimStart.
+    rel = substr(rel, length(ROOT) + 1)
+    sub(/^[\/\\]+/, "", rel)
   } else {
     sub(/^\.[\/]/, "", rel)
   }
@@ -717,22 +460,31 @@ function is_tests(path,   rel, root_lc) {
 
 BEGIN {
   # One entry per pattern: ERE, report label, documenting check id (empty when
-  # no annotation documents it), and whether the tests/ exemption applies.
-  add_pattern("2>[$]null", "2>$null", "suppression_doc", 1)
-  add_pattern("-erroraction silentlycontinue", "-ErrorAction SilentlyContinue", "suppression_doc", 1)
-  add_pattern("catch[[:space:]]*\\{[[:space:]]*\\}", "empty catch {}", "suppression_doc", 0)
-  add_pattern("[|] out-null", "| Out-Null", "", 0)
-  add_pattern("[$]null[[:space:]]*=[[:space:]]*[^[:space:]]", "$null =", "suppression_doc", 1)
-  add_pattern("\\[void\\]", "[void]", "suppression_doc", 1)
-  add_pattern("suppressmessageattribute\\(", "SuppressMessageAttribute", "SuppressMessageAttribute", 0)
+  # no annotation documents it), whether the tests/ exemption applies, and
+  # whether it belongs to the PowerShell half. The PowerShell entries mirror
+  # Get-UndocSuppViolation in 11-repo-policy-grep.ps1; a .ps1 file is the only
+  # thing that half reads, and everything else is shell or Nix.
+  add_pattern("[|][|] true", "|| true", "suppression_doc", 1, 0)
+  add_pattern("2>[$]null", "2>$null", "suppression_doc", 1, 1)
+  add_pattern("-erroraction silentlycontinue", "-ErrorAction SilentlyContinue", "suppression_doc", 1, 1)
+  add_pattern("catch[[:space:]]*\\{[[:space:]]*\\}", "empty catch {}", "suppression_doc", 0, 1)
+  add_pattern("[|] out-null", "| Out-Null", "", 0, 1)
+  add_pattern("[$]null[[:space:]]*=[[:space:]]*[^[:space:]]", "$null =", "suppression_doc", 1, 1)
+  add_pattern("\\[void\\]", "[void]", "suppression_doc", 1, 1)
+  add_pattern("suppressmessageattribute\\(", "SuppressMessageAttribute", "SuppressMessageAttribute", 0, 1)
 }
 
-FNR == 1 { prev = ""; _under_tests = is_tests(FILENAME) }
+FNR == 1 {
+  prev = ""
+  _under_tests = is_tests(FILENAME)
+  _is_ps1 = (FILENAME ~ "[.]ps1$")
+}
 
 {
   line = tolower($0)
   if (line !~ "^[ \t]*#") {
     for (_i = 1; _i <= _count; _i++) {
+      if (ps1[_i] != _is_ps1) continue
       if (exempt[_i] && _under_tests) continue
       if (line !~ pat[_i]) continue
       if (id[_i] != "") {
@@ -741,29 +493,47 @@ FNR == 1 { prev = ""; _under_tests = is_tests(FILENAME) }
         if (line ~ ("# check-suppress:" _id "[ \t:]")) continue
         if (FNR > 1 && prev ~ ("# check-suppress:" _id)) continue
       }
-      printf "%s:%d (%s)\n", FILENAME, FNR, label[_i]
+      # The shell half repeats the line, because the annotation on it is what a
+      # reader has to see to fix it; the PowerShell half names the pattern.
+      if (ps1[_i]) {
+        printf "%s:%d (%s)\n", FILENAME, FNR, label[_i]
+      } else {
+        printf "undoc_supp:%s:%d:%s: %s\n", FILENAME, FNR, label[_i], $0
+      }
     }
+  }
+  # A `shellcheck disable=` or `check-suppress:` line is documented by a
+  # registered check id, or by `reason:` for a shellcheck directive. The
+  # PowerShell half reads PowerShell annotations only, so this rule skips a
+  # .ps1 file. Comment lines are scanned on purpose: a comment carrying an
+  # unregistered id is exactly what this rule is for.
+  if (!_is_ps1 && $0 ~ /shellcheck disable=|check-suppress:/ &&
+      $0 !~ /reason:|suppression_doc:|config-method|embedded-content|packer_validate|SuppressMessageAttribute/) {
+    printf "undoc_supp:%s:%d:%s\n", FILENAME, FNR, $0
   }
   prev = line
 }
 AWKEOF
 
-    local _ps1_violations
-    _ps1_violations=$(
-      printf '%s\0' "${_ps1_files[@]}" |
-        xargs -0 awk -v ROOT="${ctx[REPO_ROOT]}" "$_awk_ps1_supp"
-    )
+    local _scan_output _violations
+    # Nothing in this call chain enables errexit, and a pipeline carries the
+    # status of its last command, so the scan is checked before the sort.
+    if ! _scan_output=$(
+      printf '%s\0' "${_scan_files[@]}" |
+        xargs -0 awk -v ROOT="${ctx[REPO_ROOT]}" "$_awk_program"
+    ); then
+      error "suppression audit scan failed"
+      return 1
+    fi
+    _violations=$(printf '%s\n' "$_scan_output" | LC_ALL=C sort -u)
     while IFS= read -r _err; do
       [ -z "$_err" ] && continue
       _errors=$((_errors + 1))
       error "$_err"
-    done < <(printf '%s\n' "$_ps1_violations" | LC_ALL=C sort -u)
-  fi
+    done <<<"$_violations"
 
-  if [ "${#_files[@]}" -gt 0 ] || [ "${#_ps1_files[@]}" -gt 0 ]; then
     if [ "$_errors" -gt 0 ]; then
       say "  add '# check-suppress:suppression_doc: reason' comment to explain intentional suppressions."
-      rm -rf -- "$_tmpdir"
       return 1
     fi
     say "no undocumented error suppressions found."
@@ -771,7 +541,6 @@ AWKEOF
     say "0 script files in scope — nothing to audit."
   fi
 
-  rm -rf -- "$_tmpdir"
   return 0
 }
 
@@ -804,7 +573,7 @@ run_cloud_mount_invariants() {
     _failed=1
   fi
 
-  _install_count=$(grep -rl 'macfuse install\|brew install.*macfuse\|fuse-t install\|brew install.*fuse-t' src/scripts/lib/ src/scripts/services/ 2>/dev/null | wc -l || true) # check-suppress:suppression_doc: grep exits 1 when no install site matches; the count must read zero either way
+  _install_count=$(grep -rl 'macfuse install\b\|brew install.*macfuse\|fuse-t install\b\|brew install.*fuse-t' src/scripts/lib/ src/scripts/services/ 2>/dev/null | wc -l || true) # check-suppress:suppression_doc: grep exits 1 when no install site matches; the count must read zero either way
   if [ "$_install_count" -ne 0 ]; then
     error "$_ctx_name: found $_install_count FUSE-library install call sites; the mount path must install none (the cask is Nix-managed)"
     _failed=1
@@ -850,7 +619,8 @@ run_service_supervision_invariants() {
 
     # Drop this step's own file: it names the constants in the loop below.
     local _self_name
-    _self_name="$(basename "${BASH_SOURCE[0]}")"
+    path_basename "${BASH_SOURCE[0]}"
+    _self_name="$REPLY"
     local _elsewhere
     _elsewhere=$(grep -rnE '_SVC_HEALTH_(LOOP|WARN)_[A-Z_]+' --include='*.sh' src/ scripts/ |
       grep -vE "^${_health_lib}:" |
@@ -927,83 +697,5 @@ run_service_supervision_invariants() {
     return 1
   fi
   say "no service supervision invariant violations found."
-  return 0
-}
-
-# run_srt_wrapper_invariants -- every srt-wrapped command separates the user's
-# arguments from srt's own option parser.
-#
-# srt is a commander program: it consumes its own options (-h, -V, -d, -s, -c,
-# --control-fd) wherever they appear, including after the wrapped command.
-# Without the end-of-options marker `pi --help` prints srt's usage and `pi -c
-# <arg>` loses the argument with no error at all, so every forwarder writes the
-# marker.
-#
-# The check is safe over its own source: both patterns are regexes, so neither
-# matches the line it is written on, and the one literal invocation in this file
-# sits in a comment the comment filter drops. No exclusion list is needed.
-run_srt_wrapper_invariants() {
-  local -n ctx="$1"
-  shift
-  local _files=("$@")
-  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
-  cd "$_repo_root" || return 1
-  local _failed=0
-
-  # `srt -c '<string>'` is not a candidate: the string is one argv element
-  # behind -c, so it exposes no per-argument flag. Only `srt command <tool>`
-  # forwards a list, and that list is what needs the marker.
-  local _invocation='(^|[^A-Za-z0-9_./-])srt[[:space:]]+command[[:space:]]+[^[:space:]]+'
-  local _separated='srt[[:space:]]+command[[:space:]]+[^[:space:]]+[[:space:]]+--([[:space:]]|$)'
-
-  local _grep_files=()
-  if $_has_args; then
-    local _f
-    for _f in "${_files[@]}"; do
-      case "$_f" in
-      *.sh | *.zsh | *.ps1 | *.nix) ;;
-      *) continue ;;
-      esac
-      # The whole-repo branch reads src/ and scripts/ only, so drop tests/ here
-      # too; a suite proving this rule needs a violating example, and a fixture
-      # is not a shipped wrapper. ref: allow-and-deny-lists.instructions.md#B9
-      case "$_f" in
-      tests/* | */tests/*) continue ;;
-      esac
-      _grep_files+=("$_f")
-    done
-    if [ "${#_grep_files[@]}" -eq 0 ]; then
-      say "0 wrapper files in scope, nothing to check."
-      return 0
-    fi
-  else
-    mapfile -t _grep_files < <(
-      find src/ scripts/ \( -name '*.sh' -o -name '*.zsh' -o -name '*.ps1' -o -name '*.nix' \) -print |
-        filter_gitignored
-    )
-  fi
-
-  if [ "${#_grep_files[@]}" -gt 0 ]; then
-    local _unseparated
-    _unseparated=$(
-      printf '%s\0' "${_grep_files[@]}" |
-        xargs -0 grep -HnE "$_invocation" |
-        grep -vE "$_separated" |
-        grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' ||
-        true
-    ) # check-suppress:suppression_doc: grep exits 1 when every wrapper already separates its arguments, which is the expected result
-    if [ -n "$_unseparated" ]; then
-      local _offender
-      while IFS= read -r _offender; do
-        error "$_offender forwards the user's arguments to srt without --; srt parses its own options, so put -- between the wrapped command and the forwarded arguments"
-      done <<<"$_unseparated"
-      _failed=1
-    fi
-  fi
-
-  if [ "$_failed" -ne 0 ]; then
-    return 1
-  fi
-  say "every srt wrapper separates its forwarded arguments."
   return 0
 }

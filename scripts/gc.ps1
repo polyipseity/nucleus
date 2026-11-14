@@ -9,6 +9,11 @@
   -DryRun reports each destructive step through Write-NucleusDryRun and removes
   nothing. The step guards make a preview impossible to turn into a real run.
 
+.PARAMETER Action
+  all runs the full GC (default). cleanup-nix, graveyard, logs, and preferences
+  run one targeted operation: graveyard reports the rip graveyard and deletes
+  nothing.
+
 .PARAMETER DryRun
   Report what would be collected and remove nothing (default: $false).
 
@@ -20,6 +25,12 @@
 
 .PARAMETER LogCompress
   Whether to gzip rotated logs (default: loggingEntry.compress in services.schema.json).
+
+.PARAMETER LogsAction
+  nucleus-logs subcommand for -Action logs: append, expire, gc, label, rotate, show, stats, or tail (default: gc).
+
+.PARAMETER LogName
+  Log name passed to nucleus-logs for the subcommands that take one.
 
 .PARAMETER GCVMData
   Collect orphaned VM data (default: $false). Runs vm.sh gc --gc-data, which is
@@ -58,7 +69,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('all', 'cleanup-nix', 'preferences')]
+  [ValidateSet('all', 'cleanup-nix', 'graveyard', 'logs', 'preferences')]
   [string]$Action = 'all',
   [string]$ModuleDir = $(if ($env:NUCLEUS_GC_MODULE_DIR) { $env:NUCLEUS_GC_MODULE_DIR } else { '' }),
   [switch]$DryRun,
@@ -80,6 +91,9 @@ param(
   [string]$LogMaxSize = $(if ($env:NUCLEUS_GC_LOG_MAX_SIZE) { $env:NUCLEUS_GC_LOG_MAX_SIZE } else { '' }),
   [string]$LogMaxFiles = $(if ($env:NUCLEUS_GC_LOG_MAX_FILES) { $env:NUCLEUS_GC_LOG_MAX_FILES } else { '' }),
   [string]$LogCompress = $(if ($env:NUCLEUS_GC_LOG_COMPRESS) { $env:NUCLEUS_GC_LOG_COMPRESS } else { '' }),
+  [ValidateSet('append', 'expire', 'gc', 'label', 'rotate', 'show', 'stats', 'tail')]
+  [string]$LogsAction = 'gc',
+  [string]$LogName,
   [string]$Expiry,
   [string]$HmExpiry = $(if ($env:NUCLEUS_GC_HM_EXPIRY) { $env:NUCLEUS_GC_HM_EXPIRY } else { '' }),
   [string]$NixExpiry = $(if ($env:NUCLEUS_GC_NIX_EXPIRY) { $env:NUCLEUS_GC_NIX_EXPIRY } else { '' }),
@@ -398,15 +412,107 @@ function Invoke-CleanupNix {
 
 # Load only the modules required by this script.
 . (Join-Path -Path $resolvedModuleDir -ChildPath "ConfigHelpers.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "remove-stalewallpaper.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-AISync.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "wallpapers\Remove-StaleWallpaper.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "system\Invoke-AISync.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-LogManagement.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-SccacheManagement.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "ManagedPaths.ps1")
 
+function Invoke-NucleusLogCommand {
+  <#
+  .SYNOPSIS
+    Runs a nucleus-logs subcommand, streaming its output and setting $LASTEXITCODE.
+  .DESCRIPTION
+    The logging operations belong to nucleus-logs, so every caller runs the app
+    rather than its internals. WHY the NUCLEUS_LOGS_BIN seam: one indirection
+    lets a caller (and a test) substitute the entry point. WHY the exit code is
+    not returned: the app's own messages stream to the host, and a returned code
+    would ride the same pipeline as that output, so callers read $LASTEXITCODE.
+  .PARAMETER Arguments
+    Arguments passed to the app, starting with -Action.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [string[]]$Arguments
+  )
+
+  $logsBin = if ($env:NUCLEUS_LOGS_BIN) {
+    $env:NUCLEUS_LOGS_BIN
+  } else {
+    Join-Path -Path $PSScriptRoot -ChildPath 'logs.ps1'
+  }
+  # WHY a child process: the app exits on a usage error, and an in-process exit
+  # would end this script's remaining garbage-collection steps with it.
+  & (Get-Process -Id $PID).Path -NoProfile -NoLogo -File $logsBin @Arguments
+}
+
+function Get-RipGraveyardReport {
+  <#
+  .SYNOPSIS
+    Reports the rip graveyard path, entry count, total bytes, and oldest entry.
+
+  .DESCRIPTION
+    Report-only: graveyard entries are the undo window for safe deletion, so
+    nothing here deletes. The path is $env:RIP_GRAVEYARD when it is set, else
+    <USER root>\state\rip\graveyard, because an elevated or scheduled session
+    does not inherit the User-scope variable.
+
+  .OUTPUTS
+    None.
+  #>
+  [CmdletBinding()]
+  param()
+
+  $graveyardPath = if ($env:RIP_GRAVEYARD) {
+    $env:RIP_GRAVEYARD
+  } else {
+    Join-Path -Path $env:LOCALAPPDATA -ChildPath 'nucleus\state\rip\graveyard'
+  }
+
+  Write-NucleusInfo "graveyard: $graveyardPath"
+
+  if (-not (Test-Path -LiteralPath $graveyardPath -PathType Container)) {
+    Write-NucleusInfo "entries: 0"
+    Write-NucleusInfo "bytes: 0"
+    Write-NucleusInfo "oldest: none"
+    return
+  }
+
+  # WHY @(...): an empty pipeline is $null, and $null.Count is $null in Windows
+  # PowerShell, so the count assertion below would read as absent.
+  $entries = @(Get-ChildItem -LiteralPath $graveyardPath -Force)
+  $files = @(Get-ChildItem -LiteralPath $graveyardPath -Recurse -Force -File)
+  $totalBytes = if ($files.Count -gt 0) { [long](($files | Measure-Object -Property Length -Sum).Sum) } else { 0 }
+  $oldest = $entries | Sort-Object -Property LastWriteTime | Select-Object -First 1
+
+  Write-NucleusInfo "entries: $($entries.Count)"
+  Write-NucleusInfo "bytes: $totalBytes"
+  if ($null -eq $oldest) {
+    Write-NucleusInfo "oldest: none"
+  } else {
+    Write-NucleusInfo "oldest: $($oldest.FullName)"
+  }
+}
+
 switch ($Action) {
   'cleanup-nix' {
     Invoke-CleanupNix -WhatIf:$DryRun
+  }
+  'graveyard' {
+    Get-RipGraveyardReport
+  }
+  'logs' {
+    # WHY the passthrough: gc.sh logs takes a nucleus-logs subcommand, so the twin
+    # must accept the same vocabulary instead of pinning the action to gc.
+    $logsArguments = @('-Action', $LogsAction, '-Scope', 'user')
+    if ($LogName) { $logsArguments += @('-Log', $LogName) }
+    if ($DryRun) { $logsArguments += '-DryRun' }
+    if ($LogMaxSize) { $logsArguments += @('-MaxSize', $LogMaxSize) }
+    if ($LogMaxFiles) { $logsArguments += @('-MaxFiles', $LogMaxFiles) }
+    if ($LogCompress) { $logsArguments += @('-Compress', $LogCompress) }
+    Invoke-NucleusLogCommand -Arguments $logsArguments
+    exit $LASTEXITCODE
   }
   'preferences' {
     Write-NucleusInfo "preferences gc is macOS-only; no Windows action performed"
@@ -580,8 +686,16 @@ if (-not $NoLogGc) {
     if ($DryRun) {
       Write-NucleusDryRun "would rotate managed logs in '$logDir' and expire archives older than $logExpiry"
     } else {
-      Invoke-LogRotation -Path $logDir -MaxSize $logMaxSize -MaxFiles $logMaxFiles -Compress $logCompress
-      Invoke-LogExpiry -Path $logDir -Expiry $logExpiry
+      Invoke-NucleusLogCommand -Arguments @('-Action', 'rotate', '-Scope', 'user', '-MaxSize', $logMaxSize, '-MaxFiles', $logMaxFiles, '-Compress', $logCompress)
+      if ($LASTEXITCODE -ne 0) {
+        Write-NucleusError -CommandName gc "nucleus-logs rotate -Scope user failed (exit $LASTEXITCODE)"
+        throw "nucleus-logs rotate -Scope user failed (exit $LASTEXITCODE)"
+      }
+      Invoke-NucleusLogCommand -Arguments @('-Action', 'expire', '-Scope', 'user', '-Expiry', $logExpiry)
+      if ($LASTEXITCODE -ne 0) {
+        Write-NucleusError -CommandName gc "nucleus-logs expire -Scope user failed (exit $LASTEXITCODE)"
+        throw "nucleus-logs expire -Scope user failed (exit $LASTEXITCODE)"
+      }
     }
 
     if ($systemLogDir -and ($systemLogDir -ne $logDir)) {
@@ -589,8 +703,16 @@ if (-not $NoLogGc) {
         if ($DryRun) {
           Write-NucleusDryRun "would rotate managed logs in '$systemLogDir' and expire archives older than $logExpiry"
         } else {
-          Invoke-LogRotation -Path $systemLogDir -MaxSize $logMaxSize -MaxFiles $logMaxFiles -Compress $logCompress
-          Invoke-LogExpiry -Path $systemLogDir -Expiry $logExpiry
+          Invoke-NucleusLogCommand -Arguments @('-Action', 'rotate', '-Scope', 'system', '-MaxSize', $logMaxSize, '-MaxFiles', $logMaxFiles, '-Compress', $logCompress)
+          if ($LASTEXITCODE -ne 0) {
+            Write-NucleusError -CommandName gc "nucleus-logs rotate -Scope system failed (exit $LASTEXITCODE)"
+            throw "nucleus-logs rotate -Scope system failed (exit $LASTEXITCODE)"
+          }
+          Invoke-NucleusLogCommand -Arguments @('-Action', 'expire', '-Scope', 'system', '-Expiry', $logExpiry)
+          if ($LASTEXITCODE -ne 0) {
+            Write-NucleusError -CommandName gc "nucleus-logs expire -Scope system failed (exit $LASTEXITCODE)"
+            throw "nucleus-logs expire -Scope system failed (exit $LASTEXITCODE)"
+          }
         }
       } elseif ($DryRun) {
         Write-NucleusDryRun "would escalate system log rotation in '$systemLogDir' to the 'log-gc-system' scheduled task"

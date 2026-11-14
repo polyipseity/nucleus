@@ -16,6 +16,12 @@
     path), so the field stays absent from records whose instance never blocked
     and never recovered.
 
+    Windows supervises replicas through Sync-CloudDriveCatalog and
+    Invoke-ReplicaSync, so it has no mount class to classify and no torn-down
+    state to report. Set-HealthSuccess stamps lastSuccess and lastLive from one
+    clock read, so the pair cannot diverge on Windows and a job that is alive and
+    not working does not show up as that signature here.
+
     ShouldProcess gating follows PSUseShouldProcessForStateChangingFunctions,
     whose verb set and fix are defined in .agents/instructions/pwsh-lint-policy.instructions.md.
     The Initialize-, Add- and Clear- mutators write the same file ungated, so a
@@ -103,6 +109,7 @@ function Initialize-HealthRecord {
         reportedState = $null
         boot         = (Get-HealthBootId)
         lastSuccess  = 0
+        lastLive     = 0
         restarts     = @()
         # WHY: null, not 0, is the "never observed" generation. A counter may
         # legitimately read 0 (systemd NRestarts), so zero cannot double as the
@@ -121,7 +128,14 @@ function Get-HealthField {
     $file = Get-HealthStateFile -Instance $Instance
     if (-not (Test-Path $file)) { return $null }
     $json = Get-Content -Raw $file | ConvertFrom-Json
-    $json.$Field
+    # WHY PSObject.Properties rather than $json.$Field: lastLive is absent from
+    #   records written before it existed (Initialize-HealthRecord never rewrites
+    #   an existing file), as are the lazily created evidence and failureOutput.
+    #   A missing field reads as null, the value a JSON null gives, instead of
+    #   throwing PropertyNotFoundException under StrictMode.
+    $property = $json.PSObject.Properties[$Field]
+    if ($null -eq $property) { return $null }
+    $property.Value
 }
 
 function Set-HealthField {
@@ -306,18 +320,29 @@ function Add-HealthRestart {
     }
 }
 
+# WHY a sibling liveness stamp from the same probe: lastSuccess is read by
+#   Get-HealthConsecutiveFailureCount for crash-loop detection, so its meaning
+#   cannot change. lastLive carries the liveness of the same observation, and a
+#   lastSuccess that advances while lastLive does not is the visible signature of
+#   a job that was alive and not working. One clock read stamps both, so the pair
+#   stays comparable.
+# WHY unconditional here: POSIX gates liveness in the watchdog
+#   (src/scripts/services/service-watchdog.sh stamps lastLive only when the
+#   record reads running), and Windows has no mount class to reach running, so
+#   there is no state to gate on. This mirrors svc_health_record_live in
+#   src/scripts/lib/service-health.sh, which is unconditional too.
 function Set-HealthSuccess {
     [CmdletBinding(SupportsShouldProcess)]
     param([Parameter(Mandatory)][string]$Instance)
     # Gate before Initialize-HealthRecord, which creates the record, so -WhatIf
     # cannot leave a new file behind.
-    if (-not $PSCmdlet.ShouldProcess($Instance, 'stamp the last-success time')) {
+    if (-not $PSCmdlet.ShouldProcess($Instance, 'stamp the last-success and liveness times')) {
         return
     }
     Initialize-HealthRecord -Instance $Instance
-    Set-HealthField -Instance $Instance -Field 'lastSuccess' -Value (
-        [DateTimeOffset]::Now.ToUnixTimeSeconds()
-    )
+    $now = [DateTimeOffset]::Now.ToUnixTimeSeconds()
+    Set-HealthField -Instance $Instance -Field 'lastSuccess' -Value $now
+    Set-HealthField -Instance $Instance -Field 'lastLive' -Value $now
 }
 
 function Get-HealthRestartCount {

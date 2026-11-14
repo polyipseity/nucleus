@@ -35,6 +35,7 @@ declare -a LAYOUT_PACKAGES=(
   nucleus-config
   nucleus-utils
   nucleus-gc
+  nucleus-logs
   nucleus-svc
   nucleus-test
   nucleus-update
@@ -50,6 +51,7 @@ declare -A ENTRY_SCRIPT=(
   ["nucleus-config"]=scripts/config.sh
   ["nucleus-utils"]=scripts/utils.sh
   ["nucleus-gc"]=scripts/gc.sh
+  ["nucleus-logs"]=scripts/logs.sh
   ["nucleus-svc"]=scripts/svc.sh
   ["nucleus-test"]=scripts/test.sh
   ["nucleus-update"]=scripts/update.sh
@@ -70,24 +72,37 @@ BUILD_JSON=$(nix build --no-link --json \
 echo "Build complete."
 
 declare -a PKG_PATHS
-while IFS=$'\t' read -r _idx _path; do
+declare -a PKG_DRVS
+while IFS=$'\t' read -r _idx _path _drv; do
   PKG_PATHS[_idx]="$_path"
-done < <(echo "$BUILD_JSON" | jq -r 'to_entries | .[] | [.key, .value.outputs.out] | @tsv')
+  PKG_DRVS[_idx]="$_drv"
+done < <(echo "$BUILD_JSON" | jq -r 'to_entries | .[] | [.key, .value.outputs.out, .value.drvPath] | @tsv')
 
-pkg_path() {
+# Resolve a package's index, output path, or drv path from its name. One loop,
+# two fields: the caller keeps its own error handling.
+pkg_field() {
   local pkg="$1"
-  local idx=-1
+  local field="$2"
+  local i
   for i in "${!LAYOUT_PACKAGES[@]}"; do
     if [ "${LAYOUT_PACKAGES[$i]}" = "$pkg" ]; then
-      idx=$i
-      break
+      case "$field" in
+      out) printf '%s' "${PKG_PATHS[$i]}" ;;
+      drv) printf '%s' "${PKG_DRVS[$i]}" ;;
+      esac
+      return 0
     fi
   done
-  if [ "$idx" -lt 0 ]; then
-    echo "error: unknown package $pkg" >&2
-    return 1
-  fi
-  printf '%s' "${PKG_PATHS[$idx]}"
+  echo "error: unknown package $pkg" >&2
+  return 1
+}
+
+pkg_path() {
+  pkg_field "$1" out
+}
+
+pkg_drv() {
+  pkg_field "$1" drv
 }
 
 test_layout() {
@@ -145,11 +160,17 @@ section 2 "Script tree input set"
 test_script_tree_inputs() {
   local app_out tree tree_drv refs
   app_out=$(pkg_path nucleus-gc) || return 1
-  # $out/src is a symlink to <nucleus-script-tree>/src; the deriver of that
-  # store path exposes the derivation's inputs.
+  # $out/src is a symlink to <nucleus-script-tree>/src, and the derivation's
+  # references expose that tree's inputs. The drv path comes from the build
+  # JSON rather than `nix-store --deriver` because a substituted output can be
+  # registered as the literal `unknown-deriver`, which would die under set -e
+  # and skip the tally instead of reporting a named failure.
   tree="$(readlink -f "$app_out/src")"
-  tree_drv="$(nix-store -q --deriver "$(dirname "$tree")")"
-  refs="$(nix-store -q --references "$tree_drv")"
+  tree_drv=$(pkg_drv nucleus-gc) || return 1
+  if ! refs="$(nix-store -q --references "$tree_drv")"; then
+    assert_fail "script tree derivation references are readable" "nix-store -q --references $tree_drv failed"
+    return
+  fi
 
   if printf '%s\n' "$refs" | grep -qE '/[0-9a-z]{32}-src$'; then
     assert_fail "script tree has no whole-src/ input" "$(printf '%s\n' "$refs" | grep -E '/[0-9a-z]{32}-src$')"

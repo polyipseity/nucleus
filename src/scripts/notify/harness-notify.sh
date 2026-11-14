@@ -24,14 +24,38 @@
 #                            has not set up fails delivery and warns
 #   harness-notify.max-chars integer body cap, default 1200
 #
-# The other two gates live in their own entry points: `harness-approval.enable`
-# (default false) answers tool calls, `harness-drive.enable` (default true)
+# The other two gates live in their own entry points: `harness-approval.sources`
+# (default ["prompt"]) answers tool calls, `harness-drive.enable` (default true)
 # decides whether a queued prompt is injected after a finished turn.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
+# WHY the shared library, not a log path: nucleus-logs owns the log root, the
+# line format, and the append, so every notification lands where the gate's own
+# decisions do.
+# shellcheck source=../lib/logs.sh
+. "$SCRIPT_DIR/../lib/logs.sh"
+# shellcheck source=../lib/harness-audit.sh
+. "$SCRIPT_DIR/../lib/harness-audit.sh"
+
+_hn_start="$(harness_audit_now_ms)"
+
+# _hn_audit <summary>: record this notification attempt.
+# WHY best-effort: a notification is advisory, so a failed append warns and the
+# delivery result stands.
+_hn_audit() {
+  if ! (
+    _hn_audit_digest="$(printf '%s' "${_hn_stdin-}" | harness_audit_digest)" || exit 1
+    _hn_audit_summary="$(printf '%s\n' "$1" | harness_audit_summary)"
+    harness_audit_log notify "$_hn_harness" '' none '' '' \
+      "$(($(harness_audit_now_ms) - _hn_start))" \
+      "$_hn_audit_summary" "$_hn_audit_digest" ''
+  ); then
+    warn "could not write the harness audit log"
+  fi
+}
 
 _hn_harness="${1-}"
 _hn_event="${2-}"
@@ -45,7 +69,7 @@ fi
 case "$_hn_event" in
 done | needs-input | approval | error) ;;
 *)
-  warn "unknown event '$_hn_event' — not notifying"
+  warn "unknown event '$_hn_event': not notifying"
   exit 0
   ;;
 esac
@@ -60,7 +84,7 @@ if [ -f "$HOME/.local/state/nucleus/config.json" ]; then
   #   both platforms report one string per action and `set -e` cannot kill a
   #   hook before it writes anything.
   if ! _hn_user_config="$(cat "$HOME/.local/state/nucleus/config.json")"; then
-    warn "could not parse nucleus config — not notifying"
+    warn "could not parse nucleus config: not notifying"
     exit 0
   fi
 fi
@@ -68,7 +92,7 @@ _hn_config="$(
   jq -c --argjson defaults "$_hn_defaults" --argjson user "$_hn_user_config" \
     '$defaults * ($user["harness-notify"] // {})' <<<'{}'
 )" || {
-  warn "could not parse nucleus config — not notifying"
+  warn "could not parse nucleus config: not notifying"
   exit 0
 }
 
@@ -112,7 +136,8 @@ if command -v hermes >/dev/null; then
 fi
 
 if [ -z "$_hn_hermes" ]; then
-  warn "hermes is not on PATH — notification dropped"
+  warn "hermes is not on PATH: notification dropped"
+  _hn_audit "$_hn_label: notification dropped (hermes is not on PATH)"
   exit 0
 fi
 
@@ -124,5 +149,7 @@ while IFS= read -r _hn_target; do
     warn "delivery to '$_hn_target' failed"
   fi
 done < <(jq -r '.channels[]' <<<"$_hn_config")
+
+_hn_audit "$_hn_label: $_hn_text"
 
 exit 0

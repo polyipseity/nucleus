@@ -1,0 +1,552 @@
+#!/usr/bin/env bash
+# Suite for the harness decision runner (src/scripts/notify/harness-filter.sh),
+# the safe-delete filter, and the filter registry.
+#
+# Five sections, because the interface has these layers:
+#
+#   1. the filter protocol, driven the way the runner drives a filter, so the
+#      decision and the rule name are asserted exactly rather than through a
+#      document that carries only a reason;
+#   2. the redirect proof, because the filter treats an unproven redirect as not
+#      redirected and that decision rests on what the caller's PATH resolves to;
+#   3. the runner end to end, one case per harness in the render table, parsed
+#      with jq so a shape a harness cannot read fails here;
+#   4. aggregation and failure handling, against a fixture registry and fixture
+#      filters, because the shipped registry carries one filter and so cannot
+#      show that deny outranks ask outranks allow;
+#   5. the shipped registry itself; and 6. the missing-runtime contract, since a
+#      filter is a bun program and a host without bun still has to answer.
+#
+# The runner resolves its filters beside itself and its registry through
+# derive_repo_root, so every case runs from a copy of the real runner, the real
+# library, and the real filters inside a fixture repository tree: the bytes under
+# test are the shipped ones, and the tree is what makes a synthetic filter,
+# filter, or registry reachable at all.
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+readonly SCRIPT_DIR REPO_ROOT
+# shellcheck source=tests/scripts/test-lib.sh
+. "$SCRIPT_DIR/test-lib.sh"
+
+init_test_state
+ensure_safe_rm_env
+
+# The runner puts a call no filter decides to the approval sources. This suite is
+# about aggregation, so the sources are switched off: an empty list answers `ask`
+# at once, which is the value every assertion below compares against. The gate
+# itself, including its terminal, is covered by harness-approval-sources-tests.sh.
+mkdir -p "$HOME/.local/state/nucleus"
+printf '%s\n' '{"harness-approval":{"sources":[]}}' >"$HOME/.local/state/nucleus/config.json"
+
+RUNNER="$REPO_ROOT/src/scripts/notify/harness-filter.sh"
+APPROVAL="$REPO_ROOT/src/scripts/notify/harness-approval.sh"
+FILTER_DIR="$REPO_ROOT/src/scripts/notify/filters"
+LIB_DIR="$REPO_ROOT/src/scripts/lib/lib.sh"
+LIB_DIR_DIR="$REPO_ROOT/src/scripts/lib"
+REGISTRY="$REPO_ROOT/src/modules/configs/harness-filters.json"
+SCHEMA="$REPO_ROOT/src/modules/configs/harness-filters.schema.json"
+readonly RUNNER FILTER_DIR LIB_DIR LIB_DIR_DIR REGISTRY SCHEMA
+
+require_command jq "the runner and the filter registry both need jq"
+require_command check-jsonschema "the shipped registry is validated against its schema"
+require_command python3 "the schema file is parsed with python3"
+require_command bun "a filter is a bun program, and this suite runs it the way the runner does"
+BUN="$(command -v bun)"
+readonly BUN
+
+for _required in "$RUNNER" "$APPROVAL" "$FILTER_DIR/safe-delete.ts" "$LIB_DIR" "$LIB_DIR_DIR/harness-audit.sh" "$LIB_DIR_DIR/logs.sh" "$REGISTRY"; do
+  if [ ! -e "$_required" ]; then
+    assert_fail "runner assets present" "$_required does not exist"
+    finish_tests
+  fi
+done
+
+WORK="$(mktemp -d)"
+readonly WORK
+# shellcheck disable=SC2064 # reason: WORK is readonly and already resolved, so expanding now is the same value and survives the exit path
+trap "rm -rf '$WORK'" EXIT
+
+# The log root is a suite-owned temp tree, so a case never writes into the real
+# one and never depends on repo-root detection to find it.
+NUCLEUS_LOG_DIR="$WORK/logs"
+export NUCLEUS_LOG_DIR
+
+# A fixture repository tree that holds the shipped runner, library, and filters
+# plus the registry, so a case can replace the registry or add a filter without
+# touching the checkout.
+make_tree() { # <name>
+  local _root="$WORK/$1"
+  mkdir -p "$_root/src/scripts/lib" "$_root/src/scripts/notify/filters" "$_root/src/modules/configs"
+  cp "$RUNNER" "$_root/src/scripts/notify/harness-filter.sh"
+  cp "$APPROVAL" "$_root/src/scripts/notify/harness-approval.sh"
+  cp "$LIB_DIR" "$_root/src/scripts/lib/lib.sh"
+  cp "$LIB_DIR_DIR/harness-audit.sh" "$LIB_DIR_DIR/log-expiry.sh" "$LIB_DIR_DIR/logs.sh" "$_root/src/scripts/lib/"
+  # The bridge entry points source the log library beside them, so the fixture
+  # carries it where the script tree does.
+  cp "$FILTER_DIR"/*.ts "$_root/src/scripts/notify/filters/"
+  cp "$REGISTRY" "$_root/src/modules/configs/harness-filters.json"
+  printf '%s\n' "$_root"
+}
+
+set_registry() { # <tree> <json>
+  printf '%s\n' "$2" >"$1/src/modules/configs/harness-filters.json"
+}
+
+# A fixture filter, named the way the registry names it. The body is JavaScript:
+# the runner starts it with bun, so a fixture is a .ts file like a shipped filter.
+# WHY no %b: a body's `\t` separators are JavaScript escapes inside a string
+# literal, and expanding them here would write a raw tab into the source and put
+# the three fields on one line with nothing separating them.
+add_filter() { # <tree> <id> <body>
+  printf '%s\n' "$3" >"$1/src/scripts/notify/filters/$2.ts"
+}
+
+run_runner() { # <tree> <harness> <payload>
+  local _root="$1"
+  local _harness="$2"
+  local _payload="$3"
+  NUCLEUS_REPO_ROOT="$_root" "$_root/src/scripts/notify/harness-filter.sh" "$_harness" <<<"$_payload"
+}
+
+run_filter() { # <settings> <command>
+  "$BUN" run "$FILTER_DIR/safe-delete.ts" --settings "$1" --command "$2" </dev/null
+}
+
+# The redirect proof depends on the caller's PATH and HOME, so those cases set
+# both and run the filter through this shell's own bun. The runtime is named
+# outright because a case that narrows PATH to the point of carrying no deletion
+# command would otherwise lose the runner's `bun` lookup too.
+run_filter_env() { # <home> <path> <settings> <command>
+  HOME="$1" PATH="$2" "$BUN" run "$FILTER_DIR/safe-delete.ts" --settings "$3" --command "$4" </dev/null
+}
+
+assert_decision() { # <name> <line> <decision> <rule>
+  local _seen_decision _seen_rule
+  _seen_decision="$(printf '%s' "$2" | cut -f1)"
+  _seen_rule="$(printf '%s' "$2" | cut -f2)"
+  if [ "$_seen_decision" = "$3" ] && [ "$_seen_rule" = "$4" ]; then
+    assert_pass "$1"
+  else
+    assert_fail "$1" "got '$2', want decision '$3' rule '$4'"
+  fi
+}
+
+# assert_document <name> <json> <jq expression>
+assert_document() {
+  local _name="$1"
+  local _json="$2"
+  local _expression="$3"
+  if ! jq -e "$_expression" >/dev/null 2>&1 <<<"$_json"; then
+    assert_fail "$_name" "document '$_json' does not satisfy $_expression"
+    return 0
+  fi
+  assert_pass "$_name"
+}
+
+section 1 "filter protocol (safe-delete)"
+
+# "<settings>|<command>|<decision>|<rule>"
+FILTER_CASES=(
+  '{"unproven":"deny"}|/bin/rm -rf x|deny|native-path'
+  '{"unproven":"deny"}|/usr/local/bin/rm x|deny|native-path'
+  '{"unproven":"deny"}|/usr/BIN/rm -rf x|deny|native-path'
+  '{"unproven":"deny"}|./rm x|deny|native-path'
+  '{"unproven":"deny"}|./RM -rf build|deny|native-path'
+  '{"unproven":"deny"}|\/bin/rm x|deny|native-path'
+  '{"unproven":"deny"}|cmd.exe /c del x|deny|cmd-shell'
+  '{"unproven":"deny"}|pwsh -c x cmd y|allow|no-match'
+  '{"unproven":"deny"}|rm x|deny|unproven-redirect'
+  '{"unproven":"deny"}|DEL /S x|deny|unproven-redirect'
+  '{"unproven":"deny"}|rm -rf build|deny|unproven-redirect'
+  '{"unproven":"ask"}|rm x|ask|unproven-redirect'
+  '{}|rm x|ask|unproven-redirect'
+  '{"unproven":"allow"}|rm x|allow|unproven-redirect'
+  '{"unproven":"deny"}|ls -la|allow|no-match'
+  '{"unproven":"deny"}|git status|allow|no-match'
+  '{"unproven":"deny"}|echo cmd|allow|no-match'
+)
+readonly FILTER_CASES
+
+for _case in "${FILTER_CASES[@]}"; do
+  IFS='|' read -r _settings _command _decision _rule <<<"$_case"
+  assert_decision "$_rule: $_command" "$(run_filter "$_settings" "$_command")" "$_decision" "$_rule"
+done
+
+# Guard, not a red-before case: a value spelled 'Allow' must stay unmatched and
+# deny, because the policy compares settings.unproven against the three accepted
+# words without folding case. A fold applied to the setting would allow with every
+# other case still green, and the PowerShell twin compares with -ceq for the same
+# reason.
+assert_decision "an uppercase settings.unproven value denies (guard: the fold stops above the setting)" \
+  "$(run_filter '{"unproven":"Allow"}' 'rm x')" deny unproven-redirect
+
+section 2 "redirect proof (safe-delete)"
+
+# The managed wrapper the proof looks for is ~/.local/bin/<verb> linked into
+# home-manager's file tree, and the filter treats anything else as not redirected.
+# These fixtures are the five shapes that answer: that link, a plain file at the
+# same path, a link the user pointed elsewhere, an absent command, and a plain rm
+# ahead of everything on PATH.
+PROVEN_HOME="$WORK/proven-home"
+PLAIN_WRAPPER_HOME="$WORK/plain-wrapper-home"
+WRONG_TARGET_HOME="$WORK/wrong-target-home"
+EMPTY_HOME="$WORK/empty-home"
+PLAIN_BIN="$WORK/plain-bin"
+MIN_BIN="$WORK/min-bin"
+# The home-manager file tree the real deployment links into. A fixture cannot
+# write a Nix store path, so the tree only carries the shape the proof reads.
+HM_TREE="$WORK/store/0123456789ab-home-manager-files"
+readonly PROVEN_HOME PLAIN_WRAPPER_HOME WRONG_TARGET_HOME EMPTY_HOME PLAIN_BIN MIN_BIN HM_TREE
+mkdir -p "$PROVEN_HOME/.local/bin" "$PLAIN_WRAPPER_HOME/.local/bin" "$WRONG_TARGET_HOME/.local/bin" \
+  "$EMPTY_HOME" "$PLAIN_BIN" "$MIN_BIN" "$HM_TREE/.local/bin"
+# WHY a symlink to an executable: `command -v` skips a link it cannot run, so a
+# dangling one would read as a missing command and prove the wrong case.
+printf '#!/bin/sh\nexit 0\n' >"$HM_TREE/.local/bin/rm"
+chmod +x "$HM_TREE/.local/bin/rm"
+ln -s "$HM_TREE/.local/bin/rm" "$PROVEN_HOME/.local/bin/rm"
+ln -s /bin/rm "$WRONG_TARGET_HOME/.local/bin/rm"
+printf '#!/bin/sh\nexit 0\n' >"$PLAIN_WRAPPER_HOME/.local/bin/rm"
+printf '#!/bin/sh\nexit 0\n' >"$PLAIN_BIN/rm"
+chmod +x "$PLAIN_WRAPPER_HOME/.local/bin/rm" "$PLAIN_BIN/rm"
+# The policy resolves the wrapper's link target with node builtins, so a narrowed
+# PATH needs no tool at all: the only property these cases need is the absence of
+# a deletion command ahead of the wrapper.
+
+PROVEN_PATH="$PROVEN_HOME/.local/bin:$MIN_BIN"
+NO_RM_PATH="$MIN_BIN"
+PLAIN_PATH="$PLAIN_BIN:$MIN_BIN"
+readonly PROVEN_PATH NO_RM_PATH PLAIN_PATH
+
+assert_decision "a proven redirect allows under deny" \
+  "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"deny"}' 'rm x')" allow proven-redirect
+assert_decision "a proven redirect allows under ask" \
+  "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"ask"}' 'rm x')" allow proven-redirect
+assert_decision "a proven redirect allows under allow" \
+  "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"allow"}' 'rm x')" allow proven-redirect
+assert_decision "a missing rm is unproven and denies when set to deny" \
+  "$(run_filter_env "$EMPTY_HOME" "$NO_RM_PATH" '{"unproven":"deny"}' 'rm x')" deny unproven-redirect
+assert_decision "an absent settings.unproven asks" \
+  "$(run_filter_env "$EMPTY_HOME" "$NO_RM_PATH" '{}' 'rm x')" ask unproven-redirect
+assert_decision "an unproven redirect asks when configured" \
+  "$(run_filter_env "$EMPTY_HOME" "$NO_RM_PATH" '{"unproven":"ask"}' 'rm x')" ask unproven-redirect
+assert_decision "an unproven redirect allows when configured" \
+  "$(run_filter_env "$EMPTY_HOME" "$NO_RM_PATH" '{"unproven":"allow"}' 'rm x')" allow unproven-redirect
+# An unknown value denies rather than allowing, and the fallthrough message is the
+# only place an operator is told the accepted words. Those words are read from the
+# schema here, so a value added to the enum alone fails this case instead of
+# shipping unannounced.
+_unknown_line="$(run_filter_env "$EMPTY_HOME" "$NO_RM_PATH" '{"unproven":"maybe"}' 'rm x')"
+assert_decision "an unknown settings.unproven denies instead of allowing" "$_unknown_line" deny unproven-redirect
+_schema_words=()
+mapfile -t _schema_words < <(jq -r '.properties.filters.items.allOf[0].then.properties.settings.properties.unproven.enum[]' "$SCHEMA")
+if [ "${#_schema_words[@]}" -eq 0 ]; then
+  assert_fail "the unknown settings.unproven message names every schema-accepted word" "no enum words read from $SCHEMA"
+else
+  _unnamed=()
+  for _word in "${_schema_words[@]}"; do
+    case "$(printf '%s' "$_unknown_line" | cut -f3)" in
+    *"$_word"*) ;;
+    *) _unnamed+=("$_word") ;;
+    esac
+  done
+  if [ "${#_unnamed[@]}" -eq 0 ]; then
+    assert_pass "the unknown settings.unproven message names every schema-accepted word"
+  else
+    assert_fail "the unknown settings.unproven message names every schema-accepted word" "not named: ${_unnamed[*]}"
+  fi
+fi
+assert_decision "a plain rm ahead of the wrapper on PATH is unproven and denies" \
+  "$(run_filter_env "$EMPTY_HOME" "$PLAIN_PATH" '{"unproven":"deny"}' 'rm x')" deny unproven-redirect
+assert_decision "a plain file at the wrapper path is unproven and denies" \
+  "$(run_filter_env "$PLAIN_WRAPPER_HOME" "$PLAIN_WRAPPER_HOME/.local/bin:$MIN_BIN" '{"unproven":"deny"}' 'rm x')" deny unproven-redirect
+assert_decision "a wrapper symlinked to a plain binary is unproven and denies" \
+  "$(run_filter_env "$WRONG_TARGET_HOME" "$WRONG_TARGET_HOME/.local/bin:$MIN_BIN" '{"unproven":"deny"}' 'rm x')" deny unproven-redirect
+assert_decision "a sudo-prefixed deletion is unproven even with the wrapper first" \
+  "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"deny"}' 'sudo rm -rf x')" deny unproven-redirect
+assert_decision "a sudo-prefixed deletion asks when configured" \
+  "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"ask"}' 'sudo rm -rf x')" ask unproven-redirect
+assert_decision "an uppercase word is detected but not proven by a lowercase wrapper" \
+  "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"deny"}' 'RM -rf build')" deny unproven-redirect
+# An escaped word is a redirect question, not a bypass: the escape is removed and
+# what remains resolves through PATH like any other word.
+assert_decision "an escaped word that resolves to the wrapper allows" \
+  "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"deny"}' '\rm x')" allow proven-redirect
+assert_decision "an escaped word with no wrapper on PATH asks when configured" \
+  "$(run_filter_env "$EMPTY_HOME" "$NO_RM_PATH" '{"unproven":"ask"}' '\rm x')" ask unproven-redirect
+# Escape does not launder a path: the word it forms is still a native path.
+assert_decision "an escaped native path denies" \
+  "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" '{"unproven":"deny"}' '\/bin/rm x')" deny native-path
+
+# The bypass families are the spellings no redirect can cover, so the setting
+# that governs an unproven redirect must not reach them.
+for _setting in deny ask allow; do
+  for _case in '/bin/rm -rf x|deny|native-path' './rm x|deny|native-path' '\/bin/rm x|deny|native-path' 'cmd.exe /c del x|deny|cmd-shell'; do
+    IFS='|' read -r _command _decision _rule <<<"$_case"
+    assert_decision "$_rule stays denied under unproven=$_setting: $_command" \
+      "$(run_filter_env "$PROVEN_HOME" "$PROVEN_PATH" "{\"unproven\":\"$_setting\"}" "$_command")" "$_decision" "$_rule"
+  done
+done
+
+section 3 "runner render table"
+
+TREE="$(make_tree runner)"
+
+_copilot_deny="$(run_runner "$TREE" copilot '{"tool_name":"runInTerminal","tool_input":{"command":"/bin/rm -rf x"}}')"
+assert_document "copilot: native path is denied" "$_copilot_deny" \
+  '.hookSpecificOutput.hookEventName == "PreToolUse" and .hookSpecificOutput.permissionDecision == "deny" and (.hookSpecificOutput.permissionDecisionReason | contains("safe-delete (native-path)"))'
+
+_cursor_deny="$(run_runner "$TREE" cursor '{"command":"/bin/rm -rf x"}')"
+if [ "$_cursor_deny" = '{"permission":"deny"}' ]; then
+  assert_pass "cursor: native path renders the byte-identical permission document"
+else
+  assert_fail "cursor: native path renders the byte-identical permission document" "got '$_cursor_deny'"
+fi
+assert_document "cursor: document parses as JSON" "$_cursor_deny" '.permission == "deny"'
+
+_copilot_unproven="$(run_runner "$TREE" copilot '{"command":"rm x"}')"
+assert_document "copilot: a plain delete with an unproven redirect asks under the shipped registry" "$_copilot_unproven" \
+  '.hookSpecificOutput.permissionDecision == "ask" and (.hookSpecificOutput.permissionDecisionReason | contains("unproven-redirect"))'
+
+_cursor_unproven="$(run_runner "$TREE" cursor '{"command":"rm x"}')"
+assert_document "cursor: a plain delete with an unproven redirect asks under the shipped registry" "$_cursor_unproven" '.permission == "ask"'
+
+_claude_deny="$(run_runner "$TREE" claude '{"command":"/bin/rm -rf x"}')"
+assert_document "claude: native path is denied" "$_claude_deny" \
+  '.hookSpecificOutput.permissionDecision == "deny"'
+
+if [ "$(run_runner "$TREE" pi '{"command":"/bin/rm x"}')" = "deny" ]; then
+  assert_pass "pi: plain deny word"
+else
+  assert_fail "pi: plain deny word" "the plain-word render is what pi reads from its last stdout line"
+fi
+
+if [ "$(run_runner "$TREE" codex '{"command":"/bin/rm x"}')" = "deny" ]; then
+  assert_pass "codex: plain deny word"
+else
+  assert_fail "codex: plain deny word" "codex has no document shape, so the plain word is its render"
+fi
+
+if [ "$(run_runner "$TREE" opencode '{"command":"ls -la"}')" = "allow" ]; then
+  assert_pass "opencode: an ungated command is allowed"
+else
+  assert_fail "opencode: an ungated command is allowed" "a command no filter matches must not become a prompt"
+fi
+
+if [ "$(run_runner "$TREE" unknown-harness '{"command":"/bin/rm x"}')" = "deny" ]; then
+  assert_pass "fallback: an unknown harness gets the plain word"
+else
+  assert_fail "fallback: an unknown harness gets the plain word" "the fallback render is the plain decision"
+fi
+
+# One document per call: a second line would be a second decision for a harness
+# that reads either the whole stdout or its last line.
+for _doc_harness in claude copilot cursor opencode pi; do
+  _count="$(run_runner "$TREE" "$_doc_harness" '{"command":"/bin/rm -rf x"}' | wc -l | tr -d ' ')"
+  if [ "$_count" = "1" ]; then
+    assert_pass "exactly one document for $_doc_harness"
+  else
+    assert_fail "exactly one document for $_doc_harness" "the runner printed $_count line(s)"
+  fi
+done
+
+_no_command="$(run_runner "$TREE" copilot '{"tool_name":"readFile","tool_input":{"path":"x"}}')"
+assert_document "a payload without a command asks, never allows by omission" "$_no_command" \
+  '.hookSpecificOutput.permissionDecision == "ask" and (.hookSpecificOutput.permissionDecisionReason | contains("not-a-command"))'
+
+# An undecided call is not an authorisation: a registry that disables every
+# filter must prompt, not silently allow.
+_undecided_tree="$(make_tree undecided)"
+set_registry "$_undecided_tree" '{"filters":[{"enabled":false,"id":"safe-delete","settings":{}}]}'
+_undecided="$(run_runner "$_undecided_tree" copilot '{"command":"ls -la"}')"
+assert_document "a call no filter decides asks with no-filter" "$_undecided" \
+  '.hookSpecificOutput.permissionDecision == "ask" and (.hookSpecificOutput.permissionDecisionReason | contains("no-filter"))'
+
+# A JSON payload behind leading whitespace is still JSON. The command is a plain
+# delete on purpose: behind the prefix the deletion pattern cannot match, so
+# without the strip this payload takes the raw-command path and answers allow with
+# no rule, while with the strip it parses and the deletion filter answers ask with
+# unproven-redirect.
+_leading="$(run_runner "$TREE" copilot '  {"command":"rm x"}')"
+assert_document "a payload with leading whitespace is still parsed as JSON" "$_leading" \
+  '.hookSpecificOutput.permissionDecision == "ask" and (.hookSpecificOutput.permissionDecisionReason | contains("unproven-redirect"))'
+
+NO_REGISTRY_TREE="$(make_tree no-registry)"
+rm -f "$NO_REGISTRY_TREE/src/modules/configs/harness-filters.json"
+_missing="$(run_runner "$NO_REGISTRY_TREE" copilot '{"command":"ls"}')"
+assert_document "a missing registry asks instead of allowing silently" "$_missing" \
+  '.hookSpecificOutput.permissionDecision == "ask" and (.hookSpecificOutput.permissionDecisionReason | contains("registry-error"))'
+
+section 4 "aggregation and filter failure"
+
+AGG="$(make_tree aggregation)"
+add_filter "$AGG" allow-first 'console.log("allow\tno-match\tfirst");'
+add_filter "$AGG" ask-second 'console.log("ask\tunproven-redirect\tsecond");'
+add_filter "$AGG" deny-third 'console.log("deny\tnative-path\tthird");'
+add_filter "$AGG" crash 'console.error("boom"); process.exit(3);'
+add_filter "$AGG" garbage 'console.log("not a decision line");'
+# A decision line plus a second line: the protocol is one verdict per filter, and
+# a harness reading the whole stdout or its last line could act on the extra one.
+add_filter "$AGG" twoline 'console.log("allow\tno-match\tquiet"); console.log("garbage");'
+# A blank line ahead of the verdict is not content: the Windows twin drops empty
+# strings before it counts, so both runners have to read this as one verdict.
+add_filter "$AGG" blankfirst 'console.log(""); console.log("allow\tno-match\tquiet");'
+
+set_registry "$AGG" '{"filters":[{"enabled":true,"id":"allow-first","settings":{}},{"enabled":true,"id":"ask-second","settings":{}},{"enabled":true,"id":"deny-third","settings":{}}]}'
+if [ "$(run_runner "$AGG" copilot '{"command":"anything"}')" = "$(printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"deny-third (native-path): third"}}')" ]; then
+  assert_pass "deny outranks ask and allow"
+else
+  assert_fail "deny outranks ask and allow" "the aggregate was not the deny entry last in registry order"
+fi
+
+set_registry "$AGG" '{"filters":[{"enabled":true,"id":"deny-third","settings":{}},{"enabled":true,"id":"ask-second","settings":{}},{"enabled":true,"id":"allow-first","settings":{}}]}'
+_agg_reversed="$(run_runner "$AGG" copilot '{"command":"anything"}')"
+# The earlier deny wins the tie, so the reason names the filter that ran first:
+# aggregation must not depend on registry order.
+if [ "$(jq -r '.hookSpecificOutput.permissionDecision' <<<"$_agg_reversed")" = "deny" ]; then
+  assert_pass "deny outranks the rest from any registry position"
+else
+  assert_fail "deny outranks the rest from any registry position" "got '$_agg_reversed'"
+fi
+
+set_registry "$AGG" '{"filters":[{"enabled":true,"id":"allow-first","settings":{}},{"enabled":true,"id":"ask-second","settings":{}}]}'
+if [ "$(jq -r '.hookSpecificOutput.permissionDecision' <<<"$(run_runner "$AGG" copilot '{"command":"anything"}')")" = "ask" ]; then
+  assert_pass "ask outranks allow"
+else
+  assert_fail "ask outranks allow" "an ask beside an allow has to prompt"
+fi
+
+set_registry "$AGG" '{"filters":[{"enabled":false,"id":"deny-third","settings":{}},{"enabled":true,"id":"allow-first","settings":{}}]}'
+if [ "$(jq -r '.hookSpecificOutput.permissionDecision' <<<"$(run_runner "$AGG" copilot '{"command":"anything"}')")" = "allow" ]; then
+  assert_pass "a disabled entry does not run"
+else
+  assert_fail "a disabled entry does not run" "the disabled deny still decided"
+fi
+
+set_registry "$AGG" '{"filters":[{"enabled":true,"id":"crash","settings":{}}]}'
+_crash="$(run_runner "$AGG" copilot '{"command":"anything"}')"
+# The reason distinguishes a filter that exited non-zero from one that printed
+# nothing: both carry rule filter-error, so only the text proves the exit status
+# was what produced the verdict.
+assert_document "a crashing filter is recorded as filter-error" "$_crash" \
+  '.hookSpecificOutput.permissionDecision == "ask" and (.hookSpecificOutput.permissionDecisionReason | contains("filter-error")) and (.hookSpecificOutput.permissionDecisionReason | contains("exited non-zero"))'
+
+set_registry "$AGG" '{"filters":[{"enabled":true,"id":"garbage","settings":{}}]}'
+_garbage="$(run_runner "$AGG" copilot '{"command":"anything"}')"
+assert_document "a filter printing no protocol line is recorded as filter-error" "$_garbage" \
+  '.hookSpecificOutput.permissionDecision == "ask" and (.hookSpecificOutput.permissionDecisionReason | contains("filter-error")) and (.hookSpecificOutput.permissionDecisionReason | contains("no decision line"))'
+
+set_registry "$AGG" '{"filters":[{"enabled":true,"id":"twoline","settings":{}}]}'
+_twoline="$(run_runner "$AGG" copilot '{"command":"anything"}')"
+assert_document "a filter printing a second line is recorded as filter-error" "$_twoline" \
+  '.hookSpecificOutput.permissionDecision == "ask" and (.hookSpecificOutput.permissionDecisionReason | contains("filter-error")) and (.hookSpecificOutput.permissionDecisionReason | contains("no decision line"))'
+
+set_registry "$AGG" '{"filters":[{"enabled":true,"id":"blankfirst","settings":{}}]}'
+_blankfirst="$(run_runner "$AGG" copilot '{"command":"anything"}')"
+# The verdict, not filter-error: the blank line the filter wrote first is not an
+# answer, and the Windows twin accepts the same bytes.
+assert_document "a blank line ahead of the verdict is not a decision line" "$_blankfirst" \
+  '.hookSpecificOutput.permissionDecision == "allow" and (.hookSpecificOutput.permissionDecisionReason | contains("no-match"))'
+
+set_registry "$AGG" '{"filters":[{"enabled":true,"id":"absent","settings":{}}]}'
+_absent="$(run_runner "$AGG" copilot '{"command":"anything"}')"
+assert_document "a registry entry with no filter script is recorded as filter-error" "$_absent" \
+  '.hookSpecificOutput.permissionDecision == "ask" and (.hookSpecificOutput.permissionDecisionReason | contains("filter-error"))'
+
+section 5 "shipped registry"
+
+if jq -e '.filters | length >= 1' "$REGISTRY" >/dev/null 2>&1; then
+  assert_pass "the registry declares at least one filter"
+else
+  assert_fail "the registry declares at least one filter" "$REGISTRY has an empty filters array"
+fi
+
+if jq -e '.filters[] | select(.id == "safe-delete" and .enabled == true and .settings.unproven == "ask")' "$REGISTRY" >/dev/null 2>&1; then
+  assert_pass "safe-delete is enabled with settings.unproven at its ask default"
+else
+  assert_fail "safe-delete is enabled with settings.unproven at its ask default" "$REGISTRY does not enable it with the documented default"
+fi
+
+if jq -e '.["$schema"] == "./harness-filters.schema.json"' "$REGISTRY" >/dev/null 2>&1; then
+  assert_pass "the registry carries its inline schema pointer"
+else
+  assert_fail "the registry carries its inline schema pointer" "$REGISTRY has no co-located \$schema"
+fi
+
+if python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$SCHEMA"; then
+  assert_pass "the schema file parses as JSON"
+else
+  assert_fail "the schema file parses as JSON" "harness-filters.schema.json is not valid JSON"
+fi
+
+# The schema pins the settings vocabulary a filter reads, so a registry naming a
+# value the filter no longer accepts is rejected before a hook ever runs it.
+if _schema_out="$(check-jsonschema --schemafile "$SCHEMA" "$REGISTRY" 2>&1)"; then
+  assert_pass "the shipped registry validates against its schema"
+else
+  assert_fail "the shipped registry validates against its schema" "$_schema_out"
+fi
+
+_retired_registry="$WORK/retired-registry.json"
+# Keyed on the filter id rather than array position, so a registry that lists
+# another filter first cannot make the case fail for the wrong reason.
+jq '(.filters[] | select(.id == "safe-delete") | .settings.unproven) = "route"' "$REGISTRY" >"$_retired_registry"
+if _retired_out="$(check-jsonschema --schemafile "$SCHEMA" "$_retired_registry" 2>&1)"; then
+  assert_fail "the schema rejects a settings.unproven value the filter no longer reads" "a registry naming route validated: $_retired_out"
+else
+  assert_pass "the schema rejects a settings.unproven value the filter no longer reads"
+fi
+
+section 6 "missing runtime"
+
+# A filter is a bun program, so a host without bun cannot state a verdict. The
+# contract is ask with rule filter-error and exit 0, never a hard exit: several
+# harnesses read a failed hook as a denial, and the warning on stderr is what
+# reaches a human.
+#
+# WHY a shadow bin directory: one tool cannot be dropped from PATH without
+# re-rooting it, and bun shares its directory with the tools the runner needs. So
+# every regular file on PATH is linked back in except bun itself, and a case fails
+# on the missing runtime rather than on a missing sed.
+NO_BUN_BIN="$WORK/no-bun-bin"
+NO_BUN_STDERR="$WORK/no-bun.stderr"
+readonly NO_BUN_BIN NO_BUN_STDERR
+mkdir -p "$NO_BUN_BIN"
+while IFS= read -r _dir; do
+  [ -d "$_dir" ] || continue
+  for _entry in "$_dir"/*; do
+    [ -f "$_entry" ] || continue
+    _name="${_entry##*/}"
+    case "$_name" in
+    bun | bunx) continue ;;
+    esac
+    ln -sf "$_entry" "$NO_BUN_BIN/$_name"
+  done
+done < <(printf '%s' "$PATH" | tr ':' '\n')
+
+if [ ! -e "$NO_BUN_BIN/bun" ]; then
+  assert_pass "the shadow bin directory carries every tool except bun"
+else
+  assert_fail "the shadow bin directory carries every tool except bun" "$NO_BUN_BIN/bun exists, so the cases below would not test a missing runtime"
+fi
+
+_no_bun_status=0
+_no_bun_line="$(PATH="$NO_BUN_BIN" NUCLEUS_REPO_ROOT="$TREE" "$RUNNER" pi <<<'{"command":"/bin/rm x"}' 2>"$NO_BUN_STDERR")" || _no_bun_status=$?
+if [ "$_no_bun_line" = "ask" ] && [ "$_no_bun_status" -eq 0 ]; then
+  assert_pass "a missing bun answers ask and exits 0"
+else
+  assert_fail "a missing bun answers ask and exits 0" "got '$_no_bun_line' with exit $_no_bun_status"
+fi
+
+_no_bun_document="$(PATH="$NO_BUN_BIN" NUCLEUS_REPO_ROOT="$TREE" "$RUNNER" copilot <<<'{"command":"/bin/rm x"}' 2>/dev/null)"
+assert_document "a missing bun is recorded as filter-error" "$_no_bun_document" \
+  '.hookSpecificOutput.permissionDecision == "ask" and (.hookSpecificOutput.permissionDecisionReason | contains("filter-error"))'
+
+if grep -q 'bun is not on PATH' "$NO_BUN_STDERR"; then
+  assert_pass "a missing bun warns on stderr, where a human looks"
+else
+  assert_fail "a missing bun warns on stderr, where a human looks" "stderr carried no bun warning: $(cat "$NO_BUN_STDERR")"
+fi
+
+finish_tests

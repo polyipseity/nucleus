@@ -14,10 +14,11 @@
   running for bot-token platforms.
 
   Deployed verbatim to <USER root>\bin and reached from harness hooks through the
-  %USERPROFILE%\.local\bin\harness-notify.cmd shim, so it stays self-contained:
-  importing the shared Format-NucleusOutput module would bake a repository path
-  into the deployed copy. The warning helper below still emits the F1 shape
-  (`<cmd>: warning: <msg>`) to stderr.
+  %USERPROFILE%\.local\bin\harness-notify.cmd shim, together with the sibling
+  harness-bridge-common.ps1 it dot-sources for the shared helpers: importing the
+  shared Format-NucleusOutput module would bake a repository path into the
+  deployed copy. That helper emits the F1 shape (`<cmd>: warning: <msg>`) to
+  stderr.
 
 .PARAMETER EventName
   Lifecycle event: done, needs-input, approval, or error. Named EventName because
@@ -41,8 +42,8 @@
     harness-notify.max-chars integer body cap, default 1200
 
     The other two gates belong to their own entry points and do not change what
-    this script sends: harness-approval.enable (default false) answers tool calls
-    locally, and harness-drive.enable (default true) decides whether a queued
+    this script sends: harness-approval.sources (default ["prompt"]) answers
+    tool calls, and harness-drive.enable (default true) decides whether a queued
     prompt is injected after a finished turn.
 #>
 
@@ -61,43 +62,45 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Write-HarnessBridgeWarning {
+# WHY $PSScriptRoot: Windows deploys a copy of this script outside the repository,
+# so the shared helpers are resolved beside the copy, never by a repo-relative path.
+. (Join-Path -Path $PSScriptRoot -ChildPath 'harness-bridge-common.ps1')
+
+# WHY script scope: the audit line is written from the delivery helper, which
+# runs before the process ends, so the start time and the input fingerprint are
+# collected here as the run produces them.
+$script:auditStart = [datetime]::UtcNow
+$script:auditDigest = ''
+
+function Write-HarnessNotifyAudit {
   <#
   .SYNOPSIS
-    Writes one F1 warning line to stderr without importing the shared module.
+    Records one notification attempt in the shared audit log.
   .DESCRIPTION
-    See the file header: this script is deployed outside the repository, so it
-    cannot import Format-NucleusOutput.psm1.  The line keeps the F1 shape minus
-    console color, which a hook never sees anyway.
-  .PARAMETER CommandName
-    F1 command prefix.
-  .PARAMETER Message
-    Warning text.
+    Best-effort: a notification is advisory, so a failed append warns and the
+    delivery result stands.
+  .PARAMETER HarnessName
+    Harness the notification was about.
+  .PARAMETER Summary
+    One-line description of the attempt.
   #>
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)]
-    [string]$CommandName,
+    [string]$HarnessName,
 
     [Parameter(Mandatory)]
-    [string]$Message
+    [AllowEmptyString()]
+    [string]$Summary
   )
 
-  [Console]::Error.WriteLine("${CommandName}: warning: $Message")
-}
-
-function Get-HarnessBridgeConfigPath {
-  <#
-  .SYNOPSIS
-    Resolves the nucleus runtime config path.
-  .DESCRIPTION
-    Same location `scripts/config.ps1` (nucleus-config) reads and writes.
-  #>
-  [CmdletBinding()]
-  [OutputType([string])]
-  param()
-
-  return (Join-Path -Path $HOME -ChildPath '.local/state/nucleus/config.json')
+  try {
+    Write-HarnessBridgeAuditEvent -Kind 'notify' -Harness $HarnessName -Summary $Summary `
+      -Digest $script:auditDigest -StartTime $script:auditStart
+  }
+  catch {
+    Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message "could not write the harness audit log: $($_.Exception.Message)"
+  }
 }
 
 function Get-HarnessBridgeNotifyConfig {
@@ -163,7 +166,7 @@ function Send-HarnessNotification {
     $config = Get-HarnessBridgeNotifyConfig -ConfigPath $ConfigPath
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message 'could not parse nucleus config — not notifying'
+    Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message 'could not parse nucleus config: not notifying'
     return
   }
 
@@ -184,7 +187,8 @@ function Send-HarnessNotification {
   # more than one hermes on PATH otherwise yields a list, which cannot be invoked.
   $hermes = Get-Command -Name 'hermes' -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1  # check-suppress:suppression_doc: absence is the expected case and is reported right below
   if ($null -eq $hermes) {
-    Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message 'hermes is not on PATH — notification dropped'
+    Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message 'hermes is not on PATH: notification dropped'
+    Write-HarnessNotifyAudit -HarnessName $Harness -Summary "${label}: notification dropped (hermes is not on PATH)"
     return
   }
 
@@ -197,6 +201,7 @@ function Send-HarnessNotification {
       Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message "delivery to '$targetText' failed"
     }
   }
+  Write-HarnessNotifyAudit -HarnessName $Harness -Summary "${label}: ${Text}"
 }
 
 # WHY: strict mode errors on reading an uninitialized variable, and
@@ -210,12 +215,13 @@ try {
   }
 
   if ($EventName -notin @('done', 'needs-input', 'approval', 'error')) {
-    Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message "unknown event '$EventName' — not notifying"
+    Write-HarnessBridgeWarning -CommandName 'harness-notify' -Message "unknown event '$EventName': not notifying"
     exit 0
   }
 
   if ([string]::IsNullOrWhiteSpace($Text) -and [Console]::IsInputRedirected) {
     $stdin = [Console]::In.ReadToEnd()
+    $script:auditDigest = Get-HarnessBridgeDigest -Text $stdin
     if (-not [string]::IsNullOrWhiteSpace($stdin)) {
       if ($stdin.TrimStart().StartsWith('{')) {
         $payload = $null

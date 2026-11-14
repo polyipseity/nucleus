@@ -20,7 +20,9 @@ require_command mktemp "each test case needs a private state directory"
 
 init_test_state
 
-helper="$(mktemp -t camilladsp-heartbeat-tests)"
+# Plain mktemp: -t takes a template without X's on BSD but demands them on GNU,
+# where the suite then died before printing a tally.
+helper="$(mktemp)"
 cat >"$helper" <<'PY'
 import importlib.util
 import os
@@ -397,6 +399,256 @@ def case_loop_states():
     assert waits == [10, 20, 40], waits
 
 
+def case_selector_codes():
+    # Values copied from the SDK headers. A wrong code makes the property
+    # unknown ('who?'), and detection then silently returns nothing.
+    # AudioHardware.h:608 kAudioHardwarePropertyDevices = 'dev#'
+    # AudioHardware.h:610 kAudioHardwarePropertyDefaultOutputDevice = 'dOut'
+    # AudioHardware.h:1008 kAudioDevicePropertyStreamConfiguration = 'slay'
+    # AudioHardwareBase.h:203 kAudioObjectPropertyScopeGlobal = 'glob'
+    # AudioHardwareBase.h:205 kAudioObjectPropertyScopeOutput = 'outp'
+    # AudioHardwareBase.h:334 kAudioObjectPropertyName = 'lnam'
+    expected = {
+        "_SYSTEM_OBJECT": 1,
+        "_SEL_DEVICES": b"dev#",
+        "_SEL_DEFAULT_OUTPUT": b"dOut",
+        "_SEL_NAME": b"lnam",
+        "_SEL_STREAM_CONFIG": b"slay",
+        "_SCOPE_GLOBAL": b"glob",
+        "_SCOPE_OUTPUT": b"outp",
+    }
+    for name, value in expected.items():
+        want = value if isinstance(value, int) else int.from_bytes(value, "big")
+        actual = getattr(m, name)
+        assert actual == want, f"{name} is {actual:#x}, header says {want:#x}"
+
+
+def case_probe_mode():
+    import contextlib
+    import io
+
+    c = Case()
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        code = m.probe(c.config())
+    text = buffer.getvalue()
+    assert code == 0, (code, text)
+    assert "default_output=Speakers" in text, text
+    assert "available=Headphones,Speakers" in text, text
+    assert "target=Speakers" in text, text
+
+    c.probe = "BlackHole 2ch"
+    c.devices = []
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        code = m.probe(c.dir / "config.yml")
+    text = buffer.getvalue()
+    assert code == 1, (code, text)
+    assert "target=\n" in text, text
+
+
+def case_warn_timestamp():
+    # An untimestamped line cannot be told apart from a months-old failure.
+    import contextlib
+    import io
+    import re
+
+    buffer = io.StringIO()
+    with contextlib.redirect_stderr(buffer):
+        m._warn("tick failed: boom")
+    line = buffer.getvalue().strip()
+    pattern = r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d camilladsp-heartbeat: warning: tick failed: boom$"
+    assert re.match(pattern, line), line
+
+
+def case_edeadlk_diagnostics():
+    import contextlib
+    import ctypes
+    import errno
+    import io
+
+    def set_xattr(path, name, value):
+        # macOS only: Linux resolves the namespace from the name prefix, and
+        # `com.` is not a known one, so this call answers EOPNOTSUPP there.
+        libc = ctypes.CDLL(None)
+        libc.setxattr.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_uint32, ctypes.c_int]
+        rc = libc.setxattr(str(path).encode(), name.encode(), value, len(value), 0, 0)
+        assert rc == 0, rc
+
+    class StopLoop(Exception):
+        pass
+
+    class FakeClient:
+        def __init__(self, port):
+            self.port = port
+
+        def endpoint_up(self):
+            return True
+
+        def reset(self):
+            pass
+
+        def request(self, payload):
+            key = next(iter(payload))
+            if key == "GetState":
+                return {"GetState": {"value": "Running"}}
+            if key == "GetConfig":
+                return {"GetConfig": {"value": ""}}
+            raise AssertionError(f"unexpected request {key}")
+
+    c = Case()
+    config = c.config()
+    if sys.platform == "darwin":
+        set_xattr(config, "com.apple.fileprovider.test", b"1")
+
+    def deadlock(_path):
+        raise OSError(errno.EDEADLK, "Resource deadlock avoided")
+
+    m.CamillaClient = FakeClient
+    m.read_toggles = lambda: (True, True)
+    m._load_config = deadlock
+
+    ticks = {"left": 1}
+
+    def fake_sleep(_seconds):
+        ticks["left"] -= 1
+        if ticks["left"] <= 0:
+            raise StopLoop
+
+    m.time.sleep = fake_sleep
+
+    buffer = io.StringIO()
+    with contextlib.redirect_stderr(buffer):
+        try:
+            m.run(1234, config)
+        except StopLoop:
+            pass
+    text = buffer.getvalue()
+    assert "Resource deadlock avoided" in text, text
+    assert f"path={os.path.realpath(config)}" in text, text
+    if sys.platform == "darwin":
+        assert "com.apple.fileprovider.test" in text, text
+    else:
+        # No File Provider attribute can be set off macOS, so the portable fact
+        # is the empty filtered list.
+        assert "xattrs=none" in text, text
+    assert "placeholder=no" in text, text
+
+
+def _run_edeadlk_tick(config, path_fragment):
+    import contextlib
+    import errno
+    import io
+
+    class StopLoop(Exception):
+        pass
+
+    class FakeClient:
+        def __init__(self, port):
+            self.port = port
+
+        def endpoint_up(self):
+            return True
+
+        def reset(self):
+            pass
+
+        def request(self, payload):
+            key = next(iter(payload))
+            if key == "GetState":
+                return {"GetState": {"value": "Running"}}
+            if key == "GetConfig":
+                return {"GetConfig": {"value": ""}}
+            raise AssertionError(f"unexpected request {key}")
+
+    def deadlock(_path):
+        raise OSError(errno.EDEADLK, "Resource deadlock avoided")
+
+    m.CamillaClient = FakeClient
+    m.read_toggles = lambda: (True, True)
+    m._load_config = deadlock
+
+    ticks = {"left": 1}
+
+    def fake_sleep(_seconds):
+        ticks["left"] -= 1
+        if ticks["left"] <= 0:
+            raise StopLoop
+
+    m.time.sleep = fake_sleep
+
+    buffer = io.StringIO()
+    with contextlib.redirect_stderr(buffer):
+        try:
+            m.run(1234, config)
+        except StopLoop:
+            pass
+    text = buffer.getvalue()
+    assert "Resource deadlock avoided" in text, text
+    assert f"path={path_fragment}" in text, text
+    assert "xattrs=none" in text, text
+    assert "placeholder=no" in text, text
+    assert f"[path={path_fragment}" in text, text
+
+
+def case_provider_state_cdll_fault():
+    c = Case()
+    config = c.config()
+    original = m.ctypes.CDLL
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("ctypes.CDLL boom")
+
+    m.ctypes.CDLL = boom
+    try:
+        state = m._provider_state(config)
+        assert f"path={os.path.realpath(config)}" in state, state
+        assert " xattrs=none" in state, state
+        assert " placeholder=no" in state, state
+        _run_edeadlk_tick(config, os.path.realpath(config))
+    finally:
+        m.ctypes.CDLL = original
+
+
+def case_provider_state_fsencode_fault():
+    c = Case()
+    config = c.config()
+    original = m.os.fsencode
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("os.fsencode boom")
+
+    m.os.fsencode = boom
+    try:
+        state = m._provider_state(config)
+        assert f"path={os.path.realpath(config)}" in state, state
+        assert " xattrs=none" in state, state
+        assert " placeholder=no" in state, state
+        _run_edeadlk_tick(config, os.path.realpath(config))
+    finally:
+        m.os.fsencode = original
+
+
+def case_provider_state_realpath_fault():
+    c = Case()
+    config = c.config()
+    original = m.os.path.realpath
+
+    def boom(*_args, **_kwargs):
+        raise RuntimeError("os.path.realpath boom")
+
+    m.os.path.realpath = boom
+    try:
+        expected = os.fspath(config)
+        state = m._provider_state(config)
+        assert f"path={expected}" in state, state
+        assert " xattrs=none" in state, state
+        assert " placeholder=no" in state, state
+        _run_edeadlk_tick(config, expected)
+    finally:
+        m.os.path.realpath = original
+
+
 CASES = {
     "passthrough_nonempty_device": case_passthrough,
     "patches_with_default_output": case_patches_default_output,
@@ -418,14 +670,20 @@ CASES = {
     "fingerprint_covers_device": case_fingerprint_covers_device,
     "linux_backend_parsing": case_linux_backends,
     "loop_three_states": case_loop_states,
+    "selector_codes": case_selector_codes,
+    "probe_mode": case_probe_mode,
+    "warn_timestamp": case_warn_timestamp,
+    "edeadlk_diagnostics": case_edeadlk_diagnostics,
+    "provider_state_cdll_fault": case_provider_state_cdll_fault,
+    "provider_state_fsencode_fault": case_provider_state_fsencode_fault,
+    "provider_state_realpath_fault": case_provider_state_realpath_fault,
 }
 
 
 def main():
     name = sys.argv[1]
     if name not in CASES:
-        print(f"unknown case: {name}", file=sys.stderr)
-        return 2
+        sys.exit(f"unknown case: {name}")
     try:
         CASES[name]()
     except AssertionError as error:
@@ -476,5 +734,14 @@ run_case linux_backend_parsing
 
 section 5 "loop states"
 run_case loop_three_states
+
+section 6 "CoreAudio wire values and log format"
+run_case selector_codes
+run_case probe_mode
+run_case warn_timestamp
+run_case edeadlk_diagnostics
+run_case provider_state_cdll_fault
+run_case provider_state_fsencode_fault
+run_case provider_state_realpath_fault
 
 finish_tests

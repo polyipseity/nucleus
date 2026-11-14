@@ -9,8 +9,8 @@ alwaysApply: false
 
 A workaround compensates for an upstream limitation. Two categories:
 
-- **A. Temporary** — upstream fix expected (PR/issue exists). Re-check quarterly; remove when the upstream fix lands.
-- **B. Permanent** — will not be fixed by upstream updates or is structural. Listed only, no re-check.
+- **A. Temporary**: upstream fix expected (PR/issue exists). Re-check quarterly; remove when the upstream fix lands.
+- **B. Permanent**: will not be fixed by upstream updates or is structural. Listed only, no re-check.
 
 ## Registry
 
@@ -18,7 +18,7 @@ A workaround compensates for an upstream limitation. Two categories:
 
 | ID | Location | Workaround | Upstream link | Re-check trigger |
 |----|----------|------------|---------------|------------------|
-| W01 | (removed) | frei0r: gate gavl — REMOVED (nixpkgs already gates gavl; PR #549406 merged) | nixpkgs PR #549747 (open) | removed 2026-10-31 |
+| W01 | (removed) | frei0r: gate gavl, REMOVED (nixpkgs already gates gavl; PR #549406 merged) | nixpkgs PR #549747 (open) | removed 2026-10-31 |
 | W02 | src/flake.nix:485-494 | sandbox-runtime: substituteInPlace Seatbelt profile to allow System V semaphores | anthropic/sandbox-runtime; codex #28921 | Profile carries ipc-sysv-sem |
 | W03 | src/flake.nix:36-59 | brew-src pinned to 7.0.11 + cirruslabs/cli tap | nix-homebrew#192 | brew-src bump |
 | W04 | src/platforms/macOS/modules/default.nix:353 | launchctl config unreliable | nix-darwin#1080 | issue resolves |

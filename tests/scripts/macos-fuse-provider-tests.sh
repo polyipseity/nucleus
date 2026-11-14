@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Tests for src/scripts/lib/macos-fuse-provider.sh, the macFUSE provider
+# Tests for src/scripts/lib/macos-fuse-provider.sh, the fuse-t provider
 # fingerprint recorded next to the ntfs-3g build fingerprint.
 #
-# That digest is the only guard against provider drift: macFUSE is installed by a
-# Homebrew cask that declares auto_updates, so /usr/local/lib/libfuse.dylib can
-# be replaced with no repository change and no Nix change at all.  These cases
-# drive the checked-in fixture tree (tests/fixtures/fuse-provider/) instead of the
-# live /usr/local installation, which the suite must never touch.
+# That digest is the only guard against provider drift: fuse-t is installed
+# outside the Nix store, so /usr/local/lib/libfuse-t.dylib can be replaced with no
+# repository change and no Nix change at all.  These cases drive the checked-in
+# fixture tree (tests/fixtures/fuse-provider/) instead of the live /usr/local
+# installation, which the suite must never touch.
 
 set -euo pipefail
 
@@ -45,27 +45,6 @@ seed_provider_root() {
   mkdir -p "$parent_dir/provider"
   cp -R "$PROVIDER_FIXTURE/." "$parent_dir/provider/"
   printf '%s\n' "$parent_dir/provider"
-}
-
-# seed_pkgutil_stub <dir> <exit_status> <receipt_line>...: write a pkgutil
-# stand-in that prints the receipt lines and exits with <exit_status>.
-# macfuse_pkg_version takes the tool path as an argument, so any receipt shape
-# can be driven on any host, including one whose output contradicts its status.
-seed_pkgutil_stub() {
-  local dir="$1" status="$2" stub
-  shift 2
-  stub="$dir/pkgutil"
-  {
-    printf '#!/bin/sh\n'
-    # Quoted heredoc delimiter: $(dirname "$0") belongs to the stub, not here.
-    cat <<'STUB'
-cat "$(dirname "$0")/receipt.txt"
-STUB
-    printf 'exit %s\n' "$status"
-  } >"$stub"
-  printf '%s\n' "$@" >"$dir/receipt.txt"
-  chmod +x "$stub"
-  printf '%s\n' "$stub"
 }
 
 # assert_digest_rejects_missing <test_name> <relative_path>: remove one required
@@ -160,11 +139,11 @@ test_digest_changes_when_the_library_symlink_is_repointed() {
   root="$(seed_provider_root "$work")"
   # The case is only meaningful while both ABI files hold identical bytes; assert
   # that here so an edit to one fixture cannot silently weaken it.
-  if cmp -s "$root/lib/libfuse.2.dylib" "$root/lib/libfuse.3.dylib"; then
+  if cmp -s "$root/lib/libfuse-t-1.2.7.dylib" "$root/lib/libfuse-t-1.3.0.dylib"; then
     identical=true
   fi
   before="$(provider_call fuse_provider_digest "$root")" || rc_before=$?
-  ln -sfn libfuse.3.dylib "$root/lib/libfuse.dylib"
+  ln -sfn libfuse-t-1.3.0.dylib "$root/lib/libfuse-t.dylib"
   after="$(provider_call fuse_provider_digest "$root")" || rc_after=$?
   rm -rf "$work"
   if [ "$identical" = true ] && [ "$rc_before" -eq 0 ] && [ "$rc_after" -eq 0 ] && [ "$before" != "$after" ]; then
@@ -175,10 +154,60 @@ test_digest_changes_when_the_library_symlink_is_repointed() {
   fi
 }
 
+# fuse-t installs /usr/local/include/fuse as a symlink into its application
+# support tree, so the walk has to follow the directory. The digest must still
+# name the headers under include/fuse/ (the spelling the build compiles against)
+# rather than under the link target, or the site of the tree would leak into the
+# fingerprint.
+test_digest_follows_a_symlinked_include_directory() {
+  local work root real_digest link_digest edited rc_real=0 rc_link=0 rc_edited=0
+  work="$(mktemp -d)"
+  root="$(seed_provider_root "$work")"
+  real_digest="$(provider_call fuse_provider_digest "$root")" || rc_real=$?
+  mkdir -p "$root/fuse-t/include"
+  mv "$root/include/fuse" "$root/fuse-t/include/fuse"
+  ln -s ../fuse-t/include/fuse "$root/include/fuse"
+  link_digest="$(provider_call fuse_provider_digest "$root")" || rc_link=$?
+  if [ "$rc_real" -eq 0 ] && [ "$rc_link" -eq 0 ] && [ "$real_digest" = "$link_digest" ]; then
+    assert_pass "provider digest follows a symlinked include/fuse directory"
+  else
+    assert_fail "provider digest follows a symlinked include/fuse directory" \
+      "rc=$rc_real/$rc_link real=[$real_digest] symlinked=[$link_digest]"
+  fi
+
+  printf '%s\n' '/* drift behind the link */' >>"$root/fuse-t/include/fuse/fuse_common.h"
+  edited="$(provider_call fuse_provider_digest "$root")" || rc_edited=$?
+  rm -rf "$work"
+  if [ "$rc_edited" -eq 0 ] && [ "$edited" != "$link_digest" ]; then
+    assert_pass "provider digest changes when a header behind the symlink changes"
+  else
+    assert_fail "provider digest changes when a header behind the symlink changes" \
+      "rc=$rc_edited before=[$link_digest] after=[$edited]"
+  fi
+}
+
+# A dangling include/fuse link is the shape left by a half-removed provider: the
+# build cannot compile against it, so the digest must refuse rather than hash a
+# library and a pkg-config file that happen to survive.
+test_digest_rejects_a_dangling_include_symlink() {
+  local work root out rc=0
+  work="$(mktemp -d)"
+  root="$(seed_provider_root "$work")"
+  rm -rf "$root/include/fuse"
+  ln -s ../absent/include/fuse "$root/include/fuse"
+  out="$(provider_call fuse_provider_digest "$root" 2>/dev/null)" || rc=$?
+  rm -rf "$work"
+  if [ "$rc" -ne 0 ] && [ -z "$out" ]; then
+    assert_pass "provider digest rejects a dangling include/fuse symlink"
+  else
+    assert_fail "provider digest rejects a dangling include/fuse symlink" "rc=$rc stdout=[$out]"
+  fi
+}
+
 test_digest_rejects_incomplete_providers() {
-  assert_digest_rejects_missing "provider digest rejects missing fuse headers" "include/fuse/fuse.h"
-  assert_digest_rejects_missing "provider digest rejects a missing provider library" "lib/libfuse.dylib"
-  assert_digest_rejects_missing "provider digest rejects a missing pkg-config file" "lib/pkgconfig/fuse.pc"
+  assert_digest_rejects_missing "provider digest rejects missing fuse-t headers" "include/fuse/fuse.h"
+  assert_digest_rejects_missing "provider digest rejects a missing provider library" "lib/libfuse-t.dylib"
+  assert_digest_rejects_missing "provider digest rejects a missing pkg-config file" "lib/pkgconfig/fuse-t.pc"
 }
 
 # A provider file that exists but cannot be read must fail the digest: an empty
@@ -209,19 +238,19 @@ test_lib_name_follows_the_provider_symlink() {
   work="$(mktemp -d)"
   root="$(seed_provider_root "$work")"
   name="$(provider_call fuse_provider_lib_name "$root")" || rc_name=$?
-  ln -sfn libfuse.3.dylib "$root/lib/libfuse.dylib"
+  ln -sfn libfuse-t-1.3.0.dylib "$root/lib/libfuse-t.dylib"
   repointed="$(provider_call fuse_provider_lib_name "$root")" || rc_repointed=$?
   rm -rf "$work"
 
-  if [ "$rc_name" -eq 0 ] && [ "$name" = "libfuse.2.dylib" ]; then
-    assert_pass "provider library name follows the macFUSE symlink"
+  if [ "$rc_name" -eq 0 ] && [ "$name" = "libfuse-t-1.2.7.dylib" ]; then
+    assert_pass "provider library name follows the fuse-t symlink"
   else
-    assert_fail "provider library name follows the macFUSE symlink" "rc=$rc_name name=[$name]"
+    assert_fail "provider library name follows the fuse-t symlink" "rc=$rc_name name=[$name]"
   fi
-  if [ "$rc_repointed" -eq 0 ] && [ "$repointed" = "libfuse.3.dylib" ]; then
-    assert_pass "provider library name follows a repointed macFUSE symlink"
+  if [ "$rc_repointed" -eq 0 ] && [ "$repointed" = "libfuse-t-1.3.0.dylib" ]; then
+    assert_pass "provider library name follows a repointed fuse-t symlink"
   else
-    assert_fail "provider library name follows a repointed macFUSE symlink" "rc=$rc_repointed name=[$repointed]"
+    assert_fail "provider library name follows a repointed fuse-t symlink" "rc=$rc_repointed name=[$repointed]"
   fi
 }
 
@@ -231,76 +260,51 @@ test_identity_names_version_and_library() {
   root="$(seed_provider_root "$work")"
   identity="$(provider_call fuse_provider_identity "$root" 9.9.9)" || rc=$?
   rm -rf "$work"
-  if [ "$rc" -eq 0 ] && [ "$identity" = "macfuse 9.9.9 libfuse.2.dylib" ]; then
-    assert_pass "provider identity names the macFUSE version and resolved library"
+  if [ "$rc" -eq 0 ] && [ "$identity" = "fuset 9.9.9 libfuse-t-1.2.7.dylib" ]; then
+    assert_pass "provider identity names the fuse-t version and resolved library"
   else
-    assert_fail "provider identity names the macFUSE version and resolved library" "rc=$rc output=[$identity]"
+    assert_fail "provider identity names the fuse-t version and resolved library" "rc=$rc output=[$identity]"
   fi
 }
 
-# Positive control for the stub fixture: the two failure cases below pass when
-# the stub prints nothing, so a stub that cannot read its receipt would let them
-# pass for the wrong reason.
-test_pkgutil_stub_prints_the_receipt_it_is_given() {
-  local work stub out
+test_provider_version_reads_the_version_line() {
+  local work root version rc=0
   work="$(mktemp -d)"
-  stub="$(seed_pkgutil_stub "$work" 0 \
-    "package-id: io.macfuse.installer.components.core" \
-    "version: 5.3.3")"
-  out="$("$stub" 2>/dev/null || true)"
+  root="$(seed_provider_root "$work")"
+  version="$(provider_call fuse_provider_version "$root" 2>/dev/null)" || rc=$?
   rm -rf "$work"
-  if [ "$out" = "$(printf 'package-id: io.macfuse.installer.components.core\nversion: 5.3.3')" ]; then
-    assert_pass "pkgutil stub prints the receipt it is given"
+  if [ "$rc" -eq 0 ] && [ "$version" = "1.2.7" ]; then
+    assert_pass "provider version reads the pkg-config version line"
   else
-    assert_fail "pkgutil stub prints the receipt it is given" "output=[$out]"
+    assert_fail "provider version reads the pkg-config version line" "rc=$rc stdout=[$version]"
   fi
 }
 
-test_macfuse_pkg_version_reads_the_version_line() {
-  local work stub version rc=0
+test_provider_version_fails_without_a_version_line() {
+  local work root out rc=0
   work="$(mktemp -d)"
-  stub="$(seed_pkgutil_stub "$work" 0 \
-    "package-id: io.macfuse.installer.components.core" \
-    "version: 5.3.3" \
-    "volume: /")"
-  version="$(provider_call macfuse_pkg_version "$stub" 2>/dev/null)" || rc=$?
-  rm -rf "$work"
-  if [ "$rc" -eq 0 ] && [ "$version" = "5.3.3" ]; then
-    assert_pass "macfuse_pkg_version reports the receipt version line"
-  else
-    assert_fail "macfuse_pkg_version reports the receipt version line" "rc=$rc stdout=[$version]"
-  fi
-}
-
-test_macfuse_pkg_version_fails_without_a_version_line() {
-  local work stub out rc=0
-  work="$(mktemp -d)"
-  stub="$(seed_pkgutil_stub "$work" 0 \
-    "package-id: io.macfuse.installer.components.core" \
-    "volume: /")"
-  out="$(provider_call macfuse_pkg_version "$stub" 2>/dev/null)" || rc=$?
+  root="$(seed_provider_root "$work")"
+  printf '%s\n' 'Name: fuse-t' >"$root/lib/pkgconfig/fuse-t.pc"
+  out="$(provider_call fuse_provider_version "$root" 2>/dev/null)" || rc=$?
   rm -rf "$work"
   if [ "$rc" -ne 0 ] && [ -z "$out" ]; then
-    assert_pass "macfuse_pkg_version fails when the receipt carries no version line"
+    assert_pass "provider version fails when the pkg-config file carries no version line"
   else
-    assert_fail "macfuse_pkg_version fails when the receipt carries no version line" "rc=$rc stdout=[$out]"
+    assert_fail "provider version fails when the pkg-config file carries no version line" "rc=$rc stdout=[$out]"
   fi
 }
 
-test_macfuse_pkg_version_fails_when_pkgutil_fails() {
-  local work stub out rc=0
+test_provider_version_fails_when_the_pkgconfig_file_is_missing() {
+  local work root out rc=0
   work="$(mktemp -d)"
-  # The stub prints a parseable version line and then fails: a non-zero pkgutil
-  # status has to fail the lookup instead of being masked by its output.
-  stub="$(seed_pkgutil_stub "$work" 1 \
-    "package-id: io.macfuse.installer.components.core" \
-    "version: 5.3.3")"
-  out="$(provider_call macfuse_pkg_version "$stub" 2>/dev/null)" || rc=$?
+  root="$(seed_provider_root "$work")"
+  rm -f "$root/lib/pkgconfig/fuse-t.pc"
+  out="$(provider_call fuse_provider_version "$root" 2>/dev/null)" || rc=$?
   rm -rf "$work"
   if [ "$rc" -ne 0 ] && [ -z "$out" ]; then
-    assert_pass "macfuse_pkg_version fails when pkgutil exits non-zero"
+    assert_pass "provider version fails when the pkg-config file is missing"
   else
-    assert_fail "macfuse_pkg_version fails when pkgutil exits non-zero" "rc=$rc stdout=[$out]"
+    assert_fail "provider version fails when the pkg-config file is missing" "rc=$rc stdout=[$out]"
   fi
 }
 
@@ -310,7 +314,7 @@ test_record_field_reads_the_requested_line() {
   local work record first second third rc_first=0 rc_second=0 rc_third=0
   work="$(mktemp -d)"
   record="$work/.build-fingerprint"
-  printf '%s\n' "nix-fingerprint-value" "provider-digest-value" "macfuse 9.9.9 libfuse.2.dylib" >"$record"
+  printf '%s\n' "nix-fingerprint-value" "provider-digest-value" "fuset 1.2.7 libfuse-t-1.2.7.dylib" >"$record"
   first="$(provider_call fuse_provider_record_field 1 "$record")" || rc_first=$?
   second="$(provider_call fuse_provider_record_field 2 "$record")" || rc_second=$?
   third="$(provider_call fuse_provider_record_field 3 "$record")" || rc_third=$?
@@ -326,7 +330,7 @@ test_record_field_reads_the_requested_line() {
   else
     assert_fail "record field 2 is the provider digest" "rc=$rc_second field=[$second]"
   fi
-  if [ "$rc_third" -eq 0 ] && [ "$third" = "macfuse 9.9.9 libfuse.2.dylib" ]; then
+  if [ "$rc_third" -eq 0 ] && [ "$third" = "fuset 1.2.7 libfuse-t-1.2.7.dylib" ]; then
     assert_pass "record field 3 is the provider identity"
   else
     assert_fail "record field 3 is the provider identity" "rc=$rc_third field=[$third]"
@@ -365,22 +369,20 @@ test_record_field_reports_an_absent_line_for_legacy_records() {
 
 # ---- Run all tests ----
 
-# The build record is read on every platform, so those cases always run, as does
-# the receipt lookup: macfuse_pkg_version takes the pkgutil path as an argument
-# and is driven against a stub here.
+# The build record and the pkg-config version line are read on every platform, so
+# those cases always run: neither needs /bin/realpath.
 test_record_field_reads_the_requested_line
 test_record_field_rejects_a_missing_record
 test_record_field_reports_an_absent_line_for_legacy_records
-test_pkgutil_stub_prints_the_receipt_it_is_given
-test_macfuse_pkg_version_reads_the_version_line
-test_macfuse_pkg_version_fails_without_a_version_line
-test_macfuse_pkg_version_fails_when_pkgutil_fails
+test_provider_version_reads_the_version_line
+test_provider_version_fails_without_a_version_line
+test_provider_version_fails_when_the_pkgconfig_file_is_missing
 
-# The provider helper resolves the provider library with /bin/realpath, so these
+# The provider helpers resolve the provider library with /bin/realpath, so these
 # cases run wherever that path exists: macOS, and any Linux whose /bin is the
 # usr-merge (Ubuntu CI included). Where it does not (NixOS keeps no /bin beyond
-# /bin/sh), the helper cannot run at all, and the product is macOS-only (macFUSE)
-#, so the cases name that absence explicitly rather than standing aside.
+# /bin/sh), the helper cannot run at all, and the product is macOS-only (fuse-t),
+# so the cases name that absence explicitly rather than standing aside.
 # Gate on the capability, not on the OS: an OS gate would have kept these cases
 # silent on Linux CI, which is where a regression in the digest would land unseen.
 if [ -x /bin/realpath ]; then
@@ -388,6 +390,8 @@ if [ -x /bin/realpath ]; then
   test_digest_is_independent_of_a_symlinked_root_spelling
   test_digest_changes_when_a_header_changes
   test_digest_changes_when_the_library_symlink_is_repointed
+  test_digest_follows_a_symlinked_include_directory
+  test_digest_rejects_a_dangling_include_symlink
   test_digest_rejects_incomplete_providers
   test_digest_rejects_an_unreadable_provider_file
   test_lib_name_follows_the_provider_symlink
@@ -399,14 +403,17 @@ else
     "provider digest ignores a symlinked provider root spelling" \
     "provider digest changes when a header changes" \
     "provider digest changes when the library symlink is repointed" \
-    "provider digest rejects missing fuse headers" \
+    "provider digest follows a symlinked include/fuse directory" \
+    "provider digest changes when a header behind the symlink changes" \
+    "provider digest rejects a dangling include/fuse symlink" \
+    "provider digest rejects missing fuse-t headers" \
     "provider digest rejects a missing provider library" \
     "provider digest rejects a missing pkg-config file" \
     "provider digest rejects an unreadable provider file" \
-    "provider library name follows the macFUSE symlink" \
-    "provider library name follows a repointed macFUSE symlink" \
-    "provider identity names the macFUSE version and resolved library"; do
-    assert_pass "$_case (not exercisable: no /bin/realpath on $(uname -s); macFUSE provider is macOS-only)"
+    "provider library name follows the fuse-t symlink" \
+    "provider library name follows a repointed fuse-t symlink" \
+    "provider identity names the fuse-t version and resolved library"; do
+    assert_pass "$_case (not exercisable: no /bin/realpath on $(uname -s); fuse-t provider is macOS-only)"
   done
 fi
 

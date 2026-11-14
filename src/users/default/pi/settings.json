@@ -5,6 +5,7 @@
     "keepRecentTokens": 32768,
     "reserveTokens": 32768
   },
+  "contextWindowCap": 256000,
   "defaultModel": "mimo-v2.6-flash",
   "defaultProjectTrust": "ask",
   "defaultProvider": "opencode-go",

@@ -37,6 +37,7 @@ Describe 'lockfile enforcement flake-pinned revisions' {
                 'src\platforms\Windows\modules\ManagedPaths.ps1',
                 'src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1',
                 'src\platforms\Windows\modules\lib\Resolve-NucleusFlakePin.ps1',
+                'src\platforms\Windows\modules\lib\PsGalleryPin.ps1',
                 'src\modules\host-platform-registry.json')) {
             $target = Join-Path $script:fakeRoot $relative
             $null = New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup

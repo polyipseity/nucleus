@@ -238,9 +238,11 @@ Register-Step -Id "repo-policy-data" -Name "Repository policy (data-driven)" -Pl
 
 
   Write-Message "--- release age uniformity ---"
+  # check-suppress:config-method: path lookup feeding the release-age validation below, not a config consumption
   $raPath = Join-Path $r 'src\modules\configs\release-ages.json'
   $raErrors = 0
   if (-not (Test-Path -LiteralPath $raPath)) {
+    # check-suppress:config-method: missing-file error text naming the release-age registry, not a config consumption
     Write-ErrorMessage "release-ages.json not found at $raPath"
     $raErrors++
   } else {

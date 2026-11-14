@@ -64,6 +64,15 @@ let
     runtimeInputs = [ pkgs.jq ];
   };
 
+  # The decision runner every harness hook calls. Its filters live beside it in the
+  # script tree ($out/src/scripts/notify/filters), so the store copy is complete
+  # and nothing under filters/ needs deploying on its own.
+  harnessFilter = pkgs.writeNucleusShellApplication {
+    name = "harness-filter";
+    scriptName = "src/scripts/notify/harness-filter";
+    runtimeInputs = [ pkgs.jq ];
+  };
+
   # Stop hooks call this instead of harness-notify so the notification half
   # still has a single implementation.
   harnessDrive = pkgs.writeNucleusShellApplication {
@@ -84,6 +93,7 @@ in
       config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/prompts";
     ".local/bin/harness-notify".source = "${harnessNotify}/bin/nucleus-harness-notify";
     ".local/bin/harness-approval".source = "${harnessApproval}/bin/nucleus-harness-approval";
+    ".local/bin/harness-filter".source = "${harnessFilter}/bin/nucleus-harness-filter";
     ".local/bin/harness-drive".source = "${harnessDrive}/bin/nucleus-harness-drive";
   };
 

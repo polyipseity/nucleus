@@ -11,6 +11,7 @@
   PROCESSOR_ARCHITECTURE (WHPX auto-detection).
 #>
 . (Join-Path $PSScriptRoot 'Get-VMGuestSshPublicKey.ps1')
+
 function Wait-GuestReady {
   <#
   .SYNOPSIS
@@ -32,6 +33,7 @@ function Wait-GuestReady {
     )
 
     $pipe = "\\.\pipe\qga-$VmId"
+    # Its own loop rather than a shared waiter: a 5s guest-agent cadence, as in vm_wait_for_guest (src/scripts/lib/vm.sh), which keeps its body too.
     $timer = [System.Diagnostics.Stopwatch]::StartNew()
     while ($timer.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
         try {
@@ -111,6 +113,49 @@ function Get-VMSystemImagePath {
     )
 
     return Get-VMSrcPath -SrcDir $SrcDir -Type $Type -Leaf $VM_SYSTEM_IMAGE
+}
+
+function Write-VMScriptIfChanged {
+  <#
+  .SYNOPSIS
+    Write generated guest-script content only when the existing bytes differ.
+  .DESCRIPTION
+    Mirrors vm_write_if_changed in src/scripts/lib/vm.sh. An unchanged script
+    keeps its content, timestamp, and file identity, so a sync stops recycling
+    it. The comparison is over bytes, against exactly what this function writes
+    (UTF-8 without a byte-order mark), so a legacy BOM, a line-ending change, or
+    any other byte difference counts as a change, and an identical file is left
+    alone on every later sync.
+  .PARAMETER Path
+    Destination file. Its directory must already exist.
+  .PARAMETER Content
+    Exact file content, written as UTF-8 without a byte-order mark.
+  .OUTPUTS
+    System.Boolean. $true when the file was written, $false when it already
+    matched and was left alone.
+  .EXAMPLE
+    if (Write-VMScriptIfChanged -Path $startPs1 -Content $content) { Write-NucleusInfo 'start script updated' }
+  #>
+    [CmdletBinding()]
+    [OutputType([bool])]
+    param(
+        [Parameter(Mandatory)]
+        [string]$Path,
+
+        [Parameter(Mandatory)]
+        [AllowEmptyString()]
+        [string]$Content
+    )
+
+    $expected = [System.Text.UTF8Encoding]::new($false).GetBytes($Content)
+    if (Test-Path -LiteralPath $Path -PathType Leaf) {
+        $existing = [System.IO.File]::ReadAllBytes($Path)
+        if ([System.Linq.Enumerable]::SequenceEqual($existing, $expected)) {
+            return $false
+        }
+    }
+    [System.IO.File]::WriteAllBytes($Path, $expected)
+    return $true
 }
 
 function Invoke-VMSetup {
@@ -735,9 +780,10 @@ function Invoke-VMSetup {
             $startPs1 = Join-Path $ScriptsDir "start-$($Vm.id).ps1"
             if ($DryRun) {
                 Write-NucleusDryRun -CommandName vm-setup "Write start script: $startPs1"
+            } elseif (Write-VMScriptIfChanged -Path $startPs1 -Content $content) {
+                Write-NucleusInfo -CommandName vm-setup "start script updated: $startPs1"
             } else {
-                Set-Content -Path $startPs1 -Value $content -Encoding UTF8
-                Write-NucleusInfo -CommandName vm-setup "start script written: $startPs1"
+                Write-NucleusNotice -CommandName vm-setup "start script up to date: $startPs1"
             }
             return
         }
@@ -815,9 +861,16 @@ function Invoke-VMSetup {
         if ($DryRun) {
             Write-NucleusDryRun -CommandName vm-setup "Write start scripts: $startPs1Path, $startShPath"
         } else {
-            Set-Content -Path $startPs1Path -Value $startContentPs1 -Encoding UTF8
-            Set-Content -Path $startShPath -Value $startContentSh -Encoding UTF8
-            Write-NucleusInfo -CommandName vm-setup "start scripts written: $startPs1Path, $startShPath"
+            if (Write-VMScriptIfChanged -Path $startPs1Path -Content $startContentPs1) {
+                Write-NucleusInfo -CommandName vm-setup "start script updated: $startPs1Path"
+            } else {
+                Write-NucleusNotice -CommandName vm-setup "start script up to date: $startPs1Path"
+            }
+            if (Write-VMScriptIfChanged -Path $startShPath -Content $startContentSh) {
+                Write-NucleusInfo -CommandName vm-setup "start script updated: $startShPath"
+            } else {
+                Write-NucleusNotice -CommandName vm-setup "start script up to date: $startShPath"
+            }
         }
     }
 
@@ -845,8 +898,11 @@ function Invoke-VMSetup {
         }
         $template = Get-Content -Path $stopTemplatePath -Raw
         $content = $template.Replace('__HOST_KIND__', 'windows-qemu').Replace('__VM_ID__', $Vm.id)
-        Set-Content -Path $stopPs1 -Value $content -Encoding UTF8
-        Write-NucleusInfo -CommandName vm-setup "stop script written: $stopPs1"
+        if (Write-VMScriptIfChanged -Path $stopPs1 -Content $content) {
+            Write-NucleusInfo -CommandName vm-setup "stop script updated: $stopPs1"
+        } else {
+            Write-NucleusNotice -CommandName vm-setup "stop script up to date: $stopPs1"
+        }
     }
 
     function Invoke-VMWritePackUnpackHelper {
@@ -864,11 +920,16 @@ function Invoke-VMSetup {
         $unpackSh = "#!/usr/bin/env bash`nset -euo pipefail`nexec nucleus-vm unpack `"`$@`"`n"
         $packPs1 = "# Generated by nucleus-vm setup — pack.ps1. Delegates to nucleus-vm pack.`n& nucleus-vm pack @args`nexit `$LASTEXITCODE`n"
         $unpackPs1 = "# Generated by nucleus-vm setup — unpack.ps1. Delegates to nucleus-vm unpack.`n& nucleus-vm unpack @args`nexit `$LASTEXITCODE`n"
-        Set-Content -Path (Join-Path $ScriptsDir 'pack.sh') -Value $packSh -Encoding UTF8
-        Set-Content -Path (Join-Path $ScriptsDir 'unpack.sh') -Value $unpackSh -Encoding UTF8
-        Set-Content -Path (Join-Path $ScriptsDir 'pack.ps1') -Value $packPs1 -Encoding UTF8
-        Set-Content -Path (Join-Path $ScriptsDir 'unpack.ps1') -Value $unpackPs1 -Encoding UTF8
-        Write-NucleusInfo -CommandName vm-setup "pack/unpack helper scripts written: $ScriptsDir"
+        $changedScripts = [System.Collections.Generic.List[string]]::new()
+        if (Write-VMScriptIfChanged -Path (Join-Path $ScriptsDir 'pack.sh') -Content $packSh) { $changedScripts.Add('pack.sh') }
+        if (Write-VMScriptIfChanged -Path (Join-Path $ScriptsDir 'unpack.sh') -Content $unpackSh) { $changedScripts.Add('unpack.sh') }
+        if (Write-VMScriptIfChanged -Path (Join-Path $ScriptsDir 'pack.ps1') -Content $packPs1) { $changedScripts.Add('pack.ps1') }
+        if (Write-VMScriptIfChanged -Path (Join-Path $ScriptsDir 'unpack.ps1') -Content $unpackPs1) { $changedScripts.Add('unpack.ps1') }
+        if ($changedScripts.Count -gt 0) {
+            Write-NucleusInfo -CommandName vm-setup "pack/unpack helper scripts updated: $($changedScripts -join ', ')"
+        } else {
+            Write-NucleusNotice -CommandName vm-setup 'pack/unpack helper scripts up to date'
+        }
     }
 
     . (Join-Path -Path $RepoRoot -ChildPath 'src\platforms\Windows\modules\SizeStrings.ps1')
@@ -988,21 +1049,6 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
     }
 
     $scriptsDir = Join-Path $vmDir 'scripts'
-    if (Test-Path $scriptsDir) {
-        $staleScripts = @(
-            # check-suppress:suppression_doc: probe -- no stale start/stop scripts may exist; empty result handled.
-            Get-ChildItem -LiteralPath $scriptsDir -File -ErrorAction SilentlyContinue |
-                Where-Object { $_.Name -match '^(start|stop)-.+\.(sh|ps1)$' }
-        )
-        foreach ($stale in $staleScripts) {
-            if ($DryRun) {
-                Write-NucleusDryRun -CommandName vm-sync "Remove-Item '$($stale.FullName)' -Force"
-            } else {
-                Remove-Item -LiteralPath $stale.FullName -Force
-            }
-        }
-    }
-
     if (-not $DryRun) {
         New-Item -ItemType Directory -Path $scriptsDir -Force > $null
     }
@@ -1015,6 +1061,37 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
     }
 
     Invoke-VMWritePackUnpackHelper -ScriptsDir $scriptsDir
+
+    # Guest-script names this manifest asks for. The prune below removes only a
+    # managed name absent from this set, so a custom file in scripts/ survives
+    # and an unchanged script is never recycled to make room for its own rewrite.
+    # Android renders no .sh start script (its start helper is PowerShell-only).
+    $desiredScriptNames = [System.Collections.Generic.List[string]]::new()
+    foreach ($desiredVm in $vmDef.VMs) {
+        $desiredScriptNames.Add("start-$($desiredVm.id).ps1")
+        $desiredScriptNames.Add("stop-$($desiredVm.id).ps1")
+        if ($desiredVm.type -ne 'Android') {
+            $desiredScriptNames.Add("start-$($desiredVm.id).sh")
+        }
+    }
+    foreach ($wrapperName in @('pack.sh', 'unpack.sh', 'pack.ps1', 'unpack.ps1')) {
+        $desiredScriptNames.Add($wrapperName)
+    }
+
+    if (Test-Path -LiteralPath $scriptsDir -PathType Container) {
+        $staleScripts = @(
+            # check-suppress:suppression_doc: probe -- a scripts directory with no stale managed script must yield an empty list.
+            Get-ChildItem -LiteralPath $scriptsDir -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -match '^(start-|stop-|pack\.|unpack\.)' -and -not $desiredScriptNames.Contains($_.Name) }
+        )
+        foreach ($stale in $staleScripts) {
+            if ($DryRun) {
+                Write-NucleusDryRun -CommandName vm-sync "Remove-Item '$($stale.FullName)' -Force"
+            } else {
+                Remove-Item -LiteralPath $stale.FullName -Force
+            }
+        }
+    }
 
     foreach ($vm in $vmDef.VMs) {
         if (-not (Test-VMEnabled -Vm $vm)) { continue }
@@ -1566,6 +1643,7 @@ function Invoke-FidoWindowsIso {
     try {
         $maxAttempts = $Retries + 1
         $attempt = 1
+        # Its own loop rather than a shared waiter: attempt-bounded retry with exponential backoff, like run_with_backoff (src/scripts/lib/vm.sh).
         while ($attempt -le $maxAttempts) {
             Push-Location $tmpDir
             try {
@@ -1693,6 +1771,7 @@ function Invoke-BuildWindowsImage {
             $maxAttempts = $WindowsIsoRetries + 1
             $attempt = 1
             $downloadOk = $false
+            # Its own loop rather than a shared waiter: attempt-bounded retry with exponential backoff, like run_with_backoff (src/scripts/lib/vm.sh).
             while ($attempt -le $maxAttempts) {
                 & curl.exe -fL -o $cachedIso $WindowsIsoUrl
                 if ($LASTEXITCODE -eq 0) {

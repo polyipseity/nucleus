@@ -49,11 +49,14 @@ Register-Step -Id "script-and-framework-tests" -Name "Script and framework tests
 
   Write-Message '--- discovered script tests ---'
 
+  $timings = [System.Collections.Generic.List[pscustomobject]]::new()
+
   foreach ($testScript in $priorityScripts) {
     Write-Message "running $([System.IO.Path]::GetFileName($testScript))"
     # A fresh runspace carries $null in $LASTEXITCODE, and a script that ends
     # without an explicit exit leaves the previous value in place; reset it so
     # only this script's own outcome is measured.
+    $startMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
     $LASTEXITCODE = 0
     $scriptThrew = $false
     try {
@@ -62,6 +65,11 @@ Register-Step -Id "script-and-framework-tests" -Name "Script and framework tests
       $scriptThrew = $true
       Write-ErrorMessage $_
     }
+    $endMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+    $null = $timings.Add([pscustomobject]@{
+        ElapsedMs = $endMs - $startMs
+        Name      = [System.IO.Path]::GetFileName($testScript)
+      })  # check-suppress:suppression_doc: List.Add returns bool; the timing entry is the only effect needed
     if ($scriptThrew -or $LASTEXITCODE -ne 0) { $exitCode = 1 }
   }
 
@@ -82,6 +90,7 @@ Register-Step -Id "script-and-framework-tests" -Name "Script and framework tests
       # Same reset as the priority loop, plus a catch: a throw terminates the
       # runspace iteration before the exit code is observable, which used to
       # drop the suite silently instead of reporting it as failed.
+      $startMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
       $LASTEXITCODE = 0
       $scriptThrew = $false
       try {
@@ -90,9 +99,13 @@ Register-Step -Id "script-and-framework-tests" -Name "Script and framework tests
         $scriptThrew = $true
         Add-Content -Path $captureFile -Value $_.Exception.Message
       }
+      $endMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
       if ($scriptThrew -or $LASTEXITCODE -ne 0) {
         New-Item -ItemType File -Path (Join-Path -Path $captureDir -ChildPath "$base.failed") -Force > $null
       }
+      # Written after the failure marker so a write error cannot cost a failed
+      # suite its report; the timing table itself never drives the exit code.
+      Set-Content -Path (Join-Path -Path $captureDir -ChildPath "$base.ms") -Value "$startMs $endMs"
     } -ThrottleLimit $throttle
 
     foreach ($testScript in $parallelScripts) {
@@ -100,6 +113,22 @@ Register-Step -Id "script-and-framework-tests" -Name "Script and framework tests
       $captureFile = Join-Path -Path $captureDir -ChildPath "$base.out"
       if (Test-Path -LiteralPath $captureFile) {
         Get-Content -LiteralPath $captureFile
+      }
+      $msFile = Join-Path -Path $captureDir -ChildPath "$base.ms"
+      if (Test-Path -LiteralPath $msFile) {
+        $msPair = (Get-Content -LiteralPath $msFile -Raw) -split '\s+'
+        $null = $timings.Add([pscustomobject]@{
+            ElapsedMs = [long]$msPair[1] - [long]$msPair[0]
+            Name      = $base
+          })  # check-suppress:suppression_doc: List.Add returns bool; the timing entry is the only effect needed
+      }
+    }
+
+    # Informational only: the table never feeds the exit code or the failure list.
+    if ($timings.Count -gt 0) {
+      Write-Message 'suite wall times (slowest first):'
+      foreach ($timing in ($timings | Sort-Object -Property ElapsedMs -Descending)) {
+        Write-Output ([string]::Format([System.Globalization.CultureInfo]::InvariantCulture, '{0,6:F1} s  {1}', ($timing.ElapsedMs / 1000), $timing.Name))
       }
     }
 

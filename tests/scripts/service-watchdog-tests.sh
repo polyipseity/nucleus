@@ -25,6 +25,8 @@ readonly SCRIPT_DIR REPO_ROOT
 
 require_command jq "service watchdog tests build health records with jq"
 
+ensure_safe_rm_env
+
 WATCHDOG="$REPO_ROOT/src/scripts/services/service-watchdog.sh"
 SERVICE_HEALTH="$REPO_ROOT/src/scripts/lib/service-health.sh"
 

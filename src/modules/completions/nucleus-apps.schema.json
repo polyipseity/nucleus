@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "description": "Nix-generated list of nucleus-* command names derived from the flake app registry. Consumed by completion generators and checks on hosts that do not evaluate Nix.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "commands": {
+      "description": "Nucleus command names without the nucleus- prefix, sorted lexicographically.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$"
+      },
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "$schema",
+    "commands"
+  ]
+}

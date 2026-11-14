@@ -1,31 +1,21 @@
 {
   "$schema": "https://raw.githubusercontent.com/ScoopInstaller/Scoop/master/schema.json",
-  "version": "0.9.7",
-  "description": "A safe and ergonomic alternative to rm",
-  "homepage": "https://github.com/MilesCranmer/rip2",
-  "license": "GPL-3.0-or-later",
   "architecture": {
-    "64bit": {
-      "url": "https://github.com/MilesCranmer/rip2/releases/download/v0.9.7/rip-Windows-x86_64.zip",
-      "hash": "TODO: compute sha256 on Windows before first apply"
-    },
     "32bit": {
-      "url": "https://github.com/MilesCranmer/rip2/releases/download/v0.9.7/rip-Windows-i686.zip",
-      "hash": "TODO: compute sha256 on Windows before first apply"
+      "hash": "73c7ae1574e90040b6b4a36f576787823489b222dfb891e8d00b558e123b64ab",
+      "url": "https://github.com/MilesCranmer/rip2/releases/download/v0.9.7/rip-Windows-i686.zip"
+    },
+    "64bit": {
+      "hash": "f38b7a7c9ecd6a23cf014841fe0da7c1866c9ba6255e6c3ea5e8c8df88063806",
+      "url": "https://github.com/MilesCranmer/rip2/releases/download/v0.9.7/rip-Windows-x86_64.zip"
     }
   },
   "bin": "rip.exe",
   "checkver": {
     "github": "https://github.com/MilesCranmer/rip2"
   },
-  "autoupdate": {
-    "architecture": {
-      "64bit": {
-        "url": "https://github.com/MilesCranmer/rip2/releases/download/v$version/rip-Windows-x86_64.zip"
-      },
-      "32bit": {
-        "url": "https://github.com/MilesCranmer/rip2/releases/download/v$version/rip-Windows-i686.zip"
-      }
-    }
-  }
+  "description": "A safe and ergonomic alternative to rm",
+  "homepage": "https://github.com/MilesCranmer/rip2",
+  "license": "GPL-3.0-or-later",
+  "version": "0.9.7"
 }

@@ -15,6 +15,8 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
 
+ensure_safe_rm_env
+
 GC_SH="$SCRIPT_DIR/../../scripts/gc.sh"
 
 # seed_tool_cache_tree HOME: create one marker file inside each cache directory

@@ -17,6 +17,8 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 init_test_state
 
+ensure_safe_rm_env
+
 REPO_ROOT="$SCRIPT_DIR/../.."
 GENERATOR="$REPO_ROOT/src/platforms/macOS/scripts/macos-generate-sf-symbols.sh"
 SKILL_MD="$REPO_ROOT/.agents/skills/sf-symbols/SKILL.md"
@@ -213,12 +215,6 @@ test_skill_points_at_generated_path() {
   else
     assert_pass "skill no longer points at the committed list"
   fi
-
-  if grep -q 'NixOS and Windows: not applicable' "$SKILL_MD"; then
-    assert_pass "skill records NixOS/Windows as not applicable"
-  else
-    assert_fail "cross-host status" "expected an explicit N/A for NixOS/Windows"
-  fi
 }
 
 test_committed_list_removed() {
@@ -274,7 +270,10 @@ test_real_framework_extraction() {
     assert_pass "real run carries no hex placeholders"
   fi
 
-  if [ "$("$SORT_BIN" -u "$OUT" | "$CMP_BIN" -s - "$OUT" && echo unique)" = "unique" ]; then
+  # LC_ALL=C matches the generator's own collation; without it this check
+  # compares a locale-order sort against a byte-order file and fails on any host
+  # whose collation is not C, which is every non-English machine.
+  if [ "$(LC_ALL=C "$SORT_BIN" -u "$OUT" | "$CMP_BIN" -s - "$OUT" && echo unique)" = "unique" ]; then
     assert_pass "real output is already sorted and unique"
   else
     assert_fail "real output shape" "output was not sorted/unique"

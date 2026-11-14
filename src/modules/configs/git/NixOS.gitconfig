@@ -1,6 +1,14 @@
 # Managed global (system) Git config for POSIX hosts (see
 # .agents/instructions/git-scope-terminology.instructions.md). Symlinked as
 # /etc/gitconfig by the posix/base.nix activation script, with a same-folder
-# .bak backup of any system-owned original. Intentionally empty: signing,
-# newline and symlink defaults are user-scoped in
-# src/users/default/git/<host>.gitconfig.
+# .bak backup of any system-owned original. Signing, newline and symlink
+# defaults are user-scoped in src/users/default/git/<host>.gitconfig.
+
+# Machine-wide LFS filters, the same four keys `git lfs install --system`
+# writes (git-lfs lfs/attribute.go, filterAttribute). Hooks stay per-repo:
+# git lfs install adds them only when run inside a repository.
+[filter "lfs"]
+    clean = git-lfs clean -- %f
+    smudge = git-lfs smudge -- %f
+    process = git-lfs filter-process
+    required = true

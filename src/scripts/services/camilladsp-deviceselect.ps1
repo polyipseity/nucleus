@@ -8,20 +8,39 @@
 # devices, first available device in sorted-name order. A config that already
 # sets playback.device is returned unchanged.
 #
-# The capture device is never selected, since playback and capture on one
-# device is an audio loop.
+# A loopback capture reads a render endpoint: with devices.capture.loopback set
+# and no capture device, the capture side is the default playback endpoint, so
+# that endpoint is resolved for the capture and never selected for playback.
+# Source: camilladsp v4.1.3 src/wasapi_backend/device.rs (find_device switches to
+# the Render direction in loopback mode) and backend_wasapi.md.
+#
+# When no playback candidate remains, the config is returned unchanged and one
+# warning names the cause: a failed endpoint enumeration, or the second endpoint
+# the loopback topology needs. The warning repeats only when the cause changes,
+# because a broken topology would otherwise log on every tick.
 #
 # State files live in Get-CamillaDSPStateDir:
 #   last-device.txt          last device pushed to CamillaDSP
 #   available-devices.txt    enumerated device names, one per line
 #   available-devices.meta   capture device, then the enumeration epoch
 #
-# Dependencies: PowerShell 7+, powershell-yaml module
+# Dependencies: PowerShell 7+, the powershell-yaml module, and Write-NucleusWarning
+# from Format-NucleusOutput.psm1. That function is resolved in the caller's scope,
+# because the heartbeat imports the formatter for its own messages; a caller that
+# dot-sources this library without it has to stub it (the suite does).
 #
 # Usage (dot-source):
 #   . "$PSScriptRoot/camilladsp-deviceselect.ps1"
 #   $resolved = Resolve-CamillaDSPPlaybackDevice -ConfigPath $configPath
 #
+
+# WHY: the suite dot-sources this file once per case, and Add-Type rejects a
+# duplicate type name, so the compile is guarded instead of unconditional.
+# It runs on every host on purpose: an off-Windows run still proves the interop
+# builds, and Get-CamillaDSPWasapi is what gates the calls.
+if (-not ('CamillaDSPWasapi' -as [type])) {
+  Add-Type -Path (Join-Path -Path $PSScriptRoot -ChildPath '../../platforms/Windows/modules/scripts/camilladsp-wasapi.cs')
+}
 
 function Get-CamillaDSPStateDir {
   <#
@@ -45,26 +64,40 @@ function Get-CamillaDSPStateDir {
   return (Join-Path -Path $HOME -ChildPath '.local/state/camilladsp')
 }
 
+function Get-CamillaDSPWasapi {
+  <#
+  .SYNOPSIS
+    WASAPI endpoint reader, or $null off Windows.
+  .DESCRIPTION
+    The single seam between this library and the managed interop in
+    camilladsp-wasapi.cs. The suite replaces this function, because a typed .NET
+    class cannot be stubbed the way the COM wrapper used to be.
+  #>
+  [CmdletBinding()]
+  param()
+
+  if (-not $IsWindows) { return $null }
+  return [CamillaDSPWasapi]::new()
+}
+
 function Get-CamillaDSPDefaultPlaybackDevice {
   <#
   .SYNOPSIS
     Name of the current system default playback device, or $null.
   .DESCRIPTION
-    Reads the WASAPI default render endpoint through COM, which exists only on
-    Windows. Off Windows the probe returns $null so this library and its suite
-    can be sourced on macOS and Linux.
+    Reads the WASAPI default render endpoint through the managed interop in
+    camilladsp-wasapi.cs, which exists only on Windows. Off Windows the seam
+    returns $null so this library and its suite can be sourced on macOS and Linux.
   #>
   [CmdletBinding()]
   [OutputType([string])]
   param()
 
-  if (-not $IsWindows) { return $null }
+  $wasapi = Get-CamillaDSPWasapi
+  if ($null -eq $wasapi) { return $null }
 
   try {
-    # 0 = eRender (playback), 0 = DMT_DEFAULT (user default)
-    $enumerator = New-Object -ComObject MMDeviceEnumerator
-    $endpoint = $enumerator.GetDefaultAudioEndpoint(0, 0)
-    return $endpoint.FriendlyName
+    return $wasapi.GetDefaultRenderFriendlyName()
   } catch {
     # Audio service not running or no devices.
     return $null
@@ -90,22 +123,18 @@ function Get-CamillaDSPAvailablePlaybackDeviceList {
     [string]$CaptureDevice = ''
   )
 
+  $wasapi = Get-CamillaDSPWasapi
+  if ($null -eq $wasapi) { return $null }
+
   try {
-    $enumerator = New-Object -ComObject MMDeviceEnumerator
-    # 0 = eRender, 0x1 = DEVICE_STATE_ACTIVE
-    $devices = $enumerator.EnumAudioEndpoints(0, 0x1)
-    $names = @()
-    for ($i = 0; $i -lt $devices.Count; $i++) {
-      $name = $devices.Item($i).FriendlyName
-      if ($name -ne $CaptureDevice) {
-        $names += $name
-      }
-    }
+    $names = @($wasapi.GetActiveRenderFriendlyNames() | Where-Object { $_ -ne $CaptureDevice })
   } catch {
     return $null
   }
 
-  return ($names | Sort-Object)
+  # WHY: a bare return unrolls the array, so an empty successful enumeration
+  # would reach the caller as no output and read as a failed enumeration.
+  Write-Output -InputObject ([string[]]@($names | Sort-Object)) -NoEnumerate
 }
 
 function Get-CamillaDSPDeviceCacheTtl {
@@ -173,7 +202,7 @@ function Get-CamillaDSPAvailablePlaybackDeviceCache {
       if (-not [string]::IsNullOrEmpty($RequiredDevice) -and $cached -notcontains $RequiredDevice) {
         $reusable = $false
       }
-      if ($reusable) { return [string[]]$cached }
+      if ($reusable) { Write-Output -InputObject ([string[]]$cached) -NoEnumerate; return }
     }
   }
 
@@ -183,7 +212,9 @@ function Get-CamillaDSPAvailablePlaybackDeviceCache {
   New-Item -ItemType Directory -Path $stateDir -Force > $null
   Set-Content -Path $metaFile -Value @($CaptureDevice, [DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
   Set-Content -Path $cacheFile -Value $devices
-  return [string[]]$devices
+  # WHY: an empty list has to stay an empty array here too, or the caller reads
+  # it as a failed enumeration.
+  Write-Output -InputObject ([string[]]$devices) -NoEnumerate
 }
 
 function Clear-CamillaDSPDeviceCache {
@@ -211,7 +242,11 @@ function Clear-CamillaDSPDeviceCache {
 function Get-CamillaDSPFirstAvailablePlaybackDevice {
   <#
   .SYNOPSIS
-    First cached playback device in sorted-name order, or $null.
+    First cached playback device in sorted-name order.
+  .DESCRIPTION
+    Returns $null when enumeration failed and an empty string when enumeration
+    succeeded with nothing left, so the caller can name the real cause of a
+    resolution that found no device.
   .PARAMETER CaptureDevice
     Device excluded from playback selection.
   #>
@@ -222,9 +257,11 @@ function Get-CamillaDSPFirstAvailablePlaybackDevice {
     [string]$CaptureDevice = ''
   )
 
-  $names = @(Get-CamillaDSPAvailablePlaybackDeviceCache -CaptureDevice $CaptureDevice)
-  if ($names.Count -eq 0) { return $null }
-  return $names[0]
+  $names = Get-CamillaDSPAvailablePlaybackDeviceCache -CaptureDevice $CaptureDevice
+  if ($null -eq $names) { return $null }
+  $names = @($names)
+  if ($names.Count -eq 0) { return '' }
+  return [string]$names[0]
 }
 
 # --- Last saved default and push state ---
@@ -285,17 +322,92 @@ function Clear-CamillaDSPLastDevice {
 
 # --- Config resolution ---
 
+# WHY: one broken topology would otherwise log the same line on every 5 s tick.
+# Dot-sourcing puts this in the caller's script scope, so it survives a resident
+# heartbeat and stays fresh in each test block; it is not a state file, because a
+# restart should report the cause again.
+$script:CamillaDSPLastWarnedCause = ''
+
+function Write-CamillaDSPTopologyWarning {
+  <#
+  .SYNOPSIS
+    Warns about a resolution failure, once per distinct cause.
+  .DESCRIPTION
+    A different cause warns again, and a successful resolution clears the record,
+    so the next failure is reported.
+  .PARAMETER Cause
+    Cause key; the same key is not warned twice in a row.
+  .PARAMETER Message
+    Text to log when the cause is new.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [string]$Cause,
+
+    [Parameter(Mandatory)]
+    [string]$Message
+  )
+
+  if ($script:CamillaDSPLastWarnedCause -eq $Cause) { return }
+  $script:CamillaDSPLastWarnedCause = $Cause
+  Write-NucleusWarning -CommandName 'camilladsp-deviceselect' -Message $Message
+}
+
+function Get-CamillaDSPLoopbackCaptureDevice {
+  <#
+  .SYNOPSIS
+    Render endpoint the loopback capture reads, or an empty string.
+  .DESCRIPTION
+    In loopback mode CamillaDSP captures a render endpoint, so a null
+    devices.capture.device means the default playback endpoint, which is the one
+    applications play into. An explicit capture device is returned as is, since
+    CamillaDSP opens that render endpoint instead. A config that is not loopback
+    returns an empty string, because its capture device is not a render endpoint.
+  .PARAMETER ConfigPath
+    Config file to read.
+  #>
+  [CmdletBinding()]
+  [OutputType([string])]
+  param(
+    [Parameter(Mandatory)]
+    [string]$ConfigPath
+  )
+
+  $config = (Get-Content -Raw -Path $ConfigPath) | ConvertFrom-Yaml
+  $capture = $config.devices.capture
+  if ($null -eq $capture -or $capture.loopback -ne $true) {
+    return ''
+  }
+
+  $captureDevice = [string]$capture.device
+  if (-not [string]::IsNullOrEmpty($captureDevice)) {
+    return $captureDevice
+  }
+
+  $default = Get-CamillaDSPDefaultPlaybackDevice
+  if ([string]::IsNullOrEmpty($default)) {
+    return ''
+  }
+  return [string]$default
+}
+
 function ConvertTo-CamillaDSPPlaybackDeviceYaml {
   <#
   .SYNOPSIS
     Re-serializes a config with the playback device set.
   .DESCRIPTION
     The heartbeat pushes this instead of re-running detection, so the device it
-    measured and the device it pushes are the same one.
+    measured and the device it pushes are the same one. A loopback capture also
+    gets its render endpoint written, so the pushed config names the endpoint
+    instead of leaving CamillaDSP to resolve the default a second time.
   .PARAMETER ConfigPath
     Config file to patch.
   .PARAMETER Device
     Device to write into devices.playback.device.
+  .PARAMETER CaptureDevice
+    Render endpoint to write into devices.capture.device; ignored unless the
+    config captures in loopback.
   #>
   [CmdletBinding()]
   [OutputType([string])]
@@ -305,11 +417,20 @@ function ConvertTo-CamillaDSPPlaybackDeviceYaml {
 
     [Parameter(Mandatory)]
     [AllowEmptyString()]
-    [string]$Device
+    [string]$Device,
+
+    [Parameter(Mandatory = $false)]
+    [AllowEmptyString()]
+    [string]$CaptureDevice = ''
   )
 
   $config = (Get-Content -Raw -Path $ConfigPath) | ConvertFrom-Yaml
   $config.devices.playback.device = $Device
+  # WHY: a capture that is not loopback has a capture-side name of its own, and
+  # writing a render endpoint there would replace it.
+  if (-not [string]::IsNullOrEmpty($CaptureDevice) -and $config.devices.capture.loopback -eq $true) {
+    $config.devices.capture.device = $CaptureDevice
+  }
   return ($config | ConvertTo-Yaml)
 }
 
@@ -321,7 +442,10 @@ function Resolve-CamillaDSPPlaybackDevice {
     Resolution order: system default output, last saved device validated
     against the available list, first available device. A config that already
     sets a device is returned with its original text, so nothing is reserialized
-    needlessly.
+    needlessly. A loopback capture holds the default playback endpoint, so that
+    endpoint is excluded from every step, and a config whose only render
+    endpoint is the capture source is returned unchanged with a warning naming
+    the cause: a failed enumeration or the missing second endpoint.
   .PARAMETER ConfigPath
     Config file to resolve.
   #>
@@ -335,11 +459,17 @@ function Resolve-CamillaDSPPlaybackDevice {
   $yaml = Get-Content -Raw -Path $ConfigPath
   $config = $yaml | ConvertFrom-Yaml
 
-  $playbackDevice = $config.devices.playback.device
-  $captureDevice = $config.devices.capture.device
-
-  if ($null -ne $playbackDevice) {
+  if ($null -ne $config.devices.playback.device) {
     return $yaml
+  }
+
+  # A loopback capture reads a render endpoint, which is the device playback has
+  # to avoid. A config with a capture-side name keeps the exclusion it had.
+  $loopbackCaptureDevice = Get-CamillaDSPLoopbackCaptureDevice -ConfigPath $ConfigPath
+  $captureDevice = if ([string]::IsNullOrEmpty($loopbackCaptureDevice)) {
+    [string]$config.devices.capture.device
+  } else {
+    $loopbackCaptureDevice
   }
 
   $detected = Get-CamillaDSPDefaultPlaybackDevice
@@ -364,17 +494,29 @@ function Resolve-CamillaDSPPlaybackDevice {
   }
 
   # Fallback 2: first available device in sorted-name order.
+  $enumerationFailed = $false
   if ([string]::IsNullOrEmpty($detected)) {
-    $detected = Get-CamillaDSPFirstAvailablePlaybackDevice -CaptureDevice $captureDevice
+    $firstAvailable = Get-CamillaDSPFirstAvailablePlaybackDevice -CaptureDevice $captureDevice
+    if ($null -eq $firstAvailable) {
+      $enumerationFailed = $true
+    } else {
+      $detected = [string]$firstAvailable
+    }
   }
 
-  # Nothing available: pass through with the null device.
+  # Nothing available: pass through with the null device and say why.
   if ([string]::IsNullOrEmpty($detected)) {
+    if ($enumerationFailed) {
+      Write-CamillaDSPTopologyWarning -Cause 'enumeration-failed' -Message 'cannot enumerate playback devices: the Windows audio endpoint list is unavailable, so no playback device was selected'
+    } else {
+      Write-CamillaDSPTopologyWarning -Cause 'no-candidate' -Message 'no playback device available: the loopback capture takes the default playback endpoint, so this host needs a second playback endpoint'
+    }
     return $yaml
   }
 
+  $script:CamillaDSPLastWarnedCause = ''
   Save-CamillaDSPLastDevice -Device $detected
-  return (ConvertTo-CamillaDSPPlaybackDeviceYaml -ConfigPath $ConfigPath -Device $detected)
+  return (ConvertTo-CamillaDSPPlaybackDeviceYaml -ConfigPath $ConfigPath -Device $detected -CaptureDevice $loopbackCaptureDevice)
 }
 
 function Get-CamillaDSPResolvedPlaybackDeviceName {

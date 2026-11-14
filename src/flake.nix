@@ -7,7 +7,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     hermes-agent = {
-      url = "github:NousResearch/hermes-agent/v2026.8.31";
+      url = "github:NousResearch/hermes-agent/v2026.9.24";
       inputs.nixpkgs.follows = "nixpkgs";
       # WHY: v2026.8.31 is the first release exposing homeManagerModules.default
       # (PR #84178). The `voice` dependency group is excluded in src/modules/hermes-agent.nix.
@@ -36,7 +36,7 @@
     nix-homebrew.url = "github:zhaofengli/nix-homebrew";
     nix-homebrew.inputs.brew-src.follows = "brew-src";
     brew-src = {
-      url = "github:Homebrew/brew/7.0.11";
+      url = "github:Homebrew/brew/7.0.13";
       flake = false;
     };
     homebrew-core = {
@@ -216,6 +216,62 @@
                 };
               };
             })
+            (
+              _final: prev:
+              prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
+                # WHY: nixpkgs' glaxnimate is Linux-only, so macOS takes the
+                # KDE dmg. Its bundle is a native arm64 build, so the
+                # derivation declares aarch64-darwin only; an x86_64-darwin
+                # eval could not run the bundle it would fetch.
+                glaxnimate = prev.stdenv.mkDerivation rec {
+                  pname = "glaxnimate";
+                  version = "0.6.0";
+
+                  sourceRoot = ".";
+
+                  nativeBuildInputs = [ prev.undmg ];
+
+                  # WHY: download.kde.org answers with a Mirrorbits redirect to
+                  # geo mirrors outside *.kde.org, which the srt proxy allowlist
+                  # refuses (403 X-Proxy-Error: blocked-by-allowlist), so the
+                  # URL pins a *.kde.org mirror that serves the file directly.
+                  src = prev.fetchurl {
+                    url = "https://sakura-osaka.mirrors.kde.org/kde/ftp/stable/glaxnimate/${version}/macOS/glaxnimate-${version}-arm64.dmg";
+                    hash = "sha256-X3aNoON6y5Sl84QaGXFfmeEhZG/Zg/+gCktnW/6pvXU=";
+                  };
+
+                  # WHY: the dmg payload puts the real bundle beside an
+                  # `Applications` symlink to the host's /Applications, and a
+                  # `cp -r *` over the payload root follows it and drags that
+                  # tree in. `find` does not follow symlinks and `-type d`
+                  # excludes the link itself, so only the real bundle is
+                  # collected. The guard below exists because `find` matches
+                  # nothing successfully, where a glob would fail loudly.
+                  installPhase = ''
+                    mkdir -p $out/Applications
+                    find . -maxdepth 2 -name '*.app' -type d -exec cp -r {} $out/Applications/ \;
+                    test -n "$(ls -A $out/Applications)" || {
+                      echo "glaxnimate: no .app bundle collected" >&2
+                      exit 1
+                    }
+                  '';
+
+                  meta = {
+                    description = "Animated vector graphics editor";
+                    homepage = "https://glaxnimate.org/";
+                    license = with prev.lib.licenses; [
+                      bsd2
+                      cc-by-sa-40
+                      cc0
+                      gpl2Plus
+                      gpl3Plus
+                      unicodeTOU
+                    ];
+                    platforms = [ "aarch64-darwin" ];
+                  };
+                };
+              }
+            )
             (_final: prev: {
               # WHY no strip: a PyInstaller bundle carries its Python data past the
               # Mach-O section boundaries, so stripping drops the appended PKG.
@@ -423,6 +479,64 @@
                     "aarch64-darwin"
                     "x86_64-windows"
                   ];
+                };
+              };
+
+              # WHY: pinned upstream release binary; not in nixpkgs as CLI. The v0.5.6
+              # assets are single executables (no archive) and x86_64-linux ships only a
+              # musl binary.
+              deep-filter = prev.stdenv.mkDerivation rec {
+                pname = "deep-filter";
+                version = "0.5.6";
+
+                src =
+                  if prev.stdenv.hostPlatform.isDarwin then
+                    if prev.stdenv.hostPlatform.isAarch64 then
+                      prev.fetchurl {
+                        url = "https://github.com/Rikorose/DeepFilterNet/releases/download/v${version}/deep-filter-${version}-aarch64-apple-darwin";
+                        hash = "sha256-RgHn9OTAPlmkxbUAAhbvOt0+gIeZz8zZXhToPqRhEIE=";
+                      }
+                    else
+                      prev.fetchurl {
+                        url = "https://github.com/Rikorose/DeepFilterNet/releases/download/v${version}/deep-filter-${version}-x86_64-apple-darwin";
+                        hash = "sha256-076EADrLfCPnOK1/cKFY7HeajSM6guf6PnF9ES61tQ8=";
+                      }
+                  else if prev.stdenv.hostPlatform.isAarch64 then
+                    prev.fetchurl {
+                      url = "https://github.com/Rikorose/DeepFilterNet/releases/download/v${version}/deep-filter-${version}-aarch64-unknown-linux-gnu";
+                      hash = "sha256-FOAqHAAo88oL34O2KzM25WugVWiU7ylalehXPwZVcWY=";
+                    }
+                  else
+                    prev.fetchurl {
+                      url = "https://github.com/Rikorose/DeepFilterNet/releases/download/v${version}/deep-filter-${version}-x86_64-unknown-linux-musl";
+                      hash = "sha256-cHdeJR7uRMDyRRoegzMmz4vLvjBNPnzRKFHm/Ocu99o=";
+                    };
+
+                dontUnpack = true;
+                dontBuild = true;
+                dontStrip = true;
+                dontPatchELF = true;
+
+                installPhase = ''
+                  runHook preInstall
+                  install -Dm755 "$src" "$out/bin/deep-filter"
+                  runHook postInstall
+                '';
+
+                meta = {
+                  description = "DeepFilterNet noise suppression CLI";
+                  homepage = "https://github.com/Rikorose/DeepFilterNet";
+                  license = with prev.lib.licenses; [
+                    asl20
+                    mit
+                  ];
+                  platforms = [
+                    "x86_64-linux"
+                    "aarch64-linux"
+                    "x86_64-darwin"
+                    "aarch64-darwin"
+                  ];
+                  mainProgram = "deep-filter";
                 };
               };
             })
@@ -642,11 +756,23 @@
             name = "bootstrap";
             runtimeInputs = [ ];
           };
+          nucleus-camilladsp-heartbeat = nucleusApp {
+            name = "camilladsp-heartbeat";
+            scriptName = "src/scripts/services/camilladsp-heartbeat";
+            # WHY: `aplay -l` is the heartbeat's only device source on Linux, and the
+            # wrapper prepends runtimeInputs to an inherited PATH, so alsa-utils has to
+            # be carried here instead of resolving from the ambient systemd user PATH.
+            runtimeInputs = [
+              (import ./modules/lib/camilladsp-python.nix { inherit pkgs; })
+            ]
+            ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.alsa-utils ];
+          };
           nucleus-check = nucleusApp {
             name = "check";
             runtimeInputs = [
               pkgs.actionlint
               pkgs.bash
+              pkgs.bun
               pkgs.git
               pkgs.jq
               pkgs.nixf
@@ -693,6 +819,17 @@
               MANAGED_PREF_DOMAINS = builtins.concatStringsSep " " managedPrefDomains.resetUserPreferenceDomains;
             };
           };
+          nucleus-logs = nucleusApp {
+            name = "logs";
+            # Windows twin: scripts/logs.ps1.
+            runtimeInputs = [
+              pkgs.coreutils
+              pkgs.findutils
+              pkgs.gawk
+              pkgs.gzip
+              pkgs.jq
+            ];
+          };
           nucleus-svc = nucleusApp {
             name = "svc";
             runtimeInputs = [ pkgs.jq ];
@@ -701,6 +838,8 @@
             name = "test";
             runtimeInputs = [
               pkgs.bash
+              # WHY: pi-context-cap-tests runs bun test over the extension source.
+              pkgs.bun
               pkgs.check-jsonschema
               pkgs.findutils
               pkgs.git
@@ -903,38 +1042,70 @@
       };
 
       packages = {
-        "${systems.mac}" = {
-          treefmt = mkTreefmtWrapper systems.mac pkgsMac;
-          bootstrap-deps = pkgsMac.symlinkJoin {
-            name = "bootstrap-deps";
-            paths = [
-              pkgsMac.gnupg
-              pkgsMac.sops
-              pkgsMac.ssh-to-age
-              (mkTreefmtWrapper systems.mac pkgsMac)
-            ];
+        "${systems.mac}" =
+          let
+            nucleusAppsJson = pkgsMac.writeText "nucleus-apps.json" (
+              (import ./modules/lib/json.nix { lib = nixpkgs.lib; }).toSortedJSON {
+                "$schema" = "./nucleus-apps.schema.json";
+                commands =
+                  let
+                    names = builtins.attrNames nucleusAppsMac;
+                    nucleus = builtins.filter (n: builtins.substring 0 8 n == "nucleus-") names;
+                    short = builtins.map (n: builtins.substring 8 ((builtins.stringLength n) - 8) n) nucleus;
+                  in
+                  builtins.sort builtins.lessThan short;
+              }
+            );
+          in
+          {
+            treefmt = mkTreefmtWrapper systems.mac pkgsMac;
+            bootstrap-deps = pkgsMac.symlinkJoin {
+              name = "bootstrap-deps";
+              paths = [
+                pkgsMac.gnupg
+                pkgsMac.sops
+                pkgsMac.ssh-to-age
+                (mkTreefmtWrapper systems.mac pkgsMac)
+              ];
+            };
+            nucleus-apps = nucleusAppsJson;
+          }
+          // nucleusAppsMac
+          // {
+            flakeInputs = mkFlakeInputsPkg pkgsMac flakeInputsMac;
           };
-        }
-        // nucleusAppsMac
-        // {
-          flakeInputs = mkFlakeInputsPkg pkgsMac flakeInputsMac;
-        };
-        "${systems.linux}" = {
-          treefmt = mkTreefmtWrapper systems.linux pkgsLinux;
-          bootstrap-deps = pkgsLinux.symlinkJoin {
-            name = "bootstrap-deps";
-            paths = [
-              pkgsLinux.gnupg
-              pkgsLinux.sops
-              pkgsLinux.ssh-to-age
-              (mkTreefmtWrapper systems.linux pkgsLinux)
-            ];
+        "${systems.linux}" =
+          let
+            nucleusAppsJson = pkgsLinux.writeText "nucleus-apps.json" (
+              (import ./modules/lib/json.nix { lib = nixpkgs.lib; }).toSortedJSON {
+                "$schema" = "./nucleus-apps.schema.json";
+                commands =
+                  let
+                    names = builtins.attrNames nucleusAppsLinux;
+                    nucleus = builtins.filter (n: builtins.substring 0 8 n == "nucleus-") names;
+                    short = builtins.map (n: builtins.substring 8 ((builtins.stringLength n) - 8) n) nucleus;
+                  in
+                  builtins.sort builtins.lessThan short;
+              }
+            );
+          in
+          {
+            treefmt = mkTreefmtWrapper systems.linux pkgsLinux;
+            bootstrap-deps = pkgsLinux.symlinkJoin {
+              name = "bootstrap-deps";
+              paths = [
+                pkgsLinux.gnupg
+                pkgsLinux.sops
+                pkgsLinux.ssh-to-age
+                (mkTreefmtWrapper systems.linux pkgsLinux)
+              ];
+            };
+            nucleus-apps = nucleusAppsJson;
+          }
+          // nucleusAppsLinux
+          // {
+            flakeInputs = mkFlakeInputsPkg pkgsLinux flakeInputsLinux;
           };
-        }
-        // nucleusAppsLinux
-        // {
-          flakeInputs = mkFlakeInputsPkg pkgsLinux flakeInputsLinux;
-        };
       };
 
       # Committed as src/hosts/Windows/system/winget-packages.json and read by

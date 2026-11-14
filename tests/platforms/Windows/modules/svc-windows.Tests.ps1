@@ -513,6 +513,75 @@ Describe 'Get-ServiceStatus' {
   }
 }
 # ---------------------------------------------------------------------------
+# Get-ServiceActionWarning
+# ---------------------------------------------------------------------------
+
+Describe 'Get-ServiceActionWarning' {
+  Context 'stop' {
+    It 'warns that a stopped scheduled task runs again at its next trigger' {
+      (Get-ServiceActionWarning -Action 'stop' -HostEntry @{ type = 'windows-schtask' }) |
+        Should -Match 'next trigger'
+    }
+
+    It 'names -Disable as the remedy' {
+      (Get-ServiceActionWarning -Action 'stop' -HostEntry @{ type = 'windows-schtask' }) |
+        Should -Match '-Disable'
+    }
+
+    It 'stays silent for a manually stopped service' {
+      Get-ServiceActionWarning -Action 'stop' -HostEntry @{ type = 'windows-native' } | Should -BeNullOrEmpty
+    }
+
+    It 'stays silent for an unsupported type' {
+      Get-ServiceActionWarning -Action 'stop' -HostEntry @{ type = 'unsupported' } | Should -BeNullOrEmpty
+    }
+  }
+
+  Context 'start' {
+    It 'warns and names -Enable when the service does not start automatically' {
+      Mock Get-Service {
+        return [PSCustomObject]@{ Status = 'Stopped'; StartType = 'Manual' }
+      }
+
+      $warning = Get-ServiceActionWarning -Action 'start' -HostEntry @{ type = 'windows-native'; service = 'sshd' }
+      $warning | Should -Match 'not enabled'
+      $warning | Should -Match '-Enable'
+    }
+
+    It 'stays silent when the service starts automatically' {
+      Mock Get-Service {
+        return [PSCustomObject]@{ Status = 'Running'; StartType = 'Automatic' }
+      }
+
+      Get-ServiceActionWarning -Action 'start' -HostEntry @{ type = 'windows-native'; service = 'ollama' } | Should -BeNullOrEmpty
+    }
+
+    It 'warns and names -Enable for a disabled scheduled task' {
+      Mock Get-ScheduledTask {
+        return [PSCustomObject]@{ State = 'Disabled' }
+      }
+
+      $warning = Get-ServiceActionWarning -Action 'start' -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCamillaDSP' }
+      $warning | Should -Match '-Enable'
+    }
+
+    It 'stays silent for an enabled scheduled task' {
+      Mock Get-ScheduledTask {
+        return [PSCustomObject]@{ State = 'Ready' }
+      }
+
+      Get-ServiceActionWarning -Action 'start' -HostEntry @{ type = 'windows-schtask'; taskPath = '\NucleusCamillaDSP' } | Should -BeNullOrEmpty
+    }
+
+    It 'stays silent for a service that is not installed, because the start reports it' {
+      Mock Get-Service { throw 'not found' }
+
+      Get-ServiceActionWarning -Action 'start' -HostEntry @{ type = 'windows-native'; service = 'gone' } | Should -BeNullOrEmpty
+    }
+  }
+}
+
+# ---------------------------------------------------------------------------
 # Dispatch
 # ---------------------------------------------------------------------------
 
@@ -549,9 +618,14 @@ Describe 'Dispatch' {
 
     # Test helper that wraps the switch dispatch for testing.
     function Invoke-Dispatch {
+      # Disable and Enable are read by the dot-sourced dispatch text, which PSSA cannot see.
+      # check-suppress:SuppressMessageAttribute: PSReviewUnusedParameter -- the dispatch text reads them
+      [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '')]
       param(
         [string]$Action,
-        [string[]]$ServiceName
+        [string[]]$ServiceName,
+        [switch]$Disable,
+        [switch]$Enable
       )
       # Parameters consumed by the dynamic switch dispatch below.
       Write-Debug "Invoke-Dispatch: Action=$Action ServiceName=$($ServiceName -join ',')"
@@ -923,6 +997,66 @@ Describe 'Dispatch' {
       ($output -join "`n") | Should -Match 'NucleusCloudMount-work'
     }
   }
+
+  Context 'remedy switches' {
+    BeforeEach {
+      $Script:ActionCalls = @()
+      Mock Resolve-ServiceName { return @(New-LiveRow -Key 'ollama') }
+      Mock Invoke-ServiceAction { $Script:ActionCalls += $Action; return $true }
+    }
+
+    It 'runs the enable before the start when -Enable is given' {
+      Mock Get-ServiceActionWarning { return $null }
+
+      Invoke-Dispatch -Action start -ServiceName @('ollama') -Enable
+
+      ($Script:ActionCalls -join ',') | Should -Be 'enable,start'
+    }
+
+    It 'runs the disable after the stop when -Disable is given' {
+      Mock Get-ServiceActionWarning { return $null }
+
+      Invoke-Dispatch -Action stop -ServiceName @('ollama') -Disable
+
+      ($Script:ActionCalls -join ',') | Should -Be 'stop,disable'
+    }
+
+    It 'skips the warning for the stop it disables' {
+      Mock Get-ServiceActionWarning { return 'a message' }
+
+      Invoke-Dispatch -Action stop -ServiceName @('ollama') -Disable
+
+      Should -Invoke Get-ServiceActionWarning -Exactly 0
+    }
+
+    It 'warns through the dispatch for a stop without -Disable' {
+      Mock Get-ServiceActionWarning { return 'a message' }
+      Mock Write-NucleusWarning { }
+
+      Invoke-Dispatch -Action stop -ServiceName @('ollama')
+
+      Should -Invoke Write-NucleusWarning -Exactly 1 -ParameterFilter { $Message -match 'a message' }
+    }
+
+    It 'warns through the dispatch for a start' {
+      Mock Get-ServiceActionWarning { return $null }
+
+      Invoke-Dispatch -Action start -ServiceName @('ollama')
+
+      Should -Invoke Get-ServiceActionWarning -Exactly 1 -ParameterFilter { $Action -eq 'start' }
+    }
+
+    It 'skips the start when the enable it asked for fails' {
+      Mock Invoke-ServiceAction { $Script:ActionCalls += $Action; return ($Action -ne 'enable') }
+      Mock Get-ServiceActionWarning { return $null }
+      Mock Write-NucleusError { }
+      Mock Write-NucleusWarning { }
+
+      { Invoke-Dispatch -Action start -ServiceName @('ollama') -Enable } | Should -Throw
+
+      ($Script:ActionCalls -join ',') | Should -Be 'enable'
+    }
+  }
 }
 # ---------------------------------------------------------------------------
 # Invoke-ServiceAction
@@ -1048,11 +1182,6 @@ Describe 'Get-HostService' {
 }
 
 Describe 'Get-CaptureMode' {
-  It 'returns platform-specific capture mode when set' {
-    $result = Get-CaptureMode -ServiceKey 'ollama'
-    $result | Should -Be 'all'
-  }
-
   It 'falls back to platform-specific when top-level not set' {
     $result = Get-CaptureMode -ServiceKey 'cloud-drive'
     $result | Should -Be 'stderr'

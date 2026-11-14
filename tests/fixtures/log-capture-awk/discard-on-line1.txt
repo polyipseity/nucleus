@@ -1,0 +1,4 @@
+StandardErrorPath = "/dev/null";
+# trailing context so the directive is not also the last line
+{
+}

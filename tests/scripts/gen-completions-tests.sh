@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 # Tests for src/scripts/completions/gen-completions.sh: --help contract, --check determinism,
-# idempotent regeneration, 13-command coverage, generated headers + zsh syntax,
-# update lockfile --list-* dynamic wiring, flag-extraction correctness pins, and
-# spec-word escaping of shell metacharacters in subcommand descriptions.
+# idempotent regeneration, the suite not touching the tracked completions tree, 14-command
+# coverage, generated headers + zsh syntax,
+# update lockfile --list-* dynamic wiring, flag-extraction correctness pins,
+# spec-word escaping of shell metacharacters in subcommand descriptions, and the
+# six hand-coded subcommand lists (gc, svc, config, logs, utils, vm): the zsh
+# table against the app's scripts/<cmd>.sh dispatch, the PowerShell array against
+# the app's scripts/<cmd>.ps1 subcommand constraint.
 #
 # Also guards the PowerShell twin (src/scripts/completions/gen-completions.ps1):
 # its command list matches the canonical set, every Register-ArgumentCompleter
@@ -28,12 +32,36 @@ _COMPLETIONS_DIR="src/modules/completions/zsh"
 _ps_gen_script="src/scripts/completions/gen-completions.ps1"
 _profile_ps1="src/scripts/shell/profile.ps1"
 
-# The canonical nucleus-* command set (alphabetical), must match the generator.
-# Subcommands are covered by their parent completion files, not as standalone
-# commands: check packer/sh/pwsh, gc cleanup-nix/preferences, apply
-# health-check/audit-store, cloud setup/reset/sync/status/restart, update
-# lockfile.
-_NUCLEUS_COMMANDS=(ai apply bootstrap check cloud config gc utils svc test update vm)
+# The canonical nucleus-* command set comes from the committed manifest.
+# A nix-capable host must keep that manifest identical to the flake-derived set.
+require_command jq "gen-completions: jq is required to read the nucleus command manifest"
+require_command nix "gen-completions: nix eval is required to verify the nucleus command manifest against the flake"
+_sys_t="$(nix config show system)"
+_NUCLEUS_COMMANDS=()
+while IFS= read -r _cmd_t; do
+  [ -n "$_cmd_t" ] || continue
+  _NUCLEUS_COMMANDS+=("$_cmd_t")
+done < <(jq -r '.commands[]' "$REPO_ROOT/src/modules/completions/nucleus-apps.json")
+if [ "${#_NUCLEUS_COMMANDS[@]}" -eq 0 ]; then
+  assert_fail "gen-completions: read nucleus command manifest" "could not read nucleus command list from src/modules/completions/nucleus-apps.json"
+  finish_tests
+fi
+_manifest_out="$(nix build --no-link --print-out-paths "$REPO_ROOT/src#nucleus-apps" 2>/dev/null || true)"
+if [ -n "$_manifest_out" ] && cmp -s "$_manifest_out" "$REPO_ROOT/src/modules/completions/nucleus-apps.json"; then
+  assert_pass "gen-completions: nucleus command manifest matches flake derivation"
+else
+  assert_fail "gen-completions: nucleus command manifest matches flake derivation" "manifest differs from ./src#nucleus-apps"
+fi
+
+# Marker for the no-touch assertion (case 14): plain mktemp, outside the tracked
+# tree, timestamped before anything in the suite can generate. The one-second
+# buffer keeps a same-second write from sharing the marker's timestamp and
+# escaping find -newer on a one-second-granularity filesystem. The manifest
+# beside it is the deletion half of that assertion: a removed file has no mtime
+# left to compare, so it can only be caught by its absence from the file list.
+_tree_marker="$(mktemp)"
+_tree_files_before="$(find src/modules/completions -type f | LC_ALL=C sort)"
+sleep 1
 
 # 1. --help exits 0 and prints a usage: line.
 if _help_out="$(bash "$_gen_script" --help 2>&1)" && printf '%s\n' "$_help_out" | grep -q '^usage: '; then
@@ -42,25 +70,18 @@ else
   assert_fail "gen-completions: --help contract" "exit code or usage line missing"
 fi
 
-# 2. Regenerate the tree, then --check must exit 0.
-if bash "$_gen_script" >/dev/null 2>&1 && bash "$_gen_script" --check >/dev/null 2>&1; then
-  assert_pass "gen-completions: generate then --check exits 0"
-else
-  assert_fail "gen-completions: generate + --check" "non-zero exit"
-fi
-
-# 3. Idempotency: a second generate is byte-identical (git-free comparison).
-_tmp_snapshot="$(mktemp -d)"
+# 2. Idempotency via --check: it regenerates into a temp dir and exits 0 only
+#    when every generated file matches the tracked tree byte-for-byte, which is
+#    the same invocation check step 10 runs, and it never writes the real tree.
 _tmp_stub_repo="$(mktemp -d)"
-trap 'rm -rf "$_tmp_snapshot" "$_tmp_stub_repo"' EXIT
-cp -R "$_COMPLETIONS_DIR/." "$_tmp_snapshot/"
-if bash "$_gen_script" >/dev/null 2>&1 && diff -rq "$_tmp_snapshot" "$_COMPLETIONS_DIR" >/dev/null 2>&1; then
-  assert_pass "gen-completions: regeneration is idempotent"
+trap 'rm -rf "$_tree_marker" "$_tmp_stub_repo"' EXIT
+if bash "$_gen_script" --check >/dev/null 2>&1; then
+  assert_pass "gen-completions: regeneration via --check is byte-identical"
 else
-  assert_fail "gen-completions: idempotency" "files changed after regenerate"
+  assert_fail "gen-completions: idempotency via --check" "regenerated output differs from the tracked tree"
 fi
 
-# 4. Coverage: every command has a zsh completion file.
+# 3. Coverage: every command has a zsh completion file.
 _coverage_ok=1
 for _cmd in "${_NUCLEUS_COMMANDS[@]}"; do
   if [ ! -f "$_COMPLETIONS_DIR/_nucleus-$_cmd" ]; then
@@ -72,7 +93,7 @@ if [ "$_coverage_ok" -eq 1 ]; then
   assert_pass "gen-completions: all ${#_NUCLEUS_COMMANDS[@]} commands have zsh completion files"
 fi
 
-# 5. Generated headers and zsh syntax on every host.
+# 4. Generated headers and zsh syntax on every host.
 _gen_ok=1
 for _zsh_f in "$_COMPLETIONS_DIR"/_nucleus "$_COMPLETIONS_DIR"/_nucleus-*; do
   [ -f "$_zsh_f" ] || continue
@@ -91,7 +112,7 @@ if [ "$_gen_ok" -eq 1 ]; then
   assert_pass "gen-completions: all generated files have headers and pass zsh -n"
 fi
 
-# 6. update lockfile dynamic value completion via --list-sections.
+# 5. update lockfile dynamic value completion via --list-sections.
 if grep -q "_call_program 'sections' nucleus-update --list-sections" "$_COMPLETIONS_DIR/_nucleus-update" &&
   grep -q -- '--sections:section name:->sections' "$_COMPLETIONS_DIR/_nucleus-update"; then
   assert_pass "gen-completions: update lockfile --sections dynamic wiring"
@@ -99,7 +120,7 @@ else
   assert_fail "gen-completions: update lockfile --sections wiring" "missing _call_program/->sections"
 fi
 
-# 8. Flag extraction correctness: usage-line + body flags land in the spec,
+# 6. Flag extraction correctness: usage-line + body flags land in the spec,
 #    corrected sets are pinned (apply's 12 flags + health-check/audit-store
 #    subcommands, test's -q group, optimize-pdf --rm-bak), and no jq/rclone/curl
 #    tool flags leak into any file.
@@ -120,9 +141,9 @@ else
   assert_fail "gen-completions: flag extraction" "flag set deviates from the authoritative table"
 fi
 
-# 9. Merged subcommand coverage: parent completion files enumerate their
+# 7. Merged subcommand coverage: parent completion files enumerate their
 #    subcommands after the command-surface merge (check packer/sh/pwsh,
-#    gc cleanup-nix/preferences, apply health-check/audit-store, cloud
+#    gc cleanup-nix/logs/preferences, apply health-check/audit-store, cloud
 #    setup/reset/sync/status/restart, update lockfile).
 _sub_ok=1
 for _s in packer sh pwsh; do
@@ -131,7 +152,7 @@ for _s in packer sh pwsh; do
     _sub_ok=0
   }
 done
-for _s in cleanup-nix preferences; do
+for _s in cleanup-nix logs preferences; do
   grep -qw -- "$_s" "$_COMPLETIONS_DIR/_nucleus-gc" || {
     assert_fail "gen-completions: subcommand" "gc missing $_s"
     _sub_ok=0
@@ -163,7 +184,7 @@ if [ "$_sub_ok" -eq 1 ]; then
   assert_pass "gen-completions: merged subcommands covered by parent completions"
 fi
 
-# 7. _nucleus dispatcher completes `nucleus-<TAB>` with every command name.
+# 8. _nucleus dispatcher completes `nucleus-<TAB>` with every command name.
 _disp_file="$_COMPLETIONS_DIR/_nucleus"
 if grep -q '^#compdef nucleus-$' "$_disp_file" &&
   grep -qw 'apply' "$_disp_file" &&
@@ -177,7 +198,7 @@ else
   assert_fail "gen-completions: _nucleus dispatcher" "missing #compdef nucleus- or command names"
 fi
 
-# 10. Description text with shell metacharacters must survive BOTH quoting
+# 9. Description text with shell metacharacters must survive BOTH quoting
 #     layers of a generated file: the single-quoted spec word parsed by the
 #     shell, and the double-quoted description that _arguments evals out of the
 #     ((...)) action. Regression: an unescaped ' ended the spec word early, so
@@ -188,6 +209,13 @@ fi
 _fx_repo="$_tmp_stub_repo/repo"
 mkdir -p "$_fx_repo/scripts"
 for _cmd in "${_NUCLEUS_COMMANDS[@]}"; do
+  case "$_cmd" in
+  # WHY: the generator maps daemon entry points to src/scripts/services/, so the
+  # stub has to sit at that path or generation fails outright.
+  camilladsp-heartbeat) _stub_dir="$_fx_repo/src/scripts/services" ;;
+  *) _stub_dir="$_fx_repo/scripts" ;;
+  esac
+  mkdir -p "$_stub_dir"
   {
     printf '#!/usr/bin/env bash\n'
     # shellcheck disable=SC2016 # reason: the stub's own shell expands this literal text; the test must not.
@@ -198,7 +226,7 @@ for _cmd in "${_NUCLEUS_COMMANDS[@]}"; do
     printf -- "  echo '  --flag  Some flag'\n"
     printf -- '  ;;\n'
     printf 'esac\n'
-  } >"$_fx_repo/scripts/$_cmd.sh"
+  } >"$_stub_dir/$_cmd.sh"
 done
 _fx_desc="Strip a file's \"\$HOME\" metadata"
 {
@@ -231,8 +259,17 @@ _fx_decode() {
   '
 }
 
+# WHY: the stub repo has no committed manifest, so provide the canonical list explicitly.
+_fx_cmds=""
+for _cmd in "${_NUCLEUS_COMMANDS[@]}"; do
+  if [ -n "$_fx_cmds" ]; then
+    _fx_cmds="$_fx_cmds"$'\n'"$_cmd"
+  else
+    _fx_cmds="$_cmd"
+  fi
+done
 _fx_gen_rc=0
-NUCLEUS_REPO_ROOT="$_fx_repo" bash "$_gen_script" >/dev/null 2>&1 || _fx_gen_rc=$?
+NUCLEUS_REPO_ROOT="$_fx_repo" NUCLEUS_COMPLETIONS_COMMANDS="$_fx_cmds" bash "$_gen_script" >/dev/null 2>&1 || _fx_gen_rc=$?
 _fx_file="$_fx_repo/src/modules/completions/zsh/_nucleus-utils"
 if [ "$_fx_gen_rc" -ne 0 ]; then
   assert_fail "gen-completions: metacharacters in a subcommand description" "generator exited $_fx_gen_rc against the stub repo root"
@@ -250,18 +287,20 @@ else
   fi
 fi
 
-# 11. The PowerShell twin's command list must be the canonical set. It is the
+# 10. The PowerShell twin's command list must be the canonical set. It is the
 #     list that decides which $nucleus<Cmd>Flags inventories exist, so a command
 #     missing here loses its flag completion silently.
 _ps_commands="$(pwsh -NoLogo -NoProfile -NonInteractive -File "$_ps_gen_script" -ListCommands | tr -d '\r' | LC_ALL=C sort)"
-_expected_commands="$(printf '%s\n' "${_NUCLEUS_COMMANDS[@]}" | LC_ALL=C sort)"
+# The PowerShell twin derives the Windows command list from the flake via
+# gen-completions.ps1 -ListCommands (excluding POSIX-only daemon entry points).
+_expected_commands="$(printf '%s\n' "${_NUCLEUS_COMMANDS[@]}" | grep -vx -- 'camilladsp-heartbeat' | LC_ALL=C sort)"
 if [ "$_ps_commands" = "$_expected_commands" ]; then
   assert_pass "gen-completions.ps1: command list matches the canonical set"
 else
   assert_fail "gen-completions.ps1: command list" "ps-only: $(comm -13 <(printf '%s\n' "$_expected_commands") <(printf '%s\n' "$_ps_commands") | tr '\n' ' ')|missing: $(comm -23 <(printf '%s\n' "$_expected_commands") <(printf '%s\n' "$_ps_commands") | tr '\n' ' ')"
 fi
 
-# 12. Every flag inventory profile.ps1 REFERENCES must be DEFINED in it. The
+# 11. Every flag inventory profile.ps1 REFERENCES must be DEFINED in it. The
 #     generated region is the only definition site, so a completer naming a
 #     variable the generator no longer emits completes nothing at all. This is
 #     the exact shipped regression: the utils completer existed while the
@@ -283,7 +322,7 @@ else
   assert_fail "profile.ps1: referenced flag inventories" "nothing defines: ${_undefined_vars:-<no $nucleus*Flags references found>}"
 fi
 
-# 13. Every completer entry targets a canonical command: a registration for a
+# 12. Every completer entry targets a canonical command: a registration for a
 #     command that is not part of the nucleus surface is dead code that can also
 #     reference an inventory nothing defines.
 _targets="$(grep -oE '^Register-ArgumentCompleter -CommandName nucleus-[a-z0-9-]+' "$_profile_ps1" | awk '{print $3}' | sed 's/^nucleus-//' | LC_ALL=C sort -u || true)"
@@ -293,7 +332,7 @@ else
   assert_fail "profile.ps1: completer targets" "extra: $(comm -23 <(printf '%s\n' "$_targets") <(printf '%s\n' "$_expected_commands") | tr '\n' ' ')|missing: $(comm -13 <(printf '%s\n' "$_targets") <(printf '%s\n' "$_expected_commands") | tr '\n' ' ')"
 fi
 
-# 14. PowerShell/zsh flag parity for nucleus-utils: the two generators must
+# 13. PowerShell/zsh flag parity for nucleus-utils: the two generators must
 #     describe the same flag set, or a flag completes on one platform and not the
 #     other. Only utils is pinned -- the other commands' zsh files carry flags the
 #     pwsh inventory does not derive, so they are not parity-comparable here.
@@ -306,5 +345,290 @@ if [ -n "$_ps_utils_flags" ] && [ "$_ps_utils_flags" = "$_zsh_utils_flags" ]; th
 else
   assert_fail "gen-completions: nucleus-utils pwsh/zsh flag parity" "pwsh-only: $(comm -23 <(printf '%s\n' "$_ps_utils_flags") <(printf '%s\n' "$_zsh_utils_flags") | tr '\n' ' ')|zsh-only: $(comm -13 <(printf '%s\n' "$_ps_utils_flags") <(printf '%s\n' "$_zsh_utils_flags") | tr '\n' ' ')"
 fi
+
+# 14. A test run must not touch the tracked completions tree at all. Content
+#     equality cannot see this: rewriting a file with identical bytes replaces
+#     its inode and mtime, so only metadata shows that the suite wrote there,
+#     and a deletion leaves no file for -newer to see, so the manifest captured
+#     before the run is diffed as the second half.
+_moved_files="$(find src/modules/completions -newer "$_tree_marker" -type f)"
+_tree_files_after="$(find src/modules/completions -type f | LC_ALL=C sort)"
+_deleted_files="$(comm -23 <(printf '%s\n' "$_tree_files_before") <(printf '%s\n' "$_tree_files_after") | tr '\n' ' ')"
+if [ -z "$_moved_files" ] && [ -z "$_deleted_files" ]; then
+  assert_pass "gen-completions: suite left the tracked completions tree untouched"
+else
+  assert_fail "gen-completions: tracked tree untouched" "files rewritten during the run: ${_moved_files:-none}|files deleted during the run: ${_deleted_files:-none}"
+fi
+
+# 15. Each hand-coded subcommand list answers to one surface, and --check cannot
+#     prove either: it compares the tracked file with the generator, so a label
+#     that vanished from both would stay green.
+#
+#     The zsh table answers to the dispatch in scripts/<cmd>.sh, the set of labels
+#     a POSIX user can actually type: a dispatched label the table omits ships
+#     silently (nucleus-gc logs shipped that way), and a table entry the dispatch
+#     cannot run is dead.
+#
+#     The PowerShell array answers to the Windows app, not to the POSIX dispatch:
+#     a ValidateSet on the entry-point parameter of scripts/<cmd>.ps1, or the
+#     command switch in config.ps1, the one app of the six with no ValidateSet.
+#     That is why nucleus-gc all completes on Windows and is correctly absent from
+#     the zsh table.
+
+# _dispatch_subcommand_labels <script> <anchor> <first|last>: the arm labels of
+# the case block that starts on the anchor line. Only depth-one arm headers count,
+# so a case nested in an arm body contributes nothing, and non-word labels (-h,
+# --help, *) drop out: a subcommand is a bare word.
+_dispatch_subcommand_labels() {
+  awk -v anchor="$2" -v which="$3" '
+    { lines[NR] = $0; if ($0 == anchor) hits[++total] = NR }
+    END {
+      if (total == 0) exit 1
+      start = (which == "last") ? hits[total] : hits[1]
+      depth = 1
+      expecting = 1
+      for (i = start + 1; i <= NR; i++) {
+        line = lines[i]
+        if (line ~ /^[[:space:]]*esac([[:space:]]|;|$)/) {
+          depth--
+          if (depth == 0) exit 0
+          continue
+        }
+        if (line ~ /^[[:space:]]*case[[:space:]].*[[:space:]]in[[:space:]]*$/) {
+          depth++
+          continue
+        }
+        if (depth != 1) continue
+        if (expecting == 0) {
+          if (line ~ /;;[[:space:]]*$/) expecting = 1
+          continue
+        }
+        # A comment or blank line between arms is not an arm header.
+        if (line !~ /\)/) continue
+        labels = line
+        sub(/\).*/, "", labels)
+        rest = line
+        sub(/^[^)]*\)/, "", rest)
+        count = split(labels, alternates, "|")
+        for (j = 1; j <= count; j++) {
+          gsub(/[[:space:]]/, "", alternates[j])
+          if (alternates[j] ~ /^[a-z][a-z0-9-]*$/) print alternates[j]
+        }
+        # An arm that closes on its own line leaves the next line an arm header.
+        expecting = (rest ~ /;;/) ? 1 : 0
+      }
+    }
+  ' "$1"
+}
+
+# _completion_subcommand_labels <file>: the labels of the subcommand spec word,
+# with each label's quoted description removed.
+_completion_subcommand_labels() {
+  sed -n "s/^  '1:subcommand:((\(.*\)))'.*/\1/p" "$1" |
+    sed -E 's/"[^"]*"//g' |
+    tr -s ' ' '\n' |
+    sed -E '/^[a-z][a-z0-9-]*$/!d'
+}
+
+# _validate_set_labels <ps1>: the labels of the ValidateSet on the entry-point
+# parameter, meaning the first one inside the script's top-level param block. Six
+# of the apps declare more than one ValidateSet (gc.ps1:67 and :89, logs.ps1:85
+# and :97, svc.ps1:40, :170, :430), so anchoring on the block keeps a nested
+# option list from answering for the subcommands.
+_validate_set_labels() {
+  awk '
+    { sub(/\r$/, "") }
+    !in_block && $0 == "param(" { in_block = 1; next }
+    in_block && $0 == ")" { exit }
+    in_block && /ValidateSet\(/ { print; exit }
+  ' "$1" | grep -oE "'[^']+'" | tr -d "'"
+}
+
+# _switch_labels <ps1> <switch line>: the arm labels of a switch statement, for
+# the one app that constrains its subcommands with a switch instead.
+_switch_labels() {
+  awk -v anchor="$2" '
+    { sub(/\r$/, "") }
+    $0 == anchor { in_switch = 1; next }
+    in_switch && /^[[:space:]]*default/ { exit }
+    in_switch && /^[[:space:]]*\047[a-z]/ { print; next }
+  ' "$1" | grep -oE "'[^']+'" | tr -d "'"
+}
+
+# _profile_subcommand_labels <command>: the hand-coded $nucleus<Cmd>Commands
+# array profile.ps1 keeps for the PowerShell completer.
+_profile_subcommand_labels() {
+  local _pascal _variable
+  _pascal="$(printf '%s\n' "$1" | awk '{ print toupper(substr($0, 1, 1)) substr($0, 2) }')"
+  _variable="nucleus${_pascal}Commands"
+  grep -F "\$$_variable = @(" "$_profile_ps1" |
+    grep -oE "'[^']+'" |
+    tr -d "'"
+}
+
+# _subcommand_diff <expected-list> <actual-list> [missing|surplus|both]: print the
+# one-sided labels, one per line, in either the first or the second list.
+# WHY separate from the row loop: the row loop can only show that today's six
+# lists agree, so a comparison that never reports a difference would pass it.
+# This function gets its own case, which fails when it reports nothing. The row
+# loop asks for one direction at a time so a failure keeps its own wording.
+_subcommand_diff() {
+  local _mode="${3:-both}" _missing _surplus
+  _missing="$(comm -23 <(printf '%s\n' "$1" | LC_ALL=C sort) <(printf '%s\n' "$2" | LC_ALL=C sort))"
+  _surplus="$(comm -13 <(printf '%s\n' "$1" | LC_ALL=C sort) <(printf '%s\n' "$2" | LC_ALL=C sort))"
+  case "$_mode" in
+  missing)
+    if [ -n "$_missing" ]; then printf '%s\n' "$_missing"; fi
+    ;;
+  surplus)
+    if [ -n "$_surplus" ]; then printf '%s\n' "$_surplus"; fi
+    ;;
+  both)
+    if [ -n "$_missing" ]; then printf '%s\n' "$_missing"; fi
+    if [ -n "$_surplus" ]; then printf '%s\n' "$_surplus"; fi
+    ;;
+  *)
+    # WHY: a mistyped direction would otherwise print both blocks and read as a
+    # clean comparison of whichever block the caller looked at.
+    printf 'unknown direction %s\n' "$_mode" >&2
+    return 1
+    ;;
+  esac
+}
+
+_self_test_diff() {
+  local _same _truncated _surplus _missing _empty
+  _same="$(_subcommand_diff $'a\nb' $'b\na')"
+  if [ -z "$_same" ]; then
+    assert_pass "diff: identical lists report nothing"
+  else
+    assert_fail "diff-identical" "reported [${_same//$'\n'/ }]"
+  fi
+  _truncated="$(_subcommand_diff $'a\nb' $'a\nb\nc')"
+  if [ "$_truncated" = "c" ]; then
+    assert_pass "diff: a label absent from expected is named"
+  else
+    assert_fail "diff-truncated" "reported [${_truncated//$'\n'/ }], wanted [c]"
+  fi
+  _surplus="$(_subcommand_diff $'a\nb' $'a\nb\nc' surplus)"
+  if [ "$_surplus" = "c" ]; then
+    assert_pass "diff: the surplus direction names the label on its own"
+  else
+    assert_fail "diff-surplus" "reported [${_surplus//$'\n'/ }], wanted [c]"
+  fi
+  _missing="$(_subcommand_diff $'a\nb\nc' $'a\nb' missing)"
+  if [ "$_missing" = "c" ]; then
+    assert_pass "diff: the missing direction names the label on its own"
+  else
+    assert_fail "diff-missing" "reported [${_missing//$'\n'/ }], wanted [c]"
+  fi
+  _empty="$(_subcommand_diff '' '')"
+  if [ -z "$_empty" ]; then
+    assert_pass "diff: two empty lists report nothing (the row loop rejects an empty extraction before comparing)"
+  else
+    assert_fail "diff-empty" "reported [${_empty//$'\n'/ }]"
+  fi
+}
+_self_test_diff
+
+# Fields: command | script | exact anchor line | which matching block | Windows
+# app | its subcommand constraint. The bash anchor is the whole line,
+# indentation included, because a trimmed match hits an in-function block first
+# (svc line 579, vm line 352), and logs matches three times on the same variable,
+# so there its anchor is only right because the selector is last. Heredoc data,
+# so each anchor stays the app's own text unquoted.
+_subcommand_ok=1
+while IFS='|' read -r _cmd _script _anchor _which _ps1 _mechanism; do
+  # WHY the empty-list clause below: a dispatch the extractor cannot parse, or a
+  # completer whose list moved, would otherwise compare two empty sets and pass,
+  # which is the one outcome this case exists to prevent.
+  _dispatched="$(_dispatch_subcommand_labels "$_script" "$_anchor" "$_which" | LC_ALL=C sort || true)"
+  _completed="$(_completion_subcommand_labels "$_COMPLETIONS_DIR/_nucleus-$_cmd" | LC_ALL=C sort || true)"
+  case "$_mechanism" in
+  validateset) _in_app="$(_validate_set_labels "$_ps1" | LC_ALL=C sort || true)" ;;
+  switch:*) _in_app="$(_switch_labels "$_ps1" "${_mechanism#switch:}" | LC_ALL=C sort || true)" ;;
+  *)
+    # WHY: the loop body runs in the main shell, so without this arm a mistyped
+    # mechanism would silently reuse the previous row's list.
+    assert_fail "gen-completions: $_cmd app subcommand list" \
+      "unknown mechanism '$_mechanism' for $_ps1"
+    _subcommand_ok=0
+    continue
+    ;;
+  esac
+  _in_profile="$(_profile_subcommand_labels "$_cmd" | LC_ALL=C sort || true)"
+  if [ -z "$_dispatched" ] || [ -z "$_completed" ] || [ -z "$_in_app" ] || [ -z "$_in_profile" ]; then
+    assert_fail "gen-completions: $_cmd subcommand lists" \
+      "empty extraction -- dispatch: [${_dispatched//$'\n'/ }]|zsh: [${_completed//$'\n'/ }]|app: [${_in_app//$'\n'/ }]|profile.ps1: [${_in_profile//$'\n'/ }]"
+    _subcommand_ok=0
+    continue
+  fi
+  _zsh_missing="$(_subcommand_diff "$_dispatched" "$_completed" missing | tr '\n' ' ')"
+  _zsh_stale="$(_subcommand_diff "$_dispatched" "$_completed" surplus | tr '\n' ' ')"
+  if [ -n "$_zsh_missing" ] || [ -n "$_zsh_stale" ]; then
+    assert_fail "gen-completions: $_cmd zsh completion subcommands" \
+      "missing: ${_zsh_missing:-none}|not dispatched: ${_zsh_stale:-none}"
+    _subcommand_ok=0
+  fi
+  _profile_missing="$(_subcommand_diff "$_in_app" "$_in_profile" missing | tr '\n' ' ')"
+  _profile_stale="$(_subcommand_diff "$_in_app" "$_in_profile" surplus | tr '\n' ' ')"
+  if [ -n "$_profile_missing" ] || [ -n "$_profile_stale" ]; then
+    assert_fail "gen-completions: $_cmd profile.ps1 completer subcommands" \
+      "missing: ${_profile_missing:-none}|not in $_ps1: ${_profile_stale:-none}"
+    _subcommand_ok=0
+  fi
+done <<'SUBCOMMAND_SOURCES'
+gc|scripts/gc.sh|case "$action" in|first|scripts/gc.ps1|validateset
+svc|scripts/svc.sh|case "$action" in|first|scripts/svc.ps1|validateset
+config|scripts/config.sh|case "${1:-}" in|first|scripts/config.ps1|switch:switch ($Command) {
+logs|scripts/logs.sh|  case "$_logs_action" in|last|scripts/logs.ps1|validateset
+utils|scripts/utils.sh|  case "$subcommand" in|first|scripts/utils.ps1|validateset
+vm|scripts/vm.sh|case "$action" in|first|scripts/vm.ps1|validateset
+SUBCOMMAND_SOURCES
+if [ "$_subcommand_ok" -eq 1 ]; then
+  assert_pass "gen-completions: six hand-coded subcommand lists match their zsh and PowerShell sources"
+fi
+
+# 16. A temporary 15th mkNucleusApps-derived command must make freshness fail
+#     naming the missing completion, so new registry entries cannot ship without
+#     generated zsh coverage.
+_extra_repo="$(mktemp -d)"
+mkdir -p "$_extra_repo/src/modules/completions" "$_extra_repo/scripts" "$_extra_repo/src/scripts/services"
+cp -R "$REPO_ROOT/src/modules/completions/zsh" "$_extra_repo/src/modules/completions/zsh"
+for _cmd in "${_NUCLEUS_COMMANDS[@]}"; do
+  case "$_cmd" in
+  camilladsp-heartbeat)
+    cat >"$_extra_repo/src/scripts/services/camilladsp-heartbeat.sh" <<EOF
+#!/usr/bin/env bash
+case "\${1:-}" in --help) echo "usage: nucleus-${_cmd}";; esac
+EOF
+    chmod +x "$_extra_repo/src/scripts/services/camilladsp-heartbeat.sh"
+    ;;
+  *)
+    cat >"$_extra_repo/scripts/${_cmd}.sh" <<EOF
+#!/usr/bin/env bash
+case "\${1:-}" in --help) echo "usage: nucleus-${_cmd}";; esac
+EOF
+    chmod +x "$_extra_repo/scripts/${_cmd}.sh"
+    ;;
+  esac
+done
+cat >"$_extra_repo/scripts/zzz-extra-command.sh" <<'EOF'
+#!/usr/bin/env bash
+case "${1:-}" in --help) echo "usage: nucleus-zzz-extra-command";; esac
+EOF
+chmod +x "$_extra_repo/scripts/zzz-extra-command.sh"
+_extra_list=""
+for _cmd in "${_NUCLEUS_COMMANDS[@]}"; do _extra_list="${_extra_list}${_cmd}"$'\n'; done
+_extra_list="${_extra_list}zzz-extra-command"
+_extra_out=""
+_extra_rc=0
+_extra_out="$(NUCLEUS_REPO_ROOT="$_extra_repo" NUCLEUS_COMPLETIONS_COMMANDS="$_extra_list" bash "$_gen_script" --check 2>&1)" || _extra_rc=$?
+if [ "$_extra_rc" -ne 0 ] && printf '%s\n' "$_extra_out" | grep -q '_nucleus-zzz-extra-command'; then
+  assert_pass "gen-completions: a 15th derived command makes the suite fail naming it"
+else
+  assert_fail "gen-completions: 15th derived command detection" "rc=$_extra_rc output=${_extra_out//$'\n'/ | }"
+fi
+rm -rf "$_extra_repo"
 
 finish_tests

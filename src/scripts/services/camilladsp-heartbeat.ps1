@@ -21,6 +21,9 @@
 
 .PARAMETER ConfigFile
   Config file the heartbeat pushes.
+
+.PARAMETER Probe
+  Print the device selection state and exit. Exits 1 when no target device can be bound.
 #>
 
 param(
@@ -28,7 +31,10 @@ param(
   [int]$Port = 1234,
 
   [Parameter(Mandatory = $false)]
-  [string]$ConfigFile = "$HOME\.config\camilladsp\configs\config.yml"
+  [string]$ConfigFile = "$HOME\.config\camilladsp\configs\config.yml",
+
+  [Parameter(Mandatory = $false)]
+  [switch]$Probe
 )
 
 $ErrorActionPreference = "Stop"
@@ -39,6 +45,90 @@ $ErrorActionPreference = "Stop"
 Import-Module (Join-Path -Path $PSScriptRoot -ChildPath '..\..\platforms\Windows\modules\Format-NucleusOutput.psm1') -Force
 
 . "$PSScriptRoot/camilladsp-deviceselect.ps1"
+
+# WHY: resolver warnings must be stamped and stay off stdout, matching heartbeat
+# probe/warning output on this host.
+function Write-NucleusWarning {
+  param(
+    [Parameter(Mandatory = $false)]
+    [string]$Message = '',
+    [Parameter(Mandatory = $false)]
+    [string]$CommandName = ''
+  )
+
+  $null = $CommandName # check-suppress:suppression_doc: satisfy shared logging-module signature; heartbeat warning formatter ignores command name
+  Write-CamillaDSPWarning -Message $Message
+}
+
+function Write-CamillaDSPWarning {
+  <#
+  .SYNOPSIS
+    Writes a stamped heartbeat warning to stderr.
+  .PARAMETER Message
+    Warning text.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [string]$Message
+  )
+
+  $stamp = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ss')
+  [Console]::Error.WriteLine("$stamp camilladsp-heartbeat: warning: $Message")
+}
+
+function Invoke-CamillaDSPProbe {
+  <#
+  .SYNOPSIS
+    Prints the device selection state and returns an exit code.
+  .DESCRIPTION
+    Probe output mirrors the POSIX heartbeat: platform, config, capture,
+    default_output, available, and target. It exits 1 when no target device can
+    be bound.
+  .PARAMETER ProbeConfigFile
+    Config file to inspect.
+  #>
+  [CmdletBinding()]
+  [OutputType([int])]
+  param(
+    [Parameter(Mandatory)]
+    [string]$ProbeConfigFile
+  )
+
+  $capture = ''
+  if (Test-Path -Path $ProbeConfigFile -PathType Leaf) {
+    try {
+      $configObject = (Get-Content -Raw -Path $ProbeConfigFile) | ConvertFrom-Yaml
+      $captureDevice = $configObject.devices.capture.device
+      $capture = if ($null -eq $captureDevice) { '' } else { [string]$captureDevice }
+    } catch {
+      Write-CamillaDSPWarning -Message "cannot read ${ProbeConfigFile}: $($_.Exception.Message)"
+      return 1
+    }
+  }
+
+  $defaultOutput = [string](Get-CamillaDSPDefaultPlaybackDevice)
+  $availableDevices = @(Get-CamillaDSPAvailablePlaybackDeviceList -CaptureDevice $capture)
+  if ($null -eq $availableDevices) { $availableDevices = @() }
+  $target = ''
+  if (Test-Path -Path $ProbeConfigFile -PathType Leaf) {
+    $resolvedTarget = Get-CamillaDSPResolvedPlaybackDeviceName -ConfigPath $ProbeConfigFile
+    if ($null -ne $resolvedTarget) { $target = [string]$resolvedTarget }
+  }
+
+  [Console]::Out.WriteLine("platform=windows")
+  [Console]::Out.WriteLine("config=$ProbeConfigFile")
+  [Console]::Out.WriteLine("capture=$capture")
+  [Console]::Out.WriteLine("default_output=$defaultOutput")
+  [Console]::Out.WriteLine("available=$([string]::Join(',', $availableDevices))")
+  [Console]::Out.WriteLine("target=$target")
+
+  if ([string]::IsNullOrEmpty($target)) {
+    Write-CamillaDSPWarning -Message 'probe found no playback device to bind'
+    return 1
+  }
+  return 0
+}
 
 $baseSleep = 5
 $maxSleep = 300
@@ -121,7 +211,7 @@ function Close-CamillaDSPWebSocket {
   try {
     $script:CamillaDSPWebSocket.Dispose()
   } catch {
-    Write-NucleusWarning -CommandName 'camilladsp-heartbeat' -Message "closing the stale websocket failed: $($_.Exception.Message)"
+    Write-CamillaDSPWarning -Message "closing the stale websocket failed: $($_.Exception.Message)"
   }
   $script:CamillaDSPWebSocket = $null
 }
@@ -237,7 +327,7 @@ function Get-CamillaDSPLiveDevice {
   try {
     $config = $text | ConvertFrom-Yaml
   } catch {
-    Write-NucleusWarning -CommandName 'camilladsp-heartbeat' -Message "live config is not valid YAML: $($_.Exception.Message)"
+    Write-CamillaDSPWarning -Message "live config is not valid YAML: $($_.Exception.Message)"
     return ''
   }
 
@@ -251,10 +341,13 @@ function Test-CamillaDSPNeedsPush {
   .SYNOPSIS
     Whether CamillaDSP needs the config pushed this tick.
   .DESCRIPTION
-    A null target is skipped while CamillaDSP is Running: the resolver falls
-    back to the first available device, so a null device is never actually
-    pushed. A stopped instance is pushed even with a null target, because that
-    is what delivers the initial config.
+    A null target is skipped while CamillaDSP is Running: there is no device to
+    compare, and a push would only repeat the running config. While it is not
+    Running the decision is a push whatever the target, so the initial config is
+    delivered; Send-CamillaDSPConfig then refuses a loopback config whose
+    playback device is empty or is the capture endpoint, or whose capture
+    endpoint is unresolved, so a config that would capture its own output never
+    binds.
   .PARAMETER RunState
     Value of GetState.
   .PARAMETER LiveDevice
@@ -298,14 +391,19 @@ function Test-CamillaDSPNeedsPush {
 function Get-CamillaDSPConfigFingerprint {
   <#
   .SYNOPSIS
-    SHA256 over the config bytes and the resolved playback device.
+    SHA256 over the config bytes, the resolved playback device, and the resolved
+    capture device.
   .DESCRIPTION
-    The device is part of the hash because the config stores a null playback
-    device, so a device change would otherwise look like no change.
+    The device names are part of the hash because the config stores them as null,
+    so a device change would otherwise look like no change. A loopback capture
+    follows the default playback endpoint, which can change with the config bytes
+    untouched, so the capture name needs its own separator.
   .PARAMETER ConfigPath
     Config file whose bytes are hashed.
   .PARAMETER TargetDevice
     Device resolution selects right now.
+  .PARAMETER CaptureDevice
+    Capture endpoint resolution selects right now.
   #>
   [CmdletBinding()]
   [OutputType([string])]
@@ -315,17 +413,31 @@ function Get-CamillaDSPConfigFingerprint {
 
     [Parameter(Mandatory)]
     [AllowEmptyString()]
-    [string]$TargetDevice
+    [string]$TargetDevice,
+
+    [Parameter(Mandatory = $false)]
+    [AllowEmptyString()]
+    [string]$CaptureDevice = ''
   )
 
-  $config = [System.IO.File]::ReadAllBytes($ConfigPath)
-  $separator = [System.Text.Encoding]::UTF8.GetBytes("`n--playback-device--`n")
-  $device = [System.Text.Encoding]::UTF8.GetBytes($TargetDevice)
+  $segments = @(
+    [System.IO.File]::ReadAllBytes($ConfigPath),
+    [System.Text.Encoding]::UTF8.GetBytes("`n--playback-device--`n"),
+    [System.Text.Encoding]::UTF8.GetBytes($TargetDevice),
+    [System.Text.Encoding]::UTF8.GetBytes("`n--capture-device--`n"),
+    [System.Text.Encoding]::UTF8.GetBytes($CaptureDevice)
+  )
 
-  $combined = [byte[]]::new($config.Length + $separator.Length + $device.Length)
-  [System.Array]::Copy($config, 0, $combined, 0, $config.Length)
-  [System.Array]::Copy($separator, 0, $combined, $config.Length, $separator.Length)
-  [System.Array]::Copy($device, 0, $combined, $config.Length + $separator.Length, $device.Length)
+  $length = 0
+  foreach ($segment in $segments) {
+    $length += $segment.Length
+  }
+  $combined = [byte[]]::new($length)
+  $offset = 0
+  foreach ($segment in $segments) {
+    [System.Array]::Copy($segment, 0, $combined, $offset, $segment.Length)
+    $offset += $segment.Length
+  }
 
   $sha = [System.Security.Cryptography.SHA256]::Create()
   try {
@@ -347,6 +459,8 @@ function Test-CamillaDSPConfigChanged {
     Config file to fingerprint.
   .PARAMETER TargetDevice
     Device resolution selects right now.
+  .PARAMETER CaptureDevice
+    Capture endpoint resolution selects right now.
   #>
   [CmdletBinding()]
   [OutputType([bool])]
@@ -356,14 +470,18 @@ function Test-CamillaDSPConfigChanged {
 
     [Parameter(Mandatory)]
     [AllowEmptyString()]
-    [string]$TargetDevice
+    [string]$TargetDevice,
+
+    [Parameter(Mandatory = $false)]
+    [AllowEmptyString()]
+    [string]$CaptureDevice = ''
   )
 
   $lastPushFile = Join-Path -Path (Get-CamillaDSPStateDir) -ChildPath 'last-push.txt'
   if (-not (Test-Path -Path $lastPushFile -PathType Leaf)) { return $true }
 
   $recorded = (Get-Content -Raw -Path $lastPushFile).Trim()
-  return $recorded -ne (Get-CamillaDSPConfigFingerprint -ConfigPath $ConfigPath -TargetDevice $TargetDevice)
+  return $recorded -ne (Get-CamillaDSPConfigFingerprint -ConfigPath $ConfigPath -TargetDevice $TargetDevice -CaptureDevice $CaptureDevice)
 }
 
 function Save-CamillaDSPLastPush {
@@ -386,6 +504,37 @@ function Save-CamillaDSPLastPush {
   Set-Content -Path (Join-Path -Path $stateDir -ChildPath 'last-push.txt') -Value $Fingerprint -NoNewline
 }
 
+# WHY: a refused push is retried on every tick while the topology stays broken,
+# so the refusal is logged once per distinct reason instead of once per tick.
+# This is the heartbeat's own scope, which outlives the loop's iterations.
+$script:CamillaDSPLastPushRefusal = ''
+
+function Write-CamillaDSPPushRefusalWarning {
+  <#
+  .SYNOPSIS
+    Warns about a refused push, once per distinct reason.
+  .DESCRIPTION
+    A different reason warns again, and an accepted push clears the record, so
+    the next refusal is reported.
+  .PARAMETER Cause
+    Reason key; the same key is not warned twice in a row.
+  .PARAMETER Message
+    Text to log when the reason is new.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [string]$Cause,
+
+    [Parameter(Mandatory)]
+    [string]$Message
+  )
+
+  if ($script:CamillaDSPLastPushRefusal -eq $Cause) { return }
+  $script:CamillaDSPLastPushRefusal = $Cause
+  Write-CamillaDSPWarning -Message $Message
+}
+
 function Send-CamillaDSPConfig {
   <#
   .SYNOPSIS
@@ -394,13 +543,26 @@ function Send-CamillaDSPConfig {
     A target device is patched into the config directly, so the device that was
     measured is the device that gets pushed. State is recorded only after
     CamillaDSP answers "Ok"; a rejection drops the device cache, because the
-    resolved device is probably gone even though the cache still lists it.
+    resolved device is probably gone even though the cache still lists it. A
+    loopback capture is never pushed onto a device it would feed from: an empty
+    playback device binds the system default output, which is the loopback
+    capture endpoint, an unresolved capture endpoint cannot be proven different
+    from that output, and a playback device equal to the capture endpoint makes
+    CamillaDSP capture its own output. A capture that is not loopback is pushed
+    even with an empty playback device, because CamillaDSP then binds its own
+    default output and nothing feeds it back. The unresolved-endpoint and
+    capture-equals-playback refusals each name a reason and warn once per
+    reason; the empty-device refusal names none and keeps the resolver's own
+    warning.
   .PARAMETER EndpointPort
     CamillaDSP websocket API port.
   .PARAMETER ConfigPath
     Config file to push.
   .PARAMETER TargetDevice
     Device to push, or an empty value to resolve the config first.
+  .PARAMETER CaptureDevice
+    Capture endpoint the tick resolved: written alongside the target device, and
+    the endpoint the push must not be pointed back into. Empty means unresolved.
   #>
   [CmdletBinding()]
   [OutputType([bool])]
@@ -413,13 +575,44 @@ function Send-CamillaDSPConfig {
 
     [Parameter(Mandatory)]
     [AllowEmptyString()]
-    [string]$TargetDevice
+    [string]$TargetDevice,
+
+    [Parameter(Mandatory = $false)]
+    [AllowEmptyString()]
+    [string]$CaptureDevice = ''
   )
 
   $yaml = if ([string]::IsNullOrEmpty($TargetDevice)) {
     Resolve-CamillaDSPPlaybackDevice -ConfigPath $ConfigPath
   } else {
-    ConvertTo-CamillaDSPPlaybackDeviceYaml -ConfigPath $ConfigPath -Device $TargetDevice
+    ConvertTo-CamillaDSPPlaybackDeviceYaml -ConfigPath $ConfigPath -Device $TargetDevice -CaptureDevice $CaptureDevice
+  }
+
+  $pushedConfig = $yaml | ConvertFrom-Yaml
+  $pushedDevice = [string]$pushedConfig.devices.playback.device
+
+  # WHY: the capture endpoint is the one device playback has to avoid, and the
+  # comparison uses the endpoint the tick resolved. Resolving it again here could
+  # observe a different default and prove nothing. Only a loopback capture reads
+  # a render endpoint, so only then can playback be pointed back into it; a
+  # capture with a capture-side device of its own cannot be what a null playback
+  # device binds, and CamillaDSP resolves that null to its own default output.
+  if ($pushedConfig.devices.capture.loopback -eq $true) {
+    # WHY: an empty playback device makes CamillaDSP bind the system default
+    # output, which is the loopback capture endpoint whenever capture is that
+    # loopback, so only then would the config feed its own output back as input.
+    # The resolver has already warned about the cause.
+    if ([string]::IsNullOrEmpty($pushedDevice)) {
+      return $false
+    }
+    if ([string]::IsNullOrEmpty($CaptureDevice)) {
+      Write-CamillaDSPPushRefusalWarning -Cause 'unknown-capture' -Message 'not pushing: the loopback capture endpoint is unresolved because no default playback endpoint was found, so playback cannot be proven different from it'
+      return $false
+    }
+    if ($pushedDevice -eq $CaptureDevice) {
+      Write-CamillaDSPPushRefusalWarning -Cause 'capture-equals-playback' -Message "not pushing: playback device '$pushedDevice' is also the capture endpoint '$CaptureDevice', so CamillaDSP would capture its own output"
+      return $false
+    }
   }
 
   $payload = @{ SetConfig = $yaml } | ConvertTo-Json -Compress
@@ -429,9 +622,9 @@ function Send-CamillaDSPConfig {
     return $false
   }
 
-  $pushedDevice = [string]($yaml | ConvertFrom-Yaml).devices.playback.device
+  $script:CamillaDSPLastPushRefusal = ''
   Save-CamillaDSPLastDevice -Device $pushedDevice
-  Save-CamillaDSPLastPush -Fingerprint (Get-CamillaDSPConfigFingerprint -ConfigPath $ConfigPath -TargetDevice $pushedDevice)
+  Save-CamillaDSPLastPush -Fingerprint (Get-CamillaDSPConfigFingerprint -ConfigPath $ConfigPath -TargetDevice $pushedDevice -CaptureDevice $CaptureDevice)
   return $true
 }
 
@@ -455,7 +648,7 @@ function Get-CamillaDSPRuntimeToggle {
   try {
     $config = Get-Content -Raw -Path $configPath | ConvertFrom-Json -AsHashtable
   } catch {
-    Write-NucleusWarning -CommandName 'camilladsp-heartbeat' -Message "cannot read ${configPath}: $($_.Exception.Message)"
+    Write-CamillaDSPWarning -Message "cannot read ${configPath}: $($_.Exception.Message)"
     return $toggle
   }
 
@@ -467,6 +660,10 @@ function Get-CamillaDSPRuntimeToggle {
   if ($null -ne $section['heartbeat']) { $toggle.Heartbeat = [bool]$section['heartbeat'] }
   if ($null -ne $section['enable']) { $toggle.Binding = [bool]$section['enable'] }
   return $toggle
+}
+
+if ($Probe) {
+  exit (Invoke-CamillaDSPProbe -ProbeConfigFile $ConfigFile)
 }
 
 while ($true) {
@@ -495,19 +692,21 @@ while ($true) {
     }
 
     $targetDevice = ''
+    $captureDevice = ''
     $configChanged = $true
     if (Test-Path -Path $ConfigFile -PathType Leaf) {
       $targetDevice = [string](Get-CamillaDSPResolvedPlaybackDeviceName -ConfigPath $ConfigFile)
-      $configChanged = Test-CamillaDSPConfigChanged -ConfigPath $ConfigFile -TargetDevice $targetDevice
+      $captureDevice = [string](Get-CamillaDSPLoopbackCaptureDevice -ConfigPath $ConfigFile)
+      $configChanged = Test-CamillaDSPConfigChanged -ConfigPath $ConfigFile -TargetDevice $targetDevice -CaptureDevice $captureDevice
     }
 
     if (Test-CamillaDSPNeedsPush -RunState $runState -LiveDevice $liveDevice -TargetDevice $targetDevice -ConfigChanged $configChanged) {
-      $success = Send-CamillaDSPConfig -EndpointPort $Port -ConfigPath $ConfigFile -TargetDevice $targetDevice
+      $success = Send-CamillaDSPConfig -EndpointPort $Port -ConfigPath $ConfigFile -TargetDevice $targetDevice -CaptureDevice $captureDevice
     } else {
       $success = $true
     }
   } catch {
-    Write-NucleusWarning -CommandName 'camilladsp-heartbeat' -Message "tick failed: $($_.Exception.Message)"
+    Write-CamillaDSPWarning -Message "tick failed: $($_.Exception.Message)"
   }
 
   $sleepSeconds = if ($success) { $baseSleep } else { [Math]::Min($sleepSeconds * 2, $maxSleep) }

@@ -24,6 +24,8 @@ A framework export that reaches one shell family is not enough. nix-darwin, for 
 
 POSIX toolchain values (`CC`, `DEVELOPER_DIR`, and friends) never name a raw `/nix/store` path: they route through stable symlinks under the host SYSTEM root (`<root>/toolchains/<name>`) that activation repoints each apply (`src/modules/lib/toolchain-links.nix`), so `nix-collect-garbage` cannot leave an inherited value dangling.
 
+`RIP_GRAVEYARD` is `userSpecific = true`, so Windows writes it at User scope from `user/env.dsc.yml` and each value names that user's own nucleus root. The directory is created by POSIX activation (`ensure-rip-graveyard`) and by `Sync-SafeDelete.ps1` on Windows rather than by the variable alone, because an activation, cron, or elevated session does not necessarily carry user scope; `nucleus-gc graveyard` falls back to `<USER root>/state/rip/graveyard` for the same reason.
+
 ## Cross-host exceptions
 
 | Var | macOS | NixOS | Windows | Rationale |

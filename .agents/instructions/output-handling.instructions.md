@@ -37,7 +37,7 @@ Sixteen named colors only, plus dim, underline (`4m`), and underline-cyan (`4;36
 
 A non-empty `NO_COLOR` turns decoration off. `FORCE_COLOR` set to anything but 0, or `CLICOLOR_FORCE`, turns it on. Otherwise it follows per-stream tty and `TERM != dumb`. PowerShell also requires `$Host.UI.SupportsVirtualTerminal` and `-not [Console]::IsOutputRedirected`. The engine owns `NO_COLOR` and sets `$PSStyle.OutputRendering = PlainText`; the output module must not mutate it.
 
-Color lives in the shared helpers only. `repository-policy.awk` in logging-format mode, run by check step 12, fails raw ANSI literals, `tput`, `echo -e`, `[char]27`, and backtick-e everywhere outside its own color-helper allowlist.
+Color lives in the shared helpers only. `repository-policy.awk` in logging-format mode, run by check step 12, fails raw ANSI literals, `tput`, `echo -e`, `[char]27`, and backtick-e escapes outside its own color-helper allowlist.
 
 ## Log storage and rotation
 
@@ -45,6 +45,6 @@ Roots come from `services.json` `$logging` and are overridable with `NUCLEUS_LOG
 
 Where a file is captured, merging the two streams, capturing one and dropping the other, and discarding a stream to `/dev/null` are all prohibited: the platform default would swallow it silently. Unit paths are hardcoded per module and check step 12 enforces the pair. `logging.capture` selects which streams are captured, never the destination shape, and drives display, rotation, and health-check.
 
-Rotation is copy-truncate plus gzip, 7d expiry, with thresholds from the `services.schema.json` `$logging` defaults. Health-check rotates immediately when a file passes `maxSize`.
+`nucleus-logs` owns rotation and expiry for every nucleus log, including a file a native writer appends to directly: rotation is copy-truncate over each `*.log` under a managed root, compressed with gzip when `compress` is true (`--max-files 0` truncates without archiving), archive expiry defaults to 7d (`NUCLEUS_LOG_EXPIRY`), and the thresholds come from the `services.schema.json` `$logging` defaults. A writer that never calls the app is tolerated, not converted. Health-check rotates immediately when a file passes `maxSize`.
 
 Sanctioned passthrough categories, for output that is not a nucleus message: third-party passthrough (nix, brew, cargo, git hooks, winget, adb, qemu), probe suppression, pwsh host rendering, vendored scripts, static doc, bootstrap, VM templates, Nix and Darwin activation scripts, shell-init, framework-local PS1, daemon log writers, test harness, fixtures, status/diff/event-log, and documented third-party tools (sops, rclone, tart, packer, duperemove, journalctl).

@@ -9,6 +9,8 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 readonly SCRIPT_DIR REPO_ROOT
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
+
+ensure_safe_rm_env
 # Pin HOME and NUCLEUS_USER_ROOT to a temp tree before any library resolves a
 # state path: the suite asserts on svc_health_boot_id, which materialises
 # <state dir>/.boot-id on first call and would otherwise write into the

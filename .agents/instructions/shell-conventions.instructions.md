@@ -12,7 +12,7 @@ zsh expands an alias before it looks up a function, so a `shellAliases` entry si
 
 ## Sandbox wrappers
 
-srt parses its own options anywhere on the line, including after the wrapped command, so every srt-wrapped command needs `--` between the command and the forwarded arguments: `srt command pi -- "$@"`. Without it `pi --help` prints srt's help and `pi -c <arg>` drops the argument silently. `srt -c '<string>'` needs no separator, since the string is a single argument. Check step 11 (`run_srt_wrapper_invariants`) rejects a wrapper that omits it.
+srt parses its own options anywhere on the line, including after the wrapped command, so every srt-wrapped command needs `--` between the command and the forwarded arguments: `srt command pi -- "$@"`. Without it `pi --help` prints srt's help and `pi -c <arg>` drops the argument silently. `srt -c '<string>'` needs no separator, since the string is a single argument.
 
 `pi-unrestricted` must resolve the application from PATH explicitly. In zsh `command pi "$@"` bypasses the function; in PowerShell `& pi` calls the wrapper and stays sandboxed, so use `Get-Command <name> -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1` (every PATH entry carries its own copy under Nix, so the array needs narrowing) and throw when nothing resolves.
 

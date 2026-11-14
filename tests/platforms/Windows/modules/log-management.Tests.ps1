@@ -3,10 +3,11 @@
   Pester tests for Invoke-LogManagement.ps1 functions.
 
 .DESCRIPTION
-  Tests Invoke-LogRotation, Get-NucleusLogDir, Get-NucleusSystemLogDir,
-  and ConvertTo-SanitizedText from the Invoke-LogManagement module.
+  Tests the Invoke-LogManagement.ps1 helpers: the log directory lookups,
+  sanitization, expiry, and log directory creation. Rotation belongs to
+  nucleus-logs and is covered by scripts/logs.Tests.ps1.
 
-  Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/log-management.Tests.ps1 -Passthru"
+  Run with: pwsh -NoProfile -Command "Invoke-Pester tests/platforms/Windows/modules/log-management.Tests.ps1 -Passthru"
 #>
 
 BeforeAll {
@@ -73,120 +74,6 @@ Describe 'ConvertTo-SanitizedText' {
     $inputText = "line1`r`nline2"
     $result = $inputText | ConvertTo-SanitizedText
     $result | Should -Be "line1`nline2"
-  }
-}
-
-Describe 'Invoke-LogRotation' {
-  BeforeEach {
-    # Create a fresh test directory per test.
-    $dir = Join-Path $Script:TestDir ([System.IO.Path]::GetRandomFileName())
-    New-Item -Path $dir -ItemType Directory -Force > $null
-    $Script:LogDir = $dir
-  }
-
-  AfterEach {
-    if (Test-Path -LiteralPath $Script:LogDir -PathType Container) {
-      Remove-Item -LiteralPath $Script:LogDir -Recurse -Force
-    }
-  }
-
-  It 'is a no-op on missing directory' {
-    # Should not throw.
-    { Invoke-LogRotation -Path "$Script:TestDir\nonexistent" } | Should -Not -Throw
-  }
-
-  It 'is a no-op on files below MaxSize' {
-    $logFile = Join-Path $Script:LogDir 'test.log'
-    Set-Content -Path $logFile -Value 'small content'
-
-    Invoke-LogRotation -Path $Script:LogDir -MaxSize 1MB
-
-    (Test-Path -LiteralPath $logFile -PathType Leaf) | Should -Be $true
-    (Get-Item -LiteralPath $logFile).Length | Should -BeGreaterThan 0
-  }
-
-  It 'rotates a file exceeding MaxSize via copy-truncate' {
-    $logFile = Join-Path $Script:LogDir 'test.log'
-    # Create a file larger than 10 bytes.
-    $content = 'a' * 100
-    Set-Content -Path $logFile -Value $content
-
-    Invoke-LogRotation -Path $Script:LogDir -MaxSize 10 -MaxFiles 2 -Compress:$false
-
-    $archive = Join-Path $Script:LogDir 'test.1.log'
-    (Test-Path -LiteralPath $archive -PathType Leaf) | Should -Be $true
-    (Test-Path -LiteralPath $logFile -PathType Leaf) | Should -Be $true
-    (Get-Item -LiteralPath $logFile).Length | Should -Be 0
-  }
-
-  It 'shifts existing archives' {
-    $logFile = Join-Path $Script:LogDir 'test.log'
-    $content = 'a' * 100
-
-    # Populate current log, .1, .2
-    Set-Content -Path $logFile -Value $content
-    Set-Content -Path "$Script:LogDir\test.1.log" -Value 'old1'
-    Set-Content -Path "$Script:LogDir\test.2.log" -Value 'old2'
-
-    Invoke-LogRotation -Path $Script:LogDir -MaxSize 10 -MaxFiles 3 -Compress:$false
-
-    # .1, .2, .3 should all exist after rotation
-    (Test-Path -LiteralPath "$Script:LogDir\test.1.log" -PathType Leaf) | Should -Be $true
-    (Test-Path -LiteralPath "$Script:LogDir\test.2.log" -PathType Leaf) | Should -Be $true
-    (Test-Path -LiteralPath "$Script:LogDir\test.3.log" -PathType Leaf) | Should -Be $true
-  }
-
-  It 'removes oldest archive when at MaxFiles' {
-    $logFile = Join-Path $Script:LogDir 'test.log'
-    $content = 'a' * 100
-
-    # Fill all slots: current, .1, .2, .3
-    Set-Content -Path $logFile -Value $content
-    Set-Content -Path "$Script:LogDir\test.1.log" -Value 'old1'
-    Set-Content -Path "$Script:LogDir\test.2.log" -Value 'old2'
-    Set-Content -Path "$Script:LogDir\test.3.log" -Value 'old3'
-
-    Invoke-LogRotation -Path $Script:LogDir -MaxSize 10 -MaxFiles 3 -Compress:$false
-
-    # .4 must not exist
-    (Test-Path -LiteralPath "$Script:LogDir\test.4.log" -PathType Leaf) | Should -Be $false
-  }
-
-  It 'rotates logs in subdirectories' {
-    $subDir = Join-Path $Script:LogDir 'subsvc'
-    New-Item -Path $subDir -ItemType Directory -Force > $null
-    $logFile = Join-Path $subDir 'combined.log'
-    Set-Content -Path $logFile -Value ('a' * 100)
-
-    Invoke-LogRotation -Path $Script:LogDir -MaxSize 10 -MaxFiles 2 -Compress:$false
-
-  $archive = Join-Path $subDir 'combined.1.log'
-    (Test-Path -LiteralPath $archive -PathType Leaf) | Should -Be $true
-    (Get-Item -LiteralPath $logFile).Length | Should -Be 0
-  }
-
-  It 'does not rotate files without .log extension' {
-    $nonLog = Join-Path $Script:LogDir 'data.txt'
-    Set-Content -Path $nonLog -Value ('a' * 100)
-
-    Invoke-LogRotation -Path $Script:LogDir -MaxSize 10 -MaxFiles 2 -Compress:$false
-
-    # txt file should be untouched
-    (Test-Path -LiteralPath $nonLog -PathType Leaf) | Should -Be $true
-    (Test-Path -LiteralPath "$Script:LogDir\data.1.txt" -PathType Leaf) | Should -Be $false
-  }
-
-  It 'throws on an unwritable log target instead of skipping' {
-    $logFile = Join-Path $Script:LogDir 'test.log'
-    Set-Content -Path $logFile -Value ('a' * 100)
-    # Drop write permission so the OpenWrite probe fails (cross-platform: macOS
-    # does not enforce NT-style ACL denies, so chmod is the reliable signal).
-    chmod 0444 $logFile
-    try {
-      { Invoke-LogRotation -Path $Script:LogDir -MaxSize 10 -MaxFiles 2 -Compress:$false } | Should -Throw
-    } finally {
-      chmod 0644 $logFile
-    }
   }
 }
 

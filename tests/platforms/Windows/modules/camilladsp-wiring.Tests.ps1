@@ -21,6 +21,16 @@
     lives. Both stay silent until someone reads a log, which is why this drift
     has to be caught by a test rather than by a compiler.
 
+    A fourth coupling lives in the heartbeat itself:
+        src/scripts/services/camilladsp-heartbeat.ps1
+            hashes the resolved playback and capture endpoints with the config.
+    The fingerprint only covers the capture endpoint while every call that hashes
+    or records a config passes -CaptureDevice, and a parameter added to one call
+    site and not the other is silent: the daemon then stops re-pushing when the
+    capture source changes. The parameter names and the call sites are read from
+    the parsed source, so a rename or a reflow stays green while a missing
+    argument does not.
+
     Sources are read through the PowerShell parser and the YAML reader rather
     than through regular expressions over raw text. Reformatting, renaming a
     local, spelling both Join-Path arguments positionally, and writing the
@@ -31,6 +41,18 @@
     New-ScheduledTaskAction is reported here until the suite is updated. No
     scheduled-task, registry, or COM API is touched, so the suite runs on macOS
     and Linux as well as Windows.
+
+    The push boundary is guarded the same way: the capture endpoint the tick
+    resolved is what a pushed playback device has to differ from, so the boundary
+    must compare against its -CaptureDevice argument, refuse the three ways a
+    push can feed the output back in, and never resolve the endpoint itself. A
+    second resolution could observe a different system default than the one the
+    tick used, which would make the comparison prove nothing. Those three
+    refusals gate on a loopback capture, so the boundary is also driven rather
+    than only read: its function definitions are sourced from the parsed file and
+    called with the state directory, the resolver's answer, and the request log
+    stubbed, which is the only way this suite can see that a config that is not
+    loopback reaches a request at all.
 
 .NOTES
     Environment variables: (none)
@@ -261,6 +283,108 @@ Describe 'Windows CamillaDSP statefile wiring' {
         # Site 3: the GUI backend's own answer.
         $script:guiConfig = ConvertFrom-Yaml -Yaml (Get-Content -Raw -LiteralPath $script:guiConfigPath)
         $script:guiStatefilePath = $script:guiConfig.statefile_path
+
+        # Site 4: every heartbeat call that hashes or records a config, and the
+        # parameters of the functions it calls, so a capture endpoint that reaches
+        # one call site and not the other is reported.
+        $script:heartbeatPath = Join-Path -Path $script:repoRoot -ChildPath 'src/scripts/services/camilladsp-heartbeat.ps1'
+        $heartbeatAst = Get-ScriptAst -Path $script:heartbeatPath
+        $fingerprintFunctionName = @(
+            'Get-CamillaDSPConfigFingerprint'
+            'Send-CamillaDSPConfig'
+            'Test-CamillaDSPConfigChanged'
+        )
+        $script:fingerprintCalls = @($heartbeatAst.FindAll(
+            {
+                $args[0] -is [System.Management.Automation.Language.CommandAst] -and
+                $fingerprintFunctionName -contains $args[0].GetCommandName()
+            },
+            $true
+        ))
+        $script:fingerprintCallsWithoutCapture = @(
+            foreach ($call in $script:fingerprintCalls) {
+                if (-not (Get-CommandParameterValue -Command $call -Name 'CaptureDevice')) {
+                    $call.Extent.Text
+                }
+            }
+        )
+        $script:fingerprintFunctionParameters = @{}
+        foreach ($definition in @($heartbeatAst.FindAll(
+                    {
+                        $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+                        $fingerprintFunctionName -contains $args[0].Name
+                    },
+                    $true
+                ))) {
+            $script:fingerprintFunctionParameters[$definition.Name] = @(
+                $definition.Body.ParamBlock.Parameters | ForEach-Object { $_.Name.VariablePath.UserPath }
+            )
+        }
+
+        # Site 4 again: the push boundary. Its guard conditions are read as
+        # source text, and the capture resolver call is searched for inside Send
+        # so a boundary that observes the endpoint a second time is reported.
+        $script:sendDefinitions = @($heartbeatAst.FindAll(
+            {
+                $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+                $args[0].Name -eq 'Send-CamillaDSPConfig'
+            },
+            $true
+        ))
+        $script:sendGuardConditions = @()
+        $script:sendCaptureResolutions = @()
+        if ($script:sendDefinitions.Count -eq 1) {
+            $script:sendGuardConditions = @(
+                foreach ($guard in @($script:sendDefinitions[0].Body.FindAll(
+                    { $args[0] -is [System.Management.Automation.Language.IfStatementAst] },
+                    $true
+                ))) {
+                    foreach ($clause in $guard.Clauses) { $clause.Item1.Extent.Text }
+                }
+            )
+            $script:sendCaptureResolutions = @($script:sendDefinitions[0].Body.FindAll(
+                {
+                    $args[0] -is [System.Management.Automation.Language.CommandAst] -and
+                    $args[0].GetCommandName() -eq 'Get-CamillaDSPLoopbackCaptureDevice'
+                },
+                $true
+            ))
+        }
+
+        # Site 4 again: the tick's single capture observation and the arguments
+        # that carry it. A call outside a function body is a tick call, and every
+        # one of those has to pass the variable the one resolution is assigned to.
+        $script:captureResolutions = @($heartbeatAst.FindAll(
+            {
+                $args[0] -is [System.Management.Automation.Language.CommandAst] -and
+                $args[0].GetCommandName() -eq 'Get-CamillaDSPLoopbackCaptureDevice'
+            },
+            $true
+        ))
+        $script:captureObservationVariable = if ($script:captureResolutions.Count -eq 1) {
+            Get-AssignedVariableName -Ast $script:captureResolutions[0]
+        }
+        else {
+            $null
+        }
+        $script:tickCaptureArgumentValues = @(
+            @(
+                foreach ($call in $script:fingerprintCalls) {
+                    $current = $call.Parent
+                    $insideFunction = $false
+                    while ($null -ne $current) {
+                        if ($current -is [System.Management.Automation.Language.FunctionDefinitionAst]) {
+                            $insideFunction = $true
+                            break
+                        }
+                        $current = $current.Parent
+                    }
+                    if (-not $insideFunction) {
+                        Get-CommandParameterValue -Command $call -Name 'CaptureDevice'
+                    }
+                }
+            ) | Select-Object -Unique
+        )
     }
 
     It 'declares the supervisor parameters the task action has to bind' {
@@ -317,5 +441,171 @@ Describe 'Windows CamillaDSP statefile wiring' {
 
         $guiStatefilePathSlash = $script:guiStatefilePath -replace '\\', '/'
         $guiStatefilePathSlash.EndsWith('/' + $script:daemonStatefileTail) | Should -BeTrue -Because "statefile_path '$script:guiStatefilePath' must end with '$script:daemonStatefileTail'"
+    }
+
+    It 'declares the capture endpoint on the heartbeat functions that hash a config' {
+        $script:fingerprintFunctionParameters.Keys.Count | Should -Be 3
+        foreach ($name in @('Get-CamillaDSPConfigFingerprint', 'Send-CamillaDSPConfig', 'Test-CamillaDSPConfigChanged')) {
+            $script:fingerprintFunctionParameters[$name] | Should -Contain 'CaptureDevice' -Because "$name has to accept the capture endpoint the fingerprint covers"
+        }
+    }
+
+    It 'passes the capture endpoint to every heartbeat call that hashes a config' {
+        $script:fingerprintCalls.Count | Should -BeGreaterThan 0
+        $script:fingerprintCallsWithoutCapture | Should -BeNullOrEmpty -Because "a call without -CaptureDevice stops the re-push when the capture source changes: $($script:fingerprintCallsWithoutCapture -join '; ')"
+    }
+
+    It 'refuses a push that would feed the output back in' {
+        $script:sendDefinitions.Count | Should -Be 1
+
+        $loopbackGuards = @($script:sendGuardConditions | Where-Object { $_ -match 'capture\.loopback' })
+        $loopbackGuards.Count | Should -BeGreaterThan 0 -Because 'a capture that is not loopback has a capture-side device, so playback cannot equal it'
+
+        $unknownGuards = @($script:sendGuardConditions | Where-Object { $_ -match '(?i)IsNullOrEmpty\(\$CaptureDevice\)' })
+        $unknownGuards.Count | Should -BeGreaterThan 0 -Because 'an unresolved capture endpoint cannot be proven different from the device about to be pushed'
+
+        $equalityGuards = @($script:sendGuardConditions | Where-Object { $_ -match '(?i)\$pushedDevice\s+-eq\s+\$CaptureDevice' })
+        $equalityGuards.Count | Should -BeGreaterThan 0 -Because 'a playback device equal to the capture endpoint makes CamillaDSP capture its own output'
+    }
+
+    It 'compares the capture endpoint the tick resolved instead of resolving it again' {
+        $script:sendCaptureResolutions.Count | Should -Be 0 -Because 'resolving the endpoint inside the push boundary could observe a different default than the tick did'
+        $script:captureResolutions.Count | Should -Be 1 -Because 'the tick has to resolve the endpoint once and pass that value to every comparison'
+        $script:captureObservationVariable | Should -Not -BeNullOrEmpty -Because 'the single resolution has to be assigned to a variable the calls can pass'
+
+        $expected = '$' + $script:captureObservationVariable
+        $script:tickCaptureArgumentValues.Count | Should -Be 1 -Because "every capture-taking call in the tick has to pass one observation, got: $($script:tickCaptureArgumentValues -join ', ')"
+        $script:tickCaptureArgumentValues[0] | Should -Be $expected
+    }
+}
+
+Describe 'Windows CamillaDSP push gate' {
+    BeforeAll {
+        $script:deviceSelectPath = Join-Path -Path $PSScriptRoot -ChildPath '../../../../src/scripts/services/camilladsp-deviceselect.ps1'
+        $script:heartbeatPath = Join-Path -Path $PSScriptRoot -ChildPath '../../../../src/scripts/services/camilladsp-heartbeat.ps1'
+
+        # The push boundary is driven rather than only read, because the fix is
+        # about which configs reach a request. Only the function definitions are
+        # sourced: the heartbeat's tick loop lives at top level, so dot-sourcing
+        # the file would never return.
+        $tokens = $null
+        $parseErrors = $null
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($script:heartbeatPath, [ref]$tokens, [ref]$parseErrors)
+        if ($parseErrors) {
+            throw "camilladsp-heartbeat.ps1 does not parse: $($parseErrors[0].Message)"
+        }
+
+        $definitions = @($ast.FindAll(
+            { $args[0] -is [System.Management.Automation.Language.FunctionDefinitionAst] },
+            $true
+        ))
+        . ([scriptblock]::Create(($definitions | ForEach-Object { $_.Extent.Text }) -join "`n"))
+
+        # The state helpers the boundary records through, so the record is real
+        # and lands in the temporary state directory the tests mock.
+        . $script:deviceSelectPath
+    }
+
+    BeforeEach {
+        $script:requests = @()
+        $script:refusals = @()
+        $script:stateDir = Join-Path -Path $TestDrive -ChildPath 'camilladsp-state'
+        New-Item -ItemType Directory -Path $script:stateDir -Force > $null
+
+        # The three things outside the boundary: the state directory, the
+        # resolver's answer, and the request log. Everything else runs shipped.
+        Mock Get-CamillaDSPStateDir { $script:stateDir }
+        # An empty -TargetDevice is what the tick passes when the resolver found
+        # no device, so the mock returns the config unchanged, as the resolver
+        # does in that case.
+        Mock Resolve-CamillaDSPPlaybackDevice { Get-Content -Raw -LiteralPath $ConfigPath }
+        Mock Invoke-CamillaDSPRequest {
+            $script:requests += $Payload
+            return @{ SetConfig = @{ result = 'Ok' } }
+        }
+        Mock Write-CamillaDSPPushRefusalWarning {
+            $script:refusals += [pscustomobject]@{ Cause = $Cause; Message = $Message }
+        }
+    }
+
+    It 'pushes a null-device config when capture is not loopback' {
+        $configPath = Join-Path -Path $TestDrive -ChildPath 'nonloopback.yml'
+        Set-Content -LiteralPath $configPath -Value @'
+devices:
+  capture:
+    type: Wasapi
+    device: "Some Microphone"
+    loopback: false
+  playback:
+    type: Wasapi
+    device: null
+'@
+
+        Send-CamillaDSPConfig -ConfigPath $configPath -TargetDevice '' -CaptureDevice 'Some Microphone' -EndpointPort 1 | Should -BeTrue
+
+        $script:requests.Count | Should -Be 1 -Because 'a capture that is not loopback cannot be the output a null playback device binds, so the config has to reach CamillaDSP'
+        $pushedConfig = ($script:requests[0] | ConvertFrom-Json).SetConfig | ConvertFrom-Yaml
+        $pushedConfig.devices.playback.device | Should -BeNullOrEmpty -Because 'the config keeps its null device so CamillaDSP binds its own default output'
+        @($script:refusals | Where-Object { $_.Cause -eq 'unknown-capture' }).Count | Should -Be 0 -Because 'a refusal would have recorded a cause instead of reaching CamillaDSP'
+    }
+
+    It 'refuses a null-device loopback config that would bind the capture endpoint' {
+        $configPath = Join-Path -Path $TestDrive -ChildPath 'loopback-null.yml'
+        Set-Content -LiteralPath $configPath -Value @'
+devices:
+  capture:
+    type: Wasapi
+    device: null
+    loopback: true
+  playback:
+    type: Wasapi
+    device: null
+'@
+
+        Send-CamillaDSPConfig -ConfigPath $configPath -TargetDevice '' -CaptureDevice 'Some Speakers' -EndpointPort 1 | Should -BeFalse
+
+        $script:requests.Count | Should -Be 0 -Because 'a null playback device on a loopback config binds the system default output, which is the endpoint the loopback capture reads'
+        $script:refusals.Count | Should -Be 0 -Because 'the empty-device refusal keeps the resolver warning and records no cause of its own'
+    }
+
+    It 'refuses a loopback config whose capture endpoint is unresolved' {
+        $configPath = Join-Path -Path $TestDrive -ChildPath 'loopback-unresolved.yml'
+        Set-Content -LiteralPath $configPath -Value @'
+devices:
+  capture:
+    type: Wasapi
+    device: null
+    loopback: true
+  playback:
+    type: Wasapi
+    device: "Some Speakers"
+'@
+
+        Send-CamillaDSPConfig -ConfigPath $configPath -TargetDevice '' -CaptureDevice '' -EndpointPort 1 | Should -BeFalse
+
+        $script:requests.Count | Should -Be 0 -Because 'an unresolved loopback capture endpoint cannot be proven different from the device about to be pushed'
+        @($script:refusals | Where-Object { $_.Cause -eq 'unknown-capture' }).Count | Should -Be 1 -Because 'the unresolved-endpoint refusal has to name its own reason'
+    }
+
+    # Both guards refuse this config, so only the recorded cause shows which one
+    # ran: swapping them, or lifting the unresolved-endpoint guard out of the
+    # loopback branch, records a cause the empty-device refusal does not.
+    It 'refuses an empty loopback playback device before the unresolved capture endpoint' {
+        $configPath = Join-Path -Path $TestDrive -ChildPath 'loopback-null-unresolved.yml'
+        Set-Content -LiteralPath $configPath -Value @'
+devices:
+  capture:
+    type: Wasapi
+    device: null
+    loopback: true
+  playback:
+    type: Wasapi
+    device: null
+'@
+
+        Send-CamillaDSPConfig -ConfigPath $configPath -TargetDevice '' -CaptureDevice '' -EndpointPort 1 | Should -BeFalse -Because 'the loopback capture endpoint is the output a null playback device would bind'
+
+        $script:requests.Count | Should -Be 0 -Because 'a self-feeding config reaches no request whichever guard refuses it'
+        $script:refusals.Count | Should -Be 0 -Because 'the empty-device guard runs first and keeps the resolver warning instead of recording a cause'
     }
 }

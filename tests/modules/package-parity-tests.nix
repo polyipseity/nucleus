@@ -5,6 +5,8 @@
 #   • dotted nixpkgs attribute paths resolve via lib.hasAttrByPath
 #   • darwin-only packages have platforms = ["darwin"]
 #   • darwin-only packages are not buildable on Linux
+#   • packages nixpkgs cannot provide on darwin have platforms = ["linux"] or a Homebrew-on-darwin/overlay carrier
+#   • src/hosts/NixOS/desktop.nix installs nothing managedPackages provides
 #   • homebrew.kind is the documented formula|cask and carries a name
 #
 # Run with: nix-instantiate --eval tests/modules/package-parity-tests.nix
@@ -28,6 +30,15 @@ let
   isListElement = x: builtins.isList x;
   listElements = builtins.filter isListElement parts;
   extractedNames = map builtins.head listElements;
+
+  # Entries are matched by source order, so this asserts the file's declared
+  # order. Nix compares strings with strcmp, which is byte order, so the rule
+  # needs no locale and no collation data.
+  namePairs = lib.lists.genList (i: [
+    (builtins.elemAt extractedNames i)
+    (builtins.elemAt extractedNames (i + 1))
+  ]) (builtins.length extractedNames - 1);
+  outOfOrder = builtins.filter (p: builtins.elemAt p 0 >= builtins.elemAt p 1) namePairs;
 
   # --- Entry blocks keyed by name (structural parse) ---
   # WHY: the assertion needs each entry's real text, and forcing managedPackages
@@ -121,6 +132,103 @@ let
     "equaliser"
   ];
 
+  # --- Packages nixpkgs cannot provide on darwin, derived from nixpkgs ---
+  # The declared platforms decide it, since `lib.meta.availableOn` folds in
+  # `meta.platforms` and `meta.badPlatforms`, read from the Linux package set: a
+  # darwin evaluation of an unfree or broken attribute answers a different
+  # question than "can nixpkgs build this for darwin".
+  # WHY: attribute presence cannot stand in, because nixpkgs defines the
+  # attribute on every system; `alsa-utils` resolves in an aarch64-darwin package
+  # set and is still unavailable there.
+  darwinSystem = lib.systems.elaborate "aarch64-darwin";
+  linuxPkgs' = import <nixpkgs> { system = "x86_64-linux"; };
+  # One entry's own `nixpkgs = "…"`, read from its block text: `nixpkgsAttrs`
+  # above is a flat list of every attribute in the file and cannot be keyed by
+  # entry. Split rather than regex, because a POSIX ERE over multi-line text is
+  # implementation-defined about `.` crossing newlines.
+  nixpkgsAttrOf =
+    name:
+    let
+      block = entryBlocks.${name} or "";
+      parts = lib.strings.splitString "nixpkgs = \"" block;
+    in
+    if builtins.length parts < 2 then
+      null
+    else
+      builtins.head (lib.strings.splitString "\"" (builtins.elemAt parts 1));
+  linuxPackageOf =
+    name:
+    let
+      attr = nixpkgsAttrOf name;
+    in
+    if attr == null then null else lib.attrByPath (lib.strings.splitString "." attr) null linuxPkgs';
+  # Presence stays the entry filter: an entry with no `nixpkgs` attribute is not
+  # a nix package at all.
+  nixpkgsEntryNames = builtins.filter (name: nixpkgsAttrOf name != null) extractedNames;
+
+  # Entries nixpkgs cannot provide on darwin at all, read with
+  # `lib.meta.availableOn` over the Linux package set, so an unfree or broken
+  # attribute does not answer a different question.  A null package (attribute
+  # absent from the Linux set) is not a platform answer.
+  darwinUnavailablePackageNames = builtins.filter (
+    name:
+    let
+      pkg = linuxPackageOf name;
+    in
+    pkg != null && !(lib.meta.availableOn darwinSystem pkg)
+  ) nixpkgsEntryNames;
+
+  # macOS keeps an app that nixpkgs packages only for Linux when the registry
+  # routes it to Homebrew on darwin: `resolvePackageBackend` sends the gui
+  # category to Homebrew under the policy default, and core.nix's
+  # `darwinUnavailableNixPackages` filters on that same backend, so its
+  # assertion never examines such an entry. A CLI entry stays on nixpkgs
+  # whatever Homebrew metadata it carries, which is why a Homebrew block alone
+  # cannot carry it. The flake overlay replaces the attribute with a darwin
+  # build, so it carries either route. `platforms = [ "linux" ]` removes an
+  # entry from every darwin list, the Homebrew ones included, because
+  # `managedPackagePlatformCompatible` gates them all, so the marker is owed
+  # only where nothing else carries darwin.
+  homebrewRoutedOnDarwin = name: lib.hasInfix "category = \"gui\"" (entryBlocks.${name} or "");
+  flakeText = builtins.readFile ../../src/flake.nix;
+  darwinCarriedElsewhere =
+    name:
+    (homebrewRoutedOnDarwin name && homebrewBlockOf name != "")
+    || lib.hasInfix "${name} = prev.stdenv.mkDerivation" flakeText;
+
+  # --- NixOS host package list ---
+  # A host may not install by hand what managedPackages already provides: both
+  # paths reach environment.systemPackages, so the duplicate survives only until
+  # one of the two changes.  Compared against each entry's `nixpkgs` attribute,
+  # because that is the name a host file writes for a managed package (`p7zip`
+  # for the "7zip" entry).  Only the `environment.systemPackages` block is read,
+  # so option paths and service settings elsewhere in the file cannot match.
+  nixosDesktopText = builtins.readFile ../../src/hosts/NixOS/desktop.nix;
+  # The split is the parse, so each half checks that it found its delimiter
+  # before taking a head: one occurrence of the opener and one `\n    ];` close.
+  # Without the guard a reformat would hand back an empty interior and the
+  # duplicate check would scan nothing.
+  nixosDesktopBlocks = lib.strings.splitString "environment.systemPackages =" nixosDesktopText;
+  nixosDesktopPackageList =
+    assert lib.assertMsg (
+      builtins.length nixosDesktopBlocks > 1
+    ) "src/hosts/NixOS/desktop.nix must declare an environment.systemPackages = block";
+    let
+      listParts = lib.strings.splitString "\n    ];" (builtins.head (builtins.tail nixosDesktopBlocks));
+    in
+    assert lib.assertMsg (builtins.length listParts > 1)
+      "src/hosts/NixOS/desktop.nix environment.systemPackages block must close with `];` on a line indented four spaces";
+    builtins.head listParts;
+  desktopPackageTokenOf =
+    line:
+    lib.removePrefix "pkgs." (lib.strings.trim (builtins.head (lib.strings.splitString "#" line)));
+  # List entries are one bare token per line; the `(with pkgs; [` opener, the
+  # `])` close and the `++ lib.optionals …` scaffolding carry punctuation and
+  # drop out.
+  nixosDesktopPackageNames = builtins.filter (t: builtins.match "[a-zA-Z0-9._-]+" t != null) (
+    map desktopPackageTokenOf (lib.strings.splitString "\n" nixosDesktopPackageList)
+  );
+
   # --- Packages without nixpkgs attr (WinGet-only / macOS-cask-only) ---
 
   # --- Tests ---
@@ -130,17 +238,31 @@ let
     builtins.length extractedNames > 0
   ) "managedPackages must have at least one entry";
 
+  # managedPackages must be sorted by entry name in byte order.
+  test_registry_names_sorted =
+    assert' (outOfOrder == [ ])
+      "managedPackages entries must be sorted by name, byte order; out of order: ${
+        lib.strings.concatStringsSep ", " (
+          map (p: "${builtins.elemAt p 0} before ${builtins.elemAt p 1}") outOfOrder
+        )
+      }";
+
   # No duplicate entry names.
   test_no_duplicate_names = assert' (
     builtins.length extractedNames == builtins.length (lib.unique extractedNames)
   ) "No duplicate package names in managedPackages";
 
-  # All nixpkgs attrs extracted from core.nix must resolve.
+  # deep-filter must be registered as a managed POSIX package.
+  test_deep_filter_registered = assert' (builtins.elem "deep-filter" extractedNames) "managedPackages must include deep-filter";
+
+  # All nixpkgs attrs extracted from core.nix must resolve, or be provided by
+  # the flake overlay when absent from upstream nixpkgs.
   test_managed_nixpkgs_attrs_resolve =
     let
       pkgs' = import <nixpkgs> { };
       pathOf = s: lib.strings.splitString "." s;
-      resolves = s: lib.hasAttrByPath (pathOf s) pkgs';
+      overlayProvides = s: lib.hasInfix "\n              ${s} = prev.stdenv.mkDerivation" flakeText;
+      resolves = s: lib.hasAttrByPath (pathOf s) pkgs' || overlayProvides s;
     in
     assert' (builtins.all resolves nixpkgsAttrs) "All managedPackages nixpkgs attrs must resolve in nixpkgs";
 
@@ -166,6 +288,25 @@ let
     in
     assert' (unmarked == [ ])
       "Darwin-only packages must set platforms = [ \"darwin\" ] in core.nix; unmarked: ${lib.strings.concatStringsSep ", " unmarked}";
+
+  # Entries nixpkgs cannot provide on darwin need a darwin carrier:
+  # `platforms = [ "linux" ]` for a package that is genuinely Linux-only, a
+  # Homebrew block on an entry the registry routes to Homebrew on darwin, or a
+  # flake overlay build for one macOS installs another way. core.nix carries
+  # every platform-compatible entry in the darwin nixpkgs list without probing
+  # availability, so without one of the three the entry drops out of it
+  # silently. The marker also gates the Homebrew lists, so it is only correct
+  # where nothing else carries darwin.
+  test_darwin_unavailable_packages_declared =
+    let
+      unmarked = builtins.filter (
+        name:
+        !(darwinCarriedElsewhere name)
+        && !lib.hasInfix "platforms = [ \"linux\" ]" (entryBlocks.${name} or "")
+      ) darwinUnavailablePackageNames;
+    in
+    assert' (builtins.length darwinUnavailablePackageNames > 0 && unmarked == [ ])
+      "packages nixpkgs cannot provide on darwin need a darwin carrier: platforms = [ \"linux\" ] for a genuinely Linux-only package, a Homebrew block on an entry routed to Homebrew on darwin, or a flake overlay build; parsed ${builtins.toString (builtins.length darwinUnavailablePackageNames)}, unmarked: ${lib.strings.concatStringsSep ", " unmarked}";
 
   # Darwin-only packages must not be buildable on Linux.
   test_darwin_only_absent_on_linux =
@@ -212,16 +353,33 @@ let
     !(lib.hasInfix "kind = \"brew\"" coreModuleText)
   ) "core.nix must not declare homebrew kind \"brew\" (documented values: formula, cask)";
 
+  # src/hosts/NixOS/desktop.nix must not reinstall a managedPackages entry.
+  # An entry is matched by its `nixpkgs` attribute (through `nixpkgsAttrOf`
+  # rather than the flat `nixpkgsAttrs`, which is empty because it filters the
+  # between-match strings instead of the capture groups), and the message names
+  # the host-file token, which is the line to drop.
+  test_nixos_desktop_has_no_registry_duplicates =
+    let
+      providedByRegistry = token: builtins.any (name: nixpkgsAttrOf name == token) extractedNames;
+      duplicates = lib.unique (builtins.filter providedByRegistry nixosDesktopPackageNames);
+    in
+    assert' (builtins.length nixosDesktopPackageNames > 0 && duplicates == [ ])
+      "src/hosts/NixOS/desktop.nix must not install what managedPackages already provides; drop the line for: ${lib.strings.concatStringsSep ", " duplicates}";
+
   allTests = [
     test_entry_names_valid
+    test_registry_names_sorted
     test_no_duplicate_names
+    test_deep_filter_registered
     test_managed_nixpkgs_attrs_resolve
     test_dotted_nixpkgs_paths_resolve
     test_darwin_only_packages_platform_marked
+    test_darwin_unavailable_packages_declared
     test_darwin_only_absent_on_linux
     test_homebrew_kind_documented
     test_homebrew_kind_has_name
     test_no_undocumented_homebrew_kind
+    test_nixos_desktop_has_no_registry_duplicates
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {

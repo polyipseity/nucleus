@@ -20,6 +20,8 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
 
+ensure_safe_rm_env
+
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 
 PKG_DIR="$REPO_ROOT/src/scripts/packages"
@@ -267,15 +269,14 @@ test_cargo_binstall_passes_version_pins() {
   local tmp
   tmp="$(setup_fake_repo)"
   stub_tool cargo-binstall "$tmp"
+  stub_tool cargo "$tmp"
   # cargo install --list emits nothing -> both desired crates are fresh installs.
-  # WHY: HOME must point at a clean temp dir. A real `cargo` is on PATH in a
-  # provisioned dev environment, so `cargo install --list` would otherwise read
-  # the operator's real ~/.cargo and the script's zap loop would then run
-  # `cargo uninstall` against their installed crates. CARGO_HOME must be
-  # neutralised too: cargo resolves CARGO_HOME ahead of $HOME/.cargo, so
-  # setting HOME alone still leaks the real crate set when the operator has
-  # CARGO_HOME exported. No cargo stub exists here, the real binary runs.
-  # Mirrors the HOME="$tmp" guard the bun and pi cases already use.
+  # WHY: the cargo stub stands in for the real binary, so the installer's bare
+  # `cargo install --list` never reads an operator crate set. The assertions
+  # read only the binstall stub's records, and a real cargo spawn costs tens of
+  # seconds per call on a provisioned host. HOME and CARGO_HOME stay pointed at
+  # the temp dir as the same isolation guard the bun and pi cases use, so
+  # nothing else in the installer can reach the real user state either.
   if HOME="$tmp" CARGO_HOME="$tmp/.cargo" run_pkg_script install-cargo-binstall-packages.sh "$tmp" \
     "$(command -v jq)" "$(command -v awk)" \
     "$DESIRED_CARGO_BINSTALL" \

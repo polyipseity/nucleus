@@ -5,13 +5,13 @@
  * Only a conservative pattern list is gated. Prompting for every tool call would
  * make the agent unusable, and pi already has its own permission model for the
  * rest; the patterns here are the commands a person would want to veto from a
- * phone: recursive deletes, privilege escalation, pushes, piping to a shell,
- * recursive chmod, raw disk writes, and power commands.
+ * phone: privilege escalation, pushes, piping to a shell, recursive chmod, raw
+ * disk writes, and power commands.
  *
  * Three outcomes, all decided remotely first:
- *   allow — the call runs untouched (no local prompt)
- *   deny  — the call is blocked without asking locally
- *   ask   — no remote decision arrived (broker disabled, unreachable, or nobody
+ *   allow: the call runs untouched (no local prompt)
+ *   deny:  the call is blocked without asking locally
+ *   ask:   no remote decision arrived (broker disabled, unreachable, or nobody
  *           answered in time), so the local confirm prompt decides
  *
  * The local prompt on `ask` is deliberate: it is pi's normal interactive
@@ -26,13 +26,16 @@ import { join } from "node:path";
 
 const APPROVAL_COMMAND = "harness-approval";
 const CONFIG_PATH = join(homedir(), ".local", "state", "nucleus", "config.json");
-// Must exceed harness-approval's own wait (harness-approval.timeout-seconds,
-// default 120) so the broker's timeout — not this one — produces `ask`.
-const EXEC_TIMEOUT_MS = 240_000;
+// The sources wait until answered by default (harness-approval.timeout-seconds
+// is 0), so this is the ceiling for the whole wait rather than a limit under the
+// gate: 3600 s matches the hook budget the shared hook files declare, and pi
+// falls back to its own confirm when it expires.
+const EXEC_TIMEOUT_MS = 3_600_000;
 const SUMMARY_LIMIT = 200;
 
+const DELETION_WORD_RE = /\b(?:rm|del|rd|rmdir|erase|ri|unlink|shred|remove-item)\b/i;
+
 const RISKY_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
-  [/\brm\s+-[A-Za-z]*[rRfF]/, "recursive delete"],
   [/\bsudo\b/, "privileged command"],
   [/\bgit\s+push\b/, "git push"],
   [/\|\s*(?:ba|z|k|fi)?sh\b/, "piped to a shell"],
@@ -43,9 +46,10 @@ const RISKY_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
 
 /**
  * `harness-notify.enable` is the master kill switch: with it off, this gate must
- * not add prompts pi would not otherwise show. The remote gate itself
- * (`harness-approval.enable`, off by default) is read by the `harness-approval`
- * command this extension calls, so turning it off leaves pi's own confirm.
+ * not add prompts pi would not otherwise show. The gate itself
+ * (`harness-approval.sources`, `["prompt"]` by default) is read by the
+ * `harness-approval` command this extension calls, so an empty list leaves pi's
+ * own confirm.
  */
 function approvalEnabled(): boolean {
   try {
@@ -74,6 +78,7 @@ function riskyReason(input: unknown): string | null {
     return null;
   }
   if (text.length > 4000) text = text.slice(0, 4000);
+  if (DELETION_WORD_RE.test(text)) return null;
   for (const [pattern, reason] of RISKY_PATTERNS) {
     if (pattern.test(text)) return reason;
   }

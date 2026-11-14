@@ -10,6 +10,12 @@
   blocks survive regeneration, and single-flag commands get a full '--help'
   entry (regression: if-expression unrolling once emitted a corrupt '-' line).
 
+  Every hand-coded PowerShell subcommand array (gc, svc, config, logs, utils,
+  vm) is also pinned to the subcommand constraint of its Windows app: a
+  subcommand an app accepts but a completer never offers ships silently, which is
+  how nucleus-gc logs stayed undiscoverable, and how nucleus-gc all stayed
+  unofferable.
+
   Run with: pwsh -NoProfile -Command "Invoke-Pester tests/platforms/Windows/modules/gen-completions.Tests.ps1 -Passthru"
 #>
 
@@ -17,7 +23,21 @@ BeforeAll {
   $Script:FixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) 'nucleus-gen-completions-tests'
   $Script:ScriptPath = Join-Path $PSScriptRoot '../../../../src/scripts/completions/gen-completions.ps1'
   $Script:RealProfilePath = Join-Path $PSScriptRoot '../../../../src/scripts/shell/profile.ps1'
+  $Script:RepoRoot = Join-Path $PSScriptRoot '../../../..'
   $Script:PwshExe = (Get-Command pwsh).Source
+
+  # The six commands whose PowerShell completer keeps its subcommand list by
+  # hand, with the constraint in the Windows app that is the source of truth for
+  # it: a ValidateSet on the entry-point parameter, or the command switch in
+  # config.ps1, the one app of the six with no ValidateSet.
+  $Script:SubcommandSources = [ordered]@{
+    'gc'     = @{ App = 'scripts/gc.ps1'; Mechanism = 'ValidateSet'; Anchor = ''; Variable = 'nucleusGcCommands' }
+    'svc'    = @{ App = 'scripts/svc.ps1'; Mechanism = 'ValidateSet'; Anchor = ''; Variable = 'nucleusSvcCommands' }
+    'config' = @{ App = 'scripts/config.ps1'; Mechanism = 'switch'; Anchor = 'switch ($Command) {'; Variable = 'nucleusConfigCommands' }
+    'logs'   = @{ App = 'scripts/logs.ps1'; Mechanism = 'ValidateSet'; Anchor = ''; Variable = 'nucleusLogsCommands' }
+    'utils'  = @{ App = 'scripts/utils.ps1'; Mechanism = 'ValidateSet'; Anchor = ''; Variable = 'nucleusUtilsCommands' }
+    'vm'     = @{ App = 'scripts/vm.ps1'; Mechanism = 'ValidateSet'; Anchor = ''; Variable = 'nucleusVmCommands' }
+  }
 
   function New-FixtureProfile {
     # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test fixture mutates a temp dir; no ShouldProcess in tests
@@ -27,9 +47,12 @@ BeforeAll {
       Remove-Item -LiteralPath $Script:FixtureRoot -Recurse -Force
     }
     $profileDir = Join-Path $Script:FixtureRoot 'src/scripts/shell'
+    $manifestDir = Join-Path $Script:FixtureRoot 'src/modules/completions'
     New-Item -Path $profileDir -ItemType Directory -Force > $null
+    New-Item -Path $manifestDir -ItemType Directory -Force > $null
     # Copy-Item preserves bytes, keeping the real file's CRLF + UTF-8 encoding.
     Copy-Item -LiteralPath $Script:RealProfilePath -Destination (Join-Path $profileDir 'profile.ps1')
+    Copy-Item -LiteralPath (Join-Path $Script:RepoRoot 'src/modules/completions/nucleus-apps.json') -Destination (Join-Path $manifestDir 'nucleus-apps.json')
   }
 
   function Get-FixtureProfile {
@@ -87,6 +110,91 @@ BeforeAll {
       return @()
     }
     return @([regex]::Matches($match.Groups['flags'].Value, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+  }
+
+  function Get-ProfileSubcommandList {
+    param(
+      [Parameter(Mandatory)]
+      [string]$VariableName,
+      [Parameter(Mandatory)]
+      [string]$ProfileText
+    )
+    $match = [regex]::Match($ProfileText, [regex]::Escape("`$$VariableName = @(") + "(?<list>[^)]*)\)")
+    if (-not $match.Success) {
+      return @()
+    }
+    return @([regex]::Matches($match.Groups['list'].Value, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+  }
+
+  function Get-ValidateSetSubcommandList {
+    # The labels of the ValidateSet on the entry-point parameter, meaning the
+    # first one inside the script's top-level param block: a nested option list
+    # (logs' scope, svc's live/pseudo list) must not answer for the subcommands.
+    param(
+      [Parameter(Mandatory)]
+      [string]$Path
+    )
+    $inBlock = $false
+    foreach ($line in (Get-Content -LiteralPath $Path)) {
+      if (-not $inBlock) {
+        if ($line -ceq 'param(') { $inBlock = $true }
+        continue
+      }
+      if ($line -ceq ')') { break }
+      if ($line -match 'ValidateSet\(') {
+        return @([regex]::Matches($line, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+      }
+    }
+    return @()
+  }
+
+  function Get-SwitchSubcommandList {
+    # The arm labels of a switch statement, for the one app that constrains its
+    # subcommands with a switch instead of a ValidateSet.
+    param(
+      [Parameter(Mandatory)]
+      [string]$Path,
+      [Parameter(Mandatory)]
+      [string]$Anchor
+    )
+    $inSwitch = $false
+    $labels = [System.Collections.Generic.List[string]]::new()
+    foreach ($line in (Get-Content -LiteralPath $Path)) {
+      if (-not $inSwitch) {
+        if ($line -ceq $Anchor) { $inSwitch = $true }
+        continue
+      }
+      if ($line -match '^\s*default') { break }
+      $match = [regex]::Match($line, "^\s*'([^']+)'")
+      if ($match.Success) { $labels.Add($match.Groups[1].Value) }
+    }
+    return @($labels)
+  }
+
+  function Compare-SubcommandList {
+    # The labels that are one-sided between an expected list and an actual
+    # list, expected-only first and then actual-only. -Direction narrows the
+    # result to one side so a caller can still say which way a difference runs.
+    [CmdletBinding()]
+    [OutputType([object[]])]
+    param(
+      [Parameter(Mandatory)]
+      [AllowEmptyCollection()]
+      [string[]]$Expected,
+      [Parameter(Mandatory)]
+      [AllowEmptyCollection()]
+      [string[]]$Actual,
+      [ValidateSet('Both', 'Missing', 'Surplus')]
+      [string]$Direction = 'Both'
+    )
+    $missing = @($Expected | Where-Object { $Actual -notcontains $_ })
+    $surplus = @($Actual | Where-Object { $Expected -notcontains $_ })
+    switch ($Direction) {
+      'Missing' { return $missing }
+      'Surplus' { return $surplus }
+      'Both' { return @($missing + $surplus) }
+      default { throw "Unknown direction '$Direction'." }
+    }
   }
 }
 
@@ -156,6 +264,47 @@ Describe 'gen-completions.ps1 generated inventory' {
     $profileText = Get-FixtureProfile
     $profileText | Should -Match 'Register-ArgumentCompleter -CommandName nucleus-gc '
     $profileText | Should -Match "'verify'"
+  }
+
+  It 'offers every subcommand each Windows app accepts' {
+    $null = Invoke-GenCompletion  # check-suppress:suppression_doc: Invoke-GenCompletion returns the generated profile text; output discarded because the test reads the fixture file instead
+    $profileText = Get-FixtureProfile
+
+    # WHY: the subcommands come from each Windows app's own parameter constraint,
+    # so this case pins the arrays to the CLI instead of to a second list that can
+    # drift. nucleus-gc logs was undiscoverable, and nucleus-gc all is the reverse
+    # case: a Windows-only action the array must offer and the zsh table must not.
+    $failures = [System.Collections.Generic.List[string]]::new()
+    foreach ($command in $Script:SubcommandSources.Keys) {
+      $source = $Script:SubcommandSources[$command]
+      $appPath = Join-Path $Script:RepoRoot $source.App
+      $accepted = if ($source.Mechanism -eq 'switch') {
+        @(Get-SwitchSubcommandList -Path $appPath -Anchor $source.Anchor)
+      } else {
+        @(Get-ValidateSetSubcommandList -Path $appPath)
+      }
+      if ($accepted.Count -eq 0) {
+        # WHY: an extraction that landed on nothing would otherwise blame every
+        # offered label, which reads as a completer bug rather than a broken one.
+        $failures.Add("${command}: $($source.App) yielded no subcommand labels")
+        continue
+      }
+      $offered = @(Get-ProfileSubcommandList -VariableName $source.Variable -ProfileText $profileText)
+      if ($offered.Count -eq 0) {
+        $failures.Add("${command}: `$$($source.Variable) is missing or empty in profile.ps1")
+        continue
+      }
+      $missing = @(Compare-SubcommandList -Expected $accepted -Actual $offered -Direction 'Missing')
+      $stale = @(Compare-SubcommandList -Expected $accepted -Actual $offered -Direction 'Surplus')
+      if ($missing.Count -gt 0) {
+        $failures.Add("${command}: not offered: " + ($missing -join ', '))
+      }
+      if ($stale.Count -gt 0) {
+        $failures.Add("${command}: offered but never accepted: " + ($stale -join ', '))
+      }
+    }
+    ($failures -join '; ') | Should -BeNullOrEmpty -Because (
+      'nucleus-<command> must complete every subcommand its Windows app accepts, and nothing the app rejects')
   }
 
   It 'gc flags include the full generated set' {
@@ -234,5 +383,32 @@ Describe 'gen-completions.ps1 generated inventory' {
     @($vmFlags | Sort-Object) | Should -Be $vmExpected
     $vmFlags | Should -Not -Contain '--no-windows-iso'
     $profileText | Should -Not -Match '--remove-backup'
+  }
+}
+
+Describe 'Compare-SubcommandList' {
+  It 'reports nothing for identical lists' {
+    $difference = Compare-SubcommandList -Expected @('a', 'b') -Actual @('b', 'a')
+    ($difference -join ',') | Should -BeExactly ''
+  }
+
+  It 'names a label missing from the expected list' {
+    $difference = Compare-SubcommandList -Expected @('a', 'b') -Actual @('a', 'b', 'c')
+    ($difference -join ',') | Should -BeExactly 'c'
+  }
+
+  It 'names a label surplus to the expected list' {
+    $difference = Compare-SubcommandList -Expected @('a', 'b') -Actual @('a', 'b', 'c') -Direction 'Surplus'
+    ($difference -join ',') | Should -BeExactly 'c'
+  }
+
+  It 'names a label missing from the actual list' {
+    $difference = Compare-SubcommandList -Expected @('a', 'b', 'c') -Actual @('a', 'b') -Direction 'Missing'
+    ($difference -join ',') | Should -BeExactly 'c'
+  }
+
+  It 'reports nothing for two empty lists' {
+    $difference = Compare-SubcommandList -Expected @() -Actual @()
+    ($difference -join ',') | Should -BeExactly ''
   }
 }

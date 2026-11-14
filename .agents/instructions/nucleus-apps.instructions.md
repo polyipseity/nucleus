@@ -10,15 +10,17 @@ Every `nucleus-*` command is declared once in `mkNucleusApps` (`src/flake.nix`);
 
 `service-watchdog` is the exception: a daemon, not an app. It stays out of `mkNucleusApps`, never appears on PATH or `nix run`, and runs only from its store path under systemd or launchd. `nucleus-utils` groups user utilities such as `optimize-pdf`.
 
+`nucleus-camilladsp-heartbeat` is the opposite case: a daemon whose `--probe` mode operators run by hand after an apply, so it is registered normally and lands on PATH with the rest.
+
 ## Adding functionality
 
 Stop at the first fit:
 
 1. Not user-facing (library, daemon helper, activation step): keep it a plain script, with no PATH command.
 2. A variant of an existing app: add a subcommand to `check`, `gc`, `apply`, `cloud`, or `update`.
-3. A new top-level concern: register it in `mkNucleusApps` with a matching `scripts/<name>.sh` and `scripts/<name>.ps1`. A daemon-only entry skips `home.packages`.
+3. A new top-level concern: register it in `mkNucleusApps` with a matching `scripts/<name>.sh` and `scripts/<name>.ps1`. An entry with no Windows twin declares only the POSIX script and its zsh completion; an entry that must never be invoked by hand stays out of `mkNucleusApps` entirely and is wired from its store path.
 
-The command set is shared with the completion generators and check step `10-completions-fresh`, so change one and the other or freshness fails.
+`src/modules/completions/nucleus-apps.json` is the committed command manifest derived from flake `packages.<system>` / `mkNucleusApps`. `src/flake.nix` package output `nucleus-apps` builds it, and nix-capable checks compare the committed file to that derivation, so adding or removing an app in `mkNucleusApps` requires regenerating the manifest and committed completion artifacts in the same change. Completion generators and check step `10-completions-fresh` read the manifest, so Windows generation and checks do not evaluate nix at runtime and cannot pass from a stale static fallback. A `scripts/<name>.sh` (or the daemon mapping in `gen-completions.sh`) must still exist so `--help`-derived completions can be generated.
 
 ## Internal invocation
 
@@ -34,7 +36,7 @@ Every POSIX `scripts/<name>.sh` with subcommands needs a `scripts/<name>.ps1` tw
 
 ## Completions
 
-`src/scripts/completions/gen-completions.sh` and `gen-completions.ps1` derive completions from `--help` output. Regenerate and commit after a command-surface change; step `10-completions-fresh` re-runs them in check mode and fails on a diff. Never hand-edit generated files.
+`src/scripts/completions/gen-completions.sh` and `gen-completions.ps1` read the command list from `src/modules/completions/nucleus-apps.json` and derive flag/help content from command `--help` output. Regenerate the manifest and committed completion artifacts after a command-surface change; step `10-completions-fresh` and the nix-capable flake/generated-artifact checks fail on drift. Never hand-edit generated files.
 
 ## Agent host wrapper
 

@@ -32,6 +32,30 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
+# WHY the shared library, not a log path: nucleus-logs owns the log root, the
+# line format, and the append, so a dropped prompt is recorded beside every gate
+# decision.
+# shellcheck source=../lib/logs.sh
+. "$SCRIPT_DIR/../lib/logs.sh"
+# shellcheck source=../lib/harness-audit.sh
+. "$SCRIPT_DIR/../lib/harness-audit.sh"
+
+_hd_start="$(harness_audit_now_ms)"
+
+# _hd_audit <summary>: record one drive-side event.
+# WHY best-effort: driving is advisory at both ends, so a failed append warns and
+# the turn's document is still printed.
+_hd_audit() {
+  if ! (
+    _hd_audit_digest="$(printf '%s' "${_hd_payload-}" | harness_audit_digest)" || exit 1
+    _hd_audit_summary="$(printf '%s\n' "$1" | harness_audit_summary)"
+    harness_audit_log notify "$_hd_harness" '' none '' '' \
+      "$(($(harness_audit_now_ms) - _hd_start))" \
+      "$_hd_audit_summary" "$_hd_audit_digest" ''
+  ); then
+    warn "could not write the harness audit log"
+  fi
+}
 
 _hd_harness="${1-}"
 
@@ -74,7 +98,7 @@ if [ -f "$HOME/.local/state/nucleus/config.json" ]; then
   # that dies under `set -e` renders no document, so the harness reports the turn
   # end itself as failed.
   if ! _hd_user_config="$(cat "$HOME/.local/state/nucleus/config.json")"; then
-    warn "could not parse nucleus config — not driving"
+    warn "could not parse nucleus config: not driving"
     _hd_empty "$_hd_harness"
     exit 0
   fi
@@ -83,7 +107,7 @@ if ! _hd_config="$(
   jq -c --argjson defaults '{"harness-notify":{"enable":true},"harness-drive":{"enable":true}}' --argjson user "$_hd_user_config" \
     '$defaults * { "harness-notify": ($user["harness-notify"] // {}), "harness-drive": ($user["harness-drive"] // {}) }' <<<'{}'
 )"; then
-  warn "could not parse nucleus config — not driving"
+  warn "could not parse nucleus config: not driving"
   _hd_empty "$_hd_harness"
   exit 0
 fi
@@ -102,7 +126,7 @@ fi
 # The notification half shares one implementation; an empty payload still means
 # "the turn finished", which is what harness-notify turns into its default body.
 if ! printf '%s' "$_hd_payload" | "$SCRIPT_DIR/harness-notify.sh" "$_hd_harness" "done"; then
-  warn "notification failed — continuing to the queued prompt"
+  warn "notification failed: continuing to the queued prompt"
 fi
 
 _hd_commands="$(derive_nucleus_user_root)/state/harness-bridge/commands/$_hd_harness"
@@ -125,13 +149,8 @@ if [ "$(jq -r '."harness-drive".enable' <<<"$_hd_config")" != "true" ]; then
     done
   fi
   if [ "$_hd_dropped" -gt 0 ]; then
-    _hd_log_dir="$(derive_nucleus_user_root)/logs"
-    mkdir -p "$_hd_log_dir"
-    printf '%s\t%s\t%s\t%s\t%s\n' \
-      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$_hd_harness" "drive" "disabled" \
-      "dropped $_hd_dropped queued prompt(s)" \
-      >>"$_hd_log_dir/harness-bridge.log"
-    warn "harness-drive is disabled — dropped $_hd_dropped queued prompt(s)"
+    _hd_audit "dropped $_hd_dropped queued prompt(s)"
+    warn "harness-drive is disabled: dropped $_hd_dropped queued prompt(s)"
   fi
   _hd_empty "$_hd_harness"
   exit 0
@@ -155,12 +174,12 @@ if [ -z "$_hd_newest" ]; then
 fi
 
 if ! _hd_text="$(jq -r '.text // empty' "$_hd_newest")"; then
-  warn "could not read the queued prompt '$_hd_newest' — treating it as empty"
+  warn "could not read the queued prompt '$_hd_newest': treating it as empty"
   _hd_text=""
 fi
 
 if [ -z "${_hd_text//[[:space:]]/}" ]; then
-  warn "queued prompt is empty — nothing to inject"
+  warn "queued prompt is empty: nothing to inject"
   if ! rm -f "$_hd_newest"; then
     warn "could not discard the empty queued prompt"
   fi
@@ -171,7 +190,7 @@ fi
 # Consume before printing: if the delete fails, delivering the prompt anyway
 # would let the next turn deliver it again, so the prompt is dropped instead.
 if ! rm -f "$_hd_newest"; then
-  warn "could not consume the queued prompt — dropping it to avoid double delivery"
+  warn "could not consume the queued prompt: dropping it to avoid double delivery"
   _hd_empty "$_hd_harness"
   exit 0
 fi

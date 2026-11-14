@@ -22,6 +22,8 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd)"
 AUTOSTART_SH="$REPO_ROOT/src/scripts/autostart.sh"
 readonly AUTOSTART_SH
 
+ensure_safe_rm_env
+
 # Build a fixture repo with a two-app registry and a fixture home whose
 # LaunchAgents directory holds the app-owned plists under test.
 make_fixture() {

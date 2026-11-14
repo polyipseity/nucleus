@@ -138,6 +138,7 @@ $EnableAgentsClawHubSkillsParity = -not $noUserStateParity
 $EnablePiExtensionsParity = -not $noUserStateParity
 $EnableOpenCodeConfigParity = -not $noUserStateParity
 $EnableSuperpowersParity = -not $noUserStateParity
+$EnableDeepFilterNetModelParity = -not $noUserStateParity
 $EnableWhisperModelParity = -not $noUserStateParity
 $EnableBunParity = -not $noUserStateParity
 $EnableCloudDrivesParity = -not $noUserStateParity
@@ -277,6 +278,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-PiAgentConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-OpenCodeConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-SuperpowersPlugin.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-DeepFilterNetModel.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-WhisperModel.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-SymlinkManifest.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-DevRepoCatalog.ps1")
@@ -569,7 +571,7 @@ foreach ($configFile in $effectiveConfigFiles) {
 
 wevtutil sl Application /ms:209715200 2>$null  # check-suppress:suppression_doc: may already be at desired size; wevtutil exits non-zero but this is harmless
 
-# After WinGet DSC installs Scoop.Scoop, since the shims directory is not on
+# After the ScoopInstall DSC bootstrap, since the shims directory is not on
 # PATH until Invoke-ScoopSetup prepends it.
 # rustup runs after WinGet DSC installs Rustlang.Rustup, and before
 # Invoke-CargoBinstallSetup so the stable toolchain and its cargo binary exist
@@ -637,6 +639,7 @@ $superpowersSkillsSource = Join-Path -Path (Get-NucleusUserRoot) -ChildPath 'plu
 
 Sync-AgentsConfig -RepoRoot $repoRoot -User $sessionUser -Enabled:$EnableAgentsConfigParity
 Sync-SuperpowersPlugin -RepoRoot $repoRoot -Enabled:$EnableSuperpowersParity
+Sync-DeepFilterNetModel -RepoRoot $repoRoot -Enabled:$EnableDeepFilterNetModelParity
 Sync-WhisperModel -RepoRoot $repoRoot -Enabled:$EnableWhisperModelParity
 Sync-OpenCodeConfig -RepoRoot $repoRoot -User $sessionUser -Enabled:$EnableOpenCodeConfigParity
 Sync-AgentsSkillManifest -RepoRoot $repoRoot -User $sessionUser -Enabled:$EnableAgentsSkillsParity -ExtraSkillsSource $superpowersSkillsSource

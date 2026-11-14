@@ -44,6 +44,7 @@ function Invoke-SafeDelete {
       # POSIX backend: delegate to the platform safe alternative.
       $safeBin = $null
       foreach ($candidate in @('shell-safe-rm')) {
+        # check-suppress:suppression_doc: shell-safe-rm is optional; an absent candidate falls through to the original cmdlet
         $cmd = Get-Command $candidate -ErrorAction SilentlyContinue
         if ($cmd) { $safeBin = $cmd.Source; break }
       }
@@ -115,7 +116,16 @@ function Invoke-SafeDelete {
     }
 
     if ($isInteractive -and $allFilesystem) {
-      Write-Host '[SafeDelete] Routed to Recycle Bin. Tip: use rip for instant undo.' -ForegroundColor Cyan
+      # WHY: Write-Information needs no host object and stays suppressible; $PSStyle
+      # is an automatic variable in pwsh 7.2+, so the colour costs no import. The
+      # gate mirrors the shared helpers: non-empty NO_COLOR wins, and colour also
+      # needs a VT-capable terminal with stdout not redirected.
+      $tip = '[SafeDelete] Routed to Recycle Bin. Tip: use rip for instant undo.'
+      if ((Test-Path Variable:PSStyle) -and (-not $env:NO_COLOR) -and
+        $Host.UI.SupportsVirtualTerminal -and (-not [Console]::IsOutputRedirected)) {
+        $tip = "$($PSStyle.Foreground.Cyan)$tip$($PSStyle.Reset)"
+      }
+      Write-Information -MessageData $tip -InformationAction Continue
     }
 
     foreach ($item in $resolvedItems) {
@@ -835,6 +845,23 @@ $nucleusGcFlags = @(
   '--wallpaper-gc'
 )
 
+$nucleusLogsFlags = @(
+  '--compress',
+  '--dry-run',
+  '--expiry',
+  '--harness',
+  '--help',
+  '--json',
+  '--kind',
+  '--lines',
+  '--log',
+  '--max-files',
+  '--max-size',
+  '--note',
+  '--scope',
+  '--since'
+)
+
 $nucleusSvcFlags = @(
   '--help',
   '--json',
@@ -966,6 +993,12 @@ if ($IsWindows) {
     param()
     Invoke-NucleusRepoScript 'scripts\gc.ps1' @Args
   }
+  function nucleus-logs {
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    param()
+    Invoke-NucleusRepoScript 'scripts\logs.ps1' @Args
+  }
   function nucleus-update {
     # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
@@ -1000,7 +1033,8 @@ if ($IsWindows) {
 
 $nucleusSvcCommands = @('list', 'status', 'start', 'stop', 'restart', 'enable', 'disable', 'verify', 'endpoint', 'logs', 'log-paths', 'log-config')
 $nucleusConfigCommands = @('get', 'set', 'list')
-$nucleusGcCommands = @('cleanup-nix', 'preferences')
+$nucleusGcCommands = @('all', 'cleanup-nix', 'graveyard', 'logs', 'preferences')
+$nucleusLogsCommands = @('append', 'expire', 'gc', 'label', 'rotate', 'show', 'stats', 'tail')
 $nucleusUtilsCommands = @('optimize-pdf', 'strip-metadata')
 
 Register-ArgumentCompleter -CommandName nucleus-svc -ScriptBlock {
@@ -1036,6 +1070,13 @@ Register-ArgumentCompleter -CommandName nucleus-gc -ScriptBlock {
   $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: parameter metadata variables, declared for introspection
   $nucleusGcCommands | Where-Object { $_ -like "$wordToComplete*" }
   $nucleusGcFlags | Where-Object { $_ -like "$wordToComplete*" }
+}
+
+Register-ArgumentCompleter -CommandName nucleus-logs -ScriptBlock {
+  param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: parameter metadata variables, declared for introspection
+  $nucleusLogsCommands | Where-Object { $_ -like "$wordToComplete*" }
+  $nucleusLogsFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-cloud -ScriptBlock {

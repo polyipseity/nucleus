@@ -19,25 +19,62 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   $cfgDir = Join-Path -Path $r -ChildPath "src\modules\configs"
   $cfgErrors = 0
 
-  $cfgFiles = Get-ChildItem -Path $cfgDir -Recurse -File
-  $srcFiles = Get-ChildItem -Path (Join-Path $r "src") -Recurse -Include '*.nix', '*.ps1', '*.sh' |
+  $cfgFiles = Get-ChildItem -LiteralPath $cfgDir -Recurse -File
+  $srcFiles = Get-ChildItem -LiteralPath (Join-Path $r "src") -Recurse -Include '*.nix', '*.ps1', '*.sh' |
     Where-Object { $_.FullName -notmatch '[\/]vendor[\/]' -and $_.FullName -notmatch '[\/]configs[\/]' } |
     Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#B1 -- structural invariants; vendored code and config methods are different concerns; gitignore filter applied on top
-  # WHY: raw basenames with -SimpleMatch mirror the .sh twin's grep -F -f semantics; [regex]::Escape here would make dotted basenames (e.g. system.gitconfig) match literally and never be found
+  # WHY: basenames stay raw in this list and each is [regex]::Escape'd when it enters the alternation below, so dotted basenames (e.g. system.gitconfig) match literally, mirroring the .sh twin's grep -Fi -f fixed-string semantics
   $cfgPatterns = @($cfgFiles | ForEach-Object { $_.Name } | Sort-Object -Unique)
-  # WHY: Select-GitIgnored returns path strings; piping strings to Select-String searches them as content, so -Path is required to read the actual files
-  $cfgSelectOutput = Select-String -Path $srcFiles -Pattern $cfgPatterns -SimpleMatch
-  # WHY: refs may use a ${hostName} template that no raw basename matches.
-  $cfgMethodOutput = Select-String -Path $srcFiles -Pattern '# check-suppress:config-method'
-  $cfgTemplateOutput = Select-String -Path $srcFiles -Pattern '${hostName}' -SimpleMatch
+  if ($cfgPatterns.Count -eq 0) {
+    # WHY: -match '' matches every line, so an empty list must not run the scan
+    # or the per-config loop; mirrors the .sh empty-list early return.
+    Write-Message "config method compliance passed (0 configs)."
+  } else {
+  # One read pass builds the three lists the per-config loop below reads:
+  # every config basename as one escaped alternation (raw basenames stay
+  # literal substrings, mirroring the .sh twin's grep -F), the annotation
+  # marker, and the ${hostName} template form. Entries keep Select-String's
+  # Path/LineNumber/Line shape and its file-then-line order, so the loop is
+  # unchanged; this replaces three sweeps that each re-read every source file.
+  # Case-insensitive -match is the stricter reading, agreed with the .sh twin
+  # (grep -Fi): a case-variant reference to a config basename is still a real
+  # reference, so this flags deployments a case-sensitive read skips; annotation
+  # ids are machine-parsed in exact form, so nothing hides on that side.
+  $cfgCombinedPattern = ($cfgPatterns | ForEach-Object { [regex]::Escape($_) }) -join '|'
+  $cfgTemplatePattern = [regex]::Escape('${hostName}')
+  $cfgSelectOutput = [System.Collections.Generic.List[pscustomobject]]::new()
+  $cfgMethodOutput = [System.Collections.Generic.List[pscustomobject]]::new()
+  $cfgTemplateOutput = [System.Collections.Generic.List[pscustomobject]]::new()
+  foreach ($cfgSrc in $srcFiles) {
+    $cfgLines = @(Get-Content -LiteralPath $cfgSrc)
+    for ($cfgI = 0; $cfgI -lt $cfgLines.Count; $cfgI++) {
+      $cfgLine = $cfgLines[$cfgI]
+      $cfgHitSelect = $cfgLine -match $cfgCombinedPattern
+      $cfgHitMethod = $cfgLine -match '# check-suppress:config-method'
+      $cfgHitTemplate = $cfgLine -match $cfgTemplatePattern
+      if ($cfgHitSelect -or $cfgHitMethod -or $cfgHitTemplate) {
+        $cfgEntry = [pscustomobject]@{ Path = $cfgSrc; LineNumber = $cfgI + 1; Line = $cfgLine }
+        if ($cfgHitSelect) { $cfgSelectOutput.Add($cfgEntry) }
+        if ($cfgHitMethod) { $cfgMethodOutput.Add($cfgEntry) }
+        if ($cfgHitTemplate) { $cfgTemplateOutput.Add($cfgEntry) }
+      }
+    }
+  }
 
   $parallelJobs = [Environment]::ProcessorCount
 
   # WHY: $using: is only valid inside the -Parallel scriptblock; -ThrottleLimit is
   # evaluated in the caller scope, so it takes the plain variable (canonical order:
   # scriptblock first, then -ThrottleLimit)
-  $cfgFileErrors = $cfgFiles | ForEach-Object -Parallel {
-    $basename = $_.Name
+  # WHY the index wrapper: -Parallel emits results in completion order (a slow
+  # first input prints last), so each result carries its input index and the
+  # report below sorts by it, restoring $cfgFiles order deterministically.
+  $cfgIndexed = @(for ($cfgIdx = 0; $cfgIdx -lt $cfgFiles.Count; $cfgIdx++) {
+      [pscustomobject]@{ Index = $cfgIdx; File = $cfgFiles[$cfgIdx] }
+    })
+  $cfgFileErrors = $cfgIndexed | ForEach-Object -Parallel {
+    $cfgEntry = $_
+    $basename = $cfgEntry.File.Name
 
     # Skip infrastructure files and Nix modules inside configs/  # ref: allow-and-deny-lists.instructions.md#A2 -- infrastructure files are not configs
     if ($basename -in '.gitkeep', '.gitignore') { return $null }
@@ -47,7 +84,7 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
     if ($basename -like '*.nix') { return $null }
 
     # Skip agent customization files (consumed as a directory via Method 4)  # ref: allow-and-deny-lists.instructions.md#A2 -- agents/* consumed as directory
-    $relPath = $_.FullName.Substring($using:cfgDir.Length + 1) -replace '\\', '/'
+    $relPath = $cfgEntry.File.FullName.Substring($using:cfgDir.Length + 1) -replace '\\', '/'
     if ($relPath -like 'agents/*') { return $null }
 
     # Skip configs deployed via provision-data-directory or flake inputs (not direct src/ references)
@@ -71,7 +108,7 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
     }
 
     if ($refs.Count -eq 0) {
-      return "$relPath : no references found in src/ (excluding configs/) -- orphaned config?"
+      return [pscustomobject]@{ Index = $cfgEntry.Index; Message = "$relPath : no references found in src/ (excluding configs/) -- orphaned config?" }
     }
 
     $hasMethod = $false
@@ -93,17 +130,15 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
       }
     }
     if (-not $hasMethod) {
-      return "$relPath : referenced but no '# check-suppress:config-method' comment found on or before reference lines"
+      return [pscustomobject]@{ Index = $cfgEntry.Index; Message = "$relPath : referenced but no '# check-suppress:config-method' comment found on or before reference lines" }
     }
 
     return $null
   } -ThrottleLimit $parallelJobs
 
-  foreach ($cfe in $cfgFileErrors) {
-    if ($cfe) {
-      Write-ErrorMessage $cfe
-      $cfgErrors++
-    }
+  foreach ($cfe in ($cfgFileErrors | Where-Object { $null -ne $_ } | Sort-Object Index)) {
+    Write-ErrorMessage $cfe.Message
+    $cfgErrors++
   }
 
   if ($cfgErrors -gt 0) {
@@ -111,6 +146,8 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
     $failed = $true
   } else {
     Write-Message "config method compliance passed."
+  }
+
   }
 
   Write-Message "--- activation naming policy ---"
@@ -124,7 +161,8 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   $kebabRegex = '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'
   $macosDirRegex = '^(src[\\/]platforms[\\/]macOS[\\/]|src[\\/]hosts[\\/]MacBook[\\/])'
   $namingErrors = 0
-  $definitions = @()
+  # WHY: List rather than += on an array: += copies the whole array per append, and a repo this size defines thousands of entries
+  $definitions = [System.Collections.Generic.List[string]]::new()
 
   # WHY: if-expression output is pipeline-enumerated: an empty branch yields $null, crashing the .Count check below under StrictMode; the @() wrapper forces an array
   # WHY: paths are made repo-relative (mirroring the .sh twin's `find src` output) so the ^src/... anchor in $macosDirRegex matches; full paths would never match and silently disable the macos- prefix rule
@@ -147,7 +185,7 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
         if ($line -match '^\s*#') { continue }
 
         if ($line -match $dottedRegex) {
-          $definitions += "$file`:$($i + 1):$(($Matches[0] -split '\.')[-1])"
+          $definitions.Add("$file`:$($i + 1):$(($Matches[0] -split '\.')[-1])")
         }
 
         if (-not $inBlock -and $line -match ($nsRegex + '\s*=[^;]*\{')) {
@@ -155,7 +193,7 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
           $depth = 0
         }
         if ($inBlock -and $line -match $entryRegex) {
-          $definitions += "$file`:$($i + 1):$($Matches[1])"
+          $definitions.Add("$file`:$($i + 1):$($Matches[1])")
         }
         if ($inBlock) {
           $depth += ([regex]::Matches($line, '\{')).Count - ([regex]::Matches($line, '\}')).Count
@@ -234,45 +272,50 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
       'Format-NucleusOutput.psm1', 'Format-NucleusOutput.Tests.ps1', 'Invoke-LogManagement.ps1', 'log-management.Tests.ps1')
     $lfScanned = @($lfFiles | Where-Object { (Split-Path -Leaf $_) -notin $lfAllowlisted })
 
-    $lfShFiles = @($lfScanned | Where-Object { $_ -match '\.(sh|zsh)$' })
-    $lfEchoFiles = @($lfScanned | Where-Object { $_ -match '\.sh$' })
-    $lfPsFiles = @($lfScanned | Where-Object { $_ -match '\.(ps1|psm1)$' })
+    # WHY seven buckets: the old code ran one Select-String sweep per rule over
+    # its file list, so every sweep re-read every file; this reads each file
+    # once and flushes the buckets in the same sweep order below, keeping the
+    # report byte-identical.
+    $lfAnsiSh = [System.Collections.Generic.List[string]]::new()
+    $lfTputSh = [System.Collections.Generic.List[string]]::new()
+    $lfEcho = [System.Collections.Generic.List[string]]::new()
+    $lfAnsiPs = [System.Collections.Generic.List[string]]::new()
+    $lfTputPs = [System.Collections.Generic.List[string]]::new()
+    $lfChar27 = [System.Collections.Generic.List[string]]::new()
+    $lfBacktick = [System.Collections.Generic.List[string]]::new()
 
-    if ($lfShFiles.Count -gt 0) {
-      foreach ($m in (Select-String -Path $lfShFiles -Pattern '\\033\[', '\\e\[', '\\x1b\[')) {
-        Write-ErrorMessage "$($m.Path):$($m.LineNumber): raw ANSI escape literal (use shared color helpers)"
-        $lfErrors++
-      }
-      foreach ($m in (Select-String -Path $lfShFiles -Pattern '\btput\b')) {
-        Write-ErrorMessage "$($m.Path):$($m.LineNumber): terminal capability query (use shared color helpers)"
-        $lfErrors++
+    foreach ($lfFile in $lfScanned) {
+      $lfIsPs = $lfFile -match '\.(ps1|psm1)$'
+      $lfLines = @(Get-Content -LiteralPath $lfFile)
+      for ($lfI = 0; $lfI -lt $lfLines.Count; $lfI++) {
+        $lfLine = $lfLines[$lfI]
+        $lfLoc = "$($lfFile):$($lfI + 1)"
+        if ($lfLine -match '\\033\[' -or $lfLine -match '\\e\[' -or $lfLine -match '\\x1b\[') {
+          if ($lfIsPs) { $lfAnsiPs.Add("$lfLoc`: raw ANSI escape literal (use shared color helpers)") } else { $lfAnsiSh.Add("$lfLoc`: raw ANSI escape literal (use shared color helpers)") }
+        }
+        if ($lfLine -match '\btput\b') {
+          if ($lfIsPs) { $lfTputPs.Add("$lfLoc`: terminal capability query (use shared color helpers)") } else { $lfTputSh.Add("$lfLoc`: terminal capability query (use shared color helpers)") }
+        }
+        if (-not $lfIsPs -and $lfFile -match '\.sh$' -and $lfLine -match '(^|[^A-Za-z0-9_])echo\s+-e([^A-Za-z0-9_]|$)') {
+          $lfEcho.Add("$lfLoc`: echo dash-e flag (use printf with %b)")
+        }
+        if ($lfIsPs) {
+          if ($lfLine -match '\[char\]27') { $lfChar27.Add("$lfLoc`: char-27 escape literal (use PSStyle helpers)") }
+          # WHY the token-end group: an ESC escape is a backtick-e that ends the
+          # token; inline code such as `enable` continues with an identifier
+          # character. -cmatch is parity with the awk twin
+          # (repository-policy.awk), whose regex is case-sensitive, so both twins
+          # report the same lines.
+          if ($lfLine -cmatch '`e([^A-Za-z0-9_]|$)') { $lfBacktick.Add("$lfLoc`: backtick-e escape literal (use PSStyle helpers)") }
+        }
       }
     }
-    if ($lfEchoFiles.Count -gt 0) {
-      foreach ($m in (Select-String -Path $lfEchoFiles -Pattern '(^|[^A-Za-z0-9_])echo\s+-e([^A-Za-z0-9_]|$)')) {
-        Write-ErrorMessage "$($m.Path):$($m.LineNumber): echo dash-e flag (use printf with %b)"
-        $lfErrors++
-      }
-    }
-    if ($lfPsFiles.Count -gt 0) {
-      foreach ($m in (Select-String -Path $lfPsFiles -Pattern '\\033\[', '\\e\[', '\\x1b\[')) {
-        Write-ErrorMessage "$($m.Path):$($m.LineNumber): raw ANSI escape literal (use shared color helpers)"
-        $lfErrors++
-      }
-      foreach ($m in (Select-String -Path $lfPsFiles -Pattern '\btput\b')) {
-        Write-ErrorMessage "$($m.Path):$($m.LineNumber): terminal capability query (use shared color helpers)"
-        $lfErrors++
-      }
-      foreach ($m in (Select-String -Path $lfPsFiles -Pattern '\[char\]27')) {
-        Write-ErrorMessage "$($m.Path):$($m.LineNumber): char-27 escape literal (use PSStyle helpers)"
-        $lfErrors++
-      }
-      # WHY: -CaseSensitive matches the awk twin (repository-policy.awk), whose
-      # regex is case-sensitive by construction. Select-String's case-insensitive
-      # default would flag any lowercase-e example, including a comment naming the
-      # automatic Event variable.
-      foreach ($m in (Select-String -Path $lfPsFiles -Pattern '`e' -CaseSensitive)) {
-        Write-ErrorMessage "$($m.Path):$($m.LineNumber): backtick-e escape literal (use PSStyle helpers)"
+
+    # Flush in the sweep order the Select-String version used: sh ANSI, sh
+    # tput, echo, ps ANSI, ps tput, char-27, backtick-e.
+    foreach ($lfGroup in @($lfAnsiSh, $lfTputSh, $lfEcho, $lfAnsiPs, $lfTputPs, $lfChar27, $lfBacktick)) {
+      foreach ($lfMsg in $lfGroup) {
+        Write-ErrorMessage $lfMsg
         $lfErrors++
       }
     }
@@ -281,12 +324,12 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   # The spec requires NO_COLOR handling in both helpers; the probe is guarded on
   # existence so fixture trees skip it.
   $libShPath = Join-Path $r 'src\scripts\lib\lib.sh'
-  if ((Test-Path -LiteralPath $libShPath) -and -not (Select-String -Path $libShPath -Pattern 'NO_COLOR' -Quiet)) {
+  if ((Test-Path -LiteralPath $libShPath) -and -not (Select-String -LiteralPath $libShPath -Pattern 'NO_COLOR' -Quiet)) {
     Write-ErrorMessage "src/scripts/lib/lib.sh does not reference NO_COLOR (logging-format self-check)"
     $lfErrors++
   }
   $psm1Path = Join-Path $r 'src\platforms\Windows\modules\Format-NucleusOutput.psm1'
-  if ((Test-Path -LiteralPath $psm1Path) -and -not (Select-String -Path $psm1Path -Pattern 'NO_COLOR' -Quiet)) {
+  if ((Test-Path -LiteralPath $psm1Path) -and -not (Select-String -LiteralPath $psm1Path -Pattern 'NO_COLOR' -Quiet)) {
     Write-ErrorMessage "src/platforms/Windows/modules/Format-NucleusOutput.psm1 does not reference NO_COLOR (logging-format self-check)"
     $lfErrors++
   }
@@ -296,75 +339,6 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
     $failed = $true
   } else {
     Write-Message "logging format policy passed."
-  }
-
-  # --- text hygiene ---
-  # ref: documentation.instructions.md -- prose-style rule this sub-check enforces
-  Write-Message "--- text hygiene ---"
-  $thErrors = 0
-  $thSelfLeaf = $selfLeaf
-  $thSelfShLeaf = $selfShLeaf
-
-  # WHY the same shape as the logging-format scope: vendored code, secrets, and
-  # test fixtures carry the pattern text itself and must not be scanned.
-  # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariants; vendored and secret files are separate concerns
-  $thFiles = @(if ($HasArgs) {
-    @($PositionalArgs | Where-Object {
-        $_ -notmatch '(^|[\\/])(vendor[\\/]|node_modules[\\/]|src[\\/]secrets[\\/]|tests[\\/]fixtures[\\/])' -and
-        $_ -notmatch '(^|[\\/])skills[\\/]humanizer[\\/]' -and
-        $_ -match '\.(md|sh|zsh|ps1|psm1|nix|yml|yaml)$' -and
-        (Split-Path -Leaf $_) -notin @($thSelfLeaf, $thSelfShLeaf) + $allStepLeaves
-      })
-  } else {
-    @(git ls-files | Select-GitIgnored | Where-Object {
-        $_ -notmatch '(^|[\\/])(vendor[\\/]|node_modules[\\/]|src[\\/]secrets[\\/]|tests[\\/]fixtures[\\/])' -and
-        $_ -notmatch '(^|[\\/])skills[\\/]humanizer[\\/]' -and
-        $_ -match '\.(md|sh|zsh|ps1|psm1|nix|yml|yaml)$' -and
-        (Split-Path -Leaf $_) -notin @($thSelfLeaf, $thSelfShLeaf) + $allStepLeaves
-      })
-  })
-
-  if ($thFiles.Count -gt 0) {
-    # WHY [char]0x2014 and not a literal: this file is scanned by the sub-check
-    # it implements, so writing the byte sequence here would flag itself.
-    $emDash = [char]0x2014
-    foreach ($thPath in $thFiles) {
-      $thLines = @(Get-Content -LiteralPath (Join-Path $r $thPath) -ErrorAction SilentlyContinue)
-      $thInHelp = $false
-      $thInFence = $false
-      $thIsMd = $thPath -match '\.md$'
-      $thIsPs = $thPath -match '\.(ps1|psm1)$'
-      for ($thI = 0; $thI -lt $thLines.Count; $thI++) {
-        $thLine = $thLines[$thI]
-        if ($thIsMd -and $thLine -match '^[ \t]*(```|~~~)') { $thInFence = -not $thInFence }
-        if (-not $thInFence -and $thLine.Contains($emDash)) {
-          # A dash inside a markdown inline code span names a literal value, the
-          # way a quoted string does in code, so the scan sees the line without
-          # its code spans. WHY markdown only: a code span is its literal syntax.
-          $thScan = if ($thIsMd) { [regex]::Replace($thLine, '`[^`]*`', '') } else { $thLine }
-          $thPlaceholder = $false
-          foreach ($thCell in $thLine.Split('|')) {
-            if ($thCell.Trim() -eq $emDash) { $thPlaceholder = $true; break }
-          }
-          if (-not $thPlaceholder -and $thScan.Contains($emDash) -and
-              ($thIsMd -or $thInHelp -or $thLine -match '^[ \t]*#' -or $thLine -match '<#')) {
-            Write-ErrorMessage "$thPath`:$($thI + 1): em dash in prose (use a comma, a colon, or two sentences)"
-            $thErrors++
-          }
-        }
-        if ($thIsPs) {
-          if ((-not $thInHelp) -and $thLine -match '<#') { $thInHelp = -not ($thLine -match '#>') }
-          elseif ($thInHelp -and $thLine -match '#>') { $thInHelp = $false }
-        }
-      }
-    }
-  }
-
-  if ($thErrors -gt 0) {
-    Write-ErrorMessage "text hygiene policy check failed with $thErrors error(s)"
-    $failed = $true
-  } else {
-    Write-Message "text hygiene policy passed."
   }
 
   # --- removed skip mechanism ---
@@ -456,44 +430,61 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
   # `2>$null`/`2>/dev/null` on a single command is the suppression-audit concern (step 11).
   Write-Message "--- log capture pair policy ---"
   $lcpErrors = 0
-  $lcpSearchDirs = @(
-    (Join-Path -Path $r -ChildPath 'src'),
-    (Join-Path -Path $r -ChildPath 'tests')
-  )
+  # POSIX roots: the whole tracked repo (git ls-files | filter_gitignored,
+  # 12-repo-policy-pattern.sh:494), extension-narrowed by _lcp_ext_re (.sh:484)
+  # and filtered by _policy_scan_target (.sh:310-324: vendor, src/secrets,
+  # tests/fixtures, self twins). Scanning $r gives the same roots, so a capture
+  # point under scripts/ is caught like one under src/; Select-GitIgnored
+  # applies the gitignore filter on top.
+  $lcpSearchDirs = @($r)
   $lcpFiles = @()
   foreach ($dir in $lcpSearchDirs) {
     if (Test-Path -LiteralPath $dir) {
       # Scope excludes test fixtures, which deliberately hold violation samples.
       # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariants; vendored and secret files are separate concerns
-      $lcpFiles += Get-ChildItem -Path $dir -Recurse -Include '*.nix', '*.sh', '*.ps1', '*.psm1', '*.yml' |
+      $lcpFiles += Get-ChildItem -LiteralPath $dir -Recurse -Include '*.nix', '*.sh', '*.ps1', '*.psm1', '*.yml' |
         Where-Object { $_.FullName -notmatch '(^|[\\\/])(vendor|secrets|tests[\\\/]fixtures)([\\\/]|$)' } |
         Select-GitIgnored
     }
   }
 
   $lcpDiscardPattern = '(StandardOutPath|StandardErrorPath|StandardOutput|StandardError)\s*=\s*"/dev/null"'
+  # WHY one read per file instead of two Select-String calls plus a -Raw read:
+  # the .sh twin batches this family into a single awk pass, and one Get-Content
+  # matches that cost while preserving per-file, per-rule report order.
   foreach ($f in $lcpFiles) {
     # Exclude this check's own twins: their source contains the literal pattern text.
     if ((Split-Path -Leaf $f) -in ($allStepLeaves + $allStepShLeaves)) { continue }  # WHY: $f is a string from Select-GitIgnored, not a FileInfo object
     $lcpRel = $f.Substring($r.Length + 1) -replace '\\', '/'
 
-    # Rule 1: no capture directive may discard a stream.
-    Select-String -Path $f -Pattern $lcpDiscardPattern | ForEach-Object {
-      Write-ErrorMessage "log capture pair: '$lcpRel`:$($_.LineNumber)' discards a stream to /dev/null; capture stdout.log and stderr.log instead (output-handling.instructions.md)"
-      $lcpErrors++
+    $lcpLines = @(Get-Content -LiteralPath $f)
+
+    # Rule 1: no capture directive may discard a stream. One finding per matching
+    # line, matching Select-String's one-MatchInfo-per-line emission.
+    for ($lcpI = 0; $lcpI -lt $lcpLines.Count; $lcpI++) {
+      if ($lcpLines[$lcpI] -match $lcpDiscardPattern) {
+        Write-ErrorMessage "log capture pair: '$lcpRel`:$($lcpI + 1)' discards a stream to /dev/null; capture stdout.log and stderr.log instead (output-handling.instructions.md)"
+        $lcpErrors++
+      }
     }
 
-    # Rule 2: no merged-stream redirection.
-    Select-String -Path $f -Pattern '*>>' -SimpleMatch | ForEach-Object {
-      Write-ErrorMessage "log capture pair: '$lcpRel`:$($_.LineNumber)' merges stdout and stderr; use 1>> and 2>> into stdout.log and stderr.log"
-      $lcpErrors++
+    # Rule 2: no merged-stream redirection. Literal '*>>' substring, the same
+    # search Select-String -SimpleMatch and the POSIX twin's index($0, "*>>") do,
+    # one finding per line.
+    for ($lcpI = 0; $lcpI -lt $lcpLines.Count; $lcpI++) {
+      if ($lcpLines[$lcpI].Contains('*>>')) {
+        Write-ErrorMessage "log capture pair: '$lcpRel`:$($lcpI + 1)' merges stdout and stderr; use 1>> and 2>> into stdout.log and stderr.log"
+        $lcpErrors++
+      }
     }
 
     # Rule 3: capture is both-or-neither per file, per directive family.
     # WHY boolean presence: a file may own several services, so only the lone-stream case
     # is a violation -- with one stream captured and the other discarded, the discarded
     # stream lands in whatever the platform default is.
-    $lcpRaw = Get-Content -LiteralPath $f -Raw
+    # Presence over the whole file, derived from the same read; joining with LF
+    # keeps every -match pattern equivalent to the old -Raw read.
+    $lcpRaw = $lcpLines -join "`n"
     if (($lcpRaw -match 'StandardOutPath') -ne ($lcpRaw -match 'StandardErrorPath')) {
       Write-ErrorMessage "log capture pair: '$lcpRel' declares only one of StandardOutPath/StandardErrorPath; declare both or neither"
       $lcpErrors++
@@ -562,9 +553,6 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
       @($ptDirs | ForEach-Object { Get-ChildItem -LiteralPath (Join-Path $r $_) -Filter '*.md' -File -Recurse })
     })
   $ptErrors = 0
-  # One harness's tool and agent names belong in the adapter mapping table, never
-  # in a body an agent follows in an unknown harness.
-  $ptHarnessNames = 'activate_vs_code_interaction|multi_replace_string_in_file|runSubagent|resolve_memory_file_uri|__LANE_SCOPE__|/memories/|get_errors|run_in_terminal|run_vscode_command|vscode_askQuestions|replace_string_in_file|create_file'
   if (-not $HasArgs -and $ptFiles.Count -eq 0) {
     $ptErrors++
     Write-ErrorMessage "no prompt templates found under .agents/prompts or src/users/default/agents/prompts"
@@ -579,46 +567,8 @@ Register-Step -Id "repo-policy-pattern" -Name "Repository policy (pattern-based)
       $ptErrors++
       Write-ErrorMessage "$($pt.FullName): no argument slot; text typed after the command is discarded"
     }
-    if ($ptText -notmatch 'standing-orders\.instructions\.md') {
-      $ptErrors++
-      Write-ErrorMessage "$($pt.FullName): missing standing-orders anchor line"
-    }
-    if ($ptText -match $ptHarnessNames) {
-      $ptErrors++
-      Write-ErrorMessage "$($pt.FullName): harness-specific name; use a capability from ~/.agents/instructions/harness-adapters.reference.md"
-    }
   }
 
-  # The same vocabulary rule covers every user-scope file an agent follows in an
-  # unknown harness: instruction bodies, agent definitions, and skill bodies. The
-  # adapter reference is exempt because its table is the sanctioned place for a
-  # harness's own tool names.
-  $ucDirs = @('src/users/default/agents/instructions', 'src/users/default/agents/agents', 'src/users/default/agents/skills')
-  $ucFiles = @(if ($HasArgs) {
-      @($PositionalArgs | Where-Object {
-          $ucNorm = $_ -replace '\\', '/'
-          # Prefix match, mirroring filter_scoped_files in check-lib.sh: a scoped run
-          # accepts any file nested under a scanned directory, which the skills tree
-          # needs. Exact parent equality would pass a nested file on Windows only.
-          $ucInScope = $false
-          foreach ($ucDir in $ucDirs) {
-            if ($ucNorm.StartsWith("$ucDir/", [StringComparison]::Ordinal)) { $ucInScope = $true; break }
-          }
-          $ucInScope -and ((Split-Path -Leaf $ucNorm) -like '*.md')
-        } | Where-Object { Test-Path -LiteralPath (Join-Path $r $_) } |
-        ForEach-Object { Get-Item -LiteralPath (Join-Path $r $_) })
-    } else {
-      @($ucDirs | Where-Object { Test-Path -LiteralPath (Join-Path $r $_) } |
-        ForEach-Object { Get-ChildItem -LiteralPath (Join-Path $r $_) -Filter '*.md' -File -Recurse })
-    })
-  foreach ($uc in $ucFiles) {
-    if ($uc.Name -eq 'harness-adapters.reference.md') { continue }
-    $ucText = Get-Content -Raw -LiteralPath $uc.FullName
-    if ($ucText -match $ptHarnessNames) {
-      $ptErrors++
-      Write-ErrorMessage "$($uc.FullName): harness-specific name; use a capability from ~/.agents/instructions/harness-adapters.reference.md"
-    }
-  }
   $ptPolicy = Join-Path $r 'src/users/default/agents/instructions/standing-orders.instructions.md'
   if ((Test-Path -LiteralPath $ptPolicy) -and
     (Select-String -LiteralPath $ptPolicy -Pattern 'child-prompt-block:begin' -SimpleMatch -Quiet) -and

@@ -1,7 +1,8 @@
 # Daily log rotation for Windows scheduled tasks and manual use.
 #
 # The system tree is root-owned, so the scheduled task runs it elevated; the
-# user tree runs as the logged-on user.
+# user tree runs as the logged-on user. The operations belong to nucleus-logs;
+# this wrapper only selects scope and runs the app in the system or user domain.
 
 [CmdletBinding()]
 param (
@@ -16,29 +17,20 @@ $ErrorActionPreference = 'Stop'
 $modulePath = Join-Path $PSScriptRoot '..\..\..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force
 
-$repoRoot = $env:NUCLEUS_REPO_ROOT
-if ([string]::IsNullOrWhiteSpace($repoRoot)) {
-  Write-NucleusError -CommandName log-gc 'NUCLEUS_REPO_ROOT not set'
+# WHY NUCLEUS_LOGS_BIN: one seam for the app entry point, so the scheduled-task
+# wrapper and the tests resolve it the same way gc.ps1 does.
+$logsBin = if ($env:NUCLEUS_LOGS_BIN) {
+  $env:NUCLEUS_LOGS_BIN
+} else {
+  Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\scripts\logs.ps1'
+}
+if (-not (Test-Path -LiteralPath $logsBin -PathType Leaf)) {
+  Write-NucleusError -CommandName log-gc "nucleus-logs entry point not found at '$logsBin'"
+  exit 1
 }
 
-$moduleDir = Join-Path -Path $repoRoot -ChildPath 'src\platforms\Windows\modules'
-$schemaPath = Join-Path -Path $repoRoot -ChildPath 'src\modules\services.schema.json'
-. (Join-Path -Path $moduleDir -ChildPath 'Invoke-LogManagement.ps1')
-
-try {
-  $schemaContent = Get-Content -LiteralPath $schemaPath -Raw | ConvertFrom-Json
-  $loggingDefaults = $schemaContent.definitions.loggingEntry.properties
-} catch {
-  Write-NucleusWarning -CommandName log-gc "failed to parse services.schema.json; using hardcoded defaults, $($_.Exception.Message)"
-  $loggingDefaults = $null
+& (Get-Process -Id $PID).Path -NoProfile -NoLogo -File $logsBin -Action gc -Scope $Scope
+if ($LASTEXITCODE -ne 0) {
+  Write-NucleusError -CommandName log-gc "nucleus-logs gc failed with exit code $LASTEXITCODE"
+  exit $LASTEXITCODE
 }
-
-$logMaxSize = if ($loggingDefaults.maxSize.default) { [int]$loggingDefaults.maxSize.default } else { 10000000 } # bytes
-$logMaxFiles = if ($loggingDefaults.maxFiles.default) { [int]$loggingDefaults.maxFiles.default } else { 4 }
-$logCompress = if ($null -ne $loggingDefaults.compress.default) { [bool]$loggingDefaults.compress.default } else { $true }
-
-$logExpiry = if ($env:NUCLEUS_LOG_EXPIRY) { $env:NUCLEUS_LOG_EXPIRY } else { '7d' }
-$logDir = if ($Scope -eq 'system') { Get-NucleusSystemLogDir } else { Get-NucleusLogDir }
-
-Invoke-LogRotation -Path $logDir -MaxSize $logMaxSize -MaxFiles $logMaxFiles -Compress $logCompress
-Invoke-LogExpiry -Path $logDir -Expiry $logExpiry

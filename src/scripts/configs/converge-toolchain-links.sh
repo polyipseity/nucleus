@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Converge the SYSTEM-root toolchain symlink farm from a JSON name->target map.
 #
-# Every env-catalog toolchain value (CC, DEVELOPER_DIR, SDKROOT, ...) points into
-# this directory, so each link is repointed to the current generation's store
-# path on every apply and `nix-collect-garbage` can never leave an exported value
-# dangling. The target derivations are interpolated by the calling module, which
-# keeps them alive in the system closure for as long as the links reference them.
+# Every toolchain value in src/modules/lib/env-secrets.nix (CC, DEVELOPER_DIR,
+# SDKROOT, ...) points into this directory, so each link is repointed to the
+# current generation's store path on every apply and `nix-collect-garbage` can
+# never leave an exported value dangling. The target derivations are
+# interpolated by the calling module, which keeps them alive in the system
+# closure for as long as the links reference them.
 #
 # Usage: converge-toolchain-links.sh <jq-bin> <link-dir> <targets-json>
 #   <jq-bin>        Store path to the jq binary (activation PATH is isolated).

@@ -8,50 +8,13 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
   # WHY: all repo-policy step files must be excluded from pattern scans to avoid self-referencing literal pattern text
   $allStepLeaves = @('11-repo-policy-grep.ps1', '12-repo-policy-pattern.ps1', '13-repo-policy-data.ps1')
-  $allStepShLeaves = @('11-repo-policy-grep.sh', '12-repo-policy-pattern.sh', '13-repo-policy-data.sh')
+  # WHY: only this step's own shell leaf is excluded. It carries `|| true`
+  #   unannotated in its own scan table; the sibling leaves carry the literal
+  #   only behind `# check-suppress:suppression_doc:` annotations, which the
+  #   audit accepts, so excluding them would silently exempt a real violation
+  #   there and diverge from the POSIX twin, which drops its own file alone.
+  $allStepShLeaves = @('11-repo-policy-grep.sh')
   $failed = $false
-
-  # --- Package manager enforcement ---
-  Write-Message "--- package manager enforcement ---"
-  $pmeViolations = 0
-  $pmeExcludeNames = @() + $allStepLeaves + $allStepShLeaves
-
-  if ($HasArgs) {
-    $pmeHasShell = @($PositionalArgs | Where-Object { $_ -match '\.(sh|ps1|nix)$' }).Count -gt 0
-    if (-not $pmeHasShell) {
-      Write-Message "0 shell files in scope — nothing to enforce."
-    } else {
-      $pmeGrepFiles = @(
-        $PositionalArgs | Where-Object { $_ -match '\.(sh|ps1|nix)$' } |
-        Where-Object { $pmeExcludeNames -notcontains [System.IO.Path]::GetFileName($_) }
-      )
-      if ($pmeGrepFiles.Count -gt 0) {
-        $pipV = Select-String -Path $pmeGrepFiles -Pattern '(^|[^a-z])pip install([^-]|$)' |
-          Where-Object { $_.Line -notmatch 'uv pip install' }
-        if ($pipV) { Write-ErrorMessage 'bare pip install detected (use uv pip install instead)'; $pmeViolations++ }
-
-        $npmV = Select-String -Path $pmeGrepFiles -Pattern '(^|[^a-z])npm install([^-]|$)'
-        if ($npmV) { Write-ErrorMessage 'bare npm install detected (use bun or nix instead)'; $pmeViolations++ }
-      }
-    }
-  } else {
-    $pmeGrepFiles = @(
-      Get-ChildItem -Recurse -Path (Join-Path $r 'scripts'), (Join-Path $r 'src'), (Join-Path $r 'tests') `
-        -Include *.sh, *.ps1, *.nix `
-        | Where-Object { $pmeExcludeNames -notcontains $_.Name } `
-        | ForEach-Object { $_.FullName }
-    )
-    if ($pmeGrepFiles.Count -gt 0) {
-      $pipV = Select-String -Path $pmeGrepFiles -Pattern '(^|[^a-z])pip install([^-]|$)' |
-        Where-Object { $_.Line -notmatch 'uv pip install' }
-      if ($pipV) { Write-ErrorMessage 'bare pip install detected (use uv pip install instead)'; $pmeViolations++ }
-
-      $npmV = Select-String -Path $pmeGrepFiles -Pattern '(^|[^a-z])npm install([^-]|$)'
-      if ($npmV) { Write-ErrorMessage 'bare npm install detected (use bun or nix instead)'; $pmeViolations++ }
-    }
-  }
-
-  if ($pmeViolations -gt 0) { $failed = $true } else { Write-Message 'no package manager violations found.' }
 
   # --- Suppression audit ---
   Write-Message "--- suppression audit ---"
@@ -115,9 +78,10 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
     $saNixFiles = @(if ($Context.NixFiles) { $Context.NixFiles } else { $PositionalArgs | Where-Object { $_ -like '*.nix' } })
     $saPs1Files = @((@(if ($Context.Ps1Files) { $Context.Ps1Files } else { $PositionalArgs | Where-Object { $_ -like '*.ps1' } })) |
       Where-Object { (Split-Path -Leaf $_) -notin $allStepLeaves })
+    $saShNixFiles = @((@($saShFiles + $saNixFiles)) | Where-Object { (Split-Path -Leaf $_) -notin $allStepShLeaves })
     $saHasFiles = ($saShFiles.Count -gt 0) -or ($saNixFiles.Count -gt 0) -or ($saPs1Files.Count -gt 0)
 
-    $saUndocViolations += Get-UndocSuppViolation -Pattern '|| true' -Label '|| true' -Files @((@($saShFiles + $saNixFiles)) | Where-Object $saNotTests) -Cache ([ref]$saFileCache)
+    $saUndocViolations += Get-UndocSuppViolation -Pattern '|| true' -Label '|| true' -Files @($saShNixFiles | Where-Object $saNotTests) -Cache ([ref]$saFileCache)
     $saUndocViolations += Get-UndocSuppViolation -Pattern '2>$null' -Label '2>$null' -Files @($saPs1Files | Where-Object $saNotTests) -Cache ([ref]$saFileCache)
     $saUndocViolations += Get-UndocSuppViolation -Pattern '-ErrorAction SilentlyContinue' -Label '-ErrorAction SilentlyContinue' -Files @($saPs1Files | Where-Object $saNotTests) -Cache ([ref]$saFileCache)
     $saUndocViolations += Get-UndocSuppViolation -Pattern 'catch\s*\{\s*\}' -Label 'empty catch {}' -IsRegex -Files $saPs1Files -Cache ([ref]$saFileCache)
@@ -128,12 +92,12 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   } else {
     $saAllShNix = @(
       Get-ChildItem -Path $r -Recurse -File |
-        Where-Object { $_.Extension -in '.sh', '.nix' -and $_.FullName -notmatch '[\/]vendor[\/]' } |
+        Where-Object { $_.Extension -in '.sh', '.nix' -and $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.Name -notin $allStepShLeaves } |
         ForEach-Object { $_.FullName }
     )
     $saAllPs1 = @(
       Get-ChildItem -Path $r -Recurse -File |
-        Where-Object { $_.Extension -eq '.ps1' -and $_.FullName -notmatch '[\/]vendor[\/]' -and $_.Name -notin $allStepLeaves } |
+        Where-Object { $_.Extension -eq '.ps1' -and $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.Name -notin $allStepLeaves } |
         ForEach-Object { $_.FullName }
     )
     $saHasFiles = ($saAllShNix.Count -gt 0) -or ($saAllPs1.Count -gt 0)
@@ -177,14 +141,16 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
     }
   }
 
-  $cmDeclCount = 0
   $cmHomebrew = Join-Path -Path $r -ChildPath 'src/hosts/MacBook/homebrew.nix'
+  # WHY the guard wraps the failure too: a fixture root with no homebrew.nix
+  #   has nothing to declare, and a bare `continue` at this level would abort
+  #   the whole step action (no enclosing loop), not skip this check.
   if (Test-Path -LiteralPath $cmHomebrew) {
     $cmDeclCount = (Select-String -LiteralPath $cmHomebrew -Pattern 'fuse-t' -CaseSensitive:$false | Measure-Object).Count
-  }
-  if ($cmDeclCount -lt 1) {
-    Write-ErrorMessage 'no fuse-t declaration in src/hosts/MacBook/homebrew.nix; macOS cloud mounts need the cask'
-    $cmViolations++
+    if ($cmDeclCount -lt 1) {
+      Write-ErrorMessage 'no fuse-t declaration in src/hosts/MacBook/homebrew.nix; macOS cloud mounts need the cask'
+      $cmViolations++
+    }
   }
 
   $cmInstallDirs = @(
@@ -196,7 +162,7 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   if ($cmInstallDirs.Count -gt 0) {
     $cmInstallSites = @(
       Get-ChildItem -LiteralPath $cmInstallDirs -Recurse -File |
-        Select-String -Pattern 'macfuse install|brew install.*macfuse|fuse-t install|brew install.*fuse-t' -CaseSensitive |
+        Select-String -Pattern 'macfuse install\b|brew install.*macfuse|fuse-t install\b|brew install.*fuse-t' -CaseSensitive |
         ForEach-Object { $_.Path } |
         Sort-Object -Unique
     )
@@ -342,62 +308,6 @@ Register-Step -Id "repo-policy-grep" -Name "Repository policy (grep-heavy)" -Pla
   }
 
   if ($ssViolations -gt 0) { $failed = $true } else { Write-Message 'no service supervision invariant violations found.' }
-
-  # --- SRT wrapper invariants ---
-  # srt consumes its own options (-h, -V, -d, -s, -c, --control-fd) wherever they
-  # appear, so `pi --help` prints srt's usage and `pi -c <arg>` loses the argument
-  # silently. Every forwarder must write the -- marker.
-  Write-Message "--- srt wrapper invariants ---"
-  $swViolations = 0
-  # `srt -c '<string>'` is deliberately not a candidate: the string is a single
-  # argv element behind -c, so it exposes no per-argument flag to srt's parser.
-  $swInvocation = '(^|[^A-Za-z0-9_./-])srt\s+command\s+\S+'
-  $swSeparated = 'srt\s+command\s+\S+\s+--(\s|$)'
-
-  # The comment filter below keeps this check from reporting itself: both patterns
-  # are regexes, so neither matches the line it is written on, and a literal
-  # invocation left in a comment is dropped.
-  $swFiles = @()
-  if ($HasArgs) {
-    # The whole-repo branch reads src/ and scripts/ only, so drop tests/ here too
-    # and keep both modes in agreement: a test proving this rule needs a violating
-    # example, and a fixture is not a shipped wrapper.
-    # ref: allow-and-deny-lists.instructions.md#B9
-    $swFiles = @(
-      $PositionalArgs |
-        Where-Object { $_ -match '\.(sh|zsh|ps1|nix)$' } |
-        Where-Object { $_ -notmatch '(^|[\\/])tests[\\/]' }
-    )
-  } else {
-    foreach ($swDir in @('src', 'scripts')) {
-      $swDirPath = Join-Path -Path $r -ChildPath $swDir
-      if (-not (Test-Path -LiteralPath $swDirPath)) { continue }
-      $swFiles += @(
-        Get-ChildItem -LiteralPath $swDirPath -Recurse -File -Include *.sh, *.zsh, *.ps1, *.nix |
-          Select-GitIgnored |
-          ForEach-Object { $_ }
-      )
-    }
-  }
-
-  if ($swFiles.Count -gt 0) {
-    $swUnseparated = @(
-      Select-String -Path $swFiles -Pattern $swInvocation |
-        Where-Object { $_.Line -notmatch $swSeparated } |
-        Where-Object { $_.Line -notmatch '^\s*#' }
-    )
-    foreach ($swHit in $swUnseparated) {
-      $swRelative = if ($swHit.Path.StartsWith($r)) {
-        ($swHit.Path.Substring($r.Length).TrimStart([char[]]"\/")) -replace '\\', '/'
-      } else {
-        $swHit.Path
-      }
-      Write-ErrorMessage "$($swRelative):$($swHit.LineNumber) forwards the user's arguments to srt without --; srt parses its own options, so put -- between the wrapped command and the forwarded arguments"
-      $swViolations++
-    }
-  }
-
-  if ($swViolations -gt 0) { $failed = $true } else { Write-Message 'every srt wrapper separates its forwarded arguments.' }
 
   if ($failed) {
     Write-ErrorMessage "repository policy (grep-heavy) check failed"

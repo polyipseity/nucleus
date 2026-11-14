@@ -47,7 +47,13 @@ usage() {
   log-config [service...]           Show effective logging configuration.
   --json                            Machine-readable JSON output.
   --verbose                         Show action result summaries (start/restart).
+  --disable                         With stop: disable auto-start after stopping.
+  --enable                          With start: enable auto-start before starting.
   -h|--help                         Show usage.
+
+  stop warns when the platform will bring the service back: a persistent
+  launchd job, or an enabled scheduled task. start warns when the service is not
+  enabled. Pass --disable or --enable to apply the remedy in the same run.
 
   Services are registry keys from src/modules/services.json. Entries flagged
   prefixMatch stand in for one runtime service per instance: list and status
@@ -258,7 +264,7 @@ svc_status() {
     launchd_domain=$(echo "$entry_json" | jq -r '.launchdDomain // "gui"')
     [ "$scope" = "system" ] && domain_flag="sudo"
 
-    local list_line running=true enabled=true pid=""
+    local list_line running=true pid=""
     # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
     if [ "$scope" = "user" ] && [ "$EUID" -eq 0 ]; then
       list_line=$(launchctl asuser "$REAL_USER_UID" launchctl list 2>/dev/null | awk -v label="$svc_id" 'NR>1 && $3==label { print $1, $2 }' || true) # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
@@ -269,7 +275,6 @@ svc_status() {
     socket_activated=$(echo "$entry_json" | jq -r '.socketActivated // false')
     if [ -z "$list_line" ]; then
       running=false
-      enabled=false
     else
       pid=$(echo "$list_line" | awk '{ print $1 }')
       if [ "$pid" = "-" ] || [ -z "$pid" ]; then pid=""; fi
@@ -286,12 +291,24 @@ svc_status() {
       case "$print_out" in
       *"state = running"*)
         running=true
-        enabled=true
         pid=$(echo "$print_out" | sed -n 's/.*pid = \([0-9]*\).*/\1/p')
         [ -z "$pid" ] && pid=""
         ;;
       esac
     fi
+    # The disabled gate is a separate question from loaded-ness, so it is read on
+    # its own and stays tri-state: only a read that names the state can claim one.
+    local domain_target
+    if [ "$scope" = "system" ]; then
+      domain_target=$(launchctl_bootstrap_domain system "")
+    else
+      domain_target=$(launchctl_bootstrap_domain "${launchd_domain:-gui}" "$(launchctl_session_uid)")
+    fi
+    local enabled_json="null"
+    case "$(launchctl_service_enabled "$domain_target" "$svc_id" "$domain_flag")" in
+    enabled) enabled_json=true ;;
+    disabled) enabled_json=false ;;
+    esac
     local status_text state_text exit_code=""
     if [ "$running" = true ]; then
       status_text="active"
@@ -304,7 +321,7 @@ svc_status() {
     fi
     platform_json=$(printf '{"status":"%s","running":%s,"enabled":%s,"pid":%s,"state":%s,"exitCode":%s}' \
       "$status_text" \
-      "$running" "$enabled" "${pid:-null}" \
+      "$running" "$enabled_json" "${pid:-null}" \
       "$(printf '%s' "${state_text:-null}" | jq -R . 2>/dev/null || echo null)" \
       "${exit_code:-null}")
     ;;
@@ -545,6 +562,39 @@ wait_cloud_mount_attached() {
   return 1
 }
 
+# WHY: a stopped service that the platform brings back looks like a success, so
+# the consequence is stated before the action and the remedy is named. The stop
+# rule is declarative: services.json's onDemand is the only entry field that says
+# a service is started explicitly by apply, vm or svc, which is what the schema
+# documents. The start rule needs the runtime gate, which a pure helper must not
+# probe, so the caller passes the verdict it read (true, false, or empty for
+# unknown) and only an explicit false warns. Only the two types this CLI drives
+# appear below: a Windows entry is served by svc.ps1, which owns its own table.
+# svc_action_warning <action> <entry_json> [enabled]
+svc_action_warning() {
+  local action="$1" entry_json="$2" enabled="${3:-}"
+  local svc_type
+  svc_type=$(printf '%s' "$entry_json" | jq -r '.type // ""')
+
+  case "$action" in
+  stop)
+    case "$svc_type" in
+    macos-launchctl)
+      if [ "$(printf '%s' "$entry_json" | jq -r '.onDemand // false')" = "true" ]; then
+        return 0
+      fi
+      printf '%s' "launchd restarts a persistent job after a stop; use --disable to stop it for good"
+      ;;
+    esac
+    ;;
+  start)
+    if [ "$enabled" = "false" ]; then
+      printf '%s' "the service is not enabled, so it will not start on its own; use --enable to enable it"
+    fi
+    ;;
+  esac
+}
+
 svc_action() {
   local action="$1"
   local name="$2"
@@ -585,6 +635,13 @@ svc_action() {
     case "$action" in
     status) svc_status "$name" "$entry_json" ;;
     start)
+      local _start_enabled="" _start_warning=""
+      case "$(launchctl_service_enabled "$(launchctl_bootstrap_domain "$launchd_domain" "$uid")" "$svc_id" "$sudo_prefix")" in
+      enabled) _start_enabled=true ;;
+      disabled) _start_enabled=false ;;
+      esac
+      _start_warning=$(svc_action_warning start "$entry_json" "$_start_enabled")
+      [ -z "$_start_warning" ] || warn "$_start_warning"
       cleanup_service_ports "$entry_json"
       recover_launchctl_service "$launchd_domain" "$svc_id" "$sudo_prefix" "$uid" || {
         # WHY: a loaded job only needs starting and an unloaded one loading again;
@@ -614,6 +671,13 @@ svc_action() {
       fi
       ;;
     stop)
+      local _stop_warning=""
+      # WHY: the warning says the stop will be undone, which --disable makes false,
+      # so a run that already applies the remedy stays quiet.
+      if [ "$stop_disable" != true ]; then
+        _stop_warning=$(svc_action_warning stop "$entry_json")
+        [ -z "$_stop_warning" ] || warn "$_stop_warning"
+      fi
       local stop_rc=0
       $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 || stop_rc=$?
       if ! wait_cloud_mount_released "$name" "$cloud_mount"; then
@@ -676,8 +740,22 @@ svc_action() {
         }
       fi
       ;;
-    enable) $sudo_prefix launchctl enable "$target" >/dev/null 2>&1 ;;
-    disable) $sudo_prefix launchctl disable "$target" >/dev/null 2>&1 ;;
+    enable)
+      local _out=""
+      if ! _out=$(launchctl_service_enable "$target" "$sudo_prefix"); then
+        error "$name — launchctl enable failed: $_out"
+        return 1
+      fi
+      say "$name — enabled"
+      ;;
+    disable)
+      local _out=""
+      if ! _out=$(launchctl_service_disable "$target" "$sudo_prefix"); then
+        error "$name — launchctl disable failed: $_out"
+        return 1
+      fi
+      say "$name — disabled and unloaded"
+      ;;
     esac
     ;;
   nixos-systemctl)
@@ -687,6 +765,16 @@ svc_action() {
     case "$action" in
     status) svc_status "$name" "$entry_json" ;;
     start)
+      local _start_enabled="" _start_warning="" _is_enabled=""
+      # check-suppress:suppression_doc: a unit that is not enabled is the question being asked; is-enabled exits 1 for it.
+      _is_enabled=$(systemctl $scope_flag is-enabled "$svc_id" 2>/dev/null || true)
+      # WHY: only the exact disabled verdict has --enable as an actionable remedy;
+      # static and generated units are not enabled but cannot be enabled.
+      case "$_is_enabled" in
+      disabled) _start_enabled=false ;;
+      esac
+      _start_warning=$(svc_action_warning start "$entry_json" "$_start_enabled")
+      [ -z "$_start_warning" ] || warn "$_start_warning"
       cleanup_service_ports "$entry_json"
       systemctl $scope_flag start "$svc_id" >/dev/null 2>&1
       poll_service_ready "$name" "$entry_json" >/dev/null || {
@@ -696,7 +784,14 @@ svc_action() {
         return 1
       }
       ;;
-    stop) systemctl $scope_flag stop "$svc_id" >/dev/null 2>&1 ;;
+    stop)
+      local _stop_warning=""
+      if [ "$stop_disable" != true ]; then
+        _stop_warning=$(svc_action_warning stop "$entry_json")
+        [ -z "$_stop_warning" ] || warn "$_stop_warning"
+      fi
+      systemctl $scope_flag stop "$svc_id" >/dev/null 2>&1
+      ;;
     restart)
       cleanup_service_ports "$entry_json"
       systemctl $scope_flag restart "$svc_id" >/dev/null 2>&1
@@ -924,9 +1019,30 @@ do_action() {
       _d_prefix_entry="$(printf '%s' "$registry" | jq -c --arg k "$key" '.[$k].hostEntry')"
     fi
 
-    if ! svc_action "$action" "$instance" "$svc_json" "$_d_prefix_entry"; then
+    # WHY: --enable runs before the start because a disabled macOS job cannot be
+    # bootstrapped, and a failed enable leaves the start to fail with a misleading
+    # launchctl error. --disable runs after the stop, and runs even when the stop
+    # reported a failure, because the disable is the operation that makes the
+    # stop stick.
+    local _d_enable_ok=true
+    if [ "$action" = "start" ] && [ "$start_enable" = true ]; then
+      if ! svc_action enable "$instance" "$svc_json" "$_d_prefix_entry"; then
+        warn "$instance — enable before start failed"
+        _d_enable_ok=false
+        overall_exit=1
+      fi
+    fi
+
+    if [ "$_d_enable_ok" = true ] && ! svc_action "$action" "$instance" "$svc_json" "$_d_prefix_entry"; then
       warn "$instance — action $action failed"
       overall_exit=1
+    fi
+
+    if [ "$action" = "stop" ] && [ "$stop_disable" = true ]; then
+      if ! svc_action disable "$instance" "$svc_json" "$_d_prefix_entry"; then
+        warn "$instance — disable after stop failed"
+        overall_exit=1
+      fi
     fi
     if "$verbose_mode" && [ "$action" = "start" ] || [ "$action" = "restart" ]; then
       local _v_status
@@ -1365,6 +1481,8 @@ do_log_config() {
 
 json_output=false
 verbose_mode=false
+stop_disable=false
+start_enable=false
 domain_filter=""
 action=""
 service_names=()
@@ -1424,11 +1542,27 @@ for arg in "${service_names[@]}"; do
     domain_filter="user"
   elif [ "$arg" = "--system" ]; then
     domain_filter="system"
+  elif [ "$arg" = "--disable" ]; then
+    stop_disable=true
+  elif [ "$arg" = "--enable" ]; then
+    start_enable=true
   else
     filtered_service_names+=("$arg")
   fi
 done
 service_names=("${filtered_service_names[@]}")
+
+# WHY: both orders parse (`stop caddy --disable` and `stop --disable caddy`), so
+# the flag reaches the loop as a service name on one of them. Rejecting it on any
+# other action keeps it from being dropped on the floor as an unknown service.
+if [ "$stop_disable" = true ] && [ "$action" != "stop" ]; then
+  error "--disable is only valid with stop"
+  exit 1
+fi
+if [ "$start_enable" = true ] && [ "$action" != "start" ]; then
+  error "--enable is only valid with start"
+  exit 1
+fi
 
 : "${SVC_DOMAIN_FILTER:=all}"
 case "$SVC_DOMAIN_FILTER" in

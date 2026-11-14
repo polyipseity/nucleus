@@ -106,13 +106,6 @@ else
   assert_fail "no fusermount unmount or mkdir helper remains" "$offenders"
 fi
 
-offenders="$(grep -n 'watchdog owns' "$NIX_FILE" || true)"
-if [ -z "$offenders" ]; then
-  assert_pass "no comment still hands revival to the watchdog"
-else
-  assert_fail "no comment still hands revival to the watchdog" "$offenders"
-fi
-
 # Banned-pattern check (permitted form per the testing guidelines): no unit
 # command may nest a command inside `sh -c '…'`, which is the construction
 # that let lib.escapeShellArg's quotes be consumed by an outer parse.

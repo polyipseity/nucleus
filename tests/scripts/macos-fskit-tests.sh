@@ -13,6 +13,8 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 readonly SCRIPT_DIR REPO_ROOT
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
+
+ensure_safe_rm_env
 # shellcheck source=../../src/scripts/lib/lib.sh
 . "$REPO_ROOT/src/scripts/lib/lib.sh"
 # shellcheck source=../../src/scripts/lib/macos-fskit.sh

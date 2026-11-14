@@ -257,7 +257,12 @@ _run_step() {
     done
   fi
 
-  _fifo=$(mktemp -u "${TMPDIR:-/tmp}/nucleus-step-${_n}-XXXXXX")
+  # WHY inside the wave directory: a step FIFO created outside it has to be
+  # removed on its own, and a deletion transport that cannot move a FIFO returns
+  # non-zero, which under `set -e` killed the step before it recorded its exit
+  # status. _wave_cleanup removes the wave directory wholesale, and removing a
+  # directory works on every transport.
+  _fifo="$_wave_tmpdir/step-$_n.fifo"
   mkfifo "$_fifo"
   (
     if "$_func" "STEP_CTX" "$@"; then
@@ -278,7 +283,6 @@ _run_step() {
 
   _exit_code=0
   wait "$_func_pid" || _exit_code=$?
-  rm -f "$_fifo"
 
   printf '%s' "$_exit_code" >"$_wave_tmpdir/step-$_n.exit"
   _elapsed_ms=$(($(_step_now_ms) - _step_start_ms))
@@ -546,6 +550,9 @@ run_all_steps() {
 
   local _max_jobs _pipeline_start_ms
   _max_jobs="${PARALLEL_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 2)}"
+  if [ "$_max_jobs" -lt 1 ]; then
+    _max_jobs=1
+  fi
   _pipeline_start_ms=$(_step_now_ms)
 
   local _i _id _state _total _started _n _name
@@ -568,42 +575,64 @@ run_all_steps() {
 
   _total=${#_pending_indices[@]}
 
-  local _pos=0 _batch_end _batch_i _wait_ret _fail_fast=false
-  local -a _batch_pids=() _batch_indices=() _fail_fast_indices=()
-  while [ "$_pos" -lt "${#_pending_indices[@]}" ]; do
-    _batch_end=$((_pos + _max_jobs))
-    if [ "$_batch_end" -gt "${#_pending_indices[@]}" ]; then
-      _batch_end=${#_pending_indices[@]}
-    fi
-    _batch_pids=()
-    _batch_indices=()
-    while [ "$_pos" -lt "$_batch_end" ]; do
-      _i="${_pending_indices[$_pos]}"
+  # Work queue: keep up to _max_jobs wrappers running and launch the next
+  # pending step the moment a slot frees, instead of waiting out a batch.
+  local _pos=0 _wait_ret _reaped_pid _slot _launch_pos _k _stop_launching=false
+  local -a _run_pids=() _run_positions=() _launched_positions=() _fail_fast_indices=()
+  local -A _failed_positions=()
+
+  while :; do
+    while ! $_stop_launching && [ "${#_run_pids[@]}" -lt "$_max_jobs" ] && [ "$_pos" -lt "${#_pending_indices[@]}" ]; do
+      _launch_pos=$_pos
+      _i="${_pending_indices[$_launch_pos]}"
       _pos=$((_pos + 1))
       _n="${_STEP_NUMBERS[$_i]}"
       _name="${_STEP_NAMES[$_i]}"
       _id="${_STEP_IDS[$_i]}"
       _started=$((_started + 1))
       _run_step "$_n" "$_name" "${_STEP_FUNCS[$_i]}" "$_id" "${POSITIONAL_ARGS[@]+${POSITIONAL_ARGS[@]}}" &
-      _batch_pids+=($!)
-      _batch_indices+=("$_i")
+      _run_pids+=($!)
+      _run_positions+=("$_launch_pos")
+      _launched_positions+=("$_launch_pos")
       _spawned_steps+=("$_n")
       printf '%s[%d/%d] step %s %s started%s\n' "${_nuc_c1_dim}" "$_started" "$_total" "$_n" "$_name" "${_nuc_c1_reset}"
     done
-    _fail_fast=false
-    for _batch_i in "${!_batch_pids[@]}"; do
-      _wait_ret=0
-      wait "${_batch_pids[$_batch_i]}" || _wait_ret=$?
-      if [ "$_wait_ret" -ne 0 ] && $FAIL_FAST; then
-        _fail_fast=true
-        _fail_fast_indices+=("${_batch_indices[$_batch_i]}")
+
+    [ "${#_run_pids[@]}" -eq 0 ] && break
+
+    # Blocks until any wrapper exits; the pid tells us which slot freed.
+    _reaped_pid=""
+    _wait_ret=0
+    wait -n -p _reaped_pid || _wait_ret=$?
+    _slot=-1
+    for _k in "${!_run_pids[@]}"; do
+      if [ "${_run_pids[$_k]}" = "$_reaped_pid" ]; then
+        _slot=$_k
+        break
       fi
     done
-    if $_fail_fast; then
-      _report_fail_fast "${_fail_fast_indices[@]}"
-      exit 1
+    # A reaped pid outside the set is a leftover process-substitution child.
+    [ "$_slot" -ge 0 ] || continue
+
+    _launch_pos="${_run_positions[$_slot]}"
+    unset "_run_pids[$_slot]" "_run_positions[$_slot]"
+
+    if [ "$_wait_ret" -ne 0 ] && $FAIL_FAST; then
+      _failed_positions[$_launch_pos]=1
+      _stop_launching=true
     fi
   done
+
+  if $_stop_launching; then
+    # In-flight steps have drained; report the failed set in launch order.
+    for _k in "${_launched_positions[@]}"; do
+      if [ -n "${_failed_positions[$_k]+x}" ]; then
+        _fail_fast_indices+=("${_pending_indices[$_k]}")
+      fi
+    done
+    _report_fail_fast "${_fail_fast_indices[@]}"
+    exit 1
+  fi
 
   printf '%s' $(($(_step_now_ms) - _pipeline_start_ms)) >"$_wave_tmpdir/pipeline.wall_ms"
 
@@ -740,6 +769,8 @@ aggregate_results() {
 
 preflight_check() {
   require_command actionlint
+  # WHY: harness-filter runs every filters/<id>.ts through bun, so a host without bun cannot gate a tool call.
+  require_command bun
   require_command check-jsonschema
   require_command git # required by deny-list.sh for gitignore filtering; must hard-fail rather than silently pass through
   require_command jq

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "filters": {
+      "items": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "id": {
+                  "const": "safe-delete"
+                }
+              },
+              "required": [
+                "id"
+              ]
+            },
+            "then": {
+              "properties": {
+                "settings": {
+                  "properties": {
+                    "powershell": {
+                      "default": "profile",
+                      "description": "Whether the managed PowerShell profile is assumed loaded, so the deletion words it overrides count as redirected. profile is the default; none disables the assumption.",
+                      "enum": [
+                        "profile",
+                        "none"
+                      ],
+                      "type": "string"
+                    },
+                    "unproven": {
+                      "enum": [
+                        "allow",
+                        "ask",
+                        "deny"
+                      ],
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "settings": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "enabled",
+          "settings"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "$schema",
+    "filters"
+  ],
+  "title": "Harness filters",
+  "type": "object"
+}

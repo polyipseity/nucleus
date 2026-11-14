@@ -25,10 +25,11 @@
   would have to fake user input into the harness.
 
   Deployed verbatim to <USER root>\bin and reached from harness hooks through the
-  %USERPROFILE%\.local\bin\harness-drive.cmd shim, so it stays self-contained:
-  importing the shared Format-NucleusOutput module would bake a repository path
-  into the deployed copy. The warning helper below still emits the F1 shape
-  (`<cmd>: warning: <msg>`) to stderr.
+  %USERPROFILE%\.local\bin\harness-drive.cmd shim, together with the sibling
+  harness-bridge-common.ps1 it dot-sources for the shared helpers: importing the
+  shared Format-NucleusOutput module would bake a repository path into the
+  deployed copy. That helper emits the F1 shape (`<cmd>: warning: <msg>`) to
+  stderr.
 
 .PARAMETER Harness
   Harness name: pi, opencode, cursor, or copilot.
@@ -59,56 +60,14 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-function Write-HarnessBridgeWarning {
-  <#
-  .SYNOPSIS
-    Writes one F1 warning line to stderr without importing the shared module.
-  .PARAMETER CommandName
-    F1 command prefix.
-  .PARAMETER Message
-    Warning text.
-  #>
-  [CmdletBinding()]
-  param(
-    [Parameter(Mandatory)]
-    [string]$CommandName,
+# WHY $PSScriptRoot: Windows deploys a copy of this script outside the repository,
+# so the shared helpers are resolved beside the copy, never by a repo-relative path.
+. (Join-Path -Path $PSScriptRoot -ChildPath 'harness-bridge-common.ps1')
 
-    [Parameter(Mandatory)]
-    [string]$Message
-  )
-
-  [Console]::Error.WriteLine("${CommandName}: warning: $Message")
-}
-
-function Get-HarnessBridgeUserRoot {
-  <#
-  .SYNOPSIS
-    Resolves the Windows nucleus USER root.
-  .DESCRIPTION
-    Mirrors Get-NucleusUserRoot in ManagedPaths.ps1, inlined because this script
-    is deployed outside the repository.
-  #>
-  [CmdletBinding()]
-  [OutputType([string])]
-  param()
-
-  if ([string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
-    throw 'harness-drive: %LOCALAPPDATA% is unset; the nucleus USER root is undefined'
-  }
-  return (Join-Path -Path $env:LOCALAPPDATA -ChildPath 'nucleus')
-}
-
-function Get-HarnessBridgeConfigPath {
-  <#
-  .SYNOPSIS
-    Resolves the nucleus runtime config path.
-  #>
-  [CmdletBinding()]
-  [OutputType([string])]
-  param()
-
-  return (Join-Path -Path $HOME -ChildPath '.local/state/nucleus/config.json')
-}
+# WHY script scope: the drop record is written from the queue helper, so the
+# start time and the payload fingerprint are collected here as the run takes them.
+$script:auditStart = [datetime]::UtcNow
+$script:auditDigest = ''
 
 function Get-HarnessBridgeDriveConfig {
   <#
@@ -247,7 +206,7 @@ function Get-QueuedHarnessPrompt {
     }
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message "could not read the queued prompt '$($newest.FullName)' — treating it as empty"
+    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message "could not read the queued prompt '$($newest.FullName)': treating it as empty"
     $text = ''
   }
 
@@ -290,13 +249,13 @@ function Clear-QueuedHarnessPrompt {
   if ($dropped -eq 0) { return }
 
   Write-HarnessDriveAuditEntry -Harness $Harness -Detail "dropped $dropped queued prompt(s)"
-  Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message "harness-drive is disabled — dropped $dropped queued prompt(s)"
+  Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message "harness-drive is disabled: dropped $dropped queued prompt(s)"
 }
 
 function Write-HarnessDriveAuditEntry {
   <#
   .SYNOPSIS
-    Appends one line to the harness-bridge audit log.
+    Appends one drive event to the shared audit log.
   .PARAMETER Harness
     Harness the entry is about.
   .PARAMETER Detail
@@ -312,19 +271,11 @@ function Write-HarnessDriveAuditEntry {
   )
 
   try {
-    $logDir = Join-Path -Path (Get-HarnessBridgeUserRoot) -ChildPath 'log'
-    $null = New-Item -ItemType Directory -Path $logDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
-    $line = @(
-      [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ', [System.Globalization.CultureInfo]::InvariantCulture)
-      $Harness
-      'drive'
-      'disabled'
-      $Detail
-    ) -join "`t"
-    Add-Content -LiteralPath (Join-Path -Path $logDir -ChildPath 'harness-bridge.log') -Value $line -Encoding utf8
+    Write-HarnessBridgeAuditEvent -Kind 'notify' -Harness $Harness -Summary $Detail `
+      -Digest $script:auditDigest -StartTime $script:auditStart
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'could not write the harness-bridge audit log'
+    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message "could not write the harness audit log: $($_.Exception.Message)"
   }
 }
 
@@ -353,7 +304,7 @@ function Send-HarnessDriveNotification {
   # check-suppress:suppression_doc: several pwsh wrappers can sit on PATH and absence is handled right below
   $pwshCli = Get-Command -Name 'pwsh' -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
   if ($null -eq $pwshCli) {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'pwsh is not on PATH — notification dropped'
+    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'pwsh is not on PATH: notification dropped'
     return
   }
 
@@ -361,11 +312,11 @@ function Send-HarnessDriveNotification {
     $Payload | & $pwshCli.Source -NoProfile -ExecutionPolicy Bypass -File $notifyPath $Harness 'done'
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'notification failed — continuing to the queued prompt'
+    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'notification failed: continuing to the queued prompt'
     return
   }
   if ($LASTEXITCODE -ne 0) {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'notification failed — continuing to the queued prompt'
+    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'notification failed: continuing to the queued prompt'
   }
 }
 
@@ -383,7 +334,7 @@ try {
     $config = Get-HarnessBridgeDriveConfig -ConfigPath (Get-HarnessBridgeConfigPath)
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'could not parse nucleus config — not driving'
+    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'could not parse nucleus config: not driving'
     $empty = Get-HarnessDriveEmptyDocument -Harness $Harness
     if (-not [string]::IsNullOrWhiteSpace($empty)) { Write-Output $empty }
     exit 0
@@ -397,6 +348,7 @@ try {
 
   $payload = ''
   if ([Console]::IsInputRedirected) { $payload = [Console]::In.ReadToEnd() }
+  $script:auditDigest = Get-HarnessBridgeDigest -Text $payload
 
   # The notification half shares one implementation; an empty payload still means
   # "the turn finished", which is what harness-notify turns into its default body.
@@ -421,7 +373,7 @@ try {
   }
 
   if ([string]::IsNullOrWhiteSpace($queued.Text)) {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'queued prompt is empty — nothing to inject'
+    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'queued prompt is empty: nothing to inject'
     try {
       Remove-Item -LiteralPath $queued.Path -Force
     }
@@ -439,7 +391,7 @@ try {
     Remove-Item -LiteralPath $queued.Path -Force
   }
   catch {
-    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'could not consume the queued prompt — dropping it to avoid double delivery'
+    Write-HarnessBridgeWarning -CommandName 'harness-drive' -Message 'could not consume the queued prompt: dropping it to avoid double delivery'
     $empty = Get-HarnessDriveEmptyDocument -Harness $Harness
     if (-not [string]::IsNullOrWhiteSpace($empty)) { Write-Output $empty }
     exit 0

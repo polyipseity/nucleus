@@ -301,6 +301,54 @@ EOF
   return $_rc
 }
 
+# Verify each pinned DeepFilterNet3 ONNX model is deployed under the nucleus
+# user root and still hashes to the pinned value.
+#
+# WHY the lockfile is the only authority: no package manager ships the ONNX
+# model weights, and the deployed copy under <nucleusUserRoot>/models is the
+# file deep-filter opens, which a truncated download or manual replacement can
+# corrupt. The pkgs.fetchurl output that enforces the hash in the store is not
+# that file.
+_lfe_check_deepfilternet() {
+  local _lf="$1" _jq="$2"
+  if [ -z "${NUCLEUS_USER_ROOT:-}" ]; then
+    error "NUCLEUS_USER_ROOT is unset; cannot verify the deepfilternet model (source src/scripts/lib/lib.sh first)"
+    return 1
+  fi
+  local _files _rc=0
+  _files="$(printf '%s' "$_lf" | "$_jq" -r '(.deepfilternet // {}) | keys[]' 2>/dev/null)" || return 0
+  while IFS= read -r _file; do
+    [ -z "$_file" ] && continue
+    local _sri _want _got _path
+    # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
+    # `type` guards rather than a bare .hash: a string value would make jq
+    # raise, and the 2>/dev/null below would hide the entry the operator needs.
+    # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
+    _sri="$(printf '%s' "$_lf" | "$_jq" -r --arg f "$_file" '(.deepfilternet // {})[$f] | if type == "object" then .hash // empty else empty end' 2>/dev/null)" || continue
+    [ -z "$_sri" ] && continue
+    # SRI is base64 and sha256_of_file yields hex, so one side is decoded. `od -v`
+    # is load-bearing: without it od collapses a run of identical bytes to `*`,
+    # truncating the hash of an all-zero file instead of reporting a mismatch.
+    _want="$(printf '%s' "${_sri#sha256-}" | base64 -d | od -An -v -tx1 | tr -d ' \n')"
+    _path="$NUCLEUS_USER_ROOT/models/$_file"
+    if [ ! -f "$_path" ]; then
+      error "deepfilternet.$_file: not deployed at $_path"
+      _rc=1
+      continue
+    fi
+    _got="$(sha256_of_file "$_path")"
+    if [ "$_got" != "$_want" ]; then
+      error "deepfilternet.$_file: expected sha256:$_want, found $_got"
+      _rc=1
+    else
+      say -l deepfilternet "$_file present (sha256:$_want)"
+    fi
+  done <<EOF
+$_files
+EOF
+  return $_rc
+}
+
 # Warn for every `suggestions` sub-section, never an error.
 _lfe_warn_suggestions() {
   local _lf="$1" _jq="$2"
@@ -458,6 +506,7 @@ _lfe_run_core() {
   _lfe_check_rustup "$_lf_data" "$_jq" || _failures=$((_failures + 1))
   _lfe_check_psgallery "$_lf_data" "$_jq" || _failures=$((_failures + 1))
   _lfe_check_superpowers "$_lf_data" "$_jq" || _failures=$((_failures + 1))
+  _lfe_check_deepfilternet "$_lf_data" "$_jq" || _failures=$((_failures + 1))
   _lfe_check_whisper "$_lf_data" "$_jq" || _failures=$((_failures + 1))
 
   _lfe_check_opencode "$_lf_data" "$_jq"

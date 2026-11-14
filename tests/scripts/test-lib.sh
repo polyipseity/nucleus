@@ -130,6 +130,58 @@ user_root_for_home() { # <home>
   esac
 }
 
+# ensure_safe_rm_env: point safe-rm at a scratch trash, so a suite's deletions
+# neither land in the operator's Trash nor stop at an interactive "create the
+# trash directory?" prompt. A provisioned host routes `rm` through safe-rm
+# (file-deletion-safety.instructions.md), every suite in this directory deletes
+# temp trees with `rm`, and a prompt on stdout corrupts every assertion that
+# compares exact output.
+#
+# A complete caller-supplied pair is honored as given, which is how the check
+# gate passes the operator's real config. A half pair is completed, and the
+# supplied half survives: a caller-supplied config without a trash is the broken
+# case, because SAFE_RM_TRASH then defaults to $HOME/.Trash, which is absent in
+# a test home.
+#
+# Without safe-rm on PATH there is nothing to point anywhere: `rm` is the plain
+# one, it asks no questions and keeps no trash. That is also how the suites run
+# in CI, where neither bootstrap nor the test app provides safe-rm, so a missing
+# safe-rm is reported in one line and left alone rather than failed.
+#
+# The trash directory sits in the system temp dir, outside every tree a suite
+# deletes: safe-rm moves a deletion into the trash, and moving a directory into
+# its own descendant fails, so a trash inside the suite's temp root would break
+# that suite's own EXIT-trap cleanup. Nothing removes it afterwards for the same
+# class of reason, the trap deletes after the tally and would only re-create and
+# refill it; the platform's own temp cleanup is what bounds it. One directory
+# serves the whole run, cached in an exported variable, so a child process
+# inherits it instead of leaving another one behind.
+ensure_safe_rm_env() {
+  if ! command -v safe-rm >/dev/null 2>&1; then
+    printf '%s: safe-rm not found, deletions run through the plain rm\n' "${0##*/}"
+    return 0
+  fi
+  if [ -n "${SAFE_RM_CONFIG-}" ] && [ -n "${SAFE_RM_TRASH-}" ]; then
+    return 0
+  fi
+  if [ -z "${SAFE_RM_CONFIG-}" ]; then
+    local _test_dir
+    _test_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+    # Resolved, not spelled with ..: the exported value is asserted verbatim, and
+    # a path that only means the fixture after resolution cannot be checked that way.
+    _test_dir="$(CDPATH='' cd -- "$_test_dir/../fixtures/safe-rm" && pwd -P)"
+    SAFE_RM_CONFIG="$_test_dir/config"
+  fi
+  if [ -z "${SAFE_RM_TRASH-}" ]; then
+    if [ -z "${_NUCLEUS_TEST_SAFE_RM_TRASH-}" ]; then
+      _NUCLEUS_TEST_SAFE_RM_TRASH="$(mktemp -d)"
+      export _NUCLEUS_TEST_SAFE_RM_TRASH
+    fi
+    SAFE_RM_TRASH="$_NUCLEUS_TEST_SAFE_RM_TRASH"
+  fi
+  export SAFE_RM_CONFIG SAFE_RM_TRASH
+}
+
 # require_command: Fail the suite when a provisioned prerequisite is missing.
 # Skip-guards are banned (tooling-and-validation.instructions.md): a missing tool
 # is a suite failure the tally has to record, not a silent pass. finish_tests
