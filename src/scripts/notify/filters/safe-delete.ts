@@ -4,9 +4,11 @@
 // decision<TAB>rule<TAB>reason, and it classifies the spellings that reach a
 // deletion without the interactive alias or the PATH shims: a native path,
 // cmd.exe in command position, find's own -delete primitive, and a bare deletion
-// word. A bare word is proven only when it resolves to the home-manager wrapper,
-// because that wrapper is the redirect this policy trusts; every other bare word
-// is unproven and settings.unproven decides what that gets.
+// word. A bare word is proven only when it resolves to a redirect this policy
+// trusts: the home-manager wrapper on POSIX, or on Windows a shim the manifest
+// lists with rip.exe's hash, or the managed PowerShell profile for the words it
+// overrides. Every other bare word is unproven and settings.unproven decides what
+// that gets.
 //
 //   filters/safe-delete.ts --settings <json> --command <text>
 //   filters/safe-delete.ts --settings <json> --hook
@@ -18,8 +20,9 @@
 // Rule names are the audit contract: native-path, cmd-shell, find-primitive,
 // proven-redirect, unproven-redirect, no-match, filter-error.
 
+import { createHash } from "node:crypto";
 import { accessSync, constants, readFileSync, readlinkSync, realpathSync, statSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, join, win32 } from "node:path";
 
 export type Decision = "allow" | "ask" | "deny";
 export type Rule =
@@ -37,23 +40,34 @@ export interface Verdict {
   readonly reason: string;
 }
 
+// A proven redirect names the mechanism, because each mechanism is proven from
+// different facts and the reason a human reads names that mechanism.
 export type RedirectProof =
-  | { readonly proven: true; readonly path: string }
+  | { readonly proven: true; readonly via: "wrapper" | "shim"; readonly path: string }
+  | { readonly proven: true; readonly via: "profile" }
   | { readonly proven: false; readonly why: string };
 export type RedirectResolver = (word: string) => RedirectProof;
 
 // What the default resolver reads from the environment. The probe is an argument
 // rather than a hidden process.env read so a case can prove both outcomes without
-// depending on the host's home directory or PATH.
+// depending on the host's home directory, PATH, or deployed manifest.
 export interface RedirectProbe {
   readonly home: string | null;
   readonly path: string;
   readonly platform: string;
+  // The shim manifest Sync-SafeDelete writes, and the extension order Windows
+  // resolves a word through.
+  readonly manifest?: string | null;
+  readonly pathext?: string;
+  // Whether the managed PowerShell profile is assumed loaded.
+  readonly powershell?: "profile" | "none";
+  readonly noProfile?: boolean;
 }
 
 export interface PolicyOptions {
   readonly settings: unknown;
   readonly redirect?: RedirectResolver;
+  readonly platform?: string;
 }
 
 // A word reached through a prefix whose PATH this repository does not manage, so
@@ -68,6 +82,7 @@ interface BareDeletion {
 }
 
 interface CommandFacts {
+  readonly platform: string;
   readonly native: string[];
   readonly bare: BareDeletion[];
   cmdShell: boolean;
@@ -96,6 +111,20 @@ const DELETION_WORDS = new Set([
   "shred",
   "remove-item",
 ]);
+
+// The words the managed PowerShell profile rewrites into its recycle-bin function.
+// `rm` is not one of them on Windows: it is a deployed shim there, so it keeps the
+// manifest proof.
+const POWERSHELL_WORDS = new Set(["remove-item", "ri", "del", "rd", "erase"]);
+
+const WIN32_EXECUTABLE_EXTENSIONS = [".exe", ".cmd", ".bat", ".com"];
+
+// The Windows default, used when PATHEXT is unset.
+const DEFAULT_PATHEXT = ".COM;.EXE;.BAT;.CMD";
+
+// Aggregation order: a later verdict replaces an earlier one only when its
+// decision ranks higher, and the first rule wins a tie.
+const DECISION_RANK: Record<Decision, number> = { allow: 1, ask: 2, deny: 3 };
 
 // A -c string is a script only for an interpreter, so a pattern passed to
 // `grep -c 'rm x'` stays an argument and is never re-tokenized as a command.
@@ -126,10 +155,6 @@ const MAX_NESTING = 8;
 // guard and the filter share one spelling of that status.
 const HOOK_DENY_STATUS = 2;
 
-// Aggregation order: a later verdict replaces an earlier one only when its
-// decision ranks higher, and the first rule wins a tie.
-const DECISION_RANK: Record<Decision, number> = { allow: 1, ask: 2, deny: 3 };
-
 const WRAPPER_MARKER = "home-manager-files/.local/bin";
 
 // A word that takes the command position without being the executed word, so the
@@ -137,18 +162,45 @@ const WRAPPER_MARKER = "home-manager-files/.local/bin";
 const STATEMENT_WORDS = new Set(["do", "done", "elif", "else", "esac", "fi", "if", "then", "time", "until", "while", "!", "{", "}"]);
 
 // A leading backslash escapes the word name rather than spelling a path, so the
-// word it forms is the one that runs.
+// word it forms is the one that runs. Windows has no such escape: there a
+// backslash separates path components.
 function stripEscape(word: string): string {
   return word.startsWith("\\") ? word.slice(1) : word;
 }
 
-function isDeletionWord(word: string): boolean {
-  return DELETION_WORDS.has(basename(word).toLowerCase());
+// A Windows command word carries its executable extension, so RM.EXE names the
+// same deletion as rm and pwsh.exe the same interpreter as pwsh.
+function foldWin32Name(name: string): string {
+  const folded = name.toLowerCase();
+  for (const extension of WIN32_EXECUTABLE_EXTENSIONS) {
+    if (folded.endsWith(extension)) return folded.slice(0, -extension.length);
+  }
+  return folded;
 }
 
-function isCmdSpelling(word: string): boolean {
-  const folded = basename(stripEscape(word)).toLowerCase();
-  return folded === "cmd" || folded === "cmd.exe";
+// The name a word runs under on this platform, with that platform's escape and
+// executable-extension rules.
+function commandBase(word: string, platform: string): string {
+  if (platform === "win32") return foldWin32Name(win32.basename(word));
+  return basename(stripEscape(word)).toLowerCase();
+}
+
+function isDeletionWord(word: string, platform: string): boolean {
+  return DELETION_WORDS.has(commandBase(word, platform));
+}
+
+function isCmdSpelling(word: string, platform: string): boolean {
+  const folded = commandBase(word, platform);
+  // WHY: cmd.exe keeps its extension on POSIX, where the name is not native, so
+  // both spellings name the shell there.
+  return folded === "cmd" || (platform !== "win32" && folded === "cmd.exe");
+}
+
+function isNativePath(word: string, platform: string): boolean {
+  if (platform === "win32") {
+    return word.includes("\\") || word.includes("/") || /^[A-Za-z]:/.test(word);
+  }
+  return word.includes("/");
 }
 
 interface HeredocSpec {
@@ -590,13 +642,16 @@ function analyzeFind(
 }
 
 function classifyWord(token: Token, forced: ForcedUnproven | null, facts: CommandFacts): void {
-  const text = stripEscape(token.text);
-  if (!isDeletionWord(text)) return;
-  if (text.includes("/")) {
+  const platform = facts.platform;
+  const text = platform === "win32" ? token.text : stripEscape(token.text);
+  if (!isDeletionWord(text, platform)) return;
+  if (isNativePath(text, platform)) {
     facts.native.push(text);
     return;
   }
-  facts.bare.push({ word: text, forced });
+  // A Windows word is probed and listed without its executable extension, so
+  // `rm.exe` and `rm` reach the same shim.
+  facts.bare.push({ word: platform === "win32" ? commandBase(text, platform) : text, forced });
 }
 
 function analyzeSegment(
@@ -610,7 +665,7 @@ function analyzeSegment(
   if (depth > MAX_NESTING) return;
   const position = locateCommand(segment);
   const commandToken = position === null ? null : (segment[position.index] ?? null);
-  const commandWord = commandToken === null ? null : basename(stripEscape(commandToken.text)).toLowerCase();
+  const commandWord = commandToken === null ? null : commandBase(commandToken.text, facts.platform);
   const scriptHost = commandWord !== null && SCRIPT_HOSTS.has(commandWord);
 
   for (let index = 0; index < segment.length; index += 1) {
@@ -627,7 +682,7 @@ function analyzeSegment(
 
   if (position === null || commandToken === null) return;
   // Only the command word names the shell, so `echo cmd` keeps cmd as an argument.
-  if (isCmdSpelling(commandToken.text)) facts.cmdShell = true;
+  if (isCmdSpelling(commandToken.text, facts.platform)) facts.cmdShell = true;
   classifyWord(commandToken, position.forced ?? inherited, facts);
   if (commandWord === "find") analyzeFind(segment, position.index, depth, facts, position.forced ?? inherited);
 }
@@ -717,11 +772,26 @@ function bareVerdict(entry: BareDeletion, unproven: string, redirect: RedirectRe
   if (entry.forced !== null) return unprovenVerdict(forcedReason(entry.word, entry.forced), unproven);
   const proof = redirect(entry.word);
   if (!proof.proven) return unprovenVerdict(proof.why, unproven);
-  return {
-    decision: "allow",
-    rule: "proven-redirect",
-    reason: `deletion command: ${entry.word} resolves to the home-manager safe-delete wrapper at ${proof.path}`,
-  };
+  switch (proof.via) {
+    case "wrapper":
+      return {
+        decision: "allow",
+        rule: "proven-redirect",
+        reason: `deletion command: ${entry.word} resolves to the home-manager safe-delete wrapper at ${proof.path}`,
+      };
+    case "shim":
+      return {
+        decision: "allow",
+        rule: "proven-redirect",
+        reason: `deletion command: ${entry.word} resolves to the deployed rip shim at ${proof.path}, whose hash matches the shim manifest`,
+      };
+    case "profile":
+      return {
+        decision: "allow",
+        rule: "proven-redirect",
+        reason: `deletion command: ${entry.word} is redirected by the managed PowerShell profile, which overrides the deletion words`,
+      };
+  }
 }
 
 function readUnproven(settings: unknown): string {
@@ -731,10 +801,32 @@ function readUnproven(settings: unknown): string {
   return typeof raw === "string" ? raw : JSON.stringify(raw);
 }
 
+// The managed profile is assumed loaded unless the setting says otherwise, so an
+// absent or invalid value keeps the redirect proof the profile provides.
+function readPowershell(settings: unknown): "profile" | "none" {
+  if (typeof settings !== "object" || settings === null || Array.isArray(settings)) return "profile";
+  return (settings as Record<string, unknown>).powershell === "none" ? "none" : "profile";
+}
+
+// A session started with -NoProfile discards the managed profile, so the redirect
+// it provides is absent from that command. The spelling is matched anywhere in
+// the command, because an outer interpreter may hand it to an inner one.
+export function hasNoProfile(command: string): boolean {
+  return /-no(?:profile|p)\b/i.test(command);
+}
+
 export function decideDeletion(command: string, options: PolicyOptions): Verdict {
   const unproven = readUnproven(options.settings);
-  const redirect = options.redirect ?? managedRedirectResolver(defaultProbe());
-  const facts: CommandFacts = { native: [], bare: [], cmdShell: false, findPrimitive: false };
+  const platform = options.platform ?? process.platform;
+  const redirect =
+    options.redirect ??
+    managedRedirectResolver({
+      ...defaultProbe(),
+      platform,
+      powershell: readPowershell(options.settings),
+      noProfile: hasNoProfile(command),
+    });
+  const facts: CommandFacts = { platform, native: [], bare: [], cmdShell: false, findPrimitive: false };
   analyzeCommand(command, 0, facts, null);
 
   const verdicts: Verdict[] = [];
@@ -781,18 +873,150 @@ function lookupOnPath(word: string, path: string): string | null {
   return null;
 }
 
-// The managed wrapper is the only redirect the policy trusts, and it is proven
-// from three facts: the word resolves on PATH, the resolved file is the wrapper,
-// and the wrapper is a symlink into home-manager's file tree. A PowerShell
-// session rewrites the word through its alias table, which a filter cannot see,
-// so Windows has no provable redirect at all.
+// The shim manifest Sync-SafeDelete writes: one entry per deployed copy, plus the
+// hash of the rip.exe those copies were made from.
+interface ShimEntry {
+  readonly name: string;
+  readonly path: string;
+}
+
+interface ShimManifest {
+  readonly ripHash: string;
+  readonly shims: readonly ShimEntry[];
+}
+
+interface Win32Resolved {
+  readonly name: string;
+  readonly path: string;
+}
+
+// A failed read answers with the reason, which is what the unproven verdict shows.
+// Any shape this policy cannot trust is a reason, never an empty manifest.
+function readShimManifest(manifestPath: string | null): ShimManifest | string {
+  if (manifestPath === null) return "the shim manifest path is unknown because LOCALAPPDATA is unset";
+  let text: string;
+  try {
+    text = readFileSync(manifestPath, "utf8");
+  } catch {
+    return `the shim manifest at ${manifestPath} is missing`;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return `the shim manifest at ${manifestPath} is not valid JSON`;
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return `the shim manifest at ${manifestPath} is not an object`;
+  }
+  const record = parsed as Record<string, unknown>;
+  if (record.version !== 1) return `the shim manifest at ${manifestPath} is not version 1`;
+  if (typeof record.ripHash !== "string" || record.ripHash.length === 0) {
+    return `the shim manifest at ${manifestPath} carries no ripHash`;
+  }
+  if (!Array.isArray(record.shims)) return `the shim manifest at ${manifestPath} carries no shim list`;
+  const shims: ShimEntry[] = [];
+  for (const shim of record.shims) {
+    if (typeof shim !== "object" || shim === null || Array.isArray(shim)) continue;
+    const { name, path } = shim as Record<string, unknown>;
+    if (typeof name !== "string" || typeof path !== "string") continue;
+    shims.push({ name, path });
+  }
+  return { ripHash: record.ripHash, shims };
+}
+
+// Windows compares paths without regard to case, and either separator may appear.
+function normalizeWin32Path(path: string): string {
+  return path.replace(/\//g, "\\").toLowerCase();
+}
+
+function win32CandidateNames(word: string, pathext: string): string[] {
+  const folded = word.toLowerCase();
+  const extensions = pathext
+    .split(";")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  if (extensions.some((extension) => folded.endsWith(extension.toLowerCase()))) return [word];
+  return extensions.map((extension) => `${word}${extension}`);
+}
+
+// Windows resolves a word through PATHEXT, entry by entry, so the first file that
+// exists wins and the extension it was found under is part of its name.
+function lookupOnWin32Path(word: string, path: string, pathext: string): Win32Resolved | null {
+  const candidates = win32CandidateNames(word, pathext);
+  for (const rawEntry of path.split(";")) {
+    const entry = rawEntry.trim().replace(/^"(.*)"$/, "$1");
+    if (entry.length === 0) continue;
+    for (const name of candidates) {
+      const candidate = join(entry, name);
+      try {
+        if (!statSync(candidate).isFile()) continue;
+        return { name, path: candidate };
+      } catch {
+        continue;
+      }
+    }
+  }
+  return null;
+}
+
+function sha256OrNull(path: string): string | null {
+  try {
+    return createHash("sha256").update(readFileSync(path)).digest("hex");
+  } catch {
+    return null;
+  }
+}
+
+// A deployed shim is a copy of rip.exe rather than a symlink, so a realpath
+// comparison proves nothing. The manifest records where the copies were written
+// and the bytes they were made from, and only a match on both proves the shim.
+function win32ShimProof(word: string, probe: RedirectProbe, manifest: ShimManifest | string): RedirectProof {
+  const resolved = lookupOnWin32Path(word, probe.path, probe.pathext ?? DEFAULT_PATHEXT);
+  if (resolved === null) return { proven: false, why: `${word} does not resolve on a PATH entry` };
+  if (typeof manifest === "string") {
+    return { proven: false, why: `${word} resolves to ${resolved.path}, but ${manifest}` };
+  }
+  const listed = manifest.shims.some(
+    (shim) =>
+      shim.name.toLowerCase() === resolved.name.toLowerCase() &&
+      normalizeWin32Path(shim.path) === normalizeWin32Path(resolved.path),
+  );
+  if (!listed) {
+    return { proven: false, why: `${word} resolves to ${resolved.path}, which the shim manifest does not list` };
+  }
+  const hash = sha256OrNull(resolved.path);
+  if (hash === null) return { proven: false, why: `${resolved.path} could not be read for the shim hash check` };
+  if (hash !== manifest.ripHash.toLowerCase()) {
+    return {
+      proven: false,
+      why: `${resolved.path} does not match the rip.exe hash in the shim manifest, so the shim is stale`,
+    };
+  }
+  return { proven: true, via: "shim", path: resolved.path };
+}
+
+// A bare word is proven when it reaches a redirect this policy trusts: the
+// home-manager wrapper on POSIX, or on Windows a shim the manifest lists with
+// rip.exe's hash or the managed PowerShell profile for the words it overrides.
 export function managedRedirectResolver(probe: RedirectProbe): RedirectResolver {
+  let manifest: ShimManifest | string | null = null;
   return (word: string): RedirectProof => {
-    if (probe.platform === "win32") {
+    if (probe.noProfile === true) {
       return {
         proven: false,
-        why: `${word} has no provable redirect in PowerShell: the deletion shims serve the non-PowerShell contexts, and the profile aliases that redirect the word are invisible to this filter`,
+        why: `${word} runs in a session started with -NoProfile, which discards the managed profile`,
       };
+    }
+    if (probe.platform === "win32") {
+      // The profile proof belongs to the words the profile rewrites, and those
+      // words keep their shims, so turning the assumption off falls through to
+      // the manifest rather than making the word unprovable.
+      if (POWERSHELL_WORDS.has(word.toLowerCase()) && (probe.powershell ?? "profile") !== "none") {
+        return { proven: true, via: "profile" };
+      }
+      if (manifest === null) manifest = readShimManifest(probe.manifest ?? null);
+      return win32ShimProof(word, probe, manifest);
     }
     if (probe.home === null) {
       return { proven: false, why: `${word} has no managed wrapper to compare against because HOME is unset` };
@@ -814,14 +1038,20 @@ export function managedRedirectResolver(probe: RedirectProbe): RedirectResolver 
     if (!target.endsWith(`${WRAPPER_MARKER}/${word}`)) {
       return { proven: false, why: `${wrapper} is a symlink to ${target}, not the home-manager wrapper for ${word}` };
     }
-    return { proven: true, path: wrapper };
+    return { proven: true, via: "wrapper", path: wrapper };
   };
 }
 
 function defaultProbe(): RedirectProbe {
+  const localAppData = process.env.LOCALAPPDATA;
   return {
-    home: process.env.HOME ?? null,
+    home: process.env.USERPROFILE ?? process.env.HOME ?? null,
+    manifest:
+      localAppData === undefined || localAppData.length === 0
+        ? null
+        : join(localAppData, "nucleus", "state", "safe-delete", "shims.json"),
     path: process.env.PATH ?? "",
+    pathext: process.env.PATHEXT ?? DEFAULT_PATHEXT,
     platform: process.platform,
   };
 }

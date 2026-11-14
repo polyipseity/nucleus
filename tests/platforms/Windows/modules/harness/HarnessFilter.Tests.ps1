@@ -321,6 +321,7 @@ Describe 'safe-delete filter settings' {
       @{ Payload = '{"command":"/bin/rm -rf x"}'; Rule = 'native-path' }
       @{ Payload = '{"command":"./rm x"}'; Rule = 'native-path' }
       @{ Payload = '{"command":"C:/BIN/RM.exe -r x"}'; Rule = 'native-path' }
+      @{ Payload = '{"command":"C:\\BIN\\RM.exe -r x"}'; Rule = 'native-path' }
       @{ Payload = '{"command":"cmd.exe /c del x"}'; Rule = 'cmd-shell' }
     )
     foreach ($case in $cases) {
@@ -348,21 +349,32 @@ Describe 'safe-delete filter settings' {
 Describe 'safe-delete deletion-verb case matching' {
   # WHY uppercase: PowerShell folds case for every deletion word, so `DEL` is the
   # same deletion as `del`; a case-sensitive verb test would let it through as
-  # no-match with no unproven ruling. The case fails if the verb test stops folding
+  # no-match with no proof ruling. The case fails if the verb test stops folding
   # case, which is exactly the regression it exists for.
-  It 'asks for an uppercase deletion word whose redirect is unproven' {
+  It 'proves an uppercase deletion word through the managed profile' {
     $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"DEL /S x"}'
 
     $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
-    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'ask'
-    $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'unproven-redirect'
+    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'allow'
+    $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'proven-redirect'
   }
 
-  It 'asks for Remove-Item spelled in lower case' {
+  It 'proves Remove-Item spelled in lower case through the managed profile' {
     $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"remove-item -Recurse -Force C:\\data"}'
 
     $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
-    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'ask'
+    $document['hookSpecificOutput']['permissionDecision'] | Should -Be 'allow'
+    $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'proven-redirect'
+  }
+
+  It 'answers unproven for a session started with -NoProfile' {
+    # WHY: -NoProfile discards the managed profile, so the redirect a profile word
+    # relies on is not loaded. No shim manifest is deployed here, and the default
+    # settings.unproven is ask, so the answer is unproven and not a denial.
+    $result = Invoke-FilterTwin -Root $script:Sandbox -Harness 'copilot' -Payload '{"command":"pwsh -NoProfile -c \"Remove-Item x\""}'
+
+    $document = ConvertFrom-Json -InputObject $result.Stdout -AsHashtable
+    $document['hookSpecificOutput']['permissionDecision'] | Should -Not -Be 'deny'
     $document['hookSpecificOutput']['permissionDecisionReason'] | Should -Match 'unproven-redirect'
   }
 }

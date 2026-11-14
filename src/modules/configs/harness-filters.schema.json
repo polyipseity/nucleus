@@ -24,6 +24,15 @@
               "properties": {
                 "settings": {
                   "properties": {
+                    "powershell": {
+                      "default": "profile",
+                      "description": "Whether the managed PowerShell profile is assumed loaded, so the deletion words it overrides count as redirected. profile is the default; none disables the assumption.",
+                      "enum": [
+                        "profile",
+                        "none"
+                      ],
+                      "type": "string"
+                    },
                     "unproven": {
                       "enum": [
                         "allow",
