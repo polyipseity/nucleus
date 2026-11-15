@@ -91,6 +91,14 @@ let
   # Enhanced apple-sdk, so xcrun shims resolve to nixpkgs tools.
   appleSdkEnhanced = import ../../modules/lib/apple-sdk-enhanced.nix { inherit pkgs lib; };
 
+  # Stable SYSTEM-root toolchain links (DEVELOPER_DIR/SDKROOT point here). WHY computed
+  # here too: extraActivation converges before homebrew so a brew-bundle abort cannot
+  # leave xcode-select and the apple-sdk link diverged; postActivation still converges.
+  toolchainLinks = import ../../modules/lib/toolchain-links.nix { inherit lib pkgs; };
+  toolchainTargetsJson = builtins.toJSON (
+    builtins.mapAttrs (_name: target: "${target}") (toolchainLinks.linkTargetsFor "MacBook")
+  );
+
   # GUI apps that spawn() tools by name resolve via PATH without xcrun.
   appleSdkTools = import ../../modules/lib/apple-sdk-tools.nix { inherit pkgs; };
   symlinkFarmEntries = lib.concatStringsSep " " (
@@ -147,6 +155,18 @@ in
     # dir (Xcode >= 27.0 on macOS 27), so the versioned apple-sdk-enhanced shim must be
     # selected before homebrew activation runs.
     /usr/bin/xcode-select --switch "${appleSdkEnhanced}"
+
+    # ---- converge-toolchain-links (pre-homebrew) ---------------------------------
+    # WHY run before nix-darwin homebrew: brew bundle aborts activation on failure, so a
+    # postActivation-only pass can leave the stable apple-sdk link (DEVELOPER_DIR/SDKROOT)
+    # behind the newly selected xcode-select dev dir. Converging here keeps them consistent
+    # for bundle-time consumers and on rerun recovery without masking brew/homebrew
+    # failures; converge-toolchain-links is idempotent and exits non-zero on real
+    # conflicts, and postActivation convergence remains the end-state pass.
+    "${activationBundle}/src/scripts/configs/converge-toolchain-links.sh" \
+      "${pkgs.jq}/bin/jq" \
+      "${toString (toolchainLinks.linkDirFor "MacBook")}" \
+      '${toolchainTargetsJson}'
   '';
 
   # WHY lib.mkBefore: it puts these fragments ahead of the home-manager call
