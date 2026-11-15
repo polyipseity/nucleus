@@ -10,7 +10,14 @@ in
 pkgs.symlinkJoin {
   name = "apple-sdk-enhanced";
   paths = [
-    pkgs.apple-sdk # original: headers, platforms, xcrun → xcbuild
+    # WHY: switch base to macOS 27 SDK (pkgs.apple-sdk_27) so Homebrew 7.0.13
+    # check_if_supported_sdk_available finds a macOS 27-compatible SDK
+    # (SDKSettings Version 27.x) under the selected developer dir on macOS 27,
+    # while keeping the same layout/paths (MacOSX.sdk symlink, Platforms/...).
+    # Declarative from flake pkgs (no synthetic SDK metadata). Risk: base move
+    # 14.4->27.0 may change headers/APIs/deployment defaults for downstream
+    # builds (e.g. ntfs-3g, rust/c toolchains) — validate builds on-host if needed.
+    pkgs.apple-sdk_27 # macOS 27-capable SDK base (headers, platforms, xcrun -> xcbuild)
     (pkgs.runCommand "apple-sdk-enhanced-usr-bin" { } ''
       mkdir -p "$out/usr/bin"
       ${lib.concatStringsSep "\n" (
