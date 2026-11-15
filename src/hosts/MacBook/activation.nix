@@ -91,6 +91,14 @@ let
   # Enhanced apple-sdk, so xcrun shims resolve to nixpkgs tools.
   appleSdkEnhanced = import ../../modules/lib/apple-sdk-enhanced.nix { inherit pkgs lib; };
 
+  # Stable SYSTEM-root toolchain links (DEVELOPER_DIR/SDKROOT point here). WHY computed
+  # here too: extraActivation converges before homebrew so a brew-bundle abort cannot
+  # leave xcode-select and the apple-sdk link diverged; postActivation still converges.
+  toolchainLinks = import ../../modules/lib/toolchain-links.nix { inherit lib pkgs; };
+  toolchainTargetsJson = builtins.toJSON (
+    builtins.mapAttrs (_name: target: "${target}") (toolchainLinks.linkTargetsFor "MacBook")
+  );
+
   # GUI apps that spawn() tools by name resolve via PATH without xcrun.
   appleSdkTools = import ../../modules/lib/apple-sdk-tools.nix { inherit pkgs; };
   symlinkFarmEntries = lib.concatStringsSep " " (
@@ -141,6 +149,44 @@ in
       "${builtins.toString userLogDirsWithReplicas}" \
       "${builtins.toString chownLogDirs}" \
       "${macBookUserLogDirSuffix}"
+
+    # ---- configure-xcode-select (pre-homebrew) -----------------------------------
+    # WHY run before nix-darwin homebrew: brew bundle validates the selected developer
+    # dir (Xcode >= 27.0 on macOS 27), so the versioned apple-sdk-enhanced shim must be
+    # selected before homebrew activation runs.
+    /usr/bin/xcode-select --switch "${appleSdkEnhanced}"
+
+    # ---- converge-toolchain-links (pre-homebrew) ---------------------------------
+    # WHY run before nix-darwin homebrew: brew bundle aborts activation on failure, so a
+    # postActivation-only pass can leave the stable apple-sdk link (DEVELOPER_DIR/SDKROOT)
+    # behind the newly selected xcode-select dev dir. Converging here keeps them consistent
+    # for bundle-time consumers and on rerun recovery without masking brew/homebrew
+    # failures; converge-toolchain-links is idempotent and exits non-zero on real
+    # conflicts, and postActivation convergence remains the end-state pass.
+    "${activationBundle}/src/scripts/configs/converge-toolchain-links.sh" \
+      "${pkgs.jq}/bin/jq" \
+      "${toString (toolchainLinks.linkDirFor "MacBook")}" \
+      '${toolchainTargetsJson}'
+
+    # ---- provision-homebrew-gcc16 (pre-homebrew) ---------------------------------
+    # WHY Homebrew 7 compiler selection (clang, then gcc 8..16) rejects clang here because
+    # DevelopmentTools.clang_build_version is null (/usr/bin/clang aborts SIGABRT under the
+    # Nix-selected developer dir and Nix clang output is not an Apple build version), and
+    # locate() cannot resolve gcc-N via /usr/bin or xcrun (xcrun also aborts) when no CLT,
+    # real Xcode, or brewed gcc is installed. Providing $HOMEBREW_PREFIX/bin/gcc-16 as a
+    # symlink to the Nix gcc wrapper in the enhanced SDK makes locate("gcc-16") and
+    # gcc_version succeed, so formula build-env/compiler selection works for
+    # openai/tools/softnet without installing CLT, making a real Xcode the default dev
+    # dir, or running `brew install gcc`. Runs in extraActivation so it is in place before
+    # nix-darwin's homebrew activation/brew bundle phase.
+    _hb_gcc16="/opt/homebrew/bin/gcc-16"
+    _hb_gcc16_target="${appleSdkEnhanced}/usr/bin/gcc"
+    /bin/mkdir -p /opt/homebrew/bin
+    if [ -e "$_hb_gcc16" ] && [ ! -L "$_hb_gcc16" ]; then
+      echo "activation: refusing to replace non-symlink $_hb_gcc16; expected Homebrew-locatable gcc-16 symlink to $_hb_gcc16_target" >&2
+      exit 1
+    fi
+    /bin/ln -sfn "$_hb_gcc16_target" "$_hb_gcc16"
   '';
 
   # WHY lib.mkBefore: it puts these fragments ahead of the home-manager call

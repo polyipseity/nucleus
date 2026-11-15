@@ -6,7 +6,6 @@
   homebrew-core,
   homebrew-cask,
   openai-tools,
-  cirruslabs-cli,
   smudge-smudge,
   ...
 }:
@@ -15,11 +14,14 @@ let
   coreManagedBrews = config.nucleus.macos.homebrew.brews;
   coreManagedCasks = config.nucleus.macos.homebrew.casks;
   staticManagedBrews = [
+    "curl" # WHY: pre-existing Homebrew install/dependency kept declared to avoid disruptive zap removal and reconcile bundle/check state with host intent.
+    "displayplacer" # CLI display arrangement tool
+    "git" # WHY: pre-existing Homebrew install (brew leaf, on PATH) kept declared to avoid disruptive zap removal and reconcile bundle/check state; core routes git CLI to nixpkgs by policy but retained in Homebrew brews here for host stability (ownership consolidation separate).
     "openai/tools/softnet" # Runtime dependency of tart; must be declared to survive brew bundle --zap cleanup
     "openai/tools/tart" # macOS VM hypervisor using Apple Virtualization.framework (requires code-signed binary)
-    "displayplacer" # CLI display arrangement tool
-    "sqlite" # SQLite library; needed by qmd setCustomSQLite for sqlite-vec extension support
+    "sdl2" # WHY: provided by homebrew-core `sdl2-compat` alias and required by managed `czkawka`/installed `ffmpeg`; declaring it keeps the provider in the Brewfile and prevents zap cleanup refusal/failure.
     "smudge/smudge/nightlight" # Night Shift schedule & temperature control
+    "sqlite" # SQLite library; needed by qmd setCustomSQLite for sqlite-vec extension support
   ];
 
   managedBrews = builtins.sort (a: b: a < b) (lib.unique (staticManagedBrews ++ coreManagedBrews));
@@ -71,14 +73,15 @@ in
       "homebrew/homebrew-core" = homebrew-core;
       "homebrew/homebrew-cask" = homebrew-cask;
       "openai/homebrew-tools" = openai-tools;
-      "cirruslabs/homebrew-cli" = cirruslabs-cli;
       "smudge/homebrew-smudge" = smudge-smudge;
     };
     trust = {
-      # softnet is a transitive tart dependency that cannot be enumerated statically.
+      # WHY: openai tart depends on openai/tools/softnet, so both are owned and
+      # trusted through openai/tools; cirruslabs/homebrew-cli is not needed for
+      # managed formulae and its stale softnet/tart definitions conflicted with
+      # openai ownership under brew 7.
       taps = [
         "openai/tools"
-        "cirruslabs/cli"
       ];
       formulae = [
         "smudge/smudge/nightlight"
