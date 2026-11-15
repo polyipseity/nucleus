@@ -141,6 +141,12 @@ in
       "${builtins.toString userLogDirsWithReplicas}" \
       "${builtins.toString chownLogDirs}" \
       "${macBookUserLogDirSuffix}"
+
+    # ---- configure-xcode-select (pre-homebrew) -----------------------------------
+    # WHY run before nix-darwin homebrew: brew bundle validates the selected developer
+    # dir (Xcode >= 27.0 on macOS 27), so the versioned apple-sdk-enhanced shim must be
+    # selected before homebrew activation runs.
+    /usr/bin/xcode-select --switch "${appleSdkEnhanced}"
   '';
 
   # WHY lib.mkBefore: it puts these fragments ahead of the home-manager call
