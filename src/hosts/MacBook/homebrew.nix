@@ -6,7 +6,6 @@
   homebrew-core,
   homebrew-cask,
   openai-tools,
-  cirruslabs-cli,
   smudge-smudge,
   ...
 }:
@@ -71,14 +70,15 @@ in
       "homebrew/homebrew-core" = homebrew-core;
       "homebrew/homebrew-cask" = homebrew-cask;
       "openai/homebrew-tools" = openai-tools;
-      "cirruslabs/homebrew-cli" = cirruslabs-cli;
       "smudge/homebrew-smudge" = smudge-smudge;
     };
     trust = {
-      # softnet is a transitive tart dependency that cannot be enumerated statically.
+      # WHY: openai tart depends on openai/tools/softnet, so both are owned and
+      # trusted through openai/tools; cirruslabs/homebrew-cli is not needed for
+      # managed formulae and its stale softnet/tart definitions conflicted with
+      # openai ownership under brew 7.
       taps = [
         "openai/tools"
-        "cirruslabs/cli"
       ];
       formulae = [
         "smudge/smudge/nightlight"

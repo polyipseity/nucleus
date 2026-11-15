@@ -51,10 +51,6 @@
       url = "github:openai/homebrew-tools";
       flake = false;
     };
-    cirruslabs-cli = {
-      url = "github:cirruslabs/homebrew-cli";
-      flake = false;
-    };
     smudge-smudge = {
       url = "github:smudge/homebrew-smudge";
       flake = false;
@@ -78,7 +74,6 @@
       home-manager,
       homebrew-cask,
       homebrew-core,
-      cirruslabs-cli,
       nix-homebrew,
       nix-vscode-extensions,
       nixpkgs,
@@ -900,7 +895,6 @@
         homebrew-core = homebrew-core;
         homebrew-cask = homebrew-cask;
         openai-tools = openai-tools;
-        cirruslabs-cli = cirruslabs-cli;
         smudge-smudge = smudge-smudge;
         mac-app-util = mac-app-util;
         nixos-generators = nixos-generators;
@@ -958,7 +952,6 @@
             homebrew-core
             homebrew-cask
             openai-tools
-            cirruslabs-cli
             smudge-smudge
             ;
           nucleusApps = nucleusAppsMac // {
