@@ -25,5 +25,26 @@ pkgs.symlinkJoin {
         ) (builtins.attrNames appleSdkTools.allTools)
       )}
     '')
+    # WHY: Homebrew 7.0.13 treats a non-CLT developer dir selected via
+    # xcode-select as Xcode and requires a readable Xcode version >= 27.0 on
+    # macOS 27. It detects that version from <prefix>.parent/version.plist or
+    # by running <prefix>/usr/bin/xcodebuild -version. The enhanced Nix SDK has
+    # no real Xcode/CLT, so we provide a minimal xcodebuild identity shim for
+    # version detection instead of installing/enabling Apple CLT or a real
+    # Xcode as the default developer dir.
+    (pkgs.writeTextFile {
+      name = "apple-sdk-xcodebuild-shim";
+      destination = "/usr/bin/xcodebuild";
+      executable = true;
+      text = ''
+        #!/bin/sh
+        if [ "''${1-}" = "-version" ]; then
+          printf '%s\n' "Xcode 27.0" "Build version 17A324"
+          exit 0
+        fi
+        echo "xcodebuild: compatibility shim for Nix apple-sdk-enhanced; no real Xcode is installed" >&2
+        exit 1
+      '';
+    })
   ];
 }
