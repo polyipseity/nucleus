@@ -57,41 +57,6 @@ let
   # nucleus.packages.selection.backendOverrides in core.nix, because the cask
   # is not notarized. Windows uses WinGet IJHack.QtPass.
   managedCasks = builtins.sort (a: b: a < b) (lib.unique (staticManagedCasks ++ coreManagedCasks));
-
-  # WHY: Homebrew 7.0.13 on macOS 27 requires the selected developer directory
-  # to identify as Xcode >= 27.0 when `xcode-select -print-path` resolves a
-  # non-CLT path. `nucleus-apply` intentionally switches xcode-select to the Nix
-  # apple-sdk-enhanced tree (no CLT, no Xcode version.plist/xcodebuild) for the
-  # managed toolchain, so Homebrew misreads it as an installed-but-outdated
-  # Xcode and blocks `brew bundle` (e.g. openai/tools/softnet, tart). Homebrew
-  # reads the active developer dir via `/usr/bin/xcode-select -print-path` (not
-  # DEVELOPER_DIR / HOMEBREW_DEVELOPER_DIR), so we hide Xcode only for the bundle
-  # command by resetting xcode-select to its CLT-default state. With CLT absent
-  # and no Xcode.app, Homebrew does not see an installed Xcode and therefore does
-  # not apply the Xcode-minimum gate. The previous developer dir is restored on
-  # success or failure. We do not fake an Xcode version, because that would have
-  # to track Homebrew’s minimum and could mislead other consumers.
-  brewBundleWithoutSelectedXcode = body: ''
-    _nucleus_xs_saved="$(/usr/bin/xcode-select -print-path 2>/dev/null || true)" # check-suppress:suppression_doc: no selected developer dir means there is nothing to restore
-    _nucleus_restore_xcode_select() {
-      if [ -n "$_nucleus_xs_saved" ]; then
-        if ! /usr/bin/xcode-select --switch "$_nucleus_xs_saved" >/dev/null 2>&1; then
-          echo >&2 "warning: failed to restore xcode-select developer dir to $_nucleus_xs_saved"
-        fi
-      else
-        /usr/bin/xcode-select --reset >/dev/null 2>&1 || true # check-suppress:suppression_doc: reset best-effort when no previous developer dir was recorded
-      fi
-    }
-    trap _nucleus_restore_xcode_select EXIT
-    /usr/bin/xcode-select --reset >/dev/null 2>&1 || true # check-suppress:suppression_doc: reset may fail on unsupported systems; brew bundle still runs and previous state is restored
-    set +e
-    ${body}
-    _nucleus_brew_bundle_status=$?
-    set -e
-    _nucleus_restore_xcode_select
-    trap - EXIT
-    (exit "$_nucleus_brew_bundle_status")
-  '';
 in
 {
 
@@ -143,19 +108,4 @@ in
       Amphetamine = 937984704;
     };
   };
-
-  # WHY: wrap the generated brew-bundle invocation so Homebrew runs while
-  # xcode-select points at an absent CLT path (no selected Xcode, CLT still
-  # absent) instead of the Nix apple-sdk-enhanced dev dir. This preserves the
-  # upstream nix-darwin brew-bundle command/flags/env and restores the previous
-  # developer dir even when bundle fails.
-  system.activationScripts.homebrew.text = lib.mkForce (brewBundleWithoutSelectedXcode ''
-    # Homebrew Bundle
-    echo >&2 "Homebrew bundle..."
-    if [ -f "${config.homebrew.prefix}/bin/brew" ]; then
-      ${config.homebrew.onActivation.brewBundleCmd { onlyCheck = false; }}
-    else
-      echo -e "\e[1;31merror: Homebrew is not installed, skipping...\e[0m" >&2
-    fi
-  '');
 }
