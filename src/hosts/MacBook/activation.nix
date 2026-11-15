@@ -167,6 +167,26 @@ in
       "${pkgs.jq}/bin/jq" \
       "${toString (toolchainLinks.linkDirFor "MacBook")}" \
       '${toolchainTargetsJson}'
+
+    # ---- provision-homebrew-gcc16 (pre-homebrew) ---------------------------------
+    # WHY Homebrew 7 compiler selection (clang, then gcc 8..16) rejects clang here because
+    # DevelopmentTools.clang_build_version is null (/usr/bin/clang aborts SIGABRT under the
+    # Nix-selected developer dir and Nix clang output is not an Apple build version), and
+    # locate() cannot resolve gcc-N via /usr/bin or xcrun (xcrun also aborts) when no CLT,
+    # real Xcode, or brewed gcc is installed. Providing $HOMEBREW_PREFIX/bin/gcc-16 as a
+    # symlink to the Nix gcc wrapper in the enhanced SDK makes locate("gcc-16") and
+    # gcc_version succeed, so formula build-env/compiler selection works for
+    # openai/tools/softnet without installing CLT, making a real Xcode the default dev
+    # dir, or running `brew install gcc`. Runs in extraActivation so it is in place before
+    # nix-darwin's homebrew activation/brew bundle phase.
+    _hb_gcc16="/opt/homebrew/bin/gcc-16"
+    _hb_gcc16_target="${appleSdkEnhanced}/usr/bin/gcc"
+    /bin/mkdir -p /opt/homebrew/bin
+    if [ -e "$_hb_gcc16" ] && [ ! -L "$_hb_gcc16" ]; then
+      echo "activation: refusing to replace non-symlink $_hb_gcc16; expected Homebrew-locatable gcc-16 symlink to $_hb_gcc16_target" >&2
+      exit 1
+    fi
+    /bin/ln -sfn "$_hb_gcc16_target" "$_hb_gcc16"
   '';
 
   # WHY lib.mkBefore: it puts these fragments ahead of the home-manager call
