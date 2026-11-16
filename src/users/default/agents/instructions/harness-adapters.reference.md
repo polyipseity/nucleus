@@ -26,12 +26,17 @@ This file is user scope, deployed to `~/.agents/instructions/`, so it applies in
 | Skill | `/skill:<name>`, or read the `SKILL.md` | `skill:` invocation, or read the `SKILL.md` |
 | Read-only mode | `/plan` blocks `edit`, `write`, and unsafe bash | no harness mode; obey the standing orders boundary |
 | Model pin | `subagents.modelScope` in settings, allow `inherit` only | model picker; the owner's choice is the only authority |
+| Continue turn | `/continue` (prompt-tools extension; falls back to `sendUserMessage(" ")` when no retry/resume API is verified) | no verified command surface in this repository; use harness-native controls if available, otherwise state the gap |
+| Copy user prompt | `/copy-user-prompt [sent\|queued\|pick]` (default `sent`; clipboard exec with selectable-text fallback) | no verified command/history/clipboard surface in this repository; state the gap |
+| Repeat user prompt | `/repeat-user-prompt [sent\|queued\|pick]` (default `sent`; confirms while streaming, resubmits as a new user turn) | no verified command/history/resubmit surface in this repository; state the gap |
 
 `scout` ships `write` for its `context.md` artifact, so it is not a read-only child. Use `reviewer` when the boundary forbids any write.
 
 A session-memory entry is one file whose name the workflow chooses, so `plan-<datetime>.md` and `checkpoint-<datetime>.md` are the same filename on every harness and only the directory above differs.
 
-opencode, Cursor, and CLI agents have no verified mapping in this repository. State the gap and use repository files instead of an unverified tool name.
+opencode, Cursor, Claude Code, Hermes, and CLI agents have no verified mapping for most capabilities in this repository. State the gap and use repository files instead of an unverified tool name.
+
+Prompt tools (verified/unsupported): Pi implements `/continue`, `/copy-user-prompt [sent|queued|pick]`, and `/repeat-user-prompt [sent|queued|pick]` via `src/users/default/pi/extensions/prompt-tools.ts` (unit-tested). `sent` is the last user-role message in the session branch; `queued` is the newest prompt in `<nucleus user root>/state/harness-bridge/commands/pi/*.json` (read without consuming). OpenCode, Cursor, VS Code Copilot, Claude Code, and Hermes do not have verified custom-command surfaces for equivalent copy/repeat/continue behavior in this repository; Hermes continues to support manual queued resend via `/harness send` where available. Do not register silent no-op commands for unsupported harnesses.
 
 ## Prompt invocation names
 
