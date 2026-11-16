@@ -219,16 +219,22 @@ if ($runPssa) {
     } else {
       $fanoutSw = $null
       if ($profileEnabled) { $fanoutSw = [System.Diagnostics.Stopwatch]::StartNew() }
-      # Contiguous slices of the sorted file list, one child per slice, so the
-      # merged diagnostics keep the sorted file order of a single-process run.
-      # Within a file the diagnostic set is identical; only PSSA's first-file
-      # ordering quirk can differ, since each slice starts a fresh analyzer.
-      $sliceSize = [int][Math]::Ceiling($files.Count / $maxWorkers)
-      $slices = [System.Collections.Generic.List[string[]]]::new()
-      for ($i = 0; $i -lt $files.Count; $i += $sliceSize) {
-        $last = [Math]::Min($i + $sliceSize - 1, $files.Count - 1)
-        $slices.Add([string[]]@($files[$i..$last]))
+      # Round-robin slices of the sorted file list to balance analysis cost across
+      # workers while keeping the same findings/rules/settings/pass-fail. Diagnostics
+      # are merged and sorted for deterministic output.
+      $sliceLists = [System.Collections.Generic.List[System.Collections.Generic.List[string]]]::new()
+      $workerCount = [int][Math]::Min($maxWorkers, $files.Count)
+      for ($w = 0; $w -lt $workerCount; $w++) {
+        $sliceLists.Add([System.Collections.Generic.List[string]]::new())
       }
+      for ($i = 0; $i -lt $files.Count; $i++) {
+        $sliceLists[$i % $workerCount].Add($files[$i])
+      }
+      $slices = [System.Collections.Generic.List[string[]]]::new()
+      foreach ($list in $sliceLists) {
+        $slices.Add([string[]]@($list))
+      }
+      $sliceSize = [int][Math]::Ceiling($files.Count / [Math]::Max($workerCount, 1))
 
       $childPwsh = Join-Path -Path $PSHOME -ChildPath $(if ($IsWindows) { 'pwsh.exe' } else { 'pwsh' })
       $scriptPath = (Resolve-Path -Path $PSCommandPath).Path
@@ -281,8 +287,7 @@ if ($runPssa) {
         }
       )
 
-      # Collect in job order: job N carries slice N, so the diagnostics keep
-      # the sorted file order of a single-process run.
+      # Collect diagnostics from all workers, then sort for deterministic output.
       $workerDiags = [System.Collections.Generic.List[object]]::new()
       foreach ($job in $jobs) {
         $outcome = $job | Wait-Job | Receive-Job
@@ -306,7 +311,7 @@ if ($runPssa) {
           }
         }
       }
-      $diags = @($workerDiags)
+      $diags = @($workerDiags | Sort-Object ScriptPath, @{Expression = { [int]$_.Line } }, @{Expression = { [int]$_.Column } }, Severity, Message)
       $fanoutMs = if ($profileEnabled) { $fanoutSw.ElapsedMilliseconds } else { 0 }
       if ($profileEnabled) {
         Write-CheckPwshProfile ("phase=pssa mode=fanout files={0} rules={1} workers={2} slice_size={3} setup_ms={4} fanout_ms={5} total_ms={6}" -f $files.Count, $enabledRuleNames.Count, $slices.Count, $sliceSize, $setupMs, $fanoutMs, $pssaSw.ElapsedMilliseconds)
