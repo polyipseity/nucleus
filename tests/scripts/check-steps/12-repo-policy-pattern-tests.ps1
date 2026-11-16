@@ -51,6 +51,7 @@ $RepoRoot = $repoRoot
 $script:CapturedStepAction = $null
 function Register-Step {
   param($Id, $Name, $Platform, $Mode, $Requires, [scriptblock]$Action)
+  $null = $Id, $Name, $Platform, $Mode, $Requires
   $script:CapturedStepAction = $Action
 }
 . (Join-Path $CheckDir 'check-steps/12-repo-policy-pattern.ps1')
