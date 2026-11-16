@@ -12,6 +12,11 @@ if [ -h "$_self" ]; then
   esac
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
+# shellcheck source=../src/scripts/lib/bash-guard.sh
+. "$SCRIPT_DIR/../src/scripts/lib/bash-guard.sh"
+bash_guard_require 5 1 utils
+
+# shellcheck source=../src/scripts/lib/lib.sh
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
 # WHY: the help text is the executable contract, so it enumerates every

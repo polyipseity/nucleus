@@ -29,15 +29,9 @@ if [ -h "$_self" ]; then
 fi
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 
-# D5: fail early with copy-pastable remediation for incompatible bash runtimes.
-# Never auto-switch runtimes; require bash >= 5.1 for the step runner (wait -n -p).
-if [ "${BASH_VERSINFO[0]:-0}" -lt 5 ] || { [ "${BASH_VERSINFO[0]:-0}" -eq 5 ] && [ "${BASH_VERSINFO[1]:-0}" -lt 1 ]; }; then
-  printf '%s\n' "error: incompatible bash runtime (${BASH_VERSION:-unknown}); bash >= 5.1 is required (step runner uses wait -n -p)." >&2
-  printf '%s\n' "hint: rerun with a compatible bash, for example:" >&2
-  # shellcheck disable=SC2016 # reason: show literal $USER/$PATH in copy-pastable remediation
-  printf '%s\n' '  PATH="/etc/profiles/per-user/$USER/bin:/run/current-system/sw/bin:$PATH" /run/current-system/sw/bin/bash ./scripts/test.sh' >&2
-  exit 1
-fi
+# shellcheck source=../src/scripts/lib/bash-guard.sh
+. "$SCRIPT_DIR/../src/scripts/lib/bash-guard.sh"
+bash_guard_require 5 1 test
 
 _ORCH_SCRIPT_DIR="$SCRIPT_DIR"
 _NUCLEUS_TESTS_DIR="$(CDPATH='' cd -- "$_ORCH_SCRIPT_DIR/../src/scripts/tests" && pwd)"

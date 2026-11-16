@@ -14,6 +14,11 @@ if [ -h "$_self" ]; then
   esac
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
+# shellcheck source=../src/scripts/lib/bash-guard.sh
+. "$SCRIPT_DIR/../src/scripts/lib/bash-guard.sh"
+bash_guard_require 5 1 config
+
+# shellcheck source=../src/scripts/lib/lib.sh
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
 # WHY: one canonical location on every host. Resolving this per-OS made the

@@ -22,6 +22,10 @@ Keep scripts non-interactive with predictable exit codes and idempotent operatio
 
 A script that sources another file derives its own directory and sources relative to that, exactly `SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"`. `pwd -P` resolves symlinks and `CDPATH=''` prevents interference. Never use bare `$(dirname "$0")` in a source line. Scripts under `scripts/` reached through a symlink use `dirname -- "$_self"`.
 
+## Bash baseline guard
+
+Every new POSIX entrypoint declares its minimum bash version and uses the shared guard in `src/scripts/lib/bash-guard.sh`. Source the guard right after `SCRIPT_DIR` is computed, before any construct that needs a newer bash, and call `bash_guard_require <major> <minor> <name>` with the invoked app name. `scripts/bootstrap.sh` is the exception: it stays compatible with bash 3.2 because it runs before Nix is installed, so it requires 3.2 and carries a comment that explains the exception.
+
 ## CLI option and variable naming
 
 Use `--XXX` / `--no-XXX` flag pairs, and a bare positive shell variable name (`ai_sync`, not `do_ai_sync`) with conditions testing `"$x" = false`.

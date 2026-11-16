@@ -20,6 +20,12 @@ if [ -h "$_self" ]; then
   esac
 fi
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
+# bootstrap.sh runs before Nix is installed, so it must work on stock macOS
+# /bin/bash 3.2. The guard library parses under 3.2 and only enforces that floor.
+# shellcheck source=../src/scripts/lib/bash-guard.sh
+. "$SCRIPT_DIR/../src/scripts/lib/bash-guard.sh"
+bash_guard_require 3 2 bootstrap
+
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 REPO_ROOT="$(derive_repo_root)"
 VERSIONS_FILE="$SCRIPT_DIR/bootstrap-versions.env"

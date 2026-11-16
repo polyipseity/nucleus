@@ -26,6 +26,9 @@ _logs_script_dir="$(CDPATH='' cd -- "$(dirname -- "$_logs_self")" && pwd)"
 # mode and sources lib.sh.
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   set -euo pipefail
+  # shellcheck source=../src/scripts/lib/bash-guard.sh
+  . "$_logs_script_dir/../src/scripts/lib/bash-guard.sh"
+  bash_guard_require 5 1 logs
 fi
 if ! declare -F nucleus_log_dir >/dev/null; then
   # shellcheck source=../src/scripts/lib/lib.sh

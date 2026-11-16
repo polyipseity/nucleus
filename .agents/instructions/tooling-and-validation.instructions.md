@@ -24,6 +24,10 @@ A step that resolves `<nixpkgs>` pins it with `nucleus_pin_nixpkgs <repo_root>` 
 
 Scoped mode keys off `_has_args`: POSIX steps read `ctx[HAS_ARGS]`/`ctx[REPO_ROOT]` plus the trailing file args, PowerShell steps read `$Context.HasArgs`/`$Context.RepoRoot`/`$Context.PositionalArgs`. A path-scopable step filters what it is given and treats an empty match set as nothing to check. A whole-repo-only step declares `mode full` at registration and the runner reports it `not applicable (mode: full)`. Wrap an empty PowerShell pipeline in `@(...)` before `.Count`, with a `# WHY:`.
 
+## Bash baseline guard
+
+Guarded `nucleus-*` entrypoints enforce their bash baseline through `src/scripts/lib/bash-guard.sh` instead of inline version checks. `scripts/check.sh`, `scripts/test.sh`, and `scripts/update.sh` require bash 5.1 for the step runner, while `scripts/bootstrap.sh` remains the 3.2-compatible exception. A preflight failure names the required version, the running bash, and copy-pastable remediation.
+
 ## Stack specifics
 
 - Nix formatting is treefmt only. No separate `format-nix` hook.

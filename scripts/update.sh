@@ -31,17 +31,11 @@ if [ -h "$_self" ]; then
   esac
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
-. "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
+# shellcheck source=../src/scripts/lib/bash-guard.sh
+. "$SCRIPT_DIR/../src/scripts/lib/bash-guard.sh"
+bash_guard_require 5 1 update
 
-# D5: fail early with copy-pastable remediation for incompatible bash runtimes.
-# Never auto-switch runtimes; require bash >= 4 for associative arrays.
-if [ "${BASH_VERSINFO[0]:-0}" -lt 4 ] 2>/dev/null; then
-  printf '%s\n' "error: incompatible bash runtime (${BASH_VERSION:-unknown}); bash >= 4 is required (declare -A unsupported)." >&2
-  printf '%s\n' "hint: rerun with a compatible bash, for example:" >&2
-  # shellcheck disable=SC2016 # reason: show literal $USER/$PATH in copy-pastable remediation
-  printf '%s\n' '  PATH="/etc/profiles/per-user/$USER/bin:/run/current-system/sw/bin:$PATH" /run/current-system/sw/bin/bash ./scripts/update.sh' >&2
-  exit 1
-fi
+. "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
 # usage
 #   Prints the CLI synopsis and the two stage toggles to stdout.
