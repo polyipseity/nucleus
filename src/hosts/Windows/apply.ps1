@@ -98,19 +98,21 @@ $applyScript = Join-Path -Path $actionRepoRoot -ChildPath "scripts\apply.ps1"
 switch ($Action) {
   "health-check" {
     if (Test-Path -LiteralPath $applyScript) {
-      & $applyScript health-check
+      & $applyScript health-check @RemainingArgs
+      exit $LASTEXITCODE
     } else {
       Write-NucleusInfo -CommandName health-check "scripts/apply.ps1 not found; health-check is not yet implemented for Windows; exiting 0"
+      exit 0
     }
-    exit 0
   }
   "audit-store" {
     if (Test-Path -LiteralPath $applyScript) {
-      & $applyScript audit-store
+      & $applyScript audit-store @RemainingArgs
+      exit $LASTEXITCODE
     } else {
       Write-NucleusInfo -CommandName audit-store "scripts/apply.ps1 not found; audit-store is not yet implemented for Windows; exiting 0"
+      exit 0
     }
-    exit 0
   }
   "status" {
     if (Test-Path -LiteralPath $applyScript) {

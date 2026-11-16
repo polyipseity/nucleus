@@ -30,12 +30,24 @@ Subcommands:
                             --history N  show the N newest records, most recent first
                             --json       emit {"version":1,"entries":[...]}
   health-check [options]    Run pre-flight health checks.
+                            --min-free-bytes <bytes>
+                                                  minimum free bytes required at the repo filesystem (default: 16000000000)
+                            --secret-health|--no-secret-health
+                                                  enable or disable secret decryption checks (default: on)
+                            --log-health          enable log health checks
+                            --store-audit|--no-store-audit
+                                                  enable or disable the Nix store baseline report
+                            -h, --help            show this help
   audit-store               Report Nix store baseline.
 
 Apply options:
   --ai-sync|--no-ai-sync
   --replica-sync|--no-replica-sync
   --store-audit|--no-store-audit
+  --health-check|--no-health-check
+                            run or skip pre-rebuild/pre-build health checks (default: on)
+  --min-free-bytes <bytes>
+                            forward the minimum free-bytes threshold to apply-time health checks
   --target-user=<name>
   --username=<name>
   --vm-sync|--no-vm-sync
@@ -365,6 +377,8 @@ replica_sync=false
 vm_sync=true
 vm_setup=false
 store_audit=false
+health_check=true
+health_check_min_free_bytes=""
 target_user=""
 
 if [ "${NUCLEUS_HEALTH_CHECK_STORE_AUDIT:-}" = "1" ]; then
@@ -383,6 +397,23 @@ while [ "$#" -gt 0 ]; do
   --no-vm-setup) vm_setup=false ;;
   --store-audit) store_audit=true ;;
   --no-store-audit) store_audit=false ;;
+  --health-check) health_check=true ;;
+  --no-health-check) health_check=false ;;
+  --min-free-bytes)
+    if [ "$#" -lt 2 ]; then
+      error -l apply "--min-free-bytes requires a value"
+      exit 1
+    fi
+    health_check_min_free_bytes="$2"
+    shift
+    ;;
+  --min-free-bytes=*)
+    health_check_min_free_bytes="${1#--min-free-bytes=}"
+    if [ -z "$health_check_min_free_bytes" ]; then
+      error -l apply "--min-free-bytes requires a non-empty value"
+      exit 1
+    fi
+    ;;
   --target-user)
     target_user="$2"
     shift
@@ -489,11 +520,18 @@ start_sudo_keepalive() {
 }
 
 run_health_check() {
-  if [ "$store_audit" = true ]; then
-    run_nix run "$REPO_ROOT/src#apply" health-check --store-audit
-  else
-    run_nix run "$REPO_ROOT/src#apply" health-check
+  if [ "$health_check" != true ]; then
+    return 0
   fi
+
+  _rhc_args=(health-check)
+  if [ "$store_audit" = true ]; then
+    _rhc_args+=(--store-audit)
+  fi
+  if [ -n "$health_check_min_free_bytes" ]; then
+    _rhc_args+=(--min-free-bytes "$health_check_min_free_bytes")
+  fi
+  run_nix run "$REPO_ROOT/src#apply" "${_rhc_args[@]}"
 }
 
 run_pre_build() {

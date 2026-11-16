@@ -16,6 +16,9 @@ _arguments -C \
   '--no-vm-sync[Skip VM sync]' \
   '--vm-setup[Run VM setup]' \
   '--no-vm-setup[Skip VM setup]' \
+  '--health-check[Run pre-rebuild/pre-build health checks]' \
+  '--no-health-check[Skip pre-rebuild/pre-build health checks]' \
+  '--min-free-bytes[Forward the minimum free-bytes threshold to apply-time health checks]:min free bytes:' \
   '1:subcommand:->subcmd' \
   '*::arg:->args'
 
@@ -43,7 +46,13 @@ case $state in
         ;;
       health-check)
         _arguments \
-          '*: :'
+          '{-h,--help}[Show this help]' \
+          '--min-free-bytes[Minimum free bytes required at the repo filesystem]:min free bytes:' \
+          '--secret-health[Enable secret decryption checks]' \
+          '--no-secret-health[Disable secret decryption checks]' \
+          '--log-health[Enable log health checks]' \
+          '--store-audit[Enable the Nix store baseline report]' \
+          '--no-store-audit[Disable the Nix store baseline report]'
         ;;
       audit-store)
         _arguments \

@@ -167,6 +167,22 @@
           "long": "--no-vm-setup",
           "takesValue": false,
           "description": "Skip VM setup"
+        },
+        {
+          "long": "--health-check",
+          "takesValue": false,
+          "description": "Run pre-rebuild/pre-build health checks"
+        },
+        {
+          "long": "--no-health-check",
+          "takesValue": false,
+          "description": "Skip pre-rebuild/pre-build health checks"
+        },
+        {
+          "long": "--min-free-bytes",
+          "takesValue": true,
+          "valueType": "bytes",
+          "description": "Forward the minimum free-bytes threshold to apply-time health checks"
         }
       ],
       "subcommands": [
@@ -196,7 +212,45 @@
         },
         {
           "name": "health-check",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--help",
+              "takesValue": false,
+              "short": "-h",
+              "description": "Show this help"
+            },
+            {
+              "long": "--min-free-bytes",
+              "takesValue": true,
+              "valueType": "bytes",
+              "description": "Minimum free bytes required at the repo filesystem"
+            },
+            {
+              "long": "--secret-health",
+              "takesValue": false,
+              "description": "Enable secret decryption checks"
+            },
+            {
+              "long": "--no-secret-health",
+              "takesValue": false,
+              "description": "Disable secret decryption checks"
+            },
+            {
+              "long": "--log-health",
+              "takesValue": false,
+              "description": "Enable log health checks"
+            },
+            {
+              "long": "--store-audit",
+              "takesValue": false,
+              "description": "Enable the Nix store baseline report"
+            },
+            {
+              "long": "--no-store-audit",
+              "takesValue": false,
+              "description": "Disable the Nix store baseline report"
+            }
+          ],
           "positionals": [],
           "description": "Run pre-flight health checks."
         },
