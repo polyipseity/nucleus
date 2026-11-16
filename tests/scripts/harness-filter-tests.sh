@@ -239,23 +239,22 @@ assert_decision "an unproven redirect allows when configured" \
 # shipping unannounced.
 _unknown_line="$(run_filter_env "$EMPTY_HOME" "$NO_RM_PATH" '{"unproven":"maybe"}' 'rm x')"
 assert_decision "an unknown settings.unproven denies instead of allowing" "$_unknown_line" deny unproven-redirect
-_schema_words=()
-mapfile -t _schema_words < <(jq -r '.properties.filters.items.allOf[0].then.properties.settings.properties.unproven.enum[]' "$SCHEMA")
-if [ "${#_schema_words[@]}" -eq 0 ]; then
+_unnamed=()
+_schema_words_seen=0
+while IFS= read -r _word; do
+  [ -n "$_word" ] || continue
+  _schema_words_seen=1
+  case "$(printf '%s' "$_unknown_line" | cut -f3)" in
+  *"$_word"*) ;;
+  *) _unnamed+=("$_word") ;;
+  esac
+done < <(jq -r '.properties.filters.items.allOf[0].then.properties.settings.properties.unproven.enum[]' "$SCHEMA")
+if [ "$_schema_words_seen" -eq 0 ]; then
   assert_fail "the unknown settings.unproven message names every schema-accepted word" "no enum words read from $SCHEMA"
+elif [ "${#_unnamed[@]}" -eq 0 ]; then
+  assert_pass "the unknown settings.unproven message names every schema-accepted word"
 else
-  _unnamed=()
-  for _word in "${_schema_words[@]}"; do
-    case "$(printf '%s' "$_unknown_line" | cut -f3)" in
-    *"$_word"*) ;;
-    *) _unnamed+=("$_word") ;;
-    esac
-  done
-  if [ "${#_unnamed[@]}" -eq 0 ]; then
-    assert_pass "the unknown settings.unproven message names every schema-accepted word"
-  else
-    assert_fail "the unknown settings.unproven message names every schema-accepted word" "not named: ${_unnamed[*]}"
-  fi
+  assert_fail "the unknown settings.unproven message names every schema-accepted word" "not named: ${_unnamed[*]}"
 fi
 assert_decision "a plain rm ahead of the wrapper on PATH is unproven and denies" \
   "$(run_filter_env "$EMPTY_HOME" "$PLAIN_PATH" '{"unproven":"deny"}' 'rm x')" deny unproven-redirect
