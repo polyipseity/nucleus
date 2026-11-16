@@ -16,8 +16,11 @@ MATERIALIZE_SCRIPT="$REPO_ROOT/src/scripts/secrets/materialize-user-secrets.sh"
 DERIVE_HOST_AGE_KEY_SCRIPT="$REPO_ROOT/src/scripts/secrets/derive-host-age-key.sh"
 
 test_list_secret_users_sorted() {
-  local users prev=""
-  mapfile -t users < <(list_secret_users "$REPO_ROOT")
+  local users=() user prev=""
+  while IFS= read -r user; do
+    [ -n "$user" ] || continue
+    users+=("$user")
+  done < <(list_secret_users "$REPO_ROOT")
   if [ "${#users[@]}" -lt 1 ]; then
     assert_fail "list_secret_users returns secret users" "expected at least one user"
     return
