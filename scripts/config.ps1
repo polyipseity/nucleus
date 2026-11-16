@@ -33,6 +33,7 @@ $configFile = Join-Path -Path $HOME -ChildPath ".local/state/nucleus/config.json
 # Default values for all known config keys.
 # Used as fallback when file/key is absent, so users can discover available options.
 $script:Defaults = @{
+  applyHistoryLimit = 256
   camilladsp = @{
     enable = $true
     heartbeat = $true

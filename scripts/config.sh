@@ -39,6 +39,7 @@ require_command jq
 
 # Fallback for an absent file or key, so users can discover the options.
 DEFAULTS='{
+  "applyHistoryLimit": 256,
   "camilladsp": {
     "enable": true,
     "heartbeat": true

@@ -62,7 +62,7 @@ Every `nucleus-*` command works from any working directory. `derive_repo_root()`
 
 ## Runtime configuration (`nucleus-config`)
 
-Toggles live at `~/.local/state/nucleus/config.json`, outside `~/.config/` so they survive rebuilds, and resolve identically on every host. They default to `true` when absent. `scripts/config.sh` / `scripts/config.ps1` enforce them while services read the file directly for early-boot compatibility. A new toggle needs a default entry in both script implementations and the same default at every read site.
+Toggles and runtime settings live at `~/.local/state/nucleus/config.json`, outside `~/.config/` so they survive rebuilds, and resolve identically on every host. Boolean toggles default to `true` when absent unless documented otherwise. `scripts/config.sh` / `scripts/config.ps1` enforce them while services read the file directly for early-boot compatibility. A new key needs a default entry in both script implementations and the same default at every read site. The apply history limit is `applyHistoryLimit` (number): default `256`, `0` disables writes, negative means unlimited.
 
 ## Terminology in examples
 
