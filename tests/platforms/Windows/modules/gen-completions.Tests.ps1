@@ -53,6 +53,7 @@ BeforeAll {
     # Copy-Item preserves bytes, keeping the real file's CRLF + UTF-8 encoding.
     Copy-Item -LiteralPath $Script:RealProfilePath -Destination (Join-Path $profileDir 'profile.ps1')
     Copy-Item -LiteralPath (Join-Path $Script:RepoRoot 'src/modules/completions/nucleus-apps.json') -Destination (Join-Path $manifestDir 'nucleus-apps.json')
+    Copy-Item -LiteralPath (Join-Path $Script:RepoRoot 'src/modules/completions/nucleus-cli-spec.json') -Destination (Join-Path $manifestDir 'nucleus-cli-spec.json')
   }
 
   function Get-FixtureProfile {
@@ -370,16 +371,15 @@ Describe 'gen-completions.ps1 generated inventory' {
     # Commands whose generated (sorted) order equals the authoritative table.
     @(Get-NucleusFlagsFromProfile -VariableName 'nucleusAiFlags' -ProfileText $profileText) | Should -Be @('--dry-run', '--gc-only', '--help', '--json', '--no-gc-only', '--ollama-profile', '--profile')
     @(Get-NucleusFlagsFromProfile -VariableName 'nucleusUtilsFlags' -ProfileText $profileText) | Should -Be @('--dialog', '--help', '--preset', '--rm-bak')
-    @(Get-NucleusFlagsFromProfile -VariableName 'nucleusSvcFlags' -ProfileText $profileText) | Should -Be @('--help', '--json', '--system', '--user', '--verbose')
+    @(Get-NucleusFlagsFromProfile -VariableName 'nucleusSvcFlags' -ProfileText $profileText) | Should -Be @('--disable', '--enable', '--help', '--json', '--system', '--user', '--verbose')
 
-    # test/vm: the generator re-sorts via Sort-Object (e.g. '-q' sorts last), so
-    # assert the SET order-independently plus absence of the stale flags.
+    # test/vm: assert the flag set matches the spec-driven inventory.
     $testFlags = @(Get-NucleusFlagsFromProfile -VariableName 'nucleusTestFlags' -ProfileText $profileText)
-    $testExpected = @('-q', '--fail-fast', '--help', '--no-fail-fast', '--only-steps', '--quiet') | Sort-Object
-    @($testFlags | Sort-Object) | Should -Be $testExpected
+    $testExpected = @('--fail-fast', '--help', '--no-fail-fast', '--no-verbose', '--only-steps', '--quiet', '--verbose')
+    @($testFlags | Sort-Object) | Should -Be @($testExpected | Sort-Object)
 
     $vmFlags = @(Get-NucleusFlagsFromProfile -VariableName 'nucleusVmFlags' -ProfileText $profileText)
-    $vmExpected = @('--accept-gsi-license', '--accelerator', '--adb-keys', '--allow-shrink', '--dry-run', '--fake-wifi', '--fake-wifi-revert', '--force', '--gc', '--gc-data', '--gc-disabled', '--gapps', '--headful', '--help', '--json', '--magisk', '--mido-patch-file', '--mido-script', '--no-accept-gsi-license', '--no-gc', '--no-gc-data', '--no-gc-disabled', '--no-headful', '--repo-root', '--root', '--vm-dir-override', '--windows-iso', '--windows-iso-retries', '--windows-iso-source') | Sort-Object
+    $vmExpected = @('--accept-gsi-license', '--accelerator', '--adb-keys', '--allow-shrink', '--dry-run', '--fake-wifi', '--fake-wifi-revert', '--force', '--gapps', '--gc', '--gc-data', '--gc-disabled', '--headful', '--help', '--json', '--magisk', '--mido-patch-file', '--mido-script', '--no-accept-gsi-license', '--no-gc', '--no-gc-data', '--no-gc-disabled', '--no-headful', '--repo-root', '--root', '--vm-dir-override', '--windows-iso', '--windows-iso-retries', '--windows-iso-source') | Sort-Object
     @($vmFlags | Sort-Object) | Should -Be $vmExpected
     $vmFlags | Should -Not -Contain '--no-windows-iso'
     $profileText | Should -Not -Match '--remove-backup'

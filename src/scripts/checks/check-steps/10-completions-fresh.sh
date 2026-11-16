@@ -296,6 +296,90 @@ run_completions_fresh() {
   done
   say "completions-fresh: help/--list-* introspection: $(_cf_dur_s $(($(_cf_now_ms) - _cf_int_t0)))"
 
+  # 4. Bidirectional help<->spec drift: every --long-flag token in an app's
+  #    --help must exist in the spec, and every spec long flag must appear in
+  #    that help. Fail naming the app and flag.
+  local _cf_drift_t0 _spec_file="$_repo_root/src/modules/completions/nucleus-cli-spec.json"
+  _cf_drift_t0=$(_cf_now_ms)
+  require_command python3 "python3 is required for help/spec drift checking"
+  [ -f "$_spec_file" ] || {
+    error "nucleus CLI spec not found: $_spec_file"
+    return 1
+  }
+  local _drift_out="" _drift_rc=0
+  _drift_out="$(
+    python3 - "$_repo_root" "$_spec_file" <<'PY'
+import json, re, subprocess, sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+spec_path = Path(sys.argv[2])
+spec = json.loads(spec_path.read_text())
+
+def help_path(name):
+    if name == 'camilladsp-heartbeat':
+        return root / 'src/scripts/services/camilladsp-heartbeat.sh'
+    return root / 'scripts' / f'{name}.sh'
+
+def extract_long_flags(text):
+    out = set()
+    for line in text.splitlines():
+        if re.match(r'^(usage|Usage):', line):
+            # usage bracket groups, including nested [=<...>]
+            for grp in re.findall(r'\[([^\]]*(?:\[[^\]]*\][^\]]*)*)\]', line):
+                for tok in re.findall(r'--[a-z0-9][a-z0-9-]*', grp):
+                    out.add(tok)
+        m = re.match(r'^[ \t]*((?:-|--)[a-z0-9][a-z0-9-]*(?:\s*[|,]\s*(?:-|--)[a-z0-9][a-z0-9-]*)*)', line)
+        if m:
+            for tok in re.findall(r'--[a-z0-9][a-z0-9-]*', m.group(1)):
+                out.add(tok)
+    return out
+
+def spec_flags(app):
+    out = set()
+    for f in app.get('globalFlags') or []:
+        if f.get('long'): out.add(f['long'])
+    for sc in app.get('subcommands') or []:
+        for f in sc.get('flags') or []:
+            if f.get('long'): out.add(f['long'])
+    return out
+
+errors = []
+for app in spec.get('apps') or []:
+    name = app.get('name')
+    if not name:
+        continue
+    hp = help_path(name)
+    if not hp.exists():
+        errors.append(f'{name}: help source not found: {hp}')
+        continue
+    r = subprocess.run(['bash', str(hp), '--help'], capture_output=True, text=True)
+    text = (r.stdout or '') + '\n' + (r.stderr or '')
+    hf = extract_long_flags(text)
+    sf = spec_flags(app)
+    for flag in sorted(hf - sf):
+        errors.append(f'{name}: help flag {flag} missing from spec')
+    for flag in sorted(sf - hf):
+        errors.append(f'{name}: spec flag {flag} missing from help')
+
+if errors:
+    for e in errors:
+        print(e)
+    sys.exit(1)
+PY
+  )" || _drift_rc=$?
+  if [ "$_drift_rc" -ne 0 ]; then
+    if [ -n "$_drift_out" ]; then
+      while IFS= read -r _line; do
+        [ -n "$_line" ] || continue
+        error "$_line"
+      done <<<"$_drift_out"
+    fi
+    error "help/spec drift detected"
+    return 1
+  fi
+  say "completions-fresh: help/spec drift: $(_cf_dur_s $(($(_cf_now_ms) - _cf_drift_t0)))"
+
   say "completions freshness passed."
   return 0
 }

@@ -38,7 +38,7 @@ target_user="${NUCLEUS_TARGET_USER:-}"
 _apply_args=""
 
 usage() {
-  usage_std "bootstrap.sh" "[--apply|--no-apply] [--ai-sync|--no-ai-sync] [--replica-sync|--no-replica-sync] [--force-admin] [--target-user=<name>] [-- <apply-args>...]" "Installs Nix (if absent) and the Nix-managed bootstrap dependencies. By default installs dependencies only. Pass --apply to also run the apply flow."
+  usage_std "bootstrap.sh" "[-h|--help] [--apply|--no-apply] [--ai-sync|--no-ai-sync] [--replica-sync|--no-replica-sync] [--force-admin] [--target-user=<name>] [-- <apply-args>...]" "Installs Nix (if absent) and the Nix-managed bootstrap dependencies. By default installs dependencies only. Pass --apply to also run the apply flow."
 }
 
 while [ "$#" -gt 0 ]; do

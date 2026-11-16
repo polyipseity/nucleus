@@ -4,11 +4,11 @@
 
 _arguments \
   '(-h --help)'{--help,-h}'[Show usage]' \
-  '--ai-sync[ai sync]' \
-  '--apply[apply]' \
-  '--force-admin[force admin]' \
-  '--no-ai-sync[no ai sync]' \
-  '--no-apply[no apply]' \
-  '--no-replica-sync[no replica sync]' \
-  '--replica-sync[replica sync]' \
-  '--target-user[target user]'
+  '--apply[Also run the apply flow]' \
+  '--no-apply[Install dependencies only]' \
+  '--ai-sync[Run AI sync]' \
+  '--no-ai-sync[Skip AI sync]' \
+  '--replica-sync[Run replica sync]' \
+  '--no-replica-sync[Skip replica sync]' \
+  '--force-admin[Force admin mode]' \
+  '--target-user[Target user]:target user:'

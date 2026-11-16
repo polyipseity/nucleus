@@ -83,6 +83,7 @@ esac
 usage() {
   usage_std "$(basename "$0")" "[options]"
   cat <<'EOF'
+  -h|--help                           Show usage.
   --tool-cache-gc|--no-tool-cache-gc  Control bun/cargo/rustc/uv cache gc (default: --tool-cache-gc).
   --git-cache-gc|--no-git-cache-gc  Control stale .git cache/state cleanup and git gc --auto (default: --git-cache-gc).
   --hm-gc|--no-hm-gc                        Control home-manager generation expiration (default: --hm-gc).

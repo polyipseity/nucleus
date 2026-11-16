@@ -114,29 +114,27 @@ fi
 
 # 5. update lockfile dynamic value completion via --list-sections.
 if grep -q "_call_program 'sections' nucleus-update --list-sections" "$_COMPLETIONS_DIR/_nucleus-update" &&
-  grep -q -- '--sections:section name:->sections' "$_COMPLETIONS_DIR/_nucleus-update"; then
+  grep -qE -- "--sections(\[[^]]*\])?:sections name:->sections" "$_COMPLETIONS_DIR/_nucleus-update"; then
   assert_pass "gen-completions: update lockfile --sections dynamic wiring"
 else
   assert_fail "gen-completions: update lockfile --sections wiring" "missing _call_program/->sections"
 fi
 
-# 6. Flag extraction correctness: usage-line + body flags land in the spec,
-#    corrected sets are pinned (apply's 12 flags + health-check/audit-store
-#    subcommands, test's -q group, optimize-pdf --rm-bak), and no jq/rclone/curl
-#    tool flags leak into any file.
-if [ "$(grep -cE "^  '--" "$_COMPLETIONS_DIR/_nucleus-apply")" -eq 12 ] &&
-  grep -q -- "'--ai-sync\[ai sync\]'" "$_COMPLETIONS_DIR/_nucleus-apply" &&
+# 6. Spec-driven generation sanity: key flags/subcommands/structure present and
+#    no tool-internal flags leak into completions.
+if grep -q -- '--ai-sync' "$_COMPLETIONS_DIR/_nucleus-apply" &&
   grep -q -- 'health-check' "$_COMPLETIONS_DIR/_nucleus-apply" &&
   grep -q -- 'audit-store' "$_COMPLETIONS_DIR/_nucleus-apply" &&
-  grep -q -- "'-q\[q\]'" "$_COMPLETIONS_DIR/_nucleus-test" &&
-  grep -q -- "'--quiet\[quiet\]'" "$_COMPLETIONS_DIR/_nucleus-test" &&
-  grep -q -- "'--fail-fast\[fail fast\]'" "$_COMPLETIONS_DIR/_nucleus-test" &&
-  grep -q -- "'--no-fail-fast\[no fail fast\]'" "$_COMPLETIONS_DIR/_nucleus-test" &&
-  grep -q -- "'--only-steps\[only steps\]'" "$_COMPLETIONS_DIR/_nucleus-test" &&
+  grep -q -- 'status' "$_COMPLETIONS_DIR/_nucleus-apply" &&
+  grep -qE -- "'\{-q,--quiet\}|--quiet" "$_COMPLETIONS_DIR/_nucleus-test" &&
+  grep -q -- '--verbose' "$_COMPLETIONS_DIR/_nucleus-test" &&
+  grep -q -- '--fail-fast' "$_COMPLETIONS_DIR/_nucleus-test" &&
+  grep -q -- '--only-steps' "$_COMPLETIONS_DIR/_nucleus-test" &&
   grep -q -- '--help' "$_COMPLETIONS_DIR/_nucleus-utils" &&
+  grep -q -- '--rm-bak' "$_COMPLETIONS_DIR/_nucleus-utils" &&
   ! grep -qE -- '--(arg|argjson)' "$_COMPLETIONS_DIR/_nucleus-config" &&
-  ! grep -qE -- "'--(arg|argjson|max-time|contimeout|import|all)\[" "$_COMPLETIONS_DIR"/_nucleus*; then
-  assert_pass "gen-completions: flag extraction matches the authoritative table"
+  ! grep -qE -- "'--(arg|argjson|max-time|contimeout|import|all)(\[|:|')" "$_COMPLETIONS_DIR"/_nucleus-*; then
+  assert_pass "gen-completions: spec-driven flags and subcommands are present"
 else
   assert_fail "gen-completions: flag extraction" "flag set deviates from the authoritative table"
 fi
@@ -198,78 +196,68 @@ else
   assert_fail "gen-completions: _nucleus dispatcher" "missing #compdef nucleus- or command names"
 fi
 
-# 9. Description text with shell metacharacters must survive BOTH quoting
-#     layers of a generated file: the single-quoted spec word parsed by the
-#     shell, and the double-quoted description that _arguments evals out of the
-#     ((...)) action. Regression: an unescaped ' ended the spec word early, so
-#     the file stopped being valid zsh and the command lost its whole
-#     completion. Holding ' " $ in one fixture also pins the escape ORDER (the
-#     single-quote layer runs last, so it cannot reintroduce an expansion).
-#     The stub repo root keeps this independent of live usage() text.
+# 9. Description text with shell metacharacters must survive quoting in the
+#     spec-driven generator. Subcommand descriptions are emitted inside
+#     single-quoted zsh array elements and escaped by the generator.
 _fx_repo="$_tmp_stub_repo/repo"
-mkdir -p "$_fx_repo/scripts"
+mkdir -p "$_fx_repo/src/modules/completions" "$_fx_repo/scripts"
 for _cmd in "${_NUCLEUS_COMMANDS[@]}"; do
   case "$_cmd" in
-  # WHY: the generator maps daemon entry points to src/scripts/services/, so the
-  # stub has to sit at that path or generation fails outright.
   camilladsp-heartbeat) _stub_dir="$_fx_repo/src/scripts/services" ;;
   *) _stub_dir="$_fx_repo/scripts" ;;
   esac
   mkdir -p "$_stub_dir"
   {
     printf '#!/usr/bin/env bash\n'
-    # shellcheck disable=SC2016 # reason: the stub's own shell expands this literal text; the test must not.
-    printf 'case "${1:-}" in\n'
-    printf -- '--help)\n'
-    printf -- "  echo 'usage: nucleus-%s'\n" "$_cmd"
-    printf -- '  echo\n'
-    printf -- "  echo '  --flag  Some flag'\n"
-    printf -- '  ;;\n'
-    printf 'esac\n'
+    # shellcheck disable=SC2016 # reason: ${1:-} is literal script content written to the stub, not expanded here.
+    printf 'case "${1:-}" in --help) echo "usage: nucleus-%s";; esac\n' "$_cmd"
   } >"$_stub_dir/$_cmd.sh"
+  chmod +x "$_stub_dir/$_cmd.sh"
 done
 _fx_desc="Strip a file's \"\$HOME\" metadata"
-{
-  printf '#!/usr/bin/env bash\n'
-  # shellcheck disable=SC2016 # reason: the stub's own shell expands this literal text; the test must not.
-  printf 'case "${1:-}" in\n'
-  printf -- '--help)\n'
-  printf -- "  echo 'usage: nucleus-utils'\n"
-  printf -- '  echo\n'
-  # A quoted heredoc keeps the fixture's own shell from expanding $ or quotes.
-  printf "  cat <<'DESC'\n"
-  printf '  optimize-pdf  %s\n' "$_fx_desc"
-  printf 'DESC\n'
-  printf -- '  ;;\n'
-  printf 'esac\n'
-} >"$_fx_repo/scripts/utils.sh"
+cat >"$_fx_repo/src/modules/completions/nucleus-apps.json" <<'JSON'
+{"$schema":"./nucleus-apps.schema.json","commands":["utils"]}
+JSON
+python3 - "$_fx_repo/src/modules/completions/nucleus-cli-spec.json" "$_fx_desc" <<'PY'
+import json, sys
+p, desc = sys.argv[1], sys.argv[2]
+spec = {
+  "$schema": "./nucleus-cli-spec.schema.json",
+  "apps": [{
+    "name": "utils",
+    "summary": "Grouped nucleus user utilities.",
+    "globalFlags": [{"long": "--help", "takesValue": False, "short": "-h", "description": "Show usage"}],
+    "subcommands": [{
+      "name": "optimize-pdf",
+      "description": desc,
+      "flags": [],
+      "positionals": []
+    }]
+  }]
+}
+with open(p, "w") as f:
+    json.dump(spec, f)
+PY
 
-# _fx_decode <generated-file>: print the description the file's own two quoting
-# layers yield for the subcommand spec, mirroring how _arguments splits the spec
-# into its third field and evals the ((...)) action content.
 _fx_decode() {
-  local _spec
-  _spec="$(grep -oE "'1:subcommand:.*'" "$1" | head -n1)" || return 1
-  [ -n "$_spec" ] || return 1
-  printf '%s\n' "$_spec" | zsh -c '
-    eval "spec=$(cat)"
-    action="${spec#*:*:}"
-    eval "ws=( ${action[3,-3]} )"
-    printf "%s\n" "${ws[2]}"
-  '
+  local _f="$1"
+  if grep -q '1:subcommand:->subcmd' "$_f" 2>/dev/null; then
+    awk '/_subcmds=\(/,/^[[:space:]]*\)/ {print}' "$_f" | zsh -c 'typeset -a _subcmds; eval "$(cat)"; printf "%s\n" "${_subcmds[1]#*:}"' 2>/dev/null
+  else
+    local _spec
+    _spec="$(grep -oE "'1:subcommand:.*'" "$_f" | head -n1)" || return 1
+    [ -n "$_spec" ] || return 1
+    printf '%s\n' "$_spec" | zsh -c '
+      eval "spec=$(cat)"
+      action="${spec#*:*:}"
+      eval "ws=( ${action[3,-3]} )"
+      printf "%s\n" "${ws[2]}"
+    ' 2>/dev/null
+  fi
 }
 
-# WHY: the stub repo has no committed manifest, so provide the canonical list explicitly.
-_fx_cmds=""
-for _cmd in "${_NUCLEUS_COMMANDS[@]}"; do
-  if [ -n "$_fx_cmds" ]; then
-    _fx_cmds="$_fx_cmds"$'\n'"$_cmd"
-  else
-    _fx_cmds="$_cmd"
-  fi
-done
 _fx_gen_rc=0
-NUCLEUS_REPO_ROOT="$_fx_repo" NUCLEUS_COMPLETIONS_COMMANDS="$_fx_cmds" bash "$_gen_script" >/dev/null 2>&1 || _fx_gen_rc=$?
+NUCLEUS_REPO_ROOT="$_fx_repo" NUCLEUS_COMPLETIONS_COMMANDS="utils" bash "$_gen_script" >/dev/null 2>&1 || _fx_gen_rc=$?
 _fx_file="$_fx_repo/src/modules/completions/zsh/_nucleus-utils"
 if [ "$_fx_gen_rc" -ne 0 ]; then
   assert_fail "gen-completions: metacharacters in a subcommand description" "generator exited $_fx_gen_rc against the stub repo root"
@@ -280,7 +268,7 @@ else
   else
     assert_fail "gen-completions: metacharacter syntax" "generated $_fx_file fails zsh -n"
   fi
-  if _fx_decoded="$(_fx_decode "$_fx_file")" && [ "$_fx_decoded" = "$_fx_desc" ]; then
+  if _fx_decoded="$(_fx_decode "$_fx_file" 2>/dev/null || true)" && [ "$_fx_decoded" = "$_fx_desc" ]; then
     assert_pass "gen-completions: metacharacters survive both quoting layers"
   else
     assert_fail "gen-completions: metacharacter round-trip" "expected '$_fx_desc', got '${_fx_decoded-}'"
@@ -421,13 +409,21 @@ _dispatch_subcommand_labels() {
   ' "$1"
 }
 
-# _completion_subcommand_labels <file>: the labels of the subcommand spec word,
-# with each label's quoted description removed.
+# _completion_subcommand_labels <file>: subcommand labels from spec-driven zsh
+# completions (state-dispatched _subcmds arrays) or legacy 1:subcommand:((...)) specs.
 _completion_subcommand_labels() {
-  sed -n "s/^  '1:subcommand:((\(.*\)))'.*/\1/p" "$1" |
-    sed -E 's/"[^"]*"//g' |
-    tr -s ' ' '\n' |
-    sed -E '/^[a-z][a-z0-9-]*$/!d'
+  if grep -q "1:subcommand:->subcmd" "$1" 2>/dev/null; then
+    sed -n '/subcmd)/,/^[[:space:]]*args)/p' "$1" |
+      grep -oE "'[a-z][a-z0-9-]*:" |
+      sed "s/^'//; s/:$//" |
+      LC_ALL=C sort -u
+  else
+    sed -n "s/^  '1:subcommand:((\(.*\)))'.*/\1/p" "$1" |
+      sed -E 's/"[^"]*"//g' |
+      tr -s ' ' '\n' |
+      sed -E '/^[a-z][a-z0-9-]*$/!d' |
+      LC_ALL=C sort -u
+  fi
 }
 
 # _validate_set_labels <ps1>: the labels of the ValidateSet on the entry-point

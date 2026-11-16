@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Generate zsh completions for every nucleus-* command from its --help output;
-# the CLI is the source of truth. Idempotent, and --check fails listing every
+# Generate zsh completions and PowerShell-facing artifacts from the committed CLI spec;
+# the spec is the source of truth. Idempotent, and --check fails listing every
 # differing checked-in file (check step 10-completions-fresh).
 # Generated files must not be edited by hand.
 set -euo pipefail
@@ -20,11 +20,17 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd -P)"
 
 REPO_ROOT="$(derive_repo_root)"
 COMPLETIONS_DIR="$REPO_ROOT/src/modules/completions/zsh"
-
-# The canonical nucleus-* command set, read from the committed manifest that
-# nix-capable checks keep in sync with mkNucleusApps. NUCLEUS_COMPLETIONS_COMMANDS
-# overrides the manifest for tests (space or newline separated names).
+SPEC_FILE="$REPO_ROOT/src/modules/completions/nucleus-cli-spec.json"
 NUCLEUS_APPS_MANIFEST="$REPO_ROOT/src/modules/completions/nucleus-apps.json"
+
+require_command jq "jq is required to read the nucleus CLI spec"
+
+usage() {
+  usage_std "$(basename "$0")" "generate|--check|--help" "Generate zsh completion files for every nucleus-* command from src/modules/completions/nucleus-cli-spec.json. Default action: generate (write files in place). --check regenerates into a temp dir and fails (exit 1) listing every differing file. Files are generated — do not edit by hand."
+}
+
+# The canonical nucleus-* command set comes from the committed manifest.
+# NUCLEUS_COMPLETIONS_COMMANDS overrides for tests (space/newline separated).
 COMMANDS=()
 if [ -n "${NUCLEUS_COMPLETIONS_COMMANDS:-}" ]; then
   while IFS= read -r _cmd; do
@@ -35,150 +41,45 @@ if [ -n "${NUCLEUS_COMPLETIONS_COMMANDS:-}" ]; then
     esac
   done < <(printf '%s\n' "$NUCLEUS_COMPLETIONS_COMMANDS" | tr ' \t' '\n' | LC_ALL=C sort -u)
 else
-  if [ ! -f "$NUCLEUS_APPS_MANIFEST" ]; then
+  [ -f "$NUCLEUS_APPS_MANIFEST" ] || {
     error "nucleus command manifest not found: $NUCLEUS_APPS_MANIFEST"
     exit 1
-  fi
-  require_command jq "jq is required to read the nucleus command manifest"
+  }
   while IFS= read -r _cmd; do
     [ -n "$_cmd" ] || continue
     COMMANDS+=("$_cmd")
   done < <(jq -r '.commands[]' "$NUCLEUS_APPS_MANIFEST")
 fi
-if [ "${#COMMANDS[@]}" -eq 0 ]; then
-  error "could not read nucleus command list from $NUCLEUS_APPS_MANIFEST"
+[ "${#COMMANDS[@]}" -gt 0 ] || {
+  error "could not read nucleus command list"
   exit 1
+}
+
+# Spec is the source of truth; if unavailable in a fixture context, generate minimal completions.
+if [ ! -f "$SPEC_FILE" ]; then
+  SPEC_FILE=""
 fi
 
-# Subcommands whose usage line does not enumerate them cleanly (config embeds
-# argument syntax between names). Descriptions still come from the live --help body.
-sh_for_command() {
-  case "$1" in
-  # Daemon entry points live under src/scripts/services/, not scripts/.
-  camilladsp-heartbeat) printf '%s\n' "src/scripts/services/camilladsp-heartbeat.sh" ;;
-  *) printf '%s\n' "scripts/$1.sh" ;;
-  esac
-}
-
-# Subcommands whose usage line does not enumerate them cleanly (config embeds
-# argument syntax between names). Descriptions still come from the live --help
-# body.
-known_subcommands() {
-  case "$1" in
-  svc) printf '%s\n' "list|status|start|stop|restart|enable|disable|verify|endpoint|logs|log-paths|log-config" ;;
-  logs) printf '%s\n' "append|expire|gc|label|rotate|show|stats|tail" ;;
-  vm) printf '%s\n' "setup|sync|build-system|list|status|start|stop|upgrade|reset|android-config|inject|gc|resize|pack|unpack" ;;
-  ai) printf '%s\n' "sync|list|status|endpoint|config" ;;
-  config) printf '%s\n' "get|set|list" ;;
-  check) printf '%s\n' "packer|sh|pwsh" ;;
-  gc) printf '%s\n' "cleanup-nix|graveyard|logs|preferences" ;;
-  apply) printf '%s\n' "health-check|audit-store" ;;
-  cloud) printf '%s\n' "setup|reset|sync|status|restart" ;;
-  update) printf '%s\n' "lockfile" ;;
-  utils) printf '%s\n' "optimize-pdf|strip-metadata" ;;
-  esac
-}
-
-usage() {
-  usage_std "$(basename "$0")" "generate|--check|--help" "Generate zsh completion files for every nucleus-* command from its --help output. Default action: generate (write files in place). --check regenerates into a temp dir and fails (exit 1) listing every differing file. Files are generated — do not edit by hand."
-}
-
-# Flag tokens from the usage summary line's bracketed groups and from each
-# help-body flag line, minus the always-emitted -h/--help group, deduped and
-# sorted in the C locale. Brackets only, so subcommand words never leak a
-# -config token; |-alternates split apart; value placeholders are stripped
-# (`--flag=<name>` and `--flag <name>`); the bare -- marker never matches since a
-# flag token needs a letter. Help-body flags anchor to the line start, so
-# description words such as "machine-readable" leak nothing.
-extract_flags() {
-  {
-    # Help-body flag lines.
-    grep -E '^usage: ' "$1" | head -n1 |
-      grep -oE '\[[^]]*\]' |
-      sed -E 's/^\[//; s/\]$//' |
-      sed -E 's/ <[^]]*>//g; s/=<[^]]*>//g' |
-      tr '|' '\n' |
-      grep -oE -- '(-|--)[a-z0-9][a-z0-9-]*'
-    # Help-body flag lines.
-    grep -E '^[[:space:]]*-' "$1" |
-      grep -oE '^[[:space:]]*(-|--)[a-z0-9][a-z0-9-]*(\|(-|--)[a-z0-9][a-z0-9-]*)*' |
-      tr '|' '\n' |
-      sed -E 's/^[[:space:]]*//'
-  } |
-    grep -vxE -- '-h|--help' |
-    LC_ALL=C sort -u || true # check-suppress:suppression_doc: no flag tokens in either source is a valid result (help-only commands); the pipeline then emits nothing.
-}
-
-# '|'-separated bare lowercase [a-z0-9-] words on the usage summary line.
-extract_subcommands() {
-  grep -E '^usage: ' "$1" | head -n1 |
-    sed -E 's/^usage: [^[:space:]]+[[:space:]]*//' |
-    tr '|' '\n' |
-    sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' |
-    grep -E '^[a-z][a-z0-9-]*$' || true # check-suppress:suppression_doc: no subcommands in the usage line is a valid result; the pipeline then emits nothing.
-}
-
-# The first help-body line whose first token is the subcommand, minus leading
-# [arg]/<arg> groups; '' when none.
-sub_description() {
-  local _line
-  _line="$(grep -E "^[[:space:]]*${2}($|[[:space:]])" "$1" | head -n1)" || true # check-suppress:suppression_doc: no help-body line for the subcommand → empty description.
-  [ -n "$_line" ] || return 0
-  _line="${_line#"${_line%%[![:space:]]*}"}"
-  _line="${_line#"${2}"}"
-  _line="${_line#"${_line%%[![:space:]]*}"}"
-  while true; do
-    case "$_line" in
-    '['*']'*)
-      _line="${_line#*]}"
-      _line="${_line#"${_line%%[![:space:]]*}"}"
-      ;;
-    '<'*'>'*)
-      _line="${_line#*>}"
-      _line="${_line#"${_line%%[![:space:]]*}"}"
-      ;;
-    *) break ;;
-    esac
-  done
-  printf '%s\n' "$_line" |
-    sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//; s/\.$//'
-}
-
-# Escapes text that ends up inside a generated _arguments spec word, quoted
-# twice. Order is load-bearing: escape \ " $ and ` first, since the double-quoted
-# eval action needs them literal, then a bare ' as '\'', since the spec word is
-# single-quoted. The other order makes step 1 escape the backslashes it adds.
+# Escapes text for a generated single-quoted zsh spec word whose description is
+# double-quoted and eval'd by _arguments. Escape \ " $ ` first, then ' as '\''.
 escape_zsh_spec_text() {
   local _text
-  # shellcheck disable=SC2016 # reason: the sed program is a regex metacharacter string for the tool, not shell expansion.
+  # shellcheck disable=SC2016 # reason: regex metacharacter string for sed, not shell expansion.
   _text="$(printf '%s\n' "$1" | sed -E 's/([\\"$`])/\\\1/g')"
   printf '%s\n' "$_text" | sed -E "s/'/'\\\\''/g"
 }
 
 flag_desc() {
-  local _f="$1"
-  _f="${_f#--}"
-  _f="${_f#-}"
-  _f="${_f//-/' '}"
-  printf '%s\n' "$_f"
-}
-
-# Every .sh command supports --help, so a failure here is a real bug.
-capture_help() {
-  local _cmd="$1" _out="$2" _sh_rel
-  _sh_rel="$(sh_for_command "$_cmd")"
-  : >"$_out"
-  [ -n "$_sh_rel" ] || return 0 # no .sh source: the fixed --help group only.
-  # check-suppress:suppression_doc: help output is stdout-only per the output-format contract; stderr is suppressed.
-  if ! bash "$REPO_ROOT/$_sh_rel" --help >"$_out" 2>/dev/null; then
-    error "nucleus-$_cmd: --help failed (every .sh command supports --help; a failure is a real bug)"
-    exit 1
+  local _long="$1" _desc="${2:-}"
+  if [ -n "$_desc" ]; then
+    printf '%s\n' "$_desc"
+    return 0
   fi
+  _long="${_long#--}"
+  _long="${_long//-/' '}"
+  printf '%s\n' "$_long"
 }
 
-# The hand-written services.json runtime function, preserved verbatim
-# (behavioral glue exception; only the flag and subcommand inventory is
-# generated).
 emit_svc_glue() {
   cat <<'ZSH_GLUE'
 _nucleus_svc_services() {
@@ -199,148 +100,365 @@ _nucleus_svc_services() {
 ZSH_GLUE
 }
 
-# Writes src/modules/completions/zsh/_nucleus-<command>.
+# Append a line to a newline-delimited accumulator variable by name.
+append_line() {
+  local _var="$1" _line="$2"
+  local -n _ref="$_var"
+  if [ -n "$_ref" ]; then
+    _ref="${_ref}"$'\n'"${_line}"
+  else
+    _ref="${_line}"
+  fi
+}
+
+# emit_flag_spec <cmd> <flag-json> <out-var> <state-var> <state-action-var>
+# Appends one _arguments spec line. Records dynamic state for value providers
+# that need a state/action block (sections -> _call_program).
+emit_flag_spec() {
+  local _cmd="$1" _flag="$2" _out_var="$3" _state_var="$4" _action_var="$5"
+  local _long _short _takes _vtype _source _desc _choices _spec _msg _action
+  _long="$(jq -r '.long' <<<"$_flag")"
+  _short="$(jq -r '.short // empty' <<<"$_flag")"
+  _takes="$(jq -r '.takesValue' <<<"$_flag")"
+  _vtype="$(jq -r '.valueType // "string"' <<<"$_flag")"
+  _source="$(jq -r '.valueSource // empty' <<<"$_flag")"
+  _desc="$(jq -r '.description // empty' <<<"$_flag")"
+  _desc="$(flag_desc "$_long" "$_desc")"
+  _desc="$(escape_zsh_spec_text "$_desc")"
+
+  _msg="${_long#--}"
+  _msg="${_msg//-/' '}"
+
+  _spec=""
+  # description and value completion
+  if [ "$_takes" = "true" ]; then
+    _action=""
+    case "$_source" in
+    sections)
+      _action=":$_msg name:->sections"
+      printf -v "$_state_var" '%s' "sections"
+      printf -v "$_action_var" '%s' "_call_program 'sections' nucleus-$_cmd --list-sections"
+      ;;
+    services)
+      _action=":$_msg name:_nucleus_svc_services"
+      ;;
+    verdicts)
+      _choices="$(jq -r '(.choices // []) | join(" ")' <<<"$_flag")"
+      if [ -n "$_choices" ]; then
+        _action=":$_msg:($_choices)"
+      else
+        _action=":$_msg:"
+      fi
+      ;;
+    profiles)
+      _choices="$(jq -r '(.choices // []) | join(" ")' <<<"$_flag")"
+      if [ -n "$_choices" ]; then
+        _action=":$_msg:($_choices)"
+      else
+        _action=":$_msg:"
+      fi
+      ;;
+    *)
+      _choices="$(jq -r '(.choices // []) | join(" ")' <<<"$_flag")"
+      if [ -n "$_choices" ]; then
+        _action=":$_msg:($_choices)"
+      elif [ "$_vtype" = "path" ]; then
+        _action=":$_msg:_files"
+      else
+        _action=":$_msg:"
+      fi
+      ;;
+    esac
+    _spec="${_long}[${_desc}]${_action}"
+  else
+    _spec="${_long}[${_desc}]"
+  fi
+
+  if [ -n "$_short" ]; then
+    # Emit grouped short+long exclusion where both exist: {-q,--quiet}'[desc]'
+    # but keep action/simple form manageable; also emit short alias as separate spec
+    # is less ideal. Use zsh grouped form for boolean flags without actions.
+    if [ "$_takes" = "true" ]; then
+      append_line "$_out_var" "'${_spec}'"
+      append_line "$_out_var" "'${_short}[${_desc}]${_action}'"
+    else
+      append_line "$_out_var" "'{${_short},${_long}}[${_desc}]'"
+    fi
+  else
+    append_line "$_out_var" "'${_spec}'"
+  fi
+}
+
+# Determine if app needs subcommand-aware (stateful) completion.
+app_needs_stateful() {
+  local _app="$1"
+  local _sc_count _has_sc_flags _has_values
+  _sc_count="$(jq -r '.subcommands | length' <<<"$_app")"
+  [ "$_sc_count" -eq 0 ] && return 1
+  _has_sc_flags="$(jq -r '[.subcommands[] | (.flags | length) + (.positionals | length)] | add // 0' <<<"$_app")"
+  _has_values="$(jq -r '[.subcommands[] | select(.values != null)] | length' <<<"$_app")"
+  # Any per-subcommand flags, positionals, or values => stateful for correctness.
+  if [ "$_has_sc_flags" -gt 0 ] || [ "$_has_values" -gt 0 ]; then
+    return 0
+  fi
+  # Multiple subcommands with only names/descs: flat model is fine.
+  return 1
+}
+
+# positional action snippet for a positional object
+pos_action() {
+  local _pos="$1" _idx="$2"
+  local _name _source _choices _variadic _opt
+  _name="$(jq -r '.name' <<<"$_pos")"
+  _source="$(jq -r '.valueSource // empty' <<<"$_pos")"
+  _choices="$(jq -r '(.choices // []) | join(" ")' <<<"$_pos")"
+  _variadic="$(jq -r '.variadic // false' <<<"$_pos")"
+  _opt=":${_name}:"
+  case "$_source" in
+  services) _opt=":${_name}:_nucleus_svc_services" ;;
+  verdicts)
+    [ -n "$_choices" ] && _opt=":${_name}:(${_choices})" || _opt=":${_name}:"
+    ;;
+  profiles)
+    [ -n "$_choices" ] && _opt=":${_name}:(${_choices})" || _opt=":${_name}:"
+    ;;
+  sections) _opt=":${_name}:->sections" ;;
+  *)
+    [ -n "$_choices" ] && _opt=":${_name}:(${_choices})" || _opt=":${_name}:"
+    ;;
+  esac
+  if [ "$_variadic" = "true" ]; then
+    printf '*%s' "$_opt"
+  else
+    printf '%s%s' "$_idx" "$_opt"
+  fi
+}
+
 generate_command_file() {
   local _cmd="$1" _out_dir="$2"
   local _out_file="$_out_dir/_nucleus-$_cmd"
   local _tmp_file="$_out_dir/.tmp-_nucleus-$_cmd.$$"
-  local _help_tmp="" _known="" _sub_line="" _flag_lines="" _dyn_state="" _s="" _desc="" _f=""
-  local -a _subs=() _flags_arr=()
+  local _app _global_specs="" _sub_names=() _s _desc _sub_line="" _sc
+  local _stateful=0 _dyn_state="" _dyn_action="" _need_svc_glue=0
 
-  _help_tmp="$(mktemp)"
-  capture_help "$_cmd" "$_help_tmp"
-
-  # Subcommand inventory: the known table when the usage line does not
-  # enumerate subcommands cleanly; usage-line extraction otherwise.
-  _known="$(known_subcommands "$_cmd")"
-  if [ -n "$_known" ]; then
-    IFS='|' read -r -a _subs <<<"$_known"
+  if [ -n "$SPEC_FILE" ] && [ -f "$SPEC_FILE" ]; then
+    _app="$(jq -c --arg n "$_cmd" '.apps[] | select(.name == $n)' "$SPEC_FILE")"
   else
-    while IFS= read -r _s; do
-      _subs+=("$_s")
-    done < <(extract_subcommands "$_help_tmp")
+    _app=""
+  fi
+  if [ -z "$_app" ] || [ "$_app" = "null" ]; then
+    # Command in manifest but missing from spec: emit minimal help-only completion.
+    _app='{"name":"'"$_cmd"'","summary":"","globalFlags":[],"subcommands":[]}'
   fi
 
-  # Subcommand positional spec (index 1) with per-sub descriptions.
-  if [ "${#_subs[@]}" -gt 0 ]; then
-    _sub_line="1:subcommand:(("
-    local _sub_first=1
-    for _s in "${_subs[@]}"; do
-      _desc="$(sub_description "$_help_tmp" "$_s")"
-      if [ -n "$_desc" ]; then
-        _desc="$(escape_zsh_spec_text "$_desc")"
-      else
-        _desc=""
-      fi
-      if [ "$_sub_first" -eq 1 ]; then
-        _sub_line="$_sub_line$_s \"$_desc\""
-        _sub_first=0
-      else
-        _sub_line="$_sub_line $_s \"$_desc\""
-      fi
-    done
-    _sub_line="$_sub_line))"
+  # Determine svc glue need.
+  if [ "$_cmd" = "svc" ] || jq -e '.. | .valueSource? // empty | select(. == "services")' <<<"$_app" >/dev/null 2>&1; then
+    _need_svc_glue=1
   fi
 
-  # Flags: sorted, deduped. A --<X> flag gets dynamic value completion when the
-  # command also exposes --list-<X> (values come from the live CLI at runtime).
+  # Global flags
   while IFS= read -r _f; do
-    _flags_arr+=("$_f")
-  done < <(extract_flags "$_help_tmp")
-
-  local _suffix="" _spec="" _i=0 _j=0 _list_suffix=""
-  local -a _list_suffixes=()
-  for _j in "${!_flags_arr[@]}"; do
-    case "${_flags_arr[$_j]}" in
-    --list-*) _list_suffixes+=("${_flags_arr[$_j]#--list-}") ;;
-    *) : ;;
-    esac
-  done
-  for _i in "${!_flags_arr[@]}"; do
-    _f="${_flags_arr[$_i]}"
-    _spec="${_f}[$(flag_desc "$_f")]"
-    _suffix="${_f#--}"
-    if [ -n "$_suffix" ]; then
-      for _list_suffix in "${_list_suffixes[@]}"; do
-        if [ "$_list_suffix" = "$_suffix" ]; then
-          _spec="${_f}:${_suffix%s} name:->$_suffix"
-          _dyn_state="$_suffix"
-          break
-        fi
-      done
+    [ -n "$_f" ] || continue
+    local _gs="" _ds="" _da=""
+    emit_flag_spec "$_cmd" "$_f" _gs _ds _da
+    if [ -n "$_ds" ]; then
+      _dyn_state="$_ds"
+      _dyn_action="$_da"
     fi
-    if [ -n "$_flag_lines" ]; then
-      _flag_lines="$_flag_lines
-$_spec"
-    else
-      _flag_lines="$_spec"
-    fi
-  done
+    if [ -n "$_gs" ]; then append_line _global_specs "$_gs"; fi
+  done < <(jq -c '.globalFlags[]?' <<<"$_app")
 
-  # Temp plus atomic rename, so a concurrent reader never sees a half-written file.
+  # Subcommand names and descriptions
+  while IFS= read -r _sc; do
+    [ -n "$_sc" ] || continue
+    _s="$(jq -r '.name' <<<"$_sc")"
+    _desc="$(jq -r '.description // empty' <<<"$_sc")"
+    _sub_names+=("$_s")
+  done < <(jq -c '.subcommands[]?' <<<"$_app")
+
+  if app_needs_stateful "$_app"; then
+    _stateful=1
+  fi
+
   {
     printf '#compdef nucleus-%s\n' "$_cmd"
     printf '\n'
     printf '# GENERATED by src/scripts/completions/gen-completions.sh — do not edit.\n'
     printf '\n'
-    if [ "$_cmd" = "svc" ]; then
+    if [ "$_need_svc_glue" -eq 1 ]; then
       emit_svc_glue
       printf '\n'
     fi
-    printf '_arguments \\\n'
-    printf "  '(-h --help)'{--help,-h}'[Show usage]'"
-    if [ -n "$_sub_line" ] || [ -n "$_flag_lines" ]; then
+
+    if [ "$_stateful" -eq 1 ]; then
+      # Stateful: global flags + subcommand dispatch + per-subcommand args.
+      printf '_arguments -C \\\n'
+      printf "  '(-h --help)'{--help,-h}'[Show usage]'"
+      # global flags (excluding help already emitted)
+      local _gline
+      while IFS= read -r _gline; do
+        [ -n "$_gline" ] || continue
+        # skip duplicate help if present as long flag only? globalFlags may include --help
+        case "$_gline" in
+        *"--help"*) continue ;;
+        esac
+        printf ' \\\n  %s' "$_gline"
+      done <<<"$_global_specs"
       printf ' \\\n'
-    else
-      printf '\n'
-    fi
-    if [ -n "$_sub_line" ]; then
-      printf "  '%s'" "$_sub_line"
-      if [ -n "$_flag_lines" ]; then
-        printf ' \\\n'
-      else
-        printf '\n'
-      fi
-    fi
-    if [ -n "$_flag_lines" ]; then
-      local _n=0 _i2=0 _line
-      while IFS= read -r _line; do
-        _n=$((_n + 1))
-      done <<<"$_flag_lines"
-      while IFS= read -r _line; do
-        _i2=$((_i2 + 1))
-        printf "  '%s'" "$_line"
-        if [ "$_i2" -lt "$_n" ]; then
-          printf ' \\\n'
+      printf '%s\n' "  '1:subcommand:->subcmd' \\"
+      printf '%s\n\n' "  '*::arg:->args'"
+      # shellcheck disable=SC2016 # reason: $state/$words are zsh variables in generated output, not shell expansions.
+      printf 'case $state in\n'
+      printf '  subcmd)\n'
+      printf '    local -a _subcmds\n'
+      printf '    _subcmds=(\n'
+      while IFS= read -r _sc; do
+        [ -n "$_sc" ] || continue
+        _s="$(jq -r '.name' <<<"$_sc")"
+        _desc="$(jq -r '.description // empty' <<<"$_sc")"
+        _desc="$(escape_zsh_spec_text "$_desc")"
+        printf "      '%s:%s'\n" "$_s" "$_desc"
+      done < <(jq -c '.subcommands[]?' <<<"$_app")
+      printf '    )\n'
+      printf "    _describe -t commands 'subcommand' _subcmds\n"
+      printf '    ;;\n'
+      printf '  args)\n'
+      # shellcheck disable=SC2016 # reason: $words is a zsh variable in generated output, not shell expansion.
+      printf '    case $words[1] in\n'
+      while IFS= read -r _sc; do
+        [ -n "$_sc" ] || continue
+        _s="$(jq -r '.name' <<<"$_sc")"
+        printf '      %s)\n' "$_s"
+        printf '        _arguments \\\n'
+        # subcommand flags
+        local _sc_specs="" _sc_ds="" _sc_da="" _sf
+        while IFS= read -r _sf; do
+          [ -n "$_sf" ] || continue
+          emit_flag_spec "$_cmd" "$_sf" _sc_specs _sc_ds _sc_da
+          if [ -n "$_sc_ds" ]; then
+            _dyn_state="$_sc_ds"
+            _dyn_action="$_sc_da"
+          fi
+        done < <(jq -c '.flags[]?' <<<"$_sc")
+        # positionals
+        local _pi=1 _p
+        while IFS= read -r _p; do
+          [ -n "$_p" ] || continue
+          local _pa
+          _pa="$(pos_action "$_p" "$_pi")"
+          append_line _sc_specs "'${_pa}'"
+          if jq -e '.variadic == true' <<<"$_p" >/dev/null 2>&1; then :; else _pi=$((_pi + 1)); fi
+          # sections positional state
+          if [ "$(jq -r '.valueSource // empty' <<<"$_p")" = "sections" ]; then
+            _dyn_state="sections"
+            _dyn_action="_call_program 'sections' nucleus-$_cmd --list-sections"
+          fi
+        done < <(jq -c '.positionals[]?' <<<"$_sc")
+        if [ -z "$_sc_specs" ]; then
+          printf "          '*: :'\n"
         else
-          printf '\n'
+          local _n=0 _i=0 _line
+          _n="$(printf '%s\n' "$_sc_specs" | wc -l | tr -d ' ')"
+          while IFS= read -r _line; do
+            _i=$((_i + 1))
+            if [ "$_i" -lt "$_n" ]; then
+              printf '          %s \\\n' "$_line"
+            else
+              printf '          %s\n' "$_line"
+            fi
+          done <<<"$_sc_specs"
         fi
-      done <<<"$_flag_lines"
-    fi
-    if [ -n "$_dyn_state" ]; then
-      printf "case \$state in\n"
-      printf '%s)\n' "$_dyn_state"
-      printf "  _call_program '%s' nucleus-%s --list-%s\n" "$_dyn_state" "$_cmd" "$_dyn_state"
-      printf '  ;;\n'
+        printf '        ;;\n'
+      done < <(jq -c '.subcommands[]?' <<<"$_app")
+      printf '    esac\n'
+      printf '    ;;\n'
+      if [ -n "$_dyn_state" ] && [ -n "$_dyn_action" ]; then
+        printf '  %s)\n' "$_dyn_state"
+        printf '    %s\n' "$_dyn_action"
+        printf '    ;;\n'
+      fi
       printf 'esac\n'
+    else
+      # Flat completion (no per-subcommand flags/positionals).
+      printf '_arguments \\\n'
+      printf "  '(-h --help)'{--help,-h}'[Show usage]'"
+      local _has_more=0
+      [ "${#_sub_names[@]}" -gt 0 ] && _has_more=1
+      [ -n "$_global_specs" ] && _has_more=1
+      if [ "$_has_more" -eq 1 ]; then printf ' \\\n'; else printf '\n'; fi
+
+      if [ "${#_sub_names[@]}" -gt 0 ]; then
+        # build subcommand positional
+        printf "  '1:subcommand:(("
+        local _first=1
+        while IFS= read -r _sc; do
+          [ -n "$_sc" ] || continue
+          _s="$(jq -r '.name' <<<"$_sc")"
+          _desc="$(jq -r '.description // empty' <<<"$_sc")"
+          _desc="$(escape_zsh_spec_text "$_desc")"
+          if [ "$_first" -eq 1 ]; then
+            printf "%s \"%s\"" "$_s" "$_desc"
+            _first=0
+          else
+            printf " %s \"%s\"" "$_s" "$_desc"
+          fi
+        done < <(jq -c '.subcommands[]?' <<<"$_app")
+        printf "))'"
+        if [ -n "$_global_specs" ]; then printf ' \\\n'; else printf '\n'; fi
+      fi
+      if [ -n "$_global_specs" ]; then
+        local _n=0 _i=0 _line
+        _n="$(printf '%s\n' "$_global_specs" | wc -l | tr -d ' ')"
+        while IFS= read -r _line; do
+          [ -n "$_line" ] || continue
+          _i=$((_i + 1))
+          case "$_line" in *"--help"*)
+            _n=$((_n - 1))
+            continue
+            ;;
+          esac
+        done <<<"$_global_specs"
+        _i=0
+        local _printed=0
+        # recompute printable count
+        _n=0
+        while IFS= read -r _line; do
+          [ -n "$_line" ] || continue
+          case "$_line" in *"--help"*) continue ;; esac
+          _n=$((_n + 1))
+        done <<<"$_global_specs"
+        while IFS= read -r _line; do
+          [ -n "$_line" ] || continue
+          case "$_line" in *"--help"*) continue ;; esac
+          _i=$((_i + 1))
+          if [ "$_i" -lt "$_n" ]; then
+            printf '  %s \\\n' "$_line"
+          else
+            printf '  %s\n' "$_line"
+          fi
+        done <<<"$_global_specs"
+      fi
+      # dynamic state for flat model (e.g. unlikely, but handle sections)
+      if [ -n "$_dyn_state" ] && [ -n "$_dyn_action" ]; then
+        # shellcheck disable=SC2016 # reason: $state is a zsh variable in generated output, not shell expansion.
+        printf 'case $state in\n'
+        printf '%s)\n' "$_dyn_state"
+        printf '  %s\n' "$_dyn_action"
+        printf '  ;;\n'
+        printf 'esac\n'
+      fi
     fi
   } >"$_tmp_file"
   mv -f "$_tmp_file" "$_out_file"
-  rm -f "$_help_tmp"
 }
 
-# Regenerates the _nucleus dispatcher that completes `nucleus-<TAB>`.
 generate_dispatcher() {
   local _out_dir="$1"
   local _out_file="$_out_dir/_nucleus"
   local _tmp_file="$_out_dir/.tmp-_nucleus.$$"
   local _joined="" _c
   for _c in "${COMMANDS[@]}"; do
-    if [ -n "$_joined" ]; then
-      _joined="$_joined $_c"
-    else
-      _joined="$_c"
-    fi
+    if [ -n "$_joined" ]; then _joined="$_joined $_c"; else _joined="$_c"; fi
   done
   {
     printf '#compdef nucleus-\n'
@@ -370,12 +488,8 @@ case "${1:-}" in
   usage
   exit 0
   ;;
---check)
-  _check_mode=1
-  ;;
-generate | "")
-  _check_mode=0
-  ;;
+--check) _check_mode=1 ;;
+generate | "") _check_mode=0 ;;
 *)
   error "unknown argument '$1'"
   usage >&2

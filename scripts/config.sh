@@ -27,11 +27,12 @@ bash_guard_require 5 1 config
 CONFIG_FILE="$HOME/.local/state/nucleus/config.json"
 
 usage() {
-  usage_std "$(basename "$0")" "get [<section.key>]|set <section.key> <value>|list" "Manage runtime configuration for nucleus services."
+  usage_std "$(basename "$0")" "[-h|--help] get [<section.key>]|set <section.key> <value>|list" "Manage runtime configuration for nucleus services."
   cat <<'EOF'
   get [<section.key>]       Print config value(s). Omit key to dump all.
   set <section.key> <val>   Set a config key (value is JSON-typed).
   list                      Print all config as flat key=value pairs.
+  -h|--help                 Show usage.
 EOF
 }
 

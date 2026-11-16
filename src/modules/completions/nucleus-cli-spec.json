@@ -1,0 +1,1669 @@
+{
+  "$schema": "./nucleus-cli-spec.schema.json",
+  "apps": [
+    {
+      "name": "ai",
+      "summary": "Manage AI models and endpoints.",
+      "globalFlags": [
+        {
+          "long": "--help",
+          "takesValue": false,
+          "short": "-h",
+          "description": "Show usage"
+        },
+        {
+          "long": "--json",
+          "takesValue": false,
+          "description": "Machine-readable JSON output"
+        }
+      ],
+      "subcommands": [
+        {
+          "name": "sync",
+          "flags": [
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Print planned actions without executing them"
+            },
+            {
+              "long": "--gc-only",
+              "takesValue": false,
+              "description": "Skip pulls, only remove orphans"
+            },
+            {
+              "long": "--no-gc-only",
+              "takesValue": false,
+              "description": "Re-enable pulls"
+            },
+            {
+              "long": "--ollama-profile",
+              "takesValue": true,
+              "valueType": "enum",
+              "choices": [
+                "MacBook",
+                "NixOS",
+                "Windows"
+              ],
+              "description": "Override profile selection"
+            }
+          ],
+          "positionals": [],
+          "description": "Pull models and remove orphans."
+        },
+        {
+          "name": "list",
+          "flags": [
+            {
+              "long": "--profile",
+              "takesValue": true,
+              "valueType": "enum",
+              "choices": [
+                "MacBook",
+                "NixOS",
+                "Windows"
+              ],
+              "valueSource": "profiles",
+              "description": "Filter to a specific profile"
+            }
+          ],
+          "positionals": [],
+          "description": "List AI models by profile."
+        },
+        {
+          "name": "status",
+          "flags": [
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Machine-readable JSON output"
+            }
+          ],
+          "positionals": [],
+          "description": "Show AI service and model sync status."
+        },
+        {
+          "name": "endpoint",
+          "flags": [],
+          "positionals": [],
+          "description": "Show AI service endpoints."
+        },
+        {
+          "name": "config",
+          "flags": [],
+          "positionals": [],
+          "description": "Show effective AI configuration."
+        }
+      ]
+    },
+    {
+      "name": "apply",
+      "summary": "Apply the nucleus configuration to this host.",
+      "globalFlags": [
+        {
+          "long": "--help",
+          "takesValue": false,
+          "short": "-h",
+          "description": "Show this help"
+        },
+        {
+          "long": "--ai-sync",
+          "takesValue": false,
+          "description": "Run AI sync"
+        },
+        {
+          "long": "--no-ai-sync",
+          "takesValue": false,
+          "description": "Skip AI sync"
+        },
+        {
+          "long": "--replica-sync",
+          "takesValue": false,
+          "description": "Run replica sync"
+        },
+        {
+          "long": "--no-replica-sync",
+          "takesValue": false,
+          "description": "Skip replica sync"
+        },
+        {
+          "long": "--store-audit",
+          "takesValue": false,
+          "description": "Run store audit"
+        },
+        {
+          "long": "--no-store-audit",
+          "takesValue": false,
+          "description": "Skip store audit"
+        },
+        {
+          "long": "--target-user",
+          "takesValue": true,
+          "valueType": "string",
+          "description": "Target user"
+        },
+        {
+          "long": "--username",
+          "takesValue": true,
+          "valueType": "string",
+          "description": "Username"
+        },
+        {
+          "long": "--vm-sync",
+          "takesValue": false,
+          "description": "Run VM sync"
+        },
+        {
+          "long": "--no-vm-sync",
+          "takesValue": false,
+          "description": "Skip VM sync"
+        },
+        {
+          "long": "--vm-setup",
+          "takesValue": false,
+          "description": "Run VM setup"
+        },
+        {
+          "long": "--no-vm-setup",
+          "takesValue": false,
+          "description": "Skip VM setup"
+        }
+      ],
+      "subcommands": [
+        {
+          "name": "apply",
+          "flags": [],
+          "positionals": [],
+          "description": "Apply the Nix configuration (default)."
+        },
+        {
+          "name": "status",
+          "flags": [
+            {
+              "long": "--history",
+              "takesValue": true,
+              "valueType": "count",
+              "description": "Show the N newest records"
+            },
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Emit JSON output"
+            }
+          ],
+          "positionals": [],
+          "description": "Show apply history (read-only)."
+        },
+        {
+          "name": "health-check",
+          "flags": [],
+          "positionals": [],
+          "description": "Run pre-flight health checks."
+        },
+        {
+          "name": "audit-store",
+          "flags": [],
+          "positionals": [],
+          "description": "Report Nix store baseline."
+        }
+      ]
+    },
+    {
+      "name": "bootstrap",
+      "summary": "Install Nix and base dependencies on a bare machine.",
+      "globalFlags": [
+        {
+          "long": "--help",
+          "takesValue": false,
+          "short": "-h",
+          "description": "Show usage"
+        },
+        {
+          "long": "--apply",
+          "takesValue": false,
+          "description": "Also run the apply flow"
+        },
+        {
+          "long": "--no-apply",
+          "takesValue": false,
+          "description": "Install dependencies only"
+        },
+        {
+          "long": "--ai-sync",
+          "takesValue": false,
+          "description": "Run AI sync"
+        },
+        {
+          "long": "--no-ai-sync",
+          "takesValue": false,
+          "description": "Skip AI sync"
+        },
+        {
+          "long": "--replica-sync",
+          "takesValue": false,
+          "description": "Run replica sync"
+        },
+        {
+          "long": "--no-replica-sync",
+          "takesValue": false,
+          "description": "Skip replica sync"
+        },
+        {
+          "long": "--force-admin",
+          "takesValue": false,
+          "description": "Force admin mode"
+        },
+        {
+          "long": "--target-user",
+          "takesValue": true,
+          "valueType": "string",
+          "description": "Target user"
+        }
+      ],
+      "subcommands": []
+    },
+    {
+      "name": "camilladsp-heartbeat",
+      "summary": "Run or probe the CamillaDSP heartbeat daemon.",
+      "globalFlags": [
+        {
+          "long": "--help",
+          "takesValue": false,
+          "short": "-h",
+          "description": "Show this help message and exit"
+        },
+        {
+          "long": "--port",
+          "takesValue": true,
+          "valueType": "string",
+          "description": "Port"
+        },
+        {
+          "long": "--config",
+          "takesValue": true,
+          "valueType": "path",
+          "description": "Config path"
+        },
+        {
+          "long": "--probe",
+          "takesValue": false,
+          "description": "Print what device detection sees and exit"
+        }
+      ],
+      "subcommands": []
+    },
+    {
+      "name": "check",
+      "summary": "Run repository validation checks.",
+      "globalFlags": [
+        {
+          "long": "--help",
+          "takesValue": false,
+          "short": "-h",
+          "description": "Show usage"
+        },
+        {
+          "long": "--fail-fast",
+          "takesValue": false,
+          "description": "Exit immediately on first failure"
+        },
+        {
+          "long": "--no-fail-fast",
+          "takesValue": false,
+          "description": "Accumulate all failures"
+        },
+        {
+          "long": "--scoped",
+          "takesValue": false,
+          "description": "Run scoped checks"
+        },
+        {
+          "long": "--full",
+          "takesValue": false,
+          "description": "Run full checks"
+        },
+        {
+          "long": "--online",
+          "takesValue": false,
+          "description": "Run online checks"
+        },
+        {
+          "long": "--verbose",
+          "takesValue": true,
+          "valueType": "string",
+          "description": "Stream step output; optional step ids"
+        },
+        {
+          "long": "--no-verbose",
+          "takesValue": false,
+          "description": "Suppress step output streaming"
+        },
+        {
+          "long": "--only-steps",
+          "takesValue": true,
+          "valueType": "string",
+          "description": "Run only the specified step IDs"
+        }
+      ],
+      "subcommands": [
+        {
+          "name": "packer",
+          "flags": [],
+          "positionals": [],
+          "description": "Packer template validation."
+        },
+        {
+          "name": "sh",
+          "flags": [],
+          "positionals": [],
+          "description": "Shell script lint."
+        },
+        {
+          "name": "pwsh",
+          "flags": [],
+          "positionals": [],
+          "description": "PowerShell syntax and naming lint."
+        }
+      ]
+    },
+    {
+      "name": "cloud",
+      "summary": "Manage cloud mounts and replica sync.",
+      "globalFlags": [
+        {
+          "long": "--help",
+          "short": "-h",
+          "takesValue": false,
+          "description": "Show usage."
+        }
+      ],
+      "subcommands": [
+        {
+          "name": "setup",
+          "description": "Verify/create rclone remotes, validate credentials, sync display names, and optionally run nucleus apply.",
+          "flags": [
+            {
+              "long": "--apply",
+              "takesValue": false,
+              "description": "Run nucleus apply to converge cloud mount services."
+            },
+            {
+              "long": "--no-apply",
+              "takesValue": false,
+              "description": "Skip nucleus apply."
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "name": "reset",
+          "description": "Remove local replica data and rclone cache (local-only).",
+          "flags": [
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Print planned removals instead of executing them."
+            },
+            {
+              "long": "--replica-id",
+              "takesValue": true,
+              "valueType": "string",
+              "description": "Reset only the replica with the given id."
+            },
+            {
+              "long": "--repo-root",
+              "takesValue": true,
+              "valueType": "path",
+              "description": "Repo checkout used to find src/users/."
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "name": "sync",
+          "description": "Pull-only replica sync (remote -> local).",
+          "flags": [
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Print planned sync commands instead of executing them."
+            },
+            {
+              "long": "--replica-id",
+              "takesValue": true,
+              "valueType": "string",
+              "valueSource": "replicas",
+              "description": "Sync only the replica with the given id."
+            },
+            {
+              "long": "--repo-root",
+              "takesValue": true,
+              "valueType": "path",
+              "description": "Repo checkout used to find src/users/."
+            }
+          ],
+          "positionals": []
+        },
+        {
+          "name": "status",
+          "description": "Show up/down per mount from the platform mount table, with the last 20 lines of each mount's log.",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "name": "restart",
+          "description": "Stop the rclone process for each mount; the platform manager remounts it within 30 seconds.",
+          "flags": [],
+          "positionals": []
+        }
+      ]
+    },
+    {
+      "name": "config",
+      "summary": "Read and write nucleus runtime configuration.",
+      "globalFlags": [
+        {
+          "long": "--help",
+          "takesValue": false,
+          "short": "-h",
+          "description": "Show usage"
+        }
+      ],
+      "subcommands": [
+        {
+          "name": "get",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "key",
+              "valueSource": "config-keys",
+              "description": "section.key"
+            }
+          ],
+          "description": "Print config value(s). Omit key to dump all."
+        },
+        {
+          "name": "set",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "key",
+              "required": true,
+              "valueSource": "config-keys",
+              "description": "section.key"
+            },
+            {
+              "name": "value",
+              "required": true,
+              "description": "JSON-typed value"
+            }
+          ],
+          "description": "Set a config key (value is JSON-typed)."
+        },
+        {
+          "name": "list",
+          "flags": [],
+          "positionals": [],
+          "description": "Print all config as flat key=value pairs."
+        }
+      ]
+    },
+    {
+      "name": "gc",
+      "summary": "Clean caches, generations, logs, and stale artifacts.",
+      "globalFlags": [
+        {
+          "long": "--help",
+          "takesValue": false,
+          "short": "-h",
+          "description": "Show usage"
+        },
+        {
+          "long": "--tool-cache-gc",
+          "takesValue": false,
+          "description": "Control bun/cargo/rustc/uv cache gc"
+        },
+        {
+          "long": "--no-tool-cache-gc",
+          "takesValue": false,
+          "description": "Disable bun/cargo/rustc/uv cache gc"
+        },
+        {
+          "long": "--git-cache-gc",
+          "takesValue": false,
+          "description": "Control stale .git cache/state cleanup and git gc --auto"
+        },
+        {
+          "long": "--no-git-cache-gc",
+          "takesValue": false,
+          "description": "Disable stale .git cache/state cleanup and git gc --auto"
+        },
+        {
+          "long": "--hm-gc",
+          "takesValue": false,
+          "description": "Control home-manager generation expiration"
+        },
+        {
+          "long": "--no-hm-gc",
+          "takesValue": false,
+          "description": "Disable home-manager generation expiration"
+        },
+        {
+          "long": "--system-gc",
+          "takesValue": false,
+          "description": "Control system profile generation expiration"
+        },
+        {
+          "long": "--no-system-gc",
+          "takesValue": false,
+          "description": "Disable system profile generation expiration"
+        },
+        {
+          "long": "--nix-artifacts-gc",
+          "takesValue": false,
+          "description": "Control stale result symlink cleanup"
+        },
+        {
+          "long": "--no-nix-artifacts-gc",
+          "takesValue": false,
+          "description": "Disable stale result symlink cleanup"
+        },
+        {
+          "long": "--nix-gc",
+          "takesValue": false,
+          "description": "Control nix-collect-garbage"
+        },
+        {
+          "long": "--no-nix-gc",
+          "takesValue": false,
+          "description": "Disable nix-collect-garbage"
+        },
+        {
+          "long": "--duperemove-gc",
+          "takesValue": false,
+          "description": "Control btrfs duperemove on /nix/store"
+        },
+        {
+          "long": "--no-duperemove-gc",
+          "takesValue": false,
+          "description": "Disable btrfs duperemove on /nix/store"
+        },
+        {
+          "long": "--ollama-gc",
+          "takesValue": false,
+          "description": "Control stale Ollama model removal"
+        },
+        {
+          "long": "--no-ollama-gc",
+          "takesValue": false,
+          "description": "Disable stale Ollama model removal"
+        },
+        {
+          "long": "--sccache-gc",
+          "takesValue": false,
+          "description": "Control sccache cache clearing"
+        },
+        {
+          "long": "--no-sccache-gc",
+          "takesValue": false,
+          "description": "Disable sccache cache clearing"
+        },
+        {
+          "long": "--wallpaper-gc",
+          "takesValue": false,
+          "description": "Control stale wallpaper gc"
+        },
+        {
+          "long": "--no-wallpaper-gc",
+          "takesValue": false,
+          "description": "Disable stale wallpaper gc"
+        },
+        {
+          "long": "--vm-gc",
+          "takesValue": false,
+          "description": "Control stale VM artifact removal"
+        },
+        {
+          "long": "--no-vm-gc",
+          "takesValue": false,
+          "description": "Disable stale VM artifact removal"
+        },
+        {
+          "long": "--vm-data-gc",
+          "takesValue": false,
+          "description": "Also GC data/ writable disks during VM gc"
+        },
+        {
+          "long": "--no-vm-data-gc",
+          "takesValue": false,
+          "description": "Do not GC data/ writable disks during VM gc"
+        },
+        {
+          "long": "--log-gc",
+          "takesValue": false,
+          "description": "Control log rotation"
+        },
+        {
+          "long": "--no-log-gc",
+          "takesValue": false,
+          "description": "Disable log rotation"
+        },
+        {
+          "long": "--journald-gc",
+          "takesValue": false,
+          "description": "Control journald log vacuum"
+        },
+        {
+          "long": "--no-journald-gc",
+          "takesValue": false,
+          "description": "Disable journald log vacuum"
+        },
+        {
+          "long": "--scoop-gc",
+          "takesValue": false,
+          "description": "Control Scoop cache clearing"
+        },
+        {
+          "long": "--no-scoop-gc",
+          "takesValue": false,
+          "description": "Disable Scoop cache clearing"
+        },
+        {
+          "long": "--log-max-size",
+          "takesValue": true,
+          "valueType": "bytes",
+          "description": "Log rotation max file size before rotation"
+        },
+        {
+          "long": "--log-max-files",
+          "takesValue": true,
+          "valueType": "count",
+          "description": "Number of rotated archives to keep"
+        },
+        {
+          "long": "--log-compress",
+          "takesValue": true,
+          "valueType": "enum",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "description": "Compress rotated logs"
+        },
+        {
+          "long": "--expiry",
+          "takesValue": true,
+          "valueType": "string",
+          "description": "Master expiry override"
+        },
+        {
+          "long": "--generations-keep",
+          "takesValue": true,
+          "valueType": "count",
+          "description": "Master generation-count override"
+        },
+        {
+          "long": "--hm-expiry",
+          "takesValue": true,
+          "valueType": "string",
+          "description": "Home Manager generation expiry duration"
+        },
+        {
+          "long": "--hm-generations-keep",
+          "takesValue": true,
+          "valueType": "count",
+          "description": "Home Manager generations to keep"
+        },
+        {
+          "long": "--nix-expiry",
+          "takesValue": true,
+          "valueType": "string",
+          "description": "Nix store GC --delete-older-than duration"
+        },
+        {
+          "long": "--system-generations-keep",
+          "takesValue": true,
+          "valueType": "count",
+          "description": "System profile generations to keep"
+        },
+        {
+          "long": "--dry-run",
+          "takesValue": false,
+          "description": "Print actions without executing"
+        },
+        {
+          "long": "--no-dry-run",
+          "takesValue": false,
+          "description": "Execute actions"
+        }
+      ],
+      "subcommands": [
+        {
+          "name": "cleanup-nix",
+          "description": "Run nix cleanup subcommand.",
+          "flags": [],
+          "positionals": []
+        },
+        {
+          "name": "graveyard",
+          "flags": [],
+          "positionals": [],
+          "description": "Report the rip2 graveyard path, entry count, total bytes, and oldest entry; deletes nothing."
+        },
+        {
+          "name": "logs",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "subcommand",
+              "description": "logs subcommand"
+            }
+          ],
+          "description": "Rotate and expire managed logs via nucleus-logs; defaults to gc."
+        },
+        {
+          "name": "preferences",
+          "description": "Run macOS preferences garbage collection.",
+          "flags": [],
+          "positionals": []
+        }
+      ]
+    },
+    {
+      "name": "logs",
+      "summary": "Append, rotate, query, and label nucleus logs.",
+      "globalFlags": [
+        {
+          "long": "--help",
+          "takesValue": false,
+          "short": "-h",
+          "description": "Show usage"
+        },
+        {
+          "long": "--compress",
+          "takesValue": true,
+          "valueType": "enum",
+          "choices": [
+            "true",
+            "false"
+          ],
+          "description": "Compress rotated archives"
+        },
+        {
+          "long": "--expiry",
+          "takesValue": true,
+          "valueType": "string",
+          "description": "Archive retention"
+        },
+        {
+          "long": "--harness",
+          "takesValue": true,
+          "valueType": "string",
+          "description": "show: keep events whose harness matches"
+        },
+        {
+          "long": "--json",
+          "takesValue": false,
+          "description": "Emit one JSON document instead of text"
+        },
+        {
+          "long": "--kind",
+          "takesValue": true,
+          "valueType": "string",
+          "description": "show: keep events whose kind matches"
+        },
+        {
+          "long": "--lines",
+          "takesValue": true,
+          "valueType": "count",
+          "description": "tail: number of events to print"
+        },
+        {
+          "long": "--log",
+          "takesValue": true,
+          "valueType": "string",
+          "valueSource": "log-names",
+          "description": "label/stats: log name"
+        },
+        {
+          "long": "--max-files",
+          "takesValue": true,
+          "valueType": "count",
+          "description": "Rotated archives to keep"
+        },
+        {
+          "long": "--max-size",
+          "takesValue": true,
+          "valueType": "bytes",
+          "description": "Rotation threshold in bytes"
+        },
+        {
+          "long": "--scope",
+          "takesValue": true,
+          "valueType": "enum",
+          "choices": [
+            "user",
+            "system"
+          ],
+          "description": "Log root to operate on"
+        },
+        {
+          "long": "--since",
+          "takesValue": true,
+          "valueType": "string",
+          "description": "show: keep events at or after an ISO-8601 timestamp"
+        },
+        {
+          "long": "--note",
+          "takesValue": true,
+          "valueType": "string",
+          "description": "label: free-text justification"
+        },
+        {
+          "long": "--dry-run",
+          "takesValue": false,
+          "description": "Report what would change without writing"
+        }
+      ],
+      "subcommands": [
+        {
+          "name": "append",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "log-name",
+              "required": true,
+              "valueSource": "log-names"
+            }
+          ],
+          "description": "Append one JSON event object read from stdin."
+        },
+        {
+          "name": "expire",
+          "flags": [],
+          "positionals": [],
+          "description": "Delete archives older than the expiry."
+        },
+        {
+          "name": "gc",
+          "flags": [],
+          "positionals": [],
+          "description": "Rotate, then expire."
+        },
+        {
+          "name": "label",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "id",
+              "required": true,
+              "description": "event id"
+            },
+            {
+              "name": "verdict",
+              "required": true,
+              "valueSource": "verdicts",
+              "choices": [
+                "correct",
+                "false-allow",
+                "false-deny"
+              ]
+            }
+          ],
+          "description": "Append a kind=label event."
+        },
+        {
+          "name": "rotate",
+          "flags": [],
+          "positionals": [],
+          "description": "Rotate logs larger than the size limit."
+        },
+        {
+          "name": "show",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "log-name",
+              "required": true,
+              "valueSource": "log-names"
+            }
+          ],
+          "description": "Print matching events, oldest first."
+        },
+        {
+          "name": "stats",
+          "flags": [],
+          "positionals": [],
+          "description": "Count events, bytes, and archives per log."
+        },
+        {
+          "name": "tail",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "log-name",
+              "required": true,
+              "valueSource": "log-names"
+            }
+          ],
+          "description": "Print the last events (default: 10)."
+        }
+      ]
+    },
+    {
+      "name": "svc",
+      "summary": "List and control nucleus services.",
+      "globalFlags": [
+        {
+          "long": "--help",
+          "takesValue": false,
+          "short": "-h",
+          "description": "Show usage"
+        },
+        {
+          "long": "--json",
+          "takesValue": false,
+          "description": "Machine-readable JSON output"
+        },
+        {
+          "long": "--system",
+          "takesValue": false,
+          "description": "Show only system-domain services"
+        },
+        {
+          "long": "--user",
+          "takesValue": false,
+          "description": "Show only user-domain services"
+        },
+        {
+          "long": "--verbose",
+          "takesValue": false,
+          "description": "Show action result summaries"
+        },
+        {
+          "long": "--disable",
+          "takesValue": false,
+          "description": "With stop: disable auto-start after stopping"
+        },
+        {
+          "long": "--enable",
+          "takesValue": false,
+          "description": "With start: enable auto-start before starting"
+        }
+      ],
+      "subcommands": [
+        {
+          "name": "list",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "service",
+              "variadic": true,
+              "valueSource": "services"
+            }
+          ],
+          "description": "List services with status (instance ids included)."
+        },
+        {
+          "name": "status",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "service",
+              "variadic": true,
+              "valueSource": "services"
+            }
+          ],
+          "description": "Show status of specified services (all if omitted)."
+        },
+        {
+          "name": "start",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "service",
+              "required": true,
+              "valueSource": "services"
+            }
+          ],
+          "description": "Start a service."
+        },
+        {
+          "name": "stop",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "service",
+              "required": true,
+              "valueSource": "services"
+            }
+          ],
+          "description": "Stop a service."
+        },
+        {
+          "name": "restart",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "service",
+              "required": true,
+              "valueSource": "services"
+            }
+          ],
+          "description": "Restart a service, repairing a blocked cloud mount first if needed."
+        },
+        {
+          "name": "enable",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "service",
+              "required": true,
+              "valueSource": "services"
+            }
+          ],
+          "description": "Enable auto-start."
+        },
+        {
+          "name": "disable",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "service",
+              "required": true,
+              "valueSource": "services"
+            }
+          ],
+          "description": "Disable auto-start."
+        },
+        {
+          "name": "verify",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "service",
+              "variadic": true,
+              "valueSource": "services"
+            }
+          ],
+          "description": "Check all (or specified) services, warn if inactive."
+        },
+        {
+          "name": "endpoint",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "service",
+              "required": true,
+              "valueSource": "services"
+            },
+            {
+              "name": "name"
+            }
+          ],
+          "description": "Show network endpoint(s) for a service."
+        },
+        {
+          "name": "logs",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "service",
+              "variadic": true,
+              "valueSource": "services"
+            }
+          ],
+          "description": "Show service logs (list available if no service)."
+        },
+        {
+          "name": "log-paths",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "service",
+              "variadic": true,
+              "valueSource": "services"
+            }
+          ],
+          "description": "Print log file path(s)."
+        },
+        {
+          "name": "log-config",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "service",
+              "variadic": true,
+              "valueSource": "services"
+            }
+          ],
+          "description": "Show effective logging configuration."
+        }
+      ]
+    },
+    {
+      "name": "test",
+      "summary": "Run the repository test suite.",
+      "globalFlags": [
+        {
+          "long": "--help",
+          "takesValue": false,
+          "short": "-h",
+          "description": "Show usage"
+        },
+        {
+          "long": "--quiet",
+          "takesValue": false,
+          "short": "-q",
+          "description": "Suppress success/progress output across applicable steps"
+        },
+        {
+          "long": "--fail-fast",
+          "takesValue": false,
+          "description": "Exit immediately on first failure"
+        },
+        {
+          "long": "--no-fail-fast",
+          "takesValue": false,
+          "description": "Accumulate all failures"
+        },
+        {
+          "long": "--verbose",
+          "takesValue": true,
+          "valueType": "string",
+          "description": "Stream step output; optional step ids"
+        },
+        {
+          "long": "--no-verbose",
+          "takesValue": false,
+          "description": "Suppress step output streaming"
+        },
+        {
+          "long": "--only-steps",
+          "takesValue": true,
+          "valueType": "string",
+          "description": "Run only the specified step IDs"
+        }
+      ],
+      "subcommands": []
+    },
+    {
+      "name": "update",
+      "summary": "Update flake inputs and managed lock state.",
+      "globalFlags": [
+        {
+          "long": "--help",
+          "takesValue": false,
+          "short": "-h",
+          "description": "Show usage"
+        }
+      ],
+      "subcommands": [
+        {
+          "name": "update",
+          "flags": [
+            {
+              "long": "--flake",
+              "takesValue": false,
+              "description": "Control nix flake update"
+            },
+            {
+              "long": "--no-flake",
+              "takesValue": false,
+              "description": "Skip nix flake update"
+            },
+            {
+              "long": "--sops",
+              "takesValue": false,
+              "description": "Control sops updatekeys"
+            },
+            {
+              "long": "--no-sops",
+              "takesValue": false,
+              "description": "Skip sops updatekeys"
+            },
+            {
+              "long": "--force",
+              "takesValue": false,
+              "description": "Bypass the 14-day nixpkgs age guard"
+            }
+          ],
+          "positionals": [],
+          "description": "Update flake inputs and rewrap SOPS-managed files (default)."
+        },
+        {
+          "name": "lockfile",
+          "flags": [
+            {
+              "long": "--sections",
+              "takesValue": true,
+              "valueType": "string",
+              "valueSource": "sections",
+              "description": "Comma-separated section names to update"
+            },
+            {
+              "long": "--verify",
+              "takesValue": false,
+              "description": "Check for updates without writing"
+            },
+            {
+              "long": "--verify-installed",
+              "takesValue": false,
+              "description": "Verify installed tool versions against the pinned lockfile sections"
+            },
+            {
+              "long": "--list-sections",
+              "takesValue": false,
+              "description": "Print valid section names, one per line"
+            }
+          ],
+          "positionals": [],
+          "description": "Query each available tool for the current version of each pinned item and write an updated lockfile atomically."
+        }
+      ]
+    },
+    {
+      "name": "utils",
+      "summary": "Run nucleus utility subcommands.",
+      "globalFlags": [
+        {
+          "long": "--help",
+          "takesValue": false,
+          "short": "-h",
+          "description": "Show usage"
+        }
+      ],
+      "subcommands": [
+        {
+          "name": "optimize-pdf",
+          "flags": [
+            {
+              "long": "--preset",
+              "takesValue": true,
+              "valueType": "enum",
+              "choices": [
+                "default",
+                "ebook",
+                "prepress",
+                "printer",
+                "screen"
+              ],
+              "description": "Optimization preset"
+            },
+            {
+              "long": "--rm-bak",
+              "takesValue": false,
+              "description": "Remove the .bak backup on success"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "file",
+              "required": true,
+              "variadic": true,
+              "description": "PDF file"
+            }
+          ],
+          "description": "Optimize PDF files using Ghostscript."
+        },
+        {
+          "name": "strip-metadata",
+          "flags": [
+            {
+              "long": "--rm-bak",
+              "takesValue": false,
+              "description": "Remove the .bak backup on success"
+            },
+            {
+              "long": "--dialog",
+              "takesValue": false,
+              "description": "Show one popup listing the inputs that were not processed"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "file",
+              "required": true,
+              "variadic": true,
+              "description": "file"
+            }
+          ],
+          "description": "Strip personal metadata from files."
+        }
+      ]
+    },
+    {
+      "name": "vm",
+      "summary": "Provision and manage virtual machines.",
+      "globalFlags": [
+        {
+          "long": "--help",
+          "takesValue": false,
+          "short": "-h",
+          "description": "Show usage"
+        },
+        {
+          "long": "--dry-run",
+          "takesValue": false,
+          "description": "Print planned actions without executing"
+        },
+        {
+          "long": "--accept-gsi-license",
+          "takesValue": false,
+          "description": "Accept the GSI license for Android GSI downloads"
+        },
+        {
+          "long": "--no-accept-gsi-license",
+          "takesValue": false,
+          "description": "Do not accept the GSI license"
+        },
+        {
+          "long": "--windows-iso",
+          "takesValue": true,
+          "valueType": "path",
+          "description": "Path to the Windows 11 ISO"
+        },
+        {
+          "long": "--windows-iso-source",
+          "takesValue": true,
+          "valueType": "enum",
+          "choices": [
+            "auto",
+            "url",
+            "mido"
+          ],
+          "description": "ISO auto-resolution"
+        },
+        {
+          "long": "--windows-iso-retries",
+          "takesValue": true,
+          "valueType": "count",
+          "description": "Retry attempts for network downloads"
+        },
+        {
+          "long": "--headful",
+          "takesValue": false,
+          "description": "Run guest builds with visible GUI"
+        },
+        {
+          "long": "--no-headful",
+          "takesValue": false,
+          "description": "Run guest builds headless"
+        },
+        {
+          "long": "--accelerator",
+          "takesValue": true,
+          "valueType": "enum",
+          "choices": [
+            "hvf",
+            "kvm",
+            "tcg"
+          ],
+          "description": "QEMU accelerator override"
+        },
+        {
+          "long": "--gc",
+          "takesValue": false,
+          "description": "Run GC after setup"
+        },
+        {
+          "long": "--no-gc",
+          "takesValue": false,
+          "description": "Do not run GC after setup"
+        },
+        {
+          "long": "--gc-disabled",
+          "takesValue": false,
+          "description": "Also clear disabled VM entries during GC"
+        },
+        {
+          "long": "--no-gc-disabled",
+          "takesValue": false,
+          "description": "Do not clear disabled VM entries during GC"
+        },
+        {
+          "long": "--gc-data",
+          "takesValue": false,
+          "description": "Also GC data/ writable disks during GC"
+        },
+        {
+          "long": "--no-gc-data",
+          "takesValue": false,
+          "description": "Do not GC data/ writable disks during GC"
+        },
+        {
+          "long": "--force",
+          "takesValue": false,
+          "description": "Recreate invalid data disks during setup, and perform pack removals"
+        },
+        {
+          "long": "--allow-shrink",
+          "takesValue": false,
+          "description": "Allow shrinking during resize"
+        },
+        {
+          "long": "--vm-dir-override",
+          "takesValue": true,
+          "valueType": "path",
+          "description": "Override the default ~/virtual machines path"
+        },
+        {
+          "long": "--mido-patch-file",
+          "takesValue": true,
+          "valueType": "path",
+          "description": "Override runtime Mido patch file path"
+        },
+        {
+          "long": "--mido-script",
+          "takesValue": true,
+          "valueType": "path",
+          "description": "Override the Mido script path"
+        },
+        {
+          "long": "--json",
+          "takesValue": false,
+          "description": "Machine-readable JSON output (list, status)"
+        },
+        {
+          "long": "--repo-root",
+          "takesValue": true,
+          "valueType": "path",
+          "description": "Override the repository root path"
+        }
+      ],
+      "subcommands": [
+        {
+          "name": "setup",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "vm",
+              "variadic": true,
+              "valueSource": "vm-ids"
+            }
+          ],
+          "description": "Full provision: config sync + image build + disk/bundle setup."
+        },
+        {
+          "name": "sync",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "vm",
+              "variadic": true,
+              "valueSource": "vm-ids"
+            }
+          ],
+          "description": "Refresh VM config (scripts, UTM plists, virsh define)."
+        },
+        {
+          "name": "build-system",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "type",
+              "required": true
+            }
+          ],
+          "description": "Build/rebuild the type-scoped system image."
+        },
+        {
+          "name": "list",
+          "flags": [],
+          "positionals": [],
+          "description": "List all VMs from manifest with runtime status."
+        },
+        {
+          "name": "status",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "vm",
+              "variadic": true,
+              "valueSource": "vm-ids"
+            }
+          ],
+          "description": "Show runtime status of specified VMs (all if omitted)."
+        },
+        {
+          "name": "start",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "vm",
+              "required": true,
+              "valueSource": "vm-ids"
+            }
+          ],
+          "description": "Start a VM."
+        },
+        {
+          "name": "stop",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "vm",
+              "required": true,
+              "valueSource": "vm-ids"
+            }
+          ],
+          "description": "Stop a VM."
+        },
+        {
+          "name": "upgrade",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "vm",
+              "required": true,
+              "valueSource": "vm-ids"
+            }
+          ],
+          "description": "Re-download+replace OS image (Android only; error for others)."
+        },
+        {
+          "name": "reset",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "vm",
+              "required": true,
+              "valueSource": "vm-ids"
+            }
+          ],
+          "description": "Factory-reset VM user state (Android only; error for others)."
+        },
+        {
+          "name": "android-config",
+          "flags": [
+            {
+              "long": "--gapps",
+              "takesValue": false,
+              "description": "Sideload MindTheGapps in recovery"
+            },
+            {
+              "long": "--adb-keys",
+              "takesValue": false,
+              "description": "Install host ~/.android/adbkey.pub into guest adb_keys"
+            },
+            {
+              "long": "--magisk",
+              "takesValue": false,
+              "description": "Install Magisk on booted Lineage"
+            },
+            {
+              "long": "--root",
+              "takesValue": false,
+              "description": "Enable rooted debugging"
+            },
+            {
+              "long": "--fake-wifi",
+              "takesValue": false,
+              "description": "Create wlan0 via virt_wifi on eth0"
+            },
+            {
+              "long": "--fake-wifi-revert",
+              "takesValue": false,
+              "description": "Remove persisted fake Wi-Fi and restore eth0"
+            }
+          ],
+          "positionals": [
+            {
+              "name": "vm",
+              "required": true,
+              "valueSource": "vm-ids"
+            }
+          ],
+          "description": "Android post-provision: GApps sideload, ADB keys, Magisk, fake Wi-Fi."
+        },
+        {
+          "name": "inject",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "vm",
+              "required": true,
+              "valueSource": "vm-ids"
+            }
+          ],
+          "description": "Re-run in-place disk injection for one VM; --force recreates the data disk."
+        },
+        {
+          "name": "gc",
+          "flags": [],
+          "positionals": [],
+          "description": "Remove stale VM artifacts."
+        },
+        {
+          "name": "resize",
+          "flags": [],
+          "positionals": [
+            {
+              "name": "vm",
+              "required": true,
+              "valueSource": "vm-ids"
+            },
+            {
+              "name": "size",
+              "required": true,
+              "description": "size"
+            }
+          ],
+          "description": "Grow-only resize of the writable disk to an explicit size."
+        },
+        {
+          "name": "pack",
+          "flags": [],
+          "positionals": [],
+          "description": "Strip trivially regenerable artifacts so the tree can be copied to another host."
+        },
+        {
+          "name": "unpack",
+          "flags": [],
+          "positionals": [],
+          "description": "Regenerate per-platform VM artifacts from descriptors."
+        }
+      ]
+    }
+  ]
+}

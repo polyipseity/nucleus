@@ -26,6 +26,8 @@ usage() {
     "Grouped nucleus user utilities. Currently: optimize-pdf (optimize PDFs with Ghostscript), strip-metadata (strip file metadata with mat2/exiftool)."
   cat <<'EOF'
 
+  -h|--help  Show usage.
+
 Subcommands:
   optimize-pdf [--preset <name>] [--rm-bak] <file>...
               Optimize PDF files using Ghostscript. Keeps a .bak backup by default.

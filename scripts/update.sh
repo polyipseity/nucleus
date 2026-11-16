@@ -42,6 +42,7 @@ bash_guard_require 5 1 update
 usage() {
   usage_std "$(basename "$0")" "update|lockfile [options]"
   cat <<'EOF'
+  -h|--help                 Show usage.
   update    Update flake inputs and rewrap SOPS-managed files (default).
   lockfile  Query each available tool for the current version of each pinned
             item and write an updated lockfile atomically.

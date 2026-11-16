@@ -4,12 +4,12 @@
 
 _arguments \
   '(-h --help)'{--help,-h}'[Show usage]' \
-  '1:subcommand:((packer "" sh "" pwsh ""))' \
-  '--fail-fast[fail fast]' \
-  '--full[full]' \
-  '--no-fail-fast[no fail fast]' \
-  '--no-verbose[no verbose]' \
-  '--online[online]' \
-  '--only-steps[only steps]' \
-  '--scoped[scoped]' \
-  '--verbose[verbose]'
+  '1:subcommand:((packer "Packer template validation." sh "Shell script lint." pwsh "PowerShell syntax and naming lint."))' \
+  '--fail-fast[Exit immediately on first failure]' \
+  '--no-fail-fast[Accumulate all failures]' \
+  '--scoped[Run scoped checks]' \
+  '--full[Run full checks]' \
+  '--online[Run online checks]' \
+  '--verbose[Stream step output; optional step ids]:verbose:' \
+  '--no-verbose[Suppress step output streaming]' \
+  '--only-steps[Run only the specified step IDs]:only steps:'

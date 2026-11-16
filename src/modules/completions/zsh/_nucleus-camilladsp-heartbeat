@@ -4,6 +4,6 @@
 
 _arguments \
   '(-h --help)'{--help,-h}'[Show usage]' \
-  '--config[config]' \
-  '--port[port]' \
-  '--probe[probe]'
+  '--port[Port]:port:' \
+  '--config[Config path]:config:_files' \
+  '--probe[Print what device detection sees and exit]'

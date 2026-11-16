@@ -72,6 +72,7 @@ usage() {
   --since <iso>            show: keep events at or after an ISO-8601 timestamp.
   --note <text>            label: free-text justification stored as the note.
   --dry-run                Report what would change without writing.
+  -h|--help                Show usage.
 EOF
 }
 

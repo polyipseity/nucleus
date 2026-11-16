@@ -1,0 +1,196 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Nucleus CLI spec",
+  "description": "Single source of truth for nucleus CLI subcommands, flags, positionals, and completion value providers. Consumed by completion generators and drift checks.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "apps"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "apps": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/app"
+      },
+      "minItems": 1
+    }
+  },
+  "definitions": {
+    "flag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["long", "takesValue"],
+      "properties": {
+        "long": {
+          "type": "string",
+          "pattern": "^--[a-z0-9][a-z0-9-]*$"
+        },
+        "short": {
+          "type": "string",
+          "pattern": "^-[a-zA-Z0-9]$"
+        },
+        "takesValue": {
+          "type": "boolean"
+        },
+        "valueType": {
+          "type": "string",
+          "enum": ["path", "bytes", "enum", "count", "string"]
+        },
+        "choices": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "valueSource": {
+          "type": "string",
+          "enum": [
+            "profiles",
+            "sections",
+            "replicas",
+            "vm-ids",
+            "log-names",
+            "services",
+            "config-keys",
+            "verdicts"
+          ]
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "takesValue": {
+                "const": true
+              }
+            },
+            "required": ["takesValue"]
+          },
+          "then": {
+            "required": ["valueType"]
+          }
+        }
+      ]
+    },
+    "positional": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "variadic": {
+          "type": "boolean"
+        },
+        "description": {
+          "type": "string"
+        },
+        "valueSource": {
+          "type": "string",
+          "enum": [
+            "profiles",
+            "sections",
+            "replicas",
+            "vm-ids",
+            "log-names",
+            "services",
+            "config-keys",
+            "verdicts"
+          ]
+        },
+        "choices": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "values": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": [
+            "profiles",
+            "sections",
+            "replicas",
+            "vm-ids",
+            "log-names",
+            "services",
+            "config-keys",
+            "verdicts"
+          ]
+        }
+      }
+    },
+    "subcommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "flags", "positionals"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "description": {
+          "type": "string"
+        },
+        "flags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/flag"
+          }
+        },
+        "positionals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/positional"
+          }
+        },
+        "values": {
+          "$ref": "#/definitions/values"
+        }
+      }
+    },
+    "app": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "summary", "globalFlags", "subcommands"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "globalFlags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/flag"
+          }
+        },
+        "subcommands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/subcommand"
+          }
+        }
+      }
+    }
+  }
+}

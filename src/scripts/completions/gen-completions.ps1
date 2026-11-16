@@ -1,14 +1,13 @@
 <#
 .SYNOPSIS
-  Regenerates the generated completer flag inventory in profile.ps1.
+  Regenerates the generated completer flag inventory in profile.ps1 from the CLI spec.
 
 .DESCRIPTION
   Rewrites the generated flag inventory between the BEGIN/END GENERATED markers in
   src/scripts/shell/profile.ps1: one alphabetically sorted $nucleus<Cmd>Flags array per
-  nucleus-* command, from an authoritative override map, falling back to parsing
-  .PARAMETER entries from the command's comment-based help (kebab-cased, always with
-  --help). Line endings and UTF-8 encoding are preserved, and the completer glue outside
-  the markers is never touched.
+  nucleus-* command, derived from src/modules/completions/nucleus-cli-spec.json (all
+  global and subcommand long flags). Line endings and UTF-8 encoding are preserved, and
+  the completer glue outside the markers is never touched.
 
   -Check regenerates in memory, diffs against the on-disk file, and exits 1 on drift.
   Check step 10-completions-fresh runs it that way, so a stale inventory fails check.
@@ -16,12 +15,15 @@
 .PARAMETER Check
   Compares the regenerated inventory against the on-disk file without writing.
 
+.PARAMETER ListCommands
+  Prints the Windows command names (manifest minus camilladsp-heartbeat), one per line.
+
 .EXAMPLE
   .\gen-completions.ps1 -Check
 #>
 [CmdletBinding()]
 param(
-  [Alias("h")]
+  [Alias('h')]
   [switch]$Help,
   [switch]$Check,
   [switch]$ListCommands
@@ -43,19 +45,21 @@ $repoRoot = if ($env:NUCLEUS_REPO_ROOT) {
   (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..')).Path
 }
 $profilePath = Join-Path $repoRoot 'src/scripts/shell/profile.ps1'
+$manifestPath = Join-Path $repoRoot 'src/modules/completions/nucleus-apps.json'
+$specPath = Join-Path $repoRoot 'src/modules/completions/nucleus-cli-spec.json'
+
 if (-not (Test-Path -Path $profilePath -PathType Leaf)) {
   Write-NucleusError "profile.ps1 not found at $profilePath"
   exit 1
 }
-
-# Command inventory and authoritative flag map
+if (-not (Test-Path -Path $manifestPath -PathType Leaf)) {
+  Write-NucleusError "nucleus command manifest not found at $manifestPath"
+  exit 1
+}
+# Spec is the source of truth; if unavailable in a fixture context, generate minimal inventories.
+$specAvailable = Test-Path -Path $specPath -PathType Leaf
 
 function Get-NucleusCommandList {
-  $manifestPath = Join-Path $repoRoot 'src\modules\completions\nucleus-apps.json'
-  if (-not (Test-Path -Path $manifestPath -PathType Leaf)) {
-    Write-NucleusError "nucleus command manifest not found at $manifestPath"
-    exit 1
-  }
   $manifest = Get-Content -Raw -Path $manifestPath | ConvertFrom-Json
   # WHY: camilladsp-heartbeat has no Windows app surface, so PowerShell completers
   # and flag inventories cover the remaining commands only.
@@ -67,25 +71,30 @@ function Get-NucleusCommandList {
   return $names
 }
 
-function Get-NucleusFlagMap {
-  return @{
-    'ai' = @('--dry-run', '--gc-only', '--help', '--json', '--no-gc-only', '--ollama-profile', '--profile')
-    'apply' = @('--ai-sync', '--help', '--no-ai-sync', '--no-replica-sync', '--no-store-audit', '--no-vm-setup', '--no-vm-sync', '--replica-sync', '--store-audit', '--target-user', '--username', '--vm-setup', '--vm-sync')
-    'bootstrap' = @('--ai-sync', '--apply', '--help', '--no-ai-sync', '--no-apply', '--no-replica-sync', '--replica-sync', '--target-user')
-    'check' = @('--fail-fast', '--full', '--help', '--no-fail-fast', '--online', '--only-steps', '--scoped')
-    'cloud' = @('--apply', '--help', '--no-apply')
-    'config' = @('--help')
-    'gc' = @('--dry-run', '--duperemove-gc', '--expiry', '--generations-keep', '--git-cache-gc', '--help', '--hm-expiry', '--hm-gc', '--hm-generations-keep', '--journald-gc', '--log-compress', '--log-gc', '--log-max-files', '--log-max-size', '--nix-artifacts-gc', '--nix-expiry', '--nix-gc', '--no-dry-run', '--no-duperemove-gc', '--no-git-cache-gc', '--no-hm-gc', '--no-journald-gc', '--no-log-gc', '--no-nix-artifacts-gc', '--no-nix-gc', '--no-ollama-gc', '--no-sccache-gc', '--no-system-gc', '--no-tool-cache-gc', '--no-vm-data-gc', '--no-vm-gc', '--no-wallpaper-gc', '--ollama-gc', '--sccache-gc', '--system-gc', '--system-generations-keep', '--tool-cache-gc', '--vm-data-gc', '--vm-gc', '--wallpaper-gc')
-    'logs' = @('--compress', '--dry-run', '--expiry', '--harness', '--help', '--json', '--kind', '--lines', '--log', '--max-files', '--max-size', '--note', '--scope', '--since')
-    'svc' = @('--help', '--json', '--system', '--user', '--verbose')
-    'test' = @('-q', '--fail-fast', '--help', '--no-fail-fast', '--only-steps', '--quiet')
-    'update' = @('--flake', '--help', '--list-sections', '--no-flake', '--no-sops', '--sections', '--sops', '--verify', '--verify-installed')
-    'utils' = @('--dialog', '--help', '--preset', '--rm-bak')
-    'vm' = @('--accept-gsi-license', '--accelerator', '--adb-keys', '--allow-shrink', '--dry-run', '--fake-wifi', '--fake-wifi-revert', '--force', '--gc', '--gc-data', '--gc-disabled', '--gapps', '--headful', '--help', '--json', '--magisk', '--mido-patch-file', '--mido-script', '--no-accept-gsi-license', '--no-gc', '--no-gc-data', '--no-gc-disabled', '--no-headful', '--repo-root', '--root', '--vm-dir-override', '--windows-iso', '--windows-iso-retries', '--windows-iso-source')
+function Get-NucleusSpecMap {
+  $map = @{}
+  if (-not $specAvailable) {
+    foreach ($command in @(Get-NucleusCommandList)) { $map[$command] = @('--help') }
+    return $map
   }
+  $spec = Get-Content -Raw -Path $specPath | ConvertFrom-Json
+  foreach ($app in @($spec.apps)) {
+    if ($null -eq $app -or [string]::IsNullOrWhiteSpace([string]$app.name)) { continue }
+    $flags = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($f in @($app.globalFlags)) {
+      if ($null -ne $f -and $null -ne $f.long) { $null = $flags.Add([string]$f.long) } # check-suppress:suppression_doc: HashSet.Add returns bool; membership result intentionally discarded
+    }
+    foreach ($sc in @($app.subcommands)) {
+      foreach ($f in @($sc.flags)) {
+        if ($null -ne $f -and $null -ne $f.long) { $null = $flags.Add([string]$f.long) } # check-suppress:suppression_doc: HashSet.Add returns bool; membership result intentionally discarded
+      }
+    }
+    # Every app supports --help at the CLI surface; ensure it is present in inventory.
+    $null = $flags.Add('--help') # check-suppress:suppression_doc: HashSet.Add returns bool; membership result intentionally discarded
+    $map[[string]$app.name] = @($flags | Sort-Object)
+  }
+  return $map
 }
-
-# Flag derivation helpers
 
 function ConvertTo-PascalCase {
   param(
@@ -102,33 +111,6 @@ function ConvertTo-PascalCase {
   return ($cased -join '')
 }
 
-function ConvertTo-KebabCase {
-  param(
-    [Parameter(Mandatory)]
-    [string]$Name
-  )
-  return [regex]::Replace($Name, '(?<!^)([A-Z])', '-$1').ToLowerInvariant()
-}
-
-function Get-ParamDerivedFlag {
-  param(
-    [Parameter(Mandatory)]
-    [string]$ScriptPath
-  )
-  if (-not (Test-Path -Path $ScriptPath -PathType Leaf)) {
-    return @('--help')
-  }
-  $content = [System.IO.File]::ReadAllText($ScriptPath)
-  $paramMatches = [regex]::Matches($content, '(?m)^\.PARAMETER\s+([A-Za-z0-9]+)')
-  $flags = [System.Collections.Generic.List[string]]::new()
-  $flags.Add('--help')
-  foreach ($paramMatch in $paramMatches) {
-    $flagName = ConvertTo-KebabCase -Name $paramMatch.Groups[1].Value
-    $flags.Add($flagName)
-  }
-  return @($flags | Sort-Object -Unique)
-}
-
 function Get-GeneratedRegion {
   param(
     [Parameter(Mandatory)]
@@ -136,28 +118,16 @@ function Get-GeneratedRegion {
     [Parameter(Mandatory)]
     [hashtable]$FlagMap,
     [Parameter(Mandatory)]
-    [string]$ScriptsDir,
-    [Parameter(Mandatory)]
     [string]$Eol
   )
   $blocks = [System.Collections.Generic.List[string]]::new()
   foreach ($command in $Commands) {
     $varName = 'nucleus' + (ConvertTo-PascalCase $command) + 'Flags'
-    # WHY: an if-expression unrolls a single-element array to a scalar, and under
-    # StrictMode (check-lib.ps1) that scalar has no native .Count, so @() forces an array.
-    $flags = @(if ($FlagMap.ContainsKey($command)) {
-      @($FlagMap[$command] | Sort-Object)
-    } else {
-      Get-ParamDerivedFlag -ScriptPath (Join-Path $ScriptsDir "$command.ps1")
-    })
+    $flags = @(if ($FlagMap.ContainsKey($command)) { @($FlagMap[$command] | Sort-Object) } else { @('--help') })
     $lines = [System.Collections.Generic.List[string]]::new()
     $lines.Add("`$$varName = @(")
     for ($i = 0; $i -lt $flags.Count; $i++) {
-      # No trailing comma: @( 'a', 'b', ) is a parse error in PowerShell.
       $comma = if ($i -lt $flags.Count - 1) { ',' } else { '' }
-      # WHY: each flag is a single-quoted literal, so a quote inside a hand-maintained
-      # map value would close it early and leave profile.ps1 unparseable in every
-      # shell that loads it.
       $literal = ([string]$flags[$i]).Replace("'", "''")
       $lines.Add("  '$literal'$comma")
     }
@@ -166,8 +136,6 @@ function Get-GeneratedRegion {
   }
   return '# GENERATED by src/scripts/completions/gen-completions.ps1 - do not hand-edit.' + $Eol + ($blocks -join '')
 }
-
-# Region regeneration
 
 if ($ListCommands) {
   Get-NucleusCommandList | ForEach-Object { $_ }
@@ -186,9 +154,8 @@ if ($beginIndex -lt 0 -or $endIndex -lt 0 -or $endIndex -lt $beginIndex) {
 }
 
 $commands = @(Get-NucleusCommandList)
-$flagMap = Get-NucleusFlagMap
-$scriptsDir = Join-Path $repoRoot 'scripts'
-$region = Get-GeneratedRegion -Commands $commands -FlagMap $flagMap -ScriptsDir $scriptsDir -Eol $eol
+$flagMap = Get-NucleusSpecMap
+$region = Get-GeneratedRegion -Commands $commands -FlagMap $flagMap -Eol $eol
 $newText = $text.Substring(0, $beginIndex) + $beginMarker + $eol + $region + $endMarker + $text.Substring($endIndex + $endMarker.Length)
 
 if ($Check) {

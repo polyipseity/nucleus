@@ -18,12 +18,87 @@ _nucleus_svc_services() {
   fi
 }
 
-_arguments \
+_arguments -C \
   '(-h --help)'{--help,-h}'[Show usage]' \
-  '1:subcommand:((list "List services with status (instance ids included)" status "Show status of specified services (all if omitted)" start "Start a service" stop "Stop a service" restart "Restart a service, repairing a blocked cloud mount first if needed" enable "Enable auto-start" disable "Disable auto-start" verify "Check all (or specified) services, warn if inactive" endpoint "Show network endpoint(s) for a service" logs "Show service logs (list available if no service)" log-paths "Print log file path(s)" log-config "Show effective logging configuration"))' \
-  '--disable[disable]' \
-  '--enable[enable]' \
-  '--json[json]' \
-  '--system[system]' \
-  '--user[user]' \
-  '--verbose[verbose]'
+  '--json[Machine-readable JSON output]' \
+  '--system[Show only system-domain services]' \
+  '--user[Show only user-domain services]' \
+  '--verbose[Show action result summaries]' \
+  '--disable[With stop: disable auto-start after stopping]' \
+  '--enable[With start: enable auto-start before starting]' \
+  '1:subcommand:->subcmd' \
+  '*::arg:->args'
+
+case $state in
+  subcmd)
+    local -a _subcmds
+    _subcmds=(
+      'list:List services with status (instance ids included).'
+      'status:Show status of specified services (all if omitted).'
+      'start:Start a service.'
+      'stop:Stop a service.'
+      'restart:Restart a service, repairing a blocked cloud mount first if needed.'
+      'enable:Enable auto-start.'
+      'disable:Disable auto-start.'
+      'verify:Check all (or specified) services, warn if inactive.'
+      'endpoint:Show network endpoint(s) for a service.'
+      'logs:Show service logs (list available if no service).'
+      'log-paths:Print log file path(s).'
+      'log-config:Show effective logging configuration.'
+    )
+    _describe -t commands 'subcommand' _subcmds
+    ;;
+  args)
+    case $words[1] in
+      list)
+        _arguments \
+          '*:service:_nucleus_svc_services'
+        ;;
+      status)
+        _arguments \
+          '*:service:_nucleus_svc_services'
+        ;;
+      start)
+        _arguments \
+          '1:service:_nucleus_svc_services'
+        ;;
+      stop)
+        _arguments \
+          '1:service:_nucleus_svc_services'
+        ;;
+      restart)
+        _arguments \
+          '1:service:_nucleus_svc_services'
+        ;;
+      enable)
+        _arguments \
+          '1:service:_nucleus_svc_services'
+        ;;
+      disable)
+        _arguments \
+          '1:service:_nucleus_svc_services'
+        ;;
+      verify)
+        _arguments \
+          '*:service:_nucleus_svc_services'
+        ;;
+      endpoint)
+        _arguments \
+          '1:service:_nucleus_svc_services' \
+          '2:name:'
+        ;;
+      logs)
+        _arguments \
+          '*:service:_nucleus_svc_services'
+        ;;
+      log-paths)
+        _arguments \
+          '*:service:_nucleus_svc_services'
+        ;;
+      log-config)
+        _arguments \
+          '*:service:_nucleus_svc_services'
+        ;;
+    esac
+    ;;
+esac

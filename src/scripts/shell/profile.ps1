@@ -758,6 +758,8 @@ $nucleusAiFlags = @(
 $nucleusApplyFlags = @(
   '--ai-sync',
   '--help',
+  '--history',
+  '--json',
   '--no-ai-sync',
   '--no-replica-sync',
   '--no-store-audit',
@@ -774,6 +776,7 @@ $nucleusApplyFlags = @(
 $nucleusBootstrapFlags = @(
   '--ai-sync',
   '--apply',
+  '--force-admin',
   '--help',
   '--no-ai-sync',
   '--no-apply',
@@ -787,15 +790,20 @@ $nucleusCheckFlags = @(
   '--full',
   '--help',
   '--no-fail-fast',
+  '--no-verbose',
   '--online',
   '--only-steps',
-  '--scoped'
+  '--scoped',
+  '--verbose'
 )
 
 $nucleusCloudFlags = @(
   '--apply',
+  '--dry-run',
   '--help',
-  '--no-apply'
+  '--no-apply',
+  '--replica-id',
+  '--repo-root'
 )
 
 $nucleusConfigFlags = @(
@@ -830,6 +838,7 @@ $nucleusGcFlags = @(
   '--no-nix-gc',
   '--no-ollama-gc',
   '--no-sccache-gc',
+  '--no-scoop-gc',
   '--no-system-gc',
   '--no-tool-cache-gc',
   '--no-vm-data-gc',
@@ -837,6 +846,7 @@ $nucleusGcFlags = @(
   '--no-wallpaper-gc',
   '--ollama-gc',
   '--sccache-gc',
+  '--scoop-gc',
   '--system-gc',
   '--system-generations-keep',
   '--tool-cache-gc',
@@ -863,6 +873,8 @@ $nucleusLogsFlags = @(
 )
 
 $nucleusSvcFlags = @(
+  '--disable',
+  '--enable',
   '--help',
   '--json',
   '--system',
@@ -874,13 +886,15 @@ $nucleusTestFlags = @(
   '--fail-fast',
   '--help',
   '--no-fail-fast',
+  '--no-verbose',
   '--only-steps',
   '--quiet',
-  '-q'
+  '--verbose'
 )
 
 $nucleusUpdateFlags = @(
   '--flake',
+  '--force',
   '--help',
   '--list-sections',
   '--no-flake',
