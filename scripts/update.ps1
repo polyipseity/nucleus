@@ -79,6 +79,7 @@ if ($Help) {
 }
 
 $repoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path }
+if ($Action -eq 'update') { $Action = 'all' }
 
 # ---------------------------------------------------------------------------
 # Invoke-UpdateAll: flake input updates + SOPS recipient rewrap

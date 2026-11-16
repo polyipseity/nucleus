@@ -48,6 +48,7 @@ param(
 
   [switch]$DryRun,
   [switch]$GcOnly,
+  [Alias('Profile','OllamaProfile')]
   [string]$AiProfile,
   [switch]$Json,
   [Alias("h")]
@@ -98,7 +99,13 @@ function Invoke-AiSync {
 
   . $modulePath
 
-  Invoke-AISync -RepoRoot $RepoRoot -DryRun:$DryRun -GcOnly:$GcOnly -ServerReadyTimeoutSeconds $(if ($env:NUCLEUS_AI_SYNC_TIMEOUT) { [int]$env:NUCLEUS_AI_SYNC_TIMEOUT } else { 60 })
+  $prevProfile = $env:NUCLEUS_AI_SYNC_PROFILE
+  if ($AiProfile) { $env:NUCLEUS_AI_SYNC_PROFILE = $AiProfile }
+  try {
+    Invoke-AISync -RepoRoot $RepoRoot -DryRun:$DryRun -GcOnly:$GcOnly -ServerReadyTimeoutSeconds $(if ($env:NUCLEUS_AI_SYNC_TIMEOUT) { [int]$env:NUCLEUS_AI_SYNC_TIMEOUT } else { 60 }) -Json:$Json
+  } finally {
+    if ($null -ne $prevProfile) { $env:NUCLEUS_AI_SYNC_PROFILE = $prevProfile } else { Remove-Item Env:NUCLEUS_AI_SYNC_PROFILE -ErrorAction SilentlyContinue } # check-suppress:suppression_doc: env var may not exist; cleanup is best-effort
+  }
 }
 
 function Invoke-AiList {

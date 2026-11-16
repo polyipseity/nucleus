@@ -54,6 +54,9 @@ usage() {
     --replica-id ID     Sync only the replica with the given id.
     --repo-root PATH    Repo checkout used to find src/users/.
 
+  status options:
+    --json              Machine-readable JSON output.
+
   Common options:
     -h|--help           Show usage.
 EOF
@@ -1170,15 +1173,67 @@ _cloud_mount_context() {
 # status: one line per enabled mount with the platform mount table as the
 # authority, then the last 20 lines of that mount's retained log.
 do_status() {
-  local rows tab id mount_point log_file state
+  local rows tab id mount_point log_file state json=false
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --json) json=true ;;
+    *)
+      error "unsupported argument '$1'"
+      usage >&2
+      exit 1
+      ;;
+    esac
+    shift
+  done
+
   _cloud_mount_context
   rows="$(_cloud_mount_targets "$_cmc_host" "$_cmc_username" "$_cmc_cloud_entry")"
   if [ -z "$rows" ]; then
-    say "no enabled cloud mounts are declared for user '$_cmc_username'"
+    if [ "$json" = true ]; then
+      jq -n --arg user "$_cmc_username" '{user:$user,mounts:[]}'
+    else
+      say "no enabled cloud mounts are declared for user '$_cmc_username'"
+    fi
     return 0
   fi
 
   tab="$(printf '\t')"
+  if [ "$json" = true ]; then
+    local _json_items=""
+    while IFS="$tab" read -r id mount_point log_file; do
+      [ -n "$id" ] || continue
+      state="$(svc_mount_table_state "$mount_point")"
+      local up=false state_detail="$state"
+      case "$state" in
+      present)
+        up=true
+        state_detail="up"
+        ;;
+      unknown:*)
+        up=false
+        state_detail="$state"
+        ;;
+      *)
+        up=false
+        state_detail="down"
+        ;;
+      esac
+      local _tail_json='[]'
+      if [ -f "$log_file" ]; then
+        _tail_json="$(tail -n 20 "$log_file" | jq -Rsc 'split("\n")[:-1]')"
+      fi
+      local _item
+      _item="$(jq -nc --arg id "$id" --arg mount_point "$mount_point" --arg log_file "$log_file" --arg state "$state_detail" --argjson up "$up" --argjson log_tail "$_tail_json" '{id:$id,mount_point:$mount_point,log_file:$log_file,state:$state,up:$up,log_tail:$log_tail}')"
+      if [ -n "$_json_items" ]; then _json_items="${_json_items},${_item}"; else _json_items="$_item"; fi
+    done <<<"$rows"
+    printf '[%s]\n' "$_json_items"
+    return 0
+  fi
+
   while IFS="$tab" read -r id mount_point log_file; do
     [ -n "$id" ] || continue
     state="$(svc_mount_table_state "$mount_point")"

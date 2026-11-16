@@ -40,7 +40,7 @@ case $state in
         ;;
       status)
         _arguments \
-          '*: :'
+          '--json[Machine-readable JSON output]'
         ;;
       restart)
         _arguments \

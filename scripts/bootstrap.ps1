@@ -10,6 +10,9 @@
   Optional arguments passed through to src/hosts/Windows/apply.ps1 (default: empty).
   Use -- before positional passthrough args (e.g., .\bootstrap.ps1 -Apply -- -DryRun).
 
+.PARAMETER NoApply
+  Install dependencies only; cancels -Apply.
+
 .PARAMETER TargetUser
   Accepted for cross-platform CLI parity. Only effective on the POSIX apply
   path (nix run .#apply -- --target-user=<name>). On Windows this flag is
@@ -23,6 +26,9 @@ param(
   [Alias("a")]
   [Parameter()]
   [switch]$Apply = $(if ($env:NUCLEUS_APPLY -eq 'true') { $true } else { $false }),
+
+  [Parameter()]
+  [switch]$NoApply,
 
   [Parameter(ValueFromRemainingArguments)]
   [string[]]$ApplyArgs,
@@ -45,6 +51,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+if ($NoApply) { $Apply = $false }
 
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking

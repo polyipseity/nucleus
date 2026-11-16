@@ -336,7 +336,7 @@ Describe 'gen-completions.ps1 generated inventory' {
     $profileText | Should -Not -Match '--no-windows-iso-source'
   }
 
-  It 'Windows nucleus-ai completer mirrors ai.ps1 params (no POSIX-only spellings)' {
+  It 'Windows nucleus-ai completer mirrors ai.ps1 params and profile aliases' {
     $null = Invoke-GenCompletion  # check-suppress:suppression_doc: Invoke-GenCompletion returns the generated profile text; output discarded because the test reads the fixture file instead
     $profileText = Get-FixtureProfile
     $aiBlock = [regex]::Match(
@@ -346,14 +346,14 @@ Describe 'gen-completions.ps1 generated inventory' {
     ).Value
     $aiBlock | Should -Not -Be ''
     # Windows flags must bind to scripts/ai.ps1 params (DryRun, GcOnly,
-    # AiProfile, Json, Help); POSIX-only ai.sh spellings are rejected.
+    # AiProfile, Json, Help) and accepted profile aliases.
     $aiBlock | Should -Match ([regex]::Escape("'--ai-profile'"))
     $aiBlock | Should -Match ([regex]::Escape("'--dry-run'"))
     $aiBlock | Should -Match ([regex]::Escape("'--gc-only'"))
     $aiBlock | Should -Match ([regex]::Escape("'--json'"))
-    $aiBlock | Should -Not -Match ([regex]::Escape("'--ollama-profile'"))
+    $aiBlock | Should -Match ([regex]::Escape("'--ollama-profile'"))
+    $aiBlock | Should -Match ([regex]::Escape("'--profile'"))
     $aiBlock | Should -Not -Match ([regex]::Escape("'--no-gc-only'"))
-    $aiBlock | Should -Not -Match ([regex]::Escape("'--profile'"))
   }
 
   It 'keeps the generated region markers' {
@@ -369,7 +369,7 @@ Describe 'gen-completions.ps1 generated inventory' {
     $profileText = Get-FixtureProfile
 
     # Commands whose generated (sorted) order equals the authoritative table.
-    @(Get-NucleusFlagsFromProfile -VariableName 'nucleusAiFlags' -ProfileText $profileText) | Should -Be @('--dry-run', '--gc-only', '--help', '--json', '--no-gc-only', '--ollama-profile', '--profile')
+    @(Get-NucleusFlagsFromProfile -VariableName 'nucleusAiFlags' -ProfileText $profileText) | Should -Be @('--ai-profile', '--dry-run', '--gc-only', '--help', '--json', '--no-gc-only', '--ollama-profile', '--profile')
     @(Get-NucleusFlagsFromProfile -VariableName 'nucleusUtilsFlags' -ProfileText $profileText) | Should -Be @('--dialog', '--help', '--preset', '--rm-bak')
     @(Get-NucleusFlagsFromProfile -VariableName 'nucleusSvcFlags' -ProfileText $profileText) | Should -Be @('--disable', '--enable', '--help', '--json', '--system', '--user', '--verbose')
 

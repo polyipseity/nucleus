@@ -56,9 +56,12 @@ usage() {
     --gc-only                       Skip pulls, only remove orphans.
     --no-gc-only                    Re-enable pulls (default; cancels --gc-only).
     --ollama-profile <name>         Override profile selection (MacBook|NixOS|Windows).
+    --ai-profile <name>             Alias for --ollama-profile.
+    --json                          Machine-readable JSON output.
 
   list options:
     --profile <name>                Filter to a specific profile.
+    --ai-profile <name>             Alias for --profile.
 
   status options:
     --json                          Machine-readable JSON output.
@@ -104,14 +107,15 @@ do_sync() {
   _sync_dry_run=false
   _sync_gc_only=false
   _sync_profile_override=""
+  _sync_json=false
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
     --dry-run)
       _sync_dry_run=true
       ;;
-    --ollama-profile)
-      _sync_profile_override="$2"
+    --ollama-profile | --ai-profile)
+      _sync_profile_override="${2:-}"
       shift
       ;;
     --gc-only)
@@ -121,7 +125,7 @@ do_sync() {
       _sync_gc_only=false
       ;;
     --json)
-      # WHY: sync emits human progress messages, not machine data, so --json
+      _sync_json=true
       ;;
     *)
       error "sync: unsupported argument '$1'"
@@ -145,12 +149,22 @@ do_sync() {
     error "jq not found; cannot parse manifest"
   fi
 
+  _sync_pulled=()
+  _sync_removed=()
   if ! command -v ollama >/dev/null 2>&1; then
-    say "ollama not found; skipping sync"
+    if [ "$_sync_json" = true ]; then
+      jq -n --arg profile "$profile" --argjson dry_run "$([ "$_sync_dry_run" = true ] && echo true || echo false)" --argjson gc_only "$([ "$_sync_gc_only" = true ] && echo true || echo false)" '{profile:$profile,dry_run:$dry_run,gc_only:$gc_only,status:"skipped",reason:"ollama-not-found",pulled:[],removed:[]}'
+    else
+      say "ollama not found; skipping sync"
+    fi
     exit 0
   fi
   if ! wait_for_ollama_server; then
-    say "ollama server unavailable after waiting ${ready_timeout_seconds}s; skipping sync"
+    if [ "$_sync_json" = true ]; then
+      jq -n --arg profile "$profile" --argjson dry_run "$([ "$_sync_dry_run" = true ] && echo true || echo false)" --argjson gc_only "$([ "$_sync_gc_only" = true ] && echo true || echo false)" '{profile:$profile,dry_run:$dry_run,gc_only:$gc_only,status:"skipped",reason:"ollama-unavailable",pulled:[],removed:[]}'
+    else
+      say "ollama server unavailable after waiting ${ready_timeout_seconds}s; skipping sync"
+    fi
     exit 0
   fi
 
@@ -159,18 +173,18 @@ do_sync() {
   installed_models=$(OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama list | awk 'NR>1 && $1!="" {print $1}')
 
   if [ "$_sync_gc_only" = false ]; then
-    printf '%s\n' "$desired_models" | while IFS= read -r model; do
-      if [ -z "$model" ]; then
-        continue
-      fi
+    while IFS= read -r model; do
+      [ -z "$model" ] && continue
       if printf '%s\n' "$installed_models" | grep -Fxq "$model"; then
         continue
       fi
       if [ "$_sync_dry_run" = true ]; then
-        dry_run "would pull $model"
+        _sync_pulled+=("$model")
+        if [ "$_sync_json" != true ]; then dry_run "would pull $model"; fi
       else
-        say "pulling $model"
+        if [ "$_sync_json" != true ]; then say "pulling $model"; fi
         OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama pull "$model"
+        _sync_pulled+=("$model")
         if ! printf '%s\n' "$(OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama list | awk 'NR>1 && $1!="" {print $1}')" | grep -Fxq "$model"; then
           error "$model was pulled but is not in 'ollama list'"
         fi
@@ -186,29 +200,29 @@ do_sync() {
             _actual_digest=$(OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama show --format json "$model" 2>/dev/null | jq -r '.digest // empty' 2>/dev/null || true) # check-suppress:suppression_doc: model may not be pulled yet; digest probe expected to fail.
             if [ -n "$_actual_digest" ] && [ "$_actual_digest" != "$_expected_digest" ]; then
               warn "digest mismatch for $model (expected $_expected_digest, got $_actual_digest)"
-            elif [ -n "$_actual_digest" ]; then
+            elif [ -n "$_actual_digest" ] && [ "$_sync_json" != true ]; then
               say "digest verified for $model"
             fi
           fi
         fi
       fi
-    done
+    done <<<"$desired_models"
   fi
 
-  printf '%s\n' "$installed_models" | while IFS= read -r model; do
-    if [ -z "$model" ]; then
-      continue
-    fi
+  while IFS= read -r model; do
+    [ -z "$model" ] && continue
     if printf '%s\n' "$desired_models" | grep -Fxq "$model"; then
       continue
     fi
     if [ "$_sync_dry_run" = true ]; then
-      dry_run "would remove $model"
+      _sync_removed+=("$model")
+      if [ "$_sync_json" != true ]; then dry_run "would remove $model"; fi
     else
-      say "removing $model"
+      _sync_removed+=("$model")
+      if [ "$_sync_json" != true ]; then say "removing $model"; fi
       OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama rm "$model"
     fi
-  done
+  done <<<"$installed_models"
 
   # WHY: the summary names dry-run/gc-only explicitly so headless or logged
   _summary_flags=""
@@ -219,7 +233,18 @@ do_sync() {
     _summary_flags="${_summary_flags}, gc-only mode (no pulls)"
   fi
 
-  say "sync completed (profile=$profile${_summary_flags})"
+  if [ "$_sync_json" = true ]; then
+    _pulled_json="$(printf '%s\n' ${_sync_pulled[@]+"${_sync_pulled[@]}"} | jq -Rsc 'split("\n") | map(select(length>0))')"
+    _removed_json="$(printf '%s\n' ${_sync_removed[@]+"${_sync_removed[@]}"} | jq -Rsc 'split("\n") | map(select(length>0))')"
+    jq -n --arg profile "$profile" \
+      --argjson dry_run "$([ "$_sync_dry_run" = true ] && echo true || echo false)" \
+      --argjson gc_only "$([ "$_sync_gc_only" = true ] && echo true || echo false)" \
+      --arg status "completed" \
+      --argjson pulled "$_pulled_json" --argjson removed "$_removed_json" \
+      '{profile:$profile,dry_run:$dry_run,gc_only:$gc_only,status:$status,pulled:$pulled,removed:$removed}'
+  else
+    say "sync completed (profile=$profile${_summary_flags})"
+  fi
 }
 
 # list subcommand
@@ -232,8 +257,8 @@ do_list() {
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
-    --profile)
-      _list_profile="$2"
+    --profile | --ai-profile)
+      _list_profile="${2:-}"
       shift
       ;;
     --json)

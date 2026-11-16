@@ -78,7 +78,8 @@ function Invoke-AISync {
     [switch]$DryRun,
     [switch]$GcOnly,
     [Parameter(Mandatory)]
-    [int]$ServerReadyTimeoutSeconds
+    [int]$ServerReadyTimeoutSeconds,
+    [switch]$Json
   )
 
   $ErrorActionPreference = "Stop"
@@ -101,11 +102,17 @@ function Invoke-AISync {
   }
   . (Join-Path -Path $resolvedRepoRoot -ChildPath 'src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1')
   $profileName = if ($env:NUCLEUS_AI_SYNC_PROFILE) { $env:NUCLEUS_AI_SYNC_PROFILE } else { Get-NucleusHostKey }
+  $pulled = [System.Collections.Generic.List[string]]::new()
+  $removed = [System.Collections.Generic.List[string]]::new()
 
   # check-suppress:suppression_doc: probe -- ollama may not be installed; $null check handles absence.
   $ollamaCmd = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaCmd) {
-    Write-NucleusInfo -CommandName 'ai' "ollama not found; skipping sync"
+    if ($Json) {
+      [ordered]@{ profile = $profileName; dry_run = [bool]$DryRun; gc_only = [bool]$GcOnly; status = 'skipped'; reason = 'ollama-not-found'; pulled = @(); removed = @() } | ConvertTo-Json -Compress
+    } else {
+      Write-NucleusInfo -CommandName 'ai' "ollama not found; skipping sync"
+    }
     return
   }
 
@@ -128,7 +135,7 @@ function Invoke-AISync {
   $listOutput = @($probeResult.Output)
 
   if ($listExitCode -ne 0 -and $ServerReadyTimeoutSeconds -gt 0) {
-    Write-NucleusInfo -CommandName 'ai' "waiting up to ${ServerReadyTimeoutSeconds}s for ollama server readiness..."
+    if (-not $Json) { Write-NucleusInfo -CommandName 'ai' "waiting up to ${ServerReadyTimeoutSeconds}s for ollama server readiness..." }
     $deadline = (Get-Date).AddSeconds($ServerReadyTimeoutSeconds)
     do {
       Start-Sleep -Seconds 2
@@ -142,7 +149,11 @@ function Invoke-AISync {
   }
 
   if ($listExitCode -ne 0) {
-    Write-NucleusInfo -CommandName 'ai' "ollama server unavailable after waiting ${ServerReadyTimeoutSeconds}s; skipping sync"
+    if ($Json) {
+      [ordered]@{ profile = $profileName; dry_run = [bool]$DryRun; gc_only = [bool]$GcOnly; status = 'skipped'; reason = 'ollama-unavailable'; pulled = @(); removed = @() } | ConvertTo-Json -Compress
+    } else {
+      Write-NucleusInfo -CommandName 'ai' "ollama server unavailable after waiting ${ServerReadyTimeoutSeconds}s; skipping sync"
+    }
     return
   }
 
@@ -166,13 +177,15 @@ function Invoke-AISync {
         continue
       }
       if ($DryRun) {
-        Write-NucleusInfo -CommandName 'ai' "would pull $model"
+        $pulled.Add($model)
+        if (-not $Json) { Write-NucleusInfo -CommandName 'ai' "would pull $model" }
       } else {
-        Write-NucleusInfo -CommandName 'ai' "pulling $model"
+        if (-not $Json) { Write-NucleusInfo -CommandName 'ai' "pulling $model" }
         & $ollamaCmd.Source pull $model
         if ($LASTEXITCODE -ne 0) {
           Write-NucleusError -CommandName 'ai' "ollama pull $model failed with exit code $LASTEXITCODE"
         } else {
+          $pulled.Add($model)
           # Verify the pull via ollama list
           $pullCheck = @(& $ollamaCmd.Source list 2>&1 | Select-Object -Skip 1 | ForEach-Object { ($_ -split '\s+')[0] } | Where-Object { $_ -ne '' })
           if ($pullCheck -notcontains $model) {
@@ -191,7 +204,7 @@ function Invoke-AISync {
                 $_actualDigest = ($_showJson | ConvertFrom-Json).digest
                 if ($_actualDigest -and $_actualDigest -ne $_expectedDigest) {
                   Write-NucleusWarning -CommandName 'ai' "digest mismatch for $model (expected $_expectedDigest, got $_actualDigest)"
-                } elseif ($_actualDigest) {
+                } elseif ($_actualDigest -and -not $Json) {
                   Write-NucleusInfo -CommandName 'ai' "digest verified for $model"
                 }
               }
@@ -210,9 +223,11 @@ function Invoke-AISync {
       continue
     }
     if ($DryRun) {
-        Write-NucleusInfo -CommandName 'ai' "would remove $model"
+      $removed.Add($model)
+      if (-not $Json) { Write-NucleusInfo -CommandName 'ai' "would remove $model" }
     } else {
-        Write-NucleusInfo -CommandName 'ai' "removing $model"
+      $removed.Add($model)
+      if (-not $Json) { Write-NucleusInfo -CommandName 'ai' "removing $model" }
       & $ollamaCmd.Source rm $model
       if ($LASTEXITCODE -ne 0) {
         Write-NucleusError -CommandName 'ai' "ollama rm $model failed with exit code $LASTEXITCODE"
@@ -224,5 +239,9 @@ function Invoke-AISync {
   if ($DryRun)    { $flags += "dry-run" }
   if ($GcOnly) { $flags += "gc-only" }
   $flagStr = if ($flags.Count -gt 0) { " ($($flags -join ', '))" } else { "" }
-  Write-NucleusInfo -CommandName 'ai' "sync completed (profile=$profileName$flagStr)"
+  if ($Json) {
+    [ordered]@{ profile = $profileName; dry_run = [bool]$DryRun; gc_only = [bool]$GcOnly; status = 'completed'; pulled = @($pulled); removed = @($removed) } | ConvertTo-Json -Compress
+  } else {
+    Write-NucleusInfo -CommandName 'ai' "sync completed (profile=$profileName$flagStr)"
+  }
 }

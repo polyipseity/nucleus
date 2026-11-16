@@ -6,9 +6,9 @@ _arguments -C \
   '(-h --help)'{--help,-h}'[Show usage]' \
   '--compress[Compress rotated archives]:compress:(true false)' \
   '--expiry[Archive retention]:expiry:' \
-  '--harness[show: keep events whose harness matches]:harness:' \
+  '--harness[show: keep events whose harness matches]:harness:(claude codex cursor opencode pi vscode)' \
   '--json[Emit one JSON document instead of text]' \
-  '--kind[show: keep events whose kind matches]:kind:' \
+  '--kind[show: keep events whose kind matches]:kind:(event label)' \
   '--lines[tail: number of events to print]:lines:' \
   '--log[label/stats: log name]:log:' \
   '--max-files[Rotated archives to keep]:max files:' \

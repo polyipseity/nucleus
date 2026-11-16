@@ -22,6 +22,11 @@
           "name": "sync",
           "flags": [
             {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Machine-readable JSON output"
+            },
+            {
               "long": "--dry-run",
               "takesValue": false,
               "description": "Print planned actions without executing them"
@@ -46,6 +51,17 @@
                 "Windows"
               ],
               "description": "Override profile selection"
+            },
+            {
+              "long": "--ai-profile",
+              "takesValue": true,
+              "valueType": "enum",
+              "choices": [
+                "MacBook",
+                "NixOS",
+                "Windows"
+              ],
+              "description": "Override profile selection (alias)"
             }
           ],
           "positionals": [],
@@ -402,7 +418,13 @@
       "subcommands": [
         {
           "name": "packer",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--validate-only",
+              "takesValue": false,
+              "description": "Skip the packer fmt -check phase"
+            }
+          ],
           "positionals": [],
           "description": "Packer template validation."
         },
@@ -462,7 +484,8 @@
               "long": "--replica-id",
               "takesValue": true,
               "valueType": "string",
-              "description": "Reset only the replica with the given id."
+              "description": "Reset only the replica with the given id.",
+              "valueSource": "replicas"
             },
             {
               "long": "--repo-root",
@@ -501,7 +524,13 @@
         {
           "name": "status",
           "description": "Show up/down per mount from the platform mount table, with the last 20 lines of each mount's log.",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Machine-readable JSON output"
+            }
+          ],
           "positionals": []
         },
         {
@@ -852,8 +881,16 @@
         {
           "long": "--harness",
           "takesValue": true,
-          "valueType": "string",
-          "description": "show: keep events whose harness matches"
+          "valueType": "enum",
+          "description": "show: keep events whose harness matches",
+          "choices": [
+            "claude",
+            "codex",
+            "cursor",
+            "opencode",
+            "pi",
+            "vscode"
+          ]
         },
         {
           "long": "--json",
@@ -863,8 +900,12 @@
         {
           "long": "--kind",
           "takesValue": true,
-          "valueType": "string",
-          "description": "show: keep events whose kind matches"
+          "valueType": "enum",
+          "description": "show: keep events whose kind matches",
+          "choices": [
+            "event",
+            "label"
+          ]
         },
         {
           "long": "--lines",

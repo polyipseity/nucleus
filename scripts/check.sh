@@ -29,7 +29,7 @@ _NUCLEUS_CHECKS_DIR="$(CDPATH='' cd -- "$_ORCH_SCRIPT_DIR/../src/scripts/checks"
 # flake-input source trees a parallel step still needs mid-eval (see
 # src/scripts/lib/lib.sh merge_nix_config).
 usage() {
-  usage_std "check.sh" "[-h|--help] [packer|pwsh|sh] [--fail-fast|--no-fail-fast] [--scoped|--full] [--online] [--verbose[=<ids>]] [--no-verbose] [--only-steps=<ids>] [path ...]" "Run repository validation checks. With a subcommand, run only that check; without one, run all checks with parallel step dispatch (capped at PARALLEL_JOBS). Subcommands: packer (Packer template validation), pwsh (PowerShell syntax + naming lint), sh (shell script lint). Default: scoped if paths given, full otherwise."
+  usage_std "check.sh" "[-h|--help] [packer|pwsh|sh] [--fail-fast|--no-fail-fast] [--scoped|--full] [--online] [--verbose[=<ids>]] [--no-verbose] [--only-steps=<ids>] [--validate-only] [path ...]" "Run repository validation checks. With a subcommand, run only that check; without one, run all checks with parallel step dispatch (capped at PARALLEL_JOBS). Subcommands: packer (Packer template validation), pwsh (PowerShell syntax + naming lint), sh (shell script lint). Default: scoped if paths given, full otherwise."
 }
 
 # packer subcommand, inline body of scripts/check-packer.sh

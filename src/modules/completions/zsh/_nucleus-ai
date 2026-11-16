@@ -24,10 +24,12 @@ case $state in
     case $words[1] in
       sync)
         _arguments \
+          '--json[Machine-readable JSON output]' \
           '--dry-run[Print planned actions without executing them]' \
           '--gc-only[Skip pulls, only remove orphans]' \
           '--no-gc-only[Re-enable pulls]' \
-          '--ollama-profile[Override profile selection]:ollama profile:(MacBook NixOS Windows)'
+          '--ollama-profile[Override profile selection]:ollama profile:(MacBook NixOS Windows)' \
+          '--ai-profile[Override profile selection (alias)]:ai profile:(MacBook NixOS Windows)'
         ;;
       list)
         _arguments \

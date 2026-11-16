@@ -317,6 +317,9 @@ spec_path = Path(sys.argv[2])
 spec = json.loads(spec_path.read_text())
 
 def help_path(name):
+    p = root / 'scripts' / f'{name}.sh'
+    if p.exists():
+        return p
     if name == 'camilladsp-heartbeat':
         return root / 'src/scripts/services/camilladsp-heartbeat.sh'
     return root / 'scripts' / f'{name}.sh'

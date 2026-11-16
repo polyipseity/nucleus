@@ -102,6 +102,9 @@ import json, re, subprocess, sys
 from pathlib import Path
 root = Path(sys.argv[1]); spec = json.loads(Path(sys.argv[2]).read_text())
 def help_path(name):
+    p = root / 'scripts' / f'{name}.sh'
+    if p.exists():
+        return p
     if name == 'camilladsp-heartbeat':
         return root / 'src/scripts/services/camilladsp-heartbeat.sh'
     return root / 'scripts' / f'{name}.sh'

@@ -28,6 +28,8 @@ param(
   [string]$ReplicaId = $(if ($env:NUCLEUS_REPLICA_ID) { $env:NUCLEUS_REPLICA_ID } else { '' }),
   [string]$RepoRoot = $(if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { '' }),
 
+  [switch]$Json = $false,
+
   [Alias("h")]
   [switch]$Help
 )
@@ -58,6 +60,9 @@ Usage: .\scripts\cloud.ps1 <setup|reset|sync> [options]
     -DryRun           Print planned actions instead of executing them.
     -ReplicaId ID     Act only on the replica with the given id.
     -RepoRoot PATH    Repo checkout used to find src/users/.
+
+  status options:
+    -Json             Machine-readable JSON output.
 
   Common options:
     -Help             Show usage.
@@ -91,7 +96,9 @@ function Invoke-CloudStatus {
     .\scripts\cloud.ps1 status
   #>
   [CmdletBinding()]
-  param()
+  param(
+    [switch]$Json
+  )
 
   $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
   Import-Module $modulePath -Force -DisableNameChecking
@@ -122,10 +129,12 @@ function Invoke-CloudStatus {
   $cloudDrives = $primaryUser['cloudDrives']
   $homeDirectory = [string]$primaryUser['homeDirectory']
   if ($null -eq $cloudDrives) {
+    if ($Json) { '[]'; return }
     Write-NucleusInfo 'no cloudDrives configuration is declared for the primary user.'
     return
   }
 
+  $items = [System.Collections.Generic.List[object]]::new()
   foreach ($mount in @($cloudDrives['mounts'] | Where-Object { $_ })) {
     $enabled = if ($null -ne $mount['enable']) { [bool]$mount['enable'] } else { $true }
     if (-not $enabled) { continue }
@@ -136,17 +145,33 @@ function Invoke-CloudStatus {
       # check-suppress:suppression_doc: an unreadable mount point counts as down rather than failing the whole report
       $listing = @(Get-ChildItem -LiteralPath $mountPoint -Force -ErrorAction SilentlyContinue)
     }
-    $stateWord = if ($listing.Count -gt 0) { 'up' } else { 'down' }
-    Write-NucleusInfo "$($mount['id']) $stateWord $mountPoint"
-
+    $up = $listing.Count -gt 0
+    $stateWord = if ($up) { 'up' } else { 'down' }
     $logFile = Join-Path (Get-NucleusLogDir) "cloud-drive-mount-$($mount['id'])\mount.log"
-    Write-NucleusInfo "--- $($mount['id']) log (last 20 lines) ---"
+    $tail = @()
     if (Test-Path -LiteralPath $logFile -PathType Leaf) {
-      Get-Content -LiteralPath $logFile -Tail 20
+      $tail = @(Get-Content -LiteralPath $logFile -Tail 20)
     }
-    else {
-      Write-NucleusInfo "(no log yet at $logFile)"
+    $items.Add([ordered]@{
+      id = [string]$mount['id']
+      mount_point = $mountPoint
+      log_file = $logFile
+      state = $stateWord
+      up = [bool]$up
+      log_tail = $tail
+    }) > $null
+    if (-not $Json) {
+      Write-NucleusInfo "$($mount['id']) $stateWord $mountPoint"
+      Write-NucleusInfo "--- $($mount['id']) log (last 20 lines) ---"
+      if (Test-Path -LiteralPath $logFile -PathType Leaf) {
+        Get-Content -LiteralPath $logFile -Tail 20
+      } else {
+        Write-NucleusInfo "(no log yet at $logFile)"
+      }
     }
+  }
+  if ($Json) {
+    @($items) | ConvertTo-Json -Depth 5 -Compress
   }
 }
 
@@ -192,6 +217,7 @@ function Invoke-CloudRestart {
   $cloudDrives = $primaryUser['cloudDrives']
   $homeDirectory = [string]$primaryUser['homeDirectory']
   if ($null -eq $cloudDrives) {
+    if ($Json) { '[]'; return }
     Write-NucleusInfo 'no cloudDrives configuration is declared for the primary user.'
     return
   }
@@ -234,7 +260,7 @@ switch ($Action) {
     Invoke-ReplicaSync -DryRun $DryRun -ReplicaId $ReplicaId
   }
   'status' {
-    Invoke-CloudStatus
+    Invoke-CloudStatus -Json:$Json
   }
   'restart' {
     Invoke-CloudRestart
