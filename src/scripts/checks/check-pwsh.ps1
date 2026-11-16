@@ -101,9 +101,19 @@ $onlyStepSet = [System.Collections.Generic.HashSet[string]]::new(
 foreach ($t in $OnlyStep) {
     $null = $onlyStepSet.Add($t) }  # check-suppress:suppression_doc: Add returns bool, discarded
 
+$profileEnabled = $env:NUCLEUS_CHECK_PWSH_PROFILE -eq '1'
+
+function Write-CheckPwshProfile {
+  param([Parameter(Mandatory)][string]$Message)
+  # Profile lines go to stderr so worker stdout remains the JSON protocol.
+  [Console]::Error.WriteLine("check-pwsh: profile: $Message")
+}
+
 # Syntax validation.
 $runSyntax = $onlyStepSet.Count -eq 0 -or $onlyStepSet.Contains('Syntax')
 if ($runSyntax) {
+  $syntaxSw = $null
+  if ($profileEnabled) { $syntaxSw = [System.Diagnostics.Stopwatch]::StartNew() }
   $parseErrors = @($Paths | Sort-Object -Unique | ForEach-Object -Parallel {
     $path = $_
     if (-not (Test-Path -Path $path)) {
@@ -118,6 +128,10 @@ if ($runSyntax) {
       $errors
     }
   } -ThrottleLimit ([System.Environment]::ProcessorCount) | Where-Object { $_ -ne $null })
+
+  if ($profileEnabled) {
+    Write-CheckPwshProfile ("phase=syntax files={0} errors={1} total_ms={2}" -f $Paths.Count, $parseErrors.Count, $syntaxSw.ElapsedMilliseconds)
+  }
 
   if ($parseErrors.Count -gt 0) {
     # WHY: Write-NucleusError → Write-Error is terminating under the script-wide
@@ -141,6 +155,9 @@ if ($runPssa) {
   if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
     throw 'PSScriptAnalyzer module is required for lint phase. Install with: Install-Module PSScriptAnalyzer -Scope CurrentUser'
   }
+
+  $pssaSw = $null
+  if ($profileEnabled) { $pssaSw = [System.Diagnostics.Stopwatch]::StartNew() }
 
   # $env:PSModulePath stays as the running pwsh provides it, which already
   # carries every module directory the enabled rules need.
@@ -169,6 +186,8 @@ if ($runPssa) {
       throw "No PSSA rules enabled after filtering (severities: $($enabledSeverities -join ', '); excluded: $($excludedRules -join ', '))."
     }
 
+    $setupMs = if ($profileEnabled) { $pssaSw.ElapsedMilliseconds } else { 0 }
+
     # WHY child processes rather than threads: the phase's cost is
     # PSScriptAnalyzer resolving each distinct command name through
     # Get-Command once per process (907 names, 109 s measured here on the
@@ -186,11 +205,20 @@ if ($runPssa) {
     )
 
     if ($PssaWorker -or $maxWorkers -le 1) {
+      $analysisSw = $null
+      if ($profileEnabled) { $analysisSw = [System.Diagnostics.Stopwatch]::StartNew() }
       $diags = $files | Invoke-ScriptAnalyzer -Settings @{
         IncludeRules = [string[]]$enabledRuleNames
         Rules = @{}
       }
+      $analysisMs = if ($profileEnabled) { $analysisSw.ElapsedMilliseconds } else { 0 }
+      if ($profileEnabled) {
+        $mode = if ($PssaWorker) { 'worker' } else { 'single' }
+        Write-CheckPwshProfile ("phase=pssa mode={0} files={1} rules={2} setup_ms={3} analysis_ms={4} total_ms={5}" -f $mode, $files.Count, $enabledRuleNames.Count, $setupMs, $analysisMs, $pssaSw.ElapsedMilliseconds)
+      }
     } else {
+      $fanoutSw = $null
+      if ($profileEnabled) { $fanoutSw = [System.Diagnostics.Stopwatch]::StartNew() }
       # Contiguous slices of the sorted file list, one child per slice, so the
       # merged diagnostics keep the sorted file order of a single-process run.
       # Within a file the diagnostic set is identical; only PSSA's first-file
@@ -279,6 +307,10 @@ if ($runPssa) {
         }
       }
       $diags = @($workerDiags)
+      $fanoutMs = if ($profileEnabled) { $fanoutSw.ElapsedMilliseconds } else { 0 }
+      if ($profileEnabled) {
+        Write-CheckPwshProfile ("phase=pssa mode=fanout files={0} rules={1} workers={2} slice_size={3} setup_ms={4} fanout_ms={5} total_ms={6}" -f $files.Count, $enabledRuleNames.Count, $slices.Count, $sliceSize, $setupMs, $fanoutMs, $pssaSw.ElapsedMilliseconds)
+      }
     }
 
     if ($PssaWorker) {
