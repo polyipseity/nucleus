@@ -19,6 +19,7 @@ _POLICY_DATA_CHECKS=(
   "method-1 symlink resolution|run_method1_symlink_resolution|ctx"
   "release age uniformity|run_release_age_uniformity|files"
   "upstream workaround staleness|run_upstream_workaround_staleness|ctx"
+  "provisioned tools instruction drift|run_provisioned_tools_instruction_drift|ctx"
 )
 
 run_repo_policy_data() {
@@ -521,5 +522,137 @@ run_upstream_workaround_staleness() {
   if [ "$_errors" -ne 0 ]; then
     return 1
   fi
+  return 0
+}
+
+# run_provisioned_tools_instruction_drift: the user-global nucleus provisioned
+# tools instruction must list every required CLI tool name so "comprehensive"
+# stays true. Required names are derived from source files (not a snapshot):
+# managedPackages CLI entries in src/modules/core.nix excluding font entries and
+# the dummy default marker, unioned with every package name in
+# src/modules/packages/desired.json. Detection looks for a backticked tool name
+# in the instruction.
+run_provisioned_tools_instruction_drift() {
+  local -n ctx="$1"
+  local _repo_root="${ctx[REPO_ROOT]}"
+  shift
+  cd "$_repo_root" || return 1
+
+  local _instr="src/users/default/agents/instructions/nucleus-provisioned-tools.instructions.md"
+  if [ ! -f "$_instr" ]; then
+    error "nucleus provisioned tools instruction not found at $_instr"
+    return 1
+  fi
+
+  local _missing_file
+  _missing_file="$(mktemp)" || {
+    error "failed to create temp file"
+    return 1
+  }
+
+  # Required names are derived from source files (not a snapshot): managedPackages
+  # CLI entries in core.nix excluding font entries and the dummy default marker,
+  # unioned with every package name in desired.json. Detection requires a
+  # backticked tool name in the instruction.
+  #
+  # Layout/block coupling (intentional, fail-loud): extraction assumes the
+  # current formatting of core.nix: the managedPackages block is bounded by
+  # `  managedPackages = {` and `  };` followed by `  packageConfig`; each
+  # top-level entry header is indented 4 spaces (`    name = {` or quoted) and
+  # body braces are tracked by line brace counts to find the entry end. If the
+  # block is missing or the layout changes incompatibly, the check errors and
+  # fails rather than guessing.
+  python3 - "$_repo_root" "$_instr" >"$_missing_file" <<'PY'
+import json
+import pathlib
+import re
+import sys
+
+repo = pathlib.Path(sys.argv[1])
+instr = pathlib.Path(sys.argv[2]).read_text(encoding="utf-8")
+
+font_exclude = {
+    "font-awesome",
+    "inter",
+    "jetbrains-mono-nerd-font",
+    "noto-sans-cjk-sc",
+    "noto-sans-cjk-tc",
+    "noto-serif-cjk-sc",
+    "noto-serif-cjk-tc",
+    "source-serif",
+}
+
+core = (repo / "src/modules/core.nix").read_text(encoding="utf-8")
+match = re.search(r"\n  managedPackages = \{\n(.*?)\n  \};\n\n  packageConfig", core, re.S)
+if not match:
+    print("ERROR:managedPackages block not found in src/modules/core.nix")
+    raise SystemExit(0)
+block = match.group(1)
+lines = block.splitlines()
+managed_cli = set()
+index = 0
+while index < len(lines):
+    line = lines[index]
+    entry = re.match(r'^    "?([^"=]+?)"?\s*=\s*\{$', line)
+    if entry:
+        name = entry.group(1).strip()
+        body_index = index + 1
+        depth = 1
+        body = []
+        while body_index < len(lines) and depth > 0:
+            body_line = lines[body_index]
+            depth += body_line.count("{") - body_line.count("}")
+            body.append(body_line)
+            body_index += 1
+        if name != "default" and name not in font_exclude and re.search(r'category\s*=\s*"cli"', "\n".join(body)):
+            managed_cli.add(name)
+        index = body_index
+        continue
+    index += 1
+
+desired = json.loads((repo / "src/modules/packages/desired.json").read_text(encoding="utf-8"))
+desired_names = set()
+for manager, hosts in desired.items():
+    if manager == "$schema":
+        continue
+    if not isinstance(hosts, dict):
+        continue
+    for packages in hosts.values():
+        if not isinstance(packages, list):
+            continue
+        for package in packages:
+            if isinstance(package, dict) and "name" in package:
+                desired_names.add(str(package["name"]))
+
+for name in sorted(managed_cli | desired_names):
+    if f"`{name}`" not in instr:
+        print(name)
+PY
+  local _py_rc=$?
+  if [ "$_py_rc" -ne 0 ]; then
+    error "provisioned tools instruction drift check failed to compute required names"
+    rm -f "$_missing_file"
+    return 1
+  fi
+
+  if grep -q '^ERROR:' "$_missing_file"; then
+    error "$(sed 's/^ERROR://' "$_missing_file")"
+    rm -f "$_missing_file"
+    return 1
+  fi
+
+  if [ -s "$_missing_file" ]; then
+    _msg="nucleus provisioned tools instruction is missing required tool name(s):"
+    while IFS= read -r _name; do
+      [ -z "$_name" ] && continue
+      _msg="${_msg}"$'
+'"  ${_name}"
+    done <"$_missing_file"
+    rm -f "$_missing_file"
+    error "$_msg" || return 1
+  fi
+
+  rm -f "$_missing_file"
+  say "provisioned tools instruction drift policy passed."
   return 0
 }
