@@ -140,7 +140,10 @@ function applySandboxState(ctx: SandboxStatusContext, env: NodeJS.ProcessEnv): v
 	if (!detection.sandboxed && ctx.hasUI === true && !warnedUnsandboxed) {
 		warnedUnsandboxed = true;
 		if (ctx.ui && typeof ctx.ui.notify === "function") {
-			ctx.ui.notify("Running unsandboxed (SANDBOX_RUNTIME not set).", "warning");
+			ctx.ui.notify(
+				`Outside the srt sandbox (${detection.evidence}). The full host is reachable; treat deletions, secrets, and network calls with extra care.`,
+				"warning",
+			);
 		}
 	}
 }

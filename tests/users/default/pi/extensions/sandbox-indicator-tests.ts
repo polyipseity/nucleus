@@ -143,7 +143,7 @@ describe("sandbox status lifecycle", () => {
 
 		expect(first.statuses).toEqual([[STATUS_KEY, UNSANDBOXED_LABEL]]);
 		expect(second.statuses).toEqual([[STATUS_KEY, UNSANDBOXED_LABEL]]);
-		expect(first.notifications).toEqual([["Running unsandboxed (SANDBOX_RUNTIME not set).", "warning"]]);
+		expect(first.notifications).toEqual([["Outside the srt sandbox (SANDBOX_RUNTIME unset). The full host is reachable; treat deletions, secrets, and network calls with extra care.", "warning"]]);
 		expect(second.notifications).toEqual([]);
 	});
 
@@ -155,7 +155,7 @@ describe("sandbox status lifecycle", () => {
 		events.session_start?.({}, start.ctx);
 		events.session_compact?.({}, compact.ctx);
 
-		expect(start.notifications).toEqual([["Running unsandboxed (SANDBOX_RUNTIME not set).", "warning"]]);
+		expect(start.notifications).toEqual([["Outside the srt sandbox (SANDBOX_RUNTIME unset). The full host is reachable; treat deletions, secrets, and network calls with extra care.", "warning"]]);
 		expect(compact.notifications).toEqual([]);
 		expect(compact.statuses).toEqual([[STATUS_KEY, UNSANDBOXED_LABEL]]);
 	});
@@ -170,7 +170,7 @@ describe("sandbox status lifecycle", () => {
 
 		expect(noUI.statuses).toEqual([[STATUS_KEY, UNSANDBOXED_LABEL]]);
 		expect(noUI.notifications).toEqual([]);
-		expect(withUI.notifications).toEqual([["Running unsandboxed (SANDBOX_RUNTIME not set).", "warning"]]);
+		expect(withUI.notifications).toEqual([["Outside the srt sandbox (SANDBOX_RUNTIME unset). The full host is reachable; treat deletions, secrets, and network calls with extra care.", "warning"]]);
 	});
 
 	test("sandboxed never warns even with UI", () => {

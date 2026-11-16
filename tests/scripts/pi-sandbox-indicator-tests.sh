@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Test: the pi sandbox-indicator extension suite runs under bun and reports real
-# passing cases. The wrapper enforces the two failure modes a bare `bun test`
-# call would hide in a log: a non-zero exit and a vacuous zero-pass run.
+# Test: the pi sandbox-indicator and sandbox-context extension suites run under
+# bun and report real passing cases. The wrapper enforces the two failure modes
+# a bare `bun test` call would hide in a log: a non-zero exit and a vacuous
+# zero-pass run.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -10,16 +11,17 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 
-require_command bun "bun test executes the pi sandbox-indicator suite"
+require_command bun "bun test executes the pi sandbox extension suites"
 
-_psi_suite="./tests/users/default/pi/extensions/sandbox-indicator-tests.ts"
+_psi_indicator="./tests/users/default/pi/extensions/sandbox-indicator-tests.ts"
+_psi_context="./tests/users/default/pi/extensions/sandbox-context-tests.ts"
 _psi_out="$(mktemp)"
 trap 'rm -f "$_psi_out"' EXIT
 
-if (cd "$REPO_ROOT" && bun test "$_psi_suite") >"$_psi_out" 2>&1; then
-  assert_pass "pi sandbox-indicator tests pass under bun test"
+if (cd "$REPO_ROOT" && bun test "$_psi_indicator" "$_psi_context") >"$_psi_out" 2>&1; then
+  assert_pass "pi sandbox extension tests pass under bun test"
 else
-  assert_fail "pi sandbox-indicator tests pass under bun test" \
+  assert_fail "pi sandbox extension tests pass under bun test" \
     "$(tail -n 20 "$_psi_out" | tr '\n' ' ')"
 fi
 
