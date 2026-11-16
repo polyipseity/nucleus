@@ -87,7 +87,21 @@ _run_script_test() {
   fi
 
   if ! _reason=$(check_suite_tally "$_script" "$_capture" "$_status"); then
+    if [ "$quiet_mode" = true ] && [ "$_status" -eq 0 ]; then
+      cat "$_capture"
+    fi
     error "FAILED script tests: $(basename "$_script") — $_reason"
+    if [ -s "$_capture" ]; then
+      local _lines
+      _lines=$(wc -l <"$_capture" | tr -d ' ')
+      if [ "$_lines" -le 40 ]; then
+        sed 's/^/  | /' "$_capture" >&2
+      else
+        head -n 20 "$_capture" | sed 's/^/  | /' >&2
+        printf '  | ...\n' >&2
+        tail -n 20 "$_capture" | sed 's/^/  | /' >&2
+      fi
+    fi
     _status=1
   fi
 
@@ -169,8 +183,14 @@ _run_parallel_script_tests() {
     # one job, run the suite and record its status.
     if ! _reason=$(check_suite_tally "$_script" "$_capture_file" "$_status"); then
       printf '%s (%s)\n' "$_script" "$_reason" >>"$_failed_list"
+      if [ -s "$_capture_file" ]; then
+        tail -n 20 "$_capture_file" | sed 's/^/  | /' >>"$_failed_list"
+      fi
     elif [ "$_status" -ne 0 ]; then
       printf '%s (exit %s)\n' "$_script" "$_status" >>"$_failed_list"
+      if [ -s "$_capture_file" ]; then
+        tail -n 20 "$_capture_file" | sed 's/^/  | /' >>"$_failed_list"
+      fi
     fi
     if [ -f "$_capture_dir/$(basename "$_script").ms" ]; then
       _ms_pair=$(cat "$_capture_dir/$(basename "$_script").ms")

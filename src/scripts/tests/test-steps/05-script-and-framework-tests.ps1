@@ -101,7 +101,8 @@ Register-Step -Id "script-and-framework-tests" -Name "Script and framework tests
       }
       $endMs = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
       if ($scriptThrew -or $LASTEXITCODE -ne 0) {
-        New-Item -ItemType File -Path (Join-Path -Path $captureDir -ChildPath "$base.failed") -Force > $null
+        $reason = if ($scriptThrew) { 'threw' } else { "exit $LASTEXITCODE" }
+        Set-Content -Path (Join-Path -Path $captureDir -ChildPath "$base.failed") -Value $reason
       }
       # Written after the failure marker so a write error cannot cost a failed
       # suite its report; the timing table itself never drives the exit code.
@@ -138,9 +139,22 @@ Register-Step -Id "script-and-framework-tests" -Name "Script and framework tests
       Write-ErrorMessage 'FAILED script tests:'
       foreach ($marker in $failed) {
         $failedBase = $marker.Name -replace '\.failed$',''
+        $reason = (Get-Content -LiteralPath $marker.FullName -Raw -ErrorAction SilentlyContinue)
+        if ($null -eq $reason) { $reason = '' }
+        $reason = $reason.Trim()
         foreach ($testScript in $parallelScripts) {
           if ([System.IO.Path]::GetFileName($testScript) -eq $failedBase) {
-            Write-ErrorMessage $testScript
+            if ($reason) {
+              Write-ErrorMessage "$testScript ($reason)"
+            } else {
+              Write-ErrorMessage $testScript
+            }
+            $captureFile = Join-Path -Path $captureDir -ChildPath "$failedBase.out"
+            if (Test-Path -LiteralPath $captureFile) {
+              Get-Content -LiteralPath $captureFile -Tail 20 -ErrorAction SilentlyContinue | ForEach-Object {
+                Write-ErrorMessage "  | $_"
+              }
+            }
           }
         }
       }

@@ -148,10 +148,10 @@ EOF
   assert_case "tally: reported failure is named" "1:tally reports 1 failed" "$(_tally_check "$_suite" "$_capture" 1)"
 
   : >"$_capture"
-  assert_case "tally: missing tally rejected" "1:no tally (found 0)" "$(_tally_check "$_suite" "$_capture" 0)"
+  assert_case "tally: missing tally rejected" "1:crashed before tally (exit 0)" "$(_tally_check "$_suite" "$_capture" 0)"
 
   printf '# nucleus-tally passed=1 failed=0\n# nucleus-tally passed=1 failed=0\n' >"$_capture"
-  assert_case "tally: duplicate tally rejected" "1:no tally (found 2)" "$(_tally_check "$_suite" "$_capture" 0)"
+  assert_case "tally: duplicate tally rejected" "1:duplicate tally (exit 0, found 2)" "$(_tally_check "$_suite" "$_capture" 0)"
 
   printf '# nucleus-tally passed=1 failed=2\n' >"$_capture"
   assert_case "tally: failed>0 with exit 0 rejected" "1:tally reports 2 failed but the suite exited 0" \

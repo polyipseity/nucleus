@@ -133,14 +133,18 @@ check_suite_tally() {
   local _suite="$1" _capture="$2" _status="$3"
   grep -qE '^[[:space:]]*\.[[:space:]].*test-lib\.sh' "$_suite" || return 0
   if [ ! -f "$_capture" ]; then
-    printf 'no output captured\n'
+    printf 'no output captured (exit %s)\n' "$_status"
     return 1
   fi
   # Exactly one tally line: a suite must not be able to report twice, or not at all.
   local _tally _count
   _count=$(grep -c '^# nucleus-tally ' "$_capture" || true)
+  if [ "$_count" -eq 0 ]; then
+    printf 'crashed before tally (exit %s)\n' "$_status"
+    return 1
+  fi
   if [ "$_count" -ne 1 ]; then
-    printf 'no tally (found %s)\n' "$_count"
+    printf 'duplicate tally (exit %s, found %s)\n' "$_status" "$_count"
     return 1
   fi
   _tally=$(grep '^# nucleus-tally ' "$_capture") || _tally=""
