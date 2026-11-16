@@ -245,24 +245,33 @@ svc_mount_table_contains() {
 svc_run_bounded() {
   local bound="$1"
   shift
-  local pid ticks=0 max_ticks
+  local pid ticks=0 max_ticks _sleep
   max_ticks=$((bound * 5))
+  _sleep="${REAL_SLEEP:-sleep}"
 
-  "$@" &
+  # Run in its own process group so timeout kills can reap children that keep
+  # stdout/stderr open and would otherwise block command substitutions.
+  if command -v setsid >/dev/null 2>&1; then
+    setsid "$@" &
+  else
+    set -m
+    "$@" &
+    set +m
+  fi
   pid=$!
 
   while kill -0 "$pid" 2>/dev/null; do
     if [ "$ticks" -ge "$max_ticks" ]; then
       # check-suppress:suppression_doc: the command already outlived its bound; signalling and reaping a process that ignores the signal must not change the timeout answer.
-      kill -TERM "$pid" 2>/dev/null || true
-      sleep 0.2
+      kill -TERM -- "-$pid" "$pid" 2>/dev/null || true
+      "$_sleep" 0.2
       # check-suppress:suppression_doc: same as above: the kill and the reap are best effort, the bound is the answer.
-      kill -KILL "$pid" 2>/dev/null || true
+      kill -KILL -- "-$pid" "$pid" 2>/dev/null || true
       # check-suppress:suppression_doc: same as above.
       wait "$pid" 2>/dev/null || true
       return 124
     fi
-    sleep 0.2
+    "$_sleep" 0.2
     ticks=$((ticks + 1))
   done
 
