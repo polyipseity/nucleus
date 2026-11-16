@@ -4,6 +4,25 @@
 
 register_step "nix-flake-eval" "Nix flake evaluation and managed config keys" run_nix_flake_eval posix any none
 
+_ne_now_ms() {
+  if declare -F _step_now_ms >/dev/null 2>&1; then
+    _step_now_ms
+  elif [ -n "${EPOCHREALTIME-}" ]; then
+    awk -v t="$EPOCHREALTIME" 'BEGIN { printf "%d\n", int(t * 1000) }'
+  else
+    perl -MTime::HiRes=time -e 'printf "%d\n", int(time() * 1000)' 2>/dev/null || date +%s000
+  fi
+}
+
+_ne_dur_s() {
+  local _ms="${1:-0}"
+  if declare -F _format_duration_s >/dev/null 2>&1; then
+    _format_duration_s "$_ms"
+  else
+    awk -v ms="$_ms" 'BEGIN { printf "%.3f s", ms / 1000 }'
+  fi
+}
+
 run_nix_flake_eval() {
   local -n ctx="$1"
   local _ctx_name="$1"
@@ -26,18 +45,15 @@ run_nix_flake_eval() {
   fi
 
   if $_ne_eval; then
-    # Each remaining nix invocation keeps its own call because three lanes are
-    # in play and a merge would drop the contract of the lane that gave up its
-    # environment or its real output. Real build: the pin exports NIX_PATH for
-    # the whole step, and the winget check needs the store path it prints for
-    # cmp. Env-present eval: `nix config show system` and the package eval must
-    # read the environment this host's nix runs with. Env-clean hermetic: the
-    # dry-run below strips NUCLEUS_REPO_ROOT and forces its own NIX_CONFIG.
-    # WHY: <nixpkgs> comes from the flake-locked input, never from this
-    # machine's channel; the evals below must not depend on the ambient one.
+    local _ne_t0 _ne_pin_state=computed
+    _ne_t0=$(_ne_now_ms)
+    if [ -n "${NUCLEUS_PINNED_NIXPKGS:-}" ]; then
+      _ne_pin_state=reused
+    fi
     if ! nucleus_pin_nixpkgs "$_repo_root"; then
       _ne_exit=1
     fi
+    say "nix-flake-eval: pin: $(_ne_dur_s $(($(_ne_now_ms) - _ne_t0))) ($_ne_pin_state)"
 
     # WHY: these nix calls write the shared SQLite eval cache; serialize them
     # with the test steps' nix invocations (pre-push check and test may overlap).
@@ -47,12 +63,14 @@ run_nix_flake_eval() {
     # the wrong package set on Linux. `nix config show system` is pure, cheap,
     # and follows a configured `system = ...` exactly as `nix build` would.
     local sys
+    _ne_t0=$(_ne_now_ms)
     sys="$(nucleus_nix_locked nix config show system)"
     if ! nucleus_nix_locked nix eval "path:./src#packages.$sys" >/dev/null; then
       _ne_exit=1
     else
       say "nix flake evaluation passed."
     fi
+    say "nix-flake-eval: nix eval packages.${sys:-unknown}: $(_ne_dur_s $(($(_ne_now_ms) - _ne_t0)))"
 
     # Committed generated artifacts must equal their flake derivation.
     # WHY: src/modules/completions/nucleus-apps.json is the cross-platform command
@@ -60,6 +78,7 @@ run_nix_flake_eval() {
     # It is derived per system from mkNucleusApps, so freshness is checked by
     # building this host's package and comparing it byte-for-byte.
     local _ne_na_out
+    _ne_t0=$(_ne_now_ms)
     if _ne_na_out="$(nucleus_nix_locked nix build --no-link --print-out-paths ./src#nucleus-apps)"; then
       if ! cmp -s "$_ne_na_out" src/modules/completions/nucleus-apps.json; then
         error "src/modules/completions/nucleus-apps.json is stale — regenerate it from its derivation (see .agents/instructions/nucleus-apps.instructions.md)"
@@ -71,6 +90,7 @@ run_nix_flake_eval() {
       error "failed to build ./src#nucleus-apps for the generated-artifact check"
       _ne_exit=1
     fi
+    say "nix-flake-eval: nucleus-apps build+cmp: $(_ne_dur_s $(($(_ne_now_ms) - _ne_t0)))"
 
     # WHY: src/hosts/Windows/system/winget-packages.json cannot be generated on
     # Windows, so it is committed, and this is the only byte-exact (format
@@ -82,8 +102,10 @@ run_nix_flake_eval() {
     # It stays its own real build: cmp compares the store path this command
     # prints, and a dry-run prints no path.
     local _ne_ga_out
+    _ne_t0=$(_ne_now_ms)
     if [ "$sys" != "aarch64-darwin" ]; then
       say "winget allow-list freshness not checked: ./src#winget-packages is an aarch64-darwin derivation (host system: $sys)."
+      say "nix-flake-eval: winget-packages build+cmp (aarch64-darwin): $(_ne_dur_s $(($(_ne_now_ms) - _ne_t0))) (not checked)"
     elif _ne_ga_out="$(nucleus_nix_locked nix build --no-link --print-out-paths ./src#winget-packages)"; then
       if ! cmp -s "$_ne_ga_out" src/hosts/Windows/system/winget-packages.json; then
         error "src/hosts/Windows/system/winget-packages.json is stale — regenerate it from its derivation (see .agents/instructions/winget-dsc.instructions.md)"
@@ -91,9 +113,11 @@ run_nix_flake_eval() {
       else
         say "generated winget allow-list matches its derivation."
       fi
+      say "nix-flake-eval: winget-packages build+cmp (aarch64-darwin): $(_ne_dur_s $(($(_ne_now_ms) - _ne_t0)))"
     else
       error "failed to build ./src#winget-packages for the generated-artifact check"
       _ne_exit=1
+      say "nix-flake-eval: winget-packages build+cmp (aarch64-darwin): $(_ne_dur_s $(($(_ne_now_ms) - _ne_t0)))"
     fi
 
     # Hermetic eval: prove Nix layer evaluates without forwarded env vars.
@@ -101,10 +125,14 @@ run_nix_flake_eval() {
     # takes the whole installable list in a single run (help synopsis
     # `nix build [option...] installables...`, description "nix build builds the
     # specified installables"), so the targets share one process instead of two.
+    _ne_t0=$(_ne_now_ms)
     run_hermetic_eval "$_ctx_name" || _ne_exit=1
+    say "nix-flake-eval: hermetic dry-run (both toplevels): $(_ne_dur_s $(($(_ne_now_ms) - _ne_t0)))"
 
     # Nix lint (nixf-tidy)
+    _ne_t0=$(_ne_now_ms)
     run_nixf_tidy "$_ctx_name" || _ne_exit=1
+    say "nix-flake-eval: nixf-tidy: $(_ne_dur_s $(($(_ne_now_ms) - _ne_t0)))"
   else
     say "0 Nix files in scope — nothing to evaluate."
   fi
@@ -114,7 +142,10 @@ run_nix_flake_eval() {
   # always-run rule step 05 follows). The check decides its own applicability from
   # two facts: the config is declared only on the host that deploys it, and it is
   # judged only by the nix flavor that consumes it.
+  local _ne_nc_t0
+  _ne_nc_t0=$(_ne_now_ms)
   run_nix_conf_key_check "$_ctx_name" || _ne_exit=1
+  say "nix-flake-eval: nix-conf-key check: $(_ne_dur_s $(($(_ne_now_ms) - _ne_nc_t0)))"
 
   return $_ne_exit
 }

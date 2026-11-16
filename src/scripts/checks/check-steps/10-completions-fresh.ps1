@@ -14,15 +14,22 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
   $RepoRoot = $Context.RepoRoot
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
+  $fmtDur = {
+    param([datetime]$Start)
+    '{0:N3} s' -f (([datetime]::UtcNow - $Start).TotalSeconds)
+  }
 
   Write-Message "--- generated completer inventory matches generator ---"
+  $t0 = [datetime]::UtcNow
   & (Join-Path $r 'src\scripts\completions\gen-completions.ps1') -Check
   if ($LASTEXITCODE -ne 0) {
     Write-ErrorMessage "src/scripts/shell/profile.ps1 is stale -- run src/scripts/completions/gen-completions.ps1"
     return $false
   }
+  Write-Message "completions-fresh: gen-completions.ps1 --check: $(& $fmtDur $t0)"
 
   Write-Message "--- coverage: zsh + pwsh completions for every nucleus-* command ---"
+  $t0 = [datetime]::UtcNow
   $commands = @(pwsh -NoLogo -NoProfile -NonInteractive -File (Join-Path $r 'src\scripts\completions\gen-completions.ps1') -ListCommands | ForEach-Object { ($_ | Out-String).Trim() } | Where-Object { $_ -ne '' })
   if ($commands.Count -eq 0) {
     Write-ErrorMessage "could not derive nucleus command list from gen-completions.ps1 -ListCommands"
@@ -63,14 +70,17 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
     Write-ErrorMessage "profile.ps1 references flag inventories that nothing defines: $($undefined -join ', ')"
     return $false
   }
+  Write-Message "completions-fresh: coverage/defined checks: $(& $fmtDur $t0)"
 
   # The update lockfile completer completes -Sections, so update.sh needs -ListSections.
   Write-Message "--- --list-* introspection contract ---"
+  $t0 = [datetime]::UtcNow
   $updatePath = Join-Path $r 'scripts\update.sh'
   if (-not (Select-String -Path $updatePath -Pattern 'list-sections' -SimpleMatch -Quiet)) {
     Write-ErrorMessage "scripts/update.sh lacks --list-sections, which the update lockfile completer depends on"
     return $false
   }
+  Write-Message "completions-fresh: help/--list-* introspection: $(& $fmtDur $t0)"
 
   Write-Message "completions are fresh."
   return $true

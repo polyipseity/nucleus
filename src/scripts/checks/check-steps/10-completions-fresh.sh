@@ -3,6 +3,25 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
+_cf_now_ms() {
+  if declare -F _step_now_ms >/dev/null 2>&1; then
+    _step_now_ms
+  elif [ -n "${EPOCHREALTIME-}" ]; then
+    awk -v t="$EPOCHREALTIME" 'BEGIN { printf "%d\n", int(t * 1000) }'
+  else
+    perl -MTime::HiRes=time -e 'printf "%d\n", int(time() * 1000)' 2>/dev/null || date +%s000
+  fi
+}
+
+_cf_dur_s() {
+  local _ms="${1:-0}"
+  if declare -F _format_duration_s >/dev/null 2>&1; then
+    _format_duration_s "$_ms"
+  else
+    awk -v ms="$_ms" 'BEGIN { printf "%.3f s", ms / 1000 }'
+  fi
+}
+
 # The canonical nucleus-* command set comes from the committed manifest.
 # The zsh side asserts coverage over the full manifest; the pwsh side asserts
 # completer and flag inventory parity for commands that have a Windows app
@@ -70,17 +89,24 @@ run_completions_fresh() {
   cd "$_repo_root" || return 1
 
   _load_nucleus_commands_from_manifest "$_repo_root" || return 1
+  local _cf_na_t0 _cf_na_state=checked
+  _cf_na_t0=$(_cf_now_ms)
   _check_manifest_matches_flake "$_repo_root" || return 1
+  say "completions-fresh: nucleus-apps manifest build+cmp: $(_cf_dur_s $(($(_cf_now_ms) - _cf_na_t0))) ($_cf_na_state)"
 
   # 1. Generated files must match generator output; drift is a hard failure.
+  local _cf_gen_t0
+  _cf_gen_t0=$(_cf_now_ms)
   if ! bash "$_repo_root/src/scripts/completions/gen-completions.sh" --check; then
     error "generated completions are stale — run src/scripts/completions/gen-completions.sh to regenerate"
     return 1
   fi
+  say "completions-fresh: gen-completions.sh --check: $(_cf_dur_s $(($(_cf_now_ms) - _cf_gen_t0)))"
 
   # 2. Every command needs a zsh completion file, a pwsh completer entry and a
   #    defined flag inventory, so a new command cannot silently lack completions.
-  local _cmd _pascal _profile="$_repo_root/src/scripts/shell/profile.ps1"
+  local _cf_inv_t0 _cmd _pascal _profile="$_repo_root/src/scripts/shell/profile.ps1"
+  _cf_inv_t0=$(_cf_now_ms)
   for _cmd in "${_NUCLEUS_COMMANDS[@]}"; do
     if [ ! -f "$_repo_root/src/modules/completions/zsh/_nucleus-$_cmd" ]; then
       error "missing zsh completion file src/modules/completions/zsh/_nucleus-$_cmd"
@@ -118,10 +144,12 @@ run_completions_fresh() {
     error "profile.ps1 references flag inventories nothing defines: ${_undefined[*]}"
     return 1
   fi
+  say "completions-fresh: inventory checks: $(_cf_dur_s $(($(_cf_now_ms) - _cf_inv_t0)))"
 
   # 3. A --list-* flag wired via _call_program must exist in --help, because
   #    completion values come from the live CLI.
-  local _sh_rel="" _zsh_file="" _help_tmp="" _list_flags="" _flag=""
+  local _cf_int_t0 _sh_rel="" _zsh_file="" _help_tmp="" _list_flags="" _flag=""
+  _cf_int_t0=$(_cf_now_ms)
   for _cmd in "${_NUCLEUS_COMMANDS[@]}"; do
     _zsh_file="$_repo_root/src/modules/completions/zsh/_nucleus-$_cmd"
     if ! grep -q '_call_program' "$_zsh_file"; then
@@ -150,6 +178,7 @@ run_completions_fresh() {
     fi
     rm -f "$_help_tmp"
   done
+  say "completions-fresh: help/--list-* introspection: $(_cf_dur_s $(($(_cf_now_ms) - _cf_int_t0)))"
 
   say "completions freshness passed."
   return 0
