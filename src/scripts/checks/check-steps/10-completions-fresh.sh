@@ -81,17 +81,133 @@ sh_for_command() {
 
 register_step "completions-fresh" "Completions freshness (generated files match)" run_completions_fresh posix full nix
 
+_cf_na_manifest_result_file() {
+  local _ctx_name="$1"
+  local -n _ctx="$1"
+  printf '%s/nucleus-apps-manifest.result' "${_ctx[_wave_tmpdir]:-}"
+}
+
+_cf_na_manifest_lock_dir() {
+  local _ctx_name="$1"
+  local -n _ctx="$1"
+  printf '%s/nucleus-apps-manifest.lock' "${_ctx[_wave_tmpdir]:-}"
+}
+
+_cf_na_manifest_write_result() {
+  local _file="$1" _status="$2" _out="${3-}"
+  {
+    printf 'status=%s\n' "$_status"
+    printf 'out=%s\n' "$_out"
+  } >"${_file}.tmp.$$" && mv -f "${_file}.tmp.$$" "$_file"
+}
+
+_cf_na_manifest_read_result() {
+  local _file="$1" _status_var="$2" _out_var="$3"
+  local -n _st="$2" _op="$3"
+  _st="" _op=""
+  [ -f "$_file" ] || return 1
+  local _line
+  while IFS= read -r _line || [ -n "$_line" ]; do
+    case "$_line" in
+    status=*) _st="${_line#status=}" ;;
+    out=*) _op="${_line#out=}" ;;
+    esac
+  done <"$_file"
+  [ -n "$_st" ]
+}
+
+_cf_na_manifest_check() {
+  # Returns shared/built nucleus-apps manifest status for this check run.
+  # args: ctx_name status_var out_var state_var repo_root
+  local _ctx_name="$1" _status_var="$2" _out_var="$3" _state_var="$4" _root="$5"
+  local -n _ctx="$1" _mstatus="$2" _mout="$3" _mstate="$4"
+  local _result _lock _manifest
+  _result="$(_cf_na_manifest_result_file "$_ctx_name")"
+  _lock="$(_cf_na_manifest_lock_dir "$_ctx_name")"
+  _manifest="$_root/src/modules/completions/nucleus-apps.json"
+  _mstatus="" _mout="" _mstate=built
+
+  if [ -n "$_result" ] && _cf_na_manifest_read_result "$_result" "$_status_var" "$_out_var"; then
+    _mstate=reused
+    return 0
+  fi
+  if [ -n "$_lock" ] && mkdir "$_lock" 2>/dev/null; then
+    if [ -n "$_result" ] && _cf_na_manifest_read_result "$_result" "$_status_var" "$_out_var"; then
+      _mstate=reused
+      rmdir "$_lock" 2>/dev/null || true # check-suppress:suppression_doc: best-effort release of shared nucleus-apps manifest lock
+      return 0
+    fi
+    if _mout="$(nucleus_nix_locked nix build --no-link --print-out-paths "$_root/src#nucleus-apps")"; then
+      if cmp -s "$_mout" "$_manifest"; then
+        _mstatus=ok
+      else
+        _mstatus=stale
+      fi
+    else
+      _mstatus=build_failed
+      _mout=""
+    fi
+    [ -n "$_result" ] && _cf_na_manifest_write_result "$_result" "$_mstatus" "$_mout"
+    rmdir "$_lock" 2>/dev/null || true # check-suppress:suppression_doc: best-effort release of shared nucleus-apps manifest lock
+    _mstate=built
+    return 0
+  fi
+  local _i=0
+  while [ "$_i" -lt 600 ]; do
+    if [ -n "$_result" ] && _cf_na_manifest_read_result "$_result" "$_status_var" "$_out_var"; then
+      _mstate=reused
+      return 0
+    fi
+    sleep 0.1 2>/dev/null || sleep 1
+    _i=$((_i + 1))
+  done
+  _mstate=built
+  _check_manifest_matches_flake "$_root"
+  local _rc=$?
+  if [ "$_rc" -eq 0 ]; then
+    _mstatus=ok
+  else
+    _mstatus=failed
+  fi
+  return "$_rc"
+}
+
 run_completions_fresh() {
   local -n ctx="$1"
+  local _ctx_name="$1"
   local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
   shift
   local _files=("$@")
   cd "$_repo_root" || return 1
 
   _load_nucleus_commands_from_manifest "$_repo_root" || return 1
-  local _cf_na_t0 _cf_na_state=checked
+  local _cf_na_t0 _cf_na_state=checked _cf_na_status="" _cf_na_out="" _cf_na_rc=0
   _cf_na_t0=$(_cf_now_ms)
-  _check_manifest_matches_flake "$_repo_root" || return 1
+  # D1: share/reuse the nucleus-apps build+compare result across steps in the
+  # same full check run, preserving the check and freshness guarantee.
+  _cf_na_manifest_check "$_ctx_name" _cf_na_status _cf_na_out _cf_na_state "$_repo_root" || _cf_na_rc=$?
+  if [ "$_cf_na_rc" -eq 0 ]; then
+    case "$_cf_na_status" in
+    ok)
+      # Preserve step 10's success/freshness message in both built and reused paths.
+      say "nucleus app manifest matches its flake derivation."
+      ;;
+    stale)
+      error "src/modules/completions/nucleus-apps.json is stale — regenerate it from ./src#nucleus-apps"
+      return 1
+      ;;
+    build_failed)
+      error "failed to build ./src#nucleus-apps for the generated-artifact check"
+      return 1
+      ;;
+    *)
+      return 1
+      ;;
+    esac
+  else
+    # _check_manifest_matches_flake already reported the failure in the fallback path.
+    return 1
+  fi
   say "completions-fresh: nucleus-apps manifest build+cmp: $(_cf_dur_s $(($(_cf_now_ms) - _cf_na_t0))) ($_cf_na_state)"
 
   # 1. Generated files must match generator output; drift is a hard failure.

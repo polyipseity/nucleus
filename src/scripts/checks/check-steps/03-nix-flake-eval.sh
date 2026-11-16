@@ -23,6 +23,108 @@ _ne_dur_s() {
   fi
 }
 
+_na_manifest_result_file() {
+  local _ctx_name="$1"
+  local -n _ctx="$1"
+  printf '%s/nucleus-apps-manifest.result' "${_ctx[_wave_tmpdir]:-}"
+}
+
+_na_manifest_lock_dir() {
+  local _ctx_name="$1"
+  local -n _ctx="$1"
+  printf '%s/nucleus-apps-manifest.lock' "${_ctx[_wave_tmpdir]:-}"
+}
+
+_na_manifest_write_result() {
+  local _file="$1" _status="$2" _out="${3-}" _detail="${4-}"
+  {
+    printf 'status=%s\n' "$_status"
+    printf 'out=%s\n' "$_out"
+    [ -z "$_detail" ] || printf 'detail=%s\n' "$_detail"
+  } >"${_file}.tmp.$$" && mv -f "${_file}.tmp.$$" "$_file"
+}
+
+_na_manifest_read_result() {
+  local _file="$1" _status_var="$2" _out_var="$3" _detail_var="$4"
+  local -n _st="$2" _op="$3" _dt="$4"
+  _st="" _op="" _dt=""
+  [ -f "$_file" ] || return 1
+  local _line
+  while IFS= read -r _line || [ -n "$_line" ]; do
+    case "$_line" in
+    status=*) _st="${_line#status=}" ;;
+    out=*) _op="${_line#out=}" ;;
+    detail=*) _dt="${_line#*=}" ;;
+    esac
+  done <"$_file"
+  [ -n "$_st" ]
+}
+
+_na_manifest_build_cmp() {
+  # Builds+compares ./src#nucleus-apps against the committed manifest once per
+  # check run and shares the result via ctx[_wave_tmpdir] so step 10 can reuse it.
+  # Sets: $1=status(ok|stale|build_failed), $2=out path, $3=detail, $4=state(built|reused)
+  local _ctx_name="$1" _status_var="$2" _out_var="$3" _detail_var="$4" _state_var="$5"
+  local -n _ctx="$1" _mstatus="$2" _mout="$3" _mdetail="$4" _mstate="$5"
+  local _result _lock
+  _result="$(_na_manifest_result_file "$_ctx_name")"
+  _lock="$(_na_manifest_lock_dir "$_ctx_name")"
+  _mstatus="" _mout="" _mdetail="" _mstate=built
+
+  if [ -n "$_result" ] && _na_manifest_read_result "$_result" "$_status_var" "$_out_var" "$_detail_var"; then
+    _mstate=reused
+    return 0
+  fi
+
+  if [ -n "$_lock" ] && mkdir "$_lock" 2>/dev/null; then
+    if [ -n "$_result" ] && _na_manifest_read_result "$_result" "$_status_var" "$_out_var" "$_detail_var"; then
+      _mstate=reused
+      rmdir "$_lock" 2>/dev/null || true # check-suppress:suppression_doc: best-effort release of shared nucleus-apps manifest lock
+      return 0
+    fi
+    if _mout="$(nucleus_nix_locked nix build --no-link --print-out-paths ./src#nucleus-apps)"; then
+      if cmp -s "$_mout" src/modules/completions/nucleus-apps.json; then
+        _mstatus=ok
+      else
+        _mstatus=stale
+      fi
+    else
+      _mstatus=build_failed
+      _mout=""
+    fi
+    _mdetail=""
+    [ -n "$_result" ] && _na_manifest_write_result "$_result" "$_mstatus" "$_mout" "$_mdetail"
+    rmdir "$_lock" 2>/dev/null || true # check-suppress:suppression_doc: best-effort release of shared nucleus-apps manifest lock
+    _mstate=built
+    return 0
+  fi
+
+  # Another step owns the build; wait briefly for the shared result.
+  local _i=0
+  while [ "$_i" -lt 600 ]; do
+    if [ -n "$_result" ] && _na_manifest_read_result "$_result" "$_status_var" "$_out_var" "$_detail_var"; then
+      _mstate=reused
+      return 0
+    fi
+    sleep 0.1 2>/dev/null || sleep 1
+    _i=$((_i + 1))
+  done
+  # Fallback: perform the check locally if sharing did not complete.
+  _mstate=built
+  if _mout="$(nucleus_nix_locked nix build --no-link --print-out-paths ./src#nucleus-apps)"; then
+    if cmp -s "$_mout" src/modules/completions/nucleus-apps.json; then
+      _mstatus=ok
+    else
+      _mstatus=stale
+    fi
+  else
+    _mstatus=build_failed
+    _mout=""
+  fi
+  [ -n "$_result" ] && _na_manifest_write_result "$_result" "$_mstatus" "$_mout" "$_mdetail" 2>/dev/null || true # check-suppress:suppression_doc: best-effort cache write; correctness does not depend on sharing
+  return 0
+}
+
 run_nix_flake_eval() {
   local -n ctx="$1"
   local _ctx_name="$1"
@@ -77,20 +179,24 @@ run_nix_flake_eval() {
     # manifest consumed on hosts without nix (Windows completion generation/checks).
     # It is derived per system from mkNucleusApps, so freshness is checked by
     # building this host's package and comparing it byte-for-byte.
-    local _ne_na_out
+    # D1: share the nucleus-apps build+cmp result with step 10 in the same run.
+    local _ne_na_out="" _ne_na_status="" _ne_na_detail="" _ne_na_state=built
     _ne_t0=$(_ne_now_ms)
-    if _ne_na_out="$(nucleus_nix_locked nix build --no-link --print-out-paths ./src#nucleus-apps)"; then
-      if ! cmp -s "$_ne_na_out" src/modules/completions/nucleus-apps.json; then
-        error "src/modules/completions/nucleus-apps.json is stale — regenerate it from its derivation (see .agents/instructions/nucleus-apps.instructions.md)"
-        _ne_exit=1
-      else
-        say "generated nucleus app manifest matches its derivation."
-      fi
-    else
+    _na_manifest_build_cmp "$_ctx_name" _ne_na_status _ne_na_out _ne_na_detail _ne_na_state
+    case "$_ne_na_status" in
+    ok)
+      say "generated nucleus app manifest matches its derivation."
+      ;;
+    stale)
+      error "src/modules/completions/nucleus-apps.json is stale — regenerate it from its derivation (see .agents/instructions/nucleus-apps.instructions.md)"
+      _ne_exit=1
+      ;;
+    build_failed | *)
       error "failed to build ./src#nucleus-apps for the generated-artifact check"
       _ne_exit=1
-    fi
-    say "nix-flake-eval: nucleus-apps build+cmp: $(_ne_dur_s $(($(_ne_now_ms) - _ne_t0)))"
+      ;;
+    esac
+    say "nix-flake-eval: nucleus-apps build+cmp: $(_ne_dur_s $(($(_ne_now_ms) - _ne_t0))) ($_ne_na_state)"
 
     # WHY: src/hosts/Windows/system/winget-packages.json cannot be generated on
     # Windows, so it is committed, and this is the only byte-exact (format
