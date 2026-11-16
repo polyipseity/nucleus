@@ -103,6 +103,17 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: >-
+          Ensure Deno is installed for cross-host JavaScript and TypeScript
+          runtime parity with macOS and NixOS. Deno is also provisioned because
+          yt-dlp has no official bun support for its JavaScript challenge
+          solving; bun remains the default JavaScript runtime for everything else.
+      settings:
+        id: DenoLand.Deno
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure JetBrains Mono Nerd Font is installed as the open-source terminal monospace + icon baseline for Windows font parity with POSIX hosts
       settings:
         id: DEVCOM.JetBrainsMonoNerdFont
@@ -724,6 +735,16 @@ properties:
         description: Ensure WinFsp (FUSE for Windows) is installed as a prerequisite for rclone mount on Windows; required for any cloud drive mount operation
       settings:
         id: WinFsp.WinFsp
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Ensure yt-dlp is installed for cross-host media download parity with
+          macOS and NixOS. It relies on the provisioned ffmpeg and Deno tools
+          for muxing and JavaScript challenge solving.
+      settings:
+        id: yt-dlp.yt-dlp
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package

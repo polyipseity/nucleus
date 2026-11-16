@@ -9,6 +9,7 @@
     "CaddyServer.Caddy",
     "Clement.bottom",
     "DEVCOM.JetBrainsMonoNerdFont",
+    "DenoLand.Deno",
     "Discord.Discord.Canary",
     "EclipseAdoptium.Temurin.25.JDK",
     "GIMP.GIMP",
@@ -86,6 +87,7 @@
     "suzuki-shunsuke.pinact",
     "tamasfe.taplo",
     "waterlan.dos2unix",
+    "yt-dlp.yt-dlp",
     "zizmor.zizmor"
   ]
 }

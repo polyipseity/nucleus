@@ -184,6 +184,11 @@ let
       nixpkgs = "deep-filter";
       nixpkgsPackage = pkgs.deep-filter;
     };
+    deno = {
+      category = "cli";
+      nixpkgs = "deno";
+      winget = "DenoLand.Deno";
+    };
     desktoppr = {
       category = "cli";
       platforms = [ "darwin" ];
@@ -1094,6 +1099,11 @@ let
       category = "cli";
       nixpkgs = "yq-go";
       winget = "MikeFarah.yq";
+    };
+    yt-dlp = {
+      category = "cli";
+      nixpkgs = "yt-dlp";
+      winget = "yt-dlp.yt-dlp";
     };
     zizmor = {
       category = "cli";
