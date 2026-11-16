@@ -29,8 +29,9 @@
   Skip the lightweight VM descriptor and script refresh apply runs after every
   apply.
 .PARAMETER Action
-  Command surface to run: "apply" (default), or "health-check" and "audit-store",
-  which are stubs that report not-implemented and exit 0.
+  Command surface to run: "apply" (default), "status" (read-only history
+  retrieval), or "health-check" and "audit-store", which are stubs that report
+  not-implemented and exit 0.
 .NOTES
   Environment: NUCLEUS_REPO_ROOT, NUCLEUS_HOST (must be "Windows"), USERNAME,
   HOME, LOCALAPPDATA, ProgramData, ProgramFiles, USERPROFILE.
@@ -56,7 +57,9 @@ param(
   [switch]$VMSetup,
   [switch]$Elevated,
   [string]$Action = "apply",
-  [string]$ParamsJson = ""
+  [string]$ParamsJson = "",
+  [Parameter(ValueFromRemainingArguments = $true)]
+  [string[]]$RemainingArgs = @()
 )
 
 $ErrorActionPreference = "Stop"
@@ -109,10 +112,19 @@ switch ($Action) {
     }
     exit 0
   }
+  "status" {
+    if (Test-Path -LiteralPath $applyScript) {
+      & $applyScript status @RemainingArgs
+    } else {
+      Write-NucleusError -CommandName status "scripts/apply.ps1 not found; status is unavailable."
+      exit 1
+    }
+    exit $LASTEXITCODE
+  }
   "apply" {
   }
   default {
-    Write-NucleusError -CommandName apply "Unknown action '$Action'. Valid actions: apply, health-check, audit-store."
+    Write-NucleusError -CommandName apply "Unknown action '$Action'. Valid actions: apply, status, health-check, audit-store."
     exit 1
   }
 }

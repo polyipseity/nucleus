@@ -20,9 +20,118 @@ bash_guard_require 5 1 apply
 . "$SCRIPT_DIR/lib/apply-history.sh"
 
 usage() {
-  usage_std 'apply.sh' '[--ai-sync|--no-ai-sync] [--replica-sync|--no-replica-sync] [--store-audit|--no-store-audit] [--target-user=<name>] [--username=<name>] [--vm-sync|--no-vm-sync] [--vm-setup|--no-vm-setup]' \
-    'Dispatch the Nix apply command for the current host.'
+  cat <<'EOF'
+Usage: apply.sh [subcommand] [options]
+
+Subcommands:
+  apply                     Apply the Nix configuration (default).
+  status [--history N] [--json]
+                            Show apply history (read-only). Default: newest record.
+                            --history N  show the N newest records, most recent first
+                            --json       emit {"version":1,"entries":[...]}
+  health-check [options]    Run pre-flight health checks.
+  audit-store               Report Nix store baseline.
+
+Apply options:
+  --ai-sync|--no-ai-sync
+  --replica-sync|--no-replica-sync
+  --store-audit|--no-store-audit
+  --target-user=<name>
+  --username=<name>
+  --vm-sync|--no-vm-sync
+  --vm-setup|--no-vm-setup
+  -h, --help                Show this help.
+EOF
   exit 0
+}
+
+_apply_history_print_human_entries() {
+  # Prints one or more entries (JSON array string) in human-readable form.
+  # Assumes non-empty entries array.
+  _ahphe_json="$1"
+  _ahphe_count="$(printf '%s' "$_ahphe_json" | jq '.entries | length')"
+  _ahphe_i=0
+  while [ "$_ahphe_i" -lt "$_ahphe_count" ]; do
+    if [ "$_ahphe_i" -gt 0 ]; then
+      printf '\n'
+    fi
+    printf '%s' "$_ahphe_json" | jq -r --argjson i "$_ahphe_i" '
+      .entries[$i] | "result: \(.result)\nphase: \(.phase)\nappliedAt: \(.appliedAt)\nhost: \(.host)\nuser: \(.user)\nrepoRoot: \(.repoRoot)\ncommitHash: \(.commitHash)\nbranch: \(.branch)\ndetachedHead: \(.detachedHead)\nappliedCommitTag: \(.appliedCommitTag)\nlastTagOnBranch: \(.lastTagOnBranch)\nhasUnstaged: \(.hasUnstaged)\nhasStaged: \(.hasStaged)\nhasUntracked: \(.hasUntracked)\nisDirty: \(.isDirty)"'
+    _ahphe_i=$((_ahphe_i + 1))
+  done
+}
+
+do_status() {
+  _ds_history_n=""
+  _ds_json=false
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+    -h | --help)
+      usage
+      ;;
+    --json)
+      _ds_json=true
+      ;;
+    --history)
+      if [ "$#" -lt 2 ]; then
+        error "status: --history requires a value"
+        return 1
+      fi
+      _ds_history_n="$2"
+      shift
+      ;;
+    --history=*)
+      _ds_history_n="${1#--history=}"
+      ;;
+    *)
+      error "status: unsupported argument '$1'"
+      return 1
+      ;;
+    esac
+    shift
+  done
+
+  if [ -n "$_ds_history_n" ]; then
+    case "$_ds_history_n" in
+    *[!0-9]* | '')
+      error "status: --history requires a non-negative integer"
+      return 1
+      ;;
+    esac
+  fi
+
+  # Default count is 1 (newest) unless --history N is given.
+  _ds_count="1"
+  _ds_explicit_history=false
+  if [ -n "$_ds_history_n" ]; then
+    _ds_count="$_ds_history_n"
+    _ds_explicit_history=true
+  fi
+
+  if [ "$_ds_json" = true ]; then
+    if [ "$_ds_explicit_history" = true ]; then
+      apply_history_read_entries_json "$_ds_count"
+    else
+      apply_history_read_entries_json 1
+    fi
+    return $?
+  fi
+
+  # Human output.
+  if [ "$_ds_explicit_history" = false ]; then
+    apply_history_read_latest_human
+    return $?
+  fi
+
+  _ds_json_out="$(apply_history_read_entries_json "$_ds_count")" || return 1
+  _ds_entry_count="$(printf '%s' "$_ds_json_out" | jq '.entries | length')"
+  if [ "$_ds_entry_count" -eq 0 ]; then
+    printf 'No apply history yet.\n'
+    return 0
+  fi
+  _apply_history_print_human_entries "$_ds_json_out"
+  return 0
 }
 
 # Subcommand dispatch: health-check and audit-store run standalone; the default
@@ -236,6 +345,11 @@ health-check)
 audit-store)
   shift
   do_audit_store "$@"
+  exit $?
+  ;;
+status)
+  shift
+  do_status "$@"
   exit $?
   ;;
 apply)
