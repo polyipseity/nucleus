@@ -294,10 +294,10 @@ fi
 # must not answer for the operator: the answer is a line, which needs Enter. A bare
 # key therefore leaves the prompt unanswered until its own timeout runs out.
 clear_state
-write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":2}}}'
+write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":1}}}'
 _start=$SECONDS
 if tty_run y "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
-  if [ "$(decision_of "$WORK/out")" = "ask" ] && [ "$(elapsed_since "$_start")" -ge 2 ]; then
+  if [ "$(decision_of "$WORK/out")" = "ask" ] && [ "$(elapsed_since "$_start")" -ge 1 ]; then
     assert_pass "a bare y without Enter is not an answer and the prompt answers ask at its timeout"
   else
     assert_fail "bare y is not an answer" "transcript=$(tr -d '\r' <"$WORK/out") elapsed=$(elapsed_since "$_start")s"
@@ -390,10 +390,10 @@ fi
 
 # An empty line is Enter and nothing else, which is still not an answer.
 clear_state
-write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":2}}}'
+write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":1}}}'
 _start=$SECONDS
 if tty_run "$NEWLINE" "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
-  if [ "$(decision_of "$WORK/out")" = "ask" ] && [ "$(elapsed_since "$_start")" -ge 2 ]; then
+  if [ "$(decision_of "$WORK/out")" = "ask" ] && [ "$(elapsed_since "$_start")" -ge 1 ]; then
     assert_pass "an empty line is not an answer and the prompt answers ask at its timeout"
   else
     assert_fail "empty line" "transcript=$(tr -d '\r' <"$WORK/out") elapsed=$(elapsed_since "$_start")s"
@@ -405,10 +405,10 @@ fi
 # A word the prompt does not know is not an answer either, and neither is a letter
 # inside one: reading a keystroke at a time answered allow on the y in `maybe`.
 clear_state
-write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":2}}}'
+write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":1}}}'
 _start=$SECONDS
 if tty_run "maybe$NEWLINE" "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
-  if [ "$(decision_of "$WORK/out")" = "ask" ] && [ "$(elapsed_since "$_start")" -ge 2 ]; then
+  if [ "$(decision_of "$WORK/out")" = "ask" ] && [ "$(elapsed_since "$_start")" -ge 1 ]; then
     assert_pass "an unknown word is not an answer and the prompt answers ask at its timeout"
   else
     assert_fail "unknown word" "transcript=$(tr -d '\r' <"$WORK/out") elapsed=$(elapsed_since "$_start")s"
@@ -435,7 +435,7 @@ fi
 # The prompt's own finite timeout: nobody types anything, so the source gives up
 # and the decision falls through to the harness.
 clear_state
-write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":2}}}'
+write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["prompt"],"timeout-seconds":{"prompt":1}}}'
 _start=$SECONDS
 if tty_run - "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
   if [ "$(decision_of "$WORK/out")" = "ask" ] && [ "$(elapsed_since "$_start")" -lt 10 ]; then
@@ -472,11 +472,11 @@ fi
 # A finite per-source timeout is honoured: the request waits out its seconds,
 # then the run ends with ask and the request is consumed rather than left pending.
 clear_state
-write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["hermes"],"timeout-seconds":{"hermes":2}}}'
+write_config '{"harness-notify":{"channels":["telegram"]},"harness-approval":{"sources":["hermes"],"timeout-seconds":{"hermes":1}}}'
 _start=$SECONDS
 if tty_run - "$WORK/out" pi bash "rm -rf build" >/dev/null 2>"$WORK/err"; then
   _elapsed="$(elapsed_since "$_start")"
-  if [ "$(decision_of "$WORK/out")" = "ask" ] && [ "$_elapsed" -ge 2 ] && [ "$_elapsed" -lt 15 ] &&
+  if [ "$(decision_of "$WORK/out")" = "ask" ] && [ "$_elapsed" -ge 1 ] && [ "$_elapsed" -lt 15 ] &&
     [ -z "$(pending_requests)" ]; then
     assert_pass "the hermes source stops at its per-source timeout and clears the request"
   else
