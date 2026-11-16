@@ -16,6 +16,8 @@ bash_guard_require 5 1 apply
 
 # shellcheck source=lib/lib.sh
 . "$SCRIPT_DIR/lib/lib.sh"
+# shellcheck source=lib/apply-history.sh
+. "$SCRIPT_DIR/lib/apply-history.sh"
 
 usage() {
   usage_std 'apply.sh' '[--ai-sync|--no-ai-sync] [--replica-sync|--no-replica-sync] [--store-audit|--no-store-audit] [--target-user=<name>] [--username=<name>] [--vm-sync|--no-vm-sync] [--vm-setup|--no-vm-setup]' \
@@ -370,9 +372,6 @@ start_sudo_keepalive() {
     done
   } </dev/null >/dev/null 2>&1 &
   SUDO_KEEPALIVE_PID=$!
-
-  # check-suppress:suppression_doc: trap cleanup for sudo keepalive; subprocess may have already exited.
-  trap 'kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true' EXIT INT TERM
 }
 
 run_health_check() {
@@ -501,6 +500,55 @@ run_terminal_activations() {
   rm -f "$_rta_manifest"
 }
 
+_apply_history_active=true
+_apply_history_recorded=false
+_apply_history_phase="preflight"
+_lb_started=false
+
+_apply_cleanup() {
+  if [ -n "${SUDO_KEEPALIVE_PID-}" ]; then
+    # check-suppress:suppression_doc: best-effort cleanup; keepalive may have already exited
+    kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true
+  fi
+  if [ "${_lb_started-}" = true ] && command -v nucleus-svc >/dev/null 2>&1; then
+    # check-suppress:suppression_doc: best-effort cleanup; builder may already be stopped
+    nucleus-svc stop linux-builder >/dev/null 2>&1 || true
+  fi
+}
+
+_apply_history_on_exit() {
+  _ahe_rc=$?
+  trap - EXIT INT TERM
+  _apply_cleanup
+  if [ "$_ahe_rc" -ne 0 ] && [ "${_apply_history_recorded}" = false ]; then
+    # Subshell keeps best-effort recording from killing the trap when the lib dies (e.g. missing jq).
+    (apply_history_record "failure" "${_apply_history_phase}" "$REPO_ROOT" "$(resolve_nucleus_host)" "$(id -un)") 2>/dev/null || true # check-suppress:suppression_doc: preserve original apply failure exit status
+    _apply_history_recorded=true
+  fi
+  exit "$_ahe_rc"
+}
+
+_apply_history_on_signal() {
+  _ahs_sig="$1"
+  case "$_ahs_sig" in
+  INT) _ahs_rc=130 ;;
+  TERM) _ahs_rc=143 ;;
+  *) _ahs_rc=1 ;;
+  esac
+  trap - EXIT INT TERM
+  _apply_cleanup
+  if [ "${_apply_history_recorded}" = false ]; then
+    # Subshell keeps best-effort recording from killing the trap when the lib dies (e.g. missing jq).
+    (apply_history_record "failure" "${_apply_history_phase}" "$REPO_ROOT" "$(resolve_nucleus_host)" "$(id -un)") 2>/dev/null || true # check-suppress:suppression_doc: preserve original signal exit status
+    _apply_history_recorded=true
+  fi
+  exit "$_ahs_rc"
+}
+
+trap '_apply_history_on_exit' EXIT
+trap '_apply_history_on_signal INT' INT
+trap '_apply_history_on_signal TERM' TERM
+
 case "$(uname -s)" in
 Darwin)
   # nix-darwin manages the system layer and the user Home Manager profile, and
@@ -517,15 +565,13 @@ Darwin)
   # are built during pre-build rather than late in activation.
   run_pin_flake_inputs
   run_pin_devshell
-  # linux-builder saves ~500 MiB RAM when idle; the trap stops it on any exit.
+  # linux-builder saves ~500 MiB RAM when idle; unified exit handling stops it if we started it.
   _lb_started=false
   if command -v nucleus-svc >/dev/null 2>&1; then
     if ! nucleus-svc status linux-builder >/dev/null 2>&1; then
       notice -l linux-builder "starting linux-builder (takes ~30-60s)..."
       if nucleus-svc start linux-builder; then
         _lb_started=true
-        # check-suppress:suppression_doc: trap cleanup for linux-builder; stop only if we started it.
-        trap 'if [ "$_lb_started" = true ]; then nucleus-svc stop linux-builder >/dev/null 2>&1 || true; fi' EXIT
       else
         warn -l linux-builder "failed to start linux-builder; builds may fail"
       fi
@@ -537,7 +583,9 @@ Darwin)
   sudo -H install -d -m 0755 "/Library/Application Support/nucleus"
   printf '%s\n' "$REPO_ROOT" | sudo -H tee "/Library/Application Support/nucleus/repo-root" >/dev/null
   # WHY -H: root-owned HOME keeps Nix from inheriting a user-owned one.
+  _apply_history_phase="rebuild"
   run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#MacBook"
+  _apply_history_phase="post-apply"
   # refresh the recorded live repo root in case the checkout moved during activation
   _post_rebuild_repo_root="$(derive_repo_root)"
   printf '%s\n' "$_post_rebuild_repo_root" | sudo -H tee "/Library/Application Support/nucleus/repo-root" >/dev/null
@@ -546,9 +594,13 @@ Darwin)
   run_caddy_local_ca_trust sudo
   run_post_apply MacBook
   if [ "$_lb_started" = true ]; then
-    # check-suppress:suppression_doc: builder may already be stopped by trap; ignore stop failure.
+    # check-suppress:suppression_doc: best-effort cleanup; builder may already be stopped
     nucleus-svc stop linux-builder >/dev/null 2>&1 || true
+    _lb_started=false
   fi
+  # Subshell keeps best-effort recording from killing the script when the lib dies (e.g. missing jq).
+  (apply_history_record "success" "" "$REPO_ROOT" "$(resolve_nucleus_host)" "$(id -un)") || warn -l apply-history "failed to record apply success"
+  _apply_history_recorded=true
   ;;
 Linux)
   if [ -f /etc/NIXOS ]; then
@@ -570,7 +622,9 @@ Linux)
     sudo -H install -d -m 0755 "/var/lib/nucleus"
     printf '%s\n' "$REPO_ROOT" | sudo -H tee "/var/lib/nucleus/repo-root" >/dev/null
     # Keep root invocations on root-owned HOME for consistent Nix behavior.
+    _apply_history_phase="rebuild"
     run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#NixOS"
+    _apply_history_phase="post-apply"
     # refresh in case the checkout moved during activation
     _post_rebuild_repo_root="$(derive_repo_root)"
     printf '%s\n' "$_post_rebuild_repo_root" | sudo -H tee "/var/lib/nucleus/repo-root" >/dev/null
@@ -578,6 +632,9 @@ Linux)
     "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
     run_caddy_local_ca_trust sudo
     run_post_apply NixOS
+    # Subshell keeps best-effort recording from killing the script when the lib dies (e.g. missing jq).
+    (apply_history_record "success" "" "$REPO_ROOT" "$(resolve_nucleus_host)" "$(id -un)") || warn -l apply-history "failed to record apply success"
+    _apply_history_recorded=true
   else
     # Standalone Home Manager (plain Linux or WSL): no system layer and no sudo,
     # so no keepalive. The profile name matches the homeConfigurations key.
@@ -587,11 +644,16 @@ Linux)
     # Front-load the devShell/flake-inputs closures (see Darwin branch).
     run_pin_flake_inputs
     run_pin_devshell
+    _apply_history_phase="rebuild"
     run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
+    _apply_history_phase="post-apply"
     run_terminal_activations
     "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
     run_caddy_local_ca_trust user
     run_post_apply NixOS
+    # Subshell keeps best-effort recording from killing the script when the lib dies (e.g. missing jq).
+    (apply_history_record "success" "" "$REPO_ROOT" "$(resolve_nucleus_host)" "$(id -un)") || warn -l apply-history "failed to record apply success"
+    _apply_history_recorded=true
   fi
   ;;
 *)

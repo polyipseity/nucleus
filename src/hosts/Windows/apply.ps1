@@ -207,6 +207,15 @@ if (-not $Elevated) {
   exit $exitCode
 }
 
+. (Join-Path -Path $PSScriptRoot -ChildPath "..\..\scripts\lib\apply-history.ps1")
+
+$script:ApplyHistoryRecorded = $false
+$script:ApplyHistoryPhase = 'preflight'
+$script:ApplyHistoryRepoRoot = $actionRepoRoot
+$script:ApplyHistoryHost = 'Windows'
+$script:ApplyHistoryUser = [Environment]::UserName
+
+try {
 # Load first: modules below read $nucleusPathComponents, $nucleusPrependRegistry,
 # and Get-NucleusManagedBinDir.
 . (Join-Path -Path $resolvedModuleDir -ChildPath "ManagedPaths.ps1")
@@ -389,6 +398,7 @@ $prekExe = if ($prekCandidates.Count -gt 0) {
 $secretsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\secrets"
 $machineSshHostKeyPubPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_host_ed25519_key.pub"
 $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\")).Path
+$script:ApplyHistoryRepoRoot = $repoRoot
 
 $userRegistry = & (Join-Path -Path $resolvedModuleDir -ChildPath "Load-UserRegistry.ps1") -RepoRoot $repoRoot
 $registeredUserNames = @($userRegistry.users.name)
@@ -397,7 +407,7 @@ $selectedUserRecords = @($userRegistry.users | Where-Object { $Users -contains $
 foreach ($user in $Users) {
   if ($user -notin $registeredUserNames) {
     Write-NucleusError -CommandName apply "User '$user' not found in registry. Registered users: $($registeredUserNames -join ', ')" -ErrorAction Stop
-    exit 1
+    throw "User '$user' not found in registry."
   }
 }
 
@@ -424,14 +434,15 @@ foreach ($configuredUser in $userRegistry.users) {
 
 if (-not $userRegistry.primaryUser) {
   Write-NucleusError -CommandName 'apply' "No primary user marked (isPrimary=true) in user registry"
-  exit 1
+  throw "No primary user marked (isPrimary=true) in user registry."
 }
 
 $primaryUser = $userRegistry.primaryUser.name
 $sessionUser = [Environment]::UserName
+$script:ApplyHistoryUser = $sessionUser
 if ($Users -notcontains $sessionUser) {
   Write-NucleusError -CommandName 'apply' "current user '$sessionUser' must be included in -Users ($($Users -join ', '))"
-  exit 1
+  throw "current user '$sessionUser' must be included in -Users."
 }
 $primarySshKeyPath = Join-Path -Path $userRegistry.primaryUser.homeDirectory -ChildPath ".ssh\ssh_personal_$primaryUser"
 $sessionUserRecord = @($userRegistry.users | Where-Object { $_.name -eq $sessionUser }) | Select-Object -First 1
@@ -565,6 +576,7 @@ $effectiveConfigFiles = @($effectiveConfigFiles | ForEach-Object {
   else { $_ }
 })
 
+$script:ApplyHistoryPhase = 'rebuild'
 foreach ($configFile in $effectiveConfigFiles) {
   Invoke-WingetConfiguration -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath $configFile) -WallpaperPath $activeWallpaperPath
 }
@@ -744,6 +756,30 @@ Invoke-AgentHostShellSetup
 
 # Post-apply provisioning: service verification, AI sync, replica sync,
 # VM setup/sync, garbage collection, and manual display.
+$script:ApplyHistoryPhase = 'post-apply'
 Invoke-PostApply -RepoRoot $repoRoot -ModuleDir $systemModuleDir `
   -NoAISync:$NoAISync -ReplicaSync:$ReplicaSync `
   -VMSetup:$VMSetup -NoVMSync:$NoVMSync
+
+try {
+  Add-ApplyHistoryRecord -Result success -Phase $null -RepoRoot $script:ApplyHistoryRepoRoot -HostName $script:ApplyHistoryHost -User $script:ApplyHistoryUser
+} catch {
+  # best-effort: do not mask a successful apply or convert it into a failure record
+  Write-NucleusWarning -CommandName 'apply-history' "failed to record apply success: $($_.Exception.Message)"
+}
+$script:ApplyHistoryRecorded = $true
+} catch {
+  if (-not $script:ApplyHistoryRecorded) {
+    $ahRepo = $script:ApplyHistoryRepoRoot
+    if ([string]::IsNullOrWhiteSpace($ahRepo)) { $ahRepo = $actionRepoRoot }
+    $ahUser = $script:ApplyHistoryUser
+    if ([string]::IsNullOrWhiteSpace($ahUser)) { $ahUser = [Environment]::UserName }
+    try {
+      Add-ApplyHistoryRecord -Result failure -Phase $script:ApplyHistoryPhase -RepoRoot $ahRepo -HostName $script:ApplyHistoryHost -User $ahUser
+      $script:ApplyHistoryRecorded = $true
+    } catch {
+      # best-effort: do not mask the original apply failure
+    }
+  }
+  throw
+}
