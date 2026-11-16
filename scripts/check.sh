@@ -331,5 +331,11 @@ export NIX_CONFIG
 cd "$REPO_ROOT" || exit
 parse_args "$@"
 preflight_check
+if [ -n "${NUCLEUS_PINNED_NIXPKGS:-}" ]; then
+  say "nix pinning: pinned (NUCLEUS_PINNED_NIXPKGS set)"
+else
+  say "nix pinning: unpinned (will resolve from flakeInputs when needed)"
+  say "nix pinning hint: if fetch/GC/403 blocks resolution, rerun with NUCLEUS_PINNED_NIXPKGS=\"\$NIX_PATH_PIN\" ./scripts/check.sh (no NIX_PATH=, no nix_path prefix)"
+fi
 run_all_steps
 aggregate_results

@@ -198,6 +198,7 @@ nucleus_pin_nixpkgs() {
     # WHY: a failed or empty build must fail the caller's step, never pin "$empty/nixpkgs".
     if ! _pin_out="$(nix build --no-link --print-out-paths "$_repo_root/src#flakeInputs")"; then
       error "failed to build the flakeInputs derivation from $_repo_root/src — cannot pin <nixpkgs>"
+      error "hint: if nixpkgs fetch/GC/403 blocks resolution, pre-pin and rerun with NUCLEUS_PINNED_NIXPKGS=\"\$NIX_PATH_PIN\" <script> (no NIX_PATH=, no nix_path prefix)"
       return 1
     fi
     if [ ! -d "$_pin_out/nixpkgs" ]; then

@@ -180,7 +180,11 @@ preflight_check() {
   # fails the pipeline once, up front, instead of as one suite among many in step 05.
   # The module probe is a second line because require_command tests command presence only.
   require_command python3
-  python3 -c 'import yaml' >/dev/null 2>&1 || die "python3 cannot import yaml"
+  if ! python3 -c 'import yaml' >/dev/null 2>&1; then
+    error "python3 cannot import yaml (PyYAML missing from the test runtime)"
+    error "hint: run with a Python environment that provides PyYAML and a compatible bash; if PATH/bash differ from the host profile, use the corrected runtime env before long measurements"
+    die "test preflight failed: python3 cannot import yaml"
+  fi
 }
 
 usage() {
