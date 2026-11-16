@@ -182,7 +182,9 @@ preflight_check() {
   require_command python3
   if ! python3 -c 'import yaml' >/dev/null 2>&1; then
     error "python3 cannot import yaml (PyYAML missing from the test runtime)"
-    error "hint: run with a Python environment that provides PyYAML and a compatible bash; if PATH/bash differ from the host profile, use the corrected runtime env before long measurements"
+    error "hint: rerun with a runtime that provides PyYAML and bash >= 4, for example:"
+    # shellcheck disable=SC2016 # reason: show literal $USER/$PATH in copy-pastable remediation
+    error '  PATH="/etc/profiles/per-user/$USER/bin:/run/current-system/sw/bin:$PATH" /run/current-system/sw/bin/bash ./scripts/test.sh'
     die "test preflight failed: python3 cannot import yaml"
   fi
 }
