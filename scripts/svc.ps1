@@ -973,12 +973,12 @@ switch ($Action) {
     }
     if ($parsedServices.Count -eq 0) {
       if ($Json) {
-        $list = [ordered]@{}
+        $list = @()
         foreach ($row in (Resolve-ServiceName -Names @())) {
           if ($row.class -eq 'error') { continue }
-          $list[$row.instanceId] = @{ capture = Get-CaptureMode -ServiceKey $row.registryKey; hasLogs = Test-ServiceHasLog -ServiceKey $row.registryKey -InstanceId (Get-InstanceArgument -Row $row) }
+          $list += $row.instanceId
         }
-        Write-Output ($list | ConvertTo-Json -Compress)
+        Write-Output (ConvertTo-Json -InputObject @($list) -Compress)
       } else {
         Write-Output "Available services:"
         Write-Output ""

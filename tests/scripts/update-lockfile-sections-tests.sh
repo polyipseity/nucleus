@@ -42,8 +42,8 @@ fi
 
 ps1_sections=""
 if command -v pwsh >/dev/null 2>&1; then
-  # The PowerShell twin prints a trailing workflow summary; keep only tokens that
-  # look like section names (lower-case, dots/dashes, no spaces).
+  # The PowerShell twin prints bare section names (plus possible summary noise);
+  # keep only tokens that look like section names (lower-case, dots/dashes, no spaces).
   ps1_sections="$(pwsh -NoProfile -File "$UPDATE_PS1" lockfile -ListSections 2>/dev/null | sed 's/^[^:]*: //' | grep -E '^[A-Za-z0-9.-]+$' | sort)"
   if [ -n "$ps1_sections" ]; then
     assert_pass "update.ps1 -ListSections emits the section list"

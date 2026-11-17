@@ -158,7 +158,7 @@ function Invoke-LockfileBump {
   # Exits before any lockfile read, matching the bash twin.
   if ($ListSections) {
     foreach ($s in ($validSectionsCsv -split ',')) {
-      Write-NucleusInfo $s
+      Write-Output $s
     }
     return
   }

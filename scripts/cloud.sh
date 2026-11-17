@@ -1194,7 +1194,7 @@ do_status() {
   rows="$(_cloud_mount_targets "$_cmc_host" "$_cmc_username" "$_cmc_cloud_entry")"
   if [ -z "$rows" ]; then
     if [ "$json" = true ]; then
-      jq -n --arg user "$_cmc_username" '{user:$user,mounts:[]}'
+      printf '[]\n'
     else
       say "no enabled cloud mounts are declared for user '$_cmc_username'"
     fi

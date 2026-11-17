@@ -171,7 +171,7 @@ function Invoke-CloudStatus {
     }
   }
   if ($Json) {
-    @($items) | ConvertTo-Json -Depth 5 -Compress
+    ,@($items) | ConvertTo-Json -Depth 5 -Compress
   }
 }
 
