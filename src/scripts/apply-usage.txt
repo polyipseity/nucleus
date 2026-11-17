@@ -1,0 +1,32 @@
+Usage: apply.sh [subcommand] [options]
+
+Subcommands:
+  apply                     Apply the Nix configuration (default).
+  status [--history N] [--json]
+                            Show apply history (read-only). Default: newest record.
+                            --history N  show the N newest records, most recent first
+                            --json       emit {"version":1,"entries":[...]}
+  health-check [options]    Run pre-flight health checks.
+                            --min-free-bytes <bytes>
+                                                  minimum free bytes required at the repo filesystem (default: 16000000000)
+                            --secret-health|--no-secret-health
+                                                  enable or disable secret decryption checks (default: on)
+                            --log-health          enable log health checks
+                            --store-audit|--no-store-audit
+                                                  enable or disable the Nix store baseline report
+                            -h, --help            show this help
+  audit-store               Report Nix store baseline.
+
+Apply options:
+  --ai-sync|--no-ai-sync
+  --replica-sync|--no-replica-sync
+  --store-audit|--no-store-audit
+  --health-check|--no-health-check
+                            run or skip pre-rebuild/pre-build health checks (default: on)
+  --min-free-bytes <bytes>
+                            forward the minimum free-bytes threshold to apply-time health checks
+  --target-user=<name>
+  --username=<name>
+  --vm-sync|--no-vm-sync
+  --vm-setup|--no-vm-setup
+  -h, --help                Show this help.
