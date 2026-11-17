@@ -274,7 +274,20 @@ HARNESS
 # defaults to a listing of the shadowing copy alone; 'pin-and-shadow' reports the
 # converged pin beside it, which is the state where a removal has to run and the
 # pin must survive it. Sets RUN_STATUS, RUN_STDOUT, RUN_STDERR and RUN_CALLS.
+_IPM_SHADOWED_KEY=''
+_IPM_SHADOWED_STATUS=0
+_IPM_SHADOWED_STDOUT=''
+_IPM_SHADOWED_STDERR=''
+_IPM_SHADOWED_CALLS=''
 run_shadowed_program() {
+  local _key="$1|$2|$3|${4-shadow}"
+  if [ "$_IPM_SHADOWED_KEY" = "$_key" ]; then
+    RUN_STATUS="$_IPM_SHADOWED_STATUS"
+    RUN_STDOUT="$_IPM_SHADOWED_STDOUT"
+    RUN_STDERR="$_IPM_SHADOWED_STDERR"
+    RUN_CALLS="$_IPM_SHADOWED_CALLS"
+    return 0
+  fi
   run_installer "$1" "$2" "${4-$IPM_SUDO_STUB}"
   cp "$IPM_STUB_LOG" "$TMP_DIR/recorded-for-harness.ps1"
   write_shadow_harness
@@ -296,6 +309,11 @@ run_shadowed_program() {
   RUN_STDOUT="$(cat "$TMP_DIR/shadow-out.txt")"
   RUN_STDERR="$(cat "$TMP_DIR/shadow-err.txt")"
   RUN_CALLS="$(cat "$TMP_DIR/calls.log")"
+  _IPM_SHADOWED_KEY="$_key"
+  _IPM_SHADOWED_STATUS="$RUN_STATUS"
+  _IPM_SHADOWED_STDOUT="$RUN_STDOUT"
+  _IPM_SHADOWED_STDERR="$RUN_STDERR"
+  _IPM_SHADOWED_CALLS="$RUN_CALLS"
 }
 
 section 1 "install-pwsh-module program contract"
