@@ -11,7 +11,7 @@
     %USERPROFILE%\.opencode\plugins\superpowers        -> <plugin>\.opencode\plugins\superpowers.js
 
   Both links are unconditional because pi and opencode are provisioned on Windows
-  (opencode through the SST.opencode WinGet package).
+  (opencode through the Anomaly.OpenCode WinGet package).
 
   Idempotent: a checkout already at the pin is left alone and a link already
   pointing at the plugin is a no-op. Any git failure is a hard error, since the

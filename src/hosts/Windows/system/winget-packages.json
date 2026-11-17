@@ -3,6 +3,7 @@
   "packages": [
     "7zip.7zip",
     "9NBDXK71NK08",
+    "Anomaly.OpenCode",
     "Anthropic.ClaudeCode",
     "Audacity.Audacity",
     "BlenderFoundation.Blender",
@@ -53,7 +54,6 @@
     "RimSort.RimSort",
     "Rustlang.Rustup",
     "SQLite.SQLite",
-    "SST.opencode",
     "SecretsOPerationS.SOPS",
     "Sigrok.PulseView",
     "Starship.Starship",

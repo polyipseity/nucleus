@@ -17,5 +17,10 @@
     # REMOVE WHEN: the pinned nixpkgs provides a usable claude-code for all hosts.
     # WHY: Claude Code must be provisioned on macOS, NixOS, and Windows in this slice.
     claude-code = nixpkgsNext.legacyPackages.${prev.stdenv.hostPlatform.system}.claude-code;
+
+    # TEMPORARY: pull opencode from nixpkgs-next while the main pin resolves v1.
+    # REMOVE WHEN: the pinned nixpkgs provides opencode >= 2.
+    # WHY: OpenCode v2 is required for the harness and plugin contract migration.
+    opencode = nixpkgsNext.legacyPackages.${prev.stdenv.hostPlatform.system}.opencode;
   };
 }

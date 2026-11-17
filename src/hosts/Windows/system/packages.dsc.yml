@@ -29,6 +29,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure opencode is installed for cross-host agent tooling parity with macOS and NixOS
+      settings:
+        id: Anomaly.OpenCode
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure Claude Code is installed for cross-host AI coding agent CLI parity with macOS (Homebrew cask claude-code) and NixOS (nixpkgs claude-code)
       settings:
         id: Anthropic.ClaudeCode
@@ -629,13 +636,6 @@ properties:
         description: Ensure SQLite is installed for command-line database access
       settings:
         id: SQLite.SQLite
-        source: winget
-
-    - resource: Microsoft.WinGet.Client/Package
-      directives:
-        description: Ensure opencode is installed for cross-host agent tooling parity with macOS and NixOS
-      settings:
-        id: SST.opencode
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package

@@ -624,7 +624,7 @@ let
         name = "opencode";
       };
       nixpkgs = "opencode";
-      winget = "SST.opencode";
+      winget = "Anomaly.OpenCode";
     };
     packer = {
       category = "cli";
@@ -1390,6 +1390,9 @@ in
         # WHY: install Claude Code from the Homebrew cask on macOS; NixOS uses
         # the nixpkgs attr (temporarily sourced via the nixpkgs-next override).
         claude-code = "homebrew";
+        # WHY: install OpenCode from the Homebrew formula on macOS; NixOS uses
+        # the nixpkgs attr (temporarily sourced via the nixpkgs-next override).
+        opencode = "homebrew";
         # WHY: no glaxnimate cask exists at all, so the gui category's Homebrew
         # route contributes nothing on macOS with no error. The macOS carrier is
         # the flake's darwin derivation of the KDE arm64 dmg.
