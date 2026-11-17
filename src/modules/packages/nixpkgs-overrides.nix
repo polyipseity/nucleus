@@ -12,7 +12,10 @@
 # its removal condition. An empty file is valid and must stay in the tree.
 { nixpkgsNext, ... }:
 {
-  overlay = _final: _prev: {
-    # No temporary package overrides.
+  overlay = _final: prev: {
+    # TEMPORARY: pull claude-code from nixpkgs-next while the main pin is behind.
+    # REMOVE WHEN: the pinned nixpkgs provides a usable claude-code for all hosts.
+    # WHY: Claude Code must be provisioned on macOS, NixOS, and Windows in this slice.
+    claude-code = nixpkgsNext.legacyPackages.${prev.stdenv.hostPlatform.system}.claude-code;
   };
 }

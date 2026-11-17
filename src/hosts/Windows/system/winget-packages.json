@@ -3,6 +3,7 @@
   "packages": [
     "7zip.7zip",
     "9NBDXK71NK08",
+    "Anthropic.ClaudeCode",
     "Audacity.Audacity",
     "BlenderFoundation.Blender",
     "BurntSushi.ripgrep",

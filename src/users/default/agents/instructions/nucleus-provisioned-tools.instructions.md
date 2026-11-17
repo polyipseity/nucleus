@@ -88,6 +88,7 @@ Each tool below is installed on this machine. Links go to official documentation
 - [`cargo-cache`](https://github.com/matthiaskrgr/cargo-cache#readme): Cargo cache management.
 - [`cargo-nextest`](https://nexte.st/): Rust test runner.
 - [`check-jsonschema`](https://check-jsonschema.readthedocs.io/): JSON Schema validation.
+- [`claude-code`](https://docs.anthropic.com/en/docs/claude-code/overview): Anthropic Claude Code CLI.
 - [`clink`](https://chrisant996.github.io/clink/): Windows command line editing.
 - [`deadnix`](https://github.com/astro/deadnix#readme): Nix dead code detection.
 - [`gh`](https://cli.github.com/manual/): GitHub CLI.

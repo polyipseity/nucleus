@@ -143,6 +143,15 @@ let
       };
       winget = "Google.ChromeRemoteDesktopHost";
     };
+    claude-code = {
+      category = "cli";
+      homebrew = {
+        kind = "cask";
+        name = "claude-code";
+      };
+      nixpkgs = "claude-code";
+      winget = "Anthropic.ClaudeCode";
+    };
     clink = {
       # WinGet-only: no Homebrew cask exists and no nixpkgs attr; Windows installs via WinGet.
       category = "cli";
@@ -1378,6 +1387,9 @@ in
       # nixpkgs (pkgs.qtpass) there instead. Windows still uses WinGet; NixOS is
       # nixpkgs anyway, so this only changes macOS.
       default = {
+        # WHY: install Claude Code from the Homebrew cask on macOS; NixOS uses
+        # the nixpkgs attr (temporarily sourced via the nixpkgs-next override).
+        claude-code = "homebrew";
         # WHY: no glaxnimate cask exists at all, so the gui category's Homebrew
         # route contributes nothing on macOS with no error. The macOS carrier is
         # the flake's darwin derivation of the KDE arm64 dmg.

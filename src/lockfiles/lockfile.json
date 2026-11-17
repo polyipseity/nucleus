@@ -301,6 +301,7 @@
   "winget": {
     "7zip.7zip": "26.06",
     "ajeetdsouza.zoxide": "0.10.0",
+    "Anthropic.ClaudeCode": "2.1.318",
     "Anysphere.Cursor": "3.14.7",
     "astral-sh.ruff": "0.17.2",
     "astral-sh.ty": "0.0.98",
