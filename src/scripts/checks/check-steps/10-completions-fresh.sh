@@ -296,6 +296,55 @@ run_completions_fresh() {
   done
   say "completions-fresh: help/--list-* introspection: $(_cf_dur_s $(($(_cf_now_ms) - _cf_int_t0)))"
 
+  # 3b. Provider commands must exit 0 (E5). Test against repo scripts (not
+  #     installed binaries, which may be stale in dev). For context-dependent
+  #     providers ($words/variables), substitute a safe concrete value.
+  local _cf_prov_t0 _prov_cmd="" _prov_test="" _prov_svc="" _prov_bin="" _prov_script=""
+  _cf_prov_t0=$(_cf_now_ms)
+  for _cmd in "${_NUCLEUS_COMMANDS[@]}"; do
+    _zsh_file="$_repo_root/src/modules/completions/zsh/_nucleus-$_cmd"
+    [ -f "$_zsh_file" ] || continue
+    while IFS= read -r _prov_cmd; do
+      [ -n "$_prov_cmd" ] || continue
+      _prov_test="$_prov_cmd"
+      # Map leading nucleus-<name> to repo script for dev/check correctness.
+      _prov_bin="${_prov_test%%[[:space:]]*}"
+      if [[ "$_prov_bin" == nucleus-* ]]; then
+        _prov_script="$(sh_for_command "${_prov_bin#nucleus-}")"
+        if [ -n "$_prov_script" ] && [ -f "$_repo_root/$_prov_script" ]; then
+          _prov_test="bash $(printf '%q' "$_repo_root/$_prov_script")${_prov_test#"$_prov_bin"}"
+        fi
+      fi
+      # endpoints provider needs a service with network endpoints
+      # shellcheck disable=SC2016 # reason: matching literal $words placeholder from completion wiring
+      if printf '%s' "$_prov_test" | grep -qF '$words'; then
+        if printf '%s' "$_prov_test" | grep -q 'endpoint --list-endpoints'; then
+          _prov_svc=""
+          while IFS= read -r _s; do
+            [ -n "$_s" ] || continue
+            if bash "$_repo_root/scripts/svc.sh" endpoint --list-endpoints "$_s" >/dev/null 2>&1; then
+              _prov_svc="$_s"
+              break
+            fi
+          done < <(bash "$_repo_root/scripts/svc.sh" --list-services 2>/dev/null || true) # check-suppress:suppression_doc: probe for a service with endpoints; absence means no endpoint provider context to test
+          if [ -z "$_prov_svc" ]; then
+            continue
+          fi
+          _prov_test="$(printf '%s' "$_prov_test" | sed "s/\"\$words\[2\]\"/$_prov_svc/g; s/\$words\[2\]/$_prov_svc/g")"
+        else
+          continue
+        fi
+      fi
+      # Run the provider command; pipelines must succeed as a whole.
+      # check-suppress:suppression_doc: provider command output is not user-facing here; failure is the signal
+      if ! bash -c "$_prov_test" >/dev/null 2>&1; then
+        error "nucleus-$_cmd: completion provider command exited non-zero: $_prov_test"
+        return 1
+      fi
+    done < <(sed -n "s/.*_call_program '[^']*' //p" "$_zsh_file" | LC_ALL=C sort -u)
+  done
+  say "completions-fresh: provider commands: $(_cf_dur_s $(($(_cf_now_ms) - _cf_prov_t0)))"
+
   # 4. Bidirectional help<->spec drift: every --long-flag token in an app's
   #    --help must exist in the spec, and every spec long flag must appear in
   #    that help. Fail naming the app and flag.

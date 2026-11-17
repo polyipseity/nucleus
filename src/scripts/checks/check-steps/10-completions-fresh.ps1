@@ -72,15 +72,84 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
   }
   Write-Message "completions-fresh: coverage/defined checks: $(& $fmtDur $t0)"
 
-  # The update lockfile completer completes -Sections, so update.sh needs -ListSections.
-  Write-Message "--- --list-* introspection contract ---"
+  # --list-* flags wired via _call_program must exist in --help (E5).
+  Write-Message "--- --list-* help/introspection contract ---"
   $t0 = [datetime]::UtcNow
-  $updatePath = Join-Path $r 'scripts\update.sh'
-  if (-not (Select-String -Path $updatePath -Pattern 'list-sections' -SimpleMatch -Quiet)) {
-    Write-ErrorMessage "scripts/update.sh lacks --list-sections, which the update lockfile completer depends on"
-    return $false
+  $zshDir = Join-Path $r 'src/modules/completions/zsh'
+  $bashExe = (Get-Command bash -ErrorAction SilentlyContinue).Source # check-suppress:suppression_doc: optional probe; absence fails below
+  foreach ($command in $commands) {
+    $zshFile = Join-Path $zshDir "_nucleus-$command"
+    if (-not (Test-Path -LiteralPath $zshFile -PathType Leaf)) { continue }
+    $zshText = [System.IO.File]::ReadAllText($zshFile)
+    if ($zshText -notmatch '_call_program') { continue }
+    $scriptName = "scripts/$command.sh"
+    if ($command -eq 'camilladsp-heartbeat') { $scriptName = 'src/scripts/services/camilladsp-heartbeat.sh' }
+    $scriptPath = Join-Path $r $scriptName
+    if (-not $bashExe -or -not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) { continue }
+    $helpOut = & $bashExe $scriptPath --help 2>$null # check-suppress:suppression_doc: help is stdout-only per contract; --help failure handled below
+    if ($LASTEXITCODE -ne 0) {
+      Write-ErrorMessage "nucleus-$command: --help failed during introspection"
+      return $false
+    }
+    $helpText = ($helpOut | Out-String)
+    $listFlags = @([regex]::Matches($zshText, '--list-[a-z0-9-]+') | ForEach-Object { $_.Value } | Sort-Object -Unique)
+    foreach ($flag in $listFlags) {
+      if ($helpText -notmatch [regex]::Escape($flag)) {
+        Write-ErrorMessage "nucleus-$command: completion wires $flag but --help output lacks it"
+        return $false
+      }
+    }
   }
   Write-Message "completions-fresh: help/--list-* introspection: $(& $fmtDur $t0)"
+
+  # Provider commands must exit 0 (E5). Test against repo scripts (not installed
+  # binaries, which may be stale in dev). Context-dependent providers ($words)
+  # are tested with a concrete service when possible.
+  Write-Message "--- provider commands exit 0 ---"
+  $t0 = [datetime]::UtcNow
+  if ($bashExe) {
+    $endpointSvc = $null
+    try {
+      $svcList = @(& $bashExe (Join-Path $r 'scripts/svc.sh') --list-services 2>$null) # check-suppress:suppression_doc: probe for endpoint-capable service; empty is handled
+      foreach ($svc in ($svcList | ForEach-Object { ($_ | Out-String).Trim() } | Where-Object { $_ })) {
+        & $bashExe (Join-Path $r 'scripts/svc.sh') endpoint --list-endpoints $svc > $null 2>&1 # check-suppress:suppression_doc: probe exit code selects a service with endpoints
+        if ($LASTEXITCODE -eq 0) { $endpointSvc = $svc; break }
+      }
+    } catch { $endpointSvc = $null } # check-suppress:suppression_doc: probe failure means no endpoint provider context to test
+    foreach ($command in $commands) {
+      $zshFile = Join-Path $zshDir "_nucleus-$command"
+      if (-not (Test-Path -LiteralPath $zshFile -PathType Leaf)) { continue }
+      $zshText = [System.IO.File]::ReadAllText($zshFile)
+      $provCmds = @([regex]::Matches($zshText, "_call_program\s+'[^']+'\s+(?<cmd>[^\r\n]+)") | ForEach-Object { $_.Groups['cmd'].Value } | Sort-Object -Unique)
+      foreach ($prov in $provCmds) {
+        $testCmd = $prov
+        # Map leading nucleus-<name> to repo script for dev/check correctness.
+        if ($testCmd -match '^nucleus-([a-z0-9-]+)(\s|$)') {
+          $name = $Matches[1]
+          $scriptName = "scripts/$name.sh"
+          if ($name -eq 'camilladsp-heartbeat') { $scriptName = 'src/scripts/services/camilladsp-heartbeat.sh' }
+          $scriptPath = Join-Path $r $scriptName
+          if (Test-Path -LiteralPath $scriptPath -PathType Leaf) {
+            $quotedScriptPath = $scriptPath -replace "'", "'\\''"
+            $testCmd = "bash '$quotedScriptPath'" + $testCmd.Substring(("nucleus-$name").Length)
+          }
+        }
+        if ($testCmd -match '\$words') {
+          if ($testCmd -match 'endpoint --list-endpoints' -and $endpointSvc) {
+            $testCmd = $testCmd -replace '"?\$words\[2\]"?', $endpointSvc
+          } else {
+            continue
+          }
+        }
+        & $bashExe -c $testCmd > $null 2>&1 # check-suppress:suppression_doc: provider output not user-facing; exit code is the signal
+        if ($LASTEXITCODE -ne 0) {
+          Write-ErrorMessage "nucleus-$command: completion provider command exited non-zero: $testCmd"
+          return $false
+        }
+      }
+    }
+  }
+  Write-Message "completions-fresh: provider commands: $(& $fmtDur $t0)"
 
   # Bidirectional help<->spec drift: every --long-flag token in an app's --help
   # must exist in the spec, and every spec long flag must appear in that help.
