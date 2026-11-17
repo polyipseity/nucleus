@@ -9,14 +9,12 @@
   "instructions": [
     "../../.agents/instructions/**/*.md"
   ],
-  "skills": {
-    // Source: OpenCode skills discovery paths.
+  "skills": [
+    // Source: OpenCode skills discovery paths (v2: additional paths or URLs).
     // https://opencode.ai/docs/zh-tw/skills/
-    "paths": [
-      "../../.agents/skills"
-    ]
-  },
-  "plugin": [
+    "../../.agents/skills"
+  ],
+  "plugins": [
     // Harness bridge: v2 server plugin (session.idle, permission.asked, execution failures).
     "./plugins/harness-notify",
     // Prompt tools: v2 TUI plugin (/continue, /copy-user-prompt, /repeat-user-prompt).
@@ -24,7 +22,7 @@
     // Superpowers is provisioned via method-1 symlink to Nix store.
     // See symlink-superpowers-for-opencode.sh and agents.nix.
   ],
-  "permission": {
+  "permissions": {
     "bash": {
       "*": "allow",
       "rm *": "deny",

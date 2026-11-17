@@ -117,10 +117,6 @@ in
     # `tui.js`); seed the directory into both global plugin locations so config
     # and auto-discovery can find it.
     seed-opencode-notify-plugin = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      # Remove the v1 single-file plugin path when it is a managed symlink.
-      if [ -L "$HOME/.opencode/plugins/harness-notify.js" ]; then
-        rm -f "$HOME/.opencode/plugins/harness-notify.js"
-      fi
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "$HOME/.opencode/plugins/harness-notify" \
         "${overlay.toRepoRelPath (overlay.selectFile "opencode" "plugins/harness-notify")}" \

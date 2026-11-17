@@ -5,10 +5,8 @@
   "instructions": [
     ".agents/instructions/**/*.instructions.md"
   ],
-  "skills": {
-    "paths": [
-      ".agents/skills"
-    ],
-  },
-  "plugin": [],
+  "skills": [
+    ".agents/skills"
+  ],
+  "plugins": [],
 }
