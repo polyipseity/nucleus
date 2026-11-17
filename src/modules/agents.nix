@@ -132,6 +132,19 @@ in
         "${hostName}"
     '';
 
+    # Method-1 writable symlink for the prompt-tools v2 TUI plugin directory.
+    seed-opencode-prompt-tools-plugin = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+        "$HOME/.opencode/plugins/prompt-tools" \
+        "${overlay.toRepoRelPath (overlay.selectFile "opencode" "plugins/prompt-tools")}" \
+        "${hostName}"
+      mkdir -p "$HOME/.config/opencode/plugins"
+      "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+        "$HOME/.config/opencode/plugins/prompt-tools" \
+        "${overlay.toRepoRelPath (overlay.selectFile "opencode" "plugins/prompt-tools")}" \
+        "${hostName}"
+    '';
+
     # skills/ is excluded because install-agent-skills manages it, so fetched
     # ClawHub downloads land in a real, untracked directory.
     symlink-agent-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''

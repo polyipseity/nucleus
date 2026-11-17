@@ -19,6 +19,8 @@
   "plugin": [
     // Harness bridge: v2 server plugin (session.idle, permission.asked, execution failures).
     "./plugins/harness-notify",
+    // Prompt tools: v2 TUI plugin (/continue, /copy-user-prompt, /repeat-user-prompt).
+    "./plugins/prompt-tools",
     // Superpowers is provisioned via method-1 symlink to Nix store.
     // See symlink-superpowers-for-opencode.sh and agents.nix.
   ],
