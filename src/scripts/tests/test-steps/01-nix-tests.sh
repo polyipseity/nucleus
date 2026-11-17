@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck source=../test-lib.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../test-lib.sh"
+bash_guard_require 5 1 test
 
 register_step "nix-tests" "Nix test suite" run_nix_tests
 

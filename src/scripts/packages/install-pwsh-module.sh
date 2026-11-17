@@ -8,6 +8,11 @@
 # powershell-yaml activation entries in src/modules/pwsh.nix.
 set -euo pipefail
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd -P)"
+# shellcheck source=../lib/bash-guard.sh
+. "$SCRIPT_DIR/../lib/bash-guard.sh"
+bash_guard_require 5 1 install-pwsh-module
+
 _ipm_pwsh="$1"
 _ipm_module="$2"
 _ipm_version="$3"

@@ -12,6 +12,9 @@ _self="${BASH_SOURCE[0]:-$0}"
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 
 NUCLEUS_LIB_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/../lib" && pwd)"
+# shellcheck source=../lib/bash-guard.sh
+. "$NUCLEUS_LIB_DIR/bash-guard.sh"
+bash_guard_require 5 1 test
 # shellcheck source=../lib/lib.sh
 . "$NUCLEUS_LIB_DIR/lib.sh"
 # shellcheck source=../lib/step-runner.sh

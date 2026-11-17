@@ -3,6 +3,11 @@
 # When the arg is empty, resolve at runtime from /dev/console (macOS).
 set -euo pipefail
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd -P)"
+# shellcheck source=../lib/bash-guard.sh
+. "$SCRIPT_DIR/../lib/bash-guard.sh"
+bash_guard_require 5 1 launch-nvim
+
 _nvim_path="$1"
 
 if [ -z "$_nvim_path" ]; then

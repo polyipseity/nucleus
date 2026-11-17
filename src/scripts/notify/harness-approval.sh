@@ -42,6 +42,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/bash-guard.sh
+. "$SCRIPT_DIR/../lib/bash-guard.sh"
+bash_guard_require 5 1 harness-approval
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
 # WHY the shared library, not a log path: nucleus-logs owns the log root, the

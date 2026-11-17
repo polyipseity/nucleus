@@ -7,6 +7,11 @@
 # Usage: sourced by android-config.sh; not invoked directly.
 set -euo pipefail
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd -P)"
+# shellcheck source=../lib/bash-guard.sh
+. "$SCRIPT_DIR/../lib/bash-guard.sh"
+bash_guard_require 5 1 android-magisk
+
 NUCLEUS_MAGISK_MARKER='android-magisk.tag.json'
 NUCLEUS_MAGISK_PATCH_REMOTE='/data/local/tmp/nucleus-magisk-patch'
 NUCLEUS_MAGISK_STOCK_BOOT_REMOTE='/data/local/tmp/nucleus-stock-boot.img'

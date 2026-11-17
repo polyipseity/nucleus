@@ -167,4 +167,100 @@ _t_bootstrap_help_under_bash32
 _t_bootstrap_no_modern_bash_constructs
 _t_no_duplicated_inline_guards
 
+# F1 sweep: every directly invocable POSIX bash script in scripts/*.sh and
+# src/scripts/**/*.sh must have a bash guard (bash_guard_require). Bootstrap is
+# allowed to require 3.2; sourced libs and explicit non-bash fragments are exempt.
+# shellcheck disable=SC2329 # reason: invoked at end of script
+_t_guard_sweep() {
+  local unguarded=0
+  local f rel
+  # Explicit exception list (commented): sourced libs/loaders/steps and non-bash
+  # fragments that must not carry a bash 5.1 guard.
+  local -a _exempt=(
+    # sourced libs
+    "src/scripts/lib/apply-history.sh"
+    "src/scripts/lib/argparse.sh"
+    "src/scripts/lib/audit-store.sh"
+    "src/scripts/lib/bash-guard.sh"
+    "src/scripts/lib/deny-list.sh"
+    "src/scripts/lib/dev-repos-provision.sh"
+    "src/scripts/lib/discord-tray.sh"
+    "src/scripts/lib/expire-profile-generations.sh"
+    "src/scripts/lib/harness-audit.sh"
+    "src/scripts/lib/lib.sh"
+    "src/scripts/lib/load-user-registry.sh"
+    "src/scripts/lib/log-expiry.sh"
+    "src/scripts/lib/logs.sh"
+    "src/scripts/lib/macos-console-user.sh"
+    "src/scripts/lib/macos-fda-warning.sh"
+    "src/scripts/lib/macos-finder-sidebar.sh"
+    "src/scripts/lib/macos-fskit.sh"
+    "src/scripts/lib/macos-fuse-provider.sh"
+    "src/scripts/lib/macos-icloud-exclusions.sh"
+    "src/scripts/lib/macos-launch-services.sh"
+    "src/scripts/lib/nix-test-eval.sh"
+    "src/scripts/lib/require-command.sh"
+    "src/scripts/lib/resolve-user-config.sh"
+    "src/scripts/lib/resolve-user-homedir.sh"
+    "src/scripts/lib/service-health.sh"
+    "src/scripts/lib/size.sh"
+    "src/scripts/lib/step-runner.sh"
+    "src/scripts/lib/supervisor-launchd.sh"
+    "src/scripts/lib/supervisor-systemd.sh"
+    "src/scripts/lib/svc-instances.sh"
+    "src/scripts/lib/symlink-convergence.sh"
+    "src/scripts/lib/symlink-hardening.sh"
+    "src/scripts/lib/vm.sh"
+    "src/scripts/checks/check-lib.sh"
+    "src/scripts/checks/check-steps.sh"
+    "src/scripts/checks/lockfile-enforcement-lib.sh"
+    "src/scripts/tests/test-lib.sh"
+    "src/scripts/tests/test-steps.sh"
+    # sourced step definitions
+    "src/scripts/checks/check-steps/01-code-formatting.sh"
+    "src/scripts/checks/check-steps/02-powershell-lint.sh"
+    "src/scripts/checks/check-steps/03-nix-flake-eval.sh"
+    "src/scripts/checks/check-steps/05-lockfile-validation.sh"
+    "src/scripts/checks/check-steps/07-schema-validation.sh"
+    "src/scripts/checks/check-steps/08-service-registry.sh"
+    "src/scripts/checks/check-steps/10-completions-fresh.sh"
+    "src/scripts/checks/check-steps/11-repo-policy-grep.sh"
+    "src/scripts/checks/check-steps/12-repo-policy-pattern.sh"
+    "src/scripts/checks/check-steps/13-repo-policy-data.sh"
+    "src/scripts/checks/check-steps/15-app-registry.sh"
+    "src/scripts/tests/test-steps/01-nix-tests.sh"
+    "src/scripts/tests/test-steps/02-powershell-lint.sh"
+    "src/scripts/tests/test-steps/04-system-config-build.sh"
+    "src/scripts/tests/test-steps/05-script-and-framework-tests.sh"
+    # non-bash fragments (POSIX sh / guest scripts), not standalone bash entrypoints
+    "src/scripts/safe-delete-rm.sh"
+    "src/scripts/safe-delete-shim.sh"
+    "src/scripts/vms/android-fake-wifi-guest-revert.sh"
+    "src/scripts/vms/android-fake-wifi-guest-setup.sh"
+  )
+  _is_exempt() {
+    local _x
+    for _x in "${_exempt[@]}"; do
+      [ "$1" = "$_x" ] && return 0
+    done
+    return 1
+  }
+  while IFS= read -r f; do
+    rel="${f#"$REPO_ROOT"/}"
+    _is_exempt "$rel" && continue
+    # bootstrap 3.2 is an allowed guard variant, not unguarded
+    if ! grep -q 'bash_guard_require' "$f"; then
+      printf '  unguarded: %s\n' "$rel" >&2
+      unguarded=1
+    fi
+  done < <(find "$REPO_ROOT/scripts" "$REPO_ROOT/src/scripts" -type f -name '*.sh' | LC_ALL=C sort)
+  if [ "$unguarded" -eq 0 ]; then
+    assert_pass "F1 sweep: all standalone scripts in scripts/*.sh and src/scripts/**/*.sh are guarded or explicitly exempt"
+  else
+    assert_fail "F1 sweep: every standalone script has a bash guard or explicit exemption" "see unguarded list above"
+  fi
+}
+
+_t_guard_sweep
+
 finish_tests

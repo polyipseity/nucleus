@@ -5,6 +5,9 @@
 
 _self="${BASH_SOURCE[0]:-$0}"
 _CHECKS_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
+# shellcheck source=../lib/bash-guard.sh
+. "$_CHECKS_DIR/../lib/bash-guard.sh"
+bash_guard_require 5 1 check
 # shellcheck disable=SC2016 # reason: eval body must emit literal dot-source lines for BASH_SOURCE
 eval "$({
   printf 'cd %q || exit\n' "$_CHECKS_DIR/check-steps"

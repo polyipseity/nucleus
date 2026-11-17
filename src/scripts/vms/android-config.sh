@@ -7,6 +7,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="${NUCLEUS_ANDROID_CONFIG_DIR:-}"
+# shellcheck source=../lib/bash-guard.sh
+. "$SCRIPT_DIR/../lib/bash-guard.sh"
+bash_guard_require 5 1 android-config
 if [ -z "$SCRIPT_DIR" ]; then
   SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 fi

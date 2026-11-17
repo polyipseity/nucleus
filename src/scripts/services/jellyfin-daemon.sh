@@ -7,6 +7,11 @@
 # Usage: jellyfin-daemon.sh [state_root] [log_dir] [jellyfin_bin]
 set -eu
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd -P)"
+# shellcheck source=../lib/bash-guard.sh
+. "$SCRIPT_DIR/../lib/bash-guard.sh"
+bash_guard_require 5 1 jellyfin-daemon
+
 state_root="${JELLYFIN_STATE_ROOT:-${1:-/Users/Shared/Jellyfin}}"
 if [ "$(uname -s)" = "Darwin" ]; then
   _jfd_log_default="$HOME/Library/Application Support/nucleus/logs/jellyfin"

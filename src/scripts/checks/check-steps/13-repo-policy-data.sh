@@ -2,6 +2,7 @@
 # shellcheck shell=bash
 # shellcheck source=../check-lib.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
+bash_guard_require 5 1 check
 
 register_step "repo-policy-data" "Repository policy (data-driven)" run_repo_policy_data posix any none
 

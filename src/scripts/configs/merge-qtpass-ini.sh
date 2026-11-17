@@ -4,6 +4,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/bash-guard.sh
+. "$SCRIPT_DIR/../lib/bash-guard.sh"
+bash_guard_require 5 1 merge-qtpass-ini
 
 _mqi_awk_bin="$1"
 _mqi_darwin_commands="$2"

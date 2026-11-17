@@ -3,6 +3,11 @@
 # Args: $1 = wrapper path (may contain spaces), $2 = absolute shell exe.
 set -euo pipefail
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd -P)"
+# shellcheck source=../lib/bash-guard.sh
+. "$SCRIPT_DIR/../lib/bash-guard.sh"
+bash_guard_require 5 1 write-wrapper
+
 _wrapper_path="$1"
 _shell_exe="$2"
 

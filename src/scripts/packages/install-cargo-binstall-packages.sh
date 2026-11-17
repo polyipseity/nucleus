@@ -22,6 +22,9 @@ _cleanup_icp() { rm -f "$_icp_desired" "$_icp_installed" "$_icp_installed_versio
 trap _cleanup_icp EXIT
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/bash-guard.sh
+. "$SCRIPT_DIR/../lib/bash-guard.sh"
+bash_guard_require 5 1 install-cargo-binstall-packages
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
 

@@ -5,6 +5,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+# shellcheck source=../lib/bash-guard.sh
+. "$SCRIPT_DIR/../lib/bash-guard.sh"
+bash_guard_require 5 1 jellyfin-sync
 . "$SCRIPT_DIR/../lib/lib.sh"
 
 # WHY: empty by default. derive_repo_root() resolves NUCLEUS_REPO_ROOT when it is a live

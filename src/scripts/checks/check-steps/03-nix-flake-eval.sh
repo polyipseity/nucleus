@@ -1,6 +1,7 @@
 # shellcheck shell=bash
 # shellcheck source=../check-lib.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
+bash_guard_require 5 1 check
 
 register_step "nix-flake-eval" "Nix flake evaluation and managed config keys" run_nix_flake_eval posix any none
 

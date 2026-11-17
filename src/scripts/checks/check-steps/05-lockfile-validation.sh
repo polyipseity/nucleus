@@ -1,6 +1,7 @@
 # shellcheck shell=bash
 # shellcheck source=../check-lib.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
+bash_guard_require 5 1 check
 
 register_step "lockfile-validation" "Lockfile validation" run_lockfile_validation posix any none
 

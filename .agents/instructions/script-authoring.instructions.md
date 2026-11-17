@@ -24,7 +24,7 @@ A script that sources another file derives its own directory and sources relativ
 
 ## Bash baseline guard
 
-Every new POSIX entrypoint declares its minimum bash version and uses the shared guard in `src/scripts/lib/bash-guard.sh`. Source the guard right after `SCRIPT_DIR` is computed, before any construct that needs a newer bash, and call `bash_guard_require <major> <minor> <name>` with the invoked app name. `scripts/bootstrap.sh` is the exception: it stays compatible with bash 3.2 because it runs before Nix is installed, so it requires 3.2 and carries a comment that explains the exception.
+Every directly invocable POSIX script declares its minimum bash version and uses the shared guard in `src/scripts/lib/bash-guard.sh`. Source the guard right after `SCRIPT_DIR` is computed, before any construct that needs a newer bash, and call `bash_guard_require <major> <minor> <name>` with the invoked app name. `scripts/bootstrap.sh` is the exception: it stays compatible with bash 3.2 because it runs before Nix is installed, so it requires 3.2 and carries a comment that explains the exception. Libs that are only sourced (e.g. `src/scripts/lib/*.sh`, `*-lib.sh`, loaders, and step-definition files) must not add their own standalone guard; the sweep test exempts them explicitly.
 
 ## CLI option and variable naming
 

@@ -5,6 +5,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/bash-guard.sh
+. "$SCRIPT_DIR/../lib/bash-guard.sh"
+bash_guard_require 5 1 update-nix-index
 . "$SCRIPT_DIR/../lib/lib.sh"
 
 _uni_nix_index_bin="${NIX_INDEX_NAME:-${1:?usage: update-nix-index.sh <nix_index_bin> [max_age_days]}}"

@@ -2,6 +2,7 @@
 # shellcheck shell=bash
 # shellcheck source=../check-lib.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
+bash_guard_require 5 1 check
 
 _REPO_POLICY_STEP_DIR="$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _AWK_PATH="$_REPO_POLICY_STEP_DIR/repository-policy.awk"

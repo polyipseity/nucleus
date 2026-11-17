@@ -4,6 +4,11 @@
 # Preset name provided via PDF_OPT_PRESET env var or first positional arg.
 set -eu
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd -P)"
+# shellcheck source=../lib/bash-guard.sh
+. "$SCRIPT_DIR/../lib/bash-guard.sh"
+bash_guard_require 5 1 configure-file-manager-optimize-pdf
+
 preset="${PDF_OPT_PRESET:-${1:-default}}"
 shift 2>/dev/null || true # check-suppress:suppression_doc: expected failure when fewer args than shift count
 

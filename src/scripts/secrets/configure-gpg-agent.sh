@@ -3,6 +3,11 @@
 # CLI args: pinentry_mac_bin
 set -euo pipefail
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" && pwd -P)"
+# shellcheck source=../lib/bash-guard.sh
+. "$SCRIPT_DIR/../lib/bash-guard.sh"
+bash_guard_require 5 1 configure-gpg-agent
+
 _cga_pinentry_mac_bin="$1"
 
 # /dev/console may not exist (headless/SSH session); empty result means no console user, handled downstream.

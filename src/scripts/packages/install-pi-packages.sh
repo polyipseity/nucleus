@@ -19,6 +19,9 @@ _cleanup_ipp() { rm -f "$_ipp_desired" "$_ipp_installed" "$_ipp_installed.dedup"
 trap _cleanup_ipp EXIT
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/bash-guard.sh
+. "$SCRIPT_DIR/../lib/bash-guard.sh"
+bash_guard_require 5 1 install-pi-packages
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
 

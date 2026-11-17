@@ -8,6 +8,11 @@
 
 # Package names this host manages, from the shared registry. An unreadable
 # registry is fatal: a silent fallback would re-introduce cross-host false drift.
+# shellcheck source=../lib/bash-guard.sh
+_lfe_lib_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")/../lib" && pwd)"
+. "$_lfe_lib_dir/bash-guard.sh"
+bash_guard_require 5 1 update
+
 _lfe_desired_names() {
   local _host="$1" _jq="$2"
   local _desired="src/modules/packages/desired.json"

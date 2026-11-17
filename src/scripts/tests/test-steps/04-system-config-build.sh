@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck source=../test-lib.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../test-lib.sh"
+bash_guard_require 5 1 test
 
 register_step "system-config-build" "System config build" run_system_config_build any any sops-machine-key
 

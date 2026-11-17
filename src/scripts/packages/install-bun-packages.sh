@@ -20,6 +20,9 @@ _cleanup_ibp() { rm -f "$_ibp_desired" "$_ibp_desired_names" "$_ibp_installed" "
 trap _cleanup_ibp EXIT
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/bash-guard.sh
+. "$SCRIPT_DIR/../lib/bash-guard.sh"
+bash_guard_require 5 1 install-bun-packages
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
 

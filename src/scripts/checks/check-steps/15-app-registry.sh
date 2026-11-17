@@ -2,6 +2,7 @@
 # shellcheck source=../check-lib.sh
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
+bash_guard_require 5 1 check
 
 register_step "app-registry" "App auto-start registry validation" run_app_registry posix full none
 

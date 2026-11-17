@@ -4,6 +4,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/bash-guard.sh
+. "$SCRIPT_DIR/../lib/bash-guard.sh"
+bash_guard_require 5 1 merge-picard-ini
 
 _mpi_awk_bin="$1"
 _mpi_picard_defaults_ini="$2"
