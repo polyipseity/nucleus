@@ -314,7 +314,7 @@ svc_status() {
     enabled) enabled_json=true ;;
     disabled) enabled_json=false ;;
     esac
-    local status_text state_text exit_code=""
+    local status_text state_text="" exit_code=""
     if [ "$running" = true ]; then
       status_text="active"
     elif [ "$socket_activated" = "true" ]; then
@@ -324,11 +324,21 @@ svc_status() {
       state_text=$(echo "$print_out" | sed -n 's/.*state = //p' | head -1)
       exit_code=$(echo "$print_out" | sed -n 's/.*last exit code = //p' | head -1 | sed 's/:.*//')
     fi
-    platform_json=$(printf '{"status":"%s","running":%s,"enabled":%s,"pid":%s,"state":%s,"exitCode":%s}' \
-      "$status_text" \
-      "$running" "$enabled_json" "${pid:-null}" \
-      "$(printf '%s' "${state_text:-null}" | jq -R . 2>/dev/null || echo null)" \
-      "${exit_code:-null}")
+    platform_json=$(jq -cn \
+      --arg status "$status_text" \
+      --argjson running "$running" \
+      --argjson enabled "$enabled_json" \
+      --arg pid "${pid:-}" \
+      --arg state "$state_text" \
+      --arg exitCode "$exit_code" \
+      '{
+        status: $status,
+        running: $running,
+        enabled: $enabled,
+        pid: (if ($pid | test("^[0-9]+$")) then ($pid | tonumber) else null end),
+        state: (if $state == "" then null else $state end),
+        exitCode: (if ($exitCode | test("^-?[0-9]+$")) then ($exitCode | tonumber) else null end)
+      }')
     ;;
   nixos-systemctl)
     local scope_flag=""
@@ -357,28 +367,40 @@ svc_status() {
       exit_code=$(systemctl $scope_flag show -p ExecMainStatus "$svc_id" 2>/dev/null | sed 's/ExecMainStatus=//' || true)
       [ -z "$exit_code" ] && exit_code=""
     fi
-    platform_json=$(printf '{"status":"%s","running":%s,"enabled":%s,"pid":%s,"state":%s,"exitCode":%s}' \
-      "$is_active" "$running" "$enabled_bool" "${pid:-null}" \
-      "$(printf '%s' "$is_active" | jq -R . 2>/dev/null || echo null)" \
-      "${exit_code:-null}")
+    platform_json=$(jq -cn \
+      --arg status "$is_active" \
+      --argjson running "$running" \
+      --argjson enabled "$enabled_bool" \
+      --arg pid "${pid:-}" \
+      --arg state "$is_active" \
+      --arg exitCode "$exit_code" \
+      '{
+        status: $status,
+        running: $running,
+        enabled: $enabled,
+        pid: (if ($pid | test("^[0-9]+$")) then ($pid | tonumber) else null end),
+        state: (if $state == "" then null else $state end),
+        exitCode: (if ($exitCode | test("^-?[0-9]+$")) then ($exitCode | tonumber) else null end)
+      }')
     ;;
   *)
-    platform_json='{"status":"unknown","running":false,"enabled":false,"pid":null}'
+    platform_json='{"status":"unknown","running":false,"enabled":null,"pid":null,"state":null,"exitCode":null}'
     ;;
   esac
 
   # WHY: a blocked instance is a nucleus-side state, not a service-manager one.
   # The marker key is the concrete instance id every caller passes as the name;
   # the JSON carries the class alone.
-  if svc_health_is_blocked "$name"; then
-    blocked="blocked $(svc_health_get "$name" "class")"
-    remedy="$(svc_health_get "$name" "remedy")"
+  if svc_health_is_blocked "$name" 2>/dev/null; then                        # check-suppress:suppression_doc: blocked-state probe is best-effort and must not abort status.
+    blocked="blocked $(svc_health_get "$name" "class" 2>/dev/null || true)" # check-suppress:suppression_doc: blocked-state probe is best-effort and must not abort status.
+    remedy="$(svc_health_get "$name" "remedy" 2>/dev/null || true)"         # check-suppress:suppression_doc: blocked-state probe is best-effort and must not abort status.
   else
     blocked="clear"
     remedy=""
   fi
   printf '%s' "$platform_json" | jq -c --arg b "$blocked" --arg r "$remedy" \
-    '. + {blocked: (if $b == "clear" then null else ($b | sub("^blocked "; "")) end), blockedRemedy: (if $r == "" then null else $r end)}'
+    '. + {blocked: (if $b == "clear" then null else ($b | sub("^blocked "; "")) end), blockedRemedy: (if $r == "" then null else $r end)}' 2>/dev/null ||
+    printf '{"status":"unknown","running":false,"enabled":null,"pid":null,"state":null,"exitCode":null,"blocked":null,"blockedRemedy":null}' # check-suppress:suppression_doc: jq shaping is best-effort; fall back to typed unknown row.
 }
 
 # WHY: spawn-scheduled, waiting and exit code 78 (EX_CONFIG, which launchd will
@@ -856,9 +878,12 @@ do_list() {
       local status_json pair_json
       if [ "$row_class" = "live" ]; then
         local crash_status
-        status_json=$(svc_status "$instance" "$svc_json")
-        crash_status=$(svc_health_status "$instance")
-        status_json=$(printf '%s' "$status_json" | jq --arg cs "$crash_status" '. + {crashLoop: $cs}')
+        status_json=$(svc_status "$instance" "$svc_json") || status_json='{"status":"unknown","running":false,"enabled":null,"pid":null,"state":null,"exitCode":null,"blocked":null,"blockedRemedy":null}'
+        # check-suppress:suppression_doc: probe failure must not abort listing; health state is best-effort.
+        crash_status=$(svc_health_status "$instance" 2>/dev/null) || crash_status="unknown" # check-suppress:suppression_doc: crash-loop health probe is best-effort for listing resilience.
+        # check-suppress:suppression_doc: jq shaping is best-effort; fall back to typed unknown row.
+        status_json=$(printf '%s' "$status_json" | jq --arg cs "$crash_status" '. + {crashLoop: $cs}' 2>/dev/null) ||
+          status_json=$(jq -cn --arg cs "$crash_status" '{"status":"unknown","running":false,"enabled":null,"pid":null,"state":null,"exitCode":null,"blocked":null,"blockedRemedy":null,"crashLoop":$cs}')
       else
         status_json=$(placeholder_status_json "$row_class")
       fi
@@ -897,18 +922,19 @@ $pair_json"
         continue
       fi
       local status_json
-      status_json=$(svc_status "$instance" "$svc_json")
+      status_json=$(svc_status "$instance" "$svc_json") || status_json='{"status":"unknown","running":false,"enabled":null,"pid":null,"state":null,"exitCode":null,"blocked":null,"blockedRemedy":null}'
       local status running pid exit_code
-      status=$(echo "$status_json" | jq -r '.status')
-      running=$(echo "$status_json" | jq -r '.running')
-      pid=$(echo "$status_json" | jq -r '.pid // "-"')
-      exit_code=$(echo "$status_json" | jq -r '.exitCode // ""')
+      status=$(echo "$status_json" | jq -r '.status // "unknown"' 2>/dev/null || echo "unknown") # check-suppress:suppression_doc: JSON field extraction is best-effort; fall back to unknown display.
+      running=$(echo "$status_json" | jq -r '.running // "false"' 2>/dev/null || echo "false")   # check-suppress:suppression_doc: JSON field extraction is best-effort; fall back to unknown display.
+      pid=$(echo "$status_json" | jq -r '.pid // "-"' 2>/dev/null || echo "-")                   # check-suppress:suppression_doc: JSON field extraction is best-effort; fall back to unknown display.
+      exit_code=$(echo "$status_json" | jq -r '.exitCode // ""' 2>/dev/null || echo "")          # check-suppress:suppression_doc: JSON field extraction is best-effort; fall back to unknown display.
       if [ -n "$exit_code" ] && [ "$exit_code" != "null" ]; then
         local exit_display="exit $exit_code"
         pid="$exit_display"
       fi
       local crash_status
-      crash_status=$(svc_health_status "$instance")
+      # check-suppress:suppression_doc: probe failure must not abort listing; health state is best-effort.
+      crash_status=$(svc_health_status "$instance" 2>/dev/null) || crash_status="unknown" # check-suppress:suppression_doc: crash-loop health probe is best-effort for listing resilience.
       printf '%-20s %-24s %-10s %-8s %-10s %s\n' "$instance" "$display" "$status" "$running" "$pid" "$crash_status"
       print_blocked_note "$status_json"
     done <<<"$entries"
