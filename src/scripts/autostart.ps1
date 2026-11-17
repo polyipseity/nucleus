@@ -40,6 +40,7 @@
   Environment variables: NUCLEUS_REPO_ROOT.
   Exit codes: 0 on success; non-zero on failure.
 #>
+
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
@@ -54,6 +55,9 @@ param(
   [Alias("h")]
   [switch]$Help
 )
+
+. (Join-Path $PSScriptRoot 'lib\pwsh-guard.ps1')
+Assert-NucleusPowerShell -Minimum '7.0'
 
 $ErrorActionPreference = 'Stop'
 

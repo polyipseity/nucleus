@@ -21,6 +21,7 @@
 .EXAMPLE
   .\gen-completions.ps1 -Check
 #>
+
 [CmdletBinding()]
 param(
   [Alias('h')]
@@ -28,6 +29,9 @@ param(
   [switch]$Check,
   [switch]$ListCommands
 )
+
+. (Join-Path $PSScriptRoot '..\lib\pwsh-guard.ps1')
+Assert-NucleusPowerShell -Minimum '7.0'
 
 $ErrorActionPreference = 'Stop'
 

@@ -54,6 +54,7 @@
   Environment variables: NUCLEUS_NO_FLAKE, NUCLEUS_NO_SOPS, NUCLEUS_REPO_ROOT.
   Exit codes: 0 on success; non-zero on failure.
 #>
+
 # Manual argument parsing: accepts PowerShell-style named params and POSIX
 # spellings (--list-sections, --sections, --verify, --verify-installed, lockfile
 # subcommand, action words). Bare flags mean no action word was given (B10).
@@ -124,6 +125,9 @@ function Invoke-UpdateAll {
     [switch]$NoFlake,
     [switch]$NoSops
   )
+
+. (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
+Assert-NucleusPowerShell -Minimum '7.0'
 
   # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
   if (-not $NoFlake -and (Get-Command -Name 'nix.exe' -ErrorAction SilentlyContinue)) {

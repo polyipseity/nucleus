@@ -55,6 +55,9 @@ function Get-CamillaDSPStateDir {
   [OutputType([string])]
   param()
 
+. (Join-Path $PSScriptRoot '..\lib\pwsh-guard.ps1')
+Assert-NucleusPowerShell -Minimum '7.0'
+
   if ($IsWindows) {
     return (Join-Path -Path $env:LOCALAPPDATA -ChildPath 'nucleus\camilladsp')
   }

@@ -35,6 +35,9 @@ param(
   [switch]$Help
 )
 
+. (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
+Assert-NucleusPowerShell -Minimum '7.0'
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 

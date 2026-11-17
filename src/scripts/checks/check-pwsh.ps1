@@ -47,6 +47,7 @@
   Environment variables: NUCLEUS_CHECK_PATHS.
   Exit codes: 0 on success; non-zero on failure.
 #>
+
 [CmdletBinding()]
 param(
   [string]$Settings = '',
@@ -61,6 +62,9 @@ param(
   [Parameter(Position = 0, ValueFromRemainingArguments = $true)]
   [string[]]$Paths = @($env:NUCLEUS_CHECK_PATHS -split ';' | Where-Object { $_ })
 )
+
+. (Join-Path $PSScriptRoot '..\lib\pwsh-guard.ps1')
+Assert-NucleusPowerShell -Minimum '7.0'
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'

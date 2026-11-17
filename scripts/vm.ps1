@@ -36,6 +36,7 @@
   Environment variables: NUCLEUS_REPO_ROOT.
   Exit codes: 0 on success; 1 on failure.
 #>
+
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
@@ -48,6 +49,9 @@ param(
   [Alias("h")]
   [switch]$Help
 )
+
+. (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
+Assert-NucleusPowerShell -Minimum '7.0'
 
 # Suppress false positive PSReviewUnusedParameter: $SubcommandArgs IS used below
 # (setup flag parsing, status/stop/reset actions).

@@ -38,9 +38,13 @@
   Run one iteration and exit instead of sleeping forever.
 #>
 
+
 param(
   [switch]$Oneshot
 )
+
+. (Join-Path $PSScriptRoot '..\lib\pwsh-guard.ps1')
+Assert-NucleusPowerShell -Minimum '7.0'
 
 $ErrorActionPreference = "Stop"
 

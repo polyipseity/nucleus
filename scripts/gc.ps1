@@ -65,6 +65,7 @@
 .NOTES
   Environment variables: NUCLEUS_GC_HM_EXPIRY, NUCLEUS_GC_LOG_COMPRESS, NUCLEUS_GC_LOG_MAX_FILES, NUCLEUS_GC_LOG_MAX_SIZE, NUCLEUS_GC_MODULE_DIR, NUCLEUS_GC_NIX_EXPIRY, NUCLEUS_LOG_EXPIRY, NUCLEUS_REPO_ROOT.
 #>
+
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
@@ -99,6 +100,9 @@ param(
   [Alias("h")]
   [switch]$Help
 )
+
+. (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
+Assert-NucleusPowerShell -Minimum '7.0'
 
 $ErrorActionPreference = 'Stop'
 

@@ -70,6 +70,7 @@
                                                waits indefinitely
 #>
 
+
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
@@ -86,6 +87,9 @@ param(
 
   [switch]$Plain
 )
+
+. (Join-Path $PSScriptRoot '..\lib\pwsh-guard.ps1')
+Assert-NucleusPowerShell -Minimum '7.0'
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'

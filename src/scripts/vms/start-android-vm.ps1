@@ -20,6 +20,10 @@
   to the edk2-aarch64 UEFI image in QEMU's standard installation layout.
 #>
 
+. (Join-Path $PSScriptRoot '..\lib\pwsh-guard.ps1')
+Assert-NucleusPowerShell -Minimum '7.0'
+
+
 #Requires -Version 7.4
 
 $ErrorActionPreference = 'Stop'

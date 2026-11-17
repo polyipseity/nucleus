@@ -26,6 +26,7 @@
   Print the device selection state and exit. Exits 1 when no target device can be bound.
 #>
 
+
 param(
   [Parameter(Mandatory = $false)]
   [int]$Port = 1234,
@@ -36,6 +37,9 @@ param(
   [Parameter(Mandatory = $false)]
   [switch]$Probe
 )
+
+. (Join-Path $PSScriptRoot '..\lib\pwsh-guard.ps1')
+Assert-NucleusPowerShell -Minimum '7.0'
 
 $ErrorActionPreference = "Stop"
 

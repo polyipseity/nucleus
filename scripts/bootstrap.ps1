@@ -21,6 +21,7 @@
 .NOTES
   Environment variables: NUCLEUS_APPLY, NUCLEUS_AI_SYNC, NUCLEUS_REPLICA_SYNC, NUCLEUS_TARGET_USER.
 #>
+
 [CmdletBinding()]
 param(
   [Alias("a")]
@@ -49,6 +50,9 @@ param(
   [Parameter()]
   [switch]$Help
 )
+
+. (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
+Assert-NucleusPowerShell -Minimum '7.0'
 
 $ErrorActionPreference = "Stop"
 

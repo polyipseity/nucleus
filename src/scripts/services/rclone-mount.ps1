@@ -34,6 +34,7 @@
 .EXAMPLE
     rclone-mount.ps1 -Instance '\NucleusCloudMount\NucleusCloudMount-iCloud' -LogFile 'C:\Users\guest\AppData\Local\nucleus\logs\cloud-drive-mount-iCloud\mount.log' -MountPoint 'C:\Users\guest\clouds\iCloud' -RemoteSpec 'iCloud:/' -RcloneArgs @('--iclouddrive-service', 'drive')
 #>
+
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)]
@@ -58,6 +59,9 @@ param(
     [Parameter()]
     [int]$RetrySeconds = 30
 )
+
+. (Join-Path $PSScriptRoot '..\lib\pwsh-guard.ps1')
+Assert-NucleusPowerShell -Minimum '7.0'
 
 $ErrorActionPreference = 'Stop'
 

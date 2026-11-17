@@ -18,12 +18,16 @@
   nucleus-config list
 #>
 
+
 param(
   [Parameter(Position = 0)]
   [string]$Command,
   [Parameter(ValueFromRemainingArguments = $true)]
   [string[]]$Arguments
 )
+
+. (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
+Assert-NucleusPowerShell -Minimum '7.0'
 
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking

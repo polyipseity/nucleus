@@ -113,6 +113,9 @@ function Invoke-CheckPacker {
     [switch]$ValidateOnly
   )
 
+. (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
+Assert-NucleusPowerShell -Minimum '7.0'
+
   Set-Location -Path $RepoRoot
 
   $packerWindowsTemplate = if ($WindowsTemplateOverride) {

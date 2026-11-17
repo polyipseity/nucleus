@@ -47,6 +47,7 @@
     prompt is injected after a finished turn.
 #>
 
+
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
@@ -58,6 +59,9 @@ param(
   [Parameter(Position = 2)]
   [string]$Text
 )
+
+. (Join-Path $PSScriptRoot '..\lib\pwsh-guard.ps1')
+Assert-NucleusPowerShell -Minimum '7.0'
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'

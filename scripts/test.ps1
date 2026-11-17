@@ -1,4 +1,6 @@
 #Requires -Version 7.4
+. (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
+Assert-NucleusPowerShell -Minimum '7.0'
 # test.ps1 - Repository test suite runner (Windows).
 #
 # Sources test-lib.ps1 for the framework and test-steps.ps1 for step

@@ -82,6 +82,7 @@
   Exit codes: 0 on success; 1 on a usage or write error.
 #>
 
+
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
@@ -108,6 +109,9 @@ param(
   [switch]$ListLogs,
   [switch]$Help
 )
+
+. (Join-Path $PSScriptRoot '..\src\scripts\lib\pwsh-guard.ps1')
+Assert-NucleusPowerShell -Minimum '7.0'
 
 # WHY: only the entry script changes its own session. A dot-sourcing caller
 # loads the functions and keeps its strict mode, its error preference, and its

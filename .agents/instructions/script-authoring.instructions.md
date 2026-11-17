@@ -26,6 +26,10 @@ A script that sources another file derives its own directory and sources relativ
 
 Every directly invocable POSIX script declares its minimum bash version and uses the shared guard in `src/scripts/lib/bash-guard.sh`. Source the guard right after `SCRIPT_DIR` is computed, before any construct that needs a newer bash, and call `bash_guard_require <major> <minor> <name>` with the invoked app name. `scripts/bootstrap.sh` is the exception: it stays compatible with bash 3.2 because it runs before Nix is installed, so it requires 3.2 and carries a comment that explains the exception. Libs that are only sourced (e.g. `src/scripts/lib/*.sh`, `*-lib.sh`, loaders, and step-definition files) must not add their own standalone guard; the sweep test exempts them explicitly.
 
+## PowerShell floor guard
+
+Every directly invocable PowerShell script guards the PowerShell floor with `Assert-NucleusPowerShell -Minimum '7.0'` from `src/scripts/lib/pwsh-guard.ps1`. Dot-source the guard and call it early in the script (after `param()` when a param block exists). Module files, sourced libs/loaders/step definitions, and shell template/profile files are exempt and must not add a standalone guard; the sweep test exempts them explicitly.
+
 ## CLI option and variable naming
 
 Use `--XXX` / `--no-XXX` flag pairs, and a bare positive shell variable name (`ai_sync`, not `do_ai_sync`) with conditions testing `"$x" = false`.
