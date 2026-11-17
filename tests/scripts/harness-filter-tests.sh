@@ -56,7 +56,7 @@ require_command bun "a filter is a bun program, and this suite runs it the way t
 BUN="$(command -v bun)"
 readonly BUN
 
-for _required in "$RUNNER" "$APPROVAL" "$FILTER_DIR/safe-delete.ts" "$LIB_DIR" "$LIB_DIR_DIR/harness-audit.sh" "$LIB_DIR_DIR/logs.sh" "$REGISTRY"; do
+for _required in "$RUNNER" "$APPROVAL" "$FILTER_DIR/safe-delete.ts" "$LIB_DIR" "$LIB_DIR_DIR/harness-audit.sh" "$LIB_DIR_DIR/bash-guard.sh" "$LIB_DIR_DIR/logs.sh" "$REGISTRY"; do
   if [ ! -e "$_required" ]; then
     assert_fail "runner assets present" "$_required does not exist"
     finish_tests
@@ -82,7 +82,7 @@ make_tree() { # <name>
   cp "$RUNNER" "$_root/src/scripts/notify/harness-filter.sh"
   cp "$APPROVAL" "$_root/src/scripts/notify/harness-approval.sh"
   cp "$LIB_DIR" "$_root/src/scripts/lib/lib.sh"
-  cp "$LIB_DIR_DIR/harness-audit.sh" "$LIB_DIR_DIR/log-expiry.sh" "$LIB_DIR_DIR/logs.sh" "$_root/src/scripts/lib/"
+  cp "$LIB_DIR_DIR/harness-audit.sh" "$LIB_DIR_DIR/bash-guard.sh" "$LIB_DIR_DIR/log-expiry.sh" "$LIB_DIR_DIR/logs.sh" "$_root/src/scripts/lib/"
   # The bridge entry points source the log library beside them, so the fixture
   # carries it where the script tree does.
   cp "$FILTER_DIR"/*.ts "$_root/src/scripts/notify/filters/"
@@ -528,6 +528,13 @@ if [ ! -e "$NO_BUN_BIN/bun" ]; then
   assert_pass "the shadow bin directory carries every tool except bun"
 else
   assert_fail "the shadow bin directory carries every tool except bun" "$NO_BUN_BIN/bun exists, so the cases below would not test a missing runtime"
+fi
+
+# The runner requires bash >= 5.1 (bash-guard.sh). A shadow bin built from PATH
+# can pick up /bin/bash 3.2 before a compatible bash, which would fail the guard
+# instead of exercising the missing-bun path.
+if command -v bash >/dev/null 2>&1 && bash -c '[[ ${BASH_VERSINFO[0]} -gt 5 || ( ${BASH_VERSINFO[0]} -eq 5 && ${BASH_VERSINFO[1]} -ge 1 ) ]]' 2>/dev/null; then
+  ln -sf "$(command -v bash)" "$NO_BUN_BIN/bash"
 fi
 
 _no_bun_status=0
