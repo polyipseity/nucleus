@@ -29,6 +29,15 @@ $null = $FrameworkDir  # check-suppress:suppression_doc: consumed by test-lib.ps
 . (Join-Path $TestDir "test-lib.ps1")
 . (Join-Path $TestDir "test-steps.ps1")
 
+if ($args -contains '--list-steps' -or $args -contains '-ListSteps') {
+  Set-Location -Path $RepoRoot
+  $FrameworkDir = Join-Path $RepoRoot "src/scripts/lib"
+  . (Join-Path $TestDir "test-lib.ps1")
+  . (Join-Path $TestDir "test-steps.ps1")
+  foreach ($id in $script:StepIds) { Write-Output $id }
+  exit 0
+}
+
 Read-Argument $args
 Test-Prerequisite
 Invoke-StepPipeline

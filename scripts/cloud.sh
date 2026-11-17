@@ -29,7 +29,7 @@ bash_guard_require 5 1 cloud
 . "$SCRIPT_DIR/../src/scripts/lib/service-health.sh"
 
 usage() {
-  usage_std "$(basename "$0")" "setup|reset|sync|status|restart [options]"
+  usage_std "$(basename "$0")" "setup|reset|sync|status|restart [options] | --list-replicas"
   cat <<'EOF'
   setup    Verify/create rclone remotes, validate credentials, sync display
            names, and optionally run nucleus apply.
@@ -58,6 +58,7 @@ usage() {
     --json              Machine-readable JSON output.
 
   Common options:
+    --list-replicas     Print configured replica ids, one per line.
     -h|--help           Show usage.
 EOF
 }
@@ -1293,6 +1294,28 @@ do_restart() {
     fi
   done <<<"$rows"
 }
+
+# List surface for completions and scripting (D4).
+for _arg in "$@"; do
+  if [ "$_arg" = "--list-replicas" ]; then
+    _list_replicas_repo_root=""
+    _prev=""
+    for _arg2 in "$@"; do
+      if [ "$_prev" = "--repo-root" ]; then
+        _list_replicas_repo_root="$_arg2"
+      fi
+      _prev="$_arg2"
+    done
+    REPO_ROOT="${_list_replicas_repo_root:-${NUCLEUS_REPO_ROOT:-$(derive_repo_root)}}"
+    require_command jq
+    USERS_REGISTRY="$(_load_users_registry)"
+    username="$(printf '%s' "$USERS_REGISTRY" | jq -r '.primaryUser // empty')"
+    if [ -n "$username" ]; then
+      printf '%s' "$USERS_REGISTRY" | jq -r --arg username "$username" '.[$username].cloudDrives.replicas // [] | .[] | .id // empty' | sed '/^$/d' | LC_ALL=C sort -u
+    fi
+    exit 0
+  fi
+done
 
 action="${1:-help}"
 case "$action" in

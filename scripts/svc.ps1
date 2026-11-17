@@ -51,6 +51,9 @@ param(
   # With start: enable auto-start before starting.
   [switch]$Enable,
 
+  [switch]$ListServices,
+  [switch]$ListEndpoints,
+
   [Alias("h")]
   [switch]$Help,
 
@@ -72,6 +75,11 @@ if ($Help) {
 # A missing action is an error, matching svc.sh (message on stderr, exit 1):
 # callers act on the result of a service operation, so a run that performed
 # nothing must not read as success.
+if ($ListServices) {
+  foreach ($id in Get-FilteredServiceIdList) { Write-Output $id }
+  exit 0
+}
+
 if (-not $Action) {
   Write-NucleusError "missing action (list, status, start, stop, restart, enable, disable, verify, endpoint, logs, log-paths, log-config)"
   exit 1
@@ -917,10 +925,23 @@ switch ($Action) {
     if ($ServiceName.Count -eq 0) {
       throw "missing service name for endpoint"
     }
-    $svcName = $ServiceName[0]
-    $epName  = if ($ServiceName.Count -ge 2) { $ServiceName[1] } else { $null }
+    $listNames = $false
+    if ($ListEndpoints -or $ServiceName[0] -eq '--list-endpoints') {
+      $listNames = $true
+      $svcName = if ($ServiceName[0] -eq '--list-endpoints' -and $ServiceName.Count -gt 1) { $ServiceName[1] } elseif ($ServiceName.Count -gt 1) { $ServiceName[1] } else { $null }
+      if (-not $svcName -and $ServiceName[0] -ne '--list-endpoints') { $svcName = $ServiceName[0] }
+    } elseif ($ServiceName.Count -gt 1 -and $ServiceName[1] -eq '--list-endpoints') {
+      $listNames = $true
+      $svcName = $ServiceName[0]
+      $epName = $null
+    } else {
+      $svcName = $ServiceName[0]
+      $epName = if ($ServiceName.Count -ge 2) { $ServiceName[1] } else { $null }
+    }
+    if (-not $svcName) {
+      throw "missing service name for endpoint"
+    }
 
-    $Registry = [ordered]@{}
     $raw = Get-Content -Raw "$RepoRoot/src/modules/services.json" | ConvertFrom-Json
     if (-not $raw.PSObject.Properties.Name -contains $svcName) {
       Write-NucleusError "$svcName — service not found in registry"
@@ -932,6 +953,11 @@ switch ($Action) {
       exit 1
     }
     $network = $entry.network
+
+    if ($listNames) {
+      foreach ($prop in $network.PSObject.Properties) { Write-Output $prop.Name }
+      break
+    }
 
     if ($epName) {
       if (-not $network.PSObject.Properties.Name -contains $epName) {

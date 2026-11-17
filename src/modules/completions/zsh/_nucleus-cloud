@@ -4,6 +4,7 @@
 
 _arguments -C \
   '(-h --help)'{--help,-h}'[Show usage]' \
+  '--list-replicas[Print configured replica ids, one per line]' \
   '1:subcommand:->subcmd' \
   '*::arg:->args'
 

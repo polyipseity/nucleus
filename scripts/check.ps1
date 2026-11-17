@@ -39,7 +39,8 @@ param(
   # Pass-through flags for the inlined packer subcommand.
   [string]$WindowsTemplateOverride = '',
   [switch]$AnnotationCheckOnly,
-  [switch]$ValidateOnly
+  [switch]$ValidateOnly,
+  [switch]$ListSteps
 )
 
 Set-StrictMode -Version Latest
@@ -50,6 +51,16 @@ $ScriptDir = $PSScriptRoot
 
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force
+
+if ($ListSteps) {
+  Set-Location -Path $RepoRoot
+  $FrameworkDir = Join-Path $RepoRoot "src/scripts/lib"
+  $CheckDir = Join-Path $RepoRoot "src/scripts/checks"
+  . (Join-Path $CheckDir "check-lib.ps1")
+  . (Join-Path $CheckDir "check-steps.ps1")
+  foreach ($id in $script:StepIds) { Write-Output $id }
+  exit 0
+}
 
 function Invoke-CheckPacker {
   <#

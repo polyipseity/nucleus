@@ -413,6 +413,11 @@
           "takesValue": true,
           "valueType": "string",
           "description": "Run only the specified step IDs"
+        },
+        {
+          "long": "--list-steps",
+          "takesValue": false,
+          "description": "Print registered step IDs, one per line"
         }
       ],
       "subcommands": [
@@ -451,6 +456,11 @@
           "short": "-h",
           "takesValue": false,
           "description": "Show usage."
+        },
+        {
+          "long": "--list-replicas",
+          "takesValue": false,
+          "description": "Print configured replica ids, one per line"
         }
       ],
       "subcommands": [
@@ -585,7 +595,13 @@
         },
         {
           "name": "list",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Print config as a dotted-key JSON object"
+            }
+          ],
           "positionals": [],
           "description": "Print all config as flat key=value pairs."
         }
@@ -857,6 +873,11 @@
       "summary": "Append, rotate, query, and label nucleus logs.",
       "globalFlags": [
         {
+          "long": "--list-logs",
+          "takesValue": false,
+          "description": "Print known log names, one per line"
+        },
+        {
           "long": "--help",
           "takesValue": false,
           "short": "-h",
@@ -1084,6 +1105,11 @@
           "long": "--enable",
           "takesValue": false,
           "description": "With start: enable auto-start before starting"
+        },
+        {
+          "long": "--list-services",
+          "takesValue": false,
+          "description": "Print host-filtered service instance IDs, one per line"
         }
       ],
       "subcommands": [
@@ -1185,15 +1211,23 @@
         },
         {
           "name": "endpoint",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--list-endpoints",
+              "takesValue": false,
+              "description": "Print endpoint names for <service>, one per line"
+            }
+          ],
           "positionals": [
             {
               "name": "service",
-              "required": true,
-              "valueSource": "services"
+              "valueSource": "services",
+              "description": "Service name",
+              "required": true
             },
             {
-              "name": "name"
+              "name": "name",
+              "description": "Endpoint name"
             }
           ],
           "description": "Show network endpoint(s) for a service."
@@ -1278,6 +1312,11 @@
           "takesValue": true,
           "valueType": "string",
           "description": "Run only the specified step IDs"
+        },
+        {
+          "long": "--list-steps",
+          "takesValue": false,
+          "description": "Print registered step IDs, one per line"
         }
       ],
       "subcommands": []

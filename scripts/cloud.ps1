@@ -29,6 +29,7 @@ param(
   [string]$RepoRoot = $(if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { '' }),
 
   [switch]$Json = $false,
+  [switch]$ListReplicas = $false,
 
   [Alias("h")]
   [switch]$Help
@@ -65,6 +66,7 @@ Usage: .\scripts\cloud.ps1 <setup|reset|sync> [options]
     -Json             Machine-readable JSON output.
 
   Common options:
+    -ListReplicas     Print configured replica ids, one per line.
     -Help             Show usage.
 "@
 }
@@ -247,6 +249,33 @@ function Invoke-CloudRestart {
       Write-NucleusInfo "$($mount['id']) rclone stopped (pid $($process.ProcessId)); the platform manager (task loop) remounts it within 30s"
     }
   }
+}
+
+if ($ListReplicas) {
+  $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
+  if (Test-Path -LiteralPath $modulePath) { Import-Module $modulePath -Force -DisableNameChecking }
+  function Resolve-CloudListRepoRoot {
+    $repoRoot = $env:NUCLEUS_REPO_ROOT
+    if (-not $repoRoot) {
+      # check-suppress:suppression_doc: probe -- may be invoked outside repo checkouts; resolution handled below.
+      $candidate = Resolve-Path "$PSScriptRoot\.." -ErrorAction SilentlyContinue
+      if ($candidate) { return $candidate.Path }
+      throw "NUCLEUS_REPO_ROOT is not set. Run via apply.ps1 or run from the repo checkout."
+    }
+    if (-not (Test-Path -Path $repoRoot -PathType Container)) {
+      throw "NUCLEUS_REPO_ROOT path '$repoRoot' does not exist or is not a directory."
+    }
+    return $repoRoot
+  }
+  $repoRoot = Resolve-CloudListRepoRoot
+  $registry = & (Join-Path $repoRoot 'src\platforms\Windows\modules\Load-UserRegistry.ps1') -RepoRoot $repoRoot
+  $primaryUser = $registry['primaryUser']
+  if ($null -eq $primaryUser) { exit 0 }
+  $cloudDrives = $primaryUser['cloudDrives']
+  if ($null -eq $cloudDrives) { exit 0 }
+  @($cloudDrives['replicas'] | Where-Object { $_ -and $_['id'] }) |
+    ForEach-Object { [string]$_['id'] } | Sort-Object -Unique
+  exit 0
 }
 
 switch ($Action) {

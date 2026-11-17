@@ -26,6 +26,7 @@ _arguments -C \
   '--verbose[Show action result summaries]' \
   '--disable[With stop: disable auto-start after stopping]' \
   '--enable[With start: enable auto-start before starting]' \
+  '--list-services[Print host-filtered service instance IDs, one per line]' \
   '1:subcommand:->subcmd' \
   '*::arg:->args'
 
@@ -84,6 +85,7 @@ case $state in
         ;;
       endpoint)
         _arguments \
+          '--list-endpoints[Print endpoint names for <service>, one per line]' \
           '1:service:_nucleus_svc_services' \
           '2:name:'
         ;;

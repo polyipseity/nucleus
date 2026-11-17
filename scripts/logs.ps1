@@ -60,6 +60,9 @@
 .PARAMETER Json
   Emit one JSON document instead of text.
 
+.PARAMETER ListLogs
+  Print known log names, one per line, and exit.
+
 .PARAMETER DryRun
   Report what would change without writing.
 
@@ -102,6 +105,7 @@ param(
   [string]$Expiry,
   [switch]$Json,
   [switch]$DryRun,
+  [switch]$ListLogs,
   [switch]$Help
 )
 
@@ -681,9 +685,27 @@ function Invoke-LogRotation {
 # imports Add-NucleusLogEvent without printing help and exiting 1.
 if (-not $script:IsEntryScript) { return }
 
-if ($Help -or [string]::IsNullOrWhiteSpace($Action)) {
+if ($Help) {
   Get-Help -Full $PSCommandPath
-  if ($Help) { exit 0 }
+  exit 0
+}
+
+if ($ListLogs) {
+  $logRoot = Get-LogsDir -ScopeName $Scope
+  if (Test-Path -LiteralPath $logRoot) {
+    # check-suppress:suppression_doc: a log directory that disappears between Test-Path and enumeration lists nothing
+    Get-ChildItem -LiteralPath $logRoot -File -Filter '*.log' -ErrorAction SilentlyContinue |
+      ForEach-Object { $_.BaseName } |
+      Where-Object { $_ -and $_ -notmatch '\.\d+$' } |
+      Sort-Object -Unique |
+      ForEach-Object { Write-Output $_ }
+  }
+  exit 0
+}
+
+
+if ([string]::IsNullOrWhiteSpace($Action)) {
+  Get-Help -Full $PSCommandPath
   Write-NucleusError -CommandName logs 'missing action (append, expire, gc, label, rotate, show, stats, tail)'
   exit 1
 }

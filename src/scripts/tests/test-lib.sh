@@ -190,5 +190,5 @@ preflight_check() {
 }
 
 usage() {
-  usage_std "test.sh" "[-h|--help] [-q|--quiet] [--fail-fast|--no-fail-fast] [--verbose[=<ids>]] [--no-verbose] [--only-steps=<ids>]" "Run the repository test suite. With --quiet, suppress success/progress output across applicable steps (failures always shown). With --verbose, stream all step output (default: headers + summaries only). --verbose=<ids> streams only the specified comma-separated step IDs. --fail-fast exits immediately on first failure (default); --no-fail-fast accumulates all failures. --only-steps=<ids> runs only the steps with the given comma-separated IDs."
+  usage_std "test.sh" "[-h|--help] [-q|--quiet] [--fail-fast|--no-fail-fast] [--verbose[=<ids>]] [--no-verbose] [--only-steps=<ids>] [--list-steps]" "Run the repository test suite. With --quiet, suppress success/progress output across applicable steps (failures always shown). With --verbose, stream all step output (default: headers + summaries only). --verbose=<ids> streams only the specified comma-separated step IDs. --fail-fast exits immediately on first failure (default); --no-fail-fast accumulates all failures. --only-steps=<ids> runs only the steps with the given comma-separated IDs. --list-steps prints registered step IDs."
 }

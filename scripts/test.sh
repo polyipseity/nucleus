@@ -49,6 +49,24 @@ export NIX_CONFIG
 
 cd "$REPO_ROOT" || exit
 
+for _arg in "$@"; do
+  case "$_arg" in
+  --list-steps)
+    /run/current-system/sw/bin/bash -c '
+      set -euo pipefail
+      REPO_ROOT="$1"
+      cd "$REPO_ROOT"
+      # shellcheck source=../src/scripts/tests/test-lib.sh
+      . "$REPO_ROOT/src/scripts/tests/test-lib.sh" 2>/dev/null
+      # shellcheck source=../src/scripts/tests/test-steps.sh
+      . "$REPO_ROOT/src/scripts/tests/test-steps.sh" 2>/dev/null
+      printf "%s\n" "${_STEP_IDS[@]}"
+    ' -- "$REPO_ROOT"
+    exit 0
+    ;;
+  esac
+done
+
 parse_args "$@"
 preflight_check
 if [ -n "${NUCLEUS_PINNED_NIXPKGS:-}" ]; then

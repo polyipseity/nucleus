@@ -142,27 +142,53 @@ function Set-ConfigValue {
 }
 
 function Out-ConfigValueList {
-  $merged = Merge-Config
-  function Flatten($obj, $prefix) {
-    foreach ($prop in $obj.PSObject.Properties) {
-      $key = if ($prefix) { "$prefix.$($prop.Name)" } else { $prop.Name }
-      if ($prop.Value -is [PSCustomObject]) {
-        Flatten $prop.Value $key
-      } elseif ($null -ne $prop.Value) {
-        $val = $prop.Value | ConvertTo-Json -Compress
-        Write-Output "$key=$val"
+  param([string[]]$Arguments = @())
+  $asJson = $false
+  foreach ($arg in @($Arguments)) {
+    switch ($arg) {
+      '--json' { $asJson = $true }
+      default {
+        Write-NucleusError "unsupported argument '$arg'"
+        exit 1
       }
     }
   }
-  Flatten $merged ""
+
+  $merged = Merge-Config
+  function Get-FlatEntries($obj, $prefix) {
+    foreach ($prop in $obj.PSObject.Properties) {
+      $key = if ($prefix) { "$prefix.$($prop.Name)" } else { $prop.Name }
+      if ($prop.Value -is [PSCustomObject]) {
+        Get-FlatEntries $prop.Value $key
+      } else {
+        [pscustomobject]@{ key = $key; value = $prop.Value }
+      }
+    }
+  }
+
+  $entries = @(Get-FlatEntries $merged "")
+  if ($asJson) {
+    $map = [ordered]@{}
+    foreach ($entry in $entries) {
+      $map[$entry.key] = $entry.value
+    }
+    # Preserve JSON scalar/array/object values as-is.
+    [pscustomobject]$map | ConvertTo-Json -Depth 10 -Compress
+    return
+  }
+
+  foreach ($entry in $entries) {
+    $val = $entry.value | ConvertTo-Json -Compress -Depth 10
+    Write-Output "$($entry.key)=$val"
+  }
 }
 
 switch ($Command) {
   'get' { Get-ConfigValue $Arguments }
   'set' { Set-ConfigValue $Arguments }
-  'list' { Out-ConfigValueList }
+  'list' { Out-ConfigValueList $Arguments }
   default {
-    Write-NucleusError "Usage: nucleus-config get [<section.key>]|set <section.key> <value>|list"
+    Write-NucleusError "Usage: nucleus-config get [<section.key>]|set <section.key> <value>|list [--json]"
     exit 1
   }
 }

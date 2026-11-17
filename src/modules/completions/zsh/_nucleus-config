@@ -30,7 +30,7 @@ case $state in
         ;;
       list)
         _arguments \
-          '*: :'
+          '--json[Print config as a dotted-key JSON object]'
         ;;
     esac
     ;;

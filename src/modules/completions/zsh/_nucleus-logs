@@ -4,6 +4,7 @@
 
 _arguments -C \
   '(-h --help)'{--help,-h}'[Show usage]' \
+  '--list-logs[Print known log names, one per line]' \
   '--compress[Compress rotated archives]:compress:(true false)' \
   '--expiry[Archive retention]:expiry:' \
   '--harness[show: keep events whose harness matches]:harness:(claude codex cursor opencode pi vscode)' \

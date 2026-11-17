@@ -9,4 +9,5 @@ _arguments \
   '--no-fail-fast[Accumulate all failures]' \
   '--verbose[Stream step output; optional step ids]:verbose:' \
   '--no-verbose[Suppress step output streaming]' \
-  '--only-steps[Run only the specified step IDs]:only steps:'
+  '--only-steps[Run only the specified step IDs]:only steps:' \
+  '--list-steps[Print registered step IDs, one per line]'

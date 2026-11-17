@@ -48,7 +48,7 @@ LOGS_LABEL_LOG="harness"
 LOGS_LABEL_VERDICTS="correct false-allow false-deny"
 
 usage() {
-  usage_std "$(basename "$0")" "<subcommand> [options]" "Append, inspect, rotate, and expire nucleus JSONL event logs."
+  usage_std "$(basename "$0")" "<subcommand> [options] | --list-logs [--scope <user|system>]" "Append, inspect, rotate, and expire nucleus JSONL event logs."
   cat <<'EOF'
   append <log-name>                      Append one JSON event object read from stdin.
   expire [--scope <user|system>]         Delete archives older than the expiry.
@@ -59,6 +59,7 @@ usage() {
   stats [--scope <user|system>]          Count events, bytes, and archives per log.
   tail <log-name> [--scope <user|system>]  Print the last events (default: 10).
 
+  --list-logs              Print known log names, one per line.
   --compress <true|false>  Compress rotated archives (default: services schema).
   --expiry <duration>      Archive retention, e.g. 7d (default: NUCLEUS_LOG_EXPIRY or 7d).
   --harness <name>         show: keep events whose harness matches.
@@ -83,6 +84,21 @@ logs_dir_for_scope() {
   system) nucleus_system_log_dir ;;
   *) nucleus_log_dir ;;
   esac
+}
+
+# logs_list_names <dir>: print live log names under a root, one per line.
+# Archives (*.<N>.log and *.log.gz) are rotated history, not log identities.
+logs_list_names() {
+  [ -d "$1" ] || return 0
+  find "$1" -maxdepth 1 -type f -name '*.log' -print 2>/dev/null |
+    while IFS= read -r _lln_path; do
+      [ -n "$_lln_path" ] || continue
+      _lln_name="$(basename -- "$_lln_path" .log)"
+      case "$_lln_name" in
+      *.[0-9]*) continue ;;
+      esac
+      printf '%s\n' "$_lln_name"
+    done | LC_ALL=C sort -u
 }
 
 # logs_append_stdin <log-name> <dry-run true|false> <log-dir>: read exactly one
@@ -277,13 +293,39 @@ logs_stats() {
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   _logs_action="${1:-}"
-  if [ "$#" -gt 0 ]; then
-    shift
-  fi
+  _logs_args=("$@")
 
   case "$_logs_action" in
   -h | --help | help)
     usage
+    exit 0
+    ;;
+  --list-logs)
+    _logs_scope="user"
+    shift
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+      --scope)
+        logs_require_value --scope "$#"
+        _logs_scope="$2"
+        shift 2
+        ;;
+      --json)
+        # Accepted for forward compatibility; output remains one name per line.
+        shift
+        ;;
+      *)
+        error "unsupported option '$1' for --list-logs"
+        exit 1
+        ;;
+      esac
+    done
+    case "$_logs_scope" in
+    user | system) ;;
+    *) die "unknown scope '$_logs_scope' (expected user or system)" ;;
+    esac
+    _logs_dir="$(logs_dir_for_scope "$_logs_scope")" || die "cannot resolve the nucleus log directory"
+    logs_list_names "$_logs_dir"
     exit 0
     ;;
   '')
@@ -292,6 +334,10 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
     exit 1
     ;;
   esac
+
+  if [ "$#" -gt 0 ]; then
+    shift
+  fi
 
   # Options are parsed per command group, so an option the group does not act on
   # is an error instead of being silently accepted.

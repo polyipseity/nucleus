@@ -46,7 +46,9 @@ usage() {
   enable <service>                  Enable auto-start.
   disable <service>                 Disable auto-start.
   verify [service...]               Check all (or specified) services, warn if inactive.
+  --list-services                   Print host-filtered service instance IDs, one per line.
   endpoint <service> [<name>]       Show network endpoint(s) for a service.
+  --list-endpoints <service>        Print endpoint names for a service.
   logs [service...]                 Show service logs (list available if no service).
   log-paths [service...]            Print log file path(s).
   log-config [service...]           Show effective logging configuration.
@@ -1141,44 +1143,57 @@ do_verify() {
 # WHY: endpoints are host-independent (the same host:port on every host), so
 # filtering by host would hide valid data.
 do_endpoint() {
-  local svc_name="${service_names[0]:-}"
-  local endpoint_name="${service_names[1]:-}"
+  local registry svc_name endpoint_name list_names=false
+  registry=$(read_registry)
+
+  # endpoint --list-endpoints <service> OR endpoint <service> --list-endpoints
+  if [ "${service_names[0]:-}" = "--list-endpoints" ]; then
+    list_names=true
+    svc_name="${service_names[1]:-}"
+    endpoint_name=""
+  elif [ "${service_names[1]:-}" = "--list-endpoints" ]; then
+    list_names=true
+    svc_name="${service_names[0]:-}"
+    endpoint_name=""
+  else
+    svc_name="${service_names[0]:-}"
+    endpoint_name="${service_names[1]:-}"
+  fi
 
   if [ -z "$svc_name" ]; then
     error "missing service name for endpoint"
   fi
-  require_command jq
 
-  local entry
-  entry=$(jq -c --arg name "$svc_name" '.[$name] // empty' "$SERVICES_JSON")
-  if [ -z "$entry" ]; then
-    error "$svc_name — service not found in registry"
+  local svc_json
+  svc_json=$(printf '%s' "$registry" | jq -c --arg svc "$svc_name" '.[$svc] // empty')
+  if [ -z "$svc_json" ] || [ "$svc_json" = "null" ]; then
+    error "unknown service: $svc_name"
   fi
 
   local network
-  network=$(echo "$entry" | jq -c '.network // empty')
-  if [ -z "$network" ]; then
+  network=$(printf '%s' "$svc_json" | jq -c '.network // empty')
+  if [ -z "$network" ] || [ "$network" = "null" ] || [ "$network" = "{}" ]; then
     error "$svc_name — no network endpoints defined"
+  fi
+
+  if [ "$list_names" = true ]; then
+    printf '%s' "$network" | jq -r 'keys[]'
+    return 0
   fi
 
   if [ -n "$endpoint_name" ]; then
     local ep
     ep=$(echo "$network" | jq -c --arg ep "$endpoint_name" '.[$ep] // empty')
-    if [ -z "$ep" ]; then
+    if [ -z "$ep" ] || [ "$ep" = "null" ]; then
       error "$svc_name — endpoint \"$endpoint_name\" not found"
     fi
-    if [ "$json_output" = true ]; then
-      printf '%s\n' "$ep"
-    else
-      echo "$ep" | jq -r '[.protocol, "://", .host, ":", (.port|tostring)] | add'
-    fi
-  else
-    if [ "$json_output" = true ]; then
-      printf '%s\n' "$network"
-    else
-      echo "$network" | jq -r 'to_entries[] | [.key, .value.protocol + "://" + .value.host + ":" + (.value.port|tostring)] | @tsv'
-    fi
+    printf '%s
+' "$ep" | jq '.'
+    return 0
   fi
+
+  printf '%s
+' "$network" | jq '.'
 }
 
 # WHY: sorting keeps logs/log-paths output deterministic, and the $ prefix
@@ -1511,6 +1526,7 @@ do_log_config() {
 }
 
 json_output=false
+list_services=false
 verbose_mode=false
 stop_disable=false
 start_enable=false
@@ -1526,6 +1542,10 @@ while [ "$#" -gt 0 ]; do
   -h | --help)
     usage
     exit 0
+    ;;
+  --list-services)
+    list_services=true
+    shift
     ;;
   --json)
     json_output=true
@@ -1620,6 +1640,23 @@ elif [ "$domain_filter" = "all" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE;
 fi
 
 [ -z "$action" ] && {
+  if [ "$list_services" = true ]; then
+    require_command jq
+    registry=$(read_registry)
+    entries=$(resolve_service_names "$registry")
+    while IFS=$'	' read -r key display svc_json instance row_class; do
+      [ -n "$instance" ] || continue
+      case "$key" in
+      ERROR:*) continue ;;
+      esac
+      _d_entry_domain=$(echo "$svc_json" | jq -r '.scope // "system"')
+      if [ "$domain_filter" = "user" ] && [ "$_d_entry_domain" != "user" ]; then continue; fi
+      if [ "$domain_filter" = "system" ] && [ "$_d_entry_domain" != "system" ]; then continue; fi
+      printf '%s
+' "$instance"
+    done <<<"$entries"
+    exit 0
+  fi
   error "missing action (list, status, start, stop, restart, enable, disable, verify, endpoint, logs, log-paths, log-config)"
   usage >&2
   exit 1

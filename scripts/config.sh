@@ -27,11 +27,11 @@ bash_guard_require 5 1 config
 CONFIG_FILE="$HOME/.local/state/nucleus/config.json"
 
 usage() {
-  usage_std "$(basename "$0")" "[-h|--help] get [<section.key>]|set <section.key> <value>|list" "Manage runtime configuration for nucleus services."
+  usage_std "$(basename "$0")" "[-h|--help] get [<section.key>]|set <section.key> <value>|list [--json]" "Manage runtime configuration for nucleus services."
   cat <<'EOF'
   get [<section.key>]       Print config value(s). Omit key to dump all.
   set <section.key> <val>   Set a config key (value is JSON-typed).
-  list                      Print all config as flat key=value pairs.
+  list [--json]             Print all config as flat key=value pairs, or as a dotted-key JSON object with --json.
   -h|--help                 Show usage.
 EOF
 }
@@ -137,15 +137,53 @@ cmd_set() {
 }
 
 cmd_list() {
-  # WHY `type != ...` and not `scalars`: `paths(f)` keeps a leaf only when f is
-  # truthy, so `paths(scalars)` dropped every `false` leaf and the default-off
-  # flags were missing from the listing. Arrays are leaves in their own right and
-  # their elements are not, which is also what the PowerShell twin prints.
-  merge_config | jq -r '
-    paths(type != "object") as $p
-    | select((getpath($p[0:-1]) | type) != "array")
-    | { key: ($p | map(tostring) | join(".")), val: getpath($p) | tojson }
-    | "\(.key)=\(.val)"
+  _list_json=false
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+    --json)
+      _list_json=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      error "unsupported argument '$1'"
+      usage >&2
+      return 1
+      ;;
+    esac
+  done
+
+  merged=$(merge_config)
+  if [ "$_list_json" = true ]; then
+    printf '%s' "$merged" | jq -c '
+      def flat($p):
+        if type == "object" then
+          to_entries[]
+          | (if $p == "" then .key else ($p + "." + .key) end) as $k
+          | (.value | flat($k))
+        else
+          {key: $p, value: .}
+        end;
+      [flat("")] | reduce .[] as $i ({}; .[$i.key] = $i.value)
+    '
+    printf '
+'
+    return 0
+  fi
+
+  printf '%s' "$merged" | jq -r '
+    def flat($p):
+      if type == "object" then
+        to_entries[]
+        | (if $p == "" then .key else ($p + "." + .key) end) as $k
+        | (.value | flat($k))
+      else
+        "\($p)=\(.|tojson)"
+      end;
+    flat("")
   '
 }
 
@@ -162,7 +200,10 @@ set)
   shift
   cmd_set "$@"
   ;;
-list) cmd_list ;;
+list)
+  shift
+  cmd_list "$@"
+  ;;
 *)
   error "unknown command '${1:-}'"
   usage >&2

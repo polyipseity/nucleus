@@ -12,6 +12,7 @@ _arguments -C \
   '--verbose[Stream step output; optional step ids]:verbose:' \
   '--no-verbose[Suppress step output streaming]' \
   '--only-steps[Run only the specified step IDs]:only steps:' \
+  '--list-steps[Print registered step IDs, one per line]' \
   '1:subcommand:->subcmd' \
   '*::arg:->args'
 
