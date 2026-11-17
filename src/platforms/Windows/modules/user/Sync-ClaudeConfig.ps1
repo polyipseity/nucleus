@@ -35,27 +35,46 @@ function Sync-ClaudeConfig {
 
   $claudeDir = Join-Path -Path $UserProfile -ChildPath ".claude"
   $settingsPath = Join-Path -Path $claudeDir -ChildPath "settings.json"
+  $marketplacePath = Join-Path -Path $claudeDir -ChildPath ".claude-plugin\marketplace.json"
+  $pluginDir = Join-Path -Path $claudeDir -ChildPath "plugins\nucleus-prompt-tools"
 
   if (-not $Enabled) {
-    if (Test-Path -LiteralPath $settingsPath) {
-      # check-suppress:suppression_doc: settings file may not exist; idempotent cleanup.
-      Remove-Item -LiteralPath $settingsPath -Force -ErrorAction SilentlyContinue
+    foreach ($managedPath in @($settingsPath, $marketplacePath, $pluginDir)) {
+      if (Test-Path -LiteralPath $managedPath) {
+        # check-suppress:suppression_doc: probe -- managed files/dirs may not exist during idempotent cleanup.
+        Remove-Item -LiteralPath $managedPath -Force -Recurse -ErrorAction SilentlyContinue
+      }
     }
     return
   }
 
-  if (-not (Test-Path -LiteralPath $claudeDir)) {
-    # check-suppress:suppression_doc: directory creation output not needed.
-    New-Item -ItemType Directory -Path $claudeDir -Force > $null
+  foreach ($dir in @(
+      $claudeDir,
+      (Join-Path -Path $claudeDir -ChildPath ".claude-plugin"),
+      (Join-Path -Path $claudeDir -ChildPath "plugins")
+    )) {
+    if (-not (Test-Path -LiteralPath $dir)) {
+      # check-suppress:suppression_doc: directory creation output not needed.
+      New-Item -ItemType Directory -Path $dir -Force > $null
+    }
   }
 
   # The overlay resolves the per-user override first; a missing source in both
   # overlays is a hard error, never a silent skip.
-  $sourcePath = Resolve-UserConfigFile -User $User -ConfigName 'claude' -RelativePath 'settings.json' -RepoRoot $RepoRoot
-  # Method 1: writable symlink
-  if (Test-Path -LiteralPath $settingsPath) {
-    # check-suppress:suppression_doc: settings file may not exist; idempotent cleanup.
-    Remove-Item -LiteralPath $settingsPath -Force -ErrorAction SilentlyContinue
+  $settingsSource = Resolve-UserConfigFile -User $User -ConfigName 'claude' -RelativePath 'settings.json' -RepoRoot $RepoRoot
+  $marketplaceSource = Resolve-UserConfigFile -User $User -ConfigName 'claude' -RelativePath '.claude-plugin\marketplace.json' -RepoRoot $RepoRoot
+  $pluginSource = Resolve-UserConfigFile -User $User -ConfigName 'claude' -RelativePath 'plugins\nucleus-prompt-tools' -RepoRoot $RepoRoot
+
+  # Method 1: writable symlinks (settings + nucleus marketplace + plugin dir).
+  foreach ($deployment in @(
+      @{ Link = $settingsPath; Target = $settingsSource },
+      @{ Link = $marketplacePath; Target = $marketplaceSource },
+      @{ Link = $pluginDir; Target = $pluginSource }
+    )) {
+    if (Test-Path -LiteralPath $deployment.Link) {
+      # check-suppress:suppression_doc: probe -- managed target may not exist during idempotent replace.
+      Remove-Item -LiteralPath $deployment.Link -Force -Recurse -ErrorAction SilentlyContinue
+    }
+    New-Item -ItemType SymbolicLink -Path $deployment.Link -Target $deployment.Target -Force > $null
   }
-  New-Item -ItemType SymbolicLink -Path $settingsPath -Target $sourcePath -Force > $null
 }

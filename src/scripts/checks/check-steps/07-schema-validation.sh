@@ -32,7 +32,7 @@ run_schema_validation() {
     # Schema definitions, meta
     *.schema.json) return 0 ;;
     # External formats with no published schema
-    */users/*/cursor/*.json | */users/*/iterm2/DynamicProfiles/*.json | */users/*/obsidian/*.json | */users/*/qtpass/*.json | */users/*/rimsort/*.json | */configs/camilladsp/* | */configs/camillagui-backend/* | */users/*/discord-music-rpc/* | */users/*/agents/hooks/*.json | */users/*/agents/skills/*/_meta.json | */configs/litellm/* | */users/*/hermes/plugins/*/plugin.yaml | */users/*/claude/plugins/*/.claude-plugin/plugin.json | */users/*/claude/plugins/*/hooks/hooks.json | */users/*/vscode/mcp.json | */users/*/vscode/chatLanguageModels*.json | */.sops.yaml | */.yamllint.yml)
+    */users/*/cursor/*.json | */users/*/iterm2/DynamicProfiles/*.json | */users/*/obsidian/*.json | */users/*/qtpass/*.json | */users/*/rimsort/*.json | */configs/camilladsp/* | */configs/camillagui-backend/* | */users/*/discord-music-rpc/* | */users/*/agents/hooks/*.json | */users/*/agents/skills/*/_meta.json | */configs/litellm/* | */users/*/hermes/plugins/*/plugin.yaml | */users/*/claude/plugins/*/.claude-plugin/plugin.json | */users/*/claude/plugins/*/hooks/hooks.json | */users/*/claude/.claude-plugin/marketplace.json | */users/*/vscode/mcp.json | */users/*/vscode/chatLanguageModels*.json | */.sops.yaml | */.yamllint.yml)
       return 0
       ;;
     # Infrastructure

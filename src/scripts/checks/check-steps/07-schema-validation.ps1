@@ -25,6 +25,7 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Pla
       $f -like '*users\*\hermes\plugins\*\plugin.yaml' -or $f -like '*users/*/hermes/plugins/*/plugin.yaml' -or
       $f -like '*users\*\claude\plugins\*\.claude-plugin\plugin.json' -or $f -like '*users/*/claude/plugins/*/.claude-plugin/plugin.json' -or
       $f -like '*users\*\claude\plugins\*\hooks\hooks.json' -or $f -like '*users/*/claude/plugins/*/hooks/hooks.json' -or
+      $f -like '*users\*\claude\.claude-plugin\marketplace.json' -or $f -like '*users/*/claude/.claude-plugin/marketplace.json' -or
       $f -like '*users\*\vscode\mcp.json' -or $f -like '*users/*/vscode/mcp.json' -or
       $f -like '*users\*\vscode\chatLanguageModels*.json' -or $f -like '*users/*/vscode/chatLanguageModels*.json' -or
       $f -like '*\.sops.yaml' -or $f -like '*/.sops.yaml' -or

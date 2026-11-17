@@ -1,0 +1,13 @@
+{
+  "name": "nucleus",
+  "owner": {
+    "name": "nucleus"
+  },
+  "plugins": [
+    {
+      "name": "nucleus-prompt-tools",
+      "source": "./plugins/nucleus-prompt-tools",
+      "description": "Prompt tools: /continue, /copy-user-prompt, /repeat-user-prompt."
+    }
+  ]
+}

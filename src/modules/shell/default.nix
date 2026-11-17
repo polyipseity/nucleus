@@ -251,12 +251,20 @@ in
     executable = true;
   };
 
-  # Claude Code settings: deploy via writable symlink (method 1).
+  # Claude Code settings and nucleus plugin marketplace: deploy via writable symlinks (method 1).
+  # settings.json carries extraKnownMarketplaces/enabledPlugins for nucleus-prompt-tools;
+  # the marketplace and plugin directories must exist after activation so Claude can load them.
   home.activation.seed-claude-settings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    mkdir -p "${config.home.homeDirectory}/.claude"
+    mkdir -p "${config.home.homeDirectory}/.claude/.claude-plugin" "${config.home.homeDirectory}/.claude/plugins"
     "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
       "${config.home.homeDirectory}/.claude/settings.json" \
       "${overlay.toRepoRelPath (overlay.selectFile "claude" "settings.json")}"
+    "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+      "${config.home.homeDirectory}/.claude/.claude-plugin/marketplace.json" \
+      "${overlay.toRepoRelPath (overlay.selectFile "claude" ".claude-plugin/marketplace.json")}"
+    "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+      "${config.home.homeDirectory}/.claude/plugins/nucleus-prompt-tools" \
+      "${overlay.toRepoRelPath (overlay.selectFile "claude" "plugins/nucleus-prompt-tools")}"
   '';
 
   # Non-interactive zsh: rm function delegates to safe-rm. .zshenv is sourced
