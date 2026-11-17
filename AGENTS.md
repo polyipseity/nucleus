@@ -23,6 +23,7 @@ Inspect the on-disk tree before assuming source files, tests, or commands exist.
 - `nucleus-bootstrap` installs Nix and base deps only and never depends on apply. It may invoke apply via `--apply`/`-Apply` once deps exist.
 - Never filter or truncate `nucleus-apply` output: capture full stdout+stderr, ignore the direnv dump at the end, and on a non-zero exit read the last activation step instead of re-running.
 - Nix is unavailable on Windows: keep Nix changes small and isolated and lean on CI.
+- Temporary nixpkgs package overrides (no pin bump): use the `nixpkgs-next` mechanism in `src/modules/packages/nixpkgs-overrides.nix` and follow `.agents/instructions/nixpkgs-overrides.instructions.md`.
 
 ## Core conventions
 

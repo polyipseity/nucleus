@@ -21,6 +21,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    nixpkgs-next = {
+      url = "github:nixos/nixpkgs/nixos-unstable";
+      # WHY: packages newer than the pinned nixpkgs, imported only through the
+      # temporary override layer. Bumping the nixpkgs pin is what retires entries.
+    };
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -77,6 +82,7 @@
       nix-homebrew,
       nix-vscode-extensions,
       nixpkgs,
+      nixpkgs-next,
       nixos-generators,
       rust-overlay,
       smudge-smudge,
@@ -126,6 +132,11 @@
         mac = "aarch64-darwin";
       };
 
+      nixpkgsOverrides = import ./modules/packages/nixpkgs-overrides.nix {
+        inherit (nixpkgs) lib;
+        nixpkgsNext = nixpkgs-next;
+      };
+
       mkPkgs =
         system:
         import nixpkgs {
@@ -135,6 +146,7 @@
           config.permittedInsecurePackages = [ "dotnet-runtime-6.0.36" ];
 
           overlays = [
+            nixpkgsOverrides.overlay
             (_final: prev: {
               # Nix sandbox; these deps are tested upstream.
               davs2 = prev.davs2.overrideAttrs (_: {
@@ -610,7 +622,10 @@
         import nixpkgs {
           inherit system;
           config.allowUnfree = true;
-          overlays = [ (import rust-overlay) ];
+          overlays = [
+            nixpkgsOverrides.overlay
+            (import rust-overlay)
+          ];
         };
       pkgsDevLinux = mkDevPkgs systems.linux;
       pkgsDevMac = mkDevPkgs systems.mac;
@@ -888,6 +903,7 @@
         home-manager = home-manager;
         nix-vscode-extensions = nix-vscode-extensions;
         nixpkgs = nixpkgs;
+        nixpkgs-next = nixpkgs-next;
         rust-overlay = rust-overlay;
         sops-nix = sops-nix;
         treefmt-nix = treefmt-nix;
