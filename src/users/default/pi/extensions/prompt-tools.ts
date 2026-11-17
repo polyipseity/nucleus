@@ -178,9 +178,6 @@ export async function pickPromptChoice(
 	if (choices.length === 0) {
 		return null;
 	}
-	if (choices.length === 1) {
-		return choices[0] ?? null;
-	}
 
 	const options = choices.map(promptOptionLabel);
 	const selected = await ui.select("Select prompt", options);

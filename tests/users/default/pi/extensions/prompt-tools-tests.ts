@@ -251,15 +251,28 @@ describe("pickPromptChoice", () => {
 		expect(result).toEqual({ source: "queued", text: "queued prompt" });
 	});
 
-	test("returns single available choice without prompting", async () => {
-		const { ctx, selectCalls } = makeContext();
+	test("opens picker for single available choice and can select it", async () => {
+		const sentOption = `Sent: ${promptPreview("only sent")}`;
+		const { ctx, selectCalls } = makeContext({ selectResult: sentOption });
 		const result = await pickPromptChoice(
 			{ source: "sent", text: "only sent" },
 			null,
 			(ctx as { ui: { select: (title: string, options: string[]) => Promise<string | undefined> } }).ui as never,
 		);
-		expect(selectCalls).toEqual([]);
+		expect(selectCalls).toHaveLength(1);
+		expect(selectCalls[0]?.[0]).toBe("Select prompt");
 		expect(result).toEqual({ source: "sent", text: "only sent" });
+	});
+
+	test("returns cancelled when single-choice picker is cancelled", async () => {
+		const { ctx, selectCalls } = makeContext({ selectResult: undefined });
+		const result = await pickPromptChoice(
+			{ source: "sent", text: "only sent" },
+			null,
+			(ctx as { ui: { select: (title: string, options: string[]) => Promise<string | undefined> } }).ui as never,
+		);
+		expect(selectCalls).toHaveLength(1);
+		expect(result).toBe("cancelled");
 	});
 
 	test("returns cancelled when picker selection is cancelled", async () => {
