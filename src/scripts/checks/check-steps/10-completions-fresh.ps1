@@ -88,14 +88,14 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
     if (-not $bashExe -or -not (Test-Path -LiteralPath $scriptPath -PathType Leaf)) { continue }
     $helpOut = & $bashExe $scriptPath --help 2>$null # check-suppress:suppression_doc: help is stdout-only per contract; --help failure handled below
     if ($LASTEXITCODE -ne 0) {
-      Write-ErrorMessage "nucleus-$command: --help failed during introspection"
+      Write-ErrorMessage "nucleus-${command}: --help failed during introspection"
       return $false
     }
     $helpText = ($helpOut | Out-String)
     $listFlags = @([regex]::Matches($zshText, '--list-[a-z0-9-]+') | ForEach-Object { $_.Value } | Sort-Object -Unique)
     foreach ($flag in $listFlags) {
       if ($helpText -notmatch [regex]::Escape($flag)) {
-        Write-ErrorMessage "nucleus-$command: completion wires $flag but --help output lacks it"
+        Write-ErrorMessage "nucleus-${command}: completion wires $flag but --help output lacks it"
         return $false
       }
     }
@@ -143,7 +143,7 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Platform
         }
         & $bashExe -c $testCmd > $null 2>&1 # check-suppress:suppression_doc: provider output not user-facing; exit code is the signal
         if ($LASTEXITCODE -ne 0) {
-          Write-ErrorMessage "nucleus-$command: completion provider command exited non-zero: $testCmd"
+          Write-ErrorMessage "nucleus-${command}: completion provider command exited non-zero: $testCmd"
           return $false
         }
       }
