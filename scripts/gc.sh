@@ -60,6 +60,10 @@ do_graveyard_report() {
 # default GC below runs.
 action="${1:-}"
 case "$action" in
+--list-logs)
+  shift
+  exec "${NUCLEUS_LOGS_BIN:-"$SCRIPT_DIR/logs.sh"}" --list-logs "$@"
+  ;;
 cleanup-nix | graveyard | logs | preferences)
   shift
   case "$action" in
@@ -81,9 +85,10 @@ cleanup-nix | graveyard | logs | preferences)
 esac
 
 usage() {
-  usage_std "$(basename "$0")" "[options]"
+  usage_std "$(basename "$0")" "[options] | --list-logs [--scope <user|system>]"
   cat <<'EOF'
   -h|--help                           Show usage.
+  --list-logs                         Print known nucleus-logs names, one per line.
   --tool-cache-gc|--no-tool-cache-gc  Control bun/cargo/rustc/uv cache gc (default: --tool-cache-gc).
   --git-cache-gc|--no-git-cache-gc  Control stale .git cache/state cleanup and git gc --auto (default: --git-cache-gc).
   --hm-gc|--no-hm-gc                        Control home-manager generation expiration (default: --hm-gc).
@@ -97,8 +102,20 @@ usage() {
   --vm-gc|--no-vm-gc                  Control stale VM artifact removal (default: --vm-gc).
   --vm-data-gc|--no-vm-data-gc        Also GC data/ writable disks during VM gc (default: --no-vm-data-gc).
   --log-gc|--no-log-gc                Control log rotation (default: --log-gc).
+  cleanup-nix [--dry-run]             Remove stale Nix build result symlinks.
   graveyard                           Report the rip2 graveyard path, entry count, total bytes, and oldest entry; deletes nothing.
   logs [<subcommand>] [options]       Rotate and expire managed logs via nucleus-logs; defaults to 'gc'.
+  --compress <true|false>             logs: compress rotated archives (forwarded).
+  --harness <name>                    logs: filter show by harness (forwarded).
+  --json                              logs: emit JSON where supported (forwarded).
+  --kind <kind>                       logs: filter show by kind (forwarded).
+  --lines <count>                     logs: tail line count (forwarded).
+  --log <name>                        logs: label/stats log name (forwarded).
+  --max-files <count>                 logs: rotated archives to keep (forwarded).
+  --max-size <bytes>                  logs: rotation threshold (forwarded).
+  --note <text>                       logs: label note (forwarded).
+  --scope <user|system>               logs: log root scope (forwarded).
+  --since <iso>                       logs: filter show since timestamp (forwarded).
   --journald-gc|--no-journald-gc        Control journald log vacuum (default: --journald-gc).
   --scoop-gc|--no-scoop-gc            Control Scoop cache clearing (default: --scoop-gc; ignored on POSIX, Scoop is Windows-only).
   --log-max-size <bytes>              Log rotation max file size before rotation (default: 10000000).

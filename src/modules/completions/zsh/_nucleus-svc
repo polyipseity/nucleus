@@ -82,6 +82,10 @@ case $state in
         ;;
       logs)
         _arguments \
+          '--lines[Number of log lines to show]:lines:' \
+          '-n[Number of log lines to show]:lines:' \
+          '--since[Show entries since timestamp (journald)]:since:' \
+          '--raw[Show unsanitized log output]' \
           '*:service:_nucleus_svc_services'
         ;;
       log-paths)

@@ -4,6 +4,7 @@
 
 _arguments -C \
   '(-h --help)'{--help,-h}'[Show usage]' \
+  '--list-logs[Print known nucleus-logs names, one per line]' \
   '--tool-cache-gc[Control bun/cargo/rustc/uv cache gc]' \
   '--no-tool-cache-gc[Disable bun/cargo/rustc/uv cache gc]' \
   '--git-cache-gc[Control stale .git cache/state cleanup and git gc --auto]' \
@@ -63,7 +64,7 @@ case $state in
     case $words[1] in
       cleanup-nix)
         _arguments \
-          '*: :'
+          '--dry-run[Print actions without executing]'
         ;;
       graveyard)
         _arguments \
@@ -71,12 +72,28 @@ case $state in
         ;;
       logs)
         _arguments \
-          '1:subcommand:'
+          '--compress[Compress rotated archives]:compress:(true false)' \
+          '--expiry[Archive retention]:expiry:' \
+          '--harness[show: keep events whose harness matches]:harness:(claude codex cursor opencode pi vscode)' \
+          '--json[Emit one JSON document instead of text]' \
+          '--kind[show: keep events whose kind matches]:kind:(event label)' \
+          '--lines[tail: number of events to print]:lines:' \
+          '--log[label/stats: log name]:log:->log_names' \
+          '--max-files[Rotated archives to keep]:max files:' \
+          '--max-size[Rotation threshold in bytes]:max size:' \
+          '--scope[Log root to operate on]:scope:(user system)' \
+          '--since[show: keep events at or after an ISO-8601 timestamp]:since:' \
+          '--note[label: free-text justification]:note:' \
+          '--dry-run[Report what would change without writing]' \
+          '1:subcommand:(append expire gc label rotate show stats tail)'
         ;;
       preferences)
         _arguments \
           '*: :'
         ;;
     esac
+    ;;
+  log_names)
+    _call_program 'log-names' nucleus-logs --list-logs
     ;;
 esac

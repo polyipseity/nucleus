@@ -5,19 +5,7 @@
 _arguments -C \
   '(-h --help)'{--help,-h}'[Show usage]' \
   '--list-logs[Print known log names, one per line]' \
-  '--compress[Compress rotated archives]:compress:(true false)' \
-  '--expiry[Archive retention]:expiry:' \
-  '--harness[show: keep events whose harness matches]:harness:(claude codex cursor opencode pi vscode)' \
-  '--json[Emit one JSON document instead of text]' \
-  '--kind[show: keep events whose kind matches]:kind:(event label)' \
-  '--lines[tail: number of events to print]:lines:' \
-  '--log[label/stats: log name]:log:->log_names' \
-  '--max-files[Rotated archives to keep]:max files:' \
-  '--max-size[Rotation threshold in bytes]:max size:' \
   '--scope[Log root to operate on]:scope:(user system)' \
-  '--since[show: keep events at or after an ISO-8601 timestamp]:since:' \
-  '--note[label: free-text justification]:note:' \
-  '--dry-run[Report what would change without writing]' \
   '1:subcommand:->subcmd' \
   '*::arg:->args'
 
@@ -40,35 +28,60 @@ case $state in
     case $words[1] in
       append)
         _arguments \
+          '--scope[Log root to operate on]:scope:(user system)' \
+          '--dry-run[Report what would change without writing]' \
           '1:log-name:->log_names'
         ;;
       expire)
         _arguments \
-          '*: :'
+          '--scope[Log root to operate on]:scope:(user system)' \
+          '--expiry[Archive retention]:expiry:' \
+          '--dry-run[Report what would change without writing]'
         ;;
       gc)
         _arguments \
-          '*: :'
+          '--scope[Log root to operate on]:scope:(user system)' \
+          '--dry-run[Report what would change without writing]' \
+          '--compress[Compress rotated archives]:compress:(true false)' \
+          '--expiry[Archive retention]:expiry:' \
+          '--max-files[Rotated archives to keep]:max files:' \
+          '--max-size[Rotation threshold in bytes]:max size:'
         ;;
       label)
         _arguments \
+          '--log[label/stats: log name]:log:->log_names' \
+          '--note[label: free-text justification]:note:' \
+          '--dry-run[Report what would change without writing]' \
           '1:id:' \
           '2:verdict:(correct false-allow false-deny)'
         ;;
       rotate)
         _arguments \
-          '*: :'
+          '--scope[Log root to operate on]:scope:(user system)' \
+          '--dry-run[Report what would change without writing]' \
+          '--compress[Compress rotated archives]:compress:(true false)' \
+          '--max-files[Rotated archives to keep]:max files:' \
+          '--max-size[Rotation threshold in bytes]:max size:'
         ;;
       show)
         _arguments \
+          '--scope[Log root to operate on]:scope:(user system)' \
+          '--harness[show: keep events whose harness matches]:harness:(claude codex cursor opencode pi vscode)' \
+          '--json[Emit one JSON document instead of text]' \
+          '--kind[show: keep events whose kind matches]:kind:(event label)' \
+          '--since[show: keep events at or after an ISO-8601 timestamp]:since:' \
           '1:log-name:->log_names'
         ;;
       stats)
         _arguments \
-          '*: :'
+          '--scope[Log root to operate on]:scope:(user system)' \
+          '--json[Emit one JSON document instead of text]' \
+          '--log[label/stats: log name]:log:->log_names'
         ;;
       tail)
         _arguments \
+          '--scope[Log root to operate on]:scope:(user system)' \
+          '--lines[tail: number of events to print]:lines:' \
           '1:log-name:->log_names'
         ;;
     esac

@@ -4,15 +4,16 @@
 
 _arguments -C \
   '(-h --help)'{--help,-h}'[Show usage]' \
-  '--dry-run[Print planned actions without executing]' \
-  '--accept-gsi-license[Accept the GSI license for Android GSI downloads]' \
-  '--no-accept-gsi-license[Do not accept the GSI license]' \
   '--windows-iso[Path to the Windows 11 ISO]:windows iso:_files' \
   '--windows-iso-source[ISO auto-resolution]:windows iso source:(auto url mido)' \
   '--windows-iso-retries[Retry attempts for network downloads]:windows iso retries:' \
-  '--headful[Run guest builds with visible GUI]' \
-  '--no-headful[Run guest builds headless]' \
   '--accelerator[QEMU accelerator override]:accelerator:(hvf kvm tcg)' \
+  '--vm-dir-override[Override the default ~/virtual machines path]:vm dir override:_files' \
+  '--mido-patch-file[Override runtime Mido patch file path]:mido patch file:_files' \
+  '--mido-script[Override the Mido script path]:mido script:_files' \
+  '--repo-root[Override the repository root path]:repo root:_files' \
+  '--json[Machine-readable JSON output (list, status)]' \
+  '--dry-run[Print planned actions without executing]' \
   '--gc[Run GC after setup]' \
   '--no-gc[Do not run GC after setup]' \
   '--gc-disabled[Also clear disabled VM entries during GC]' \
@@ -21,11 +22,10 @@ _arguments -C \
   '--no-gc-data[Do not GC data/ writable disks during GC]' \
   '--force[Recreate invalid data disks during setup, and perform pack removals]' \
   '--allow-shrink[Allow shrinking during resize]' \
-  '--vm-dir-override[Override the default ~/virtual machines path]:vm dir override:_files' \
-  '--mido-patch-file[Override runtime Mido patch file path]:mido patch file:_files' \
-  '--mido-script[Override the Mido script path]:mido script:_files' \
-  '--json[Machine-readable JSON output (list, status)]' \
-  '--repo-root[Override the repository root path]:repo root:_files' \
+  '--accept-gsi-license[Accept the GSI license for Android GSI downloads]' \
+  '--no-accept-gsi-license[Do not accept the GSI license]' \
+  '--headful[Run guest builds with visible GUI]' \
+  '--no-headful[Run guest builds headless]' \
   '1:subcommand:->subcmd' \
   '*::arg:->args'
 
@@ -55,38 +55,163 @@ case $state in
     case $words[1] in
       setup)
         _arguments \
+          '--json[Machine-readable JSON output (list, status)]' \
+          '--dry-run[Print planned actions without executing]' \
+          '--gc[Run GC after setup]' \
+          '--no-gc[Do not run GC after setup]' \
+          '--gc-disabled[Also clear disabled VM entries during GC]' \
+          '--no-gc-disabled[Do not clear disabled VM entries during GC]' \
+          '--gc-data[Also GC data/ writable disks during GC]' \
+          '--no-gc-data[Do not GC data/ writable disks during GC]' \
+          '--force[Recreate invalid data disks during setup, and perform pack removals]' \
+          '--allow-shrink[Allow shrinking during resize]' \
+          '--accept-gsi-license[Accept the GSI license for Android GSI downloads]' \
+          '--no-accept-gsi-license[Do not accept the GSI license]' \
+          '--headful[Run guest builds with visible GUI]' \
+          '--no-headful[Run guest builds headless]' \
           '*:vm:->vm_ids'
         ;;
       sync)
         _arguments \
+          '--json[Machine-readable JSON output (list, status)]' \
+          '--dry-run[Print planned actions without executing]' \
+          '--gc[Run GC after setup]' \
+          '--no-gc[Do not run GC after setup]' \
+          '--gc-disabled[Also clear disabled VM entries during GC]' \
+          '--no-gc-disabled[Do not clear disabled VM entries during GC]' \
+          '--gc-data[Also GC data/ writable disks during GC]' \
+          '--no-gc-data[Do not GC data/ writable disks during GC]' \
+          '--force[Recreate invalid data disks during setup, and perform pack removals]' \
+          '--allow-shrink[Allow shrinking during resize]' \
+          '--accept-gsi-license[Accept the GSI license for Android GSI downloads]' \
+          '--no-accept-gsi-license[Do not accept the GSI license]' \
+          '--headful[Run guest builds with visible GUI]' \
+          '--no-headful[Run guest builds headless]' \
           '*:vm:->vm_ids'
         ;;
       build-system)
         _arguments \
+          '--json[Machine-readable JSON output (list, status)]' \
+          '--dry-run[Print planned actions without executing]' \
+          '--gc[Run GC after setup]' \
+          '--no-gc[Do not run GC after setup]' \
+          '--gc-disabled[Also clear disabled VM entries during GC]' \
+          '--no-gc-disabled[Do not clear disabled VM entries during GC]' \
+          '--gc-data[Also GC data/ writable disks during GC]' \
+          '--no-gc-data[Do not GC data/ writable disks during GC]' \
+          '--force[Recreate invalid data disks during setup, and perform pack removals]' \
+          '--allow-shrink[Allow shrinking during resize]' \
+          '--accept-gsi-license[Accept the GSI license for Android GSI downloads]' \
+          '--no-accept-gsi-license[Do not accept the GSI license]' \
+          '--headful[Run guest builds with visible GUI]' \
+          '--no-headful[Run guest builds headless]' \
           '1:type:'
         ;;
       list)
         _arguments \
-          '*: :'
+          '--json[Machine-readable JSON output (list, status)]' \
+          '--dry-run[Print planned actions without executing]' \
+          '--gc[Run GC after setup]' \
+          '--no-gc[Do not run GC after setup]' \
+          '--gc-disabled[Also clear disabled VM entries during GC]' \
+          '--no-gc-disabled[Do not clear disabled VM entries during GC]' \
+          '--gc-data[Also GC data/ writable disks during GC]' \
+          '--no-gc-data[Do not GC data/ writable disks during GC]' \
+          '--force[Recreate invalid data disks during setup, and perform pack removals]' \
+          '--allow-shrink[Allow shrinking during resize]' \
+          '--accept-gsi-license[Accept the GSI license for Android GSI downloads]' \
+          '--no-accept-gsi-license[Do not accept the GSI license]' \
+          '--headful[Run guest builds with visible GUI]' \
+          '--no-headful[Run guest builds headless]'
         ;;
       status)
         _arguments \
+          '--json[Machine-readable JSON output (list, status)]' \
+          '--dry-run[Print planned actions without executing]' \
+          '--gc[Run GC after setup]' \
+          '--no-gc[Do not run GC after setup]' \
+          '--gc-disabled[Also clear disabled VM entries during GC]' \
+          '--no-gc-disabled[Do not clear disabled VM entries during GC]' \
+          '--gc-data[Also GC data/ writable disks during GC]' \
+          '--no-gc-data[Do not GC data/ writable disks during GC]' \
+          '--force[Recreate invalid data disks during setup, and perform pack removals]' \
+          '--allow-shrink[Allow shrinking during resize]' \
+          '--accept-gsi-license[Accept the GSI license for Android GSI downloads]' \
+          '--no-accept-gsi-license[Do not accept the GSI license]' \
+          '--headful[Run guest builds with visible GUI]' \
+          '--no-headful[Run guest builds headless]' \
           '*:vm:->vm_ids'
         ;;
       start)
         _arguments \
+          '--json[Machine-readable JSON output (list, status)]' \
+          '--dry-run[Print planned actions without executing]' \
+          '--gc[Run GC after setup]' \
+          '--no-gc[Do not run GC after setup]' \
+          '--gc-disabled[Also clear disabled VM entries during GC]' \
+          '--no-gc-disabled[Do not clear disabled VM entries during GC]' \
+          '--gc-data[Also GC data/ writable disks during GC]' \
+          '--no-gc-data[Do not GC data/ writable disks during GC]' \
+          '--force[Recreate invalid data disks during setup, and perform pack removals]' \
+          '--allow-shrink[Allow shrinking during resize]' \
+          '--accept-gsi-license[Accept the GSI license for Android GSI downloads]' \
+          '--no-accept-gsi-license[Do not accept the GSI license]' \
+          '--headful[Run guest builds with visible GUI]' \
+          '--no-headful[Run guest builds headless]' \
           '1:vm:->vm_ids'
         ;;
       stop)
         _arguments \
+          '--json[Machine-readable JSON output (list, status)]' \
+          '--dry-run[Print planned actions without executing]' \
+          '--gc[Run GC after setup]' \
+          '--no-gc[Do not run GC after setup]' \
+          '--gc-disabled[Also clear disabled VM entries during GC]' \
+          '--no-gc-disabled[Do not clear disabled VM entries during GC]' \
+          '--gc-data[Also GC data/ writable disks during GC]' \
+          '--no-gc-data[Do not GC data/ writable disks during GC]' \
+          '--force[Recreate invalid data disks during setup, and perform pack removals]' \
+          '--allow-shrink[Allow shrinking during resize]' \
+          '--accept-gsi-license[Accept the GSI license for Android GSI downloads]' \
+          '--no-accept-gsi-license[Do not accept the GSI license]' \
+          '--headful[Run guest builds with visible GUI]' \
+          '--no-headful[Run guest builds headless]' \
           '1:vm:->vm_ids'
         ;;
       upgrade)
         _arguments \
+          '--json[Machine-readable JSON output (list, status)]' \
+          '--dry-run[Print planned actions without executing]' \
+          '--gc[Run GC after setup]' \
+          '--no-gc[Do not run GC after setup]' \
+          '--gc-disabled[Also clear disabled VM entries during GC]' \
+          '--no-gc-disabled[Do not clear disabled VM entries during GC]' \
+          '--gc-data[Also GC data/ writable disks during GC]' \
+          '--no-gc-data[Do not GC data/ writable disks during GC]' \
+          '--force[Recreate invalid data disks during setup, and perform pack removals]' \
+          '--allow-shrink[Allow shrinking during resize]' \
+          '--accept-gsi-license[Accept the GSI license for Android GSI downloads]' \
+          '--no-accept-gsi-license[Do not accept the GSI license]' \
+          '--headful[Run guest builds with visible GUI]' \
+          '--no-headful[Run guest builds headless]' \
           '1:vm:->vm_ids'
         ;;
       reset)
         _arguments \
+          '--json[Machine-readable JSON output (list, status)]' \
+          '--dry-run[Print planned actions without executing]' \
+          '--gc[Run GC after setup]' \
+          '--no-gc[Do not run GC after setup]' \
+          '--gc-disabled[Also clear disabled VM entries during GC]' \
+          '--no-gc-disabled[Do not clear disabled VM entries during GC]' \
+          '--gc-data[Also GC data/ writable disks during GC]' \
+          '--no-gc-data[Do not GC data/ writable disks during GC]' \
+          '--force[Recreate invalid data disks during setup, and perform pack removals]' \
+          '--allow-shrink[Allow shrinking during resize]' \
+          '--accept-gsi-license[Accept the GSI license for Android GSI downloads]' \
+          '--no-accept-gsi-license[Do not accept the GSI license]' \
+          '--headful[Run guest builds with visible GUI]' \
+          '--no-headful[Run guest builds headless]' \
           '1:vm:->vm_ids'
         ;;
       android-config)
@@ -97,28 +222,109 @@ case $state in
           '--root[Enable rooted debugging]' \
           '--fake-wifi[Create wlan0 via virt_wifi on eth0]' \
           '--fake-wifi-revert[Remove persisted fake Wi-Fi and restore eth0]' \
+          '--json[Machine-readable JSON output (list, status)]' \
+          '--dry-run[Print planned actions without executing]' \
+          '--gc[Run GC after setup]' \
+          '--no-gc[Do not run GC after setup]' \
+          '--gc-disabled[Also clear disabled VM entries during GC]' \
+          '--no-gc-disabled[Do not clear disabled VM entries during GC]' \
+          '--gc-data[Also GC data/ writable disks during GC]' \
+          '--no-gc-data[Do not GC data/ writable disks during GC]' \
+          '--force[Recreate invalid data disks during setup, and perform pack removals]' \
+          '--allow-shrink[Allow shrinking during resize]' \
+          '--accept-gsi-license[Accept the GSI license for Android GSI downloads]' \
+          '--no-accept-gsi-license[Do not accept the GSI license]' \
+          '--headful[Run guest builds with visible GUI]' \
+          '--no-headful[Run guest builds headless]' \
           '1:vm:->vm_ids'
         ;;
       inject)
         _arguments \
+          '--json[Machine-readable JSON output (list, status)]' \
+          '--dry-run[Print planned actions without executing]' \
+          '--gc[Run GC after setup]' \
+          '--no-gc[Do not run GC after setup]' \
+          '--gc-disabled[Also clear disabled VM entries during GC]' \
+          '--no-gc-disabled[Do not clear disabled VM entries during GC]' \
+          '--gc-data[Also GC data/ writable disks during GC]' \
+          '--no-gc-data[Do not GC data/ writable disks during GC]' \
+          '--force[Recreate invalid data disks during setup, and perform pack removals]' \
+          '--allow-shrink[Allow shrinking during resize]' \
+          '--accept-gsi-license[Accept the GSI license for Android GSI downloads]' \
+          '--no-accept-gsi-license[Do not accept the GSI license]' \
+          '--headful[Run guest builds with visible GUI]' \
+          '--no-headful[Run guest builds headless]' \
           '1:vm:->vm_ids'
         ;;
       gc)
         _arguments \
-          '*: :'
+          '--json[Machine-readable JSON output (list, status)]' \
+          '--dry-run[Print planned actions without executing]' \
+          '--gc[Run GC after setup]' \
+          '--no-gc[Do not run GC after setup]' \
+          '--gc-disabled[Also clear disabled VM entries during GC]' \
+          '--no-gc-disabled[Do not clear disabled VM entries during GC]' \
+          '--gc-data[Also GC data/ writable disks during GC]' \
+          '--no-gc-data[Do not GC data/ writable disks during GC]' \
+          '--force[Recreate invalid data disks during setup, and perform pack removals]' \
+          '--allow-shrink[Allow shrinking during resize]' \
+          '--accept-gsi-license[Accept the GSI license for Android GSI downloads]' \
+          '--no-accept-gsi-license[Do not accept the GSI license]' \
+          '--headful[Run guest builds with visible GUI]' \
+          '--no-headful[Run guest builds headless]'
         ;;
       resize)
         _arguments \
+          '--json[Machine-readable JSON output (list, status)]' \
+          '--dry-run[Print planned actions without executing]' \
+          '--gc[Run GC after setup]' \
+          '--no-gc[Do not run GC after setup]' \
+          '--gc-disabled[Also clear disabled VM entries during GC]' \
+          '--no-gc-disabled[Do not clear disabled VM entries during GC]' \
+          '--gc-data[Also GC data/ writable disks during GC]' \
+          '--no-gc-data[Do not GC data/ writable disks during GC]' \
+          '--force[Recreate invalid data disks during setup, and perform pack removals]' \
+          '--allow-shrink[Allow shrinking during resize]' \
+          '--accept-gsi-license[Accept the GSI license for Android GSI downloads]' \
+          '--no-accept-gsi-license[Do not accept the GSI license]' \
+          '--headful[Run guest builds with visible GUI]' \
+          '--no-headful[Run guest builds headless]' \
           '1:vm:->vm_ids' \
           '2:size:'
         ;;
       pack)
         _arguments \
-          '*: :'
+          '--json[Machine-readable JSON output (list, status)]' \
+          '--dry-run[Print planned actions without executing]' \
+          '--gc[Run GC after setup]' \
+          '--no-gc[Do not run GC after setup]' \
+          '--gc-disabled[Also clear disabled VM entries during GC]' \
+          '--no-gc-disabled[Do not clear disabled VM entries during GC]' \
+          '--gc-data[Also GC data/ writable disks during GC]' \
+          '--no-gc-data[Do not GC data/ writable disks during GC]' \
+          '--force[Recreate invalid data disks during setup, and perform pack removals]' \
+          '--allow-shrink[Allow shrinking during resize]' \
+          '--accept-gsi-license[Accept the GSI license for Android GSI downloads]' \
+          '--no-accept-gsi-license[Do not accept the GSI license]' \
+          '--headful[Run guest builds with visible GUI]' \
+          '--no-headful[Run guest builds headless]'
         ;;
       unpack)
         _arguments \
-          '*: :'
+          '--json[Machine-readable JSON output (list, status)]' \
+          '--dry-run[Print planned actions without executing]' \
+          '--gc[Run GC after setup]' \
+          '--no-gc[Do not run GC after setup]' \
+          '--gc-disabled[Also clear disabled VM entries during GC]' \
+          '--no-gc-disabled[Do not clear disabled VM entries during GC]' \
+          '--gc-data[Also GC data/ writable disks during GC]' \
+          '--no-gc-data[Do not GC data/ writable disks during GC]' \
+          '--force[Recreate invalid data disks during setup, and perform pack removals]' \
+          '--allow-shrink[Allow shrinking during resize]' \
+          '--accept-gsi-license[Accept the GSI license for Android GSI downloads]' \
+          '--no-accept-gsi-license[Do not accept the GSI license]' \
+          '--headful[Run guest builds with visible GUI]' \
+          '--no-headful[Run guest builds headless]'
         ;;
     esac
     ;;

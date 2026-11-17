@@ -679,7 +679,7 @@ else
   # vm-ids
   grep -qF -- "->vm_ids" "$_prov_file" && grep -qF "nucleus-prov list --json" "$_prov_file" || _prov_ok=0
   # log-names
-  grep -qF -- "->log_names" "$_prov_file" && grep -qF "nucleus-prov --list-logs" "$_prov_file" || _prov_ok=0
+  grep -qF -- "->log_names" "$_prov_file" && grep -qF "nucleus-logs --list-logs" "$_prov_file" || _prov_ok=0
   # config-keys
   grep -qF -- "->config_keys" "$_prov_file" && grep -qF "nucleus-prov list --json" "$_prov_file" || _prov_ok=0
   # replicas

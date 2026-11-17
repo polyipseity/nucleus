@@ -151,7 +151,7 @@ dynamic_provider_action() {
     printf "_call_program 'vm-ids' nucleus-%s list --json | jq -r '.[].id'" "$_cmd"
     ;;
   log-names)
-    printf "_call_program 'log-names' nucleus-%s --list-logs" "$_cmd"
+    printf "_call_program 'log-names' nucleus-logs --list-logs"
     ;;
   config-keys)
     printf "_call_program 'config-keys' nucleus-%s list --json | jq -r 'keys[]'" "$_cmd"

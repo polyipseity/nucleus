@@ -50,6 +50,9 @@ usage() {
   endpoint <service> [<name>]       Show network endpoint(s) for a service.
   --list-endpoints <service>        Print endpoint names for a service.
   logs [service...]                 Show service logs (list available if no service).
+  -n|--lines <count>                logs: number of log lines to show (default: 10).
+  --since <timestamp>               logs: show entries since timestamp (journald).
+  --raw                             logs: show unsanitized log output.
   log-paths [service...]            Print log file path(s).
   log-config [service...]           Show effective logging configuration.
   --json                            Machine-readable JSON output.

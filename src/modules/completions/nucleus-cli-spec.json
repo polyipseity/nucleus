@@ -619,6 +619,11 @@
           "description": "Show usage"
         },
         {
+          "long": "--list-logs",
+          "takesValue": false,
+          "description": "Print known nucleus-logs names, one per line"
+        },
+        {
           "long": "--tool-cache-gc",
           "takesValue": false,
           "description": "Control bun/cargo/rustc/uv cache gc"
@@ -841,7 +846,13 @@
         {
           "name": "cleanup-nix",
           "description": "Run nix cleanup subcommand.",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Print actions without executing"
+            }
+          ],
           "positionals": []
         },
         {
@@ -852,11 +863,119 @@
         },
         {
           "name": "logs",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--compress",
+              "takesValue": true,
+              "valueType": "enum",
+              "choices": [
+                "true",
+                "false"
+              ],
+              "description": "Compress rotated archives"
+            },
+            {
+              "long": "--expiry",
+              "takesValue": true,
+              "valueType": "string",
+              "description": "Archive retention"
+            },
+            {
+              "long": "--harness",
+              "takesValue": true,
+              "valueType": "enum",
+              "description": "show: keep events whose harness matches",
+              "choices": [
+                "claude",
+                "codex",
+                "cursor",
+                "opencode",
+                "pi",
+                "vscode"
+              ]
+            },
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Emit one JSON document instead of text"
+            },
+            {
+              "long": "--kind",
+              "takesValue": true,
+              "valueType": "enum",
+              "description": "show: keep events whose kind matches",
+              "choices": [
+                "event",
+                "label"
+              ]
+            },
+            {
+              "long": "--lines",
+              "takesValue": true,
+              "valueType": "count",
+              "description": "tail: number of events to print"
+            },
+            {
+              "long": "--log",
+              "takesValue": true,
+              "valueType": "string",
+              "valueSource": "log-names",
+              "description": "label/stats: log name"
+            },
+            {
+              "long": "--max-files",
+              "takesValue": true,
+              "valueType": "count",
+              "description": "Rotated archives to keep"
+            },
+            {
+              "long": "--max-size",
+              "takesValue": true,
+              "valueType": "bytes",
+              "description": "Rotation threshold in bytes"
+            },
+            {
+              "long": "--scope",
+              "takesValue": true,
+              "valueType": "enum",
+              "choices": [
+                "user",
+                "system"
+              ],
+              "description": "Log root to operate on"
+            },
+            {
+              "long": "--since",
+              "takesValue": true,
+              "valueType": "string",
+              "description": "show: keep events at or after an ISO-8601 timestamp"
+            },
+            {
+              "long": "--note",
+              "takesValue": true,
+              "valueType": "string",
+              "description": "label: free-text justification"
+            },
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Report what would change without writing"
+            }
+          ],
           "positionals": [
             {
               "name": "subcommand",
-              "description": "logs subcommand"
+              "description": "nucleus-logs subcommand",
+              "choices": [
+                "append",
+                "expire",
+                "gc",
+                "label",
+                "rotate",
+                "show",
+                "stats",
+                "tail"
+              ]
             }
           ],
           "description": "Rotate and expire managed logs via nucleus-logs; defaults to gc."
@@ -874,85 +993,15 @@
       "summary": "Append, rotate, query, and label nucleus logs.",
       "globalFlags": [
         {
-          "long": "--list-logs",
-          "takesValue": false,
-          "description": "Print known log names, one per line"
-        },
-        {
           "long": "--help",
           "takesValue": false,
           "short": "-h",
           "description": "Show usage"
         },
         {
-          "long": "--compress",
-          "takesValue": true,
-          "valueType": "enum",
-          "choices": [
-            "true",
-            "false"
-          ],
-          "description": "Compress rotated archives"
-        },
-        {
-          "long": "--expiry",
-          "takesValue": true,
-          "valueType": "string",
-          "description": "Archive retention"
-        },
-        {
-          "long": "--harness",
-          "takesValue": true,
-          "valueType": "enum",
-          "description": "show: keep events whose harness matches",
-          "choices": [
-            "claude",
-            "codex",
-            "cursor",
-            "opencode",
-            "pi",
-            "vscode"
-          ]
-        },
-        {
-          "long": "--json",
+          "long": "--list-logs",
           "takesValue": false,
-          "description": "Emit one JSON document instead of text"
-        },
-        {
-          "long": "--kind",
-          "takesValue": true,
-          "valueType": "enum",
-          "description": "show: keep events whose kind matches",
-          "choices": [
-            "event",
-            "label"
-          ]
-        },
-        {
-          "long": "--lines",
-          "takesValue": true,
-          "valueType": "count",
-          "description": "tail: number of events to print"
-        },
-        {
-          "long": "--log",
-          "takesValue": true,
-          "valueType": "string",
-          "valueSource": "log-names",
-          "description": "label/stats: log name"
-        },
-        {
-          "long": "--max-files",
-          "takesValue": true,
-          "valueType": "count",
-          "description": "Rotated archives to keep"
-        },
-        {
-          "long": "--max-size",
-          "takesValue": true,
-          "valueType": "bytes",
-          "description": "Rotation threshold in bytes"
+          "description": "Print known log names, one per line"
         },
         {
           "long": "--scope",
@@ -963,29 +1012,28 @@
             "system"
           ],
           "description": "Log root to operate on"
-        },
-        {
-          "long": "--since",
-          "takesValue": true,
-          "valueType": "string",
-          "description": "show: keep events at or after an ISO-8601 timestamp"
-        },
-        {
-          "long": "--note",
-          "takesValue": true,
-          "valueType": "string",
-          "description": "label: free-text justification"
-        },
-        {
-          "long": "--dry-run",
-          "takesValue": false,
-          "description": "Report what would change without writing"
         }
       ],
       "subcommands": [
         {
           "name": "append",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--scope",
+              "takesValue": true,
+              "valueType": "enum",
+              "choices": [
+                "user",
+                "system"
+              ],
+              "description": "Log root to operate on"
+            },
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Report what would change without writing"
+            }
+          ],
           "positionals": [
             {
               "name": "log-name",
@@ -997,19 +1045,104 @@
         },
         {
           "name": "expire",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--scope",
+              "takesValue": true,
+              "valueType": "enum",
+              "choices": [
+                "user",
+                "system"
+              ],
+              "description": "Log root to operate on"
+            },
+            {
+              "long": "--expiry",
+              "takesValue": true,
+              "valueType": "string",
+              "description": "Archive retention"
+            },
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Report what would change without writing"
+            }
+          ],
           "positionals": [],
           "description": "Delete archives older than the expiry."
         },
         {
           "name": "gc",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--scope",
+              "takesValue": true,
+              "valueType": "enum",
+              "choices": [
+                "user",
+                "system"
+              ],
+              "description": "Log root to operate on"
+            },
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Report what would change without writing"
+            },
+            {
+              "long": "--compress",
+              "takesValue": true,
+              "valueType": "enum",
+              "choices": [
+                "true",
+                "false"
+              ],
+              "description": "Compress rotated archives"
+            },
+            {
+              "long": "--expiry",
+              "takesValue": true,
+              "valueType": "string",
+              "description": "Archive retention"
+            },
+            {
+              "long": "--max-files",
+              "takesValue": true,
+              "valueType": "count",
+              "description": "Rotated archives to keep"
+            },
+            {
+              "long": "--max-size",
+              "takesValue": true,
+              "valueType": "bytes",
+              "description": "Rotation threshold in bytes"
+            }
+          ],
           "positionals": [],
           "description": "Rotate, then expire."
         },
         {
           "name": "label",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--log",
+              "takesValue": true,
+              "valueType": "string",
+              "valueSource": "log-names",
+              "description": "label/stats: log name"
+            },
+            {
+              "long": "--note",
+              "takesValue": true,
+              "valueType": "string",
+              "description": "label: free-text justification"
+            },
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Report what would change without writing"
+            }
+          ],
           "positionals": [
             {
               "name": "id",
@@ -1031,13 +1164,97 @@
         },
         {
           "name": "rotate",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--scope",
+              "takesValue": true,
+              "valueType": "enum",
+              "choices": [
+                "user",
+                "system"
+              ],
+              "description": "Log root to operate on"
+            },
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Report what would change without writing"
+            },
+            {
+              "long": "--compress",
+              "takesValue": true,
+              "valueType": "enum",
+              "choices": [
+                "true",
+                "false"
+              ],
+              "description": "Compress rotated archives"
+            },
+            {
+              "long": "--max-files",
+              "takesValue": true,
+              "valueType": "count",
+              "description": "Rotated archives to keep"
+            },
+            {
+              "long": "--max-size",
+              "takesValue": true,
+              "valueType": "bytes",
+              "description": "Rotation threshold in bytes"
+            }
+          ],
           "positionals": [],
           "description": "Rotate logs larger than the size limit."
         },
         {
           "name": "show",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--scope",
+              "takesValue": true,
+              "valueType": "enum",
+              "choices": [
+                "user",
+                "system"
+              ],
+              "description": "Log root to operate on"
+            },
+            {
+              "long": "--harness",
+              "takesValue": true,
+              "valueType": "enum",
+              "description": "show: keep events whose harness matches",
+              "choices": [
+                "claude",
+                "codex",
+                "cursor",
+                "opencode",
+                "pi",
+                "vscode"
+              ]
+            },
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Emit one JSON document instead of text"
+            },
+            {
+              "long": "--kind",
+              "takesValue": true,
+              "valueType": "enum",
+              "description": "show: keep events whose kind matches",
+              "choices": [
+                "event",
+                "label"
+              ]
+            },
+            {
+              "long": "--since",
+              "takesValue": true,
+              "valueType": "string",
+              "description": "show: keep events at or after an ISO-8601 timestamp"
+            }
+          ],
           "positionals": [
             {
               "name": "log-name",
@@ -1049,13 +1266,53 @@
         },
         {
           "name": "stats",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--scope",
+              "takesValue": true,
+              "valueType": "enum",
+              "choices": [
+                "user",
+                "system"
+              ],
+              "description": "Log root to operate on"
+            },
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Emit one JSON document instead of text"
+            },
+            {
+              "long": "--log",
+              "takesValue": true,
+              "valueType": "string",
+              "valueSource": "log-names",
+              "description": "label/stats: log name"
+            }
+          ],
           "positionals": [],
           "description": "Count events, bytes, and archives per log."
         },
         {
           "name": "tail",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--scope",
+              "takesValue": true,
+              "valueType": "enum",
+              "choices": [
+                "user",
+                "system"
+              ],
+              "description": "Log root to operate on"
+            },
+            {
+              "long": "--lines",
+              "takesValue": true,
+              "valueType": "count",
+              "description": "tail: number of events to print"
+            }
+          ],
           "positionals": [
             {
               "name": "log-name",
@@ -1236,7 +1493,26 @@
         },
         {
           "name": "logs",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--lines",
+              "short": "-n",
+              "takesValue": true,
+              "valueType": "count",
+              "description": "Number of log lines to show"
+            },
+            {
+              "long": "--since",
+              "takesValue": true,
+              "valueType": "string",
+              "description": "Show entries since timestamp (journald)"
+            },
+            {
+              "long": "--raw",
+              "takesValue": false,
+              "description": "Show unsanitized log output"
+            }
+          ],
           "positionals": [
             {
               "name": "service",
@@ -1480,21 +1756,6 @@
           "description": "Show usage"
         },
         {
-          "long": "--dry-run",
-          "takesValue": false,
-          "description": "Print planned actions without executing"
-        },
-        {
-          "long": "--accept-gsi-license",
-          "takesValue": false,
-          "description": "Accept the GSI license for Android GSI downloads"
-        },
-        {
-          "long": "--no-accept-gsi-license",
-          "takesValue": false,
-          "description": "Do not accept the GSI license"
-        },
-        {
           "long": "--windows-iso",
           "takesValue": true,
           "valueType": "path",
@@ -1518,16 +1779,6 @@
           "description": "Retry attempts for network downloads"
         },
         {
-          "long": "--headful",
-          "takesValue": false,
-          "description": "Run guest builds with visible GUI"
-        },
-        {
-          "long": "--no-headful",
-          "takesValue": false,
-          "description": "Run guest builds headless"
-        },
-        {
           "long": "--accelerator",
           "takesValue": true,
           "valueType": "enum",
@@ -1537,6 +1788,40 @@
             "tcg"
           ],
           "description": "QEMU accelerator override"
+        },
+        {
+          "long": "--vm-dir-override",
+          "takesValue": true,
+          "valueType": "path",
+          "description": "Override the default ~/virtual machines path"
+        },
+        {
+          "long": "--mido-patch-file",
+          "takesValue": true,
+          "valueType": "path",
+          "description": "Override runtime Mido patch file path"
+        },
+        {
+          "long": "--mido-script",
+          "takesValue": true,
+          "valueType": "path",
+          "description": "Override the Mido script path"
+        },
+        {
+          "long": "--repo-root",
+          "takesValue": true,
+          "valueType": "path",
+          "description": "Override the repository root path"
+        },
+        {
+          "long": "--json",
+          "takesValue": false,
+          "description": "Machine-readable JSON output (list, status)"
+        },
+        {
+          "long": "--dry-run",
+          "takesValue": false,
+          "description": "Print planned actions without executing"
         },
         {
           "long": "--gc",
@@ -1579,39 +1864,101 @@
           "description": "Allow shrinking during resize"
         },
         {
-          "long": "--vm-dir-override",
-          "takesValue": true,
-          "valueType": "path",
-          "description": "Override the default ~/virtual machines path"
-        },
-        {
-          "long": "--mido-patch-file",
-          "takesValue": true,
-          "valueType": "path",
-          "description": "Override runtime Mido patch file path"
-        },
-        {
-          "long": "--mido-script",
-          "takesValue": true,
-          "valueType": "path",
-          "description": "Override the Mido script path"
-        },
-        {
-          "long": "--json",
+          "long": "--accept-gsi-license",
           "takesValue": false,
-          "description": "Machine-readable JSON output (list, status)"
+          "description": "Accept the GSI license for Android GSI downloads"
         },
         {
-          "long": "--repo-root",
-          "takesValue": true,
-          "valueType": "path",
-          "description": "Override the repository root path"
+          "long": "--no-accept-gsi-license",
+          "takesValue": false,
+          "description": "Do not accept the GSI license"
+        },
+        {
+          "long": "--headful",
+          "takesValue": false,
+          "description": "Run guest builds with visible GUI"
+        },
+        {
+          "long": "--no-headful",
+          "takesValue": false,
+          "description": "Run guest builds headless"
         }
       ],
       "subcommands": [
         {
           "name": "setup",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Machine-readable JSON output (list, status)"
+            },
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Print planned actions without executing"
+            },
+            {
+              "long": "--gc",
+              "takesValue": false,
+              "description": "Run GC after setup"
+            },
+            {
+              "long": "--no-gc",
+              "takesValue": false,
+              "description": "Do not run GC after setup"
+            },
+            {
+              "long": "--gc-disabled",
+              "takesValue": false,
+              "description": "Also clear disabled VM entries during GC"
+            },
+            {
+              "long": "--no-gc-disabled",
+              "takesValue": false,
+              "description": "Do not clear disabled VM entries during GC"
+            },
+            {
+              "long": "--gc-data",
+              "takesValue": false,
+              "description": "Also GC data/ writable disks during GC"
+            },
+            {
+              "long": "--no-gc-data",
+              "takesValue": false,
+              "description": "Do not GC data/ writable disks during GC"
+            },
+            {
+              "long": "--force",
+              "takesValue": false,
+              "description": "Recreate invalid data disks during setup, and perform pack removals"
+            },
+            {
+              "long": "--allow-shrink",
+              "takesValue": false,
+              "description": "Allow shrinking during resize"
+            },
+            {
+              "long": "--accept-gsi-license",
+              "takesValue": false,
+              "description": "Accept the GSI license for Android GSI downloads"
+            },
+            {
+              "long": "--no-accept-gsi-license",
+              "takesValue": false,
+              "description": "Do not accept the GSI license"
+            },
+            {
+              "long": "--headful",
+              "takesValue": false,
+              "description": "Run guest builds with visible GUI"
+            },
+            {
+              "long": "--no-headful",
+              "takesValue": false,
+              "description": "Run guest builds headless"
+            }
+          ],
           "positionals": [
             {
               "name": "vm",
@@ -1623,7 +1970,78 @@
         },
         {
           "name": "sync",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Machine-readable JSON output (list, status)"
+            },
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Print planned actions without executing"
+            },
+            {
+              "long": "--gc",
+              "takesValue": false,
+              "description": "Run GC after setup"
+            },
+            {
+              "long": "--no-gc",
+              "takesValue": false,
+              "description": "Do not run GC after setup"
+            },
+            {
+              "long": "--gc-disabled",
+              "takesValue": false,
+              "description": "Also clear disabled VM entries during GC"
+            },
+            {
+              "long": "--no-gc-disabled",
+              "takesValue": false,
+              "description": "Do not clear disabled VM entries during GC"
+            },
+            {
+              "long": "--gc-data",
+              "takesValue": false,
+              "description": "Also GC data/ writable disks during GC"
+            },
+            {
+              "long": "--no-gc-data",
+              "takesValue": false,
+              "description": "Do not GC data/ writable disks during GC"
+            },
+            {
+              "long": "--force",
+              "takesValue": false,
+              "description": "Recreate invalid data disks during setup, and perform pack removals"
+            },
+            {
+              "long": "--allow-shrink",
+              "takesValue": false,
+              "description": "Allow shrinking during resize"
+            },
+            {
+              "long": "--accept-gsi-license",
+              "takesValue": false,
+              "description": "Accept the GSI license for Android GSI downloads"
+            },
+            {
+              "long": "--no-accept-gsi-license",
+              "takesValue": false,
+              "description": "Do not accept the GSI license"
+            },
+            {
+              "long": "--headful",
+              "takesValue": false,
+              "description": "Run guest builds with visible GUI"
+            },
+            {
+              "long": "--no-headful",
+              "takesValue": false,
+              "description": "Run guest builds headless"
+            }
+          ],
           "positionals": [
             {
               "name": "vm",
@@ -1635,7 +2053,78 @@
         },
         {
           "name": "build-system",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Machine-readable JSON output (list, status)"
+            },
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Print planned actions without executing"
+            },
+            {
+              "long": "--gc",
+              "takesValue": false,
+              "description": "Run GC after setup"
+            },
+            {
+              "long": "--no-gc",
+              "takesValue": false,
+              "description": "Do not run GC after setup"
+            },
+            {
+              "long": "--gc-disabled",
+              "takesValue": false,
+              "description": "Also clear disabled VM entries during GC"
+            },
+            {
+              "long": "--no-gc-disabled",
+              "takesValue": false,
+              "description": "Do not clear disabled VM entries during GC"
+            },
+            {
+              "long": "--gc-data",
+              "takesValue": false,
+              "description": "Also GC data/ writable disks during GC"
+            },
+            {
+              "long": "--no-gc-data",
+              "takesValue": false,
+              "description": "Do not GC data/ writable disks during GC"
+            },
+            {
+              "long": "--force",
+              "takesValue": false,
+              "description": "Recreate invalid data disks during setup, and perform pack removals"
+            },
+            {
+              "long": "--allow-shrink",
+              "takesValue": false,
+              "description": "Allow shrinking during resize"
+            },
+            {
+              "long": "--accept-gsi-license",
+              "takesValue": false,
+              "description": "Accept the GSI license for Android GSI downloads"
+            },
+            {
+              "long": "--no-accept-gsi-license",
+              "takesValue": false,
+              "description": "Do not accept the GSI license"
+            },
+            {
+              "long": "--headful",
+              "takesValue": false,
+              "description": "Run guest builds with visible GUI"
+            },
+            {
+              "long": "--no-headful",
+              "takesValue": false,
+              "description": "Run guest builds headless"
+            }
+          ],
           "positionals": [
             {
               "name": "type",
@@ -1646,13 +2135,155 @@
         },
         {
           "name": "list",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Machine-readable JSON output (list, status)"
+            },
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Print planned actions without executing"
+            },
+            {
+              "long": "--gc",
+              "takesValue": false,
+              "description": "Run GC after setup"
+            },
+            {
+              "long": "--no-gc",
+              "takesValue": false,
+              "description": "Do not run GC after setup"
+            },
+            {
+              "long": "--gc-disabled",
+              "takesValue": false,
+              "description": "Also clear disabled VM entries during GC"
+            },
+            {
+              "long": "--no-gc-disabled",
+              "takesValue": false,
+              "description": "Do not clear disabled VM entries during GC"
+            },
+            {
+              "long": "--gc-data",
+              "takesValue": false,
+              "description": "Also GC data/ writable disks during GC"
+            },
+            {
+              "long": "--no-gc-data",
+              "takesValue": false,
+              "description": "Do not GC data/ writable disks during GC"
+            },
+            {
+              "long": "--force",
+              "takesValue": false,
+              "description": "Recreate invalid data disks during setup, and perform pack removals"
+            },
+            {
+              "long": "--allow-shrink",
+              "takesValue": false,
+              "description": "Allow shrinking during resize"
+            },
+            {
+              "long": "--accept-gsi-license",
+              "takesValue": false,
+              "description": "Accept the GSI license for Android GSI downloads"
+            },
+            {
+              "long": "--no-accept-gsi-license",
+              "takesValue": false,
+              "description": "Do not accept the GSI license"
+            },
+            {
+              "long": "--headful",
+              "takesValue": false,
+              "description": "Run guest builds with visible GUI"
+            },
+            {
+              "long": "--no-headful",
+              "takesValue": false,
+              "description": "Run guest builds headless"
+            }
+          ],
           "positionals": [],
           "description": "List all VMs from manifest with runtime status."
         },
         {
           "name": "status",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Machine-readable JSON output (list, status)"
+            },
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Print planned actions without executing"
+            },
+            {
+              "long": "--gc",
+              "takesValue": false,
+              "description": "Run GC after setup"
+            },
+            {
+              "long": "--no-gc",
+              "takesValue": false,
+              "description": "Do not run GC after setup"
+            },
+            {
+              "long": "--gc-disabled",
+              "takesValue": false,
+              "description": "Also clear disabled VM entries during GC"
+            },
+            {
+              "long": "--no-gc-disabled",
+              "takesValue": false,
+              "description": "Do not clear disabled VM entries during GC"
+            },
+            {
+              "long": "--gc-data",
+              "takesValue": false,
+              "description": "Also GC data/ writable disks during GC"
+            },
+            {
+              "long": "--no-gc-data",
+              "takesValue": false,
+              "description": "Do not GC data/ writable disks during GC"
+            },
+            {
+              "long": "--force",
+              "takesValue": false,
+              "description": "Recreate invalid data disks during setup, and perform pack removals"
+            },
+            {
+              "long": "--allow-shrink",
+              "takesValue": false,
+              "description": "Allow shrinking during resize"
+            },
+            {
+              "long": "--accept-gsi-license",
+              "takesValue": false,
+              "description": "Accept the GSI license for Android GSI downloads"
+            },
+            {
+              "long": "--no-accept-gsi-license",
+              "takesValue": false,
+              "description": "Do not accept the GSI license"
+            },
+            {
+              "long": "--headful",
+              "takesValue": false,
+              "description": "Run guest builds with visible GUI"
+            },
+            {
+              "long": "--no-headful",
+              "takesValue": false,
+              "description": "Run guest builds headless"
+            }
+          ],
           "positionals": [
             {
               "name": "vm",
@@ -1664,7 +2295,78 @@
         },
         {
           "name": "start",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Machine-readable JSON output (list, status)"
+            },
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Print planned actions without executing"
+            },
+            {
+              "long": "--gc",
+              "takesValue": false,
+              "description": "Run GC after setup"
+            },
+            {
+              "long": "--no-gc",
+              "takesValue": false,
+              "description": "Do not run GC after setup"
+            },
+            {
+              "long": "--gc-disabled",
+              "takesValue": false,
+              "description": "Also clear disabled VM entries during GC"
+            },
+            {
+              "long": "--no-gc-disabled",
+              "takesValue": false,
+              "description": "Do not clear disabled VM entries during GC"
+            },
+            {
+              "long": "--gc-data",
+              "takesValue": false,
+              "description": "Also GC data/ writable disks during GC"
+            },
+            {
+              "long": "--no-gc-data",
+              "takesValue": false,
+              "description": "Do not GC data/ writable disks during GC"
+            },
+            {
+              "long": "--force",
+              "takesValue": false,
+              "description": "Recreate invalid data disks during setup, and perform pack removals"
+            },
+            {
+              "long": "--allow-shrink",
+              "takesValue": false,
+              "description": "Allow shrinking during resize"
+            },
+            {
+              "long": "--accept-gsi-license",
+              "takesValue": false,
+              "description": "Accept the GSI license for Android GSI downloads"
+            },
+            {
+              "long": "--no-accept-gsi-license",
+              "takesValue": false,
+              "description": "Do not accept the GSI license"
+            },
+            {
+              "long": "--headful",
+              "takesValue": false,
+              "description": "Run guest builds with visible GUI"
+            },
+            {
+              "long": "--no-headful",
+              "takesValue": false,
+              "description": "Run guest builds headless"
+            }
+          ],
           "positionals": [
             {
               "name": "vm",
@@ -1676,7 +2378,78 @@
         },
         {
           "name": "stop",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Machine-readable JSON output (list, status)"
+            },
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Print planned actions without executing"
+            },
+            {
+              "long": "--gc",
+              "takesValue": false,
+              "description": "Run GC after setup"
+            },
+            {
+              "long": "--no-gc",
+              "takesValue": false,
+              "description": "Do not run GC after setup"
+            },
+            {
+              "long": "--gc-disabled",
+              "takesValue": false,
+              "description": "Also clear disabled VM entries during GC"
+            },
+            {
+              "long": "--no-gc-disabled",
+              "takesValue": false,
+              "description": "Do not clear disabled VM entries during GC"
+            },
+            {
+              "long": "--gc-data",
+              "takesValue": false,
+              "description": "Also GC data/ writable disks during GC"
+            },
+            {
+              "long": "--no-gc-data",
+              "takesValue": false,
+              "description": "Do not GC data/ writable disks during GC"
+            },
+            {
+              "long": "--force",
+              "takesValue": false,
+              "description": "Recreate invalid data disks during setup, and perform pack removals"
+            },
+            {
+              "long": "--allow-shrink",
+              "takesValue": false,
+              "description": "Allow shrinking during resize"
+            },
+            {
+              "long": "--accept-gsi-license",
+              "takesValue": false,
+              "description": "Accept the GSI license for Android GSI downloads"
+            },
+            {
+              "long": "--no-accept-gsi-license",
+              "takesValue": false,
+              "description": "Do not accept the GSI license"
+            },
+            {
+              "long": "--headful",
+              "takesValue": false,
+              "description": "Run guest builds with visible GUI"
+            },
+            {
+              "long": "--no-headful",
+              "takesValue": false,
+              "description": "Run guest builds headless"
+            }
+          ],
           "positionals": [
             {
               "name": "vm",
@@ -1688,7 +2461,78 @@
         },
         {
           "name": "upgrade",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Machine-readable JSON output (list, status)"
+            },
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Print planned actions without executing"
+            },
+            {
+              "long": "--gc",
+              "takesValue": false,
+              "description": "Run GC after setup"
+            },
+            {
+              "long": "--no-gc",
+              "takesValue": false,
+              "description": "Do not run GC after setup"
+            },
+            {
+              "long": "--gc-disabled",
+              "takesValue": false,
+              "description": "Also clear disabled VM entries during GC"
+            },
+            {
+              "long": "--no-gc-disabled",
+              "takesValue": false,
+              "description": "Do not clear disabled VM entries during GC"
+            },
+            {
+              "long": "--gc-data",
+              "takesValue": false,
+              "description": "Also GC data/ writable disks during GC"
+            },
+            {
+              "long": "--no-gc-data",
+              "takesValue": false,
+              "description": "Do not GC data/ writable disks during GC"
+            },
+            {
+              "long": "--force",
+              "takesValue": false,
+              "description": "Recreate invalid data disks during setup, and perform pack removals"
+            },
+            {
+              "long": "--allow-shrink",
+              "takesValue": false,
+              "description": "Allow shrinking during resize"
+            },
+            {
+              "long": "--accept-gsi-license",
+              "takesValue": false,
+              "description": "Accept the GSI license for Android GSI downloads"
+            },
+            {
+              "long": "--no-accept-gsi-license",
+              "takesValue": false,
+              "description": "Do not accept the GSI license"
+            },
+            {
+              "long": "--headful",
+              "takesValue": false,
+              "description": "Run guest builds with visible GUI"
+            },
+            {
+              "long": "--no-headful",
+              "takesValue": false,
+              "description": "Run guest builds headless"
+            }
+          ],
           "positionals": [
             {
               "name": "vm",
@@ -1700,7 +2544,78 @@
         },
         {
           "name": "reset",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Machine-readable JSON output (list, status)"
+            },
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Print planned actions without executing"
+            },
+            {
+              "long": "--gc",
+              "takesValue": false,
+              "description": "Run GC after setup"
+            },
+            {
+              "long": "--no-gc",
+              "takesValue": false,
+              "description": "Do not run GC after setup"
+            },
+            {
+              "long": "--gc-disabled",
+              "takesValue": false,
+              "description": "Also clear disabled VM entries during GC"
+            },
+            {
+              "long": "--no-gc-disabled",
+              "takesValue": false,
+              "description": "Do not clear disabled VM entries during GC"
+            },
+            {
+              "long": "--gc-data",
+              "takesValue": false,
+              "description": "Also GC data/ writable disks during GC"
+            },
+            {
+              "long": "--no-gc-data",
+              "takesValue": false,
+              "description": "Do not GC data/ writable disks during GC"
+            },
+            {
+              "long": "--force",
+              "takesValue": false,
+              "description": "Recreate invalid data disks during setup, and perform pack removals"
+            },
+            {
+              "long": "--allow-shrink",
+              "takesValue": false,
+              "description": "Allow shrinking during resize"
+            },
+            {
+              "long": "--accept-gsi-license",
+              "takesValue": false,
+              "description": "Accept the GSI license for Android GSI downloads"
+            },
+            {
+              "long": "--no-accept-gsi-license",
+              "takesValue": false,
+              "description": "Do not accept the GSI license"
+            },
+            {
+              "long": "--headful",
+              "takesValue": false,
+              "description": "Run guest builds with visible GUI"
+            },
+            {
+              "long": "--no-headful",
+              "takesValue": false,
+              "description": "Run guest builds headless"
+            }
+          ],
           "positionals": [
             {
               "name": "vm",
@@ -1742,6 +2657,76 @@
               "long": "--fake-wifi-revert",
               "takesValue": false,
               "description": "Remove persisted fake Wi-Fi and restore eth0"
+            },
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Machine-readable JSON output (list, status)"
+            },
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Print planned actions without executing"
+            },
+            {
+              "long": "--gc",
+              "takesValue": false,
+              "description": "Run GC after setup"
+            },
+            {
+              "long": "--no-gc",
+              "takesValue": false,
+              "description": "Do not run GC after setup"
+            },
+            {
+              "long": "--gc-disabled",
+              "takesValue": false,
+              "description": "Also clear disabled VM entries during GC"
+            },
+            {
+              "long": "--no-gc-disabled",
+              "takesValue": false,
+              "description": "Do not clear disabled VM entries during GC"
+            },
+            {
+              "long": "--gc-data",
+              "takesValue": false,
+              "description": "Also GC data/ writable disks during GC"
+            },
+            {
+              "long": "--no-gc-data",
+              "takesValue": false,
+              "description": "Do not GC data/ writable disks during GC"
+            },
+            {
+              "long": "--force",
+              "takesValue": false,
+              "description": "Recreate invalid data disks during setup, and perform pack removals"
+            },
+            {
+              "long": "--allow-shrink",
+              "takesValue": false,
+              "description": "Allow shrinking during resize"
+            },
+            {
+              "long": "--accept-gsi-license",
+              "takesValue": false,
+              "description": "Accept the GSI license for Android GSI downloads"
+            },
+            {
+              "long": "--no-accept-gsi-license",
+              "takesValue": false,
+              "description": "Do not accept the GSI license"
+            },
+            {
+              "long": "--headful",
+              "takesValue": false,
+              "description": "Run guest builds with visible GUI"
+            },
+            {
+              "long": "--no-headful",
+              "takesValue": false,
+              "description": "Run guest builds headless"
             }
           ],
           "positionals": [
@@ -1755,7 +2740,78 @@
         },
         {
           "name": "inject",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Machine-readable JSON output (list, status)"
+            },
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Print planned actions without executing"
+            },
+            {
+              "long": "--gc",
+              "takesValue": false,
+              "description": "Run GC after setup"
+            },
+            {
+              "long": "--no-gc",
+              "takesValue": false,
+              "description": "Do not run GC after setup"
+            },
+            {
+              "long": "--gc-disabled",
+              "takesValue": false,
+              "description": "Also clear disabled VM entries during GC"
+            },
+            {
+              "long": "--no-gc-disabled",
+              "takesValue": false,
+              "description": "Do not clear disabled VM entries during GC"
+            },
+            {
+              "long": "--gc-data",
+              "takesValue": false,
+              "description": "Also GC data/ writable disks during GC"
+            },
+            {
+              "long": "--no-gc-data",
+              "takesValue": false,
+              "description": "Do not GC data/ writable disks during GC"
+            },
+            {
+              "long": "--force",
+              "takesValue": false,
+              "description": "Recreate invalid data disks during setup, and perform pack removals"
+            },
+            {
+              "long": "--allow-shrink",
+              "takesValue": false,
+              "description": "Allow shrinking during resize"
+            },
+            {
+              "long": "--accept-gsi-license",
+              "takesValue": false,
+              "description": "Accept the GSI license for Android GSI downloads"
+            },
+            {
+              "long": "--no-accept-gsi-license",
+              "takesValue": false,
+              "description": "Do not accept the GSI license"
+            },
+            {
+              "long": "--headful",
+              "takesValue": false,
+              "description": "Run guest builds with visible GUI"
+            },
+            {
+              "long": "--no-headful",
+              "takesValue": false,
+              "description": "Run guest builds headless"
+            }
+          ],
           "positionals": [
             {
               "name": "vm",
@@ -1767,13 +2823,155 @@
         },
         {
           "name": "gc",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Machine-readable JSON output (list, status)"
+            },
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Print planned actions without executing"
+            },
+            {
+              "long": "--gc",
+              "takesValue": false,
+              "description": "Run GC after setup"
+            },
+            {
+              "long": "--no-gc",
+              "takesValue": false,
+              "description": "Do not run GC after setup"
+            },
+            {
+              "long": "--gc-disabled",
+              "takesValue": false,
+              "description": "Also clear disabled VM entries during GC"
+            },
+            {
+              "long": "--no-gc-disabled",
+              "takesValue": false,
+              "description": "Do not clear disabled VM entries during GC"
+            },
+            {
+              "long": "--gc-data",
+              "takesValue": false,
+              "description": "Also GC data/ writable disks during GC"
+            },
+            {
+              "long": "--no-gc-data",
+              "takesValue": false,
+              "description": "Do not GC data/ writable disks during GC"
+            },
+            {
+              "long": "--force",
+              "takesValue": false,
+              "description": "Recreate invalid data disks during setup, and perform pack removals"
+            },
+            {
+              "long": "--allow-shrink",
+              "takesValue": false,
+              "description": "Allow shrinking during resize"
+            },
+            {
+              "long": "--accept-gsi-license",
+              "takesValue": false,
+              "description": "Accept the GSI license for Android GSI downloads"
+            },
+            {
+              "long": "--no-accept-gsi-license",
+              "takesValue": false,
+              "description": "Do not accept the GSI license"
+            },
+            {
+              "long": "--headful",
+              "takesValue": false,
+              "description": "Run guest builds with visible GUI"
+            },
+            {
+              "long": "--no-headful",
+              "takesValue": false,
+              "description": "Run guest builds headless"
+            }
+          ],
           "positionals": [],
           "description": "Remove stale VM artifacts."
         },
         {
           "name": "resize",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Machine-readable JSON output (list, status)"
+            },
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Print planned actions without executing"
+            },
+            {
+              "long": "--gc",
+              "takesValue": false,
+              "description": "Run GC after setup"
+            },
+            {
+              "long": "--no-gc",
+              "takesValue": false,
+              "description": "Do not run GC after setup"
+            },
+            {
+              "long": "--gc-disabled",
+              "takesValue": false,
+              "description": "Also clear disabled VM entries during GC"
+            },
+            {
+              "long": "--no-gc-disabled",
+              "takesValue": false,
+              "description": "Do not clear disabled VM entries during GC"
+            },
+            {
+              "long": "--gc-data",
+              "takesValue": false,
+              "description": "Also GC data/ writable disks during GC"
+            },
+            {
+              "long": "--no-gc-data",
+              "takesValue": false,
+              "description": "Do not GC data/ writable disks during GC"
+            },
+            {
+              "long": "--force",
+              "takesValue": false,
+              "description": "Recreate invalid data disks during setup, and perform pack removals"
+            },
+            {
+              "long": "--allow-shrink",
+              "takesValue": false,
+              "description": "Allow shrinking during resize"
+            },
+            {
+              "long": "--accept-gsi-license",
+              "takesValue": false,
+              "description": "Accept the GSI license for Android GSI downloads"
+            },
+            {
+              "long": "--no-accept-gsi-license",
+              "takesValue": false,
+              "description": "Do not accept the GSI license"
+            },
+            {
+              "long": "--headful",
+              "takesValue": false,
+              "description": "Run guest builds with visible GUI"
+            },
+            {
+              "long": "--no-headful",
+              "takesValue": false,
+              "description": "Run guest builds headless"
+            }
+          ],
           "positionals": [
             {
               "name": "vm",
@@ -1790,13 +2988,155 @@
         },
         {
           "name": "pack",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Machine-readable JSON output (list, status)"
+            },
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Print planned actions without executing"
+            },
+            {
+              "long": "--gc",
+              "takesValue": false,
+              "description": "Run GC after setup"
+            },
+            {
+              "long": "--no-gc",
+              "takesValue": false,
+              "description": "Do not run GC after setup"
+            },
+            {
+              "long": "--gc-disabled",
+              "takesValue": false,
+              "description": "Also clear disabled VM entries during GC"
+            },
+            {
+              "long": "--no-gc-disabled",
+              "takesValue": false,
+              "description": "Do not clear disabled VM entries during GC"
+            },
+            {
+              "long": "--gc-data",
+              "takesValue": false,
+              "description": "Also GC data/ writable disks during GC"
+            },
+            {
+              "long": "--no-gc-data",
+              "takesValue": false,
+              "description": "Do not GC data/ writable disks during GC"
+            },
+            {
+              "long": "--force",
+              "takesValue": false,
+              "description": "Recreate invalid data disks during setup, and perform pack removals"
+            },
+            {
+              "long": "--allow-shrink",
+              "takesValue": false,
+              "description": "Allow shrinking during resize"
+            },
+            {
+              "long": "--accept-gsi-license",
+              "takesValue": false,
+              "description": "Accept the GSI license for Android GSI downloads"
+            },
+            {
+              "long": "--no-accept-gsi-license",
+              "takesValue": false,
+              "description": "Do not accept the GSI license"
+            },
+            {
+              "long": "--headful",
+              "takesValue": false,
+              "description": "Run guest builds with visible GUI"
+            },
+            {
+              "long": "--no-headful",
+              "takesValue": false,
+              "description": "Run guest builds headless"
+            }
+          ],
           "positionals": [],
           "description": "Strip trivially regenerable artifacts so the tree can be copied to another host."
         },
         {
           "name": "unpack",
-          "flags": [],
+          "flags": [
+            {
+              "long": "--json",
+              "takesValue": false,
+              "description": "Machine-readable JSON output (list, status)"
+            },
+            {
+              "long": "--dry-run",
+              "takesValue": false,
+              "description": "Print planned actions without executing"
+            },
+            {
+              "long": "--gc",
+              "takesValue": false,
+              "description": "Run GC after setup"
+            },
+            {
+              "long": "--no-gc",
+              "takesValue": false,
+              "description": "Do not run GC after setup"
+            },
+            {
+              "long": "--gc-disabled",
+              "takesValue": false,
+              "description": "Also clear disabled VM entries during GC"
+            },
+            {
+              "long": "--no-gc-disabled",
+              "takesValue": false,
+              "description": "Do not clear disabled VM entries during GC"
+            },
+            {
+              "long": "--gc-data",
+              "takesValue": false,
+              "description": "Also GC data/ writable disks during GC"
+            },
+            {
+              "long": "--no-gc-data",
+              "takesValue": false,
+              "description": "Do not GC data/ writable disks during GC"
+            },
+            {
+              "long": "--force",
+              "takesValue": false,
+              "description": "Recreate invalid data disks during setup, and perform pack removals"
+            },
+            {
+              "long": "--allow-shrink",
+              "takesValue": false,
+              "description": "Allow shrinking during resize"
+            },
+            {
+              "long": "--accept-gsi-license",
+              "takesValue": false,
+              "description": "Accept the GSI license for Android GSI downloads"
+            },
+            {
+              "long": "--no-accept-gsi-license",
+              "takesValue": false,
+              "description": "Do not accept the GSI license"
+            },
+            {
+              "long": "--headful",
+              "takesValue": false,
+              "description": "Run guest builds with visible GUI"
+            },
+            {
+              "long": "--no-headful",
+              "takesValue": false,
+              "description": "Run guest builds headless"
+            }
+          ],
           "positionals": [],
           "description": "Regenerate per-platform VM artifacts from descriptors."
         }
