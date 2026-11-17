@@ -9,6 +9,9 @@
 #   --fail-fast         Exit immediately on first failure (default).
 #   --no-fail-fast      Accumulate all failures.
 #   --quiet             No-op (--quiet is POSIX-only; accepted for CLI parity).
+#   --verbose[=<ids>]   Stream step output.
+#   --no-verbose        Suppress step output streaming.
+#   --scoped|--full     Select scoped or full mode.
 #   --only-steps=<ids>  Run only steps with the given comma-separated IDs.
 #
 # Environment variables:

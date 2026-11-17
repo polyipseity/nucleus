@@ -12,7 +12,7 @@ Set-StepLibPath -Path $MyInvocation.MyCommand.Path
 
 $script:FAIL_FAST = $true
 $script:usageAction = {
-  Write-Output "Usage: test.ps1 [--fail-fast|--no-fail-fast] [--quiet] [--verbose[=<ids>]] [--no-verbose] [--only-steps=<ids>]"
+  Write-Output "Usage: test.ps1 [--fail-fast|--no-fail-fast] [--quiet] [--verbose[=<ids>]] [--no-verbose] [--scoped|--full] [--only-steps=<ids>]"
   Write-Output "  Run all Windows-compatible repository test suites."
   Write-Output "  --fail-fast            Exit immediately on first failure (default)."
   Write-Output "  --no-fail-fast          Accumulate all failures."
@@ -20,6 +20,7 @@ $script:usageAction = {
   Write-Output "  --verbose              Stream all step output (default: headers + summaries only)."
   Write-Output "  --verbose=<ids>        Stream only the specified comma-separated step IDs."
   Write-Output "  --no-verbose           Suppress step output streaming (default)."
+  Write-Output "  --scoped|--full        Select scoped or full mode (accepted for parity)."
   Write-Output "  --only-steps=<ids>     Run only steps with the given comma-separated IDs."
 }
 
@@ -62,6 +63,36 @@ function Read-Argument {
       }
       '^--quiet$' {
         # No-op: --quiet is POSIX-only.
+        break
+      }
+      '^--scoped$' {
+        $script:SCOPED = $true
+        break
+      }
+      '^--full$' {
+        $script:FULL = $true
+        break
+      }
+      '^--verbose$' {
+        $script:VerboseIds = @('*')
+        break
+      }
+      '^--verbose=(.*)$' {
+        $script:VerboseIds = @()
+        $value = $Matches[1]
+        if ($value) {
+          $ids = $value -split ','
+          foreach ($id in $ids) {
+            $id = $id.Trim()
+            if ($id -and $script:VerboseIds -notcontains $id) {
+              $script:VerboseIds += $id
+            }
+          }
+        }
+        break
+      }
+      '^--no-verbose$' {
+        $script:VerboseIds = @()
         break
       }
       '^--only-steps=(.*)$' {

@@ -10,9 +10,8 @@
   nothing. The step guards make a preview impossible to turn into a real run.
 
 .PARAMETER Action
-  all runs the full GC (default). cleanup-nix, graveyard, logs, and preferences
-  run one targeted operation: graveyard reports the rip graveyard and deletes
-  nothing.
+  cleanup-nix, graveyard, logs, and preferences run one targeted operation.
+  Omit the action to run the full GC (default). graveyard deletes nothing.
 
 .PARAMETER DryRun
   Report what would be collected and remove nothing (default: $false).
@@ -69,8 +68,8 @@
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('all', 'cleanup-nix', 'graveyard', 'logs', 'preferences')]
-  [string]$Action = 'all',
+  [ValidateSet('cleanup-nix', 'graveyard', 'logs', 'preferences')]
+  [string]$Action = '',
   [string]$ModuleDir = $(if ($env:NUCLEUS_GC_MODULE_DIR) { $env:NUCLEUS_GC_MODULE_DIR } else { '' }),
   [switch]$DryRun,
   [switch]$NoNixGc,
@@ -518,7 +517,9 @@ switch ($Action) {
     Write-NucleusInfo "preferences gc is macOS-only; no Windows action performed"
     Write-NucleusDone
   }
-  'all' {
+  '' {
+    # full GC (default)
+
     # ---- Step 1: stale wallpaper gc ----------------------------------------
     if (-not $NoWallpaperGc) {
   $wallpaperOutputDir = Join-Path -Path $env:USERPROFILE -ChildPath "Pictures\wallpapers"

@@ -18,6 +18,7 @@
 #   --verbose=<ids>  Stream only the specified comma-separated step IDs.
 #   --no-verbose     Suppress step output streaming (default).
 #   --only-steps=<ids>  Run only steps with the given comma-separated IDs.
+#   --list-steps     Print registered step IDs and exit.
 #   (paths)          Files to check; restricts --scoped to matching files.
 #
 # Environment variables:
@@ -28,21 +29,6 @@
 
 #Requires -Version 7.4
 
-[CmdletBinding()]
-param(
-  [Parameter(Position = 0)]
-  [ValidateSet('all', 'packer', 'sh', 'pwsh')]
-  [string]$Action = 'all',
-  [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
-  [string[]]$Paths = @(),
-
-  # Pass-through flags for the inlined packer subcommand.
-  [string]$WindowsTemplateOverride = '',
-  [switch]$AnnotationCheckOnly,
-  [switch]$ValidateOnly,
-  [switch]$ListSteps
-)
-
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -51,6 +37,50 @@ $ScriptDir = $PSScriptRoot
 
 $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force
+
+# Manual argument parsing: accepts PowerShell-style and POSIX-style flags.
+# Bare flags mean no action word was given (B10/E4).
+$Action = 'all'
+$Paths = @()
+$WindowsTemplateOverride = ''
+$AnnotationCheckOnly = $false
+$ValidateOnly = $false
+$ListSteps = $false
+
+$_ua = @($args)
+$i = 0
+# First token may be an action word.
+if ($_ua.Count -gt 0 -and $_ua[0] -in @('all', 'packer', 'sh', 'pwsh', 'nix', 'yaml')) {
+  $Action = [string]$_ua[0]
+  $i = 1
+}
+while ($i -lt $_ua.Count) {
+  $a = [string]$_ua[$i]
+  switch -Regex ($a) {
+    '^(-h|--help|-Help)$' {
+      if ($Action -eq 'all') { $Action = 'all'; $ListSteps = $false } # handled by pipeline/help
+      # Let pipeline/subcommand handle help where possible; for --help at top level show usage.
+      $Paths += $a; $i++; continue
+    }
+    '^(-ListSteps|--list-steps)$' { $ListSteps = $true; $i++; continue }
+    '^(-WindowsTemplateOverride|--windows-template-override)$' {
+      if ($i + 1 -ge $_ua.Count) { throw "nucleus: check: $a requires a value" }
+      $WindowsTemplateOverride = [string]$_ua[$i + 1]; $i += 2; continue
+    }
+    '^--windows-template-override=(.+)$' { $WindowsTemplateOverride = $Matches[1]; $i++; continue }
+    '^(-AnnotationCheckOnly|--annotation-check-only)$' { $AnnotationCheckOnly = $true; $i++; continue }
+    '^(-ValidateOnly|--validate-only)$' { $ValidateOnly = $true; $i++; continue }
+    '^(-Action|--action)$' {
+      if ($i + 1 -ge $_ua.Count) { throw "nucleus: check: $a requires a value" }
+      $Action = [string]$_ua[$i + 1]; $i += 2; continue
+    }
+    '^--paths$' { $i++; continue } # consume marker; remaining are paths
+    default {
+      $Paths += $a
+      $i++; continue
+    }
+  }
+}
 
 if ($ListSteps) {
   Set-Location -Path $RepoRoot
@@ -305,22 +335,24 @@ function Invoke-CheckSh {
 
 switch ($Action) {
   'packer' {
-    # WHY: filter --verbose/--no-verbose/--only-steps from Paths: these flags are only for the step pipeline (all action); subcommands don't understand them.
-    $PackerPaths = @($Paths | Where-Object { $_ -notmatch '^--verbose' -and $_ -ne '--no-verbose' -and $_ -notmatch '^--only-steps' })
+    # WHY: filter pipeline flags from Paths: subcommands don't understand them.
+    $PackerPaths = @($Paths | Where-Object { $_ -notmatch '^--verbose' -and $_ -ne '--no-verbose' -and $_ -notmatch '^--only-steps' -and $_ -notmatch '^--fail-fast' -and $_ -notmatch '^--no-fail-fast' -and $_ -ne '--scoped' -and $_ -ne '--full' -and $_ -ne '--online' })
     Invoke-CheckPacker @PackerPaths -WindowsTemplateOverride $WindowsTemplateOverride -AnnotationCheckOnly:$AnnotationCheckOnly -ValidateOnly:$ValidateOnly
     exit $LASTEXITCODE
   }
   'sh' {
-    $ShPaths = @($Paths | Where-Object { $_ -notmatch '^--verbose' -and $_ -ne '--no-verbose' -and $_ -notmatch '^--only-steps' })
+    $ShPaths = @($Paths | Where-Object { $_ -notmatch '^--verbose' -and $_ -ne '--no-verbose' -and $_ -notmatch '^--only-steps' -and $_ -notmatch '^--fail-fast' -and $_ -notmatch '^--no-fail-fast' -and $_ -ne '--scoped' -and $_ -ne '--full' -and $_ -ne '--online' })
     Invoke-CheckSh @ShPaths
     exit $LASTEXITCODE
   }
   'pwsh' {
-    $PwshPaths = @($Paths | Where-Object { $_ -notmatch '^--verbose' -and $_ -ne '--no-verbose' -and $_ -notmatch '^--only-steps' })
+    $PwshPaths = @($Paths | Where-Object { $_ -notmatch '^--verbose' -and $_ -ne '--no-verbose' -and $_ -notmatch '^--only-steps' -and $_ -notmatch '^--fail-fast' -and $_ -notmatch '^--no-fail-fast' -and $_ -ne '--scoped' -and $_ -ne '--full' -and $_ -ne '--online' })
     & (Join-Path $ScriptDir '..\src\scripts\checks\check-pwsh.ps1') @PwshPaths
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    exit 0
   }
-  'all' {
+  default {
+    # 'all' and unknown treated as all pipeline run (POSIX behavior: no subcommand = full check)
     $CheckDir = Join-Path $RepoRoot "src/scripts/checks"
     $FrameworkDir = Join-Path $RepoRoot "src/scripts/lib"
     $null = $FrameworkDir  # check-suppress:suppression_doc: consumed by check-lib.ps1 at runtime

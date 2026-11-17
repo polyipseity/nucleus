@@ -54,19 +54,53 @@
   Environment variables: NUCLEUS_NO_FLAKE, NUCLEUS_NO_SOPS, NUCLEUS_REPO_ROOT.
   Exit codes: 0 on success; non-zero on failure.
 #>
-[CmdletBinding()]
-param(
-  [ValidateSet('all', 'lockfile')]
-  [string]$Action = 'all',
-  [switch]$NoFlake = $(if ($env:NUCLEUS_NO_FLAKE -eq 'true') { $true } else { $false }),
-  [switch]$NoSops = $(if ($env:NUCLEUS_NO_SOPS -eq 'true') { $true } else { $false }),
-  [Alias("h")]
-  [switch]$Help,
-  [string]$Sections = '',
-  [switch]$Verify,
-  [switch]$VerifyInstalled,
-  [switch]$ListSections
-)
+# Manual argument parsing: accepts PowerShell-style named params and POSIX
+# spellings (--list-sections, --sections, --verify, --verify-installed, lockfile
+# subcommand, action words). Bare flags mean no action word was given (B10).
+$Action = 'all'
+$NoFlake = $(if ($env:NUCLEUS_NO_FLAKE -eq 'true') { $true } else { $false })
+$NoSops = $(if ($env:NUCLEUS_NO_SOPS -eq 'true') { $true } else { $false })
+$Help = $false
+$Sections = ''
+$Verify = $false
+$VerifyInstalled = $false
+$ListSections = $false
+
+# Prefer raw invocation args so POSIX --flags are not rejected by parameter binding.
+$_ua = @($args)
+$i = 0
+while ($i -lt $_ua.Count) {
+  $a = [string]$_ua[$i]
+  switch -Regex ($a) {
+    '^(-h|--help|-Help)$' { $Help = $true; $i++; continue }
+    '^(-ListSections|--list-sections)$' { $ListSections = $true; $Action = 'lockfile'; $i++; continue }
+    '^(-VerifyInstalled|--verify-installed)$' { $VerifyInstalled = $true; $Action = 'lockfile'; $i++; continue }
+    '^(-Verify|--verify)$' { $Verify = $true; $Action = 'lockfile'; $i++; continue }
+    '^(-Sections|--sections)$' {
+      if ($i + 1 -ge $_ua.Count) { Write-Error "nucleus: update: --sections requires a value"; exit 1 }
+      $Sections = [string]$_ua[$i + 1]; $Action = 'lockfile'; $i += 2; continue
+    }
+    '^--sections=(.+)$' { $Sections = $Matches[1]; $Action = 'lockfile'; $i++; continue }
+    '^(-NoFlake|--no-flake)$' { $NoFlake = $true; $i++; continue }
+    '^--flake$' { $NoFlake = $false; $i++; continue }
+    '^(-NoSops|--no-sops)$' { $NoSops = $true; $i++; continue }
+    '^--sops$' { $NoSops = $false; $i++; continue }
+    '^--force$' { $i++; continue } # POSIX update option; accepted (no-op on Windows update flow today)
+    '^(-Action|--action)$' {
+      if ($i + 1 -ge $_ua.Count) { Write-Error "nucleus: update: -Action requires a value"; exit 1 }
+      $Action = [string]$_ua[$i + 1]; $i += 2; continue
+    }
+    '^(all|lockfile|update)$' { $Action = $a; $i++; continue }
+    default {
+      # Allow PowerShell-style named values that may arrive as separate tokens in some hosts.
+      if ($a -like '-*') {
+        Write-Error "nucleus: update: unsupported argument '$a'"
+        exit 1
+      }
+      $i++; continue
+    }
+  }
+}
 
 $ErrorActionPreference = 'Stop'
 
