@@ -17,6 +17,8 @@
     ]
   },
   "plugin": [
+    // Harness bridge: v2 server plugin (session.idle, permission.asked, execution failures).
+    "./plugins/harness-notify",
     // Superpowers is provisioned via method-1 symlink to Nix store.
     // See symlink-superpowers-for-opencode.sh and agents.nix.
   ],
