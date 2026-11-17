@@ -112,12 +112,42 @@ if [ "$_gen_ok" -eq 1 ]; then
   assert_pass "gen-completions: all generated files have headers and pass zsh -n"
 fi
 
-# 5. update lockfile dynamic value completion via --list-sections.
-if grep -q "_call_program 'sections' nucleus-update --list-sections" "$_COMPLETIONS_DIR/_nucleus-update" &&
-  grep -qE -- "--sections(\[[^]]*\])?:sections name:->sections" "$_COMPLETIONS_DIR/_nucleus-update"; then
+# 5. update lockfile dynamic value completion via --list-sections (B5: must use lockfile subcommand).
+if grep -q "_call_program 'sections' nucleus-update lockfile --list-sections" "$_COMPLETIONS_DIR/_nucleus-update" &&
+  grep -qE -- "--sections(\[[^]]*\])?:sections( name)?:->sections" "$_COMPLETIONS_DIR/_nucleus-update"; then
   assert_pass "gen-completions: update lockfile --sections dynamic wiring"
 else
-  assert_fail "gen-completions: update lockfile --sections wiring" "missing _call_program/->sections"
+  assert_fail "gen-completions: update lockfile --sections wiring" "missing _call_program/->sections or wrong provider command"
+fi
+
+# 5b. E1/E2: svc endpoint has two independent completable arguments (services + endpoints).
+if grep -q "1:service:_nucleus_svc_services" "$_COMPLETIONS_DIR/_nucleus-svc" &&
+  grep -q "2:name:->endpoints" "$_COMPLETIONS_DIR/_nucleus-svc" &&
+  grep -q '^  endpoints)$' "$_COMPLETIONS_DIR/_nucleus-svc" &&
+  grep -q '_call_program .*endpoints.*nucleus-svc endpoint --list-endpoints' "$_COMPLETIONS_DIR/_nucleus-svc"; then
+  assert_pass "gen-completions: svc endpoint has two independent dynamic providers"
+else
+  assert_fail "gen-completions: svc endpoint dual providers" "missing service/endpoints wiring"
+fi
+
+# 5c. E2: steps provider wired for --only-steps on check and test.
+if grep -q -- '--only-steps' "$_COMPLETIONS_DIR/_nucleus-check" &&
+  grep -qF -- '->steps' "$_COMPLETIONS_DIR/_nucleus-check" &&
+  grep -qF -- "nucleus-check --list-steps" "$_COMPLETIONS_DIR/_nucleus-check" &&
+  grep -q -- '--only-steps' "$_COMPLETIONS_DIR/_nucleus-test" &&
+  grep -qF -- '->steps' "$_COMPLETIONS_DIR/_nucleus-test" &&
+  grep -qF -- "nucleus-test --list-steps" "$_COMPLETIONS_DIR/_nucleus-test"; then
+  assert_pass "gen-completions: steps provider wired for check and test"
+else
+  assert_fail "gen-completions: steps provider wiring" "missing --only-steps ->steps or steps handler"
+fi
+
+# 5d. E2: services provider does not read services.json (uses CLI).
+if grep -q 'nucleus-svc --list-services' "$_COMPLETIONS_DIR/_nucleus-svc" &&
+  ! grep -q 'services.json' "$_COMPLETIONS_DIR/_nucleus-svc"; then
+  assert_pass "gen-completions: services provider uses CLI, not services.json"
+else
+  assert_fail "gen-completions: services provider source" "services.json still referenced or CLI call missing"
 fi
 
 # 6. Spec-driven generation sanity: key flags/subcommands/structure present and
@@ -584,6 +614,93 @@ SUBCOMMAND_SOURCES
 if [ "$_subcommand_ok" -eq 1 ]; then
   assert_pass "gen-completions: six hand-coded subcommand lists match their zsh and PowerShell sources"
 fi
+
+# 15b. E2: every schema valueSource token has a generator arm (representative coverage).
+_prov_repo="$(mktemp -d)"
+mkdir -p "$_prov_repo/src/modules/completions" "$_prov_repo/scripts"
+for _cmd in "${_NUCLEUS_COMMANDS[@]}"; do
+  case "$_cmd" in
+  camilladsp-heartbeat) _stub_dir="$_prov_repo/src/scripts/services" ;;
+  *) _stub_dir="$_prov_repo/scripts" ;;
+  esac
+  mkdir -p "$_stub_dir"
+  # shellcheck disable=SC2016 # reason: stub script body is written literally; ${1:-} must not expand here.
+  printf '#!/usr/bin/env bash\ncase "${1:-}" in --help) echo "usage: nucleus-%s";; esac\n' "$_cmd" >"$_stub_dir/$_cmd.sh"
+  chmod +x "$_stub_dir/$_cmd.sh"
+done
+# shellcheck disable=SC2016 # reason: stub script body is written literally; ${1:-} must not expand here.
+printf '#!/usr/bin/env bash\ncase "${1:-}" in --help) echo "usage: nucleus-prov";; esac\n' >"$_prov_repo/scripts/prov.sh"
+chmod +x "$_prov_repo/scripts/prov.sh"
+cat >"$_prov_repo/src/modules/completions/nucleus-apps.json" <<'JSON'
+{"$schema":"./nucleus-apps.schema.json","commands":["prov"]}
+JSON
+cat >"$_prov_repo/src/modules/completions/nucleus-cli-spec.json" <<'JSON'
+{
+  "$schema": "./nucleus-cli-spec.schema.json",
+  "apps": [{
+    "name": "prov",
+    "summary": "Provider coverage fixture.",
+    "globalFlags": [],
+    "subcommands": [
+      {
+        "name": "lockfile",
+        "flags": [
+          {"long":"--sections","takesValue":true,"valueType":"string","valueSource":"sections","description":"s"},
+          {"long":"--steps","takesValue":true,"valueType":"string","valueSource":"steps","description":"s"},
+          {"long":"--vm","takesValue":true,"valueType":"string","valueSource":"vm-ids","description":"s"},
+          {"long":"--log","takesValue":true,"valueType":"string","valueSource":"log-names","description":"s"},
+          {"long":"--config","takesValue":true,"valueType":"string","valueSource":"config-keys","description":"s"},
+          {"long":"--replica","takesValue":true,"valueType":"string","valueSource":"replicas","description":"s"},
+          {"long":"--profile","takesValue":true,"valueType":"string","valueSource":"profiles","description":"s"},
+          {"long":"--verdict","takesValue":true,"valueType":"enum","valueSource":"verdicts","choices":["ok","bad"],"description":"s"}
+        ],
+        "positionals": [
+          {"name":"svc","valueSource":"services","description":"s"},
+          {"name":"endpoint","valueSource":"endpoints","description":"s"}
+        ],
+        "description": "provider fixture"
+      }
+    ]
+  }]
+}
+JSON
+_prov_rc=0
+NUCLEUS_REPO_ROOT="$_prov_repo" NUCLEUS_COMPLETIONS_COMMANDS="prov" bash "$_gen_script" >/dev/null 2>&1 || _prov_rc=$?
+_prov_file="$_prov_repo/src/modules/completions/zsh/_nucleus-prov"
+_prov_ok=1
+if [ "$_prov_rc" -ne 0 ] || [ ! -f "$_prov_file" ]; then
+  assert_fail "gen-completions: schema valueSource generator arms" "generator failed rc=$_prov_rc"
+  _prov_ok=0
+else
+  # sections
+  grep -qF -- "->sections" "$_prov_file" && grep -qF "nucleus-prov lockfile --list-sections" "$_prov_file" || _prov_ok=0
+  # steps
+  grep -qF -- "->steps" "$_prov_file" && grep -qF "nucleus-prov --list-steps" "$_prov_file" || _prov_ok=0
+  # vm-ids
+  grep -qF -- "->vm_ids" "$_prov_file" && grep -qF "nucleus-prov list --json" "$_prov_file" || _prov_ok=0
+  # log-names
+  grep -qF -- "->log_names" "$_prov_file" && grep -qF "nucleus-prov --list-logs" "$_prov_file" || _prov_ok=0
+  # config-keys
+  grep -qF -- "->config_keys" "$_prov_file" && grep -qF "nucleus-prov list --json" "$_prov_file" || _prov_ok=0
+  # replicas
+  grep -qF -- "->replicas" "$_prov_file" && grep -qF "nucleus-prov --list-replicas" "$_prov_file" || _prov_ok=0
+  # profiles (dynamic, no choices)
+  grep -qF -- "->profiles" "$_prov_file" && grep -qF "_call_program 'profiles'" "$_prov_file" || _prov_ok=0
+  # verdicts (choices)
+  grep -qF "(ok bad)" "$_prov_file" || _prov_ok=0
+  # services (glue)
+  grep -qF "_nucleus_svc_services" "$_prov_file" || _prov_ok=0
+  # endpoints (positional state)
+  grep -qF -- "->endpoints" "$_prov_file" && grep -qF "nucleus-prov endpoint --list-endpoints" "$_prov_file" || _prov_ok=0
+  # shellcheck disable=SC2016 # reason: zsh -n stderr is not needed; exit code decides.
+  if ! zsh -n "$_prov_file" 2>/dev/null; then _prov_ok=0; fi
+fi
+if [ "$_prov_ok" -eq 1 ]; then
+  assert_pass "gen-completions: schema valueSource tokens have generator arms"
+else
+  assert_fail "gen-completions: schema valueSource generator arms" "one or more provider arms missing or invalid"
+fi
+rm -rf "$_prov_repo"
 
 # 16. A temporary 15th mkNucleusApps-derived command must make freshness fail
 #     naming the missing completion, so new registry entries cannot ship without

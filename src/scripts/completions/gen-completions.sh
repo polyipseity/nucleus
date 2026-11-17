@@ -83,19 +83,10 @@ flag_desc() {
 emit_svc_glue() {
   cat <<'ZSH_GLUE'
 _nucleus_svc_services() {
-  local services_json
-  if [[ -n "$NUCLEUS_REPO_ROOT" ]]; then
-    services_json="$NUCLEUS_REPO_ROOT/src/modules/services.json"
-  else
-    local repo_root
-    repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
-    services_json="$repo_root/src/modules/services.json"
-  fi
-  if [[ -f "$services_json" ]] && command -v jq >/dev/null 2>&1; then
-    local -a svc_names
-    svc_names=("${(@f)$(jq -r 'to_entries | .[] | select(.value | type == "object") | .key' "$services_json" 2>/dev/null)}")
-    _describe -t services 'service' svc_names
-  fi
+  local -a svc_names
+  svc_names=("${(@f)$(nucleus-svc --list-services 2>/dev/null)}")
+  (( ${#svc_names} )) || svc_names=("${(@f)$(nucleus-svc logs --json 2>/dev/null | jq -r '.[]?' 2>/dev/null)}")
+  (( ${#svc_names} )) && _describe -t services 'service' svc_names
 }
 ZSH_GLUE
 }
@@ -111,11 +102,91 @@ append_line() {
   fi
 }
 
-# emit_flag_spec <cmd> <flag-json> <out-var> <state-var> <state-action-var>
-# Appends one _arguments spec line. Records dynamic state for value providers
-# that need a state/action block (sections -> _call_program).
+# Append a (state, action) pair once to the parallel newline-delimited lists.
+append_unique_state() {
+  local _states_var="$1" _actions_var="$2" _state="$3" _action="$4"
+  local _s
+  while IFS= read -r _s; do
+    [ "$_s" = "$_state" ] && return 0
+  done <<<"${!_states_var-}"
+  append_line "$_states_var" "$_state"
+  append_line "$_actions_var" "$_action"
+}
+
+# dynamic_provider_state <cmd> <subcmd|-> <source> <pos-index>
+# Prints the zsh state name for a dynamic provider (or empty when none).
+dynamic_provider_state() {
+  local _cmd="$1" _subcmd="$2" _source="$3" _pos="$4"
+  case "$_source" in
+  sections) printf 'sections' ;;
+  steps) printf 'steps' ;;
+  vm-ids) printf 'vm_ids' ;;
+  log-names) printf 'log_names' ;;
+  config-keys) printf 'config_keys' ;;
+  replicas) printf 'replicas' ;;
+  profiles) printf 'profiles' ;;
+  endpoints)
+    # Context-dependent: depends on the selected service argument.
+    if [ "$_cmd" = "svc" ] && [ "$_subcmd" = "endpoint" ]; then
+      printf 'endpoints'
+    else
+      printf 'endpoints'
+    fi
+    ;;
+  esac
+}
+
+# dynamic_provider_action <cmd> <subcmd|-> <source> <pos-index>
+# Prints the zsh _call_program action for a dynamic provider state.
+dynamic_provider_action() {
+  local _cmd="$1" _subcmd="$2" _source="$3" _pos="$4"
+  case "$_source" in
+  sections)
+    printf "_call_program 'sections' nucleus-%s lockfile --list-sections" "$_cmd"
+    ;;
+  steps)
+    printf "_call_program 'steps' nucleus-%s --list-steps" "$_cmd"
+    ;;
+  vm-ids)
+    printf "_call_program 'vm-ids' nucleus-%s list --json | jq -r '.[].id'" "$_cmd"
+    ;;
+  log-names)
+    printf "_call_program 'log-names' nucleus-%s --list-logs" "$_cmd"
+    ;;
+  config-keys)
+    printf "_call_program 'config-keys' nucleus-%s list --json | jq -r 'keys[]'" "$_cmd"
+    ;;
+  replicas)
+    printf "_call_program 'replicas' nucleus-%s --list-replicas" "$_cmd"
+    ;;
+  profiles)
+    if [ "$_cmd" = "ai" ]; then
+      printf "_call_program 'profiles' nucleus-%s list --json 2>/dev/null | jq -r '.profiles[]?.profile // empty'" "$_cmd"
+    else
+      printf "_call_program 'profiles' nucleus-%s --list-profiles 2>/dev/null || true" "$_cmd" # check-suppress:suppression_doc: generated zsh action falls back when no profile list command exists
+    fi
+    ;;
+  endpoints)
+    # shellcheck disable=SC2016 # reason: $words is a zsh variable in generated output.
+    printf "_call_program 'endpoints' nucleus-%s endpoint --list-endpoints \"\$words[2]\"" "$_cmd"
+    ;;
+  esac
+}
+
+# record_dynamic_provider <cmd> <subcmd|-> <source> <pos-index> <states-var> <actions-var>
+record_dynamic_provider() {
+  local _cmd="$1" _subcmd="$2" _source="$3" _pos="$4" _states_var="$5" _actions_var="$6"
+  local _state _action
+  _state="$(dynamic_provider_state "$_cmd" "$_subcmd" "$_source" "$_pos")"
+  [ -n "$_state" ] || return 0
+  _action="$(dynamic_provider_action "$_cmd" "$_subcmd" "$_source" "$_pos")"
+  append_unique_state "$_states_var" "$_actions_var" "$_state" "$_action"
+}
+
+# emit_flag_spec <cmd> <subcmd|-> <flag-json> <out-var> <states-var> <actions-var>
+# Appends one _arguments spec line and records dynamic provider states.
 emit_flag_spec() {
-  local _cmd="$1" _flag="$2" _out_var="$3" _state_var="$4" _action_var="$5"
+  local _cmd="$1" _subcmd="$2" _flag="$3" _out_var="$4" _states_var="$5" _actions_var="$6"
   local _long _short _takes _vtype _source _desc _choices _spec _msg _action
   _long="$(jq -r '.long' <<<"$_flag")"
   _short="$(jq -r '.short // empty' <<<"$_flag")"
@@ -134,23 +205,27 @@ emit_flag_spec() {
   if [ "$_takes" = "true" ]; then
     _action=""
     case "$_source" in
-    sections)
-      _action=":$_msg name:->sections"
-      printf -v "$_state_var" '%s' "sections"
-      printf -v "$_action_var" '%s' "_call_program 'sections' nucleus-$_cmd --list-sections"
+    sections | steps | vm-ids | log-names | config-keys | replicas | endpoints)
+      local _st
+      _st="$(dynamic_provider_state "$_cmd" "$_subcmd" "$_source" "")"
+      _action=":${_msg}:->${_st}"
+      record_dynamic_provider "$_cmd" "$_subcmd" "$_source" "" "$_states_var" "$_actions_var"
       ;;
     services)
       _action=":$_msg name:_nucleus_svc_services"
       ;;
-    verdicts)
+    profiles)
       _choices="$(jq -r '(.choices // []) | join(" ")' <<<"$_flag")"
       if [ -n "$_choices" ]; then
         _action=":$_msg:($_choices)"
       else
-        _action=":$_msg:"
+        local _stp
+        _stp="$(dynamic_provider_state "$_cmd" "$_subcmd" "profiles" "")"
+        _action=":${_msg}:->${_stp}"
+        record_dynamic_provider "$_cmd" "$_subcmd" "profiles" "" "$_states_var" "$_actions_var"
       fi
       ;;
-    profiles)
+    verdicts)
       _choices="$(jq -r '(.choices // []) | join(" ")' <<<"$_flag")"
       if [ -n "$_choices" ]; then
         _action=":$_msg:($_choices)"
@@ -175,9 +250,8 @@ emit_flag_spec() {
   fi
 
   if [ -n "$_short" ]; then
-    # Emit grouped short+long exclusion where both exist: {-q,--quiet}'[desc]'
-    # but keep action/simple form manageable; also emit short alias as separate spec
-    # is less ideal. Use zsh grouped form for boolean flags without actions.
+    # Emit grouped short+long exclusion where both exist for boolean flags;
+    # emit separate specs when a value/action is required.
     if [ "$_takes" = "true" ]; then
       append_line "$_out_var" "'${_spec}'"
       append_line "$_out_var" "'${_short}[${_desc}]${_action}'"
@@ -192,13 +266,13 @@ emit_flag_spec() {
 # Determine if app needs subcommand-aware (stateful) completion.
 app_needs_stateful() {
   local _app="$1"
-  local _sc_count _has_sc_flags _has_values
+  local _sc_count _has_sc_flags _has_sc_payload
   _sc_count="$(jq -r '.subcommands | length' <<<"$_app")"
   [ "$_sc_count" -eq 0 ] && return 1
   _has_sc_flags="$(jq -r '[.subcommands[] | (.flags | length) + (.positionals | length)] | add // 0' <<<"$_app")"
-  _has_values="$(jq -r '[.subcommands[] | select(.values != null)] | length' <<<"$_app")"
-  # Any per-subcommand flags, positionals, or values => stateful for correctness.
-  if [ "$_has_sc_flags" -gt 0 ] || [ "$_has_values" -gt 0 ]; then
+  _has_sc_payload="$(jq -r '[.subcommands[] | select((.values != null) or ((.flags // [])[]? | .valueSource != null) or ((.positionals // [])[]? | .valueSource != null))] | length' <<<"$_app")"
+  # Any per-subcommand flags, positionals, or dynamic providers => stateful.
+  if [ "$_has_sc_flags" -gt 0 ] || [ "$_has_sc_payload" -gt 0 ]; then
     return 0
   fi
   # Multiple subcommands with only names/descs: flat model is fine.
@@ -207,7 +281,7 @@ app_needs_stateful() {
 
 # positional action snippet for a positional object
 pos_action() {
-  local _pos="$1" _idx="$2"
+  local _cmd="$1" _subcmd="$2" _pos="$3" _idx="$4"
   local _name _source _choices _variadic _opt
   _name="$(jq -r '.name' <<<"$_pos")"
   _source="$(jq -r '.valueSource // empty' <<<"$_pos")"
@@ -220,9 +294,11 @@ pos_action() {
     [ -n "$_choices" ] && _opt=":${_name}:(${_choices})" || _opt=":${_name}:"
     ;;
   profiles)
-    [ -n "$_choices" ] && _opt=":${_name}:(${_choices})" || _opt=":${_name}:"
+    [ -n "$_choices" ] && _opt=":${_name}:(${_choices})" || _opt=":${_name}:->$(dynamic_provider_state "$_cmd" "$_subcmd" profiles "$_idx")"
     ;;
-  sections) _opt=":${_name}:->sections" ;;
+  sections | steps | vm-ids | log-names | config-keys | replicas | endpoints)
+    _opt=":${_name}:->$(dynamic_provider_state "$_cmd" "$_subcmd" "$_source" "$_idx")"
+    ;;
   *)
     [ -n "$_choices" ] && _opt=":${_name}:(${_choices})" || _opt=":${_name}:"
     ;;
@@ -239,7 +315,7 @@ generate_command_file() {
   local _out_file="$_out_dir/_nucleus-$_cmd"
   local _tmp_file="$_out_dir/.tmp-_nucleus-$_cmd.$$"
   local _app _global_specs="" _sub_names=() _s _desc _sub_line="" _sc
-  local _stateful=0 _dyn_state="" _dyn_action="" _need_svc_glue=0
+  local _stateful=0 _need_svc_glue=0 _dyn_states="" _dyn_actions=""
 
   if [ -n "$SPEC_FILE" ] && [ -f "$SPEC_FILE" ]; then
     _app="$(jq -c --arg n "$_cmd" '.apps[] | select(.name == $n)' "$SPEC_FILE")"
@@ -259,12 +335,8 @@ generate_command_file() {
   # Global flags
   while IFS= read -r _f; do
     [ -n "$_f" ] || continue
-    local _gs="" _ds="" _da=""
-    emit_flag_spec "$_cmd" "$_f" _gs _ds _da
-    if [ -n "$_ds" ]; then
-      _dyn_state="$_ds"
-      _dyn_action="$_da"
-    fi
+    local _gs=""
+    emit_flag_spec "$_cmd" "-" "$_f" _gs _dyn_states _dyn_actions
     if [ -n "$_gs" ]; then append_line _global_specs "$_gs"; fi
   done < <(jq -c '.globalFlags[]?' <<<"$_app")
 
@@ -331,28 +403,23 @@ generate_command_file() {
         printf '      %s)\n' "$_s"
         printf '        _arguments \\\n'
         # subcommand flags
-        local _sc_specs="" _sc_ds="" _sc_da="" _sf
+        local _sc_specs="" _sf
         while IFS= read -r _sf; do
           [ -n "$_sf" ] || continue
-          emit_flag_spec "$_cmd" "$_sf" _sc_specs _sc_ds _sc_da
-          if [ -n "$_sc_ds" ]; then
-            _dyn_state="$_sc_ds"
-            _dyn_action="$_sc_da"
-          fi
+          emit_flag_spec "$_cmd" "$_s" "$_sf" _sc_specs _dyn_states _dyn_actions
         done < <(jq -c '.flags[]?' <<<"$_sc")
         # positionals
         local _pi=1 _p
         while IFS= read -r _p; do
           [ -n "$_p" ] || continue
-          local _pa
-          _pa="$(pos_action "$_p" "$_pi")"
+          local _pa _psrc
+          _pa="$(pos_action "$_cmd" "$_s" "$_p" "$_pi")"
           append_line _sc_specs "'${_pa}'"
-          if jq -e '.variadic == true' <<<"$_p" >/dev/null 2>&1; then :; else _pi=$((_pi + 1)); fi
-          # sections positional state
-          if [ "$(jq -r '.valueSource // empty' <<<"$_p")" = "sections" ]; then
-            _dyn_state="sections"
-            _dyn_action="_call_program 'sections' nucleus-$_cmd --list-sections"
+          _psrc="$(jq -r '.valueSource // empty' <<<"$_p")"
+          if [ -n "$_psrc" ]; then
+            record_dynamic_provider "$_cmd" "$_s" "$_psrc" "$_pi" _dyn_states _dyn_actions
           fi
+          if jq -e '.variadic == true' <<<"$_p" >/dev/null 2>&1; then :; else _pi=$((_pi + 1)); fi
         done < <(jq -c '.positionals[]?' <<<"$_sc")
         if [ -z "$_sc_specs" ]; then
           printf "          '*: :'\n"
@@ -372,10 +439,16 @@ generate_command_file() {
       done < <(jq -c '.subcommands[]?' <<<"$_app")
       printf '    esac\n'
       printf '    ;;\n'
-      if [ -n "$_dyn_state" ] && [ -n "$_dyn_action" ]; then
-        printf '  %s)\n' "$_dyn_state"
-        printf '    %s\n' "$_dyn_action"
-        printf '    ;;\n'
+      if [ -n "$_dyn_states" ]; then
+        local _di=1 _dstate _daction
+        while IFS= read -r _dstate; do
+          [ -n "$_dstate" ] || continue
+          _daction="$(printf '%s\n' "$_dyn_actions" | sed -n "${_di}p")"
+          printf '  %s)\n' "$_dstate"
+          printf '    %s\n' "$_daction"
+          printf '    ;;\n'
+          _di=$((_di + 1))
+        done <<<"$_dyn_states"
       fi
       printf 'esac\n'
     else
@@ -408,18 +481,6 @@ generate_command_file() {
       fi
       if [ -n "$_global_specs" ]; then
         local _n=0 _i=0 _line
-        _n="$(printf '%s\n' "$_global_specs" | wc -l | tr -d ' ')"
-        while IFS= read -r _line; do
-          [ -n "$_line" ] || continue
-          _i=$((_i + 1))
-          case "$_line" in *"--help"*)
-            _n=$((_n - 1))
-            continue
-            ;;
-          esac
-        done <<<"$_global_specs"
-        _i=0
-        local _printed=0
         # recompute printable count
         _n=0
         while IFS= read -r _line; do
@@ -438,13 +499,19 @@ generate_command_file() {
           fi
         done <<<"$_global_specs"
       fi
-      # dynamic state for flat model (e.g. unlikely, but handle sections)
-      if [ -n "$_dyn_state" ] && [ -n "$_dyn_action" ]; then
-        # shellcheck disable=SC2016 # reason: $state is a zsh variable in generated output, not shell expansion.
+      # dynamic state for flat model (unlikely, but handle providers).
+      if [ -n "$_dyn_states" ]; then
+        # shellcheck disable=SC2016 # reason: $state is a zsh variable in generated output.
         printf 'case $state in\n'
-        printf '%s)\n' "$_dyn_state"
-        printf '  %s\n' "$_dyn_action"
-        printf '  ;;\n'
+        local _di=1 _dstate _daction
+        while IFS= read -r _dstate; do
+          [ -n "$_dstate" ] || continue
+          _daction="$(printf '%s\n' "$_dyn_actions" | sed -n "${_di}p")"
+          printf '%s)\n' "$_dstate"
+          printf '  %s\n' "$_daction"
+          printf '  ;;\n'
+          _di=$((_di + 1))
+        done <<<"$_dyn_states"
         printf 'esac\n'
       fi
     fi

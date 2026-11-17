@@ -412,7 +412,8 @@
           "long": "--only-steps",
           "takesValue": true,
           "valueType": "string",
-          "description": "Run only the specified step IDs"
+          "description": "Run only the specified step IDs",
+          "valueSource": "steps"
         },
         {
           "long": "--list-steps",
@@ -1227,7 +1228,8 @@
             },
             {
               "name": "name",
-              "description": "Endpoint name"
+              "description": "Endpoint name",
+              "valueSource": "endpoints"
             }
           ],
           "description": "Show network endpoint(s) for a service."
@@ -1311,7 +1313,8 @@
           "long": "--only-steps",
           "takesValue": true,
           "valueType": "string",
-          "description": "Run only the specified step IDs"
+          "description": "Run only the specified step IDs",
+          "valueSource": "steps"
         },
         {
           "long": "--list-steps",

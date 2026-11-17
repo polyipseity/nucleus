@@ -55,11 +55,11 @@ case $state in
     case $words[1] in
       setup)
         _arguments \
-          '*:vm:'
+          '*:vm:->vm_ids'
         ;;
       sync)
         _arguments \
-          '*:vm:'
+          '*:vm:->vm_ids'
         ;;
       build-system)
         _arguments \
@@ -71,23 +71,23 @@ case $state in
         ;;
       status)
         _arguments \
-          '*:vm:'
+          '*:vm:->vm_ids'
         ;;
       start)
         _arguments \
-          '1:vm:'
+          '1:vm:->vm_ids'
         ;;
       stop)
         _arguments \
-          '1:vm:'
+          '1:vm:->vm_ids'
         ;;
       upgrade)
         _arguments \
-          '1:vm:'
+          '1:vm:->vm_ids'
         ;;
       reset)
         _arguments \
-          '1:vm:'
+          '1:vm:->vm_ids'
         ;;
       android-config)
         _arguments \
@@ -97,11 +97,11 @@ case $state in
           '--root[Enable rooted debugging]' \
           '--fake-wifi[Create wlan0 via virt_wifi on eth0]' \
           '--fake-wifi-revert[Remove persisted fake Wi-Fi and restore eth0]' \
-          '1:vm:'
+          '1:vm:->vm_ids'
         ;;
       inject)
         _arguments \
-          '1:vm:'
+          '1:vm:->vm_ids'
         ;;
       gc)
         _arguments \
@@ -109,7 +109,7 @@ case $state in
         ;;
       resize)
         _arguments \
-          '1:vm:' \
+          '1:vm:->vm_ids' \
           '2:size:'
         ;;
       pack)
@@ -121,5 +121,8 @@ case $state in
           '*: :'
         ;;
     esac
+    ;;
+  vm_ids)
+    _call_program 'vm-ids' nucleus-vm list --json | jq -r '.[].id'
     ;;
 esac

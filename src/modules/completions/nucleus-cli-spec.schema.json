@@ -4,7 +4,10 @@
   "description": "Single source of truth for nucleus CLI subcommands, flags, positionals, and completion value providers. Consumed by completion generators and drift checks.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["$schema", "apps"],
+  "required": [
+    "$schema",
+    "apps"
+  ],
   "properties": {
     "$schema": {
       "type": "string"
@@ -21,7 +24,10 @@
     "flag": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["long", "takesValue"],
+      "required": [
+        "long",
+        "takesValue"
+      ],
       "properties": {
         "long": {
           "type": "string",
@@ -36,7 +42,13 @@
         },
         "valueType": {
           "type": "string",
-          "enum": ["path", "bytes", "enum", "count", "string"]
+          "enum": [
+            "path",
+            "bytes",
+            "enum",
+            "count",
+            "string"
+          ]
         },
         "choices": {
           "type": "array",
@@ -55,7 +67,9 @@
             "log-names",
             "services",
             "config-keys",
-            "verdicts"
+            "verdicts",
+            "endpoints",
+            "steps"
           ]
         },
         "description": {
@@ -70,10 +84,14 @@
                 "const": true
               }
             },
-            "required": ["takesValue"]
+            "required": [
+              "takesValue"
+            ]
           },
           "then": {
-            "required": ["valueType"]
+            "required": [
+              "valueType"
+            ]
           }
         }
       ]
@@ -81,7 +99,9 @@
     "positional": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "properties": {
         "name": {
           "type": "string"
@@ -105,7 +125,9 @@
             "log-names",
             "services",
             "config-keys",
-            "verdicts"
+            "verdicts",
+            "endpoints",
+            "steps"
           ]
         },
         "choices": {
@@ -117,30 +139,14 @@
         }
       }
     },
-    "values": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["source"],
-      "properties": {
-        "source": {
-          "type": "string",
-          "enum": [
-            "profiles",
-            "sections",
-            "replicas",
-            "vm-ids",
-            "log-names",
-            "services",
-            "config-keys",
-            "verdicts"
-          ]
-        }
-      }
-    },
     "subcommand": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "flags", "positionals"],
+      "required": [
+        "name",
+        "flags",
+        "positionals"
+      ],
       "properties": {
         "name": {
           "type": "string",
@@ -160,16 +166,18 @@
           "items": {
             "$ref": "#/definitions/positional"
           }
-        },
-        "values": {
-          "$ref": "#/definitions/values"
         }
       }
     },
     "app": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "summary", "globalFlags", "subcommands"],
+      "required": [
+        "name",
+        "summary",
+        "globalFlags",
+        "subcommands"
+      ],
       "properties": {
         "name": {
           "type": "string",

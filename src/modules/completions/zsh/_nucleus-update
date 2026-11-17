@@ -28,7 +28,7 @@ case $state in
         ;;
       lockfile)
         _arguments \
-          '--sections[Comma-separated section names to update]:sections name:->sections' \
+          '--sections[Comma-separated section names to update]:sections:->sections' \
           '--verify[Check for updates without writing]' \
           '--verify-installed[Verify installed tool versions against the pinned lockfile sections]' \
           '--list-sections[Print valid section names, one per line]'
@@ -36,6 +36,6 @@ case $state in
     esac
     ;;
   sections)
-    _call_program 'sections' nucleus-update --list-sections
+    _call_program 'sections' nucleus-update lockfile --list-sections
     ;;
 esac

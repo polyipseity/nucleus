@@ -30,13 +30,13 @@ case $state in
       reset)
         _arguments \
           '--dry-run[Print planned removals instead of executing them.]' \
-          '--replica-id[Reset only the replica with the given id.]:replica id:' \
+          '--replica-id[Reset only the replica with the given id.]:replica id:->replicas' \
           '--repo-root[Repo checkout used to find src/users/.]:repo root:_files'
         ;;
       sync)
         _arguments \
           '--dry-run[Print planned sync commands instead of executing them.]' \
-          '--replica-id[Sync only the replica with the given id.]:replica id:' \
+          '--replica-id[Sync only the replica with the given id.]:replica id:->replicas' \
           '--repo-root[Repo checkout used to find src/users/.]:repo root:_files'
         ;;
       status)
@@ -48,5 +48,8 @@ case $state in
           '*: :'
         ;;
     esac
+    ;;
+  replicas)
+    _call_program 'replicas' nucleus-cloud --list-replicas
     ;;
 esac

@@ -11,7 +11,7 @@ _arguments -C \
   '--online[Run online checks]' \
   '--verbose[Stream step output; optional step ids]:verbose:' \
   '--no-verbose[Suppress step output streaming]' \
-  '--only-steps[Run only the specified step IDs]:only steps:' \
+  '--only-steps[Run only the specified step IDs]:only steps:->steps' \
   '--list-steps[Print registered step IDs, one per line]' \
   '1:subcommand:->subcmd' \
   '*::arg:->args'
@@ -41,5 +41,8 @@ case $state in
           '*: :'
         ;;
     esac
+    ;;
+  steps)
+    _call_program 'steps' nucleus-check --list-steps
     ;;
 esac

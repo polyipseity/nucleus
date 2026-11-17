@@ -796,6 +796,7 @@ $nucleusCheckFlags = @(
   '--fail-fast',
   '--full',
   '--help',
+  '--list-steps',
   '--no-fail-fast',
   '--no-verbose',
   '--online',
@@ -810,13 +811,15 @@ $nucleusCloudFlags = @(
   '--dry-run',
   '--help',
   '--json',
+  '--list-replicas',
   '--no-apply',
   '--replica-id',
   '--repo-root'
 )
 
 $nucleusConfigFlags = @(
-  '--help'
+  '--help',
+  '--json'
 )
 
 $nucleusGcFlags = @(
@@ -873,6 +876,7 @@ $nucleusLogsFlags = @(
   '--json',
   '--kind',
   '--lines',
+  '--list-logs',
   '--log',
   '--max-files',
   '--max-size',
@@ -886,6 +890,8 @@ $nucleusSvcFlags = @(
   '--enable',
   '--help',
   '--json',
+  '--list-endpoints',
+  '--list-services',
   '--system',
   '--user',
   '--verbose'
@@ -894,6 +900,7 @@ $nucleusSvcFlags = @(
 $nucleusTestFlags = @(
   '--fail-fast',
   '--help',
+  '--list-steps',
   '--no-fail-fast',
   '--no-verbose',
   '--only-steps',
@@ -1064,22 +1071,119 @@ $nucleusUpdateCommands = @('update', 'lockfile')
 $nucleusCheckCommands = @('nix', 'sh', 'yaml', 'packer')
 $nucleusTestCommands = @('nix', 'nixos', 'win')
 
+function Get-NucleusCompletionValues {
+  param(
+    [Parameter(Mandatory)]
+    [string]$CommandName,
+    [string[]]$Arguments = @()
+  )
+  try {
+    $cmd = Get-Command -Name $CommandName -ErrorAction SilentlyContinue | Select-Object -First 1 # check-suppress:suppression_doc: dynamic completion probe; command may be absent
+    if (-not $cmd) { return @() }
+    $out = & $cmd.Source @Arguments 2>$null # check-suppress:suppression_doc: dynamic completion probe; provider stderr not useful
+    if ($null -eq $out) { return @() }
+    @($out | ForEach-Object { [string]$_ } | Where-Object { $_ -ne '' })
+  } catch {
+    @()
+  }
+}
+
+function Get-NucleusServiceCompletions {
+  param([string]$WordToComplete)
+  $vals = @(Get-NucleusCompletionValues -CommandName 'nucleus-svc' -Arguments @('--list-services'))
+  if ($vals.Count -eq 0) {
+    $json = @(Get-NucleusCompletionValues -CommandName 'nucleus-svc' -Arguments @('logs', '--json'))
+    foreach ($line in $json) {
+      try { $vals = @($line | ConvertFrom-Json) } catch { $null = $_ } # check-suppress:suppression_doc: dynamic completion probe; ignore parse failures
+      if ($vals.Count -gt 0) { break }
+    }
+  }
+  $vals | Where-Object { $_ -like "$WordToComplete*" }
+}
+
+function Get-NucleusEndpointCompletions {
+  param([string]$ServiceName, [string]$WordToComplete)
+  if ([string]::IsNullOrWhiteSpace($ServiceName)) { return @() }
+  $vals = @(Get-NucleusCompletionValues -CommandName 'nucleus-svc' -Arguments @('endpoint', '--list-endpoints', $ServiceName))
+  $vals | Where-Object { $_ -like "$WordToComplete*" }
+}
+
+function Get-NucleusLogNameCompletions {
+  param([string]$WordToComplete)
+  @(Get-NucleusCompletionValues -CommandName 'nucleus-logs' -Arguments @('--list-logs')) | Where-Object { $_ -like "$WordToComplete*" }
+}
+
+function Get-NucleusReplicaCompletions {
+  param([string]$WordToComplete)
+  @(Get-NucleusCompletionValues -CommandName 'nucleus-cloud' -Arguments @('--list-replicas')) | Where-Object { $_ -like "$WordToComplete*" }
+}
+
+function Get-NucleusStepCompletions {
+  param([string]$CommandName, [string]$WordToComplete)
+  @(Get-NucleusCompletionValues -CommandName $CommandName -Arguments @('--list-steps')) | Where-Object { $_ -like "$WordToComplete*" }
+}
+
+function Get-NucleusSectionCompletions {
+  param([string]$WordToComplete)
+  @(Get-NucleusCompletionValues -CommandName 'nucleus-update' -Arguments @('lockfile', '--list-sections')) | Where-Object { $_ -like "$WordToComplete*" }
+}
+
+function Get-NucleusVmIdCompletions {
+  param([string]$WordToComplete)
+  $json = @(Get-NucleusCompletionValues -CommandName 'nucleus-vm' -Arguments @('list', '--json'))
+  $ids = @()
+  foreach ($line in $json) {
+    try {
+      $obj = $line | ConvertFrom-Json
+      $ids += @($obj | ForEach-Object { [string]$_.id } | Where-Object { $_ })
+    } catch { $null = $_ } # check-suppress:suppression_doc: dynamic completion probe; ignore parse failures
+  }
+  $ids | Where-Object { $_ -like "$WordToComplete*" }
+}
+
+function Get-NucleusConfigKeyCompletions {
+  param([string]$WordToComplete)
+  $json = @(Get-NucleusCompletionValues -CommandName 'nucleus-config' -Arguments @('list', '--json'))
+  $keys = @()
+  foreach ($line in $json) {
+    try {
+      $obj = $line | ConvertFrom-Json
+      if ($obj -is [System.Collections.IDictionary]) { $keys += @($obj.Keys | ForEach-Object { [string]$_ }) }
+      else { $keys += @($obj.PSObject.Properties.Name) }
+    } catch { $null = $_ } # check-suppress:suppression_doc: dynamic completion probe; ignore parse failures
+  }
+  $keys | Where-Object { $_ -like "$WordToComplete*" }
+}
+
+function Get-NucleusAiProfileCompletions {
+  param([string]$WordToComplete)
+  $json = @(Get-NucleusCompletionValues -CommandName 'nucleus-ai' -Arguments @('list', '--json'))
+  $profiles = @()
+  foreach ($line in $json) {
+    try {
+      $obj = $line | ConvertFrom-Json
+      $profiles += @($obj.profiles | ForEach-Object { [string]$_.profile } | Where-Object { $_ })
+    } catch { $null = $_ } # check-suppress:suppression_doc: dynamic completion probe; ignore parse failures
+  }
+  if ($profiles.Count -eq 0) { $profiles = @('MacBook', 'NixOS', 'Windows') }
+  $profiles | Where-Object { $_ -like "$WordToComplete*" }
+}
+
 Register-ArgumentCompleter -CommandName nucleus-svc -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
   $null = $commandName, $parameterName, $fakeBoundParameters  # check-suppress:suppression_doc: parameter metadata variables, declared for introspection
   $nucleusSvcCommands | Where-Object { $_ -like "$wordToComplete*" }
   if ($commandAst.CommandElements.Count -ge 2) {
-    $prev = $commandAst.CommandElements[1].Value
-    if ($nucleusSvcCommands -contains $prev) {
-      # Complete service names by reading services.json
-      $repoRoot = Resolve-NucleusRepoRoot
-      if ($repoRoot) {
-        $svcJson = Join-Path $repoRoot "src/modules/services.json"
-        if (Test-Path $svcJson) {
-          Get-Content $svcJson | ConvertFrom-Json | Get-Member -MemberType NoteProperty |
-            Select-Object -ExpandProperty Name | Where-Object { $_ -like "$wordToComplete*" }
-        }
+    $sub = [string]$commandAst.CommandElements[1].Extent.Text
+    if ($sub -eq 'endpoint' -and $commandAst.CommandElements.Count -ge 3) {
+      $svcName = [string]$commandAst.CommandElements[2].Extent.Text
+      if ($wordToComplete -eq $svcName) {
+        Get-NucleusServiceCompletions -WordToComplete $wordToComplete
+      } else {
+        Get-NucleusEndpointCompletions -ServiceName $svcName -WordToComplete $wordToComplete
       }
+    } elseif ($nucleusSvcCommands -contains $sub) {
+      Get-NucleusServiceCompletions -WordToComplete $wordToComplete
     }
   }
   $nucleusSvcFlags | Where-Object { $_ -like "$wordToComplete*" }
@@ -1087,8 +1191,14 @@ Register-ArgumentCompleter -CommandName nucleus-svc -ScriptBlock {
 
 Register-ArgumentCompleter -CommandName nucleus-config -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: parameter metadata variables, declared for introspection
+  $null = $commandName, $parameterName, $fakeBoundParameters  # check-suppress:suppression_doc: parameter metadata variables, declared for introspection
   $nucleusConfigCommands | Where-Object { $_ -like "$wordToComplete*" }
+  if ($commandAst.CommandElements.Count -ge 2) {
+    $sub = [string]$commandAst.CommandElements[1].Extent.Text
+    if ($sub -in @('get', 'set')) {
+      Get-NucleusConfigKeyCompletions -WordToComplete $wordToComplete
+    }
+  }
   $nucleusConfigFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
 
@@ -1101,53 +1211,81 @@ Register-ArgumentCompleter -CommandName nucleus-gc -ScriptBlock {
 
 Register-ArgumentCompleter -CommandName nucleus-logs -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: parameter metadata variables, declared for introspection
+  $null = $commandName, $parameterName, $fakeBoundParameters  # check-suppress:suppression_doc: parameter metadata variables, declared for introspection
   $nucleusLogsCommands | Where-Object { $_ -like "$wordToComplete*" }
+  if ($commandAst.CommandElements.Count -ge 2) {
+    $sub = [string]$commandAst.CommandElements[1].Extent.Text
+    $prev = [string]$commandAst.CommandElements[$commandAst.CommandElements.Count - 1].Extent.Text
+    if ($prev -eq '--log' -or $sub -in @('append', 'show', 'tail')) {
+      Get-NucleusLogNameCompletions -WordToComplete $wordToComplete
+    }
+  } elseif ($wordToComplete -and $wordToComplete -notlike '-*') {
+    Get-NucleusLogNameCompletions -WordToComplete $wordToComplete
+  }
   $nucleusLogsFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-cloud -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
+  $null = $commandName, $parameterName, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   $nucleusCloudCommands | Where-Object { $_ -like "$wordToComplete*" }
+  $prev = ''
+  if ($commandAst.CommandElements.Count -ge 1) { $prev = [string]$commandAst.CommandElements[$commandAst.CommandElements.Count - 1].Extent.Text }
+  if ($prev -eq '--replica-id') {
+    Get-NucleusReplicaCompletions -WordToComplete $wordToComplete
+  }
   $nucleusCloudFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-update -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
+  $null = $commandName, $parameterName, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   $nucleusUpdateCommands | Where-Object { $_ -like "$wordToComplete*" }
+  $prev = ''
+  if ($commandAst.CommandElements.Count -ge 1) { $prev = [string]$commandAst.CommandElements[$commandAst.CommandElements.Count - 1].Extent.Text }
+  if ($prev -eq '--sections') {
+    Get-NucleusSectionCompletions -WordToComplete $wordToComplete
+  }
   $nucleusUpdateFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-check -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
+  $null = $commandName, $parameterName, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   $nucleusCheckCommands | Where-Object { $_ -like "$wordToComplete*" }
+  $prev = ''
+  if ($commandAst.CommandElements.Count -ge 1) { $prev = [string]$commandAst.CommandElements[$commandAst.CommandElements.Count - 1].Extent.Text }
+  if ($prev -eq '--only-steps' -or $prev -eq '--verbose') {
+    Get-NucleusStepCompletions -CommandName 'nucleus-check' -WordToComplete $wordToComplete
+  }
   $nucleusCheckFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-ai -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
+  $null = $commandName, $parameterName, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
+  $prev = ''
+  if ($commandAst.CommandElements.Count -ge 1) { $prev = [string]$commandAst.CommandElements[$commandAst.CommandElements.Count - 1].Extent.Text }
   if ($IsWindows) {
-    # Windows nucleus-ai flags mirror scripts/ai.ps1 params.
     @('--ai-profile', '--dry-run', '--gc-only', '--help', '--json', '--ollama-profile', '--profile') |
       Where-Object { $_ -like "$wordToComplete*" }
+    if ($prev -in @('--profile', '--ai-profile', '--ollama-profile')) {
+      Get-NucleusAiProfileCompletions -WordToComplete $wordToComplete
+    }
   } else {
-    # POSIX nucleus-ai exposes subcommands and the generated ai.sh flag set.
     @('--help', 'sync', 'list', 'status', 'endpoint', 'config') |
       Where-Object { $_ -like "$wordToComplete*" }
-    $nucleusAiFlags |
-      Where-Object { $_ -like "$wordToComplete*" }
+    if ($prev -in @('--profile', '--ai-profile', '--ollama-profile')) {
+      Get-NucleusAiProfileCompletions -WordToComplete $wordToComplete
+    }
+    $nucleusAiFlags | Where-Object { $_ -like "$wordToComplete*" }
   }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-bootstrap -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
   $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
-  $nucleusBootstrapFlags |
-    Where-Object { $_ -like "$wordToComplete*" }
+  $nucleusBootstrapFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 $nucleusVmCommands = @('setup', 'sync', 'build-system', 'list', 'status', 'start', 'stop', 'upgrade', 'reset', 'android-config', 'inject', 'resize', 'gc', 'pack', 'unpack')
@@ -1162,9 +1300,12 @@ Register-ArgumentCompleter -CommandName nucleus-vm -ScriptBlock {
   $null = $commandName, $parameterName, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   $nucleusVmCommands | Where-Object { $_ -like "$wordToComplete*" }
   if ($commandAst.CommandElements.Count -ge 2) {
-    $subcommand = $commandAst.CommandElements[1].Value
+    $subcommand = [string]$commandAst.CommandElements[1].Extent.Text
     if ($subcommand -eq 'setup') {
       $nucleusVmSetupFlags | Where-Object { $_ -like "$wordToComplete*" }
+    }
+    if ($subcommand -in @('sync', 'build-system', 'status', 'start', 'stop', 'upgrade', 'reset', 'android-config', 'inject', 'resize')) {
+      Get-NucleusVmIdCompletions -WordToComplete $wordToComplete
     }
   }
   $nucleusVmFlags | Where-Object { $_ -like "$wordToComplete*" }
@@ -1173,8 +1314,7 @@ Register-ArgumentCompleter -CommandName nucleus-vm -ScriptBlock {
 Register-ArgumentCompleter -CommandName nucleus-apply -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
   $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
-  $nucleusApplyFlags |
-    Where-Object { $_ -like "$wordToComplete*" }
+  $nucleusApplyFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-utils -ScriptBlock {
@@ -1186,6 +1326,11 @@ Register-ArgumentCompleter -CommandName nucleus-utils -ScriptBlock {
 
 Register-ArgumentCompleter -CommandName nucleus-test -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
+  $null = $commandName, $parameterName, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
+  $prev = ''
+  if ($commandAst.CommandElements.Count -ge 1) { $prev = [string]$commandAst.CommandElements[$commandAst.CommandElements.Count - 1].Extent.Text }
+  if ($prev -eq '--only-steps' -or $prev -eq '--verbose') {
+    Get-NucleusStepCompletions -CommandName 'nucleus-test' -WordToComplete $wordToComplete
+  }
   $nucleusTestFlags | Where-Object { $_ -like "$wordToComplete*" }
 }

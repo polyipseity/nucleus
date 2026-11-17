@@ -11,7 +11,7 @@ _arguments -C \
   '--json[Emit one JSON document instead of text]' \
   '--kind[show: keep events whose kind matches]:kind:(event label)' \
   '--lines[tail: number of events to print]:lines:' \
-  '--log[label/stats: log name]:log:' \
+  '--log[label/stats: log name]:log:->log_names' \
   '--max-files[Rotated archives to keep]:max files:' \
   '--max-size[Rotation threshold in bytes]:max size:' \
   '--scope[Log root to operate on]:scope:(user system)' \
@@ -40,7 +40,7 @@ case $state in
     case $words[1] in
       append)
         _arguments \
-          '1:log-name:'
+          '1:log-name:->log_names'
         ;;
       expire)
         _arguments \
@@ -61,7 +61,7 @@ case $state in
         ;;
       show)
         _arguments \
-          '1:log-name:'
+          '1:log-name:->log_names'
         ;;
       stats)
         _arguments \
@@ -69,8 +69,11 @@ case $state in
         ;;
       tail)
         _arguments \
-          '1:log-name:'
+          '1:log-name:->log_names'
         ;;
     esac
+    ;;
+  log_names)
+    _call_program 'log-names' nucleus-logs --list-logs
     ;;
 esac
