@@ -1,0 +1,10 @@
+{
+  "hooks": [
+    {
+      "event": "session.start",
+      "modules": [
+        "./register.js"
+      ]
+    }
+  ]
+}

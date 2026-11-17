@@ -1,0 +1,5 @@
+{
+  "name": "nucleus-prompt-tools",
+  "version": "0.1.0",
+  "description": "Prompt tools for Claude Code: /continue, /copy-user-prompt, /repeat-user-prompt."
+}
